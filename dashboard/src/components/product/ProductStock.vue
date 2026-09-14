@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { Button, TextInput } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import { ia } from '../../ia/store'
+import EmptyState from '../EmptyState.vue'
 import ReceiveStockDialog from './ReceiveStockDialog.vue'
 
 const props = defineProps({ product: { type: Object, required: true } })
@@ -72,6 +73,14 @@ const rows = computed(() =>
       </ListRows>
     </List>
     </div>
+
+    <EmptyState
+      v-if="!rows.length"
+      compact
+      icon="lucide-boxes"
+      title="No stock to track yet"
+      description="Stock appears once this product has variants."
+    />
 
     <ReceiveStockDialog v-model:open="receiveOpen" :rows="rows" @received="emit('received')" />
   </section>

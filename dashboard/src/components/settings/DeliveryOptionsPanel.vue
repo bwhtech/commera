@@ -20,9 +20,11 @@ import {
   dialog,
   toast,
 } from 'frappe-ui'
+import EmptyState from '../EmptyState.vue'
 import DeliveryOptionDialog from './DeliveryOptionDialog.vue'
 import DeliveryOptionRow from './DeliveryOptionRow.vue'
 import ImportCarrierServicesDialog from './ImportCarrierServicesDialog.vue'
+import SettingsSkeleton from './SettingsSkeleton.vue'
 import { useDeliveryOptions } from '../../data/deliveryOptions'
 
 const props = defineProps({
@@ -129,29 +131,40 @@ function confirmDelete(option) {
 
   <SettingsBody>
     <!-- A refused read must not read as "this store has no delivery options". -->
-    <div v-if="store.loadError.value" class="py-6 text-base text-ink-gray-5">
-      These could not be loaded.
-      <Button label="Try again" variant="ghost" @click="store.load()" />
-    </div>
-
-    <div
-      v-else-if="store.loading.value && !store.options.value.length"
-      class="py-6 text-base text-ink-gray-5"
+    <EmptyState
+      v-if="store.loadError.value"
+      compact
+      icon="lucide-triangle-alert"
+      title="These could not be loaded"
+      description="Shoppers are still offered whatever is stored — this panel just cannot say what."
     >
-      Loading…
-    </div>
+      <Button label="Try again" variant="subtle" theme="gray" @click="store.load()" />
+    </EmptyState>
+
+    <!-- Three lines, because an option row carries its name, its description and its price. -->
+    <SettingsSkeleton
+      v-else-if="store.loading.value && !store.options.value.length"
+      :rows="3"
+      :lines="3"
+    />
 
     <!-- The app that defines a shipping service is not installed, so there is nothing to
          list and nothing to create — this is a state of the site, not a failure. -->
-    <p v-else-if="!store.available.value" class="py-6 text-p-base text-ink-gray-5">
-      Delivery options arrive with the shipping app. Install it to offer shoppers a choice at
-      checkout; until then every order ships on whatever your carrier quotes.
-    </p>
+    <EmptyState
+      v-else-if="!store.available.value"
+      compact
+      icon="lucide-package"
+      title="Delivery options arrive with the shipping app"
+      description="Install it to offer shoppers a choice at checkout; until then every order ships on whatever your carrier quotes."
+    />
 
-    <p v-else-if="!store.options.value.length" class="py-6 text-p-base text-ink-gray-5">
-      No delivery options yet, so checkout offers nothing to pick. Import the services a
-      connected carrier sells, or add one of your own.
-    </p>
+    <EmptyState
+      v-else-if="!store.options.value.length"
+      compact
+      icon="lucide-truck"
+      title="Checkout offers nothing to pick"
+      description="There are no delivery options yet. Import the services a connected carrier sells, or add one of your own."
+    />
 
     <div v-else class="divide-y divide-outline-gray-1">
       <DeliveryOptionRow

@@ -11,6 +11,14 @@ import { errorMessage } from './errors'
 // It must be the v2 path: useCall unwraps a response as `data.value?.data`, and reads a
 // failure as `errorResponse.errors[0]`. Only /api/v2/ answers in that shape — v1 replies
 // `{"message": ...}`, so every read and write silently resolved to null on every screen.
+// A request the client itself cancelled — a newer keystroke, a changed filter, an
+// unmounted screen — is not a failure the user needs to hear about. Without this,
+// every character typed into the search palette raised its own red
+// "signal is aborted without reason" toast, twenty deep.
+function wasAborted(error) {
+  return error?.name === 'AbortError' || /aborted/i.test(error?.message ?? '')
+}
+
 const METHOD_PREFIX = '/api/v2/method/'
 const ADMIN_MODULE = 'commera.api.admin.'
 
@@ -26,6 +34,7 @@ export function useMethodRead(method, options = {}) {
     url: METHOD_PREFIX + method,
     method: 'GET',
     onError: (error) => {
+      if (wasAborted(error)) return
       if (!quiet) toast.error(errorMessage(error))
       onError?.(error)
     },
@@ -41,6 +50,7 @@ export function useMethodAction(method, options = {}) {
     method: 'POST',
     immediate: false,
     onError: (error) => {
+      if (wasAborted(error)) return
       if (!quiet) toast.error(errorMessage(error))
       onError?.(error)
     },

@@ -9,6 +9,7 @@ import ResponsiveButton from '../components/ResponsiveButton.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import Thumb from '../components/Thumb.vue'
 import EmptyState from '../components/EmptyState.vue'
+import ListSkeleton from '../components/ListSkeleton.vue'
 import BulkBar from '../components/BulkBar.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 import { pickCollectionFor, useCollections } from '../data/collections'
@@ -92,6 +93,12 @@ const rows = computed(() => {
   })
 })
 
+// "Change the filters" is a lie on a store with an empty catalogue, which is the
+// state this list is most often first seen in.
+const isFiltered = computed(
+  () => Boolean(query.value) || status.value !== 'all' || collection.value !== 'all',
+)
+
 function toggleSort(key) {
   sort.value =
     sort.value.key === key
@@ -172,9 +179,7 @@ function moveToCollection() {
       />
     </BulkBar>
 
-    <p v-if="productsRequest.loading" class="mt-3 text-sm text-ink-gray-5">Loading products…</p>
-
-    <div v-else class="mt-3 overflow-x-auto">
+    <div class="mt-3 overflow-x-auto">
       <List
       v-model:selection="selection"
       class="min-w-[54rem]"
@@ -199,7 +204,12 @@ function moveToCollection() {
         </ListHeaderCellSort>
       </ListHeader>
 
-      <ListRows :items="rows" row-key="name" v-slot="{ item }">
+      <!-- `loading` flips on every param change and the request keeps the previous
+           `data`, so guarding on it alone would blank a loaded table on each sort
+           toggle, keystroke and page change. The skeleton means first load only. -->
+      <ListSkeleton v-if="productsRequest.loading && !rows.length" :columns="6" />
+
+      <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
         <ListRow :to="`/products/${item.name}`" :value="item.name">
           <ListCell>
             <div class="flex min-w-0 items-center gap-2.5">
@@ -242,8 +252,11 @@ function moveToCollection() {
     <EmptyState
       v-if="!productsRequest.loading && !rows.length"
       icon="lucide-package"
-      title="No products match"
-      description="Change the filters, or import a catalogue to get started."
+      title="No products yet"
+      description="Add your first product, or import a catalogue to get started."
+      :filtered="isFiltered"
+      filtered-title="No products match"
+      filtered-description="Change the filters, or import a catalogue to get started."
     >
       <Button label="Import CSV" icon-left="lucide-upload" variant="solid" theme="gray" class="mt-2" @click="openImport" />
     </EmptyState>

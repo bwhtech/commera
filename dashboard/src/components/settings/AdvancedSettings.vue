@@ -7,8 +7,9 @@
  * Every control saves its own field the moment it settles, so there is no Save button.
  */
 import { watch } from 'vue'
-import { Alert, Button, LoadingText, SettingsBody, SettingsHeader, dialog, toast } from 'frappe-ui'
+import { Alert, Button, SettingsBody, SettingsHeader, dialog, toast } from 'frappe-ui'
 import SettingsFieldRows from './SettingsFieldRows.vue'
+import SettingsSkeleton from './SettingsSkeleton.vue'
 import { useAdminAction, useAdminRead } from '../../data/api'
 import { useSettingsAutosave } from '../../data/useSettingsAutosave'
 
@@ -74,7 +75,7 @@ function confirmInstallDemoData() {
   />
 
   <SettingsBody>
-    <LoadingText v-if="advanced.loading && !advanced.data" class="py-10" />
+    <SettingsSkeleton v-if="advanced.loading && !advanced.data" class="mt-2" :rows="6" />
 
     <template v-else-if="advanced.data">
       <Alert

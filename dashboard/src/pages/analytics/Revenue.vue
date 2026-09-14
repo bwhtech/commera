@@ -1,12 +1,15 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { Skeleton } from 'frappe-ui'
 import { AreaChart, BarChart } from 'frappe-ui/charts'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import ReportHeader from '../../components/ReportHeader.vue'
 import ReportStats from '../../components/ReportStats.vue'
 import PageBody from '../../components/PageBody.vue'
+import EmptyState from '../../components/EmptyState.vue'
+import ListSkeleton from '../../components/ListSkeleton.vue'
 import { useAdminRead } from '../../data/api'
-import { monthsForRange } from '../../data/analytics'
+import { hasValues, monthsForRange } from '../../data/analytics'
 import { compactMoney, money } from '../../data/format'
 import { ia } from '../../ia/store'
 
@@ -50,6 +53,14 @@ const stats = computed(() => {
 const rows = computed(() =>
   [...months.value].reverse().map((row) => ({ ...row, net: row.revenue - row.refunds - row.discounts })),
 )
+
+// Every panel on this report is empty for the same reason — the chosen window holds no orders —
+// so they say it in one voice.
+const noRevenueState = {
+  icon: 'lucide-chart-line',
+  title: 'No revenue in this period',
+  description: 'Try a wider date range.',
+}
 </script>
 
 <template>
@@ -63,63 +74,79 @@ const rows = computed(() =>
       </p>
     </div>
 
-    <p v-if="reportRequest.loading" class="mt-5 text-sm text-ink-gray-5">Loading revenue…</p>
+    <ReportStats
+      class="mt-5"
+      :stats="stats"
+      :compare="compare"
+      :loading="reportRequest.loading && !reportRequest.data"
+    />
 
-    <template v-else>
-      <ReportStats class="mt-5" :stats="stats" :compare="compare" />
-
-      <section class="mt-6 rounded-5 border border-outline-gray-1 p-4">
-        <h2 class="text-lg-semibold text-ink-gray-8">Revenue over time</h2>
-        <div class="h-72">
-          <AreaChart :data="months" x="label" :y="['revenue']" />
-        </div>
-      </section>
-
-      <div class="mt-6 grid gap-6 lg:grid-cols-2">
-        <section class="rounded-5 border border-outline-gray-1 p-4">
-          <h2 class="text-lg-semibold text-ink-gray-8">Discounts given</h2>
-          <div class="h-56">
-            <BarChart :data="months" x="label" :y="['discounts']" />
-          </div>
-        </section>
-        <section class="rounded-5 border border-outline-gray-1 p-4">
-          <h2 class="text-lg-semibold text-ink-gray-8">Average order value</h2>
-          <div class="h-56">
-            <BarChart :data="months" x="label" :y="['aov']" />
-          </div>
-        </section>
+    <section class="mt-6 rounded-5 border border-outline-gray-1 p-4">
+      <h2 class="text-lg-semibold text-ink-gray-8">Revenue over time</h2>
+      <Skeleton v-if="reportRequest.loading && !months.length" class="h-72 w-full rounded" />
+      <EmptyState v-else-if="!hasValues(months, 'revenue')" compact v-bind="noRevenueState" />
+      <div v-else class="h-72">
+        <AreaChart :data="months" x="label" :y="['revenue']" />
       </div>
+    </section>
 
-      <section class="mt-6 rounded-5 border border-outline-gray-1">
-        <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">By month</h2>
-        <div class="overflow-x-auto px-2 pb-2">
-          <List
-            class="min-w-[46rem]"
-            :columns="['6rem', '8rem', '6rem', '7rem', '7rem', '8rem']"
-            :row-height="Math.max(ia.density, 44)"
-          >
-            <ListHeader>
-              <ListHeaderCell>Month</ListHeaderCell>
-              <ListHeaderCell>Revenue</ListHeaderCell>
-              <ListHeaderCell>Orders</ListHeaderCell>
-              <ListHeaderCell>Discounts</ListHeaderCell>
-              <ListHeaderCell>Refunds</ListHeaderCell>
-              <ListHeaderCell>Net</ListHeaderCell>
-            </ListHeader>
-            <ListRows :items="rows" row-key="month" v-slot="{ item }">
-              <ListRow :value="item.month">
-                <ListCell><span class="text-base text-ink-gray-8">{{ item.label }}</span></ListCell>
-                <ListCell><span class="text-base text-ink-gray-7 tabular-nums">{{ money(item.revenue) }}</span></ListCell>
-                <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ item.orders }}</span></ListCell>
-                <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ money(item.discounts) }}</span></ListCell>
-                <ListCell><span class="text-base text-ink-red-6 tabular-nums">{{ money(item.refunds) }}</span></ListCell>
-                <ListCell><span class="text-base text-ink-gray-8 tabular-nums">{{ money(item.net) }}</span></ListCell>
-              </ListRow>
-            </ListRows>
-          </List>
+    <div class="mt-6 grid gap-6 lg:grid-cols-2">
+      <section class="rounded-5 border border-outline-gray-1 p-4">
+        <h2 class="text-lg-semibold text-ink-gray-8">Discounts given</h2>
+        <Skeleton v-if="reportRequest.loading && !months.length" class="h-56 w-full rounded" />
+        <EmptyState v-else-if="!hasValues(months, 'discounts')" compact v-bind="noRevenueState" />
+        <div v-else class="h-56">
+          <BarChart :data="months" x="label" :y="['discounts']" />
         </div>
       </section>
-    </template>
+      <section class="rounded-5 border border-outline-gray-1 p-4">
+        <h2 class="text-lg-semibold text-ink-gray-8">Average order value</h2>
+        <Skeleton v-if="reportRequest.loading && !months.length" class="h-56 w-full rounded" />
+        <EmptyState v-else-if="!hasValues(months, 'aov')" compact v-bind="noRevenueState" />
+        <div v-else class="h-56">
+          <BarChart :data="months" x="label" :y="['aov']" />
+        </div>
+      </section>
+    </div>
+
+    <section class="mt-6 rounded-5 border border-outline-gray-1">
+      <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">By month</h2>
+      <div class="overflow-x-auto px-2 pb-2">
+        <List
+          class="min-w-[46rem]"
+          :columns="['6rem', '8rem', '6rem', '7rem', '7rem', '8rem']"
+          :row-height="Math.max(ia.density, 44)"
+        >
+          <ListHeader>
+            <ListHeaderCell>Month</ListHeaderCell>
+            <ListHeaderCell>Revenue</ListHeaderCell>
+            <ListHeaderCell>Orders</ListHeaderCell>
+            <ListHeaderCell>Discounts</ListHeaderCell>
+            <ListHeaderCell>Refunds</ListHeaderCell>
+            <ListHeaderCell>Net</ListHeaderCell>
+          </ListHeader>
+          <ListSkeleton v-if="reportRequest.loading && !rows.length" :columns="6" />
+          <ListRows v-else :items="rows" row-key="month" v-slot="{ item }">
+            <ListRow :value="item.month">
+              <ListCell><span class="text-base text-ink-gray-8">{{ item.label }}</span></ListCell>
+              <ListCell><span class="text-base text-ink-gray-7 tabular-nums">{{ money(item.revenue) }}</span></ListCell>
+              <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ item.orders }}</span></ListCell>
+              <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ money(item.discounts) }}</span></ListCell>
+              <ListCell>
+                <!-- Red is a warning, and a month that refunded nothing has nothing to warn about —
+                     twelve rows of ₹0 in red read as twelve problems on a store that never took a
+                     payment. -->
+                <span
+                  class="text-base tabular-nums"
+                  :class="item.refunds ? 'text-ink-red-6' : 'text-ink-gray-6'"
+                >{{ money(item.refunds) }}</span>
+              </ListCell>
+              <ListCell><span class="text-base text-ink-gray-8 tabular-nums">{{ money(item.net) }}</span></ListCell>
+            </ListRow>
+          </ListRows>
+        </List>
+        <EmptyState v-if="!reportRequest.loading && !rows.length" compact v-bind="noRevenueState" />
+      </div>
+    </section>
   </PageBody>
 </template>
-

@@ -7,6 +7,7 @@ import PageBody from '../components/PageBody.vue'
 import Thumb from '../components/Thumb.vue'
 import ResponsiveButton from '../components/ResponsiveButton.vue'
 import EmptyState from '../components/EmptyState.vue'
+import ListSkeleton from '../components/ListSkeleton.vue'
 import BulkBar from '../components/BulkBar.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 import { stockTone } from '../data/format'
@@ -35,6 +36,10 @@ const inventoryRequest = useAdminRead('inventory.get_inventory', {
 })
 
 const rows = computed(() => inventoryRequest.data?.rows ?? [])
+
+// "Clear the filters" is a lie on a store with nothing stocked yet, which is the
+// state this list is most often first seen in.
+const isFiltered = computed(() => lowOnly.value || Boolean(query.value))
 
 function availableStock(item) {
   return item.stock - item.committed
@@ -103,9 +108,7 @@ function adjust() {
       <Button label="Adjust quantity" @click="adjust" />
     </BulkBar>
 
-    <p v-if="inventoryRequest.loading" class="mt-3 text-sm text-ink-gray-5">Loading stock…</p>
-
-    <div v-else class="mt-3 overflow-x-auto">
+    <div class="mt-3 overflow-x-auto">
       <List
       v-model:selection="selection"
       class="min-w-[56rem]"
@@ -120,7 +123,11 @@ function adjust() {
         <ListHeaderCell>Available</ListHeaderCell>
         <ListHeaderCell>On hand</ListHeaderCell>
       </ListHeader>
-      <ListRows :items="rows" row-key="item_code" v-slot="{ item }">
+      <!-- `loading` flips on every param change and the request keeps the previous
+           `data`, so guarding on it alone would blank a loaded table on each keystroke
+           in the search box. The skeleton means first load only. -->
+      <ListSkeleton v-if="inventoryRequest.loading && !rows.length" :columns="5" />
+      <ListRows v-else :items="rows" row-key="item_code" v-slot="{ item }">
         <ListRow :value="item.item_code">
           <ListCell>
             <div class="flex min-w-0 items-center gap-2.5">
@@ -160,7 +167,15 @@ function adjust() {
     </List>
     </div>
 
-    <EmptyState v-if="!inventoryRequest.loading && !rows.length" icon="lucide-boxes" title="Nothing matches" description="Clear the filters to see all stock." />
+    <EmptyState
+      v-if="!inventoryRequest.loading && !rows.length"
+      icon="lucide-boxes"
+      title="No stock yet"
+      description="Add a product, then receive stock against it to see it counted here."
+      :filtered="isFiltered"
+      filtered-title="Nothing matches"
+      filtered-description="Clear the filters to see all stock."
+    />
   </PageBody>
 </template>
 

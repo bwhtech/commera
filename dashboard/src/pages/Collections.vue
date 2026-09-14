@@ -6,6 +6,7 @@ import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
 import ListPagination from '../components/ListPagination.vue'
 import EmptyState from '../components/EmptyState.vue'
+import ListSkeleton from '../components/ListSkeleton.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 import { ia } from '../ia/store'
 
@@ -49,9 +50,7 @@ function addCollection() {
   </AppPageHeader>
 
   <PageBody width="wide">
-    <p v-if="collectionsRequest.loading" class="mt-3 text-sm text-ink-gray-5">Loading collections…</p>
-
-    <div v-else-if="rows.length" class="mt-3 overflow-x-auto">
+    <div v-if="collectionsRequest.loading || rows.length" class="mt-3 overflow-x-auto">
       <!-- Collection and Products only: commera has no smart-collection rule engine, so
            "Type" read "manual" and "Condition" read "—" on every row — two columns of no
            information, and a caption under the header apologising for them. -->
@@ -64,7 +63,11 @@ function addCollection() {
           <ListHeaderCell>Collection</ListHeaderCell>
           <ListHeaderCell>Products</ListHeaderCell>
         </ListHeader>
-        <ListRows :items="rows" row-key="name" v-slot="{ item }">
+        <!-- `loading` flips on every param change and the request keeps the previous
+             `data`, so guarding on it alone would blank a loaded table on each page
+             change. The skeleton means first load only. -->
+        <ListSkeleton v-if="collectionsRequest.loading && !rows.length" :columns="2" />
+        <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
           <ListRow :value="item.name">
             <ListCell><span class="truncate text-base text-ink-gray-8">{{ item.name }}</span></ListCell>
             <ListCell><span class="text-base text-ink-gray-7 tabular-nums">{{ item.count }}</span></ListCell>

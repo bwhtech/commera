@@ -9,8 +9,10 @@
  * Every control saves its own field the moment it settles, so there is no Save button.
  */
 import { computed, watch } from 'vue'
-import { LoadingText, SettingsBody, SettingsHeader } from 'frappe-ui'
+import { SettingsBody, SettingsHeader } from 'frappe-ui'
+import EmptyState from '../EmptyState.vue'
 import SettingsFieldRows from './SettingsFieldRows.vue'
+import SettingsSkeleton from './SettingsSkeleton.vue'
 import { useAdminAction, useAdminRead } from '../../data/api'
 import { useSettingsAutosave } from '../../data/useSettingsAutosave'
 
@@ -134,11 +136,15 @@ async function commitField(fieldname, value, label) {
   <SettingsBody>
     <!-- The refusal itself is already toasted by useAdminRead. This says why the panel is
          empty, so an empty screen never reads as "nothing is connected". -->
-    <p v-if="analytics.error" class="py-6 text-base text-ink-gray-5">
-      These credentials are only visible to a System Manager.
-    </p>
+    <EmptyState
+      v-if="analytics.error"
+      compact
+      icon="lucide-lock"
+      title="Hidden from your role"
+      description="These credentials are only visible to a System Manager."
+    />
 
-    <LoadingText v-else-if="!analytics.data" class="py-10" />
+    <SettingsSkeleton v-else-if="!analytics.data" :rows="6" />
 
     <div v-else class="divide-y divide-outline-gray-1">
       <SettingsFieldRows :groups="groups" :values="values" @update="set" @commit="commitField" />

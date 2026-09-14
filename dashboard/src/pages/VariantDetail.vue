@@ -1,12 +1,14 @@
 <script setup>
 import { computed, reactive, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Button, FormControl, Switch, TextInput, toast } from 'frappe-ui'
+import { Button, FormControl, Skeleton, Switch, TextInput, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
+import EmptyState from '../components/EmptyState.vue'
 import PageBody from '../components/PageBody.vue'
 import Thumb from '../components/Thumb.vue'
 import VariantMedia from '../components/VariantMedia.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
+import { errorMessage } from '../data/errors'
 import { pricePayload, shownPrice } from '../data/product'
 
 const route = useRoute()
@@ -82,6 +84,40 @@ async function togglePublish() {
   if (publishAction.error) return
   productRequest.reload()
 }
+
+// Two identifiers, so three ways to end up with nothing: the product read was
+// refused, the product is gone, or the product loaded fine and carries no option
+// by this variantId. The last one never touches the request's error and used to
+// leave the screen blank forever, so it gets its own message and its own way
+// back — to the product, not to the whole catalogue. §2: the error is read here
+// only to word the page; useAdminRead already toasted it.
+const loadFailure = computed(() => {
+  if (productRequest.error) {
+    return {
+      icon: 'lucide-triangle-alert',
+      title: 'Could not load this variant',
+      description: errorMessage(productRequest.error),
+      backLabel: 'Back to products',
+      backRoute: '/products',
+    }
+  }
+  if (product.value) {
+    return {
+      icon: 'lucide-search-x',
+      title: 'Variant not found',
+      description: `${product.value.title} has no option ${route.params.variantId}. It may have been deleted.`,
+      backLabel: 'Back to product',
+      backRoute: `/products/${product.value.name}`,
+    }
+  }
+  return {
+    icon: 'lucide-search-x',
+    title: 'Product not found',
+    description: `No product matches ${route.params.id}. It may have been deleted or renamed.`,
+    backLabel: 'Back to products',
+    backRoute: '/products',
+  }
+})
 </script>
 
 <template>
@@ -174,7 +210,73 @@ async function togglePublish() {
             />
           </div>
         </section>
+
+        <EmptyState
+          v-if="!variant.sizes.length"
+          compact
+          icon="lucide-ruler"
+          title="No sizes yet"
+          description="Add a size so this variant can be stocked and sold."
+        />
       </div>
+    </PageBody>
+  </template>
+
+  <!-- The route already carries both identifiers, so the header and the shape of
+       the page are drawn from them and only the values wait on the request. -->
+  <template v-else-if="productRequest.loading">
+    <AppPageHeader
+      :title="route.params.variantId"
+      :back-to="`/products/${route.params.id}`"
+      :breadcrumbs="[
+        { label: 'Products', route: '/products' },
+        { label: route.params.id, route: `/products/${route.params.id}` },
+        { label: route.params.variantId },
+      ]"
+    />
+
+    <PageBody width="narrow">
+      <div class="flex items-center gap-3">
+        <Skeleton class="size-16 rounded-4" />
+        <div class="space-y-2">
+          <Skeleton class="h-4 w-40 rounded" />
+          <Skeleton class="h-3.5 w-24 rounded" />
+        </div>
+      </div>
+
+      <div class="mt-8 space-y-11">
+        <section v-for="placeholder in 3" :key="placeholder">
+          <Skeleton class="h-5 w-32 rounded" />
+          <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Skeleton class="h-8 rounded" />
+            <Skeleton class="h-8 rounded" />
+          </div>
+        </section>
+      </div>
+    </PageBody>
+  </template>
+
+  <!-- The request has settled with nothing to show. Without this branch a bad id,
+       an unknown variantId or a refusal paints an empty screen. -->
+  <template v-else>
+    <AppPageHeader
+      :title="route.params.variantId"
+      :back-to="`/products/${route.params.id}`"
+      :breadcrumbs="[
+        { label: 'Products', route: '/products' },
+        { label: route.params.id, route: `/products/${route.params.id}` },
+        { label: route.params.variantId },
+      ]"
+    />
+
+    <PageBody width="narrow">
+      <EmptyState
+        :icon="loadFailure.icon"
+        :title="loadFailure.title"
+        :description="loadFailure.description"
+      >
+        <Button :label="loadFailure.backLabel" variant="subtle" theme="gray" :route="loadFailure.backRoute" />
+      </EmptyState>
     </PageBody>
   </template>
 </template>

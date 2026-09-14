@@ -8,7 +8,9 @@
  * address is never written and there is nothing to lose by closing the dialog.
  */
 import { computed, watch } from 'vue'
-import { Button, LoadingText, SettingsBody, SettingsHeader, SettingsRow, TextInput } from 'frappe-ui'
+import { Button, SettingsBody, SettingsHeader, SettingsRow, TextInput } from 'frappe-ui'
+import EmptyState from '../EmptyState.vue'
+import SettingsSkeleton from './SettingsSkeleton.vue'
 import { useAdminAction, useAdminRead } from '../../data/api'
 import { useSettingsAutosave } from '../../data/useSettingsAutosave'
 
@@ -63,7 +65,7 @@ const companyLink = computed(() =>
   />
 
   <SettingsBody>
-    <LoadingText v-if="store.loading && !store.data" class="py-10" />
+    <SettingsSkeleton v-if="store.loading && !store.data" :rows="4" />
 
     <div v-else class="divide-y divide-outline-gray-1">
       <SettingsRow title="Store name" description="Shown across your storefront and in the browser tab.">
@@ -117,12 +119,15 @@ const companyLink = computed(() =>
 
       <!-- Gated on isFinished, not on data: an in-flight request has no data either, and saying
            there is no company while still asking for one states the opposite of the truth. -->
-      <LoadingText v-if="!company.isFinished" class="mt-4" />
+      <SettingsSkeleton v-if="!company.isFinished" class="mt-2" :rows="5" />
 
-      <p v-else-if="!company.data" class="mt-4 text-base text-ink-gray-5">
-        No company is set for this store yet, so there is nothing to show. Set one on Commera
-        Settings in Desk and orders will book against it.
-      </p>
+      <EmptyState
+        v-else-if="!company.data"
+        compact
+        icon="lucide-building-2"
+        title="No company is set for this store yet"
+        description="There is nothing to show until there is. Set one on Commera Settings in Desk and orders will book against it."
+      />
 
       <div v-else class="mt-2 divide-y divide-outline-gray-1">
         <SettingsRow title="Registered name">

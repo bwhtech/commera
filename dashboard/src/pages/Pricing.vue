@@ -6,6 +6,7 @@ import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
 import Thumb from '../components/Thumb.vue'
 import EmptyState from '../components/EmptyState.vue'
+import ListSkeleton from '../components/ListSkeleton.vue'
 import BulkBar from '../components/BulkBar.vue'
 import EditableValue from '../components/EditableValue.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
@@ -128,9 +129,7 @@ function bulkSetCompareAt() {
       <Button label="Set compare-at" @click="bulkSetCompareAt" />
     </BulkBar>
 
-    <p v-if="pricingRequest.loading" class="mt-3 text-sm text-ink-gray-5">Loading prices…</p>
-
-    <div v-else class="mt-3 overflow-x-auto">
+    <div class="mt-3 overflow-x-auto">
       <List
       v-model:selection="selection"
       class="min-w-[50rem]"
@@ -144,7 +143,11 @@ function bulkSetCompareAt() {
         <ListHeaderCell>Price</ListHeaderCell>
         <ListHeaderCell>Compare at</ListHeaderCell>
       </ListHeader>
-      <ListRows :items="rows" row-key="name" v-slot="{ item }">
+      <!-- `loading` flips on every reload and the request keeps the previous `data`,
+           so guarding on it alone would blank a loaded table after every price edit.
+           The skeleton means first load only. -->
+      <ListSkeleton v-if="pricingRequest.loading && !rows.length" :columns="4" />
+      <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
         <ListRow :value="item.name">
           <ListCell>
             <div class="flex min-w-0 items-center gap-2.5">

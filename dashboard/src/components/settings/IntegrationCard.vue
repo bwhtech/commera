@@ -36,7 +36,10 @@ const isLive = computed(() => props.card.enabled && !needsKeys.value)
              nothing to configure and the row says so rather than offering keys. -->
         <Badge v-if="!card.available" label="Not installed" theme="gray" variant="subtle" />
       </div>
-      <p v-if="card.blurb" class="mt-1 truncate text-sm text-ink-gray-5">{{ card.blurb }}</p>
+      <!-- Wraps rather than truncates: a carrier blurb is a sentence, and clipping it at the
+           column edge cut it mid-word — which reads as a rendering fault rather than as text
+           there is more of. The row grows instead; nothing below it is positioned absolutely. -->
+      <p v-if="card.blurb" class="mt-1 text-sm text-ink-gray-5">{{ card.blurb }}</p>
     </div>
 
     <div class="ml-auto flex shrink-0 items-center gap-3">

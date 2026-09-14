@@ -12,3 +12,11 @@ export const RANGE_MONTHS = {
 export function monthsForRange(range) {
   return RANGE_MONTHS[range] ?? RANGE_MONTHS['Last 12 months']
 }
+
+// A report that has never taken an order still answers with a full row per month, every
+// figure zero — so `months.length` is 12 and an emptiness check built on it never fires,
+// leaving the reader a 0-to-1 axis with a flat line pinned at the bottom. Emptiness on
+// these screens means "no value anywhere in the series", not "no rows".
+export function hasValues(rows, ...fields) {
+  return rows.some((row) => fields.some((field) => Number(row[field]) > 0))
+}

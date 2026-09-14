@@ -5,6 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/src/assets/commera.svg" />
     <title>Commera</title>
+
+    <!-- The app paints `bg-surface-base` only once Vue has mounted, so a cold load left the
+         browser's white canvas on screen for the whole boot — a full-screen white flash in a
+         dark session, ~3s at 500KB/s. Raw CSS and raw colours because this has to hold before
+         the stylesheet and every JS chunk have landed, so no Tailwind token is available yet;
+         the two values are frappe-ui's own --surface-base for light and dark, and want
+         rechecking if that token moves.
+         The stamp below mirrors frappe-ui's useColorScheme exactly — the same `theme` key and
+         the same `data-theme` attribute — so the pre-mount paint and the mounted app agree,
+         and `prefers-color-scheme` only decides a first-ever visit. -->
+    <style>
+      html {
+        background-color: oklch(1 0 0);
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-theme='light']) {
+          background-color: oklch(0.205 0 0);
+          color-scheme: dark;
+        }
+      }
+      html[data-theme='light'] {
+        background-color: oklch(1 0 0);
+        color-scheme: light;
+      }
+      html[data-theme='dark'] {
+        background-color: oklch(0.205 0 0);
+        color-scheme: dark;
+      }
+    </style>
+    <script>
+      try {
+        var storedColorScheme = localStorage.getItem('theme')
+        if (storedColorScheme === 'dark' || storedColorScheme === 'light') {
+          document.documentElement.setAttribute('data-theme', storedColorScheme)
+        }
+      } catch (error) {
+        /* private mode — prefers-color-scheme still covers everything but an explicit choice */
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

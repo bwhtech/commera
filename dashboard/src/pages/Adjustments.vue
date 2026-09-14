@@ -4,6 +4,7 @@ import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'f
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
 import EmptyState from '../components/EmptyState.vue'
+import ListSkeleton from '../components/ListSkeleton.vue'
 import { useAdminRead } from '../data/api'
 import { shortDate } from '../data/format'
 import { ia } from '../ia/store'
@@ -27,9 +28,7 @@ const rows = computed(() => movementsRequest.data?.rows ?? [])
   <PageBody>
     <p class="text-p-sm text-ink-gray-5">Every stock movement, in order. Read-only.</p>
 
-    <p v-if="movementsRequest.loading" class="mt-3 text-sm text-ink-gray-5">Loading…</p>
-
-    <div v-else class="mt-3 overflow-x-auto">
+    <div class="mt-3 overflow-x-auto">
       <List class="min-w-[52rem]" :row-height="ia.density" :columns="['7rem', '1fr', '11rem', '6rem', '9rem', '7rem']">
       <ListHeader>
         <ListHeaderCell>Date</ListHeaderCell>
@@ -39,7 +38,11 @@ const rows = computed(() => movementsRequest.data?.rows ?? [])
         <ListHeaderCell>Reason</ListHeaderCell>
         <ListHeaderCell>By</ListHeaderCell>
       </ListHeader>
-      <ListRows :items="rows" row-key="name" v-slot="{ item }">
+      <!-- `loading` flips on every reload and the request keeps the previous `data`,
+           so guarding on it alone would blank a loaded table on a refetch. The
+           skeleton means first load only. -->
+      <ListSkeleton v-if="movementsRequest.loading && !rows.length" :columns="6" />
+      <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
         <ListRow :value="item.name">
           <ListCell><span class="text-base text-ink-gray-5">{{ shortDate(item.date) }}</span></ListCell>
           <ListCell><span class="truncate text-base text-ink-gray-8">{{ item.product }}</span></ListCell>

@@ -265,7 +265,7 @@
    "label": "Bulk Actions / Import"
   },
   {
-   "default": "0",
+   "default": "1",
    "fieldname": "create_variants_automatically_on_configurator_creation",
    "fieldtype": "Check",
    "label": "Create variants automatically on Configurator Creation"

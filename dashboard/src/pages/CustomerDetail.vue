@@ -1,13 +1,15 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { Avatar, Button } from 'frappe-ui'
+import { Avatar, Button, Skeleton } from 'frappe-ui'
 import { List, ListCell, ListRow, ListRows } from 'frappe-ui/list'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { useAdminRead } from '../data/api'
 import { erpnextLink } from '../data/erpnext'
+import { errorMessage } from '../data/errors'
 import { longDate, money, shortDate } from '../data/format'
 import { ia } from '../ia/store'
 
@@ -20,12 +22,28 @@ const customerRequest = useAdminRead('customers.get_customer', {
 
 const customer = computed(() => customerRequest.data)
 const theirOrders = computed(() => customer.value?.recent_orders ?? [])
+
+// A merged or deleted customer, a typo in the URL and a permission refusal all
+// settle the same way — a finished request holding no customer — so the wording
+// is chosen from whether the request also kept an error. §2: useAdminRead
+// already toasted that error; it is read here to word the page, not to re-toast.
+const loadFailure = computed(() =>
+  customerRequest.error
+    ? {
+        icon: 'lucide-triangle-alert',
+        title: 'Could not load this customer',
+        description: errorMessage(customerRequest.error),
+      }
+    : {
+        icon: 'lucide-search-x',
+        title: 'Customer not found',
+        description: `No customer matches ${route.params.id}. They may have been deleted or merged.`,
+      },
+)
 </script>
 
 <template>
-  <p v-if="customerRequest.loading" class="p-5 text-sm text-ink-gray-5">Loading customer…</p>
-
-  <template v-else-if="customer">
+  <template v-if="customer">
     <AppPageHeader
       :title="customer.name"
       back-to="/customers"
@@ -101,7 +119,77 @@ const theirOrders = computed(() => customer.value?.recent_orders ?? [])
             </ListRows>
           </List>
         </div>
+
+        <EmptyState v-if="!theirOrders.length" icon="lucide-shopping-bag" title="No orders yet" compact />
       </section>
+    </PageBody>
+  </template>
+
+  <!-- The customer id is already in the route, so the header is real from the
+       first frame and only the record below waits on the request — the same
+       decision the order, product and variant screens make. -->
+  <template v-else-if="customerRequest.loading">
+    <AppPageHeader
+      :title="route.params.id"
+      back-to="/customers"
+      :breadcrumbs="[{ label: 'Customers', route: '/customers' }, { label: route.params.id }]"
+    />
+
+    <PageBody width="wide">
+      <div class="flex items-center gap-3">
+        <Skeleton class="size-10 rounded-4" />
+        <div class="space-y-2">
+          <Skeleton class="h-6 w-48 rounded" />
+          <Skeleton class="h-3.5 w-72 rounded" />
+          <Skeleton class="h-3.5 w-56 rounded" />
+        </div>
+      </div>
+
+      <section
+        class="mt-6 grid grid-cols-2 rounded-5 border border-outline-gray-1 sm:grid-cols-3 sm:divide-x sm:divide-outline-gray-2"
+      >
+        <div v-for="placeholder in 3" :key="placeholder" class="px-4 py-3.5">
+          <Skeleton class="h-3.5 w-20 rounded" />
+          <Skeleton class="mt-1 h-7 w-24 rounded" />
+        </div>
+      </section>
+
+      <section class="mt-8">
+        <div class="flex items-baseline justify-between">
+          <Skeleton class="h-5 w-32 rounded" />
+          <Skeleton class="h-3.5 w-28 rounded" />
+        </div>
+        <div class="mt-1 divide-y divide-outline-gray-1">
+          <div v-for="placeholder in 3" :key="placeholder" class="flex items-center gap-4 py-3.5">
+            <Skeleton class="h-4 w-28 rounded" />
+            <div class="min-w-0 flex-1 space-y-2">
+              <Skeleton class="h-4 w-44 rounded" />
+              <Skeleton class="h-3.5 w-24 rounded" />
+            </div>
+            <Skeleton class="h-5 w-20 rounded" />
+          </div>
+        </div>
+      </section>
+    </PageBody>
+  </template>
+
+  <!-- The request has settled with nothing to show. Without this branch a bad id
+       or a refusal falls through every branch above and paints an empty screen. -->
+  <template v-else>
+    <AppPageHeader
+      :title="route.params.id"
+      back-to="/customers"
+      :breadcrumbs="[{ label: 'Customers', route: '/customers' }, { label: route.params.id }]"
+    />
+
+    <PageBody width="wide">
+      <EmptyState
+        :icon="loadFailure.icon"
+        :title="loadFailure.title"
+        :description="loadFailure.description"
+      >
+        <Button label="Back to customers" variant="subtle" theme="gray" route="/customers" />
+      </EmptyState>
     </PageBody>
   </template>
 </template>

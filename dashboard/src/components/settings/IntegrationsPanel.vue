@@ -8,7 +8,8 @@
  * of this component — nothing else.
  */
 import { computed, ref, watch } from 'vue'
-import { Badge, Button, SettingsBody, SettingsHeader, toast } from 'frappe-ui'
+import { Badge, Button, SettingsBody, SettingsHeader, Skeleton, toast } from 'frappe-ui'
+import EmptyState from '../EmptyState.vue'
 import IntegrationCard from './IntegrationCard.vue'
 import IntegrationConfig from './IntegrationConfig.vue'
 
@@ -64,9 +65,35 @@ async function saveCurrent({ enabled, values }) {
         These could not be loaded.
         <Button label="Try again" variant="ghost" @click="store.load()" />
       </div>
-      <div v-else-if="store.loading.value && !store.cards.value.length" class="py-6 text-base text-ink-gray-5">
-        Loading…
+      <!-- Shaped like IntegrationCard's own row — plate, two lines, the two controls —
+           so the list does not shift when the real cards land. First load only: a
+           save keeps `cards` populated and must not blank the list under the switch. -->
+      <div
+        v-else-if="store.loading.value && !store.cards.value.length"
+        class="divide-y divide-outline-gray-1"
+        aria-hidden="true"
+      >
+        <div v-for="row in 3" :key="row" class="flex items-center gap-3 py-3">
+          <Skeleton class="h-9 w-24 shrink-0 rounded-5" />
+          <div class="min-w-0 flex-1">
+            <Skeleton class="h-4 w-32 rounded" />
+            <Skeleton class="mt-2 h-3.5 w-48 rounded" />
+          </div>
+          <div class="ml-auto flex shrink-0 items-center gap-3">
+            <Skeleton class="h-7 w-20 rounded" />
+            <Skeleton class="h-4 w-8 rounded-full" />
+          </div>
+        </div>
       </div>
+      <!-- Nothing installed answers with an empty registry, not a refusal — without this
+           the divider stack renders as a blank panel under the heading. -->
+      <EmptyState
+        v-else-if="!store.cards.value.length"
+        compact
+        icon="lucide-plug"
+        title="No integrations available"
+        description="Install a payments or delivery app to see it here."
+      />
       <div v-else class="divide-y divide-outline-gray-1">
         <IntegrationCard
           v-for="card in store.cards.value"

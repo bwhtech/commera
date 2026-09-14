@@ -4,6 +4,7 @@ import { Badge, Button, Dropdown, dialog, toast } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import Thumb from './Thumb.vue'
 import EditableValue from './EditableValue.vue'
+import EmptyState from './EmptyState.vue'
 import VariantDialog from './VariantDialog.vue'
 import { useAdminAction } from '../data/api'
 import { stockTone } from '../data/format'
@@ -155,8 +156,12 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
       </div>
     </div>
 
-    <!-- The matrix: one row per option, each with its own sizes underneath. -->
-    <div v-if="product.variants.length" id="product-variants" class="rounded-5 border border-outline-gray-1">
+    <!-- The matrix: one row per option, each with its own sizes underneath. The
+         card, its List and its headers stay mounted with no variants — the ⋯
+         menu's "jump to variants" row scrolls to this id and would land nowhere
+         if the card came and went, and an empty column layout is how every other
+         list in the app answers "no rows" (see ProductStock right below). -->
+    <div id="product-variants" class="rounded-5 border border-outline-gray-1">
       <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
         <h2 class="text-lg-semibold text-ink-gray-8">Variants</h2>
         <div class="flex items-center gap-2">
@@ -264,6 +269,14 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
           </ListRows>
         </List>
       </div>
+
+      <EmptyState
+        v-if="!product.variants.length"
+        compact
+        icon="lucide-layers"
+        title="No variants yet"
+        description="Variants are the buyable combinations — a colour in a size."
+      />
     </div>
   </section>
 

@@ -1,13 +1,17 @@
 <script setup>
 import { computed } from 'vue'
-import { Avatar, Button } from 'frappe-ui'
+import { Avatar, Button, Skeleton } from 'frappe-ui'
 import { LineChart } from 'frappe-ui/charts'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
+import ReportStats from '../components/ReportStats.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import Thumb from '../components/Thumb.vue'
+import ListSkeleton from '../components/ListSkeleton.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { useAdminRead } from '../data/api'
+import { hasValues } from '../data/analytics'
 import { compactMoney, money, shortDate } from '../data/format'
 import { ia } from '../ia/store'
 
@@ -23,15 +27,22 @@ const revenueRequest = useAdminRead('analytics.get_revenue_report', { params: ()
 
 const overview = computed(() => overviewRequest.data)
 
-const kpiTiles = computed(() =>
-  (overview.value?.stats ?? []).map((stat) => ({
+// ReportStats renders a fixed grid of whatever it is handed, so before the first answer arrives the
+// strip still needs four entries to skeleton — an empty array would collapse it to nothing.
+const kpiPlaceholders = Array.from({ length: 4 }, (tile, index) => ({ key: `placeholder-${index}` }))
+
+const kpiTiles = computed(() => {
+  const stats = overview.value?.stats ?? []
+  if (!stats.length) return kpiPlaceholders
+  return stats.map((stat) => ({
     key: stat.key,
     label: stat.label,
     value: stat.format === 'currency' ? money(stat.value) : Number(stat.value).toLocaleString('en-IN'),
-    delta: stat.delta,
+    delta: stat.delta == null ? null : `${stat.delta >= 0 ? '+' : ''}${stat.delta}%`,
+    up: stat.delta >= 0,
     note: stat.note,
-  })),
-)
+  }))
+})
 
 // Only what is actually waiting: a block that lists a zero is a block that teaches you to stop
 // reading it. "Payments pending" is gone from this list on purpose — every seeded order here is
@@ -83,40 +94,46 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
   </AppPageHeader>
 
   <PageBody width="narrow">
-    <p v-if="overviewRequest.loading" class="text-sm text-ink-gray-5">Loading overview…</p>
+    <ReportStats
+      :stats="kpiTiles"
+      compare
+      skeleton-labels
+      :loading="overviewRequest.loading && !overview"
+    />
 
-    <template v-else>
-      <div class="grid grid-cols-2 rounded-5 border border-outline-gray-1 sm:grid-cols-4 sm:divide-x sm:divide-outline-gray-2">
-        <div v-for="kpi in kpiTiles" :key="kpi.key" class="px-4 py-3.5">
-          <p class="text-sm text-ink-gray-5">{{ kpi.label }}</p>
-          <p class="mt-1 text-2xl text-ink-gray-9 tabular-nums">{{ kpi.value }}</p>
-          <p
-            v-if="kpi.delta != null"
-            class="mt-1 text-sm"
-            :class="kpi.delta >= 0 ? 'text-ink-green-6' : 'text-ink-red-6'"
-          >
-            {{ kpi.delta >= 0 ? '+' : '' }}{{ kpi.delta }}% vs. last period
-          </p>
-          <p v-else class="mt-1 truncate text-sm text-ink-gray-5">{{ kpi.note }}</p>
+    <!-- Reserving one row rather than three: the section drops any counter sitting at zero, so a
+         settled store shows one to three rows and a spotless one shows none. Reserving the floor
+         means the block grows by a row or two instead of appearing whole and shoving the revenue
+         chart down the page. -->
+    <section v-if="overviewRequest.loading && !overview" class="mt-6" aria-hidden="true">
+      <Skeleton class="h-5 w-36 rounded" />
+      <div class="mt-2 rounded-5 border border-outline-gray-1">
+        <div class="flex items-center gap-3 px-4 py-3">
+          <Skeleton class="size-8 rounded-full" />
+          <div class="min-w-0 flex-1">
+            <Skeleton class="h-4 w-48 rounded" />
+            <Skeleton class="mt-2 h-3.5 w-32 rounded" />
+          </div>
+          <Skeleton class="h-7 w-24 rounded" />
         </div>
       </div>
+    </section>
 
-      <section v-if="attention.length" class="mt-6">
-        <h2 class="text-lg-semibold text-ink-gray-8">Needs attention</h2>
-        <div class="mt-2 divide-y divide-outline-gray-1 rounded-5 border border-outline-gray-1">
-          <div v-for="row in attention" :key="row.title" class="flex items-center gap-3 px-4 py-3">
-            <span class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-gray-2 text-ink-gray-6">
-              <span :class="[row.icon, 'size-4']" aria-hidden="true" />
-            </span>
-            <div class="min-w-0 flex-1">
-              <p class="truncate text-base text-ink-gray-8">{{ row.title }}</p>
-              <p class="mt-1 truncate text-sm text-ink-gray-5">{{ row.note }}</p>
-            </div>
-            <Button :label="row.action" :route="row.to" />
+    <section v-else-if="attention.length" class="mt-6">
+      <h2 class="text-lg-semibold text-ink-gray-8">Needs attention</h2>
+      <div class="mt-2 divide-y divide-outline-gray-1 rounded-5 border border-outline-gray-1">
+        <div v-for="row in attention" :key="row.title" class="flex items-center gap-3 px-4 py-3">
+          <span class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-gray-2 text-ink-gray-6">
+            <span :class="[row.icon, 'size-4']" aria-hidden="true" />
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-base text-ink-gray-8">{{ row.title }}</p>
+            <p class="mt-1 truncate text-sm text-ink-gray-5">{{ row.note }}</p>
           </div>
+          <Button :label="row.action" :route="row.to" />
         </div>
-      </section>
-    </template>
+      </div>
+    </section>
 
     <section class="mt-6 rounded-5 border border-outline-gray-1 p-4">
       <div class="flex items-center justify-between">
@@ -131,7 +148,15 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
           />
         </div>
       </div>
-      <div class="h-72">
+      <Skeleton v-if="revenueRequest.loading && !revenueByMonth.length" class="h-72 w-full rounded" />
+      <EmptyState
+        v-else-if="!hasValues(revenueByMonth, 'revenue')"
+        icon="lucide-chart-line"
+        title="No revenue yet"
+        description="The trend appears once orders start coming in."
+        compact
+      />
+      <div v-else class="h-72">
         <LineChart :data="revenueByMonth" x="label" :y="['revenue']" />
       </div>
     </section>
@@ -163,7 +188,11 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
             <ListHeaderCell>Total</ListHeaderCell>
             <ListHeaderCell>Placed</ListHeaderCell>
           </ListHeader>
-          <ListRows :items="recentOrders" row-key="name" v-slot="{ item }">
+          <!-- Four placeholder rows against a five-row panel: the skeleton is also the space the
+               empty state below reserves, and five rows of blank is a lot of nothing to hold for a
+               store with no orders. Keep the two heights in step if either changes. -->
+          <ListSkeleton v-if="overviewRequest.loading && !recentOrders.length" :columns="6" :rows="4" />
+          <ListRows v-else :items="recentOrders" row-key="name" v-slot="{ item }">
             <ListRow :to="`/orders/${item.name}`" :value="item.name">
               <ListCell>
                 <span class="truncate text-base text-ink-gray-5 tabular-nums">{{ item.name }}</span>
@@ -190,6 +219,15 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
           </ListRows>
         </List>
       </div>
+
+      <div v-if="!overviewRequest.loading && !recentOrders.length" class="grid min-h-48 place-items-center">
+        <EmptyState
+          icon="lucide-shopping-bag"
+          title="No orders yet"
+          description="Your first order will appear here."
+          compact
+        />
+      </div>
     </section>
 
     <section class="mt-6 rounded-5 border border-outline-gray-1">
@@ -198,22 +236,48 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
         <Button variant="ghost" label="All products" icon-right="lucide-arrow-right" route="/products" />
       </div>
       <div class="divide-y divide-outline-gray-1 border-t border-outline-gray-1">
-        <RouterLink
-          v-for="product in topProducts"
-          :key="product.name"
-          :to="`/products/${product.name}`"
-          class="flex items-center gap-3 px-4 py-3 hover:bg-surface-gray-1"
-        >
-          <Thumb :image="product.image" size="size-8" />
-          <div class="min-w-0 flex-1">
-            <p class="truncate text-base text-ink-gray-8">{{ product.title }}</p>
-            <p class="mt-1 text-sm text-ink-gray-5">{{ product.stock }} in stock</p>
+        <template v-if="topProductsRequest.loading && !topProducts.length">
+          <div v-for="row in 4" :key="row" class="flex items-center gap-3 px-4 py-3">
+            <Skeleton class="size-8 rounded" />
+            <div class="min-w-0 flex-1">
+              <Skeleton class="h-4 w-40 rounded" />
+              <Skeleton class="mt-2 h-3.5 w-24 rounded" />
+            </div>
+            <Skeleton class="h-3.5 w-16 rounded" />
+            <Skeleton class="h-4 w-16 rounded" />
           </div>
-          <span class="w-20 text-right text-sm text-ink-gray-5 tabular-nums">{{ product.units }} sold</span>
-          <span class="w-24 text-right text-base text-ink-gray-7 tabular-nums">
-            {{ compactMoney(product.revenue) }}
-          </span>
-        </RouterLink>
+        </template>
+
+        <template v-else-if="topProducts.length">
+          <RouterLink
+            v-for="product in topProducts"
+            :key="product.name"
+            :to="`/products/${product.name}`"
+            class="flex items-center gap-3 px-4 py-3 hover:bg-surface-gray-1"
+          >
+            <Thumb :image="product.image" size="size-8" />
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-base text-ink-gray-8">{{ product.title }}</p>
+              <p class="mt-1 text-sm text-ink-gray-5">{{ product.stock }} in stock</p>
+            </div>
+            <span class="w-20 text-right text-sm text-ink-gray-5 tabular-nums">{{ product.units }} sold</span>
+            <span class="w-24 text-right text-base text-ink-gray-7 tabular-nums">
+              {{ compactMoney(product.revenue) }}
+            </span>
+          </RouterLink>
+        </template>
+
+        <!-- get_top_products is capped at four, so the skeleton above reserves exactly what a
+             selling store fills. This holds most of that height for a store that has sold
+             nothing, so the section below barely moves when the answer lands. -->
+        <div v-else class="grid min-h-52 place-items-center">
+          <EmptyState
+            icon="lucide-package"
+            title="No sales yet"
+            description="Bestsellers rank once orders come in."
+            compact
+          />
+        </div>
       </div>
     </section>
   </PageBody>

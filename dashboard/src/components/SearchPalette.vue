@@ -11,6 +11,7 @@ import {
   CommandPaletteItem,
   CommandPaletteList,
 } from 'frappe-ui/experimental'
+import EmptyState from './EmptyState.vue'
 import { useAdminRead } from '../data/api'
 import { money, priceRange } from '../data/format'
 import { openSettings } from '../ia/settings'
@@ -64,6 +65,36 @@ const productHits = computed(() => (needle.value ? (productsRequest.data?.produc
 const orderHits = computed(() => (needle.value ? (ordersRequest.data?.orders ?? []) : []))
 const customerHits = computed(() => (needle.value ? (customersRequest.data?.customers ?? []) : []))
 const collectionHits = computed(() => (needle.value ? (collectionsRequest.data?.collections ?? []) : []))
+
+// Four requests re-fire on every keystroke, and a hit list that is briefly empty
+// mid-flight is not a miss — without this the palette would flash "nothing matches"
+// between every letter typed.
+const searching = computed(
+  () =>
+    productsRequest.loading ||
+    ordersRequest.loading ||
+    customersRequest.loading ||
+    collectionsRequest.loading,
+)
+
+const noRecordHits = computed(
+  () =>
+    Boolean(needle.value) &&
+    !searching.value &&
+    !productHits.value.length &&
+    !orderHits.value.length &&
+    !customerHits.value.length &&
+    !collectionHits.value.length,
+)
+
+// The miss reads the same wherever it lands — inside the list above a group of matching
+// commands, or in the palette's own empty slot — so both sites bind this one set.
+const noMatchState = computed(() => ({
+  compact: true,
+  icon: 'lucide-search',
+  title: `Nothing matches “${needle.value}”`,
+  description: 'Try a product name, an order number, or a customer.',
+}))
 
 // Everything reachable by keyboard, including the screens the sidebar does not
 // list — stock, prices and product types are reached from the catalogue, but
@@ -209,6 +240,12 @@ function onSelect(value) {
         </CommandPaletteItem>
       </CommandPaletteGroup>
 
+      <!-- Commands that match the query still render below, and a group of them reads as
+           a result list — so the miss has to be said out loud. When nothing matches at all
+           the palette itself reports empty and the state moves to CommandPaletteEmpty
+           below, which is why this one waits for a command group to sit under. -->
+      <EmptyState v-if="noRecordHits && commandGroups.length" v-bind="noMatchState" />
+
       <CommandPaletteGroup v-for="group in commandGroups" :key="group.label" :label="group.label">
         <CommandPaletteItem
           v-for="command in group.commands"
@@ -224,8 +261,7 @@ function onSelect(value) {
     </CommandPaletteList>
 
     <CommandPaletteEmpty>
-      <span class="lucide-search-x mx-auto mb-2 block size-7 text-ink-gray-4" aria-hidden="true" />
-      Nothing matches that.
+      <EmptyState v-bind="noMatchState" />
     </CommandPaletteEmpty>
 
     <CommandPaletteFooter>

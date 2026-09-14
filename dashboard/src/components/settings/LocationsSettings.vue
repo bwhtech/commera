@@ -4,7 +4,9 @@
  * fact rather than a list to manage — the warehouse itself is set up in the books.
  */
 import { watch } from 'vue'
-import { Badge, LoadingText, SettingsBody, SettingsHeader } from 'frappe-ui'
+import { Badge, SettingsBody, SettingsHeader } from 'frappe-ui'
+import EmptyState from '../EmptyState.vue'
+import SettingsSkeleton from './SettingsSkeleton.vue'
 import { useAdminRead } from '../../data/api'
 
 const props = defineProps({
@@ -24,12 +26,17 @@ watch(
   <SettingsHeader title="Locations" description="The warehouse online orders are fulfilled from." />
 
   <SettingsBody>
-    <LoadingText v-if="locations.loading && !locations.data" class="py-10" />
+    <!-- A warehouse row is a name, a sub-line and a badge — the same two-lines-and-a-control
+         shape a settings row has, so it wears the same placeholder. -->
+    <SettingsSkeleton v-if="locations.loading && !locations.data" :rows="2" />
 
-    <p v-else-if="!locations.data?.length" class="py-6 text-base text-ink-gray-5">
-      No ecommerce warehouse is set yet, so orders have nothing to reserve stock against. Set one
-      under Advanced → Ecommerce Warehouse.
-    </p>
+    <EmptyState
+      v-else-if="!locations.data?.length"
+      compact
+      icon="lucide-warehouse"
+      title="No ecommerce warehouse is set yet"
+      description="Orders have nothing to reserve stock against. Set one under Advanced → Ecommerce Warehouse."
+    />
 
     <div v-else class="divide-y divide-outline-gray-1">
       <div

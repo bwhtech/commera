@@ -1,15 +1,17 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Button, LoadingText } from 'frappe-ui'
+import { Button } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import AppPageHeader from '../../components/AppPageHeader.vue'
 import PageBody from '../../components/PageBody.vue'
 import ListPagination from '../../components/ListPagination.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import EmptyState from '../../components/EmptyState.vue'
+import ListSkeleton from '../../components/ListSkeleton.vue'
 import { usePages } from '../../data/pages'
 import { errorMessage } from '../../data/errors'
 import { shortDate } from '../../data/format'
+import { useIsMobile } from '../../utils/useIsMobile'
 import { ia } from '../../ia/store'
 
 const { pages, total, loadError, loading, load } = usePages()
@@ -23,6 +25,14 @@ const pageSize = ref(10)
 const rows = computed(() =>
   pages.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value),
 )
+
+const isMobile = useIsMobile()
+
+// Below `sm` the List overrides itself to two tracks and the real rows hide their
+// Path and Status cells, so a four-cell skeleton row would spill into an implicit
+// second grid row and draw at double height. Recheck this if the max-sm column
+// override or either `max-sm:hidden` cell below changes.
+const skeletonColumns = computed(() => (isMobile.value ? 2 : 4))
 
 function detailRoute(name) {
   return `/storefront/pages/${encodeURIComponent(name)}`
@@ -47,17 +57,15 @@ function detailRoute(name) {
       Standalone pages — About us, shipping, returns — that your footer and menus can link to.
     </p>
 
-    <LoadingText v-if="loading && !pages.length" class="mt-4" />
-
     <EmptyState
-      v-else-if="loadError"
+      v-if="loadError"
       icon="lucide-triangle-alert"
       title="Could not load your pages"
       :description="errorMessage(loadError)"
     />
 
     <EmptyState
-      v-else-if="!pages.length"
+      v-else-if="!loading && !pages.length"
       icon="lucide-file-text"
       title="No pages yet"
       description="Add one to tell shoppers about your store, your shipping or your returns."
@@ -78,7 +86,8 @@ function detailRoute(name) {
             <ListHeaderCell>Status</ListHeaderCell>
             <ListHeaderCell>Updated</ListHeaderCell>
           </ListHeader>
-          <ListRows :items="rows" row-key="name" v-slot="{ item }">
+          <ListSkeleton v-if="loading && !pages.length" :columns="skeletonColumns" />
+          <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
             <ListRow :to="detailRoute(item.name)" :value="item.name">
               <ListCell>
                 <span class="truncate text-base text-ink-gray-8">{{ item.name }}</span>
@@ -97,7 +106,7 @@ function detailRoute(name) {
         </List>
       </div>
 
-      <ListPagination v-model:page="page" v-model:page-size="pageSize" :total="total" />
+      <ListPagination v-if="total" v-model:page="page" v-model:page-size="pageSize" :total="total" />
     </template>
   </PageBody>
 </template>

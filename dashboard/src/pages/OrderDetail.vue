@@ -1,8 +1,9 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Button, Dropdown, ScrollArea, toast } from 'frappe-ui'
+import { Button, Dropdown, ScrollArea, Skeleton, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
+import EmptyState from '../components/EmptyState.vue'
 import PageBody from '../components/PageBody.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import OrderProgress from '../components/OrderProgress.vue'
@@ -11,6 +12,7 @@ import Thumb from '../components/Thumb.vue'
 import RefundDialog from '../components/RefundDialog.vue'
 import { useAdminRead, useAdminAction, useMethodRead } from '../data/api'
 import { erpnextLink, printUrl } from '../data/erpnext'
+import { errorMessage } from '../data/errors'
 import { longDate, money } from '../data/format'
 
 const route = useRoute()
@@ -85,6 +87,24 @@ function reloadAfterRefund() {
   orderRequest.reload()
   refundStatusRequest.reload()
 }
+
+// A cancelled-and-deleted order, a typo in the URL and a permission refusal all
+// settle the same way — a finished request holding no order — so the wording is
+// chosen from whether the request also kept an error. §2: useAdminRead already
+// toasted that error; it is read here to word the page, not to toast it again.
+const loadFailure = computed(() =>
+  orderRequest.error
+    ? {
+        icon: 'lucide-triangle-alert',
+        title: 'Could not load this order',
+        description: errorMessage(orderRequest.error),
+      }
+    : {
+        icon: 'lucide-search-x',
+        title: 'Order not found',
+        description: `No order matches ${route.params.id}. It may have been deleted.`,
+      },
+)
 </script>
 
 <template>
@@ -162,6 +182,8 @@ function reloadAfterRefund() {
               </div>
             </div>
 
+            <EmptyState v-if="!order.items.length" compact icon="lucide-package" title="No items on this order" />
+
             <div class="space-y-1.5 border-t border-outline-gray-1 px-4 py-3">
               <div class="flex justify-between text-base text-ink-gray-6">
                 <span>Subtotal</span><span class="tabular-nums">{{ money(order.net_total) }}</span>
@@ -210,6 +232,84 @@ function reloadAfterRefund() {
       :status="refundStatus"
       @refunded="reloadAfterRefund"
     />
+  </template>
+
+  <!-- The order id is already in the route, so the header is real from the first
+       frame and only the order's contents are placeholders. -->
+  <template v-else-if="orderRequest.loading">
+    <AppPageHeader
+      :title="route.params.id"
+      back-to="/orders"
+      :breadcrumbs="[{ label: 'Orders', route: '/orders' }, { label: route.params.id }]"
+    />
+
+    <div class="flex min-h-0 flex-1 overflow-hidden">
+      <ScrollArea class="min-w-0 flex-1">
+        <PageBody width="narrow">
+          <div class="flex flex-wrap items-center gap-2">
+            <Skeleton class="h-5 w-20 rounded" />
+            <Skeleton class="h-4 w-32 rounded" />
+          </div>
+
+          <Skeleton class="mt-6 h-12 w-full rounded-4" />
+
+          <div class="mt-5 space-y-6">
+            <section class="rounded-5 border border-outline-gray-1">
+              <div class="flex items-center justify-between px-4 py-3">
+                <Skeleton class="h-5 w-16 rounded" />
+                <Skeleton class="h-5 w-24 rounded" />
+              </div>
+
+              <div class="divide-y divide-outline-gray-1 border-t border-outline-gray-1">
+                <div v-for="placeholder in 3" :key="placeholder" class="flex items-center gap-3 px-4 py-3">
+                  <Skeleton class="size-10 rounded-4" />
+                  <div class="min-w-0 flex-1 space-y-2">
+                    <Skeleton class="h-4 w-48 rounded" />
+                    <Skeleton class="h-3.5 w-32 rounded" />
+                  </div>
+                  <Skeleton class="h-4 w-28 rounded" />
+                  <Skeleton class="h-4 w-24 rounded" />
+                </div>
+              </div>
+
+              <div class="space-y-1.5 border-t border-outline-gray-1 px-4 py-3">
+                <div v-for="placeholder in 4" :key="placeholder" class="flex justify-between">
+                  <Skeleton class="h-4 w-24 rounded" />
+                  <Skeleton class="h-4 w-16 rounded" />
+                </div>
+              </div>
+            </section>
+          </div>
+        </PageBody>
+      </ScrollArea>
+
+      <aside class="hidden w-[19rem] shrink-0 flex-col gap-4 border-l border-outline-gray-1 p-4 lg:flex">
+        <Skeleton class="h-4 w-24 rounded" />
+        <Skeleton class="h-4 w-40 rounded" />
+        <Skeleton class="h-24 w-full rounded-4" />
+        <Skeleton class="h-24 w-full rounded-4" />
+      </aside>
+    </div>
+  </template>
+
+  <!-- The request has settled with nothing to show. Without this branch a bad id
+       or a refusal falls through every branch above and paints an empty screen. -->
+  <template v-else>
+    <AppPageHeader
+      :title="route.params.id"
+      back-to="/orders"
+      :breadcrumbs="[{ label: 'Orders', route: '/orders' }, { label: route.params.id }]"
+    />
+
+    <PageBody width="narrow">
+      <EmptyState
+        :icon="loadFailure.icon"
+        :title="loadFailure.title"
+        :description="loadFailure.description"
+      >
+        <Button label="Back to orders" variant="subtle" theme="gray" route="/orders" />
+      </EmptyState>
+    </PageBody>
   </template>
 </template>
 

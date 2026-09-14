@@ -17,10 +17,11 @@ import {
   Dialog,
   ErrorMessage,
   FormControl,
-  LoadingText,
   ScrollArea,
+  Skeleton,
   toast,
 } from 'frappe-ui'
+import EmptyState from '../EmptyState.vue'
 
 const props = defineProps({
   // { provider, label } of the carrier being imported from; null while closed.
@@ -39,6 +40,9 @@ const loading = ref(false)
 // on screen unless the failure is kept.
 const failed = ref(false)
 const importing = ref(false)
+
+// A stack of identical bars reads as a progress bar rather than as a list of names.
+const skeletonWidths = ['w-52', 'w-40', 'w-60', 'w-44']
 
 const serviceCount = computed(() =>
   accounts.value.reduce((total, account) => total + account.services.length, 0),
@@ -101,16 +105,27 @@ async function importSelected() {
 <template>
   <Dialog v-model:open="open" :title="`Import from ${provider?.label ?? 'carrier'}`">
     <template #default>
-      <LoadingText v-if="loading" class="py-6" />
+      <!-- Shaped like the checkbox rows below — a box and its label — so the dialog does
+           not resize under the pointer when the carrier answers. -->
+      <div v-if="loading" class="divide-y divide-outline-gray-1" aria-hidden="true">
+        <div v-for="row in 4" :key="row" class="flex items-center gap-3 py-2.5">
+          <Skeleton class="size-4 shrink-0 rounded" />
+          <Skeleton class="h-4 rounded" :class="skeletonWidths[row % skeletonWidths.length]" />
+        </div>
+      </div>
 
       <ErrorMessage
         v-else-if="failed"
         message="These services could not be read from the carrier."
       />
 
-      <p v-else-if="!serviceCount" class="py-2 text-p-base text-ink-gray-5">
-        This carrier is not offering any services on the account it is connected with.
-      </p>
+      <EmptyState
+        v-else-if="!serviceCount"
+        compact
+        icon="lucide-truck"
+        title="No services to import"
+        description="This carrier is not offering any services on the account it is connected with."
+      />
 
       <template v-else>
         <p class="text-p-base text-ink-gray-7">

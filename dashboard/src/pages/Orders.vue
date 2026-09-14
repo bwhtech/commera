@@ -7,10 +7,12 @@ import PageBody from '../components/PageBody.vue'
 import ListPagination from '../components/ListPagination.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import EmptyState from '../components/EmptyState.vue'
+import ListSkeleton from '../components/ListSkeleton.vue'
 import BulkBar from '../components/BulkBar.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 import { printUrl } from '../data/erpnext'
 import { money, shortDate } from '../data/format'
+import { useIsMobile } from '../utils/useIsMobile'
 import { ia } from '../ia/store'
 
 const TABS = [
@@ -68,6 +70,10 @@ const rows = computed(() => {
   })
 })
 
+// "Try a different filter" is a lie on a store that has never taken an order, which
+// is the state this list is most often first seen in.
+const isFiltered = computed(() => Boolean(query.value) || tab.value !== 'all')
+
 function toggleSort(key) {
   sort.value =
     sort.value.key === key
@@ -76,6 +82,13 @@ function toggleSort(key) {
 }
 
 const directionFor = (key) => (sort.value.key === key ? sort.value.direction : null)
+
+const isMobile = useIsMobile()
+
+// Below `sm` the List overrides itself to two tracks and the four middle cells hide, so a
+// six-cell skeleton row would spill into an implicit second grid row and draw at double
+// height. Recheck this if the max-sm column override or any `max-sm:hidden` cell changes.
+const skeletonColumns = computed(() => (isMobile.value ? 2 : 6))
 
 const fulfilAction = useAdminAction('orders.fulfil_order')
 
@@ -149,12 +162,15 @@ function printDeliveryNotes() {
       <Button label="Print delivery notes" @click="printDeliveryNotes" />
     </BulkBar>
 
-    <p v-if="ordersRequest.loading" class="mt-3 text-sm text-ink-gray-5">Loading orders…</p>
-
-    <div v-else class="mt-3 overflow-x-auto">
+    <div class="mt-3 overflow-x-auto">
+      <!-- 54rem is the width the six columns need; a phone gets two of them instead, because
+           a scroll the reader cannot see reads as a rendering fault rather than as more table.
+           An order is its name and what it came to: the total. Do not lower the `min-w` —
+           below the columns' own sum the 1fr track collapses to zero and the first cell
+           disappears. -->
       <List
       v-model:selection="selection"
-      class="min-w-[54rem]"
+      class="max-sm:[--list-columns:minmax(0,1fr)_auto] sm:min-w-[54rem]"
       :selectable="selecting"
       :row-height="ia.density"
       :columns="['1fr', '7rem', '9rem', '9rem', '6rem', '7rem']"
@@ -163,18 +179,27 @@ function printDeliveryNotes() {
         <ListHeaderCellSort :direction="directionFor('customer')" @click="toggleSort('customer')">
           Order
         </ListHeaderCellSort>
-        <ListHeaderCellSort :direction="directionFor('date')" @click="toggleSort('date')">
+        <ListHeaderCellSort
+          class="max-sm:hidden"
+          :direction="directionFor('date')"
+          @click="toggleSort('date')"
+        >
           Date
         </ListHeaderCellSort>
-        <ListHeaderCell>Payment</ListHeaderCell>
-        <ListHeaderCell>Fulfilment</ListHeaderCell>
-        <ListHeaderCell>Items</ListHeaderCell>
+        <ListHeaderCell class="max-sm:hidden">Payment</ListHeaderCell>
+        <ListHeaderCell class="max-sm:hidden">Fulfilment</ListHeaderCell>
+        <ListHeaderCell class="max-sm:hidden">Items</ListHeaderCell>
         <ListHeaderCellSort align="end" :direction="directionFor('total')" @click="toggleSort('total')">
           Total
         </ListHeaderCellSort>
       </ListHeader>
 
-      <ListRows :items="rows" row-key="name" v-slot="{ item }">
+      <!-- `loading` flips on every param change and the request keeps the previous
+           `data`, so guarding on it alone would blank a loaded table on each sort
+           toggle, keystroke and page change. The skeleton means first load only. -->
+      <ListSkeleton v-if="ordersRequest.loading && !rows.length" :columns="skeletonColumns" />
+
+      <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
         <ListRow :to="`/orders/${item.name}`" :value="item.name">
           <ListCell>
             <div class="min-w-0">
@@ -182,16 +207,16 @@ function printDeliveryNotes() {
               <p class="truncate text-sm text-ink-gray-4 tabular-nums">{{ item.name }}</p>
             </div>
           </ListCell>
-          <ListCell>
+          <ListCell class="max-sm:hidden">
             <span class="text-base text-ink-gray-5">{{ shortDate(item.placed_on) }}</span>
           </ListCell>
-          <ListCell>
+          <ListCell class="max-sm:hidden">
             <StatusBadge :status="item.payment_state.key" :label="item.payment_state.label" />
           </ListCell>
-          <ListCell>
+          <ListCell class="max-sm:hidden">
             <StatusBadge :status="item.state.key" :label="item.state.label" />
           </ListCell>
-          <ListCell>
+          <ListCell class="max-sm:hidden">
             <span class="text-base text-ink-gray-7 tabular-nums">{{ item.item_count }}</span>
           </ListCell>
           <ListCell>
@@ -214,8 +239,11 @@ function printDeliveryNotes() {
     <EmptyState
       v-if="!ordersRequest.loading && !rows.length"
       icon="lucide-shopping-bag"
-      title="No orders here"
-      description="Try a different filter or search term."
+      title="No orders yet"
+      description="Your first order will appear here the moment a shopper checks out."
+      :filtered="isFiltered"
+      filtered-title="No orders here"
+      filtered-description="Try a different filter or search term."
     />
   </PageBody>
 </template>

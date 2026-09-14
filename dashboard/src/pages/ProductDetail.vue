@@ -1,8 +1,9 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, Dropdown, ScrollArea, toast } from 'frappe-ui'
+import { Button, Dropdown, ScrollArea, Skeleton, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
+import EmptyState from '../components/EmptyState.vue'
 import PageBody from '../components/PageBody.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import VariantEditor from '../components/VariantEditor.vue'
@@ -13,6 +14,7 @@ import ProductOrganization from '../components/product/ProductOrganization.vue'
 import ProductStorefront from '../components/product/ProductStorefront.vue'
 import ProductSummaryPanel from '../components/product/ProductSummaryPanel.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
+import { errorMessage } from '../data/errors'
 import { longDate } from '../data/format'
 import { useProductStats } from '../data/product'
 import { asDropdownOptions, buildProductActions } from '../ia/productActions'
@@ -121,6 +123,24 @@ watch(
   () => route.params.id,
   () => productRequest.reload(),
 )
+
+// A deleted item, a typo in the URL and a permission refusal all settle the same
+// way — a finished request holding no product — so the wording is chosen from
+// whether the request also kept an error. §2: useAdminRead already toasted that
+// error; it is read here to word the page, never to toast it a second time.
+const loadFailure = computed(() =>
+  productRequest.error
+    ? {
+        icon: 'lucide-triangle-alert',
+        title: 'Could not load this product',
+        description: errorMessage(productRequest.error),
+      }
+    : {
+        icon: 'lucide-search-x',
+        title: 'Product not found',
+        description: `No product matches ${route.params.id}. It may have been deleted or renamed.`,
+      },
+)
 </script>
 
 <template>
@@ -167,6 +187,66 @@ watch(
         </ScrollArea>
       </aside>
     </div>
+  </template>
+
+  <!-- The item code is already in the route, so the header is real from the first
+       frame and only the form below waits on the request. The sections are not
+       stubbed individually — VariantEditor and ProductStock draw their own
+       placeholders once they have a product. -->
+  <template v-else-if="productRequest.loading">
+    <AppPageHeader
+      :title="route.params.id"
+      back-to="/products"
+      :breadcrumbs="[{ label: 'Products', route: '/products' }, { label: route.params.id }]"
+    />
+
+    <div class="flex min-h-0 flex-1 overflow-hidden">
+      <ScrollArea class="min-w-0 flex-1">
+        <PageBody width="narrow">
+          <div class="flex flex-wrap items-center gap-2">
+            <Skeleton class="h-5 w-16 rounded" />
+            <Skeleton class="h-4 w-56 rounded" />
+          </div>
+
+          <div class="mt-6 space-y-11">
+            <section v-for="placeholder in 4" :key="placeholder">
+              <Skeleton class="h-5 w-32 rounded" />
+              <Skeleton class="mt-1 h-3.5 w-64 rounded" />
+              <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Skeleton class="h-8 rounded" />
+                <Skeleton class="h-8 rounded" />
+              </div>
+            </section>
+          </div>
+        </PageBody>
+      </ScrollArea>
+
+      <aside class="hidden w-[19rem] shrink-0 flex-col gap-4 border-l border-outline-gray-1 p-4 lg:flex">
+        <Skeleton class="h-4 w-24 rounded" />
+        <Skeleton class="h-32 w-full rounded-4" />
+        <Skeleton class="h-24 w-full rounded-4" />
+      </aside>
+    </div>
+  </template>
+
+  <!-- The request has settled with nothing to show. Without this branch a bad id
+       or a refusal falls through every branch above and paints an empty screen. -->
+  <template v-else>
+    <AppPageHeader
+      :title="route.params.id"
+      back-to="/products"
+      :breadcrumbs="[{ label: 'Products', route: '/products' }, { label: route.params.id }]"
+    />
+
+    <PageBody width="narrow">
+      <EmptyState
+        :icon="loadFailure.icon"
+        :title="loadFailure.title"
+        :description="loadFailure.description"
+      >
+        <Button label="Back to products" variant="subtle" theme="gray" route="/products" />
+      </EmptyState>
+    </PageBody>
   </template>
 </template>
 

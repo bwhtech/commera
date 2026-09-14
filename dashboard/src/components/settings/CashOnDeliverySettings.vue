@@ -12,7 +12,6 @@
 import { computed, ref, watch } from 'vue'
 import {
   Button,
-  LoadingText,
   SettingsBody,
   SettingsHeader,
   SettingsRow,
@@ -20,7 +19,9 @@ import {
   TextInput,
   toast,
 } from 'frappe-ui'
+import EmptyState from '../EmptyState.vue'
 import SettingsLinkControl from './SettingsLinkControl.vue'
+import SettingsSkeleton from './SettingsSkeleton.vue'
 import { useAdminAction, useAdminRead } from '../../data/api'
 
 const props = defineProps({
@@ -94,12 +95,17 @@ function commitNumber(fieldname, event, label) {
 
   <SettingsBody>
     <!-- A refused read must not read as "cash on delivery is off". -->
-    <div v-if="settings.error" class="py-6 text-base text-ink-gray-5">
-      This could not be loaded.
-      <Button label="Try again" variant="ghost" @click="settings.reload()" />
-    </div>
+    <EmptyState
+      v-if="settings.error"
+      compact
+      icon="lucide-triangle-alert"
+      title="This could not be loaded"
+      description="Cash on delivery may still be on — this panel just cannot say."
+    >
+      <Button label="Try again" variant="subtle" theme="gray" @click="settings.reload()" />
+    </EmptyState>
 
-    <LoadingText v-else-if="settings.loading && !settings.data" class="py-10" />
+    <SettingsSkeleton v-else-if="settings.loading && !settings.data" :rows="4" />
 
     <div v-else class="divide-y divide-outline-gray-1">
       <SettingsRow

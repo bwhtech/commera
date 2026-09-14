@@ -1,8 +1,9 @@
 <script setup>
 import { computed } from 'vue'
-import { Button, ScrollArea, dialog, toast } from 'frappe-ui'
+import { Button, ScrollArea, Skeleton, dialog, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 
 const attributesRequest = useAdminRead('catalog.get_attributes')
@@ -61,16 +62,29 @@ function editAttribute(attribute) {
   </AppPageHeader>
 
   <PageBody width="narrow">
-    <p class="text-p-base text-ink-gray-7">
-      Size and Color ship out of the box, but they are ordinary records — a bookshop can delete
-      them and add Format and Binding instead.
-    </p>
+    <div
+      v-if="attributesRequest.loading"
+      class="divide-y divide-outline-gray-1 border-y border-outline-gray-1"
+    >
+      <div v-for="row in 4" :key="row" class="flex items-start gap-4 py-4">
+        <div class="min-w-0 flex-1">
+          <Skeleton class="h-4 w-32 rounded" />
+          <Skeleton class="mt-2 h-3.5 w-40 rounded" />
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <Skeleton class="h-5 w-12 rounded" />
+            <Skeleton class="h-5 w-16 rounded" />
+            <Skeleton class="h-5 w-10 rounded" />
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <p v-if="attributesRequest.loading" class="mt-6 text-sm text-ink-gray-5">Loading attributes…</p>
-
-    <!-- The list scrolls on its own, so the page header and the intent above
-         stay put while you work down a long set of attributes. -->
-    <ScrollArea v-else class="mt-6 max-h-[calc(100vh-15rem)] border-y border-outline-gray-1">
+    <!-- The list scrolls on its own, so the page header stays put while you
+         work down a long set of attributes. -->
+    <ScrollArea
+      v-else-if="attributes.length"
+      class="max-h-[calc(100vh-15rem)] border-y border-outline-gray-1"
+    >
       <div class="divide-y divide-outline-gray-1">
         <div v-for="attribute in attributes" :key="attribute.name" class="flex items-start gap-4 py-4">
           <div class="min-w-0 flex-1">
@@ -90,5 +104,14 @@ function editAttribute(attribute) {
         </div>
       </div>
     </ScrollArea>
+
+    <EmptyState
+      v-else
+      icon="lucide-tags"
+      title="No attributes yet"
+      description="Attributes are the choices a shopper picks — size, colour, format."
+    >
+      <Button label="New attribute" icon-left="lucide-plus" variant="solid" theme="gray" @click="addAttribute" />
+    </EmptyState>
   </PageBody>
 </template>
