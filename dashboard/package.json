@@ -17,11 +17,11 @@
     "vue-router": "^4.4.5"
   },
   "devDependencies": {
-    "@iconify/json": "^2.2.300",
+    "@iconify/json": "^2.2.527",
     "@vitejs/plugin-vue": "^5.2.1",
-    "autoprefixer": "^10.4.20",
+    "autoprefixer": "^10.5.6",
     "lucide-static": "^0.469.0",
-    "postcss": "^8.4.49",
+    "postcss": "^8.5.28",
     "puppeteer": "^24.43.1",
     "tailwindcss": "^3.4.17",
     "unplugin-auto-import": "^0.19.0",
