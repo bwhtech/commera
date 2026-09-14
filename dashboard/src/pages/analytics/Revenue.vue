@@ -54,12 +54,18 @@ const rows = computed(() =>
   [...months.value].reverse().map((row) => ({ ...row, net: row.revenue - row.refunds - row.discounts })),
 )
 
-// Every panel on this report is empty for the same reason — the chosen window holds no orders —
-// so they say it in one voice.
+// Revenue, average order value and the month table go empty together (the window holds no orders),
+// so they share one message. Discounts can be empty on a store full of orders, so it has its own.
 const noRevenueState = {
   icon: 'lucide-chart-line',
   title: 'No revenue in this period',
   description: 'Try a wider date range.',
+}
+
+const noDiscountsState = {
+  icon: 'lucide-badge-percent',
+  title: 'No discounts given',
+  description: 'Orders placed with a discount will show up here.',
 }
 </script>
 
@@ -94,7 +100,7 @@ const noRevenueState = {
       <section class="rounded-5 border border-outline-gray-1 p-4">
         <h2 class="text-lg-semibold text-ink-gray-8">Discounts given</h2>
         <Skeleton v-if="reportRequest.loading && !months.length" class="h-56 w-full rounded" />
-        <EmptyState v-else-if="!hasValues(months, 'discounts')" compact v-bind="noRevenueState" />
+        <EmptyState v-else-if="!hasValues(months, 'discounts')" compact v-bind="noDiscountsState" />
         <div v-else class="h-56">
           <BarChart :data="months" x="label" :y="['discounts']" />
         </div>
