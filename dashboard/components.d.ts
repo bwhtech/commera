@@ -72,6 +72,8 @@ declare module 'vue' {
     SettingsFieldControl: typeof import('./src/components/settings/SettingsFieldControl.vue')['default']
     SettingsFieldRows: typeof import('./src/components/settings/SettingsFieldRows.vue')['default']
     SettingsLinkControl: typeof import('./src/components/settings/SettingsLinkControl.vue')['default']
+    ShippingRuleDialog: typeof import('./src/components/settings/ShippingRuleDialog.vue')['default']
+    ShippingRulesPanel: typeof import('./src/components/settings/ShippingRulesPanel.vue')['default']
     SourceStep: typeof import('./src/components/import/steps/SourceStep.vue')['default']
     StatusBadge: typeof import('./src/components/StatusBadge.vue')['default']
     ThemeEditor: typeof import('./src/components/storefront/ThemeEditor.vue')['default']

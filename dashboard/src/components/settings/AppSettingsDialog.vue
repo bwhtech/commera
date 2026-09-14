@@ -15,6 +15,7 @@ import AppearancePicker from './AppearancePicker.vue'
 import AppsSettings from './AppsSettings.vue'
 import CashOnDeliverySettings from './CashOnDeliverySettings.vue'
 import DeliveryOptionsPanel from './DeliveryOptionsPanel.vue'
+import ShippingRulesPanel from './ShippingRulesPanel.vue'
 import GeneralSettings from './GeneralSettings.vue'
 import IntegrationsPanel from './IntegrationsPanel.vue'
 import LocationsSettings from './LocationsSettings.vue'
@@ -153,7 +154,11 @@ watch(
             description="Carriers this store books with. Each quotes its own rates at checkout."
           />
         </div>
-        <DeliveryOptionsPanel :active="settings.open && settings.tab === 'shipping'" />
+        <!-- Now a middle section too, so it drops its tail padding the same way. -->
+        <div class="flex shrink-0 flex-col [&_[data-slot=scroll-area-viewport]]:pb-0">
+          <DeliveryOptionsPanel :active="settings.open && settings.tab === 'shipping'" />
+        </div>
+        <ShippingRulesPanel :active="settings.open && settings.tab === 'shipping'" />
       </SettingsPanel>
 
       <SettingsPanel value="apps" class="min-w-0">

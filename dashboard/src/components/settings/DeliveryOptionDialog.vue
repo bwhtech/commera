@@ -113,6 +113,10 @@ async function save() {
             @update="(fieldname, value) => (values[fieldname] = value)"
           />
         </div>
+
+        <!-- Left to the panel, which owns the stores: the dialog stays a plain form, and the
+             slot can still fill one of its answers, e.g. a rate created on the spot. -->
+        <slot name="after-fields" :set-value="(fieldname, value) => (values[fieldname] = value)" />
       </form>
     </template>
 

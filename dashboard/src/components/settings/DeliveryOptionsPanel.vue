@@ -23,7 +23,9 @@ import {
 import DeliveryOptionDialog from './DeliveryOptionDialog.vue'
 import DeliveryOptionRow from './DeliveryOptionRow.vue'
 import ImportCarrierServicesDialog from './ImportCarrierServicesDialog.vue'
+import ShippingRuleDialog from './ShippingRuleDialog.vue'
 import { useDeliveryOptions } from '../../data/deliveryOptions'
+import { useShippingRules } from '../../data/shippingRules'
 
 const props = defineProps({
   // Opening the Shipping tab should fetch; switching away and back should not.
@@ -36,6 +38,18 @@ const editing = ref(null)
 const editorOpen = ref(false)
 const importProvider = ref(null)
 const importOpen = ref(false)
+
+// The shared store, so a rate made from an option's form is already listed in the Shipping
+// rates section below when the form closes.
+const shippingRules = useShippingRules()
+const rateEditorOpen = ref(false)
+let setRateOnOption = null
+
+async function openRateEditor(setValue) {
+  setRateOnOption = setValue
+  await shippingRules.loadOnce()
+  rateEditorOpen.value = true
+}
 
 const importActions = computed(() =>
   store.importProviders.value.map((provider) => ({
@@ -172,6 +186,25 @@ function confirmDelete(option) {
     :groups="store.fieldGroups.value"
     :link-options-path="store.linkOptionsPath.value"
     :submit="saveOption"
+  >
+    <template #after-fields="{ setValue }">
+      <div class="pt-3">
+        <Button
+          label="New shipping rate"
+          icon-left="lucide-plus"
+          variant="ghost"
+          @click="openRateEditor(setValue)"
+        />
+      </div>
+    </template>
+  </DeliveryOptionDialog>
+
+  <ShippingRuleDialog
+    v-model:open="rateEditorOpen"
+    :default-account="shippingRules.defaultAccount.value"
+    :link-options-path="shippingRules.linkOptionsPath.value"
+    :submit="(values) => shippingRules.mutate('save_shipping_rule', values)"
+    @saved="(label) => setRateOnOption?.('shipping_rule', label)"
   />
 
   <ImportCarrierServicesDialog

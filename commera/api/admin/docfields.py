@@ -104,13 +104,13 @@ def get_linked_doctypes(doctype):
 	}
 
 
-def search_link_options(doctype, search_text=None):
+def search_link_options(doctype, search_text=None, filters=None):
 	"""Matching records as a picker's options. The CALLER owns the guard on which doctype may be
 	searched — this only shapes the answer.
 	"""
 	frappe.has_permission(doctype, ptype="read", throw=True)
 
-	filters = {}
+	filters = dict(filters or {})
 	if search_text:
 		filters["name"] = ("like", f"%{cstr(search_text)}%")
 
