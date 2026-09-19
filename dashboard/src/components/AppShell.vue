@@ -7,6 +7,7 @@ import logoUrl from '../assets/commera.svg'
 import { openSettings } from '../ia/settings'
 import { useAdminRead, useMethodAction } from '../data/api'
 import NavSection from './NavSection.vue'
+import SetupBanner from './firstrun/SetupBanner.vue'
 
 const route = useRoute()
 
@@ -66,6 +67,7 @@ const headerMenu = [
             <ScrollArea class="min-h-0 flex-1" viewport-class="pt-1 pb-10">
               <NavSection v-for="section in sections" :key="section.id" :section="section" :active-target="activeTarget" />
             </ScrollArea>
+            <SetupBanner />
           </div>
         </Sidebar>
       </template>

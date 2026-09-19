@@ -10,6 +10,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 import Thumb from '../components/Thumb.vue'
 import ListSkeleton from '../components/ListSkeleton.vue'
 import EmptyState from '../components/EmptyState.vue'
+import FirstRunWelcome from '../components/firstrun/FirstRunWelcome.vue'
 import { useAdminRead } from '../data/api'
 import { hasValues } from '../data/analytics'
 import { compactMoney, money, shortDate } from '../data/format'
@@ -90,6 +91,8 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
   <AppPageHeader title="Overview" />
 
   <PageBody width="narrow">
+    <FirstRunWelcome />
+
     <ReportStats
       :stats="kpiTiles"
       compare

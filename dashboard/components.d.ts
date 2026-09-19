@@ -30,6 +30,7 @@ declare module 'vue' {
     DeliveryOptionsPanel: typeof import('./src/components/settings/DeliveryOptionsPanel.vue')['default']
     EditableValue: typeof import('./src/components/EditableValue.vue')['default']
     EmptyState: typeof import('./src/components/EmptyState.vue')['default']
+    FirstRunWelcome: typeof import('./src/components/firstrun/FirstRunWelcome.vue')['default']
     FooterEditor: typeof import('./src/components/storefront/FooterEditor.vue')['default']
     FooterLinkDialog: typeof import('./src/components/storefront/FooterLinkDialog.vue')['default']
     GeneralSettings: typeof import('./src/components/settings/GeneralSettings.vue')['default']
@@ -47,6 +48,8 @@ declare module 'vue' {
     LocationMap: typeof import('./src/components/LocationMap.vue')['default']
     LocationsSettings: typeof import('./src/components/settings/LocationsSettings.vue')['default']
     MapStep: typeof import('./src/components/import/steps/MapStep.vue')['default']
+    MaximizeIcon: typeof import('./src/components/firstrun/MaximizeIcon.vue')['default']
+    MinimizeIcon: typeof import('./src/components/firstrun/MinimizeIcon.vue')['default']
     MobileLayout: typeof import('./src/components/MobileLayout.vue')['default']
     NavigationEditor: typeof import('./src/components/storefront/NavigationEditor.vue')['default']
     NavInspector: typeof import('./src/components/storefront/NavInspector.vue')['default']
@@ -80,6 +83,8 @@ declare module 'vue' {
     SettingsLinkControl: typeof import('./src/components/settings/SettingsLinkControl.vue')['default']
     SettingsPanelHeader: typeof import('./src/components/settings/SettingsPanelHeader.vue')['default']
     SettingsSkeleton: typeof import('./src/components/settings/SettingsSkeleton.vue')['default']
+    SetupBanner: typeof import('./src/components/firstrun/SetupBanner.vue')['default']
+    SetupPanel: typeof import('./src/components/firstrun/SetupPanel.vue')['default']
     SourceStep: typeof import('./src/components/import/steps/SourceStep.vue')['default']
     StatusBadge: typeof import('./src/components/StatusBadge.vue')['default']
     SwatchDot: typeof import('./src/components/SwatchDot.vue')['default']
@@ -90,5 +95,6 @@ declare module 'vue' {
     VariantDialog: typeof import('./src/components/VariantDialog.vue')['default']
     VariantEditor: typeof import('./src/components/VariantEditor.vue')['default']
     VariantMedia: typeof import('./src/components/VariantMedia.vue')['default']
+    WelcomeGreeting: typeof import('./src/components/firstrun/WelcomeGreeting.vue')['default']
   }
 }
