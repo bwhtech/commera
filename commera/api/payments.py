@@ -49,6 +49,8 @@ def get_charge_amount(quotation) -> float:
 
 def get_open_gateway_payment_request(quotation_name: str) -> str | None:
 	for status in ("Paid", "Pending"):
+		# A locking read: a plain one is served from this request's snapshot, which predates a session
+		# another Place Order just committed, and the cart would open a second payment link.
 		open_request = frappe.db.get_value(
 			"Gateway Payment Request",
 			{"ref_doctype": "Quotation", "ref_docname": quotation_name, "status": status},
@@ -60,11 +62,27 @@ def get_open_gateway_payment_request(quotation_name: str) -> str | None:
 	return None
 
 
-def validate_cart_is_not_in_checkout(quotation_name: str):
+def cart_payment_request(quotation):
+	"""The session this cart last opened, read past this request's own snapshot.
+
+	By name, and only by name: a filtered locking read gap-locks the table and deadlocks the other click.
+	"""
+	name = quotation.get("custom_checkout_request")
+	if not name:
+		return None
+
+	# for_update to see a session another Place Order committed after this request's snapshot was taken.
+	live = frappe.db.get_value(
+		"Gateway Payment Request", name, ["name", "status", "order_url"], as_dict=True, for_update=True
+	)
+	return live if live and live.status in ("Pending", "Paid") else None
+
+
+def validate_cart_is_not_in_checkout(quotation_name: str, open_request=None):
 	if not quotation_name:
 		return
 
-	open_request = get_open_gateway_payment_request(quotation_name)
+	open_request = open_request.name if open_request else get_open_gateway_payment_request(quotation_name)
 	if not open_request:
 		return
 
@@ -104,16 +122,19 @@ def refuse_payment(message: str, quotation: str | None = None, **context):
 
 
 @frappe.whitelist()
-def initiate_checkout_with_mode(payment_mode: str):
+def initiate_checkout_with_mode(payment_mode: str, checkout_key: str | None = None):
 	quotation = _get_cart_quotation()
 	with cart_write_lock(quotation):
-		return open_checkout(quotation, payment_mode)
+		return open_checkout(quotation, payment_mode, checkout_key)
 
 
-def open_checkout(quotation, payment_mode: str):
+def open_checkout(quotation, payment_mode: str, checkout_key: str | None = None):
 	"""Held under the cart lock start to finish: an option picked between the repricing and the gateway
 	session would bill the shopper for a cart the session was never priced against."""
-	validate_cart_is_not_in_checkout(quotation.name)
+	if reopened := reopen_checkout_session(quotation, checkout_key):
+		return reopened
+
+	validate_cart_is_not_in_checkout(quotation.name, cart_payment_request(quotation))
 	update_delivery_charges(quotation)
 
 	if is_cod(payment_mode):
@@ -129,6 +150,9 @@ def open_checkout(quotation, payment_mode: str):
 			requested=payment_mode,
 			available=get_available_payment_modes(),
 		)
+
+	if checkout_key and (reopened := hold_checkout_attempt(quotation, checkout_key)):
+		return reopened
 
 	customer_contact = (
 		frappe.db.get_value(
@@ -163,7 +187,78 @@ def open_checkout(quotation, payment_mode: str):
 		}
 	).insert(ignore_permissions=True)
 
+	stamp_checkout_session(quotation, checkout_key, payment_request.name)
 	return {"order_url": payment_request.order_url}
+
+
+def reopen_checkout_session(quotation, checkout_key: str | None) -> dict | None:
+	"""The link this same attempt already opened, before anything is allowed to cancel it: a retried
+	Place Order must land back on its own link rather than bill a fresh one."""
+	if not (checkout_key and quotation.get("custom_checkout_key") == checkout_key):
+		return None
+
+	open_request = cart_payment_request(quotation)
+	if not (open_request and open_request.status == "Pending"):
+		return None
+
+	return {"order_url": open_request.order_url} if open_request.order_url else None
+
+
+def hold_checkout_attempt(quotation, checkout_key: str) -> dict | None:
+	"""Sole ownership of this cart's checkout, claimed on the cart itself: bwh_payments reaches the
+	gateway through `create_request_log`, whose commit ends this request's transaction mid-checkout."""
+	owner, ours = claim_checkout(quotation, checkout_key)
+	if ours:
+		return None
+
+	if owner != checkout_key:
+		# Another attempt holds this cart: cancel its session if the gateway still lets us, then take over.
+		validate_cart_is_not_in_checkout(quotation.name, cart_payment_request(quotation))
+		take_over_checkout(quotation, checkout_key)
+		return None
+
+	open_request = cart_payment_request(quotation)
+	if not open_request:
+		if not quotation.get("custom_checkout_request"):
+			# The click that claimed this key is still at the gateway; a second link would be a second bill.
+			frappe.throw(
+				_("Your payment page is still opening. Give it a moment and try again."),
+				title=_("Opening Payment"),
+			)
+		# The session this attempt opened is spent, so the shopper gets a fresh one.
+		take_over_checkout(quotation, checkout_key)
+		return None
+
+	if open_request.status == "Paid":
+		validate_cart_is_not_in_checkout(quotation.name, open_request)
+	return {"order_url": open_request.order_url} if open_request.order_url else None
+
+
+def claim_checkout(quotation, checkout_key: str) -> tuple[str, bool]:
+	"""Publish which attempt owns this cart's checkout: the owner, and whether this call is the one that set it."""
+	owner = frappe.db.get_value("Quotation", quotation.name, "custom_checkout_key", for_update=True)
+	if owner:
+		return owner, False
+
+	quotation.db_set("custom_checkout_key", checkout_key, update_modified=False)
+	return checkout_key, True
+
+
+def take_over_checkout(quotation, checkout_key: str) -> None:
+	release_checkout_claim(quotation)
+	claim_checkout(quotation, checkout_key)
+
+
+def release_checkout_claim(quotation) -> None:
+	quotation.db_set({"custom_checkout_key": None, "custom_checkout_request": None}, update_modified=False)
+
+
+def stamp_checkout_session(quotation, checkout_key: str | None, payment_request: str) -> None:
+	"""Leave the cart pointing at its open session, so the next click finds it by name."""
+	quotation.db_set(
+		{"custom_checkout_key": checkout_key, "custom_checkout_request": payment_request},
+		update_modified=False,
+	)
 
 
 def get_gateway_email(contact_email: str | None) -> str | None:

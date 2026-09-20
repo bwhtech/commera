@@ -501,6 +501,7 @@
 				selected_shipping_charge: 0,
 				shipping_option_saving: false,
 				pending_shipping_option: null,
+				checkout_key: null,
 
 				async init() {
 					this.set_available_payment_mode();
@@ -682,13 +683,16 @@
 
 				async save_order() {
 					this.order_loading = true;
+// One payment link per attempt: a retry carries the same key, so the server hands back the link it already opened.
+					this.checkout_key = this.checkout_key || crypto.randomUUID();
 					try {
 						const response = await frappe_call(
 							"/api/v2/method/commera.api.payments.initiate_checkout_with_mode",
-							{ payment_mode: this.payment_mode },
+							{ payment_mode: this.payment_mode, checkout_key: this.checkout_key },
 						);
 						window.location.href = response.data.order_url;
 					} catch (error) {
+						this.checkout_key = null;
 						this.order_loading = false;
 					}
 				},

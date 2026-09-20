@@ -16,8 +16,12 @@ from frappe.utils.data import flt
 
 from commera.api.payment_hooks import on_payment_request_update
 from commera.api.payments import (
+	claim_checkout,
 	confirm_payment,
 	get_open_gateway_payment_request,
+	hold_checkout_attempt,
+	reopen_checkout_session,
+	stamp_checkout_session,
 	validate_cart_is_not_in_checkout,
 )
 from commera.jobs import sync_pending_gateway_payments
@@ -286,6 +290,54 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 			self.payment_request.order_ref,
 		)
 		self.assertEqual(frappe.db.get_value("Payment Entry", payment_entries[0], "mode_of_payment"), GATEWAY)
+
+	# -- one payment link per checkout attempt ------------------------------------------------------
+
+	def open_pending_request(self, quotation):
+		return frappe.get_doc(
+			{
+				"doctype": "Gateway Payment Request",
+				"gateway": GATEWAY,
+				"amount": quotation.grand_total,
+				"currency_code": quotation.currency,
+				"company": COMPANY,
+				"ref_doctype": "Quotation",
+				"ref_docname": quotation.name,
+				"customer_ref": quotation.party_name,
+				"customer_email": self.contact_email,
+			}
+		).insert(ignore_permissions=True)
+
+	def test_the_checkout_claim_stays_with_the_attempt_that_took_it(self):
+		quotation = frappe.get_doc("Quotation", self.quotation.name)
+
+		self.assertEqual(claim_checkout(quotation, "attempt-one"), ("attempt-one", True))
+		self.assertEqual(claim_checkout(quotation, "attempt-two"), ("attempt-one", False))
+
+	def test_a_retried_checkout_gets_the_link_it_already_opened(self):
+		quotation = frappe.get_doc("Quotation", self.quotation.name)
+		payment_request = self.open_pending_request(quotation)
+		stamp_checkout_session(quotation, "attempt-one", payment_request.name)
+
+		self.assertEqual(
+			reopen_checkout_session(quotation, "attempt-one"), {"order_url": payment_request.order_url}
+		)
+
+	def test_another_tab_is_never_handed_this_attempts_link(self):
+		"""Its own key means its own session, so cancelling one tab cannot strand the other on a dead link."""
+		quotation = frappe.get_doc("Quotation", self.quotation.name)
+		payment_request = self.open_pending_request(quotation)
+		stamp_checkout_session(quotation, "attempt-one", payment_request.name)
+
+		self.assertIsNone(reopen_checkout_session(quotation, "another-tab"))
+
+	def test_a_second_click_opens_no_link_while_the_first_is_still_at_the_gateway(self):
+		"""The claim is taken before the gateway round-trip, and a second link would be a second bill."""
+		quotation = frappe.get_doc("Quotation", self.quotation.name)
+		claim_checkout(quotation, "attempt-one")
+
+		with self.assertRaises(frappe.ValidationError):
+			hold_checkout_attempt(quotation, "attempt-one")
 
 	def test_a_duplicate_callback_does_not_create_a_second_order(self):
 		"""A replayed webhook racing a confirm_payment poll must not bill the shopper twice."""
