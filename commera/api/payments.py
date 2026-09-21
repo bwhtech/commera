@@ -129,8 +129,8 @@ def initiate_checkout_with_mode(payment_mode: str, checkout_key: str | None = No
 
 
 def open_checkout(quotation, payment_mode: str, checkout_key: str | None = None):
-	"""Held under the cart lock start to finish: an option picked between the repricing and the gateway
-	session would bill the shopper for a cart the session was never priced against."""
+	"""Repriced under the cart lock, but the lock ends the moment the gateway is called, because
+	create_request_log commits - which is why the attempt is claimed on the cart instead."""
 	if reopened := reopen_checkout_session(quotation, checkout_key):
 		return reopened
 
