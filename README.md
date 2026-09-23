@@ -50,9 +50,23 @@ Providers are configured from the dashboard rather than the desk. Each keeps its
 - **Stripe** — Cards and wallets, worldwide.
 - **Telr** — Cards and local methods across the GCC.
 - **Tabby** — Buy now, pay later in four instalments. MENA.
+- **PayPal** — Wallet payments in supported currencies; unavailable for INR and Gulf currencies.
 - **Cash on delivery** — With its own fee, a threshold above which the fee is waived, and the account it books to.
 
 Gateway callbacks are idempotent, so a replayed webhook racing a shopper's return cannot bill twice.
+
+#### PayPal setup
+
+PayPal uses `bwh_payments`' hosted checkout. In Desk, configure **PayPal Gateway Settings** with Sandbox
+or Live credentials, redirect URLs, and the webhook ID returned by PayPal. Enable a **Payment Gateway
+Profile** named `PayPal` pointing to those settings, and give the `PayPal` Mode of Payment a default
+account for each selling company. If the separate `payments` app created a `Payment Gateway` named
+`PayPal`, check that it points to `PayPal Gateway Settings` rather than its legacy `PayPal Settings`.
+
+Register a public HTTPS webhook at
+`/api/method/bwh_payments.bwh_payments.webhook.handle?gateway=PayPal` for
+`CHECKOUT.ORDER.APPROVED` and `PAYMENT.CAPTURE.COMPLETED`. Checkout offers PayPal only when the cart's
+currency is supported; a pending PayPal order keeps its cart until the payment is resolved.
 
 <div>
 	<img width="1402" alt="Payment providers and cash on delivery settings" src=".github/screenshots/payments.png">
