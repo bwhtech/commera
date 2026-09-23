@@ -188,6 +188,17 @@ def delete_old_draft_quotations():
 		pluck="name",
 	)
 	for quotation in old_drafts:
+		# A PayPal approval URL can remain payable after the shopper closes the browser.
+		if frappe.db.exists(
+			"Gateway Payment Request",
+			{
+				"ref_doctype": "Quotation",
+				"ref_docname": quotation,
+				"gateway": "PayPal",
+				"status": "Pending",
+			},
+		):
+			continue
 		try:
 			frappe.delete_doc("Quotation", quotation)
 		except Exception as e:
@@ -196,9 +207,8 @@ def delete_old_draft_quotations():
 
 def sync_pending_gateway_payments():
 	"""Settle checkouts the shopper's browser never confirmed, so captured money always reaches an order."""
-	# ponytail: a request older than the lookback is left to manual reconciliation - delete_old_draft_
-	# quotations already removes the draft cart it points at after 6 hours, so the order can no longer
-	# be placed from it. Widen both windows together, never this one alone.
+	# Requests older than the lookback need a webhook or manual reconciliation. PayPal carts are kept
+	# while their request is pending, so a late webhook can still place the order.
 	now = now_datetime()
 	pending_requests = frappe.get_all(
 		"Gateway Payment Request",

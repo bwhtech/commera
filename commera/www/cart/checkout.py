@@ -1,5 +1,5 @@
 import frappe
-from bwh_payments.bwh_payments.utils import get_available_payment_modes
+from bwh_payments.bwh_payments.utils import get_payment_modes_for_currency
 from frappe.query_builder import DocType
 
 from commera.core import _get_cart_quotation
@@ -29,7 +29,7 @@ def get_context(context):
 		frappe.redirect(f"/{frappe.local.lang}/cart")
 	commera_settings = frappe.get_cached_doc("Commera Settings")
 	default_price_list = commera_settings.get("default_price_list")
-	context.payment_gateways = get_available_payment_modes()
+	context.payment_gateways = get_payment_modes_for_currency(cart_quotation.currency)
 	context.show_cod = commera_settings.get("cod_enabled", 0)
 	context.cart_quotation = cart_quotation
 	context.coupon_code = get_coupon_code(cart_quotation)

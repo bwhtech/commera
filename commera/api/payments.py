@@ -1,7 +1,8 @@
 from contextlib import contextmanager
 
 import frappe
-from bwh_payments.bwh_payments.utils import get_available_payment_modes, resolve_payment_mode
+from bwh_payments.bwh_payments.utils import get_payment_modes_for_currency, resolve_payment_mode
+from bwh_payments.currency import to_minor_units
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 from erpnext.accounts.doctype.pricing_rule.utils import validate_coupon_code
@@ -36,6 +37,7 @@ except ImportError:
 	from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
 
 COD_PAYMENT_MODE = "COD"
+PAYPAL_PAYMENT_MODE = "PayPal"
 
 
 def is_cod(payment_mode: str | None) -> bool:
@@ -58,6 +60,29 @@ def get_open_gateway_payment_request(quotation_name: str) -> str | None:
 			return open_request
 
 	return None
+
+
+def get_reusable_paypal_url(quotation) -> str | None:
+	request_name = get_open_gateway_payment_request(quotation.name)
+	if not request_name:
+		return None
+
+	payment_request = frappe.get_doc("Gateway Payment Request", request_name)
+	if payment_request.status != "Pending" or payment_request.gateway != PAYPAL_PAYMENT_MODE:
+		return None
+
+	payment_request.sync_status()
+	if payment_request.status == "Paid":
+		return get_confirmation_url(payment_request.name)
+	if payment_request.status != "Pending" or payment_request.currency_code != quotation.currency:
+		return None
+
+	if to_minor_units(payment_request.amount, quotation.currency) != to_minor_units(
+		get_charge_amount(quotation), quotation.currency
+	):
+		return None
+
+	return payment_request.order_url
 
 
 def validate_cart_is_not_in_checkout(quotation_name: str):
@@ -111,6 +136,11 @@ def initiate_checkout_with_mode(payment_mode: str):
 
 
 def open_checkout(quotation, payment_mode: str):
+	if (payment_mode or "").strip().casefold() == PAYPAL_PAYMENT_MODE.casefold():
+		if PAYPAL_PAYMENT_MODE in get_payment_modes_for_currency(quotation.currency):
+			if order_url := get_reusable_paypal_url(quotation):
+				return {"order_url": order_url}
+
 	validate_cart_is_not_in_checkout(quotation.name)
 	update_delivery_charges(quotation)
 
@@ -120,12 +150,13 @@ def open_checkout(quotation, payment_mode: str):
 		return {"order_url": get_confirmation_url(quotation.name, payment_mode=COD_PAYMENT_MODE)}
 
 	gateway = resolve_payment_mode(payment_mode)
-	if not gateway:
+	available_gateways = get_payment_modes_for_currency(quotation.currency)
+	if not gateway or gateway not in available_gateways:
 		refuse_payment(
-			_("Please select a valid payment mode."),
+			_("Please select a payment mode available for this currency."),
 			quotation.name,
 			requested=payment_mode,
-			available=get_available_payment_modes(),
+			available=available_gateways,
 		)
 
 	customer_contact = (
