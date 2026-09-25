@@ -20,8 +20,14 @@
 
 {% macro menu_tab(node, branch_key) %}
 {% if node.children %}
-<li class="has-mega-menu sub-menu-down auto-width" :class="is_branch_open({{ branch_key }}) ? 'open' : ''">
-	<a href="{{ node.href or 'javascript:void(0);' }}">
+{#- Opens on keyboard focus only: a tap or click also focuses the link, and would pin the menu open or fight the mobile chevron toggle. -#}
+<li class="has-mega-menu sub-menu-down auto-width" x-data="{ menu_expanded: false }"
+	:class="{ 'open': is_branch_open({{ branch_key }}), 'menu-expanded': menu_expanded }"
+	@focusin="$event.target.matches(':focus-visible') && (menu_expanded = true)"
+	@focusout="$el.contains($event.relatedTarget) || (menu_expanded = false)"
+	@keydown.escape="$refs.menu_trigger.focus(); menu_expanded = false">
+	<a href="{{ node.href or 'javascript:void(0);' }}" x-ref="menu_trigger" aria-haspopup="true"
+		:aria-expanded="menu_expanded || is_branch_open({{ branch_key }})">
 		<span>{{ node.label }}</span>
 		<i class="fas fa-chevron-down tabindex" @click.prevent.stop="toggle_branch({{ branch_key }})"></i>
 	</a>
