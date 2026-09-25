@@ -189,12 +189,24 @@
 					<h6>&minus; {{ get_currency_symbol() }}{{ "%.2f" | format(discount_amount) }}</h6>
 				</div>
 				{% endif %}
-				{% if order.total_taxes_and_charges %}
+				{% if charge_lines.shipping %}
 				<div class="tracking-item-content">
-					<span>{{ _("Shipping & Handling") }}</span>
-					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(order.total_taxes_and_charges) }}</h6>
+					<span>{{ _("Shipping") }}</span>
+					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(charge_lines.shipping) }}</h6>
 				</div>
 				{% endif %}
+				{% if charge_lines.cod_charge %}
+				<div class="tracking-item-content">
+					<span>{{ _("Cash on Delivery Fee") }}</span>
+					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(charge_lines.cod_charge) }}</h6>
+				</div>
+				{% endif %}
+				{% for tax in charge_lines.taxes %}
+				<div class="tracking-item-content">
+					<span>{{ tax.description }}</span>
+					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(tax.amount) }}</h6>
+				</div>
+				{% endfor %}
 				{% if order.rounding_adjustment %}
 				<div class="tracking-item-content">
 					<span>{{ _("Rounding Adjustment") }}</span>
