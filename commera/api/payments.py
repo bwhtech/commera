@@ -12,18 +12,17 @@ from frappe.utils.data import flt
 from commera.analytics.events import log_purchase, set_attribution_fields
 from commera.api.cart import validate_stock_available
 from commera.api.shipping import (
+	add_cod_charge,
 	clear_delivery_option,
+	clear_pickup_charges,
 	copy_delivery_option_to_order,
-	get_charge_lines,
+	get_charge_amount,
+	get_checkout_summary,
+	get_cod_charge,
 	reprice_selected_option,
 )
 from commera.core import _get_cart_quotation
-from commera.utils import (
-	COD_CHARGE_DESCRIPTION,
-	get_cod_configuration,
-	get_pickup_addresses,
-	get_pickup_warehouses,
-)
+from commera.utils import get_pickup_addresses, get_pickup_warehouses
 
 # ERPNext moved its transaction mappers to a sibling `mapper` module; both layouts are in the wild.
 try:
@@ -41,22 +40,6 @@ COD_PAYMENT_MODE = "COD"
 
 def is_cod(payment_mode: str | None) -> bool:
 	return (payment_mode or "").strip().casefold() == COD_PAYMENT_MODE.casefold()
-
-
-def get_charge_amount(quotation) -> float:
-	# rounded_total is 0 when rounding is disabled on the document; grand_total is the billed figure then.
-	return flt(quotation.rounded_total) or flt(quotation.grand_total)
-
-
-def get_checkout_summary(quotation) -> dict:
-	charge_lines = get_charge_lines(quotation.taxes, quotation.shipping_rule)
-	return {
-		"net_total": flt(quotation.net_total),
-		"shipping": charge_lines["shipping"],
-		"taxes": charge_lines["taxes"],
-		"rounding_adjustment": flt(quotation.rounding_adjustment),
-		"total": get_charge_amount(quotation),
-	}
 
 
 def get_open_gateway_payment_request(quotation_name: str) -> str | None:
@@ -354,26 +337,14 @@ def set_charges(quotation):
 
 
 def set_cod_charges(quotation):
-	cod_charges_applicable_below, cod_charge = get_cod_configuration()
+	cod_charge = get_cod_charge(quotation)
+	if not cod_charge:
+		return
 	account_head = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
-	if not cod_charges_applicable_below or not cod_charge:
-		return
-	if flt(cod_charges_applicable_below) < flt(quotation.rounded_total):
-		return
 	if not account_head:
 		frappe.throw(_("Please select a valid account for cod charges."))
 
-	cod_charge = {
-		"doctype": "Sales Taxes and Charges",
-		"description": COD_CHARGE_DESCRIPTION,
-		"charge_type": "Actual",
-		"account_head": account_head,
-		"tax_amount": cod_charge,
-		# ERPNext's validate_inclusive_tax refuses an inclusive Actual charge; pinned against a site default of 1.
-		"included_in_print_rate": 0,
-	}
-	quotation.append("taxes", cod_charge)
-	quotation.calculate_taxes_and_totals()
+	add_cod_charge(quotation, cod_charge, account_head)
 	quotation.flags.ignore_permissions = True
 	quotation.save()
 
@@ -394,7 +365,6 @@ def save_quotation_address(quotation, address: dict):
 		quotation.custom_is_store_pickup = True
 		# A delivery option picked before store pickup would otherwise still be charged at payment time.
 		clear_delivery_option(quotation)
-		clear_pickup_charges(quotation)
 		save_cart_quotation(quotation)
 
 		return get_address_saved_response(quotation)
@@ -668,13 +638,6 @@ def validate_store_pickup(warehouse: str | None):
 	# Checkout only lists warehouses that have a Shop address, so one without is not a place to send a shopper.
 	if warehouse not in get_pickup_warehouses() or not get_pickup_addresses([warehouse]):
 		frappe.throw(_("Please select a valid pickup location."))
-
-
-def clear_pickup_charges(quotation):
-	"""Applied when pickup is chosen as well as at payment, so the summary shown is the one charged."""
-	quotation.shipping_rule = None
-	quotation.taxes = []
-	quotation.calculate_taxes_and_totals()
 
 
 def update_delivery_charges(quotation):

@@ -8,8 +8,6 @@
 	"payment_gateways": payment_gateways,
 	"show_cod": show_cod | int,
 	"summary": checkout_summary,
-	"cod_charge": cod_charge or 0,
-	"cod_charge_applicable_below": cod_charge_applicable_below or 0,
 	"has_billing_addresses": billing_addresses | length > 0,
 	"has_shipping_addresses": shipping_addresses | length > 0,
 	"has_store_pickup": store_pickup_addresses | length > 0,
@@ -297,7 +295,7 @@
 							<tbody>
 								<tr class="subtotal">
 									<td>{{ _("Subtotal") }}</td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(summary.net_total)">{{ "%.2f" | format(checkout_summary.net_total) }}</span></td>
+									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.subtotal)">{{ "%.2f" | format(checkout_summary.subtotal) }}</span></td>
 								</tr>
 								<tr class="shipping">
 									<td>
@@ -310,23 +308,27 @@
 										<span x-show="shipping_amount" x-cloak>{{ currency_symbol }}<span x-text="format_amount(shipping_amount)"></span></span>
 									</td>
 								</tr>
-								<template x-for="(tax, index) in summary.taxes" :key="index">
+								<template x-for="(tax, index) in active_summary.taxes" :key="index">
 									<tr class="tax">
 										<td x-text="tax.description"></td>
 										<td class="price">{{ currency_symbol }}<span x-text="format_amount(tax.amount)"></span></td>
 									</tr>
 								</template>
-								<tr class="cod-charge" x-show="cod_amount" x-cloak>
+								<tr class="cod-charge" x-show="active_summary.cod_charge" x-cloak>
 									<td>{{ _("Cash on Delivery Fee") }}</td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(cod_amount)"></span></td>
+									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.cod_charge)"></span></td>
 								</tr>
-								<tr class="rounding-adjustment" x-show="summary.rounding_adjustment" x-cloak>
+								<tr class="discount" x-show="active_summary.discount_amount" x-cloak>
+									<td>{{ _("Discount") }}</td>
+									<td class="price">-{{ currency_symbol }}<span x-text="format_amount(active_summary.discount_amount)"></span></td>
+								</tr>
+								<tr class="rounding-adjustment" x-show="active_summary.rounding_adjustment" x-cloak>
 									<td>{{ _("Rounding Adjustment") }}</td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(summary.rounding_adjustment)"></span></td>
+									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.rounding_adjustment)"></span></td>
 								</tr>
 								<tr class="total">
 									<td>{{ _("Total") }}</td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(total)"></span></td>
+									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.total)"></span></td>
 								</tr>
 							</tbody>
 						</table>
@@ -412,12 +414,10 @@
 										<div class="accordion-collapse collapse" :class="payment_mode === 'COD' && 'show'">
 											<div class="accordion-body">
 												<p class="m-b0">{{ _("Pay in cash when your order is delivered.") }}</p>
-												{% if cod_charge and cod_charge_applicable_below > (cart_quotation.rounded_total or 0) %}
-													<p class="m-b0 text-danger">
-														{{ _("A non-refundable cash on delivery fee of") }}
-														{{ currency_symbol }}{{ "%.2f" | format(cod_charge) }} {{ _("will apply.") }}
-													</p>
-												{% endif %}
+												<p class="m-b0 text-danger" x-show="summary.cash_on_delivery.cod_charge" x-cloak>
+													{{ _("A non-refundable cash on delivery fee of") }}
+													{{ currency_symbol }}<span x-text="format_amount(summary.cash_on_delivery.cod_charge)"></span> {{ _("will apply.") }}
+												</p>
 											</div>
 										</div>
 									</div>
@@ -498,10 +498,8 @@
 				shipping_option_saving: false,
 				pending_shipping_option: null,
 
-				async init() {
+				init() {
 					this.set_available_payment_mode();
-					const response = await frappe_call("/api/v2/method/commera.api.checkout.save_checkout_charges");
-					this.summary = response.data;
 				},
 
 				format_amount(amount) {
@@ -515,17 +513,12 @@
 				},
 
 				get shipping_amount() {
-					return this.summary.shipping;
+					return this.active_summary.shipping;
 				},
 
-				get cod_amount() {
-					if (!this.address_saved || this.payment_mode !== COD_PAYMENT_MODE) return 0;
-					return this.config.cod_charge_applicable_below >= this.summary.total ? this.config.cod_charge : 0;
-				},
-
-				get total() {
-// The COD fee is only added to the order when it is placed, so it is the one figure not in the server's total.
-					return this.summary.total + this.cod_amount;
+				get active_summary() {
+					if (!this.address_saved || this.payment_mode !== COD_PAYMENT_MODE) return this.summary;
+					return this.summary.cash_on_delivery;
 				},
 
 				set_available_payment_mode() {

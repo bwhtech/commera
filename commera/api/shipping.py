@@ -3,7 +3,7 @@ from frappe import _
 from frappe.utils.data import cstr, flt, sha256_hash
 
 from commera.core import _get_cart_quotation
-from commera.utils import COD_CHARGE_DESCRIPTION, validate_document_access
+from commera.utils import COD_CHARGE_DESCRIPTION, get_cod_configuration, validate_document_access
 
 # The Actual charge row the chosen option posts through, matched on description on re-selection.
 DELIVERY_CHARGE_DESCRIPTION = "Delivery Charges"
@@ -289,6 +289,71 @@ def get_charge_lines(taxes, shipping_rule: str | None) -> dict:
 	return charge_lines
 
 
+def get_charge_amount(quotation) -> float:
+	# rounded_total is 0 when rounding is disabled on the document; grand_total is the billed figure then.
+	return flt(quotation.rounded_total) or flt(quotation.grand_total)
+
+
+def get_checkout_summary(quotation) -> dict:
+	"""The charges payment will apply, priced on an unsaved copy so showing them never rewrites the cart."""
+	preview = frappe.get_doc(quotation.as_dict())
+	if preview.custom_is_store_pickup:
+		clear_pickup_charges(preview)
+	summary = get_charge_summary(preview)
+
+	cod_charge = get_cod_charge(preview)
+	if cod_charge:
+		add_cod_charge(preview, cod_charge)
+	summary["cash_on_delivery"] = get_charge_summary(preview)
+	return summary
+
+
+def get_charge_summary(quotation) -> dict:
+	charge_lines = get_charge_lines(quotation.taxes, quotation.shipping_rule)
+	charges = charge_lines["shipping"] + charge_lines["cod_charge"]
+	charges += sum(tax["amount"] for tax in charge_lines["taxes"])
+	discount_amount = flt(quotation.discount_amount)
+	return {
+		# Derived rather than read: with a Grand Total discount the stored net_total is already partly discounted.
+		"subtotal": flt(quotation.grand_total) + discount_amount - charges,
+		"shipping": charge_lines["shipping"],
+		"cod_charge": charge_lines["cod_charge"],
+		"taxes": charge_lines["taxes"],
+		"discount_amount": discount_amount,
+		"rounding_adjustment": flt(quotation.rounding_adjustment),
+		"total": get_charge_amount(quotation),
+	}
+
+
+def clear_pickup_charges(quotation):
+	quotation.shipping_rule = None
+	quotation.taxes = []
+	quotation.calculate_taxes_and_totals()
+
+
+def get_cod_charge(quotation) -> float:
+	applicable_below, cod_charge = get_cod_configuration()
+	if not applicable_below or not cod_charge or flt(applicable_below) < get_charge_amount(quotation):
+		return 0.0
+	return flt(cod_charge)
+
+
+def add_cod_charge(quotation, cod_charge: float, account_head: str | None = None):
+	quotation.append(
+		"taxes",
+		{
+			"doctype": "Sales Taxes and Charges",
+			"description": COD_CHARGE_DESCRIPTION,
+			"charge_type": "Actual",
+			"account_head": account_head,
+			"tax_amount": cod_charge,
+			# ERPNext's validate_inclusive_tax refuses an inclusive Actual charge; pinned against a site default of 1.
+			"included_in_print_rate": 0,
+		},
+	)
+	quotation.calculate_taxes_and_totals()
+
+
 def get_order_charge_lines(sales_order: str, shipping_rule: str | None) -> dict:
 	taxes = frappe.get_all(
 		"Sales Taxes and Charges",
@@ -319,12 +384,10 @@ def get_charge_account(title: str) -> str:
 
 
 def get_delivery_summary(quotation) -> dict:
-	from commera.api.payments import get_checkout_summary
-
 	return {
 		"delivery_option": quotation.custom_delivery_option,
 		"delivery_charge": flt(quotation.custom_delivery_charge),
-		"grand_total": flt(quotation.rounded_total) or flt(quotation.grand_total),
+		"grand_total": get_charge_amount(quotation),
 		"currency": quotation.currency,
 		"checkout_summary": get_checkout_summary(quotation),
 	}

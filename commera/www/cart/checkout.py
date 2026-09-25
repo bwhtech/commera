@@ -2,7 +2,7 @@ import frappe
 from bwh_payments.bwh_payments.utils import get_available_payment_modes
 from frappe.query_builder import DocType
 
-from commera.api.payments import get_checkout_summary
+from commera.api.shipping import get_checkout_summary
 from commera.core import _get_cart_quotation
 from commera.utils import (
 	format_addresses,

@@ -8,7 +8,7 @@ from frappe.model.document import Document
 from frappe.tests import IntegrationTestCase
 
 from commera.api.cart import get_detail_for_cart_items, get_stock_shortfalls, validate_stock_available
-from commera.api.checkout import apply_shipping_rule, save_checkout_charges
+from commera.api.checkout import apply_shipping_rule
 from commera.api.payments import (
 	COD_PAYMENT_MODE,
 	confirm_payment,
@@ -18,10 +18,16 @@ from commera.api.payments import (
 	update_delivery_charges,
 	update_quotation_address,
 )
-from commera.api.shipping import get_cart_fingerprint, get_order_charge_lines, set_delivery_option
+from commera.api.shipping import (
+	get_cart_fingerprint,
+	get_checkout_summary,
+	get_order_charge_lines,
+	set_delivery_option,
+)
 from commera.core import _get_cart_quotation
 from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.utils import get_pickup_addresses
+from commera.www.cart.checkout import get_context as get_checkout_context
 from commera.www.cart.checkout import get_store_pickup_addresses
 
 COUNTRY = "Saudi Arabia"
@@ -247,6 +253,13 @@ class TestCartCheckout(IntegrationTestCase):
 
 	# -- checkout summary -------------------------------------------------------------------------
 
+	def get_output_tax_account(self, company: str) -> str:
+		return frappe.db.get_value(
+			"Account",
+			{"company": company, "root_type": "Liability", "account_type": "", "is_group": 0},
+			"name",
+		)
+
 	def add_tax_to_cart(self):
 		"""An On Net Total tax row, as a GST template leaves on the cart once the address is known."""
 		quotation = _get_cart_quotation()
@@ -255,21 +268,41 @@ class TestCartCheckout(IntegrationTestCase):
 			{
 				"charge_type": "On Net Total",
 				"description": TAX_DESCRIPTION,
-				"account_head": frappe.db.get_value(
-					"Account",
-					{
-						"company": quotation.company,
-						"root_type": "Liability",
-						"account_type": "",
-						"is_group": 0,
-					},
-					"name",
-				),
+				"account_head": self.get_output_tax_account(quotation.company),
 				"rate": TAX_RATE,
 				"included_in_print_rate": 0,
 			},
 		)
 		save_cart_quotation(quotation)
+
+	def set_cod_fee(self, cod_charge: float):
+		frappe.db.set_single_value(
+			"Commera Settings",
+			{
+				"cod_enabled": 1,
+				"cod_charge": cod_charge,
+				"cod_charge_applicable_below": 100000,
+				"charge_account_head": frappe.db.get_value(
+					"Account",
+					{"company": _get_cart_quotation().company, "root_type": "Income", "is_group": 0},
+					"name",
+				),
+			},
+		)
+		frappe.clear_document_cache("Commera Settings", "Commera Settings")
+		self.addCleanup(frappe.clear_document_cache, "Commera Settings", "Commera Settings")
+
+	def assert_summary_adds_up(self, summary: dict):
+		self.assertAlmostEqual(
+			summary["total"],
+			summary["subtotal"]
+			+ summary["shipping"]
+			+ summary["cod_charge"]
+			+ sum(tax["amount"] for tax in summary["taxes"])
+			- summary["discount_amount"]
+			+ summary["rounding_adjustment"],
+			places=2,
+		)
 
 	def test_the_checkout_summary_names_the_tax_and_adds_up_to_its_total(self):
 		frappe.set_user(self.shopper)
@@ -277,42 +310,53 @@ class TestCartCheckout(IntegrationTestCase):
 		update_quotation_address(self.address_payload())
 		self.add_tax_to_cart()
 
-		summary = save_checkout_charges()
+		summary = get_checkout_summary(_get_cart_quotation())
 
+		self.assertEqual(summary["subtotal"], 270)
 		self.assertEqual(summary["taxes"], [{"description": TAX_DESCRIPTION, "amount": 48.6}])
-		self.assertAlmostEqual(
-			summary["total"],
-			summary["net_total"]
-			+ summary["shipping"]
-			+ sum(tax["amount"] for tax in summary["taxes"])
-			+ summary["rounding_adjustment"],
-			places=2,
-		)
+		self.assert_summary_adds_up(summary)
 
-	def test_the_checkout_total_is_what_the_cod_order_charges(self):
-		ensure_fiscal_year()
-		frappe.db.set_single_value("Commera Settings", "cod_enabled", 1)
+	def test_a_grand_total_coupon_shows_as_a_discount_the_lines_add_up_to(self):
 		frappe.set_user(self.shopper)
 		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 3)]})
 		update_quotation_address(self.address_payload())
 		self.add_tax_to_cart()
-		summary = save_checkout_charges()
+		quotation = _get_cart_quotation()
+		quotation.apply_discount_on = "Grand Total"
+		quotation.discount_amount = 50
+		save_cart_quotation(quotation)
 
-		with patch("commera.api.payments.get_cod_configuration", return_value=(0, 0)):
-			initiate_checkout_with_mode(COD_PAYMENT_MODE)
-			order_name = confirm_payment(_get_cart_quotation().name, payment_mode=COD_PAYMENT_MODE)[
-				"order_name"
-			]
+		summary = get_checkout_summary(_get_cart_quotation())
+
+		self.assertEqual(summary["subtotal"], 270)
+		self.assertEqual(summary["discount_amount"], 50)
+		self.assertEqual(summary["total"], round(270 + 48.6 + summary["shipping"] - 50))
+		self.assert_summary_adds_up(summary)
+
+	def test_the_cod_checkout_total_is_what_the_order_charges(self):
+		ensure_fiscal_year()
+		frappe.set_user(self.shopper)
+		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 3)]})
+		update_quotation_address(self.address_payload())
+		self.add_tax_to_cart()
+		self.set_cod_fee(49.5)
+		summary = get_checkout_summary(_get_cart_quotation())["cash_on_delivery"]
+
+		initiate_checkout_with_mode(COD_PAYMENT_MODE)
+		order_name = confirm_payment(_get_cart_quotation().name, payment_mode=COD_PAYMENT_MODE)["order_name"]
 
 		frappe.set_user("Administrator")
 		sales_order = frappe.get_doc("Sales Order", order_name)
-		self.assertEqual(summary["total"], sales_order.rounded_total or sales_order.grand_total)
+		self.assertEqual(summary["cod_charge"], 49.5)
+		# Rounding once after the fee, as the order does; rounding the goods first and adding 49.50 lands on .50.
+		self.assertEqual(summary["total"], round(270 + 48.6 + summary["shipping"] + 49.5))
+		self.assertEqual(summary["total"], sales_order.rounded_total)
 		self.assertEqual(
 			get_order_charge_lines(sales_order.name, sales_order.shipping_rule)["taxes"],
 			[{"description": TAX_DESCRIPTION, "amount": 48.6}],
 		)
 
-	def test_a_pickup_summary_is_the_charge_free_total_it_pays(self):
+	def test_a_pickup_summary_drops_the_charges_without_saving_that(self):
 		self.set_store_pickup(1)
 		warehouse = self.create_pickup_warehouse()
 		frappe.set_user(self.shopper)
@@ -321,10 +365,43 @@ class TestCartCheckout(IntegrationTestCase):
 
 		summary = update_quotation_address(self.pickup_payload(warehouse))["checkout_summary"]
 
-		quotation = _get_cart_quotation()
-		update_delivery_charges(quotation)
 		self.assertEqual(summary["taxes"], [])
-		self.assertEqual(summary["total"], quotation.rounded_total or quotation.grand_total)
+		self.assertEqual(summary["total"], 270)
+		self.assertIn(TAX_DESCRIPTION, [row.description for row in _get_cart_quotation().taxes])
+
+	def test_switching_from_pickup_back_to_delivery_keeps_the_tax(self):
+		self.set_store_pickup(1)
+		warehouse = self.create_pickup_warehouse()
+		frappe.set_user(self.shopper)
+		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 3)]})
+		self.add_tax_to_cart()
+		update_quotation_address(self.pickup_payload(warehouse))
+
+		summary = update_quotation_address(self.address_payload())["checkout_summary"]
+
+		self.assertEqual(summary["taxes"], [{"description": TAX_DESCRIPTION, "amount": 48.6}])
+		self.assertIn(TAX_DESCRIPTION, [row.description for row in _get_cart_quotation().taxes])
+
+	def test_opening_checkout_does_not_rewrite_a_cart_with_a_stale_delivery_option(self):
+		frappe.set_user(self.shopper)
+		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 3)]})
+		update_quotation_address(self.address_payload())
+		quotation = _get_cart_quotation()
+		quotation.custom_delivery_option = "ZZ Retired Courier"
+		quotation.custom_delivery_charge = 40
+		save_cart_quotation(quotation)
+		before = _get_cart_quotation()
+
+		context = frappe._dict()
+		get_checkout_context(context)
+
+		after = _get_cart_quotation()
+		self.assertEqual(after.modified, before.modified)
+		self.assertEqual(
+			[(row.description, row.tax_amount) for row in after.taxes],
+			[(row.description, row.tax_amount) for row in before.taxes],
+		)
+		self.assertEqual(context.checkout_summary["total"], after.rounded_total or after.grand_total)
 
 	# -- stock ------------------------------------------------------------------------------------
 
