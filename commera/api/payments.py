@@ -24,6 +24,11 @@ from commera.api.shipping import (
 from commera.core import _get_cart_quotation
 from commera.utils import get_pickup_addresses, get_pickup_warehouses
 
+
+class CheckoutPriceChangedError(frappe.ValidationError):
+	pass
+
+
 # ERPNext moved its transaction mappers to a sibling `mapper` module; both layouts are in the wild.
 try:
 	from erpnext.selling.doctype.quotation.mapper import _make_sales_order
@@ -186,6 +191,7 @@ def validate_delivery_option(quotation, delivery_option: str | None):
 	frappe.throw(
 		_("Your delivery option has changed. Please choose it again before placing your order."),
 		title=_("Delivery Option Changed"),
+		exc=CheckoutPriceChangedError,
 	)
 
 
@@ -204,6 +210,7 @@ def validate_expected_total(quotation, payment_mode: str, expected_total: float 
 			fmt_money(payable_total, currency=quotation.currency)
 		),
 		title=_("Order Total Changed"),
+		exc=CheckoutPriceChangedError,
 	)
 
 

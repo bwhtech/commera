@@ -11,6 +11,7 @@ from commera.api.cart import get_detail_for_cart_items, get_stock_shortfalls, va
 from commera.api.checkout import apply_shipping_rule
 from commera.api.payments import (
 	COD_PAYMENT_MODE,
+	CheckoutPriceChangedError,
 	confirm_payment,
 	generate_quotation_for_cart,
 	initiate_checkout_with_mode,
@@ -484,7 +485,7 @@ class TestCartCheckout(IntegrationTestCase):
 		self.prepare_cod_checkout()
 		self.choose_delivery_option()
 
-		with self.assertRaises(frappe.ValidationError) as raised:
+		with self.assertRaises(CheckoutPriceChangedError) as raised:
 			initiate_checkout_with_mode(COD_PAYMENT_MODE, delivery_option=None)
 
 		self.assertIn("delivery option has changed", str(raised.exception))
@@ -504,7 +505,7 @@ class TestCartCheckout(IntegrationTestCase):
 		self.choose_delivery_option()
 		shown_total = get_checkout_summary(_get_cart_quotation())["cash_on_delivery"]["total"]
 
-		with self.quote_express(amount=80.0), self.assertRaises(frappe.ValidationError) as raised:
+		with self.quote_express(amount=80.0), self.assertRaises(CheckoutPriceChangedError) as raised:
 			initiate_checkout_with_mode(
 				COD_PAYMENT_MODE, delivery_option="ZZ Express", expected_total=shown_total
 			)

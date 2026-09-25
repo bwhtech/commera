@@ -696,7 +696,8 @@
 						window.location.href = response.data.order_url;
 					} catch (error) {
 						this.order_loading = false;
-// A refused order means the price or option moved on the server, so the one shown here is re-quoted.
+						// Only a moved price or option is worth re-quoting; other refusals would toast twice.
+						if (error.type !== "CheckoutPriceChangedError") return;
 						this.selected_shipping_option = null;
 						await this.load_shipping_options();
 					}

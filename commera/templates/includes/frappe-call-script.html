@@ -38,7 +38,9 @@
                 toast({{ _("Internal Server Error") | tojson }}, { type: "danger" })
             }
 
-            throw Error(error.exception)
+            const server_error = Error(error.exception)
+            server_error.type = error.type
+            throw server_error
         }
 
         if (!response.ok) {
