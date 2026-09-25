@@ -121,29 +121,23 @@ def get_category_root(category):
 def get_context(context):
 	page = get_current_page()
 	selected_filters = get_selected_filters()
-	requested_category = selected_filters["category"]
-	category_root = get_category_root(requested_category)
-	# An unknown ?category= is shopper-typed text: it must never be echoed or stand in for the whole catalog.
-	unknown_category = bool(requested_category and not category_root)
-	if unknown_category:
+	category_root = get_category_root(selected_filters["category"])
+	# An unknown ?category= is shopper-typed text that must never be echoed; the other filters still apply.
+	if not category_root:
 		selected_filters["category"] = ""
 	filters, price_range = get_product_filters(selected_filters)
 	context.page_length = get_page_size()
 	context.page_size_options = PAGE_SIZE_OPTIONS
 	context.show_relevance_sort = search_query.relevance_sort_available(selected_filters)
 	context.sort_by = get_sort_by("default" if context.show_relevance_sort else "new_arrival")
-	context.products = (
-		[]
-		if unknown_category
-		else get_product_list(
-			filters=selected_filters,
-			page=page,
-			page_length=context.page_length,
-			sort_by=context.sort_by,
-		)
+	context.products = get_product_list(
+		filters=selected_filters,
+		page=page,
+		page_length=context.page_length,
+		sort_by=context.sort_by,
 	)
 	context.current_page = page
-	context.total_count = 0 if unknown_category else get_total_product_count(filters=selected_filters)
+	context.total_count = get_total_product_count(filters=selected_filters)
 	context.filters = filters
 	context.selected_filters = selected_filters
 	context.swatches = get_swatch_map()
@@ -156,12 +150,11 @@ def get_context(context):
 	]
 	context.category = category_root["label"] if category_root else ""
 
-	category_doc = seo.get_category_seo_overrides(selected_filters["category"])
 	context.seo = seo.build_collection_seo(
 		context.category,
 		context.breadcrumbs,
 		total_count=context.total_count,
-		category_doc=category_doc,
+		category_doc=category_root,
 	)
 	context.json_ld = [
 		seo.build_collection_json_ld(context.category, context.breadcrumbs, context.total_count),

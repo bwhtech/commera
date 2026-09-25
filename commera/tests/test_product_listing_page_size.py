@@ -34,6 +34,7 @@ class ProductListingPageSizeTestCase(IntegrationTestCase):
 		self.item_group = self.make_item_group()
 		self.configurator = get_test_configurator()
 		frappe.local.lang = "en"
+		frappe.local.commera_storefront_menu = None
 		self.variants = [self.make_variant(index) for index in range(FIXTURE_COUNT)]
 
 		self.configured_page_size = frappe.db.get_single_value(SETTINGS_DOCTYPE, PAGE_SIZE_FIELD)
@@ -175,20 +176,21 @@ class ProductListingPageSizeTestCase(IntegrationTestCase):
 		context = self.get_listing(**query_params)
 		return render_themed_template("theme://pages/products/list.html", context, theme_name="Summer Theme")
 
-	def test_unknown_category_lists_nothing(self):
-		context = self.get_listing(category=f"No Such Tab {self.suffix}")
+	def test_unknown_category_is_dropped_and_the_other_filters_still_apply(self):
+		context = self.get_listing(category=f"stale-tab-{self.suffix.lower()}")
 
-		self.assertEqual(context.products, [])
-		self.assertEqual(context.total_count, 0)
 		self.assertEqual(context.category, "")
+		self.assertEqual(context.selected_filters["category"], "")
+		self.assertEqual(context.total_count, FIXTURE_COUNT)
 
 	def test_script_in_category_is_never_echoed(self):
 		context = self.get_listing(category=SCRIPT_PAYLOAD)
-		self.assertNotIn("alert(1)", frappe.as_json([context.category, context.seo, context.json_ld]))
+		self.assertNotIn(
+			"alert(1)", frappe.as_json([context.category, context.seo, context.json_ld, context.filters])
+		)
+		self.assertEqual(context.total_count, FIXTURE_COUNT)
 
-		html = self.get_listing_html(category=SCRIPT_PAYLOAD)
-		self.assertNotIn("alert(1)", html)
-		self.assertIn("No products found", html)
+		self.assertNotIn("alert(1)", self.get_listing_html(category=SCRIPT_PAYLOAD))
 
 	def test_script_in_a_filter_chip_is_escaped(self):
 		html = self.get_listing_html(colors=SCRIPT_PAYLOAD)
@@ -200,11 +202,17 @@ class ProductListingPageSizeTestCase(IntegrationTestCase):
 		label = f"Listing Tab {self.suffix}"
 		route_slug = f"listing-tab-{self.suffix.lower()}"
 		tab = navbar_manager.create_node("", label)
-		frappe.db.set_value("Ecommerce Category", tab.name, "route_slug", route_slug)
+		frappe.db.set_value(
+			"Ecommerce Category", tab.name, {"route_slug": route_slug, "meta_title": f"Meta {label}"}
+		)
 		frappe.local.commera_storefront_menu = None
 
-		context = self.get_listing(category=route_slug)
+		for category in (route_slug, tab.name, label):
+			with self.subTest(category=category):
+				context = self.get_listing(category=category)
 
-		self.assertEqual(context.category, label)
-		self.assertEqual(context.total_count, FIXTURE_COUNT)
-		self.assertIn(f"<h1>{label}</h1>", self.get_listing_html(category=route_slug))
+				self.assertEqual(context.category, label)
+				self.assertEqual(context.total_count, FIXTURE_COUNT)
+				self.assertEqual(context.seo["title"], f"Meta {label}")
+				self.assertIn(label, context.filters)
+				self.assertIn(f"<h1>{label}</h1>", self.get_listing_html(category=category))

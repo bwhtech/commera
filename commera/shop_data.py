@@ -62,7 +62,7 @@ def get_category_facets(category):
 	menu = get_storefront_menu()
 	if category:
 		root = find_menu_root(menu, category)
-		return {category: build_facet_nodes(root["children"]) if root else []}
+		return {root["label"]: build_facet_nodes(root["children"])} if root else {}
 	return {root["label"]: build_facet_nodes(root["children"]) for root in menu}
 
 
