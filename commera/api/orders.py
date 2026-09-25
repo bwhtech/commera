@@ -4,7 +4,7 @@ from frappe import _
 from frappe.utils import flt
 
 from commera.api.payments import system_user_session
-from commera.utils import validate_document_access
+from commera.utils import update_sales_order_ecommerce_status, validate_document_access
 
 
 @frappe.whitelist()
@@ -27,6 +27,8 @@ def cancel_order(order_id: str):
 			order_doc.submit()
 			order_doc.reload()
 			order_doc.cancel()
+		# The on_cancel hook only enqueues this, so the page would reload onto the old status.
+		update_sales_order_ecommerce_status(order_id)
 
 		if refund:
 			submit_refund_payment_entry(order_id, *refund)

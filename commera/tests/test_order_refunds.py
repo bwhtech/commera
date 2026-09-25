@@ -227,3 +227,12 @@ class TestOrderRefunds(IntegrationTestCase):
 
 		self.assertEqual(frappe.db.get_value("Sales Order", sales_order.name, "docstatus"), 2)
 		self.assertEqual(self.refunds_for(sales_order), [])
+
+	def test_a_cancelled_order_reads_cancelled_straight_away(self):
+		sales_order = self.make_cod_order()
+
+		cancel_order(sales_order.name)
+
+		self.assertEqual(
+			frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status"), "Cancelled"
+		)
