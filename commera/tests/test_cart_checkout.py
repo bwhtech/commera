@@ -280,19 +280,17 @@ class TestCartCheckout(IntegrationTestCase):
 		save_cart_quotation(quotation)
 
 	def set_cod_fee(self, cod_charge: float):
-		frappe.db.set_single_value(
-			"Commera Settings",
-			{
-				"cod_enabled": 1,
-				"cod_charge": cod_charge,
-				"cod_charge_applicable_below": 100000,
-				"charge_account_head": frappe.db.get_value(
-					"Account",
-					{"company": _get_cart_quotation().company, "root_type": "Income", "is_group": 0},
-					"name",
-				),
-			},
+		self.set_commera_settings(
+			{"cod_enabled": 1, "cod_charge": cod_charge, "cod_charge_applicable_below": 100000}
 		)
+
+	def set_commera_settings(self, values: dict):
+		charge_account_head = frappe.db.get_value(
+			"Account",
+			{"company": _get_cart_quotation().company, "root_type": "Income", "is_group": 0},
+			"name",
+		)
+		frappe.db.set_single_value("Commera Settings", {**values, "charge_account_head": charge_account_head})
 		frappe.clear_document_cache("Commera Settings", "Commera Settings")
 		self.addCleanup(frappe.clear_document_cache, "Commera Settings", "Commera Settings")
 
@@ -410,6 +408,7 @@ class TestCartCheckout(IntegrationTestCase):
 	# -- payment bills only what the shopper was shown --------------------------------------------
 
 	def choose_delivery_option(self, amount: float = 50.0):
+		self.set_commera_settings({})
 		quotation = _get_cart_quotation()
 		apply_delivery_option(quotation, {"title": "ZZ Express", "amount": amount})
 		save_cart_quotation(quotation)
