@@ -29,13 +29,19 @@ def validate_user_names(first_name: str, last_name: str):
 			frappe.throw(_("{0} cannot be longer than {1} characters.").format(_(field.label), max_length))
 
 
+def validate_single_email(email: str):
+	# validate_email_address accepts "a@x.com, b@y.com" and "Name <a@x.com>" and returns the list unchanged;
+	# either would mail the OTP to more than the one address typed.
+	normalized_email = validate_email_address(email, throw=True)
+	if "," in normalized_email or normalized_email != cstr(email).strip():
+		frappe.throw(_("Please enter a single valid email address."), frappe.InvalidEmailAddressError)
+
+
 # Pre-login by definition; writes nothing but the cached OTP, and is rate limited.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=30, seconds=60 * 60)
-# The IP limit stops one caller spraying addresses; this one stops many callers flooding one inbox.
-@rate_limit(key="email", ip_based=False, limit=5, seconds=60 * 60)
 def send_signup_otp(email: str, first_name: str, last_name: str):
-	validate_email_address(email, throw=True)
+	validate_single_email(email)
 	validate_user_names(first_name, last_name)
 	user_exist = frappe.db.exists("User", {"email": email})
 	if user_exist:
@@ -46,8 +52,8 @@ def send_signup_otp(email: str, first_name: str, last_name: str):
 # Pre-login by definition; writes nothing but the cached OTP, and is rate limited.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=30, seconds=60 * 60)
-@rate_limit(key="email", ip_based=False, limit=5, seconds=60 * 60)
 def send_login_otp(email: str):
+	validate_single_email(email)
 	user_exists = frappe.db.exists("User", email)
 	if not user_exists:
 		frappe.throw(_("Invalid login ID"))
@@ -57,7 +63,7 @@ def send_login_otp(email: str):
 
 # Pre-login by definition; the OTP proves the caller owns the address.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
-# Keyed on email, not the caller IP: an IP-bound limit leaves a 6-digit code brute-forceable.
+# Keyed on the caller IP plus the email, so each address gets its own attempt budget per caller.
 @rate_limit(key="email", limit=5, seconds=60 * 5)
 def verify_signup_otp(email: str, first_name: str, last_name: str, otp: str):
 	validate_user_names(first_name, last_name)
