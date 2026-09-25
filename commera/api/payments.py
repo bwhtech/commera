@@ -14,6 +14,7 @@ from commera.api.cart import validate_stock_available
 from commera.api.shipping import (
 	clear_delivery_option,
 	copy_delivery_option_to_order,
+	get_charge_lines,
 	reprice_selected_option,
 )
 from commera.core import _get_cart_quotation
@@ -45,6 +46,17 @@ def is_cod(payment_mode: str | None) -> bool:
 def get_charge_amount(quotation) -> float:
 	# rounded_total is 0 when rounding is disabled on the document; grand_total is the billed figure then.
 	return flt(quotation.rounded_total) or flt(quotation.grand_total)
+
+
+def get_checkout_summary(quotation) -> dict:
+	charge_lines = get_charge_lines(quotation.taxes, quotation.shipping_rule)
+	return {
+		"net_total": flt(quotation.net_total),
+		"shipping": charge_lines["shipping"],
+		"taxes": charge_lines["taxes"],
+		"rounding_adjustment": flt(quotation.rounding_adjustment),
+		"total": get_charge_amount(quotation),
+	}
 
 
 def get_open_gateway_payment_request(quotation_name: str) -> str | None:
@@ -382,9 +394,10 @@ def save_quotation_address(quotation, address: dict):
 		quotation.custom_is_store_pickup = True
 		# A delivery option picked before store pickup would otherwise still be charged at payment time.
 		clear_delivery_option(quotation)
+		clear_pickup_charges(quotation)
 		save_cart_quotation(quotation)
 
-		return {"message": _("Addresses updated successfully")}
+		return get_address_saved_response(quotation)
 	quotation.custom_is_store_pickup = False
 	quotation.custom_store = ""
 
@@ -422,7 +435,14 @@ def save_quotation_address(quotation, address: dict):
 	contact.save(ignore_permissions=True)
 	save_cart_quotation(quotation)
 
-	return {"message": _("Addresses updated successfully")}
+	return get_address_saved_response(quotation)
+
+
+def get_address_saved_response(quotation) -> dict:
+	return {
+		"message": _("Addresses updated successfully"),
+		"checkout_summary": get_checkout_summary(quotation),
+	}
 
 
 def set_gst_details(quotation):
@@ -650,13 +670,18 @@ def validate_store_pickup(warehouse: str | None):
 		frappe.throw(_("Please select a valid pickup location."))
 
 
+def clear_pickup_charges(quotation):
+	"""Applied when pickup is chosen as well as at payment, so the summary shown is the one charged."""
+	quotation.shipping_rule = None
+	quotation.taxes = []
+	quotation.calculate_taxes_and_totals()
+
+
 def update_delivery_charges(quotation):
 	if quotation.custom_is_store_pickup:
 		# A cart saved as a pickup before the owner switched pickup off must not reach payment as one.
 		validate_store_pickup(quotation.custom_store)
-		quotation.shipping_rule = None
-		quotation.taxes = []
-		quotation.calculate_taxes_and_totals()
+		clear_pickup_charges(quotation)
 		save_cart_quotation(quotation)
 		return
 

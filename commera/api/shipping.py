@@ -1,9 +1,9 @@
 import frappe
 from frappe import _
-from frappe.utils.data import flt, sha256_hash
+from frappe.utils.data import cstr, flt, sha256_hash
 
 from commera.core import _get_cart_quotation
-from commera.utils import validate_document_access
+from commera.utils import COD_CHARGE_DESCRIPTION, validate_document_access
 
 # The Actual charge row the chosen option posts through, matched on description on re-selection.
 DELIVERY_CHARGE_DESCRIPTION = "Delivery Charges"
@@ -248,25 +248,55 @@ def remove_shipping_rule_row(quotation):
 
 	Matched on charge_type, account_head and cost_center: the description is renamed and translated.
 	"""
-	if not quotation.shipping_rule:
-		return
-
-	rule = frappe.get_cached_value(
-		"Shipping Rule", quotation.shipping_rule, ["account", "cost_center"], as_dict=True
-	)
+	rule = get_shipping_rule_accounts(quotation.shipping_rule)
 	if not rule:
 		return
 
-	quotation.taxes = [
-		row
-		for row in quotation.taxes
-		if not (
-			row.charge_type == "Actual"
-			and row.account_head == rule.account
-			and row.cost_center == rule.cost_center
-		)
-	]
+	quotation.taxes = [row for row in quotation.taxes if not is_shipping_rule_row(row, rule)]
 	reindex_taxes(quotation)
+
+
+def get_shipping_rule_accounts(shipping_rule: str | None):
+	if not shipping_rule:
+		return None
+	return frappe.get_cached_value("Shipping Rule", shipping_rule, ["account", "cost_center"], as_dict=True)
+
+
+def is_shipping_rule_row(row, rule) -> bool:
+	return bool(
+		rule
+		and row.charge_type == "Actual"
+		and row.account_head == rule.account
+		and row.cost_center == rule.cost_center
+	)
+
+
+def get_charge_lines(taxes, shipping_rule: str | None) -> dict:
+	"""Split a charge table into delivery, the COD fee and the taxes a shopper sees by their own names.
+
+	The Shipping Rule row is matched on account and cost centre because its description is translated.
+	"""
+	rule = get_shipping_rule_accounts(shipping_rule)
+	charge_lines = {"shipping": 0.0, "cod_charge": 0.0, "taxes": []}
+	for row in taxes:
+		description = cstr(row.description).strip()
+		if description == COD_CHARGE_DESCRIPTION.strip():
+			charge_lines["cod_charge"] += flt(row.tax_amount)
+		elif description.startswith(DELIVERY_CHARGE_DESCRIPTION) or is_shipping_rule_row(row, rule):
+			charge_lines["shipping"] += flt(row.tax_amount)
+		else:
+			charge_lines["taxes"].append({"description": description, "amount": flt(row.tax_amount)})
+	return charge_lines
+
+
+def get_order_charge_lines(sales_order: str, shipping_rule: str | None) -> dict:
+	taxes = frappe.get_all(
+		"Sales Taxes and Charges",
+		filters={"parent": sales_order, "parenttype": "Sales Order"},
+		fields=["description", "charge_type", "account_head", "cost_center", "tax_amount"],
+		order_by="idx asc",
+	)
+	return get_charge_lines(taxes, shipping_rule)
 
 
 def reindex_taxes(quotation):
@@ -289,11 +319,14 @@ def get_charge_account(title: str) -> str:
 
 
 def get_delivery_summary(quotation) -> dict:
+	from commera.api.payments import get_checkout_summary
+
 	return {
 		"delivery_option": quotation.custom_delivery_option,
 		"delivery_charge": flt(quotation.custom_delivery_charge),
 		"grand_total": flt(quotation.rounded_total) or flt(quotation.grand_total),
 		"currency": quotation.currency,
+		"checkout_summary": get_checkout_summary(quotation),
 	}
 
 

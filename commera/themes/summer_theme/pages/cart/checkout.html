@@ -7,11 +7,7 @@
 {% set checkout_config = {
 	"payment_gateways": payment_gateways,
 	"show_cod": show_cod | int,
-	"net_total": cart_quotation.net_total or 0,
-	"rounding_adjustment": cart_quotation.rounding_adjustment or 0,
-	"rounded_total": cart_quotation.rounded_total or 0,
-	"delivery_charge": delivery_charge or 0,
-	"delivery_charge_applicable_below": delivery_charge_applicable_below or 0,
+	"summary": checkout_summary,
 	"cod_charge": cod_charge or 0,
 	"cod_charge_applicable_below": cod_charge_applicable_below or 0,
 	"has_billing_addresses": billing_addresses | length > 0,
@@ -301,7 +297,7 @@
 							<tbody>
 								<tr class="subtotal">
 									<td>{{ _("Subtotal") }}</td>
-									<td class="price">{{ currency_symbol }}{{ "%.2f" | format(cart_quotation.net_total or 0) }}</td>
+									<td class="price">{{ currency_symbol }}<span x-text="format_amount(summary.net_total)">{{ "%.2f" | format(checkout_summary.net_total) }}</span></td>
 								</tr>
 								<tr class="shipping">
 									<td>
@@ -314,9 +310,19 @@
 										<span x-show="shipping_amount" x-cloak>{{ currency_symbol }}<span x-text="format_amount(shipping_amount)"></span></span>
 									</td>
 								</tr>
+								<template x-for="(tax, index) in summary.taxes" :key="index">
+									<tr class="tax">
+										<td x-text="tax.description"></td>
+										<td class="price">{{ currency_symbol }}<span x-text="format_amount(tax.amount)"></span></td>
+									</tr>
+								</template>
 								<tr class="cod-charge" x-show="cod_amount" x-cloak>
 									<td>{{ _("Cash on Delivery Fee") }}</td>
 									<td class="price">{{ currency_symbol }}<span x-text="format_amount(cod_amount)"></span></td>
+								</tr>
+								<tr class="rounding-adjustment" x-show="summary.rounding_adjustment" x-cloak>
+									<td>{{ _("Rounding Adjustment") }}</td>
+									<td class="price">{{ currency_symbol }}<span x-text="format_amount(summary.rounding_adjustment)"></span></td>
 								</tr>
 								<tr class="total">
 									<td>{{ _("Total") }}</td>
@@ -484,19 +490,18 @@
 				terms_accepted: false,
 				errors: [],
 				payment_mode: Alpine.$persist(null).as("payment_mode"),
-				delivery_charge: config.delivery_charge,
-				delivery_charge_applicable_below: config.delivery_charge_applicable_below,
+				summary: config.summary,
 				shipping_options: [],
 				shipping_options_loading: false,
 				shipping_options_message: "",
 				selected_shipping_option: null,
-				selected_shipping_charge: 0,
 				shipping_option_saving: false,
 				pending_shipping_option: null,
 
 				async init() {
 					this.set_available_payment_mode();
-					await this.set_delivery_charge();
+					const response = await frappe_call("/api/v2/method/commera.api.checkout.save_checkout_charges");
+					this.summary = response.data;
 				},
 
 				format_amount(amount) {
@@ -510,30 +515,22 @@
 				},
 
 				get shipping_amount() {
-					if (this.delivery_option !== "home_delivery") return 0;
-// A chosen delivery option is priced and stored by the server and replaces the flat shipping rule, so its charge wins.
-					if (this.selected_shipping_option) return this.selected_shipping_charge;
-					return this.config.net_total < this.delivery_charge_applicable_below ? this.delivery_charge : 0;
+					return this.summary.shipping;
 				},
 
 				get cod_amount() {
 					if (!this.address_saved || this.payment_mode !== COD_PAYMENT_MODE) return 0;
-					return this.config.cod_charge_applicable_below > this.config.rounded_total ? this.config.cod_charge : 0;
+					return this.config.cod_charge_applicable_below >= this.summary.total ? this.config.cod_charge : 0;
 				},
 
 				get total() {
-					return this.config.net_total + this.config.rounding_adjustment + this.shipping_amount + this.cod_amount;
+// The COD fee is only added to the order when it is placed, so it is the one figure not in the server's total.
+					return this.summary.total + this.cod_amount;
 				},
 
 				set_available_payment_mode() {
 					if (this.available_payment_modes.includes(this.payment_mode)) return;
 					this.payment_mode = this.available_payment_modes[0] || null;
-				},
-
-// The shipping rule lives on the quotation, so the billed charge can differ from what Commera Settings advertised on page load.
-				async set_delivery_charge() {
-					const response = await frappe_call("/api/v2/method/commera.api.checkout.apply_shipping_rule");
-					[this.delivery_charge, this.delivery_charge_applicable_below] = response.data.map(Number);
 				},
 
 				reset_address_step() {
@@ -543,7 +540,6 @@
 					this.shipping_options = [];
 					this.shipping_options_message = "";
 					this.selected_shipping_option = null;
-					this.selected_shipping_charge = 0;
 					this.pending_shipping_option = null;
 				},
 
@@ -587,7 +583,7 @@
 								{ delivery_option: next_option },
 							);
 							this.selected_shipping_option = response.data.delivery_option;
-							this.selected_shipping_charge = Number(response.data.delivery_charge) || 0;
+							this.summary = response.data.checkout_summary;
 						}
 					} finally {
 						this.shipping_option_saving = false;
@@ -664,6 +660,7 @@
 							{ address: this.get_address_payload() },
 						);
 						toast(response.data.message, { type: "success" });
+						this.summary = response.data.checkout_summary;
 						this.address_saved = true;
 						await this.load_shipping_options();
 					} finally {

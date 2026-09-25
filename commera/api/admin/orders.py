@@ -9,8 +9,8 @@ from frappe.utils.data import add_days, cint, cstr, flt, formatdate, getdate
 
 from commera.api.admin.catalog import get_unpublishable_options
 from commera.api.admin.inventory import get_inventory
-from commera.api.shipping import DELIVERY_CHARGE_DESCRIPTION
-from commera.utils import COD_CHARGE_DESCRIPTION, get_address_lines
+from commera.api.shipping import get_order_charge_lines
+from commera.utils import get_address_lines
 
 PAGE_LENGTH = 20
 
@@ -562,37 +562,11 @@ def read_shipment_stages(order_names: list, lifecycles: dict) -> None:
 
 
 def get_order_charges(order):
-	"""Split the charge table into the lines the order screen can name. The Shipping Rule row is matched
-	on account and cost centre because its description is the rule's *translated* label."""
-	rule = (
-		frappe.get_cached_value(
-			"Shipping Rule", order.shipping_rule, ["account", "cost_center"], as_dict=True
-		)
-		if order.shipping_rule
-		else None
-	)
-
-	shipping = 0.0
-	cod_charge = 0.0
-	for row in frappe.get_all(
-		"Sales Taxes and Charges",
-		filters={"parent": order.name, "parenttype": "Sales Order"},
-		fields=["description", "charge_type", "account_head", "cost_center", "tax_amount"],
-	):
-		description = cstr(row.description).strip()
-		if description == COD_CHARGE_DESCRIPTION.strip():
-			cod_charge += flt(row.tax_amount)
-		elif description.startswith(DELIVERY_CHARGE_DESCRIPTION) or (
-			rule
-			and row.charge_type == "Actual"
-			and row.account_head == rule.account
-			and row.cost_center == rule.cost_center
-		):
-			shipping += flt(row.tax_amount)
+	charge_lines = get_order_charge_lines(order.name, order.shipping_rule)
 
 	precision = frappe.get_precision("Sales Order", "grand_total", order.currency)
-	shipping = flt(shipping, precision)
-	cod_charge = flt(cod_charge, precision)
+	shipping = flt(charge_lines["shipping"], precision)
+	cod_charge = flt(charge_lines["cod_charge"], precision)
 	return {
 		"shipping": shipping,
 		"cod_charge": cod_charge,
