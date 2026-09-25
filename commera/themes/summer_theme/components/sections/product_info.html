@@ -53,9 +53,9 @@
 							{% if discount_percent %}
 							<span class="badge bg-secondary mb-2">{{ _("Sale {0}% Off").format(discount_percent | round | int) }}</span>
 							{% endif %}
-							<h4 class="title mb-1">
+							<h1 class="h4 title mb-1">
 								{% if frappe.lang == "ar" %}{{ product.custom_item_name_ar or product_variant.display_name }}{% else %}{{ product_variant.display_name }}{% endif %}
-							</h4>
+							</h1>
 							<div class="review-num">
 								<a href="/{{ frappe.lang or 'en' }}/products?brands={{ product.brand | urlencode }}">{{ product.brand }}</a>
 							</div>
