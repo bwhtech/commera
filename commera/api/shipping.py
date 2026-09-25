@@ -303,7 +303,8 @@ def get_checkout_summary(quotation) -> dict:
 
 	cod_charge = get_cod_charge(preview)
 	if cod_charge:
-		add_cod_charge(preview, cod_charge)
+		account_head = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
+		add_cod_charge(preview, cod_charge, account_head)
 	summary["cash_on_delivery"] = get_charge_summary(preview)
 	return summary
 
@@ -340,7 +341,7 @@ def get_cod_charge(quotation) -> float:
 	return flt(cod_charge)
 
 
-def add_cod_charge(quotation, cod_charge: float, account_head: str | None = None):
+def add_cod_charge(quotation, cod_charge: float, account_head: str | None):
 	quotation.append(
 		"taxes",
 		{
