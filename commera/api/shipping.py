@@ -315,7 +315,9 @@ def get_charge_summary(quotation) -> dict:
 	discount_amount = flt(quotation.discount_amount)
 	return {
 		# Derived rather than read: with a Grand Total discount the stored net_total is already partly discounted.
-		"subtotal": flt(quotation.grand_total) + discount_amount - charges,
+		"subtotal": flt(
+			flt(quotation.grand_total) + discount_amount - charges, quotation.precision("grand_total")
+		),
 		"shipping": charge_lines["shipping"],
 		"cod_charge": charge_lines["cod_charge"],
 		"taxes": charge_lines["taxes"],
