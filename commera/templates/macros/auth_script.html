@@ -6,7 +6,9 @@
             return;
         }
         const args = {
-            'email': email
+            'email': email,
+            'first_name': signup_data.first_name,
+            'last_name': signup_data.last_name
         };
         const btn = ref.sign_in_btn
         const spinner = btn.querySelector(".animate-spin");
