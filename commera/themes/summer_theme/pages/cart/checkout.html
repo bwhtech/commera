@@ -559,13 +559,18 @@
 						}
 
 						const still_offered = this.shipping_options.some((option) => option.title === data.selected);
-						await this.select_shipping_option(still_offered ? data.selected : this.shipping_options[0].title);
+						await this.select_shipping_option(still_offered ? data.selected : this.get_cheapest_shipping_option());
 					} catch (error) {
 						this.shipping_options = [];
 						this.shipping_options_message = SHIPPING_UNAVAILABLE_MESSAGE;
 					} finally {
 						this.shipping_options_loading = false;
 					}
+				},
+
+				get_cheapest_shipping_option() {
+					return this.shipping_options.reduce((cheapest, option) =>
+						Number(option.amount) < Number(cheapest.amount) ? option : cheapest).title;
 				},
 
 				async select_shipping_option(title) {
