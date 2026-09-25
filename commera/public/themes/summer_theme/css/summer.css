@@ -389,12 +389,14 @@ button:focus-visible {
 	outline-offset: -2px;
 }
 
-/* style.css opens the mega-menu on :hover only; navigation.html sets .menu-expanded on keyboard focus. */
-.header-nav .nav > li.menu-expanded > .mega-menu {
-	display: block;
-	opacity: 1;
-	visibility: visible;
-	margin-top: 0;
-	z-index: 11;
-	pointer-events: unset;
+/* style.css opens the desktop mega-menu on :hover only; navigation.html sets .menu-expanded on keyboard focus.
+   The mobile drawer keeps its own chevron toggle (li.open). */
+@media only screen and (min-width: 992px) {
+	.header-nav .nav > li.menu-expanded > .mega-menu {
+		opacity: 1;
+		visibility: visible;
+		margin-top: 0;
+		z-index: 11;
+		pointer-events: unset;
+	}
 }

@@ -26,7 +26,7 @@
 	@focusin="$event.target.matches(':focus-visible') && (menu_expanded = true)"
 	@focusout="$el.contains($event.relatedTarget) || (menu_expanded = false)"
 	@keydown.escape="$refs.menu_trigger.focus(); menu_expanded = false">
-	<a href="{{ node.href or 'javascript:void(0);' }}" x-ref="menu_trigger" aria-haspopup="true"
+	<a href="{{ node.href or 'javascript:void(0);' }}" x-ref="menu_trigger"
 		:aria-expanded="menu_expanded || is_branch_open({{ branch_key }})">
 		<span>{{ node.label }}</span>
 		<i class="fas fa-chevron-down tabindex" @click.prevent.stop="toggle_branch({{ branch_key }})"></i>
