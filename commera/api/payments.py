@@ -7,7 +7,7 @@ from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_ent
 from erpnext.accounts.doctype.pricing_rule.utils import validate_coupon_code
 from frappe import _
 from frappe.utils import getdate, validate_email_address
-from frappe.utils.data import flt
+from frappe.utils.data import cstr, flt, fmt_money
 
 from commera.analytics.events import log_purchase, set_attribution_fields
 from commera.api.cart import validate_stock_available
@@ -59,23 +59,36 @@ def validate_cart_is_not_in_checkout(quotation_name: str):
 	if not quotation_name:
 		return
 
-	open_request = get_open_gateway_payment_request(quotation_name)
-	if not open_request:
-		return
+	if frappe.db.exists(
+		"Gateway Payment Request",
+		{"ref_doctype": "Quotation", "ref_docname": quotation_name, "status": "Paid"},
+	):
+		refuse_paid_cart()
 
-	payment_request = frappe.get_doc("Gateway Payment Request", open_request)
-	if payment_request.release_if_unpaid():
-		return
-
-	if payment_request.status == "Paid":
+	# A double-clicked Place Order leaves two open sessions, and each one still bills the old cart.
+	pending_requests = frappe.get_all(
+		"Gateway Payment Request",
+		filters={"ref_doctype": "Quotation", "ref_docname": quotation_name, "status": "Pending"},
+		pluck="name",
+	)
+	for pending_request in pending_requests:
+		payment_request = frappe.get_doc("Gateway Payment Request", pending_request)
+		if payment_request.release_if_unpaid():
+			continue
+		if payment_request.status == "Paid":
+			refuse_paid_cart()
 		frappe.throw(
-			_("This order has already been paid. Open it from your account rather than changing the cart."),
-			title=_("Already Paid"),
+			_(
+				"A payment is already in progress for this order. Finish or cancel it before changing your cart."
+			),
+			title=_("Checkout In Progress"),
 		)
 
+
+def refuse_paid_cart():
 	frappe.throw(
-		_("A payment is already in progress for this order. Finish or cancel it before changing your cart."),
-		title=_("Checkout In Progress"),
+		_("This order has already been paid. Open it from your account rather than changing the cart."),
+		title=_("Already Paid"),
 	)
 
 
@@ -98,16 +111,22 @@ def refuse_payment(message: str, quotation: str | None = None, **context):
 	frappe.throw(message)
 
 
-@frappe.whitelist()
-def initiate_checkout_with_mode(payment_mode: str):
+@frappe.whitelist(methods=["POST"])
+def initiate_checkout_with_mode(
+	payment_mode: str, delivery_option: str | None = None, expected_total: float | None = None
+):
 	quotation = _get_cart_quotation()
 	with cart_write_lock(quotation):
-		return open_checkout(quotation, payment_mode)
+		return open_checkout(quotation, payment_mode, delivery_option, expected_total)
 
 
-def open_checkout(quotation, payment_mode: str):
+def open_checkout(
+	quotation, payment_mode: str, delivery_option: str | None = None, expected_total: float | None = None
+):
+	validate_delivery_option(quotation, delivery_option)
 	validate_cart_is_not_in_checkout(quotation.name)
 	update_delivery_charges(quotation)
+	validate_expected_total(quotation, payment_mode, expected_total)
 
 	if is_cod(payment_mode):
 		if not frappe.db.get_single_value("Commera Settings", "cod_enabled"):
@@ -157,6 +176,41 @@ def open_checkout(quotation, payment_mode: str):
 	).insert(ignore_permissions=True)
 
 	return {"order_url": payment_request.order_url}
+
+
+def validate_delivery_option(quotation, delivery_option: str | None):
+	# Payment reprices the stored option, so it must be the one the shopper is looking at.
+	if cstr(quotation.custom_delivery_option) == cstr(delivery_option):
+		return
+
+	frappe.throw(
+		_("Your delivery option has changed. Please choose it again before placing your order."),
+		title=_("Delivery Option Changed"),
+	)
+
+
+def validate_expected_total(quotation, payment_mode: str, expected_total: float | None):
+	# A re-quote past the rates cache, or a flat rule edited meanwhile, must not bill a figure never shown.
+	if expected_total is None:
+		return
+
+	payable_total = get_payable_total(quotation, payment_mode)
+	precision = quotation.precision("grand_total")
+	if flt(expected_total, precision) == flt(payable_total, precision):
+		return
+
+	frappe.throw(
+		_("Your order total has changed to {0}. Please review it before placing your order.").format(
+			fmt_money(payable_total, currency=quotation.currency)
+		),
+		title=_("Order Total Changed"),
+	)
+
+
+def get_payable_total(quotation, payment_mode: str) -> float:
+	if is_cod(payment_mode):
+		return get_checkout_summary(quotation)["cash_on_delivery"]["total"]
+	return get_charge_amount(quotation)
 
 
 def get_gateway_email(contact_email: str | None) -> str | None:
@@ -292,7 +346,7 @@ def fix_payment_schedule_dates(doc):
 			term.due_date = today
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def generate_quotation_for_cart(cart: dict):
 	cart = frappe.parse_json(cart)
 	if len(cart.get("items", [])) < 1:
@@ -323,6 +377,8 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 			},
 		)
 	save_cart_quotation(unsaved_quotation_doc)
+	# The stored option was priced for the old cart, and payment would re-quote it for the new one.
+	clear_delivery_option(unsaved_quotation_doc)
 	_remove_coupon_code(unsaved_quotation_doc)
 	set_charges(unsaved_quotation_doc)
 	return save_cart_quotation(unsaved_quotation_doc)
@@ -349,7 +405,7 @@ def set_cod_charges(quotation):
 	quotation.save()
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def update_quotation_address(address: dict):
 	quotation = _get_cart_quotation()
 	with cart_write_lock(quotation):
@@ -571,57 +627,53 @@ def _remove_coupon_code(quotation):
 
 
 def add_billing_address(party_name, address):
-	if not party_name:
-		frappe.throw(_("Cannot save an address without a customer"))
-
-	address_doc = frappe.get_doc(
-		{
-			"doctype": "Address",
-			"address_title": f"Shop Billing Address - {party_name}",
-			"address_type": "Billing",
-			"city": address.get("billing_address", {}).get("city"),
-			"country": address.get("billing_address", {}).get("country"),
-			"state": address.get("billing_address", {}).get("state"),
-			"address_line1": address.get("billing_address", {}).get("full_address"),
-			"address_line2": address.get("billing_address", {}).get("landmark"),
-			"pincode": address.get("billing_address", {}).get("po_box"),
-			"phone": address.get("billing_address", {}).get("phone_number"),
-			"email_id": address.get("billing_address", {}).get("email"),
-			"first_name": address.get("billing_address", {}).get("first_name"),
-			"last_name": address.get("billing_address", {}).get("last_name"),
-		}
-	)
-	# ERPNext resolves a transaction address through Dynamic Link; unlinked addresses are refused.
-	address_doc.append("links", {"link_doctype": "Customer", "link_name": party_name})
-	address_doc.insert(ignore_permissions=True)
-	return address_doc
+	return add_party_address(party_name, address.get("billing_address", {}), "Billing")
 
 
 def add_shipping_address(party_name, address):
+	return add_party_address(party_name, address.get("shipping_address", {}), "Shipping")
+
+
+def add_party_address(party_name, address: dict, address_type: str):
 	if not party_name:
 		frappe.throw(_("Cannot save an address without a customer"))
 
+	values = {
+		"address_type": address_type,
+		"city": address.get("city"),
+		"country": address.get("country"),
+		"state": address.get("state"),
+		"address_line1": address.get("full_address"),
+		"address_line2": address.get("landmark"),
+		"pincode": address.get("po_box"),
+		"phone": address.get("phone_number"),
+		"email_id": address.get("email"),
+	}
+	# A Continue retried after a dropped response must not file the same address twice.
+	if existing_address := get_party_address(party_name, values):
+		return frappe.get_doc("Address", existing_address)
+
 	address_doc = frappe.get_doc(
-		{
-			"doctype": "Address",
-			"address_title": f"Shop Shipping Address - {party_name}",
-			"address_type": "Shipping",
-			"city": address.get("shipping_address", {}).get("city"),
-			"country": address.get("shipping_address", {}).get("country"),
-			"state": address.get("shipping_address", {}).get("state"),
-			"address_line1": address.get("shipping_address", {}).get("full_address"),
-			"address_line2": address.get("shipping_address", {}).get("landmark"),
-			"pincode": address.get("shipping_address", {}).get("po_box"),
-			"phone": address.get("shipping_address", {}).get("phone_number"),
-			"email_id": address.get("shipping_address", {}).get("email"),
-			"first_name": address.get("shipping_address", {}).get("first_name"),
-			"last_name": address.get("shipping_address", {}).get("last_name"),
-		}
+		{"doctype": "Address", "address_title": f"Shop {address_type} Address - {party_name}", **values}
 	)
 	# ERPNext resolves a transaction address through Dynamic Link; unlinked addresses are refused.
 	address_doc.append("links", {"link_doctype": "Customer", "link_name": party_name})
 	address_doc.insert(ignore_permissions=True)
 	return address_doc
+
+
+def get_party_address(party_name: str, values: dict) -> str | None:
+	filters = [
+		["Address", field, "=", value] if value else ["Address", field, "is", "not set"]
+		for field, value in values.items()
+	]
+	filters += [
+		["Address", "disabled", "=", 0],
+		["Dynamic Link", "link_doctype", "=", "Customer"],
+		["Dynamic Link", "link_name", "=", party_name],
+	]
+	matches = frappe.get_all("Address", filters=filters, pluck="name", order_by="creation desc", limit=1)
+	return matches[0] if matches else None
 
 
 def update_quotation_payment_terms_due_date(quotation):

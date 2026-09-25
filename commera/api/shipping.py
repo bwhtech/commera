@@ -157,7 +157,7 @@ def get_cart_parcels(quotation) -> list[dict]:
 	]
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def set_delivery_option(delivery_option: str | None = None) -> dict:
 	"""Persist the customer's choice and reprice the delivery fee server-side.
 

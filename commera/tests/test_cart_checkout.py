@@ -17,8 +17,11 @@ from commera.api.payments import (
 	save_cart_quotation,
 	update_delivery_charges,
 	update_quotation_address,
+	validate_cart_is_not_in_checkout,
 )
 from commera.api.shipping import (
+	DELIVERY_CHARGE_DESCRIPTION,
+	apply_delivery_option,
 	get_cart_fingerprint,
 	get_checkout_summary,
 	get_order_charge_lines,
@@ -402,6 +405,158 @@ class TestCartCheckout(IntegrationTestCase):
 			[(row.description, row.tax_amount) for row in before.taxes],
 		)
 		self.assertEqual(context.checkout_summary["total"], after.rounded_total or after.grand_total)
+
+	# -- payment bills only what the shopper was shown --------------------------------------------
+
+	def choose_delivery_option(self, amount: float = 50.0):
+		quotation = _get_cart_quotation()
+		apply_delivery_option(quotation, {"title": "ZZ Express", "amount": amount})
+		save_cart_quotation(quotation)
+
+	def delivery_charge_rows(self) -> list[float]:
+		return [
+			row.tax_amount
+			for row in _get_cart_quotation().taxes
+			if (row.description or "").startswith(DELIVERY_CHARGE_DESCRIPTION)
+		]
+
+	def create_payment_request(self, quotation_name: str, status: str) -> str:
+		payment_request = frappe.new_doc("Gateway Payment Request")
+		payment_request.update(
+			{
+				"name": frappe.generate_hash(length=10),
+				"ref_doctype": "Quotation",
+				"ref_docname": quotation_name,
+				"status": status,
+			}
+		)
+		# db_insert, not insert(): insert() opens a real gateway session.
+		payment_request.db_insert()
+		return payment_request.name
+
+	def prepare_cod_checkout(self):
+		frappe.set_user(self.shopper)
+		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
+		update_quotation_address(self.address_payload())
+		self.set_cod_fee(0)
+
+	def quote_express(self, amount: float = 50.0):
+		return patch(
+			"commera.api.shipping.get_quoted_options",
+			return_value=[{"title": "ZZ Express", "amount": amount}],
+		)
+
+	def test_a_changed_cart_drops_the_delivery_option_priced_for_the_old_one(self):
+		frappe.set_user(self.shopper)
+		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
+		self.choose_delivery_option()
+		self.assertEqual(self.delivery_charge_rows(), [50.0])
+
+		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 3)]})
+
+		self.assertFalse(_get_cart_quotation().custom_delivery_option)
+		self.assertEqual(self.delivery_charge_rows(), [])
+
+	def test_opening_checkout_drops_the_last_delivery_option(self):
+		frappe.set_user(self.shopper)
+		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
+		self.choose_delivery_option()
+
+		apply_shipping_rule()
+
+		self.assertFalse(_get_cart_quotation().custom_delivery_option)
+		self.assertEqual(self.delivery_charge_rows(), [])
+
+	def test_opening_checkout_leaves_a_cart_with_an_open_payment_alone(self):
+		frappe.set_user(self.shopper)
+		quotation = generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
+		self.choose_delivery_option()
+		pending_request = self.create_payment_request(quotation.name, "Pending")
+
+		apply_shipping_rule()
+		get_checkout_context(frappe._dict())
+
+		self.assertEqual(_get_cart_quotation().custom_delivery_option, "ZZ Express")
+		self.assertEqual(self.delivery_charge_rows(), [50.0])
+		self.assertEqual(frappe.db.get_value("Gateway Payment Request", pending_request, "status"), "Pending")
+
+	def test_payment_refuses_a_delivery_option_the_shopper_was_not_shown(self):
+		self.prepare_cod_checkout()
+		self.choose_delivery_option()
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			initiate_checkout_with_mode(COD_PAYMENT_MODE, delivery_option=None)
+
+		self.assertIn("delivery option has changed", str(raised.exception))
+		self.assertEqual(self.delivery_charge_rows(), [50.0])
+
+	def test_payment_accepts_the_delivery_option_the_shopper_was_shown(self):
+		self.prepare_cod_checkout()
+		self.choose_delivery_option()
+
+		with self.quote_express():
+			checkout = initiate_checkout_with_mode(COD_PAYMENT_MODE, delivery_option="ZZ Express")
+
+		self.assertIn("payment_mode=COD", checkout["order_url"])
+
+	def test_payment_refuses_a_total_the_shopper_was_not_shown(self):
+		self.prepare_cod_checkout()
+		self.choose_delivery_option()
+		shown_total = get_checkout_summary(_get_cart_quotation())["cash_on_delivery"]["total"]
+
+		with self.quote_express(amount=80.0), self.assertRaises(frappe.ValidationError) as raised:
+			initiate_checkout_with_mode(
+				COD_PAYMENT_MODE, delivery_option="ZZ Express", expected_total=shown_total
+			)
+
+		self.assertIn("order total has changed", str(raised.exception))
+
+	def test_payment_accepts_the_total_the_shopper_was_shown(self):
+		self.prepare_cod_checkout()
+		self.set_cod_fee(49.5)
+		self.choose_delivery_option()
+		shown_total = get_checkout_summary(_get_cart_quotation())["cash_on_delivery"]["total"]
+
+		with self.quote_express():
+			checkout = initiate_checkout_with_mode(
+				COD_PAYMENT_MODE, delivery_option="ZZ Express", expected_total=shown_total
+			)
+
+		self.assertIn("payment_mode=COD", checkout["order_url"])
+
+	def test_a_paid_cart_is_refused_without_touching_its_pending_session(self):
+		frappe.set_user(self.shopper)
+		quotation = generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
+		frappe.set_user("Administrator")
+		self.create_payment_request(quotation.name, "Paid")
+		pending_request = self.create_payment_request(quotation.name, "Pending")
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			validate_cart_is_not_in_checkout(quotation.name)
+
+		self.assertIn("already been paid", str(raised.exception))
+		self.assertEqual(frappe.db.get_value("Gateway Payment Request", pending_request, "status"), "Pending")
+
+	def test_every_open_payment_session_on_the_cart_is_released(self):
+		frappe.set_user(self.shopper)
+		quotation = generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
+		double_click = [self.create_payment_request(quotation.name, "Pending") for _ in range(2)]
+
+		def release(payment_request):
+			payment_request.db_set("status", "Cancelled")
+			return True
+
+		with patch(
+			"bwh_payments.bwh_payments.doctype.gateway_payment_request.gateway_payment_request"
+			".GatewayPaymentRequest.release_if_unpaid",
+			release,
+		):
+			validate_cart_is_not_in_checkout(quotation.name)
+
+		statuses = frappe.get_all(
+			"Gateway Payment Request", filters={"name": ("in", double_click)}, pluck="status"
+		)
+		self.assertEqual(statuses, ["Cancelled", "Cancelled"])
 
 	# -- stock ------------------------------------------------------------------------------------
 
