@@ -180,7 +180,7 @@
 					<i class="icon feather icon-heart-on" x-show="in_wishlist" x-cloak></i>
 					<span x-text='in_wishlist ? {{ _("Remove From Wishlist") | tojson }} : {{ _("Add To Wishlist") | tojson }}'></span>
 				</button>
-				<button type="button" class="btn btn-secondary w-100" @click="add_to_cart()" {% if not product_in_stock %}disabled{% endif %}>
+				<button type="button" class="btn btn-secondary w-100" @click.throttle.1000ms="add_to_cart()" {% if not product_in_stock %}disabled{% endif %}>
 					{{ _("Add To Cart") }}
 				</button>
 				{% if not product_in_stock and frappe.session.user != "Guest" %}

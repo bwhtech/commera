@@ -6,22 +6,18 @@
             "X-Frappe-CSRF-Token": '{{ frappe.session.csrf_token }}',
             Accept: "application/json",
         }
-        if (method === "POST") {
-            response = await fetch(url, {
-                body: JSON.stringify(args),
-                method: "POST",
-                headers
-            })
-        }
-        else if (method === "PUT") {
-            response = await fetch(url, {
-                body: JSON.stringify(args),
-                method: "PUT",
-                headers
-            })
-        }
-        else {
-            response = await fetch(url)
+        try {
+            if (method === "POST" || method === "PUT") {
+                response = await fetch(url, { body: JSON.stringify(args), method, headers })
+            }
+            else {
+                response = await fetch(url)
+            }
+        } catch (error) {
+            if (error.name !== "AbortError") {
+                toast({{ _("Could not reach the store. Check your connection and try again.") | tojson }}, { type: "danger" })
+            }
+            throw error
         }
 
         const fallback_message = {{ _("Something went wrong") | tojson }}

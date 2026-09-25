@@ -37,7 +37,6 @@
 // The header and the sidebar render the name server-side, so they only pick it up on a reload.
 					window.location.reload();
 				} catch (error) {
-					toast(this.$store.i18n.t("Something went wrong"), { type: "danger" });
 					this.saving = false;
 				}
 			},
