@@ -145,7 +145,10 @@ def local_image_path(image_url):
 	elif image_url.startswith("/private/files/"):
 		path = get_files_path(image_url[len("/private/files/") :], is_private=True)
 	elif image_url.startswith("/assets/"):
-		path = os.path.join(frappe.local.sites_path, image_url.lstrip("/"))
+		assets_root = os.path.abspath(os.path.join(frappe.local.sites_path, "assets"))
+		path = os.path.abspath(os.path.join(frappe.local.sites_path, image_url.lstrip("/")))
+		if not path.startswith(assets_root + os.sep):
+			return None
 	else:
 		return None
 
@@ -157,6 +160,7 @@ def logo_data_uri(image_url):
 	if not path:
 		return None
 
+	# nosemgrep: frappe-security-file-traversal  # local_image_path confines the path to files/ or assets/
 	with open(path, "rb") as logo_file:
 		raw = logo_file.read()
 	if path.lower().endswith(".svg"):

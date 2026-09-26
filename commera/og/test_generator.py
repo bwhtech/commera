@@ -303,6 +303,9 @@ class TestStoreCard(IntegrationTestCase):
 		inlined = Image.open(BytesIO(base64.b64decode(data_uri.split(",", 1)[1])))
 		self.assertEqual(inlined.getpixel((0, 0))[3], 0)
 
+	def test_asset_path_cannot_climb_out_of_assets(self):
+		self.assertIsNone(generator.logo_data_uri("/assets/../site_config.json"))
+
 	def test_remote_logo_is_skipped(self):
 		self.assertIsNone(generator.logo_data_uri("https://cdn.example.com/logo.png"))
 
