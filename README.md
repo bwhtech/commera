@@ -104,9 +104,9 @@ Both connections are optional and off until their keys are filled in. Because th
 - [Frappe UI](https://github.com/frappe/frappe-ui) — Vue 3 component library for the dashboard.
 - Jinja, [Tailwind CSS](https://tailwindcss.com) and [Alpine.js](https://alpinejs.dev) for the storefront.
 
-## About BWH Studios
+## About BWH Tech
 
-Commera is developed and maintained by BWH Studios, a tech company based in Jagdalpur, Chhattisgarh, specializing in Frappe customizations and consulting.
+Commera is developed and maintained by BWH Tech, a tech company based in Jagdalpur, Chhattisgarh, specializing in Frappe customizations and consulting.
 
 ---
 
