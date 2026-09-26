@@ -1,6 +1,6 @@
 # Commera Apps — Platform implementation
 
-Spec 2 of 3. What Commera builds so the [developer API](01-developer-api.md) works. File paths are
+Spec 2 of 4. What Commera builds so the [developer API](01-developer-api.md) works. File paths are
 proposals unless they name existing code; line numbers are from `e606f77`.
 
 Status: draft.

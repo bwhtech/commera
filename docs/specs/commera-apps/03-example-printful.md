@@ -1,6 +1,6 @@
 # Commera Apps — Example: Printful (`print2commera`)
 
-Spec 3 of 3. A complete app built on the [developer API](01-developer-api.md) and the
+Spec 3 of 4. A complete app built on the [developer API](01-developer-api.md) and the
 [platform](02-platform-implementation.md): a port of the Medusa plugin
 [print2medusa](https://github.com/legenki/print2medusa) (0.9.7, MIT), which connects a store to
 Printful's print-on-demand service. It is the reference app and the acceptance test for specs 1 and 2:

@@ -1,8 +1,8 @@
 # Commera Apps — Developer API
 
-Spec 1 of 3. What an app developer writes to extend Commera: the registration API, the dashboard
+Spec 1 of 4. What an app developer writes to extend Commera: the registration API, the dashboard
 extension API, the server SDK, the build kit and the CLI. [Spec 2](02-platform-implementation.md)
-is how Commera implements it; [spec 3](03-example-printful.md) is a full app built on it.
+is how Commera implements it; [spec 3](03-example-printful.md) is a full app built on it. [Spec 4](04-theme-sections-and-layouts.md) covers the storefront: theme sections, page layouts and storefront app blocks.
 
 Status: draft. Nothing here exists yet.
 
