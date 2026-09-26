@@ -2,6 +2,7 @@ import frappe
 from bwh_payments.bwh_payments.utils import get_available_payment_modes
 from frappe.query_builder import DocType
 
+from commera.api.shipping import get_checkout_summary
 from commera.core import _get_cart_quotation
 from commera.utils import (
 	format_addresses,
@@ -32,6 +33,7 @@ def get_context(context):
 	context.payment_gateways = get_available_payment_modes()
 	context.show_cod = commera_settings.get("cod_enabled", 0)
 	context.cart_quotation = cart_quotation
+	context.checkout_summary = get_checkout_summary(cart_quotation)
 	context.coupon_code = get_coupon_code(cart_quotation)
 	context.country_list = get_country_list()
 	items = get_checkout_items(cart_quotation)

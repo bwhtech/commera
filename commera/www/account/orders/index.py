@@ -132,6 +132,7 @@ def get_orders_list(order_id_list=None, page=1, page_length=6):
 			sales_order.net_total,
 			sales_order.total_taxes_and_charges,
 			sales_order.rounding_adjustment,
+			sales_order.shipping_rule,
 			sales_order.shipping_address,
 			sales_order.custom_is_store_pickup,
 			address.address_line1.as_("pickup_address_line_1"),

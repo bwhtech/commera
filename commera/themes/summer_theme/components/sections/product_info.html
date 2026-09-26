@@ -163,14 +163,14 @@
 						{% if discount_percent %}
 						<tr>
 							<td><h6 class="mb-0">{{ _("You save") }}</h6></td>
-							<td class="price">{{ get_currency_symbol() }}{{ "%.2f" | format(default_price - selected_price) }}</td>
+							<td class="price">{{ get_currency_symbol() }}<span x-text="(qty * (default_price - price)).toFixed(2)">{{ "%.2f" | format(default_price - selected_price) }}</span></td>
 						</tr>
 						{% endif %}
 						<tr class="total">
 							<td><h6 class="mb-0">{{ _("Total") }}</h6></td>
 							<td class="price">
-								{{ get_currency_symbol() }}{{ "%.2f" | format(selected_price or 0) }}
-								{% if discount_percent %}<del>{{ get_currency_symbol() }}{{ "%.2f" | format(default_price or 0) }}</del>{% endif %}
+								{{ get_currency_symbol() }}<span x-text="(qty * price).toFixed(2)">{{ "%.2f" | format(selected_price or 0) }}</span>
+								{% if discount_percent %}<del>{{ get_currency_symbol() }}<span x-text="(qty * default_price).toFixed(2)">{{ "%.2f" | format(default_price or 0) }}</span></del>{% endif %}
 							</td>
 						</tr>
 					</tbody>

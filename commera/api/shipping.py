@@ -1,9 +1,9 @@
 import frappe
 from frappe import _
-from frappe.utils.data import flt, sha256_hash
+from frappe.utils.data import cstr, flt, sha256_hash
 
 from commera.core import _get_cart_quotation
-from commera.utils import validate_document_access
+from commera.utils import COD_CHARGE_DESCRIPTION, get_cod_configuration, validate_document_access
 
 # The Actual charge row the chosen option posts through, matched on description on re-selection.
 DELIVERY_CHARGE_DESCRIPTION = "Delivery Charges"
@@ -248,25 +248,123 @@ def remove_shipping_rule_row(quotation):
 
 	Matched on charge_type, account_head and cost_center: the description is renamed and translated.
 	"""
-	if not quotation.shipping_rule:
-		return
-
-	rule = frappe.get_cached_value(
-		"Shipping Rule", quotation.shipping_rule, ["account", "cost_center"], as_dict=True
-	)
+	rule = get_shipping_rule_accounts(quotation.shipping_rule)
 	if not rule:
 		return
 
-	quotation.taxes = [
-		row
-		for row in quotation.taxes
-		if not (
-			row.charge_type == "Actual"
-			and row.account_head == rule.account
-			and row.cost_center == rule.cost_center
-		)
-	]
+	quotation.taxes = [row for row in quotation.taxes if not is_shipping_rule_row(row, rule)]
 	reindex_taxes(quotation)
+
+
+def get_shipping_rule_accounts(shipping_rule: str | None):
+	if not shipping_rule:
+		return None
+	return frappe.get_cached_value("Shipping Rule", shipping_rule, ["account", "cost_center"], as_dict=True)
+
+
+def is_shipping_rule_row(row, rule) -> bool:
+	return bool(
+		rule
+		and row.charge_type == "Actual"
+		and row.account_head == rule.account
+		and row.cost_center == rule.cost_center
+	)
+
+
+def get_charge_lines(taxes, shipping_rule: str | None) -> dict:
+	"""Split a charge table into delivery, the COD fee and the taxes a shopper sees by their own names.
+
+	The Shipping Rule row is matched on account and cost centre because its description is translated.
+	"""
+	rule = get_shipping_rule_accounts(shipping_rule)
+	charge_lines = {"shipping": 0.0, "cod_charge": 0.0, "taxes": []}
+	for row in taxes:
+		description = cstr(row.description).strip()
+		if description == COD_CHARGE_DESCRIPTION.strip():
+			charge_lines["cod_charge"] += flt(row.tax_amount)
+		elif description.startswith(DELIVERY_CHARGE_DESCRIPTION) or is_shipping_rule_row(row, rule):
+			charge_lines["shipping"] += flt(row.tax_amount)
+		else:
+			charge_lines["taxes"].append({"description": description, "amount": flt(row.tax_amount)})
+	return charge_lines
+
+
+def get_charge_amount(quotation) -> float:
+	# rounded_total is 0 when rounding is disabled on the document; grand_total is the billed figure then.
+	return flt(quotation.rounded_total) or flt(quotation.grand_total)
+
+
+def get_checkout_summary(quotation) -> dict:
+	"""The charges payment will apply, priced on an unsaved copy so showing them never rewrites the cart."""
+	preview = frappe.get_doc(quotation.as_dict())
+	if preview.custom_is_store_pickup:
+		clear_pickup_charges(preview)
+	summary = get_charge_summary(preview)
+
+	cod_charge = get_cod_charge(preview)
+	if cod_charge:
+		account_head = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
+		add_cod_charge(preview, cod_charge, account_head)
+	summary["cash_on_delivery"] = get_charge_summary(preview)
+	return summary
+
+
+def get_charge_summary(quotation) -> dict:
+	charge_lines = get_charge_lines(quotation.taxes, quotation.shipping_rule)
+	charges = charge_lines["shipping"] + charge_lines["cod_charge"]
+	charges += sum(tax["amount"] for tax in charge_lines["taxes"])
+	discount_amount = flt(quotation.discount_amount)
+	return {
+		# Derived rather than read: with a Grand Total discount the stored net_total is already partly discounted.
+		"subtotal": flt(
+			flt(quotation.grand_total) + discount_amount - charges, quotation.precision("grand_total")
+		),
+		"shipping": charge_lines["shipping"],
+		"cod_charge": charge_lines["cod_charge"],
+		"taxes": charge_lines["taxes"],
+		"discount_amount": discount_amount,
+		"rounding_adjustment": flt(quotation.rounding_adjustment),
+		"total": get_charge_amount(quotation),
+	}
+
+
+def clear_pickup_charges(quotation):
+	quotation.shipping_rule = None
+	quotation.taxes = []
+	quotation.calculate_taxes_and_totals()
+
+
+def get_cod_charge(quotation) -> float:
+	applicable_below, cod_charge = get_cod_configuration()
+	if not applicable_below or not cod_charge or flt(applicable_below) < get_charge_amount(quotation):
+		return 0.0
+	return flt(cod_charge)
+
+
+def add_cod_charge(quotation, cod_charge: float, account_head: str | None):
+	quotation.append(
+		"taxes",
+		{
+			"doctype": "Sales Taxes and Charges",
+			"description": COD_CHARGE_DESCRIPTION,
+			"charge_type": "Actual",
+			"account_head": account_head,
+			"tax_amount": cod_charge,
+			# ERPNext's validate_inclusive_tax refuses an inclusive Actual charge; pinned against a site default of 1.
+			"included_in_print_rate": 0,
+		},
+	)
+	quotation.calculate_taxes_and_totals()
+
+
+def get_order_charge_lines(sales_order: str, shipping_rule: str | None) -> dict:
+	taxes = frappe.get_all(
+		"Sales Taxes and Charges",
+		filters={"parent": sales_order, "parenttype": "Sales Order"},
+		fields=["description", "charge_type", "account_head", "cost_center", "tax_amount"],
+		order_by="idx asc",
+	)
+	return get_charge_lines(taxes, shipping_rule)
 
 
 def reindex_taxes(quotation):
@@ -292,8 +390,9 @@ def get_delivery_summary(quotation) -> dict:
 	return {
 		"delivery_option": quotation.custom_delivery_option,
 		"delivery_charge": flt(quotation.custom_delivery_charge),
-		"grand_total": flt(quotation.rounded_total) or flt(quotation.grand_total),
+		"grand_total": get_charge_amount(quotation),
 		"currency": quotation.currency,
+		"checkout_summary": get_checkout_summary(quotation),
 	}
 
 
