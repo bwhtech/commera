@@ -1,0 +1,7 @@
+{
+  "name": "@commera/extension-kit",
+  "private": true,
+  "type": "module",
+  "exports": { "./vite": "./vite.js" },
+  "peerDependencies": { "vite": "^5.4.11" }
+}
