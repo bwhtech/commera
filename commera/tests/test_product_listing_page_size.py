@@ -1,16 +1,19 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
-# Tests for the storefront listing page-size control (commera/utils.py and
-# commera/www/products/list.py). Real-DB, auto-rolled-back.
+# Tests for the storefront listing controller (commera/utils.py and commera/www/products/list.py):
+# page size, and the ?category= a shopper can type. Real-DB, auto-rolled-back.
 
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from commera.tests import get_test_configurator
+from commera.commera_ecommerce.doctype.commera_settings.navbar import navbar_manager
+from commera.shop_themes.render import render_themed_template
+from commera.tests import delete_menu_entries, get_test_configurator
 from commera.utils import DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS
 from commera.www.products import list as products_list
 
 FIXTURE_COUNT = 15
 SETTINGS_DOCTYPE = "Commera Settings"
+SCRIPT_PAYLOAD = "<script>alert(1)</script>"
 PAGE_SIZE_FIELD = "products_per_page"
 
 
@@ -31,6 +34,7 @@ class ProductListingPageSizeTestCase(IntegrationTestCase):
 		self.item_group = self.make_item_group()
 		self.configurator = get_test_configurator()
 		frappe.local.lang = "en"
+		frappe.local.commera_storefront_menu = None
 		self.variants = [self.make_variant(index) for index in range(FIXTURE_COUNT)]
 
 		self.configured_page_size = frappe.db.get_single_value(SETTINGS_DOCTYPE, PAGE_SIZE_FIELD)
@@ -39,6 +43,8 @@ class ProductListingPageSizeTestCase(IntegrationTestCase):
 
 	def tearDown(self):
 		self.set_configured_page_size(self.configured_page_size)
+		delete_menu_entries({"display_name": ["like", f"%{self.suffix}%"]})
+		frappe.local.commera_storefront_menu = None
 
 	def set_configured_page_size(self, page_size):
 		"""The controller reads a Single, so a rolled-back value would otherwise linger in Redis."""
@@ -165,3 +171,48 @@ class ProductListingPageSizeTestCase(IntegrationTestCase):
 		for page_size in ("abc", "0", "-5", "30", ""):
 			with self.subTest(page_size=page_size):
 				self.assertEqual(self.get_listing(page_size=page_size).page_length, 12)
+
+	def get_listing_html(self, **query_params):
+		context = self.get_listing(**query_params)
+		return render_themed_template("theme://pages/products/list.html", context, theme_name="Summer Theme")
+
+	def test_unknown_category_is_dropped_and_the_other_filters_still_apply(self):
+		context = self.get_listing(category=f"stale-tab-{self.suffix.lower()}")
+
+		self.assertEqual(context.category, "")
+		self.assertEqual(context.selected_filters["category"], "")
+		self.assertEqual(context.total_count, FIXTURE_COUNT)
+
+	def test_script_in_category_is_never_echoed(self):
+		context = self.get_listing(category=SCRIPT_PAYLOAD)
+		self.assertNotIn(
+			"alert(1)", frappe.as_json([context.category, context.seo, context.json_ld, context.filters])
+		)
+		self.assertEqual(context.total_count, FIXTURE_COUNT)
+
+		self.assertNotIn("alert(1)", self.get_listing_html(category=SCRIPT_PAYLOAD))
+
+	def test_script_in_a_filter_chip_is_escaped(self):
+		html = self.get_listing_html(colors=SCRIPT_PAYLOAD)
+
+		self.assertNotIn(SCRIPT_PAYLOAD, html)
+		self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
+
+	def test_known_category_heads_the_page_with_its_label(self):
+		label = f"Listing Tab {self.suffix}"
+		route_slug = f"listing-tab-{self.suffix.lower()}"
+		tab = navbar_manager.create_node("", label)
+		frappe.db.set_value(
+			"Ecommerce Category", tab.name, {"route_slug": route_slug, "meta_title": f"Meta {label}"}
+		)
+		frappe.local.commera_storefront_menu = None
+
+		for category in (route_slug, tab.name, label):
+			with self.subTest(category=category):
+				context = self.get_listing(category=category)
+
+				self.assertEqual(context.category, label)
+				self.assertEqual(context.total_count, FIXTURE_COUNT)
+				self.assertEqual(context.seo["title"], f"Meta {label}")
+				self.assertIn(label, context.filters)
+				self.assertIn(f"<h1>{label}</h1>", self.get_listing_html(category=category))

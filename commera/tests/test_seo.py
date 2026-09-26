@@ -157,53 +157,6 @@ class TestBuildPageSeo(IntegrationTestCase):
 		self.assertEqual(seo.build_page_seo({}, page_type="article")["type"], "article")
 
 
-class TestCategorySeoOverrides(IntegrationTestCase):
-	def setUp(self):
-		self.cleanup = []
-
-	def tearDown(self):
-		for doctype, name in reversed(self.cleanup):
-			if frappe.db.exists(doctype, name):
-				frappe.delete_doc(doctype, name, force=True)
-
-	def make_category(self, **kwargs):
-		category = frappe.new_doc("Ecommerce Category")
-		category.category_name = kwargs.pop("category_name", f"Cat {frappe.generate_hash(length=8)}")
-		category.display_name = kwargs.pop("display_name", category.category_name)
-		category.enabled = kwargs.pop("enabled", 1)
-		category.update(kwargs)
-		category.insert(ignore_permissions=True)
-		self.cleanup.append(("Ecommerce Category", category.name))
-		return category
-
-	def test_returns_overrides_when_set(self):
-		category = self.make_category(
-			meta_title="Cat Title",
-			meta_description="Cat description.",
-			og_image="/cat.png",
-			noindex=1,
-		)
-		overrides = seo.get_category_seo_overrides(category.category_name)
-		self.assertIsNotNone(overrides)
-		self.assertEqual(overrides["meta_title"], "Cat Title")
-		self.assertEqual(overrides["meta_description"], "Cat description.")
-		self.assertEqual(overrides["og_image"], "/cat.png")
-		self.assertEqual(overrides["noindex"], 1)
-
-	def test_matches_by_route_slug(self):
-		# the controller scrubs route_slug (hyphens -> underscores); match the stored value
-		category = self.make_category(route_slug=f"slug-{frappe.generate_hash(length=6)}")
-		overrides = seo.get_category_seo_overrides(category.route_slug)
-		self.assertIsNotNone(overrides)
-
-	def test_none_when_unmatched(self):
-		self.assertIsNone(seo.get_category_seo_overrides(f"missing-{frappe.generate_hash(length=8)}"))
-
-	def test_none_when_falsy(self):
-		self.assertIsNone(seo.get_category_seo_overrides(""))
-		self.assertIsNone(seo.get_category_seo_overrides(None))
-
-
 class TestBuildCollectionSeo(IntegrationTestCase):
 	"""A category page keeps its per-category SEO overrides regardless of the product_list_* globals."""
 

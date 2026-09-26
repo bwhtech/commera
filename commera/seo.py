@@ -297,19 +297,6 @@ def build_page_seo(source, display_name=None, page_type="website"):
 	}
 
 
-def get_category_seo_overrides(category):
-	if not category:
-		return None
-	matched = frappe.get_all(
-		"Ecommerce Category",
-		filters={"enabled": 1},
-		or_filters={"category_name": category, "display_name": category, "route_slug": category},
-		fields=["meta_title", "meta_description", "og_image", "noindex"],
-		limit=1,
-	)
-	return matched[0] if matched else None
-
-
 def build_collection_seo(category, breadcrumbs, total_count=0, lang="en", image_url=None, category_doc=None):
 	store_name = get_store_name()
 	overrides = category_doc or {}

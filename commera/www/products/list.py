@@ -7,7 +7,7 @@ from frappe.utils.caching import redis_cache
 from commera import seo
 from commera.product_detail import size_sort_key
 from commera.search import query as search_query
-from commera.shop_data import get_category_facets
+from commera.shop_data import find_menu_root, get_category_facets, get_storefront_menu
 from commera.swatches import get_swatch_map
 from commera.utils import (
 	PAGE_SIZE_OPTIONS,
@@ -114,21 +114,28 @@ def get_sort_by(default_sort):
 	return frappe.form_dict.get("sort_by") or default_sort
 
 
+def get_category_root(category):
+	return find_menu_root(get_storefront_menu(), category) if category else None
+
+
 def get_context(context):
 	page = get_current_page()
 	selected_filters = get_selected_filters()
+	category_root = get_category_root(selected_filters["category"])
+	# An unknown ?category= is shopper-typed text that must never be echoed; the other filters still apply.
+	if not category_root:
+		selected_filters["category"] = ""
 	filters, price_range = get_product_filters(selected_filters)
 	context.page_length = get_page_size()
 	context.page_size_options = PAGE_SIZE_OPTIONS
 	context.show_relevance_sort = search_query.relevance_sort_available(selected_filters)
 	context.sort_by = get_sort_by("default" if context.show_relevance_sort else "new_arrival")
-	products = get_product_list(
+	context.products = get_product_list(
 		filters=selected_filters,
 		page=page,
 		page_length=context.page_length,
 		sort_by=context.sort_by,
 	)
-	context.products = products
 	context.current_page = page
 	context.total_count = get_total_product_count(filters=selected_filters)
 	context.filters = filters
@@ -141,14 +148,13 @@ def get_context(context):
 			"href": "#",
 		}
 	]
-	context.category = selected_filters.get("category", "")
+	context.category = category_root["label"] if category_root else ""
 
-	category_doc = seo.get_category_seo_overrides(context.category)
 	context.seo = seo.build_collection_seo(
 		context.category,
 		context.breadcrumbs,
 		total_count=context.total_count,
-		category_doc=category_doc,
+		category_doc=category_root,
 	)
 	context.json_ld = [
 		seo.build_collection_json_ld(context.category, context.breadcrumbs, context.total_count),

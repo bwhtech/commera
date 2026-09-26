@@ -13,7 +13,7 @@
 <div class="dz-bnr-inr bg-secondary">
 	<div class="container">
 		<div class="dz-bnr-inr-entry">
-			<h1>{{ category or _("Products") }}</h1>
+			<h1>{{ (category or _("Products")) | e }}</h1>
 			<nav aria-label="{{ _('breadcrumb') }}" class="breadcrumb-row">
 				<ul class="breadcrumb">
 					<li class="breadcrumb-item"><a href="/{{ frappe.lang or 'en' }}/">{{ _("Home") }}</a></li>

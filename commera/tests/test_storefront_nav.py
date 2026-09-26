@@ -134,10 +134,11 @@ class TestStorefrontNav(IntegrationTestCase):
 		self.assertEqual({facet["item_groups"][0] for facet in facets}, {shirts, belts})
 		self.assertTrue(all(facet["is_leaf"] for facet in facets))
 
-		# Selecting the tab narrows to that tab only, keyed by whatever ?category= carried.
+		# Selecting the tab by its entry name still keys the sidebar by the label a shopper reads.
 		one_tab = get_category_facets(tab)
-		self.assertEqual(list(one_tab), [tab])
-		self.assertEqual(one_tab[tab], all_tabs[f"{PREFIX} Men {self.tag}"])
+		self.assertEqual(list(one_tab), [f"{PREFIX} Men {self.tag}"])
+		self.assertEqual(one_tab[f"{PREFIX} Men {self.tag}"], all_tabs[f"{PREFIX} Men {self.tag}"])
+		self.assertEqual(get_category_facets(f"No Such Tab {self.tag}"), {})
 
 	def test_a_heading_with_no_item_group_never_becomes_a_facet(self):
 		"""A Brand or URL entry links no item group, so its facet would filter on the empty string."""
