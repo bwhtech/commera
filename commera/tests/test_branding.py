@@ -74,18 +74,19 @@ class TestBrandAssetResolution(IntegrationTestCase):
 		self.assertEqual(branding.get_brand_assets().footer_logo, "/files/website-logo.png")
 
 	def test_configured_assets_stay_empty_when_unset(self):
-		# If this answered with the bundled default, DEFAULT_OG_IMAGE would become unreachable.
+		# If this answered with the bundled default, the Organization JSON-LD would claim Commera's mark as its logo.
 		set_brand_settings()
 
 		self.assertEqual(branding.get_configured_brand_assets()["favicon"], "")
 		self.assertIn(seo.DEFAULT_OG_IMAGE, seo.default_seo()["image"])
 
-	def test_configured_favicon_becomes_the_share_image(self):
+	def test_favicon_never_becomes_the_share_image(self):
+		# A 32px favicon stretched onto a 1200x630 link preview is worse than the generated store card.
 		set_brand_settings(website={"favicon": "/files/website-favicon.png"})
 		frappe.db.set_single_value(branding.LEGACY_SETTINGS, "default_share_image", "")
 		frappe.clear_document_cache(branding.LEGACY_SETTINGS, branding.LEGACY_SETTINGS)
 
-		self.assertIn("/files/website-favicon.png", seo.default_seo()["image"])
+		self.assertIn(seo.DEFAULT_OG_IMAGE, seo.default_seo()["image"])
 
 
 class TestSyncBrandAssetsPatch(IntegrationTestCase):

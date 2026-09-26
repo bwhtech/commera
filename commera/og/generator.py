@@ -5,11 +5,13 @@ import os
 import subprocess
 import time
 from io import BytesIO
+from urllib.parse import urlsplit
 
 import frappe
-from frappe.utils import flt, get_files_path
+from frappe.utils import flt, get_files_path, get_url
 
 from commera import seo
+from commera.branding import get_brand_assets
 from commera.shop_themes.render import render_themed_template
 
 # resvg-js is pathologically slow on large embedded images (~58s for 1220x1760, <1s downscaled).
@@ -20,6 +22,10 @@ DEFAULT_OG_WIDTH = 1200
 DEFAULT_OG_HEIGHT = 630
 
 BUNDLED_CARD_TEMPLATE = "commera/templates/og/product_card.html"
+STORE_CARD_TEMPLATE = "commera/templates/og/store_card.html"
+
+# Tall enough for a crisp logo at the card's 140px display height, small enough to keep resvg fast.
+CARD_LOGO_PX = 420
 
 
 def render_og_png(html_str, width, height):
@@ -112,6 +118,17 @@ def render_card_for_doc(for_doctype, doc):
 	return render_og_png(html_str, DEFAULT_OG_WIDTH, DEFAULT_OG_HEIGHT)
 
 
+def build_store_card_html():
+	settings = seo.get_seo_settings()
+	context = {
+		"store_name": seo.get_store_name(),
+		"tagline": settings.get("default_meta_description") or seo.default_store_description(),
+		"site_host": urlsplit(get_url()).hostname or "",
+		"logo_data_uri": logo_data_uri(get_brand_assets().logo),
+	}
+	return render_themed_template(STORE_CARD_TEMPLATE, context)
+
+
 def variant_primary_image_url(variant_name):
 	return frappe.db.get_value(
 		"Website Slideshow Item",
@@ -121,19 +138,47 @@ def variant_primary_image_url(variant_name):
 	)
 
 
-def product_image_data_uri(image_url):
-	# Satori can't fetch remote URLs offline, so local files are inlined as data URIs.
-	if image_url.startswith("http://") or image_url.startswith("https://"):
-		return None
-
+def local_image_path(image_url):
+	# Satori can't fetch remote URLs offline, so only local files can be inlined as data URIs.
 	if image_url.startswith("/files/"):
 		path = get_files_path(image_url[len("/files/") :], is_private=False)
 	elif image_url.startswith("/private/files/"):
 		path = get_files_path(image_url[len("/private/files/") :], is_private=True)
+	elif image_url.startswith("/assets/"):
+		assets_root = os.path.abspath(os.path.join(frappe.local.sites_path, "assets"))
+		path = os.path.abspath(os.path.join(frappe.local.sites_path, image_url.lstrip("/")))
+		if not path.startswith(assets_root + os.sep):
+			return None
 	else:
 		return None
 
-	if not os.path.exists(path):
+	return path if os.path.exists(path) else None
+
+
+def logo_data_uri(image_url):
+	path = local_image_path(image_url)
+	if not path:
+		return None
+
+	# nosemgrep: frappe-security-file-traversal  # local_image_path confines the path to files/ or assets/
+	with open(path, "rb") as logo_file:
+		raw = logo_file.read()
+	if path.lower().endswith(".svg"):
+		return f"data:image/svg+xml;base64,{base64.b64encode(raw).decode()}"
+
+	from PIL import Image
+
+	# PNG, not the product photo's JPEG: a logo's transparency must survive onto the card background.
+	image = Image.open(BytesIO(raw)).convert("RGBA")
+	image.thumbnail((CARD_LOGO_PX * 3, CARD_LOGO_PX))
+	buffer = BytesIO()
+	image.save(buffer, format="PNG")
+	return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+
+
+def product_image_data_uri(image_url):
+	path = local_image_path(image_url)
+	if not path:
 		return None
 
 	from PIL import Image

@@ -7,7 +7,8 @@ from commera.branding import get_configured_brand_assets
 
 META_DESCRIPTION_MAX_LENGTH = 160
 
-DEFAULT_OG_IMAGE = "/assets/commera/images/1.jpg"
+# Satori card of the store's logo and name, served by www/og_image_render.
+DEFAULT_OG_IMAGE = "/og-image/store.png"
 
 # Storefront languages, in hreflang emission order; the first is the x-default target.
 LANGUAGES = ("en", "ar")
@@ -273,12 +274,7 @@ def build_page_seo(source, display_name=None, page_type="website"):
 		else (settings.get("default_meta_description") or default_store_description())
 	)
 
-	image = (
-		source.get("og_image")
-		or settings.get("default_share_image")
-		or get_configured_brand_assets()["favicon"]
-		or DEFAULT_OG_IMAGE
-	)
+	image = source.get("og_image") or settings.get("default_share_image") or DEFAULT_OG_IMAGE
 
 	request_path = frappe.local.request.path if getattr(frappe.local, "request", None) else ""
 	canonical = get_url(request_path) if request_path else current_request_url()
@@ -360,9 +356,7 @@ def build_collection_json_ld(category, breadcrumbs, total_count=0):
 def default_seo():
 	settings = get_seo_settings()
 
-	image = (
-		settings.get("default_share_image") or get_configured_brand_assets()["favicon"] or DEFAULT_OG_IMAGE
-	)
+	image = settings.get("default_share_image") or DEFAULT_OG_IMAGE
 
 	return {
 		"title": apply_title_template(),

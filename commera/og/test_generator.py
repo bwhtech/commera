@@ -14,7 +14,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import flt, get_files_path
 
-from commera import seo
+from commera import branding, seo
 from commera.og import generator
 from commera.tests import get_test_configurator, get_test_item
 from commera.www import og_image_render
@@ -259,6 +259,86 @@ class TestServeOgImage(IntegrationTestCase):
 		self.assertNotEqual(first, og_image_render.cache_file_path(route, "2026-06-18 00:00:00"))
 
 
+class TestStoreCard(IntegrationTestCase):
+	def setUp(self):
+		frappe.local.flags.redirect_location = None
+		public_root = get_files_path(is_private=False)
+		cache_dir = os.path.join(public_root, og_image_render.CACHE_SUBDIR)
+		os.makedirs(cache_dir, exist_ok=True)
+		self.cache_path = os.path.join(cache_dir, f"og-test-{frappe.generate_hash(length=12)}.png")
+		self.addCleanup(lambda: os.path.exists(self.cache_path) and os.remove(self.cache_path))
+		self.expected_url = "/files/" + os.path.relpath(self.cache_path, public_root).replace(os.sep, "/")
+
+	def tearDown(self):
+		frappe.local.flags.redirect_location = None
+
+	def test_card_carries_the_store_name_and_inlined_logo(self):
+		html_str = generator.build_store_card_html()
+
+		self.assertIn(seo.get_store_name(), html_str)
+		self.assertIn("data:image/", html_str)
+
+	def test_bundled_svg_logo_is_inlined_as_svg(self):
+		self.assertTrue(
+			generator.logo_data_uri(branding.BUNDLED_LOGO).startswith("data:image/svg+xml;base64,")
+		)
+
+	def test_raster_logo_keeps_its_transparency(self):
+		from PIL import Image
+
+		buffer = BytesIO()
+		Image.new("RGBA", (40, 20), (0, 0, 0, 0)).save(buffer, format="PNG")
+		logo = frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": f"og-logo-{frappe.generate_hash(length=8)}.png",
+				"content": buffer.getvalue(),
+				"is_private": 0,
+			}
+		).insert(ignore_permissions=True)
+
+		data_uri = generator.logo_data_uri(logo.file_url)
+
+		self.assertTrue(data_uri.startswith("data:image/png;base64,"))
+		inlined = Image.open(BytesIO(base64.b64decode(data_uri.split(",", 1)[1])))
+		self.assertEqual(inlined.getpixel((0, 0))[3], 0)
+
+	def test_asset_path_cannot_climb_out_of_assets(self):
+		self.assertIsNone(generator.logo_data_uri("/assets/../site_config.json"))
+
+	def test_remote_logo_is_skipped(self):
+		self.assertIsNone(generator.logo_data_uri("https://cdn.example.com/logo.png"))
+
+	def test_renders_once_then_serves_from_cache(self):
+		fixed_png = b"\x89PNG\r\n\x1a\n-fake-store-card"
+		# Mock ONLY the Node/Satori boundary; the template and the cache are real.
+		with (
+			patch("commera.www.og_image_render.render_og_png", return_value=fixed_png) as mocked,
+			patch("commera.www.og_image_render.cache_file_path", return_value=self.cache_path),
+		):
+			for _attempt in range(2):
+				with self.assertRaises(frappe.Redirect):
+					og_image_render.serve_store_card()
+
+		mocked.assert_called_once()
+		with open(self.cache_path, "rb") as cache_file:
+			self.assertEqual(cache_file.read(), fixed_png)
+		self.assertEqual(frappe.local.flags.redirect_location, self.expected_url)
+
+	def test_failed_render_falls_back_to_the_store_logo(self):
+		frappe.form_dict.route = "store.png"
+		self.addCleanup(frappe.form_dict.pop, "route", None)
+
+		with (
+			patch("commera.www.og_image_render.render_og_png", side_effect=RuntimeError("node missing")),
+			patch("commera.www.og_image_render.cache_file_path", return_value=self.cache_path),
+		):
+			with self.assertRaises(frappe.Redirect):
+				og_image_render.get_context(frappe._dict())
+
+		self.assertEqual(frappe.local.flags.redirect_location, branding.get_brand_assets().logo)
+
+
 class TestClearOldCards(IntegrationTestCase):
 	"""The cache key embeds `modified`, so every edit strands a PNG; clear_old_cards is the only bound."""
 
@@ -317,6 +397,16 @@ class TestRenderOgPng(IntegrationTestCase):
 
 		image = Image.open(BytesIO(png_bytes))
 		self.assertEqual(image.format, "PNG")
+		self.assertEqual(image.size, (generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT))
+
+	def test_store_card_renders_a_spec_sized_png(self):
+		from PIL import Image
+
+		png_bytes = generator.render_og_png(
+			generator.build_store_card_html(), generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT
+		)
+
+		image = Image.open(BytesIO(png_bytes))
 		self.assertEqual(image.size, (generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT))
 
 	def test_render_card_for_doc_produces_a_png_for_a_real_variant(self):
