@@ -97,10 +97,6 @@ x-data=
                 window.location.reload()
 
             }
-            catch (error) {
-                const message = $store.i18n.t("Something went wrong")
-                toast(message, { type: "danger" })
-            }
             finally {
                 btn.disabled = false;
                 const spinner = btn.querySelector(".animate-spin");

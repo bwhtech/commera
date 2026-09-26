@@ -165,6 +165,46 @@ class TestCheckoutAddress(IntegrationTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			self.create_cart_quotation(unlinked_address.name, unlinked_address.name)
 
+	def test_a_retried_address_save_reuses_the_saved_address(self):
+		first_attempt = add_billing_address(self.customer, self.checkout_payload())
+		retry = add_billing_address(self.customer, self.checkout_payload())
+
+		self.assertEqual(retry.name, first_attempt.name)
+		self.assertEqual(self.addresses_of_customer(), [first_attempt.name])
+
+	def test_a_different_address_is_saved_as_a_new_one(self):
+		first_address = add_billing_address(self.customer, self.checkout_payload())
+		payload = self.checkout_payload()
+		payload["billing_address"]["full_address"] = "9 Other Street"
+
+		second_address = add_billing_address(self.customer, payload)
+
+		self.assertNotEqual(second_address.name, first_address.name)
+
+	def test_another_customers_identical_address_is_not_reused(self):
+		other_customer_address = add_billing_address(self.create_customer(), self.checkout_payload())
+
+		own_address = add_billing_address(self.customer, self.checkout_payload())
+
+		self.assertNotEqual(own_address.name, other_customer_address.name)
+		self.assertEqual(self.customer_links_of(own_address.name), [self.customer])
+
+	def test_a_disabled_address_is_not_reused(self):
+		disabled_address = add_billing_address(self.customer, self.checkout_payload())
+		frappe.db.set_value("Address", disabled_address.name, "disabled", 1)
+
+		new_address = add_billing_address(self.customer, self.checkout_payload())
+
+		self.assertNotEqual(new_address.name, disabled_address.name)
+		self.assertFalse(new_address.disabled)
+
+	def addresses_of_customer(self):
+		return frappe.get_all(
+			"Dynamic Link",
+			filters={"parenttype": "Address", "link_doctype": "Customer", "link_name": self.customer},
+			pluck="parent",
+		)
+
 	def test_address_without_a_party_is_refused(self):
 		with self.assertRaises(frappe.ValidationError):
 			add_billing_address(None, self.checkout_payload())
