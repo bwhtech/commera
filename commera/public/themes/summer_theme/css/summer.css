@@ -375,3 +375,28 @@
 .shop-card .shop-card-rating .dz-rating li.star-fill {
 	color: var(--bs-warning);
 }
+
+/* style.css strips the outline from every link, and from every button with !important, which left
+   keyboard focus invisible across the theme. */
+a:focus-visible,
+button:focus-visible {
+	outline: 2px solid var(--title) !important;
+	outline-offset: 2px;
+}
+
+/* The top-level nav links fill the header's height, so an outside ring is clipped by the page edge. */
+.header-nav .nav > li > a:focus-visible {
+	outline-offset: -2px;
+}
+
+/* style.css opens the desktop mega-menu on :hover only; navigation.html sets .menu-expanded on keyboard focus.
+   The mobile drawer keeps its own chevron toggle (li.open). */
+@media only screen and (min-width: 992px) {
+	.header-nav .nav > li.menu-expanded > .mega-menu {
+		opacity: 1;
+		visibility: visible;
+		margin-top: 0;
+		z-index: 11;
+		pointer-events: unset;
+	}
+}
