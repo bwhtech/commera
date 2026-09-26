@@ -129,7 +129,9 @@ A **block** may also hide itself by rendering nothing; the slot collapses with n
 
 An extension module is a Vue SFC whose default export is the component. It imports from three
 shared modules only — `vue`, `frappe-ui`, `@commera/admin` — which resolve to the dashboard's own
-copies at runtime. Anything else it imports is bundled into the extension.
+copies at runtime. Anything else it imports is bundled into the extension. From `frappe-ui`, only the
+curated list the dashboard shares may be imported (the kit's build fails on any other name, and on
+`frappe-ui/…` subpaths).
 
 ```vue
 <!-- my_app/commera/loyalty-order-block/index.vue -->

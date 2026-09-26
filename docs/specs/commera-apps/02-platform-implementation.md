@@ -137,8 +137,12 @@ Absent row = enabled. Written from **Settings → Installed apps**.
   one instance of each.
 - A small Vite plugin writes `<script type="importmap">` into `commera/www/commera.html` before the
   entry script, mapping `vue`, `frappe-ui`, `@commera/admin` to those hashed files.
-- **Spike first:** measure the bundle-size change from exposing frappe-ui as one entry; expose heavy
-  subpaths (editor, charts) as separate lazily-loaded names if needed.
+- **The frappe-ui entry is a curated export list, not `export *`.** The front-end POC
+  (`poc/extension-runtime/`) measured `export *` at +76 kB gzip on a page with no extensions; a
+  16-name list cut that to +16 kB. Heavy subpaths (editor, charts) stay unshared until an extension
+  needs them.
+- The build also emits `shared-exports.json` (each shared specifier's export names, read from the
+  runtime chunks), which the kit checks extension imports against.
 
 ### 2.2 `@commera/admin` — `dashboard/src/extension-api/index.js`
 
