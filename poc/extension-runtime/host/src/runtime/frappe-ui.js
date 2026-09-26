@@ -1,21 +1,6 @@
-// The frappe-ui surface extensions may import. Curated rather than `export *`:
-// re-exporting the whole library defeats tree-shaking and costs every page
-// ~150 kB gzip (measured in this POC). The kit refuses imports outside this list.
-export {
-  Avatar,
-  Badge,
-  Button,
-  Checkbox,
-  Dialog,
-  Dropdown,
-  FormControl,
-  LoadingIndicator,
-  Select,
-  Switch,
-  TabButtons,
-  TextInput,
-  Textarea,
-  Tooltip,
-  toast,
-  useCall,
-} from 'frappe-ui'
+// All of frappe-ui is shared: extensions import any name, no list to maintain.
+// Measured on the real Commera dashboard, this costs 15 kB gzip on first load
+// over no sharing, and a curated list would save only 2 kB of it, because the
+// dashboard already uses most of frappe-ui. (This toy host uses little of it,
+// so here the cost looks far larger; see README.)
+export * from 'frappe-ui'

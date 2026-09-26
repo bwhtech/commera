@@ -29,7 +29,7 @@ function staticClasses(source) {
   return [...template.matchAll(/\sclass="([^"]*)"/g)].flatMap((match) => match[1].split(/\s+/)).filter(Boolean)
 }
 
-function guard({ hostClasses, hostExports }) {
+function guard({ hostClasses, hostExports, bundleFrappeUI }) {
   const known = hostClasses && existsSync(hostClasses) ? new Set(JSON.parse(readFileSync(hostClasses, 'utf8'))) : null
   const shared = hostExports && existsSync(hostExports) ? JSON.parse(readFileSync(hostExports, 'utf8')) : null
   return {
@@ -53,12 +53,12 @@ function guard({ hostClasses, hostExports }) {
     resolveId(source) {
       // The import map shares the package roots only; a subpath would pull a
       // second copy of the library into the extension.
-      if (SHARED.some((name) => source.startsWith(`${name}/`))) {
+      if (!bundleFrappeUI && SHARED.some((name) => source.startsWith(`${name}/`))) {
         this.error(`import '${source}' is not shared with extensions; import from '${source.split('/')[0]}'`)
       }
     },
     transform(code, id) {
-      if (id.includes('?vue&type=style')) {
+      if (id.includes('?vue&type=style') && !id.includes('/node_modules/')) {
         this.error(`${id.split('?')[0]}: extensions ship no CSS in v1; use frappe-ui and dashboard classes`)
       }
       if (!known || !id.endsWith('.vue')) return
@@ -70,11 +70,13 @@ function guard({ hostClasses, hostExports }) {
   }
 }
 
-export default function commeraExtension({ root = process.cwd(), hostClasses, hostExports } = {}) {
+export default function commeraExtension({ root = process.cwd(), hostClasses, hostExports, bundleFrappeUI = false } = {}) {
+  // Experiment switch: bundle frappe-ui into the extension instead of sharing the host's.
+  const external = bundleFrappeUI ? SHARED.filter((name) => name !== 'frappe-ui') : SHARED
   const sourceDir = resolve(root, 'commera')
   const modules = discoverModules(sourceDir)
   return [
-    guard({ hostClasses, hostExports }),
+    guard({ hostClasses, hostExports, bundleFrappeUI }),
     vue(),
     {
       name: 'commera-extension-build',
@@ -88,7 +90,7 @@ export default function commeraExtension({ root = process.cwd(), hostClasses, ho
           minify: true,
           lib: { entry: modules, formats: ['es'], fileName: (_format, name) => `${name}.js` },
           rollupOptions: {
-            external: SHARED,
+            external,
             output: {
               banner: `/*! commera-extension-api: ${API_VERSION} */`,
               chunkFileNames: 'chunks/[name]-[hash].js',

@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { Badge, Button, Dialog, FormControl } from 'frappe-ui'
+import { Badge, Button, Dialog, FormControl, toast as frappeToast } from 'frappe-ui'
 import { useExtension, useMethodAction, useMethodRead } from '@commera/admin'
 import { statusTheme } from '../shared/status.js'
 
@@ -32,6 +32,9 @@ const confirmation = ref('')
     <p class="text-sm text-ink-gray-6">Sub-path: {{ path || '(root)' }}</p>
     <div class="flex gap-2">
       <Button label="Open syncs sub-page" @click="navigate('syncs')" />
+      <!-- frappe-ui imported directly, not through useExtension(): only shows
+           because the extension shares the host's frappe-ui instance. -->
+      <Button label="Direct toast" @click="frappeToast.success('Toast via frappe-ui import')" />
     </div>
 
     <section class="rounded-5 border border-outline-gray-2">

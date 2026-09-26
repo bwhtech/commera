@@ -137,12 +137,13 @@ Absent row = enabled. Written from **Settings → Installed apps**.
   one instance of each.
 - A small Vite plugin writes `<script type="importmap">` into `commera/www/commera.html` before the
   entry script, mapping `vue`, `frappe-ui`, `@commera/admin` to those hashed files.
-- **The frappe-ui entry is a curated export list, not `export *`.** The front-end POC
-  (`poc/extension-runtime/`) measured `export *` at +76 kB gzip on a page with no extensions; a
-  16-name list cut that to +16 kB. Heavy subpaths (editor, charts) stay unshared until an extension
-  needs them.
+- **All of frappe-ui is shared (`export *`), not a curated list.** Measured on the real dashboard
+  build: +15 kB gzip on first load over no sharing; a list of the 57 names the dashboard imports would
+  save only 2 kB of that. Bundling frappe-ui into extensions instead breaks module-level state: a
+  `toast` imported from `frappe-ui` never shows (`poc/extension-runtime/experiment-bundled-toast.mjs`).
 - The build also emits `shared-exports.json` (each shared specifier's export names, read from the
-  runtime chunks), which the kit checks extension imports against.
+  runtime chunks). The kit checks extension imports against it, which catches an app built against a
+  newer frappe-ui than the site runs.
 
 ### 2.2 `@commera/admin` — `dashboard/src/extension-api/index.js`
 

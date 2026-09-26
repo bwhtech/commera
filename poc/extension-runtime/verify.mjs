@@ -55,6 +55,10 @@ try {
   await toast.waitFor({ timeout: 10000 })
   check("extension toast shows in the host's toaster (one frappe-ui instance)", await toast.isVisible())
   await page.screenshot({ path: 'screenshots/2-app-page-toast.png' })
+  await page.getByRole('button', { name: 'Direct toast' }).click()
+  const directToast = page.getByText('Toast via frappe-ui import')
+  await directToast.waitFor({ timeout: 10000 })
+  check("toast imported straight from 'frappe-ui' also reaches the host's toaster", await directToast.isVisible())
 
   // 4. frappe-ui Dialog from the extension opens in the host's overlay layer.
   await page.getByRole('button', { name: 'Clear stuck sync' }).click()
