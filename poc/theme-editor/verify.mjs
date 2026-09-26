@@ -95,6 +95,7 @@ try {
   // Layout data and publish.
   await page.getByRole('button', { name: 'View layout data' }).click()
   await page.getByText('Theme Layout · summer_theme · index').waitFor()
+  await page.waitForTimeout(500) // let the dialog finish fading in
   await shot('8-layout-json')
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Publish' }).click()
