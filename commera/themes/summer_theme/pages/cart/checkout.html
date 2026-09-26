@@ -256,7 +256,7 @@
 						</template>
 
 						<div class="col-md-12" x-show="errors.length" x-cloak>
-							<ul class="checkout-errors m-b25">
+							<ul class="checkout-errors m-b25" role="alert">
 								<template x-for="error in errors" :key="error">
 									<li x-text="error"></li>
 								</template>
@@ -447,9 +447,18 @@
 		const MISSING_FIELD_MESSAGE = {{ _("Please fill in every required field.") | tojson }};
 		const INVALID_PHONE_MESSAGE = {{ _("Please enter a valid phone number.") | tojson }};
 		const UNSELECTED_ADDRESS_MESSAGE = {{ _("Please select a saved address.") | tojson }};
-		const PHONE_NUMBER_PATTERN = /^(\+?\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{3,4}$/;
+		const PHONE_NUMBER_SEPARATORS = /[\s().-]/g;
+		const PHONE_NUMBER_DIGITS = /^\+?\d{7,15}$/;
+		// Frappe's own Phone field check allows at most 20 characters, separators included.
+		const PHONE_NUMBER_MAX_LENGTH = 20;
 		const NO_SHIPPING_OPTIONS_MESSAGE = {{ _("No delivery options are available for this address.") | tojson }};
 		const SHIPPING_UNAVAILABLE_MESSAGE = {{ _("Delivery options are temporarily unavailable.") | tojson }};
+
+		function is_valid_phone_number(phone_number) {
+			const trimmed = phone_number.trim();
+			const digits = trimmed.replace(PHONE_NUMBER_SEPARATORS, "");
+			return trimmed.length <= PHONE_NUMBER_MAX_LENGTH && PHONE_NUMBER_DIGITS.test(digits);
+		}
 
 		function get_blank_address() {
 			return {
@@ -600,7 +609,7 @@
 						if (field === "landmark") continue;
 						if (!String(value).trim()) errors.push(`${label}: ${MISSING_FIELD_MESSAGE}`);
 					}
-					if (address.phone_number && !PHONE_NUMBER_PATTERN.test(address.phone_number)) {
+					if (address.phone_number && !is_valid_phone_number(address.phone_number)) {
 						errors.push(`${label}: ${INVALID_PHONE_MESSAGE}`);
 					}
 					return [...new Set(errors)];

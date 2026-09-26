@@ -6,7 +6,9 @@
             return;
         }
         const args = {
-            'email': email
+            'email': email,
+            'first_name': signup_data.first_name,
+            'last_name': signup_data.last_name
         };
         const btn = ref.sign_in_btn
         const spinner = btn.querySelector(".animate-spin");
@@ -17,6 +19,7 @@
 
             toast("OTP sent successfully, please check you email.", { type: "success" });
             signup_data.otp_sent = true;
+            focus_first_otp_box(ref);
 
 
         } catch (error) {
@@ -25,7 +28,13 @@
         finally {
             btn.disabled = false;
             spinner.classList.add("hidden");
+            if (!signup_data.otp_sent) btn.focus();
         }
+    }
+
+    // x-show reveals the OTP pane on the next animation frame, and a hidden input cannot take focus.
+    function focus_first_otp_box(ref) {
+        Alpine.nextTick(() => requestAnimationFrame(() => ref.otp0.focus()));
     }
 
     function handle_digit_input(data, refs, event, index) {
@@ -110,6 +119,7 @@
         finally {
             btn.disabled = false;
             spinner.classList.add("hidden");
+            btn.focus();
         }
     }
     function start_resend_timer(x_data) {
@@ -152,6 +162,7 @@
 
             toast("OTP sent successfully, please check you email.", { type: "success" });
             x_data.otp_sent = true;
+            focus_first_otp_box(ref);
 
 
         } catch (error) {
@@ -159,6 +170,7 @@
         finally {
             btn.disabled = false;
             spinner.classList.add("hidden");
+            if (!x_data.otp_sent) btn.focus();
         }
     }
 </script>
