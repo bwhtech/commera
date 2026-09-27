@@ -53,8 +53,11 @@ satisfied.
 
 ## Data: where everything comes from
 
-Never query DocTypes. Everything comes from the page context or `commera.sdk.storefront`. For exact
-fields, read `references/context.md`, or run `theme context`.
+Commerce data (products, prices, stock, collections, cart) comes from the page context or
+`commera.sdk.storefront`; for exact fields, read `references/context.md` or run `theme context`.
+For everything else you have the full Frappe API: the app's own DocTypes, `frappe.get_list`,
+`frappe.get_cached_doc` and whitelisted methods. That is what lets a Commera theme do more than a
+Shopify one.
 
 | You need | Use |
 | --- | --- |
@@ -68,6 +71,20 @@ fields, read `references/context.md`, or run `theme context`.
 | In stock? | `x.available` (Commera handles made-to-order items) |
 | An image | `{{ image_url(x.image, width=600) }}` with `alt="{{ x.image.alt }}"` |
 | Theme UI text | `{{ t("cart.empty") }}` with `locales/<lang>.json` |
+| Your own records (lookbooks, store locations, size guides…) | Create a DocType in the app if needed. Load it in `sections/<type>.py` with `frappe.get_list` / `frappe.get_cached_doc`. Read its JSON to learn its fields. |
+| A setting that points at one of your records | `{"type": "link", "doctype": "Lookbook"}` |
+| Products listed in your own records | Take their handles from your record, then call `storefront.products(handles=…)` so prices and stock are right |
+| A form, finder or booking | Call a whitelisted method in the app from the section's JS |
+
+When you use Frappe directly:
+
+- **Queries go in the controller**, never the template.
+- **Storefront requests run as Guest or a customer.** Prefer `frappe.get_list`, which applies
+  permissions. With `frappe.get_all`, filter to published records and return only public fields.
+- **Cache expensive queries** with `frappe.cache` or `@redis_cache`, and clear the cache when the
+  record changes.
+- **Never read `Item Price`, `Bin` or `Item` fields for display.** Use Commera's objects, which
+  apply price lists, customer prices, made-to-order items and translation.
 
 ## Sections and blocks
 
@@ -103,7 +120,9 @@ opening your cart UI, because app blocks dispatch it. Types are in `commera-stor
 
 ## Rules
 
-- **Commera owns data.** No `frappe.*` calls and no DocType names anywhere in the theme.
+- **Commerce data comes from Commera.** Get prices, availability and catalogue text from the page
+  context or `commera.sdk.storefront`, never from ERPNext DocTypes. Everything else is yours to
+  build with Frappe.
 - **Commera formats and translates.** Never format money, compute discounts, check stock, or
   hard-code customer-facing English.
 - **Arabic is right-to-left.** Put `dir="{{ request.dir }}"` on `<html>`. Use logical CSS
@@ -124,8 +143,10 @@ opening your cart UI, because app blocks dispatch it. Types are in `commera-stor
 
 - A `theme check` rule you disagree with: don't suppress it. Report it to the developer with the
   rule id.
-- Data you need isn't in `theme context`: don't query around it. Tell the developer which key is
-  missing and why the brief needs it. It may belong in `commera.sdk.storefront`.
+- Commerce data you need isn't in `theme context` (for example a price variant the SDK doesn't
+  expose): tell the developer which key is missing. It belongs in `commera.sdk.storefront`.
+- Non-commerce data the brief needs (store locations, lookbooks, FAQs): build it. Add a DocType to
+  the app and load it in a controller.
 - The brief conflicts with a rule (for example "hide prices"): follow the rule, and put the
   conflict in your report.
 

@@ -149,6 +149,7 @@ Setting types map to docfield types, so the dashboard's `SettingsFieldControl` r
 | `color` | Color | hex |
 | `image` | Attach Image | file URL |
 | `collection`, `product`, `page` | Link (Item Group, Style Attribute Variant, Shop Web Page) | record name |
+| `link` (`doctype`) | Link to any DocType, including the app's own (e.g. `Lookbook`) | record name |
 
 `settings.json` uses the same setting types for global values; its values are exposed to every
 template as `theme_settings` and as CSS variables.
@@ -263,8 +264,8 @@ example path above is for a theme inside Commera and differs for other apps.
   - there are duplicate setting ids.
 - **Warnings:**
   - a section with non-static blocks never loops over `section.blocks`;
+  - CSS uses a physical property (`margin-left`) where a logical one keeps RTL correct;
   - a translatable setting is printed through `|safe`;
-  - a section queries in its template (`frappe.get_all`, `frappe.db`) instead of a controller;
   - a template has no default layout.
 
 **Develop loop.** In developer mode, schemas and layouts are read from disk on every request, not
@@ -273,8 +274,9 @@ show without a restart. Settings added to a schema appear in the editor with the
 existing layouts keep working (§2.3, "Unknown data is ignored").
 
 Every command also takes `--json` for agents, and [spec 7](07-agent-ready-development.md) §2 adds
-`theme context`, `theme describe` and `theme render`. Section controllers load data only through
-`commera.sdk.storefront` (spec 7 §1).
+`theme context`, `theme describe` and `theme render`. Section controllers get commerce data
+from `commera.sdk.storefront` (spec 7 §1). Anything else can come from the full Frappe API and the
+app's own DocTypes (spec 7 §1.5).
 
 Test helper: `from commera.sdk.testing import assert_theme_valid`, which runs `theme check` for one
 theme in the app's own tests.

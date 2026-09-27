@@ -24,8 +24,8 @@ Most new themes and apps will be started by a developer prompting an agent. An a
 - it can **see the result** by rendering and screenshotting without a browser session;
 - it has **one guide** that tells it the workflow and the rules.
 
-Today a Commera theme has none of these. Templates call `frappe.get_all` inline, page context keys
-differ per controller and live only in the code, and nothing checks a theme except its own tests.
+Today a Commera theme has none of these. Page context keys differ per controller and live only in the
+code, and nothing checks a theme except its own tests.
 Specs 4 and 6 already fix the structure: sections, schemas, layouts and a CLI. This spec finishes the
 job for data, verification and guidance.
 
@@ -47,8 +47,9 @@ job for data, verification and guidance.
 
 ## 1. Storefront data API (`commera.sdk.storefront`)
 
-Themes get data from **one typed page context** and **one query module**, never from DocTypes. This is
-the refactor: storefront controllers (`www/index.py`, `www/products/…`, `www/cart`, `shop_web_page`)
+Themes get **commerce data** (products, prices, availability, collections, cart) from **one typed page
+context** and **one query module**. Everything else is open. A theme ships in a Frappe app, so it can
+use the full Frappe API and its own DocTypes (§1.5). This is the refactor: storefront controllers (`www/index.py`, `www/products/…`, `www/cart`, `shop_web_page`)
 build these objects instead of each assembling its own dict, and every template and section receives
 the same shapes.
 
@@ -121,8 +122,7 @@ def get_context(section, page):
 
 All results are published-only, priced for the current customer and cached per request. Setting types
 `collection` and `product` (spec 4 §2.2) store handles, so a setting value can be passed directly.
-`theme check` flags `frappe.*` calls in templates and controllers as errors in themes (warnings for
-Commera's own, until migrated).
+Anything that isn't commerce data comes straight from Frappe (§1.5).
 
 ### 1.3 Jinja filters and helpers
 
@@ -155,6 +155,45 @@ commera.format.money(amount)
 - Themes may use Alpine (as today) or plain JS. The skill recommends Alpine stores that wrap
   `commera.cart` so that markup stays declarative.
 
+### 1.5 Beyond commerce: the full Frappe API
+
+This is where Commera themes go further than Shopify's. A Shopify theme can only read what Liquid
+exposes, plus metafields. A Commera theme lives in a Frappe app, and that app can:
+
+- **Own DocTypes.** Lookbooks, store locations, designers, recipes, size guides, events, and so on.
+  Merchants edit them in the desk or in an app page (spec 1).
+- **Query them from a section controller** with `frappe.get_list`, `frappe.get_cached_doc`,
+  `frappe.db` or the app's own Python.
+- **Link a section setting to any record:** `{"type": "link", "doctype": "Lookbook"}` (spec 4 §2.2).
+- **Call the app's own whitelisted methods** from the browser, for forms, store finders and bookings.
+
+```python
+# sections/lookbook.py: the app's own DocType, plus Commera for the products in it
+import frappe
+from commera.sdk import storefront
+
+def get_context(section, page):
+    look = frappe.get_cached_doc("Lookbook", section.settings.lookbook)
+    return {
+        "look": look,
+        "products": storefront.products(handles=[row.product for row in look.items]),
+    }
+```
+
+`theme check` does not restrict any of this. The skill gives guidance instead:
+
+- **Commerce facts go through the SDK.** Get prices, availability and catalogue text from
+  `commera.sdk.storefront`, even when the list of products comes from your own DocType, as in the
+  example. Commera applies price lists, customer-group prices, made-to-order items and translation
+  there. Reading `Item Price` or `Bin` directly shows the wrong price or stock to some shoppers.
+- **Load data in the controller, not the template.** A controller runs once per render, sits inside
+  the section's failure isolation, and can be cached with `frappe.cache` or `@redis_cache`.
+- **Remember who is asking.** Storefront requests run as Guest or as the logged-in customer.
+  `frappe.get_list` applies permissions and `frappe.get_all` does not, so with `get_all`, filter to
+  published records and return only public fields.
+- **Agents learn custom data from the app.** `theme context` shows Commera's objects. For the app's
+  own DocTypes, the agent reads their JSON in the app, as it would for any Frappe app.
+
 ## 2. Tooling an agent can drive
 
 Every theme command from spec 4 §2.5 gains `--json`. Five more commands close the loop:
@@ -163,7 +202,7 @@ Every theme command from spec 4 §2.5 gains `--json`. Five more commands close t
 | --- | --- | --- |
 | `bench --site X commera theme context --template product [--handle H] [--json]` | The full page context for a real product on the site, as JSON | It learns exact keys and realistic values without reading source. |
 | `bench commera theme describe --theme S --json` | Every section, block, setting, template, static part and accepted app block, with the layouts | One read shows the whole theme. It is used before editing an existing theme. |
-| `bench commera theme check --json` | `[{rule, severity, file, line, message, fix}]` | Stable rule ids (`blocks-not-looped`, `query-in-template`, `untranslated-string`, …) and a concrete fix per finding. |
+| `bench commera theme check --json` | `[{rule, severity, file, line, message, fix}]` | Stable rule ids (`blocks-not-looped`, `physical-css-property`, `untranslated-string`, …) and a concrete fix per finding. |
 | `bench --site X commera theme render --theme S --template T [--handle H] [--lang ar] [--width 390] --out file.png\|.html` | A screenshot (headless Chromium) or HTML of the draft theme, without publishing it | The agent sees what it built and compares English and Arabic, desktop and mobile. |
 | `bench --site X commera demo-data --preset fashion\|electronics\|grocery` | Sample products, collections, pages and menus, with images | A fresh dev site has something to render. Presets are chosen from the brief. |
 
@@ -215,8 +254,9 @@ The developer decides; the agent executes. The skill has the agent:
 
 These are short, testable statements, and most are enforced by `theme check`:
 
-- **Data.** Data comes only from the page context and `commera.sdk.storefront`. No `frappe.*` calls
-  and no DocType names in a theme.
+- **Data.** Commerce data comes from the page context and `commera.sdk.storefront`. Everything else
+  can come from Frappe: the app's own DocTypes, `frappe.get_list`, and whitelisted methods (§1.5).
+  Load it in the section's controller, and respect permissions.
 - **Money, availability and translation** come from Commera (§1.1). Never format prices, check stock,
   or hard-code English in templates; use `t()` and translatable settings.
 - **RTL.** Arabic is right-to-left. Use CSS logical properties (`margin-inline-start`, not
