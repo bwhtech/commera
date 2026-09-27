@@ -49,6 +49,18 @@ saved changes show up.
 
 ![Builder page in the theme editor](screenshots/9-builder-page-in-editor.png)
 
+## Simpler variations (`/variations`)
+
+The hand-off points above mix two editors in several places. Three simpler variations, each built on
+one rule a new merchant can learn; none put Builder inside the theme editor. Screenshots in
+`screenshots/variations/`, regenerated with `node variations.mjs`.
+
+| Variation | The rule |
+| --- | --- |
+| **A · One screen, one tool** | *Theme* is for the store's built-in pages. *Pages* is for pages you add, and they open in Builder. |
+| **B · Every page in one list** | *Pages* lists every page: "Store pages" and "Your pages", one Edit button each; the page decides which editor opens. *Look & feel* is only the theme. |
+| **C · Text pages vs designed pages** | Text pages (about, FAQ, policies) are written in the dashboard; designed pages open in Builder. You choose when you create one. |
+
 ## How the parts map to the real thing
 
 | Prototype | Commera |
