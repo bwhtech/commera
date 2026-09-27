@@ -113,6 +113,12 @@ includes item codes, so caching is unaffected.
 `get_link_options` and the unchanged `describe_integration` engine read the merged list. Fix the
 empty-state copy in `IntegrationsPanel.vue` accordingly.
 
+Each hook result carries `capabilities`. For carriers, bwh_shipping gains a capability check in
+`ShippingProviderBase`: it calls `get_rates` on every provider, and `create_shipment`, labels and
+tracking only on providers that declare `booking` / `tracking`. Orders shipped through a rates-only
+carrier show "Fulfilled by <provider>" instead of a booking action. This replaces the refusal stubs
+in spec 3.
+
 ### 1.8 SDK
 
 `commera/sdk/catalog.py` wraps `create_product` / `update_product` / `set_variant_published`
@@ -137,9 +143,9 @@ Absent row = enabled. Written from **Settings → Installed apps**.
   one instance of each.
 - A small Vite plugin writes `<script type="importmap">` into `commera/www/commera.html` before the
   entry script, mapping `vue`, `frappe-ui`, `@commera/admin` to those hashed files.
-- **All of frappe-ui is shared (`export *`), not a curated list.** Measured on the real dashboard
-  build: +15 kB gzip on first load over no sharing; a list of the 57 names the dashboard imports would
-  save only 2 kB of that. Bundling frappe-ui into extensions instead breaks module-level state: a
+- **All of frappe-ui is shared (`export *`), not a curated list.** Decided: no trimming in v1.
+  Measured on the real dashboard build: +15 kB gzip on first load over no sharing; a list of the 57
+  names the dashboard imports would save only 2 kB of that, and would need maintaining. Bundling frappe-ui into extensions instead breaks module-level state: a
   `toast` imported from `frappe-ui` never shows (`poc/extension-runtime/experiment-bundled-toast.mjs`).
 - The build also emits `shared-exports.json` (each shared specifier's export names, read from the
   runtime chunks). The kit checks extension imports against it, which catches an app built against a
@@ -160,7 +166,7 @@ Re-exports `useMethodRead`, `useMethodAction` (`data/api.js`), `AppPageHeader`, 
 | `components/ExtensionActions.js` | Turns action entries into Dropdown options; declarative actions POST `method` and toast `message`; module actions open a Dialog |
 | `pages/ExtensionPage.vue` | Route `/apps/:app/:page/:path(.*)*`; hosts `APP_PAGE` modules |
 | `components/settings/ExtensionSettingsPanel.vue` | Declarative `settings()` tab: `SettingsFieldRows` + `useSettingsAutosave` over the Single DocType; secrets via the `write_settings` blank-keeps-stored rule |
-| `components/settings/InstalledApps.vue` | **Settings → Installed apps** (slug `installed-apps`; `apps` is taken by Analytics, `ia/settings.js:39`): per-extension switches, and a Discover list from the FC marketplace API via a cached server proxy |
+| `components/settings/InstalledApps.vue` | **Settings → Installed apps** (slug `installed-apps`; `apps` is taken by Analytics, `ia/settings.js:39`): per-extension switches, and a **Discover** tab that is a "Coming soon" placeholder until the FC marketplace API exists |
 | `components/settings/DeveloperPanel.vue` | Developer mode only: registry, module URLs, API version, validation and boundary errors |
 
 Slot placements (edits to existing pages):
@@ -203,7 +209,7 @@ JSON, one source).
 | P3 pages | Kit v0, `APP_PAGE`, `ExtensionSlot`, Developer tab, `new-extension`, `types` | P0, P2 |
 | P4 records | Blocks, actions (declarative + module), selection actions, record conditions, `settings()` tab | P3 |
 | P5 SDK | `commera.sdk.catalog`, `commera.sdk.orders` | P1 |
-| P6 marketplace | Discover list from FC API | FC endpoint |
+| P6 marketplace (deferred) | Replace the Discover placeholder with the FC marketplace list | FC endpoint |
 
 Each phase ships with tests: registry and validation unit tests, order-hook tests (placed/paid fire
 once; COD cancel never fires placed), made-to-order checkout test, and an e2e spec driving a fixture
@@ -213,6 +219,7 @@ app's link, page and order block.
 
 - **frappe-ui version coupling.** A frappe-ui major bump in Commera is an extension API bump; apps
   rebuild. Mitigated by the stamped API version and a supported-previous-version window.
-- **Shared-runtime bundle size.** Measured in P0 before committing.
-- **bwh_shipping carrier contract** assumes the store books labels; rates-only carriers need either a
-  mode in `ShippingProviderBase` or refusal stubs (decide with bwh_shipping owners).
+- **Shared-runtime bundle size.** Measured in the POC: +15 kB gzip, accepted; not worth trimming.
+- **bwh_shipping carrier contract** assumes the store books labels. Decided: add `capabilities` to
+  `ShippingProviderBase` (§1.7) so rates-only carriers are first-class; needs a bwh_shipping release
+  before P1.

@@ -217,7 +217,7 @@ commera_payment_gateways = ["my_app.gateway.gateway"]         # () -> dict (inte
 | `commera_order_placed` | Once per webshop order, **after commit**: gateway orders when placed, COD orders when the shopper places the draft | Runs in a background job as a system user. Never inside checkout's transaction |
 | `commera_order_paid` | Once per order, after commit, when payment is recorded (gateway capture, or a COD Payment Entry) | Same as above |
 | `commera_before_order_cancel` | Before a merchant or shopper cancel | Return a translated reason string to refuse; `None` to allow |
-| `commera_shipping_providers` / `commera_payment_gateways` | Settings → Shipping / Payments render | Return the card: `{slug, label, blurb, settings_doctype, docs_url}` |
+| `commera_shipping_providers` / `commera_payment_gateways` | Settings → Shipping / Payments render | Return the provider's meta: `{slug, label, blurb, settings_doctype, docs_url, capabilities}`. `capabilities` for a carrier is a subset of `["rates", "booking", "tracking"]`; bwh_shipping only calls the methods a carrier declares |
 
 ### 3.2 Catalog and orders
 
@@ -303,11 +303,13 @@ Test helper: `from commera.sdk.testing import assert_extensions_valid` — call 
 | Ship | `shopify app deploy` (versions) | Push to git; `bench build` on deploy; FC marketplace listing |
 | Install | Managed install + scopes | `install-app`. Permissions are Frappe's; `requires` gates visibility |
 | Uninstall | `app/uninstalled` webhook | `uninstall-app`; extensions vanish automatically. Clean up external registrations in `before_uninstall` |
-| Discover | App Store | **Settings → Installed apps → Discover**, from the FC marketplace API filtered to Commera apps |
+| Discover | App Store | **Settings → Installed apps → Discover** is a "Coming soon" placeholder in v1. Later: the FC marketplace API filtered to Commera apps |
 | Billing | Billing API | FC marketplace plans; no app code |
 
 ## Open questions
 
-- Integration settings as a card in Settings → Shipping / Payments (via `commera_shipping_providers`)
-  versus the app's own `settings()` tab — both are specified; do we keep both?
+- **Decided:** a shipping or payment provider app must define its provider meta through
+  `commera_shipping_providers` / `commera_payment_gateways`, and that gives it its card in Settings →
+  Shipping / Payments. The app's `settings()` tab is for anything that isn't the provider itself
+  (Printful keeps both: a carrier card and a Printful Settings tab).
 - Merchant-arranged block placement (Medusa 2.17.2 moved to layouts) or fixed placement in v1.

@@ -167,10 +167,11 @@ Hooks run after commit, once, as a system user (spec 2 §1.4), so this app needs
 `PrintfulShippingSettings(Document, ShippingProviderBase).get_rates` reads `parcel["items"]`, maps
 item codes to `printful_sync_variant_id`, returns `[]` for carts with no Printful lines, and serves a
 fresh cache → stale cache → `[]` (bwh_shipping then uses each Shipping Service's Backup Charge).
-`get_service_choices` lists Printful's methods for Commera's **Import from carrier**. The booking
-methods raise "Printful ships this order itself" pending a rates-only mode in bwh_shipping.
+`get_service_choices` lists Printful's methods for Commera's **Import from carrier**. The provider
+declares `capabilities: ["rates"]`, so bwh_shipping never calls booking or label methods on it
+(spec 2 §1.7); Printful ships the order itself and the order shows "Fulfilled by Printful".
 `provider_card()` returns `{slug: "printful", label: "Printful", settings_doctype: "Printful Shipping
-Settings", …}` so the carrier gets a card in Settings → Shipping.
+Settings", capabilities: ["rates"], …}` so the carrier gets a card in Settings → Shipping.
 
 ### Webhooks
 
