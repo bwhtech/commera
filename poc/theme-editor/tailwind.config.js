@@ -5,5 +5,5 @@ export default {
   presets: [frappeUIPreset],
   // The preview page is storefront markup with its own stylesheet, so only the
   // editor is scanned: dashboard tokens never leak into the shop's look.
-  content: [...frappeUIContent, './index.html', './src/pages/**/*.vue', './src/editor/**/*.{vue,js}', './src/theme/**/*.js', './src/variations/**/*.{vue,js}', './src/*.{vue,js}'],
+  content: [...frappeUIContent, './index.html', './src/pages/**/*.vue', './src/editor/**/*.{vue,js}', './src/theme/**/*.js', './src/variations/**/*.{vue,js}', './src/storefront/**/*.{vue,js}', './src/*.{vue,js}'],
 }

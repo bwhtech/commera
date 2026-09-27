@@ -6,7 +6,7 @@ import { Sidebar, SidebarItem, SidebarLabel } from 'frappe-ui'
 defineProps({
   active: { type: String, required: true },
   items: { type: Array, required: true }, // [{ key, label, icon }]
-  variant: { type: String, required: true },
+  variant: { type: String, default: '' },
 })
 defineEmits(['navigate'])
 </script>
@@ -15,7 +15,7 @@ defineEmits(['navigate'])
   <div class="flex h-screen">
     <Sidebar width="14rem" class="border-r border-outline-gray-1">
       <div class="flex h-full flex-col gap-0.5 p-2">
-        <div class="mb-2 px-2 py-1 text-base font-semibold text-ink-gray-9">Commera · {{ variant }}</div>
+        <div class="mb-2 px-2 py-1 text-base font-semibold text-ink-gray-9">Commera{{ variant ? ` · ${variant}` : '' }}</div>
         <SidebarItem label="Overview" icon="lucide-layout-dashboard" />
         <SidebarItem label="Orders" icon="lucide-shopping-bag" />
         <SidebarItem label="Products" icon="lucide-package" />
@@ -32,7 +32,7 @@ defineEmits(['navigate'])
       </div>
     </Sidebar>
     <main class="min-w-0 flex-1 overflow-y-auto">
-      <div class="mx-auto max-w-3xl px-8 py-10"><slot /></div>
+      <slot name="bare"><div class="mx-auto max-w-3xl px-8 py-10"><slot /></div></slot>
     </main>
   </div>
 </template>

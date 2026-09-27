@@ -61,6 +61,33 @@ one rule a new merchant can learn; none put Builder inside the theme editor. Scr
 | **B · Every page in one list** | *Pages* lists every page: "Store pages" and "Your pages", one Edit button each; the page decides which editor opens. *Look & feel* is only the theme. |
 | **C · Text pages vs designed pages** | Text pages (about, FAQ, policies) are written in the dashboard; designed pages open in Builder. You choose when you create one. |
 
+## Storefront hierarchy (`/storefront`)
+
+The direction chosen after the variations. Themes stay the core, organised the way Shopify's Online
+Store is. Frappe Builder becomes a *kind of theme*, not a kind of page. Screenshots are in
+`screenshots/storefront/`; regenerate them with `node storefront.mjs`.
+
+```
+Storefront
+├─ Themes         Live theme (Edit theme, ⋯) · Draft themes (Publish, Edit theme)
+│   └─ Add theme  ├─ Create with Frappe Builder → a new draft theme with empty pages
+│                 └─ Get themes from apps
+├─ Pages          rich text content pages (About, FAQ, policies) + "Theme template"
+├─ Navigation
+└─ Preferences
+```
+
+- **Edit theme** always means "change how the store looks". Which editor opens depends on the theme's kind:
+  - a sections theme opens the section editor (`/themes/:name/customize`);
+  - a Builder theme opens its page list (`/storefront/themes/:name`), and each page opens in Builder.
+- **Create with Frappe Builder** creates a theme record flagged `kind: builder` and one empty Builder page for each theme page: Header & footer, Home, Product, Collection, Content page, and an optional Cart. The theme is a draft until the required pages are designed; after that it can be published like any other theme.
+- **Theme settings** (colours and fonts) belong to the theme, whatever its kind. Builder pages and content pages both read them.
+- **Pages** are only content: the title, rich text (English and Arabic), visibility and SEO fields. The live theme lays them out:
+  - in a sections theme, through a `page.*` template the merchant picks under "Theme template";
+  - in a Builder theme, through its Content page, where a "Page content" block shows the text.
+
+  Content pages therefore survive a theme switch.
+
 ## How the parts map to the real thing
 
 | Prototype | Commera |
