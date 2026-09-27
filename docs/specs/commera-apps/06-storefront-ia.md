@@ -1,6 +1,6 @@
 # Commera Apps — Storefront information architecture and Builder themes
 
-Spec 6 of 6. This spec covers how the dashboard's Storefront area is organised: themes, content pages,
+Spec 6 of 7. This spec covers how the dashboard's Storefront area is organised: themes, content pages,
 navigation and preferences. It also covers where Frappe Builder fits, which is as a second kind of
 theme and not as a second kind of page.
 

@@ -1,6 +1,6 @@
 # Commera Apps — Theme sections, page layouts and storefront app blocks
 
-Spec 4 of 6. How merchants customize a Jinja theme without touching code, how theme developers make
+Spec 4 of 7. How merchants customize a Jinja theme without touching code, how theme developers make
 that possible, and how apps put UI on the storefront. It extends [spec 1](01-developer-api.md)'s
 registry with storefront targets and reuses [spec 2](02-platform-implementation.md)'s isolation
 rules. The interaction was agreed on a working prototype, [`poc/theme-editor/`](../../../poc/theme-editor/);
@@ -271,6 +271,10 @@ example path above is for a theme inside Commera and differs for other apps.
 cached. The editor preview re-renders when a file under `sections/` or `layouts/` changes, so edits
 show without a restart. Settings added to a schema appear in the editor with their defaults, and
 existing layouts keep working (§2.3, "Unknown data is ignored").
+
+Every command also takes `--json` for agents, and [spec 7](07-agent-ready-development.md) §2 adds
+`theme context`, `theme describe` and `theme render`. Section controllers load data only through
+`commera.sdk.storefront` (spec 7 §1).
 
 Test helper: `from commera.sdk.testing import assert_theme_valid`, which runs `theme check` for one
 theme in the app's own tests.

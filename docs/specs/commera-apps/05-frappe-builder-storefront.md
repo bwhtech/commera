@@ -1,6 +1,6 @@
 # Commera Apps — Frappe Builder as a storefront source (research)
 
-Spec 5 of 6. Research note, not a build plan yet. It answers three questions: what Frappe Builder's
+Spec 5 of 7. Research note, not a build plan yet. It answers three questions: what Frappe Builder's
 extension work (in flight, September 2026) gives us, how a merchant could build storefront pages in
 Builder instead of a Jinja theme, and how Commera can hand storefront context to Builder's AI agent,
 Bob. It ends with the asks for the Builder maintainers, who have said they are open to shaping
