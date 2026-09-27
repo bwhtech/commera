@@ -134,6 +134,7 @@ through the same child-first chain, so a child theme can override one section.
 | `max_blocks` | Editor refuses more |
 | `presets` | What **Add section** inserts |
 | `static` | Part of the page: reorderable, not removable (e.g. product information) |
+| `blocks.<type>.static` | Placed by the template with `render_static_block`; settings editable, not movable (§2.4) |
 | `groups` | `["header"]` / `["footer"]`: lives in a shared group, not a page |
 | `templates` | Restrict to page types, e.g. `["product"]` |
 
@@ -182,6 +183,97 @@ template as `theme_settings` and as CSS variables.
   placeholder naming the section.
 - **Unknown data is ignored:** a section type no longer in the theme is skipped (and flagged in the
   editor); a setting id no longer in the schema is ignored; a new one takes its default.
+
+### 2.4 Ordering
+
+A page is not one template. It is a list of section templates rendered one after another, and each
+section renders its own blocks. Merchants can reorder both, as they can in Shopify:
+
+- **Stored as array position.** In a layout, `sections[]` order is page order and `blocks[]` order
+  is block order. Every section and block has a stable `id`, so a move changes only positions (Shopify
+  keeps the same information in separate `order` and `block_order` arrays).
+- **Moves stay among siblings.** Sections move within their place (header group, page, footer
+  group), and blocks move within their own section. Nothing moves across sections, as in Shopify.
+- **A section must loop over its blocks.** Order only shows if the template renders
+  `{% for block in section.blocks %}{{ render_block(block) }}{% endfor %}`. A template that picks
+  `section.blocks[0]` into a fixed spot silently ignores reordering, and `theme check` (§2.5) flags it.
+- **Static blocks** are for parts whose position is part of the design, such as a product badge that
+  is always on the image. The block type is declared with `"static": true`, and the template places
+  it with `{{ render_static_block("badge") }}`. Its settings are editable, but the editor shows it
+  locked: it can't be dragged or removed. Static sections (`"static": true` on a section) work the
+  same way one level up.
+- **Limits.** There are at most 25 sections per page and at most `max_blocks` blocks per section
+  (default 50). Both match Shopify, and `save_layout` rejects anything above them.
+
+### 2.5 Developer tooling
+
+Theme developers work with files and a CLI, never the database. These commands mirror Shopify's
+`shopify theme init` and `shopify theme check`, and share the `bench commera` group from
+[spec 1](01-developer-api.md) §5:
+
+| Command | Does |
+| --- | --- |
+| `bench commera theme new --app A --slug S [--parent shop_base_theme]` | Scaffolds `A/themes/S/` with `settings.json`, empty `sections/`, and default layouts for `index`, `product`, `collection` and `page` that contain their static main sections. It also creates the `Shop Theme` record on migrate. |
+| `bench commera theme new-section --theme S --type T [--blocks a,b] [--group header\|footer] [--templates product,…] [--static] [--controller]` | Writes `sections/T.html`, `T.json` and, with `--controller`, `T.py` (below). The type must be snake_case and unique in the theme's inheritance chain. |
+| `bench commera theme new-block --theme S --section T --type B [--static]` | Adds `blocks.B` to `T.json` and a `{% macro B(block) %}` to `T.html`. |
+| `bench commera theme check [--theme S]` | Lints the theme (list below) with file and line numbers. It exits non-zero on errors, and runs in CI and after migrate. |
+| `bench --site X commera theme export-layout --theme S --template index` | Writes the site's *published* layout back into `layouts/index.json`, so a developer can arrange the default in the editor and ship it. |
+
+**What `new-section --type testimonials --blocks quote` writes:**
+
+```jinja
+{# sections/testimonials.html #}
+{% macro quote(block) %}
+  <figure>
+    <blockquote>{{ block.settings.text }}</blockquote>
+  </figure>
+{% endmacro %}
+
+<div class="container">
+  <h2>{{ section.settings.heading }}</h2>
+  {% for block in section.blocks %}{{ render_block(block) }}{% endfor %}
+</div>
+```
+
+```json
+{
+  "$schema": "../../section.schema.json",
+  "name": "Testimonials",
+  "settings": [{ "id": "heading", "type": "text", "label": "Heading", "translatable": true }],
+  "blocks": {
+    "quote": { "name": "Quote", "settings": [{ "id": "text", "type": "textarea", "label": "Text", "translatable": true }] }
+  },
+  "presets": [{ "blocks": ["quote"] }]
+}
+```
+
+The `$schema` line points at a JSON Schema that Commera ships (`commera/themes/section.schema.json`).
+It gives editors like VS Code autocomplete and inline errors for keys, setting types and options
+without running anything. The generator writes the relative path from the section to that file, so the
+example path above is for a theme inside Commera and differs for other apps.
+
+**What `theme check` reports:**
+
+- **Errors:**
+  - the schema is invalid against `section.schema.json`;
+  - a block type has no macro, or a macro has no block type;
+  - a layout names an unknown section or block type;
+  - a static section is missing from its template's default layout;
+  - a `select` default is not among its options;
+  - there are duplicate setting ids.
+- **Warnings:**
+  - a section with non-static blocks never loops over `section.blocks`;
+  - a translatable setting is printed through `|safe`;
+  - a section queries in its template (`frappe.get_all`, `frappe.db`) instead of a controller;
+  - a template has no default layout.
+
+**Develop loop.** In developer mode, schemas and layouts are read from disk on every request, not
+cached. The editor preview re-renders when a file under `sections/` or `layouts/` changes, so edits
+show without a restart. Settings added to a schema appear in the editor with their defaults, and
+existing layouts keep working (§2.3, "Unknown data is ignored").
+
+Test helper: `from commera.sdk.testing import assert_theme_valid`, which runs `theme check` for one
+theme in the app's own tests.
 
 ---
 
@@ -321,7 +413,7 @@ required blocks (`test_theme_engine.py`).
 
 | Phase | Ships |
 | --- | --- |
-| T1 Engine | Section schemas, `render_layout` / `render_block`, section controllers, Theme Layout, default layouts, failure isolation, validation |
+| T1 Engine | Section schemas, `render_layout` / `render_block` / `render_static_block`, section controllers, Theme Layout, default layouts, failure isolation, validation; `section.schema.json`, `bench commera theme new-section \| new-block \| check` (used to convert Summer in T2) |
 | T2 Summer home | Convert Summer's home page + patch; unchanged storefront output is the acceptance test |
 | T3 Editor | Dashboard editor as prototyped: tree, preview, settings, draft/publish, EN/AR, devices |
 | T4 Product and collection | Main sections with blocks; convert Summer and Shop Default |

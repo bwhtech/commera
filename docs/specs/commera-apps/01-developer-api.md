@@ -287,6 +287,7 @@ export default defineConfig({ plugins: [commera()] })
 | `bench --site S commera extensions list [--user U]` | Every extension: app, handle, target, module URL, API version check, visible to `U` |
 | `bench --site S commera extensions validate [--app A]` | Registry + build check with "did you mean" suggestions. Also runs after migrate |
 | `bench --site S commera extensions types --app A` | Writes `commera/commera-env.d.ts` for editor types |
+| `bench commera theme new \| new-section \| new-block \| check \| export-layout` | Theme and section scaffolding and linting; see [spec 4](04-theme-sections-and-layouts.md) §2.5 |
 
 Test helper: `from commera.sdk.testing import assert_extensions_valid` — call it in the app's CI.
 
