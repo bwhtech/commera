@@ -1,7 +1,9 @@
 <script setup>
 import { computed } from 'vue'
-import { Popover, Select, Slider, Switch, Textarea, TextInput } from 'frappe-ui'
+import { Button, Popover, Select, Slider, Switch, Textarea, TextInput } from 'frappe-ui'
 import { COLLECTIONS, FONTS, IMAGES, imageUrl } from '../theme/sample-data.js'
+import { BUILDER_COMPONENTS, builderUrl } from '../theme/builder.js'
+import { openBuilder } from './openBuilder.js'
 
 // One control per setting type. In Commera these types are docfield types, so
 // this becomes the dashboard's SettingsFieldControl plus two new controls
@@ -25,6 +27,7 @@ const placeholder = computed(() => (props.setting.translatable && props.language
 const optionsFor = (setting) => {
   if (setting.options === 'fonts') return FONTS
   if (setting.type === 'collection') return COLLECTIONS.map(({ value, label }) => ({ value, label }))
+  if (setting.type === 'builder_component') return BUILDER_COMPONENTS
   return setting.options
 }
 
@@ -91,6 +94,25 @@ const change = (value) => emit('change', value)
         @input="change($event.target.value)"
       />
       <TextInput class="flex-1" :model-value="value" @update:model-value="change" />
+    </div>
+    <div v-else-if="setting.type === 'builder_component'" class="space-y-2">
+      <Select class="w-full" :model-value="value" :options="optionsFor(setting)" @update:model-value="change" />
+      <div class="flex gap-2">
+        <Button
+          class="flex-1"
+          icon-left="lucide-pencil"
+          label="Edit in Builder"
+          :disabled="!value"
+          data-edit-component
+          @click="openBuilder(builderUrl('component', { name: value }), 'this component')"
+        />
+        <Button
+          icon-left="lucide-plus"
+          label="New"
+          @click="openBuilder(builderUrl('new-component'), 'a new component')"
+        />
+      </div>
+      <p class="text-sm text-ink-gray-5">Designed in Frappe Builder; this section only places it.</p>
     </div>
     <Popover v-else-if="setting.type === 'image'" side="bottom" align="start">
       <template #trigger>

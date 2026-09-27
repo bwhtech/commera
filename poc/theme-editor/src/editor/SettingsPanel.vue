@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { Button } from 'frappe-ui'
 import { APP_BLOCKS, SECTIONS } from '../theme/schemas.js'
 import FieldControl from './FieldControl.vue'
+import BuilderPagePanel from './BuilderPagePanel.vue'
 
 const props = defineProps({ editor: { type: Object, required: true } })
 const { state, selection, selectedSchema, setValue, remove, toggleHidden, select } = props.editor
@@ -12,7 +13,9 @@ const parentSection = computed(() => (selection.value?.kind === 'block' ? select
 </script>
 
 <template>
-  <div v-if="!selection || !selectedSchema" class="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+  <BuilderPagePanel v-if="selection?.kind === 'builder-page'" :page="selection.node" />
+
+  <div v-else-if="!selection || !selectedSchema" class="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
     <span class="lucide-mouse-pointer-click size-6 text-ink-gray-4" aria-hidden="true" />
     <p class="text-base text-ink-gray-7">Select a section or block</p>
     <p class="text-sm text-ink-gray-5">Click it in the preview or in the list on the left to change its settings.</p>

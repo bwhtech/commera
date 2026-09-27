@@ -6,7 +6,7 @@ standing in for the Jinja section templates, and localStorage stands in for the 
 
 ```bash
 npm install
-npm run build && npm run verify   # 11 browser checks, screenshots in ./screenshots
+npm run build && npm run verify   # 17 browser checks, screenshots in ./screenshots
 npm run dev                       # http://localhost:5173 to click around
 ```
 
@@ -31,6 +31,24 @@ npm run dev                       # http://localhost:5173 to click around
 - **Save and Publish.** Save keeps a draft; Publish makes it live; Discard returns to what is live.
   **View layout data** shows the JSON a site would store for the page. Theme files are never written.
 
+## Where Frappe Builder comes in
+
+Builder is the second, free-form option next to the section-based theme. The prototype shows every
+point where Commera hands off to it; all links are built in one place, `src/theme/builder.js`.
+
+| Where | What the merchant does | Link Commera opens |
+| --- | --- | --- |
+| **Storefront → Pages** | Sees theme pages and Builder pages in one list; *Edit in Builder* on a Builder page | `/builder/page/<name>` (exists today) |
+| **Pages → New page** | Picks *Describe it* (Builder's AI), *From a template* or *Blank*, and whether to use the store's header and footer | `/builder/page/new?prompt=…&template=…&layout=commera-theme` (`new` exists; the parameters are the proposed hooks) |
+| **Theme editor page picker** | Builder pages are listed under *Built in Frappe Builder*; *New page…* opens the same dialog | — |
+| **Theme editor, Builder page selected** | Previews the page inside the theme's header and footer, toggles that layout, sees the Commera components it uses, *Edit in Builder* | `/builder/page/<name>` |
+| **Theme editor, "Builder component" section** | Places a Builder component in any theme page; *Edit in Builder* / *New* | `/builder/component/<name>`, `/builder/component/new` (proposed routes) |
+
+Builder opens in a new tab; returning to the editor re-renders the preview, which is when Builder's
+saved changes show up.
+
+![Builder page in the theme editor](screenshots/9-builder-page-in-editor.png)
+
 ## How the parts map to the real thing
 
 | Prototype | Commera |
@@ -40,4 +58,5 @@ npm run dev                       # http://localhost:5173 to click around
 | `src/editor/state.js` localStorage | A Theme Layout record per (theme, template) with draft and published layout |
 | `src/preview/sections.js` renderers | `sections/<type>.html` Jinja templates, via `render_layout()` / `render_blocks()` |
 | `preview.html` + postMessage | The `theme_editor_preview` route rendering the draft layout |
-| `FieldControl.vue` | `SettingsFieldControl`, plus colour and image-picker controls |
+| `FieldControl.vue` | `SettingsFieldControl`, plus colour, image-picker and Builder-component controls |
+| `src/theme/builder.js` `BUILDER_PAGES` | Builder Page records, via the proposed `builder_*` hooks |

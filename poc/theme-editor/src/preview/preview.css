@@ -81,3 +81,22 @@ blockquote { margin: 0 0 12px; font-size: 16px; } figcaption { font-size: 13px; 
   .slide { padding: 20px; } .slide-copy h1 { font-size: 26px; }
   .newsletter-form { flex-direction: column; } .newsletter input { min-width: 0; }
 }
+
+/* Builder-rendered content: outlined in Builder's own colour so merchants can
+   tell what the theme editor manages from what they edit in Builder. */
+.builder-page { position: relative; }
+.builder-page:hover, .builder-page.is-selected { outline: 2px solid #0d9488 !important; outline-offset: -2px; }
+.builder-page:hover::before, .builder-page.is-selected::before {
+  content: attr(data-label); position: absolute; top: 0; inset-inline-start: 0; z-index: 5;
+  background: #0d9488; color: #fff; font: 600 11px/1 Inter, sans-serif; padding: 4px 6px; border-end-end-radius: 4px;
+}
+.campaign-hero { background: linear-gradient(135deg, #f97316, #db2777); color: #fff; text-align: center; padding: 80px 24px; }
+.campaign-hero h1 { font-size: 40px; } .campaign-hero .button { background: #fff; color: #111; }
+.eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: 12px; opacity: .9; }
+.countdown { display: flex; align-items: center; justify-content: center; gap: 10px; background: #111827; color: #fff; padding: 18px; border-radius: var(--radius); font-size: 18px; flex-wrap: wrap; }
+.countdown span { background: rgba(255,255,255,.12); padding: 6px 10px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+.brand-story { text-align: center; max-width: 620px; margin: 0 auto; padding: 24px 0; }
+.lookbook { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; height: 260px; }
+.lookbook div { border-radius: var(--radius); background: linear-gradient(135deg, #a855f7, #ec4899); }
+.lookbook div + div { background: linear-gradient(135deg, #0ea5e9, #6366f1); }
+.builder-note { font-size: 12px; opacity: .6; margin-top: 12px; }

@@ -19,7 +19,10 @@ function applyThemeSettings(settings) {
 function markSelection(selectedId, scroll) {
   root.querySelectorAll('.is-selected').forEach((element) => element.classList.remove('is-selected'))
   if (!selectedId) return
-  const element = root.querySelector(`[data-section-id="${selectedId}"], [data-block-id="${selectedId}"]`)
+  const element =
+    selectedId === 'builder-page'
+      ? root.querySelector('[data-builder-page]')
+      : root.querySelector(`[data-section-id="${selectedId}"], [data-block-id="${selectedId}"]`)
   if (!element) return
   element.classList.add('is-selected')
   if (scroll) element.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -45,9 +48,9 @@ window.addEventListener('message', (event) => {
 // A click selects the innermost block, else its section, in the editor.
 root.addEventListener('click', (event) => {
   event.preventDefault()
-  const target = event.target.closest('[data-block-id], [data-section-id]')
+  const target = event.target.closest('[data-block-id], [data-section-id], [data-builder-page]')
   if (!target) return
-  const id = target.dataset.blockId ?? target.dataset.sectionId
+  const id = target.dataset.blockId ?? target.dataset.sectionId ?? 'builder-page'
   window.parent.postMessage({ type: 'commera:select', id }, window.location.origin)
   markSelection(id, false)
 })

@@ -1,6 +1,7 @@
 import { computed, reactive, watch } from 'vue'
 import { createBlock, createSection, defaultTheme, newId } from '../theme/layouts.js'
 import { SECTIONS, schemaFor } from '../theme/schemas.js'
+import { BUILDER_PAGES } from '../theme/builder.js'
 
 // Stands in for the site database. In Commera a Theme Layout record per
 // (theme, template) holds `layout` (draft) and `published_layout`; the theme's
@@ -47,12 +48,29 @@ export function createEditor(themeName) {
   const hasUnsavedChanges = computed(() => JSON.stringify(state.draft) !== state.savedDraft)
   const hasUnpublishedChanges = computed(() => JSON.stringify(state.draft) !== JSON.stringify(state.published))
 
+  // A page is either a theme template ('index', 'product', …) or a Builder
+  // page ('builder:<name>'), whose content lives in Builder, not in a layout.
+  const builderPage = computed(() =>
+    state.template.startsWith('builder:') ? BUILDER_PAGES.find((page) => `builder:${page.name}` === state.template) : null,
+  )
+
   // Every section on the current page, in render order, tagged with its place.
-  const places = computed(() => [
-    { place: 'header', label: 'Header', sections: state.draft.groups.header },
-    { place: 'template', label: 'Template', sections: state.draft.templates[state.template] },
-    { place: 'footer', label: 'Footer', sections: state.draft.groups.footer },
-  ])
+  // A Builder page has no template sections here; it keeps the theme's header
+  // and footer only when it uses the store layout.
+  const places = computed(() => {
+    if (builderPage.value) {
+      if (builderPage.value.layout !== 'commera-theme') return []
+      return [
+        { place: 'header', label: 'Header', sections: state.draft.groups.header },
+        { place: 'footer', label: 'Footer', sections: state.draft.groups.footer },
+      ]
+    }
+    return [
+      { place: 'header', label: 'Header', sections: state.draft.groups.header },
+      { place: 'template', label: 'Template', sections: state.draft.templates[state.template] },
+      { place: 'footer', label: 'Footer', sections: state.draft.groups.footer },
+    ]
+  })
 
   function locate(id) {
     for (const { place, sections } of places.value) {
@@ -73,6 +91,7 @@ export function createEditor(themeName) {
 
   const selection = computed(() => {
     if (state.selectedId === 'theme-settings') return { kind: 'theme', node: { settings: state.draft.settings } }
+    if (state.selectedId === 'builder-page') return builderPage.value ? { kind: 'builder-page', node: builderPage.value } : null
     return state.selectedId ? locate(state.selectedId) : null
   })
 
@@ -163,10 +182,11 @@ export function createEditor(themeName) {
   // The preview only needs what it renders: the page's sections and theme settings.
   const previewPayload = computed(() => ({
     settings: clone(state.draft.settings),
-    header: clone(state.draft.groups.header),
+    header: builderPage.value && builderPage.value.layout !== 'commera-theme' ? [] : clone(state.draft.groups.header),
     template: state.template,
-    sections: clone(state.draft.templates[state.template]),
-    footer: clone(state.draft.groups.footer),
+    sections: builderPage.value ? [] : clone(state.draft.templates[state.template]),
+    builderPage: builderPage.value ? clone(builderPage.value) : null,
+    footer: builderPage.value && builderPage.value.layout !== 'commera-theme' ? [] : clone(state.draft.groups.footer),
     language: state.language,
     selectedId: state.selectedId,
   }))
@@ -175,7 +195,9 @@ export function createEditor(themeName) {
   watch(
     () => state.template,
     () => {
-      if (state.selectedId && state.selectedId !== 'theme-settings' && !locate(state.selectedId)) {
+      if (builderPage.value) {
+        state.selectedId = 'builder-page'
+      } else if (state.selectedId && state.selectedId !== 'theme-settings' && !locate(state.selectedId)) {
         state.selectedId = null
       }
     },
@@ -183,6 +205,7 @@ export function createEditor(themeName) {
 
   return {
     state,
+    builderPage,
     places,
     selection,
     selectedSchema,

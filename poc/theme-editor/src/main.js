@@ -8,6 +8,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: () => import('./pages/Themes.vue') },
+    { path: '/pages', component: () => import('./pages/Pages.vue') },
     { path: '/themes/:theme/customize', component: () => import('./pages/ThemeEditor.vue') },
   ],
 })

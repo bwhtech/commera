@@ -47,7 +47,28 @@ const productCards = (products, showPrices) =>
     )
     .join('')
 
+// Stand-ins for what Builder renders. In Commera the storefront asks Builder to
+// render the component or page; the theme never holds its markup.
+const BUILDER_COMPONENT_HTML = {
+  'countdown-banner': () => `<div class="countdown"><strong>Summer sale ends in</strong><span>02</span>:<span>14</span>:<span>37</span><a class="button">Shop the sale</a></div>`,
+  'brand-story': () => `<div class="brand-story"><h2>Made slowly, on purpose</h2><p>Three friends, one print shop, and a rule: nothing gets made until someone wants it.</p></div>`,
+  'lookbook-grid': () => `<div class="lookbook"><div></div><div></div><div></div></div>`,
+}
+
+export function renderBuilderPage(page) {
+  const body = page.name === 'summer-sale'
+    ? `<div class="campaign-hero"><p class="eyebrow">Summer sale</p><h1>Up to 40% off, printed to order</h1><a class="button">Shop the sale</a></div>
+       <div class="container">${BUILDER_COMPONENT_HTML['countdown-banner']()}</div>
+       <div class="container"><h2>On sale now</h2><div class="product-grid" style="--columns:4">${productCards(PRODUCTS.slice(0, 8), true)}</div>
+       <p class="builder-note">Product grid: the Commera component, bound to the "Summer sale" collection data source.</p></div>`
+    : `<div class="container">${BUILDER_COMPONENT_HTML['brand-story']()}</div>`
+  return `<div class="builder-page" data-builder-page data-label="Built in Frappe Builder · ${escape(page.title)}">${body}</div>`
+}
+
 export const RENDERERS = {
+  builder_component: ({ settings }) => `
+    <div class="${settings.full_width ? '' : 'container'}">${(BUILDER_COMPONENT_HTML[settings.component] ?? (() => ''))()}</div>`,
+
   announcement_bar: ({ settings }, { t, language }) => `
     <div class="announcement" style="background:${escape(settings.background)}">
       ${escape(t(settings.text))}${settings.link ? ` · <u>${escape(collectionLabel(settings.link, language))}</u>` : ''}
@@ -174,11 +195,14 @@ export const RENDERERS = {
 export function renderPage(payload) {
   const t = (value) => (value && typeof value === 'object' ? value[payload.language] || value.en || '' : value ?? '')
   const context = { t, language: payload.language }
-  return [...payload.header, ...payload.sections, ...payload.footer]
-    .filter((section) => !section.disabled)
-    .map((section) => {
-      const html = RENDERERS[section.type]?.(section, context) ?? ''
-      return `<section class="section" data-section-id="${section.id}" data-label="${escape(SECTIONS[section.type].name)}">${html}</section>`
-    })
-    .join('')
+  const wrap = (sections) =>
+    sections
+      .filter((section) => !section.disabled)
+      .map((section) => {
+        const html = RENDERERS[section.type]?.(section, context) ?? ''
+        return `<section class="section" data-section-id="${section.id}" data-label="${escape(SECTIONS[section.type].name)}">${html}</section>`
+      })
+      .join('')
+  const body = payload.builderPage ? renderBuilderPage(payload.builderPage) : wrap(payload.sections)
+  return wrap(payload.header) + body + wrap(payload.footer)
 }

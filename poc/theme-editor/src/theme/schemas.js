@@ -125,6 +125,16 @@ export const SECTIONS = {
     max_blocks: 6,
     presets: [{ blocks: ['quote', 'quote', 'quote'] }],
   },
+  // Embeds a Frappe Builder component in a theme page. The design lives in
+  // Builder; the theme only places it. (Proposed builder_components hook.)
+  builder_component: {
+    name: 'Builder component',
+    icon: 'lucide-component',
+    settings: [
+      { id: 'component', type: 'builder_component', label: 'Component', default: 'countdown-banner' },
+      { id: 'full_width', type: 'check', label: 'Full width', default: true },
+    ],
+  },
   newsletter: {
     name: 'Newsletter',
     icon: 'lucide-mail',

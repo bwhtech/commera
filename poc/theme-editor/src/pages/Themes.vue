@@ -1,6 +1,7 @@
 <script setup>
 import { Badge, Button, Dropdown, toast } from 'frappe-ui'
 import { useRouter } from 'vue-router'
+import StorefrontNav from './StorefrontNav.vue'
 
 const router = useRouter()
 
@@ -17,7 +18,8 @@ const customize = (theme) => router.push(`/themes/${theme.name}/customize`)
 
 <template>
   <div class="mx-auto max-w-4xl px-6 py-10">
-    <h1 class="text-2xl font-semibold text-ink-gray-9">Theme</h1>
+    <StorefrontNav />
+    <h1 class="mt-6 text-2xl font-semibold text-ink-gray-9">Theme</h1>
     <p class="mt-1 text-base text-ink-gray-6">Pick how your storefront looks, then customize its pages section by section.</p>
 
     <div class="mt-8 space-y-4">

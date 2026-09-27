@@ -24,8 +24,17 @@ function onMessage(event) {
   if (event.data?.type === 'commera:select') select(event.data.id, { scroll: false })
 }
 
-onMounted(() => window.addEventListener('message', onMessage))
-onBeforeUnmount(() => window.removeEventListener('message', onMessage))
+// Returning from a Builder tab: re-render so Builder's saved changes show.
+const onFocus = () => post(false)
+
+onMounted(() => {
+  window.addEventListener('message', onMessage)
+  window.addEventListener('focus', onFocus)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('message', onMessage)
+  window.removeEventListener('focus', onFocus)
+})
 
 watch(previewPayload, () => post(false), { deep: true })
 watch(() => state.scrollRequest, () => post(true))

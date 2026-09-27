@@ -21,6 +21,17 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []
 page.on('pageerror', (error) => errors.push(error.message))
 const shot = (name) => page.screenshot({ path: `screenshots/${name}.png` })
+const pickPage = async (name) => {
+  await page.locator('[data-page-picker]').click()
+  await page.getByRole('menuitem', { name, exact: true }).click()
+}
+// Builder opens in a new tab; the check is the URL Commera hands it.
+const builderTab = async (action) => {
+  const [popup] = await Promise.all([page.context().waitForEvent('page'), action()])
+  const url = new URL(popup.url())
+  await popup.close()
+  return url.pathname + url.search
+}
 
 try {
   await page.goto(BASE)
@@ -65,8 +76,7 @@ try {
   check('adding a section selects it', await page.locator('[data-settings-panel] h2').innerText() === 'Newsletter')
 
   // Product page: the main section carries a Printful app block.
-  await page.locator('[data-template-select]').click()
-  await page.getByRole('option', { name: 'Product' }).click()
+  await pickPage('Product')
   await preview.locator('.main-product').waitFor({ timeout: 5000 })
   await page.locator('[data-tree-node]').filter({ hasText: 'Size chart' }).click()
   check('app block from an app sits inside the theme section', (await page.locator('[data-settings-panel]').innerText()).includes('App block from Printful'))
@@ -75,8 +85,7 @@ try {
   // Arabic + mobile.
   await page.getByRole('radio', { name: 'AR' }).click()
   await page.getByRole('radio', { name: 'Mobile' }).click()
-  await page.locator('[data-template-select]').click()
-  await page.getByRole('option', { name: 'Home page' }).click()
+  await pickPage('Home page')
   await preview.locator('html[dir="rtl"]').waitFor({ timeout: 5000 })
   check('Arabic preview renders right-to-left', true)
   await page.waitForTimeout(400)
@@ -92,6 +101,29 @@ try {
   check('theme settings restyle the whole preview', accent === '#2563eb', accent)
   await shot('7-theme-settings')
 
+  // Builder: a theme section that embeds a Builder component, edited in Builder.
+  await page.locator('[data-add-section="template"]').click()
+  await page.getByRole('menuitem', { name: 'Builder component' }).click()
+  await preview.locator('.countdown').first().waitFor({ timeout: 5000 })
+  await page.waitForTimeout(900) // the preview smooth-scrolls to the new section
+  await shot('10-builder-component-section')
+  const componentUrl = await builderTab(() => page.locator('[data-edit-component]').click())
+  check('"Edit in Builder" on a component section opens that component', componentUrl === '/builder/component/countdown-banner', componentUrl)
+
+  // Builder: a Builder page in the page picker, shown inside the store layout.
+  await pickPage('Summer sale')
+  await preview.locator('[data-builder-page]').waitFor({ timeout: 5000 })
+  check('a Builder page previews inside the theme header and footer', await preview.locator('.site-header').count() === 1)
+  await page.waitForTimeout(300)
+  await shot('9-builder-page-in-editor')
+  const pageUrl = await builderTab(() => page.locator('[data-edit-in-builder]').click())
+  check('"Edit in Builder" on a Builder page opens it in Builder', pageUrl === '/builder/page/summer-sale', pageUrl)
+  await page.locator('[data-builder-page-panel]').getByRole('switch').click()
+  await page.waitForTimeout(300)
+  check("turning off the store layout drops the theme's header", await preview.locator('.site-header').count() === 0)
+  await page.locator('[data-builder-page-panel]').getByRole('switch').click()
+  await pickPage('Home page')
+
   // Layout data and publish.
   await page.getByRole('button', { name: 'View layout data' }).click()
   await page.getByText('Theme Layout · summer_theme · index').waitFor()
@@ -101,6 +133,20 @@ try {
   await page.getByRole('button', { name: 'Publish' }).click()
   await page.getByText('Published to your storefront').waitFor()
   check('publish clears the unpublished badge', await page.getByText('Unpublished changes').count() === 0)
+  // Pages list: theme pages and Builder pages together; a new page starts in Builder.
+  await page.goto(`${BASE}/pages`)
+  await page.locator('[data-builder-row="summer-sale"]').waitFor()
+  await shot('11-pages-list')
+  await page.locator('[data-new-page]').click()
+  await page.locator('[data-new-page-title]').fill('Winter drop')
+  await page.locator('[data-new-page-prompt] textarea, textarea[data-new-page-prompt]').first().fill('A landing page for our winter hoodie drop with a countdown and the Hoodies collection.')
+  await page.waitForTimeout(300)
+  await shot('12-new-page-dialog')
+  const newUrl = await builderTab(() => page.locator('[data-create-in-builder]').click())
+  check('"Create in Builder" hands the prompt and layout to Builder', newUrl.startsWith('/builder/page/new?prompt=') && newUrl.includes('layout=commera-theme'), newUrl.slice(0, 60))
+  await page.locator('[data-builder-row="winter-drop"]').waitFor({ timeout: 5000 })
+  check('the new page is listed as a draft', (await page.locator('[data-builder-row="winter-drop"]').innerText()).includes('Draft'))
+
   check('no uncaught errors', errors.length === 0, errors.join(' | '))
 } catch (error) {
   check('run completed', false, error.message.split('\n')[0])
