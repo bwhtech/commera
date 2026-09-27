@@ -1,6 +1,6 @@
 # Commera Apps — Frappe Builder as a storefront source (research)
 
-Spec 5. Research note, not a build plan yet. It answers three questions: what Frappe Builder's
+Spec 5 of 6. Research note, not a build plan yet. It answers three questions: what Frappe Builder's
 extension work (in flight, September 2026) gives us, how a merchant could build storefront pages in
 Builder instead of a Jinja theme, and how Commera can hand storefront context to Builder's AI agent,
 Bob. It ends with the asks for the Builder maintainers, who have said they are open to shaping
@@ -110,6 +110,10 @@ Code is in `builder/ai/`.
 ## 3. Builder as a storefront source (Commera side)
 
 ### Model
+
+> **Superseded by [spec 6](06-storefront-ia.md) §3.** Merchants choose Builder by publishing a
+> *Builder theme*, which carries its own template → Builder page map (`Shop Theme.builder_pages`).
+> The `storefront_source` switch and Shop Builder Page Map below are kept as research history.
 
 Add a `storefront_source` select to **Shop Theme Settings**: `Theme` (today) or `Frappe Builder`.
 With `Frappe Builder`, a new child table, **Shop Builder Page Map**, maps each template to a Builder
