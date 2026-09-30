@@ -73,6 +73,7 @@ def get_cart_fingerprint(quotation) -> str:
 		str(flt(quotation.net_total)),
 		quotation.currency or "",
 		get_services_stamp(),
+		get_store_rule_stamp(),
 	)
 	return sha256_hash("|".join(parts))[:12]
 
@@ -84,6 +85,18 @@ def get_services_stamp() -> str:
 	"""
 	latest = frappe.get_all("Shipping Service", fields=["modified"], order_by="modified desc", limit=1)
 	return str(latest[0].modified) if latest else ""
+
+
+def get_store_rule_stamp() -> str:
+	"""The store Shipping Rule and when its bands were last edited, since those bands price the options."""
+	shipping_rule = get_store_shipping_rule()
+	if not shipping_rule:
+		return ""
+	return f"{shipping_rule}@{frappe.get_cached_value('Shipping Rule', shipping_rule, 'modified')}"
+
+
+def get_store_shipping_rule() -> str | None:
+	return frappe.get_cached_value("Commera Settings", "Commera Settings", "shipping_rule")
 
 
 def quote_options(quotation) -> list[dict]:
@@ -100,6 +113,7 @@ def quote_options(quotation) -> list[dict]:
 		get_cart_parcels(quotation),
 		get_cart_context(quotation),
 		cod=False,
+		shipping_rule=get_store_shipping_rule(),
 	)
 
 
@@ -231,7 +245,7 @@ def set_delivery_charge_row(quotation, amount: float, title: str):
 				"doctype": "Sales Taxes and Charges",
 				"description": f"{DELIVERY_CHARGE_DESCRIPTION} - {title}",
 				"charge_type": "Actual",
-				"account_head": get_charge_account(title),
+				"account_head": get_charge_account(get_store_shipping_rule()),
 				"tax_amount": amount,
 				# ERPNext refuses an inclusive Actual charge, and a site default of 1 would fail checkout.
 				"included_in_print_rate": 0,
@@ -377,11 +391,11 @@ def reindex_taxes(quotation):
 		row.idx = index
 
 
-def get_charge_account(title: str) -> str:
-	"""The option's own Shipping Rule account when it has one, else the store's charge account head."""
-	from bwh_shipping.bwh_shipping.pricing import get_charge_account as get_option_account
+def get_charge_account(shipping_rule: str | None) -> str:
+	"""The store Shipping Rule's account when it has one, else the store's charge account head."""
+	from bwh_shipping.bwh_shipping.pricing import get_charge_account as get_rule_account
 
-	account = get_option_account(title)
+	account = get_rule_account(shipping_rule)
 	if account:
 		return account
 
@@ -420,7 +434,9 @@ def reprice_selected_option(quotation) -> bool:
 	amount = get_charge_amount(
 		quotation.custom_delivery_option,
 		get_cart_context(quotation),
-		quoted_amount=flt(quotation.custom_delivery_charge) or None,
+		# A stored 0 is a free option and must stay free; None means no price was ever stored.
+		quoted_amount=quotation.custom_delivery_charge,
+		shipping_rule=get_store_shipping_rule(),
 	)
 	apply_delivery_option(
 		quotation,

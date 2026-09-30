@@ -323,8 +323,17 @@ def get_delivery_configuration():
 	shipping_rule = frappe.get_cached_doc("Shipping Rule", shoe_arena_settings.shipping_rule)
 	if not shipping_rule or not shipping_rule.conditions:
 		return 0, 0
-	condition = shipping_rule.conditions[0]
-	return condition.shipping_amount, condition.to_value
+	free_condition = next(
+		(condition for condition in shipping_rule.conditions if condition.free_shipping), None
+	)
+	if not free_condition:
+		condition = shipping_rule.conditions[0]
+		return condition.shipping_amount, condition.to_value
+	charge = next(
+		(condition.shipping_amount for condition in shipping_rule.conditions if not condition.free_shipping),
+		0,
+	)
+	return charge, free_condition.from_value
 
 
 # The leading space is historical and live orders carry it: strip before comparing, never remove it.
