@@ -4,6 +4,8 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, random_string
 
+STANDARD_DELIVERY_OPTION = "Standard Delivery"
+
 
 def install_demo_data():
 	"""Main function to install all demo data"""
@@ -178,6 +180,13 @@ def create_price_lists():
 			print(f"    • Price List '{pl_data['name']}' already exists")
 
 
+def get_standard_delivery_option() -> str | None:
+	"""The delivery option the store's Shipping Rule bands price, when bwh_shipping has created it."""
+	if not frappe.db.exists("DocType", "Shipping Service"):
+		return None
+	return frappe.db.exists("Shipping Service", STANDARD_DELIVERY_OPTION) or None
+
+
 def create_shipping_rule():
 	"""Create a basic shipping rule"""
 	print("  - Creating Shipping Rule...")
@@ -205,6 +214,7 @@ def create_shipping_rule():
 		if not cost_center:
 			cost_center = f"Main - {company_abbr}"
 
+		delivery_option = get_standard_delivery_option()
 		shipping_rule = frappe.get_doc(
 			{
 				"doctype": "Shipping Rule",
@@ -215,8 +225,19 @@ def create_shipping_rule():
 				"account": account,
 				"cost_center": cost_center,
 				"conditions": [
-					{"from_value": 0, "to_value": 50, "shipping_amount": 10},
-					{"from_value": 50, "to_value": 999999, "shipping_amount": 0},
+					{
+						"from_value": 0,
+						"to_value": 50,
+						"shipping_amount": 10,
+						"shipping_service": delivery_option,
+					},
+					{
+						"from_value": 50,
+						"to_value": 0,
+						"shipping_amount": 0,
+						"free_shipping": 1,
+						"shipping_service": delivery_option,
+					},
 				],
 			}
 		)
