@@ -10,7 +10,7 @@ from commera.install_demo_data import (
 	configure_commera_settings,
 	create_item_attributes,
 	ensure_warehouse_exists,
-	get_standard_delivery_option,
+	save_standard_delivery_option,
 )
 from commera.install_fashion_demo_data import (
 	DEFAULT_SIZES,
@@ -263,7 +263,11 @@ def save_shipping_rule(profile):
 			"cost_center": frappe.db.get_value("Cost Center", {"company": company, "is_group": 0}, "name"),
 		}
 	)
-	delivery_option = get_standard_delivery_option()
+	delivery_option = save_standard_delivery_option(
+		profile["flat_shipping_charge"],
+		profile["free_shipping_above"],
+		frappe.get_cached_value("Company", company, "default_currency"),
+	)
 	rule.conditions = []
 	rule.append(
 		"conditions",
