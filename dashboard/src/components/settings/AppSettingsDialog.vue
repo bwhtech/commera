@@ -13,13 +13,13 @@ import AdvancedSettings from './AdvancedSettings.vue'
 import AppearancePicker from './AppearancePicker.vue'
 import AppsSettings from './AppsSettings.vue'
 import CashOnDeliverySettings from './CashOnDeliverySettings.vue'
-import DeliveryOptionsPanel from './DeliveryOptionsPanel.vue'
 import EmailSettings from './EmailSettings.vue'
 import GeneralSettings from './GeneralSettings.vue'
 import GuestSettings from './GuestSettings.vue'
 import IntegrationTabPanel from './IntegrationTabPanel.vue'
 import LocationsSettings from './LocationsSettings.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
+import ShippingSections from './ShippingSections.vue'
 import { paymentIntegrations, shippingIntegrations } from '../../data/integrations'
 import { pickupLocations } from '../../data/pickupLocations'
 import { settings } from '../../ia/settings'
@@ -155,7 +155,7 @@ watch(
           title="Shipping"
           description="Carriers this store books with. Each quotes its own rates at checkout."
         >
-          <DeliveryOptionsPanel
+          <ShippingSections
             :configuring="takeover"
             :active="settings.open && settings.tab === 'shipping'"
             @update:configuring="setTakeover"
