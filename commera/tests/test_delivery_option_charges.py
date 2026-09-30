@@ -140,16 +140,19 @@ class TestDeliveryOptionCharges(IntegrationTestCase):
 
 	def get_delivery_rows(self, quotation) -> list:
 		return [
-			row
-			for row in quotation.taxes
-			if (row.description or "").startswith(DELIVERY_CHARGE_DESCRIPTION)
+			row for row in quotation.taxes if (row.description or "").startswith(DELIVERY_CHARGE_DESCRIPTION)
 		]
 
 	def make_tiered_rule(self, account: str | None = None):
 		return make_store_rule(
 			[
 				{"from_value": 0, "to_value": 500, "shipping_amount": 100, "shipping_service": self.express},
-				{"from_value": 500, "to_value": 1000, "shipping_amount": 50, "shipping_service": self.express},
+				{
+					"from_value": 500,
+					"to_value": 1000,
+					"shipping_amount": 50,
+					"shipping_service": self.express,
+				},
 				{"from_value": 1000, "to_value": 0, "shipping_amount": 0, "shipping_service": self.express},
 			],
 			account=account,
