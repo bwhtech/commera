@@ -434,7 +434,7 @@ def reprice_selected_option(quotation) -> bool:
 	amount = get_charge_amount(
 		quotation.custom_delivery_option,
 		get_cart_context(quotation),
-		# A stored 0 is a free option and must stay free; None means no price was ever stored.
+		# A Currency field is never None, so the stored price is always billed and a stored 0 stays free.
 		quoted_amount=quotation.custom_delivery_charge,
 		shipping_rule=get_store_shipping_rule(),
 	)
