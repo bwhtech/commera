@@ -237,7 +237,7 @@ def import_carrier_services(provider: str, selections: list | str, default_rate:
 @frappe.whitelist()
 def get_link_options(doctype: str, search_text: str | None = None):
 	"""Options for a Link control on the delivery-option form. Scoped to what a Shipping Service links to -
-	its provider profile and its shipping rule - so the picker cannot be turned on an unrelated doctype."""
+	its provider profile - so the picker cannot be turned on an unrelated doctype."""
 	frappe.only_for("System Manager")
 	ensure_available()
 
