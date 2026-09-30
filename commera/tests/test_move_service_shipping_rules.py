@@ -1,6 +1,7 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 
 import unittest
+from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -17,10 +18,6 @@ def get_band_services(shipping_rule: str) -> list:
 	return [band.shipping_service for band in frappe.get_doc("Shipping Rule", shipping_rule).conditions]
 
 
-def count_error_logs(title: str = NOT_MOVED_TITLE) -> int:
-	return frappe.db.count("Error Log", {"method": title})
-
-
 class TestMoveServiceShippingRules(IntegrationTestCase):
 	def setUp(self):
 		self.addCleanup(set_store_rule, frappe.db.get_single_value("Commera Settings", "shipping_rule"))
@@ -31,15 +28,19 @@ class TestMoveServiceShippingRules(IntegrationTestCase):
 		self.store_rule = make_store_rule(
 			[{"from_value": 0, "to_value": 100, "shipping_amount": 50}, {"from_value": 100, "to_value": 500}]
 		).name
-		self.error_logs = count_error_logs()
+		# Error Log rows outlive the test rollback, so the logs are captured rather than written.
+		self.log_error = self.enterContext(patch.object(frappe, "log_error"))
 
 	def make_other_rule(self, bands: list[dict]) -> str:
 		rule = make_store_rule(bands).name
 		set_store_rule(self.store_rule)
 		return rule
 
+	def count_logged(self, title: str = NOT_MOVED_TITLE) -> int:
+		return sum(1 for call in self.log_error.call_args_list if call.kwargs.get("title") == title)
+
 	def assert_logged(self):
-		self.assertEqual(count_error_logs(), self.error_logs + 1)
+		self.assertEqual(self.count_logged(), 1)
 
 	def test_the_store_rule_bands_are_stamped_with_its_only_option(self):
 		move_service_shipping_rules_to_store_rule({self.standard: self.store_rule})
@@ -47,14 +48,12 @@ class TestMoveServiceShippingRules(IntegrationTestCase):
 		self.assertEqual(get_band_services(self.store_rule), [self.standard, self.standard])
 
 	def test_a_store_rule_shared_by_two_options_is_left_alone_and_logged(self):
-		shared_logs = count_error_logs("Store Shipping Rule bands not assigned")
-
 		move_service_shipping_rules_to_store_rule(
 			{self.standard: self.store_rule, self.express: self.store_rule}
 		)
 
 		self.assertEqual(get_band_services(self.store_rule), [None, None])
-		self.assertEqual(count_error_logs("Store Shipping Rule bands not assigned"), shared_logs + 1)
+		self.assertEqual(self.count_logged("Store Shipping Rule bands not assigned"), 1)
 
 	def test_another_rule_is_merged_into_the_store_rule(self):
 		other_rule = self.make_other_rule([{"from_value": 500, "to_value": 0, "shipping_amount": 20}])
