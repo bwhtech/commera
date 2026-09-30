@@ -3,6 +3,7 @@ from frappe.modules.utils import sync_customizations
 
 BAND_FIELDS = ("from_value", "to_value", "shipping_amount", "free_shipping")
 MERGE_SAVEPOINT = "move_service_shipping_rule"
+NOT_MOVED_TITLE = "Delivery option Shipping Rule not moved"
 
 
 def execute():
@@ -11,29 +12,14 @@ def execute():
 		return
 	# Customizations sync after post_model_sync patches, so the band's shipping_service column may not exist yet.
 	sync_customizations("bwh_shipping")
+	move_service_shipping_rules_to_store_rule(get_legacy_service_rules())
+
+
+def get_legacy_service_rules() -> dict[str, str]:
+	"""The Shipping Rule each delivery option carried, from the column the doctype no longer declares."""
 	if not frappe.db.has_column("Shipping Service", "shipping_rule"):
-		return
-	move_service_shipping_rules_to_store_rule()
+		return {}
 
-
-def move_service_shipping_rules_to_store_rule():
-	services_by_rule = get_services_by_rule()
-	if not services_by_rule:
-		return
-
-	store_rule = get_store_rule(services_by_rule)
-	if not store_rule:
-		return
-
-	for shipping_rule, services in services_by_rule.items():
-		if shipping_rule == store_rule:
-			stamp_store_rule_bands(store_rule, services)
-		else:
-			for service in services:
-				merge_service_rule(store_rule, shipping_rule, service)
-
-
-def get_services_by_rule() -> dict[str, list[str]]:
 	service = frappe.qb.DocType("Shipping Service")
 	rows = (
 		frappe.qb.from_(service)
@@ -42,28 +28,47 @@ def get_services_by_rule() -> dict[str, list[str]]:
 		.orderby(service.creation)
 		.run(as_dict=True)
 	)
-	services_by_rule = {}
-	for row in rows:
-		services_by_rule.setdefault(row.shipping_rule, []).append(row.name)
-	return services_by_rule
+	return {row.name: row.shipping_rule for row in rows}
 
 
-def get_store_rule(services_by_rule: dict[str, list[str]]) -> str | None:
+def move_service_shipping_rules_to_store_rule(legacy_rules: dict[str, str]):
+	if not legacy_rules:
+		return
+
 	store_rule = frappe.db.get_single_value("Commera Settings", "shipping_rule")
-	if store_rule:
-		return store_rule
-
-	if len(services_by_rule) > 1:
+	if not store_rule:
+		# Setting one here would switch on the flat store-rule tax row for carts with no option chosen.
 		frappe.log_error(
-			title="Delivery option Shipping Rules not moved",
-			message=f"No store Shipping Rule is set and the delivery options use different rules: "
-			f"{services_by_rule}. Pick the store rule in Commera Settings and name each band's option.",
+			title=NOT_MOVED_TITLE,
+			message=f"No store Shipping Rule is set, so the delivery options' rules were not moved: "
+			f"{format_service_rules(legacy_rules)}. Pick the store rule in Commera Settings and add "
+			"each option's bands to it.",
 		)
-		return None
+		return
 
-	store_rule = next(iter(services_by_rule))
-	frappe.db.set_single_value("Commera Settings", "shipping_rule", store_rule)
-	return store_rule
+	for shipping_rule, services in get_services_by_enabled_rule(legacy_rules).items():
+		if shipping_rule == store_rule:
+			stamp_store_rule_bands(store_rule, services)
+		else:
+			for service in services:
+				merge_service_rule(store_rule, shipping_rule, service)
+
+
+def get_services_by_enabled_rule(legacy_rules: dict[str, str]) -> dict[str, list[str]]:
+	enabled_rules = set(
+		frappe.get_all(
+			"Shipping Rule",
+			filters={"name": ["in", list(set(legacy_rules.values()))], "disabled": 0},
+			pluck="name",
+		)
+	)
+	services_by_rule = {}
+	for service, shipping_rule in legacy_rules.items():
+		if shipping_rule in enabled_rules:
+			services_by_rule.setdefault(shipping_rule, []).append(service)
+		else:
+			log_not_moved(service, shipping_rule, "it is disabled or no longer exists")
+	return services_by_rule
 
 
 def stamp_store_rule_bands(store_rule: str, services: list[str]):
@@ -90,8 +95,13 @@ def merge_service_rule(store_rule: str, shipping_rule: str, service: str):
 		return
 
 	service_rule = frappe.get_doc("Shipping Rule", shipping_rule)
+	if service_rule.calculate_based_on == "Fixed" or not service_rule.conditions:
+		log_not_moved(service, shipping_rule, "it has no bands to merge into the store rule")
+		return
 	if (service_rule.calculate_based_on, service_rule.company) != (rule.calculate_based_on, rule.company):
-		log_merge_refused(service, shipping_rule, store_rule, "it is based on a different figure or company")
+		log_not_moved(
+			service, shipping_rule, f"it is based on a different figure or company than {store_rule}"
+		)
 		return
 
 	for band in service_rule.conditions:
@@ -105,12 +115,16 @@ def merge_service_rule(store_rule: str, shipping_rule: str, service: str):
 	except frappe.ValidationError:
 		frappe.db.rollback(save_point=MERGE_SAVEPOINT)
 		frappe.clear_last_message()
-		log_merge_refused(service, shipping_rule, store_rule, "its bands clash with the store rule's")
+		log_not_moved(service, shipping_rule, f"its bands clash with those of {store_rule}")
 
 
-def log_merge_refused(service: str, shipping_rule: str, store_rule: str, reason: str):
+def log_not_moved(service: str, shipping_rule: str, reason: str):
 	frappe.log_error(
-		title="Delivery option Shipping Rule not moved",
-		message=f"Delivery option {service} used Shipping Rule {shipping_rule}, which could not be merged into "
-		f"the store rule {store_rule} because {reason}. Add its bands to the store rule by hand.",
+		title=NOT_MOVED_TITLE,
+		message=f"Delivery option {service} used Shipping Rule {shipping_rule}, which was not moved onto the "
+		f"store rule because {reason}. The option loses that pricing until its bands are added by hand.",
 	)
+
+
+def format_service_rules(legacy_rules: dict[str, str]) -> str:
+	return ", ".join(f"{service} ({shipping_rule})" for service, shipping_rule in legacy_rules.items())
