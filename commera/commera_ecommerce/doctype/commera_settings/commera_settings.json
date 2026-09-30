@@ -185,7 +185,7 @@
    "fieldname": "shipping_rule",
    "fieldtype": "Link",
    "label": "Shipping Rule",
-   "link_filters": "[[\"Shipping Rule\",\"calculate_based_on\",\"=\",\"Net Total\"],[\"Shipping Rule\",\"disabled\",\"=\",0]]",
+   "link_filters": "[[\"Shipping Rule\",\"disabled\",\"=\",0]]",
    "options": "Shipping Rule"
   },
   {
@@ -863,7 +863,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-29 12:00:00.000000",
+ "modified": "2026-09-30 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Settings",
