@@ -151,6 +151,7 @@ watch(
         <IntegrationTabPanel
           v-slot="{ takeover, setTakeover }"
           :store="shippingIntegrations"
+          scrolls-as-one
           :active="settings.tab === 'shipping'"
           title="Shipping"
           description="Carriers this store books with. Each quotes its own rates at checkout."

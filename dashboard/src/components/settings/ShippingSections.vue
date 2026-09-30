@@ -18,12 +18,12 @@ function setSection(section, open) {
 </script>
 
 <template>
-  <!-- Sized like the carriers above it (IntegrationTabPanel): its own content height while
-       stacked, so the rates below get the scroll area; the whole column once it takes over. -->
+  <!-- Sized like the carriers above it (IntegrationTabPanel): no tail padding while stacked,
+       the whole column once it takes over. -->
   <div
     v-if="!takeover || openSection === 'options'"
     class="flex flex-col"
-    :class="takeover ? 'min-h-0 flex-1' : 'shrink-0 [&_[data-slot=scroll-area-viewport]]:pb-0'"
+    :class="takeover ? 'min-h-0 flex-1' : '[&_[data-slot=scroll-area-viewport]]:pb-0'"
   >
     <DeliveryOptionsPanel
       :configuring="openSection === 'options'"
