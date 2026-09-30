@@ -78,7 +78,7 @@ class TestAdminDeliveryOptions(IntegrationTestCase):
 		)
 
 	def test_the_screen_names_the_picker_its_link_fields_search_through(self):
-		# The provider is a required Link: without a picker the owner has to type a profile name exactly.
+		# The provider is a Link: without a picker the owner has to type a profile name exactly.
 		self.assertEqual(get_delivery_options()["link_options_path"], "delivery_options.get_link_options")
 
 	def test_the_picker_searches_a_doctype_the_option_actually_links_to(self):
@@ -133,7 +133,8 @@ class TestAdminDeliveryOptions(IntegrationTestCase):
 		)
 		self.assertEqual(provider_field["fieldtype"], "Link")
 		self.assertEqual(provider_field["options"], "Shipping Provider Profile")
-		self.assertTrue(provider_field["required"])
+		# Optional, so a store with no carrier connected can still offer a delivery it makes itself.
+		self.assertFalse(provider_field["required"])
 
 	def test_create_writes_a_shipping_service(self):
 		screen = self.create_option("_Test Create Express", description="1-2 days", markup_percent=5)
@@ -144,6 +145,13 @@ class TestAdminDeliveryOptions(IntegrationTestCase):
 		self.assertEqual(option["markup_percent"], 5)
 		# The write answers with the whole screen, so the editor never renders a stale list.
 		self.assertTrue(screen["available"])
+
+	def test_create_without_a_carrier_writes_a_store_delivered_option(self):
+		screen = save_delivery_option(values={"title": "_Test Own Van", "backup_charge": 50})
+
+		option = find_option(screen, "_Test Own Van")
+		self.assertFalse(option["provider"])
+		self.assertEqual(option["backup_charge"], 50)
 
 	def test_edit_updates_the_option_it_names(self):
 		self.create_option("_Test Edit Express")

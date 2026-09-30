@@ -27,12 +27,19 @@ const priceParts = computed(() => {
   if (props.option.handling_fee) parts.push(`+${money(props.option.handling_fee)} handling`)
   // What the shopper is charged when the carrier will not quote — the difference between
   // a checkout that completes and one that dead-ends, so it is never hidden behind Edit.
-  if (props.option.backup_charge) parts.push(`${money(props.option.backup_charge)} fallback`)
+  // With no carrier there is no live rate to fall back from, so the backup charge is the price.
+  if (props.option.backup_charge) {
+    parts.push(
+      props.option.provider
+        ? `${money(props.option.backup_charge)} fallback`
+        : `${money(props.option.backup_charge)} flat`,
+    )
+  }
 
   return parts
 })
 
-const source = computed(() => props.option.carrier || props.option.provider)
+const source = computed(() => props.option.carrier || props.option.provider || 'Own delivery')
 
 // Frappe answers 1/0. Handed straight to a Switch, reka never reads a non-boolean as its
 // starting state: the thumb renders on from `data-state` while its internal value stays
