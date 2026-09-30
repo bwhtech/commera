@@ -22,7 +22,8 @@ const props = defineProps({
 const emit = defineEmits(['back'])
 
 // The From and To boxes need room for a five-digit value; below that 1fr collapses to nothing.
-const GRID = 'grid grid-cols-[minmax(4.5rem,1fr)_minmax(4.5rem,1fr)_minmax(5rem,1fr)_auto_auto] items-center gap-2'
+const GRID =
+  'grid grid-cols-3 items-center gap-2 sm:grid-cols-[minmax(4.5rem,1fr)_minmax(4.5rem,1fr)_minmax(5rem,1fr)_auto_auto]'
 
 let nextKey = 0
 const toRow = (band) => ({
@@ -119,42 +120,46 @@ async function save() {
 
   <SettingsBody v-scroll-fade>
     <div class="flex flex-col gap-2 py-3">
-      <div v-if="rows.length" :class="GRID" class="text-sm text-ink-gray-5">
-        <span>From ({{ boundaryUnit }})</span>
-        <span>To ({{ boundaryUnit }})</span>
-        <span>Charge{{ currency ? ` (${currency})` : '' }}</span>
-        <span class="sr-only">Free</span>
-        <span class="sr-only">Remove</span>
-      </div>
+      <!-- One grid for the headings and every band, so the columns line up. -->
+      <div v-if="rows.length" :class="GRID">
+        <span class="text-sm text-ink-gray-5">From ({{ boundaryUnit }})</span>
+        <span class="text-sm text-ink-gray-5">To ({{ boundaryUnit }})</span>
+        <span class="text-sm text-ink-gray-5">Charge{{ currency ? ` (${currency})` : '' }}</span>
+        <span class="hidden sm:block" aria-hidden="true" />
+        <span class="hidden sm:block" aria-hidden="true" />
 
-      <div v-for="(row, index) in rows" :key="row.key" :class="GRID">
-        <TextInput
-          v-model="row.from_value"
-          type="number"
-          min="0"
-          :aria-label="`Band ${index + 1} from`"
-        />
-        <TextInput
-          v-model="row.to_value"
-          type="number"
-          min="0"
-          placeholder="and above"
-          :aria-label="`Band ${index + 1} to`"
-        />
-        <TextInput
-          v-model="row.shipping_amount"
-          type="number"
-          min="0"
-          :disabled="row.free_shipping"
-          :aria-label="`Band ${index + 1} charge`"
-        />
-        <Checkbox v-model="row.free_shipping" label="Free" />
-        <Button
-          icon="lucide-x"
-          variant="ghost"
-          :aria-label="`Remove band ${index + 1}`"
-          @click="removeRow(row.key)"
-        />
+        <template v-for="(row, index) in rows" :key="row.key">
+          <TextInput
+            v-model="row.from_value"
+            type="number"
+            min="0"
+            :aria-label="`Band ${index + 1} from`"
+          />
+          <TextInput
+            v-model="row.to_value"
+            type="number"
+            min="0"
+            placeholder="and above"
+            :aria-label="`Band ${index + 1} to`"
+          />
+          <TextInput
+            v-model="row.shipping_amount"
+            type="number"
+            min="0"
+            :disabled="row.free_shipping"
+            :aria-label="`Band ${index + 1} charge`"
+          />
+          <!-- Below sm the five columns overflow a phone, so Free and remove drop to their own line. -->
+          <div class="col-span-3 flex items-center justify-between sm:contents">
+            <Checkbox v-model="row.free_shipping" label="Free" />
+            <Button
+              icon="lucide-x"
+              variant="ghost"
+              :aria-label="`Remove band ${index + 1}`"
+              @click="removeRow(row.key)"
+            />
+          </div>
+        </template>
       </div>
 
       <p v-if="!rows.length" class="text-p-sm text-ink-gray-5">
