@@ -4,6 +4,7 @@ from frappe import _
 from frappe.utils import flt
 
 from commera.api.payments import system_user_session
+from commera.order_events import OrderCancelRefused
 from commera.utils import update_sales_order_ecommerce_status, validate_document_access
 
 
@@ -32,6 +33,8 @@ def cancel_order(order_id: str):
 
 		if refund:
 			submit_refund_payment_entry(order_id, *refund)
+	except OrderCancelRefused:
+		raise
 	except Exception:
 		frappe.log_error(
 			title="Order cancellation failed", reference_doctype="Sales Order", reference_name=order_id

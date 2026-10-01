@@ -32,6 +32,7 @@ from commera.guest import (
 	validate_guest_checkout_enabled,
 )
 from commera.order_access import get_order_link, set_order_access_key
+from commera.order_events import fire_order_event
 from commera.utils import get_pickup_addresses, get_pickup_warehouses
 
 
@@ -341,6 +342,9 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 	# Outside the switch: log_purchase stamps frappe.session.user, so Administrator would own every purchase.
 	stamp_order_owner(sales_order, shopper)
 	log_purchase(sales_order)
+	fire_order_event("order_placed", sales_order.name)
+	if flt(gateway_amount) > 0:
+		fire_order_event("order_paid", sales_order.name)
 	return sales_order
 
 
@@ -748,6 +752,7 @@ def place_cod_order(quotation_name: str):
 	# COD orders count as purchases even while the Sales Order stays draft.
 	stamp_order_owner(sales_order, shopper)
 	log_purchase(sales_order)
+	fire_order_event("order_placed", sales_order.name)
 	return sales_order
 
 

@@ -135,6 +135,7 @@ doc_events = {
 			"commera.jobs.send_order_success_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
 		],
+		"before_cancel": "commera.order_events.check_order_cancel_hooks",
 		"on_cancel": [
 			"commera.jobs.send_order_cancel_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
@@ -152,6 +153,7 @@ doc_events = {
 		"on_trash": "commera.search.sync.on_trash",
 	},
 	"Sales Invoice": {"on_submit": "commera.utils.update_so_status_from_related_doc"},
+	"Payment Entry": {"on_submit": "commera.order_events.on_payment_entry_submit"},
 	"Delivery Note": {
 		"after_insert": "commera.utils.update_so_status_from_related_doc",
 		"on_submit": "commera.utils.update_so_status_from_related_doc",
@@ -194,6 +196,7 @@ user_data_fields = [
 ignore_links_on_delete = [
 	"Bulk Image Upload Log",
 	"Bulk Style Attribute Configurator Creation Log",
+	"Commera Order Event",
 ]
 
 # Apps
