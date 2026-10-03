@@ -275,7 +275,7 @@ async function save() {
               <div
                 v-if="draft?.key === row.key"
                 :id="`band-${row.key}`"
-                class="mb-3 flex flex-col gap-3 rounded-lg bg-surface-gray-2 p-3"
+                class="mb-3 flex flex-col gap-3 rounded-lg border border-outline-gray-2 p-3"
               >
                 <div class="grid grid-cols-2 gap-2">
                   <TextInput
