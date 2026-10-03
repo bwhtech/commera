@@ -186,7 +186,7 @@ function optionLabel(row) {
 }
 
 function bandSentence(row) {
-  const price = row.free_shipping ? 'delivery is free' : `${exactMoney(row.shipping_amount)} is charged`
+  const price = row.free_shipping ? 'delivery is free' : `delivery costs ${exactMoney(row.shipping_amount)}`
   const from = exactMoney(row.from_value)
   const to = exactMoney(row.to_value)
 
