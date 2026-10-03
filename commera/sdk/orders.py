@@ -93,14 +93,15 @@ def get_order_result(order, paid_orders: set, taxes: list, extra_fields) -> Orde
 def record_shipment(
 	sales_order: str | int,
 	*,
-	provider: str,
 	awb: str,
+	provider: str | None = None,
 	carrier: str | None = None,
 	status: str = "In Transit",
 	events: list[dict] | None = None,
+	tracking_url: str | None = None,
 ) -> str:
-	"""Upserts the order's Shipping Request on `awb`; its status never moves back. No Delivery Note is made,
-	so stock and delivered quantities are untouched."""
+	"""Upserts the order's Shipping Request on `awb`; its status never moves back. No Delivery Note is made.
+	Leave `provider` empty when a fulfilment partner shipped it; shoppers see `carrier` and `tracking_url`."""
 	if not is_connector_installed():
 		frappe.throw(_("Install bwh_shipping to record shipments."), ShippingNotInstalled)
 
@@ -117,34 +118,40 @@ def record_shipment(
 		"name",
 	)
 	if not request_name:
-		return create_order_shipping_request(sales_order, provider, awb, carrier, status, events)
+		return create_order_shipping_request(
+			sales_order, provider, awb, carrier, status, events, tracking_url
+		)
 
 	request = frappe.get_doc("Shipping Request", request_name)
 	request.check_permission("write")
 	request.lock_booking()
+	if tracking_url:
+		request.tracking_url = tracking_url
 	request.apply_status(status, events=events)
 	return request.name
 
 
-def create_order_shipping_request(sales_order, provider, awb, carrier, status, events) -> str:
+def create_order_shipping_request(sales_order, provider, awb, carrier, status, events, tracking_url) -> str:
 	"""bwh_shipping's create_shipping_request, fed from the Sales Order instead of a Delivery Note."""
 	from bwh_shipping.fulfilment import build_parcels, get_provider_pickup_address
 
-	if not frappe.db.exists("Shipping Provider Profile", provider):
+	if provider and not frappe.db.exists("Shipping Provider Profile", provider):
 		frappe.throw(_("Shipping provider {0} does not exist.").format(provider), frappe.ValidationError)
 
 	order = frappe.get_doc("Sales Order", sales_order)
+	pickup_address = get_provider_pickup_address(provider) if provider else None
 	request = frappe.get_doc(
 		{
 			"doctype": "Shipping Request",
 			"provider": provider,
 			"carrier": carrier,
 			"awb": awb,
+			"tracking_url": tracking_url,
 			"status": status,
 			"company": order.company,
 			"ref_doctype": "Sales Order",
 			"ref_docname": order.name,
-			"origin_address": get_provider_pickup_address(provider) or order.company_address,
+			"origin_address": pickup_address or order.company_address,
 			"destination_address": order.shipping_address_name or order.customer_address,
 			"customer_name": order.customer_name,
 			"customer_phone": order.contact_phone,

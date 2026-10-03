@@ -103,6 +103,9 @@
 		<p class="mb-2">
 			<span x-text="tracking.carrier"></span> &middot; {{ _("AWB") }} <strong class="text-black" x-text="tracking.awb"></strong>
 			&middot; <span x-text="tracking.status"></span>
+			<template x-if="tracking.tracking_url">
+				<span>&middot; <a :href="tracking.tracking_url" target="_blank" rel="noopener noreferrer">{{ _("Track your parcel") }}</a></span>
+			</template>
 		</p>
 		<ul class="timeline ps-0">
 			<template x-for="event in tracking.events || []" :key="event.timestamp + event.status">

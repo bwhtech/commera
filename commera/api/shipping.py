@@ -506,7 +506,7 @@ def get_order_tracking(sales_order: str, key: str | None = None) -> dict:
 	shipment = frappe.get_all(
 		"Shipping Request",
 		filters={"ref_doctype": "Sales Order", "ref_docname": sales_order},
-		fields=["name", "awb", "carrier", "status", "label_url"],
+		fields=["name", "awb", "carrier", "status", "label_url", "tracking_url"],
 		order_by="creation desc",
 		limit=1,
 	)
@@ -525,5 +525,6 @@ def get_order_tracking(sales_order: str, key: str | None = None) -> dict:
 		"awb": request.awb,
 		"carrier": request.carrier,
 		"status": request.status,
+		"tracking_url": request.tracking_url,
 		"events": events,
 	}

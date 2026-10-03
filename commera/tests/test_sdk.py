@@ -307,3 +307,51 @@ class TestSdk(IntegrationTestCase):
 		self.assertEqual(orders.get_order(sales_order.name)["stage"]["key"], "delivered")
 		with self.assertRaises(frappe.ValidationError):
 			orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="Teleported")
+
+	def test_a_partner_shipment_needs_no_provider_and_shows_the_shopper_its_link(self):
+		if not is_connector_installed():
+			self.skipTest("bwh_shipping is not installed")
+		from bwh_shipping.tests.test_carrier_import import create_test_address
+
+		from commera.api.shipping import get_order_tracking
+
+		patch_app_hooks(self, {"commera_order_fulfilled": [], "commera_order_delivered": []})
+		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
+		sales_order.db_set(
+			{
+				"shipping_address_name": create_test_address("India"),
+				"company_address": create_test_address("India"),
+			}
+		)
+		tracking_url = "https://track.example.com/ZZ-PARTNER-AWB"
+
+		shipment = orders.record_shipment(
+			sales_order.name, awb="ZZ-PARTNER-AWB", carrier="Delhivery", tracking_url=tracking_url
+		)
+		self.assertFalse(frappe.db.get_value("Shipping Request", shipment, "provider"))
+		update_sales_order_ecommerce_status(sales_order.name)
+		self.assertEqual(
+			frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status"), "Shipped"
+		)
+
+		orders.record_shipment(sales_order.name, awb="ZZ-PARTNER-AWB", status="Delivered")
+		orders.record_shipment(sales_order.name, awb="ZZ-PARTNER-AWB", status="In Transit")
+		update_sales_order_ecommerce_status(sales_order.name)
+		self.assertEqual(
+			frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status"), "Delivered"
+		)
+		self.assertTrue(
+			frappe.db.exists(
+				"Commera Event", {"reference_name": sales_order.name, "event": "order_delivered"}
+			)
+		)
+
+		tracking = get_order_tracking(sales_order.name)
+		self.assertEqual(
+			(tracking["awb"], tracking["carrier"], tracking["status"], tracking["tracking_url"]),
+			("ZZ-PARTNER-AWB", "Delhivery", "Delivered", tracking_url),
+		)
+		with self.assertRaises(frappe.ValidationError):
+			orders.record_shipment(
+				sales_order.name, awb="ZZ-PARTNER-AWB-2", tracking_url="javascript:alert(1)"
+			)
