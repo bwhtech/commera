@@ -1,0 +1,15 @@
+{
+	"name": "commera_example_app",
+	"releases": [
+		{
+			"version": "0.1.0",
+			"branch": "main",
+			"commit": "397e8e4d4badd8858f32be351adf0d2ce6e895ab",
+			"frappe_core": ">=16.0.0,<17.0.0",
+			"dependencies": {
+				"commera": ">=1.0.0,<2.0.0"
+			},
+			"channel": "nightly"
+		}
+	]
+}
