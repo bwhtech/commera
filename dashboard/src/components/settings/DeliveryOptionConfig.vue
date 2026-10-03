@@ -21,12 +21,18 @@ const formId = useId()
 
 const isEdit = computed(() => Boolean(props.option))
 
+const CARRIER_FIELDNAMES = ['service_code', 'carrier', 'markup_percent', 'handling_fee']
+
 // An order stores this title, so it is set once and then read-only.
 const editableGroups = computed(() =>
   props.groups
     .map((group) => ({
       ...group,
-      fields: group.fields.filter((field) => field.fieldname !== 'title'),
+      fields: group.fields.filter(
+        (field) =>
+          field.fieldname !== 'title' &&
+          (values.provider || !CARRIER_FIELDNAMES.includes(field.fieldname)),
+      ),
     }))
     .filter((group) => group.fields.length),
 )

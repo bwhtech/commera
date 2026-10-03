@@ -13,6 +13,7 @@ const props = defineProps({
   busy: { type: Boolean, default: false },
   // No band, no carrier service and no backup charge: checkout has no price to show for it.
   hidden: { type: Boolean, default: false },
+  pricedByRates: { type: Boolean, default: false },
 })
 
 defineEmits(['edit', 'delete', 'toggle'])
@@ -22,6 +23,7 @@ defineEmits(['edit', 'delete', 'toggle'])
 const priceParts = computed(() => {
   const parts = []
 
+  if (props.pricedByRates) parts.push('Priced by shipping rates')
   if (props.option.service_code) parts.push('Carrier rate')
 
   if (props.option.markup_percent) parts.push(`+${props.option.markup_percent}%`)
@@ -30,7 +32,7 @@ const priceParts = computed(() => {
   // a checkout that completes and one that dead-ends, so it is never hidden behind Edit.
   // With no carrier there is no live rate to fall back from, so the backup charge is the price.
   if (props.option.backup_charge) {
-    const kind = props.option.provider ? 'fallback' : 'flat'
+    const kind = props.option.provider || props.pricedByRates ? 'fallback' : 'flat'
     parts.push(`${money(props.option.backup_charge)} ${kind}`)
   }
 

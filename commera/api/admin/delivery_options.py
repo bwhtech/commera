@@ -49,8 +49,8 @@ def ensure_available():
 
 
 def build_options() -> list[dict]:
-	"""Every delivery option the store has, in the order the checkout would list them."""
-	return frappe.get_all(SERVICE_DOCTYPE, fields=list(OPTION_FIELDS), order_by="title asc")
+	"""Every delivery option the store has: the ones checkout offers first, each group by title."""
+	return frappe.get_all(SERVICE_DOCTYPE, fields=list(OPTION_FIELDS), order_by="enabled desc, title asc")
 
 
 def build_editor_field_groups() -> list[dict]:
@@ -177,6 +177,10 @@ def save_delivery_option(name: str | None = None, values: dict | str | None = No
 
 	for fieldname, value in values.items():
 		option.set(fieldname, coerce_field_value(docfield_by_fieldname[fieldname].fieldtype, value))
+
+	if not option.provider:
+		option.service_code = None
+		option.carrier = None
 
 	option.save()
 	return build_screen()

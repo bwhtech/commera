@@ -30,6 +30,10 @@ function isHidden(option) {
   return rates.loaded.value && !rates.loadError.value && !isPriced(rates.bandsFor(option.name), option)
 }
 
+function hasBands(option) {
+  return rates.bandsFor(option.name).length > 0
+}
+
 // Two values: a new option has no row to name. A model, because the tab above has to know.
 const editing = ref(null)
 const editorOpen = defineModel('configuring', { type: Boolean, default: false })
@@ -186,6 +190,7 @@ function confirmDelete(option) {
           :option="option"
           :busy="store.loading.value"
           :hidden="isHidden(option)"
+          :priced-by-rates="hasBands(option)"
           @edit="edit"
           @delete="confirmDelete"
           @toggle="toggle(option, $event)"

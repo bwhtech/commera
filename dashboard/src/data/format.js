@@ -7,13 +7,13 @@ import { bootValue } from './boot'
 const currencyCode = bootValue('currency', 'INR')
 const currencySymbol = bootValue('currency_symbol', '')
 
-function moneyFormatter(compact) {
+function moneyFormatter(compact, maximumFractionDigits = compact ? 1 : 0) {
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency: currencyCode,
     currencyDisplay: 'narrowSymbol',
     notation: compact ? 'compact' : 'standard',
-    maximumFractionDigits: compact ? 1 : 0,
+    maximumFractionDigits,
   })
 }
 
@@ -29,6 +29,10 @@ function formatWithSymbol(amount, formatter) {
 }
 
 export const money = (n) => formatWithSymbol(n, moneyFormatter(false))
+
+// A rate band edge such as 499.99 must not round up into the next band's ₹500.
+export const exactMoney = (n) =>
+  formatWithSymbol(n, moneyFormatter(false, Number.isInteger(Number(n ?? 0)) ? 0 : 2))
 
 // Report figures are read side by side, so they are compacted: ₹4.8L reads at
 // a glance where ₹4,82,300 has to be counted.

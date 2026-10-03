@@ -93,7 +93,7 @@ function setBasis(value) {
   <template v-else>
     <SettingsPanelHeader
       title="Shipping rates"
-      description="What each option costs. Unpriced options use the carrier."
+      description="What each option costs. Options with no matching band use their carrier rate or Backup Charge."
     >
       <template #actions>
         <Select

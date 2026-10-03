@@ -157,6 +157,24 @@ class TestAdminDeliveryOptions(IntegrationTestCase):
 		self.assertEqual(option["handling_fee"], 25)
 		self.assertEqual(frappe.db.count("Shipping Service", {"title": "_Test Edit Express"}), 1)
 
+	def test_enabled_options_are_listed_before_disabled_ones(self):
+		self.create_option("_Test A Switched Off", enabled=0)
+		screen = self.create_option("_Test Z Switched On")
+
+		titles = [option["title"] for option in screen["options"]]
+		self.assertLess(titles.index("_Test Z Switched On"), titles.index("_Test A Switched Off"))
+
+	def test_clearing_the_provider_drops_the_carrier_service(self):
+		self.create_option("_Test Own Delivery", carrier="Blue Dart")
+
+		screen = save_delivery_option(name="_Test Own Delivery", values={"provider": ""})
+
+		option = find_option(screen, "_Test Own Delivery")
+		self.assertFalse(option["provider"])
+		self.assertIsNone(option["service_code"])
+		self.assertIsNone(option["carrier"])
+		self.assertEqual(option["backup_charge"], 100)
+
 	def test_edit_accepting_the_unchanged_title_is_not_a_rename(self):
 		"""The editor posts back every field it rendered, title included."""
 		self.create_option("_Test Same Title")

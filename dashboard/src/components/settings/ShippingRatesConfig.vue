@@ -42,7 +42,9 @@ const serverError = ref('')
 
 function addRow() {
   const highestTo = Math.max(0, ...rows.value.map((row) => Number(row.to_value) || 0))
-  rows.value.push(toRow({ from_value: highestTo, to_value: 0, shipping_amount: 0 }))
+  // ERPNext's convention: a band starts one unit past the previous To, which is inclusive.
+  const from = highestTo ? highestTo + 1 : 0
+  rows.value.push(toRow({ from_value: from, to_value: 0, shipping_amount: 0 }))
 }
 
 function removeRow(key) {
@@ -133,12 +135,14 @@ async function save() {
             v-model="row.from_value"
             type="number"
             min="0"
+            step="0.01"
             :aria-label="`Band ${index + 1} from`"
           />
           <TextInput
             v-model="row.to_value"
             type="number"
             min="0"
+            step="0.01"
             placeholder="and above"
             :aria-label="`Band ${index + 1} to`"
           />
@@ -146,6 +150,7 @@ async function save() {
             v-model="row.shipping_amount"
             type="number"
             min="0"
+            step="0.01"
             :disabled="row.free_shipping"
             :aria-label="`Band ${index + 1} charge`"
           />

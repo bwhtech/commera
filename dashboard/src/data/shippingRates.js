@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { createAdminCaller } from './adminCaller'
-import { money } from './format'
+import { exactMoney } from './format'
 
 /**
  * The price bands on the store's one Shipping Rule, each naming the delivery option it
@@ -60,7 +60,7 @@ async function mutate(method, params = {}) {
 
 // A band row's boundary: money for an order-value rule, the weight unit for a weight rule.
 function formatBoundary(value) {
-  return isWeightBased.value ? `${Number(value) || 0} ${weightUom.value}` : money(value)
+  return isWeightBased.value ? `${Number(value) || 0} ${weightUom.value}` : exactMoney(value)
 }
 
 function bandsFor(shippingService) {
@@ -90,7 +90,7 @@ export function useShippingRates() {
 
 const byFromValue = (first, second) => Number(first.from_value) - Number(second.from_value)
 
-export function formatBandRange(band, formatBoundary = money) {
+export function formatBandRange(band, formatBoundary = exactMoney) {
   const from = Number(band.from_value) || 0
   const to = Number(band.to_value) || 0
   if (!to) return `${formatBoundary(from)} and above`
@@ -98,7 +98,7 @@ export function formatBandRange(band, formatBoundary = money) {
 }
 
 function formatBand(band, formatBoundary) {
-  const price = band.free_shipping ? 'Free' : money(band.shipping_amount)
+  const price = band.free_shipping ? 'Free' : exactMoney(band.shipping_amount)
   const from = Number(band.from_value) || 0
   const to = Number(band.to_value) || 0
 
@@ -112,9 +112,9 @@ function formatBand(band, formatBoundary) {
 // Backup Charge. Null when neither exists, so a cart outside every band is not offered it.
 function formatFallback(option) {
   const backupCharge = Number(option?.backup_charge) || 0
-  if (option?.service_code && backupCharge) return `carrier rate, ${money(backupCharge)} if unavailable`
+  if (option?.service_code && backupCharge) return `carrier rate, ${exactMoney(backupCharge)} if unavailable`
   if (option?.service_code) return 'carrier rate'
-  if (backupCharge) return money(backupCharge)
+  if (backupCharge) return exactMoney(backupCharge)
   return null
 }
 
@@ -122,7 +122,7 @@ function formatFallback(option) {
  * One line saying what an option costs, from its bands and then its fallback. Empty when
  * nothing prices it at all — the option is then hidden at checkout.
  */
-export function rateSummary(bands, option, formatBoundary = money) {
+export function rateSummary(bands, option, formatBoundary = exactMoney) {
   const bandParts = [...bands].sort(byFromValue).map((band) => formatBand(band, formatBoundary))
   const fallback = formatFallback(option)
 
