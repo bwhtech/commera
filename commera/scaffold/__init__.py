@@ -70,20 +70,14 @@ class AppScaffold:
 
 	def add_places(self):
 		for place in PLACES:
-			if place == "pages":
-				self.add_starter_page()
-			elif not (self.source_dir / place).exists():
-				self.add_file(self.source_dir / place / ".gitkeep", "")
-			else:
+			if (self.source_dir / place).exists():
 				self.changes.append(("skipped", f"commera/{place}/"))
-
-	def add_starter_page(self):
-		if (self.source_dir / "pages").exists():
-			self.changes.append(("skipped", "commera/pages/"))
-			return
-		self.add_file(
-			self.source_dir / "pages" / self.page_name / "index.vue", self.format_starter("page.vue")
-		)
+			elif place == "pages":
+				self.add_file(
+					self.source_dir / place / self.page_name / "index.vue", self.format_starter("page.vue")
+				)
+			else:
+				self.add_file(self.source_dir / place / ".gitkeep", "")
 
 	def add_file(self, path: Path, content: str):
 		if path.exists():

@@ -95,7 +95,7 @@ export default defineConfig({
         'runtime-vue': fromHere('./src/runtime/vue.js'),
         'runtime-frappe-ui': fromHere('./src/runtime/frappe-ui.js'),
         'runtime-frappe-ui-list': fromHere('./src/runtime/frappe-ui-list.js'),
-        'runtime-commera-admin': fromHere('./src/runtime/commera-admin.js'),
+        'runtime-commera-admin': fromHere('./src/extension-api/index.js'),
       },
       // Nothing in the dashboard imports the runtime entries by name, so without this Rollup tree-shakes their exports.
       preserveEntrySignatures: 'exports-only',

@@ -23,20 +23,14 @@ const appSettings = useAdminRead('extensions.get_app_settings', {
   params: { app: props.entry.app },
   immediate: false,
 })
-const saveSetting = useAdminAction('extensions.save_app_setting')
+const save = useAdminAction('extensions.save_app_setting')
 
-// useSettingsAutosave submits { [fieldname]: value }; this endpoint takes one field by name.
-const save = {
-  submit: async (fields) => {
-    const [[fieldname, value]] = Object.entries(fields)
-    return { [fieldname]: await saveSetting.submit({ app: props.entry.app, fieldname, value }) }
-  },
+const { values, adopt, set, commit } = useSettingsAutosave({
+  submit: (fields) => save.submit({ app: props.entry.app, ...fields }),
   get error() {
-    return saveSetting.error
+    return save.error
   },
-}
-
-const { values, adopt, set, commit } = useSettingsAutosave(save)
+})
 
 watch(
   () => appSettings.data,

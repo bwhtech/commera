@@ -1,17 +1,6 @@
 import { dayjs } from 'frappe-ui'
 
-const EVENT_LABELS = {
-  order_placed: 'Order placed',
-  order_paid: 'Order paid',
-  order_cancelled: 'Order cancelled',
-  order_fulfilled: 'Order fulfilled',
-  order_delivered: 'Order delivered',
-  order_refunded: 'Order refunded',
-  order_returned: 'Order returned',
-}
-
 export function eventLabel(event) {
-  if (EVENT_LABELS[event]) return EVENT_LABELS[event]
   const words = event.replace(/_/g, ' ')
   return words.charAt(0).toUpperCase() + words.slice(1)
 }

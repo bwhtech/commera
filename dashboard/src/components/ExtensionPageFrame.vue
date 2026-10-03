@@ -4,7 +4,6 @@ import { Button, Dropdown } from 'frappe-ui'
 import { PAGE_CONTEXT } from '../extension-api/context'
 import { appLocation, lucideIcon } from '../ia/extensions'
 import AppPageHeader from './AppPageHeader.vue'
-import EmptyState from './EmptyState.vue'
 import ExtensionHost from './ExtensionHost.vue'
 import PageBody from './PageBody.vue'
 import ResponsiveButton from './ResponsiveButton.vue'
@@ -15,11 +14,7 @@ const props = defineProps({
   query: { type: Object, default: () => ({}) },
 })
 
-const VARIANTS = {
-  solid: { variant: 'solid', theme: 'gray' },
-  subtle: { variant: 'subtle', theme: 'gray' },
-  ghost: { variant: 'ghost', theme: 'gray' },
-}
+const VARIANTS = ['solid', 'subtle', 'ghost']
 
 // Each setter keeps what it was given, unread, so a ref or a getter passed in stays live.
 const titleSource = shallowRef(null)
@@ -55,7 +50,8 @@ const actions = computed(() =>
   (toValue(actionsSource.value) ?? []).map((action) => ({
     label: toValue(action.label),
     icon: action.icon ? lucideIcon(toValue(action.icon)) : null,
-    ...(VARIANTS[toValue(action.variant)] ?? VARIANTS.subtle),
+    variant: VARIANTS.includes(toValue(action.variant)) ? toValue(action.variant) : 'subtle',
+    theme: 'gray',
     loading: Boolean(toValue(action.loading)),
     disabled: Boolean(toValue(action.disabled)),
     onClick: () => action.onClick?.(),
@@ -92,35 +88,16 @@ onUnmounted(() => (document.title = titleBeforeMount))
       <Dropdown v-if="overflowOptions.length" :options="overflowOptions">
         <Button icon="lucide-ellipsis" label="More actions" />
       </Dropdown>
-      <template v-for="action in headerButtons" :key="action.label">
-        <ResponsiveButton
-          v-if="action.icon"
-          :label="action.label"
-          :icon="action.icon"
-          :variant="action.variant"
-          :theme="action.theme"
-          :loading="action.loading"
-          :disabled="action.disabled"
-          @click="action.onClick"
-        />
-        <Button
-          v-else
-          :label="action.label"
-          :variant="action.variant"
-          :theme="action.theme"
-          :loading="action.loading"
-          :disabled="action.disabled"
-          @click="action.onClick"
-        />
-      </template>
+      <component
+        :is="action.icon ? ResponsiveButton : Button"
+        v-for="action in headerButtons"
+        :key="action.label"
+        v-bind="action"
+      />
     </template>
   </AppPageHeader>
 
   <PageBody>
-    <ExtensionHost :entry="entry" :path="path" :query="query" @failed="clear">
-      <template #failure="{ label, reason }">
-        <EmptyState icon="lucide-triangle-alert" :title="`${label} couldn't load`" :description="reason" />
-      </template>
-    </ExtensionHost>
+    <ExtensionHost :entry="entry" :path="path" :query="query" :compact="false" @failed="clear" />
   </PageBody>
 </template>

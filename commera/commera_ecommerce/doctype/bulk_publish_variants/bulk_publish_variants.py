@@ -6,7 +6,7 @@ from frappe.model.document import Document
 from frappe.query_builder import DocType
 from frappe.utils import cint, create_batch
 
-from commera.app_events import add_changed_products, get_variant_templates
+from commera.app_events import add_changed_products
 from commera.commera_ecommerce.doctype.commera_settings.editor_input import parse_list
 from commera.search.sync import enqueue_upsert_many
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
@@ -58,11 +58,17 @@ def get_variants_to_publish(publish, names=None, item_groups=None, require_compl
 def save_publish_state(publish, changed_names):
 	"""The one place `is_published` is written in bulk, and so the one place the index is told:
 	`frappe.db.set_value` fires no document event, so `sync.on_update` never runs."""
+	item_templates = set()
 	for chunk in create_batch(changed_names, IN_CLAUSE_CHUNK_SIZE):
 		frappe.db.set_value(PRODUCT_DOCTYPE, {"name": ["in", chunk]}, {"is_published": publish})
+		item_templates.update(
+			frappe.get_all(
+				PRODUCT_DOCTYPE, filters={"name": ["in", chunk]}, pluck="item_style", distinct=True
+			)
+		)
 
 	enqueue_upsert_many(PRODUCT_DOCTYPE, changed_names)
-	add_changed_products(get_variant_templates(changed_names), "published")
+	add_changed_products(item_templates, "published")
 
 	return changed_names
 

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useMediaQuery } from '@vueuse/core'
 import { Button, Dropdown, ScrollArea, Skeleton, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -50,6 +51,8 @@ const { cards, actionGroup, openAction, record, reload: reloadExtensions } = use
   () => route.params.id,
   { onReload: () => orderRequest.reload() },
 )
+
+const hasRail = useMediaQuery('(min-width: 1024px)')
 
 const erpLink = computed(() => (order.value ? erpnextLink('Sales Order', order.value.name) : null))
 
@@ -160,7 +163,7 @@ const loadFailure = computed(() =>
         <span class="text-sm text-ink-gray-5">{{ longDate(order.placed_on) }}</span>
       </div>
 
-      <OrderAppFailures class="mt-4" :order="order.name" />
+      <OrderAppFailures class="mt-4" :failures="order.app_failures" @retried="orderRequest.reload()" />
 
       <!-- Where the order has reached, read left to right. -->
       <OrderProgress class="mt-6" :progress="order.progress" />
@@ -238,7 +241,7 @@ const loadFailure = computed(() =>
           <OrderCustomerPanel :order="order" />
         </section>
 
-        <div v-if="cards.length" class="space-y-6 lg:hidden">
+        <div v-if="cards.length && !hasRail" class="space-y-6">
           <ExtensionSlot :entries="cards" :record="record" frame="stack" @reload="reloadExtensions" />
         </div>
       </div>
@@ -248,7 +251,7 @@ const loadFailure = computed(() =>
       <aside class="hidden w-[19rem] shrink-0 flex-col border-l border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
           <OrderCustomerPanel :order="order" />
-          <ExtensionSlot :entries="cards" :record="record" frame="rail" @reload="reloadExtensions" />
+          <ExtensionSlot v-if="hasRail" :entries="cards" :record="record" frame="rail" @reload="reloadExtensions" />
         </ScrollArea>
       </aside>
     </div>

@@ -3,29 +3,20 @@
  * Which installed apps could not act on this order. Nothing renders while every app took it, which is
  * the usual case, so the notice only costs space when there is something to do about it.
  */
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { Alert, toast } from 'frappe-ui'
-import { useAdminRead, useMethodAction } from '../data/api'
+import { useMethodAction } from '../data/api'
 
 const props = defineProps({
-  order: { type: String, required: true },
+  failures: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['retried'])
 
-const failuresRequest = useAdminRead('orders.get_order_app_events', {
-  params: () => ({ sales_order: props.order, status: 'Failed' }),
-})
-
-watch(
-  () => props.order,
-  () => failuresRequest.reload(),
-)
-
 // The rows carry the app's title, not its module name, so they group by what the owner reads.
 const failuresByApp = computed(() => {
   const groups = new Map()
-  for (const row of failuresRequest.data ?? []) groups.set(row.app, [...(groups.get(row.app) ?? []), row])
+  for (const row of props.failures) groups.set(row.app, [...(groups.get(row.app) ?? []), row])
   return [...groups.entries()].map(([app, rows]) => ({ app, rows }))
 })
 
@@ -42,7 +33,6 @@ async function retry(failure) {
       if (retryAction.error) return
     }
     toast.success(`Sending to ${failure.app} again`)
-    failuresRequest.reload()
     emit('retried')
   } finally {
     retryingApp.value = null

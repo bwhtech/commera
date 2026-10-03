@@ -28,12 +28,8 @@ def fire_event(
 	reference_name: str | int,
 	data: dict | None = None,
 	key: str | None = None,
-	record_without_handlers: bool = True,
 ):
 	handlers = get_handlers(f"commera_{event}")
-	if not handlers and not record_without_handlers:
-		return
-
 	event_key = get_event_key(event, reference_doctype, reference_name, key)
 	# Checked first because a duplicate insert also msgprints a red "already exists" at whoever triggered it.
 	if frappe.db.exists("Commera Event", event_key):
@@ -537,23 +533,6 @@ def on_item_price_change(doc, method=None):
 		add_changed_products([item_template], "price")
 
 
-def get_variant_templates(variant_names: list[str]) -> set[str]:
-	# Imported here: commera.utils imports this module.
-	from commera.utils import IN_CLAUSE_CHUNK_SIZE
-
-	item_templates = set()
-	for variant_name_chunk in create_batch(variant_names, IN_CLAUSE_CHUNK_SIZE):
-		item_templates.update(
-			frappe.get_all(
-				"Style Attribute Variant",
-				filters={"name": ["in", variant_name_chunk]},
-				pluck="item_style",
-				distinct=True,
-			)
-		)
-	return item_templates
-
-
 def add_changed_products(item_templates: list[str] | set[str], change: str):
 	if not item_templates or not get_handlers("commera_product_updated"):
 		return
@@ -592,7 +571,6 @@ def fire_product_updated(item_code: str, changed: list[str]):
 		item_code,
 		data={"item_code": item_code, "changed": changed},
 		key=frappe.generate_hash(length=10),
-		record_without_handlers=False,
 	)
 
 
@@ -693,7 +671,6 @@ def fire_inventory_changed(item_code: str):
 			"available_qty": get_available_stock(item_code, warehouse)["stock_qty"],
 		},
 		key=frappe.generate_hash(length=10),
-		record_without_handlers=False,
 	)
 
 

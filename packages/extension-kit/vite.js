@@ -25,11 +25,6 @@ const ICON_LIMIT = 20 * 1024;
 
 // The host draws these frames itself, so an app that draws its own gets two headers or a dialog on a dialog.
 const HOST_FRAMES = {
-	'@commera/admin': {
-		AppPageHeader: 'the page header is drawn by Commera; set it with usePage()',
-		PageBody: 'the page body is drawn by Commera; put content at the top level',
-		ExtensionCard: 'the card frame is drawn by Commera from extension.label',
-	},
 	'frappe-ui': {
 		Dialog:
 			'Commera draws action dialogs; put the form in an action and drive its button with useAction()',

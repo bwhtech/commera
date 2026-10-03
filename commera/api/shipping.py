@@ -51,9 +51,9 @@ def get_shipping_options() -> dict:
 	return {"options": options, "selected": quotation.custom_delivery_option}
 
 
-def get_delivery_options(quotation, strict: bool = False) -> list[dict]:
+def get_delivery_options(quotation) -> list[dict]:
 	# Only the raw quote is cached: an app's answer can depend on more than the cart fingerprint.
-	return apply_delivery_option_hooks(quotation, get_quoted_options(quotation), strict)
+	return apply_delivery_option_hooks(quotation, get_quoted_options(quotation), strict=False)
 
 
 def get_quoted_options(quotation) -> list[dict]:

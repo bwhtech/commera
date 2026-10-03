@@ -28,13 +28,11 @@ def apply_app_fees(quotation):
 	from commera.api.shipping import reindex_taxes
 
 	handlers = get_handlers("commera_cart_fees")
-	if not handlers and not any(row.get(APP_FEE_FIELD) for row in quotation.taxes):
-		return
-
-	# Dropped before the hooks run, so a fee priced on the grand total never compounds on its own last value.
-	quotation.taxes = [row for row in quotation.taxes if not row.get(APP_FEE_FIELD)]
-	reindex_taxes(quotation)
-	quotation.calculate_taxes_and_totals()
+	if any(row.get(APP_FEE_FIELD) for row in quotation.taxes):
+		# Dropped before the hooks run, so a fee priced on the grand total never compounds on its own last value.
+		quotation.taxes = [row for row in quotation.taxes if not row.get(APP_FEE_FIELD)]
+		reindex_taxes(quotation)
+		quotation.calculate_taxes_and_totals()
 	if not handlers:
 		return
 
@@ -56,7 +54,7 @@ def get_app_fee_rows(quotation, handlers: list[str], strict: bool) -> list[dict]
 def get_app_fee_row(fee: dict, precision: int) -> dict | None:
 	description = cstr(fee.get("description")).strip()
 	amount = fee.get("amount")
-	if isinstance(amount, bool) or not isinstance(amount, int | float) or not math.isfinite(amount):
+	if not is_finite_number(amount):
 		raise ValueError(f"A cart fee amount must be a number, got {amount!r}")
 	amount = flt(amount, precision)
 	if amount == 0:
@@ -74,6 +72,10 @@ def get_app_fee_row(fee: dict, precision: int) -> dict | None:
 		"included_in_print_rate": 0,
 		APP_FEE_FIELD: 1,
 	}
+
+
+def is_finite_number(amount) -> bool:
+	return not isinstance(amount, bool) and isinstance(amount, int | float) and math.isfinite(amount)
 
 
 def apply_delivery_option_hooks(quotation, options: list[dict], strict: bool) -> list[dict]:
@@ -108,12 +110,7 @@ def get_hooked_delivery_option(option: dict, hooked_option: dict, precision: int
 	option = dict(option)
 	if "amount" in hooked_option:
 		amount = hooked_option["amount"]
-		if (
-			isinstance(amount, bool)
-			or not isinstance(amount, int | float)
-			or not math.isfinite(amount)
-			or amount < 0
-		):
+		if not is_finite_number(amount) or amount < 0:
 			raise ValueError(f"A delivery option amount must be a number of zero or more, got {amount!r}")
 		option["amount"] = flt(amount, precision)
 	for field in ("label", "description"):

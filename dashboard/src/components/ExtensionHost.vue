@@ -12,6 +12,7 @@ const props = defineProps({
   query: { type: Object, default: () => ({}) },
   // The record a card or an action sits on, as { doctype, name }.
   record: { type: Object, default: null },
+  compact: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['reload', 'failed', 'ready'])
@@ -63,8 +64,12 @@ onErrorCaptured((error) => {
 </script>
 
 <template>
-  <slot v-if="failure" name="failure" :label="label" :reason="failure">
-    <EmptyState compact icon="lucide-triangle-alert" :title="`${label} couldn't load`" :description="failure" />
-  </slot>
+  <EmptyState
+    v-if="failure"
+    :compact="compact"
+    icon="lucide-triangle-alert"
+    :title="`${label} couldn't load`"
+    :description="failure"
+  />
   <component :is="Extension" v-else-if="Extension" @vue:mounted="emit('ready')" />
 </template>

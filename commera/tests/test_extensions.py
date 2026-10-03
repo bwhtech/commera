@@ -481,8 +481,8 @@ class TestAppSettings(ExtensionTestCase):
 		self.addCleanup(frappe.clear_document_cache, SETTINGS_DOCTYPE, SETTINGS_DOCTYPE)
 
 	def test_reads_the_declared_single_as_field_groups_without_secrets(self):
-		save_app_setting(APP, "client_secret", "secret-1")
-		save_app_setting(APP, "client_id", "client-1")
+		save_app_setting(APP, client_secret="secret-1")
+		save_app_setting(APP, client_id="client-1")
 
 		app_settings_data = get_app_settings(APP)
 
@@ -495,23 +495,23 @@ class TestAppSettings(ExtensionTestCase):
 		self.assertTrue(fields["client_secret"]["is_set"])
 
 	def test_a_blank_secret_keeps_the_stored_one(self):
-		save_app_setting(APP, "client_secret", "secret-1")
-		save_app_setting(APP, "client_secret", "")
+		save_app_setting(APP, client_secret="secret-1")
+		save_app_setting(APP, client_secret="")
 
 		self.assertEqual(
 			get_decrypted_password(SETTINGS_DOCTYPE, SETTINGS_DOCTYPE, "client_secret"), "secret-1"
 		)
-		self.assertEqual(save_app_setting(APP, "client_id", "client-2"), "client-2")
+		self.assertEqual(save_app_setting(APP, client_id="client-2"), {"client_id": "client-2"})
 
 	def test_only_the_declared_single_is_reachable(self):
 		with self.assertRaises(frappe.DoesNotExistError):
 			get_app_settings(OTHER_APP)
 		with self.assertRaises(frappe.ValidationError):
-			save_app_setting(APP, "no_such_field", "value")
+			save_app_setting(APP, no_such_field="value")
 
 	def test_saving_needs_write_permission_on_the_single(self):
 		with self.set_user(STOCK_USER), self.assertRaises(frappe.PermissionError):
-			save_app_setting(APP, "client_id", "client-3")
+			save_app_setting(APP, client_id="client-3")
 
 
 class TestInstalledApps(ExtensionTestCase):

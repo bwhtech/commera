@@ -61,28 +61,31 @@ def get_app_settings(app: str) -> dict:
 
 
 @frappe.whitelist(methods=["POST"])
-def save_app_setting(app: str, fieldname: str, value=None):
+def save_app_setting(app: str, **fields):
 	doctype = get_app_settings_doctype(app)
 	frappe.has_permission(doctype, "write", throw=True)
 
-	docfield = next(
-		(
-			docfield
-			for _group_label, docfield in get_editable_docfields(doctype)
-			if docfield.fieldname == fieldname
-		),
-		None,
-	)
-	if not docfield:
-		frappe.throw(_("{0} has no field {1}").format(doctype, fieldname))
-	# A blank secret keeps the stored one; only an explicit null clears it.
-	if docfield.fieldtype == "Password" and value == "":
-		return None
+	docfields = {docfield.fieldname: docfield for _group_label, docfield in get_editable_docfields(doctype)}
+	unknown = set(fields) - set(docfields)
+	if unknown:
+		frappe.throw(_("{0} has no field {1}").format(doctype, ", ".join(sorted(unknown))))
 
+	# A blank secret keeps the stored one; only an explicit null clears it.
+	changed = {
+		fieldname: value
+		for fieldname, value in fields.items()
+		if not (docfields[fieldname].fieldtype == "Password" and value == "")
+	}
 	settings = frappe.get_doc(doctype)
-	settings.set(fieldname, coerce_field_value(docfield.fieldtype, value))
-	settings.save()
-	return None if docfield.fieldtype == "Password" else settings.get(fieldname)
+	if changed:
+		for fieldname, value in changed.items():
+			settings.set(fieldname, coerce_field_value(docfields[fieldname].fieldtype, value))
+		settings.save()
+
+	return {
+		fieldname: None if docfields[fieldname].fieldtype == "Password" else settings.get(fieldname)
+		for fieldname in fields
+	}
 
 
 def get_app_settings_doctype(app: str) -> str:

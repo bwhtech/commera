@@ -660,11 +660,12 @@ def get_order(sales_order: str):
 		],
 		"deliveries": lifecycle.get("printable_delivery_notes") or [],
 		"invoices": read_order_invoices(order.name),
+		"app_failures": get_order_app_failures(order.name),
 	}
 
 
-def read_order(sales_order: str | int, extra_fields: list | tuple = ()) -> frappe._dict:
-	order = read_orders([sales_order], extra_fields).get(cstr(sales_order))
+def read_order(sales_order: str | int) -> frappe._dict:
+	order = read_orders([sales_order]).get(cstr(sales_order))
 	if not order:
 		frappe.throw(_("Order {0} not found").format(sales_order), frappe.DoesNotExistError)
 	return order
@@ -742,17 +743,14 @@ def read_order_lines(order_names: list[str]) -> dict[str, list]:
 	return lines_by_order
 
 
-@frappe.whitelist()
-def get_order_app_events(sales_order: str, status: str | None = None):
-	frappe.has_permission("Sales Order", doc=sales_order, ptype="read", throw=True)
-
+def get_order_app_failures(sales_order: str) -> list:
 	commera_event = frappe.qb.DocType("Commera Event")
-	criterion = (commera_event.reference_doctype == "Sales Order") & (
-		commera_event.reference_name == sales_order
+	delivery = frappe.qb.DocType("Commera Event Delivery")
+	return query_deliveries(
+		(commera_event.reference_doctype == "Sales Order")
+		& (commera_event.reference_name == sales_order)
+		& (delivery.status == "Failed")
 	)
-	if status:
-		criterion &= frappe.qb.DocType("Commera Event Delivery").status == status
-	return query_deliveries(criterion)
 
 
 def get_deliveries_query(criterion):
@@ -782,7 +780,6 @@ def query_deliveries(criterion, start: int = 0, page_length: int | None = None) 
 			delivery.next_retry_at,
 			delivery.finished_at,
 			commera_event.creation,
-			delivery.last_error.as_("error_log"),
 		)
 		.orderby(commera_event.creation, order=Order.desc)
 		.orderby(delivery.idx)

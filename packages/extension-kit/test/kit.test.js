@@ -349,10 +349,18 @@ describe('guards', () => {
 		);
 	});
 
+	for (const name of ['AppPageHeader', 'PageBody', 'ExtensionCard']) {
+		test(`importing ${name} fails because the dashboard does not share it`, async () => {
+			await buildFails(
+				{
+					'pages/jobs/index.vue': `${page}<script setup>\nimport { ${name} } from '@commera/admin'\nconsole.log(${name})\n</script>\n`,
+				},
+				new RegExp(`'@commera/admin' does not share ${name} with app pages`),
+			);
+		});
+	}
+
 	for (const [name, specifier, hint] of [
-		['AppPageHeader', '@commera/admin', /usePage\(\)/],
-		['PageBody', '@commera/admin', /page body is drawn by Commera/],
-		['ExtensionCard', '@commera/admin', /card frame is drawn by Commera/],
 		['Dialog', 'frappe-ui', /useAction\(\)/],
 	]) {
 		test(`importing ${name} fails and points at the host`, async () => {

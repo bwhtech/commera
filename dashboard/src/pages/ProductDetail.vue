@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useMediaQuery } from '@vueuse/core'
 import { Button, Dropdown, ScrollArea, Skeleton, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -112,6 +113,8 @@ const { cards, actionGroup, openAction, record, reload: reloadExtensions } = use
   { onReload: () => productRequest.reload() },
 )
 
+const hasRail = useMediaQuery('(min-width: 1024px)')
+
 const moreActions = computed(() => [...asDropdownOptions(actions.value.groups), actionGroup.value].filter(Boolean))
 
 // ProductBasics/ProductOrganization write straight onto this ref's own
@@ -191,7 +194,7 @@ const loadFailure = computed(() =>
           </div>
 
           <!-- Below lg the rail is hidden, so the apps' cards stack under the form instead. -->
-          <div v-if="cards.length" class="mt-11 space-y-6 lg:hidden">
+          <div v-if="cards.length && !hasRail" class="mt-11 space-y-6">
             <ExtensionSlot :entries="cards" :record="record" frame="stack" @reload="reloadExtensions" />
           </div>
         </PageBody>
@@ -200,7 +203,7 @@ const loadFailure = computed(() =>
       <aside class="hidden w-[19rem] shrink-0 flex-col border-l border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
           <ProductSummaryPanel :product="product" :stats="stats" />
-          <ExtensionSlot :entries="cards" :record="record" frame="rail" @reload="reloadExtensions" />
+          <ExtensionSlot v-if="hasRail" :entries="cards" :record="record" frame="rail" @reload="reloadExtensions" />
         </ScrollArea>
       </aside>
     </div>

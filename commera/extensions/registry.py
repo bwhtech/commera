@@ -33,11 +33,7 @@ def get_registry() -> dict:
 	if frappe.conf.developer_mode:
 		return get_app_extensions()
 
-	registry = frappe.cache.get_value(CACHE_KEY)
-	if registry is None:
-		registry = get_app_extensions()
-		frappe.cache.set_value(CACHE_KEY, registry)
-	return registry
+	return frappe.cache.get_value(CACHE_KEY, generator=get_app_extensions)
 
 
 def clear_registry_cache():
