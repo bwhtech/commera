@@ -5,7 +5,7 @@ import { bootValue } from './boot'
 // its symbol on `window`, so money reads correctly without any screen
 // threading a symbol down from its own endpoint — see boot.js.
 const currencyCode = bootValue('currency', 'INR')
-const currencySymbol = bootValue('currency_symbol', '')
+export const currencySymbol = bootValue('currency_symbol', '')
 
 function moneyFormatter(compact, maximumFractionDigits = compact ? 1 : 0) {
   return new Intl.NumberFormat(undefined, {

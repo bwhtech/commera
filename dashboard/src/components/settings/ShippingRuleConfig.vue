@@ -1,18 +1,20 @@
 <script setup>
 import { computed, ref, useId } from 'vue'
 import {
+  Badge,
   Button,
-  Checkbox,
   FormControl,
   Select,
   SettingsBody,
   SettingsRow,
   Switch,
+  TabButtons,
   TextInput,
   toast,
 } from 'frappe-ui'
 import SettingsConfigHeader from './SettingsConfigHeader.vue'
 import { errorMessage } from '../../data/errors'
+import { currencySymbol, exactMoney } from '../../data/format'
 import { findBandConflicts, formatBandRange } from '../../data/shippingRates'
 
 const props = defineProps({
@@ -26,14 +28,16 @@ const props = defineProps({
 
 const emit = defineEmits(['back'])
 
-// The From and To boxes need room for a five-digit value; below that 1fr collapses to nothing.
-const GRID =
-  'grid grid-cols-3 items-center gap-2 sm:grid-cols-[minmax(4.5rem,1fr)_minmax(4.5rem,1fr)_minmax(5rem,1fr)_auto_minmax(8rem,1.5fr)_auto]'
+const CHARGE_KINDS = [
+  { label: 'Amount', value: 'amount' },
+  { label: 'Free', value: 'free' },
+]
 
 // The submit button sits outside the form, so `form` is what runs the name's `required`.
 const formId = useId()
 
 const isEdit = computed(() => Boolean(props.rule))
+const moneyPrefix = currencySymbol || props.currency
 
 // '' is the "Any option" row: a band that names no delivery option.
 const optionChoices = computed(() => [
@@ -41,13 +45,17 @@ const optionChoices = computed(() => [
   ...props.deliveryOptions.map((option) => ({ label: option.title, value: option.name })),
 ])
 
+const optionTitles = computed(() =>
+  Object.fromEntries(props.deliveryOptions.map((option) => [option.name, option.title])),
+)
+
 let nextKey = 0
 const toRow = (band) => ({
   key: nextKey++,
-  from_value: band.from_value ?? 0,
-  // A stored 0 means "and above", which reads as an empty box, not as a limit of zero.
-  to_value: Number(band.to_value) ? band.to_value : '',
-  shipping_amount: band.shipping_amount ?? 0,
+  from_value: Number(band.from_value) || 0,
+  // 0 means "and above".
+  to_value: Number(band.to_value) || 0,
+  shipping_amount: Number(band.shipping_amount) || 0,
   free_shipping: Boolean(band.free_shipping),
   shipping_service: band.shipping_service ?? '',
 })
@@ -58,33 +66,111 @@ const rows = ref((props.rule?.bands ?? []).map(toRow))
 const saving = ref(false)
 const serverError = ref('')
 
+// The one band open for editing, as a draft; the list keeps the saved copy until Done.
+const draft = ref(null)
+const draftIsNew = ref(false)
+
+function toDraft(row) {
+  return {
+    key: row.key,
+    from_value: String(row.from_value),
+    to_value: row.to_value ? String(row.to_value) : '',
+    shipping_amount: String(row.shipping_amount),
+    charge: row.free_shipping ? 'free' : 'amount',
+    shipping_service: row.shipping_service,
+  }
+}
+
+function fromDraft(band) {
+  return {
+    key: band.key,
+    from_value: Number(band.from_value) || 0,
+    to_value: Number(band.to_value) || 0,
+    shipping_amount: band.charge === 'free' ? 0 : Number(band.shipping_amount) || 0,
+    free_shipping: band.charge === 'free',
+    shipping_service: band.shipping_service,
+  }
+}
+
+function editRow(row) {
+  if (draft.value) return
+  draft.value = toDraft(row)
+  draftIsNew.value = false
+}
+
 function addRow() {
-  const highestTo = Math.max(0, ...rows.value.map((row) => Number(row.to_value) || 0))
+  if (draft.value) return
+  const highestTo = Math.max(0, ...rows.value.map((row) => row.to_value))
   // ERPNext's convention: a band starts one unit past the previous To, which is inclusive.
-  const from = highestTo ? highestTo + 1 : 0
-  rows.value.push(toRow({ from_value: from, to_value: 0, shipping_amount: 0 }))
+  const row = toRow({ from_value: highestTo ? highestTo + 1 : 0 })
+  rows.value.push(row)
+  draft.value = toDraft(row)
+  draftIsNew.value = true
+}
+
+function closeDraft() {
+  draft.value = null
+  draftIsNew.value = false
+}
+
+function cancelDraft() {
+  if (draftIsNew.value) removeRow(draft.value.key)
+  closeDraft()
 }
 
 function removeRow(key) {
   rows.value = rows.value.filter((row) => row.key !== key)
+  if (draft.value?.key === key) closeDraft()
 }
 
 function describeConflict({ kind, bands }) {
   if (kind === 'order') return 'Each band has to start below where it ends.'
   if (kind === 'open') return 'Only one band can be left open-ended.'
-  return `${bands.map(formatBandRange).join(' and ')} overlap.`
+  return `${bands.map((band) => formatBandRange(band)).join(' and ')} overlap.`
 }
 
-const conflictMessages = computed(() => [...new Set(findBandConflicts(rows.value).map(describeConflict))])
+// ERPNext checks the whole rule, so the draft is checked against every other band.
+const draftConflicts = computed(() => {
+  if (!draft.value) return []
+  const others = rows.value.filter((row) => row.key !== draft.value.key)
+  const candidate = { ...fromDraft(draft.value), draft: true }
+  const conflicts = findBandConflicts([candidate, ...others]).filter((conflict) =>
+    conflict.bands.some((band) => band.draft),
+  )
+  return [...new Set(conflicts.map(describeConflict))]
+})
+
+function applyDraft() {
+  if (draftConflicts.value.length) return
+  const updated = fromDraft(draft.value)
+  rows.value = rows.value
+    .map((row) => (row.key === updated.key ? updated : row))
+    .sort((first, second) => first.from_value - second.from_value)
+  closeDraft()
+}
+
+// While a band is open its header follows the draft, so the summary reads what Done will keep.
+function shown(row) {
+  return draft.value?.key === row.key ? fromDraft(draft.value) : row
+}
+
+function optionLabel(row) {
+  if (!row.shipping_service) return 'Any option'
+  return optionTitles.value[row.shipping_service] ?? row.shipping_service
+}
+
+function chargeText(row) {
+  return row.free_shipping ? null : exactMoney(row.shipping_amount)
+}
 
 async function save() {
   saving.value = true
   serverError.value = ''
   try {
     const conditions = rows.value.map((row) => ({
-      from_value: Number(row.from_value) || 0,
-      to_value: Number(row.to_value) || 0,
-      shipping_amount: row.free_shipping ? 0 : Number(row.shipping_amount) || 0,
+      from_value: row.from_value,
+      to_value: row.to_value,
+      shipping_amount: row.free_shipping ? 0 : row.shipping_amount,
       free_shipping: row.free_shipping ? 1 : 0,
       shipping_service: row.shipping_service || '',
     }))
@@ -111,7 +197,7 @@ async function save() {
 <template>
   <SettingsConfigHeader
     :title="isEdit ? rule.label : 'Add a shipping rule'"
-    description="Checkout charges the band the order total falls in. Leave To blank for “and above”."
+    description="Checkout charges the band the order total falls in."
     @back="emit('back')"
   >
     <template #actions>
@@ -121,7 +207,7 @@ async function save() {
         variant="solid"
         theme="gray"
         :loading="saving"
-        :disabled="conflictMessages.length > 0"
+        :disabled="Boolean(draft)"
         :label="isEdit ? 'Save' : 'Add'"
       />
     </template>
@@ -130,104 +216,163 @@ async function save() {
   <SettingsBody v-scroll-fade>
     <form :id="formId" @submit.prevent="save">
       <div class="divide-y divide-outline-gray-1">
-        <SettingsRow
-          v-if="isEdit"
-          title="Name"
-          description="The rule is stored under this name, so it cannot be changed."
-        >
-          <p class="w-72 text-base text-ink-gray-7">{{ rule.label }}</p>
-        </SettingsRow>
-
-        <div v-else class="py-3.5">
+        <div class="py-3.5">
           <FormControl
+            v-if="!isEdit"
             v-model="label"
             label="Name"
             required
             placeholder="Standard shipping"
             description="Only you see it. It cannot be changed later."
           />
+          <template v-else>
+            <p class="text-sm text-ink-gray-5">Name</p>
+            <p class="mt-1 text-base text-ink-gray-8">{{ rule.label }}</p>
+          </template>
         </div>
 
         <SettingsRow
-          title="Use at checkout"
-          :description="
-            inUse
-              ? 'Checkout charges these bands. Switch another rule on to stop using this one.'
-              : 'On, and checkout charges these bands instead of the rule it uses now.'
-          "
+          v-if="inUse"
+          title="Used at checkout"
+          description="Checkout charges these bands. To stop, pick another rule for checkout."
         >
-          <Switch v-model="useAtCheckout" size="sm" :disabled="inUse" />
+          <Badge label="In use" theme="green" />
+        </SettingsRow>
+        <SettingsRow
+          v-else
+          title="Use at checkout"
+          description="On, and checkout charges these bands instead of the rule it uses now."
+        >
+          <Switch v-model="useAtCheckout" size="sm" />
         </SettingsRow>
 
-        <div class="flex flex-col gap-2 py-3">
-          <!-- One grid for the headings and every band, so the columns line up. -->
-          <div v-if="rows.length" :class="GRID">
-            <span class="text-sm text-ink-gray-5">From ({{ currency }})</span>
-            <span class="text-sm text-ink-gray-5">To ({{ currency }})</span>
-            <span class="text-sm text-ink-gray-5">Charge{{ currency ? ` (${currency})` : '' }}</span>
-            <span class="hidden sm:block" aria-hidden="true" />
-            <span class="hidden text-sm text-ink-gray-5 sm:block">Delivery option</span>
-            <span class="hidden sm:block" aria-hidden="true" />
+        <div class="flex flex-col gap-1 py-3">
+          <p class="text-base font-medium text-ink-gray-8">Bands</p>
 
-            <template v-for="(row, index) in rows" :key="row.key">
-              <TextInput
-                v-model="row.from_value"
-                type="number"
-                min="0"
-                step="0.01"
-                :aria-label="`Band ${index + 1} from`"
-              />
-              <TextInput
-                v-model="row.to_value"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="and above"
-                :aria-label="`Band ${index + 1} to`"
-              />
-              <TextInput
-                v-model="row.shipping_amount"
-                type="number"
-                min="0"
-                step="0.01"
-                :disabled="row.free_shipping"
-                :aria-label="`Band ${index + 1} charge`"
-              />
-              <!-- Below sm the six columns overflow a phone, so Free, the option and remove drop to their own line. -->
-              <div class="col-span-3 flex items-center gap-2 sm:contents">
-                <Checkbox v-model="row.free_shipping" label="Free" />
-                <Select
-                  v-model="row.shipping_service"
-                  class="w-full min-w-0"
-                  :options="optionChoices"
-                  :aria-label="`Band ${index + 1} delivery option`"
+          <div class="divide-y divide-outline-gray-1">
+            <div v-for="row in rows" :key="row.key">
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 py-2.5 text-left disabled:cursor-default"
+                :disabled="Boolean(draft) && draft.key !== row.key"
+                :aria-expanded="draft?.key === row.key"
+                :aria-controls="`band-${row.key}`"
+                @click="draft?.key === row.key ? cancelDraft() : editRow(row)"
+              >
+                <span class="flex min-w-0 flex-1 flex-col">
+                  <span class="text-base font-medium text-ink-gray-8 tabular-nums">{{ formatBandRange(shown(row)) }}</span>
+                  <span class="truncate text-p-sm text-ink-gray-5">{{ optionLabel(shown(row)) }}</span>
+                </span>
+                <Badge v-if="shown(row).free_shipping" label="Free" theme="green" />
+                <span v-else class="text-base font-medium text-ink-gray-8 tabular-nums">{{ chargeText(shown(row)) }}</span>
+                <span
+                  class="lucide-chevron-down size-4 shrink-0 text-ink-gray-5 transition-transform"
+                  :class="draft?.key === row.key ? 'rotate-180' : ''"
+                  aria-hidden="true"
                 />
-                <Button
-                  icon="lucide-x"
-                  variant="ghost"
-                  :aria-label="`Remove band ${index + 1}`"
-                  @click="removeRow(row.key)"
-                />
+              </button>
+
+              <div
+                v-if="draft?.key === row.key"
+                :id="`band-${row.key}`"
+                class="mb-3 flex flex-col gap-3 rounded-lg bg-surface-gray-2 p-3"
+              >
+                <div class="grid grid-cols-2 gap-2">
+                  <TextInput
+                    v-model="draft.from_value"
+                    type="text"
+                    inputmode="decimal"
+                    label="From"
+                  >
+                    <template #prefix>
+                      <span class="text-ink-gray-5">{{ moneyPrefix }}</span>
+                    </template>
+                  </TextInput>
+                  <TextInput
+                    v-model="draft.to_value"
+                    type="text"
+                    inputmode="decimal"
+                    label="To"
+                    placeholder="No limit"
+                  >
+                    <template #prefix>
+                      <span class="text-ink-gray-5">{{ moneyPrefix }}</span>
+                    </template>
+                  </TextInput>
+                </div>
+
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div class="flex flex-col gap-1.5">
+                    <span class="text-xs text-ink-gray-5">Charge</span>
+                    <div class="flex items-center gap-2">
+                      <TabButtons v-model="draft.charge" :options="CHARGE_KINDS" />
+                      <TextInput
+                        v-if="draft.charge === 'amount'"
+                        v-model="draft.shipping_amount"
+                        class="min-w-0 flex-1"
+                        type="text"
+                        inputmode="decimal"
+                        aria-label="Charge"
+                      >
+                        <template #prefix>
+                          <span class="text-ink-gray-5">{{ moneyPrefix }}</span>
+                        </template>
+                      </TextInput>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <span class="text-xs text-ink-gray-5">Delivery option</span>
+                    <Select v-model="draft.shipping_service" :options="optionChoices" aria-label="Delivery option" />
+                  </div>
+                </div>
+
+                <p
+                  v-for="message in draftConflicts"
+                  :key="message"
+                  class="flex items-start gap-1.5 text-p-sm text-ink-red-6"
+                  role="alert"
+                >
+                  <span class="lucide-circle-alert mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  {{ message }}
+                </p>
+
+                <div class="flex items-center justify-end gap-2">
+                  <Button v-if="!draftIsNew" label="Remove" variant="ghost" theme="red" @click="removeRow(row.key)" />
+                  <Button label="Cancel" @click="cancelDraft" />
+                  <Button
+                    label="Done"
+                    variant="solid"
+                    theme="gray"
+                    :disabled="draftConflicts.length > 0"
+                    @click="applyDraft"
+                  />
+                </div>
               </div>
-            </template>
+            </div>
           </div>
 
-          <p v-if="!rows.length" class="text-p-sm text-ink-gray-5">
+          <p v-if="!rows.length" class="py-2 text-p-sm text-ink-gray-5">
             No bands yet. Add one for each range of order totals you charge differently.
           </p>
 
-          <div>
-            <Button label="Add band" icon-left="lucide-plus" variant="subtle" theme="gray" @click="addRow" />
+          <div class="pt-1">
+            <Button
+              label="Add band"
+              icon-left="lucide-plus"
+              variant="subtle"
+              theme="gray"
+              :disabled="Boolean(draft)"
+              @click="addRow"
+            />
           </div>
 
           <p
-            v-for="message in [...conflictMessages, ...(serverError ? [serverError] : [])]"
-            :key="message"
+            v-if="serverError"
             class="flex items-start gap-1.5 text-p-sm text-ink-red-6"
             role="alert"
           >
             <span class="lucide-circle-alert mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            {{ message }}
+            {{ serverError }}
           </p>
         </div>
       </div>
