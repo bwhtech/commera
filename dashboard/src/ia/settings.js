@@ -9,13 +9,19 @@ export const SETTINGS_TABS = [
     value: 'general',
     label: 'General',
     icon: 'lucide-store',
-    keywords: ['store', 'shop', 'name', 'address', 'currency', 'timezone', 'contact'],
+    keywords: ['store', 'shop', 'name', 'address', 'currency', 'timezone', 'contact', 'company'],
   },
   {
     value: 'appearance',
     label: 'Appearance',
     icon: 'lucide-sun-moon',
     keywords: ['theme', 'dark', 'light', 'colour', 'color', 'logo', 'brand'],
+  },
+  {
+    value: 'emails',
+    label: 'Emails',
+    icon: 'lucide-mail',
+    keywords: ['email', 'template', 'order confirmation', 'cancellation', 'back in stock', 'notification'],
   },
   {
     value: 'payments',
@@ -36,10 +42,10 @@ export const SETTINGS_TABS = [
     keywords: ['pickup', 'warehouse', 'collect', 'store pickup', 'branch', 'address'],
   },
   {
-    value: 'guest',
-    label: 'Guest',
-    icon: 'lucide-user-round-check',
-    keywords: ['guest', 'guest checkout', 'order link', 'track order', 'without account'],
+    value: 'checkout',
+    label: 'Checkout',
+    icon: 'lucide-shopping-cart',
+    keywords: ['checkout', 'guest', 'guest checkout', 'order link', 'track order', 'without account'],
   },
   {
     value: 'apps',

@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue'
 import { Button, SettingsBody, SettingsRow, TextInput } from 'frappe-ui'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
+import SettingsLinkControl from './SettingsLinkControl.vue'
 import EmptyState from '../EmptyState.vue'
 import SettingsSkeleton from './SettingsSkeleton.vue'
 import { useAdminAction, useAdminRead } from '../../data/api'
@@ -12,7 +13,9 @@ const props = defineProps({
   active: { type: Boolean, default: false },
 })
 
-const STORE_FIELDS = ['store_name', 'contact_email', 'contact_phone', 'working_hours']
+const STORE_FIELDS = ['store_name', 'contact_email', 'contact_phone', 'working_hours', 'company']
+
+const COMPANY_FIELD = { options: 'Company' }
 
 const store = useAdminRead('settings.get_store_settings', { immediate: false })
 const company = useAdminRead('settings.get_company_profile', { immediate: false })
@@ -40,9 +43,16 @@ watch(
   { immediate: true },
 )
 
-// The save answers with the branding fields too; only the four this screen owns are adopted.
+// The save answers with the branding fields too; only the ones this screen owns are adopted.
 function commitStoreField(fieldname, event, label) {
   commit(fieldname, event.target.value, label, (saved) => adopt(pickStoreFields(saved)))
+}
+
+function commitCompany(value) {
+  commit('company', value, 'Company', (saved) => {
+    adopt(pickStoreFields(saved))
+    return company.reload()
+  })
 }
 
 // This site's own Desk, on this site's own origin — the dashboard and the books are one install.
@@ -92,14 +102,14 @@ const companyLink = computed(() =>
       </SettingsRow>
     </div>
 
-    <!-- Read-only on purpose: these are accounting facts, and changing them here would mean
-         changing them in one place and not the other. -->
+    <!-- The details are read-only on purpose: these are accounting facts, and changing them here
+         would mean changing them in one place and not the other. Which company is picked is ours. -->
     <div class="mt-8 border-t border-outline-gray-1 pt-6">
       <div class="flex items-start justify-between gap-3">
         <div>
           <h3 class="text-base font-medium text-ink-gray-8">Company</h3>
           <p class="mt-1 text-p-sm text-ink-gray-5">
-            Your books own this record. Change it there and it updates here.
+            Orders are booked against this company. Its details are edited on the company record.
           </p>
         </div>
         <Button
@@ -110,16 +120,26 @@ const companyLink = computed(() =>
         />
       </div>
 
+      <SettingsRow v-if="store.data" class="mt-2" title="Store company">
+        <SettingsLinkControl
+          :field="COMPANY_FIELD"
+          :model-value="values.company ?? ''"
+          options-path="settings.get_link_options"
+          required
+          @update:model-value="commitCompany"
+        />
+      </SettingsRow>
+
       <!-- Gated on isFinished, not on data: an in-flight request has no data either, and saying
            there is no company while still asking for one states the opposite of the truth. -->
-      <SettingsSkeleton v-if="!company.isFinished" class="mt-2" :rows="5" />
+      <SettingsSkeleton v-if="!company.isFinished || !store.data" class="mt-2" :rows="5" />
 
       <EmptyState
         v-else-if="!company.data"
         compact
         icon="lucide-building-2"
         title="No company is set for this store yet"
-        description="There is nothing to show until there is. Set one on Commera Settings in Desk and orders will book against it."
+        description="Pick one above and orders will book against it."
       />
 
       <div v-else class="mt-2 divide-y divide-outline-gray-1">

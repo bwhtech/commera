@@ -24,6 +24,7 @@ def after_install():
 	create_payment_modes()
 	try:
 		create_default_email_templates()
+		assign_default_email_templates()
 	except Exception as e:
 		import traceback
 
@@ -157,6 +158,23 @@ def get_shop_company() -> str | None:
 	return frappe.db.get_single_value("Commera Settings", "company") or frappe.get_cached_value(
 		"Global Defaults", "Global Defaults", "default_company"
 	)
+
+
+DEFAULT_EMAIL_TEMPLATES = {
+	"order_confirmation_email_template": "Order Confirmation",
+	"order_cancellation_email_template": "Order Cancellation",
+	"item_in_stock_email_template": "Item In Stock",
+}
+
+
+def assign_default_email_templates():
+	# The fields are mandatory, so while any is empty every save of Commera Settings fails, even one
+	# that only changes the company. set_single_value skips that check, which a save() here cannot.
+	for fieldname, template in DEFAULT_EMAIL_TEMPLATES.items():
+		if frappe.db.get_single_value("Commera Settings", fieldname):
+			continue
+		if frappe.db.exists("Email Template", template):
+			frappe.db.set_single_value("Commera Settings", fieldname, template)
 
 
 def create_default_email_templates():

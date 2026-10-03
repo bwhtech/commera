@@ -1,11 +1,11 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, h } from 'vue'
 import { useRoute } from 'vue-router'
 import { DesktopShell, ScrollArea, Sidebar, SidebarHeader } from 'frappe-ui'
 import { activeNavTarget, productName, sections } from '../ia/nav'
 import logoUrl from '../assets/commera.svg'
 import { openSettings } from '../ia/settings'
-import { useAdminRead, useMethodAction } from '../data/api'
+import { useAdminRead, useMethodAction, useMethodRead } from '../data/api'
 import NavSection from './NavSection.vue'
 import SetupBanner from './firstrun/SetupBanner.vue'
 
@@ -43,14 +43,35 @@ async function logout() {
   }
 }
 
+// Desk is not an `add_to_apps_screen` app, so get_apps never lists it; it is
+// prepended here the way Gameplan and CRM do. Commera itself is dropped —
+// a link to the screen you are on is a dead end.
+const DESK_APP = { name: 'frappe', title: 'Desk', logo: '/assets/frappe/images/framework.png', route: '/desk' }
+
+const installedApps = useMethodRead('frappe.apps.get_apps', {
+  quiet: true,
+  transform: (apps) => [DESK_APP, ...apps.filter((app) => app.name !== 'commera')],
+})
+
+// A full page load, not a router push: every other app is its own SPA or Desk,
+// outside this router's /commera base.
+const appsMenuItems = computed(() =>
+  (installedApps.data ?? [DESK_APP]).map((app) => ({
+    label: app.title,
+    slots: { prefix: () => h('img', { src: app.logo, alt: '', class: 'size-5 rounded-sm object-contain' }) },
+    onClick: () => window.location.assign(app.route),
+  })),
+)
+
 // The workspace header is the dropdown: it names the store and gets you to the
 // things that are about the account, not about the page you are on.
-const headerMenu = [
+const headerMenu = computed(() => [
+  { label: 'Apps', icon: 'lucide-layout-grid', submenu: appsMenuItems.value },
   { label: 'Settings', icon: 'lucide-settings', onClick: () => openSettings('general') },
   { label: 'Appearance', icon: 'lucide-sun-moon', onClick: () => openSettings('appearance') },
   { label: 'View storefront', icon: 'lucide-external-link', onClick: openStorefront },
   { label: 'Log out', icon: 'lucide-log-out', onClick: logout },
-]
+])
 </script>
 
 <template>
