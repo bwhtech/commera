@@ -1,13 +1,11 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
-"""The Shipping Rates screen: the price bands on the store's one Shipping Rule, grouped by the delivery
-option each band prices. bwh_shipping.pricing reads the bands; this module only edits them."""
+"""The Shipping Rules screen: the store's selling Shipping Rules, their bands, and which one checkout uses."""
 
 import frappe
 from frappe import _
-from frappe.model.naming import append_number_if_name_exists
-from frappe.utils.data import cstr
+from frappe.utils.data import cint, cstr
 
 from commera.api.admin.delivery_options import (
 	SERVICE_DOCTYPE,
@@ -22,38 +20,54 @@ RULE_DOCTYPE = "Shipping Rule"
 BAND_DOCTYPE = "Shipping Rule Condition"
 SETTINGS_DOCTYPE = "Commera Settings"
 
-NEW_RULE_LABEL = "Store Shipping"
+RULE_TYPE = "Selling"
+CALCULATE_BASED_ON = "Net Total"
 
-# "Fixed" is left out on purpose: ShippingRule.validate deletes every band of a Fixed rule.
-BASED_ON_CHOICES = ("Net Total", "Net Weight")
-DEFAULT_BASED_ON = "Net Total"
-
+RULE_FIELDS = ("name", "label", "disabled")
 BAND_FIELDS = ("name", "shipping_service", "from_value", "to_value", "shipping_amount", "free_shipping")
 BAND_INPUT_FIELDS = ("from_value", "to_value", "shipping_amount", "free_shipping")
-
-# bwh_shipping weighs a cart in kg whatever UOM each item is stored in (commera.api.shipping.to_kg).
-WEIGHT_UOM = "kg"
 
 FREIGHT_ACCOUNT_NAME = "Freight and Forwarding Charges"
 
 
-def get_store_rule():
-	"""The rule Commera Settings links to, or None before the first band is saved."""
-	rule_name = frappe.db.get_single_value(SETTINGS_DOCTYPE, "shipping_rule")
-	if not rule_name or not frappe.db.exists(RULE_DOCTYPE, rule_name):
-		return None
-	return frappe.get_doc(RULE_DOCTYPE, rule_name)
+def get_store_company() -> str | None:
+	return frappe.db.get_single_value(SETTINGS_DOCTYPE, "company")
+
+
+def get_store_rule_name() -> str | None:
+	return frappe.db.get_single_value(SETTINGS_DOCTYPE, "shipping_rule")
+
+
+def build_rules(company: str) -> list[dict]:
+	rules = frappe.get_all(
+		RULE_DOCTYPE,
+		filters={"company": company, "shipping_rule_type": RULE_TYPE},
+		fields=list(RULE_FIELDS),
+		order_by="label asc",
+	)
+	if not rules:
+		return []
+
+	bands_by_rule = {}
+	for band in frappe.get_all(
+		BAND_DOCTYPE,
+		filters={"parenttype": RULE_DOCTYPE, "parent": ["in", [rule.name for rule in rules]]},
+		fields=["parent", *BAND_FIELDS],
+		order_by="idx asc",
+	):
+		parent = band.pop("parent")
+		bands_by_rule.setdefault(parent, []).append(band)
+
+	return [{**rule, "bands": bands_by_rule.get(rule.name, [])} for rule in rules]
 
 
 def build_screen() -> dict:
-	"""Everything the Shipping Rates screen renders, in one read."""
+	"""Everything the Shipping Rules screen renders, in one read."""
 	screen = {
 		"available": False,
-		"rule": None,
-		"calculate_based_on": DEFAULT_BASED_ON,
+		"store_rule": None,
 		"currency": get_reporting_currency(),
-		"weight_uom": WEIGHT_UOM,
-		"bands": [],
+		"rules": [],
 		"delivery_options": [],
 	}
 	if not is_available():
@@ -61,15 +75,11 @@ def build_screen() -> dict:
 
 	frappe.has_permission(RULE_DOCTYPE, ptype="read", throw=True)
 
-	rule = get_store_rule()
+	company = get_store_company()
 	screen["available"] = True
+	screen["store_rule"] = get_store_rule_name()
 	screen["delivery_options"] = build_options()
-	if rule:
-		screen["rule"] = rule.name
-		screen["calculate_based_on"] = rule.calculate_based_on
-		screen["bands"] = [
-			{fieldname: band.get(fieldname) for fieldname in BAND_FIELDS} for band in rule.conditions
-		]
+	screen["rules"] = build_rules(company) if company else []
 	return screen
 
 
@@ -85,11 +95,11 @@ def get_cost_center(company: str) -> str | None:
 	)
 
 
-def create_store_rule(calculate_based_on: str = DEFAULT_BASED_ON):
-	"""A new selling rule on the store's company, linked on Commera Settings so pricing reads it."""
-	company = frappe.db.get_single_value(SETTINGS_DOCTYPE, "company")
+def new_store_rule(label: str):
+	"""An unsaved selling rule on the store's company, posting to its freight account."""
+	company = get_store_company()
 	if not company:
-		frappe.throw(_("Set the company in Settings → General before adding shipping rates."))
+		frappe.throw(_("Set the company in Settings → General before adding shipping rules."))
 
 	account = get_freight_account(company)
 	if not account:
@@ -102,17 +112,23 @@ def create_store_rule(calculate_based_on: str = DEFAULT_BASED_ON):
 	rule = frappe.new_doc(RULE_DOCTYPE)
 	rule.update(
 		{
-			"label": append_number_if_name_exists(RULE_DOCTYPE, NEW_RULE_LABEL, fieldname="label"),
-			"shipping_rule_type": "Selling",
-			"calculate_based_on": calculate_based_on,
+			"label": label,
+			"shipping_rule_type": RULE_TYPE,
 			"company": company,
 			"account": account,
 			"cost_center": get_cost_center(company),
 		}
 	)
-	rule.insert()
+	return rule
 
-	write_settings_fields(("shipping_rule",), {"shipping_rule": rule.name})
+
+def get_listed_rule(name: str):
+	"""The named rule, refused unless it is a selling rule of the store's company - the only ones listed."""
+	rule = frappe.get_doc(RULE_DOCTYPE, cstr(name))
+	if rule.shipping_rule_type != RULE_TYPE or rule.company != get_store_company():
+		frappe.throw(
+			_("{0} is not a selling shipping rule of the store's company.").format(frappe.bold(name))
+		)
 	return rule
 
 
@@ -133,64 +149,87 @@ def parse_band(band: dict, shipping_service: str | None) -> dict:
 	return values
 
 
-def get_kept_bands(rule, shipping_service: str | None) -> list[dict]:
-	return [
-		{fieldname: band.get(fieldname) for fieldname in BAND_FIELDS if fieldname != "name"}
-		for band in rule.conditions
-		if cstr(band.shipping_service) != cstr(shipping_service)
-	]
+def parse_conditions(conditions) -> list[dict]:
+	bands = frappe.parse_json(conditions or [])
+	services = {cstr(band.get("shipping_service")) for band in bands} - {""}
+	if services:
+		found = frappe.get_all(SERVICE_DOCTYPE, filters={"name": ["in", list(services)]}, pluck="name")
+		missing = sorted(services - set(found))
+		if missing:
+			frappe.throw(_("Delivery option {0} not found").format(missing[0]), frappe.DoesNotExistError)
+
+	return [parse_band(band, cstr(band.get("shipping_service")) or None) for band in bands]
 
 
 @frappe.whitelist()
-def get_shipping_rates() -> dict:
-	"""The store rule's bands, the delivery options they price, and the currency they are in."""
+def get_shipping_rules() -> dict:
+	"""The store's selling rules with their bands, the one checkout uses, and the options a band can name."""
 	frappe.only_for("System Manager")
 
 	return build_screen()
 
 
 @frappe.whitelist(methods=["POST"])
-def save_service_rates(shipping_service: str | None = None, bands: list | str | None = None) -> dict:
-	"""Replace one delivery option's bands, leaving every other option's untouched; a blank
-	`shipping_service` edits the bands that name no option. Returns the refreshed screen."""
+def save_shipping_rule(
+	name: str | None = None,
+	label: str | None = None,
+	conditions: list | str | None = None,
+	use_at_checkout: int = 0,
+) -> dict:
+	"""Create a rule (no `name`) or replace an existing rule's bands. Returns the refreshed screen."""
 	frappe.only_for("System Manager")
 	ensure_available()
 
-	shipping_service = cstr(shipping_service) or None
-	if shipping_service and not frappe.db.exists(SERVICE_DOCTYPE, shipping_service):
-		frappe.throw(_("Delivery option {0} not found").format(shipping_service), frappe.DoesNotExistError)
-
-	rule = get_store_rule()
-	if rule:
+	if name:
+		if label:
+			frappe.throw(_("A shipping rule's name cannot be changed."))
+		rule = get_listed_rule(name)
 		frappe.has_permission(RULE_DOCTYPE, ptype="write", doc=rule, throw=True)
 	else:
-		rule = create_store_rule()
+		label = cstr(label).strip()
+		if not label:
+			frappe.throw(_("Name the shipping rule."))
+		rule = new_store_rule(label)
 
-	new_bands = [parse_band(band, shipping_service) for band in frappe.parse_json(bands or [])]
-	# Overlaps and a second open-ended band are refused by ShippingRule.validate, across the whole rule.
-	rule.set("conditions", get_kept_bands(rule, shipping_service) + new_bands)
+	rule.calculate_based_on = CALCULATE_BASED_ON
+	# Overlaps and a second open-ended band are refused by ShippingRule.validate.
+	rule.set("conditions", parse_conditions(conditions))
 	rule.save()
+
+	if cint(use_at_checkout):
+		write_settings_fields(("shipping_rule",), {"shipping_rule": rule.name})
 
 	return build_screen()
 
 
 @frappe.whitelist(methods=["POST"])
-def set_rate_basis(calculate_based_on: str) -> dict:
-	"""Price every band on order value or on weight. The band numbers are kept as they are.
-	Returns the refreshed screen."""
+def delete_shipping_rule(name: str) -> dict:
+	"""Delete a rule checkout does not use. Returns the refreshed screen."""
 	frappe.only_for("System Manager")
 	ensure_available()
 
-	if calculate_based_on not in BASED_ON_CHOICES:
-		frappe.throw(_("Shipping rates are based on order value or weight."))
+	rule = get_listed_rule(name)
+	if rule.name == get_store_rule_name():
+		frappe.throw(
+			_("Checkout uses {0}. Pick another rule for checkout before deleting it.").format(
+				frappe.bold(rule.label)
+			)
+		)
 
-	rule = get_store_rule()
-	if not rule:
-		create_store_rule(calculate_based_on)
-		return build_screen()
+	frappe.has_permission(RULE_DOCTYPE, ptype="delete", doc=rule, throw=True)
+	frappe.delete_doc(RULE_DOCTYPE, rule.name)
 
-	frappe.has_permission(RULE_DOCTYPE, ptype="write", doc=rule, throw=True)
-	rule.calculate_based_on = calculate_based_on
-	rule.save()
+	return build_screen()
+
+
+@frappe.whitelist(methods=["POST"])
+def set_store_rule(name: str) -> dict:
+	"""Make checkout charge this rule's bands. Returns the refreshed screen."""
+	frappe.only_for("System Manager")
+	ensure_available()
+
+	rule = get_listed_rule(name)
+	frappe.has_permission(RULE_DOCTYPE, ptype="read", doc=rule, throw=True)
+	write_settings_fields(("shipping_rule",), {"shipping_rule": rule.name})
 
 	return build_screen()

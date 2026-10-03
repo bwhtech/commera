@@ -23,7 +23,7 @@ defineEmits(['edit', 'delete', 'toggle'])
 const priceParts = computed(() => {
   const parts = []
 
-  if (props.pricedByRates) parts.push('Priced by shipping rates')
+  if (props.pricedByRates) parts.push('Priced by shipping rule')
   if (props.option.service_code) parts.push('Carrier rate')
 
   if (props.option.markup_percent) parts.push(`+${props.option.markup_percent}%`)

@@ -3,21 +3,14 @@ import { createAdminCaller } from './adminCaller'
 import { exactMoney } from './format'
 
 /**
- * The price bands on the store's one Shipping Rule, each naming the delivery option it
- * prices. Bands are in the company currency, which is also the currency `money` formats in.
+ * The store company's selling Shipping Rules and the one checkout uses. Bands are on order
+ * value, in the company currency, which is also the currency `money` formats in.
  */
 
-export const RATE_BASES = [
-  { label: 'Order value', value: 'Net Total' },
-  { label: 'Weight', value: 'Net Weight' },
-]
-
 const available = ref(false)
-const rule = ref(null)
-const calculateBasedOn = ref('Net Total')
+const storeRule = ref(null)
 const currency = ref('')
-const weightUom = ref('kg')
-const bands = ref([])
+const rules = ref([])
 const deliveryOptions = ref([])
 
 const loadError = ref(null)
@@ -25,22 +18,21 @@ const loaded = ref(false)
 
 const { attempt, loading } = createAdminCaller('shipping_rates.')
 
-const isWeightBased = computed(() => calculateBasedOn.value === 'Net Weight')
+// The bands checkout charges: the rule in use, which is what prices each delivery option.
+const bands = computed(() => rules.value.find((rule) => rule.name === storeRule.value)?.bands ?? [])
 
 function apply(data) {
   if (!data) return
 
   available.value = Boolean(data.available)
-  rule.value = data.rule ?? null
-  calculateBasedOn.value = data.calculate_based_on ?? 'Net Total'
+  storeRule.value = data.store_rule ?? null
   currency.value = data.currency ?? ''
-  weightUom.value = data.weight_uom ?? 'kg'
-  bands.value = data.bands ?? []
+  rules.value = data.rules ?? []
   deliveryOptions.value = data.delivery_options ?? []
 }
 
 async function load() {
-  const { data, error } = await attempt('get_shipping_rates')
+  const { data, error } = await attempt('get_shipping_rules')
   loadError.value = error
   apply(data)
   loaded.value = true
@@ -50,17 +42,12 @@ async function loadOnce() {
   if (!loaded.value) await load()
 }
 
-// The refusal is handed back as well as the screen: the rates editor shows ERPNext's own
+// The refusal is handed back as well as the screen: the rule editor shows ERPNext's own
 // overlap message beside the bands, where the toast alone would vanish before it is read.
 async function mutate(method, params = {}) {
   const { data, error } = await attempt(method, params)
   if (data) apply(data)
   return { data, error }
-}
-
-// A band row's boundary: money for an order-value rule, the weight unit for a weight rule.
-function formatBoundary(value) {
-  return isWeightBased.value ? `${Number(value) || 0} ${weightUom.value}` : exactMoney(value)
 }
 
 function bandsFor(shippingService) {
@@ -70,42 +57,39 @@ function bandsFor(shippingService) {
 export function useShippingRates() {
   return {
     available,
-    rule,
-    calculateBasedOn,
+    storeRule,
     currency,
-    weightUom,
+    rules,
     bands,
     deliveryOptions,
-    isWeightBased,
     loadError,
     loaded,
     loading,
     load,
     loadOnce,
     mutate,
-    formatBoundary,
     bandsFor,
   }
 }
 
 const byFromValue = (first, second) => Number(first.from_value) - Number(second.from_value)
 
-export function formatBandRange(band, formatBoundary = exactMoney) {
+export function formatBandRange(band) {
   const from = Number(band.from_value) || 0
   const to = Number(band.to_value) || 0
-  if (!to) return `${formatBoundary(from)} and above`
-  return `${formatBoundary(from)}–${formatBoundary(to)}`
+  if (!to) return `${exactMoney(from)} and above`
+  return `${exactMoney(from)}–${exactMoney(to)}`
 }
 
-function formatBand(band, formatBoundary) {
+function formatBand(band) {
   const price = band.free_shipping ? 'Free' : exactMoney(band.shipping_amount)
   const from = Number(band.from_value) || 0
   const to = Number(band.to_value) || 0
 
   if (!to && !from) return `${price} flat`
-  if (!to) return `${price} from ${formatBoundary(from)} and above`
-  if (!from) return `${price} up to ${formatBoundary(to)}`
-  return `${price} for ${formatBandRange(band, formatBoundary)}`
+  if (!to) return `${price} from ${exactMoney(from)} and above`
+  if (!from) return `${price} up to ${exactMoney(to)}`
+  return `${price} for ${formatBandRange(band)}`
 }
 
 // What bwh_shipping charges when no band covers the cart: the carrier's live quote, then the
@@ -118,20 +102,16 @@ function formatFallback(option) {
   return null
 }
 
-/**
- * One line saying what an option costs, from its bands and then its fallback. Empty when
- * nothing prices it at all — the option is then hidden at checkout.
- */
-export function rateSummary(bands, option, formatBoundary = exactMoney) {
-  const bandParts = [...bands].sort(byFromValue).map((band) => formatBand(band, formatBoundary))
-  const fallback = formatFallback(option)
-
-  if (!bandParts.length) return fallback ? fallback[0].toUpperCase() + fallback.slice(1) : ''
-
-  // Bands naming no option price no option, so there is no fallback to speak of.
-  const coversEverything = bands.some((band) => !Number(band.to_value))
-  if (!option || coversEverything) return bandParts.join(' · ')
-  return [...bandParts, `${fallback ?? 'hidden at checkout'} otherwise`].join(' · ')
+// One line for a rule's row: every band, each naming the delivery option it prices.
+export function ruleSummary(bands, optionTitles = {}) {
+  return [...bands]
+    .sort(byFromValue)
+    .map((band) => {
+      const price = formatBand(band)
+      if (!band.shipping_service) return price
+      return `${optionTitles[band.shipping_service] ?? band.shipping_service}: ${price}`
+    })
+    .join(' · ')
 }
 
 export function isPriced(bands, option) {
@@ -154,8 +134,8 @@ function rangesOverlap([firstFrom, firstTo], [secondFrom, secondTo]) {
 }
 
 /**
- * What ShippingRule.validate would refuse across the whole rule, whatever option each band
- * names: a From not below its To, two open-ended bands, or two overlapping ranges.
+ * What ShippingRule.validate would refuse across one rule, whatever option each band names:
+ * a From not below its To, two open-ended bands, or two overlapping ranges.
  * Each conflict is `{ kind: 'order' | 'open' | 'overlap', bands }`.
  */
 export function findBandConflicts(bands) {

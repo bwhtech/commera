@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import DeliveryOptionsPanel from './DeliveryOptionsPanel.vue'
-import ShippingRatesPanel from './ShippingRatesPanel.vue'
+import ShippingRulesPanel from './ShippingRulesPanel.vue'
 
 defineProps({
   active: { type: Boolean, default: false },
@@ -32,10 +32,10 @@ function setSection(section, open) {
     />
   </div>
 
-  <ShippingRatesPanel
-    v-if="!takeover || openSection === 'rates'"
-    :configuring="openSection === 'rates'"
+  <ShippingRulesPanel
+    v-if="!takeover || openSection === 'rules'"
+    :configuring="openSection === 'rules'"
     :active="active"
-    @update:configuring="setSection('rates', $event)"
+    @update:configuring="setSection('rules', $event)"
   />
 </template>
