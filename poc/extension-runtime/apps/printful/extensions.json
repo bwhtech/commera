@@ -1,0 +1,5 @@
+[
+  { "handle": "printful-nav", "target": "admin.nav.link", "label": "Printful", "icon": "printer", "page": "printful" },
+  { "handle": "printful", "target": "admin.app.page", "page": "printful", "module": "printful-page" },
+  { "handle": "printful-order", "target": "admin.order-details.block", "module": "printful-order-block" }
+]

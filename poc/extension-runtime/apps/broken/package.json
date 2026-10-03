@@ -1,0 +1,12 @@
+{
+  "name": "poc-app-broken",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "vite build --config commera/vite.config.js" },
+  "devDependencies": {
+    "@commera/extension-kit": "*",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^5.4.11",
+    "vue": "^3.5.15"
+  }
+}
