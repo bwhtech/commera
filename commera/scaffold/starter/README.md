@@ -134,7 +134,9 @@ export const extension = {
 
 ### Settings from a Single: `settings/index.vue`
 
-Commera draws every field of the Single as a row that saves itself.
+Commera draws every field of the Single as a row that saves itself. A `reqd` field shows a `*` and cannot be
+cleared, but each row saves while other required rows are still blank, so your `validate` must allow that.
+Check the required values in your own code before you use them.
 
 ```vue
 <script>

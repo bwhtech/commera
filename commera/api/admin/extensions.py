@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 
-from commera.api.admin.docfields import build_field_groups, get_editable_docfields
+from commera.api.admin.docfields import build_field_groups, get_editable_docfields, get_missing_fields
 from commera.api.admin.settings import coerce_field_value
 from commera.extensions.places import PLACES, get_record_place_prefix
 from commera.extensions.registry import (
@@ -80,6 +80,12 @@ def save_app_setting(app: str, **fields):
 	if changed:
 		for fieldname, value in changed.items():
 			settings.set(fieldname, coerce_field_value(docfields[fieldname].fieldtype, value))
+
+		cleared = [fieldname for fieldname in get_missing_fields(doctype, settings) if fieldname in changed]
+		if cleared:
+			frappe.throw(_("{0} is required").format(_(docfields[cleared[0]].label)), frappe.MandatoryError)
+		# Each row saves alone, so the other required rows may still be blank on a Single filled in bit by bit.
+		settings.flags.ignore_mandatory = True
 		settings.save()
 
 	return {

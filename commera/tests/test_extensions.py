@@ -10,6 +10,7 @@ from types import ModuleType
 from unittest.mock import patch
 
 import frappe
+from frappe.core.doctype.sms_settings.sms_settings import SMSSettings
 from frappe.core.doctype.user_permission.test_user_permission import create_user
 from frappe.tests import IntegrationTestCase
 from frappe.utils import now_datetime
@@ -35,6 +36,7 @@ APP = "bwh_shipping"
 OTHER_APP = "bwh_payments"
 FUNCTIONS = f"{APP}.commera_test_extensions"
 SETTINGS_DOCTYPE = "Google Settings"
+REQUIRED_SETTINGS_DOCTYPE = "SMS Settings"
 STOCK_USER = "extensions-stock@example.com"
 SALES_USER = "extensions-sales@example.com"
 OUTSIDER = "extensions-outsider@example.com"
@@ -512,6 +514,37 @@ class TestAppSettings(ExtensionTestCase):
 	def test_saving_needs_write_permission_on_the_single(self):
 		with self.set_user(STOCK_USER), self.assertRaises(frappe.PermissionError):
 			save_app_setting(APP, client_id="client-3")
+
+
+class TestAppSettingsWithRequiredFields(ExtensionTestCase):
+	def setUp(self):
+		super().setUp()
+		self.write_manifest([app_settings(doctype=REQUIRED_SETTINGS_DOCTYPE)])
+		self.addCleanup(frappe.clear_document_cache, REQUIRED_SETTINGS_DOCTYPE, REQUIRED_SETTINGS_DOCTYPE)
+		for fieldname in ("sms_gateway_url", "message_parameter", "receiver_parameter"):
+			frappe.db.set_single_value(REQUIRED_SETTINGS_DOCTYPE, fieldname, None)
+
+	def test_a_row_saves_while_other_required_rows_are_blank(self):
+		save_app_setting(APP, message_parameter="text")
+
+		self.assertEqual(frappe.db.get_single_value(REQUIRED_SETTINGS_DOCTYPE, "message_parameter"), "text")
+		self.assertFalse(frappe.db.get_single_value(REQUIRED_SETTINGS_DOCTYPE, "receiver_parameter"))
+
+	def test_a_required_row_cannot_be_cleared(self):
+		save_app_setting(APP, message_parameter="text")
+
+		with self.assertRaises(frappe.MandatoryError):
+			save_app_setting(APP, message_parameter="")
+		self.assertEqual(frappe.db.get_single_value(REQUIRED_SETTINGS_DOCTYPE, "message_parameter"), "text")
+
+	def test_the_single_still_runs_its_own_validation(self):
+		with (
+			patch.object(
+				SMSSettings, "validate", side_effect=frappe.ValidationError("checked by the app"), create=True
+			),
+			self.assertRaisesRegex(frappe.ValidationError, "checked by the app"),
+		):
+			save_app_setting(APP, message_parameter="text")
 
 
 class TestInstalledApps(ExtensionTestCase):
