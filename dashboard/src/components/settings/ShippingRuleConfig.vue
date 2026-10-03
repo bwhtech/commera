@@ -285,7 +285,11 @@ async function save() {
 
           <div class="divide-y divide-outline-gray-1">
             <div v-for="row in rows" :key="row.key">
-              <div class="flex items-start gap-2 py-2.5">
+              <div class="flex items-start justify-between gap-3 py-2.5">
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <span class="text-base text-ink-gray-8 tabular-nums">{{ bandSentence(shown(row)) }}</span>
+                  <span class="truncate text-p-sm text-ink-gray-5">{{ optionLabel(shown(row)) }}</span>
+                </div>
                 <Button
                   v-if="draft?.key === row.key"
                   icon="lucide-trash-2"
@@ -296,12 +300,8 @@ async function save() {
                   :loading="savingBand"
                   @click="removeDraftBand"
                 />
-                <div class="flex min-w-0 flex-1 flex-col">
-                  <span class="text-base text-ink-gray-8 tabular-nums">{{ bandSentence(shown(row)) }}</span>
-                  <span class="truncate text-p-sm text-ink-gray-5">{{ optionLabel(shown(row)) }}</span>
-                </div>
                 <Button
-                  v-if="draft?.key !== row.key"
+                  v-else
                   label="Edit"
                   icon-left="lucide-pencil"
                   :disabled="Boolean(draft)"
