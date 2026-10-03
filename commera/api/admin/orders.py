@@ -10,6 +10,7 @@ from frappe.utils.data import add_days, cint, cstr, flt, formatdate, getdate
 from commera.api.admin.catalog import get_unpublishable_options
 from commera.api.admin.inventory import get_inventory
 from commera.api.shipping import get_order_charge_lines
+from commera.extensions.registry import get_app_title
 from commera.utils import get_address_lines, get_item_images
 
 PAGE_LENGTH = 20
@@ -18,6 +19,35 @@ PAGE_LENGTH = 20
 MAX_PAGE_LENGTH = 100
 
 OPEN_STATUSES = ("To Deliver and Bill", "To Deliver", "To Bill")
+
+ORDER_FIELDS = (
+	"name",
+	"customer",
+	"customer_name",
+	"contact_email",
+	"contact_phone",
+	"transaction_date",
+	"creation",
+	"order_type",
+	"status",
+	"docstatus",
+	"currency",
+	"total",
+	"net_total",
+	"total_taxes_and_charges",
+	"grand_total",
+	"rounded_total",
+	"base_grand_total",
+	"base_rounded_total",
+	"shipping_rule",
+	"per_delivered",
+	"custom_ecommerce_payment_mode",
+	"custom_ecommerce_status",
+	"custom_delivery_option",
+	"shipping_address",
+	"address_display",
+	"modified",
+)
 
 # Priority order, read top-down: an order is described by the furthest rung it has reached.
 STAGE_LABELS = {
@@ -582,58 +612,8 @@ def get_order(sales_order: str):
 	"""Everything one order's screen needs, in one call."""
 	frappe.has_permission("Sales Order", doc=sales_order, ptype="read", throw=True)
 
-	order = frappe.db.get_value(
-		"Sales Order",
-		sales_order,
-		[
-			"name",
-			"customer",
-			"customer_name",
-			"contact_email",
-			"contact_phone",
-			"transaction_date",
-			"creation",
-			"status",
-			"docstatus",
-			"currency",
-			"total",
-			"net_total",
-			"total_taxes_and_charges",
-			"grand_total",
-			"shipping_rule",
-			"per_delivered",
-			"custom_ecommerce_payment_mode",
-			"custom_delivery_option",
-			"shipping_address",
-			"address_display",
-			"modified",
-		],
-		as_dict=True,
-	)
-	if not order:
-		frappe.throw(_("Order {0} not found").format(sales_order))
-
-	items = frappe.get_all(
-		"Sales Order Item",
-		filters={"parent": sales_order},
-		fields=["item_code", "item_name", "qty", "delivered_qty", "rate", "amount", "image"],
-		order_by="idx asc",
-	)
-
-	# The size lives on the variant's child row, not on the order line.
-	sizes_by_item_code = {}
-	item_codes = [row.item_code for row in items if row.item_code]
-	if item_codes:
-		for row in frappe.get_all(
-			"Color Size Item",
-			filters={"item_code": ["in", item_codes], "parenttype": "Style Attribute Variant"},
-			fields=["item_code", "size", "parent"],
-		):
-			sizes_by_item_code.setdefault(cstr(row.item_code), row.size)
-
-	image_by_item_code = get_item_images(item_codes)
-
-	lifecycle = read_order_lifecycles([order.name]).get(cstr(order.name), frappe._dict())
+	order = read_order(sales_order)
+	lifecycle = order.lifecycle
 	state = describe_state(order, lifecycle)
 	charges = get_order_charges(order)
 	payment_state = describe_payment(order)
@@ -663,41 +643,139 @@ def get_order(sales_order: str):
 		"payment_mode": order.custom_ecommerce_payment_mode,
 		"payment_state": payment_state,
 		"shipping_address": get_address_lines(order.address_display),
-		"tags": frappe.get_all(
-			"Tag Link", filters={"document_type": "Sales Order", "document_name": order.name}, pluck="tag"
-		),
+		"tags": order.tags,
 		"can_fulfil": can_fulfil_order(order, state),
 		"items": [
 			{
 				"item_code": row.item_code,
 				"title": row.item_name,
-				"size": sizes_by_item_code.get(cstr(row.item_code)),
+				"size": row.size,
 				"qty": flt(row.qty),
 				"delivered_qty": flt(row.delivered_qty),
 				"rate": flt(row.rate),
 				"amount": flt(row.amount),
-				"image": row.image or image_by_item_code.get(row.item_code),
+				"image": row.image,
 			}
-			for row in items
+			for row in order.lines
 		],
 		"deliveries": lifecycle.get("printable_delivery_notes") or [],
 		"invoices": read_order_invoices(order.name),
 	}
 
 
+def read_order(sales_order: str | int, extra_fields: list | tuple = ()) -> frappe._dict:
+	order = read_orders([sales_order], extra_fields).get(cstr(sales_order))
+	if not order:
+		frappe.throw(_("Order {0} not found").format(sales_order), frappe.DoesNotExistError)
+	return order
+
+
+def read_orders(order_names: list, extra_fields: list | tuple = ()) -> dict:
+	"""Orders keyed by `cstr(name)` with their `lines`, `lifecycle` and `tags`, in the same number of
+	queries however many there are. No permission check: every caller makes its own."""
+	if not order_names:
+		return {}
+
+	orders = {
+		cstr(order.name): order
+		for order in frappe.get_all(
+			"Sales Order", filters={"name": ["in", order_names]}, fields=[*ORDER_FIELDS, *extra_fields]
+		)
+	}
+	if not orders:
+		return {}
+
+	found_names = [order.name for order in orders.values()]
+	lines_by_order = read_order_lines(list(orders))
+	lifecycles = read_order_lifecycles(found_names)
+	tags_by_order = {}
+	for row in frappe.get_all(
+		"Tag Link",
+		filters={"document_type": "Sales Order", "document_name": ["in", list(orders)]},
+		fields=["document_name", "tag"],
+	):
+		tags_by_order.setdefault(cstr(row.document_name), []).append(row.tag)
+
+	for name, order in orders.items():
+		order.lines = lines_by_order.get(name, [])
+		order.lifecycle = lifecycles.get(name, frappe._dict())
+		order.tags = tags_by_order.get(name, [])
+	return orders
+
+
+def read_order_lines(order_names: list[str]) -> dict[str, list]:
+	lines = frappe.get_all(
+		"Sales Order Item",
+		filters={"parent": ["in", order_names], "parenttype": "Sales Order"},
+		fields=[
+			"name",
+			"parent",
+			"item_code",
+			"item_name",
+			"qty",
+			"delivered_qty",
+			"rate",
+			"amount",
+			"image",
+		],
+		order_by="idx asc",
+	)
+
+	# The size lives on the variant's child row, not on the order line.
+	sizes_by_item_code = {}
+	item_codes = list({row.item_code for row in lines if row.item_code})
+	if item_codes:
+		for row in frappe.get_all(
+			"Color Size Item",
+			filters={"item_code": ["in", item_codes], "parenttype": "Style Attribute Variant"},
+			fields=["item_code", "size", "parent"],
+		):
+			sizes_by_item_code.setdefault(cstr(row.item_code), row.size)
+
+	image_by_item_code = get_item_images(item_codes)
+
+	lines_by_order = {}
+	for row in lines:
+		row.size = sizes_by_item_code.get(cstr(row.item_code))
+		row.image = row.image or image_by_item_code.get(row.item_code)
+		lines_by_order.setdefault(cstr(row.parent), []).append(row)
+	return lines_by_order
+
+
 @frappe.whitelist()
-def get_order_app_events(sales_order: str):
+def get_order_app_events(sales_order: str, status: str | None = None):
 	frappe.has_permission("Sales Order", doc=sales_order, ptype="read", throw=True)
 
 	commera_event = frappe.qb.DocType("Commera Event")
+	criterion = (commera_event.reference_doctype == "Sales Order") & (
+		commera_event.reference_name == sales_order
+	)
+	if status:
+		criterion &= frappe.qb.DocType("Commera Event Delivery").status == status
+	return query_deliveries(criterion)
+
+
+def get_deliveries_query(criterion):
+	commera_event = frappe.qb.DocType("Commera Event")
 	delivery = frappe.qb.DocType("Commera Event Delivery")
-	rows = (
+	return (
 		frappe.qb.from_(delivery)
 		.join(commera_event)
 		.on(commera_event.name == delivery.parent)
+		.where(criterion)
+	)
+
+
+def query_deliveries(criterion, start: int = 0, page_length: int | None = None) -> list:
+	commera_event = frappe.qb.DocType("Commera Event")
+	delivery = frappe.qb.DocType("Commera Event Delivery")
+	query = (
+		get_deliveries_query(criterion)
 		.select(
 			delivery.name.as_("delivery"),
 			commera_event.event,
+			commera_event.reference_doctype,
+			commera_event.reference_name,
 			delivery.app,
 			delivery.status,
 			delivery.attempts,
@@ -706,17 +784,17 @@ def get_order_app_events(sales_order: str):
 			commera_event.creation,
 			delivery.last_error.as_("error_log"),
 		)
-		.where(commera_event.reference_doctype == "Sales Order")
-		.where(commera_event.reference_name == sales_order)
 		.orderby(commera_event.creation, order=Order.desc)
 		.orderby(delivery.idx)
-	).run(as_dict=True)
+	)
+	if page_length:
+		query = query.limit(page_length).offset(start)
+	rows = query.run(as_dict=True)
 
 	# An uninstalled app keeps its deliveries but has no hooks.py to read a title from.
 	installed_apps = set(frappe.get_installed_apps())
 	app_titles = {
-		app: (frappe.get_hooks("app_title", app_name=app) or [app])[0] if app in installed_apps else app
-		for app in {row.app for row in rows}
+		app: get_app_title(app) if app in installed_apps else app for app in {row.app for row in rows}
 	}
 	can_retry = "System Manager" in frappe.get_roles()
 	for row in rows:
