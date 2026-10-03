@@ -5,7 +5,7 @@ import { bootValue } from './boot'
 // its symbol on `window`, so money reads correctly without any screen
 // threading a symbol down from its own endpoint — see boot.js.
 const currencyCode = bootValue('currency', 'INR')
-export const currencySymbol = bootValue('currency_symbol', '')
+const currencySymbol = bootValue('currency_symbol', '')
 
 function moneyFormatter(compact, maximumFractionDigits = compact ? 1 : 0) {
   return new Intl.NumberFormat(undefined, {
@@ -26,6 +26,20 @@ function formatWithSymbol(amount, formatter) {
     .formatToParts(value)
     .map((part) => (part.type === 'currency' ? currencySymbol : part.value))
     .join('')
+}
+
+// The site's own symbol for its currency; Intl's narrow symbol for any other, or when the
+// shell did not boot one (the Vite dev server serves a bare index.html).
+export function symbolFor(code = currencyCode) {
+  if (code === currencyCode && currencySymbol) return currencySymbol
+  const currencyPart = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: code,
+    currencyDisplay: 'narrowSymbol',
+  })
+    .formatToParts(0)
+    .find((part) => part.type === 'currency')
+  return currencyPart?.value ?? code
 }
 
 export const money = (n) => formatWithSymbol(n, moneyFormatter(false))

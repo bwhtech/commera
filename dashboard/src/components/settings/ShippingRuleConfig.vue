@@ -12,7 +12,7 @@ import {
 } from 'frappe-ui'
 import SettingsConfigHeader from './SettingsConfigHeader.vue'
 import { errorMessage } from '../../data/errors'
-import { currencySymbol, exactMoney } from '../../data/format'
+import { exactMoney, symbolFor } from '../../data/format'
 import { findBandConflicts, formatBandRange } from '../../data/shippingRates'
 
 const props = defineProps({
@@ -30,7 +30,7 @@ const emit = defineEmits(['back'])
 const formId = useId()
 
 const isEdit = computed(() => Boolean(props.rule))
-const moneyUnit = currencySymbol || props.currency
+const moneyUnit = symbolFor(props.currency || undefined)
 
 // '' is the "Any option" row: a band that names no delivery option.
 const optionChoices = computed(() => [
