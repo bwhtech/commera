@@ -67,6 +67,21 @@ class TestOrderAppEvents(IntegrationTestCase):
 		self.assertEqual(rows[2].error_log, error_log.name)
 		self.assertIsNone(rows[0].error_log)
 
+	def test_status_filter_returns_only_matching_deliveries(self):
+		make_order_event(
+			self.sales_order,
+			"order_placed",
+			[
+				{"app": "frappe", "handler": "frappe.placed_one", "status": "Done", "attempts": 1},
+				{"app": "frappe", "handler": "frappe.placed_two", "status": "Failed", "attempts": 6},
+			],
+		)
+
+		rows = get_order_app_events(self.sales_order, status="Failed")
+
+		self.assertEqual([(row.status, row.attempts) for row in rows], [("Failed", 6)])
+		self.assertEqual(len(get_order_app_events(self.sales_order)), 2)
+
 	def test_order_without_events_returns_empty_list(self):
 		self.assertEqual(get_order_app_events(self.sales_order), [])
 

@@ -1,0 +1,32 @@
+<script setup>
+/**
+ * The installed apps' cards on a record page. The frame and its title are drawn here, so every app's card
+ * sits in the page the way the page's own panels do; the app's module only fills the body.
+ */
+import ExtensionCardFrame from './ExtensionCardFrame.vue'
+
+defineProps({
+  entries: { type: Array, required: true },
+  record: { type: Object, required: true },
+  // `rail` is a section of a detail page's right rail; `stack` a bordered card in the main column.
+  frame: { type: String, default: 'stack', validator: (value) => ['rail', 'stack'].includes(value) },
+})
+
+const emit = defineEmits(['reload'])
+
+const FRAMES = {
+  rail: 'border-t border-outline-gray-1 px-4 py-4',
+  stack: 'rounded-5 border border-outline-gray-1 px-4 py-3.5',
+}
+</script>
+
+<template>
+  <ExtensionCardFrame
+    v-for="entry in entries"
+    :key="`${entry.key}:${record.revision}`"
+    :entry="entry"
+    :record="record"
+    :frame-class="FRAMES[frame]"
+    @reload="emit('reload')"
+  />
+</template>

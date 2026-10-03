@@ -13,10 +13,13 @@ import ProductStock from '../components/product/ProductStock.vue'
 import ProductOrganization from '../components/product/ProductOrganization.vue'
 import ProductStorefront from '../components/product/ProductStorefront.vue'
 import ProductSummaryPanel from '../components/product/ProductSummaryPanel.vue'
+import ExtensionActionDialog from '../components/ExtensionActionDialog.vue'
+import ExtensionSlot from '../components/ExtensionSlot.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 import { errorMessage } from '../data/errors'
 import { longDate } from '../data/format'
 import { useProductStats } from '../data/product'
+import { useRecordExtensions } from '../data/recordExtensions'
 import { asDropdownOptions, buildProductActions } from '../ia/productActions'
 
 const route = useRoute()
@@ -102,6 +105,15 @@ const actions = computed(() =>
     : { groups: [], quick: [] },
 )
 
+const { cards, actionGroup, openAction, record, reload: reloadExtensions } = useRecordExtensions(
+  'product',
+  'Item',
+  () => route.params.id,
+  { onReload: () => productRequest.reload() },
+)
+
+const moreActions = computed(() => [...asDropdownOptions(actions.value.groups), actionGroup.value].filter(Boolean))
+
 // ProductBasics/ProductOrganization write straight onto this ref's own
 // fields via v-model (see their templates), so one Save just pushes whatever
 // is currently on it — there is no separate draft to track.
@@ -150,7 +162,7 @@ const loadFailure = computed(() =>
       :breadcrumbs="[{ label: 'Products', route: '/products' }, { label: product.title }]"
     >
       <template #actions>
-        <Dropdown :options="asDropdownOptions(actions.groups)">
+        <Dropdown :options="moreActions">
           <Button icon="lucide-ellipsis" label="More actions" />
         </Dropdown>
         <Button label="Save" variant="solid" theme="gray" @click="save" />
@@ -177,15 +189,23 @@ const loadFailure = computed(() =>
             <ProductStorefront :product="product" />
             <ProductOrganization :product="product" />
           </div>
+
+          <!-- Below lg the rail is hidden, so the apps' cards stack under the form instead. -->
+          <div v-if="cards.length" class="mt-11 space-y-6 lg:hidden">
+            <ExtensionSlot :entries="cards" :record="record" frame="stack" @reload="reloadExtensions" />
+          </div>
         </PageBody>
       </ScrollArea>
 
       <aside class="hidden w-[19rem] shrink-0 flex-col border-l border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
           <ProductSummaryPanel :product="product" :stats="stats" />
+          <ExtensionSlot :entries="cards" :record="record" frame="rail" @reload="reloadExtensions" />
         </ScrollArea>
       </aside>
     </div>
+
+    <ExtensionActionDialog v-model:entry="openAction" :record="record" @reload="reloadExtensions" />
   </template>
 
   <!-- The item code is already in the route, so the header is real from the first

@@ -7,6 +7,7 @@ from frappe.utils.jinja_globals import is_rtl
 
 from commera.api.admin.orders import get_reporting_currency, get_reporting_currency_symbol
 from commera.api.permission import has_app_permission
+from commera.extensions.registry import get_visible_extensions
 
 no_cache = 1
 
@@ -37,6 +38,7 @@ def get_context(context):
 			# instead of every money surface having to carry the symbol down from its own endpoint.
 			"currency": currency,
 			"currency_symbol": get_reporting_currency_symbol(currency),
+			"extensions": get_visible_extensions(frappe.session.user),
 		}
 	)
 	frappe.db.commit()  # nosemgrep

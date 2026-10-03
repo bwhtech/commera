@@ -1,0 +1,126 @@
+<script setup>
+import { computed, onUnmounted, provide, shallowRef, toValue, watchEffect } from 'vue'
+import { Button, Dropdown } from 'frappe-ui'
+import { PAGE_CONTEXT } from '../extension-api/context'
+import { appLocation, lucideIcon } from '../ia/extensions'
+import AppPageHeader from './AppPageHeader.vue'
+import EmptyState from './EmptyState.vue'
+import ExtensionHost from './ExtensionHost.vue'
+import PageBody from './PageBody.vue'
+import ResponsiveButton from './ResponsiveButton.vue'
+
+const props = defineProps({
+  entry: { type: Object, required: true },
+  path: { type: String, default: '' },
+  query: { type: Object, default: () => ({}) },
+})
+
+const VARIANTS = {
+  solid: { variant: 'solid', theme: 'gray' },
+  subtle: { variant: 'subtle', theme: 'gray' },
+  ghost: { variant: 'ghost', theme: 'gray' },
+}
+
+// Each setter keeps what it was given, unread, so a ref or a getter passed in stays live.
+const titleSource = shallowRef(null)
+const breadcrumbsSource = shallowRef(null)
+const actionsSource = shallowRef(null)
+
+function clear() {
+  breadcrumbsSource.value = null
+  actionsSource.value = null
+}
+
+provide(PAGE_CONTEXT, {
+  setTitle: (title) => (titleSource.value = title),
+  setBreadcrumbs: (breadcrumbs) => (breadcrumbsSource.value = breadcrumbs),
+  setActions: (actions) => (actionsSource.value = actions),
+})
+
+const title = computed(() => toValue(titleSource.value) || props.entry.label)
+
+const breadcrumbs = computed(() => {
+  const crumbs = toValue(breadcrumbsSource.value)
+  if (!crumbs?.length) return null
+  return crumbs.map((crumb) => ({
+    label: toValue(crumb.label),
+    route: crumb.to == null ? undefined : appLocation(props.entry.app, toValue(crumb.to)),
+  }))
+})
+
+// On a phone the breadcrumbs collapse into one back button, which goes to the nearest crumb above this one.
+const backTo = computed(() => breadcrumbs.value?.slice(0, -1).findLast((crumb) => crumb.route)?.route ?? null)
+
+const actions = computed(() =>
+  (toValue(actionsSource.value) ?? []).map((action) => ({
+    label: toValue(action.label),
+    icon: action.icon ? lucideIcon(toValue(action.icon)) : null,
+    ...(VARIANTS[toValue(action.variant)] ?? VARIANTS.subtle),
+    loading: Boolean(toValue(action.loading)),
+    disabled: Boolean(toValue(action.disabled)),
+    onClick: () => action.onClick?.(),
+  })),
+)
+
+// The first action is the page's main one: it stays a button at the right edge, like an order's Fulfil items,
+// and past two the rest fold into the More menu so a phone header never wraps.
+const mainAction = computed(() => actions.value[0] ?? null)
+const otherActions = computed(() => actions.value.slice(1).reverse())
+const overflowOptions = computed(() =>
+  actions.value.length > 2
+    ? actions.value.slice(1).map((action) => ({
+        label: action.label,
+        icon: action.icon ?? undefined,
+        disabled: action.disabled || action.loading,
+        onClick: action.onClick,
+      }))
+    : [],
+)
+const headerButtons = computed(() => {
+  if (!mainAction.value) return []
+  return overflowOptions.value.length ? [mainAction.value] : [...otherActions.value, mainAction.value]
+})
+
+const titleBeforeMount = document.title
+watchEffect(() => (document.title = title.value))
+onUnmounted(() => (document.title = titleBeforeMount))
+</script>
+
+<template>
+  <AppPageHeader :title="title" :breadcrumbs="breadcrumbs" :back-to="backTo">
+    <template #actions>
+      <Dropdown v-if="overflowOptions.length" :options="overflowOptions">
+        <Button icon="lucide-ellipsis" label="More actions" />
+      </Dropdown>
+      <template v-for="action in headerButtons" :key="action.label">
+        <ResponsiveButton
+          v-if="action.icon"
+          :label="action.label"
+          :icon="action.icon"
+          :variant="action.variant"
+          :theme="action.theme"
+          :loading="action.loading"
+          :disabled="action.disabled"
+          @click="action.onClick"
+        />
+        <Button
+          v-else
+          :label="action.label"
+          :variant="action.variant"
+          :theme="action.theme"
+          :loading="action.loading"
+          :disabled="action.disabled"
+          @click="action.onClick"
+        />
+      </template>
+    </template>
+  </AppPageHeader>
+
+  <PageBody>
+    <ExtensionHost :entry="entry" :path="path" :query="query" @failed="clear">
+      <template #failure="{ label, reason }">
+        <EmptyState icon="lucide-triangle-alert" :title="`${label} couldn't load`" :description="reason" />
+      </template>
+    </ExtensionHost>
+  </PageBody>
+</template>

@@ -1,0 +1,698 @@
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+export const API_VERSION = 1;
+const KIT_VERSION = JSON.parse(
+	readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
+).version;
+const GRAMMAR = JSON.parse(
+	readFileSync(new URL('./places.json', import.meta.url), 'utf8'),
+);
+const BANNER = `/* commera-extension-api: ${API_VERSION} */`;
+const SHARED = ['vue', 'frappe-ui', 'frappe-ui/list', '@commera/admin'];
+const SHARED_ROOTS = ['vue', 'frappe-ui', '@commera/admin'];
+const STYLESHEET = /\.(css|scss|sass|less|styl|stylus|pcss|postcss)(\?|$)/;
+const NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;
+const DOTTED_PATH = /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)+$/;
+const EMPTY_ENTRY = '\0commera-empty-entry';
+const EMPTY_ENTRY_PATH = '__commera_empty_entry__';
+const SKIPPED_DIRS = new Set(['node_modules', 'dist']);
+const ICON_FILE = 'icon.svg';
+const ICON_LIMIT = 20 * 1024;
+
+// The host draws these frames itself, so an app that draws its own gets two headers or a dialog on a dialog.
+const HOST_FRAMES = {
+	'@commera/admin': {
+		AppPageHeader: 'the page header is drawn by Commera; set it with usePage()',
+		PageBody: 'the page body is drawn by Commera; put content at the top level',
+		ExtensionCard: 'the card frame is drawn by Commera from extension.label',
+	},
+	'frappe-ui': {
+		Dialog:
+			'Commera draws action dialogs; put the form in an action and drive its button with useAction()',
+	},
+};
+
+const FRAPPE_V1 = new Set([
+	'createResource',
+	'createListResource',
+	'createDocumentResource',
+	'useCall',
+	'useList',
+	'useDoc',
+	'useDoctype',
+	'useNewDoc',
+	'frappeRequest',
+	'call',
+]);
+
+const FIELD_TYPES = {
+	label: 'text',
+	icon: 'icon',
+	requires: 'text',
+	condition: 'dotted',
+	method: 'dotted',
+	confirm: 'text',
+	doctype: 'text',
+	sidebar: 'boolean',
+	order: 'number',
+};
+
+const SLUG_HINT = '<name>';
+
+function placementTable() {
+	return Object.keys(GRAMMAR.places)
+		.map((place) =>
+			place === 'settings'
+				? '  settings/index.vue'
+				: `  ${place}/${SLUG_HINT}/index.vue`,
+		)
+		.join('\n');
+}
+
+function toPosix(path) {
+	return path.split(sep).join('/');
+}
+
+function walk(dir, found = []) {
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		const path = join(dir, entry.name);
+		if (entry.isDirectory()) {
+			if (!SKIPPED_DIRS.has(entry.name) && !entry.name.startsWith('.'))
+				walk(path, found);
+		} else if (entry.name.endsWith('.vue')) {
+			found.push(path);
+		}
+	}
+	return found;
+}
+
+// `settings` is a single slot named after itself; every other place takes one `<name>` folder.
+function matchPlacement(folder) {
+	if (folder === 'settings') return { place: 'settings', name: 'settings' };
+	const cut = folder.lastIndexOf('/');
+	if (cut < 0) return null;
+	const place = folder.slice(0, cut);
+	if (place === 'settings' || !GRAMMAR.places[place]) return null;
+	return { place, name: folder.slice(cut + 1) };
+}
+
+function placeOf(folder) {
+	const cut = folder.lastIndexOf('/');
+	return cut < 0 ? folder : folder.slice(0, cut);
+}
+
+function isReserved(folder) {
+	return GRAMMAR.reserved.some(
+		(reserved) => folder === reserved || folder.startsWith(`${reserved}/`),
+	);
+}
+
+function levenshtein(left, right) {
+	const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+	for (let i = 1; i <= left.length; i++) {
+		let diagonal = row[0];
+		row[0] = i;
+		for (let j = 1; j <= right.length; j++) {
+			const above = row[j];
+			row[j] = Math.min(
+				row[j] + 1,
+				row[j - 1] + 1,
+				diagonal + (left[i - 1] === right[j - 1] ? 0 : 1),
+			);
+			diagonal = above;
+		}
+	}
+	return row[right.length];
+}
+
+function suggest(word, candidates) {
+	const [best] = candidates
+		.map((candidate) => [candidate, levenshtein(word, candidate)])
+		.sort((a, b) => a[1] - b[1]);
+	return best && best[1] <= 2 ? ` (did you mean '${best[0]}'?)` : '';
+}
+
+class LiteralError extends Error {
+	constructor(node, message) {
+		super(message);
+		this.node = node;
+	}
+}
+
+function propertyKey(property) {
+	if (property.computed) return null;
+	if (property.key.type === 'Identifier') return property.key.name;
+	if (property.key.type === 'StringLiteral') return property.key.value;
+	return null;
+}
+
+function evaluateLiteral(node, path) {
+	const fail = () => new LiteralError(node, `${path} must be a literal`);
+	switch (node.type) {
+		case 'StringLiteral':
+		case 'NumericLiteral':
+		case 'BooleanLiteral':
+			return node.value;
+		case 'NullLiteral':
+			return null;
+		case 'TemplateLiteral':
+			if (node.expressions.length) throw fail();
+			return node.quasis.map((quasi) => quasi.value.cooked).join('');
+		case 'UnaryExpression':
+			if (node.operator === '-' && node.argument.type === 'NumericLiteral')
+				return -node.argument.value;
+			throw fail();
+		case 'ArrayExpression':
+			return node.elements.map((element, index) => {
+				if (!element || element.type === 'SpreadElement') throw fail();
+				return evaluateLiteral(element, `${path}[${index}]`);
+			});
+		case 'ObjectExpression': {
+			const value = {};
+			for (const property of node.properties) {
+				if (property.type !== 'ObjectProperty') throw fail();
+				const key = propertyKey(property);
+				if (key === null)
+					throw new LiteralError(property, `${path} keys must be plain names`);
+				value[key] = evaluateLiteral(property.value, `${path}.${key}`);
+			}
+			return value;
+		}
+		default:
+			throw fail();
+	}
+}
+
+function scriptPosition(script, node) {
+	const { line, column } = node.loc.start;
+	return line === 1
+		? `${script.loc.start.line}:${script.loc.start.column + column}`
+		: `${script.loc.start.line + line - 1}:${column + 1}`;
+}
+
+function parseScript(compiler, script) {
+	const plugins = script.lang === 'ts' ? ['typescript'] : [];
+	return compiler.babelParse(script.content, {
+		sourceType: 'module',
+		plugins,
+	}).program.body;
+}
+
+function declaresExtension(statement) {
+	return (
+		statement.type === 'ExportNamedDeclaration' &&
+		statement.declaration?.type === 'VariableDeclaration' &&
+		statement.declaration.declarations.some(
+			(declarator) => declarator.id.name === 'extension',
+		)
+	);
+}
+
+// Returns null when the SFC has no plain <script>, or a plain one that never mentions `extension`.
+function readExtensionBlock(compiler, file, display) {
+	const { descriptor, errors } = compiler.parse(readFileSync(file, 'utf8'), {
+		filename: file,
+	});
+	if (errors.length)
+		return {
+			errors: errors.map((error) => `${display}: ${error.message}`),
+			descriptor,
+		};
+	const script = descriptor.script;
+	if (!script) return { descriptor, extension: null, errors: [] };
+	let body;
+	try {
+		body = parseScript(compiler, script);
+	} catch (error) {
+		return { descriptor, errors: [`${display}: ${error.message}`] };
+	}
+	if (!body.some(declaresExtension))
+		return { descriptor, extension: null, errors: [] };
+	const at = (node) => `${display}:${scriptPosition(script, node)}`;
+	const strays = body.filter((statement) => !declaresExtension(statement));
+	const errorsFound = strays.map(
+		(statement) =>
+			`${at(
+				statement,
+			)} the plain <script> may only hold \`export const extension = { … }\`; move other code to <script setup>`,
+	);
+	const statement = body.find(declaresExtension);
+	const { declaration } = statement;
+	const [declarator] = declaration.declarations;
+	if (
+		declaration.kind !== 'const' ||
+		declaration.declarations.length !== 1 ||
+		declarator.init?.type !== 'ObjectExpression'
+	) {
+		errorsFound.push(
+			`${at(statement)} write the block as \`export const extension = { … }\``,
+		);
+		return { descriptor, extension: null, errors: errorsFound, declared: true };
+	}
+	try {
+		const extension = evaluateLiteral(declarator.init, 'extension');
+		return { descriptor, extension, errors: errorsFound, declared: true };
+	} catch (error) {
+		if (!(error instanceof LiteralError)) throw error;
+		errorsFound.push(`${at(error.node)} ${error.message}`);
+		return { descriptor, extension: null, errors: errorsFound, declared: true };
+	}
+}
+
+function checkField(key, value, { app, icons }) {
+	switch (FIELD_TYPES[key]) {
+		case 'text':
+			return typeof value === 'string' && value.trim()
+				? null
+				: 'must be non-empty text';
+		case 'boolean':
+			return typeof value === 'boolean' ? null : 'must be true or false';
+		case 'number':
+			return typeof value === 'number' && Number.isFinite(value)
+				? null
+				: 'must be a number';
+		case 'icon':
+			if (typeof value !== 'string') return 'must be an icon name';
+			if (icons && !icons.includes(value))
+				return `'${value}' is not a Commera icon${suggest(value, icons)}`;
+			return null;
+		case 'dotted':
+			if (typeof value !== 'string' || !DOTTED_PATH.test(value))
+				return 'must be a dotted path like my_app.module.function';
+			return value.startsWith(`${app}.`)
+				? null
+				: `'${value}' must start with '${app}.'`;
+		default:
+			return null;
+	}
+}
+
+function checkExtension(extension, place, hasModule, context) {
+	const spec = GRAMMAR.places[place];
+	const problems = [];
+	for (const [key, value] of Object.entries(extension)) {
+		if (!spec.fields.includes(key)) {
+			problems.push(
+				`extension.${key} is not allowed on ${place}${suggest(
+					key,
+					spec.fields,
+				)}`,
+			);
+			continue;
+		}
+		const problem = checkField(key, value, context);
+		if (problem) problems.push(`extension.${key} ${problem}`);
+	}
+	for (const key of spec.required) {
+		if (!(key in extension)) problems.push(`extension.${key} is required`);
+	}
+	const declarative = place === 'settings' ? 'doctype' : 'method';
+	if (spec.module === 'required' && !hasModule)
+		problems.push('needs a <template> or <script setup>');
+	if (spec.module === 'optional') {
+		const declared = declarative in extension;
+		if (hasModule && declared)
+			problems.push(
+				`has both a template and extension.${declarative}; keep exactly one`,
+			);
+		if (!hasModule && !declared)
+			problems.push(
+				`needs either a template or extension.${declarative}; it has neither`,
+			);
+	}
+	return problems;
+}
+
+export function discoverExtensions(
+	sourceDir,
+	{ app, compiler, icons = null, warn = () => {} },
+) {
+	const errors = [];
+	const entries = [];
+	const seen = new Map();
+	for (const file of walk(sourceDir).sort()) {
+		const display = toPosix(relative(sourceDir, file));
+		const isIndex = basename(file) === 'index.vue';
+		const folder = toPosix(dirname(display));
+		const placement = isIndex ? matchPlacement(folder) : null;
+		const block = readExtensionBlock(compiler, file, display);
+
+		if (!placement) {
+			if (!block.declared) continue;
+			if (isIndex && isReserved(folder)) {
+				warn(`${display} is reserved for a later Commera; it was not built`);
+				continue;
+			}
+			errors.push(
+				isIndex
+					? `${display} declares an extension but ${placeOf(
+							folder,
+					  )} isn't a Commera placement; valid places:\n${placementTable()}`
+					: `${display} declares an extension, but only a placement's index.vue may; valid places:\n${placementTable()}`,
+			);
+			continue;
+		}
+
+		errors.push(...block.errors);
+		if (!block.declared) {
+			errors.push(
+				`${display}: add \`<script>export const extension = { label: '…' }</script>\``,
+			);
+			continue;
+		}
+		if (!NAME.test(placement.name)) {
+			errors.push(
+				`${display}: '${placement.name}' must be lowercase letters, digits and hyphens (at most 40)`,
+			);
+			continue;
+		}
+		if (!block.extension) continue;
+
+		const { descriptor, extension } = block;
+		const hasModule = Boolean(descriptor.template || descriptor.scriptSetup);
+		const problems = checkExtension(extension, placement.place, hasModule, {
+			app,
+			icons,
+		});
+		errors.push(...problems.map((problem) => `${display}: ${problem}`));
+		if (problems.length) continue;
+
+		const key = `${placement.place}/${placement.name}`;
+		if (seen.has(key)) {
+			errors.push(`${display}: ${key} is already declared by ${seen.get(key)}`);
+			continue;
+		}
+		seen.set(key, display);
+		entries.push({
+			place: placement.place,
+			name: placement.name,
+			file,
+			entryName: hasModule
+				? key.replace(/^settings\/settings$/, 'settings')
+				: null,
+			extension,
+		});
+	}
+	return { entries, errors };
+}
+
+function readHostFile(hostDir, name) {
+	const path = join(hostDir, name);
+	return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
+}
+
+// Bound :class values are left to review: the dashboard's style law already forbids string-built class names.
+function staticClasses(source) {
+	const template = source.match(/<template>([\s\S]*)<\/template>/)?.[1] ?? '';
+	return [...template.matchAll(/\sclass="([^"]*)"/g)]
+		.flatMap((match) => match[1].split(/\s+/))
+		.filter(Boolean);
+}
+
+function stripPlainScript(compiler, code, id) {
+	const { descriptor } = compiler.parse(code, { filename: id });
+	const script = descriptor.script;
+	if (!script) return null;
+	const start = code.lastIndexOf('<script', script.loc.start.offset);
+	const end = code.indexOf('</script>', script.loc.end.offset) + 9;
+	return code.slice(0, start) + code.slice(end);
+}
+
+function guard({ hostDir, compiler, extensionFiles }) {
+	const knownClasses = readHostFile(hostDir, 'classes.json');
+	const sharedExports = readHostFile(hostDir, 'shared-exports.json');
+	const knownClassSet = knownClasses ? new Set(knownClasses) : null;
+	return {
+		name: 'commera-extension-guard',
+		enforce: 'pre',
+		buildStart() {
+			if (!knownClassSet || !sharedExports) {
+				this.warn(
+					`no dashboard build at ${hostDir}; class and import checks skipped (build commera first)`,
+				);
+			}
+		},
+		resolveId(source) {
+			if (source.endsWith(EMPTY_ENTRY_PATH)) return EMPTY_ENTRY;
+			const sharesRoot = SHARED_ROOTS.some((name) =>
+				source.startsWith(`${name}/`),
+			);
+			if (sharesRoot && !SHARED.includes(source)) {
+				this.error(
+					`import '${source}' is not shared with app pages; use one of ${SHARED.join(
+						', ',
+					)}`,
+				);
+			}
+		},
+		load(id) {
+			if (id === EMPTY_ENTRY) return 'export {};';
+		},
+		transform(code, id) {
+			if (id.includes('/node_modules/')) return;
+			if (id.includes('?vue&type=style') || STYLESHEET.test(id)) {
+				this.error(
+					'app pages ship no CSS; use frappe-ui components and dashboard classes',
+				);
+			}
+			if (!id.endsWith('.vue')) return;
+			if (knownClassSet) {
+				const unknown = [...new Set(staticClasses(code))].filter(
+					(name) => !knownClassSet.has(name),
+				);
+				if (unknown.length) {
+					this.error(
+						`classes the dashboard does not ship: ${unknown.join(', ')}`,
+					);
+				}
+			}
+			// The manifest is the only copy of the block, so dotted paths never reach the browser.
+			if (extensionFiles.has(id)) {
+				const stripped = stripPlainScript(compiler, code, id);
+				if (stripped !== null) return { code: stripped, map: null };
+			}
+		},
+		// The browser would otherwise refuse the module at runtime with "does not provide an export named …".
+		generateBundle(_options, bundle) {
+			const problems = [];
+			for (const chunk of Object.values(bundle)) {
+				if (chunk.type !== 'chunk') continue;
+				for (const [specifier, names] of Object.entries(
+					chunk.importedBindings,
+				)) {
+					const frames = HOST_FRAMES[specifier] ?? {};
+					for (const name of names.filter((name) => frames[name])) {
+						problems.push(
+							`${chunk.fileName}: do not import ${name} from '${specifier}': ${frames[name]}`,
+						);
+					}
+					const callsV1 = (name) =>
+						specifier === 'frappe-ui' && FRAPPE_V1.has(name);
+					for (const name of names.filter(callsV1)) {
+						problems.push(
+							`${chunk.fileName}: ${name} calls Frappe's v1 API, which this dashboard reads as null. Use useMethodRead / useMethodAction with a whitelisted method in your app's api.py.`,
+						);
+					}
+					if (!sharedExports || !SHARED.includes(specifier)) continue;
+					const available = sharedExports[specifier] ?? [];
+					const missing = names.filter(
+						(name) =>
+							name !== '*' &&
+							!frames[name] &&
+							!callsV1(name) &&
+							!available.includes(name),
+					);
+					if (missing.length) {
+						problems.push(
+							`${chunk.fileName}: '${specifier}' does not share ${missing.join(
+								', ',
+							)} with app pages${
+								specifier === '@commera/admin'
+									? ` (or ${hostDir} is from an older Commera: rebuild it with \`bench build --app commera\`)`
+									: ''
+							}`,
+						);
+					}
+				}
+			}
+			if (problems.length) this.error(problems.join('\n'));
+		},
+	};
+}
+
+function manifestEntry(entry, hashes) {
+	const fields = Object.fromEntries(
+		GRAMMAR.places[entry.place].fields
+			.filter((field) => field in entry.extension)
+			.map((field) => [field, entry.extension[field]]),
+	);
+	const module = entry.entryName ? `${entry.entryName}.js` : null;
+	return {
+		place: entry.place,
+		name: entry.name,
+		module,
+		hash: module ? hashes[module] : null,
+		...fields,
+	};
+}
+
+// The registry reads line 1, so the banner goes on after minification, which would strip or move a plain comment.
+function finish({ app, entries, icon }) {
+	return {
+		name: 'commera-extension-manifest',
+		enforce: 'post',
+		generateBundle(_options, bundle) {
+			const hashes = {};
+			for (const [fileName, chunk] of Object.entries(bundle)) {
+				if (chunk.type !== 'chunk' || !chunk.isEntry) continue;
+				if (chunk.facadeModuleId === EMPTY_ENTRY) {
+					delete bundle[fileName];
+					continue;
+				}
+				chunk.code = `${BANNER}\n${chunk.code}`;
+				hashes[fileName] = createHash('sha1')
+					.update(chunk.code)
+					.digest('hex')
+					.slice(0, 8);
+			}
+			if (icon)
+				this.emitFile({ type: 'asset', fileName: ICON_FILE, source: icon });
+			const manifest = {
+				api_version: API_VERSION,
+				kit_version: KIT_VERSION,
+				app,
+				...(icon ? { icon: ICON_FILE } : {}),
+				extensions: entries.map((entry) => manifestEntry(entry, hashes)),
+			};
+			this.emitFile({
+				type: 'asset',
+				fileName: 'manifest.json',
+				source: `${JSON.stringify(manifest, null, '\t')}\n`,
+			});
+		},
+	};
+}
+
+// Painted as a CSS mask, but the file is also served as-is under /assets, so it must be safe to open directly.
+export function readAppIcon(sourceDir) {
+	const path = join(sourceDir, ICON_FILE);
+	if (!existsSync(path)) return { icon: null, errors: [] };
+	const source = readFileSync(path, 'utf8');
+	const outer = source
+		.replace(/<\?xml[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>/gi, '')
+		.trim();
+	const problems = [];
+	if (Buffer.byteLength(source) > ICON_LIMIT)
+		problems.push(
+			`is ${Math.ceil(
+				Buffer.byteLength(source) / 1024,
+			)} kB; keep it under 20 kB`,
+		);
+	if (!/^<svg[\s>]/i.test(outer) || !/<\/svg>$/i.test(outer))
+		problems.push('must be a single <svg> element');
+	if (/<script[\s>]/i.test(source)) problems.push('may not contain <script>');
+	if (/\son[a-z]+\s*=/i.test(source))
+		problems.push('may not use on* event attributes');
+	if (/\s(?:xlink:)?href\s*=\s*(?:"(?!\s*#)|'(?!\s*#)|(?!["'#]))/i.test(source))
+		problems.push('may only link to its own #ids');
+	return {
+		icon: problems.length ? null : source,
+		errors: problems.map((problem) => `${ICON_FILE} ${problem}`),
+	};
+}
+
+function requireFromApp(appRoot) {
+	return createRequire(join(appRoot, 'package.json'));
+}
+
+// A `link:`ed kit resolves its own imports from apps/commera, where nothing is installed, so this resolves from the app.
+// It imports the ESM entry because plugin-vue's CJS build requires Vite's deprecated CJS API.
+async function importFromApp(appRoot, name) {
+	let packageDir = dirname(requireFromApp(appRoot).resolve(name));
+	while (!existsSync(join(packageDir, 'package.json')))
+		packageDir = dirname(packageDir);
+	const { exports } = JSON.parse(
+		readFileSync(join(packageDir, 'package.json'), 'utf8'),
+	);
+	return import(pathToFileURL(join(packageDir, exports['.'].import)).href);
+}
+
+export default async function commeraExtension({
+	root = process.cwd(),
+	app = basename(resolve(root)),
+	hostDir,
+} = {}) {
+	// Vite reports module ids by real path, and the strip step matches files by id.
+	const appRoot = realpathSync(resolve(root));
+	const sourceDir = join(appRoot, 'commera');
+	const resolvedHostDir =
+		hostDir ?? resolve(appRoot, '../commera/commera/public/extension-host');
+	const { default: vue } = await importFromApp(appRoot, '@vitejs/plugin-vue');
+	const compiler = requireFromApp(appRoot)('vue/compiler-sfc');
+	const icons = readHostFile(resolvedHostDir, 'icons.json');
+	const warnings = [];
+	const discovered = discoverExtensions(sourceDir, {
+		app,
+		compiler,
+		icons,
+		warn: (message) => warnings.push(message),
+	});
+	const { entries } = discovered;
+	const appIcon = readAppIcon(sourceDir);
+	const errors = [...discovered.errors, ...appIcon.errors];
+	if (errors.length) {
+		throw new Error(
+			`commera: ${errors.length} problem${
+				errors.length === 1 ? '' : 's'
+			} in ${app}/commera\n\n${errors
+				.map((error) => `- ${error}`)
+				.join('\n')}\n`,
+		);
+	}
+	const moduleEntries = Object.fromEntries(
+		entries
+			.filter((entry) => entry.entryName)
+			.map((entry) => [entry.entryName, entry.file]),
+	);
+	const extensionFiles = new Set(entries.map((entry) => entry.file));
+	return [
+		guard({ hostDir: resolvedHostDir, compiler, extensionFiles }),
+		vue(),
+		finish({ app, entries, icon: appIcon.icon }),
+		{
+			name: 'commera-extension-build',
+			buildStart() {
+				if (!icons)
+					this.warn(`no icons.json at ${resolvedHostDir}; icon check skipped`);
+				for (const warning of warnings) this.warn(warning);
+			},
+			config: () => ({
+				root: sourceDir,
+				publicDir: false,
+				define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+				build: {
+					outDir: join(appRoot, app, 'public', 'commera'),
+					emptyOutDir: true,
+					target: 'es2022',
+					minify: true,
+					sourcemap: false,
+					lib: {
+						entry: Object.keys(moduleEntries).length
+							? moduleEntries
+							: { __empty: EMPTY_ENTRY_PATH },
+						formats: ['es'],
+						fileName: (_format, name) => `${name}.js`,
+					},
+					rollupOptions: {
+						external: SHARED,
+						output: { chunkFileNames: 'chunks/[name]-[hash].js' },
+					},
+				},
+			}),
+		},
+	];
+}

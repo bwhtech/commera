@@ -1,0 +1,104 @@
+# Copyright (c) 2026, company@bwhstudios.com and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe import _
+
+from commera.api.admin.docfields import build_field_groups, get_editable_docfields
+from commera.api.admin.settings import coerce_field_value
+from commera.extensions.places import PLACES, get_record_place_prefix
+from commera.extensions.registry import (
+	get_registry,
+	get_registry_entry,
+	get_whitelisted_method,
+	has_required_access,
+	passes_condition,
+	resolve_record_extensions,
+)
+
+
+@frappe.whitelist()
+def get_record_extensions(doctype: str, name: str | int) -> dict:
+	place_prefix = get_record_place_prefix(doctype)
+	if not place_prefix:
+		frappe.throw(_("Apps can't extend {0} records").format(doctype))
+
+	frappe.has_permission(doctype, "read", doc=name, throw=True)
+	return {"keys": resolve_record_extensions(place_prefix, name, frappe.session.user)}
+
+
+@frappe.whitelist(methods=["POST"])
+def run_record_action(key: str, name: str | int) -> dict:
+	entry = get_registry_entry(key)
+	if not entry or not entry["method"]:
+		frappe.throw(_("App action {0} not found").format(key), frappe.DoesNotExistError)
+	if entry.get("error"):
+		frappe.throw(entry["error"])
+
+	doctype = PLACES[entry["place"]]["doctype"]
+	frappe.has_permission(doctype, "read", doc=name, throw=True)
+	method = get_whitelisted_method(entry["app"], entry["method"])
+	if not (
+		method and has_required_access(entry, frappe.session.user) and passes_condition(entry, doctype, name)
+	):
+		frappe.throw(_("{0} isn't available for {1}").format(entry["label"], name), frappe.PermissionError)
+
+	message = method(name=name)
+	return {"message": message if isinstance(message, str) else None}
+
+
+@frappe.whitelist()
+def get_app_settings(app: str) -> dict:
+	doctype = get_app_settings_doctype(app)
+	frappe.has_permission(doctype, "read", throw=True)
+
+	groups = build_field_groups(doctype, frappe.get_cached_doc(doctype))
+	return {
+		"doctype": doctype,
+		"groups": groups,
+		"values": {field["fieldname"]: field["value"] for group in groups for field in group["fields"]},
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def save_app_setting(app: str, fieldname: str, value=None):
+	doctype = get_app_settings_doctype(app)
+	frappe.has_permission(doctype, "write", throw=True)
+
+	docfield = next(
+		(
+			docfield
+			for _group_label, docfield in get_editable_docfields(doctype)
+			if docfield.fieldname == fieldname
+		),
+		None,
+	)
+	if not docfield:
+		frappe.throw(_("{0} has no field {1}").format(doctype, fieldname))
+	# A blank secret keeps the stored one; only an explicit null clears it.
+	if docfield.fieldtype == "Password" and value == "":
+		return None
+
+	settings = frappe.get_doc(doctype)
+	settings.set(fieldname, coerce_field_value(docfield.fieldtype, value))
+	settings.save()
+	return None if docfield.fieldtype == "Password" else settings.get(fieldname)
+
+
+def get_app_settings_doctype(app: str) -> str:
+	entry = next(
+		(
+			entry
+			for entry in get_registry()["entries"]
+			if entry["app"] == app and entry["place"] == "settings"
+		),
+		None,
+	)
+	if not (
+		entry
+		and entry["doctype"]
+		and has_required_access(entry, frappe.session.user)
+		and passes_condition(entry)
+	):
+		frappe.throw(_("{0} has no settings here").format(app), frappe.DoesNotExistError)
+	return entry["doctype"]

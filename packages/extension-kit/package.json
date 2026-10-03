@@ -1,0 +1,18 @@
+{
+	"name": "@commera/extension-kit",
+	"version": "0.2.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./vite": "./vite.js",
+		"./places.json": "./places.json"
+	},
+	"scripts": {
+		"test": "node --test test/*.test.js"
+	},
+	"peerDependencies": {
+		"@vitejs/plugin-vue": "^5.2.1",
+		"vite": "^5.4.11",
+		"vue": "^3.5.15"
+	}
+}

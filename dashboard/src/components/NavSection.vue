@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { KeyboardShortcut, SidebarItem, SidebarLabel } from 'frappe-ui'
+import AppIcon from './AppIcon.vue'
 
 const props = defineProps({
   section: { type: Object, required: true },
@@ -30,6 +31,9 @@ const toggle = (item) => (opened.value[item.to] = !isOpen(item))
             :active="!isOpen(item) && holdsRoute(item)"
             @click="toggle(item)"
           >
+            <template v-if="item.iconUrl" #prefix>
+              <AppIcon :src="item.iconUrl" class="size-4 text-ink-gray-6" />
+            </template>
             <template #suffix>
               <span
                 class="lucide-chevron-down mr-1 size-3.5 text-ink-gray-5 transition-transform"
@@ -61,6 +65,9 @@ const toggle = (item) => (opened.value[item.to] = !isOpen(item))
           :active="Boolean(item.to) && item.to === activeTarget"
           @click="item.onClick?.()"
         >
+          <template v-if="item.iconUrl" #prefix>
+            <AppIcon :src="item.iconUrl" class="size-4 text-ink-gray-6" />
+          </template>
           <template v-if="item.shortcut" #suffix>
             <KeyboardShortcut class="mr-1" :combo="item.shortcut" />
           </template>

@@ -1,0 +1,109 @@
+import { bootValue } from '../data/boot'
+
+// commera/www/commera.py has already filtered these for the session user, so the client only places them.
+const extensions = bootValue('extensions', {}) ?? {}
+const apps = extensions.apps ?? {}
+const entries = extensions.entries ?? []
+
+// An entry without `order` sorts after every ordered one, then by label, so two apps never shuffle.
+function byOrder(left, right) {
+  const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER
+  const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER
+  return leftOrder - rightOrder || String(left.label).localeCompare(String(right.label))
+}
+
+export function lucideIcon(name, fallback = 'blocks') {
+  const icon = name || fallback
+  return icon.startsWith('lucide-') ? icon : `lucide-${icon}`
+}
+
+export function appTitle(app) {
+  return apps[app]?.title || app
+}
+
+// An app without its own logo borrows its first page's icon.
+export function appFallbackIcon(app) {
+  return lucideIcon(appPages(app)[0]?.icon)
+}
+
+// Every app link resolves like an href against the app's root, so 'jobs/JOB-1', '../orders' and '/orders/X'
+// mean the same from a page, a card and an action.
+export function appLocation(app, to) {
+  if (to.startsWith('/')) return to
+  const resolved = new URL(to, `https://commera.invalid/apps/${app}/`)
+  return `${resolved.pathname.replace(/\/$/, '')}${resolved.search}${resolved.hash}`
+}
+
+export function pageRoute(entry) {
+  return `/apps/${entry.app}/${entry.name}`
+}
+
+export function placeEntries(place) {
+  return entries.filter((entry) => entry.place === place).sort(byOrder)
+}
+
+function appPages(app) {
+  return placeEntries('pages').filter((entry) => entry.app === app)
+}
+
+export function findPage(app, name) {
+  return appPages(app).find((entry) => entry.name === name)
+}
+
+export function firstPageRoute(app) {
+  const [first] = appPages(app)
+  return first ? pageRoute(first) : null
+}
+
+function pageNavItem(entry) {
+  return { label: entry.label, icon: lucideIcon(entry.icon), to: pageRoute(entry) }
+}
+
+// One row per app: its only page, or a disclosure over its pages shaped like the Analytics row.
+export function appNavItems() {
+  const shown = placeEntries('pages').filter((entry) => entry.sidebar !== false)
+  const byApp = new Map()
+  for (const entry of shown) byApp.set(entry.app, [...(byApp.get(entry.app) ?? []), entry])
+  return [...byApp.entries()]
+    .map(([app, pages]) =>
+      pages.length === 1
+        ? { ...pageNavItem(pages[0]), iconUrl: apps[app]?.icon_url }
+        : {
+            label: appTitle(app),
+            icon: lucideIcon(pages[0].icon),
+            iconUrl: apps[app]?.icon_url,
+            to: `/apps/${app}`,
+            children: pages.map(pageNavItem),
+          },
+    )
+    .sort((left, right) => left.label.localeCompare(right.label))
+}
+
+export function settingsTabValue(app) {
+  return `app-${app}`
+}
+
+export function extensionSettingsTabs() {
+  return placeEntries('settings').map((entry) => ({
+    value: settingsTabValue(entry.app),
+    label: entry.label,
+    icon: lucideIcon(entry.icon, 'settings'),
+    keywords: [appTitle(entry.app).toLowerCase(), entry.app],
+    entry,
+  }))
+}
+
+const PLACE_LABELS = {
+  pages: 'Page',
+  'order/cards': 'Order card',
+  'product/cards': 'Product card',
+  'customer/cards': 'Customer card',
+  'order/actions': 'Order action',
+  'product/actions': 'Product action',
+  'customer/actions': 'Customer action',
+  settings: 'Settings tab',
+}
+
+export function placeLabel(place) {
+  return PLACE_LABELS[place] ?? place
+}

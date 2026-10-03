@@ -1,0 +1,84 @@
+{
+	"places": {
+		"pages": {
+			"module": "required",
+			"doctype": null,
+			"fields": ["label", "icon", "requires", "condition", "sidebar", "order"],
+			"required": ["label", "icon"]
+		},
+		"order/cards": {
+			"module": "required",
+			"doctype": "Sales Order",
+			"fields": ["label", "requires", "condition", "order"],
+			"required": ["label"]
+		},
+		"product/cards": {
+			"module": "required",
+			"doctype": "Item",
+			"fields": ["label", "requires", "condition", "order"],
+			"required": ["label"]
+		},
+		"customer/cards": {
+			"module": "required",
+			"doctype": "Customer",
+			"fields": ["label", "requires", "condition", "order"],
+			"required": ["label"]
+		},
+		"order/actions": {
+			"module": "optional",
+			"doctype": "Sales Order",
+			"fields": [
+				"label",
+				"icon",
+				"requires",
+				"condition",
+				"method",
+				"confirm",
+				"order"
+			],
+			"required": ["label"]
+		},
+		"product/actions": {
+			"module": "optional",
+			"doctype": "Item",
+			"fields": [
+				"label",
+				"icon",
+				"requires",
+				"condition",
+				"method",
+				"confirm",
+				"order"
+			],
+			"required": ["label"]
+		},
+		"customer/actions": {
+			"module": "optional",
+			"doctype": "Customer",
+			"fields": [
+				"label",
+				"icon",
+				"requires",
+				"condition",
+				"method",
+				"confirm",
+				"order"
+			],
+			"required": ["label"]
+		},
+		"settings": {
+			"module": "optional",
+			"doctype": null,
+			"fields": ["label", "icon", "requires", "condition", "doctype"],
+			"required": ["label"],
+			"single": true
+		}
+	},
+	"reserved": [
+		"orders/actions",
+		"orders/selection",
+		"products/actions",
+		"products/selection",
+		"customers/actions"
+	]
+}

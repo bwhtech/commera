@@ -9,6 +9,7 @@ from commera.app_events import add_apps_user, validate_extension_apps
 from commera.commera_ecommerce.doctype.commera_settings.navbar.navbar_manager import (
 	seed_menu_when_empty,
 )
+from commera.extensions.registry import clear_registry_cache, get_registry
 from commera.search.build import ensure_index_built
 from commera.search.record_builder import DEFAULT_CONTENT_FIELDS
 from commera.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
@@ -61,6 +62,13 @@ def after_migrate():
 	seed_llms_txt()
 	seed_default_routes()
 	validate_extension_apps()
+	reset_extension_registry()
+
+
+def reset_extension_registry():
+	clear_registry_cache()
+	for problem in get_registry()["problems"]:
+		print(f"{problem['app']} extension skipped: {problem['message']}")
 
 
 def populate_search_settings():

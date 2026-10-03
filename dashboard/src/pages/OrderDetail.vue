@@ -8,13 +8,16 @@ import PageBody from '../components/PageBody.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import OrderProgress from '../components/OrderProgress.vue'
 import OrderCustomerPanel from '../components/OrderCustomerPanel.vue'
-import OrderAppEventsPanel from '../components/OrderAppEventsPanel.vue'
+import OrderAppFailures from '../components/OrderAppFailures.vue'
+import ExtensionActionDialog from '../components/ExtensionActionDialog.vue'
+import ExtensionSlot from '../components/ExtensionSlot.vue'
 import Thumb from '../components/Thumb.vue'
 import RefundDialog from '../components/RefundDialog.vue'
 import { useAdminRead, useAdminAction, useMethodRead } from '../data/api'
 import { erpnextLink, printUrl } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { longDate, money } from '../data/format'
+import { useRecordExtensions } from '../data/recordExtensions'
 
 const route = useRoute()
 
@@ -33,22 +36,19 @@ const refundStatusRequest = useMethodRead('commera.api.orders.get_sales_order_re
 const refundStatus = computed(() => refundStatusRequest.data ?? {})
 const refundOpen = ref(false)
 
-const appEventsRequest = useAdminRead('orders.get_order_app_events', {
-  params: () => ({ sales_order: route.params.id }),
-  refetch: true,
-})
-const appEvents = computed(() => appEventsRequest.data ?? [])
-const appEventsLoading = computed(() => appEventsRequest.loading && !appEventsRequest.data)
-// No installed app listens to order events on most stores, so the card only exists when one did.
-const showAppEvents = computed(() => appEventsLoading.value || appEvents.value.length > 0)
-
 watch(
   () => route.params.id,
   () => {
     orderRequest.reload()
     refundStatusRequest.reload()
-    appEventsRequest.reload()
   },
+)
+
+const { cards, actionGroup, openAction, record, reload: reloadExtensions } = useRecordExtensions(
+  'order',
+  'Sales Order',
+  () => route.params.id,
+  { onReload: () => orderRequest.reload() },
 )
 
 const erpLink = computed(() => (order.value ? erpnextLink('Sales Order', order.value.name) : null))
@@ -59,7 +59,7 @@ const erpLink = computed(() => (order.value ? erpnextLink('Sales Order', order.v
 // (639.98, 640) — reachable under browser zoom — would hide both copies and
 // leave the action unreachable. The menu is the one route that always works;
 // the labelled button is a desktop convenience on top of it.
-const moreActions = [
+const orderActions = [
   {
     label: 'View in ERP',
     icon: 'lucide-external-link',
@@ -82,6 +82,8 @@ const moreActions = [
     onClick: () => (refundOpen.value = true),
   },
 ]
+
+const moreActions = computed(() => [{ group: 'Order', options: orderActions }, actionGroup.value].filter(Boolean))
 
 const fulfilAction = useAdminAction('orders.fulfil_order')
 
@@ -157,6 +159,8 @@ const loadFailure = computed(() =>
         <StatusBadge v-if="order.state.key === 'cancelled'" :status="order.state.key" :label="order.state.label" />
         <span class="text-sm text-ink-gray-5">{{ longDate(order.placed_on) }}</span>
       </div>
+
+      <OrderAppFailures class="mt-4" :order="order.name" />
 
       <!-- Where the order has reached, read left to right. -->
       <OrderProgress class="mt-6" :progress="order.progress" />
@@ -234,12 +238,8 @@ const loadFailure = computed(() =>
           <OrderCustomerPanel :order="order" />
         </section>
 
-        <div v-if="showAppEvents" class="rounded-5 border border-outline-gray-1 lg:hidden">
-          <OrderAppEventsPanel
-            :events="appEvents"
-            :loading="appEventsLoading"
-            @retried="appEventsRequest.reload()"
-          />
+        <div v-if="cards.length" class="space-y-6 lg:hidden">
+          <ExtensionSlot :entries="cards" :record="record" frame="stack" @reload="reloadExtensions" />
         </div>
       </div>
         </PageBody>
@@ -248,16 +248,12 @@ const loadFailure = computed(() =>
       <aside class="hidden w-[19rem] shrink-0 flex-col border-l border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
           <OrderCustomerPanel :order="order" />
-          <OrderAppEventsPanel
-            v-if="showAppEvents"
-            class="border-t border-outline-gray-1"
-            :events="appEvents"
-            :loading="appEventsLoading"
-            @retried="appEventsRequest.reload()"
-          />
+          <ExtensionSlot :entries="cards" :record="record" frame="rail" @reload="reloadExtensions" />
         </ScrollArea>
       </aside>
     </div>
+
+    <ExtensionActionDialog v-model:entry="openAction" :record="record" @reload="reloadExtensions" />
 
     <RefundDialog
       v-model:open="refundOpen"
