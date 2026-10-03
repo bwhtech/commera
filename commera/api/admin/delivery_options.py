@@ -35,7 +35,6 @@ OPTION_FIELDS = (
 	"markup_percent",
 	"handling_fee",
 	"backup_charge",
-	"shipping_rule",
 )
 
 
