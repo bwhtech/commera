@@ -8,7 +8,6 @@ import {
   SettingsBody,
   SettingsRow,
   Switch,
-  TabButtons,
   TextInput,
   toast,
 } from 'frappe-ui'
@@ -28,16 +27,11 @@ const props = defineProps({
 
 const emit = defineEmits(['back'])
 
-const CHARGE_KINDS = [
-  { label: 'Amount', value: 'amount' },
-  { label: 'Free', value: 'free' },
-]
-
 // The submit button sits outside the form, so `form` is what runs the name's `required`.
 const formId = useId()
 
 const isEdit = computed(() => Boolean(props.rule))
-const moneyPrefix = currencySymbol || props.currency
+const moneyUnit = currencySymbol || props.currency
 
 // '' is the "Any option" row: a band that names no delivery option.
 const optionChoices = computed(() => [
@@ -76,7 +70,6 @@ function toDraft(row) {
     from_value: String(row.from_value),
     to_value: row.to_value ? String(row.to_value) : '',
     shipping_amount: String(row.shipping_amount),
-    charge: row.free_shipping ? 'free' : 'amount',
     shipping_service: row.shipping_service,
   }
 }
@@ -86,8 +79,8 @@ function fromDraft(band) {
     key: band.key,
     from_value: Number(band.from_value) || 0,
     to_value: Number(band.to_value) || 0,
-    shipping_amount: band.charge === 'free' ? 0 : Number(band.shipping_amount) || 0,
-    free_shipping: band.charge === 'free',
+    shipping_amount: Number(band.shipping_amount) || 0,
+    free_shipping: !(Number(band.shipping_amount) > 0),
     shipping_service: band.shipping_service,
   }
 }
@@ -159,8 +152,15 @@ function optionLabel(row) {
   return optionTitles.value[row.shipping_service] ?? row.shipping_service
 }
 
-function chargeText(row) {
-  return row.free_shipping ? null : exactMoney(row.shipping_amount)
+function bandSentence(row) {
+  const price = row.free_shipping ? 'delivery is free' : `${exactMoney(row.shipping_amount)} is charged`
+  const from = exactMoney(row.from_value)
+  const to = exactMoney(row.to_value)
+
+  if (!row.from_value && !row.to_value) return `For every order, ${price}`
+  if (!row.to_value) return `For orders ${from} and above, ${price}`
+  if (!row.from_value) return `For orders up to ${to}, ${price}`
+  return `For orders ${from} to ${to}, ${price}`
 }
 
 async function save() {
@@ -260,11 +260,9 @@ async function save() {
                 @click="draft?.key === row.key ? cancelDraft() : editRow(row)"
               >
                 <span class="flex min-w-0 flex-1 flex-col">
-                  <span class="text-base font-medium text-ink-gray-8 tabular-nums">{{ formatBandRange(shown(row)) }}</span>
+                  <span class="text-base text-ink-gray-8 tabular-nums">{{ bandSentence(shown(row)) }}</span>
                   <span class="truncate text-p-sm text-ink-gray-5">{{ optionLabel(shown(row)) }}</span>
                 </span>
-                <Badge v-if="shown(row).free_shipping" label="Free" theme="green" />
-                <span v-else class="text-base font-medium text-ink-gray-8 tabular-nums">{{ chargeText(shown(row)) }}</span>
                 <span
                   class="lucide-chevron-down size-4 shrink-0 text-ink-gray-5 transition-transform"
                   :class="draft?.key === row.key ? 'rotate-180' : ''"
@@ -283,23 +281,15 @@ async function save() {
                       v-model="draft.from_value"
                       type="text"
                       inputmode="decimal"
-                      label="From"
-                    >
-                      <template #prefix>
-                        <span class="text-ink-gray-5">{{ moneyPrefix }}</span>
-                      </template>
-                    </TextInput>
+                      :label="`From (${moneyUnit})`"
+                    />
                     <TextInput
                       v-model="draft.to_value"
                       type="text"
                       inputmode="decimal"
-                      label="To"
+                      :label="`To (${moneyUnit})`"
                       placeholder="No limit"
-                    >
-                      <template #prefix>
-                        <span class="text-ink-gray-5">{{ moneyPrefix }}</span>
-                      </template>
-                    </TextInput>
+                    />
                   </div>
                   <Button
                     icon="lucide-trash-2"
@@ -310,24 +300,13 @@ async function save() {
                 </div>
 
                 <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div class="flex flex-col gap-1.5">
-                    <span class="text-xs text-ink-gray-5">Charge</span>
-                    <div class="flex items-center gap-2">
-                      <TabButtons v-model="draft.charge" :options="CHARGE_KINDS" />
-                      <TextInput
-                        v-if="draft.charge === 'amount'"
-                        v-model="draft.shipping_amount"
-                        class="min-w-0 flex-1"
-                        type="text"
-                        inputmode="decimal"
-                        aria-label="Charge"
-                      >
-                        <template #prefix>
-                          <span class="text-ink-gray-5">{{ moneyPrefix }}</span>
-                        </template>
-                      </TextInput>
-                    </div>
-                  </div>
+                  <TextInput
+                    v-model="draft.shipping_amount"
+                    type="text"
+                    inputmode="decimal"
+                    :label="`Charge (${moneyUnit})`"
+                    placeholder="0 for free delivery"
+                  />
                   <div class="flex flex-col gap-1.5">
                     <span class="text-xs text-ink-gray-5">Delivery option</span>
                     <Select v-model="draft.shipping_service" :options="optionChoices" aria-label="Delivery option" />
