@@ -275,30 +275,38 @@ async function save() {
               <div
                 v-if="draft?.key === row.key"
                 :id="`band-${row.key}`"
-                class="mb-3 flex flex-col gap-3 rounded-lg border border-outline-gray-2 p-3"
+                class="flex flex-col gap-3 pb-3"
               >
-                <div class="grid grid-cols-2 gap-2">
-                  <TextInput
-                    v-model="draft.from_value"
-                    type="text"
-                    inputmode="decimal"
-                    label="From"
-                  >
-                    <template #prefix>
-                      <span class="text-ink-gray-5">{{ moneyPrefix }}</span>
-                    </template>
-                  </TextInput>
-                  <TextInput
-                    v-model="draft.to_value"
-                    type="text"
-                    inputmode="decimal"
-                    label="To"
-                    placeholder="No limit"
-                  >
-                    <template #prefix>
-                      <span class="text-ink-gray-5">{{ moneyPrefix }}</span>
-                    </template>
-                  </TextInput>
+                <div class="flex items-start gap-2">
+                  <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
+                    <TextInput
+                      v-model="draft.from_value"
+                      type="text"
+                      inputmode="decimal"
+                      label="From"
+                    >
+                      <template #prefix>
+                        <span class="text-ink-gray-5">{{ moneyPrefix }}</span>
+                      </template>
+                    </TextInput>
+                    <TextInput
+                      v-model="draft.to_value"
+                      type="text"
+                      inputmode="decimal"
+                      label="To"
+                      placeholder="No limit"
+                    >
+                      <template #prefix>
+                        <span class="text-ink-gray-5">{{ moneyPrefix }}</span>
+                      </template>
+                    </TextInput>
+                  </div>
+                  <Button
+                    icon="lucide-trash-2"
+                    variant="ghost"
+                    aria-label="Remove band"
+                    @click="removeRow(row.key)"
+                  />
                 </div>
 
                 <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -337,10 +345,9 @@ async function save() {
                 </p>
 
                 <div class="flex items-center justify-end gap-2">
-                  <Button v-if="!draftIsNew" label="Remove" variant="ghost" theme="red" @click="removeRow(row.key)" />
                   <Button label="Cancel" @click="cancelDraft" />
                   <Button
-                    label="Done"
+                    label="Save"
                     variant="solid"
                     theme="gray"
                     :disabled="draftConflicts.length > 0"
