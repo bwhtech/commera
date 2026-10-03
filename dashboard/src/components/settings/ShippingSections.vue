@@ -21,21 +21,21 @@ function setSection(section, open) {
   <!-- Sized like the carriers above it (IntegrationTabPanel): no tail padding while stacked,
        the whole column once it takes over. -->
   <div
-    v-if="!takeover || openSection === 'options'"
+    v-if="!takeover || openSection === 'rules'"
     class="flex flex-col"
     :class="takeover ? 'min-h-0 flex-1' : '[&_[data-slot=scroll-area-viewport]]:pb-0'"
   >
-    <DeliveryOptionsPanel
-      :configuring="openSection === 'options'"
+    <ShippingRulesPanel
+      :configuring="openSection === 'rules'"
       :active="active"
-      @update:configuring="setSection('options', $event)"
+      @update:configuring="setSection('rules', $event)"
     />
   </div>
 
-  <ShippingRulesPanel
-    v-if="!takeover || openSection === 'rules'"
-    :configuring="openSection === 'rules'"
+  <DeliveryOptionsPanel
+    v-if="!takeover || openSection === 'options'"
+    :configuring="openSection === 'options'"
     :active="active"
-    @update:configuring="setSection('rules', $event)"
+    @update:configuring="setSection('options', $event)"
   />
 </template>
