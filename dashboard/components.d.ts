@@ -57,6 +57,7 @@ declare module 'vue' {
     NavInspector: typeof import('./src/components/storefront/NavInspector.vue')['default']
     NavSection: typeof import('./src/components/NavSection.vue')['default']
     OptionSizeGrid: typeof import('./src/components/OptionSizeGrid.vue')['default']
+    OrderAppEventsPanel: typeof import('./src/components/OrderAppEventsPanel.vue')['default']
     OrderCustomerPanel: typeof import('./src/components/OrderCustomerPanel.vue')['default']
     OrderProgress: typeof import('./src/components/OrderProgress.vue')['default']
     PageBody: typeof import('./src/components/PageBody.vue')['default']

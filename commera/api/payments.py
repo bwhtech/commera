@@ -23,6 +23,8 @@ from commera.api.shipping import (
 	reprice_selected_option,
 )
 from commera.api.signup import get_placeholder_first_name, validate_single_email, validate_user_names
+from commera.app_events import fire_event
+from commera.checkout_hooks import apply_app_fees, get_cart_refusal
 from commera.core import _get_cart_quotation, create_party, get_customer_contact, new_cart_quotation
 from commera.guest import (
 	get_guest_cart_name,
@@ -32,7 +34,6 @@ from commera.guest import (
 	validate_guest_checkout_enabled,
 )
 from commera.order_access import get_order_link, set_order_access_key
-from commera.order_events import fire_order_event
 from commera.utils import get_pickup_addresses, get_pickup_warehouses
 
 
@@ -143,7 +144,9 @@ def open_checkout(
 ):
 	validate_delivery_option(quotation, delivery_option)
 	validate_cart_is_not_in_checkout(quotation.name)
+	quotation.flags.strict_app_fees = True
 	update_delivery_charges(quotation)
+	validate_cart(quotation)
 	validate_expected_total(quotation, payment_mode, expected_total)
 
 	if is_cod(payment_mode):
@@ -205,6 +208,12 @@ def get_gateway_customer(quotation) -> dict:
 			"phone",
 		),
 	}
+
+
+def validate_cart(quotation):
+	if refusal := get_cart_refusal(quotation):
+		# Not refuse_payment: the shopper can fix this, so it is no error to log.
+		frappe.throw(refusal)
 
 
 def validate_delivery_option(quotation, delivery_option: str | None):
@@ -342,9 +351,9 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 	# Outside the switch: log_purchase stamps frappe.session.user, so Administrator would own every purchase.
 	stamp_order_owner(sales_order, shopper)
 	log_purchase(sales_order)
-	fire_order_event("order_placed", sales_order.name)
+	fire_event("order_placed", "Sales Order", sales_order.name)
 	if flt(gateway_amount) > 0:
-		fire_order_event("order_paid", sales_order.name)
+		fire_event("order_paid", "Sales Order", sales_order.name)
 	return sales_order
 
 
@@ -486,6 +495,7 @@ def set_charges(quotation):
 		quotation.shipping_rule = shipping_rule
 		quotation.run_method("apply_shipping_rule")
 		quotation.run_method("calculate_taxes_and_totals")
+	apply_app_fees(quotation)
 
 
 def set_cod_charges(quotation):
@@ -737,6 +747,11 @@ def quotation_purchase_summary(quotation_name: str):
 def place_cod_order(quotation_name: str):
 	quotation = frappe.get_doc("Quotation", quotation_name)
 	shopper = get_order_shopper(quotation)
+	quotation.flags.strict_app_fees = True
+	# Repriced here too: the fee a cart edit left out after a hook failed must not slip into the order.
+	apply_app_fees(quotation)
+	# Again here: a COD confirmation can be posted without ever opening checkout.
+	validate_cart(quotation)
 	with system_user_session():
 		set_cod_charges(quotation)
 		quotation.flags.ignore_permissions = True
@@ -752,7 +767,7 @@ def place_cod_order(quotation_name: str):
 	# COD orders count as purchases even while the Sales Order stays draft.
 	stamp_order_owner(sales_order, shopper)
 	log_purchase(sales_order)
-	fire_order_event("order_placed", sales_order.name)
+	fire_event("order_placed", "Sales Order", sales_order.name)
 	return sales_order
 
 
@@ -867,6 +882,7 @@ def update_delivery_charges(quotation):
 		# A cart saved as a pickup before the owner switched pickup off must not reach payment as one.
 		validate_store_pickup(quotation.custom_store)
 		clear_pickup_charges(quotation)
+		apply_app_fees(quotation)
 		save_cart_quotation(quotation)
 		return
 

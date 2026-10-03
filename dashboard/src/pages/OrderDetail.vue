@@ -8,6 +8,7 @@ import PageBody from '../components/PageBody.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import OrderProgress from '../components/OrderProgress.vue'
 import OrderCustomerPanel from '../components/OrderCustomerPanel.vue'
+import OrderAppEventsPanel from '../components/OrderAppEventsPanel.vue'
 import Thumb from '../components/Thumb.vue'
 import RefundDialog from '../components/RefundDialog.vue'
 import { useAdminRead, useAdminAction, useMethodRead } from '../data/api'
@@ -32,11 +33,21 @@ const refundStatusRequest = useMethodRead('commera.api.orders.get_sales_order_re
 const refundStatus = computed(() => refundStatusRequest.data ?? {})
 const refundOpen = ref(false)
 
+const appEventsRequest = useAdminRead('orders.get_order_app_events', {
+  params: () => ({ sales_order: route.params.id }),
+  refetch: true,
+})
+const appEvents = computed(() => appEventsRequest.data ?? [])
+const appEventsLoading = computed(() => appEventsRequest.loading && !appEventsRequest.data)
+// No installed app listens to order events on most stores, so the card only exists when one did.
+const showAppEvents = computed(() => appEventsLoading.value || appEvents.value.length > 0)
+
 watch(
   () => route.params.id,
   () => {
     orderRequest.reload()
     refundStatusRequest.reload()
+    appEventsRequest.reload()
   },
 )
 
@@ -204,6 +215,13 @@ const loadFailure = computed(() =>
               <div class="flex justify-between text-base text-ink-gray-6">
                 <span>Tax</span><span class="tabular-nums">{{ money(order.tax) }}</span>
               </div>
+              <div
+                v-for="fee in order.app_fees"
+                :key="fee.description"
+                class="flex justify-between text-base text-ink-gray-6"
+              >
+                <span>{{ fee.description }}</span><span class="tabular-nums">{{ money(fee.amount) }}</span>
+              </div>
               <div class="flex justify-between pt-1 text-base-semibold text-ink-gray-9">
                 <span>Total</span><span class="tabular-nums">{{ money(order.grand_total) }}</span>
               </div>
@@ -215,6 +233,14 @@ const loadFailure = computed(() =>
         <section class="rounded-5 border border-outline-gray-1 lg:hidden">
           <OrderCustomerPanel :order="order" />
         </section>
+
+        <div v-if="showAppEvents" class="rounded-5 border border-outline-gray-1 lg:hidden">
+          <OrderAppEventsPanel
+            :events="appEvents"
+            :loading="appEventsLoading"
+            @retried="appEventsRequest.reload()"
+          />
+        </div>
       </div>
         </PageBody>
       </ScrollArea>
@@ -222,6 +248,13 @@ const loadFailure = computed(() =>
       <aside class="hidden w-[19rem] shrink-0 flex-col border-l border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
           <OrderCustomerPanel :order="order" />
+          <OrderAppEventsPanel
+            v-if="showAppEvents"
+            class="border-t border-outline-gray-1"
+            :events="appEvents"
+            :loading="appEventsLoading"
+            @retried="appEventsRequest.reload()"
+          />
         </ScrollArea>
       </aside>
     </div>

@@ -240,6 +240,12 @@
 					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(tax.amount) }}</h6>
 				</div>
 				{% endfor %}
+				{% for fee in charge_lines.app_fees %}
+				<div class="tracking-item-content">
+					<span>{{ fee.description }}</span>
+					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(fee.amount) }}</h6>
+				</div>
+				{% endfor %}
 				{% if order.rounding_adjustment %}
 				<div class="tracking-item-content">
 					<span>{{ _("Rounding Adjustment") }}</span>

@@ -13,6 +13,7 @@ from frappe.utils import add_days, cint, create_batch, cstr, flt, get_datetime, 
 from frappe.utils.data import strip_html
 from pypika import Order
 
+from commera.app_events import STORE_ORDER_TYPE, fire_event
 from commera.core import get_address_docs, get_party
 from commera.order_access import get_key_access
 
@@ -676,19 +677,29 @@ SHIPMENT_STATUS_LADDER = {
 	"Delivered": "Delivered",
 	"RTO": "Returned",
 }
+# A parcel can skip Shipped (a Delivery Note with no carrier), so Delivered also announces it fulfilled first.
+FULFILMENT_EVENTS = {"Shipped": ("order_fulfilled",), "Delivered": ("order_fulfilled", "order_delivered")}
 
 
 def update_sales_order_ecommerce_status(sales_order_name):
-	docstatus = frappe.db.get_value("Sales Order", sales_order_name, "docstatus")
+	order = frappe.db.get_value(
+		"Sales Order",
+		sales_order_name,
+		["docstatus", "custom_ecommerce_status", "order_type"],
+		as_dict=True,
+	)
 
-	if docstatus == 2:
+	if order.docstatus == 2:
 		new_status = "Cancelled"
-	elif docstatus == 0:
+	elif order.docstatus == 0:
 		new_status = "Waiting for Approval"
 	else:
 		new_status = get_fulfilment_status(sales_order_name)
 
 	frappe.db.set_value("Sales Order", sales_order_name, "custom_ecommerce_status", new_status)
+	if order.order_type == STORE_ORDER_TYPE and new_status != order.custom_ecommerce_status:
+		for event in FULFILMENT_EVENTS.get(new_status, ()):
+			fire_event(event, "Sales Order", sales_order_name)
 
 
 def get_fulfilment_status(sales_order_name) -> str:

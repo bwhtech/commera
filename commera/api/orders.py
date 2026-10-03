@@ -4,7 +4,7 @@ from frappe import _
 from frappe.utils import flt
 
 from commera.api.payments import system_user_session
-from commera.order_events import OrderCancelRefused
+from commera.app_events import OrderCancelRefused, fire_order_refunded
 from commera.utils import update_sales_order_ecommerce_status, validate_document_access
 
 
@@ -135,6 +135,12 @@ def submit_refund_payment_entry(order_id: str, payment_entry_doc, refund_amount:
 		new_payment_entry.insert(ignore_permissions=True)
 		new_payment_entry.submit()
 
+	# Fired here too: cancel_order unlinks the capture first, so the Payment Entry hook can't find the order.
+	order = frappe.db.get_value(
+		"Sales Order", order_id, ["name", "currency", "conversion_rate"], as_dict=True
+	)
+	order.refunded_amount = new_payment_entry.received_amount
+	fire_order_refunded(new_payment_entry, [order])
 	return new_payment_entry.name
 
 

@@ -134,14 +134,23 @@ doc_events = {
 		"on_submit": [
 			"commera.jobs.send_order_success_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
+			"commera.app_events.on_sales_order_stock_reservation",
 		],
-		"before_cancel": "commera.order_events.check_order_cancel_hooks",
+		"before_cancel": "commera.app_events.check_order_cancel_hooks",
 		"on_cancel": [
 			"commera.jobs.send_order_cancel_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
+			"commera.app_events.on_sales_order_cancel",
+			"commera.app_events.on_sales_order_stock_reservation",
 		],
 	},
-	"Stock Ledger Entry": {"after_insert": ["commera.jobs.send_product_back_in_stock_email"]},
+	"Stock Ledger Entry": {
+		"after_insert": [
+			"commera.jobs.send_product_back_in_stock_email",
+			"commera.app_events.on_stock_ledger_entry_insert",
+		]
+	},
+	"Item": {"on_update": "commera.app_events.on_item_update"},
 	"Style Attribute Variant": {
 		"on_update": "commera.search.sync.on_update",
 		"after_rename": "commera.search.sync.after_rename",
@@ -153,7 +162,7 @@ doc_events = {
 		"on_trash": "commera.search.sync.on_trash",
 	},
 	"Sales Invoice": {"on_submit": "commera.utils.update_so_status_from_related_doc"},
-	"Payment Entry": {"on_submit": "commera.order_events.on_payment_entry_submit"},
+	"Payment Entry": {"on_submit": "commera.app_events.on_payment_entry_submit"},
 	"Delivery Note": {
 		"after_insert": "commera.utils.update_so_status_from_related_doc",
 		"on_submit": "commera.utils.update_so_status_from_related_doc",
@@ -196,7 +205,8 @@ user_data_fields = [
 ignore_links_on_delete = [
 	"Bulk Image Upload Log",
 	"Bulk Style Attribute Configurator Creation Log",
-	"Commera Order Event",
+	"Commera Event",
+	"Commera Event Delivery",
 ]
 
 # Apps
@@ -425,9 +435,7 @@ before_tests = "commera.install.before_tests"
 # Automatically update python controller files with type annotations for this app.
 export_python_type_annotations = True
 
-# default_log_clearing_doctypes = {
-# 	"Logging DocType Name": 30  # days to retain logs
-# }
+default_log_clearing_doctypes = {"Commera Event": 14}
 
 fixtures = [
 	{
@@ -443,6 +451,14 @@ fixtures = [
 ]
 
 scheduler_events = {
+	# Cron entries still only fire on the scheduler tick (scheduler_tick_interval, 4 minutes by default),
+	# so a retry due after 1 minute really runs up to a tick later.
+	"cron": {
+		"* * * * *": ["commera.app_events.run_due_deliveries"],
+	},
+	"hourly": [
+		"commera.app_events.sweep_missed_cod_payments",
+	],
 	# Long queue, not the short one: sync_status() is a gateway round-trip per pending request, so a
 	# slow gateway would otherwise sit on a worker the whole storefront shares.
 	"hourly_long": [

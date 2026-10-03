@@ -567,10 +567,13 @@ def get_order_charges(order):
 	precision = frappe.get_precision("Sales Order", "grand_total", order.currency)
 	shipping = flt(charge_lines["shipping"], precision)
 	cod_charge = flt(charge_lines["cod_charge"], precision)
+	app_fees = charge_lines["app_fees"]
+	app_fee_total = flt(sum(fee["amount"] for fee in app_fees), precision)
 	return {
 		"shipping": shipping,
 		"cod_charge": cod_charge,
-		"tax": flt(flt(order.total_taxes_and_charges) - shipping - cod_charge, precision),
+		"app_fees": app_fees,
+		"tax": flt(flt(order.total_taxes_and_charges) - shipping - cod_charge - app_fee_total, precision),
 	}
 
 
@@ -653,6 +656,7 @@ def get_order(sales_order: str):
 		# before the shipping connector was installed, or one that took the flat Shipping Rule.
 		"delivery_option": order.custom_delivery_option,
 		"cod_charge": charges["cod_charge"],
+		"app_fees": charges["app_fees"],
 		"tax": charges["tax"],
 		"total_taxes_and_charges": flt(order.total_taxes_and_charges),
 		"grand_total": flt(order.grand_total),
@@ -679,6 +683,46 @@ def get_order(sales_order: str):
 		"deliveries": lifecycle.get("printable_delivery_notes") or [],
 		"invoices": read_order_invoices(order.name),
 	}
+
+
+@frappe.whitelist()
+def get_order_app_events(sales_order: str):
+	frappe.has_permission("Sales Order", doc=sales_order, ptype="read", throw=True)
+
+	commera_event = frappe.qb.DocType("Commera Event")
+	delivery = frappe.qb.DocType("Commera Event Delivery")
+	rows = (
+		frappe.qb.from_(delivery)
+		.join(commera_event)
+		.on(commera_event.name == delivery.parent)
+		.select(
+			delivery.name.as_("delivery"),
+			commera_event.event,
+			delivery.app,
+			delivery.status,
+			delivery.attempts,
+			delivery.next_retry_at,
+			delivery.finished_at,
+			commera_event.creation,
+			delivery.last_error.as_("error_log"),
+		)
+		.where(commera_event.reference_doctype == "Sales Order")
+		.where(commera_event.reference_name == sales_order)
+		.orderby(commera_event.creation, order=Order.desc)
+		.orderby(delivery.idx)
+	).run(as_dict=True)
+
+	# An uninstalled app keeps its deliveries but has no hooks.py to read a title from.
+	installed_apps = set(frappe.get_installed_apps())
+	app_titles = {
+		app: (frappe.get_hooks("app_title", app_name=app) or [app])[0] if app in installed_apps else app
+		for app in {row.app for row in rows}
+	}
+	can_retry = "System Manager" in frappe.get_roles()
+	for row in rows:
+		row.app = app_titles[row.app]
+		row.can_retry = can_retry
+	return rows
 
 
 def read_payment_totals(order_name: str) -> tuple[float, float]:

@@ -350,6 +350,12 @@
 										<td class="price">{{ currency_symbol }}<span x-text="format_amount(tax.amount)"></span></td>
 									</tr>
 								</template>
+								<template x-for="(fee, index) in active_summary.app_fees" :key="index">
+									<tr class="app-fee">
+										<td x-text="fee.description"></td>
+										<td class="price">{{ currency_symbol }}<span x-text="format_amount(fee.amount)"></span></td>
+									</tr>
+								</template>
 								<tr class="cod-charge" x-show="active_summary.cod_charge" x-cloak>
 									<td>{{ _("Cash on Delivery Fee") }}</td>
 									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.cod_charge)"></span></td>

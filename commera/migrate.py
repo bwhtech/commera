@@ -5,6 +5,7 @@ from bwh_payments.bwh_payments.utils import get_available_payment_modes
 from frappe.model.sync import sync_for
 
 from commera.api.payments import COD_PAYMENT_MODE
+from commera.app_events import add_apps_user, validate_extension_apps
 from commera.commera_ecommerce.doctype.commera_settings.navbar.navbar_manager import (
 	seed_menu_when_empty,
 )
@@ -40,6 +41,7 @@ def after_install():
 	seed_default_routes()
 	activate_summer_theme()
 	seed_menu_when_empty()
+	add_apps_user()
 
 
 def activate_summer_theme():
@@ -51,12 +53,14 @@ def activate_summer_theme():
 
 def after_migrate():
 	create_payment_modes()
+	add_apps_user()
 	register_optional_doctype_links()
 	populate_search_settings()
 	ensure_storefront_search_index()
 	setup_robots_txt()
 	seed_llms_txt()
 	seed_default_routes()
+	validate_extension_apps()
 
 
 def populate_search_settings():
