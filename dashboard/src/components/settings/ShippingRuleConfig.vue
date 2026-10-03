@@ -312,6 +312,7 @@ async function save() {
                   />
                   <Combobox
                     v-model="draft.shipping_service"
+                    trigger="button"
                     label="Delivery option"
                     placeholder="Search delivery options"
                     :options="optionChoices"
