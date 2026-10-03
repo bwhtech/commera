@@ -158,7 +158,6 @@ function bandSentence(row) {
 
   if (!row.from_value && !row.to_value) return `For every order, ${price}`
   if (!row.to_value) return `For orders ${from} and above, ${price}`
-  if (!row.from_value) return `For orders up to ${to}, ${price}`
   return `For orders ${from} to ${to}, ${price}`
 }
 
