@@ -9,10 +9,11 @@ def commera_commands():
 	"""Commera tools for apps that extend the Commera dashboard."""
 
 
-@commera_commands.command("init")
+# After an app name bench runs its own command of the same name (init, setup, new-app...), so avoid those.
+@commera_commands.command("scaffold")
 @click.argument("app")
 @click.option("--skip-install", is_flag=True, default=False, help="Do not run yarn install in the app")
-def init(app: str, skip_install: bool):
+def scaffold(app: str, skip_install: bool):
 	"""Set up APP to add pages, cards, actions and settings to the Commera dashboard."""
 	from frappe.utils import get_bench_path
 

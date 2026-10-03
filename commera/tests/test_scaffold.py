@@ -48,7 +48,7 @@ class TestScaffold(UnitTestCase):
 		self.apps_path = Path(self.directory.name)
 		self.addCleanup(self.directory.cleanup)
 
-	def test_init_adds_every_piece_to_a_new_app(self):
+	def test_scaffold_adds_every_piece_to_a_new_app(self):
 		app_root = make_app(self.apps_path)
 		created = {path for change, path in AppScaffold(APP, self.apps_path).save() if change == "created"}
 
@@ -79,7 +79,7 @@ class TestScaffold(UnitTestCase):
 		self.assertIn("commera/vite.config.js", created)
 		self.assertNotIn(f"{APP}/public/.gitkeep", created)
 
-	def test_second_init_changes_nothing(self):
+	def test_second_scaffold_changes_nothing(self):
 		app_root = make_app(self.apps_path)
 		AppScaffold(APP, self.apps_path).save()
 		before = read_tree(app_root)
@@ -89,7 +89,7 @@ class TestScaffold(UnitTestCase):
 		self.assertEqual({change for change, path in changes}, {"skipped"})
 		self.assertEqual(read_tree(app_root), before)
 
-	def test_init_keeps_existing_files_and_adds_missing_entries(self):
+	def test_scaffold_keeps_existing_files_and_adds_missing_entries(self):
 		app_root = make_app(self.apps_path)
 		hooks_path = app_root / APP / "hooks.py"
 		hooks_path.write_text(
@@ -142,7 +142,7 @@ class TestScaffold(UnitTestCase):
 			"\ndoc_events = {}\n",
 		)
 
-	def test_init_refuses_commera_and_missing_apps(self):
+	def test_scaffold_refuses_commera_and_missing_apps(self):
 		make_app(self.apps_path)
 		with self.assertRaisesRegex(click.ClickException, "host app"):
 			AppScaffold("commera", self.apps_path)

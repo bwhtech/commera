@@ -33,7 +33,7 @@ you don't use.
 
 ## Starters
 
-`bench commera init` wrote a starter page that calls `$app_name.api.get_summary` in `$app_name/api.py`.
+`bench commera scaffold` wrote a starter page that calls `$app_name.api.get_summary` in `$app_name/api.py`.
 The starters below put their whitelisted methods in that same file.
 
 ### A page: `pages/<name>/index.vue`
