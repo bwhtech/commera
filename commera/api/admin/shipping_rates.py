@@ -35,7 +35,7 @@ def get_store_company() -> str | None:
 
 
 def get_store_rule_name() -> str | None:
-	return frappe.db.get_single_value(SETTINGS_DOCTYPE, "shipping_rule")
+	return frappe.db.get_single_value(SETTINGS_DOCTYPE, "shipping_rule") or None
 
 
 def build_rules(company: str) -> list[dict]:

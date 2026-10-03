@@ -104,7 +104,7 @@ class TestAdminShippingRules(IntegrationTestCase):
 		self.assertEqual(rule.company, company)
 		self.assertEqual(frappe.db.get_value("Account", rule.account, "company"), company)
 		self.assertEqual(frappe.db.get_value("Cost Center", rule.cost_center, "company"), company)
-		self.assertIsNone(frappe.db.get_single_value("Commera Settings", "shipping_rule"))
+		self.assertFalse(frappe.db.get_single_value("Commera Settings", "shipping_rule"))
 		self.assertEqual(get_band_ranges(get_rule(get_shipping_rules(), name)), [(0, 999)])
 
 	def test_create_with_use_at_checkout_links_it_on_commera_settings(self):
@@ -222,7 +222,7 @@ class TestAdminShippingRules(IntegrationTestCase):
 
 		with self.assertRaises(frappe.ValidationError):
 			set_store_rule(rule.name)
-		self.assertIsNone(frappe.db.get_single_value("Commera Settings", "shipping_rule"))
+		self.assertFalse(frappe.db.get_single_value("Commera Settings", "shipping_rule"))
 
 	def test_delete_is_refused_while_checkout_uses_the_rule(self):
 		name = self.create_rule(use_at_checkout=1)
