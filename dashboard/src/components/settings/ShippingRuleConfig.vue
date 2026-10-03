@@ -62,6 +62,7 @@ const label = ref('')
 const useAtCheckout = ref(props.inUse)
 const rows = ref((props.rule?.bands ?? []).map(toRow))
 const saving = ref(false)
+const savingBand = ref(false)
 const serverError = ref('')
 
 // The one band open for editing, as a draft; the list keeps the saved copy until Done.
@@ -137,16 +138,44 @@ const draftConflicts = computed(() => {
   return [...new Set(conflicts.map(describeConflict))]
 })
 
-function applyDraft() {
-  if (draftConflicts.value.length) return
-  const updated = fromDraft(draft.value)
-  rows.value = rows.value
-    .map((row) => (row.key === updated.key ? updated : row))
-    .sort((first, second) => first.from_value - second.from_value)
+// An existing rule stores each band change at once; a new rule keeps them until Add creates it.
+async function commitRows(nextRows, successMessage) {
+  if (isEdit.value) {
+    savingBand.value = true
+    serverError.value = ''
+    try {
+      const { data, error } = await props.submit(buildPayload(nextRows))
+      if (!data) {
+        serverError.value = errorMessage(error)
+        return
+      }
+      toast.success(successMessage)
+    } finally {
+      savingBand.value = false
+    }
+  }
+  rows.value = nextRows
   closeDraft()
 }
 
-// While a band is open its header follows the draft, so the summary reads what Done will keep.
+async function saveDraft() {
+  if (draftConflicts.value.length) return
+  const updated = fromDraft(draft.value)
+  const nextRows = rows.value
+    .map((row) => (row.key === updated.key ? updated : row))
+    .sort((first, second) => first.from_value - second.from_value)
+  await commitRows(nextRows, 'Band saved')
+}
+
+async function removeDraftBand() {
+  if (draftIsNew.value) return cancelDraft()
+  await commitRows(
+    rows.value.filter((row) => row.key !== draft.value.key),
+    'Band removed',
+  )
+}
+
+// While a band is open its header follows the draft, so the summary reads what Save will keep.
 function shown(row) {
   return draft.value?.key === row.key ? fromDraft(draft.value) : row
 }
@@ -166,24 +195,26 @@ function bandSentence(row) {
   return `For orders ${from} to ${to}, ${price}`
 }
 
-async function save() {
-  saving.value = true
-  serverError.value = ''
-  try {
-    const conditions = rows.value.map((row) => ({
+function buildPayload(rowsToSave) {
+  return {
+    conditions: rowsToSave.map((row) => ({
       from_value: row.from_value,
       to_value: row.to_value,
       shipping_amount: row.free_shipping ? 0 : row.shipping_amount,
       free_shipping: row.free_shipping ? 1 : 0,
       shipping_service: row.shipping_service || '',
-    }))
+    })),
+    use_at_checkout: useAtCheckout.value ? 1 : 0,
     // The server refuses a label on an edit: it is the rule's name.
-    const payload = {
-      conditions,
-      use_at_checkout: useAtCheckout.value ? 1 : 0,
-      ...(isEdit.value ? {} : { label: label.value.trim() }),
-    }
-    const { data, error } = await props.submit(payload)
+    ...(isEdit.value ? {} : { label: label.value.trim() }),
+  }
+}
+
+async function save() {
+  saving.value = true
+  serverError.value = ''
+  try {
+    const { data, error } = await props.submit(buildPayload(rows.value))
     if (!data) {
       serverError.value = errorMessage(error)
       return
@@ -254,7 +285,17 @@ async function save() {
 
           <div class="divide-y divide-outline-gray-1">
             <div v-for="row in rows" :key="row.key">
-              <div class="flex items-center gap-3 py-2.5">
+              <div class="flex items-start gap-2 py-2.5">
+                <Button
+                  v-if="draft?.key === row.key"
+                  icon="lucide-trash-2"
+                  variant="ghost"
+                  theme="red"
+                  size="sm"
+                  aria-label="Remove band"
+                  :loading="savingBand"
+                  @click="removeDraftBand"
+                />
                 <div class="flex min-w-0 flex-1 flex-col">
                   <span class="text-base text-ink-gray-8 tabular-nums">{{ bandSentence(shown(row)) }}</span>
                   <span class="truncate text-p-sm text-ink-gray-5">{{ optionLabel(shown(row)) }}</span>
@@ -262,6 +303,7 @@ async function save() {
                 <Button
                   v-if="draft?.key !== row.key"
                   label="Edit"
+                  icon-left="lucide-pencil"
                   :disabled="Boolean(draft)"
                   @click="editRow(row)"
                 />
@@ -303,7 +345,7 @@ async function save() {
                 </div>
 
                 <p
-                  v-for="message in draftConflicts"
+                  v-for="message in [...draftConflicts, ...(serverError ? [serverError] : [])]"
                   :key="message"
                   class="flex items-start gap-1.5 text-p-sm text-ink-red-6"
                   role="alert"
@@ -312,21 +354,15 @@ async function save() {
                   {{ message }}
                 </p>
 
-                <div class="flex items-center gap-2 pt-2">
-                  <Button
-                    label="Remove band"
-                    icon-left="lucide-trash-2"
-                    variant="ghost"
-                    theme="red"
-                    @click="removeRow(row.key)"
-                  />
-                  <Button class="ml-auto" label="Cancel" @click="cancelDraft" />
+                <div class="flex items-center justify-end gap-2 pt-2">
+                  <Button label="Cancel" @click="cancelDraft" />
                   <Button
                     label="Save"
                     variant="solid"
                     theme="gray"
+                    :loading="savingBand"
                     :disabled="draftConflicts.length > 0"
-                    @click="applyDraft"
+                    @click="saveDraft"
                   />
                 </div>
               </div>
@@ -349,7 +385,7 @@ async function save() {
           </div>
 
           <p
-            v-if="serverError"
+            v-if="serverError && !draft"
             class="flex items-start gap-1.5 text-p-sm text-ink-red-6"
             role="alert"
           >
