@@ -254,55 +254,38 @@ async function save() {
 
           <div class="divide-y divide-outline-gray-1">
             <div v-for="row in rows" :key="row.key">
-              <button
-                type="button"
-                class="flex w-full items-center gap-3 py-2.5 text-left disabled:cursor-default"
-                :disabled="Boolean(draft) && draft.key !== row.key"
-                :aria-expanded="draft?.key === row.key"
-                :aria-controls="`band-${row.key}`"
-                @click="draft?.key === row.key ? cancelDraft() : editRow(row)"
-              >
-                <span class="flex min-w-0 flex-1 flex-col">
+              <div class="flex items-center gap-3 py-2.5">
+                <div class="flex min-w-0 flex-1 flex-col">
                   <span class="text-base text-ink-gray-8 tabular-nums">{{ bandSentence(shown(row)) }}</span>
                   <span class="truncate text-p-sm text-ink-gray-5">{{ optionLabel(shown(row)) }}</span>
-                </span>
-                <span
-                  class="lucide-chevron-down size-4 shrink-0 text-ink-gray-5 transition-transform"
-                  :class="draft?.key === row.key ? 'rotate-180' : ''"
-                  aria-hidden="true"
+                </div>
+                <Button
+                  v-if="draft?.key !== row.key"
+                  label="Edit"
+                  :disabled="Boolean(draft)"
+                  @click="editRow(row)"
                 />
-              </button>
+              </div>
 
               <div
                 v-if="draft?.key === row.key"
                 :id="`band-${row.key}`"
                 class="flex flex-col gap-4 pb-4"
               >
-                <div class="flex items-start gap-2">
-                  <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
-                    <TextInput
-                      v-model="draft.from_value"
-                      type="text"
-                      inputmode="decimal"
-                      :label="`From (${moneyUnit})`"
-                    />
-                    <TextInput
-                      v-model="draft.to_value"
-                      type="text"
-                      inputmode="decimal"
-                      :label="`To (${moneyUnit})`"
-                      placeholder="No limit"
-                    />
-                  </div>
-                  <Button
-                    icon="lucide-trash-2"
-                    variant="ghost"
-                    aria-label="Remove band"
-                    @click="removeRow(row.key)"
+                <div class="grid grid-cols-1 gap-x-2 gap-y-4 sm:grid-cols-2">
+                  <TextInput
+                    v-model="draft.from_value"
+                    type="text"
+                    inputmode="decimal"
+                    :label="`From (${moneyUnit})`"
                   />
-                </div>
-
-                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <TextInput
+                    v-model="draft.to_value"
+                    type="text"
+                    inputmode="decimal"
+                    :label="`To (${moneyUnit})`"
+                    placeholder="No limit"
+                  />
                   <TextInput
                     v-model="draft.shipping_amount"
                     type="text"
@@ -329,8 +312,15 @@ async function save() {
                   {{ message }}
                 </p>
 
-                <div class="flex items-center justify-end gap-2 pt-2">
-                  <Button label="Cancel" @click="cancelDraft" />
+                <div class="flex items-center gap-2 pt-2">
+                  <Button
+                    label="Remove band"
+                    icon-left="lucide-trash-2"
+                    variant="ghost"
+                    theme="red"
+                    @click="removeRow(row.key)"
+                  />
+                  <Button class="ml-auto" label="Cancel" @click="cancelDraft" />
                   <Button
                     label="Save"
                     variant="solid"
