@@ -92,7 +92,7 @@
                     JSON.stringify(cart_item.variant) === JSON.stringify(variant)
                 );
                 if (!found_item) return;
-                if ((found_item.qty + 1) > found_item.stock_qty) {
+                if (found_item.stock_qty !== null && (found_item.qty + 1) > found_item.stock_qty) {
                     toast(`Only ${found_item.stock_qty} left in stock.`, { type: "warning" });
                     return;
                 }

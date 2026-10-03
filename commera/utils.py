@@ -576,20 +576,38 @@ def get_available_stocks(item_codes, warehouse):
 		bin_by_item_code.update({cstr(row.item_code): row for row in bin_rows})
 
 	pos_reserved_by_item_code = get_pos_reserved_qtys(item_codes, warehouse)
+	unlimited_item_codes = get_unlimited_item_codes(item_codes)
 
 	stock_by_item_code = {}
 	for item_code in item_codes:
-		bin_data = bin_by_item_code.get(item_code)
-		if not bin_data:
-			stock_by_item_code[item_code] = {"stock_qty": 0, "in_stock": 0}
-			continue
+		bin_data = bin_by_item_code.get(item_code) or {}
 		actual_qty = (
-			flt(bin_data.actual_qty)
-			- flt(bin_data.reserved_qty)
+			flt(bin_data.get("actual_qty"))
+			- flt(bin_data.get("reserved_qty"))
 			- flt(pos_reserved_by_item_code.get(item_code))
 		)
-		stock_by_item_code[item_code] = {"stock_qty": actual_qty, "in_stock": int(actual_qty > 0)}
+		unlimited = item_code in unlimited_item_codes
+		stock_by_item_code[item_code] = {
+			"stock_qty": actual_qty,
+			"in_stock": int(unlimited or actual_qty > 0),
+			"unlimited": int(unlimited),
+		}
 	return stock_by_item_code
+
+
+def get_unlimited_item_codes(item_codes) -> set[str]:
+	"""Items sold without stock: drop-shipped by the supplier, or not stock-tracked by ERPNext at all."""
+	unlimited_item_codes = set()
+	for item_code_chunk in create_batch(item_codes, IN_CLAUSE_CHUNK_SIZE):
+		unlimited_item_codes.update(
+			frappe.get_all(
+				"Item",
+				filters={"name": ["in", item_code_chunk]},
+				or_filters={"delivered_by_supplier": 1, "is_stock_item": 0},
+				pluck="name",
+			)
+		)
+	return unlimited_item_codes
 
 
 def get_discount_percent(default_price, sale_price):

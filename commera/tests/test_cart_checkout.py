@@ -30,7 +30,7 @@ from commera.api.shipping import (
 )
 from commera.core import _get_cart_quotation
 from commera.tests.test_admin_orders import ensure_fiscal_year
-from commera.utils import get_pickup_addresses
+from commera.utils import get_available_stocks, get_pickup_addresses
 from commera.www.cart.checkout import get_context as get_checkout_context
 from commera.www.cart.checkout import get_store_pickup_addresses
 
@@ -88,7 +88,7 @@ class TestCartCheckout(IntegrationTestCase):
 		user.insert(ignore_permissions=True)
 		return email
 
-	def create_item(self, sale_rate: float | None) -> str:
+	def create_item(self, sale_rate: float | None, stock_qty: float = IN_STOCK_QTY, **item_fields) -> str:
 		item_code = f"ZZ-CART-{frappe.generate_hash(length=8)}"
 		frappe.get_doc(
 			{
@@ -98,6 +98,7 @@ class TestCartCheckout(IntegrationTestCase):
 				"item_group": frappe.get_all("Item Group", {"is_group": 0}, pluck="name", limit=1)[0],
 				"stock_uom": "Nos",
 				"is_stock_item": 1,
+				**item_fields,
 			}
 		).insert(ignore_permissions=True)
 
@@ -125,7 +126,7 @@ class TestCartCheckout(IntegrationTestCase):
 				"doctype": "Bin",
 				"item_code": item_code,
 				"warehouse": self.warehouse,
-				"actual_qty": IN_STOCK_QTY,
+				"actual_qty": stock_qty,
 			}
 		).insert(ignore_permissions=True)
 		return item_code
@@ -578,6 +579,47 @@ class TestCartCheckout(IntegrationTestCase):
 		shortfalls = get_stock_shortfalls([self.cart_line(self.discounted_item, 9)])
 
 		self.assertEqual(shortfalls, ["ZZ Cart Item - Requested: 9, In Stock: 4"])
+
+	def test_a_stock_item_with_no_stock_is_unavailable(self):
+		item_code = self.create_item(sale_rate=None, stock_qty=0)
+
+		self.assertEqual(
+			get_available_stocks([item_code], self.warehouse)[item_code],
+			{"stock_qty": 0, "in_stock": 0, "unlimited": 0},
+		)
+
+	def test_a_drop_ship_item_is_available_with_no_stock(self):
+		item_code = self.create_item(sale_rate=None, stock_qty=0, delivered_by_supplier=1)
+
+		self.assertEqual(
+			get_available_stocks([item_code], self.warehouse)[item_code],
+			{"stock_qty": 0, "in_stock": 1, "unlimited": 1},
+		)
+
+	def test_a_non_stock_item_is_available_with_no_bin(self):
+		item_code = self.create_item(sale_rate=None, is_stock_item=0)
+		frappe.db.delete("Bin", {"item_code": item_code})
+
+		self.assertEqual(
+			get_available_stocks([item_code], self.warehouse)[item_code],
+			{"stock_qty": 0, "in_stock": 1, "unlimited": 1},
+		)
+
+	def test_checkout_accepts_a_drop_ship_item_with_no_stock(self):
+		item_code = self.create_item(sale_rate=None, stock_qty=0, delivered_by_supplier=1)
+		frappe.set_user(self.shopper)
+
+		quotation = generate_quotation_for_cart({"items": [self.cart_line(item_code, 3)]})
+
+		self.assertEqual([(row.item_code, row.qty) for row in quotation.items], [(item_code, 3)])
+		self.assertEqual(get_stock_shortfalls([self.cart_line(item_code, 3)]), [])
+
+	def test_the_cart_does_not_cap_a_drop_ship_item(self):
+		item_code = self.create_item(sale_rate=None, stock_qty=0, delivered_by_supplier=1)
+
+		detail = get_detail_for_cart_items([self.cart_line(item_code, 1)])
+
+		self.assertIsNone(detail["stock_data"][item_code]["stock"])
 
 	# -- pricing ----------------------------------------------------------------------------------
 

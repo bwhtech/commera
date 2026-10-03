@@ -31,9 +31,9 @@
     sizes: {{ json.dumps(available_sizes) }},
     size_chart: {% if size_chart %}JSON.parse({{ size_chart|tojson }}){% else %}[]{% endif %},
     qty: 1,
-    max_qty: `{{selected_item['stock_detail']['stock_qty']|round|int}}`,
+    max_qty: {{ (none if selected_item['stock_detail']['unlimited'] else selected_item['stock_detail']['stock_qty']|round|int) | tojson }},
     increment() {
-        if (this.qty < this.max_qty) {
+        if (this.max_qty === null || this.qty < this.max_qty) {
         this.qty +=1; 
     }
     else { 
@@ -110,7 +110,7 @@
                             </div>
                         </template>
                     </div>
-                    {% if size_selected %}
+                    {% if size_selected and not selected_item['stock_detail']['unlimited'] %}
                         <p class="text-accent text-xs font-medium mb-3">
                             {% if product_in_stock %}
                             {{_('Only')}}
