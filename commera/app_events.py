@@ -5,15 +5,14 @@ from frappe import _
 from frappe.permissions import AUTOMATIC_ROLES
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Coalesce, Max, Min
-from frappe.utils import add_days, add_to_date, cstr, flt, now_datetime
+from frappe.utils import add_days, add_to_date, create_batch, cstr, flt, now_datetime
 from frappe.utils.background_jobs import get_job_status
 from pypika.terms import Case, ExistsCriterion
 from rq.job import JobStatus
 
-from commera.sdk import API_VERSION
+from commera.sdk import API_VERSION, STORE_ORDER_TYPE, as_apps_user
 from commera.sdk.events import CommeraEvent
 
-STORE_ORDER_TYPE = "Shopping Cart"
 APPS_USER = "commera-apps@commera.local"
 RETRY_DELAYS_IN_MINUTES = (1, 5, 30, 120, 360)
 # Well past the longest queue timeout, so only a worker that died mid-handler leaves a claim this old.
@@ -21,10 +20,6 @@ STALE_CLAIM_MINUTES = 30
 LANES_PER_SWEEP = 500
 COD_SWEEP_LOOKBACK_DAYS = 30
 EXTENDED_DOCTYPES = ("Sales Order", "Quotation", "Sales Invoice", "Item", "Customer")
-
-
-class OrderCancelRefused(frappe.ValidationError):
-	pass
 
 
 def fire_event(
@@ -141,13 +136,8 @@ def run_app_deliveries(app: str, reference_doctype: str, reference_name: str, la
 		fail_uninstalled_app_deliveries(app)
 		return
 
-	previous_user = frappe.session.user
-	# Audited: only ever runs as a background job, so there is no shopper session to hijack.
-	frappe.set_user(APPS_USER)  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
-	try:
+	with as_apps_user(app):
 		run_lane(app, reference_doctype, reference_name, lane_event)
-	finally:
-		frappe.set_user(previous_user)  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
 
 
 def fail_uninstalled_app_deliveries(app: str):
@@ -529,36 +519,117 @@ def get_captured_orders(payment_entry, sales_order):
 
 
 def on_item_update(doc, method=None):
-	if get_handlers("commera_product_updated") and is_listed_item(doc.name):
-		fire_event(
-			"product_updated",
-			"Item",
-			doc.name,
-			data={"item_code": doc.name},
-			key=frappe.generate_hash(length=10),
-			record_without_handlers=False,
+	# A new Item is a product being created or a size being added; the option save that lists it announces it.
+	if not doc.flags.in_insert:
+		add_changed_products([doc.variant_of or doc.name], "details")
+
+
+def on_style_attribute_variant_update(doc, method=None):
+	if not doc.flags.in_insert:
+		add_changed_products(
+			[doc.item_style], "published" if doc.has_value_changed("is_published") else "options"
 		)
+
+
+def on_item_price_change(doc, method=None):
+	if doc.selling and get_handlers("commera_product_updated"):
+		item_template = frappe.db.get_value("Item", doc.item_code, "variant_of") or doc.item_code
+		add_changed_products([item_template], "price")
+
+
+def get_variant_templates(variant_names: list[str]) -> set[str]:
+	# Imported here: commera.utils imports this module.
+	from commera.utils import IN_CLAUSE_CHUNK_SIZE
+
+	item_templates = set()
+	for variant_name_chunk in create_batch(variant_names, IN_CLAUSE_CHUNK_SIZE):
+		item_templates.update(
+			frappe.get_all(
+				"Style Attribute Variant",
+				filters={"name": ["in", variant_name_chunk]},
+				pluck="item_style",
+				distinct=True,
+			)
+		)
+	return item_templates
+
+
+def add_changed_products(item_templates: list[str] | set[str], change: str):
+	if not item_templates or not get_handlers("commera_product_updated"):
+		return
+
+	changed_products = frappe.local.flags.commera_changed_products
+	if changed_products is None:
+		changed_products = frappe.local.flags.commera_changed_products = defaultdict(set)
+		frappe.db.after_commit.add(enqueue_product_updated)
+		frappe.db.after_rollback.add(reset_changed_products)
+	for item_template in item_templates:
+		if item_template:
+			changed_products[cstr(item_template)].add(change)
+
+
+def reset_changed_products():
+	frappe.local.flags.pop("commera_changed_products", None)
+
+
+def enqueue_product_updated():
+	changed_products = frappe.local.flags.pop("commera_changed_products", None) or {}
+	for item_code, changes in changed_products.items():
+		# No job_id: deduplicating against a queued job would drop this transaction's changes.
+		frappe.enqueue(fire_product_updated, item_code=item_code, changed=sorted(changes))
+
+
+def fire_product_updated(item_code: str, changed: list[str]):
+	if not get_handlers("commera_product_updated") or not frappe.db.exists("Item", item_code):
+		return
+	# An unpublish can take the product off the storefront, and apps still need to hear about it.
+	if "published" not in changed and not is_listed_item(item_code):
+		return
+
+	fire_event(
+		"product_updated",
+		"Item",
+		item_code,
+		data={"item_code": item_code, "changed": changed},
+		key=frappe.generate_hash(length=10),
+		record_without_handlers=False,
+	)
 
 
 def is_listed_item(item_code: str) -> bool:
+	return cstr(item_code) in get_listed_items([item_code])
+
+
+def get_listed_items(item_codes: list[str]) -> set[str]:
 	"""An item is on the storefront when a published Style Attribute Variant sells it or is styled on it."""
+	# Imported here: commera.utils imports this module.
+	from commera.utils import IN_CLAUSE_CHUNK_SIZE
+
 	style_attribute_variant = DocType("Style Attribute Variant")
 	color_size_item = DocType("Color Size Item")
-	return bool(
-		frappe.qb.from_(style_attribute_variant)
-		.left_join(color_size_item)
-		.on(
-			(color_size_item.parent == style_attribute_variant.name)
-			& (color_size_item.parenttype == "Style Attribute Variant")
+	item_codes = {cstr(item_code) for item_code in item_codes}
+	listed_items = set()
+	for item_code_chunk in create_batch(list(item_codes), IN_CLAUSE_CHUNK_SIZE):
+		rows = (
+			frappe.qb.from_(style_attribute_variant)
+			.left_join(color_size_item)
+			.on(
+				(color_size_item.parent == style_attribute_variant.name)
+				& (color_size_item.parenttype == "Style Attribute Variant")
+			)
+			.select(color_size_item.item_code, style_attribute_variant.item_style)
+			.distinct()
+			.where(
+				(style_attribute_variant.is_published == 1)
+				& (
+					color_size_item.item_code.isin(item_code_chunk)
+					| style_attribute_variant.item_style.isin(item_code_chunk)
+				)
+			)
+			.run()
 		)
-		.select(style_attribute_variant.name)
-		.where(
-			(style_attribute_variant.is_published == 1)
-			& ((color_size_item.item_code == item_code) | (style_attribute_variant.item_style == item_code))
-		)
-		.limit(1)
-		.run()
-	)
+		listed_items.update(cstr(code) for row in rows for code in row if cstr(code) in item_codes)
+	return listed_items
 
 
 def on_stock_ledger_entry_insert(doc, method=None):
@@ -648,15 +719,6 @@ def sweep_missed_cod_payments():
 		fire_event("order_paid", "Sales Order", order_name)
 
 
-def check_order_cancel_hooks(doc, method=None):
-	if doc.get("order_type") != STORE_ORDER_TYPE:
-		return
-
-	for hook in get_handlers("commera_before_order_cancel"):
-		if reason := frappe.get_attr(hook)(doc):
-			frappe.throw(reason, exc=OrderCancelRefused)
-
-
 def on_sales_order_cancel(doc, method=None):
 	if doc.get("order_type") == STORE_ORDER_TYPE:
 		fire_event("order_cancelled", "Sales Order", doc.name)
@@ -707,3 +769,25 @@ def get_unprefixed_custom_fields(apps: list[str]) -> list:
 		.run(as_dict=True)
 	)
 	return [field for field in custom_fields if not field.fieldname.startswith(f"{field.app_name}_")]
+
+
+def get_app_fieldnames(doctype: str) -> list[str]:
+	"""The columns on `doctype` named `<app>_...` after an installed Commera app."""
+	prefixes = tuple(f"{app}_" for app in get_extension_apps())
+	if not prefixes:
+		return []
+	return [
+		fieldname
+		for fieldname in frappe.get_meta(doctype).get_valid_columns()
+		if fieldname.startswith(prefixes)
+	]
+
+
+def validate_app_fieldnames(doctype: str, fieldnames) -> None:
+	if not_app_fields := {cstr(fieldname) for fieldname in fieldnames} - set(get_app_fieldnames(doctype)):
+		frappe.throw(
+			_("{0} is not a field an installed Commera app owns on {1}.").format(
+				", ".join(sorted(not_app_fields)), _(doctype)
+			),
+			frappe.ValidationError,
+		)

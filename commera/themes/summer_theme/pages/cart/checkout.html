@@ -396,7 +396,7 @@
 														:id="'shipping_option_' + index" :value="option.title"
 														x-model="selected_shipping_option">
 													<label class="form-check-label" :for="'shipping_option_' + index">
-														<span x-text="option.title"></span>
+														<span x-text="option.label || option.title"></span>
 														<span x-show="option.is_free"> &mdash; {{ _("Free") }}</span>
 														<span x-show="!option.is_free" x-cloak>
 															&mdash; {{ currency_symbol }}<span x-text="format_amount(option.amount)"></span>

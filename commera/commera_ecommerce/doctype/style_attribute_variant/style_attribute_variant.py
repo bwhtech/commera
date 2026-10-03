@@ -12,6 +12,7 @@ from commera.api.variant_pricing import (
 	get_selling_price_lists,
 	insert_item_prices,
 )
+from commera.app_events import add_changed_products
 
 
 class StyleAttributeVariant(Document):
@@ -168,6 +169,8 @@ class StyleAttributeVariant(Document):
 				frappe.db.set_value("Item Price", existing_price.name, "price_list_rate", rate)
 				updated_count += 1
 
+		if updated_count:
+			add_changed_products([self.item_style], "price")
 		return {"created": insert_item_prices(price_rows_to_insert), "updated": updated_count}
 
 	@frappe.whitelist(methods=["POST"])

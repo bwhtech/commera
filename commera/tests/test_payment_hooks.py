@@ -50,12 +50,8 @@ ITEM_RATE = 150.0
 CANCEL_REFUSAL = "Printful is already producing this order."
 
 
-def refuse_cancel(sales_order):
-	return f"{CANCEL_REFUSAL} ({sales_order.name})"
-
-
-def allow_cancel(sales_order):
-	return None
+def refuse_cancel(sales_order, method=None):
+	frappe.throw(f"{CANCEL_REFUSAL} ({sales_order.name})")
 
 
 def record_app_event(event):
@@ -775,15 +771,31 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		self.assertEqual(self.app_events(sales_order.name), ["order_paid", "order_placed"])
 
-	def test_an_app_can_refuse_a_cancel_with_its_own_reason(self):
-		patch_app_hooks(self, {"commera_before_order_cancel": [f"{__name__}.refuse_cancel"]})
+	def test_an_app_before_cancel_refusal_reaches_the_user_without_an_error_log(self):
+		doc_events = frappe.get_doc_hooks()
+		sales_order_events = doc_events.get("Sales Order", {})
+		doc_events_patch = patch.object(
+			frappe.local,
+			"doc_events_hooks",
+			{
+				**doc_events,
+				"Sales Order": {
+					**sales_order_events,
+					"before_cancel": [
+						*sales_order_events.get("before_cancel", []),
+						f"{__name__}.refuse_cancel",
+					],
+				},
+			},
+		)
+		doc_events_patch.start()
+		self.addCleanup(doc_events_patch.stop)
 		sales_order = self.place_cod_order_for_cart()
 		started_at = now_datetime()
 
 		with self.assertRaises(frappe.ValidationError) as raised:
 			cancel_order(sales_order.name)
 
-		# The hook gets the live Sales Order, so it can read any field without another query.
 		self.assertIn(f"{CANCEL_REFUSAL} ({sales_order.name})", str(raised.exception))
 		self.assertNotEqual(frappe.db.get_value("Sales Order", sales_order.name, "docstatus"), 2)
 		# Error Logs outlive the rollback, and rolled-back order names get reused, so only count this run's.
@@ -794,14 +806,6 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 			),
 			"a refusal is the app's answer, not a failure to log",
 		)
-
-	def test_a_cancel_every_app_allows_goes_through(self):
-		patch_app_hooks(self, {"commera_before_order_cancel": [f"{__name__}.allow_cancel"]})
-		sales_order = self.place_cod_order_for_cart()
-
-		cancel_order(sales_order.name)
-
-		self.assertEqual(frappe.db.get_value("Sales Order", sales_order.name, "docstatus"), 2)
 
 	def run_enqueued_jobs_now(self):
 		"""Route jobs through the real frappe.enqueue, run inline, so its own keywords can't swallow the job's."""

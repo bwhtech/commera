@@ -76,6 +76,65 @@ def get_app_fee_row(fee: dict, precision: int) -> dict | None:
 	}
 
 
+def apply_delivery_option_hooks(quotation, options: list[dict], strict: bool) -> list[dict]:
+	"""Each handler gets the options the previous one returned; a failing handler's answer is dropped."""
+	precision = quotation.precision("tax_amount", "taxes")
+	for handler in get_handlers("commera_delivery_options"):
+		with handle_hook_error("commera_delivery_options", handler, quotation, strict):
+			hooked_options = frappe.get_attr(handler)(quotation, [dict(option) for option in options])
+			options = get_hooked_delivery_options(options, hooked_options, precision)
+	return options
+
+
+def get_hooked_delivery_options(options: list[dict], hooked_options, precision: int) -> list[dict]:
+	if not isinstance(hooked_options, list) or not all(isinstance(option, dict) for option in hooked_options):
+		raise TypeError(f"commera_delivery_options must return a list of dicts, got {hooked_options!r}")
+
+	hooked_by_title = {option.get("title"): option for option in hooked_options}
+	titles = {option["title"] for option in options}
+	if len(hooked_by_title) != len(hooked_options) or not set(hooked_by_title) <= titles:
+		raise ValueError(
+			f"commera_delivery_options may only drop or change offered options, got {hooked_options!r}"
+		)
+
+	return [
+		get_hooked_delivery_option(option, hooked_by_title[option["title"]], precision)
+		for option in options
+		if option["title"] in hooked_by_title
+	]
+
+
+def get_hooked_delivery_option(option: dict, hooked_option: dict, precision: int) -> dict:
+	option = dict(option)
+	if "amount" in hooked_option:
+		amount = hooked_option["amount"]
+		if (
+			isinstance(amount, bool)
+			or not isinstance(amount, int | float)
+			or not math.isfinite(amount)
+			or amount < 0
+		):
+			raise ValueError(f"A delivery option amount must be a number of zero or more, got {amount!r}")
+		option["amount"] = flt(amount, precision)
+	for field in ("label", "description"):
+		if field in hooked_option:
+			option[field] = cstr(hooked_option[field]).strip()
+	option["is_free"] = not option["amount"]
+	return option
+
+
+def filter_payment_methods(quotation, methods: list[str], strict: bool) -> list[str]:
+	for handler in get_handlers("commera_payment_methods"):
+		with handle_hook_error("commera_payment_methods", handler, quotation, strict):
+			kept_methods = frappe.get_attr(handler)(quotation, list(methods))
+			if not isinstance(kept_methods, list) or not set(kept_methods) <= set(methods):
+				raise ValueError(
+					f"commera_payment_methods may only drop offered methods, got {kept_methods!r}"
+				)
+			methods = [method for method in methods if method in kept_methods]
+	return methods
+
+
 def get_default_fee_account() -> str:
 	account = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
 	if not account:

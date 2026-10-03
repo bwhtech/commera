@@ -1,7 +1,7 @@
 import frappe
-from bwh_payments.bwh_payments.utils import get_available_payment_modes
 from frappe.query_builder import DocType
 
+from commera.api.payments import COD_PAYMENT_MODE, get_checkout_payment_methods
 from commera.api.shipping import get_checkout_summary
 from commera.core import _get_cart_quotation
 from commera.guest import is_guest
@@ -31,8 +31,9 @@ def get_context(context, allow_guest: bool = False):
 	else:
 		set_cart_context(context, commera_settings)
 	context.is_guest = is_guest()
-	context.payment_gateways = get_available_payment_modes()
-	context.show_cod = commera_settings.get("cod_enabled", 0)
+	payment_methods = get_checkout_payment_methods(context.cart_quotation)
+	context.payment_gateways = [method for method in payment_methods if method != COD_PAYMENT_MODE]
+	context.show_cod = int(COD_PAYMENT_MODE in payment_methods)
 	context.country_list = get_country_list()
 	context.store_pickup_addresses = (
 		get_store_pickup_addresses() if commera_settings.store_pickup_enabled else []

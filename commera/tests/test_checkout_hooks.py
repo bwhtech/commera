@@ -18,16 +18,23 @@ from commera.api.admin.orders import get_order_charges
 from commera.api.checkout import apply_shipping_rule
 from commera.api.payments import (
 	COD_PAYMENT_MODE,
+	CheckoutPriceChangedError,
 	confirm_payment,
 	generate_quotation_for_cart,
 	initiate_checkout_with_mode,
 	update_quotation_address,
 )
-from commera.api.shipping import get_checkout_summary, get_order_charge_lines
+from commera.api.shipping import (
+	get_checkout_summary,
+	get_order_charge_lines,
+	get_shipping_options,
+	set_delivery_option,
+)
 from commera.core import _get_cart_quotation
 from commera.tests import test_cart_checkout
 from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.tests.test_payment_hooks import patch_app_hooks
+from commera.www.cart.checkout import get_context as get_checkout_context
 
 REFUSAL = "Engraved items ship to India only."
 GIFT_WRAP = "Gift Wrap"
@@ -38,6 +45,14 @@ HANDLING = "Handling"
 HANDLING_SHARE = 0.05
 GENERIC_FAILURE = "Something went wrong, please try again."
 APP_SECRET = "Printful API key is missing"
+EXPRESS = "ZZ Express"
+STANDARD = "ZZ Standard"
+EXPRESS_LABEL = "Express, gift wrapped"
+EXPRESS_REPRICED = 80.0
+QUOTED_OPTIONS = [
+	{"title": EXPRESS, "amount": 50.0, "description": "", "is_free": False},
+	{"title": STANDARD, "amount": 20.0, "description": "", "is_free": False},
+]
 
 
 def refuse_cart(quotation):
@@ -67,6 +82,55 @@ def charge_test_fee(quotation):
 
 
 def crash_charging_fees(quotation):
+	frappe.throw(APP_SECRET)
+
+
+def hide_express(quotation, options):
+	return [option for option in options if option["title"] != EXPRESS]
+
+
+def reprice_express(quotation, options):
+	return [
+		{**option, "amount": EXPRESS_REPRICED, "label": EXPRESS_LABEL}
+		if option["title"] == EXPRESS
+		else option
+		for option in options
+	]
+
+
+def halve_delivery_amounts(quotation, options):
+	return [{**option, "amount": option["amount"] / 2} for option in options]
+
+
+def add_delivery_option(quotation, options):
+	return [*options, {"title": "ZZ Teleport", "amount": 0}]
+
+
+def rename_delivery_option(quotation, options):
+	return [{**options[0], "title": "ZZ Renamed"}, *options[1:]]
+
+
+def charge_negative_delivery(quotation, options):
+	return [{**option, "amount": -1} for option in options]
+
+
+def crash_listing_delivery_options(quotation, options):
+	frappe.throw(APP_SECRET)
+
+
+def hide_cod(quotation, methods):
+	return [method for method in methods if method != COD_PAYMENT_MODE]
+
+
+def hide_gateway(quotation, methods):
+	return [method for method in methods if method != GATEWAY]
+
+
+def add_payment_method(quotation, methods):
+	return [*methods, "ZZ Barter"]
+
+
+def crash_listing_payment_methods(quotation, methods):
 	frappe.throw(APP_SECRET)
 
 
@@ -356,3 +420,139 @@ class TestCheckoutHooks(IntegrationTestCase):
 		frappe.set_user("Administrator")
 		self.assertEqual(self.fee_rows(frappe.get_doc("Quotation", quotation.name)), [])
 		self.assertEqual(len(self.gateway_requests(quotation.name)), 1)
+
+	def quote_delivery_options(self):
+		quote_patch = patch("commera.api.shipping.get_quoted_options", return_value=QUOTED_OPTIONS)
+		quote_patch.start()
+		self.addCleanup(quote_patch.stop)
+
+	def open_delivery_cart(self, delivery_option: str = EXPRESS):
+		self.quote_delivery_options()
+		quotation = self.open_cart()
+		set_delivery_option(delivery_option)
+		return quotation
+
+	def listed_options(self) -> list[tuple]:
+		return [
+			(option["title"], option["amount"], option.get("label"))
+			for option in get_shipping_options()["options"]
+		]
+
+	def test_a_hidden_delivery_option_is_not_listed_cannot_be_chosen_and_is_refused_at_payment(self):
+		quotation = self.open_delivery_cart(EXPRESS)
+		patch_app_hooks(self, {"commera_delivery_options": [f"{__name__}.hide_express"]})
+
+		self.assertEqual(self.listed_options(), [(STANDARD, 20.0, None)])
+		with self.assertRaisesRegex(frappe.ValidationError, "is not available"):
+			set_delivery_option(EXPRESS)
+		with self.assertRaisesRegex(CheckoutPriceChangedError, "no longer available"):
+			initiate_checkout_with_mode(GATEWAY, delivery_option=EXPRESS)
+
+		frappe.set_user("Administrator")
+		self.assertEqual(self.gateway_requests(quotation.name), [])
+
+	def test_a_repriced_option_costs_the_same_from_listing_to_order_and_keeps_its_title(self):
+		patch_app_hooks(self, {"commera_delivery_options": [f"{__name__}.reprice_express"]})
+		quotation = self.open_delivery_cart(EXPRESS)
+
+		self.assertEqual(
+			self.listed_options(), [(EXPRESS, EXPRESS_REPRICED, EXPRESS_LABEL), (STANDARD, 20.0, None)]
+		)
+		self.assertEqual(_get_cart_quotation().custom_delivery_charge, EXPRESS_REPRICED)
+		shown_total = get_checkout_summary(_get_cart_quotation())["cash_on_delivery"]["total"]
+		initiate_checkout_with_mode(COD_PAYMENT_MODE, delivery_option=EXPRESS, expected_total=shown_total)
+		order_name = confirm_payment(quotation.name, payment_mode=COD_PAYMENT_MODE)["order_name"]
+
+		frappe.set_user("Administrator")
+		self.assertEqual(
+			frappe.db.get_value(
+				"Sales Order", order_name, ["custom_delivery_option", "custom_delivery_charge"], as_dict=True
+			),
+			{"custom_delivery_option": EXPRESS, "custom_delivery_charge": EXPRESS_REPRICED},
+		)
+
+	def test_delivery_hooks_chain_in_hook_order(self):
+		self.open_delivery_cart(EXPRESS)
+		patch_app_hooks(
+			self,
+			{
+				"commera_delivery_options": [
+					f"{__name__}.reprice_express",
+					f"{__name__}.halve_delivery_amounts",
+				]
+			},
+		)
+
+		self.assertEqual(
+			self.listed_options(), [(EXPRESS, EXPRESS_REPRICED / 2, EXPRESS_LABEL), (STANDARD, 10.0, None)]
+		)
+
+	def test_a_failing_delivery_hook_lists_the_quoted_options_but_blocks_payment(self):
+		quotation = self.open_delivery_cart(EXPRESS)
+		for handler in (
+			crash_listing_delivery_options,
+			add_delivery_option,
+			rename_delivery_option,
+			charge_negative_delivery,
+		):
+			with self.subTest(handler=handler.__name__):
+				handler_path = f"{__name__}.{handler.__name__}"
+				patch_app_hooks(self, {"commera_delivery_options": [handler_path]})
+
+				self.assertEqual(self.listed_options(), [(EXPRESS, 50.0, None), (STANDARD, 20.0, None)])
+				self.assertIn(
+					f"commera_delivery_options hook failed: {handler_path}", self.queued_error_logs()
+				)
+				with self.assertRaisesRegex(frappe.ValidationError, GENERIC_FAILURE):
+					initiate_checkout_with_mode(GATEWAY, delivery_option=EXPRESS)
+
+		frappe.set_user("Administrator")
+		self.assertEqual(self.gateway_requests(quotation.name), [])
+
+	def render_payment_methods(self) -> tuple[bool, int]:
+		context = frappe._dict()
+		get_checkout_context(context)
+		return GATEWAY in context.payment_gateways, context.show_cod
+
+	def test_a_hidden_gateway_is_left_off_the_checkout_page_and_refused_at_payment(self):
+		quotation = self.open_cart()
+		self.assertEqual(self.render_payment_methods(), (True, 1))
+		patch_app_hooks(self, {"commera_payment_methods": [f"{__name__}.hide_gateway"]})
+
+		self.assertEqual(self.render_payment_methods(), (False, 1))
+		with self.assertRaisesRegex(frappe.ValidationError, "not available for your order"):
+			initiate_checkout_with_mode(GATEWAY)
+
+		frappe.set_user("Administrator")
+		self.assertEqual(self.gateway_requests(quotation.name), [])
+		self.assertEqual(FakeStripeClient.created_sessions, [])
+
+	def test_hidden_cash_on_delivery_is_refused_at_checkout_and_at_confirmation(self):
+		patch_app_hooks(self, {"commera_payment_methods": [f"{__name__}.hide_cod"]})
+		quotation = self.open_cart()
+
+		self.assertEqual(self.render_payment_methods(), (True, 0))
+		with self.assertRaisesRegex(frappe.ValidationError, "Cash on delivery is not available"):
+			initiate_checkout_with_mode(COD_PAYMENT_MODE)
+		with self.assertRaisesRegex(frappe.ValidationError, "Cash on delivery is not available"):
+			confirm_payment(quotation.name, payment_mode=COD_PAYMENT_MODE)
+
+		frappe.set_user("Administrator")
+		self.assertEqual(self.placed_orders(quotation.name), [])
+
+	def test_a_failing_payment_method_hook_shows_every_method_but_blocks_checkout(self):
+		quotation = self.open_cart()
+		for handler in (crash_listing_payment_methods, add_payment_method):
+			with self.subTest(handler=handler.__name__):
+				handler_path = f"{__name__}.{handler.__name__}"
+				patch_app_hooks(self, {"commera_payment_methods": [handler_path]})
+
+				self.assertEqual(self.render_payment_methods(), (True, 1))
+				self.assertIn(
+					f"commera_payment_methods hook failed: {handler_path}", self.queued_error_logs()
+				)
+				with self.assertRaisesRegex(frappe.ValidationError, GENERIC_FAILURE):
+					initiate_checkout_with_mode(GATEWAY)
+
+		frappe.set_user("Administrator")
+		self.assertEqual(self.gateway_requests(quotation.name), [])

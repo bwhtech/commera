@@ -97,6 +97,7 @@ page_renderer = ["commera.shop_themes.theme_resolver.ThemePageRenderer"]
 clear_cache = [
 	"commera.shop_themes.doctype.shop_theme.shop_theme.clear_theme_cache",
 	"commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings.clear_settings_cache",
+	"commera.extensions.registry.clear_registry_cache",
 ]
 
 # Without this, records of a custom doctype never import on migrate (frappe/model/sync.py).
@@ -136,7 +137,6 @@ doc_events = {
 			"commera.utils.update_so_status_from_related_doc",
 			"commera.app_events.on_sales_order_stock_reservation",
 		],
-		"before_cancel": "commera.app_events.check_order_cancel_hooks",
 		"on_cancel": [
 			"commera.jobs.send_order_cancel_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
@@ -151,8 +151,15 @@ doc_events = {
 		]
 	},
 	"Item": {"on_update": "commera.app_events.on_item_update"},
+	"Item Price": {
+		"on_update": "commera.app_events.on_item_price_change",
+		"on_trash": "commera.app_events.on_item_price_change",
+	},
 	"Style Attribute Variant": {
-		"on_update": "commera.search.sync.on_update",
+		"on_update": [
+			"commera.search.sync.on_update",
+			"commera.app_events.on_style_attribute_variant_update",
+		],
 		"after_rename": "commera.search.sync.after_rename",
 		"on_trash": "commera.search.sync.on_trash",
 	},

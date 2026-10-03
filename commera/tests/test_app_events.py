@@ -11,6 +11,13 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, add_to_date, now_datetime, nowdate
 from rq.job import JobStatus
 
+from commera.api.admin.catalog import (
+	create_product,
+	save_product_options,
+	save_product_prices,
+	set_variant_price,
+	set_variant_published,
+)
 from commera.api.orders import cancel_order, make_refund_payment_entry
 from commera.api.payment_hooks import on_payment_request_update
 from commera.api.payments import create_payment_entry
@@ -22,27 +29,41 @@ from commera.app_events import (
 	fire_event,
 	fire_inventory_changed,
 	on_payment_entry_submit,
+	reset_changed_products,
 	run_app_deliveries,
 	run_due_deliveries,
 	run_lane,
 	validate_extension_apps,
 )
+from commera.commera_ecommerce.doctype.bulk_publish_variants.bulk_publish_variants import (
+	set_variants_published,
+)
 from commera.commera_ecommerce.doctype.commera_event.commera_event import CommeraEvent
+from commera.tests import test_admin_catalog
 from commera.tests import test_payment_hooks as payment_hooks
 from commera.tests.test_admin_orders import make_test_sales_order
 from commera.tests.test_payment_hooks import COMPANY, CURRENCY, ITEM_GROUP, patch_app_hooks
+from commera.tests.test_product_onboarding import ProductOnboardingTestCase
 from commera.utils import update_sales_order_ecommerce_status
 
 try:
 	from erpnext.accounts.doctype.sales_invoice.mapper import make_sales_return
 	from erpnext.selling.doctype.sales_order.mapper import make_delivery_note
+	from erpnext.stock.doctype.delivery_note.mapper import make_sales_return as make_delivery_return
 except ImportError:
 	from erpnext.accounts.doctype.sales_invoice.sales_invoice import make_sales_return
 	from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note
+	from erpnext.stock.doctype.delivery_note.delivery_note import make_sales_return as make_delivery_return
 
 RECORD_APP_EVENT = f"{payment_hooks.__name__}.record_app_event"
 STORE_WAREHOUSE = "Stores - LSD"
 OTHER_WAREHOUSE = "Finished Goods - LSD"
+
+
+def start_recording_product_changes():
+	"""Forget what the fixtures changed, and the after-commit callbacks earlier tests left queued."""
+	frappe.db.after_commit.reset()
+	reset_changed_products()
 
 
 def patch_app_declarations(test_case, hooks_by_app: dict):
@@ -141,14 +162,81 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 
 	def test_an_order_placed_outside_the_store_is_never_announced(self):
 		sales_order = make_test_sales_order().name
-		self.book_parcel(sales_order, "Delivered")
+		parcel = self.book_parcel(sales_order, "Delivered")
+
+		update_sales_order_ecommerce_status(sales_order)
+		frappe.db.set_value("Shipping Request", parcel, "status", "RTO")
+		update_sales_order_ecommerce_status(sales_order)
+
+		self.assertEqual(
+			frappe.db.get_value("Sales Order", sales_order, "custom_ecommerce_status"), "Returned"
+		)
+		self.assertEqual(self.event_names(sales_order), [])
+
+	def submit_delivery_note(self, sales_order):
+		delivery_note = make_delivery_note(sales_order)
+		delivery_note.flags.ignore_permissions = True
+		delivery_note.insert()
+		delivery_note.submit()
+		return delivery_note.name
+
+	def submit_delivery_return(self, delivery_note, returned_qty):
+		return_note = make_delivery_return(delivery_note)
+		return_note.items[0].qty = -returned_qty
+		return_note.flags.ignore_permissions = True
+		return_note.insert()
+		return_note.submit()
+
+	def returns_announced(self, sales_order):
+		return [
+			(event.name, frappe.parse_json(event.data).status, frappe.parse_json(event.data).partial)
+			for event in self.commera_events(sales_order, "order_returned")
+		]
+
+	def test_a_partial_then_a_full_return_are_announced_once_each(self):
+		patch_app_hooks(self, {"commera_order_returned": []})
+		sales_order = self.submitted_cod_order()
+		delivery_note = self.submit_delivery_note(sales_order)
+		update_sales_order_ecommerce_status(sales_order)
+
+		self.submit_delivery_return(delivery_note, 1)
+		update_sales_order_ecommerce_status(sales_order)
+		update_sales_order_ecommerce_status(sales_order)
+		self.submit_delivery_return(delivery_note, 1)
+		update_sales_order_ecommerce_status(sales_order)
+		update_sales_order_ecommerce_status(sales_order)
+
+		self.assertEqual(
+			frappe.db.get_value("Sales Order", sales_order, "custom_ecommerce_status"), "Returned"
+		)
+		self.assertEqual(
+			self.returns_announced(sales_order),
+			[
+				(f"{sales_order}-order_returned-partially_returned", "Partially Returned", True),
+				(f"{sales_order}-order_returned-returned", "Returned", False),
+			],
+		)
+		self.assertEqual(
+			self.event_names(sales_order),
+			["order_delivered", "order_fulfilled", "order_placed", "order_returned", "order_returned"],
+		)
+
+	def test_a_parcel_returned_to_origin_is_announced_fulfilled_then_returned(self):
+		patch_app_hooks(
+			self,
+			{"commera_order_fulfilled": [RECORD_APP_EVENT], "commera_order_returned": [RECORD_APP_EVENT]},
+		)
+		calls = self.record_app_events()
+		self.run_enqueued_jobs_now()
+		sales_order = self.submitted_cod_order()
+		self.book_parcel(sales_order, "RTO")
 
 		update_sales_order_ecommerce_status(sales_order)
 
 		self.assertEqual(
-			frappe.db.get_value("Sales Order", sales_order, "custom_ecommerce_status"), "Delivered"
+			[(event.name, event.data.get("partial")) for event, user in calls],
+			[("order_fulfilled", None), ("order_returned", False)],
 		)
-		self.assertEqual(self.event_names(sales_order), [])
 
 	def test_each_refund_is_announced_once_with_its_payment_entry(self):
 		patch_app_hooks(self, {"commera_order_refunded": []})
@@ -313,20 +401,24 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		item.description = frappe.generate_hash(length=10)
 		item.save(ignore_permissions=True)
 
-	def test_every_update_to_a_listed_item_is_announced(self):
+	def test_two_saves_of_a_listed_item_are_announced_once_after_commit(self):
 		patch_app_hooks(self, {"commera_product_updated": [RECORD_APP_EVENT]})
+		calls = self.record_app_events()
+		self.run_enqueued_jobs_now()
 		listed_item = self.create_listed_item()
 		unlisted_item = self.create_item()
+		start_recording_product_changes()
 
-		with patch.object(frappe, "enqueue"):
-			self.save_item(listed_item)
-			self.save_item(listed_item)
-			self.save_item(unlisted_item)
+		self.save_item(listed_item)
+		self.save_item(listed_item)
+		self.save_item(unlisted_item)
+		self.assertEqual(calls, [], "nothing is announced before the save commits")
+		frappe.db.after_commit.run()
 
-		updates = self.commera_events(listed_item, "product_updated")
-		self.assertEqual(len(updates), 2)
-		self.assertEqual(frappe.parse_json(updates[0].data), {"item_code": listed_item})
-		self.assertEqual(self.commera_events(unlisted_item, "product_updated"), [])
+		self.assertEqual(
+			[(event.reference_name, event.data) for event, user in calls],
+			[(listed_item, {"item_code": listed_item, "changed": ["details"]})],
+		)
 
 	def test_a_product_event_no_app_listens_to_is_not_recorded(self):
 		patch_app_hooks(self, {"commera_product_updated": [], "commera_inventory_changed": []})
@@ -698,3 +790,109 @@ class TestAppEventDeliveryClaims(IntegrationTestCase):
 			with patch("commera.app_events.get_job_status", return_value=job_status):
 				enqueue_app_deliveries("commera", "Company", COMPANY, self.event)
 			self.assertEqual(self.enqueue.call_args.kwargs["deduplicate"], deduplicate, job_status)
+
+
+class TestProductUpdatedEvent(ProductOnboardingTestCase):
+	make_named_attribute = test_admin_catalog.DeleteProductTestCase.make_named_attribute
+	record_app_events = payment_hooks.TestPaymentHookIdempotency.record_app_events
+	run_enqueued_jobs_now = payment_hooks.TestPaymentHookIdempotency.run_enqueued_jobs_now
+
+	def setUp(self):
+		super().setUp()
+		patch_app_hooks(self, {"commera_product_updated": [RECORD_APP_EVENT]})
+		self.calls = self.record_app_events()
+		self.product, self.option = self.add_listed_product()
+		start_recording_product_changes()
+
+	def add_listed_product(self):
+		product = create_product(
+			title=f"Events Product {frappe.generate_hash(length=6).upper()}",
+			collection=self.item_group,
+			option_attribute=self.make_named_attribute("Colour", ["Crimson"]),
+			size_attribute="Size",
+			option_sizes=[{"option": "Crimson", "sizes": ["S", "M"]}],
+			price=500,
+			sale_price=400,
+		)["name"]
+		option = frappe.get_all("Style Attribute Variant", {"item_style": product}, pluck="name")[0]
+		frappe.get_doc(
+			{
+				"doctype": "Website Slideshow Item",
+				"name": frappe.generate_hash(length=10),
+				"parent": option,
+				"parenttype": "Style Attribute Variant",
+				"parentfield": "images",
+				"image": f"/files/{frappe.generate_hash(length=8)}.png",
+			}
+		).db_insert()
+		frappe.db.set_value("Style Attribute Variant", option, "is_published", 1)
+		return product, option
+
+	def get_product_sizes(self):
+		return frappe.get_all("Item", {"variant_of": self.product}, pluck="name", order_by="name")
+
+	def announced_changes(self):
+		self.run_enqueued_jobs_now()
+		frappe.db.after_commit.run()
+		return [(event.reference_name, event.data) for event, user in self.calls]
+
+	def assert_announced(self, *changed):
+		self.assertEqual(
+			self.announced_changes(), [(self.product, {"item_code": self.product, "changed": list(changed)})]
+		)
+
+	def test_a_size_item_save_is_announced_on_its_product(self):
+		size_item = frappe.get_doc("Item", self.get_product_sizes()[0])
+		size_item.description = frappe.generate_hash(length=10)
+		size_item.save()
+
+		self.assert_announced("details")
+
+	def test_repricing_an_option_is_announced(self):
+		set_variant_price(self.option, default_rate=600)
+
+		self.assert_announced("price")
+
+	def test_editing_one_size_price_is_announced(self):
+		save_product_prices(self.option, [{"item_code": self.get_product_sizes()[0], "default_rate": 700}])
+
+		self.assert_announced("price")
+
+	def test_two_price_edits_in_one_transaction_are_one_price_event(self):
+		set_variant_price(self.option, default_rate=600)
+		save_product_prices(self.option, [{"item_code": self.get_product_sizes()[0], "default_rate": 700}])
+
+		self.assert_announced("price")
+
+	def test_unpublishing_the_last_option_in_bulk_is_announced_though_it_unlists_the_product(self):
+		set_variants_published(0, [self.option])
+
+		self.assert_announced("published")
+
+	def test_unpublishing_one_option_is_announced(self):
+		set_variant_published(self.option, 0)
+
+		self.assert_announced("published")
+
+	def test_removing_a_size_is_announced_as_an_options_change(self):
+		save_product_options(self.product, remove=[{"option": "Crimson", "size": "M"}])
+
+		self.assert_announced("options")
+
+	def test_an_unlisted_products_edit_is_not_announced(self):
+		set_variant_published(self.option, 0)
+		start_recording_product_changes()
+
+		set_variant_price(self.option, default_rate=600)
+
+		self.assertEqual(self.announced_changes(), [])
+
+	def test_a_rolled_back_change_never_stops_the_next_transactions_from_being_announced(self):
+		set_variant_price(self.option, default_rate=600)
+		frappe.db.rollback()
+
+		super().setUp()
+		self.product, self.option = self.add_listed_product()
+		set_variant_price(self.option, default_rate=600)
+
+		self.assert_announced("price")

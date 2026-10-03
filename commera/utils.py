@@ -678,7 +678,12 @@ SHIPMENT_STATUS_LADDER = {
 	"RTO": "Returned",
 }
 # A parcel can skip Shipped (a Delivery Note with no carrier), so Delivered also announces it fulfilled first.
-FULFILMENT_EVENTS = {"Shipped": ("order_fulfilled",), "Delivered": ("order_fulfilled", "order_delivered")}
+FULFILMENT_EVENTS = {
+	"Shipped": ("order_fulfilled",),
+	"Delivered": ("order_fulfilled", "order_delivered"),
+	"Partially Returned": ("order_fulfilled", "order_returned"),
+	"Returned": ("order_fulfilled", "order_returned"),
+}
 
 
 def update_sales_order_ecommerce_status(sales_order_name):
@@ -699,7 +704,17 @@ def update_sales_order_ecommerce_status(sales_order_name):
 	frappe.db.set_value("Sales Order", sales_order_name, "custom_ecommerce_status", new_status)
 	if order.order_type == STORE_ORDER_TYPE and new_status != order.custom_ecommerce_status:
 		for event in FULFILMENT_EVENTS.get(new_status, ()):
-			fire_event(event, "Sales Order", sales_order_name)
+			fire_event(event, "Sales Order", sales_order_name, **get_status_event_args(event, new_status))
+
+
+def get_status_event_args(event: str, status: str) -> dict:
+	if event != "order_returned":
+		return {}
+	# Keyed on the status, so a partial return and the full return that follows each fire once.
+	return {
+		"data": {"status": status, "partial": status == "Partially Returned"},
+		"key": frappe.scrub(status),
+	}
 
 
 def get_fulfilment_status(sales_order_name) -> str:

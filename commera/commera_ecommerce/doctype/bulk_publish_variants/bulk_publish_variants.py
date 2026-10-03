@@ -6,6 +6,7 @@ from frappe.model.document import Document
 from frappe.query_builder import DocType
 from frappe.utils import cint, create_batch
 
+from commera.app_events import add_changed_products, get_variant_templates
 from commera.commera_ecommerce.doctype.commera_settings.editor_input import parse_list
 from commera.search.sync import enqueue_upsert_many
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
@@ -61,6 +62,7 @@ def save_publish_state(publish, changed_names):
 		frappe.db.set_value(PRODUCT_DOCTYPE, {"name": ["in", chunk]}, {"is_published": publish})
 
 	enqueue_upsert_many(PRODUCT_DOCTYPE, changed_names)
+	add_changed_products(get_variant_templates(changed_names), "published")
 
 	return changed_names
 

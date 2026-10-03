@@ -24,7 +24,7 @@ from commera.api.shipping import (
 )
 from commera.api.signup import get_placeholder_first_name, validate_single_email, validate_user_names
 from commera.app_events import fire_event
-from commera.checkout_hooks import apply_app_fees, get_cart_refusal
+from commera.checkout_hooks import apply_app_fees, filter_payment_methods, get_cart_refusal
 from commera.core import _get_cart_quotation, create_party, get_customer_contact, new_cart_quotation
 from commera.guest import (
 	get_guest_cart_name,
@@ -148,9 +148,10 @@ def open_checkout(
 	update_delivery_charges(quotation)
 	validate_cart(quotation)
 	validate_expected_total(quotation, payment_mode, expected_total)
+	payment_methods = get_checkout_payment_methods(quotation, strict=True)
 
 	if is_cod(payment_mode):
-		if not frappe.db.get_single_value("Commera Settings", "cod_enabled"):
+		if COD_PAYMENT_MODE not in payment_methods:
 			refuse_payment(_("Cash on delivery is not available."), quotation.name)
 		return {"order_url": get_confirmation_url(quotation.name, payment_mode=COD_PAYMENT_MODE)}
 
@@ -161,6 +162,10 @@ def open_checkout(
 			quotation.name,
 			requested=payment_mode,
 			available=get_available_payment_modes(),
+		)
+	if gateway not in payment_methods:
+		refuse_payment(
+			_("This payment method is not available for your order."), quotation.name, gateway=gateway
 		)
 
 	payment_request = frappe.get_doc(
@@ -179,6 +184,16 @@ def open_checkout(
 	).insert(ignore_permissions=True)
 
 	return {"order_url": payment_request.order_url}
+
+
+def get_checkout_payment_methods(quotation, strict: bool = False) -> list[str]:
+	"""Payment Gateway Profile names, plus COD when it is on, as the installed apps let this cart pay."""
+	payment_methods = list(get_available_payment_modes())
+	if frappe.db.get_single_value("Commera Settings", "cod_enabled"):
+		payment_methods.append(COD_PAYMENT_MODE)
+	if not quotation:
+		return payment_methods
+	return filter_payment_methods(quotation, payment_methods, strict)
 
 
 def get_gateway_customer(quotation) -> dict:
@@ -272,8 +287,8 @@ def gateway_mode_of_payment(gateway: str) -> str:
 
 
 @contextmanager
-def system_user_session():
-	"""Place the accounting documents as Administrator, then hand the session back.
+def system_user_session(user: str = "Administrator"):
+	"""Place the accounting documents as `user`, then hand the session back.
 
 	ERPNext's get_party_account checks frappe.has_permission directly, so no ignore_permissions reaches it.
 	"""
@@ -282,7 +297,7 @@ def system_user_session():
 	live_session_snapshot = frappe.local.session.copy()
 	try:
 		# Audited: the docstring above and the snapshot restore below are why this is safe.
-		frappe.set_user("Administrator")  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
+		frappe.set_user(user)  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
 		yield
 	finally:
 		frappe.local.session.update(live_session_snapshot)
@@ -752,6 +767,8 @@ def place_cod_order(quotation_name: str):
 	apply_app_fees(quotation)
 	# Again here: a COD confirmation can be posted without ever opening checkout.
 	validate_cart(quotation)
+	if COD_PAYMENT_MODE not in get_checkout_payment_methods(quotation, strict=True):
+		refuse_payment(_("Cash on delivery is not available."), quotation.name)
 	with system_user_session():
 		set_cod_charges(quotation)
 		quotation.flags.ignore_permissions = True
