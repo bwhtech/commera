@@ -4,7 +4,6 @@ import {
   Badge,
   Button,
   FormControl,
-  Select,
   SettingsBody,
   SettingsRow,
   Switch,
@@ -273,7 +272,7 @@ async function save() {
               <div
                 v-if="draft?.key === row.key"
                 :id="`band-${row.key}`"
-                class="flex flex-col gap-3 pb-3"
+                class="flex flex-col gap-4 pb-4"
               >
                 <div class="flex items-start gap-2">
                   <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
@@ -307,10 +306,12 @@ async function save() {
                     :label="`Charge (${moneyUnit})`"
                     placeholder="0 for free delivery"
                   />
-                  <div class="flex flex-col gap-1.5">
-                    <span class="text-xs text-ink-gray-5">Delivery option</span>
-                    <Select v-model="draft.shipping_service" :options="optionChoices" aria-label="Delivery option" />
-                  </div>
+                  <FormControl
+                    v-model="draft.shipping_service"
+                    type="select"
+                    label="Delivery option"
+                    :options="optionChoices"
+                  />
                 </div>
 
                 <p
@@ -323,7 +324,7 @@ async function save() {
                   {{ message }}
                 </p>
 
-                <div class="flex items-center justify-end gap-2">
+                <div class="flex items-center justify-end gap-2 pt-2">
                   <Button label="Cancel" @click="cancelDraft" />
                   <Button
                     label="Save"
