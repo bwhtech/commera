@@ -3,6 +3,7 @@ import { computed, ref, useId } from 'vue'
 import {
   Badge,
   Button,
+  Combobox,
   FormControl,
   SettingsBody,
   SettingsRow,
@@ -35,7 +36,11 @@ const moneyUnit = symbolFor(props.currency || undefined)
 // '' is the "Any option" row: a band that names no delivery option.
 const optionChoices = computed(() => [
   { label: 'Any option', value: '' },
-  ...props.deliveryOptions.map((option) => ({ label: option.title, value: option.name })),
+  ...props.deliveryOptions.map((option) => ({
+    label: option.title,
+    value: option.name,
+    description: option.enabled ? undefined : 'Off at checkout',
+  })),
 ])
 
 const optionTitles = computed(() =>
@@ -305,10 +310,10 @@ async function save() {
                     :label="`Charge (${moneyUnit})`"
                     placeholder="0 for free delivery"
                   />
-                  <FormControl
+                  <Combobox
                     v-model="draft.shipping_service"
-                    type="select"
                     label="Delivery option"
+                    placeholder="Search delivery options"
                     :options="optionChoices"
                   />
                 </div>
