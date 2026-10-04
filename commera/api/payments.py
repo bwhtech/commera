@@ -353,6 +353,7 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 		sales_order = _make_sales_order(quotation.name, ignore_permissions=True)
 		sales_order.custom_ecommerce_payment_mode = payment_mode
 		copy_delivery_option_to_order(quotation.name, sales_order)
+		set_delivery_date(sales_order)
 		fix_payment_schedule_dates(sales_order)
 		set_attribution_fields(sales_order)
 		sales_order.flags.ignore_permissions = True
@@ -405,6 +406,13 @@ def create_payment_entry(sales_invoice, payment_mode: str, paid_amount: float, r
 	payment_entry.insert()
 	payment_entry.submit()
 	return payment_entry
+
+
+def set_delivery_date(sales_order):
+	# ERPNext fills these only for order type "Sales"; drop-ship Purchase Orders copy them into Required By.
+	sales_order.delivery_date = sales_order.delivery_date or sales_order.transaction_date or getdate()
+	for item in sales_order.items:
+		item.delivery_date = item.delivery_date or sales_order.delivery_date
 
 
 def fix_payment_schedule_dates(doc):
@@ -776,6 +784,7 @@ def place_cod_order(quotation_name: str):
 
 		sales_order = _make_sales_order(quotation_name, ignore_permissions=True)
 		sales_order.custom_ecommerce_payment_mode = COD_PAYMENT_MODE
+		set_delivery_date(sales_order)
 		set_attribution_fields(sales_order)
 		sales_order.flags.ignore_permissions = True
 		sales_order.insert()

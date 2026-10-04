@@ -339,6 +339,21 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		)
 		self.assertEqual(frappe.db.get_value("Payment Entry", payment_entries[0], "mode_of_payment"), GATEWAY)
 
+	def test_a_paid_order_is_due_on_its_order_date_on_the_header_and_every_line(self):
+		on_payment_request_update(self.payment_request)
+
+		self.assert_due_on_order_date(self.submitted_sales_orders()[0])
+
+	def test_a_cod_order_is_due_on_its_order_date_on_the_header_and_every_line(self):
+		self.assert_due_on_order_date(self.place_cod_order_for_cart().name)
+
+	def assert_due_on_order_date(self, sales_order_name):
+		# A drop-ship Purchase Order copies these into Required By and refuses to save without them.
+		sales_order = frappe.get_doc("Sales Order", sales_order_name)
+		order_date = getdate(sales_order.transaction_date)
+		self.assertEqual(sales_order.delivery_date, order_date)
+		self.assertEqual({item.delivery_date for item in sales_order.items}, {order_date})
+
 	def test_a_duplicate_callback_does_not_create_a_second_order(self):
 		"""A replayed webhook racing a confirm_payment poll must not bill the shopper twice."""
 		on_payment_request_update(self.payment_request)
