@@ -263,6 +263,14 @@ class TestSdk(IntegrationTestCase):
 		self.assertFalse(items[unlisted_item]["is_listed"])
 		self.assertEqual(items[unlisted_item]["price"], test_cart_checkout.DEFAULT_RATE)
 
+	def test_a_drop_shipped_item_reads_as_unlimited_whatever_its_stock(self):
+		drop_shipped_item = self.create_item(sale_rate=None, stock_qty=0, delivered_by_supplier=1)
+
+		items = catalog.get_items([self.item, drop_shipped_item])
+
+		self.assertTrue(items[drop_shipped_item]["unlimited"])
+		self.assertFalse(items[self.item]["unlimited"])
+
 	def test_items_read_no_price_and_no_stock_before_the_store_is_set_up(self):
 		store_setup = {"ecommerce_warehouse": None, "default_price_list": None, "sale_price_list": None}
 		# The rollback is per class, not per test, so the store's setup has to be put back by hand.

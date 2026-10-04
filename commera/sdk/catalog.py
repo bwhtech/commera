@@ -48,6 +48,7 @@ def read_items(item_codes: list[str]) -> dict[str, CatalogItem]:
 			"list_price": list_prices.get(row.name),
 			"currency": currency,
 			"available_qty": flt(stocks.get(row.name, {}).get("stock_qty")),
+			"unlimited": bool(stocks.get(row.name, {}).get("unlimited")),
 		}
 		for row in rows
 	}

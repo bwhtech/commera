@@ -123,3 +123,5 @@ class CatalogItem(TypedDict):
 	list_price: float | None
 	currency: str
 	available_qty: float
+	# Drop-shipped or not stock-tracked: sellable whatever available_qty says.
+	unlimited: bool
