@@ -12,7 +12,7 @@ from pypika.terms import Case, ExistsCriterion
 from rq.job import JobStatus
 
 from commera.sdk import API_VERSION, STORE_ORDER_TYPE, as_apps_user
-from commera.sdk.events import CommeraEvent
+from commera.sdk.events import HANDLER_HOOKS, CommeraEvent
 
 APPS_USER = "commera-apps@commera.local"
 RETRY_DELAYS_IN_MINUTES = (1, 5, 30, 120, 360)
@@ -40,7 +40,7 @@ def fire_event(
 	data: dict | None = None,
 	key: str | None = None,
 ):
-	handlers = get_handlers(f"commera_{event}")
+	handlers = get_handlers("commera_events", event)
 	event_key = get_event_key(event, reference_doctype, reference_name, key)
 	# Checked first because a duplicate insert also msgprints a red "already exists" at whoever triggered it.
 	if frappe.db.exists("Commera Event", event_key):
@@ -149,8 +149,12 @@ def get_handler_app(handler: str) -> str:
 	return handler.split(".", 1)[0]
 
 
-def get_handlers(hook: str) -> list[str]:
-	return [handler for handler in frappe.get_hooks(hook) if is_supported_app(get_handler_app(handler))]
+def get_handlers(hook: str, key: str) -> list[str]:
+	return [
+		handler
+		for handler in frappe.get_hooks(hook, {}).get(key, [])
+		if is_supported_app(get_handler_app(handler))
+	]
 
 
 def is_supported_app(app: str) -> bool:
@@ -269,7 +273,7 @@ def run_delivery(delivery) -> bool:
 	except Exception:
 		frappe.db.rollback()
 		error_log = frappe.log_error(
-			title=f"commera_{delivery.event} hook failed: {delivery.handler}",
+			title=f'commera_events["{delivery.event}"] hook failed: {delivery.handler}',
 			reference_doctype=delivery.reference_doctype,
 			reference_name=delivery.reference_name,
 		)
@@ -580,13 +584,13 @@ def on_style_attribute_variant_update(doc, method=None):
 
 
 def on_item_price_change(doc, method=None):
-	if doc.selling and get_handlers("commera_product_updated"):
+	if doc.selling and get_handlers("commera_events", "product_updated"):
 		item_template = frappe.db.get_value("Item", doc.item_code, "variant_of") or doc.item_code
 		add_changed_products([item_template], "price")
 
 
 def add_changed_products(item_templates: list[str] | set[str], change: str):
-	if not item_templates or not get_handlers("commera_product_updated"):
+	if not item_templates or not get_handlers("commera_events", "product_updated"):
 		return
 
 	changed_products = frappe.local.flags.commera_changed_products
@@ -611,7 +615,7 @@ def enqueue_product_updated():
 
 
 def fire_product_updated(item_code: str, changed: list[str]):
-	if not get_handlers("commera_product_updated") or not frappe.db.exists("Item", item_code):
+	if not get_handlers("commera_events", "product_updated") or not frappe.db.exists("Item", item_code):
 		return
 	# An unpublish can take the product off the storefront, and apps still need to hear about it.
 	if "published" not in changed and not is_listed_item(item_code):
@@ -674,7 +678,7 @@ def on_sales_order_stock_reservation(doc, method=None):
 
 
 def add_changed_items(item_codes: list[str]):
-	if not item_codes or not get_handlers("commera_inventory_changed"):
+	if not item_codes or not get_handlers("commera_events", "inventory_changed"):
 		return
 
 	changed_items = frappe.local.flags.commera_changed_items
@@ -708,7 +712,7 @@ def fire_inventory_changed(item_code: str):
 	# Imported here: commera.utils imports this module.
 	from commera.utils import get_available_stock
 
-	if not get_handlers("commera_inventory_changed") or not is_listed_item(item_code):
+	if not get_handlers("commera_events", "inventory_changed") or not is_listed_item(item_code):
 		return
 
 	warehouse = get_ecommerce_warehouse()
@@ -763,6 +767,15 @@ def validate_extension_apps():
 			message = f"{app} supports Commera API versions {api_versions}, not {API_VERSION}: its hooks are skipped."
 			print(message)
 			frappe.log_error(title=f"{app} does not support this Commera", message=message)
+
+		for hook, keys in HANDLER_HOOKS.items():
+			if unknown_keys := set(frappe.get_hooks(hook, {}, app_name=app)) - set(keys):
+				message = (
+					f"{app} declares {hook} for {', '.join(sorted(unknown_keys))}, which Commera never runs. "
+					f"Known names: {', '.join(keys)}."
+				)
+				print(message)
+				frappe.log_error(title=f"{app} declares unknown {hook}", message=message)
 
 	if unprefixed_fields := get_unprefixed_custom_fields(extension_apps):
 		message = (

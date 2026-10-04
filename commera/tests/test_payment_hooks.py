@@ -696,8 +696,10 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		patch_app_hooks(
 			self,
 			{
-				"commera_order_placed": [f"{__name__}.record_app_event"],
-				"commera_order_paid": [f"{__name__}.record_app_event"],
+				"commera_events": {
+					"order_placed": [f"{__name__}.record_app_event"],
+					"order_paid": [f"{__name__}.record_app_event"],
+				}
 			},
 		)
 		with patch.object(frappe, "enqueue") as enqueue:
@@ -720,7 +722,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.assertEqual(self.queued_app_jobs(enqueue), [job, job], "one job per event, none for the repeat")
 
 	def test_an_event_no_app_listens_to_is_recorded_but_queues_nothing(self):
-		patch_app_hooks(self, {"commera_order_placed": []})
+		patch_app_hooks(self, {"commera_events": {"order_placed": []}})
 		with patch.object(frappe, "enqueue") as enqueue:
 			sales_order = self.place_cod_order_for_cart()
 
@@ -785,7 +787,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.assertEqual(self.app_events(sales_order.name), ["order_paid", "order_placed"])
 
 	def test_the_hourly_sweep_fires_paid_for_a_settled_cod_order_the_payment_hook_missed(self):
-		patch_app_hooks(self, {"commera_order_paid": []})
+		patch_app_hooks(self, {"commera_events": {"order_paid": []}})
 		sales_order = self.place_cod_order_for_cart()
 		sales_order.flags.ignore_permissions = True
 		sales_order.submit()
@@ -861,7 +863,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		return f"{app}.{attribute}"
 
 	def test_a_cancelled_webshop_order_is_announced_once(self):
-		patch_app_hooks(self, {"commera_order_cancelled": [f"{__name__}.record_app_event"]})
+		patch_app_hooks(self, {"commera_events": {"order_cancelled": [f"{__name__}.record_app_event"]}})
 		calls = self.record_app_events()
 		self.run_enqueued_jobs_now()
 		sales_order = self.place_cod_order_for_cart()
@@ -878,8 +880,10 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		patch_app_hooks(
 			self,
 			{
-				"commera_order_placed": [f"{__name__}.record_app_event"],
-				"commera_order_paid": [f"{__name__}.record_app_event"],
+				"commera_events": {
+					"order_placed": [f"{__name__}.record_app_event"],
+					"order_paid": [f"{__name__}.record_app_event"],
+				}
 			},
 		)
 		calls = self.record_app_events()
@@ -917,8 +921,10 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		patch_app_hooks(
 			self,
 			{
-				"commera_order_placed": [f"{__name__}.fail_once_then_record"],
-				"commera_order_paid": [f"{__name__}.record_app_event"],
+				"commera_events": {
+					"order_placed": [f"{__name__}.fail_once_then_record"],
+					"order_paid": [f"{__name__}.record_app_event"],
+				}
 			},
 		)
 		calls = self.record_app_events()
@@ -945,7 +951,9 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 	def test_a_failing_app_is_retried_on_schedule_then_failed_without_holding_up_another(self):
 		broken_handler = self.add_handler_to_app("bwh_payments", raise_from_app_event)
-		patch_app_hooks(self, {"commera_order_placed": [broken_handler, f"{__name__}.record_app_event"]})
+		patch_app_hooks(
+			self, {"commera_events": {"order_placed": [broken_handler, f"{__name__}.record_app_event"]}}
+		)
 		calls = self.record_app_events()
 		self.run_enqueued_jobs_now()
 
@@ -991,7 +999,9 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 	def test_a_failed_delivery_runs_again_when_staff_retry_it(self):
 		self.add_handler_to_app("bwh_payments", raise_from_app_event)
 		handler = self.add_handler_to_app("bwh_payments", record_app_event)
-		patch_app_hooks(self, {"commera_order_placed": ["bwh_payments.commera_test_raise_from_app_event"]})
+		patch_app_hooks(
+			self, {"commera_events": {"order_placed": ["bwh_payments.commera_test_raise_from_app_event"]}}
+		)
 		calls = self.record_app_events()
 		self.run_enqueued_jobs_now()
 		sales_order = self.place_cod_order_for_cart().name

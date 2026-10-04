@@ -14,7 +14,7 @@
 			"creation": "2026-10-01 12:00:00.000000",
 			"default": "0",
 			"depends_on": null,
-			"description": "Charged by an installed app through its commera_cart_fees hook.",
+			"description": "Charged by an installed app through its commera_checkout cart_fees hook.",
 			"docstatus": 0,
 			"dt": "Sales Taxes and Charges",
 			"fetch_from": null,

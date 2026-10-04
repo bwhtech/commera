@@ -39,6 +39,7 @@ from commera.commera_ecommerce.doctype.bulk_publish_variants.bulk_publish_varian
 	set_variants_published,
 )
 from commera.commera_ecommerce.doctype.commera_event.commera_event import CommeraEvent
+from commera.sdk import API_VERSION
 from commera.tests import test_admin_catalog
 from commera.tests import test_payment_hooks as payment_hooks
 from commera.tests.test_admin_orders import make_test_sales_order
@@ -113,7 +114,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		return sales_order.name
 
 	def test_an_order_is_announced_fulfilled_then_delivered_once_each(self):
-		patch_app_hooks(self, {"commera_order_fulfilled": [], "commera_order_delivered": []})
+		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = self.submitted_cod_order()
 		update_sales_order_ecommerce_status(sales_order)
 		parcel = self.book_parcel(sales_order, "Ready To Ship")
@@ -141,8 +142,10 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		patch_app_hooks(
 			self,
 			{
-				"commera_order_fulfilled": [RECORD_APP_EVENT],
-				"commera_order_delivered": [RECORD_APP_EVENT],
+				"commera_events": {
+					"order_fulfilled": [RECORD_APP_EVENT],
+					"order_delivered": [RECORD_APP_EVENT],
+				}
 			},
 		)
 		calls = self.record_app_events()
@@ -194,7 +197,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		]
 
 	def test_a_partial_then_a_full_return_are_announced_once_each(self):
-		patch_app_hooks(self, {"commera_order_returned": []})
+		patch_app_hooks(self, {"commera_events": {"order_returned": []}})
 		sales_order = self.submitted_cod_order()
 		delivery_note = self.submit_delivery_note(sales_order)
 		update_sales_order_ecommerce_status(sales_order)
@@ -224,7 +227,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 	def test_a_parcel_returned_to_origin_is_announced_fulfilled_then_returned(self):
 		patch_app_hooks(
 			self,
-			{"commera_order_fulfilled": [RECORD_APP_EVENT], "commera_order_returned": [RECORD_APP_EVENT]},
+			{"commera_events": {"order_fulfilled": [RECORD_APP_EVENT], "order_returned": [RECORD_APP_EVENT]}},
 		)
 		calls = self.record_app_events()
 		self.run_enqueued_jobs_now()
@@ -239,7 +242,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		)
 
 	def test_each_refund_is_announced_once_with_its_payment_entry(self):
-		patch_app_hooks(self, {"commera_order_refunded": []})
+		patch_app_hooks(self, {"commera_events": {"order_refunded": []}})
 		on_payment_request_update(self.payment_request)
 		sales_order = self.submitted_sales_orders()[0]
 
@@ -264,7 +267,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		return refunds
 
 	def test_the_refund_a_cancel_pays_out_is_announced(self):
-		patch_app_hooks(self, {"commera_order_refunded": []})
+		patch_app_hooks(self, {"commera_events": {"order_refunded": []}})
 		on_payment_request_update(self.payment_request)
 		sales_order = self.submitted_sales_orders()[0]
 		frappe.set_user(frappe.db.get_value("Sales Order", sales_order, "owner"))
@@ -286,7 +289,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		return credit_note
 
 	def test_a_cod_refund_made_in_desk_is_announced_through_its_credit_note(self):
-		patch_app_hooks(self, {"commera_order_refunded": []})
+		patch_app_hooks(self, {"commera_events": {"order_refunded": []}})
 		sales_order = self.submitted_cod_order()
 		credit_note = self.submit_credit_note(sales_order, returned_qty=1)
 
@@ -304,7 +307,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		)
 
 	def test_one_desk_refund_for_two_orders_announces_each_order_its_own_share(self):
-		patch_app_hooks(self, {"commera_order_refunded": []})
+		patch_app_hooks(self, {"commera_events": {"order_refunded": []}})
 		first_order = self.submitted_cod_order()
 		self.quotation = self.create_cart_quotation()
 		second_order = self.submitted_cod_order()
@@ -361,7 +364,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 				"stock_uom": "Nos",
 			}
 		).insert(ignore_permissions=True)
-		patch_app_hooks(self, {"commera_product_updated": [RECORD_APP_EVENT]})
+		patch_app_hooks(self, {"commera_events": {"product_updated": [RECORD_APP_EVENT]}})
 
 		with patch.object(frappe, "enqueue"):
 			fire_event("product_updated", "Item", item_code, key=frappe.generate_hash(length=10))
@@ -402,7 +405,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		item.save(ignore_permissions=True)
 
 	def test_two_saves_of_a_listed_item_are_announced_once_after_commit(self):
-		patch_app_hooks(self, {"commera_product_updated": [RECORD_APP_EVENT]})
+		patch_app_hooks(self, {"commera_events": {"product_updated": [RECORD_APP_EVENT]}})
 		calls = self.record_app_events()
 		self.run_enqueued_jobs_now()
 		listed_item = self.create_listed_item()
@@ -421,7 +424,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		)
 
 	def test_a_product_event_no_app_listens_to_is_not_recorded(self):
-		patch_app_hooks(self, {"commera_product_updated": [], "commera_inventory_changed": []})
+		patch_app_hooks(self, {"commera_events": {"product_updated": [], "inventory_changed": []}})
 		listed_item = self.create_listed_item()
 
 		self.save_item(listed_item)
@@ -460,7 +463,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		stock_entry.submit()
 
 	def test_a_stock_entry_announces_each_store_item_once_with_its_new_qty(self):
-		patch_app_hooks(self, {"commera_inventory_changed": [RECORD_APP_EVENT]})
+		patch_app_hooks(self, {"commera_events": {"inventory_changed": [RECORD_APP_EVENT]}})
 		# Commera Settings is shared with suites running in parallel on this site.
 		warehouse_patch = patch("commera.app_events.get_ecommerce_warehouse", return_value=STORE_WAREHOUSE)
 		warehouse_patch.start()
@@ -495,7 +498,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		)
 
 	def test_reserving_and_releasing_stock_for_an_order_is_announced(self):
-		patch_app_hooks(self, {"commera_inventory_changed": [RECORD_APP_EVENT]})
+		patch_app_hooks(self, {"commera_events": {"inventory_changed": [RECORD_APP_EVENT]}})
 		warehouse_patch = patch("commera.app_events.get_ecommerce_warehouse", return_value=STORE_WAREHOUSE)
 		warehouse_patch.start()
 		self.addCleanup(warehouse_patch.stop)
@@ -535,12 +538,15 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 	def test_an_app_built_for_another_api_version_is_skipped_and_logged(self):
 		outdated_handler = self.add_handler_to_app("bwh_payments", payment_hooks.record_app_event)
 		current_handler = self.add_handler_to_app("bwh_shipping", payment_hooks.record_app_event)
-		patch_app_hooks(self, {"commera_product_updated": [outdated_handler, current_handler]})
+		patch_app_hooks(self, {"commera_events": {"product_updated": [outdated_handler, current_handler]}})
 		patch_app_declarations(
 			self,
 			{
-				"bwh_payments": {"commera_api_version": [99], "commera_product_updated": [outdated_handler]},
-				"bwh_shipping": {"commera_product_updated": [current_handler]},
+				"bwh_payments": {
+					"commera_api_version": [99],
+					"commera_events": {"product_updated": [outdated_handler]},
+				},
+				"bwh_shipping": {"commera_events": {"product_updated": [current_handler]}},
 			},
 		)
 		started_at = now_datetime()
@@ -566,6 +572,70 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 			)
 		)
 
+	def test_each_apps_handlers_for_an_event_are_delivered_in_app_order(self):
+		app_declarations = {
+			"bwh_payments": {
+				"commera_api_version": [99],
+				"commera_events": {"product_updated": ["bwh_payments.on_product"]},
+			},
+			"bwh_shipping": {
+				"commera_api_version": [API_VERSION],
+				"commera_events": {
+					"product_updated": "bwh_shipping.on_product",
+					"inventory_changed": ["bwh_shipping.on_stock"],
+				},
+			},
+			"commera": {"commera_events": {"product_updated": ["commera.on_product"]}},
+		}
+		# The same merge frappe.get_hooks applies to every installed app's hooks.py.
+		merged_hooks = {}
+		for declarations in app_declarations.values():
+			frappe.append_hook(merged_hooks, "commera_events", declarations["commera_events"])
+		patch_app_hooks(self, merged_hooks)
+		patch_app_declarations(self, {app: app_declarations[app] for app in ("bwh_payments", "bwh_shipping")})
+
+		with patch.object(frappe, "enqueue"):
+			fire_event("product_updated", "Item", self.item_code, key="merged")
+
+		self.assertEqual(
+			frappe.get_all(
+				"Commera Event Delivery",
+				{"parent": "product_updated-merged"},
+				pluck="handler",
+				order_by="idx asc",
+			),
+			["bwh_shipping.on_product", "commera.on_product"],
+		)
+
+	def test_an_event_or_checkout_name_commera_does_not_know_is_warned_about(self):
+		patch_app_declarations(
+			self,
+			{
+				"bwh_payments": {
+					"commera_api_version": [API_VERSION],
+					"commera_events": {
+						"order_payed": ["bwh_payments.paid"],
+						"order_paid": ["bwh_payments.paid"],
+					},
+				},
+				"bwh_shipping": {"commera_checkout": {"cart_fee": ["bwh_shipping.fees"]}},
+			},
+		)
+		started_at = now_datetime()
+
+		with redirect_stdout(StringIO()) as output:
+			validate_extension_apps()
+
+		self.assertIn("bwh_payments declares commera_events for order_payed, which", output.getvalue())
+		self.assertIn("bwh_shipping declares commera_checkout for cart_fee, which", output.getvalue())
+		self.assertNotIn("bwh_payments declares commera_checkout", output.getvalue())
+		self.assertTrue(
+			frappe.db.exists(
+				"Error Log",
+				{"method": "bwh_payments declares unknown commera_events", "creation": [">=", started_at]},
+			)
+		)
+
 	def add_custom_field(self, dt, fieldname, module):
 		frappe.get_doc(
 			{
@@ -580,7 +650,13 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 
 	def test_custom_fields_an_app_adds_without_its_prefix_are_listed(self):
 		patch_app_declarations(
-			self, {"bwh_payments": {"commera_api_version": [1], "commera_order_paid": ["bwh_payments.paid"]}}
+			self,
+			{
+				"bwh_payments": {
+					"commera_api_version": [1],
+					"commera_events": {"order_paid": ["bwh_payments.paid"]},
+				}
+			},
 		)
 		# db_insert, not insert: a real Custom Field alters the table, and the DDL would commit the test.
 		self.add_custom_field("Item", "zz_gift_wrap", "BWH Payments")
@@ -599,7 +675,7 @@ class TestAppEvents(payment_hooks.TestPaymentHookIdempotency):
 		stock_handler = self.add_handler_to_app("bwh_payments", payment_hooks.record_app_event)
 		patch_app_hooks(
 			self,
-			{"commera_product_updated": [broken_handler], "commera_inventory_changed": [stock_handler]},
+			{"commera_events": {"product_updated": [broken_handler], "inventory_changed": [stock_handler]}},
 		)
 		calls = self.record_app_events()
 		self.run_enqueued_jobs_now()
@@ -683,7 +759,7 @@ class TestAppEventDeliveryClaims(IntegrationTestCase):
 		self.event = f"zz_claim_{frappe.generate_hash(length=6)}"
 
 	def fire_committed_event(self, handler) -> str:
-		patch_app_hooks(self, {f"commera_{self.event}": [f"{__name__}.{handler.__name__}"]})
+		patch_app_hooks(self, {"commera_events": {self.event: [f"{__name__}.{handler.__name__}"]}})
 		key = frappe.generate_hash(length=10)
 		fire_event(self.event, "Company", COMPANY, key=key)
 		event_key = f"{self.event}-{key}"
@@ -731,7 +807,7 @@ class TestAppEventDeliveryClaims(IntegrationTestCase):
 
 	def add_running_delivery(self, claimed_minutes_ago: int) -> str:
 		key = frappe.generate_hash(length=10)
-		with patch.object(frappe, "get_hooks", return_value=[]):
+		with patch.object(frappe, "get_hooks", return_value={}):
 			fire_event(self.event, "Company", COMPANY, key=key)
 		event_key = f"{self.event}-{key}"
 		frappe.get_doc("Commera Event", event_key).append(
@@ -759,9 +835,11 @@ class TestAppEventDeliveryClaims(IntegrationTestCase):
 		patch_app_hooks(
 			self,
 			{
-				"commera_order_placed": [RECORD_APP_EVENT],
-				"commera_order_paid": [RECORD_APP_EVENT],
-				f"commera_{self.event}": [RECORD_APP_EVENT],
+				"commera_events": {
+					"order_placed": [RECORD_APP_EVENT],
+					"order_paid": [RECORD_APP_EVENT],
+					self.event: [RECORD_APP_EVENT],
+				}
 			},
 		)
 		fire_event("order_placed", "Sales Order", sales_order)
@@ -799,7 +877,7 @@ class TestProductUpdatedEvent(ProductOnboardingTestCase):
 
 	def setUp(self):
 		super().setUp()
-		patch_app_hooks(self, {"commera_product_updated": [RECORD_APP_EVENT]})
+		patch_app_hooks(self, {"commera_events": {"product_updated": [RECORD_APP_EVENT]}})
 		self.calls = self.record_app_events()
 		self.product, self.option = self.add_listed_product()
 		start_recording_product_changes()

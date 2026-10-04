@@ -94,8 +94,10 @@ class TestSdk(IntegrationTestCase):
 
 	def setUp(self):
 		self.addCleanup(frappe.set_user, "Administrator")
-		patch_app_hooks(self, {"commera_cart_fees": [f"{__name__}.charge_note_fee"]})
-		test_app_events.patch_app_declarations(self, {APP: {"commera_order_paid": [f"{APP}.paid"]}})
+		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_note_fee"]}})
+		test_app_events.patch_app_declarations(
+			self, {APP: {"commera_events": {"order_paid": [f"{APP}.paid"]}}}
+		)
 		self.shopper = self.create_shopper()
 		self.item = self.create_item(sale_rate=test_cart_checkout.SALE_RATE)
 
@@ -322,7 +324,7 @@ class TestSdk(IntegrationTestCase):
 			self.skipTest("bwh_shipping is not installed")
 		from bwh_shipping.tests.test_carrier_import import create_test_address, create_test_provider_profile
 
-		patch_app_hooks(self, {"commera_order_fulfilled": [], "commera_order_delivered": []})
+		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
 		sales_order.db_set(
 			{
@@ -364,7 +366,7 @@ class TestSdk(IntegrationTestCase):
 			self.skipTest("bwh_shipping is not installed")
 		from bwh_shipping.tests.test_carrier_import import create_test_address
 
-		patch_app_hooks(self, {"commera_order_fulfilled": [], "commera_order_delivered": []})
+		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
 		sales_order.db_set({"shipping_address_name": create_test_address("India"), "company_address": None})
 
@@ -381,7 +383,7 @@ class TestSdk(IntegrationTestCase):
 
 		from commera.api.shipping import get_order_tracking
 
-		patch_app_hooks(self, {"commera_order_fulfilled": [], "commera_order_delivered": []})
+		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
 		sales_order.db_set({"shipping_address_name": create_test_address("India"), "company_address": None})
 		tracking_url = "https://track.example.com/ZZ-PARTNER-AWB"
