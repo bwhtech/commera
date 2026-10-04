@@ -46,7 +46,7 @@ async function logout() {
 // The workspace header is the dropdown: it names the store and gets you to the
 // things that are about the account, not about the page you are on.
 const headerMenu = [
-  { label: 'Settings', icon: 'lucide-settings', onClick: () => openSettings('general') },
+  { label: 'Settings', icon: 'lucide-settings', onClick: () => openSettings() },
   { label: 'Appearance', icon: 'lucide-sun-moon', onClick: () => openSettings('appearance') },
   { label: 'View storefront', icon: 'lucide-external-link', onClick: openStorefront },
   { label: 'Log out', icon: 'lucide-log-out', onClick: logout },

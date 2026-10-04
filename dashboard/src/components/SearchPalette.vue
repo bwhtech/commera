@@ -118,7 +118,7 @@ const CREATE = [
 ]
 
 const SETTINGS = [
-  { id: 'settings', label: 'Open settings', icon: 'lucide-settings', keywords: ['preferences', 'config'], run: () => openSettings('general') },
+  { id: 'settings', label: 'Open settings', icon: 'lucide-settings', keywords: ['preferences', 'config'], run: () => openSettings() },
   ...SETTINGS_TABS.map((tab) => ({
     id: `settings-${tab.value}`,
     label: tab.label,

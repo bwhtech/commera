@@ -36,13 +36,14 @@ const routes = [
   { path: '/storefront/pages/:name', name: 'StorefrontPageDetail', component: () => import('./pages/storefront/PageDetail.vue') },
   // No component on purpose: RouterView renders nothing for a matched record without one,
   // so the page App.vue hands it stays mounted behind the modal.
-  { path: '/settings', redirect: `/settings/${DEFAULT_SETTINGS_TAB}` },
   {
-    path: '/settings/:tab',
+    // No tab is the phone's list of sections; on a desktop it shows the default tab.
+    path: '/settings/:tab?',
     name: SETTINGS_ROUTE_NAME,
     // beforeEnter, not `redirect`: a redirect function must always return a location,
     // and an unknown tab is the only case that moves.
     beforeEnter: (to) => {
+      if (!to.params.tab) return true
       const known = SETTINGS_TABS.some((settingsTab) => settingsTab.value === to.params.tab)
       return known ? true : { path: `/settings/${DEFAULT_SETTINGS_TAB}`, replace: true }
     },

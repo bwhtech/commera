@@ -1,6 +1,7 @@
 <script setup>
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import {
+  Button,
   Icon,
   SettingsBody,
   SettingsContent,
@@ -26,6 +27,7 @@ import { paymentIntegrations, shippingIntegrations } from '../../data/integratio
 import { pickupLocations } from '../../data/pickupLocations'
 import { pluginSettingsTabs } from '../../ia/plugins'
 import { settings } from '../../ia/settings'
+import { useIsMobile } from '../../utils/useIsMobile'
 
 // The counts beside the sidebar entries are the server's answer, not a local tally, so
 // they cannot claim a provider is live when the site says otherwise.
@@ -33,6 +35,18 @@ const connectedCount = paymentIntegrations.connectedCount
 const shippingConnected = shippingIntegrations.connectedCount
 
 const pluginTabs = pluginSettingsTabs()
+
+// On a phone the dialog is a full-screen list of sections, then one section at a time.
+const isMobile = useIsMobile()
+const tab = computed({
+  get: () => (isMobile.value ? settings.pickedTab : settings.tab),
+  set: (value) => (settings.tab = value),
+})
+
+function goBack() {
+  if (settings.pickedTab) settings.tab = ''
+  else settings.open = false
+}
 
 // Both load when the dialog opens, not when their tab is shown: an unread registry counts
 // zero, which reads as "nothing is connected".
@@ -49,10 +63,24 @@ watch(
 </script>
 
 <template>
-  <SettingsDialog v-model:open="settings.open" v-model:tab="settings.tab" :unmount-on-hide="false">
+  <SettingsDialog v-model:open="settings.open" v-model:tab="tab" :unmount-on-hide="false">
     <template #title>Commera settings</template>
 
-    <SettingsSidebar>
+    <header class="flex h-12 shrink-0 items-center gap-1 border-b border-outline-gray-1 px-2 sm:hidden">
+      <Button
+        variant="ghost"
+        size="lg"
+        icon="lucide-chevron-left"
+        :aria-label="settings.pickedTab ? 'Back' : 'Close'"
+        @click="goBack"
+      />
+      <h2 aria-hidden="true" class="text-lg-semibold text-ink-gray-8">Settings</h2>
+    </header>
+
+    <SettingsSidebar
+      class="max-sm:max-h-none max-sm:flex-1 max-sm:border-b-0 max-sm:[&_[role=tab]]:h-10"
+      :class="{ 'max-sm:hidden': settings.pickedTab }"
+    >
       <SettingsNavGroup>
         <SettingsNavItem value="general">
           <template #prefix><span class="lucide-store size-4" aria-hidden="true" /></template>
@@ -118,7 +146,7 @@ watch(
 
     <!-- min-w-0 on the column and every panel: frappe-ui gives them `flex-1` with no
          min-width, so below ~780px the right-hand controls are clipped clean off. -->
-    <SettingsContent class="min-w-0">
+    <SettingsContent class="commera-settings min-w-0" :class="{ 'max-sm:hidden': !settings.pickedTab }">
       <SettingsPanel value="general" class="min-w-0">
         <GeneralSettings :active="settings.open && settings.tab === 'general'" />
       </SettingsPanel>
@@ -189,3 +217,26 @@ watch(
     </SettingsContent>
   </SettingsDialog>
 </template>
+
+<style>
+/* frappe-ui's Dialog keeps its card gutter on a phone, which pushes the full-screen settings
+   past the viewport, and its panels keep their desktop insets. */
+@media (max-width: 639.98px) {
+  .dialog-scroll-container > div:has(.commera-settings) {
+    padding: 0;
+  }
+
+  .dialog-content:has(.commera-settings) {
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .commera-settings .px-\[4\.4rem\] {
+    padding-inline: 1rem;
+  }
+
+  .commera-settings .px-\[4\.4rem\].pt-10 {
+    padding-top: 1.25rem;
+  }
+}
+</style>
