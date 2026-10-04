@@ -750,6 +750,19 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		self.assertEqual(self.app_events(sales_order.name), ["order_paid", "order_placed"])
 
+	def test_a_fully_discounted_order_is_billed_and_paid_at_placement(self):
+		quotation = self.create_cart_quotation()
+		quotation.apply_discount_on = "Grand Total"
+		quotation.additional_discount_percentage = 100
+		quotation.save()
+		self.assertEqual(flt(quotation.grand_total), 0)
+
+		on_payment_request_update(self.create_paid_payment_request(quotation))
+
+		sales_order = self.submitted_sales_orders(quotation.name)[0]
+		self.assertEqual(self.app_events(sales_order), ["order_paid", "order_placed"])
+		self.assertEqual(len(self.submitted_sales_invoices(sales_order)), 1)
+
 	def submit_invoice_for(self, sales_order, qty):
 		sales_invoice = make_sales_invoice(sales_order.name, ignore_permissions=True)
 		sales_invoice.items[0].qty = qty

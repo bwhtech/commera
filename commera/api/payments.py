@@ -361,14 +361,16 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 		set_order_access_key(sales_order)
 		sales_order.submit()
 
-		if flt(gateway_amount) > 0:
+		# A cart discounted to nothing is settled at placement, so it is billed and paid like a charged one.
+		paid = flt(gateway_amount) > 0 or flt(sales_order.grand_total) <= 0
+		if paid:
 			create_sales_invoice(sales_order, payment_mode, flt(gateway_amount), gateway_reference)
 
 	# Outside the switch: log_purchase stamps frappe.session.user, so Administrator would own every purchase.
 	stamp_order_owner(sales_order, shopper)
 	log_purchase(sales_order)
 	fire_event("order_placed", "Sales Order", sales_order.name)
-	if flt(gateway_amount) > 0:
+	if paid:
 		fire_event("order_paid", "Sales Order", sales_order.name)
 	return sales_order
 
