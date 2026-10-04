@@ -359,6 +359,21 @@ class TestSdk(IntegrationTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="Teleported")
 
+	def test_a_carrier_named_after_the_first_record_is_saved(self):
+		if not is_connector_installed():
+			self.skipTest("bwh_shipping is not installed")
+		from bwh_shipping.tests.test_carrier_import import create_test_address
+
+		patch_app_hooks(self, {"commera_order_fulfilled": [], "commera_order_delivered": []})
+		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
+		sales_order.db_set({"shipping_address_name": create_test_address("India"), "company_address": None})
+
+		shipment = orders.record_shipment(sales_order.name, awb="ZZ-LATE-CARRIER-AWB")
+		orders.record_shipment(sales_order.name, awb="ZZ-LATE-CARRIER-AWB", carrier="Delhivery")
+		orders.record_shipment(sales_order.name, awb="ZZ-LATE-CARRIER-AWB")
+
+		self.assertEqual(frappe.db.get_value("Shipping Request", shipment, "carrier"), "Delhivery")
+
 	def test_a_partner_shipment_needs_no_provider_and_shows_the_shopper_its_link(self):
 		if not is_connector_installed():
 			self.skipTest("bwh_shipping is not installed")

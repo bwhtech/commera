@@ -131,6 +131,8 @@ def record_shipment(
 	request.lock_booking()
 	if tracking_url:
 		request.tracking_url = tracking_url
+	if carrier:
+		request.carrier = carrier
 	request.apply_status(status, events=events)
 	return request.name
 
