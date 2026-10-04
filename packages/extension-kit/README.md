@@ -56,6 +56,7 @@ The folder decides where an extension goes. `places.json` is the one list; Comme
 | `{order,product,customer}/cards/<name>/index.vue` | A card on that record's page | **label** / requires, condition, order |
 | `{order,product,customer}/actions/<name>/index.vue` | A row in that page's More actions menu | **label** / icon, requires, condition, method, confirm, order |
 | `settings/index.vue` | The app's tab in Settings | **label** / icon, requires, condition, doctype |
+| `commands/<name>/index.vue` | A row in the search palette's Apps group (Cmd+K), while the user types | **label, method** / icon, keywords, requires, condition, confirm, order |
 
 Each placement's `index.vue` starts with a plain `<script>` that holds one literal:
 
@@ -78,9 +79,14 @@ export const extension = {
   whatever the record is: `def send_order(name)`, not `def send_order(sales_order)`. If it returns a string,
   Commera shows that string in the success toast. Any other return value shows "<label> done". Raise with
   `frappe.throw` to show an error.
+- A command has no template and no `<script setup>`: the plain `<script>` is the whole file. Commera calls
+  its `method()` with no arguments, after `confirm` if given, and toasts the returned string or "<label> done".
+  `keywords` is a list of extra words to match, such as `['qikink', 'print']`; the app's title always matches.
+- Your pages appear in the palette's Go to group automatically; there is nothing to declare.
 - A settings tab has a template, or `doctype`: a Single that Commera renders as self-saving rows. Never both.
 - `condition` and `method` are dotted paths that start with your app's module name. A page or settings
-  `condition` takes no arguments; a card or action `condition` gets `(doctype, name)`.
+  `condition` takes no arguments; a card or action `condition` gets `(doctype, name)`. A command `condition`
+  takes no arguments, like a page's.
 - `icon` is a name from `commera/sdk/extension_icons.json`.
 
 Every other folder and file under `commera/` is yours: components, composables, sub-pages. Only an
@@ -140,6 +146,7 @@ Folder and `extension` problems are collected and reported together.
 | Any other statement in the plain `<script>` | `import x from './x'` |
 | An unknown, missing or mistyped field | `sidebr: false` (with a did-you-mean), no `label`, `sidebar` on a card |
 | An action or settings tab with both or neither of template and `method`/`doctype` | |
+| A command with a template or `<script setup>` | `commands/sync/index.vue` with a `<template>` |
 | An icon not in the list | `icon: 'printr'` |
 | A dotted path outside the app | `condition: 'frappe.client.get_list'` |
 | Drawing a frame the dashboard owns | importing `AppPageHeader`, `PageBody` or `ExtensionCard`, or frappe-ui's `Dialog` |
