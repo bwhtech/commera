@@ -138,6 +138,7 @@ const loadFailure = computed(() =>
           <Button icon="lucide-ellipsis" label="More actions" />
         </Dropdown>
         <Button
+          v-if="order.items.some((item) => !item.delivered_by_supplier)"
           label="Fulfil items"
           icon-left="lucide-truck"
           variant="solid"

@@ -157,7 +157,14 @@ def return_against_order(sales_order):
 
 
 def make_order(**values):
-	order = frappe._dict({"docstatus": 1, "status": "To Deliver", "per_delivered": 0})
+	order = frappe._dict(
+		{
+			"docstatus": 1,
+			"status": "To Deliver",
+			"per_delivered": 0,
+			"lines": [frappe._dict({"qty": 2, "delivered_qty": 0, "delivered_by_supplier": 0})],
+		}
+	)
 	order.update(values)
 	return order
 
@@ -499,6 +506,49 @@ class TestToFulfilAgreement(IntegrationTestCase):
 		for row in page["orders"]:
 			with self.subTest(order=row["name"]):
 				self.assertNotIn(row["state"]["key"], SETTLED_STAGES)
+
+
+class TestDropShipFulfilment(IntegrationTestCase):
+	"""A drop-ship line is the supplier's to ship, so the store's fulfil flow must leave it alone."""
+
+	def test_a_drop_ship_only_order_offers_and_allows_no_fulfilment(self):
+		sales_order = make_drop_ship_order()
+
+		self.assertFalse(get_order(sales_order.name)["can_fulfil"])
+		with self.assertRaises(frappe.ValidationError):
+			fulfil_order(sales_order.name)
+		self.assertFalse(frappe.db.exists("Delivery Note Item", {"against_sales_order": sales_order.name}))
+
+	def test_a_mixed_order_fulfils_only_the_store_line(self):
+		sales_order = make_drop_ship_order(with_store_line=True)
+		store_line = next(line for line in sales_order.items if not line.delivered_by_supplier)
+		self.assertTrue(get_order(sales_order.name)["can_fulfil"])
+
+		delivery_note = frappe.get_doc("Delivery Note", fulfil_order(sales_order.name)["delivery_note"])
+
+		self.assertEqual([line.so_detail for line in delivery_note.items], [store_line.name])
+		self.assertFalse(get_order(sales_order.name)["can_fulfil"])
+
+
+def make_drop_ship_order(with_store_line: bool = False):
+	sales_order = make_test_sales_order(submit=False)
+	if with_store_line:
+		sales_order.append(
+			"items", {"item_code": sales_order.items[0].item_code, "qty": 1, "rate": ITEM_RATE}
+		)
+	sales_order.items[0].update({"delivered_by_supplier": 1, "supplier": get_drop_ship_supplier()})
+	sales_order.save()
+	sales_order.submit()
+	return sales_order
+
+
+def get_drop_ship_supplier() -> str:
+	supplier_name = "ZZ Drop Ship Supplier"
+	if not frappe.db.exists("Supplier", supplier_name):
+		frappe.get_doc({"doctype": "Supplier", "supplier_name": supplier_name}).insert(
+			ignore_permissions=True
+		)
+	return supplier_name
 
 
 class TestRevenueDefinition(IntegrationTestCase):

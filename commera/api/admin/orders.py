@@ -652,6 +652,7 @@ def get_order(sales_order: str):
 				"size": row.size,
 				"qty": flt(row.qty),
 				"delivered_qty": flt(row.delivered_qty),
+				"delivered_by_supplier": cint(row.delivered_by_supplier),
 				"rate": flt(row.rate),
 				"amount": flt(row.amount),
 				"image": row.image,
@@ -715,6 +716,7 @@ def read_order_lines(order_names: list[str]) -> dict[str, list]:
 			"item_name",
 			"qty",
 			"delivered_qty",
+			"delivered_by_supplier",
 			"rate",
 			"amount",
 			"image",
@@ -879,8 +881,21 @@ def can_fulfil_order(order, state) -> bool:
 	"""Whether there is anything left for the owner to ship. per_delivered alone is not the answer: a
 	return resets it, so a returned order used to offer a live "Fulfil order" button."""
 	return (
-		cint(order.docstatus) == 1 and flt(order.per_delivered) < 100 and state["key"] not in SETTLED_STAGES
+		cint(order.docstatus) == 1
+		and flt(order.per_delivered) < 100
+		and state["key"] not in SETTLED_STAGES
+		and bool(get_lines_the_store_ships(order.lines))
 	)
+
+
+def get_lines_the_store_ships(lines) -> list:
+	"""Outstanding lines a Delivery Note can take. ERPNext's mapper leaves out drop-ship lines: the supplier
+	ships those against a Purchase Order."""
+	return [
+		line
+		for line in lines
+		if not cint(line.delivered_by_supplier) and flt(line.delivered_qty) < flt(line.qty)
+	]
 
 
 @frappe.whitelist(methods=["POST"])
@@ -900,6 +915,8 @@ def fulfil_order(sales_order: str):
 		frappe.throw(_("Only a confirmed order can be fulfilled."))
 	if flt(order.per_delivered) >= 100:
 		frappe.throw(_("This order has already been fulfilled."))
+	if not get_lines_the_store_ships(order.items):
+		frappe.throw(_("The items left on this order are shipped by their supplier, not from your store."))
 
 	# A screen left open on a stale list can still reach here, so enforce and not just hide.
 	lifecycle = read_order_lifecycles([order.name]).get(cstr(order.name), frappe._dict())
