@@ -93,6 +93,32 @@ export function extensionSettingsTabs() {
   }))
 }
 
+function appKeywords(entry) {
+  return [appTitle(entry.app).toLowerCase(), entry.app, ...(entry.keywords ?? [])]
+}
+
+// Every app page is a palette destination, sidebar or not, so an app never has to declare one twice.
+export function appPageCommands() {
+  return placeEntries('pages').map((entry) => ({
+    id: `ext:${entry.key}`,
+    label: entry.label,
+    icon: lucideIcon(entry.icon),
+    keywords: appKeywords(entry),
+    to: pageRoute(entry),
+  }))
+}
+
+export function appCommands() {
+  return placeEntries('commands').map((entry) => ({
+    id: `ext:${entry.key}`,
+    label: entry.label,
+    icon: lucideIcon(entry.icon, 'zap'),
+    keywords: appKeywords(entry),
+    appTitle: appTitle(entry.app),
+    entry,
+  }))
+}
+
 const PLACE_LABELS = {
   pages: 'Page',
   'order/cards': 'Order card',
@@ -102,6 +128,7 @@ const PLACE_LABELS = {
   'product/actions': 'Product action',
   'customer/actions': 'Customer action',
   settings: 'Settings tab',
+  commands: 'Command',
 }
 
 export function placeLabel(place) {

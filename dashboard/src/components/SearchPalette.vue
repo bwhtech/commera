@@ -1,7 +1,7 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { KeyboardShortcut, useKeyboardShortcut } from 'frappe-ui'
+import { KeyboardShortcut, dialog, toast, useKeyboardShortcut } from 'frappe-ui'
 import {
   CommandPalette,
   CommandPaletteEmpty,
@@ -12,10 +12,11 @@ import {
   CommandPaletteList,
 } from 'frappe-ui/experimental'
 import EmptyState from './EmptyState.vue'
-import { useAdminRead } from '../data/api'
+import { useAdminAction, useAdminRead } from '../data/api'
 import { money, priceRange } from '../data/format'
 import { SETTINGS_TABS, openSettings } from '../ia/settings'
 import { search } from '../ia/search'
+import { appCommands, appPageCommands } from '../ia/extensions'
 import { customerRoute, orderRoute, productRoute } from '../ia/routes'
 import { openImport } from '../data/importFlow'
 import { openAddProduct } from '../data/addProduct'
@@ -106,6 +107,7 @@ const GO_TO = [
   { id: 'go-stock-report', label: 'Inventory report', icon: 'lucide-chart-line', keywords: ['analytics', 'dead stock', 'cover'], run: () => router.push('/analytics/inventory') },
   { id: 'go-storefront-report', label: 'Storefront report', icon: 'lucide-globe', keywords: ['analytics', 'sessions', 'funnel'], run: () => router.push('/analytics/storefront') },
   { id: 'go-theme', label: 'Storefront theme', icon: 'lucide-palette', keywords: ['design', 'brand'], run: () => router.push('/storefront/theme') },
+  ...appPageCommands().map((page) => ({ ...page, run: () => router.push(page.to) })),
 ]
 
 const CREATE = [
@@ -126,10 +128,29 @@ const SETTINGS = [
   })),
 ]
 
+const runAppCommand = useAdminAction('extensions.run_command')
+
+async function runApp(entry) {
+  const result = await runAppCommand.submit({ key: entry.key })
+  if (runAppCommand.error) return
+  toast.success(result?.message || `${entry.label} done`)
+}
+
+// The palette closes only after its select handler returns, so a confirm opened straight away would sit on a
+// dialog that is about to close and lose focus with it.
+async function startApp(entry) {
+  await nextTick()
+  if (!entry.confirm) return runApp(entry)
+  dialog.confirm({ title: entry.label, message: entry.confirm, confirmLabel: entry.label, onConfirm: () => runApp(entry) })
+}
+
+const APPS = appCommands().map((command) => ({ ...command, suffix: command.appTitle, run: () => startApp(command.entry) }))
+
 const ALL = [
   { label: 'Go to', commands: GO_TO },
   { label: 'Create', commands: CREATE },
   { label: 'Settings', commands: SETTINGS },
+  { label: 'Apps', commands: APPS },
 ]
 
 // Before you type, the palette is a short menu — the five destinations worth a
@@ -259,6 +280,9 @@ function onSelect(value) {
             <span :class="[command.icon, 'mr-2.5 size-4 shrink-0 text-ink-gray-5']" aria-hidden="true" />
           </template>
           {{ command.label }}
+          <template v-if="command.suffix" #suffix>
+            <span class="text-sm text-ink-gray-5">{{ command.suffix }}</span>
+          </template>
         </CommandPaletteItem>
       </CommandPaletteGroup>
     </CommandPaletteList>
