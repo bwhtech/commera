@@ -735,7 +735,44 @@ def get_status_event_args(event: str, status: str) -> dict:
 	}
 
 
+FORWARD_STATUSES = ("Order Received", "Preparing for Shipment", "Shipped", "Delivered")
+
+
 def get_fulfilment_status(sales_order_name) -> str:
+	lines = frappe.get_all(
+		"Sales Order Item",
+		filters={"parent": sales_order_name},
+		fields=["delivered_by_supplier", "qty", "delivered_qty"],
+	)
+	supplier_lines = [line for line in lines if line.delivered_by_supplier]
+	if not supplier_lines:
+		return get_store_status(sales_order_name)
+
+	supplier_status = get_supplier_status(sales_order_name, supplier_lines)
+	if len(supplier_lines) == len(lines):
+		return supplier_status
+	# Mixed order: a Shipping Request without a Delivery Note is the supplier's parcel, not the store's.
+	return get_earlier_status(get_store_status(sales_order_name, from_delivery_note=True), supplier_status)
+
+
+def get_supplier_status(sales_order_name, supplier_lines) -> str:
+	# ERPNext rolls the drop-ship Purchase Order's received qty into these lines' delivered_qty.
+	if all(flt(line.delivered_qty) >= flt(line.qty) for line in supplier_lines):
+		return "Delivered"
+	return get_carrier_status(sales_order_name, from_delivery_note=False) or "Order Received"
+
+
+def get_earlier_status(store_status: str, supplier_status: str) -> str:
+	for status in (store_status, supplier_status):
+		if status not in FORWARD_STATUSES:
+			return status
+	earlier, later = sorted((store_status, supplier_status), key=FORWARD_STATUSES.index)
+	if earlier == "Order Received" and later != earlier:
+		return "Preparing for Shipment"
+	return earlier
+
+
+def get_store_status(sales_order_name, from_delivery_note: bool | None = None) -> str:
 	delivery_lines = get_delivery_note_lines(sales_order_name)
 	submitted_lines = [line for line in delivery_lines if line.docstatus == 1]
 	delivered_qty = sum(flt(line.qty) for line in submitted_lines if not line.is_return)
@@ -746,7 +783,7 @@ def get_fulfilment_status(sales_order_name) -> str:
 	if returned_qty:
 		return "Partially Returned"
 
-	if carrier_status := get_carrier_status(sales_order_name):
+	if carrier_status := get_carrier_status(sales_order_name, from_delivery_note):
 		return carrier_status
 
 	if delivered_qty:
@@ -758,10 +795,13 @@ def get_fulfilment_status(sales_order_name) -> str:
 	return "Order Received"
 
 
-def get_carrier_status(sales_order_name) -> str | None:
+def get_carrier_status(sales_order_name, from_delivery_note: bool | None = None) -> str | None:
+	filters = {"ref_doctype": "Sales Order", "ref_docname": sales_order_name, "docstatus": ["<", 2]}
+	if from_delivery_note is not None:
+		filters["delivery_note"] = ["is", "set" if from_delivery_note else "not set"]
 	requests = frappe.get_all(
 		"Shipping Request",
-		filters={"ref_doctype": "Sales Order", "ref_docname": sales_order_name, "docstatus": ["<", 2]},
+		filters=filters,
 		fields=["status"],
 		order_by="creation desc",
 		limit=1,
