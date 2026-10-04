@@ -226,27 +226,19 @@ class CommeraSettings(Document):
 
 	@frappe.whitelist()
 	def install_demo_data(self):
-		"""Seed the Summer demo storefront in the store's own currency.
+		"""Seed the Summer demo storefront in the company's own currency.
 		Not install_demo_data: its price lists are hardcoded USD, which blocks every Sales Invoice on a non-USD company.
 		"""
-		from commera.install_summer_demo import (
-			CURRENCY_PROFILES,
-			DEFAULT_CURRENCY,
-			get_company_currency,
-			install_summer_demo,
-		)
+		from commera.install_summer_demo import get_currency_profile, get_demo_company, install_summer_demo
 
-		# A store already trading in a supported currency keeps it; anything else gets the default.
-		currency = get_company_currency()
-		if currency not in CURRENCY_PROFILES:
-			currency = DEFAULT_CURRENCY
+		# Refused here rather than in the job, so the merchant sees why nothing was seeded.
+		get_currency_profile(frappe.db.get_value("Company", get_demo_company(), "default_currency"))
 
 		frappe.enqueue(
 			install_summer_demo,
 			queue="long",
 			timeout=3000,
 			enqueue_after_commit=True,
-			currency=currency,
 		)
 
 		return "Demo data installation has been queued. This may take a few minutes. Check the background jobs for progress."
