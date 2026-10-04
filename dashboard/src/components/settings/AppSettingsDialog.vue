@@ -220,15 +220,27 @@ watch(
 
 <style>
 /* frappe-ui's Dialog keeps its card gutter on a phone, which pushes the full-screen settings
-   past the viewport, and its panels keep their desktop insets. */
+   past the viewport, and its panels keep their desktop insets. Its wrapper is min-h-screen
+   (100vh), which on a real phone is taller than the visible 100dvh while the address bar
+   shows, so the centred dialog gets a gap above and below. Headless Chrome hides this. */
 @media (max-width: 639.98px) {
   .dialog-scroll-container > div:has(.commera-settings) {
+    min-height: 100dvh;
+    justify-content: flex-start;
     padding: 0;
   }
 
   .dialog-content:has(.commera-settings) {
     margin: 0;
     border-radius: 0;
+  }
+
+  /* frappe-ui's SettingsRow is always side by side; a row with a full-size control stacks,
+     like buzz's settings, so the label keeps the width. */
+  .commera-settings .gap-8.py-3\.5:has(.sm\:w-72, .sm\:w-40) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
   }
 
   .commera-settings .px-\[4\.4rem\] {

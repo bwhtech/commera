@@ -74,7 +74,7 @@ const enabled = computed(() => Boolean(values.value.allow_guest_checkout))
       >
         <TextInput
           :model-value="values.guest_order_link_days"
-          class="w-40"
+          class="w-full sm:w-40"
           type="number"
           min="0"
           :disabled="save.loading"
