@@ -20,6 +20,7 @@ CLIENT_FIELDS = (
 	"name",
 	"label",
 	"icon",
+	"keywords",
 	"order",
 	"sidebar",
 	"doctype",
@@ -187,6 +188,8 @@ def get_module_reason(entry: dict, spec: dict) -> str | None:
 	module = entry["module"]
 	if spec["module"] == "required" and not module:
 		return "It has no built module."
+	if spec["module"] == "none" and module:
+		return f"{entry['place']} is declared by its extension block alone; remove the template."
 	if spec["module"] == "optional" and bool(module) == bool(entry["method"] or entry["doctype"]):
 		return "It needs exactly one of a template or a declared method or doctype."
 	if module and not is_contained_asset(module, ".js"):

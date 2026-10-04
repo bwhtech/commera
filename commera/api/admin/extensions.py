@@ -16,6 +16,11 @@ from commera.extensions.registry import (
 	resolve_record_extensions,
 )
 
+RECORD_ACTION_PLACES = frozenset(
+	place for place, spec in PLACES.items() if spec["doctype"] and "method" in spec["fields"]
+)
+COMMAND_PLACES = frozenset({"commands"})
+
 
 @frappe.whitelist()
 def get_record_extensions(doctype: str, name: str | int) -> dict:
@@ -29,21 +34,43 @@ def get_record_extensions(doctype: str, name: str | int) -> dict:
 
 @frappe.whitelist(methods=["POST"])
 def run_record_action(key: str, name: str | int) -> dict:
+	method = get_runnable_method(key, RECORD_ACTION_PLACES, name)
+	return get_action_result(method(name=name))
+
+
+@frappe.whitelist(methods=["POST"])
+def run_command(key: str) -> dict:
+	method = get_runnable_method(key, COMMAND_PLACES)
+	return get_action_result(method())
+
+
+def get_runnable_method(key: str, places: frozenset, name: str | int | None = None):
 	entry = get_registry_entry(key)
-	if not entry or not entry["method"]:
+	if not entry or not entry["method"] or entry["place"] not in places:
 		frappe.throw(_("App action {0} not found").format(key), frappe.DoesNotExistError)
 	if entry.get("error"):
 		frappe.throw(entry["error"])
 
 	doctype = PLACES[entry["place"]]["doctype"]
-	frappe.has_permission(doctype, "read", doc=name, throw=True)
+	if doctype:
+		frappe.has_permission(doctype, "read", doc=name, throw=True)
 	method = get_whitelisted_method(entry["app"], entry["method"])
+	condition_arguments = (doctype, name) if doctype else ()
 	if not (
-		method and has_required_access(entry, frappe.session.user) and passes_condition(entry, doctype, name)
+		method
+		and has_required_access(entry, frappe.session.user)
+		and passes_condition(entry, *condition_arguments)
 	):
-		frappe.throw(_("{0} isn't available for {1}").format(entry["label"], name), frappe.PermissionError)
+		message = (
+			_("{0} isn't available for {1}").format(entry["label"], name)
+			if doctype
+			else _("{0} isn't available").format(entry["label"])
+		)
+		frappe.throw(message, frappe.PermissionError)
+	return method
 
-	message = method(name=name)
+
+def get_action_result(message) -> dict:
 	return {"message": message if isinstance(message, str) else None}
 
 

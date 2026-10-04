@@ -20,6 +20,7 @@ from commera.api.admin import apps as apps_api
 from commera.api.admin.extensions import (
 	get_app_settings,
 	get_record_extensions,
+	run_command,
 	run_record_action,
 	save_app_setting,
 )
@@ -72,6 +73,16 @@ def unlisted_method(name):
 	return "never runs"
 
 
+@frappe.whitelist(methods=["POST"])
+def sync_orders():
+	return "Synced 3 orders"
+
+
+@frappe.whitelist(methods=["POST"])
+def sync_quietly():
+	return {"synced": 3}
+
+
 def page(name="jobs", **fields) -> dict:
 	return {
 		"place": "pages",
@@ -103,6 +114,18 @@ def action(name="resend", place="order/actions", **fields) -> dict:
 		"label": "Resend to printer",
 		"method": f"{FUNCTIONS}.resend_order",
 		"confirm": "Send it again?",
+		**fields,
+	}
+
+
+def command(name="sync", **fields) -> dict:
+	return {
+		"place": "commands",
+		"name": name,
+		"module": None,
+		"label": "Sync orders",
+		"keywords": ["printer"],
+		"method": f"{FUNCTIONS}.sync_orders",
 		**fields,
 	}
 
@@ -146,7 +169,16 @@ class ExtensionTestCase(IntegrationTestCase):
 		self.declare_apps({APP: [API_VERSION], OTHER_APP: [API_VERSION]})
 
 		module = ModuleType(FUNCTIONS)
-		for function in (show_record, hide_record, show_page, hide_page, raise_error, resend_order):
+		for function in (
+			show_record,
+			hide_record,
+			show_page,
+			hide_page,
+			raise_error,
+			resend_order,
+			sync_orders,
+			sync_quietly,
+		):
 			setattr(module, function.__name__, function)
 		module.unlisted_method = unlisted_method
 		sys.modules[FUNCTIONS] = module
@@ -281,6 +313,9 @@ class TestExtensionValidation(ExtensionTestCase):
 			"page without a module": page(module=None),
 			"module outside public/commera": page(module="../../secrets.js"),
 			"icon outside the set": page(icon="lucide-printer"),
+			"command with a module": command(module="commands/sync.js"),
+			"command without a method": command(method=None),
+			"command with an unwhitelisted method": command(method=f"{FUNCTIONS}.unlisted_method"),
 		}
 		for case, entry in invalid_entries.items():
 			with self.subTest(case=case):
@@ -404,7 +439,19 @@ class TestExtensionVisibility(ExtensionTestCase):
 		)
 		self.assertEqual(
 			set(extensions["entries"][0]),
-			{"key", "app", "place", "name", "label", "icon", "order", "sidebar", "doctype", "confirm"}
+			{
+				"key",
+				"app",
+				"place",
+				"name",
+				"label",
+				"icon",
+				"keywords",
+				"order",
+				"sidebar",
+				"doctype",
+				"confirm",
+			}
 			| {"module_url", "error", "has_condition", "has_method"},
 		)
 		self.assertTrue(extensions["entries"][0]["sidebar"])
@@ -474,6 +521,55 @@ class TestRecordExtensions(ExtensionTestCase):
 		for key in (f"{APP}:order/cards:shown", f"{APP}:order/actions:missing"):
 			with self.subTest(key=key), self.assertRaises(frappe.DoesNotExistError):
 				run_record_action(key, self.sales_order)
+
+
+class TestCommands(ExtensionTestCase):
+	def setUp(self):
+		super().setUp()
+		self.write_manifest(
+			[
+				command("sync"),
+				command("quiet", label="Sync quietly", method=f"{FUNCTIONS}.sync_quietly"),
+				command("hidden", label="Hidden", condition=f"{FUNCTIONS}.hide_page"),
+				command("quotes-only", label="Quotes only", requires="Quotation"),
+				action("resend"),
+				page("jobs"),
+			]
+		)
+
+	def test_the_boot_lists_only_commands_whose_condition_and_requires_pass(self):
+		commands = {
+			entry["name"]: entry
+			for entry in get_visible_extensions(STOCK_USER)["entries"]
+			if entry["place"] == "commands"
+		}
+
+		self.assertEqual(sorted(commands), ["quiet", "sync"])
+		self.assertEqual(commands["sync"]["keywords"], ["printer"])
+		self.assertTrue(commands["sync"]["has_method"])
+		self.assertFalse(commands["sync"]["has_condition"])
+
+	def test_running_a_command_returns_its_message_or_none(self):
+		with self.set_user(STOCK_USER):
+			self.assertEqual(run_command(f"{APP}:commands:sync"), {"message": "Synced 3 orders"})
+			self.assertEqual(run_command(f"{APP}:commands:quiet"), {"message": None})
+
+	def test_running_a_command_rechecks_its_condition_and_requires(self):
+		with self.set_user(STOCK_USER):
+			for key in (f"{APP}:commands:hidden", f"{APP}:commands:quotes-only"):
+				with self.subTest(key=key), self.assertRaises(frappe.PermissionError):
+					run_command(key)
+
+		with self.set_user(SYSTEM_MANAGER):
+			self.assertEqual(run_command(f"{APP}:commands:quotes-only")["message"], "Synced 3 orders")
+
+	def test_only_a_command_runs_as_a_command_and_only_an_action_runs_on_a_record(self):
+		for key in (f"{APP}:order/actions:resend", f"{APP}:pages:jobs", f"{APP}:commands:missing"):
+			with self.subTest(key=key), self.assertRaises(frappe.DoesNotExistError):
+				run_command(key)
+
+		with self.assertRaises(frappe.DoesNotExistError):
+			run_record_action(f"{APP}:commands:sync", make_test_sales_order(submit=False).name)
 
 
 class TestAppSettings(ExtensionTestCase):
