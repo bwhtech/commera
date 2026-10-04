@@ -10,6 +10,7 @@ const SHARED = {
   vue: 'runtime-vue',
   'frappe-ui': 'runtime-frappe-ui',
   'frappe-ui/list': 'runtime-frappe-ui-list',
+  'frappe-ui/charts': 'runtime-frappe-ui-charts',
   '@commera/admin': 'runtime-commera-admin',
 }
 
@@ -95,6 +96,7 @@ export default defineConfig({
         'runtime-vue': fromHere('./src/runtime/vue.js'),
         'runtime-frappe-ui': fromHere('./src/runtime/frappe-ui.js'),
         'runtime-frappe-ui-list': fromHere('./src/runtime/frappe-ui-list.js'),
+        'runtime-frappe-ui-charts': fromHere('./src/runtime/frappe-ui-charts.js'),
         'runtime-commera-admin': fromHere('./src/extension-api/index.js'),
       },
       // Nothing in the dashboard imports the runtime entries by name, so without this Rollup tree-shakes their exports.

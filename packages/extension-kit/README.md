@@ -128,8 +128,8 @@ Throw `request.error` from `onSubmit` and the dialog shows it once.
 - Strips the plain `<script>` from the shipped JS, so dotted paths only live in the manifest.
 - Copies `commera/icon.svg`, if there is one, to `my_app/public/commera/icon.svg` and adds `"icon": "icon.svg"`
   to the manifest.
-- Does not bundle `vue`, `frappe-ui`, `frappe-ui/list` or `@commera/admin`. The dashboard supplies them at
-  runtime through its import map.
+- Does not bundle `vue`, `frappe-ui`, `frappe-ui/list`, `frappe-ui/charts` or `@commera/admin`. The dashboard
+  supplies them at runtime through its import map.
 - Puts `/* commera-extension-api: 1 */` on line 1 of each module. Commera refuses a module or a manifest
   with a different version and shows the reason in place of the extension.
 
@@ -155,7 +155,7 @@ Folder and `extension` problems are collected and reported together.
 | A `<style>` block or a stylesheet import | `<style>.x { color: red }</style>` |
 | A static class the dashboard does not ship | `class="p-13"` |
 | A name the dashboard's shared modules do not export | `import { Foo } from 'frappe-ui'` |
-| A subpath that is not shared | `import { AxisChart } from 'frappe-ui/charts'` |
+| A subpath that is not shared | `import { TextEditor } from 'frappe-ui/editor'` |
 
 An `index.vue` under a reserved folder (`orders/actions`, `orders/selection`, `products/actions`,
 `products/selection`, `customers/actions`) only warns: those placements come in a later Commera.

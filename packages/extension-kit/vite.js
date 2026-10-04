@@ -12,7 +12,13 @@ const GRAMMAR = JSON.parse(
 	readFileSync(new URL('./places.json', import.meta.url), 'utf8'),
 );
 const BANNER = `/* commera-extension-api: ${API_VERSION} */`;
-const SHARED = ['vue', 'frappe-ui', 'frappe-ui/list', '@commera/admin'];
+const SHARED = [
+	'vue',
+	'frappe-ui',
+	'frappe-ui/list',
+	'frappe-ui/charts',
+	'@commera/admin',
+];
 const SHARED_ROOTS = ['vue', 'frappe-ui', '@commera/admin'];
 const STYLESHEET = /\.(css|scss|sass|less|styl|stylus|pcss|postcss)(\?|$)/;
 const NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;

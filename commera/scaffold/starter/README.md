@@ -27,6 +27,8 @@ you don't use.
 - Read and write data with `useMethodRead` and `useMethodAction` from `@commera/admin`, pointed at a
   whitelisted method in `$app_name/api.py`. frappe-ui's `createResource`, `useCall`, `useList`, `useDoc`
   and the like call Frappe's v1 API, which the dashboard reads as null, so they fail the build.
+- Import shared code only from `vue`, `frappe-ui`, `frappe-ui/list`, `frappe-ui/charts` and `@commera/admin`;
+  the dashboard supplies them. Any other `frappe-ui/` subpath fails the build.
 - No `<style>` blocks: use the frappe-ui classes the dashboard already ships.
 - Folders that are not in the table are ignored. Put shared components and helpers in any other folder,
   for example `commera/shared/`, and import them with a relative path.

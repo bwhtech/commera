@@ -50,6 +50,7 @@ writeFileSync(
 		),
 		'frappe-ui': ['Button', 'Dialog', 'dialog'],
 		'frappe-ui/list': [],
+		'frappe-ui/charts': ['AreaChart', 'BarChart'],
 		'@commera/admin': ['useExtension', 'usePage', 'useAction'],
 	}),
 );
@@ -363,9 +364,25 @@ describe('guards', () => {
 	test('an unshared subpath fails', async () => {
 		await buildFails(
 			{
-				'pages/jobs/index.vue': `${page}<script setup>\nimport { AxisChart } from 'frappe-ui/charts'\nconsole.log(AxisChart)\n</script>\n`,
+				'pages/jobs/index.vue': `${page}<script setup>\nimport { TextEditor } from 'frappe-ui/editor'\nconsole.log(TextEditor)\n</script>\n`,
 			},
-			/import 'frappe-ui\/charts' is not shared with app pages/,
+			/import 'frappe-ui\/editor' is not shared with app pages/,
+		);
+	});
+
+	test('a chart from frappe-ui/charts builds and stays external', async () => {
+		const { read } = await buildApp({
+			'pages/jobs/index.vue': `${page}<script setup>\nimport { BarChart } from 'frappe-ui/charts'\nconsole.log(BarChart)\n</script>\n`,
+		});
+		assert.match(read('pages/jobs.js'), /from\s*["']frappe-ui\/charts["']/);
+	});
+
+	test('a chart the dashboard does not share fails', async () => {
+		await buildFails(
+			{
+				'pages/jobs/index.vue': `${page}<script setup>\nimport { SankeyChart } from 'frappe-ui/charts'\nconsole.log(SankeyChart)\n</script>\n`,
+			},
+			/'frappe-ui\/charts' does not share SankeyChart with app pages/,
 		);
 	});
 

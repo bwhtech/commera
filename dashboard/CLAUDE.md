@@ -142,9 +142,9 @@ time. Light and dark both, and the `sm` breakpoint both sides.
 
 ## 10 — `src/extension-api/` is a public API
 
-Installed apps import it as `@commera/admin`, next to `vue`, `frappe-ui` and `frappe-ui/list`, through the
-import map `vite.config.js` writes into `commera.html`. Renaming or removing an export, a prop of a re-exported
-component, or a `useExtension()` member breaks every app built against it; add, never change. The build also
+Installed apps import it as `@commera/admin`, next to `vue`, `frappe-ui`, `frappe-ui/list` and `frappe-ui/charts`,
+through the import map `vite.config.js` writes into `commera.html`. Renaming or removing an export, a prop of a
+re-exported component, or a `useExtension()` member breaks every app built against it; add, never change. The build also
 writes `commera/public/extension-host/` (shared export names, the class vocabulary and the icon list), which
 the extension kit in `packages/extension-kit/` checks app builds against.
 
