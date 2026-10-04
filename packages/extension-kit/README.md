@@ -14,7 +14,7 @@ my_app/                              # app root
 │   ├── order/cards/status/index.vue # a card on the order page
 │   ├── order/actions/resend/index.vue
 │   ├── settings/index.vue           # the app's Settings tab
-│   ├── icon.svg                     # optional sidebar logo
+│   ├── icon.svg                     # optional app icon
 │   └── shared/                      # anything else is your own code
 └── my_app/public/commera/           # build output, gitignored
 ```
@@ -52,7 +52,7 @@ The folder decides where an extension goes. `places.json` is the one list; Comme
 
 | Path under `commera/` | Where it shows | `extension` fields: **required** / optional |
 | --- | --- | --- |
-| `pages/<name>/index.vue` | `/commera/apps/<app>/<name>`, plus a sidebar row | **label, icon** / requires, condition, sidebar, order |
+| `pages/<name>/index.vue` | `/commera/apps/<app>/<name>`, plus a sidebar row | **label** / icon, requires, condition, sidebar, order |
 | `{order,product,customer}/cards/<name>/index.vue` | A card on that record's page | **label** / requires, condition, order |
 | `{order,product,customer}/actions/<name>/index.vue` | A row in that page's More actions menu | **label** / icon, requires, condition, method, confirm, order |
 | `settings/index.vue` | The app's tab in Settings | **label** / icon, requires, condition, doctype |
@@ -87,17 +87,20 @@ export const extension = {
 - `condition` and `method` are dotted paths that start with your app's module name. A page or settings
   `condition` takes no arguments; a card or action `condition` gets `(doctype, name)`. A command `condition`
   takes no arguments, like a page's.
-- `icon` is a name from `commera/sdk/extension_icons.json`.
+- `icon` is optional; without it the entry uses the app's icon (`commera/icon.svg`). It is a name from
+  `commera/sdk/extension_icons.json`.
 
 Every other folder and file under `commera/` is yours: components, composables, sub-pages. Only an
 `index.vue` at a placement path is built as an extension.
 
 ## App logo
 
-Put an optional `commera/icon.svg` next to `pages/`. The sidebar's app row and Settings → Apps show it in
-one colour, the same ink as the other sidebar icons, in light and dark mode. Draw it on a 24 × 24 viewBox
-with filled shapes or strokes; the colours in the file are ignored. Without it, the row uses the first
-page's `icon`.
+Put an optional `commera/icon.svg` next to `pages/`. Set it once: it is the icon of everything your app
+adds, from the sidebar and Settings → Apps to your settings tab, palette rows and More actions rows. An entry
+with its own `icon` shows that one instead. The logo is drawn in one colour, the same ink as the other icons,
+in light and dark mode. Draw it on a 24 × 24 viewBox with filled shapes or strokes; the colours in the file are
+ignored. Without it, the app's sidebar row uses the first page's `icon`, and an entry without an `icon` uses
+the dashboard's generic one.
 
 ## The dashboard draws the frame
 

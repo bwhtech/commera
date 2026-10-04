@@ -1,3 +1,5 @@
+import { h } from 'vue'
+import AppIcon from '../components/AppIcon.vue'
 import { bootValue } from '../data/boot'
 
 // commera/www/commera.py has already filtered these for the session user, so the client only places them.
@@ -21,9 +23,24 @@ export function appTitle(app) {
   return apps[app]?.title || app
 }
 
+// A logo is an SVG URL, so it travels as a component: frappe-ui's icon props and `Icon` take either kind.
+const logoIcons = new Map()
+
+function logoIcon(iconUrl) {
+  if (!logoIcons.has(iconUrl)) logoIcons.set(iconUrl, () => h(AppIcon, { src: iconUrl }))
+  return logoIcons.get(iconUrl)
+}
+
 // An app without its own logo borrows its first page's icon.
-export function appFallbackIcon(app) {
-  return lucideIcon(appPages(app)[0]?.icon)
+export function appIcon(app, iconUrl = apps[app]?.icon_url) {
+  return iconUrl ? logoIcon(iconUrl) : lucideIcon(appPages(app)[0]?.icon)
+}
+
+// An entry's own icon wins; without one it wears its app's logo, then the place's generic icon.
+export function extensionIcon(entry, fallback) {
+  if (entry.icon) return lucideIcon(entry.icon)
+  const iconUrl = apps[entry.app]?.icon_url
+  return iconUrl ? logoIcon(iconUrl) : lucideIcon(null, fallback)
 }
 
 // Every app link resolves like an href against the app's root, so 'jobs/JOB-1', '../orders' and '/orders/X'
@@ -56,7 +73,7 @@ export function firstPageRoute(app) {
 }
 
 function pageNavItem(entry) {
-  return { label: entry.label, icon: lucideIcon(entry.icon), to: pageRoute(entry) }
+  return { label: entry.label, icon: extensionIcon(entry), to: pageRoute(entry) }
 }
 
 // One row per app: its only page, or a disclosure over its pages shaped like the Analytics row.
@@ -67,11 +84,10 @@ export function appNavItems() {
   return [...byApp.entries()]
     .map(([app, pages]) =>
       pages.length === 1
-        ? { ...pageNavItem(pages[0]), iconUrl: apps[app]?.icon_url }
+        ? { ...pageNavItem(pages[0]), icon: appIcon(app) }
         : {
             label: appTitle(app),
-            icon: lucideIcon(pages[0].icon),
-            iconUrl: apps[app]?.icon_url,
+            icon: appIcon(app),
             to: `/apps/${app}`,
             children: pages.map(pageNavItem),
           },
@@ -87,7 +103,7 @@ export function extensionSettingsTabs() {
   return placeEntries('settings').map((entry) => ({
     value: settingsTabValue(entry.app),
     label: entry.label,
-    icon: lucideIcon(entry.icon, 'settings'),
+    icon: extensionIcon(entry, 'settings'),
     keywords: [appTitle(entry.app).toLowerCase(), entry.app],
     entry,
   }))
@@ -102,7 +118,7 @@ export function appPageCommands() {
   return placeEntries('pages').map((entry) => ({
     id: `ext:${entry.key}`,
     label: entry.label,
-    icon: lucideIcon(entry.icon),
+    icon: extensionIcon(entry),
     keywords: appKeywords(entry),
     to: pageRoute(entry),
   }))
@@ -112,7 +128,7 @@ export function appCommands() {
   return placeEntries('commands').map((entry) => ({
     id: `ext:${entry.key}`,
     label: entry.label,
-    icon: lucideIcon(entry.icon, 'zap'),
+    icon: extensionIcon(entry, 'zap'),
     keywords: appKeywords(entry),
     appTitle: appTitle(entry.app),
     entry,

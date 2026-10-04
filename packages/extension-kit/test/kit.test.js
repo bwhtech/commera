@@ -176,8 +176,9 @@ describe('folder grammar', () => {
 				'order/cards/status/index.vue': vue(
 					`{ label: 'Status', sidebar: true }`,
 				),
+				'order/cards/total/index.vue': vue('{ order: 1 }'),
 			},
-			/2 problems[\s\S]*extension\.sidebar is not allowed on order\/cards[\s\S]*extension\.icon is required/,
+			/2 problems[\s\S]*extension\.sidebar is not allowed on order\/cards[\s\S]*extension\.label is required/,
 		);
 	});
 });
@@ -634,6 +635,15 @@ describe('the app icon', () => {
 		});
 		assert.equal(manifest.icon, 'icon.svg');
 		assert.equal(read('icon.svg'), svg);
+	});
+
+	test('a page without its own icon builds and leaves the icon to the app', async () => {
+		const { manifest } = await buildApp({
+			'pages/jobs/index.vue': vue(`{ label: 'Print jobs' }`),
+			'icon.svg': svg,
+		});
+		assert.equal(manifest.icon, 'icon.svg');
+		assert.equal('icon' in manifest.extensions[0], false);
 	});
 
 	test('without an icon.svg the manifest has no icon', async () => {

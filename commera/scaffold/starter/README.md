@@ -23,7 +23,8 @@ you don't use.
   `useAction()`; don't import `AppPageHeader`, `PageBody` or frappe-ui's `Dialog`.
 - `condition` and `method` are dotted paths that start with `$app_name.`. A page or settings `condition`
   takes no arguments; a card or action `condition` gets `(doctype, name)` and returns a bool.
-- `icon` is a name from Commera's list (`commera/sdk/extension_icons.json`), such as `gift` or `star`.
+- `icon` is optional; without it the entry uses the app's icon (`commera/icon.svg`). It is a name from
+  Commera's list (`commera/sdk/extension_icons.json`), such as `gift` or `star`.
 - Read and write data with `useMethodRead` and `useMethodAction` from `@commera/admin`, pointed at a
   whitelisted method in `$app_name/api.py`. frappe-ui's `createResource`, `useCall`, `useList`, `useDoc`
   and the like call Frappe's v1 API, which the dashboard reads as null, so they fail the build.

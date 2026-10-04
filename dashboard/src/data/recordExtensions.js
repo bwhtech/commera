@@ -1,7 +1,7 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { dialog, toast } from 'frappe-ui'
 import { useAdminAction, useAdminRead } from './api'
-import { lucideIcon, placeEntries } from '../ia/extensions'
+import { extensionIcon, placeEntries } from '../ia/extensions'
 
 /**
  * The installed apps' cards and actions for one record page. Every conditional entry is resolved in one
@@ -70,7 +70,7 @@ export function useRecordExtensions(place, doctype, nameGetter, { onReload } = {
           group: 'Apps',
           options: actions.value.map((entry) => ({
             label: entry.label,
-            icon: lucideIcon(entry.icon),
+            icon: extensionIcon(entry),
             onClick: () => start(entry),
           })),
         }

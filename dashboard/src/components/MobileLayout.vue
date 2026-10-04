@@ -1,9 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { BottomSheet, MobileNav, MobileNavItem, MobileShell } from 'frappe-ui'
+import { BottomSheet, Icon, MobileNav, MobileNavItem, MobileShell } from 'frappe-ui'
 import { activeNavTarget, sections } from '../ia/nav'
-import AppIcon from './AppIcon.vue'
 
 // The four destinations that earn a permanent tab. Everything else is reached
 // through "More", so the bar stays thumb-sized on a 375px screen.
@@ -76,8 +75,7 @@ function closeMore(item) {
             :class="[rowClass, item.to === activeTarget ? 'bg-surface-gray-2' : '']"
             @click="closeMore()"
           >
-            <AppIcon v-if="item.iconUrl" :src="item.iconUrl" class="size-5 text-ink-gray-7" />
-            <span v-else :class="item.icon" class="size-5 text-ink-gray-7" aria-hidden="true" />
+            <Icon :name="item.icon" class="size-5 text-ink-gray-7" />
             {{ item.label }}
           </RouterLink>
 

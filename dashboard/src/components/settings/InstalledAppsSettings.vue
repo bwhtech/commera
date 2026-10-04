@@ -4,17 +4,16 @@
  * the store's orders. Opening one takes over this panel, like a payment provider, never a second dialog.
  */
 import { computed, ref, watch } from 'vue'
-import { Badge, Button, SettingsBody, Skeleton, TabButtons, toast } from 'frappe-ui'
+import { Badge, Button, Icon, SettingsBody, Skeleton, TabButtons, toast } from 'frappe-ui'
 import SettingsConfigHeader from './SettingsConfigHeader.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import EmptyState from '../EmptyState.vue'
 import ListPagination from '../ListPagination.vue'
-import AppIcon from '../AppIcon.vue'
 import ResponsiveButton from '../ResponsiveButton.vue'
 import StatusBadge from '../StatusBadge.vue'
 import { useAdminRead, useMethodAction } from '../../data/api'
 import { eventLabel, statusKey, timeLabel } from '../../data/appEvents'
-import { appFallbackIcon, extensionSettingsTabs, placeLabel, settingsTabValue } from '../../ia/extensions'
+import { appIcon, extensionSettingsTabs, placeLabel, settingsTabValue } from '../../ia/extensions'
 import { settings } from '../../ia/settings'
 import { orderRoute } from '../../ia/routes'
 
@@ -122,8 +121,7 @@ async function retry(row) {
 
       <div v-else class="divide-y divide-outline-gray-1">
         <div v-for="app in installedApps" :key="app.app" class="flex items-center gap-3 py-3">
-          <AppIcon v-if="app.icon_url" :src="app.icon_url" class="size-4 text-ink-gray-6" />
-          <span v-else :class="[appFallbackIcon(app.app), 'size-4 shrink-0 text-ink-gray-6']" aria-hidden="true" />
+          <Icon :name="appIcon(app.app, app.icon_url)" class="size-4 shrink-0 text-ink-gray-6" />
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
               <p class="truncate text-base text-ink-gray-8">{{ app.title }}</p>

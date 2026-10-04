@@ -4,7 +4,7 @@
 			"module": "required",
 			"doctype": null,
 			"fields": ["label", "icon", "requires", "condition", "sidebar", "order"],
-			"required": ["label", "icon"]
+			"required": ["label"]
 		},
 		"order/cards": {
 			"module": "required",

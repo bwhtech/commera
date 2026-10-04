@@ -1,6 +1,7 @@
 <script setup>
 import { watch } from 'vue'
 import {
+  Icon,
   SettingsBody,
   SettingsContent,
   SettingsDialog,
@@ -109,7 +110,7 @@ watch(
 
       <SettingsNavGroup v-if="appTabs.length" label="Installed apps">
         <SettingsNavItem v-for="tab in appTabs" :key="tab.value" :value="tab.value">
-          <template #prefix><span :class="[tab.icon, 'size-4']" aria-hidden="true" /></template>
+          <template #prefix><Icon :name="tab.icon" class="size-4" /></template>
           {{ tab.label }}
         </SettingsNavItem>
       </SettingsNavGroup>

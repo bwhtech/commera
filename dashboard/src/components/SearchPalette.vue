@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { KeyboardShortcut, dialog, toast, useKeyboardShortcut } from 'frappe-ui'
+import { Icon, KeyboardShortcut, dialog, toast, useKeyboardShortcut } from 'frappe-ui'
 import {
   CommandPalette,
   CommandPaletteEmpty,
@@ -277,7 +277,7 @@ function onSelect(value) {
           :value="{ kind: 'command', id: command.id }"
         >
           <template #prefix>
-            <span :class="[command.icon, 'mr-2.5 size-4 shrink-0 text-ink-gray-5']" aria-hidden="true" />
+            <Icon :name="command.icon" class="mr-2.5 size-4 shrink-0 text-ink-gray-5" />
           </template>
           {{ command.label }}
           <template v-if="command.suffix" #suffix>
