@@ -47,6 +47,7 @@ const FRAPPE_V1 = new Set([
 const FIELD_TYPES = {
 	label: 'text',
 	icon: 'icon',
+	keywords: 'texts',
 	requires: 'text',
 	condition: 'dotted',
 	method: 'dotted',
@@ -264,6 +265,12 @@ function checkField(key, value, { app, icons }) {
 			return typeof value === 'string' && value.trim()
 				? null
 				: 'must be non-empty text';
+		case 'texts':
+			return Array.isArray(value) &&
+				value.length &&
+				value.every((text) => typeof text === 'string' && text.trim())
+				? null
+				: 'must be a list of non-empty text';
 		case 'boolean':
 			return typeof value === 'boolean' ? null : 'must be true or false';
 		case 'number':
@@ -305,9 +312,13 @@ function checkExtension(extension, place, hasModule, context) {
 	for (const key of spec.required) {
 		if (!(key in extension)) problems.push(`extension.${key} is required`);
 	}
-	const declarative = place === 'settings' ? 'doctype' : 'method';
+	const { declarative } = spec;
 	if (spec.module === 'required' && !hasModule)
 		problems.push('needs a <template> or <script setup>');
+	if (spec.module === 'none' && hasModule)
+		problems.push(
+			`can't have a <template> or <script setup>; ${place} is declared by the extension block alone`,
+		);
 	if (spec.module === 'optional') {
 		const declared = declarative in extension;
 		if (hasModule && declared)

@@ -36,7 +36,8 @@
 				"confirm",
 				"order"
 			],
-			"required": ["label"]
+			"required": ["label"],
+			"declarative": "method"
 		},
 		"product/actions": {
 			"module": "optional",
@@ -50,7 +51,8 @@
 				"confirm",
 				"order"
 			],
-			"required": ["label"]
+			"required": ["label"],
+			"declarative": "method"
 		},
 		"customer/actions": {
 			"module": "optional",
@@ -64,14 +66,31 @@
 				"confirm",
 				"order"
 			],
-			"required": ["label"]
+			"required": ["label"],
+			"declarative": "method"
 		},
 		"settings": {
 			"module": "optional",
 			"doctype": null,
 			"fields": ["label", "icon", "requires", "condition", "doctype"],
 			"required": ["label"],
+			"declarative": "doctype",
 			"single": true
+		},
+		"commands": {
+			"module": "none",
+			"doctype": null,
+			"fields": [
+				"label",
+				"icon",
+				"keywords",
+				"requires",
+				"condition",
+				"method",
+				"confirm",
+				"order"
+			],
+			"required": ["label", "method"]
 		}
 	},
 	"reserved": [

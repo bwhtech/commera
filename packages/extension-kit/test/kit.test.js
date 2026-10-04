@@ -283,6 +283,44 @@ describe('schema per placement', () => {
 		);
 	});
 
+	const command = (extension) =>
+		`<script>\nexport const extension = ${extension}\n</script>\n`;
+
+	test('a command with a template fails', async () => {
+		await buildFails(
+			{
+				'commands/sync/index.vue': vue(
+					`{ label: 'Sync', method: '${APP}.api.sync' }`,
+				),
+			},
+			/commands\/sync\/index\.vue: can't have a <template> or <script setup>; commands is declared by the extension block alone/,
+		);
+	});
+
+	test('a command without a method fails', async () => {
+		await buildFails(
+			{ 'commands/sync/index.vue': command(`{ label: 'Sync' }`) },
+			/commands\/sync\/index\.vue: extension\.method is required/,
+		);
+	});
+
+	for (const [problem, keywords] of [
+		['a plain string', `'sync'`],
+		['an empty list', '[]'],
+		['a blank word', `['sync', ' ']`],
+	]) {
+		test(`command keywords as ${problem} fail`, async () => {
+			await buildFails(
+				{
+					'commands/sync/index.vue': command(
+						`{ label: 'Sync', method: '${APP}.api.sync', keywords: ${keywords} }`,
+					),
+				},
+				/extension\.keywords must be a list of non-empty text/,
+			);
+		});
+	}
+
 	test('an icon outside the list fails with a suggestion', async () => {
 		await buildFails(
 			{ 'pages/jobs/index.vue': vue(`{ label: 'Jobs', icon: 'printr' }`) },
@@ -547,6 +585,24 @@ describe('a clean build', () => {
 		});
 		assert.equal(manifest.extensions[0].module, null);
 		assert.equal(existsSync(join(outDir, '__empty.js')), false);
+	});
+
+	test('a command reaches the manifest with its keywords and no module', async () => {
+		const { manifest } = await buildApp({
+			'commands/sync/index.vue': `<script>\nexport const extension = { label: 'Sync', icon: 'rotate-cw', keywords: ['print', 'orders'], method: '${APP}.api.sync' }\n</script>\n`,
+		});
+		assert.deepEqual(manifest.extensions, [
+			{
+				place: 'commands',
+				name: 'sync',
+				module: null,
+				hash: null,
+				label: 'Sync',
+				icon: 'rotate-cw',
+				keywords: ['print', 'orders'],
+				method: `${APP}.api.sync`,
+			},
+		]);
 	});
 });
 
