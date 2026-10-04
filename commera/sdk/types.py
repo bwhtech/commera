@@ -2,6 +2,7 @@ from datetime import date
 from typing import Any, TypedDict
 
 __all__ = [
+	"Address",
 	"Cart",
 	"CartLine",
 	"CatalogItem",
@@ -24,6 +25,18 @@ class Stage(TypedDict):
 	label: str
 
 
+class Address(TypedDict):
+	name: str
+	address_title: str | None
+	address_line1: str
+	address_line2: str | None
+	city: str
+	state: str | None
+	pincode: str | None
+	country: str
+	phone: str | None
+
+
 class OrderLine(TypedDict):
 	line_id: str
 	item_code: str
@@ -44,6 +57,8 @@ class Order(TypedDict):
 	customer_name: str
 	email: str | None
 	phone: str | None
+	# The order's shipping address, else its billing one; None when it has neither.
+	shipping_address: Address | None
 	placed_on: date
 	order_type: str
 	currency: str

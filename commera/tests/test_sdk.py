@@ -7,10 +7,11 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.tests import IntegrationTestCase
 
 from commera.api.shipping import is_connector_installed
-from commera.app_events import APPS_USER
+from commera.app_events import APPS_USER, get_order_snapshot
 from commera.checkout_hooks import APP_FEE_FIELD
 from commera.sdk import STORE_ORDER_TYPE, as_apps_user, cart, catalog, orders
 from commera.sdk.types import (
+	Address,
 	Cart,
 	CartLine,
 	CatalogItem,
@@ -33,6 +34,7 @@ PUBLIC_NAMES = {
 	"commera.sdk.catalog": ["get_items"],
 	"commera.sdk.orders": ["ShippingNotInstalled", "get_order", "get_orders", "record_shipment"],
 	"commera.sdk.types": [
+		"Address",
 		"Cart",
 		"CartLine",
 		"CatalogItem",
@@ -171,6 +173,47 @@ class TestSdk(IntegrationTestCase):
 		self.assertEqual(order["stage"]["key"], "cancelled")
 		self.assertEqual(orders.get_order(desk_order.name)["order_type"], "Sales")
 
+	def test_an_order_and_its_event_ship_to_the_shipping_address_else_the_billing_one(self):
+		billing = self.make_address("Billing", "Pune")
+		shipping = self.make_address("Shipping", "Mumbai")
+		shipped = self.make_store_order()
+		frappe.db.set_value(
+			"Sales Order", shipped.name, {"customer_address": billing, "shipping_address_name": shipping}
+		)
+		billed_only = self.make_store_order()
+		frappe.db.set_value(
+			"Sales Order", billed_only.name, {"customer_address": billing, "shipping_address_name": ""}
+		)
+		no_address = self.make_store_order()
+
+		order = orders.get_order(shipped.name)
+		self.assert_shape(order["shipping_address"], Address)
+		self.assertEqual(
+			(order["shipping_address"]["name"], order["shipping_address"]["city"]), (shipping, "Mumbai")
+		)
+		self.assertEqual(get_order_snapshot(shipped.name)["shipping_address"], order["shipping_address"])
+		self.assertEqual(orders.get_order(billed_only.name)["shipping_address"]["name"], billing)
+		self.assertEqual(get_order_snapshot(billed_only.name)["shipping_address"]["city"], "Pune")
+		self.assertIsNone(orders.get_order(no_address.name)["shipping_address"])
+		self.assertIsNone(get_order_snapshot(no_address.name)["shipping_address"])
+
+	def make_address(self, address_type: str, city: str) -> str:
+		address = frappe.new_doc("Address")
+		address.update(
+			{
+				"address_title": f"ZZ SDK {city}",
+				"address_type": address_type,
+				"address_line1": "1 Test Street",
+				"city": city,
+				"state": "Maharashtra",
+				"pincode": "400001",
+				"country": "India",
+				"phone": "9999999999",
+			}
+		)
+		address.insert(ignore_permissions=True)
+		return address.name
+
 	def test_a_field_no_installed_app_owns_is_refused(self):
 		sales_order = self.make_store_order(submit=False)
 
@@ -200,7 +243,7 @@ class TestSdk(IntegrationTestCase):
 		order_names = [self.make_store_order().name for _ in range(3)]
 		orders.get_orders(order_names[:1])
 
-		with self.assertQueryCount(13):
+		with self.assertQueryCount(14):
 			page = orders.get_orders([*order_names, "ZZ-NO-SUCH-ORDER"])
 
 		self.assertEqual(sorted(page), sorted(order_names))

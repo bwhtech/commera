@@ -5,7 +5,7 @@ from frappe.utils.data import cint, cstr, flt
 
 from commera.api.admin.orders import MAX_PAGE_LENGTH, describe_state, read_orders, read_paid_orders
 from commera.api.shipping import get_charge_lines, is_connector_installed, read_order_taxes
-from commera.app_events import validate_app_fieldnames
+from commera.app_events import read_shipping_addresses, validate_app_fieldnames
 from commera.sdk.types import Order
 
 __all__ = ["ShippingNotInstalled", "get_order", "get_orders", "record_shipment"]
@@ -43,19 +43,23 @@ def read_order_results(sales_orders: list, extra_fields) -> dict[str, Order]:
 		return {}
 	paid_orders = read_paid_orders([order.name for order in orders.values()])
 	taxes_by_order = read_order_taxes(list(orders))
+	addresses = read_shipping_addresses(list(orders))
 	return {
-		name: get_order_result(order, paid_orders, taxes_by_order.get(name, []), extra_fields)
+		name: get_order_result(
+			order, paid_orders, taxes_by_order.get(name, []), addresses.get(name), extra_fields
+		)
 		for name, order in orders.items()
 	}
 
 
-def get_order_result(order, paid_orders: set, taxes: list, extra_fields) -> Order:
+def get_order_result(order, paid_orders: set, taxes: list, shipping_address, extra_fields) -> Order:
 	return {
 		"name": order.name,
 		"customer": order.customer,
 		"customer_name": order.customer_name,
 		"email": order.contact_email,
 		"phone": order.contact_phone,
+		"shipping_address": shipping_address,
 		"placed_on": order.transaction_date,
 		"order_type": order.order_type,
 		"currency": order.currency,

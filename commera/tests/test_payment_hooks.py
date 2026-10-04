@@ -878,6 +878,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 				"grand_total": self.quotation.grand_total,
 				"payment_mode": GATEWAY,
 				"docstatus": 1,
+				"shipping_address": None,
 			},
 		)
 		self.assertEqual(placed.created_at, frappe.db.get_value("Commera Event", placed.id, "creation"))

@@ -7,6 +7,7 @@ from frappe.query_builder import DocType
 from frappe.query_builder.functions import Coalesce, Max, Min
 from frappe.utils import add_days, add_to_date, create_batch, cstr, flt, now_datetime
 from frappe.utils.background_jobs import get_job_status
+from pypika.functions import NullIf
 from pypika.terms import Case, ExistsCriterion
 from rq.job import JobStatus
 
@@ -18,6 +19,16 @@ RETRY_DELAYS_IN_MINUTES = (1, 5, 30, 120, 360)
 # Well past the longest queue timeout, so only a worker that died mid-handler leaves a claim this old.
 STALE_CLAIM_MINUTES = 30
 LANES_PER_SWEEP = 500
+SHIPPING_ADDRESS_FIELDS = (
+	"address_title",
+	"address_line1",
+	"address_line2",
+	"city",
+	"state",
+	"pincode",
+	"country",
+	"phone",
+)
 COD_SWEEP_LOOKBACK_DAYS = 30
 EXTENDED_DOCTYPES = ("Sales Order", "Quotation", "Sales Invoice", "Item", "Customer")
 
@@ -72,11 +83,18 @@ def get_event_key(event: str, reference_doctype: str, reference_name: str | int,
 
 
 def get_order_snapshot(sales_order: str | int) -> dict:
-	order = frappe.db.get_value(
-		"Sales Order",
-		sales_order,
-		["customer", "currency", "grand_total", "custom_ecommerce_payment_mode", "docstatus"],
-		as_dict=True,
+	sales_order_table = DocType("Sales Order")
+	order = (
+		add_shipping_address(frappe.qb.from_(sales_order_table), sales_order_table)
+		.select(
+			sales_order_table.customer,
+			sales_order_table.currency,
+			sales_order_table.grand_total,
+			sales_order_table.custom_ecommerce_payment_mode,
+			sales_order_table.docstatus,
+		)
+		.where(sales_order_table.name == sales_order)
+		.run(as_dict=True)[0]
 	)
 	return {
 		"customer": order.customer,
@@ -84,7 +102,41 @@ def get_order_snapshot(sales_order: str | int) -> dict:
 		"grand_total": flt(order.grand_total),
 		"payment_mode": order.custom_ecommerce_payment_mode,
 		"docstatus": order.docstatus,
+		"shipping_address": get_shipping_address(order),
 	}
+
+
+def read_shipping_addresses(sales_orders: list) -> dict:
+	sales_order_table = DocType("Sales Order")
+	rows = (
+		add_shipping_address(frappe.qb.from_(sales_order_table), sales_order_table)
+		.select(sales_order_table.name)
+		.where(sales_order_table.name.isin(sales_orders))
+		.run(as_dict=True)
+	)
+	return {cstr(row.name): get_shipping_address(row) for row in rows}
+
+
+def add_shipping_address(query, sales_order_table):
+	# ERPNext ships to the billing address when the order has no shipping address of its own.
+	address = DocType("Address")
+	address_name = Coalesce(
+		NullIf(sales_order_table.shipping_address_name, ""), sales_order_table.customer_address
+	)
+	return (
+		query.left_join(address)
+		.on(address.name == address_name)
+		.select(
+			address.name.as_("address_name"),
+			*(address[field].as_(f"address_{field}") for field in SHIPPING_ADDRESS_FIELDS),
+		)
+	)
+
+
+def get_shipping_address(row) -> dict | None:
+	if not row.address_name:
+		return None
+	return {"name": row.address_name, **{field: row[f"address_{field}"] for field in SHIPPING_ADDRESS_FIELDS}}
 
 
 def get_lane_event(reference_doctype: str, event: str) -> str | None:
