@@ -19,7 +19,7 @@ HANDLER_HOOKS = {
 
 @dataclass(frozen=True)
 class CommeraEvent:
-	"""What an app's async commera_events handler receives. Delivery is at least once: dedupe on `id`."""
+	"""What a plugin's async commera_events handler receives. Delivery is at least once: dedupe on `id`."""
 
 	id: str
 	name: str
@@ -27,7 +27,3 @@ class CommeraEvent:
 	reference_name: str
 	data: dict
 	created_at: datetime
-
-	@property
-	def sales_order(self) -> str | None:
-		return self.reference_name if self.reference_doctype == "Sales Order" else None

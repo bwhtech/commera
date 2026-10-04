@@ -159,7 +159,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		update_sales_order_ecommerce_status(sales_order)
 
 		self.assertEqual(
-			[(event.name, event.sales_order) for event, user in calls],
+			[(event.name, event.reference_name) for event, user in calls],
 			[("order_fulfilled", sales_order), ("order_delivered", sales_order)],
 		)
 

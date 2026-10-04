@@ -872,7 +872,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		on_sales_order_cancel(frappe.get_doc("Sales Order", sales_order.name))
 
 		self.assertEqual(
-			[(event.name, event.sales_order) for event, user in calls],
+			[(event.name, event.reference_name) for event, user in calls],
 			[("order_cancelled", sales_order.name)],
 		)
 
@@ -893,7 +893,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		sales_order = self.submitted_sales_orders()[0]
 		self.assertEqual(
-			[(event.name, event.sales_order, user) for event, user in calls],
+			[(event.name, event.reference_name, user) for event, user in calls],
 			[("order_placed", sales_order, PLUGINS_USER), ("order_paid", sales_order, PLUGINS_USER)],
 		)
 		placed = calls[0][0]
@@ -945,7 +945,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		# A gateway call commits mid-checkout, so earlier tests can leave due deliveries the sweep also runs.
 		self.assertEqual(
-			[event.name for event, user in calls if event.sales_order == sales_order],
+			[event.name for event, user in calls if event.reference_name == sales_order],
 			["order_placed", "order_paid"],
 		)
 
@@ -991,7 +991,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.assertEqual(frappe.db.get_value("Error Log", broken.last_error, "reference_name"), sales_order)
 		self.assertEqual(self.delivery(sales_order, "order_placed").status, "Done")
 		self.assertEqual(
-			len([event for event, user in calls if event.sales_order == sales_order]),
+			len([event for event, user in calls if event.reference_name == sales_order]),
 			1,
 			"the healthy app ran once and was never retried",
 		)
