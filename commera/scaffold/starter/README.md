@@ -35,7 +35,7 @@ you don't use.
 
 ## Starters
 
-`bench commera scaffold` wrote a starter page that calls `$app_name.api.get_summary` in `$app_name/api.py`.
+`bench commera init` wrote a starter page that calls `$app_name.api.get_summary` in `$app_name/api.py`.
 The starters below put their whitelisted methods in that same file. When you replace the starter page
 `pages/$page_name/index.vue`, delete `get_summary` from `$app_name/api.py` too: nothing else calls it.
 

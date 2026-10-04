@@ -9,7 +9,7 @@ from frappe.tests import UnitTestCase
 from frappe.utils.boilerplate import _create_app_boilerplate
 
 from commera.extensions.places import ICONS, PLACES
-from commera.scaffold import AppScaffold, get_dashboard_versions
+from commera.scaffold import AppScaffold, get_app_from_folder, get_dashboard_versions
 from commera.sdk import API_VERSION
 
 APP = "commera_test_extension"
@@ -150,3 +150,13 @@ class TestScaffold(UnitTestCase):
 			AppScaffold("no_such_app", self.apps_path)
 		with self.assertRaisesRegex(click.ClickException, "not a Frappe app"):
 			AppScaffold(APP, self.apps_path / APP)
+
+	def test_init_finds_the_app_from_any_folder_inside_it(self):
+		app_root = make_app(self.apps_path)
+		self.assertEqual(get_app_from_folder(app_root, self.apps_path), APP)
+		self.assertEqual(get_app_from_folder(app_root / APP / "public", self.apps_path), APP)
+
+	def test_init_outside_an_app_folder_says_where_to_run_it(self):
+		for folder in (self.apps_path, self.apps_path.parent):
+			with self.assertRaisesRegex(click.ClickException, "cd apps/<your_app>"):
+				get_app_from_folder(folder, self.apps_path)

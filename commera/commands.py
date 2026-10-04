@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 
@@ -9,17 +10,19 @@ def commera_commands():
 	"""Commera tools for apps that extend the Commera dashboard."""
 
 
-# After an app name bench runs its own command of the same name (init, setup, new-app...), so avoid those.
-@commera_commands.command("scaffold")
-@click.argument("app")
+# Run from the bench folder, bench skips the app name "commera" and runs its own `bench init` instead.
+@commera_commands.command("init")
 @click.option("--skip-install", is_flag=True, default=False, help="Do not run yarn install in the app")
-def scaffold(app: str, skip_install: bool):
-	"""Set up APP to add pages, cards, actions and settings to the Commera dashboard."""
+def init(skip_install: bool):
+	"""Set up the app you are in to add pages, cards, actions and settings to the Commera dashboard."""
 	from frappe.utils import get_bench_path
 
-	from commera.scaffold import AppScaffold
+	from commera.scaffold import AppScaffold, get_app_from_folder
 
-	scaffold = AppScaffold(app, Path(get_bench_path()) / "apps")
+	apps_path = Path(get_bench_path()) / "apps"
+	# bench runs every command from sites/, so only $PWD still says which app folder the user is in.
+	app = get_app_from_folder(Path(os.environ.get("PWD") or os.getcwd()), apps_path)
+	scaffold = AppScaffold(app, apps_path)
 	for change, path in scaffold.save():
 		click.echo(f"{change:<8} {path}")
 

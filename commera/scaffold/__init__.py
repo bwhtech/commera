@@ -17,7 +17,7 @@ SHARED_PACKAGES = ("@vitejs/plugin-vue", "vite", "vue")
 class AppScaffold:
 	def __init__(self, app: str, apps_path: Path):
 		if app == "commera":
-			raise click.ClickException("commera is the host app; scaffold the app that extends it")
+			raise click.ClickException("commera is the host app; run this inside the app that extends it")
 		self.app = app
 		self.app_root = Path(apps_path) / app
 		self.hooks_path = self.app_root / app / "hooks.py"
@@ -116,6 +116,14 @@ class AppScaffold:
 
 	def get_relative_path(self, path: Path) -> str:
 		return str(path.relative_to(self.app_root))
+
+
+def get_app_from_folder(folder: Path, apps_path: Path) -> str:
+	try:
+		app = Path(folder).resolve().relative_to(Path(apps_path).resolve()).parts[0]
+	except (ValueError, IndexError):
+		raise click.ClickException("Run bench commera init inside your app's folder: cd apps/<your_app>")
+	return app
 
 
 def get_starter(name: str) -> str:
