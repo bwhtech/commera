@@ -4,9 +4,9 @@ from frappe.utils.data import flt
 
 from commera.api.payments import cart_write_lock, save_cart_quotation, validate_cart_is_not_in_checkout
 from commera.api.shipping import get_checkout_summary
-from commera.app_events import get_app_fieldnames, validate_app_fieldnames
-from commera.checkout_hooks import apply_app_fees
+from commera.checkout_hooks import apply_plugin_fees
 from commera.core import _get_cart_quotation
+from commera.plugin_events import get_plugin_fieldnames, validate_plugin_fieldnames
 from commera.sdk.types import Cart, CheckoutSummary
 
 __all__ = ["get_cart", "set_cart_fields"]
@@ -34,14 +34,16 @@ def get_cart() -> Cart | None:
 		],
 		"total": flt(quotation.total),
 		"grand_total": flt(quotation.grand_total),
-		"app_fields": {fieldname: quotation.get(fieldname) for fieldname in get_app_fieldnames("Quotation")},
+		"plugin_fields": {
+			fieldname: quotation.get(fieldname) for fieldname in get_plugin_fieldnames("Quotation")
+		},
 	}
 
 
 def set_cart_fields(values: dict) -> CheckoutSummary:
-	"""Save an app's own Quotation fields on the shopper's cart and re-price its app fees. Each field must
-	start with the name of an installed Commera app; a cart already in payment is refused."""
-	validate_app_fieldnames("Quotation", values)
+	"""Save an app's own Quotation fields on the shopper's cart and re-price its plugin fees. Each field must
+	start with the name of an installed Commera plugin; a cart already in payment is refused."""
+	validate_plugin_fieldnames("Quotation", values)
 	quotation = _get_cart_quotation()
 	if quotation.is_new():
 		frappe.throw(_("Add something to your cart first."), frappe.DoesNotExistError)
@@ -49,6 +51,6 @@ def set_cart_fields(values: dict) -> CheckoutSummary:
 	with cart_write_lock(quotation):
 		validate_cart_is_not_in_checkout(quotation.name)
 		quotation.update(values)
-		apply_app_fees(quotation)
+		apply_plugin_fees(quotation)
 		save_cart_quotation(quotation)
 		return get_checkout_summary(quotation)

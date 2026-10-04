@@ -16,8 +16,8 @@ const SHARED = {
 
 const fromHere = (path) => fileURLToPath(new URL(path, import.meta.url))
 
-// Outside the emptied outDir: bench builds apps in parallel, and the extension kit reads these while commera rebuilds.
-const EXTENSION_HOST_DIR = fromHere('../commera/public/extension-host')
+// Outside the emptied outDir: bench builds apps in parallel, and the plugin kit reads these while commera rebuilds.
+const PLUGIN_HOST_DIR = fromHere('../commera/public/plugin-host')
 
 function findEntryChunk(bundle, entryName) {
   const chunk = Object.values(bundle).find((output) => output.type === 'chunk' && output.isEntry && output.name === entryName)
@@ -59,10 +59,10 @@ function sharedRuntime() {
       const sharedExports = Object.fromEntries(
         Object.entries(SHARED).map(([specifier, entryName]) => [specifier, findEntryChunk(bundle, entryName).exports]),
       )
-      mkdirSync(EXTENSION_HOST_DIR, { recursive: true })
-      writeFileSync(`${EXTENSION_HOST_DIR}/shared-exports.json`, `${JSON.stringify(sharedExports, null, 2)}\n`)
-      writeFileSync(`${EXTENSION_HOST_DIR}/classes.json`, `${JSON.stringify([...classes].sort())}\n`)
-      copyFileSync(fromHere('../commera/sdk/extension_icons.json'), `${EXTENSION_HOST_DIR}/icons.json`)
+      mkdirSync(PLUGIN_HOST_DIR, { recursive: true })
+      writeFileSync(`${PLUGIN_HOST_DIR}/shared-exports.json`, `${JSON.stringify(sharedExports, null, 2)}\n`)
+      writeFileSync(`${PLUGIN_HOST_DIR}/classes.json`, `${JSON.stringify([...classes].sort())}\n`)
+      copyFileSync(fromHere('../commera/sdk/plugin_icons.json'), `${PLUGIN_HOST_DIR}/icons.json`)
     },
   }
 }
@@ -97,7 +97,7 @@ export default defineConfig({
         'runtime-frappe-ui': fromHere('./src/runtime/frappe-ui.js'),
         'runtime-frappe-ui-list': fromHere('./src/runtime/frappe-ui-list.js'),
         'runtime-frappe-ui-charts': fromHere('./src/runtime/frappe-ui-charts.js'),
-        'runtime-commera-admin': fromHere('./src/extension-api/index.js'),
+        'runtime-commera-admin': fromHere('./src/plugin-api/index.js'),
       },
       // Nothing in the dashboard imports the runtime entries by name, so without this Rollup tree-shakes their exports.
       preserveEntrySignatures: 'exports-only',

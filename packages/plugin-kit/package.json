@@ -1,5 +1,5 @@
 {
-	"name": "@commera/extension-kit",
+	"name": "@commera/plugin-kit",
 	"version": "0.2.0",
 	"private": true,
 	"type": "module",

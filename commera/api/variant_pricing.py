@@ -6,7 +6,7 @@ from frappe import _
 from frappe.utils import create_batch
 from frappe.utils.data import cint, cstr, flt
 
-from commera.app_events import add_changed_products
+from commera.plugin_events import add_changed_products
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
 PRODUCT_DOCTYPE = "Style Attribute Variant"

@@ -5,9 +5,9 @@
  */
 import { computed, provide, ref, shallowRef, toValue, watch } from 'vue'
 import { Button, Dialog, ErrorMessage } from 'frappe-ui'
-import { ACTION_CONTEXT } from '../extension-api/context'
+import { ACTION_CONTEXT } from '../plugin-api/context'
 import { errorMessage } from '../data/errors'
-import ExtensionHost from './ExtensionHost.vue'
+import PluginHost from './PluginHost.vue'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -80,7 +80,7 @@ async function submit() {
 <template>
   <Dialog v-model:open="open" :title="shownEntry?.label" :dismissible="!submitting">
     <template #default>
-      <ExtensionHost
+      <PluginHost
         v-if="entry"
         :key="entry.key"
         :entry="entry"

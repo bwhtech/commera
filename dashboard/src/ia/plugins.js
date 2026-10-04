@@ -3,9 +3,9 @@ import AppIcon from '../components/AppIcon.vue'
 import { bootValue } from '../data/boot'
 
 // commera/www/commera.py has already filtered these for the session user, so the client only places them.
-const extensions = bootValue('extensions', {}) ?? {}
-const apps = extensions.apps ?? {}
-const entries = extensions.entries ?? []
+const plugins = bootValue('plugins', {}) ?? {}
+const apps = plugins.apps ?? {}
+const entries = plugins.entries ?? []
 
 // An entry without `order` sorts after every ordered one, then by label, so two apps never shuffle.
 function byOrder(left, right) {
@@ -37,7 +37,7 @@ export function appIcon(app, iconUrl = apps[app]?.icon_url) {
 }
 
 // An entry's own icon wins; without one it wears its app's logo, then the place's generic icon.
-export function extensionIcon(entry, fallback) {
+export function pluginIcon(entry, fallback) {
   if (entry.icon) return lucideIcon(entry.icon)
   const iconUrl = apps[entry.app]?.icon_url
   return iconUrl ? logoIcon(iconUrl) : lucideIcon(null, fallback)
@@ -47,12 +47,12 @@ export function extensionIcon(entry, fallback) {
 // mean the same from a page, a card and an action.
 export function appLocation(app, to) {
   if (to.startsWith('/')) return to
-  const resolved = new URL(to, `https://commera.invalid/apps/${app}/`)
+  const resolved = new URL(to, `https://commera.invalid/plugins/${app}/`)
   return `${resolved.pathname.replace(/\/$/, '')}${resolved.search}${resolved.hash}`
 }
 
 export function pageRoute(entry) {
-  return `/apps/${entry.app}/${entry.name}`
+  return `/plugins/${entry.app}/${entry.name}`
 }
 
 export function placeEntries(place) {
@@ -73,11 +73,11 @@ export function firstPageRoute(app) {
 }
 
 function pageNavItem(entry) {
-  return { label: entry.label, icon: extensionIcon(entry), to: pageRoute(entry) }
+  return { label: entry.label, icon: pluginIcon(entry), to: pageRoute(entry) }
 }
 
 // One row per app: its only page, or a disclosure over its pages shaped like the Analytics row.
-export function appNavItems() {
+export function pluginNavItems() {
   const shown = placeEntries('pages').filter((entry) => entry.sidebar !== false)
   const byApp = new Map()
   for (const entry of shown) byApp.set(entry.app, [...(byApp.get(entry.app) ?? []), entry])
@@ -88,7 +88,7 @@ export function appNavItems() {
         : {
             label: appTitle(app),
             icon: appIcon(app),
-            to: `/apps/${app}`,
+            to: `/plugins/${app}`,
             children: pages.map(pageNavItem),
           },
     )
@@ -96,14 +96,14 @@ export function appNavItems() {
 }
 
 export function settingsTabValue(app) {
-  return `app-${app}`
+  return `plugin-${app}`
 }
 
-export function extensionSettingsTabs() {
+export function pluginSettingsTabs() {
   return placeEntries('settings').map((entry) => ({
     value: settingsTabValue(entry.app),
     label: entry.label,
-    icon: extensionIcon(entry, 'settings'),
+    icon: pluginIcon(entry, 'settings'),
     keywords: [appTitle(entry.app).toLowerCase(), entry.app],
     entry,
   }))
@@ -114,21 +114,21 @@ function appKeywords(entry) {
 }
 
 // Every app page is a palette destination, sidebar or not, so an app never has to declare one twice.
-export function appPageCommands() {
+export function pluginPageCommands() {
   return placeEntries('pages').map((entry) => ({
     id: `ext:${entry.key}`,
     label: entry.label,
-    icon: extensionIcon(entry),
+    icon: pluginIcon(entry),
     keywords: appKeywords(entry),
     to: pageRoute(entry),
   }))
 }
 
-export function appCommands() {
+export function pluginCommands() {
   return placeEntries('commands').map((entry) => ({
     id: `ext:${entry.key}`,
     label: entry.label,
-    icon: extensionIcon(entry, 'zap'),
+    icon: pluginIcon(entry, 'zap'),
     keywords: appKeywords(entry),
     appTitle: appTitle(entry.app),
     entry,

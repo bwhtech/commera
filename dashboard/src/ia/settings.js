@@ -1,4 +1,4 @@
-import { extensionSettingsTabs } from './extensions'
+import { pluginSettingsTabs } from './plugins'
 
 // Derived from the URL in ia/settingsRoute; re-exported because this is still the door the
 // rest of the app knocks on.
@@ -50,10 +50,10 @@ export const SETTINGS_TABS = [
     keywords: ['ga4', 'google analytics', 'pixel', 'tracking', 'meta', 'apps', 'integrations'],
   },
   {
-    value: 'installed-apps',
-    label: 'Apps',
+    value: 'plugins',
+    label: 'Plugins',
     icon: 'lucide-blocks',
-    keywords: ['apps', 'installed', 'extensions', 'deliveries', 'webhooks', 'failed', 'retry'],
+    keywords: ['plugins', 'apps', 'installed', 'deliveries', 'webhooks', 'failed', 'retry'],
   },
   {
     value: 'advanced',
@@ -61,6 +61,6 @@ export const SETTINGS_TABS = [
     icon: 'lucide-sliders-horizontal',
     keywords: ['developer', 'api', 'reset', 'danger', 'cache', 'debug'],
   },
-  // Each installed app's own tab, appended so the search palette finds them as well.
-  ...extensionSettingsTabs(),
+  // Each installed plugin's own tab, appended so the search palette finds them as well.
+  ...pluginSettingsTabs(),
 ]

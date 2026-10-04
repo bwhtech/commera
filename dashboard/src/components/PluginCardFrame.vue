@@ -1,7 +1,7 @@
 <script setup>
 import { computed, provide, ref } from 'vue'
-import { CARD_CONTEXT } from '../extension-api/context'
-import ExtensionHost from './ExtensionHost.vue'
+import { CARD_CONTEXT } from '../plugin-api/context'
+import PluginHost from './PluginHost.vue'
 
 const props = defineProps({
   entry: { type: Object, required: true },
@@ -29,7 +29,7 @@ const visible = computed(() => failed.value || (ready.value && !hidden.value))
   <section :hidden="!visible" :class="frameClass" :aria-label="entry.label">
     <h2 class="text-sm text-ink-gray-5">{{ entry.label }}</h2>
     <div class="mt-2 min-w-0">
-      <ExtensionHost
+      <PluginHost
         :entry="props.entry"
         :record="props.record"
         @ready="ready = true"

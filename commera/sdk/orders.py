@@ -5,7 +5,7 @@ from frappe.utils.data import cint, cstr, flt
 
 from commera.api.admin.orders import MAX_PAGE_LENGTH, describe_state, read_orders, read_paid_orders
 from commera.api.shipping import get_charge_lines, is_connector_installed, read_order_taxes
-from commera.app_events import read_shipping_addresses, validate_app_fieldnames
+from commera.plugin_events import read_shipping_addresses, validate_plugin_fieldnames
 from commera.sdk.types import Order
 
 __all__ = ["ShippingNotInstalled", "get_order", "get_orders", "record_shipment"]
@@ -16,10 +16,10 @@ class ShippingNotInstalled(frappe.ValidationError):
 
 
 def get_order(sales_order: str | int, extra_fields: list[str] | tuple = ()) -> Order:
-	"""`extra_fields` reads an app's own Sales Order fields into `app_fields`; each must start with the
-	name of an installed Commera app."""
+	"""`extra_fields` reads an app's own Sales Order fields into `plugin_fields`; each must start with the
+	name of an installed Commera plugin."""
 	frappe.has_permission("Sales Order", doc=sales_order, ptype="read", throw=True)
-	validate_app_fieldnames("Sales Order", extra_fields)
+	validate_plugin_fieldnames("Sales Order", extra_fields)
 	orders = read_order_results([sales_order], extra_fields)
 	if cstr(sales_order) not in orders:
 		frappe.throw(_("Order {0} not found").format(sales_order), frappe.DoesNotExistError)
@@ -29,7 +29,7 @@ def get_order(sales_order: str | int, extra_fields: list[str] | tuple = ()) -> O
 def get_orders(sales_orders: list[str | int], extra_fields: list[str] | tuple = ()) -> dict[str, Order]:
 	"""Keyed by `cstr(name)`. An order the session user can't read, or that doesn't exist, is left out."""
 	frappe.has_permission("Sales Order", ptype="read", throw=True)
-	validate_app_fieldnames("Sales Order", extra_fields)
+	validate_plugin_fieldnames("Sales Order", extra_fields)
 	orders = {}
 	for order_chunk in create_batch(list(sales_orders), MAX_PAGE_LENGTH):
 		readable = frappe.get_list("Sales Order", filters={"name": ["in", order_chunk]}, pluck="name")
@@ -74,7 +74,7 @@ def get_order_result(order, paid_orders: set, taxes: list, shipping_address, ext
 		"is_cancelled": cint(order.docstatus) == 2,
 		"status": order.custom_ecommerce_status,
 		"stage": describe_state(order, order.lifecycle),
-		"app_fees": get_charge_lines(taxes, order.shipping_rule)["app_fees"],
+		"plugin_fees": get_charge_lines(taxes, order.shipping_rule)["plugin_fees"],
 		"items": [
 			{
 				"line_id": line.name,
@@ -90,7 +90,7 @@ def get_order_result(order, paid_orders: set, taxes: list, shipping_address, ext
 			for line in order.lines
 		],
 		"tags": order.tags,
-		"app_fields": {fieldname: order.get(fieldname) for fieldname in extra_fields},
+		"plugin_fields": {fieldname: order.get(fieldname) for fieldname in extra_fields},
 	}
 
 

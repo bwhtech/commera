@@ -1,8 +1,8 @@
-# @commera/extension-kit
+# @commera/plugin-kit
 
-The Vite config every Commera app uses to build what it adds to the Commera dashboard.
+The Vite config every Commera plugin uses to build what it adds to the Commera dashboard.
 
-## Set up an app
+## Set up a plugin
 
 ```
 my_app/                              # app root
@@ -26,7 +26,7 @@ my_app/                              # app root
 		"dev": "vite build --watch --config commera/vite.config.js"
 	},
 	"devDependencies": {
-		"@commera/extension-kit": "link:../commera/packages/extension-kit",
+		"@commera/plugin-kit": "link:../commera/packages/plugin-kit",
 		"@vitejs/plugin-vue": "^5.2.1",
 		"vite": "^5.4.11",
 		"vue": "^3.5.15"
@@ -37,7 +37,7 @@ my_app/                              # app root
 ```js
 // commera/vite.config.js
 import { defineConfig } from 'vite';
-import commera from '@commera/extension-kit/vite';
+import commera from '@commera/plugin-kit/vite';
 
 export default defineConfig({ plugins: [commera()] });
 ```
@@ -47,22 +47,22 @@ Keep `vue` on the same minor version as the Commera dashboard. The app compiles 
 
 ## Placements
 
-The folder decides where an extension goes. `places.json` is the one list; Commera's server reads it too.
+The folder decides where a plugin goes. `places.json` is the one list; Commera's server reads it too.
 `<name>` is 1 to 40 lowercase letters, digits and hyphens, and is also the URL slug.
 
-| Path under `commera/` | Where it shows | `extension` fields: **required** / optional |
+| Path under `commera/` | Where it shows | `plugin` fields: **required** / optional |
 | --- | --- | --- |
-| `pages/<name>/index.vue` | `/commera/apps/<app>/<name>`, plus a sidebar row | **label** / icon, requires, condition, sidebar, order |
+| `pages/<name>/index.vue` | `/commera/plugins/<app>/<name>`, plus a sidebar row | **label** / icon, requires, condition, sidebar, order |
 | `{order,product,customer}/cards/<name>/index.vue` | A card on that record's page | **label** / requires, condition, order |
 | `{order,product,customer}/actions/<name>/index.vue` | A row in that page's More actions menu | **label** / icon, requires, condition, method, confirm, order |
 | `settings/index.vue` | The app's tab in Settings | **label** / icon, requires, condition, doctype |
-| `commands/<name>/index.vue` | A row in the search palette's Apps group (Cmd+K), while the user types | **label, method** / icon, keywords, requires, condition, confirm, order |
+| `commands/<name>/index.vue` | A row in the search palette's Plugins group (Cmd+K), while the user types | **label, method** / icon, keywords, requires, condition, confirm, order |
 
 Each placement's `index.vue` starts with a plain `<script>` that holds one literal:
 
 ```vue
 <script>
-export const extension = {
+export const plugin = {
 	label: 'Print status',
 	condition: 'my_app.commera_conditions.has_print_jobs',
 };
@@ -88,15 +88,15 @@ export const extension = {
   `condition` takes no arguments; a card or action `condition` gets `(doctype, name)`. A command `condition`
   takes no arguments, like a page's.
 - `icon` is optional; without it the entry uses the app's icon (`commera/icon.svg`). It is a name from
-  `commera/sdk/extension_icons.json`.
+  `commera/sdk/plugin_icons.json`.
 
 Every other folder and file under `commera/` is yours: components, composables, sub-pages. Only an
-`index.vue` at a placement path is built as an extension.
+`index.vue` at a placement path is built as a plugin.
 
 ## App logo
 
 Put an optional `commera/icon.svg` next to `pages/`. Set it once: it is the icon of everything your app
-adds, from the sidebar and Settings → Apps to your settings tab, palette rows and More actions rows. An entry
+adds, from the sidebar and Settings → Plugins to your settings tab, palette rows and More actions rows. An entry
 with its own `icon` shows that one instead. The logo is drawn in one colour, the same ink as the other icons,
 in light and dark mode. Draw it on a 24 × 24 viewBox with filled shapes or strokes; the colours in the file are
 ignored. Without it, the app's sidebar row uses the first page's `icon`, and an entry without an `icon` uses
@@ -104,7 +104,7 @@ the dashboard's generic one.
 
 ## The dashboard draws the frame
 
-The app fills the content; Commera draws the chrome around it, so every app looks like the rest of the
+The plugin fills the content; Commera draws the chrome around it, so every plugin looks like the rest of the
 dashboard. Import these from `@commera/admin`:
 
 | In | Use | To |
@@ -112,9 +112,9 @@ dashboard. Import these from `@commera/admin`:
 | a page | `usePage()` | `setTitle(text)`, `setBreadcrumbs([{ label, to }])`, `setActions([{ label, icon, variant, onClick, loading, disabled }])`. Each takes a value, a ref or a getter. The first action is the main one; past two, the rest fold into a More menu. |
 | a card | `useCard()` | `hide()`, `show()`, `setHidden(bool)`. The frame only appears after the card's first render, so hiding during setup never shows an empty card. |
 | an action | `useAction()` | `setPrimary({ label, disabled, loading })`, `onSubmit(async () => …)`, `close(result)`. Resolve to close; resolve `{ reload: true }` to reload the record; throw to keep the dialog open with the error under the form. |
-| all | `useExtension()` | `extension`, `path`, `query`, `record` (`{ doctype, name }` on cards and actions), `reload()`, `navigate(to)`, `toast`, `__`. |
+| all | `usePlugin()` | `plugin`, `path`, `query`, `record` (`{ doctype, name }` on cards and actions), `reload()`, `navigate(to)`, `toast`, `__`. |
 
-`navigate(to)` and a breadcrumb's `to` resolve like a link against `/commera/apps/<app>/`: `'jobs/JOB-1'`,
+`navigate(to)` and a breadcrumb's `to` resolve like a link against `/commera/plugins/<app>/`: `'jobs/JOB-1'`,
 `'../'` and `'/orders/SO-1'` all work the same from a page, a card or an action.
 
 Fetch data with `useMethodRead` and `useMethodAction` from `@commera/admin`, pointed at a whitelisted
@@ -124,8 +124,8 @@ Throw `request.error` from `onSubmit` and the dialog shows it once.
 ## What the build does
 
 - Writes `my_app/public/commera/manifest.json`: `api_version`, `kit_version`, `app`, and one entry per
-  extension with its `place`, `name`, `module` (or `null` for a declarative action or settings tab), a
-  content `hash`, and the `extension` fields. Commera reads only this file to place extensions.
+  plugin with its `place`, `name`, `module` (or `null` for a declarative action or settings tab), a
+  content `hash`, and the `plugin` fields. Commera reads only this file to place plugins.
 - Builds each placement with a template to `my_app/public/commera/<place>/<name>.js` (`settings.js` for
   the settings tab). Shared code goes to `chunks/`.
 - Strips the plain `<script>` from the shipped JS, so dotted paths only live in the manifest.
@@ -133,17 +133,17 @@ Throw `request.error` from `onSubmit` and the dialog shows it once.
   to the manifest.
 - Does not bundle `vue`, `frappe-ui`, `frappe-ui/list`, `frappe-ui/charts` or `@commera/admin`. The dashboard
   supplies them at runtime through its import map.
-- Puts `/* commera-extension-api: 1 */` on line 1 of each module. Commera refuses a module or a manifest
-  with a different version and shows the reason in place of the extension.
+- Puts `/* commera-plugin-api: 1 */` on line 1 of each module. Commera refuses a module or a manifest
+  with a different version and shows the reason in place of the plugin.
 
 ## What fails the build
 
-Folder and `extension` problems are collected and reported together.
+Folder and `plugin` problems are collected and reported together.
 
 | Check | Example |
 | --- | --- |
-| An `index.vue` that declares `extension` outside a placement | `ordr/cards/status/index.vue` |
-| A placement `index.vue` without an `extension` block | `pages/jobs/index.vue` with only a template |
+| An `index.vue` that declares `plugin` outside a placement | `ordr/cards/status/index.vue` |
+| A placement `index.vue` without an `plugin` block | `pages/jobs/index.vue` with only a template |
 | A `<name>` that is not a slug | `pages/Print_Jobs/` |
 | A non-literal value | `label: t('Jobs')`, `...base`, `[key]: 1` |
 | Any other statement in the plain `<script>` | `import x from './x'` |
@@ -152,7 +152,7 @@ Folder and `extension` problems are collected and reported together.
 | A command with a template or `<script setup>` | `commands/sync/index.vue` with a `<template>` |
 | An icon not in the list | `icon: 'printr'` |
 | A dotted path outside the app | `condition: 'frappe.client.get_list'` |
-| Drawing a frame the dashboard owns | importing `AppPageHeader`, `PageBody` or `ExtensionCard`, or frappe-ui's `Dialog` |
+| Drawing a frame the dashboard owns | importing `AppPageHeader`, `PageBody` or `PluginCard`, or frappe-ui's `Dialog` |
 | A frappe-ui resource that calls Frappe's v1 API | importing `createResource`, `createListResource`, `createDocumentResource`, `useCall`, `useList`, `useDoc`, `useDoctype`, `useNewDoc`, `frappeRequest` or `call` from `frappe-ui` |
 | An `icon.svg` that is not a plain SVG | over 20 kB, not an `<svg>`, a `<script>`, an `on*` attribute, or an `href` that is not `#id` |
 | A `<style>` block or a stylesheet import | `<style>.x { color: red }</style>` |
@@ -163,13 +163,13 @@ Folder and `extension` problems are collected and reported together.
 An `index.vue` under a reserved folder (`orders/actions`, `orders/selection`, `products/actions`,
 `products/selection`, `customers/actions`) only warns: those placements come in a later Commera.
 
-The class, export and icon checks read `commera/public/extension-host/`, which the Commera dashboard build
+The class, export and icon checks read `commera/public/plugin-host/`, which the Commera dashboard build
 writes. If that folder is missing, the build warns and skips them; if it is from an older Commera, a missing
 `@commera/admin` name says so. Build Commera first, or pass `commera({ hostDir })` to read another folder.
 
 ## Develop
 
-Build Commera once, run `yarn dev` in your app, and reload `/commera` on the bench web server. Extensions
+Build Commera once, run `yarn dev` in your app, and reload `/commera` on the bench web server. Plugins
 render only in the built dashboard, not in its Vite dev server. `vite --watch` fixes its entries when it
 starts, so restart it after adding a placement folder. In production, run `bench build --app my_app` or
 `bench clear-cache` after a build so the manifest is re-read.

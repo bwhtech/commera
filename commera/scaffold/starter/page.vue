@@ -1,5 +1,5 @@
 <script>
-export const extension = { label: '$label', icon: '$icon' }
+export const plugin = { label: '$label', icon: '$icon' }
 </script>
 
 <script setup>

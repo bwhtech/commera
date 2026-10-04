@@ -16,32 +16,33 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils import now_datetime
 from frappe.utils.password import get_decrypted_password
 
-from commera.api.admin import apps as apps_api
-from commera.api.admin.extensions import (
-	get_app_settings,
-	get_record_extensions,
+from commera.api.admin.plugins import (
+	get_plugin_deliveries,
+	get_plugin_settings,
+	get_plugins,
+	get_record_plugins,
 	run_command,
 	run_record_action,
-	save_app_setting,
+	save_plugin_setting,
 )
-from commera.extensions import registry
-from commera.extensions.places import GRAMMAR, PLACES, RECORD_DOCTYPES
-from commera.extensions.registry import get_registry, get_visible_extensions
+from commera.plugins import registry
+from commera.plugins.places import GRAMMAR, PLACES, RECORD_DOCTYPES
+from commera.plugins.registry import get_registry, get_visible_plugins
 from commera.sdk import API_VERSION
-from commera.tests.test_admin_order_app_events import make_order_event
+from commera.tests.test_admin_order_plugin_events import make_order_event
 from commera.tests.test_admin_orders import make_test_sales_order
-from commera.tests.test_app_events import patch_app_declarations
+from commera.tests.test_plugin_events import patch_app_declarations
 from commera.www import commera as dashboard
 
 APP = "bwh_shipping"
 OTHER_APP = "bwh_payments"
-FUNCTIONS = f"{APP}.commera_test_extensions"
+FUNCTIONS = f"{APP}.commera_test_plugins"
 SETTINGS_DOCTYPE = "Google Settings"
 REQUIRED_SETTINGS_DOCTYPE = "SMS Settings"
-STOCK_USER = "extensions-stock@example.com"
-SALES_USER = "extensions-sales@example.com"
-OUTSIDER = "extensions-outsider@example.com"
-SYSTEM_MANAGER = "extensions-admin@example.com"
+STOCK_USER = "plugins-stock@example.com"
+SALES_USER = "plugins-sales@example.com"
+OUTSIDER = "plugins-outsider@example.com"
+SYSTEM_MANAGER = "plugins-admin@example.com"
 
 
 def show_record(doctype, name):
@@ -146,7 +147,7 @@ def error_logged(title: str, since) -> bool:
 
 
 @patch.dict(frappe.conf, {"developer_mode": 1})
-class ExtensionTestCase(IntegrationTestCase):
+class PluginTestCase(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
@@ -194,13 +195,13 @@ class ExtensionTestCase(IntegrationTestCase):
 		)
 
 	def write_manifest(
-		self, extensions: list, app: str = APP, api_version: int = API_VERSION, **manifest_fields
+		self, entries: list, app: str = APP, api_version: int = API_VERSION, **manifest_fields
 	):
 		self.write_asset(
 			app,
 			"manifest.json",
 			json.dumps(
-				{"api_version": api_version, "kit_version": "0.2.0", "app": app, "extensions": extensions}
+				{"api_version": api_version, "kit_version": "0.2.0", "app": app, "entries": entries}
 				| manifest_fields
 			),
 		)
@@ -215,27 +216,27 @@ class ExtensionTestCase(IntegrationTestCase):
 		return {entry["key"]: entry for entry in get_registry()["entries"]}
 
 
-class TestExtensionDiscovery(ExtensionTestCase):
-	def test_only_apps_with_a_manifest_add_extensions(self):
+class TestPluginDiscovery(PluginTestCase):
+	def test_only_apps_with_a_manifest_add_entries(self):
 		self.write_manifest([page()])
 
-		extensions = get_registry()
+		plugins = get_registry()
 
-		self.assertEqual(extensions["apps"], {APP: {"title": "Shipping"}})
-		self.assertEqual([entry["key"] for entry in extensions["entries"]], [f"{APP}:pages:jobs"])
-		self.assertEqual(extensions["problems"], [])
+		self.assertEqual(plugins["apps"], {APP: {"title": "Shipping"}})
+		self.assertEqual([entry["key"] for entry in plugins["entries"]], [f"{APP}:pages:jobs"])
+		self.assertEqual(plugins["problems"], [])
 
 	def test_a_malformed_manifest_is_logged_and_the_other_apps_survive(self):
 		self.write_asset(OTHER_APP, "manifest.json", "{not json")
 		self.write_manifest([page()])
 
-		extensions = get_registry()
+		plugins = get_registry()
 
-		self.assertEqual({entry["app"] for entry in extensions["entries"]}, {APP})
-		self.assertEqual([problem["app"] for problem in extensions["problems"]], [OTHER_APP])
-		self.assertTrue(error_logged(f"Commera extension {OTHER_APP}:manifest.json skipped", self.started_at))
+		self.assertEqual({entry["app"] for entry in plugins["entries"]}, {APP})
+		self.assertEqual([problem["app"] for problem in plugins["problems"]], [OTHER_APP])
+		self.assertTrue(error_logged(f"Commera plugin {OTHER_APP}:manifest.json skipped", self.started_at))
 
-	def test_a_manifest_built_for_another_api_marks_every_extension_failed(self):
+	def test_a_manifest_built_for_another_api_marks_every_plugin_failed(self):
 		self.write_manifest([page(), action()], api_version=API_VERSION + 1)
 
 		entries = get_registry()["entries"]
@@ -254,9 +255,9 @@ class TestExtensionDiscovery(ExtensionTestCase):
 	def test_a_module_reports_whether_it_is_built_for_this_api(self):
 		self.write_manifest([page("jobs"), page("wrong-api"), page("no-banner"), page("missing"), action()])
 		self.write_asset(
-			APP, "pages/jobs.js", f"/* commera-extension-api: {API_VERSION} */\nexport default {{}}"
+			APP, "pages/jobs.js", f"/* commera-plugin-api: {API_VERSION} */\nexport default {{}}"
 		)
-		self.write_asset(APP, "pages/wrong-api.js", "/* commera-extension-api: 99 */\nexport default {}")
+		self.write_asset(APP, "pages/wrong-api.js", "/* commera-plugin-api: 99 */\nexport default {}")
 		self.write_asset(APP, "pages/no-banner.js", "import { ref } from 'vue'")
 
 		entries = self.entries_by_key()
@@ -266,7 +267,7 @@ class TestExtensionDiscovery(ExtensionTestCase):
 		)
 		self.assertIsNone(entries[f"{APP}:pages:jobs"].get("error"))
 		self.assertIn("API 99", entries[f"{APP}:pages:wrong-api"]["error"])
-		self.assertIn("extension-kit", entries[f"{APP}:pages:no-banner"]["error"])
+		self.assertIn("plugin-kit", entries[f"{APP}:pages:no-banner"]["error"])
 		self.assertIn("isn't built", entries[f"{APP}:pages:missing"]["error"])
 		self.assertIsNone(entries[f"{APP}:pages:missing"].get("module_url"))
 		self.assertIsNone(entries[f"{APP}:order/actions:resend"].get("error"))
@@ -277,13 +278,13 @@ class TestExtensionDiscovery(ExtensionTestCase):
 		self.write_asset(APP, "icon.svg", icon)
 		self.write_manifest([page()], app=OTHER_APP, icon="icon.svg")
 
-		visible = get_visible_extensions("Administrator")
+		visible = get_visible_plugins("Administrator")
 
 		digest = hashlib.sha256(icon.encode()).hexdigest()[:8]
 		self.assertEqual(visible["apps"][APP]["icon_url"], f"/assets/{APP}/commera/icon.svg?v={digest}")
 		self.assertNotIn("icon_url", visible["apps"][OTHER_APP])
 		with self.set_user(SYSTEM_MANAGER):
-			icon_urls = {row["app"]: row["icon_url"] for row in apps_api.get_installed_apps()}
+			icon_urls = {row["app"]: row["icon_url"] for row in get_plugins()}
 		self.assertEqual(icon_urls[APP], visible["apps"][APP]["icon_url"])
 		self.assertIsNone(icon_urls[OTHER_APP])
 
@@ -294,7 +295,7 @@ class TestExtensionDiscovery(ExtensionTestCase):
 		self.assertNotIn("icon_url", get_registry()["apps"][APP])
 
 
-class TestExtensionValidation(ExtensionTestCase):
+class TestPluginValidation(PluginTestCase):
 	def test_each_invalid_entry_is_dropped_logged_and_listed_as_a_problem(self):
 		invalid_entries = {
 			"unknown place": card(place="order/blocks"),
@@ -322,14 +323,12 @@ class TestExtensionValidation(ExtensionTestCase):
 				started_at = now_datetime()
 				self.write_manifest([page("kept"), entry])
 
-				extensions = get_registry()
+				plugins = get_registry()
 
-				self.assertEqual([entry["name"] for entry in extensions["entries"]], ["kept"])
-				self.assertEqual(len(extensions["problems"]), 1)
+				self.assertEqual([entry["name"] for entry in plugins["entries"]], ["kept"])
+				self.assertEqual(len(plugins["problems"]), 1)
 				self.assertTrue(
-					error_logged(
-						f"Commera extension {APP}:{entry['place']}/{entry['name']} skipped", started_at
-					)
+					error_logged(f"Commera plugin {APP}:{entry['place']}/{entry['name']} skipped", started_at)
 				)
 
 	def test_a_duplicate_name_keeps_the_first_and_settings_is_one_per_app(self):
@@ -344,10 +343,10 @@ class TestExtensionValidation(ExtensionTestCase):
 			]
 		)
 
-		extensions = get_registry()
+		plugins = get_registry()
 
 		self.assertEqual(
-			[(entry["place"], entry["name"], entry["label"]) for entry in extensions["entries"]],
+			[(entry["place"], entry["name"], entry["label"]) for entry in plugins["entries"]],
 			[
 				("pages", "jobs", "First"),
 				("settings", "settings", "Shipping"),
@@ -355,7 +354,7 @@ class TestExtensionValidation(ExtensionTestCase):
 				("order/cards", "print-status", "Print status"),
 			],
 		)
-		self.assertEqual(len(extensions["problems"]), 2)
+		self.assertEqual(len(plugins["problems"]), 2)
 
 	def test_the_grammar_names_the_three_records_commera_extends(self):
 		self.assertEqual(RECORD_DOCTYPES, {"order": "Sales Order", "product": "Item", "customer": "Customer"})
@@ -365,7 +364,7 @@ class TestExtensionValidation(ExtensionTestCase):
 				self.assertLessEqual(set(spec["required"]), set(spec["fields"]))
 
 
-class TestExtensionRegistryCache(ExtensionTestCase):
+class TestPluginRegistryCache(PluginTestCase):
 	@patch.dict(frappe.conf, {"developer_mode": 0})
 	def test_outside_developer_mode_the_registry_is_cached_until_clear_cache(self):
 		frappe.clear_cache()
@@ -387,18 +386,18 @@ class TestExtensionRegistryCache(ExtensionTestCase):
 		self.assertEqual(len(get_registry()["entries"]), 2)
 
 
-class TestExtensionVisibility(ExtensionTestCase):
+class TestPluginVisibility(PluginTestCase):
 	def visible_labels(self, user: str) -> list[str]:
-		return sorted(entry["label"] for entry in get_visible_extensions(user)["entries"])
+		return sorted(entry["label"] for entry in get_visible_plugins(user)["entries"])
 
-	def test_each_user_sees_only_the_extensions_whose_doctypes_they_can_read(self):
+	def test_each_user_sees_only_the_plugins_whose_doctypes_they_can_read(self):
 		self.write_manifest([page("stock", label="Stock", requires="Stock Entry")])
 		self.write_manifest([page("quotes", label="Quotes", requires="Quotation")], app=OTHER_APP)
 
 		self.assertEqual(self.visible_labels(STOCK_USER), ["Stock"])
 		self.assertEqual(self.visible_labels(SALES_USER), ["Quotes"])
 		self.assertEqual(self.visible_labels(SYSTEM_MANAGER), ["Quotes", "Stock"])
-		self.assertEqual(list(get_visible_extensions(STOCK_USER)["apps"]), [APP])
+		self.assertEqual(list(get_visible_plugins(STOCK_USER)["apps"]), [APP])
 
 	def test_a_page_condition_runs_at_boot_but_a_record_condition_waits_for_the_record(self):
 		self.write_manifest(
@@ -411,9 +410,7 @@ class TestExtensionVisibility(ExtensionTestCase):
 		)
 
 		self.assertEqual(self.visible_labels(STOCK_USER), ["Card", "Shown"])
-		self.assertTrue(
-			error_logged(f"Commera extension {APP}:pages:broken condition failed", self.started_at)
-		)
+		self.assertTrue(error_logged(f"Commera plugin {APP}:pages:broken condition failed", self.started_at))
 
 	def test_the_dashboard_boot_carries_no_server_paths(self):
 		self.write_manifest(
@@ -427,10 +424,10 @@ class TestExtensionVisibility(ExtensionTestCase):
 		with self.set_user(STOCK_USER), patch.object(frappe.db, "commit"):
 			dashboard.get_context(context)
 
-		extensions = context.boot.extensions
-		self.assertEqual(extensions["apps"], {APP: {"title": "Shipping"}})
+		plugins = context.boot.plugins
+		self.assertEqual(plugins["apps"], {APP: {"title": "Shipping"}})
 		self.assertEqual(
-			[(entry["key"], entry["has_condition"], entry["has_method"]) for entry in extensions["entries"]],
+			[(entry["key"], entry["has_condition"], entry["has_method"]) for entry in plugins["entries"]],
 			[
 				(f"{APP}:pages:jobs", False, False),
 				(f"{APP}:order/cards:print-status", True, False),
@@ -438,7 +435,7 @@ class TestExtensionVisibility(ExtensionTestCase):
 			],
 		)
 		self.assertEqual(
-			set(extensions["entries"][0]),
+			set(plugins["entries"][0]),
 			{
 				"key",
 				"app",
@@ -454,11 +451,11 @@ class TestExtensionVisibility(ExtensionTestCase):
 			}
 			| {"module_url", "error", "has_condition", "has_method"},
 		)
-		self.assertTrue(extensions["entries"][0]["sidebar"])
-		self.assertNotIn(FUNCTIONS, json.dumps(extensions))
+		self.assertTrue(plugins["entries"][0]["sidebar"])
+		self.assertNotIn(FUNCTIONS, json.dumps(plugins))
 
 
-class TestRecordExtensions(ExtensionTestCase):
+class TestRecordPlugins(PluginTestCase):
 	def setUp(self):
 		super().setUp()
 		self.sales_order = make_test_sales_order(submit=False).name
@@ -477,7 +474,7 @@ class TestRecordExtensions(ExtensionTestCase):
 
 	def test_one_call_returns_every_card_and_action_whose_condition_passed(self):
 		with self.set_user(STOCK_USER):
-			keys = get_record_extensions("Sales Order", self.sales_order)["keys"]
+			keys = get_record_plugins("Sales Order", self.sales_order)["keys"]
 
 		self.assertEqual(
 			keys,
@@ -488,16 +485,16 @@ class TestRecordExtensions(ExtensionTestCase):
 			],
 		)
 		self.assertTrue(
-			error_logged(f"Commera extension {APP}:order/cards:broken condition failed", self.started_at)
+			error_logged(f"Commera plugin {APP}:order/cards:broken condition failed", self.started_at)
 		)
 
 	def test_a_user_who_cannot_read_the_record_is_refused(self):
 		with self.set_user(OUTSIDER), self.assertRaises(frappe.PermissionError):
-			get_record_extensions("Sales Order", self.sales_order)
+			get_record_plugins("Sales Order", self.sales_order)
 
 	def test_a_doctype_apps_cannot_extend_is_refused(self):
 		with self.assertRaises(frappe.ValidationError):
-			get_record_extensions("Quotation", self.sales_order)
+			get_record_plugins("Quotation", self.sales_order)
 
 	def test_running_an_action_returns_its_message(self):
 		with self.set_user(STOCK_USER):
@@ -523,7 +520,7 @@ class TestRecordExtensions(ExtensionTestCase):
 				run_record_action(key, self.sales_order)
 
 
-class TestCommands(ExtensionTestCase):
+class TestCommands(PluginTestCase):
 	def setUp(self):
 		super().setUp()
 		self.write_manifest(
@@ -540,7 +537,7 @@ class TestCommands(ExtensionTestCase):
 	def test_the_boot_lists_only_commands_whose_condition_and_requires_pass(self):
 		commands = {
 			entry["name"]: entry
-			for entry in get_visible_extensions(STOCK_USER)["entries"]
+			for entry in get_visible_plugins(STOCK_USER)["entries"]
 			if entry["place"] == "commands"
 		}
 
@@ -572,17 +569,17 @@ class TestCommands(ExtensionTestCase):
 			run_record_action(f"{APP}:commands:sync", make_test_sales_order(submit=False).name)
 
 
-class TestAppSettings(ExtensionTestCase):
+class TestPluginSettings(PluginTestCase):
 	def setUp(self):
 		super().setUp()
 		self.write_manifest([app_settings()])
 		self.addCleanup(frappe.clear_document_cache, SETTINGS_DOCTYPE, SETTINGS_DOCTYPE)
 
 	def test_reads_the_declared_single_as_field_groups_without_secrets(self):
-		save_app_setting(APP, client_secret="secret-1")
-		save_app_setting(APP, client_id="client-1")
+		save_plugin_setting(APP, client_secret="secret-1")
+		save_plugin_setting(APP, client_id="client-1")
 
-		app_settings_data = get_app_settings(APP)
+		app_settings_data = get_plugin_settings(APP)
 
 		self.assertEqual(app_settings_data["doctype"], SETTINGS_DOCTYPE)
 		self.assertEqual(app_settings_data["values"]["client_id"], "client-1")
@@ -593,26 +590,26 @@ class TestAppSettings(ExtensionTestCase):
 		self.assertTrue(fields["client_secret"]["is_set"])
 
 	def test_a_blank_secret_keeps_the_stored_one(self):
-		save_app_setting(APP, client_secret="secret-1")
-		save_app_setting(APP, client_secret="")
+		save_plugin_setting(APP, client_secret="secret-1")
+		save_plugin_setting(APP, client_secret="")
 
 		self.assertEqual(
 			get_decrypted_password(SETTINGS_DOCTYPE, SETTINGS_DOCTYPE, "client_secret"), "secret-1"
 		)
-		self.assertEqual(save_app_setting(APP, client_id="client-2"), {"client_id": "client-2"})
+		self.assertEqual(save_plugin_setting(APP, client_id="client-2"), {"client_id": "client-2"})
 
 	def test_only_the_declared_single_is_reachable(self):
 		with self.assertRaises(frappe.DoesNotExistError):
-			get_app_settings(OTHER_APP)
+			get_plugin_settings(OTHER_APP)
 		with self.assertRaises(frappe.ValidationError):
-			save_app_setting(APP, no_such_field="value")
+			save_plugin_setting(APP, no_such_field="value")
 
 	def test_saving_needs_write_permission_on_the_single(self):
 		with self.set_user(STOCK_USER), self.assertRaises(frappe.PermissionError):
-			save_app_setting(APP, client_id="client-3")
+			save_plugin_setting(APP, client_id="client-3")
 
 
-class TestAppSettingsWithRequiredFields(ExtensionTestCase):
+class TestPluginSettingsWithRequiredFields(PluginTestCase):
 	def setUp(self):
 		super().setUp()
 		self.write_manifest([app_settings(doctype=REQUIRED_SETTINGS_DOCTYPE)])
@@ -621,16 +618,16 @@ class TestAppSettingsWithRequiredFields(ExtensionTestCase):
 			frappe.db.set_single_value(REQUIRED_SETTINGS_DOCTYPE, fieldname, None)
 
 	def test_a_row_saves_while_other_required_rows_are_blank(self):
-		save_app_setting(APP, message_parameter="text")
+		save_plugin_setting(APP, message_parameter="text")
 
 		self.assertEqual(frappe.db.get_single_value(REQUIRED_SETTINGS_DOCTYPE, "message_parameter"), "text")
 		self.assertFalse(frappe.db.get_single_value(REQUIRED_SETTINGS_DOCTYPE, "receiver_parameter"))
 
 	def test_a_required_row_cannot_be_cleared(self):
-		save_app_setting(APP, message_parameter="text")
+		save_plugin_setting(APP, message_parameter="text")
 
 		with self.assertRaises(frappe.MandatoryError):
-			save_app_setting(APP, message_parameter="")
+			save_plugin_setting(APP, message_parameter="")
 		self.assertEqual(frappe.db.get_single_value(REQUIRED_SETTINGS_DOCTYPE, "message_parameter"), "text")
 
 	def test_the_single_still_runs_its_own_validation(self):
@@ -640,11 +637,11 @@ class TestAppSettingsWithRequiredFields(ExtensionTestCase):
 			),
 			self.assertRaisesRegex(frappe.ValidationError, "checked by the app"),
 		):
-			save_app_setting(APP, message_parameter="text")
+			save_plugin_setting(APP, message_parameter="text")
 
 
-class TestInstalledApps(ExtensionTestCase):
-	def test_lists_each_app_with_its_extensions_problems_and_failures(self):
+class TestInstalledApps(PluginTestCase):
+	def test_lists_each_plugin_with_its_entries_problems_and_failures(self):
 		failed_before = self.get_installed_app(APP)["failed_deliveries"]
 		sales_order = make_test_sales_order(submit=False).name
 		make_order_event(
@@ -656,13 +653,13 @@ class TestInstalledApps(ExtensionTestCase):
 			],
 		)
 		self.write_manifest([page(), card(place="order/blocks")])
-		self.write_asset(APP, "pages/jobs.js", f"/* commera-extension-api: {API_VERSION} */")
+		self.write_asset(APP, "pages/jobs.js", f"/* commera-plugin-api: {API_VERSION} */")
 
 		installed_app = self.get_installed_app(APP)
 
 		self.assertEqual(installed_app["title"], "Shipping")
 		self.assertEqual(
-			installed_app["extensions"],
+			installed_app["entries"],
 			[{"place": "pages", "name": "jobs", "label": "Print jobs", "error": None}],
 		)
 		self.assertEqual(len(installed_app["problems"]), 1)
@@ -681,8 +678,8 @@ class TestInstalledApps(ExtensionTestCase):
 		)
 
 		with self.set_user(SYSTEM_MANAGER):
-			failed = apps_api.get_app_deliveries("commera_test_app", status="Failed", page_length=1)
-			every_delivery = apps_api.get_app_deliveries("commera_test_app")
+			failed = get_plugin_deliveries("commera_test_app", status="Failed", page_length=1)
+			every_delivery = get_plugin_deliveries("commera_test_app")
 
 		self.assertEqual(failed["total"], 2)
 		self.assertEqual(
@@ -693,10 +690,10 @@ class TestInstalledApps(ExtensionTestCase):
 	def test_only_a_system_manager_sees_installed_apps(self):
 		with self.set_user(STOCK_USER):
 			with self.assertRaises(frappe.PermissionError):
-				apps_api.get_installed_apps()
+				get_plugins()
 			with self.assertRaises(frappe.PermissionError):
-				apps_api.get_app_deliveries(APP)
+				get_plugin_deliveries(APP)
 
 	def get_installed_app(self, app: str) -> dict:
 		with self.set_user(SYSTEM_MANAGER):
-			return next(row for row in apps_api.get_installed_apps() if row["app"] == app)
+			return next(row for row in get_plugins() if row["app"] == app)

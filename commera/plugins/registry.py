@@ -6,12 +6,12 @@ import re
 import frappe
 from frappe.utils.data import cstr
 
-from commera.app_events import is_supported_app
-from commera.extensions.places import ICONS, NAME_PATTERN, PLACES, RECORD_DOCTYPES, RECORDLESS_PLACES
+from commera.plugin_events import is_supported_app
+from commera.plugins.places import ICONS, NAME_PATTERN, PLACES, RECORD_DOCTYPES, RECORDLESS_PLACES
 from commera.sdk import API_VERSION
 
-CACHE_KEY = "commera:extensions"
-BANNER_PATTERN = re.compile(r"commera-extension-api:\s*(\d+)")
+CACHE_KEY = "commera:plugins"
+BANNER_PATTERN = re.compile(r"commera-plugin-api:\s*(\d+)")
 ENTRY_FIELDS = tuple(dict.fromkeys(field for spec in PLACES.values() for field in spec["fields"]))
 CLIENT_FIELDS = (
 	"key",
@@ -32,16 +32,16 @@ CLIENT_FIELDS = (
 
 def get_registry() -> dict:
 	if frappe.conf.developer_mode:
-		return get_app_extensions()
+		return get_plugin_entries()
 
-	return frappe.cache.get_value(CACHE_KEY, generator=get_app_extensions)
+	return frappe.cache.get_value(CACHE_KEY, generator=get_plugin_entries)
 
 
 def clear_registry_cache():
 	frappe.cache.delete_value(CACHE_KEY)
 
 
-def get_visible_extensions(user: str) -> dict:
+def get_visible_plugins(user: str) -> dict:
 	registry = get_registry()
 	entries = [
 		entry
@@ -62,7 +62,7 @@ def get_client_entry(entry: dict) -> dict:
 	}
 
 
-def resolve_record_extensions(place_prefix: str, name: str | int, user: str) -> list[str]:
+def resolve_record_plugins(place_prefix: str, name: str | int, user: str) -> list[str]:
 	doctype = RECORD_DOCTYPES[place_prefix]
 	return [
 		entry["key"]
@@ -87,19 +87,19 @@ def passes_condition(entry: dict, *arguments) -> bool:
 	try:
 		return bool(frappe.get_attr(entry["condition"])(*arguments))
 	except Exception:
-		frappe.log_error(title=f"Commera extension {entry['key']} condition failed")
+		frappe.log_error(title=f"Commera plugin {entry['key']} condition failed")
 		return False
 
 
-def get_app_extensions() -> dict:
+def get_plugin_entries() -> dict:
 	registry = {"apps": {}, "entries": [], "problems": []}
 	for app in frappe.get_installed_apps():
 		if app != "commera" and is_supported_app(app):
-			add_app_extensions(registry, app)
+			add_plugin_entries(registry, app)
 	return registry
 
 
-def add_app_extensions(registry: dict, app: str):
+def add_plugin_entries(registry: dict, app: str):
 	path = get_asset_path(app, "manifest.json")
 	if not os.path.isfile(path):
 		return
@@ -109,7 +109,7 @@ def add_app_extensions(registry: dict, app: str):
 			manifest = json.load(manifest_file)
 	except ValueError:
 		manifest = None
-	if not isinstance(manifest, dict) or not isinstance(manifest.get("extensions"), list):
+	if not isinstance(manifest, dict) or not isinstance(manifest.get("entries"), list):
 		add_problem(registry, app, "manifest.json", f"isn't valid. Run bench build --app {app}.")
 		return
 
@@ -118,8 +118,8 @@ def add_app_extensions(registry: dict, app: str):
 		registry["apps"][app]["icon_url"] = icon_url
 	version_error = get_version_error(manifest)
 	taken = set()
-	for extension in manifest["extensions"]:
-		entry = get_entry(app, extension if isinstance(extension, dict) else {})
+	for manifest_entry in manifest["entries"]:
+		entry = get_entry(app, manifest_entry if isinstance(manifest_entry, dict) else {})
 		if reason := get_invalid_reason(entry, taken):
 			add_problem(registry, app, f"{entry['place']}/{entry['name']}", reason)
 			continue
@@ -129,7 +129,7 @@ def add_app_extensions(registry: dict, app: str):
 
 def add_problem(registry: dict, app: str, subject: str, reason: str):
 	message = f"{subject}: {reason}"
-	frappe.log_error(title=f"Commera extension {app}:{subject} skipped", message=message)
+	frappe.log_error(title=f"Commera plugin {app}:{subject} skipped", message=message)
 	registry["problems"].append({"app": app, "message": message})
 
 
@@ -141,14 +141,14 @@ def get_version_error(manifest: dict) -> str | None:
 	if manifest.get("api_version") != API_VERSION:
 		return (
 			f"Built for Commera API {manifest.get('api_version')}, not {API_VERSION}. "
-			"Rebuild it with the current @commera/extension-kit."
+			"Rebuild it with the current @commera/plugin-kit."
 		)
 
 
-def get_entry(app: str, extension: dict) -> dict:
-	place, name = cstr(extension.get("place")), cstr(extension.get("name"))
+def get_entry(app: str, manifest_entry: dict) -> dict:
+	place, name = cstr(manifest_entry.get("place")), cstr(manifest_entry.get("name"))
 	place_fields = PLACES.get(place, {}).get("fields", ())
-	entry = {field: extension.get(field) if field in place_fields else None for field in ENTRY_FIELDS}
+	entry = {field: manifest_entry.get(field) if field in place_fields else None for field in ENTRY_FIELDS}
 	if place == "pages" and entry["sidebar"] is None:
 		entry["sidebar"] = True
 	return entry | {
@@ -156,8 +156,8 @@ def get_entry(app: str, extension: dict) -> dict:
 		"app": app,
 		"place": place,
 		"name": name,
-		"module": extension.get("module"),
-		"hash": extension.get("hash"),
+		"module": manifest_entry.get("module"),
+		"hash": manifest_entry.get("hash"),
 	}
 
 
@@ -172,7 +172,7 @@ def get_invalid_reason(entry: dict, taken: set) -> str | None:
 	if not NAME_PATTERN.fullmatch(entry["name"]):
 		return "The name must be 1-40 characters of a-z, 0-9 and -, starting with a letter or digit."
 	if get_uniqueness_key(entry) in taken:
-		return f"{entry['app']} already has an extension here."
+		return f"{entry['app']} already has an entry here."
 	if missing := [field for field in spec["required"] if entry[field] in (None, "")]:
 		return f"{', '.join(missing)} is required."
 	if entry["icon"] and entry["icon"] not in ICONS:
@@ -189,7 +189,7 @@ def get_module_reason(entry: dict, spec: dict) -> str | None:
 	if spec["module"] == "required" and not module:
 		return "It has no built module."
 	if spec["module"] == "none" and module:
-		return f"{entry['place']} is declared by its extension block alone; remove the template."
+		return f"{entry['place']} is declared by its plugin block alone; remove the template."
 	if spec["module"] == "optional" and bool(module) == bool(entry["method"] or entry["doctype"]):
 		return "It needs exactly one of a template or a declared method or doctype."
 	if module and not is_contained_asset(module, ".js"):
@@ -253,7 +253,7 @@ def add_module_url(entry: dict, version_error: str | None) -> dict:
 	with open(path) as module_file:
 		banner = BANNER_PATTERN.search(module_file.readline())
 	if not banner:
-		return entry | {"error": f"{module} wasn't built with @commera/extension-kit."}
+		return entry | {"error": f"{module} wasn't built with @commera/plugin-kit."}
 	if int(banner.group(1)) != API_VERSION:
 		return entry | {"error": f"{module} is built for Commera API {banner.group(1)}, not {API_VERSION}."}
 

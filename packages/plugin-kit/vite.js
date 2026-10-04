@@ -11,7 +11,7 @@ const KIT_VERSION = JSON.parse(
 const GRAMMAR = JSON.parse(
 	readFileSync(new URL('./places.json', import.meta.url), 'utf8'),
 );
-const BANNER = `/* commera-extension-api: ${API_VERSION} */`;
+const BANNER = `/* commera-plugin-api: ${API_VERSION} */`;
 const SHARED = [
 	'vue',
 	'frappe-ui',
@@ -204,18 +204,18 @@ function parseScript(compiler, script) {
 	}).program.body;
 }
 
-function declaresExtension(statement) {
+function declaresPlugin(statement) {
 	return (
 		statement.type === 'ExportNamedDeclaration' &&
 		statement.declaration?.type === 'VariableDeclaration' &&
 		statement.declaration.declarations.some(
-			(declarator) => declarator.id.name === 'extension',
+			(declarator) => declarator.id.name === 'plugin',
 		)
 	);
 }
 
-// Returns null when the SFC has no plain <script>, or a plain one that never mentions `extension`.
-function readExtensionBlock(compiler, file, display) {
+// Returns null when the SFC has no plain <script>, or a plain one that never mentions `plugin`.
+function readPluginBlock(compiler, file, display) {
 	const { descriptor, errors } = compiler.parse(readFileSync(file, 'utf8'), {
 		filename: file,
 	});
@@ -225,24 +225,24 @@ function readExtensionBlock(compiler, file, display) {
 			descriptor,
 		};
 	const script = descriptor.script;
-	if (!script) return { descriptor, extension: null, errors: [] };
+	if (!script) return { descriptor, plugin: null, errors: [] };
 	let body;
 	try {
 		body = parseScript(compiler, script);
 	} catch (error) {
 		return { descriptor, errors: [`${display}: ${error.message}`] };
 	}
-	if (!body.some(declaresExtension))
-		return { descriptor, extension: null, errors: [] };
+	if (!body.some(declaresPlugin))
+		return { descriptor, plugin: null, errors: [] };
 	const at = (node) => `${display}:${scriptPosition(script, node)}`;
-	const strays = body.filter((statement) => !declaresExtension(statement));
+	const strays = body.filter((statement) => !declaresPlugin(statement));
 	const errorsFound = strays.map(
 		(statement) =>
 			`${at(
 				statement,
-			)} the plain <script> may only hold \`export const extension = { … }\`; move other code to <script setup>`,
+			)} the plain <script> may only hold \`export const plugin = { … }\`; move other code to <script setup>`,
 	);
-	const statement = body.find(declaresExtension);
+	const statement = body.find(declaresPlugin);
 	const { declaration } = statement;
 	const [declarator] = declaration.declarations;
 	if (
@@ -251,17 +251,17 @@ function readExtensionBlock(compiler, file, display) {
 		declarator.init?.type !== 'ObjectExpression'
 	) {
 		errorsFound.push(
-			`${at(statement)} write the block as \`export const extension = { … }\``,
+			`${at(statement)} write the block as \`export const plugin = { … }\``,
 		);
-		return { descriptor, extension: null, errors: errorsFound, declared: true };
+		return { descriptor, plugin: null, errors: errorsFound, declared: true };
 	}
 	try {
-		const extension = evaluateLiteral(declarator.init, 'extension');
-		return { descriptor, extension, errors: errorsFound, declared: true };
+		const plugin = evaluateLiteral(declarator.init, 'plugin');
+		return { descriptor, plugin, errors: errorsFound, declared: true };
 	} catch (error) {
 		if (!(error instanceof LiteralError)) throw error;
 		errorsFound.push(`${at(error.node)} ${error.message}`);
-		return { descriptor, extension: null, errors: errorsFound, declared: true };
+		return { descriptor, plugin: null, errors: errorsFound, declared: true };
 	}
 }
 
@@ -299,47 +299,44 @@ function checkField(key, value, { app, icons }) {
 	}
 }
 
-function checkExtension(extension, place, hasModule, context) {
+function checkPlugin(plugin, place, hasModule, context) {
 	const spec = GRAMMAR.places[place];
 	const problems = [];
-	for (const [key, value] of Object.entries(extension)) {
+	for (const [key, value] of Object.entries(plugin)) {
 		if (!spec.fields.includes(key)) {
 			problems.push(
-				`extension.${key} is not allowed on ${place}${suggest(
-					key,
-					spec.fields,
-				)}`,
+				`plugin.${key} is not allowed on ${place}${suggest(key, spec.fields)}`,
 			);
 			continue;
 		}
 		const problem = checkField(key, value, context);
-		if (problem) problems.push(`extension.${key} ${problem}`);
+		if (problem) problems.push(`plugin.${key} ${problem}`);
 	}
 	for (const key of spec.required) {
-		if (!(key in extension)) problems.push(`extension.${key} is required`);
+		if (!(key in plugin)) problems.push(`plugin.${key} is required`);
 	}
 	const { declarative } = spec;
 	if (spec.module === 'required' && !hasModule)
 		problems.push('needs a <template> or <script setup>');
 	if (spec.module === 'none' && hasModule)
 		problems.push(
-			`can't have a <template> or <script setup>; ${place} is declared by the extension block alone`,
+			`can't have a <template> or <script setup>; ${place} is declared by the plugin block alone`,
 		);
 	if (spec.module === 'optional') {
-		const declared = declarative in extension;
+		const declared = declarative in plugin;
 		if (hasModule && declared)
 			problems.push(
-				`has both a template and extension.${declarative}; keep exactly one`,
+				`has both a template and plugin.${declarative}; keep exactly one`,
 			);
 		if (!hasModule && !declared)
 			problems.push(
-				`needs either a template or extension.${declarative}; it has neither`,
+				`needs either a template or plugin.${declarative}; it has neither`,
 			);
 	}
 	return problems;
 }
 
-export function discoverExtensions(
+export function discoverPlugins(
 	sourceDir,
 	{ app, compiler, icons = null, warn = () => {} },
 ) {
@@ -351,7 +348,7 @@ export function discoverExtensions(
 		const isIndex = basename(file) === 'index.vue';
 		const folder = toPosix(dirname(display));
 		const placement = isIndex ? matchPlacement(folder) : null;
-		const block = readExtensionBlock(compiler, file, display);
+		const block = readPluginBlock(compiler, file, display);
 
 		if (!placement) {
 			if (!block.declared) continue;
@@ -361,10 +358,10 @@ export function discoverExtensions(
 			}
 			errors.push(
 				isIndex
-					? `${display} declares an extension but ${placeOf(
+					? `${display} declares a plugin block but ${placeOf(
 							folder,
 					  )} isn't a Commera placement; valid places:\n${placementTable()}`
-					: `${display} declares an extension, but only a placement's index.vue may; valid places:\n${placementTable()}`,
+					: `${display} declares a plugin block, but only a placement's index.vue may; valid places:\n${placementTable()}`,
 			);
 			continue;
 		}
@@ -372,7 +369,7 @@ export function discoverExtensions(
 		errors.push(...block.errors);
 		if (!block.declared) {
 			errors.push(
-				`${display}: add \`<script>export const extension = { label: '…' }</script>\``,
+				`${display}: add \`<script>export const plugin = { label: '…' }</script>\``,
 			);
 			continue;
 		}
@@ -382,11 +379,11 @@ export function discoverExtensions(
 			);
 			continue;
 		}
-		if (!block.extension) continue;
+		if (!block.plugin) continue;
 
-		const { descriptor, extension } = block;
+		const { descriptor, plugin } = block;
 		const hasModule = Boolean(descriptor.template || descriptor.scriptSetup);
-		const problems = checkExtension(extension, placement.place, hasModule, {
+		const problems = checkPlugin(plugin, placement.place, hasModule, {
 			app,
 			icons,
 		});
@@ -406,7 +403,7 @@ export function discoverExtensions(
 			entryName: hasModule
 				? key.replace(/^settings\/settings$/, 'settings')
 				: null,
-			extension,
+			plugin,
 		});
 	}
 	return { entries, errors };
@@ -434,12 +431,12 @@ function stripPlainScript(compiler, code, id) {
 	return code.slice(0, start) + code.slice(end);
 }
 
-function guard({ hostDir, compiler, extensionFiles }) {
+function guard({ hostDir, compiler, pluginFiles }) {
 	const knownClasses = readHostFile(hostDir, 'classes.json');
 	const sharedExports = readHostFile(hostDir, 'shared-exports.json');
 	const knownClassSet = knownClasses ? new Set(knownClasses) : null;
 	return {
-		name: 'commera-extension-guard',
+		name: 'commera-plugin-guard',
 		enforce: 'pre',
 		buildStart() {
 			if (!knownClassSet || !sharedExports) {
@@ -483,7 +480,7 @@ function guard({ hostDir, compiler, extensionFiles }) {
 				}
 			}
 			// The manifest is the only copy of the block, so dotted paths never reach the browser.
-			if (extensionFiles.has(id)) {
+			if (pluginFiles.has(id)) {
 				const stripped = stripPlainScript(compiler, code, id);
 				if (stripped !== null) return { code: stripped, map: null };
 			}
@@ -539,8 +536,8 @@ function guard({ hostDir, compiler, extensionFiles }) {
 function manifestEntry(entry, hashes) {
 	const fields = Object.fromEntries(
 		GRAMMAR.places[entry.place].fields
-			.filter((field) => field in entry.extension)
-			.map((field) => [field, entry.extension[field]]),
+			.filter((field) => field in entry.plugin)
+			.map((field) => [field, entry.plugin[field]]),
 	);
 	const module = entry.entryName ? `${entry.entryName}.js` : null;
 	return {
@@ -555,7 +552,7 @@ function manifestEntry(entry, hashes) {
 // The registry reads line 1, so the banner goes on after minification, which would strip or move a plain comment.
 function finish({ app, entries, icon }) {
 	return {
-		name: 'commera-extension-manifest',
+		name: 'commera-plugin-manifest',
 		enforce: 'post',
 		generateBundle(_options, bundle) {
 			const hashes = {};
@@ -578,7 +575,7 @@ function finish({ app, entries, icon }) {
 				kit_version: KIT_VERSION,
 				app,
 				...(icon ? { icon: ICON_FILE } : {}),
-				extensions: entries.map((entry) => manifestEntry(entry, hashes)),
+				entries: entries.map((entry) => manifestEntry(entry, hashes)),
 			};
 			this.emitFile({
 				type: 'asset',
@@ -633,7 +630,7 @@ async function importFromApp(appRoot, name) {
 	return import(pathToFileURL(join(packageDir, exports['.'].import)).href);
 }
 
-export default async function commeraExtension({
+export default async function commeraPlugin({
 	root = process.cwd(),
 	app = basename(resolve(root)),
 	hostDir,
@@ -642,12 +639,12 @@ export default async function commeraExtension({
 	const appRoot = realpathSync(resolve(root));
 	const sourceDir = join(appRoot, 'commera');
 	const resolvedHostDir =
-		hostDir ?? resolve(appRoot, '../commera/commera/public/extension-host');
+		hostDir ?? resolve(appRoot, '../commera/commera/public/plugin-host');
 	const { default: vue } = await importFromApp(appRoot, '@vitejs/plugin-vue');
 	const compiler = requireFromApp(appRoot)('vue/compiler-sfc');
 	const icons = readHostFile(resolvedHostDir, 'icons.json');
 	const warnings = [];
-	const discovered = discoverExtensions(sourceDir, {
+	const discovered = discoverPlugins(sourceDir, {
 		app,
 		compiler,
 		icons,
@@ -670,13 +667,13 @@ export default async function commeraExtension({
 			.filter((entry) => entry.entryName)
 			.map((entry) => [entry.entryName, entry.file]),
 	);
-	const extensionFiles = new Set(entries.map((entry) => entry.file));
+	const pluginFiles = new Set(entries.map((entry) => entry.file));
 	return [
-		guard({ hostDir: resolvedHostDir, compiler, extensionFiles }),
+		guard({ hostDir: resolvedHostDir, compiler, pluginFiles }),
 		vue(),
 		finish({ app, entries, icon: appIcon.icon }),
 		{
-			name: 'commera-extension-build',
+			name: 'commera-plugin-build',
 			buildStart() {
 				if (!icons)
 					this.warn(`no icons.json at ${resolvedHostDir}; icon check skipped`);

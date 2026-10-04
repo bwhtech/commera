@@ -3,17 +3,22 @@
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Count
+from frappe.utils.data import cint
 
 from commera.api.admin.docfields import build_field_groups, get_editable_docfields, get_missing_fields
+from commera.api.admin.orders import get_deliveries_query, query_deliveries
 from commera.api.admin.settings import coerce_field_value
-from commera.extensions.places import PLACES, get_record_place_prefix
-from commera.extensions.registry import (
+from commera.plugin_events import get_plugin_apps
+from commera.plugins.places import PLACES, get_record_place_prefix
+from commera.plugins.registry import (
+	get_app_title,
 	get_registry,
 	get_registry_entry,
 	get_whitelisted_method,
 	has_required_access,
 	passes_condition,
-	resolve_record_extensions,
+	resolve_record_plugins,
 )
 
 RECORD_ACTION_PLACES = frozenset(
@@ -23,13 +28,62 @@ COMMAND_PLACES = frozenset({"commands"})
 
 
 @frappe.whitelist()
-def get_record_extensions(doctype: str, name: str | int) -> dict:
+def get_plugins() -> list[dict]:
+	frappe.only_for("System Manager")
+
+	registry = get_registry()
+	failed_deliveries = get_failed_delivery_counts()
+	return [
+		{
+			"app": app,
+			"title": get_app_title(app),
+			"icon_url": registry["apps"].get(app, {}).get("icon_url"),
+			"version": getattr(frappe.get_module(app), "__version__", None),
+			"entries": [
+				{field: entry.get(field) for field in ("place", "name", "label", "error")}
+				for entry in registry["entries"]
+				if entry["app"] == app
+			],
+			"problems": [problem["message"] for problem in registry["problems"] if problem["app"] == app],
+			"failed_deliveries": failed_deliveries.get(app, 0),
+		}
+		for app in dict.fromkeys([*get_plugin_apps(), *registry["apps"]])
+	]
+
+
+@frappe.whitelist()
+def get_plugin_deliveries(app: str, status: str | None = None, start: int = 0, page_length: int = 20) -> dict:
+	frappe.only_for("System Manager")
+
+	delivery = frappe.qb.DocType("Commera Event Delivery")
+	criterion = delivery.app == app
+	if status:
+		criterion &= delivery.status == status
+	return {
+		"rows": query_deliveries(criterion, cint(start), cint(page_length)),
+		"total": get_deliveries_query(criterion).select(Count("*")).run()[0][0],
+	}
+
+
+def get_failed_delivery_counts() -> dict:
+	delivery = frappe.qb.DocType("Commera Event Delivery")
+	return dict(
+		frappe.qb.from_(delivery)
+		.select(delivery.app, Count("*"))
+		.where(delivery.status == "Failed")
+		.groupby(delivery.app)
+		.run()
+	)
+
+
+@frappe.whitelist()
+def get_record_plugins(doctype: str, name: str | int) -> dict:
 	place_prefix = get_record_place_prefix(doctype)
 	if not place_prefix:
-		frappe.throw(_("Apps can't extend {0} records").format(doctype))
+		frappe.throw(_("Plugins can't extend {0} records").format(doctype))
 
 	frappe.has_permission(doctype, "read", doc=name, throw=True)
-	return {"keys": resolve_record_extensions(place_prefix, name, frappe.session.user)}
+	return {"keys": resolve_record_plugins(place_prefix, name, frappe.session.user)}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -47,7 +101,7 @@ def run_command(key: str) -> dict:
 def get_runnable_method(key: str, places: frozenset, name: str | int | None = None):
 	entry = get_registry_entry(key)
 	if not entry or not entry["method"] or entry["place"] not in places:
-		frappe.throw(_("App action {0} not found").format(key), frappe.DoesNotExistError)
+		frappe.throw(_("Plugin action {0} not found").format(key), frappe.DoesNotExistError)
 	if entry.get("error"):
 		frappe.throw(entry["error"])
 
@@ -75,8 +129,8 @@ def get_action_result(message) -> dict:
 
 
 @frappe.whitelist()
-def get_app_settings(app: str) -> dict:
-	doctype = get_app_settings_doctype(app)
+def get_plugin_settings(app: str) -> dict:
+	doctype = get_plugin_settings_doctype(app)
 	frappe.has_permission(doctype, "read", throw=True)
 
 	groups = build_field_groups(doctype, frappe.get_cached_doc(doctype))
@@ -88,8 +142,8 @@ def get_app_settings(app: str) -> dict:
 
 
 @frappe.whitelist(methods=["POST"])
-def save_app_setting(app: str, **fields):
-	doctype = get_app_settings_doctype(app)
+def save_plugin_setting(app: str, **fields):
+	doctype = get_plugin_settings_doctype(app)
 	frappe.has_permission(doctype, "write", throw=True)
 
 	docfields = {docfield.fieldname: docfield for _group_label, docfield in get_editable_docfields(doctype)}
@@ -121,7 +175,7 @@ def save_app_setting(app: str, **fields):
 	}
 
 
-def get_app_settings_doctype(app: str) -> str:
+def get_plugin_settings_doctype(app: str) -> str:
 	entry = next(
 		(
 			entry

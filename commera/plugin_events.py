@@ -11,10 +11,10 @@ from pypika.functions import NullIf
 from pypika.terms import Case, ExistsCriterion
 from rq.job import JobStatus
 
-from commera.sdk import API_VERSION, STORE_ORDER_TYPE, as_apps_user
+from commera.sdk import API_VERSION, STORE_ORDER_TYPE, as_plugin_user
 from commera.sdk.events import HANDLER_HOOKS, CommeraEvent
 
-APPS_USER = "commera-apps@commera.local"
+PLUGINS_USER = "commera-plugins@commera.local"
 RETRY_DELAYS_IN_MINUTES = (1, 5, 30, 120, 360)
 # Well past the longest queue timeout, so only a worker that died mid-handler leaves a claim this old.
 STALE_CLAIM_MINUTES = 30
@@ -166,7 +166,7 @@ def enqueue_app_deliveries(
 	app: str, reference_doctype: str, reference_name: str | int, lane_event: str | None = None
 ):
 	reference_name = cstr(reference_name)
-	job_id = f"commera-app-events::{app}::{reference_doctype}::{reference_name}"
+	job_id = f"commera-plugin-events::{app}::{reference_doctype}::{reference_name}"
 	if lane_event:
 		job_id = f"{job_id}::{lane_event}"
 	# A started job may already be past this event's delivery, so deduplicating against it would drop it.
@@ -188,7 +188,7 @@ def run_app_deliveries(app: str, reference_doctype: str, reference_name: str, la
 		fail_uninstalled_app_deliveries(app)
 		return
 
-	with as_apps_user(app):
+	with as_plugin_user(app):
 		run_lane(app, reference_doctype, reference_name, lane_event)
 
 
@@ -388,14 +388,14 @@ def retry_delivery(delivery: str):
 	)
 
 
-def add_apps_user():
-	"""The user app handlers run as: every desk role, like Administrator, but its writes are its own."""
-	if not frappe.db.exists("User", APPS_USER):
+def add_plugin_user():
+	"""The user plugin handlers run as: every desk role, like Administrator, but its writes are its own."""
+	if not frappe.db.exists("User", PLUGINS_USER):
 		user = frappe.new_doc("User")
 		user.update(
 			{
-				"email": APPS_USER,
-				"first_name": "Commera Apps",
+				"email": PLUGINS_USER,
+				"first_name": "Commera Plugins",
 				"user_type": "System User",
 				"enabled": 1,
 				"send_welcome_email": 0,
@@ -410,9 +410,9 @@ def add_apps_user():
 		filters={"desk_access": 1, "disabled": 0, "name": ["not in", [*AUTOMATIC_ROLES, "Administrator"]]},
 		pluck="name",
 	)
-	missing_roles = set(desk_roles) - set(frappe.get_roles(APPS_USER))
+	missing_roles = set(desk_roles) - set(frappe.get_roles(PLUGINS_USER))
 	if missing_roles:
-		frappe.get_doc("User", APPS_USER).add_roles(*missing_roles)
+		frappe.get_doc("User", PLUGINS_USER).add_roles(*missing_roles)
 
 
 def get_settled_cod_orders_query():
@@ -757,9 +757,9 @@ def on_sales_order_cancel(doc, method=None):
 		fire_event("order_cancelled", "Sales Order", doc.name)
 
 
-def validate_extension_apps():
-	extension_apps = get_extension_apps()
-	for app in extension_apps:
+def validate_plugins():
+	plugins = get_plugin_apps()
+	for app in plugins:
 		api_versions = frappe.get_hooks("commera_api_version", app_name=app)
 		if not api_versions:
 			print(f"{app} doesn't declare commera_api_version, so Commera can't tell if its hooks still fit.")
@@ -777,16 +777,16 @@ def validate_extension_apps():
 				print(message)
 				frappe.log_error(title=f"{app} declares unknown {hook}", message=message)
 
-	if unprefixed_fields := get_unprefixed_custom_fields(extension_apps):
+	if unprefixed_fields := get_unprefixed_custom_fields(plugins):
 		message = (
 			"Custom Fields should start with their app's name, so two apps never claim one column:\n"
 			+ ("\n".join(f"{field.dt}.{field.fieldname} ({field.app_name})" for field in unprefixed_fields))
 		)
 		print(message)
-		frappe.log_error(title="Commera apps added unprefixed Custom Fields", message=message)
+		frappe.log_error(title="Commera plugins added unprefixed Custom Fields", message=message)
 
 
-def get_extension_apps() -> list[str]:
+def get_plugin_apps() -> list[str]:
 	return [
 		app
 		for app in frappe.get_installed_apps()
@@ -813,9 +813,9 @@ def get_unprefixed_custom_fields(apps: list[str]) -> list:
 	return [field for field in custom_fields if not field.fieldname.startswith(f"{field.app_name}_")]
 
 
-def get_app_fieldnames(doctype: str) -> list[str]:
-	"""The columns on `doctype` named `<app>_...` after an installed Commera app."""
-	prefixes = tuple(f"{app}_" for app in get_extension_apps())
+def get_plugin_fieldnames(doctype: str) -> list[str]:
+	"""The columns on `doctype` named `<app>_...` after an installed Commera plugin."""
+	prefixes = tuple(f"{app}_" for app in get_plugin_apps())
 	if not prefixes:
 		return []
 	return [
@@ -825,11 +825,13 @@ def get_app_fieldnames(doctype: str) -> list[str]:
 	]
 
 
-def validate_app_fieldnames(doctype: str, fieldnames) -> None:
-	if not_app_fields := {cstr(fieldname) for fieldname in fieldnames} - set(get_app_fieldnames(doctype)):
+def validate_plugin_fieldnames(doctype: str, fieldnames) -> None:
+	if not_plugin_fields := {cstr(fieldname) for fieldname in fieldnames} - set(
+		get_plugin_fieldnames(doctype)
+	):
 		frappe.throw(
-			_("{0} is not a field an installed Commera app owns on {1}.").format(
-				", ".join(sorted(not_app_fields)), _(doctype)
+			_("{0} is not a field an installed Commera plugin owns on {1}.").format(
+				", ".join(sorted(not_plugin_fields)), _(doctype)
 			),
 			frappe.ValidationError,
 		)

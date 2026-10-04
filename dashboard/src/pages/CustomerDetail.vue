@@ -9,14 +9,14 @@ import ReportStats from '../components/ReportStats.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import Thumb from '../components/Thumb.vue'
 import EmptyState from '../components/EmptyState.vue'
-import ExtensionActionDialog from '../components/ExtensionActionDialog.vue'
-import ExtensionSlot from '../components/ExtensionSlot.vue'
+import PluginActionDialog from '../components/PluginActionDialog.vue'
+import PluginSlot from '../components/PluginSlot.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 import { erpnextLink } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { longDate, money } from '../data/format'
 import { orderRoute, productRoute } from '../ia/routes'
-import { useRecordExtensions } from '../data/recordExtensions'
+import { useRecordPlugins } from '../data/recordPlugins'
 
 const LAPSED_AFTER_DAYS = 90
 
@@ -118,7 +118,7 @@ async function saveNote() {
   customerRequest.reload()
 }
 
-const { cards, actionGroup, openAction, record, reload: reloadExtensions } = useRecordExtensions(
+const { cards, actionGroup, openAction, record, reload: reloadPlugins } = useRecordPlugins(
   'customer',
   'Customer',
   () => route.params.id,
@@ -138,7 +138,7 @@ function plural(count, word) {
       :breadcrumbs="[{ label: 'Customers', route: '/customers' }, { label: customer.name }]"
     >
       <template #actions>
-        <!-- A customer has no actions of its own, so the menu only exists once an installed app adds one. -->
+        <!-- A customer has no actions of its own, so the menu only exists once an installed plugin adds one. -->
         <Dropdown v-if="actionGroup" :options="[actionGroup]">
           <Button icon="lucide-ellipsis" label="More actions" />
         </Dropdown>
@@ -282,12 +282,12 @@ function plural(count, word) {
             />
           </section>
 
-          <ExtensionSlot :entries="cards" :record="record" frame="stack" @reload="reloadExtensions" />
+          <PluginSlot :entries="cards" :record="record" frame="stack" @reload="reloadPlugins" />
         </div>
       </div>
     </PageBody>
 
-    <ExtensionActionDialog v-model:entry="openAction" :record="record" @reload="reloadExtensions" />
+    <PluginActionDialog v-model:entry="openAction" :record="record" @reload="reloadPlugins" />
   </template>
 
   <!-- The customer id is already in the route, so the header is real from the

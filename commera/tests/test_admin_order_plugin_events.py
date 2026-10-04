@@ -24,14 +24,14 @@ def make_order_event(sales_order: str, event: str, deliveries: list, creation=No
 	return commera_event
 
 
-class TestOrderAppEvents(IntegrationTestCase):
+class TestOrderPluginEvents(IntegrationTestCase):
 	def setUp(self):
 		self.sales_order = make_test_sales_order(submit=False).name
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
 
-	def test_app_failures_lists_failed_deliveries_newest_event_first_with_app_title(self):
+	def test_plugin_failures_lists_failed_deliveries_newest_event_first_with_app_title(self):
 		make_order_event(
 			self.sales_order,
 			"order_placed",
@@ -55,7 +55,7 @@ class TestOrderAppEvents(IntegrationTestCase):
 			],
 		)
 
-		rows = get_order(self.sales_order)["app_failures"]
+		rows = get_order(self.sales_order)["plugin_failures"]
 
 		self.assertEqual(
 			[(row.event, row.app, row.status, row.attempts) for row in rows],
@@ -66,7 +66,7 @@ class TestOrderAppEvents(IntegrationTestCase):
 		)
 
 	def test_order_without_events_has_no_app_failures(self):
-		self.assertEqual(get_order(self.sales_order)["app_failures"], [])
+		self.assertEqual(get_order(self.sales_order)["plugin_failures"], [])
 
 	def test_user_without_order_access_is_refused(self):
 		frappe.set_user("Guest")

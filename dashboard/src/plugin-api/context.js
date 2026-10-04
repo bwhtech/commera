@@ -1,10 +1,10 @@
 import { inject } from 'vue'
 
 // The host provides and an app injects through these Symbols, so they must stay in a module the import map shares.
-export const EXTENSION_CONTEXT = Symbol('commera-extension-context')
-export const PAGE_CONTEXT = Symbol('commera-extension-page')
-export const ACTION_CONTEXT = Symbol('commera-extension-action')
-export const CARD_CONTEXT = Symbol('commera-extension-card')
+export const PLUGIN_CONTEXT = Symbol('commera-plugin-context')
+export const PAGE_CONTEXT = Symbol('commera-plugin-page')
+export const ACTION_CONTEXT = Symbol('commera-plugin-action')
+export const CARD_CONTEXT = Symbol('commera-plugin-card')
 
 export function __(text, replacements = []) {
   return String(text).replace(/\{(\d+)\}/g, (placeholder, index) => replacements[index] ?? placeholder)
@@ -16,8 +16,8 @@ function injectOrThrow(key, message) {
   return context
 }
 
-export function useExtension() {
-  return injectOrThrow(EXTENSION_CONTEXT, 'useExtension() was called outside a Commera app extension')
+export function usePlugin() {
+  return injectOrThrow(PLUGIN_CONTEXT, 'usePlugin() was called outside a Commera plugin')
 }
 
 export function usePage() {

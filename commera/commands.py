@@ -7,14 +7,14 @@ import click
 
 @click.group("commera")
 def commera_commands():
-	"""Commera tools for apps that extend the Commera dashboard."""
+	"""Commera tools for plugins that extend the Commera dashboard."""
 
 
 # Run from the bench folder, bench skips the app name "commera" and runs its own `bench init` instead.
 @commera_commands.command("init")
 @click.option("--skip-install", is_flag=True, default=False, help="Do not run yarn install in the app")
 def init(skip_install: bool):
-	"""Set up the app you are in to add pages, cards, actions and settings to the Commera dashboard."""
+	"""Set up the app you are in as a Commera plugin that adds pages, cards, actions and settings to the Commera dashboard."""
 	from frappe.utils import get_bench_path
 
 	from commera.scaffold import AppScaffold, get_app_from_folder

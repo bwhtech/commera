@@ -1,10 +1,10 @@
 <script setup>
 import { computed, onUnmounted, provide, shallowRef, toValue, watchEffect } from 'vue'
 import { Button, Dropdown } from 'frappe-ui'
-import { PAGE_CONTEXT } from '../extension-api/context'
-import { appLocation, lucideIcon } from '../ia/extensions'
+import { PAGE_CONTEXT } from '../plugin-api/context'
+import { appLocation, lucideIcon } from '../ia/plugins'
 import AppPageHeader from './AppPageHeader.vue'
-import ExtensionHost from './ExtensionHost.vue'
+import PluginHost from './PluginHost.vue'
 import PageBody from './PageBody.vue'
 import ResponsiveButton from './ResponsiveButton.vue'
 
@@ -98,6 +98,6 @@ onUnmounted(() => (document.title = titleBeforeMount))
   </AppPageHeader>
 
   <PageBody>
-    <ExtensionHost :entry="entry" :path="path" :query="query" :compact="false" @failed="clear" />
+    <PluginHost :entry="entry" :path="path" :query="query" :compact="false" @failed="clear" />
   </PageBody>
 </template>

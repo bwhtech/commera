@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { findPage } from '../ia/extensions'
-import ExtensionPageFrame from '../components/ExtensionPageFrame.vue'
+import { findPage } from '../ia/plugins'
+import PluginPageFrame from '../components/PluginPageFrame.vue'
 import NotFound from './NotFound.vue'
 
 const route = useRoute()
@@ -14,5 +14,5 @@ const path = computed(() => [route.params.path ?? []].flat().join('/'))
   <NotFound v-if="!entry" />
   <!-- Keyed by the page, not the sub-path, so moving within an app updates `path` instead of remounting it,
        while moving to another page drops the header the last one set. -->
-  <ExtensionPageFrame v-else :key="entry.key" :entry="entry" :path="path" :query="route.query" />
+  <PluginPageFrame v-else :key="entry.key" :entry="entry" :path="path" :query="route.query" />
 </template>

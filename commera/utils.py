@@ -13,9 +13,9 @@ from frappe.utils import add_days, cint, create_batch, cstr, flt, get_datetime, 
 from frappe.utils.data import strip_html
 from pypika import Order
 
-from commera.app_events import STORE_ORDER_TYPE, fire_event
 from commera.core import get_address_docs, get_party
 from commera.order_access import get_key_access
+from commera.plugin_events import STORE_ORDER_TYPE, fire_event
 
 # Ceiling for any IN (...) list this app sends to MariaDB/Postgres.
 IN_CLAUSE_CHUNK_SIZE = 1000

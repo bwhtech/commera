@@ -12,8 +12,8 @@ import ListPagination from '../ListPagination.vue'
 import ResponsiveButton from '../ResponsiveButton.vue'
 import StatusBadge from '../StatusBadge.vue'
 import { useAdminRead, useMethodAction } from '../../data/api'
-import { eventLabel, statusKey, timeLabel } from '../../data/appEvents'
-import { appIcon, extensionSettingsTabs, placeLabel, settingsTabValue } from '../../ia/extensions'
+import { eventLabel, statusKey, timeLabel } from '../../data/pluginEvents'
+import { appIcon, pluginSettingsTabs, placeLabel, settingsTabValue } from '../../ia/plugins'
 import { settings } from '../../ia/settings'
 import { orderRoute } from '../../ia/routes'
 
@@ -26,26 +26,26 @@ const DELIVERY_TABS = [
   { label: 'Failed', value: 'Failed' },
 ]
 
-const appsRequest = useAdminRead('apps.get_installed_apps', { immediate: false })
-const installedApps = computed(() => appsRequest.data ?? [])
+const pluginsRequest = useAdminRead('plugins.get_plugins', { immediate: false })
+const plugins = computed(() => pluginsRequest.data ?? [])
 
 watch(
   () => props.active,
-  (isActive) => isActive && !appsRequest.isFinished && appsRequest.reload(),
+  (isActive) => isActive && !pluginsRequest.isFinished && pluginsRequest.reload(),
   { immediate: true },
 )
 
 const configuring = ref(null)
-const current = computed(() => installedApps.value.find((app) => app.app === configuring.value) ?? null)
+const current = computed(() => plugins.value.find((app) => app.app === configuring.value) ?? null)
 const settingsTab = computed(() =>
-  extensionSettingsTabs().find((tab) => tab.value === settingsTabValue(configuring.value)),
+  pluginSettingsTabs().find((tab) => tab.value === settingsTabValue(configuring.value)),
 )
 
 const deliveryStatus = ref('all')
 const page = ref(1)
 const pageSize = ref(20)
 
-const deliveriesRequest = useAdminRead('apps.get_app_deliveries', {
+const deliveriesRequest = useAdminRead('plugins.get_plugin_deliveries', {
   params: () => ({
     app: configuring.value,
     status: deliveryStatus.value === 'all' ? undefined : deliveryStatus.value,
@@ -59,17 +59,17 @@ const deliveries = computed(() => deliveriesRequest.data?.rows ?? [])
 watch([configuring, deliveryStatus, pageSize], () => (page.value = 1))
 watch([configuring, deliveryStatus, page, pageSize], () => configuring.value && deliveriesRequest.reload())
 
-function openApp(app) {
+function openPlugin(app) {
   deliveryStatus.value = app.failed_deliveries ? 'Failed' : 'all'
   configuring.value = app.app
 }
 
-function extensionCount(app) {
-  const count = app.extensions.length
+function pluginCount(app) {
+  const count = app.entries.length
   return count === 1 ? '1 addition to the dashboard' : `${count} additions to the dashboard`
 }
 
-const retryAction = useMethodAction('commera.app_events.retry_delivery')
+const retryAction = useMethodAction('commera.plugin_events.retry_delivery')
 const retryingDelivery = ref(null)
 
 async function retry(row) {
@@ -79,7 +79,7 @@ async function retry(row) {
     if (retryAction.error) return
     toast.success(`Sending to ${row.app} again`)
     deliveriesRequest.reload()
-    appsRequest.reload()
+    pluginsRequest.reload()
   } finally {
     retryingDelivery.value = null
   }
@@ -88,19 +88,19 @@ async function retry(row) {
 
 <template>
   <template v-if="!current">
-    <SettingsPanelHeader title="Apps" description="Apps installed alongside Commera, and what they add to it." />
+    <SettingsPanelHeader title="Plugins" description="Plugins installed alongside Commera, and what they add to it." />
 
     <SettingsBody v-scroll-fade>
       <!-- The refusal itself is already toasted by useAdminRead. This says why the panel is empty. -->
       <EmptyState
-        v-if="appsRequest.error"
+        v-if="pluginsRequest.error"
         compact
         icon="lucide-lock"
         title="Hidden from your role"
-        description="Installed apps are only listed for a System Manager."
+        description="Installed plugins are only listed for a System Manager."
       />
 
-      <div v-else-if="!appsRequest.data" class="divide-y divide-outline-gray-1" aria-hidden="true">
+      <div v-else-if="!pluginsRequest.data" class="divide-y divide-outline-gray-1" aria-hidden="true">
         <div v-for="row in 3" :key="row" class="flex items-center gap-3 py-3">
           <Skeleton class="size-4 shrink-0 rounded-4" />
           <div class="min-w-0 flex-1">
@@ -112,15 +112,15 @@ async function retry(row) {
       </div>
 
       <EmptyState
-        v-else-if="!installedApps.length"
+        v-else-if="!plugins.length"
         compact
         icon="lucide-blocks"
-        title="No apps installed"
-        description="Apps built for Commera show up here once they are installed on this site."
+        title="No plugins installed"
+        description="Plugins built for Commera show up here once they are installed on this site."
       />
 
       <div v-else class="divide-y divide-outline-gray-1">
-        <div v-for="app in installedApps" :key="app.app" class="flex items-center gap-3 py-3">
+        <div v-for="app in plugins" :key="app.app" class="flex items-center gap-3 py-3">
           <Icon :name="appIcon(app.app, app.icon_url)" class="size-4 shrink-0 text-ink-gray-6" />
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
@@ -128,7 +128,7 @@ async function retry(row) {
               <span v-if="app.version" class="shrink-0 text-sm text-ink-gray-5">{{ app.version }}</span>
             </div>
             <p class="mt-1 text-sm text-ink-gray-5">
-              {{ extensionCount(app) }}
+              {{ pluginCount(app) }}
               <template v-if="app.problems.length"> · {{ app.problems.length }} not loaded</template>
             </p>
           </div>
@@ -139,7 +139,7 @@ async function retry(row) {
             variant="subtle"
             :label="`${app.failed_deliveries} failed`"
           />
-          <Button class="shrink-0" label="Open" @click="openApp(app)" />
+          <Button class="shrink-0" label="Open" @click="openPlugin(app)" />
         </div>
       </div>
     </SettingsBody>
@@ -160,15 +160,15 @@ async function retry(row) {
       <section class="mt-2">
         <h3 class="text-base font-medium text-ink-gray-8">What it adds</h3>
         <ul
-          v-if="current.extensions.length || current.problems.length"
+          v-if="current.entries.length || current.problems.length"
           class="mt-2 divide-y divide-outline-gray-1 border-y border-outline-gray-1"
         >
-          <li v-for="extension in current.extensions" :key="`${extension.place}/${extension.name}`" class="py-2.5">
+          <li v-for="entry in current.entries" :key="`${entry.place}/${entry.name}`" class="py-2.5">
             <div class="flex items-baseline justify-between gap-3">
-              <p class="min-w-0 truncate text-base text-ink-gray-8">{{ extension.label }}</p>
-              <p class="shrink-0 text-sm text-ink-gray-5">{{ placeLabel(extension.place) }}</p>
+              <p class="min-w-0 truncate text-base text-ink-gray-8">{{ entry.label }}</p>
+              <p class="shrink-0 text-sm text-ink-gray-5">{{ placeLabel(entry.place) }}</p>
             </div>
-            <p v-if="extension.error" class="mt-1 text-p-sm text-ink-red-6">{{ extension.error }}</p>
+            <p v-if="entry.error" class="mt-1 text-p-sm text-ink-red-6">{{ entry.error }}</p>
           </li>
           <li v-for="problem in current.problems" :key="problem" class="py-2.5 text-p-sm text-ink-red-6">
             {{ problem }}
@@ -182,7 +182,7 @@ async function retry(row) {
           <h3 class="text-base font-medium text-ink-gray-8">Recent deliveries</h3>
           <TabButtons v-model="deliveryStatus" size="sm" :options="DELIVERY_TABS" />
         </div>
-        <p class="mt-1 text-p-sm text-ink-gray-5">Each time an order changes, Commera tells the app. A failed send can be retried.</p>
+        <p class="mt-1 text-p-sm text-ink-gray-5">Each time an order changes, Commera tells the plugin. A failed send can be retried.</p>
 
         <div v-if="deliveriesRequest.loading && !deliveriesRequest.data" class="mt-3 space-y-3" aria-hidden="true">
           <Skeleton v-for="row in 3" :key="row" class="h-10 w-full rounded-4" />
@@ -193,7 +193,7 @@ async function retry(row) {
           compact
           :icon="deliveryStatus === 'Failed' ? 'lucide-circle-check' : 'lucide-send'"
           :title="deliveryStatus === 'Failed' ? 'Nothing failed' : 'No deliveries yet'"
-          :description="deliveryStatus === 'Failed' ? 'Every order update reached this app.' : 'This app has not been sent an order update.'"
+          :description="deliveryStatus === 'Failed' ? 'Every order update reached this plugin.' : 'This plugin has not been sent an order update.'"
         />
 
         <template v-else>

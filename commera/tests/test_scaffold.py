@@ -8,17 +8,17 @@ import frappe
 from frappe.tests import UnitTestCase
 from frappe.utils.boilerplate import _create_app_boilerplate
 
-from commera.extensions.places import ICONS, PLACES
+from commera.plugins.places import ICONS, PLACES
 from commera.scaffold import AppScaffold, get_app_from_folder, get_dashboard_versions
 from commera.sdk import API_VERSION
 
-APP = "commera_test_extension"
+APP = "commera_test_plugin"
 
 
 def make_app(apps_path: Path, app: str = APP) -> Path:
 	hooks = frappe._dict(
 		app_name=app,
-		app_title="Test Extension",
+		app_title="Test Plugin",
 		app_description="",
 		app_publisher="",
 		app_email="",
@@ -61,14 +61,12 @@ class TestScaffold(UnitTestCase):
 		self.assertEqual(package["scripts"]["dev"], "vite build --watch --config commera/vite.config.js")
 		self.assertEqual(
 			package["devDependencies"],
-			{"@commera/extension-kit": "link:../commera/packages/extension-kit", **get_dashboard_versions()},
+			{"@commera/plugin-kit": "link:../commera/packages/plugin-kit", **get_dashboard_versions()},
 		)
 		self.assertEqual((app_root / ".gitignore").read_text(), f"node_modules\n{APP}/public/commera/\n")
 
-		page = app_root / "commera" / "pages" / "commera-test-extension" / "index.vue"
-		self.assertIn(
-			"export const extension = { label: 'Test Extension', icon: 'sparkles' }", page.read_text()
-		)
+		page = app_root / "commera" / "pages" / "commera-test-plugin" / "index.vue"
+		self.assertIn("export const plugin = { label: 'Test Plugin', icon: 'sparkles' }", page.read_text())
 		self.assertIn("sparkles", ICONS)
 		self.assertIn(f"useMethodRead('{APP}.api.get_summary')", page.read_text())
 		self.assertIn(f"{APP}/api.py", created)
@@ -110,7 +108,7 @@ class TestScaffold(UnitTestCase):
 		)
 		package = json.loads((app_root / "package.json").read_text())
 		self.assertEqual(package["scripts"]["build"], "custom")
-		self.assertIn("@commera/extension-kit", package["devDependencies"])
+		self.assertIn("@commera/plugin-kit", package["devDependencies"])
 		self.assertEqual(
 			list((app_root / "commera" / "pages").iterdir()), [app_root / "commera" / "pages" / "jobs"]
 		)

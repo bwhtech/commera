@@ -1,4 +1,4 @@
-import { appNavItems } from './extensions'
+import { pluginNavItems } from './plugins'
 import { search } from './search'
 
 // The three reports. Overview carries the headline numbers, so none of them
@@ -43,10 +43,10 @@ const coreSections = [
   { id: 'storefront', label: 'Storefront', items: [ITEM.theme, ITEM.navigation, ITEM.pages, ITEM.reviews] },
 ]
 
-const appItems = appNavItems()
+const pluginItems = pluginNavItems()
 
-// Installed apps sit in their own section after the core ones, which only shows when it has rows.
-export const sections = [...coreSections, ...(appItems.length ? [{ id: 'apps', label: 'Apps', items: appItems }] : [])]
+// Installed plugins sit in their own section after the core ones, which only shows when it has rows.
+export const sections = [...coreSections, ...(pluginItems.length ? [{ id: 'plugins', label: 'Plugins', items: pluginItems }] : [])]
 
 // SidebarItem only infers active state from an exact route match, so a detail
 // route (/products/p-2) would leave its section unlit. Resolve it here instead:

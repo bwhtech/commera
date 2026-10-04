@@ -1,6 +1,6 @@
 <script setup>
 /**
- * Which installed apps could not act on this order. Nothing renders while every app took it, which is
+ * Which installed plugins could not act on this order. Nothing renders while every app took it, which is
  * the usual case, so the notice only costs space when there is something to do about it.
  */
 import { computed, ref } from 'vue'
@@ -20,7 +20,7 @@ const failuresByApp = computed(() => {
   return [...groups.entries()].map(([app, rows]) => ({ app, rows }))
 })
 
-const retryAction = useMethodAction('commera.app_events.retry_delivery')
+const retryAction = useMethodAction('commera.plugin_events.retry_delivery')
 const retryingApp = ref(null)
 
 // Oldest first, so the app hears about the order in the order things happened to it.

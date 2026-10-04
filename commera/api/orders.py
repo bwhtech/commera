@@ -4,7 +4,7 @@ from frappe import _
 from frappe.utils import flt
 
 from commera.api.payments import system_user_session
-from commera.app_events import fire_order_refunded
+from commera.plugin_events import fire_order_refunded
 from commera.utils import update_sales_order_ecommerce_status, validate_document_access
 
 

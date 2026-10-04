@@ -1,6 +1,6 @@
 <script setup>
 /**
- * An installed app's own Settings tab. Commera draws the heading; an app that only names its settings
+ * An installed plugin's own Settings tab. Commera draws the heading; an app that only names its settings
  * Single gets the same self-saving rows as Advanced, and one with a template fills the body itself.
  */
 import { ref, watch } from 'vue'
@@ -9,9 +9,9 @@ import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import SettingsFieldRows from './SettingsFieldRows.vue'
 import SettingsSkeleton from './SettingsSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
-import ExtensionHost from '../ExtensionHost.vue'
+import PluginHost from '../PluginHost.vue'
 import { useAdminAction, useAdminRead } from '../../data/api'
-import { appTitle } from '../../ia/extensions'
+import { appTitle } from '../../ia/plugins'
 import { useSettingsAutosave } from '../../data/useSettingsAutosave'
 
 const props = defineProps({
@@ -19,11 +19,11 @@ const props = defineProps({
   active: { type: Boolean, default: false },
 })
 
-const appSettings = useAdminRead('extensions.get_app_settings', {
+const pluginSettings = useAdminRead('plugins.get_plugin_settings', {
   params: { app: props.entry.app },
   immediate: false,
 })
-const save = useAdminAction('extensions.save_app_setting')
+const save = useAdminAction('plugins.save_plugin_setting')
 
 const { values, adopt, set, commit } = useSettingsAutosave({
   submit: (fields) => save.submit({ app: props.entry.app, ...fields }),
@@ -33,7 +33,7 @@ const { values, adopt, set, commit } = useSettingsAutosave({
 })
 
 watch(
-  () => appSettings.data,
+  () => pluginSettings.data,
   (data) => data && adopt(data.values),
   { immediate: true },
 )
@@ -46,14 +46,14 @@ watch(
   (isActive) => {
     if (!isActive) return
     shown.value = true
-    if (props.entry.doctype && !appSettings.isFinished) appSettings.reload()
+    if (props.entry.doctype && !pluginSettings.isFinished) pluginSettings.reload()
   },
   { immediate: true },
 )
 
 // A controller can rewrite a value on save and a secret is never echoed back, so the tab is re-read.
 async function commitField(fieldname, value, label) {
-  await commit(fieldname, value, label, () => appSettings.reload())
+  await commit(fieldname, value, label, () => pluginSettings.reload())
 }
 </script>
 
@@ -63,20 +63,20 @@ async function commitField(fieldname, value, label) {
   <SettingsBody v-scroll-fade>
     <template v-if="entry.doctype">
       <EmptyState
-        v-if="appSettings.error"
+        v-if="pluginSettings.error"
         compact
         icon="lucide-triangle-alert"
         title="These settings could not be loaded"
         :description="`${appTitle(entry.app)} may still be set up. This tab just cannot say.`"
       >
-        <Button label="Try again" variant="subtle" theme="gray" @click="appSettings.reload()" />
+        <Button label="Try again" variant="subtle" theme="gray" @click="pluginSettings.reload()" />
       </EmptyState>
-      <SettingsSkeleton v-else-if="!appSettings.data" :rows="3" />
+      <SettingsSkeleton v-else-if="!pluginSettings.data" :rows="3" />
       <div v-else class="divide-y divide-outline-gray-1">
-        <SettingsFieldRows :groups="appSettings.data.groups" :values="values" @update="set" @commit="commitField" />
+        <SettingsFieldRows :groups="pluginSettings.data.groups" :values="values" @update="set" @commit="commitField" />
       </div>
     </template>
 
-    <ExtensionHost v-else-if="shown" :entry="entry" />
+    <PluginHost v-else-if="shown" :entry="entry" />
   </SettingsBody>
 </template>

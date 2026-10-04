@@ -5,7 +5,7 @@ from string import Template
 
 import click
 
-from commera.extensions.places import NAME_PATTERN, PLACES
+from commera.plugins.places import NAME_PATTERN, PLACES
 from commera.sdk import API_VERSION
 
 COMMERA_ROOT = Path(__file__).parents[2]
@@ -54,7 +54,7 @@ class AppScaffold:
 		scripts.setdefault("build", "vite build --config commera/vite.config.js")
 		scripts.setdefault("dev", "vite build --watch --config commera/vite.config.js")
 		dev_dependencies = package.setdefault("devDependencies", {})
-		dev_dependencies.setdefault("@commera/extension-kit", "link:../commera/packages/extension-kit")
+		dev_dependencies.setdefault("@commera/plugin-kit", "link:../commera/packages/plugin-kit")
 		for name, version in get_dashboard_versions().items():
 			dev_dependencies.setdefault(name, version)
 		self.write_change(path, json.dumps(package, indent="\t") + "\n", json.dumps(package) != original)

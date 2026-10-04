@@ -6,8 +6,8 @@ from frappe.model.document import Document
 from frappe.query_builder import DocType
 from frappe.utils import cint, create_batch
 
-from commera.app_events import add_changed_products
 from commera.commera_ecommerce.doctype.commera_settings.editor_input import parse_list
+from commera.plugin_events import add_changed_products
 from commera.search.sync import enqueue_upsert_many
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 

@@ -2,9 +2,9 @@
 import { computed, onErrorCaptured, provide, ref, shallowRef, toRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'frappe-ui'
-import { __, EXTENSION_CONTEXT } from '../extension-api/context'
+import { __, PLUGIN_CONTEXT } from '../plugin-api/context'
 import EmptyState from './EmptyState.vue'
-import { appLocation } from '../ia/extensions'
+import { appLocation } from '../ia/plugins'
 
 const props = defineProps({
   entry: { type: Object, required: true },
@@ -24,17 +24,17 @@ const failure = ref(null)
 function fail(error) {
   failure.value = error?.message || String(error)
   emit('failed')
-  console.error(`[commera app ${props.entry.key}]`, error)
+  console.error(`[commera plugin ${props.entry.key}]`, error)
 }
 
-if (props.entry.error || !props.entry.module_url) fail(props.entry.error || 'The app has not built this extension.')
+if (props.entry.error || !props.entry.module_url) fail(props.entry.error || 'This plugin has not been built yet.')
 
 function navigate(to) {
   return router.push(appLocation(props.entry.app, to))
 }
 
-provide(EXTENSION_CONTEXT, {
-  extension: { app: props.entry.app, place: props.entry.place, name: props.entry.name, label: props.entry.label },
+provide(PLUGIN_CONTEXT, {
+  plugin: { app: props.entry.app, place: props.entry.place, name: props.entry.name, label: props.entry.label },
   path: toRef(props, 'path'),
   query: toRef(props, 'query'),
   record: toRef(props, 'record'),
@@ -44,11 +44,11 @@ provide(EXTENSION_CONTEXT, {
   __,
 })
 
-const Extension = shallowRef(null)
+const Plugin = shallowRef(null)
 
 async function load() {
   try {
-    Extension.value = (await import(/* @vite-ignore */ props.entry.module_url)).default
+    Plugin.value = (await import(/* @vite-ignore */ props.entry.module_url)).default
   } catch (error) {
     fail(error)
   }
@@ -71,5 +71,5 @@ onErrorCaptured((error) => {
     :title="`${label} couldn't load`"
     :description="failure"
   />
-  <component :is="Extension" v-else-if="Extension" @vue:mounted="emit('ready')" />
+  <component :is="Plugin" v-else-if="Plugin" @vue:mounted="emit('ready')" />
 </template>

@@ -1,9 +1,9 @@
 <script setup>
 /**
- * The installed apps' cards on a record page. The frame and its title are drawn here, so every app's card
+ * The installed plugins' cards on a record page. The frame and its title are drawn here, so every app's card
  * sits in the page the way the page's own panels do; the app's module only fills the body.
  */
-import ExtensionCardFrame from './ExtensionCardFrame.vue'
+import PluginCardFrame from './PluginCardFrame.vue'
 
 defineProps({
   entries: { type: Array, required: true },
@@ -21,7 +21,7 @@ const FRAMES = {
 </script>
 
 <template>
-  <ExtensionCardFrame
+  <PluginCardFrame
     v-for="entry in entries"
     :key="`${entry.key}:${record.revision}`"
     :entry="entry"

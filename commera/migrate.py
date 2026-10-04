@@ -5,11 +5,11 @@ from bwh_payments.bwh_payments.utils import get_available_payment_modes
 from frappe.model.sync import sync_for
 
 from commera.api.payments import COD_PAYMENT_MODE
-from commera.app_events import add_apps_user, validate_extension_apps
 from commera.commera_ecommerce.doctype.commera_settings.navbar.navbar_manager import (
 	seed_menu_when_empty,
 )
-from commera.extensions.registry import get_registry
+from commera.plugin_events import add_plugin_user, validate_plugins
+from commera.plugins.registry import get_registry
 from commera.search.build import ensure_index_built
 from commera.search.record_builder import DEFAULT_CONTENT_FIELDS
 from commera.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
@@ -42,7 +42,7 @@ def after_install():
 	seed_default_routes()
 	activate_summer_theme()
 	seed_menu_when_empty()
-	add_apps_user()
+	add_plugin_user()
 
 
 def activate_summer_theme():
@@ -54,20 +54,20 @@ def activate_summer_theme():
 
 def after_migrate():
 	create_payment_modes()
-	add_apps_user()
+	add_plugin_user()
 	register_optional_doctype_links()
 	populate_search_settings()
 	ensure_storefront_search_index()
 	setup_robots_txt()
 	seed_llms_txt()
 	seed_default_routes()
-	validate_extension_apps()
-	reset_extension_registry()
+	validate_plugins()
+	reset_plugin_registry()
 
 
-def reset_extension_registry():
+def reset_plugin_registry():
 	for problem in get_registry()["problems"]:
-		print(f"{problem['app']} extension skipped: {problem['message']}")
+		print(f"{problem['app']} plugin skipped: {problem['message']}")
 
 
 def populate_search_settings():

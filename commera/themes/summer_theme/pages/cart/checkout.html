@@ -350,8 +350,8 @@
 										<td class="price">{{ currency_symbol }}<span x-text="format_amount(tax.amount)"></span></td>
 									</tr>
 								</template>
-								<template x-for="(fee, index) in active_summary.app_fees" :key="index">
-									<tr class="app-fee">
+								<template x-for="(fee, index) in active_summary.plugin_fees" :key="index">
+									<tr class="plugin-fee">
 										<td x-text="fee.description"></td>
 										<td class="price">{{ currency_symbol }}<span x-text="format_amount(fee.amount)"></span></td>
 									</tr>

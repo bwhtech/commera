@@ -9,16 +9,16 @@ import PageBody from '../components/PageBody.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import OrderProgress from '../components/OrderProgress.vue'
 import OrderCustomerPanel from '../components/OrderCustomerPanel.vue'
-import OrderAppFailures from '../components/OrderAppFailures.vue'
-import ExtensionActionDialog from '../components/ExtensionActionDialog.vue'
-import ExtensionSlot from '../components/ExtensionSlot.vue'
+import OrderPluginFailures from '../components/OrderPluginFailures.vue'
+import PluginActionDialog from '../components/PluginActionDialog.vue'
+import PluginSlot from '../components/PluginSlot.vue'
 import Thumb from '../components/Thumb.vue'
 import RefundDialog from '../components/RefundDialog.vue'
 import { useAdminRead, useAdminAction, useMethodRead } from '../data/api'
 import { erpnextLink, printUrl } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { longDate, money } from '../data/format'
-import { useRecordExtensions } from '../data/recordExtensions'
+import { useRecordPlugins } from '../data/recordPlugins'
 
 const route = useRoute()
 
@@ -45,7 +45,7 @@ watch(
   },
 )
 
-const { cards, actionGroup, openAction, record, reload: reloadExtensions } = useRecordExtensions(
+const { cards, actionGroup, openAction, record, reload: reloadPlugins } = useRecordPlugins(
   'order',
   'Sales Order',
   () => route.params.id,
@@ -164,7 +164,7 @@ const loadFailure = computed(() =>
         <span class="text-sm text-ink-gray-5">{{ longDate(order.placed_on) }}</span>
       </div>
 
-      <OrderAppFailures class="mt-4" :failures="order.app_failures" @retried="orderRequest.reload()" />
+      <OrderPluginFailures class="mt-4" :failures="order.plugin_failures" @retried="orderRequest.reload()" />
 
       <!-- Where the order has reached, read left to right. -->
       <OrderProgress class="mt-6" :progress="order.progress" />
@@ -224,7 +224,7 @@ const loadFailure = computed(() =>
                 <span>Tax</span><span class="tabular-nums">{{ money(order.tax) }}</span>
               </div>
               <div
-                v-for="fee in order.app_fees"
+                v-for="fee in order.plugin_fees"
                 :key="fee.description"
                 class="flex justify-between text-base text-ink-gray-6"
               >
@@ -243,7 +243,7 @@ const loadFailure = computed(() =>
         </section>
 
         <div v-if="cards.length && !hasRail" class="space-y-6">
-          <ExtensionSlot :entries="cards" :record="record" frame="stack" @reload="reloadExtensions" />
+          <PluginSlot :entries="cards" :record="record" frame="stack" @reload="reloadPlugins" />
         </div>
       </div>
         </PageBody>
@@ -252,12 +252,12 @@ const loadFailure = computed(() =>
       <aside class="hidden w-[19rem] shrink-0 flex-col border-l border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
           <OrderCustomerPanel :order="order" />
-          <ExtensionSlot v-if="hasRail" :entries="cards" :record="record" frame="rail" @reload="reloadExtensions" />
+          <PluginSlot v-if="hasRail" :entries="cards" :record="record" frame="rail" @reload="reloadPlugins" />
         </ScrollArea>
       </aside>
     </div>
 
-    <ExtensionActionDialog v-model:entry="openAction" :record="record" @reload="reloadExtensions" />
+    <PluginActionDialog v-model:entry="openAction" :record="record" @reload="reloadPlugins" />
 
     <RefundDialog
       v-model:open="refundOpen"

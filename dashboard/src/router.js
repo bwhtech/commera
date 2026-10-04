@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { firstPageRoute } from './ia/extensions'
+import { firstPageRoute } from './ia/plugins'
 import { SETTINGS_TABS } from './ia/settings'
 import { attachSettingsRouter, DEFAULT_SETTINGS_TAB, SETTINGS_ROUTE_NAME } from './ia/settingsRoute'
 
@@ -49,11 +49,11 @@ const routes = [
   },
   // Like /analytics, an app with several pages is a disclosure in the sidebar, so its own path opens the first page.
   {
-    path: '/apps/:app',
+    path: '/plugins/:app',
     redirect: (to) =>
       firstPageRoute(to.params.app) ?? { name: 'NotFound', params: { pathMatch: to.path.slice(1).split('/') } },
   },
-  { path: '/apps/:app/:page/:path(.*)*', name: 'ExtensionPage', component: () => import('./pages/ExtensionPage.vue') },
+  { path: '/plugins/:app/:page/:path(.*)*', name: 'PluginPage', component: () => import('./pages/PluginPage.vue') },
   // Last, so it only catches what nothing above claimed: without it an unknown path rendered the
   // shell with an empty content area, which reads as a screen that failed to load.
   { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('./pages/NotFound.vue') },

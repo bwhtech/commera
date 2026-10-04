@@ -14,7 +14,7 @@ from commera.api.variant_pricing import (
 	get_selling_price_lists,
 	set_variant_prices,
 )
-from commera.app_events import add_changed_products
+from commera.plugin_events import add_changed_products
 from commera.swatches import COLOUR_ATTRIBUTE, ensure_default_swatch, get_swatch_map
 from commera.utils import IN_CLAUSE_CHUNK_SIZE, get_first_option_photos, get_product_covers
 

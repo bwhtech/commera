@@ -25,8 +25,9 @@ from commera.api.payments import (
 	place_cod_order,
 	validate_cart_is_not_in_checkout,
 )
-from commera.app_events import (
-	APPS_USER,
+from commera.jobs import sync_pending_gateway_payments
+from commera.plugin_events import (
+	PLUGINS_USER,
 	RETRY_DELAYS_IN_MINUTES,
 	fire_event,
 	on_sales_order_cancel,
@@ -35,7 +36,6 @@ from commera.app_events import (
 	run_due_deliveries,
 	sweep_missed_cod_payments,
 )
-from commera.jobs import sync_pending_gateway_payments
 from commera.sdk.events import CommeraEvent
 
 COMPANY = "Lifestyle Demo"
@@ -54,23 +54,23 @@ def refuse_cancel(sales_order, method=None):
 	frappe.throw(f"{CANCEL_REFUSAL} ({sales_order.name})")
 
 
-def record_app_event(event):
-	frappe.flags.commera_app_event_calls.append((event, frappe.session.user))
+def record_plugin_event(event):
+	frappe.flags.commera_plugin_event_calls.append((event, frappe.session.user))
 
 
-def raise_from_app_event(event):
+def raise_from_plugin_event(event):
 	raise RuntimeError("an app's broken handler")
 
 
 def fail_once_then_record(event):
-	if not frappe.flags.commera_app_event_failed_once:
-		frappe.flags.commera_app_event_failed_once = True
+	if not frappe.flags.commera_plugin_event_failed_once:
+		frappe.flags.commera_plugin_event_failed_once = True
 		raise RuntimeError("an app's flaky handler")
-	record_app_event(event)
+	record_plugin_event(event)
 
 
 def patch_app_hooks(test_case, app_hooks: dict):
-	"""Stand in for an installed app's hooks.py, leaving every other hook (doc_events included) untouched."""
+	"""Stand in for an installed plugin's hooks.py, leaving every other hook (doc_events included) untouched."""
 	get_hooks = frappe.get_hooks
 
 	def get_hooks_with_app(hook=None, *args, **kwargs):
@@ -664,7 +664,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 	# -- app events --------------------------------------------------------------------------------
 
-	def app_events(self, sales_order):
+	def plugin_events(self, sales_order):
 		return sorted(
 			frappe.get_all(
 				"Commera Event",
@@ -683,10 +683,10 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 	def queued_app_jobs(self, enqueue):
 		return [call.kwargs for call in enqueue.call_args_list if call.args[:1] == (run_app_deliveries,)]
 
-	def record_app_events(self):
-		frappe.flags.commera_app_event_calls = []
-		self.addCleanup(frappe.flags.pop, "commera_app_event_calls", None)
-		return frappe.flags.commera_app_event_calls
+	def record_plugin_events(self):
+		frappe.flags.commera_plugin_event_calls = []
+		self.addCleanup(frappe.flags.pop, "commera_plugin_event_calls", None)
+		return frappe.flags.commera_plugin_event_calls
 
 	def place_cod_order_for_cart(self):
 		frappe.db.set_single_value("Commera Settings", "cod_enabled", 1)
@@ -697,8 +697,8 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 			self,
 			{
 				"commera_events": {
-					"order_placed": [f"{__name__}.record_app_event"],
-					"order_paid": [f"{__name__}.record_app_event"],
+					"order_placed": [f"{__name__}.record_plugin_event"],
+					"order_paid": [f"{__name__}.record_plugin_event"],
 				}
 			},
 		)
@@ -709,13 +709,13 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 			fire_event("order_paid", "Sales Order", sales_order)
 
 		self.assertEqual(frappe.local.message_log, [], "a repeat must not pop an error at the user")
-		self.assertEqual(self.app_events(sales_order), ["order_paid", "order_placed"])
+		self.assertEqual(self.plugin_events(sales_order), ["order_paid", "order_placed"])
 		job = {
 			"app": "commera",
 			"reference_doctype": "Sales Order",
 			"reference_name": sales_order,
 			"lane_event": None,
-			"job_id": f"commera-app-events::commera::Sales Order::{sales_order}",
+			"job_id": f"commera-plugin-events::commera::Sales Order::{sales_order}",
 			"deduplicate": True,
 			"enqueue_after_commit": True,
 		}
@@ -726,7 +726,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		with patch.object(frappe, "enqueue") as enqueue:
 			sales_order = self.place_cod_order_for_cart()
 
-		self.assertEqual(self.app_events(sales_order.name), ["order_placed"])
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_placed"])
 		self.assertFalse(
 			frappe.db.exists("Commera Event Delivery", {"parent": f"{sales_order.name}-order_placed"})
 		)
@@ -734,7 +734,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 	def test_a_cod_order_is_paid_only_once_its_invoice_is_settled(self):
 		sales_order = self.place_cod_order_for_cart()
-		self.assertEqual(self.app_events(sales_order.name), ["order_placed"])
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_placed"])
 
 		sales_order.flags.ignore_permissions = True
 		sales_order.submit()
@@ -745,12 +745,12 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		half = flt(sales_invoice.outstanding_amount) / 2
 
 		create_payment_entry(sales_invoice, GATEWAY, half, None)
-		self.assertEqual(self.app_events(sales_order.name), ["order_placed"])
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_placed"])
 
 		sales_invoice.reload()
 		create_payment_entry(sales_invoice, GATEWAY, sales_invoice.outstanding_amount, None)
 
-		self.assertEqual(self.app_events(sales_order.name), ["order_paid", "order_placed"])
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_paid", "order_placed"])
 
 	def test_a_fully_discounted_order_is_billed_and_paid_at_placement(self):
 		quotation = self.create_cart_quotation()
@@ -762,7 +762,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		on_payment_request_update(self.create_paid_payment_request(quotation))
 
 		sales_order = self.submitted_sales_orders(quotation.name)[0]
-		self.assertEqual(self.app_events(sales_order), ["order_paid", "order_placed"])
+		self.assertEqual(self.plugin_events(sales_order), ["order_paid", "order_placed"])
 		self.assertEqual(len(self.submitted_sales_invoices(sales_order)), 1)
 
 	def submit_invoice_for(self, sales_order, qty):
@@ -781,10 +781,10 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		second_invoice = self.submit_invoice_for(sales_order, qty=1)
 
 		create_payment_entry(first_invoice, GATEWAY, first_invoice.outstanding_amount, None)
-		self.assertEqual(self.app_events(sales_order.name), ["order_placed"])
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_placed"])
 
 		create_payment_entry(second_invoice, GATEWAY, second_invoice.outstanding_amount, None)
-		self.assertEqual(self.app_events(sales_order.name), ["order_paid", "order_placed"])
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_paid", "order_placed"])
 
 	def test_the_hourly_sweep_fires_paid_for_a_settled_cod_order_the_payment_hook_missed(self):
 		patch_app_hooks(self, {"commera_events": {"order_paid": []}})
@@ -792,14 +792,14 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		sales_order.flags.ignore_permissions = True
 		sales_order.submit()
 		sales_invoice = self.submit_invoice_for(sales_order, qty=2)
-		with patch("commera.app_events.on_payment_entry_submit"):
+		with patch("commera.plugin_events.on_payment_entry_submit"):
 			create_payment_entry(sales_invoice, GATEWAY, sales_invoice.outstanding_amount, None)
-		self.assertEqual(self.app_events(sales_order.name), ["order_placed"])
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_placed"])
 
 		sweep_missed_cod_payments()
 		sweep_missed_cod_payments()
 
-		self.assertEqual(self.app_events(sales_order.name), ["order_paid", "order_placed"])
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_paid", "order_placed"])
 
 	def test_an_app_before_cancel_refusal_reaches_the_user_without_an_error_log(self):
 		doc_events = frappe.get_doc_hooks()
@@ -855,7 +855,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 			self.addCleanup(enqueue_patch.stop)
 
 	def add_handler_to_app(self, app: str, handler) -> str:
-		"""Stand in for a handler shipped by another installed app; frappe.get_attr refuses unknown apps."""
+		"""Stand in for a handler shipped by another installed plugin; frappe.get_attr refuses unknown apps."""
 		attribute = f"commera_test_{handler.__name__}"
 		handler_patch = patch.object(importlib.import_module(app), attribute, handler, create=True)
 		handler_patch.start()
@@ -863,8 +863,8 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		return f"{app}.{attribute}"
 
 	def test_a_cancelled_webshop_order_is_announced_once(self):
-		patch_app_hooks(self, {"commera_events": {"order_cancelled": [f"{__name__}.record_app_event"]}})
-		calls = self.record_app_events()
+		patch_app_hooks(self, {"commera_events": {"order_cancelled": [f"{__name__}.record_plugin_event"]}})
+		calls = self.record_plugin_events()
 		self.run_enqueued_jobs_now()
 		sales_order = self.place_cod_order_for_cart()
 
@@ -881,12 +881,12 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 			self,
 			{
 				"commera_events": {
-					"order_placed": [f"{__name__}.record_app_event"],
-					"order_paid": [f"{__name__}.record_app_event"],
+					"order_placed": [f"{__name__}.record_plugin_event"],
+					"order_paid": [f"{__name__}.record_plugin_event"],
 				}
 			},
 		)
-		calls = self.record_app_events()
+		calls = self.record_plugin_events()
 		self.run_enqueued_jobs_now()
 
 		on_payment_request_update(self.payment_request)
@@ -894,7 +894,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		sales_order = self.submitted_sales_orders()[0]
 		self.assertEqual(
 			[(event.name, event.sales_order, user) for event, user in calls],
-			[("order_placed", sales_order, APPS_USER), ("order_paid", sales_order, APPS_USER)],
+			[("order_placed", sales_order, PLUGINS_USER), ("order_paid", sales_order, PLUGINS_USER)],
 		)
 		placed = calls[0][0]
 		self.assertIsInstance(placed, CommeraEvent)
@@ -923,12 +923,12 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 			{
 				"commera_events": {
 					"order_placed": [f"{__name__}.fail_once_then_record"],
-					"order_paid": [f"{__name__}.record_app_event"],
+					"order_paid": [f"{__name__}.record_plugin_event"],
 				}
 			},
 		)
-		calls = self.record_app_events()
-		self.addCleanup(frappe.flags.pop, "commera_app_event_failed_once", None)
+		calls = self.record_plugin_events()
+		self.addCleanup(frappe.flags.pop, "commera_plugin_event_failed_once", None)
 		self.run_enqueued_jobs_now()
 
 		on_payment_request_update(self.payment_request)
@@ -950,11 +950,11 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		)
 
 	def test_a_failing_app_is_retried_on_schedule_then_failed_without_holding_up_another(self):
-		broken_handler = self.add_handler_to_app("bwh_payments", raise_from_app_event)
+		broken_handler = self.add_handler_to_app("bwh_payments", raise_from_plugin_event)
 		patch_app_hooks(
-			self, {"commera_events": {"order_placed": [broken_handler, f"{__name__}.record_app_event"]}}
+			self, {"commera_events": {"order_placed": [broken_handler, f"{__name__}.record_plugin_event"]}}
 		)
-		calls = self.record_app_events()
+		calls = self.record_plugin_events()
 		self.run_enqueued_jobs_now()
 
 		placed_at = now_datetime()
@@ -997,12 +997,12 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		)
 
 	def test_a_failed_delivery_runs_again_when_staff_retry_it(self):
-		self.add_handler_to_app("bwh_payments", raise_from_app_event)
-		handler = self.add_handler_to_app("bwh_payments", record_app_event)
+		self.add_handler_to_app("bwh_payments", raise_from_plugin_event)
+		handler = self.add_handler_to_app("bwh_payments", record_plugin_event)
 		patch_app_hooks(
-			self, {"commera_events": {"order_placed": ["bwh_payments.commera_test_raise_from_app_event"]}}
+			self, {"commera_events": {"order_placed": ["bwh_payments.commera_test_raise_from_plugin_event"]}}
 		)
-		calls = self.record_app_events()
+		calls = self.record_plugin_events()
 		self.run_enqueued_jobs_now()
 		sales_order = self.place_cod_order_for_cart().name
 		failed = self.delivery(sales_order, "order_placed", app="bwh_payments")

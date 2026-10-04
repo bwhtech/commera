@@ -5,9 +5,9 @@ import frappe
 from frappe import _
 from frappe.utils.data import cstr, flt
 
-from commera.app_events import get_handlers
+from commera.plugin_events import get_handlers
 
-APP_FEE_FIELD = "commera_app_fee"
+PLUGIN_FEE_FIELD = "commera_plugin_fee"
 
 
 def get_cart_refusal(quotation) -> str | None:
@@ -23,37 +23,37 @@ def get_cart_refusal(quotation) -> str | None:
 	return None
 
 
-def apply_app_fees(quotation):
-	"""Set quotation.flags.strict_app_fees at checkout: a failing fee hook then blocks it, while on a cart
+def apply_plugin_fees(quotation):
+	"""Set quotation.flags.strict_plugin_fees at checkout: a failing fee hook then blocks it, while on a cart
 	edit the fee is only left out, so a broken app never stops a shopper changing their cart."""
 	# Imported here: commera.api.shipping imports this module.
 	from commera.api.shipping import reindex_taxes
 
 	handlers = get_handlers("commera_checkout", "cart_fees")
-	if any(row.get(APP_FEE_FIELD) for row in quotation.taxes):
+	if any(row.get(PLUGIN_FEE_FIELD) for row in quotation.taxes):
 		# Dropped before the hooks run, so a fee priced on the grand total never compounds on its own last value.
-		quotation.taxes = [row for row in quotation.taxes if not row.get(APP_FEE_FIELD)]
+		quotation.taxes = [row for row in quotation.taxes if not row.get(PLUGIN_FEE_FIELD)]
 		reindex_taxes(quotation)
 		quotation.calculate_taxes_and_totals()
 	if not handlers:
 		return
 
-	for fee_row in get_app_fee_rows(quotation, handlers, strict=bool(quotation.flags.strict_app_fees)):
+	for fee_row in get_plugin_fee_rows(quotation, handlers, strict=bool(quotation.flags.strict_plugin_fees)):
 		quotation.append("taxes", fee_row)
 	quotation.calculate_taxes_and_totals()
 
 
-def get_app_fee_rows(quotation, handlers: list[str], strict: bool) -> list[dict]:
+def get_plugin_fee_rows(quotation, handlers: list[str], strict: bool) -> list[dict]:
 	precision = quotation.precision("tax_amount", "taxes")
 	fee_rows = []
 	for handler in handlers:
 		with handle_hook_error("cart_fees", handler, quotation, strict):
 			fees = frappe.get_attr(handler)(quotation) or []
-			fee_rows += [fee_row for fee in fees if (fee_row := get_app_fee_row(fee, precision))]
+			fee_rows += [fee_row for fee in fees if (fee_row := get_plugin_fee_row(fee, precision))]
 	return fee_rows
 
 
-def get_app_fee_row(fee: dict, precision: int) -> dict | None:
+def get_plugin_fee_row(fee: dict, precision: int) -> dict | None:
 	description = cstr(fee.get("description")).strip()
 	amount = fee.get("amount")
 	if not is_finite_number(amount):
@@ -72,7 +72,7 @@ def get_app_fee_row(fee: dict, precision: int) -> dict | None:
 		"tax_amount": amount,
 		# ERPNext refuses an inclusive Actual charge, and a site default of 1 would fail checkout.
 		"included_in_print_rate": 0,
-		APP_FEE_FIELD: 1,
+		PLUGIN_FEE_FIELD: 1,
 	}
 
 
@@ -139,7 +139,7 @@ def filter_payment_methods(quotation, methods: list[str], strict: bool) -> list[
 def get_default_fee_account() -> str:
 	account = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
 	if not account:
-		frappe.throw(_("Set a Charge Account Head in Commera Settings before an app charges a cart fee."))
+		frappe.throw(_("Set a Charge Account Head in Commera Settings before a plugin charges a cart fee."))
 	return account
 
 

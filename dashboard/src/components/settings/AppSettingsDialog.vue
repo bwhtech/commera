@@ -15,16 +15,16 @@ import AppearancePicker from './AppearancePicker.vue'
 import AppsSettings from './AppsSettings.vue'
 import CashOnDeliverySettings from './CashOnDeliverySettings.vue'
 import DeliveryOptionsPanel from './DeliveryOptionsPanel.vue'
-import ExtensionSettingsPanel from './ExtensionSettingsPanel.vue'
+import PluginSettingsPanel from './PluginSettingsPanel.vue'
 import GeneralSettings from './GeneralSettings.vue'
 import GuestSettings from './GuestSettings.vue'
-import InstalledAppsSettings from './InstalledAppsSettings.vue'
+import PluginsSettings from './PluginsSettings.vue'
 import IntegrationTabPanel from './IntegrationTabPanel.vue'
 import LocationsSettings from './LocationsSettings.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import { paymentIntegrations, shippingIntegrations } from '../../data/integrations'
 import { pickupLocations } from '../../data/pickupLocations'
-import { extensionSettingsTabs } from '../../ia/extensions'
+import { pluginSettingsTabs } from '../../ia/plugins'
 import { settings } from '../../ia/settings'
 
 // The counts beside the sidebar entries are the server's answer, not a local tally, so
@@ -32,7 +32,7 @@ import { settings } from '../../ia/settings'
 const connectedCount = paymentIntegrations.connectedCount
 const shippingConnected = shippingIntegrations.connectedCount
 
-const appTabs = extensionSettingsTabs()
+const pluginTabs = pluginSettingsTabs()
 
 // Both load when the dialog opens, not when their tab is shown: an unread registry counts
 // zero, which reads as "nothing is connected".
@@ -98,9 +98,9 @@ watch(
           <template #prefix><span class="lucide-chart-line size-4" aria-hidden="true" /></template>
           Analytics
         </SettingsNavItem>
-        <SettingsNavItem value="installed-apps">
+        <SettingsNavItem value="plugins">
           <template #prefix><span class="lucide-blocks size-4" aria-hidden="true" /></template>
-          Apps
+          Plugins
         </SettingsNavItem>
         <SettingsNavItem value="advanced">
           <template #prefix><span class="lucide-sliders-horizontal size-4" aria-hidden="true" /></template>
@@ -108,8 +108,8 @@ watch(
         </SettingsNavItem>
       </SettingsNavGroup>
 
-      <SettingsNavGroup v-if="appTabs.length" label="Installed apps">
-        <SettingsNavItem v-for="tab in appTabs" :key="tab.value" :value="tab.value">
+      <SettingsNavGroup v-if="pluginTabs.length" label="Installed plugins">
+        <SettingsNavItem v-for="tab in pluginTabs" :key="tab.value" :value="tab.value">
           <template #prefix><Icon :name="tab.icon" class="size-4" /></template>
           {{ tab.label }}
         </SettingsNavItem>
@@ -175,12 +175,12 @@ watch(
         <AppsSettings :active="settings.open && settings.tab === 'apps'" />
       </SettingsPanel>
 
-      <SettingsPanel value="installed-apps" class="min-w-0">
-        <InstalledAppsSettings :active="settings.open && settings.tab === 'installed-apps'" />
+      <SettingsPanel value="plugins" class="min-w-0">
+        <PluginsSettings :active="settings.open && settings.tab === 'plugins'" />
       </SettingsPanel>
 
-      <SettingsPanel v-for="tab in appTabs" :key="tab.value" :value="tab.value" class="min-w-0">
-        <ExtensionSettingsPanel :entry="tab.entry" :active="settings.open && settings.tab === tab.value" />
+      <SettingsPanel v-for="tab in pluginTabs" :key="tab.value" :value="tab.value" class="min-w-0">
+        <PluginSettingsPanel :entry="tab.entry" :active="settings.open && settings.tab === tab.value" />
       </SettingsPanel>
 
       <SettingsPanel value="advanced" class="min-w-0">

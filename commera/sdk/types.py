@@ -75,10 +75,10 @@ class Order(TypedDict):
 	status: str | None
 	# The dashboard's badge for the order, so a card matches the order screen.
 	stage: Stage
-	app_fees: list[Charge]
+	plugin_fees: list[Charge]
 	items: list[OrderLine]
 	tags: list[str]
-	app_fields: dict[str, Any]
+	plugin_fields: dict[str, Any]
 
 
 class CartLine(TypedDict):
@@ -96,14 +96,14 @@ class Cart(TypedDict):
 	items: list[CartLine]
 	total: float
 	grand_total: float
-	app_fields: dict[str, Any]
+	plugin_fields: dict[str, Any]
 
 
 class ChargeSummary(TypedDict):
 	subtotal: float
 	shipping: float
 	cod_charge: float
-	app_fees: list[Charge]
+	plugin_fees: list[Charge]
 	taxes: list[Charge]
 	discount_amount: float
 	rounding_adjustment: float

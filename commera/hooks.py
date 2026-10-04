@@ -97,7 +97,7 @@ page_renderer = ["commera.shop_themes.theme_resolver.ThemePageRenderer"]
 clear_cache = [
 	"commera.shop_themes.doctype.shop_theme.shop_theme.clear_theme_cache",
 	"commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings.clear_settings_cache",
-	"commera.extensions.registry.clear_registry_cache",
+	"commera.plugins.registry.clear_registry_cache",
 ]
 
 # Without this, records of a custom doctype never import on migrate (frappe/model/sync.py).
@@ -135,30 +135,30 @@ doc_events = {
 		"on_submit": [
 			"commera.jobs.send_order_success_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
-			"commera.app_events.on_sales_order_stock_reservation",
+			"commera.plugin_events.on_sales_order_stock_reservation",
 		],
 		"on_cancel": [
 			"commera.jobs.send_order_cancel_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
-			"commera.app_events.on_sales_order_cancel",
-			"commera.app_events.on_sales_order_stock_reservation",
+			"commera.plugin_events.on_sales_order_cancel",
+			"commera.plugin_events.on_sales_order_stock_reservation",
 		],
 	},
 	"Stock Ledger Entry": {
 		"after_insert": [
 			"commera.jobs.send_product_back_in_stock_email",
-			"commera.app_events.on_stock_ledger_entry_insert",
+			"commera.plugin_events.on_stock_ledger_entry_insert",
 		]
 	},
-	"Item": {"on_update": "commera.app_events.on_item_update"},
+	"Item": {"on_update": "commera.plugin_events.on_item_update"},
 	"Item Price": {
-		"on_update": "commera.app_events.on_item_price_change",
-		"on_trash": "commera.app_events.on_item_price_change",
+		"on_update": "commera.plugin_events.on_item_price_change",
+		"on_trash": "commera.plugin_events.on_item_price_change",
 	},
 	"Style Attribute Variant": {
 		"on_update": [
 			"commera.search.sync.on_update",
-			"commera.app_events.on_style_attribute_variant_update",
+			"commera.plugin_events.on_style_attribute_variant_update",
 		],
 		"after_rename": "commera.search.sync.after_rename",
 		"on_trash": "commera.search.sync.on_trash",
@@ -169,7 +169,7 @@ doc_events = {
 		"on_trash": "commera.search.sync.on_trash",
 	},
 	"Sales Invoice": {"on_submit": "commera.utils.update_so_status_from_related_doc"},
-	"Payment Entry": {"on_submit": "commera.app_events.on_payment_entry_submit"},
+	"Payment Entry": {"on_submit": "commera.plugin_events.on_payment_entry_submit"},
 	"Delivery Note": {
 		"after_insert": "commera.utils.update_so_status_from_related_doc",
 		"on_submit": "commera.utils.update_so_status_from_related_doc",
@@ -461,10 +461,10 @@ scheduler_events = {
 	# Cron entries still only fire on the scheduler tick (scheduler_tick_interval, 4 minutes by default),
 	# so a retry due after 1 minute really runs up to a tick later.
 	"cron": {
-		"* * * * *": ["commera.app_events.run_due_deliveries"],
+		"* * * * *": ["commera.plugin_events.run_due_deliveries"],
 	},
 	"hourly": [
-		"commera.app_events.sweep_missed_cod_payments",
+		"commera.plugin_events.sweep_missed_cod_payments",
 	],
 	# Long queue, not the short one: sync_status() is a gateway round-trip per pending request, so a
 	# slow gateway would otherwise sit on a worker the whole storefront shares.

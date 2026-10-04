@@ -5,11 +5,11 @@ import { readFileSync } from 'node:fs'
 import frappeUIPreset, { content as frappeUIContent } from 'frappe-ui/tailwind'
 
 // Apps name their sidebar icon in Python, which no content glob scans.
-const extensionIcons = JSON.parse(readFileSync(new URL('../commera/sdk/extension_icons.json', import.meta.url), 'utf8'))
+const pluginIcons = JSON.parse(readFileSync(new URL('../commera/sdk/plugin_icons.json', import.meta.url), 'utf8'))
 
 /** @type {import('tailwindcss').Config} */
 export default {
   presets: [frappeUIPreset],
   content: [...frappeUIContent, './index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
-  safelist: extensionIcons.map((name) => `lucide-${name}`),
+  safelist: pluginIcons.map((name) => `lucide-${name}`),
 }

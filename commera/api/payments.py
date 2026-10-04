@@ -23,8 +23,7 @@ from commera.api.shipping import (
 	reprice_selected_option,
 )
 from commera.api.signup import get_placeholder_first_name, validate_single_email, validate_user_names
-from commera.app_events import fire_event
-from commera.checkout_hooks import apply_app_fees, filter_payment_methods, get_cart_refusal
+from commera.checkout_hooks import apply_plugin_fees, filter_payment_methods, get_cart_refusal
 from commera.core import _get_cart_quotation, create_party, get_customer_contact, new_cart_quotation
 from commera.guest import (
 	get_guest_cart_name,
@@ -34,6 +33,7 @@ from commera.guest import (
 	validate_guest_checkout_enabled,
 )
 from commera.order_access import get_order_link, set_order_access_key
+from commera.plugin_events import fire_event
 from commera.utils import get_pickup_addresses, get_pickup_warehouses
 
 
@@ -144,7 +144,7 @@ def open_checkout(
 ):
 	validate_delivery_option(quotation, delivery_option)
 	validate_cart_is_not_in_checkout(quotation.name)
-	quotation.flags.strict_app_fees = True
+	quotation.flags.strict_plugin_fees = True
 	update_delivery_charges(quotation)
 	validate_cart(quotation)
 	validate_expected_total(quotation, payment_mode, expected_total)
@@ -187,7 +187,7 @@ def open_checkout(
 
 
 def get_checkout_payment_methods(quotation, strict: bool = False) -> list[str]:
-	"""Payment Gateway Profile names, plus COD when it is on, as the installed apps let this cart pay."""
+	"""Payment Gateway Profile names, plus COD when it is on, as the installed plugins let this cart pay."""
 	payment_methods = list(get_available_payment_modes())
 	if frappe.db.get_single_value("Commera Settings", "cod_enabled"):
 		payment_methods.append(COD_PAYMENT_MODE)
@@ -520,7 +520,7 @@ def set_charges(quotation):
 		quotation.shipping_rule = shipping_rule
 		quotation.run_method("apply_shipping_rule")
 		quotation.run_method("calculate_taxes_and_totals")
-	apply_app_fees(quotation)
+	apply_plugin_fees(quotation)
 
 
 def set_cod_charges(quotation):
@@ -772,9 +772,9 @@ def quotation_purchase_summary(quotation_name: str):
 def place_cod_order(quotation_name: str):
 	quotation = frappe.get_doc("Quotation", quotation_name)
 	shopper = get_order_shopper(quotation)
-	quotation.flags.strict_app_fees = True
+	quotation.flags.strict_plugin_fees = True
 	# Repriced here too: the fee a cart edit left out after a hook failed must not slip into the order.
-	apply_app_fees(quotation)
+	apply_plugin_fees(quotation)
 	# Again here: a COD confirmation can be posted without ever opening checkout.
 	validate_cart(quotation)
 	if COD_PAYMENT_MODE not in get_checkout_payment_methods(quotation, strict=True):
@@ -910,7 +910,7 @@ def update_delivery_charges(quotation):
 		# A cart saved as a pickup before the owner switched pickup off must not reach payment as one.
 		validate_store_pickup(quotation.custom_store)
 		clear_pickup_charges(quotation)
-		apply_app_fees(quotation)
+		apply_plugin_fees(quotation)
 		save_cart_quotation(quotation)
 		return
 

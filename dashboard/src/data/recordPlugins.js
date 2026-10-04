@@ -1,18 +1,18 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { dialog, toast } from 'frappe-ui'
 import { useAdminAction, useAdminRead } from './api'
-import { extensionIcon, placeEntries } from '../ia/extensions'
+import { pluginIcon, placeEntries } from '../ia/plugins'
 
 /**
- * The installed apps' cards and actions for one record page. Every conditional entry is resolved in one
+ * The installed plugins' cards and actions for one record page. Every conditional entry is resolved in one
  * request per record, and stays hidden until it answers, so nothing flashes in and back out.
  */
-export function useRecordExtensions(place, doctype, nameGetter, { onReload } = {}) {
+export function useRecordPlugins(place, doctype, nameGetter, { onReload } = {}) {
   const cardEntries = placeEntries(`${place}/cards`)
   const actionEntries = placeEntries(`${place}/actions`)
   const hasConditions = [...cardEntries, ...actionEntries].some((entry) => entry.has_condition)
 
-  const conditionsRequest = useAdminRead('extensions.get_record_extensions', { immediate: false })
+  const conditionsRequest = useAdminRead('plugins.get_record_plugins', { immediate: false })
   const resolved = shallowRef({ name: null, keys: new Set() })
 
   // Moving to the next order mid-request answers for the old one, so an answer only counts for its own record.
@@ -46,7 +46,7 @@ export function useRecordExtensions(place, doctype, nameGetter, { onReload } = {
     resolveConditions()
   }
 
-  const runAction = useAdminAction('extensions.run_record_action')
+  const runAction = useAdminAction('plugins.run_record_action')
 
   async function run(entry) {
     const result = await runAction.submit({ key: entry.key, name: nameGetter() })
@@ -67,10 +67,10 @@ export function useRecordExtensions(place, doctype, nameGetter, { onReload } = {
   const actionGroup = computed(() =>
     actions.value.length
       ? {
-          group: 'Apps',
+          group: 'Plugins',
           options: actions.value.map((entry) => ({
             label: entry.label,
-            icon: extensionIcon(entry),
+            icon: pluginIcon(entry),
             onClick: () => start(entry),
           })),
         }

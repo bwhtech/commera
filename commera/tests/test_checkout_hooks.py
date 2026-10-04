@@ -198,7 +198,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		return frappe.get_all("Sales Order Item", {"prevdoc_docname": quotation_name}, pluck="parent")
 
 	def fee_rows(self, quotation) -> list:
-		return [row for row in quotation.taxes if row.commera_app_fee]
+		return [row for row in quotation.taxes if row.commera_plugin_fee]
 
 	def queued_error_logs(self) -> str:
 		return frappe.as_unicode(b"".join(frappe.cache.lrange(f"{queue_prefix}Error Log", 0, -1)))
@@ -267,7 +267,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 
 		self.assertEqual(sorted(frappe.flags.commera_checkout_hook_calls), ["fees", "validate"])
 
-	def test_an_app_fee_is_an_untaxed_charge_the_gateway_bills(self):
+	def test_a_plugin_fee_is_an_untaxed_charge_the_gateway_bills(self):
 		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_gift_wrap"]}})
 		self.open_cart()
 		self.add_tax_to_cart()
@@ -282,7 +282,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		self.assertEqual(
 			fee_row.account_head, frappe.db.get_single_value("Commera Settings", "charge_account_head")
 		)
-		self.assertEqual(summary["app_fees"], [{"description": GIFT_WRAP, "amount": GIFT_WRAP_FEE}])
+		self.assertEqual(summary["plugin_fees"], [{"description": GIFT_WRAP, "amount": GIFT_WRAP_FEE}])
 		# 18% of the 270 of goods alone: had the fee been in the tax base this would read 53.10.
 		self.assertIn({"description": test_cart_checkout.TAX_DESCRIPTION, "amount": 48.6}, summary["taxes"])
 		self.assertEqual(summary["total"], round(270 + 48.6 + summary["shipping"] + GIFT_WRAP_FEE))
@@ -293,7 +293,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		gateway_line = FakeStripeClient.created_sessions[-1]["line_items"][0]["price_data"]
 		self.assertEqual(gateway_line["unit_amount"], to_minor_units(summary["total"], quotation.currency))
 
-	def test_a_pickup_cart_keeps_its_app_fee(self):
+	def test_a_pickup_cart_keeps_its_plugin_fee(self):
 		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_gift_wrap"]}})
 		self.set_store_pickup(1)
 		warehouse = self.create_pickup_warehouse()
@@ -302,11 +302,11 @@ class TestCheckoutHooks(IntegrationTestCase):
 		summary = update_quotation_address(self.pickup_payload(warehouse))["checkout_summary"]
 		initiate_checkout_with_mode(GATEWAY, expected_total=summary["total"])
 
-		self.assertEqual(summary["app_fees"], [{"description": GIFT_WRAP, "amount": GIFT_WRAP_FEE}])
+		self.assertEqual(summary["plugin_fees"], [{"description": GIFT_WRAP, "amount": GIFT_WRAP_FEE}])
 		self.assertEqual(summary["total"], 270 + GIFT_WRAP_FEE)
 		self.assertEqual(len(self.fee_rows(_get_cart_quotation())), 1)
 
-	def test_an_app_fee_carries_into_the_sales_order(self):
+	def test_a_plugin_fee_carries_into_the_sales_order(self):
 		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_gift_wrap"]}})
 		quotation = self.open_cart()
 
@@ -320,7 +320,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 			[(GIFT_WRAP, GIFT_WRAP_FEE)],
 		)
 		self.assertEqual(
-			get_order_charge_lines(sales_order.name, sales_order.shipping_rule)["app_fees"],
+			get_order_charge_lines(sales_order.name, sales_order.shipping_rule)["plugin_fees"],
 			[{"description": GIFT_WRAP, "amount": GIFT_WRAP_FEE}],
 		)
 
@@ -338,7 +338,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		sales_order = frappe.get_doc("Sales Order", order_name)
 		charge_lines = get_order_charge_lines(sales_order.name, sales_order.shipping_rule)
 		charges = get_order_charges(sales_order)
-		self.assertEqual(charge_lines["app_fees"], [{"description": INSURANCE, "amount": GIFT_WRAP_FEE}])
+		self.assertEqual(charge_lines["plugin_fees"], [{"description": INSURANCE, "amount": GIFT_WRAP_FEE}])
 		self.assertEqual(charges["shipping"], charge_lines["shipping"])
 		self.assertNotIn(INSURANCE, [line["description"] for line in charge_lines["taxes"]])
 		self.assertEqual(charges["tax"], 48.6)

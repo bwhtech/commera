@@ -7,9 +7,9 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.tests import IntegrationTestCase
 
 from commera.api.shipping import is_connector_installed
-from commera.app_events import APPS_USER, get_order_snapshot
-from commera.checkout_hooks import APP_FEE_FIELD
-from commera.sdk import STORE_ORDER_TYPE, as_apps_user, cart, catalog, orders
+from commera.checkout_hooks import PLUGIN_FEE_FIELD
+from commera.plugin_events import PLUGINS_USER, get_order_snapshot
+from commera.sdk import STORE_ORDER_TYPE, as_plugin_user, cart, catalog, orders
 from commera.sdk.types import (
 	Address,
 	Cart,
@@ -22,14 +22,14 @@ from commera.sdk.types import (
 	OrderLine,
 	Stage,
 )
-from commera.tests import test_app_events, test_cart_checkout, test_checkout_hooks
+from commera.tests import test_cart_checkout, test_checkout_hooks, test_plugin_events
 from commera.tests.test_admin_orders import ensure_fiscal_year, get_company_account, make_test_sales_order
 from commera.tests.test_payment_hooks import patch_app_hooks
 from commera.utils import update_sales_order_ecommerce_status
 
 # Removing or renaming a name here breaks apps built on the SDK, so it needs an API_VERSION bump.
 PUBLIC_NAMES = {
-	"commera.sdk": ["API_VERSION", "STORE_ORDER_TYPE", "as_apps_user", "cart", "catalog", "orders"],
+	"commera.sdk": ["API_VERSION", "STORE_ORDER_TYPE", "as_plugin_user", "cart", "catalog", "orders"],
 	"commera.sdk.cart": ["get_cart", "set_cart_fields"],
 	"commera.sdk.catalog": ["get_items"],
 	"commera.sdk.orders": ["ShippingNotInstalled", "get_order", "get_orders", "record_shipment"],
@@ -64,7 +64,7 @@ class TestSdk(IntegrationTestCase):
 	cart_line = test_cart_checkout.TestCartCheckout.cart_line
 	address_payload = test_cart_checkout.TestCartCheckout.address_payload
 	open_cart = test_checkout_hooks.TestCheckoutHooks.open_cart
-	list_item = test_app_events.TestAppEvents.list_item
+	list_item = test_plugin_events.TestPluginEvents.list_item
 
 	@classmethod
 	def setUpClass(cls):
@@ -95,7 +95,7 @@ class TestSdk(IntegrationTestCase):
 	def setUp(self):
 		self.addCleanup(frappe.set_user, "Administrator")
 		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_note_fee"]}})
-		test_app_events.patch_app_declarations(
+		test_plugin_events.patch_app_declarations(
 			self, {APP: {"commera_events": {"order_paid": [f"{APP}.paid"]}}}
 		)
 		self.shopper = self.create_shopper()
@@ -111,7 +111,7 @@ class TestSdk(IntegrationTestCase):
 				"account_head": get_company_account(),
 				"tax_amount": FEE_AMOUNT,
 				"included_in_print_rate": 0,
-				APP_FEE_FIELD: 1,
+				PLUGIN_FEE_FIELD: 1,
 			},
 		)
 		sales_order.set(APP_FIELD, "Happy birthday")
@@ -135,7 +135,7 @@ class TestSdk(IntegrationTestCase):
 		self.assert_shape(order, Order)
 		self.assert_shape(order["items"][0], OrderLine)
 		self.assert_shape(order["stage"], Stage)
-		self.assert_shape(order["app_fees"][0], Charge)
+		self.assert_shape(order["plugin_fees"][0], Charge)
 
 		self.assert_shape(catalog.get_items([self.item])[self.item], CatalogItem)
 
@@ -146,20 +146,20 @@ class TestSdk(IntegrationTestCase):
 		summary = cart.set_cart_fields({APP_FIELD: "Wrap it"})
 		self.assert_shape(summary, CheckoutSummary)
 		self.assert_shape(summary["cash_on_delivery"], ChargeSummary)
-		self.assert_shape(summary["app_fees"][0], Charge)
+		self.assert_shape(summary["plugin_fees"][0], Charge)
 
-	def test_an_order_reads_its_app_fee_its_stage_and_the_app_field_asked_for(self):
+	def test_an_order_reads_its_plugin_fee_its_stage_and_the_app_field_asked_for(self):
 		sales_order = self.make_store_order()
 
 		order = orders.get_order(sales_order.name, extra_fields=[APP_FIELD])
 
 		self.assertEqual(order["order_type"], STORE_ORDER_TYPE)
-		self.assertEqual(order["app_fees"], [{"description": FEE_DESCRIPTION, "amount": FEE_AMOUNT}])
+		self.assertEqual(order["plugin_fees"], [{"description": FEE_DESCRIPTION, "amount": FEE_AMOUNT}])
 		self.assertEqual(order["grand_total"], sales_order.grand_total)
 		self.assertEqual(order["stage"]["key"], "to_fulfil")
 		self.assertFalse(order["is_cancelled"])
 		self.assertFalse(order["is_paid"])
-		self.assertEqual(order["app_fields"], {APP_FIELD: "Happy birthday"})
+		self.assertEqual(order["plugin_fields"], {APP_FIELD: "Happy birthday"})
 		self.assertEqual(
 			[(line["line_id"], line["qty"]) for line in order["items"]],
 			[(row.name, row.qty) for row in sales_order.items],
@@ -225,7 +225,7 @@ class TestSdk(IntegrationTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			cart.set_cart_fields({"grand_total": 1})
 
-	def test_a_user_without_read_access_is_refused_until_the_app_acts_as_the_apps_user(self):
+	def test_a_user_without_read_access_is_refused_until_the_plugin_acts_as_the_plugin_user(self):
 		sales_order = self.make_store_order()
 		frappe.set_user(self.shopper)
 
@@ -233,12 +233,12 @@ class TestSdk(IntegrationTestCase):
 			orders.get_order(sales_order.name)
 		with self.assertRaises(frappe.PermissionError):
 			orders.get_orders([sales_order.name])
-		with as_apps_user("commera"):
-			self.assertEqual(frappe.session.user, APPS_USER)
+		with as_plugin_user("commera"):
+			self.assertEqual(frappe.session.user, PLUGINS_USER)
 			self.assertEqual(orders.get_order(sales_order.name)["name"], sales_order.name)
 		self.assertEqual(frappe.session.user, self.shopper)
 		with self.assertRaises(frappe.ValidationError):
-			with as_apps_user("zz_not_installed"):
+			with as_plugin_user("zz_not_installed"):
 				pass
 
 	def test_a_page_of_orders_costs_no_more_queries_than_one_order(self):
@@ -249,7 +249,7 @@ class TestSdk(IntegrationTestCase):
 			page = orders.get_orders([*order_names, "ZZ-NO-SUCH-ORDER"])
 
 		self.assertEqual(sorted(page), sorted(order_names))
-		self.assertTrue(all(order["app_fees"] for order in page.values()))
+		self.assertTrue(all(order["plugin_fees"] for order in page.values()))
 
 	def test_items_read_their_shopper_price_store_stock_and_listing(self):
 		listed_item = self.list_item(self.item)
@@ -291,17 +291,17 @@ class TestSdk(IntegrationTestCase):
 		self.assertIsNone(item["list_price"])
 		self.assertEqual(item["available_qty"], 0)
 
-	def test_an_app_field_saved_on_the_cart_reprices_the_apps_fee(self):
+	def test_an_app_field_saved_on_the_cart_reprices_the_plugin_fee(self):
 		frappe.set_user(self.shopper)
 		self.assertIsNone(cart.get_cart())
 		quotation = self.open_cart()
-		self.assertEqual(cart.get_cart()["app_fields"], {APP_FIELD: None})
+		self.assertIsNone(cart.get_cart()["plugin_fields"][APP_FIELD])
 
 		summary = cart.set_cart_fields({APP_FIELD: "Wrap it"})
 
-		self.assertEqual(summary["app_fees"], [{"description": FEE_DESCRIPTION, "amount": FEE_AMOUNT}])
+		self.assertEqual(summary["plugin_fees"], [{"description": FEE_DESCRIPTION, "amount": FEE_AMOUNT}])
 		self.assertEqual(frappe.db.get_value("Quotation", quotation.name, APP_FIELD), "Wrap it")
-		self.assertEqual(cart.get_cart()["app_fields"], {APP_FIELD: "Wrap it"})
+		self.assertEqual(cart.get_cart()["plugin_fields"][APP_FIELD], "Wrap it")
 
 	def test_a_cart_already_paid_for_is_refused(self):
 		quotation = self.open_cart()

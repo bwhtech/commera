@@ -10,7 +10,7 @@ from frappe.utils.data import add_days, cint, cstr, flt, formatdate, getdate
 from commera.api.admin.catalog import get_unpublishable_options
 from commera.api.admin.inventory import get_inventory
 from commera.api.shipping import get_order_charge_lines
-from commera.extensions.registry import get_app_title
+from commera.plugins.registry import get_app_title
 from commera.utils import get_address_lines, get_item_images
 
 PAGE_LENGTH = 20
@@ -597,13 +597,13 @@ def get_order_charges(order):
 	precision = frappe.get_precision("Sales Order", "grand_total", order.currency)
 	shipping = flt(charge_lines["shipping"], precision)
 	cod_charge = flt(charge_lines["cod_charge"], precision)
-	app_fees = charge_lines["app_fees"]
-	app_fee_total = flt(sum(fee["amount"] for fee in app_fees), precision)
+	plugin_fees = charge_lines["plugin_fees"]
+	plugin_fee_total = flt(sum(fee["amount"] for fee in plugin_fees), precision)
 	return {
 		"shipping": shipping,
 		"cod_charge": cod_charge,
-		"app_fees": app_fees,
-		"tax": flt(flt(order.total_taxes_and_charges) - shipping - cod_charge - app_fee_total, precision),
+		"plugin_fees": plugin_fees,
+		"tax": flt(flt(order.total_taxes_and_charges) - shipping - cod_charge - plugin_fee_total, precision),
 	}
 
 
@@ -636,7 +636,7 @@ def get_order(sales_order: str):
 		# before the shipping connector was installed, or one that took the flat Shipping Rule.
 		"delivery_option": order.custom_delivery_option,
 		"cod_charge": charges["cod_charge"],
-		"app_fees": charges["app_fees"],
+		"plugin_fees": charges["plugin_fees"],
 		"tax": charges["tax"],
 		"total_taxes_and_charges": flt(order.total_taxes_and_charges),
 		"grand_total": flt(order.grand_total),
@@ -661,7 +661,7 @@ def get_order(sales_order: str):
 		],
 		"deliveries": lifecycle.get("printable_delivery_notes") or [],
 		"invoices": read_order_invoices(order.name),
-		"app_failures": get_order_app_failures(order.name),
+		"plugin_failures": get_order_plugin_failures(order.name),
 	}
 
 
@@ -745,7 +745,7 @@ def read_order_lines(order_names: list[str]) -> dict[str, list]:
 	return lines_by_order
 
 
-def get_order_app_failures(sales_order: str) -> list:
+def get_order_plugin_failures(sales_order: str) -> list:
 	commera_event = frappe.qb.DocType("Commera Event")
 	delivery = frappe.qb.DocType("Commera Event Delivery")
 	return query_deliveries(

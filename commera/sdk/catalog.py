@@ -4,7 +4,7 @@ from frappe.utils.data import cstr, flt
 
 from commera.api.admin.catalog import get_default_rates, get_selling_rates
 from commera.api.admin.orders import get_reporting_currency
-from commera.app_events import get_ecommerce_warehouse, get_listed_items
+from commera.plugin_events import get_ecommerce_warehouse, get_listed_items
 from commera.sdk.types import CatalogItem
 from commera.utils import IN_CLAUSE_CHUNK_SIZE, get_available_stocks
 

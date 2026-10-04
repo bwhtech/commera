@@ -3,7 +3,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cstr, flt, sha256_hash
 
-from commera.checkout_hooks import APP_FEE_FIELD, apply_app_fees, apply_delivery_option_hooks
+from commera.checkout_hooks import PLUGIN_FEE_FIELD, apply_delivery_option_hooks, apply_plugin_fees
 from commera.core import _get_cart_quotation
 from commera.utils import COD_CHARGE_DESCRIPTION, get_cod_configuration, validate_document_access
 
@@ -210,7 +210,7 @@ def apply_delivery_option(quotation, option: dict):
 	quotation.custom_shipping_provider = option.get("provider")
 	quotation.custom_shipping_service_code = option.get("service_code")
 	set_delivery_charge_row(quotation, flt(option["amount"]), option["title"])
-	apply_app_fees(quotation)
+	apply_plugin_fees(quotation)
 
 
 def clear_delivery_option(quotation):
@@ -284,17 +284,17 @@ def is_shipping_rule_row(row, rule) -> bool:
 
 
 def get_charge_lines(taxes, shipping_rule: str | None) -> dict:
-	"""Split a charge table into delivery, the COD fee, app fees and the taxes a shopper sees by their own names.
+	"""Split a charge table into delivery, the COD fee, plugin fees and the taxes a shopper sees by their own names.
 
 	The Shipping Rule row is matched on account and cost centre because its description is translated.
 	"""
 	rule = get_shipping_rule_accounts(shipping_rule)
-	charge_lines = {"shipping": 0.0, "cod_charge": 0.0, "app_fees": [], "taxes": []}
+	charge_lines = {"shipping": 0.0, "cod_charge": 0.0, "plugin_fees": [], "taxes": []}
 	for row in taxes:
 		description = cstr(row.description).strip()
 		# First: an app names its own fee, so its description can look like any other charge.
-		if row.get(APP_FEE_FIELD):
-			charge_lines["app_fees"].append({"description": description, "amount": flt(row.tax_amount)})
+		if row.get(PLUGIN_FEE_FIELD):
+			charge_lines["plugin_fees"].append({"description": description, "amount": flt(row.tax_amount)})
 		elif description == COD_CHARGE_DESCRIPTION.strip():
 			charge_lines["cod_charge"] += flt(row.tax_amount)
 		elif description.startswith(DELIVERY_CHARGE_DESCRIPTION) or is_shipping_rule_row(row, rule):
@@ -327,7 +327,7 @@ def get_checkout_summary(quotation) -> dict:
 def get_charge_summary(quotation) -> dict:
 	charge_lines = get_charge_lines(quotation.taxes, quotation.shipping_rule)
 	charges = charge_lines["shipping"] + charge_lines["cod_charge"]
-	charges += sum(line["amount"] for line in charge_lines["taxes"] + charge_lines["app_fees"])
+	charges += sum(line["amount"] for line in charge_lines["taxes"] + charge_lines["plugin_fees"])
 	discount_amount = flt(quotation.discount_amount)
 	return {
 		# Derived rather than read: with a Grand Total discount the stored net_total is already partly discounted.
@@ -336,7 +336,7 @@ def get_charge_summary(quotation) -> dict:
 		),
 		"shipping": charge_lines["shipping"],
 		"cod_charge": charge_lines["cod_charge"],
-		"app_fees": charge_lines["app_fees"],
+		"plugin_fees": charge_lines["plugin_fees"],
 		"taxes": charge_lines["taxes"],
 		"discount_amount": discount_amount,
 		"rounding_adjustment": flt(quotation.rounding_adjustment),
@@ -346,7 +346,7 @@ def get_charge_summary(quotation) -> dict:
 
 def clear_pickup_charges(quotation):
 	quotation.shipping_rule = None
-	quotation.taxes = [row for row in quotation.taxes if row.get(APP_FEE_FIELD)]
+	quotation.taxes = [row for row in quotation.taxes if row.get(PLUGIN_FEE_FIELD)]
 	reindex_taxes(quotation)
 	quotation.calculate_taxes_and_totals()
 
@@ -391,7 +391,7 @@ def read_order_taxes(order_names: list) -> dict[str, list]:
 			"account_head",
 			"cost_center",
 			"tax_amount",
-			APP_FEE_FIELD,
+			PLUGIN_FEE_FIELD,
 		],
 		order_by="idx asc",
 	):
@@ -458,7 +458,7 @@ def reprice_selected_option(quotation) -> bool:
 			},
 		]
 
-	options = apply_delivery_option_hooks(quotation, options, strict=bool(quotation.flags.strict_app_fees))
+	options = apply_delivery_option_hooks(quotation, options, strict=bool(quotation.flags.strict_plugin_fees))
 	for option in options:
 		if option["title"] == quotation.custom_delivery_option:
 			apply_delivery_option(quotation, option)

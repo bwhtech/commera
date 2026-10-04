@@ -51,7 +51,7 @@ writeFileSync(
 		'frappe-ui': ['Button', 'Dialog', 'dialog'],
 		'frappe-ui/list': [],
 		'frappe-ui/charts': ['AreaChart', 'BarChart'],
-		'@commera/admin': ['useExtension', 'usePage', 'useAction'],
+		'@commera/admin': ['usePlugin', 'usePage', 'useAction'],
 	}),
 );
 
@@ -97,10 +97,8 @@ async function buildFails(files, pattern) {
 	});
 }
 
-const vue = (
-	extension,
-	body = '<template><div class="p-2">hi</div></template>',
-) => `<script>\nexport const extension = ${extension}\n</script>\n${body}\n`;
+const vue = (plugin, body = '<template><div class="p-2">hi</div></template>') =>
+	`<script>\nexport const plugin = ${plugin}\n</script>\n${body}\n`;
 
 const page = vue(`{ label: 'Print jobs', icon: 'printer' }`);
 
@@ -108,14 +106,14 @@ describe('folder grammar', () => {
 	test('a typo in a placement folder fails and lists the valid places', async () => {
 		await buildFails(
 			{ 'ordr/cards/status/index.vue': vue(`{ label: 'Status' }`) },
-			/ordr\/cards\/status\/index\.vue declares an extension but ordr\/cards isn't a Commera placement; valid places:[\s\S]*order\/cards\/<name>\/index\.vue/,
+			/ordr\/cards\/status\/index\.vue declares a plugin block but ordr\/cards isn't a Commera placement; valid places:[\s\S]*order\/cards\/<name>\/index\.vue/,
 		);
 	});
 
-	test('a placement one level too deep with an extension block fails', async () => {
+	test('a placement one level too deep with a plugin block fails', async () => {
 		await buildFails(
 			{ 'pages/jobs/detail/index.vue': page },
-			/pages\/jobs\/detail\/index\.vue declares an extension but pages\/jobs isn't a Commera placement/,
+			/pages\/jobs\/detail\/index\.vue declares a plugin block but pages\/jobs isn't a Commera placement/,
 		);
 	});
 
@@ -132,15 +130,15 @@ describe('folder grammar', () => {
 				'<template><span class="p-2">pill</span></template>',
 		});
 		assert.deepEqual(
-			manifest.extensions.map((entry) => `${entry.place}/${entry.name}`),
+			manifest.entries.map((entry) => `${entry.place}/${entry.name}`),
 			['pages/jobs'],
 		);
 	});
 
-	test('a sibling component may not declare an extension', async () => {
+	test('a sibling component may not declare a plugin', async () => {
 		await buildFails(
 			{ 'pages/jobs/index.vue': page, 'pages/jobs/JobList.vue': page },
-			/pages\/jobs\/JobList\.vue declares an extension, but only a placement's index\.vue may/,
+			/pages\/jobs\/JobList\.vue declares a plugin block, but only a placement's index\.vue may/,
 		);
 	});
 
@@ -149,7 +147,7 @@ describe('folder grammar', () => {
 			'pages/jobs/index.vue': page,
 			'orders/selection/bulk/index.vue': vue(`{ label: 'Bulk' }`),
 		});
-		assert.equal(manifest.extensions.length, 1);
+		assert.equal(manifest.entries.length, 1);
 		assert.equal(existsSync(join(outDir, 'orders')), false);
 	});
 
@@ -165,7 +163,7 @@ describe('folder grammar', () => {
 			{
 				'pages/jobs/index.vue': '<template><div class="p-2">x</div></template>',
 			},
-			/pages\/jobs\/index\.vue: add `<script>export const extension/,
+			/pages\/jobs\/index\.vue: add `<script>export const plugin/,
 		);
 	});
 
@@ -178,20 +176,20 @@ describe('folder grammar', () => {
 				),
 				'order/cards/total/index.vue': vue('{ order: 1 }'),
 			},
-			/2 problems[\s\S]*extension\.sidebar is not allowed on order\/cards[\s\S]*extension\.label is required/,
+			/2 problems[\s\S]*plugin\.sidebar is not allowed on order\/cards[\s\S]*plugin\.label is required/,
 		);
 	});
 });
 
-describe('the extension block is literal only', () => {
+describe('the plugin block is literal only', () => {
 	for (const [kind, value, path] of [
-		['a call', `{ label: label(), icon: 'printer' }`, 'extension.label'],
-		['an identifier', `{ label: LABEL, icon: 'printer' }`, 'extension.label'],
-		['a spread', `{ ...base, label: 'x', icon: 'printer' }`, 'extension'],
+		['a call', `{ label: label(), icon: 'printer' }`, 'plugin.label'],
+		['an identifier', `{ label: LABEL, icon: 'printer' }`, 'plugin.label'],
+		['a spread', `{ ...base, label: 'x', icon: 'printer' }`, 'plugin'],
 		[
 			'a template with an expression',
 			"{ label: `x${1}`, icon: 'printer' }",
-			'extension.label',
+			'plugin.label',
 		],
 	]) {
 		test(`${kind} fails with its position`, async () => {
@@ -210,16 +208,16 @@ describe('the extension block is literal only', () => {
 	test('a computed key fails', async () => {
 		await buildFails(
 			{ 'pages/jobs/index.vue': vue(`{ ['label']: 'x', icon: 'printer' }`) },
-			/extension keys must be plain names/,
+			/plugin keys must be plain names/,
 		);
 	});
 
 	test('an extra import in the plain script fails', async () => {
 		await buildFails(
 			{
-				'pages/jobs/index.vue': `<script>\nimport { x } from './x.js'\nexport const extension = { label: 'Jobs', icon: 'printer' }\n</script>\n<template><div class="p-2" /></template>\n`,
+				'pages/jobs/index.vue': `<script>\nimport { x } from './x.js'\nexport const plugin = { label: 'Jobs', icon: 'printer' }\n</script>\n<template><div class="p-2" /></template>\n`,
 			},
-			/index\.vue:2:1 the plain <script> may only hold `export const extension/,
+			/index\.vue:2:1 the plain <script> may only hold `export const plugin/,
 		);
 	});
 });
@@ -232,14 +230,14 @@ describe('schema per placement', () => {
 					`{ label: 'Jobs', icon: 'printer', sidebr: false }`,
 				),
 			},
-			/extension\.sidebr is not allowed on pages \(did you mean 'sidebar'\?\)/,
+			/plugin\.sidebr is not allowed on pages \(did you mean 'sidebar'\?\)/,
 		);
 	});
 
 	test('a missing label fails', async () => {
 		await buildFails(
 			{ 'order/cards/status/index.vue': vue('{ order: 1 }') },
-			/order\/cards\/status\/index\.vue: extension\.label is required/,
+			/order\/cards\/status\/index\.vue: plugin\.label is required/,
 		);
 	});
 
@@ -250,7 +248,7 @@ describe('schema per placement', () => {
 					`{ label: 'Resend', method: '${APP}.api.resend' }`,
 				),
 			},
-			/has both a template and extension\.method; keep exactly one/,
+			/has both a template and plugin\.method; keep exactly one/,
 		);
 	});
 
@@ -258,9 +256,9 @@ describe('schema per placement', () => {
 		await buildFails(
 			{
 				'order/actions/resend/index.vue':
-					"<script>\nexport const extension = { label: 'Resend' }\n</script>\n",
+					"<script>\nexport const plugin = { label: 'Resend' }\n</script>\n",
 			},
-			/needs either a template or extension\.method; it has neither/,
+			/needs either a template or plugin\.method; it has neither/,
 		);
 	});
 
@@ -271,7 +269,7 @@ describe('schema per placement', () => {
 					`{ label: 'Gift wrap', doctype: 'Gift Wrap Settings' }`,
 				),
 			},
-			/has both a template and extension\.doctype/,
+			/has both a template and plugin\.doctype/,
 		);
 	});
 
@@ -279,14 +277,14 @@ describe('schema per placement', () => {
 		await buildFails(
 			{
 				'settings/index.vue':
-					"<script>\nexport const extension = { label: 'Gift wrap' }\n</script>\n",
+					"<script>\nexport const plugin = { label: 'Gift wrap' }\n</script>\n",
 			},
-			/needs either a template or extension\.doctype/,
+			/needs either a template or plugin\.doctype/,
 		);
 	});
 
-	const command = (extension) =>
-		`<script>\nexport const extension = ${extension}\n</script>\n`;
+	const command = (plugin) =>
+		`<script>\nexport const plugin = ${plugin}\n</script>\n`;
 
 	test('a command with a template fails', async () => {
 		await buildFails(
@@ -295,14 +293,14 @@ describe('schema per placement', () => {
 					`{ label: 'Sync', method: '${APP}.api.sync' }`,
 				),
 			},
-			/commands\/sync\/index\.vue: can't have a <template> or <script setup>; commands is declared by the extension block alone/,
+			/commands\/sync\/index\.vue: can't have a <template> or <script setup>; commands is declared by the plugin block alone/,
 		);
 	});
 
 	test('a command without a method fails', async () => {
 		await buildFails(
 			{ 'commands/sync/index.vue': command(`{ label: 'Sync' }`) },
-			/commands\/sync\/index\.vue: extension\.method is required/,
+			/commands\/sync\/index\.vue: plugin\.method is required/,
 		);
 	});
 
@@ -318,7 +316,7 @@ describe('schema per placement', () => {
 						`{ label: 'Sync', method: '${APP}.api.sync', keywords: ${keywords} }`,
 					),
 				},
-				/extension\.keywords must be a list of non-empty text/,
+				/plugin\.keywords must be a list of non-empty text/,
 			);
 		});
 	}
@@ -337,7 +335,7 @@ describe('schema per placement', () => {
 					`{ label: 'Status', condition: 'frappe.client.get_list' }`,
 				),
 			},
-			/extension\.condition 'frappe\.client\.get_list' must start with 'fixture_app\.'/,
+			/plugin\.condition 'frappe\.client\.get_list' must start with 'fixture_app\.'/,
 		);
 	});
 });
@@ -405,7 +403,7 @@ describe('guards', () => {
 		);
 	});
 
-	for (const name of ['AppPageHeader', 'PageBody', 'ExtensionCard']) {
+	for (const name of ['AppPageHeader', 'PageBody', 'PluginCard']) {
 		test(`importing ${name} fails because the dashboard does not share it`, async () => {
 			await buildFails(
 				{
@@ -482,27 +480,26 @@ describe('a clean build', () => {
 			'order/cards/print-status/index.vue': card('Print status'),
 			'product/cards/listing/index.vue': card('Listing'),
 			'customer/cards/points/index.vue': card('Points'),
-			'order/actions/resend/index.vue': `<script>\nexport const extension = { label: 'Resend to printer', icon: 'rotate-cw', method: '${APP}.api.resend_order', confirm: \`Send this order's print jobs again?\` }\n</script>\n`,
+			'order/actions/resend/index.vue': `<script>\nexport const plugin = { label: 'Resend to printer', icon: 'rotate-cw', method: '${APP}.api.resend_order', confirm: \`Send this order's print jobs again?\` }\n</script>\n`,
 			'order/actions/pick/index.vue': vue(
 				`{ label: 'Pick a printer', icon: 'printer' }`,
 			),
-			'product/actions/sync/index.vue': `<script>\nexport const extension = { label: 'Sync now', method: '${APP}.api.sync' }\n</script>\n`,
+			'product/actions/sync/index.vue': `<script>\nexport const plugin = { label: 'Sync now', method: '${APP}.api.sync' }\n</script>\n`,
 			'customer/actions/award/index.vue': vue(
 				`{ label: 'Award points', icon: 'gift' }`,
 			),
 			'settings/index.vue':
-				"<script>\nexport const extension = { label: 'Gift wrap', icon: 'gift', doctype: 'Gift Wrap Settings' }\n</script>\n",
+				"<script>\nexport const plugin = { label: 'Gift wrap', icon: 'gift', doctype: 'Gift Wrap Settings' }\n</script>\n",
 		});
 
 		assert.equal(manifest.api_version, 1);
 		assert.equal(manifest.kit_version, '0.2.0');
 		assert.equal(manifest.app, APP);
-		const hashes = manifest.extensions.map((entry) => entry.hash);
+		const hashes = manifest.entries.map((entry) => entry.hash);
 		for (const [index, hash] of hashes.entries()) {
-			if (manifest.extensions[index].module)
-				assert.match(hash, /^[0-9a-f]{8}$/);
+			if (manifest.entries[index].module) assert.match(hash, /^[0-9a-f]{8}$/);
 		}
-		const shape = manifest.extensions.map(({ hash, ...entry }) => entry);
+		const shape = manifest.entries.map(({ hash, ...entry }) => entry);
 		assert.deepEqual(shape, [
 			{
 				place: 'customer/actions',
@@ -591,7 +588,7 @@ describe('a clean build', () => {
 		]);
 
 		const cardModule = read('order/cards/print-status.js');
-		assert.ok(cardModule.startsWith('/* commera-extension-api: 1 */\n'));
+		assert.ok(cardModule.startsWith('/* commera-plugin-api: 1 */\n'));
 		assert.doesNotMatch(cardModule, /has_jobs|POD Job|Print status/);
 		assert.doesNotMatch(read('pages/jobs.js'), /Print jobs/);
 	});
@@ -599,17 +596,17 @@ describe('a clean build', () => {
 	test('an app with only declarative entries emits just the manifest', async () => {
 		const { manifest, outDir } = await buildApp({
 			'settings/index.vue':
-				"<script>\nexport const extension = { label: 'Gift wrap', doctype: 'Gift Wrap Settings' }\n</script>\n",
+				"<script>\nexport const plugin = { label: 'Gift wrap', doctype: 'Gift Wrap Settings' }\n</script>\n",
 		});
-		assert.equal(manifest.extensions[0].module, null);
+		assert.equal(manifest.entries[0].module, null);
 		assert.equal(existsSync(join(outDir, '__empty.js')), false);
 	});
 
 	test('a command reaches the manifest with its keywords and no module', async () => {
 		const { manifest } = await buildApp({
-			'commands/sync/index.vue': `<script>\nexport const extension = { label: 'Sync', icon: 'rotate-cw', keywords: ['print', 'orders'], method: '${APP}.api.sync' }\n</script>\n`,
+			'commands/sync/index.vue': `<script>\nexport const plugin = { label: 'Sync', icon: 'rotate-cw', keywords: ['print', 'orders'], method: '${APP}.api.sync' }\n</script>\n`,
 		});
-		assert.deepEqual(manifest.extensions, [
+		assert.deepEqual(manifest.entries, [
 			{
 				place: 'commands',
 				name: 'sync',
@@ -643,7 +640,7 @@ describe('the app icon', () => {
 			'icon.svg': svg,
 		});
 		assert.equal(manifest.icon, 'icon.svg');
-		assert.equal('icon' in manifest.extensions[0], false);
+		assert.equal('icon' in manifest.entries[0], false);
 	});
 
 	test('without an icon.svg the manifest has no icon', async () => {

@@ -12,7 +12,7 @@ from commera.api.variant_pricing import (
 	get_selling_price_lists,
 	insert_item_prices,
 )
-from commera.app_events import add_changed_products
+from commera.plugin_events import add_changed_products
 
 
 class StyleAttributeVariant(Document):

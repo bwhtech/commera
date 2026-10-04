@@ -14,13 +14,13 @@ import ProductStock from '../components/product/ProductStock.vue'
 import ProductOrganization from '../components/product/ProductOrganization.vue'
 import ProductStorefront from '../components/product/ProductStorefront.vue'
 import ProductSummaryPanel from '../components/product/ProductSummaryPanel.vue'
-import ExtensionActionDialog from '../components/ExtensionActionDialog.vue'
-import ExtensionSlot from '../components/ExtensionSlot.vue'
+import PluginActionDialog from '../components/PluginActionDialog.vue'
+import PluginSlot from '../components/PluginSlot.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 import { errorMessage } from '../data/errors'
 import { longDate } from '../data/format'
 import { useProductStats } from '../data/product'
-import { useRecordExtensions } from '../data/recordExtensions'
+import { useRecordPlugins } from '../data/recordPlugins'
 import { asDropdownOptions, buildProductActions } from '../ia/productActions'
 
 const route = useRoute()
@@ -106,7 +106,7 @@ const actions = computed(() =>
     : { groups: [], quick: [] },
 )
 
-const { cards, actionGroup, openAction, record, reload: reloadExtensions } = useRecordExtensions(
+const { cards, actionGroup, openAction, record, reload: reloadPlugins } = useRecordPlugins(
   'product',
   'Item',
   () => route.params.id,
@@ -195,7 +195,7 @@ const loadFailure = computed(() =>
 
           <!-- Below lg the rail is hidden, so the apps' cards stack under the form instead. -->
           <div v-if="cards.length && !hasRail" class="mt-11 space-y-6">
-            <ExtensionSlot :entries="cards" :record="record" frame="stack" @reload="reloadExtensions" />
+            <PluginSlot :entries="cards" :record="record" frame="stack" @reload="reloadPlugins" />
           </div>
         </PageBody>
       </ScrollArea>
@@ -203,12 +203,12 @@ const loadFailure = computed(() =>
       <aside class="hidden w-[19rem] shrink-0 flex-col border-l border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
           <ProductSummaryPanel :product="product" :stats="stats" />
-          <ExtensionSlot v-if="hasRail" :entries="cards" :record="record" frame="rail" @reload="reloadExtensions" />
+          <PluginSlot v-if="hasRail" :entries="cards" :record="record" frame="rail" @reload="reloadPlugins" />
         </ScrollArea>
       </aside>
     </div>
 
-    <ExtensionActionDialog v-model:entry="openAction" :record="record" @reload="reloadExtensions" />
+    <PluginActionDialog v-model:entry="openAction" :record="record" @reload="reloadPlugins" />
   </template>
 
   <!-- The item code is already in the route, so the header is real from the first
