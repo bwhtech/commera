@@ -56,12 +56,12 @@ QUOTED_OPTIONS = [
 
 
 def refuse_cart(quotation):
-	frappe.flags.commera_checkout_hook_calls.append("validate")
+	frappe.flags.commera_hooks_hook_calls.append("validate")
 	return REFUSAL
 
 
 def allow_cart(quotation):
-	frappe.flags.commera_checkout_hook_calls.append("validate")
+	frappe.flags.commera_hooks_hook_calls.append("validate")
 
 
 def crash_validating_cart(quotation):
@@ -69,7 +69,7 @@ def crash_validating_cart(quotation):
 
 
 def charge_gift_wrap(quotation):
-	frappe.flags.commera_checkout_hook_calls.append("fees")
+	frappe.flags.commera_hooks_hook_calls.append("fees")
 	return [{"description": GIFT_WRAP, "amount": GIFT_WRAP_FEE}]
 
 
@@ -174,8 +174,8 @@ class TestCheckoutHooks(IntegrationTestCase):
 		self.addCleanup(stripe_client_patch.stop)
 		frappe.cache.delete_value(f"{queue_prefix}Error Log")
 		self.addCleanup(frappe.cache.delete_value, f"{queue_prefix}Error Log")
-		frappe.flags.commera_checkout_hook_calls = []
-		self.addCleanup(frappe.flags.pop, "commera_checkout_hook_calls", None)
+		frappe.flags.commera_hooks_hook_calls = []
+		self.addCleanup(frappe.flags.pop, "commera_hooks_hook_calls", None)
 
 		self.shopper = self.create_shopper()
 		self.item = self.create_item(sale_rate=test_cart_checkout.SALE_RATE)
@@ -210,7 +210,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		]
 
 	def test_an_app_refusal_reaches_the_shopper_and_opens_no_payment(self):
-		patch_app_hooks(self, {"commera_checkout": {"validate_cart": [f"{__name__}.refuse_cart"]}})
+		patch_app_hooks(self, {"commera_hooks": {"validate_cart": [f"{__name__}.refuse_cart"]}})
 		quotation = self.open_cart()
 
 		with self.assertRaisesRegex(frappe.ValidationError, REFUSAL):
@@ -222,7 +222,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		self.assertNotIn(REFUSAL, self.queued_error_logs(), "a refusal the shopper can fix is no error")
 
 	def test_an_app_refusal_stops_a_cod_order_at_checkout_and_at_confirmation(self):
-		patch_app_hooks(self, {"commera_checkout": {"validate_cart": [f"{__name__}.refuse_cart"]}})
+		patch_app_hooks(self, {"commera_hooks": {"validate_cart": [f"{__name__}.refuse_cart"]}})
 		quotation = self.open_cart()
 
 		with self.assertRaisesRegex(frappe.ValidationError, REFUSAL):
@@ -236,7 +236,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 
 	def test_a_crashing_validator_blocks_checkout_with_a_generic_message_and_is_logged(self):
 		handler = f"{__name__}.crash_validating_cart"
-		patch_app_hooks(self, {"commera_checkout": {"validate_cart": [handler]}})
+		patch_app_hooks(self, {"commera_hooks": {"validate_cart": [handler]}})
 		quotation = self.open_cart()
 		frappe.local.message_log = []
 
@@ -246,7 +246,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		shown_to_shopper = frappe.as_json(frappe.local.message_log)
 		self.assertIn(GENERIC_FAILURE, shown_to_shopper)
 		self.assertNotIn(APP_SECRET, shown_to_shopper)
-		self.assertIn(f'commera_checkout["validate_cart"] hook failed: {handler}', self.queued_error_titles())
+		self.assertIn(f'commera_hooks["validate_cart"] hook failed: {handler}', self.queued_error_titles())
 		frappe.set_user("Administrator")
 		self.assertEqual(self.gateway_requests(quotation.name), [])
 
@@ -254,21 +254,21 @@ class TestCheckoutHooks(IntegrationTestCase):
 		patch_app_hooks(
 			self,
 			{
-				"commera_checkout": {
+				"commera_hooks": {
 					"validate_cart": [f"{__name__}.allow_cart"],
 					"cart_fees": [f"{__name__}.charge_gift_wrap"],
 				}
 			},
 		)
 		self.open_cart()
-		frappe.flags.commera_checkout_hook_calls.clear()
+		frappe.flags.commera_hooks_hook_calls.clear()
 
 		initiate_checkout_with_mode(GATEWAY)
 
-		self.assertEqual(sorted(frappe.flags.commera_checkout_hook_calls), ["fees", "validate"])
+		self.assertEqual(sorted(frappe.flags.commera_hooks_hook_calls), ["fees", "validate"])
 
 	def test_a_plugin_fee_is_an_untaxed_charge_the_gateway_bills(self):
-		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_gift_wrap"]}})
+		patch_app_hooks(self, {"commera_hooks": {"cart_fees": [f"{__name__}.charge_gift_wrap"]}})
 		self.open_cart()
 		self.add_tax_to_cart()
 		quotation = _get_cart_quotation()
@@ -294,7 +294,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		self.assertEqual(gateway_line["unit_amount"], to_minor_units(summary["total"], quotation.currency))
 
 	def test_a_pickup_cart_keeps_its_plugin_fee(self):
-		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_gift_wrap"]}})
+		patch_app_hooks(self, {"commera_hooks": {"cart_fees": [f"{__name__}.charge_gift_wrap"]}})
 		self.set_store_pickup(1)
 		warehouse = self.create_pickup_warehouse()
 		self.open_cart()
@@ -307,7 +307,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		self.assertEqual(len(self.fee_rows(_get_cart_quotation())), 1)
 
 	def test_a_plugin_fee_carries_into_the_sales_order(self):
-		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_gift_wrap"]}})
+		patch_app_hooks(self, {"commera_hooks": {"cart_fees": [f"{__name__}.charge_gift_wrap"]}})
 		quotation = self.open_cart()
 
 		initiate_checkout_with_mode(COD_PAYMENT_MODE)
@@ -325,7 +325,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		)
 
 	def test_a_fee_named_like_delivery_stays_a_fee_and_leaves_the_order_tax_alone(self):
-		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_test_fee"]}})
+		patch_app_hooks(self, {"commera_hooks": {"cart_fees": [f"{__name__}.charge_test_fee"]}})
 		self.addCleanup(frappe.flags.pop, "commera_test_fee", None)
 		frappe.flags.commera_test_fee = {"description": INSURANCE, "amount": GIFT_WRAP_FEE}
 		quotation = self.open_cart()
@@ -345,20 +345,20 @@ class TestCheckoutHooks(IntegrationTestCase):
 
 	def test_a_crashing_fee_hook_never_blocks_a_cart_edit_but_blocks_checkout(self):
 		handler = f"{__name__}.crash_charging_fees"
-		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [handler]}})
+		patch_app_hooks(self, {"commera_hooks": {"cart_fees": [handler]}})
 
 		quotation = self.open_cart()
 		apply_shipping_rule()
 
 		self.assertEqual(self.fee_rows(_get_cart_quotation()), [])
-		self.assertIn(f'commera_checkout["cart_fees"] hook failed: {handler}', self.queued_error_titles())
+		self.assertIn(f'commera_hooks["cart_fees"] hook failed: {handler}', self.queued_error_titles())
 		with self.assertRaisesRegex(frappe.ValidationError, GENERIC_FAILURE):
 			initiate_checkout_with_mode(GATEWAY)
 		frappe.set_user("Administrator")
 		self.assertEqual(self.gateway_requests(quotation.name), [])
 
 	def test_a_fee_hook_failing_after_checkout_opened_blocks_the_cod_confirmation(self):
-		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_test_fee"]}})
+		patch_app_hooks(self, {"commera_hooks": {"cart_fees": [f"{__name__}.charge_test_fee"]}})
 		self.addCleanup(frappe.flags.pop, "commera_test_fee", None)
 		frappe.flags.commera_test_fee = {"description": GIFT_WRAP, "amount": GIFT_WRAP_FEE}
 		quotation = self.open_cart()
@@ -373,7 +373,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 
 	def test_recomputing_charges_replaces_the_fee_instead_of_stacking_it(self):
 		patch_app_hooks(
-			self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_handling_on_grand_total"]}}
+			self, {"commera_hooks": {"cart_fees": [f"{__name__}.charge_handling_on_grand_total"]}}
 		)
 		self.open_cart()
 		first_total = _get_cart_quotation().grand_total
@@ -390,17 +390,17 @@ class TestCheckoutHooks(IntegrationTestCase):
 		)
 
 	def test_uninstalling_the_fee_app_drops_its_fee_at_the_next_recompute(self):
-		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_gift_wrap"]}})
+		patch_app_hooks(self, {"commera_hooks": {"cart_fees": [f"{__name__}.charge_gift_wrap"]}})
 		self.open_cart()
 		self.assertEqual(len(self.fee_rows(_get_cart_quotation())), 1)
 
-		patch_app_hooks(self, {"commera_checkout": {"cart_fees": []}})
+		patch_app_hooks(self, {"commera_hooks": {"cart_fees": []}})
 		apply_shipping_rule()
 
 		self.assertEqual(self.fee_rows(_get_cart_quotation()), [])
 
 	def test_an_invalid_fee_blocks_checkout(self):
-		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_test_fee"]}})
+		patch_app_hooks(self, {"commera_hooks": {"cart_fees": [f"{__name__}.charge_test_fee"]}})
 		self.addCleanup(frappe.flags.pop, "commera_test_fee", None)
 		frappe.flags.commera_test_fee = {"description": GIFT_WRAP, "amount": GIFT_WRAP_FEE}
 		quotation = self.open_cart()
@@ -420,7 +420,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		self.assertEqual(self.gateway_requests(quotation.name), [])
 
 	def test_a_zero_fee_is_no_fee_and_checkout_goes_through(self):
-		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_test_fee"]}})
+		patch_app_hooks(self, {"commera_hooks": {"cart_fees": [f"{__name__}.charge_test_fee"]}})
 		self.addCleanup(frappe.flags.pop, "commera_test_fee", None)
 		frappe.flags.commera_test_fee = {"description": GIFT_WRAP, "amount": 0}
 		quotation = self.open_cart()
@@ -450,7 +450,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 
 	def test_a_hidden_delivery_option_is_not_listed_cannot_be_chosen_and_is_refused_at_payment(self):
 		quotation = self.open_delivery_cart(EXPRESS)
-		patch_app_hooks(self, {"commera_checkout": {"delivery_options": [f"{__name__}.hide_express"]}})
+		patch_app_hooks(self, {"commera_hooks": {"delivery_options": [f"{__name__}.hide_express"]}})
 
 		self.assertEqual(self.listed_options(), [(STANDARD, 20.0, None)])
 		with self.assertRaisesRegex(frappe.ValidationError, "is not available"):
@@ -462,7 +462,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		self.assertEqual(self.gateway_requests(quotation.name), [])
 
 	def test_a_repriced_option_costs_the_same_from_listing_to_order_and_keeps_its_title(self):
-		patch_app_hooks(self, {"commera_checkout": {"delivery_options": [f"{__name__}.reprice_express"]}})
+		patch_app_hooks(self, {"commera_hooks": {"delivery_options": [f"{__name__}.reprice_express"]}})
 		quotation = self.open_delivery_cart(EXPRESS)
 
 		self.assertEqual(
@@ -486,7 +486,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		patch_app_hooks(
 			self,
 			{
-				"commera_checkout": {
+				"commera_hooks": {
 					"delivery_options": [
 						f"{__name__}.reprice_express",
 						f"{__name__}.halve_delivery_amounts",
@@ -509,11 +509,11 @@ class TestCheckoutHooks(IntegrationTestCase):
 		):
 			with self.subTest(handler=handler.__name__):
 				handler_path = f"{__name__}.{handler.__name__}"
-				patch_app_hooks(self, {"commera_checkout": {"delivery_options": [handler_path]}})
+				patch_app_hooks(self, {"commera_hooks": {"delivery_options": [handler_path]}})
 
 				self.assertEqual(self.listed_options(), [(EXPRESS, 50.0, None), (STANDARD, 20.0, None)])
 				self.assertIn(
-					f'commera_checkout["delivery_options"] hook failed: {handler_path}',
+					f'commera_hooks["delivery_options"] hook failed: {handler_path}',
 					self.queued_error_titles(),
 				)
 				with self.assertRaisesRegex(frappe.ValidationError, GENERIC_FAILURE):
@@ -530,7 +530,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 	def test_a_hidden_gateway_is_left_off_the_checkout_page_and_refused_at_payment(self):
 		quotation = self.open_cart()
 		self.assertEqual(self.render_payment_methods(), (True, 1))
-		patch_app_hooks(self, {"commera_checkout": {"payment_methods": [f"{__name__}.hide_gateway"]}})
+		patch_app_hooks(self, {"commera_hooks": {"payment_methods": [f"{__name__}.hide_gateway"]}})
 
 		self.assertEqual(self.render_payment_methods(), (False, 1))
 		with self.assertRaisesRegex(frappe.ValidationError, "not available for your order"):
@@ -541,7 +541,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		self.assertEqual(FakeStripeClient.created_sessions, [])
 
 	def test_hidden_cash_on_delivery_is_refused_at_checkout_and_at_confirmation(self):
-		patch_app_hooks(self, {"commera_checkout": {"payment_methods": [f"{__name__}.hide_cod"]}})
+		patch_app_hooks(self, {"commera_hooks": {"payment_methods": [f"{__name__}.hide_cod"]}})
 		quotation = self.open_cart()
 
 		self.assertEqual(self.render_payment_methods(), (True, 0))
@@ -558,11 +558,11 @@ class TestCheckoutHooks(IntegrationTestCase):
 		for handler in (crash_listing_payment_methods, add_payment_method):
 			with self.subTest(handler=handler.__name__):
 				handler_path = f"{__name__}.{handler.__name__}"
-				patch_app_hooks(self, {"commera_checkout": {"payment_methods": [handler_path]}})
+				patch_app_hooks(self, {"commera_hooks": {"payment_methods": [handler_path]}})
 
 				self.assertEqual(self.render_payment_methods(), (True, 1))
 				self.assertIn(
-					f'commera_checkout["payment_methods"] hook failed: {handler_path}',
+					f'commera_hooks["payment_methods"] hook failed: {handler_path}',
 					self.queued_error_titles(),
 				)
 				with self.assertRaisesRegex(frappe.ValidationError, GENERIC_FAILURE):

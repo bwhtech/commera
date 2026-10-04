@@ -623,7 +623,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 						"order_paid": ["bwh_payments.paid"],
 					},
 				},
-				"bwh_shipping": {"commera_checkout": {"cart_fee": ["bwh_shipping.fees"]}},
+				"bwh_shipping": {"commera_hooks": {"cart_fee": ["bwh_shipping.fees"]}},
 			},
 		)
 		started_at = now_datetime()
@@ -632,8 +632,8 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 			validate_plugins()
 
 		self.assertIn("bwh_payments declares commera_events for order_payed, which", output.getvalue())
-		self.assertIn("bwh_shipping declares commera_checkout for cart_fee, which", output.getvalue())
-		self.assertNotIn("bwh_payments declares commera_checkout", output.getvalue())
+		self.assertIn("bwh_shipping declares commera_hooks for cart_fee, which", output.getvalue())
+		self.assertNotIn("bwh_payments declares commera_hooks", output.getvalue())
 		self.assertTrue(
 			frappe.db.exists(
 				"Error Log",

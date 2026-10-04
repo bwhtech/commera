@@ -11,12 +11,12 @@ PLUGIN_FEE_FIELD = "commera_plugin_fee"
 
 
 def get_cart_refusal(quotation) -> str | None:
-	for handler in get_handlers("commera_checkout", "validate_cart"):
+	for handler in get_handlers("commera_hooks", "validate_cart"):
 		with handle_hook_error("validate_cart", handler, quotation, strict=True):
 			reason = frappe.get_attr(handler)(quotation)
 			if reason and not isinstance(reason, str):
 				raise TypeError(
-					f'commera_checkout["validate_cart"] must return a str or None, got {reason!r}'
+					f'commera_hooks["validate_cart"] must return a str or None, got {reason!r}'
 				)
 		if reason:
 			return reason
@@ -29,7 +29,7 @@ def apply_plugin_fees(quotation):
 	# Imported here: commera.api.shipping imports this module.
 	from commera.api.shipping import reindex_taxes
 
-	handlers = get_handlers("commera_checkout", "cart_fees")
+	handlers = get_handlers("commera_hooks", "cart_fees")
 	if any(row.get(PLUGIN_FEE_FIELD) for row in quotation.taxes):
 		# Dropped before the hooks run, so a fee priced on the grand total never compounds on its own last value.
 		quotation.taxes = [row for row in quotation.taxes if not row.get(PLUGIN_FEE_FIELD)]
@@ -83,7 +83,7 @@ def is_finite_number(amount) -> bool:
 def apply_delivery_option_hooks(quotation, options: list[dict], strict: bool) -> list[dict]:
 	"""Each handler gets the options the previous one returned; a failing handler's answer is dropped."""
 	precision = quotation.precision("tax_amount", "taxes")
-	for handler in get_handlers("commera_checkout", "delivery_options"):
+	for handler in get_handlers("commera_hooks", "delivery_options"):
 		with handle_hook_error("delivery_options", handler, quotation, strict):
 			hooked_options = frappe.get_attr(handler)(quotation, [dict(option) for option in options])
 			options = get_hooked_delivery_options(options, hooked_options, precision)
@@ -93,14 +93,14 @@ def apply_delivery_option_hooks(quotation, options: list[dict], strict: bool) ->
 def get_hooked_delivery_options(options: list[dict], hooked_options, precision: int) -> list[dict]:
 	if not isinstance(hooked_options, list) or not all(isinstance(option, dict) for option in hooked_options):
 		raise TypeError(
-			f'commera_checkout["delivery_options"] must return a list of dicts, got {hooked_options!r}'
+			f'commera_hooks["delivery_options"] must return a list of dicts, got {hooked_options!r}'
 		)
 
 	hooked_by_title = {option.get("title"): option for option in hooked_options}
 	titles = {option["title"] for option in options}
 	if len(hooked_by_title) != len(hooked_options) or not set(hooked_by_title) <= titles:
 		raise ValueError(
-			f'commera_checkout["delivery_options"] may only drop or change offered options, got {hooked_options!r}'
+			f'commera_hooks["delivery_options"] may only drop or change offered options, got {hooked_options!r}'
 		)
 
 	return [
@@ -125,12 +125,12 @@ def get_hooked_delivery_option(option: dict, hooked_option: dict, precision: int
 
 
 def filter_payment_methods(quotation, methods: list[str], strict: bool) -> list[str]:
-	for handler in get_handlers("commera_checkout", "payment_methods"):
+	for handler in get_handlers("commera_hooks", "payment_methods"):
 		with handle_hook_error("payment_methods", handler, quotation, strict):
 			kept_methods = frappe.get_attr(handler)(quotation, list(methods))
 			if not isinstance(kept_methods, list) or not set(kept_methods) <= set(methods):
 				raise ValueError(
-					f'commera_checkout["payment_methods"] may only drop offered methods, got {kept_methods!r}'
+					f'commera_hooks["payment_methods"] may only drop offered methods, got {kept_methods!r}'
 				)
 			methods = [method for method in methods if method in kept_methods]
 	return methods
@@ -150,7 +150,7 @@ def handle_hook_error(key: str, handler: str, quotation, strict: bool):
 		yield
 	except Exception:
 		frappe.log_error(
-			title=f'commera_checkout["{key}"] hook failed: {handler}'[:140],
+			title=f'commera_hooks["{key}"] hook failed: {handler}'[:140],
 			reference_doctype="Quotation",
 			reference_name=quotation.name,
 			defer_insert=True,

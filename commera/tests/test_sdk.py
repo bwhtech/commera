@@ -94,7 +94,7 @@ class TestSdk(IntegrationTestCase):
 
 	def setUp(self):
 		self.addCleanup(frappe.set_user, "Administrator")
-		patch_app_hooks(self, {"commera_checkout": {"cart_fees": [f"{__name__}.charge_note_fee"]}})
+		patch_app_hooks(self, {"commera_hooks": {"cart_fees": [f"{__name__}.charge_note_fee"]}})
 		test_plugin_events.patch_app_declarations(
 			self, {APP: {"commera_events": {"order_paid": [f"{APP}.paid"]}}}
 		)
