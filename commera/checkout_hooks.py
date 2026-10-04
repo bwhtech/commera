@@ -15,9 +15,7 @@ def get_cart_refusal(quotation) -> str | None:
 		with handle_hook_error("validate_cart", handler, quotation, strict=True):
 			reason = frappe.get_attr(handler)(quotation)
 			if reason and not isinstance(reason, str):
-				raise TypeError(
-					f'commera_hooks["validate_cart"] must return a str or None, got {reason!r}'
-				)
+				raise TypeError(f'commera_hooks["validate_cart"] must return a str or None, got {reason!r}')
 		if reason:
 			return reason
 	return None
