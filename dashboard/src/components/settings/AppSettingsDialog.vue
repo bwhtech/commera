@@ -243,6 +243,19 @@ watch(
     gap: 0.5rem;
   }
 
+  /* SettingsHeader's actions never shrink, so three of them crush the title; wrap them under it. */
+  .commera-settings .items-start.justify-between.gap-4 {
+    flex-wrap: wrap;
+  }
+
+  .commera-settings .items-start.justify-between.gap-4 > .min-w-0.flex-col {
+    flex: 1 1 12rem;
+  }
+
+  .commera-settings .items-start.justify-between.gap-4 > .shrink-0 {
+    flex-wrap: wrap;
+  }
+
   .commera-settings .px-\[4\.4rem\] {
     padding-inline: 1rem;
   }
