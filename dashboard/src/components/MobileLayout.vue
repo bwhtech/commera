@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { BottomSheet, Icon, MobileNav, MobileNavItem, MobileShell } from 'frappe-ui'
+import { useAccountMenu } from '../data/account'
 import { activeNavTarget, sections } from '../ia/nav'
 
 // The four destinations that earn a permanent tab. Everything else is reached
@@ -15,15 +16,19 @@ const tabs = TAB_TARGETS.map((to) => navItems.find((item) => item.to === to)).fi
 
 // The sheet is one flat list per section: a parent row (Analytics) is a
 // disclosure rather than a destination, so its reports stand in for it.
-const moreSections = sections
-  .map((section) => ({
-    id: section.id,
-    label: section.label,
-    items: section.items
-      .flatMap((item) => item.children ?? [item])
-      .filter((item) => !TAB_TARGETS.includes(item.to)),
-  }))
-  .filter((section) => section.items.length)
+const moreSections = [
+  ...sections
+    .map((section) => ({
+      id: section.id,
+      label: section.label,
+      items: section.items
+        .flatMap((item) => item.children ?? [item])
+        .filter((item) => !TAB_TARGETS.includes(item.to)),
+    }))
+    .filter((section) => section.items.length),
+  // A phone never renders the sidebar, so its store menu has no other way in.
+  { id: 'account', label: 'Account', items: useAccountMenu() },
+]
 
 const rowClass =
   'flex min-h-12 w-full items-center gap-3 rounded px-3 text-base text-ink-gray-8 active:bg-surface-gray-2'
