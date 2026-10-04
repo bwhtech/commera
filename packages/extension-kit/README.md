@@ -74,6 +74,10 @@ export const extension = {
 
 - An action has a template (Commera opens it in a dialog) or a whitelisted `method` (Commera runs it,
   after `confirm` if given). Never both.
+- Commera calls an action's `method` as `method(name=<record name>)`, so the parameter must be called `name`,
+  whatever the record is: `def send_order(name)`, not `def send_order(sales_order)`. If it returns a string,
+  Commera shows that string in the success toast. Any other return value shows "<label> done". Raise with
+  `frappe.throw` to show an error.
 - A settings tab has a template, or `doctype`: a Single that Commera renders as self-saving rows. Never both.
 - `condition` and `method` are dotted paths that start with your app's module name. A page or settings
   `condition` takes no arguments; a card or action `condition` gets `(doctype, name)`.
