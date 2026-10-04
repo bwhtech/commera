@@ -360,18 +360,15 @@ class TestSdk(IntegrationTestCase):
 
 		patch_app_hooks(self, {"commera_order_fulfilled": [], "commera_order_delivered": []})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
-		sales_order.db_set(
-			{
-				"shipping_address_name": create_test_address("India"),
-				"company_address": create_test_address("India"),
-			}
-		)
+		sales_order.db_set({"shipping_address_name": create_test_address("India"), "company_address": None})
 		tracking_url = "https://track.example.com/ZZ-PARTNER-AWB"
 
 		shipment = orders.record_shipment(
 			sales_order.name, awb="ZZ-PARTNER-AWB", carrier="Delhivery", tracking_url=tracking_url
 		)
-		self.assertFalse(frappe.db.get_value("Shipping Request", shipment, "provider"))
+		self.assertFalse(
+			any(frappe.db.get_value("Shipping Request", shipment, ["provider", "origin_address"]))
+		)
 		update_sales_order_ecommerce_status(sales_order.name)
 		self.assertEqual(
 			frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status"), "Shipped"

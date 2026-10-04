@@ -143,7 +143,8 @@ def create_order_shipping_request(sales_order, provider, awb, carrier, status, e
 		frappe.throw(_("Shipping provider {0} does not exist.").format(provider), frappe.ValidationError)
 
 	order = frappe.get_doc("Sales Order", sales_order)
-	pickup_address = get_provider_pickup_address(provider) if provider else None
+	# A partner-made shipment left from the partner's warehouse, which the store does not know.
+	origin_address = (get_provider_pickup_address(provider) or order.company_address) if provider else None
 	request = frappe.get_doc(
 		{
 			"doctype": "Shipping Request",
@@ -155,7 +156,7 @@ def create_order_shipping_request(sales_order, provider, awb, carrier, status, e
 			"company": order.company,
 			"ref_doctype": "Sales Order",
 			"ref_docname": order.name,
-			"origin_address": pickup_address or order.company_address,
+			"origin_address": origin_address,
 			"destination_address": order.shipping_address_name or order.customer_address,
 			"customer_name": order.customer_name,
 			"customer_phone": order.contact_phone,
