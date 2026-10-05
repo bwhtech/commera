@@ -25,6 +25,10 @@ const NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const DOTTED_PATH = /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)+$/;
 const EMPTY_ENTRY = '\0commera-empty-entry';
 const EMPTY_ENTRY_PATH = '__commera_empty_entry__';
+const PAGE_ENTRY = '\0commera-page:';
+const PAGE_ENTRY_PATH = '__commera_page__/';
+const DYNAMIC_FILE = /^\[(\.\.\.)?([^\]]*)\]\.vue$/;
+const PARAM = /^[a-z][A-Za-z0-9]{0,39}$/;
 const SKIPPED_DIRS = new Set(['node_modules', 'dist']);
 const ICON_FILE = 'icon.svg';
 const ICON_LIMIT = 20 * 1024;
@@ -343,11 +347,25 @@ export function discoverPlugins(
 	const errors = [];
 	const entries = [];
 	const seen = new Map();
+	const details = new Map();
 	for (const file of walk(sourceDir).sort()) {
 		const display = toPosix(relative(sourceDir, file));
 		const isIndex = basename(file) === 'index.vue';
 		const folder = toPosix(dirname(display));
 		const placement = isIndex ? matchPlacement(folder) : null;
+		const dynamic = basename(file).match(DYNAMIC_FILE);
+		if (dynamic) {
+			const [, rest, param] = dynamic;
+			const problem = getDetailProblem(folder, rest, param, details);
+			if (problem === 'reserved') {
+				warn(
+					`${display} is reserved for a later Commera; it was not built. Name it [...${param}].vue to get the rest of the URL`,
+				);
+				continue;
+			}
+			if (problem) errors.push(`${display}: ${problem}`);
+			else details.set(folder, { file, param, display });
+		}
 		const block = readPluginBlock(compiler, file, display);
 
 		if (!placement) {
@@ -406,7 +424,44 @@ export function discoverPlugins(
 			plugin,
 		});
 	}
+	for (const [folder, detail] of details) {
+		const entry = entries.find(
+			(entry) => entry.place === 'pages' && `pages/${entry.name}` === folder,
+		);
+		if (entry) entry.detail = detail;
+		else if (!existsSync(join(sourceDir, folder, 'index.vue')))
+			errors.push(
+				`${detail.display}: add ${folder}/index.vue; a detail page needs its list page`,
+			);
+	}
 	return { entries, errors };
+}
+
+function getDetailProblem(folder, rest, param, details) {
+	if (matchPlacement(folder)?.place !== 'pages')
+		return 'only a page folder (pages/<name>/) may hold a [...param].vue';
+	if (!rest) return 'reserved';
+	if (!PARAM.test(param))
+		return `'${param}' must be a camelCase prop name, such as [...id].vue`;
+	if (details.has(folder))
+		return `${folder} already has ${details.get(folder).display}`;
+}
+
+// The page stays mounted while its URL changes, so the detail is keyed by its id to load each record fresh.
+function pageEntryCode(entry) {
+	const { file, param } = entry.detail;
+	return [
+		"import { defineComponent, h } from 'vue';",
+		"import { usePlugin } from '@commera/admin';",
+		`import Page from ${JSON.stringify(entry.file)};`,
+		`import Detail from ${JSON.stringify(file)};`,
+		'export default defineComponent({',
+		'\tsetup() {',
+		'\t\tconst { path } = usePlugin();',
+		`\t\treturn () => (path.value ? h(Detail, { key: path.value, ${param}: path.value }) : h(Page));`,
+		'\t},',
+		'});',
+	].join('\n');
 }
 
 function readHostFile(hostDir, name) {
@@ -431,7 +486,7 @@ function stripPlainScript(compiler, code, id) {
 	return code.slice(0, start) + code.slice(end);
 }
 
-function guard({ hostDir, compiler, pluginFiles }) {
+function guard({ hostDir, compiler, pluginFiles, pageEntries }) {
 	const knownClasses = readHostFile(hostDir, 'classes.json');
 	const sharedExports = readHostFile(hostDir, 'shared-exports.json');
 	const knownClassSet = knownClasses ? new Set(knownClasses) : null;
@@ -447,6 +502,8 @@ function guard({ hostDir, compiler, pluginFiles }) {
 		},
 		resolveId(source) {
 			if (source.endsWith(EMPTY_ENTRY_PATH)) return EMPTY_ENTRY;
+			const pageEntry = source.split(PAGE_ENTRY_PATH)[1];
+			if (pageEntries.has(pageEntry)) return `${PAGE_ENTRY}${pageEntry}`;
 			const sharesRoot = SHARED_ROOTS.some((name) =>
 				source.startsWith(`${name}/`),
 			);
@@ -460,6 +517,8 @@ function guard({ hostDir, compiler, pluginFiles }) {
 		},
 		load(id) {
 			if (id === EMPTY_ENTRY) return 'export {};';
+			if (id.startsWith(PAGE_ENTRY))
+				return pageEntries.get(id.slice(PAGE_ENTRY.length));
 		},
 		transform(code, id) {
 			if (id.includes('/node_modules/')) return;
@@ -662,14 +721,24 @@ export default async function commeraPlugin({
 				.join('\n')}\n`,
 		);
 	}
+	const pageEntries = new Map(
+		entries
+			.filter((entry) => entry.detail)
+			.map((entry) => [entry.entryName, pageEntryCode(entry)]),
+	);
 	const moduleEntries = Object.fromEntries(
 		entries
 			.filter((entry) => entry.entryName)
-			.map((entry) => [entry.entryName, entry.file]),
+			.map((entry) => [
+				entry.entryName,
+				pageEntries.has(entry.entryName)
+					? `${PAGE_ENTRY_PATH}${entry.entryName}`
+					: entry.file,
+			]),
 	);
 	const pluginFiles = new Set(entries.map((entry) => entry.file));
 	return [
-		guard({ hostDir: resolvedHostDir, compiler, pluginFiles }),
+		guard({ hostDir: resolvedHostDir, compiler, pluginFiles, pageEntries }),
 		vue(),
 		finish({ app, entries, icon: appIcon.icon }),
 		{

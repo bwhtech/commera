@@ -93,6 +93,21 @@ export const plugin = {
 Every other folder and file under `commera/` is yours: components, composables, sub-pages. Only an
 `index.vue` at a placement path is built as a plugin.
 
+### Detail pages
+
+Put a `[...id].vue` next to a page's `index.vue` to give it a detail view:
+
+```
+pages/orders/index.vue     /commera/plugins/<app>/orders
+pages/orders/[...id].vue   /commera/plugins/<app>/orders/SAL-ORD-0001
+```
+
+Everything after the page name reaches the detail as one prop named after the file, slashes included, so
+`orders/INV/2026/001` gives `id = 'INV/2026/001'`. Declare it with `defineProps({ id: String })`. The detail
+has no `plugin` block: it shares the page's sidebar row, `requires` and `condition`. Open it with
+`navigate(\`orders/${name}\`)` and set its header with `usePage()`. A page holds one `[...name].vue`;
+`[id].vue` (one URL segment) is reserved and is not built.
+
 ## App logo
 
 Put an optional `commera/icon.svg` next to `pages/`. Set it once: it is the icon of everything your app

@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, describe, test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import commera from '../vite.js';
+import commera, { discoverPlugins } from '../vite.js';
 
 // The kit installs nothing of its own; the dashboard's node_modules carries the vite and vue it builds with.
 const here = dirname(fileURLToPath(import.meta.url));
@@ -459,6 +459,140 @@ describe('guards', () => {
 				'shared/open.js': `import { Dialog } from 'frappe-ui'\nexport const open = () => console.log(Dialog)\n`,
 			},
 			/do not import Dialog from 'frappe-ui'/,
+		);
+	});
+});
+
+describe('detail pages', () => {
+	const detail = `<script setup>\ndefineProps({ id: String })\n</script>\n<template><div class="p-2">{{ id }}</div></template>\n`;
+
+	// The built page runs on the real vue; only the host's usePlugin() is stood in for, so `path` can be set.
+	async function renderAt(outDir, entry, paths) {
+		writeFileSync(join(outDir, 'package.json'), '{"type":"module"}');
+		const admin = join(outDir, '../../node_modules/@commera/admin');
+		mkdirSync(admin, { recursive: true });
+		writeFileSync(
+			join(admin, 'package.json'),
+			'{"name":"@commera/admin","type":"module","exports":"./index.js"}',
+		);
+		writeFileSync(
+			join(admin, 'index.js'),
+			"import { ref } from 'vue'\nexport const path = ref('')\nexport const usePlugin = () => ({ path })\n",
+		);
+		const { path } = await import(pathToFileURL(join(admin, 'index.js')).href);
+		const { createSSRApp } = await import(
+			pathToFileURL(join(dashboardModules, 'vue/index.mjs')).href
+		);
+		const { renderToString } = await import(
+			pathToFileURL(join(dashboardModules, 'vue/server-renderer/index.mjs'))
+				.href
+		);
+		const { default: Page } = await import(
+			pathToFileURL(join(outDir, entry)).href
+		);
+		const html = [];
+		for (const value of paths) {
+			path.value = value;
+			html.push(await renderToString(createSSRApp(Page)));
+		}
+		return html;
+	}
+
+	test('[...id].vue shows for any path under the page and gets all of it as its prop', async () => {
+		const { manifest, outDir } = await buildApp({
+			'pages/jobs/index.vue': vue(
+				`{ label: 'Print jobs', icon: 'printer' }`,
+				'<template><div class="p-2">list</div></template>',
+			),
+			'pages/jobs/[...id].vue': detail,
+		});
+		assert.deepEqual(
+			manifest.entries.map((entry) => [entry.name, entry.module]),
+			[['jobs', 'pages/jobs.js']],
+		);
+		assert.deepEqual(
+			await renderAt(outDir, 'pages/jobs.js', ['', 'JOB-1', 'INV/2026/001']),
+			[
+				'<div class="p-2">list</div>',
+				'<div class="p-2">JOB-1</div>',
+				'<div class="p-2">INV/2026/001</div>',
+			],
+		);
+	});
+
+	test('the prop is named after the file', async () => {
+		const { outDir } = await buildApp({
+			'pages/jobs/index.vue': page,
+			'pages/jobs/[...jobName].vue': `<script setup>\ndefineProps({ jobName: String })\n</script>\n<template><div class="p-2">{{ jobName }}</div></template>\n`,
+		});
+		assert.deepEqual(await renderAt(outDir, 'pages/jobs.js', ['JOB-7']), [
+			'<div class="p-2">JOB-7</div>',
+		]);
+	});
+
+	test('[id].vue warns and is not built', async () => {
+		const files = {
+			'pages/jobs/index.vue': page,
+			'pages/jobs/[id].vue':
+				'<template><div class="p-2">single</div></template>',
+		};
+		const compiler = await import(
+			pathToFileURL(join(dashboardModules, 'vue/compiler-sfc/index.mjs')).href
+		);
+		const warnings = [];
+		const { entries } = discoverPlugins(join(makeApp(files), 'commera'), {
+			app: APP,
+			compiler,
+			warn: (message) => warnings.push(message),
+		});
+		assert.equal(entries[0].detail, undefined);
+		assert.match(
+			warnings[0],
+			/pages\/jobs\/\[id\]\.vue is reserved[\s\S]*\[\.\.\.id\]\.vue/,
+		);
+		const { read } = await buildApp(files);
+		assert.doesNotMatch(read('pages/jobs.js'), /single/);
+	});
+
+	test('outside a page folder fails', async () => {
+		await buildFails(
+			{
+				'pages/jobs/index.vue': page,
+				'order/cards/status/[...id].vue': detail,
+			},
+			/order\/cards\/status\/\[\.\.\.id\]\.vue: only a page folder/,
+		);
+	});
+
+	test('without the page index.vue fails', async () => {
+		await buildFails(
+			{ 'pages/jobs/[...id].vue': detail },
+			/pages\/jobs\/\[\.\.\.id\]\.vue: add pages\/jobs\/index\.vue/,
+		);
+	});
+
+	test('two in one page fails', async () => {
+		await buildFails(
+			{
+				'pages/jobs/index.vue': page,
+				'pages/jobs/[...id].vue': detail,
+				'pages/jobs/[...name].vue': detail,
+			},
+			/pages\/jobs\/\[\.\.\.name\]\.vue: pages\/jobs already has pages\/jobs\/\[\.\.\.id\]\.vue/,
+		);
+	});
+
+	test('a prop name that is not camelCase fails', async () => {
+		await buildFails(
+			{ 'pages/jobs/index.vue': page, 'pages/jobs/[...job-id].vue': detail },
+			/'job-id' must be a camelCase prop name/,
+		);
+	});
+
+	test('a plugin block in it fails', async () => {
+		await buildFails(
+			{ 'pages/jobs/index.vue': page, 'pages/jobs/[...id].vue': page },
+			/pages\/jobs\/\[\.\.\.id\]\.vue declares a plugin block, but only a placement's index\.vue may/,
 		);
 	});
 });
