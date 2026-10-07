@@ -8,8 +8,7 @@ from bwh_payments.bwh_payments.doctype.gateway_payment_request.test_gateway_paym
 	configure_stripe_gateway,
 	remove_stripe_gateway,
 )
-from bwh_payments.bwh_payments.doctype.stripe_gateway_settings import stripe_gateway_settings
-from bwh_payments.tests.fake_stripe import FakeStripeClient
+from bwh_payments.services.stripe.stub import StubStripeClient
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date, get_year_ending, get_year_start, getdate, now_datetime
 from frappe.utils.data import flt
@@ -54,12 +53,9 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		frappe.db.commit()
 
 	def setUp(self):
-		FakeStripeClient.reset()
+		# bwh_payments swaps in its in-memory Stripe under tests; everything else here is real.
+		StubStripeClient.reset()
 		self.addCleanup(frappe.set_user, frappe.session.user)
-		# The gateway transport is the only true external boundary here; everything else is real.
-		stripe_client_patch = patch.object(stripe_gateway_settings.stripe, "StripeClient", FakeStripeClient)
-		stripe_client_patch.start()
-		self.addCleanup(stripe_client_patch.stop)
 
 		self.item_code = self.create_item()
 		self.customer = self.create_customer()
@@ -215,7 +211,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 				"customer_email": self.contact_email,
 			}
 		).insert(ignore_permissions=True)
-		FakeStripeClient.register_paid_session(payment_request.order_ref, CURRENCY.lower())
+		StubStripeClient.pay(payment_request.order_ref)
 		return payment_request
 
 	def create_paid_payment_request(self, quotation):
@@ -233,9 +229,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 			}
 		).insert(ignore_permissions=True)
 
-		FakeStripeClient.register_paid_session(
-			payment_request.order_ref, payment_request.currency_code.lower()
-		)
+		StubStripeClient.pay(payment_request.order_ref)
 		# db_set, not save(), so flipping to Paid does not itself fire the hook under test.
 		payment_request.db_set("status", "Paid", update_modified=False)
 		payment_request.reload()
@@ -325,7 +319,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 				"customer_email": self.contact_email,
 			}
 		).insert(ignore_permissions=True)
-		FakeStripeClient.register_paid_session(payment_request.order_ref, CURRENCY.lower())
+		StubStripeClient.pay(payment_request.order_ref)
 
 		payment_request.status = "Paid"
 		payment_request.save(ignore_permissions=True)
@@ -363,10 +357,10 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 	def test_an_amended_refund_payment_entry_does_not_refund_a_second_time(self):
 		"""Cancel+amend re-issues the entry as `<name>-1`, which the doc.name dedupe key never matched."""
 		on_payment_request_update(self.payment_request)
-		FakeStripeClient.created_refunds.clear()
+		StubStripeClient.created_refunds.clear()
 
 		payment_entry = self.create_refund_payment_entry(50)
-		self.assertEqual(len(FakeStripeClient.created_refunds), 1)
+		self.assertEqual(len(StubStripeClient.created_refunds), 1)
 
 		payment_entry.cancel()
 		amended = frappe.copy_doc(payment_entry)
@@ -377,7 +371,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		amended.submit()
 
 		self.assertNotEqual(amended.name, payment_entry.name)
-		self.assertEqual(len(FakeStripeClient.created_refunds), 1)
+		self.assertEqual(len(StubStripeClient.created_refunds), 1)
 		self.assertEqual(
 			flt(frappe.db.get_value("Gateway Payment Request", self.payment_request.name, "refund_amount")),
 			50.0,
@@ -386,11 +380,11 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 	def test_a_payment_entry_with_no_mode_of_payment_never_reaches_the_gateway(self):
 		"""A blank mode plus a coincidentally matching reference_no used to refund real money."""
 		on_payment_request_update(self.payment_request)
-		FakeStripeClient.created_refunds.clear()
+		StubStripeClient.created_refunds.clear()
 
 		self.create_refund_payment_entry(50, mode_of_payment=None)
 
-		self.assertEqual(FakeStripeClient.created_refunds, [])
+		self.assertEqual(StubStripeClient.created_refunds, [])
 		self.assertEqual(
 			flt(frappe.db.get_value("Gateway Payment Request", self.payment_request.name, "refund_amount")),
 			0.0,
@@ -475,9 +469,8 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 	def create_abandoned_payment_request(self, quotation):
 		payment_request = self.create_pending_payment_request(quotation)
-		FakeStripeClient.sessions[payment_request.order_ref].update(
-			{"payment_status": "unpaid", "status": "open", "payment_intent": None}
-		)
+		session = StubStripeClient.sessions[payment_request.order_ref]
+		session.payment_status, session.status, session.payment_intent = "unpaid", "open", None
 		return payment_request
 
 	def test_an_abandoned_checkout_releases_the_cart_instead_of_refusing_it(self):
@@ -488,7 +481,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		payment_request.reload()
 		self.assertEqual(payment_request.status, "Cancelled")
-		self.assertEqual(FakeStripeClient.sessions[payment_request.order_ref]["status"], "expired")
+		self.assertEqual(StubStripeClient.sessions[payment_request.order_ref].status, "expired")
 
 	def test_a_cart_whose_payment_the_gateway_still_honours_stays_locked(self):
 		quotation = self.create_cart_quotation()
@@ -572,7 +565,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 	def test_one_unreachable_gateway_session_does_not_strand_the_rest_of_the_sweep(self):
 		unreachable_quotation = self.create_cart_quotation()
 		unreachable_request = self.create_pending_payment_request(unreachable_quotation)
-		# The fake transport raises for a session it never issued, as an expired reference does.
+		# The stub raises for a session it never issued, as Stripe does for an expired reference.
 		frappe.db.set_value("Gateway Payment Request", unreachable_request.name, "order_ref", "cs_test_gone")
 		# Strictly older, so the sweep's oldest-first ordering reaches it before the healthy one.
 		self.age_payment_request(unreachable_request, minutes=60)
