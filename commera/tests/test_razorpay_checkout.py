@@ -4,18 +4,13 @@ from unittest.mock import patch
 
 import frappe
 from bwh_payments.bwh_payments import webhook
-from bwh_payments.bwh_payments.doctype.razorpay_gateway_settings import razorpay_gateway_settings
 from bwh_payments.bwh_payments.doctype.razorpay_gateway_settings.test_razorpay_gateway_settings import (
 	RAZORPAY_GATEWAY,
 	RAZORPAY_WEBHOOK_SECRET,
 	configure_razorpay_gateway,
 )
 from bwh_payments.currency import to_minor_units
-from bwh_payments.tests.fake_razorpay import (
-	FakeRazorpay,
-	build_payment_link_paid_event,
-	sign_razorpay_payload,
-)
+from bwh_payments.services.razorpay.stub import StubRazorpayClient, build_payment_link_event, sign_payload
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date, getdate, now_datetime
 from frappe.utils.data import flt
@@ -52,8 +47,8 @@ class TestRazorpayCheckout(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		# Every Razorpay call writes an Integration Request through create_request_log, which commits. The
-		# test case only rolls back at class end, so without this the whole journey would land on the site.
+		# Webhook and refund logging go through create_request_log, which commits. The test case only rolls
+		# back at class end, so without this the whole journey would land on the site.
 		commit_patch = patch.object(frappe.db, "commit")
 		commit_patch.start()
 		cls.addClassCleanup(cls.discard_class_writes, commit_patch)
@@ -91,7 +86,7 @@ class TestRazorpayCheckout(IntegrationTestCase):
 	def setUp(self):
 		super().setUp()
 		self.addCleanup(frappe.set_user, "Administrator")
-		self.patch_razorpay_transport()
+		StubRazorpayClient.reset()
 
 		self.item_code = self.create_item()
 		self.customer = self.create_customer()
@@ -102,32 +97,23 @@ class TestRazorpayCheckout(IntegrationTestCase):
 	# -- gateway driver -----------------------------------------------------------------------------
 	# Recordings come back in Razorpay's own request shapes; a stub must keep producing the same ones.
 
-	def patch_razorpay_transport(self):
-		FakeRazorpay.reset()
-		for name, fake in (("make_post_request", FakeRazorpay.post), ("make_get_request", FakeRazorpay.get)):
-			transport_patch = patch.object(razorpay_gateway_settings, name, fake)
-			transport_patch.start()
-			self.addCleanup(transport_patch.stop)
-
 	def created_links(self) -> list[dict]:
-		return FakeRazorpay.created_links
+		return StubRazorpayClient.created_links
 
 	def checkout_url(self, link_id: str) -> str:
-		return FakeRazorpay.links[link_id]["short_url"]
+		return StubRazorpayClient.links[link_id].short_url
 
 	def link_status(self, link_id: str) -> str:
-		return FakeRazorpay.links[link_id]["status"]
+		return StubRazorpayClient.links[link_id].status
 
 	def shopper_pays(self, link_id: str) -> str:
-		"""The shopper completes the hosted page: Razorpay captures a payment and closes the link."""
-		FakeRazorpay.links[link_id]["status"] = "paid"
-		return FakeRazorpay.add_payment(link_id, "captured")
+		return StubRazorpayClient.pay(link_id)
 
 	def refunds_sent(self) -> list[dict]:
-		return FakeRazorpay.created_refunds
+		return StubRazorpayClient.created_refunds
 
 	def deliver_paid_webhook(self, link_id: str) -> dict:
-		payload = build_payment_link_paid_event(link_id)
+		payload = build_payment_link_event(link_id)
 		builder = EnvironBuilder(
 			method="POST", path="/api/method/bwh_payments.bwh_payments.webhook.handle", data=payload
 		)
@@ -135,7 +121,7 @@ class TestRazorpayCheckout(IntegrationTestCase):
 			{
 				"Content-Type": "application/json",
 				"X-Razorpay-Event-Id": f"evt_{link_id}",
-				"X-Razorpay-Signature": sign_razorpay_payload(payload, RAZORPAY_WEBHOOK_SECRET),
+				"X-Razorpay-Signature": sign_payload(payload, RAZORPAY_WEBHOOK_SECRET),
 			}
 		)
 		environ = builder.get_environ()
