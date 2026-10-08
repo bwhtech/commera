@@ -251,6 +251,7 @@
             {% include 'templates/components/promo_code_component.html' %}
         </div>
     </div>
+    {{ plugin_slot("checkout_banner") }}
     <div class="flex items-baseline md:hidden">
         <h2 class="text-lg font-medium me-2 flex">
             {{_('TOTAL')}} ( {{ cart_quotation.total_qty|int }}&nbsp;<span class="">

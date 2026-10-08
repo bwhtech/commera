@@ -29,6 +29,7 @@
 	<section class="content-inner shop-account"
 		x-data="summer_cart({{ delivery_charge | tojson }}, {{ delivery_charge_applicable_below | tojson }})">
 		<div class="container">
+			{{ plugin_slot("cart_banner") }}
 			<div class="cart-empty text-center" x-show="!$store.cart.items.length" x-cloak>
 				<i class="flaticon flaticon-cart"></i>
 				<h4 class="title">{{ _("Your cart is empty") }}</h4>

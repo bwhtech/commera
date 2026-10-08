@@ -98,6 +98,7 @@ clear_cache = [
 	"commera.shop_themes.doctype.shop_theme.shop_theme.clear_theme_cache",
 	"commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings.clear_settings_cache",
 	"commera.plugins.registry.clear_registry_cache",
+	"commera.storefront_plugins.clear_storefront_plugin_cache",
 ]
 
 # Without this, records of a custom doctype never import on migrate (frappe/model/sync.py).
@@ -117,6 +118,8 @@ doctype_js = {
 
 after_install = "commera.migrate.after_install"
 after_migrate = "commera.migrate.after_migrate"
+after_app_install = "commera.storefront_plugins.sync_storefront_apps"
+after_app_uninstall = "commera.storefront_plugins.sync_storefront_apps"
 setup_wizard_complete = "commera.swatches.drop_unused_colour_attribute"
 
 
@@ -192,6 +195,9 @@ jinja = {
 		"commera.shop_data.get_storefront_menu",
 		"commera.shop_themes.jinja_helpers.shop_theme_asset_url",
 		"commera.shop_themes.jinja_helpers.shop_theme_config",
+		"commera.storefront_plugins.format_plugin_scripts",
+		"commera.storefront_plugins.format_plugin_styles",
+		"commera.storefront_plugins.plugin_slot",
 	],
 }
 

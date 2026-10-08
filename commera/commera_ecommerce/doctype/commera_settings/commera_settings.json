@@ -136,7 +136,9 @@
   "order_cancellation_email_template",
   "logo_url",
   "email_section",
-  "cc_email"
+  "cc_email",
+  "storefront_apps_tab",
+  "storefront_apps"
  ],
  "fields": [
   {
@@ -858,12 +860,26 @@
    "fieldtype": "Int",
    "label": "Guest Order Link Full Details (Days)",
    "non_negative": 1
+  },
+  {
+   "fieldname": "storefront_apps_tab",
+   "fieldtype": "Tab Break",
+   "label": "Storefront Apps"
+  },
+  {
+   "cannot_add_rows": 1,
+   "cannot_delete_rows": 1,
+   "description": "Installed apps that add scripts, styles or blocks to the storefront. An app loads only when it is enabled here.",
+   "fieldname": "storefront_apps",
+   "fieldtype": "Table",
+   "label": "Storefront Apps",
+   "options": "Commera Storefront App"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-29 12:00:00.000000",
+ "modified": "2026-10-08 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Settings",
