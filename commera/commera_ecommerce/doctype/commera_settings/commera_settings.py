@@ -5,6 +5,7 @@ import frappe
 from bwh_payments.bwh_payments.utils import get_available_payment_modes
 from frappe.model.document import Document
 from frappe.utils import get_url_to_form
+from frappe.website.utils import clear_cache as clear_website_cache
 
 from commera.search.build import enqueue_full_rebuild
 from commera.search.record_builder import ALLOWED_CONTENT_DOCTYPES, is_indexable_content_field
@@ -14,6 +15,7 @@ from commera.search.result_card import (
 	MIN_RESULT_FIELDS,
 	RESULT_CARD_CATALOG,
 )
+from commera.storefront_plugins import clear_storefront_plugin_cache, get_enabled_storefront_apps
 
 MAX_CONTENT_FIELDS = 15
 
@@ -27,6 +29,9 @@ class CommeraSettings(Document):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
+		from commera.commera_ecommerce.doctype.commera_storefront_app.commera_storefront_app import (
+			CommeraStorefrontApp,
+		)
 		from commera.commera_ecommerce.doctype.footer_section_mapping.footer_section_mapping import (
 			FooterSectionMapping,
 		)
@@ -105,6 +110,7 @@ class CommeraSettings(Document):
 		snapchat_url: DF.Data | None
 		store_name: DF.Data | None
 		store_pickup_enabled: DF.Check
+		storefront_apps: DF.Table[CommeraStorefrontApp]
 		strikethrough_color: DF.Color | None
 		tiktok_url: DF.Data | None
 		twitter_handle: DF.Data | None
@@ -183,10 +189,12 @@ class CommeraSettings(Document):
 		return "\n".join(["", *fields])
 
 	def on_update(self):
-		"""Enqueue a background index rebuild only when the indexed field list changes."""
+		before = self.get_doc_before_save()
+		if get_enabled_storefront_apps(before) != get_enabled_storefront_apps(self):
+			clear_storefront_plugin_cache()
+			clear_website_cache()
 		if frappe.flags.in_install or frappe.flags.in_migrate:
 			return
-		before = self.get_doc_before_save()
 		if before is None:
 			return
 		old_pairs = [(row.search_doctype, row.field) for row in (before.search_content_fields or [])]

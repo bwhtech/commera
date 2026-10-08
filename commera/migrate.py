@@ -14,6 +14,7 @@ from commera.search.build import ensure_index_built
 from commera.search.record_builder import DEFAULT_CONTENT_FIELDS
 from commera.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import seed_default_routes
+from commera.storefront_plugins import sync_storefront_apps
 from commera.www.llms import DEFAULT_LLMS_TXT
 
 # Sentinel marking the robots.txt value as ours; absent from a non-blank value, an admin owns it.
@@ -53,6 +54,7 @@ def activate_summer_theme():
 
 
 def after_migrate():
+	sync_storefront_apps()
 	create_payment_modes()
 	add_plugin_user()
 	register_optional_doctype_links()

@@ -286,6 +286,7 @@
 				</div>
 
 				<div class="col-xl-4 side-bar">
+					{{ plugin_slot("checkout_banner") }}
 					<h4 class="title m-b15">{{ _("Your Order") }}</h4>
 					<div class="order-detail sticky-top">
 						{% if is_guest %}
