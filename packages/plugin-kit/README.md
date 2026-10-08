@@ -186,7 +186,8 @@ writes. If that folder is missing, the build warns and skips them; if it is from
 Run `yarn dev` in `apps/commera/dashboard` and open `/commera` on its port (`<site>:8080`). Developer mode must be
 on. The dev server loads every installed plugin app's `commera/` folder from source, so a saved `.vue` file updates
 in place, without a reload. Each save also runs the app's `yarn build` in the background: a failed check shows
-in the error overlay, and a new placement or a changed `plugin` field reloads the page.
+in the error overlay, and a new placement or a changed `plugin` field reloads the page. When an installed app gets
+a `commera/` folder, for example from `bench commera init`, the dev server restarts itself to load it.
 
 Your app has no `yarn dev` of its own. In production, run `bench build --app my_app`, or `bench clear-cache` after
 a `yarn build`, so the manifest is re-read.

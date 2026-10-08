@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, watch } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { searchForWorkspaceRoot } from 'vite'
@@ -8,6 +8,7 @@ import { discoverPlugins, pageEntryCode } from '../packages/plugin-kit/vite.js'
 
 const PREFIX = '/@commera-plugin/'
 const VIRTUAL = '\0commera-plugin:'
+const CONFIG_TIMESTAMP = /\.timestamp-\d+-\w+\.mjs$/
 const BENCH = fileURLToPath(new URL('../../..', import.meta.url))
 
 function readPluginApps() {
@@ -53,6 +54,8 @@ function buildRunner(server) {
   const failed = new Set()
 
   function build(app) {
+    // Removing the commera/ folder fires unlink events too; restartOnNewApps drops the app instead.
+    if (!existsSync(sourceDirOf(app))) return Promise.resolve()
     if (running.has(app)) {
       queued.add(app)
       return running.get(app)
@@ -84,6 +87,46 @@ function buildRunner(server) {
   return build
 }
 
+// fs.allow is fixed once the server starts, so a new plugin app needs a restart, which re-reads this config.
+// Plain non-recursive fs.watch: adding apps/ to Vite's watcher would recurse into every app's node_modules.
+function restartOnNewApps(server, apps) {
+  const watchers = new Map()
+  let timer
+
+  function check() {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      const current = readPluginApps()
+      if (current.length !== apps.length || current.some((app) => !apps.includes(app))) server.restart()
+    }, 300)
+  }
+
+  function watchDirectory(directory) {
+    if (watchers.has(directory) || !existsSync(directory)) return
+    const watcher = watch(directory, () => {
+      if (directory === join(BENCH, 'apps')) watchAppDirectories()
+      check()
+    })
+    // A deleted app folder errors its watcher; the restart that follows sets up a fresh one.
+    watcher.on('error', () => watcher.close())
+    watchers.set(directory, watcher)
+  }
+
+  function watchAppDirectories() {
+    for (const entry of readdirSync(join(BENCH, 'apps'), { withFileTypes: true })) {
+      if (entry.isDirectory()) watchDirectory(join(BENCH, 'apps', entry.name))
+    }
+  }
+
+  watchDirectory(join(BENCH, 'sites'))
+  watchDirectory(join(BENCH, 'apps'))
+  watchAppDirectories()
+  server.httpServer?.once('close', () => {
+    clearTimeout(timer)
+    for (const watcher of watchers.values()) watcher.close()
+  })
+}
+
 export function pluginDevServer() {
   const apps = readPluginApps()
   return {
@@ -102,11 +145,13 @@ export function pluginDevServer() {
       server.watcher.add(apps.map(sourceDirOf))
       server.watcher.on('all', (_event, file) => {
         const app = apps.find((app) => file.startsWith(`${sourceDirOf(app)}/`))
-        if (!app || file.includes('/node_modules/')) return
+        // Each build loads the app's vite.config.js through a temporary .timestamp-*.mjs beside it; reacting to that loops.
+        if (!app || file.includes('/node_modules/') || CONFIG_TIMESTAMP.test(file)) return
         clearTimeout(timers.get(app))
         timers.set(app, setTimeout(() => build(app), 300))
       })
       apps.reduce((previous, app) => previous.then(() => build(app)), Promise.resolve())
+      restartOnNewApps(server, apps)
     },
     resolveId(source) {
       if (source.startsWith(PREFIX)) return VIRTUAL + source.slice(PREFIX.length)
