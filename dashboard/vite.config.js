@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import frappeui from 'frappe-ui/vite'
+import { pluginDevServer } from './pluginDevServer.js'
 
 // The bare specifiers an app page may import, each mapped to a runtime entry whose chunk keeps its export names,
 // so the dashboard and every app share one Vue, one frappe-ui (toasts, dialogs) and one provide/inject tree.
@@ -88,6 +89,7 @@ export default defineConfig({
     }),
     vue(),
     sharedRuntime(),
+    pluginDevServer(),
   ],
   build: {
     rollupOptions: {

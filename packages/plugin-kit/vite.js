@@ -448,7 +448,7 @@ function getDetailProblem(folder, rest, param, details) {
 }
 
 // The page stays mounted while its URL changes, so the detail is keyed by its id to load each record fresh.
-function pageEntryCode(entry) {
+export function pageEntryCode(entry) {
 	const { file, param } = entry.detail;
 	return [
 		"import { defineComponent, h } from 'vue';",

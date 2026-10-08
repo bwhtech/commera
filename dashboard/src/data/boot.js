@@ -1,3 +1,5 @@
+import './devBoot'
+
 // commera/www/commera.py injects each boot key straight onto `window` (see
 // commera.html's `window["{{ key }}"] = ...` loop) — csrf_token, date_format,
 // time_format, lang, is_rtl, currency, currency_symbol. This is the one place

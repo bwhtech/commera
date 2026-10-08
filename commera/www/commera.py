@@ -17,13 +17,25 @@ def get_context(context):
 		frappe.local.flags.redirect_location = "/login?redirect-to=/commera"
 		raise frappe.Redirect
 
+	context.boot = get_boot()
+	context.no_cache = 1
+
+
+@frappe.whitelist(methods=["GET"])
+def get_context_for_dev():
+	if not frappe.conf.developer_mode:
+		frappe.throw(_("This method is only meant for developer mode"))
+	return get_boot()
+
+
+def get_boot():
 	if not has_app_permission():
 		frappe.throw(_("You do not have access to the store dashboard."), frappe.PermissionError)
 
 	currency = get_reporting_currency()
 
 	# get_csrf_token issues the token into the session, so it must be committed to outlive this request.
-	context.boot = frappe._dict(
+	boot = frappe._dict(
 		{
 			"csrf_token": frappe.sessions.get_csrf_token(),
 			# The SPA has no /api/method/frappe.boot call of its own, so the site's date and time
@@ -42,5 +54,4 @@ def get_context(context):
 		}
 	)
 	frappe.db.commit()  # nosemgrep
-
-	context.no_cache = 1
+	return boot
