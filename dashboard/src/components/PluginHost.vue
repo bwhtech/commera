@@ -48,7 +48,9 @@ const Plugin = shallowRef(null)
 
 async function load() {
   try {
-    Plugin.value = (await import(/* @vite-ignore */ props.entry.module_url)).default
+    const { app, place, name, module_url } = props.entry
+    const url = import.meta.env.DEV ? `/@commera-plugin/${app}/${place}/${name}` : module_url
+    Plugin.value = (await import(/* @vite-ignore */ url)).default
   } catch (error) {
     fail(error)
   }

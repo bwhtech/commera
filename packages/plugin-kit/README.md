@@ -22,8 +22,7 @@ my_app/                              # app root
 ```json
 {
 	"scripts": {
-		"build": "vite build --config commera/vite.config.js",
-		"dev": "vite build --watch --config commera/vite.config.js"
+		"build": "vite build --config commera/vite.config.js"
 	},
 	"devDependencies": {
 		"@commera/plugin-kit": "link:../commera/packages/plugin-kit",
@@ -184,9 +183,12 @@ writes. If that folder is missing, the build warns and skips them; if it is from
 
 ## Develop
 
-Build Commera once, run `yarn dev` in your app, and reload `/commera` on the bench web server. Plugins
-render only in the built dashboard, not in its Vite dev server. `vite --watch` fixes its entries when it
-starts, so restart it after adding a placement folder. In production, run `bench build --app my_app` or
-`bench clear-cache` after a build so the manifest is re-read.
+Run `yarn dev` in `apps/commera/dashboard` and open `/commera` on its port (`<site>:8080`). Developer mode must be
+on. The dev server loads every installed plugin app's `commera/` folder from source, so a saved `.vue` file updates
+in place, without a reload. Each save also runs the app's `yarn build` in the background: a failed check shows
+in the error overlay, and a new placement or a changed `plugin` field reloads the page.
+
+Your app has no `yarn dev` of its own. In production, run `bench build --app my_app`, or `bench clear-cache` after
+a `yarn build`, so the manifest is re-read.
 
 Run the kit's own tests with `node --test test/*.test.js` (they build with the dashboard's `node_modules`).
