@@ -145,6 +145,25 @@
             remove_selected() {
                 this.items = this.items.filter(item => !item.selected);
             },
+            link(discount_code = "") {
+                const pairs = this.items
+                    .filter(item => item.selected)
+                    .map(item => `${encodeURIComponent(item.variant.item_code)}:${item.qty}`);
+                const language = window.location.pathname.split("/")[1] === "ar" ? "ar" : "en";
+                const url = new URL(`/${language}/cart/${pairs.join(",")}`, window.location.origin);
+                if (discount_code) url.searchParams.set("discount", discount_code);
+                return url.href;
+            },
+            async copy_link(discount_code = "") {
+                const url = this.link(discount_code);
+                try {
+                    await navigator.clipboard.writeText(url);
+                    toast({{ _("Cart link copied") | tojson }}, { type: "success" });
+                } catch (error) {
+                    // The clipboard is refused over plain http and in some in-app browsers.
+                    window.prompt({{ _("Copy this cart link") | tojson }}, url);
+                }
+            },
             async update_variant(cart_item, selected_size) {
                 const item_name = cart_item.item.name;
                 const reponse = await frappe_call("/api/v2/method/commera.api.cart.update_variant", { product_name: item_name, size: selected_size });

@@ -150,6 +150,9 @@
 								{{ _("Place Order") }}
 							</button>
 						{% endif %}
+						<button type="button" class="btn btn-outline-secondary w-100 m-t10" @click="$store.cart.copy_link()">
+							<i class="fa-solid fa-link m-r5"></i>{{ _("Copy cart link") }}
+						</button>
 					</div>
 				</div>
 			</div>
@@ -212,7 +215,7 @@
 						await frappe_call("/api/v2/method/commera.api.payments.generate_quotation_for_cart", {
 							cart: { items: items },
 						});
-						window.location.href = "/{{ language }}/cart/checkout";
+						window.location.href = "/{{ language }}/cart/checkout" + window.location.search;
 					} finally {
 						this.checkout_loading = false;
 					}

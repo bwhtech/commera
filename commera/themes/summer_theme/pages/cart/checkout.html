@@ -14,6 +14,8 @@
 	"is_guest": is_guest,
 	"delivery_charge": delivery_charge,
 	"delivery_charge_applicable_below": delivery_charge_applicable_below,
+	"prefill": checkout_prefill,
+	"coupon_code": coupon_code,
 } %}
 
 {% block head %}
@@ -482,6 +484,10 @@
 								<span x-show="order_loading" x-cloak>{{ _("Placing...") }}</span>
 							</button>
 						</div>
+						<button type="button" class="btn btn-outline-secondary w-100 m-t10"
+							@click="$store.cart.copy_link(pending_discount || config.coupon_code)">
+							<i class="fa-solid fa-link m-r5"></i>{{ _("Copy cart link") }}
+						</button>
 					</div>
 				</div>
 			</div>
@@ -553,10 +559,24 @@
 				selected_shipping_option: null,
 				shipping_option_saving: false,
 				pending_shipping_option: null,
+				pending_discount: null,
 
 				init() {
 					this.set_available_payment_mode();
-					if (!this.config.is_guest) return;
+					const url = new URL(window.location.href);
+					this.pending_discount = url.searchParams.get("discount");
+					if (this.pending_discount) {
+						// Left in the URL, every reload would re-apply the coupon against its rate limit.
+						url.searchParams.delete("discount");
+						history.replaceState(null, "", url);
+					}
+					for (const [field, value] of Object.entries(this.config.prefill)) {
+						if (!this.billing[field]) this.billing[field] = value;
+					}
+					if (!this.config.is_guest) {
+						this.apply_pending_discount();
+						return;
+					}
 					if (!this.$store.cart.items.length) {
 						window.location.replace("/{{ language }}/cart");
 						return;
@@ -577,6 +597,19 @@
 						total: subtotal + shipping,
 					};
 					return { ...summary, cash_on_delivery: summary };
+				},
+
+				async apply_pending_discount() {
+					if (!this.pending_discount) return;
+					try {
+						const response = await frappe_call("/api/v2/method/commera.api.payments.apply_coupon_code", {
+							applied_code: this.pending_discount,
+						});
+						toast(response.data.message, { type: "success" });
+						this.summary = response.data.checkout_summary;
+					} catch (error) {
+						this.pending_discount = null;
+					}
 				},
 
 				format_amount(amount) {
@@ -758,6 +791,8 @@
 						this.reset_address_step();
 						this.summary = response.data.checkout_summary;
 						this.address_saved = true;
+						// A guest has no server cart to hold the link's coupon until their first address save.
+						if (this.config.is_guest) await this.apply_pending_discount();
 						await this.load_shipping_options();
 					} catch (error) {
 						if (error.type === "InvalidEmailAddressError") this.email_error = INVALID_EMAIL_MESSAGE;

@@ -15,10 +15,11 @@ import AdvancedSettings from './AdvancedSettings.vue'
 import AppearancePicker from './AppearancePicker.vue'
 import AppsSettings from './AppsSettings.vue'
 import CashOnDeliverySettings from './CashOnDeliverySettings.vue'
+import CheckoutSettings from './CheckoutSettings.vue'
 import DeliveryOptionsPanel from './DeliveryOptionsPanel.vue'
 import PluginSettingsPanel from './PluginSettingsPanel.vue'
+import EmailSettings from './EmailSettings.vue'
 import GeneralSettings from './GeneralSettings.vue'
-import GuestSettings from './GuestSettings.vue'
 import PluginsSettings from './PluginsSettings.vue'
 import IntegrationTabPanel from './IntegrationTabPanel.vue'
 import LocationsSettings from './LocationsSettings.vue'
@@ -90,6 +91,10 @@ watch(
           <template #prefix><span class="lucide-sun-moon size-4" aria-hidden="true" /></template>
           Appearance
         </SettingsNavItem>
+        <SettingsNavItem value="emails">
+          <template #prefix><span class="lucide-mail size-4" aria-hidden="true" /></template>
+          Emails
+        </SettingsNavItem>
       </SettingsNavGroup>
 
       <SettingsNavGroup label="Checkout">
@@ -115,9 +120,9 @@ watch(
             <span class="text-sm text-ink-gray-5 tabular-nums">{{ pickupLocations.activeCount.value }}</span>
           </template>
         </SettingsNavItem>
-        <SettingsNavItem value="guest">
-          <template #prefix><span class="lucide-user-round-check size-4" aria-hidden="true" /></template>
-          Guest
+        <SettingsNavItem value="checkout">
+          <template #prefix><span class="lucide-shopping-cart size-4" aria-hidden="true" /></template>
+          General
         </SettingsNavItem>
       </SettingsNavGroup>
 
@@ -151,12 +156,16 @@ watch(
         <GeneralSettings :active="settings.open && settings.tab === 'general'" />
       </SettingsPanel>
 
+      <SettingsPanel value="emails" class="min-w-0">
+        <EmailSettings :active="settings.open && settings.tab === 'emails'" />
+      </SettingsPanel>
+
       <SettingsPanel value="locations" class="min-w-0">
         <LocationsSettings :active="settings.open && settings.tab === 'locations'" />
       </SettingsPanel>
 
-      <SettingsPanel value="guest" class="min-w-0">
-        <GuestSettings :active="settings.open && settings.tab === 'guest'" />
+      <SettingsPanel value="checkout" class="min-w-0">
+        <CheckoutSettings :active="settings.open && settings.tab === 'checkout'" />
       </SettingsPanel>
 
       <SettingsPanel value="appearance" class="min-w-0">

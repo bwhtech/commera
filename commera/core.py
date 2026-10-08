@@ -113,10 +113,13 @@ def get_party(user=None):
 		if link:
 			party_doc = frappe.get_cached_doc(link.link_doctype, link.link_name)
 			if not frappe.db.exists("Portal User", {"parent": party_doc.name, "user": user}):
+				from commera.api.payments import system_user_session
+
 				party_doc.append("portal_users", {"user": user})
-				party_doc.flags.ignore_permissions = True
 				party_doc.flags.ignore_mandatory = True
-				party_doc.save()
+				# Customer.on_update rewrites the primary Contact, which the shopper cannot write.
+				with system_user_session():
+					party_doc.save()
 			return party_doc
 
 	if portal_party := frappe.db.get_value("Portal User", {"user": user}, "parent"):

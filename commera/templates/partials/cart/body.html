@@ -11,7 +11,7 @@
 		}
 		frappe_call("/api/v2/method/commera.api.payments.generate_quotation_for_cart", { cart: { items: selected_items } })
 			.then((d) => {
-				window.location.href = "/{{frappe.lang}}/cart/checkout"
+				window.location.href = "/{{frappe.lang}}/cart/checkout" + window.location.search
 			}).finally(() => {
 				state.checkout_loading = false;
 			})
@@ -259,6 +259,10 @@
 						</span>
 					</button>
 					{% endif %}
+					<button type="button" x-on:click="$store.cart.copy_link()"
+						class="mt-3 w-full h-12 py-3 border border-accent rounded-lg text-accent text-base font-semibold uppercase cursor-pointer">
+						{{ _("Copy cart link") }}
+					</button>
 				</div>
 			</div>
 		</div>

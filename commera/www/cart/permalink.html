@@ -1,0 +1,22 @@
+{% extends "templates/layout.html" %}
+
+{% block body %}
+{% include "templates/includes/cart-permalink.html" %}
+<div class="max-w-xl mx-auto py-16 space-y-6 text-center"
+	x-data='cart_permalink({{ {"lines": lines, "notices": notices, "next_url": next_url} | tojson }})'>
+	{% if lines and not notices %}
+	<p class="text-lg font-medium">{{ _("Adding the products to your bag...") }}</p>
+	{% else %}
+	<h1 class="text-2xl font-semibold">{{ _("Some products in this link were changed") if lines else _("This cart link has nothing to add") }}</h1>
+	<ul class="space-y-2 text-sm text-gray-600">
+		{% for notice in notices %}
+		<li>{{ notice | e }}</li>
+		{% endfor %}
+	</ul>
+	<a href="{{ next_url | e }}"
+		class="inline-flex h-12 px-8 items-center rounded-lg bg-accent hover:bg-secondary-accent text-white text-base font-semibold uppercase">
+		{{ _("Continue") if lines else _("Go to your bag") }}
+	</a>
+	{% endif %}
+</div>
+{% endblock %}

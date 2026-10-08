@@ -28,6 +28,7 @@ website_redirects = [
 website_route_rules = [
 	# SPA client-side routing: every /commera deep link resolves to the same shell so a reload does not 404.
 	{"from_route": "/commera/<path:app_path>", "to_route": "/commera"},
+	{"from_route": "/cart/<path:codes>", "to_route": "/cart/permalink.html"},
 	# ------------
 	# English Routes
 	# ------------
@@ -40,6 +41,7 @@ website_route_rules = [
 	# -> Cart / Checkout
 	{"from_route": "/en/cart", "to_route": "/cart/cart.html"},
 	{"from_route": "/en/cart/checkout", "to_route": "/cart/checkout.html"},
+	{"from_route": "/en/cart/<path:codes>", "to_route": "/cart/permalink.html"},
 	# -> Account
 	{"from_route": "/en/account/dashboard", "to_route": "/account/dashboard.html"},
 	{"from_route": "/en/account/profile", "to_route": "/account/profile.html"},
@@ -67,6 +69,7 @@ website_route_rules = [
 	# -> Cart / Checkout
 	{"from_route": "/ar/cart", "to_route": "/cart/cart.html"},
 	{"from_route": "/ar/cart/checkout", "to_route": "/cart/checkout.html"},
+	{"from_route": "/ar/cart/<path:codes>", "to_route": "/cart/permalink.html"},
 	# -> Account
 	{"from_route": "/ar/account/dashboard", "to_route": "/account/dashboard.html"},
 	{"from_route": "/ar/account/profile", "to_route": "/account/profile.html"},

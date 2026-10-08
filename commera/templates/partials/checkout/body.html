@@ -37,6 +37,19 @@
                 })
                 this.apply_shipping_rule()
                 this.validate_payment_mode()
+                this.apply_pending_discount()
+            },
+            async apply_pending_discount() {
+                const url = new URL(window.location.href);
+                const discount = url.searchParams.get("discount");
+                if (!discount) return;
+                // Stripped first: removing the coupon reloads this page and must not re-apply it.
+                url.searchParams.delete("discount");
+                history.replaceState(null, "", url);
+                try {
+                    await frappe_call("/api/v2/method/commera.api.payments.apply_coupon_code", { applied_code: discount });
+                    window.location.reload();
+                } catch (error) {}
             },
             calculate_checkout_total() {
 
@@ -72,6 +85,12 @@
 
                     
     })
+    function fill_empty_fields(form, prefill) {
+        for (const [field, value] of Object.entries(prefill)) {
+            const input = form.elements[`billing_${field}`];
+            if (input && !input.value) input.value = value;
+        }
+    }
     function billing_state() {
         return {
             billing_use_address: 'saved_address',
@@ -247,8 +266,14 @@
     x-init="$watch('payment_mode_confirmed', value => fetch_payment_details(value, $data))">
     <div class="flex items-baseline justify-between">
         <h1 class="text-3xl font-bold my-3 md:mb-11 md">{{ _('Checkout') }}</h1>
-        <div class="md:hidden my-3">
-            {% include 'templates/components/promo_code_component.html' %}
+        <div class="flex items-center gap-4 my-3">
+            <div class="md:hidden">
+                {% include 'templates/components/promo_code_component.html' %}
+            </div>
+            <button type="button" @click='$store.cart.copy_link({{ coupon_code | tojson }})'
+                class="text-md text-secondary-accent underline decoration-accent md:text-base capitalize cursor-pointer">
+                {{ _("Copy cart link") }}
+            </button>
         </div>
     </div>
     {{ plugin_slot("checkout_banner") }}
@@ -274,7 +299,8 @@
     </div>
     <div class="flex flex-col md:flex-row gap-8 md:gap-25 md:mt-2">
         <div class="flex-1" x-data="billing_state()">
-            <form x-ref="checkout_form" @submit.prevent="update_quotation_address($data, $refs)">
+            <form x-ref="checkout_form" @submit.prevent="update_quotation_address($data, $refs)"
+                x-init='fill_empty_fields($el, {{ checkout_prefill | tojson }})'>
                 <div class="flex justify-between items-center border-b border-gray-200 pb-4">
                     <h2 class="text-lg font-semibold text-secondary-accent capitalize">
                         {{ _('select delivery option') }}
