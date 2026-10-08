@@ -4,45 +4,35 @@
 import os
 
 import frappe
-from markupsafe import Markup, escape
+from markupsafe import Markup
 
 from commera.guest import is_guest
 
 SETTINGS = "Commera Settings"
 CACHE_KEY = "commera_storefront_plugins"
 SLOTS = ("cart_banner", "checkout_banner", "page_overlay")
-INCLUDE_HOOKS = {
-	"css": "commera_storefront_include_css",
-	"js": "commera_storefront_include_js",
-}
-BLOCKS_HOOK = "commera_storefront_blocks"
-HOOK_KEYS = (*INCLUDE_HOOKS.values(), BLOCKS_HOOK)
+INCLUDE_TAGS = {"css": '<link rel="stylesheet" href="{0}">', "js": '<script defer src="{0}"></script>'}
 
 
-def format_plugin_styles() -> Markup:
+def format_plugin_includes(kind: str) -> Markup:
 	if is_checkout_request():
 		return Markup()
-	return Markup("\n").join(
-		Markup('<link rel="stylesheet" href="{0}">').format(url) for url in get_storefront_plugins()["css"]
-	)
-
-
-def format_plugin_scripts() -> Markup:
-	if is_checkout_request():
-		return Markup()
-	return Markup("\n").join(
-		Markup('<script defer src="{0}"></script>').format(url) for url in get_storefront_plugins()["js"]
-	)
+	return Markup("\n").join(Markup(INCLUDE_TAGS[kind]).format(url) for url in get_storefront_plugins()[kind])
 
 
 def plugin_slot(name: str) -> Markup:
 	if name == "page_overlay" and is_checkout_request():
 		return Markup()
 
+	templates = get_storefront_plugins()["blocks"].get(name, [])
+	if not templates:
+		return Markup()
+
 	html = []
-	for template in get_storefront_plugins()["blocks"].get(name, []):
+	context = get_slot_context()
+	for template in templates:
 		try:
-			html.append(frappe.get_template(template).render(get_slot_context()))
+			html.append(frappe.get_template(template).render(context))
 		except Exception:
 			log_plugin_error(f"Storefront block {template} failed to render")
 	return Markup("".join(html))
@@ -68,13 +58,11 @@ def get_storefront_plugins() -> dict:
 
 def build_storefront_plugins() -> dict:
 	plugins = {"css": [], "js": [], "blocks": {slot: [] for slot in SLOTS}}
-	installed_apps = frappe.get_installed_apps()
-	for app in get_enabled_storefront_apps(frappe.get_cached_doc(SETTINGS)):
-		if app not in installed_apps:
-			continue
-		for kind, hook in INCLUDE_HOOKS.items():
-			plugins[kind] += get_asset_urls(app, hook)
-		for slot, templates in get_app_hook(app, BLOCKS_HOOK, {}).items():
+	enabled_apps = get_enabled_storefront_apps(frappe.get_cached_doc(SETTINGS))
+	for app in [app for app in frappe.get_installed_apps() if app in enabled_apps]:
+		plugins["css"] += get_asset_urls(app, "commera_storefront_include_css")
+		plugins["js"] += get_asset_urls(app, "commera_storefront_include_js")
+		for slot, templates in frappe.get_hooks("commera_storefront_blocks", {}, app_name=app).items():
 			if slot not in SLOTS:
 				log_plugin_error(f"{app}: unknown storefront slot {slot}", f"Use one of: {', '.join(SLOTS)}.")
 				continue
@@ -84,7 +72,7 @@ def build_storefront_plugins() -> dict:
 
 def get_asset_urls(app: str, hook: str) -> list[str]:
 	urls = []
-	for url in get_app_hook(app, hook, []):
+	for url in frappe.get_hooks(hook, app_name=app):
 		if not url.startswith(f"/assets/{app}/") or ".." in url:
 			log_plugin_error(f"{app}: storefront include refused", f"{url} must start with /assets/{app}/.")
 			continue
@@ -109,33 +97,27 @@ def get_app_templates(app: str, templates: list[str]) -> list[str]:
 	return valid_templates
 
 
-def get_app_hook(app: str, hook: str, default):
-	return frappe.get_hooks(hook, default=default, app_name=app)
-
-
 def get_enabled_storefront_apps(settings) -> set[str]:
 	if not settings:
 		return set()
 	return {row.app for row in settings.storefront_apps if row.enabled}
 
 
-def get_declaring_apps() -> list[str]:
-	return [
-		app for app in frappe.get_installed_apps() if any(get_app_hook(app, hook, None) for hook in HOOK_KEYS)
-	]
-
-
 def sync_storefront_apps(app_name: str | None = None):
 	settings = frappe.get_single(SETTINGS)
-	declaring_apps = get_declaring_apps()
+	hooks = ("commera_storefront_include_css", "commera_storefront_include_js", "commera_storefront_blocks")
+	declaring_apps = {
+		app
+		for app in frappe.get_installed_apps()
+		if any(frappe.get_hooks(hook, None, app_name=app) for hook in hooks)
+	}
 	listed_apps = {row.app for row in settings.storefront_apps}
 
 	for row in settings.storefront_apps:
 		if row.app not in declaring_apps:
 			frappe.db.delete("Commera Storefront App", {"name": row.name})
-	for app in declaring_apps:
-		if app not in listed_apps:
-			settings.append("storefront_apps", {"app": app, "enabled": 0}).db_insert()
+	for app in sorted(declaring_apps - listed_apps):
+		settings.append("storefront_apps", {"app": app, "enabled": 0}).db_insert()
 
 	frappe.clear_document_cache(SETTINGS, SETTINGS)
 	clear_storefront_plugin_cache()

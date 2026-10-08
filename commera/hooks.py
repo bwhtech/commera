@@ -119,7 +119,6 @@ doctype_js = {
 after_install = "commera.migrate.after_install"
 after_migrate = "commera.migrate.after_migrate"
 after_app_install = "commera.storefront_plugins.sync_storefront_apps"
-after_app_uninstall = "commera.storefront_plugins.sync_storefront_apps"
 setup_wizard_complete = "commera.swatches.drop_unused_colour_attribute"
 
 
@@ -195,8 +194,7 @@ jinja = {
 		"commera.shop_data.get_storefront_menu",
 		"commera.shop_themes.jinja_helpers.shop_theme_asset_url",
 		"commera.shop_themes.jinja_helpers.shop_theme_config",
-		"commera.storefront_plugins.format_plugin_scripts",
-		"commera.storefront_plugins.format_plugin_styles",
+		"commera.storefront_plugins.format_plugin_includes",
 		"commera.storefront_plugins.plugin_slot",
 	],
 }

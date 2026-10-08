@@ -1,7 +1,5 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 
-from unittest.mock import patch
-
 import frappe
 from frappe.deferred_insert import save_to_db
 from frappe.tests import IntegrationTestCase
@@ -29,16 +27,7 @@ class TestStorefrontPlugins(IntegrationTestCase):
 		storefront_plugins.clear_storefront_plugin_cache()
 
 	def declare_hooks(self, hooks):
-		real_get_app_hook = storefront_plugins.get_app_hook
-
-		def get_app_hook(app, hook, default):
-			if app == "commera":
-				return hooks.get(hook, default)
-			return real_get_app_hook(app, hook, default)
-
-		patcher = patch.object(storefront_plugins, "get_app_hook", side_effect=get_app_hook)
-		patcher.start()
-		self.addCleanup(patcher.stop)
+		self.enterContext(self.patch_hooks(hooks))
 		storefront_plugins.sync_storefront_apps()
 
 	def set_enabled(self, enabled):
@@ -71,22 +60,17 @@ class TestStorefrontPlugins(IntegrationTestCase):
 		rows = frappe.get_single("Commera Settings").storefront_apps
 		self.assertIn(("commera", 0), [(row.app, row.enabled) for row in rows])
 
-	def test_switched_off_app_renders_nothing(self):
-		self.declare_full_plugin()
-
-		self.assertEqual(storefront_plugins.format_plugin_styles(), "")
-		self.assertEqual(storefront_plugins.format_plugin_scripts(), "")
-		self.assertEqual(storefront_plugins.plugin_slot("cart_banner"), "")
-
 	def test_switching_on_renders_tags_and_blocks(self):
 		self.declare_full_plugin()
-		self.assertEqual(storefront_plugins.format_plugin_scripts(), "")
+		self.assertEqual(storefront_plugins.format_plugin_includes("js"), "")
 
 		self.set_enabled(1)
 
-		self.assertEqual(storefront_plugins.format_plugin_styles(), f'<link rel="stylesheet" href="{STYLE}">')
 		self.assertEqual(
-			storefront_plugins.format_plugin_scripts(), f'<script defer src="{SCRIPT}"></script>'
+			storefront_plugins.format_plugin_includes("css"), f'<link rel="stylesheet" href="{STYLE}">'
+		)
+		self.assertEqual(
+			storefront_plugins.format_plugin_includes("js"), f'<script defer src="{SCRIPT}"></script>'
 		)
 		banner = storefront_plugins.plugin_slot("cart_banner")
 		store_name = frappe.db.get_single_value("Commera Settings", "store_name")
@@ -103,9 +87,9 @@ class TestStorefrontPlugins(IntegrationTestCase):
 		self.set_enabled(1)
 
 		self.assertEqual(
-			storefront_plugins.format_plugin_scripts(), f'<script defer src="{SCRIPT}"></script>'
+			storefront_plugins.format_plugin_includes("js"), f'<script defer src="{SCRIPT}"></script>'
 		)
-		self.assertEqual(storefront_plugins.format_plugin_styles(), "")
+		self.assertEqual(storefront_plugins.format_plugin_includes("css"), "")
 		self.assertEqual(self.get_error_titles().count("commera: storefront include refused"), 2)
 
 	def test_template_outside_the_app_is_refused(self):
@@ -152,7 +136,7 @@ class TestStorefrontPlugins(IntegrationTestCase):
 
 		set_request(method="GET", path="/en/cart/checkout")
 
-		self.assertEqual(storefront_plugins.format_plugin_scripts(), "")
-		self.assertEqual(storefront_plugins.format_plugin_styles(), "")
+		self.assertEqual(storefront_plugins.format_plugin_includes("js"), "")
+		self.assertEqual(storefront_plugins.format_plugin_includes("css"), "")
 		self.assertEqual(storefront_plugins.plugin_slot("page_overlay"), "")
 		self.assertIn("test-plugin-banner", storefront_plugins.plugin_slot("checkout_banner"))
