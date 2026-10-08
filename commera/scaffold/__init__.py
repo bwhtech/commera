@@ -52,7 +52,6 @@ class AppScaffold:
 		package.setdefault("type", "module")
 		scripts = package.setdefault("scripts", {})
 		scripts.setdefault("build", "vite build --config commera/vite.config.js")
-		scripts.setdefault("dev", "vite build --watch --config commera/vite.config.js")
 		dev_dependencies = package.setdefault("devDependencies", {})
 		dev_dependencies.setdefault("@commera/plugin-kit", "link:../commera/packages/plugin-kit")
 		for name, version in get_dashboard_versions().items():

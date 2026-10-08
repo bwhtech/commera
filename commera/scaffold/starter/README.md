@@ -1,8 +1,9 @@
 # Commera plugins for $app_name
 
 Everything in this folder is built into the Commera dashboard at `/commera`. The folder an `index.vue`
-sits in decides where it shows. Build with `bench build --app $app_name` (or `yarn dev` while you work),
-then reload `/commera`.
+sits in decides where it shows. While you work, run `yarn dev` in
+`apps/commera/dashboard` and open `/commera` on its port (8080): a saved file updates in place. For production,
+build with `bench build --app $app_name`.
 
 | Folder | What it adds |
 | --- | --- |

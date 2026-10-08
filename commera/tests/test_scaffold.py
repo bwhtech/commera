@@ -58,7 +58,7 @@ class TestScaffold(UnitTestCase):
 
 		package = json.loads((app_root / "package.json").read_text())
 		self.assertEqual(package["scripts"]["build"], "vite build --config commera/vite.config.js")
-		self.assertEqual(package["scripts"]["dev"], "vite build --watch --config commera/vite.config.js")
+		self.assertNotIn("dev", package["scripts"])
 		self.assertEqual(
 			package["devDependencies"],
 			{"@commera/plugin-kit": "link:../commera/packages/plugin-kit", **get_dashboard_versions()},
