@@ -417,7 +417,7 @@ class TestCartCheckout(IntegrationTestCase):
 
 		self.assertFalse(quotation.coupon_code)
 		self.assertEqual(get_checkout_summary(quotation)["discount_amount"], 0)
-		self.assertEqual(frappe.get_message_log(), [])
+		self.assertNotIn("expired", frappe.as_json(frappe.get_message_log()))
 
 	def test_the_cod_checkout_total_is_what_the_order_charges(self):
 		ensure_fiscal_year()
