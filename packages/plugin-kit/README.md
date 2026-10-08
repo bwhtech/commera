@@ -150,6 +150,25 @@ Throw `request.error` from `onSubmit` and the dialog shows it once.
 - Puts `/* commera-plugin-api: 1 */` on line 1 of each module. Commera refuses a module or a manifest
   with a different version and shows the reason in place of the plugin.
 
+## Classes you can use
+
+Plugins ship no CSS, so a class works only if the dashboard's stylesheet has it. Commera keeps this set in every
+build, whether or not a dashboard screen uses it:
+
+| Group | Classes |
+| --- | --- |
+| Colours | `text-ink-*`, `bg-surface-*`, `border-outline-*`: frappe-ui's tokens, which follow light and dark mode |
+| Text | `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`, `text-2xl`, `text-3xl`, each also with `-medium` and `-semibold`; `text-p-*`; `font-normal`, `font-medium`, `font-semibold`, `uppercase`, `underline`; `text-left`, `text-center`, `text-right`, `text-start`, `text-end`; `truncate`, `tabular-nums`, `whitespace-nowrap`, `whitespace-normal`, `break-words`, `break-all` |
+| Spacing | `p`, `px`, `py`, `pt`, `pb`, `ps`, `pe`, `m`, `mx`, `my`, `mt`, `mb`, `ms`, `me`, `gap`, `gap-x`, `gap-y`, `space-x`, `space-y`, each with 0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10, 12 or 16 (`px-4`, `gap-2.5`) |
+| Layout | `flex`, `inline-flex`, `grid`, `block`, `inline-block`, `hidden`, `contents`; `flex-row`, `flex-col`, `flex-wrap`, `flex-nowrap`, `flex-1`, `flex-none`; `items-*`, `justify-*` and `self-*` with `start`, `end`, `center`, `between`, `stretch` or `baseline`; `grow`, `shrink`, `grow-0`, `shrink-0`; `grid-cols-1` to `grid-cols-12`, `col-span-1` to `col-span-12`, `col-span-full` |
+| Size | `w-full`, `w-auto`, `w-fit`, `w-1/2`, `w-1/3`, `w-2/3`, `w-1/4`, `w-3/4`; `min-w-0`, `min-w-full`, `h-full`, `min-h-0`; `max-w-xs` to `max-w-7xl`, `max-w-full`, `max-w-none`; `overflow-hidden`, `overflow-auto`, `overflow-x-auto`, `overflow-y-auto` |
+| Borders | `border`, `border-x`, `border-y`, `border-t`, `border-b`, `border-s`, `border-e`; `rounded-1` to `rounded-8`, `rounded-full`, `rounded-none`, also on one side (`rounded-t-4`); `shadow`, `shadow-sm`, `shadow-base`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`, `shadow-none` |
+
+The spacing, layout and width classes also work with `sm:`, `md:` and `lg:` (`md:grid-cols-2`, `lg:px-6`).
+
+A class outside this set can pass the build because a dashboard screen happens to use it. A later Commera can
+drop it, and your plugin then fails to build, so stay inside the set.
+
 ## What fails the build
 
 Folder and `plugin` problems are collected and reported together.
