@@ -124,7 +124,7 @@ has no `plugin` block: it shares the page's sidebar row, `requires` and `conditi
 ## App logo
 
 Put an optional `commera/plugin-icon.svg` next to `pages/`. `bench commera init` writes a placeholder there:
-the Commera logo in violet. It is the icon of everything your app adds, from the sidebar and Settings → Plugins
+the Commera logo in violet, orange, blue or green, picked once at random. It is the icon of everything your app adds, from the sidebar and Settings → Plugins
 to your settings tab, palette rows and More actions rows. An entry with its own `icon` shows that one instead,
 and an app with only one page shows that page's `icon` in the sidebar when it has one.
 

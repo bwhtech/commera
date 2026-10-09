@@ -9,7 +9,13 @@ from frappe.tests import UnitTestCase
 from frappe.utils.boilerplate import _create_app_boilerplate
 
 from commera.plugins.places import ICONS, PLACES
-from commera.scaffold import PLACE_KINDS, AppScaffold, get_app_from_folder, get_dashboard_versions
+from commera.scaffold import (
+	LOGO_COLOURS,
+	PLACE_KINDS,
+	AppScaffold,
+	get_app_from_folder,
+	get_dashboard_versions,
+)
 from commera.sdk import API_VERSION
 
 APP = "commera_test_plugin"
@@ -68,7 +74,8 @@ class TestScaffold(UnitTestCase):
 
 		page = app_root / "commera" / "pages" / "commera-test-plugin" / "index.vue"
 		self.assertIn("export const plugin = { label: 'Test Plugin' }", page.read_text())
-		self.assertIn("<svg", (app_root / "commera" / "plugin-icon.svg").read_text())
+		logo = (app_root / "commera" / "plugin-icon.svg").read_text()
+		self.assertTrue(any(f'fill="{colour}"' in logo for colour in LOGO_COLOURS), logo)
 		self.assertIn("sparkles", ICONS)
 		self.assertIn(f"useMethodRead('{APP}.api.get_summary')", page.read_text())
 		self.assertIn(f"{APP}/api.py", created)

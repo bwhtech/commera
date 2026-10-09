@@ -1,5 +1,6 @@
 import ast
 import json
+import random
 from pathlib import Path
 from string import Template
 
@@ -12,6 +13,8 @@ COMMERA_ROOT = Path(__file__).parents[2]
 STARTER_DIR = Path(__file__).parent / "starter"
 STARTER_ICON = "sparkles"
 SHARED_PACKAGES = ("@vitejs/plugin-vue", "vite", "vue")
+# frappe-ui's violet, orange, blue and green 500 shades; a new plugin's placeholder logo gets one at random.
+LOGO_COLOURS = ("#7757EE", "#E86C13", "#0C8EF8", "#43AC79")
 # What `bench commera add` takes, mapped to the placement folder it writes and the starter it writes there.
 PLACE_KINDS = {
 	"page": ("pages", "page"),
@@ -46,7 +49,10 @@ class AppScaffold:
 		self.add_gitignore_lines(["node_modules", f"{self.app}/public/commera/"])
 		self.add_file(self.app_root / self.app / "public" / ".gitkeep", "")
 		self.add_file(self.source_dir / "vite.config.js", get_starter("vite.config.js"))
-		self.add_file(self.source_dir / "plugin-icon.svg", get_starter("plugin-icon.svg"))
+		self.add_file(
+			self.source_dir / "plugin-icon.svg",
+			Template(get_starter("plugin-icon.svg")).substitute(colour=random.choice(LOGO_COLOURS)),
+		)
 		self.add_places()
 		# A plain api.py here would be importable, and so callable, as commera.scaffold.starter.api.
 		self.add_file(self.app_root / self.app / "api.py", get_starter("api.py.template"))
