@@ -207,6 +207,17 @@ class TestAddPlace(UnitTestCase):
 		with self.assertRaisesRegex(click.ClickException, "already has resend_order"):
 			self.add("order-action", "resend")
 
+	def test_a_page_with_detail_gets_a_detail_view_that_its_list_opens(self):
+		AppScaffold(APP, self.apps_path).add_place("page", "jobs", detail=True)
+
+		folder = self.app_root / "commera" / "pages" / "jobs"
+		self.assertIn("navigate('jobs/EXAMPLE-0001')", (folder / "index.vue").read_text())
+		self.assertIn("defineProps({ id: String })", (folder / "[...id].vue").read_text())
+
+	def test_only_a_page_takes_detail(self):
+		with self.assertRaisesRegex(click.ClickException, "only goes with a page"):
+			AppScaffold(APP, self.apps_path).add_place("order-card", "status", detail=True)
+
 	def test_a_bad_kind_or_name_is_refused(self):
 		with self.assertRaisesRegex(click.ClickException, "Add one of: page, order-card"):
 			self.add("orders-card", "status")

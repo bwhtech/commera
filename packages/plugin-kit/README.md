@@ -50,7 +50,7 @@ Run `bench commera add <kind> <name>` inside your app's folder to add one placem
 
 | Kind | Writes |
 | --- | --- |
-| `page` | `commera/pages/<name>/index.vue` |
+| `page` | `commera/pages/<name>/index.vue`; with `--detail`, also `[...id].vue`, one record's view, which the list opens with `navigate('<name>/<id>')` |
 | `order-card`, `product-card`, `customer-card` | `commera/<record>/cards/<name>/index.vue` |
 | `order-action`, `product-action`, `customer-action` | `commera/<record>/actions/<name>/index.vue` and a whitelisted `<name>_<record>(name)` in your `api.py` |
 | `settings` | `commera/settings/index.vue` (no name: one per plugin) |

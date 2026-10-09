@@ -104,10 +104,14 @@ class AppScaffold:
 		path.parent.mkdir(parents=True, exist_ok=True)
 		path.write_text(content)
 
-	def add_place(self, kind: str, name: str | None) -> list[tuple[str, str]]:
+	def add_place(self, kind: str, name: str | None, detail: bool = False) -> list[tuple[str, str]]:
 		if kind not in PLACE_KINDS:
 			raise click.ClickException(f"Add one of: {', '.join(PLACE_KINDS)}")
 		place, starter = PLACE_KINDS[kind]
+		if detail and kind != "page":
+			raise click.ClickException(
+				"--detail only goes with a page: bench commera add page <name> --detail"
+			)
 		if place == "settings":
 			folder = Path("settings")
 			label = "Settings"
@@ -126,6 +130,7 @@ class AppScaffold:
 		function = get_function_name(name or "", record if doctype else None)
 		values = {
 			"app_name": self.app,
+			"name": name or "",
 			"label": label,
 			"folder": folder.as_posix(),
 			"function": function,
@@ -134,8 +139,15 @@ class AppScaffold:
 		}
 		self.add_file(
 			self.source_dir / folder / "index.vue",
-			Template(get_starter(f"places/{starter}.vue")).substitute(values),
+			Template(get_starter(f"places/{'page_with_detail' if detail else starter}.vue")).substitute(
+				values
+			),
 		)
+		if detail:
+			self.add_file(
+				self.source_dir / folder / "[...id].vue",
+				Template(get_starter("places/detail.vue")).substitute(values),
+			)
 		if starter in ("action", "command"):
 			self.add_api_method(
 				function, Template(get_starter(f"places/{starter}.py.template")).substitute(values)
@@ -185,7 +197,7 @@ def get_app_from_folder(folder: Path, apps_path: Path) -> str:
 	try:
 		app = Path(folder).resolve().relative_to(Path(apps_path).resolve()).parts[0]
 	except (ValueError, IndexError):
-		raise click.ClickException("Run bench commera init inside your app's folder: cd apps/<your_app>")
+		raise click.ClickException("Run bench commera inside your app's folder: cd apps/<your_app>")
 	return app
 
 

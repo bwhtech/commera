@@ -39,7 +39,8 @@ you don't use.
 
 `bench commera add <kind> <name>`, run in this app's folder, writes one placement with a starter that builds.
 Kinds: `page`, `order-card`, `product-card`, `customer-card`, `order-action`, `product-action`,
-`customer-action`, `settings` (no name) and `command`. Actions and commands also get a whitelisted method in
+`customer-action`, `settings` (no name) and `command`. `bench commera add page <name> --detail` also writes the
+page's `[...id].vue`. Actions and commands also get a whitelisted method in
 `$app_name/api.py`. Nothing is overwritten.
 
 ## Starters
