@@ -34,6 +34,7 @@ class AppScaffold:
 		self.add_gitignore_lines(["node_modules", f"{self.app}/public/commera/"])
 		self.add_file(self.app_root / self.app / "public" / ".gitkeep", "")
 		self.add_file(self.source_dir / "vite.config.js", get_starter("vite.config.js"))
+		self.add_file(self.source_dir / "plugin-icon.svg", get_starter("plugin-icon.svg"))
 		self.add_places()
 		# A plain api.py here would be importable, and so callable, as commera.scaffold.starter.api.
 		self.add_file(self.app_root / self.app / "api.py", get_starter("api.py.template"))

@@ -759,30 +759,39 @@ describe('the app icon', () => {
 	const svg =
 		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><defs><path id="a" d="M0 0h24v24H0z"/></defs><use href="#a"/></svg>\n';
 
-	test('a valid icon.svg is copied next to the manifest and named in it', async () => {
+	test('a valid plugin-icon.svg is copied next to the manifest and named in it', async () => {
 		const { manifest, read } = await buildApp({
 			'pages/jobs/index.vue': page,
-			'icon.svg': svg,
+			'plugin-icon.svg': svg,
 		});
-		assert.equal(manifest.icon, 'icon.svg');
-		assert.equal(read('icon.svg'), svg);
+		assert.equal(manifest.icon, 'plugin-icon.svg');
+		assert.equal(read('plugin-icon.svg'), svg);
 	});
 
 	test('a page without its own icon builds and leaves the icon to the app', async () => {
 		const { manifest } = await buildApp({
 			'pages/jobs/index.vue': vue(`{ label: 'Print jobs' }`),
-			'icon.svg': svg,
+			'plugin-icon.svg': svg,
 		});
-		assert.equal(manifest.icon, 'icon.svg');
+		assert.equal(manifest.icon, 'plugin-icon.svg');
 		assert.equal('icon' in manifest.entries[0], false);
 	});
 
-	test('without an icon.svg the manifest has no icon', async () => {
+	test('an old icon.svg is not used as the logo', async () => {
+		const { manifest, outDir } = await buildApp({
+			'pages/jobs/index.vue': page,
+			'icon.svg': svg,
+		});
+		assert.equal('icon' in manifest, false);
+		assert.equal(existsSync(join(outDir, 'icon.svg')), false);
+	});
+
+	test('without a plugin-icon.svg the manifest has no icon', async () => {
 		const { manifest, outDir } = await buildApp({
 			'pages/jobs/index.vue': page,
 		});
 		assert.equal('icon' in manifest, false);
-		assert.equal(existsSync(join(outDir, 'icon.svg')), false);
+		assert.equal(existsSync(join(outDir, 'plugin-icon.svg')), false);
 	});
 
 	for (const [problem, source, pattern] of [
@@ -819,7 +828,7 @@ describe('the app icon', () => {
 	]) {
 		test(`an icon with ${problem} fails`, async () => {
 			await buildFails(
-				{ 'pages/jobs/index.vue': page, 'icon.svg': source },
+				{ 'pages/jobs/index.vue': page, 'plugin-icon.svg': source },
 				pattern,
 			);
 		});

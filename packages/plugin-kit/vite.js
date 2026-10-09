@@ -30,7 +30,7 @@ const PAGE_ENTRY_PATH = '__commera_page__/';
 const DYNAMIC_FILE = /^\[(\.\.\.)?([^\]]*)\]\.vue$/;
 const PARAM = /^[a-z][A-Za-z0-9]{0,39}$/;
 const SKIPPED_DIRS = new Set(['node_modules', 'dist']);
-const ICON_FILE = 'icon.svg';
+const ICON_FILE = 'plugin-icon.svg';
 const ICON_LIMIT = 20 * 1024;
 
 // The host draws these frames itself, so an app that draws its own gets two headers or a dialog on a dialog.
@@ -645,7 +645,7 @@ function finish({ app, entries, icon }) {
 	};
 }
 
-// Painted as a CSS mask, but the file is also served as-is under /assets, so it must be safe to open directly.
+// Served as-is under /assets and shown with <img>, so it must also be safe to open directly.
 export function readAppIcon(sourceDir) {
 	const path = join(sourceDir, ICON_FILE);
 	if (!existsSync(path)) return { icon: null, errors: [] };
@@ -711,6 +711,10 @@ export default async function commeraPlugin({
 	});
 	const { entries } = discovered;
 	const appIcon = readAppIcon(sourceDir);
+	if (existsSync(join(sourceDir, 'icon.svg')))
+		warnings.push(
+			`commera/icon.svg is not used; rename it to commera/${ICON_FILE}`,
+		);
 	const errors = [...discovered.errors, ...appIcon.errors];
 	if (errors.length) {
 		throw new Error(

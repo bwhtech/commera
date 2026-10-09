@@ -66,7 +66,8 @@ class TestScaffold(UnitTestCase):
 		self.assertEqual((app_root / ".gitignore").read_text(), f"node_modules\n{APP}/public/commera/\n")
 
 		page = app_root / "commera" / "pages" / "commera-test-plugin" / "index.vue"
-		self.assertIn("export const plugin = { label: 'Test Plugin', icon: 'sparkles' }", page.read_text())
+		self.assertIn("export const plugin = { label: 'Test Plugin' }", page.read_text())
+		self.assertIn("<svg", (app_root / "commera" / "plugin-icon.svg").read_text())
 		self.assertIn("sparkles", ICONS)
 		self.assertIn(f"useMethodRead('{APP}.api.get_summary')", page.read_text())
 		self.assertIn(f"{APP}/api.py", created)
