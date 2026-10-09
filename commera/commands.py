@@ -36,4 +36,24 @@ def init(skip_install: bool):
 	click.secho(f"Next: bench build --app {app}, then open /commera", fg="green")
 
 
+@commera_commands.command("add")
+@click.argument("kind")
+@click.argument("name", required=False)
+def add(kind: str, name: str | None):
+	"""Add one starter placement to the plugin you are in: page, order-card, product-card, customer-card,
+	order-action, product-action, customer-action, settings or command."""
+	from frappe.utils import get_bench_path
+
+	from commera.scaffold import AppScaffold, get_app_from_folder
+
+	apps_path = Path(get_bench_path()) / "apps"
+	app = get_app_from_folder(Path(os.environ.get("PWD") or os.getcwd()), apps_path)
+	for change, path in AppScaffold(app, apps_path).add_place(kind, name):
+		click.echo(f"{change:<8} {path}")
+	click.secho(
+		"A running yarn dev in apps/commera/dashboard picks it up; otherwise run bench build --app " + app,
+		fg="green",
+	)
+
+
 commands = [commera_commands]

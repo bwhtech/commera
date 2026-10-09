@@ -1,0 +1,7 @@
+
+
+@frappe.whitelist()
+def $function(name: str) -> str:
+	doc = frappe.get_doc("$doctype", name)
+	doc.check_permission("write")
+	return f"$label ran on {doc.name}"

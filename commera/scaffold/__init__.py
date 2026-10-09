@@ -12,6 +12,18 @@ COMMERA_ROOT = Path(__file__).parents[2]
 STARTER_DIR = Path(__file__).parent / "starter"
 STARTER_ICON = "sparkles"
 SHARED_PACKAGES = ("@vitejs/plugin-vue", "vite", "vue")
+# What `bench commera add` takes, mapped to the placement folder it writes and the starter it writes there.
+PLACE_KINDS = {
+	"page": ("pages", "page"),
+	"order-card": ("order/cards", "card"),
+	"product-card": ("product/cards", "card"),
+	"customer-card": ("customer/cards", "card"),
+	"order-action": ("order/actions", "action"),
+	"product-action": ("product/actions", "action"),
+	"customer-action": ("customer/actions", "action"),
+	"settings": ("settings", "settings"),
+	"command": ("commands", "command"),
+}
 
 
 class AppScaffold:
@@ -92,6 +104,51 @@ class AppScaffold:
 		path.parent.mkdir(parents=True, exist_ok=True)
 		path.write_text(content)
 
+	def add_place(self, kind: str, name: str | None) -> list[tuple[str, str]]:
+		if kind not in PLACE_KINDS:
+			raise click.ClickException(f"Add one of: {', '.join(PLACE_KINDS)}")
+		place, starter = PLACE_KINDS[kind]
+		if place == "settings":
+			folder = Path("settings")
+			label = "Settings"
+		else:
+			if not name or not NAME_PATTERN.fullmatch(name):
+				raise click.ClickException(
+					f"Give the {kind} a name of lowercase letters, digits and hyphens: bench commera add {kind} <name>"
+				)
+			folder = Path(place) / name
+			label = name.replace("-", " ").capitalize()
+		if (self.source_dir / folder / "index.vue").exists():
+			raise click.ClickException(f"commera/{folder} already exists; pick another name")
+
+		doctype = PLACES[place]["doctype"]
+		record = place.split("/")[0]
+		function = get_function_name(name or "", record if doctype else None)
+		values = {
+			"app_name": self.app,
+			"label": label,
+			"folder": folder.as_posix(),
+			"function": function,
+			"doctype": doctype or "",
+			"record": record,
+		}
+		self.add_file(
+			self.source_dir / folder / "index.vue",
+			Template(get_starter(f"places/{starter}.vue")).substitute(values),
+		)
+		if starter in ("action", "command"):
+			self.add_api_method(
+				function, Template(get_starter(f"places/{starter}.py.template")).substitute(values)
+			)
+		return self.changes
+
+	def add_api_method(self, function: str, source: str):
+		path = self.app_root / self.app / "api.py"
+		text = path.read_text() if path.exists() else "import frappe\n"
+		if function in {node.name for node in ast.parse(text).body if isinstance(node, ast.FunctionDef)}:
+			raise click.ClickException(f"{self.app}/api.py already has {function}; pick another name")
+		self.write_change(path, text.rstrip("\n") + "\n" + source, True)
+
 	def format_starter(self, name: str) -> str:
 		label = self.get_app_title().replace("\\", "\\\\").replace("'", "\\'")
 		return Template(get_starter(name)).safe_substitute(
@@ -115,6 +172,13 @@ class AppScaffold:
 
 	def get_relative_path(self, path: Path) -> str:
 		return str(path.relative_to(self.app_root))
+
+
+def get_function_name(name: str, record: str | None) -> str:
+	function = name.replace("-", "_")
+	if record:
+		function = f"{function}_{record}"
+	return function if function[:1].isalpha() else f"run_{function}"
 
 
 def get_app_from_folder(folder: Path, apps_path: Path) -> str:

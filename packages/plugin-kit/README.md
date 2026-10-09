@@ -44,6 +44,20 @@ export default defineConfig({ plugins: [commera()] });
 Keep `vue` on the same minor version as the Commera dashboard. The app compiles its templates with its own
 `vue`, but they run on the dashboard's copy.
 
+## Add a placement
+
+Run `bench commera add <kind> <name>` inside your app's folder to add one placement with a starter that builds:
+
+| Kind | Writes |
+| --- | --- |
+| `page` | `commera/pages/<name>/index.vue` |
+| `order-card`, `product-card`, `customer-card` | `commera/<record>/cards/<name>/index.vue` |
+| `order-action`, `product-action`, `customer-action` | `commera/<record>/actions/<name>/index.vue` and a whitelisted `<name>_<record>(name)` in your `api.py` |
+| `settings` | `commera/settings/index.vue` (no name: one per plugin) |
+| `command` | `commera/commands/<name>/index.vue` and a whitelisted `<name>()` in your `api.py` |
+
+The command never overwrites: it stops when the placement or the method already exists.
+
 ## Placements
 
 The folder decides where a plugin goes. `places.json` is the one list; Commera's server reads it too.
