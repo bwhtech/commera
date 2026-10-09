@@ -14,7 +14,7 @@ my_app/                              # app root
 │   ├── order/cards/status/index.vue # a card on the order page
 │   ├── order/actions/resend/index.vue
 │   ├── settings/index.vue           # the app's Settings tab
-│   ├── icon.svg                     # optional app icon
+│   ├── plugin-icon.svg              # optional app logo
 │   └── shared/                      # anything else is your own code
 └── my_app/public/commera/           # build output, gitignored
 ```
@@ -86,7 +86,7 @@ export const plugin = {
 - `condition` and `method` are dotted paths that start with your app's module name. A page or settings
   `condition` takes no arguments; a card or action `condition` gets `(doctype, name)`. A command `condition`
   takes no arguments, like a page's.
-- `icon` is optional; without it the entry uses the app's icon (`commera/icon.svg`). It is a name from
+- `icon` is optional; without it the entry uses the app's icon (`commera/plugin-icon.svg`). It is a name from
   `commera/sdk/plugin_icons.json`.
 
 Every other folder and file under `commera/` is yours: components, composables, sub-pages. Only an
@@ -109,12 +109,14 @@ has no `plugin` block: it shares the page's sidebar row, `requires` and `conditi
 
 ## App logo
 
-Put an optional `commera/icon.svg` next to `pages/`. Set it once: it is the icon of everything your app
-adds, from the sidebar and Settings → Plugins to your settings tab, palette rows and More actions rows. An entry
-with its own `icon` shows that one instead. The logo is drawn in one colour, the same ink as the other icons,
-in light and dark mode. Draw it on a 24 × 24 viewBox with filled shapes or strokes; the colours in the file are
-ignored. Without it, the app's sidebar row uses the first page's `icon`, and an entry without an `icon` uses
-the dashboard's generic one.
+Put an optional `commera/plugin-icon.svg` next to `pages/`. `bench commera init` writes a placeholder there:
+the Commera logo in violet. It is the icon of everything your app adds, from the sidebar and Settings → Plugins
+to your settings tab, palette rows and More actions rows. An entry with its own `icon` shows that one instead,
+and an app with only one page shows that page's `icon` in the sidebar when it has one.
+
+The logo shows as it is, in its own colours, so pick one that reads on both a light and a dark sidebar. A
+`currentColor` in the file draws black. Without a logo, the sidebar row uses the first page's `icon`, and an
+entry without an `icon` uses the dashboard's generic one.
 
 ## The dashboard draws the frame
 
@@ -143,7 +145,7 @@ Throw `request.error` from `onSubmit` and the dialog shows it once.
 - Builds each placement with a template to `my_app/public/commera/<place>/<name>.js` (`settings.js` for
   the settings tab). Shared code goes to `chunks/`.
 - Strips the plain `<script>` from the shipped JS, so dotted paths only live in the manifest.
-- Copies `commera/icon.svg`, if there is one, to `my_app/public/commera/icon.svg` and adds `"icon": "icon.svg"`
+- Copies `commera/plugin-icon.svg`, if there is one, to `my_app/public/commera/plugin-icon.svg` and adds `"icon": "plugin-icon.svg"`
   to the manifest.
 - Does not bundle `vue`, `frappe-ui`, `frappe-ui/list`, `frappe-ui/charts` or `@commera/admin`. The dashboard
   supplies them at runtime through its import map.
@@ -168,7 +170,7 @@ Folder and `plugin` problems are collected and reported together.
 | A dotted path outside the app | `condition: 'frappe.client.get_list'` |
 | Drawing a frame the dashboard owns | importing `AppPageHeader`, `PageBody` or `PluginCard`, or frappe-ui's `Dialog` |
 | A frappe-ui resource that calls Frappe's v1 API | importing `createResource`, `createListResource`, `createDocumentResource`, `useCall`, `useList`, `useDoc`, `useDoctype`, `useNewDoc`, `frappeRequest` or `call` from `frappe-ui` |
-| An `icon.svg` that is not a plain SVG | over 20 kB, not an `<svg>`, a `<script>`, an `on*` attribute, or an `href` that is not `#id` |
+| A `plugin-icon.svg` that is not a plain SVG | over 20 kB, not an `<svg>`, a `<script>`, an `on*` attribute, or an `href` that is not `#id` |
 | A `<style>` block or a stylesheet import | `<style>.x { color: red }</style>` |
 | A static class the dashboard does not ship | `class="p-13"` |
 | A name the dashboard's shared modules do not export | `import { Foo } from 'frappe-ui'` |

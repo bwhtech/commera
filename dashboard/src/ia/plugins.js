@@ -31,9 +31,11 @@ function logoIcon(iconUrl) {
   return logoIcons.get(iconUrl)
 }
 
-// An app without its own logo borrows its first page's icon.
+// A one-page app is that page, so the page's own icon wins; otherwise the logo, then the first page's icon.
 export function appIcon(app, iconUrl = apps[app]?.icon_url) {
-  return iconUrl ? logoIcon(iconUrl) : lucideIcon(appPages(app)[0]?.icon)
+  const pages = appPages(app)
+  if (pages.length === 1 && pages[0].icon) return lucideIcon(pages[0].icon)
+  return iconUrl ? logoIcon(iconUrl) : lucideIcon(pages[0]?.icon)
 }
 
 // An entry's own icon wins; without one it wears its app's logo, then the place's generic icon.
