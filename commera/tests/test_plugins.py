@@ -226,6 +226,21 @@ class TestPluginDiscovery(PluginTestCase):
 		self.assertEqual([entry["key"] for entry in plugins["entries"]], [f"{APP}:pages:jobs"])
 		self.assertEqual(plugins["problems"], [])
 
+	def test_commera_plugin_title_names_the_plugin_over_app_title(self):
+		patch_app_declarations(
+			self,
+			{
+				APP: {
+					"commera_api_version": [API_VERSION],
+					"app_title": ["Shipping"],
+					"commera_plugin_title": ["Ship it"],
+				}
+			},
+		)
+		self.write_manifest([page()])
+
+		self.assertEqual(get_registry()["apps"], {APP: {"title": "Ship it"}})
+
 	def test_a_malformed_manifest_is_logged_and_the_other_apps_survive(self):
 		self.write_asset(OTHER_APP, "manifest.json", "{not json")
 		self.write_manifest([page()])

@@ -134,7 +134,10 @@ def add_problem(registry: dict, app: str, subject: str, reason: str):
 
 
 def get_app_title(app: str) -> str:
-	return (frappe.get_hooks("app_title", app_name=app) or [app])[0]
+	titles = frappe.get_hooks("commera_plugin_title", app_name=app) or frappe.get_hooks(
+		"app_title", app_name=app
+	)
+	return (titles or [app])[0]
 
 
 def get_version_error(manifest: dict) -> str | None:

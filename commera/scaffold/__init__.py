@@ -42,7 +42,9 @@ class AppScaffold:
 
 	def add_hooks(self):
 		text = self.hooks_path.read_text()
-		updated = set_commera_api_version(set_required_apps(text))
+		updated = set_commera_plugin_title(
+			set_commera_api_version(set_required_apps(text)), self.get_app_title()
+		)
 		self.write_change(self.hooks_path, updated, text != updated)
 
 	def add_package_json(self):
@@ -174,6 +176,16 @@ def set_commera_api_version(text: str) -> str:
 		return text
 	statement = f"commera_api_version = [{API_VERSION}]\n"
 	return insert_after(text.splitlines(keepends=True), assignments["required_apps"].end_lineno, statement)
+
+
+def set_commera_plugin_title(text: str, title: str) -> str:
+	assignments = get_assignments(text)
+	if "commera_plugin_title" in assignments:
+		return text
+	statement = f"commera_plugin_title = {json.dumps(title)}\n"
+	return insert_after(
+		text.splitlines(keepends=True), assignments["commera_api_version"].end_lineno, statement
+	)
 
 
 def get_metadata_end(text: str) -> int:
