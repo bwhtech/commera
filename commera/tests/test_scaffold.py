@@ -55,6 +55,7 @@ class TestScaffold(UnitTestCase):
 		hooks = get_hooks(app_root)
 		self.assertEqual(hooks["required_apps"], ["commera"])
 		self.assertEqual(hooks["commera_api_version"], [API_VERSION])
+		self.assertEqual(hooks["commera_plugin_title"], "Test Plugin")
 
 		package = json.loads((app_root / "package.json").read_text())
 		self.assertEqual(package["scripts"]["build"], "vite build --config commera/vite.config.js")
@@ -138,7 +139,7 @@ class TestScaffold(UnitTestCase):
 		self.assertEqual(
 			hooks_path.read_text(),
 			f'app_name = "x"\napp_title = "X"\nrequired_apps = ["commera"]\ncommera_api_version = [{API_VERSION}]\n'
-			"\ndoc_events = {}\n",
+			'commera_plugin_title = "X"\n\ndoc_events = {}\n',
 		)
 
 	def test_scaffold_refuses_commera_and_missing_apps(self):
