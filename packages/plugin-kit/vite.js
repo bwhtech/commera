@@ -524,7 +524,7 @@ function guard({ hostDir, compiler, pluginFiles, pageEntries }) {
 			if (id.includes('/node_modules/')) return;
 			if (id.includes('?vue&type=style') || STYLESHEET.test(id)) {
 				this.error(
-					'app pages ship no CSS; use frappe-ui components and dashboard classes',
+					'app pages ship no CSS; use frappe-ui components and Tailwind classes',
 				);
 			}
 			if (!id.endsWith('.vue')) return;
@@ -533,8 +533,10 @@ function guard({ hostDir, compiler, pluginFiles, pageEntries }) {
 					(name) => !knownClassSet.has(name),
 				);
 				if (unknown.length) {
-					this.error(
-						`classes the dashboard does not ship: ${unknown.join(', ')}`,
+					this.warn(
+						`classes not in the dashboard's stylesheet yet: ${unknown.join(
+							', ',
+						)}; run bench build --app commera to add them`,
 					);
 				}
 			}

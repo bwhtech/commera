@@ -186,12 +186,16 @@ Folder and `plugin` problems are collected and reported together.
 | A frappe-ui resource that calls Frappe's v1 API | importing `createResource`, `createListResource`, `createDocumentResource`, `useCall`, `useList`, `useDoc`, `useDoctype`, `useNewDoc`, `frappeRequest` or `call` from `frappe-ui` |
 | A `plugin-icon.svg` that is not a plain SVG | over 20 kB, not an `<svg>`, a `<script>`, an `on*` attribute, or an `href` that is not `#id` |
 | A `<style>` block or a stylesheet import | `<style>.x { color: red }</style>` |
-| A static class the dashboard does not ship | `class="p-13"` |
 | A name the dashboard's shared modules do not export | `import { Foo } from 'frappe-ui'` |
 | A subpath that is not shared | `import { TextEditor } from 'frappe-ui/editor'` |
 
 An `index.vue` under a reserved folder (`orders/actions`, `orders/selection`, `products/actions`,
 `products/selection`, `customers/actions`) only warns: those placements come in a later Commera.
+
+Any frappe-ui or Tailwind class works. The plugin ships no CSS: the dashboard's Tailwind reads every installed
+plugin's `commera/` folder, so plugin classes join its one stylesheet in Tailwind's order. `yarn dev` in the
+dashboard adds a new class on save. In production a new class is styled after `bench build --app commera` or
+`bench build`; a plugin-only build warns which classes are waiting for it.
 
 The class, export and icon checks read `commera/public/plugin-host/`, which the Commera dashboard build
 writes. If that folder is missing, the build warns and skips them; if it is from an older Commera, a missing

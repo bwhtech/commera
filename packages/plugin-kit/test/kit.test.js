@@ -348,16 +348,14 @@ describe('guards', () => {
 		);
 	});
 
-	test('a class the dashboard does not ship fails', async () => {
-		await buildFails(
-			{
-				'pages/jobs/index.vue': vue(
-					`{ label: 'Jobs', icon: 'printer' }`,
-					'<template><div class="p-13" /></template>',
-				),
-			},
-			/classes the dashboard does not ship: p-13/,
-		);
+	test('a class the dashboard does not ship yet still builds', async () => {
+		const { manifest } = await buildApp({
+			'pages/jobs/index.vue': vue(
+				`{ label: 'Jobs', icon: 'printer' }`,
+				'<template><div class="p-13" /></template>',
+			),
+		});
+		assert.equal(manifest.entries.length, 1);
 	});
 
 	test('an unshared subpath fails', async () => {
