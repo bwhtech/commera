@@ -31,7 +31,8 @@ you don't use.
   and the like call Frappe's v1 API, which the dashboard reads as null, so they fail the build.
 - Import shared code only from `vue`, `frappe-ui`, `frappe-ui/list`, `frappe-ui/charts` and `@commera/admin`;
   the dashboard supplies them. Any other `frappe-ui/` subpath fails the build.
-- No `<style>` blocks: use the frappe-ui classes the dashboard already ships.
+- No `<style>` blocks: use frappe-ui and Tailwind classes. In production, run `bench build --app commera` after
+  adding a class no other screen uses.
 - Folders that are not in the table are ignored. Put shared components and helpers in any other folder,
   for example `commera/shared/`, and import them with a relative path.
 
