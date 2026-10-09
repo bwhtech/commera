@@ -33,7 +33,8 @@ def init(skip_install: bool):
 		except (FileNotFoundError, subprocess.CalledProcessError) as error:
 			raise click.ClickException(f"yarn install failed in {scaffold.app_root}: {error}")
 
-	click.secho(f"Next: bench build --app {app}, then open /commera", fg="green")
+	click.secho("Next: run yarn dev in apps/commera/dashboard, then open /commera on port 8080", fg="green")
+	click.echo(f"For production: bench build --app {app}")
 
 
 @commera_commands.command("add")

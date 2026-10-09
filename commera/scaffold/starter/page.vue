@@ -24,8 +24,8 @@ usePage().setActions([
     <EmptyState
       v-if="!ordersToday"
       icon="lucide-$icon"
-      title="No store orders today"
-      description="This page reads $app_name.api.get_summary. Build it in commera/pages/$page_name/index.vue, then run bench build --app $app_name."
+      title="Your awesome plugin"
+      description="Edit commera/pages/$page_name/index.vue. With yarn dev running in apps/commera/dashboard, this page updates each time you save."
     />
     <div v-else>
       <p class="text-sm text-ink-gray-5">Store orders today</p>
