@@ -1,7 +1,10 @@
-"""One-shot seeder for a Summer storefront demo site, in whatever currency it is handed.
+"""One-shot seeder for a Summer storefront demo site, in the currency of the company it seeds.
 create_price_lists is skipped: it hardcodes USD, which blocks Sales Invoices on a non-USD company."""
 
+import math
+
 import frappe
+from erpnext.setup.utils import get_exchange_rate
 from frappe.permissions import add_permission, update_permission_property
 from frappe.utils.data import flt
 
@@ -25,14 +28,11 @@ SHIPPING_RULE = "Standard Shipping"
 COD_CHARGE_ACCOUNT = "Cash on Delivery Charges"
 SHOPPER_ROLE = "Customer"
 
-DEFAULT_CURRENCY = "SAR"
-
-# FASHION_PRODUCTS carries dollar-scale numbers, so price_multiplier restates them in the site's own
+# FASHION_PRODUCTS carries dollar-scale numbers, so price_multiplier restates them in the company's own
 # currency. Rates are recomputed from it on every run - scaling in place would compound on a re-run.
+# A currency listed here gets prices a local shopper expects; any other is derived from DOLLAR_PROFILE.
 CURRENCY_PROFILES = {
 	"SAR": {
-		"country": "Saudi Arabia",
-		"symbol": "ر.س",
 		"price_multiplier": 3.75,
 		"price_rounding": 10,
 		"free_shipping_above": 299,
@@ -42,8 +42,6 @@ CURRENCY_PROFILES = {
 		"contact_phone": "+966 55 123 4567",
 	},
 	"INR": {
-		"country": "India",
-		"symbol": "₹",
 		"price_multiplier": 50,
 		"price_rounding": 100,
 		"free_shipping_above": 999,
@@ -52,6 +50,22 @@ CURRENCY_PROFILES = {
 		"cod_charge_applicable_below": 999,
 		"contact_phone": "+91 98765 43210",
 	},
+	"IDR": {
+		"price_multiplier": 16000,
+		"price_rounding": 1000,
+		"free_shipping_above": 300000,
+		"flat_shipping_charge": 15000,
+		"cod_charge": 5000,
+		"cod_charge_applicable_below": 300000,
+		"contact_phone": "+62 812 3456 7890",
+	},
+}
+
+DOLLAR_PROFILE = {
+	"free_shipping_above": 80,
+	"flat_shipping_charge": 7,
+	"cod_charge": 4,
+	"cod_charge_applicable_below": 80,
 }
 
 DEFAULT_HOMEPAGE_IMAGES = "/assets/commera/images/homepage/demo"
@@ -106,11 +120,13 @@ FOOTER_SECTIONS = (
 )
 
 
-def install_summer_demo(currency=DEFAULT_CURRENCY):
-	"""Seed a demo storefront end to end in `currency`. Safe to re-run."""
+def install_summer_demo():
+	"""Seed a demo storefront end to end in the company's own currency. Safe to re-run."""
+	company = get_demo_company()
+	currency, country = frappe.db.get_value("Company", company, ["default_currency", "country"])
 	profile = get_currency_profile(currency)
 
-	configure_site_defaults(currency, profile)
+	configure_site_defaults(currency, country)
 	align_store_currency(currency)
 	save_sale_price_list(currency)
 	create_item_attributes()
@@ -143,15 +159,44 @@ def install_summer_demo(currency=DEFAULT_CURRENCY):
 
 
 def get_currency_profile(currency):
-	profile = CURRENCY_PROFILES.get(currency)
-	if not profile:
+	symbol = frappe.db.get_value("Currency", currency, "symbol") or currency
+	if currency in CURRENCY_PROFILES:
+		return {**CURRENCY_PROFILES[currency], "symbol": symbol}
+
+	rate = 1 if currency == "USD" else flt(get_exchange_rate("USD", currency))
+	if not rate:
 		frappe.throw(
-			frappe._("No demo currency profile for {0}. Known: {1}.").format(
-				currency, ", ".join(sorted(CURRENCY_PROFILES))
-			)
+			frappe._(
+				"Demo data has no price profile for {0} and no USD exchange rate to derive one. "
+				"Add a Currency Exchange from USD to {0}, or use one of: {1}."
+			).format(currency, ", ".join(sorted(CURRENCY_PROFILES)))
 		)
 
+	# One rounding step per order of magnitude of the rate: 3.75 rounds to tens, 16,000 to ten-thousands.
+	step = 10 ** max(0, round(math.log10(rate)))
+	profile = {"symbol": symbol, "price_multiplier": rate, "price_rounding": step}
+	for key, amount in DOLLAR_PROFILE.items():
+		profile[key] = max(step, round(amount * rate / step) * step)
+
 	return profile
+
+
+def get_demo_company():
+	"""The company to seed, refused until the setup wizard has given it a currency and a chart."""
+	company = get_company()
+	if not company or not frappe.db.exists("Company", company):
+		frappe.throw(frappe._("Please set up a company first by completing the setup wizard."))
+
+	if not frappe.db.get_value("Company", company, "default_currency") or not frappe.db.exists(
+		"Account", {"company": company}
+	):
+		frappe.throw(
+			frappe._(
+				"Please finish setting up {0} first: it needs a default currency and a chart of accounts."
+			).format(company)
+		)
+
+	return company
 
 
 def seed_storefront_analytics():
@@ -160,16 +205,16 @@ def seed_storefront_analytics():
 	install_analytics_demo_data()
 
 
-def configure_site_defaults(currency, profile):
+def configure_site_defaults(currency, country):
 	"""The site-level settings that silently break a paid checkout later."""
 	# A blank System Settings.language crashes money_in_words (num2words(lang=None)) on every invoice;
 	# a Contact whose email_id is not an address is rejected by the gateways.
 	frappe.db.set_single_value("System Settings", "language", "en")
-	frappe.db.set_single_value("System Settings", "country", profile["country"])
+	frappe.db.set_single_value("System Settings", "country", country)
 	frappe.db.set_default("currency", currency)
 	# A second, separate currency surface: utils.get_currency_symbol reads Global Defaults, not this default.
 	frappe.db.set_single_value("Global Defaults", "default_currency", currency)
-	frappe.db.set_single_value("Global Defaults", "country", profile["country"])
+	frappe.db.set_single_value("Global Defaults", "country", country)
 	# Frappe ships most currencies disabled, and a disabled one cannot be picked on any document.
 	frappe.db.set_value("Currency", currency, "enabled", 1)
 
@@ -181,19 +226,9 @@ def configure_site_defaults(currency, profile):
 
 
 def align_store_currency(currency):
-	"""Put the company, its accounts and every price its catalogue carries into one currency."""
-	# The three-way mismatch this undoes (system INR, company SAR, price list USD) throws
-	# "Party Account ... currency and document currency should be same" on every Sales Invoice.
-	company = get_company()
-	frappe.db.set_value("Company", company, "default_currency", currency)
-
-	# ponytail: written straight to the table because ERPNext refuses a currency change once a
-	# company has transactions — safe on a seeded demo, revisit if this is ever run on a live store.
-	account = frappe.qb.DocType("Account")
-	frappe.qb.update(account).set(account.account_currency, currency).where(
-		(account.company == company) & (account.account_currency != currency)
-	).run()
-
+	"""Put every price the catalogue carries into the company's currency; the company itself is left alone."""
+	# A price list in another currency (USD from install_demo_data) throws "Party Account ... currency
+	# and document currency should be same" on every Sales Invoice.
 	price_list = frappe.qb.DocType("Price List")
 	frappe.qb.update(price_list).set(price_list.currency, currency).where(
 		price_list.currency != currency
@@ -288,7 +323,8 @@ def apply_store_copy(profile):
 	# Without this, set_cod_charges throws "Please select a valid account for cod charges".
 	settings.charge_account_head = ensure_cod_charge_account()
 
-	settings.contact_phone = profile["contact_phone"]
+	if profile.get("contact_phone"):
+		settings.contact_phone = profile["contact_phone"]
 	for fieldname, value in STORE_COPY.items():
 		settings.set(fieldname, value)
 
@@ -462,18 +498,34 @@ def allow_shoppers_to_select_accounts():
 
 def get_freight_account():
 	company = get_company()
-	abbr = frappe.db.get_value("Company", company, "abbr")
+	account = frappe.db.get_value(
+		"Account", {"account_name": "Freight and Forwarding Charges", "company": company}, "name"
+	)
+	if account:
+		return account
+
+	# Only the standard chart ships this account; country charts don't, so make it where the
+	# standard chart would put it, or under the deepest expense group the chart has.
+	expense_group = {"company": company, "root_type": "Expense", "is_group": 1}
+	parent_account = frappe.db.get_value(
+		"Account", {**expense_group, "account_name": "Stock Expenses"}, "name"
+	) or frappe.db.get_value("Account", expense_group, "name", order_by="lft desc")
 	return (
-		frappe.db.get_value(
-			"Account", {"account_name": "Freight and Forwarding Charges", "company": company}, "name"
+		frappe.get_doc(
+			{
+				"doctype": "Account",
+				"account_name": "Freight and Forwarding Charges",
+				"company": company,
+				"parent_account": parent_account,
+				"account_type": "Chargeable",
+				"root_type": "Expense",
+				"is_group": 0,
+			}
 		)
-		or f"Freight and Forwarding Charges - {abbr}"
+		.insert(ignore_permissions=True)
+		.name
 	)
 
 
 def get_company():
 	return frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
-
-
-def get_company_currency():
-	return frappe.db.get_value("Company", get_company(), "default_currency") or DEFAULT_CURRENCY
