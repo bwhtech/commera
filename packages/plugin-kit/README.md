@@ -182,7 +182,7 @@ Folder and `plugin` problems are collected and reported together.
 | A command with a template or `<script setup>` | `commands/sync/index.vue` with a `<template>` |
 | An icon not in the list | `icon: 'printr'` |
 | A dotted path outside the app | `condition: 'frappe.client.get_list'` |
-| Drawing a frame the dashboard owns | importing `AppPageHeader`, `PageBody` or `PluginCard`, or frappe-ui's `Dialog` |
+| Drawing a frame the dashboard owns | importing `AppPageHeader`, `PageBody` or `PluginCard` |
 | A frappe-ui resource that calls Frappe's v1 API | importing `createResource`, `createListResource`, `createDocumentResource`, `useCall`, `useList`, `useDoc`, `useDoctype`, `useNewDoc`, `frappeRequest` or `call` from `frappe-ui` |
 | A `plugin-icon.svg` that is not a plain SVG | over 20 kB, not an `<svg>`, a `<script>`, an `on*` attribute, or an `href` that is not `#id` |
 | A `<style>` block or a stylesheet import | `<style>.x { color: red }</style>` |
