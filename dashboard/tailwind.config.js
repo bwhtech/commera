@@ -16,7 +16,7 @@ export default {
     ...frappeUIContent,
     './index.html',
     './src/**/*.{vue,js,ts,jsx,tsx}',
-    ...readPluginApps().map((app) => `${sourceDirOf(app)}/**/*.vue`),
+    ...readPluginApps().map((app) => `${sourceDirOf(app)}/**/*.{vue,js,ts}`),
   ],
   safelist: pluginIcons.map((name) => `lucide-${name}`),
 }
