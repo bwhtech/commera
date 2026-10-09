@@ -35,6 +35,14 @@ you don't use.
 - Folders that are not in the table are ignored. Put shared components and helpers in any other folder,
   for example `commera/shared/`, and import them with a relative path.
 
+## Add a placement
+
+`bench commera add <kind> <name>`, run in this app's folder, writes one placement with a starter that builds.
+Kinds: `page`, `order-card`, `product-card`, `customer-card`, `order-action`, `product-action`,
+`customer-action`, `settings` (no name) and `command`. `bench commera add page <name> --detail` also writes the
+page's `[...id].vue`. Actions and commands also get a whitelisted method in
+`$app_name/api.py`. Nothing is overwritten.
+
 ## Starters
 
 `bench commera init` wrote a starter page that calls `$app_name.api.get_summary` in `$app_name/api.py`.

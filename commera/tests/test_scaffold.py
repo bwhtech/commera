@@ -9,7 +9,7 @@ from frappe.tests import UnitTestCase
 from frappe.utils.boilerplate import _create_app_boilerplate
 
 from commera.plugins.places import ICONS, PLACES
-from commera.scaffold import AppScaffold, get_app_from_folder, get_dashboard_versions
+from commera.scaffold import PLACE_KINDS, AppScaffold, get_app_from_folder, get_dashboard_versions
 from commera.sdk import API_VERSION
 
 APP = "commera_test_plugin"
@@ -160,3 +160,76 @@ class TestScaffold(UnitTestCase):
 		for folder in (self.apps_path, self.apps_path.parent):
 			with self.assertRaisesRegex(click.ClickException, "cd apps/<your_app>"):
 				get_app_from_folder(folder, self.apps_path)
+
+
+class TestAddPlace(UnitTestCase):
+	def setUp(self):
+		self.directory = tempfile.TemporaryDirectory()
+		self.apps_path = Path(self.directory.name)
+		self.addCleanup(self.directory.cleanup)
+		self.app_root = make_app(self.apps_path)
+		AppScaffold(APP, self.apps_path).save()
+
+	def add(self, kind: str, name: str | None = None) -> list[tuple[str, str]]:
+		return AppScaffold(APP, self.apps_path).add_place(kind, name)
+
+	def test_every_placement_folder_has_a_kind(self):
+		self.assertEqual({place for place, _starter in PLACE_KINDS.values()}, set(PLACES))
+
+	def test_each_kind_writes_its_placement_with_a_plugin_block(self):
+		for kind, (place, _starter) in PLACE_KINDS.items():
+			name = None if kind == "settings" else "first-one"
+			self.add(kind, name)
+			folder = "settings" if kind == "settings" else f"{place}/first-one"
+			source = (self.app_root / "commera" / folder / "index.vue").read_text()
+			self.assertIn("export const plugin = {", source, kind)
+			self.assertNotIn("$", source.replace("${", ""), kind)
+
+	def test_an_action_gets_a_whitelisted_method_that_checks_the_record(self):
+		self.add("order-action", "resend")
+
+		page = (self.app_root / "commera" / "order/actions/resend/index.vue").read_text()
+		self.assertIn(f"method: '{APP}.api.resend_order'", page)
+		api = self.load_api()
+		self.assertIn(api.resend_order, frappe.whitelisted)
+		with self.assertRaises(frappe.DoesNotExistError):
+			api.resend_order(name="no-such-order")
+
+	def test_a_command_gets_a_method_without_arguments(self):
+		self.add("command", "sync-now")
+
+		self.assertEqual(self.load_api().sync_now(), "Sync now ran")
+
+	def test_an_existing_placement_or_method_is_not_overwritten(self):
+		self.add("order-card", "status")
+		with self.assertRaisesRegex(click.ClickException, "already exists"):
+			self.add("order-card", "status")
+		self.add("order-action", "resend")
+		(self.app_root / "commera" / "order/actions/resend").rename(self.app_root / "commera" / "moved")
+		with self.assertRaisesRegex(click.ClickException, "already has resend_order"):
+			self.add("order-action", "resend")
+
+	def test_a_page_with_detail_gets_a_detail_view_that_its_list_opens(self):
+		AppScaffold(APP, self.apps_path).add_place("page", "jobs", detail=True)
+
+		folder = self.app_root / "commera" / "pages" / "jobs"
+		self.assertIn("navigate('jobs/EXAMPLE-0001')", (folder / "index.vue").read_text())
+		self.assertIn("defineProps({ id: String })", (folder / "[...id].vue").read_text())
+
+	def test_only_a_page_takes_detail(self):
+		with self.assertRaisesRegex(click.ClickException, "only goes with a page"):
+			AppScaffold(APP, self.apps_path).add_place("order-card", "status", detail=True)
+
+	def test_a_bad_kind_or_name_is_refused(self):
+		with self.assertRaisesRegex(click.ClickException, "Add one of: page, order-card"):
+			self.add("orders-card", "status")
+		with self.assertRaisesRegex(click.ClickException, "lowercase letters"):
+			self.add("page", "Print_Jobs")
+		with self.assertRaisesRegex(click.ClickException, "lowercase letters"):
+			self.add("page")
+
+	def load_api(self):
+		spec = importlib.util.spec_from_file_location("commera.starter_api", self.app_root / APP / "api.py")
+		module = importlib.util.module_from_spec(spec)
+		spec.loader.exec_module(module)
+		return module
