@@ -5,25 +5,11 @@ import { fileURLToPath } from 'node:url'
 import { searchForWorkspaceRoot } from 'vite'
 import * as compiler from 'vue/compiler-sfc'
 import { discoverPlugins, pageEntryCode } from '../packages/plugin-kit/vite.js'
+import { BENCH, readPluginApps, sourceDirOf } from './pluginApps.js'
 
 const PREFIX = '/@commera-plugin/'
 const VIRTUAL = '\0commera-plugin:'
 const CONFIG_TIMESTAMP = /\.timestamp-\d+-\w+\.mjs$/
-const BENCH = fileURLToPath(new URL('../../..', import.meta.url))
-
-function readPluginApps() {
-  const appsFile = join(BENCH, 'sites', 'apps.txt')
-  if (!existsSync(appsFile)) return []
-  return readFileSync(appsFile, 'utf8')
-    .split('\n')
-    .map((app) => app.trim())
-    .filter((app) => app && app !== 'commera' && existsSync(join(BENCH, 'apps', app, 'commera')))
-}
-
-function sourceDirOf(app) {
-  return join(BENCH, 'apps', app, 'commera')
-}
-
 // Without the hashes, which change on every edit, so only a new placement or changed plugin field reloads the page.
 function placementsOf(app) {
   const path = join(BENCH, 'apps', app, app, 'public', 'commera', 'manifest.json')

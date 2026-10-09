@@ -189,7 +189,8 @@ in place, without a reload. Each save also runs the app's `yarn build` in the ba
 in the error overlay, and a new placement or a changed `plugin` field reloads the page. When an installed app gets
 a `commera/` folder, for example from `bench commera init`, the dev server restarts itself to load it.
 
-Your app has no `yarn dev` of its own. In production, run `bench build --app my_app`, or `bench clear-cache` after
+Your app has no `yarn dev` of its own. `bench build --app commera` builds every installed plugin after the
+dashboard. In production, run `bench build --app my_app`, or `bench clear-cache` after
 a `yarn build`, so the manifest is re-read.
 
 Run the kit's own tests with `node --test test/*.test.js` (they build with the dashboard's `node_modules`).
