@@ -4,6 +4,7 @@
 import os
 
 import frappe
+from frappe import _
 from markupsafe import Markup
 
 from commera.guest import is_guest
@@ -120,6 +121,22 @@ def sync_storefront_apps(app_name: str | None = None):
 		settings.append("storefront_apps", {"app": app, "enabled": 0}).db_insert()
 
 	frappe.clear_document_cache(SETTINGS, SETTINGS)
+	clear_storefront_plugin_cache()
+
+
+def get_storefront_switches() -> dict[str, bool]:
+	"""Each app that declares a storefront hook, and whether the merchant has it switched on."""
+	settings = frappe.get_cached_doc(SETTINGS)
+	return {row.app: bool(row.enabled) for row in settings.storefront_apps}
+
+
+def set_storefront_enabled(app: str, enabled: bool):
+	settings = frappe.get_single(SETTINGS)
+	row = next((row for row in settings.storefront_apps if row.app == app), None)
+	if not row:
+		frappe.throw(_("{0} adds nothing to the storefront.").format(app))
+	row.enabled = int(enabled)
+	settings.save()
 	clear_storefront_plugin_cache()
 
 
