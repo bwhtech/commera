@@ -33,14 +33,6 @@ const SKIPPED_DIRS = new Set(['node_modules', 'dist']);
 const ICON_FILE = 'plugin-icon.svg';
 const ICON_LIMIT = 20 * 1024;
 
-// The host draws these frames itself, so an app that draws its own gets two headers or a dialog on a dialog.
-const HOST_FRAMES = {
-	'frappe-ui': {
-		Dialog:
-			'Commera draws action dialogs; put the form in an action and drive its button with useAction()',
-	},
-};
-
 const FRAPPE_V1 = new Set([
 	'createResource',
 	'createListResource',
@@ -556,12 +548,6 @@ function guard({ hostDir, compiler, pluginFiles, pageEntries }) {
 				for (const [specifier, names] of Object.entries(
 					chunk.importedBindings,
 				)) {
-					const frames = HOST_FRAMES[specifier] ?? {};
-					for (const name of names.filter((name) => frames[name])) {
-						problems.push(
-							`${chunk.fileName}: do not import ${name} from '${specifier}': ${frames[name]}`,
-						);
-					}
 					const callsV1 = (name) =>
 						specifier === 'frappe-ui' && FRAPPE_V1.has(name);
 					for (const name of names.filter(callsV1)) {
@@ -573,10 +559,7 @@ function guard({ hostDir, compiler, pluginFiles, pageEntries }) {
 					const available = sharedExports[specifier] ?? [];
 					const missing = names.filter(
 						(name) =>
-							name !== '*' &&
-							!frames[name] &&
-							!callsV1(name) &&
-							!available.includes(name),
+							name !== '*' && !callsV1(name) && !available.includes(name),
 					);
 					if (missing.length) {
 						problems.push(

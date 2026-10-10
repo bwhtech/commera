@@ -412,20 +412,15 @@ describe('guards', () => {
 		});
 	}
 
-	for (const [name, specifier, hint] of [
-		['Dialog', 'frappe-ui', /useAction\(\)/],
-	]) {
-		test(`importing ${name} fails and points at the host`, async () => {
-			await buildFails(
-				{
-					'pages/jobs/index.vue': `${page}<script setup>\nimport { ${name} } from '${specifier}'\nconsole.log(${name})\n</script>\n`,
-				},
-				new RegExp(
-					`do not import ${name} from '${specifier}'[\\s\\S]*${hint.source}`,
-				),
-			);
+	test('a page and an action may each open their own Dialog', async () => {
+		await buildApp({
+			'pages/jobs/index.vue': `${page}<script setup>\nimport { Dialog } from 'frappe-ui'\nconsole.log(Dialog)\n</script>\n`,
+			'order/actions/resend/index.vue': vue(
+				`{ label: 'Resend' }`,
+				`<template><div class="p-2" /></template>\n<script setup>\nimport { Dialog } from 'frappe-ui'\nconsole.log(Dialog)\n</script>`,
+			),
 		});
-	}
+	});
 
 	for (const name of ['createResource', 'useCall', 'useList', 'call']) {
 		test(`importing ${name} from frappe-ui fails and points at useMethodRead`, async () => {
@@ -446,19 +441,6 @@ describe('guards', () => {
 			);
 		});
 	}
-
-	test('a Dialog in shared code fails too', async () => {
-		await buildFails(
-			{
-				'order/actions/resend/index.vue': vue(
-					`{ label: 'Resend' }`,
-					`<template><div class="p-2" /></template>\n<script setup>\nimport { open } from '../../../shared/open.js'\nopen()\n</script>`,
-				),
-				'shared/open.js': `import { Dialog } from 'frappe-ui'\nexport const open = () => console.log(Dialog)\n`,
-			},
-			/do not import Dialog from 'frappe-ui'/,
-		);
-	});
 });
 
 describe('detail pages', () => {
