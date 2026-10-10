@@ -370,7 +370,7 @@ export function discoverPlugins(
 				isIndex
 					? `${display} declares a plugin block but ${placeOf(
 							folder,
-						)} isn't a Commera placement; valid places:\n${placementTable()}`
+					  )} isn't a Commera placement; valid places:\n${placementTable()}`
 					: `${display} declares a plugin block, but only a placement's index.vue may; valid places:\n${placementTable()}`,
 			);
 			continue;
