@@ -1,10 +1,11 @@
 <script setup>
-import { computed, onErrorCaptured, provide, ref, shallowRef, toRef } from 'vue'
+import { computed, defineComponent, onErrorCaptured, provide, ref, shallowRef, toRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'frappe-ui'
 import { __, PLUGIN_CONTEXT } from '../plugin-api/context'
 import EmptyState from './EmptyState.vue'
-import { appLocation } from '../ia/plugins'
+import { appLocation, settingsTabValue } from '../ia/plugins'
+import { openSettings } from '../ia/settings'
 
 const props = defineProps({
   entry: { type: Object, required: true },
@@ -40,6 +41,8 @@ provide(PLUGIN_CONTEXT, {
   record: toRef(props, 'record'),
   reload: () => emit('reload'),
   navigate,
+  // No tab opens the plugin's own Settings tab; a Commera tab name such as 'payments' opens that one.
+  openSettings: (tab) => openSettings(tab ?? settingsTabValue(props.entry.app)),
   toast,
   __,
 })
@@ -50,10 +53,23 @@ async function load() {
   try {
     const { app, place, name, module_url } = props.entry
     const url = import.meta.env.DEV ? `/@commera-plugin/${app}/${place}/${name}` : module_url
-    Plugin.value = (await import(/* @vite-ignore */ url)).default
+    const module = (await import(/* @vite-ignore */ url)).default
+    Plugin.value = place === 'sidebar' ? runOnly(module) : module
   } catch (error) {
     fail(error)
   }
+}
+
+// A sidebar action has a <script setup> and no template: run its setup inside a component that draws nothing,
+// so usePlugin() and the other composables still find this host's context.
+function runOnly(module) {
+  return defineComponent({
+    name: 'PluginSidebarAction',
+    setup(_props, context) {
+      module.setup?.({}, context)
+      return () => null
+    },
+  })
 }
 
 if (!failure.value) load()

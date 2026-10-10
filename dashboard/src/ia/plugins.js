@@ -1,4 +1,4 @@
-import { h } from 'vue'
+import { h, shallowRef } from 'vue'
 import AppIcon from '../components/AppIcon.vue'
 import { bootValue } from '../data/boot'
 
@@ -74,24 +74,37 @@ export function firstPageRoute(app) {
   return first ? pageRoute(first) : null
 }
 
-function pageNavItem(entry) {
-  return { label: entry.label, icon: pluginIcon(entry), to: pageRoute(entry) }
+// The sidebar action a click asked for. PluginSidebarRunner hosts it once, then sets this back to null.
+export const runningSidebarAction = shallowRef(null)
+
+let sidebarRuns = 0
+
+export function runSidebarAction(entry) {
+  // A new run id each click, so the same row clicked twice runs twice.
+  runningSidebarAction.value = { ...entry, run: ++sidebarRuns }
 }
 
-// One row per app: its only page, or a disclosure over its pages shaped like the Analytics row.
+function navItem(entry) {
+  return entry.place === 'sidebar'
+    ? { label: entry.label, icon: pluginIcon(entry), onClick: () => runSidebarAction(entry) }
+    : { label: entry.label, icon: pluginIcon(entry), to: pageRoute(entry) }
+}
+
+// One row per app: its only page or action, or a disclosure over its pages and then its actions,
+// shaped like the Analytics row.
 export function pluginNavItems() {
-  const shown = placeEntries('pages').filter((entry) => entry.sidebar !== false)
+  const rows = [...placeEntries('pages').filter((entry) => entry.sidebar !== false), ...placeEntries('sidebar')]
   const byApp = new Map()
-  for (const entry of shown) byApp.set(entry.app, [...(byApp.get(entry.app) ?? []), entry])
+  for (const entry of rows) byApp.set(entry.app, [...(byApp.get(entry.app) ?? []), entry])
   return [...byApp.entries()]
-    .map(([app, pages]) =>
-      pages.length === 1
-        ? { ...pageNavItem(pages[0]), icon: appIcon(app) }
+    .map(([app, appRows]) =>
+      appRows.length === 1
+        ? { ...navItem(appRows[0]), icon: appIcon(app) }
         : {
             label: appTitle(app),
             icon: appIcon(app),
             to: `/plugins/${app}`,
-            children: pages.map(pageNavItem),
+            children: appRows.map(navItem),
           },
     )
     .sort((left, right) => left.label.localeCompare(right.label))
@@ -139,6 +152,7 @@ export function pluginCommands() {
 
 const PLACE_LABELS = {
   pages: 'Page',
+  sidebar: 'Sidebar action',
   'order/cards': 'Order card',
   'product/cards': 'Product card',
   'customer/cards': 'Customer card',

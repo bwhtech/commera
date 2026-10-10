@@ -297,6 +297,27 @@ describe('schema per placement', () => {
 		);
 	});
 
+	const sidebarAction = (body) =>
+		`<script>\nexport const plugin = { label: 'Settings', icon: 'printer' }\n</script>\n${body}`;
+
+	test('a sidebar action with a template fails', async () => {
+		await buildFails(
+			{
+				'sidebar/settings/index.vue': sidebarAction(
+					'<template><div class="p-2" /></template>\n',
+				),
+			},
+			/sidebar\/settings\/index\.vue: can't have a <template>; sidebar runs its <script setup> when the row is clicked/,
+		);
+	});
+
+	test('a sidebar action without a script setup fails', async () => {
+		await buildFails(
+			{ 'sidebar/settings/index.vue': sidebarAction('') },
+			/sidebar\/settings\/index\.vue: needs a <script setup> to run when the row is clicked/,
+		);
+	});
+
 	test('a command without a method fails', async () => {
 		await buildFails(
 			{ 'commands/sync/index.vue': command(`{ label: 'Sync' }`) },
@@ -714,6 +735,22 @@ describe('a clean build', () => {
 		});
 		assert.equal(manifest.entries[0].module, null);
 		assert.equal(existsSync(join(outDir, '__empty.js')), false);
+	});
+
+	test('a sidebar action reaches the manifest with its module', async () => {
+		const { manifest } = await buildApp({
+			'sidebar/settings/index.vue': `<script>\nexport const plugin = { label: 'Settings', icon: 'printer', order: 9 }\n</script>\n<script setup>\nimport { usePlugin } from '@commera/admin'\nusePlugin().openSettings()\n</script>\n`,
+		});
+		const [{ hash, ...entry }] = manifest.entries;
+		assert.match(hash, /^[0-9a-f]{8}$/);
+		assert.deepEqual(entry, {
+			place: 'sidebar',
+			name: 'settings',
+			module: 'sidebar/settings.js',
+			label: 'Settings',
+			icon: 'printer',
+			order: 9,
+		});
 	});
 
 	test('a command reaches the manifest with its keywords and no module', async () => {

@@ -96,6 +96,18 @@ def page(name="jobs", **fields) -> dict:
 	}
 
 
+def sidebar_action(name="settings", **fields) -> dict:
+	return {
+		"place": "sidebar",
+		"name": name,
+		"module": f"sidebar/{name}.js",
+		"hash": "4b7e2d",
+		"label": "Settings",
+		"icon": "settings",
+		**fields,
+	}
+
+
 def card(name="print-status", place="order/cards", **fields) -> dict:
 	return {
 		"place": place,
@@ -429,6 +441,26 @@ class TestPluginVisibility(PluginTestCase):
 
 		self.assertEqual(self.visible_labels(STOCK_USER), ["Card", "Shown"])
 		self.assertTrue(error_logged(f"Commera plugin {APP}:pages:broken condition failed", self.started_at))
+
+	def test_a_sidebar_action_reaches_the_boot_with_its_module_and_runs_its_condition(self):
+		self.write_manifest(
+			[
+				sidebar_action(),
+				sidebar_action("hidden", label="Hidden", condition=f"{FUNCTIONS}.hide_page"),
+			]
+		)
+		self.write_asset(
+			APP, "sidebar/settings.js", f"/* commera-plugin-api: {API_VERSION} */\nexport default {{}}"
+		)
+
+		entries = get_visible_plugins(STOCK_USER)["entries"]
+		self.assertEqual([entry["label"] for entry in entries], ["Settings"])
+		self.assertEqual(entries[0]["place"], "sidebar")
+		self.assertTrue(entries[0]["module_url"].endswith("/sidebar/settings.js?v=4b7e2d"))
+
+	def test_a_sidebar_action_without_a_module_is_dropped(self):
+		self.write_manifest([sidebar_action(module=None)])
+		self.assertEqual(get_visible_plugins(STOCK_USER)["entries"], [])
 
 	def test_the_dashboard_boot_carries_no_server_paths(self):
 		self.write_manifest(

@@ -26,6 +26,7 @@ PLACE_KINDS = {
 	"customer-action": ("customer/actions", "action"),
 	"settings": ("settings", "settings"),
 	"command": ("commands", "command"),
+	"sidebar": ("sidebar", "sidebar"),
 }
 
 

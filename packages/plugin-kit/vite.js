@@ -295,7 +295,7 @@ function checkField(key, value, { app, icons }) {
 	}
 }
 
-function checkPlugin(plugin, place, hasModule, context) {
+function checkPlugin(plugin, place, { hasModule, hasTemplate }, context) {
 	const spec = GRAMMAR.places[place];
 	const problems = [];
 	for (const [key, value] of Object.entries(plugin)) {
@@ -312,8 +312,17 @@ function checkPlugin(plugin, place, hasModule, context) {
 		if (!(key in plugin)) problems.push(`plugin.${key} is required`);
 	}
 	const { declarative } = spec;
+	// A sidebar action has no frame to draw into: its <script setup> runs when the row is clicked.
+	if (spec.template === 'none' && hasTemplate)
+		problems.push(
+			`can't have a <template>; ${place} runs its <script setup> when the row is clicked`,
+		);
 	if (spec.module === 'required' && !hasModule)
-		problems.push('needs a <template> or <script setup>');
+		problems.push(
+			spec.template === 'none'
+				? 'needs a <script setup> to run when the row is clicked'
+				: 'needs a <template> or <script setup>',
+		);
 	if (spec.module === 'none' && hasModule)
 		problems.push(
 			`can't have a <template> or <script setup>; ${place} is declared by the plugin block alone`,
@@ -393,10 +402,15 @@ export function discoverPlugins(
 
 		const { descriptor, plugin } = block;
 		const hasModule = Boolean(descriptor.template || descriptor.scriptSetup);
-		const problems = checkPlugin(plugin, placement.place, hasModule, {
-			app,
-			icons,
-		});
+		const problems = checkPlugin(
+			plugin,
+			placement.place,
+			{ hasModule, hasTemplate: Boolean(descriptor.template) },
+			{
+				app,
+				icons,
+			},
+		);
 		errors.push(...problems.map((problem) => `${display}: ${problem}`));
 		if (problems.length) continue;
 

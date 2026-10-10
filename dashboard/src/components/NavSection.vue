@@ -39,13 +39,15 @@ const toggle = (item) => (opened.value[item.to] = !isOpen(item))
             </template>
           </SidebarItem>
           <div v-show="isOpen(item)" class="space-y-0.5 pl-5">
+            <!-- A child without `to` is a plugin's sidebar action: it runs on click and never takes active state. -->
             <SidebarItem
               v-for="child in item.children"
-              :key="child.to"
+              :key="child.to ?? child.label"
               :label="child.label"
               :icon="child.icon"
               :to="child.to"
-              :active="child.to === activeTarget"
+              :active="Boolean(child.to) && child.to === activeTarget"
+              @click="child.onClick?.()"
             />
           </div>
         </template>
