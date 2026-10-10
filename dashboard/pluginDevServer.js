@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { searchForWorkspaceRoot } from 'vite'
 import * as compiler from 'vue/compiler-sfc'
-import { discoverPlugins, pageEntryCode } from '../packages/plugin-kit/vite.js'
+import { discoverPlugins, findPluginConfig, pageEntryCode } from '../packages/plugin-kit/vite.js'
+import places from '../packages/plugin-kit/places.json' with { type: 'json' }
 import { BENCH, readPluginApps, sourceDirOf } from './pluginApps.js'
 
 const PREFIX = '/@commera-plugin/'
@@ -27,6 +28,12 @@ function parseKey(key) {
 
 function moduleCode(key) {
   const { app, place, name } = parseKey(key)
+  // Sidebar actions and other config places all live in one plugin.config file; the dashboard picks the item by name.
+  if (places.places[place]?.config) {
+    const configFile = findPluginConfig(sourceDirOf(app))
+    if (!configFile) throw new Error(`${app} has no commera/plugin.config.ts`)
+    return `export { default } from ${JSON.stringify(configFile)}`
+  }
   const { entries } = discoverPlugins(sourceDirOf(app), { app, compiler })
   const entry = entries.find((entry) => entry.place === place && entry.name === name)
   if (!entry?.entryName) throw new Error(`${app} has no ${place}/${name}/index.vue with a template`)
@@ -121,7 +128,10 @@ export function pluginDevServer() {
     config: () => ({
       resolve: {
         dedupe: ['vue', 'frappe-ui'],
-        alias: { '@commera/admin': fileURLToPath(new URL('./src/plugin-api/index.js', import.meta.url)) },
+        alias: {
+          '@commera/admin': fileURLToPath(new URL('./src/plugin-api/index.js', import.meta.url)),
+          '@commera/plugin-kit': fileURLToPath(new URL('../packages/plugin-kit/index.js', import.meta.url)),
+        },
       },
       server: { fs: { allow: [searchForWorkspaceRoot(process.cwd()), ...apps.map(sourceDirOf)] } },
     }),

@@ -69,7 +69,6 @@ declare module 'vue' {
     PluginHost: typeof import('./src/components/PluginHost.vue')['default']
     PluginPageFrame: typeof import('./src/components/PluginPageFrame.vue')['default']
     PluginSettingsPanel: typeof import('./src/components/settings/PluginSettingsPanel.vue')['default']
-    PluginSidebarRunner: typeof import('./src/components/PluginSidebarRunner.vue')['default']
     PluginSlot: typeof import('./src/components/PluginSlot.vue')['default']
     PluginsSettings: typeof import('./src/components/settings/PluginsSettings.vue')['default']
     ProductBasics: typeof import('./src/components/product/ProductBasics.vue')['default']

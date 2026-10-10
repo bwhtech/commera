@@ -8,7 +8,7 @@
 		},
 		"sidebar": {
 			"module": "required",
-			"template": "none",
+			"config": true,
 			"doctype": null,
 			"fields": ["label", "icon", "requires", "condition", "order"],
 			"required": ["label"]

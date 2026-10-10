@@ -6,7 +6,6 @@ import { visibleRoute } from './ia/settingsRoute'
 import { useIsMobile } from './utils/useIsMobile'
 import AppShell from './components/AppShell.vue'
 import AppSettingsDialog from './components/settings/AppSettingsDialog.vue'
-import PluginSidebarRunner from './components/PluginSidebarRunner.vue'
 import SearchPalette from './components/SearchPalette.vue'
 import ImportDialog from './components/import/ImportDialog.vue'
 import AddProductDialog from './components/AddProductDialog.vue'
@@ -36,7 +35,6 @@ provide(routeLocationKey, shallowReactive(shellRoute))
          them; opened from the workspace menu and the sidebar footer. -->
     <AppSettingsDialog />
     <SearchPalette />
-    <PluginSidebarRunner />
     <ImportDialog />
     <AddProductDialog />
   </FrappeUIProvider>

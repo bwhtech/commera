@@ -1,5 +1,5 @@
 <script setup>
-import { computed, defineComponent, onErrorCaptured, provide, ref, shallowRef, toRef } from 'vue'
+import { computed, onErrorCaptured, provide, ref, shallowRef, toRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'frappe-ui'
 import { __, PLUGIN_CONTEXT } from '../plugin-api/context'
@@ -53,23 +53,10 @@ async function load() {
   try {
     const { app, place, name, module_url } = props.entry
     const url = import.meta.env.DEV ? `/@commera-plugin/${app}/${place}/${name}` : module_url
-    const module = (await import(/* @vite-ignore */ url)).default
-    Plugin.value = place === 'sidebar' ? runOnly(module) : module
+    Plugin.value = (await import(/* @vite-ignore */ url)).default
   } catch (error) {
     fail(error)
   }
-}
-
-// A sidebar action has a <script setup> and no template: run its setup inside a component that draws nothing,
-// so usePlugin() and the other composables still find this host's context.
-function runOnly(module) {
-  return defineComponent({
-    name: 'PluginSidebarAction',
-    setup(_props, context) {
-      module.setup?.({}, context)
-      return () => null
-    },
-  })
 }
 
 if (!failure.value) load()

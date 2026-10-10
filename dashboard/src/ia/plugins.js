@@ -1,6 +1,7 @@
-import { h, shallowRef } from 'vue'
+import { h } from 'vue'
 import AppIcon from '../components/AppIcon.vue'
 import { bootValue } from '../data/boot'
+import { runSidebarAction } from '../plugin-api/sidebar'
 
 // commera/www/commera.py has already filtered these for the session user, so the client only places them.
 const plugins = bootValue('plugins', {}) ?? {}
@@ -72,16 +73,6 @@ export function findPage(app, name) {
 export function firstPageRoute(app) {
   const [first] = appPages(app)
   return first ? pageRoute(first) : null
-}
-
-// The sidebar action a click asked for. PluginSidebarRunner hosts it once, then sets this back to null.
-export const runningSidebarAction = shallowRef(null)
-
-let sidebarRuns = 0
-
-export function runSidebarAction(entry) {
-  // A new run id each click, so the same row clicked twice runs twice.
-  runningSidebarAction.value = { ...entry, run: ++sidebarRuns }
 }
 
 function navItem(entry) {

@@ -100,7 +100,7 @@ def sidebar_action(name="settings", **fields) -> dict:
 	return {
 		"place": "sidebar",
 		"name": name,
-		"module": f"sidebar/{name}.js",
+		"module": "plugin.config.js",
 		"hash": "4b7e2d",
 		"label": "Settings",
 		"icon": "settings",
@@ -450,13 +450,13 @@ class TestPluginVisibility(PluginTestCase):
 			]
 		)
 		self.write_asset(
-			APP, "sidebar/settings.js", f"/* commera-plugin-api: {API_VERSION} */\nexport default {{}}"
+			APP, "plugin.config.js", f"/* commera-plugin-api: {API_VERSION} */\nexport default {{}}"
 		)
 
 		entries = get_visible_plugins(STOCK_USER)["entries"]
 		self.assertEqual([entry["label"] for entry in entries], ["Settings"])
 		self.assertEqual(entries[0]["place"], "sidebar")
-		self.assertTrue(entries[0]["module_url"].endswith("/sidebar/settings.js?v=4b7e2d"))
+		self.assertTrue(entries[0]["module_url"].endswith("/plugin.config.js?v=4b7e2d"))
 
 	def test_a_sidebar_action_without_a_module_is_dropped(self):
 		self.write_manifest([sidebar_action(module=None)])

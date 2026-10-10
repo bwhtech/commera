@@ -55,7 +55,6 @@ Run `bench commera add <kind> <name>` inside your app's folder to add one placem
 | `order-action`, `product-action`, `customer-action` | `commera/<record>/actions/<name>/index.vue` and a whitelisted `<name>_<record>(name)` in your `api.py` |
 | `settings` | `commera/settings/index.vue` (no name: one per plugin) |
 | `command` | `commera/commands/<name>/index.vue` and a whitelisted `<name>()` in your `api.py` |
-| `sidebar` | `commera/sidebar/<name>/index.vue`, a sidebar row that opens the plugin's Settings tab |
 
 The command never overwrites: it stops when the placement or the method already exists.
 
@@ -67,7 +66,6 @@ The folder decides where a plugin goes. `places.json` is the one list; Commera's
 | Path under `commera/` | Where it shows | `plugin` fields: **required** / optional |
 | --- | --- | --- |
 | `pages/<name>/index.vue` | `/commera/plugins/<app>/<name>`, plus a sidebar row | **label** / icon, requires, condition, sidebar, order |
-| `sidebar/<name>/index.vue` | A sidebar row that runs the file's `<script setup>` when clicked, instead of opening a page. It has no `<template>` | **label** / icon, requires, condition, order |
 | `{order,product,customer}/cards/<name>/index.vue` | A card on that record's page | **label** / requires, condition, order |
 | `{order,product,customer}/actions/<name>/index.vue` | A row in that page's More actions menu | **label** / icon, requires, condition, method, confirm, order |
 | `settings/index.vue` | The app's tab in Settings | **label** / icon, requires, condition, doctype |
@@ -134,26 +132,28 @@ The logo shows as it is, in its own colours, so pick one that reads on both a li
 `currentColor` in the file draws black. Without a logo, the sidebar row uses the first page's `icon`, and an
 entry without an `icon` uses the dashboard's generic one.
 
-## Sidebar actions
+## plugin.config.ts
 
-A file under `sidebar/<name>/` adds a row to the plugin's group in the sidebar, after its pages. When a user clicks
-the row, Commera loads the file and runs its `<script setup>` once, with the same `@commera/admin` composables as a
-page. The common case opens the plugin's Settings tab:
+Folders hold everything that draws UI. Contributions that draw nothing of their own go in one file,
+`commera/plugin.config.ts` (or `.js`). Today that is sidebar actions: rows after the plugin's pages in its sidebar
+group that run a function on click instead of opening a page.
 
-```vue
-<script>
-export const plugin = { label: 'Settings', icon: 'settings', order: 9 }
-</script>
+```ts
+import { definePlugin } from '@commera/plugin-kit'
 
-<script setup>
-import { usePlugin } from '@commera/admin'
-
-usePlugin().openSettings()
-</script>
+export default definePlugin({
+  sidebar: [
+    { name: 'settings', label: 'Settings', icon: 'settings', order: 9, run: ({ openSettings }) => openSettings() },
+    { name: 'help', label: 'Help', icon: 'circle-help', run: ({ openUrl }) => openUrl('https://example.com/help') },
+  ],
+})
 ```
 
-The setup runs and the action ends; it draws nothing. Put work that takes time in a whitelisted method and call it
-with `useMethodAction`.
+The build reads `name` (1 to 40 lowercase letters, digits and hyphens, the entry's stable key), `label` (required),
+`icon`, `order`, `requires` and `condition` into the manifest, with the same checks as a folder entry, and ships
+the file as one module, `plugin.config.js`. `run` gets a context with `openSettings(tab)`, `navigate(to)`,
+`openUrl(url)` and `toast`. The file may import only `definePlugin` from `@commera/plugin-kit`; put work that takes
+time in a whitelisted method and reach it from a page.
 
 ## The dashboard draws the frame
 
@@ -203,7 +203,8 @@ Folder and `plugin` problems are collected and reported together.
 | An unknown, missing or mistyped field | `sidebr: false` (with a did-you-mean), no `label`, `sidebar` on a card |
 | An action or settings tab with both or neither of template and `method`/`doctype` | |
 | A command with a template or `<script setup>` | `commands/sync/index.vue` with a `<template>` |
-| A sidebar action with a template, or without a `<script setup>` | `sidebar/settings/index.vue` with a `<template>` |
+| A sidebar action in a folder instead of `plugin.config.ts` | `sidebar/settings/index.vue` |
+| A `plugin.config.ts` item without `name`, `label` or `run`, or that imports anything but `@commera/plugin-kit` | `import { toast } from 'frappe-ui'` |
 | An icon not in the list | `icon: 'printr'` |
 | A dotted path outside the app | `condition: 'frappe.client.get_list'` |
 | Drawing a frame the dashboard owns | importing `AppPageHeader`, `PageBody` or `PluginCard` |
