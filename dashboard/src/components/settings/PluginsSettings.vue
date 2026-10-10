@@ -1,13 +1,13 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Badge, Button, Icon, SettingsBody, Skeleton, TabButtons } from 'frappe-ui'
+import { Badge, Button, Icon, SettingsBody, SettingsRow, Skeleton, Switch, TabButtons, toast } from 'frappe-ui'
 import SettingsConfigHeader from './SettingsConfigHeader.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import EmptyState from '../EmptyState.vue'
 import ListPagination from '../ListPagination.vue'
 import ResponsiveButton from '../ResponsiveButton.vue'
 import StatusBadge from '../StatusBadge.vue'
-import { useAdminRead } from '../../data/api'
+import { useAdminAction, useAdminRead } from '../../data/api'
 import { eventLabel, statusKey, timeLabel, useDeliveryRetry } from '../../data/pluginEvents'
 import { appIcon, pluginSettingsTabs, placeLabel, settingsTabValue } from '../../ia/plugins'
 import { settings } from '../../ia/settings'
@@ -72,6 +72,20 @@ const { retrying: retryingDelivery, retry: retryDeliveries } = useDeliveryRetry(
 
 function retry(row) {
   return retryDeliveries(row.delivery, row.app, [row.delivery])
+}
+
+const storefrontSave = useAdminAction('plugins.set_storefront_enabled')
+
+// Saves on change like every settings switch; a refused save puts the switch back.
+async function setStorefront(enabled) {
+  const plugin = current.value
+  plugin.storefront = enabled
+  await storefrontSave.submit({ app: plugin.app, enabled })
+  if (storefrontSave.error) {
+    plugin.storefront = !enabled
+    return
+  }
+  toast.success(enabled ? `${plugin.title} now runs on your storefront` : `${plugin.title} is off your storefront`)
 }
 </script>
 
@@ -146,6 +160,20 @@ function retry(row) {
     </SettingsConfigHeader>
 
     <SettingsBody v-scroll-fade>
+      <SettingsRow
+        v-if="current.storefront !== null"
+        class="mt-2 border-b border-outline-gray-1"
+        title="Run on the storefront"
+        description="This plugin adds scripts or blocks to your store pages, such as a popup or a banner. They load only while this is on."
+      >
+        <Switch
+          size="sm"
+          :model-value="current.storefront"
+          :disabled="storefrontSave.loading"
+          @update:model-value="setStorefront"
+        />
+      </SettingsRow>
+
       <section class="mt-2">
         <h3 class="text-base font-medium text-ink-gray-8">What it adds</h3>
         <ul

@@ -6,6 +6,7 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils import get_html_for_route, set_request
 
 from commera import storefront_plugins
+from commera.api.admin.plugins import set_storefront_enabled
 
 BANNER = "commera/tests/storefront_plugin_templates/banner.html"
 BROKEN = "commera/tests/storefront_plugin_templates/broken.html"
@@ -76,6 +77,27 @@ class TestStorefrontPlugins(IntegrationTestCase):
 		store_name = frappe.db.get_single_value("Commera Settings", "store_name")
 		currency = frappe.db.get_single_value("Global Defaults", "default_currency")
 		self.assertIn(f"{store_name}|{currency}|{frappe.local.lang}|False", banner)
+
+	def test_the_switch_turns_a_plugin_on_and_off_the_storefront(self):
+		self.declare_full_plugin()
+
+		set_storefront_enabled(app="commera", enabled=True)
+		self.assertEqual(storefront_plugins.get_storefront_switches()["commera"], True)
+		self.assertIn(SCRIPT, storefront_plugins.format_plugin_includes("js"))
+
+		set_storefront_enabled(app="commera", enabled=False)
+		self.assertEqual(storefront_plugins.format_plugin_includes("js"), "")
+
+	def test_the_switch_refuses_an_app_without_storefront_hooks(self):
+		with self.assertRaises(frappe.ValidationError):
+			set_storefront_enabled(app="frappe", enabled=True)
+
+	def test_only_a_system_manager_turns_the_switch(self):
+		self.declare_full_plugin()
+		frappe.set_user("Guest")
+		self.addCleanup(frappe.set_user, "Administrator")
+		with self.assertRaises(frappe.PermissionError):
+			set_storefront_enabled(app="commera", enabled=True)
 
 	def test_asset_outside_the_app_is_refused(self):
 		self.declare_hooks(

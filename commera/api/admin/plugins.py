@@ -7,6 +7,7 @@ from frappe.query_builder import Order
 from frappe.query_builder.functions import Count
 from frappe.utils.data import cint
 
+from commera import storefront_plugins
 from commera.api.admin.docfields import build_field_groups, get_editable_docfields, get_missing_fields
 from commera.api.admin.integrations import write_settings
 from commera.plugin_events import get_plugin_apps
@@ -33,6 +34,7 @@ def get_plugins() -> list[dict]:
 
 	registry = get_registry()
 	failed_deliveries = get_failed_delivery_counts()
+	storefront_switches = storefront_plugins.get_storefront_switches()
 	return [
 		{
 			"app": app,
@@ -46,9 +48,17 @@ def get_plugins() -> list[dict]:
 			],
 			"problems": [problem["message"] for problem in registry["problems"] if problem["app"] == app],
 			"failed_deliveries": failed_deliveries.get(app, 0),
+			# None for an app with no storefront hook; else whether its scripts and blocks load on store pages.
+			"storefront": storefront_switches.get(app),
 		}
 		for app in dict.fromkeys([*get_plugin_apps(), *registry["apps"]])
 	]
+
+
+@frappe.whitelist(methods=["POST"])
+def set_storefront_enabled(app: str, enabled: bool) -> None:
+	frappe.only_for("System Manager")
+	storefront_plugins.set_storefront_enabled(app, enabled)
 
 
 @frappe.whitelist()
