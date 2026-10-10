@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { toast } from 'frappe-ui'
 import { __, PLUGIN_CONTEXT } from '../plugin-api/context'
 import EmptyState from './EmptyState.vue'
-import { appLocation } from '../ia/plugins'
+import { appLocation, settingsTabValue } from '../ia/plugins'
+import { openSettings } from '../ia/settings'
 
 const props = defineProps({
   entry: { type: Object, required: true },
@@ -40,6 +41,8 @@ provide(PLUGIN_CONTEXT, {
   record: toRef(props, 'record'),
   reload: () => emit('reload'),
   navigate,
+  // No tab opens the plugin's own Settings tab; a Commera tab name such as 'payments' opens that one.
+  openSettings: (tab) => openSettings(tab ?? settingsTabValue(props.entry.app)),
   toast,
   __,
 })

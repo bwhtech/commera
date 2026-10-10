@@ -6,6 +6,13 @@
 			"fields": ["label", "icon", "requires", "condition", "sidebar", "order"],
 			"required": ["label"]
 		},
+		"sidebar": {
+			"module": "required",
+			"config": true,
+			"doctype": null,
+			"fields": ["label", "icon", "requires", "condition", "order"],
+			"required": ["label"]
+		},
 		"order/cards": {
 			"module": "required",
 			"doctype": "Sales Order",
