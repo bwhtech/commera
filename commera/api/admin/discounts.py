@@ -77,6 +77,20 @@ LIST_FIELDS = (
 	"budget",
 	"times_used",
 	"discount_given",
+	# What the list's one-line summary reads.
+	"exclude_sale_items",
+	"minimum_requirement",
+	"minimum_subtotal",
+	"minimum_quantity",
+	"buy_requirement",
+	"buy_value",
+	"get_quantity",
+	"get_value_type",
+	"get_value",
+	"shipping_percentage",
+	"combines_with_product",
+	"combines_with_order",
+	"combines_with_shipping",
 )
 
 
@@ -108,9 +122,14 @@ def get_discounts(
 		.offset(cint(start))
 	).run(as_dict=True)
 
-	codes = get_code_summaries([row.name for row in rows])
+	names = [row.name for row in rows]
+	codes = get_code_summaries(names)
+	tiers = get_tiers(names)
 	return {
-		"discounts": [{**row, **codes.get(row.name, {}), "status": get_status(row)} for row in rows],
+		"discounts": [
+			{**row, **codes.get(row.name, {}), "tiers": tiers.get(row.name, []), "status": get_status(row)}
+			for row in rows
+		],
 		"total": count.run()[0][0],
 	}
 
@@ -132,6 +151,22 @@ def get_tab_condition(discount, tab: str):
 
 def get_status(row) -> str:
 	return frappe.get_doc({"doctype": DOCTYPE, **row}).status
+
+
+def get_tiers(discounts: list[str]) -> dict[str, list[dict]]:
+	tiers = {}
+	if not discounts:
+		return tiers
+	for row in frappe.get_all(
+		"Commera Discount Tier",
+		filters={"parent": ("in", discounts), "parenttype": DOCTYPE},
+		fields=["parent", "minimum_subtotal", "value"],
+		order_by="idx asc",
+	):
+		tiers.setdefault(row.parent, []).append(
+			{"minimum_subtotal": row.minimum_subtotal, "value": row.value}
+		)
+	return tiers
 
 
 def get_code_summaries(discounts: list[str]) -> dict[str, dict]:
@@ -328,14 +363,17 @@ def get_delivery_option_titles() -> list[str]:
 
 
 @frappe.whitelist()
-def search_targets(target_type: str, search: str | None = None) -> list[dict]:
-	"""Products, collections or brands for a discount's target pickers."""
+def search_targets(target_type: str, search: str | None = None, sellable: int = 0) -> list[dict]:
+	"""Products, collections or brands for a discount's target pickers. `sellable` lists the items a
+	cart can hold, such as each size, rather than the products they belong to."""
 	search = f"%{cstr(search)}%"
 	if target_type == "Item":
 		frappe.has_permission("Item", ptype="read", throw=True)
 		rows = frappe.get_all(
 			"Item",
-			filters={"disabled": 0, "variant_of": ("is", "not set")},
+			filters={"disabled": 0, "has_variants": 0}
+			if cint(sellable)
+			else {"disabled": 0, "variant_of": ("is", "not set")},
 			or_filters={"name": ("like", search), "item_name": ("like", search)},
 			fields=["name", "item_name"],
 			order_by="item_name",

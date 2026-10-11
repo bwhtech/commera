@@ -19,6 +19,7 @@ const ITEM = {
   },
   orders: { label: 'Orders', icon: 'lucide-shopping-bag', to: '/orders' },
   customers: { label: 'Customers', icon: 'lucide-users', to: '/customers' },
+  discounts: { label: 'Discounts', icon: 'lucide-badge-percent', to: '/discounts' },
   // A parent with children is a disclosure, not a destination: /analytics
   // itself holds nothing, so opening it lands on the first report.
   analytics: { label: 'Analytics', icon: 'lucide-chart-line', to: '/analytics', children: REPORTS },
@@ -37,7 +38,7 @@ const ITEM = {
 const coreSections = [
   {
     id: 'primary',
-    items: [ITEM.overview, ITEM.search, ITEM.orders, ITEM.customers, ITEM.analytics],
+    items: [ITEM.overview, ITEM.search, ITEM.orders, ITEM.customers, ITEM.discounts, ITEM.analytics],
   },
   { id: 'catalog', label: 'Catalog', items: [ITEM.products, ITEM.collections, ITEM.attributes] },
   { id: 'storefront', label: 'Storefront', items: [ITEM.theme, ITEM.navigation, ITEM.pages, ITEM.reviews] },

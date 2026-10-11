@@ -54,6 +54,18 @@ class TestAdminDiscounts(DiscountCodeTestCase):
 		self.assertNotIn(active["name"], scheduled_names)
 		self.assertEqual([row["name"] for row in found], [active["name"]])
 
+	def test_the_list_carries_what_its_summary_reads(self):
+		saved = self.save(
+			discount_type="Amount Off Order", tiered=1, tiers=[{"minimum_subtotal": 100, "value": 5}]
+		)
+
+		row = next(
+			row for row in admin_discounts.get_discounts()["discounts"] if row["name"] == saved["name"]
+		)
+
+		self.assertEqual(row["tiers"], [{"minimum_subtotal": 100, "value": 5}])
+		self.assertEqual(row["combines_with_shipping"], 1)
+
 	def test_generated_codes_download_as_csv(self):
 		saved = self.save()
 
