@@ -13,13 +13,7 @@ HANDLER_HOOKS = {
 		"product_updated",
 		"inventory_changed",
 	),
-	"commera_hooks": (
-		"validate_cart",
-		"cart_fees",
-		"delivery_options",
-		"payment_methods",
-		"payment_gateways",
-	),
+	"commera_hooks": ("validate_cart", "cart_fees", "delivery_options", "payment_methods"),
 }
 
 
