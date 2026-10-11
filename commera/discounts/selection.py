@@ -93,10 +93,10 @@ def get_candidates(doc) -> list[Selection]:
 def get_unmet_reason(discount: CommeraDiscount, cart) -> str | None:
 	if reason := discount.get_unmet_condition(cart):
 		return reason
-	if (
-		discount.eligibility == "First Order"
-		and not cart.doc.flags.commera_first_order
-		and not is_first_order(cart)
+	# A merchant's test cart says whether it stands for a first order; a real cart is looked up.
+	is_first = cart.doc.flags.commera_first_order
+	if discount.eligibility == "First Order" and not (
+		is_first if is_first is not None else is_first_order(cart)
 	):
 		return _("{0} is for a first order only.").format(discount.title)
 	if discount.once_per_customer and has_used_before(discount.name, cart):

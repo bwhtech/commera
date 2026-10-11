@@ -6,7 +6,7 @@ from frappe.utils.data import cint, cstr, flt, get_datetime
 from commera.discounts.allocations import get_allocations
 from commera.discounts.cart_context import get_cart_context
 from commera.discounts.codes import get_code_discount, normalize_code
-from commera.discounts.pricing import apply_code_discounts
+from commera.discounts.preview import get_preview_quotation
 from commera.discounts.selection import (
 	get_discount,
 	get_discount_codes,
@@ -124,33 +124,8 @@ class CommeraCart(Document):
 		}
 
 	def get_quotation_preview(self):
-		"""An unsaved Quotation. Priced elevated, like the checkout cart: ERPNext reads Items the shopper cannot."""
-		from commera.api.payments import system_user_session
-
-		settings = frappe.get_cached_doc("Commera Settings")
-		quotation = frappe.new_doc("Quotation")
-		quotation.update(
-			{
-				"quotation_to": "Customer",
-				"company": settings.get("company") or frappe.defaults.get_global_default("company"),
-				"order_type": "Shopping Cart",
-				"selling_price_list": settings.sale_price_list,
-				"custom_discount_codes": self.discount_codes,
-				# Who is shopping, so first-order, group and once-per-customer rules can be judged.
-				"party_name": self.user and frappe.db.get_value("Portal User", {"user": self.user}, "parent"),
-				"contact_email": self.user,
-			}
-		)
-		for row in self.lines:
-			quotation.append(
-				"items",
-				{"item_code": row.item_code, "qty": row.qty, "warehouse": settings.ecommerce_warehouse},
-			)
-		with system_user_session():
-			quotation.run_method("set_missing_values")
-			quotation.calculate_taxes_and_totals()
-			apply_code_discounts(quotation)
-		return quotation
+		lines = [{"item_code": row.item_code, "qty": row.qty} for row in self.lines]
+		return get_preview_quotation(lines, self.discount_codes, self.user)
 
 	def update_quotation(self, quotation):
 		"""Copy the attributes and codes onto a checkout Quotation whose lines came from the browser. When
