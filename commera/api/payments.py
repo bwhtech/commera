@@ -318,9 +318,18 @@ def stamp_order_owner(sales_order, shopper: str) -> None:
 	sales_order.db_set("owner", shopper, update_modified=False)
 
 
+def get_shopper(quotation) -> str:
+	"""A gateway webhook places the order as Administrator; the cart's contact_email is the shopper's login."""
+	if frappe.session.user != "Administrator":
+		return frappe.session.user
+	if quotation.contact_email and frappe.db.exists("User", quotation.contact_email):
+		return quotation.contact_email
+	return frappe.session.user
+
+
 def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
 	"""Submit the cart and bill it. Called once per payment; the Quotation docstatus enforces that."""
-	shopper = frappe.session.user
+	shopper = get_shopper(quotation)
 	with system_user_session():
 		fix_payment_schedule_dates(quotation)
 		quotation.flags.ignore_permissions = True
