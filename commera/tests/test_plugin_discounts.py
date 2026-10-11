@@ -1,8 +1,17 @@
+from unittest.mock import patch
+
 import frappe
 
-from commera.api.payments import generate_quotation_for_cart
+from commera.api.payments import (
+	CheckoutPriceChangedError,
+	apply_coupon_code,
+	drop_refused_codes,
+	generate_quotation_for_cart,
+)
+from commera.commera_ecommerce.doctype.commera_discount.commera_discount import DiscountCodeError
 from commera.sdk import cart as cart_sdk
 from commera.sdk import orders as orders_sdk
+from commera.tests import test_cart_checkout
 from commera.tests.test_discount_codes import CAP_RATE, SHIRT_RATE, DiscountCodeTestCase
 from commera.tests.test_payment_hooks import patch_app_hooks
 
@@ -24,6 +33,10 @@ def name_a_missing_line(quotation):
 
 def note_the_cart(event):
 	pass
+
+
+def refuse_zz_codes(quotation, code):
+	return "This code's limit was reached." if code.upper().startswith("ZZ") else None
 
 
 class TestCartDiscountsHook(DiscountCodeTestCase):
@@ -137,3 +150,51 @@ class TestCartAttributes(DiscountCodeTestCase):
 		self.assertEqual(priced["attributes"], {"source": "buy-link"})
 		self.assertEqual(frappe.parse_json(quotation.custom_cart_attributes), {"source": "buy-link"})
 		self.assertEqual(self.get_line(quotation, self.cap).rate, CAP_RATE)
+
+
+class TestValidateDiscountCodeHook(DiscountCodeTestCase):
+	def setUp(self):
+		super().setUp()
+		patch_app_hooks(self, {"commera_hooks": {"validate_discount_code": [f"{__name__}.refuse_zz_codes"]}})
+
+	def test_a_refused_code_is_skipped_on_the_cart(self):
+		code = self.create_code(percentage=10)
+
+		quotation = self.create_quotation({self.shirt: 1}, (code,))
+
+		self.assertFalse(quotation.custom_code_order_discount)
+
+	def test_a_refused_code_cannot_be_added_and_says_why(self):
+		code = self.create_code(percentage=10)
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
+
+		with self.assertRaisesRegex(DiscountCodeError, "limit was reached"):
+			cart_sdk.add_discount_code(code)
+
+	def test_checkout_removes_a_refused_code_and_tells_the_shopper(self):
+		code = self.create_code(percentage=10)
+		patch_app_hooks(self, {"commera_hooks": {}})
+		quotation = self.create_quotation({self.shirt: 1}, (code,))
+		self.assertEqual(quotation.custom_code_order_discount, 9)
+		patch_app_hooks(self, {"commera_hooks": {"validate_discount_code": [f"{__name__}.refuse_zz_codes"]}})
+
+		# The removal is committed before the message; a test must not commit its fixtures.
+		with (
+			patch.object(frappe.db, "commit"),
+			self.assertRaisesRegex(CheckoutPriceChangedError, "limit was reached"),
+		):
+			drop_refused_codes(quotation)
+
+		quotation.reload()
+		self.assertFalse(quotation.custom_discount_codes)
+		self.assertFalse(quotation.custom_code_order_discount)
+
+	def test_the_store_coupon_box_refuses_a_code_an_app_refuses(self):
+		self.sale_price_list = self.price_list
+		coupon = test_cart_checkout.TestCartCheckout.create_coupon(self, discount_percentage=10)
+		shopper = test_cart_checkout.TestCartCheckout.create_shopper(self)
+		frappe.set_user(shopper)
+		generate_quotation_for_cart({"items": [{"item": {}, "variant": {"item_code": self.shirt}, "qty": 1}]})
+
+		with self.assertRaisesRegex(frappe.ValidationError, "limit was reached"):
+			apply_coupon_code(coupon)

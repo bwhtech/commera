@@ -79,10 +79,13 @@ def get_candidates(doc) -> list[Selection]:
 	if doc.flags.commera_discounts is not None:
 		return [Selection(discount) for discount in doc.flags.commera_discounts]
 
+	# Imported here: commera.checkout_hooks imports the shipping step, which imports this module.
+	from commera.checkout_hooks import get_discount_code_refusal
+
 	candidates = []
 	for code in get_discount_codes(doc):
 		discount_name = get_code_discount(code)
-		if discount_name and not is_single_use_spent(code):
+		if discount_name and not is_single_use_spent(code) and not get_discount_code_refusal(doc, code):
 			candidates.append(Selection(get_discount(discount_name), code))
 	automatic = frappe.get_all(
 		"Commera Discount", filters={"enabled": 1, "method": "Automatic"}, pluck="name", order_by="creation"

@@ -58,9 +58,8 @@ def get_cart() -> Cart | None:
 
 
 def set_cart_fields(values: dict) -> CheckoutSummary:
-	"""Save an app's own Quotation fields on the shopper's cart and re-price its plugin fees. Each field must
-	start with the name of an installed Commera plugin; a cart already in payment is refused. Before
-	checkout the fields wait on the server cart, a guest's included, and reach the Quotation at checkout."""
+	"""Save an app's own Quotation fields (each named for an installed plugin) and re-price its fees. Before
+	checkout they wait on the server cart, a guest's too; a cart already in payment is refused."""
 	validate_plugin_fieldnames("Quotation", values)
 	quotation = get_open_cart_quotation()
 	if not quotation:

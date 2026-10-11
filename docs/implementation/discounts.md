@@ -116,11 +116,23 @@ cart.add_discount_code("WELCOME10")
 | `commera.sdk.discounts` | `create_discount`, `update_discount`, `get_discount`, `list_discounts`, `add_code`, `generate_codes`, `preview_cart`, `get_order_discounts` |
 | `commera.sdk.cart` | `get_priced_cart`, `add_lines`, `update_lines`, `remove_lines`, `add_discount_code`, `remove_discount_code` (and the existing `get_cart`, `set_cart_fields`) |
 
+## Cart links
+
+A cart link `/en/cart/<item_code>:<qty>,...` takes two more options:
+
+| Option | Effect |
+| --- | --- |
+| `mode=add` | Adds the link's lines to the shopper's cart instead of replacing it. |
+| `return_to=cart` or `return_to=/<path>` | Opens the cart or that page on this site afterwards. A value that would leave the site is ignored, and the link goes to checkout as before. |
+
+`discount`, `utm_*` and `checkout[...]` are passed on to the page the link opens. Checkout applies `discount`.
+
 ## Plugin hooks and events
 
 | Name | Kind | What it does |
 | --- | --- | --- |
 | `cart_discounts` | `commera_hooks`, synchronous | Returns `[{"title", "amount", "line"?}]` for the cart. With `line` (a row `idx`) it is a product discount; without, it comes off the order. Called on store carts only; orders and invoices keep what the cart got. |
+| `validate_discount_code` | `commera_hooks`, synchronous | Takes `(quotation, code)` and returns a refusal message or `None`, for discount codes and the store coupon alike. A refused code cannot be added, is skipped while the cart changes, and at checkout is removed: the shopper sees the message and the new total instead of a refused cart. |
 | `cart_created` | `commera_events` | A Commera Cart was created. Logged only when an app listens, because most guest carts never reach checkout. |
 | `discount_used` | `commera_events` | One per discount on a placed order, with the order snapshot plus `discount`, `code` and `amount`. |
 

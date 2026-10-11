@@ -23,6 +23,24 @@ def get_cart_refusal(quotation) -> str | None:
 	return None
 
 
+def get_discount_code_refusal(quotation, code: str) -> str | None:
+	"""Why an app will not let this code apply to the cart, in the shopper's words; None when every app
+	allows it. Checked for discount codes and the store coupon alike."""
+	for handler in get_handlers("commera_hooks", "validate_discount_code"):
+		reason = None
+		with handle_hook_error(
+			"validate_discount_code", handler, quotation, bool(quotation.flags.strict_plugin_fees)
+		):
+			reason = frappe.get_attr(handler)(quotation, code)
+			if reason and not isinstance(reason, str):
+				raise TypeError(
+					f'commera_hooks["validate_discount_code"] must return a str or None, got {reason!r}'
+				)
+		if reason:
+			return reason
+	return None
+
+
 def apply_plugin_fees(quotation):
 	"""Set quotation.flags.strict_plugin_fees at checkout: a failing fee hook then blocks it, while on a cart
 	edit the fee is only left out, so a broken app never stops a shopper changing their cart."""
@@ -44,9 +62,8 @@ def apply_plugin_fees(quotation):
 
 
 def get_plugin_discounts(quotation) -> list[dict]:
-	"""What each app's cart_discounts hook takes off the cart. A product discount names its cart line by
-	`line` (the row idx); one without `line` comes off the order. A failing handler blocks checkout, but
-	on a cart edit its discounts are only left out."""
+	"""What the apps' cart_discounts hooks take off: `line` (a row idx) marks a product discount, none an
+	order one. Like cart fees, a failing handler blocks checkout but is only left out of a cart edit."""
 	discounts = []
 	for handler in get_handlers("commera_hooks", "cart_discounts"):
 		with handle_hook_error(

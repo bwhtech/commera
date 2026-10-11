@@ -15,7 +15,14 @@ HANDLER_HOOKS = {
 		"cart_created",
 		"discount_used",
 	),
-	"commera_hooks": ("validate_cart", "cart_fees", "cart_discounts", "delivery_options", "payment_methods"),
+	"commera_hooks": (
+		"validate_cart",
+		"validate_discount_code",
+		"cart_fees",
+		"cart_discounts",
+		"delivery_options",
+		"payment_methods",
+	),
 }
 
 

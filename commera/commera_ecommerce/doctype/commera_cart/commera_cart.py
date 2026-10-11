@@ -3,6 +3,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils.data import cint, cstr, flt, get_datetime
 
+from commera.checkout_hooks import get_discount_code_refusal
+from commera.commera_ecommerce.doctype.commera_discount.commera_discount import DiscountCodeError
 from commera.discounts.allocations import get_allocations
 from commera.discounts.cart_context import get_cart_context
 from commera.discounts.codes import get_code_discount, normalize_code
@@ -100,8 +102,10 @@ class CommeraCart(Document):
 
 	def add_discount_code(self, code: str):
 		codes = get_discount_codes(self)
-		codes.append(validate_new_discount_code(code, codes))
-		self.discount_codes = "\n".join(codes)
+		code = validate_new_discount_code(code, codes)
+		if refusal := get_discount_code_refusal(self.get_quotation_preview(), code):
+			frappe.throw(refusal, DiscountCodeError)
+		self.discount_codes = "\n".join([*codes, code])
 
 	def remove_discount_code(self, code: str):
 		code = normalize_code(code)
@@ -196,13 +200,15 @@ def get_code_states(quotation) -> list[dict]:
 				"title": discount.title,
 				"discount_class": discount.discount_class,
 				"applied": is_applied,
-				"reason": None if is_applied else get_code_reason(discount, cart),
+				"reason": None if is_applied else get_code_reason(discount, cart, code),
 			}
 		)
 	return states
 
 
-def get_code_reason(discount, cart) -> str:
+def get_code_reason(discount, cart, code: str) -> str:
+	if refusal := get_discount_code_refusal(cart.doc, code):
+		return refusal
 	if discount.status != "Active":
 		return _("{0} is not active.").format(discount.title)
 	if reason := get_unmet_reason(discount, cart):

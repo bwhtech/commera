@@ -27,9 +27,8 @@ def remove_code_discounts(doc, method=None):
 
 
 def apply_code_discounts(doc, method=None):
-	"""Add the discounts on top of ERPNext's price: product discounts per line (the best one wins on a
-	line), then order discounts on the discounted subtotal. Apps' cart_discounts join both. A cart chooses
-	its discounts again on every save; an order or invoice keeps the ones its cart had."""
+	"""Product discounts per line (best wins), then order discounts on the discounted subtotal. A cart
+	chooses its discounts on every save; an order or invoice keeps the ones its cart had."""
 	selections = get_selections(doc)
 	app_discounts = get_app_discounts(doc)
 	allocations = apply_line_discounts(

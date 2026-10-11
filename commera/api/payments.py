@@ -23,9 +23,15 @@ from commera.api.shipping import (
 	reprice_selected_option,
 )
 from commera.api.signup import get_placeholder_first_name, validate_single_email, validate_user_names
-from commera.checkout_hooks import apply_plugin_fees, filter_payment_methods, get_cart_refusal
+from commera.checkout_hooks import (
+	apply_plugin_fees,
+	filter_payment_methods,
+	get_cart_refusal,
+	get_discount_code_refusal,
+)
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.core import _get_cart_quotation, create_party, get_customer_contact, new_cart_quotation
+from commera.discounts.selection import get_discount_codes
 from commera.guest import (
 	get_guest_cart_name,
 	is_guest,
@@ -146,6 +152,7 @@ def open_checkout(
 	validate_delivery_option(quotation, delivery_option)
 	validate_cart_is_not_in_checkout(quotation.name)
 	quotation.flags.strict_plugin_fees = True
+	drop_refused_codes(quotation)
 	update_delivery_charges(quotation)
 	validate_cart(quotation)
 	validate_expected_total(quotation, payment_mode, expected_total)
@@ -229,6 +236,42 @@ def validate_cart(quotation):
 	if refusal := get_cart_refusal(quotation):
 		# Not refuse_payment: the shopper can fix this, so it is no error to log.
 		frappe.throw(refusal)
+
+
+def drop_refused_codes(quotation):
+	"""Take off the codes an app's validate_discount_code hook refuses now, such as one whose limit another
+	order just used up, and tell the shopper why and that the total changed, instead of refusing the cart."""
+	reasons = []
+	codes = get_discount_codes(quotation)
+	kept_codes = []
+	for code in codes:
+		if reason := get_discount_code_refusal(quotation, code):
+			reasons.append(reason)
+		else:
+			kept_codes.append(code)
+
+	coupon = quotation.coupon_code and frappe.db.get_value(
+		"Coupon Code", quotation.coupon_code, "coupon_code"
+	)
+	if coupon and (reason := get_discount_code_refusal(quotation, coupon)):
+		reasons.append(reason)
+		_remove_coupon_code(quotation)
+	if not reasons:
+		return
+
+	quotation.custom_discount_codes = "\n".join(kept_codes) or None
+	save_cart_quotation(quotation)
+	if server_cart := get_session_cart():
+		for code in set(codes) - set(kept_codes):
+			server_cart.remove_discount_code(code)
+		server_cart.save(ignore_permissions=True)
+	# nosemgrep: frappe-manual-commit  # kept past the throw below, or every retry would refuse again
+	frappe.db.commit()
+	frappe.throw(
+		"<br>".join([*reasons, _("We removed the code and updated your total.")]),
+		title=_("Discount Removed"),
+		exc=CheckoutPriceChangedError,
+	)
 
 
 def validate_delivery_option(quotation, delivery_option: str | None):
@@ -527,6 +570,9 @@ def reapply_coupon_code(quotation, coupon_code: str | None):
 		# An expired coupon is dropped quietly; the shopper only edited their cart.
 		frappe.clear_last_message()
 		return
+	# An app's refusal drops it as quietly as an expiry; checkout explains it if the shopper gets there.
+	if get_discount_code_refusal(quotation, frappe.db.get_value("Coupon Code", coupon_code, "coupon_code")):
+		return
 	quotation.coupon_code = coupon_code
 
 
@@ -824,6 +870,8 @@ def apply_coupon_code(applied_code: str):
 		frappe.throw(_("Please enter a valid coupon code"))
 	validate_coupon_code(coupon_name)
 	validate_cart_is_not_in_checkout(quotation.name)
+	if refusal := get_discount_code_refusal(quotation, applied_code):
+		frappe.throw(refusal)
 	quotation.coupon_code = coupon_name
 	save_cart_quotation(quotation)
 	return {

@@ -205,9 +205,8 @@ def get_variants(variant_names: list[str]) -> dict[str, dict]:
 
 
 def get_next_url(return_to: str | None = None) -> str:
-	"""Where the shopper goes once the lines are in the cart. `return_to` is "cart" or a path on this site;
-	anything else, "checkout" included, keeps the default: checkout, or the cart when checkout needs a
-	sign-in."""
+	"""`return_to` is "cart" or a path on this site; anything else keeps the default: checkout, or the
+	cart when checkout needs a sign-in."""
 	forwarded_params = [
 		(key, value)
 		for key, value in frappe.form_dict.items()
