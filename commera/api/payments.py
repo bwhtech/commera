@@ -43,7 +43,8 @@ except ImportError:
 	from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
 
 COD_PAYMENT_MODE = "COD"
-PAYPAL_PAYMENT_MODE = "PayPal"
+# A gateway capability: its checkout link stays payable after the shopper closes the tab.
+REUSABLE_CHECKOUT = "reusable_checkout"
 
 
 def is_cod(payment_mode: str | None) -> bool:
@@ -63,13 +64,22 @@ def get_open_gateway_payment_request(quotation_name: str) -> str | None:
 	return None
 
 
-def get_reusable_paypal_url(quotation, payment_mode: str, expected_total: float | None) -> str | None:
+def get_reusable_checkout_gateways() -> list[str]:
+	# Imported here: commera.api.admin.payments imports commera.migrate, which imports this module.
+	from commera.api.admin.payments import get_gateways_with_capability
+
+	return get_gateways_with_capability(REUSABLE_CHECKOUT)
+
+
+def get_reusable_checkout_url(
+	quotation, gateway: str, payment_mode: str, expected_total: float | None
+) -> str | None:
 	request_name = get_open_gateway_payment_request(quotation.name)
 	if not request_name:
 		return None
 
 	payment_request = frappe.get_doc("Gateway Payment Request", request_name)
-	if payment_request.status != "Pending" or payment_request.gateway != PAYPAL_PAYMENT_MODE:
+	if payment_request.status != "Pending" or payment_request.gateway != gateway:
 		return None
 
 	payment_request.sync_status()
@@ -156,10 +166,12 @@ def open_checkout(
 	quotation, payment_mode: str, delivery_option: str | None = None, expected_total: float | None = None
 ):
 	validate_delivery_option(quotation, delivery_option)
-	if (payment_mode or "").strip().casefold() == PAYPAL_PAYMENT_MODE.casefold():
-		if PAYPAL_PAYMENT_MODE in get_payment_modes_for_currency(quotation.currency):
-			if order_url := get_reusable_paypal_url(quotation, payment_mode, expected_total):
-				return {"order_url": order_url}
+	gateway = resolve_payment_mode(payment_mode)
+	if gateway in get_reusable_checkout_gateways() and gateway in get_payment_modes_for_currency(
+		quotation.currency
+	):
+		if order_url := get_reusable_checkout_url(quotation, gateway, payment_mode, expected_total):
+			return {"order_url": order_url}
 
 	validate_cart_is_not_in_checkout(quotation.name)
 	update_delivery_charges(quotation)
@@ -170,7 +182,6 @@ def open_checkout(
 			refuse_payment(_("Cash on delivery is not available."), quotation.name)
 		return {"order_url": get_confirmation_url(quotation.name, payment_mode=COD_PAYMENT_MODE)}
 
-	gateway = resolve_payment_mode(payment_mode)
 	available_gateways = get_payment_modes_for_currency(quotation.currency)
 	if not gateway or gateway not in available_gateways:
 		refuse_payment(

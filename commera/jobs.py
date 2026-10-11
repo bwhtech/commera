@@ -4,6 +4,8 @@ from frappe.integrations.utils import (
 )
 from frappe.utils import add_to_date, get_url, now_datetime
 
+from commera.api.payments import get_reusable_checkout_gateways
+
 
 def get_cc_email():
 	return frappe.get_cached_value("Commera Settings", "Commera Settings", "cc_email")
@@ -187,14 +189,15 @@ def delete_old_draft_quotations():
 		},
 		pluck="name",
 	)
+	reusable_gateways = get_reusable_checkout_gateways()
 	for quotation in old_drafts:
-		# A PayPal approval URL can remain payable after the shopper closes the browser.
-		if frappe.db.exists(
+		# The gateway's checkout link is still payable, so the cart must outlive the shopper's tab.
+		if reusable_gateways and frappe.db.exists(
 			"Gateway Payment Request",
 			{
 				"ref_doctype": "Quotation",
 				"ref_docname": quotation,
-				"gateway": "PayPal",
+				"gateway": ["in", reusable_gateways],
 				"status": "Pending",
 			},
 		):
@@ -207,8 +210,8 @@ def delete_old_draft_quotations():
 
 def sync_pending_gateway_payments():
 	"""Settle checkouts the shopper's browser never confirmed, so captured money always reaches an order."""
-	# Requests older than the lookback need a webhook or manual reconciliation. PayPal carts are kept
-	# while their request is pending, so a late webhook can still place the order.
+	# Requests older than the lookback need a webhook or manual reconciliation. Carts of reusable-checkout
+	# gateways are kept while their request is pending, so a late webhook can still place the order.
 	now = now_datetime()
 	pending_requests = frappe.get_all(
 		"Gateway Payment Request",

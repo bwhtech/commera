@@ -48,17 +48,39 @@ def add_gateway_payment_mode(integration):
 	add_payment_mode(integration["label"], "Bank")
 
 
+def get_payment_gateways():
+	"""Built-ins, then `commera_payment_gateways` hook results; a hook cannot replace a built-in slug."""
+	gateways = list(PAYMENT_GATEWAYS)
+	slugs = {gateway["slug"] for gateway in gateways}
+	for method in frappe.get_hooks("commera_payment_gateways"):
+		gateway = frappe.get_attr(method)()
+		if gateway["slug"] not in slugs:
+			gateways.append(gateway)
+			slugs.add(gateway["slug"])
+	return gateways
+
+
 def get_payment_registry():
 	"""The gateway registry as integration entries, with what every payment gateway shares filled in."""
 	return [
 		{
+			"capabilities": [],
 			**gateway,
 			"profile_doctype": PROFILE_DOCTYPE,
 			"profile_settings_fieldname": PROFILE_SETTINGS_FIELDNAME,
 			"webhook_path": WEBHOOK_PATH,
 			"on_enable": add_gateway_payment_mode,
 		}
-		for gateway in PAYMENT_GATEWAYS
+		for gateway in get_payment_gateways()
+	]
+
+
+def get_gateways_with_capability(capability: str) -> list[str]:
+	"""Payment Gateway Profile names whose provider declares `capability`."""
+	return [
+		gateway["label"]
+		for gateway in get_payment_gateways()
+		if capability in gateway.get("capabilities", ())
 	]
 
 
