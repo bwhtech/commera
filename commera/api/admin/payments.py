@@ -5,6 +5,7 @@ import frappe
 
 from commera.api.admin.integrations import describe_integration, save_integration
 from commera.migrate import add_payment_mode
+from commera.plugin_events import get_handlers
 
 PROFILE_DOCTYPE = "Payment Gateway Profile"
 PROFILE_SETTINGS_FIELDNAME = "gateway_settings"
@@ -49,10 +50,10 @@ def add_gateway_payment_mode(integration):
 
 
 def get_payment_gateways():
-	"""Built-ins, then `commera_payment_gateways` hook results; a hook cannot replace a built-in slug."""
+	"""Built-ins, then `commera_hooks["payment_gateways"]` results; a hook cannot replace a built-in slug."""
 	gateways = list(PAYMENT_GATEWAYS)
 	slugs = {gateway["slug"] for gateway in gateways}
-	for method in frappe.get_hooks("commera_payment_gateways"):
+	for method in get_handlers("commera_hooks", "payment_gateways"):
 		gateway = frappe.get_attr(method)()
 		if gateway["slug"] not in slugs:
 			gateways.append(gateway)

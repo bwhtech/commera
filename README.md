@@ -56,8 +56,8 @@ Gateway callbacks are idempotent, so a replayed webhook racing a shopper's retur
 
 #### Gateways from other apps
 
-A payment provider app adds its own card by declaring `commera_payment_gateways` in its `hooks.py`: a
-list of dotted paths, each returning `{slug, label, blurb, settings_doctype, docs_url, capabilities}`,
+A payment provider app adds its own card through `commera_hooks = {"payment_gateways": [...]}` in its
+`hooks.py`: dotted paths, each returning `{slug, label, blurb, settings_doctype, docs_url, capabilities}`,
 where `label` is the Payment Gateway Profile's name. Commera never names a provider in code; it acts on
 `capabilities` instead. With `reusable_checkout`, a shopper who returns to checkout is sent back to the
 still-open checkout link, and the cart is kept while that payment is pending. Checkout only offers

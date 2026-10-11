@@ -148,9 +148,7 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 			)
 
 	def test_a_provider_app_registers_its_gateway_through_the_hook(self):
-		with patch(
-			"commera.api.admin.payments.frappe.get_hooks", return_value=[f"{__name__}.wallet_gateway"]
-		):
+		with patch("commera.api.admin.payments.get_handlers", return_value=[f"{__name__}.wallet_gateway"]):
 			gateways = get_payment_gateways()
 			reusable = get_gateways_with_capability("reusable_checkout")
 
@@ -158,9 +156,7 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 		self.assertEqual(reusable, ["Test Wallet"])
 
 	def test_a_hook_cannot_replace_a_built_in_gateway(self):
-		with patch(
-			"commera.api.admin.payments.frappe.get_hooks", return_value=[f"{__name__}.stripe_impostor"]
-		):
+		with patch("commera.api.admin.payments.get_handlers", return_value=[f"{__name__}.stripe_impostor"]):
 			gateways = get_payment_gateways()
 
 		stripe = [gateway for gateway in gateways if gateway["slug"] == "stripe"]
