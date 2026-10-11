@@ -29,8 +29,35 @@ from commera.utils import update_sales_order_ecommerce_status
 
 # Removing or renaming a name here breaks apps built on the SDK, so it needs an API_VERSION bump.
 PUBLIC_NAMES = {
-	"commera.sdk": ["API_VERSION", "STORE_ORDER_TYPE", "as_plugin_user", "cart", "catalog", "orders"],
-	"commera.sdk.cart": ["get_cart", "set_cart_fields"],
+	"commera.sdk": [
+		"API_VERSION",
+		"STORE_ORDER_TYPE",
+		"as_plugin_user",
+		"cart",
+		"catalog",
+		"discounts",
+		"orders",
+	],
+	"commera.sdk.cart": [
+		"add_discount_code",
+		"add_lines",
+		"get_cart",
+		"get_priced_cart",
+		"remove_discount_code",
+		"remove_lines",
+		"set_cart_fields",
+		"update_lines",
+	],
+	"commera.sdk.discounts": [
+		"add_code",
+		"create_discount",
+		"generate_codes",
+		"get_discount",
+		"get_order_discounts",
+		"list_discounts",
+		"preview_cart",
+		"update_discount",
+	],
 	"commera.sdk.catalog": ["get_items"],
 	"commera.sdk.orders": ["ShippingNotInstalled", "get_order", "get_orders", "record_shipment"],
 	"commera.sdk.types": [
@@ -41,8 +68,14 @@ PUBLIC_NAMES = {
 		"Charge",
 		"ChargeSummary",
 		"CheckoutSummary",
+		"Discount",
+		"DiscountAllocation",
+		"DiscountInput",
+		"NewCartLine",
 		"Order",
 		"OrderLine",
+		"PricedCart",
+		"PricedCartLine",
 		"Stage",
 	],
 }

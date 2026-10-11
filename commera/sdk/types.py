@@ -9,6 +9,9 @@ __all__ = [
 	"Charge",
 	"ChargeSummary",
 	"CheckoutSummary",
+	"Discount",
+	"DiscountAllocation",
+	"DiscountInput",
 	"NewCartLine",
 	"Order",
 	"OrderLine",
@@ -100,6 +103,44 @@ class Cart(TypedDict):
 	total: float
 	grand_total: float
 	plugin_fields: dict[str, Any]
+
+
+class DiscountInput(TypedDict, total=False):
+	"""Commera Discount fields. Only `discount_type` is required; see the doctype for every rule."""
+
+	title: str
+	# "Code" or "Automatic".
+	method: str
+	# "Amount Off Products", "Amount Off Order", "Buy X Get Y" or "Free Shipping".
+	discount_type: str
+	# "Percentage" or "Fixed Amount".
+	value_type: str
+	value: float
+	maximum_discount: float
+	# {"role": "Applies To" | "Excluded" | "Buys" | "Gets", "target_type": "Item" | "Item Group" | "Brand", "target"}
+	targets: list[dict]
+	tiers: list[dict]
+	starts_on: date
+	ends_on: date | None
+
+
+class Discount(DiscountInput, total=False):
+	name: str
+	# Active, Scheduled, Expired, Used Up or Disabled.
+	status: str
+	# Product, Order or Shipping.
+	discount_class: str
+	codes: list[str]
+	times_used: int
+	discount_given: float
+	sales: float
+
+
+class DiscountAllocation(TypedDict):
+	discount: str
+	code: str | None
+	discount_class: str
+	amount: float
 
 
 class NewCartLine(TypedDict, total=False):
