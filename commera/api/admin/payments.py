@@ -8,6 +8,7 @@ from commera.migrate import add_payment_mode
 from commera.plugin_events import get_handler_app, is_supported_app
 
 PROFILE_DOCTYPE = "Payment Gateway Profile"
+REQUIRED_GATEWAY_FIELDS = {"slug", "label", "settings_doctype"}
 PROFILE_SETTINGS_FIELDNAME = "gateway_settings"
 WEBHOOK_PATH = "/api/method/bwh_payments.bwh_payments.webhook.handle?gateway={profile}"
 
@@ -54,8 +55,8 @@ def get_payment_gateways():
 	gateways = list(PAYMENT_GATEWAYS)
 	slugs = {gateway["slug"] for gateway in gateways}
 	for method in get_gateway_hooks():
-		gateway = frappe.get_attr(method)()
-		if gateway["slug"] not in slugs:
+		gateway = get_hook_gateway(method)
+		if gateway and gateway["slug"] not in slugs:
 			gateways.append(gateway)
 			slugs.add(gateway["slug"])
 	return gateways
@@ -117,3 +118,15 @@ def get_gateway_hooks() -> list[str]:
 		for method in frappe.get_hooks("commera_payment_gateways")
 		if is_supported_app(get_handler_app(method))
 	]
+
+
+def get_hook_gateway(method: str) -> dict | None:
+	# Read on every checkout, so a broken provider app is logged and skipped, never raised.
+	try:
+		gateway = frappe.get_attr(method)()
+		if missing := REQUIRED_GATEWAY_FIELDS - set(gateway):
+			raise ValueError(f"Gateway card is missing {', '.join(sorted(missing))}")
+		return gateway
+	except Exception:
+		frappe.log_error(title=f"commera_payment_gateways hook failed: {method}"[:140], defer_insert=True)
+		return None

@@ -108,6 +108,10 @@ def get_reusable_checkout_url(
 	):
 		return None
 
+	# The checks a new checkout runs, so a plugin that has since dropped the gateway or refuses the cart wins.
+	if gateway not in get_checkout_payment_methods(quotation, strict=True):
+		return None
+	validate_cart(quotation)
 	validate_expected_total(quotation, payment_mode, expected_total)
 	return payment_request.order_url
 
@@ -184,9 +188,7 @@ def open_checkout(
 ):
 	validate_delivery_option(quotation, delivery_option)
 	gateway = resolve_payment_mode(payment_mode)
-	if gateway in get_reusable_checkout_gateways() and gateway in get_payment_modes_for_currency(
-		quotation.currency
-	):
+	if gateway in get_reusable_checkout_gateways():
 		if order_url := get_reusable_checkout_url(quotation, gateway, payment_mode, expected_total):
 			return {"order_url": order_url}
 

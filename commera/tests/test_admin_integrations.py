@@ -13,6 +13,7 @@ from commera.api.admin.integrations import (
 	get_link_options,
 )
 from commera.api.admin.payments import (
+	PAYMENT_GATEWAYS,
 	get_gateways_with_capability,
 	get_payment_gateways,
 	get_payment_integrations,
@@ -166,6 +167,18 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 
 		self.assertNotIn("test-wallet", [gateway["slug"] for gateway in gateways])
 
+	def test_a_failing_card_is_logged_and_skipped_instead_of_breaking_the_registry(self):
+		hooks = [f"{__name__}.broken_gateway", f"{__name__}.card_without_slug", f"{__name__}.wallet_gateway"]
+		with (
+			patch("commera.api.admin.payments.get_gateway_hooks", return_value=hooks),
+			patch("commera.api.admin.payments.frappe.log_error") as log_error,
+		):
+			gateways = get_payment_gateways()
+
+		self.assertEqual(gateways[-1]["slug"], "test-wallet")
+		self.assertEqual(len(gateways), len(PAYMENT_GATEWAYS) + 1)
+		self.assertEqual(log_error.call_count, 2)
+
 	def test_a_hook_cannot_replace_a_built_in_gateway(self):
 		with patch(
 			"commera.api.admin.payments.get_gateway_hooks", return_value=[f"{__name__}.stripe_impostor"]
@@ -227,3 +240,11 @@ def wallet_gateway():
 
 def stripe_impostor():
 	return {**wallet_gateway(), "slug": "stripe", "settings_doctype": "Impostor Settings"}
+
+
+def broken_gateway():
+	raise RuntimeError("provider app bug")
+
+
+def card_without_slug():
+	return {"label": "No Slug", "settings_doctype": "No Slug Settings"}

@@ -63,7 +63,6 @@ class TestReusableCheckout(UnitTestCase):
 		with (
 			patch("commera.api.payments.resolve_payment_mode", return_value=GATEWAY),
 			patch("commera.api.payments.get_reusable_checkout_gateways", return_value=[GATEWAY]),
-			patch("commera.api.payments.get_payment_modes_for_currency", return_value=[GATEWAY]),
 			patch("commera.api.payments.get_reusable_checkout_url", return_value="https://wallet.test/old"),
 			patch("commera.api.payments.validate_cart_is_not_in_checkout") as validate_cart,
 			patch("commera.api.payments.frappe.get_doc") as get_doc,
@@ -108,6 +107,8 @@ class TestReusableCheckout(UnitTestCase):
 		with (
 			patch("commera.api.payments.get_open_gateway_payment_request", return_value="GPR-1"),
 			patch("commera.api.payments.frappe.get_doc", return_value=payment_request),
+			patch("commera.api.payments.get_checkout_payment_methods", return_value=[GATEWAY]),
+			patch("commera.api.payments.validate_cart"),
 			patch(
 				"commera.api.payments.to_minor_units", side_effect=lambda amount, currency: int(amount * 100)
 			),
@@ -188,7 +189,6 @@ class TestReusableCheckout(UnitTestCase):
 		with (
 			patch("commera.api.payments.resolve_payment_mode", return_value=GATEWAY),
 			patch("commera.api.payments.get_reusable_checkout_gateways", return_value=[]),
-			patch("commera.api.payments.get_payment_modes_for_currency", return_value=[GATEWAY]),
 			patch("commera.api.payments.get_reusable_checkout_url") as reuse,
 			patch("commera.api.payments.validate_cart_is_not_in_checkout", side_effect=StopIteration),
 		):
@@ -196,3 +196,35 @@ class TestReusableCheckout(UnitTestCase):
 				open_checkout(quotation, GATEWAY)
 
 		reuse.assert_not_called()
+
+	def test_a_link_is_not_reused_once_a_plugin_stops_offering_its_gateway(self):
+		with self.patch_open_request():
+			with patch("commera.api.payments.get_checkout_payment_methods", return_value=["Stripe"]):
+				self.assertIsNone(get_reusable_checkout_url(make_quotation(), GATEWAY, GATEWAY, None))
+
+	def test_a_link_is_not_reused_for_a_cart_a_plugin_refuses(self):
+		with self.patch_open_request():
+			with (
+				patch("commera.api.payments.get_checkout_payment_methods", return_value=[GATEWAY]),
+				patch("commera.api.payments.validate_cart", side_effect=frappe.ValidationError) as validate,
+			):
+				with self.assertRaises(frappe.ValidationError):
+					get_reusable_checkout_url(make_quotation(), GATEWAY, GATEWAY, None)
+
+		validate.assert_called_once()
+
+	def patch_open_request(self):
+		payment_request = SimpleNamespace(
+			status="Pending",
+			gateway=GATEWAY,
+			currency_code="USD",
+			amount=20,
+			order_url="https://wallet.test/old",
+			sync_status=Mock(),
+		)
+		return patch.multiple(
+			"commera.api.payments",
+			get_open_gateway_payment_request=Mock(return_value="GPR-1"),
+			to_minor_units=Mock(side_effect=lambda amount, currency: int(amount * 100)),
+			frappe=SimpleNamespace(get_doc=Mock(return_value=payment_request)),
+		)
