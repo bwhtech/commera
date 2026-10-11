@@ -3,6 +3,7 @@ from frappe.query_builder.functions import Count, Sum
 from frappe.utils.data import flt
 
 from commera.discounts.allocations import get_allocations
+from commera.plugin_events import fire_event
 
 
 def has_used_before(discount: str, cart) -> bool:
@@ -41,6 +42,9 @@ def record_discount_uses(sales_order, method=None):
 	"""Log each discount a placed order used. Counts, budgets and once-per-customer read this log."""
 	amounts = {}
 	for allocation in get_allocations(sales_order):
+		# An app's cart discount is the app's own to count; it has no Commera Discount behind it.
+		if not allocation.get("discount"):
+			continue
 		key = (allocation["discount"], allocation.get("code"))
 		amounts[key] = amounts.get(key, 0) + flt(allocation["amount"])
 
@@ -59,6 +63,14 @@ def record_discount_uses(sales_order, method=None):
 			}
 		).insert(ignore_permissions=True)
 	refresh_usage({discount for discount, _code in amounts}, {code for _discount, code in amounts if code})
+	for (discount, code), amount in amounts.items():
+		fire_event(
+			"discount_used",
+			"Sales Order",
+			sales_order.name,
+			data={"discount": discount, "code": code, "amount": amount},
+			key=f"{discount}-{code or ''}",
+		)
 
 
 def remove_discount_uses(sales_order, method=None):

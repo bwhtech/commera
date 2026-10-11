@@ -6,7 +6,7 @@ from frappe import _
 from frappe.utils.data import cstr, flt
 
 from commera.discounts.shipping import apply_shipping_discounts
-from commera.plugin_events import get_handlers
+from commera.plugin_events import get_handler_app, get_handlers
 from commera.utils import get_charge_account_head
 
 PLUGIN_FEE_FIELD = "commera_plugin_fee"
@@ -41,6 +41,42 @@ def apply_plugin_fees(quotation):
 	for fee_row in get_plugin_fee_rows(quotation, handlers, strict=bool(quotation.flags.strict_plugin_fees)):
 		quotation.append("taxes", fee_row)
 	quotation.calculate_taxes_and_totals()
+
+
+def get_plugin_discounts(quotation) -> list[dict]:
+	"""What each app's cart_discounts hook takes off the cart. A product discount names its cart line by
+	`line` (the row idx); one without `line` comes off the order. A failing handler blocks checkout, but
+	on a cart edit its discounts are only left out."""
+	discounts = []
+	for handler in get_handlers("commera_hooks", "cart_discounts"):
+		with handle_hook_error(
+			"cart_discounts", handler, quotation, bool(quotation.flags.strict_plugin_fees)
+		):
+			returned = frappe.get_attr(handler)(quotation) or []
+			if not isinstance(returned, list):
+				raise TypeError(f'commera_hooks["cart_discounts"] must return a list, got {returned!r}')
+			app = get_handler_app(handler)
+			discounts += [get_plugin_discount(quotation, app, discount) for discount in returned]
+	return [discount for discount in discounts if discount["amount"] > 0]
+
+
+def get_plugin_discount(quotation, app: str, discount: dict) -> dict:
+	title = cstr(discount.get("title")).strip()
+	amount = discount.get("amount")
+	if not title or not is_finite_number(amount) or amount < 0:
+		raise ValueError(f"A cart discount needs a title and an amount of zero or more, got {discount!r}")
+	line = discount.get("line")
+	if line is not None and line not in {item.idx for item in quotation.items}:
+		raise ValueError(f"A cart discount names line {line!r}, which the cart does not have")
+	return {
+		"discount": None,
+		"code": None,
+		"app": app,
+		"title": title,
+		"discount_class": "Product" if line is not None else "Order",
+		"amount": flt(amount, quotation.precision("discount_amount")),
+		"line": line,
+	}
 
 
 def get_plugin_fee_rows(quotation, handlers: list[str], strict: bool) -> list[dict]:

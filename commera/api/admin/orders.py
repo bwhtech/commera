@@ -44,6 +44,8 @@ ORDER_FIELDS = (
 	"custom_ecommerce_payment_mode",
 	"custom_ecommerce_status",
 	"custom_delivery_option",
+	"custom_discount_allocations",
+	"custom_cart_attributes",
 	"shipping_address",
 	"address_display",
 	"modified",
@@ -720,6 +722,8 @@ def read_order_lines(order_names: list[str]) -> dict[str, list]:
 			"rate",
 			"amount",
 			"image",
+			"custom_code_discount",
+			"custom_line_attributes",
 		],
 		order_by="idx asc",
 	)

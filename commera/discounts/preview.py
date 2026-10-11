@@ -3,7 +3,13 @@ import frappe
 from commera.discounts.pricing import apply_code_discounts
 
 
-def get_preview_quotation(lines: list[dict], codes: str | None = None, user: str | None = None, flags=None):
+def get_preview_quotation(
+	lines: list[dict],
+	codes: str | None = None,
+	user: str | None = None,
+	flags=None,
+	fields: dict | None = None,
+):
 	"""An unsaved store cart priced as checkout would price it: ERPNext price lists and rules, then the
 	discounts. Priced elevated, like the checkout cart, because ERPNext reads Items the shopper cannot."""
 	# Imported here: commera.api.payments imports the cart, which imports this module.
@@ -23,6 +29,8 @@ def get_preview_quotation(lines: list[dict], codes: str | None = None, user: str
 			"contact_email": user,
 		}
 	)
+	# Plugin fields and cart attributes, so the apps' cart hooks see the cart as checkout will.
+	quotation.update(fields or {})
 	quotation.flags.update(flags or {})
 	for line in lines:
 		quotation.append(

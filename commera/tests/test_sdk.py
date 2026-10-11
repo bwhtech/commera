@@ -45,6 +45,7 @@ PUBLIC_NAMES = {
 		"get_priced_cart",
 		"remove_discount_code",
 		"remove_lines",
+		"set_cart_attributes",
 		"set_cart_fields",
 		"update_lines",
 	],

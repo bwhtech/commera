@@ -5,6 +5,7 @@ from frappe.utils.data import cint, cstr, flt
 
 from commera.api.admin.orders import MAX_PAGE_LENGTH, describe_state, read_orders, read_paid_orders
 from commera.api.shipping import get_charge_lines, is_connector_installed, read_order_taxes
+from commera.discounts.allocations import get_allocations
 from commera.plugin_events import read_shipping_addresses, validate_plugin_fieldnames
 from commera.sdk.types import Order
 
@@ -86,9 +87,13 @@ def get_order_result(order, paid_orders: set, taxes: list, shipping_address, ext
 				"rate": flt(line.rate),
 				"amount": flt(line.amount),
 				"image": line.image,
+				"discount": flt(line.custom_code_discount) * flt(line.qty),
+				"attributes": frappe.parse_json(line.custom_line_attributes or "{}"),
 			}
 			for line in order.lines
 		],
+		"discounts": get_allocations(order),
+		"attributes": frappe.parse_json(order.custom_cart_attributes or "{}"),
 		"tags": order.tags,
 		"plugin_fields": {fieldname: order.get(fieldname) for fieldname in extra_fields},
 	}

@@ -14,6 +14,7 @@ from commera.discounts.selection import (
 	validate_new_discount_code,
 )
 from commera.guest import get_guest_cart_key, is_guest, set_guest_cart_cookie
+from commera.plugin_events import fire_event, get_handlers
 
 MAX_CART_LINES = 50
 
@@ -29,6 +30,11 @@ class CommeraCart(Document):
 				frappe.throw(_("Row {0}: the quantity must be at least 1.").format(line.idx))
 			attributes = parse_attributes(line.attributes)
 			line.attributes = frappe.as_json(attributes, indent=None) if attributes else None
+
+	def after_insert(self):
+		# Most guest carts never reach checkout, so the event is only logged when an app listens for it.
+		if get_handlers("commera_events", "cart_created"):
+			fire_event("cart_created", self.doctype, self.name, data={"user": self.user})
 
 	@property
 	def version(self) -> str:
@@ -114,6 +120,7 @@ class CommeraCart(Document):
 		return {
 			"name": self.name,
 			"version": self.version,
+			"attributes": parse_attributes(self.attributes),
 			"currency": quotation.currency,
 			"discount_codes": get_code_states(quotation),
 			"automatic_discounts": get_automatic_discounts(quotation),
@@ -125,7 +132,8 @@ class CommeraCart(Document):
 
 	def get_quotation_preview(self):
 		lines = [{"item_code": row.item_code, "qty": row.qty} for row in self.lines]
-		return get_preview_quotation(lines, self.discount_codes, self.user)
+		fields = {**frappe.parse_json(self.plugin_fields or "{}"), "custom_cart_attributes": self.attributes}
+		return get_preview_quotation(lines, self.discount_codes, self.user, fields=fields)
 
 	def update_quotation(self, quotation):
 		"""Copy the attributes and codes onto a checkout Quotation whose lines came from the browser. When
@@ -145,6 +153,22 @@ class CommeraCart(Document):
 				)
 		quotation.set("items", items)
 		quotation.custom_discount_codes = self.discount_codes
+		quotation.custom_cart_attributes = self.attributes
+		quotation.update(frappe.parse_json(self.plugin_fields or "{}"))
+
+	def set_attributes(self, values: dict):
+		"""Merge cart-level attributes; a value of None removes its key."""
+		attributes = {
+			**parse_attributes(self.attributes),
+			**{cstr(key): value for key, value in values.items()},
+		}
+		attributes = {key: cstr(value) for key, value in attributes.items() if value is not None}
+		self.attributes = frappe.as_json(attributes, indent=None) if attributes else None
+
+	def set_plugin_fields(self, values: dict):
+		self.plugin_fields = frappe.as_json(
+			{**frappe.parse_json(self.plugin_fields or "{}"), **values}, indent=None
+		)
 
 
 def change_quantity_from_the_end(cart, rows: list, delta: int):
@@ -190,7 +214,7 @@ def get_code_reason(discount, cart) -> str:
 
 def get_automatic_discounts(quotation) -> list[dict]:
 	return [
-		{"title": get_discount(row["discount"]).title, "amount": row["amount"]}
+		{"title": row["title"], "amount": row["amount"], "app": row.get("app")}
 		for row in get_allocations(quotation)
 		if not row.get("code")
 	]

@@ -4,7 +4,14 @@
 	"creation": "2026-10-10 00:00:00.000000",
 	"doctype": "DocType",
 	"engine": "InnoDB",
-	"field_order": ["user", "cart_key", "discount_codes", "lines"],
+	"field_order": [
+		"user",
+		"cart_key",
+		"attributes",
+		"plugin_fields",
+		"discount_codes",
+		"lines"
+	],
 	"fields": [
 		{
 			"fieldname": "user",
@@ -23,6 +30,19 @@
 			"label": "Guest Cart Key",
 			"read_only": 1,
 			"search_index": 1
+		},
+		{
+			"description": "JSON object of cart-level attributes, copied to the order.",
+			"fieldname": "attributes",
+			"fieldtype": "Small Text",
+			"label": "Attributes"
+		},
+		{
+			"description": "JSON object of plugin Quotation fields set before checkout; copied to the Quotation at checkout.",
+			"fieldname": "plugin_fields",
+			"fieldtype": "Long Text",
+			"label": "Plugin Fields",
+			"read_only": 1
 		},
 		{
 			"description": "Commera Discount codes, one per line.",

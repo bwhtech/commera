@@ -53,6 +53,9 @@ class OrderLine(TypedDict):
 	rate: float
 	amount: float
 	image: str | None
+	# The whole line's discount from a discount code, an automatic discount or an app.
+	discount: float
+	attributes: dict[str, str]
 
 
 class Order(TypedDict):
@@ -85,6 +88,8 @@ class Order(TypedDict):
 	items: list[OrderLine]
 	tags: list[str]
 	plugin_fields: dict[str, Any]
+	discounts: list["DiscountAllocation"]
+	attributes: dict[str, str]
 
 
 class CartLine(TypedDict):
@@ -93,6 +98,8 @@ class CartLine(TypedDict):
 	qty: float
 	rate: float
 	amount: float
+	discount: float
+	attributes: dict[str, str]
 
 
 class Cart(TypedDict):
@@ -100,6 +107,8 @@ class Cart(TypedDict):
 	customer: str | None
 	currency: str
 	items: list[CartLine]
+	discounts: list["DiscountAllocation"]
+	attributes: dict[str, str]
 	total: float
 	grand_total: float
 	plugin_fields: dict[str, Any]
@@ -137,10 +146,17 @@ class Discount(DiscountInput, total=False):
 
 
 class DiscountAllocation(TypedDict):
-	discount: str
+	# The Commera Discount, or None for an app's cart_discounts entry.
+	discount: str | None
 	code: str | None
+	# The app whose cart_discounts hook gave it; None for a merchant's discount.
+	app: str | None
+	title: str
+	# Product, Order or Shipping.
 	discount_class: str
 	amount: float
+	# The cart line's idx for a product discount.
+	line: int | None
 
 
 class NewCartLine(TypedDict, total=False):
@@ -168,6 +184,7 @@ class PricedCart(TypedDict):
 
 	name: str
 	version: str
+	attributes: dict[str, str]
 	currency: str
 	# {"code", "class"}, where class is "Product" or "Order".
 	discount_codes: list[dict]
