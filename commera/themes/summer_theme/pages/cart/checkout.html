@@ -11,6 +11,11 @@
 	"has_billing_addresses": billing_addresses | length > 0,
 	"has_shipping_addresses": shipping_addresses | length > 0,
 	"has_store_pickup": store_pickup_addresses | length > 0,
+	"is_guest": is_guest,
+	"delivery_charge": delivery_charge,
+	"delivery_charge_applicable_below": delivery_charge_applicable_below,
+	"prefill": checkout_prefill,
+	"coupon_code": coupon_code,
 } %}
 
 {% block head %}
@@ -27,6 +32,10 @@
 	{%- endfor -%}
 	{{ combobox(prefix ~ "_address_id", prefix ~ "_address_id", options, _("Saved addresses") ~ " *",
 		placeholder=_("Search by name, city or postcode"), empty_message=_("No matching address")) }}
+{% endmacro %}
+
+{% macro email_error_message() %}
+	<small class="text-danger" role="alert" x-show="email_error" x-cloak x-text="email_error"></small>
 {% endmacro %}
 
 {% macro address_fields(prefix, heading) %}
@@ -49,6 +58,7 @@
 		<div class="form-group m-b25">
 			<label class="label-title" for="{{ prefix }}_email">{{ _("Email address") }} *</label>
 			<input type="email" id="{{ prefix }}_email" class="form-control" x-model="{{ prefix }}.email" required>
+			{% if prefix == "billing" %}{{ email_error_message() }}{% endif %}
 		</div>
 	</div>
 	<div class="col-md-12">
@@ -159,12 +169,20 @@
 										{% endfor %}
 									</select>
 								</div>
+								{% if is_guest %}
+									<div class="form-group m-b25">
+										<label class="label-title" for="pickup_email">{{ _("Email address") }} *</label>
+										<input type="email" id="pickup_email" class="form-control" x-model="billing.email" required>
+										{{ email_error_message() }}
+									</div>
+								{% endif %}
 							</div>
 						</template>
 
 						<template x-if="delivery_option === 'home_delivery'">
 							<div class="col-md-12">
 								<div class="row">
+									{% if not is_guest %}
 									<div class="col-md-12">
 										<div class="form-group m-b20">
 											<div class="custom-control custom-checkbox d-flex align-items-center m-b10">
@@ -180,6 +198,7 @@
 											</div>
 										</div>
 									</div>
+									{% endif %}
 
 									<template x-if="billing_use_address === 'saved_address'">
 										<div class="col-md-12">
@@ -212,6 +231,7 @@
 											<div class="row">
 												<div class="col-md-12">
 													<h5 class="title m-b15">{{ _("Shipping Address") }}</h5>
+													{% if not is_guest %}
 													<div class="form-group m-b20">
 														<div class="custom-control custom-checkbox d-flex align-items-center m-b10">
 															<input class="form-check-input radio" type="radio" id="shipping_saved_address"
@@ -225,6 +245,7 @@
 															<label class="form-check-label" for="shipping_new_address">{{ _("Add new address") }}</label>
 														</div>
 													</div>
+													{% endif %}
 												</div>
 
 												<template x-if="shipping_use_address === 'saved_address'">
@@ -267,8 +288,26 @@
 				</div>
 
 				<div class="col-xl-4 side-bar">
+					{{ plugin_slot("checkout_banner") }}
 					<h4 class="title m-b15">{{ _("Your Order") }}</h4>
 					<div class="order-detail sticky-top">
+						{% if is_guest %}
+							<template x-for="cart_item in $store.cart.items" :key="cart_item.variant.item_code">
+								<div class="cart-item style-1">
+									<div class="dz-media">
+										<img :src="cart_item.item.images.length ? cart_item.item.images[0].image : '/assets/commera/images/1.jpg'"
+											:alt="cart_item.variant.item_name">
+									</div>
+									<div class="dz-content">
+										<h6 class="title mb-0">
+											<span x-text="{% if language == 'ar' %}cart_item.variant.item_name_ar || {% endif %}cart_item.variant.item_name"></span>
+											<span class="checkout-item-meta">{{ _("Qty") }} <span x-text="cart_item.qty"></span></span>
+										</h6>
+										<span class="price">{{ currency_symbol }}<span x-text="format_amount(cart_item.price * cart_item.qty)"></span></span>
+									</div>
+								</div>
+							</template>
+						{% endif %}
 						{% for item in items %}
 							<div class="cart-item style-1 {% if loop.last %}mb-0{% endif %}">
 								<div class="dz-media">
@@ -295,7 +334,7 @@
 							<tbody>
 								<tr class="subtotal">
 									<td>{{ _("Subtotal") }}</td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.subtotal)">{{ "%.2f" | format(checkout_summary.subtotal) }}</span></td>
+									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.subtotal)">{{ "%.2f" | format(checkout_summary.subtotal or 0) }}</span></td>
 								</tr>
 								<tr class="shipping">
 									<td>
@@ -312,6 +351,12 @@
 									<tr class="tax">
 										<td x-text="tax.description"></td>
 										<td class="price">{{ currency_symbol }}<span x-text="format_amount(tax.amount)"></span></td>
+									</tr>
+								</template>
+								<template x-for="(fee, index) in active_summary.plugin_fees" :key="index">
+									<tr class="plugin-fee">
+										<td x-text="fee.description"></td>
+										<td class="price">{{ currency_symbol }}<span x-text="format_amount(fee.amount)"></span></td>
 									</tr>
 								</template>
 								<tr class="cod-charge" x-show="active_summary.cod_charge" x-cloak>
@@ -354,7 +399,7 @@
 														:id="'shipping_option_' + index" :value="option.title"
 														x-model="selected_shipping_option">
 													<label class="form-check-label" :for="'shipping_option_' + index">
-														<span x-text="option.title"></span>
+														<span x-text="option.label || option.title"></span>
 														<span x-show="option.is_free"> &mdash; {{ _("Free") }}</span>
 														<span x-show="!option.is_free" x-cloak>
 															&mdash; {{ currency_symbol }}<span x-text="format_amount(option.amount)"></span>
@@ -439,6 +484,10 @@
 								<span x-show="order_loading" x-cloak>{{ _("Placing...") }}</span>
 							</button>
 						</div>
+						<button type="button" class="btn btn-outline-secondary w-100 m-t10"
+							@click="$store.cart.copy_link(pending_discount || config.coupon_code)">
+							<i class="fa-solid fa-link m-r5"></i>{{ _("Copy cart link") }}
+						</button>
 					</div>
 				</div>
 			</div>
@@ -452,6 +501,7 @@
 		const COD_PAYMENT_MODE = "COD";
 		const MISSING_FIELD_MESSAGE = {{ _("Please fill in every required field.") | tojson }};
 		const INVALID_PHONE_MESSAGE = {{ _("Please enter a valid phone number.") | tojson }};
+		const INVALID_EMAIL_MESSAGE = {{ _("Please enter a single valid email address.") | tojson }};
 		const UNSELECTED_ADDRESS_MESSAGE = {{ _("Please select a saved address.") | tojson }};
 		const PHONE_NUMBER_SEPARATORS = /[\s().-]/g;
 		const PHONE_NUMBER_DIGITS = /^\+?\d{7,15}$/;
@@ -499,6 +549,7 @@
 				order_loading: false,
 				terms_accepted: false,
 				errors: [],
+				email_error: "",
 				payment_mode: Alpine.$persist(null).as("payment_mode"),
 				summary: config.summary,
 				shipping_options: [],
@@ -508,9 +559,57 @@
 				selected_shipping_option: null,
 				shipping_option_saving: false,
 				pending_shipping_option: null,
+				pending_discount: null,
 
 				init() {
 					this.set_available_payment_mode();
+					const url = new URL(window.location.href);
+					this.pending_discount = url.searchParams.get("discount");
+					if (this.pending_discount) {
+						// Left in the URL, every reload would re-apply the coupon against its rate limit.
+						url.searchParams.delete("discount");
+						history.replaceState(null, "", url);
+					}
+					for (const [field, value] of Object.entries(this.config.prefill)) {
+						if (!this.billing[field]) this.billing[field] = value;
+					}
+					if (!this.config.is_guest) {
+						this.apply_pending_discount();
+						return;
+					}
+					if (!this.$store.cart.items.length) {
+						window.location.replace("/{{ language }}/cart");
+						return;
+					}
+					this.summary = this.get_browser_cart_summary();
+				},
+
+				get_browser_cart_summary() {
+					const subtotal = this.$store.cart.total;
+					const shipping = subtotal < this.config.delivery_charge_applicable_below ? this.config.delivery_charge : 0;
+					const summary = {
+						subtotal: subtotal,
+						shipping: shipping,
+						cod_charge: 0,
+						taxes: [],
+						discount_amount: 0,
+						rounding_adjustment: 0,
+						total: subtotal + shipping,
+					};
+					return { ...summary, cash_on_delivery: summary };
+				},
+
+				async apply_pending_discount() {
+					if (!this.pending_discount) return;
+					try {
+						const response = await frappe_call("/api/v2/method/commera.api.payments.apply_coupon_code", {
+							applied_code: this.pending_discount,
+						});
+						toast(response.data.message, { type: "success" });
+						this.summary = response.data.checkout_summary;
+					} catch (error) {
+						this.pending_discount = null;
+					}
 				},
 
 				format_amount(amount) {
@@ -648,7 +747,11 @@
 
 				get_address_payload() {
 					if (this.delivery_option === "store_pickup") {
-						return { is_store_pickup: true, store_pickup_warehouse: this.store_pickup_warehouse };
+						return {
+							is_store_pickup: true,
+							store_pickup_warehouse: this.store_pickup_warehouse,
+							billing_address: { email: this.billing.email },
+						};
 					}
 
 					const is_billing_saved = this.billing_use_address === "saved_address";
@@ -674,17 +777,25 @@
 					if (this.errors.length) return;
 
 					this.address_loading = true;
+					this.email_error = "";
 					try {
 						const response = await frappe_call(
 							"/api/v2/method/commera.api.payments.update_quotation_address",
-							{ address: this.get_address_payload() },
+							{
+								address: this.get_address_payload(),
+								...(this.config.is_guest && { cart: { items: this.$store.cart.items } }),
+							},
 						);
 						toast(response.data.message, { type: "success" });
 // Saving an address clears the delivery option on the server, so the one shown here is gone too.
 						this.reset_address_step();
 						this.summary = response.data.checkout_summary;
 						this.address_saved = true;
+						// A guest has no server cart to hold the link's coupon until their first address save.
+						if (this.config.is_guest) await this.apply_pending_discount();
 						await this.load_shipping_options();
+					} catch (error) {
+						if (error.type === "InvalidEmailAddressError") this.email_error = INVALID_EMAIL_MESSAGE;
 					} finally {
 						this.address_loading = false;
 					}

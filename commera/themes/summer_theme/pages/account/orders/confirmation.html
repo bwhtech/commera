@@ -6,6 +6,7 @@
 {% set language = frappe.lang or "en" %}
 {% set orders_url = "/" ~ language ~ "/account/orders" %}
 {% set confirmation_config = {"order_id": order.name if order else None, "orders_url": orders_url} %}
+{% set track_order_url = "/" ~ language ~ "/track-order" %}
 
 {% block head %}
 	{{ super() }}
@@ -13,17 +14,7 @@
 {% endblock %}
 
 {% block uncontained_body %}
-{% call account_shell(_("Order Confirmed"), [{"label": _("Orders"), "href": orders_url}]) %}
-{% if login_url %}
-<div class="account-card confirmed-request text-center">
-	<h4 class="mb-3">{{ _("Your payment has been received") }}</h4>
-	<p class="mb-0">{{ _("Please sign in to confirm this order. You will come straight back to this page.") }}</p>
-	<div class="mt-4 d-sm-flex gap-3 justify-content-center">
-		<a class="btn my-1 btn-secondary" href="{{ login_url }}">{{ _("Sign In To Confirm") }}</a>
-		<a class="btn btn-outline-secondary my-1 btnhover20" href="/{{ language }}/products">{{ _("Continue Shopping") }}</a>
-	</div>
-</div>
-{% else %}
+{% call account_shell(_("Order Confirmed"), [] if login_url else [{"label": _("Orders"), "href": orders_url}]) %}
 <div class="account-card confirmed-request text-center" x-data='summer_order_confirmation({{ confirmation_config | tojson }})'>
 
 	{% if not order %}
@@ -56,21 +47,27 @@
 	{% if not order %}
 	<div x-show="state === 'unconfirmed'" x-cloak>
 		<h4 class="mb-3">{{ _("We could not confirm this order") }}</h4>
+		{% if login_url %}
+		<p class="mb-0">{{ _("If you checked out with an account, sign in to confirm it. Otherwise you can look the order up with its number and your email.") }}</p>
+		<div class="mt-4 d-sm-flex gap-3 justify-content-center">
+			<a class="btn my-1 btn-secondary" href="{{ login_url }}">{{ _("Sign In") }}</a>
+			<a class="btn btn-outline-secondary my-1 btnhover20" href="{{ track_order_url }}">{{ _("Track Your Order") }}</a>
+		</div>
+		{% else %}
 		<p class="mb-0">{{ _("This confirmation link has expired. Your orders page shows the current status of every order you have placed.") }}</p>
 		<div class="mt-4 d-sm-flex gap-3 justify-content-center">
 			<a class="btn my-1 btn-secondary" href="{{ orders_url }}">{{ _("My Orders") }}</a>
 			<a class="btn btn-outline-secondary my-1 btnhover20" href="/{{ language }}/products">{{ _("Continue Shopping") }}</a>
 		</div>
+		{% endif %}
 	</div>
 	{% endif %}
 </div>
-{% endif %}
 {% endcall %}
 {% endblock %}
 
 {% block script %}
 	{{ super() }}
-	{% if not login_url %}
 	<script>
 		function track_purchase(data, order_name) {
 // The first-party `purchase` event is logged server-side at order creation; the capture endpoint rejects it from the client.
@@ -95,6 +92,7 @@
 		document.addEventListener("alpine:init", () => {
 			Alpine.data("summer_order_confirmation", (config) => ({
 				order_id: config.order_id,
+				order_link: null,
 				orders_url: config.orders_url,
 				state: config.order_id ? "confirmed" : "checking",
 
@@ -104,6 +102,7 @@
 				},
 
 				get order_detail_url() {
+					if (this.order_link) return this.order_link;
 					return `${this.orders_url}/detail?order_id=${encodeURIComponent(this.order_id || "")}`;
 				},
 
@@ -130,6 +129,7 @@
 							return;
 						}
 						this.order_id = data.order_name || data.ref_docname || reference_id;
+						this.order_link = data.order_link || null;
 						track_purchase(data, this.order_id);
 						Alpine.store("cart").remove_selected();
 						this.state = "confirmed";
@@ -140,5 +140,4 @@
 			}));
 		});
 	</script>
-	{% endif %}
 {% endblock %}

@@ -78,7 +78,7 @@ async function uploadFile(event) {
   <Select
     v-else-if="field.fieldtype === 'Select'"
     :model-value="text"
-    class="w-72"
+    class="w-full sm:w-72"
     :options="selectOptions(field)"
     @update:model-value="commit"
   />
@@ -91,7 +91,7 @@ async function uploadFile(event) {
     @update:model-value="commit"
   />
 
-  <div v-else-if="ATTACH_FIELDTYPES.includes(field.fieldtype)" class="flex w-72 items-center gap-2">
+  <div v-else-if="ATTACH_FIELDTYPES.includes(field.fieldtype)" class="flex w-full items-center gap-2 sm:w-72">
     <input
       ref="fileInput"
       type="file"
@@ -114,7 +114,7 @@ async function uploadFile(event) {
   <Textarea
     v-else-if="MULTILINE_FIELDTYPES.includes(field.fieldtype)"
     v-model="text"
-    class="w-72"
+    class="w-full sm:w-72"
     :rows="field.fieldtype === 'Code' ? 8 : 3"
     @change="commit($event.target.value)"
   />
@@ -122,7 +122,7 @@ async function uploadFile(event) {
   <TextInput
     v-else
     v-model="text"
-    class="w-72"
+    class="w-full sm:w-72"
     :type="inputType(field)"
     :placeholder="field.is_secret && field.is_set ? '••••••••' : ''"
     @change="commit($event.target.value)"

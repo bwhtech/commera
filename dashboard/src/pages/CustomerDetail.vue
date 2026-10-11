@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Avatar, Badge, Button, FormControl, Skeleton, dayjs, toast } from 'frappe-ui'
+import { Avatar, Badge, Button, Dropdown, FormControl, Skeleton, dayjs, toast } from 'frappe-ui'
 import { BarChart } from 'frappe-ui/charts'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
@@ -9,11 +9,14 @@ import ReportStats from '../components/ReportStats.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import Thumb from '../components/Thumb.vue'
 import EmptyState from '../components/EmptyState.vue'
+import PluginActionDialog from '../components/PluginActionDialog.vue'
+import PluginSlot from '../components/PluginSlot.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 import { erpnextLink } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { longDate, money } from '../data/format'
 import { orderRoute, productRoute } from '../ia/routes'
+import { useRecordPlugins } from '../data/recordPlugins'
 
 const LAPSED_AFTER_DAYS = 90
 
@@ -115,6 +118,13 @@ async function saveNote() {
   customerRequest.reload()
 }
 
+const { cards, actionGroup, openAction, record, reload: reloadPlugins } = useRecordPlugins(
+  'customer',
+  'Customer',
+  () => route.params.id,
+  { onReload: () => customerRequest.reload() },
+)
+
 function plural(count, word) {
   return `${count} ${word}${count === 1 ? '' : 's'}`
 }
@@ -128,6 +138,10 @@ function plural(count, word) {
       :breadcrumbs="[{ label: 'Customers', route: '/customers' }, { label: customer.name }]"
     >
       <template #actions>
+        <!-- A customer has no actions of its own, so the menu only exists once an installed plugin adds one. -->
+        <Dropdown v-if="actionGroup" :options="[actionGroup]">
+          <Button icon="lucide-ellipsis" label="More actions" />
+        </Dropdown>
         <Button label="View in ERP" icon-right="lucide-external-link" :link="erpnextLink('Customer', customer.id)" />
       </template>
     </AppPageHeader>
@@ -267,9 +281,13 @@ function plural(count, word) {
               @click="saveNote"
             />
           </section>
+
+          <PluginSlot :entries="cards" :record="record" frame="stack" @reload="reloadPlugins" />
         </div>
       </div>
     </PageBody>
+
+    <PluginActionDialog v-model:entry="openAction" :record="record" @reload="reloadPlugins" />
   </template>
 
   <!-- The customer id is already in the route, so the header is real from the

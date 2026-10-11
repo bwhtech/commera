@@ -1,12 +1,17 @@
 from contextlib import contextmanager
 
 import frappe
-from bwh_payments.bwh_payments.utils import get_payment_modes_for_currency, resolve_payment_mode
+from bwh_payments.bwh_payments.utils import (
+	get_available_payment_modes,
+	get_payment_modes_for_currency,
+	resolve_payment_mode,
+)
 from bwh_payments.currency import to_minor_units
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 from erpnext.accounts.doctype.pricing_rule.utils import validate_coupon_code
 from frappe import _
+from frappe.rate_limiter import rate_limit
 from frappe.utils import getdate, validate_email_address
 from frappe.utils.data import cstr, flt, fmt_money
 
@@ -22,9 +27,19 @@ from commera.api.shipping import (
 	get_cod_charge,
 	reprice_selected_option,
 )
-from commera.api.signup import get_placeholder_first_name, validate_user_names
-from commera.core import _get_cart_quotation
-from commera.utils import get_pickup_addresses, get_pickup_warehouses
+from commera.api.signup import get_placeholder_first_name, validate_single_email, validate_user_names
+from commera.checkout_hooks import apply_plugin_fees, filter_payment_methods, get_cart_refusal
+from commera.core import _get_cart_quotation, create_party, get_customer_contact, new_cart_quotation
+from commera.guest import (
+	get_guest_cart_name,
+	is_guest,
+	is_guest_cart,
+	set_guest_cart_cookie,
+	validate_guest_checkout_enabled,
+)
+from commera.order_access import get_order_link, set_order_access_key
+from commera.plugin_events import fire_event
+from commera.utils import get_charge_account_head, get_pickup_addresses, get_pickup_warehouses
 
 
 class CheckoutPriceChangedError(frappe.ValidationError):
@@ -153,7 +168,9 @@ def refuse_payment(message: str, quotation: str | None = None, **context):
 	frappe.throw(message)
 
 
-@frappe.whitelist(methods=["POST"])
+# Guest checkout: refuses any caller without a guest cart cookie, and is rate limited.
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
+@rate_limit(limit=100, seconds=60 * 60)
 def initiate_checkout_with_mode(
 	payment_mode: str, delivery_option: str | None = None, expected_total: float | None = None
 ):
@@ -174,11 +191,14 @@ def open_checkout(
 			return {"order_url": order_url}
 
 	validate_cart_is_not_in_checkout(quotation.name)
+	quotation.flags.strict_plugin_fees = True
 	update_delivery_charges(quotation)
+	validate_cart(quotation)
 	validate_expected_total(quotation, payment_mode, expected_total)
+	payment_methods = get_checkout_payment_methods(quotation, strict=True)
 
 	if is_cod(payment_mode):
-		if not frappe.db.get_single_value("Commera Settings", "cod_enabled"):
+		if COD_PAYMENT_MODE not in payment_methods:
 			refuse_payment(_("Cash on delivery is not available."), quotation.name)
 		return {"order_url": get_confirmation_url(quotation.name, payment_mode=COD_PAYMENT_MODE)}
 
@@ -190,21 +210,10 @@ def open_checkout(
 			requested=payment_mode,
 			available=available_gateways,
 		)
-
-	customer_contact = (
-		frappe.db.get_value(
-			"Contact",
-			quotation.contact_person,
-			["email_id", "first_name", "last_name"],
-			as_dict=True,
+	if gateway not in payment_methods:
+		refuse_payment(
+			_("This payment method is not available for your order."), quotation.name, gateway=gateway
 		)
-		or frappe._dict()
-	)
-	customer_phone = frappe.db.get_value(
-		"Contact Phone",
-		{"parent": quotation.contact_person, "parenttype": "Contact", "idx": 1},
-		"phone",
-	)
 
 	payment_request = frappe.get_doc(
 		{
@@ -216,15 +225,58 @@ def open_checkout(
 			"ref_doctype": quotation.doctype,
 			"ref_docname": quotation.name,
 			"customer_ref": quotation.party_name,
-			"customer_phone": customer_phone,
-			"customer_forenames": customer_contact.first_name,
-			"customer_surname": customer_contact.last_name,
-			"customer_email": get_gateway_email(customer_contact.email_id),
 			"customer_address": quotation.customer_address,
+			**get_gateway_customer(quotation),
 		}
 	).insert(ignore_permissions=True)
 
 	return {"order_url": payment_request.order_url}
+
+
+def get_checkout_payment_methods(quotation, strict: bool = False) -> list[str]:
+	payment_methods = list(
+		get_payment_modes_for_currency(quotation.currency) if quotation else get_available_payment_modes()
+	)
+	if frappe.get_cached_value("Commera Settings", "Commera Settings", "cod_enabled"):
+		payment_methods.append(COD_PAYMENT_MODE)
+	if not quotation:
+		return payment_methods
+	return filter_payment_methods(quotation, payment_methods, strict)
+
+
+def get_gateway_customer(quotation) -> dict:
+	if quotation.custom_guest_cart_key:
+		# The cart's contact may be an account the guest does not own, so only what they typed is sent.
+		return {
+			"customer_email": get_gateway_email(quotation.contact_email),
+			"customer_phone": frappe.db.get_value("Address", quotation.customer_address, "phone"),
+		}
+
+	customer_contact = (
+		frappe.db.get_value(
+			"Contact",
+			quotation.contact_person,
+			["email_id", "first_name", "last_name"],
+			as_dict=True,
+		)
+		or frappe._dict()
+	)
+	return {
+		"customer_email": get_gateway_email(customer_contact.email_id),
+		"customer_forenames": customer_contact.first_name,
+		"customer_surname": customer_contact.last_name,
+		"customer_phone": frappe.db.get_value(
+			"Contact Phone",
+			{"parent": quotation.contact_person, "parenttype": "Contact", "idx": 1},
+			"phone",
+		),
+	}
+
+
+def validate_cart(quotation):
+	if refusal := get_cart_refusal(quotation):
+		# Not refuse_payment: the shopper can fix this, so it is no error to log.
+		frappe.throw(refusal)
 
 
 def validate_delivery_option(quotation, delivery_option: str | None):
@@ -283,8 +335,8 @@ def gateway_mode_of_payment(gateway: str) -> str:
 
 
 @contextmanager
-def system_user_session():
-	"""Place the accounting documents as Administrator, then hand the session back.
+def system_user_session(user: str = "Administrator"):
+	"""Place the accounting documents as `user`, then hand the session back.
 
 	ERPNext's get_party_account checks frappe.has_permission directly, so no ignore_permissions reaches it.
 	"""
@@ -293,7 +345,7 @@ def system_user_session():
 	live_session_snapshot = frappe.local.session.copy()
 	try:
 		# Audited: the docstring above and the snapshot restore below are why this is safe.
-		frappe.set_user("Administrator")  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
+		frappe.set_user(user)  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
 		yield
 	finally:
 		frappe.local.session.update(live_session_snapshot)
@@ -329,18 +381,18 @@ def stamp_order_owner(sales_order, shopper: str) -> None:
 	sales_order.db_set("owner", shopper, update_modified=False)
 
 
-def get_shopper(quotation) -> str:
-	"""A gateway webhook places the order as Administrator; the cart's contact_email is the shopper's login."""
-	if frappe.session.user != "Administrator":
+def get_order_shopper(quotation) -> str | None:
+	# A guest cart has no account to hand the order to. bwh_payments places webhook orders as Administrator.
+	if quotation.custom_guest_cart_key:
+		return None
+	if not is_guest() and frappe.session.user != "Administrator":
 		return frappe.session.user
-	if quotation.contact_email and frappe.db.exists("User", quotation.contact_email):
-		return quotation.contact_email
-	return frappe.session.user
+	return frappe.db.exists("User", quotation.contact_email) if quotation.contact_email else None
 
 
 def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
 	"""Submit the cart and bill it. Called once per payment; the Quotation docstatus enforces that."""
-	shopper = get_shopper(quotation)
+	shopper = get_order_shopper(quotation)
 	with system_user_session():
 		fix_payment_schedule_dates(quotation)
 		quotation.flags.ignore_permissions = True
@@ -349,18 +401,25 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 		sales_order = _make_sales_order(quotation.name, ignore_permissions=True)
 		sales_order.custom_ecommerce_payment_mode = payment_mode
 		copy_delivery_option_to_order(quotation.name, sales_order)
+		set_delivery_date(sales_order)
 		fix_payment_schedule_dates(sales_order)
 		set_attribution_fields(sales_order)
 		sales_order.flags.ignore_permissions = True
 		sales_order.insert()
+		set_order_access_key(sales_order)
 		sales_order.submit()
 
-		if flt(gateway_amount) > 0:
+		# A cart discounted to nothing is settled at placement, so it is billed and paid like a charged one.
+		paid = flt(gateway_amount) > 0 or flt(sales_order.grand_total) <= 0
+		if paid:
 			create_sales_invoice(sales_order, payment_mode, flt(gateway_amount), gateway_reference)
 
 	# Outside the switch: log_purchase stamps frappe.session.user, so Administrator would own every purchase.
 	stamp_order_owner(sales_order, shopper)
 	log_purchase(sales_order)
+	fire_event("order_placed", "Sales Order", sales_order.name)
+	if paid:
+		fire_event("order_paid", "Sales Order", sales_order.name)
 	return sales_order
 
 
@@ -399,6 +458,13 @@ def create_payment_entry(sales_invoice, payment_mode: str, paid_amount: float, r
 	return payment_entry
 
 
+def set_delivery_date(sales_order):
+	# ERPNext fills these only for order type "Sales"; drop-ship Purchase Orders copy them into Required By.
+	sales_order.delivery_date = sales_order.delivery_date or sales_order.transaction_date or getdate()
+	for item in sales_order.items:
+		item.delivery_date = item.delivery_date or sales_order.delivery_date
+
+
 def fix_payment_schedule_dates(doc):
 	today = getdate()
 	for term in doc.get("payment_schedule", []):
@@ -408,15 +474,67 @@ def fix_payment_schedule_dates(doc):
 
 @frappe.whitelist(methods=["POST"])
 def generate_quotation_for_cart(cart: dict):
-	cart = frappe.parse_json(cart)
+	cart = get_checkout_cart(cart)
+	quotation = _get_cart_quotation()
+	validate_cart_is_not_in_checkout(quotation.name)
+	return get_quotation_for_cart(cart, quotation)
+
+
+def get_checkout_cart(cart: dict) -> dict:
+	cart = frappe.parse_json(cart) or {}
 	if len(cart.get("items", [])) < 1:
 		frappe.throw(_("Can't checkout with empty cart"))
 	validate_stock_available(cart["items"])
-	quotation = _get_cart_quotation()
-	validate_cart_is_not_in_checkout(quotation.name)
-	cart_quotation = get_quotation_for_cart(cart, quotation)
-	remove_coupon_code()
-	return cart_quotation
+	return cart
+
+
+def save_guest_cart(cart: dict, email: str | None):
+	"""Book the browser cart to the customer of the email typed at checkout, creating the cart on first use."""
+	validate_guest_checkout_enabled()
+	email = cstr(email).strip().lower()
+	validate_single_email(email)
+	cart = get_checkout_cart(cart)
+	cart_key = set_guest_cart_cookie()
+	customer_name, contact_name = get_guest_party(email)
+
+	if cart_name := get_guest_cart_name(cart_key):
+		quotation = frappe.get_doc("Quotation", cart_name)
+		validate_cart_is_not_in_checkout(cart_name)
+		set_guest_cart_party(quotation, customer_name, contact_name, email)
+	else:
+		quotation = new_cart_quotation(frappe.get_cached_doc("Customer", customer_name), email, contact_name)
+		quotation.custom_guest_cart_key = cart_key
+	return get_quotation_for_cart(cart, quotation)
+
+
+def set_guest_cart_party(quotation, customer_name: str, contact_name: str, email: str):
+	if quotation.contact_email == email:
+		return
+	# Moved rather than replaced: a dropped cart with this email would surface as that account's own cart.
+	quotation.update(
+		{
+			"party_name": customer_name,
+			"customer_name": frappe.db.get_value("Customer", customer_name, "customer_name"),
+			"contact_person": contact_name,
+			"contact_email": email,
+			"contact_display": None,
+			"contact_mobile": None,
+			"customer_address": None,
+			"address_display": None,
+			"shipping_address_name": None,
+			"shipping_address": None,
+		}
+	)
+
+
+def get_guest_party(email: str) -> tuple[str, str]:
+	"""The customer and contact a guest's email already belongs to, else new ones with no User behind them."""
+	if customer_contact := get_customer_contact(email):
+		return customer_contact
+
+	with system_user_session():
+		customer, contact = create_party(email, get_placeholder_first_name(email))
+	return customer.name, contact.name
 
 
 def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
@@ -439,9 +557,23 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 	save_cart_quotation(unsaved_quotation_doc)
 	# The stored option was priced for the old cart, and payment would re-quote it for the new one.
 	clear_delivery_option(unsaved_quotation_doc)
+	coupon_code = unsaved_quotation_doc.coupon_code
 	_remove_coupon_code(unsaved_quotation_doc)
+	reapply_coupon_code(unsaved_quotation_doc, coupon_code)
 	set_charges(unsaved_quotation_doc)
 	return save_cart_quotation(unsaved_quotation_doc)
+
+
+def reapply_coupon_code(quotation, coupon_code: str | None):
+	if not coupon_code:
+		return
+	try:
+		validate_coupon_code(coupon_code)
+	except frappe.ValidationError:
+		# An expired coupon is dropped quietly; the shopper only edited their cart.
+		frappe.clear_last_message()
+		return
+	quotation.coupon_code = coupon_code
 
 
 def set_charges(quotation):
@@ -450,24 +582,27 @@ def set_charges(quotation):
 		quotation.shipping_rule = shipping_rule
 		quotation.run_method("apply_shipping_rule")
 		quotation.run_method("calculate_taxes_and_totals")
+	apply_plugin_fees(quotation)
 
 
 def set_cod_charges(quotation):
 	cod_charge = get_cod_charge(quotation)
 	if not cod_charge:
 		return
-	account_head = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
-	if not account_head:
-		frappe.throw(_("Please select a valid account for cod charges."))
-
-	add_cod_charge(quotation, cod_charge, account_head)
+	add_cod_charge(quotation, cod_charge, get_charge_account_head())
 	quotation.flags.ignore_permissions = True
 	quotation.save()
 
 
-@frappe.whitelist(methods=["POST"])
-def update_quotation_address(address: dict):
-	quotation = _get_cart_quotation()
+# Guest checkout starts here; it creates at most one Customer per email and is rate limited.
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
+@rate_limit(limit=100, seconds=60 * 60)
+def update_quotation_address(address: dict, cart: dict | None = None):
+	address = frappe.parse_json(address)
+	if is_guest():
+		quotation = save_guest_cart(cart, address.get("billing_address", {}).get("email"))
+	else:
+		quotation = _get_cart_quotation()
 	with cart_write_lock(quotation):
 		return save_quotation_address(quotation, address)
 
@@ -486,6 +621,7 @@ def save_quotation_address(quotation, address: dict):
 		return get_address_saved_response(quotation)
 	quotation.custom_is_store_pickup = False
 	quotation.custom_store = ""
+	validate_guest_address_is_new(quotation, address)
 
 	if address.get("billing_address", {}).get("is_saved"):
 		billing_address_name = address.get("billing_address", {}).get("address_id")
@@ -506,6 +642,16 @@ def save_quotation_address(quotation, address: dict):
 	quotation.shipping_address_name = shipping_address_name
 	clear_delivery_option(quotation)
 	set_gst_details(quotation)
+	save_contact_details(quotation, address)
+	save_cart_quotation(quotation)
+
+	return get_address_saved_response(quotation)
+
+
+def save_contact_details(quotation, address: dict):
+	# Only the account holder edits their own contact; a guest who typed their email must not.
+	if quotation.custom_guest_cart_key and frappe.db.exists("User", quotation.contact_email):
+		return
 
 	contact = frappe.get_doc("Contact", quotation.contact_person)
 	replace_placeholder_names(quotation, contact, address.get("billing_address", {}))
@@ -520,16 +666,24 @@ def save_quotation_address(quotation, address: dict):
 		contact.append("phone_nos", {"phone": shipping_phone})
 
 	contact.save(ignore_permissions=True)
-	save_cart_quotation(quotation)
 
-	return get_address_saved_response(quotation)
+
+def validate_guest_address_is_new(quotation, address: dict):
+	# Saved addresses belong to the customer the email is booked to, never to the guest typing it.
+	if not quotation.custom_guest_cart_key:
+		return
+	if address.get("billing_address", {}).get("is_saved") or address.get("shipping_address", {}).get(
+		"is_saved"
+	):
+		raise frappe.PermissionError
 
 
 def replace_placeholder_names(quotation, contact, billing_address: dict):
-	"""Checkout sign-in names a new shopper after their email; the billing name is the first real one."""
-	shopper = frappe.session.user
+	"""Checkout names a new shopper after their email; the billing name is the first real one."""
+	shopper_email = quotation.contact_email
+	placeholder_name = get_placeholder_first_name(shopper_email)
 	first_name = cstr(billing_address.get("first_name")).strip()
-	if not first_name or contact.last_name or contact.first_name != get_placeholder_first_name(shopper):
+	if not first_name or contact.last_name or contact.first_name != placeholder_name:
 		return
 
 	last_name = cstr(billing_address.get("last_name")).strip()
@@ -540,14 +694,15 @@ def replace_placeholder_names(quotation, contact, billing_address: dict):
 	quotation.customer_name = full_name
 
 	with system_user_session():
-		user = frappe.get_doc("User", shopper)
-		if user.first_name == get_placeholder_first_name(shopper) and not user.last_name:
-			user.first_name = first_name
-			user.last_name = last_name
-			user.save(ignore_permissions=True)
+		if shopper := frappe.db.exists("User", shopper_email):
+			user = frappe.get_doc("User", shopper)
+			if user.first_name == placeholder_name and not user.last_name:
+				user.first_name = first_name
+				user.last_name = last_name
+				user.save(ignore_permissions=True)
 
 		customer = frappe.get_doc("Customer", quotation.party_name)
-		if customer.customer_name == get_placeholder_first_name(shopper):
+		if customer.customer_name == placeholder_name:
 			customer.customer_name = full_name
 			customer.save(ignore_permissions=True)
 
@@ -576,7 +731,9 @@ def set_gst_details(quotation):
 	set_charges(quotation)
 
 
-@frappe.whitelist()
+# Gateway return page for guests too: validate_reference_owner ties the reference to the caller's cart.
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
+@rate_limit(limit=100, seconds=60 * 60)
 def confirm_payment(reference_id: str, payment_mode: str | None = None):
 	"""Resolve the outcome of a checkout the shopper has just come back from.
 
@@ -621,9 +778,20 @@ def get_gateway_payment_request(reference_id: str):
 
 
 def validate_reference_owner(doctype: str, docname: str):
+	if is_guest():
+		if not is_guest_cart(get_reference_quotation(doctype, docname)):
+			raise frappe.PermissionError
+		return
+
 	# Scoped to the cart's own contact, so a forged reference simply finds nothing.
 	if not frappe.db.exists(doctype, {"name": docname, "contact_email": frappe.session.user}):
 		raise frappe.PermissionError
+
+
+def get_reference_quotation(doctype: str, docname: str) -> str | None:
+	if doctype == "Quotation":
+		return docname
+	return frappe.db.get_value("Sales Order Item", {"parent": docname}, "prevdoc_docname")
 
 
 def purchase_summary(payment_request):
@@ -638,6 +806,7 @@ def sales_order_purchase_summary(sales_order):
 		return {}
 	return {
 		"order_name": sales_order.name,
+		"order_link": get_order_link(sales_order),
 		"grand_total": sales_order.grand_total,
 		"currency": sales_order.currency,
 	}
@@ -659,41 +828,58 @@ def quotation_purchase_summary(quotation_name: str):
 
 
 def place_cod_order(quotation_name: str):
-	shopper = frappe.session.user
+	quotation = frappe.get_doc("Quotation", quotation_name)
+	shopper = get_order_shopper(quotation)
+	quotation.flags.strict_plugin_fees = True
+	# Repriced here too: the fee a cart edit left out after a hook failed must not slip into the order.
+	apply_plugin_fees(quotation)
+	# Again here: a COD confirmation can be posted without ever opening checkout.
+	validate_cart(quotation)
+	if COD_PAYMENT_MODE not in get_checkout_payment_methods(quotation, strict=True):
+		refuse_payment(_("Cash on delivery is not available."), quotation.name)
 	with system_user_session():
-		quotation = frappe.get_doc("Quotation", quotation_name)
 		set_cod_charges(quotation)
 		quotation.flags.ignore_permissions = True
 		quotation.submit()
 
 		sales_order = _make_sales_order(quotation_name, ignore_permissions=True)
 		sales_order.custom_ecommerce_payment_mode = COD_PAYMENT_MODE
+		set_delivery_date(sales_order)
 		set_attribution_fields(sales_order)
 		sales_order.flags.ignore_permissions = True
 		sales_order.insert()
+		set_order_access_key(sales_order)
 
 	# COD orders count as purchases even while the Sales Order stays draft.
 	stamp_order_owner(sales_order, shopper)
 	log_purchase(sales_order)
+	fire_event("order_placed", "Sales Order", sales_order.name)
 	return sales_order
 
 
-@frappe.whitelist()
+# Guest checkout: refuses any caller without a guest cart cookie, and is rate limited.
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
+@rate_limit(limit=30, seconds=60 * 60)
 def apply_coupon_code(applied_code: str):
 	if not applied_code:
 		frappe.throw(_("Please enter a coupon code"))
+	quotation = _get_cart_quotation()
 	coupon_name = frappe.db.get_value("Coupon Code", {"coupon_code": applied_code}, "name")
 	if not coupon_name:
 		frappe.throw(_("Please enter a valid coupon code"))
 	validate_coupon_code(coupon_name)
-	quotation = _get_cart_quotation()
 	validate_cart_is_not_in_checkout(quotation.name)
 	quotation.coupon_code = coupon_name
 	save_cart_quotation(quotation)
-	return {"message": _("Coupon code applied successfully")}
+	return {
+		"message": _("Coupon code applied successfully"),
+		"checkout_summary": get_checkout_summary(quotation),
+	}
 
 
-@frappe.whitelist()
+# Guest checkout: refuses any caller without a guest cart cookie, and is rate limited.
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
+@rate_limit(limit=100, seconds=60 * 60)
 def remove_coupon_code():
 	quotation = _get_cart_quotation()
 	validate_cart_is_not_in_checkout(quotation.name)
@@ -785,6 +971,7 @@ def update_delivery_charges(quotation):
 		# A cart saved as a pickup before the owner switched pickup off must not reach payment as one.
 		validate_store_pickup(quotation.custom_store)
 		clear_pickup_charges(quotation)
+		apply_plugin_fees(quotation)
 		save_cart_quotation(quotation)
 		return
 

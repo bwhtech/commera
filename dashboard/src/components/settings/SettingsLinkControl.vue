@@ -36,7 +36,7 @@ const options = computed(() => {
 </script>
 
 <template>
-  <div class="w-72">
+  <div class="w-full sm:w-72">
     <Combobox
       v-model:open="search.open.value"
       v-model:query="search.query.value"

@@ -5,9 +5,8 @@ from unittest.mock import Mock, patch
 import frappe
 from frappe.tests import UnitTestCase
 
-from commera.api.payments import get_reusable_checkout_url, open_checkout
+from commera.api.payments import get_checkout_payment_methods, get_reusable_checkout_url, open_checkout
 from commera.jobs import delete_old_draft_quotations
-from commera.www.cart.checkout import get_context
 
 GATEWAY = "Test Wallet"
 
@@ -19,27 +18,24 @@ def make_quotation(amount=20):
 		rounded_total=amount,
 		grand_total=amount,
 		custom_delivery_option=None,
+		flags=frappe._dict(),
 	)
 
 
 class TestReusableCheckout(UnitTestCase):
 	def test_checkout_offers_gateways_for_the_cart_currency(self):
-		quotation = SimpleNamespace(currency="USD", items=[object()])
-		context = frappe._dict()
 		with (
-			patch("commera.www.cart.checkout._get_cart_quotation", return_value=quotation),
-			patch("commera.www.cart.checkout.frappe.get_cached_doc") as get_settings,
+			patch("commera.api.payments.get_payment_modes_for_currency", return_value=[GATEWAY]) as available,
+			patch("commera.api.payments.frappe.get_cached_value", return_value=0),
 			patch(
-				"commera.www.cart.checkout.get_payment_modes_for_currency", return_value=[GATEWAY]
-			) as available,
-			patch("commera.www.cart.checkout.get_checkout_summary", side_effect=StopIteration),
+				"commera.api.payments.filter_payment_methods",
+				side_effect=lambda quotation, methods, strict: methods,
+			),
 		):
-			get_settings.return_value.get.return_value = None
-			with self.assertRaises(StopIteration):
-				get_context(context)
+			payment_methods = get_checkout_payment_methods(make_quotation())
 
 		available.assert_called_once_with("USD")
-		self.assertEqual(context.payment_gateways, [GATEWAY])
+		self.assertEqual(payment_methods, [GATEWAY])
 
 	def test_an_unsupported_currency_is_rejected_before_a_payment_request_is_created(self):
 		quotation = make_quotation()
@@ -49,6 +45,9 @@ class TestReusableCheckout(UnitTestCase):
 			patch("commera.api.payments.get_reusable_checkout_gateways", return_value=[GATEWAY]),
 			patch("commera.api.payments.validate_cart_is_not_in_checkout"),
 			patch("commera.api.payments.update_delivery_charges"),
+			patch("commera.api.payments.validate_cart"),
+			patch("commera.api.payments.validate_expected_total"),
+			patch("commera.api.payments.get_checkout_payment_methods", return_value=[]),
 			patch("commera.api.payments._", side_effect=lambda message: message),
 			patch("commera.api.payments.refuse_payment", side_effect=frappe.ValidationError),
 			patch("commera.api.payments.frappe.get_doc") as get_doc,

@@ -38,7 +38,7 @@ def get_context(context):
 	]
 
 
-def get_orders_list(order_id_list=None, page=1, page_length=6):
+def get_orders_list(order_id_list=None, page=1, page_length=6, owned_only=True):
 	sales_order = DocType("Sales Order")
 	sales_order_item = DocType("Sales Order Item")
 	style_attribute_variant = DocType("Style Attribute Variant")
@@ -111,8 +111,9 @@ def get_orders_list(order_id_list=None, page=1, page_length=6):
 		.left_join(payment_entry)
 		.on(payment_entry_reference.parent == payment_entry.name)
 		.where(item_variant_attribute.attribute == "Size")
-		.where(sales_order.owner == frappe.session.user)
 	)
+	if owned_only:
+		base_query = base_query.where(sales_order.owner == frappe.session.user)
 
 	if order_id_list:
 		base_query = base_query.where(sales_order.name.isin(order_id_list))

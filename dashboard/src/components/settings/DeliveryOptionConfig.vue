@@ -91,7 +91,7 @@ async function save() {
           title="Name at checkout"
           description="Orders are stored against this name, so it cannot be changed."
         >
-          <p class="w-72 text-base text-ink-gray-7">{{ option.title }}</p>
+          <p class="w-full text-base sm:w-72 text-ink-gray-7">{{ option.title }}</p>
         </SettingsRow>
 
         <div v-else class="py-3.5">

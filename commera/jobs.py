@@ -4,7 +4,8 @@ from frappe.integrations.utils import (
 )
 from frappe.utils import add_to_date, get_url, now_datetime
 
-from commera.api.payments import get_reusable_checkout_gateways
+from commera.api.payments import COD_PAYMENT_MODE, get_reusable_checkout_gateways
+from commera.order_access import get_order_link, set_order_access_key
 
 
 def get_cc_email():
@@ -12,8 +13,15 @@ def get_cc_email():
 
 
 def send_order_success_acknowledgement(doc, method):
+	# COD orders stay draft until staff act, so they are confirmed on insert and never again on submit.
+	is_cod_order = doc.custom_ecommerce_payment_mode == COD_PAYMENT_MODE
+	if is_cod_order != (method == "after_insert"):
+		return
+
 	try:
 		doc_args = doc.as_dict()
+		set_order_access_key(doc)
+		doc_args["order_link"] = get_order_link(doc)
 		order_confirmation_template_name = frappe.get_cached_value(
 			"Commera Settings",
 			"Commera Settings",
@@ -24,9 +32,17 @@ def send_order_success_acknowledgement(doc, method):
 		message = frappe.render_template(email_template.response_, doc_args)  # nosemgrep: frappe-ssti
 		subject = frappe.render_template(email_template.subject, doc_args)  # nosemgrep: frappe-ssti
 
-		emails = frappe.get_all("Portal User", {"parent": doc.customer}, ["user"], limit=1)
-		email = emails[0].get("user", "")
-		frappe.sendmail(recipients=[email], subject=subject, message=message, cc=[get_cc_email()])
+		recipient = doc.contact_email or get_portal_user_email(doc.customer)
+		if not recipient:
+			return
+		frappe.sendmail(
+			recipients=[recipient],
+			subject=subject,
+			message=message,
+			cc=[get_cc_email()],
+			reference_doctype=doc.doctype,
+			reference_name=doc.name,
+		)
 	except Exception as e:
 		create_request_log(
 			data=doc_args,
@@ -34,6 +50,11 @@ def send_order_success_acknowledgement(doc, method):
 			output=e,
 			status="Failed",
 		)
+
+
+def get_portal_user_email(customer: str) -> str | None:
+	portal_users = frappe.get_all("Portal User", {"parent": customer}, pluck="user", limit=1)
+	return portal_users[0] if portal_users else None
 
 
 def send_order_cancel_acknowledgement(doc, method):

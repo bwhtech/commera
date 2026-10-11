@@ -38,9 +38,11 @@ ORDER_DETAIL_FIELDS = (
 ORDER_DETAIL_ITEM_FIELDS = ("item_code", "item_name", "qty", "rate", "amount", "image")
 
 
-@frappe.whitelist()
-def get_order_detail(order_name: str):
-	sales_order = validate_document_access("Sales Order", order_name)
+# Guests read an order only with its private link key; validate_document_access compares it.
+@frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
+@rate_limit(limit=120, seconds=60 * 60)
+def get_order_detail(order_name: str, key: str | None = None):
+	sales_order = validate_document_access("Sales Order", order_name, key)
 
 	detail = {fieldname: sales_order.get(fieldname) for fieldname in ORDER_DETAIL_FIELDS}
 	detail["items"] = [

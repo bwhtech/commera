@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useMediaQuery } from '@vueuse/core'
 import { Button, Dropdown, ScrollArea, Skeleton, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -13,10 +14,13 @@ import ProductStock from '../components/product/ProductStock.vue'
 import ProductOrganization from '../components/product/ProductOrganization.vue'
 import ProductStorefront from '../components/product/ProductStorefront.vue'
 import ProductSummaryPanel from '../components/product/ProductSummaryPanel.vue'
+import PluginActionDialog from '../components/PluginActionDialog.vue'
+import PluginSlot from '../components/PluginSlot.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 import { errorMessage } from '../data/errors'
 import { longDate } from '../data/format'
 import { useProductStats } from '../data/product'
+import { useRecordPlugins } from '../data/recordPlugins'
 import { asDropdownOptions, buildProductActions } from '../ia/productActions'
 
 const route = useRoute()
@@ -102,6 +106,17 @@ const actions = computed(() =>
     : { groups: [], quick: [] },
 )
 
+const { cards, actionGroup, openAction, record, reload: reloadPlugins } = useRecordPlugins(
+  'product',
+  'Item',
+  () => route.params.id,
+  { onReload: () => productRequest.reload() },
+)
+
+const hasRail = useMediaQuery('(min-width: 1024px)')
+
+const moreActions = computed(() => [...asDropdownOptions(actions.value.groups), actionGroup.value].filter(Boolean))
+
 // ProductBasics/ProductOrganization write straight onto this ref's own
 // fields via v-model (see their templates), so one Save just pushes whatever
 // is currently on it — there is no separate draft to track.
@@ -150,7 +165,7 @@ const loadFailure = computed(() =>
       :breadcrumbs="[{ label: 'Products', route: '/products' }, { label: product.title }]"
     >
       <template #actions>
-        <Dropdown :options="asDropdownOptions(actions.groups)">
+        <Dropdown :options="moreActions">
           <Button icon="lucide-ellipsis" label="More actions" />
         </Dropdown>
         <Button label="Save" variant="solid" theme="gray" @click="save" />
@@ -177,15 +192,23 @@ const loadFailure = computed(() =>
             <ProductStorefront :product="product" />
             <ProductOrganization :product="product" />
           </div>
+
+          <!-- Below lg the rail is hidden, so the apps' cards stack under the form instead. -->
+          <div v-if="cards.length && !hasRail" class="mt-11 space-y-6">
+            <PluginSlot :entries="cards" :record="record" frame="stack" @reload="reloadPlugins" />
+          </div>
         </PageBody>
       </ScrollArea>
 
       <aside class="hidden w-[19rem] shrink-0 flex-col border-l border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
           <ProductSummaryPanel :product="product" :stats="stats" />
+          <PluginSlot v-if="hasRail" :entries="cards" :record="record" frame="rail" @reload="reloadPlugins" />
         </ScrollArea>
       </aside>
     </div>
+
+    <PluginActionDialog v-model:entry="openAction" :record="record" @reload="reloadPlugins" />
   </template>
 
   <!-- The item code is already in the route, so the header is real from the first

@@ -30,10 +30,11 @@ def get_stock_shortfalls(items) -> list[str]:
 	shortfalls = []
 	for entry in items:
 		item_code = cstr(entry.get("variant", {}).get("item_code"))
-		if not item_code:
+		stock_detail = stock_by_item_code.get(item_code, {})
+		if not item_code or stock_detail.get("unlimited"):
 			continue
 
-		available_qty = flt(stock_by_item_code.get(item_code, {}).get("stock_qty", 0))
+		available_qty = flt(stock_detail.get("stock_qty", 0))
 		requested_qty = flt(entry.get("qty", 1))
 		if requested_qty > available_qty:
 			item_name = entry.get("item", {}).get("display_name") or item_code
@@ -74,8 +75,9 @@ def get_detail_for_cart_items(items: list | str):
 	stock_data = {}
 	for item_code in item_codes:
 		default_price, sale_price = get_cart_price(item_code, default_price_list, sale_price_list)
+		stock_detail = stock_by_item_code.get(item_code, {})
 		stock_data[item_code] = {
-			"stock": stock_by_item_code.get(item_code, {}).get("stock_qty", 0),
+			"stock": None if stock_detail.get("unlimited") else stock_detail.get("stock_qty", 0),
 			"default_price": default_price,
 			"sale_price": sale_price,
 		}

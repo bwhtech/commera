@@ -8,10 +8,13 @@ from commera.api.payments import COD_PAYMENT_MODE
 from commera.commera_ecommerce.doctype.commera_settings.navbar.navbar_manager import (
 	seed_menu_when_empty,
 )
+from commera.plugin_events import add_plugin_user, validate_plugins
+from commera.plugins.registry import get_registry
 from commera.search.build import ensure_index_built
 from commera.search.record_builder import DEFAULT_CONTENT_FIELDS
 from commera.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import seed_default_routes
+from commera.storefront_plugins import sync_storefront_apps
 from commera.www.llms import DEFAULT_LLMS_TXT
 
 # Sentinel marking the robots.txt value as ours; absent from a non-blank value, an admin owns it.
@@ -24,6 +27,7 @@ def after_install():
 	create_payment_modes()
 	try:
 		create_default_email_templates()
+		assign_default_email_templates()
 	except Exception as e:
 		import traceback
 
@@ -40,6 +44,7 @@ def after_install():
 	seed_default_routes()
 	activate_summer_theme()
 	seed_menu_when_empty()
+	add_plugin_user()
 
 
 def activate_summer_theme():
@@ -50,13 +55,22 @@ def activate_summer_theme():
 
 
 def after_migrate():
+	sync_storefront_apps()
 	create_payment_modes()
+	add_plugin_user()
 	register_optional_doctype_links()
 	populate_search_settings()
 	ensure_storefront_search_index()
 	setup_robots_txt()
 	seed_llms_txt()
 	seed_default_routes()
+	validate_plugins()
+	print_plugin_problems()
+
+
+def print_plugin_problems():
+	for problem in get_registry()["problems"]:
+		print(f"{problem['app']} plugin skipped: {problem['message']}")
 
 
 def populate_search_settings():
@@ -157,6 +171,23 @@ def get_shop_company() -> str | None:
 	return frappe.db.get_single_value("Commera Settings", "company") or frappe.get_cached_value(
 		"Global Defaults", "Global Defaults", "default_company"
 	)
+
+
+DEFAULT_EMAIL_TEMPLATES = {
+	"order_confirmation_email_template": "Order Confirmation",
+	"order_cancellation_email_template": "Order Cancellation",
+	"item_in_stock_email_template": "Item In Stock",
+}
+
+
+def assign_default_email_templates():
+	# The fields are mandatory, so while any is empty every save of Commera Settings fails, even one
+	# that only changes the company. set_single_value skips that check, which a save() here cannot.
+	for fieldname, template in DEFAULT_EMAIL_TEMPLATES.items():
+		if frappe.db.get_single_value("Commera Settings", fieldname):
+			continue
+		if frappe.db.exists("Email Template", template):
+			frappe.db.set_single_value("Commera Settings", fieldname, template)
 
 
 def create_default_email_templates():

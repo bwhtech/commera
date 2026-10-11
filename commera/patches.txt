@@ -17,3 +17,4 @@ commera.patches.allow_guest_on_order_confirmation
 commera.patches.sync_brand_assets_to_website_settings
 commera.patches.move_item_group_links_onto_the_menu_entry
 commera.patches.seed_shop_web_page_route
+commera.patches.allow_guest_on_order_detail

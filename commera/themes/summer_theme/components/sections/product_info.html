@@ -7,9 +7,9 @@
 		default_price: {{ (default_price or 0) | tojson }},
 		brand: {{ (product.brand or "") | tojson }},
 		qty: 1,
-		max_qty: {{ (selected_item.stock_detail.stock_qty or 0) | round | int | tojson }},
+		max_qty: {{ (none if selected_item.stock_detail.unlimited else (selected_item.stock_detail.stock_qty or 0) | round | int) | tojson }},
 		increment() {
-			if (this.qty < this.max_qty) {
+			if (this.max_qty === null || this.qty < this.max_qty) {
 				this.qty += 1;
 				return;
 			}
@@ -150,7 +150,9 @@
 				<div class="save-text">
 					<i class="icon feather icon-check-circle"></i>
 					<span class="m-l10">
-						{% if size_selected %}
+						{% if size_selected and selected_item.stock_detail.unlimited %}
+						{{ _("In stock") }}
+						{% elif size_selected %}
 						{{ _("Only {0} left in stock").format(selected_item.stock_detail.stock_qty | round | int) }}
 						{% else %}
 						{{ _("In stock - pick a size to continue") }}

@@ -57,7 +57,7 @@ def get_product_detail(route, selected_size=None):
 		"sale_price": sale_price,
 		"selected_price": selected_price,
 		"discount_percent": get_discount_percent(default_price, sale_price),
-		"in_stock": (selected_item or {}).get("stock_detail", {}).get("stock_qty", 0) > 0,
+		"in_stock": bool((selected_item or {}).get("stock_detail", {}).get("in_stock")),
 		"warehouse": warehouse,
 	}
 

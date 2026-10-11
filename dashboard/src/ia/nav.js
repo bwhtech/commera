@@ -1,3 +1,4 @@
+import { pluginNavItems } from './plugins'
 import { search } from './search'
 
 // The three reports. Overview carries the headline numbers, so none of them
@@ -33,7 +34,7 @@ const ITEM = {
 // The daily work sits ungrouped at the top; the two groups below it are the
 // things you go to on purpose. Neither collapses — three rows each is not
 // enough to be worth hiding.
-export const sections = [
+const coreSections = [
   {
     id: 'primary',
     items: [ITEM.overview, ITEM.search, ITEM.orders, ITEM.customers, ITEM.analytics],
@@ -41,6 +42,11 @@ export const sections = [
   { id: 'catalog', label: 'Catalog', items: [ITEM.products, ITEM.collections, ITEM.attributes] },
   { id: 'storefront', label: 'Storefront', items: [ITEM.theme, ITEM.navigation, ITEM.pages, ITEM.reviews] },
 ]
+
+const pluginItems = pluginNavItems()
+
+// Installed plugins sit in their own section after the core ones, which only shows when it has rows.
+export const sections = [...coreSections, ...(pluginItems.length ? [{ id: 'plugins', label: 'Plugins', items: pluginItems }] : [])]
 
 // SidebarItem only infers active state from an exact route match, so a detail
 // route (/products/p-2) would leave its section unlit. Resolve it here instead:

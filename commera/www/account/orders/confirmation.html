@@ -1,16 +1,12 @@
 {% extends "templates/layout.html" %}
 
 {% block body %}
-{% if login_url %}
-<div class=" shadow p-5 m-4">
-    <h1 class="text-xl font-semibold text-gray-800">{{ _('Your payment has been received') }}</h1>
-    <p>{{ _('Please sign in to confirm this order. You will come straight back to this page.') }}</p>
-    <a class="underline" href="{{ login_url }}">{{ _('Sign in to confirm your order') }}</a>
-</div>
-{% else %}
 <div class=" shadow p-5 m-4">
     <h1 class="text-xl font-semibold text-gray-800">{{ _('Checking payment status') }}</h1>
     <p>{{ _('Please do not refresh') }}...</p>
+    {% if login_url %}
+    <a class="underline" href="{{ login_url }}">{{ _('Checked out with an account? Sign in to confirm your order') }}</a>
+    {% endif %}
 </div>
 
 <script defer>
@@ -53,10 +49,9 @@
         if (order_name) track_purchase(data, order_name);
 
         Alpine.store("cart").remove_selected();
-        window.location.href = `/{{frappe.lang}}/account/orders`;
+        window.location.href = data.order_link || `/{{frappe.lang}}/account/orders`;
     }
 
     confirm_payment();
 </script>
-{% endif %}
 {% endblock %}

@@ -8,7 +8,7 @@ from commera.www.account.orders.index import get_orders_list
 
 def get_context(context):
 	context.no_cache = 1
-	# Guests reach this gateway-return page; frappe.is_whitelisted would refuse confirm_payment bare.
+	# A guest checkout confirms from its cart cookie; the sign-in link only rescues a shopper whose session lapsed.
 	if frappe.session.user == "Guest":
 		context.login_url = get_login_url_for_current_page()
 		return context

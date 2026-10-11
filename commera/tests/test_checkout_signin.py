@@ -99,7 +99,9 @@ class TestCheckoutSignin(IntegrationTestCase):
 		customer = _create_party_for_user(self.email)
 		contact = frappe.get_doc("Contact", {"email_id": self.email})
 		frappe.set_user(self.email)
-		quotation = frappe._dict(party_name=customer.name, customer_name=customer.customer_name)
+		quotation = frappe._dict(
+			party_name=customer.name, customer_name=customer.customer_name, contact_email=self.email
+		)
 		return customer, contact, quotation
 
 	def test_billing_name_replaces_the_placeholder_everywhere(self):

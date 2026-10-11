@@ -48,6 +48,14 @@ PAYMENT_FIELDS = (
 	"charge_account_head",
 )
 
+CHECKOUT_FIELDS = ("allow_guest_checkout", "guest_order_link_days")
+
+EMAIL_TEMPLATE_FIELDS = (
+	"order_confirmation_email_template",
+	"order_cancellation_email_template",
+	"item_in_stock_email_template",
+)
+
 FOOTER_FIELDS = (
 	"facebook_url",
 	"twitter_url",
@@ -61,8 +69,18 @@ FOOTER_FIELDS = (
 	"vat_certificate_image",
 )
 
-# Fields the four curated tabs own, so the Advanced tab does not render a second copy.
-CURATED_FIELDS = frozenset(STORE_DETAIL_FIELDS + SHIPPING_FIELDS + PAYMENT_FIELDS + FOOTER_FIELDS)
+# The dashboard's settings tabs that only read and write their own fields; each tuple is also
+# the allowlist that stops a save from writing any other field.
+SETTINGS_TAB_FIELDS = {
+	"payments": PAYMENT_FIELDS,
+	"checkout": CHECKOUT_FIELDS,
+	"emails": EMAIL_TEMPLATE_FIELDS,
+}
+
+# Fields the curated tabs own, so the Advanced tab does not render a second copy.
+CURATED_FIELDS = frozenset(
+	STORE_DETAIL_FIELDS + SHIPPING_FIELDS + FOOTER_FIELDS + sum(SETTINGS_TAB_FIELDS.values(), ())
+)
 
 # Fieldtypes the generic renderer cannot express as one input. Color is skipped for a different
 # reason: colour is moving to the theme, though format_theme_css() still reads these fields.
@@ -163,47 +181,20 @@ def save_store_settings(**kwargs):
 	return write_settings_fields(STORE_DETAIL_SETTINGS_FIELDS, kwargs) | write_branding_fields(kwargs)
 
 
-@frappe.whitelist()
-def get_shipping_settings():
-	"""Shipping rule and returns window, plus the return reasons for reference."""
-	settings = read_settings_fields(SHIPPING_FIELDS)
-
-	# ponytail: return reasons are read-only here, edit them in Desk until the dashboard
-	# grows a child-table editor
-	settings["reason_for_return"] = frappe.get_all(
-		"Return Reason",
-		filters={"parent": SETTINGS_DOCTYPE, "parenttype": SETTINGS_DOCTYPE},
-		fields=["name", "display_name", "description"],
-		order_by="idx asc",
-	)
-	return settings
-
-
-@frappe.whitelist(methods=["POST"])
-def save_shipping_settings(**kwargs):
-	return write_settings_fields(SHIPPING_FIELDS, kwargs)
+def get_tab_fields(tab: str) -> tuple[str, ...]:
+	if tab not in SETTINGS_TAB_FIELDS:
+		frappe.throw(frappe._("Unknown settings tab {0}").format(tab))
+	return SETTINGS_TAB_FIELDS[tab]
 
 
 @frappe.whitelist()
-def get_payment_settings():
-	"""Cash on delivery switches and the account the COD charge posts to."""
-	return read_settings_fields(PAYMENT_FIELDS)
+def get_tab_settings(tab: str):
+	return read_settings_fields(get_tab_fields(tab))
 
 
 @frappe.whitelist(methods=["POST"])
-def save_payment_settings(**kwargs):
-	return write_settings_fields(PAYMENT_FIELDS, kwargs)
-
-
-@frappe.whitelist()
-def get_footer_settings():
-	"""Social links, newsletter copy, and the footer trust badges."""
-	return read_settings_fields(FOOTER_FIELDS)
-
-
-@frappe.whitelist(methods=["POST"])
-def save_footer_settings(**kwargs):
-	return write_settings_fields(FOOTER_FIELDS, kwargs)
+def save_tab_settings(tab: str, **kwargs):
+	return write_settings_fields(get_tab_fields(tab), kwargs)
 
 
 def get_advanced_docfields():

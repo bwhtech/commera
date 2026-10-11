@@ -1,7 +1,7 @@
 
 {% macro account_shell(page_title, parent_crumbs=None) %}
 {% set language = frappe.lang or "en" %}
-{# The order confirmation is the one account route a logged-out shopper can reach - it is the gateway return URL. #}
+{# Order pages are reachable logged out: the gateway return URL and the private order link. #}
 {% set is_signed_in = frappe.session.user != "Guest" %}
 
 <div class="dz-bnr-inr account-banner">

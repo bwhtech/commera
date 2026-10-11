@@ -10,6 +10,8 @@
 {% endblock %}
 
 {% block user_body %}
+{% set is_owner = order_access == "owner" %}
+{% set shows_private_details = order_access != "limited" %}
 <div x-data="{ 
     selected_items: [],
     returned_items: [],
@@ -27,7 +29,7 @@
 
 }
 }"
-x-init="fetch_returned_items('{{ order.name }}')" class=" flex flex-col border border-gray-300 rounded-lg w-full p-4">
+x-init="{% if is_owner %}fetch_returned_items('{{ order.name }}'){% endif %}" class=" flex flex-col border border-gray-300 rounded-lg w-full p-4">
     <div class="flex md:justify-between md:items-center border-b border-gray-300 mb-5 pb-5 flex-col md:flex-row">
         <div class="flex flex-col md:flex-row md:w-2/3 md:justify-between md:items-center">
             <h1 class=" text-base mb-2 md:mb-0 md:text-lg font-normal">{{_('Order placed')}} {{
@@ -37,7 +39,7 @@ x-init="fetch_returned_items('{{ order.name }}')" class=" flex flex-col border b
        {% set print_format  =  frappe.db.get_value("Commera Settings","Commera Settings","print_format") or 'Standard' %}
 
         {% with sales_invoice = frappe.get_all("Sales Invoice",filters={'sales_order':order.name},limit=1) %}
-        {% if sales_invoice %}
+        {% if sales_invoice and shows_private_details %}
         <a href="/api/method/frappe.utils.print_format.download_pdf?doctype=Sales Invoice&name={{sales_invoice[0].name}}&format={{print_format}}" target="_blank" class="text-base flex items-center mb-2 md:mb-0 "       x-show="!partially_returned">
             {% if order.custom_ecommerce_status == "Delivered"  %}
                     {{icon("invoice",classes = 'size-4 me-1')}}
@@ -53,6 +55,7 @@ x-init="fetch_returned_items('{{ order.name }}')" class=" flex flex-col border b
     </div>
     <div
         class="flex flex-col md:flex-row items-start md:justify-between border-b border-gray-300 pb-5 mb-5 gap-3 ipad:gap-20">
+        {% if shows_private_details %}
         <div class="md:w-1/3">
             <h3 class="text-base text-secondary-accent font-medium ">
                 {% if order.custom_is_store_pickup %}
@@ -92,6 +95,7 @@ x-init="fetch_returned_items('{{ order.name }}')" class=" flex flex-col border b
                 {% endif %}
             </h3>
         </div>
+        {% endif %}
         <div class="w-full md:w-1/3">
             <h3 class="text-base text-secondary-accent font-medium ">{{_('Order Summary')}}</h3>
             <h3 class="text-base font-normal mt-2 flex items-center justify-between">
@@ -170,11 +174,13 @@ x-init="fetch_returned_items('{{ order.name }}')" class=" flex flex-col border b
             <!-- <button class="bg-red-800 hover:bg-red-900 text-white text-sm text-center p-2 rounded-lg cursor-pointer">
                 {{_('Track Order')}}
             </button> -->
+            {% if is_owner %}
             <div x-show="!is_fully_returned">
                {{ cancel_order_button(classes='mt-4', order_id=order.name, ecommerce_order_status =order.custom_ecommerce_status) }}
             </div>
             {% if order.name | can_return(return_period) %}
             {{return_button("mt-4",order.name,order.delivery_status,items,return_reasons)}}
+            {% endif %}
             {% endif %}
         </div>
     </div>

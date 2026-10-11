@@ -37,6 +37,7 @@ const optionValues = computed(() => [...new Set(props.product.variants.map((v) =
 
 const optionValuesRequest = useAdminRead('catalog.get_attribute_values', {
   params: () => ({ attribute: props.product.option_attribute }),
+  immediate: Boolean(props.product.option_attribute),
   refetch: true,
 })
 

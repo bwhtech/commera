@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useMediaQuery } from '@vueuse/core'
 import { Button, Dropdown, ScrollArea, Skeleton, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -8,12 +9,16 @@ import PageBody from '../components/PageBody.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import OrderProgress from '../components/OrderProgress.vue'
 import OrderCustomerPanel from '../components/OrderCustomerPanel.vue'
+import OrderPluginFailures from '../components/OrderPluginFailures.vue'
+import PluginActionDialog from '../components/PluginActionDialog.vue'
+import PluginSlot from '../components/PluginSlot.vue'
 import Thumb from '../components/Thumb.vue'
 import RefundDialog from '../components/RefundDialog.vue'
 import { useAdminRead, useAdminAction, useMethodRead } from '../data/api'
 import { erpnextLink, printUrl } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { longDate, money } from '../data/format'
+import { useRecordPlugins } from '../data/recordPlugins'
 
 const route = useRoute()
 
@@ -40,6 +45,15 @@ watch(
   },
 )
 
+const { cards, actionGroup, openAction, record, reload: reloadPlugins } = useRecordPlugins(
+  'order',
+  'Sales Order',
+  () => route.params.id,
+  { onReload: () => orderRequest.reload() },
+)
+
+const hasRail = useMediaQuery('(min-width: 1024px)')
+
 const erpLink = computed(() => (order.value ? erpnextLink('Sales Order', order.value.name) : null))
 
 // "View in ERP" is here unconditionally rather than only below `sm`: the
@@ -48,7 +62,7 @@ const erpLink = computed(() => (order.value ? erpnextLink('Sales Order', order.v
 // (639.98, 640) — reachable under browser zoom — would hide both copies and
 // leave the action unreachable. The menu is the one route that always works;
 // the labelled button is a desktop convenience on top of it.
-const moreActions = [
+const orderActions = [
   {
     label: 'View in ERP',
     icon: 'lucide-external-link',
@@ -71,6 +85,8 @@ const moreActions = [
     onClick: () => (refundOpen.value = true),
   },
 ]
+
+const moreActions = computed(() => [{ group: 'Order', options: orderActions }, actionGroup.value].filter(Boolean))
 
 const fulfilAction = useAdminAction('orders.fulfil_order')
 
@@ -122,6 +138,7 @@ const loadFailure = computed(() =>
           <Button icon="lucide-ellipsis" label="More actions" />
         </Dropdown>
         <Button
+          v-if="order.items.some((item) => !item.delivered_by_supplier)"
           label="Fulfil items"
           icon-left="lucide-truck"
           variant="solid"
@@ -146,6 +163,8 @@ const loadFailure = computed(() =>
         <StatusBadge v-if="order.state.key === 'cancelled'" :status="order.state.key" :label="order.state.label" />
         <span class="text-sm text-ink-gray-5">{{ longDate(order.placed_on) }}</span>
       </div>
+
+      <OrderPluginFailures class="mt-4" :failures="order.plugin_failures" @retried="orderRequest.reload()" />
 
       <!-- Where the order has reached, read left to right. -->
       <OrderProgress class="mt-6" :progress="order.progress" />
@@ -204,6 +223,13 @@ const loadFailure = computed(() =>
               <div class="flex justify-between text-base text-ink-gray-6">
                 <span>Tax</span><span class="tabular-nums">{{ money(order.tax) }}</span>
               </div>
+              <div
+                v-for="fee in order.plugin_fees"
+                :key="fee.description"
+                class="flex justify-between text-base text-ink-gray-6"
+              >
+                <span>{{ fee.description }}</span><span class="tabular-nums">{{ money(fee.amount) }}</span>
+              </div>
               <div class="flex justify-between pt-1 text-base-semibold text-ink-gray-9">
                 <span>Total</span><span class="tabular-nums">{{ money(order.grand_total) }}</span>
               </div>
@@ -215,6 +241,10 @@ const loadFailure = computed(() =>
         <section class="rounded-5 border border-outline-gray-1 lg:hidden">
           <OrderCustomerPanel :order="order" />
         </section>
+
+        <div v-if="cards.length && !hasRail" class="space-y-6">
+          <PluginSlot :entries="cards" :record="record" frame="stack" @reload="reloadPlugins" />
+        </div>
       </div>
         </PageBody>
       </ScrollArea>
@@ -222,9 +252,12 @@ const loadFailure = computed(() =>
       <aside class="hidden w-[19rem] shrink-0 flex-col border-l border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
           <OrderCustomerPanel :order="order" />
+          <PluginSlot v-if="hasRail" :entries="cards" :record="record" frame="rail" @reload="reloadPlugins" />
         </ScrollArea>
       </aside>
     </div>
+
+    <PluginActionDialog v-model:entry="openAction" :record="record" @reload="reloadPlugins" />
 
     <RefundDialog
       v-model:open="refundOpen"

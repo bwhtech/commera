@@ -25,6 +25,7 @@
 							<li><p><span>{{ _("E-mail") }}</span> : <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p></li>
 							<li><p><span>{{ _("Phone") }}</span> : <a href="tel:{{ contact_phone }}">{{ contact_phone }}</a></p></li>
 							<li><p><span>{{ _("Hours") }}</span> : {{ working_hours }}</p></li>
+							<li><p><a href="/{{ frappe.lang or 'en' }}/track-order">{{ _("Track Your Order") }}</a></p></li>
 						</ul>
 						<div class="subscribe_widget">
 							<h6 class="title fw-medium text-capitalize">{{ newsletter_title }}</h6>

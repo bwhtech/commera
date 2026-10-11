@@ -15,8 +15,11 @@
 	"Cancelled": "bg-danger",
 	"Returned": "bg-danger",
 } %}
-{% set is_cancellable = order.custom_ecommerce_status in ("Waiting for Approval", "Order Received") %}
-{% set is_returnable = return_period and order.name | can_return(return_period) %}
+{% set is_owner = order_access == "owner" %}
+{% set shows_private_details = order_access != "limited" %}
+{% set is_cancellable = is_owner and order.custom_ecommerce_status in ("Waiting for Approval", "Order Received") %}
+{% set is_returnable = is_owner and return_period and order.name | can_return(return_period) %}
+{% set order_detail_config = {"order_id": order.name, "key": order_key, "is_owner": is_owner} %}
 {% set returnable_items = order_items | rejectattr("is_free_item") | list %}
 {% set discount_amount = (order.total or 0) - (order.net_total or 0) %}
 {# The stored shipping address is an ERPNext display string with <br> separators and trailing empty lines. #}
@@ -37,8 +40,8 @@
 {% endblock %}
 
 {% block uncontained_body %}
-{% call account_shell(_("Order Details"), [{"label": _("Orders"), "href": orders_url}]) %}
-<div class="account-card order-details" x-data='order_detail({{ order.name | tojson }})'>
+{% call account_shell(_("Order Details"), [{"label": _("Orders"), "href": orders_url}] if is_owner else []) %}
+<div class="account-card order-details" x-data='order_detail({{ order_detail_config | tojson }})'>
 	<div class="order-head">
 		{% if order_items and order_items[0].image %}
 		<div class="head-thumb">
@@ -53,6 +56,13 @@
 		</div>
 	</div>
 
+	{% if not shows_private_details %}
+	<div class="alert alert-info m-b30">
+		{{ _("This order link is older, so the delivery address and payment details are hidden.") }}
+		<a href="/{{ language }}/track-order" class="text-underline">{{ _("Get a new link by email") }}</a>
+	</div>
+	{% endif %}
+
 	<div class="row mb-sm-4 mb-2">
 		<div class="col-sm-6">
 			<div class="shiping-tracker-detail">
@@ -60,6 +70,7 @@
 				<h6 class="title">{{ frappe.utils.format_datetime(order.creation, "medium") }}</h6>
 			</div>
 		</div>
+		{% if shows_private_details %}
 		<div class="col-sm-6">
 			<div class="shiping-tracker-detail">
 				<span>{{ _("Payment Method") }}</span>
@@ -70,18 +81,43 @@
 				</h6>
 			</div>
 		</div>
+		{% endif %}
 		<div class="col-sm-6">
 			<div class="shiping-tracker-detail">
 				<span>{{ _("Items") }}</span>
 				<h6 class="title">{{ order_items | length }}</h6>
 			</div>
 		</div>
+		{% if shows_private_details %}
 		<div class="col-sm-6">
 			<div class="shiping-tracker-detail">
 				<span>{{ address_label }}</span>
 				<h6 class="title">{% if address_display %}{{ address_display }}{% else %}&mdash;{% endif %}</h6>
 			</div>
 		</div>
+		{% endif %}
+	</div>
+
+	<div class="widget-timeline m-b30" x-show="tracking.has_tracking" x-cloak>
+		<h6>{{ _("Delivery Tracking") }}</h6>
+		<p class="mb-2">
+			<span x-text="tracking.carrier"></span> &middot; {{ _("AWB") }} <strong class="text-black" x-text="tracking.awb"></strong>
+			&middot; <span x-text="tracking.status"></span>
+			<template x-if="tracking.tracking_url">
+				<span>&middot; <a :href="tracking.tracking_url" target="_blank" rel="noopener noreferrer">{{ _("Track your parcel") }}</a></span>
+			</template>
+		</p>
+		<ul class="timeline ps-0">
+			<template x-for="event in tracking.events || []" :key="event.timestamp + event.status">
+				<li>
+					<div class="timeline-badge primary"></div>
+					<div class="timeline-box">
+						<span x-text="[event.timestamp, event.location].filter(Boolean).join(' · ')"></span>
+						<p x-text="event.message || event.status"></p>
+					</div>
+				</li>
+			</template>
+		</ul>
 	</div>
 
 	{% if invoice_name or is_cancellable or is_returnable %}
@@ -207,6 +243,12 @@
 					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(tax.amount) }}</h6>
 				</div>
 				{% endfor %}
+				{% for fee in charge_lines.plugin_fees %}
+				<div class="tracking-item-content">
+					<span>{{ fee.description }}</span>
+					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(fee.amount) }}</h6>
+				</div>
+				{% endfor %}
 				{% if order.rounding_adjustment %}
 				<div class="tracking-item-content">
 					<span>{{ _("Rounding Adjustment") }}</span>
@@ -226,9 +268,13 @@
 					<li>{{ _("Date") }} : <strong>{{ frappe.utils.format_datetime(order.creation, "medium") }}</strong></li>
 					<li>{{ _("Total") }} : <strong>{{ get_currency_symbol() }}{{ "%.2f" | format(order.rounded_total or 0) }}</strong></li>
 					<li>{{ _("Status") }} : <strong>{{ _(order.custom_ecommerce_status or "Draft") }}</strong></li>
+					{% if shows_private_details %}
 					<li>{{ address_label }} : <strong>{% if address_display %}{{ address_display }}{% else %}&mdash;{% endif %}</strong></li>
+					{% endif %}
 				</ul>
+				{% if is_owner %}
 				<a href="{{ orders_url }}" class="btn-link text-underline p-0">{{ _("Back to Orders") }}</a>
+				{% endif %}
 			</div>
 		</div>
 	</div>
@@ -236,8 +282,9 @@
 
 <script>
 	document.addEventListener('alpine:init', () => {
-		Alpine.data('order_detail', (order_id) => ({
+		Alpine.data('order_detail', ({ order_id, key, is_owner }) => ({
 			active_tab: 'items',
+			tracking: {},
 			show_cancel_confirm: false,
 			show_return_form: false,
 			is_saving: false,
@@ -249,7 +296,15 @@
 			is_fully_returned: false,
 
 			init() {
-				this.get_returned_items();
+				this.get_order_tracking();
+				if (is_owner) this.get_returned_items();
+			},
+
+			async get_order_tracking() {
+				const args = { sales_order: order_id };
+				if (key) args.key = key;
+				const response = await frappe_call('/api/v2/method/commera.api.shipping.get_order_tracking', args);
+				this.tracking = response.data;
 			},
 
 			is_item_locked(item_code) {

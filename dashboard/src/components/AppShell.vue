@@ -1,11 +1,11 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, h } from 'vue'
 import { useRoute } from 'vue-router'
 import { DesktopShell, ScrollArea, Sidebar, SidebarHeader } from 'frappe-ui'
 import { activeNavTarget, productName, sections } from '../ia/nav'
 import logoUrl from '../assets/commera.svg'
-import { openSettings } from '../ia/settings'
-import { useAdminRead, useMethodAction } from '../data/api'
+import { useAccountMenu } from '../data/account'
+import { useAdminRead, useMethodRead } from '../data/api'
 import NavSection from './NavSection.vue'
 import SetupBanner from './firstrun/SetupBanner.vue'
 
@@ -21,36 +21,32 @@ const storeSettings = useAdminRead('settings.get_store_settings', { quiet: true 
 
 const storeName = computed(() => storeSettings.data?.store_name || null)
 
-// The storefront is served by this same site, so it is the origin's root — a
-// bare '/' redirects to the shopper's language.
-function openStorefront() {
-  window.open('/', '_blank', 'noopener')
-}
+const accountMenu = useAccountMenu()
 
-const logoutAction = useMethodAction('logout', { quiet: true })
+// Desk is not an `add_to_apps_screen` app, so get_apps never lists it; it is
+// prepended here the way Gameplan and CRM do. Commera itself is dropped —
+// a link to the screen you are on is a dead end.
+const DESK_APP = { name: 'frappe', title: 'Desk', logo: '/assets/frappe/images/framework.png', route: '/desk' }
 
-// `location.replace` rather than a router push: the session cookie is gone
-// server-side, so the shell in memory is authenticated against nothing and
-// every subsequent read would 403 behind a screen that still looks logged in.
-async function logout() {
-  // The redirect runs either way: a logout that failed still leaves a shell whose
-  // session may be gone, and stranding the merchant on it is worse than sending
-  // them to a login page they can retry from.
-  try {
-    await logoutAction.submit()
-  } finally {
-    window.location.replace('/login')
-  }
-}
+const installedApps = useMethodRead('frappe.apps.get_apps', {
+  quiet: true,
+  transform: (apps) => [DESK_APP, ...apps.filter((app) => app.name !== 'commera')],
+})
 
-// The workspace header is the dropdown: it names the store and gets you to the
-// things that are about the account, not about the page you are on.
-const headerMenu = [
-  { label: 'Settings', icon: 'lucide-settings', onClick: () => openSettings('general') },
-  { label: 'Appearance', icon: 'lucide-sun-moon', onClick: () => openSettings('appearance') },
-  { label: 'View storefront', icon: 'lucide-external-link', onClick: openStorefront },
-  { label: 'Log out', icon: 'lucide-log-out', onClick: logout },
-]
+// A full page load, not a router push: every other app is its own SPA or Desk,
+// outside this router's /commera base.
+const appsMenuItems = computed(() =>
+  (installedApps.data ?? [DESK_APP]).map((app) => ({
+    label: app.title,
+    slots: { prefix: () => h('img', { src: app.logo, alt: '', class: 'size-5 rounded-sm object-contain' }) },
+    onClick: () => window.location.assign(app.route),
+  })),
+)
+
+const headerMenu = computed(() => [
+  { label: 'Apps', icon: 'lucide-layout-grid', submenu: appsMenuItems.value },
+  ...accountMenu,
+])
 </script>
 
 <template>

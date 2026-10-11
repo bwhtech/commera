@@ -29,6 +29,7 @@
 	<section class="content-inner shop-account"
 		x-data="summer_cart({{ delivery_charge | tojson }}, {{ delivery_charge_applicable_below | tojson }})">
 		<div class="container">
+			{{ plugin_slot("cart_banner") }}
 			<div class="cart-empty text-center" x-show="!$store.cart.items.length" x-cloak>
 				<i class="flaticon flaticon-cart"></i>
 				<h4 class="title">{{ _("Your cart is empty") }}</h4>
@@ -149,6 +150,9 @@
 								{{ _("Place Order") }}
 							</button>
 						{% endif %}
+						<button type="button" class="btn btn-outline-secondary w-100 m-t10" @click="$store.cart.copy_link()">
+							<i class="fa-solid fa-link m-r5"></i>{{ _("Copy cart link") }}
+						</button>
 					</div>
 				</div>
 			</div>
@@ -211,7 +215,7 @@
 						await frappe_call("/api/v2/method/commera.api.payments.generate_quotation_for_cart", {
 							cart: { items: items },
 						});
-						window.location.href = "/{{ language }}/cart/checkout";
+						window.location.href = "/{{ language }}/cart/checkout" + window.location.search;
 					} finally {
 						this.checkout_loading = false;
 					}

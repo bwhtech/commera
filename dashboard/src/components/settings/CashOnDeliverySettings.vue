@@ -1,18 +1,17 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import {
   Button,
   SettingsBody,
   SettingsRow,
   Switch,
   TextInput,
-  toast,
 } from 'frappe-ui'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import EmptyState from '../EmptyState.vue'
 import SettingsLinkControl from './SettingsLinkControl.vue'
 import SettingsSkeleton from './SettingsSkeleton.vue'
-import { useAdminAction, useAdminRead } from '../../data/api'
+import { useSettingsTab } from '../../data/useSettingsTab'
 
 const props = defineProps({
   // Opening the Payments tab should fetch; switching away and back should not.
@@ -21,56 +20,9 @@ const props = defineProps({
 
 const ACCOUNT_FIELD = { fieldname: 'charge_account_head', options: 'Account' }
 
-const settings = useAdminRead('settings.get_payment_settings', { immediate: false })
-const save = useAdminAction('settings.save_payment_settings')
-
-// What is in the boxes, and what the server last said was stored. Every answer the server gives
-// is adopted into both, so a value it rewrote — or a save it refused — wins over what was typed.
-const values = ref({})
-const stored = ref({})
-
-function adopt(record) {
-  stored.value = { ...record }
-  values.value = { ...record }
-}
-
-watch(
-  () => settings.data,
-  (data) => data && adopt(data),
-  { immediate: true },
-)
-
-watch(
-  () => props.active,
-  (isActive) => {
-    if (isActive && !settings.isFinished) settings.reload()
-  },
-  { immediate: true },
-)
+const { settings, save, values, commit } = useSettingsTab('payments', () => props.active)
 
 const enabled = computed(() => Boolean(values.value.cod_enabled))
-
-// Frappe stores checks as 1/0 and currency as a number, while an input hands back a string:
-// two values are the same when they would be stored the same.
-function unchanged(fieldname, value) {
-  const before = stored.value[fieldname]
-  return String(value ?? '') === String(before ?? '')
-}
-
-async function commit(fieldname, value, label) {
-  if (unchanged(fieldname, value)) return
-
-  values.value[fieldname] = value
-  const saved = await save.submit({ [fieldname]: value })
-  if (save.error) {
-    // The write is the only truth; a refused one must not leave the box showing what it refused.
-    values.value = { ...stored.value }
-    return
-  }
-
-  adopt(saved)
-  toast.success(`${label} saved`)
-}
 
 function commitNumber(fieldname, event, label) {
   commit(fieldname, event.target.value, label)
@@ -115,7 +67,7 @@ function commitNumber(fieldname, event, label) {
         <SettingsRow title="COD charge" description="Added to the order when the fee applies.">
           <TextInput
             :model-value="values.cod_charge"
-            class="w-40"
+            class="w-full sm:w-40"
             type="number"
             :disabled="save.loading"
             @change="commitNumber('cod_charge', $event, 'COD charge')"
@@ -128,7 +80,7 @@ function commitNumber(fieldname, event, label) {
         >
           <TextInput
             :model-value="values.cod_charge_applicable_below"
-            class="w-40"
+            class="w-full sm:w-40"
             type="number"
             :disabled="save.loading"
             @change="commitNumber('cod_charge_applicable_below', $event, 'Order value')"
@@ -146,7 +98,7 @@ function commitNumber(fieldname, event, label) {
           :field="ACCOUNT_FIELD"
           :model-value="values.charge_account_head ?? ''"
           options-path="settings.get_link_options"
-          class="w-72"
+          class="w-full sm:w-72"
           @update:model-value="commit('charge_account_head', $event, 'Charge account')"
         />
       </SettingsRow>

@@ -5,7 +5,7 @@
 	"main": "index.js",
 	"scripts": {
 		"postinstall": "yarn tailwind:build",
-		"build": "yarn tailwind:build && cd dashboard && yarn install && yarn build",
+		"build": "yarn tailwind:build && cd dashboard && yarn install && yarn build && node buildPlugins.js",
 		"tailwind:watch": "npx @tailwindcss/cli -i ./commera/public/css/main.css -o ./commera/public/css/tailwind.css --watch",
 		"tailwind:build": "npx @tailwindcss/cli -i ./commera/public/css/main.css -o ./commera/public/css/tailwind.css",
 		"dupes": "npm run dupes:py && npm run dupes:vue",

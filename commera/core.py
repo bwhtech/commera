@@ -8,6 +8,8 @@ from frappe.contacts.doctype.contact.contact import get_contact_name
 from frappe.utils import get_fullname
 from frappe.utils.nestedset import get_root_of
 
+from commera.guest import get_guest_cart_name, is_guest, validate_guest_checkout_enabled
+
 
 def generate_otp():
 	"""Generates a cryptographically secure random OTP"""
@@ -48,28 +50,50 @@ def get_default_customer_group() -> str:
 
 
 def _create_party_for_user(user: str):
-	fullname = get_fullname(user) or user
+	customer, contact = create_party(user, get_fullname(user) or user, portal_user=user)
+	return customer
+
+
+def create_party(email: str, customer_name: str, portal_user: str | None = None):
 	customer = frappe.new_doc("Customer")
 	customer_group = get_default_customer_group()
 	customer.update(
 		{
-			"customer_name": fullname,
+			"customer_name": customer_name,
 			"customer_type": "Individual",
 			"customer_group": customer_group,
 			"territory": _get_default_territory(),
 		}
 	)
-	customer.append("portal_users", {"user": user})
+	if portal_user:
+		customer.append("portal_users", {"user": portal_user})
 	customer.flags.ignore_mandatory = True
 	customer.insert(ignore_permissions=True)
 
 	contact = frappe.new_doc("Contact")
-	contact.update({"first_name": fullname, "email_ids": [{"email_id": user, "is_primary": 1}]})
+	contact.update({"first_name": customer_name, "email_ids": [{"email_id": email, "is_primary": 1}]})
 	contact.append("links", {"link_doctype": "Customer", "link_name": customer.name})
 	contact.flags.ignore_mandatory = True
 	contact.insert(ignore_permissions=True)
 
-	return customer
+	return customer, contact
+
+
+def get_customer_contact(email: str) -> tuple[str, str] | None:
+	"""The Customer an email already belongs to, and the Contact that links them."""
+	contact_names = frappe.get_all(
+		"Contact Email", filters={"email_id": email, "parenttype": "Contact"}, pluck="parent"
+	)
+	if not contact_names:
+		return None
+
+	links = frappe.get_all(
+		"Dynamic Link",
+		filters={"parenttype": "Contact", "parent": ("in", contact_names), "link_doctype": "Customer"},
+		fields=["link_name", "parent"],
+		limit=1,
+	)
+	return (links[0].link_name, links[0].parent) if links else None
 
 
 def get_party(user=None):
@@ -89,10 +113,13 @@ def get_party(user=None):
 		if link:
 			party_doc = frappe.get_cached_doc(link.link_doctype, link.link_name)
 			if not frappe.db.exists("Portal User", {"parent": party_doc.name, "user": user}):
+				from commera.api.payments import system_user_session
+
 				party_doc.append("portal_users", {"user": user})
-				party_doc.flags.ignore_permissions = True
 				party_doc.flags.ignore_mandatory = True
-				party_doc.save()
+				# Customer.on_update rewrites the primary Contact, which the shopper cannot write.
+				with system_user_session():
+					party_doc.save()
 			return party_doc
 
 	if portal_party := frappe.db.get_value("Portal User", {"user": user}, "parent"):
@@ -103,6 +130,9 @@ def get_party(user=None):
 
 
 def _get_cart_quotation(party=None):
+	if is_guest():
+		return get_guest_cart_quotation()
+
 	if not party:
 		party = get_party()
 
@@ -114,6 +144,8 @@ def _get_cart_quotation(party=None):
 			"contact_email": frappe.session.user,
 			"order_type": "Shopping Cart",
 			"docstatus": 0,
+			# A guest who typed this shopper's email booked that cart to them, but it is not theirs to see.
+			"custom_guest_cart_key": ("is", "not set"),
 		},
 		order_by="modified desc",
 		limit_page_length=1,
@@ -122,6 +154,18 @@ def _get_cart_quotation(party=None):
 
 	if quotation:
 		return frappe.get_cached_doc("Quotation", quotation[0])
+	return new_cart_quotation(party, frappe.session.user)
+
+
+def get_guest_cart_quotation():
+	validate_guest_checkout_enabled()
+	cart_name = get_guest_cart_name()
+	if not cart_name:
+		raise frappe.PermissionError
+	return frappe.get_cached_doc("Quotation", cart_name)
+
+
+def new_cart_quotation(party, email: str, contact_person: str | None = None):
 	commera_settings = frappe.get_cached_doc("Commera Settings")
 	company = commera_settings.get("company") or frappe.get_cached_value(
 		"Global Defaults", "Global Defaults", "default_company"
@@ -131,8 +175,8 @@ def _get_cart_quotation(party=None):
 	quotation_doc.company = company
 	quotation_doc.order_type = "Shopping Cart"
 	quotation_doc.party_name = party.name
-	quotation_doc.contact_person = frappe.db.get_value("Contact", {"email_id": frappe.session.user})
-	quotation_doc.contact_email = frappe.session.user
+	quotation_doc.contact_person = contact_person or frappe.db.get_value("Contact", {"email_id": email})
+	quotation_doc.contact_email = email
 	quotation_doc.flags.ignore_permissions = True
 	quotation_doc.run_method("set_missing_values")
 	if sale_price_list := frappe.get_cached_value("Commera Settings", "Commera Settings", "sale_price_list"):
@@ -141,6 +185,9 @@ def _get_cart_quotation(party=None):
 
 
 def get_address_docs(party=None):
+	# A guest may be booked to an existing customer, whose saved addresses are not theirs to see.
+	if is_guest():
+		return []
 	if not party:
 		party = get_party()
 	if not party:

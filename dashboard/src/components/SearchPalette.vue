@@ -1,7 +1,7 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { KeyboardShortcut, useKeyboardShortcut } from 'frappe-ui'
+import { Icon, KeyboardShortcut, useKeyboardShortcut } from 'frappe-ui'
 import {
   CommandPalette,
   CommandPaletteEmpty,
@@ -16,10 +16,12 @@ import { useAdminRead } from '../data/api'
 import { money, priceRange } from '../data/format'
 import { SETTINGS_TABS, openSettings } from '../ia/settings'
 import { search } from '../ia/search'
+import { pluginCommands, pluginPageCommands } from '../ia/plugins'
 import { customerRoute, orderRoute, productRoute } from '../ia/routes'
 import { openImport } from '../data/importFlow'
 import { openAddProduct } from '../data/addProduct'
 import { confirmInstallDemoData } from '../data/demoData'
+import { usePluginRun } from '../data/recordPlugins'
 
 const LIMIT = 5
 
@@ -106,6 +108,7 @@ const GO_TO = [
   { id: 'go-stock-report', label: 'Inventory report', icon: 'lucide-chart-line', keywords: ['analytics', 'dead stock', 'cover'], run: () => router.push('/analytics/inventory') },
   { id: 'go-storefront-report', label: 'Storefront report', icon: 'lucide-globe', keywords: ['analytics', 'sessions', 'funnel'], run: () => router.push('/analytics/storefront') },
   { id: 'go-theme', label: 'Storefront theme', icon: 'lucide-palette', keywords: ['design', 'brand'], run: () => router.push('/storefront/theme') },
+  ...pluginPageCommands().map((page) => ({ ...page, run: () => router.push(page.to) })),
 ]
 
 const CREATE = [
@@ -116,7 +119,7 @@ const CREATE = [
 ]
 
 const SETTINGS = [
-  { id: 'settings', label: 'Open settings', icon: 'lucide-settings', keywords: ['preferences', 'config'], run: () => openSettings('general') },
+  { id: 'settings', label: 'Open settings', icon: 'lucide-settings', keywords: ['preferences', 'config'], run: () => openSettings() },
   ...SETTINGS_TABS.map((tab) => ({
     id: `settings-${tab.value}`,
     label: tab.label,
@@ -126,10 +129,22 @@ const SETTINGS = [
   })),
 ]
 
+const runPluginCommand = usePluginRun('plugins.run_command', (entry) => ({ key: entry.key }))
+
+// The palette closes only after its select handler returns, so a confirm opened straight away would sit on a
+// dialog that is about to close and lose focus with it.
+async function startPlugin(entry) {
+  await nextTick()
+  return runPluginCommand(entry)
+}
+
+const PLUGINS = pluginCommands().map((command) => ({ ...command, suffix: command.appTitle, run: () => startPlugin(command.entry) }))
+
 const ALL = [
   { label: 'Go to', commands: GO_TO },
   { label: 'Create', commands: CREATE },
   { label: 'Settings', commands: SETTINGS },
+  { label: 'Plugins', commands: PLUGINS },
 ]
 
 // Before you type, the palette is a short menu — the five destinations worth a
@@ -256,9 +271,12 @@ function onSelect(value) {
           :value="{ kind: 'command', id: command.id }"
         >
           <template #prefix>
-            <span :class="[command.icon, 'mr-2.5 size-4 shrink-0 text-ink-gray-5']" aria-hidden="true" />
+            <Icon :name="command.icon" class="mr-2.5 size-4 shrink-0 text-ink-gray-5" />
           </template>
           {{ command.label }}
+          <template v-if="command.suffix" #suffix>
+            <span class="text-sm text-ink-gray-5">{{ command.suffix }}</span>
+          </template>
         </CommandPaletteItem>
       </CommandPaletteGroup>
     </CommandPaletteList>

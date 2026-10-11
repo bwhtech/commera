@@ -1,0 +1,21 @@
+{% extends "components/theme_layout.html" %}
+
+{% block uncontained_body %}
+	{% include "templates/includes/cart-permalink.html" %}
+	<section class="content-inner"
+		x-data='cart_permalink({{ {"lines": lines, "notices": notices, "next_url": next_url} | tojson }})'>
+		<div class="container text-center">
+			{% if lines and not notices %}
+				<h4 class="title">{{ _("Adding the products to your bag...") }}</h4>
+			{% else %}
+				<h4 class="title">{{ _("Some products in this link were changed") if lines else _("This cart link has nothing to add") }}</h4>
+				<ul class="m-b30">
+					{% for notice in notices %}
+						<li>{{ notice | e }}</li>
+					{% endfor %}
+				</ul>
+				<a href="{{ next_url | e }}" class="btn btn-secondary">{{ _("Continue") if lines else _("Go to your bag") }}</a>
+			{% endif %}
+		</div>
+	</section>
+{% endblock %}

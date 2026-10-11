@@ -14,6 +14,7 @@ from commera.api.variant_pricing import (
 	get_selling_price_lists,
 	set_variant_prices,
 )
+from commera.plugin_events import add_changed_products
 from commera.swatches import COLOUR_ATTRIBUTE, ensure_default_swatch, get_swatch_map
 from commera.utils import IN_CLAUSE_CHUNK_SIZE, get_first_option_photos, get_product_covers
 
@@ -1406,6 +1407,7 @@ def save_product_options(item_template: str, add: list | str | None = None, remo
 		configurator.name, add_pairs, remove_keys, item_code_by_key, set(created_codes)
 	)
 	price_new_sizes(item_template, variants_with_new_sizes, [item.name for item in existing_items.values()])
+	add_changed_products([item_template], "options")
 
 	return {"created": len(created_codes), "disabled": len(disabled_codes), "restored": len(restored_codes)}
 

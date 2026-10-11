@@ -15,26 +15,29 @@ const sectionTakeover = ref(false)
 </script>
 
 <template>
+  <!-- The list view scrolls as one pane: each section's SettingsBody sits in a block, so it grows
+       to its content instead of splitting the height. An open editor fills the panel instead. -->
   <div
-    v-if="!sectionTakeover"
-    class="flex flex-col"
-    :class="
-      configuring
-        ? 'min-h-0 flex-1'
-        : 'shrink-0 [&_[data-slot=scroll-area-viewport]]:pb-0'
-    "
+    v-scroll-fade
+    class="flex min-h-0 flex-1 flex-col"
+    :class="{ 'overflow-y-auto': !configuring && !sectionTakeover }"
   >
-    <!-- Drops the 4rem of tail padding a whole panel ends on, through frappe-ui's own
-         data-slot, so IntegrationsPanel itself stays generic. -->
-    <IntegrationsPanel
-      v-model:configuring="configuring"
-      :store="store"
-      :active="active"
-      :title="title"
-      :description="description"
-    />
-  </div>
+    <div
+      v-if="!sectionTakeover"
+      :class="configuring ? 'flex min-h-0 flex-1 flex-col' : 'shrink-0 [&_[data-slot=scroll-area-viewport]]:pb-0'"
+    >
+      <IntegrationsPanel
+        v-model:configuring="configuring"
+        :store="store"
+        :active="active"
+        :title="title"
+        :description="description"
+      />
+    </div>
 
-  <!-- A section that cannot open a screen of its own simply ignores `setTakeover`. -->
-  <slot v-if="!configuring" :takeover="sectionTakeover" :set-takeover="(open) => (sectionTakeover = open)" />
+    <!-- A section that cannot open a screen of its own simply ignores `setTakeover`. -->
+    <div v-if="!configuring" :class="sectionTakeover ? 'flex min-h-0 flex-1 flex-col' : 'shrink-0'">
+      <slot :takeover="sectionTakeover" :set-takeover="(open) => (sectionTakeover = open)" />
+    </div>
+  </div>
 </template>

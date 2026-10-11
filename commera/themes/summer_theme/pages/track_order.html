@@ -1,0 +1,59 @@
+{% extends "components/theme_layout.html" %}
+{% from "components/core/account_shell.html" import account_shell %}
+
+{% block head %}
+	{{ super() }}
+	<link rel="stylesheet" href="{{ shop_theme_asset_url('css/account.css') }}">
+{% endblock %}
+
+{% block uncontained_body %}
+{% call account_shell(_("Track Your Order")) %}
+<script>
+	document.addEventListener("alpine:init", () => {
+		Alpine.data("summer_track_order", () => ({
+			order_number: "",
+			email: "",
+			sending: false,
+			message: "",
+
+			async send_order_link() {
+				this.sending = true;
+				try {
+					const { data } = await frappe_call("/api/v2/method/commera.api.order_link.send_order_link", {
+						order_number: this.order_number,
+						email: this.email,
+					});
+					this.message = data;
+				} finally {
+					this.sending = false;
+				}
+			},
+		}));
+	});
+</script>
+
+<div class="account-card" x-data="summer_track_order">
+	<p class="m-b25">{{ _("Enter your order number and the email you checked out with. We will email you a link to the order.") }}</p>
+	<form class="row" @submit.prevent="send_order_link()">
+		<div class="col-lg-6">
+			<div class="form-group m-b25">
+				<label class="label-title" for="order_number">{{ _("Order Number") }}</label>
+				<input id="order_number" class="form-control" required autocomplete="off" x-model="order_number">
+			</div>
+		</div>
+		<div class="col-lg-6">
+			<div class="form-group m-b25">
+				<label class="label-title" for="order_email">{{ _("Email address") }}</label>
+				<input id="order_email" type="email" class="form-control" required autocomplete="email" x-model="email">
+			</div>
+		</div>
+		<div class="col-12" x-show="message" x-cloak>
+			<div class="alert alert-info" role="status" x-text="message"></div>
+		</div>
+		<div class="col-12">
+			<button class="btn btn-primary" type="submit" :disabled="sending">{{ _("Email Me The Link") }}</button>
+		</div>
+	</form>
+</div>
+{% endcall %}
+{% endblock %}

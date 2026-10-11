@@ -19,7 +19,9 @@ function normalize(value) {
  * is ever submitted, so a blank secret means "keep the stored one" rather than "wipe it", and one
  * control's save never rewrites a field the owner never touched.
  */
-export function useSettingsAutosave(save) {
+// `params` rides along on every write, for an endpoint that serves more than one panel: a
+// submit's own params replace the action's, so they cannot be set once on the action.
+export function useSettingsAutosave(save, { params = {} } = {}) {
   const values = ref({})
   const stored = ref({})
 
@@ -61,7 +63,7 @@ export function useSettingsAutosave(save) {
     values.value[fieldname] = value
 
     return enqueue(async () => {
-      const saved = await save.submit({ [fieldname]: value })
+      const saved = await save.submit({ ...params, [fieldname]: value })
       // The refusal is read off the shared action, which only answers for this commit because
       // nothing else is in flight. Only the refused box rolls back: replacing the whole map
       // would wipe what the owner is typing into another field.
