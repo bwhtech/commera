@@ -108,6 +108,16 @@ class CommeraDiscount(Document):
 			return _("{0} is not available for your account.").format(self.title)
 		return None
 
+	def gives_anything(self, cart) -> bool:
+		"""Whether the discount would take anything off this cart. One that gives nothing must not take a
+		place that another, combinable discount could use."""
+		if self.discount_class == PRODUCT:
+			return any(self.get_line_discounts(cart).values())
+		if self.discount_class == ORDER:
+			return self.get_order_discount(cart) > 0
+		# A shipping discount is judged on the delivery options, which the cart does not hold yet.
+		return True
+
 	def is_for_customer_group(self, customer_group: str | None) -> bool:
 		if not customer_group:
 			return False

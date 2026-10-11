@@ -172,10 +172,20 @@ def get_code_states(quotation) -> list[dict]:
 				"title": discount.title,
 				"discount_class": discount.discount_class,
 				"applied": is_applied,
-				"reason": None if is_applied else get_unmet_reason(discount, cart) or discount.status,
+				"reason": None if is_applied else get_code_reason(discount, cart),
 			}
 		)
 	return states
+
+
+def get_code_reason(discount, cart) -> str:
+	if discount.status != "Active":
+		return _("{0} is not active.").format(discount.title)
+	if reason := get_unmet_reason(discount, cart):
+		return reason
+	if not discount.gives_anything(cart):
+		return _("Nothing in your cart qualifies for {0}.").format(discount.title)
+	return _("{0} cannot be combined with your other discounts.").format(discount.title)
 
 
 def get_automatic_discounts(quotation) -> list[dict]:

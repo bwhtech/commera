@@ -131,6 +131,14 @@ class TestServerCart(DiscountCodeTestCase):
 		self.assertFalse(state["applied"])
 		self.assertIn("more to use", state["reason"])
 
+	def test_a_code_with_nothing_to_discount_says_so(self):
+		code = self.create_code(percentage=10, item_codes=(self.shirt,))
+		cart_sdk.add_lines([{"item_code": self.cap, "qty": 1}])
+
+		state = cart_sdk.add_discount_code(code)["discount_codes"][0]
+
+		self.assertIn("Nothing in your cart qualifies", state["reason"])
+
 	def test_checkout_without_a_server_cart_is_unchanged(self):
 		quotation = generate_quotation_for_cart({"items": [self.browser_line(self.cap, 2)]})
 

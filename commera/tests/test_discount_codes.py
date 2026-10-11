@@ -301,6 +301,14 @@ class TestDiscountSelection(DiscountCodeTestCase):
 		self.assertEqual(cart.custom_code_order_discount, 9)
 		self.assertFalse(desk_quotation.custom_code_order_discount)
 
+	def test_a_discount_that_gives_nothing_does_not_block_another(self):
+		self.create_discount(percentage=50, item_codes=(self.cap,), method="Automatic")
+		code = self.create_code(percentage=10)
+
+		quotation = self.create_quotation({self.shirt: 1}, (code,))
+
+		self.assertEqual(quotation.custom_code_order_discount, 9)
+
 	def test_a_prepaid_discount_drops_off_for_cash_on_delivery(self):
 		code = self.create_code(percentage=10, payment_condition="Prepaid")
 		quotation = self.create_quotation({self.shirt: 1}, (code,))

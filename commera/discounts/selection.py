@@ -68,7 +68,7 @@ def select_discounts(cart) -> list[Selection]:
 		discount = selection.discount
 		if discount.status != "Active" or not discount.is_for_currency(cart.currency):
 			continue
-		if get_unmet_reason(discount, cart):
+		if get_unmet_reason(discount, cart) or not discount.gives_anything(cart):
 			continue
 		if all(discount.can_combine_with(other.discount) for other in selected):
 			selected.append(selection)
