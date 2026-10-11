@@ -1,0 +1,58 @@
+{
+	"actions": [],
+	"autoname": "hash",
+	"creation": "2026-10-10 00:00:00.000000",
+	"doctype": "DocType",
+	"engine": "InnoDB",
+	"field_order": ["user", "cart_key", "discount_codes", "lines"],
+	"fields": [
+		{
+			"fieldname": "user",
+			"fieldtype": "Link",
+			"in_list_view": 1,
+			"label": "User",
+			"options": "User",
+			"read_only": 1,
+			"search_index": 1
+		},
+		{
+			"description": "Hash of the guest cart cookie. Empty for a signed-in shopper.",
+			"fieldname": "cart_key",
+			"fieldtype": "Data",
+			"hidden": 1,
+			"label": "Guest Cart Key",
+			"read_only": 1,
+			"search_index": 1
+		},
+		{
+			"description": "Commera Discount codes, one per line.",
+			"fieldname": "discount_codes",
+			"fieldtype": "Small Text",
+			"label": "Discount Codes"
+		},
+		{
+			"fieldname": "lines",
+			"fieldtype": "Table",
+			"label": "Lines",
+			"options": "Commera Cart Line"
+		}
+	],
+	"links": [],
+	"modified": "2026-10-10 00:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "Commera Ecommerce",
+	"name": "Commera Cart",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"read": 1,
+			"role": "System Manager",
+			"write": 1
+		}
+	],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": []
+}

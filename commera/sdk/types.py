@@ -9,8 +9,11 @@ __all__ = [
 	"Charge",
 	"ChargeSummary",
 	"CheckoutSummary",
+	"NewCartLine",
 	"Order",
 	"OrderLine",
+	"PricedCart",
+	"PricedCartLine",
 	"Stage",
 ]
 
@@ -97,6 +100,40 @@ class Cart(TypedDict):
 	total: float
 	grand_total: float
 	plugin_fields: dict[str, Any]
+
+
+class NewCartLine(TypedDict, total=False):
+	item_code: str
+	qty: int
+	attributes: dict[str, str]
+
+
+class PricedCartLine(TypedDict):
+	line_id: str
+	item_code: str
+	title: str
+	qty: int
+	attributes: dict[str, str]
+	price: float
+	rate: float
+	# Per unit, from the best product discount code on the line.
+	code_discount: float
+	discount_code: str | None
+	amount: float
+
+
+class PricedCart(TypedDict):
+	"""The server cart priced like checkout, before shipping and tax."""
+
+	name: str
+	version: str
+	currency: str
+	# {"code", "class"}, where class is "Product" or "Order".
+	discount_codes: list[dict]
+	lines: list[PricedCartLine]
+	subtotal: float
+	order_discount: float
+	total: float
 
 
 class ChargeSummary(TypedDict):

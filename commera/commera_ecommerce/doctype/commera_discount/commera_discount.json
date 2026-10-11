@@ -1,0 +1,169 @@
+{
+	"actions": [],
+	"creation": "2026-10-10 00:00:00.000000",
+	"doctype": "DocType",
+	"engine": "InnoDB",
+	"field_order": [
+		"code",
+		"enabled",
+		"discount_class",
+		"value_type",
+		"value",
+		"currency",
+		"column_break_value",
+		"valid_from",
+		"valid_upto",
+		"usage_limit",
+		"times_used",
+		"section_conditions",
+		"targets",
+		"minimum_quantity",
+		"minimum_subtotal",
+		"section_combinations",
+		"combines_with_product",
+		"combines_with_order"
+	],
+	"fields": [
+		{
+			"description": "What the shopper types. Stored in capitals; matching ignores case.",
+			"fieldname": "code",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"label": "Code",
+			"reqd": 1,
+			"unique": 1
+		},
+		{
+			"default": "1",
+			"fieldname": "enabled",
+			"fieldtype": "Check",
+			"in_list_view": 1,
+			"label": "Enabled"
+		},
+		{
+			"description": "Product: comes off matching lines. Order: comes off the subtotal after product discounts.",
+			"fieldname": "discount_class",
+			"fieldtype": "Select",
+			"in_list_view": 1,
+			"label": "Discount Class",
+			"options": "Product\nOrder",
+			"reqd": 1
+		},
+		{
+			"fieldname": "value_type",
+			"fieldtype": "Select",
+			"label": "Value Type",
+			"options": "Percentage\nFixed Amount",
+			"reqd": 1
+		},
+		{
+			"description": "A percentage, or an amount per unit (Product) or per order (Order).",
+			"fieldname": "value",
+			"fieldtype": "Float",
+			"in_list_view": 1,
+			"label": "Value",
+			"non_negative": 1,
+			"reqd": 1
+		},
+		{
+			"depends_on": "eval:doc.value_type == 'Fixed Amount'",
+			"description": "A fixed amount applies only to carts in this currency.",
+			"fieldname": "currency",
+			"fieldtype": "Link",
+			"label": "Currency",
+			"mandatory_depends_on": "eval:doc.value_type == 'Fixed Amount'",
+			"options": "Currency"
+		},
+		{
+			"fieldname": "column_break_value",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "valid_from",
+			"fieldtype": "Date",
+			"label": "Valid From"
+		},
+		{
+			"fieldname": "valid_upto",
+			"fieldtype": "Date",
+			"label": "Valid Upto"
+		},
+		{
+			"description": "0 means no limit.",
+			"fieldname": "usage_limit",
+			"fieldtype": "Int",
+			"label": "Usage Limit",
+			"non_negative": 1
+		},
+		{
+			"default": "0",
+			"fieldname": "times_used",
+			"fieldtype": "Int",
+			"label": "Times Used",
+			"no_copy": 1,
+			"read_only": 1
+		},
+		{
+			"fieldname": "section_conditions",
+			"fieldtype": "Section Break",
+			"label": "Conditions"
+		},
+		{
+			"depends_on": "eval:doc.discount_class == 'Product'",
+			"description": "Items, item groups (with their sub-groups) or brands. Empty means every item.",
+			"fieldname": "targets",
+			"fieldtype": "Table",
+			"label": "Applies To",
+			"options": "Commera Discount Target"
+		},
+		{
+			"depends_on": "eval:doc.discount_class == 'Product'",
+			"fieldname": "minimum_quantity",
+			"fieldtype": "Int",
+			"label": "Minimum Quantity Per Line",
+			"non_negative": 1
+		},
+		{
+			"depends_on": "eval:doc.discount_class == 'Order'",
+			"fieldname": "minimum_subtotal",
+			"fieldtype": "Currency",
+			"label": "Minimum Subtotal",
+			"non_negative": 1
+		},
+		{
+			"fieldname": "section_combinations",
+			"fieldtype": "Section Break",
+			"label": "Combinations"
+		},
+		{
+			"default": "0",
+			"fieldname": "combines_with_product",
+			"fieldtype": "Check",
+			"label": "Combines With Product Discounts"
+		},
+		{
+			"default": "0",
+			"fieldname": "combines_with_order",
+			"fieldtype": "Check",
+			"label": "Combines With Order Discounts"
+		}
+	],
+	"links": [],
+	"modified": "2026-10-10 00:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "Commera Ecommerce",
+	"name": "Commera Discount",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"read": 1,
+			"role": "System Manager",
+			"write": 1
+		}
+	],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": []
+}

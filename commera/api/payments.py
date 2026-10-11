@@ -24,6 +24,7 @@ from commera.api.shipping import (
 )
 from commera.api.signup import get_placeholder_first_name, validate_single_email, validate_user_names
 from commera.checkout_hooks import apply_plugin_fees, filter_payment_methods, get_cart_refusal
+from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.core import _get_cart_quotation, create_party, get_customer_contact, new_cart_quotation
 from commera.guest import (
 	get_guest_cart_name,
@@ -505,6 +506,8 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 				"warehouse": ecommerce_warehouse,
 			},
 		)
+	if server_cart := get_session_cart():
+		server_cart.update_quotation(unsaved_quotation_doc)
 	save_cart_quotation(unsaved_quotation_doc)
 	# The stored option was priced for the old cart, and payment would re-quote it for the new one.
 	clear_delivery_option(unsaved_quotation_doc)

@@ -9,6 +9,7 @@
 				}
 				// $persist writes on Alpine's next flush; navigating first can leave the old cart in storage.
 				await this.$nextTick();
+				await this.$store.cart.sync();
 				if (!config.notices.length) window.location.replace(config.next_url);
 			},
 		}));
