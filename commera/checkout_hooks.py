@@ -5,6 +5,7 @@ import frappe
 from frappe import _
 from frappe.utils.data import cstr, flt
 
+from commera.discounts.shipping import apply_shipping_discounts
 from commera.plugin_events import get_handlers
 from commera.utils import get_charge_account_head
 
@@ -86,7 +87,7 @@ def apply_delivery_option_hooks(quotation, options: list[dict], strict: bool) ->
 		with handle_hook_error("delivery_options", handler, quotation, strict):
 			hooked_options = frappe.get_attr(handler)(quotation, [dict(option) for option in options])
 			options = get_hooked_delivery_options(options, hooked_options, precision)
-	return options
+	return apply_shipping_discounts(quotation, options)
 
 
 def get_hooked_delivery_options(options: list[dict], hooked_options, precision: int) -> list[dict]:

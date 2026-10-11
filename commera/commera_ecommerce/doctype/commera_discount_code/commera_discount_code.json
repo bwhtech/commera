@@ -1,0 +1,70 @@
+{
+	"actions": [],
+	"creation": "2026-10-11 00:00:00.000000",
+	"doctype": "DocType",
+	"engine": "InnoDB",
+	"field_order": [
+		"code",
+		"discount",
+		"is_generated",
+		"times_used"
+	],
+	"fields": [
+		{
+			"fieldname": "code",
+			"fieldtype": "Data",
+			"label": "Code",
+			"reqd": 1,
+			"unique": 1,
+			"in_list_view": 1,
+			"description": "What the shopper types. Stored in capitals; matching ignores case."
+		},
+		{
+			"fieldname": "discount",
+			"fieldtype": "Link",
+			"label": "Discount",
+			"options": "Commera Discount",
+			"reqd": 1,
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"search_index": 1
+		},
+		{
+			"fieldname": "is_generated",
+			"fieldtype": "Check",
+			"label": "Generated",
+			"read_only": 1,
+			"description": "A generated code can be used once."
+		},
+		{
+			"fieldname": "times_used",
+			"fieldtype": "Int",
+			"label": "Times Used",
+			"read_only": 1,
+			"no_copy": 1,
+			"default": "0",
+			"in_list_view": 1
+		}
+	],
+	"links": [],
+	"modified": "2026-10-11 00:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "Commera Ecommerce",
+	"name": "Commera Discount Code",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"read": 1,
+			"role": "System Manager",
+			"write": 1,
+			"export": 1,
+			"report": 1
+		}
+	],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": [],
+	"autoname": "field:code"
+}

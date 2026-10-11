@@ -791,6 +791,7 @@ def place_cod_order(quotation_name: str):
 	validate_cart(quotation)
 	if COD_PAYMENT_MODE not in get_checkout_payment_methods(quotation, strict=True):
 		refuse_payment(_("Cash on delivery is not available."), quotation.name)
+	quotation.flags.commera_payment_kind = "cod"
 	with system_user_session():
 		set_cod_charges(quotation)
 		quotation.flags.ignore_permissions = True

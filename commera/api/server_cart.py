@@ -8,7 +8,7 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	CommeraCart,
 	get_session_cart,
 )
-from commera.discount_codes import get_discount_codes
+from commera.discounts.selection import get_discount_codes
 from commera.sdk import cart as cart_sdk
 from commera.www.cart.permalink import get_cart_lines
 

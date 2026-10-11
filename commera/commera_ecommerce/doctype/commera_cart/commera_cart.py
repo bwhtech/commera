@@ -3,11 +3,14 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils.data import cint, cstr, flt, get_datetime
 
-from commera.commera_ecommerce.doctype.commera_discount.commera_discount import get_code_name
-from commera.discount_codes import (
-	apply_code_discounts,
+from commera.discounts.allocations import get_allocations
+from commera.discounts.cart_context import get_cart_context
+from commera.discounts.codes import get_code_discount, normalize_code
+from commera.discounts.pricing import apply_code_discounts
+from commera.discounts.selection import (
 	get_discount,
 	get_discount_codes,
+	get_unmet_reason,
 	validate_new_discount_code,
 )
 from commera.guest import get_guest_cart_key, is_guest, set_guest_cart_cookie
@@ -95,7 +98,7 @@ class CommeraCart(Document):
 		self.discount_codes = "\n".join(codes)
 
 	def remove_discount_code(self, code: str):
-		code = get_code_name(code)
+		code = normalize_code(code)
 		self.discount_codes = "\n".join(name for name in get_discount_codes(self) if name != code)
 
 	def get_lines_by_item_code(self) -> dict[str, list]:
@@ -112,10 +115,8 @@ class CommeraCart(Document):
 			"name": self.name,
 			"version": self.version,
 			"currency": quotation.currency,
-			"discount_codes": [
-				{"code": code, "class": get_discount(code).discount_class}
-				for code in get_discount_codes(self)
-			],
+			"discount_codes": get_code_states(quotation),
+			"automatic_discounts": get_automatic_discounts(quotation),
 			"lines": [get_priced_line(row, lines_by_row[row.name]) for row in self.lines],
 			"subtotal": flt(quotation.total),
 			"order_discount": flt(quotation.custom_code_order_discount),
@@ -135,6 +136,9 @@ class CommeraCart(Document):
 				"order_type": "Shopping Cart",
 				"selling_price_list": settings.sale_price_list,
 				"custom_discount_codes": self.discount_codes,
+				# Who is shopping, so first-order, group and once-per-customer rules can be judged.
+				"party_name": self.user and frappe.db.get_value("Portal User", {"user": self.user}, "parent"),
+				"contact_email": self.user,
 			}
 		)
 		for row in self.lines:
@@ -179,6 +183,34 @@ def change_quantity_from_the_end(cart, rows: list, delta: int):
 	cart.lines = [row for row in cart.lines if cint(row.qty) > 0]
 
 
+def get_code_states(quotation) -> list[dict]:
+	"""Each code with whether it applies now and, when not, why in the shopper's words."""
+	applied = {(row["discount"], row.get("code")) for row in get_allocations(quotation)}
+	cart = get_cart_context(quotation)
+	states = []
+	for code in get_discount_codes(quotation):
+		discount = get_discount(get_code_discount(code))
+		is_applied = (discount.name, code) in applied
+		states.append(
+			{
+				"code": code,
+				"title": discount.title,
+				"discount_class": discount.discount_class,
+				"applied": is_applied,
+				"reason": None if is_applied else get_unmet_reason(discount, cart) or discount.status,
+			}
+		)
+	return states
+
+
+def get_automatic_discounts(quotation) -> list[dict]:
+	return [
+		{"title": get_discount(row["discount"]).title, "amount": row["amount"]}
+		for row in get_allocations(quotation)
+		if not row.get("code")
+	]
+
+
 def get_priced_line(row, item) -> dict:
 	return {
 		"line_id": row.name,
@@ -189,7 +221,7 @@ def get_priced_line(row, item) -> dict:
 		"price": flt(item.price_list_rate),
 		"rate": flt(item.rate),
 		"code_discount": flt(item.custom_code_discount),
-		"discount_code": item.custom_discount_code,
+		"discount": item.custom_discount_code,
 		"amount": flt(item.amount),
 	}
 

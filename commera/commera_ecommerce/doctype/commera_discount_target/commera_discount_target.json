@@ -1,31 +1,42 @@
 {
 	"actions": [],
-	"creation": "2026-10-10 00:00:00.000000",
+	"creation": "2026-10-11 00:00:00.000000",
 	"doctype": "DocType",
-	"editable_grid": 1,
 	"engine": "InnoDB",
-	"field_order": ["target_type", "target"],
+	"field_order": [
+		"role",
+		"target_type",
+		"target"
+	],
 	"fields": [
+		{
+			"fieldname": "role",
+			"fieldtype": "Select",
+			"label": "Role",
+			"options": "Applies To\nExcluded\nBuys\nGets",
+			"default": "Applies To",
+			"reqd": 1,
+			"in_list_view": 1
+		},
 		{
 			"fieldname": "target_type",
 			"fieldtype": "Select",
-			"in_list_view": 1,
 			"label": "Target Type",
 			"options": "Item\nItem Group\nBrand",
-			"reqd": 1
+			"reqd": 1,
+			"in_list_view": 1
 		},
 		{
 			"fieldname": "target",
 			"fieldtype": "Dynamic Link",
-			"in_list_view": 1,
 			"label": "Target",
 			"options": "target_type",
-			"reqd": 1
+			"reqd": 1,
+			"in_list_view": 1
 		}
 	],
-	"istable": 1,
 	"links": [],
-	"modified": "2026-10-10 00:00:00.000000",
+	"modified": "2026-10-11 00:00:00.000000",
 	"modified_by": "Administrator",
 	"module": "Commera Ecommerce",
 	"name": "Commera Discount Target",
@@ -33,5 +44,7 @@
 	"permissions": [],
 	"sort_field": "modified",
 	"sort_order": "DESC",
-	"states": []
+	"states": [],
+	"istable": 1,
+	"editable_grid": 1
 }

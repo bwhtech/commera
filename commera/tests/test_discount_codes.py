@@ -3,12 +3,12 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils.data import add_days, today
 
 from commera.api.payments import _make_sales_order, make_sales_invoice
+from commera.commera_ecommerce.doctype.commera_discount.commera_discount import DiscountCodeError
 from commera.core import new_cart_quotation
-from commera.discount_codes import (
-	MAX_DISCOUNT_CODES,
-	DiscountCodeError,
-	validate_new_discount_code,
-)
+from commera.discounts.codes import add_code, generate_codes, get_code_discount
+from commera.discounts.pricing import refresh_code_discounts
+from commera.discounts.selection import MAX_DISCOUNT_CODES, validate_new_discount_code
+from commera.discounts.shipping import apply_shipping_discounts
 
 SHIRT_RATE = 90.0
 CAP_RATE = 40.0
@@ -38,6 +38,7 @@ class DiscountCodeTestCase(IntegrationTestCase):
 		self.addCleanup(frappe.set_user, "Administrator")
 		self.shirt = self.create_item(SHIRT_RATE)
 		self.cap = self.create_item(CAP_RATE)
+		self.customer = self.create_customer()
 
 	def create_item(self, rate: float) -> str:
 		item_code = f"ZZ-CODE-{frappe.generate_hash(length=8)}"
@@ -51,43 +52,76 @@ class DiscountCodeTestCase(IntegrationTestCase):
 				"is_stock_item": 1,
 			}
 		).insert(ignore_permissions=True)
-		frappe.get_doc(
-			{
-				"doctype": "Item Price",
-				"item_code": item_code,
-				"price_list": self.price_list,
-				"price_list_rate": rate,
-			}
-		).insert(ignore_permissions=True)
+		self.set_price(item_code, self.price_list, rate)
 		frappe.get_doc(
 			{"doctype": "Bin", "item_code": item_code, "warehouse": self.warehouse, "actual_qty": 10}
 		).insert(ignore_permissions=True)
 		return item_code
 
-	def create_code(
-		self,
-		percentage: float = 0,
-		amount: float = 0,
-		item_codes: tuple[str, ...] = (),
-		**discount_fields,
+	def set_price(self, item_code: str, price_list: str, rate: float):
+		frappe.get_doc(
+			{
+				"doctype": "Item Price",
+				"item_code": item_code,
+				"price_list": price_list,
+				"price_list_rate": rate,
+			}
+		).insert(ignore_permissions=True)
+
+	def create_customer(self, customer_group: str | None = None):
+		return frappe.get_doc(
+			{
+				"doctype": "Customer",
+				"customer_name": f"ZZ Code Shopper {frappe.generate_hash(length=6)}",
+				**({"customer_group": customer_group} if customer_group else {}),
+			}
+		).insert(ignore_permissions=True)
+
+	def create_discount(
+		self, percentage: float = 0, amount: float = 0, item_codes: tuple[str, ...] = (), **fields
 	) -> str:
-		"""A Product code on `item_codes` when given, else an Order code."""
-		return (
-			frappe.get_doc(
-				{
-					"doctype": "Commera Discount",
-					"code": f"zz{frappe.generate_hash(length=8)}",
-					"discount_class": "Product" if item_codes else "Order",
-					"value_type": "Percentage" if percentage else "Fixed Amount",
-					"value": percentage or amount,
-					"currency": self.currency,
-					"targets": [{"target_type": "Item", "target": item_code} for item_code in item_codes],
-					**discount_fields,
-				}
-			)
-			.insert(ignore_permissions=True)
-			.name
-		)
+		"""Amount off products on `item_codes` when given, else amount off the order."""
+		discount = frappe.get_doc(
+			{
+				"doctype": "Commera Discount",
+				"title": f"ZZ {frappe.generate_hash(length=6)}",
+				"discount_type": "Amount Off Products" if item_codes else "Amount Off Order",
+				"applies_to": "Specific Products" if item_codes else "All Products",
+				"value_type": "Percentage" if percentage else "Fixed Amount",
+				"value": percentage or amount,
+				"currency": self.currency,
+				"targets": [
+					{"role": "Applies To", "target_type": "Item", "target": code} for code in item_codes
+				],
+				**fields,
+			}
+		).insert(ignore_permissions=True)
+		return discount.name
+
+	def create_code(self, percentage: float = 0, amount: float = 0, item_codes=(), **fields) -> str:
+		discount = self.create_discount(percentage, amount, item_codes, **fields)
+		return add_code(discount, f"zz{frappe.generate_hash(length=8)}")
+
+	def create_quotation(self, lines: dict[str, int], codes=(), customer=None, order_type="Shopping Cart"):
+		customer = customer or self.customer
+		quotation = new_cart_quotation(customer, f"{customer.name.lower().replace(' ', '-')}@example.com")
+		quotation.order_type = order_type
+		quotation.selling_price_list = self.price_list
+		for item_code, qty in lines.items():
+			quotation.append("items", {"item_code": item_code, "qty": qty, "warehouse": self.warehouse})
+		quotation.custom_discount_codes = "\n".join(codes)
+		quotation.insert(ignore_permissions=True)
+		return quotation
+
+	def place_order(self, quotation):
+		quotation.submit()
+		sales_order = _make_sales_order(quotation.name, ignore_permissions=True)
+		sales_order.delivery_date = add_days(today(), 2)
+		sales_order.insert(ignore_permissions=True)
+		return sales_order
+
+	def get_line(self, doc, item_code: str):
+		return next(row for row in doc.items if row.item_code == item_code)
 
 	def create_automatic_rule(self, item_code: str, percentage: float):
 		frappe.get_doc(
@@ -103,21 +137,6 @@ class DiscountCodeTestCase(IntegrationTestCase):
 			}
 		).insert(ignore_permissions=True)
 
-	def create_quotation(self, lines: dict[str, int], codes: tuple[str, ...] = ()):
-		customer = frappe.get_doc(
-			{"doctype": "Customer", "customer_name": f"ZZ Code Shopper {frappe.generate_hash(length=6)}"}
-		).insert(ignore_permissions=True)
-		quotation = new_cart_quotation(customer, "zz-code-shopper@example.com")
-		quotation.selling_price_list = self.price_list
-		for item_code, qty in lines.items():
-			quotation.append("items", {"item_code": item_code, "qty": qty, "warehouse": self.warehouse})
-		quotation.custom_discount_codes = "\n".join(codes)
-		quotation.insert(ignore_permissions=True)
-		return quotation
-
-	def get_line(self, doc, item_code: str):
-		return next(row for row in doc.items if row.item_code == item_code)
-
 
 class TestDiscountCodes(DiscountCodeTestCase):
 	def test_a_product_code_discounts_only_its_items(self):
@@ -126,9 +145,8 @@ class TestDiscountCodes(DiscountCodeTestCase):
 		quotation = self.create_quotation({self.shirt: 2, self.cap: 1}, (code,))
 
 		shirt = self.get_line(quotation, self.shirt)
-		self.assertEqual(shirt.rate, 81)
-		self.assertEqual(shirt.custom_code_discount, 9)
-		self.assertEqual(shirt.custom_discount_code, code)
+		self.assertEqual((shirt.rate, shirt.custom_code_discount), (81, 9))
+		self.assertEqual(shirt.custom_discount_code, get_code_discount(code))
 		self.assertEqual(self.get_line(quotation, self.cap).rate, CAP_RATE)
 		self.assertEqual(quotation.net_total, 2 * 81 + CAP_RATE)
 
@@ -140,7 +158,7 @@ class TestDiscountCodes(DiscountCodeTestCase):
 
 		shirt = self.get_line(quotation, self.shirt)
 		self.assertEqual(shirt.rate, 70)
-		self.assertEqual(shirt.custom_discount_code, large)
+		self.assertEqual(shirt.custom_discount_code, get_code_discount(large))
 
 	def test_an_order_code_comes_off_the_subtotal_after_product_codes(self):
 		product = self.create_code(amount=10, item_codes=(self.shirt,), combines_with_order=1)
@@ -172,18 +190,88 @@ class TestDiscountCodes(DiscountCodeTestCase):
 		quotation.save(ignore_permissions=True)
 
 		shirt = self.get_line(quotation, self.shirt)
-		self.assertEqual(shirt.rate, 90 - 9 - 5)
-		self.assertEqual(shirt.discount_amount, 14)
+		self.assertEqual((shirt.rate, shirt.discount_amount), (90 - 9 - 5, 14))
 
+	def test_a_percentage_is_capped_for_the_whole_order(self):
+		code = self.create_code(percentage=10, maximum_discount=5)
+
+		quotation = self.create_quotation({self.shirt: 1, self.cap: 1}, (code,))
+
+		self.assertEqual(quotation.custom_code_order_discount, 5)
+
+	def test_the_best_spend_tier_reached_applies(self):
+		code = self.create_code(
+			percentage=1,
+			tiered=1,
+			tiers=[{"minimum_subtotal": 100, "value": 10}, {"minimum_subtotal": 200, "value": 20}],
+		)
+
+		reached = self.create_quotation({self.shirt: 1, self.cap: 1}, (code,))
+		missed = self.create_quotation({self.cap: 2}, (code,))
+
+		self.assertEqual(reached.custom_code_order_discount, 13)
+		self.assertFalse(missed.custom_code_order_discount)
+
+	def test_items_already_on_sale_get_no_extra_discount(self):
+		settings = frappe.get_cached_doc("Commera Settings")
+		self.set_price(self.shirt, settings.get_default_price_list(), 200)
+		self.set_price(self.shirt, settings.get_sale_price_list(), 100)
+		code = self.create_code(percentage=10, item_codes=(self.shirt, self.cap), exclude_sale_items=1)
+
+		quotation = self.create_quotation({self.shirt: 1, self.cap: 1}, (code,))
+
+		self.assertEqual(self.get_line(quotation, self.shirt).rate, SHIRT_RATE)
+		self.assertEqual(self.get_line(quotation, self.cap).rate, 36)
+
+	def test_buy_x_get_y_discounts_the_cheapest_rewarded_units(self):
+		code = self.create_code(
+			discount_type="Buy X Get Y",
+			buy_value=2,
+			get_quantity=1,
+			uses_per_order=1,
+			targets=[
+				{"role": "Buys", "target_type": "Item", "target": self.shirt},
+				{"role": "Gets", "target_type": "Item", "target": self.cap},
+			],
+		)
+
+		quotation = self.create_quotation({self.shirt: 2, self.cap: 3}, (code,))
+
+		self.assertAlmostEqual(self.get_line(quotation, self.cap).amount, 2 * CAP_RATE, places=1)
+		self.assertEqual(self.get_line(quotation, self.shirt).rate, SHIRT_RATE)
+
+	def test_buy_x_get_y_needs_the_bought_units(self):
+		code = self.create_code(
+			discount_type="Buy X Get Y",
+			buy_value=2,
+			get_quantity=1,
+			targets=[
+				{"role": "Buys", "target_type": "Item", "target": self.shirt},
+				{"role": "Gets", "target_type": "Item", "target": self.cap},
+			],
+		)
+
+		quotation = self.create_quotation({self.shirt: 1, self.cap: 1}, (code,))
+
+		self.assertEqual(self.get_line(quotation, self.cap).rate, CAP_RATE)
+
+	def test_a_budget_caps_the_discount(self):
+		code = self.create_code(percentage=50, item_codes=(self.shirt,), budget=20)
+
+		quotation = self.create_quotation({self.shirt: 1}, (code,))
+
+		self.assertEqual(self.get_line(quotation, self.shirt).rate, SHIRT_RATE - 20)
+
+
+class TestDiscountSelection(DiscountCodeTestCase):
 	def test_codes_combine_only_when_both_allow_it(self):
 		product = self.create_code(percentage=10, item_codes=(self.shirt,), combines_with_order=1)
 		strict_order = self.create_code(percentage=5)
 		open_order = self.create_code(percentage=5, combines_with_product=1)
-		applied = [product]
 
 		with self.assertRaises(DiscountCodeError):
-			validate_new_discount_code(strict_order, applied)
-		self.assertEqual(validate_new_discount_code(open_order, applied), open_order)
+			validate_new_discount_code(strict_order, [product])
+		self.assertEqual(validate_new_discount_code(open_order, [product]), open_order)
 
 	def test_a_cart_holds_a_limited_number_of_codes(self):
 		codes = [
@@ -194,7 +282,7 @@ class TestDiscountCodes(DiscountCodeTestCase):
 			validate_new_discount_code(self.create_code(percentage=1, combines_with_order=1), codes)
 
 	def test_an_expired_code_is_refused(self):
-		code = self.create_code(percentage=10, valid_upto=add_days(today(), -1))
+		code = self.create_code(percentage=10, starts_on=add_days(today(), -9), ends_on=add_days(today(), -1))
 
 		with self.assertRaises(DiscountCodeError):
 			validate_new_discount_code(code, [])
@@ -204,36 +292,110 @@ class TestDiscountCodes(DiscountCodeTestCase):
 
 		self.assertEqual(validate_new_discount_code(f" {code.lower()} ", []), code)
 
+	def test_an_automatic_discount_applies_to_store_carts_only(self):
+		self.create_discount(percentage=10, method="Automatic")
 
-class TestDiscountCodesOnOrders(DiscountCodeTestCase):
-	def test_the_sales_order_keeps_code_discounts_and_counts_uses(self):
+		cart = self.create_quotation({self.shirt: 1})
+		desk_quotation = self.create_quotation({self.shirt: 1}, order_type="Sales")
+
+		self.assertEqual(cart.custom_code_order_discount, 9)
+		self.assertFalse(desk_quotation.custom_code_order_discount)
+
+	def test_a_prepaid_discount_drops_off_for_cash_on_delivery(self):
+		code = self.create_code(percentage=10, payment_condition="Prepaid")
+		quotation = self.create_quotation({self.shirt: 1}, (code,))
+		self.assertEqual(quotation.custom_code_order_discount, 9)
+
+		quotation.flags.commera_payment_kind = "cod"
+		refresh_code_discounts(quotation)
+
+		self.assertFalse(quotation.custom_code_order_discount)
+
+	def test_a_customer_group_discount_skips_other_groups(self):
+		group = frappe.get_doc(
+			{"doctype": "Customer Group", "customer_group_name": f"ZZ VIP {frappe.generate_hash(length=6)}"}
+		).insert(ignore_permissions=True)
+		code = self.create_code(
+			percentage=10, eligibility="Customer Groups", customer_groups=[{"customer_group": group.name}]
+		)
+
+		member = self.create_quotation({self.shirt: 1}, (code,), customer=self.create_customer(group.name))
+		other = self.create_quotation({self.shirt: 1}, (code,))
+
+		self.assertEqual(member.custom_code_order_discount, 9)
+		self.assertFalse(other.custom_code_order_discount)
+
+	def test_a_first_order_discount_skips_a_returning_customer(self):
+		code = self.create_code(percentage=10, eligibility="First Order")
+		first = self.create_quotation({self.shirt: 1}, (code,))
+		self.assertEqual(first.custom_code_order_discount, 9)
+		self.place_order(first)
+
+		second = self.create_quotation({self.shirt: 1}, (code,))
+
+		self.assertFalse(second.custom_code_order_discount)
+
+	def test_a_once_per_customer_code_is_not_applied_twice(self):
+		code = self.create_code(percentage=10, once_per_customer=1)
+		self.place_order(self.create_quotation({self.shirt: 1}, (code,)))
+
+		second = self.create_quotation({self.shirt: 1}, (code,))
+
+		self.assertFalse(second.custom_code_order_discount)
+
+	def test_a_generated_code_is_used_once(self):
+		discount = self.create_discount(percentage=10)
+		first_code, second_code = generate_codes(discount, 2, prefix="zz-")
+		self.place_order(self.create_quotation({self.shirt: 1}, (first_code,)))
+
+		with self.assertRaises(DiscountCodeError):
+			validate_new_discount_code(first_code, [])
+		self.assertEqual(validate_new_discount_code(second_code, []), second_code)
+		self.assertTrue(first_code.startswith("ZZ-"))
+
+	def test_a_shipping_discount_frees_cheap_delivery_options(self):
+		self.create_discount(
+			discount_type="Free Shipping",
+			method="Automatic",
+			minimum_requirement="Subtotal",
+			minimum_subtotal=50,
+			maximum_shipping_rate=100,
+			combines_with_product=1,
+			combines_with_order=1,
+		)
+		quotation = self.create_quotation({self.shirt: 1})
+		options = [{"title": "Standard", "amount": 60}, {"title": "Express", "amount": 150}]
+
+		standard, express = apply_shipping_discounts(quotation, options)
+
+		self.assertEqual((standard["amount"], standard["original_amount"]), (0, 60))
+		self.assertEqual(express["amount"], 150)
+
+
+class TestDiscountsOnOrders(DiscountCodeTestCase):
+	def test_the_sales_order_keeps_discounts_and_logs_their_use(self):
 		product = self.create_code(percentage=10, item_codes=(self.shirt,), combines_with_order=1)
 		order = self.create_code(amount=5, combines_with_product=1)
 		quotation = self.create_quotation({self.shirt: 1, self.cap: 1}, (product, order))
-		quotation.submit()
 
-		sales_order = _make_sales_order(quotation.name, ignore_permissions=True)
-		sales_order.delivery_date = add_days(today(), 2)
-		sales_order.insert(ignore_permissions=True)
+		sales_order = self.place_order(quotation)
 		sales_order.submit()
 
+		discount = frappe.get_doc("Commera Discount", get_code_discount(product))
 		self.assertEqual(self.get_line(sales_order, self.shirt).rate, 81)
 		self.assertEqual(sales_order.custom_code_order_discount, 5)
 		self.assertEqual(sales_order.net_total, quotation.net_total)
-		self.assertEqual(frappe.db.get_value("Commera Discount", product, "times_used"), 1)
+		self.assertEqual((discount.times_used, discount.discount_given), (1, 9))
+		self.assertEqual(frappe.db.get_value("Commera Discount Code", product, "times_used"), 1)
 
 		sales_order.cancel()
-		self.assertEqual(frappe.db.get_value("Commera Discount", product, "times_used"), 0)
+		self.assertEqual(frappe.db.get_value("Commera Discount", discount.name, "times_used"), 0)
 
-	def test_the_invoice_keeps_code_discounts_over_an_automatic_rule(self):
+	def test_the_invoice_keeps_discounts_over_an_automatic_rule(self):
 		"""ERPNext prices the invoice again; with an automatic rule on the line that drops an unhooked code."""
 		self.create_automatic_rule(self.shirt, percentage=10)
 		code = self.create_code(amount=5, item_codes=(self.shirt,))
-		quotation = self.create_quotation({self.shirt: 1}, (code,))
-		quotation.submit()
-		sales_order = _make_sales_order(quotation.name, ignore_permissions=True)
-		sales_order.delivery_date = add_days(today(), 2)
-		sales_order.insert(ignore_permissions=True)
+		sales_order = self.place_order(self.create_quotation({self.shirt: 1}, (code,)))
 		sales_order.submit()
 
 		sales_invoice = make_sales_invoice(sales_order.name)
@@ -241,14 +403,3 @@ class TestDiscountCodesOnOrders(DiscountCodeTestCase):
 
 		self.assertEqual(self.get_line(sales_invoice, self.shirt).rate, 90 - 9 - 5)
 		self.assertEqual(sales_invoice.net_total, sales_order.net_total)
-
-	def test_an_order_is_refused_when_its_code_is_used_up(self):
-		code = self.create_code(percentage=10, usage_limit=1, times_used=1)
-		quotation = self.create_quotation({self.shirt: 1}, (code,))
-		quotation.submit()
-		sales_order = _make_sales_order(quotation.name, ignore_permissions=True)
-		sales_order.delivery_date = add_days(today(), 2)
-		sales_order.insert(ignore_permissions=True)
-
-		with self.assertRaises(DiscountCodeError):
-			sales_order.submit()

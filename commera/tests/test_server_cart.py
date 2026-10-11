@@ -3,6 +3,7 @@ import frappe
 from commera.api.payments import generate_quotation_for_cart
 from commera.api.server_cart import sync_server_cart
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
+from commera.discounts.codes import get_code_discount
 from commera.sdk import cart as cart_sdk
 from commera.tests.test_discount_codes import CAP_RATE, SHIRT_RATE, DiscountCodeTestCase
 
@@ -84,7 +85,9 @@ class TestServerCart(DiscountCodeTestCase):
 		priced = cart_sdk.add_discount_code(order)
 
 		shirt = next(line for line in priced["lines"] if line["item_code"] == self.shirt)
-		self.assertEqual((shirt["rate"], shirt["code_discount"], shirt["discount_code"]), (81, 9, product))
+		self.assertEqual((shirt["rate"], shirt["code_discount"]), (81, 9))
+		self.assertEqual(shirt["discount"], get_code_discount(product))
+		self.assertEqual([state["applied"] for state in priced["discount_codes"]], [True, True])
 		self.assertEqual(priced["subtotal"], 2 * 81 + CAP_RATE)
 		self.assertEqual(priced["order_discount"], 10)
 		self.assertEqual(priced["total"], 2 * 81 + CAP_RATE - 10)
@@ -118,6 +121,15 @@ class TestServerCart(DiscountCodeTestCase):
 
 		self.assertEqual(quotation.custom_code_order_discount, 10)
 		self.assertEqual(quotation.net_total, SHIRT_RATE - 10)
+
+	def test_a_code_that_does_not_apply_yet_says_why(self):
+		code = self.create_code(percentage=10, minimum_requirement="Subtotal", minimum_subtotal=500)
+		cart_sdk.add_lines([{"item_code": self.cap, "qty": 1}])
+
+		state = cart_sdk.add_discount_code(code)["discount_codes"][0]
+
+		self.assertFalse(state["applied"])
+		self.assertIn("more to use", state["reason"])
 
 	def test_checkout_without_a_server_cart_is_unchanged(self):
 		quotation = generate_quotation_for_cart({"items": [self.browser_line(self.cap, 2)]})

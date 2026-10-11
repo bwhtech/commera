@@ -99,7 +99,7 @@
 			"insert_after": "custom_code_discount",
 			"is_system_generated": 0,
 			"is_virtual": 0,
-			"label": "Discount Code",
+			"label": "Discount",
 			"length": 0,
 			"link_filters": null,
 			"mandatory_depends_on": null,
