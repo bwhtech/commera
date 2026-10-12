@@ -321,6 +321,28 @@ describe('schema per placement', () => {
 		});
 	}
 
+	for (const [problem, plugin, pattern] of [
+		[
+			'neither url',
+			`{ label: 'Docs' }`,
+			/needs exactly one of plugin\.url or plugin\.url_method/,
+		],
+		[
+			'both urls',
+			`{ label: 'Docs', url: 'https://example.com', url_method: '${APP}.api.docs_url' }`,
+			/needs exactly one of plugin\.url or plugin\.url_method/,
+		],
+		[
+			'a javascript: url',
+			`{ label: 'Docs', url: 'javascript:alert(1)' }`,
+			/plugin\.url must be an http:\/\/ or https:\/\/ address/,
+		],
+	]) {
+		test(`a sidebar link with ${problem} fails`, async () => {
+			await buildFails({ 'sidebar/docs/index.vue': command(plugin) }, pattern);
+		});
+	}
+
 	test('an icon outside the list fails with a suggestion', async () => {
 		await buildFails(
 			{ 'pages/jobs/index.vue': vue(`{ label: 'Jobs', icon: 'printr' }`) },
@@ -733,89 +755,36 @@ describe('a clean build', () => {
 			},
 		]);
 	});
-});
 
-describe('plugin.config', () => {
-	const config = (body) =>
-		`import { definePlugin } from '@commera/plugin-kit'\nexport default definePlugin(${body})\n`;
-
-	test('sidebar actions reach the manifest with one shared module', async () => {
-		const { manifest, read } = await buildApp({
-			'plugin.config.ts': config(`{
-				sidebar: [
-					{ name: 'settings', label: 'Settings', icon: 'printer', order: 9, run: ({ openSettings }) => openSettings() },
-					{ name: 'help', label: 'Help', run: ({ openUrl }) => openUrl('https://example.com') },
-				],
-			}`),
+	test('a sidebar link reaches the manifest with its url and no module', async () => {
+		const { manifest } = await buildApp({
+			'sidebar/docs/index.vue': `<script>\nexport const plugin = { label: 'Docs', order: 9, url: 'https://example.com/docs' }\n</script>\n`,
+			'sidebar/live/index.vue': `<script>\nexport const plugin = { label: 'Live', url_method: '${APP}.api.live_url' }\n</script>\n`,
 		});
-		const entries = manifest.entries.map(({ hash, ...entry }) => entry);
-		assert.deepEqual(entries, [
-			{
-				place: 'sidebar',
-				name: 'settings',
-				module: 'plugin.config.js',
-				label: 'Settings',
-				icon: 'printer',
-				order: 9,
-			},
-			{
-				place: 'sidebar',
-				name: 'help',
-				module: 'plugin.config.js',
-				label: 'Help',
-			},
-		]);
-		assert.match(manifest.entries[0].hash, /^[0-9a-f]{8}$/);
-		const shipped = read('plugin.config.js');
-		assert.match(shipped, /^\/\* commera-plugin-api: 1 \*\//);
-		assert.doesNotMatch(shipped, /plugin-kit/);
-	});
-
-	test('an unknown key in plugin.config fails', async () => {
-		await buildFails(
-			{ 'plugin.config.js': config('{ sidebr: [] }') },
-			/plugin\.config\.js: sidebr is not allowed/,
-		);
-	});
-
-	test('every broken sidebar action is reported, each with its place in the list', async () => {
-		await assert.rejects(
-			buildApp({
-				'plugin.config.js': config(`{
-					sidebar: [
-						{ name: 'Settings', label: 'Settings', run() {} },
-						{ name: 'help', run() {} },
-						{ name: 'docs', label: 'Docs' },
-						{ name: 'docs', label: 'Docs again', run() {} },
-					],
-				}`),
-			}),
-			(error) => {
-				for (const pattern of [
-					/sidebar\[0\]: name must be 1 to 40 lowercase letters/,
-					/sidebar\[1\]: plugin\.label is required/,
-					/sidebar\[2\]: run must be a function/,
-					/sidebar\[3\]: docs is already in sidebar/,
-				])
-					assert.match(error.message, pattern);
-				return true;
-			},
-		);
-	});
-
-	test('a config that imports anything but the kit fails', async () => {
-		await buildFails(
-			{
-				'plugin.config.js': `import { toast } from 'frappe-ui'\nexport default { sidebar: [] }\n`,
-			},
-			/plugin\.config\.js: plugin\.config\.ts may import only definePlugin from @commera\/plugin-kit, not 'frappe-ui'/,
-		);
-	});
-
-	test('a sidebar folder fails and points at plugin.config', async () => {
-		await buildFails(
-			{ 'sidebar/settings/index.vue': vue(`{ label: 'Settings' }`) },
-			/sidebar\/settings\/index\.vue: sidebar entries draw nothing, so they go in commera\/plugin\.config\.ts, not in a folder/,
+		assert.deepEqual(
+			manifest.entries.map(({ place, name, module, url, url_method }) => ({
+				place,
+				name,
+				module,
+				url,
+				url_method,
+			})),
+			[
+				{
+					place: 'sidebar',
+					name: 'docs',
+					module: null,
+					url: 'https://example.com/docs',
+					url_method: undefined,
+				},
+				{
+					place: 'sidebar',
+					name: 'live',
+					module: null,
+					url: undefined,
+					url_method: `${APP}.api.live_url`,
+				},
+			],
 		);
 	});
 });

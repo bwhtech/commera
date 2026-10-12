@@ -65,6 +65,14 @@ def raise_error(*arguments):
 	raise ValueError("condition broke")
 
 
+def dashboard_url():
+	return "https://dashboard.example.com/live"
+
+
+def relative_url():
+	return "/app/settings"
+
+
 @frappe.whitelist(methods=["POST"])
 def resend_order(name):
 	return f"Resent {name}"
@@ -96,14 +104,12 @@ def page(name="jobs", **fields) -> dict:
 	}
 
 
-def sidebar_action(name="settings", **fields) -> dict:
+def sidebar_link(name="dashboard", **fields) -> dict:
 	return {
 		"place": "sidebar",
 		"name": name,
-		"module": "plugin.config.js",
-		"hash": "4b7e2d",
-		"label": "Settings",
-		"icon": "settings",
+		"label": "Dashboard",
+		"url": "https://dashboard.example.com",
 		**fields,
 	}
 
@@ -191,6 +197,8 @@ class PluginTestCase(IntegrationTestCase):
 			show_page,
 			hide_page,
 			raise_error,
+			dashboard_url,
+			relative_url,
 			resend_order,
 			sync_orders,
 			sync_quietly,
@@ -347,6 +355,11 @@ class TestPluginValidation(PluginTestCase):
 			"command with a module": command(module="commands/sync.js"),
 			"command without a method": command(method=None),
 			"command with an unwhitelisted method": command(method=f"{FUNCTIONS}.unlisted_method"),
+			"link with a module": sidebar_link(module="sidebar/dashboard.js"),
+			"link with neither url": sidebar_link(url=None),
+			"link with both urls": sidebar_link(url_method=f"{FUNCTIONS}.dashboard_url"),
+			"link to a javascript: url": sidebar_link(url="javascript:alert(1)"),
+			"url_method outside the app": sidebar_link(url=None, url_method="frappe.utils.get_url"),
 		}
 		for case, entry in invalid_entries.items():
 			with self.subTest(case=case):
@@ -442,25 +455,35 @@ class TestPluginVisibility(PluginTestCase):
 		self.assertEqual(self.visible_labels(STOCK_USER), ["Card", "Shown"])
 		self.assertTrue(error_logged(f"Commera plugin {APP}:pages:broken condition failed", self.started_at))
 
-	def test_a_sidebar_action_reaches_the_boot_with_its_module_and_runs_its_condition(self):
+	def test_a_sidebar_link_reaches_the_boot_with_its_url_and_runs_its_condition(self):
 		self.write_manifest(
 			[
-				sidebar_action(),
-				sidebar_action("hidden", label="Hidden", condition=f"{FUNCTIONS}.hide_page"),
+				sidebar_link(),
+				sidebar_link("hidden", label="Hidden", condition=f"{FUNCTIONS}.hide_page"),
 			]
-		)
-		self.write_asset(
-			APP, "plugin.config.js", f"/* commera-plugin-api: {API_VERSION} */\nexport default {{}}"
 		)
 
 		entries = get_visible_plugins(STOCK_USER)["entries"]
-		self.assertEqual([entry["label"] for entry in entries], ["Settings"])
-		self.assertEqual(entries[0]["place"], "sidebar")
-		self.assertTrue(entries[0]["module_url"].endswith("/plugin.config.js?v=4b7e2d"))
+		self.assertEqual([entry["label"] for entry in entries], ["Dashboard"])
+		self.assertEqual(entries[0]["url"], "https://dashboard.example.com")
 
-	def test_a_sidebar_action_without_a_module_is_dropped(self):
-		self.write_manifest([sidebar_action(module=None)])
-		self.assertEqual(get_visible_plugins(STOCK_USER)["entries"], [])
+	def test_a_url_method_resolves_at_boot_and_a_bad_answer_drops_the_link(self):
+		self.write_manifest(
+			[
+				sidebar_link("live", url=None, url_method=f"{FUNCTIONS}.dashboard_url"),
+				sidebar_link("relative", url=None, url_method=f"{FUNCTIONS}.relative_url"),
+				sidebar_link("broken", url=None, url_method=f"{FUNCTIONS}.raise_error"),
+			]
+		)
+
+		entries = get_visible_plugins(STOCK_USER)["entries"]
+		self.assertEqual([entry["url"] for entry in entries], ["https://dashboard.example.com/live"])
+		self.assertTrue(
+			error_logged(f"Commera plugin {APP}:sidebar:relative url_method failed", self.started_at)
+		)
+		self.assertTrue(
+			error_logged(f"Commera plugin {APP}:sidebar:broken url_method failed", self.started_at)
+		)
 
 	def test_the_dashboard_boot_carries_no_server_paths(self):
 		self.write_manifest(
@@ -498,6 +521,7 @@ class TestPluginVisibility(PluginTestCase):
 				"sidebar",
 				"doctype",
 				"confirm",
+				"url",
 			}
 			| {"module_url", "error", "has_condition", "has_method"},
 		)

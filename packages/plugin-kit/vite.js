@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 const API_VERSION = 1;
 const KIT_VERSION = JSON.parse(
@@ -31,10 +31,6 @@ const DYNAMIC_FILE = /^\[(\.\.\.)?([^\]]*)\]\.vue$/;
 const PARAM = /^[a-z][A-Za-z0-9]{0,39}$/;
 const SKIPPED_DIRS = new Set(['node_modules', 'dist']);
 const ICON_FILE = 'plugin-icon.svg';
-// Contributions that draw nothing (sidebar actions) are declared here; anything that draws UI is a folder.
-const CONFIG_FILES = ['plugin.config.ts', 'plugin.config.js'];
-const CONFIG_ENTRY = 'plugin.config';
-const KIT_ENTRY = fileURLToPath(new URL('./index.js', import.meta.url));
 const ICON_LIMIT = 20 * 1024;
 
 const FRAPPE_V1 = new Set([
@@ -57,6 +53,8 @@ const FIELD_TYPES = {
 	requires: 'text',
 	condition: 'dotted',
 	method: 'dotted',
+	url: 'url',
+	url_method: 'dotted',
 	confirm: 'text',
 	doctype: 'text',
 	sidebar: 'boolean',
@@ -67,7 +65,6 @@ const SLUG_HINT = '<name>';
 
 function placementTable() {
 	return Object.keys(GRAMMAR.places)
-		.filter((place) => !GRAMMAR.places[place].config)
 		.map((place) =>
 			GRAMMAR.places[place].single
 				? `  ${place}/index.vue`
@@ -289,6 +286,10 @@ function checkField(key, value, { app, icons }) {
 			if (icons && !icons.includes(value))
 				return `'${value}' is not a Commera icon${suggest(value, icons)}`;
 			return null;
+		case 'url':
+			return typeof value === 'string' && /^https?:\/\/\S+$/.test(value)
+				? null
+				: 'must be an http:// or https:// address';
 		case 'dotted':
 			if (typeof value !== 'string' || !DOTTED_PATH.test(value))
 				return 'must be a dotted path like my_app.module.function';
@@ -316,6 +317,12 @@ function checkPlugin(plugin, place, hasModule, context) {
 	for (const key of spec.required) {
 		if (!(key in plugin)) problems.push(`plugin.${key} is required`);
 	}
+	if (spec.one_of && spec.one_of.filter((key) => key in plugin).length !== 1)
+		problems.push(
+			`needs exactly one of ${spec.one_of
+				.map((key) => `plugin.${key}`)
+				.join(' or ')}`,
+		);
 	const { declarative } = spec;
 	if (spec.module === 'required' && !hasModule)
 		problems.push('needs a <template> or <script setup>');
@@ -375,15 +382,8 @@ export function discoverPlugins(
 				isIndex
 					? `${display} declares a plugin block but ${placeOf(
 							folder,
-						)} isn't a Commera placement; valid places:\n${placementTable()}`
+					  )} isn't a Commera placement; valid places:\n${placementTable()}`
 					: `${display} declares a plugin block, but only a placement's index.vue may; valid places:\n${placementTable()}`,
-			);
-			continue;
-		}
-
-		if (GRAMMAR.places[placement.place].config) {
-			errors.push(
-				`${display}: ${placement.place} entries draw nothing, so they go in commera/${CONFIG_FILES[0]}, not in a folder`,
 			);
 			continue;
 		}
@@ -591,116 +591,6 @@ function guard({ hostDir, compiler, pluginFiles, pageEntries }) {
 	};
 }
 
-export function findPluginConfig(sourceDir) {
-	return (
-		CONFIG_FILES.map((name) => join(sourceDir, name)).find((path) =>
-			existsSync(path),
-		) ?? null
-	);
-}
-
-// Bundles the config for Node so the build can read its static fields. Only @commera/plugin-kit may be imported by name:
-// `run` gets everything else from its context, and the dashboard's shared modules do not exist outside the browser.
-async function evaluateConfig(file, appRoot) {
-	const esbuild = requireFromApp(appRoot)('esbuild');
-	const result = await esbuild.build({
-		entryPoints: [file],
-		bundle: true,
-		write: false,
-		format: 'esm',
-		platform: 'neutral',
-		logLevel: 'silent',
-		plugins: [
-			{
-				name: 'commera-plugin-config',
-				setup(build) {
-					build.onResolve({ filter: /^@commera\/plugin-kit$/ }, () => ({
-						path: KIT_ENTRY,
-					}));
-					build.onResolve({ filter: /^[^./]/ }, (args) => ({
-						errors: [
-							{
-								text: `${CONFIG_FILES[0]} may import only definePlugin from @commera/plugin-kit, not '${args.path}'; run() gets openSettings, navigate, openUrl and toast in its context`,
-							},
-						],
-					}));
-				},
-			},
-		],
-	});
-	const code = result.outputFiles[0].text;
-	const module = await import(
-		`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
-	);
-	return module.default;
-}
-
-export async function readPluginConfig(sourceDir, { app, appRoot, icons }) {
-	const file = findPluginConfig(sourceDir);
-	if (!file) return { entries: [], errors: [] };
-	const display = basename(file);
-	let config;
-	try {
-		config = await evaluateConfig(file, appRoot);
-	} catch (error) {
-		const detail =
-			error.errors?.map((problem) => problem.text).join('; ') ?? error.message;
-		return { entries: [], errors: [`${display}: ${detail}`] };
-	}
-	if (!config || typeof config !== 'object')
-		return {
-			entries: [],
-			errors: [`${display}: export default definePlugin({ … })`],
-		};
-
-	const errors = [];
-	const entries = [];
-	const places = Object.keys(GRAMMAR.places).filter(
-		(place) => GRAMMAR.places[place].config,
-	);
-	for (const key of Object.keys(config)) {
-		if (!places.includes(key))
-			errors.push(`${display}: ${key} is not allowed${suggest(key, places)}`);
-	}
-	for (const place of places) {
-		const items = config[place] ?? [];
-		if (!Array.isArray(items)) {
-			errors.push(`${display}: ${place} must be a list`);
-			continue;
-		}
-		const seen = new Set();
-		for (const [index, item] of items.entries()) {
-			const where = `${display}: ${place}[${index}]`;
-			const { name, run, ...plugin } = item ?? {};
-			if (!NAME.test(name ?? '')) {
-				errors.push(
-					`${where}: name must be 1 to 40 lowercase letters, digits and hyphens`,
-				);
-				continue;
-			}
-			if (seen.has(name)) {
-				errors.push(`${where}: ${name} is already in ${place}`);
-				continue;
-			}
-			seen.add(name);
-			if (typeof run !== 'function')
-				errors.push(`${where}: run must be a function`);
-			const problems = checkPlugin(plugin, place, true, { app, icons });
-			errors.push(...problems.map((problem) => `${where}: ${problem}`));
-			if (problems.length || typeof run !== 'function') continue;
-			entries.push({
-				place,
-				name,
-				file,
-				entryName: CONFIG_ENTRY,
-				plugin,
-				fromConfig: true,
-			});
-		}
-	}
-	return { entries, errors };
-}
-
 function manifestEntry(entry, hashes) {
 	const fields = Object.fromEntries(
 		GRAMMAR.places[entry.place].fields
@@ -818,14 +708,13 @@ export default async function commeraPlugin({
 		icons,
 		warn: (message) => warnings.push(message),
 	});
-	const config = await readPluginConfig(sourceDir, { app, appRoot, icons });
-	const entries = [...discovered.entries, ...config.entries];
+	const { entries } = discovered;
 	const appIcon = readAppIcon(sourceDir);
 	if (existsSync(join(sourceDir, 'icon.svg')))
 		warnings.push(
 			`commera/icon.svg is not used; rename it to commera/${ICON_FILE}`,
 		);
-	const errors = [...discovered.errors, ...config.errors, ...appIcon.errors];
+	const errors = [...discovered.errors, ...appIcon.errors];
 	if (errors.length) {
 		throw new Error(
 			`commera: ${errors.length} problem${
@@ -850,18 +739,13 @@ export default async function commeraPlugin({
 					: entry.file,
 			]),
 	);
-	const pluginFiles = new Set(
-		entries.filter((entry) => !entry.fromConfig).map((entry) => entry.file),
-	);
+	const pluginFiles = new Set(entries.map((entry) => entry.file));
 	return [
 		guard({ hostDir: resolvedHostDir, compiler, pluginFiles, pageEntries }),
 		vue(),
 		finish({ app, entries, icon: appIcon.icon }),
 		{
 			name: 'commera-plugin-build',
-			// plugin.config imports definePlugin; the kit's own index.js is browser-safe, so it is bundled from here.
-			resolveId: (source) =>
-				source === '@commera/plugin-kit' ? KIT_ENTRY : null,
 			buildStart() {
 				if (!icons)
 					this.warn(`no icons.json at ${resolvedHostDir}; icon check skipped`);

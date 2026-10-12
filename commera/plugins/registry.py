@@ -12,6 +12,7 @@ from commera.sdk import API_VERSION
 
 CACHE_KEY = "commera:plugins"
 BANNER_PATTERN = re.compile(r"commera-plugin-api:\s*(\d+)")
+URL_PATTERN = re.compile(r"https?://\S+")
 ENTRY_FIELDS = tuple(dict.fromkeys(field for spec in PLACES.values() for field in spec["fields"]))
 CLIENT_FIELDS = (
 	"key",
@@ -25,6 +26,7 @@ CLIENT_FIELDS = (
 	"sidebar",
 	"doctype",
 	"confirm",
+	"url",
 	"module_url",
 	"error",
 )
@@ -49,6 +51,7 @@ def get_visible_plugins(user: str) -> dict:
 		if has_required_access(entry, user)
 		and (entry["place"] not in RECORDLESS_PLACES or passes_condition(entry))
 	]
+	entries = [entry for entry in map(resolve_url, entries) if entry]
 	return {
 		"apps": {app: registry["apps"][app] for app in dict.fromkeys(entry["app"] for entry in entries)},
 		"entries": [get_client_entry(entry) for entry in entries],
@@ -89,6 +92,23 @@ def passes_condition(entry: dict, *arguments) -> bool:
 	except Exception:
 		frappe.log_error(title=f"Commera plugin {entry['key']} condition failed")
 		return False
+
+
+def resolve_url(entry: dict) -> dict | None:
+	if not entry["url_method"]:
+		return entry
+	try:
+		url = cstr(frappe.get_attr(entry["url_method"])())
+	except Exception:
+		frappe.log_error(title=f"Commera plugin {entry['key']} url_method failed")
+		return None
+	if not URL_PATTERN.fullmatch(url):
+		frappe.log_error(
+			title=f"Commera plugin {entry['key']} url_method failed",
+			message=f"{entry['url_method']} returned {url!r}, not an http:// or https:// address.",
+		)
+		return None
+	return entry | {"url": url}
 
 
 def get_plugin_entries() -> dict:
@@ -179,6 +199,10 @@ def get_invalid_reason(entry: dict, taken: set) -> str | None:
 		return f"{entry['app']} already has an entry here."
 	if missing := [field for field in spec["required"] if entry[field] in (None, "")]:
 		return f"{', '.join(missing)} is required."
+	if spec.get("one_of") and sum(entry[field] not in (None, "") for field in spec["one_of"]) != 1:
+		return f"It needs exactly one of {' or '.join(spec['one_of'])}."
+	if entry["url"] and not URL_PATTERN.fullmatch(cstr(entry["url"])):
+		return "url must be an http:// or https:// address."
 	if entry["icon"] and entry["icon"] not in ICONS:
 		return f"Icon {entry['icon']} isn't in Commera's icon set."
 	if entry["requires"] and not frappe.db.exists("DocType", entry["requires"]):
@@ -225,6 +249,8 @@ def get_function_reason(entry: dict) -> str | None:
 	app = entry["app"]
 	if entry["condition"] and not get_app_function(app, entry["condition"]):
 		return f"condition {entry['condition']} must name a function inside {app}."
+	if entry["url_method"] and not get_app_function(app, entry["url_method"]):
+		return f"url_method {entry['url_method']} must name a function inside {app}."
 	if entry["method"] and not get_whitelisted_method(app, entry["method"]):
 		return f"method {entry['method']} must name a whitelisted function inside {app}."
 

@@ -181,9 +181,7 @@ class TestAddPlace(UnitTestCase):
 		return AppScaffold(APP, self.apps_path).add_place(kind, name)
 
 	def test_every_placement_folder_has_a_kind(self):
-		# Config places (sidebar actions) live in commera/plugin.config.ts, so `add` writes no folder for them.
-		folder_places = {place for place, spec in PLACES.items() if not spec.get("config")}
-		self.assertEqual({place for place, _starter in PLACE_KINDS.values()}, folder_places)
+		self.assertEqual({place for place, _starter in PLACE_KINDS.values()}, set(PLACES))
 
 	def test_each_kind_writes_its_placement_with_a_plugin_block(self):
 		for kind, (place, _starter) in PLACE_KINDS.items():

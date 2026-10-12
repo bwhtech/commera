@@ -7,11 +7,19 @@
 			"required": ["label"]
 		},
 		"sidebar": {
-			"module": "required",
-			"config": true,
+			"module": "none",
 			"doctype": null,
-			"fields": ["label", "icon", "requires", "condition", "order"],
-			"required": ["label"]
+			"fields": [
+				"label",
+				"icon",
+				"requires",
+				"condition",
+				"url",
+				"url_method",
+				"order"
+			],
+			"required": ["label"],
+			"one_of": ["url", "url_method"]
 		},
 		"order/cards": {
 			"module": "required",

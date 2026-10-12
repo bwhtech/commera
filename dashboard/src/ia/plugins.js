@@ -1,7 +1,7 @@
 import { h } from 'vue'
 import AppIcon from '../components/AppIcon.vue'
 import { bootValue } from '../data/boot'
-import { runSidebarAction } from '../plugin-api/sidebar'
+import { openSettings } from './settingsRoute'
 
 // commera/www/commera.py has already filtered these for the session user, so the client only places them.
 const plugins = bootValue('plugins', {}) ?? {}
@@ -77,27 +77,33 @@ export function firstPageRoute(app) {
 
 function navItem(entry) {
   return entry.place === 'sidebar'
-    ? { label: entry.label, icon: pluginIcon(entry), onClick: () => runSidebarAction(entry) }
+    ? {
+        label: entry.label,
+        icon: pluginIcon(entry, 'external-link'),
+        onClick: () => window.open(entry.url, '_blank', 'noopener'),
+      }
     : { label: entry.label, icon: pluginIcon(entry), to: pageRoute(entry) }
 }
 
-// One row per app: its only page or action, or a disclosure over its pages and then its actions,
-// shaped like the Analytics row.
+function settingsNavItem(app) {
+  return { label: 'Settings', icon: lucideIcon('settings'), onClick: () => openSettings(settingsTabValue(app)) }
+}
+
+// One row per app: its only page or link, or a disclosure over its pages, its links and then its Settings tab,
+// shaped like the Analytics row. An app with no rows gets no Settings row: it lives in Settings alone.
 export function pluginNavItems() {
   const rows = [...placeEntries('pages').filter((entry) => entry.sidebar !== false), ...placeEntries('sidebar')]
   const byApp = new Map()
   for (const entry of rows) byApp.set(entry.app, [...(byApp.get(entry.app) ?? []), entry])
+  const withSettings = new Set(placeEntries('settings').map((entry) => entry.app))
   return [...byApp.entries()]
-    .map(([app, appRows]) =>
-      appRows.length === 1
-        ? { ...navItem(appRows[0]), icon: appIcon(app) }
-        : {
-            label: appTitle(app),
-            icon: appIcon(app),
-            to: `/plugins/${app}`,
-            children: appRows.map(navItem),
-          },
-    )
+    .map(([app, appRows]) => {
+      const children = appRows.map(navItem)
+      if (withSettings.has(app)) children.push(settingsNavItem(app))
+      return children.length === 1
+        ? { ...children[0], icon: appIcon(app) }
+        : { label: appTitle(app), icon: appIcon(app), to: `/plugins/${app}`, children }
+    })
     .sort((left, right) => left.label.localeCompare(right.label))
 }
 
@@ -143,7 +149,7 @@ export function pluginCommands() {
 
 const PLACE_LABELS = {
   pages: 'Page',
-  sidebar: 'Sidebar action',
+  sidebar: 'Sidebar link',
   'order/cards': 'Order card',
   'product/cards': 'Product card',
   'customer/cards': 'Customer card',
