@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from bwh_payments.api import GatewayInfo, get_gateways
 
 from commera.api.admin.integrations import describe_integration, save_integration
 from commera.migrate import add_payment_mode
@@ -12,38 +13,6 @@ REQUIRED_GATEWAY_FIELDS = {"slug", "label", "settings_doctype"}
 PROFILE_SETTINGS_FIELDNAME = "gateway_settings"
 WEBHOOK_PATH = "/api/method/bwh_payments.bwh_payments.webhook.handle?gateway={profile}"
 
-# Order here is the order the cards render in.
-PAYMENT_GATEWAYS = (
-	{
-		"slug": "razorpay",
-		"label": "Razorpay",
-		"blurb": "Cards, UPI, netbanking and wallets. India.",
-		"settings_doctype": "Razorpay Gateway Settings",
-		"docs_url": "https://dashboard.razorpay.com/app/website-app-settings/webhooks",
-	},
-	{
-		"slug": "stripe",
-		"label": "Stripe",
-		"blurb": "Cards and wallets, worldwide.",
-		"settings_doctype": "Stripe Gateway Settings",
-		"docs_url": "https://dashboard.stripe.com/apikeys",
-	},
-	{
-		"slug": "telr",
-		"label": "Telr",
-		"blurb": "Cards and local methods across the GCC.",
-		"settings_doctype": "Telr Gateway Settings",
-		"docs_url": "https://telr.com/support/knowledge-base/hosted-payment-page-integration-guide/",
-	},
-	{
-		"slug": "tabby",
-		"label": "Tabby",
-		"blurb": "Buy now, pay later in four instalments. MENA.",
-		"settings_doctype": "Tabby Gateway Settings",
-		"docs_url": "https://docs.tabby.ai/",
-	},
-)
-
 
 def add_gateway_payment_mode(integration):
 	"""ERPNext refuses to post a Payment Entry for a gateway with no matching Mode of Payment."""
@@ -51,8 +20,8 @@ def add_gateway_payment_mode(integration):
 
 
 def get_payment_gateways():
-	"""Built-ins, then each provider app's `commera_payment_gateways` card; a card cannot replace a built-in."""
-	gateways = list(PAYMENT_GATEWAYS)
+	"""bwh_payments' gateways, then each provider app's `commera_payment_gateways` card; a card cannot replace one."""
+	gateways = [get_bwh_payments_card(gateway) for gateway in get_gateways()]
 	slugs = {gateway["slug"] for gateway in gateways}
 	for method in get_gateway_hooks():
 		gateway = get_hook_gateway(method)
@@ -110,6 +79,17 @@ def save_payment_integration(slug: str, enabled: int | str, values: dict | str |
 	return save_integration(
 		get_payment_integration(slug), enabled, frappe.parse_json(values) if values else {}
 	)
+
+
+def get_bwh_payments_card(gateway: GatewayInfo) -> dict:
+	return {
+		"slug": frappe.scrub(gateway.name),
+		"label": gateway.name,
+		"blurb": gateway.description,
+		"settings_doctype": gateway.settings_doctype,
+		"docs_url": gateway.docs_url,
+		"capabilities": gateway.capabilities,
+	}
 
 
 def get_gateway_hooks() -> list[str]:

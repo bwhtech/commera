@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 import frappe
+from bwh_payments.api import GatewayInfo, get_gateways
 from bwh_payments.bwh_payments.utils import get_available_payment_modes
 from frappe.tests import IntegrationTestCase
 from frappe.utils.password import get_decrypted_password
@@ -13,7 +14,6 @@ from commera.api.admin.integrations import (
 	get_link_options,
 )
 from commera.api.admin.payments import (
-	PAYMENT_GATEWAYS,
 	get_gateways_with_capability,
 	get_payment_gateways,
 	get_payment_integrations,
@@ -138,7 +138,7 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 		self.assertEqual(
 			[card["slug"] for card in cards], [gateway["slug"] for gateway in get_payment_gateways()]
 		)
-		self.assertEqual([card["slug"] for card in cards][:4], ["razorpay", "stripe", "telr", "tabby"])
+		self.assertTrue({"razorpay", "stripe", "telr", "tabby"} <= {card["slug"] for card in cards})
 		for card in cards:
 			self.assertTrue(card["available"], f"{card['slug']} settings doctype is missing")
 			self.assertTrue(card["webhook_url"].endswith(f"gateway={card['label']}"))
@@ -148,9 +148,35 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 				[field["fieldname"] for group in card["groups"] for field in group["fields"]],
 			)
 
+	def test_bwh_payments_gateways_need_no_registration_in_commera(self):
+		with (
+			patch("commera.api.admin.payments.get_gateways", return_value=[wallet_gateway_info()]),
+			patch("commera.api.admin.payments.get_gateway_hooks", return_value=[]),
+		):
+			gateways = get_payment_gateways()
+			reusable = get_gateways_with_capability("reusable_checkout")
+
+		self.assertEqual(
+			gateways,
+			[
+				{
+					"slug": "test_wallet",
+					"label": "Test Wallet",
+					"blurb": "A wallet bwh_payments describes.",
+					"settings_doctype": "Test Wallet Settings",
+					"docs_url": "https://wallet.test/docs",
+					"capabilities": ["reusable_checkout"],
+				}
+			],
+		)
+		self.assertEqual(reusable, ["Test Wallet"])
+
 	def test_a_provider_app_registers_its_gateway_through_the_hook(self):
-		with patch(
-			"commera.api.admin.payments.get_gateway_hooks", return_value=[f"{__name__}.wallet_gateway"]
+		with (
+			patch("commera.api.admin.payments.get_gateways", return_value=[]),
+			patch(
+				"commera.api.admin.payments.get_gateway_hooks", return_value=[f"{__name__}.wallet_gateway"]
+			),
 		):
 			gateways = get_payment_gateways()
 			reusable = get_gateways_with_capability("reusable_checkout")
@@ -160,6 +186,7 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 
 	def test_a_card_from_an_app_built_for_another_commera_api_is_skipped(self):
 		with (
+			patch("commera.api.admin.payments.get_gateways", return_value=[]),
 			patch("commera.api.admin.payments.frappe.get_hooks", return_value=[f"{__name__}.wallet_gateway"]),
 			patch("commera.api.admin.payments.is_supported_app", return_value=False),
 		):
@@ -176,7 +203,7 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 			gateways = get_payment_gateways()
 
 		self.assertEqual(gateways[-1]["slug"], "test-wallet")
-		self.assertEqual(len(gateways), len(PAYMENT_GATEWAYS) + 1)
+		self.assertEqual(len(gateways), len(get_gateways()) + 1)
 		self.assertEqual(log_error.call_count, 2)
 
 	def test_a_hook_cannot_replace_a_built_in_gateway(self):
@@ -236,6 +263,16 @@ def wallet_gateway():
 		"docs_url": "https://wallet.test/docs",
 		"capabilities": ["reusable_checkout"],
 	}
+
+
+def wallet_gateway_info():
+	return GatewayInfo(
+		name="Test Wallet",
+		settings_doctype="Test Wallet Settings",
+		description="A wallet bwh_payments describes.",
+		docs_url="https://wallet.test/docs",
+		capabilities=["reusable_checkout"],
+	)
 
 
 def stripe_impostor():
