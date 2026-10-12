@@ -1,11 +1,8 @@
 from contextlib import contextmanager
 
 import frappe
-from bwh_payments.bwh_payments.utils import (
-	get_available_payment_modes,
-	get_payment_modes_for_currency,
-	resolve_payment_mode,
-)
+from bwh_payments.api import get_gateway_options
+from bwh_payments.bwh_payments.utils import get_available_payment_modes, resolve_payment_mode
 from bwh_payments.currency import to_minor_units
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
@@ -60,6 +57,10 @@ except ImportError:
 COD_PAYMENT_MODE = "COD"
 # A gateway capability: its checkout link stays payable after the shopper closes the tab.
 REUSABLE_CHECKOUT = "reusable_checkout"
+
+
+def get_payment_modes_for_currency(currency: str) -> list[str]:
+	return [option.name for option in get_gateway_options(currency)]
 
 
 def is_cod(payment_mode: str | None) -> bool:
