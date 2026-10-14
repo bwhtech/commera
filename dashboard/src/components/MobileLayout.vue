@@ -87,7 +87,7 @@ function closeMore(item) {
           <!-- An item without `to` is an action row (Search): it opens an
                overlay rather than routing, so it never takes active state. -->
           <button v-else type="button" :class="rowClass" @click="closeMore(item)">
-            <span :class="item.icon" class="size-5 text-ink-gray-7" aria-hidden="true" />
+            <Icon :name="item.icon" class="size-5 text-ink-gray-7" />
             {{ item.label }}
           </button>
         </template>

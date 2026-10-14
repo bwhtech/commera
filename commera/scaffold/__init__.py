@@ -92,7 +92,9 @@ class AppScaffold:
 		self.write_change(path, text + "".join(f"{line}\n" for line in missing), bool(missing))
 
 	def add_places(self):
-		for place in PLACES:
+		for place, spec in PLACES.items():
+			if spec.get("config"):
+				continue
 			if (self.source_dir / place).exists():
 				self.changes.append(("skipped", f"commera/{place}/"))
 			elif place == "pages":

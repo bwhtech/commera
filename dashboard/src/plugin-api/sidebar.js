@@ -1,6 +1,5 @@
 import { toast } from 'frappe-ui'
-import { appLocation, settingsTabValue } from '../ia/plugins'
-import { openSettings } from '../ia/settingsRoute'
+import { appLocation, openPluginSettings } from '../ia/plugins'
 
 // A sidebar action is an item in the plugin's commera/plugin.config.ts. The build ships that file as one module;
 // a click imports it, finds the item by name and calls its run() with what a row can do.
@@ -13,7 +12,7 @@ export async function runSidebarAction(entry) {
     const action = config?.[place]?.find((item) => item.name === name)
     if (!action) throw new Error(`${name} is not in ${app}'s plugin.config`)
     await action.run({
-      openSettings: (tab) => openSettings(tab ?? settingsTabValue(app)),
+      openSettings: (tab) => openPluginSettings(app, tab),
       // Imported on use: router.js imports ia/plugins, which imports this file.
       navigate: async (to) => (await import('../router')).router.push(appLocation(app, to)),
       openUrl: (target) => window.open(target, '_blank', 'noopener'),

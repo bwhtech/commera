@@ -79,8 +79,10 @@ class TestScaffold(UnitTestCase):
 		self.assertIn("sparkles", ICONS)
 		self.assertIn(f"useMethodRead('{APP}.api.get_summary')", page.read_text())
 		self.assertIn(f"{APP}/api.py", created)
-		for place in PLACES:
-			if place != "pages":
+		for place, spec in PLACES.items():
+			if spec.get("config"):
+				self.assertFalse((app_root / "commera" / place).exists(), place)
+			elif place != "pages":
 				self.assertTrue((app_root / "commera" / place / ".gitkeep").is_file(), place)
 		self.assertIn(f"bench build --app {APP}", (app_root / "commera" / "README.md").read_text())
 		self.assertIn("commera/vite.config.js", created)

@@ -152,8 +152,9 @@ export default definePlugin({
 The build reads `name` (1 to 40 lowercase letters, digits and hyphens, the entry's stable key), `label` (required),
 `icon`, `order`, `requires` and `condition` into the manifest, with the same checks as a folder entry, and ships
 the file as one module, `plugin.config.js`. `run` gets a context with `openSettings(tab)`, `navigate(to)`,
-`openUrl(url)` and `toast`. The file may import only `definePlugin` from `@commera/plugin-kit`; put work that takes
-time in a whitelisted method and reach it from a page.
+`openUrl(url)` and `toast`. The build runs the file in Node to read those fields, so keep it to plain data:
+it and the files it imports may import only `definePlugin` from `@commera/plugin-kit`, and its top-level code
+runs at build time. Put work that takes time in a whitelisted method and reach it from a page.
 
 ## The dashboard draws the frame
 
@@ -165,7 +166,7 @@ dashboard. Import these from `@commera/admin`:
 | a page | `usePage()` | `setTitle(text)`, `setBreadcrumbs([{ label, to }])`, `setActions([{ label, icon, variant, onClick, loading, disabled }])`. Each takes a value, a ref or a getter. The first action is the main one; past two, the rest fold into a More menu. |
 | a card | `useCard()` | `hide()`, `show()`, `setHidden(bool)`. The frame only appears after the card's first render, so hiding during setup never shows an empty card. |
 | an action | `useAction()` | `setPrimary({ label, disabled, loading })`, `onSubmit(async () => …)`, `close(result)`. Resolve to close; resolve `{ reload: true }` to reload the record; throw to keep the dialog open with the error under the form. |
-| all | `usePlugin()` | `plugin`, `path`, `query`, `record` (`{ doctype, name }` on cards and actions), `reload()`, `navigate(to)`, `openSettings(tab)`, `toast`, `__`. `openSettings()` opens the plugin's own Settings tab; `openSettings('payments')` opens a Commera tab. |
+| all | `usePlugin()` | `plugin`, `path`, `query`, `record` (`{ doctype, name }` on cards and actions), `reload()`, `navigate(to)`, `openSettings(tab)`, `toast`, `__`. `openSettings()` opens the plugin's own Settings tab (General if it has none); `openSettings('payments')` opens a Commera tab. |
 
 `navigate(to)` and a breadcrumb's `to` resolve like a link against `/commera/plugins/<app>/`: `'jobs/JOB-1'`,
 `'../'` and `'/orders/SO-1'` all work the same from a page, a card or an action.

@@ -2,6 +2,7 @@ import { h } from 'vue'
 import AppIcon from '../components/AppIcon.vue'
 import { bootValue } from '../data/boot'
 import { runSidebarAction } from '../plugin-api/sidebar'
+import { openSettings } from './settingsRoute'
 
 // commera/www/commera.py has already filtered these for the session user, so the client only places them.
 const plugins = bootValue('plugins', {}) ?? {}
@@ -103,6 +104,11 @@ export function pluginNavItems() {
 
 export function settingsTabValue(app) {
   return `plugin-${app}`
+}
+
+// No tab opens the plugin's own Settings tab; a Commera tab name such as 'payments' opens that one.
+export function openPluginSettings(app, tab) {
+  openSettings(tab ?? settingsTabValue(app))
 }
 
 export function pluginSettingsTabs() {

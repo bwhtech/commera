@@ -11,7 +11,7 @@ const props = defineProps({
 // route lands inside it, and stays wherever you last put it otherwise.
 const opened = ref({})
 
-const holdsRoute = (item) => item.children.some((child) => child.to === props.activeTarget)
+const holdsRoute = (item) => item.children.some((child) => child.to && child.to === props.activeTarget)
 const isOpen = (item) => opened.value[item.to] ?? holdsRoute(item)
 const toggle = (item) => (opened.value[item.to] = !isOpen(item))
 </script>
