@@ -5,6 +5,7 @@ import frappe
 from bwh_payments.api import GatewayInfo, get_gateways
 
 from commera.api.admin.integrations import describe_integration, save_integration
+from commera.api.payments import REUSABLE_CHECKOUT
 from commera.migrate import add_payment_mode
 from commera.plugin_events import get_handler_app, is_supported_app
 
@@ -88,7 +89,7 @@ def get_bwh_payments_card(gateway: GatewayInfo) -> dict:
 		"blurb": gateway.description,
 		"settings_doctype": gateway.settings_doctype,
 		"docs_url": gateway.docs_url,
-		"capabilities": gateway.capabilities,
+		"capabilities": [REUSABLE_CHECKOUT] if gateway.reusable_checkout else [],
 	}
 
 

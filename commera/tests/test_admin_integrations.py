@@ -271,7 +271,7 @@ def wallet_gateway_info():
 		settings_doctype="Test Wallet Settings",
 		description="A wallet bwh_payments describes.",
 		docs_url="https://wallet.test/docs",
-		capabilities=["reusable_checkout"],
+		reusable_checkout=True,
 	)
 
 
