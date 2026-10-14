@@ -113,7 +113,6 @@ class TestAdminDeliveryOptions(IntegrationTestCase):
 				"markup_percent",
 				"handling_fee",
 				"backup_charge",
-				"shipping_rule",
 			},
 		)
 
@@ -133,7 +132,7 @@ class TestAdminDeliveryOptions(IntegrationTestCase):
 		)
 		self.assertEqual(provider_field["fieldtype"], "Link")
 		self.assertEqual(provider_field["options"], "Shipping Provider Profile")
-		self.assertTrue(provider_field["required"])
+		self.assertFalse(provider_field["required"])
 
 	def test_create_writes_a_shipping_service(self):
 		screen = self.create_option("_Test Create Express", description="1-2 days", markup_percent=5)
