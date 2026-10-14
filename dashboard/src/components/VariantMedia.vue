@@ -31,8 +31,11 @@ async function addFiles(files) {
   }
   if (!uploaded.length) return
 
-  await addAction.submit({ style_attribute_variant: props.variant.name, file_urls: uploaded })
-  if (addAction.error) return
+  try {
+    await addAction.submit({ style_attribute_variant: props.variant.name, file_urls: uploaded })
+  } catch {
+    return
+  }
   toast.success(`${uploaded.length} photo${uploaded.length > 1 ? 's' : ''} added to ${props.variant.option}`)
   emit('saved')
 }
@@ -48,8 +51,11 @@ function onDrop(event) {
 }
 
 async function remove(fileUrl) {
-  await removeAction.submit({ style_attribute_variant: props.variant.name, file_url: fileUrl })
-  if (removeAction.error) return
+  try {
+    await removeAction.submit({ style_attribute_variant: props.variant.name, file_url: fileUrl })
+  } catch {
+    return
+  }
   emit('saved')
 }
 </script>

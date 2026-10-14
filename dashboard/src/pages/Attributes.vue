@@ -20,11 +20,14 @@ function addAttribute() {
       { name: 'values', label: 'Values', description: 'Comma separated' },
     ],
     onConfirm: async ({ values }) => {
-      await createAction.submit({ name: values.name, values: values.values })
-      // A failure already toasted inside useAdminAction — this is also where the abbreviation
-      // guard would fire if it ever could here (see catalog.check_abbreviations_are_distinct);
-      // it can't in practice, because create_attribute auto-generates every abbreviation fresh.
-      if (createAction.error) return
+      try {
+        await createAction.submit({ name: values.name, values: values.values })
+      } catch {
+        // A failure already toasted inside useAdminAction — this is also where the abbreviation
+        // guard would fire if it ever could here (see catalog.check_abbreviations_are_distinct);
+        // it can't in practice, because create_attribute auto-generates every abbreviation fresh.
+        return
+      }
       toast.success(`"${values.name}" created`)
       attributesRequest.reload()
     },

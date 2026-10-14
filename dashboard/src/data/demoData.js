@@ -15,9 +15,12 @@ export function confirmInstallDemoData() {
     onConfirm: async () => {
       // The palette can reopen this dialog while a run is still queuing; one seed job at a time.
       if (installDemoDataAction.loading) return
-      await installDemoDataAction.submit()
-      // useAdminAction has already toasted a refusal; a second toast here would stack on it.
-      if (installDemoDataAction.error) return
+      try {
+        await installDemoDataAction.submit()
+      } catch {
+        // useAdminAction has already toasted a refusal; a second toast here would stack on it.
+        return
+      }
       toast.success('Demo data queued', {
         description: 'It runs in the background and takes a few minutes.',
       })

@@ -32,10 +32,10 @@ export function useDeliveryRetry(onRetried) {
     try {
       for (const delivery of deliveries) {
         await retryAction.submit({ delivery })
-        if (retryAction.error) return
       }
       toast.success(`Sending to ${app} again`)
       onRetried()
+    } catch {
     } finally {
       retrying.value = null
     }

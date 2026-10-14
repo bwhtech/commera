@@ -64,8 +64,11 @@ const saveAction = useAdminAction('catalog.save_product_options')
 async function save() {
   if (!canSave.value) return
 
-  await saveAction.submit({ item_template: props.product.id, add: addedPairs.value, remove: removedPairs.value })
-  if (saveAction.error) return
+  try {
+    await saveAction.submit({ item_template: props.product.id, add: addedPairs.value, remove: removedPairs.value })
+  } catch {
+    return
+  }
 
   const { created, disabled, restored } = saveAction.data
   const parts = [

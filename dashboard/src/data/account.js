@@ -21,6 +21,7 @@ export function useAccountMenu() {
     // them to a login page they can retry from.
     try {
       await logoutAction.submit()
+    } catch {
     } finally {
       window.location.replace('/login')
     }

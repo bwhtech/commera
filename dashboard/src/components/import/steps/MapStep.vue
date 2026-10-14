@@ -15,14 +15,20 @@ const confidenceTheme = { high: 'green', medium: 'orange', low: 'gray', none: 'g
 const confidenceLabel = { high: 'Sure', medium: 'Likely', low: 'Guess', none: 'No match' }
 
 async function recheck() {
-  await validateImportAction.submit({ file_url: imp.fileUrl, column_mapping: { ...imp.mapping } })
-  if (validateImportAction.error) return
+  try {
+    await validateImportAction.submit({ file_url: imp.fileUrl, column_mapping: { ...imp.mapping } })
+  } catch {
+    return
+  }
   applyValidation(validateImportAction.data)
 }
 
 async function resetToSuggested() {
-  await validateImportAction.submit({ file_url: imp.fileUrl })
-  if (validateImportAction.error) return
+  try {
+    await validateImportAction.submit({ file_url: imp.fileUrl })
+  } catch {
+    return
+  }
   applyValidation(validateImportAction.data)
 }
 </script>

@@ -100,9 +100,12 @@ async function markFulfilled() {
   if (!names.length) return
 
   for (const name of names) {
-    await fulfilAction.submit({ sales_order: name })
-    // A failure already toasted inside useAdminAction — stop rather than fulfil the rest silently.
-    if (fulfilAction.error) return
+    try {
+      await fulfilAction.submit({ sales_order: name })
+    } catch {
+      // A failure already toasted inside useAdminAction — stop rather than fulfil the rest silently.
+      return
+    }
   }
 
   toast.success(`${names.length} order(s) marked fulfilled`)

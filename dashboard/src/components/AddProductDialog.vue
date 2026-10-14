@@ -69,8 +69,11 @@ function addCollection() {
     title: 'New collection',
     fields: [{ name: 'title', label: 'Name', required: true }],
     onConfirm: async ({ values }) => {
-      await createCollectionAction.submit({ title: values.title })
-      if (createCollectionAction.error) return
+      try {
+        await createCollectionAction.submit({ title: values.title })
+      } catch {
+        return
+      }
       await collectionsRequest.reload()
       collection.value = values.title
       toast.success(`"${values.title}" created`)
@@ -97,8 +100,11 @@ function addAttribute() {
       { name: 'values', label: 'Values', placeholder: 'Paperback, Hardcover' },
     ],
     onConfirm: async ({ values }) => {
-      await createAttributeAction.submit({ name: values.title, values: values.values || undefined })
-      if (createAttributeAction.error) return
+      try {
+        await createAttributeAction.submit({ name: values.title, values: values.values || undefined })
+      } catch {
+        return
+      }
       await attributesRequest.reload()
       optionAttribute.value = values.title
       toast.success(`"${values.title}" created`)
@@ -167,18 +173,21 @@ const submitHint = computed(() => {
 async function submit() {
   if (!canSubmit.value) return
 
-  await createAction.submit({
-    title: title.value.trim(),
-    collection: collection.value,
-    option_attribute: colors.value.length ? optionAttribute.value : undefined,
-    size_attribute: 'Size',
-    option_sizes: optionSizes.value,
-    price: compareAt.value || undefined,
-    sale_price: price.value || undefined,
-  })
-  // A failure (missing collection, colliding abbreviation, wrong size attribute…) already
-  // toasted inside useAdminAction — the form stays open so the owner can fix it and resubmit.
-  if (createAction.error) return
+  try {
+    await createAction.submit({
+      title: title.value.trim(),
+      collection: collection.value,
+      option_attribute: colors.value.length ? optionAttribute.value : undefined,
+      size_attribute: 'Size',
+      option_sizes: optionSizes.value,
+      price: compareAt.value || undefined,
+      sale_price: price.value || undefined,
+    })
+  } catch {
+    // A failure (missing collection, colliding abbreviation, wrong size attribute…) already
+    // toasted inside useAdminAction — the form stays open so the owner can fix it and resubmit.
+    return
+  }
 
   const created = createAction.data
   toast.success(`"${title.value}" created`)

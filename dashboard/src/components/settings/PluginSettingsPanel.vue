@@ -23,9 +23,6 @@ const save = useAdminAction('plugins.save_plugin_setting')
 
 const { values, adopt, set, commit } = useSettingsAutosave({
   submit: (fields) => save.submit({ app: props.entry.app, ...fields }),
-  get error() {
-    return save.error
-  },
 })
 
 watch(

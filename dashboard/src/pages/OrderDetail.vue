@@ -91,8 +91,11 @@ const moreActions = computed(() => [{ group: 'Order', options: orderActions }, a
 const fulfilAction = useAdminAction('orders.fulfil_order')
 
 async function fulfil() {
-  await fulfilAction.submit({ sales_order: order.value.name })
-  if (fulfilAction.error) return
+  try {
+    await fulfilAction.submit({ sales_order: order.value.name })
+  } catch {
+    return
+  }
   toast.success('Fulfilment created')
   orderRequest.reload()
 }

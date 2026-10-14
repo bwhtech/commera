@@ -24,12 +24,10 @@ export function createAdminCaller(modulePath) {
     const request = requestFor(method)
     pending.value += 1
     try {
-      // `submit` resolves null on a failed request instead of rejecting, so the
-      // refusal is read off the call. useAdminAction has already toasted it.
-      const data = await request.submit(params)
-      const error = request.error ?? null
-      if (error) return { data: null, error }
-      return { data, error: null }
+      return { data: await request.submit(params), error: null }
+    } catch (error) {
+      // useAdminAction has already toasted it.
+      return { data: null, error }
     } finally {
       pending.value -= 1
     }

@@ -63,10 +63,13 @@ function adjust() {
       const qty = Math.max(0, Number(values.value) || 0)
       if (!qty) return
 
-      await receiveAction.submit({
-        received_quantities: Object.fromEntries(item_codes.map((code) => [code, qty])),
-      })
-      if (receiveAction.error) return
+      try {
+        await receiveAction.submit({
+          received_quantities: Object.fromEntries(item_codes.map((code) => [code, qty])),
+        })
+      } catch {
+        return
+      }
 
       endSelecting()
       toast.success(`Adjustment recorded for ${item_codes.length} lines`)

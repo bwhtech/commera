@@ -19,8 +19,9 @@ async function pick(event) {
     const uploaded = await upload(file, { private: true })
     imp.fileUrl = uploaded.file_url
 
-    await validateImportAction.submit({ file_url: imp.fileUrl })
-    if (validateImportAction.error) {
+    try {
+      await validateImportAction.submit({ file_url: imp.fileUrl })
+    } catch {
       imp.file = null
       imp.fileUrl = null
       return

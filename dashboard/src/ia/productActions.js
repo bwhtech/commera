@@ -133,10 +133,13 @@ export function buildProductActions(product, router, handlers = {}) {
                 const quantity = Math.max(0, Number(values.value) || 0)
                 if (!quantity) return
 
-                await receiveStockAction.submit({
-                  received_quantities: Object.fromEntries(itemCodes.map((code) => [code, quantity])),
-                })
-                if (receiveStockAction.error) return
+                try {
+                  await receiveStockAction.submit({
+                    received_quantities: Object.fromEntries(itemCodes.map((code) => [code, quantity])),
+                  })
+                } catch {
+                  return
+                }
 
                 toast.success(`Received ${quantity} on ${itemCodes.length} sizes`)
                 handlers.onReload?.()
@@ -165,8 +168,11 @@ export function buildProductActions(product, router, handlers = {}) {
                 // set_restock_level stores cint(level), which truncates: 2.7 is kept as 2.
                 // Truncating here too keeps the toast honest about what was stored.
                 const level = Math.max(0, Math.trunc(Number(values.value) || 0))
-                await restockLevelAction.submit({ item_template: product.id, level })
-                if (restockLevelAction.error) return
+                try {
+                  await restockLevelAction.submit({ item_template: product.id, level })
+                } catch {
+                  return
+                }
 
                 toast.success(`Low stock now reads at ${level} or below`)
                 handlers.onReload?.()
@@ -228,8 +234,11 @@ export function buildProductActions(product, router, handlers = {}) {
               theme: 'red',
               confirmLabel: 'Delete',
               onConfirm: async () => {
-                await deleteAction.submit({ item_template: product.id })
-                if (deleteAction.error) return
+                try {
+                  await deleteAction.submit({ item_template: product.id })
+                } catch {
+                  return
+                }
                 toast.success(`${product.title} deleted`)
                 router.push('/products')
               },

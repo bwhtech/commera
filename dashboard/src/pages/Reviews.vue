@@ -60,10 +60,11 @@ const publishAction = useAdminAction('reviews.set_published', { quiet: true })
 async function togglePublished(row) {
   const nextValue = !row.is_published
   row.is_published = nextValue
-  await publishAction.submit({ name: row.name, published: nextValue })
-  if (publishAction.error) {
+  try {
+    await publishAction.submit({ name: row.name, published: nextValue })
+  } catch (error) {
     row.is_published = !nextValue
-    toast.error(errorMessage(publishAction.error))
+    toast.error(errorMessage(error))
   }
 }
 </script>

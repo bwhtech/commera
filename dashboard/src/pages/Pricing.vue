@@ -48,8 +48,11 @@ const priceAction = useAdminAction('catalog.set_variant_price')
 // The same variant-wide bulk write (catalog.set_variant_price) the product page's own variant
 // matrix uses, applying one rate to every size under the variant.
 async function setPrice(row, rate) {
-  await priceAction.submit({ style_attribute_variant: row.name, ...pricePayload(row, rate) })
-  if (priceAction.error) return
+  try {
+    await priceAction.submit({ style_attribute_variant: row.name, ...pricePayload(row, rate) })
+  } catch {
+    return
+  }
   toast.success(`Price updated for ${row.title} (${row.size_count} sizes)`)
   pricingRequest.reload()
 }
@@ -67,9 +70,12 @@ function bulkRaisePrice() {
       const pct = Number(values.value) || 0
       for (const row of selected) {
         const rate = Math.round(row.price * (1 + pct / 100) * 100) / 100
-        await priceAction.submit({ style_attribute_variant: row.name, ...pricePayload(row, rate) })
-        // A failure already toasted inside useAdminAction — stop rather than reprice the rest silently.
-        if (priceAction.error) return
+        try {
+          await priceAction.submit({ style_attribute_variant: row.name, ...pricePayload(row, rate) })
+        } catch {
+          // A failure already toasted inside useAdminAction — stop rather than reprice the rest silently.
+          return
+        }
       }
       endSelecting()
       toast.success(`Price raised on ${selected.length} ${selected.length === 1 ? 'item' : 'items'}`)
@@ -90,8 +96,11 @@ function bulkSetCompareAt() {
     onConfirm: async ({ values }) => {
       const rate = Math.max(0, Number(values.value) || 0)
       for (const row of selected) {
-        await priceAction.submit({ style_attribute_variant: row.name, default_rate: rate })
-        if (priceAction.error) return
+        try {
+          await priceAction.submit({ style_attribute_variant: row.name, default_rate: rate })
+        } catch {
+          return
+        }
       }
       endSelecting()
       toast.success(`Compare-at set on ${selected.length} ${selected.length === 1 ? 'item' : 'items'}`)

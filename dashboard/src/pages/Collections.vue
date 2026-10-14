@@ -32,9 +32,12 @@ function addCollection() {
     message: 'A collection groups products the storefront can filter and browse by.',
     fields: [{ name: 'title', label: 'Title', required: true }],
     onConfirm: async ({ values }) => {
-      await createAction.submit({ title: values.title })
-      // A failure already toasted inside useAdminAction.
-      if (createAction.error) return
+      try {
+        await createAction.submit({ title: values.title })
+      } catch {
+        // A failure already toasted inside useAdminAction.
+        return
+      }
       toast.success(`"${values.title}" created`)
       collectionsRequest.reload()
     },

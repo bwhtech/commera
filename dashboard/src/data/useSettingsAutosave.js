@@ -63,11 +63,12 @@ export function useSettingsAutosave(save, { params = {} } = {}) {
     values.value[fieldname] = value
 
     return enqueue(async () => {
-      const saved = await save.submit({ ...params, [fieldname]: value })
-      // The refusal is read off the shared action, which only answers for this commit because
-      // nothing else is in flight. Only the refused box rolls back: replacing the whole map
-      // would wipe what the owner is typing into another field.
-      if (save.error) {
+      let saved
+      try {
+        saved = await save.submit({ ...params, [fieldname]: value })
+      } catch {
+        // Only the refused box rolls back: replacing the whole map would wipe what the owner is
+        // typing into another field.
         values.value[fieldname] = stored.value[fieldname]
         return
       }

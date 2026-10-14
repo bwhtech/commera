@@ -63,8 +63,11 @@ async function save() {
         : pricePayload(size, draft.price)),
     }
   })
-  await priceAction.submit({ style_attribute_variant: variant.value.name, size_prices })
-  if (priceAction.error) return
+  try {
+    await priceAction.submit({ style_attribute_variant: variant.value.name, size_prices })
+  } catch {
+    return
+  }
 
   const received_quantities = Object.fromEntries(
     Object.entries(sizeDrafts)
@@ -72,8 +75,11 @@ async function save() {
       .map(([item_code, draft]) => [item_code, Number(draft.receiveQty)]),
   )
   if (Object.keys(received_quantities).length) {
-    await stockAction.submit({ style_attribute_variant: variant.value.name, received_quantities })
-    if (stockAction.error) return
+    try {
+      await stockAction.submit({ style_attribute_variant: variant.value.name, received_quantities })
+    } catch {
+      return
+    }
   }
 
   toast.success('Variant saved')
@@ -81,8 +87,11 @@ async function save() {
 }
 
 async function togglePublish() {
-  await publishAction.submit({ style_attribute_variant: variant.value.name, publish: !variant.value.is_published })
-  if (publishAction.error) return
+  try {
+    await publishAction.submit({ style_attribute_variant: variant.value.name, publish: !variant.value.is_published })
+  } catch {
+    return
+  }
   productRequest.reload()
 }
 
