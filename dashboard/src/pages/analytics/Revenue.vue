@@ -91,7 +91,7 @@ const noRevenueState = {
       <h2 class="text-lg-semibold text-ink-gray-8">Revenue over time</h2>
       <EmptyState v-if="!hasValues(months, 'revenue')" compact v-bind="noRevenueState" />
       <div v-else class="h-72">
-        <AreaChart :data="months" x="label" :y="['revenue']" />
+        <AreaChart :data="months" x="label" :y="['revenue']" palette="categorical" />
       </div>
     </section>
 
