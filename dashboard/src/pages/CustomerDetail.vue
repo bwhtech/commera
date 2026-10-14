@@ -142,7 +142,7 @@ function plural(count, word) {
         <Dropdown v-if="actionGroup" :options="[actionGroup]">
           <Button icon="lucide-ellipsis" label="More actions" />
         </Dropdown>
-        <Button label="View in ERP" icon-right="lucide-external-link" :link="erpnextLink('Customer', customer.id)" />
+        <Button label="View in ERP" icon-right="lucide-external-link" :href="erpnextLink('Customer', customer.id)" />
       </template>
     </AppPageHeader>
 

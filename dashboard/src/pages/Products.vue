@@ -211,7 +211,7 @@ function moveToCollection() {
       <ListSkeleton v-if="productsRequest.loading && !rows.length" :columns="6" />
 
       <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
-        <ListRow :to="productRoute(item.name)" :value="item.name">
+        <ListRow :route="productRoute(item.name)" :value="item.name">
           <ListCell>
             <div class="flex min-w-0 items-center gap-2.5">
               <Thumb :image="item.image" />

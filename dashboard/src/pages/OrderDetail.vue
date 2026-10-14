@@ -133,7 +133,7 @@ const loadFailure = computed(() =>
       <template #actions>
         <!-- Three full label+icon buttons do not fit a phone header, so this one
              drops out below `sm` and the More menu's own entry carries it. -->
-        <Button class="hidden sm:inline-flex" label="View in ERP" icon-right="lucide-external-link" :link="erpLink" />
+        <Button class="hidden sm:inline-flex" label="View in ERP" icon-right="lucide-external-link" :href="erpLink" />
         <Dropdown :options="moreActions">
           <Button icon="lucide-ellipsis" label="More actions" />
         </Dropdown>

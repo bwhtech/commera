@@ -190,7 +190,7 @@ async function useCurrentLocation() {
 
       <div class="flex flex-col gap-2">
         <div class="flex items-center justify-between gap-2">
-          <FormLabel label="Location on the map" size="md" />
+          <FormLabel label="Location on the map" />
           <Button
             v-if="canUseDevice"
             label="Use my current location"

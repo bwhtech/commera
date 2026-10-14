@@ -198,7 +198,7 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
                store with no orders. Keep the two heights in step if either changes. -->
           <ListSkeleton v-if="overviewRequest.loading && !recentOrders.length" :columns="6" :rows="4" />
           <ListRows v-else :items="recentOrders" row-key="name" v-slot="{ item }">
-            <ListRow :to="orderRoute(item.name)" :value="item.name">
+            <ListRow :route="orderRoute(item.name)" :value="item.name">
               <ListCell>
                 <span class="truncate text-base text-ink-gray-5 tabular-nums">{{ item.name }}</span>
               </ListCell>
