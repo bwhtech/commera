@@ -94,7 +94,7 @@ const noCoverState = {
         description="Stock value appears once inventory is received or sold."
       />
       <div v-else class="h-72">
-        <LineChart :data="stockValueByMonth" x="label" :y="['value']" />
+        <LineChart :data="stockValueByMonth" x="label" :y="['value']" palette="categorical" />
       </div>
     </section>
 

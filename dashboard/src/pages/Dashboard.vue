@@ -162,7 +162,7 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
         compact
       />
       <div v-else class="h-72">
-        <LineChart :data="revenueByMonth" x="label" :y="['revenue']" />
+        <LineChart :data="revenueByMonth" x="label" :y="['revenue']" palette="categorical" />
       </div>
     </section>
 
