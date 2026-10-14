@@ -571,9 +571,10 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		)
 		self.assertIn("bwh_shipping doesn't declare commera_api_version", output.getvalue())
 		self.assertTrue(
-			frappe.db.exists(
+			frappe.get_all(
 				"Error Log",
 				{"method": "bwh_payments does not support this Commera", "creation": [">=", started_at]},
+				limit=1,
 			)
 		)
 
@@ -635,9 +636,10 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		self.assertIn("bwh_shipping declares commera_hooks for cart_fee, which", output.getvalue())
 		self.assertNotIn("bwh_payments declares commera_hooks", output.getvalue())
 		self.assertTrue(
-			frappe.db.exists(
+			frappe.get_all(
 				"Error Log",
 				{"method": "bwh_payments declares unknown commera_events", "creation": [">=", started_at]},
+				limit=1,
 			)
 		)
 

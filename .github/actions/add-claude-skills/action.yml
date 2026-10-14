@@ -1,0 +1,19 @@
+name: Add Claude skills
+description: Install the bwhtech/skills agents and skills into ~/.claude for Claude Code
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v7
+      with:
+        repository: bwhtech/skills
+        ref: main
+        path: .bwhtech-skills
+        persist-credentials: false
+
+    - shell: bash
+      run: |
+        mkdir -p ~/.claude/agents ~/.claude/skills
+        cp .bwhtech-skills/agents/*.md ~/.claude/agents/
+        cp -r .bwhtech-skills/skills/* ~/.claude/skills/
+        rm -rf .bwhtech-skills

@@ -155,7 +155,7 @@ def app_settings(**fields) -> dict:
 
 
 def error_logged(title: str, since) -> bool:
-	return bool(frappe.db.exists("Error Log", {"method": title, "creation": [">=", since]}))
+	return bool(frappe.get_all("Error Log", {"method": title, "creation": [">=", since]}, limit=1))
 
 
 class PluginTestCase(IntegrationTestCase):

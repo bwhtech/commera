@@ -3,7 +3,7 @@
 import frappe
 from frappe.deferred_insert import save_to_db
 from frappe.tests import IntegrationTestCase
-from frappe.utils import get_html_for_route, set_request
+from frappe.utils import get_html_for_route, now_datetime, set_request
 
 from commera import storefront_plugins
 from commera.api.admin.plugins import set_storefront_enabled
@@ -19,7 +19,7 @@ class TestStorefrontPlugins(IntegrationTestCase):
 		self.previous_request = getattr(frappe.local, "request", None)
 		frappe.db.delete("Commera Storefront App")
 		save_to_db()
-		frappe.db.delete("Error Log")
+		self.started_at = now_datetime()
 		frappe.clear_document_cache("Commera Settings", "Commera Settings")
 		storefront_plugins.clear_storefront_plugin_cache()
 
@@ -40,7 +40,7 @@ class TestStorefrontPlugins(IntegrationTestCase):
 
 	def get_error_titles(self):
 		save_to_db()
-		return frappe.get_all("Error Log", pluck="method")
+		return frappe.get_all("Error Log", {"creation": [">=", self.started_at]}, pluck="method")
 
 	def declare_full_plugin(self):
 		self.declare_hooks(

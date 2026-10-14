@@ -658,7 +658,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		)
 		self.assertEqual(len(self.submitted_sales_orders(healthy_quotation.name)), 1)
 		self.assertTrue(
-			frappe.db.exists("Error Log", {"reference_name": unreachable_request.name}),
+			frappe.get_all("Error Log", {"reference_name": unreachable_request.name}, limit=1),
 			"the failing request must be logged, not swallowed",
 		)
 
@@ -830,9 +830,10 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.assertNotEqual(frappe.db.get_value("Sales Order", sales_order.name, "docstatus"), 2)
 		# Error Logs outlive the rollback, and rolled-back order names get reused, so only count this run's.
 		self.assertFalse(
-			frappe.db.exists(
+			frappe.get_all(
 				"Error Log",
 				{"reference_name": sales_order.name, "creation": [">=", started_at]},
+				limit=1,
 			),
 			"a refusal is the app's answer, not a failure to log",
 		)
@@ -988,7 +989,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		broken = self.delivery(sales_order, "order_placed", app="bwh_payments")
 		self.assertEqual((broken.status, broken.attempts, broken.next_retry_at), ("Failed", 6, None))
-		self.assertEqual(frappe.db.get_value("Error Log", broken.last_error, "reference_name"), sales_order)
+		self.assertEqual(frappe.get_doc("Error Log", broken.last_error).reference_name, sales_order)
 		self.assertEqual(self.delivery(sales_order, "order_placed").status, "Done")
 		self.assertEqual(
 			len([event for event, user in calls if event.reference_name == sales_order]),
