@@ -96,7 +96,7 @@
 										Alpine.store('i18n').i18n = {};
 										Alpine.store('i18n').lastFetched = null;
 										await Alpine.store('i18n').init();
-										window.location.href = window.location.pathname.replace(/^\/(en|ar)/, `/${language}`);
+										window.location.href = window.location.pathname.replace(/^\/(en|ar)/, `/${language}`) + window.location.search;
 									},
 								}">
 								<a class="nav-link" href="javascript:void(0);" @click="language_open = !language_open"
