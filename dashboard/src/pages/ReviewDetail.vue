@@ -67,11 +67,9 @@ watch(
 const replyAction = useAdminAction('reviews.save_reply')
 
 async function saveReply() {
-  try {
-    await replyAction.submit({ name: review.value.name, reply: replyDraft.value })
-  } catch {
-    return
-  }
+  const posted = await replyAction.submit({ name: review.value.name, reply: replyDraft.value })
+    .then(() => true, () => false)
+  if (!posted) return
   toast.success('Reply posted')
   reviewRequest.reload()
 }

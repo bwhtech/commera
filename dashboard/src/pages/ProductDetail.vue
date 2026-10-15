@@ -68,12 +68,9 @@ const publishAction = useAdminAction('catalog.set_product_published')
 
 async function togglePublish() {
   const publish = !product.value.variants.some((variant) => variant.is_published)
-  let result
-  try {
-    result = await publishAction.submit({ item_template: product.value.id, publish })
-  } catch {
-    return
-  }
+  const toggled = await publishAction.submit({ item_template: product.value.id, publish }).then(() => true, () => false)
+  if (!toggled) return
+  const result = publishAction.data
   productRequest.reload()
   if (result.skipped.length) {
     toast.warning(`Published ${result.updated.length}, skipped ${result.skipped.join(', ')} (missing a photo or size)`)
@@ -84,11 +81,9 @@ async function togglePublish() {
 
 async function toggleArchive() {
   const disabled = product.value.status !== 'archived'
-  try {
-    await updateAction.submit({ item_template: product.value.id, disabled: disabled ? 1 : 0 })
-  } catch {
-    return
-  }
+  const saved = await updateAction.submit({ item_template: product.value.id, disabled: disabled ? 1 : 0 })
+    .then(() => true, () => false)
+  if (!saved) return
   toast.success(disabled ? 'Archived' : 'Restored')
   productRequest.reload()
 }
@@ -129,16 +124,13 @@ const moreActions = computed(() => [...asDropdownOptions(actions.value.groups), 
 // is currently on it — there is no separate draft to track.
 async function save() {
   if (!product.value) return
-  try {
-    await updateAction.submit({
-      item_template: product.value.id,
-      title: product.value.title,
-      collection: product.value.collection,
-      description: product.value.description,
-    })
-  } catch {
-    return
-  }
+  const saved = await updateAction.submit({
+    item_template: product.value.id,
+    title: product.value.title,
+    collection: product.value.collection,
+    description: product.value.description,
+  }).then(() => true, () => false)
+  if (!saved) return
   toast.success('Saved')
   productRequest.reload()
 }

@@ -28,12 +28,9 @@ async function refund() {
     // No `amount`: the server refunds everything it still considers refundable,
     // and it is the one that clamps. It throws on failure — useMethodAction has
     // already surfaced the thrown message verbatim as a toast.
-    let paymentEntry
-    try {
-      paymentEntry = await refundAction.submit({ order_id: props.orderId })
-    } catch {
-      return
-    }
+    const refunded = await refundAction.submit({ order_id: props.orderId }).then(() => true, () => false)
+    if (!refunded) return
+    const paymentEntry = refundAction.data
     if (!paymentEntry) return
 
     open.value = false

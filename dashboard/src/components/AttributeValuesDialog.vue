@@ -63,13 +63,10 @@ async function commitRename(row, typed) {
   if (!next || next === row.value) return
 
   savingValue.value = row.value
-  try {
-    await renameAction.submit({ attribute: props.attribute.name, value: row.value, new_value: next })
-  } catch {
-    return
-  } finally {
-    savingValue.value = ''
-  }
+  const renamed = await renameAction.submit({ attribute: props.attribute.name, value: row.value, new_value: next })
+    .then(() => true, () => false)
+  savingValue.value = ''
+  if (!renamed) return
   row.value = next
   emit('saved')
 }
@@ -79,31 +76,24 @@ async function save(row, changes) {
   if (!next.color && !next.image) return clear(row)
 
   savingValue.value = row.value
-  try {
-    await setAction.submit({
-      attribute: props.attribute.name,
-      value: row.value,
-      color: next.color ?? '',
-      image: next.image ?? '',
-    })
-  } catch {
-    return
-  } finally {
-    savingValue.value = ''
-  }
+  const saved = await setAction.submit({
+    attribute: props.attribute.name,
+    value: row.value,
+    color: next.color ?? '',
+    image: next.image ?? '',
+  }).then(() => true, () => false)
+  savingValue.value = ''
+  if (!saved) return
   Object.assign(row, changes)
   emit('saved')
 }
 
 async function clear(row) {
   savingValue.value = row.value
-  try {
-    await clearAction.submit({ attribute: props.attribute.name, value: row.value })
-  } catch {
-    return
-  } finally {
-    savingValue.value = ''
-  }
+  const cleared = await clearAction.submit({ attribute: props.attribute.name, value: row.value })
+    .then(() => true, () => false)
+  savingValue.value = ''
+  if (!cleared) return
   row.color = null
   row.image = null
   emit('saved')
@@ -124,11 +114,8 @@ async function uploadImage(row, event) {
 async function addValue() {
   const value = newValue.value.trim()
   if (!value) return
-  try {
-    await addAction.submit({ attribute: props.attribute.name, value })
-  } catch {
-    return
-  }
+  const added = await addAction.submit({ attribute: props.attribute.name, value }).then(() => true, () => false)
+  if (!added) return
   rows.value.push({ value, color: null, image: null, used_by: 0 })
   newValue.value = ''
   emit('saved')

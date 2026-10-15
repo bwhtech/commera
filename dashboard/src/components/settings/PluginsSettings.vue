@@ -80,9 +80,8 @@ const storefrontSave = useAdminAction('plugins.set_storefront_enabled')
 async function setStorefront(enabled) {
   const plugin = current.value
   plugin.storefront = enabled
-  try {
-    await storefrontSave.submit({ app: plugin.app, enabled })
-  } catch {
+  const saved = await storefrontSave.submit({ app: plugin.app, enabled }).then(() => true, () => false)
+  if (!saved) {
     plugin.storefront = !enabled
     return
   }

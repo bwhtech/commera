@@ -60,11 +60,9 @@ const searchText = computed(() =>
 const otherMatches = computed(() => matches.value.filter((match) => match !== chosenMatch.value))
 
 async function lookUp(query) {
-  try {
-    return (await findLocation.submit({ query })) ?? []
-  } catch {
-    return []
-  }
+  const searched = await findLocation.submit({ query }).then(() => true, () => false)
+  if (!searched) return []
+  return findLocation.data ?? []
 }
 
 // A new address has no pin, so the map opens on its country rather than the whole world.

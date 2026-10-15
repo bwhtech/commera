@@ -133,13 +133,10 @@ export function buildProductActions(product, router, handlers = {}) {
                 const quantity = Math.max(0, Number(values.value) || 0)
                 if (!quantity) return
 
-                try {
-                  await receiveStockAction.submit({
-                    received_quantities: Object.fromEntries(itemCodes.map((code) => [code, quantity])),
-                  })
-                } catch {
-                  return
-                }
+                const received = await receiveStockAction.submit({
+                  received_quantities: Object.fromEntries(itemCodes.map((code) => [code, quantity])),
+                }).then(() => true, () => false)
+                if (!received) return
 
                 toast.success(`Received ${quantity} on ${itemCodes.length} sizes`)
                 handlers.onReload?.()
@@ -168,11 +165,9 @@ export function buildProductActions(product, router, handlers = {}) {
                 // set_restock_level stores cint(level), which truncates: 2.7 is kept as 2.
                 // Truncating here too keeps the toast honest about what was stored.
                 const level = Math.max(0, Math.trunc(Number(values.value) || 0))
-                try {
-                  await restockLevelAction.submit({ item_template: product.id, level })
-                } catch {
-                  return
-                }
+                const saved = await restockLevelAction.submit({ item_template: product.id, level })
+                  .then(() => true, () => false)
+                if (!saved) return
 
                 toast.success(`Low stock now reads at ${level} or below`)
                 handlers.onReload?.()
@@ -234,11 +229,8 @@ export function buildProductActions(product, router, handlers = {}) {
               theme: 'red',
               confirmLabel: 'Delete',
               onConfirm: async () => {
-                try {
-                  await deleteAction.submit({ item_template: product.id })
-                } catch {
-                  return
-                }
+                const deleted = await deleteAction.submit({ item_template: product.id }).then(() => true, () => false)
+                if (!deleted) return
                 toast.success(`${product.title} deleted`)
                 router.push('/products')
               },

@@ -45,13 +45,9 @@ async function receive() {
     lines.value.filter((line) => line.rate !== '' && line.rate != null).map((line) => [line.itemCode, Number(line.rate)]),
   )
 
-  let result
-  try {
-    result = await receiveAction.submit({ received_quantities, valuation_rates })
-  } catch {
-    return
-  }
-  if (!result) return
+  const received = await receiveAction.submit({ received_quantities, valuation_rates }).then(() => true, () => false)
+  if (!received) return
+  const result = receiveAction.data
 
   open.value = false
   const count = result.stock_entries?.length ?? 0

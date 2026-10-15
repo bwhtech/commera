@@ -52,15 +52,12 @@ function rebuildAssignments() {
 }
 
 async function matchUploadedFiles() {
-  try {
-    await matchAction.submit({
-      file_url: imp.fileUrl,
-      column_mapping: { ...imp.mapping },
-      image_files: imp.imageFiles,
-    })
-  } catch {
-    return
-  }
+  const matched = await matchAction.submit({
+    file_url: imp.fileUrl,
+    column_mapping: { ...imp.mapping },
+    image_files: imp.imageFiles,
+  }).then(() => true, () => false)
+  if (!matched) return
   imp.imageMatch = matchAction.data
   rebuildAssignments()
 }

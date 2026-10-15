@@ -59,16 +59,13 @@ async function save() {
   // With no compare-at there is only one price to write, and it has to land on the list already
   // in force: a product created without one is priced on the sale list alone, so writing the
   // default list there would leave the shopper paying the old rate.
-  try {
-    await priceAction.submit({
-      style_attribute_variant: props.variant.name,
-      ...(hasCompareAt
-        ? { default_rate: compareAt.value, sale_rate: price.value }
-        : pricePayload(props.variant.sizes?.[0], price.value)),
-    })
-  } catch {
-    return
-  }
+  const saved = await priceAction.submit({
+    style_attribute_variant: props.variant.name,
+    ...(hasCompareAt
+      ? { default_rate: compareAt.value, sale_rate: price.value }
+      : pricePayload(props.variant.sizes?.[0], price.value)),
+  }).then(() => true, () => false)
+  if (!saved) return
   open.value = false
   toast.success(`${props.variant.option} saved`)
   emit('saved')

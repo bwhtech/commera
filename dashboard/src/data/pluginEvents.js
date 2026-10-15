@@ -31,11 +31,11 @@ export function useDeliveryRetry(onRetried) {
     retrying.value = key
     try {
       for (const delivery of deliveries) {
-        await retryAction.submit({ delivery })
+        const sent = await retryAction.submit({ delivery }).then(() => true, () => false)
+        if (!sent) return
       }
       toast.success(`Sending to ${app} again`)
       onRetried()
-    } catch {
     } finally {
       retrying.value = null
     }

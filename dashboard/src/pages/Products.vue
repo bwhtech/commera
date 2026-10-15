@@ -116,12 +116,9 @@ async function archiveSelected() {
   if (!ids.length) return
 
   for (const id of ids) {
-    try {
-      await archiveAction.submit({ item_template: id, disabled: 1 })
-    } catch {
-      // A failure already toasted inside useAdminAction — stop rather than archive the rest silently.
-      return
-    }
+    const archived = await archiveAction.submit({ item_template: id, disabled: 1 }).then(() => true, () => false)
+    // A failure already toasted inside useAdminAction — stop rather than archive the rest silently.
+    if (!archived) return
   }
 
   toast.success(`${ids.length} product${ids.length > 1 ? 's' : ''} archived`)

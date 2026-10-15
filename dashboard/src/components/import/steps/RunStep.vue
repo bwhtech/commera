@@ -16,17 +16,15 @@ async function run() {
   imp.failed = false
   imp.running = true
 
-  try {
-    await runImportAction.submit({
-      file_url: imp.fileUrl,
-      column_mapping: { ...imp.mapping },
-      image_assignments: { ...imp.imageAssignments },
-    })
-  } catch {
+  const imported = await runImportAction.submit({
+    file_url: imp.fileUrl,
+    column_mapping: { ...imp.mapping },
+    image_assignments: { ...imp.imageAssignments },
+  }).then(() => true, () => false)
+  imp.running = false
+  if (!imported) {
     imp.failed = true
     return
-  } finally {
-    imp.running = false
   }
   imp.finished = true
   const result = runImportAction.data

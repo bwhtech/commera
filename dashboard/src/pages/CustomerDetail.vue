@@ -112,11 +112,8 @@ const noteAction = useAdminAction('customers.save_customer_note')
 const noteChanged = computed(() => note.value !== (customer.value?.note ?? ''))
 
 async function saveNote() {
-  try {
-    await noteAction.submit({ customer: route.params.id, note: note.value })
-  } catch {
-    return
-  }
+  const saved = await noteAction.submit({ customer: route.params.id, note: note.value }).then(() => true, () => false)
+  if (!saved) return
   toast.success('Note saved')
   customerRequest.reload()
 }

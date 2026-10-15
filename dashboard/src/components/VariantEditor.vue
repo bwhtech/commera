@@ -53,14 +53,11 @@ const swatches = computed(() =>
 const priceAction = useAdminAction('catalog.set_variant_price')
 
 async function setPrice(variant, rate) {
-  try {
-    await priceAction.submit({
-      style_attribute_variant: variant.name,
-      ...pricePayload(variant.sizes[0], rate),
-    })
-  } catch {
-    return
-  }
+  const saved = await priceAction.submit({
+    style_attribute_variant: variant.name,
+    ...pricePayload(variant.sizes[0], rate),
+  }).then(() => true, () => false)
+  if (!saved) return
   toast.success(`Price updated for ${variant.option} (${variant.sizes.length} sizes)`)
   emit('saved')
 }
@@ -76,15 +73,12 @@ async function bulkSetPrice() {
     onConfirm: async ({ values }) => {
       const rate = Math.max(0, Number(values.value) || 0)
       for (const variant of selected) {
-        try {
-          await priceAction.submit({
-            style_attribute_variant: variant.name,
-            ...pricePayload(variant.sizes[0], rate),
-          })
-        } catch {
-          // A failure already toasted inside useAdminAction — stop rather than reprice the rest silently.
-          return
-        }
+        const saved = await priceAction.submit({
+          style_attribute_variant: variant.name,
+          ...pricePayload(variant.sizes[0], rate),
+        }).then(() => true, () => false)
+        // A failure already toasted inside useAdminAction — stop rather than reprice the rest silently.
+        if (!saved) return
       }
       selection.value = []
       toast.success(`Price updated on ${selected.length} ${selected.length === 1 ? 'variant' : 'variants'}`)
@@ -110,12 +104,10 @@ function blockerLabel(variant) {
 }
 
 async function togglePublish(variant) {
-  try {
-    await publishAction.submit({ style_attribute_variant: variant.name, publish: variant.is_published ? 0 : 1 })
-  } catch {
-    // A refusal names the missing photo or size and has already been toasted.
-    return
-  }
+  const toggled = await publishAction.submit({ style_attribute_variant: variant.name, publish: variant.is_published ? 0 : 1 })
+    .then(() => true, () => false)
+  // A refusal names the missing photo or size and has already been toasted.
+  if (!toggled) return
   toast.success(variant.is_published ? `${variant.option} hidden from the storefront` : `${variant.option} published`)
   emit('saved')
 }
@@ -137,13 +129,10 @@ function receiveStock(variant) {
       const quantity = Math.max(0, Math.trunc(Number(values.value) || 0))
       if (!quantity) return
 
-      try {
-        await receiveAction.submit({
-          received_quantities: Object.fromEntries(itemCodes.map((code) => [code, quantity])),
-        })
-      } catch {
-        return
-      }
+      const received = await receiveAction.submit({
+        received_quantities: Object.fromEntries(itemCodes.map((code) => [code, quantity])),
+      }).then(() => true, () => false)
+      if (!received) return
       toast.success(`Received ${quantity} on ${itemCodes.length} sizes`)
       emit('saved')
     },

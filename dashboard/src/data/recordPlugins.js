@@ -7,12 +7,9 @@ export function usePluginRun(path, paramsOf, { onDone } = {}) {
   const runAction = useAdminAction(path)
 
   async function run(entry) {
-    let result
-    try {
-      result = await runAction.submit(paramsOf(entry))
-    } catch {
-      return
-    }
+    const ran = await runAction.submit(paramsOf(entry)).then(() => true, () => false)
+    if (!ran) return
+    const result = runAction.data
     toast.success(result?.message || `${entry.label} done`)
     onDone?.()
   }
@@ -36,13 +33,9 @@ export function useRecordPlugins(place, doctype, nameGetter, { onReload } = {}) 
   async function resolveConditions() {
     const name = nameGetter()
     if (!hasConditions || !name) return
-    let result
-    try {
-      result = await conditionsRequest.submit({ doctype, name })
-    } catch {
-      return
-    }
-    if (nameGetter() !== name) return
+    const answered = await conditionsRequest.submit({ doctype, name }).then(() => true, () => false)
+    if (!answered || nameGetter() !== name) return
+    const result = conditionsRequest.data
     resolved.value = { name, keys: new Set(result?.keys ?? []) }
   }
 

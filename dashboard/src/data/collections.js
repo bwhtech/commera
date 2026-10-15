@@ -51,15 +51,12 @@ export async function pickCollectionFor(itemTemplates, { label, currentCollectio
     ],
     confirmLabel: 'Move',
     onConfirm: async ({ values }) => {
-      let response
-      try {
-        response = await collectionAction.submit({
-          item_templates: itemTemplates,
-          collection: values.collection,
-        })
-      } catch {
-        return
-      }
+      const moved = await collectionAction.submit({
+        item_templates: itemTemplates,
+        collection: values.collection,
+      }).then(() => true, () => false)
+      if (!moved) return
+      const response = collectionAction.data
 
       // The server reports which products it actually saved, and under which collection it
       // resolved the name to — the toast says that, not what was asked for.
