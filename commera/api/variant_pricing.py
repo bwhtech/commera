@@ -6,6 +6,7 @@ from frappe import _
 from frappe.utils import create_batch
 from frappe.utils.data import cint, cstr, flt
 
+from commera.plugin_events import add_changed_products
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
 PRODUCT_DOCTYPE = "Style Attribute Variant"
@@ -131,6 +132,9 @@ def set_variant_prices(
 				counts["skipped"] += 1
 
 		counts["updated"] += set_item_price_rate(stale_price_names, rate)
+
+	if counts["updated"]:
+		add_changed_products([item_template], "price")
 
 	if len(price_rows_to_insert) > BACKGROUND_INSERT_THRESHOLD:
 		frappe.enqueue(

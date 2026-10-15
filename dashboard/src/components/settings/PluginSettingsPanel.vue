@@ -1,0 +1,78 @@
+<script setup>
+import { ref, watch } from 'vue'
+import { Button, SettingsBody } from 'frappe-ui'
+import SettingsPanelHeader from './SettingsPanelHeader.vue'
+import SettingsFieldRows from './SettingsFieldRows.vue'
+import SettingsSkeleton from './SettingsSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
+import PluginHost from '../PluginHost.vue'
+import { useAdminAction, useAdminRead } from '../../data/api'
+import { appTitle } from '../../ia/plugins'
+import { useSettingsAutosave } from '../../data/useSettingsAutosave'
+
+const props = defineProps({
+  entry: { type: Object, required: true },
+  active: { type: Boolean, default: false },
+})
+
+const pluginSettings = useAdminRead('plugins.get_plugin_settings', {
+  params: { app: props.entry.app },
+  immediate: false,
+})
+const save = useAdminAction('plugins.save_plugin_setting')
+
+const { values, adopt, set, commit } = useSettingsAutosave({
+  submit: (fields) => save.submit({ app: props.entry.app, ...fields }),
+  get error() {
+    return save.error
+  },
+})
+
+watch(
+  () => pluginSettings.data,
+  (data) => data && adopt(data.values),
+  { immediate: true },
+)
+
+// An app's module loads the first time its tab is shown, then stays, like the dialog's other panels.
+const shown = ref(false)
+
+watch(
+  () => props.active,
+  (isActive) => {
+    if (!isActive) return
+    shown.value = true
+    if (props.entry.doctype && !pluginSettings.isFinished) pluginSettings.reload()
+  },
+  { immediate: true },
+)
+
+// A controller can rewrite a value on save and a secret is never echoed back, so the tab is re-read.
+async function commitField(fieldname, value, label) {
+  await commit(fieldname, value, label, () => pluginSettings.reload())
+}
+</script>
+
+<template>
+  <SettingsPanelHeader :title="entry.label" :description="`Added by ${appTitle(entry.app)}.`" />
+
+  <SettingsBody v-scroll-fade>
+    <template v-if="entry.doctype">
+      <EmptyState
+        v-if="pluginSettings.error"
+        compact
+        icon="lucide-triangle-alert"
+        title="These settings could not be loaded"
+        :description="`${appTitle(entry.app)} may still be set up. This tab just cannot say.`"
+      >
+        <Button label="Try again" variant="subtle" theme="gray" @click="pluginSettings.reload()" />
+      </EmptyState>
+      <SettingsSkeleton v-else-if="!pluginSettings.data" :rows="3" />
+      <div v-else class="divide-y divide-outline-gray-1">
+        <SettingsFieldRows :groups="pluginSettings.data.groups" :values="values" @update="set" @commit="commitField" />
+      </div>
+    </template>
+
+    <PluginHost v-else-if="shown" :entry="entry" />
+  </SettingsBody>
+</template>

@@ -19,10 +19,13 @@ export function attachSettingsRouter(instance) {
   })
 }
 
-function currentTab() {
+function pickedTab() {
   const location = router.currentRoute.value
-  if (location.name !== SETTINGS_ROUTE_NAME) return DEFAULT_SETTINGS_TAB
-  return location.params.tab || DEFAULT_SETTINGS_TAB
+  return (location.name === SETTINGS_ROUTE_NAME && location.params.tab) || ''
+}
+
+function currentTab() {
+  return pickedTab() || DEFAULT_SETTINGS_TAB
 }
 
 // Plain getters, not `reactive()`: they read router.currentRoute, which is a ref, so anything
@@ -39,10 +42,13 @@ export const settings = {
   get tab() {
     return currentTab()
   },
+  get pickedTab() {
+    return pickedTab()
+  },
   set tab(tab) {
     // reka-ui's TabsRoot writes this model back as it mounts, which without the open guard
     // would navigate to /settings/general over a cold link to /settings/payments.
-    if (!settings.open || tab === currentTab()) return
+    if (!settings.open || tab === pickedTab()) return
     // replace, not push: Back closes the dialog rather than stepping back through tabs.
     router.replace({ name: SETTINGS_ROUTE_NAME, params: { tab } })
   },
@@ -54,7 +60,7 @@ export const visibleRoute = computed(() =>
 )
 
 // An unknown tab is normalised by the route record's beforeEnter.
-export function openSettings(tab = DEFAULT_SETTINGS_TAB) {
+export function openSettings(tab) {
   router.push({ name: SETTINGS_ROUTE_NAME, params: { tab } })
 }
 

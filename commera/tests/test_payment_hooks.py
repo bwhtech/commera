@@ -1,5 +1,6 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 
+import importlib
 from unittest.mock import patch
 
 import frappe
@@ -14,13 +15,28 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date, get_year_ending, get_year_start, getdate, now_datetime
 from frappe.utils.data import flt
 
+from commera.api.orders import cancel_order
 from commera.api.payment_hooks import on_payment_request_update
 from commera.api.payments import (
 	confirm_payment,
+	create_payment_entry,
 	get_open_gateway_payment_request,
+	make_sales_invoice,
+	place_cod_order,
 	validate_cart_is_not_in_checkout,
 )
 from commera.jobs import sync_pending_gateway_payments
+from commera.plugin_events import (
+	PLUGINS_USER,
+	RETRY_DELAYS_IN_MINUTES,
+	fire_event,
+	on_sales_order_cancel,
+	retry_delivery,
+	run_app_deliveries,
+	run_due_deliveries,
+	sweep_missed_cod_payments,
+)
+from commera.sdk.events import CommeraEvent
 
 COMPANY = "Lifestyle Demo"
 ITEM_GROUP = "Interior Accessories"
@@ -29,6 +45,42 @@ CURRENCY = "INR"
 # A price list in the company currency keeps the fixture off the Currency Exchange table.
 PRICE_LIST = "ZZ Payhook SAR Selling"
 ITEM_RATE = 150.0
+
+
+CANCEL_REFUSAL = "Printful is already producing this order."
+
+
+def refuse_cancel(sales_order, method=None):
+	frappe.throw(f"{CANCEL_REFUSAL} ({sales_order.name})")
+
+
+def record_plugin_event(event):
+	frappe.flags.commera_plugin_event_calls.append((event, frappe.session.user))
+
+
+def raise_from_plugin_event(event):
+	raise RuntimeError("an app's broken handler")
+
+
+def fail_once_then_record(event):
+	if not frappe.flags.commera_plugin_event_failed_once:
+		frappe.flags.commera_plugin_event_failed_once = True
+		raise RuntimeError("an app's flaky handler")
+	record_plugin_event(event)
+
+
+def patch_app_hooks(test_case, app_hooks: dict):
+	"""Stand in for an installed plugin's hooks.py, leaving every other hook (doc_events included) untouched."""
+	get_hooks = frappe.get_hooks
+
+	def get_hooks_with_app(hook=None, *args, **kwargs):
+		if hook in app_hooks:
+			return app_hooks[hook]
+		return get_hooks(hook, *args, **kwargs)
+
+	hooks_patch = patch.object(frappe, "get_hooks", side_effect=get_hooks_with_app)
+	hooks_patch.start()
+	test_case.addCleanup(hooks_patch.stop)
 
 
 class TestPaymentHookIdempotency(IntegrationTestCase):
@@ -286,6 +338,21 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 			self.payment_request.order_ref,
 		)
 		self.assertEqual(frappe.db.get_value("Payment Entry", payment_entries[0], "mode_of_payment"), GATEWAY)
+
+	def test_a_paid_order_is_due_on_its_order_date_on_the_header_and_every_line(self):
+		on_payment_request_update(self.payment_request)
+
+		self.assert_due_on_order_date(self.submitted_sales_orders()[0])
+
+	def test_a_cod_order_is_due_on_its_order_date_on_the_header_and_every_line(self):
+		self.assert_due_on_order_date(self.place_cod_order_for_cart().name)
+
+	def assert_due_on_order_date(self, sales_order_name):
+		# A drop-ship Purchase Order copies these into Required By and refuses to save without them.
+		sales_order = frappe.get_doc("Sales Order", sales_order_name)
+		order_date = getdate(sales_order.transaction_date)
+		self.assertEqual(sales_order.delivery_date, order_date)
+		self.assertEqual({item.delivery_date for item in sales_order.items}, {order_date})
 
 	def test_a_duplicate_callback_does_not_create_a_second_order(self):
 		"""A replayed webhook racing a confirm_payment poll must not bill the shopper twice."""
@@ -591,6 +658,364 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		)
 		self.assertEqual(len(self.submitted_sales_orders(healthy_quotation.name)), 1)
 		self.assertTrue(
-			frappe.db.exists("Error Log", {"reference_name": unreachable_request.name}),
+			frappe.get_all("Error Log", {"reference_name": unreachable_request.name}, limit=1),
 			"the failing request must be logged, not swallowed",
 		)
+
+	# -- app events --------------------------------------------------------------------------------
+
+	def plugin_events(self, sales_order):
+		return sorted(
+			frappe.get_all(
+				"Commera Event",
+				{"reference_doctype": "Sales Order", "reference_name": sales_order},
+				pluck="event",
+			)
+		)
+
+	def delivery(self, sales_order, event, app="commera"):
+		return frappe.get_all(
+			"Commera Event Delivery",
+			filters={"parent": f"{sales_order}-{event}", "app": app},
+			fields=["name", "status", "attempts", "next_retry_at", "last_error"],
+		)[0]
+
+	def queued_app_jobs(self, enqueue):
+		return [call.kwargs for call in enqueue.call_args_list if call.args[:1] == (run_app_deliveries,)]
+
+	def record_plugin_events(self):
+		frappe.flags.commera_plugin_event_calls = []
+		self.addCleanup(frappe.flags.pop, "commera_plugin_event_calls", None)
+		return frappe.flags.commera_plugin_event_calls
+
+	def place_cod_order_for_cart(self):
+		frappe.db.set_single_value("Commera Settings", "cod_enabled", 1)
+		return place_cod_order(self.quotation.name)
+
+	def test_a_paid_order_queues_placed_then_paid_once_after_commit(self):
+		patch_app_hooks(
+			self,
+			{
+				"commera_events": {
+					"order_placed": [f"{__name__}.record_plugin_event"],
+					"order_paid": [f"{__name__}.record_plugin_event"],
+				}
+			},
+		)
+		with patch.object(frappe, "enqueue") as enqueue:
+			on_payment_request_update(self.payment_request)
+			sales_order = self.submitted_sales_orders()[0]
+			frappe.local.message_log = []
+			fire_event("order_paid", "Sales Order", sales_order)
+
+		self.assertEqual(frappe.local.message_log, [], "a repeat must not pop an error at the user")
+		self.assertEqual(self.plugin_events(sales_order), ["order_paid", "order_placed"])
+		job = {
+			"app": "commera",
+			"reference_doctype": "Sales Order",
+			"reference_name": sales_order,
+			"lane_event": None,
+			"job_id": f"commera-plugin-events::commera::Sales Order::{sales_order}",
+			"deduplicate": True,
+			"enqueue_after_commit": True,
+		}
+		self.assertEqual(self.queued_app_jobs(enqueue), [job, job], "one job per event, none for the repeat")
+
+	def test_an_event_no_app_listens_to_is_recorded_but_queues_nothing(self):
+		patch_app_hooks(self, {"commera_events": {"order_placed": []}})
+		with patch.object(frappe, "enqueue") as enqueue:
+			sales_order = self.place_cod_order_for_cart()
+
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_placed"])
+		self.assertFalse(
+			frappe.db.exists("Commera Event Delivery", {"parent": f"{sales_order.name}-order_placed"})
+		)
+		self.assertEqual(self.queued_app_jobs(enqueue), [])
+
+	def test_a_cod_order_is_paid_only_once_its_invoice_is_settled(self):
+		sales_order = self.place_cod_order_for_cart()
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_placed"])
+
+		sales_order.flags.ignore_permissions = True
+		sales_order.submit()
+		sales_invoice = make_sales_invoice(sales_order.name, ignore_permissions=True)
+		sales_invoice.flags.ignore_permissions = True
+		sales_invoice.insert()
+		sales_invoice.submit()
+		half = flt(sales_invoice.outstanding_amount) / 2
+
+		create_payment_entry(sales_invoice, GATEWAY, half, None)
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_placed"])
+
+		sales_invoice.reload()
+		create_payment_entry(sales_invoice, GATEWAY, sales_invoice.outstanding_amount, None)
+
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_paid", "order_placed"])
+
+	def test_a_fully_discounted_order_is_billed_and_paid_at_placement(self):
+		quotation = self.create_cart_quotation()
+		quotation.apply_discount_on = "Grand Total"
+		quotation.additional_discount_percentage = 100
+		quotation.save()
+		self.assertEqual(flt(quotation.grand_total), 0)
+
+		on_payment_request_update(self.create_paid_payment_request(quotation))
+
+		sales_order = self.submitted_sales_orders(quotation.name)[0]
+		self.assertEqual(self.plugin_events(sales_order), ["order_paid", "order_placed"])
+		self.assertEqual(len(self.submitted_sales_invoices(sales_order)), 1)
+
+	def submit_invoice_for(self, sales_order, qty):
+		sales_invoice = make_sales_invoice(sales_order.name, ignore_permissions=True)
+		sales_invoice.items[0].qty = qty
+		sales_invoice.flags.ignore_permissions = True
+		sales_invoice.insert()
+		sales_invoice.submit()
+		return sales_invoice
+
+	def test_a_cod_order_billed_in_two_invoices_is_paid_only_when_both_are(self):
+		sales_order = self.place_cod_order_for_cart()
+		sales_order.flags.ignore_permissions = True
+		sales_order.submit()
+		first_invoice = self.submit_invoice_for(sales_order, qty=1)
+		second_invoice = self.submit_invoice_for(sales_order, qty=1)
+
+		create_payment_entry(first_invoice, GATEWAY, first_invoice.outstanding_amount, None)
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_placed"])
+
+		create_payment_entry(second_invoice, GATEWAY, second_invoice.outstanding_amount, None)
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_paid", "order_placed"])
+
+	def test_the_hourly_sweep_fires_paid_for_a_settled_cod_order_the_payment_hook_missed(self):
+		patch_app_hooks(self, {"commera_events": {"order_paid": []}})
+		sales_order = self.place_cod_order_for_cart()
+		sales_order.flags.ignore_permissions = True
+		sales_order.submit()
+		sales_invoice = self.submit_invoice_for(sales_order, qty=2)
+		with patch("commera.plugin_events.on_payment_entry_submit"):
+			create_payment_entry(sales_invoice, GATEWAY, sales_invoice.outstanding_amount, None)
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_placed"])
+
+		sweep_missed_cod_payments()
+		sweep_missed_cod_payments()
+
+		self.assertEqual(self.plugin_events(sales_order.name), ["order_paid", "order_placed"])
+
+	def test_an_app_before_cancel_refusal_reaches_the_user_without_an_error_log(self):
+		doc_events = frappe.get_doc_hooks()
+		sales_order_events = doc_events.get("Sales Order", {})
+		doc_events_patch = patch.object(
+			frappe.local,
+			"doc_events_hooks",
+			{
+				**doc_events,
+				"Sales Order": {
+					**sales_order_events,
+					"before_cancel": [
+						*sales_order_events.get("before_cancel", []),
+						f"{__name__}.refuse_cancel",
+					],
+				},
+			},
+		)
+		doc_events_patch.start()
+		self.addCleanup(doc_events_patch.stop)
+		sales_order = self.place_cod_order_for_cart()
+		started_at = now_datetime()
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			cancel_order(sales_order.name)
+
+		self.assertIn(f"{CANCEL_REFUSAL} ({sales_order.name})", str(raised.exception))
+		self.assertNotEqual(frappe.db.get_value("Sales Order", sales_order.name, "docstatus"), 2)
+		# Error Logs outlive the rollback, and rolled-back order names get reused, so only count this run's.
+		self.assertFalse(
+			frappe.get_all(
+				"Error Log",
+				{"reference_name": sales_order.name, "creation": [">=", started_at]},
+				limit=1,
+			),
+			"a refusal is the app's answer, not a failure to log",
+		)
+
+	def run_enqueued_jobs_now(self):
+		"""Route jobs through the real frappe.enqueue, run inline, so its own keywords can't swallow the job's."""
+		enqueue = frappe.enqueue
+
+		def enqueue_now(method, *args, **kwargs):
+			kwargs.update(now=True, enqueue_after_commit=False)
+			return enqueue(method, *args, **kwargs)
+
+		for enqueue_patch in (
+			patch.object(frappe, "enqueue", side_effect=enqueue_now),
+			# The job commits per handler; inside a test that would escape the rollback.
+			patch.object(frappe.db, "commit"),
+			patch.object(frappe.db, "rollback"),
+		):
+			enqueue_patch.start()
+			self.addCleanup(enqueue_patch.stop)
+
+	def add_handler_to_app(self, app: str, handler) -> str:
+		"""Stand in for a handler shipped by another installed plugin; frappe.get_attr refuses unknown apps."""
+		attribute = f"commera_test_{handler.__name__}"
+		handler_patch = patch.object(importlib.import_module(app), attribute, handler, create=True)
+		handler_patch.start()
+		self.addCleanup(handler_patch.stop)
+		return f"{app}.{attribute}"
+
+	def test_a_cancelled_webshop_order_is_announced_once(self):
+		patch_app_hooks(self, {"commera_events": {"order_cancelled": [f"{__name__}.record_plugin_event"]}})
+		calls = self.record_plugin_events()
+		self.run_enqueued_jobs_now()
+		sales_order = self.place_cod_order_for_cart()
+
+		cancel_order(sales_order.name)
+		on_sales_order_cancel(frappe.get_doc("Sales Order", sales_order.name))
+
+		self.assertEqual(
+			[(event.name, event.reference_name) for event, user in calls],
+			[("order_cancelled", sales_order.name)],
+		)
+
+	def test_an_installed_app_hears_placed_then_paid_through_the_real_queue(self):
+		patch_app_hooks(
+			self,
+			{
+				"commera_events": {
+					"order_placed": [f"{__name__}.record_plugin_event"],
+					"order_paid": [f"{__name__}.record_plugin_event"],
+				}
+			},
+		)
+		calls = self.record_plugin_events()
+		self.run_enqueued_jobs_now()
+
+		on_payment_request_update(self.payment_request)
+
+		sales_order = self.submitted_sales_orders()[0]
+		self.assertEqual(
+			[(event.name, event.reference_name, user) for event, user in calls],
+			[("order_placed", sales_order, PLUGINS_USER), ("order_paid", sales_order, PLUGINS_USER)],
+		)
+		placed = calls[0][0]
+		self.assertIsInstance(placed, CommeraEvent)
+		self.assertEqual(
+			(placed.id, placed.reference_doctype, placed.reference_name),
+			(f"{sales_order}-order_placed", "Sales Order", sales_order),
+		)
+		self.assertEqual(
+			placed.data,
+			{
+				"customer": self.customer,
+				"currency": CURRENCY,
+				"grand_total": self.quotation.grand_total,
+				"payment_mode": GATEWAY,
+				"docstatus": 1,
+				"shipping_address": None,
+			},
+		)
+		self.assertEqual(placed.created_at, frappe.db.get_value("Commera Event", placed.id, "creation"))
+		self.assertEqual(self.delivery(sales_order, "order_placed").status, "Done")
+		self.assertEqual(self.delivery(sales_order, "order_paid").status, "Done")
+
+	def test_an_app_never_hears_paid_before_its_placed_handler_succeeds(self):
+		patch_app_hooks(
+			self,
+			{
+				"commera_events": {
+					"order_placed": [f"{__name__}.fail_once_then_record"],
+					"order_paid": [f"{__name__}.record_plugin_event"],
+				}
+			},
+		)
+		calls = self.record_plugin_events()
+		self.addCleanup(frappe.flags.pop, "commera_plugin_event_failed_once", None)
+		self.run_enqueued_jobs_now()
+
+		on_payment_request_update(self.payment_request)
+
+		sales_order = self.submitted_sales_orders()[0]
+		placed = self.delivery(sales_order, "order_placed")
+		paid = self.delivery(sales_order, "order_paid")
+		self.assertEqual(calls, [])
+		self.assertEqual((placed.status, placed.attempts), ("Queued", 1))
+		self.assertEqual((paid.status, paid.attempts), ("Queued", 0))
+
+		with self.freeze_time(placed.next_retry_at):
+			run_due_deliveries()
+
+		# A gateway call commits mid-checkout, so earlier tests can leave due deliveries the sweep also runs.
+		self.assertEqual(
+			[event.name for event, user in calls if event.reference_name == sales_order],
+			["order_placed", "order_paid"],
+		)
+
+	def test_a_failing_app_is_retried_on_schedule_then_failed_without_holding_up_another(self):
+		broken_handler = self.add_handler_to_app("bwh_payments", raise_from_plugin_event)
+		patch_app_hooks(
+			self, {"commera_events": {"order_placed": [broken_handler, f"{__name__}.record_plugin_event"]}}
+		)
+		calls = self.record_plugin_events()
+		self.run_enqueued_jobs_now()
+
+		placed_at = now_datetime()
+		sales_order = self.place_cod_order_for_cart().name
+		broken = self.delivery(sales_order, "order_placed", app="bwh_payments")
+		self.assertEqual(broken.attempts, 1)
+		self.assertGreaterEqual(
+			broken.next_retry_at, add_to_date(placed_at, minutes=RETRY_DELAYS_IN_MINUTES[0])
+		)
+		self.assertLessEqual(
+			broken.next_retry_at, add_to_date(now_datetime(), minutes=RETRY_DELAYS_IN_MINUTES[0])
+		)
+
+		with self.freeze_time(add_to_date(broken.next_retry_at, seconds=-1)):
+			run_due_deliveries()
+		self.assertEqual(
+			self.delivery(sales_order, "order_placed", app="bwh_payments").attempts, 1, "not due yet"
+		)
+
+		for delay in RETRY_DELAYS_IN_MINUTES[1:]:
+			retried_at = broken.next_retry_at
+			with self.freeze_time(retried_at):
+				run_due_deliveries()
+			broken = self.delivery(sales_order, "order_placed", app="bwh_payments")
+			self.assertEqual(
+				(broken.status, broken.next_retry_at), ("Queued", add_to_date(retried_at, minutes=delay))
+			)
+
+		with self.freeze_time(broken.next_retry_at):
+			run_due_deliveries()
+
+		broken = self.delivery(sales_order, "order_placed", app="bwh_payments")
+		self.assertEqual((broken.status, broken.attempts, broken.next_retry_at), ("Failed", 6, None))
+		self.assertEqual(frappe.get_doc("Error Log", broken.last_error).reference_name, sales_order)
+		self.assertEqual(self.delivery(sales_order, "order_placed").status, "Done")
+		self.assertEqual(
+			len([event for event, user in calls if event.reference_name == sales_order]),
+			1,
+			"the healthy app ran once and was never retried",
+		)
+
+	def test_a_failed_delivery_runs_again_when_staff_retry_it(self):
+		self.add_handler_to_app("bwh_payments", raise_from_plugin_event)
+		handler = self.add_handler_to_app("bwh_payments", record_plugin_event)
+		patch_app_hooks(
+			self, {"commera_events": {"order_placed": ["bwh_payments.commera_test_raise_from_plugin_event"]}}
+		)
+		calls = self.record_plugin_events()
+		self.run_enqueued_jobs_now()
+		sales_order = self.place_cod_order_for_cart().name
+		failed = self.delivery(sales_order, "order_placed", app="bwh_payments")
+		frappe.db.set_value("Commera Event Delivery", failed.name, {"status": "Failed", "attempts": 6})
+		frappe.db.set_value("Commera Event Delivery", failed.name, "handler", handler)
+
+		frappe.set_user(self.shopper)
+		with self.assertRaises(frappe.PermissionError):
+			retry_delivery(failed.name)
+		frappe.set_user("Administrator")
+		retry_delivery(failed.name)
+
+		retried = self.delivery(sales_order, "order_placed", app="bwh_payments")
+		self.assertEqual((retried.status, retried.attempts), ("Done", 7))
+		self.assertEqual([event.id for event, user in calls], [f"{sales_order}-order_placed"])

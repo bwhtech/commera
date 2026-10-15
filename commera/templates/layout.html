@@ -35,6 +35,7 @@
     
     <script defer src="/assets/commera/js/vendor/alpinejs/core.js"></script>
     {% block head %} {% endblock %}
+    {{ format_plugin_includes("css") }}
 </head>
 
 {% include "templates/includes/cart-state.html" %}
@@ -83,6 +84,8 @@
 
     {% block footer %}{% include "templates/includes/footer.html" %}{% endblock %}
     {% block analytics_events %}{% include "templates/includes/analytics-events.html" %}{% endblock %}
+    {{ plugin_slot("page_overlay") }}
+    {{ format_plugin_includes("js") }}
 </body>
 {% block script %} {% endblock %}
 </html>

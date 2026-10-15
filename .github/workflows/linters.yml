@@ -3,6 +3,7 @@ name: Linters
 
 on:
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -31,10 +32,11 @@ jobs:
   linter:
     name: 'Semgrep Rules'
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
@@ -44,14 +46,16 @@ jobs:
         run: git clone --depth 1 https://github.com/frappe/semgrep-rules.git frappe-semgrep-rules
 
       - name: Run Semgrep rules
+        env:
+          QUEUE_BASE_SHA: ${{ github.event.merge_group.base_sha }}
         run: |
           pip install semgrep
+          if [ -n "$QUEUE_BASE_SHA" ]; then export SEMGREP_BASELINE_REF="$QUEUE_BASE_SHA"; fi
           semgrep ci --config ./frappe-semgrep-rules/rules --config r/python.lang.correctness
 
   precommit:
     name: 'Pre-Commit'
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v7
@@ -64,7 +68,6 @@ jobs:
   npm-audit:
     name: 'Vulnerable Dependency Check'
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v7
@@ -84,7 +87,6 @@ jobs:
   duplication:
     name: 'Code Duplication'
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v7
@@ -105,7 +107,6 @@ jobs:
   dashboard-build:
     name: 'Dashboard Build'
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v7

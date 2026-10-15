@@ -15,6 +15,7 @@ import DeliveryOptionRow from './DeliveryOptionRow.vue'
 import ImportCarrierServicesDialog from './ImportCarrierServicesDialog.vue'
 import SettingsSkeleton from './SettingsSkeleton.vue'
 import { useDeliveryOptions } from '../../data/deliveryOptions'
+import { isPriced, useShippingRates } from '../../data/shippingRates'
 
 const props = defineProps({
   // Opening the Shipping tab should fetch; switching away and back should not.
@@ -22,6 +23,16 @@ const props = defineProps({
 })
 
 const store = useDeliveryOptions()
+const rates = useShippingRates()
+
+// Only once the rates have loaded: before that every option would briefly read as hidden.
+function isHidden(option) {
+  return rates.loaded.value && !rates.loadError.value && !isPriced(rates.bandsFor(option.name), option)
+}
+
+function hasBands(option) {
+  return rates.bandsFor(option.name).length > 0
+}
 
 // Two values: a new option has no row to name. A model, because the tab above has to know.
 const editing = ref(null)
@@ -178,6 +189,8 @@ function confirmDelete(option) {
           :key="option.name"
           :option="option"
           :busy="store.loading.value"
+          :hidden="isHidden(option)"
+          :priced-by-rates="hasBands(option)"
           @edit="edit"
           @delete="confirmDelete"
           @toggle="toggle(option, $event)"

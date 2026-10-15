@@ -38,6 +38,15 @@ class TestDefaultEmailTemplates(IntegrationTestCase):
 	def setUp(self):
 		create_default_email_templates()
 
+	def test_a_missing_template_is_created_as_an_email_template(self):
+		frappe.delete_doc("Email Template", "Order Cancellation", force=True)
+
+		create_default_email_templates()
+
+		self.assertEqual(
+			frappe.db.get_value("Email Template", "Order Cancellation", "reference_doctype"), "Sales Order"
+		)
+
 	def test_empty_fields_get_the_default_templates(self):
 		set_email_templates(dict.fromkeys(DEFAULT_EMAIL_TEMPLATES, ""))
 

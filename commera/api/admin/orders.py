@@ -9,6 +9,7 @@ from frappe.utils.data import add_days, cint, cstr, flt, formatdate, getdate
 
 from commera.api.admin.catalog import get_unpublishable_options
 from commera.api.admin.inventory import get_inventory
+from commera.api.admin.plugins import query_deliveries
 from commera.api.shipping import get_order_charge_lines
 from commera.utils import get_address_lines, get_item_images
 
@@ -18,6 +19,35 @@ PAGE_LENGTH = 20
 MAX_PAGE_LENGTH = 100
 
 OPEN_STATUSES = ("To Deliver and Bill", "To Deliver", "To Bill")
+
+ORDER_FIELDS = (
+	"name",
+	"customer",
+	"customer_name",
+	"contact_email",
+	"contact_phone",
+	"transaction_date",
+	"creation",
+	"order_type",
+	"status",
+	"docstatus",
+	"currency",
+	"total",
+	"net_total",
+	"total_taxes_and_charges",
+	"grand_total",
+	"rounded_total",
+	"base_grand_total",
+	"base_rounded_total",
+	"shipping_rule",
+	"per_delivered",
+	"custom_ecommerce_payment_mode",
+	"custom_ecommerce_status",
+	"custom_delivery_option",
+	"shipping_address",
+	"address_display",
+	"modified",
+)
 
 # Priority order, read top-down: an order is described by the furthest rung it has reached.
 STAGE_LABELS = {
@@ -567,10 +597,13 @@ def get_order_charges(order):
 	precision = frappe.get_precision("Sales Order", "grand_total", order.currency)
 	shipping = flt(charge_lines["shipping"], precision)
 	cod_charge = flt(charge_lines["cod_charge"], precision)
+	plugin_fees = charge_lines["plugin_fees"]
+	plugin_fee_total = flt(sum(fee["amount"] for fee in plugin_fees), precision)
 	return {
 		"shipping": shipping,
 		"cod_charge": cod_charge,
-		"tax": flt(flt(order.total_taxes_and_charges) - shipping - cod_charge, precision),
+		"plugin_fees": plugin_fees,
+		"tax": flt(flt(order.total_taxes_and_charges) - shipping - cod_charge - plugin_fee_total, precision),
 	}
 
 
@@ -579,58 +612,8 @@ def get_order(sales_order: str):
 	"""Everything one order's screen needs, in one call."""
 	frappe.has_permission("Sales Order", doc=sales_order, ptype="read", throw=True)
 
-	order = frappe.db.get_value(
-		"Sales Order",
-		sales_order,
-		[
-			"name",
-			"customer",
-			"customer_name",
-			"contact_email",
-			"contact_phone",
-			"transaction_date",
-			"creation",
-			"status",
-			"docstatus",
-			"currency",
-			"total",
-			"net_total",
-			"total_taxes_and_charges",
-			"grand_total",
-			"shipping_rule",
-			"per_delivered",
-			"custom_ecommerce_payment_mode",
-			"custom_delivery_option",
-			"shipping_address",
-			"address_display",
-			"modified",
-		],
-		as_dict=True,
-	)
-	if not order:
-		frappe.throw(_("Order {0} not found").format(sales_order))
-
-	items = frappe.get_all(
-		"Sales Order Item",
-		filters={"parent": sales_order},
-		fields=["item_code", "item_name", "qty", "delivered_qty", "rate", "amount", "image"],
-		order_by="idx asc",
-	)
-
-	# The size lives on the variant's child row, not on the order line.
-	sizes_by_item_code = {}
-	item_codes = [row.item_code for row in items if row.item_code]
-	if item_codes:
-		for row in frappe.get_all(
-			"Color Size Item",
-			filters={"item_code": ["in", item_codes], "parenttype": "Style Attribute Variant"},
-			fields=["item_code", "size", "parent"],
-		):
-			sizes_by_item_code.setdefault(cstr(row.item_code), row.size)
-
-	image_by_item_code = get_item_images(item_codes)
-
-	lifecycle = read_order_lifecycles([order.name]).get(cstr(order.name), frappe._dict())
+	order = read_order(sales_order)
+	lifecycle = order.lifecycle
 	state = describe_state(order, lifecycle)
 	charges = get_order_charges(order)
 	payment_state = describe_payment(order)
@@ -653,32 +636,123 @@ def get_order(sales_order: str):
 		# before the shipping connector was installed, or one that took the flat Shipping Rule.
 		"delivery_option": order.custom_delivery_option,
 		"cod_charge": charges["cod_charge"],
+		"plugin_fees": charges["plugin_fees"],
 		"tax": charges["tax"],
 		"total_taxes_and_charges": flt(order.total_taxes_and_charges),
 		"grand_total": flt(order.grand_total),
 		"payment_mode": order.custom_ecommerce_payment_mode,
 		"payment_state": payment_state,
 		"shipping_address": get_address_lines(order.address_display),
-		"tags": frappe.get_all(
-			"Tag Link", filters={"document_type": "Sales Order", "document_name": order.name}, pluck="tag"
-		),
+		"tags": order.tags,
 		"can_fulfil": can_fulfil_order(order, state),
 		"items": [
 			{
 				"item_code": row.item_code,
 				"title": row.item_name,
-				"size": sizes_by_item_code.get(cstr(row.item_code)),
+				"size": row.size,
 				"qty": flt(row.qty),
 				"delivered_qty": flt(row.delivered_qty),
+				"delivered_by_supplier": cint(row.delivered_by_supplier),
 				"rate": flt(row.rate),
 				"amount": flt(row.amount),
-				"image": row.image or image_by_item_code.get(row.item_code),
+				"image": row.image,
 			}
-			for row in items
+			for row in order.lines
 		],
 		"deliveries": lifecycle.get("printable_delivery_notes") or [],
 		"invoices": read_order_invoices(order.name),
+		"plugin_failures": get_order_plugin_failures(order.name),
 	}
+
+
+def read_order(sales_order: str | int) -> frappe._dict:
+	order = read_orders([sales_order]).get(cstr(sales_order))
+	if not order:
+		frappe.throw(_("Order {0} not found").format(sales_order), frappe.DoesNotExistError)
+	return order
+
+
+def read_orders(order_names: list, extra_fields: list | tuple = ()) -> dict:
+	"""Orders keyed by `cstr(name)` with their `lines`, `lifecycle` and `tags`, in the same number of
+	queries however many there are. No permission check: every caller makes its own."""
+	if not order_names:
+		return {}
+
+	orders = {
+		cstr(order.name): order
+		for order in frappe.get_all(
+			"Sales Order", filters={"name": ["in", order_names]}, fields=[*ORDER_FIELDS, *extra_fields]
+		)
+	}
+	if not orders:
+		return {}
+
+	found_names = list(orders)
+	lines_by_order = read_order_lines(found_names)
+	lifecycles = read_order_lifecycles(found_names)
+	tags_by_order = {}
+	for row in frappe.get_all(
+		"Tag Link",
+		filters={"document_type": "Sales Order", "document_name": ["in", found_names]},
+		fields=["document_name", "tag"],
+	):
+		tags_by_order.setdefault(cstr(row.document_name), []).append(row.tag)
+
+	for name, order in orders.items():
+		order.lines = lines_by_order.get(name, [])
+		order.lifecycle = lifecycles.get(name, frappe._dict())
+		order.tags = tags_by_order.get(name, [])
+	return orders
+
+
+def read_order_lines(order_names: list[str]) -> dict[str, list]:
+	lines = frappe.get_all(
+		"Sales Order Item",
+		filters={"parent": ["in", order_names], "parenttype": "Sales Order"},
+		fields=[
+			"name",
+			"parent",
+			"item_code",
+			"item_name",
+			"qty",
+			"delivered_qty",
+			"delivered_by_supplier",
+			"rate",
+			"amount",
+			"image",
+		],
+		order_by="idx asc",
+	)
+
+	# The size lives on the variant's child row, not on the order line.
+	sizes_by_item_code = {}
+	item_codes = list({row.item_code for row in lines if row.item_code})
+	if item_codes:
+		for row in frappe.get_all(
+			"Color Size Item",
+			filters={"item_code": ["in", item_codes], "parenttype": "Style Attribute Variant"},
+			fields=["item_code", "size", "parent"],
+		):
+			sizes_by_item_code.setdefault(cstr(row.item_code), row.size)
+
+	image_by_item_code = get_item_images(item_codes)
+
+	lines_by_order = {}
+	for row in lines:
+		row.size = sizes_by_item_code.get(cstr(row.item_code))
+		row.image = row.image or image_by_item_code.get(row.item_code)
+		lines_by_order.setdefault(cstr(row.parent), []).append(row)
+	return lines_by_order
+
+
+def get_order_plugin_failures(sales_order: str) -> list:
+	commera_event = frappe.qb.DocType("Commera Event")
+	delivery = frappe.qb.DocType("Commera Event Delivery")
+	return query_deliveries(
+		(commera_event.reference_doctype == "Sales Order")
+		& (commera_event.reference_name == sales_order)
+		& (delivery.status == "Failed")
+	)
 
 
 def read_payment_totals(order_name: str) -> tuple[float, float]:
@@ -760,8 +834,21 @@ def can_fulfil_order(order, state) -> bool:
 	"""Whether there is anything left for the owner to ship. per_delivered alone is not the answer: a
 	return resets it, so a returned order used to offer a live "Fulfil order" button."""
 	return (
-		cint(order.docstatus) == 1 and flt(order.per_delivered) < 100 and state["key"] not in SETTLED_STAGES
+		cint(order.docstatus) == 1
+		and flt(order.per_delivered) < 100
+		and state["key"] not in SETTLED_STAGES
+		and bool(get_lines_the_store_ships(order.lines))
 	)
+
+
+def get_lines_the_store_ships(lines) -> list:
+	"""Outstanding lines a Delivery Note can take. ERPNext's mapper leaves out drop-ship lines: the supplier
+	ships those against a Purchase Order."""
+	return [
+		line
+		for line in lines
+		if not cint(line.delivered_by_supplier) and flt(line.delivered_qty) < flt(line.qty)
+	]
 
 
 @frappe.whitelist(methods=["POST"])
@@ -781,6 +868,8 @@ def fulfil_order(sales_order: str):
 		frappe.throw(_("Only a confirmed order can be fulfilled."))
 	if flt(order.per_delivered) >= 100:
 		frappe.throw(_("This order has already been fulfilled."))
+	if not get_lines_the_store_ships(order.items):
+		frappe.throw(_("The items left on this order are shipped by their supplier, not from your store."))
 
 	# A screen left open on a stale list can still reach here, so enforce and not just hide.
 	lifecycle = read_order_lifecycles([order.name]).get(cstr(order.name), frappe._dict())

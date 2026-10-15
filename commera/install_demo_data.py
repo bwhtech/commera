@@ -2,7 +2,9 @@ import random
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, random_string
+from frappe.utils import cint, flt, fmt_money, random_string
+
+STANDARD_DELIVERY_OPTION = "Standard Delivery"
 
 
 def install_demo_data():
@@ -178,52 +180,87 @@ def create_price_lists():
 			print(f"    • Price List '{pl_data['name']}' already exists")
 
 
+def save_standard_delivery_option(
+	flat_charge: float, free_shipping_above: float, currency: str
+) -> str | None:
+	"""The delivery option the store's Shipping Rule bands price; created once, then left to the merchant."""
+	if "bwh_shipping" not in frappe.get_installed_apps():
+		return None
+	if frappe.db.exists("Shipping Service", STANDARD_DELIVERY_OPTION):
+		return STANDARD_DELIVERY_OPTION
+
+	threshold = fmt_money(free_shipping_above, precision=0, currency=currency)
+	service = frappe.new_doc("Shipping Service")
+	service.title = STANDARD_DELIVERY_OPTION
+	service.enabled = 1
+	service.description = f"Delivered in 3-5 business days. Free on orders over {threshold}."
+	service.backup_charge = flat_charge
+	service.insert(ignore_permissions=True)
+	return service.name
+
+
 def create_shipping_rule():
-	"""Create a basic shipping rule"""
+	"""Create the Standard Shipping rule, or rebuild its bands so a re-seed names the delivery option."""
 	print("  - Creating Shipping Rule...")
 
-	if not frappe.db.exists("Shipping Rule", "Standard Shipping"):
-		# Get company for shipping rule
-		company = frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
+	company = frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
+	if not company:
+		print("    ⚠ Skipping Shipping Rule creation - no Company found")
+		return
 
-		if not company:
-			print("    ⚠ Skipping Shipping Rule creation - no Company found")
-			return
+	company_abbr = frappe.db.get_value("Company", company, "abbr")
+	account = frappe.db.get_value(
+		"Account", {"account_name": "Freight and Forwarding Charges", "company": company}, "name"
+	)
+	if not account:
+		account = f"Freight and Forwarding Charges - {company_abbr}"
 
-		# Get required account and cost center
-		company_abbr = frappe.db.get_value("Company", company, "abbr")
+	cost_center = frappe.db.get_value("Cost Center", {"company": company, "is_group": 0}, "name")
+	if not cost_center:
+		cost_center = f"Main - {company_abbr}"
 
-		# Get or create Freight and Forwarding Charges account
-		account = frappe.db.get_value(
-			"Account", {"account_name": "Freight and Forwarding Charges", "company": company}, "name"
-		)
-		if not account:
-			account = f"Freight and Forwarding Charges - {company_abbr}"
-
-		# Get default cost center
-		cost_center = frappe.db.get_value("Cost Center", {"company": company, "is_group": 0}, "name")
-		if not cost_center:
-			cost_center = f"Main - {company_abbr}"
-
-		shipping_rule = frappe.get_doc(
+	exists = frappe.db.exists("Shipping Rule", "Standard Shipping")
+	shipping_rule = (
+		frappe.get_doc("Shipping Rule", "Standard Shipping") if exists else frappe.new_doc("Shipping Rule")
+	)
+	if not exists:
+		shipping_rule.update(
 			{
-				"doctype": "Shipping Rule",
 				"label": "Standard Shipping",
 				"shipping_rule_type": "Selling",
 				"calculate_based_on": "Net Total",
 				"company": company,
 				"account": account,
 				"cost_center": cost_center,
-				"conditions": [
-					{"from_value": 0, "to_value": 50, "shipping_amount": 10},
-					{"from_value": 50, "to_value": 999999, "shipping_amount": 0},
-				],
 			}
 		)
-		shipping_rule.insert(ignore_permissions=True)
-		print("    ✓ Shipping Rule 'Standard Shipping' created")
-	else:
-		print("    • Shipping Rule already exists")
+
+	flat_charge, free_shipping_above = 10, 50
+	delivery_option = save_standard_delivery_option(
+		flat_charge, free_shipping_above, frappe.get_cached_value("Company", company, "default_currency")
+	)
+	shipping_rule.conditions = []
+	shipping_rule.append(
+		"conditions",
+		{
+			"from_value": 0,
+			"to_value": free_shipping_above,
+			"shipping_amount": flat_charge,
+			"shipping_service": delivery_option,
+		},
+	)
+	shipping_rule.append(
+		"conditions",
+		{
+			"from_value": free_shipping_above,
+			"to_value": 0,
+			"shipping_amount": 0,
+			"free_shipping": 1,
+			"shipping_service": delivery_option,
+		},
+	)
+	shipping_rule.save(ignore_permissions=True)
+	print(f"    ✓ Shipping Rule 'Standard Shipping' {'updated' if exists else 'created'}")
 
 
 def ensure_warehouse_exists():

@@ -103,6 +103,9 @@
 		<p class="mb-2">
 			<span x-text="tracking.carrier"></span> &middot; {{ _("AWB") }} <strong class="text-black" x-text="tracking.awb"></strong>
 			&middot; <span x-text="tracking.status"></span>
+			<template x-if="tracking.tracking_url">
+				<span>&middot; <a :href="tracking.tracking_url" target="_blank" rel="noopener noreferrer">{{ _("Track your parcel") }}</a></span>
+			</template>
 		</p>
 		<ul class="timeline ps-0">
 			<template x-for="event in tracking.events || []" :key="event.timestamp + event.status">
@@ -238,6 +241,12 @@
 				<div class="tracking-item-content">
 					<span>{{ tax.description }}</span>
 					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(tax.amount) }}</h6>
+				</div>
+				{% endfor %}
+				{% for fee in charge_lines.plugin_fees %}
+				<div class="tracking-item-content">
+					<span>{{ fee.description }}</span>
+					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(fee.amount) }}</h6>
 				</div>
 				{% endfor %}
 				{% if order.rounding_adjustment %}

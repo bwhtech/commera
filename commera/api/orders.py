@@ -4,6 +4,7 @@ from frappe import _
 from frappe.utils import flt
 
 from commera.api.payments import system_user_session
+from commera.plugin_events import fire_order_refunded
 from commera.utils import update_sales_order_ecommerce_status, validate_document_access
 
 
@@ -12,6 +13,7 @@ def cancel_order(order_id: str):
 	order_doc = frappe.get_doc("Sales Order", order_id, for_update=True)
 	validate_can_cancel(order_doc)
 
+	cancelling = False
 	try:
 		refund = None
 		if order_doc.custom_ecommerce_payment_mode != "COD":
@@ -21,21 +23,25 @@ def cancel_order(order_id: str):
 			order_doc.reload()
 
 		order_doc.flags.ignore_permissions = True
+		cancelling = True
 		if order_doc.docstatus == 1:
 			order_doc.cancel()
 		elif order_doc.docstatus == 0:
 			order_doc.submit()
 			order_doc.reload()
 			order_doc.cancel()
+		cancelling = False
 		# The on_cancel hook only enqueues this, so the page would reload onto the old status.
 		update_sales_order_ecommerce_status(order_id)
 
 		if refund:
 			submit_refund_payment_entry(order_id, *refund)
-	except Exception:
-		frappe.log_error(
-			title="Order cancellation failed", reference_doctype="Sales Order", reference_name=order_id
-		)
+	except Exception as error:
+		# A refusal from the order's own cancel (an app's before_cancel) is meant for the user, not a bug.
+		if not (cancelling and isinstance(error, frappe.ValidationError)):
+			frappe.log_error(
+				title="Order cancellation failed", reference_doctype="Sales Order", reference_name=order_id
+			)
 		raise
 
 
@@ -132,6 +138,12 @@ def submit_refund_payment_entry(order_id: str, payment_entry_doc, refund_amount:
 		new_payment_entry.insert(ignore_permissions=True)
 		new_payment_entry.submit()
 
+	# Fired here too: cancel_order unlinks the capture first, so the Payment Entry hook can't find the order.
+	order = frappe.db.get_value(
+		"Sales Order", order_id, ["name", "currency", "conversion_rate"], as_dict=True
+	)
+	order.refunded_amount = new_payment_entry.received_amount
+	fire_order_refunded(new_payment_entry, [order])
 	return new_payment_entry.name
 
 

@@ -74,14 +74,14 @@ const companyLink = computed(() =>
       <SettingsRow title="Store name" description="Shown across your storefront and in the browser tab.">
         <TextInput
           :model-value="values.store_name"
-          class="w-72"
+          class="w-full sm:w-72"
           @change="commitStoreField('store_name', $event, 'Store name')"
         />
       </SettingsRow>
       <SettingsRow title="Contact email" description="Where customers reach you, and who order mail comes from.">
         <TextInput
           :model-value="values.contact_email"
-          class="w-72"
+          class="w-full sm:w-72"
           type="email"
           @change="commitStoreField('contact_email', $event, 'Contact email')"
         />
@@ -89,14 +89,14 @@ const companyLink = computed(() =>
       <SettingsRow title="Contact phone">
         <TextInput
           :model-value="values.contact_phone"
-          class="w-72"
+          class="w-full sm:w-72"
           @change="commitStoreField('contact_phone', $event, 'Contact phone')"
         />
       </SettingsRow>
       <SettingsRow title="Working hours" description="Shown alongside your contact details.">
         <TextInput
           :model-value="values.working_hours"
-          class="w-72"
+          class="w-full sm:w-72"
           @change="commitStoreField('working_hours', $event, 'Working hours')"
         />
       </SettingsRow>

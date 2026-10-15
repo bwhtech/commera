@@ -99,7 +99,9 @@ static class names — build variants with an object/array binding or a lookup m
 A colour the store owner picked is exempt: it is data, not styling, and no class can hold an
 arbitrary hex. Draw one through `SwatchDot`, which binds it with `:style`, rather than a new binding.
 
-Icons are a `<span class="lucide-name size-4" aria-hidden="true" />`. There is no icon component.
+Icons are a `<span class="lucide-name size-4" aria-hidden="true" />`. The one exception is an
+icon that may be an installed plugin's logo: take it from `pluginIcon()` / `appIcon()` in `ia/plugins.js` and
+draw it with frappe-ui's `Icon`, which renders a lucide class or the logo's component at the same size and colour.
 
 Mobile-first, `sm` (640px) is the layout switch — `useIsMobile()` and `MobileLayout` both agree
 on it. **`min-w-0` on a flex child is load-bearing**: frappe-ui's shells give children `flex-1`
@@ -139,3 +141,15 @@ screenshot, and any claim that a change works. Both build outputs are gitignored
 
 UI changes are screenshot-driven: reference → current → name the exact diff → one change at a
 time. Light and dark both, and the `sm` breakpoint both sides.
+
+## 10 — `src/plugin-api/` is a public API
+
+Installed plugins import it as `@commera/admin`, next to `vue`, `frappe-ui`, `frappe-ui/list` and `frappe-ui/charts`,
+through the import map `vite.config.js` writes into `commera.html`. Renaming or removing an export, a prop of a
+re-exported component, or a `usePlugin()` member breaks every plugin built against it; add, never change. The build also
+writes `commera/public/plugin-host/` (shared export names, the class vocabulary and the icon list), which
+the plugin kit in `packages/plugin-kit/` checks app builds against.
+
+The dashboard draws every frame a plugin sits in: `PluginPageFrame` (header + body), `PluginCardFrame`,
+`PluginActionDialog` and `PluginSettingsPanel`. Plugins reach that chrome only through `usePage()`, `useCard()`
+and `useAction()`, so never export `AppPageHeader`, `PageBody` or a card wrapper from `@commera/admin`.

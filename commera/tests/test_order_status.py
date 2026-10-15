@@ -5,7 +5,8 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils.data import flt
 
 from commera.api.payments import make_sales_invoice
-from commera.tests.test_admin_orders import make_test_sales_order
+from commera.sdk import STORE_ORDER_TYPE
+from commera.tests.test_admin_orders import make_drop_ship_order, make_test_sales_order
 from commera.utils import can_return, update_sales_order_ecommerce_status
 
 try:
@@ -46,13 +47,14 @@ class TestOrderStatus(IntegrationTestCase):
 		sales_return.submit()
 		return sales_return
 
-	def book_parcel(self, sales_order, status):
+	def book_parcel(self, sales_order, status, delivery_note=None):
 		frappe.get_doc(
 			{
 				"doctype": "Shipping Request",
 				"name": frappe.generate_hash(length=10),
 				"ref_doctype": "Sales Order",
 				"ref_docname": sales_order.name,
+				"delivery_note": delivery_note,
 				"status": status,
 			}
 		).db_insert()
@@ -118,6 +120,72 @@ class TestOrderStatus(IntegrationTestCase):
 		sales_order = make_test_sales_order()
 		sales_order.cancel()
 		self.assertEqual(self.status_of(sales_order), "Cancelled")
+
+
+class TestMixedOrderStatus(IntegrationTestCase):
+	"""A store line ships on a Delivery Note; a drop-ship line ships through its supplier's parcel."""
+
+	book_parcel = TestOrderStatus.book_parcel
+	status_of = TestOrderStatus.status_of
+
+	def make_mixed_order(self):
+		sales_order = make_drop_ship_order(with_store_line=True)
+		frappe.db.set_value("Sales Order", sales_order.name, "order_type", STORE_ORDER_TYPE)
+		return sales_order
+
+	def mark_supplier_lines_received(self, sales_order):
+		for line in sales_order.items:
+			if line.delivered_by_supplier:
+				frappe.db.set_value("Sales Order Item", line.name, "delivered_qty", line.qty)
+
+	def fired_events(self, sales_order):
+		return frappe.get_all(
+			"Commera Event", filters={"reference_name": sales_order.name}, pluck="event", order_by="creation"
+		)
+
+	def test_delivering_the_store_line_leaves_the_order_in_preparation(self):
+		sales_order = self.make_mixed_order()
+		deliver(sales_order)
+		self.assertEqual(self.status_of(sales_order), "Preparing for Shipment")
+		self.assertEqual(self.fired_events(sales_order), [])
+
+	def test_the_supplier_parcel_moving_alone_does_not_ship_the_order(self):
+		sales_order = self.make_mixed_order()
+		self.book_parcel(sales_order, "In Transit")
+		self.assertEqual(self.status_of(sales_order), "Preparing for Shipment")
+
+	def test_the_order_ships_when_every_line_has_left_and_delivers_when_every_line_arrives(self):
+		sales_order = self.make_mixed_order()
+		deliver(sales_order)
+		self.book_parcel(sales_order, "In Transit")
+		self.assertEqual(self.status_of(sales_order), "Shipped")
+		self.assertEqual(self.fired_events(sales_order), ["order_fulfilled"])
+
+		self.book_parcel(sales_order, "Delivered")
+		self.assertEqual(self.status_of(sales_order), "Delivered")
+		self.assertEqual(self.status_of(sales_order), "Delivered")
+		self.assertEqual(self.fired_events(sales_order), ["order_fulfilled", "order_delivered"])
+
+	def test_the_store_carrier_parcel_is_not_read_as_the_supplier_parcel(self):
+		sales_order = self.make_mixed_order()
+		delivery_note = deliver(sales_order)
+		self.book_parcel(sales_order, "Delivered", delivery_note=delivery_note.name)
+		self.assertEqual(self.status_of(sales_order), "Preparing for Shipment")
+
+	def test_the_supplier_receipt_on_the_purchase_order_delivers_the_drop_ship_line(self):
+		sales_order = self.make_mixed_order()
+		deliver(sales_order)
+		self.mark_supplier_lines_received(sales_order)
+		self.assertEqual(self.status_of(sales_order), "Delivered")
+		self.assertEqual(self.fired_events(sales_order), ["order_fulfilled", "order_delivered"])
+
+	def test_a_drop_ship_only_order_follows_its_supplier_parcel(self):
+		sales_order = make_drop_ship_order()
+		self.assertEqual(self.status_of(sales_order), "Order Received")
+		self.book_parcel(sales_order, "In Transit")
+		self.assertEqual(self.status_of(sales_order), "Shipped")
+		self.book_parcel(sales_order, "Delivered")
+		self.assertEqual(self.status_of(sales_order), "Delivered")
 
 
 class TestReturnWindow(IntegrationTestCase):

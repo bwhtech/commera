@@ -1,8 +1,9 @@
 <script setup>
 import { computed, reactive, ref, useId } from 'vue'
-import { Button, FormControl, SettingsBody, SettingsRow, toast } from 'frappe-ui'
+import { Button, FormControl, SettingsBody, toast } from 'frappe-ui'
 import SettingsConfigHeader from './SettingsConfigHeader.vue'
 import SettingsFieldRows from './SettingsFieldRows.vue'
+import StackedSettingsRow from './StackedSettingsRow.vue'
 
 const props = defineProps({
   // Null while creating; the row being edited otherwise.
@@ -21,12 +22,18 @@ const formId = useId()
 
 const isEdit = computed(() => Boolean(props.option))
 
+const CARRIER_FIELDNAMES = ['service_code', 'carrier', 'markup_percent', 'handling_fee']
+
 // An order stores this title, so it is set once and then read-only.
 const editableGroups = computed(() =>
   props.groups
     .map((group) => ({
       ...group,
-      fields: group.fields.filter((field) => field.fieldname !== 'title'),
+      fields: group.fields.filter(
+        (field) =>
+          field.fieldname !== 'title' &&
+          (values.provider || !CARRIER_FIELDNAMES.includes(field.fieldname)),
+      ),
     }))
     .filter((group) => group.fields.length),
 )
@@ -86,13 +93,13 @@ async function save() {
   <SettingsBody v-scroll-fade>
     <form :id="formId" @submit.prevent="save">
       <div class="divide-y divide-outline-gray-1">
-        <SettingsRow
+        <StackedSettingsRow
           v-if="isEdit"
           title="Name at checkout"
           description="Orders are stored against this name, so it cannot be changed."
         >
-          <p class="w-72 text-base text-ink-gray-7">{{ option.title }}</p>
-        </SettingsRow>
+          <p class="text-base text-ink-gray-7">{{ option.title }}</p>
+        </StackedSettingsRow>
 
         <div v-else class="py-3.5">
           <FormControl
@@ -108,6 +115,7 @@ async function save() {
           :groups="editableGroups"
           :values="values"
           :link-options-path="linkOptionsPath"
+          stacked
           @update="(fieldname, value) => (values[fieldname] = value)"
         />
       </div>

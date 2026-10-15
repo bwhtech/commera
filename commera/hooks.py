@@ -28,6 +28,7 @@ website_redirects = [
 website_route_rules = [
 	# SPA client-side routing: every /commera deep link resolves to the same shell so a reload does not 404.
 	{"from_route": "/commera/<path:app_path>", "to_route": "/commera"},
+	{"from_route": "/cart/<path:codes>", "to_route": "/cart/permalink.html"},
 	# ------------
 	# English Routes
 	# ------------
@@ -40,6 +41,7 @@ website_route_rules = [
 	# -> Cart / Checkout
 	{"from_route": "/en/cart", "to_route": "/cart/cart.html"},
 	{"from_route": "/en/cart/checkout", "to_route": "/cart/checkout.html"},
+	{"from_route": "/en/cart/<path:codes>", "to_route": "/cart/permalink.html"},
 	# -> Account
 	{"from_route": "/en/account/dashboard", "to_route": "/account/dashboard.html"},
 	{"from_route": "/en/account/profile", "to_route": "/account/profile.html"},
@@ -67,6 +69,7 @@ website_route_rules = [
 	# -> Cart / Checkout
 	{"from_route": "/ar/cart", "to_route": "/cart/cart.html"},
 	{"from_route": "/ar/cart/checkout", "to_route": "/cart/checkout.html"},
+	{"from_route": "/ar/cart/<path:codes>", "to_route": "/cart/permalink.html"},
 	# -> Account
 	{"from_route": "/ar/account/dashboard", "to_route": "/account/dashboard.html"},
 	{"from_route": "/ar/account/profile", "to_route": "/account/profile.html"},
@@ -97,6 +100,8 @@ page_renderer = ["commera.shop_themes.theme_resolver.ThemePageRenderer"]
 clear_cache = [
 	"commera.shop_themes.doctype.shop_theme.shop_theme.clear_theme_cache",
 	"commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings.clear_settings_cache",
+	"commera.plugins.registry.clear_registry_cache",
+	"commera.storefront_plugins.clear_storefront_plugin_cache",
 ]
 
 # Without this, records of a custom doctype never import on migrate (frappe/model/sync.py).
@@ -116,6 +121,7 @@ doctype_js = {
 
 after_install = "commera.migrate.after_install"
 after_migrate = "commera.migrate.after_migrate"
+after_app_install = "commera.storefront_plugins.sync_storefront_apps"
 setup_wizard_complete = "commera.swatches.drop_unused_colour_attribute"
 
 
@@ -134,15 +140,31 @@ doc_events = {
 		"on_submit": [
 			"commera.jobs.send_order_success_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
+			"commera.plugin_events.on_sales_order_stock_reservation",
 		],
 		"on_cancel": [
 			"commera.jobs.send_order_cancel_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
+			"commera.plugin_events.on_sales_order_cancel",
+			"commera.plugin_events.on_sales_order_stock_reservation",
 		],
 	},
-	"Stock Ledger Entry": {"after_insert": ["commera.jobs.send_product_back_in_stock_email"]},
+	"Stock Ledger Entry": {
+		"after_insert": [
+			"commera.jobs.send_product_back_in_stock_email",
+			"commera.plugin_events.on_stock_ledger_entry_insert",
+		]
+	},
+	"Item": {"on_update": "commera.plugin_events.on_item_update"},
+	"Item Price": {
+		"on_update": "commera.plugin_events.on_item_price_change",
+		"on_trash": "commera.plugin_events.on_item_price_change",
+	},
 	"Style Attribute Variant": {
-		"on_update": "commera.search.sync.on_update",
+		"on_update": [
+			"commera.search.sync.on_update",
+			"commera.plugin_events.on_style_attribute_variant_update",
+		],
 		"after_rename": "commera.search.sync.after_rename",
 		"on_trash": "commera.search.sync.on_trash",
 	},
@@ -152,6 +174,7 @@ doc_events = {
 		"on_trash": "commera.search.sync.on_trash",
 	},
 	"Sales Invoice": {"on_submit": "commera.utils.update_so_status_from_related_doc"},
+	"Payment Entry": {"on_submit": "commera.plugin_events.on_payment_entry_submit"},
 	"Delivery Note": {
 		"after_insert": "commera.utils.update_so_status_from_related_doc",
 		"on_submit": "commera.utils.update_so_status_from_related_doc",
@@ -174,6 +197,8 @@ jinja = {
 		"commera.shop_data.get_storefront_menu",
 		"commera.shop_themes.jinja_helpers.shop_theme_asset_url",
 		"commera.shop_themes.jinja_helpers.shop_theme_config",
+		"commera.storefront_plugins.format_plugin_includes",
+		"commera.storefront_plugins.plugin_slot",
 	],
 }
 
@@ -194,6 +219,8 @@ user_data_fields = [
 ignore_links_on_delete = [
 	"Bulk Image Upload Log",
 	"Bulk Style Attribute Configurator Creation Log",
+	"Commera Event",
+	"Commera Event Delivery",
 ]
 
 # Apps
@@ -422,9 +449,7 @@ before_tests = "commera.install.before_tests"
 # Automatically update python controller files with type annotations for this app.
 export_python_type_annotations = True
 
-# default_log_clearing_doctypes = {
-# 	"Logging DocType Name": 30  # days to retain logs
-# }
+default_log_clearing_doctypes = {"Commera Event": 14}
 
 fixtures = [
 	{
@@ -440,6 +465,14 @@ fixtures = [
 ]
 
 scheduler_events = {
+	# Cron entries still only fire on the scheduler tick (scheduler_tick_interval, 4 minutes by default),
+	# so a retry due after 1 minute really runs up to a tick later.
+	"cron": {
+		"* * * * *": ["commera.plugin_events.run_due_deliveries"],
+	},
+	"hourly": [
+		"commera.plugin_events.sweep_missed_cod_payments",
+	],
 	# Long queue, not the short one: sync_status() is a gateway round-trip per pending request, so a
 	# slow gateway would otherwise sit on a worker the whole storefront shares.
 	"hourly_long": [

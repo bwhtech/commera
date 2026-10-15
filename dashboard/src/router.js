@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { firstPageRoute } from './ia/plugins'
 import { SETTINGS_TABS } from './ia/settings'
 import { attachSettingsRouter, DEFAULT_SETTINGS_TAB, SETTINGS_ROUTE_NAME } from './ia/settingsRoute'
 
@@ -35,17 +36,25 @@ const routes = [
   { path: '/storefront/pages/:name', name: 'StorefrontPageDetail', component: () => import('./pages/storefront/PageDetail.vue') },
   // No component on purpose: RouterView renders nothing for a matched record without one,
   // so the page App.vue hands it stays mounted behind the modal.
-  { path: '/settings', redirect: `/settings/${DEFAULT_SETTINGS_TAB}` },
   {
-    path: '/settings/:tab',
+    // No tab is the phone's list of sections; on a desktop it shows the default tab.
+    path: '/settings/:tab?',
     name: SETTINGS_ROUTE_NAME,
     // beforeEnter, not `redirect`: a redirect function must always return a location,
     // and an unknown tab is the only case that moves.
     beforeEnter: (to) => {
+      if (!to.params.tab) return true
       const known = SETTINGS_TABS.some((settingsTab) => settingsTab.value === to.params.tab)
       return known ? true : { path: `/settings/${DEFAULT_SETTINGS_TAB}`, replace: true }
     },
   },
+  // Like /analytics, an app with several pages is a disclosure in the sidebar, so its own path opens the first page.
+  {
+    path: '/plugins/:app',
+    redirect: (to) =>
+      firstPageRoute(to.params.app) ?? { name: 'NotFound', params: { pathMatch: to.path.slice(1).split('/') } },
+  },
+  { path: '/plugins/:app/:page/:path(.*)*', name: 'PluginPage', component: () => import('./pages/PluginPage.vue') },
   // Last, so it only catches what nothing above claimed: without it an unknown path rendered the
   // shell with an empty content area, which reads as a screen that failed to load.
   { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('./pages/NotFound.vue') },

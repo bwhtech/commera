@@ -92,7 +92,7 @@
                     JSON.stringify(cart_item.variant) === JSON.stringify(variant)
                 );
                 if (!found_item) return;
-                if ((found_item.qty + 1) > found_item.stock_qty) {
+                if (found_item.stock_qty !== null && (found_item.qty + 1) > found_item.stock_qty) {
                     toast(`Only ${found_item.stock_qty} left in stock.`, { type: "warning" });
                     return;
                 }
@@ -144,6 +144,25 @@
             },
             remove_selected() {
                 this.items = this.items.filter(item => !item.selected);
+            },
+            link(discount_code = "") {
+                const pairs = this.items
+                    .filter(item => item.selected)
+                    .map(item => `${encodeURIComponent(item.variant.item_code)}:${item.qty}`);
+                const language = window.location.pathname.split("/")[1] === "ar" ? "ar" : "en";
+                const url = new URL(`/${language}/cart/${pairs.join(",")}`, window.location.origin);
+                if (discount_code) url.searchParams.set("discount", discount_code);
+                return url.href;
+            },
+            async copy_link(discount_code = "") {
+                const url = this.link(discount_code);
+                try {
+                    await navigator.clipboard.writeText(url);
+                    toast({{ _("Cart link copied") | tojson }}, { type: "success" });
+                } catch (error) {
+                    // The clipboard is refused over plain http and in some in-app browsers.
+                    window.prompt({{ _("Copy this cart link") | tojson }}, url);
+                }
             },
             async update_variant(cart_item, selected_size) {
                 const item_name = cart_item.item.name;

@@ -15,6 +15,7 @@ from pypika import Order
 
 from commera.core import get_address_docs, get_party
 from commera.order_access import get_key_access
+from commera.plugin_events import SHIPPING_ADDRESS_FIELDS, STORE_ORDER_TYPE, fire_event, get_order_snapshot
 
 # Ceiling for any IN (...) list this app sends to MariaDB/Postgres.
 IN_CLAUSE_CHUNK_SIZE = 1000
@@ -323,8 +324,17 @@ def get_delivery_configuration():
 	shipping_rule = frappe.get_cached_doc("Shipping Rule", shoe_arena_settings.shipping_rule)
 	if not shipping_rule or not shipping_rule.conditions:
 		return 0, 0
-	condition = shipping_rule.conditions[0]
-	return condition.shipping_amount, condition.to_value
+	free_condition = next(
+		(condition for condition in shipping_rule.conditions if condition.free_shipping), None
+	)
+	if not free_condition:
+		condition = shipping_rule.conditions[0]
+		return condition.shipping_amount, condition.to_value
+	charge = next(
+		(condition.shipping_amount for condition in shipping_rule.conditions if not condition.free_shipping),
+		0,
+	)
+	return charge, free_condition.from_value
 
 
 # The leading space is historical and live orders carry it: strip before comparing, never remove it.
@@ -339,6 +349,15 @@ def get_cod_configuration():
 	)
 
 
+def get_charge_account_head() -> str:
+	account = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
+	if not account:
+		frappe.throw(
+			frappe._("Set a Charge Account Head in Commera Settings before adding charges to a cart.")
+		)
+	return account
+
+
 def format_theme_css():
 	# jinja's safe globals return documents as plain dicts, so controller methods are unreachable from templates
 	return frappe.get_cached_doc("Commera Settings", "Commera Settings").generate_theme_css()
@@ -349,7 +368,8 @@ def get_currency_symbol():
 	# Riyal has no glyph in the fonts the themes ship, so SAR alone borrows the icon font.
 	if currency == "SAR":
 		return '<span class="saudi-currency-symbol pe-0.5"></span>'
-	return frappe.get_cached_value("Currency", currency, "symbol")
+	# A code needs a gap before the amount; a plain space collapses inside the flex price wrappers.
+	return frappe.get_cached_value("Currency", currency, "symbol") or f"{currency}\u00a0"
 
 
 def get_addresses(party=None, address_type="Billing"):
@@ -385,17 +405,7 @@ def format_addresses(addresses, address_type):
 	]
 
 
-PICKUP_ADDRESS_FIELDS = (
-	"address_title",
-	"address_line1",
-	"address_line2",
-	"city",
-	"state",
-	"pincode",
-	"country",
-	"phone",
-	"custom_store_location",
-)
+PICKUP_ADDRESS_FIELDS = (*SHIPPING_ADDRESS_FIELDS, "custom_store_location")
 
 
 def get_pickup_warehouses() -> list[str]:
@@ -575,20 +585,38 @@ def get_available_stocks(item_codes, warehouse):
 		bin_by_item_code.update({cstr(row.item_code): row for row in bin_rows})
 
 	pos_reserved_by_item_code = get_pos_reserved_qtys(item_codes, warehouse)
+	unlimited_item_codes = get_unlimited_item_codes(item_codes)
 
 	stock_by_item_code = {}
 	for item_code in item_codes:
-		bin_data = bin_by_item_code.get(item_code)
-		if not bin_data:
-			stock_by_item_code[item_code] = {"stock_qty": 0, "in_stock": 0}
-			continue
+		bin_data = bin_by_item_code.get(item_code) or {}
 		actual_qty = (
-			flt(bin_data.actual_qty)
-			- flt(bin_data.reserved_qty)
+			flt(bin_data.get("actual_qty"))
+			- flt(bin_data.get("reserved_qty"))
 			- flt(pos_reserved_by_item_code.get(item_code))
 		)
-		stock_by_item_code[item_code] = {"stock_qty": actual_qty, "in_stock": int(actual_qty > 0)}
+		unlimited = item_code in unlimited_item_codes
+		stock_by_item_code[item_code] = {
+			"stock_qty": actual_qty,
+			"in_stock": int(unlimited or actual_qty > 0),
+			"unlimited": int(unlimited),
+		}
 	return stock_by_item_code
+
+
+def get_unlimited_item_codes(item_codes) -> set[str]:
+	"""Items sold without stock: drop-shipped by the supplier, or not stock-tracked by ERPNext at all."""
+	unlimited_item_codes = set()
+	for item_code_chunk in create_batch(item_codes, IN_CLAUSE_CHUNK_SIZE):
+		unlimited_item_codes.update(
+			frappe.get_all(
+				"Item",
+				filters={"name": ["in", item_code_chunk]},
+				or_filters={"delivered_by_supplier": 1, "is_stock_item": 0},
+				pluck="name",
+			)
+		)
+	return unlimited_item_codes
 
 
 def get_discount_percent(default_price, sale_price):
@@ -676,22 +704,92 @@ SHIPMENT_STATUS_LADDER = {
 	"Delivered": "Delivered",
 	"RTO": "Returned",
 }
+# A parcel can skip Shipped (a Delivery Note with no carrier), so Delivered also announces it fulfilled first.
+FULFILMENT_EVENTS = {
+	"Shipped": ("order_fulfilled",),
+	"Delivered": ("order_fulfilled", "order_delivered"),
+	"Partially Returned": ("order_fulfilled", "order_returned"),
+	"Returned": ("order_fulfilled", "order_returned"),
+}
 
 
 def update_sales_order_ecommerce_status(sales_order_name):
-	docstatus = frappe.db.get_value("Sales Order", sales_order_name, "docstatus")
+	order = frappe.db.get_value(
+		"Sales Order",
+		sales_order_name,
+		["docstatus", "custom_ecommerce_status", "order_type"],
+		as_dict=True,
+	)
 
-	if docstatus == 2:
+	if order.docstatus == 2:
 		new_status = "Cancelled"
-	elif docstatus == 0:
+	elif order.docstatus == 0:
 		new_status = "Waiting for Approval"
 	else:
 		new_status = get_fulfilment_status(sales_order_name)
 
 	frappe.db.set_value("Sales Order", sales_order_name, "custom_ecommerce_status", new_status)
+	events = FULFILMENT_EVENTS.get(new_status, ())
+	if order.order_type == STORE_ORDER_TYPE and new_status != order.custom_ecommerce_status and events:
+		order_snapshot = get_order_snapshot(sales_order_name)
+		for event in events:
+			fire_event(
+				event,
+				"Sales Order",
+				sales_order_name,
+				order_snapshot=order_snapshot,
+				**get_status_event_args(event, new_status),
+			)
+
+
+def get_status_event_args(event: str, status: str) -> dict:
+	if event != "order_returned":
+		return {}
+	# Keyed on the status, so a partial return and the full return that follows each fire once.
+	return {
+		"data": {"status": status, "partial": status == "Partially Returned"},
+		"key": frappe.scrub(status),
+	}
+
+
+FORWARD_STATUSES = ("Order Received", "Preparing for Shipment", "Shipped", "Delivered")
 
 
 def get_fulfilment_status(sales_order_name) -> str:
+	lines = frappe.get_all(
+		"Sales Order Item",
+		filters={"parent": sales_order_name},
+		fields=["delivered_by_supplier", "qty", "delivered_qty"],
+	)
+	supplier_lines = [line for line in lines if line.delivered_by_supplier]
+	if not supplier_lines:
+		return get_store_status(sales_order_name)
+
+	supplier_status = get_supplier_status(sales_order_name, supplier_lines)
+	if len(supplier_lines) == len(lines):
+		return supplier_status
+	# Mixed order: a Shipping Request without a Delivery Note is the supplier's parcel, not the store's.
+	return get_earlier_status(get_store_status(sales_order_name, from_delivery_note=True), supplier_status)
+
+
+def get_supplier_status(sales_order_name, supplier_lines) -> str:
+	# ERPNext rolls the drop-ship Purchase Order's received qty into these lines' delivered_qty.
+	if all(flt(line.delivered_qty) >= flt(line.qty) for line in supplier_lines):
+		return "Delivered"
+	return get_carrier_status(sales_order_name, from_delivery_note=False) or "Order Received"
+
+
+def get_earlier_status(store_status: str, supplier_status: str) -> str:
+	for status in (store_status, supplier_status):
+		if status not in FORWARD_STATUSES:
+			return status
+	earlier, later = sorted((store_status, supplier_status), key=FORWARD_STATUSES.index)
+	if earlier == "Order Received" and later != earlier:
+		return "Preparing for Shipment"
+	return earlier
+
+
+def get_store_status(sales_order_name, from_delivery_note: bool | None = None) -> str:
 	delivery_lines = get_delivery_note_lines(sales_order_name)
 	submitted_lines = [line for line in delivery_lines if line.docstatus == 1]
 	delivered_qty = sum(flt(line.qty) for line in submitted_lines if not line.is_return)
@@ -702,7 +800,7 @@ def get_fulfilment_status(sales_order_name) -> str:
 	if returned_qty:
 		return "Partially Returned"
 
-	if carrier_status := get_carrier_status(sales_order_name):
+	if carrier_status := get_carrier_status(sales_order_name, from_delivery_note):
 		return carrier_status
 
 	if delivered_qty:
@@ -714,10 +812,13 @@ def get_fulfilment_status(sales_order_name) -> str:
 	return "Order Received"
 
 
-def get_carrier_status(sales_order_name) -> str | None:
+def get_carrier_status(sales_order_name, from_delivery_note: bool | None = None) -> str | None:
+	filters = {"ref_doctype": "Sales Order", "ref_docname": sales_order_name, "docstatus": ["<", 2]}
+	if from_delivery_note is not None:
+		filters["delivery_note"] = ["is", "set" if from_delivery_note else "not set"]
 	requests = frappe.get_all(
 		"Shipping Request",
-		filters={"ref_doctype": "Sales Order", "ref_docname": sales_order_name, "docstatus": ["<", 2]},
+		filters=filters,
 		fields=["status"],
 		order_by="creation desc",
 		limit=1,

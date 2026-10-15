@@ -29,6 +29,11 @@ DEFAULT_ROUTES = [
 		"requires_auth": 0,
 	},
 	{
+		"url_pattern": rf"^{LANG}/cart/(?!checkout$)(?P<codes>.+)$",
+		"template_path": "pages/cart/permalink.html",
+		"requires_auth": 0,
+	},
+	{
 		"url_pattern": rf"^{LANG}/account/dashboard$",
 		"template_path": "pages/account/dashboard.html",
 		"requires_auth": 1,

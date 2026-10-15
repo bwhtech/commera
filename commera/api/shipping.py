@@ -3,8 +3,14 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cstr, flt, sha256_hash
 
+from commera.checkout_hooks import PLUGIN_FEE_FIELD, apply_delivery_option_hooks, apply_plugin_fees
 from commera.core import _get_cart_quotation
-from commera.utils import COD_CHARGE_DESCRIPTION, get_cod_configuration, validate_document_access
+from commera.utils import (
+	COD_CHARGE_DESCRIPTION,
+	get_charge_account_head,
+	get_cod_configuration,
+	validate_document_access,
+)
 
 # The Actual charge row the chosen option posts through, matched on description on re-selection.
 DELIVERY_CHARGE_DESCRIPTION = "Delivery Charges"
@@ -41,13 +47,18 @@ def get_shipping_options() -> dict:
 		return {"options": [], "address_missing": True}
 
 	try:
-		options = get_quoted_options(quotation)
+		options = get_delivery_options(quotation)
 	except Exception:
 		# The connector failed, so checkout falls back to the flat Shipping Rule and says so.
 		frappe.log_error(title="Shipping options could not be quoted")
 		return {"options": [], "unavailable": True}
 
 	return {"options": options, "selected": quotation.custom_delivery_option}
+
+
+def get_delivery_options(quotation) -> list[dict]:
+	# Only the raw quote is cached: an app's answer can depend on more than the cart fingerprint.
+	return apply_delivery_option_hooks(quotation, get_quoted_options(quotation), strict=False)
 
 
 def get_quoted_options(quotation) -> list[dict]:
@@ -73,6 +84,7 @@ def get_cart_fingerprint(quotation) -> str:
 		str(flt(quotation.net_total)),
 		quotation.currency or "",
 		get_services_stamp(),
+		get_store_rule_stamp(),
 	)
 	return sha256_hash("|".join(parts))[:12]
 
@@ -84,6 +96,18 @@ def get_services_stamp() -> str:
 	"""
 	latest = frappe.get_all("Shipping Service", fields=["modified"], order_by="modified desc", limit=1)
 	return str(latest[0].modified) if latest else ""
+
+
+def get_store_rule_stamp() -> str:
+	"""The store Shipping Rule and when its bands were last edited, since those bands price the options."""
+	shipping_rule = get_store_shipping_rule()
+	if not shipping_rule:
+		return ""
+	return f"{shipping_rule}@{frappe.get_cached_value('Shipping Rule', shipping_rule, 'modified')}"
+
+
+def get_store_shipping_rule() -> str | None:
+	return frappe.get_cached_value("Commera Settings", "Commera Settings", "shipping_rule")
 
 
 def quote_options(quotation) -> list[dict]:
@@ -100,6 +124,7 @@ def quote_options(quotation) -> list[dict]:
 		get_cart_parcels(quotation),
 		get_cart_context(quotation),
 		cod=False,
+		shipping_rule=get_store_shipping_rule(),
 	)
 
 
@@ -192,7 +217,7 @@ def set_delivery_option(delivery_option: str | None = None) -> dict:
 
 
 def find_option(quotation, delivery_option: str) -> dict:
-	for option in get_quoted_options(quotation):
+	for option in get_delivery_options(quotation):
 		if option["title"] == delivery_option:
 			return option
 	frappe.throw(_("Delivery option {0} is not available for this address.").format(delivery_option))
@@ -204,6 +229,7 @@ def apply_delivery_option(quotation, option: dict):
 	quotation.custom_shipping_provider = option.get("provider")
 	quotation.custom_shipping_service_code = option.get("service_code")
 	set_delivery_charge_row(quotation, flt(option["amount"]), option["title"])
+	apply_plugin_fees(quotation)
 
 
 def clear_delivery_option(quotation):
@@ -231,7 +257,7 @@ def set_delivery_charge_row(quotation, amount: float, title: str):
 				"doctype": "Sales Taxes and Charges",
 				"description": f"{DELIVERY_CHARGE_DESCRIPTION} - {title}",
 				"charge_type": "Actual",
-				"account_head": get_charge_account(title),
+				"account_head": get_charge_account(get_store_shipping_rule()),
 				"tax_amount": amount,
 				# ERPNext refuses an inclusive Actual charge, and a site default of 1 would fail checkout.
 				"included_in_print_rate": 0,
@@ -277,15 +303,18 @@ def is_shipping_rule_row(row, rule) -> bool:
 
 
 def get_charge_lines(taxes, shipping_rule: str | None) -> dict:
-	"""Split a charge table into delivery, the COD fee and the taxes a shopper sees by their own names.
+	"""Split a charge table into delivery, the COD fee, plugin fees and the taxes a shopper sees by their own names.
 
 	The Shipping Rule row is matched on account and cost centre because its description is translated.
 	"""
 	rule = get_shipping_rule_accounts(shipping_rule)
-	charge_lines = {"shipping": 0.0, "cod_charge": 0.0, "taxes": []}
+	charge_lines = {"shipping": 0.0, "cod_charge": 0.0, "plugin_fees": [], "taxes": []}
 	for row in taxes:
 		description = cstr(row.description).strip()
-		if description == COD_CHARGE_DESCRIPTION.strip():
+		# First: an app names its own fee, so its description can look like any other charge.
+		if row.get(PLUGIN_FEE_FIELD):
+			charge_lines["plugin_fees"].append({"description": description, "amount": flt(row.tax_amount)})
+		elif description == COD_CHARGE_DESCRIPTION.strip():
 			charge_lines["cod_charge"] += flt(row.tax_amount)
 		elif description.startswith(DELIVERY_CHARGE_DESCRIPTION) or is_shipping_rule_row(row, rule):
 			charge_lines["shipping"] += flt(row.tax_amount)
@@ -317,7 +346,7 @@ def get_checkout_summary(quotation) -> dict:
 def get_charge_summary(quotation) -> dict:
 	charge_lines = get_charge_lines(quotation.taxes, quotation.shipping_rule)
 	charges = charge_lines["shipping"] + charge_lines["cod_charge"]
-	charges += sum(tax["amount"] for tax in charge_lines["taxes"])
+	charges += sum(line["amount"] for line in charge_lines["taxes"] + charge_lines["plugin_fees"])
 	discount_amount = flt(quotation.discount_amount)
 	return {
 		# Derived rather than read: with a Grand Total discount the stored net_total is already partly discounted.
@@ -326,6 +355,7 @@ def get_charge_summary(quotation) -> dict:
 		),
 		"shipping": charge_lines["shipping"],
 		"cod_charge": charge_lines["cod_charge"],
+		"plugin_fees": charge_lines["plugin_fees"],
 		"taxes": charge_lines["taxes"],
 		"discount_amount": discount_amount,
 		"rounding_adjustment": flt(quotation.rounding_adjustment),
@@ -335,7 +365,8 @@ def get_charge_summary(quotation) -> dict:
 
 def clear_pickup_charges(quotation):
 	quotation.shipping_rule = None
-	quotation.taxes = []
+	quotation.taxes = [row for row in quotation.taxes if row.get(PLUGIN_FEE_FIELD)]
+	reindex_taxes(quotation)
 	quotation.calculate_taxes_and_totals()
 
 
@@ -363,13 +394,27 @@ def add_cod_charge(quotation, cod_charge: float, account_head: str | None):
 
 
 def get_order_charge_lines(sales_order: str, shipping_rule: str | None) -> dict:
-	taxes = frappe.get_all(
+	return get_charge_lines(read_order_taxes([sales_order]).get(cstr(sales_order), []), shipping_rule)
+
+
+def read_order_taxes(order_names: list) -> dict[str, list]:
+	taxes_by_order = {}
+	for row in frappe.get_all(
 		"Sales Taxes and Charges",
-		filters={"parent": sales_order, "parenttype": "Sales Order"},
-		fields=["description", "charge_type", "account_head", "cost_center", "tax_amount"],
+		filters={"parent": ["in", [cstr(name) for name in order_names]], "parenttype": "Sales Order"},
+		fields=[
+			"parent",
+			"description",
+			"charge_type",
+			"account_head",
+			"cost_center",
+			"tax_amount",
+			PLUGIN_FEE_FIELD,
+		],
 		order_by="idx asc",
-	)
-	return get_charge_lines(taxes, shipping_rule)
+	):
+		taxes_by_order.setdefault(cstr(row.parent), []).append(row)
+	return taxes_by_order
 
 
 def reindex_taxes(quotation):
@@ -377,18 +422,11 @@ def reindex_taxes(quotation):
 		row.idx = index
 
 
-def get_charge_account(title: str) -> str:
-	"""The option's own Shipping Rule account when it has one, else the store's charge account head."""
-	from bwh_shipping.bwh_shipping.pricing import get_charge_account as get_option_account
+def get_charge_account(shipping_rule: str | None) -> str:
+	"""The store Shipping Rule's account when it has one, else the store's charge account head."""
+	from bwh_shipping.bwh_shipping.pricing import get_charge_account as get_rule_account
 
-	account = get_option_account(title)
-	if account:
-		return account
-
-	account = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
-	if not account:
-		frappe.throw(_("Set a Charge Account Head in Commera Settings before charging for delivery."))
-	return account
+	return get_rule_account(shipping_rule) or get_charge_account_head()
 
 
 def get_delivery_summary(quotation) -> dict:
@@ -411,27 +449,39 @@ def reprice_selected_option(quotation) -> bool:
 
 	from bwh_shipping.bwh_shipping.pricing import get_charge_amount
 
-	for option in get_quoted_options(quotation):
+	from commera.api.payments import CheckoutPriceChangedError
+
+	options = get_quoted_options(quotation)
+	if not any(option["title"] == quotation.custom_delivery_option for option in options):
+		# No longer quotable for this address, so fall back to its stored price rather than lose the charge.
+		amount = get_charge_amount(
+			quotation.custom_delivery_option,
+			get_cart_context(quotation),
+			# A Currency field is never None, so the stored price is always billed and a stored 0 stays free.
+			quoted_amount=quotation.custom_delivery_charge,
+			shipping_rule=get_store_shipping_rule(),
+		)
+		options = [
+			*options,
+			{
+				"title": quotation.custom_delivery_option,
+				"amount": amount,
+				"provider": quotation.custom_shipping_provider,
+				"service_code": quotation.custom_shipping_service_code,
+			},
+		]
+
+	options = apply_delivery_option_hooks(quotation, options, strict=bool(quotation.flags.strict_plugin_fees))
+	for option in options:
 		if option["title"] == quotation.custom_delivery_option:
 			apply_delivery_option(quotation, option)
 			return True
 
-	# No longer quotable for this address, so fall back to its stored price rather than lose the charge.
-	amount = get_charge_amount(
-		quotation.custom_delivery_option,
-		get_cart_context(quotation),
-		quoted_amount=flt(quotation.custom_delivery_charge) or None,
+	frappe.throw(
+		_("Your delivery option is no longer available. Please choose another one."),
+		title=_("Delivery Option Changed"),
+		exc=CheckoutPriceChangedError,
 	)
-	apply_delivery_option(
-		quotation,
-		{
-			"title": quotation.custom_delivery_option,
-			"amount": amount,
-			"provider": quotation.custom_shipping_provider,
-			"service_code": quotation.custom_shipping_service_code,
-		},
-	)
-	return True
 
 
 def copy_delivery_option_to_order(quotation_name: str, sales_order) -> None:
@@ -469,7 +519,7 @@ def get_order_tracking(sales_order: str, key: str | None = None) -> dict:
 	shipment = frappe.get_all(
 		"Shipping Request",
 		filters={"ref_doctype": "Sales Order", "ref_docname": sales_order},
-		fields=["name", "awb", "carrier", "status", "label_url"],
+		fields=["name", "awb", "carrier", "status", "label_url", "tracking_url"],
 		order_by="creation desc",
 		limit=1,
 	)
@@ -488,5 +538,6 @@ def get_order_tracking(sales_order: str, key: str | None = None) -> dict:
 		"awb": request.awb,
 		"carrier": request.carrier,
 		"status": request.status,
+		"tracking_url": request.tracking_url,
 		"events": events,
 	}

@@ -68,6 +68,7 @@ async function copyWebhookUrl() {
         :groups="card.groups"
         :values="values"
         link-options-path="integrations.get_link_options"
+        stacked
         @update="(fieldname, value) => (values[fieldname] = value)"
       />
     </div>

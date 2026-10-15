@@ -249,7 +249,7 @@ class TestUtilityPageNoindexInjection(IntegrationTestCase):
 		frappe.local.request = self.saved_request
 
 	def run_context(self, path):
-		frappe.local.request = frappe._dict(path=path)
+		frappe.local.request = frappe._dict(path=path, headers={})
 		context = frappe._dict()
 		website_context.update_website_context(context)
 		return context

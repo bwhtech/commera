@@ -23,6 +23,7 @@ from commera.api.shipping import (
 	reprice_selected_option,
 )
 from commera.api.signup import get_placeholder_first_name, validate_single_email, validate_user_names
+from commera.checkout_hooks import apply_plugin_fees, filter_payment_methods, get_cart_refusal
 from commera.core import _get_cart_quotation, create_party, get_customer_contact, new_cart_quotation
 from commera.guest import (
 	get_guest_cart_name,
@@ -32,7 +33,8 @@ from commera.guest import (
 	validate_guest_checkout_enabled,
 )
 from commera.order_access import get_order_link, set_order_access_key
-from commera.utils import get_pickup_addresses, get_pickup_warehouses
+from commera.plugin_events import fire_event
+from commera.utils import get_charge_account_head, get_pickup_addresses, get_pickup_warehouses
 
 
 class CheckoutPriceChangedError(frappe.ValidationError):
@@ -142,11 +144,14 @@ def open_checkout(
 ):
 	validate_delivery_option(quotation, delivery_option)
 	validate_cart_is_not_in_checkout(quotation.name)
+	quotation.flags.strict_plugin_fees = True
 	update_delivery_charges(quotation)
+	validate_cart(quotation)
 	validate_expected_total(quotation, payment_mode, expected_total)
+	payment_methods = get_checkout_payment_methods(quotation, strict=True)
 
 	if is_cod(payment_mode):
-		if not frappe.db.get_single_value("Commera Settings", "cod_enabled"):
+		if COD_PAYMENT_MODE not in payment_methods:
 			refuse_payment(_("Cash on delivery is not available."), quotation.name)
 		return {"order_url": get_confirmation_url(quotation.name, payment_mode=COD_PAYMENT_MODE)}
 
@@ -157,6 +162,10 @@ def open_checkout(
 			quotation.name,
 			requested=payment_mode,
 			available=get_available_payment_modes(),
+		)
+	if gateway not in payment_methods:
+		refuse_payment(
+			_("This payment method is not available for your order."), quotation.name, gateway=gateway
 		)
 
 	payment_request = frappe.get_doc(
@@ -175,6 +184,15 @@ def open_checkout(
 	).insert(ignore_permissions=True)
 
 	return {"order_url": payment_request.order_url}
+
+
+def get_checkout_payment_methods(quotation, strict: bool = False) -> list[str]:
+	payment_methods = list(get_available_payment_modes())
+	if frappe.get_cached_value("Commera Settings", "Commera Settings", "cod_enabled"):
+		payment_methods.append(COD_PAYMENT_MODE)
+	if not quotation:
+		return payment_methods
+	return filter_payment_methods(quotation, payment_methods, strict)
 
 
 def get_gateway_customer(quotation) -> dict:
@@ -204,6 +222,12 @@ def get_gateway_customer(quotation) -> dict:
 			"phone",
 		),
 	}
+
+
+def validate_cart(quotation):
+	if refusal := get_cart_refusal(quotation):
+		# Not refuse_payment: the shopper can fix this, so it is no error to log.
+		frappe.throw(refusal)
 
 
 def validate_delivery_option(quotation, delivery_option: str | None):
@@ -262,8 +286,8 @@ def gateway_mode_of_payment(gateway: str) -> str:
 
 
 @contextmanager
-def system_user_session():
-	"""Place the accounting documents as Administrator, then hand the session back.
+def system_user_session(user: str = "Administrator"):
+	"""Place the accounting documents as `user`, then hand the session back.
 
 	ERPNext's get_party_account checks frappe.has_permission directly, so no ignore_permissions reaches it.
 	"""
@@ -272,7 +296,7 @@ def system_user_session():
 	live_session_snapshot = frappe.local.session.copy()
 	try:
 		# Audited: the docstring above and the snapshot restore below are why this is safe.
-		frappe.set_user("Administrator")  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
+		frappe.set_user(user)  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
 		yield
 	finally:
 		frappe.local.session.update(live_session_snapshot)
@@ -328,6 +352,7 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 		sales_order = _make_sales_order(quotation.name, ignore_permissions=True)
 		sales_order.custom_ecommerce_payment_mode = payment_mode
 		copy_delivery_option_to_order(quotation.name, sales_order)
+		set_delivery_date(sales_order)
 		fix_payment_schedule_dates(sales_order)
 		set_attribution_fields(sales_order)
 		sales_order.flags.ignore_permissions = True
@@ -335,12 +360,17 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 		set_order_access_key(sales_order)
 		sales_order.submit()
 
-		if flt(gateway_amount) > 0:
+		# A cart discounted to nothing is settled at placement, so it is billed and paid like a charged one.
+		paid = flt(gateway_amount) > 0 or flt(sales_order.grand_total) <= 0
+		if paid:
 			create_sales_invoice(sales_order, payment_mode, flt(gateway_amount), gateway_reference)
 
 	# Outside the switch: log_purchase stamps frappe.session.user, so Administrator would own every purchase.
 	stamp_order_owner(sales_order, shopper)
 	log_purchase(sales_order)
+	fire_event("order_placed", "Sales Order", sales_order.name)
+	if paid:
+		fire_event("order_paid", "Sales Order", sales_order.name)
 	return sales_order
 
 
@@ -377,6 +407,13 @@ def create_payment_entry(sales_invoice, payment_mode: str, paid_amount: float, r
 	payment_entry.insert()
 	payment_entry.submit()
 	return payment_entry
+
+
+def set_delivery_date(sales_order):
+	# ERPNext fills these only for order type "Sales"; drop-ship Purchase Orders copy them into Required By.
+	sales_order.delivery_date = sales_order.delivery_date or sales_order.transaction_date or getdate()
+	for item in sales_order.items:
+		item.delivery_date = item.delivery_date or sales_order.delivery_date
 
 
 def fix_payment_schedule_dates(doc):
@@ -471,9 +508,23 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 	save_cart_quotation(unsaved_quotation_doc)
 	# The stored option was priced for the old cart, and payment would re-quote it for the new one.
 	clear_delivery_option(unsaved_quotation_doc)
+	coupon_code = unsaved_quotation_doc.coupon_code
 	_remove_coupon_code(unsaved_quotation_doc)
+	reapply_coupon_code(unsaved_quotation_doc, coupon_code)
 	set_charges(unsaved_quotation_doc)
 	return save_cart_quotation(unsaved_quotation_doc)
+
+
+def reapply_coupon_code(quotation, coupon_code: str | None):
+	if not coupon_code:
+		return
+	try:
+		validate_coupon_code(coupon_code)
+	except frappe.ValidationError:
+		# An expired coupon is dropped quietly; the shopper only edited their cart.
+		frappe.clear_last_message()
+		return
+	quotation.coupon_code = coupon_code
 
 
 def set_charges(quotation):
@@ -482,17 +533,14 @@ def set_charges(quotation):
 		quotation.shipping_rule = shipping_rule
 		quotation.run_method("apply_shipping_rule")
 		quotation.run_method("calculate_taxes_and_totals")
+	apply_plugin_fees(quotation)
 
 
 def set_cod_charges(quotation):
 	cod_charge = get_cod_charge(quotation)
 	if not cod_charge:
 		return
-	account_head = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
-	if not account_head:
-		frappe.throw(_("Please select a valid account for cod charges."))
-
-	add_cod_charge(quotation, cod_charge, account_head)
+	add_cod_charge(quotation, cod_charge, get_charge_account_head())
 	quotation.flags.ignore_permissions = True
 	quotation.save()
 
@@ -733,6 +781,13 @@ def quotation_purchase_summary(quotation_name: str):
 def place_cod_order(quotation_name: str):
 	quotation = frappe.get_doc("Quotation", quotation_name)
 	shopper = get_order_shopper(quotation)
+	quotation.flags.strict_plugin_fees = True
+	# Repriced here too: the fee a cart edit left out after a hook failed must not slip into the order.
+	apply_plugin_fees(quotation)
+	# Again here: a COD confirmation can be posted without ever opening checkout.
+	validate_cart(quotation)
+	if COD_PAYMENT_MODE not in get_checkout_payment_methods(quotation, strict=True):
+		refuse_payment(_("Cash on delivery is not available."), quotation.name)
 	with system_user_session():
 		set_cod_charges(quotation)
 		quotation.flags.ignore_permissions = True
@@ -740,6 +795,7 @@ def place_cod_order(quotation_name: str):
 
 		sales_order = _make_sales_order(quotation_name, ignore_permissions=True)
 		sales_order.custom_ecommerce_payment_mode = COD_PAYMENT_MODE
+		set_delivery_date(sales_order)
 		set_attribution_fields(sales_order)
 		sales_order.flags.ignore_permissions = True
 		sales_order.insert()
@@ -748,6 +804,7 @@ def place_cod_order(quotation_name: str):
 	# COD orders count as purchases even while the Sales Order stays draft.
 	stamp_order_owner(sales_order, shopper)
 	log_purchase(sales_order)
+	fire_event("order_placed", "Sales Order", sales_order.name)
 	return sales_order
 
 
@@ -765,7 +822,10 @@ def apply_coupon_code(applied_code: str):
 	validate_cart_is_not_in_checkout(quotation.name)
 	quotation.coupon_code = coupon_name
 	save_cart_quotation(quotation)
-	return {"message": _("Coupon code applied successfully")}
+	return {
+		"message": _("Coupon code applied successfully"),
+		"checkout_summary": get_checkout_summary(quotation),
+	}
 
 
 # Guest checkout: refuses any caller without a guest cart cookie, and is rate limited.
@@ -862,6 +922,7 @@ def update_delivery_charges(quotation):
 		# A cart saved as a pickup before the owner switched pickup off must not reach payment as one.
 		validate_store_pickup(quotation.custom_store)
 		clear_pickup_charges(quotation)
+		apply_plugin_fees(quotation)
 		save_cart_quotation(quotation)
 		return
 

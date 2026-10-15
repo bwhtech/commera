@@ -61,15 +61,18 @@ If you want to quickly test Commera with demo products, you have two options:
 bench --site your-site-name execute commera.install_summer_demo.install_summer_demo
 ```
 
-This seeds the Summer storefront in **SAR**. Pass `--kwargs '{"currency": "INR"}'` for a rupee store;
-the supported currencies are the keys of `CURRENCY_PROFILES` in `commera/install_summer_demo.py`.
+This seeds the Summer storefront in the **company's own currency**, so finish the setup wizard first:
+without a company, a default currency and a chart of accounts the seeder stops and says so.
+SAR, INR and IDR get hand-picked local prices (`CURRENCY_PROFILES` in `commera/install_summer_demo.py`);
+any other currency is converted from the dollar catalogue at the USD exchange rate, which needs a
+Currency Exchange record (or ERPNext's live rate lookup) to exist.
 The seeder is idempotent — run it as often as you like.
 
-Currency is a parameter, not a constant: one run puts the system default, the company, every account
-under it, all three price lists and every Item Price into the same currency, and restates the demo
-catalogue, the shipping rule, the COD charge and the hero-slide copy at that currency's scale. A store
-whose company and price list disagree cannot submit a single Sales Invoice, which is what makes this
-the setting to get right before anything else.
+The company, its accounts and its currency are never changed. What the seeder does align is the system
+default, all three price lists and every Item Price, and it restates the demo catalogue, the shipping
+rule, the COD charge and the hero-slide copy at that currency's scale. A store whose company and price
+list disagree cannot submit a single Sales Invoice, which is what makes this the setting to get right
+before anything else.
 
 #### Rebuilding a demo site from nothing
 
@@ -82,7 +85,7 @@ bench new-site $SITE --admin-password admin
 bench --site $SITE install-app erpnext commera
 bench --site $SITE execute frappe.desk.page.setup_wizard.setup_wizard.setup_complete --kwargs '{"args": {"language": "en", "country": "Saudi Arabia", "timezone": "Asia/Riyadh", "currency": "SAR", "company_name": "Lifestyle Demo", "company_abbr": "LSD", "chart_of_accounts": "Standard", "fy_start_date": "2026-01-01", "fy_end_date": "2026-12-31", "full_name": "Administrator", "email": "admin@example.com", "password": "admin"}}'
 bench --site $SITE migrate
-bench --site $SITE execute commera.install_summer_demo.install_summer_demo --kwargs '{"currency": "SAR"}'
+bench --site $SITE execute commera.install_summer_demo.install_summer_demo
 ```
 
 Two things about that order are load-bearing:

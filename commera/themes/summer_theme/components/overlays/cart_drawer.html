@@ -32,6 +32,7 @@
 
 					<div class="tab-pane fade" role="tabpanel" :class="cart_tab === 'cart' ? 'show active' : ''">
 						<div class="shop-sidebar-cart">
+							{{ plugin_slot("cart_banner") }}
 							<ul class="sidebar-cart-list">
 								<template x-for="cart_item in $store.cart.items" :key="cart_item.variant.item_code">
 									<li>

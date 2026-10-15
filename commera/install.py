@@ -28,6 +28,12 @@ def complete_setup_wizard():
 
 	from frappe.desk.page.setup_wizard.setup_wizard import setup_complete
 
+	# Once frappe's own stage counts as done, later stages take country/currency from System Settings, not
+	# from these args, and ERPNext's fixtures crash on a blank country.
+	frappe.db.set_single_value(
+		"System Settings", {"country": "India", "currency": TEST_CURRENCY, "time_zone": "Asia/Kolkata"}
+	)
+
 	today = getdate()
 	setup_complete(
 		{
