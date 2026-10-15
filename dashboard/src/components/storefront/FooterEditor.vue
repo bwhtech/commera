@@ -159,7 +159,7 @@ function columnActions(section, columnIndex) {
     },
     {
       label: section.enabled ? 'Hide from footer' : 'Show in footer',
-      icon: section.enabled ? 'eye-off' : 'eye',
+      icon: section.enabled ? 'lucide-eye-off' : 'lucide-eye',
       onClick: () => toggleSection(section),
     },
     {
@@ -200,7 +200,7 @@ function linkActions(section, columnIndex, link, linkIndex) {
     },
     {
       label: link.enabled ? 'Hide from footer' : 'Show in footer',
-      icon: link.enabled ? 'eye-off' : 'eye',
+      icon: link.enabled ? 'lucide-eye-off' : 'lucide-eye',
       onClick: () => toggleLink(section, link),
     },
     {

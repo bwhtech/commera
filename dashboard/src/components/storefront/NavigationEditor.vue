@@ -215,7 +215,7 @@ function rowActions(node) {
     },
     {
       label: node.visible ? 'Hide from menu' : 'Show in menu',
-      icon: node.visible ? 'eye-off' : 'eye',
+      icon: node.visible ? 'lucide-eye-off' : 'lucide-eye',
       onClick: () => toggleVisible(node),
     },
     // A separate group because it acts on a different object: the rows above move and hide the
