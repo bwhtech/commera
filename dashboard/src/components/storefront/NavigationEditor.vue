@@ -12,6 +12,7 @@ import { useIsMobile } from '../../utils/useIsMobile'
 
 const {
   menu,
+  expandedKeys,
   loadError,
   selected,
   selectedName,
@@ -312,7 +313,7 @@ const menuActions = computed(() => [
 
       <div v-else class="mt-3 gap-6 lg:flex">
         <div class="min-w-0 flex-1">
-          <Tree :nodes="menu" node-key="name" draggable :move="canDrop" @drag-end="onDragEnd">
+          <Tree v-model:expanded="expandedKeys" :nodes="menu" node-key="name" draggable :move="canDrop" @drag-end="onDragEnd">
             <template #item-label="{ node }">
               <button
                 v-if="isMenuNode(node)"
