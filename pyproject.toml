@@ -17,6 +17,11 @@ erpnext = ">=16.0.0,<17.0.0"
 bwh_payments = ">=0.0.1,<1.0.0"
 bwh_shipping = ">=0.0.1,<1.0.0"
 
+[tool.bench.assets]
+build_dir = "./dashboard"
+out_dir = "./commera/public/commera"
+index_html_path = "./commera/www/commera.html"
+
 [build-system]
 requires = ["flit_core >=3.4,<4"]
 build-backend = "flit_core.buildapi"
