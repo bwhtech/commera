@@ -121,7 +121,7 @@ const noRevenueState = {
       <div class="overflow-x-auto px-2 pb-2">
         <List
           class="min-w-[46rem]"
-          :columns="['6rem', '8rem', '6rem', '7rem', '7rem', '8rem']"
+          :columns="['minmax(6rem,1fr)', '8rem', '6rem', '7rem', '7rem', '8rem']"
           :row-height="Math.max(ia.density, 44)"
         >
           <ListHeader>
