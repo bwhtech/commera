@@ -200,16 +200,16 @@ function rowActions(node) {
   const isLast = !location || location.index === location.siblings.length - 1
 
   return [
-    { label: 'Add entry inside', icon: 'corner-down-right', onClick: () => addEntry(node.name) },
+    { label: 'Add entry inside', icon: 'lucide-corner-down-right', onClick: () => addEntry(node.name) },
     {
       label: 'Move up',
-      icon: 'arrow-up',
+      icon: 'lucide-arrow-up',
       disabled: isFirst,
       onClick: () => moveEntry(node, -1),
     },
     {
       label: 'Move down',
-      icon: 'arrow-down',
+      icon: 'lucide-arrow-down',
       disabled: isLast,
       onClick: () => moveEntry(node, 1),
     },
@@ -225,12 +225,12 @@ function rowActions(node) {
       options: [
         {
           label: 'Publish to the storefront',
-          icon: 'globe',
+          icon: 'lucide-globe',
           onClick: () => publishProducts(node, 1),
         },
         {
           label: 'Take off the storefront',
-          icon: 'globe-lock',
+          icon: 'lucide-globe-lock',
           onClick: () => publishProducts(node, 0),
         },
       ],
@@ -238,18 +238,18 @@ function rowActions(node) {
     {
       group: 'Danger',
       options: [
-        { label: 'Delete', icon: 'trash-2', theme: 'red', onClick: () => removeEntry(node) },
+        { label: 'Delete', icon: 'lucide-trash-2', theme: 'red', onClick: () => removeEntry(node) },
       ],
     },
   ]
 }
 
 const menuActions = computed(() => [
-  { label: 'Import from item groups', icon: 'download', onClick: importGroups },
+  { label: 'Import from item groups', icon: 'lucide-download', onClick: importGroups },
   {
     group: 'Danger',
     options: [
-      { label: 'Delete whole menu', icon: 'trash-2', theme: 'red', onClick: clearMenu },
+      { label: 'Delete whole menu', icon: 'lucide-trash-2', theme: 'red', onClick: clearMenu },
     ],
   },
 ])
