@@ -4,6 +4,8 @@ import { Button, ScrollArea, Skeleton, dialog, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
 import EmptyState from '../components/EmptyState.vue'
+import AttributeValuesDialog from '../components/AttributeValuesDialog.vue'
+import SwatchDot from '../components/SwatchDot.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 
 const attributesRequest = useAdminRead('catalog.get_attributes')
