@@ -22,6 +22,7 @@ def init(skip_install: bool):
 	if not skip_install:
 		click.echo("Running yarn install…")
 		try:
+			# nosemgrep: frappe-subprocess-exec
 			subprocess.run(["yarn", "install"], cwd=scaffold.app_root, check=True)
 		except (FileNotFoundError, subprocess.CalledProcessError) as error:
 			raise click.ClickException(f"yarn install failed in {scaffold.app_root}: {error}")

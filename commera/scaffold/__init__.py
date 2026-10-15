@@ -51,6 +51,7 @@ class AppScaffold:
 		self.add_file(self.source_dir / "vite.config.js", get_starter("vite.config.js"))
 		self.add_file(
 			self.source_dir / "plugin-icon.svg",
+			# nosemgrep: frappe-direct-jinja-construction
 			Template(get_starter("plugin-icon.svg")).substitute(colour=random.choice(LOGO_COLOURS)),
 		)
 		self.add_places()
@@ -150,6 +151,7 @@ class AppScaffold:
 		}
 		self.add_file(
 			self.source_dir / folder / "index.vue",
+			# nosemgrep: frappe-direct-jinja-construction
 			Template(get_starter(f"places/{'page_with_detail' if detail else starter}.vue")).substitute(
 				values
 			),
@@ -157,11 +159,14 @@ class AppScaffold:
 		if detail:
 			self.add_file(
 				self.source_dir / folder / "[...id].vue",
+				# nosemgrep: frappe-direct-jinja-construction
 				Template(get_starter("places/detail.vue")).substitute(values),
 			)
 		if starter in ("action", "command"):
 			self.add_api_method(
-				function, Template(get_starter(f"places/{starter}.py.template")).substitute(values)
+				function,
+				# nosemgrep: frappe-direct-jinja-construction
+				Template(get_starter(f"places/{starter}.py.template")).substitute(values),
 			)
 		return self.changes
 
@@ -174,6 +179,7 @@ class AppScaffold:
 
 	def format_starter(self, name: str) -> str:
 		label = self.get_app_title().replace("\\", "\\\\").replace("'", "\\'")
+		# nosemgrep: frappe-direct-jinja-construction
 		return Template(get_starter(name)).safe_substitute(
 			app_name=self.app, label=label, page_name=self.page_name, icon=STARTER_ICON
 		)
