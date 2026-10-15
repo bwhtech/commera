@@ -10,17 +10,17 @@ required_apps = ["frappe/erpnext", "bwhtech/bwh_payments", "bwhtech/bwh_shipping
 
 
 website_redirects = [
-	{"source": "/products", "target": "/en/products"},
-	{"source": "/products/(.*)", "target": r"/en/products/\1"},
-	{"source": "/", "target": "/en"},
-	{"source": "/cart", "target": "/en/cart"},
-	{"source": "/cart/checkout", "target": "/en/cart/checkout"},
-	{"source": "/account", "target": "en/account/dashboard"},
-	{"source": "/account/(.*)", "target": r"/en/account/\1"},
-	{"source": "/en/account", "target": "/account/dashboard"},
-	{"source": "/ar/account", "target": "/account/dashboard"},
-	{"source": "/en-US/(.*)", "target": r"/en/\1"},
-	{"source": "/en-GB/(.*)", "target": r"/en/\1"},
+	{"source": "/products", "target": "/en/products", "forward_query_parameters": True},
+	{"source": "/products/(.*)", "target": r"/en/products/\1", "forward_query_parameters": True},
+	{"source": "/", "target": "/en", "forward_query_parameters": True},
+	{"source": "/cart", "target": "/en/cart", "forward_query_parameters": True},
+	{"source": "/cart/checkout", "target": "/en/cart/checkout", "forward_query_parameters": True},
+	{"source": "/account", "target": "en/account/dashboard", "forward_query_parameters": True},
+	{"source": "/account/(.*)", "target": r"/en/account/\1", "forward_query_parameters": True},
+	{"source": "/en/account", "target": "/account/dashboard", "forward_query_parameters": True},
+	{"source": "/ar/account", "target": "/account/dashboard", "forward_query_parameters": True},
+	{"source": "/en-US/(.*)", "target": r"/en/\1", "forward_query_parameters": True},
+	{"source": "/en-GB/(.*)", "target": r"/en/\1", "forward_query_parameters": True},
 ]
 
 # website_path_resolver = "commera.utils.resolve_bilingual_path"
