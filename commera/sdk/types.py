@@ -9,8 +9,14 @@ __all__ = [
 	"Charge",
 	"ChargeSummary",
 	"CheckoutSummary",
+	"Discount",
+	"DiscountAllocation",
+	"DiscountInput",
+	"NewCartLine",
 	"Order",
 	"OrderLine",
+	"PricedCart",
+	"PricedCartLine",
 	"Stage",
 ]
 
@@ -47,6 +53,9 @@ class OrderLine(TypedDict):
 	rate: float
 	amount: float
 	image: str | None
+	# The whole line's discount from a discount code, an automatic discount or an app.
+	discount: float
+	attributes: dict[str, str]
 
 
 class Order(TypedDict):
@@ -79,6 +88,8 @@ class Order(TypedDict):
 	items: list[OrderLine]
 	tags: list[str]
 	plugin_fields: dict[str, Any]
+	discounts: list["DiscountAllocation"]
+	attributes: dict[str, str]
 
 
 class CartLine(TypedDict):
@@ -87,6 +98,8 @@ class CartLine(TypedDict):
 	qty: float
 	rate: float
 	amount: float
+	discount: float
+	attributes: dict[str, str]
 
 
 class Cart(TypedDict):
@@ -94,9 +107,91 @@ class Cart(TypedDict):
 	customer: str | None
 	currency: str
 	items: list[CartLine]
+	discounts: list["DiscountAllocation"]
+	attributes: dict[str, str]
 	total: float
 	grand_total: float
 	plugin_fields: dict[str, Any]
+
+
+class DiscountInput(TypedDict, total=False):
+	"""Commera Discount fields. Only `discount_type` is required; see the doctype for every rule."""
+
+	title: str
+	# "Code" or "Automatic".
+	method: str
+	# "Amount Off Products", "Amount Off Order", "Buy X Get Y" or "Free Shipping".
+	discount_type: str
+	# "Percentage" or "Fixed Amount".
+	value_type: str
+	value: float
+	maximum_discount: float
+	# {"role": "Applies To" | "Excluded" | "Buys" | "Gets", "target_type": "Item" | "Item Group" | "Brand", "target"}
+	targets: list[dict]
+	tiers: list[dict]
+	starts_on: date
+	ends_on: date | None
+
+
+class Discount(DiscountInput, total=False):
+	name: str
+	# Active, Scheduled, Expired, Used Up or Disabled.
+	status: str
+	# Product, Order or Shipping.
+	discount_class: str
+	codes: list[str]
+	times_used: int
+	discount_given: float
+	sales: float
+
+
+class DiscountAllocation(TypedDict):
+	# The Commera Discount, or None for an app's cart_discounts entry.
+	discount: str | None
+	code: str | None
+	# The app whose cart_discounts hook gave it; None for a merchant's discount.
+	app: str | None
+	title: str
+	# Product, Order or Shipping.
+	discount_class: str
+	amount: float
+	# The cart line's idx for a product discount.
+	line: int | None
+
+
+class NewCartLine(TypedDict, total=False):
+	item_code: str
+	qty: int
+	attributes: dict[str, str]
+
+
+class PricedCartLine(TypedDict):
+	line_id: str
+	item_code: str
+	title: str
+	qty: int
+	attributes: dict[str, str]
+	price: float
+	rate: float
+	# Per unit, from the best product discount code on the line.
+	code_discount: float
+	discount_code: str | None
+	amount: float
+
+
+class PricedCart(TypedDict):
+	"""The server cart priced like checkout, before shipping and tax."""
+
+	name: str
+	version: str
+	attributes: dict[str, str]
+	currency: str
+	# {"code", "class"}, where class is "Product" or "Order".
+	discount_codes: list[dict]
+	lines: list[PricedCartLine]
+	subtotal: float
+	order_discount: float
+	total: float
 
 
 class ChargeSummary(TypedDict):

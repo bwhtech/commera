@@ -5,7 +5,8 @@ import frappe
 from frappe import _
 from frappe.utils.data import cstr, flt
 
-from commera.plugin_events import get_handlers
+from commera.discounts.shipping import apply_shipping_discounts
+from commera.plugin_events import get_handler_app, get_handlers
 from commera.utils import get_charge_account_head
 
 PLUGIN_FEE_FIELD = "commera_plugin_fee"
@@ -17,6 +18,24 @@ def get_cart_refusal(quotation) -> str | None:
 			reason = frappe.get_attr(handler)(quotation)
 			if reason and not isinstance(reason, str):
 				raise TypeError(f'commera_hooks["validate_cart"] must return a str or None, got {reason!r}')
+		if reason:
+			return reason
+	return None
+
+
+def get_discount_code_refusal(quotation, code: str) -> str | None:
+	"""Why an app will not let this code apply to the cart, in the shopper's words; None when every app
+	allows it. Checked for discount codes and the store coupon alike."""
+	for handler in get_handlers("commera_hooks", "validate_discount_code"):
+		reason = None
+		with handle_hook_error(
+			"validate_discount_code", handler, quotation, bool(quotation.flags.strict_plugin_fees)
+		):
+			reason = frappe.get_attr(handler)(quotation, code)
+			if reason and not isinstance(reason, str):
+				raise TypeError(
+					f'commera_hooks["validate_discount_code"] must return a str or None, got {reason!r}'
+				)
 		if reason:
 			return reason
 	return None
@@ -40,6 +59,41 @@ def apply_plugin_fees(quotation):
 	for fee_row in get_plugin_fee_rows(quotation, handlers, strict=bool(quotation.flags.strict_plugin_fees)):
 		quotation.append("taxes", fee_row)
 	quotation.calculate_taxes_and_totals()
+
+
+def get_plugin_discounts(quotation) -> list[dict]:
+	"""What the apps' cart_discounts hooks take off: `line` (a row idx) marks a product discount, none an
+	order one. Like cart fees, a failing handler blocks checkout but is only left out of a cart edit."""
+	discounts = []
+	for handler in get_handlers("commera_hooks", "cart_discounts"):
+		with handle_hook_error(
+			"cart_discounts", handler, quotation, bool(quotation.flags.strict_plugin_fees)
+		):
+			returned = frappe.get_attr(handler)(quotation) or []
+			if not isinstance(returned, list):
+				raise TypeError(f'commera_hooks["cart_discounts"] must return a list, got {returned!r}')
+			app = get_handler_app(handler)
+			discounts += [get_plugin_discount(quotation, app, discount) for discount in returned]
+	return [discount for discount in discounts if discount["amount"] > 0]
+
+
+def get_plugin_discount(quotation, app: str, discount: dict) -> dict:
+	title = cstr(discount.get("title")).strip()
+	amount = discount.get("amount")
+	if not title or not is_finite_number(amount) or amount < 0:
+		raise ValueError(f"A cart discount needs a title and an amount of zero or more, got {discount!r}")
+	line = discount.get("line")
+	if line is not None and line not in {item.idx for item in quotation.items}:
+		raise ValueError(f"A cart discount names line {line!r}, which the cart does not have")
+	return {
+		"discount": None,
+		"code": None,
+		"app": app,
+		"title": title,
+		"discount_class": "Product" if line is not None else "Order",
+		"amount": flt(amount, quotation.precision("discount_amount")),
+		"line": line,
+	}
 
 
 def get_plugin_fee_rows(quotation, handlers: list[str], strict: bool) -> list[dict]:
@@ -86,7 +140,7 @@ def apply_delivery_option_hooks(quotation, options: list[dict], strict: bool) ->
 		with handle_hook_error("delivery_options", handler, quotation, strict):
 			hooked_options = frappe.get_attr(handler)(quotation, [dict(option) for option in options])
 			options = get_hooked_delivery_options(options, hooked_options, precision)
-	return options
+	return apply_shipping_discounts(quotation, options)
 
 
 def get_hooked_delivery_options(options: list[dict], hooked_options, precision: int) -> list[dict]:

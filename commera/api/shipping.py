@@ -5,6 +5,8 @@ from frappe.utils.data import cstr, flt, sha256_hash
 
 from commera.checkout_hooks import PLUGIN_FEE_FIELD, apply_delivery_option_hooks, apply_plugin_fees
 from commera.core import _get_cart_quotation
+from commera.discounts.pricing import refresh_code_discounts
+from commera.discounts.shipping import set_shipping_discount
 from commera.utils import (
 	COD_CHARGE_DESCRIPTION,
 	get_charge_account_head,
@@ -214,6 +216,7 @@ def apply_delivery_option(quotation, option: dict):
 	quotation.custom_delivery_charge = flt(option["amount"])
 	quotation.custom_shipping_provider = option.get("provider")
 	quotation.custom_shipping_service_code = option.get("service_code")
+	set_shipping_discount(quotation, option)
 	set_delivery_charge_row(quotation, flt(option["amount"]), option["title"])
 	apply_plugin_fees(quotation)
 
@@ -223,6 +226,7 @@ def clear_delivery_option(quotation):
 	quotation.custom_delivery_charge = 0
 	quotation.custom_shipping_provider = None
 	quotation.custom_shipping_service_code = None
+	set_shipping_discount(quotation, None)
 	remove_delivery_charge_row(quotation)
 	quotation.calculate_taxes_and_totals()
 
@@ -321,6 +325,9 @@ def get_checkout_summary(quotation) -> dict:
 		clear_pickup_charges(preview)
 	summary = get_charge_summary(preview)
 
+	# A prepaid-only discount drops off, and a cash-on-delivery one comes on, before the fee is judged.
+	preview.flags.commera_payment_kind = "cod"
+	refresh_code_discounts(preview)
 	cod_charge = get_cod_charge(preview)
 	if cod_charge:
 		account_head = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")

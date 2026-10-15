@@ -2,6 +2,56 @@
     document.addEventListener('alpine:init', () => {
         Alpine.store('cart', {
             items: Alpine.$persist([]),
+            // The server cart's version this browser last saw; the server cart wins when they differ.
+            version: Alpine.$persist(null).as('commera_cart_version'),
+            async init() {
+                await this.load_server_cart();
+                let is_first_run = true;
+                Alpine.effect(() => {
+                    this.items.forEach(item => [item.variant?.item_code, item.qty]);
+                    if (is_first_run) {
+                        is_first_run = false;
+                        return;
+                    }
+                    clearTimeout(this.sync_timer);
+                    this.sync_timer = setTimeout(() => this.sync(), 400);
+                });
+            },
+            async load_server_cart() {
+                try {
+                    const server_cart = (await frappe_call("/api/v2/method/commera.api.server_cart.get_server_cart", {})).data;
+                    if (!server_cart) {
+                        if (this.items.length) await this.sync();
+                        return;
+                    }
+                    if (server_cart.version === this.version) return;
+                    if (this.version || server_cart.lines.length) this.apply_server_cart(server_cart);
+                    else await this.sync();
+                } catch (error) {}
+            },
+            async sync() {
+                clearTimeout(this.sync_timer);
+                const items = this.items.map(item => ({ item_code: item.variant.item_code, qty: item.qty }));
+                try {
+                    const response = (await frappe_call("/api/v2/method/commera.api.server_cart.sync_server_cart", { items, version: this.version })).data;
+                    if (response.conflict) this.apply_server_cart(response);
+                    else this.version = response.version;
+                } catch (error) {}
+            },
+            apply_server_cart(server_cart) {
+                this.items = server_cart.lines.map(line => ({
+                    item: line.item,
+                    variant: line.variant,
+                    qty: line.qty,
+                    price: line.price,
+                    default_price: line.default_price,
+                    brand: line.brand,
+                    stock_qty: line.variant.stock_detail?.stock_qty ?? 0,
+                    selected: true,
+                    sizes: line.sizes,
+                }));
+                this.version = server_cart.version;
+            },
             add(item, variant, price = 0,default_price=0, brand = '',sizes=[],qty=1) {
                 let already_added = false;
                 variant = JSON.parse(variant)

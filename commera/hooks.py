@@ -135,14 +135,25 @@ doc_events = {
 	"Gateway Payment Request": {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},
+	"Quotation": {
+		"before_validate": "commera.discounts.pricing.remove_code_discounts",
+		"validate": "commera.discounts.pricing.apply_code_discounts",
+	},
 	"Sales Order": {
-		"after_insert": "commera.jobs.send_order_success_acknowledgement",
+		"before_validate": "commera.discounts.pricing.remove_code_discounts",
+		"validate": "commera.discounts.pricing.apply_code_discounts",
+		"after_insert": [
+			"commera.discounts.usage.record_discount_uses",
+			"commera.jobs.send_order_success_acknowledgement",
+		],
+		"on_trash": "commera.discounts.usage.remove_discount_uses",
 		"on_submit": [
 			"commera.jobs.send_order_success_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
 			"commera.plugin_events.on_sales_order_stock_reservation",
 		],
 		"on_cancel": [
+			"commera.discounts.usage.remove_discount_uses",
 			"commera.jobs.send_order_cancel_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
 			"commera.plugin_events.on_sales_order_cancel",
@@ -173,7 +184,11 @@ doc_events = {
 		"after_rename": "commera.search.sync.after_rename",
 		"on_trash": "commera.search.sync.on_trash",
 	},
-	"Sales Invoice": {"on_submit": "commera.utils.update_so_status_from_related_doc"},
+	"Sales Invoice": {
+		"before_validate": "commera.discounts.pricing.remove_code_discounts",
+		"validate": "commera.discounts.pricing.apply_code_discounts",
+		"on_submit": "commera.utils.update_so_status_from_related_doc",
+	},
 	"Payment Entry": {"on_submit": "commera.plugin_events.on_payment_entry_submit"},
 	"Delivery Note": {
 		"after_insert": "commera.utils.update_so_status_from_related_doc",

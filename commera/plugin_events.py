@@ -11,6 +11,7 @@ from pypika.functions import NullIf
 from pypika.terms import Case, ExistsCriterion
 from rq.job import JobStatus
 
+from commera.discounts.allocations import get_allocations
 from commera.sdk import API_VERSION, STORE_ORDER_TYPE, as_plugin_user
 from commera.sdk.events import HANDLER_HOOKS, CommeraEvent
 
@@ -98,6 +99,7 @@ def get_order_snapshot(sales_order: str | int) -> dict:
 			sales_order_table.grand_total,
 			sales_order_table.custom_ecommerce_payment_mode,
 			sales_order_table.docstatus,
+			sales_order_table.custom_discount_allocations,
 		)
 		.where(sales_order_table.name == sales_order)
 		.run(as_dict=True)[0]
@@ -109,6 +111,7 @@ def get_order_snapshot(sales_order: str | int) -> dict:
 		"payment_mode": order.custom_ecommerce_payment_mode,
 		"docstatus": order.docstatus,
 		"shipping_address": get_shipping_address(order),
+		"discounts": get_allocations(order),
 	}
 
 
