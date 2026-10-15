@@ -26,7 +26,6 @@ export function createAdminCaller(modulePath) {
     try {
       return { data: await request.submit(params), error: null }
     } catch (error) {
-      // useAdminAction has already toasted it.
       return { data: null, error }
     } finally {
       pending.value -= 1

@@ -67,8 +67,6 @@ export function useSettingsAutosave(save, { params = {} } = {}) {
       try {
         saved = await save.submit({ ...params, [fieldname]: value })
       } catch {
-        // Only the refused box rolls back: replacing the whole map would wipe what the owner is
-        // typing into another field.
         values.value[fieldname] = stored.value[fieldname]
         return
       }
