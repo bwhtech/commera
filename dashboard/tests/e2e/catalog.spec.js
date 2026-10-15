@@ -93,6 +93,19 @@ describe('catalog', () => {
     assert.ok((await text(page)).includes(COLLECTION), 'the new collection did not appear in the list')
   })
 
+  uiTest(session, 'opens an attribute to edit its values', async () => {
+    const { page } = session
+    const [attribute] = await adminGet(page, 'catalog.get_attributes')
+    assert.ok(attribute?.values?.length, 'the store has no attribute with values to open')
+
+    await goto(page, '/attributes')
+    await clickByText(page, 'button', 'Edit', { pause: 1200 })
+    const dialog = await page.$eval('[role="dialog"]', (node) => node.innerText).catch(() => '')
+    assert.ok(dialog.includes(attribute.name), 'Edit did not open the attribute dialog')
+    assert.ok(dialog.includes(attribute.values[0].value), 'the dialog does not list the attribute values')
+    assert.deepEqual(realProblems(session.problems), [], 'the attribute dialog reported browser problems')
+  })
+
   uiTest(session, 'creates an attribute with values', async () => {
     const { page } = session
     await goto(page, '/attributes')

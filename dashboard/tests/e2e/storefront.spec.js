@@ -101,6 +101,30 @@ describe('storefront', () => {
     assert.deepEqual(realProblems(session.problems), [], 'the navigation editor reported browser problems')
   })
 
+  uiTest(session, 'draws an icon on every editor menu item', async () => {
+    const { page } = session
+    const missing = []
+    const menus = [
+      { open: () => goto(page, '/storefront/navigation'), aria: 'Entry actions' },
+      { open: () => openFooterTab(page), aria: 'Column actions' },
+      { open: () => openFooterTab(page), aria: 'Link actions' },
+    ]
+    for (const menu of menus) {
+      await menu.open()
+      const trigger = await page.$(`button[aria-label="${menu.aria}"]`)
+      assert.ok(trigger, `no "${menu.aria}" menu on screen`)
+      await trigger.click()
+      await wait(700)
+      const items = await page.$$eval('[role="menuitem"]', (nodes) =>
+        nodes.map((node) => ({ label: node.innerText.trim(), icon: Boolean(node.querySelector('svg, [class*="lucide-"]')) })),
+      )
+      assert.ok(items.length, `the "${menu.aria}" menu opened empty`)
+      missing.push(...items.filter((item) => !item.icon).map((item) => `${menu.aria}: ${item.label}`))
+      await page.keyboard.press('Escape')
+    }
+    assert.deepEqual(missing, [], 'menu items without an icon')
+  })
+
   uiTest(session, 'adds, renames and deletes a footer column', async () => {
     const { page } = session
     await openFooterTab(page)

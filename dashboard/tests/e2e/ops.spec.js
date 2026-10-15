@@ -69,6 +69,25 @@ describe('ops', () => {
     assert.deepEqual(realProblems(session.problems), [], 'the customer screens reported browser problems')
   })
 
+  uiTest(session, 'revenue by-month table fills its card', async () => {
+    const { page } = session
+    await page.setViewport({ width: 1440, height: 900 })
+    await goto(page, '/analytics/revenue')
+    const gap = await page.evaluate(() => {
+      const heading = Array.from(document.querySelectorAll('h2')).find((node) => node.innerText.trim() === 'By month')
+      const section = heading?.closest('section')
+      const lastColumn = Array.from(section?.querySelectorAll('*') ?? []).find(
+        (node) => node.children.length === 0 && node.innerText?.trim() === 'Net',
+      )
+      let cell = lastColumn
+      while (cell?.parentElement && getComputedStyle(cell.parentElement).display !== 'grid') cell = cell.parentElement
+      if (!section || !cell?.parentElement) return null
+      return section.getBoundingClientRect().right - cell.getBoundingClientRect().right
+    })
+    assert.ok(gap !== null, 'no By month table on the revenue report')
+    assert.ok(gap < 48, `the table stops ${Math.round(gap)}px short of its card's edge`)
+  })
+
   uiTest(session, 'inventory and pricing lists render their rows', async () => {
     const { page } = session
 
