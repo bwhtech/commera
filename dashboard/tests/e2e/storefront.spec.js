@@ -20,6 +20,7 @@ import {
 } from './harness.js'
 
 const NAV_ENTRY = `${PREFIX} Nav`
+const NAV_CHILD = `${PREFIX} Nav Child`
 const FOOTER_COLUMN = `${PREFIX} Column`
 const FOOTER_RENAMED = `${PREFIX} Column Renamed`
 
@@ -98,6 +99,30 @@ describe('storefront', () => {
     assert.ok(!after.menu.some((row) => row.label === NAV_ENTRY), 'the section is still persisted')
     created.nodes.length = 0
 
+    assert.deepEqual(realProblems(session.problems), [], 'the navigation editor reported browser problems')
+  })
+
+  uiTest(session, 'shows an entry added inside a section without expanding it', async () => {
+    const { page } = session
+    const parent = await adminPost(page, 'navigation.add_node', { parent: '', display_name: NAV_ENTRY })
+    const section = parent.menu.find((row) => row.label === NAV_ENTRY)
+    assert.ok(section, 'the API did not create the section')
+    created.nodes.push(section.name)
+
+    await goto(page, '/storefront/navigation')
+    await openRowMenu(page, NAV_ENTRY, 'Entry actions')
+    await clickByText(page, '[role="menuitem"]', 'Add entry inside', { pause: 900 })
+    await typeIntoDialog(page, NAV_CHILD)
+    await clickByText(page, '[role="dialog"] button', 'Add', { pause: 2000 })
+
+    const child = (await adminGet(page, 'navigation.get_editor_data')).menu
+      .find((row) => row.label === NAV_ENTRY)?.children.find((row) => row.label === NAV_CHILD)
+    assert.ok(child, 'the child entry is not persisted under its section')
+    created.nodes.unshift(child.name)
+    assert.ok((await text(page)).includes(NAV_CHILD), 'the new child is hidden inside a collapsed section')
+
+    await goto(page, '/storefront/navigation')
+    assert.ok((await text(page)).includes(NAV_CHILD), 'top-level sections no longer open on load')
     assert.deepEqual(realProblems(session.problems), [], 'the navigation editor reported browser problems')
   })
 
