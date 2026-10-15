@@ -107,7 +107,12 @@ async function togglePublished(row) {
         <ListSkeleton v-if="reviewsRequest.loading && !rows.length" :columns="skeletonColumns" />
 
         <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
-          <ListRow :route="`/reviews/${item.name}`" :value="item.name">
+          <ListRow :value="item.name" class="cursor-pointer active:bg-surface-gray-2 sm:rounded-5 sm:hover:bg-surface-gray-1">
+            <RouterLink
+              :to="`/reviews/${item.name}`"
+              :aria-label="item.review_title || 'Untitled review'"
+              class="absolute inset-0 sm:rounded-5"
+            />
             <ListCell>
               <div class="flex min-w-0 items-center gap-2.5">
                 <Rating :model-value="item.rating" disabled size="sm" />
@@ -129,8 +134,8 @@ async function togglePublished(row) {
             <ListCell class="max-sm:hidden">
               <span class="text-sm text-ink-gray-5">{{ shortDate(item.creation) }}</span>
             </ListCell>
-            <ListCell>
-              <Switch :model-value="item.is_published" @click.stop @update:model-value="togglePublished(item)" />
+            <ListCell class="relative">
+              <Switch :model-value="item.is_published" @update:model-value="togglePublished(item)" />
             </ListCell>
           </ListRow>
         </ListRows>
