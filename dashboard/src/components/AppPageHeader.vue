@@ -23,7 +23,7 @@ defineProps({
            12px `px-3` gutter puts the glyph at 11px, level with the content
            below, instead of the box's padding pushing it in to 19px. Recheck it
            if that button ever stops defaulting to `md`. -->
-      <PageHeaderBackButton v-if="backTo" class="-ml-2 shrink-0 sm:hidden" :to="backTo" />
+      <PageHeaderBackButton v-if="backTo" class="-ml-2 shrink-0 sm:hidden" :fallback-route="backTo" />
       <Breadcrumbs v-if="breadcrumbs" class="min-w-0" :items="breadcrumbs" />
       <h1 v-else class="min-w-0 truncate text-lg-semibold text-ink-gray-8">{{ title }}</h1>
     </div>

@@ -9,7 +9,7 @@ import ResponsiveButton from '../components/ResponsiveButton.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ListSkeleton from '../components/ListSkeleton.vue'
 import BulkBar from '../components/BulkBar.vue'
-import { useAdminRead, useAdminAction } from '../data/api'
+import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { stockTone } from '../data/format'
 import { ia } from '../ia/store'
 
@@ -63,10 +63,10 @@ function adjust() {
       const qty = Math.max(0, Number(values.value) || 0)
       if (!qty) return
 
-      await receiveAction.submit({
+      const received = await trySubmit(receiveAction, {
         received_quantities: Object.fromEntries(item_codes.map((code) => [code, qty])),
       })
-      if (receiveAction.error) return
+      if (!received) return
 
       endSelecting()
       toast.success(`Adjustment recorded for ${item_codes.length} lines`)

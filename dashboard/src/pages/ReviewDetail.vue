@@ -5,7 +5,7 @@ import { Avatar, Badge, Button, Rating, Skeleton, Switch, Textarea, dayjs, toast
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { useAdminAction, useAdminRead } from '../data/api'
+import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { erpnextLink } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { productRoute } from '../ia/routes'
@@ -43,9 +43,10 @@ const publishAction = useAdminAction('reviews.set_published', { quiet: true })
 // onto it — the same reload-after-write shape Orders.vue's fulfilAction uses.
 async function togglePublished() {
   const nextValue = !review.value.is_published
-  await publishAction.submit({ name: review.value.name, published: nextValue })
-  if (publishAction.error) {
-    toast.error(errorMessage(publishAction.error))
+  try {
+    await publishAction.submit({ name: review.value.name, published: nextValue })
+  } catch (error) {
+    toast.error(errorMessage(error))
     return
   }
   reviewRequest.reload()
@@ -66,8 +67,8 @@ watch(
 const replyAction = useAdminAction('reviews.save_reply')
 
 async function saveReply() {
-  await replyAction.submit({ name: review.value.name, reply: replyDraft.value })
-  if (replyAction.error) return
+  const posted = await trySubmit(replyAction, { name: review.value.name, reply: replyDraft.value })
+  if (!posted) return
   toast.success('Reply posted')
   reviewRequest.reload()
 }

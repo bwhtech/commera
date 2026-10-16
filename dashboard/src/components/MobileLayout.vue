@@ -60,7 +60,7 @@ function closeMore(item) {
           :key="tab.to"
           :label="tab.label"
           :icon="tab.icon"
-          :to="tab.to"
+          :route="tab.to"
           :active="tab.to === activeTarget"
         />
         <MobileNavItem label="More" icon="lucide-ellipsis" :active="moreIsActive" @click="moreOpen = true" />

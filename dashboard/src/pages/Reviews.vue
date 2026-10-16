@@ -60,10 +60,11 @@ const publishAction = useAdminAction('reviews.set_published', { quiet: true })
 async function togglePublished(row) {
   const nextValue = !row.is_published
   row.is_published = nextValue
-  await publishAction.submit({ name: row.name, published: nextValue })
-  if (publishAction.error) {
+  try {
+    await publishAction.submit({ name: row.name, published: nextValue })
+  } catch (error) {
     row.is_published = !nextValue
-    toast.error(errorMessage(publishAction.error))
+    toast.error(errorMessage(error))
   }
 }
 </script>
@@ -88,9 +89,9 @@ async function togglePublished(row) {
            Do not lower the `min-w` — below the columns' own sum the 1fr track collapses to
            zero and the review cell disappears. -->
       <List
-        class="max-sm:[--list-columns:minmax(0,1fr)_auto] sm:min-w-[44rem]"
+        class="sm:min-w-[44rem]"
         :row-height="Math.max(ia.density, 48)"
-        :columns="['1fr', '9rem', '9rem', '7rem', '5rem']"
+        :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['1fr', '9rem', '9rem', '7rem', '5rem'] }"
       >
         <ListHeader>
           <ListHeaderCell>Review</ListHeaderCell>
@@ -106,7 +107,12 @@ async function togglePublished(row) {
         <ListSkeleton v-if="reviewsRequest.loading && !rows.length" :columns="skeletonColumns" />
 
         <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
-          <ListRow :to="`/reviews/${item.name}`" :value="item.name">
+          <ListRow :value="item.name" class="cursor-pointer active:bg-surface-gray-2 sm:rounded-5 sm:hover:bg-surface-gray-1">
+            <RouterLink
+              :to="`/reviews/${item.name}`"
+              :aria-label="item.review_title || 'Untitled review'"
+              class="absolute inset-0 sm:rounded-5"
+            />
             <ListCell>
               <div class="flex min-w-0 items-center gap-2.5">
                 <Rating :model-value="item.rating" disabled size="sm" />
@@ -128,8 +134,8 @@ async function togglePublished(row) {
             <ListCell class="max-sm:hidden">
               <span class="text-sm text-ink-gray-5">{{ shortDate(item.creation) }}</span>
             </ListCell>
-            <ListCell>
-              <Switch :model-value="item.is_published" @click.stop @update:model-value="togglePublished(item)" />
+            <ListCell class="relative">
+              <Switch :model-value="item.is_published" @update:model-value="togglePublished(item)" />
             </ListCell>
           </ListRow>
         </ListRows>

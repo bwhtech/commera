@@ -14,7 +14,7 @@ import PluginActionDialog from '../components/PluginActionDialog.vue'
 import PluginSlot from '../components/PluginSlot.vue'
 import Thumb from '../components/Thumb.vue'
 import RefundDialog from '../components/RefundDialog.vue'
-import { useAdminRead, useAdminAction, useMethodRead } from '../data/api'
+import { useAdminRead, useAdminAction, useMethodRead, trySubmit } from '../data/api'
 import { erpnextLink, printUrl } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { longDate, money } from '../data/format'
@@ -91,8 +91,8 @@ const moreActions = computed(() => [{ group: 'Order', options: orderActions }, a
 const fulfilAction = useAdminAction('orders.fulfil_order')
 
 async function fulfil() {
-  await fulfilAction.submit({ sales_order: order.value.name })
-  if (fulfilAction.error) return
+  const fulfilled = await trySubmit(fulfilAction, { sales_order: order.value.name })
+  if (!fulfilled) return
   toast.success('Fulfilment created')
   orderRequest.reload()
 }
@@ -133,7 +133,7 @@ const loadFailure = computed(() =>
       <template #actions>
         <!-- Three full label+icon buttons do not fit a phone header, so this one
              drops out below `sm` and the More menu's own entry carries it. -->
-        <Button class="hidden sm:inline-flex" label="View in ERP" icon-right="lucide-external-link" :link="erpLink" />
+        <Button class="hidden sm:inline-flex" label="View in ERP" icon-right="lucide-external-link" :href="erpLink" />
         <Dropdown :options="moreActions">
           <Button icon="lucide-ellipsis" label="More actions" />
         </Dropdown>

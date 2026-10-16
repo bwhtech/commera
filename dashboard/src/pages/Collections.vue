@@ -7,7 +7,7 @@ import PageBody from '../components/PageBody.vue'
 import ListPagination from '../components/ListPagination.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ListSkeleton from '../components/ListSkeleton.vue'
-import { useAdminRead, useAdminAction } from '../data/api'
+import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { ia } from '../ia/store'
 
 const page = ref(1)
@@ -32,9 +32,9 @@ function addCollection() {
     message: 'A collection groups products the storefront can filter and browse by.',
     fields: [{ name: 'title', label: 'Title', required: true }],
     onConfirm: async ({ values }) => {
-      await createAction.submit({ title: values.title })
+      const created = await trySubmit(createAction, { title: values.title })
       // A failure already toasted inside useAdminAction.
-      if (createAction.error) return
+      if (!created) return
       toast.success(`"${values.title}" created`)
       collectionsRequest.reload()
     },

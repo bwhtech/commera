@@ -9,7 +9,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ListSkeleton from '../components/ListSkeleton.vue'
 import BulkBar from '../components/BulkBar.vue'
-import { useAdminRead, useAdminAction } from '../data/api'
+import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { printUrl } from '../data/erpnext'
 import { money, shortDate } from '../data/format'
 import { useIsMobile } from '../utils/useIsMobile'
@@ -100,9 +100,9 @@ async function markFulfilled() {
   if (!names.length) return
 
   for (const name of names) {
-    await fulfilAction.submit({ sales_order: name })
+    const fulfilled = await trySubmit(fulfilAction, { sales_order: name })
     // A failure already toasted inside useAdminAction — stop rather than fulfil the rest silently.
-    if (fulfilAction.error) return
+    if (!fulfilled) return
   }
 
   toast.success(`${names.length} order(s) marked fulfilled`)
@@ -171,10 +171,10 @@ function printDeliveryNotes() {
            disappears. -->
       <List
       v-model:selection="selection"
-      class="max-sm:[--list-columns:minmax(0,1fr)_auto] sm:min-w-[54rem]"
+      class="sm:min-w-[54rem]"
       :selectable="selecting"
       :row-height="ia.density"
-      :columns="['1fr', '7rem', '9rem', '9rem', '6rem', '7rem']"
+      :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['1fr', '7rem', '9rem', '9rem', '6rem', '7rem'] }"
     >
       <ListHeader>
         <ListHeaderCellSort :direction="directionFor('customer')" @click="toggleSort('customer')">
@@ -201,7 +201,7 @@ function printDeliveryNotes() {
       <ListSkeleton v-if="ordersRequest.loading && !rows.length" :columns="skeletonColumns" />
 
       <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
-        <ListRow :to="orderRoute(item.name)" :value="item.name">
+        <ListRow :route="orderRoute(item.name)" :value="item.name">
           <ListCell>
             <div class="min-w-0">
               <p class="truncate text-base text-ink-gray-8">{{ item.customer }}</p>

@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Button, Spinner, toast, useFileUpload } from 'frappe-ui'
+import { trySubmit } from '../../../data/api'
 import { applyValidation, imp, validateImportAction } from '../../../data/importFlow'
 import CoachTip from '../CoachTip.vue'
 
@@ -19,8 +20,8 @@ async function pick(event) {
     const uploaded = await upload(file, { private: true })
     imp.fileUrl = uploaded.file_url
 
-    await validateImportAction.submit({ file_url: imp.fileUrl })
-    if (validateImportAction.error) {
+    const checked = await trySubmit(validateImportAction, { file_url: imp.fileUrl })
+    if (!checked) {
       imp.file = null
       imp.fileUrl = null
       return

@@ -4,7 +4,9 @@ import { Button, ScrollArea, Skeleton, dialog, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { useAdminRead, useAdminAction } from '../data/api'
+import AttributeValuesDialog from '../components/AttributeValuesDialog.vue'
+import SwatchDot from '../components/SwatchDot.vue'
+import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 
 const attributesRequest = useAdminRead('catalog.get_attributes')
 const attributes = computed(() => attributesRequest.data ?? [])
@@ -20,11 +22,11 @@ function addAttribute() {
       { name: 'values', label: 'Values', description: 'Comma separated' },
     ],
     onConfirm: async ({ values }) => {
-      await createAction.submit({ name: values.name, values: values.values })
+      const created = await trySubmit(createAction, { name: values.name, values: values.values })
       // A failure already toasted inside useAdminAction — this is also where the abbreviation
       // guard would fire if it ever could here (see catalog.check_abbreviations_are_distinct);
       // it can't in practice, because create_attribute auto-generates every abbreviation fresh.
-      if (createAction.error) return
+      if (!created) return
       toast.success(`"${values.name}" created`)
       attributesRequest.reload()
     },

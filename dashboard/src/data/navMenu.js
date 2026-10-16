@@ -5,6 +5,7 @@ const menu = ref([])
 const maxDepth = ref(0)
 const selectedName = ref(null)
 const revision = ref(0)
+const expandedKeys = ref([])
 
 // A refused read leaves `menu` empty, which reads as "this store has no menu" unless the failure is kept.
 const loadError = ref(null)
@@ -51,26 +52,22 @@ function canNest(node, parentDepth) {
   return parentDepth + 1 + subtreeHeight(node) <= maxDepth.value
 }
 
-// Tree keeps each node's open state on the node itself and every mutation replaces
-// the whole tree, so without this, moving one entry collapses the branch being worked in.
-function rememberExpansion() {
-  const state = new Map()
-  walk(menu.value, (node) => state.set(node.name, node.expanded !== false))
-  return state
-}
-
-function applyExpansion(nodes, state, depth = 1) {
-  for (const node of nodes) {
-    node.expanded = state.get(node.name) ?? depth === 1
-    applyExpansion(node.children, state, depth + 1)
-  }
+// Every mutation replaces the whole tree, so without this, moving one entry collapses the branch being worked in.
+function keepExpansion(nodes) {
+  const known = new Set()
+  walk(menu.value, (node) => known.add(node.name))
+  const open = new Set(expandedKeys.value)
+  const next = []
+  walk(nodes, (node, depth) => {
+    if (known.has(node.name) ? open.has(node.name) : depth === 1) next.push(node.name)
+  })
+  expandedKeys.value = next
 }
 
 function apply(data) {
   if (!data?.menu) return
 
-  const expansion = rememberExpansion()
-  applyExpansion(data.menu, expansion)
+  keepExpansion(data.menu)
   menu.value = data.menu
   if (data.max_depth) maxDepth.value = data.max_depth
 
@@ -96,7 +93,8 @@ async function mutate(method, params = {}, revealUnder = '') {
   const data = await call(method, params)
   if (!data) return null
   apply(data)
-  for (const node of pathTo(revealUnder)) node.expanded = true
+  const revealed = pathTo(revealUnder).map((node) => node.name)
+  expandedKeys.value = [...new Set([...expandedKeys.value, ...revealed])]
   // Every menu change funnels through here, so this is the one place the storefront
   // preview is told it is stale.
   revision.value += 1
@@ -112,6 +110,7 @@ async function load() {
 export function useNavMenu() {
   return {
     menu,
+    expandedKeys,
     maxDepth,
     loadError,
     revision,

@@ -93,7 +93,7 @@ async function copyWebhookUrl() {
         label="Provider documentation"
         icon-right="lucide-external-link"
         variant="ghost"
-        :link="card.docs_url"
+        :href="card.docs_url"
       />
     </div>
   </SettingsBody>

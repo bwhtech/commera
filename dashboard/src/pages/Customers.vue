@@ -59,9 +59,9 @@ const skeletonColumns = computed(() => (isMobile.value ? 2 : 5))
            not lower the `min-w` — below the columns' own sum the 1fr track collapses to zero
            and the customer cell disappears. -->
       <List
-        class="max-sm:[--list-columns:minmax(0,1fr)_auto] sm:min-w-[46rem]"
+        class="sm:min-w-[46rem]"
         :row-height="Math.max(ia.density, 44)"
-        :columns="['1fr', '9rem', '6rem', '8rem', '9rem']"
+        :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['1fr', '9rem', '6rem', '8rem', '9rem'] }"
       >
         <ListHeader>
           <ListHeaderCell>Customer</ListHeaderCell>
@@ -75,7 +75,7 @@ const skeletonColumns = computed(() => (isMobile.value ? 2 : 5))
              in the search box. The skeleton means first load only. -->
         <ListSkeleton v-if="customersRequest.loading && !rows.length" :columns="skeletonColumns" />
         <ListRows v-else :items="rows" row-key="id" v-slot="{ item }">
-          <ListRow :to="customerRoute(item.id)" :value="item.id">
+          <ListRow :route="customerRoute(item.id)" :value="item.id">
             <ListCell>
               <div class="flex min-w-0 items-center gap-2.5">
                 <Avatar :label="item.name" size="sm" />

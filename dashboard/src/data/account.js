@@ -19,11 +19,8 @@ export function useAccountMenu() {
     // The redirect runs either way: a logout that failed still leaves a shell whose
     // session may be gone, and stranding the merchant on it is worse than sending
     // them to a login page they can retry from.
-    try {
-      await logoutAction.submit()
-    } finally {
-      window.location.replace('/login')
-    }
+    await logoutAction.submit().catch(() => {})
+    window.location.replace('/login')
   }
 
   return [

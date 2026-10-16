@@ -2,7 +2,7 @@
 import { useRouter } from 'vue-router'
 import { Alert, Badge, Button, Spinner } from 'frappe-ui'
 import { STEPS, closeImport, imp } from '../../../data/importFlow'
-import { useAdminAction } from '../../../data/api'
+import { useAdminAction, trySubmit } from '../../../data/api'
 import { openSettings } from '../../../ia/settings'
 import ProductThumb from '../ProductThumb.vue'
 
@@ -16,14 +16,13 @@ async function run() {
   imp.failed = false
   imp.running = true
 
-  await runImportAction.submit({
+  const imported = await trySubmit(runImportAction, {
     file_url: imp.fileUrl,
     column_mapping: { ...imp.mapping },
     image_assignments: { ...imp.imageAssignments },
   })
   imp.running = false
-
-  if (runImportAction.error) {
+  if (!imported) {
     imp.failed = true
     return
   }

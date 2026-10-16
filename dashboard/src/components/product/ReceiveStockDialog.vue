@@ -9,7 +9,7 @@
  */
 import { computed, reactive, watch } from 'vue'
 import { Button, Dialog, TextInput, toast } from 'frappe-ui'
-import { useAdminAction } from '../../data/api'
+import { useAdminAction, trySubmit } from '../../data/api'
 
 const props = defineProps({
   // The rows ProductStock already builds: { id, title, sku, onHand }.
@@ -45,8 +45,9 @@ async function receive() {
     lines.value.filter((line) => line.rate !== '' && line.rate != null).map((line) => [line.itemCode, Number(line.rate)]),
   )
 
-  const result = await receiveAction.submit({ received_quantities, valuation_rates })
-  if (receiveAction.error || !result) return
+  const received = await trySubmit(receiveAction, { received_quantities, valuation_rates })
+  if (!received) return
+  const result = receiveAction.data
 
   open.value = false
   const count = result.stock_entries?.length ?? 0

@@ -11,7 +11,7 @@ import Thumb from '../components/Thumb.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PluginActionDialog from '../components/PluginActionDialog.vue'
 import PluginSlot from '../components/PluginSlot.vue'
-import { useAdminRead, useAdminAction } from '../data/api'
+import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { erpnextLink } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { longDate, money } from '../data/format'
@@ -112,8 +112,8 @@ const noteAction = useAdminAction('customers.save_customer_note')
 const noteChanged = computed(() => note.value !== (customer.value?.note ?? ''))
 
 async function saveNote() {
-  await noteAction.submit({ customer: route.params.id, note: note.value })
-  if (noteAction.error) return
+  const saved = await trySubmit(noteAction, { customer: route.params.id, note: note.value })
+  if (!saved) return
   toast.success('Note saved')
   customerRequest.reload()
 }
@@ -142,7 +142,7 @@ function plural(count, word) {
         <Dropdown v-if="actionGroup" :options="[actionGroup]">
           <Button icon="lucide-ellipsis" label="More actions" />
         </Dropdown>
-        <Button label="View in ERP" icon-right="lucide-external-link" :link="erpnextLink('Customer', customer.id)" />
+        <Button label="View in ERP" icon-right="lucide-external-link" :href="erpnextLink('Customer', customer.id)" />
       </template>
     </AppPageHeader>
 

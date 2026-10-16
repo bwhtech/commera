@@ -7,7 +7,7 @@ import EmptyState from '../EmptyState.vue'
 import ListPagination from '../ListPagination.vue'
 import ResponsiveButton from '../ResponsiveButton.vue'
 import StatusBadge from '../StatusBadge.vue'
-import { useAdminAction, useAdminRead } from '../../data/api'
+import { useAdminAction, useAdminRead, trySubmit } from '../../data/api'
 import { eventLabel, statusKey, timeLabel, useDeliveryRetry } from '../../data/pluginEvents'
 import { appIcon, pluginSettingsTabs, placeLabel, settingsTabValue } from '../../ia/plugins'
 import { settings } from '../../ia/settings'
@@ -80,8 +80,8 @@ const storefrontSave = useAdminAction('plugins.set_storefront_enabled')
 async function setStorefront(enabled) {
   const plugin = current.value
   plugin.storefront = enabled
-  await storefrontSave.submit({ app: plugin.app, enabled })
-  if (storefrontSave.error) {
+  const saved = await trySubmit(storefrontSave, { app: plugin.app, enabled })
+  if (!saved) {
     plugin.storefront = !enabled
     return
   }

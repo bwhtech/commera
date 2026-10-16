@@ -4,7 +4,7 @@ import { Button, FormControl, FormLabel, SettingsBody, toast } from 'frappe-ui'
 import SettingsConfigHeader from './SettingsConfigHeader.vue'
 import LocationMap from '../LocationMap.vue'
 import SettingsLinkControl from './SettingsLinkControl.vue'
-import { useAdminAction } from '../../data/api'
+import { useAdminAction, trySubmit } from '../../data/api'
 
 const props = defineProps({
   warehouse: { type: Object, required: true },
@@ -60,8 +60,9 @@ const searchText = computed(() =>
 const otherMatches = computed(() => matches.value.filter((match) => match !== chosenMatch.value))
 
 async function lookUp(query) {
-  const found = await findLocation.submit({ query })
-  return findLocation.error ? [] : (found ?? [])
+  const searched = await trySubmit(findLocation, { query })
+  if (!searched) return []
+  return findLocation.data ?? []
 }
 
 // A new address has no pin, so the map opens on its country rather than the whole world.
@@ -190,7 +191,7 @@ async function useCurrentLocation() {
 
       <div class="flex flex-col gap-2">
         <div class="flex items-center justify-between gap-2">
-          <FormLabel label="Location on the map" size="md" />
+          <FormLabel label="Location on the map" />
           <Button
             v-if="canUseDevice"
             label="Use my current location"

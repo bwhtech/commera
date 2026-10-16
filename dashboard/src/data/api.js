@@ -69,3 +69,12 @@ export function useAdminRead(path, options = {}) {
 export function useAdminAction(path, options = {}) {
   return useMethodAction(ADMIN_MODULE + path, options)
 }
+
+export async function trySubmit(action, params) {
+  try {
+    await action.submit(params)
+    return true
+  } catch {
+    return false
+  }
+}

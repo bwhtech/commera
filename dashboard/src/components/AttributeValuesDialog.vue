@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { Button, Dialog, ErrorMessage, TextInput, toast, useFileUpload } from 'frappe-ui'
 import SwatchDot from './SwatchDot.vue'
-import { useAdminAction } from '../data/api'
+import { useAdminAction, trySubmit } from '../data/api'
 
 const props = defineProps({
   attribute: { type: Object, default: null },
@@ -63,9 +63,13 @@ async function commitRename(row, typed) {
   if (!next || next === row.value) return
 
   savingValue.value = row.value
-  await renameAction.submit({ attribute: props.attribute.name, value: row.value, new_value: next })
+  const renamed = await trySubmit(renameAction, {
+    attribute: props.attribute.name,
+    value: row.value,
+    new_value: next,
+  })
   savingValue.value = ''
-  if (renameAction.error) return
+  if (!renamed) return
   row.value = next
   emit('saved')
 }
@@ -75,23 +79,23 @@ async function save(row, changes) {
   if (!next.color && !next.image) return clear(row)
 
   savingValue.value = row.value
-  await setAction.submit({
+  const saved = await trySubmit(setAction, {
     attribute: props.attribute.name,
     value: row.value,
     color: next.color ?? '',
     image: next.image ?? '',
   })
   savingValue.value = ''
-  if (setAction.error) return
+  if (!saved) return
   Object.assign(row, changes)
   emit('saved')
 }
 
 async function clear(row) {
   savingValue.value = row.value
-  await clearAction.submit({ attribute: props.attribute.name, value: row.value })
+  const cleared = await trySubmit(clearAction, { attribute: props.attribute.name, value: row.value })
   savingValue.value = ''
-  if (clearAction.error) return
+  if (!cleared) return
   row.color = null
   row.image = null
   emit('saved')
@@ -112,8 +116,8 @@ async function uploadImage(row, event) {
 async function addValue() {
   const value = newValue.value.trim()
   if (!value) return
-  await addAction.submit({ attribute: props.attribute.name, value })
-  if (addAction.error) return
+  const added = await trySubmit(addAction, { attribute: props.attribute.name, value })
+  if (!added) return
   rows.value.push({ value, color: null, image: null, used_by: 0 })
   newValue.value = ''
   emit('saved')
