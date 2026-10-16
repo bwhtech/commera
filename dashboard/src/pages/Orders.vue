@@ -9,7 +9,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ListSkeleton from '../components/ListSkeleton.vue'
 import BulkBar from '../components/BulkBar.vue'
-import { useAdminRead, useAdminAction } from '../data/api'
+import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { printUrl } from '../data/erpnext'
 import { money, shortDate } from '../data/format'
 import { useIsMobile } from '../utils/useIsMobile'
@@ -100,7 +100,7 @@ async function markFulfilled() {
   if (!names.length) return
 
   for (const name of names) {
-    const fulfilled = await fulfilAction.submit({ sales_order: name }).then(() => true, () => false)
+    const fulfilled = await trySubmit(fulfilAction, { sales_order: name })
     // A failure already toasted inside useAdminAction — stop rather than fulfil the rest silently.
     if (!fulfilled) return
   }

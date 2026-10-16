@@ -4,7 +4,7 @@ import { Button, FormControl, FormLabel, SettingsBody, toast } from 'frappe-ui'
 import SettingsConfigHeader from './SettingsConfigHeader.vue'
 import LocationMap from '../LocationMap.vue'
 import SettingsLinkControl from './SettingsLinkControl.vue'
-import { useAdminAction } from '../../data/api'
+import { useAdminAction, trySubmit } from '../../data/api'
 
 const props = defineProps({
   warehouse: { type: Object, required: true },
@@ -60,7 +60,7 @@ const searchText = computed(() =>
 const otherMatches = computed(() => matches.value.filter((match) => match !== chosenMatch.value))
 
 async function lookUp(query) {
-  const searched = await findLocation.submit({ query }).then(() => true, () => false)
+  const searched = await trySubmit(findLocation, { query })
   if (!searched) return []
   return findLocation.data ?? []
 }

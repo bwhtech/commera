@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Alert, Badge, Button, Select } from 'frappe-ui'
+import { trySubmit } from '../../../data/api'
 import { REQUIRED_FIELDS, TARGET_FIELDS, applyValidation, imp, validateImportAction } from '../../../data/importFlow'
 import CoachTip from '../CoachTip.vue'
 
@@ -15,14 +16,16 @@ const confidenceTheme = { high: 'green', medium: 'orange', low: 'gray', none: 'g
 const confidenceLabel = { high: 'Sure', medium: 'Likely', low: 'Guess', none: 'No match' }
 
 async function recheck() {
-  const checked = await validateImportAction.submit({ file_url: imp.fileUrl, column_mapping: { ...imp.mapping } })
-    .then(() => true, () => false)
+  const checked = await trySubmit(validateImportAction, {
+    file_url: imp.fileUrl,
+    column_mapping: { ...imp.mapping },
+  })
   if (!checked) return
   applyValidation(validateImportAction.data)
 }
 
 async function resetToSuggested() {
-  const checked = await validateImportAction.submit({ file_url: imp.fileUrl }).then(() => true, () => false)
+  const checked = await trySubmit(validateImportAction, { file_url: imp.fileUrl })
   if (!checked) return
   applyValidation(validateImportAction.data)
 }

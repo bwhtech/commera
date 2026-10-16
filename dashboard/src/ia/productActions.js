@@ -1,5 +1,5 @@
 import { dialog, toast } from 'frappe-ui'
-import { useAdminAction } from '../data/api'
+import { useAdminAction, trySubmit } from '../data/api'
 import { pickCollectionFor } from '../data/collections'
 
 // Every action a merchant can take from a product page, grouped by intent.
@@ -133,9 +133,9 @@ export function buildProductActions(product, router, handlers = {}) {
                 const quantity = Math.max(0, Number(values.value) || 0)
                 if (!quantity) return
 
-                const received = await receiveStockAction.submit({
+                const received = await trySubmit(receiveStockAction, {
                   received_quantities: Object.fromEntries(itemCodes.map((code) => [code, quantity])),
-                }).then(() => true, () => false)
+                })
                 if (!received) return
 
                 toast.success(`Received ${quantity} on ${itemCodes.length} sizes`)
@@ -165,8 +165,7 @@ export function buildProductActions(product, router, handlers = {}) {
                 // set_restock_level stores cint(level), which truncates: 2.7 is kept as 2.
                 // Truncating here too keeps the toast honest about what was stored.
                 const level = Math.max(0, Math.trunc(Number(values.value) || 0))
-                const saved = await restockLevelAction.submit({ item_template: product.id, level })
-                  .then(() => true, () => false)
+                const saved = await trySubmit(restockLevelAction, { item_template: product.id, level })
                 if (!saved) return
 
                 toast.success(`Low stock now reads at ${level} or below`)
@@ -229,7 +228,7 @@ export function buildProductActions(product, router, handlers = {}) {
               theme: 'red',
               confirmLabel: 'Delete',
               onConfirm: async () => {
-                const deleted = await deleteAction.submit({ item_template: product.id }).then(() => true, () => false)
+                const deleted = await trySubmit(deleteAction, { item_template: product.id })
                 if (!deleted) return
                 toast.success(`${product.title} deleted`)
                 router.push('/products')

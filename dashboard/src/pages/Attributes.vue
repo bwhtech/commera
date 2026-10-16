@@ -6,7 +6,7 @@ import PageBody from '../components/PageBody.vue'
 import EmptyState from '../components/EmptyState.vue'
 import AttributeValuesDialog from '../components/AttributeValuesDialog.vue'
 import SwatchDot from '../components/SwatchDot.vue'
-import { useAdminRead, useAdminAction } from '../data/api'
+import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 
 const attributesRequest = useAdminRead('catalog.get_attributes')
 const attributes = computed(() => attributesRequest.data ?? [])
@@ -22,8 +22,7 @@ function addAttribute() {
       { name: 'values', label: 'Values', description: 'Comma separated' },
     ],
     onConfirm: async ({ values }) => {
-      const created = await createAction.submit({ name: values.name, values: values.values })
-        .then(() => true, () => false)
+      const created = await trySubmit(createAction, { name: values.name, values: values.values })
       // A failure already toasted inside useAdminAction — this is also where the abbreviation
       // guard would fire if it ever could here (see catalog.check_abbreviations_are_distinct);
       // it can't in practice, because create_attribute auto-generates every abbreviation fresh.

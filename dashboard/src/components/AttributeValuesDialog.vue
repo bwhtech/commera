@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { Button, Dialog, ErrorMessage, TextInput, toast, useFileUpload } from 'frappe-ui'
 import SwatchDot from './SwatchDot.vue'
-import { useAdminAction } from '../data/api'
+import { useAdminAction, trySubmit } from '../data/api'
 
 const props = defineProps({
   attribute: { type: Object, default: null },
@@ -63,8 +63,11 @@ async function commitRename(row, typed) {
   if (!next || next === row.value) return
 
   savingValue.value = row.value
-  const renamed = await renameAction.submit({ attribute: props.attribute.name, value: row.value, new_value: next })
-    .then(() => true, () => false)
+  const renamed = await trySubmit(renameAction, {
+    attribute: props.attribute.name,
+    value: row.value,
+    new_value: next,
+  })
   savingValue.value = ''
   if (!renamed) return
   row.value = next
@@ -76,12 +79,12 @@ async function save(row, changes) {
   if (!next.color && !next.image) return clear(row)
 
   savingValue.value = row.value
-  const saved = await setAction.submit({
+  const saved = await trySubmit(setAction, {
     attribute: props.attribute.name,
     value: row.value,
     color: next.color ?? '',
     image: next.image ?? '',
-  }).then(() => true, () => false)
+  })
   savingValue.value = ''
   if (!saved) return
   Object.assign(row, changes)
@@ -90,8 +93,7 @@ async function save(row, changes) {
 
 async function clear(row) {
   savingValue.value = row.value
-  const cleared = await clearAction.submit({ attribute: props.attribute.name, value: row.value })
-    .then(() => true, () => false)
+  const cleared = await trySubmit(clearAction, { attribute: props.attribute.name, value: row.value })
   savingValue.value = ''
   if (!cleared) return
   row.color = null
@@ -114,7 +116,7 @@ async function uploadImage(row, event) {
 async function addValue() {
   const value = newValue.value.trim()
   if (!value) return
-  const added = await addAction.submit({ attribute: props.attribute.name, value }).then(() => true, () => false)
+  const added = await trySubmit(addAction, { attribute: props.attribute.name, value })
   if (!added) return
   rows.value.push({ value, color: null, image: null, used_by: 0 })
   newValue.value = ''

@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Button, Dialog, toast } from 'frappe-ui'
-import { useMethodAction } from '../data/api'
+import { useMethodAction, trySubmit } from '../data/api'
 import { money } from '../data/format'
 
 const props = defineProps({
@@ -28,7 +28,7 @@ async function refund() {
     // No `amount`: the server refunds everything it still considers refundable,
     // and it is the one that clamps. It throws on failure — useMethodAction has
     // already surfaced the thrown message verbatim as a toast.
-    const refunded = await refundAction.submit({ order_id: props.orderId }).then(() => true, () => false)
+    const refunded = await trySubmit(refundAction, { order_id: props.orderId })
     if (!refunded) return
     const paymentEntry = refundAction.data
     if (!paymentEntry) return

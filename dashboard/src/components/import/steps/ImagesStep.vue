@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { Badge, Button, Progress, Select, Spinner, TabButtons, toast, useFileUpload } from 'frappe-ui'
 import { imp } from '../../../data/importFlow'
-import { useAdminAction } from '../../../data/api'
+import { useAdminAction, trySubmit } from '../../../data/api'
 import CoachTip from '../CoachTip.vue'
 
 const emit = defineEmits(['next'])
@@ -52,11 +52,11 @@ function rebuildAssignments() {
 }
 
 async function matchUploadedFiles() {
-  const matched = await matchAction.submit({
+  const matched = await trySubmit(matchAction, {
     file_url: imp.fileUrl,
     column_mapping: { ...imp.mapping },
     image_files: imp.imageFiles,
-  }).then(() => true, () => false)
+  })
   if (!matched) return
   imp.imageMatch = matchAction.data
   rebuildAssignments()

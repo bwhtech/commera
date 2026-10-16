@@ -14,7 +14,7 @@ import PluginActionDialog from '../components/PluginActionDialog.vue'
 import PluginSlot from '../components/PluginSlot.vue'
 import Thumb from '../components/Thumb.vue'
 import RefundDialog from '../components/RefundDialog.vue'
-import { useAdminRead, useAdminAction, useMethodRead } from '../data/api'
+import { useAdminRead, useAdminAction, useMethodRead, trySubmit } from '../data/api'
 import { erpnextLink, printUrl } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { longDate, money } from '../data/format'
@@ -91,7 +91,7 @@ const moreActions = computed(() => [{ group: 'Order', options: orderActions }, a
 const fulfilAction = useAdminAction('orders.fulfil_order')
 
 async function fulfil() {
-  const fulfilled = await fulfilAction.submit({ sales_order: order.value.name }).then(() => true, () => false)
+  const fulfilled = await trySubmit(fulfilAction, { sales_order: order.value.name })
   if (!fulfilled) return
   toast.success('Fulfilment created')
   orderRequest.reload()

@@ -7,7 +7,7 @@
 import { computed, ref, watch } from 'vue'
 import { Badge, Button, Dialog, FormControl, toast } from 'frappe-ui'
 import VariantMedia from './VariantMedia.vue'
-import { useAdminAction } from '../data/api'
+import { useAdminAction, trySubmit } from '../data/api'
 import { pricePayload, shownPrice } from '../data/product'
 import { productRoute } from '../ia/routes'
 
@@ -59,12 +59,12 @@ async function save() {
   // With no compare-at there is only one price to write, and it has to land on the list already
   // in force: a product created without one is priced on the sale list alone, so writing the
   // default list there would leave the shopper paying the old rate.
-  const saved = await priceAction.submit({
+  const saved = await trySubmit(priceAction, {
     style_attribute_variant: props.variant.name,
     ...(hasCompareAt
       ? { default_rate: compareAt.value, sale_rate: price.value }
       : pricePayload(props.variant.sizes?.[0], price.value)),
-  }).then(() => true, () => false)
+  })
   if (!saved) return
   open.value = false
   toast.success(`${props.variant.option} saved`)

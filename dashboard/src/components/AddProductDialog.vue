@@ -8,7 +8,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Alert, Button, Dialog, ErrorMessage, FormControl, Select, dialog, toast } from 'frappe-ui'
-import { useAdminAction, useAdminRead } from '../data/api'
+import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { addProduct, closeAddProduct } from '../data/addProduct'
 import { buildOptionSizes } from '../data/optionSizes'
 import { productRoute } from '../ia/routes'
@@ -69,7 +69,7 @@ function addCollection() {
     title: 'New collection',
     fields: [{ name: 'title', label: 'Name', required: true }],
     onConfirm: async ({ values }) => {
-      const created = await createCollectionAction.submit({ title: values.title }).then(() => true, () => false)
+      const created = await trySubmit(createCollectionAction, { title: values.title })
       if (!created) return
       await collectionsRequest.reload()
       collection.value = values.title
@@ -97,8 +97,10 @@ function addAttribute() {
       { name: 'values', label: 'Values', placeholder: 'Paperback, Hardcover' },
     ],
     onConfirm: async ({ values }) => {
-      const created = await createAttributeAction.submit({ name: values.title, values: values.values || undefined })
-        .then(() => true, () => false)
+      const created = await trySubmit(createAttributeAction, {
+        name: values.title,
+        values: values.values || undefined,
+      })
       if (!created) return
       await attributesRequest.reload()
       optionAttribute.value = values.title
@@ -168,7 +170,7 @@ const submitHint = computed(() => {
 async function submit() {
   if (!canSubmit.value) return
 
-  const added = await createAction.submit({
+  const added = await trySubmit(createAction, {
     title: title.value.trim(),
     collection: collection.value,
     option_attribute: colors.value.length ? optionAttribute.value : undefined,
@@ -176,7 +178,7 @@ async function submit() {
     option_sizes: optionSizes.value,
     price: compareAt.value || undefined,
     sale_price: price.value || undefined,
-  }).then(() => true, () => false)
+  })
   // A failure (missing collection, colliding abbreviation, wrong size attribute…) already
   // toasted inside useAdminAction — the form stays open so the owner can fix it and resubmit.
   if (!added) return

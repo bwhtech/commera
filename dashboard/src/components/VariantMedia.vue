@@ -5,7 +5,7 @@
  */
 import { ref } from 'vue'
 import { Badge, Button, toast, useFileUpload } from 'frappe-ui'
-import { useAdminAction } from '../data/api'
+import { useAdminAction, trySubmit } from '../data/api'
 
 const props = defineProps({
   variant: { type: Object, required: true },
@@ -31,8 +31,7 @@ async function addFiles(files) {
   }
   if (!uploaded.length) return
 
-  const added = await addAction.submit({ style_attribute_variant: props.variant.name, file_urls: uploaded })
-    .then(() => true, () => false)
+  const added = await trySubmit(addAction, { style_attribute_variant: props.variant.name, file_urls: uploaded })
   if (!added) return
   toast.success(`${uploaded.length} photo${uploaded.length > 1 ? 's' : ''} added to ${props.variant.option}`)
   emit('saved')
@@ -49,8 +48,10 @@ function onDrop(event) {
 }
 
 async function remove(fileUrl) {
-  const removed = await removeAction.submit({ style_attribute_variant: props.variant.name, file_url: fileUrl })
-    .then(() => true, () => false)
+  const removed = await trySubmit(removeAction, {
+    style_attribute_variant: props.variant.name,
+    file_url: fileUrl,
+  })
   if (!removed) return
   emit('saved')
 }

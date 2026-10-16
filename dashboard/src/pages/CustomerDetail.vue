@@ -11,7 +11,7 @@ import Thumb from '../components/Thumb.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PluginActionDialog from '../components/PluginActionDialog.vue'
 import PluginSlot from '../components/PluginSlot.vue'
-import { useAdminRead, useAdminAction } from '../data/api'
+import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { erpnextLink } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { longDate, money } from '../data/format'
@@ -112,7 +112,7 @@ const noteAction = useAdminAction('customers.save_customer_note')
 const noteChanged = computed(() => note.value !== (customer.value?.note ?? ''))
 
 async function saveNote() {
-  const saved = await noteAction.submit({ customer: route.params.id, note: note.value }).then(() => true, () => false)
+  const saved = await trySubmit(noteAction, { customer: route.params.id, note: note.value })
   if (!saved) return
   toast.success('Note saved')
   customerRequest.reload()

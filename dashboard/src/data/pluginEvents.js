@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { dayjs, toast } from 'frappe-ui'
-import { useMethodAction } from './api'
+import { useMethodAction, trySubmit } from './api'
 
 export function eventLabel(event) {
   const words = event.replace(/_/g, ' ')
@@ -31,7 +31,7 @@ export function useDeliveryRetry(onRetried) {
     retrying.value = key
     try {
       for (const delivery of deliveries) {
-        const sent = await retryAction.submit({ delivery }).then(() => true, () => false)
+        const sent = await trySubmit(retryAction, { delivery })
         if (!sent) return
       }
       toast.success(`Sending to ${app} again`)

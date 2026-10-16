@@ -16,7 +16,7 @@ import ProductStorefront from '../components/product/ProductStorefront.vue'
 import ProductSummaryPanel from '../components/product/ProductSummaryPanel.vue'
 import PluginActionDialog from '../components/PluginActionDialog.vue'
 import PluginSlot from '../components/PluginSlot.vue'
-import { useAdminRead, useAdminAction } from '../data/api'
+import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { errorMessage } from '../data/errors'
 import { longDate } from '../data/format'
 import { useProductStats } from '../data/product'
@@ -68,7 +68,7 @@ const publishAction = useAdminAction('catalog.set_product_published')
 
 async function togglePublish() {
   const publish = !product.value.variants.some((variant) => variant.is_published)
-  const toggled = await publishAction.submit({ item_template: product.value.id, publish }).then(() => true, () => false)
+  const toggled = await trySubmit(publishAction, { item_template: product.value.id, publish })
   if (!toggled) return
   const result = publishAction.data
   productRequest.reload()
@@ -81,8 +81,7 @@ async function togglePublish() {
 
 async function toggleArchive() {
   const disabled = product.value.status !== 'archived'
-  const saved = await updateAction.submit({ item_template: product.value.id, disabled: disabled ? 1 : 0 })
-    .then(() => true, () => false)
+  const saved = await trySubmit(updateAction, { item_template: product.value.id, disabled: disabled ? 1 : 0 })
   if (!saved) return
   toast.success(disabled ? 'Archived' : 'Restored')
   productRequest.reload()
@@ -124,12 +123,12 @@ const moreActions = computed(() => [...asDropdownOptions(actions.value.groups), 
 // is currently on it — there is no separate draft to track.
 async function save() {
   if (!product.value) return
-  const saved = await updateAction.submit({
+  const saved = await trySubmit(updateAction, {
     item_template: product.value.id,
     title: product.value.title,
     collection: product.value.collection,
     description: product.value.description,
-  }).then(() => true, () => false)
+  })
   if (!saved) return
   toast.success('Saved')
   productRequest.reload()

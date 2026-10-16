@@ -2,7 +2,7 @@
 // bar — so the list, the wording and the count it reports live here rather than in each screen.
 import { computed } from 'vue'
 import { dialog, toast } from 'frappe-ui'
-import { useAdminAction, useAdminRead } from './api'
+import { useAdminAction, useAdminRead, trySubmit } from './api'
 
 // Module scope: the product action list is rebuilt on every product reload, and a resource per
 // rebuild would refetch the collection list each time.
@@ -51,10 +51,10 @@ export async function pickCollectionFor(itemTemplates, { label, currentCollectio
     ],
     confirmLabel: 'Move',
     onConfirm: async ({ values }) => {
-      const moved = await collectionAction.submit({
+      const moved = await trySubmit(collectionAction, {
         item_templates: itemTemplates,
         collection: values.collection,
-      }).then(() => true, () => false)
+      })
       if (!moved) return
       const response = collectionAction.data
 

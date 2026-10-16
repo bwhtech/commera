@@ -7,7 +7,7 @@ import EmptyState from '../components/EmptyState.vue'
 import PageBody from '../components/PageBody.vue'
 import Thumb from '../components/Thumb.vue'
 import VariantMedia from '../components/VariantMedia.vue'
-import { useAdminRead, useAdminAction } from '../data/api'
+import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { errorMessage } from '../data/errors'
 import { pricePayload, shownPrice } from '../data/product'
 import { productRoute } from '../ia/routes'
@@ -63,8 +63,7 @@ async function save() {
         : pricePayload(size, draft.price)),
     }
   })
-  const saved = await priceAction.submit({ style_attribute_variant: variant.value.name, size_prices })
-    .then(() => true, () => false)
+  const saved = await trySubmit(priceAction, { style_attribute_variant: variant.value.name, size_prices })
   if (!saved) return
 
   const received_quantities = Object.fromEntries(
@@ -73,8 +72,10 @@ async function save() {
       .map(([item_code, draft]) => [item_code, Number(draft.receiveQty)]),
   )
   if (Object.keys(received_quantities).length) {
-    const received = await stockAction.submit({ style_attribute_variant: variant.value.name, received_quantities })
-      .then(() => true, () => false)
+    const received = await trySubmit(stockAction, {
+      style_attribute_variant: variant.value.name,
+      received_quantities,
+    })
     if (!received) return
   }
 
@@ -83,8 +84,10 @@ async function save() {
 }
 
 async function togglePublish() {
-  const toggled = await publishAction.submit({ style_attribute_variant: variant.value.name, publish: !variant.value.is_published })
-    .then(() => true, () => false)
+  const toggled = await trySubmit(publishAction, {
+    style_attribute_variant: variant.value.name,
+    publish: !variant.value.is_published,
+  })
   if (!toggled) return
   productRequest.reload()
 }

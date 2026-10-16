@@ -5,7 +5,7 @@ import { Avatar, Badge, Button, Rating, Skeleton, Switch, Textarea, dayjs, toast
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { useAdminAction, useAdminRead } from '../data/api'
+import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { erpnextLink } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { productRoute } from '../ia/routes'
@@ -67,8 +67,7 @@ watch(
 const replyAction = useAdminAction('reviews.save_reply')
 
 async function saveReply() {
-  const posted = await replyAction.submit({ name: review.value.name, reply: replyDraft.value })
-    .then(() => true, () => false)
+  const posted = await trySubmit(replyAction, { name: review.value.name, reply: replyDraft.value })
   if (!posted) return
   toast.success('Reply posted')
   reviewRequest.reload()
