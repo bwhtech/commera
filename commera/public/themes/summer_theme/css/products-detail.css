@@ -174,3 +174,102 @@
 	background: var(--bs-gray-100);
 	border-radius: 10px;
 }
+
+.add-to-cart {
+	overflow: hidden;
+}
+
+.add-to-cart .add-to-cart-label,
+.add-to-cart .add-to-cart-done {
+	display: block;
+	transition: opacity 0.2s, transform 0.2s;
+}
+
+.add-to-cart .add-to-cart-done,
+.add-to-cart .add-to-cart-shirt,
+.add-to-cart .add-to-cart-cart {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	pointer-events: none;
+}
+
+.add-to-cart .add-to-cart-done {
+	opacity: 0;
+	transform: translate(-50%, -50%) translateY(12px);
+}
+
+.add-to-cart .add-to-cart-done .icon {
+	margin-right: 8px;
+	font-size: 1.1em;
+	-webkit-text-stroke: 0.75px currentColor;
+}
+
+.add-to-cart .add-to-cart-shirt {
+	width: 16px;
+	height: 16px;
+	margin: -14px 0 0 -6px;
+	fill: currentColor;
+	opacity: 0;
+}
+
+.add-to-cart .add-to-cart-cart {
+	width: 30px;
+	height: 30px;
+	margin: -15px 0 0 -15px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.8;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	transform: translateX(-160px);
+}
+
+.add-to-cart .add-to-cart-label {
+	transition-delay: 0.2s;
+}
+
+.add-to-cart.adding .add-to-cart-label {
+	opacity: 0;
+	transform: translateX(24px);
+	transition-delay: 0s;
+}
+
+.add-to-cart.adding .add-to-cart-cart {
+	animation: add-to-cart-cart 1.6s ease-in-out forwards;
+}
+
+.add-to-cart.adding .add-to-cart-shirt {
+	animation: add-to-cart-shirt 1.6s ease-in-out forwards;
+}
+
+.add-to-cart.adding .add-to-cart-done {
+	opacity: 1;
+	transform: translate(-50%, -50%);
+	transition-delay: 1.5s;
+}
+
+@keyframes add-to-cart-cart {
+	30%, 62% { transform: translateX(0); }
+	68% { transform: translateX(0) rotate(-6deg); }
+	100% { transform: translateX(220px) rotate(-6deg); }
+}
+
+@keyframes add-to-cart-shirt {
+	0%, 28% { opacity: 0; transform: translateY(-24px); }
+	34% { opacity: 1; }
+	50%, 62% { transform: translateY(4px); }
+	68% { transform: translateY(4px) rotate(-6deg); }
+	100% { opacity: 1; transform: translate(220px, 4px) rotate(-6deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.add-to-cart.adding .add-to-cart-cart,
+	.add-to-cart.adding .add-to-cart-shirt {
+		animation: none;
+	}
+
+	.add-to-cart.adding .add-to-cart-done {
+		transition-delay: 0s;
+	}
+}

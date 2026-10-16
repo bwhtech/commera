@@ -7,6 +7,7 @@
 		default_price: {{ (default_price or 0) | tojson }},
 		brand: {{ (product.brand or "") | tojson }},
 		qty: 1,
+		adding: false,
 		max_qty: {{ (none if selected_item.stock_detail.unlimited else (selected_item.stock_detail.stock_qty or 0) | round | int) | tojson }},
 		increment() {
 			if (this.max_qty === null || this.qty < this.max_qty) {
@@ -32,6 +33,8 @@
 			}
 			$store.cart.add(this.product, this.selected_variant, this.price, this.default_price, this.brand, this.sizes, this.qty);
 			toast($store.i18n.t("Item added to your bag"), { type: "success" });
+			this.adding = true;
+			setTimeout(() => this.adding = false, 3000);
 		},
 		get in_wishlist() {
 			return $store.wishlist.is_in_wishlist(this.product);
@@ -182,8 +185,11 @@
 					<i class="icon feather icon-heart-on" x-show="in_wishlist" x-cloak></i>
 					<span x-text='in_wishlist ? {{ _("Remove From Wishlist") | tojson }} : {{ _("Add To Wishlist") | tojson }}'></span>
 				</button>
-				<button type="button" class="btn btn-secondary w-100" @click.throttle.1000ms="add_to_cart()" {% if not product_in_stock %}disabled{% endif %}>
-					{{ _("Add To Cart") }}
+				<button type="button" class="btn btn-secondary w-100 add-to-cart" :class="{ adding }" @click.throttle.1000ms="adding || add_to_cart()" {% if not product_in_stock %}disabled{% endif %}>
+					<span class="add-to-cart-label">{{ _("Add To Cart") }}</span>
+					<span class="add-to-cart-done" aria-hidden="true"><i class="icon feather icon-check"></i>{{ _("Added") }}</span>
+					<svg class="add-to-cart-shirt" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 3 6l2 4 2-1v12h10V9l2 1 2-4-5-3c0 1.7-1.8 3-4 3S8 4.7 8 3Z"/></svg>
+					<svg class="add-to-cart-cart" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 2h3l2.7 12.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L22 7H5.2"/><circle cx="9" cy="20" r="1.5"/><circle cx="19" cy="20" r="1.5"/></svg>
 				</button>
 				{% if not product_in_stock and frappe.session.user != "Guest" %}
 				<button type="button" class="btn btn-link w-100 mt-2"
