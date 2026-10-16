@@ -4,7 +4,7 @@ from frappe.integrations.utils import (
 )
 from frappe.utils import add_to_date, get_url, now_datetime
 
-from commera.api.payments import COD_PAYMENT_MODE
+from commera.api.payments import COD_PAYMENT_MODE, get_reusable_checkout_gateways
 from commera.order_access import get_order_link, set_order_access_key
 
 
@@ -210,7 +210,19 @@ def delete_old_draft_quotations():
 		},
 		pluck="name",
 	)
+	reusable_gateways = get_reusable_checkout_gateways()
 	for quotation in old_drafts:
+		# The gateway's checkout link is still payable, so the cart must outlive the shopper's tab.
+		if reusable_gateways and frappe.db.exists(
+			"Gateway Payment Request",
+			{
+				"ref_doctype": "Quotation",
+				"ref_docname": quotation,
+				"gateway": ["in", reusable_gateways],
+				"status": "Pending",
+			},
+		):
+			continue
 		try:
 			frappe.delete_doc("Quotation", quotation)
 		except Exception as e:
@@ -219,9 +231,8 @@ def delete_old_draft_quotations():
 
 def sync_pending_gateway_payments():
 	"""Settle checkouts the shopper's browser never confirmed, so captured money always reaches an order."""
-	# ponytail: a request older than the lookback is left to manual reconciliation - delete_old_draft_
-	# quotations already removes the draft cart it points at after 6 hours, so the order can no longer
-	# be placed from it. Widen both windows together, never this one alone.
+	# Requests older than the lookback need a webhook or manual reconciliation. Carts of reusable-checkout
+	# gateways are kept while their request is pending, so a late webhook can still place the order.
 	now = now_datetime()
 	pending_requests = frappe.get_all(
 		"Gateway Payment Request",

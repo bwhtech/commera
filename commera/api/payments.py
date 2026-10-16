@@ -1,7 +1,9 @@
 from contextlib import contextmanager
 
 import frappe
+from bwh_payments.api import get_gateway_options
 from bwh_payments.bwh_payments.utils import get_available_payment_modes, resolve_payment_mode
+from bwh_payments.currency import to_minor_units
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 from erpnext.accounts.doctype.pricing_rule.utils import validate_coupon_code
@@ -53,6 +55,12 @@ except ImportError:
 	from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
 
 COD_PAYMENT_MODE = "COD"
+# A gateway capability: its checkout link stays payable after the shopper closes the tab.
+REUSABLE_CHECKOUT = "reusable_checkout"
+
+
+def get_payment_modes_for_currency(currency: str) -> list[str]:
+	return [option.name for option in get_gateway_options(currency)]
 
 
 def is_cod(payment_mode: str | None) -> bool:
@@ -70,6 +78,43 @@ def get_open_gateway_payment_request(quotation_name: str) -> str | None:
 			return open_request
 
 	return None
+
+
+def get_reusable_checkout_gateways() -> list[str]:
+	# Imported here: commera.api.admin.payments imports commera.migrate, which imports this module.
+	from commera.api.admin.payments import get_gateways_with_capability
+
+	return get_gateways_with_capability(REUSABLE_CHECKOUT)
+
+
+def get_reusable_checkout_url(
+	quotation, gateway: str, payment_mode: str, expected_total: float | None
+) -> str | None:
+	request_name = get_open_gateway_payment_request(quotation.name)
+	if not request_name:
+		return None
+
+	payment_request = frappe.get_doc("Gateway Payment Request", request_name)
+	if payment_request.status != "Pending" or payment_request.gateway != gateway:
+		return None
+
+	payment_request.sync_status()
+	if payment_request.status == "Paid":
+		return get_confirmation_url(payment_request.name)
+	if payment_request.status != "Pending" or payment_request.currency_code != quotation.currency:
+		return None
+
+	if to_minor_units(payment_request.amount, quotation.currency) != to_minor_units(
+		get_charge_amount(quotation), quotation.currency
+	):
+		return None
+
+	# The checks a new checkout runs, so a plugin that has since dropped the gateway or refuses the cart wins.
+	if gateway not in get_checkout_payment_methods(quotation, strict=True):
+		return None
+	validate_cart(quotation)
+	validate_expected_total(quotation, payment_mode, expected_total)
+	return payment_request.order_url
 
 
 def validate_cart_is_not_in_checkout(quotation_name: str):
@@ -143,6 +188,11 @@ def open_checkout(
 	quotation, payment_mode: str, delivery_option: str | None = None, expected_total: float | None = None
 ):
 	validate_delivery_option(quotation, delivery_option)
+	gateway = resolve_payment_mode(payment_mode)
+	if gateway in get_reusable_checkout_gateways():
+		if order_url := get_reusable_checkout_url(quotation, gateway, payment_mode, expected_total):
+			return {"order_url": order_url}
+
 	validate_cart_is_not_in_checkout(quotation.name)
 	quotation.flags.strict_plugin_fees = True
 	update_delivery_charges(quotation)
@@ -155,13 +205,13 @@ def open_checkout(
 			refuse_payment(_("Cash on delivery is not available."), quotation.name)
 		return {"order_url": get_confirmation_url(quotation.name, payment_mode=COD_PAYMENT_MODE)}
 
-	gateway = resolve_payment_mode(payment_mode)
-	if not gateway:
+	available_gateways = get_payment_modes_for_currency(quotation.currency)
+	if not gateway or gateway not in available_gateways:
 		refuse_payment(
-			_("Please select a valid payment mode."),
+			_("Please select a payment mode available for this currency."),
 			quotation.name,
 			requested=payment_mode,
-			available=get_available_payment_modes(),
+			available=available_gateways,
 		)
 	if gateway not in payment_methods:
 		refuse_payment(
@@ -187,7 +237,9 @@ def open_checkout(
 
 
 def get_checkout_payment_methods(quotation, strict: bool = False) -> list[str]:
-	payment_methods = list(get_available_payment_modes())
+	payment_methods = list(
+		get_payment_modes_for_currency(quotation.currency) if quotation else get_available_payment_modes()
+	)
 	if frappe.get_cached_value("Commera Settings", "Commera Settings", "cod_enabled"):
 		payment_methods.append(COD_PAYMENT_MODE)
 	if not quotation:
@@ -332,18 +384,18 @@ def stamp_order_owner(sales_order, shopper: str) -> None:
 	sales_order.db_set("owner", shopper, update_modified=False)
 
 
-def get_order_shopper(quotation) -> str | None:
-	# A guest cart has no account to hand the order to, and the payment webhook runs as Guest itself.
+def get_order_shopper(quotation, by_gateway: bool = False) -> str | None:
+	# A guest cart has no account to hand the order to. bwh_payments applies a webhook's payment as Administrator.
 	if quotation.custom_guest_cart_key:
 		return None
-	if not is_guest():
+	if not is_guest() and not (by_gateway and frappe.session.user == "Administrator"):
 		return frappe.session.user
 	return frappe.db.exists("User", quotation.contact_email) if quotation.contact_email else None
 
 
 def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
 	"""Submit the cart and bill it. Called once per payment; the Quotation docstatus enforces that."""
-	shopper = get_order_shopper(quotation)
+	shopper = get_order_shopper(quotation, by_gateway=True)
 	with system_user_session():
 		fix_payment_schedule_dates(quotation)
 		quotation.flags.ignore_permissions = True
