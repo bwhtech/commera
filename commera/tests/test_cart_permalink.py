@@ -169,7 +169,14 @@ class TestCartPermalinkPage(ProductDetailPriceTestCase):
 
 	def test_return_to_never_leaves_the_site(self):
 		default = self.render(f"{self.medium}:1").next_url
-		for target in ("https://evil.example", "//evil.example", "/\\evil.example", "javascript:alert(1)"):
+		for target in (
+			"https://evil.example",
+			"//evil.example",
+			"/\\evil.example",
+			"javascript:alert(1)",
+			"/\t/evil.example",
+			"/\n/evil.example",
+		):
 			self.assertEqual(self.render(f"{self.medium}:1", return_to=target).next_url, default)
 
 	def test_add_mode_keeps_the_shoppers_cart(self):

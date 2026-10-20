@@ -230,6 +230,9 @@ def get_return_to_url(return_to: str | None, cart_url: str) -> str | None:
 	return_to = cstr(return_to).strip()
 	if return_to == "cart":
 		return cart_url
+	# Browsers drop tabs and newlines, so "/\t/host" would become "//host".
+	if any(character.isspace() or not character.isprintable() for character in return_to):
+		return None
 	# Only a path on this site: "//host" and "/\host" would leave it, and a scheme would too.
 	if return_to.startswith("/") and not return_to.startswith(("//", "/\\")) and "://" not in return_to:
 		return return_to
