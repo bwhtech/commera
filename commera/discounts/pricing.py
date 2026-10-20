@@ -50,6 +50,8 @@ def apply_code_discounts(doc, method=None):
 	doc.calculate_taxes_and_totals()
 	allocations += get_shipping_allocations(doc)
 	set_allocations(doc, allocations)
+	if allocations:
+		set_amounts_from_grand_total(doc)
 
 
 def apply_line_discounts(doc, selections: list) -> list[dict]:
@@ -158,6 +160,14 @@ def apply_recorded_discounts(doc):
 	allocations += [{**row, "amount": share} for row, share in zip(order_rows, shares, strict=True)]
 	allocations += [row for row in recorded if row["discount_class"] == SHIPPING]
 	set_allocations(doc, allocations)
+	set_amounts_from_grand_total(doc)
+
+
+def set_amounts_from_grand_total(doc):
+	"""ERPNext writes these during validate, before this hook takes the discount off the total."""
+	doc.set_total_in_words()
+	if doc.meta.has_field("payment_schedule") and not doc.get("is_return"):
+		doc.set_payment_schedule()
 
 
 def get_other_order_discount(doc, source) -> float:
