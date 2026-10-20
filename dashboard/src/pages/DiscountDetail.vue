@@ -270,6 +270,7 @@ const customerGroups = computed({
                 v-model="customerGroups"
                 :options="options.customer_groups"
                 placeholder="Choose customer groups"
+                :error="customerGroups.length ? null : 'Choose at least one group. Without one, nobody can use this discount.'"
               />
               <FormControl
                 v-model="discount.payment_condition"
