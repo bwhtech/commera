@@ -222,7 +222,7 @@ class CommeraDiscount(Document):
 
 	def get_tier_value(self, subtotal: float) -> float | None:
 		reached = [tier for tier in self.tiers if subtotal >= flt(tier.minimum_subtotal)]
-		return flt(reached[-1].value) if reached else None
+		return flt(max(reached, key=lambda tier: flt(tier.minimum_subtotal)).value) if reached else None
 
 	def get_delivery_discount(self, option: dict) -> float:
 		titles = {line.strip() for line in (self.delivery_options or "").splitlines() if line.strip()}
