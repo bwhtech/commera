@@ -288,10 +288,17 @@ def download_codes(name: str):
 
 @frappe.whitelist(methods=["POST"])
 def test_discount(
-	discount: dict | str, lines: list | str, payment_kind: str = "prepaid", first_order: int = 0
+	discount: dict | str,
+	lines: list | str,
+	payment_kind: str = "prepaid",
+	first_order: int = 0,
+	customer: str | None = None,
 ) -> dict:
-	"""Price a cart with an unsaved draft of the discount, the way checkout would price it."""
+	"""Price a cart with an unsaved draft of the discount, the way checkout would price it. With a
+	customer, their group and order history decide the customer rules instead of `first_order`."""
 	frappe.has_permission(DOCTYPE, ptype="read", throw=True)
+	if customer:
+		frappe.has_permission("Customer", doc=customer, ptype="read", throw=True)
 	values = frappe.parse_json(discount)
 	lines = [
 		{"item_code": cstr(line["item_code"]), "qty": max(cint(line.get("qty")), 1)}
@@ -311,9 +318,11 @@ def test_discount(
 	flags = {
 		"commera_discounts": [draft],
 		"commera_payment_kind": "cod" if payment_kind == "cod" else "prepaid",
-		"commera_first_order": bool(cint(first_order)),
+		"commera_first_order": None if customer else bool(cint(first_order)),
 	}
-	quotation = get_preview_quotation(lines, flags=flags)
+	quotation = get_preview_quotation(
+		lines, flags=flags, fields={"party_name": customer} if customer else None
+	)
 	subtotal = sum(flt(item.price_list_rate) * flt(item.qty) for item in quotation.items)
 	return {
 		"lines": [
@@ -395,6 +404,19 @@ def search_targets(target_type: str, search: str | None = None, sellable: int = 
 			.limit(20)
 		).run(pluck=True)
 		return [{"label": name, "value": name} for name in names]
+	if target_type == "Customer":
+		frappe.has_permission("Customer", ptype="read", throw=True)
+		rows = frappe.get_list(
+			"Customer",
+			filters={"disabled": 0},
+			or_filters={"name": ("like", search), "customer_name": ("like", search)},
+			fields=["name", "customer_name", "customer_group"],
+			order_by="customer_name",
+			limit=20,
+		)
+		return [
+			{"label": row.customer_name, "value": row.name, "description": row.customer_group} for row in rows
+		]
 	if target_type == "Brand":
 		frappe.has_permission("Brand", ptype="read", throw=True)
 		names = frappe.get_all(

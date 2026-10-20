@@ -134,8 +134,8 @@ export const getDiscount = (name) => attempt('get_discount', { name })
 export const saveDiscount = (discount) => call('save_discount', { discount })
 export const deleteDiscount = (name) => attempt('delete_discount', { name })
 export const createCodes = (name, count, prefix) => call('create_codes', { name, count, prefix })
-export const testDiscount = (discount, lines, paymentKind, firstOrder) =>
-  call('test_discount', { discount, lines, payment_kind: paymentKind, first_order: firstOrder ? 1 : 0 })
+export const testDiscount = (discount, lines, paymentKind, firstOrder, customer) =>
+  call('test_discount', { discount, lines, payment_kind: paymentKind, first_order: firstOrder ? 1 : 0, customer })
 export const getEditorOptions = () => call('get_editor_options')
 export const searchTargets = (targetType, search, sellable = false) =>
   call('search_targets', { target_type: targetType, search, sellable: sellable ? 1 : 0 })
