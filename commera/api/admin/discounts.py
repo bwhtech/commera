@@ -330,7 +330,7 @@ def test_discount(
 		"subtotal": subtotal,
 		"discount": subtotal - flt(quotation.net_total),
 		"total": flt(quotation.net_total),
-		"reasons": list(filter(None, [get_unmet_reason(draft, get_cart_context(quotation))])),
+		"reasons": [reason] if (reason := get_unmet_reason(draft, get_cart_context(quotation))) else [],
 	}
 
 
