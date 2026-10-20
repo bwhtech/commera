@@ -31,7 +31,7 @@ from commera.checkout_hooks import (
 )
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import clear_ordered_cart, get_session_cart
 from commera.core import _get_cart_quotation, create_party, get_customer_contact, new_cart_quotation
-from commera.discounts.selection import get_discount_codes
+from commera.discounts.selection import get_discount_codes, get_unusable_code_reason
 from commera.guest import (
 	get_guest_cart_name,
 	is_guest,
@@ -239,13 +239,13 @@ def validate_cart(quotation):
 
 
 def drop_refused_codes(quotation):
-	"""Take off the codes an app's validate_discount_code hook refuses now, such as one whose limit another
-	order just used up, and tell the shopper why and that the total changed, instead of refusing the cart."""
+	"""Take off the codes that can no longer apply, such as one deleted, used up by another order, or refused
+	by an app's validate_discount_code hook, and tell the shopper why and that the total changed."""
 	reasons = []
 	codes = get_discount_codes(quotation)
 	kept_codes = []
 	for code in codes:
-		if reason := get_discount_code_refusal(quotation, code):
+		if reason := get_unusable_code_reason(quotation, code):
 			reasons.append(reason)
 		else:
 			kept_codes.append(code)
@@ -261,7 +261,7 @@ def drop_refused_codes(quotation):
 	# nosemgrep: frappe-manual-commit  # kept past the throw below, or every retry would refuse again
 	frappe.db.commit()
 	frappe.throw(
-		"<br>".join([*reasons, _("We removed the code and updated your total.")]),
+		" ".join([*reasons, _("We removed the code and updated your total.")]),
 		title=_("Discount Removed"),
 		exc=CheckoutPriceChangedError,
 	)

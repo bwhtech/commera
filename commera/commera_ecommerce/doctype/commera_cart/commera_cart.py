@@ -3,8 +3,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils.data import cint, cstr, flt, get_datetime
 
-from commera.checkout_hooks import get_discount_code_refusal
-from commera.commera_ecommerce.doctype.commera_discount.commera_discount import DiscountCodeError
+from commera.commera_ecommerce.doctype.commera_discount.commera_discount import SHIPPING, DiscountCodeError
 from commera.discounts.allocations import get_allocations
 from commera.discounts.cart_context import get_cart_context
 from commera.discounts.codes import get_code_discount, normalize_code
@@ -13,6 +12,8 @@ from commera.discounts.selection import (
 	get_discount,
 	get_discount_codes,
 	get_unmet_reason,
+	get_unusable_code_reason,
+	select_discounts,
 	validate_new_discount_code,
 )
 from commera.guest import clear_guest_cart_cookie, get_guest_cart_key, is_guest, set_guest_cart_cookie
@@ -108,8 +109,10 @@ class CommeraCart(Document):
 
 	def add_discount_code(self, code: str):
 		codes = [applied_code for applied_code in get_discount_codes(self) if get_code_discount(applied_code)]
-		code = validate_new_discount_code(code, codes)
-		if refusal := get_discount_code_refusal(self.get_quotation_preview(), code):
+		preview = self.get_quotation_preview()
+		active_codes = [selection.code for selection in select_discounts(get_cart_context(preview))]
+		code = validate_new_discount_code(code, codes, active_codes)
+		if refusal := get_unusable_code_reason(preview, code):
 			frappe.throw(refusal, DiscountCodeError)
 		self.discount_codes = "\n".join([*codes, code])
 
@@ -196,43 +199,43 @@ def get_code_states(quotation) -> list[dict]:
 	"""Each code with whether it applies now and, when not, why in the shopper's words."""
 	applied = {(row["discount"], row.get("code")) for row in get_allocations(quotation)}
 	cart = get_cart_context(quotation)
+	selections = select_discounts(cart)
 	states = []
 	for code in get_discount_codes(quotation):
 		discount_name = get_code_discount(code)
-		if not discount_name:
-			states.append(
-				{
-					"code": code,
-					"title": code,
-					"discount_class": None,
-					"applied": False,
-					"reason": _("{0} is no longer a valid discount code.").format(code),
-				}
-			)
-			continue
-		discount = get_discount(discount_name)
-		is_applied = (discount.name, code) in applied
+		discount = get_discount(discount_name) if discount_name else None
+		is_applied = (discount_name, code) in applied
 		states.append(
 			{
 				"code": code,
-				"title": discount.title,
-				"discount_class": discount.discount_class,
+				"title": discount.title if discount else code,
+				"discount_class": discount.discount_class if discount else None,
 				"applied": is_applied,
-				"reason": None if is_applied else get_code_reason(discount, cart, code),
+				"reason": None if is_applied else get_code_reason(cart, code, selections),
 			}
 		)
 	return states
 
 
-def get_code_reason(discount, cart, code: str) -> str:
-	if refusal := get_discount_code_refusal(cart.doc, code):
-		return refusal
-	if discount.status != "Active":
-		return _("{0} is not active.").format(discount.title)
+def get_code_reason(cart, code: str, selections: list) -> str:
+	if reason := get_unusable_code_reason(cart.doc, code):
+		return reason
+	discount = get_discount(get_code_discount(code))
 	if reason := get_unmet_reason(discount, cart):
 		return reason
 	if not discount.gives_anything(cart):
+		if discount.discount_class == SHIPPING:
+			return _("{0} does not cover the delivery option you chose.").format(discount.title)
 		return _("Nothing in your cart qualifies for {0}.").format(discount.title)
+	if discount.discount_class == SHIPPING and any(selection.code == code for selection in selections):
+		return _("{0} comes off the delivery charge once you choose a delivery option.").format(
+			discount.title
+		)
+	blocking = next((other for other in selections if not discount.can_combine_with(other.discount)), None)
+	if blocking:
+		return _("{0} cannot be combined with {1}.").format(
+			discount.title, blocking.code or blocking.discount.title
+		)
 	return _("{0} cannot be combined with your other discounts.").format(discount.title)
 
 

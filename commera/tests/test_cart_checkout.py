@@ -31,6 +31,7 @@ from commera.api.shipping import (
 )
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.core import _get_cart_quotation
+from commera.discounts.codes import add_code
 from commera.sdk import cart as cart_sdk
 from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.utils import get_available_stocks, get_pickup_addresses
@@ -383,7 +384,18 @@ class TestCartCheckout(IntegrationTestCase):
 		frappe.set_user(self.shopper)
 		cart_sdk.set_cart_attributes({"gift_message": "Happy birthday"})
 		cart = get_session_cart()
-		frappe.db.set_value("Commera Cart", cart.name, "discount_codes", "ZZUNKNOWN", update_modified=False)
+		discount = frappe.get_doc(
+			{
+				"doctype": "Commera Discount",
+				"title": f"ZZ {frappe.generate_hash(length=6)}",
+				"discount_type": "Amount Off Order",
+				"applies_to": "All Products",
+				"value_type": "Fixed Amount",
+				"value": 1,
+			}
+		).insert(ignore_permissions=True)
+		code = add_code(discount.name, f"zz{frappe.generate_hash(length=8)}")
+		frappe.db.set_value("Commera Cart", cart.name, "discount_codes", code, update_modified=False)
 		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
 		update_quotation_address(self.address_payload())
 

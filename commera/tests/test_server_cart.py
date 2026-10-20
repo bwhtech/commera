@@ -17,7 +17,7 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	keep_guest_cart,
 )
 from commera.core import _get_cart_quotation
-from commera.discounts.codes import get_code_discount
+from commera.discounts.codes import generate_codes, get_code_discount
 from commera.guest import GUEST_CART_COOKIE
 from commera.sdk import cart as cart_sdk
 from commera.tests.test_discount_codes import CAP_RATE, SHIRT_RATE, DiscountCodeTestCase
@@ -293,6 +293,37 @@ class TestServerCart(DiscountCodeTestCase):
 				)
 			},
 		)
+
+	def test_a_code_that_gives_nothing_does_not_block_another(self):
+		waiting = self.create_code(percentage=10, minimum_requirement="Subtotal", minimum_subtotal=500)
+		other = self.create_code(amount=5)
+		cart_sdk.add_lines([{"item_code": self.cap, "qty": 1}])
+		cart_sdk.add_discount_code(waiting)
+
+		priced = cart_sdk.add_discount_code(other)
+
+		states = {state["code"]: state for state in priced["discount_codes"]}
+		self.assertTrue(states[other]["applied"])
+		self.assertIn("more to use", states[waiting]["reason"])
+		self.assertEqual(priced["total"], CAP_RATE - 5)
+
+	def test_a_code_that_cannot_apply_gives_its_own_reason(self):
+		combines = {"combines_with_order": 1, "combines_with_shipping": 1}
+		single_use = generate_codes(self.create_discount(amount=5, **combines), 1)[0]
+		limited = self.create_code(amount=5, usage_limit=1, **combines)
+		shipping = self.create_code(discount_type="Free Shipping", shipping_percentage=100, **combines)
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
+		for code in (single_use, limited, shipping):
+			cart_sdk.add_discount_code(code)
+		frappe.set_user("Administrator")
+		self.place_order(self.create_quotation({self.shirt: 1}, (single_use, limited)))
+		frappe.set_user(self.shopper)
+
+		reasons = {state["code"]: state["reason"] for state in cart_sdk.get_priced_cart()["discount_codes"]}
+
+		self.assertIn("has already been used", reasons[single_use])
+		self.assertIn("has been used up", reasons[limited])
+		self.assertIn("once you choose a delivery option", reasons[shipping])
 
 	def test_checkout_without_a_server_cart_is_unchanged(self):
 		quotation = generate_quotation_for_cart({"items": [self.browser_line(self.cap, 2)]})
