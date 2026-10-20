@@ -18,6 +18,7 @@ const TABS = [
   { label: 'All', value: 'all' },
   { label: 'Active', value: 'active' },
   { label: 'Scheduled', value: 'scheduled' },
+  { label: 'Used up', value: 'used_up' },
   { label: 'Expired', value: 'expired' },
 ]
 
