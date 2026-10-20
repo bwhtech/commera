@@ -214,6 +214,20 @@ class TestDiscountCodes(DiscountCodeTestCase):
 		self.assertEqual(reached.custom_code_order_discount, 13)
 		self.assertFalse(missed.custom_code_order_discount)
 
+	def test_spend_tiers_entered_from_highest_to_lowest_pick_the_highest_reached(self):
+		code = self.create_code(
+			percentage=1,
+			tiered=1,
+			tiers=[{"minimum_subtotal": 200, "value": 20}, {"minimum_subtotal": 100, "value": 10}],
+		)
+		frappe.clear_document_cache("Commera Discount", get_code_discount(code))
+
+		highest = self.create_quotation({self.shirt: 2, self.cap: 1}, (code,))
+		lowest = self.create_quotation({self.shirt: 1, self.cap: 1}, (code,))
+
+		self.assertEqual(highest.custom_code_order_discount, 44)
+		self.assertEqual(lowest.custom_code_order_discount, 13)
+
 	def test_items_already_on_sale_get_no_extra_discount(self):
 		settings = frappe.get_cached_doc("Commera Settings")
 		self.set_price(self.shirt, settings.get_default_price_list(), 200)
