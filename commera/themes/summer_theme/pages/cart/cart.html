@@ -126,6 +126,12 @@
 									<td>{{ _("Subtotal") }} (<span x-text="$store.cart.count"></span> {{ _("items") }})</td>
 									<td class="price">{{ currency_symbol }}<span x-text="format_amount(subtotal)"></span></td>
 								</tr>
+								<template x-for="discount in $store.cart.discounts" :key="discount.label">
+									<tr class="discount">
+										<td>{{ _("Discount") }}<span x-show="discount.label" x-text="` (${discount.label})`"></span></td>
+										<td class="price">-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span></td>
+									</tr>
+								</template>
 								<tr>
 									<td>{{ _("Delivery Charge") }}</td>
 									<td class="price">
@@ -171,6 +177,7 @@
 
 				async init() {
 					await this.$store.cart.fetch_detail_for_cart();
+					await this.$store.cart.load_priced();
 					await this.resume_checkout_after_sign_in();
 				},
 
@@ -198,7 +205,7 @@
 				},
 
 				get total() {
-					return this.subtotal + this.delivery_amount;
+					return this.subtotal - this.$store.cart.saved + this.delivery_amount;
 				},
 
 				get free_delivery_shortfall() {

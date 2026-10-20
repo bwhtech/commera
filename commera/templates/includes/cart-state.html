@@ -4,6 +4,9 @@
             items: Alpine.$persist([]),
             // The server cart's version this browser last saw; the server cart wins when they differ.
             version: Alpine.$persist(null).as('commera_cart_version'),
+            // The cart priced by the server, with its discounts. Only pages that show totals ask for it.
+            priced: null,
+            wants_pricing: false,
             async init() {
                 await this.load_server_cart();
                 let is_first_run = true;
@@ -37,6 +40,22 @@
                     if (response.conflict) this.apply_server_cart(response);
                     else this.version = response.version;
                 } catch (error) {}
+                if (this.wants_pricing) await this.load_priced();
+            },
+            async load_priced() {
+                this.wants_pricing = true;
+                try {
+                    this.priced = (await frappe_call("/api/v2/method/commera.api.server_cart.get_priced_server_cart", {})).data;
+                } catch (error) {}
+            },
+            // Only while the priced cart is the cart on screen, so the rows never belong to an older cart.
+            get discounts() {
+                if (!this.priced || this.priced.version !== this.version) return [];
+                if (this.items.some(item => !item.selected)) return [];
+                return this.priced.discounts || [];
+            },
+            get saved() {
+                return this.discounts.reduce((sum, discount) => sum + discount.amount, 0);
             },
             apply_server_cart(server_cart) {
                 this.items = server_cart.lines.map(line => ({
@@ -51,6 +70,7 @@
                     sizes: line.sizes,
                 }));
                 this.version = server_cart.version;
+                if (this.wants_pricing) this.load_priced();
             },
             add(item, variant, price = 0,default_price=0, brand = '',sizes=[],qty=1) {
                 let already_added = false;

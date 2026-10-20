@@ -155,6 +155,7 @@ def get_checkout_items(cart_quotation):
 			quotation_item.rate,
 			quotation_item.price_list_rate,
 			quotation_item.amount,
+			quotation_item.custom_code_discount,
 			item_variant_attribute.attribute_value.as_("size"),
 		)
 		.groupby(quotation_item.name)

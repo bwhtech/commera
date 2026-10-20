@@ -40,14 +40,12 @@
             <span class="font-medium flex"> {{get_currency_symbol()}} <span x-text="$store.cart.total.toFixed(2)"></span> </span>
         </div>
 
-        {% if cart_quotation.custom_discount_allocations %}
-            <div class="flex justify-between text-gray-500 text-base"
-                x-show="$store.cart.total > parseFloat('{{cart_quotation.net_total or 0}}')">
-                <span>{{ _('Discount') }}</span>
-                <span class="font-medium flex text-green-700"> &minus;{{get_currency_symbol()}} <span
-                        x-text="($store.cart.total - parseFloat('{{cart_quotation.net_total or 0}}')).toFixed(2) "></span> </span>
+        {% for discount in checkout_summary.discounts or [] %}
+            <div class="flex justify-between text-gray-500 text-base">
+                <span>{{ _('Discount') }}{% if discount.label %} ({{ discount.label | e }}){% endif %}</span>
+                <span class="font-medium flex text-green-700"> &minus;{{get_currency_symbol()}} {{ "%.2f"|format(discount.amount) }}</span>
             </div>
-        {% endif %}
+        {% endfor %}
         <div class="flex justify-between text-gray-500 text-base" x-show=" delivery_option === 'home_delivery'"
             x-transition>
             <span class="capitalize">{{ _('non-refundable delivery charge') }}</span>
