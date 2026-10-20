@@ -1,5 +1,5 @@
 import re
-from functools import lru_cache
+from functools import lru_cache, wraps
 from urllib.parse import quote
 
 import frappe
@@ -9,6 +9,7 @@ from erpnext.selling.doctype.customer.customer import (
 from frappe.geo.country_info import get_all
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Count, Min, Sum
+from frappe.rate_limiter import rate_limit
 from frappe.utils import add_days, cint, create_batch, cstr, flt, get_datetime, now_datetime
 from frappe.utils.data import strip_html
 from pypika import Order
@@ -933,3 +934,20 @@ def pick_product_covers(templates: list, options: list) -> dict:
 			(option.photo for option in options if option.template == template and option.photo), None
 		)
 	return covers
+
+
+def rate_limit_per_method(limit: int, seconds: int):
+	"""Frappe's rate_limit keys its counter on form_dict.cmd, which /api/v2 does not set, so without this every
+	rate-limited v2 method would share one counter per IP."""
+
+	def decorator(method):
+		limited = rate_limit(limit=limit, seconds=seconds)(method)
+
+		@wraps(method)
+		def wrapper(*args, **kwargs):
+			frappe.form_dict.cmd = frappe.form_dict.cmd or f"{method.__module__}.{method.__name__}"
+			return limited(*args, **kwargs)
+
+		return wrapper
+
+	return decorator
