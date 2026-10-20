@@ -165,27 +165,28 @@ class CommeraDiscount(Document):
 
 	def get_buy_x_get_y_discounts(self, cart) -> dict[int, float]:
 		"""The cheapest units the customer gets are discounted; the units that earn them cannot also be them."""
+		# Matched once per line: an item group match walks the group tree, and the loop below runs per unit.
+		buy_lines = {item.idx for item in cart.items if self.is_for_line(item, cart, "Buys")}
+		get_lines = {item.idx for item in cart.items if self.is_for_line(item, cart, "Gets")}
 		units = sorted(
 			(flt(item.rate), item.idx, item)
 			for item in cart.items
 			for _unit in range(cint(item.qty))
-			if self.is_for_line(item, cart, "Buys") or self.is_for_line(item, cart, "Gets")
+			if item.idx in buy_lines or item.idx in get_lines
 		)
 		discounts = {}
 		applications = 0
 		while not self.uses_per_order or applications < cint(self.uses_per_order):
-			rewarded = take_units(
-				units, cint(self.get_quantity), lambda item: self.is_for_line(item, cart, "Gets")
-			)
-			if not rewarded or not self.take_buy_units(units, cart):
+			rewarded = take_units(units, cint(self.get_quantity), lambda item: item.idx in get_lines)
+			if not rewarded or not self.take_buy_units(units, buy_lines):
 				break
 			for rate, idx, _item in rewarded:
 				discounts[idx] = discounts.get(idx, 0) + self.get_reward(rate)
 			applications += 1
 		return discounts
 
-	def take_buy_units(self, units: list, cart) -> bool:
-		buys = [unit for unit in units if self.is_for_line(unit[2], cart, "Buys")]
+	def take_buy_units(self, units: list, buy_lines: set[int]) -> bool:
+		buys = [unit for unit in units if unit[1] in buy_lines]
 		if self.buy_requirement == "Quantity":
 			if len(buys) < cint(self.buy_value):
 				return False

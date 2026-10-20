@@ -19,6 +19,8 @@ from commera.guest import get_guest_cart_key, is_guest, set_guest_cart_cookie
 from commera.plugin_events import fire_event, get_handlers
 
 MAX_CART_LINES = 50
+# Discount pricing slows down with every unit, so even an item that never runs out has a limit.
+MAX_LINE_QUANTITY = 100
 
 
 class CommeraCart(Document):
@@ -30,6 +32,10 @@ class CommeraCart(Document):
 		for line in self.lines:
 			if cint(line.qty) < 1:
 				frappe.throw(_("Row {0}: the quantity must be at least 1.").format(line.idx))
+			if cint(line.qty) > MAX_LINE_QUANTITY:
+				frappe.throw(
+					_("Row {0}: a cart line holds at most {1} units.").format(line.idx, MAX_LINE_QUANTITY)
+				)
 			attributes = parse_attributes(line.attributes)
 			line.attributes = frappe.as_json(attributes, indent=None) if attributes else None
 

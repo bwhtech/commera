@@ -2,7 +2,7 @@ import frappe
 
 from commera.api.payments import generate_quotation_for_cart
 from commera.api.server_cart import apply_discount_code, remove_discount_code, sync_server_cart
-from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
+from commera.commera_ecommerce.doctype.commera_cart.commera_cart import MAX_LINE_QUANTITY, get_session_cart
 from commera.core import _get_cart_quotation
 from commera.discounts.codes import get_code_discount
 from commera.sdk import cart as cart_sdk
@@ -76,6 +76,18 @@ class TestServerCart(DiscountCodeTestCase):
 		self.assertEqual(
 			{(row.item_code, row.qty) for row in get_session_cart().lines}, {(self.shirt, 1), (self.cap, 1)}
 		)
+
+	def test_sync_refuses_more_than_the_stock(self):
+		self.assertTrue(sync_server_cart([{"item_code": self.shirt, "qty": 10}])["version"])
+
+		with self.assertRaisesRegex(frappe.ValidationError, "out of stock"):
+			sync_server_cart([{"item_code": self.shirt, "qty": 11}])
+
+	def test_a_cart_line_holds_a_limited_quantity(self):
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": MAX_LINE_QUANTITY}])
+
+		with self.assertRaisesRegex(frappe.ValidationError, "at most"):
+			cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
 
 	def test_the_priced_cart_shows_line_and_order_discounts(self):
 		product = self.create_code(percentage=10, item_codes=(self.shirt,), combines_with_order=1)

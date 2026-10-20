@@ -3,6 +3,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cint, cstr
 
+from commera.api.cart import validate_stock_available
 from commera.api.shipping import get_checkout_summary
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	MAX_CART_LINES,
@@ -72,6 +73,9 @@ def get_browser_quantities(items: list | str) -> dict[str, int]:
 		quantities[item_code] = quantities.get(item_code, 0) + qty
 	if len(quantities) > MAX_CART_LINES:
 		frappe.throw(_("A cart holds at most {0} lines.").format(MAX_CART_LINES))
+	validate_stock_available(
+		[{"variant": {"item_code": item_code}, "qty": qty} for item_code, qty in quantities.items()]
+	)
 	return quantities
 
 
