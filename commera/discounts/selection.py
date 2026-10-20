@@ -49,6 +49,11 @@ def validate_new_discount_code(code: str, codes: list[str]) -> str:
 	discount.validate_usable()
 	for applied_code in codes:
 		applied_name = get_code_discount(applied_code)
+		if applied_name == discount_name:
+			frappe.throw(
+				_("{0} gives the same discount as {1}, which is already applied.").format(code, applied_code),
+				DiscountCodeError,
+			)
 		if applied_name and not discount.can_combine_with(get_discount(applied_name)):
 			frappe.throw(_("{0} cannot be combined with {1}.").format(code, applied_code), DiscountCodeError)
 	return code
@@ -67,6 +72,8 @@ def select_discounts(cart) -> list[Selection]:
 	for selection in get_candidates(cart.doc):
 		discount = selection.discount
 		if discount.status != "Active" or not discount.is_for_currency(cart.currency):
+			continue
+		if any(other.discount.name == discount.name for other in selected):
 			continue
 		if get_unmet_reason(discount, cart) or not discount.gives_anything(cart):
 			continue

@@ -289,6 +289,17 @@ class TestDiscountSelection(DiscountCodeTestCase):
 			validate_new_discount_code(strict_order, [product])
 		self.assertEqual(validate_new_discount_code(open_order, [product]), open_order)
 
+	def test_one_discount_applies_once_whatever_codes_it_has(self):
+		code = self.create_code(amount=10)
+		second_code = add_code(get_code_discount(code), f"zz{frappe.generate_hash(length=8)}")
+
+		with self.assertRaisesRegex(DiscountCodeError, "same discount"):
+			validate_new_discount_code(second_code, [code])
+		quotation = self.create_quotation({self.shirt: 1}, (code, second_code))
+
+		self.assertEqual(quotation.custom_code_order_discount, 10)
+		self.assertEqual(quotation.net_total, SHIRT_RATE - 10)
+
 	def test_a_cart_holds_a_limited_number_of_codes(self):
 		codes = [
 			self.create_code(percentage=1, combines_with_order=1) for _index in range(MAX_DISCOUNT_CODES)
