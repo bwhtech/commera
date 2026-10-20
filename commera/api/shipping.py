@@ -6,7 +6,7 @@ from frappe.utils.data import cstr, flt, sha256_hash
 from commera.checkout_hooks import PLUGIN_FEE_FIELD, apply_delivery_option_hooks, apply_plugin_fees
 from commera.core import _get_cart_quotation
 from commera.discounts.pricing import refresh_code_discounts
-from commera.discounts.shipping import set_shipping_discount
+from commera.discounts.shipping import apply_shipping_discounts, set_shipping_discount
 from commera.utils import (
 	COD_CHARGE_DESCRIPTION,
 	get_charge_account_head,
@@ -221,6 +221,20 @@ def apply_delivery_option(quotation, option: dict):
 	apply_plugin_fees(quotation)
 
 
+def reprice_shipping_discount(quotation):
+	"""Discount the chosen delivery option again for how the order is paid; it was chosen on a cart priced
+	as prepaid."""
+	if not quotation.custom_delivery_option:
+		return
+	option = {
+		"title": quotation.custom_delivery_option,
+		"amount": flt(quotation.custom_delivery_charge) + flt(quotation.custom_shipping_discount),
+		"provider": quotation.custom_shipping_provider,
+		"service_code": quotation.custom_shipping_service_code,
+	}
+	apply_delivery_option(quotation, apply_shipping_discounts(quotation, [option])[0])
+
+
 def clear_delivery_option(quotation):
 	quotation.custom_delivery_option = None
 	quotation.custom_delivery_charge = 0
@@ -327,6 +341,7 @@ def get_checkout_summary(quotation) -> dict:
 
 	# A prepaid-only discount drops off, and a cash-on-delivery one comes on, before the fee is judged.
 	preview.flags.commera_payment_kind = "cod"
+	reprice_shipping_discount(preview)
 	refresh_code_discounts(preview)
 	cod_charge = get_cod_charge(preview)
 	if cod_charge:
