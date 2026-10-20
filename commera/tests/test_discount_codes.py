@@ -1,4 +1,5 @@
 import frappe
+from erpnext.controllers.sales_and_purchase_return import make_return_doc
 from frappe.tests import IntegrationTestCase
 from frappe.utils.data import add_days, today
 
@@ -411,3 +412,74 @@ class TestDiscountsOnOrders(DiscountCodeTestCase):
 
 		self.assertEqual(self.get_line(sales_invoice, self.shirt).rate, 90 - 9 - 5)
 		self.assertEqual(sales_invoice.net_total, sales_order.net_total)
+
+	def test_a_discount_changed_after_checkout_does_not_reprice_the_order(self):
+		code = self.create_code(percentage=10)
+		quotation = self.create_quotation({self.shirt: 1}, (code,))
+		frappe.db.set_value("Commera Discount", get_code_discount(code), "value", 50)
+		frappe.clear_document_cache("Commera Discount", get_code_discount(code))
+
+		sales_order = self.place_order(quotation)
+		self.assertEqual(quotation.net_total, 81)
+		self.assertEqual(sales_order.net_total, 81)
+
+		sales_order.save()
+		self.assertEqual(sales_order.net_total, 81)
+
+	def test_partial_invoices_add_up_to_the_order_discount(self):
+		product = self.create_code(amount=9, item_codes=(self.shirt,), combines_with_order=1)
+		order = self.create_code(amount=10, combines_with_product=1)
+		sales_order = self.place_order(self.create_quotation({self.shirt: 2, self.cap: 1}, (product, order)))
+		sales_order.submit()
+
+		invoices = [
+			self.create_invoice(sales_order, self.cap),
+			self.create_invoice(sales_order, self.shirt, qty=1),
+			self.create_invoice(sales_order, self.shirt, qty=1),
+		]
+
+		self.assertEqual([invoice.custom_code_order_discount for invoice in invoices], [1.98, 4.01, 4.01])
+		self.assertEqual(self.get_line(invoices[1], self.shirt).rate, 81)
+		self.assertEqual(sum(invoice.net_total for invoice in invoices), sales_order.net_total)
+
+	def test_a_credit_note_keeps_the_invoice_rates_and_its_share_of_the_order_discount(self):
+		product = self.create_code(amount=9, item_codes=(self.shirt,), combines_with_order=1)
+		order = self.create_code(amount=10, combines_with_product=1)
+		sales_order = self.place_order(self.create_quotation({self.shirt: 2, self.cap: 1}, (product, order)))
+		sales_order.submit()
+		sales_invoice = self.create_invoice(sales_order)
+
+		cap_return = self.create_return(sales_invoice, self.cap)
+		shirt_return = self.create_return(sales_invoice, self.shirt)
+
+		self.assertEqual(self.get_line(shirt_return, self.shirt).rate, 81)
+		self.assertEqual(cap_return.custom_code_order_discount, -1.98)
+		self.assertEqual(shirt_return.custom_code_order_discount, -8.02)
+		self.assertEqual(cap_return.net_total + shirt_return.net_total, -sales_invoice.net_total)
+
+	def test_a_free_unit_is_refunded_at_what_was_paid(self):
+		code = self.create_code(percentage=100, item_codes=(self.cap,))
+		sales_order = self.place_order(self.create_quotation({self.shirt: 1, self.cap: 1}, (code,)))
+		sales_order.submit()
+		sales_invoice = self.create_invoice(sales_order)
+
+		cap_return = self.create_return(sales_invoice, self.cap)
+
+		self.assertEqual(cap_return.net_total, 0)
+
+	def create_invoice(self, sales_order, item_code: str | None = None, qty: int | None = None):
+		sales_invoice = make_sales_invoice(sales_order.name)
+		if item_code:
+			sales_invoice.items = [item for item in sales_invoice.items if item.item_code == item_code]
+		if qty:
+			sales_invoice.items[0].qty = qty
+		sales_invoice.insert(ignore_permissions=True)
+		sales_invoice.submit()
+		return sales_invoice
+
+	def create_return(self, sales_invoice, item_code: str):
+		credit_note = make_return_doc("Sales Invoice", sales_invoice.name)
+		credit_note.items = [item for item in credit_note.items if item.item_code == item_code]
+		credit_note.insert(ignore_permissions=True)
+		credit_note.submit()
+		return credit_note

@@ -586,10 +586,9 @@ def set_charges(quotation):
 
 
 def set_cod_charges(quotation):
-	cod_charge = get_cod_charge(quotation)
-	if not cod_charge:
-		return
-	add_cod_charge(quotation, cod_charge, get_charge_account_head())
+	if cod_charge := get_cod_charge(quotation):
+		add_cod_charge(quotation, cod_charge, get_charge_account_head())
+	# Saved even without a fee: submit keeps the cart's discounts, so this save prices them for cash on delivery.
 	quotation.flags.ignore_permissions = True
 	quotation.save()
 
