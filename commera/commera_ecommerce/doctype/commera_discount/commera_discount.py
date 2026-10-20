@@ -29,6 +29,8 @@ class CommeraDiscount(Document):
 			frappe.throw(_("Starts On must be on or before Ends On."))
 		self.tiers = sorted(self.tiers, key=lambda tier: flt(tier.minimum_subtotal))
 		self.validate_targets()
+		if self.enabled and self.eligibility == "Customer Groups" and not self.customer_groups:
+			frappe.throw(_("Choose at least one customer group, or let everyone use this discount."))
 
 	def validate_values(self):
 		percentages = [self.shipping_percentage]
