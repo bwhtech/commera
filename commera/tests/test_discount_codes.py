@@ -1,9 +1,16 @@
+from unittest.mock import patch
+
 import frappe
 from erpnext.controllers.sales_and_purchase_return import make_return_doc
 from frappe.tests import IntegrationTestCase
 from frappe.utils.data import add_days, money_in_words, today
 
-from commera.api.payments import _make_sales_order, make_sales_invoice
+from commera.api.payments import (
+	CheckoutPriceChangedError,
+	_make_sales_order,
+	drop_refused_codes,
+	make_sales_invoice,
+)
 from commera.api.shipping import apply_delivery_option, get_checkout_summary
 from commera.commera_ecommerce.doctype.commera_discount.commera_discount import DiscountCodeError
 from commera.core import new_cart_quotation
@@ -405,6 +412,23 @@ class TestDiscountSelection(DiscountCodeTestCase):
 
 		self.assertEqual((standard["amount"], standard["original_amount"]), (0, 60))
 		self.assertEqual(express["amount"], 150)
+
+	def test_checkout_removes_a_used_up_code_and_says_why(self):
+		frappe.db.set_value("Commera Discount", {"method": "Automatic"}, "enabled", 0)
+		code = self.create_code(amount=10, usage_limit=1)
+		quotation = self.create_quotation({self.shirt: 1}, (code,))
+		self.place_order(self.create_quotation({self.shirt: 1}, (code,)))
+
+		# The removal is committed before the message; a test must not commit its fixtures.
+		with (
+			patch.object(frappe.db, "commit"),
+			self.assertRaisesRegex(CheckoutPriceChangedError, r"has been used up\. We removed"),
+		):
+			drop_refused_codes(quotation)
+
+		quotation.reload()
+		self.assertFalse(quotation.custom_discount_codes)
+		self.assertEqual(quotation.net_total, SHIRT_RATE)
 
 	def test_free_shipping_follows_how_the_order_is_paid(self):
 		for payment_condition, shipping, cod_shipping in (("Prepaid", 0, 60), ("Cash On Delivery", 60, 0)):

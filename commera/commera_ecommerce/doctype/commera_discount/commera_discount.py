@@ -68,14 +68,17 @@ class CommeraDiscount(Document):
 		return "Active"
 
 	def validate_usable(self):
+		if reason := self.get_unusable_reason():
+			frappe.throw(reason, DiscountCodeError)
+
+	def get_unusable_reason(self) -> str | None:
 		messages = {
 			"Disabled": _("{0} is not active."),
 			"Scheduled": _("{0} is not active yet."),
 			"Expired": _("{0} has expired."),
 			"Used Up": _("{0} has been used up."),
 		}
-		if self.status in messages:
-			frappe.throw(messages[self.status].format(self.title), DiscountCodeError)
+		return messages[self.status].format(self.title) if self.status in messages else None
 
 	def can_combine_with(self, other: "CommeraDiscount") -> bool:
 		return self.is_combinable_with(other.discount_class) and other.is_combinable_with(self.discount_class)
@@ -115,8 +118,15 @@ class CommeraDiscount(Document):
 			return any(self.get_line_discounts(cart).values())
 		if self.discount_class == ORDER:
 			return self.get_order_discount(cart) > 0
-		# A shipping discount is judged on the delivery options, which the cart does not hold yet.
-		return True
+		# Before a delivery option is chosen there is nothing to judge a shipping discount on.
+		if not cart.doc.get("custom_delivery_option"):
+			return True
+		option = {
+			"title": cart.doc.custom_delivery_option,
+			"amount": flt(cart.doc.get("custom_delivery_charge"))
+			+ flt(cart.doc.get("custom_shipping_discount")),
+		}
+		return self.get_delivery_discount(option) > 0
 
 	def is_for_customer_group(self, customer_group: str | None) -> bool:
 		if not customer_group:

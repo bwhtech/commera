@@ -8,6 +8,7 @@ from commera.commera_ecommerce.doctype.commera_discount.commera_discount import 
 	CommeraDiscount,
 	DiscountCodeError,
 )
+from commera.discounts.cart_context import get_cart_context
 from commera.discounts.codes import get_code_discount, normalize_code
 from commera.discounts.usage import has_used_before, is_first_order
 
@@ -30,8 +31,9 @@ def get_discount(name: str) -> CommeraDiscount:
 	return frappe.get_cached_doc("Commera Discount", name)
 
 
-def validate_new_discount_code(code: str, codes: list[str]) -> str:
-	"""Check that a shopper's code can join the codes already applied, and return it as stored."""
+def validate_new_discount_code(code: str, codes: list[str], active_codes: list[str] | None = None) -> str:
+	"""Check that a shopper's code can join the codes already applied, and return it as stored. Only
+	`active_codes`, the ones that apply to the cart now, can keep it out for not combining."""
 	code = normalize_code(code)
 	discount_name = get_code_discount(code)
 	if not discount_name:
@@ -54,9 +56,29 @@ def validate_new_discount_code(code: str, codes: list[str]) -> str:
 				_("{0} gives the same discount as {1}, which is already applied.").format(code, applied_code),
 				DiscountCodeError,
 			)
+		if active_codes is not None and applied_code not in active_codes:
+			continue
 		if applied_name and not discount.can_combine_with(get_discount(applied_name)):
 			frappe.throw(_("{0} cannot be combined with {1}.").format(code, applied_code), DiscountCodeError)
 	return code
+
+
+def get_unusable_code_reason(doc, code: str) -> str | None:
+	"""Why a code cannot apply to this cart whatever else it holds, in the shopper's words; None when it can."""
+	# Imported here: commera.checkout_hooks imports the shipping step, which imports this module.
+	from commera.checkout_hooks import get_discount_code_refusal
+
+	discount_name = get_code_discount(code)
+	if not discount_name:
+		return _("{0} is no longer a valid discount code.").format(code)
+	if is_single_use_spent(code):
+		return _("{0} has already been used.").format(code)
+	discount = get_discount(discount_name)
+	if reason := discount.get_unusable_reason():
+		return reason
+	if discount.once_per_customer and has_used_before(discount.name, get_cart_context(doc)):
+		return _("You have already used {0}.").format(discount.title)
+	return get_discount_code_refusal(doc, code)
 
 
 def is_single_use_spent(code: str) -> bool:
