@@ -341,8 +341,8 @@ def get_editor_options() -> dict:
 	company = frappe.defaults.get_global_default("company")
 	return {
 		"currency": frappe.get_cached_value("Company", company, "default_currency") if company else None,
-		"customer_groups": frappe.get_all(
-			"Customer Group", filters={"is_group": 0}, pluck="name", order_by="name"
+		"customer_groups": as_picker_options(
+			frappe.get_all("Customer Group", filters={"is_group": 0}, pluck="name", order_by="name")
 		),
 		"campaigns": frappe.get_all("UTM Campaign", pluck="name", order_by="name"),
 		"discount_accounts": frappe.get_all(
@@ -352,8 +352,12 @@ def get_editor_options() -> dict:
 			order_by="name",
 			limit=500,
 		),
-		"delivery_options": get_delivery_option_titles(),
+		"delivery_options": as_picker_options(get_delivery_option_titles()),
 	}
+
+
+def as_picker_options(names: list[str]) -> list[dict]:
+	return [{"label": name, "value": name} for name in names]
 
 
 def get_delivery_option_titles() -> list[str]:
