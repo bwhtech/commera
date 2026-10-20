@@ -4,7 +4,7 @@ from frappe.model.document import Document
 from frappe.utils.data import cint, cstr, flt, get_datetime
 
 from commera.commera_ecommerce.doctype.commera_discount.commera_discount import SHIPPING, DiscountCodeError
-from commera.discounts.allocations import get_allocations
+from commera.discounts.allocations import get_allocations, get_price_discount_rows
 from commera.discounts.cart_context import get_cart_context
 from commera.discounts.codes import get_code_discount, normalize_code
 from commera.discounts.preview import get_preview_quotation
@@ -137,6 +137,7 @@ class CommeraCart(Document):
 			"currency": quotation.currency,
 			"discount_codes": get_code_states(quotation),
 			"automatic_discounts": get_automatic_discounts(quotation),
+			"discounts": get_price_discount_rows(quotation),
 			"lines": [get_priced_line(row, lines_by_row[row.name]) for row in self.lines],
 			"subtotal": flt(quotation.total),
 			"order_discount": flt(quotation.custom_code_order_discount),

@@ -11,7 +11,7 @@ from commera.api.admin.catalog import get_unpublishable_options
 from commera.api.admin.inventory import get_inventory
 from commera.api.admin.plugins import query_deliveries
 from commera.api.shipping import get_order_charge_lines
-from commera.discounts.allocations import get_allocations
+from commera.discounts.allocations import get_allocations, get_discount_rows, get_order_discount_rows
 from commera.utils import get_address_lines, get_item_images
 
 PAGE_LENGTH = 20
@@ -622,11 +622,6 @@ def get_order(sales_order: str):
 	charges = get_order_charges(order)
 	payment_state = describe_payment(order)
 	allocations = get_allocations(order)
-	order_discounts = get_discount_rows(allocations, "Order")
-	# A discount ERPNext gave on its own, such as a Pricing Rule, has no allocation to name it.
-	other_order_discount = flt(order.discount_amount) - sum(row["amount"] for row in order_discounts)
-	if flt(other_order_discount, 2) > 0:
-		order_discounts.append({"label": None, "amount": flt(other_order_discount, 2)})
 
 	return {
 		"name": order.name,
@@ -642,8 +637,8 @@ def get_order(sales_order: str):
 		"total": flt(order.total),
 		"net_total": flt(order.net_total),
 		"shipping": charges["shipping"],
-		"order_discounts": order_discounts,
-		"shipping_discounts": get_discount_rows(allocations, "Shipping"),
+		"order_discounts": get_order_discount_rows(order),
+		"shipping_discounts": get_discount_rows(allocations, ("Shipping",)),
 		# The delivery option the shopper actually chose and paid for. Empty on an order placed
 		# before the shipping connector was installed, or one that took the flat Shipping Rule.
 		"delivery_option": order.custom_delivery_option,
@@ -676,19 +671,6 @@ def get_order(sales_order: str):
 		"invoices": read_order_invoices(order.name),
 		"plugin_failures": get_order_plugin_failures(order.name),
 	}
-
-
-def get_discount_rows(allocations: list[dict], discount_class: str | None = None, line: int | None = None):
-	"""What each code or automatic discount took off, by the name the shopper saw it under."""
-	amounts = {}
-	for allocation in allocations:
-		if line is not None and allocation.get("line") != line:
-			continue
-		if discount_class and allocation.get("discount_class") != discount_class:
-			continue
-		label = allocation.get("code") or allocation.get("title")
-		amounts[label] = amounts.get(label, 0) + flt(allocation.get("amount"))
-	return [{"label": label, "amount": flt(amount, 2)} for label, amount in amounts.items()]
 
 
 def read_order(sales_order: str | int) -> frappe._dict:

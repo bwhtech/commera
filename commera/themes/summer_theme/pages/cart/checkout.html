@@ -325,7 +325,7 @@
 											{% if item.size %}{{ item.size }} &middot; {% endif %}{{ _("Qty") }} {{ item.qty | int }}
 										</span>
 									</h6>
-									<span class="price">{{ currency_symbol }}{{ "%.2f" | format(item.amount or 0) }}</span>
+									<span class="price">{{ currency_symbol }}{{ "%.2f" | format((item.amount or 0) + (item.custom_code_discount or 0) * (item.qty or 0)) }}</span>
 								</div>
 							</div>
 						{% endfor %}
@@ -334,8 +334,14 @@
 							<tbody>
 								<tr class="subtotal">
 									<td>{{ _("Subtotal") }}</td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.subtotal)">{{ "%.2f" | format(checkout_summary.subtotal or 0) }}</span></td>
+									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.items_total ?? active_summary.subtotal)">{{ "%.2f" | format(checkout_summary.items_total or checkout_summary.subtotal or 0) }}</span></td>
 								</tr>
+								<template x-for="discount in active_summary.discounts || []" :key="discount.label">
+									<tr class="discount">
+										<td>{{ _("Discount") }}<span x-show="discount.label" x-text="` (${discount.label})`"></span></td>
+										<td class="price">-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span></td>
+									</tr>
+								</template>
 								<tr class="shipping">
 									<td>
 										<span x-show="delivery_option === 'home_delivery' && !selected_shipping_option">{{ _("Home Delivery") }}</span>
@@ -347,6 +353,12 @@
 										<span x-show="shipping_amount" x-cloak>{{ currency_symbol }}<span x-text="format_amount(shipping_amount)"></span></span>
 									</td>
 								</tr>
+								<template x-for="discount in active_summary.shipping_discounts || []" :key="discount.label">
+									<tr class="discount">
+										<td>{{ _("Shipping discount") }} <span x-text="`(${discount.label})`"></span></td>
+										<td class="price">-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span></td>
+									</tr>
+								</template>
 								<template x-for="(tax, index) in active_summary.taxes" :key="index">
 									<tr class="tax">
 										<td x-text="tax.description"></td>
@@ -362,10 +374,6 @@
 								<tr class="cod-charge" x-show="active_summary.cod_charge" x-cloak>
 									<td>{{ _("Cash on Delivery Fee") }}</td>
 									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.cod_charge)"></span></td>
-								</tr>
-								<tr class="discount" x-show="active_summary.discount_amount" x-cloak>
-									<td>{{ _("Discount") }}</td>
-									<td class="price">-{{ currency_symbol }}<span x-text="format_amount(active_summary.discount_amount)"></span></td>
 								</tr>
 								<tr class="rounding-adjustment" x-show="active_summary.rounding_adjustment" x-cloak>
 									<td>{{ _("Rounding Adjustment") }}</td>
@@ -622,8 +630,10 @@
 					return payment_modes;
 				},
 
+				// Before its discount, so the shipping row and the shipping discount rows under it add up.
 				get shipping_amount() {
-					return this.active_summary.shipping;
+					const discounts = this.active_summary.shipping_discounts || [];
+					return this.active_summary.shipping + discounts.reduce((sum, discount) => sum + discount.amount, 0);
 				},
 
 				get active_summary() {

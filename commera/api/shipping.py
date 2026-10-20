@@ -5,6 +5,7 @@ from frappe.utils.data import cstr, flt, sha256_hash
 
 from commera.checkout_hooks import PLUGIN_FEE_FIELD, apply_delivery_option_hooks, apply_plugin_fees
 from commera.core import _get_cart_quotation
+from commera.discounts.allocations import get_allocations, get_discount_rows, get_price_discount_rows
 from commera.discounts.pricing import refresh_code_discounts
 from commera.discounts.shipping import apply_shipping_discounts, set_shipping_discount
 from commera.utils import (
@@ -356,11 +357,14 @@ def get_charge_summary(quotation) -> dict:
 	charges = charge_lines["shipping"] + charge_lines["cod_charge"]
 	charges += sum(line["amount"] for line in charge_lines["taxes"] + charge_lines["plugin_fees"])
 	discount_amount = flt(quotation.discount_amount)
+	# Derived rather than read: with a Grand Total discount the stored net_total is already partly discounted.
+	subtotal = flt(flt(quotation.grand_total) + discount_amount - charges, quotation.precision("grand_total"))
+	line_discount = sum(flt(item.get("custom_code_discount")) * flt(item.qty) for item in quotation.items)
 	return {
-		# Derived rather than read: with a Grand Total discount the stored net_total is already partly discounted.
-		"subtotal": flt(
-			flt(quotation.grand_total) + discount_amount - charges, quotation.precision("grand_total")
-		),
+		"subtotal": subtotal,
+		"items_total": flt(subtotal + line_discount, quotation.precision("grand_total")),
+		"discounts": get_price_discount_rows(quotation),
+		"shipping_discounts": get_discount_rows(get_allocations(quotation), ("Shipping",)),
 		"shipping": charge_lines["shipping"],
 		"cod_charge": charge_lines["cod_charge"],
 		"plugin_fees": charge_lines["plugin_fees"],

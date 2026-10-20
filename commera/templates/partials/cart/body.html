@@ -33,7 +33,7 @@
 		cart_loading: true,
 		delivery_charge: {{delivery_charge}},
 		delivery_charge_applicable_below: {{delivery_charge_applicable_below}},
-		cart_total : $store.cart.total,
+		cart_total : $store.cart.total - $store.cart.saved,
 		show_delivery_charges: false,
 	}" x-init="
 		if (delivery_charge_applicable_below > cart_total && delivery_charge > 0  && $store.cart.selected_count > 0) {
@@ -45,10 +45,11 @@
 		};
 		await $store.cart.fetch_detail_for_cart();
 		cart_loading = false;
+		await $store.cart.load_priced();
 		await resume_checkout_after_sign_in($data);" x-effect="
-		cart_total = $store.cart.total;
+		cart_total = $store.cart.total - $store.cart.saved;
 		if (delivery_charge_applicable_below > $store.cart.total && delivery_charge > 0 && $store.cart.selected_count > 0) {
-			cart_total = $store.cart.total + delivery_charge;
+			cart_total = cart_total + delivery_charge;
 			show_delivery_charges = true;
 		} 
 		else {
@@ -217,6 +218,14 @@
 					<p class="text-base font-medium flex">{{get_currency_symbol()}}<span x-text="$store.cart.total.toFixed(2)" class="me-2"></span>
 						</p>
 				</div>
+				<template x-for="discount in $store.cart.discounts" :key="discount.label">
+					<div class="mb-3 flex items-center justify-between">
+						<p class="text-base font-normal text-gray-400">
+							{{ _('Discount') }}<span x-show="discount.label" x-text="` (${discount.label})`"></span>
+						</p>
+						<p class="text-base font-medium flex text-green-700">&minus;{{get_currency_symbol()}}<span x-text="discount.amount.toFixed(2)"></span></p>
+					</div>
+				</template>
 				<div class="mb-3 flex items-center justify-between">
 					<p class="text-base font-normal text-gray-400 capitalize">{{ _("non-refundable delivery charge") }}</p>
 					<div x-show="show_delivery_charges && $store.cart.selected_count >0">

@@ -176,6 +176,12 @@ class PricedCartLine(TypedDict):
 	amount: float
 
 
+class DiscountRow(TypedDict):
+	# The code, or the automatic discount's title; None for a discount ERPNext gave on its own.
+	label: str | None
+	amount: float
+
+
 class PricedCart(TypedDict):
 	"""The server cart priced like checkout, before shipping and tax."""
 
@@ -186,6 +192,8 @@ class PricedCart(TypedDict):
 	# {"code", "class"}, where class is "Product" or "Order".
 	discount_codes: list[dict]
 	lines: list[PricedCartLine]
+	# Line and order discounts by code or automatic discount.
+	discounts: list[DiscountRow]
 	subtotal: float
 	order_discount: float
 	total: float
@@ -193,6 +201,10 @@ class PricedCart(TypedDict):
 
 class ChargeSummary(TypedDict):
 	subtotal: float
+	# The lines before discount codes; `discounts` lists what came off them and off the order.
+	items_total: float
+	discounts: list[DiscountRow]
+	shipping_discounts: list[DiscountRow]
 	shipping: float
 	cod_charge: float
 	plugin_fees: list[Charge]
