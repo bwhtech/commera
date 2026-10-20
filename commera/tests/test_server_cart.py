@@ -4,7 +4,13 @@ from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
 from commera.api.payments import generate_quotation_for_cart
-from commera.api.server_cart import apply_discount_code, remove_discount_code, sync_server_cart
+from commera.api.server_cart import (
+	apply_discount_code,
+	get_priced_server_cart,
+	get_server_cart,
+	remove_discount_code,
+	sync_server_cart,
+)
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	MAX_LINE_QUANTITY,
 	get_session_cart,
@@ -252,6 +258,41 @@ class TestServerCart(DiscountCodeTestCase):
 
 		self.assertEqual([state["code"] for state in priced["discount_codes"]], [kept])
 		self.assertEqual(priced["total"], SHIRT_RATE - 3)
+
+	def test_each_cart_method_has_its_own_rate_limit(self):
+		code = self.create_code(amount=10)
+		self.use_guest_cart()
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
+		frappe.local.request_ip = f"10.{frappe.generate_hash(length=4)}"
+		self.addCleanup(delattr, frappe.local, "request_ip")
+		frappe.form_dict.pop("cmd", None)
+		for method in (get_server_cart, get_priced_server_cart, sync_server_cart, remove_discount_code):
+			kwargs = (
+				{"items": []}
+				if method is sync_server_cart
+				else {"code": code}
+				if method is remove_discount_code
+				else {}
+			)
+			method(**kwargs)
+			frappe.form_dict.pop("cmd", None)
+
+		counters = {
+			key.decode().split("rl:", 1)[1].rsplit(":", 2)[0]
+			for key in frappe.cache.get_keys(f"rl:*{frappe.local.request_ip}*")
+		}
+		self.assertEqual(
+			counters,
+			{
+				f"commera.api.server_cart.{name}"
+				for name in (
+					"get_server_cart",
+					"get_priced_server_cart",
+					"sync_server_cart",
+					"remove_discount_code",
+				)
+			},
+		)
 
 	def test_checkout_without_a_server_cart_is_unchanged(self):
 		quotation = generate_quotation_for_cart({"items": [self.browser_line(self.cap, 2)]})

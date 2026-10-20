@@ -1,6 +1,5 @@
 import frappe
 from frappe import _
-from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cint, cstr
 
 from commera.api.cart import validate_stock_available
@@ -12,18 +11,20 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 )
 from commera.discounts.selection import get_discount_codes
 from commera.sdk import cart as cart_sdk
+from commera.utils import rate_limit_per_method
 from commera.www.cart.permalink import get_cart_lines
 
 
 # Guests hold carts before signing in; the cart cookie scopes each call to the caller's own cart.
 @frappe.whitelist(allow_guest=True, methods=["GET", "POST"])  # nosemgrep: guest-whitelisted-method
+@rate_limit_per_method(limit=1200, seconds=60 * 60)
 def get_server_cart() -> dict | None:
 	cart = get_session_cart()
 	return get_cart_state(cart) if cart else None
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=600, seconds=60 * 60)
+@rate_limit_per_method(limit=600, seconds=60 * 60)
 def sync_server_cart(items: list | str, version: str | None = None) -> dict:
 	"""Copy the browser cart's quantities to the server cart. When the server cart changed after the
 	browser last saw it, nothing is written and the server cart comes back for the browser to show."""
@@ -40,17 +41,19 @@ def sync_server_cart(items: list | str, version: str | None = None) -> dict:
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET", "POST"])  # nosemgrep: guest-whitelisted-method
+@rate_limit_per_method(limit=600, seconds=60 * 60)
 def get_priced_server_cart() -> dict | None:
 	return cart_sdk.get_priced_cart()
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=30, seconds=60 * 60)
+@rate_limit_per_method(limit=30, seconds=60 * 60)
 def apply_discount_code(code: str) -> dict:
 	return {**cart_sdk.add_discount_code(cstr(code).strip()), "checkout_summary": get_open_checkout_summary()}
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
+@rate_limit_per_method(limit=100, seconds=60 * 60)
 def remove_discount_code(code: str) -> dict:
 	return {
 		**cart_sdk.remove_discount_code(cstr(code).strip()),
