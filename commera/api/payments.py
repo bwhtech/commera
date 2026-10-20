@@ -20,6 +20,7 @@ from commera.api.shipping import (
 	get_checkout_summary,
 	get_cod_charge,
 	reprice_selected_option,
+	reprice_shipping_discount,
 )
 from commera.api.signup import get_placeholder_first_name, validate_single_email, validate_user_names
 from commera.checkout_hooks import (
@@ -812,6 +813,7 @@ def place_cod_order(quotation_name: str):
 	if COD_PAYMENT_MODE not in get_checkout_payment_methods(quotation, strict=True):
 		refuse_payment(_("Cash on delivery is not available."), quotation.name)
 	quotation.flags.commera_payment_kind = "cod"
+	reprice_shipping_discount(quotation)
 	with system_user_session():
 		set_cod_charges(quotation)
 		quotation.flags.ignore_permissions = True

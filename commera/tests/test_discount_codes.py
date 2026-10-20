@@ -4,6 +4,7 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils.data import add_days, money_in_words, today
 
 from commera.api.payments import _make_sales_order, make_sales_invoice
+from commera.api.shipping import apply_delivery_option, get_checkout_summary
 from commera.commera_ecommerce.doctype.commera_discount.commera_discount import DiscountCodeError
 from commera.core import new_cart_quotation
 from commera.discounts.codes import add_code, generate_codes, get_code_discount
@@ -379,6 +380,25 @@ class TestDiscountSelection(DiscountCodeTestCase):
 
 		self.assertEqual((standard["amount"], standard["original_amount"]), (0, 60))
 		self.assertEqual(express["amount"], 150)
+
+	def test_free_shipping_follows_how_the_order_is_paid(self):
+		for payment_condition, shipping, cod_shipping in (("Prepaid", 0, 60), ("Cash On Delivery", 60, 0)):
+			with self.subTest(payment_condition):
+				frappe.db.set_value("Commera Discount", {"method": "Automatic"}, "enabled", 0)
+				self.create_discount(
+					discount_type="Free Shipping",
+					method="Automatic",
+					payment_condition=payment_condition,
+					shipping_percentage=100,
+				)
+				quotation = self.create_quotation({self.shirt: 1})
+				option = {"title": "Standard", "amount": 60}
+				apply_delivery_option(quotation, apply_shipping_discounts(quotation, [option])[0])
+
+				summary = get_checkout_summary(quotation)
+
+				self.assertEqual(summary["shipping"], shipping)
+				self.assertEqual(summary["cash_on_delivery"]["shipping"], cod_shipping)
 
 
 class TestDiscountsOnOrders(DiscountCodeTestCase):
