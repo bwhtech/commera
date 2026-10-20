@@ -413,6 +413,25 @@ class TestDiscountSelection(DiscountCodeTestCase):
 		self.assertEqual((standard["amount"], standard["original_amount"]), (0, 60))
 		self.assertEqual(express["amount"], 150)
 
+	def test_a_shipping_code_that_excludes_order_discounts_never_stacks_with_one(self):
+		frappe.db.set_value("Commera Discount", {"method": "Automatic"}, "enabled", 0)
+		self.create_discount(
+			percentage=10, method="Automatic", combines_with_product=1, combines_with_shipping=1
+		)
+		code = self.create_code(
+			discount_type="Free Shipping", payment_condition="Prepaid", shipping_percentage=100
+		)
+		quotation = self.create_quotation({self.shirt: 1}, (code,))
+		option = {"title": "Standard", "amount": 60}
+		apply_delivery_option(quotation, apply_shipping_discounts(quotation, [option])[0])
+		quotation.save(ignore_permissions=True)
+
+		summary = get_checkout_summary(quotation)
+
+		self.assertEqual((summary["shipping"], summary["discount_amount"]), (0, 0))
+		cash_on_delivery = summary["cash_on_delivery"]
+		self.assertEqual((cash_on_delivery["shipping"], cash_on_delivery["discount_amount"]), (60, 9))
+
 	def test_checkout_removes_a_used_up_code_and_says_why(self):
 		frappe.db.set_value("Commera Discount", {"method": "Automatic"}, "enabled", 0)
 		code = self.create_code(amount=10, usage_limit=1)
