@@ -107,7 +107,7 @@ class CommeraCart(Document):
 		return changed
 
 	def add_discount_code(self, code: str):
-		codes = get_discount_codes(self)
+		codes = [applied_code for applied_code in get_discount_codes(self) if get_code_discount(applied_code)]
 		code = validate_new_discount_code(code, codes)
 		if refusal := get_discount_code_refusal(self.get_quotation_preview(), code):
 			frappe.throw(refusal, DiscountCodeError)
@@ -198,7 +198,19 @@ def get_code_states(quotation) -> list[dict]:
 	cart = get_cart_context(quotation)
 	states = []
 	for code in get_discount_codes(quotation):
-		discount = get_discount(get_code_discount(code))
+		discount_name = get_code_discount(code)
+		if not discount_name:
+			states.append(
+				{
+					"code": code,
+					"title": code,
+					"discount_class": None,
+					"applied": False,
+					"reason": _("{0} is no longer a valid discount code.").format(code),
+				}
+			)
+			continue
+		discount = get_discount(discount_name)
 		is_applied = (discount.name, code) in applied
 		states.append(
 			{
