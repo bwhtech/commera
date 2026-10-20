@@ -3,6 +3,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cint, cstr
 
+from commera.api.shipping import get_checkout_summary
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	MAX_CART_LINES,
 	CommeraCart,
@@ -45,12 +46,20 @@ def get_priced_server_cart() -> dict | None:
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=30, seconds=60 * 60)
 def apply_discount_code(code: str) -> dict:
-	return cart_sdk.add_discount_code(cstr(code).strip())
+	return {**cart_sdk.add_discount_code(cstr(code).strip()), "checkout_summary": get_open_checkout_summary()}
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 def remove_discount_code(code: str) -> dict:
-	return cart_sdk.remove_discount_code(cstr(code).strip())
+	return {
+		**cart_sdk.remove_discount_code(cstr(code).strip()),
+		"checkout_summary": get_open_checkout_summary(),
+	}
+
+
+def get_open_checkout_summary() -> dict | None:
+	quotation = cart_sdk.get_open_cart_quotation()
+	return get_checkout_summary(quotation) if quotation else None
 
 
 def get_browser_quantities(items: list | str) -> dict[str, int]:

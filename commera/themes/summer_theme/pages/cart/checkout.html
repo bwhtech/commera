@@ -566,7 +566,7 @@
 					const url = new URL(window.location.href);
 					this.pending_discount = url.searchParams.get("discount");
 					if (this.pending_discount) {
-						// Left in the URL, every reload would re-apply the coupon against its rate limit.
+						// Left in the URL, every reload would re-apply the code against its rate limit.
 						url.searchParams.delete("discount");
 						history.replaceState(null, "", url);
 					}
@@ -602,11 +602,11 @@
 				async apply_pending_discount() {
 					if (!this.pending_discount) return;
 					try {
-						const response = await frappe_call("/api/v2/method/commera.api.payments.apply_coupon_code", {
-							applied_code: this.pending_discount,
+						const response = await frappe_call("/api/v2/method/commera.api.server_cart.apply_discount_code", {
+							code: this.pending_discount,
 						});
-						toast(response.data.message, { type: "success" });
-						this.summary = response.data.checkout_summary;
+						toast({{ _("Discount code applied") | tojson }}, { type: "success" });
+						if (response.data.checkout_summary) this.summary = response.data.checkout_summary;
 					} catch (error) {
 						this.pending_discount = null;
 					}
@@ -791,7 +791,7 @@
 						this.reset_address_step();
 						this.summary = response.data.checkout_summary;
 						this.address_saved = true;
-						// A guest has no server cart to hold the link's coupon until their first address save.
+						// A guest has no checkout to price the link's code until their first address save.
 						if (this.config.is_guest) await this.apply_pending_discount();
 						await this.load_shipping_options();
 					} catch (error) {

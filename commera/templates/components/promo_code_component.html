@@ -1,10 +1,10 @@
 {% import "templates/macros/modal.html" as modal %}
-{% if cart_quotation.coupon_code %}
+{% for discount_code in (cart_quotation.custom_discount_codes or "").splitlines() if discount_code.strip() %}
     <span
         class="w-fit inline-flex overflow-hidden rounded-lg border border-dashed border-gray-400 bg-white text-xs font-medium text-gray-600 ">
         <span class="flex items-center gap-1 bg-gray-400/10 px-2 py-1">
-            {{coupon_code}}
-            <button @click="remove_coupon_code($el)"
+            {{ discount_code }}
+            <button @click='remove_discount_code({{ discount_code | tojson }}, $el)'
                 class="flex items-center disabled:cursor-not-allowed">
                 <div class="close">
                     {{icon(name="close",classes="h-4 w-4 cursor-pointer")}}
@@ -15,7 +15,7 @@
             </button>
         </span>
     </span>
-{% else %}
+{% endfor %}
     {% call modal.modal(button_text='apply promo code',button_classes='text-md text-secondary-accent underline decoration-accent
     md:text-base capitalize',
     modal_header='Apply a promo code', header_alignment='center',modal_classes='w-fit') %}
@@ -35,7 +35,6 @@
             </div>
         </div>
     {% endcall %}
-{% endif %}
 
 
 <script defer>
@@ -48,11 +47,8 @@
         const spinner = btn.querySelector(".animate-spin");
         btn.disabled = true;
         spinner.classList.remove("hidden");
-        const args = {
-            'applied_code': coupon_code
-        }
         try {
-            await frappe_call('/api/v2/method/commera.api.payments.apply_coupon_code', args)
+            await frappe_call('/api/v2/method/commera.api.server_cart.apply_discount_code', { code: coupon_code })
             confetti({
                 particleCount: 100,
                 spread: 70,
@@ -68,14 +64,14 @@
             spinner.classList.add("hidden");
         }
     }
-    async function remove_coupon_code(btn) {
+    async function remove_discount_code(code, btn) {
         const spinner = btn.querySelector(".animate-spin");
         const close = btn.querySelector(".close");
         btn.disabled = true;
         spinner.classList.remove("hidden");
         close.classList.add("hidden");
         try {
-            const data = await frappe_call('/api/v2/method/commera.api.payments.remove_coupon_code', {});
+            await frappe_call('/api/v2/method/commera.api.server_cart.remove_discount_code', { code });
             window.location.reload()
         }
         catch (err) {

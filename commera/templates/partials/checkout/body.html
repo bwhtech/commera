@@ -43,11 +43,11 @@
                 const url = new URL(window.location.href);
                 const discount = url.searchParams.get("discount");
                 if (!discount) return;
-                // Stripped first: removing the coupon reloads this page and must not re-apply it.
+                // Stripped first: removing the code reloads this page and must not re-apply it.
                 url.searchParams.delete("discount");
                 history.replaceState(null, "", url);
                 try {
-                    await frappe_call("/api/v2/method/commera.api.payments.apply_coupon_code", { applied_code: discount });
+                    await frappe_call("/api/v2/method/commera.api.server_cart.apply_discount_code", { code: discount });
                     window.location.reload();
                 } catch (error) {}
             },

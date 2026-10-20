@@ -72,7 +72,7 @@ sequenceDiagram
   S-->>B: conflict + server lines, v4 (nothing written)
 ```
 
-At checkout, quantities come from the browser, so a shopper can check out only the selected lines. The server cart adds each line's attributes and the codes.
+At checkout, quantities come from the browser, so a shopper can check out only the selected lines. The server cart adds each line's attributes and the codes. A code applied or removed while checkout is open goes onto its Quotation too.
 
 ## Dashboard
 
@@ -132,7 +132,7 @@ A cart link `/en/cart/<item_code>:<qty>,...` takes two more options:
 | Name | Kind | What it does |
 | --- | --- | --- |
 | `cart_discounts` | `commera_hooks`, synchronous | Returns `[{"title", "amount", "line"?}]` for the cart. With `line` (a row `idx`) it is a product discount; without, it comes off the order. Called on store carts only; orders and invoices keep what the cart got. |
-| `validate_discount_code` | `commera_hooks`, synchronous | Takes `(quotation, code)` and returns a refusal message or `None`, for discount codes and the store coupon alike. A refused code cannot be added, is skipped while the cart changes, and at checkout is removed: the shopper sees the message and the new total instead of a refused cart. |
+| `validate_discount_code` | `commera_hooks`, synchronous | Takes `(quotation, code)` and returns a refusal message or `None`. A refused code cannot be added, is skipped while the cart changes, and at checkout is removed: the shopper sees the message and the new total instead of a refused cart. |
 | `cart_created` | `commera_events` | A Commera Cart was created. Logged only when an app listens, because most guest carts never reach checkout. |
 | `discount_used` | `commera_events` | One per discount on a placed order, with the order snapshot plus `discount`, `code` and `amount`. |
 
@@ -174,7 +174,6 @@ Custom fields on Quotation, Sales Order and Sales Invoice (and their items) reco
 
 ## Not done yet
 
-- The storefront checkout coupon box still applies one ERPNext coupon. A box for several Commera codes needs its own design.
 - Usage limits are checked when a code is applied and when the cart is priced. Two orders placed at the same moment can both take the last use.
 - The browser cart does not show line attributes, and a guest cart does not merge into the account cart at sign-in.
 - No job removes old guest carts yet.

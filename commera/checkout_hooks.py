@@ -25,7 +25,7 @@ def get_cart_refusal(quotation) -> str | None:
 
 def get_discount_code_refusal(quotation, code: str) -> str | None:
 	"""Why an app will not let this code apply to the cart, in the shopper's words; None when every app
-	allows it. Checked for discount codes and the store coupon alike."""
+	allows it."""
 	for handler in get_handlers("commera_hooks", "validate_discount_code"):
 		reason = None
 		with handle_hook_error(

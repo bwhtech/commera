@@ -40,10 +40,10 @@
             <span class="font-medium flex"> {{get_currency_symbol()}} <span x-text="$store.cart.total.toFixed(2)"></span> </span>
         </div>
 
-        {% if cart_quotation.coupon_code %}
+        {% if cart_quotation.custom_discount_allocations %}
             <div class="flex justify-between text-gray-500 text-base"
                 x-show="$store.cart.total > parseFloat('{{cart_quotation.net_total or 0}}')">
-                <span>{{ _('Coupon Discount') }}</span>
+                <span>{{ _('Discount') }}</span>
                 <span class="font-medium flex text-green-700"> &minus;{{get_currency_symbol()}} <span
                         x-text="($store.cart.total - parseFloat('{{cart_quotation.net_total or 0}}')).toFixed(2) "></span> </span>
             </div>

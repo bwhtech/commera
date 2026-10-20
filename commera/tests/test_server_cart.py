@@ -1,8 +1,9 @@
 import frappe
 
 from commera.api.payments import generate_quotation_for_cart
-from commera.api.server_cart import sync_server_cart
+from commera.api.server_cart import apply_discount_code, remove_discount_code, sync_server_cart
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
+from commera.core import _get_cart_quotation
 from commera.discounts.codes import get_code_discount
 from commera.sdk import cart as cart_sdk
 from commera.tests.test_discount_codes import CAP_RATE, SHIRT_RATE, DiscountCodeTestCase
@@ -111,8 +112,7 @@ class TestServerCart(DiscountCodeTestCase):
 		self.assertEqual({row.rate for row in quotation.items}, {SHIRT_RATE - 10})
 		self.assertEqual(quotation.custom_discount_codes, code)
 
-	def test_checkout_keeps_an_order_code_through_the_coupon_reset(self):
-		"""Checkout zeroes the document discount after a save; the order code must still apply."""
+	def test_checkout_keeps_an_order_code(self):
 		code = self.create_code(amount=10)
 		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
 		cart_sdk.add_discount_code(code)
@@ -121,6 +121,31 @@ class TestServerCart(DiscountCodeTestCase):
 
 		self.assertEqual(quotation.custom_code_order_discount, 10)
 		self.assertEqual(quotation.net_total, SHIRT_RATE - 10)
+
+	def test_a_code_applied_at_checkout_reaches_the_checkout(self):
+		code = self.create_code(amount=10)
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
+		generate_quotation_for_cart({"items": [self.browser_line(self.shirt, 1)]})
+
+		response = apply_discount_code(code.lower())
+
+		quotation = _get_cart_quotation()
+		self.assertEqual(quotation.custom_discount_codes, code)
+		self.assertEqual(quotation.net_total, SHIRT_RATE - 10)
+		self.assertEqual(response["checkout_summary"]["discount_amount"], 10)
+
+	def test_a_code_removed_at_checkout_leaves_the_checkout(self):
+		code = self.create_code(amount=10)
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
+		cart_sdk.add_discount_code(code)
+		generate_quotation_for_cart({"items": [self.browser_line(self.shirt, 1)]})
+
+		response = remove_discount_code(code)
+
+		quotation = _get_cart_quotation()
+		self.assertFalse(quotation.custom_discount_codes)
+		self.assertEqual(quotation.net_total, SHIRT_RATE)
+		self.assertEqual(response["checkout_summary"]["discount_amount"], 0)
 
 	def test_a_code_that_does_not_apply_yet_says_why(self):
 		code = self.create_code(percentage=10, minimum_requirement="Subtotal", minimum_subtotal=500)

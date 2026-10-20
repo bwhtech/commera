@@ -5,6 +5,7 @@ from frappe.utils.data import cstr
 from commera.api.payments import COD_PAYMENT_MODE, get_checkout_payment_methods
 from commera.api.shipping import get_checkout_summary
 from commera.core import _get_cart_quotation
+from commera.discounts.selection import get_discount_codes
 from commera.guest import is_guest
 from commera.utils import (
 	format_addresses,
@@ -117,12 +118,7 @@ def set_cart_context(context, commera_settings):
 
 
 def get_coupon_code(cart_quotation):
-	coupon_code = ""
-	try:
-		coupon_code = frappe.get_cached_value("Coupon Code", cart_quotation.coupon_code, "coupon_code")
-	except Exception:
-		pass
-	return coupon_code
+	return next(iter(get_discount_codes(cart_quotation)), "")
 
 
 def get_checkout_items(cart_quotation):

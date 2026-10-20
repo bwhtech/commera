@@ -126,12 +126,22 @@ def add_discount_code(code: str) -> PricedCart:
 	"""Apply a Commera Discount code, refused when it is invalid or does not combine with the codes applied."""
 	cart = get_existing_cart()
 	cart.add_discount_code(code)
-	return save_server_cart(cart)
+	return save_discount_codes(cart)
 
 
 def remove_discount_code(code: str) -> PricedCart:
 	cart = get_existing_cart()
 	cart.remove_discount_code(code)
+	return save_discount_codes(cart)
+
+
+def save_discount_codes(cart: CommeraCart) -> PricedCart:
+	"""Codes also go on an open checkout: it copies the cart's codes only when it is made."""
+	if quotation := get_open_cart_quotation():
+		with cart_write_lock(quotation):
+			validate_cart_is_not_in_checkout(quotation.name)
+			quotation.custom_discount_codes = cart.discount_codes
+			save_cart_quotation(quotation)
 	return save_server_cart(cart)
 
 

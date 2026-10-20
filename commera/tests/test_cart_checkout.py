@@ -13,7 +13,6 @@ from commera.api.checkout import apply_shipping_rule
 from commera.api.payments import (
 	COD_PAYMENT_MODE,
 	CheckoutPriceChangedError,
-	apply_coupon_code,
 	confirm_payment,
 	generate_quotation_for_cart,
 	initiate_checkout_with_mode,
@@ -353,72 +352,6 @@ class TestCartCheckout(IntegrationTestCase):
 		self.assertEqual(summary["discount_amount"], 50)
 		self.assertEqual(summary["total"], round(270 + 48.6 + summary["shipping"] - 50))
 		self.assert_summary_adds_up(summary)
-
-	def create_coupon(self, discount_percentage: float) -> str:
-		pricing_rule = frappe.get_doc(
-			{
-				"doctype": "Pricing Rule",
-				"title": f"ZZ Coupon {frappe.generate_hash(length=8)}",
-				"apply_on": "Transaction",
-				"rate_or_discount": "Discount Percentage",
-				"discount_percentage": discount_percentage,
-				"selling": 1,
-				"coupon_code_based": 1,
-				"currency": frappe.get_cached_value("Price List", self.sale_price_list, "currency"),
-			}
-		).insert(ignore_permissions=True)
-		coupon_code = f"ZZ{frappe.generate_hash(length=8).upper()}"
-		frappe.get_doc(
-			{
-				"doctype": "Coupon Code",
-				"coupon_name": coupon_code,
-				"coupon_code": coupon_code,
-				"coupon_type": "Promotional",
-				"pricing_rule": pricing_rule.name,
-			}
-		).insert(ignore_permissions=True)
-		return coupon_code
-
-	def test_applying_a_coupon_returns_the_discounted_checkout_summary(self):
-		coupon_code = self.create_coupon(discount_percentage=10)
-		frappe.set_user(self.shopper)
-		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 3)]})
-		self.assertEqual(get_checkout_summary(_get_cart_quotation())["discount_amount"], 0)
-
-		summary = apply_coupon_code(coupon_code)["checkout_summary"]
-
-		self.assertEqual(summary["subtotal"], 270)
-		self.assertAlmostEqual(summary["discount_amount"], (270 + summary["shipping"]) * 0.1, places=2)
-		self.assert_summary_adds_up(summary)
-
-	def test_a_coupon_stays_on_the_cart_when_it_is_rebuilt(self):
-		coupon_code = self.create_coupon(discount_percentage=10)
-		frappe.set_user(self.shopper)
-		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 3)]})
-		apply_coupon_code(coupon_code)
-
-		quotation = generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 2)]})
-
-		summary = get_checkout_summary(quotation)
-		self.assertEqual(
-			frappe.db.get_value("Coupon Code", quotation.coupon_code, "coupon_code"), coupon_code
-		)
-		self.assertEqual(summary["subtotal"], 180)
-		self.assertAlmostEqual(summary["discount_amount"], (180 + summary["shipping"]) * 0.1, places=2)
-
-	def test_an_expired_coupon_is_dropped_quietly_when_the_cart_is_rebuilt(self):
-		coupon_code = self.create_coupon(discount_percentage=10)
-		frappe.set_user(self.shopper)
-		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 3)]})
-		apply_coupon_code(coupon_code)
-		frappe.db.set_value("Coupon Code", {"coupon_code": coupon_code}, "valid_upto", add_days(today(), -1))
-		frappe.clear_messages()
-
-		quotation = generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 2)]})
-
-		self.assertFalse(quotation.coupon_code)
-		self.assertEqual(get_checkout_summary(quotation)["discount_amount"], 0)
-		self.assertNotIn("expired", frappe.as_json(frappe.get_message_log()))
 
 	def test_the_cod_checkout_total_is_what_the_order_charges(self):
 		ensure_fiscal_year()

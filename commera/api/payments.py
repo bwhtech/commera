@@ -4,7 +4,6 @@ import frappe
 from bwh_payments.bwh_payments.utils import get_available_payment_modes, resolve_payment_mode
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
-from erpnext.accounts.doctype.pricing_rule.utils import validate_coupon_code
 from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import getdate, validate_email_address
@@ -249,13 +248,6 @@ def drop_refused_codes(quotation):
 			reasons.append(reason)
 		else:
 			kept_codes.append(code)
-
-	coupon = quotation.coupon_code and frappe.db.get_value(
-		"Coupon Code", quotation.coupon_code, "coupon_code"
-	)
-	if coupon and (reason := get_discount_code_refusal(quotation, coupon)):
-		reasons.append(reason)
-		_remove_coupon_code(quotation)
 	if not reasons:
 		return
 
@@ -554,26 +546,8 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 	save_cart_quotation(unsaved_quotation_doc)
 	# The stored option was priced for the old cart, and payment would re-quote it for the new one.
 	clear_delivery_option(unsaved_quotation_doc)
-	coupon_code = unsaved_quotation_doc.coupon_code
-	_remove_coupon_code(unsaved_quotation_doc)
-	reapply_coupon_code(unsaved_quotation_doc, coupon_code)
 	set_charges(unsaved_quotation_doc)
 	return save_cart_quotation(unsaved_quotation_doc)
-
-
-def reapply_coupon_code(quotation, coupon_code: str | None):
-	if not coupon_code:
-		return
-	try:
-		validate_coupon_code(coupon_code)
-	except frappe.ValidationError:
-		# An expired coupon is dropped quietly; the shopper only edited their cart.
-		frappe.clear_last_message()
-		return
-	# An app's refusal drops it as quietly as an expiry; checkout explains it if the shopper gets there.
-	if get_discount_code_refusal(quotation, frappe.db.get_value("Coupon Code", coupon_code, "coupon_code")):
-		return
-	quotation.coupon_code = coupon_code
 
 
 def set_charges(quotation):
@@ -855,51 +829,6 @@ def place_cod_order(quotation_name: str):
 	log_purchase(sales_order)
 	fire_event("order_placed", "Sales Order", sales_order.name)
 	return sales_order
-
-
-# Guest checkout: refuses any caller without a guest cart cookie, and is rate limited.
-@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=30, seconds=60 * 60)
-def apply_coupon_code(applied_code: str):
-	if not applied_code:
-		frappe.throw(_("Please enter a coupon code"))
-	quotation = _get_cart_quotation()
-	coupon_name = frappe.db.get_value("Coupon Code", {"coupon_code": applied_code}, "name")
-	if not coupon_name:
-		frappe.throw(_("Please enter a valid coupon code"))
-	validate_coupon_code(coupon_name)
-	validate_cart_is_not_in_checkout(quotation.name)
-	if refusal := get_discount_code_refusal(quotation, applied_code):
-		frappe.throw(refusal)
-	quotation.coupon_code = coupon_name
-	save_cart_quotation(quotation)
-	return {
-		"message": _("Coupon code applied successfully"),
-		"checkout_summary": get_checkout_summary(quotation),
-	}
-
-
-# Guest checkout: refuses any caller without a guest cart cookie, and is rate limited.
-@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=100, seconds=60 * 60)
-def remove_coupon_code():
-	quotation = _get_cart_quotation()
-	validate_cart_is_not_in_checkout(quotation.name)
-	_remove_coupon_code(quotation)
-
-
-def _remove_coupon_code(quotation):
-	quotation.coupon_code = ""
-	quotation.items = [item for item in quotation.items if not item.get("is_free_item")]
-	for item in quotation.items:
-		item.discount_percentage = 0
-		item.discount_amount = 0
-		item.distributed_discount_amount = 0
-		item.rate = item.price_list_rate
-	quotation.calculate_taxes_and_totals()
-	save_cart_quotation(quotation)
-	quotation.discount_amount = 0
-	save_cart_quotation(quotation)
 
 
 def add_billing_address(party_name, address):

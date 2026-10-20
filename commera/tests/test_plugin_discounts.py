@@ -4,7 +4,6 @@ import frappe
 
 from commera.api.payments import (
 	CheckoutPriceChangedError,
-	apply_coupon_code,
 	drop_refused_codes,
 	generate_quotation_for_cart,
 )
@@ -188,13 +187,3 @@ class TestValidateDiscountCodeHook(DiscountCodeTestCase):
 		quotation.reload()
 		self.assertFalse(quotation.custom_discount_codes)
 		self.assertFalse(quotation.custom_code_order_discount)
-
-	def test_the_store_coupon_box_refuses_a_code_an_app_refuses(self):
-		self.sale_price_list = self.price_list
-		coupon = test_cart_checkout.TestCartCheckout.create_coupon(self, discount_percentage=10)
-		shopper = test_cart_checkout.TestCartCheckout.create_shopper(self)
-		frappe.set_user(shopper)
-		generate_quotation_for_cart({"items": [{"item": {}, "variant": {"item_code": self.shirt}, "qty": 1}]})
-
-		with self.assertRaisesRegex(frappe.ValidationError, "limit was reached"):
-			apply_coupon_code(coupon)
