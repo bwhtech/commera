@@ -44,35 +44,16 @@ def apply_code_discounts(doc, method=None):
 			apply_recorded_discounts(doc)
 		return
 	selections = select_discounts(get_cart_context(doc))
-	app_discounts = get_app_discounts(doc)
-	allocations = apply_line_discounts(
-		doc,
-		[s for s in selections if s.discount.discount_class == PRODUCT],
-		[d for d in app_discounts if d["discount_class"] == PRODUCT],
-	)
+	allocations = apply_line_discounts(doc, [s for s in selections if s.discount.discount_class == PRODUCT])
 	doc.calculate_taxes_and_totals()
-	allocations += apply_order_discount(
-		doc,
-		[s for s in selections if s.discount.discount_class == ORDER],
-		[d for d in app_discounts if d["discount_class"] == ORDER],
-	)
+	allocations += apply_order_discount(doc, [s for s in selections if s.discount.discount_class == ORDER])
 	doc.calculate_taxes_and_totals()
 	allocations += get_shipping_allocations(doc)
 	set_allocations(doc, allocations)
 
 
-def get_app_discounts(doc) -> list[dict]:
-	"""A cart asks the apps; a merchant's test cart does not."""
-	if doc.flags.commera_discounts is not None:
-		return []
-	# Imported here: commera.checkout_hooks imports the shipping step, which reaches this package.
-	from commera.checkout_hooks import get_plugin_discounts
-
-	return get_plugin_discounts(doc)
-
-
-def apply_line_discounts(doc, selections: list, app_discounts: list[dict]) -> list[dict]:
-	"""Each line takes its single best offer: a merchant's product discount or an app's line discount."""
+def apply_line_discounts(doc, selections: list) -> list[dict]:
+	"""Each line takes its single best product discount."""
 	cart = get_cart_context(doc)
 	best_by_line = {}
 
@@ -84,8 +65,6 @@ def apply_line_discounts(doc, selections: list, app_discounts: list[dict]) -> li
 		line_discounts = cap_by_budget(selection.discount, selection.discount.get_line_discounts(cart))
 		for idx, amount in line_discounts.items():
 			offer(idx, amount, get_allocation(selection, PRODUCT, 0, idx))
-	for app_discount in app_discounts:
-		offer(app_discount["line"], app_discount["amount"], dict(app_discount))
 
 	allocations = []
 	for item in doc.items:
@@ -107,7 +86,7 @@ def add_line_discount(item, unit_discount: float):
 	item.custom_code_discount = unit_discount
 
 
-def apply_order_discount(doc, selections: list, app_discounts: list[dict]) -> list[dict]:
+def apply_order_discount(doc, selections: list) -> list[dict]:
 	cart = get_cart_context(doc)
 	offers = []
 	for selection in selections:
@@ -119,7 +98,6 @@ def apply_order_discount(doc, selections: list, app_discounts: list[dict]) -> li
 				get_allocation(selection, ORDER, 0),
 			)
 		)
-	offers += [(app_discount["amount"], dict(app_discount)) for app_discount in app_discounts]
 
 	allocations = []
 	subtotal = flt(doc.total)
@@ -227,7 +205,7 @@ def get_order_discount_shares(doc, order_rows: list[dict], source) -> list[float
 
 
 def get_allocation_key(row: dict) -> tuple:
-	return (row["discount_class"], row.get("discount"), row.get("code"), row.get("app"))
+	return (row["discount_class"], row.get("discount"), row.get("code"))
 
 
 def get_discount_source(doc):

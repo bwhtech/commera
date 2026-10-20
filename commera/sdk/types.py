@@ -146,11 +146,8 @@ class Discount(DiscountInput, total=False):
 
 
 class DiscountAllocation(TypedDict):
-	# The Commera Discount, or None for an app's cart_discounts entry.
-	discount: str | None
+	discount: str
 	code: str | None
-	# The app whose cart_discounts hook gave it; None for a merchant's discount.
-	app: str | None
 	title: str
 	# Product, Order or Shipping.
 	discount_class: str

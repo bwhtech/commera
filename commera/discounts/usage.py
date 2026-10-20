@@ -42,9 +42,6 @@ def record_discount_uses(sales_order, method=None):
 	"""Log each discount a placed order used. Counts, budgets and once-per-customer read this log."""
 	amounts = {}
 	for allocation in get_allocations(sales_order):
-		# An app's cart discount is the app's own to count; it has no Commera Discount behind it.
-		if not allocation.get("discount"):
-			continue
 		key = (allocation["discount"], allocation.get("code"))
 		amounts[key] = amounts.get(key, 0) + flt(allocation["amount"])
 

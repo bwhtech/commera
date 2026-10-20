@@ -220,7 +220,7 @@ def get_code_reason(discount, cart, code: str) -> str:
 
 def get_automatic_discounts(quotation) -> list[dict]:
 	return [
-		{"title": row["title"], "amount": row["amount"], "app": row.get("app")}
+		{"title": row["title"], "amount": row["amount"]}
 		for row in get_allocations(quotation)
 		if not row.get("code")
 	]

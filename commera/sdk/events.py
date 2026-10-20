@@ -19,7 +19,6 @@ HANDLER_HOOKS = {
 		"validate_cart",
 		"validate_discount_code",
 		"cart_fees",
-		"cart_discounts",
 		"delivery_options",
 		"payment_methods",
 	),

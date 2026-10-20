@@ -131,32 +131,15 @@ A cart link `/en/cart/<item_code>:<qty>,...` takes two more options:
 
 | Name | Kind | What it does |
 | --- | --- | --- |
-| `cart_discounts` | `commera_hooks`, synchronous | Returns `[{"title", "amount", "line"?}]` for the cart. With `line` (a row `idx`) it is a product discount; without, it comes off the order. Called on store carts only; orders and invoices keep what the cart got. |
 | `validate_discount_code` | `commera_hooks`, synchronous | Takes `(quotation, code)` and returns a refusal message or `None`. A refused code cannot be added, is skipped while the cart changes, and at checkout is removed: the shopper sees the message and the new total instead of a refused cart. |
 | `cart_created` | `commera_events` | A Commera Cart was created. Logged only when an app listens, because most guest carts never reach checkout. |
 | `discount_used` | `commera_events` | One per discount on a placed order, with the order snapshot plus `discount`, `code` and `amount`. |
 
-```python
-# hooks.py
-commera_hooks = {"cart_discounts": ["my_app.discounts.loyalty"]}
-
-
-# my_app/discounts.py
-def loyalty(quotation):
-	if quotation.get("my_app_member_tier") != "gold":
-		return []
-	first_line = quotation.items[0]
-	return [
-		{"title": "Gold members: 5% off", "amount": first_line.amount * 0.05, "line": first_line.idx},
-		{"title": "Free gift wrap", "amount": 49},
-	]
-```
-
-App discounts compete with the merchant's product discounts for a line (the best one wins), and add to the order discounts. A failing handler is left out on a cart edit and blocks checkout, like `cart_fees`.
+Apps do not add discounts to a cart directly. An app that gives money off, such as loyalty points, creates a Commera Discount with `discounts.create_discount`, makes a single-use code with `discounts.generate_codes` and applies it with `cart.add_discount_code`.
 
 What plugins can read and set:
 
-- `cart.get_cart()`, `cart.get_priced_cart()` and `orders.get_order()` return `discounts` (one row per discount, with `app` set for an app's) and `attributes`. Each line has `discount` and `attributes`.
+- `cart.get_cart()`, `cart.get_priced_cart()` and `orders.get_order()` return `discounts` (one row per discount) and `attributes`. Each line has `discount` and `attributes`.
 - `order_placed` and the other order events carry `discounts` in their order snapshot.
 - `cart.set_cart_attributes({...})` sets cart-level attributes, for example the campaign that brought the shopper. They reach the Quotation, Sales Order and Sales Invoice as `custom_cart_attributes`.
 - `cart.set_cart_fields({...})` now also works before checkout, for a guest too: the fields wait on the server cart and reach the Quotation at checkout.
