@@ -1,8 +1,10 @@
 import frappe
+from frappe import _
 from frappe.query_builder.functions import Count, Sum
-from frappe.utils.data import flt
+from frappe.utils.data import cint, flt
 
 from commera.discounts.allocations import get_allocations
+from commera.discounts.cart_context import get_cart_context
 from commera.plugin_events import fire_event
 
 
@@ -36,6 +38,23 @@ def is_first_order(cart) -> bool:
 	if cart.doc.doctype == "Sales Order" and cart.doc.name:
 		query = query.where(sales_order.name != cart.doc.name)
 	return not query.run()
+
+
+def validate_amended_discount_uses(sales_order, method=None):
+	"""An amended order uses its codes again; one that another order used up after the cancel is refused."""
+	if not sales_order.amended_from:
+		return
+	cart = get_cart_context(sales_order)
+	for discount_name, code in {(row["discount"], row.get("code")) for row in get_allocations(sales_order)}:
+		discount = frappe.get_cached_doc("Commera Discount", discount_name)
+		label = code or discount.title
+		if code and frappe.get_cached_value("Commera Discount Code", code, "is_generated"):
+			if frappe.db.exists("Commera Discount Use", {"code": code}):
+				frappe.throw(_("{0} is a single-use code and another order has used it.").format(label))
+		if discount.once_per_customer and has_used_before(discount_name, cart):
+			frappe.throw(_("This customer has already used {0} on another order.").format(label))
+		if discount.usage_limit and cint(discount.times_used) >= cint(discount.usage_limit):
+			frappe.throw(_("{0} has been used up by other orders.").format(label))
 
 
 def record_discount_uses(sales_order, method=None):

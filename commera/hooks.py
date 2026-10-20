@@ -141,6 +141,7 @@ doc_events = {
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 	},
 	"Sales Order": {
+		"before_insert": "commera.discounts.usage.validate_amended_discount_uses",
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 		"after_insert": [
