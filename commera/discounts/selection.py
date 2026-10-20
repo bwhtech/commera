@@ -48,8 +48,8 @@ def validate_new_discount_code(code: str, codes: list[str]) -> str:
 	discount = get_discount(discount_name)
 	discount.validate_usable()
 	for applied_code in codes:
-		applied = get_discount(get_code_discount(applied_code))
-		if not discount.can_combine_with(applied):
+		applied_name = get_code_discount(applied_code)
+		if applied_name and not discount.can_combine_with(get_discount(applied_name)):
 			frappe.throw(_("{0} cannot be combined with {1}.").format(code, applied_code), DiscountCodeError)
 	return code
 

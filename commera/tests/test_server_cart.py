@@ -226,6 +226,33 @@ class TestServerCart(DiscountCodeTestCase):
 
 		self.assertIn("Nothing in your cart qualifies", state["reason"])
 
+	def test_a_deleted_or_renamed_code_drops_off_with_a_message(self):
+		deleted = self.create_code(amount=10)
+		renamed = self.create_code(amount=5, combines_with_order=1)
+		frappe.db.set_value("Commera Discount", get_code_discount(deleted), "combines_with_order", 1)
+		kept = self.create_code(amount=3, combines_with_order=1)
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
+		cart_sdk.add_discount_code(deleted)
+		cart_sdk.add_discount_code(renamed)
+		frappe.set_user("Administrator")
+		frappe.delete_doc("Commera Discount Code", deleted, force=True)
+		frappe.rename_doc("Commera Discount Code", renamed, f"{renamed}NEW", force=True)
+		frappe.set_user(self.shopper)
+
+		priced = cart_sdk.get_priced_cart()
+
+		self.assertEqual(
+			[(state["code"], state["applied"]) for state in priced["discount_codes"]],
+			[(deleted, False), (renamed, False)],
+		)
+		self.assertIn("no longer a valid", priced["discount_codes"][0]["reason"])
+		self.assertEqual(priced["total"], SHIRT_RATE)
+
+		priced = cart_sdk.add_discount_code(kept)
+
+		self.assertEqual([state["code"] for state in priced["discount_codes"]], [kept])
+		self.assertEqual(priced["total"], SHIRT_RATE - 3)
+
 	def test_checkout_without_a_server_cart_is_unchanged(self):
 		quotation = generate_quotation_for_cart({"items": [self.browser_line(self.cap, 2)]})
 
