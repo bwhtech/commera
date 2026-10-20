@@ -271,3 +271,16 @@ def get_session_cart(create: bool = False) -> CommeraCart | None:
 	else:
 		cart.user = frappe.session.user
 	return cart
+
+
+def clear_ordered_cart(quotation, shopper: str | None):
+	"""Codes and attributes belong to the order just placed; left on the cart, the next order would get them.
+	`modified` stays, so the browser's next sync is not a version conflict."""
+	cart = frappe.qb.DocType("Commera Cart")
+	if quotation.custom_guest_cart_key:
+		condition = cart.cart_key == quotation.custom_guest_cart_key
+	elif shopper:
+		condition = cart.user == shopper
+	else:
+		return
+	frappe.qb.update(cart).set(cart.discount_codes, None).set(cart.attributes, None).where(condition).run()

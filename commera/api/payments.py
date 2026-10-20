@@ -28,7 +28,7 @@ from commera.checkout_hooks import (
 	get_cart_refusal,
 	get_discount_code_refusal,
 )
-from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
+from commera.commera_ecommerce.doctype.commera_cart.commera_cart import clear_ordered_cart, get_session_cart
 from commera.core import _get_cart_quotation, create_party, get_customer_contact, new_cart_quotation
 from commera.discounts.selection import get_discount_codes
 from commera.guest import (
@@ -403,6 +403,7 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 
 	# Outside the switch: log_purchase stamps frappe.session.user, so Administrator would own every purchase.
 	stamp_order_owner(sales_order, shopper)
+	clear_ordered_cart(quotation, shopper)
 	log_purchase(sales_order)
 	fire_event("order_placed", "Sales Order", sales_order.name)
 	if paid:
@@ -826,6 +827,7 @@ def place_cod_order(quotation_name: str):
 
 	# COD orders count as purchases even while the Sales Order stays draft.
 	stamp_order_owner(sales_order, shopper)
+	clear_ordered_cart(quotation, shopper)
 	log_purchase(sales_order)
 	fire_event("order_placed", "Sales Order", sales_order.name)
 	return sales_order

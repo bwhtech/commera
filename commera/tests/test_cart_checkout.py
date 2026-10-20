@@ -29,7 +29,9 @@ from commera.api.shipping import (
 	get_order_charge_lines,
 	set_delivery_option,
 )
+from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.core import _get_cart_quotation
+from commera.sdk import cart as cart_sdk
 from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.utils import get_available_stocks, get_pickup_addresses
 from commera.www.cart.checkout import get_context as get_checkout_context
@@ -374,6 +376,23 @@ class TestCartCheckout(IntegrationTestCase):
 		self.assertEqual(
 			get_order_charge_lines(sales_order.name, sales_order.shipping_rule)["taxes"],
 			[{"description": TAX_DESCRIPTION, "amount": 48.6}],
+		)
+
+	def test_a_placed_order_clears_the_codes_and_attributes_from_the_cart(self):
+		ensure_fiscal_year()
+		frappe.set_user(self.shopper)
+		cart_sdk.set_cart_attributes({"gift_message": "Happy birthday"})
+		cart = get_session_cart()
+		frappe.db.set_value("Commera Cart", cart.name, "discount_codes", "ZZUNKNOWN", update_modified=False)
+		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
+		update_quotation_address(self.address_payload())
+
+		initiate_checkout_with_mode(COD_PAYMENT_MODE)
+		confirm_payment(_get_cart_quotation().name, payment_mode=COD_PAYMENT_MODE)
+
+		self.assertEqual(
+			frappe.db.get_value("Commera Cart", cart.name, ["discount_codes", "attributes", "modified"]),
+			(None, None, cart.modified),
 		)
 
 	def test_a_pickup_summary_drops_the_charges_without_saving_that(self):
