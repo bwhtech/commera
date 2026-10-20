@@ -638,6 +638,35 @@ class TestDiscountsOnOrders(DiscountCodeTestCase):
 			.name
 		)
 
+	def test_the_campaign_tags_the_order_and_the_account_books_the_discount(self):
+		frappe.db.set_single_value("Selling Settings", "enable_discount_accounting", 1)
+		campaign = frappe.get_doc(
+			{"doctype": "UTM Campaign", "__newname": f"ZZ Campaign {frappe.generate_hash(length=6)}"}
+		).insert(ignore_permissions=True)
+		sales_order_company = frappe.get_cached_doc("Commera Settings").get("company")
+		account = frappe.get_all(
+			"Account",
+			filters={"is_group": 0, "root_type": "Expense", "company": sales_order_company or ["is", "set"]},
+			pluck="name",
+			limit=1,
+		)[0]
+		code = self.create_code(
+			percentage=10, item_codes=(self.shirt,), campaign=campaign.name, discount_account=account
+		)
+		sales_order = self.place_order(self.create_quotation({self.shirt: 1, self.cap: 1}, (code,)))
+		sales_order.submit()
+
+		sales_invoice = self.create_invoice(sales_order)
+
+		self.assertEqual(
+			(sales_order.utm_campaign, sales_invoice.utm_campaign), (campaign.name, campaign.name)
+		)
+		self.assertEqual(self.get_line(sales_invoice, self.shirt).discount_account, account)
+		debit = frappe.get_all(
+			"GL Entry", filters={"voucher_no": sales_invoice.name, "account": account}, pluck="debit"
+		)
+		self.assertEqual(sum(debit), 9)
+
 	def create_invoice(self, sales_order, item_code: str | None = None, qty: int | None = None):
 		sales_invoice = make_sales_invoice(sales_order.name)
 		if item_code:
