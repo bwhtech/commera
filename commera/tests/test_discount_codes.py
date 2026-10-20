@@ -512,6 +512,35 @@ class TestDiscountsOnOrders(DiscountCodeTestCase):
 
 		self.assertEqual(cap_return.net_total, 0)
 
+	def test_an_amended_order_cannot_reuse_a_code_another_order_used_up(self):
+		for limit in ("single use", "once per customer", "usage limit"):
+			with self.subTest(limit):
+				discount = self.create_discount(
+					amount=10, once_per_customer=int(limit == "once per customer"), usage_limit=1
+				)
+				code = (
+					generate_codes(discount, 1)[0]
+					if limit == "single use"
+					else add_code(discount, f"zz{frappe.generate_hash(length=8)}")
+				)
+				cancelled = self.place_order(self.create_quotation({self.shirt: 1}, (code,)))
+				cancelled.submit()
+				cancelled.cancel()
+				reorder = self.place_order(self.create_quotation({self.shirt: 1}, (code,)))
+				self.assertEqual(reorder.custom_code_order_discount, 10)
+
+				with self.assertRaisesRegex(frappe.ValidationError, "another order|used up"):
+					self.amend(cancelled)
+
+				reorder.delete()
+				self.assertEqual(self.amend(cancelled).custom_code_order_discount, 10)
+
+	def amend(self, sales_order):
+		amended = frappe.copy_doc(sales_order)
+		amended.amended_from = sales_order.name
+		amended.docstatus = 0
+		return amended.insert(ignore_permissions=True)
+
 	def test_in_words_and_the_payment_schedule_follow_the_discounted_total(self):
 		self.customer.db_set("payment_terms", self.create_payment_terms())
 		code = self.create_code(amount=10)
