@@ -180,6 +180,41 @@ def apply_recorded_discounts(doc):
 	allocations += [row for row in recorded if row["discount_class"] == SHIPPING]
 	set_allocations(doc, allocations)
 	set_amounts_from_grand_total(doc)
+	set_discount_links(doc, allocations)
+
+
+def set_discount_links(doc, allocations: list[dict]):
+	"""Tag the document with its discount's campaign, unless staff chose another, and book the discounts to
+	their accounts for ERPNext's discount accounting."""
+	discounts = {
+		discount.name: discount
+		for discount in frappe.get_all(
+			"Commera Discount",
+			filters={"name": ["in", list({row["discount"] for row in allocations})]},
+			fields=["name", "campaign", "discount_account"],
+		)
+	}
+	if not doc.get("utm_campaign"):
+		doc.utm_campaign = next(
+			(
+				discounts[row["discount"]].campaign
+				for row in allocations
+				if discounts.get(row["discount"], {}).get("campaign")
+			),
+			None,
+		)
+	if doc.doctype != "Sales Invoice":
+		return
+	for item in doc.items:
+		if account := discounts.get(item.get("custom_discount_code"), {}).get("discount_account"):
+			item.discount_account = account
+	order_accounts = {
+		discounts[row["discount"]].discount_account
+		for row in allocations
+		if row["discount_class"] == ORDER and discounts.get(row["discount"], {}).get("discount_account")
+	}
+	if len(order_accounts) == 1 and not doc.get("additional_discount_account"):
+		doc.additional_discount_account = order_accounts.pop()
 
 
 def set_amounts_from_grand_total(doc):

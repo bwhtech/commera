@@ -344,7 +344,7 @@ def get_editor_options() -> dict:
 		"customer_groups": frappe.get_all(
 			"Customer Group", filters={"is_group": 0}, pluck="name", order_by="name"
 		),
-		"campaigns": frappe.get_all("Campaign", pluck="name", order_by="name"),
+		"campaigns": frappe.get_all("UTM Campaign", pluck="name", order_by="name"),
 		"discount_accounts": frappe.get_all(
 			"Account",
 			filters={"company": company, "is_group": 0, "disabled": 0},

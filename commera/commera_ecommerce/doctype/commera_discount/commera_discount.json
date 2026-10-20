@@ -421,7 +421,7 @@
 			"fieldname": "campaign",
 			"fieldtype": "Link",
 			"label": "Campaign",
-			"options": "Campaign"
+			"options": "UTM Campaign"
 		},
 		{
 			"fieldname": "column_break_reporting",
