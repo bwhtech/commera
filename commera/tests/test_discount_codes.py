@@ -1,7 +1,7 @@
 import frappe
 from erpnext.controllers.sales_and_purchase_return import make_return_doc
 from frappe.tests import IntegrationTestCase
-from frappe.utils.data import add_days, today
+from frappe.utils.data import add_days, money_in_words, today
 
 from commera.api.payments import _make_sales_order, make_sales_invoice
 from commera.commera_ecommerce.doctype.commera_discount.commera_discount import DiscountCodeError
@@ -466,6 +466,45 @@ class TestDiscountsOnOrders(DiscountCodeTestCase):
 		cap_return = self.create_return(sales_invoice, self.cap)
 
 		self.assertEqual(cap_return.net_total, 0)
+
+	def test_in_words_and_the_payment_schedule_follow_the_discounted_total(self):
+		self.customer.db_set("payment_terms", self.create_payment_terms())
+		code = self.create_code(amount=10)
+		quotation = self.create_quotation({self.shirt: 2}, (code,))
+		sales_order = self.place_order(quotation)
+		sales_order.submit()
+		sales_invoice = self.create_invoice(sales_order)
+
+		for doc in (quotation, sales_order, sales_invoice):
+			self.assertEqual(doc.grand_total, 170)
+			self.assertEqual(doc.in_words, money_in_words(170, doc.currency))
+		for doc in (quotation, sales_order, sales_invoice):
+			self.assertEqual([row.payment_amount for row in doc.payment_schedule], [85, 85])
+
+	def create_payment_terms(self) -> str:
+		terms = []
+		for credit_days in (0, 30):
+			term = frappe.get_doc(
+				{
+					"doctype": "Payment Term",
+					"payment_term_name": f"ZZ {frappe.generate_hash(length=8)}",
+					"invoice_portion": 50,
+					"due_date_based_on": "Day(s) after invoice date",
+					"credit_days": credit_days,
+				}
+			).insert(ignore_permissions=True)
+			terms.append({"payment_term": term.name, "invoice_portion": 50, "credit_days": credit_days})
+		return (
+			frappe.get_doc(
+				{
+					"doctype": "Payment Terms Template",
+					"template_name": f"ZZ Half Now {frappe.generate_hash(length=8)}",
+					"terms": terms,
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
 
 	def create_invoice(self, sales_order, item_code: str | None = None, qty: int | None = None):
 		sales_invoice = make_sales_invoice(sales_order.name)
