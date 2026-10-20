@@ -100,9 +100,12 @@ async function save() {
   }
 }
 
+// Saves the switch alone, so flipping it never publishes edits still waiting for Save.
 async function toggleEnabled(enabled) {
-  discount.value.enabled = enabled ? 1 : 0
-  if (!isNew.value) await save()
+  const saved = await saveDiscount({ name: discount.value.name, enabled: enabled ? 1 : 0 })
+  if (!saved) return
+  Object.assign(discount.value, { enabled: saved.enabled, status: saved.status })
+  toast.success(saved.enabled ? 'Discount switched on' : 'Discount switched off')
 }
 
 function remove() {
