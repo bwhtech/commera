@@ -106,10 +106,13 @@
             },
             async fetch_detail_for_cart() {
                 try {
+                    // The server cart can replace the items while this waits; those lines bring their own prices.
+                    const requested = new Set(this.items.map(item => `${item.variant.item_code}`));
                     const data = await frappe_call("/api/v2/method/commera.api.cart.get_detail_for_cart_items", { items: this.items });
                     const stock_data = data.data.stock_data || {};
                     this.items.forEach(item => {
                         const key = `${item.variant.item_code}`;
+                        if (!requested.has(key)) return;
                         item.stock_qty = stock_data[key] !== undefined ? stock_data[key]["stock"] : 0;
                         item.price = stock_data[key] !== undefined ? stock_data[key]["sale_price"] : 0;
                         item.default_price = stock_data[key] !== undefined ? stock_data[key]["default_price"] : 0;
