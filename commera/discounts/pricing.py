@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from frappe.utils.data import flt
 
 from commera.commera_ecommerce.doctype.commera_discount.commera_discount import ORDER, PRODUCT, SHIPPING
@@ -32,8 +33,26 @@ def remove_code_discounts(doc, method=None):
 			item.custom_discount_code = None
 
 	if flt(doc.get("custom_code_order_discount")):
+		if keep_lines:
+			validate_order_discount_edit(doc)
 		doc.discount_amount = max(flt(doc.discount_amount) - flt(doc.custom_code_order_discount), 0)
 	doc.custom_code_order_discount = 0
+
+
+def validate_order_discount_edit(doc):
+	"""Staff editing a placed order's Additional Discount Amount see the code discount inside it; a lower
+	figure would quietly lose their change, because the code discount comes back on."""
+	previous = doc.get_doc_before_save()
+	code_discount = flt(doc.custom_code_order_discount)
+	if not previous or flt(previous.discount_amount) == flt(doc.discount_amount):
+		return
+	if flt(doc.discount_amount) < code_discount:
+		frappe.throw(
+			_(
+				"Additional Discount Amount includes {0} from discount codes, so it cannot be less than that. "
+				"To give more off, enter {0} plus the extra amount."
+			).format(frappe.format_value(code_discount, {"fieldtype": "Currency"}, currency=doc.currency))
+		)
 
 
 def apply_code_discounts(doc, method=None):

@@ -495,6 +495,21 @@ class TestDiscountsOnOrders(DiscountCodeTestCase):
 		sales_order.save()
 		self.assertEqual(sales_order.net_total, 81)
 
+	def test_staff_add_goodwill_on_top_of_the_order_code(self):
+		code = self.create_code(amount=10)
+		sales_order = self.place_order(self.create_quotation({self.shirt: 2}, (code,)))
+		self.assertEqual(sales_order.discount_amount, 10)
+
+		sales_order.discount_amount = 5
+		with self.assertRaisesRegex(frappe.ValidationError, "includes .*10.* from discount codes"):
+			sales_order.save()
+
+		sales_order.reload()
+		sales_order.discount_amount = 15
+		sales_order.save()
+		self.assertEqual((sales_order.discount_amount, sales_order.custom_code_order_discount), (15, 10))
+		self.assertEqual(sales_order.net_total, 2 * SHIRT_RATE - 15)
+
 	def test_partial_invoices_add_up_to_the_order_discount(self):
 		product = self.create_code(amount=9, item_codes=(self.shirt,), combines_with_order=1)
 		order = self.create_code(amount=10, combines_with_product=1)
