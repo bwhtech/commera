@@ -32,6 +32,7 @@ from commera.api.analytics_dashboard import (
 	in_window,
 	is_provider_configured,
 )
+from commera.discounts.allocations import get_allocations
 
 ANALYTICS_SETTINGS_DOCTYPE = "Analytics Settings"
 
@@ -48,6 +49,8 @@ PLAIN_FIELDS = (
 SECRET_FIELDS = ("ga4_service_account_json", "fb_access_token")
 
 SCRIPT_FIELDS = ("title", "enabled", "script")
+
+TOP_DISCOUNTS_LIMIT = 5
 
 
 def get_analytics_settings_doc():
@@ -247,6 +250,8 @@ def get_revenue_report(months: int = REPORT_MONTHS_DEFAULT):
 			sales_order.transaction_date,
 			sales_order.base_grand_total,
 			sales_order.base_discount_amount,
+			sales_order.conversion_rate,
+			sales_order.custom_discount_allocations,
 		)
 		.where(is_webshop_order(sales_order))
 		.where(sales_order.transaction_date >= start)
@@ -303,6 +308,33 @@ def get_revenue_report(months: int = REPORT_MONTHS_DEFAULT):
 			},
 			"refunds": {"value": total_refunds, "previous": previous["refunds"]},
 		},
+		"discounts": get_discount_summary(order_rows),
+	}
+
+
+def get_discount_summary(order_rows) -> dict:
+	"""What each code and automatic discount took off the window's orders, as billed on the orders."""
+	given, orders, by_label = 0.0, 0, {}
+	for row in order_rows:
+		allocations = get_allocations(row)
+		if not allocations:
+			continue
+		orders += 1
+		labels_on_order = set()
+		for allocation in allocations:
+			amount = flt(allocation.get("amount")) * (flt(row.conversion_rate) or 1)
+			label = allocation.get("code") or allocation.get("title")
+			given += amount
+			entry = by_label.setdefault(label, {"label": label, "given": 0.0, "orders": 0})
+			entry["given"] += amount
+			if label not in labels_on_order:
+				entry["orders"] += 1
+				labels_on_order.add(label)
+	top = sorted(by_label.values(), key=lambda entry: entry["given"], reverse=True)[:TOP_DISCOUNTS_LIMIT]
+	return {
+		"given": flt(given, 2),
+		"orders": orders,
+		"top": [{**entry, "given": flt(entry["given"], 2)} for entry in top],
 	}
 
 

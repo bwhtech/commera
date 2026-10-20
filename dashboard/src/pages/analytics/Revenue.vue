@@ -26,6 +26,7 @@ const reportRequest = useAdminRead('analytics.get_revenue_report', {
 
 const months = computed(() => reportRequest.data?.months ?? [])
 const totals = computed(() => reportRequest.data?.stats ?? {})
+const discounts = computed(() => reportRequest.data?.discounts ?? { given: 0, orders: 0, top: [] })
 
 function delta(stat) {
   if (!stat || !stat.previous) return null
@@ -115,6 +116,39 @@ const noRevenueState = {
         </div>
       </section>
     </div>
+
+    <section class="mt-6 rounded-5 border border-outline-gray-1">
+      <div class="flex flex-wrap items-baseline justify-between gap-x-3 px-4 py-3">
+        <h2 class="text-lg-semibold text-ink-gray-8">Discounts</h2>
+        <span v-if="discounts.orders" class="text-sm text-ink-gray-5 tabular-nums">
+          {{ money(discounts.given) }} given on {{ discounts.orders }} {{ discounts.orders === 1 ? 'order' : 'orders' }}
+        </span>
+      </div>
+      <div class="px-2 pb-2">
+        <List :columns="['minmax(0,1fr)', '6rem', '8rem']" :row-height="Math.max(ia.density, 44)">
+          <ListHeader>
+            <ListHeaderCell>Discount</ListHeaderCell>
+            <ListHeaderCell>Orders</ListHeaderCell>
+            <ListHeaderCell>Given</ListHeaderCell>
+          </ListHeader>
+          <ListSkeleton v-if="reportRequest.loading && !reportRequest.data" :columns="3" />
+          <ListRows v-else :items="discounts.top" row-key="label" v-slot="{ item }">
+            <ListRow :value="item.label">
+              <ListCell><span class="truncate text-base text-ink-gray-8">{{ item.label }}</span></ListCell>
+              <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ item.orders }}</span></ListCell>
+              <ListCell><span class="text-base text-ink-gray-7 tabular-nums">{{ money(item.given) }}</span></ListCell>
+            </ListRow>
+          </ListRows>
+        </List>
+        <EmptyState
+          v-if="!reportRequest.loading && !discounts.top.length"
+          compact
+          icon="lucide-ticket-percent"
+          title="No discounts in this period"
+          description="Orders that use a code or an automatic discount show up here."
+        />
+      </div>
+    </section>
 
     <section class="mt-6 rounded-5 border border-outline-gray-1">
       <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">By month</h2>
