@@ -136,10 +136,14 @@ def get_discounts(
 
 def get_tab_condition(discount, tab: str):
 	day = getdate(today())
-	if tab == "active":
+	if tab in ("active", "used_up"):
 		started = discount.starts_on.isnull() | (discount.starts_on <= day)
 		running = discount.ends_on.isnull() | (discount.ends_on >= day)
-		return (discount.enabled == 1) & started & running
+		used_up = ((discount.usage_limit > 0) & (discount.times_used >= discount.usage_limit)) | (
+			(discount.budget > 0) & (discount.discount_given >= discount.budget)
+		)
+		live = (discount.enabled == 1) & started & running
+		return live & used_up if tab == "used_up" else live & used_up.negate()
 	if tab == "scheduled":
 		return (discount.enabled == 1) & (discount.starts_on > day)
 	if tab == "expired":
