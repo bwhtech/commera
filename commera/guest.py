@@ -38,6 +38,10 @@ def set_guest_cart_cookie() -> str:
 	return sha256_hash(token)
 
 
+def clear_guest_cart_cookie():
+	frappe.local.cookie_manager.delete_cookie(GUEST_CART_COOKIE)
+
+
 def get_guest_cart_name(cart_key: str | None = None) -> str | None:
 	cart_key = cart_key or get_guest_cart_key()
 	if not cart_key:

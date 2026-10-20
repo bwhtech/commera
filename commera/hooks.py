@@ -92,6 +92,7 @@ website_route_rules = [
 ]
 
 before_request = ["commera.utils.before_request"]
+on_session_creation = "commera.commera_ecommerce.doctype.commera_cart.commera_cart.keep_guest_cart"
 
 # Runs before every core renderer (frappe/website/path_resolver.py); can_render() opts out when no theme.
 page_renderer = ["commera.shop_themes.theme_resolver.ThemePageRenderer"]

@@ -72,7 +72,7 @@ sequenceDiagram
   S-->>B: conflict + server lines, v4 (nothing written)
 ```
 
-At checkout, quantities come from the browser, so a shopper can check out only the selected lines. The server cart adds each line's attributes and the codes. A code applied or removed while checkout is open goes onto its Quotation too.
+At sign-in, a guest's server cart becomes the account's cart, or its lines, codes and attributes join the account cart when there is one. At checkout, quantities come from the browser, so a shopper can check out only the selected lines. The server cart adds each line's attributes and the codes. A code applied or removed while checkout is open goes onto its Quotation too.
 
 ## Dashboard
 
@@ -158,5 +158,5 @@ Custom fields on Quotation, Sales Order and Sales Invoice (and their items) reco
 ## Not done yet
 
 - Usage limits are checked when a code is applied and when the cart is priced. Two orders placed at the same moment can both take the last use.
-- The browser cart does not show line attributes, and a guest cart does not merge into the account cart at sign-in.
+- The browser cart does not show line attributes.
 - No job removes old guest carts yet.

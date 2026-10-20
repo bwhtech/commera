@@ -1,10 +1,18 @@
 import frappe
+from frappe.auth import CookieManager
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request
 
 from commera.api.payments import generate_quotation_for_cart
 from commera.api.server_cart import apply_discount_code, remove_discount_code, sync_server_cart
-from commera.commera_ecommerce.doctype.commera_cart.commera_cart import MAX_LINE_QUANTITY, get_session_cart
+from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
+	MAX_LINE_QUANTITY,
+	get_session_cart,
+	keep_guest_cart,
+)
 from commera.core import _get_cart_quotation
 from commera.discounts.codes import get_code_discount
+from commera.guest import GUEST_CART_COOKIE
 from commera.sdk import cart as cart_sdk
 from commera.tests.test_discount_codes import CAP_RATE, SHIRT_RATE, DiscountCodeTestCase
 
@@ -88,6 +96,48 @@ class TestServerCart(DiscountCodeTestCase):
 
 		with self.assertRaisesRegex(frappe.ValidationError, "at most"):
 			cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
+
+	def test_sign_in_makes_the_guest_cart_the_account_cart(self):
+		code = self.create_code(amount=10)
+		self.use_guest_cart()
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
+		cart_sdk.add_discount_code(code)
+
+		frappe.set_user(self.shopper)
+		keep_guest_cart()
+
+		cart = get_session_cart()
+		self.assertEqual([(row.item_code, row.qty) for row in cart.lines], [(self.shirt, 1)])
+		self.assertEqual(cart.discount_codes, code)
+		self.assertIsNone(cart.cart_key)
+		self.assertIn(GUEST_CART_COOKIE, frappe.local.cookie_manager.to_delete)
+
+	def test_sign_in_merges_the_guest_cart_into_the_account_cart(self):
+		code = self.create_code(amount=10)
+		cart_sdk.add_lines([{"item_code": self.cap, "qty": 1}])
+		account_cart = get_session_cart().name
+		self.use_guest_cart()
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 2}])
+		cart_sdk.add_discount_code(code)
+		guest_cart = get_session_cart().name
+
+		frappe.set_user(self.shopper)
+		keep_guest_cart()
+
+		cart = get_session_cart()
+		self.assertEqual(cart.name, account_cart)
+		self.assertEqual({(row.item_code, row.qty) for row in cart.lines}, {(self.cap, 1), (self.shirt, 2)})
+		self.assertEqual(cart.discount_codes, code)
+		self.assertFalse(frappe.db.exists("Commera Cart", guest_cart))
+
+	def use_guest_cart(self):
+		token = frappe.generate_hash(length=32)
+		frappe.local.request = Request(
+			EnvironBuilder(path="/", headers={"Cookie": f"{GUEST_CART_COOKIE}={token}"}).get_environ()
+		)
+		self.addCleanup(delattr, frappe.local, "request")
+		frappe.local.cookie_manager = CookieManager()
+		frappe.set_user("Guest")
 
 	def test_the_priced_cart_shows_line_and_order_discounts(self):
 		product = self.create_code(percentage=10, item_codes=(self.shirt,), combines_with_order=1)

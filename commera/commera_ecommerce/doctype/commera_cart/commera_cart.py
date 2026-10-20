@@ -15,7 +15,7 @@ from commera.discounts.selection import (
 	get_unmet_reason,
 	validate_new_discount_code,
 )
-from commera.guest import get_guest_cart_key, is_guest, set_guest_cart_cookie
+from commera.guest import clear_guest_cart_cookie, get_guest_cart_key, is_guest, set_guest_cart_cookie
 from commera.plugin_events import fire_event, get_handlers
 
 MAX_CART_LINES = 50
@@ -284,3 +284,43 @@ def clear_ordered_cart(quotation, shopper: str | None):
 	else:
 		return
 	frappe.qb.update(cart).set(cart.discount_codes, None).set(cart.attributes, None).where(condition).run()
+
+
+def keep_guest_cart(login_manager=None):
+	"""On sign-in, the cart built as a guest becomes the account's cart, or joins it when the account has one.
+	A cart that cannot be merged is logged, never a reason to refuse the sign-in."""
+	cart_key = get_guest_cart_key()
+	guest_cart_name = cart_key and frappe.db.get_value("Commera Cart", {"cart_key": cart_key}, "name")
+	if not guest_cart_name or is_guest():
+		return
+	frappe.db.savepoint("keep_guest_cart")
+	try:
+		guest_cart = frappe.get_doc("Commera Cart", guest_cart_name, for_update=True)
+		account_cart = get_session_cart()
+		if account_cart:
+			merge_carts(guest_cart, account_cart)
+		else:
+			guest_cart.update({"user": frappe.session.user, "cart_key": None})
+			guest_cart.save(ignore_permissions=True)
+	except Exception:
+		frappe.db.rollback(save_point="keep_guest_cart")
+		frappe.log_error(title=f"Could not keep the guest cart {guest_cart_name} on sign-in")
+	clear_guest_cart_cookie()
+
+
+def merge_carts(guest_cart: CommeraCart, account_cart: CommeraCart):
+	account_cart.add_lines(
+		[
+			{"item_code": row.item_code, "qty": row.qty, "attributes": parse_attributes(row.attributes)}
+			for row in guest_cart.lines
+		]
+	)
+	account_cart.set_attributes(parse_attributes(guest_cart.attributes))
+	for code in get_discount_codes(guest_cart):
+		try:
+			account_cart.add_discount_code(code)
+		except frappe.ValidationError:
+			# A code the account cart refuses, such as one that does not combine with its own, is left behind.
+			frappe.clear_last_message()
+	account_cart.save(ignore_permissions=True)
+	frappe.delete_doc("Commera Cart", guest_cart.name, ignore_permissions=True, force=True)
