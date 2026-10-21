@@ -58,7 +58,7 @@
 															</span>
 														</div>
 													</div>
-													<h6 class="dz-price mb-0">{{ get_currency_symbol() }}<span x-text="(cart_item.price * cart_item.qty).toFixed(2)"></span></h6>
+													<h6 class="dz-price mb-0">{{ get_currency_symbol() }}<span x-text="($store.cart.price_of(cart_item) * cart_item.qty).toFixed(2)"></span></h6>
 												</div>
 											</div>
 											<a href="javascript:void(0);" class="dz-close"

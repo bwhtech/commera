@@ -65,10 +65,10 @@
 												x-text="{% if language == 'en' %}cart_item.variant.item_name{% else %}cart_item.variant.item_name_ar || cart_item.variant.item_name{% endif %}"></a>
 										</td>
 										<td class="product-item-price">
-											<template x-if="cart_item.default_price && cart_item.default_price !== cart_item.price">
+											<template x-if="cart_item.default_price && parseFloat(cart_item.default_price) !== $store.cart.price_of(cart_item)">
 												<span>{{ currency_symbol }}<span x-text="format_amount(cart_item.default_price)"></span></span>
 											</template>
-											<strong>{{ currency_symbol }}<span x-text="format_amount(cart_item.price)"></span></strong>
+											<strong>{{ currency_symbol }}<span x-text="format_amount($store.cart.price_of(cart_item))"></span></strong>
 										</td>
 										<td class="product-item-quantity">
 											{# Written out by hand with bootstrap-touchspin's own class names, so style.css still shapes it. #}
@@ -88,7 +88,7 @@
 											</div>
 										</td>
 										<td class="product-item-totle">
-											{{ currency_symbol }}<span x-text="format_amount(cart_item.price * cart_item.qty)"></span>
+											{{ currency_symbol }}<span x-text="format_amount($store.cart.price_of(cart_item) * cart_item.qty)"></span>
 										</td>
 										<td class="product-item-close">
 											<a href="javascript:void(0);" aria-label="{{ _('Remove') }}"

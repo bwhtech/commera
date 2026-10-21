@@ -57,6 +57,14 @@
             get saved() {
                 return this.discounts.reduce((sum, discount) => sum + discount.amount, 0);
             },
+            // Quantity breaks and other pricing rules are known only to the server. Codes are left on, as they show as rows.
+            price_of(cart_item) {
+                const is_current = this.priced && this.priced.version === this.version;
+                const lines = is_current ? this.priced.lines.filter(line => line.item_code === cart_item.variant.item_code) : [];
+                const qty = lines.reduce((sum, line) => sum + line.qty, 0);
+                if (!qty || qty !== cart_item.qty) return parseFloat(cart_item.price) || 0;
+                return lines.reduce((sum, line) => sum + (line.rate + line.code_discount) * line.qty, 0) / qty;
+            },
             apply_server_cart(server_cart) {
                 this.items = server_cart.lines.map(line => ({
                     item: line.item,
@@ -206,9 +214,7 @@
 
             get total() {
                 return this.items.filter(item => item.selected).reduce((sum, cart_item) => {
-                    const price = cart_item.price ? parseFloat(cart_item.price) : 0;
-                    const quantity = cart_item.qty || 0;
-                    return sum + (isNaN(price) ? 0 : price * quantity);
+                    return sum + this.price_of(cart_item) * (cart_item.qty || 0);
                 }, 0);
             },
 

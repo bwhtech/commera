@@ -118,14 +118,14 @@
 								
 									{% include 'templates/components/cart_product_size_dropdown.html'   %}
 									<div class="text-sm font-medium mt-2 md:mt-9 flex">
-										<template x-if="cart_item.default_price && cart_item.default_price !== cart_item.price">
+										<template x-if="cart_item.default_price && parseFloat(cart_item.default_price) !== $store.cart.price_of(cart_item)">
 										<p class="text-sm font-medium line-through text-strikethrough me-2 flex">
 											{{get_currency_symbol()}}
 											<span x-text="parseFloat(cart_item.default_price).toFixed(2)"></span>
 										</p>
 									</template>
 									&nbsp;
-									<p class="flex">{{get_currency_symbol()}} <span x-text="parseFloat(cart_item.price).toFixed(2)"></span>
+									<p class="flex">{{get_currency_symbol()}} <span x-text="$store.cart.price_of(cart_item).toFixed(2)"></span>
 											
 										</p>
 								</div>
