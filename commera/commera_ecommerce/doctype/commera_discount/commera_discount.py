@@ -106,6 +106,17 @@ class CommeraDiscount(Document):
 
 	def get_unmet_condition(self, cart) -> str | None:
 		"""Why this discount does not apply to the cart now, in the shopper's words; None when it does."""
+		if reason := self.get_unmet_minimum(cart):
+			return reason
+		if self.payment_condition == "Prepaid" and cart.payment_kind == "cod":
+			return _("{0} is for prepaid orders only.").format(self.title)
+		if self.payment_condition == "Cash On Delivery" and cart.payment_kind != "cod":
+			return _("{0} is for cash on delivery orders only.").format(self.title)
+		if self.eligibility == "Customer Groups" and not self.is_for_customer_group(cart.customer_group):
+			return _("{0} is not available for your account.").format(self.title)
+		return None
+
+	def get_unmet_minimum(self, cart) -> str | None:
 		minimum_subtotal = self.get_money(self.minimum_subtotal, cart)
 		if self.minimum_requirement == "Subtotal" and cart.subtotal < minimum_subtotal:
 			return _("Add {0} more to use {1}.").format(
@@ -116,12 +127,6 @@ class CommeraDiscount(Document):
 			)
 		if self.minimum_requirement == "Quantity" and cart.quantity < cint(self.minimum_quantity):
 			return _("{0} needs at least {1} items.").format(self.title, cint(self.minimum_quantity))
-		if self.payment_condition == "Prepaid" and cart.payment_kind == "cod":
-			return _("{0} is for prepaid orders only.").format(self.title)
-		if self.payment_condition == "Cash On Delivery" and cart.payment_kind != "cod":
-			return _("{0} is for cash on delivery orders only.").format(self.title)
-		if self.eligibility == "Customer Groups" and not self.is_for_customer_group(cart.customer_group):
-			return _("{0} is not available for your account.").format(self.title)
 		return None
 
 	def gives_anything(self, cart) -> bool:

@@ -537,6 +537,36 @@ class TestDiscountsOnOrders(DiscountCodeTestCase):
 		self.assertEqual(self.get_usage(discount, code), placed)
 		self.assertEqual(placed, (1, 10, 1, [(sales_order.name, 10)]))
 
+	def test_a_draft_order_edit_scales_the_order_discount_and_never_raises_it(self):
+		code = self.create_code(amount=26)
+		sales_order = self.place_order(self.create_quotation({self.shirt: 1, self.cap: 1}, (code,)))
+
+		sales_order.items = [self.get_line(sales_order, self.shirt)]
+		sales_order.save(ignore_permissions=True)
+		self.assertEqual((sales_order.custom_code_order_discount, sales_order.net_total), (18, 72))
+
+		sales_order.append("items", {"item_code": self.cap, "qty": 2, "warehouse": self.warehouse})
+		sales_order.save(ignore_permissions=True)
+		self.assertEqual((sales_order.custom_code_order_discount, sales_order.net_total), (26, 144))
+
+	def test_a_draft_order_edit_drops_an_order_discount_whose_minimum_is_no_longer_met(self):
+		for requirement in ({"minimum_subtotal": 100}, {"minimum_quantity": 2}):
+			with self.subTest(requirement):
+				code = self.create_code(
+					amount=30,
+					minimum_requirement="Subtotal" if "minimum_subtotal" in requirement else "Quantity",
+					**requirement,
+				)
+				sales_order = self.place_order(self.create_quotation({self.shirt: 1, self.cap: 1}, (code,)))
+				self.assertEqual(sales_order.net_total, 100)
+
+				sales_order.items = [self.get_line(sales_order, self.shirt)]
+				sales_order.save(ignore_permissions=True)
+
+				self.assertEqual((sales_order.custom_code_order_discount, sales_order.net_total), (0, 90))
+				self.assertEqual(get_allocations(sales_order), [])
+				self.assertIn("no longer applies", str(frappe.message_log[-1]))
+
 	def test_a_cancelled_order_keeps_its_discount_use(self):
 		discount = self.create_discount(amount=10, usage_limit=5)
 		code = generate_codes(discount, 1)[0]

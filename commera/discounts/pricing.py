@@ -173,6 +173,8 @@ def apply_recorded_discounts(doc):
 	recorded = get_allocations(doc)
 	if not recorded:
 		return
+	if doc.doctype == "Sales Order" and doc.docstatus == 0 and not doc.is_new():
+		recorded = drop_unmet_order_discounts(doc, recorded)
 
 	allocations = []
 	for item in doc.items:
@@ -206,6 +208,22 @@ def apply_recorded_discounts(doc):
 	set_allocations(doc, allocations)
 	set_amounts_from_grand_total(doc)
 	set_discount_links(doc, allocations)
+
+
+def drop_unmet_order_discounts(doc, recorded: list[dict]) -> list[dict]:
+	"""Staff taking items off a draft order: an order discount whose minimum the order no longer meets goes.
+	Judged before the line discounts go back on, as the cart was."""
+	cart = get_cart_context(doc)
+	kept = []
+	for row in recorded:
+		reason = row["discount_class"] == ORDER and get_discount(row["discount"]).get_unmet_minimum(cart)
+		if reason:
+			frappe.msgprint(
+				_("{0} no longer applies to this order. {1}").format(row.get("code") or row["title"], reason)
+			)
+		else:
+			kept.append(row)
+	return kept
 
 
 def set_discount_links(doc, allocations: list[dict]):
