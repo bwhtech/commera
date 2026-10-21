@@ -218,7 +218,7 @@ const customerGroups = computed({
         <TabPanel value="setup">
           <div class="space-y-5 pt-5">
             <CodeSection v-model:discount="discount" @codes-created="load" />
-            <ValueSection v-if="hasValue" v-model:discount="discount" />
+            <ValueSection v-if="hasValue" v-model:discount="discount" :currencies="options.currencies" :company-currency="options.currency" />
             <AppliesToSection v-if="discount.discount_type === 'Amount Off Products'" v-model:discount="discount" />
             <BuyXGetYSection v-if="discount.discount_type === 'Buy X Get Y'" v-model:discount="discount" />
             <ShippingSection

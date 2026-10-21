@@ -357,6 +357,12 @@ def get_editor_options() -> dict:
 		"customer_groups": as_picker_options(
 			frappe.get_all("Customer Group", filters={"is_group": 0}, pluck="name", order_by="name")
 		),
+		"currencies": [
+			{"label": currency.name, "value": currency.name, "symbol": currency.symbol}
+			for currency in frappe.get_all(
+				"Currency", filters={"enabled": 1}, fields=["name", "symbol"], order_by="name"
+			)
+		],
 		"campaigns": frappe.get_all("UTM Campaign", pluck="name", order_by="name"),
 		"discount_accounts": frappe.get_all(
 			"Account",
