@@ -155,7 +155,6 @@ doc_events = {
 			"commera.plugin_events.on_sales_order_stock_reservation",
 		],
 		"on_cancel": [
-			"commera.discounts.usage.remove_discount_uses",
 			"commera.jobs.send_order_cancel_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
 			"commera.plugin_events.on_sales_order_cancel",

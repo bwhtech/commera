@@ -485,8 +485,42 @@ class TestDiscountsOnOrders(DiscountCodeTestCase):
 		self.assertEqual((discount.times_used, discount.discount_given), (1, 9))
 		self.assertEqual(frappe.db.get_value("Commera Discount Code", product, "times_used"), 1)
 
+	def test_a_placed_order_keeps_its_discount_use_whatever_happens_to_it_later(self):
+		discount = self.create_discount(amount=10, usage_limit=5)
+		code = generate_codes(discount, 1)[0]
+		sales_order = self.place_order(self.create_quotation({self.shirt: 1, self.cap: 1}, (code,)))
+		sales_order.submit()
+		placed = self.get_usage(discount, code)
+
+		sales_invoice = self.create_invoice(sales_order, self.shirt)
+		self.create_return(sales_invoice, self.shirt)
+		self.assertEqual(self.get_usage(discount, code), placed)
+		self.assertEqual(placed, (1, 10, 1, [(sales_order.name, 10)]))
+
+	def test_a_cancelled_order_keeps_its_discount_use(self):
+		discount = self.create_discount(amount=10, usage_limit=5)
+		code = generate_codes(discount, 1)[0]
+		sales_order = self.place_order(self.create_quotation({self.shirt: 1}, (code,)))
+		sales_order.submit()
 		sales_order.cancel()
-		self.assertEqual(frappe.db.get_value("Commera Discount", discount.name, "times_used"), 0)
+
+		self.assertEqual(self.get_usage(discount, code), (1, 10, 1, [(sales_order.name, 10)]))
+		reorder = self.place_order(self.create_quotation({self.shirt: 1}, (code,)))
+		self.assertEqual(reorder.custom_code_order_discount, 0)
+
+		amended = self.amend(sales_order)
+		self.assertEqual(amended.custom_code_order_discount, 10)
+		self.assertEqual(self.get_usage(discount, code), (1, 10, 1, [(sales_order.name, 10)]))
+
+	def get_usage(self, discount: str, code: str) -> tuple:
+		times_used, discount_given = frappe.db.get_value(
+			"Commera Discount", discount, ["times_used", "discount_given"]
+		)
+		uses = frappe.get_all(
+			"Commera Discount Use", filters={"discount": discount}, fields=["sales_order", "amount"]
+		)
+		code_times_used = frappe.db.get_value("Commera Discount Code", code, "times_used")
+		return times_used, discount_given, code_times_used, [(use.sales_order, use.amount) for use in uses]
 
 	def test_the_invoice_keeps_discounts_over_an_automatic_rule(self):
 		"""ERPNext prices the invoice again; with an automatic rule on the line that drops an unhooked code."""
@@ -584,13 +618,22 @@ class TestDiscountsOnOrders(DiscountCodeTestCase):
 				cancelled = self.place_order(self.create_quotation({self.shirt: 1}, (code,)))
 				cancelled.submit()
 				cancelled.cancel()
-				reorder = self.place_order(self.create_quotation({self.shirt: 1}, (code,)))
-				self.assertEqual(reorder.custom_code_order_discount, 10)
+				other_order = self.place_order(self.create_quotation({self.shirt: 1}))
+				frappe.get_doc(
+					{
+						"doctype": "Commera Discount Use",
+						"discount": discount,
+						"code": code,
+						"sales_order": other_order.name,
+						"amount": 10,
+						"customer": other_order.customer,
+					}
+				).insert(ignore_permissions=True)
 
 				with self.assertRaisesRegex(frappe.ValidationError, "another order|used up"):
 					self.amend(cancelled)
 
-				reorder.delete()
+				other_order.delete()
 				self.assertEqual(self.amend(cancelled).custom_code_order_discount, 10)
 
 	def amend(self, sales_order):
