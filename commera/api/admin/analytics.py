@@ -249,7 +249,6 @@ def get_revenue_report(months: int = REPORT_MONTHS_DEFAULT):
 			sales_order.name,
 			sales_order.transaction_date,
 			sales_order.base_grand_total,
-			sales_order.base_discount_amount,
 			sales_order.conversion_rate,
 			sales_order.custom_discount_allocations,
 		)
@@ -269,7 +268,9 @@ def get_revenue_report(months: int = REPORT_MONTHS_DEFAULT):
 		)
 		bucket["revenue"] += flt(row.base_grand_total)
 		bucket["orders"] += 1
-		bucket["discounts"] += flt(row.base_discount_amount)
+		bucket["discounts"] += sum(
+			get_base_allocation_amount(row, allocation) for allocation in get_allocations(row)
+		)
 		bucket["refunds"] += flt(refunds_by_order.get(row.name, 0))
 
 	series = []
@@ -322,7 +323,7 @@ def get_discount_summary(order_rows) -> dict:
 		orders += 1
 		labels_on_order = set()
 		for allocation in allocations:
-			amount = flt(allocation.get("amount")) * (flt(row.conversion_rate) or 1)
+			amount = get_base_allocation_amount(row, allocation)
 			label = allocation.get("code") or allocation.get("title")
 			given += amount
 			entry = by_label.setdefault(label, {"label": label, "given": 0.0, "orders": 0})
@@ -336,6 +337,10 @@ def get_discount_summary(order_rows) -> dict:
 		"orders": orders,
 		"top": [{**entry, "given": flt(entry["given"], 2)} for entry in top],
 	}
+
+
+def get_base_allocation_amount(row, allocation: dict) -> float:
+	return flt(allocation.get("amount")) * (flt(row.conversion_rate) or 1)
 
 
 def get_item_sales(from_date, to_date, item_codes):

@@ -52,7 +52,7 @@ const stats = computed(() => {
 })
 
 const rows = computed(() =>
-  [...months.value].reverse().map((row) => ({ ...row, net: row.revenue - row.refunds - row.discounts })),
+  [...months.value].reverse().map((row) => ({ ...row, net: row.revenue - row.refunds })),
 )
 
 const hasMonthlyActivity = computed(() => hasValues(months.value, 'revenue', 'orders', 'discounts', 'refunds'))
