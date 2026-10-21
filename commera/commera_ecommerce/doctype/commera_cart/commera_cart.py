@@ -394,8 +394,11 @@ def delete_abandoned_guest_carts():
 
 
 def keep_guest_cart(login_manager=None):
-	# A failed merge is logged, never a reason to refuse sign-in.
-	cart_key = get_guest_cart_key()
+	adopt_guest_cart(get_guest_cart_key())
+
+
+def adopt_guest_cart(cart_key: str | None):
+	"""Move a guest cart into the signed-in shopper's cart. A failed merge is logged, never raised."""
 	guest_cart_name = cart_key and frappe.db.get_value("Commera Cart", {"cart_key": cart_key}, "name")
 	if not guest_cart_name or is_guest():
 		return

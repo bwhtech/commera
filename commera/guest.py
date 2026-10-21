@@ -44,9 +44,9 @@ def get_guest_cart_key() -> str | None:
 	return sha256_hash(token) if token else None
 
 
-def set_guest_cart_cookie() -> str:
-	"""Keep the browser's cart token, or issue one, and return the key the cart is stored under."""
-	token = get_guest_cart_token() or frappe.generate_hash(length=32)
+def set_guest_cart_cookie(token: str | None = None) -> str:
+	"""Keep the given or the browser's cart token, or issue one, and return the key the cart is stored under."""
+	token = token or get_guest_cart_token() or frappe.generate_hash(length=32)
 	frappe.local.cookie_manager.set_cookie(
 		GUEST_CART_COOKIE, token, max_age=GUEST_CART_COOKIE_MAX_AGE, httponly=True, samesite="Lax"
 	)
