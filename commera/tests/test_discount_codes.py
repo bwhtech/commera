@@ -111,13 +111,17 @@ class DiscountCodeTestCase(IntegrationTestCase):
 		discount = self.create_discount(percentage, amount, item_codes, **fields)
 		return add_code(discount, f"zz{frappe.generate_hash(length=8)}")
 
-	def create_quotation(self, lines: dict[str, int], codes=(), customer=None, order_type="Shopping Cart"):
+	def create_quotation(
+		self, lines: dict[str, int], codes=(), customer=None, order_type="Shopping Cart", taxes=()
+	):
 		customer = customer or self.customer
 		quotation = new_cart_quotation(customer, f"{customer.name.lower().replace(' ', '-')}@example.com")
 		quotation.order_type = order_type
 		quotation.selling_price_list = self.price_list
 		for item_code, qty in lines.items():
 			quotation.append("items", {"item_code": item_code, "qty": qty, "warehouse": self.warehouse})
+		for tax in taxes:
+			quotation.append("taxes", tax)
 		quotation.custom_discount_codes = "\n".join(codes)
 		quotation.insert(ignore_permissions=True)
 		return quotation
@@ -726,3 +730,70 @@ class TestDiscountsOnOrders(DiscountCodeTestCase):
 		credit_note.insert(ignore_permissions=True)
 		credit_note.submit()
 		return credit_note
+
+
+class TestTaxInclusiveDiscounts(DiscountCodeTestCase):
+	def setUp(self):
+		super().setUp()
+		self.leggings = self.create_item(2999)
+		self.shorts = self.create_item(3399)
+
+	def test_a_discount_takes_exactly_its_amount_off_a_tax_inclusive_price(self):
+		cases = {
+			"200 off the order": (self.create_code(amount=200), 6198),
+			"10% off the order": (self.create_code(percentage=10), 5758.2),
+			"10% off products": (
+				self.create_code(percentage=10, item_codes=(self.leggings, self.shorts)),
+				5758.2,
+			),
+			"150 off each product": (
+				self.create_code(amount=150, item_codes=(self.leggings, self.shorts)),
+				6098,
+			),
+			"buy leggings get shorts free": (
+				self.create_code(
+					discount_type="Buy X Get Y",
+					buy_value=1,
+					get_quantity=1,
+					uses_per_order=1,
+					targets=[
+						{"role": "Buys", "target_type": "Item", "target": self.leggings},
+						{"role": "Gets", "target_type": "Item", "target": self.shorts},
+					],
+				),
+				2999,
+			),
+		}
+		for case, (code, grand_total) in cases.items():
+			with self.subTest(case):
+				quotation = self.create_quotation(
+					{self.leggings: 1, self.shorts: 1}, (code,), taxes=[self.get_inclusive_tax()]
+				)
+				sales_order = self.place_order(quotation)
+				sales_order.submit()
+				sales_invoice = self.create_invoice(sales_order)
+
+				for doc in (quotation, sales_order, sales_invoice):
+					self.assertEqual(doc.grand_total, grand_total)
+					self.assertAlmostEqual(doc.net_total, grand_total / 1.18, delta=0.01)
+					self.assertAlmostEqual(doc.total_taxes_and_charges, grand_total * 18 / 118, delta=0.01)
+
+	def get_inclusive_tax(self) -> dict:
+		company = frappe.get_cached_doc("Commera Settings").get(
+			"company"
+		) or frappe.defaults.get_global_default("company")
+		return {
+			"charge_type": "On Net Total",
+			"description": "GST 18% included",
+			"account_head": frappe.db.get_value(
+				"Account", {"company": company, "account_type": "Tax", "is_group": 0}, "name"
+			),
+			"rate": 18,
+			"included_in_print_rate": 1,
+		}
+
+	def create_invoice(self, sales_order):
+		sales_invoice = make_sales_invoice(sales_order.name)
+		sales_invoice.insert(ignore_permissions=True)
+		sales_invoice.submit()
+		return sales_invoice

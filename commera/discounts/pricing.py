@@ -132,14 +132,19 @@ def apply_order_discount(doc, selections: list) -> list[dict]:
 
 	total = sum(row["amount"] for row in allocations)
 	if total:
-		# Like Shopify, an order discount comes off the subtotal, before tax and shipping.
+		# Like Shopify, an order discount comes off the subtotal before shipping: before tax, or with
+		# tax-inclusive prices off what the shopper pays, so ERPNext works the tax out inside it.
 		if not flt(doc.discount_amount):
-			doc.apply_discount_on = "Net Total"
+			doc.apply_discount_on = "Grand Total" if has_inclusive_tax(doc) else "Net Total"
 		# ERPNext's own percentage discount is kept as an amount, so this share can be added to it.
 		doc.discount_amount = flt(doc.discount_amount) + total
 		doc.additional_discount_percentage = 0
 		doc.custom_code_order_discount = total
 	return allocations
+
+
+def has_inclusive_tax(doc) -> bool:
+	return any(tax.included_in_print_rate for tax in doc.get("taxes") or [])
 
 
 def apply_recorded_discounts(doc):
