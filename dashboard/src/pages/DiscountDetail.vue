@@ -37,6 +37,7 @@ import {
   getDiscount,
   getEditorOptions,
   saveDiscount,
+  searchTargets,
 } from '../data/discounts'
 import { errorMessage } from '../data/errors'
 import { money } from '../data/format'
@@ -136,7 +137,7 @@ const minimumSummary = computed(() => {
 })
 const audienceSummary = computed(() => {
   const value = discount.value
-  const customers = { 'First Order': 'First order only', 'Customer Groups': 'Chosen customer groups' }[value.eligibility] ?? 'Everyone'
+  const customers = { 'First Order': 'First order only', 'Customer Groups': 'Chosen customer groups', 'Specific Customers': 'Chosen customers' }[value.eligibility] ?? 'Everyone'
   const payment = { Prepaid: 'prepaid only', 'Cash On Delivery': 'cash on delivery only' }[value.payment_condition] ?? 'any payment'
   return `${customers} · ${payment}`
 })
@@ -168,6 +169,31 @@ const customerGroups = computed({
   get: () => discount.value.customer_groups.map((row) => row.customer_group),
   set: (groups) => (discount.value.customer_groups = groups.map((customer_group) => ({ customer_group }))),
 })
+
+const customerQuery = ref('')
+const customerOptions = ref([])
+const customers = computed({
+  get: () => discount.value.customers.map((row) => row.customer),
+  set: (names) => {
+    const labels = Object.fromEntries(customerOptions.value.map((option) => [option.value, option.label]))
+    discount.value.customers = names.map((customer) => ({ customer, customer_name: labels[customer] }))
+  },
+})
+
+// The server searches, so the chosen customers ride along to keep their names off the current search.
+watch(
+  [customerQuery, () => discount.value?.eligibility],
+  async ([query, eligibility]) => {
+    if (eligibility !== 'Specific Customers') return
+    const found = (await searchTargets('Customer', query)) ?? []
+    const known = new Set(found.map((option) => option.value))
+    const chosen = discount.value.customers
+      .filter((row) => !known.has(row.customer))
+      .map((row) => ({ label: row.customer_name || row.customer, value: row.customer }))
+    customerOptions.value = [...found, ...chosen]
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -264,6 +290,7 @@ const customerGroups = computed({
                 <Radio value="Everyone" label="Everyone, guests included" />
                 <Radio value="First Order" label="First order only" description="Checked by customer and email, so guests count too." />
                 <Radio value="Customer Groups" label="Customer groups" />
+                <Radio value="Specific Customers" label="Specific customers" description="Signed-in customers only, up to 100." />
               </RadioGroup>
               <MultiSelect
                 v-if="discount.eligibility === 'Customer Groups'"
@@ -271,6 +298,15 @@ const customerGroups = computed({
                 :options="options.customer_groups"
                 placeholder="Choose customer groups"
                 :error="customerGroups.length ? null : 'Choose at least one group. Without one, nobody can use this discount.'"
+              />
+              <MultiSelect
+                v-if="discount.eligibility === 'Specific Customers'"
+                v-model="customers"
+                v-model:query="customerQuery"
+                :options="customerOptions"
+                :filterable="false"
+                placeholder="Search customers"
+                :error="customers.length ? null : 'Choose at least one customer. Without one, nobody can use this discount.'"
               />
               <FormControl
                 v-model="discount.payment_condition"

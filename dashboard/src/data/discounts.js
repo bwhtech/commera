@@ -73,6 +73,7 @@ export function blankDiscount(discountType, currency) {
     payment_condition: 'Any',
     eligibility: 'Everyone',
     customer_groups: [],
+    customers: [],
     // A free-shipping offer is meant to sit beside the store's other discounts.
     combines_with_product: discountType === 'Free Shipping' ? 1 : 0,
     combines_with_order: discountType === 'Free Shipping' ? 1 : 0,
@@ -119,7 +120,7 @@ export function summaryLines(discount) {
     discount.minimum_requirement === 'Subtotal' && `Minimum subtotal ${money(discount.minimum_subtotal)}`,
     discount.minimum_requirement === 'Quantity' && `Minimum ${discount.minimum_quantity} items`,
     discount.exclude_sale_items && 'Not on items already on sale',
-    { 'First Order': 'First order only', 'Customer Groups': 'Chosen customer groups' }[discount.eligibility],
+    { 'First Order': 'First order only', 'Customer Groups': 'Chosen customer groups', 'Specific Customers': 'Chosen customers' }[discount.eligibility],
     { Prepaid: 'Prepaid orders only', 'Cash On Delivery': 'Cash on delivery only' }[discount.payment_condition],
     discount.once_per_customer && 'Once per customer',
     discount.usage_limit && `${discount.usage_limit} uses in total`,
