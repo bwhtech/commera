@@ -2,6 +2,7 @@ import frappe
 from frappe.utils.data import add_days, today
 
 from commera.api.payments import _make_sales_order, generate_quotation_for_cart, make_sales_invoice
+from commera.discounts.codes import get_code_discount
 from commera.discounts.preview import get_preview_quotation
 from commera.sdk import cart as cart_sdk
 from commera.tests import test_server_cart
@@ -82,6 +83,41 @@ class TestQuantityBreaks(DiscountCodeTestCase):
 
 				for doc in (quotation, sales_order, sales_invoice):
 					self.assertEqual((doc.items[0].rate, doc.net_total), (450, 4500), doc.doctype)
+
+	def test_codes_come_off_the_break_price(self):
+		"""A product code takes its percentage of the break rate, and an order code comes off after it."""
+		for rate_or_discount in ("Rate", "Discount Percentage"):
+			item_code = self.create_bulk_item(rate_or_discount)
+			product = self.create_code(percentage=10, item_codes=(item_code,), combines_with_order=1)
+			order = self.create_code(amount=100, combines_with_product=1)
+			with self.subTest(rate_or_discount=rate_or_discount):
+				self.use_new_shopper()
+				cart_sdk.add_lines([{"item_code": item_code, "qty": 10}])
+				cart_sdk.add_discount_code(product)
+				priced = cart_sdk.add_discount_code(order)
+				quotation = generate_quotation_for_cart({"items": [self.browser_line(item_code, 10)]})
+				frappe.set_user("Administrator")
+				quotation.reload()
+				quotation.save(ignore_permissions=True)
+				sales_order, sales_invoice = self.place_and_bill(quotation)
+
+				line = priced["lines"][0]
+				self.assertEqual((line["rate"], line["code_discount"]), (405, 45))
+				self.assertEqual((priced["order_discount"], priced["total"]), (100, 3950))
+				for doc in (quotation, sales_order, sales_invoice):
+					self.assertEqual(
+						(
+							doc.items[0].rate,
+							doc.items[0].custom_code_discount,
+							doc.custom_code_order_discount,
+							doc.net_total,
+						),
+						(405, 45, 100, 3950),
+						doc.doctype,
+					)
+				self.assertEqual(
+					frappe.db.get_value("Commera Discount", get_code_discount(product), "discount_given"), 450
+				)
 
 	def place_and_bill(self, quotation):
 		quotation.submit()

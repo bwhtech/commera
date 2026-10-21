@@ -21,7 +21,7 @@ def is_repriced(doc) -> bool:
 def remove_code_discounts(doc, method=None):
 	"""Take the code discounts off before ERPNext prices the document again, so they never apply twice.
 	Clamped at zero: other code may already have reset these fields."""
-	if doc.get("is_return") or (doc.doctype == "Quotation" and not is_repriced(doc)):
+	if doc.get("is_return"):
 		return
 	keep_lines = not is_repriced(doc)
 	for item in doc.items:
@@ -57,10 +57,9 @@ def validate_order_discount_edit(doc):
 
 def apply_code_discounts(doc, method=None):
 	"""Product discounts per line (best wins), then order discounts on the discounted subtotal. A cart
-	chooses and prices its discounts on every save; an order or invoice keeps the amounts its cart had."""
+	prices its discounts on every save; once placed, it and its order and invoice keep those amounts."""
 	if not is_repriced(doc):
-		if doc.doctype != "Quotation":
-			apply_recorded_discounts(doc)
+		apply_recorded_discounts(doc)
 		return
 	selections = select_discounts(get_cart_context(doc))
 	allocations = apply_line_discounts(doc, [s for s in selections if s.discount.discount_class == PRODUCT])
