@@ -57,6 +57,7 @@ TABLES = {
 	"tiers": ("minimum_subtotal", "value"),
 	"targets": ("role", "target_type", "target"),
 	"customer_groups": ("customer_group",),
+	"customers": ("customer", "customer_name"),
 }
 LIST_FIELDS = (
 	"name",

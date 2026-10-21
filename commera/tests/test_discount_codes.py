@@ -367,6 +367,25 @@ class TestDiscountSelection(DiscountCodeTestCase):
 		self.assertEqual(member.custom_code_order_discount, 9)
 		self.assertFalse(other.custom_code_order_discount)
 
+	def test_a_specific_customers_discount_skips_other_customers_and_guests(self):
+		frappe.db.set_value("Commera Discount", {"method": "Automatic"}, "enabled", 0)
+		code = self.create_code(
+			percentage=10, eligibility="Specific Customers", customers=[{"customer": self.customer.name}]
+		)
+
+		listed = self.create_quotation({self.shirt: 1}, (code,))
+		unlisted = self.create_quotation({self.shirt: 1}, (code,), customer=self.create_customer())
+		guest = self.create_quotation({self.shirt: 1}, (code,))
+		guest.custom_guest_cart_key = frappe.generate_hash(length=16)
+		refresh_code_discounts(guest)
+
+		self.assertEqual(listed.custom_code_order_discount, 9.0)
+		self.assertEqual(listed.net_total, 81.0)
+		self.assertFalse(unlisted.custom_code_order_discount)
+		self.assertEqual(unlisted.net_total, 90.0)
+		self.assertFalse(guest.custom_code_order_discount)
+		self.assertEqual(guest.net_total, 90.0)
+
 	def test_an_active_specific_customers_discount_needs_a_customer(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "at least one customer"):
 			self.create_discount(percentage=10, eligibility="Specific Customers", enabled=1)

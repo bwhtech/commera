@@ -116,6 +116,8 @@ class CommeraDiscount(Document):
 			return _("{0} is for cash on delivery orders only.").format(self.title)
 		if self.eligibility == "Customer Groups" and not self.is_for_customer_group(cart.customer_group):
 			return _("{0} is not available for your account.").format(self.title)
+		if self.eligibility == "Specific Customers" and not self.is_for_customer(cart):
+			return _("{0} is not available for your account.").format(self.title)
 		return None
 
 	def gives_anything(self, cart) -> bool:
@@ -143,6 +145,12 @@ class CommeraDiscount(Document):
 			or customer_group in get_descendants_of("Customer Group", row.customer_group)
 			for row in self.customer_groups
 		)
+
+	def is_for_customer(self, cart) -> bool:
+		# A guest who types a listed customer's email is booked to that customer, but is not them.
+		if not cart.customer or cart.doc.get("custom_guest_cart_key"):
+			return False
+		return any(row.customer == cart.customer for row in self.customers)
 
 	def is_for_line(self, item, cart, role: str = "Applies To") -> bool:
 		if self.exclude_sale_items and cart.is_on_sale(item.item_code):

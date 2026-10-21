@@ -43,6 +43,14 @@ class TestAdminDiscounts(DiscountCodeTestCase):
 		self.assertEqual(updated["code"], "ZZ-SECOND")
 		self.assertFalse(frappe.db.exists("Commera Discount Code", "ZZ-FIRST"))
 
+	def test_specific_customers_are_saved_and_read_back_with_their_names(self):
+		saved = self.save(eligibility="Specific Customers", customers=[{"customer": self.customer.name}])
+
+		self.assertEqual(
+			saved["customers"],
+			[{"customer": self.customer.name, "customer_name": self.customer.customer_name}],
+		)
+
 	def test_the_list_filters_by_tab_and_finds_by_code(self):
 		scheduled = self.save(starts_on=add_days(today(), 5))
 		active = self.save(code="zz-findme")
