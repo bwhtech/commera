@@ -1,5 +1,5 @@
 import { createAdminCaller } from './adminCaller'
-import { money } from './format'
+import { moneyIn } from './format'
 
 // The route slug is what a new-discount URL carries; the label is what the server stores.
 export const DISCOUNT_TYPES = [
@@ -89,6 +89,7 @@ export function blankDiscount(discountType, currency) {
 }
 
 function valueLine(discount) {
+  const money = (value) => moneyIn(value, discount.currency)
   const off = (value) => (discount.value_type === 'Percentage' ? `${value}%` : money(value))
   if (discount.discount_type === 'Buy X Get Y') {
     const reward = { Free: 'free', Percentage: `${discount.get_value}% off` }[discount.get_value_type] ?? `${money(discount.get_value)} off each`
@@ -109,6 +110,7 @@ function valueLine(discount) {
 // One sentence per rule, in the order a shopper meets them. The list shows the first few,
 // the editor's summary shows them all.
 export function summaryLines(discount) {
+  const money = (value) => moneyIn(value, discount.currency)
   const combines = [
     discount.combines_with_product && 'product',
     discount.combines_with_order && 'order',

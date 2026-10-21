@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { Button, Select } from 'frappe-ui'
 import { watchDebounced } from '@vueuse/core'
 import TestCartPicker from './TestCartPicker.vue'
-import { money } from '../../data/format'
+import { moneyIn } from '../../data/format'
 import { testDiscount } from '../../data/discounts'
 
 const props = defineProps({ discount: { type: Object, required: true } })
@@ -13,6 +13,8 @@ const paymentKind = ref('prepaid')
 const shopper = ref('returning')
 const customer = ref(null)
 const result = ref(null)
+
+const money = (value) => moneyIn(value, result.value?.currency)
 
 const QUANTITIES = [1, 2, 3, 4, 5].map((qty) => ({ label: String(qty), value: qty }))
 

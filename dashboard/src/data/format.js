@@ -30,6 +30,12 @@ function formatWithSymbol(amount, formatter) {
 
 export const money = (n) => formatWithSymbol(n, moneyFormatter(false))
 
+// For an amount kept in a currency of its own; blank means the site's currency.
+export function moneyIn(n, currency) {
+  if (!currency || currency === currencyCode) return money(n)
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency, currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 }).format(n ?? 0)
+}
+
 // Report figures are read side by side, so they are compacted: ₹4.8L reads at
 // a glance where ₹4,82,300 has to be counted.
 export const compactMoney = (n) => formatWithSymbol(n, moneyFormatter(true))

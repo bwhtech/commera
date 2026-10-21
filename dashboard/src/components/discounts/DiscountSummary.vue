@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { Badge } from 'frappe-ui'
 import { NumberCard } from 'frappe-ui/charts'
-import { money } from '../../data/format'
+import { money, moneyIn } from '../../data/format'
 import { STATUS_THEMES, discountTypeByValue, summaryLines } from '../../data/discounts'
 
 const props = defineProps({ discount: { type: Object, required: true } })
@@ -33,6 +33,6 @@ const performance = computed(() => props.discount.performance)
     <NumberCard title="Orders" :value="performance.orders" />
     <NumberCard title="Discount given" :value="money(performance.discount_given)" />
     <NumberCard title="Sales" :value="money(performance.sales)" />
-    <NumberCard title="Budget left" :value="performance.budget_left == null ? '—' : money(performance.budget_left)" />
+    <NumberCard title="Budget left" :value="performance.budget_left == null ? '—' : moneyIn(performance.budget_left, discount.currency)" />
   </div>
 </template>
