@@ -2,6 +2,30 @@
 
 `commera.api.storefront` serves the catalogue and the server cart to a storefront that runs on its own server, such as a Next.js app. Commera stays the owner of prices, stock, discounts, checkout, payments and customer accounts. The Jinja storefront does not use this API.
 
+## One layer for every surface
+
+The API is a thin layer over `commera.sdk`. It reads the request, calls the SDK, and answers HTTP 404 where the SDK returns None. Plugins call the same functions, so a plugin and a headless storefront see the same product, prices and cart.
+
+| SDK function | Storefront API | Plugins | Jinja storefront |
+| --- | --- | --- | --- |
+| `catalog.list_products`, `catalog.get_product` | `products.get_products`, `products.get_product` | Yes | Not yet: the pages read `commera.utils` and `commera.product_detail`, which the SDK also uses |
+| `catalog.list_collections`, `catalog.get_collection` | `collections.*` | Yes | Not yet |
+| `shop.get_shop`, `shop.get_page`, `shop.get_sitemap` | `shop.*` | Yes | Not yet |
+| `cart.get_priced_cart`, `add_lines`, `update_lines`, `remove_lines`, discount codes | `cart.*` | Yes | `commera.api.server_cart` |
+| `catalog.get_items` | None | Yes | None |
+
+The shapes are typed in `commera.sdk.types`: `ProductPage`, `ProductCard`, `Product`, `ProductVariant`, `Collection`, `Shop`, `MenuItem`, `ContentPage` and `PricedCart`. Each priced cart line has its `product` (handle, title, size and image). A menu item gives a link `type` and `target`, and the storefront API adds the headless path in `url`.
+
+Plugin hooks run for headless carts too. `validate_discount_code` runs when a code is applied. `validate_cart`, `cart_fees`, `delivery_options` and `payment_methods` run on the Commera checkout, which a headless cart reaches through the hand-off.
+
+```python
+from commera.sdk import catalog, shop
+
+page = catalog.list_products(collection="brake-system", sort="price_low", page_size=12)
+product = catalog.get_product("brake-pads-black")  # None when it is not published
+menu = shop.get_shop()["menu"]  # [{"title", "type": "collection", "target": "brake-system", "items"}]
+```
+
 ## How it fits together
 
 ```mermaid
