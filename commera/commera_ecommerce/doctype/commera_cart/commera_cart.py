@@ -8,7 +8,9 @@ from commera.discounts.allocations import get_allocations, get_price_discount_ro
 from commera.discounts.cart_context import get_cart_context
 from commera.discounts.codes import get_code_discount, normalize_code
 from commera.discounts.preview import get_preview_quotation
+from commera.discounts.pricing import get_saving
 from commera.discounts.selection import (
+	Selection,
 	get_discount,
 	get_discount_codes,
 	get_unmet_reason,
@@ -239,9 +241,11 @@ def get_code_reason(cart, code: str, selections: list) -> str:
 		)
 	blocking = next((other for other in selections if not discount.can_combine_with(other.discount)), None)
 	if blocking:
-		return _("{0} cannot be combined with {1}, which saves you more.").format(
-			discount.title, blocking.code or blocking.discount.title
-		)
+		label = blocking.code or blocking.discount.title
+		own = [Selection(discount, code), *(s for s in selections if discount.can_combine_with(s.discount))]
+		if flt(get_saving(cart, own), 2) < flt(get_saving(cart, selections), 2):
+			return _("{0} doesn't combine with {1}, which saves you more.").format(discount.title, label)
+		return _("{0} doesn't combine with {1}.").format(discount.title, label)
 	return _("{0} cannot be combined with your other discounts.").format(discount.title)
 
 

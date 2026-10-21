@@ -321,8 +321,21 @@ class TestServerCart(DiscountCodeTestCase):
 		states = {state["code"]: state for state in priced["discount_codes"]}
 		self.assertTrue(states[bigger]["applied"])
 		self.assertFalse(states[smaller]["applied"])
-		self.assertIn(f"cannot be combined with {bigger}, which saves you more", states[smaller]["reason"])
+		self.assertIn(f"doesn't combine with {bigger}, which saves you more", states[smaller]["reason"])
 		self.assertEqual(priced["total"], CAP_RATE - 8)
+
+	def test_a_code_that_saves_the_same_says_only_that_it_does_not_combine(self):
+		first = self.create_code(amount=5)
+		second = self.create_code(amount=5)
+		cart_sdk.add_lines([{"item_code": self.cap, "qty": 1}])
+		cart_sdk.add_discount_code(first)
+
+		priced = cart_sdk.add_discount_code(second)
+
+		states = {state["code"]: state for state in priced["discount_codes"]}
+		self.assertTrue(states[first]["applied"])
+		self.assertTrue(states[second]["reason"].endswith(f"doesn't combine with {first}."))
+		self.assertEqual(priced["total"], CAP_RATE - 5)
 
 	def test_a_code_that_gives_nothing_does_not_block_another(self):
 		waiting = self.create_code(percentage=10, minimum_requirement="Subtotal", minimum_subtotal=500)
