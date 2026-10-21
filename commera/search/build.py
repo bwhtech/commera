@@ -1,9 +1,9 @@
 import os
 
 import frappe
-from frappe.rate_limiter import rate_limit
 
 from commera.search.sqlite_product_search import SqliteProductSearch
+from commera.utils import rate_limit_per_method
 
 SEARCH_CLASS_PATH = "commera.search.sqlite_product_search.SqliteProductSearch"
 CORE_BUILD_INDEX = "frappe.search.sqlite_search.build_index"
@@ -24,7 +24,7 @@ def enqueue_full_rebuild(deduplicate=False):
 
 
 @frappe.whitelist()
-@rate_limit(limit=5, seconds=60 * 60)
+@rate_limit_per_method(limit=5, seconds=60 * 60)
 def rebuild_index():
 	"""Manual entry: enqueue a full rebuild, restricted to System Manager and rate-limited."""
 	frappe.only_for("System Manager")

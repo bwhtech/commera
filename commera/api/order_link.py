@@ -1,14 +1,14 @@
 import frappe
 from frappe import _
-from frappe.rate_limiter import rate_limit
 from frappe.utils import cstr, escape_html
 
 from commera.order_access import get_order_link, reset_order_access_key
+from commera.utils import rate_limit_per_method
 
 
 # Guest lookup: the answer never says whether the order exists, and the link only goes to the order's own email.
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=10, seconds=60 * 60)
+@rate_limit_per_method(limit=10, seconds=60 * 60)
 def send_order_link(order_number: str, email: str) -> str:
 	order_number = cstr(order_number).strip()
 	email = cstr(email).strip().lower()

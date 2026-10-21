@@ -936,12 +936,12 @@ def pick_product_covers(templates: list, options: list) -> dict:
 	return covers
 
 
-def rate_limit_per_method(limit: int, seconds: int):
+def rate_limit_per_method(limit: int, seconds: int, key: str | None = None):
 	"""Frappe's rate_limit keys its counter on form_dict.cmd, which /api/v2 does not set, so without this every
 	rate-limited v2 method would share one counter per IP."""
 
 	def decorator(method):
-		limited = rate_limit(limit=limit, seconds=seconds)(method)
+		limited = rate_limit(key=key, limit=limit, seconds=seconds)(method)
 
 		@wraps(method)
 		def wrapper(*args, **kwargs):

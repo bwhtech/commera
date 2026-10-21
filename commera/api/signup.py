@@ -1,9 +1,9 @@
 import frappe
 from frappe import _
-from frappe.rate_limiter import rate_limit
 from frappe.utils import cint, cstr, validate_email_address
 
 from commera.core import send_otp
+from commera.utils import rate_limit_per_method
 
 
 def verify_otp(email: str, otp: str):
@@ -39,7 +39,7 @@ def validate_single_email(email: str):
 
 # Pre-login by definition; writes nothing but the cached OTP, and is rate limited.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=30, seconds=60 * 60)
+@rate_limit_per_method(limit=30, seconds=60 * 60)
 def send_signup_otp(email: str, first_name: str, last_name: str):
 	validate_single_email(email)
 	validate_user_names(first_name, last_name)
@@ -51,7 +51,7 @@ def send_signup_otp(email: str, first_name: str, last_name: str):
 
 # Pre-login by definition; writes nothing but the cached OTP, and is rate limited.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=30, seconds=60 * 60)
+@rate_limit_per_method(limit=30, seconds=60 * 60)
 def send_login_otp(email: str):
 	validate_single_email(email)
 	user_exists = frappe.db.exists("User", email)
@@ -64,7 +64,7 @@ def send_login_otp(email: str):
 # Pre-login by definition; the OTP proves the caller owns the address.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 # Keyed on the caller IP plus the email, so each address gets its own attempt budget per caller.
-@rate_limit(key="email", limit=5, seconds=60 * 5)
+@rate_limit_per_method(key="email", limit=5, seconds=60 * 5)
 def verify_signup_otp(email: str, first_name: str, last_name: str, otp: str):
 	validate_user_names(first_name, last_name)
 	verify_otp(email, otp)
@@ -85,7 +85,7 @@ def verify_signup_otp(email: str, first_name: str, last_name: str, otp: str):
 
 # Pre-login by definition; the OTP proves the caller owns the address.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
-@rate_limit(key="email", limit=5, seconds=60 * 5)
+@rate_limit_per_method(key="email", limit=5, seconds=60 * 5)
 def verify_login_otp(email: str, otp: str):
 	verify_otp(email, otp)
 	frappe.local.login_manager.login_as(email)
@@ -98,7 +98,7 @@ def get_placeholder_first_name(email: str) -> str:
 # Pre-login by definition; writes nothing but the cached OTP, and is rate limited. It answers the same
 # whether or not the email has an account, so checkout never tells a stranger who shops here.
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=30, seconds=60 * 60)
+@rate_limit_per_method(limit=30, seconds=60 * 60)
 def send_checkout_otp(email: str):
 	email = cstr(email).strip().lower()
 	validate_single_email(email)
@@ -107,7 +107,7 @@ def send_checkout_otp(email: str):
 
 # Pre-login by definition; the OTP proves the caller owns the address.
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(key="email", limit=5, seconds=60 * 5)
+@rate_limit_per_method(key="email", limit=5, seconds=60 * 5)
 def verify_checkout_otp(email: str, otp: str):
 	email = cstr(email).strip().lower()
 	verify_otp(email, otp)

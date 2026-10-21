@@ -1,8 +1,8 @@
 import frappe
-from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cint, cstr, flt
 
 from commera.analytics import events, facebook, ga4
+from commera.utils import rate_limit_per_method
 
 CLIENT_EVENTS = ("page_view", "view_item", "add_to_cart", "begin_checkout")
 
@@ -16,7 +16,7 @@ def get_capture_payload():
 
 # nosemgrep: frappe-semgrep-rules.rules.security.guest-whitelisted-method  # anonymous beacon: validated, clamped, rate-limited
 @frappe.whitelist(allow_guest=True, methods=["POST"])
-@rate_limit(limit=600, seconds=60)
+@rate_limit_per_method(limit=600, seconds=60)
 def capture():
 	if not events.is_first_party_enabled():
 		return

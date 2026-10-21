@@ -2,10 +2,10 @@ import frappe
 from frappe import _
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Avg, Count
-from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cint, cstr, flt
 
 from commera.api.admin.orders import is_webshop_order
+from commera.utils import rate_limit_per_method
 
 MAX_COMMENT_LENGTH = 2000
 MAX_REVIEW_TITLE_LENGTH = 140
@@ -73,7 +73,7 @@ def get_rating_histogram(variant: str) -> dict:
 
 
 @frappe.whitelist()
-@rate_limit(limit=10, seconds=60 * 60)
+@rate_limit_per_method(limit=10, seconds=60 * 60)
 def submit_review(variant: str, rating: int, review_title: str | None = None, comment: str | None = None):
 	"""Not buyer-gated on purpose — the Verified Purchase badge distinguishes a reviewer who actually
 	ordered. Always lands unpublished."""
@@ -120,7 +120,7 @@ def submit_review(variant: str, rating: int, review_title: str | None = None, co
 
 
 @frappe.whitelist()
-@rate_limit(limit=10, seconds=60 * 60)
+@rate_limit_per_method(limit=10, seconds=60 * 60)
 def update_review(name: str, rating: int, review_title: str | None = None, comment: str | None = None):
 	"""Every edit goes back through moderation: an approved review that could be silently rewritten
 	would put unvetted text straight on the storefront."""
