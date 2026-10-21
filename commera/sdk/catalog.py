@@ -13,9 +13,17 @@ from commera.api.admin.catalog import (
 from commera.api.admin.orders import get_reporting_currency
 from commera.plugin_events import get_ecommerce_warehouse, get_listed_items
 from commera.product_detail import get_product_detail
-from commera.sdk.types import CatalogItem, Collection, Product, ProductCard, ProductOption, ProductPage
+from commera.sdk.types import (
+	CartLineProduct,
+	CatalogItem,
+	Collection,
+	Product,
+	ProductCard,
+	ProductOption,
+	ProductPage,
+)
 from commera.search.facets import get_product_filters
-from commera.search.record_builder import rates_by_item_code, sizes_for_variants
+from commera.search.record_builder import images_for_variants, rates_by_item_code, sizes_for_variants
 from commera.swatches import get_swatch_map
 from commera.utils import (
 	IN_CLAUSE_CHUNK_SIZE,
@@ -328,3 +336,31 @@ def get_product_collection(item_group: str | None) -> dict | None:
 		return None
 	title = frappe.get_cached_value("Item Group", item_group, "custom_displayname")
 	return {"handle": get_collection_handle(item_group), "title": title or item_group}
+
+
+def get_line_products(item_codes: list[str]) -> dict[str, CartLineProduct]:
+	"""The published product, size and image that sell each item."""
+	rows = frappe.get_all(
+		"Color Size Item",
+		filters={"item_code": ("in", item_codes or [""]), "parenttype": "Style Attribute Variant"},
+		fields=["item_code", "size", "parent"],
+	)
+	variants = {
+		row.name: row
+		for row in frappe.get_all(
+			"Style Attribute Variant",
+			filters={"name": ("in", [row.parent for row in rows] or [""]), "is_published": 1},
+			fields=["name", "route", "display_name"],
+		)
+	}
+	images = images_for_variants(list(variants))
+	return {
+		row.item_code: {
+			"handle": variants[row.parent].route,
+			"title": variants[row.parent].display_name,
+			"variant_title": row.size,
+			"image": images.get(row.parent, {}).get("image"),
+		}
+		for row in rows
+		if row.parent in variants
+	}

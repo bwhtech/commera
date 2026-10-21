@@ -7,7 +7,7 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import adopt_gu
 from commera.guest import get_guest_cart_token, is_guest, set_guest_cart_cookie
 from commera.plugin_events import get_listed_items
 from commera.sdk import cart as cart_sdk
-from commera.search.record_builder import images_for_variants
+from commera.sdk.types import PricedCart
 from commera.www.cart.permalink import get_next_url
 
 CHECKOUT_CODE_PREFIX = "commera:storefront_checkout:"
@@ -17,13 +17,13 @@ CHECKOUT_CODE_SECONDS = 5 * 60
 # Each call acts on the cart of the X-Commera-Cart-Token header the storefront server sends.
 @frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=1200, seconds=60 * 60)
-def get_cart() -> dict | None:
-	return get_cart_shape(cart_sdk.get_priced_cart())
+def get_cart() -> PricedCart | None:
+	return cart_sdk.get_priced_cart()
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=600, seconds=60 * 60)
-def add_lines(lines: list | str) -> dict:
+def add_lines(lines: list | str) -> PricedCart:
 	"""Add `[{item_code, qty, attributes}]`; only items a published product sells."""
 	lines = [
 		{
@@ -37,36 +37,36 @@ def add_lines(lines: list | str) -> dict:
 		[line["item_code"] for line in lines]
 	):
 		frappe.throw(_("{0} is not for sale.").format(", ".join(sorted(unlisted))))
-	return get_cart_shape(cart_sdk.add_lines(lines))
+	return cart_sdk.add_lines(lines)
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=600, seconds=60 * 60)
-def update_lines(lines: list | str) -> dict:
+def update_lines(lines: list | str) -> PricedCart:
 	"""Set `[{line_id, qty}]`; a quantity of 0 removes the line."""
 	lines = [
 		{"line_id": cstr(line.get("line_id")), "qty": cint(line.get("qty"))}
 		for line in frappe.parse_json(lines) or []
 	]
-	return get_cart_shape(cart_sdk.update_lines(lines))
+	return cart_sdk.update_lines(lines)
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=600, seconds=60 * 60)
-def remove_lines(line_ids: list | str) -> dict:
-	return get_cart_shape(cart_sdk.remove_lines([cstr(line_id) for line_id in frappe.parse_json(line_ids)]))
+def remove_lines(line_ids: list | str) -> PricedCart:
+	return cart_sdk.remove_lines([cstr(line_id) for line_id in frappe.parse_json(line_ids)])
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=30, seconds=60 * 60)
-def add_discount_code(code: str) -> dict:
-	return get_cart_shape(cart_sdk.add_discount_code(cstr(code).strip()))
+def add_discount_code(code: str) -> PricedCart:
+	return cart_sdk.add_discount_code(cstr(code).strip())
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=100, seconds=60 * 60)
-def remove_discount_code(code: str) -> dict:
-	return get_cart_shape(cart_sdk.remove_discount_code(cstr(code).strip()))
+def remove_discount_code(code: str) -> PricedCart:
+	return cart_sdk.remove_discount_code(cstr(code).strip())
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
@@ -100,39 +100,3 @@ def open_checkout(code: str):
 
 	frappe.local.response["type"] = "redirect"
 	frappe.local.response["location"] = get_next_url() if token else f"/{frappe.local.lang}/cart"
-
-
-def get_cart_shape(priced_cart: dict | None) -> dict | None:
-	"""The priced cart, with the product each line belongs to."""
-	if not priced_cart:
-		return None
-	products = get_line_products([line["item_code"] for line in priced_cart["lines"]])
-	lines = [{**line, "product": products.get(line["item_code"])} for line in priced_cart["lines"]]
-	return {**priced_cart, "lines": lines, "total_quantity": sum(line["qty"] for line in lines)}
-
-
-def get_line_products(item_codes: list[str]) -> dict[str, dict]:
-	rows = frappe.get_all(
-		"Color Size Item",
-		filters={"item_code": ("in", item_codes or [""]), "parenttype": "Style Attribute Variant"},
-		fields=["item_code", "size", "parent"],
-	)
-	variants = {
-		row.name: row
-		for row in frappe.get_all(
-			"Style Attribute Variant",
-			filters={"name": ("in", [row.parent for row in rows] or [""]), "is_published": 1},
-			fields=["name", "route", "display_name"],
-		)
-	}
-	images = images_for_variants(list(variants))
-	return {
-		row.item_code: {
-			"handle": variants[row.parent].route,
-			"title": variants[row.parent].display_name,
-			"variant_title": row.size,
-			"image": images.get(row.parent, {}).get("image"),
-		}
-		for row in rows
-		if row.parent in variants
-	}

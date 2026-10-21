@@ -74,6 +74,7 @@ PUBLIC_NAMES = {
 		"Address",
 		"Cart",
 		"CartLine",
+		"CartLineProduct",
 		"CatalogItem",
 		"Charge",
 		"ChargeSummary",

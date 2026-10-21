@@ -6,6 +6,7 @@ from werkzeug.wrappers import Request
 from commera.api.storefront.cart import add_lines, get_cart, get_checkout_url, open_checkout, update_lines
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.guest import CART_TOKEN_HEADER, GUEST_CART_COOKIE
+from commera.sdk.types import CartLineProduct, PricedCart, PricedCartLine
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 
 
@@ -43,6 +44,8 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 		self.assertEqual(line["product"]["handle"], self.route)
 		self.assertEqual(line["product"]["variant_title"], "M")
 		self.assertEqual(cart["total_quantity"], 2)
+		for result, shape in ((cart, PricedCart), (line, PricedCartLine), (line["product"], CartLineProduct)):
+			self.assertEqual(set(result), shape.__required_keys__ | shape.__optional_keys__)
 
 	def test_an_item_no_product_sells_is_refused(self):
 		frappe.set_user("Administrator")

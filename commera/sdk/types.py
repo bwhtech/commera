@@ -5,6 +5,7 @@ __all__ = [
 	"Address",
 	"Cart",
 	"CartLine",
+	"CartLineProduct",
 	"CatalogItem",
 	"Charge",
 	"ChargeSummary",
@@ -175,6 +176,16 @@ class NewCartLine(TypedDict, total=False):
 	selected: bool
 
 
+class CartLineProduct(TypedDict):
+	"""The published product that sells a cart line's item."""
+
+	handle: str
+	title: str
+	# The size.
+	variant_title: str
+	image: str | None
+
+
 class PricedCartLine(TypedDict):
 	line_id: str
 	item_code: str
@@ -189,6 +200,8 @@ class PricedCartLine(TypedDict):
 	# The Commera Discount on this line.
 	discount: str | None
 	amount: float
+	# None when no published product sells the item any more.
+	product: CartLineProduct | None
 
 
 class DiscountRow(TypedDict):
@@ -204,9 +217,12 @@ class PricedCart(TypedDict):
 	version: str
 	attributes: dict[str, str]
 	currency: str
-	# {"code", "class"}, where class is "Product" or "Order".
+	# {"code", "title", "discount_class", "applied", "reason"}; reason says why an unapplied code gives nothing.
 	discount_codes: list[dict]
+	# {"title", "amount"} of each automatic discount the cart gets.
+	automatic_discounts: list[dict]
 	lines: list[PricedCartLine]
+	total_quantity: int
 	discounts: list[DiscountRow]
 	subtotal: float
 	order_discount: float
