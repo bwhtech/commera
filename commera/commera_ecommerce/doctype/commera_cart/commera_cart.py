@@ -115,8 +115,8 @@ class CommeraCart(Document):
 	def add_discount_code(self, code: str):
 		codes = [applied_code for applied_code in get_discount_codes(self) if get_code_discount(applied_code)]
 		preview = self.get_quotation_preview()
-		active_codes = [selection.code for selection in select_discounts(get_cart_context(preview))]
-		code = validate_new_discount_code(code, codes, active_codes)
+		# A code that does not combine still joins the cart: pricing keeps whichever saves the shopper more.
+		code = validate_new_discount_code(code, codes, active_codes=[])
 		if refusal := get_unusable_code_reason(preview, code):
 			frappe.throw(refusal, DiscountCodeError)
 		self.discount_codes = "\n".join([*codes, code])
@@ -239,7 +239,7 @@ def get_code_reason(cart, code: str, selections: list) -> str:
 		)
 	blocking = next((other for other in selections if not discount.can_combine_with(other.discount)), None)
 	if blocking:
-		return _("{0} cannot be combined with {1}.").format(
+		return _("{0} cannot be combined with {1}, which saves you more.").format(
 			discount.title, blocking.code or blocking.discount.title
 		)
 	return _("{0} cannot be combined with your other discounts.").format(discount.title)
@@ -341,7 +341,7 @@ def merge_carts(guest_cart: CommeraCart, account_cart: CommeraCart):
 		try:
 			account_cart.add_discount_code(code)
 		except frappe.ValidationError:
-			# A code the account cart refuses, such as one that does not combine with its own, is left behind.
+			# A code the account cart refuses, such as one already used, is left behind.
 			frappe.clear_last_message()
 	account_cart.save(ignore_permissions=True)
 	frappe.delete_doc("Commera Cart", guest_cart.name, ignore_permissions=True, force=True)

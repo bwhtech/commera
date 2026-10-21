@@ -145,6 +145,24 @@ def apply_order_discount(doc, selections: list) -> list[dict]:
 	return allocations
 
 
+def get_saving(cart, selections: list) -> float:
+	"""What these discounts would take off the cart together: lines, order and the chosen delivery."""
+	doc = frappe.copy_doc(cart.doc)
+	doc.flags.commera_discounts = []
+	remove_code_discounts(doc)
+	doc.calculate_taxes_and_totals()
+	allocations = apply_line_discounts(doc, [s for s in selections if s.discount.discount_class == PRODUCT])
+	doc.calculate_taxes_and_totals()
+	allocations += apply_order_discount(doc, [s for s in selections if s.discount.discount_class == ORDER])
+	option = cart.delivery_option
+	shipping = [
+		s.discount.get_delivery_discount(option, cart)
+		for s in selections
+		if option and s.discount.discount_class == SHIPPING
+	]
+	return sum(flt(row["amount"]) for row in allocations) + max(shipping, default=0)
+
+
 def has_inclusive_tax(doc) -> bool:
 	return any(tax.included_in_print_rate for tax in doc.get("taxes") or [])
 

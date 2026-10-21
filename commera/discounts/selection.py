@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import frappe
 from frappe import _
-from frappe.utils.data import cstr
+from frappe.utils.data import cstr, flt
 
 from commera.commera_ecommerce.doctype.commera_discount.commera_discount import (
 	CommeraDiscount,
@@ -13,6 +13,7 @@ from commera.discounts.codes import get_code_discount, normalize_code
 from commera.discounts.usage import has_used_before, is_first_order
 
 MAX_DISCOUNT_CODES = 5
+MAX_PRICED_COMBINATIONS = 20
 
 
 @dataclass
@@ -89,19 +90,50 @@ def is_single_use_spent(code: str) -> bool:
 
 
 def select_discounts(cart) -> list[Selection]:
-	"""The shopper's codes first, then automatic discounts, each kept while it applies and combines."""
-	selected = []
+	"""Of the discounts that apply, the combination that saves the shopper the most, like Shopify. On a tie
+	the one holding the code applied first wins: codes come first, in the order they were applied."""
+	# Imported here: pricing imports this module.
+	from commera.discounts.pricing import get_saving
+
+	applicable = []
 	for selection in get_candidates(cart.doc):
 		discount = selection.discount
 		if discount.status != "Active" or not discount.is_for_currency(cart):
 			continue
-		if any(other.discount.name == discount.name for other in selected):
+		if any(other.discount.name == discount.name for other in applicable):
 			continue
 		if get_unmet_reason(discount, cart) or not discount.gives_anything(cart):
 			continue
-		if all(discount.can_combine_with(other.discount) for other in selected):
-			selected.append(selection)
-	return selected
+		applicable.append(selection)
+
+	combinations = get_combinations(applicable)[:MAX_PRICED_COMBINATIONS]
+	if len(combinations) == 1:
+		return combinations[0]
+	return max(combinations, key=lambda combination: flt(get_saving(cart, combination), 2))
+
+
+def get_combinations(selections: list[Selection]) -> list[list[Selection]]:
+	"""Every largest set of discounts that all combine with each other, each in the order given."""
+	combinations = []
+
+	def extend(combination: list, candidates: list, skipped: list):
+		if not candidates and not skipped:
+			combinations.append(combination)
+		for selection in list(candidates):
+			extend(
+				[*combination, selection],
+				[
+					other
+					for other in candidates
+					if other is not selection and other.discount.can_combine_with(selection.discount)
+				],
+				[other for other in skipped if other.discount.can_combine_with(selection.discount)],
+			)
+			candidates.remove(selection)
+			skipped.append(selection)
+
+	extend([], list(selections), [])
+	return combinations
 
 
 def get_candidates(doc) -> list[Selection]:

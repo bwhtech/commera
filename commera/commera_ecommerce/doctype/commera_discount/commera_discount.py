@@ -132,14 +132,9 @@ class CommeraDiscount(Document):
 		if self.discount_class == ORDER:
 			return self.get_order_discount(cart) > 0
 		# Before a delivery option is chosen there is nothing to judge a shipping discount on.
-		if not cart.doc.get("custom_delivery_option"):
+		if not cart.delivery_option:
 			return True
-		option = {
-			"title": cart.doc.custom_delivery_option,
-			"amount": flt(cart.doc.get("custom_delivery_charge"))
-			+ flt(cart.doc.get("custom_shipping_discount")),
-		}
-		return self.get_delivery_discount(option, cart) > 0
+		return self.get_delivery_discount(cart.delivery_option, cart) > 0
 
 	def is_for_customer_group(self, customer_group: str | None) -> bool:
 		if not customer_group:

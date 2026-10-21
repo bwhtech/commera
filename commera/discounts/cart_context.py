@@ -19,6 +19,7 @@ class CartContext:
 	phone: str | None
 	sale_by_item_code: dict = field(default_factory=dict)
 	exchange_rates: dict = field(default_factory=dict)
+	offered_option: dict | None = None
 
 	@property
 	def items(self) -> list:
@@ -35,6 +36,20 @@ class CartContext:
 	@property
 	def quantity(self) -> int:
 		return sum(cint(item.qty) for item in self.items)
+
+	@property
+	def delivery_option(self) -> dict | None:
+		"""The delivery option chosen at checkout, or the one being offered, at its price before any shipping
+		discount."""
+		if self.offered_option:
+			return self.offered_option
+		if not self.doc.get("custom_delivery_option"):
+			return None
+		return {
+			"title": self.doc.custom_delivery_option,
+			"amount": flt(self.doc.get("custom_delivery_charge"))
+			+ flt(self.doc.get("custom_shipping_discount")),
+		}
 
 	def get_exchange_rate(self, currency: str | None) -> float:
 		"""A discount's currency to the cart's, at the store's selling rate. Blank means the company's."""

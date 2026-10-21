@@ -14,6 +14,7 @@ from commera.api.payments import (
 from commera.api.shipping import apply_delivery_option, get_checkout_summary
 from commera.commera_ecommerce.doctype.commera_discount.commera_discount import DiscountCodeError
 from commera.core import new_cart_quotation
+from commera.discounts.allocations import get_allocations
 from commera.discounts.codes import add_code, generate_codes, get_code_discount
 from commera.discounts.pricing import refresh_code_discounts
 from commera.discounts.selection import MAX_DISCOUNT_CODES, validate_new_discount_code
@@ -299,6 +300,41 @@ class TestDiscountSelection(DiscountCodeTestCase):
 		with self.assertRaises(DiscountCodeError):
 			validate_new_discount_code(strict_order, [product])
 		self.assertEqual(validate_new_discount_code(open_order, [product]), open_order)
+
+	def test_of_two_codes_that_do_not_combine_the_bigger_saving_applies(self):
+		order = self.create_code(amount=10)
+		product = self.create_code(percentage=15, item_codes=(self.shirt,))
+		for codes in ((order, product), (product, order)):
+			with self.subTest(codes):
+				quotation = self.create_quotation({self.shirt: 1, self.cap: 1}, codes)
+
+				self.assertEqual(quotation.net_total, 116.5)
+				self.assertEqual([row["code"] for row in get_allocations(quotation)], [product])
+
+	def test_a_code_and_an_automatic_discount_keep_the_bigger_saving(self):
+		code = self.create_code(amount=10)
+		for percentage, net_total, wins in ((5, 120, "code"), (20, 104, "automatic")):
+			with self.subTest(percentage):
+				automatic = self.create_discount(percentage=percentage, method="Automatic")
+				self.addCleanup(frappe.db.set_value, "Commera Discount", automatic, "enabled", 0)
+				quotation = self.create_quotation({self.shirt: 1, self.cap: 1}, (code,))
+				frappe.db.set_value("Commera Discount", automatic, "enabled", 0)
+
+				self.assertEqual(quotation.net_total, net_total)
+				self.assertEqual(
+					[row["discount"] for row in get_allocations(quotation)],
+					[get_code_discount(code) if wins == "code" else automatic],
+				)
+
+	def test_on_an_equal_saving_the_code_applied_first_stays(self):
+		first = self.create_code(amount=10)
+		second = self.create_code(percentage=100, item_codes=(self.cap,), maximum_discount=10)
+		for codes in ((first, second), (second, first)):
+			with self.subTest(codes):
+				quotation = self.create_quotation({self.shirt: 1, self.cap: 1}, codes)
+
+				self.assertEqual(quotation.net_total, 120)
+				self.assertEqual([row["code"] for row in get_allocations(quotation)], [codes[0]])
 
 	def test_one_discount_applies_once_whatever_codes_it_has(self):
 		code = self.create_code(amount=10)
