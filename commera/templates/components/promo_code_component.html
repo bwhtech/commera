@@ -1,5 +1,7 @@
 {% import "templates/macros/modal.html" as modal %}
-{% for discount_code in (cart_quotation.custom_discount_codes or "").splitlines() if discount_code.strip() %}
+{% for code_state in discount_code_states %}
+    {% set discount_code = code_state.code %}
+    <span class="inline-flex flex-col gap-1">
     <span
         class="w-fit inline-flex overflow-hidden rounded-lg border border-dashed border-gray-400 bg-white text-xs font-medium text-gray-600 ">
         <span class="flex items-center gap-1 bg-gray-400/10 px-2 py-1">
@@ -14,6 +16,10 @@
                 </div>
             </button>
         </span>
+    </span>
+    {% if code_state.reason %}
+        <span class="max-w-60 text-xs text-gray-500">{{ code_state.reason }}</span>
+    {% endif %}
     </span>
 {% endfor %}
     {% call modal.modal(button_text='apply promo code',button_classes='text-md text-secondary-accent underline decoration-accent

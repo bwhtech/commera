@@ -130,6 +130,14 @@
 	color: var(--title);
 }
 
+.order-detail .checkout-discount-reason {
+	max-width: 240px;
+	margin: 4px 0 0;
+	font-size: 12px;
+	line-height: 18px;
+	color: #5E626F;
+}
+
 .order-detail .checkout-discount-chip button {
 	padding: 0;
 	border: 0;

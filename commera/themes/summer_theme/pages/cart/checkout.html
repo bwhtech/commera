@@ -16,7 +16,7 @@
 	"delivery_charge_applicable_below": delivery_charge_applicable_below,
 	"prefill": checkout_prefill,
 	"coupon_code": coupon_code,
-	"discount_codes": (cart_quotation.custom_discount_codes or "").splitlines() | map("trim") | select | list if cart_quotation else [],
+	"discount_codes": discount_code_states,
 } %}
 
 {% block head %}
@@ -342,15 +342,18 @@
 								</button>
 							</div>
 							<div class="checkout-discount-codes" x-show="discount_codes.length" x-cloak>
-								<template x-for="code in discount_codes" :key="code">
-									<span class="checkout-discount-chip">
-										<i class="fa-solid fa-tag"></i>
-										<span x-text="code"></span>
-										<button type="button" :aria-label="`{{ _('Remove') }} ${code}`"
-											:disabled="discount_code_saving" @click="remove_discount_code(code)">
-											<i class="fa-solid fa-xmark"></i>
-										</button>
-									</span>
+								<template x-for="code_state in discount_codes" :key="code_state.code">
+									<div class="checkout-discount-code-state">
+										<span class="checkout-discount-chip">
+											<i class="fa-solid fa-tag"></i>
+											<span x-text="code_state.code"></span>
+											<button type="button" :aria-label="`{{ _('Remove') }} ${code_state.code}`"
+												:disabled="discount_code_saving" @click="remove_discount_code(code_state.code)">
+												<i class="fa-solid fa-xmark"></i>
+											</button>
+										</span>
+										<p class="checkout-discount-reason" x-show="code_state.reason" x-text="code_state.reason"></p>
+									</div>
 								</template>
 							</div>
 						</div>
@@ -623,7 +626,7 @@
 
 				async load_discount_codes() {
 					try {
-						const response = await frappe_call("/api/v2/method/commera.api.server_cart.get_server_cart", {});
+						const response = await frappe_call("/api/v2/method/commera.api.server_cart.get_priced_server_cart", {});
 						this.discount_codes = response.data?.discount_codes || [];
 					} catch (error) {}
 				},
@@ -685,7 +688,7 @@
 
 				// A guest has no checkout before the address step, so only the codes change on screen until then.
 				set_discount_codes(priced_cart) {
-					this.discount_codes = priced_cart.discount_codes.map((row) => row.code);
+					this.discount_codes = priced_cart.discount_codes;
 					if (priced_cart.checkout_summary) this.summary = priced_cart.checkout_summary;
 				},
 

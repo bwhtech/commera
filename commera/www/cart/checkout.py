@@ -4,6 +4,7 @@ from frappe.utils.data import cstr
 
 from commera.api.payments import COD_PAYMENT_MODE, get_checkout_payment_methods
 from commera.api.shipping import get_checkout_summary
+from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_code_states
 from commera.core import _get_cart_quotation
 from commera.discounts.selection import get_discount_codes
 from commera.guest import is_guest
@@ -91,6 +92,7 @@ def set_guest_cart_context(context):
 	context.cart_quotation = None
 	context.checkout_summary = {}
 	context.coupon_code = ""
+	context.discount_code_states = []
 	context.items = []
 	context.billing_addresses = []
 	context.shipping_addresses = []
@@ -104,6 +106,7 @@ def set_cart_context(context, commera_settings):
 	context.cart_quotation = cart_quotation
 	context.checkout_summary = get_checkout_summary(cart_quotation)
 	context.coupon_code = get_coupon_code(cart_quotation)
+	context.discount_code_states = get_code_states(cart_quotation)
 	items = get_checkout_items(cart_quotation)
 	if default_price_list:
 		for item in items:
