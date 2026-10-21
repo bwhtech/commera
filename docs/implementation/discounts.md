@@ -40,6 +40,8 @@ flowchart TB
 
 An item is on sale when its sale price list rate is below its default price list rate.
 
+Quantity breaks, such as ₹500 each for 1 to 9, ₹450 from 10 and ₹400 from 50, are not a discount type. Set them up as ERPNext Pricing Rules on the item, one rule for each slab, with a minimum and maximum quantity and a rate or a percentage off. The cart, checkout, order and invoice all use the break price, and Commera codes come off on top of it. ERPNext prices each cart line on its own, so the same item on two lines (for example with different line attributes) does not count toward one break. To count them together, tick "Mixed Conditions" on the rule.
+
 ## The discount step on each save
 
 Quotation, Sales Order and Sales Invoice run the same two hooks from `commera/discounts/pricing.py`:
@@ -47,7 +49,7 @@ Quotation, Sales Order and Sales Invoice run the same two hooks from `commera/di
 1. `before_validate` takes off the amounts the last save added. The result is clamped at zero, so other code that resets these fields cannot cause a double removal.
 2. ERPNext prices the document: price lists, automatic Pricing Rules, taxes.
 3. `validate` adds the discounts again:
-    1. A storefront cart chooses its discounts: the shopper's codes first, then automatic discounts, each kept while its conditions hold and it combines with those already chosen. A Sales Order or Sales Invoice keeps the discounts its cart had.
+    1. A storefront cart chooses its discounts: the shopper's codes first, then automatic discounts, each kept while its conditions hold and it combines with those already chosen. A placed cart (the submitted Quotation), its Sales Order and its Sales Invoice keep the discounts the cart had.
     2. Product discounts: the best one on each line goes into the line `discount_amount`.
     3. Order discounts: they come off the subtotal after product discounts, into the document `discount_amount` with `apply_discount_on = Net Total`.
     4. The step writes `custom_discount_allocations`: one row per discount with its amount.
