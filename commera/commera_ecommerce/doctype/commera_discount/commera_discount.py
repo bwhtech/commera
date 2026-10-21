@@ -14,6 +14,7 @@ CLASS_BY_TYPE = {
 	"Free Shipping": SHIPPING,
 }
 PERCENTAGE = "Percentage"
+MAX_CUSTOMERS = 100
 
 
 class DiscountCodeError(frappe.ValidationError):
@@ -31,6 +32,10 @@ class CommeraDiscount(Document):
 		self.validate_targets()
 		if self.enabled and self.eligibility == "Customer Groups" and not self.customer_groups:
 			frappe.throw(_("Choose at least one customer group, or let everyone use this discount."))
+		if self.enabled and self.eligibility == "Specific Customers" and not self.customers:
+			frappe.throw(_("Choose at least one customer, or let everyone use this discount."))
+		if len(self.customers) > MAX_CUSTOMERS:
+			frappe.throw(_("A discount can be limited to at most {0} customers.").format(MAX_CUSTOMERS))
 
 	def validate_values(self):
 		percentages = [self.shipping_percentage]

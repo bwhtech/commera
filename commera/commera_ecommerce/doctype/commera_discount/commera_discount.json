@@ -45,6 +45,7 @@
 		"column_break_conditions",
 		"eligibility",
 		"customer_groups",
+		"customers",
 		"section_combinations",
 		"combines_with_product",
 		"combines_with_order",
@@ -323,7 +324,7 @@
 			"fieldname": "eligibility",
 			"fieldtype": "Select",
 			"label": "Customers",
-			"options": "Everyone\nFirst Order\nCustomer Groups",
+			"options": "Everyone\nFirst Order\nCustomer Groups\nSpecific Customers",
 			"default": "Everyone"
 		},
 		{
@@ -332,6 +333,13 @@
 			"label": "Customer Groups",
 			"options": "Commera Discount Customer Group",
 			"depends_on": "eval:doc.eligibility == 'Customer Groups'"
+		},
+		{
+			"fieldname": "customers",
+			"fieldtype": "Table MultiSelect",
+			"label": "Specific Customers",
+			"options": "Commera Discount Customer",
+			"depends_on": "eval:doc.eligibility == 'Specific Customers'"
 		},
 		{
 			"fieldname": "section_combinations",
@@ -436,7 +444,7 @@
 		}
 	],
 	"links": [],
-	"modified": "2026-10-11 00:00:00.000000",
+	"modified": "2026-10-21 00:00:00.000000",
 	"modified_by": "Administrator",
 	"module": "Commera Ecommerce",
 	"name": "Commera Discount",

@@ -367,6 +367,18 @@ class TestDiscountSelection(DiscountCodeTestCase):
 		self.assertEqual(member.custom_code_order_discount, 9)
 		self.assertFalse(other.custom_code_order_discount)
 
+	def test_an_active_specific_customers_discount_needs_a_customer(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "at least one customer"):
+			self.create_discount(percentage=10, eligibility="Specific Customers", enabled=1)
+		self.assertTrue(self.create_discount(percentage=10, eligibility="Specific Customers", enabled=0))
+
+		with self.assertRaisesRegex(frappe.ValidationError, "at most 100 customers"):
+			self.create_discount(
+				percentage=10,
+				eligibility="Specific Customers",
+				customers=[{"customer": self.customer.name}] * 101,
+			)
+
 	def test_a_first_order_discount_skips_a_returning_customer(self):
 		code = self.create_code(percentage=10, eligibility="First Order")
 		first = self.create_quotation({self.shirt: 1}, (code,))
