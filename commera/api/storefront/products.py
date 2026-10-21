@@ -6,10 +6,10 @@ from frappe.utils.data import cint, cstr, flt
 from commera.api.admin.catalog import DEFAULT_OPTION_ATTRIBUTE, DEFAULT_SIZE_VALUE
 from commera.api.storefront.collections import get_collection_handle, get_item_group
 from commera.product_detail import get_product_detail
+from commera.search.facets import get_product_filters
 from commera.search.record_builder import rates_by_item_code, sizes_for_variants
 from commera.swatches import get_swatch_map
 from commera.utils import get_available_stocks, get_product_list, get_total_product_count
-from commera.www.products.list import get_product_filters
 
 SORT_KEYS = ("default", "price_low", "price_high", "name", "new_arrival", "discount")
 MAX_PAGE_SIZE = 48

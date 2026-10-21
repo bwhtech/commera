@@ -419,9 +419,9 @@ class TestStorefrontSearch(IntegrationTestCase):
 
 	def test_sidebar_brand_round_trips_through_both_grids(self):
 		# SQLite compares the sidebar value with a BINARY-collated IN; title-casing it returned zero rows.
-		from commera.www.products import list as product_list_page
+		from commera.search.facets import get_filter_brands
 
-		brands = product_list_page.get_filter_brands({"search": SEARCH_TOKEN})
+		brands = get_filter_brands({"search": SEARCH_TOKEN})
 		self.assertIn(BRAND, brands)
 		self.assertNotIn(BRAND.title(), brands)
 		for brand in brands:
