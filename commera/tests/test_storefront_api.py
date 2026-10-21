@@ -1,12 +1,31 @@
 import frappe
 
-from commera.api.storefront.collections import get_collection, get_collection_handle, get_collections
+from commera.api.storefront.collections import get_collection, get_collections
 from commera.api.storefront.products import get_product, get_products
-from commera.api.storefront.shop import get_menu_url, get_page, get_sitemap
+from commera.api.storefront.shop import get_page, get_sitemap, get_storefront_url
+from commera.sdk import catalog, shop
+from commera.sdk.catalog import get_collection_handle
+from commera.sdk.shop import get_menu_link
+from commera.sdk.types import Collection, Product, ProductCard, ProductPage, ProductVariant, Shop
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 
 
 class TestStorefrontApi(ProductDetailPriceTestCase):
+	def assert_shape(self, result: dict, shape):
+		self.assertEqual(set(result), shape.__required_keys__ | shape.__optional_keys__)
+
+	def test_shopper_reads_have_exactly_their_declared_keys(self):
+		route = self.make_priced_variant("SHAPE", default_rate=40, sale_rate=30)
+		page = catalog.list_products(collection=get_collection_handle(self.item_group))
+		product = catalog.get_product(route)
+
+		self.assert_shape(page, ProductPage)
+		self.assert_shape(page["products"][0], ProductCard)
+		self.assert_shape(product, Product)
+		self.assert_shape(product["variants"][0], ProductVariant)
+		self.assert_shape(catalog.list_collections()[0], Collection)
+		self.assert_shape(shop.get_shop(), Shop)
+
 	def test_a_product_lists_its_sizes_as_variants_with_sale_and_list_prices(self):
 		route = self.make_priced_variant("API", default_rate=100, sale_rate=80)
 
@@ -86,13 +105,26 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		with self.assertRaises(frappe.DoesNotExistError):
 			get_page(page.route)
 
-	def test_menu_links_open_collections_and_brand_searches(self):
-		node = {"link_type": "Item Group", "item_groups": [self.item_group], "parent": "Root"}
+	def test_the_sdk_returns_none_where_the_api_answers_404(self):
+		route = self.make_priced_variant("SDKHIDDEN", default_rate=50)
+		frappe.db.set_value("Style Attribute Variant", {"route": route}, "is_published", 0)
 
-		self.assertEqual(get_menu_url(node), f"/collections/{get_collection_handle(self.item_group)}")
+		self.assertIsNone(catalog.get_product(route))
+		self.assertIsNone(catalog.get_collection("no-such-collection"))
+
+	def test_menu_links_name_their_target_and_the_api_adds_storefront_paths(self):
+		node = {"link_type": "Item Group", "item_groups": [self.item_group], "parent": "Root"}
+		handle = get_collection_handle(self.item_group)
+
+		self.assertEqual(get_menu_link(node), ("collection", handle))
 		self.assertEqual(
-			get_menu_url({"link_type": "Brand", "brand": "K&N", "parent": ""}), "/search?q=K%26N"
+			get_menu_link({"link_type": "Brand", "brand": "K&N", "parent": ""}), ("brand", "K&N")
 		)
 		self.assertEqual(
-			get_menu_url({"link_type": "Item Group", "item_groups": [], "parent": ""}), "/collections/all"
+			get_menu_link({"link_type": "Item Group", "item_groups": [], "parent": ""}), ("all", None)
 		)
+		self.assertEqual(
+			get_storefront_url({"type": "collection", "target": handle}), f"/collections/{handle}"
+		)
+		self.assertEqual(get_storefront_url({"type": "brand", "target": "K&N"}), "/search?q=K%26N")
+		self.assertEqual(get_storefront_url({"type": "all", "target": None}), "/collections/all")

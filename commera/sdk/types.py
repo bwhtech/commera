@@ -9,14 +9,28 @@ __all__ = [
 	"Charge",
 	"ChargeSummary",
 	"CheckoutSummary",
+	"Collection",
+	"ContentPage",
 	"Discount",
 	"DiscountAllocation",
 	"DiscountInput",
+	"FooterSection",
+	"MenuItem",
 	"NewCartLine",
 	"Order",
 	"OrderLine",
 	"PricedCart",
 	"PricedCartLine",
+	"Product",
+	"ProductCard",
+	"ProductFacets",
+	"ProductOption",
+	"ProductOptionValue",
+	"ProductPage",
+	"ProductVariant",
+	"Rating",
+	"Shop",
+	"SitemapEntry",
 	"Stage",
 ]
 
@@ -234,3 +248,136 @@ class CatalogItem(TypedDict):
 	available_qty: float
 	# Drop-shipped or not stock-tracked: sellable whatever available_qty says.
 	unlimited: bool
+
+
+class Rating(TypedDict):
+	average: float
+	count: int
+
+
+class ProductCard(TypedDict):
+	"""A published product as a shopper sees it in a grid. Image paths are site-relative or absolute."""
+
+	id: str
+	handle: str
+	title: str
+	vendor: str | None
+	color: str | None
+	image: str | None
+	hover_image: str | None
+	currency: str
+	price: float
+	compare_at_price: float | None
+	available: bool
+	rating: Rating
+	updated_at: str | None
+
+
+class ProductFacets(TypedDict):
+	brands: list[str]
+	colors: list[str]
+	sizes: list[str]
+	price: dict[str, float]
+
+
+class ProductPage(TypedDict):
+	products: list[ProductCard]
+	total: int
+	page: int
+	page_size: int
+	facets: ProductFacets
+
+
+class ProductOptionValue(TypedDict, total=False):
+	name: str
+	# Colour values only: the sibling product's handle, whether it is this one, and its stock and swatch.
+	handle: str
+	selected: bool
+	available: bool
+	swatch: dict | None
+
+
+class ProductOption(TypedDict):
+	name: str
+	values: list[ProductOptionValue]
+
+
+class ProductVariant(TypedDict):
+	"""One size of a product."""
+
+	id: str
+	title: str
+	price: float
+	compare_at_price: float | None
+	available: bool
+	# None when the item is sold without stock tracking.
+	quantity_available: float | None
+
+
+class Product(TypedDict):
+	"""One colour of a style: sibling colours are the colour option, sizes are the variants."""
+
+	id: str
+	handle: str
+	title: str
+	vendor: str | None
+	color: str | None
+	description_html: str
+	images: list[str]
+	collection: dict | None
+	currency: str
+	price: float
+	available: bool
+	options: list[ProductOption]
+	variants: list[ProductVariant]
+	selected_variant_id: str | None
+	rating: Rating
+	seo: dict
+	updated_at: str
+
+
+class Collection(TypedDict):
+	"""An Item Group that holds a published product."""
+
+	handle: str
+	title: str
+	image: str | None
+	updated_at: str
+
+
+class MenuItem(TypedDict):
+	"""`type` is "collection" (target: a collection handle), "brand" (target: the brand), "url" (target:
+	the URL) or "all" (every product); a node with no link has type None."""
+
+	title: str
+	type: str | None
+	target: str | None
+	items: list["MenuItem"]
+
+
+class FooterSection(TypedDict):
+	title: str
+	links: list[dict[str, str]]
+
+
+class Shop(TypedDict):
+	name: str
+	description: str
+	currency: str
+	logo: str
+	favicon: str
+	menu: list[MenuItem]
+	footer: list[FooterSection]
+
+
+class ContentPage(TypedDict):
+	handle: str
+	title: str
+	body_html: str
+	seo: dict
+	updated_at: str
+
+
+class SitemapEntry(TypedDict):
+	handle: str
+	updated_at: str
