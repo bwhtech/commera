@@ -24,18 +24,23 @@ MAX_CART_LINES = 50
 MAX_LINE_QUANTITY = 100
 
 
+def get_max_line_quantity() -> int:
+	return cint(frappe.get_cached_doc("Commera Settings").max_cart_line_quantity) or MAX_LINE_QUANTITY
+
+
 class CommeraCart(Document):
 	"""The shopper's cart on the server: lines with attributes, and discount codes. ERPNext prices it."""
 
 	def validate(self):
 		if len(self.lines) > MAX_CART_LINES:
 			frappe.throw(_("A cart holds at most {0} lines.").format(MAX_CART_LINES))
+		max_line_quantity = get_max_line_quantity()
 		for line in self.lines:
 			if cint(line.qty) < 1:
 				frappe.throw(_("Row {0}: the quantity must be at least 1.").format(line.idx))
-			if cint(line.qty) > MAX_LINE_QUANTITY:
+			if cint(line.qty) > max_line_quantity:
 				frappe.throw(
-					_("Row {0}: a cart line holds at most {1} units.").format(line.idx, MAX_LINE_QUANTITY)
+					_("Row {0}: a cart line holds at most {1} units.").format(line.idx, max_line_quantity)
 				)
 			attributes = parse_attributes(line.attributes)
 			line.attributes = frappe.as_json(attributes, indent=None) if attributes else None

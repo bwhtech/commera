@@ -34,6 +34,7 @@
   "print_format",
   "allow_guest_checkout",
   "guest_order_link_days",
+  "max_cart_line_quantity",
   "payment_mode_section",
   "column_break_iirq",
   "column_break_oopm",
@@ -862,6 +863,14 @@
    "non_negative": 1
   },
   {
+   "default": "100",
+   "description": "The most units of one item a shopper can put in the cart, even when the item never runs out of stock. Blank or 0 means 100.",
+   "fieldname": "max_cart_line_quantity",
+   "fieldtype": "Int",
+   "label": "Most Units per Cart Line",
+   "non_negative": 1
+  },
+  {
    "fieldname": "storefront_apps_tab",
    "fieldtype": "Tab Break",
    "label": "Storefront Apps"
@@ -879,7 +888,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-08 10:00:00.000000",
+ "modified": "2026-10-21 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Settings",

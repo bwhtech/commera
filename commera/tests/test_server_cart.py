@@ -103,6 +103,22 @@ class TestServerCart(DiscountCodeTestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "at most"):
 			cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
 
+	def test_the_store_sets_how_many_units_a_cart_line_holds(self):
+		previous = frappe.db.get_single_value("Commera Settings", "max_cart_line_quantity")
+		self.addCleanup(self.set_max_line_quantity, previous)
+		self.set_max_line_quantity(250)
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 250}])
+		with self.assertRaisesRegex(frappe.ValidationError, "at most 250"):
+			cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
+
+		self.set_max_line_quantity(0)
+		with self.assertRaisesRegex(frappe.ValidationError, f"at most {MAX_LINE_QUANTITY} "):
+			cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])
+
+	def set_max_line_quantity(self, quantity: int):
+		frappe.db.set_single_value("Commera Settings", "max_cart_line_quantity", quantity)
+		frappe.clear_document_cache("Commera Settings", "Commera Settings")
+
 	def test_sign_in_makes_the_guest_cart_the_account_cart(self):
 		code = self.create_code(amount=10)
 		self.use_guest_cart()
