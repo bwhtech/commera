@@ -353,7 +353,7 @@ class TestDiscountSelection(DiscountCodeTestCase):
 
 		self.assertFalse(quotation.custom_code_order_discount)
 
-	def test_a_customer_group_discount_skips_other_groups(self):
+	def test_a_customer_group_discount_skips_other_groups_and_guests(self):
 		group = frappe.get_doc(
 			{"doctype": "Customer Group", "customer_group_name": f"ZZ VIP {frappe.generate_hash(length=6)}"}
 		).insert(ignore_permissions=True)
@@ -361,11 +361,18 @@ class TestDiscountSelection(DiscountCodeTestCase):
 			percentage=10, eligibility="Customer Groups", customer_groups=[{"customer_group": group.name}]
 		)
 
-		member = self.create_quotation({self.shirt: 1}, (code,), customer=self.create_customer(group.name))
+		member_customer = self.create_customer(group.name)
+		member = self.create_quotation({self.shirt: 1}, (code,), customer=member_customer)
 		other = self.create_quotation({self.shirt: 1}, (code,))
+		guest = self.create_quotation({self.shirt: 1}, (code,), customer=member_customer)
+		guest.custom_guest_cart_key = frappe.generate_hash(length=16)
+		refresh_code_discounts(guest)
 
-		self.assertEqual(member.custom_code_order_discount, 9)
+		self.assertEqual(member.custom_code_order_discount, 9.0)
+		self.assertEqual(member.net_total, 81.0)
 		self.assertFalse(other.custom_code_order_discount)
+		self.assertFalse(guest.custom_code_order_discount)
+		self.assertEqual(guest.net_total, 90.0)
 
 	def test_a_specific_customers_discount_skips_other_customers_and_guests(self):
 		frappe.db.set_value("Commera Discount", {"method": "Automatic"}, "enabled", 0)

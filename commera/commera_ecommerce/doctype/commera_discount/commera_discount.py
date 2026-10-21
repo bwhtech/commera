@@ -114,7 +114,7 @@ class CommeraDiscount(Document):
 			return _("{0} is for prepaid orders only.").format(self.title)
 		if self.payment_condition == "Cash On Delivery" and cart.payment_kind != "cod":
 			return _("{0} is for cash on delivery orders only.").format(self.title)
-		if self.eligibility == "Customer Groups" and not self.is_for_customer_group(cart.customer_group):
+		if self.eligibility == "Customer Groups" and not self.is_for_customer_group(cart):
 			return _("{0} is not available for your account.").format(self.title)
 		if self.eligibility == "Specific Customers" and not self.is_for_customer(cart):
 			return _("{0} is not available for your account.").format(self.title)
@@ -137,12 +137,12 @@ class CommeraDiscount(Document):
 		}
 		return self.get_delivery_discount(option) > 0
 
-	def is_for_customer_group(self, customer_group: str | None) -> bool:
-		if not customer_group:
+	def is_for_customer_group(self, cart) -> bool:
+		if not cart.customer_group or cart.doc.get("custom_guest_cart_key"):
 			return False
 		return any(
-			customer_group == row.customer_group
-			or customer_group in get_descendants_of("Customer Group", row.customer_group)
+			cart.customer_group == row.customer_group
+			or cart.customer_group in get_descendants_of("Customer Group", row.customer_group)
 			for row in self.customer_groups
 		)
 
