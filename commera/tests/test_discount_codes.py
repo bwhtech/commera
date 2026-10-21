@@ -19,6 +19,7 @@ from commera.discounts.codes import add_code, generate_codes, get_code_discount
 from commera.discounts.pricing import refresh_code_discounts
 from commera.discounts.selection import MAX_DISCOUNT_CODES, validate_new_discount_code
 from commera.discounts.shipping import apply_shipping_discounts
+from commera.discounts.usage import record_discount_uses
 
 SHIRT_RATE = 90.0
 CAP_RATE = 40.0
@@ -901,6 +902,33 @@ class TestDiscountCurrency(DiscountCodeTestCase):
 		for case, (code, lines, net_total) in cases.items():
 			with self.subTest(case):
 				self.assertEqual(self.create_quotation(lines, (code,)).net_total, net_total)
+
+	def test_uses_in_two_currencies_add_up_in_the_company_currency(self):
+		discount = self.create_discount(amount=10, currency=None)
+		code = add_code(discount, f"zz{frappe.generate_hash(length=8)}")
+		sales_order = self.place_order(self.create_quotation({self.shirt: 1}, (code,)))
+		foreign_order = self.place_order(self.create_quotation({self.shirt: 1}, (code,)))
+		foreign_order.currency, foreign_order.conversion_rate = self.foreign, 80
+		foreign_order.base_grand_total = foreign_order.grand_total * 80
+		frappe.db.delete("Commera Discount Use", {"sales_order": foreign_order.name})
+		record_discount_uses(foreign_order)
+
+		self.assertEqual(
+			frappe.db.get_value("Commera Discount", discount, ["times_used", "discount_given", "sales"]),
+			(2, 810, sales_order.grand_total + foreign_order.grand_total * 80),
+		)
+
+	def test_a_budget_in_another_currency_is_used_up_by_orders_in_the_company_currency(self):
+		code = self.create_code(amount=1, currency=self.foreign, budget=1.5)
+		discounts = []
+		for _index in range(3):
+			sales_order = self.place_order(self.create_quotation({self.shirt: 1, self.cap: 1}, (code,)))
+			discounts.append(sales_order.custom_code_order_discount)
+
+		self.assertEqual(discounts, [80, 40, 0])
+		self.assertEqual(
+			frappe.db.get_value("Commera Discount", get_code_discount(code), "discount_given"), 120
+		)
 
 	def test_money_thresholds_in_another_currency_are_converted(self):
 		minimum = self.create_code(

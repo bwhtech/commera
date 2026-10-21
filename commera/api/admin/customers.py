@@ -344,7 +344,13 @@ def read_customer_discount_uses(customer: str) -> list:
 		frappe.qb.from_(use)
 		.left_join(discount)
 		.on(discount.name == use.discount)
-		.select(use.sales_order, use.code, use.amount, use.creation.as_("used_on"), discount.title)
+		.select(
+			use.sales_order,
+			use.code,
+			use.base_amount.as_("amount"),
+			use.creation.as_("used_on"),
+			discount.title,
+		)
 		.where(use.customer == customer)
 		.orderby(use.creation, order=Order.desc)
 	).run(as_dict=True)

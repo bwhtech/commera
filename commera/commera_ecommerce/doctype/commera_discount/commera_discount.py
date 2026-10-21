@@ -1,4 +1,5 @@
 import frappe
+from erpnext.setup.utils import get_exchange_rate
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils.data import cint, flt, getdate, today
@@ -55,7 +56,19 @@ class CommeraDiscount(Document):
 
 	@property
 	def budget_left(self) -> float | None:
-		return max(flt(self.budget) - flt(self.discount_given), 0) if flt(self.budget) else None
+		"""In the company currency, which Discount given is kept in; the budget is in the discount's."""
+		if not flt(self.budget):
+			return None
+		return max(flt(self.budget) * self.get_company_exchange_rate() - flt(self.discount_given), 0)
+
+	def get_company_exchange_rate(self) -> float:
+		company = frappe.get_cached_doc("Commera Settings").get(
+			"company"
+		) or frappe.defaults.get_global_default("company")
+		company_currency = frappe.get_cached_value("Company", company, "default_currency")
+		if not self.currency or self.currency == company_currency:
+			return 1.0
+		return flt(get_exchange_rate(self.currency, company_currency, today(), "for_selling"))
 
 	@property
 	def status(self) -> str:
@@ -102,7 +115,7 @@ class CommeraDiscount(Document):
 
 	def get_budget_left(self, cart) -> float | None:
 		budget_left = self.budget_left
-		return None if budget_left is None else self.get_money(budget_left, cart)
+		return None if budget_left is None else cart.convert(budget_left, None)
 
 	def get_unmet_condition(self, cart) -> str | None:
 		"""Why this discount does not apply to the cart now, in the shopper's words; None when it does."""

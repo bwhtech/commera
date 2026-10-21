@@ -9,6 +9,8 @@
 		"sales_order",
 		"amount",
 		"order_total",
+		"base_amount",
+		"base_order_total",
 		"column_break_use",
 		"customer",
 		"email",
@@ -52,6 +54,17 @@
 			"label": "Order Total"
 		},
 		{
+			"description": "In the company currency, at the order's exchange rate when it was placed.",
+			"fieldname": "base_amount",
+			"fieldtype": "Currency",
+			"label": "Discount Amount (Company Currency)"
+		},
+		{
+			"fieldname": "base_order_total",
+			"fieldtype": "Currency",
+			"label": "Order Total (Company Currency)"
+		},
+		{
 			"fieldname": "column_break_use",
 			"fieldtype": "Column Break"
 		},
@@ -77,7 +90,7 @@
 		}
 	],
 	"links": [],
-	"modified": "2026-10-11 00:00:00.000000",
+	"modified": "2026-10-21 12:00:00.000000",
 	"modified_by": "Administrator",
 	"module": "Commera Ecommerce",
 	"name": "Commera Discount Use",

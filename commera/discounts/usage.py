@@ -85,6 +85,7 @@ def record_discount_uses(sales_order, method=None):
 		key = (allocation["discount"], allocation.get("code"))
 		amounts[key] = amounts.get(key, 0) + flt(allocation["amount"])
 
+	conversion_rate = flt(sales_order.conversion_rate) or 1
 	for (discount, code), amount in amounts.items():
 		frappe.get_doc(
 			{
@@ -94,6 +95,8 @@ def record_discount_uses(sales_order, method=None):
 				"sales_order": sales_order.name,
 				"amount": amount,
 				"order_total": flt(sales_order.grand_total),
+				"base_amount": flt(amount * conversion_rate, 2),
+				"base_order_total": flt(sales_order.base_grand_total),
 				"customer": sales_order.customer,
 				"email": (sales_order.contact_email or "").lower() or None,
 				"phone": sales_order.contact_mobile or sales_order.contact_phone or None,
@@ -126,7 +129,7 @@ def refresh_usage(discounts: set[str], codes: set[str]):
 		frappe.db.get_value("Commera Discount", discount, "name", for_update=True)
 		times_used, discount_given, sales = (
 			frappe.qb.from_(use)
-			.select(Count(use.name), Sum(use.amount), Sum(use.order_total))
+			.select(Count(use.name), Sum(use.base_amount), Sum(use.base_order_total))
 			.where(use.discount == discount)
 		).run()[0]
 		frappe.db.set_value(
