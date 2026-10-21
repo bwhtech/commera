@@ -339,6 +339,15 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		)
 		self.assertEqual(frappe.db.get_value("Payment Entry", payment_entries[0], "mode_of_payment"), GATEWAY)
 
+	def test_an_order_placed_by_a_webhook_belongs_to_the_shopper(self):
+		"""A webhook runs as Administrator, and the account pages list only orders the shopper owns."""
+		frappe.set_user("Administrator")
+
+		on_payment_request_update(self.payment_request)
+
+		sales_order = self.submitted_sales_orders()[0]
+		self.assertEqual(frappe.db.get_value("Sales Order", sales_order, "owner"), self.shopper)
+
 	def test_a_paid_order_is_due_on_its_order_date_on_the_header_and_every_line(self):
 		on_payment_request_update(self.payment_request)
 

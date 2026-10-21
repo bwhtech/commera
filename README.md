@@ -50,9 +50,21 @@ Providers are configured from the dashboard rather than the desk. Each keeps its
 - **Stripe** — Cards and wallets, worldwide.
 - **Telr** — Cards and local methods across the GCC.
 - **Tabby** — Buy now, pay later in four instalments. MENA.
+- **PayPal** — PayPal wallet payments. Not for INR or Gulf currencies.
+- **Braintree** — Cards with 3-D Secure, worldwide. Needs a merchant account per currency.
 - **Cash on delivery** — With its own fee, a threshold above which the fee is waived, and the account it books to.
 
 Gateway callbacks are idempotent, so a replayed webhook racing a shopper's return cannot bill twice.
+
+#### Gateways from other apps
+
+Every gateway bwh_payments ships gets a card on its own, from `bwh_payments.api.get_gateways()`. A payment
+provider app outside bwh_payments adds its own card with `commera_payment_gateways = [...]` in its `hooks.py`,
+next to `commera_api_version`: dotted paths, each returning `{slug, label, blurb, settings_doctype, docs_url,
+capabilities}`, where `label` is the Payment Gateway Profile's name. Commera never names a provider in code; it acts on
+`capabilities` instead. With `reusable_checkout`, a shopper who returns to checkout is sent back to the
+still-open checkout link, and the cart is kept while that payment is pending. Checkout only offers
+gateways that can take the cart's currency.
 
 <div>
 	<img width="1402" alt="Payment providers and cash on delivery settings" src=".github/screenshots/payments.png">

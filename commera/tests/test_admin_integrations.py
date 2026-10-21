@@ -1,6 +1,9 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 
+from unittest.mock import patch
+
 import frappe
+from bwh_payments.api import GatewayInfo, get_gateways
 from bwh_payments.bwh_payments.utils import get_available_payment_modes
 from frappe.tests import IntegrationTestCase
 from frappe.utils.password import get_decrypted_password
@@ -10,7 +13,12 @@ from commera.api.admin.integrations import (
 	get_integration_linked_doctypes,
 	get_link_options,
 )
-from commera.api.admin.payments import get_payment_integrations, save_payment_integration
+from commera.api.admin.payments import (
+	get_gateways_with_capability,
+	get_payment_gateways,
+	get_payment_integrations,
+	save_payment_integration,
+)
 
 SLUG = "razorpay"
 GATEWAY = "Razorpay"
@@ -127,7 +135,10 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 	def test_every_registered_gateway_is_described(self):
 		cards = get_payment_integrations()
 
-		self.assertEqual([card["slug"] for card in cards], ["razorpay", "stripe", "telr", "tabby"])
+		self.assertEqual(
+			[card["slug"] for card in cards], [gateway["slug"] for gateway in get_payment_gateways()]
+		)
+		self.assertTrue({"razorpay", "stripe", "telr", "tabby"} <= {card["slug"] for card in cards})
 		for card in cards:
 			self.assertTrue(card["available"], f"{card['slug']} settings doctype is missing")
 			self.assertTrue(card["webhook_url"].endswith(f"gateway={card['label']}"))
@@ -136,6 +147,74 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 				"enabled",
 				[field["fieldname"] for group in card["groups"] for field in group["fields"]],
 			)
+
+	def test_bwh_payments_gateways_need_no_registration_in_commera(self):
+		with (
+			patch("commera.api.admin.payments.get_gateways", return_value=[wallet_gateway_info()]),
+			patch("commera.api.admin.payments.get_gateway_hooks", return_value=[]),
+		):
+			gateways = get_payment_gateways()
+			reusable = get_gateways_with_capability("reusable_checkout")
+
+		self.assertEqual(
+			gateways,
+			[
+				{
+					"slug": "test_wallet",
+					"label": "Test Wallet",
+					"blurb": "A wallet bwh_payments describes.",
+					"settings_doctype": "Test Wallet Settings",
+					"docs_url": "https://wallet.test/docs",
+					"capabilities": ["reusable_checkout"],
+				}
+			],
+		)
+		self.assertEqual(reusable, ["Test Wallet"])
+
+	def test_a_provider_app_registers_its_gateway_through_the_hook(self):
+		with (
+			patch("commera.api.admin.payments.get_gateways", return_value=[]),
+			patch(
+				"commera.api.admin.payments.get_gateway_hooks", return_value=[f"{__name__}.wallet_gateway"]
+			),
+		):
+			gateways = get_payment_gateways()
+			reusable = get_gateways_with_capability("reusable_checkout")
+
+		self.assertEqual(gateways[-1]["slug"], "test-wallet")
+		self.assertEqual(reusable, ["Test Wallet"])
+
+	def test_a_card_from_an_app_built_for_another_commera_api_is_skipped(self):
+		with (
+			patch("commera.api.admin.payments.get_gateways", return_value=[]),
+			patch("commera.api.admin.payments.frappe.get_hooks", return_value=[f"{__name__}.wallet_gateway"]),
+			patch("commera.api.admin.payments.is_supported_app", return_value=False),
+		):
+			gateways = get_payment_gateways()
+
+		self.assertNotIn("test-wallet", [gateway["slug"] for gateway in gateways])
+
+	def test_a_failing_card_is_logged_and_skipped_instead_of_breaking_the_registry(self):
+		hooks = [f"{__name__}.broken_gateway", f"{__name__}.card_without_slug", f"{__name__}.wallet_gateway"]
+		with (
+			patch("commera.api.admin.payments.get_gateway_hooks", return_value=hooks),
+			patch("commera.api.admin.payments.frappe.log_error") as log_error,
+		):
+			gateways = get_payment_gateways()
+
+		self.assertEqual(gateways[-1]["slug"], "test-wallet")
+		self.assertEqual(len(gateways), len(get_gateways()) + 1)
+		self.assertEqual(log_error.call_count, 2)
+
+	def test_a_hook_cannot_replace_a_built_in_gateway(self):
+		with patch(
+			"commera.api.admin.payments.get_gateway_hooks", return_value=[f"{__name__}.stripe_impostor"]
+		):
+			gateways = get_payment_gateways()
+
+		stripe = [gateway for gateway in gateways if gateway["slug"] == "stripe"]
+		self.assertEqual(len(stripe), 1)
+		self.assertEqual(stripe[0]["settings_doctype"], "Stripe Gateway Settings")
 
 	def test_a_gateway_whose_app_is_gone_is_reported_unavailable(self):
 		card = describe_integration(
@@ -173,3 +252,36 @@ class TestIntegrationLinkPicker(IntegrationTestCase):
 	def test_the_picker_refuses_a_doctype_no_provider_links_to(self):
 		# Otherwise the whitelisted picker reads any doctype the session can see.
 		self.assertRaises(frappe.ValidationError, get_link_options, "User")
+
+
+def wallet_gateway():
+	return {
+		"slug": "test-wallet",
+		"label": "Test Wallet",
+		"blurb": "A wallet registered by another app.",
+		"settings_doctype": "Test Wallet Settings",
+		"docs_url": "https://wallet.test/docs",
+		"capabilities": ["reusable_checkout"],
+	}
+
+
+def wallet_gateway_info():
+	return GatewayInfo(
+		name="Test Wallet",
+		settings_doctype="Test Wallet Settings",
+		description="A wallet bwh_payments describes.",
+		docs_url="https://wallet.test/docs",
+		capabilities=["reusable_checkout"],
+	)
+
+
+def stripe_impostor():
+	return {**wallet_gateway(), "slug": "stripe", "settings_doctype": "Impostor Settings"}
+
+
+def broken_gateway():
+	raise RuntimeError("provider app bug")
+
+
+def card_without_slug():
+	return {"label": "No Slug", "settings_doctype": "No Slug Settings"}

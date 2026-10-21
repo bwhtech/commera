@@ -13,14 +13,15 @@ website_redirects = [
 	{"source": "/products", "target": "/en/products"},
 	{"source": "/products/(.*)", "target": r"/en/products/\1"},
 	{"source": "/", "target": "/en"},
-	{"source": "/cart", "target": "/en/cart"},
-	{"source": "/cart/checkout", "target": "/en/cart/checkout"},
+	# Gateway return URLs carry `?reference_id=`, so these redirects must keep the query string.
+	{"source": "/cart", "target": "/en/cart", "forward_query_parameters": True},
+	{"source": "/cart/checkout", "target": "/en/cart/checkout", "forward_query_parameters": True},
 	{"source": "/account", "target": "en/account/dashboard"},
-	{"source": "/account/(.*)", "target": r"/en/account/\1"},
+	{"source": "/account/(.*)", "target": r"/en/account/\1", "forward_query_parameters": True},
 	{"source": "/en/account", "target": "/account/dashboard"},
 	{"source": "/ar/account", "target": "/account/dashboard"},
-	{"source": "/en-US/(.*)", "target": r"/en/\1"},
-	{"source": "/en-GB/(.*)", "target": r"/en/\1"},
+	{"source": "/en-US/(.*)", "target": r"/en/\1", "forward_query_parameters": True},
+	{"source": "/en-GB/(.*)", "target": r"/en/\1", "forward_query_parameters": True},
 ]
 
 # website_path_resolver = "commera.utils.resolve_bilingual_path"
