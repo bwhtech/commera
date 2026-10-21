@@ -105,3 +105,36 @@
 		position: static;
 	}
 }
+
+/* Upstream's checkout takes no discount code, so the box and its applied-code chips are net-new. */
+.order-detail .checkout-discount-code {
+	margin: 20px 0;
+}
+
+.order-detail .checkout-discount-codes {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.order-detail .checkout-discount-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 10px;
+	border: 1px dashed var(--border-color);
+	border-radius: 6px;
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--title);
+}
+
+.order-detail .checkout-discount-chip button {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	line-height: 1;
+	cursor: pointer;
+}

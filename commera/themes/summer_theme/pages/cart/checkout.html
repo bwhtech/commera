@@ -16,6 +16,7 @@
 	"delivery_charge_applicable_below": delivery_charge_applicable_below,
 	"prefill": checkout_prefill,
 	"coupon_code": coupon_code,
+	"discount_codes": (cart_quotation.custom_discount_codes or "").splitlines() | map("trim") | select | list if cart_quotation else [],
 } %}
 
 {% block head %}
@@ -330,6 +331,30 @@
 							</div>
 						{% endfor %}
 
+						<div class="checkout-discount-code">
+							<div class="d-flex gap-2">
+								<input type="text" class="form-control" x-model="discount_code"
+									placeholder="{{ _('Discount code') }}" aria-label="{{ _('Discount code') }}"
+									:disabled="discount_code_saving" @keydown.enter.prevent="apply_discount_code()">
+								<button type="button" class="btn btn-secondary"
+									:disabled="!discount_code.trim() || discount_code_saving" @click="apply_discount_code()">
+									{{ _("Apply") }}
+								</button>
+							</div>
+							<div class="checkout-discount-codes" x-show="discount_codes.length" x-cloak>
+								<template x-for="code in discount_codes" :key="code">
+									<span class="checkout-discount-chip">
+										<i class="fa-solid fa-tag"></i>
+										<span x-text="code"></span>
+										<button type="button" :aria-label="`{{ _('Remove') }} ${code}`"
+											:disabled="discount_code_saving" @click="remove_discount_code(code)">
+											<i class="fa-solid fa-xmark"></i>
+										</button>
+									</span>
+								</template>
+							</div>
+						</div>
+
 						<table>
 							<tbody>
 								<tr class="subtotal">
@@ -568,6 +593,9 @@
 				shipping_option_saving: false,
 				pending_shipping_option: null,
 				pending_discount: null,
+				discount_code: "",
+				discount_codes: config.discount_codes,
+				discount_code_saving: false,
 
 				init() {
 					this.set_available_payment_mode();
@@ -590,6 +618,14 @@
 						return;
 					}
 					this.summary = this.get_browser_cart_summary();
+					this.load_discount_codes();
+				},
+
+				async load_discount_codes() {
+					try {
+						const response = await frappe_call("/api/v2/method/commera.api.server_cart.get_server_cart", {});
+						this.discount_codes = response.data?.discount_codes || [];
+					} catch (error) {}
 				},
 
 				get_browser_cart_summary() {
@@ -614,10 +650,43 @@
 							code: this.pending_discount,
 						});
 						toast({{ _("Discount code applied") | tojson }}, { type: "success" });
-						if (response.data.checkout_summary) this.summary = response.data.checkout_summary;
+						this.set_discount_codes(response.data);
 					} catch (error) {
 						this.pending_discount = null;
 					}
+				},
+
+				async apply_discount_code() {
+					const code = this.discount_code.trim();
+					if (!code || this.discount_code_saving) return;
+					this.discount_code_saving = true;
+					try {
+						const response = await frappe_call("/api/v2/method/commera.api.server_cart.apply_discount_code", { code });
+						toast({{ _("Discount code applied") | tojson }}, { type: "success" });
+						this.set_discount_codes(response.data);
+						this.discount_code = "";
+					} catch (error) {
+					} finally {
+						this.discount_code_saving = false;
+					}
+				},
+
+				async remove_discount_code(code) {
+					if (this.discount_code_saving) return;
+					this.discount_code_saving = true;
+					try {
+						const response = await frappe_call("/api/v2/method/commera.api.server_cart.remove_discount_code", { code });
+						this.set_discount_codes(response.data);
+					} catch (error) {
+					} finally {
+						this.discount_code_saving = false;
+					}
+				},
+
+				// A guest has no checkout before the address step, so only the codes change on screen until then.
+				set_discount_codes(priced_cart) {
+					this.discount_codes = priced_cart.discount_codes.map((row) => row.code);
+					if (priced_cart.checkout_summary) this.summary = priced_cart.checkout_summary;
 				},
 
 				format_amount(amount) {
