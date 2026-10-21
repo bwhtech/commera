@@ -93,7 +93,7 @@ def select_discounts(cart) -> list[Selection]:
 	selected = []
 	for selection in get_candidates(cart.doc):
 		discount = selection.discount
-		if discount.status != "Active" or not discount.is_for_currency(cart.currency):
+		if discount.status != "Active" or not discount.is_for_currency(cart):
 			continue
 		if any(other.discount.name == discount.name for other in selected):
 			continue

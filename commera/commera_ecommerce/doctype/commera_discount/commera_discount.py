@@ -93,14 +93,25 @@ class CommeraDiscount(Document):
 		}
 		return bool(self.get(fieldname[discount_class]))
 
-	def is_for_currency(self, currency: str) -> bool:
-		return not self.currency or self.currency == currency
+	def is_for_currency(self, cart) -> bool:
+		"""A fixed amount in another currency is converted, so only a currency with no exchange rate is out."""
+		return cart.get_exchange_rate(self.currency) > 0
+
+	def get_money(self, amount: float, cart) -> float:
+		return cart.convert(amount, self.currency)
+
+	def get_budget_left(self, cart) -> float | None:
+		budget_left = self.budget_left
+		return None if budget_left is None else self.get_money(budget_left, cart)
 
 	def get_unmet_condition(self, cart) -> str | None:
 		"""Why this discount does not apply to the cart now, in the shopper's words; None when it does."""
-		if self.minimum_requirement == "Subtotal" and cart.subtotal < flt(self.minimum_subtotal):
+		minimum_subtotal = self.get_money(self.minimum_subtotal, cart)
+		if self.minimum_requirement == "Subtotal" and cart.subtotal < minimum_subtotal:
 			return _("Add {0} more to use {1}.").format(
-				frappe.format_value(flt(self.minimum_subtotal) - cart.subtotal, {"fieldtype": "Currency"}),
+				frappe.format_value(
+					minimum_subtotal - cart.subtotal, {"fieldtype": "Currency"}, currency=cart.currency
+				),
 				self.title,
 			)
 		if self.minimum_requirement == "Quantity" and cart.quantity < cint(self.minimum_quantity):
@@ -128,7 +139,7 @@ class CommeraDiscount(Document):
 			"amount": flt(cart.doc.get("custom_delivery_charge"))
 			+ flt(cart.doc.get("custom_shipping_discount")),
 		}
-		return self.get_delivery_discount(option) > 0
+		return self.get_delivery_discount(option, cart) > 0
 
 	def is_for_customer_group(self, customer_group: str | None) -> bool:
 		if not customer_group:
@@ -170,10 +181,11 @@ class CommeraDiscount(Document):
 		lines = [item for item in cart.items if self.is_for_line(item, cart)]
 		if self.value_type == PERCENTAGE:
 			discounts = {item.idx: flt(item.amount) * flt(self.value) / 100 for item in lines}
-			return cap_discounts(discounts, flt(self.maximum_discount))
+			return cap_discounts(discounts, self.get_money(self.maximum_discount, cart))
+		value = self.get_money(self.value, cart)
 		if self.fixed_applies_to == "Each Item":
-			return {item.idx: min(flt(self.value), flt(item.rate)) * flt(item.qty) for item in lines}
-		return spread_amount(flt(self.value), {item.idx: flt(item.amount) for item in lines})
+			return {item.idx: min(value, flt(item.rate)) * flt(item.qty) for item in lines}
+		return spread_amount(value, {item.idx: flt(item.amount) for item in lines})
 
 	def get_buy_x_get_y_discounts(self, cart) -> dict[int, float]:
 		"""The cheapest units the customer gets are discounted; the units that earn them cannot also be them."""
@@ -190,14 +202,14 @@ class CommeraDiscount(Document):
 		applications = 0
 		while not self.uses_per_order or applications < cint(self.uses_per_order):
 			rewarded = take_units(units, cint(self.get_quantity), lambda item: item.idx in get_lines)
-			if not rewarded or not self.take_buy_units(units, buy_lines):
+			if not rewarded or not self.take_buy_units(units, buy_lines, cart):
 				break
 			for rate, idx, _item in rewarded:
-				discounts[idx] = discounts.get(idx, 0) + self.get_reward(rate)
+				discounts[idx] = discounts.get(idx, 0) + self.get_reward(rate, cart)
 			applications += 1
 		return discounts
 
-	def take_buy_units(self, units: list, buy_lines: set[int]) -> bool:
+	def take_buy_units(self, units: list, buy_lines: set[int], cart) -> bool:
 		buys = [unit for unit in units if unit[1] in buy_lines]
 		if self.buy_requirement == "Quantity":
 			if len(buys) < cint(self.buy_value):
@@ -206,17 +218,17 @@ class CommeraDiscount(Document):
 				units.remove(unit)
 			return True
 		# An amount requirement is met once by everything bought; it does not repeat per order.
-		if sum(unit[0] for unit in buys) < flt(self.buy_value):
+		if sum(unit[0] for unit in buys) < self.get_money(self.buy_value, cart):
 			return False
 		units.clear()
 		return True
 
-	def get_reward(self, rate: float) -> float:
+	def get_reward(self, rate: float, cart) -> float:
 		if self.get_value_type == "Free":
 			return rate
 		if self.get_value_type == PERCENTAGE:
 			return rate * flt(self.get_value) / 100
-		return min(flt(self.get_value), rate)
+		return min(self.get_money(self.get_value, cart), rate)
 
 	def get_order_discount(self, cart) -> float:
 		subtotal = sum(
@@ -224,24 +236,26 @@ class CommeraDiscount(Document):
 			for item in cart.items
 			if not (self.exclude_sale_items and cart.is_on_sale(item.item_code))
 		)
-		value = self.get_tier_value(subtotal) if self.tiered else flt(self.value)
+		value = self.get_tier_value(subtotal, cart) if self.tiered else flt(self.value)
 		if value is None:
 			return 0.0
 		if self.value_type != PERCENTAGE:
-			return min(value, subtotal)
+			return min(self.get_money(value, cart), subtotal)
 		discount = subtotal * value / 100
-		return min(discount, flt(self.maximum_discount)) if flt(self.maximum_discount) else discount
+		maximum_discount = self.get_money(self.maximum_discount, cart)
+		return min(discount, maximum_discount) if maximum_discount else discount
 
-	def get_tier_value(self, subtotal: float) -> float | None:
-		reached = [tier for tier in self.tiers if subtotal >= flt(tier.minimum_subtotal)]
+	def get_tier_value(self, subtotal: float, cart) -> float | None:
+		reached = [tier for tier in self.tiers if subtotal >= self.get_money(tier.minimum_subtotal, cart)]
 		return flt(max(reached, key=lambda tier: flt(tier.minimum_subtotal)).value) if reached else None
 
-	def get_delivery_discount(self, option: dict) -> float:
+	def get_delivery_discount(self, option: dict, cart) -> float:
 		titles = {line.strip() for line in (self.delivery_options or "").splitlines() if line.strip()}
 		if titles and option["title"] not in titles:
 			return 0.0
 		amount = flt(option["amount"])
-		if flt(self.maximum_shipping_rate) and amount > flt(self.maximum_shipping_rate):
+		maximum_shipping_rate = self.get_money(self.maximum_shipping_rate, cart)
+		if maximum_shipping_rate and amount > maximum_shipping_rate:
 			return 0.0
 		return amount * flt(self.shipping_percentage) / 100
 

@@ -8,17 +8,16 @@ from commera.discounts.selection import select_discounts
 def apply_shipping_discounts(quotation, options: list[dict]) -> list[dict]:
 	"""Discount each delivery option the cart's shipping discounts cover. Runs after the plugin hooks, so
 	the price shown and the price charged at payment are the same."""
-	selections = [
-		s for s in select_discounts(get_cart_context(quotation)) if s.discount.discount_class == SHIPPING
-	]
+	cart = get_cart_context(quotation)
+	selections = [s for s in select_discounts(cart) if s.discount.discount_class == SHIPPING]
 	if not selections:
 		return options
-	return [get_discounted_option(option, selections) for option in options]
+	return [get_discounted_option(option, selections, cart) for option in options]
 
 
-def get_discounted_option(option: dict, selections: list) -> dict:
+def get_discounted_option(option: dict, selections: list, cart) -> dict:
 	best_amount, best_discount = max(
-		(s.discount.get_delivery_discount(option), s.discount.name) for s in selections
+		(s.discount.get_delivery_discount(option, cart), s.discount.name) for s in selections
 	)
 	if not best_amount:
 		return option

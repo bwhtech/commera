@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 import frappe
+from erpnext.setup.utils import get_exchange_rate
 from frappe.utils.data import cint, cstr, flt
 
 from commera.api.cart import get_cart_price
@@ -17,6 +18,7 @@ class CartContext:
 	email: str | None
 	phone: str | None
 	sale_by_item_code: dict = field(default_factory=dict)
+	exchange_rates: dict = field(default_factory=dict)
 
 	@property
 	def items(self) -> list:
@@ -33,6 +35,20 @@ class CartContext:
 	@property
 	def quantity(self) -> int:
 		return sum(cint(item.qty) for item in self.items)
+
+	def get_exchange_rate(self, currency: str | None) -> float:
+		"""A discount's currency to the cart's, at the store's selling rate. Blank means the company's."""
+		currency = currency or frappe.get_cached_value("Company", self.doc.company, "default_currency")
+		if currency == self.currency:
+			return 1.0
+		if currency not in self.exchange_rates:
+			self.exchange_rates[currency] = flt(
+				get_exchange_rate(currency, self.currency, self.doc.get("transaction_date"), "for_selling")
+			)
+		return self.exchange_rates[currency]
+
+	def convert(self, amount: float, currency: str | None) -> float:
+		return flt(amount) * self.get_exchange_rate(currency) if flt(amount) else 0.0
 
 	def is_on_sale(self, item_code: str) -> bool:
 		if item_code not in self.sale_by_item_code:

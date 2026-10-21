@@ -83,7 +83,9 @@ def apply_line_discounts(doc, selections: list) -> list[dict]:
 			best_by_line[idx] = (amount, allocation)
 
 	for selection in selections:
-		line_discounts = cap_by_budget(selection.discount, selection.discount.get_line_discounts(cart))
+		line_discounts = cap_by_budget(
+			selection.discount.get_budget_left(cart), selection.discount.get_line_discounts(cart)
+		)
 		for idx, amount in line_discounts.items():
 			offer(idx, amount, get_allocation(selection, PRODUCT, 0, idx))
 
@@ -112,7 +114,7 @@ def apply_order_discount(doc, selections: list) -> list[dict]:
 	offers = []
 	for selection in selections:
 		amount = flt(selection.discount.get_order_discount(cart))
-		budget_left = selection.discount.budget_left
+		budget_left = selection.discount.get_budget_left(cart)
 		offers.append(
 			(
 				min(amount, budget_left) if budget_left is not None else amount,
@@ -319,8 +321,7 @@ def get_shipping_allocations(doc) -> list[dict]:
 	return [get_allocation(Selection(get_discount(discount), code), SHIPPING, doc.custom_shipping_discount)]
 
 
-def cap_by_budget(discount, line_discounts: dict[int, float]) -> dict[int, float]:
-	budget_left = discount.budget_left
+def cap_by_budget(budget_left: float | None, line_discounts: dict[int, float]) -> dict[int, float]:
 	total = sum(line_discounts.values())
 	if budget_left is None or total <= budget_left:
 		return line_discounts

@@ -797,3 +797,68 @@ class TestTaxInclusiveDiscounts(DiscountCodeTestCase):
 		sales_invoice.insert(ignore_permissions=True)
 		sales_invoice.submit()
 		return sales_invoice
+
+
+class TestDiscountCurrency(DiscountCodeTestCase):
+	def setUp(self):
+		super().setUp()
+		self.foreign = "EUR" if self.currency != "EUR" else "USD"
+		self.set_exchange_rate(self.foreign, 80)
+
+	def set_exchange_rate(self, currency: str, rate: float):
+		filters = {"from_currency": currency, "to_currency": self.currency, "date": today(), "for_selling": 1}
+		if name := frappe.db.exists("Currency Exchange", filters):
+			frappe.db.set_value("Currency Exchange", name, "exchange_rate", rate)
+		else:
+			frappe.get_doc({"doctype": "Currency Exchange", **filters, "exchange_rate": rate}).insert(
+				ignore_permissions=True
+			)
+
+	def test_a_fixed_amount_in_another_currency_is_converted_to_the_cart_currency(self):
+		cases = {
+			"1 off the order": (
+				self.create_code(amount=1, currency=self.foreign),
+				{self.shirt: 1, self.cap: 1},
+				50,
+			),
+			"0.25 off each item": (
+				self.create_code(amount=0.25, item_codes=(self.shirt,), currency=self.foreign),
+				{self.shirt: 2},
+				140,
+			),
+			"blank currency is the company's": (
+				self.create_code(amount=10, currency=None),
+				{self.shirt: 1},
+				80,
+			),
+		}
+		for case, (code, lines, net_total) in cases.items():
+			with self.subTest(case):
+				self.assertEqual(self.create_quotation(lines, (code,)).net_total, net_total)
+
+	def test_money_thresholds_in_another_currency_are_converted(self):
+		minimum = self.create_code(
+			percentage=10, currency=self.foreign, minimum_requirement="Subtotal", minimum_subtotal=2
+		)
+		self.assertEqual(self.create_quotation({self.shirt: 1, self.cap: 1}, (minimum,)).net_total, 130)
+		self.assertEqual(self.create_quotation({self.shirt: 2}, (minimum,)).net_total, 162)
+
+		tiered = self.create_code(
+			percentage=1,
+			currency=self.foreign,
+			tiered=1,
+			tiers=[{"minimum_subtotal": 1, "value": 5}, {"minimum_subtotal": 2, "value": 10}],
+		)
+		self.assertEqual(self.create_quotation({self.shirt: 1, self.cap: 1}, (tiered,)).net_total, 123.5)
+
+		shipping = self.create_code(
+			discount_type="Free Shipping",
+			currency=self.foreign,
+			shipping_percentage=100,
+			maximum_shipping_rate=1,
+		)
+		quotation = self.create_quotation({self.shirt: 1}, (shipping,))
+		options = [{"title": "Standard", "amount": 60}, {"title": "Express", "amount": 100}]
+		self.assertEqual(
+			[option["amount"] for option in apply_shipping_discounts(quotation, options)], [0, 100]
+		)
