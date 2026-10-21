@@ -334,7 +334,7 @@ const customerGroups = computed({
                   type="select"
                   label="Campaign"
                   :options="['', ...options.campaigns]"
-                  description="The ERPNext Campaign this discount belongs to."
+                  description="The marketing campaign orders using this discount are tagged with."
                 />
                 <FormControl
                   v-model="discount.discount_account"
