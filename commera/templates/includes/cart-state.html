@@ -8,7 +8,9 @@
             priced: null,
             wants_pricing: false,
             async init() {
-                await this.load_server_cart();
+                // Pages that change the cart on load wait for this, or it puts the old server cart back.
+                this.loaded = this.load_server_cart();
+                await this.loaded;
                 let is_first_run = true;
                 Alpine.effect(() => {
                     this.items.forEach(item => [item.variant?.item_code, item.qty]);

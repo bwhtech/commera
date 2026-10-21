@@ -91,6 +91,17 @@ class TestServerCart(DiscountCodeTestCase):
 			{(row.item_code, row.qty) for row in get_session_cart().lines}, {(self.shirt, 1), (self.cap, 1)}
 		)
 
+	def test_a_cart_link_replaces_a_cart_changed_on_another_device(self):
+		stale_version = sync_server_cart([{"item_code": self.shirt, "qty": 1}])["version"]
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 2}])
+		link_lines = [{"item_code": self.cap, "qty": 4}]
+		self.assertTrue(sync_server_cart(link_lines, stale_version)["conflict"])
+
+		response = sync_server_cart(link_lines, get_server_cart()["version"])
+
+		self.assertNotIn("conflict", response)
+		self.assertEqual([(row.item_code, row.qty) for row in get_session_cart().lines], [(self.cap, 4)])
+
 	def test_sync_refuses_more_than_the_stock(self):
 		self.assertTrue(sync_server_cart([{"item_code": self.shirt, "qty": 10}])["version"])
 
