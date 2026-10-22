@@ -139,7 +139,10 @@
   "email_section",
   "cc_email",
   "storefront_apps_tab",
-  "storefront_apps"
+  "storefront_apps",
+  "headless_storefront_section",
+  "headless_storefront_url",
+  "headless_oauth_client"
  ],
  "fields": [
   {
@@ -883,12 +886,32 @@
    "fieldtype": "Table",
    "label": "Storefront Apps",
    "options": "Commera Storefront App"
+  },
+  {
+   "fieldname": "headless_storefront_section",
+   "fieldtype": "Section Break",
+   "label": "Headless Storefront"
+  },
+  {
+   "description": "The address of a storefront that runs on its own server, such as https://shop.example.com. When you save it, Commera sets up the OAuth client that signs shoppers in to that storefront.",
+   "fieldname": "headless_storefront_url",
+   "fieldtype": "Data",
+   "label": "Headless Storefront URL",
+   "options": "URL"
+  },
+  {
+   "description": "Commera keeps this OAuth client in step with the storefront URL. Give its Client ID and Client Secret to the storefront server.",
+   "fieldname": "headless_oauth_client",
+   "fieldtype": "Link",
+   "label": "Headless OAuth Client",
+   "options": "OAuth Client",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-21 10:00:00.000000",
+ "modified": "2026-10-22 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Settings",
