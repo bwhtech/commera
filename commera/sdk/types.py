@@ -15,6 +15,7 @@ __all__ = [
 	"Discount",
 	"DiscountAllocation",
 	"DiscountInput",
+	"FacetValue",
 	"FooterSection",
 	"MenuItem",
 	"NewCartLine",
@@ -289,10 +290,16 @@ class ProductCard(TypedDict):
 	updated_at: str | None
 
 
+class FacetValue(TypedDict):
+	value: str
+	# Products with this value under every other selected filter.
+	count: int
+
+
 class ProductFacets(TypedDict):
-	brands: list[str]
-	colors: list[str]
-	sizes: list[str]
+	brands: list[FacetValue]
+	colors: list[FacetValue]
+	sizes: list[FacetValue]
 	price: dict[str, float]
 
 

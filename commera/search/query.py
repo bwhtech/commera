@@ -52,6 +52,12 @@ def build_product_cards(product_names):
 
 def listing_facets(selected_filters):
 	"""Sidebar brand/color/size value-lists from the FTS engine, or None when frappe.qb owns the grid."""
+	counts = listing_facet_counts(selected_filters)
+	return {key: list(values) for key, values in counts.items()} if counts is not None else None
+
+
+def listing_facet_counts(selected_filters):
+	"""Brand/color/size product counts from the FTS engine, or None when frappe.qb owns the grid."""
 	if use_qb_fallback(selected_filters):
 		return None
 
@@ -59,8 +65,9 @@ def listing_facets(selected_filters):
 		search_term(selected_filters), limit=MAX_SEARCH_RESULTS, facet_filters=selected_filters
 	)["facets"]
 
+	sizes = facets.get("size") or {}
 	return {
-		"brands": list(facets.get("brand") or {}),
-		"colors": list(facets.get("color") or {}),
-		"sizes": sorted(facets.get("size") or {}, key=size_sort_key),
+		"brands": facets.get("brand") or {},
+		"colors": facets.get("color") or {},
+		"sizes": {size: sizes[size] for size in sorted(sizes, key=size_sort_key)},
 	}

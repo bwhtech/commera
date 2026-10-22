@@ -68,6 +68,37 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 			(result["products"][0]["price"], result["products"][0]["compare_at_price"]), (20, 30)
 		)
 
+	def test_facets_count_the_products_of_each_value(self):
+		brands = [f"Brand A {self.suffix}", f"Brand B {self.suffix}"]
+		colors = []
+		for label, brand in zip(("FACETA", "FACETB"), brands, strict=True):
+			route = self.make_priced_variant(label, default_rate=10)
+			variant, color = frappe.db.get_value(
+				"Style Attribute Variant", {"route": route}, ["name", "attribute_value"]
+			)
+			# make_variant gives every product the configurator's item style, so each gets its own here.
+			item_code = frappe.db.get_value("Color Size Item", {"parent": variant}, "item_code")
+			frappe.db.set_value("Style Attribute Variant", variant, "item_style", item_code)
+			frappe.db.set_value("Item", item_code, "brand", brand)
+			colors.append(color)
+		collection = get_collection_handle(self.item_group)
+
+		facets = get_products(collection=collection)["facets"]
+
+		self.assertEqual(facets["brands"], [{"value": brand, "count": 1} for brand in brands])
+		self.assertEqual(
+			sorted(facets["colors"], key=lambda color: color["value"]),
+			[{"value": color, "count": 1} for color in sorted(colors)],
+		)
+		self.assertEqual(facets["sizes"], [{"value": "M", "count": 2}])
+
+		# A brand narrows the other facets but not its own, so the shopper can still widen the selection.
+		narrowed = get_products(collection=collection, brands=brands[0])["facets"]
+
+		self.assertEqual([brand["value"] for brand in narrowed["brands"]], brands)
+		self.assertEqual(narrowed["colors"], [{"value": colors[0], "count": 1}])
+		self.assertEqual(narrowed["sizes"], [{"value": "M", "count": 1}])
+
 	def test_an_unknown_sort_is_refused(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "Sort must be one of"):
 			get_products(sort="random")

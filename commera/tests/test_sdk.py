@@ -84,6 +84,7 @@ PUBLIC_NAMES = {
 		"Discount",
 		"DiscountAllocation",
 		"DiscountInput",
+		"FacetValue",
 		"FooterSection",
 		"MenuItem",
 		"NewCartLine",

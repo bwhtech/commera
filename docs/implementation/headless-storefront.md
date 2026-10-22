@@ -50,7 +50,7 @@ All methods allow guests. Reads are GET, cart writes are POST, and each method h
 
 | Method | Returns |
 | --- | --- |
-| `products.get_products` | One page of product cards with the facets of the whole result. Filters: `collection`, `query`, `brands`, `colors`, `sizes`, `min_price`, `max_price`, `on_sale`. `sort` is `default`, `price_low`, `price_high`, `name`, `new_arrival` or `discount`. |
+| `products.get_products` | One page of product cards with the facets of the whole result. Each brand, colour and size facet value has its product count, as `{"value": "K&N", "count": 3}`. The other selected filters narrow each count, but the facet's own filter does not. `price` is the `min` and `max` sale price. Filters: `collection`, `query`, `brands`, `colors`, `sizes`, `min_price`, `max_price`, `on_sale`. `sort` is `default`, `price_low`, `price_high`, `name`, `new_arrival` or `discount`. |
 | `products.get_product` | One product: images, the colour option with sibling handles and stock, the size option, and one variant for each size with its price, list price and stock. |
 | `collections.get_collections`, `collections.get_collection` | Item Groups that hold a published product. |
 | `shop.get_shop` | Store name, currency, logo, the menu from Ecommerce Category, and the footer. |

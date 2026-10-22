@@ -17,12 +17,13 @@ from commera.sdk.types import (
 	CartLineProduct,
 	CatalogItem,
 	Collection,
+	FacetValue,
 	Product,
 	ProductCard,
 	ProductOption,
 	ProductPage,
 )
-from commera.search.facets import get_product_filters
+from commera.search.facets import get_listing_facet_counts, get_price_range
 from commera.search.record_builder import images_for_variants, rates_by_item_code, sizes_for_variants
 from commera.swatches import get_swatch_map
 from commera.utils import (
@@ -131,19 +132,21 @@ def list_products(
 	}
 
 	cards = get_product_list(filters=filters, page=page, page_length=page_size, sort_by=sort)
-	facets, price_range = get_product_filters(filters)
+	price_range = get_price_range()
 	return {
 		"products": get_product_cards(cards),
 		"total": get_total_product_count(filters=filters),
 		"page": page,
 		"page_size": page_size,
 		"facets": {
-			"brands": facets.get("brands") or [],
-			"colors": facets.get("colors") or [],
-			"sizes": facets.get("sizes") or [],
+			**{key: get_facet_values(counts) for key, counts in get_listing_facet_counts(filters).items()},
 			"price": {"min": flt(price_range.get("min_price")), "max": flt(price_range.get("max_price"))},
 		},
 	}
+
+
+def get_facet_values(counts: dict[str, int]) -> list[FacetValue]:
+	return [{"value": value, "count": count} for value, count in counts.items()]
 
 
 def get_product(handle: str) -> Product | None:
