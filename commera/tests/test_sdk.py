@@ -79,7 +79,7 @@ PUBLIC_NAMES = {
 		"list_products",
 	],
 	"commera.sdk.orders": ["ShippingNotInstalled", "get_order", "get_orders", "record_shipment"],
-	"commera.sdk.shop": ["get_page", "get_shop", "get_sitemap"],
+	"commera.sdk.shop": ["get_page", "get_shop", "get_sitemap", "get_translations"],
 	"commera.sdk.types": [
 		"Address",
 		"Cart",

@@ -1,6 +1,7 @@
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
+from commera.api.storefront.shop import get_translations
 from commera.sdk import catalog, shop
 from commera.sdk.catalog import get_collection_handle, get_line_products
 from commera.sdk.shop import get_menu_item
@@ -164,3 +165,20 @@ class TestStorefrontArabic(ProductDetailPriceTestCase):
 		page = catalog.list_products(query="فرامل")
 
 		self.assertIn(self.route, [card["handle"] for card in page["products"]])
+
+	def test_translations_hold_commera_strings_and_site_records(self):
+		self.add_translation("Continue with email", "تابع")
+		self.add_translation(f"Label {self.suffix}", "تسمية")
+
+		translations = get_translations("ar")
+
+		self.assertEqual(translations["Sign In"], "تسجيل الدخول")
+		self.assertEqual(translations["Continue with email"], "تابع")
+		self.assertEqual(translations[f"Label {self.suffix}"], "تسمية")
+		# A Frappe string is left out, so the storefront does not download every app's catalog.
+		self.assertNotIn("Cancel", translations)
+		self.assertNotIn("Sign In", get_translations("en"))
+
+	def test_translations_refuse_a_language_the_storefront_does_not_serve(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Language must be one of"):
+			get_translations("fr")
