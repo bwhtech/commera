@@ -550,6 +550,18 @@ def get_local_lang_url(path: str) -> str:
 	return path
 
 
+def get_same_site_path(path: str | None) -> str | None:
+	"""`path` when it stays on this site, else None."""
+	path = cstr(path).strip()
+	# Browsers drop tabs and newlines, so "/\t/host" would become "//host".
+	if any(character.isspace() or not character.isprintable() for character in path):
+		return None
+	# Only a path on this site: "//host" and "/\host" would leave it, and a scheme would too.
+	if path.startswith("/") and not path.startswith(("//", "/\\")) and "://" not in path:
+		return path
+	return None
+
+
 def get_login_url_for_current_page() -> str:
 	"""Login link that lands the shopper back on the page that refused them, query string intact."""
 	# The login page reads `redirect-to` off its own query string: unencoded, it truncates at the first `&`.
