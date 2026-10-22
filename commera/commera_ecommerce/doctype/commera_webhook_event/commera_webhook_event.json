@@ -1,0 +1,30 @@
+{
+ "actions": [],
+ "creation": "2026-10-22 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "event"
+ ],
+ "fields": [
+  {
+   "fieldname": "event",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Event",
+   "options": "product_updated\ninventory_changed\ncollection_updated\npage_updated\nmenu_updated\norder_placed\norder_paid\norder_cancelled\norder_refunded\norder_fulfilled\norder_delivered\norder_returned\ncart_created\ndiscount_used",
+   "reqd": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-22 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Commera Ecommerce",
+ "name": "Commera Webhook Event",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
