@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 __all__ = [
 	"Address",
@@ -322,6 +322,8 @@ class ProductCard(TypedDict):
 
 class FacetValue(TypedDict):
 	value: str
+	# The shown text, set on colour facets in Arabic.
+	label: NotRequired[str]
 	# Products with this value under every other selected filter.
 	count: int
 
@@ -421,6 +423,8 @@ class Shop(TypedDict):
 	favicon: str
 	menu: list[MenuItem]
 	footer: list[FooterSection]
+	# The store's copyright line, or None when it is not set.
+	copyright: str | None
 
 
 class ContentPage(TypedDict):
