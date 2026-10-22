@@ -15,6 +15,8 @@ from rq.job import JobStatus
 from commera.discounts.allocations import get_allocations
 from commera.sdk import API_VERSION, STORE_ORDER_TYPE, as_plugin_user
 from commera.sdk.events import HANDLER_HOOKS, CommeraEvent
+from commera.webhooks import HANDLER as WEBHOOK_HANDLER
+from commera.webhooks import is_subscribed
 
 PLUGINS_USER = "commera-plugins@commera.local"
 RETRY_DELAYS_IN_MINUTES = (1, 5, 30, 120, 360)
@@ -35,6 +37,7 @@ COD_SWEEP_LOOKBACK_DAYS = 30
 EXTENDED_DOCTYPES = ("Sales Order", "Quotation", "Sales Invoice", "Item", "Customer")
 CHANGED_PRODUCTS_FLAG = "commera_changed_products"
 CHANGED_ITEMS_FLAG = "commera_changed_items"
+CHANGED_STOREFRONT_FLAG = "commera_changed_storefront"
 
 
 def fire_event(
@@ -161,7 +164,7 @@ def get_handlers(hook: str, key: str) -> list[str]:
 	return [
 		handler
 		for handler in frappe.get_hooks(hook, {}).get(key, [])
-		if is_supported_app(get_handler_app(handler))
+		if is_supported_app(get_handler_app(handler)) and (handler != WEBHOOK_HANDLER or is_subscribed(key))
 	]
 
 
@@ -588,6 +591,44 @@ def on_style_attribute_variant_update(doc, method=None):
 	if not doc.flags.in_insert:
 		add_changed_products(
 			[doc.item_style], "published" if doc.has_value_changed("is_published") else "options"
+		)
+
+
+def on_style_attribute_variant_trash(doc, method=None):
+	add_changed_products([doc.item_style], "published")
+
+
+def on_item_group_change(doc, method=None):
+	add_storefront_change("collection_updated", doc.doctype, doc.name)
+
+
+def on_shop_web_page_change(doc, method=None):
+	add_storefront_change("page_updated", doc.doctype, doc.name, {"route": doc.route})
+
+
+def on_menu_change(doc, method=None):
+	# The menu, footer and branding are one record to a storefront, so every change is one event.
+	add_storefront_change("menu_updated", "Commera Settings", "Commera Settings")
+
+
+def add_storefront_change(event: str, reference_doctype: str, reference_name: str, data: dict | None = None):
+	if not get_handlers("commera_events", event):
+		return
+	changes = get_transaction_batch(CHANGED_STOREFRONT_FLAG, dict, enqueue_storefront_changes)
+	changes[(event, reference_doctype, reference_name)] = data or {}
+
+
+def enqueue_storefront_changes():
+	for (event, reference_doctype, reference_name), data in (
+		frappe.local.flags.pop(CHANGED_STOREFRONT_FLAG, None) or {}
+	).items():
+		frappe.enqueue(
+			fire_event,
+			event=event,
+			reference_doctype=reference_doctype,
+			reference_name=reference_name,
+			data=data,
+			repeatable=True,
 		)
 
 

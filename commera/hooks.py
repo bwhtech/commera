@@ -123,6 +123,27 @@ doctype_js = {
 after_install = "commera.migrate.after_install"
 after_migrate = "commera.migrate.after_migrate"
 after_app_install = "commera.storefront_plugins.sync_storefront_apps"
+
+# Commera Webhooks: the handler counts only while an enabled webhook subscribes to the event.
+commera_events = {
+	event: ["commera.webhooks.deliver"]
+	for event in (
+		"order_placed",
+		"order_paid",
+		"order_cancelled",
+		"order_refunded",
+		"order_fulfilled",
+		"order_delivered",
+		"order_returned",
+		"product_updated",
+		"inventory_changed",
+		"collection_updated",
+		"page_updated",
+		"menu_updated",
+		"cart_created",
+		"discount_used",
+	)
+}
 setup_wizard_complete = "commera.swatches.drop_unused_colour_attribute"
 
 
@@ -132,7 +153,15 @@ doc_events = {
 	},
 	"Item Group": {
 		"before_validate": "commera.utils.set_item_group_displayname",
+		"on_update": "commera.plugin_events.on_item_group_change",
+		"on_trash": "commera.plugin_events.on_item_group_change",
 	},
+	"Shop Web Page": {
+		"on_update": "commera.plugin_events.on_shop_web_page_change",
+		"on_trash": "commera.plugin_events.on_shop_web_page_change",
+	},
+	"Footer Section Config": {"on_update": "commera.plugin_events.on_menu_change"},
+	"Commera Settings": {"on_update": "commera.plugin_events.on_menu_change"},
 	"Gateway Payment Request": {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},
@@ -177,12 +206,15 @@ doc_events = {
 			"commera.plugin_events.on_style_attribute_variant_update",
 		],
 		"after_rename": "commera.search.sync.after_rename",
-		"on_trash": "commera.search.sync.on_trash",
+		"on_trash": [
+			"commera.search.sync.on_trash",
+			"commera.plugin_events.on_style_attribute_variant_trash",
+		],
 	},
 	"Ecommerce Category": {
-		"on_update": "commera.search.sync.on_update",
+		"on_update": ["commera.search.sync.on_update", "commera.plugin_events.on_menu_change"],
 		"after_rename": "commera.search.sync.after_rename",
-		"on_trash": "commera.search.sync.on_trash",
+		"on_trash": ["commera.search.sync.on_trash", "commera.plugin_events.on_menu_change"],
 	},
 	"Sales Invoice": {
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
