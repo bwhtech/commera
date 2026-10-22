@@ -1,12 +1,22 @@
+from urllib.parse import parse_qs, urlsplit
+
 import frappe
 from frappe.auth import CookieManager
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
-from commera.api.storefront.cart import add_lines, get_cart, get_checkout_url, open_checkout, update_lines
+from commera.api.storefront.cart import (
+	add_lines,
+	adopt_cart,
+	get_cart,
+	get_checkout_url,
+	open_checkout,
+	update_lines,
+)
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.guest import CART_TOKEN_HEADER, GUEST_CART_COOKIE
 from commera.sdk.types import CartLineProduct, PricedCart, PricedCartLine
+from commera.tests.test_order_access import make_website_user
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 
 
@@ -26,12 +36,11 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 		self.token = frappe.generate_hash(length=32)
 		self.send_token(self.token)
 
-	def send_token(self, token: str, user: str = "Guest"):
+	def send_token(self, token: str | None, user: str = "Guest", path: str = "/"):
 		if not hasattr(frappe.local, "request"):
 			self.addCleanup(delattr, frappe.local, "request")
-		frappe.local.request = Request(
-			EnvironBuilder(path="/", headers={CART_TOKEN_HEADER: token}).get_environ()
-		)
+		headers = {CART_TOKEN_HEADER: token} if token else {}
+		frappe.local.request = Request(EnvironBuilder(path=path, headers=headers).get_environ())
 		frappe.local.request_ip = "127.0.0.1"
 		frappe.local.cookie_manager = CookieManager()
 		frappe.set_user(user)
@@ -89,3 +98,39 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 	def test_checkout_needs_a_cart(self):
 		with self.assertRaises(frappe.DoesNotExistError):
 			get_checkout_url()
+
+	def test_a_signed_in_shopper_adopts_the_guest_cart_of_the_token(self):
+		add_lines([{"item_code": self.item_code, "qty": 2}])
+		self.send_token(self.token, user=make_website_user())
+
+		cart = adopt_cart()
+
+		self.assertEqual([(line["item_code"], line["qty"]) for line in cart["lines"]], [(self.item_code, 2)])
+		self.assertFalse(frappe.db.exists("Commera Cart", {"cart_key": frappe.utils.sha256_hash(self.token)}))
+
+	def test_adopting_needs_the_cart_token(self):
+		self.send_token(None, user="Administrator")
+
+		with self.assertRaisesRegex(frappe.ValidationError, "cart token"):
+			adopt_cart()
+
+	def test_a_signed_in_checkout_code_opens_only_in_a_browser_of_the_same_shopper(self):
+		shopper = make_website_user()
+		self.send_token(None, user=shopper)
+		add_lines([{"item_code": self.item_code, "qty": 1}])
+		path = get_checkout_url()["path"]
+		code = path.split("code=")[1]
+
+		for browser_user in ("Guest", make_website_user()):
+			with self.subTest(browser_user):
+				self.send_token(None, user=browser_user, path=path)
+				open_checkout(code)
+				location = urlsplit(frappe.local.response["location"])
+				self.assertEqual(location.path, "/storefront-login")
+				self.assertEqual(parse_qs(location.query), {"prompt": ["login"], "redirect-to": [path]})
+
+		self.send_token(None, user=shopper, path=path)
+		open_checkout(code)
+		self.assertEqual(frappe.local.response["location"], "/en/cart?checkout=1")
+		open_checkout(code)
+		self.assertEqual(frappe.local.response["location"], "/en/cart")

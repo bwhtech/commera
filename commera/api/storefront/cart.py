@@ -1,10 +1,18 @@
+from urllib.parse import urlencode
+
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cint, cstr, sha256_hash
 
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import adopt_guest_cart, get_session_cart
-from commera.guest import get_guest_cart_token, is_guest, set_guest_cart_cookie
+from commera.guest import (
+	CART_TOKEN_HEADER,
+	get_guest_cart_token,
+	is_guest,
+	set_guest_cart_cookie,
+	validate_cart_token,
+)
 from commera.plugin_events import get_listed_items
 from commera.sdk import cart as cart_sdk
 from commera.sdk.types import PricedCart
@@ -69,19 +77,38 @@ def remove_discount_code(code: str) -> PricedCart:
 	return cart_sdk.remove_discount_code(cstr(code).strip())
 
 
+@frappe.whitelist(methods=["POST"])
+@rate_limit(limit=60, seconds=60 * 60, user_based=True)
+def adopt_cart() -> PricedCart | None:
+	"""Move the guest cart of the X-Commera-Cart-Token header into the signed-in shopper's cart."""
+	token = frappe.request.headers.get(CART_TOKEN_HEADER)
+	if not token:
+		frappe.throw(_("Send the cart token of the cart to adopt."))
+	validate_cart_token(token)
+	adopt_guest_cart(sha256_hash(token))
+	return cart_sdk.get_priced_cart()
+
+
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=120, seconds=60 * 60)
 def get_checkout_url() -> dict:
 	"""A single-use path that opens this cart in the Commera checkout, valid for five minutes."""
-	token = get_guest_cart_token()
-	if not is_guest() or not token:
-		frappe.throw(_("Send the cart token to start a storefront checkout."))
+	handoff = get_checkout_handoff()
 	if not get_session_cart():
 		frappe.throw(_("Add something to your cart first."), frappe.DoesNotExistError)
 
 	code = frappe.generate_hash(length=32)
-	frappe.cache.set_value(f"{CHECKOUT_CODE_PREFIX}{code}", token, expires_in_sec=CHECKOUT_CODE_SECONDS)
+	frappe.cache.set_value(f"{CHECKOUT_CODE_PREFIX}{code}", handoff, expires_in_sec=CHECKOUT_CODE_SECONDS)
 	return {"path": f"/api/method/commera.api.storefront.cart.open_checkout?code={code}"}
+
+
+def get_checkout_handoff() -> str | dict:
+	"""The guest's cart token, or the signed-in shopper whose account cart the checkout opens."""
+	if not is_guest():
+		return {"user": frappe.session.user}
+	if token := get_guest_cart_token():
+		return token
+	frappe.throw(_("Send the cart token to start a storefront checkout."))
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
@@ -89,14 +116,32 @@ def get_checkout_url() -> dict:
 def open_checkout(code: str):
 	"""Bind the storefront cart to this browser, then go on to checkout. A used or old code opens the cart."""
 	key = f"{CHECKOUT_CODE_PREFIX}{cstr(code)}"
-	token = frappe.cache.get_value(key)
+	handoff = frappe.cache.get_value(key)
+	if isinstance(handoff, dict):
+		return open_account_checkout(key, handoff["user"])
+
 	frappe.cache.delete_value(key)
-	if token and is_guest():
-		set_guest_cart_cookie(token)
-	elif token:
-		adopt_guest_cart(sha256_hash(token))
+	if handoff and is_guest():
+		set_guest_cart_cookie(handoff)
+	elif handoff:
+		adopt_guest_cart(sha256_hash(handoff))
 		# A GET is not committed unless asked; the merge must persist.
 		frappe.local.flags.commit = True
 
+	redirect(get_next_url() if handoff else f"/{frappe.local.lang}/cart")
+
+
+def open_account_checkout(key: str, user: str):
+	"""Only a browser signed in as `user` uses the code. Any other browser signs in first, then comes back."""
+	if frappe.session.user == user:
+		frappe.cache.delete_value(key)
+		return redirect(get_next_url())
+
+	# The sign-in can take longer than the code would otherwise live.
+	frappe.cache.set_value(key, {"user": user}, expires_in_sec=CHECKOUT_CODE_SECONDS)
+	redirect(f"/storefront-login?{urlencode({'prompt': 'login', 'redirect-to': frappe.request.full_path})}")
+
+
+def redirect(location: str):
 	frappe.local.response["type"] = "redirect"
-	frappe.local.response["location"] = get_next_url() if token else f"/{frappe.local.lang}/cart"
+	frappe.local.response["location"] = location
