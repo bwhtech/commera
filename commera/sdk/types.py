@@ -12,6 +12,8 @@ __all__ = [
 	"CheckoutSummary",
 	"Collection",
 	"ContentPage",
+	"CustomerAddress",
+	"CustomerProfile",
 	"Discount",
 	"DiscountAllocation",
 	"DiscountInput",
@@ -32,6 +34,8 @@ __all__ = [
 	"ProductVariant",
 	"Rating",
 	"Shop",
+	"ShopperOrder",
+	"ShopperOrderPage",
 	"Sitemap",
 	"SitemapEntry",
 	"Stage",
@@ -74,7 +78,7 @@ class OrderLine(TypedDict):
 	attributes: dict[str, str]
 
 
-class Order(TypedDict):
+class ShopperOrder(TypedDict):
 	"""Money is in `currency`; the `base_` totals are in the company currency."""
 
 	name: str | int
@@ -102,10 +106,35 @@ class Order(TypedDict):
 	stage: Stage
 	plugin_fees: list[Charge]
 	items: list[OrderLine]
-	tags: list[str]
 	plugin_fields: dict[str, Any]
 	discounts: list["DiscountAllocation"]
 	attributes: dict[str, str]
+
+
+class Order(ShopperOrder):
+	tags: list[str]
+
+
+class ShopperOrderPage(TypedDict):
+	orders: list[ShopperOrder]
+	total: int
+	page: int
+	page_size: int
+
+
+class CustomerAddress(Address):
+	address_type: str
+	email_id: str | None
+	is_primary_address: bool
+	is_shipping_address: bool
+
+
+class CustomerProfile(TypedDict):
+	email: str
+	first_name: str
+	last_name: str | None
+	full_name: str
+	phone: str | None
 
 
 class CartLine(TypedDict):

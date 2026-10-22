@@ -123,7 +123,8 @@ def get_customer_contact(email: str) -> tuple[str, str] | None:
 	return (links[0].link_name, links[0].parent) if links else None
 
 
-def get_party(user=None):
+def get_party(user=None, create: bool = True):
+	"""The shopper's Customer. Without `create`, None when they have none yet."""
 	if not user:
 		user = frappe.session.user
 
@@ -151,7 +152,7 @@ def get_party(user=None):
 		if frappe.db.exists("Customer", portal_party):
 			return frappe.get_cached_doc("Customer", portal_party)
 
-	return _create_party_for_user(user)
+	return _create_party_for_user(user) if create else None
 
 
 def _get_cart_quotation(party=None):
@@ -246,6 +247,8 @@ def get_address_docs(party=None):
 			"pincode",
 			"phone",
 			"email_id",
+			"is_primary_address",
+			"is_shipping_address",
 		],
 	)
 
