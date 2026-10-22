@@ -157,3 +157,10 @@ class TestStorefrontArabic(ProductDetailPriceTestCase):
 			}
 		).insert(ignore_permissions=True, set_name=f"{label} {self.suffix}")
 		return page.route
+
+	def test_an_arabic_name_finds_its_product(self):
+		frappe.local.lang = "ar"
+
+		page = catalog.list_products(query="فرامل")
+
+		self.assertIn(self.route, [card["handle"] for card in page["products"]])
