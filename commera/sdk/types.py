@@ -32,6 +32,7 @@ __all__ = [
 	"ProductVariant",
 	"Rating",
 	"Shop",
+	"Sitemap",
 	"SitemapEntry",
 	"Stage",
 ]
@@ -404,3 +405,18 @@ class ContentPage(TypedDict):
 class SitemapEntry(TypedDict):
 	handle: str
 	updated_at: str
+
+
+class SitemapPage(TypedDict):
+	# Handles of each returned kind.
+	total: dict[str, int]
+	page: int
+	page_size: int
+
+
+class Sitemap(SitemapPage, total=False):
+	"""Only the asked kind, or every kind when none is asked."""
+
+	products: list[SitemapEntry]
+	collections: list[SitemapEntry]
+	pages: list[SitemapEntry]

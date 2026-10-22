@@ -1,15 +1,22 @@
 import frappe
-from frappe.utils.data import cstr
+from frappe import _
+from frappe.utils.data import cint, cstr
 
 from commera.branding import get_brand_assets
 from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import get_page_by_route
 from commera.sdk.catalog import get_collection_handle, get_store_currency, list_collections
-from commera.sdk.types import ContentPage, FooterSection, MenuItem, Shop, SitemapEntry
+from commera.sdk.types import ContentPage, FooterSection, MenuItem, Shop, Sitemap, SitemapEntry
 from commera.shop_data import get_storefront_menu
 
 __all__ = ["get_page", "get_shop", "get_sitemap"]
 
-SITEMAP_LIMIT = 5000
+SITEMAP_PAGE_SIZE = 5000
+SITEMAP_KINDS = ("products", "collections", "pages")
+# The doctype and filters of each kind that is read from the database.
+SITEMAP_DOCTYPES = {
+	"products": ("Style Attribute Variant", {"is_published": 1, "noindex": 0}),
+	"pages": ("Shop Web Page", {"published": 1, "noindex": 0}),
+}
 
 
 def get_shop() -> Shop:
@@ -45,29 +52,39 @@ def get_page(handle: str) -> ContentPage | None:
 	}
 
 
-def get_sitemap() -> dict[str, list[SitemapEntry]]:
-	"""Every indexable product, collection and page handle with its last change."""
-	products = frappe.get_all(
-		"Style Attribute Variant",
-		filters={"is_published": 1, "noindex": 0},
-		fields=["route as handle", "modified as updated_at"],
-		order_by="modified desc",
-		limit=SITEMAP_LIMIT,
-	)
-	pages = frappe.get_all(
-		"Shop Web Page",
-		filters={"published": 1, "noindex": 0},
-		fields=["route as handle", "modified as updated_at"],
-		limit=SITEMAP_LIMIT,
-	)
-	return {
-		"products": [{"handle": row.handle, "updated_at": str(row.updated_at)} for row in products],
-		"collections": [
+def get_sitemap(kind: str | None = None, page: int = 1) -> Sitemap:
+	"""One page of indexable handles with their last change, for `kind` or else for every kind. `total`
+	counts the handles of each returned kind."""
+	if kind is not None and kind not in SITEMAP_KINDS:
+		frappe.throw(_("Sitemap kind must be one of {0}.").format(", ".join(SITEMAP_KINDS)))
+	page = max(cint(page), 1)
+	sitemap = {"total": {}, "page": page, "page_size": SITEMAP_PAGE_SIZE}
+	for each_kind in [kind] if kind else SITEMAP_KINDS:
+		sitemap[each_kind], sitemap["total"][each_kind] = get_sitemap_entries(each_kind, page)
+	return sitemap
+
+
+def get_sitemap_entries(kind: str, page: int) -> tuple[list[SitemapEntry], int]:
+	start = (page - 1) * SITEMAP_PAGE_SIZE
+	if kind == "collections":
+		collections = list_collections()
+		return [
 			{"handle": collection["handle"], "updated_at": collection["updated_at"]}
-			for collection in list_collections()
-		],
-		"pages": [{"handle": row.handle, "updated_at": str(row.updated_at)} for row in pages],
-	}
+			for collection in collections[start : start + SITEMAP_PAGE_SIZE]
+		], len(collections)
+
+	doctype, filters = SITEMAP_DOCTYPES[kind]
+	rows = frappe.get_all(
+		doctype,
+		filters=filters,
+		fields=["route as handle", "modified as updated_at"],
+		# A stable order, so a change to a record does not move it to another page.
+		order_by="name asc",
+		offset=start,
+		limit=SITEMAP_PAGE_SIZE,
+	)
+	entries = [{"handle": row.handle, "updated_at": str(row.updated_at)} for row in rows]
+	return entries, frappe.db.count(doctype, filters)
 
 
 def get_menu_item(node: dict) -> MenuItem:

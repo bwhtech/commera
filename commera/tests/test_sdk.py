@@ -101,6 +101,7 @@ PUBLIC_NAMES = {
 		"ProductVariant",
 		"Rating",
 		"Shop",
+		"Sitemap",
 		"SitemapEntry",
 		"Stage",
 	],

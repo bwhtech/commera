@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 
 from commera.api.storefront.collections import get_collection, get_collections
@@ -122,6 +124,27 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 
 		self.assertIn(shown, handles)
 		self.assertNotIn(hidden, handles)
+
+	def test_the_sitemap_pages_each_kind_and_counts_its_handles(self):
+		self.make_priced_variant("PAGEA", default_rate=10)
+		self.make_priced_variant("PAGEB", default_rate=10)
+		total = frappe.db.count("Style Attribute Variant", {"is_published": 1, "noindex": 0})
+
+		first = get_sitemap()
+		with patch("commera.sdk.shop.SITEMAP_PAGE_SIZE", 1):
+			second_page = get_sitemap(kind="products", page=2)
+
+		self.assertEqual(set(first), {"products", "collections", "pages", "total", "page", "page_size"})
+		self.assertEqual((first["page"], first["page_size"]), (1, 5000))
+		self.assertEqual(first["total"]["products"], total)
+		self.assertEqual(first["total"]["collections"], len(first["collections"]))
+		self.assertEqual(set(second_page), {"products", "total", "page", "page_size"})
+		self.assertEqual(second_page["total"], {"products": total})
+		self.assertEqual(second_page["products"], first["products"][1:2])
+
+	def test_an_unknown_sitemap_kind_is_refused(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Sitemap kind must be one of"):
+			get_sitemap(kind="brands")
 
 	def test_a_draft_page_is_not_found(self):
 		page = frappe.get_doc(

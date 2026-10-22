@@ -5,7 +5,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 
 from commera.sdk import shop
-from commera.sdk.types import ContentPage, MenuItem, SitemapEntry
+from commera.sdk.types import ContentPage, MenuItem, Sitemap
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
@@ -26,8 +26,8 @@ def get_page(handle: str) -> ContentPage:
 
 @frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=60, seconds=60)
-def get_sitemap() -> dict[str, list[SitemapEntry]]:
-	return shop.get_sitemap()
+def get_sitemap(kind: str | None = None, page: int = 1) -> Sitemap:
+	return shop.get_sitemap(kind=kind or None, page=page)
 
 
 def with_storefront_url(item: MenuItem) -> dict:
