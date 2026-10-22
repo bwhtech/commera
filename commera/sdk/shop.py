@@ -1,14 +1,16 @@
 import frappe
 from frappe import _
+from frappe.translate import get_translations_from_apps, get_user_translations
 from frappe.utils.data import cint, cstr
 
+from commera import seo
 from commera.branding import get_brand_assets
-from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import get_page_by_route
-from commera.sdk.catalog import get_collection_handle, get_store_currency, list_collections
+from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import get_page_by_route, get_page_content
+from commera.sdk.catalog import get_collection_handle, get_store_currency, list_collections, translate_label
 from commera.sdk.types import ContentPage, FooterSection, MenuItem, Shop, Sitemap, SitemapEntry
 from commera.shop_data import get_storefront_menu
 
-__all__ = ["get_page", "get_shop", "get_sitemap"]
+__all__ = ["get_page", "get_shop", "get_sitemap", "get_translations"]
 
 SITEMAP_PAGE_SIZE = 5000
 SITEMAP_KINDS = ("products", "collections", "pages")
@@ -31,6 +33,7 @@ def get_shop() -> Shop:
 		"favicon": brand.favicon,
 		"menu": [get_menu_item(node) for node in get_storefront_menu() if node.get("visible", 1)],
 		"footer": [get_footer_section(row.footer_section) for row in get_footer_rows(settings)],
+		"copyright": translate_label(settings.copyright_text),
 	}
 
 
@@ -42,7 +45,7 @@ def get_page(handle: str) -> ContentPage | None:
 	return {
 		"handle": page.route,
 		"title": page.meta_title or page.name,
-		"body_html": page.content or "",
+		"body_html": get_page_content(page) or "",
 		"seo": {
 			"title": page.meta_title,
 			"description": page.meta_description,
@@ -50,6 +53,13 @@ def get_page(handle: str) -> ContentPage | None:
 		},
 		"updated_at": str(page.modified),
 	}
+
+
+def get_translations(lang: str) -> dict[str, str]:
+	"""Commera's own UI strings in `lang`, with the site's Translation records over them."""
+	if lang not in seo.LANGUAGES:
+		frappe.throw(_("Language must be one of {0}.").format(", ".join(seo.LANGUAGES)))
+	return {**get_translations_from_apps(lang, ["commera"]), **get_user_translations(lang)}
 
 
 def get_sitemap(kind: str | None = None, page: int = 1) -> Sitemap:
@@ -90,7 +100,7 @@ def get_sitemap_entries(kind: str, page: int) -> tuple[list[SitemapEntry], int]:
 def get_menu_item(node: dict) -> MenuItem:
 	link_type, target = get_menu_link(node)
 	return {
-		"title": node["label"],
+		"title": translate_label(node["label"]),
 		"type": link_type,
 		"target": target,
 		"items": [get_menu_item(child) for child in node.get("children") or [] if child.get("visible", 1)],
@@ -118,6 +128,6 @@ def get_footer_section(name: str) -> FooterSection:
 	section = frappe.get_cached_doc("Footer Section Config", name)
 	links = sorted((link for link in section.footer_links if link.enabled), key=lambda link: link.link_order)
 	return {
-		"title": section.section_title,
-		"links": [{"title": link.link_label, "url": link.link_url} for link in links],
+		"title": translate_label(section.section_title),
+		"links": [{"title": translate_label(link.link_label), "url": link.link_url} for link in links],
 	}

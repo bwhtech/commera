@@ -10,7 +10,7 @@ The API is a thin layer over `commera.sdk`. It reads the request, calls the SDK,
 | --- | --- | --- | --- |
 | `catalog.list_products`, `catalog.get_product` | `products.get_products`, `products.get_product` | Yes | Not yet: the pages read `commera.utils` and `commera.product_detail`, which the SDK also uses |
 | `catalog.list_collections`, `catalog.get_collection` | `collections.*` | Yes | Not yet |
-| `shop.get_shop`, `shop.get_page`, `shop.get_sitemap` | `shop.*` | Yes | Not yet |
+| `shop.get_shop`, `shop.get_page`, `shop.get_sitemap`, `shop.get_translations` | `shop.*` | Yes | Not yet |
 | `cart.get_priced_cart`, `add_lines`, `update_lines`, `remove_lines`, discount codes | `cart.*` | Yes | `commera.api.server_cart` |
 | `catalog.get_items` | None | Yes | None |
 | `account.get_profile`, `update_profile`, addresses, `list_orders`, `get_order` | `account.*` | Yes | Not yet: the account pages read `commera.utils` and `commera.www.account` |
@@ -54,8 +54,9 @@ The catalogue and cart methods allow guests. The [account methods](#account-meth
 | `products.get_products` | One page of product cards with the facets of the whole result. Each brand, colour and size facet value has its product count, as `{"value": "K&N", "count": 3}`. The other selected filters narrow each count, but the facet's own filter does not. `price` is the `min` and `max` sale price. Filters: `collection`, `query`, `brands`, `colors`, `sizes`, `min_price`, `max_price`, `on_sale`. `sort` is `default`, `price_low`, `price_high`, `name`, `new_arrival` or `discount`. |
 | `products.get_product` | One product: images, the colour option with sibling handles and stock, the size option, and one variant for each size with its price, list price and stock. |
 | `collections.get_collections`, `collections.get_collection` | Item Groups that hold a published product. |
-| `shop.get_shop` | Store name, currency, logo, the menu from Ecommerce Category, and the footer. |
+| `shop.get_shop` | Store name, currency, logo, the menu from Ecommerce Category, the footer, and the `copyright` line (None when it is not set). |
 | `shop.get_page` | A published Shop Web Page. |
+| `shop.get_translations` | `lang` is `en` or `ar`. Commera's own UI strings in that language, with the site's Translation records over them, as `{"Sign In": "تسجيل الدخول"}`. Frappe's strings are not included. Another language gets an error. |
 | `shop.get_sitemap` | Handles and change dates of indexable products, collections and pages, 5000 for each kind on a page. Without arguments, it returns page 1 of each kind. Set `kind` to `products`, `collections` or `pages`, and `page` to get one kind and one page. `total` gives the number of handles of each returned kind, and `page_size` gives the page size. |
 | `cart.get_cart`, `cart.add_lines`, `cart.update_lines`, `cart.remove_lines` | The priced server cart. Each line has the product handle, size and image. |
 | `cart.add_discount_code`, `cart.remove_discount_code` | The priced cart, with a reason for each code that takes nothing off. |
@@ -63,6 +64,24 @@ The catalogue and cart methods allow guests. The [account methods](#account-meth
 | `cart.get_checkout_url` | `{"path": "/api/method/commera.api.storefront.cart.open_checkout?code=..."}` |
 
 A missing or unpublished record returns HTTP 404. A product is one Style Attribute Variant: its `route` is the handle, sibling colours of the same configurator are the colour option, and its sizes are the variants. Options that only hold the fallback axis ("Title" or "One Size") are left out.
+
+## Arabic
+
+The storefront serves Arabic at `/ar`. It sends `_lang=ar` with each call, for example `products.get_product?handle=brake-pads-black&_lang=ar`. Without `_lang`, Frappe uses the `preferred_language` cookie, then `Accept-Language`, then the system language. The SDK reads the same `frappe.local.lang`, so a plugin gets the same text.
+
+With `_lang=ar`, these fields change. An empty Arabic value shows the English value.
+
+| Field | Arabic source |
+| --- | --- |
+| Product, product card and cart line `product.title` | Item `custom_item_name_ar`, then ` - <colour>` when the name does not contain the colour, as on the Jinja product card |
+| Product `description_html` | Item `custom_description_ar` |
+| Page `body_html` | Shop Web Page `content_ar` |
+| Collection titles, menu titles, footer titles and link titles, `copyright` | `_()` on the English value: a Translation record or Commera's `ar.csv` |
+| Colour facet values | A `label` with `_()` on the colour. `value` stays the English filter value. |
+
+The site makes the Item fields `custom_item_name_ar` and `custom_description_ar`. Commera does not make them. SEO titles and descriptions, sizes, brands and the colour option stay English. Numbers use Latin digits. A search for an Arabic name finds the product.
+
+The storefront gets the UI strings for its own catalog from `shop.get_translations?lang=ar`.
 
 ## The cart token
 
@@ -89,6 +108,8 @@ Guest methods are rate-limited by IP address. Frappe reads the first address in 
 - A used or expired code redirects to the cart.
 
 The code is used once, by the first browser that can use it.
+
+`get_checkout_url` stores the language of the call, `en` or `ar`, with the code. Send `_lang=ar` to open the checkout at `/ar/cart`. The sign-in redirect sends `_lang` to `/storefront-login` too, so the sign-in page shows in Arabic from right to left.
 
 After this, the shopper is on the Commera site. Payment, order confirmation and the account pages are Commera's.
 

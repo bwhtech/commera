@@ -304,6 +304,8 @@ def get_product_base_query(filters=None, product_list=None):
 				| (style_attribute_variant.item_group.like(f"%{search}%"))
 				| (item.name.like(f"%{search}%"))
 			)
+			if frappe.db.has_column("Item", "custom_item_name_ar"):
+				search_condition |= item.custom_item_name_ar.like(f"%{search}%")
 			if child_categories:
 				search_condition |= style_attribute_variant.item_group.isin(child_categories)
 

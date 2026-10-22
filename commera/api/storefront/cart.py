@@ -16,6 +16,7 @@ from commera.guest import (
 from commera.plugin_events import get_listed_items
 from commera.sdk import cart as cart_sdk
 from commera.sdk.types import PricedCart
+from commera.seo import LANGUAGES
 from commera.www.cart.permalink import get_next_url
 
 CHECKOUT_CODE_PREFIX = "commera:storefront_checkout:"
@@ -97,49 +98,56 @@ def get_checkout_url() -> dict:
 	if not get_session_cart():
 		frappe.throw(_("Add something to your cart first."), frappe.DoesNotExistError)
 
+	handoff["lang"] = frappe.local.lang if frappe.local.lang in LANGUAGES else "en"
 	code = frappe.generate_hash(length=32)
 	frappe.cache.set_value(f"{CHECKOUT_CODE_PREFIX}{code}", handoff, expires_in_sec=CHECKOUT_CODE_SECONDS)
 	return {"path": f"/api/method/commera.api.storefront.cart.open_checkout?code={code}"}
 
 
-def get_checkout_handoff() -> str | dict:
+def get_checkout_handoff() -> dict:
 	"""The guest's cart token, or the signed-in shopper whose account cart the checkout opens."""
 	if not is_guest():
 		return {"user": frappe.session.user}
 	if token := get_guest_cart_token():
-		return token
+		return {"token": token}
 	frappe.throw(_("Send the cart token to start a storefront checkout."))
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=60, seconds=60)
 def open_checkout(code: str):
-	"""Bind the storefront cart to this browser, then go on to checkout. A used or old code opens the cart."""
+	"""Bind the storefront cart to this browser, then go on to checkout in the storefront's language. A used
+	or old code opens the cart."""
 	key = f"{CHECKOUT_CODE_PREFIX}{cstr(code)}"
-	handoff = frappe.cache.get_value(key)
-	if isinstance(handoff, dict):
-		return open_account_checkout(key, handoff["user"])
+	handoff = frappe.cache.get_value(key) or {}
+	if handoff:
+		frappe.local.lang = handoff["lang"]
+	if "user" in handoff:
+		return open_account_checkout(key, handoff)
 
 	frappe.cache.delete_value(key)
-	if handoff and is_guest():
-		set_guest_cart_cookie(handoff)
-	elif handoff:
-		adopt_guest_cart(sha256_hash(handoff))
+	token = handoff.get("token")
+	if token and is_guest():
+		set_guest_cart_cookie(token)
+	elif token:
+		adopt_guest_cart(sha256_hash(token))
 		# A GET is not committed unless asked; the merge must persist.
 		frappe.local.flags.commit = True
 
-	redirect(get_next_url() if handoff else f"/{frappe.local.lang}/cart")
+	redirect(get_next_url() if token else f"/{frappe.local.lang}/cart")
 
 
-def open_account_checkout(key: str, user: str):
-	"""Only a browser signed in as `user` uses the code. Any other browser signs in first, then comes back."""
-	if frappe.session.user == user:
+def open_account_checkout(key: str, handoff: dict):
+	"""Only a browser signed in as the handoff's user uses the code. Any other browser signs in first, then
+	comes back."""
+	if frappe.session.user == handoff["user"]:
 		frappe.cache.delete_value(key)
 		return redirect(get_next_url())
 
 	# The sign-in can take longer than the code would otherwise live.
-	frappe.cache.set_value(key, {"user": user}, expires_in_sec=CHECKOUT_CODE_SECONDS)
-	redirect(f"/storefront-login?{urlencode({'prompt': 'login', 'redirect-to': frappe.request.full_path})}")
+	frappe.cache.set_value(key, handoff, expires_in_sec=CHECKOUT_CODE_SECONDS)
+	query = {"prompt": "login", "redirect-to": frappe.request.full_path, "_lang": handoff["lang"]}
+	redirect(f"/storefront-login?{urlencode(query)}")
 
 
 def redirect(location: str):

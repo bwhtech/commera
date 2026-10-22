@@ -127,10 +127,32 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 				open_checkout(code)
 				location = urlsplit(frappe.local.response["location"])
 				self.assertEqual(location.path, "/storefront-login")
-				self.assertEqual(parse_qs(location.query), {"prompt": ["login"], "redirect-to": [path]})
+				self.assertEqual(
+					parse_qs(location.query), {"prompt": ["login"], "redirect-to": [path], "_lang": ["en"]}
+				)
 
 		self.send_token(None, user=shopper, path=path)
 		open_checkout(code)
 		self.assertEqual(frappe.local.response["location"], "/en/cart?checkout=1")
 		open_checkout(code)
 		self.assertEqual(frappe.local.response["location"], "/en/cart")
+
+	def test_checkout_opens_in_the_language_of_the_storefront(self):
+		self.addCleanup(setattr, frappe.local, "lang", "en")
+		add_lines([{"item_code": self.item_code, "qty": 1}])
+		frappe.local.lang = "ar"
+		guest_code = get_checkout_url()["path"].split("code=")[1]
+		shopper = make_website_user()
+		self.send_token(None, user=shopper)
+		add_lines([{"item_code": self.item_code, "qty": 1}])
+		path = get_checkout_url()["path"]
+
+		# The browser that opens the link reads English from its own cookie or headers.
+		self.send_token(None, path=path)
+		frappe.local.lang = "en"
+		open_checkout(path.split("code=")[1])
+		self.assertEqual(parse_qs(urlsplit(frappe.local.response["location"]).query)["_lang"], ["ar"])
+
+		frappe.local.lang = "en"
+		open_checkout(guest_code)
+		self.assertEqual(frappe.local.response["location"], "/ar/cart/checkout")

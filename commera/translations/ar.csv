@@ -78,3 +78,185 @@ Brand logo,شعار المتجر
 Footer logo,شعار التذييل
 Favicon,أيقونة الموقع
 Store name,اسم المتجر
+Sign In,تسجيل الدخول
+Continue with email,المتابعة بالبريد الإلكتروني
+"You are signed in as {0}. Sign in with the account that you use on the storefront.","أنت مسجل الدخول باسم {0}. سجّل الدخول بالحساب الذي تستخدمه في المتجر."
+About,نبذة
+Account,الحساب
+Add address,إضافة عنوان
+Add something to your cart first.,أضف منتجًا إلى سلتك أولًا.
+Add to Cart,أضف إلى السلة
+Add {amount} more for free delivery.,أضف ما قيمته {amount} لتحصل على توصيل مجاني.
+Add {parameter} to search the live catalogue.,أضف {parameter} للبحث في الكتالوج المباشر.
+Adding to Cart...,جارٍ الإضافة إلى السلة...
+Address,العنوان
+Address is required,العنوان مطلوب
+Address type,نوع العنوان
+Addresses,العناوين
+Agent resources,موارد الوكلاء
+All products,جميع المنتجات
+An error occurred while retrieving the collection. Please try again later.,حدث خطأ أثناء جلب المجموعة. يُرجى المحاولة لاحقًا.
+An error occurred while retrieving the product. Please try again later.,حدث خطأ أثناء جلب المنتج. يُرجى المحاولة لاحقًا.
+An unexpected error occurred. Please try again.,حدث خطأ غير متوقع. يُرجى المحاولة مرة أخرى.
+"Apartment, suite, etc.",الشقة، الجناح، إلخ.
+Apply,تطبيق
+Apply price,تطبيق السعر
+Best Matches,الأكثر تطابقًا
+Billing,الفوترة
+Brand,العلامة التجارية
+Browse,تصفّح
+Browse all products,تصفّح جميع المنتجات
+Browse collection products.,تصفّح منتجات المجموعة.
+Browse every product at {siteName}: compare prices and check availability.,تصفّح جميع المنتجات في {siteName}: قارن الأسعار وتحقّق من التوفر.
+Browse products by collection.,تصفّح المنتجات حسب المجموعة.
+Browse the complete catalog.,تصفّح الكتالوج كاملًا.
+Buy,الشراء
+Cancel,إلغاء
+Cart,السلة
+Cart item,منتج في السلة
+Cart items,منتجات السلة
+Checkout,إتمام الشراء
+Checkout is unavailable. Refresh your cart and try again.,إتمام الشراء غير متاح حاليًا. حدّث السلة وحاول مرة أخرى.
+Checkout: add a size to the cart on the product page; checkout and payment open on the store's Commera site.,إتمام الشراء: أضف مقاسًا إلى السلة من صفحة المنتج؛ يتم إتمام الشراء والدفع على موقع Commera الخاص بالمتجر.
+City,المدينة
+City is required,المدينة مطلوبة
+Clear,مسح
+Close,إغلاق
+Close cart,إغلاق السلة
+Collection Not Found,المجموعة غير موجودة
+Collections,المجموعات
+Color,اللون
+Complete index of storefront content.,فهرس كامل لمحتوى المتجر.
+Continue Shopping,متابعة التسوق
+Continue browsing,متابعة التصفح
+Continue shopping,متابعة التسوق
+Country,الدولة
+Country is required,الدولة مطلوبة
+Date: New to Old,التاريخ: من الأحدث إلى الأقدم
+Decrease quantity,إنقاص الكمية
+Default billing,الفوترة الافتراضية
+Default billing address,عنوان الفوترة الافتراضي
+Default shipping,الشحن الافتراضي
+Default shipping address,عنوان الشحن الافتراضي
+Delete,حذف
+Delete address?,هل تريد حذف العنوان؟
+Discount code,رمز الخصم
+Discount codes,رموز الخصم
+Dismiss,إخفاء
+Edit,تعديل
+Edit address,تعديل العنوان
+Email,البريد الإلكتروني
+Estimated total,الإجمالي التقديري
+"Explore featured products, curated collections, and seasonal campaigns.",اكتشف المنتجات المميزة والمجموعات المختارة والعروض الموسمية.
+Failed to delete address,تعذّر حذف العنوان
+Failed to save address,تعذّر حفظ العنوان
+Failed to update profile,تعذّر تحديث الملف الشخصي
+Filter by {filter}: {value},تصفية حسب {filter}: {value}
+Filters,عوامل التصفية
+"Find products matching ""{query}""",ابحث عن المنتجات المطابقة لـ «{query}»
+First name,الاسم الأول
+From,من
+From {price},من {price}
+Go back to the home page,العودة إلى الصفحة الرئيسية
+Go to Checkout,المتابعة إلى إتمام الشراء
+Go to image {number},الانتقال إلى الصورة {number}
+Images,الصور
+Increase quantity,زيادة الكمية
+Invalid address ID,معرّف العنوان غير صالح
+Item quantity,كمية المنتج
+Last name,اسم العائلة
+Last updated: {date} · Prices in {currency},آخر تحديث: {date} · الأسعار بعملة {currency}
+Loading cart…,جارٍ تحميل السلة…
+Locale: {locale},اللغة: {locale}
+Manage your saved addresses,إدارة عناوينك المحفوظة
+Menu,القائمة
+Name: A-Z,الاسم: أ-ي
+Newer,الأحدث
+No collections found.,لم يتم العثور على مجموعات.
+No products available,لا توجد منتجات متاحة
+No products found,لم يتم العثور على منتجات
+"No results for ""{query}""",لا توجد نتائج لـ «{query}»
+Older,الأقدم
+Out of Stock,نفدت الكمية
+PIN / Postal code,الرمز البريدي
+Page Not Found,الصفحة غير موجودة
+Paid,مدفوع
+Pause video,إيقاف الفيديو مؤقتًا
+Payment pending,الدفع قيد الانتظار
+Phone,الهاتف
+Play video,تشغيل الفيديو
+Price: High to Low,السعر: من الأعلى إلى الأقل
+Price: Low to High,السعر: من الأقل إلى الأعلى
+Product Not Found,المنتج غير موجود
+Profile updated,تم تحديث الملف الشخصي
+Rated {average}/5 from {count} reviews,"التقييم {average}/5 من {count, plural, zero {دون مراجعات} one {مراجعة واحدة} two {مراجعتين} few {# مراجعات} many {# مراجعةً} other {# مراجعة}}"
+Recently viewed,شوهدت مؤخرًا
+Redirecting...,جارٍ التحويل...
+Remove discount: {code},إزالة الخصم: {code}
+Remove item,إزالة المنتج
+Review your cart items and proceed to checkout,راجع منتجات سلتك وتابع إلى إتمام الشراء
+Save,حفظ
+Search for products in our store,ابحث عن المنتجات في متجرنا
+Search products,ابحث عن المنتجات
+Search products by keyword.,ابحث عن المنتجات بكلمة مفتاحية.
+"Search results for ""{query}""",نتائج البحث عن «{query}»
+Search the live catalogue,ابحث في الكتالوج المباشر
+Search: {term},بحث: {term}
+Select {option}: {value},اختر {option}: {value}
+Server Error,خطأ في الخادم
+Shipping,الشحن
+Shipping address,عنوان الشحن
+Shop,تسوّق
+"Shop premium products, curated collections, and latest offers from {siteName}.",تسوّق منتجات مميزة ومجموعات مختارة وأحدث العروض من {siteName}.
+"Shop the catalogue, compare prices and check availability.",تسوّق من الكتالوج، وقارن الأسعار، وتحقّق من التوفر.
+"Shop {title} at {siteName}: browse products, compare prices, and check availability.",تسوّق {title} من {siteName}: تصفّح المنتجات وقارن الأسعار وتحقّق من التوفر.
+Show all {title},عرض كل {title}
+Sign in,تسجيل الدخول
+Sign out,تسجيل الخروج
+Sign-in failed,تعذّر تسجيل الدخول
+Sitemap,خريطة الموقع
+Size,المقاس
+Skip to content,تخطَّ إلى المحتوى
+Sold out,نفدت الكمية
+Something went wrong,حدث خطأ ما
+Sort,الترتيب
+State / Province,المنطقة / المحافظة
+Storefront guide,دليل المتجر
+Subtotal,المجموع الفرعي
+Taxes and shipping calculated at checkout.,تُحتسب الضرائب ورسوم الشحن عند إتمام الشراء.
+The collection {value} could not be found.,تعذّر العثور على المجموعة {value}.
+"The link may be incorrect, or the page has been removed.",قد يكون الرابط غير صحيح، أو أن الصفحة أُزيلت.
+The product {value} could not be found.,تعذّر العثور على المنتج {value}.
+This address will be permanently removed from your account.,سيُحذف هذا العنوان من حسابك نهائيًا.
+To,إلى
+Total,الإجمالي
+Try again,حاول مرة أخرى
+Up to {price},حتى {price}
+Updating cart...,جارٍ تحديث السلة...
+Updating…,جارٍ التحديث…
+View All,عرض الكل
+View this collection,عرض هذه المجموعة
+View your order history,اعرض سجل طلباتك
+Was {price},كان {price}
+"We couldn't find any products matching ""{query}""",لم نعثر على أي منتجات تطابق «{query}»
+We couldn't update your cart,تعذّر تحديث سلتك
+We couldn't update your cart. Please try again.,تعذّر تحديث سلتك. يُرجى المحاولة مرة أخرى.
+When and how to use this storefront.,متى وكيف تستخدم هذا المتجر.
+You May Also Like,قد يعجبك أيضًا
+You have no orders yet.,لا توجد لديك طلبات بعد.
+You have no saved addresses yet.,لا توجد لديك عناوين محفوظة بعد.
+Your account information,معلومات حسابك
+Your cart is empty,سلتك فارغة
+"Your sign-in didn’t finish. Try again, or keep shopping without an account.",لم يكتمل تسجيل دخولك. حاول مرة أخرى، أو تابع التسوق دون حساب.
+by {vendor},من {vendor}
+"for ""{query}""",عن «{query}»
+"{count, plural, one {# Item} other {# Items}}","{count, plural, zero {لا توجد منتجات} one {منتج واحد} two {منتجان} few {# منتجات} many {# منتجًا} other {# منتج}}"
+"{count, plural, one {# product matches} other {# products match}} ""{term}"", with live prices and stock.","{count, plural, zero {لا توجد منتجات تطابق} one {منتج واحد يطابق} two {منتجان يطابقان} few {# منتجات تطابق} many {# منتجًا يطابق} other {# منتج يطابق}} «{term}»، بأسعار ومخزون محدّثين."
+"{discount, number, percent} OFF","خصم {discount, number, percent}"
+{option}: {value} (unavailable),{option}: {value} (غير متوفر)
+{range} across {count} variants,"{range} عبر {count, plural, one {خيار واحد} two {خيارين} few {# خيارات} many {# خيارًا} other {# خيار}}"
+{title} enlarged,صورة مكبّرة لـ {title}
+{title} image {number},صورة {title} رقم {number}
+© {siteName}. All rights reserved.,© {siteName}. جميع الحقوق محفوظة.
+× {quantity},× {quantity}
+Change language,تغيير اللغة
