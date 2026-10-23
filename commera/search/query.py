@@ -21,10 +21,7 @@ def use_qb_fallback(filters):
 
 def read_or_fall_back(read, fall_back):
 	"""Serve `read()` from the engine, or `fall_back()` from frappe.qb when the search server fails.
-
-	The engine trusts its cached readiness, so the first request of an outage reaches the server. After
-	that request, the rest of this request and the next ones use frappe.qb until the server answers.
-	"""
+	The cached readiness lets the first request of an outage reach the server, so it must not raise."""
 	try:
 		return read()
 	except SearchServerError as error:

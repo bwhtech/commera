@@ -150,6 +150,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		return frappe.enqueue(
 			CORE_BUILD_INDEX,
 			queue="long",
+			enqueue_after_commit=True,
 			timeout=BUILD_TIMEOUT,
 			job_id=SEARCH_CLASS_PATH if deduplicate else None,
 			deduplicate=deduplicate,
@@ -169,6 +170,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		return frappe.enqueue(
 			CORE_BUILD_INDEX,
 			queue="long",
+			enqueue_after_commit=True,
 			timeout=BUILD_TIMEOUT,
 			job_id=f"{SEARCH_CLASS_PATH}_continuation" if is_continuation else SEARCH_CLASS_PATH,
 			deduplicate=True,

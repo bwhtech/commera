@@ -220,6 +220,7 @@ class RemoteSearchEngine(SearchEngineBase):
 		return frappe.enqueue(
 			self.REBUILD_JOB,
 			queue="long",
+			enqueue_after_commit=True,
 			timeout=REBUILD_TIMEOUT,
 			job_id=self.REBUILD_JOB if deduplicate else None,
 			deduplicate=deduplicate,

@@ -139,6 +139,8 @@ class TestStorefrontSearch(SearchCatalogue, IntegrationTestCase):
 		self.assertEqual(result["categories"], [])
 
 	def test_typeahead_finds_arabic_item_names(self):
+		if not frappe.db.has_column("Item", "custom_item_name_ar"):
+			self.skipTest("Item has no custom_item_name_ar field on this site")
 		frappe.db.set_value("Item", STYLE_ITEM, "custom_item_name_ar", "ودجت تجريبي")
 		self.addCleanup(frappe.db.set_value, "Item", STYLE_ITEM, "custom_item_name_ar", None)
 		names = {card["name"] for card in get_typeahead("ودجت", limit=10)["products"]}

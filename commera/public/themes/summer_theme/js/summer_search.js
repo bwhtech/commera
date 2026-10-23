@@ -42,7 +42,10 @@ document.addEventListener('alpine:init', () => {
 			this.latest_request += 1;
 			const request_id = this.latest_request;
 			try {
-				const response = await frappe_call('/api/v2/method/commera.api.search.typeahead', { q: term });
+				const response = await frappe_call(
+					'/api/v2/method/commera.api.search.typeahead',
+					{ q: term },
+				);
 				if (request_id !== this.latest_request) {
 					return;
 				}
