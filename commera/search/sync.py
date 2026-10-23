@@ -3,8 +3,8 @@ from frappe.utils import create_batch
 from redis.exceptions import LockError
 
 from commera.search.build import ensure_index_built
+from commera.search.engine_cache import new_search_engine
 from commera.search.record_builder import IN_CLAUSE_CHUNK_SIZE
-from commera.search.sqlite_product_search import SqliteProductSearch
 
 LOCK_KEY = "commera_search_index_write"
 LOCK_TIMEOUT = 30
@@ -79,7 +79,7 @@ def upsert_doc(doctype, name):
 
 
 def upsert_docs(doctype, names):
-	if not SqliteProductSearch().index_exists():
+	if not new_search_engine().index_exists():
 		# No index yet: patching is a no-op, so build it instead of waiting for the nightly job.
 		ensure_index_built()
 		return
@@ -92,7 +92,7 @@ def remove_doc(doctype, name):
 
 def serialized_write(write):
 	"""Run an index write under the single-writer cache lock; no-op until the index has been built."""
-	engine = SqliteProductSearch()
+	engine = new_search_engine()
 	if not engine.index_exists():
 		return
 	try:

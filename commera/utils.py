@@ -168,8 +168,8 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 
 def shape_product_cards(cards):
 	"""Give every product card the one storefront card shape, whichever grid built it."""
+	from commera.search.engine import CARD_COLUMNS
 	from commera.search.record_builder import sizes_for_variants
-	from commera.search.sqlite_product_search import SqliteProductSearch
 
 	if not cards:
 		return cards
@@ -180,9 +180,8 @@ def shape_product_cards(cards):
 	for card in cards:
 		if card.get("sizes") is None:
 			card["sizes"] = sizes_by_variant.get(card["name"], [])
-		for column in SqliteProductSearch.PRODUCT_DETAIL_COLUMNS:
-			if column != "doc_id":
-				card.setdefault(column, None)
+		for column in CARD_COLUMNS:
+			card.setdefault(column, None)
 		card.setdefault("average_rating", None)
 		card.setdefault("review_count", None)
 		# Mirrors record_builder.aggregate_prices so both grids agree on the price they filter and sort by.

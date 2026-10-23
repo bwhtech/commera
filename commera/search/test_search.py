@@ -12,7 +12,7 @@ from commera import utils
 from commera.search import build, record_builder, sync
 from commera.search import query as search_query
 from commera.search.engine_cache import clear_search_engine
-from commera.search.sqlite_product_search import SqliteProductSearch
+from commera.search.sqlite_product_search import SEARCH_CLASS_PATH, SqliteProductSearch
 
 TEST_INDEX_NAME = "test_commera_product_search.db"
 SEARCH_TOKEN = "zzwidget"
@@ -559,7 +559,7 @@ class TestStorefrontSearch(IntegrationTestCase):
 		_args, kwargs = enqueue.call_args
 		self.assertEqual(kwargs["queue"], "long")
 		self.assertIs(kwargs["force"], False)
-		self.assertEqual(kwargs["job_id"], build.SEARCH_CLASS_PATH)
+		self.assertEqual(kwargs["job_id"], SEARCH_CLASS_PATH)
 		self.assertTrue(kwargs["deduplicate"])
 
 	def test_ensure_index_built_resumes_an_interrupted_build(self):
@@ -575,7 +575,7 @@ class TestStorefrontSearch(IntegrationTestCase):
 		_args, kwargs = enqueue.call_args
 		self.assertIs(kwargs["is_continuation"], True)
 		self.assertIs(kwargs["force"], True)
-		self.assertEqual(kwargs["job_id"], f"{build.SEARCH_CLASS_PATH}_continuation")
+		self.assertEqual(kwargs["job_id"], f"{SEARCH_CLASS_PATH}_continuation")
 
 	def test_ensure_index_built_noop_on_empty_catalogue(self):
 		SqliteProductSearch().drop_index()

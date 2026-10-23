@@ -1,4 +1,6 @@
 import difflib
+import os
+import re
 import sqlite3
 import time
 from typing import ClassVar
@@ -7,7 +9,13 @@ import frappe
 from frappe.search.sqlite_search import MAX_EDIT_DISTANCE, MIN_WORD_LENGTH, SQLiteSearch
 from frappe.utils import create_batch, flt
 
-from commera.search.engine import empty_result, is_query_too_short
+from commera.search.engine import (
+	CARD_COLUMNS,
+	MIN_QUERY_LENGTH,
+	SearchEngineBase,
+	empty_result,
+	is_query_too_short,
+)
 from commera.search.record_builder import (
 	build_category_search_records,
 	build_product_search_records,
@@ -21,8 +29,14 @@ SQLITE_PARAM_CHUNK_SIZE = 500
 # Ceiling for the edit-distance fallback below; beyond 2 edits the "correction" is a different word.
 MAX_EDIT_DISTANCE_FALLBACK = 2
 
+SEARCH_CLASS_PATH = "commera.search.sqlite_product_search.SqliteProductSearch"
+CORE_BUILD_INDEX = "frappe.search.sqlite_search.build_index"
+BUILD_TIMEOUT = 2 * 60 * 60 + 10 * 60
 
-class SqliteProductSearch(SQLiteSearch):
+ARABIC_PATTERN = re.compile("[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]")
+
+
+class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	INDEX_NAME = "commera_product_search.db"
 
 	INDEX_SCHEMA: ClassVar = {
@@ -31,30 +45,7 @@ class SqliteProductSearch(SQLiteSearch):
 		"tokenizer": "unicode61 remove_diacritics 2",
 	}
 
-	PRODUCT_DETAIL_COLUMNS: ClassVar = (
-		"doc_id",
-		"name",
-		"route",
-		"item_style",
-		"display_name",
-		"attribute_value",
-		"brand",
-		"is_stock_item",
-		"item_name",
-		"custom_item_name_ar",
-		"variant_item_code",
-		"image",
-		"hover_image",
-		"item_group",
-		"color",
-		"default_price",
-		"sale_price",
-		"effective_price",
-		"discount_percent",
-		"has_discount",
-		"sale_end_date",
-		"modified",
-	)
+	PRODUCT_DETAIL_COLUMNS: ClassVar = ("doc_id", *CARD_COLUMNS)
 
 	INDEXABLE_DOCTYPES: ClassVar = {
 		"Style Attribute Variant": {
@@ -83,6 +74,14 @@ class SqliteProductSearch(SQLiteSearch):
 
 	def get_search_filters(self):
 		return {}
+
+	def can_rank(self, term):
+		"""True for a term of at least MIN_QUERY_LENGTH that is not Arabic, once the index exists."""
+		# The FTS tokenizer has no Arabic stemming, so an Arabic term goes back to frappe.qb.
+		term = (term or "").strip()
+		if len(term) < MIN_QUERY_LENGTH or is_arabic_query(term):
+			return False
+		return self.index_exists()
 
 	# -- index shape ----------------------------------------------------------------------------
 
@@ -142,6 +141,41 @@ class SqliteProductSearch(SQLiteSearch):
 			else:
 				definitions.append(f"{column} TEXT")
 		return definitions
+
+	# -- builds ---------------------------------------------------------------------------------
+
+	def enqueue_full_rebuild(self, deduplicate=False):
+		"""Enqueue a full rebuild on the long queue. Returns the enqueue payload."""
+		# Core builds into a temp DB and renames it over the live one, so the index keeps serving.
+		return frappe.enqueue(
+			CORE_BUILD_INDEX,
+			queue="long",
+			timeout=BUILD_TIMEOUT,
+			job_id=SEARCH_CLASS_PATH if deduplicate else None,
+			deduplicate=deduplicate,
+			search_class_path=SEARCH_CLASS_PATH,
+			force=True,
+		)
+
+	def ensure_index_built(self):
+		"""Build the index when it is absent, or resume a build that died part-way through."""
+		# No sqlite_search hook here, so core's own resume never sees this index; a leftover temp DB is
+		# the only trace of an interrupted build.
+		is_continuation = os.path.exists(self._get_db_path(is_temp=True))
+		if self.index_exists() and not is_continuation:
+			return None
+		if not frappe.db.exists("Style Attribute Variant", {"is_published": 1}):
+			return None
+		return frappe.enqueue(
+			CORE_BUILD_INDEX,
+			queue="long",
+			timeout=BUILD_TIMEOUT,
+			job_id=f"{SEARCH_CLASS_PATH}_continuation" if is_continuation else SEARCH_CLASS_PATH,
+			deduplicate=True,
+			search_class_path=SEARCH_CLASS_PATH,
+			force=is_continuation,
+			is_continuation=is_continuation,
+		)
 
 	# -- record overlay -------------------------------------------------------------------------
 
@@ -614,3 +648,8 @@ def levenshtein_distance(source, target):
 		previous_row = current_row
 
 	return previous_row[-1]
+
+
+def is_arabic_query(text):
+	"""True if the text carries any Arabic-script character."""
+	return bool(ARABIC_PATTERN.search(text or ""))
