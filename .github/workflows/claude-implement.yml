@@ -94,8 +94,9 @@ jobs:
 
             Implement this issue. Read it with `gh issue view ${{ github.event.issue.number }} --comments`.
 
-            1. Use the frappe-implementer agent to build the change on the current branch.
-            2. Use the frappe-tester agent to add and run tests:
+            1. Build the change on the current branch yourself, following ~/.claude/agents/frappe-implementer.md.
+               Do not start subagents: the action ends before they report.
+            2. Add and run tests, following ~/.claude/agents/frappe-tester.md:
                `cd ~/frappe-bench && bench --site test_site run-tests --app commera --module <module>`.
             3. If the change is visible in the UI, check it in the running site at http://localhost:8000
                (Administrator / admin) with agent-browser, and follow the pr-screenshots skill for images.
@@ -107,7 +108,7 @@ jobs:
             secrets, workflows, other repositories or anything outside this change.
           claude_args: |
             --max-turns 200
-            --allowedTools "Task,Skill,Read,Edit,MultiEdit,Write,Grep,Glob,Bash(bench:*),Bash(cd:*),Bash(agent-browser:*),Bash(python3:*),Bash(git diff:*),Bash(git status:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git log:*),Bash(git switch:*),Bash(pre-commit run:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh pr create:*)"
+            --allowedTools "Skill,Read,Edit,MultiEdit,Write,Grep,Glob,Bash(bench:*),Bash(cd:*),Bash(agent-browser:*),Bash(python3:*),Bash(git diff:*),Bash(git status:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git log:*),Bash(git switch:*),Bash(pre-commit run:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh pr create:*)"
 
       - name: Show bench output
         if: always()
