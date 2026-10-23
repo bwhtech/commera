@@ -29,7 +29,7 @@ const listings = computed(() => props.product.variants.filter((variant) => varia
           </div>
           <p class="mt-0.5 truncate text-sm text-ink-gray-5">{{ variant.storefront_url }}</p>
         </div>
-        <Button label="Open" icon-right="lucide-external-link" :link="variant.storefront_url" />
+        <Button label="Open" icon-right="lucide-external-link" :href="variant.storefront_url" />
       </div>
     </div>
 

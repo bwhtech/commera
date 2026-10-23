@@ -111,6 +111,11 @@
         spinner.classList.remove("hidden");
         try {
             const data = await frappe_call(url, args);
+            // Set by a page that signs the shopper in for somewhere else, such as /storefront-login.
+            if (x_data.redirect_to) {
+                window.location.href = x_data.redirect_to;
+                return;
+            }
             // The page's CSRF token belongs to the guest session, so checkout resumes on a fresh load.
             if (x_data.selected_tab === 'checkout') {
                 const resume_url = new URL(window.location.href);

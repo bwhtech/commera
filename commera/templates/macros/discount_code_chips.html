@@ -1,0 +1,25 @@
+{% from "templates/macros/icon.html" import icon %}
+
+{% macro discount_code_chips(codes, saving, remove, classes="") -%}
+<div class="flex flex-wrap gap-2 {{ classes }}" x-show="{{ codes }}.length" x-cloak
+	x-data='{ remove_label: {{ _("Remove {0}") | tojson }} }'>
+	<template x-for="code_state in {{ codes }}" :key="code_state.code">
+		<span class="inline-flex flex-col gap-1">
+			<span class="w-fit inline-flex overflow-hidden rounded-lg border border-dashed border-gray-400 bg-white text-xs font-medium text-gray-600">
+				<span class="flex items-center gap-1 bg-gray-400/10 ps-2 pe-1 py-0.5">
+					<span x-text="code_state.code"></span>
+					<button type="button" class="flex size-6 items-center justify-center cursor-pointer disabled:cursor-not-allowed"
+						:aria-label="remove_label.replace('{0}', code_state.code)" :disabled="{{ saving }}"
+						@click="{{ remove }}(code_state.code)">
+						<span aria-hidden="true" x-show="{{ saving }} !== code_state.code">{{ icon(name="close", classes="h-4 w-4") }}</span>
+						<span x-show="{{ saving }} === code_state.code"
+							class="animate-spin size-3 border-3 border-current border-t-transparent rounded-full"
+							role="status" aria-label="{{ _('Loading') | e }}"></span>
+					</button>
+				</span>
+			</span>
+			<span class="max-w-60 text-xs text-gray-500" x-show="code_state.reason" x-text="code_state.reason"></span>
+		</span>
+	</template>
+</div>
+{%- endmacro %}

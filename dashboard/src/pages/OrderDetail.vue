@@ -14,10 +14,10 @@ import PluginActionDialog from '../components/PluginActionDialog.vue'
 import PluginSlot from '../components/PluginSlot.vue'
 import Thumb from '../components/Thumb.vue'
 import RefundDialog from '../components/RefundDialog.vue'
-import { useAdminRead, useAdminAction, useMethodRead } from '../data/api'
+import { useAdminRead, useAdminAction, useMethodRead, trySubmit } from '../data/api'
 import { erpnextLink, printUrl } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
-import { longDate, money } from '../data/format'
+import { discountMoney, longDate, money } from '../data/format'
 import { useRecordPlugins } from '../data/recordPlugins'
 
 const route = useRoute()
@@ -53,6 +53,11 @@ const { cards, actionGroup, openAction, record, reload: reloadPlugins } = useRec
 )
 
 const hasRail = useMediaQuery('(min-width: 1024px)')
+
+// Shown before its discount so the shipping row and the discount rows under it add up.
+const shippingBeforeDiscount = computed(
+  () => order.value.shipping + (order.value.shipping_discounts ?? []).reduce((sum, row) => sum + row.amount, 0),
+)
 
 const erpLink = computed(() => (order.value ? erpnextLink('Sales Order', order.value.name) : null))
 
@@ -91,8 +96,8 @@ const moreActions = computed(() => [{ group: 'Order', options: orderActions }, a
 const fulfilAction = useAdminAction('orders.fulfil_order')
 
 async function fulfil() {
-  await fulfilAction.submit({ sales_order: order.value.name })
-  if (fulfilAction.error) return
+  const fulfilled = await trySubmit(fulfilAction, { sales_order: order.value.name })
+  if (!fulfilled) return
   toast.success('Fulfilment created')
   orderRequest.reload()
 }
@@ -133,7 +138,7 @@ const loadFailure = computed(() =>
       <template #actions>
         <!-- Three full label+icon buttons do not fit a phone header, so this one
              drops out below `sm` and the More menu's own entry carries it. -->
-        <Button class="hidden sm:inline-flex" label="View in ERP" icon-right="lucide-external-link" :link="erpLink" />
+        <Button class="hidden sm:inline-flex" label="View in ERP" icon-right="lucide-external-link" :href="erpLink" />
         <Dropdown :options="moreActions">
           <Button icon="lucide-ellipsis" label="More actions" />
         </Dropdown>
@@ -191,6 +196,14 @@ const loadFailure = computed(() =>
                   <p class="mt-1 truncate text-sm text-ink-gray-5">
                     <span v-if="item.size">{{ item.size }} · </span>{{ item.item_code }}
                   </p>
+                  <p
+                    v-for="(discount, index) in item.discounts"
+                    :key="`${index}-${discount.label}`"
+                    class="mt-1 flex items-center gap-1 truncate text-sm text-ink-gray-6"
+                  >
+                    <span class="lucide-tag size-3.5 shrink-0" aria-hidden="true" />
+                    {{ discount.label }} · {{ discountMoney(discount.amount) }}
+                  </p>
                 </div>
                 <span class="w-28 text-right text-base text-ink-gray-5 tabular-nums">
                   {{ money(item.rate) }} × {{ item.qty }}
@@ -205,7 +218,17 @@ const loadFailure = computed(() =>
 
             <div class="space-y-1.5 border-t border-outline-gray-1 px-4 py-3">
               <div class="flex justify-between text-base text-ink-gray-6">
-                <span>Subtotal</span><span class="tabular-nums">{{ money(order.net_total) }}</span>
+                <span>Subtotal</span><span class="tabular-nums">{{ money(order.total) }}</span>
+              </div>
+              <div
+                v-for="(discount, index) in order.order_discounts"
+                :key="`${index}-${discount.label}`"
+                class="flex justify-between gap-3 text-base text-ink-gray-6"
+              >
+                <span class="min-w-0 truncate">
+                  Discount<span v-if="discount.label" class="text-ink-gray-5"> · {{ discount.label }}</span>
+                </span>
+                <span class="shrink-0 tabular-nums">{{ discountMoney(discount.amount) }}</span>
               </div>
               <div class="flex justify-between gap-3 text-base text-ink-gray-6">
                 <!-- The service the shopper chose and paid for: an amount alone does not tell
@@ -215,7 +238,17 @@ const loadFailure = computed(() =>
                     · {{ order.delivery_option }}</span
                   >
                 </span>
-                <span class="shrink-0 tabular-nums">{{ order.shipping ? money(order.shipping) : 'Free' }}</span>
+                <span class="shrink-0 tabular-nums">{{ shippingBeforeDiscount ? money(shippingBeforeDiscount) : 'Free' }}</span>
+              </div>
+              <div
+                v-for="(discount, index) in order.shipping_discounts"
+                :key="`${index}-${discount.label}`"
+                class="flex justify-between gap-3 text-base text-ink-gray-6"
+              >
+                <span class="min-w-0 truncate">
+                  Shipping discount<span class="text-ink-gray-5"> · {{ discount.label }}</span>
+                </span>
+                <span class="shrink-0 tabular-nums">{{ discountMoney(discount.amount) }}</span>
               </div>
               <div v-if="order.cod_charge" class="flex justify-between text-base text-ink-gray-6">
                 <span>Cash on delivery charge</span><span class="tabular-nums">{{ money(order.cod_charge) }}</span>

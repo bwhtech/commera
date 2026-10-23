@@ -216,6 +216,32 @@ class TestDeliveryOptionCharges(IntegrationTestCase):
 		self.assertEqual(self.get_delivery_rows(quotation), [])
 		self.assertEqual(flt(quotation.custom_delivery_charge), 0)
 
+	def test_a_discounted_option_is_discounted_once_when_it_can_no_longer_be_quoted(self):
+		from bwh_shipping.bwh_shipping.pricing import get_enabled_services
+
+		self.make_tiered_rule()
+		discount = frappe.get_doc(
+			{
+				"doctype": "Commera Discount",
+				"title": f"_Test Half Shipping {frappe.generate_hash(length=6)}",
+				"method": "Automatic",
+				"discount_type": "Free Shipping",
+				"shipping_percentage": 50,
+			}
+		).insert(ignore_permissions=True)
+		self.addCleanup(frappe.db.set_value, "Commera Discount", discount.name, "enabled", 0)
+		quotation = self.make_quotation(rate=80)
+		self.choose(quotation, self.express)
+		quotation.save(ignore_permissions=True)
+		self.assertEqual(flt(quotation.custom_delivery_charge), 50)
+
+		frappe.db.set_value("Shipping Service", self.express, "enabled", 0)
+		get_enabled_services.clear_cache()
+
+		self.assertTrue(reprice_selected_option(quotation))
+		self.assertEqual(flt(quotation.custom_delivery_charge), 50)
+		self.assertEqual(flt(quotation.custom_shipping_discount), 50)
+
 	def test_linked_option_posts_fee_against_rule_account(self):
 		charge_account_head = frappe.db.get_single_value("Commera Settings", "charge_account_head")
 		rule_account = get_expense_account(exclude=charge_account_head)

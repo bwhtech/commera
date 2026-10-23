@@ -795,7 +795,14 @@ async function importFromApp(appRoot, name) {
 	const { exports } = JSON.parse(
 		readFileSync(join(packageDir, 'package.json'), 'utf8'),
 	);
-	return import(pathToFileURL(join(packageDir, exports['.'].import)).href);
+	return import(pathToFileURL(join(packageDir, esmEntry(exports['.']))).href);
+}
+
+// plugin-vue 5 maps `.` to `{ import, require }`; plugin-vue 6 ships ESM only and maps it to a plain path.
+function esmEntry(entry) {
+	return typeof entry === 'string'
+		? entry
+		: esmEntry(entry.import ?? entry.default);
 }
 
 export default async function commeraPlugin({

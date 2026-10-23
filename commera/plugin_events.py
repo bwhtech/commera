@@ -1,4 +1,5 @@
 from collections import defaultdict
+from contextlib import contextmanager
 
 import frappe
 from frappe import _
@@ -11,6 +12,7 @@ from pypika.functions import NullIf
 from pypika.terms import Case, ExistsCriterion
 from rq.job import JobStatus
 
+from commera.discounts.allocations import get_allocations
 from commera.sdk import API_VERSION, STORE_ORDER_TYPE, as_plugin_user
 from commera.sdk.events import HANDLER_HOOKS, CommeraEvent
 
@@ -98,6 +100,7 @@ def get_order_snapshot(sales_order: str | int) -> dict:
 			sales_order_table.grand_total,
 			sales_order_table.custom_ecommerce_payment_mode,
 			sales_order_table.docstatus,
+			sales_order_table.custom_discount_allocations,
 		)
 		.where(sales_order_table.name == sales_order)
 		.run(as_dict=True)[0]
@@ -109,6 +112,7 @@ def get_order_snapshot(sales_order: str | int) -> dict:
 		"payment_mode": order.custom_ecommerce_payment_mode,
 		"docstatus": order.docstatus,
 		"shipping_address": get_shipping_address(order),
+		"discounts": get_allocations(order),
 	}
 
 
@@ -645,14 +649,18 @@ def is_listed_item(item_code: str) -> bool:
 	return cstr(item_code) in get_listed_items([item_code])
 
 
-def get_listed_items(item_codes: list[str]) -> set[str]:
-	"""An item is on the storefront when a published Style Attribute Variant sells it or is styled on it."""
+def get_listed_items(item_codes: list[str], sellable_only: bool = False) -> set[str]:
+	"""An item is on the storefront when a published Style Attribute Variant sells it or, unless
+	`sellable_only`, is styled on it: product events fire for the template, but only a size can be bought."""
 	if not item_codes:
 		return set()
 
 	style_attribute_variant = DocType("Style Attribute Variant")
 	color_size_item = DocType("Color Size Item")
 	item_codes = {cstr(item_code) for item_code in item_codes}
+	is_listed = color_size_item.item_code.isin(list(item_codes))
+	if not sellable_only:
+		is_listed |= style_attribute_variant.item_style.isin(list(item_codes))
 	rows = (
 		frappe.qb.from_(style_attribute_variant)
 		.left_join(color_size_item)
@@ -662,13 +670,7 @@ def get_listed_items(item_codes: list[str]) -> set[str]:
 		)
 		.select(color_size_item.item_code, style_attribute_variant.item_style)
 		.distinct()
-		.where(
-			(style_attribute_variant.is_published == 1)
-			& (
-				color_size_item.item_code.isin(list(item_codes))
-				| style_attribute_variant.item_style.isin(list(item_codes))
-			)
-		)
+		.where((style_attribute_variant.is_published == 1) & is_listed)
 		.run()
 	)
 	return {cstr(code) for row in rows for code in row if cstr(code) in item_codes}
@@ -833,3 +835,21 @@ def validate_plugin_fieldnames(doctype: str, fieldnames) -> None:
 			),
 			frappe.ValidationError,
 		)
+
+
+@contextmanager
+def handle_hook_error(key: str, handler: str, quotation, strict: bool):
+	message_count = len(frappe.local.message_log)
+	try:
+		yield
+	except Exception:
+		frappe.log_error(
+			title=f'commera_hooks["{key}"] hook failed: {handler}'[:140],
+			reference_doctype="Quotation",
+			reference_name=quotation.name,
+			defer_insert=True,
+		)
+		# Whatever the app msgprinted is meant for its developer, never for the shopper.
+		del frappe.local.message_log[message_count:]
+		if strict:
+			frappe.throw(_("Something went wrong, please try again."))

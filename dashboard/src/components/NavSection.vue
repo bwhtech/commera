@@ -45,7 +45,7 @@ const toggle = (item) => (opened.value[item.to] = !isOpen(item))
               :key="child.to ?? child.label"
               :label="child.label"
               :icon="child.icon"
-              :to="child.to"
+              :route="child.to"
               :active="Boolean(child.to) && child.to === activeTarget"
               @click="child.onClick?.()"
             />
@@ -58,7 +58,7 @@ const toggle = (item) => (opened.value[item.to] = !isOpen(item))
           v-else
           :label="item.label"
           :icon="item.icon"
-          :to="item.to"
+          :route="item.to"
           :suffix="item.shortcut ? undefined : item.suffix"
           :active="Boolean(item.to) && item.to === activeTarget"
           @click="item.onClick?.()"

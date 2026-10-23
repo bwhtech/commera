@@ -153,7 +153,7 @@ async function saveSetting(field, value) {
               label="Open in Desk"
               icon-right="lucide-external-link"
               variant="ghost"
-              :link="settings.desk_url"
+              :href="settings.desk_url"
             />
           </div>
 

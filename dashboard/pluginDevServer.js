@@ -120,6 +120,31 @@ function restartOnNewApps(server, apps) {
   })
 }
 
+// yarn install writes node_modules/.yarn-integrity last, so a build that ran before the app's packages were in place
+// (Cannot find package '@commera/plugin-kit') runs again once they are. node_modules may not exist until the install starts.
+function rebuildAfterInstall(server, apps, schedule) {
+  const roots = []
+  const modules = new Map()
+
+  function watchModules(app) {
+    const directory = join(BENCH, 'apps', app, 'node_modules')
+    modules.get(app)?.close()
+    modules.delete(app)
+    if (!existsSync(directory)) return
+    const watcher = watch(directory, (_event, file) => file === '.yarn-integrity' && schedule(app))
+    watcher.on('error', () => watcher.close())
+    modules.set(app, watcher)
+  }
+
+  for (const app of apps) {
+    const watcher = watch(join(BENCH, 'apps', app), (_event, file) => file === 'node_modules' && watchModules(app))
+    watcher.on('error', () => watcher.close())
+    roots.push(watcher)
+    watchModules(app)
+  }
+  server.httpServer?.once('close', () => [...roots, ...modules.values()].forEach((watcher) => watcher.close()))
+}
+
 export function pluginDevServer() {
   const apps = readPluginApps()
   return {
@@ -138,16 +163,20 @@ export function pluginDevServer() {
     configureServer(server) {
       const build = buildRunner(server)
       const timers = new Map()
+      const schedule = (app) => {
+        clearTimeout(timers.get(app))
+        timers.set(app, setTimeout(() => build(app), 300))
+      }
       server.watcher.add(apps.map(sourceDirOf))
       server.watcher.on('all', (_event, file) => {
         const app = apps.find((app) => file.startsWith(`${sourceDirOf(app)}/`))
         // Each build loads the app's vite.config.js through a temporary .timestamp-*.mjs beside it; reacting to that loops.
         if (!app || file.includes('/node_modules/') || CONFIG_TIMESTAMP.test(file)) return
-        clearTimeout(timers.get(app))
-        timers.set(app, setTimeout(() => build(app), 300))
+        schedule(app)
       })
       apps.reduce((previous, app) => previous.then(() => build(app)), Promise.resolve())
       restartOnNewApps(server, apps)
+      rebuildAfterInstall(server, apps, schedule)
     },
     resolveId(source) {
       if (source.startsWith(PREFIX)) return VIRTUAL + source.slice(PREFIX.length)

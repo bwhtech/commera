@@ -48,7 +48,7 @@ async function saveCurrent({ enabled, values }) {
         <Badge
           v-if="store.incomplete.value.length"
           :label="`${store.incomplete.value.length} ${store.incomplete.value.length === 1 ? 'needs' : 'need'} keys`"
-          theme="orange"
+          theme="amber"
           variant="subtle"
         />
       </template>

@@ -1,0 +1,470 @@
+{
+	"actions": [],
+	"creation": "2026-10-11 00:00:00.000000",
+	"doctype": "DocType",
+	"engine": "InnoDB",
+	"field_order": [
+		"title",
+		"method",
+		"discount_type",
+		"column_break_main",
+		"enabled",
+		"starts_on",
+		"ends_on",
+		"section_value",
+		"value_type",
+		"value",
+		"maximum_discount",
+		"fixed_applies_to",
+		"column_break_value",
+		"currency",
+		"tiered",
+		"tiers",
+		"section_targets",
+		"applies_to",
+		"exclude_sale_items",
+		"targets",
+		"section_buy_x_get_y",
+		"buy_requirement",
+		"buy_value",
+		"uses_per_order",
+		"column_break_get",
+		"get_quantity",
+		"get_value_type",
+		"get_value",
+		"section_shipping",
+		"delivery_options",
+		"column_break_shipping",
+		"shipping_percentage",
+		"maximum_shipping_rate",
+		"section_conditions",
+		"minimum_requirement",
+		"minimum_subtotal",
+		"minimum_quantity",
+		"payment_condition",
+		"column_break_conditions",
+		"eligibility",
+		"customer_groups",
+		"customers",
+		"section_combinations",
+		"combines_with_product",
+		"combines_with_order",
+		"combines_with_shipping",
+		"section_limits",
+		"usage_limit",
+		"once_per_customer",
+		"budget",
+		"column_break_limits",
+		"times_used",
+		"discount_given",
+		"sales",
+		"section_reporting",
+		"campaign",
+		"column_break_reporting",
+		"discount_account"
+	],
+	"fields": [
+		{
+			"fieldname": "title",
+			"fieldtype": "Data",
+			"label": "Title",
+			"reqd": 1,
+			"in_list_view": 1,
+			"description": "Shoppers see this for an automatic discount. A code discount shows its code."
+		},
+		{
+			"fieldname": "method",
+			"fieldtype": "Select",
+			"label": "Method",
+			"options": "Code\nAutomatic",
+			"default": "Code",
+			"reqd": 1,
+			"in_list_view": 1,
+			"in_standard_filter": 1
+		},
+		{
+			"fieldname": "discount_type",
+			"fieldtype": "Select",
+			"label": "Discount Type",
+			"options": "Amount Off Products\nAmount Off Order\nBuy X Get Y\nFree Shipping",
+			"reqd": 1,
+			"in_list_view": 1,
+			"in_standard_filter": 1
+		},
+		{
+			"fieldname": "column_break_main",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "enabled",
+			"fieldtype": "Check",
+			"label": "Enabled",
+			"default": "1"
+		},
+		{
+			"fieldname": "starts_on",
+			"fieldtype": "Date",
+			"label": "Starts On",
+			"default": "Today"
+		},
+		{
+			"fieldname": "ends_on",
+			"fieldtype": "Date",
+			"label": "Ends On"
+		},
+		{
+			"fieldname": "section_value",
+			"fieldtype": "Section Break",
+			"label": "Value",
+			"depends_on": "eval:['Amount Off Products','Amount Off Order'].includes(doc.discount_type)"
+		},
+		{
+			"fieldname": "value_type",
+			"fieldtype": "Select",
+			"label": "Value Type",
+			"options": "Percentage\nFixed Amount",
+			"default": "Percentage"
+		},
+		{
+			"fieldname": "value",
+			"fieldtype": "Float",
+			"label": "Value",
+			"non_negative": 1
+		},
+		{
+			"fieldname": "maximum_discount",
+			"fieldtype": "Currency",
+			"label": "Maximum Discount",
+			"options": "currency",
+			"non_negative": 1,
+			"depends_on": "eval:doc.value_type == 'Percentage'",
+			"description": "Caps a percentage discount for the whole order. 0 means no cap."
+		},
+		{
+			"fieldname": "fixed_applies_to",
+			"fieldtype": "Select",
+			"label": "Fixed Amount Comes Off",
+			"options": "Each Item\nOnce Per Order",
+			"default": "Each Item",
+			"depends_on": "eval:doc.discount_type == 'Amount Off Products' && doc.value_type == 'Fixed Amount'"
+		},
+		{
+			"fieldname": "column_break_value",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "currency",
+			"fieldtype": "Link",
+			"label": "Currency",
+			"options": "Currency",
+			"description": "Fixed amounts, caps and budgets apply only to carts in this currency."
+		},
+		{
+			"fieldname": "tiered",
+			"fieldtype": "Check",
+			"label": "Spend Tiers",
+			"depends_on": "eval:doc.discount_type == 'Amount Off Order'",
+			"description": "The best tier the subtotal reaches replaces the single value."
+		},
+		{
+			"fieldname": "tiers",
+			"fieldtype": "Table",
+			"label": "Tiers",
+			"options": "Commera Discount Tier",
+			"depends_on": "eval:doc.tiered"
+		},
+		{
+			"fieldname": "section_targets",
+			"fieldtype": "Section Break",
+			"label": "Products",
+			"depends_on": "eval:['Amount Off Products','Buy X Get Y'].includes(doc.discount_type)"
+		},
+		{
+			"fieldname": "applies_to",
+			"fieldtype": "Select",
+			"label": "Applies To",
+			"options": "All Products\nSpecific Products\nSpecific Collections\nSpecific Brands",
+			"default": "All Products",
+			"depends_on": "eval:doc.discount_type == 'Amount Off Products'"
+		},
+		{
+			"fieldname": "exclude_sale_items",
+			"fieldtype": "Check",
+			"label": "Skip Items Already On Sale",
+			"description": "An item whose sale price is below its regular price gets no extra discount and does not count towards an order discount."
+		},
+		{
+			"fieldname": "targets",
+			"fieldtype": "Table",
+			"label": "Targets",
+			"options": "Commera Discount Target",
+			"description": "Applies To and Excluded rows for product discounts; Buys and Gets rows for Buy X Get Y."
+		},
+		{
+			"fieldname": "section_buy_x_get_y",
+			"fieldtype": "Section Break",
+			"label": "Buy X Get Y",
+			"depends_on": "eval:doc.discount_type == 'Buy X Get Y'"
+		},
+		{
+			"fieldname": "buy_requirement",
+			"fieldtype": "Select",
+			"label": "Customer Buys",
+			"options": "Quantity\nAmount",
+			"default": "Quantity"
+		},
+		{
+			"fieldname": "buy_value",
+			"fieldtype": "Float",
+			"label": "Buy Quantity Or Amount",
+			"non_negative": 1
+		},
+		{
+			"fieldname": "uses_per_order",
+			"fieldtype": "Int",
+			"label": "Maximum Uses Per Order",
+			"non_negative": 1,
+			"description": "0 means as many times as the cart allows."
+		},
+		{
+			"fieldname": "column_break_get",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "get_quantity",
+			"fieldtype": "Int",
+			"label": "Customer Gets Quantity",
+			"non_negative": 1,
+			"default": "1"
+		},
+		{
+			"fieldname": "get_value_type",
+			"fieldtype": "Select",
+			"label": "At",
+			"options": "Free\nPercentage\nFixed Amount",
+			"default": "Free"
+		},
+		{
+			"fieldname": "get_value",
+			"fieldtype": "Float",
+			"label": "Get Value",
+			"non_negative": 1,
+			"depends_on": "eval:doc.get_value_type != 'Free'"
+		},
+		{
+			"fieldname": "section_shipping",
+			"fieldtype": "Section Break",
+			"label": "Delivery",
+			"depends_on": "eval:doc.discount_type == 'Free Shipping'"
+		},
+		{
+			"fieldname": "delivery_options",
+			"fieldtype": "Small Text",
+			"label": "Delivery Options",
+			"description": "Delivery option titles, one per line. Empty means every option."
+		},
+		{
+			"fieldname": "column_break_shipping",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "shipping_percentage",
+			"fieldtype": "Float",
+			"label": "Off The Delivery Charge (%)",
+			"default": "100",
+			"non_negative": 1
+		},
+		{
+			"fieldname": "maximum_shipping_rate",
+			"fieldtype": "Currency",
+			"label": "Skip Rates Above",
+			"options": "currency",
+			"non_negative": 1,
+			"description": "0 means no limit."
+		},
+		{
+			"fieldname": "section_conditions",
+			"fieldtype": "Section Break",
+			"label": "Conditions"
+		},
+		{
+			"fieldname": "minimum_requirement",
+			"fieldtype": "Select",
+			"label": "Minimum Purchase",
+			"options": "None\nSubtotal\nQuantity",
+			"default": "None"
+		},
+		{
+			"fieldname": "minimum_subtotal",
+			"fieldtype": "Currency",
+			"label": "Minimum Subtotal",
+			"options": "currency",
+			"non_negative": 1,
+			"depends_on": "eval:doc.minimum_requirement == 'Subtotal'"
+		},
+		{
+			"fieldname": "minimum_quantity",
+			"fieldtype": "Int",
+			"label": "Minimum Items",
+			"non_negative": 1,
+			"depends_on": "eval:doc.minimum_requirement == 'Quantity'"
+		},
+		{
+			"fieldname": "payment_condition",
+			"fieldtype": "Select",
+			"label": "Payment",
+			"options": "Any\nPrepaid\nCash On Delivery",
+			"default": "Any"
+		},
+		{
+			"fieldname": "column_break_conditions",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "eligibility",
+			"fieldtype": "Select",
+			"label": "Customers",
+			"options": "Everyone\nFirst Order\nCustomer Groups\nSpecific Customers",
+			"default": "Everyone"
+		},
+		{
+			"fieldname": "customer_groups",
+			"fieldtype": "Table MultiSelect",
+			"label": "Customer Groups",
+			"options": "Commera Discount Customer Group",
+			"depends_on": "eval:doc.eligibility == 'Customer Groups'"
+		},
+		{
+			"fieldname": "customers",
+			"fieldtype": "Table MultiSelect",
+			"label": "Specific Customers",
+			"options": "Commera Discount Customer",
+			"depends_on": "eval:doc.eligibility == 'Specific Customers'"
+		},
+		{
+			"fieldname": "section_combinations",
+			"fieldtype": "Section Break",
+			"label": "Combinations",
+			"description": "Two discounts stack only when each allows the other's class."
+		},
+		{
+			"fieldname": "combines_with_product",
+			"fieldtype": "Check",
+			"label": "Combines With Product Discounts"
+		},
+		{
+			"fieldname": "combines_with_order",
+			"fieldtype": "Check",
+			"label": "Combines With Order Discounts"
+		},
+		{
+			"fieldname": "combines_with_shipping",
+			"fieldtype": "Check",
+			"label": "Combines With Shipping Discounts",
+			"default": "1"
+		},
+		{
+			"fieldname": "section_limits",
+			"fieldtype": "Section Break",
+			"label": "Limits"
+		},
+		{
+			"fieldname": "usage_limit",
+			"fieldtype": "Int",
+			"label": "Total Uses",
+			"non_negative": 1,
+			"description": "0 means no limit."
+		},
+		{
+			"fieldname": "once_per_customer",
+			"fieldtype": "Check",
+			"label": "Once Per Customer",
+			"description": "Matched by customer, email or phone."
+		},
+		{
+			"fieldname": "budget",
+			"fieldtype": "Currency",
+			"label": "Budget",
+			"options": "currency",
+			"non_negative": 1,
+			"description": "Stops once this much discount is given. 0 means no budget."
+		},
+		{
+			"fieldname": "column_break_limits",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "times_used",
+			"fieldtype": "Int",
+			"label": "Times Used",
+			"read_only": 1,
+			"no_copy": 1,
+			"default": "0"
+		},
+		{
+			"fieldname": "discount_given",
+			"fieldtype": "Currency",
+			"label": "Discount Given",
+			"options": "currency",
+			"read_only": 1,
+			"no_copy": 1,
+			"default": "0"
+		},
+		{
+			"fieldname": "sales",
+			"fieldtype": "Currency",
+			"label": "Sales With The Discount",
+			"options": "currency",
+			"read_only": 1,
+			"no_copy": 1,
+			"default": "0"
+		},
+		{
+			"fieldname": "section_reporting",
+			"fieldtype": "Section Break",
+			"label": "Reporting And Accounting",
+			"collapsible": 1
+		},
+		{
+			"fieldname": "campaign",
+			"fieldtype": "Link",
+			"label": "Campaign",
+			"options": "UTM Campaign"
+		},
+		{
+			"fieldname": "column_break_reporting",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "discount_account",
+			"fieldtype": "Link",
+			"label": "Discount Account",
+			"options": "Account",
+			"description": "Posted here when Selling Settings > Enable Discount Accounting is on."
+		}
+	],
+	"links": [],
+	"modified": "2026-10-21 00:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "Discounts",
+	"name": "Commera Discount",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"read": 1,
+			"role": "System Manager",
+			"write": 1,
+			"export": 1,
+			"report": 1
+		}
+	],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": [],
+	"autoname": "format:DISC-{#####}",
+	"title_field": "title",
+	"show_title_field_in_link": 1,
+	"search_fields": "discount_type,method"
+}

@@ -1,6 +1,7 @@
 import ast
 import json
 import random
+import subprocess
 from pathlib import Path
 from string import Template
 
@@ -43,11 +44,16 @@ class AppScaffold:
 		self.source_dir = self.app_root / "commera"
 		self.changes: list[tuple[str, str]] = []
 
-	def save(self) -> list[tuple[str, str]]:
+	def save(self, install: bool = False) -> list[tuple[str, str]]:
 		self.add_hooks()
 		self.add_package_json()
 		self.add_gitignore_lines(["node_modules", f"{self.app}/public/commera/"])
 		self.add_file(self.app_root / self.app / "public" / ".gitkeep", "")
+		# A plain api.py here would be importable, and so callable, as commera.scaffold.starter.api.
+		self.add_file(self.app_root / self.app / "api.py", get_starter("api.py.template"))
+		# A running yarn dev builds the app as soon as its commera/ folder appears, so the packages that build needs go in first.
+		if install:
+			self.install_packages()
 		self.add_file(self.source_dir / "vite.config.js", get_starter("vite.config.js"))
 		self.add_file(
 			self.source_dir / "plugin-icon.svg",
@@ -55,10 +61,16 @@ class AppScaffold:
 			Template(get_starter("plugin-icon.svg")).substitute(colour=random.choice(LOGO_COLOURS)),
 		)
 		self.add_places()
-		# A plain api.py here would be importable, and so callable, as commera.scaffold.starter.api.
-		self.add_file(self.app_root / self.app / "api.py", get_starter("api.py.template"))
 		self.add_file(self.source_dir / "README.md", self.format_starter("README.md"))
 		return self.changes
+
+	def install_packages(self):
+		click.echo("Running yarn install…")
+		try:
+			# nosemgrep: frappe-subprocess-exec
+			subprocess.run(["yarn", "install"], cwd=self.app_root, check=True)
+		except (FileNotFoundError, subprocess.CalledProcessError) as error:
+			raise click.ClickException(f"yarn install failed in {self.app_root}: {error}")
 
 	def add_hooks(self):
 		text = self.hooks_path.read_text()
@@ -162,6 +174,8 @@ class AppScaffold:
 				# nosemgrep: frappe-direct-jinja-construction
 				Template(get_starter("places/detail.vue")).substitute(values),
 			)
+		if place == "settings":
+			self.add_file(self.source_dir / "plugin.config.ts", get_starter("places/plugin.config.ts"))
 		if starter in ("action", "command"):
 			self.add_api_method(
 				function,

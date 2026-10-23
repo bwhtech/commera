@@ -1,5 +1,6 @@
 import frappe
 
+from commera.api.shipping import get_charge_summary
 from commera.order_access import OWNER_ACCESS, get_order_access
 from commera.www.account.orders.index import get_orders_list
 
@@ -19,6 +20,7 @@ def get_context(context):
 	if not order_details:
 		frappe.redirect(f"/{frappe.local.lang}/account/orders")
 	context.order = order_details[0]
+	context.order_summary = get_charge_summary(frappe.get_cached_doc("Sales Order", order_id))
 	context.order_access = order_access
 	context.order_key = frappe.form_dict.get("key") if order_access != OWNER_ACCESS else None
 	context.return_period = frappe.get_cached_value("Commera Settings", "Commera Settings", "return_period")

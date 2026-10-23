@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Button, Select, TabButtons, TextInput, toast } from 'frappe-ui'
+import { Button, Select, TabButtons, toast } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListHeaderCellSort, ListRow, ListRows } from 'frappe-ui/list'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
@@ -11,7 +11,8 @@ import Thumb from '../components/Thumb.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ListSkeleton from '../components/ListSkeleton.vue'
 import BulkBar from '../components/BulkBar.vue'
-import { useAdminRead, useAdminAction } from '../data/api'
+import SearchInput from '../components/SearchInput.vue'
+import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { pickCollectionFor, useCollections } from '../data/collections'
 import { priceRange, shortDate, stockTone } from '../data/format'
 import { ia } from '../ia/store'
@@ -116,9 +117,9 @@ async function archiveSelected() {
   if (!ids.length) return
 
   for (const id of ids) {
-    await archiveAction.submit({ item_template: id, disabled: 1 })
+    const archived = await trySubmit(archiveAction, { item_template: id, disabled: 1 })
     // A failure already toasted inside useAdminAction — stop rather than archive the rest silently.
-    if (archiveAction.error) return
+    if (!archived) return
   }
 
   toast.success(`${ids.length} product${ids.length > 1 ? 's' : ''} archived`)
@@ -150,11 +151,10 @@ function moveToCollection() {
     <div class="flex flex-wrap items-center gap-2">
       <TabButtons v-model="status" size="sm" :options="STATUS_TABS" />
       <Select v-model="collection" :options="collectionFilterOptions" />
-      <TextInput
+      <SearchInput
         v-model="query"
         class="ml-auto w-56"
         placeholder="Search products"
-        icon-left="lucide-search"
       />
       <Button
         :label="selecting ? 'Cancel selection' : 'Select'"
@@ -211,7 +211,7 @@ function moveToCollection() {
       <ListSkeleton v-if="productsRequest.loading && !rows.length" :columns="6" />
 
       <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
-        <ListRow :to="productRoute(item.name)" :value="item.name">
+        <ListRow :route="productRoute(item.name)" :value="item.name">
           <ListCell>
             <div class="flex min-w-0 items-center gap-2.5">
               <Thumb :image="item.image" />

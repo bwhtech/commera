@@ -128,7 +128,7 @@ const stats = computed(() => {
         description="Try a wider date range."
       />
       <div v-else class="h-72">
-        <AreaChart :data="sessionsByMonth" x="label" :y="['sessions']" />
+        <AreaChart :data="sessionsByMonth" x="label" :y="['sessions']" palette="categorical" />
       </div>
     </section>
 

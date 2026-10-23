@@ -17,11 +17,12 @@
             payment_gateway_loading:false,
             delivery_option: 'home_delivery',
             checkout_total: parseFloat('{{cart_quotation.net_total or 0}}') + parseFloat('{{delivery_charge or 0}}') + parseFloat('{{cart_quotation.rounding_adjustment or 0}}'),
-            delivery_charge_applicable_below: parseFloat('{{delivery_charge_applicable_below or 0}}'),
+            is_free_delivery: {{ (checkout_summary.get("free_delivery_above") is not none and not checkout_summary.get("free_delivery_shortfall")) | tojson }},
             delivery_charge: parseFloat('{{delivery_charge or 0}}'),
 
 
-            init() {
+            async init() {
+                if ({{ (cart_needs_refresh or False) | tojson }} && await this.refresh_checkout_cart()) return;
                 this.calculate_checkout_total();
                 this.$watch('payment_mode', (value, oldValue) => {
                     if (oldValue && value) {
@@ -39,28 +40,38 @@
                 this.validate_payment_mode()
                 this.apply_pending_discount()
             },
+            // Returns true when it leaves the page.
+            async refresh_checkout_cart() {
+                let response;
+                try {
+                    response = (await frappe_call("/api/v2/method/commera.www.cart.checkout.refresh_checkout_cart", {})).data;
+                } catch (error) {
+                    return false;
+                }
+                const { refreshed, redirect } = response;
+                if (redirect) window.location.replace(redirect);
+                else if (refreshed) window.location.reload();
+                return Boolean(redirect || refreshed);
+            },
             async apply_pending_discount() {
                 const url = new URL(window.location.href);
                 const discount = url.searchParams.get("discount");
                 if (!discount) return;
-                // Stripped first: removing the coupon reloads this page and must not re-apply it.
+                // Stripped first: removing the code reloads this page and must not re-apply it.
                 url.searchParams.delete("discount");
                 history.replaceState(null, "", url);
                 try {
-                    await frappe_call("/api/v2/method/commera.api.payments.apply_coupon_code", { applied_code: discount });
+                    await frappe_call("/api/v2/method/commera.api.server_cart.apply_discount_code", { code: discount });
                     window.location.reload();
                 } catch (error) {}
             },
             calculate_checkout_total() {
 
                 this.checkout_total = parseFloat('{{cart_quotation.net_total or 0}}') + parseFloat('{{cart_quotation.rounding_adjustment or 0}}')
-                if(this.delivery_option === 'home_delivery') {
-                    if (this.delivery_charge_applicable_below > parseFloat('{{cart_quotation.net_total or 0}}')) {
-                        this.checkout_total += this.delivery_charge 
-                    }
-
+                if (this.delivery_option === 'home_delivery' && !this.is_free_delivery) {
+                    this.checkout_total += this.delivery_charge
                 }
-                if (this.billing_address_filled && this.payment_mode === COD_PAYMENT_MODE && parseFloat('{{cod_charge_applicable_below or 0}}') > parseFloat('{{cart_quotation.rounded_total or 0}}')) {
+                if (this.billing_address_filled && this.payment_mode === COD_PAYMENT_MODE && parseFloat('{{cod_charge_applicable_below or 0}}') > parseFloat('{{cart_payable_total or 0}}')) {
                     this.checkout_total += parseFloat('{{cod_charge or 0}}')
                 }
 
@@ -70,7 +81,6 @@
                     "/api/v2/method/commera.api.checkout.apply_shipping_rule"
                 )
                 this.delivery_charge = parseFloat(data.data[0])
-                this.delivery_charge_applicable_below = parseFloat(data.data[1])
             },
             validate_payment_mode() {
                 const payment_modes = get_available_payment_modes()
@@ -417,7 +427,7 @@
                                     {{ _('Cash on Delivery') }}
                                 </span>
                             </div>
-                            {% if cod_charge_applicable_below > cart_quotation.rounded_total and cod_charge %}
+                            {% if cod_charge_applicable_below > cart_payable_total and cod_charge %}
                             <div class="text-red-600 rounded-lg relative mt-4">
                                 <p class="text-sm">
                                     ({{ _('Additional cash on delivery charge of')}}  {{get_currency_symbol()}}{{"%.2f"|format(cod_charge)}} {{_('will apply')}})

@@ -127,3 +127,18 @@
 		line-height: 28px;
 	}
 }
+
+.check-tbl .product-item-img .form-check-input {
+	width: 1.25em;
+	height: 1.25em;
+	cursor: pointer;
+}
+
+/* A column of its own would push the remove button off a 360px screen again. */
+@media only screen and (max-width: 575px) {
+	.check-tbl .product-item-img .form-check-input {
+		position: absolute;
+		top: 4px;
+		left: 4px;
+	}
+}

@@ -13,15 +13,16 @@ from commera.api.checkout import apply_shipping_rule
 from commera.api.payments import (
 	COD_PAYMENT_MODE,
 	CheckoutPriceChangedError,
-	apply_coupon_code,
 	confirm_payment,
 	generate_quotation_for_cart,
+	get_cod_total_key,
 	initiate_checkout_with_mode,
 	save_cart_quotation,
 	update_delivery_charges,
 	update_quotation_address,
 	validate_cart_is_not_in_checkout,
 )
+from commera.api.server_cart import sync_server_cart
 from commera.api.shipping import (
 	DELIVERY_CHARGE_DESCRIPTION,
 	apply_delivery_option,
@@ -30,7 +31,10 @@ from commera.api.shipping import (
 	get_order_charge_lines,
 	set_delivery_option,
 )
+from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.core import _get_cart_quotation
+from commera.discounts.codes import add_code
+from commera.sdk import cart as cart_sdk
 from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.utils import get_available_stocks, get_pickup_addresses
 from commera.www.cart.checkout import get_context as get_checkout_context
@@ -354,72 +358,6 @@ class TestCartCheckout(IntegrationTestCase):
 		self.assertEqual(summary["total"], round(270 + 48.6 + summary["shipping"] - 50))
 		self.assert_summary_adds_up(summary)
 
-	def create_coupon(self, discount_percentage: float) -> str:
-		pricing_rule = frappe.get_doc(
-			{
-				"doctype": "Pricing Rule",
-				"title": f"ZZ Coupon {frappe.generate_hash(length=8)}",
-				"apply_on": "Transaction",
-				"rate_or_discount": "Discount Percentage",
-				"discount_percentage": discount_percentage,
-				"selling": 1,
-				"coupon_code_based": 1,
-				"currency": frappe.get_cached_value("Price List", self.sale_price_list, "currency"),
-			}
-		).insert(ignore_permissions=True)
-		coupon_code = f"ZZ{frappe.generate_hash(length=8).upper()}"
-		frappe.get_doc(
-			{
-				"doctype": "Coupon Code",
-				"coupon_name": coupon_code,
-				"coupon_code": coupon_code,
-				"coupon_type": "Promotional",
-				"pricing_rule": pricing_rule.name,
-			}
-		).insert(ignore_permissions=True)
-		return coupon_code
-
-	def test_applying_a_coupon_returns_the_discounted_checkout_summary(self):
-		coupon_code = self.create_coupon(discount_percentage=10)
-		frappe.set_user(self.shopper)
-		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 3)]})
-		self.assertEqual(get_checkout_summary(_get_cart_quotation())["discount_amount"], 0)
-
-		summary = apply_coupon_code(coupon_code)["checkout_summary"]
-
-		self.assertEqual(summary["subtotal"], 270)
-		self.assertAlmostEqual(summary["discount_amount"], (270 + summary["shipping"]) * 0.1, places=2)
-		self.assert_summary_adds_up(summary)
-
-	def test_a_coupon_stays_on_the_cart_when_it_is_rebuilt(self):
-		coupon_code = self.create_coupon(discount_percentage=10)
-		frappe.set_user(self.shopper)
-		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 3)]})
-		apply_coupon_code(coupon_code)
-
-		quotation = generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 2)]})
-
-		summary = get_checkout_summary(quotation)
-		self.assertEqual(
-			frappe.db.get_value("Coupon Code", quotation.coupon_code, "coupon_code"), coupon_code
-		)
-		self.assertEqual(summary["subtotal"], 180)
-		self.assertAlmostEqual(summary["discount_amount"], (180 + summary["shipping"]) * 0.1, places=2)
-
-	def test_an_expired_coupon_is_dropped_quietly_when_the_cart_is_rebuilt(self):
-		coupon_code = self.create_coupon(discount_percentage=10)
-		frappe.set_user(self.shopper)
-		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 3)]})
-		apply_coupon_code(coupon_code)
-		frappe.db.set_value("Coupon Code", {"coupon_code": coupon_code}, "valid_upto", add_days(today(), -1))
-		frappe.clear_messages()
-
-		quotation = generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 2)]})
-
-		self.assertFalse(quotation.coupon_code)
-		self.assertEqual(get_checkout_summary(quotation)["discount_amount"], 0)
-		self.assertNotIn("expired", frappe.as_json(frappe.get_message_log()))
-
 	def test_the_cod_checkout_total_is_what_the_order_charges(self):
 		ensure_fiscal_year()
 		frappe.set_user(self.shopper)
@@ -441,6 +379,60 @@ class TestCartCheckout(IntegrationTestCase):
 		self.assertEqual(
 			get_order_charge_lines(sales_order.name, sales_order.shipping_rule)["taxes"],
 			[{"description": TAX_DESCRIPTION, "amount": 48.6}],
+		)
+
+	def test_cash_on_delivery_refuses_a_total_that_rose_since_checkout(self):
+		ensure_fiscal_year()
+		discount = frappe.get_doc(
+			{
+				"doctype": "Commera Discount",
+				"title": f"ZZ {frappe.generate_hash(length=6)}",
+				"method": "Automatic",
+				"discount_type": "Amount Off Order",
+				"value_type": "Fixed Amount",
+				"value": 5,
+			}
+		).insert(ignore_permissions=True)
+		self.addCleanup(frappe.db.set_value, "Commera Discount", discount.name, "enabled", 0)
+		frappe.set_user(self.shopper)
+		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
+		update_quotation_address(self.address_payload())
+		initiate_checkout_with_mode(COD_PAYMENT_MODE)
+		self.addCleanup(frappe.cache.delete_value, get_cod_total_key(_get_cart_quotation().name))
+
+		frappe.db.set_value("Commera Discount", discount.name, "enabled", 0)
+		frappe.clear_document_cache("Commera Discount", discount.name)
+
+		with self.assertRaisesRegex(CheckoutPriceChangedError, "changed to"):
+			confirm_payment(_get_cart_quotation().name, payment_mode=COD_PAYMENT_MODE)
+
+	def test_a_placed_order_clears_the_codes_and_attributes_from_the_cart(self):
+		ensure_fiscal_year()
+		frappe.set_user(self.shopper)
+		cart_sdk.set_cart_attributes({"gift_message": "Happy birthday"})
+		sync_server_cart([{"item_code": self.discounted_item, "qty": 1}])
+		cart = get_session_cart()
+		discount = frappe.get_doc(
+			{
+				"doctype": "Commera Discount",
+				"title": f"ZZ {frappe.generate_hash(length=6)}",
+				"discount_type": "Amount Off Order",
+				"applies_to": "All Products",
+				"value_type": "Fixed Amount",
+				"value": 1,
+			}
+		).insert(ignore_permissions=True)
+		code = add_code(discount.name, f"zz{frappe.generate_hash(length=8)}")
+		frappe.db.set_value("Commera Cart", cart.name, "discount_codes", code, update_modified=False)
+		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
+		update_quotation_address(self.address_payload())
+
+		initiate_checkout_with_mode(COD_PAYMENT_MODE)
+		confirm_payment(_get_cart_quotation().name, payment_mode=COD_PAYMENT_MODE)
+
+		self.assertEqual(
+			frappe.db.get_value("Commera Cart", cart.name, ["discount_codes", "attributes", "modified"]),
+			(None, None, cart.modified),
 		)
 
 	def test_a_pickup_summary_drops_the_charges_without_saving_that(self):

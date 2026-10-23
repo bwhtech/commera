@@ -8,6 +8,7 @@ from frappe.tests import IntegrationTestCase, UnitTestCase
 from frappe.utils import add_days, now_datetime
 
 from commera.analytics import events
+from commera.api.admin.analytics import get_base_discount_given
 from commera.api.analytics import capture
 from commera.api.analytics_dashboard import get_traffic_sources
 from commera.commera_ecommerce.doctype.storefront_analytics_event.storefront_analytics_event import (
@@ -27,6 +28,27 @@ DESKTOP_USER_AGENT = (
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
 	"Chrome/126.0.0.0 Safari/537.36"
 )
+
+
+class TestRevenueDiscounts(UnitTestCase):
+	def test_codes_and_the_discounts_erpnext_gave_on_its_own_both_count(self):
+		allocations = [
+			{"discount_class": "Product", "amount": 9},
+			{"discount_class": "Order", "amount": 10},
+		]
+		row = frappe._dict(
+			conversion_rate=2,
+			base_discount_amount=30,
+			custom_discount_allocations=json.dumps(allocations),
+		)
+
+		# 18 + 20 from codes in the company currency, plus the 10 a Pricing Rule added to the order discount.
+		self.assertEqual(get_base_discount_given(row), 48)
+
+	def test_an_order_without_codes_counts_its_additional_discount(self):
+		row = frappe._dict(conversion_rate=1, base_discount_amount=12, custom_discount_allocations=None)
+
+		self.assertEqual(get_base_discount_given(row), 12)
 
 
 class TestGetDevice(UnitTestCase):

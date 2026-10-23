@@ -1,0 +1,40 @@
+{
+	"actions": [],
+	"creation": "2026-10-21 00:00:00.000000",
+	"doctype": "DocType",
+	"engine": "InnoDB",
+	"field_order": [
+		"customer",
+		"customer_name"
+	],
+	"fields": [
+		{
+			"fieldname": "customer",
+			"fieldtype": "Link",
+			"label": "Customer",
+			"options": "Customer",
+			"reqd": 1,
+			"in_list_view": 1
+		},
+		{
+			"fetch_from": "customer.customer_name",
+			"fieldname": "customer_name",
+			"fieldtype": "Data",
+			"label": "Customer Name",
+			"read_only": 1,
+			"in_list_view": 1
+		}
+	],
+	"links": [],
+	"modified": "2026-10-21 00:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "Discounts",
+	"name": "Commera Discount Customer",
+	"owner": "Administrator",
+	"permissions": [],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": [],
+	"istable": 1,
+	"editable_grid": 1
+}

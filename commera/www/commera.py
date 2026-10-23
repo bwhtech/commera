@@ -5,9 +5,10 @@ import frappe
 from frappe import _
 from frappe.utils.jinja_globals import is_rtl
 
-from commera.api.admin.orders import get_reporting_currency, get_reporting_currency_symbol
+from commera.api.admin.orders import get_reporting_currency_symbol
 from commera.api.permission import has_app_permission
 from commera.plugins.registry import get_visible_plugins
+from commera.utils import get_store_currency
 
 no_cache = 1
 
@@ -32,7 +33,7 @@ def get_boot():
 	if not has_app_permission():
 		frappe.throw(_("You do not have access to the store dashboard."), frappe.PermissionError)
 
-	currency = get_reporting_currency()
+	currency = get_store_currency()
 
 	# get_csrf_token issues the token into the session, so it must be committed to outlive this request.
 	boot = frappe._dict(

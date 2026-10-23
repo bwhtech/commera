@@ -8,7 +8,7 @@ import EmptyState from './EmptyState.vue'
 import VariantDialog from './VariantDialog.vue'
 import EditOptionsDialog from './EditOptionsDialog.vue'
 import SwatchDot from './SwatchDot.vue'
-import { useAdminAction, useAdminRead } from '../data/api'
+import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { stockTone } from '../data/format'
 import { pricePayload, shownPrice } from '../data/product'
 import { ia } from '../ia/store'
@@ -53,11 +53,11 @@ const swatches = computed(() =>
 const priceAction = useAdminAction('catalog.set_variant_price')
 
 async function setPrice(variant, rate) {
-  await priceAction.submit({
+  const saved = await trySubmit(priceAction, {
     style_attribute_variant: variant.name,
     ...pricePayload(variant.sizes[0], rate),
   })
-  if (priceAction.error) return
+  if (!saved) return
   toast.success(`Price updated for ${variant.option} (${variant.sizes.length} sizes)`)
   emit('saved')
 }
@@ -73,12 +73,12 @@ async function bulkSetPrice() {
     onConfirm: async ({ values }) => {
       const rate = Math.max(0, Number(values.value) || 0)
       for (const variant of selected) {
-        await priceAction.submit({
+        const saved = await trySubmit(priceAction, {
           style_attribute_variant: variant.name,
           ...pricePayload(variant.sizes[0], rate),
         })
         // A failure already toasted inside useAdminAction — stop rather than reprice the rest silently.
-        if (priceAction.error) return
+        if (!saved) return
       }
       selection.value = []
       toast.success(`Price updated on ${selected.length} ${selected.length === 1 ? 'variant' : 'variants'}`)
@@ -104,9 +104,12 @@ function blockerLabel(variant) {
 }
 
 async function togglePublish(variant) {
-  await publishAction.submit({ style_attribute_variant: variant.name, publish: variant.is_published ? 0 : 1 })
+  const toggled = await trySubmit(publishAction, {
+    style_attribute_variant: variant.name,
+    publish: variant.is_published ? 0 : 1,
+  })
   // A refusal names the missing photo or size and has already been toasted.
-  if (publishAction.error) return
+  if (!toggled) return
   toast.success(variant.is_published ? `${variant.option} hidden from the storefront` : `${variant.option} published`)
   emit('saved')
 }
@@ -128,10 +131,10 @@ function receiveStock(variant) {
       const quantity = Math.max(0, Math.trunc(Number(values.value) || 0))
       if (!quantity) return
 
-      await receiveAction.submit({
+      const received = await trySubmit(receiveAction, {
         received_quantities: Object.fromEntries(itemCodes.map((code) => [code, quantity])),
       })
-      if (receiveAction.error) return
+      if (!received) return
       toast.success(`Received ${quantity} on ${itemCodes.length} sizes`)
       emit('saved')
     },

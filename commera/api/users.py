@@ -1,6 +1,8 @@
 import frappe
 from frappe import _
 
+from commera.core import is_shoppers_address
+
 
 @frappe.whitelist()
 def delete_user_address(address_id: str):
@@ -8,10 +10,10 @@ def delete_user_address(address_id: str):
 	if not address_id:
 		frappe.throw(_("Address ID is required."))
 
-	address_doc = frappe.get_doc("Address", address_id)
-
-	if address_doc.owner != frappe.session.user:
+	if not is_shoppers_address(address_id):
 		frappe.throw(_("Cannot delete address"))
+
+	address_doc = frappe.get_doc("Address", address_id)
 
 	try:
 		address_doc.flags.ignore_permissions = True

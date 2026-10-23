@@ -1,5 +1,4 @@
 import os
-import subprocess
 from pathlib import Path
 
 import click
@@ -16,16 +15,8 @@ def commera_commands():
 def init(skip_install: bool):
 	"""Set up the app you are in as a Commera plugin that adds pages, cards, actions and settings to the Commera dashboard."""
 	scaffold = get_current_app_scaffold()
-	for change, path in scaffold.save():
+	for change, path in scaffold.save(install=not skip_install):
 		click.echo(f"{change:<8} {path}")
-
-	if not skip_install:
-		click.echo("Running yarn install…")
-		try:
-			# nosemgrep: frappe-subprocess-exec
-			subprocess.run(["yarn", "install"], cwd=scaffold.app_root, check=True)
-		except (FileNotFoundError, subprocess.CalledProcessError) as error:
-			raise click.ClickException(f"yarn install failed in {scaffold.app_root}: {error}")
 
 	click.secho("Next: run yarn dev in apps/commera/dashboard, then open /commera on port 8080", fg="green")
 	click.echo(f"For production: bench build --app {scaffold.app}")

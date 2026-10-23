@@ -16,7 +16,12 @@ from commera.api.variant_pricing import (
 )
 from commera.plugin_events import add_changed_products
 from commera.swatches import COLOUR_ATTRIBUTE, ensure_default_swatch, get_swatch_map
-from commera.utils import IN_CLAUSE_CHUNK_SIZE, get_first_option_photos, get_product_covers
+from commera.utils import (
+	IN_CLAUSE_CHUNK_SIZE,
+	get_first_option_photos,
+	get_product_covers,
+	get_store_currency,
+)
 
 PAGE_LENGTH = 20
 BULK_PRODUCT_LIMIT = 100
@@ -53,10 +58,7 @@ def get_products(
 	"""
 	frappe.has_permission("Item", ptype="read", throw=True)
 
-	# Imported here because orders imports this module at import time; a module-level import would cycle.
-	from commera.api.admin.orders import get_reporting_currency
-
-	currency = get_reporting_currency()
+	currency = get_store_currency()
 
 	start = cint(start)
 	page_length = cint(page_length) or PAGE_LENGTH
@@ -357,9 +359,7 @@ def get_pricing_rows(
 	get_products()'s batched joins at variant grain, carrying each variant's own default_rate/sale_rate."""
 	frappe.has_permission("Item", ptype="read", throw=True)
 
-	from commera.api.admin.orders import get_reporting_currency
-
-	currency = get_reporting_currency()
+	currency = get_store_currency()
 
 	start = cint(start)
 	page_length = cint(page_length) or PAGE_LENGTH
@@ -582,9 +582,7 @@ def get_top_products(limit: int = TOP_PRODUCTS_LIMIT):
 	size, so this walks size -> variant -> configurator and sums in SQL; drafts count, as is_webshop_order does."""
 	frappe.has_permission("Item", ptype="read", throw=True)
 
-	# Delayed import: orders.py imports this module at import time, so a module-level import here
-	# would cycle - same guard get_products() above already uses for get_reporting_currency.
-	from commera.api.admin.orders import get_reporting_currency, is_webshop_order
+	from commera.api.admin.orders import is_webshop_order
 
 	sales_order = frappe.qb.DocType("Sales Order")
 	sales_order_item = frappe.qb.DocType("Sales Order Item")
@@ -613,7 +611,7 @@ def get_top_products(limit: int = TOP_PRODUCTS_LIMIT):
 		.limit(cint(limit) or TOP_PRODUCTS_LIMIT)
 		.run()
 	)
-	currency = get_reporting_currency()
+	currency = get_store_currency()
 	if not rows:
 		return {"products": [], "currency": currency}
 

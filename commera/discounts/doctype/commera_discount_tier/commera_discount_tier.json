@@ -1,0 +1,40 @@
+{
+	"actions": [],
+	"creation": "2026-10-11 00:00:00.000000",
+	"doctype": "DocType",
+	"engine": "InnoDB",
+	"field_order": [
+		"minimum_subtotal",
+		"value"
+	],
+	"fields": [
+		{
+			"fieldname": "minimum_subtotal",
+			"fieldtype": "Currency",
+			"label": "Subtotal From",
+			"reqd": 1,
+			"in_list_view": 1,
+			"non_negative": 1
+		},
+		{
+			"fieldname": "value",
+			"fieldtype": "Float",
+			"label": "Value",
+			"reqd": 1,
+			"in_list_view": 1,
+			"non_negative": 1
+		}
+	],
+	"links": [],
+	"modified": "2026-10-11 00:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "Discounts",
+	"name": "Commera Discount Tier",
+	"owner": "Administrator",
+	"permissions": [],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": [],
+	"istable": 1,
+	"editable_grid": 1
+}

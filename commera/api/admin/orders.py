@@ -11,7 +11,8 @@ from commera.api.admin.catalog import get_unpublishable_options
 from commera.api.admin.inventory import get_inventory
 from commera.api.admin.plugins import query_deliveries
 from commera.api.shipping import get_order_charge_lines
-from commera.utils import get_address_lines, get_item_images
+from commera.discounts.allocations import get_allocations, get_discount_rows, get_order_discount_rows
+from commera.utils import get_address_lines, get_item_images, get_store_currency
 
 PAGE_LENGTH = 20
 
@@ -34,6 +35,7 @@ ORDER_FIELDS = (
 	"currency",
 	"total",
 	"net_total",
+	"discount_amount",
 	"total_taxes_and_charges",
 	"grand_total",
 	"rounded_total",
@@ -44,6 +46,8 @@ ORDER_FIELDS = (
 	"custom_ecommerce_payment_mode",
 	"custom_ecommerce_status",
 	"custom_delivery_option",
+	"custom_discount_allocations",
+	"custom_cart_attributes",
 	"shipping_address",
 	"address_display",
 	"modified",
@@ -617,6 +621,7 @@ def get_order(sales_order: str):
 	state = describe_state(order, lifecycle)
 	charges = get_order_charges(order)
 	payment_state = describe_payment(order)
+	allocations = get_allocations(order)
 
 	return {
 		"name": order.name,
@@ -632,6 +637,8 @@ def get_order(sales_order: str):
 		"total": flt(order.total),
 		"net_total": flt(order.net_total),
 		"shipping": charges["shipping"],
+		"order_discounts": get_order_discount_rows(order),
+		"shipping_discounts": get_discount_rows(allocations, ("Shipping",)),
 		# The delivery option the shopper actually chose and paid for. Empty on an order placed
 		# before the shipping connector was installed, or one that took the flat Shipping Rule.
 		"delivery_option": order.custom_delivery_option,
@@ -656,6 +663,7 @@ def get_order(sales_order: str):
 				"rate": flt(row.rate),
 				"amount": flt(row.amount),
 				"image": row.image,
+				"discounts": get_discount_rows(allocations, line=row.idx),
 			}
 			for row in order.lines
 		],
@@ -712,6 +720,7 @@ def read_order_lines(order_names: list[str]) -> dict[str, list]:
 		fields=[
 			"name",
 			"parent",
+			"idx",
 			"item_code",
 			"item_name",
 			"qty",
@@ -720,6 +729,8 @@ def read_order_lines(order_names: list[str]) -> dict[str, list]:
 			"rate",
 			"amount",
 			"image",
+			"custom_code_discount",
+			"custom_line_attributes",
 		],
 		order_by="idx asc",
 	)
@@ -921,7 +932,7 @@ def get_overview(order_status: str | None = None):
 	unpublishable = get_unpublishable_options(limit=0)
 
 	return {
-		"currency": get_reporting_currency(),
+		"currency": get_store_currency(),
 		"window_days": OVERVIEW_WINDOW_DAYS,
 		"stats": [
 			{
@@ -994,12 +1005,6 @@ def percent_change(current, previous):
 	if not previous:
 		return None
 	return flt((flt(current) - previous) / previous * 100, 1)
-
-
-def get_reporting_currency():
-	company = frappe.get_cached_value("Commera Settings", "Commera Settings", "company")
-	currency = frappe.get_cached_value("Company", company, "default_currency") if company else None
-	return currency or frappe.defaults.get_global_default("currency")
 
 
 def get_reporting_currency_symbol(currency):

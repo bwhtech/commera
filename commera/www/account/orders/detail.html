@@ -104,33 +104,46 @@ x-init="{% if is_owner %}fetch_returned_items('{{ order.name }}'){% endif %}" cl
                 </span>
                 <span class="flex">
                     {{get_currency_symbol()}}
-                    {{"%.2f"|format(order.total)}}
+                    {{"%.2f"|format(order_summary.items_total)}}
                 </span>
             </h3>
-            {% if order.total > order.net_total + (order.rounding_adjustment or 0) %}
+            {% for discount in order_summary.discounts %}
                 <h3 class="text-base font-normal mt-2 flex items-center justify-between">
                     <span>
-                        {{_('Discount')}}
+                        {{_('Discount')}}{% if discount.label %} ({{ discount.label | e }}){% endif %}
                     </span>
-                    <span class="flex text-green-700">
+                    <span class="flex whitespace-nowrap text-green-700">
                         &minus;
                         {{get_currency_symbol()}}
-                        {{"%.2f"|format(order.total - order.net_total)}}
+                        {{"%.2f"|format(discount.amount)}}
 
                     </span>
                 </h3>
-            {% endif %}
-            {% if order.total_taxes_and_charges %}
+            {% endfor %}
+            {% set shipping_discount = order_summary.shipping_discounts | sum(attribute="amount") %}
+            {% if order.total_taxes_and_charges or shipping_discount %}
                 <h3 class="text-base font-normal mt-2 flex items-center justify-between">
                     <span>
                         {{_('Shipping & Handling')}}
                     </span>
                     <span class="flex">
                         {{get_currency_symbol()}}
-                        {{"%.2f"|format(order.total_taxes_and_charges)}}
+                        {{"%.2f"|format(order.total_taxes_and_charges + shipping_discount)}}
                     </span>
                 </h3>
             {% endif %}
+            {% for discount in order_summary.shipping_discounts %}
+                <h3 class="text-base font-normal mt-2 flex items-center justify-between">
+                    <span>
+                        {{_('Shipping discount')}}{% if discount.label %} ({{ discount.label | e }}){% endif %}
+                    </span>
+                    <span class="flex whitespace-nowrap text-green-700">
+                        &minus;
+                        {{get_currency_symbol()}}
+                        {{"%.2f"|format(discount.amount)}}
+                    </span>
+                </h3>
+            {% endfor %}
             {% if order.rounding_adjustment %}
             <h3 class="text-base font-normal mt-2 flex items-center justify-between capitalize">
                 <span>
@@ -149,7 +162,7 @@ x-init="{% if is_owner %}fetch_returned_items('{{ order.name }}'){% endif %}" cl
                 </span>
                 <span class="flex">
                     {{get_currency_symbol()}}
-                    {{"%.2f"|format(order.rounded_total)}}
+                    {{"%.2f"|format(order.payable_total)}}
                 </span>
             </h3>
         </div>

@@ -5,6 +5,7 @@ from collections import Counter
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
 from frappe.query_builder.functions import Count, Sum
 from frappe.utils.data import cint, cstr, date_diff, flt, formatdate
 
@@ -189,6 +190,7 @@ def get_customer(customer: str):
 	payment_modes = Counter(
 		row.custom_ecommerce_payment_mode for row in lifetime_orders if row.custom_ecommerce_payment_mode
 	)
+	discount_uses = read_customer_discount_uses(customer)
 
 	return {
 		"id": doc.name,
@@ -210,6 +212,8 @@ def get_customer(customer: str):
 		"top_products": get_top_products(items),
 		"spend_by_month": get_spend_by_month(lifetime_orders),
 		"note": cstr(doc.customer_details),
+		"discount_uses": discount_uses,
+		"discount_saved": sum(flt(use.amount) for use in discount_uses),
 		"recent_orders": [
 			{key: value for key, value in order.items() if key != "base_total"}
 			for order in read_customer_orders(customer)
@@ -331,6 +335,25 @@ def get_acquisition(first_order: str | None) -> dict | None:
 	if not event or not event[0].utm_source:
 		return None
 	return {"source": event[0].utm_source, "campaign": event[0].utm_campaign or None}
+
+
+def read_customer_discount_uses(customer: str) -> list:
+	use = frappe.qb.DocType("Commera Discount Use")
+	discount = frappe.qb.DocType("Commera Discount")
+	return (
+		frappe.qb.from_(use)
+		.left_join(discount)
+		.on(discount.name == use.discount)
+		.select(
+			use.sales_order,
+			use.code,
+			use.base_amount.as_("amount"),
+			use.creation.as_("used_on"),
+			discount.title,
+		)
+		.where(use.customer == customer)
+		.orderby(use.creation, order=Order.desc)
+	).run(as_dict=True)
 
 
 def read_customer_orders(customer: str) -> list:

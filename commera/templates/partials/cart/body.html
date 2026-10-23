@@ -1,20 +1,17 @@
+{% from "templates/macros/discount_code_chips.html" import discount_code_chips %}
 
 <script defer>
 	async function proceed_to_checkout(state) {
 		state.checkout_loading = true;
-		const selected_items = Alpine.store("cart").items.filter(item => item.selected);
-		const has_stock = await Alpine.store("cart").validate_stock_before_checkout(selected_items);
-
-		if (!has_stock) {
+		try {
+			const selected_items = Alpine.store("cart").items.filter(item => item.selected);
+			if (!await Alpine.store("cart").validate_stock_before_checkout(selected_items)) return;
+			if (!await Alpine.store("cart").flush_sync()) return;
+			await frappe_call("/api/v2/method/commera.api.payments.generate_quotation_for_cart", { cart: { items: selected_items } });
+			window.location.href = "/{{frappe.lang}}/cart/checkout" + window.location.search;
+		} finally {
 			state.checkout_loading = false;
-			return;
 		}
-		frappe_call("/api/v2/method/commera.api.payments.generate_quotation_for_cart", { cart: { items: selected_items } })
-			.then((d) => {
-				window.location.href = "/{{frappe.lang}}/cart/checkout" + window.location.search
-			}).finally(() => {
-				state.checkout_loading = false;
-			})
 	}
 
 	async function resume_checkout_after_sign_in(state) {
@@ -28,37 +25,26 @@
 	}
 </script>
 
-<div class=" space-y-10" x-data="{ 
+<div class=" space-y-10" x-data="{
 		checkout_loading: false,
 		cart_loading: true,
-		delivery_charge: {{delivery_charge}},
-		delivery_charge_applicable_below: {{delivery_charge_applicable_below}},
-		cart_total : $store.cart.total,
-		show_delivery_charges: false,
+		delivery_charge: {{ delivery_charge | float }},
+		get show_delivery_charges() {
+			return this.delivery_charge > 0 && $store.cart.is_delivery_charged;
+		},
+		get cart_total() {
+			return $store.cart.total - $store.cart.saved + (this.show_delivery_charges ? this.delivery_charge : 0);
+		},
 	}" x-init="
-		if (delivery_charge_applicable_below > cart_total && delivery_charge > 0  && $store.cart.selected_count > 0) {
-			cart_total = cart_total + delivery_charge
-			show_delivery_charges = true
-		} 
-		else {
-			show_delivery_charges = false
-		};
 		await $store.cart.fetch_detail_for_cart();
 		cart_loading = false;
-		await resume_checkout_after_sign_in($data);" x-effect="
-		cart_total = $store.cart.total;
-		if (delivery_charge_applicable_below > $store.cart.total && delivery_charge > 0 && $store.cart.selected_count > 0) {
-			cart_total = $store.cart.total + delivery_charge;
-			show_delivery_charges = true;
-		} 
-		else {
-			show_delivery_charges = false;
-	}">
+		await $store.cart.load_priced();
+		await resume_checkout_after_sign_in($data);">
 
-	<div x-show="show_delivery_charges && $store.cart.selected_count >0" x-transition>
+	<div x-show="show_delivery_charges && $store.cart.free_delivery_shortfall > 0" x-transition>
 		{% call banner() %}
 		<div class="text-sm text-secondary-accent w-full text-center">
-			{{_('Add items worth')}} {{get_currency_symbol()}} <span x-text="(delivery_charge_applicable_below - $store.cart.total) > 0 ? (delivery_charge_applicable_below - $store.cart.total).toFixed(2) : 0"></span>
+			{{_('Add items worth')}} {{get_currency_symbol()}} <span x-text="($store.cart.free_delivery_shortfall || 0).toFixed(2)"></span>
 			{{_('more to get free delivery')}}
 		</div>
 		{% endcall %}
@@ -80,10 +66,11 @@
 	{{ plugin_slot("cart_banner") }}
 	<div class="flex flex-col ipad:flex-row md:gap-20">
 		<div class="flex-2">
-			<ol>
+			<ol x-data='{ include_label: {{ _("Include {0} in checkout") | tojson }} }'>
 				<template x-for="cart_item in $store.cart.items" :key="cart_item.variant.item_code">
 					<li class="flex w-full items-center">
 						<input type="checkbox" x-model="cart_item.selected"
+							:aria-label="include_label.replace('{0}', cart_item.variant.item_name)"
 							class="w-5 h-5 accent-form text-accent border-accent rounded-lg focus:ring-focus me-1 md:me-2 ">
 
 						<div class="flex gap-2 rounded-lg border border-gray-300 md:gap-7 mb-4 w-full" x-data='{
@@ -117,14 +104,14 @@
 								
 									{% include 'templates/components/cart_product_size_dropdown.html'   %}
 									<div class="text-sm font-medium mt-2 md:mt-9 flex">
-										<template x-if="cart_item.default_price && cart_item.default_price !== cart_item.price">
+										<template x-if="cart_item.default_price && parseFloat(cart_item.default_price) !== $store.cart.price_of(cart_item)">
 										<p class="text-sm font-medium line-through text-strikethrough me-2 flex">
 											{{get_currency_symbol()}}
 											<span x-text="parseFloat(cart_item.default_price).toFixed(2)"></span>
 										</p>
 									</template>
 									&nbsp;
-									<p class="flex">{{get_currency_symbol()}} <span x-text="parseFloat(cart_item.price).toFixed(2)"></span>
+									<p class="flex">{{get_currency_symbol()}} <span x-text="$store.cart.price_of(cart_item).toFixed(2)"></span>
 											
 										</p>
 								</div>
@@ -217,6 +204,15 @@
 					<p class="text-base font-medium flex">{{get_currency_symbol()}}<span x-text="$store.cart.total.toFixed(2)" class="me-2"></span>
 						</p>
 				</div>
+				{{ discount_code_chips("$store.cart.discount_codes", "$store.cart.saving_code", "$store.cart.remove_discount_code", classes="mb-3") }}
+				<template x-for="(discount, index) in $store.cart.discounts" :key="index">
+					<div class="mb-3 flex items-center justify-between">
+						<p class="text-base font-normal text-gray-400">
+							{{ _('Discount') }}<span x-show="discount.label" x-text="` (${discount.label})`"></span>
+						</p>
+						<p class="text-base font-medium flex text-green-700">&minus;{{get_currency_symbol()}}<span x-text="discount.amount.toFixed(2)"></span></p>
+					</div>
+				</template>
 				<div class="mb-3 flex items-center justify-between">
 					<p class="text-base font-normal text-gray-400 capitalize">{{ _("non-refundable delivery charge") }}</p>
 					<div x-show="show_delivery_charges && $store.cart.selected_count >0">

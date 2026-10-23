@@ -37,29 +37,27 @@
     <div class="space-y-3 my-4 py-4 border-b border-t border-gray-300">
         <div class="flex justify-between text-gray-500 text-base">
             <span>{{ _('Subtotal') }}</span>
-            <span class="font-medium flex"> {{get_currency_symbol()}} <span x-text="$store.cart.total.toFixed(2)"></span> </span>
+            <span class="font-medium flex"> {{get_currency_symbol()}} {{ "%.2f"|format(checkout_summary.items_total or 0) }}</span>
         </div>
 
-        {% if cart_quotation.coupon_code %}
-            <div class="flex justify-between text-gray-500 text-base"
-                x-show="$store.cart.total > parseFloat('{{cart_quotation.net_total or 0}}')">
-                <span>{{ _('Coupon Discount') }}</span>
-                <span class="font-medium flex text-green-700"> &minus;{{get_currency_symbol()}} <span
-                        x-text="($store.cart.total - parseFloat('{{cart_quotation.net_total or 0}}')).toFixed(2) "></span> </span>
+        {% for discount in checkout_summary.discounts or [] %}
+            <div class="flex justify-between text-gray-500 text-base">
+                <span>{{ _('Discount') }}{% if discount.label %} ({{ discount.label | e }}){% endif %}</span>
+                <span class="font-medium flex text-green-700"> &minus;{{get_currency_symbol()}} {{ "%.2f"|format(discount.amount) }}</span>
             </div>
-        {% endif %}
+        {% endfor %}
         <div class="flex justify-between text-gray-500 text-base" x-show=" delivery_option === 'home_delivery'"
             x-transition>
             <span class="capitalize">{{ _('non-refundable delivery charge') }}</span>
-            <span class="font-medium" x-show="delivery_charge_applicable_below > parseFloat({{cart_quotation.total or 0}})"
+            <span class="font-medium" x-show="!is_free_delivery"
                 x-transition>
                 {{get_currency_symbol()}} <span x-text="delivery_charge.toFixed(2)"></span>
             </span>
-            <span class="font-medium" x-show="delivery_charge_applicable_below <= parseFloat({{cart_quotation.total or 0}})"
+            <span class="font-medium" x-show="is_free_delivery"
                 x-transition x-cloak>
                 {{_('Free')}}</span>
         </div>
-        {% if cod_charge_applicable_below > cart_quotation.rounded_total and cod_charge %}
+        {% if cod_charge_applicable_below > cart_payable_total and cod_charge %}
         <div class="flex justify-between text-gray-500 text-base"
             x-show="billing_address_filled && payment_mode === 'cod'" x-transition x-cloak>
             <span>{{ _('COD Charges') }}</span>

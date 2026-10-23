@@ -3,12 +3,14 @@
 		Alpine.data("cart_permalink", (config) => ({
 			async init() {
 				if (!config.lines.length) return;
-				this.$store.cart.clear();
+				await this.$store.cart.wait_until_loaded();
+				if (!config.is_merge) this.$store.cart.clear();
 				for (const line of config.lines) {
 					this.$store.cart.add(line.item, JSON.stringify(line.variant), line.price, line.default_price, line.brand, line.sizes, line.qty);
 				}
 				// $persist writes on Alpine's next flush; navigating first can leave the old cart in storage.
 				await this.$nextTick();
+				await this.$store.cart.sync();
 				if (!config.notices.length) window.location.replace(config.next_url);
 			},
 		}));

@@ -6,6 +6,7 @@ import {
   PREFIX,
   adminGet,
   adminPost,
+  apiPost,
   clickByText,
   deleteResource,
   goto,
@@ -23,6 +24,7 @@ import {
 const COLLECTION = `${PREFIX} Collection`
 const ATTRIBUTE = `${PREFIX}Fabric`
 const PRODUCT = `${PREFIX} Tee`
+const REVIEW = `${PREFIX} Review`
 
 const created = { products: [], collections: [], attributes: [] }
 
@@ -91,6 +93,48 @@ describe('catalog', () => {
     const collections = await adminGet(page, 'catalog.get_collections')
     assert.ok(collections.includes(COLLECTION), `${COLLECTION} was not persisted; got ${collections.join(', ')}`)
     assert.ok((await text(page)).includes(COLLECTION), 'the new collection did not appear in the list')
+  })
+
+  uiTest(session, 'publishes a review from its row without opening it', async () => {
+    const { page } = session
+    const [variant] = await listResource(page, 'Style Attribute Variant', {}, ['name', 'item_style'])
+    assert.ok(variant, 'the store has no product to review')
+    const review = await apiPost(page, 'frappe.client.insert', {
+      doc: { doctype: 'Product Review', variant: variant.name, item_style: variant.item_style, rating: 4, review_title: REVIEW },
+    })
+    onCleanup(session, ({ page: cleanupPage }) => deleteResource(cleanupPage, 'Product Review', review.name).catch(() => {}))
+
+    await goto(page, '/reviews')
+    const toggle = await page.evaluateHandle((title) => {
+      const row = Array.from(document.querySelectorAll('a, [role="row"], li, div')).find(
+        (node) => node.querySelector('[role="switch"]') && node.innerText.includes(title) && node.querySelectorAll('[role="switch"]').length === 1,
+      )
+      return row?.querySelector('[role="switch"]')
+    }, REVIEW)
+    assert.ok(toggle.asElement(), 'the new review has no publish switch in the list')
+    await toggle.asElement().click()
+    await wait(1500)
+
+    assert.ok(page.url().endsWith('/reviews'), `the switch opened ${page.url()} instead of staying on the list`)
+    const { reviews } = await adminGet(page, 'reviews.get_reviews', { tab: 'published', search: REVIEW })
+    assert.ok(reviews.some((row) => row.name === review.name), 'the switch did not publish the review')
+
+    await clickByText(page, 'p', REVIEW, { pause: 1500 })
+    assert.ok(page.url().endsWith(`/reviews/${review.name}`), `clicking the row opened ${page.url()}`)
+    assert.deepEqual(realProblems(session.problems), [], 'the reviews list reported browser problems')
+  })
+
+  uiTest(session, 'opens an attribute to edit its values', async () => {
+    const { page } = session
+    const [attribute] = await adminGet(page, 'catalog.get_attributes')
+    assert.ok(attribute?.values?.length, 'the store has no attribute with values to open')
+
+    await goto(page, '/attributes')
+    await clickByText(page, 'button', 'Edit', { pause: 1200 })
+    const dialog = await page.$eval('[role="dialog"]', (node) => node.innerText).catch(() => '')
+    assert.ok(dialog.includes(attribute.name), 'Edit did not open the attribute dialog')
+    assert.ok(dialog.includes(attribute.values[0].value), 'the dialog does not list the attribute values')
+    assert.deepEqual(realProblems(session.problems), [], 'the attribute dialog reported browser problems')
   })
 
   uiTest(session, 'creates an attribute with values', async () => {

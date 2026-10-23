@@ -116,7 +116,7 @@ const companyLink = computed(() =>
           v-if="company.data"
           label="Open company record"
           icon-right="lucide-external-link"
-          :link="companyLink"
+          :href="companyLink"
         />
       </div>
 

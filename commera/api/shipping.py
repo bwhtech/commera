@@ -5,10 +5,14 @@ from frappe.utils.data import cstr, flt, sha256_hash
 
 from commera.checkout_hooks import PLUGIN_FEE_FIELD, apply_delivery_option_hooks, apply_plugin_fees
 from commera.core import _get_cart_quotation
+from commera.discounts.allocations import get_allocations, get_discount_rows, get_price_discount_rows
+from commera.discounts.pricing import refresh_code_discounts
+from commera.discounts.shipping import apply_shipping_discounts, set_shipping_discount
 from commera.utils import (
 	COD_CHARGE_DESCRIPTION,
 	get_charge_account_head,
 	get_cod_configuration,
+	get_free_delivery,
 	validate_document_access,
 )
 
@@ -228,8 +232,22 @@ def apply_delivery_option(quotation, option: dict):
 	quotation.custom_delivery_charge = flt(option["amount"])
 	quotation.custom_shipping_provider = option.get("provider")
 	quotation.custom_shipping_service_code = option.get("service_code")
+	set_shipping_discount(quotation, option)
 	set_delivery_charge_row(quotation, flt(option["amount"]), option["title"])
 	apply_plugin_fees(quotation)
+
+
+def reprice_shipping_discount(quotation):
+	# The option was priced on a prepaid cart; re-price it for the payment mode.
+	if not quotation.custom_delivery_option:
+		return
+	option = {
+		"title": quotation.custom_delivery_option,
+		"amount": flt(quotation.custom_delivery_charge) + flt(quotation.custom_shipping_discount),
+		"provider": quotation.custom_shipping_provider,
+		"service_code": quotation.custom_shipping_service_code,
+	}
+	apply_delivery_option(quotation, apply_shipping_discounts(quotation, [option])[0])
 
 
 def clear_delivery_option(quotation):
@@ -237,6 +255,7 @@ def clear_delivery_option(quotation):
 	quotation.custom_delivery_charge = 0
 	quotation.custom_shipping_provider = None
 	quotation.custom_shipping_service_code = None
+	set_shipping_discount(quotation, None)
 	remove_delivery_charge_row(quotation)
 	quotation.calculate_taxes_and_totals()
 
@@ -324,8 +343,7 @@ def get_charge_lines(taxes, shipping_rule: str | None) -> dict:
 
 
 def get_charge_amount(quotation) -> float:
-	# rounded_total is 0 when rounding is disabled on the document; grand_total is the billed figure then.
-	return flt(quotation.rounded_total) or flt(quotation.grand_total)
+	return flt(quotation.grand_total if quotation.is_rounded_total_disabled() else quotation.rounded_total)
 
 
 def get_checkout_summary(quotation) -> dict:
@@ -335,6 +353,10 @@ def get_checkout_summary(quotation) -> dict:
 		clear_pickup_charges(preview)
 	summary = get_charge_summary(preview)
 
+	# A prepaid-only discount drops off, and a cash-on-delivery one comes on, before the fee is judged.
+	preview.flags.commera_payment_kind = "cod"
+	reprice_shipping_discount(preview)
+	refresh_code_discounts(preview)
 	cod_charge = get_cod_charge(preview)
 	if cod_charge:
 		account_head = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
@@ -348,11 +370,14 @@ def get_charge_summary(quotation) -> dict:
 	charges = charge_lines["shipping"] + charge_lines["cod_charge"]
 	charges += sum(line["amount"] for line in charge_lines["taxes"] + charge_lines["plugin_fees"])
 	discount_amount = flt(quotation.discount_amount)
+	# Derived rather than read: with a Grand Total discount the stored net_total is already partly discounted.
+	subtotal = flt(flt(quotation.grand_total) + discount_amount - charges, quotation.precision("grand_total"))
+	line_discount = sum(flt(item.get("custom_code_discount")) * flt(item.qty) for item in quotation.items)
 	return {
-		# Derived rather than read: with a Grand Total discount the stored net_total is already partly discounted.
-		"subtotal": flt(
-			flt(quotation.grand_total) + discount_amount - charges, quotation.precision("grand_total")
-		),
+		"subtotal": subtotal,
+		"items_total": flt(subtotal + line_discount, quotation.precision("grand_total")),
+		"discounts": get_price_discount_rows(quotation),
+		"shipping_discounts": get_discount_rows(get_allocations(quotation), ("Shipping",)),
 		"shipping": charge_lines["shipping"],
 		"cod_charge": charge_lines["cod_charge"],
 		"plugin_fees": charge_lines["plugin_fees"],
@@ -360,6 +385,7 @@ def get_charge_summary(quotation) -> dict:
 		"discount_amount": discount_amount,
 		"rounding_adjustment": flt(quotation.rounding_adjustment),
 		"total": get_charge_amount(quotation),
+		**get_free_delivery(quotation),
 	}
 
 
@@ -457,8 +483,8 @@ def reprice_selected_option(quotation) -> bool:
 		amount = get_charge_amount(
 			quotation.custom_delivery_option,
 			get_cart_context(quotation),
-			# A Currency field is never None, so the stored price is always billed and a stored 0 stays free.
-			quoted_amount=quotation.custom_delivery_charge,
+			# Before its shipping discount, which the hooks below take off again.
+			quoted_amount=flt(quotation.custom_delivery_charge) + flt(quotation.custom_shipping_discount),
 			shipping_rule=get_store_shipping_rule(),
 		)
 		options = [

@@ -44,7 +44,7 @@
 				<tr>
 					<td><a href="{{ order_url }}" class="fw-medium">{{ order.name }}</a></td>
 					<td>{{ frappe.utils.formatdate(order.creation, "medium") }}</td>
-					<td>{{ get_currency_symbol() }}{{ "%.2f" | format(order.rounded_total or 0) }}</td>
+					<td>{{ get_currency_symbol() }}{{ "%.2f" | format(order.payable_total) }}</td>
 					<td>
 						<span class="badge m-0 {{ status_badges.get(order.custom_ecommerce_status, 'bg-secondary') }}">
 							{{ _(order.custom_ecommerce_status or "Draft") }}

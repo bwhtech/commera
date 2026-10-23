@@ -28,12 +28,12 @@ jobs:
         ports:
           - 11000:6379
       mariadb:
-        image: mariadb:10.6
+        image: mariadb:11.8
         env:
-          MYSQL_ROOT_PASSWORD: root
+          MARIADB_ROOT_PASSWORD: root
         ports:
           - 3306:3306
-        options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=2s --health-retries=3
 
     steps:
       - name: Remove label
@@ -44,7 +44,7 @@ jobs:
       - name: Get frappe-implementer token
         id: app-token
         if: vars.FRAPPE_IMPLEMENTER_APP_ID != ''
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.FRAPPE_IMPLEMENTER_APP_ID }}
           private-key: ${{ secrets.FRAPPE_IMPLEMENTER_APP_PRIVATE_KEY }}

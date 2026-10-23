@@ -16,7 +16,8 @@ from frappe.utils.data import (
 
 from commera.analytics import facebook, ga4
 from commera.api.admin.inventory import get_ecommerce_warehouse
-from commera.api.admin.orders import get_reporting_currency, is_webshop_order
+from commera.api.admin.orders import is_webshop_order
+from commera.utils import get_store_currency
 
 KNOWN_PROVIDER_ERRORS = {
 	"meta": "Meta denied pixel stats — the token needs ads_read AND the pixel's connected ad account assigned to the system user",
@@ -173,7 +174,7 @@ def get_overview(from_date: str, to_date: str):
 	previous = get_period_kpis(previous_from, previous_to)
 	return {
 		# base_grand_total is company currency; Global Defaults is a separate setting and mislabels the tiles.
-		"currency": get_reporting_currency(),
+		"currency": get_store_currency(),
 		"kpis": {key: {"value": current[key], "previous": previous[key]} for key in current},
 	}
 

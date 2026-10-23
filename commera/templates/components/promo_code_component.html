@@ -1,21 +1,8 @@
 {% import "templates/macros/modal.html" as modal %}
-{% if cart_quotation.coupon_code %}
-    <span
-        class="w-fit inline-flex overflow-hidden rounded-lg border border-dashed border-gray-400 bg-white text-xs font-medium text-gray-600 ">
-        <span class="flex items-center gap-1 bg-gray-400/10 px-2 py-1">
-            {{coupon_code}}
-            <button @click="remove_coupon_code($el)"
-                class="flex items-center disabled:cursor-not-allowed">
-                <div class="close">
-                    {{icon(name="close",classes="h-4 w-4 cursor-pointer")}}
-                </div>
-                <div class=" hidden animate-spin  size-3 border-3 border-current border-t-transparent  rounded-full ms-2"
-                    role="status" aria-label="loading">
-                </div>
-            </button>
-        </span>
-    </span>
-{% else %}
+{% from "templates/macros/discount_code_chips.html" import discount_code_chips %}
+<div x-data='{ discount_codes: {{ discount_code_states | tojson }} }'>
+    {{ discount_code_chips("discount_codes", "$store.cart.saving_code", "remove_discount_code") }}
+</div>
     {% call modal.modal(button_text='apply promo code',button_classes='text-md text-secondary-accent underline decoration-accent
     md:text-base capitalize',
     modal_header='Apply a promo code', header_alignment='center',modal_classes='w-fit') %}
@@ -35,24 +22,20 @@
             </div>
         </div>
     {% endcall %}
-{% endif %}
 
 
 <script defer>
     async function apply_coupon(coupon_code, ref) {
         if (!coupon_code) {
-            toast("Please enter a coupon code", { type: "warning" })
+            toast({{ _("Please enter a coupon code") | tojson }}, { type: "warning" })
             return;
         }
         const btn = ref.apply_coupon_ref
         const spinner = btn.querySelector(".animate-spin");
         btn.disabled = true;
         spinner.classList.remove("hidden");
-        const args = {
-            'applied_code': coupon_code
-        }
         try {
-            await frappe_call('/api/v2/method/commera.api.payments.apply_coupon_code', args)
+            if (!await Alpine.store("cart").add_discount_code(coupon_code)) return;
             confetti({
                 particleCount: 100,
                 spread: 70,
@@ -60,32 +43,13 @@
             });
             window.location.reload()
         }
-        catch (err) {
-
-        }
         finally {
             btn.disabled = false;
             spinner.classList.add("hidden");
         }
     }
-    async function remove_coupon_code(btn) {
-        const spinner = btn.querySelector(".animate-spin");
-        const close = btn.querySelector(".close");
-        btn.disabled = true;
-        spinner.classList.remove("hidden");
-        close.classList.add("hidden");
-        try {
-            const data = await frappe_call('/api/v2/method/commera.api.payments.remove_coupon_code', {});
-            window.location.reload()
-        }
-        catch (err) {
-        }
-        finally {
-            btn.disabled = false;
-            spinner.classList.add("hidden");
-            close.classList.remove("hidden");
-
-        }
-
+    // The checkout totals are drawn by the server, so the page reloads to show them without the code.
+    async function remove_discount_code(code) {
+        if (await Alpine.store("cart").remove_discount_code(code)) window.location.reload();
     }
 </script>

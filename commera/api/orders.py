@@ -4,6 +4,8 @@ from frappe import _
 from frappe.utils import flt
 
 from commera.api.payments import system_user_session
+from commera.api.shipping import get_charge_amount
+from commera.order_access import is_shoppers_order
 from commera.plugin_events import fire_order_refunded
 from commera.utils import update_sales_order_ecommerce_status, validate_document_access
 
@@ -169,7 +171,7 @@ def validate_can_cancel(order_doc):
 	if frappe.db.exists("Delivery Note Item", {"against_sales_order": order_doc.name, "docstatus": ["<", 2]}):
 		frappe.throw(_("This order is already being prepared for shipment."))
 
-	if order_doc.owner != frappe.session.user:
+	if not is_shoppers_order(order_doc):
 		frappe.throw(_("Action not allowed"))
 
 
@@ -248,12 +250,13 @@ def get_refund_status(order_id: str | int) -> dict:
 	)
 
 	total_refunded = sum(flt(pe.paid_amount) for pe in refund_payment_entries)
+	payable_total = get_charge_amount(order)
 
-	if total_refunded >= order.rounded_total:
+	if total_refunded >= payable_total:
 		return get_refund_refusal(order, _("This order has already been refunded in full."), total_refunded)
 
 	only_charges = total_refunded >= order.net_total
-	refundable_amount = order.rounded_total - total_refunded
+	refundable_amount = payable_total - total_refunded
 
 	return {
 		"can_refund": True,

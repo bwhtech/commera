@@ -94,7 +94,7 @@
 							{{ _(order.custom_ecommerce_status or "Draft") }}
 						</span>
 					</td>
-					<td class="text-nowrap">{{ get_currency_symbol() }}{{ "%.2f" | format(order.rounded_total or 0) }}</td>
+					<td class="text-nowrap">{{ get_currency_symbol() }}{{ "%.2f" | format(order.payable_total) }}</td>
 					<td><a href="{{ order_url }}" class="btn-link text-underline p-0">{{ _("View") }}</a></td>
 				</tr>
 				{% endfor %}

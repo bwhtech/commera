@@ -1,6 +1,6 @@
 import re
 from functools import lru_cache
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 import frappe
 from erpnext.selling.doctype.customer.customer import (
@@ -14,7 +14,8 @@ from frappe.utils.data import strip_html
 from pypika import Order
 
 from commera.core import get_address_docs, get_party
-from commera.order_access import get_key_access
+from commera.guest import is_guest, is_guest_checkout_enabled
+from commera.order_access import get_key_access, is_shoppers_order
 from commera.plugin_events import SHIPPING_ADDRESS_FIELDS, STORE_ORDER_TYPE, fire_event, get_order_snapshot
 
 # Ceiling for any IN (...) list this app sends to MariaDB/Postgres.
@@ -42,7 +43,7 @@ def validate_document_access(doctype: str, name: str | int, key: str | None = No
 	document = frappe.get_doc(doctype, name)
 	if document.owner == frappe.session.user:
 		return document
-	if doctype == "Sales Order" and get_key_access(document, key):
+	if doctype == "Sales Order" and (is_shoppers_order(document) or get_key_access(document, key)):
 		return document
 	if frappe.has_permission(doctype, "read", document):
 		return document
@@ -88,7 +89,11 @@ def get_product_list(filters=None, product_list=None, page=1, page_length=30, so
 	if product_list is not None or search_query.use_qb_fallback(filters):
 		return get_product_list_qb(filters, product_list, page, page_length, sort_by)
 
-	ranked_names = get_search_engine().search_products(filters, page, page_length, sort_by)
+	ranked_names = search_query.read_or_fall_back(
+		lambda: get_search_engine().search_products(filters, page, page_length, sort_by), lambda: None
+	)
+	if ranked_names is None:
+		return get_product_list_qb(filters, product_list, page, page_length, sort_by)
 	if not ranked_names:
 		return []
 
@@ -168,8 +173,8 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 
 def shape_product_cards(cards):
 	"""Give every product card the one storefront card shape, whichever grid built it."""
+	from commera.search.engine import CARD_COLUMNS
 	from commera.search.record_builder import sizes_for_variants
-	from commera.search.sqlite_product_search import SqliteProductSearch
 
 	if not cards:
 		return cards
@@ -180,9 +185,8 @@ def shape_product_cards(cards):
 	for card in cards:
 		if card.get("sizes") is None:
 			card["sizes"] = sizes_by_variant.get(card["name"], [])
-		for column in SqliteProductSearch.PRODUCT_DETAIL_COLUMNS:
-			if column != "doc_id":
-				card.setdefault(column, None)
+		for column in CARD_COLUMNS:
+			card.setdefault(column, None)
 		card.setdefault("average_rating", None)
 		card.setdefault("review_count", None)
 		# Mirrors record_builder.aggregate_prices so both grids agree on the price they filter and sort by.
@@ -225,7 +229,10 @@ def get_total_product_count(filters=None, product_list=None):
 	from commera.search.engine_cache import get_search_engine
 
 	if product_list is None and not search_query.use_qb_fallback(filters):
-		return get_search_engine().search_count(filters)
+		return search_query.read_or_fall_back(
+			lambda: get_search_engine().search_count(filters),
+			lambda: get_product_count_qb(filters, product_list),
+		)
 	return get_product_count_qb(filters, product_list)
 
 
@@ -280,6 +287,8 @@ def get_product_base_query(filters=None, product_list=None):
 	if filters:
 		if filters.get("has_discount"):
 			query = query.where(item_price_default.price_list_rate > item_price_sale.price_list_rate)
+		if filters.get("category_item_groups"):
+			query = query.where(style_attribute_variant.item_group.isin(filters["category_item_groups"]))
 		if filters.get("subcategory"):
 			query = query.where(style_attribute_variant.item_group.isin(filters["subcategory"]))
 		if filters.get("colors"):
@@ -304,6 +313,9 @@ def get_product_base_query(filters=None, product_list=None):
 				| (style_attribute_variant.item_group.like(f"%{search}%"))
 				| (item.name.like(f"%{search}%"))
 			)
+			# SQLite sends every Arabic term here, so the Arabic item name must be searchable too.
+			if frappe.db.has_column("Item", "custom_item_name_ar"):
+				search_condition |= item.custom_item_name_ar.like(f"%{search}%")
 			if child_categories:
 				search_condition |= style_attribute_variant.item_group.isin(child_categories)
 
@@ -337,6 +349,28 @@ def get_delivery_configuration():
 	return charge, free_condition.from_value
 
 
+def get_free_delivery(doc) -> dict:
+	"""Judged as ERPNext's Shipping Rule judges it: on base_net_total, which is after every discount."""
+	settings = frappe.get_cached_doc("Commera Settings")
+	rule = frappe.get_cached_doc("Shipping Rule", settings.shipping_rule) if settings.shipping_rule else None
+	# A band charging nothing is free too, ticked or not; bands naming a delivery option price only that option.
+	free_bands = [
+		condition
+		for condition in (rule.conditions if rule and rule.calculate_based_on == "Net Total" else [])
+		if (condition.free_shipping or not flt(condition.shipping_amount))
+		and not condition.get("shipping_service")
+	]
+	free_band = min(free_bands, key=lambda condition: flt(condition.from_value), default=None)
+	if not free_band:
+		return {"free_delivery_above": None, "free_delivery_shortfall": 0}
+	conversion_rate = flt(doc.get("conversion_rate")) or 1
+	shortfall = max(flt(free_band.from_value) - flt(doc.get("base_net_total")), 0)
+	return {
+		"free_delivery_above": flt(flt(free_band.from_value) / conversion_rate, 2),
+		"free_delivery_shortfall": flt(shortfall / conversion_rate, 2),
+	}
+
+
 # The leading space is historical and live orders carry it: strip before comparing, never remove it.
 COD_CHARGE_DESCRIPTION = " Cash on Delivery Charges"
 
@@ -358,13 +392,33 @@ def get_charge_account_head() -> str:
 	return account
 
 
+def get_rounded_or_grand_total(order) -> float:
+	"""ERPNext's `grand_total if is_rounded_total_disabled() else rounded_total`, for an order read as a row."""
+	rounding_disabled = order.get("disable_rounded_total")
+	if rounding_disabled is None:
+		rounding_disabled = frappe.db.get_single_value("Global Defaults", "disable_rounded_total")
+	return flt(order.grand_total if cint(rounding_disabled) else order.rounded_total)
+
+
 def format_theme_css():
 	# jinja's safe globals return documents as plain dicts, so controller methods are unreachable from templates
 	return frappe.get_cached_doc("Commera Settings", "Commera Settings").generate_theme_css()
 
 
+def get_store_company() -> str | None:
+	return frappe.get_cached_value("Commera Settings", "Commera Settings", "company") or (
+		frappe.defaults.get_global_default("company")
+	)
+
+
+def get_store_currency(company: str | None = None) -> str:
+	company = company or get_store_company()
+	currency = frappe.get_cached_value("Company", company, "default_currency") if company else None
+	return currency or frappe.defaults.get_global_default("currency")
+
+
 def get_currency_symbol():
-	currency = frappe.get_cached_value("Global Defaults", "Global Defaults", "default_currency")
+	currency = get_store_currency()
 	# Riyal has no glyph in the fonts the themes ship, so SAR alone borrows the icon font.
 	if currency == "SAR":
 		return '<span class="saudi-currency-symbol pe-0.5"></span>'
@@ -518,6 +572,47 @@ def get_local_lang_url(path: str) -> str:
 		return path.replace("/en/", "/ar/")
 
 	return path
+
+
+def get_same_site_path(path: str | None) -> str | None:
+	"""`path` when it stays on this site, else None."""
+	path = cstr(path).strip()
+	# Browsers drop tabs and newlines, so "/\t/host" would become "//host".
+	if any(character.isspace() or not character.isprintable() for character in path):
+		return None
+	# Only a path on this site: "//host" and "/\host" would leave it, and a scheme would too.
+	if path.startswith("/") and not path.startswith(("//", "/\\")) and "://" not in path:
+		return path
+	return None
+
+
+FORWARDED_PARAM_PREFIXES = ("utm_", "checkout[")
+
+
+def get_next_url(return_to: str | None = None) -> str:
+	forwarded_params = [
+		(key, value)
+		for key, value in frappe.form_dict.items()
+		if key == "discount" or key.startswith(FORWARDED_PARAM_PREFIXES)
+	]
+	cart_url = f"/{frappe.local.lang}/cart"
+	destination = get_return_to_url(return_to, cart_url)
+	if destination:
+		query_string = urlencode(forwarded_params, doseq=True)
+		separator = "&" if "?" in destination else "?"
+		return f"{destination}{separator}{query_string}" if query_string else destination
+	if not is_guest():
+		forwarded_params = [("checkout", "1"), *forwarded_params]
+	elif is_guest_checkout_enabled():
+		cart_url = f"{cart_url}/checkout"
+	query_string = urlencode(forwarded_params, doseq=True)
+	return f"{cart_url}?{query_string}" if query_string else cart_url
+
+
+def get_return_to_url(return_to: str | None, cart_url: str) -> str | None:
+	if cstr(return_to).strip() == "cart":
+		return cart_url
+	return get_same_site_path(return_to)
 
 
 def get_login_url_for_current_page() -> str:

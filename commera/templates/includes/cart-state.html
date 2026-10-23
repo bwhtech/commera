@@ -1,7 +1,202 @@
 <script defer>
     document.addEventListener('alpine:init', () => {
+        // Kept off the store: the effect below would re-run on every change to them.
+        let sync_timer = null;
+        let sync_chain = null;
+        let is_sync_queued = false;
+        let synced_snapshot = null;
+        let loaded = null;
+        let is_loaded = false;
+        let code_save = null;
+        let priced_request = 0;
+        const get_snapshot = items => JSON.stringify(items.map(item => [item.variant?.item_code, item.qty, item.selected]));
         Alpine.store('cart', {
             items: Alpine.$persist([]),
+            // The server cart's version this browser last saw; the server cart wins when they differ.
+            version: Alpine.$persist(null).as('commera_cart_version'),
+            // Set while the screen holds edits the server has not taken, so the next page sends them.
+            is_dirty: Alpine.$persist(false).as('commera_cart_dirty'),
+            // Fetched only by pages that show totals.
+            priced: null,
+            wants_pricing: false,
+            saving_code: null,
+            init() {
+                this.items.forEach(item => { item.selected ??= true; });
+                let is_first_run = true;
+                Alpine.effect(() => {
+                    const snapshot = get_snapshot(this.items);
+                    if (is_first_run) {
+                        is_first_run = false;
+                        return;
+                    }
+                    if (snapshot === synced_snapshot) return;
+                    this.is_dirty = true;
+                    // Edits made before the server cart arrives are sent once it does.
+                    if (!is_loaded) return;
+                    clearTimeout(sync_timer);
+                    sync_timer = setTimeout(() => this.sync(), 400);
+                });
+                loaded = this.load_server_cart();
+            },
+            // Pages that change the cart on load wait for this, or it puts the old server cart back.
+            wait_until_loaded() {
+                return loaded;
+            },
+            async load_server_cart() {
+                let server_cart;
+                try {
+                    server_cart = (await frappe_call("/api/v2/method/commera.api.server_cart.get_server_cart", {})).data;
+                } catch (error) {
+                    return;
+                } finally {
+                    is_loaded = true;
+                }
+                if (!server_cart) {
+                    if (this.items.length) await this.sync();
+                    return;
+                }
+                if (server_cart.version === this.version) {
+                    if (this.is_dirty) await this.sync();
+                    else synced_snapshot = get_snapshot(this.items);
+                    return;
+                }
+                if (this.version || server_cart.lines.length) this.apply_server_cart(server_cart);
+                else await this.sync();
+            },
+            // One request at a time: a second one would carry the version the first is about to replace.
+            sync() {
+                clearTimeout(sync_timer);
+                sync_timer = null;
+                if (sync_chain) {
+                    is_sync_queued = true;
+                    return sync_chain;
+                }
+                sync_chain = this.send_queued_syncs();
+                return sync_chain;
+            },
+            async send_queued_syncs() {
+                try {
+                    do {
+                        is_sync_queued = false;
+                        await this.send_sync();
+                    } while (is_sync_queued);
+                } finally {
+                    sync_chain = null;
+                }
+                if (this.wants_pricing) await this.load_priced();
+            },
+            async send_sync() {
+                if (code_save) await code_save;
+                const snapshot = get_snapshot(this.items);
+                const items = this.items.map(item => ({ item_code: item.variant.item_code, qty: item.qty, selected: item.selected }));
+                try {
+                    const response = (await frappe_call("/api/v2/method/commera.api.server_cart.sync_server_cart", { items, version: this.version })).data;
+                    if (response.conflict) {
+                        this.apply_server_cart(response);
+                        return;
+                    }
+                    this.version = response.version;
+                    synced_snapshot = snapshot;
+                    this.is_dirty = get_snapshot(this.items) !== snapshot;
+                } catch (error) {
+                    // frappe_call has shown the error. A refused cart goes back to the server's; an unsent one
+                    // stays dirty, so the next page load sends it again.
+                    if (error.type) await this.restore_server_cart();
+                }
+            },
+            async restore_server_cart() {
+                try {
+                    const server_cart = (await frappe_call("/api/v2/method/commera.api.server_cart.get_server_cart", {})).data;
+                    if (server_cart) this.apply_server_cart(server_cart);
+                } catch (error) {}
+            },
+            // Checkout builds from the server cart, so a change still waiting on the debounce must land first.
+            async flush_sync() {
+                if (sync_timer || this.is_dirty) await this.sync();
+                else if (sync_chain) await sync_chain;
+                return !this.is_dirty;
+            },
+            async load_priced() {
+                this.wants_pricing = true;
+                const request = ++priced_request;
+                try {
+                    const priced = (await frappe_call("/api/v2/method/commera.api.server_cart.get_priced_server_cart", {})).data;
+                    if (request === priced_request) this.priced = priced;
+                } catch (error) {}
+            },
+            // Only while the priced cart is the cart on screen, so the rows never belong to an older cart.
+            get discounts() {
+                if (!this.priced || this.priced.version !== this.version) return [];
+                return this.priced.discounts || [];
+            },
+            get discount_codes() {
+                if (!this.priced || this.priced.version !== this.version) return [];
+                return this.priced.discount_codes || [];
+            },
+            add_discount_code(code) {
+                return this.save_discount_code("apply_discount_code", code);
+            },
+            remove_discount_code(code) {
+                return this.save_discount_code("remove_discount_code", code);
+            },
+            // Only the codes change, so the priced cart that comes back is the cart on screen at its new version.
+            async save_discount_code(method, code) {
+                if (this.saving_code) return null;
+                this.saving_code = code;
+                let resolve_code_save;
+                try {
+                    if (!await this.flush_sync()) return null;
+                    code_save = new Promise(resolve => { resolve_code_save = resolve; });
+                    const priced = (await frappe_call(`/api/v2/method/commera.api.server_cart.${method}`, { code })).data;
+                    priced_request++;
+                    this.version = priced.version;
+                    this.priced = priced;
+                    return priced;
+                } catch (error) {
+                    return null;
+                } finally {
+                    code_save = null;
+                    resolve_code_save?.();
+                    this.saving_code = null;
+                }
+            },
+            // The server judges it after discounts; null while unpriced or when the store has no free-delivery band.
+            get free_delivery_shortfall() {
+                if (!this.priced || this.priced.free_delivery_above == null) return null;
+                return this.priced.free_delivery_shortfall;
+            },
+            // Charged unless the server has said the cart reaches free delivery.
+            get is_delivery_charged() {
+                return this.selected_count > 0 && Boolean(this.priced) && this.free_delivery_shortfall !== 0;
+            },
+            get saved() {
+                return this.discounts.reduce((sum, discount) => sum + discount.amount, 0);
+            },
+            // Quantity breaks are known only to the server; the last priced rate holds until the next lands.
+            // Codes are left on, as they show as rows.
+            price_of(cart_item) {
+                const lines = this.priced ? this.priced.lines.filter(line => line.item_code === cart_item.variant.item_code) : [];
+                const qty = lines.reduce((sum, line) => sum + line.qty, 0);
+                if (!qty) return parseFloat(cart_item.price) || 0;
+                return lines.reduce((sum, line) => sum + (line.rate + line.code_discount) * line.qty, 0) / qty;
+            },
+            apply_server_cart(server_cart) {
+                this.items = server_cart.lines.map(line => ({
+                    item: line.item,
+                    variant: line.variant,
+                    qty: line.qty,
+                    price: line.price,
+                    default_price: line.default_price,
+                    brand: line.brand,
+                    stock_qty: line.variant.stock_detail?.stock_qty ?? 0,
+                    selected: line.selected ?? true,
+                    sizes: line.sizes,
+                }));
+                this.version = server_cart.version;
+                synced_snapshot = get_snapshot(this.items);
+                this.is_dirty = false;
+                if (this.wants_pricing) this.load_priced();
+            },
             add(item, variant, price = 0,default_price=0, brand = '',sizes=[],qty=1) {
                 let already_added = false;
                 variant = JSON.parse(variant)
@@ -56,10 +251,13 @@
             },
             async fetch_detail_for_cart() {
                 try {
+                    // The server cart can replace the items while this waits; those lines bring their own prices.
+                    const requested = new Set(this.items.map(item => `${item.variant.item_code}`));
                     const data = await frappe_call("/api/v2/method/commera.api.cart.get_detail_for_cart_items", { items: this.items });
                     const stock_data = data.data.stock_data || {};
                     this.items.forEach(item => {
                         const key = `${item.variant.item_code}`;
+                        if (!requested.has(key)) return;
                         item.stock_qty = stock_data[key] !== undefined ? stock_data[key]["stock"] : 0;
                         item.price = stock_data[key] !== undefined ? stock_data[key]["sale_price"] : 0;
                         item.default_price = stock_data[key] !== undefined ? stock_data[key]["default_price"] : 0;
@@ -133,9 +331,7 @@
 
             get total() {
                 return this.items.filter(item => item.selected).reduce((sum, cart_item) => {
-                    const price = cart_item.price ? parseFloat(cart_item.price) : 0;
-                    const quantity = cart_item.qty || 0;
-                    return sum + (isNaN(price) ? 0 : price * quantity);
+                    return sum + this.price_of(cart_item) * (cart_item.qty || 0);
                 }, 0);
             },
 

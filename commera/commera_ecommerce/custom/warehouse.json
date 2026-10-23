@@ -68,30 +68,6 @@
 	"custom_perms": [],
 	"doctype": "Warehouse",
 	"links": [],
-	"property_setters": [
-		{
-			"_assign": null,
-			"_comments": null,
-			"_liked_by": null,
-			"_user_tags": null,
-			"creation": "2025-04-11 08:39:41.822511",
-			"default_value": null,
-			"doc_type": "Warehouse",
-			"docstatus": 0,
-			"doctype_or_field": "DocType",
-			"field_name": null,
-			"idx": 0,
-			"is_system_generated": 0,
-			"modified": "2025-04-11 08:39:41.822511",
-			"modified_by": "Administrator",
-			"module": null,
-			"name": "Warehouse-main-field_order",
-			"owner": "Administrator",
-			"property": "field_order",
-			"property_type": "Data",
-			"row_name": null,
-			"value": "[\"warehouse_detail\", \"disabled\", \"warehouse_name\", \"column_break_3\", \"is_group\", \"parent_warehouse\", \"is_rejected_warehouse\", \"column_break_4\", \"custom_store_pickup\", \"account\", \"company\", \"address_and_contact\", \"address_html\", \"column_break_10\", \"contact_html\", \"warehouse_contact_info\", \"email_id\", \"phone_no\", \"mobile_no\", \"column_break0\", \"address_line_1\", \"address_line_2\", \"city\", \"state\", \"pin\", \"transit_section\", \"warehouse_type\", \"column_break_qajx\", \"default_in_transit_warehouse\", \"tree_details\", \"lft\", \"rgt\", \"old_parent\"]"
-		}
-	],
+	"property_setters": [],
 	"sync_on_migrate": 1
 }

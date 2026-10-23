@@ -21,7 +21,7 @@
 {% set is_returnable = is_owner and return_period and order.name | can_return(return_period) %}
 {% set order_detail_config = {"order_id": order.name, "key": order_key, "is_owner": is_owner} %}
 {% set returnable_items = order_items | rejectattr("is_free_item") | list %}
-{% set discount_amount = (order.total or 0) - (order.net_total or 0) %}
+{% set shipping_discount = order_summary.shipping_discounts | sum(attribute="amount") %}
 {# The stored shipping address is an ERPNext display string with <br> separators and trailing empty lines. #}
 {% set address_lines = [
 	order.pickup_address_line_1,
@@ -217,20 +217,26 @@
 
 				<div class="tracking-item-content">
 					<span>{{ _("Item(s) Subtotal") }}</span>
-					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(order.total or 0) }}</h6>
+					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(order_summary.items_total) }}</h6>
 				</div>
-				{% if discount_amount > 0 %}
+				{% for discount in order_summary.discounts %}
 				<div class="tracking-item-content">
-					<span class="text-success">{{ _("Discount") }}</span>
-					<h6>&minus; {{ get_currency_symbol() }}{{ "%.2f" | format(discount_amount) }}</h6>
+					<span class="text-success">{{ _("Discount") }}{% if discount.label %} ({{ discount.label | e }}){% endif %}</span>
+					<h6>&minus; {{ get_currency_symbol() }}{{ "%.2f" | format(discount.amount) }}</h6>
 				</div>
-				{% endif %}
-				{% if charge_lines.shipping %}
+				{% endfor %}
+				{% if charge_lines.shipping or shipping_discount %}
 				<div class="tracking-item-content">
 					<span>{{ _("Shipping") }}</span>
-					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(charge_lines.shipping) }}</h6>
+					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(charge_lines.shipping + shipping_discount) }}</h6>
 				</div>
 				{% endif %}
+				{% for discount in order_summary.shipping_discounts %}
+				<div class="tracking-item-content">
+					<span class="text-success">{{ _("Shipping discount") }}{% if discount.label %} ({{ discount.label | e }}){% endif %}</span>
+					<h6>&minus; {{ get_currency_symbol() }}{{ "%.2f" | format(discount.amount) }}</h6>
+				</div>
+				{% endfor %}
 				{% if charge_lines.cod_charge %}
 				<div class="tracking-item-content">
 					<span>{{ _("Cash on Delivery Fee") }}</span>
@@ -257,7 +263,7 @@
 				{% endif %}
 				<div class="tracking-item-content border-top pt-2">
 					<span>{{ _("Order Total") }}</span>
-					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(order.rounded_total or 0) }}</h6>
+					<h6>{{ get_currency_symbol() }}{{ "%.2f" | format(order.payable_total) }}</h6>
 				</div>
 			</div>
 
@@ -266,7 +272,7 @@
 				<ul class="tracking-receiver">
 					<li>{{ _("Order Number") }} : <strong>{{ order.name }}</strong></li>
 					<li>{{ _("Date") }} : <strong>{{ frappe.utils.format_datetime(order.creation, "medium") }}</strong></li>
-					<li>{{ _("Total") }} : <strong>{{ get_currency_symbol() }}{{ "%.2f" | format(order.rounded_total or 0) }}</strong></li>
+					<li>{{ _("Total") }} : <strong>{{ get_currency_symbol() }}{{ "%.2f" | format(order.payable_total) }}</strong></li>
 					<li>{{ _("Status") }} : <strong>{{ _(order.custom_ecommerce_status or "Draft") }}</strong></li>
 					{% if shows_private_details %}
 					<li>{{ address_label }} : <strong>{% if address_display %}{{ address_display }}{% else %}&mdash;{% endif %}</strong></li>

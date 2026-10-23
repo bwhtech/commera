@@ -1,5 +1,6 @@
 
 {% extends "components/theme_layout.html" %}
+{% from "components/macros/discount_codes.html" import discount_code_chips %}
 
 {% set language = frappe.lang or "en" %}
 {% set currency_symbol = get_currency_symbol() %}
@@ -27,7 +28,7 @@
 	</div>
 
 	<section class="content-inner shop-account"
-		x-data="summer_cart({{ delivery_charge | tojson }}, {{ delivery_charge_applicable_below | tojson }})">
+		x-data="summer_cart({{ delivery_charge | tojson }})">
 		<div class="container">
 			{{ plugin_slot("cart_banner") }}
 			<div class="cart-empty text-center" x-show="!$store.cart.items.length" x-cloak>
@@ -55,20 +56,24 @@
 								<template x-for="cart_item in $store.cart.items" :key="cart_item.variant.item_code">
 									<tr>
 										<td class="product-item-img">
-											<a :href="`/{{ language }}/products/${cart_item.item.route}`">
-												<img :src="cart_item.item.images.length > 0 ? cart_item.item.images[0].image : '/assets/commera/images/1.jpg'"
-													:alt="cart_item.variant.item_name">
-											</a>
+											<div class="d-flex align-items-center gap-3 position-relative">
+												<input type="checkbox" class="form-check-input m-0 flex-shrink-0" x-model="cart_item.selected"
+													:aria-label="include_label.replace('{0}', cart_item.variant.item_name)">
+												<a :href="`/{{ language }}/products/${cart_item.item.route}`">
+													<img :src="cart_item.item.images.length > 0 ? cart_item.item.images[0].image : '/assets/commera/images/1.jpg'"
+														:alt="cart_item.variant.item_name">
+												</a>
+											</div>
 										</td>
 										<td class="product-item-name">
 											<a :href="`/{{ language }}/products/${cart_item.item.route}`"
 												x-text="{% if language == 'en' %}cart_item.variant.item_name{% else %}cart_item.variant.item_name_ar || cart_item.variant.item_name{% endif %}"></a>
 										</td>
 										<td class="product-item-price">
-											<template x-if="cart_item.default_price && cart_item.default_price !== cart_item.price">
+											<template x-if="cart_item.default_price && parseFloat(cart_item.default_price) !== $store.cart.price_of(cart_item)">
 												<span>{{ currency_symbol }}<span x-text="format_amount(cart_item.default_price)"></span></span>
 											</template>
-											<strong>{{ currency_symbol }}<span x-text="format_amount(cart_item.price)"></span></strong>
+											<strong>{{ currency_symbol }}<span x-text="format_amount($store.cart.price_of(cart_item))"></span></strong>
 										</td>
 										<td class="product-item-quantity">
 											{# Written out by hand with bootstrap-touchspin's own class names, so style.css still shapes it. #}
@@ -88,7 +93,7 @@
 											</div>
 										</td>
 										<td class="product-item-totle">
-											{{ currency_symbol }}<span x-text="format_amount(cart_item.price * cart_item.qty)"></span>
+											{{ currency_symbol }}<span x-text="format_amount($store.cart.price_of(cart_item) * cart_item.qty)"></span>
 										</td>
 										<td class="product-item-close">
 											<a href="javascript:void(0);" aria-label="{{ _('Remove') }}"
@@ -120,12 +125,19 @@
 								{{ _("more to get free delivery") }}
 							</span>
 						</div>
+						{{ discount_code_chips("$store.cart.discount_codes", "$store.cart.saving_code", "$store.cart.remove_discount_code", classes="m-b15") }}
 						<table>
 							<tbody>
 								<tr>
-									<td>{{ _("Subtotal") }} (<span x-text="$store.cart.count"></span> {{ _("items") }})</td>
+									<td>{{ _("Subtotal") }} (<span x-text="$store.cart.selected_count"></span> {{ _("items") }})</td>
 									<td class="price">{{ currency_symbol }}<span x-text="format_amount(subtotal)"></span></td>
 								</tr>
+								<template x-for="(discount, index) in $store.cart.discounts" :key="index">
+									<tr class="discount">
+										<td>{{ _("Discount") }}<span x-show="discount.label" x-text="` (${discount.label})`"></span></td>
+										<td class="price">-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span></td>
+									</tr>
+								</template>
 								<tr>
 									<td>{{ _("Delivery Charge") }}</td>
 									<td class="price">
@@ -140,16 +152,19 @@
 							</tbody>
 						</table>
 						{% if frappe.session.user == "Guest" %}
-							<button type="button" class="btn btn-secondary w-100"
+							<button type="button" class="btn btn-secondary w-100" :disabled="!$store.cart.selected_count"
 								@click="$dispatch('open-auth', { mode: 'checkout' })">
 								{{ _("Checkout") }}
 							</button>
 						{% else %}
-							<button type="button" class="btn btn-secondary w-100" :disabled="checkout_loading"
+							<button type="button" class="btn btn-secondary w-100" :disabled="checkout_loading || !$store.cart.selected_count"
 								@click="save_quotation_for_checkout()">
 								{{ _("Place Order") }}
 							</button>
 						{% endif %}
+						<p class="text-center text-body-secondary font-14 m-t10 mb-0" x-show="!$store.cart.selected_count" x-cloak>
+							{{ _("Tick an item to check out") }}
+						</p>
 						<button type="button" class="btn btn-outline-secondary w-100 m-t10" @click="$store.cart.copy_link()">
 							<i class="fa-solid fa-link m-r5"></i>{{ _("Copy cart link") }}
 						</button>
@@ -164,13 +179,14 @@
 	{{ super() }}
 	<script>
 		document.addEventListener("alpine:init", () => {
-			Alpine.data("summer_cart", (delivery_charge, delivery_charge_applicable_below) => ({
+			Alpine.data("summer_cart", (delivery_charge) => ({
 				delivery_charge: delivery_charge,
-				delivery_charge_applicable_below: delivery_charge_applicable_below,
 				checkout_loading: false,
+				include_label: {{ _("Include {0} in checkout") | tojson }},
 
 				async init() {
 					await this.$store.cart.fetch_detail_for_cart();
+					await this.$store.cart.load_priced();
 					await this.resume_checkout_after_sign_in();
 				},
 
@@ -179,7 +195,7 @@
 					if (!url.searchParams.has("checkout")) return;
 					url.searchParams.delete("checkout");
 					history.replaceState(null, "", url);
-					if ({{ (frappe.session.user != "Guest") | tojson }} && this.$store.cart.count) {
+					if ({{ (frappe.session.user != "Guest") | tojson }} && this.$store.cart.selected_count) {
 						await this.save_quotation_for_checkout();
 					}
 				},
@@ -193,24 +209,24 @@
 				},
 
 				get delivery_amount() {
-					if (!this.$store.cart.count) return 0;
-					return this.subtotal < this.delivery_charge_applicable_below ? this.delivery_charge : 0;
+					return this.$store.cart.is_delivery_charged ? this.delivery_charge : 0;
 				},
 
 				get total() {
-					return this.subtotal + this.delivery_amount;
+					return this.subtotal - this.$store.cart.saved + this.delivery_amount;
 				},
 
 				get free_delivery_shortfall() {
-					if (!this.delivery_charge) return 0;
-					return Math.max(this.delivery_charge_applicable_below - this.subtotal, 0);
+					if (!this.delivery_amount) return 0;
+					return this.$store.cart.free_delivery_shortfall || 0;
 				},
 
 				async save_quotation_for_checkout() {
 					this.checkout_loading = true;
 					try {
-						const items = this.$store.cart.items;
+						const items = this.$store.cart.items.filter(item => item.selected);
 						if (!await this.$store.cart.validate_stock_before_checkout(items)) return;
+						if (!await this.$store.cart.flush_sync()) return;
 
 						await frappe_call("/api/v2/method/commera.api.payments.generate_quotation_for_cart", {
 							cart: { items: items },

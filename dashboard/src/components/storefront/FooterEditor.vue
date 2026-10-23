@@ -143,29 +143,29 @@ async function toggleLink(section, link) {
 
 function columnActions(section, columnIndex) {
   return [
-    { label: 'Add link', icon: 'plus', onClick: () => openLinkDialog(section) },
-    { label: 'Rename', icon: 'pencil', onClick: () => renameSection(section) },
+    { label: 'Add link', icon: 'lucide-plus', onClick: () => openLinkDialog(section) },
+    { label: 'Rename', icon: 'lucide-pencil', onClick: () => renameSection(section) },
     {
       label: 'Move left',
-      icon: 'arrow-left',
+      icon: 'lucide-arrow-left',
       disabled: columnIndex === 0,
       onClick: () => moveSection(columnIndex, -1),
     },
     {
       label: 'Move right',
-      icon: 'arrow-right',
+      icon: 'lucide-arrow-right',
       disabled: columnIndex === sections.value.length - 1,
       onClick: () => moveSection(columnIndex, 1),
     },
     {
       label: section.enabled ? 'Hide from footer' : 'Show in footer',
-      icon: section.enabled ? 'eye-off' : 'eye',
+      icon: section.enabled ? 'lucide-eye-off' : 'lucide-eye',
       onClick: () => toggleSection(section),
     },
     {
       group: 'Danger',
       options: [
-        { label: 'Delete column', icon: 'trash-2', theme: 'red', onClick: () => removeSection(section) },
+        { label: 'Delete column', icon: 'lucide-trash-2', theme: 'red', onClick: () => removeSection(section) },
       ],
     },
   ]
@@ -173,40 +173,40 @@ function columnActions(section, columnIndex) {
 
 function linkActions(section, columnIndex, link, linkIndex) {
   return [
-    { label: 'Edit', icon: 'pencil', onClick: () => openLinkDialog(section, link) },
+    { label: 'Edit', icon: 'lucide-pencil', onClick: () => openLinkDialog(section, link) },
     {
       label: 'Move up',
-      icon: 'arrow-up',
+      icon: 'lucide-arrow-up',
       disabled: linkIndex === 0,
       onClick: () => moveLinkWithinColumn(section, linkIndex, -1),
     },
     {
       label: 'Move down',
-      icon: 'arrow-down',
+      icon: 'lucide-arrow-down',
       disabled: linkIndex === section.links.length - 1,
       onClick: () => moveLinkWithinColumn(section, linkIndex, 1),
     },
     {
       label: 'Move to previous column',
-      icon: 'arrow-left',
+      icon: 'lucide-arrow-left',
       disabled: columnIndex === 0,
       onClick: () => moveLinkToColumn(section, link, columnIndex, -1),
     },
     {
       label: 'Move to next column',
-      icon: 'arrow-right',
+      icon: 'lucide-arrow-right',
       disabled: columnIndex === sections.value.length - 1,
       onClick: () => moveLinkToColumn(section, link, columnIndex, 1),
     },
     {
       label: link.enabled ? 'Hide from footer' : 'Show in footer',
-      icon: link.enabled ? 'eye-off' : 'eye',
+      icon: link.enabled ? 'lucide-eye-off' : 'lucide-eye',
       onClick: () => toggleLink(section, link),
     },
     {
       group: 'Danger',
       options: [
-        { label: 'Remove link', icon: 'trash-2', theme: 'red', onClick: () => removeLink(section, link) },
+        { label: 'Remove link', icon: 'lucide-trash-2', theme: 'red', onClick: () => removeLink(section, link) },
       ],
     },
   ]

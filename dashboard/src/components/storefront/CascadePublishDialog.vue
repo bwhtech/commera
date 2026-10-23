@@ -9,8 +9,9 @@
  * so every number here is worded as options rather than products.
  */
 import { computed, ref, watch } from 'vue'
-import { Badge, Button, Dialog, LoadingText, TextInput, toast } from 'frappe-ui'
+import { Badge, Button, Dialog, LoadingText, toast } from 'frappe-ui'
 import ListPagination from '../ListPagination.vue'
+import SearchInput from '../SearchInput.vue'
 import { useNavMenu } from '../../data/navMenu'
 
 const props = defineProps({
@@ -141,10 +142,9 @@ async function confirmPublish() {
           </p>
         </div>
 
-        <TextInput
+        <SearchInput
           v-model="search"
           placeholder="Search these options"
-          icon-left="lucide-search"
         />
 
         <LoadingText v-if="loading" />

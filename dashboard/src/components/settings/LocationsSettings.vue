@@ -135,7 +135,7 @@ async function saveAddress(values) {
                   v-else
                   class="mt-1.5"
                   label="Needs an address — hidden at checkout"
-                  theme="orange"
+                  theme="amber"
                   variant="subtle"
                 />
               </template>

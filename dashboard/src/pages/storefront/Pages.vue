@@ -76,9 +76,9 @@ function detailRoute(name) {
     <template v-else>
       <div class="mt-3 overflow-x-auto">
         <List
-          class="max-sm:[--list-columns:minmax(0,1fr)_auto] sm:min-w-[38rem]"
+          class="sm:min-w-[38rem]"
           :row-height="Math.max(ia.density, 44)"
-          :columns="['minmax(9rem,1fr)', 'minmax(11rem,1fr)', '7rem', '6rem']"
+          :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['minmax(9rem,1fr)', 'minmax(11rem,1fr)', '7rem', '6rem'] }"
         >
           <ListHeader class="max-sm:hidden">
             <ListHeaderCell>Page</ListHeaderCell>
@@ -88,7 +88,7 @@ function detailRoute(name) {
           </ListHeader>
           <ListSkeleton v-if="loading && !pages.length" :columns="skeletonColumns" />
           <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
-            <ListRow :to="detailRoute(item.name)" :value="item.name">
+            <ListRow :route="detailRoute(item.name)" :value="item.name">
               <ListCell>
                 <span class="truncate text-base text-ink-gray-8">{{ item.name }}</span>
               </ListCell>

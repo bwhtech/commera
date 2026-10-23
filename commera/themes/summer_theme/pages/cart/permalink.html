@@ -3,7 +3,7 @@
 {% block uncontained_body %}
 	{% include "templates/includes/cart-permalink.html" %}
 	<section class="content-inner"
-		x-data='cart_permalink({{ {"lines": lines, "notices": notices, "next_url": next_url} | tojson }})'>
+		x-data='cart_permalink({{ {"lines": lines, "notices": notices, "next_url": next_url, "is_merge": is_merge} | tojson }})'>
 		<div class="container text-center">
 			{% if lines and not notices %}
 				<h4 class="title">{{ _("Adding the products to your bag...") }}</h4>

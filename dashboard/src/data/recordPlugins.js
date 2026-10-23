@@ -1,14 +1,15 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { dialog, toast } from 'frappe-ui'
-import { useAdminAction, useAdminRead } from './api'
+import { useAdminAction, useAdminRead, trySubmit } from './api'
 import { pluginIcon, placeEntries } from '../ia/plugins'
 
 export function usePluginRun(path, paramsOf, { onDone } = {}) {
   const runAction = useAdminAction(path)
 
   async function run(entry) {
-    const result = await runAction.submit(paramsOf(entry))
-    if (runAction.error) return
+    const ran = await trySubmit(runAction, paramsOf(entry))
+    if (!ran) return
+    const result = runAction.data
     toast.success(result?.message || `${entry.label} done`)
     onDone?.()
   }
@@ -32,8 +33,9 @@ export function useRecordPlugins(place, doctype, nameGetter, { onReload } = {}) 
   async function resolveConditions() {
     const name = nameGetter()
     if (!hasConditions || !name) return
-    const result = await conditionsRequest.submit({ doctype, name })
-    if (conditionsRequest.error || nameGetter() !== name) return
+    const answered = await trySubmit(conditionsRequest, { doctype, name })
+    if (!answered || nameGetter() !== name) return
+    const result = conditionsRequest.data
     resolved.value = { name, keys: new Set(result?.keys ?? []) }
   }
 

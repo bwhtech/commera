@@ -32,6 +32,8 @@ from commera.api.analytics_dashboard import (
 	in_window,
 	is_provider_configured,
 )
+from commera.discounts.allocations import get_allocations
+from commera.utils import get_store_currency
 
 ANALYTICS_SETTINGS_DOCTYPE = "Analytics Settings"
 
@@ -48,6 +50,8 @@ PLAIN_FIELDS = (
 SECRET_FIELDS = ("ga4_service_account_json", "fb_access_token")
 
 SCRIPT_FIELDS = ("title", "enabled", "script")
+
+TOP_DISCOUNTS_LIMIT = 5
 
 
 def get_analytics_settings_doc():
@@ -234,7 +238,7 @@ def get_revenue_report(months: int = REPORT_MONTHS_DEFAULT):
 	"""Monthly revenue/orders/discounts/refunds for the trailing N months, plus a vs-previous comparison.
 	Reuses orders.is_webshop_order, so drafts count as real sales here as on the Home screen and Orders list."""
 	frappe.only_for("System Manager")
-	from commera.api.admin.orders import get_reporting_currency, is_webshop_order
+	from commera.api.admin.orders import is_webshop_order
 
 	start, today, months = month_window(months)
 	buckets = build_month_buckets(start, today)
@@ -247,6 +251,8 @@ def get_revenue_report(months: int = REPORT_MONTHS_DEFAULT):
 			sales_order.transaction_date,
 			sales_order.base_grand_total,
 			sales_order.base_discount_amount,
+			sales_order.conversion_rate,
+			sales_order.custom_discount_allocations,
 		)
 		.where(is_webshop_order(sales_order))
 		.where(sales_order.transaction_date >= start)
@@ -264,7 +270,7 @@ def get_revenue_report(months: int = REPORT_MONTHS_DEFAULT):
 		)
 		bucket["revenue"] += flt(row.base_grand_total)
 		bucket["orders"] += 1
-		bucket["discounts"] += flt(row.base_discount_amount)
+		bucket["discounts"] += get_base_discount_given(row)
 		bucket["refunds"] += flt(refunds_by_order.get(row.name, 0))
 
 	series = []
@@ -292,7 +298,7 @@ def get_revenue_report(months: int = REPORT_MONTHS_DEFAULT):
 	previous = read_window_totals(previous_start, previous_end)
 
 	return {
-		"currency": get_reporting_currency(),
+		"currency": get_store_currency(),
 		"months": series,
 		"stats": {
 			"revenue": {"value": total_revenue, "previous": previous["revenue"]},
@@ -303,7 +309,49 @@ def get_revenue_report(months: int = REPORT_MONTHS_DEFAULT):
 			},
 			"refunds": {"value": total_refunds, "previous": previous["refunds"]},
 		},
+		"discounts": get_discount_summary(order_rows),
 	}
+
+
+def get_discount_summary(order_rows) -> dict:
+	given, orders, by_label = 0.0, 0, {}
+	for row in order_rows:
+		allocations = get_allocations(row)
+		if not allocations:
+			continue
+		orders += 1
+		labels_on_order = set()
+		for allocation in allocations:
+			amount = get_base_allocation_amount(row, allocation)
+			label = allocation.get("code") or allocation.get("title")
+			given += amount
+			entry = by_label.setdefault(label, {"label": label, "given": 0.0, "orders": 0})
+			entry["given"] += amount
+			if label not in labels_on_order:
+				entry["orders"] += 1
+				labels_on_order.add(label)
+	top = sorted(by_label.values(), key=lambda entry: entry["given"], reverse=True)[:TOP_DISCOUNTS_LIMIT]
+	return {
+		"given": flt(given, 2),
+		"orders": orders,
+		"top": [{**entry, "given": flt(entry["given"], 2)} for entry in top],
+	}
+
+
+def get_base_discount_given(row) -> float:
+	# Codes, plus what ERPNext gave on its own (a Pricing Rule, staff's Additional Discount) beyond the order code.
+	allocations = get_allocations(row)
+	codes = sum(get_base_allocation_amount(row, allocation) for allocation in allocations)
+	order_codes = sum(
+		get_base_allocation_amount(row, allocation)
+		for allocation in allocations
+		if allocation.get("discount_class") == "Order"
+	)
+	return codes + max(flt(row.base_discount_amount) - order_codes, 0)
+
+
+def get_base_allocation_amount(row, allocation: dict) -> float:
+	return flt(allocation.get("amount")) * (flt(row.conversion_rate) or 1)
 
 
 def get_item_sales(from_date, to_date, item_codes):
@@ -343,7 +391,6 @@ def get_inventory_report(months: int = REPORT_MONTHS_DEFAULT):
 	today's selling price - "what my shelves are worth to sell", not ERPNext's landed-cost valuation."""
 	frappe.only_for("System Manager")
 	from commera.api.admin.inventory import get_inventory
-	from commera.api.admin.orders import get_reporting_currency
 
 	start, today, months = month_window(months)
 
@@ -425,7 +472,7 @@ def get_inventory_report(months: int = REPORT_MONTHS_DEFAULT):
 	]
 
 	return {
-		"currency": get_reporting_currency(),
+		"currency": get_store_currency(),
 		"stats": {
 			"stock_value": {"value": round(stock_value_now, 2)},
 			"units_on_hand": {"value": units_on_hand_now},

@@ -160,6 +160,29 @@ class TestCartPermalinkPage(ProductDetailPriceTestCase):
 			},
 		)
 
+	def test_return_to_sends_the_shopper_to_the_cart_or_a_page_on_this_site(self):
+		to_cart = self.render(f"{self.medium}:1", return_to="cart", utm_source="ig")
+		to_page = self.render(f"{self.medium}:1", return_to="/en/products/shirt?colour=red", utm_source="ig")
+
+		self.assertEqual(to_cart.next_url, "/en/cart?utm_source=ig")
+		self.assertEqual(to_page.next_url, "/en/products/shirt?colour=red&utm_source=ig")
+
+	def test_return_to_never_leaves_the_site(self):
+		default = self.render(f"{self.medium}:1").next_url
+		for target in (
+			"https://evil.example",
+			"//evil.example",
+			"/\\evil.example",
+			"javascript:alert(1)",
+			"/\t/evil.example",
+			"/\n/evil.example",
+		):
+			self.assertEqual(self.render(f"{self.medium}:1", return_to=target).next_url, default)
+
+	def test_add_mode_keeps_the_shoppers_cart(self):
+		self.assertTrue(self.render(f"{self.medium}:1", mode="add").is_merge)
+		self.assertFalse(self.render(f"{self.medium}:1").is_merge)
+
 	def test_guest_goes_to_checkout_only_when_guest_checkout_is_on(self):
 		frappe.set_user("Guest")
 		for allow_guest_checkout, expected_path in ((1, "/en/cart/checkout"), (0, "/en/cart")):

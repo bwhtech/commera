@@ -2,6 +2,7 @@ import importlib.util
 import json
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import click
 import frappe
@@ -87,6 +88,20 @@ class TestScaffold(UnitTestCase):
 		self.assertIn(f"bench build --app {APP}", (app_root / "commera" / "README.md").read_text())
 		self.assertIn("commera/vite.config.js", created)
 		self.assertNotIn(f"{APP}/public/.gitkeep", created)
+
+	def test_packages_are_installed_before_the_plugin_folder_appears(self):
+		app_root = make_app(self.apps_path)
+		seen = {}
+
+		def install(command, cwd, check):
+			seen.update(package=(app_root / "package.json").exists(), source=(app_root / "commera").exists())
+
+		with patch("commera.scaffold.subprocess.run", side_effect=install) as run:
+			AppScaffold(APP, self.apps_path).save(install=True)
+
+		run.assert_called_once_with(["yarn", "install"], cwd=app_root, check=True)
+		self.assertEqual(seen, {"package": True, "source": False})
+		self.assertTrue((app_root / "commera" / "vite.config.js").exists())
 
 	def test_second_scaffold_changes_nothing(self):
 		app_root = make_app(self.apps_path)
@@ -210,6 +225,23 @@ class TestAddPlace(UnitTestCase):
 		self.add("command", "sync-now")
 
 		self.assertEqual(self.load_api().sync_now(), "Sync now ran")
+
+	def test_settings_gets_a_sidebar_row_that_opens_it(self):
+		self.add("settings")
+
+		config = (self.app_root / "commera" / "plugin.config.ts").read_text()
+		self.assertIn("definePlugin({", config)
+		self.assertIn("name: 'settings'", config)
+		self.assertIn("openSettings()", config)
+
+	def test_an_existing_plugin_config_is_kept(self):
+		config = self.app_root / "commera" / "plugin.config.ts"
+		config.write_text("export default {}\n")
+
+		changes = self.add("settings")
+
+		self.assertIn(("skipped", "commera/plugin.config.ts"), changes)
+		self.assertEqual(config.read_text(), "export default {}\n")
 
 	def test_an_existing_placement_or_method_is_not_overwritten(self):
 		self.add("order-card", "status")

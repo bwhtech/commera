@@ -1,0 +1,32 @@
+{% extends "templates/layout.html" %}
+
+{% macro forwarded_inputs() %}
+<input type="hidden" name="code" value="{{ code|e }}">
+{% for key, value in forwarded_params.items() %}
+<input type="hidden" name="{{ key|e }}" value="{{ value|e }}">
+{% endfor %}
+{% endmacro %}
+
+{% block body %}
+<div class="max-w-md mx-auto py-16 text-center">
+    {% if signed_in_user %}
+    <h1 class="text-2xl font-medium text-gray-900">{{ _("Add to Your Cart") }}</h1>
+    <p class="mt-3 text-sm text-gray-600">
+        {{ _("You are signed in as {0}. The items of the storefront cart go into the cart of this account.").format(signed_in_user|e) }}
+    </p>
+    <form method="post" action="/api/method/commera.api.storefront.cart.adopt_checkout_cart" class="mt-6 flex justify-center gap-3">
+        {{ forwarded_inputs() }}
+        <input type="hidden" name="csrf_token" value="{{ frappe.session.csrf_token }}">
+        <a href="{{ cart_url }}" class="inline-block border border-gray-300 text-gray-900 rounded-lg px-8 py-2">{{ _("Cancel") }}</a>
+        <button type="submit" class="inline-block bg-primary text-white rounded-lg px-8 py-2">{{ _("Add and check out") }}</button>
+    </form>
+    {% else %}
+    <h1 class="text-2xl font-medium text-gray-900">{{ _("Continue to Checkout") }}</h1>
+    {# Link previewers and prefetchers run no script, so only a real browser spends the code. #}
+    <form method="post" action="/api/method/commera.api.storefront.cart.claim_checkout_cart" class="mt-6" x-data x-init="$el.submit()">
+        {{ forwarded_inputs() }}
+        <button type="submit" class="inline-block bg-primary text-white rounded-lg px-8 py-2">{{ _("Continue to checkout") }}</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

@@ -100,7 +100,7 @@ const filtered = computed(() => {
                   <div class="flex min-w-0 items-center gap-1.5">
                     <Badge
                       :label="item.issue.level === 'error' ? 'Error' : 'Warning'"
-                      :theme="item.issue.level === 'error' ? 'red' : 'orange'"
+                      :theme="item.issue.level === 'error' ? 'red' : 'amber'"
                       variant="subtle"
                     />
                     <span class="truncate text-sm text-ink-gray-5">{{ item.issue.text }}</span>

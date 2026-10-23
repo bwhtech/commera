@@ -34,6 +34,7 @@ Run one spec on its own with `node --test tests/e2e/catalog.spec.js`.
 | `ops.spec.js` | Orders list (tabs, search) and detail, customers list and detail, inventory and pricing lists. Read-only. |
 | `storefront.spec.js` | The navigation tree editor and the footer column editor, asserted after a reload. |
 | `checkout.spec.js` | A new shopper signs up on the storefront, places a COD order, and finds it in `/account/orders`. |
+| `discounts.spec.js` | A cart link's `?discount=` code is shown at checkout and reaches the COD order, `mode=add` keeps the cart and adds the code, a code typed into the default theme's promo box reaches the open checkout, and signing in merges the guest cart into the account's. |
 
 Not covered, because there is nothing behind them yet: **Storefront > Theme** and
 **Storefront > Pages** are mock screens with no endpoint, and **Product types** has no
@@ -70,6 +71,11 @@ and removed by hand.
   `COMMERA_BASE=http://dev.localhost:8000` unless that has been fixed.
 - **Assert persisted state, not toasts.** A toast proves the client tried. Every write
   spec reloads and re-reads through the admin API over the same logged-in session.
+- **The apply-code rate limit** counts every rate-limited storefront call per IP, so a few
+  `discounts.spec.js` runs from one IP get a 429. Clear it on the site first:
+  `frappe.cache.delete_keys("rl:")` in `bench --site <site> console`.
+- **The promo-box test switches the store theme** to Shop Default Theme (Summer has no box)
+  and switches it back in cleanup. A killed run leaves the store on the default theme.
 - **The signup OTP** lives only in Redis, so `checkout.spec.js` shells out to
   `bench --site <site> console` to read it. It is the one place the suite does not go
   through HTTP, because there is no HTTP route to a one-time code.

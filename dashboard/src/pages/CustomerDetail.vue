@@ -11,10 +11,10 @@ import Thumb from '../components/Thumb.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PluginActionDialog from '../components/PluginActionDialog.vue'
 import PluginSlot from '../components/PluginSlot.vue'
-import { useAdminRead, useAdminAction } from '../data/api'
+import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { erpnextLink } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
-import { longDate, money } from '../data/format'
+import { discountMoney, longDate, money } from '../data/format'
 import { orderRoute, productRoute } from '../ia/routes'
 import { useRecordPlugins } from '../data/recordPlugins'
 
@@ -30,6 +30,7 @@ const customerRequest = useAdminRead('customers.get_customer', {
 const customer = computed(() => customerRequest.data)
 const theirOrders = computed(() => customer.value?.recent_orders ?? [])
 const topProducts = computed(() => customer.value?.top_products ?? [])
+const discountUses = computed(() => customer.value?.discount_uses ?? [])
 
 // A merged or deleted customer, a typo in the URL and a permission refusal all
 // settle the same way — a finished request holding no customer — so the wording
@@ -112,8 +113,8 @@ const noteAction = useAdminAction('customers.save_customer_note')
 const noteChanged = computed(() => note.value !== (customer.value?.note ?? ''))
 
 async function saveNote() {
-  await noteAction.submit({ customer: route.params.id, note: note.value })
-  if (noteAction.error) return
+  const saved = await trySubmit(noteAction, { customer: route.params.id, note: note.value })
+  if (!saved) return
   toast.success('Note saved')
   customerRequest.reload()
 }
@@ -142,7 +143,7 @@ function plural(count, word) {
         <Dropdown v-if="actionGroup" :options="[actionGroup]">
           <Button icon="lucide-ellipsis" label="More actions" />
         </Dropdown>
-        <Button label="View in ERP" icon-right="lucide-external-link" :link="erpnextLink('Customer', customer.id)" />
+        <Button label="View in ERP" icon-right="lucide-external-link" :href="erpnextLink('Customer', customer.id)" />
       </template>
     </AppPageHeader>
 
@@ -225,6 +226,32 @@ function plural(count, word) {
           </li>
         </ul>
         <EmptyState v-else icon="lucide-shopping-bag" title="No orders yet" compact />
+      </section>
+
+      <section v-if="discountUses.length" class="mt-8">
+        <div class="flex items-baseline justify-between">
+          <h2 class="text-lg-semibold text-ink-gray-8">Discounts used</h2>
+          <span class="text-sm text-ink-gray-5">{{ money(customer.discount_saved) }} saved all time</span>
+        </div>
+        <ul class="mt-2 divide-y divide-outline-gray-1 rounded-5 border border-outline-gray-1">
+          <li v-for="use in discountUses" :key="`${use.sales_order}-${use.code}-${use.title}`">
+            <router-link
+              :to="orderRoute(use.sales_order)"
+              class="flex items-center gap-4 px-4 py-2.5 hover:bg-surface-gray-2"
+            >
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-base text-ink-gray-8">{{ use.code || use.title || 'Discount' }}</p>
+                <p class="mt-0.5 truncate text-sm text-ink-gray-5">
+                  {{ use.sales_order }} · {{ longDate(use.used_on) }}
+                </p>
+              </div>
+              <p class="w-28 shrink-0 text-right text-base text-ink-gray-8 tabular-nums">
+                {{ discountMoney(use.amount) }}
+              </p>
+              <span class="lucide-chevron-right size-4 shrink-0 text-ink-gray-4" aria-hidden="true" />
+            </router-link>
+          </li>
+        </ul>
       </section>
 
       <div class="mt-8 grid items-start gap-8 lg:grid-cols-3">

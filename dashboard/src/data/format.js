@@ -7,10 +7,10 @@ import { bootValue } from './boot'
 const currencyCode = bootValue('currency', 'INR')
 const currencySymbol = bootValue('currency_symbol', '')
 
-function moneyFormatter(compact, maximumFractionDigits = compact ? 1 : 0) {
+function moneyFormatter(compact, maximumFractionDigits = compact ? 1 : 0, currency = currencyCode) {
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
-    currency: currencyCode,
+    currency,
     currencyDisplay: 'narrowSymbol',
     notation: compact ? 'compact' : 'standard',
     maximumFractionDigits,
@@ -19,12 +19,12 @@ function moneyFormatter(compact, maximumFractionDigits = compact ? 1 : 0) {
 
 // Intl has no narrow symbol for some currencies (AED, SAR…) in a Latin locale
 // and prints the code instead, so the site's own symbol is swapped in.
-function formatWithSymbol(amount, formatter) {
+function formatWithSymbol(amount, formatter, symbol = currencySymbol) {
   const value = amount ?? 0
-  if (!currencySymbol) return formatter.format(value)
+  if (!symbol) return formatter.format(value)
   return formatter
     .formatToParts(value)
-    .map((part) => (part.type === 'currency' ? currencySymbol : part.value))
+    .map((part) => (part.type === 'currency' ? symbol : part.value))
     .join('')
 }
 
@@ -44,9 +44,18 @@ export function symbolFor(code = currencyCode) {
 
 export const money = (n) => formatWithSymbol(n, moneyFormatter(false))
 
+const exactDigits = (n) => (Number.isInteger(Number(n ?? 0)) ? 0 : 2)
+
 // A rate band edge such as 499.99 must not round up into the next band's ₹500.
-export const exactMoney = (n) =>
-  formatWithSymbol(n, moneyFormatter(false, Number.isInteger(Number(n ?? 0)) ? 0 : 2))
+export const exactMoney = (n) => formatWithSymbol(n, moneyFormatter(false, exactDigits(n)))
+
+// For an amount kept in a currency of its own; blank means the site's currency.
+export function moneyIn(n, currency) {
+  const code = currency || currencyCode
+  return formatWithSymbol(n, moneyFormatter(false, exactDigits(n), code), symbolFor(code))
+}
+
+export const discountMoney = (n, format = money) => `−${format(n)}`
 
 // Report figures are read side by side, so they are compacted: ₹4.8L reads at
 // a glance where ₹4,82,300 has to be counted.
@@ -93,6 +102,10 @@ const LABELS = {
   sending: 'Sending',
   retrying: 'Retrying',
   failed: 'Failed',
+  scheduled: 'Scheduled',
+  expired: 'Expired',
+  used_up: 'Used up',
+  disabled: 'Disabled',
 }
 
 export const label = (key) => LABELS[key] ?? key
@@ -105,14 +118,16 @@ const THEMES = {
   active: 'green',
   published: 'green',
   sent: 'green',
-  pending: 'orange',
-  partial: 'orange',
-  partially_refunded: 'orange',
-  to_fulfil: 'orange',
-  delivery_note_drafted: 'orange',
-  packed: 'orange',
-  partly_fulfilled: 'orange',
+  pending: 'amber',
+  partial: 'amber',
+  partially_refunded: 'amber',
+  to_fulfil: 'amber',
+  delivery_note_drafted: 'amber',
+  packed: 'amber',
+  partly_fulfilled: 'amber',
   shipped: 'blue',
+  scheduled: 'blue',
+  used_up: 'amber',
   unfulfilled: 'red',
   cancelled: 'red',
   failed: 'red',
@@ -120,6 +135,8 @@ const THEMES = {
   draft: 'gray',
   archived: 'gray',
   confirmation_pending: 'gray',
+  expired: 'gray',
+  disabled: 'gray',
   returned: 'gray',
 }
 

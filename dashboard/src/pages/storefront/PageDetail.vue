@@ -171,8 +171,8 @@ function remove() {
       <Dropdown
         v-if="!isNew"
         :options="[
-          { label: 'View on storefront', icon: 'external-link', onClick: openStorefront },
-          { label: 'Delete page', icon: 'trash-2', theme: 'red', onClick: remove },
+          { label: 'View on storefront', icon: 'lucide-external-link', onClick: openStorefront },
+          { label: 'Delete page', icon: 'lucide-trash-2', theme: 'red', onClick: remove },
         ]"
       >
         <Button icon="lucide-ellipsis" label="More actions" />

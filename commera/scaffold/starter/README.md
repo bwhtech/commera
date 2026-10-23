@@ -11,6 +11,8 @@ build with `bench build --app $app_name`.
 | `order/cards/<name>/`, `product/cards/<name>/`, `customer/cards/<name>/` | A card on that record's page |
 | `order/actions/<name>/`, `product/actions/<name>/`, `customer/actions/<name>/` | A row in that record page's More actions menu |
 | `settings/` | The app's tab in Settings |
+| `commands/<name>/` | A row in the search palette's Plugins group (Cmd+K) |
+| `plugin.config.ts` | Sidebar actions: rows after the pages in the app's sidebar group that run a function |
 
 `<name>` is 1 to 40 lowercase letters, digits and hyphens. Empty folders are placeholders: delete the ones
 you don't use.
@@ -42,7 +44,30 @@ you don't use.
 Kinds: `page`, `order-card`, `product-card`, `customer-card`, `order-action`, `product-action`,
 `customer-action`, `settings` (no name) and `command`. `bench commera add page <name> --detail` also writes the
 page's `[...id].vue`. Actions and commands also get a whitelisted method in
-`$app_name/api.py`. Nothing is overwritten.
+`$app_name/api.py`. `settings` also writes `commera/plugin.config.ts` with a **Settings** row for the sidebar.
+Nothing is overwritten.
+
+## Sidebar actions: `plugin.config.ts`
+
+Folders hold everything that draws UI. A sidebar row that only runs a function on click goes in
+`commera/plugin.config.ts`:
+
+```ts
+import { definePlugin } from '@commera/plugin-kit'
+
+export default definePlugin({
+	sidebar: [
+		{ name: 'settings', label: 'Settings', icon: 'settings', order: 9, run: ({ openSettings }) => openSettings() },
+	],
+})
+```
+
+- `name` (a slug), `label`, `icon`, `order`, `requires` and `condition` are checked like a `plugin` block and go
+  to the manifest. The build ships the file as one module, `plugin.config.js`.
+- `run` gets `openSettings(tab)`, `navigate(to)`, `openUrl(url)` and `toast`. `openSettings()` opens the app's own
+  tab in Settings; `openSettings('payments')` opens a Commera tab.
+- The build runs the file in Node to read the fields, so keep it to plain data: it may import only `definePlugin`
+  from `@commera/plugin-kit`. A `sidebar/<name>/index.vue` folder fails the build.
 
 ## Starters
 

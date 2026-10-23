@@ -26,6 +26,7 @@ const reportRequest = useAdminRead('analytics.get_revenue_report', {
 
 const months = computed(() => reportRequest.data?.months ?? [])
 const totals = computed(() => reportRequest.data?.stats ?? {})
+const discounts = computed(() => reportRequest.data?.discounts ?? { given: 0, orders: 0, top: [] })
 
 function delta(stat) {
   if (!stat || !stat.previous) return null
@@ -51,7 +52,7 @@ const stats = computed(() => {
 })
 
 const rows = computed(() =>
-  [...months.value].reverse().map((row) => ({ ...row, net: row.revenue - row.refunds - row.discounts })),
+  [...months.value].reverse().map((row) => ({ ...row, net: row.revenue - row.refunds })),
 )
 
 const hasMonthlyActivity = computed(() => hasValues(months.value, 'revenue', 'orders', 'discounts', 'refunds'))
@@ -91,7 +92,7 @@ const noRevenueState = {
       <h2 class="text-lg-semibold text-ink-gray-8">Revenue over time</h2>
       <EmptyState v-if="!hasValues(months, 'revenue')" compact v-bind="noRevenueState" />
       <div v-else class="h-72">
-        <AreaChart :data="months" x="label" :y="['revenue']" />
+        <AreaChart :data="months" x="label" :y="['revenue']" palette="categorical" />
       </div>
     </section>
 
@@ -99,7 +100,12 @@ const noRevenueState = {
       <Skeleton v-if="reportRequest.loading && !months.length" class="h-[17.75rem] w-full rounded-5" />
 
       <section v-else class="rounded-5 border border-outline-gray-1 p-4">
-        <h2 class="text-lg-semibold text-ink-gray-8">Discounts given</h2>
+        <div class="flex flex-wrap items-baseline justify-between gap-x-3">
+          <h2 class="text-lg-semibold text-ink-gray-8">Discounts given</h2>
+          <span v-if="discounts.orders" class="text-sm text-ink-gray-5 tabular-nums">
+            {{ money(discounts.given) }} on {{ discounts.orders }} {{ discounts.orders === 1 ? 'order' : 'orders' }}
+          </span>
+        </div>
         <EmptyState v-if="!hasValues(months, 'discounts')" compact v-bind="noRevenueState" />
         <div v-else class="h-56">
           <BarChart :data="months" x="label" :y="['discounts']" />
@@ -117,11 +123,39 @@ const noRevenueState = {
     </div>
 
     <section class="mt-6 rounded-5 border border-outline-gray-1">
+      <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">Top discounts</h2>
+      <div class="px-2 pb-2">
+        <List :columns="['minmax(0,1fr)', '6rem', '8rem']" :row-height="Math.max(ia.density, 44)">
+          <ListHeader>
+            <ListHeaderCell>Discount</ListHeaderCell>
+            <ListHeaderCell>Orders</ListHeaderCell>
+            <ListHeaderCell>Given</ListHeaderCell>
+          </ListHeader>
+          <ListSkeleton v-if="reportRequest.loading && !reportRequest.data" :columns="3" />
+          <ListRows v-else :items="discounts.top" row-key="label" v-slot="{ item }">
+            <ListRow :value="item.label">
+              <ListCell><span class="truncate text-base text-ink-gray-8">{{ item.label }}</span></ListCell>
+              <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ item.orders }}</span></ListCell>
+              <ListCell><span class="text-base text-ink-gray-7 tabular-nums">{{ money(item.given) }}</span></ListCell>
+            </ListRow>
+          </ListRows>
+        </List>
+        <EmptyState
+          v-if="!reportRequest.loading && !reportRequest.error && !discounts.top.length"
+          compact
+          icon="lucide-ticket-percent"
+          title="No discounts in this period"
+          description="Orders that use a code or an automatic discount show up here."
+        />
+      </div>
+    </section>
+
+    <section class="mt-6 rounded-5 border border-outline-gray-1">
       <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">By month</h2>
       <div class="overflow-x-auto px-2 pb-2">
         <List
           class="min-w-[46rem]"
-          :columns="['6rem', '8rem', '6rem', '7rem', '7rem', '8rem']"
+          :columns="['minmax(6rem,1fr)', '8rem', '6rem', '7rem', '7rem', '8rem']"
           :row-height="Math.max(ia.density, 44)"
         >
           <ListHeader>

@@ -5,6 +5,8 @@ from frappe.integrations.utils import (
 from frappe.utils import add_to_date, get_url, now_datetime
 
 from commera.api.payments import COD_PAYMENT_MODE
+from commera.api.shipping import get_charge_amount
+from commera.discounts.allocations import get_price_discount_rows
 from commera.order_access import get_order_link, set_order_access_key
 
 
@@ -22,6 +24,8 @@ def send_order_success_acknowledgement(doc, method):
 		doc_args = doc.as_dict()
 		set_order_access_key(doc)
 		doc_args["order_link"] = get_order_link(doc)
+		doc_args["discount_rows"] = get_price_discount_rows(doc)
+		doc_args["payable_total"] = get_charge_amount(doc)
 		order_confirmation_template_name = frappe.get_cached_value(
 			"Commera Settings",
 			"Commera Settings",
@@ -60,6 +64,7 @@ def get_portal_user_email(customer: str) -> str | None:
 def send_order_cancel_acknowledgement(doc, method):
 	try:
 		doc_args = doc.as_dict()
+		doc_args["payable_total"] = get_charge_amount(doc)
 		order_confirmation_template_name = frappe.get_cached_value(
 			"Commera Settings",
 			"Commera Settings",

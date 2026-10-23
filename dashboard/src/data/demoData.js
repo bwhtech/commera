@@ -1,5 +1,5 @@
 import { dialog, toast } from 'frappe-ui'
-import { useAdminAction } from './api'
+import { useAdminAction, trySubmit } from './api'
 
 export const installDemoDataAction = useAdminAction('settings.install_demo_data')
 
@@ -15,9 +15,9 @@ export function confirmInstallDemoData() {
     onConfirm: async () => {
       // The palette can reopen this dialog while a run is still queuing; one seed job at a time.
       if (installDemoDataAction.loading) return
-      await installDemoDataAction.submit()
+      const queued = await trySubmit(installDemoDataAction)
       // useAdminAction has already toasted a refusal; a second toast here would stack on it.
-      if (installDemoDataAction.error) return
+      if (!queued) return
       toast.success('Demo data queued', {
         description: 'It runs in the background and takes a few minutes.',
       })

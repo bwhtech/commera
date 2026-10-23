@@ -16,6 +16,7 @@ from commera.api.orders import (
 )
 from commera.api.payments import create_sales_invoice
 from commera.tests.test_admin_orders import COMPANY, make_test_sales_order
+from commera.utils import get_rounded_or_grand_total
 
 try:
 	from erpnext.selling.doctype.sales_order.mapper import make_delivery_note
@@ -55,9 +56,9 @@ class TestOrderRefunds(IntegrationTestCase):
 			mode_of_payment.save(ignore_permissions=True)
 		frappe.db.commit()
 
-	def make_paid_order(self):
+	def make_paid_order(self, sales_order=None):
 		"""An order billed and captured the way checkout does it, gateway session and all."""
-		sales_order = make_test_sales_order()
+		sales_order = sales_order or make_test_sales_order()
 		sales_order.db_set("custom_ecommerce_payment_mode", GATEWAY, update_modified=False)
 		self.gateway_reference = f"zz_session_{frappe.generate_hash(length=10)}"
 		create_sales_invoice(sales_order, GATEWAY, flt(sales_order.grand_total), self.gateway_reference)
@@ -88,6 +89,26 @@ class TestOrderRefunds(IntegrationTestCase):
 		self.assertIsNone(status["reason"])
 		self.assertAlmostEqual(status["refundable_amount"], flt(sales_order.grand_total))
 		self.assertEqual(status["currency"], sales_order.currency)
+
+	def test_an_order_with_rounding_off_shows_and_refunds_its_grand_total(self):
+		sales_order = make_test_sales_order(submit=False)
+		sales_order.disable_rounded_total = 1
+		sales_order.save()
+		sales_order.submit()
+		sales_order = self.make_paid_order(sales_order)
+		order_row = frappe.db.get_value(
+			"Sales Order",
+			sales_order.name,
+			["grand_total", "rounded_total", "disable_rounded_total"],
+			as_dict=True,
+		)
+
+		status = get_sales_order_refund_status(sales_order.name)
+
+		self.assertEqual(flt(sales_order.rounded_total), 0)
+		self.assertTrue(status["can_refund"])
+		self.assertAlmostEqual(status["refundable_amount"], flt(sales_order.grand_total))
+		self.assertAlmostEqual(get_rounded_or_grand_total(order_row), flt(sales_order.grand_total))
 
 	def test_the_capture_is_found_through_the_sales_invoice(self):
 		sales_order = self.make_paid_order()

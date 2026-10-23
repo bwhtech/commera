@@ -36,7 +36,7 @@ frappe.ui.form.on('Sales Order', {
 									change: () => {
 										const checked = d.get_value('refund_charges');
 										const new_amount = checked
-											? frm.doc.rounded_total - r.amount_refunded
+											? r.refundable_amount
 											: frm.doc.net_total - r.amount_refunded;
 
 										d.set_value('refund_amount', new_amount);

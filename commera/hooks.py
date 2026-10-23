@@ -92,6 +92,7 @@ website_route_rules = [
 ]
 
 before_request = ["commera.utils.before_request"]
+on_session_creation = "commera.commera_ecommerce.doctype.commera_cart.commera_cart.keep_guest_cart"
 
 # Runs before every core renderer (frappe/website/path_resolver.py); can_render() opts out when no theme.
 page_renderer = ["commera.shop_themes.theme_resolver.ThemePageRenderer"]
@@ -132,11 +133,24 @@ doc_events = {
 	"Item Group": {
 		"before_validate": "commera.utils.set_item_group_displayname",
 	},
+	"Price List": {
+		"validate": "commera.doc_events.price_list.validate",
+	},
 	"Gateway Payment Request": {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},
+	"Quotation": {
+		"before_validate": "commera.discounts.pricing.remove_code_discounts",
+		"validate": "commera.discounts.pricing.apply_code_discounts",
+	},
 	"Sales Order": {
-		"after_insert": "commera.jobs.send_order_success_acknowledgement",
+		"before_insert": "commera.discounts.pricing.drop_copied_discounts",
+		"before_validate": "commera.discounts.pricing.remove_code_discounts",
+		"validate": "commera.discounts.pricing.apply_code_discounts",
+		"after_insert": [
+			"commera.discounts.usage.record_discount_uses",
+			"commera.jobs.send_order_success_acknowledgement",
+		],
 		"on_submit": [
 			"commera.jobs.send_order_success_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
@@ -173,9 +187,15 @@ doc_events = {
 		"after_rename": "commera.search.sync.after_rename",
 		"on_trash": "commera.search.sync.on_trash",
 	},
-	"Sales Invoice": {"on_submit": "commera.utils.update_so_status_from_related_doc"},
+	"Sales Invoice": {
+		"before_validate": "commera.discounts.pricing.remove_code_discounts",
+		"validate": "commera.discounts.pricing.apply_code_discounts",
+		"on_submit": "commera.utils.update_so_status_from_related_doc",
+	},
 	"Payment Entry": {"on_submit": "commera.plugin_events.on_payment_entry_submit"},
 	"Delivery Note": {
+		"before_validate": "commera.discounts.pricing.remove_code_discounts",
+		"validate": "commera.discounts.pricing.apply_code_discounts",
 		"after_insert": "commera.utils.update_so_status_from_related_doc",
 		"on_submit": "commera.utils.update_so_status_from_related_doc",
 		"on_cancel": "commera.utils.update_so_status_from_related_doc",
@@ -192,6 +212,7 @@ jinja = {
 		"commera.utils.format_theme_css",
 		"commera.utils.get_currency_symbol",
 		"commera.search.result_card.get_search_result_fields",
+		"commera.search.typeahead.get_typeahead",
 		"commera.seo_jinja",
 		"commera.shop_data.get_header_data",
 		"commera.shop_data.get_storefront_menu",
@@ -221,6 +242,8 @@ ignore_links_on_delete = [
 	"Bulk Style Attribute Configurator Creation Log",
 	"Commera Event",
 	"Commera Event Delivery",
+	# A use is never given back, so its row outlives a deleted order.
+	"Commera Discount Use",
 ]
 
 # Apps
@@ -481,6 +504,7 @@ scheduler_events = {
 	"daily": [
 		"commera.jobs.delete_notified_oos",
 		"commera.jobs.delete_old_draft_quotations",
+		"commera.commera_ecommerce.doctype.commera_cart.commera_cart.delete_abandoned_guest_carts",
 		"commera.search.build.rebuild_index_nightly",
 		"commera.og.generator.clear_old_cards",
 	],

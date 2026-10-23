@@ -31,7 +31,7 @@ const isLive = computed(() => props.card.enabled && !needsKeys.value)
       <div class="flex items-center gap-2">
         <p class="truncate text-base text-ink-gray-8">{{ card.label }}</p>
         <Badge v-if="isLive" label="Live" theme="green" variant="subtle" />
-        <Badge v-else-if="needsKeys" label="Keys missing" theme="orange" variant="subtle" />
+        <Badge v-else-if="needsKeys" label="Keys missing" theme="amber" variant="subtle" />
         <!-- The app behind this provider is not installed on the site, so there is
              nothing to configure and the row says so rather than offering keys. -->
         <Badge v-if="!card.available" label="Not installed" theme="gray" variant="subtle" />

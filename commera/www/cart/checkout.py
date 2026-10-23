@@ -1,10 +1,24 @@
 import frappe
 from frappe.query_builder import DocType
+from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cstr
 
-from commera.api.payments import COD_PAYMENT_MODE, get_checkout_payment_methods
-from commera.api.shipping import get_checkout_summary
+from commera.api.payments import (
+	COD_PAYMENT_MODE,
+	cart_write_lock,
+	get_checkout_cart,
+	get_checkout_payment_methods,
+	get_quotation_for_cart,
+	validate_cart_is_not_in_checkout,
+)
+from commera.api.shipping import get_charge_amount, get_checkout_summary
+from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
+	get_code_states,
+	get_quantities_by_item_code,
+	get_session_cart,
+)
 from commera.core import _get_cart_quotation
+from commera.discounts.selection import get_discount_codes
 from commera.guest import is_guest
 from commera.utils import (
 	format_addresses,
@@ -13,6 +27,7 @@ from commera.utils import (
 	get_country_list,
 	get_delivery_configuration,
 	get_directions_url,
+	get_free_delivery,
 	get_pickup_addresses,
 	get_pickup_warehouses,
 )
@@ -88,8 +103,12 @@ def get_checkout_prefill(country_list: list[dict]) -> dict:
 def set_guest_cart_context(context):
 	# The guest's cart lives in the browser until the address step books it to the typed email.
 	context.cart_quotation = None
+	context.cart_needs_refresh = False
+	context.cart_payable_total = 0
 	context.checkout_summary = {}
+	context.free_delivery_above, context.free_delivery_shortfall = None, 0
 	context.coupon_code = ""
+	context.discount_code_states = []
 	context.items = []
 	context.billing_addresses = []
 	context.shipping_addresses = []
@@ -101,8 +120,12 @@ def set_cart_context(context, commera_settings):
 		frappe.redirect(f"/{frappe.local.lang}/cart")
 	default_price_list = commera_settings.get("default_price_list")
 	context.cart_quotation = cart_quotation
+	context.cart_needs_refresh = cart_needs_refresh(cart_quotation)
+	context.cart_payable_total = get_charge_amount(cart_quotation)
 	context.checkout_summary = get_checkout_summary(cart_quotation)
+	context.update(get_free_delivery(cart_quotation))
 	context.coupon_code = get_coupon_code(cart_quotation)
+	context.discount_code_states = get_code_states(cart_quotation)
 	items = get_checkout_items(cart_quotation)
 	if default_price_list:
 		for item in items:
@@ -116,13 +139,42 @@ def set_cart_context(context, commera_settings):
 	context.shipping_addresses = get_addresses(address_type="Shipping")
 
 
+def cart_needs_refresh(quotation) -> bool:
+	server_cart = get_session_cart()
+	if quotation.is_new() or not server_cart:
+		return False
+	quotation_lines = [row for row in quotation.items if not row.is_free_item]
+	return get_quantities_by_item_code(server_cart.get_selected_lines()) != get_quantities_by_item_code(
+		quotation_lines
+	)
+
+
+def rebuild_checkout_cart(quotation) -> tuple:
+	"""The rebuilt quotation (None when a payment is under way), or where to send a shopper with nothing ticked."""
+	with cart_write_lock(quotation):
+		try:
+			validate_cart_is_not_in_checkout(quotation.name)
+		except frappe.ValidationError:
+			frappe.clear_last_message()
+			return None, None
+		if not get_session_cart().get_selected_lines():
+			return None, f"/{frappe.local.lang}/cart"
+		return get_quotation_for_cart(get_checkout_cart({}), quotation), None
+
+
+# The page calls this on load when cart_needs_refresh, so the page GET never writes the cart.
+@frappe.whitelist(methods=["POST"])
+@rate_limit(limit=100, seconds=60 * 60)
+def refresh_checkout_cart() -> dict:
+	quotation = _get_cart_quotation()
+	if not cart_needs_refresh(quotation):
+		return {"refreshed": False, "redirect": None}
+	rebuilt, redirect = rebuild_checkout_cart(quotation)
+	return {"refreshed": bool(rebuilt), "redirect": redirect}
+
+
 def get_coupon_code(cart_quotation):
-	coupon_code = ""
-	try:
-		coupon_code = frappe.get_cached_value("Coupon Code", cart_quotation.coupon_code, "coupon_code")
-	except Exception:
-		pass
-	return coupon_code
+	return next(iter(get_discount_codes(cart_quotation)), "")
 
 
 def get_checkout_items(cart_quotation):
@@ -159,6 +211,7 @@ def get_checkout_items(cart_quotation):
 			quotation_item.rate,
 			quotation_item.price_list_rate,
 			quotation_item.amount,
+			quotation_item.custom_code_discount,
 			item_variant_attribute.attribute_value.as_("size"),
 		)
 		.groupby(quotation_item.name)

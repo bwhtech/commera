@@ -1,11 +1,11 @@
 import math
-from contextlib import contextmanager
 
 import frappe
 from frappe import _
 from frappe.utils.data import cstr, flt
 
-from commera.plugin_events import get_handlers
+from commera.discounts.shipping import apply_shipping_discounts
+from commera.plugin_events import get_handlers, handle_hook_error
 from commera.utils import get_charge_account_head
 
 PLUGIN_FEE_FIELD = "commera_plugin_fee"
@@ -86,7 +86,7 @@ def apply_delivery_option_hooks(quotation, options: list[dict], strict: bool) ->
 		with handle_hook_error("delivery_options", handler, quotation, strict):
 			hooked_options = frappe.get_attr(handler)(quotation, [dict(option) for option in options])
 			options = get_hooked_delivery_options(options, hooked_options, precision)
-	return options
+	return apply_shipping_discounts(quotation, options)
 
 
 def get_hooked_delivery_options(options: list[dict], hooked_options, precision: int) -> list[dict]:
@@ -133,21 +133,3 @@ def filter_payment_methods(quotation, methods: list[str], strict: bool) -> list[
 				)
 			methods = [method for method in methods if method in kept_methods]
 	return methods
-
-
-@contextmanager
-def handle_hook_error(key: str, handler: str, quotation, strict: bool):
-	message_count = len(frappe.local.message_log)
-	try:
-		yield
-	except Exception:
-		frappe.log_error(
-			title=f'commera_hooks["{key}"] hook failed: {handler}'[:140],
-			reference_doctype="Quotation",
-			reference_name=quotation.name,
-			defer_insert=True,
-		)
-		# Whatever the app msgprinted is meant for its developer, never for the shopper.
-		del frappe.local.message_log[message_count:]
-		if strict:
-			frappe.throw(_("Something went wrong, please try again."))
