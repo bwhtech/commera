@@ -404,6 +404,11 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			placeholders = ", ".join("?" for _ in values)
 			clauses.append(f" AND {prefix}{column} IN ({placeholders})")
 			params.extend(values)
+		# The ?category= tab scope is not a facet: no facet drops it, so it narrows every count too.
+		if selected.get("category_item_groups"):
+			placeholders = ", ".join("?" for _ in selected["category_item_groups"])
+			clauses.append(f" AND {prefix}item_group IN ({placeholders})")
+			params.extend(selected["category_item_groups"])
 		if drop_key != "sizes" and selected.get("sizes"):
 			placeholders = ", ".join("?" for _ in selected["sizes"])
 			clauses.append(

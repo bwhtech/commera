@@ -7,7 +7,12 @@ from frappe.utils.caching import redis_cache
 from commera import seo
 from commera.product_detail import size_sort_key
 from commera.search import query as search_query
-from commera.shop_data import find_menu_root, get_category_facets, get_storefront_menu
+from commera.shop_data import (
+	find_menu_root,
+	get_category_facets,
+	get_category_item_groups,
+	get_storefront_menu,
+)
 from commera.swatches import get_swatch_map
 from commera.utils import (
 	PAGE_SIZE_OPTIONS,
@@ -118,13 +123,21 @@ def get_category_root(category):
 	return find_menu_root(get_storefront_menu(), category) if category else None
 
 
+def apply_category_scope(selected_filters):
+	"""Narrow the grid to the ?category= tab's item groups. Returns the tab, or None when there is none."""
+	category_root = get_category_root(selected_filters["category"])
+	if category_root:
+		selected_filters["category_item_groups"] = get_category_item_groups(category_root)
+	else:
+		# An unknown ?category= is shopper-typed text that must never be echoed; the other filters still apply.
+		selected_filters["category"] = ""
+	return category_root
+
+
 def get_context(context):
 	page = get_current_page()
 	selected_filters = get_selected_filters()
-	category_root = get_category_root(selected_filters["category"])
-	# An unknown ?category= is shopper-typed text that must never be echoed; the other filters still apply.
-	if not category_root:
-		selected_filters["category"] = ""
+	category_root = apply_category_scope(selected_filters)
 	filters, price_range = get_product_filters(selected_filters)
 	context.page_length = get_page_size()
 	context.page_size_options = PAGE_SIZE_OPTIONS

@@ -323,6 +323,67 @@ class TestStorefrontSearch(IntegrationTestCase):
 		self.assertEqual(SqliteProductSearch().search_products(filters), [self.blue])
 		self.assertEqual(search_query.listing_facets(filters)["sizes"], ["38", "40"])
 
+	# -- ?category= tab scope --------------------------------------------------------------------
+
+	def test_category_scope_narrows_both_grids(self):
+		# ?category= used to retitle the page and leave the whole catalogue in the grid on both paths.
+		filters = {"search": SEARCH_TOKEN, "category_item_groups": [ITEM_GROUP_BLUE]}
+		engine = SqliteProductSearch()
+		self.assertEqual(engine.search_products(filters), [self.blue])
+		self.assertEqual(engine.search_count(filters), 1)
+		self.assertEqual([card["name"] for card in utils.get_product_list_qb(filters)], [self.blue])
+		self.assertEqual(utils.get_product_count_qb(filters), 1)
+
+	def test_category_scope_holds_in_every_facet(self):
+		# Each facet drops its own filter; the tab scope is no facet, so dropping it would offer dead options.
+		facets = SqliteProductSearch().search(
+			SEARCH_TOKEN,
+			facet_filters={"category_item_groups": [ITEM_GROUP_BLUE], "subcategory": [ITEM_GROUP_BLUE]},
+		)["facets"]
+		self.assertEqual(set(facets["category"]), {ITEM_GROUP_BLUE})
+		self.assertEqual(list(facets["size"]), ["38", "40"])
+
+	def test_listing_tab_narrows_to_its_item_groups(self):
+		from commera.www.products import list as product_list_page
+
+		self.link_category_to(ITEM_GROUP_BLUE)
+		tab = frappe.db.get_value("Ecommerce Category", self.category, "route_slug")
+		filters = {"search": SEARCH_TOKEN, "category": tab}
+		self.assertIsNotNone(product_list_page.apply_category_scope(filters))
+		self.assertEqual(filters["category_item_groups"], [ITEM_GROUP_BLUE])
+		self.assertEqual([card["name"] for card in utils.get_product_list(filters)], [self.blue])
+
+		# Browsing the tab without a term goes through frappe.qb, which must narrow the same way.
+		browse = {"search": "", "category": tab}
+		product_list_page.apply_category_scope(browse)
+		self.assertEqual([card["name"] for card in utils.get_product_list(browse)], [self.blue])
+
+	def test_unknown_listing_tab_is_dropped(self):
+		from commera.www.products import list as product_list_page
+
+		filters = {"search": SEARCH_TOKEN, "category": "no-such-tab"}
+		self.assertIsNone(product_list_page.apply_category_scope(filters))
+		self.assertEqual(filters["category"], "")
+		self.assertNotIn("category_item_groups", filters)
+
+	def link_category_to(self, item_group):
+		"""Make the fixture menu tab link one item group for this test, restoring it afterwards."""
+		category = frappe.get_doc("Ecommerce Category", self.category)
+		previous_link_type = category.link_type
+		category.link_type = "Item Group"
+		category.set("link_item_groups", [{"item_group": item_group}])
+		category.save(ignore_permissions=True)
+		frappe.local.commera_storefront_menu = None
+
+		def restore():
+			category.reload()
+			category.link_type = previous_link_type
+			category.set("link_item_groups", [])
+			category.save(ignore_permissions=True)
+			frappe.local.commera_storefront_menu = None
+
+		self.addCleanup(restore)
+
 	# -- filter / sort / pagination / count parity -----------------------------------------------
 
 	def test_price_and_discount_filters(self):

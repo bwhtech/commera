@@ -279,6 +279,8 @@ def get_product_base_query(filters=None, product_list=None):
 	if filters:
 		if filters.get("has_discount"):
 			query = query.where(item_price_default.price_list_rate > item_price_sale.price_list_rate)
+		if filters.get("category_item_groups"):
+			query = query.where(style_attribute_variant.item_group.isin(filters["category_item_groups"]))
 		if filters.get("subcategory"):
 			query = query.where(style_attribute_variant.item_group.isin(filters["subcategory"]))
 		if filters.get("colors"):

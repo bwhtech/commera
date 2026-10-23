@@ -38,6 +38,8 @@ class SearchFilters(TypedDict, total=False):
 
 	search: str
 	category: str
+	# The item groups the ?category= menu tab covers. Empty means the tab links none, so nothing narrows.
+	category_item_groups: list[str]
 	subcategory: list[str]
 	brands: list[str]
 	colors: list[str]
