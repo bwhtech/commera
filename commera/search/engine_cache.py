@@ -5,10 +5,13 @@ import frappe
 from commera.search.engine import SearchEngineBase
 from commera.search.sqlite_product_search import SqliteProductSearch
 
+ENGINES = {"SQLite": SqliteProductSearch}
 
-def get_engine_class() -> type[SearchEngineBase]:
-	"""The active engine class. Only the SQLite engine exists so far."""
-	return SqliteProductSearch
+
+def get_engine_class(name: str | None = None) -> type[SearchEngineBase]:
+	"""The engine class called `name`, or the one chosen in Commera Settings. SQLite is the default."""
+	name = name or frappe.get_cached_doc("Commera Settings").get("search_engine")
+	return ENGINES.get(name) or SqliteProductSearch
 
 
 def new_search_engine() -> SearchEngineBase:

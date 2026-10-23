@@ -2,7 +2,6 @@ import difflib
 import os
 import re
 import sqlite3
-import time
 from typing import ClassVar
 
 import frappe
@@ -13,7 +12,8 @@ from commera.search.engine import (
 	CARD_COLUMNS,
 	MIN_QUERY_LENGTH,
 	SearchEngineBase,
-	empty_result,
+	empty_facets,
+	empty_typeahead,
 	is_query_too_short,
 )
 from commera.search.record_builder import (
@@ -361,7 +361,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 	COLUMN_TO_NARROW_KEY: ClassVar = {column: key for key, column in NARROW_KEY_TO_COLUMN.items()}
 
-	def facet_counts(self, fts_query, filters=None):
+	def count_facets(self, fts_query, filters=None):
 		"""Sidebar counts per facet, each narrowed by every OTHER selected filter but not by its own."""
 		# Must match the frappe.qb sidebar: www/products/list.py pops the facet's own key before querying.
 		selected = filters or {}
@@ -492,12 +492,11 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		)
 		return rows[0]["count"] if rows else 0
 
-	def search(self, query, limit=20, facet_filters=None):
+	def typeahead(self, query, limit=6):
 		if is_query_too_short(query) or not self.index_exists():
-			return empty_result()
+			return empty_typeahead()
 
 		raw = super().search(query)
-
 		product_names = []
 		category_names = []
 		for hit in raw["results"]:
@@ -506,30 +505,22 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			else:
 				product_names.append(hit["name"])
 
-		search_ms = raw["summary"]["duration"] * 1000
-
-		facet_start = time.time()
-		facets = {"brand": {}, "color": {}, "size": {}, "category": {}}
-		expanded_query, _corrections = self._expand_query_with_corrections(query)
-		facets.update(self.facet_counts(self._prepare_fts_query(expanded_query), facet_filters))
-		facet_ms = (time.time() - facet_start) * 1000
-
 		raw_corrections = raw["summary"].get("corrected_words") or {}
-		corrected_words = {
-			original: suggestion
-			for original, suggestion in raw_corrections.items()
-			if original.lower() != suggestion.lower()
-		}
-
 		return {
 			"product_names": product_names[:limit],
 			"category_names": category_names[:limit],
-			"corrected_words": corrected_words,
-			"facets": facets,
-			"duration_ms": search_ms + facet_ms,
-			"search_ms": round(search_ms, 3),
-			"facet_ms": round(facet_ms, 3),
+			"corrected_words": {
+				original: suggestion
+				for original, suggestion in raw_corrections.items()
+				if original.lower() != suggestion.lower()
+			},
 		}
+
+	def facet_counts(self, filters):
+		fts_query = self.fts_query_for((filters.get("search") or "").strip())
+		if not fts_query:
+			return empty_facets()
+		return {**empty_facets(), **self.count_facets(fts_query, filters)}
 
 	# -- spell correction -----------------------------------------------------------------------
 

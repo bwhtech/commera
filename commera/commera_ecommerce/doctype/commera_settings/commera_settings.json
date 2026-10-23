@@ -47,6 +47,11 @@
   "publish_variants_for_all_templates",
   "view_logs",
   "search_tab",
+  "search_engine_section",
+  "search_engine",
+  "search_server_url",
+  "search_server_api_key",
+  "search_index_prefix",
   "search_content_section",
   "search_content_fields",
   "search_result_section",
@@ -676,6 +681,43 @@
    "label": "Search"
   },
   {
+   "fieldname": "search_engine_section",
+   "fieldtype": "Section Break",
+   "label": "Search Engine"
+  },
+  {
+   "default": "SQLite",
+   "description": "SQLite keeps the index in a file on this server. The other engines run on their own search server and add typo tolerance, Arabic search and search from the first character.",
+   "fieldname": "search_engine",
+   "fieldtype": "Select",
+   "label": "Search Engine",
+   "options": "SQLite"
+  },
+  {
+   "depends_on": "eval:doc.search_engine && doc.search_engine != 'SQLite'",
+   "description": "The address of the search server, for example http://127.0.0.1:7700",
+   "fieldname": "search_server_url",
+   "fieldtype": "Data",
+   "label": "Search Server URL",
+   "mandatory_depends_on": "eval:doc.search_engine && doc.search_engine != 'SQLite'",
+   "options": "URL"
+  },
+  {
+   "depends_on": "eval:doc.search_engine && doc.search_engine != 'SQLite'",
+   "description": "A key that can create indexes and write documents, such as the admin key.",
+   "fieldname": "search_server_api_key",
+   "fieldtype": "Password",
+   "label": "Search Server API Key",
+   "mandatory_depends_on": "eval:doc.search_engine && doc.search_engine != 'SQLite'"
+  },
+  {
+   "depends_on": "eval:doc.search_engine && doc.search_engine != 'SQLite'",
+   "description": "Index names start with this. Leave empty to use the site name. Give each site its own prefix when sites share one server.",
+   "fieldname": "search_index_prefix",
+   "fieldtype": "Data",
+   "label": "Index Prefix"
+  },
+  {
    "fieldname": "search_content_section",
    "fieldtype": "Section Break",
    "label": "Indexed Content Fields"
@@ -888,7 +930,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-21 10:00:00.000000",
+ "modified": "2026-10-23 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Settings",

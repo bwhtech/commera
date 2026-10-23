@@ -209,6 +209,7 @@ jinja = {
 		"commera.utils.format_theme_css",
 		"commera.utils.get_currency_symbol",
 		"commera.search.result_card.get_search_result_fields",
+		"commera.search.typeahead.get_typeahead",
 		"commera.seo_jinja",
 		"commera.shop_data.get_header_data",
 		"commera.shop_data.get_storefront_menu",

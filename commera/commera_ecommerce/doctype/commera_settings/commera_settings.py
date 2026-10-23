@@ -8,7 +8,10 @@ from frappe.utils import get_url_to_form
 from frappe.website.utils import clear_cache as clear_website_cache
 
 from commera.search.build import enqueue_full_rebuild
+from commera.search.engine_cache import clear_search_engine, get_engine_class
+from commera.search.http_client import SearchServerError
 from commera.search.record_builder import ALLOWED_CONTENT_DOCTYPES, is_indexable_content_field
+from commera.search.remote_engine import RemoteSearchEngine
 from commera.search.result_card import (
 	MANDATORY_RESULT_FIELDS,
 	MAX_RESULT_FIELDS,
@@ -102,6 +105,10 @@ class CommeraSettings(Document):
 		return_period: DF.Int
 		sale_price_list: DF.Link | None
 		search_content_fields: DF.Table[SearchContentField]
+		search_engine: DF.Literal["SQLite"]
+		search_index_prefix: DF.Data | None
+		search_server_api_key: DF.Password | None
+		search_server_url: DF.Data | None
 		search_result_fields: DF.Table[SearchResultField]
 		secondary_accent_color: DF.Color | None
 		seo_title_template: DF.Data | None
@@ -125,6 +132,7 @@ class CommeraSettings(Document):
 		self.validate_a_payment_method_is_available()
 		self.validate_search_content_fields()
 		self.validate_search_result_fields()
+		self.validate_search_engine()
 
 	def validate_a_payment_method_is_available(self):
 		if self.cod_enabled or get_available_payment_modes():
@@ -142,6 +150,18 @@ class CommeraSettings(Document):
 		pairs = [(row.search_doctype, row.field) for row in rows]
 		if len(pairs) != len(set(pairs)):
 			frappe.throw(frappe._("Duplicate search content fields are not allowed."))
+
+	def validate_search_engine(self):
+		engine = get_engine_class(self.get("search_engine"))
+		if not issubclass(engine, RemoteSearchEngine):
+			return
+		try:
+			engine.check_connection(
+				self.get("search_server_url"),
+				self.get_password("search_server_api_key", raise_exception=False),
+			)
+		except SearchServerError as error:
+			frappe.throw(frappe._("Cannot connect to {0}: {1}").format(engine.NAME, error))
 
 	def validate_search_result_fields(self):
 		"""Reject an invalid result-card config; an empty table falls back to the default layout."""
@@ -199,8 +219,16 @@ class CommeraSettings(Document):
 			return
 		old_pairs = [(row.search_doctype, row.field) for row in (before.search_content_fields or [])]
 		new_pairs = [(row.search_doctype, row.field) for row in (self.search_content_fields or [])]
-		if old_pairs != new_pairs:
+		if self.search_engine_changed(before):
+			# Build the newly chosen index. Until it exists, the frappe.qb grid serves every search.
+			clear_search_engine()
+			get_engine_class(self.get("search_engine"))().enqueue_full_rebuild(deduplicate=True)
+		elif old_pairs != new_pairs:
 			enqueue_full_rebuild(deduplicate=True)
+
+	def search_engine_changed(self, before):
+		fields = ("search_engine", "search_server_url", "search_index_prefix")
+		return any(before.get(field) != self.get(field) for field in fields)
 
 	def get_default_price_list(self):
 		return self.default_price_list

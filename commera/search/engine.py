@@ -49,16 +49,17 @@ class SearchFilters(TypedDict, total=False):
 	has_discount: bool
 
 
-class SearchResult(TypedDict):
-	"""Ranked names, per-facet value counts and spelling corrections for one query."""
+class TypeaheadHits(TypedDict):
+	"""Ranked product and menu-entry names for a partly typed query, plus any spelling corrections."""
 
 	product_names: list[str]
 	category_names: list[str]
+	# Typed word -> the word the engine searched for instead. Empty when the engine corrects nothing.
 	corrected_words: dict[str, str]
-	facets: dict[str, dict[str, int]]
-	duration_ms: float
-	search_ms: float
-	facet_ms: float
+
+
+# Facet -> {value: product count}. The facets are brand, color, size and category (the item group).
+FacetCounts = dict[str, dict[str, int]]
 
 
 class SearchEngineBase(ABC):
@@ -71,8 +72,12 @@ class SearchEngineBase(ABC):
 		"""Whether this engine can serve `term`. When False, the frappe.qb grid serves the request."""
 
 	@abstractmethod
-	def search(self, query: str, limit: int = 20, facet_filters: SearchFilters | None = None) -> SearchResult:
-		"""Typeahead hits plus sidebar facets. Each facet is narrowed by every other selected filter."""
+	def typeahead(self, query: str, limit: int = 6) -> TypeaheadHits:
+		"""The best products and menu entries for a query that the shopper is still typing."""
+
+	@abstractmethod
+	def facet_counts(self, filters: SearchFilters) -> FacetCounts:
+		"""Sidebar counts for a text search. Each facet is narrowed by every other selected filter."""
 
 	@abstractmethod
 	def search_products(
@@ -94,6 +99,10 @@ class SearchEngineBase(ABC):
 	@abstractmethod
 	def index_exists(self) -> bool:
 		"""Whether the index is built and ready to serve reads."""
+
+	def mark_unavailable(self) -> None:
+		"""A read failed, so serve the rest of this request from frappe.qb. A local index never fails so."""
+		return None
 
 	# -- writes ---------------------------------------------------------------------------------
 
@@ -118,17 +127,12 @@ class SearchEngineBase(ABC):
 		"""Enqueue a build when the index is missing or a build was interrupted. Otherwise do nothing."""
 
 
-def empty_result() -> SearchResult:
-	"""The search() shape with nothing matched — for too-short queries and missing indexes."""
-	return {
-		"product_names": [],
-		"category_names": [],
-		"corrected_words": {},
-		"facets": {"brand": {}, "color": {}, "size": {}, "category": {}},
-		"duration_ms": 0.0,
-		"search_ms": 0.0,
-		"facet_ms": 0.0,
-	}
+def empty_typeahead() -> TypeaheadHits:
+	return {"product_names": [], "category_names": [], "corrected_words": {}}
+
+
+def empty_facets() -> FacetCounts:
+	return {"brand": {}, "color": {}, "size": {}, "category": {}}
 
 
 def is_query_too_short(query):

@@ -1,7 +1,8 @@
-from frappe.search.sqlite_search import MAX_SEARCH_RESULTS
+import frappe
 
 from commera.product_detail import size_sort_key
 from commera.search.engine_cache import get_search_engine
+from commera.search.http_client import SearchServerError
 
 
 def search_term(filters):
@@ -18,11 +19,18 @@ def use_qb_fallback(filters):
 	return not relevance_sort_available(filters)
 
 
-def storefront_search(query, limit=20, facet_filters=None):
-	"""Run the search engine and hydrate matched product names into storefront product cards."""
-	engine = get_search_engine()
-	result = engine.search(query, limit=limit, facet_filters=facet_filters)
-	return {"products": build_product_cards(result["product_names"])}
+def read_or_fall_back(read, fall_back):
+	"""Serve `read()` from the engine, or `fall_back()` from frappe.qb when the search server fails.
+
+	The engine trusts its cached readiness, so the first request of an outage reaches the server. After
+	that request, the rest of this request and the next ones use frappe.qb until the server answers.
+	"""
+	try:
+		return read()
+	except SearchServerError as error:
+		frappe.logger("commera.search").warning(str(error))
+		get_search_engine().mark_unavailable()
+		return fall_back()
 
 
 def build_product_cards(product_names):
@@ -39,9 +47,9 @@ def listing_facets(selected_filters):
 	if use_qb_fallback(selected_filters):
 		return None
 
-	facets = get_search_engine().search(
-		search_term(selected_filters), limit=MAX_SEARCH_RESULTS, facet_filters=selected_filters
-	)["facets"]
+	facets = read_or_fall_back(lambda: get_search_engine().facet_counts(selected_filters), lambda: None)
+	if facets is None:
+		return None
 
 	return {
 		"brands": list(facets.get("brand") or {}),

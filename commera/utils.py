@@ -88,7 +88,11 @@ def get_product_list(filters=None, product_list=None, page=1, page_length=30, so
 	if product_list is not None or search_query.use_qb_fallback(filters):
 		return get_product_list_qb(filters, product_list, page, page_length, sort_by)
 
-	ranked_names = get_search_engine().search_products(filters, page, page_length, sort_by)
+	ranked_names = search_query.read_or_fall_back(
+		lambda: get_search_engine().search_products(filters, page, page_length, sort_by), lambda: None
+	)
+	if ranked_names is None:
+		return get_product_list_qb(filters, product_list, page, page_length, sort_by)
 	if not ranked_names:
 		return []
 
@@ -224,7 +228,10 @@ def get_total_product_count(filters=None, product_list=None):
 	from commera.search.engine_cache import get_search_engine
 
 	if product_list is None and not search_query.use_qb_fallback(filters):
-		return get_search_engine().search_count(filters)
+		return search_query.read_or_fall_back(
+			lambda: get_search_engine().search_count(filters),
+			lambda: get_product_count_qb(filters, product_list),
+		)
 	return get_product_count_qb(filters, product_list)
 
 
@@ -305,6 +312,9 @@ def get_product_base_query(filters=None, product_list=None):
 				| (style_attribute_variant.item_group.like(f"%{search}%"))
 				| (item.name.like(f"%{search}%"))
 			)
+			# SQLite sends every Arabic term here, so the Arabic item name must be searchable too.
+			if frappe.db.has_column("Item", "custom_item_name_ar"):
+				search_condition |= item.custom_item_name_ar.like(f"%{search}%")
 			if child_categories:
 				search_condition |= style_attribute_variant.item_group.isin(child_categories)
 

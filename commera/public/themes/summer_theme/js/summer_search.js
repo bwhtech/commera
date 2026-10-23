@@ -5,6 +5,8 @@ document.addEventListener('alpine:init', () => {
 		search_term: '',
 		matched_term: '',
 		products: [],
+		categories: [],
+		corrected_query: null,
 		loading: false,
 		debounce_timer: null,
 		/* Each keystroke fires its own request and the server answers out of order often enough
@@ -29,6 +31,8 @@ document.addEventListener('alpine:init', () => {
 			clearTimeout(this.debounce_timer);
 			this.latest_request += 1;
 			this.products = [];
+			this.categories = [];
+			this.corrected_query = null;
 			this.matched_term = '';
 			this.loading = false;
 		},
@@ -38,14 +42,13 @@ document.addEventListener('alpine:init', () => {
 			this.latest_request += 1;
 			const request_id = this.latest_request;
 			try {
-				const response = await frappe_call(
-					'/api/v2/method/commera.api.utils.get_search_results',
-					{ search: term },
-				);
+				const response = await frappe_call('/api/v2/method/commera.api.search.typeahead', { q: term });
 				if (request_id !== this.latest_request) {
 					return;
 				}
-				this.products = response.data || [];
+				this.products = response.data.products;
+				this.categories = response.data.categories;
+				this.corrected_query = response.data.corrected_query;
 				this.matched_term = term;
 			} finally {
 				if (request_id === this.latest_request) {
