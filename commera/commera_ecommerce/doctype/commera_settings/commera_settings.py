@@ -105,7 +105,7 @@ class CommeraSettings(Document):
 		return_period: DF.Int
 		sale_price_list: DF.Link | None
 		search_content_fields: DF.Table[SearchContentField]
-		search_engine: DF.Literal["SQLite"]
+		search_engine: DF.Literal["SQLite", "Meilisearch"]
 		search_index_prefix: DF.Data | None
 		search_server_api_key: DF.Password | None
 		search_server_url: DF.Data | None

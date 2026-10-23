@@ -7,6 +7,7 @@ Commera Settings > Search > Search Engine selects the engine that ranks storefro
 | Engine | Where the index is | What it adds |
 |---|---|---|
 | SQLite (default) | A file on the site, `commera_product_search.db` | Nothing to set up. Terms shorter than 4 characters and Arabic terms use a `LIKE` query instead. |
+| Meilisearch | A Meilisearch server | Typo tolerance and prefix search from the first character, Arabic search, and search on the Arabic item name. A rebuild swaps a new index in. |
 
 ### Engines on a search server
 

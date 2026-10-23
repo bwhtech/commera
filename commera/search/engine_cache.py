@@ -3,9 +3,10 @@
 import frappe
 
 from commera.search.engine import SearchEngineBase
+from commera.search.meili_search import MeilisearchEngine
 from commera.search.sqlite_product_search import SqliteProductSearch
 
-ENGINES = {"SQLite": SqliteProductSearch}
+ENGINES = {"SQLite": SqliteProductSearch, "Meilisearch": MeilisearchEngine}
 
 
 def get_engine_class(name: str | None = None) -> type[SearchEngineBase]:

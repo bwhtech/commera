@@ -691,7 +691,7 @@
    "fieldname": "search_engine",
    "fieldtype": "Select",
    "label": "Search Engine",
-   "options": "SQLite"
+   "options": "SQLite\nMeilisearch"
   },
   {
    "depends_on": "eval:doc.search_engine && doc.search_engine != 'SQLite'",
