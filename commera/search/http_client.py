@@ -18,6 +18,9 @@ class SearchHttpClient:
 	def __init__(self, url, headers):
 		self.url = (url or "").rstrip("/")
 		self.session = requests.Session()
+		# Uncompressed answers: a gzip answer over about 1 KB arrives in pieces that wait ~40 ms for a
+		# delayed TCP ack. Meilisearch facet and typeahead requests were about 10 times slower with gzip.
+		self.session.headers["Accept-Encoding"] = "identity"
 		self.session.headers.update(headers)
 
 	def get(self, path, **params):
