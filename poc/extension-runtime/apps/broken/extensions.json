@@ -1,0 +1,3 @@
+[
+  { "handle": "broken-block", "target": "admin.order-details.block", "module": "broken-block" }
+]

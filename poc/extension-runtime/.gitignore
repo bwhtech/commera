@@ -1,0 +1,8 @@
+**/auto-imports.d.ts
+**/components.d.ts
+.baseline-dist/
+apps/*/dist/
+host/dist/
+node_modules/
+package-lock.json
+screenshots/error.png
