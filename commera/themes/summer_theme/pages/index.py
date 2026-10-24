@@ -3,7 +3,6 @@ import frappe
 from commera.utils import get_product_list
 from commera.www import index
 
-# The picks tables Summer's homepage sections render, keyed by their settings fieldname.
 PICKS_FIELDS = ("best_picks", "deal_picks", "featured_picks")
 
 
@@ -15,7 +14,6 @@ def get_context(context):
 
 
 def get_picked_products(rows):
-	"""Hydrate one pinned-variant table into storefront product cards."""
 	variants = [row.item_variant for row in rows]
 	if not variants:
 		return []

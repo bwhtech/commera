@@ -1,4 +1,5 @@
 {% extends "components/base.html" %}
+{% from "templates/macros/page_not_found.html" import page_not_found %}
 
 {% block body %}
 {% if page %}
@@ -9,12 +10,6 @@
 	</div>
 </article>
 {% else %}
-<div class="py-16 text-center">
-	<h1 class="text-2xl font-semibold md:text-3xl">{{ _("Page not found") }}</h1>
-	<p class="mt-3 text-gray-700">{{ _("This page has been moved or is no longer published.") }}</p>
-	<a href="/{{ frappe.lang or 'en' }}" class="mt-6 inline-block underline hover:text-accent">
-		{{ _("Back to home") }}
-	</a>
-</div>
+{{ page_not_found() }}
 {% endif %}
 {% endblock %}

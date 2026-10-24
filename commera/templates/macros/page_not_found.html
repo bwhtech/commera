@@ -1,0 +1,7 @@
+{% macro page_not_found(text_class="text-gray-700", link_class="hover:text-accent") %}
+<div class="py-16 text-center">
+	<h1 class="text-2xl font-semibold md:text-3xl">{{ _("Page not found") }}</h1>
+	<p class="mt-3 {{ text_class }}">{{ _("This page has been moved or is no longer published.") }}</p>
+	<a href="/{{ frappe.lang or 'en' }}" class="mt-6 inline-block underline {{ link_class }}">{{ _("Back to home") }}</a>
+</div>
+{% endmacro %}

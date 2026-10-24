@@ -1,0 +1,81 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-10-24 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "theme",
+  "template",
+  "is_synced_from_settings",
+  "sections"
+ ],
+ "fields": [
+  {
+   "fieldname": "theme",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Theme",
+   "options": "Shop Theme",
+   "reqd": 1
+  },
+  {
+   "description": "index, product, collection, page (or page.<suffix>), group:header or group:footer",
+   "fieldname": "template",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Template",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Set while the theme's settings page writes this layout. Any other save clears it, and the settings page stops writing.",
+   "fieldname": "is_synced_from_settings",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Synced From Settings",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sections",
+   "fieldtype": "Table",
+   "label": "Sections",
+   "options": "Theme Layout Section"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-24 12:00:00",
+ "modified_by": "Administrator",
+ "module": "Shop Themes",
+ "name": "Theme Layout",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "template",
+ "track_changes": 1
+}
