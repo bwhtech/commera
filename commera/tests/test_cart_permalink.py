@@ -228,8 +228,10 @@ class TestGuestCheckoutRedirect(IntegrationTestCase):
 
 
 class TestCartRoutes(IntegrationTestCase):
-	def resolve(self, path):
-		frappe.local.request = Request(EnvironBuilder(path=f"/{path}").get_environ())
+	def resolve(self, path, query_string=""):
+		frappe.local.request = Request(
+			EnvironBuilder(path=f"/{path}", query_string=query_string).get_environ()
+		)
 		self.addCleanup(delattr, frappe.local, "request")
 		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
 		frappe.local.form_dict = frappe._dict()
@@ -251,6 +253,12 @@ class TestCartRoutes(IntegrationTestCase):
 
 		self.assertIsInstance(renderer, RedirectPage)
 		self.assertEqual(frappe.flags.redirect_location, "/en/cart/checkout")
+
+	def test_bare_home_redirects_to_english_keeping_the_query_string(self):
+		_, renderer = self.resolve("", "buy=abc&utm_source=email")
+
+		self.assertIsInstance(renderer, RedirectPage)
+		self.assertEqual(frappe.flags.redirect_location, "/en?buy=abc&utm_source=email")
 
 	def test_theme_permalink_route_leaves_checkout_alone(self):
 		[pattern] = [
