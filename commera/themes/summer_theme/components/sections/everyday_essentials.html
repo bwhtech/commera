@@ -1,0 +1,33 @@
+{# style.css masks the promo photo with images/bg-media.svg, which upstream never shipped, and an unloadable mask hides the element entirely - home-promo.css supplies it. #}
+{% from "components/macros/product_card.html" import variant_card %}
+<section class="content-inner overflow-hidden p-b0">
+	<div class="container">
+		<div class="row">
+			<div class="col-lg-6 col-md-12 align-self-center">
+				<div class="row">
+					{% for product in picked_products.best_picks[:4] %}
+					<div class="col-lg-6 col-md-6 col-sm-6 m-b30">
+						{{ variant_card(product, style="style-3", wow_delay="%.1fs" | format(0.2 + 0.1 * loop.index)) }}
+					</div>
+					{% endfor %}
+				</div>
+			</div>
+			<div class="col-lg-6 col-md-12 m-b30">
+				<div class="about-box style-1 clearfix h-100 right">
+					<div class="dz-media h-100">
+						<img src="{{ shop_theme_asset_url('images/about/pic1.jpg') }}" alt="">
+						<div class="media-contant">
+							<h2 class="title">{{ _("Great saving on everyday essentials") }}</h2>
+							<h5 class="sub-title">{{ _("Up to 60% off + up to $107 Cashback") }}</h5>
+							<a href="/{{ frappe.lang or 'en' }}/products" class="btn btn-white btn-lg">{{ _("See All") }}</a>
+						</div>
+						{# The stroke animation keys off the text length, so the watermark is its own short phrase. #}
+						<svg class="title animation-text" viewBox="0 0 1320 300">
+							<text x="0" y="">{{ _("Great saving") }}</text>
+						</svg>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>

@@ -1,7 +1,0 @@
-{% from "components/macros/content_blocks.html" import heading, text, button %}
-{% from "components/macros/layout_classes.html" import alignment_class %}
-{% if section.blocks %}
-<div class="page-width flex flex-col gap-6 py-12 md:py-20 {{ alignment_class(section.settings.content_alignment) }}">
-	{% for block in section.blocks %}{{ render_block(block) }}{% endfor %}
-</div>
-{% endif %}

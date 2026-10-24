@@ -10,8 +10,7 @@
     show_wishlist=True,
     image_size="w-45 h-60 md:w-55 md:h-70 lg:w-3xs lg:h-85",
     product_obj=None,
-    attribute_value = "",
-    width_class="w-fit"
+    attribute_value = ""
 ) %}
   {% set variants = {
     'default': {
@@ -38,9 +37,9 @@
   
   {% set current_variant = variants[size_variant] %}
 
-<div class="flex flex-col {{ width_class }}">
-    <div class="relative {{ width_class }}">
-        <div class="{{ width_class }} overflow-hidden rounded-lg">
+<div class="flex flex-col w-fit">
+    <div class="relative w-fit ">
+        <div class="w-fit overflow-hidden rounded-lg">
             <img src="{{ image }}" alt="" class="{{image_size}} object-cover rounded-lg transition duration-300 ease-in-out hover:scale-110" />
         </div>
         {% if discount %}

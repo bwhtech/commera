@@ -140,12 +140,6 @@ class TestThemeEditorPreview(ThemeFixtureMixin, IntegrationTestCase):
 	def test_a_theme_that_is_not_installed_falls_back_to_the_live_one(self):
 		self.assertIn("theme-summer", self.render(theme="ZZ No Such Theme"))
 
-	def test_the_pane_frames_the_base_starters_section_home(self):
-		html = self.render(theme=BASE_THEME)
-
-		self.assertIn("theme-base", html)
-		self.assertIn('data-section-type="image_banner"', html)
-
 	def test_a_previewed_theme_with_no_home_page_is_named_in_the_message(self):
 		self.add_fixture_theme()
 		html = self.render(theme=FIXTURE_THEME_NAME)

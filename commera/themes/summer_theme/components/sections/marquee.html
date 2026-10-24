@@ -1,0 +1,23 @@
+{% set category_labels = header_data.navigation_menu | map(attribute="label") | list %}
+
+{% set pass_count = (6 / (category_labels | length)) | round(0, "ceil") | int %}
+
+<section class="content-inner-3 overflow-hidden">
+	<div class="dz-features-wrapper overflow-hidden">
+		{# @keyframes ticker ends at translateX(-100%), so the second track lands where the first started; the duplicate is decorative. #}
+		{% for track in range(2) %}
+		<ul class="dz-features text-wrapper"{% if not loop.first %} aria-hidden="true"{% endif %}>
+			{% for pass in range(pass_count) %}{% for label in category_labels %}
+			<li class="item">
+				<h2 class="title">{{ label }}</h2>
+			</li>
+			<li class="item">
+				<svg xmlns="http://www.w3.org/2000/svg" width="61" height="60" viewBox="0 0 61 60" fill="none" aria-hidden="true" focusable="false">
+					<path opacity="0.3" d="M29.302 -0.00499268L38.533 21.2005L60.3307 28.9297L39.1253 38.1607L31.396 59.9585L22.165 38.753L0.367297 31.0237L21.5728 21.7928L29.302 -0.00499268Z" fill="black"/>
+				</svg>
+			</li>
+			{% endfor %}{% endfor %}
+		</ul>
+		{% endfor %}
+	</div>
+</section>

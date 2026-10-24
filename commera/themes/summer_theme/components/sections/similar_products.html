@@ -1,0 +1,66 @@
+{# .text__char reads its angle from --char-rotate, which the vendor's unloaded word-rotate script used to write, so the angles are computed here. #}
+{% from "components/macros/product_card.html" import variant_display_name, card_price %}
+
+{% macro similar_card(variant, wow_delay) %}
+{% set product_url = "/" ~ (frappe.lang or "en") ~ "/products/" ~ variant.route %}
+{% set product_name = variant_display_name(variant) %}
+<div class="shop-card style-5 wow fadeInUp" data-wow-delay="{{ wow_delay }}">
+	<div class="dz-media">
+		<a href="{{ product_url }}" tabindex="-1" aria-hidden="true">
+			<img src="{{ variant.image or '/assets/commera/images/1.jpg' }}" alt="{{ product_name }}" loading="lazy">
+		</a>
+	</div>
+	<div class="dz-content">
+		<div>
+			{% if variant.discount_percent %}<span class="sale-title">{{ _("up to {0}% off").format(variant.discount_percent | round | int) }}</span>{% endif %}
+			<h6 class="title"><a href="{{ product_url }}">{{ product_name }}</a></h6>
+		</div>
+		<h6 class="price">{{ card_price(variant.sale_price, variant.default_price, variant.discount_percent) }}</h6>
+	</div>
+</div>
+{% endmacro %}
+
+{% set badge_text = _("all products - ") * 2 %}
+<section class="content-inner-2 overflow-hidden">
+	<div class="container">
+		<div class="row align-items-xl-center align-items-start">
+			<div class="col-lg-5 col-md-12 m-b30 align-self-center">
+				<div class="dz-media style-1 img-ho1 wow fadeInUp" data-wow-delay="0.2s">
+					<img src="{{ shop_theme_asset_url('images/about/pic3.jpg') }}" alt="{{ _("Similar profiles") }}" loading="lazy">
+				</div>
+			</div>
+			<div class="col-lg-7 col-md-12 col-sm-12">
+				<div class="row justify-content-between align-items-center">
+					<div class="col-lg-8 col-md-8 col-sm-12">
+						<div class="section-head style-1 wow fadeInUp" data-wow-delay="0.4s">
+							<div class="left-content">
+								<h2 class="title">{{ _("Users Who Viewed This Also Checked Out These Similar Profiles") }}</h2>
+							</div>
+						</div>
+					</div>
+					<div class="col-lg-4 col-md-4 col-sm-12 text-md-end wow fadeInUp" data-wow-delay="0.6s">
+						<a class="icon-button d-md-block d-none ms-md-auto m-b30" href="/{{ frappe.lang or 'en' }}/products" aria-label="{{ _("All Products") }}">
+							<div class="text-row word-rotate-box" aria-hidden="true">
+								{%- for character in badge_text %}
+								<span class="text__char" style="--char-rotate: {{ "%.2f" | format(360.0 * loop.index0 / (badge_text | length)) }}deg">{{ character }}</span>
+								{%- endfor %}
+								<svg class="badge__emoji" xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" fill="none">
+									<path d="M31.3072 10.7239L39.5891 19.0059C39.8523 19.2696 40.0001 19.627 40.0001 19.9995C40.0001 20.3721 39.8523 20.7295 39.5891 20.9932L31.3072 29.2752C31.1236 29.4582 30.8748 29.5608 30.6156 29.5606C30.3564 29.5604 30.1078 29.4573 29.9245 29.274C29.7412 29.0907 29.6381 28.8422 29.6379 28.5829C29.6377 28.3237 29.7404 28.075 29.9234 27.8913L36.8368 20.9781L0.978516 20.9781C0.718997 20.9781 0.470108 20.875 0.2866 20.6915C0.103093 20.508 0 20.2591 0 19.9995C0 19.74 0.103093 19.4911 0.2866 19.3076C0.470108 19.1241 0.718997 19.021 0.978516 19.021L36.8368 19.021L29.9234 12.1077C29.7404 11.9241 29.6377 11.6754 29.6379 11.4162C29.6381 11.1569 29.7412 10.9084 29.9245 10.7251C30.1078 10.5418 30.3564 10.4387 30.6156 10.4385C30.8748 10.4383 31.1236 10.5409 31.3072 10.7239Z" fill="currentColor"/>
+								</svg>
+							</div>
+						</a>
+					</div>
+				</div>
+				<div class="swiper swiper-similar swiper-visible card-container" data-summer-carousel="similar" data-carousel-loop="true">
+					<div class="swiper-wrapper">
+						{% for product in best_picks %}
+						<div class="swiper-slide m-b30">
+							{{ similar_card(product, "%.1fs" | format(0.6 + 0.2 * loop.index)) }}
+						</div>
+						{% endfor %}
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>

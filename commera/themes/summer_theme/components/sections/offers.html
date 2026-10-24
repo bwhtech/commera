@@ -1,0 +1,30 @@
+{% set settings = shop_theme_config() %}
+<section class="content-inner-2">
+	<div class="container">
+		<div class="section-head style-1 wow fadeInUp d-flex justify-content-between m-b30" data-wow-delay="0.2s">
+			<div class="left-content">
+				<h2 class="title">{{ settings.offers_title }}</h2>
+			</div>
+		</div>
+	</div>
+	<div class="container-fluid px-3">
+		<div class="swiper swiper-product" data-summer-carousel="offers" data-carousel-loop="true">
+			<div class="swiper-wrapper product-style2">
+				{% for banner in settings.offer_banners %}
+				<div class="swiper-slide">
+					<div class="product-box style-2 wow fadeInUp" data-wow-delay="{{ "%.1f" | format(0.2 + 0.2 * loop.index) }}s">
+						<div class="product-media" style="background-image: url('{{ banner.image }}');"></div>
+						<div class="product-content">
+							<div class="main-content">
+								{% if banner.badge_label %}<span class="offer">{{ banner.badge_label }}</span>{% endif %}
+								<h2 class="product-name">{{ banner.heading }}</h2>
+								{% if banner.cta_label %}<a href="{{ banner.url or '#' }}" class="btn btn-outline-secondary btn-rounded btn-lg">{{ banner.cta_label }}</a>{% endif %}
+							</div>
+						</div>
+					</div>
+				</div>
+				{% endfor %}
+			</div>
+		</div>
+	</div>
+</section>

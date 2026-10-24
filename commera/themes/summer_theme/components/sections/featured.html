@@ -1,0 +1,21 @@
+{# No review data exists on a storefront card, so the reference's hardcoded "(2k Review)" line is left out. #}
+{% from "components/macros/product_card.html" import variant_card %}
+{% set settings = shop_theme_config() %}
+<section class="content-inner overflow-hidden">
+	<div class="container">
+		<div class="section-head style-1 wow fadeInUp d-flex justify-content-between" data-wow-delay="0.2s">
+			<div class="left-content">
+				<h2 class="title">{{ settings.featured_title }}</h2>
+			</div>
+		</div>
+		<div class="swiper swiper-product2 swiper-visible" data-summer-carousel="featured" data-carousel-loop="true">
+			<div class="swiper-wrapper">
+				{% for product in picked_products.featured_picks %}
+				<div class="swiper-slide">
+					{{ variant_card(product, style="style-4", wow_delay="%.1fs" | format(0.2 + 0.2 * loop.index)) }}
+				</div>
+				{% endfor %}
+			</div>
+		</div>
+	</div>
+</section>
