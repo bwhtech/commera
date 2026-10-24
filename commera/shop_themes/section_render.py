@@ -6,14 +6,14 @@ from jinja2.runtime import Macro
 from markupsafe import Markup, escape
 
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context
-from commera.shop_themes.layouts import APP_BLOCK_PREFIX, get_layout
+from commera.shop_themes.doctype.theme_layout.theme_layout import APP_BLOCK_PREFIX, get_layout
 from commera.shop_themes.section_data import block_products_cache
 from commera.shop_themes.theme_files import (
 	get_section_schemas,
 	get_setting_default,
 	get_settings_schema,
+	get_theme_module,
 	is_valid_setting_value,
-	load_theme_module,
 )
 
 EDITOR_LOCAL_KEY = "commera_theme_editor"
@@ -89,10 +89,8 @@ def render_section(context, theme_context, template, section, page, theme_settin
 
 
 def run_section_controller(theme_dirs, section, page):
-	module = load_theme_module(theme_dirs, f"sections/{section.type}.py", "theme_sections")
-	if not module or not hasattr(module, "get_context"):
-		return {}
-	return module.get_context(section, page) or {}
+	get_context = getattr(get_theme_module(theme_dirs, f"sections/{section.type}.py"), "get_context", None)
+	return (get_context(section, page) or {}) if get_context else {}
 
 
 def format_section_wrapper(section, html, state_attribute=""):
@@ -229,11 +227,7 @@ def resolve_setting_value(setting, value, language):
 
 
 def get_theme_settings(theme_context):
-	setting_schemas = get_settings_schema(theme_context["dirs"])
-	if not setting_schemas:
-		return frappe._dict()
-	layout = get_layout(theme_context, "settings")
-	return resolve_settings(setting_schemas, (layout or {}).get("settings"), get_language())
+	return resolve_settings(get_settings_schema(theme_context["dirs"]), None, get_language())
 
 
 def get_context_theme_settings(context, theme_context):

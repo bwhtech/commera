@@ -7,13 +7,8 @@
  "field_order": [
   "theme",
   "template",
-  "column_break_main",
-  "published_on",
-  "published_by",
   "is_synced_from_settings",
-  "section_break_layout",
-  "layout",
-  "published_layout"
+  "sections"
  ],
  "fields": [
   {
@@ -26,29 +21,12 @@
    "reqd": 1
   },
   {
-   "description": "index, product, collection, page (or page.<suffix>), group:header, group:footer or settings",
+   "description": "index, product, collection, page (or page.<suffix>), group:header or group:footer",
    "fieldname": "template",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Template",
    "reqd": 1
-  },
-  {
-   "fieldname": "column_break_main",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "published_on",
-   "fieldtype": "Datetime",
-   "label": "Published On",
-   "read_only": 1
-  },
-  {
-   "fieldname": "published_by",
-   "fieldtype": "Link",
-   "label": "Published By",
-   "options": "User",
-   "read_only": 1
   },
   {
    "default": "0",
@@ -60,26 +38,15 @@
    "read_only": 1
   },
   {
-   "fieldname": "section_break_layout",
-   "fieldtype": "Section Break",
-   "label": "Layout"
-  },
-  {
-   "description": "The draft. The storefront never renders it.",
-   "fieldname": "layout",
-   "fieldtype": "JSON",
-   "label": "Layout"
-  },
-  {
-   "description": "What the storefront renders. Empty means the theme's default layout file.",
-   "fieldname": "published_layout",
-   "fieldtype": "JSON",
-   "label": "Published Layout"
+   "fieldname": "sections",
+   "fieldtype": "Table",
+   "label": "Sections",
+   "options": "Theme Layout Section"
   }
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-10-24 06:00:00",
+ "modified": "2026-10-24 12:00:00",
  "modified_by": "Administrator",
  "module": "Shop Themes",
  "name": "Theme Layout",

@@ -10,7 +10,6 @@ from frappe.utils.jinja import get_jenv
 from frappe.website.serve import get_response
 
 from commera.api.admin.pages import save_page
-from commera.sdk.testing import assert_theme_valid
 from commera.shop_themes.chrome_preview import (
 	COMMON_BLANKED_BLOCKS,
 	FOOTER_BLOCKS,
@@ -19,15 +18,9 @@ from commera.shop_themes.chrome_preview import (
 	render_chrome_preview,
 )
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, render_theme_context
-from commera.shop_themes.layouts import (
-	LAYOUT_CACHE_KEY,
-	clear_layout_cache,
-	layout_override,
-	save_theme_layout,
-)
+from commera.shop_themes.doctype.theme_layout.theme_layout import LAYOUT_CACHE_KEY, save_theme_layout
 from commera.shop_themes.render import render_themed_template
 from commera.shop_themes.section_render import ERROR_THROTTLE_CACHE_PREFIX
-from commera.shop_themes.theme_check import check_themes_on_disk
 from commera.shop_themes.theme_files import get_default_layout, get_section_schemas, theme_file_cache
 from commera.shop_themes.theme_resolver import ThemePageRenderer, get_theme_environment
 from commera.tests import get_test_configurator
@@ -92,8 +85,8 @@ class IntegrationTestBaseTheme(IntegrationTestCase):
 			return render_themed_template(template_source, {}, theme_name=BASE_THEME)
 
 	def render_base_layout(self, template, layout):
-		with layout_override(template, layout):
-			return self.render_base(f'{{{{ render_layout("{template}") }}}}')
+		save_theme_layout(BASE_THEME, template, layout)
+		return self.render_base(f'{{{{ render_layout("{template}") }}}}')
 
 	def get_published_item_group(self):
 		suffix = frappe.generate_hash(length=8).upper()
@@ -258,6 +251,9 @@ class IntegrationTestBaseTheme(IntegrationTestCase):
 
 	def test_collection_list_links_each_collection_to_its_listing(self):
 		item_group = self.get_published_item_group()
+		deleted_group = frappe.new_doc(
+			"Item Group", item_group_name=f"ZZ Gone {frappe.generate_hash(length=8)}", is_group=0
+		).insert()
 		layout = {
 			"sections": [
 				{
@@ -272,14 +268,16 @@ class IntegrationTestBaseTheme(IntegrationTestCase):
 						{
 							"id": "missing",
 							"type": "featured_collection",
-							"settings": {"collection": "ZZ Gone"},
+							"settings": {"collection": deleted_group.name},
 						},
 					],
 				}
 			]
 		}
+		save_theme_layout(BASE_THEME, "index", layout)
+		deleted_group.delete()
 
-		html = self.render_base_layout("index", layout)
+		html = self.render_base('{{ render_layout("index") }}')
 
 		self.assertEqual(SECTION_TYPE_PATTERN.findall(html), ["collection_list"])
 		self.assertEqual(html.count('class="group flex flex-col gap-3"'), 1)
@@ -310,17 +308,6 @@ class IntegrationTestBaseTheme(IntegrationTestCase):
 		self.assertEqual(groups, {item_group})
 		self.assertIn("subcategory=", html)
 
-	def test_saved_theme_settings_reach_the_page_as_css_variables(self):
-		self.addCleanup(clear_layout_cache, BASE_THEME, "settings")
-		save_theme_layout(
-			BASE_THEME, "settings", {"settings": {"accent": "#123456", "radius": 4}}, publish=True
-		)
-
-		html = self.render_base("{{ format_theme_settings_css() }}")
-
-		self.assertIn("--theme-accent: #123456;", html)
-		self.assertIn("--theme-radius: 4px;", html)
-
 	def test_a_child_theme_with_no_files_of_its_own_renders_the_base_store(self):
 		child_dir = tempfile.mkdtemp(prefix="commera_base_child_")
 		self.addCleanup(shutil.rmtree, child_dir)
@@ -340,10 +327,6 @@ class IntegrationTestBaseTheme(IntegrationTestCase):
 		self.assertIn('data-section-type="image_banner"', home_html)
 		self.assertEqual(list_response.status_code, 200)
 		self.assertIn("theme-base", list_html)
-
-	def test_base_theme_has_no_check_findings(self):
-		assert_theme_valid(BASE_SLUG)
-		self.assertEqual(check_themes_on_disk(BASE_SLUG), [])
 
 	def test_chrome_preview_uses_each_themes_own_layout(self):
 		preview_context = get_preview_context(frappe.get_cached_doc("Commera Settings"), "en")

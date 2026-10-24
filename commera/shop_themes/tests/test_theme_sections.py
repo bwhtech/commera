@@ -9,7 +9,6 @@ from frappe.utils import now_datetime
 from frappe.utils.jinja import get_jenv
 from markupsafe import Markup, escape
 
-from commera.shop_themes.layouts import layout_override
 from commera.shop_themes.section_data import block_products_cache, get_block_products
 from commera.shop_themes.section_render import (
 	EDITOR_LOCAL_KEY,
@@ -22,12 +21,10 @@ from commera.shop_themes.tests.theme_fixtures import ThemeFixtureMixin
 from commera.shop_themes.theme_files import (
 	find_theme_file,
 	get_default_layout,
-	get_section_schema,
 	get_section_schemas,
 	get_settings_schema,
+	get_theme_module,
 	is_valid_setting_value,
-	list_layout_templates,
-	load_theme_module,
 	read_theme_json,
 	theme_file_cache,
 )
@@ -55,8 +52,8 @@ class IntegrationTestThemeFiles(ThemeFixtureMixin, IntegrationTestCase):
 
 	def test_a_child_schema_overrides_the_parents_for_one_type(self):
 		self.write_fixture_file(self.child_dir, "sections/banner.json", {"name": "Child banner"})
-		self.assertEqual(get_section_schema(self.theme_dirs, "banner")["name"], "Child banner")
-		self.assertEqual(get_section_schema(self.theme_dirs, "hero")["name"], "Hero")
+		self.assertEqual(get_section_schemas(self.theme_dirs)["banner"]["name"], "Child banner")
+		self.assertEqual(get_section_schemas(self.theme_dirs)["hero"]["name"], "Hero")
 
 	def test_layout_files_resolve_child_first(self):
 		self.assertEqual(
@@ -64,12 +61,6 @@ class IntegrationTestThemeFiles(ThemeFixtureMixin, IntegrationTestCase):
 		)
 		self.assertEqual(get_default_layout(self.theme_dirs, "index")["sections"][0]["id"], "hero")
 		self.assertEqual(get_default_layout(self.theme_dirs, "product"), {"sections": []})
-		self.assertEqual(get_default_layout(self.theme_dirs, "settings"), {"settings": {}})
-
-	def test_layout_templates_list_pages_and_groups(self):
-		self.assertEqual(
-			list_layout_templates(self.theme_dirs), ["collection", "index", "page", "group:header"]
-		)
 
 	def test_the_child_settings_file_replaces_the_parents_whole(self):
 		settings = get_settings_schema(self.theme_dirs)
@@ -118,23 +109,31 @@ class IntegrationTestThemeFiles(ThemeFixtureMixin, IntegrationTestCase):
 			)
 		)
 
-	def test_section_controllers_load_under_their_own_namespace(self):
-		module = load_theme_module(self.theme_dirs, "sections/with_data.py", "theme_sections")
-		self.assertEqual(
-			module.__name__, "commera.shop_themes.theme_sections.fixture_parent.sections_with_data"
-		)
-		self.assertIs(load_theme_module(self.theme_dirs, "sections/with_data.py", "theme_sections"), module)
+	def test_section_controllers_import_from_the_theme_that_ships_them(self):
+		module = get_theme_module(self.theme_dirs, "sections/with_data.py")
+		self.assertEqual(module.__name__, f"{self.fixture_package}.themes.fixture_parent.sections.with_data")
+		self.assertIs(get_theme_module(self.theme_dirs, "sections/with_data.py"), module)
+		self.assertIsNone(get_theme_module(self.theme_dirs, "sections/banner.py"))
 
-	def test_page_controllers_still_load_under_theme_pages(self):
+	def test_a_child_theme_controller_overrides_the_parents(self):
+		self.write_fixture_file(
+			self.child_dir,
+			"sections/with_data.py",
+			'def get_context(section, page):\n\treturn {"controller_heading": "child"}\n',
+		)
+		module = get_theme_module(self.theme_dirs, "sections/with_data.py")
+		self.assertEqual(module.__name__, f"{self.fixture_package}.themes.fixture_child.sections.with_data")
+
+	def test_page_controllers_import_the_same_way(self):
 		self.write_fixture_file(self.parent_dir, "pages/about.py", "def get_context(context):\n\tpass\n")
 		module = load_page_controller(self.theme_dirs, "pages/about.html")
-		self.assertEqual(module.__name__, "commera.shop_themes.theme_pages.fixture_parent.pages_about")
+		self.assertEqual(module.__name__, f"{self.fixture_package}.themes.fixture_parent.pages.about")
 
 
 class IntegrationTestSectionResolution(ThemeFixtureMixin, IntegrationTestCase):
 	def setUp(self):
 		self.add_fixture_theme()
-		self.hero_schema = get_section_schema(self.theme_dirs, "hero")
+		self.hero_schema = get_section_schemas(self.theme_dirs)["hero"]
 
 	def resolve_hero(self, settings=None, blocks=None, language="en"):
 		stored = {"id": "hero", "type": "hero", "settings": settings or {}, "blocks": blocks or []}
@@ -267,8 +266,8 @@ class IntegrationTestRenderLayout(ThemeFixtureMixin, IntegrationTestCase):
 		return theme_env.from_string(f'{{{{ render_layout("{template}") }}}}').render(context)
 
 	def render_sections(self, *sections, template="index"):
-		with layout_override(template, {"sections": list(sections)}):
-			return self.render(template)
+		self.save_fixture_layout(template, sections)
+		return self.render(template)
 
 	def count_error_logs(self, title, started_at):
 		return len(frappe.get_all("Error Log", filters={"method": title, "creation": [">=", started_at]}))
@@ -305,8 +304,8 @@ class IntegrationTestRenderLayout(ThemeFixtureMixin, IntegrationTestCase):
 		self.assertIn('<p class="slide">1:First</p><span class="badge">Sale</span>', html)
 
 	def test_header_and_footer_groups_render_around_the_page(self):
-		with layout_override("group:header", {"sections": [{"id": "bar", "type": "header_bar"}]}):
-			html = self.render_sections({"id": "banner", "type": "banner"})
+		self.save_fixture_layout("group:header", [{"id": "bar", "type": "header_bar"}])
+		html = self.render_sections({"id": "banner", "type": "banner"})
 		self.assertTrue(html.startswith('<section id="section-bar" data-section-type="header_bar">'))
 
 	def test_the_editor_marks_sections_and_blocks_on_their_own_root(self):

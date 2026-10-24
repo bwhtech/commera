@@ -10,9 +10,12 @@ from frappe.utils import set_request
 from frappe.website.serve import get_response
 
 from commera.patches import move_summer_home_into_theme_layout as summer_home_patch
-from commera.sdk.testing import assert_theme_valid
 from commera.shop_themes.doctype.shop_theme.shop_theme import THEME_CONTEXT_CACHE_KEY, get_theme_context
-from commera.shop_themes.layouts import LAYOUT_CACHE_KEY, layout_override, save_theme_layout
+from commera.shop_themes.doctype.theme_layout.theme_layout import (
+	LAYOUT_CACHE_KEY,
+	get_saved_layout,
+	save_theme_layout,
+)
 from commera.shop_themes.section_render import ERROR_THROTTLE_CACHE_PREFIX
 from commera.shop_themes.summer_layout import (
 	SUMMER_SETTINGS_DOCTYPE,
@@ -21,7 +24,6 @@ from commera.shop_themes.summer_layout import (
 	get_summer_layout_themes,
 )
 from commera.shop_themes.tests.theme_fixtures import write_theme_files
-from commera.shop_themes.theme_check import check_themes_on_disk
 from commera.shop_themes.theme_files import get_default_layout, read_theme_json, theme_file_cache
 from commera.utils import get_product_list
 
@@ -132,14 +134,17 @@ class IntegrationTestSummerLayout(IntegrationTestCase):
 			read_theme_json(get_theme_context(SUMMER_THEME)["dirs"], f"sections/{section_type}.json")
 		)
 
-	def get_saved_layouts(self, theme=SUMMER_THEME):
-		row = frappe.db.get_value(
-			"Theme Layout",
-			{"theme": theme, "template": "index"},
-			["layout", "published_layout"],
-			as_dict=True,
-		)
-		return row and (frappe.parse_json(row.layout), frappe.parse_json(row.published_layout))
+	def assert_saved_layout(self, expected, theme=SUMMER_THEME):
+		saved = get_saved_layout(theme, "index")
+		self.assertEqual(get_outline(saved), get_outline(expected))
+		for saved_section, section in zip(saved["sections"], expected["sections"], strict=True):
+			self.assert_settings_kept(saved_section, section)
+			for saved_block, block in zip(saved_section["blocks"], section.get("blocks") or [], strict=True):
+				self.assert_settings_kept(saved_block, block)
+
+	def assert_settings_kept(self, saved, expected):
+		settings = expected.get("settings") or {}
+		self.assertEqual({key: saved["settings"].get(key) for key in settings}, settings)
 
 	def get_home(self, lang="en"):
 		frappe.local.lang = lang
@@ -209,7 +214,7 @@ class IntegrationTestSummerLayout(IntegrationTestCase):
 				expected = build_summer_index_layout(settings, theme)
 				filters = {"theme": theme, "template": "index"}
 				self.assertEqual(frappe.db.count("Theme Layout", filters), 1)
-				self.assertEqual(self.get_saved_layouts(theme), (expected, expected))
+				self.assert_saved_layout(expected, theme)
 				self.assertEqual(frappe.db.get_value("Theme Layout", filters, "is_synced_from_settings"), 1)
 
 	def test_patch_logs_a_theme_whose_layout_is_invalid_and_moves_the_others(self):
@@ -223,8 +228,8 @@ class IntegrationTestSummerLayout(IntegrationTestCase):
 
 		summer_home_patch.execute()
 
-		self.assertIsNone(self.get_saved_layouts(CHILD_THEME))
-		self.assertIsNotNone(self.get_saved_layouts(SUMMER_THEME))
+		self.assertIsNone(get_saved_layout(CHILD_THEME, "index"))
+		self.assertIsNotNone(get_saved_layout(SUMMER_THEME, "index"))
 		error_logs = frappe.get_all(
 			"Error Log",
 			filters={"reference_name": CHILD_THEME, "creation": [">=", started_at]},
@@ -235,53 +240,49 @@ class IntegrationTestSummerLayout(IntegrationTestCase):
 	def test_patch_leaves_an_existing_row_alone(self):
 		frappe.db.delete("Theme Layout", {"theme": SUMMER_THEME, "template": "index"})
 		edited = {"sections": [{"id": "marquee", "type": "marquee"}]}
-		save_theme_layout(SUMMER_THEME, "index", edited, publish=True)
+		save_theme_layout(SUMMER_THEME, "index", edited)
 
 		summer_home_patch.execute()
 
-		self.assertEqual(self.get_saved_layouts(), (edited, edited))
+		self.assert_saved_layout(edited)
 
-	def test_saving_settings_republishes_the_layout(self):
+	def test_saving_settings_rewrites_the_layout(self):
 		frappe.db.delete("Theme Layout", {"theme": SUMMER_THEME, "template": "index"})
 		settings = frappe.get_doc(SUMMER_SETTINGS_DOCTYPE)
 		settings.save()
 		settings.products_title = "Fresh this week"
 		settings.save()
 
-		draft, published = self.get_saved_layouts()
-		self.assertEqual(
-			self.get_section(published, "products_grid")["settings"]["heading"], "Fresh this week"
-		)
-		self.assertEqual(draft, published)
+		saved = get_saved_layout(SUMMER_THEME, "index")
+		self.assertEqual(self.get_section(saved, "products_grid")["settings"]["heading"], "Fresh this week")
 
 	def test_saving_settings_leaves_an_edited_layout_alone(self):
 		settings = frappe.get_doc(SUMMER_SETTINGS_DOCTYPE)
 		settings.save()
 		edited = build_summer_index_layout(settings)
 		edited["sections"].reverse()
-		save_theme_layout(SUMMER_THEME, "index", edited, publish=True)
+		save_theme_layout(SUMMER_THEME, "index", edited)
 
 		settings.products_title = "Fresh this week"
 		settings.save()
 
-		self.assertEqual(self.get_saved_layouts(), (edited, edited))
+		self.assert_saved_layout(edited)
 
 	def test_saving_settings_still_syncs_after_the_default_layout_file_changed(self):
 		settings = frappe.get_doc(SUMMER_SETTINGS_DOCTYPE)
 		from_older_release = build_summer_index_layout(settings)
 		from_older_release["sections"].reverse()
-		save_theme_layout(SUMMER_THEME, "index", from_older_release, publish=True, synced_from_settings=True)
+		save_theme_layout(SUMMER_THEME, "index", from_older_release, synced_from_settings=True)
 
 		settings.products_title = "Fresh this week"
 		settings.save()
 
-		expected = build_summer_index_layout(settings)
-		self.assertEqual(self.get_saved_layouts(), (expected, expected))
+		self.assert_saved_layout(build_summer_index_layout(settings))
 
 	def test_any_other_save_takes_the_row_away_from_the_settings(self):
 		filters = {"theme": SUMMER_THEME, "template": "index"}
 		layout = build_summer_index_layout(frappe.get_doc(SUMMER_SETTINGS_DOCTYPE))
-		save_theme_layout(SUMMER_THEME, "index", layout, publish=True, synced_from_settings=True)
+		save_theme_layout(SUMMER_THEME, "index", layout, synced_from_settings=True)
 		self.assertEqual(frappe.db.get_value("Theme Layout", filters, "is_synced_from_settings"), 1)
 
 		save_theme_layout(SUMMER_THEME, "index", layout)
@@ -296,7 +297,7 @@ class IntegrationTestSummerLayout(IntegrationTestCase):
 
 		frappe.get_doc(SUMMER_SETTINGS_DOCTYPE).save(ignore_permissions=True)
 
-		self.assertIsNotNone(self.get_saved_layouts())
+		self.assertIsNotNone(get_saved_layout(SUMMER_THEME, "index"))
 
 	def test_a_child_theme_gets_a_layout_from_its_own_files(self):
 		deals = self.get_summer_schema("deals")
@@ -317,12 +318,12 @@ class IntegrationTestSummerLayout(IntegrationTestCase):
 		settings.deals_link_label = "All deals"
 		settings.save()
 
-		child_layout = self.get_saved_layouts(CHILD_THEME)[1]
+		child_layout = get_saved_layout(CHILD_THEME, "index")
 		self.assertEqual([section["type"] for section in child_layout["sections"]], ["deals", "offers"])
 		self.assertEqual(
 			self.get_section(child_layout, "deals")["settings"], {"heading": "Hot & cheap", "link_url": ""}
 		)
-		summer_deals = self.get_section(self.get_saved_layouts()[1], "deals")
+		summer_deals = self.get_section(get_saved_layout(SUMMER_THEME, "index"), "deals")
 		self.assertEqual(summer_deals["settings"]["link_label"], "All deals")
 
 	def test_saving_settings_creates_a_missing_row(self):
@@ -330,15 +331,15 @@ class IntegrationTestSummerLayout(IntegrationTestCase):
 
 		frappe.get_doc(SUMMER_SETTINGS_DOCTYPE).save()
 
-		self.assertIsNotNone(self.get_saved_layouts())
+		self.assertIsNotNone(get_saved_layout(SUMMER_THEME, "index"))
 
 	def test_home_shows_a_section_for_each_seeded_setting(self):
 		frappe.db.set_single_value("Shop Theme Settings", "active_theme", SUMMER_THEME)
 		frappe.clear_cache()
 
-		with layout_override("index", build_summer_index_layout(self.get_seeded_settings())):
-			html = self.get_home()
-			arabic_html = self.get_home("ar")
+		save_theme_layout(SUMMER_THEME, "index", build_summer_index_layout(self.get_seeded_settings()))
+		html = self.get_home()
+		arabic_html = self.get_home("ar")
 
 		for section_type in SETTINGS_DRIVEN_SECTIONS:
 			with self.subTest(section_type=section_type):
@@ -351,10 +352,8 @@ class IntegrationTestSummerLayout(IntegrationTestCase):
 		frappe.db.set_single_value("Shop Theme Settings", "active_theme", SUMMER_THEME)
 		frappe.clear_cache()
 
-		with (
-			layout_override("index", build_summer_index_layout(self.get_seeded_settings())),
-			patch("commera.shop_themes.section_data.get_product_list", wraps=get_product_list) as fetch,
-		):
+		save_theme_layout(SUMMER_THEME, "index", build_summer_index_layout(self.get_seeded_settings()))
+		with patch("commera.shop_themes.section_data.get_product_list", wraps=get_product_list) as fetch:
 			self.get_home()
 
 		self.assertEqual(fetch.call_count, 1)
@@ -363,11 +362,18 @@ class IntegrationTestSummerLayout(IntegrationTestCase):
 		frappe.db.set_single_value("Shop Theme Settings", "active_theme", SUMMER_THEME)
 		frappe.clear_cache()
 
-		with layout_override("index", build_summer_index_layout(self.get_empty_settings())):
-			rendered_types = SECTION_TYPE_PATTERN.findall(self.get_home())
+		save_theme_layout(SUMMER_THEME, "index", build_summer_index_layout(self.get_empty_settings()))
+		rendered_types = SECTION_TYPE_PATTERN.findall(self.get_home())
 
 		self.assertFalse(set(rendered_types) & set(SETTINGS_DRIVEN_SECTIONS))
 
-	def test_summer_theme_has_no_check_findings(self):
-		assert_theme_valid("summer_theme")
-		self.assertEqual(check_themes_on_disk("summer_theme"), [])
+
+def get_outline(layout):
+	return [
+		(
+			section["id"],
+			section["type"],
+			[(block["id"], block["type"]) for block in section.get("blocks") or []],
+		)
+		for section in layout["sections"]
+	]

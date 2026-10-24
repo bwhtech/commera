@@ -1,7 +1,7 @@
 import frappe
 
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context
-from commera.shop_themes.layouts import DEFAULT_MAX_BLOCKS, save_theme_layout
+from commera.shop_themes.doctype.theme_layout.theme_layout import DEFAULT_MAX_BLOCKS, save_theme_layout
 from commera.shop_themes.theme_files import get_default_layout, get_section_schemas, is_valid_setting_value
 
 SUMMER_THEME = "Summer Theme"
@@ -125,22 +125,17 @@ def get_ordered_variants(variant_names):
 
 def sync_summer_index_layout(settings):
 	for theme in get_summer_layout_themes():
-		saved = frappe.db.get_value(
-			"Theme Layout",
-			{"theme": theme, "template": "index"},
-			["layout", "published_layout", "is_synced_from_settings"],
-			as_dict=True,
+		is_synced = frappe.db.get_value(
+			"Theme Layout", {"theme": theme, "template": "index"}, "is_synced_from_settings"
 		)
-		if saved and not saved.is_synced_from_settings:
-			continue
-
-		layout = build_summer_index_layout(settings, theme)
-		saved_layouts = saved and [frappe.parse_json(saved.layout), frappe.parse_json(saved.published_layout)]
-		if saved_layouts == [layout, layout]:
-			continue
-		save_theme_layout(
-			theme, "index", layout, publish=True, ignore_permissions=True, synced_from_settings=True
-		)
+		if is_synced is None or is_synced:
+			save_theme_layout(
+				theme,
+				"index",
+				build_summer_index_layout(settings, theme),
+				ignore_permissions=True,
+				synced_from_settings=True,
+			)
 
 
 def get_summer_layout_themes():

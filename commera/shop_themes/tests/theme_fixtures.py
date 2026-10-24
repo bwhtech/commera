@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import sys
 import tempfile
 
 import frappe
@@ -9,7 +10,7 @@ from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	THEME_CONTEXT_CACHE_KEY,
 	render_theme_context,
 )
-from commera.shop_themes.layouts import LAYOUT_CACHE_KEY, LAYOUT_OVERRIDES_LOCAL_KEY
+from commera.shop_themes.doctype.theme_layout.theme_layout import LAYOUT_CACHE_KEY, save_theme_layout
 from commera.shop_themes.section_render import EDITOR_LOCAL_KEY, ERROR_THROTTLE_CACHE_PREFIX
 from commera.shop_themes.theme_files import theme_file_cache
 
@@ -188,8 +189,11 @@ class ThemeFixtureMixin:
 
 		self.fixture_root = tempfile.mkdtemp(prefix="commera_theme_sections_")
 		self.addCleanup(shutil.rmtree, self.fixture_root)
-		self.parent_dir = os.path.join(self.fixture_root, "fixture_parent")
-		self.child_dir = os.path.join(self.fixture_root, "fixture_child")
+		self.fixture_package = os.path.basename(self.fixture_root)
+		self.add_importable_root(self.fixture_root)
+		themes_dir = os.path.join(self.fixture_root, self.fixture_package, "themes")
+		self.parent_dir = os.path.join(themes_dir, "fixture_parent")
+		self.child_dir = os.path.join(themes_dir, "fixture_child")
 		write_theme_files(self.parent_dir, PARENT_FILES)
 		write_theme_files(self.child_dir, CHILD_FILES)
 		self.theme_dirs = [self.child_dir, self.parent_dir]
@@ -210,8 +214,19 @@ class ThemeFixtureMixin:
 		frappe.cache.hdel(THEME_CONTEXT_CACHE_KEY, FIXTURE_THEME_NAME)
 		frappe.cache.delete_value(LAYOUT_CACHE_KEY)
 		frappe.cache.delete_keys(f"{ERROR_THROTTLE_CACHE_PREFIX}|{FIXTURE_THEME_NAME}")
-		setattr(frappe.local, LAYOUT_OVERRIDES_LOCAL_KEY, None)
 		setattr(frappe.local, EDITOR_LOCAL_KEY, None)
+
+	def add_importable_root(self, root):
+		sys.path.insert(0, root)
+		self.addCleanup(sys.path.remove, root)
+		self.addCleanup(self.forget_modules, os.path.basename(root))
+
+	def forget_modules(self, package):
+		for module_name in [name for name in sys.modules if name.split(".")[0] == package]:
+			del sys.modules[module_name]
+
+	def save_fixture_layout(self, template, sections):
+		save_theme_layout(self.theme_name, template, {"sections": list(sections)})
 
 	def write_fixture_file(self, theme_dir, relative_path, content):
 		write_theme_files(theme_dir, {relative_path: content})

@@ -1,34 +1,15 @@
 import copy
-import glob
-import importlib.util
 import json
 import os
 import re
 from pathlib import Path
 
 import frappe
-from frappe import get_app_path
 
 from commera.shop_themes.doctype.shop_theme.shop_theme import is_within_directory
 
 DYNAMIC_PAGE_LANG_PREFIXES = frozenset({"en", "ar"})
 
-SETTING_TYPES = frozenset(
-	{
-		"text",
-		"textarea",
-		"url",
-		"check",
-		"select",
-		"range",
-		"color",
-		"image",
-		"collection",
-		"product",
-		"page",
-		"link",
-	}
-)
 TEXT_SETTING_TYPES = frozenset({"text", "textarea", "url"})
 LINK_DOCTYPES = {"collection": "Item Group", "product": "Style Attribute Variant", "page": "Shop Web Page"}
 LINK_SETTING_TYPES = frozenset({*LINK_DOCTYPES, "link"})
@@ -37,29 +18,9 @@ URL_SCHEME_PATTERN = re.compile(r"^([^/?#:]*):")
 SAFE_URL_SCHEMES = frozenset({"http", "https", "mailto", "tel"})
 SAFE_IMAGE_PREFIXES = ("/files/", "/private/files/", "/assets/", "http://", "https://")
 IMAGE_URL_UNSAFE_PATTERN = re.compile(r"[\'\"()\\<>\x00-\x1f]")
-SNAKE_CASE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
-RESERVED_BLOCK_TYPES = frozenset(
-	{
-		"product",
-		"collection",
-		"page",
-		"cart",
-		"section",
-		"block",
-		"settings",
-		"theme_settings",
-		"request",
-		"store",
-		"menus",
-		"search",
-		"template",
-	}
-)
-
 GROUP_TEMPLATE_PREFIX = "group:"
 
 theme_file_cache = {}
-theme_modules = {}
 
 
 def find_theme_file(theme_dirs, relative_path):
@@ -127,10 +88,6 @@ def load_section_schemas(theme_dirs):
 	return schemas
 
 
-def get_section_schema(theme_dirs, section_type):
-	return get_section_schemas(theme_dirs).get(section_type)
-
-
 def get_settings_schema(theme_dirs):
 	return get_cached(("settings", tuple(theme_dirs)), lambda: load_settings_schema(theme_dirs))
 
@@ -147,50 +104,19 @@ def get_layout_file(template):
 
 
 def get_default_layout(theme_dirs, template):
-	if template == "settings":
-		return {"settings": {}}
 	layout = read_theme_json(theme_dirs, get_layout_file(template))
 	if not layout:
 		return {"sections": []}
 	return copy.deepcopy(layout)
 
 
-def list_layout_templates(theme_dirs):
-	templates = list_theme_files(theme_dirs, "layouts", ".json")
-	groups = list_theme_files(theme_dirs, "layouts/groups", ".json")
-	return templates + [f"{GROUP_TEMPLATE_PREFIX}{group}" for group in groups]
-
-
-def load_theme_module(theme_dirs, relative_path, module_namespace):
-	module_path = find_theme_file(theme_dirs, relative_path)
-	if not module_path:
+def get_theme_module(theme_dirs, relative_path):
+	path = find_theme_file(theme_dirs, relative_path)
+	if not path:
 		return None
-
-	modified_time = os.path.getmtime(module_path)
-	cached = theme_modules.get(module_path)
-	if cached and cached[0] == modified_time:
-		return cached[1]
-
-	module_name = get_theme_module_name(theme_dirs, module_path, relative_path, module_namespace)
-	spec = importlib.util.spec_from_file_location(module_name, module_path)
-	module = importlib.util.module_from_spec(spec)
-	spec.loader.exec_module(module)
-	theme_modules[module_path] = (modified_time, module)
-	return module
-
-
-def get_theme_module_name(theme_dirs, module_path, relative_path, module_namespace):
-	theme_slug = ""
-	for theme_dir in theme_dirs:
-		if os.path.join(theme_dir, relative_path) == module_path:
-			theme_slug = os.path.basename(theme_dir.rstrip(os.sep))
-			break
-
-	module_slug = os.path.splitext(relative_path)[0]
-	for separator in (os.sep, "/", "-", "."):
-		module_slug = module_slug.replace(separator, "_")
-
-	return f"commera.shop_themes.{module_namespace}.{theme_slug}.{module_slug}"
+	# A theme folder is <app>/<app>/themes/<slug>, so its .py files import like any other app module.
+	app_root = Path(path).parents[len(Path(os.path.normpath(relative_path)).parts) + 2]
+	return frappe.get_module(".".join(Path(path).with_suffix("").relative_to(app_root).parts))
 
 
 def get_select_values(setting):
@@ -272,54 +198,3 @@ def get_link_doctype(setting):
 	if setting.get("type") == "link":
 		return setting.get("doctype")
 	return LINK_DOCTYPES.get(setting.get("type"))
-
-
-def get_theme_records_on_disk(apps_path=None):
-	records = {}
-	for app, package_path in get_app_package_paths(apps_path):
-		for record_path in sorted(glob.glob(os.path.join(package_path, "*", "shop_theme", "*", "*.json"))):
-			record = load_record_file(record_path)
-			if record and record.get("doctype") == "Shop Theme" and record.get("name"):
-				slug = frappe.scrub(record["name"])
-				records[slug] = {
-					"name": record["name"],
-					"parent_theme": record.get("parent_theme"),
-					"app": app,
-					"record_path": record_path,
-					"theme_dir": os.path.join(package_path, "themes", slug),
-				}
-	return records
-
-
-def get_app_package_paths(apps_path=None):
-	if apps_path is None:
-		return [(app, get_app_path(app)) for app in frappe.get_all_apps(with_internal_apps=False)]
-	return [
-		(app, os.path.join(apps_path, app, app))
-		for app in sorted(os.listdir(apps_path))
-		if os.path.isfile(os.path.join(apps_path, app, app, "modules.txt"))
-	]
-
-
-def load_record_file(path):
-	try:
-		record = json.loads(Path(path).read_text())
-	except (OSError, ValueError):
-		return None
-	return record if isinstance(record, dict) else None
-
-
-def find_theme_dirs_on_disk(slug, apps_path=None):
-	return get_theme_chain_dirs(get_theme_records_on_disk(apps_path), slug)
-
-
-def get_theme_chain_dirs(records, slug):
-	dirs = []
-	visited = set()
-	while slug in records and slug not in visited:
-		visited.add(slug)
-		record = records[slug]
-		if os.path.isdir(record["theme_dir"]):
-			dirs.append(record["theme_dir"])
-		slug = frappe.scrub(record["parent_theme"]) if record["parent_theme"] else None
-	return dirs

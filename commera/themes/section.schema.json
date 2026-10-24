@@ -2,7 +2,7 @@
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://commera.app/schemas/section.schema.json",
 	"title": "Commera theme section",
-	"description": "Schema of a section in <theme>/sections/<type>.json. bench commera theme check runs the same rules.",
+	"description": "Schema of a section in <theme>/sections/<type>.json.",
 	"type": "object",
 	"additionalProperties": false,
 	"required": ["name"],

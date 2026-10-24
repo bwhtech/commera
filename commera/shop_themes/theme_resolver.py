@@ -11,7 +11,7 @@ from jinja2.utils import LRUCache
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import get_compiled_routes
 from commera.shop_themes.section_render import get_theme_settings
-from commera.shop_themes.theme_files import DYNAMIC_PAGE_LANG_PREFIXES, find_theme_file, load_theme_module
+from commera.shop_themes.theme_files import DYNAMIC_PAGE_LANG_PREFIXES, find_theme_file, get_theme_module
 
 # page_renderer runs before every built-in renderer: a segment missing here is a route hijack, not a 404.
 RESERVED_PATH_SEGMENTS = frozenset(
@@ -44,7 +44,7 @@ DEFAULT_APP_NAME = "Commera"
 
 def load_page_controller(theme_dirs, template_relative_path):
 	controller_relative_path = f"{os.path.splitext(template_relative_path)[0]}.py"
-	return load_theme_module(theme_dirs, controller_relative_path, "theme_pages")
+	return get_theme_module(theme_dirs, controller_relative_path)
 
 
 def run_page_controller(theme_dirs, template_relative_path, context):
