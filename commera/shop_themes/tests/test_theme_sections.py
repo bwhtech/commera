@@ -77,6 +77,7 @@ class IntegrationTestThemeFiles(ThemeFixtureMixin, IntegrationTestCase):
 		self.assertEqual(settings[0]["max"], 40)
 
 		os.remove(os.path.join(self.child_dir, "settings.json"))
+		theme_file_cache.clear()
 		self.assertEqual(
 			[setting["id"] for setting in get_settings_schema(self.theme_dirs)],
 			["accent", "radius", "tagline"],

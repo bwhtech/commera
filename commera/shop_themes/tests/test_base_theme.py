@@ -191,7 +191,8 @@ class IntegrationTestBaseTheme(IntegrationTestCase):
 
 	def test_store_pages_render_through_the_theme(self):
 		self.activate(BASE_THEME)
-		product_route = frappe.db.get_value("Style Attribute Variant", {"is_published": 1}, "route")
+		item_group = self.get_published_item_group()
+		product_route = frappe.db.get_value("Style Attribute Variant", {"item_group": item_group}, "route")
 
 		for path in ("/en/products", f"/en/products/{product_route}", "/en/cart"):
 			with self.subTest(path=path):
