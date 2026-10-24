@@ -1,0 +1,25 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Similar products",
+	"icon": "grid",
+	"settings": [],
+	"blocks": {
+		"pick": {
+			"name": "Product",
+			"icon": "tag",
+			"settings": [
+				{
+					"id": "product",
+					"type": "product",
+					"label": "Product",
+					"default": ""
+				}
+			]
+		}
+	},
+	"presets": [
+		{
+			"name": "Similar products"
+		}
+	]
+}

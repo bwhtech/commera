@@ -1,10 +1,10 @@
+{% if header_data.navigation_menu %}
 {% set category_labels = header_data.navigation_menu | map(attribute="label") | list %}
 
 {% set pass_count = (6 / (category_labels | length)) | round(0, "ceil") | int %}
 
 <section class="content-inner-3 overflow-hidden">
 	<div class="dz-features-wrapper overflow-hidden">
-		{# @keyframes ticker ends at translateX(-100%), so the second track lands where the first started; the duplicate is decorative. #}
 		{% for track in range(2) %}
 		<ul class="dz-features text-wrapper"{% if not loop.first %} aria-hidden="true"{% endif %}>
 			{% for pass in range(pass_count) %}{% for label in category_labels %}
@@ -21,3 +21,4 @@
 		{% endfor %}
 	</div>
 </section>
+{% endif %}

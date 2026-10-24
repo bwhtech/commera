@@ -1,0 +1,32 @@
+{% from "components/macros/product_card.html" import variant_card %}
+
+{% macro pick(block) %}
+{% set product = products_by_block.get(block.id) %}
+{% if product %}
+<div class="swiper-slide"{{ block.editor_attributes }}>
+	{{ variant_card(product, style="style-2", wow_delay="%.1fs" | format(0.2 + 0.2 * block.index)) }}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% if products %}
+<section class="content-inner-2 overflow-hidden">
+	<div class="container">
+		<div class="section-head style-1 wow fadeInUp d-lg-flex justify-content-between" data-wow-delay="0.2s">
+			<div class="left-content">
+				<h2 class="title">{{ section.settings.heading }}</h2>
+			</div>
+			{% if section.settings.link_label %}
+			<a href="{{ section.settings.link_url or '/' ~ (frappe.lang or 'en') ~ '/products' }}" class="text-secondary font-14 d-flex align-items-center gap-1">{{ section.settings.link_label }}
+				<i class="icon feather icon-chevron-right font-18"></i>
+			</a>
+			{% endif %}
+		</div>
+		<div class="swiper swiper-four swiper-visible" data-summer-carousel="deals" data-carousel-loop="true">
+			<div class="swiper-wrapper">
+				{% for block in section.blocks %}{{ render_block(block) }}{% endfor %}
+			</div>
+		</div>
+	</div>
+</section>
+{% endif %}

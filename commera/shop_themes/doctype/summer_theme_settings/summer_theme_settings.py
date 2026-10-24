@@ -3,6 +3,8 @@
 
 from frappe.model.document import Document
 
+from commera.shop_themes.summer_layout import sync_summer_index_layout
+
 
 class SummerThemeSettings(Document):
 	# begin: auto-generated types
@@ -40,3 +42,6 @@ class SummerThemeSettings(Document):
 	# end: auto-generated types
 
 	_DOCTYPE_NAME = "Summer Theme Settings"
+
+	def on_update(self):
+		sync_summer_index_layout(self)
