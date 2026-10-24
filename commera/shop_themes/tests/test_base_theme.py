@@ -30,6 +30,7 @@ from commera.shop_themes.section_render import ERROR_THROTTLE_CACHE_PREFIX
 from commera.shop_themes.theme_check import check_themes_on_disk
 from commera.shop_themes.theme_files import get_default_layout, get_section_schemas, theme_file_cache
 from commera.shop_themes.theme_resolver import ThemePageRenderer, get_theme_environment
+from commera.tests import get_test_configurator
 
 BASE_THEME = "Shop Base Theme"
 BASE_SLUG = "shop_base_theme"
@@ -95,9 +96,36 @@ class IntegrationTestBaseTheme(IntegrationTestCase):
 			return self.render_base(f'{{{{ render_layout("{template}") }}}}')
 
 	def get_published_item_group(self):
-		return frappe.db.get_value("Style Attribute Variant", {"is_published": 1}, "item_group")
+		suffix = frappe.generate_hash(length=8).upper()
+		item_group = frappe.new_doc("Item Group")
+		item_group.item_group_name = f"Base Theme Group {suffix}"
+		item_group.parent_item_group = "All Item Groups"
+		item_group.is_group = 0
+		item_group.custom_displayname = item_group.item_group_name
+		item_group.insert()
+
+		item = frappe.new_doc("Item")
+		item.item_code = f"BASE-THEME-{suffix}"
+		item.item_name = item.item_code
+		item.item_group = item_group.name
+		item.stock_uom = "Nos"
+		item.insert()
+
+		variant = frappe.new_doc("Style Attribute Variant")
+		variant.configurator = get_test_configurator()
+		variant.item_style = item.name
+		variant.item_group = item_group.name
+		variant.attribute_value = f"Val {suffix}"
+		variant.display_name = f"Base Theme Product {suffix}"
+		variant.route = f"base-theme-{suffix.lower()}"
+		variant.append("images", {"image": "/assets/base-theme-test.jpg"})
+		variant.append("sizes", {"size": "M", "item_code": item.name})
+		variant.is_published = 1
+		variant.insert(ignore_permissions=True)
+		return item_group.name
 
 	def test_home_renders_the_default_layout_through_the_theme(self):
+		self.get_published_item_group()
 		self.activate(BASE_THEME)
 
 		response, html = self.get_page("/en")
@@ -203,6 +231,7 @@ class IntegrationTestBaseTheme(IntegrationTestCase):
 		self.assertIn("Page not found", html)
 
 	def test_every_section_renders_alone_with_its_defaults(self):
+		self.get_published_item_group()
 		schemas = get_section_schemas(self.base_dirs)
 		self.assertEqual(set(schemas), BASE_SECTION_TYPES)
 		errors_before = self.get_base_error_logs()

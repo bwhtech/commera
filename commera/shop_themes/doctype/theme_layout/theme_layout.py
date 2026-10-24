@@ -37,11 +37,13 @@ class ThemeLayout(Document):
 		try:
 			layout = frappe.parse_json(value)
 		except ValueError:
-			frappe.throw(_("{0} is not valid JSON").format(self.meta.get_label(fieldname)))
+			frappe.throw(_("{0} is not valid JSON").format(_(self.meta.get_label(fieldname))))
 
 		errors = validate_layout(theme_dirs, self.template, layout)
 		if errors:
-			frappe.throw(errors, title=_("Invalid {0}").format(self.meta.get_label(fieldname)), as_list=True)
+			frappe.throw(
+				errors, title=_("Invalid {0}").format(_(self.meta.get_label(fieldname))), as_list=True
+			)
 
 	def publish(self):
 		self.published_layout = self.layout
