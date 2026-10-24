@@ -1,0 +1,51 @@
+{% from "components/macros/product_card.html" import variant_card %}
+
+{% macro pick(block) %}
+{% set product = products_by_block.get(block.id) %}
+{% if product %}
+<li class="card-container col-6 col-xl-3 col-lg-3 col-md-4 col-sm-6"
+	x-show='!active_group || active_group === {{ (product.item_group or "") | tojson }}'{{ block.editor_attributes }}>
+	{{ variant_card(product, wow_delay="%.1fs" | format(0.2 * block.index)) }}
+</li>
+{% endif %}
+{% endmacro %}
+
+{% set product_groups = products | map(attribute="item_group") | select | unique | list %}
+{% if products %}
+<section class="content-inner" x-data="{ active_group: '' }">
+	<div class="container">
+		<div class="row justify-content-md-between align-items-start">
+			<div class="col-lg-6 col-md-12">
+				<div class="section-head style-1 m-b30 wow fadeInUp" data-wow-delay="0.2s">
+					<div class="left-content">
+						<h2 class="title">{{ section.settings.heading }}</h2>
+					</div>
+				</div>
+			</div>
+			{% if product_groups %}
+			<div class="col-lg-6 col-md-12">
+				<div class="site-filters clearfix style-1 align-items-center wow fadeInUp ms-lg-auto" data-wow-delay="0.4s">
+					<ul class="filters">
+						<li class="btn active" :class="{ 'active': !active_group }" @click="active_group = ''">
+							<a href="javascript:void(0);">{{ _("ALL") }}</a>
+						</li>
+						{% for group in product_groups %}
+						<li class="btn"
+							:class='{ "active": active_group === {{ group | tojson }} }'
+							@click='active_group = {{ group | tojson }}'>
+							<a href="javascript:void(0);">{{ group }}</a>
+						</li>
+						{% endfor %}
+					</ul>
+				</div>
+			</div>
+			{% endif %}
+		</div>
+		<div class="clearfix">
+			<ul class="row g-xl-4 g-3">
+				{% for block in section.blocks %}{{ render_block(block) }}{% endfor %}
+			</ul>
+		</div>
+	</div>
+</section>
+{% endif %}

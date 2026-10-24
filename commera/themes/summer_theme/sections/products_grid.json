@@ -1,0 +1,33 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Products grid",
+	"icon": "grid",
+	"settings": [
+		{
+			"id": "heading",
+			"type": "text",
+			"label": "Heading",
+			"translatable": true,
+			"default": "Most popular products"
+		}
+	],
+	"blocks": {
+		"pick": {
+			"name": "Product",
+			"icon": "tag",
+			"settings": [
+				{
+					"id": "product",
+					"type": "product",
+					"label": "Product",
+					"default": ""
+				}
+			]
+		}
+	},
+	"presets": [
+		{
+			"name": "Products grid"
+		}
+	]
+}

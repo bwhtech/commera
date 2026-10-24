@@ -12,6 +12,7 @@ from commera.api.admin.theme import (
 	get_editor_data,
 	save_theme_settings,
 )
+from commera.shop_themes.tests.theme_fixtures import FIXTURE_THEME_NAME, ThemeFixtureMixin
 from commera.www import theme_editor_preview
 
 SUMMER_THEME = "Summer Theme"
@@ -91,7 +92,7 @@ class TestAdminTheme(IntegrationTestCase):
 		self.assertRaises(frappe.ValidationError, save_theme_settings, store_name="ZZ Store")
 
 
-class TestThemeEditorPreview(IntegrationTestCase):
+class TestThemeEditorPreview(ThemeFixtureMixin, IntegrationTestCase):
 	def setUp(self):
 		self.addCleanup(frappe.db.rollback)
 		self.addCleanup(frappe.clear_cache)
@@ -115,7 +116,8 @@ class TestThemeEditorPreview(IntegrationTestCase):
 		self.assertNotIn('rel="canonical"', html)
 
 	def test_a_theme_with_no_home_page_says_so_instead_of_framing_a_404(self):
-		activate_theme(BASE_THEME)
+		self.add_fixture_theme()
+		activate_theme(FIXTURE_THEME_NAME)
 
 		self.assertIn("no home page to preview", self.render())
 
@@ -138,8 +140,15 @@ class TestThemeEditorPreview(IntegrationTestCase):
 	def test_a_theme_that_is_not_installed_falls_back_to_the_live_one(self):
 		self.assertIn("theme-summer", self.render(theme="ZZ No Such Theme"))
 
-	def test_a_previewed_theme_with_no_home_page_is_named_in_the_message(self):
+	def test_the_pane_frames_the_base_starters_section_home(self):
 		html = self.render(theme=BASE_THEME)
 
-		self.assertIn(BASE_THEME, html)
+		self.assertIn("theme-base", html)
+		self.assertIn('data-section-type="image_banner"', html)
+
+	def test_a_previewed_theme_with_no_home_page_is_named_in_the_message(self):
+		self.add_fixture_theme()
+		html = self.render(theme=FIXTURE_THEME_NAME)
+
+		self.assertIn(FIXTURE_THEME_NAME, html)
 		self.assertIn("no home page to preview", html)

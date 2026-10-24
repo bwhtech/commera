@@ -1,0 +1,11 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Menu marquee",
+	"icon": "text",
+	"settings": [],
+	"presets": [
+		{
+			"name": "Menu marquee"
+		}
+	]
+}

@@ -1,0 +1,11 @@
+<script>
+	function go_to_page(page) {
+		state.page = `${page}`;
+		window.location.reload();
+		window.scrollTo(0, 0);
+	}
+	function sort_by(sort_by_value) {
+		state.sort_by = `${sort_by_value}`;
+		window.location.reload();
+	}
+</script>

@@ -1,4 +1,3 @@
-import importlib.util
 import os
 
 import frappe
@@ -9,11 +8,10 @@ from frappe.website.utils import build_response
 from jinja2 import BaseLoader, BytecodeCache, TemplateNotFound
 from jinja2.utils import LRUCache
 
-from commera.shop_themes.doctype.shop_theme.shop_theme import (
-	get_render_theme_context,
-	is_within_directory,
-)
+from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import get_compiled_routes
+from commera.shop_themes.section_render import get_theme_settings
+from commera.shop_themes.theme_files import DYNAMIC_PAGE_LANG_PREFIXES, find_theme_file, load_theme_module
 
 # page_renderer runs before every built-in renderer: a segment missing here is a route hijack, not a 404.
 RESERVED_PATH_SEGMENTS = frozenset(
@@ -37,9 +35,6 @@ RESERVED_PATH_SEGMENTS = frozenset(
 	}
 )
 
-# Every storefront route carries a language prefix, so a dynamic page can only live below one.
-DYNAMIC_PAGE_LANG_PREFIXES = frozenset({"en", "ar"})
-
 # Bare template names resolve from a theme only under this prefix: otherwise a theme could shadow
 # templates/includes/header.html and silently disconnect the menu manager and footer editor.
 THEME_OVERRIDABLE_PREFIX = "components/"
@@ -47,48 +42,9 @@ THEME_OVERRIDABLE_PREFIX = "components/"
 DEFAULT_APP_NAME = "Commera"
 
 
-def find_theme_file(theme_dirs, relative_path):
-	for theme_dir in theme_dirs:
-		candidate = os.path.join(theme_dir, relative_path)
-		if is_within_directory(theme_dir, candidate) and os.path.isfile(candidate):
-			return candidate
-	return None
-
-
-page_controller_modules = {}
-
-
 def load_page_controller(theme_dirs, template_relative_path):
 	controller_relative_path = f"{os.path.splitext(template_relative_path)[0]}.py"
-	controller_path = find_theme_file(theme_dirs, controller_relative_path)
-	if not controller_path:
-		return None
-
-	modified_time = os.path.getmtime(controller_path)
-	cached = page_controller_modules.get(controller_path)
-	if cached and cached[0] == modified_time:
-		return cached[1]
-
-	module_name = build_controller_module_name(theme_dirs, controller_path, controller_relative_path)
-	spec = importlib.util.spec_from_file_location(module_name, controller_path)
-	module = importlib.util.module_from_spec(spec)
-	spec.loader.exec_module(module)
-	page_controller_modules[controller_path] = (modified_time, module)
-	return module
-
-
-def build_controller_module_name(theme_dirs, controller_path, relative_path):
-	theme_slug = ""
-	for theme_dir in theme_dirs:
-		if os.path.join(theme_dir, relative_path) == controller_path:
-			theme_slug = os.path.basename(theme_dir.rstrip(os.sep))
-			break
-
-	page_slug = os.path.splitext(relative_path)[0]
-	for separator in (os.sep, "/", "-", "."):
-		page_slug = page_slug.replace(separator, "_")
-
-	return f"commera.shop_themes.theme_pages.{theme_slug}.{page_slug}"
+	return load_theme_module(theme_dirs, controller_relative_path, "theme_pages")
 
 
 def run_page_controller(theme_dirs, template_relative_path, context):
@@ -257,7 +213,7 @@ def get_theme_environment(jenv, theme_dirs):
 
 
 def build_base_context(match):
-	context = frappe._dict(is_rtl=is_rtl())
+	context = frappe._dict(is_rtl=is_rtl(), theme_settings=get_theme_settings(get_render_theme_context()))
 
 	if match:
 		apply_route_groups(match, context)

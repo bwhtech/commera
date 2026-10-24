@@ -1,0 +1,174 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://commera.app/schemas/section.schema.json",
+	"title": "Commera theme section",
+	"description": "Schema of a section in <theme>/sections/<type>.json. bench commera theme check runs the same rules.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["name"],
+	"properties": {
+		"$schema": { "type": "string" },
+		"name": { "type": "string", "minLength": 1, "description": "Shown in the editor's section list" },
+		"icon": { "type": "string", "description": "Lucide icon name" },
+		"settings": { "$ref": "#/$defs/settings" },
+		"blocks": {
+			"type": "object",
+			"description": "Block types this section accepts. Each needs a {% macro <type>(block) %} in the section's .html",
+			"propertyNames": {
+				"pattern": "^[a-z][a-z0-9_]*$",
+				"not": {
+					"enum": [
+						"product",
+						"collection",
+						"page",
+						"cart",
+						"section",
+						"block",
+						"settings",
+						"theme_settings",
+						"request",
+						"store",
+						"menus",
+						"search",
+						"template"
+					]
+				}
+			},
+			"additionalProperties": { "$ref": "#/$defs/block" }
+		},
+		"accepts_apps": { "type": "boolean", "default": false, "description": "App blocks may be placed here" },
+		"max_blocks": { "type": "integer", "minimum": 1, "maximum": 50, "default": 50 },
+		"presets": {
+			"type": "array",
+			"description": "What Add section inserts",
+			"items": { "$ref": "#/$defs/preset" }
+		},
+		"static": { "type": "boolean", "default": false, "description": "Reorderable, not removable" },
+		"groups": {
+			"oneOf": [
+				{ "type": "null" },
+				{ "type": "array", "items": { "enum": ["header", "footer"] }, "minItems": 1, "maxItems": 1 }
+			]
+		},
+		"templates": {
+			"oneOf": [
+				{ "type": "null" },
+				{
+					"type": "array",
+					"items": { "enum": ["index", "product", "collection", "page"] },
+					"minItems": 1,
+					"uniqueItems": true
+				}
+			]
+		}
+	},
+	"$defs": {
+		"settings": { "type": "array", "items": { "$ref": "#/$defs/setting" } },
+		"block": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["name"],
+			"properties": {
+				"name": { "type": "string", "minLength": 1 },
+				"icon": { "type": "string" },
+				"settings": { "$ref": "#/$defs/settings" },
+				"static": {
+					"type": "boolean",
+					"default": false,
+					"description": "Placed by the template with render_static_block"
+				}
+			}
+		},
+		"preset": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"name": { "type": "string" },
+				"settings": { "type": "object" },
+				"blocks": {
+					"type": "array",
+					"items": {
+						"oneOf": [
+							{ "type": "string" },
+							{
+								"type": "object",
+								"additionalProperties": false,
+								"required": ["type"],
+								"properties": { "type": { "type": "string" }, "settings": { "type": "object" } }
+							}
+						]
+					}
+				}
+			}
+		},
+		"setting": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "type"],
+			"properties": {
+				"id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+				"type": {
+					"enum": [
+						"text",
+						"textarea",
+						"url",
+						"check",
+						"select",
+						"range",
+						"color",
+						"image",
+						"collection",
+						"product",
+						"page",
+						"link"
+					]
+				},
+				"label": { "type": "string" },
+				"default": {},
+				"info": { "type": "string", "description": "Help text under the field" },
+				"translatable": { "type": "boolean" },
+				"options": {
+					"type": "array",
+					"minItems": 1,
+					"items": {
+						"oneOf": [
+							{ "type": "string" },
+							{
+								"type": "object",
+								"additionalProperties": false,
+								"required": ["value"],
+								"properties": { "value": { "type": "string" }, "label": { "type": "string" } }
+							}
+						]
+					}
+				},
+				"min": { "type": "number" },
+				"max": { "type": "number" },
+				"step": { "type": "number", "exclusiveMinimum": 0 },
+				"unit": { "type": "string" },
+				"doctype": { "type": "string", "minLength": 1 }
+			},
+			"allOf": [
+				{
+					"if": { "properties": { "type": { "enum": ["text", "textarea", "url"] } } },
+					"else": { "properties": { "translatable": false } }
+				},
+				{
+					"if": { "properties": { "type": { "const": "select" } } },
+					"then": { "required": ["options"] },
+					"else": { "properties": { "options": false } }
+				},
+				{
+					"if": { "properties": { "type": { "const": "range" } } },
+					"then": { "required": ["min", "max"] },
+					"else": { "properties": { "min": false, "max": false, "step": false, "unit": false } }
+				},
+				{
+					"if": { "properties": { "type": { "const": "link" } } },
+					"then": { "required": ["doctype"] },
+					"else": { "properties": { "doctype": false } }
+				}
+			]
+		}
+	}
+}

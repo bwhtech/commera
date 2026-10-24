@@ -1,0 +1,28 @@
+{% from "components/macros/content_blocks.html" import section_title %}
+{% from "templates/macros/item_card.html" import item_card %}
+{% from "components/macros/layout_classes.html" import grid_columns_class %}
+{% if products %}
+<div class="page-width py-12 md:py-16">
+	{{ section_title(section.settings.title, view_all_href if section.settings.show_view_all else "") }}
+	<div class="grid grid-cols-2 gap-4 md:gap-6 {{ grid_columns_class(section.settings.columns_desktop, 4) }}">
+		{% for product in products %}
+		{% set product_name = product.item_name if frappe.lang == "en" else product.custom_item_name_ar or product.item_name %}
+		<a href="/{{ frappe.lang or 'en' }}/products/{{ product.route }}" class="block">
+			{{ item_card(
+				image=product.image or shop_theme_asset_url('images/placeholder.svg'),
+				brand=product.brand,
+				product_name=product_name,
+				original_price=product.default_price,
+				formatted_price=product.sale_price,
+				discount=product.discount_percent,
+				size_variant="small",
+				image_size="aspect-3/4 h-auto w-full",
+				product_obj=product,
+				attribute_value=product.attribute_value,
+				width_class="w-full"
+			) }}
+		</a>
+		{% endfor %}
+	</div>
+</div>
+{% endif %}
