@@ -1,0 +1,103 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Rich text",
+	"icon": "text",
+	"max_blocks": 8,
+	"settings": [
+		{
+			"id": "content_alignment",
+			"type": "select",
+			"label": "Content alignment",
+			"options": [
+				{
+					"value": "start",
+					"label": "Start"
+				},
+				{
+					"value": "center",
+					"label": "Center"
+				},
+				{
+					"value": "end",
+					"label": "End"
+				}
+			],
+			"default": "center"
+		}
+	],
+	"blocks": {
+		"heading": {
+			"name": "Heading",
+			"icon": "heading",
+			"settings": [
+				{
+					"id": "heading",
+					"type": "text",
+					"label": "Heading",
+					"translatable": true,
+					"default": {
+						"en": "Talk about your brand",
+						"ar": "تحدّث عن علامتك التجارية"
+					}
+				},
+				{
+					"id": "heading_tag",
+					"type": "select",
+					"label": "Heading tag",
+					"options": ["h1", "h2", "h3"],
+					"default": "h2",
+					"info": "Use h1 once per page, for its main heading"
+				}
+			]
+		},
+		"text": {
+			"name": "Text",
+			"icon": "text",
+			"settings": [
+				{
+					"id": "text",
+					"type": "textarea",
+					"label": "Text",
+					"translatable": true,
+					"default": {
+						"en": "Share information about your brand with your customers.",
+						"ar": "شارك عملاءك قصة علامتك التجارية."
+					}
+				}
+			]
+		},
+		"button": {
+			"name": "Button",
+			"icon": "button",
+			"settings": [
+				{
+					"id": "button_label",
+					"type": "text",
+					"label": "Label",
+					"translatable": true,
+					"default": {
+						"en": "Shop all",
+						"ar": "تسوّق الكل"
+					}
+				},
+				{
+					"id": "button_link",
+					"type": "url",
+					"label": "Link",
+					"default": "",
+					"info": "Empty links to all products"
+				}
+			]
+		}
+	},
+	"presets": [
+		{
+			"name": "Rich text",
+			"blocks": [
+				"heading",
+				"text",
+				"button"
+			]
+		}
+	]
+}

@@ -1,0 +1,14 @@
+{% from "templates/macros/page_not_found.html" import page_not_found %}
+<div class="page-width py-6 md:py-10">
+	{% if page %}
+	{% include "templates/components/breadcrumb.html" %}
+	<article>
+		{% if section.settings.show_title %}
+		<h1 class="text-2xl font-semibold md:text-3xl">{{ page.name }}</h1>
+		{% endif %}
+		<div class="mt-6 max-w-3xl text-base leading-relaxed">{{ content|safe }}</div>
+	</article>
+	{% else %}
+	{{ page_not_found("opacity-80", "hover:text-theme-accent") }}
+	{% endif %}
+</div>

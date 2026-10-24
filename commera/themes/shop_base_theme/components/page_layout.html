@@ -1,0 +1,10 @@
+{% extends "components/theme_layout.html" %}
+
+{% block body %}
+<div class="page-width">
+    {% if show_breadcrumb is not defined or show_breadcrumb %}
+        {% include "templates/components/breadcrumb.html" %}
+    {% endif %}
+    {% block page_body %}{% endblock %}
+</div>
+{% endblock %}

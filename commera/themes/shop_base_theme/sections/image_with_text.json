@@ -1,0 +1,74 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Image with text",
+	"icon": "image",
+	"max_blocks": 6,
+	"settings": [
+		{ "id": "image", "type": "image", "label": "Image", "default": "", "info": "Empty shows a placeholder" },
+		{ "id": "image_alt", "type": "text", "label": "Image description", "translatable": true, "default": "", "info": "Read out by screen readers; describe what the image shows" },
+		{
+			"id": "layout",
+			"type": "select",
+			"label": "Placement",
+			"options": [
+				{ "value": "image_first", "label": "Image first" },
+				{ "value": "text_first", "label": "Image second" }
+			],
+			"default": "image_first"
+		}
+	],
+	"blocks": {
+		"heading": {
+			"name": "Heading",
+			"icon": "heading",
+			"settings": [
+				{
+					"id": "heading",
+					"type": "text",
+					"label": "Heading",
+					"translatable": true,
+					"default": { "en": "Image with text", "ar": "صورة مع نص" }
+				},
+				{
+					"id": "heading_tag",
+					"type": "select",
+					"label": "Heading tag",
+					"options": ["h1", "h2", "h3"],
+					"default": "h2",
+					"info": "Use h1 once per page, for its main heading"
+				}
+			]
+		},
+		"text": {
+			"name": "Text",
+			"icon": "text",
+			"settings": [
+				{
+					"id": "text",
+					"type": "textarea",
+					"label": "Text",
+					"translatable": true,
+					"default": {
+						"en": "Pair text with an image to focus on your chosen product, collection or story.",
+						"ar": "اجمع النص مع صورة لتسليط الضوء على منتج أو مجموعة أو قصة."
+					}
+				}
+			]
+		},
+		"button": {
+			"name": "Button",
+			"icon": "button",
+			"settings": [
+				{
+					"id": "button_label",
+					"type": "text",
+					"label": "Label",
+					"translatable": true,
+					"default": { "en": "Shop all", "ar": "تسوّق الكل" }
+				},
+				{ "id": "button_link", "type": "url", "label": "Link", "default": "", "info": "Empty links to all products" }
+			]
+		}
+	},
+	"presets": [{ "name": "Image with text", "blocks": ["heading", "text", "button"] }]
+}

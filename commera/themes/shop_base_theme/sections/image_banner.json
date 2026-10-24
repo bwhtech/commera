@@ -1,0 +1,95 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Image banner",
+	"icon": "image",
+	"max_blocks": 6,
+	"settings": [
+		{ "id": "image", "type": "image", "label": "Image", "default": "", "info": "Empty shows a placeholder" },
+		{
+			"id": "image_overlay_opacity",
+			"type": "range",
+			"label": "Overlay opacity",
+			"min": 0,
+			"max": 100,
+			"step": 10,
+			"unit": "%",
+			"default": 30
+		},
+		{
+			"id": "image_height",
+			"type": "select",
+			"label": "Height",
+			"options": [
+				{ "value": "small", "label": "Small" },
+				{ "value": "medium", "label": "Medium" },
+				{ "value": "large", "label": "Large" }
+			],
+			"default": "medium"
+		},
+		{
+			"id": "content_alignment",
+			"type": "select",
+			"label": "Content alignment",
+			"options": [
+				{ "value": "start", "label": "Start" },
+				{ "value": "center", "label": "Center" },
+				{ "value": "end", "label": "End" }
+			],
+			"default": "center"
+		}
+	],
+	"blocks": {
+		"heading": {
+			"name": "Heading",
+			"icon": "heading",
+			"settings": [
+				{
+					"id": "heading",
+					"type": "text",
+					"label": "Heading",
+					"translatable": true,
+					"default": { "en": "Image banner", "ar": "لافتة بصورة" }
+				},
+				{
+					"id": "heading_tag",
+					"type": "select",
+					"label": "Heading tag",
+					"options": ["h1", "h2", "h3"],
+					"default": "h1",
+					"info": "Use h1 once per page, for its main heading"
+				}
+			]
+		},
+		"text": {
+			"name": "Text",
+			"icon": "text",
+			"settings": [
+				{
+					"id": "text",
+					"type": "textarea",
+					"label": "Text",
+					"translatable": true,
+					"default": {
+						"en": "Give customers details about the banner image or content.",
+						"ar": "عرّف عملاءك بمحتوى هذه اللافتة."
+					}
+				}
+			]
+		},
+		"button": {
+			"name": "Button",
+			"icon": "button",
+			"settings": [
+				{
+					"id": "button_label",
+					"type": "text",
+					"label": "Label",
+					"translatable": true,
+					"default": { "en": "Shop all", "ar": "تسوّق الكل" }
+				},
+				{ "id": "button_link", "type": "url", "label": "Link", "default": "", "info": "Empty links to all products" }
+			]
+		}
+	},
+	"presets": [{ "name": "Image banner", "blocks": ["heading", "text", "button"] }]
+}
