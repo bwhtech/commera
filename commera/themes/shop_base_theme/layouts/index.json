@@ -1,0 +1,112 @@
+{
+	"sections": [
+		{
+			"id": "image_banner",
+			"type": "image_banner",
+			"settings": { "image_height": "large", "content_alignment": "center", "image_overlay_opacity": 40 },
+			"blocks": [
+				{
+					"id": "image_banner-heading",
+					"type": "heading",
+					"settings": { "heading": { "en": "Welcome to our store", "ar": "أهلاً بك في متجرنا" } }
+				},
+				{
+					"id": "image_banner-text",
+					"type": "text",
+					"settings": {
+						"text": {
+							"en": "New arrivals every week, delivered to your door.",
+							"ar": "وصول جديد كل أسبوع، يصلك حتى باب منزلك."
+						}
+					}
+				},
+				{
+					"id": "image_banner-button",
+					"type": "button",
+					"settings": { "button_label": { "en": "Shop all", "ar": "تسوّق الكل" }, "button_link": "" }
+				}
+			]
+		},
+		{ "id": "featured_collection", "type": "featured_collection", "settings": {}, "blocks": [] },
+		{
+			"id": "image_with_text",
+			"type": "image_with_text",
+			"settings": { "layout": "image_first" },
+			"blocks": [
+				{
+					"id": "image_with_text-heading",
+					"type": "heading",
+					"settings": { "heading": { "en": "Made to last", "ar": "صُنع ليدوم" } }
+				},
+				{
+					"id": "image_with_text-text",
+					"type": "text",
+					"settings": {
+						"text": {
+							"en": "Tell shoppers what makes your products different: the materials, the makers, the care.",
+							"ar": "أخبر المتسوقين بما يميّز منتجاتك: الخامات والصنّاع والعناية بالتفاصيل."
+						}
+					}
+				},
+				{
+					"id": "image_with_text-button",
+					"type": "button",
+					"settings": { "button_label": { "en": "Browse products", "ar": "تصفّح المنتجات" }, "button_link": "" }
+				}
+			]
+		},
+		{
+			"id": "multicolumn",
+			"type": "multicolumn",
+			"settings": { "title": "", "columns_desktop": 3, "column_alignment": "center" },
+			"blocks": [
+				{
+					"id": "multicolumn-column-1",
+					"type": "column",
+					"settings": {
+						"title": { "en": "Free delivery", "ar": "توصيل مجاني" },
+						"text": { "en": "On qualifying orders, straight to your door.", "ar": "للطلبات المؤهلة، حتى باب منزلك." }
+					}
+				},
+				{
+					"id": "multicolumn-column-2",
+					"type": "column",
+					"settings": {
+						"title": { "en": "Easy returns", "ar": "إرجاع سهل" },
+						"text": { "en": "Changed your mind? Send it back, no questions asked.", "ar": "غيّرت رأيك؟ أعده دون أي أسئلة." }
+					}
+				},
+				{
+					"id": "multicolumn-column-3",
+					"type": "column",
+					"settings": {
+						"title": { "en": "Secure payment", "ar": "دفع آمن" },
+						"text": { "en": "Pay safely with the method you trust.", "ar": "ادفع بأمان بالطريقة التي تثق بها." }
+					}
+				}
+			]
+		},
+		{
+			"id": "rich_text",
+			"type": "rich_text",
+			"settings": { "content_alignment": "center" },
+			"blocks": [
+				{
+					"id": "rich_text-heading",
+					"type": "heading",
+					"settings": { "heading": { "en": "Our story", "ar": "قصتنا" } }
+				},
+				{
+					"id": "rich_text-text",
+					"type": "text",
+					"settings": {
+						"text": {
+							"en": "Share who you are and why you started. Shoppers buy from brands they know.",
+							"ar": "شارك من أنت ولماذا بدأت. المتسوقون يشترون من علامات يعرفونها."
+						}
+					}
+				}
+			]
+		}
+	]
+}

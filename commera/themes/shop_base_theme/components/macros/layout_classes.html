@@ -1,0 +1,9 @@
+{% macro grid_columns_class(count, default=3) -%}
+{%- set columns = {2: "md:grid-cols-2", 3: "md:grid-cols-3", 4: "md:grid-cols-3 lg:grid-cols-4", 5: "md:grid-cols-3 lg:grid-cols-5"} -%}
+{{ columns.get(count, columns[default]) }}
+{%- endmacro %}
+
+{% macro alignment_class(value) -%}
+{%- set alignments = {"start": "items-start text-start", "center": "items-center text-center", "end": "items-end text-end"} -%}
+{{ alignments.get(value, alignments.center) }}
+{%- endmacro %}

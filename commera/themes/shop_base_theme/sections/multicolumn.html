@@ -1,0 +1,32 @@
+{% from "components/macros/content_blocks.html" import section_title %}
+{% from "components/macros/layout_classes.html" import alignment_class, grid_columns_class %}
+
+{% macro column(block) %}
+<div class="flex flex-col gap-3 {{ alignment_class(section.settings.column_alignment) }}"{{ block.editor_attributes }}>
+	{% if block.settings.image %}
+	<img
+		src="{{ block.settings.image }}"
+		alt="{{ block.settings.image_alt }}"
+		width="600"
+		height="400"
+		loading="lazy"
+		decoding="async"
+		class="mb-2 aspect-3/2 w-full rounded-theme object-cover"
+	>
+	{% endif %}
+	{% if block.settings.title %}<h3 class="text-lg font-semibold">{{ block.settings.title }}</h3>{% endif %}
+	{% if block.settings.text %}<p class="whitespace-pre-line text-base leading-relaxed opacity-80">{{ block.settings.text }}</p>{% endif %}
+	{% if block.settings.link_label and block.settings.link %}
+	<a href="{{ block.settings.link }}" class="text-sm font-medium underline underline-offset-4 hover:text-theme-accent">{{ block.settings.link_label }}</a>
+	{% endif %}
+</div>
+{% endmacro %}
+
+{% if section.blocks %}
+<div class="page-width py-12 md:py-16">
+	{{ section_title(section.settings.title) }}
+	<div class="grid grid-cols-1 gap-10 {{ grid_columns_class(section.settings.columns_desktop) }}">
+		{% for block in section.blocks %}{{ render_block(block) }}{% endfor %}
+	</div>
+</div>
+{% endif %}

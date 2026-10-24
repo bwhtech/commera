@@ -9,6 +9,19 @@
 @source "../js";
 /* get_currency_symbol() renders the only Tailwind markup that lives in Python. */
 @source "../../utils.py";
+@source "../../themes/shop_base_theme";
+
+@theme inline {
+  --color-theme-accent: var(--theme-accent, var(--ls-accent));
+  --color-theme-text: var(--theme-text, var(--color-gray-900));
+  --color-theme-background: var(--theme-background, var(--color-white));
+  --radius-theme: var(--theme-radius, 0.5rem);
+  --container-theme: var(--theme-page_width, 80rem);
+}
+
+@utility page-width {
+  @apply mx-auto max-w-theme px-6 md:px-10;
+}
 
 @utility no-scrollbar {
   @apply [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;

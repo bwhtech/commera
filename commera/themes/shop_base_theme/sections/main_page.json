@@ -1,0 +1,8 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Page content",
+	"icon": "file",
+	"static": true,
+	"templates": ["page"],
+	"settings": [{ "id": "show_title", "type": "check", "label": "Show page title", "default": true }]
+}

@@ -1,0 +1,19 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Featured collection",
+	"icon": "grid",
+	"settings": [
+		{
+			"id": "title",
+			"type": "text",
+			"label": "Heading",
+			"translatable": true,
+			"default": { "en": "Featured products", "ar": "منتجات مختارة" }
+		},
+		{ "id": "collection", "type": "collection", "label": "Collection", "default": "", "info": "Empty shows any published products" },
+		{ "id": "products_to_show", "type": "range", "label": "Product count", "min": 2, "max": 12, "step": 1, "default": 8 },
+		{ "id": "columns_desktop", "type": "range", "label": "Columns on desktop", "min": 2, "max": 5, "step": 1, "default": 4 },
+		{ "id": "show_view_all", "type": "check", "label": "Show \"View all\" link", "default": true }
+	],
+	"presets": [{ "name": "Featured collection" }]
+}

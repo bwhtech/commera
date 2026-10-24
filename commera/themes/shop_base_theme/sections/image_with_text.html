@@ -1,0 +1,15 @@
+{% from "components/macros/content_blocks.html" import heading, text, button %}
+<div class="page-width grid items-center gap-8 py-12 md:grid-cols-2 md:gap-16 md:py-16">
+	<img
+		src="{{ section.settings.image or shop_theme_asset_url('images/placeholder.svg') }}"
+		alt="{{ section.settings.image_alt }}"
+		width="800"
+		height="600"
+		loading="lazy"
+		decoding="async"
+		class="aspect-4/3 w-full rounded-theme bg-theme-text/5 object-cover{% if section.settings.layout == 'text_first' %} md:order-last{% endif %}"
+	>
+	<div class="flex flex-col items-start gap-6 text-start">
+		{% for block in section.blocks %}{{ render_block(block) }}{% endfor %}
+	</div>
+</div>
