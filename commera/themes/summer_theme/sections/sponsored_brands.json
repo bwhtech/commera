@@ -1,0 +1,11 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Sponsored brands",
+	"icon": "tag",
+	"settings": [],
+	"presets": [
+		{
+			"name": "Sponsored brands"
+		}
+	]
+}

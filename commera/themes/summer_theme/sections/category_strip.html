@@ -1,22 +1,24 @@
-{% set settings = shop_theme_config() %}
-{% set language = frappe.lang or "en" %}
-{% set products_url = "/" ~ language ~ "/products" %}
+{% macro category(block) %}
+{% set products_url = "/" ~ (frappe.lang or "en") ~ "/products" %}
+<div class="swiper-slide"{{ block.editor_attributes }}>
+	<div class="shop-box style-1 wow fadeInUp" data-wow-delay="{{ 0.2 * block.index }}s">
+		<div class="dz-media">
+			<img src="{{ block.settings.image }}" alt="{{ block.settings.heading }}">
+		</div>
+		<h6 class="product-name"><a href="{{ block.settings.url or products_url }}">{{ block.settings.heading }}</a></h6>
+	</div>
+</div>
+{% endmacro %}
+
+{% set products_url = "/" ~ (frappe.lang or "en") ~ "/products" %}
+{% if section.blocks %}
 <section class="shop-section overflow-hidden">
 	<div class="container-fluid p-0">
 		<div class="row">
 			<div class="col-lg-8 left-box">
 				<div class="swiper swiper-shop" data-summer-carousel="category-strip" data-carousel-loop="true">
 					<div class="swiper-wrapper">
-						{% for category in settings.shop_by_category %}
-						<div class="swiper-slide">
-							<div class="shop-box style-1 wow fadeInUp" data-wow-delay="{{ 0.2 * loop.index }}s">
-								<div class="dz-media">
-									<img src="{{ category.image }}" alt="{{ category.heading }}">
-								</div>
-								<h6 class="product-name"><a href="{{ category.url or products_url }}">{{ category.heading }}</a></h6>
-							</div>
-						</div>
-						{% endfor %}
+						{% for block in section.blocks %}{{ render_block(block) }}{% endfor %}
 					</div>
 				</div>
 				<a class="icon-button" href="{{ products_url }}">
@@ -30,8 +32,8 @@
 			</div>
 			<div class="col-lg-4 right-box">
 				<div>
-					<h3 class="title wow fadeInUp" data-wow-delay="1.2s">{{ settings.categories_title }}</h3>
-					<p class="text wow fadeInUp" data-wow-delay="1.4s">{{ settings.categories_description }}</p>
+					<h3 class="title wow fadeInUp" data-wow-delay="1.2s">{{ section.settings.heading }}</h3>
+					<p class="text wow fadeInUp" data-wow-delay="1.4s">{{ section.settings.description }}</p>
 					<div class="pagination-align wow fadeInUp" data-wow-delay="1.6s">
 						<div class="shop-button-prev" role="button" tabindex="0" data-carousel-prev="category-strip" aria-label="{{ _("Previous category") }}">
 							<svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
@@ -57,3 +59,4 @@
 		</div>
 	</div>
 </section>
+{% endif %}

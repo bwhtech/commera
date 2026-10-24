@@ -1,0 +1,75 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Hero slider",
+	"icon": "image",
+	"settings": [
+		{
+			"id": "caption_label",
+			"type": "text",
+			"label": "Caption label",
+			"translatable": true,
+			"default": "Summer Collection"
+		},
+		{
+			"id": "caption",
+			"type": "text",
+			"label": "Caption",
+			"translatable": true,
+			"default": "Trendy and Classic for the New Season"
+		}
+	],
+	"blocks": {
+		"slide": {
+			"name": "Slide",
+			"icon": "image",
+			"settings": [
+				{
+					"id": "image",
+					"type": "image",
+					"label": "Image",
+					"default": ""
+				},
+				{
+					"id": "thumbnail_label",
+					"type": "text",
+					"label": "Thumbnail label",
+					"translatable": true,
+					"default": ""
+				},
+				{
+					"id": "heading",
+					"type": "text",
+					"label": "Heading",
+					"translatable": true,
+					"default": ""
+				},
+				{
+					"id": "subheading",
+					"type": "text",
+					"label": "Subheading",
+					"translatable": true,
+					"default": ""
+				},
+				{
+					"id": "cta_label",
+					"type": "text",
+					"label": "Button label",
+					"translatable": true,
+					"default": ""
+				},
+				{
+					"id": "url",
+					"type": "url",
+					"label": "Button link",
+					"default": "",
+					"info": "Empty links to all products"
+				}
+			]
+		}
+	},
+	"presets": [
+		{
+			"name": "Hero slider"
+		}
+	]
+}

@@ -1,0 +1,61 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Offers",
+	"icon": "image",
+	"settings": [
+		{
+			"id": "heading",
+			"type": "text",
+			"label": "Heading",
+			"translatable": true,
+			"default": "Featured offer for you"
+		}
+	],
+	"blocks": {
+		"banner": {
+			"name": "Banner",
+			"icon": "image",
+			"settings": [
+				{
+					"id": "image",
+					"type": "image",
+					"label": "Image",
+					"default": ""
+				},
+				{
+					"id": "badge_label",
+					"type": "text",
+					"label": "Badge",
+					"translatable": true,
+					"default": ""
+				},
+				{
+					"id": "heading",
+					"type": "text",
+					"label": "Heading",
+					"translatable": true,
+					"default": ""
+				},
+				{
+					"id": "cta_label",
+					"type": "text",
+					"label": "Button label",
+					"translatable": true,
+					"default": ""
+				},
+				{
+					"id": "url",
+					"type": "url",
+					"label": "Button link",
+					"default": "",
+					"info": "Empty links to #"
+				}
+			]
+		}
+	},
+	"presets": [
+		{
+			"name": "Offers"
+		}
+	]
+}

@@ -1,0 +1,26 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Everyday essentials",
+	"icon": "grid",
+	"max_blocks": 4,
+	"settings": [],
+	"blocks": {
+		"pick": {
+			"name": "Product",
+			"icon": "tag",
+			"settings": [
+				{
+					"id": "product",
+					"type": "product",
+					"label": "Product",
+					"default": ""
+				}
+			]
+		}
+	},
+	"presets": [
+		{
+			"name": "Everyday essentials"
+		}
+	]
+}

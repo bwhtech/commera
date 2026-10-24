@@ -1,0 +1,32 @@
+{% macro banner(block) %}
+<div class="col-lg-6 col-md-12 wow fadeInUp" data-wow-delay="{{ "%.1f" | format(0.1 * block.index) }}s"{{ block.editor_attributes }}>
+	<div class="product-box style-4">
+		<div class="product-media" style="background-image: url('{{ block.settings.image }}');"></div>
+		{% if block.index == 1 %}
+		<div class="sale-box">
+			{% if block.settings.badge_label %}<div class="badge style-1 mb-1">{{ block.settings.badge_label }}</div>{% endif %}
+			<h2 class="sale-name">{{ block.settings.heading }}</h2>
+			{% if block.settings.cta_label %}<a href="{{ block.settings.url or '#' }}" class="btn btn-outline-secondary btn-lg text-uppercase">{{ block.settings.cta_label }}</a>{% endif %}
+		</div>
+		{% else %}
+		<div class="product-content">
+			<div class="main-content">
+				{% if block.settings.badge_label %}<div class="badge style-1 mb-3">{{ block.settings.badge_label }}</div>{% endif %}
+				<h2 class="product-name">{{ block.settings.heading }}</h2>
+			</div>
+			{% if block.settings.cta_label %}<a href="{{ block.settings.url or '#' }}" class="btn btn-secondary btn-lg text-uppercase">{{ block.settings.cta_label }}</a>{% endif %}
+		</div>
+		{% endif %}
+	</div>
+</div>
+{% endmacro %}
+
+{% if section.blocks %}
+<section class="adv-area">
+	<div class="container-fluid px-0">
+		<div class="row product-style2 g-0">
+			{% for block in section.blocks %}{{ render_block(block) }}{% endfor %}
+		</div>
+	</div>
+</section>
+{% endif %}

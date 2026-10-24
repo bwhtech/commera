@@ -1,0 +1,33 @@
+{
+	"$schema": "../../section.schema.json",
+	"name": "Featured products",
+	"icon": "grid",
+	"settings": [
+		{
+			"id": "heading",
+			"type": "text",
+			"label": "Heading",
+			"translatable": true,
+			"default": "Featured now"
+		}
+	],
+	"blocks": {
+		"pick": {
+			"name": "Product",
+			"icon": "tag",
+			"settings": [
+				{
+					"id": "product",
+					"type": "product",
+					"label": "Product",
+					"default": ""
+				}
+			]
+		}
+	},
+	"presets": [
+		{
+			"name": "Featured products"
+		}
+	]
+}

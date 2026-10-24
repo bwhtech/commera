@@ -1,6 +1,3 @@
-{% set stocked_brands = frappe.get_all("Item", filters={"disabled": 0}, pluck="brand", distinct=True) | select | list %}
-{% set sponsored_brands = frappe.get_all("Brand", filters={"name": ["in", stocked_brands]}, fields=["name", "image"], order_by="brand asc") if stocked_brands else [] %}
-{% set picks = picked_products.best_picks + picked_products.deal_picks + picked_products.featured_picks %}
 {% if sponsored_brands %}
 <section class="content-inner-2 overflow-hidden">
 	<div class="container">
