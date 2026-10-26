@@ -208,7 +208,9 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 				open_checkout(code)
 				location = urlsplit(frappe.local.response["location"])
 				self.assertEqual(location.path, "/storefront-login")
-				self.assertEqual(parse_qs(location.query), {"prompt": ["login"], "redirect-to": [path]})
+				self.assertEqual(
+					parse_qs(location.query), {"prompt": ["login"], "redirect-to": [path], "_lang": ["en"]}
+				)
 
 		self.send_token(None, user=shopper, path=path)
 		open_checkout(code)

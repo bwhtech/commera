@@ -25,6 +25,12 @@ def get_page(handle: str) -> ContentPage:
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
+@rate_limit(limit=600, seconds=60)
+def get_translations(lang: str) -> dict[str, str]:
+	return shop.get_translations(lang)
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=60, seconds=60)
 def get_sitemap(kind: str | None = None, page: int = 1) -> Sitemap:
 	return shop.get_sitemap(kind=kind or None, page=page)

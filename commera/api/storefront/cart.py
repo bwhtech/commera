@@ -20,6 +20,7 @@ from commera.guest import (
 )
 from commera.sdk import cart as cart_sdk
 from commera.sdk.types import PricedCart
+from commera.seo import LANGUAGES
 from commera.utils import get_next_url
 
 CHECKOUT_CODE_PREFIX = "commera:storefront_checkout:"
@@ -108,6 +109,7 @@ def get_checkout_url() -> dict:
 	if not get_session_cart():
 		frappe.throw(_("Add something to your cart first."), frappe.DoesNotExistError)
 
+	handoff["lang"] = frappe.local.lang if frappe.local.lang in LANGUAGES else "en"
 	code = frappe.generate_hash(length=32)
 	# An account code outlives a guest one: the browser may have to sign in before it can use it.
 	handoff["expires_at"] = (
@@ -139,7 +141,7 @@ def open_checkout(code: str):
 		return redirect(f"/{frappe.local.lang}/cart")
 	if "user" in handoff:
 		return open_account_checkout(handoff)
-	redirect(get_handoff_page_url(code))
+	redirect(get_handoff_page_url(code, handoff["lang"]))
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
@@ -173,14 +175,17 @@ def adopt_checkout_cart(code: str):
 	redirect(get_next_url())
 
 
-def get_handoff_page_url(code: str) -> str:
+def get_handoff_page_url(code: str, lang: str | None = None) -> str:
 	params = {key: value for key, value in frappe.form_dict.items() if key not in ("cmd", "csrf_token")}
+	if lang and lang != "en":
+		params["_lang"] = lang
 	return f"/storefront-cart?{urlencode({**params, 'code': code})}"
 
 
 def get_checkout_code(key: str) -> dict | None:
 	handoff = frappe.cache.get_value(key)
 	if handoff and handoff["expires_at"] > time.time():
+		frappe.local.lang = handoff["lang"]
 		return handoff
 	return None
 
@@ -189,7 +194,8 @@ def open_account_checkout(handoff: dict):
 	"""Only a browser signed in as the code's user goes on to checkout. Any other browser signs in first."""
 	if frappe.session.user == handoff["user"]:
 		return redirect(get_next_url())
-	redirect(f"/storefront-login?{urlencode({'prompt': 'login', 'redirect-to': frappe.request.full_path})}")
+	query = {"prompt": "login", "redirect-to": frappe.request.full_path, "_lang": handoff["lang"]}
+	redirect(f"/storefront-login?{urlencode(query)}")
 
 
 def redirect(location: str):

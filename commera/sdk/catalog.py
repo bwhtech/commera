@@ -149,10 +149,13 @@ def list_products(
 
 
 def get_facets(filters: dict) -> dict[str, list[FacetValue]]:
-	cache_key = f"{FACETS_CACHE_PREFIX}{sha256_hash(frappe.as_json(filters))}"
+	cache_key = f"{FACETS_CACHE_PREFIX}{frappe.local.lang}:{sha256_hash(frappe.as_json(filters))}"
 	facets = frappe.cache.get_value(cache_key)
 	if facets is None:
-		facets = {key: get_facet_values(counts) for key, counts in get_listing_facet_counts(filters).items()}
+		facets = {
+			key: get_facet_values(counts, is_translated=key == "colors")
+			for key, counts in get_listing_facet_counts(filters).items()
+		}
 		frappe.cache.set_value(cache_key, facets, expires_in_sec=FACETS_CACHE_SECONDS)
 	return facets
 
@@ -163,8 +166,28 @@ def get_price_facet() -> dict:
 	return {"min": flt(price_range.get("min_price")), "max": flt(price_range.get("max_price"))}
 
 
-def get_facet_values(counts: dict[str, int]) -> list[FacetValue]:
+def get_facet_values(counts: dict[str, int], is_translated: bool = False) -> list[FacetValue]:
+	"""In Arabic a translated facet adds the shown `label`; `value` stays the filter value."""
+	if is_translated and is_arabic():
+		return [{"value": value, "label": _(value), "count": count} for value, count in counts.items()]
 	return [{"value": value, "count": count} for value, count in counts.items()]
+
+
+def is_arabic() -> bool:
+	return frappe.local.lang == "ar"
+
+
+def get_localised_title(title: str, arabic_name: str | None, color: str | None) -> str:
+	"""In Arabic, the Arabic item name with its translated colour; else `title`."""
+	if not is_arabic() or not arabic_name:
+		return title
+	color = translate_label(color)
+	return f"{arabic_name} - {color}" if color and color not in arabic_name else arabic_name
+
+
+def translate_label(text: str | None) -> str | None:
+	"""A stored English label in the request language, as the Jinja storefront shows it."""
+	return _(text) if text else text
 
 
 def get_product(handle: str) -> Product | None:
@@ -178,10 +201,14 @@ def get_product(handle: str) -> Product | None:
 	return {
 		"id": product_variant.name,
 		"handle": product_variant.route,
-		"title": product_variant.display_name or item.item_name,
+		"title": get_localised_title(
+			product_variant.display_name or item.item_name,
+			item.get("custom_item_name_ar"),
+			product_variant.attribute_value,
+		),
 		"vendor": item.brand,
 		"color": product_variant.attribute_value,
-		"description_html": item.description or "",
+		"description_html": (is_arabic() and item.get("custom_description_ar")) or item.description or "",
 		"images": detail["images"],
 		"collection": get_product_collection(product_variant.item_group),
 		"currency": get_store_currency(),
@@ -235,7 +262,7 @@ def get_collection_filters(handle: str) -> dict:
 def get_collection_shape(row) -> Collection:
 	return {
 		"handle": row.route_slug,
-		"title": row.display_name or row.category_name,
+		"title": translate_label(row.display_name or row.category_name),
 		"image": row.image,
 		"updated_at": str(row.modified),
 	}
@@ -252,7 +279,11 @@ def get_product_card(card: dict, stock: dict, currency: str) -> ProductCard:
 	return {
 		"id": card["name"],
 		"handle": card["route"],
-		"title": card["display_name"] or card["item_name"],
+		"title": get_localised_title(
+			card["display_name"] or card["item_name"],
+			card.get("custom_item_name_ar"),
+			card["attribute_value"],
+		),
 		"vendor": card["brand"],
 		"color": card["attribute_value"],
 		"image": card["image"],
@@ -337,7 +368,7 @@ def get_product_collection(item_group: str | None) -> dict | None:
 		(root for root in get_storefront_menu() if root["route_slug"] and links_item_group(root, item_group)),
 		None,
 	)
-	return {"handle": root["route_slug"], "title": root["label"]} if root else None
+	return {"handle": root["route_slug"], "title": translate_label(root["label"])} if root else None
 
 
 def links_item_group(node: dict, item_group: str) -> bool:
@@ -358,17 +389,38 @@ def get_line_products(item_codes: list[str]) -> dict[str, CartLineProduct]:
 		for row in frappe.get_all(
 			"Style Attribute Variant",
 			filters={"name": ("in", [row.parent for row in rows] or [""]), "is_published": 1},
-			fields=["name", "route", "display_name"],
+			fields=["name", "route", "display_name", "item_style", "attribute_value"],
 		)
 	}
 	images = images_for_variants(list(variants))
+	arabic_names = get_arabic_item_names([variant.item_style for variant in variants.values()])
+	titles = {
+		name: get_localised_title(
+			variant.display_name, arabic_names.get(variant.item_style), variant.attribute_value
+		)
+		for name, variant in variants.items()
+	}
 	return {
 		row.item_code: {
 			"handle": variants[row.parent].route,
-			"title": variants[row.parent].display_name,
+			"title": titles[row.parent],
 			"variant_title": row.size,
 			"image": images.get(row.parent, {}).get("image"),
 		}
 		for row in rows
 		if row.parent in variants
 	}
+
+
+def get_arabic_item_names(item_codes: list[str]) -> dict[str, str]:
+	"""Read only for an Arabic request on a site that has the Arabic name field."""
+	if not is_arabic() or not frappe.db.has_column("Item", "custom_item_name_ar"):
+		return {}
+	return dict(
+		frappe.get_all(
+			"Item",
+			filters={"name": ("in", item_codes or [""])},
+			fields=["name", "custom_item_name_ar"],
+			as_list=True,
+		)
+	)
