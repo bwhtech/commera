@@ -38,6 +38,25 @@ def system_user_session(user: str = "Administrator"):
 		frappe.local.user_perms = None
 
 
+@contextmanager
+def latest_committed_reads():
+	# MariaDB 11.6+ turns innodb_snapshot_isolation on: a locking read or update of a row another request
+	# committed after this transaction began fails with 1020 instead of returning the latest version.
+	setting = (
+		frappe.db.sql("SHOW SESSION VARIABLES LIKE 'innodb_snapshot_isolation'")
+		if frappe.db.db_type == "mariadb"
+		else ()
+	)
+	if not setting or setting[0][1] != "ON":
+		yield
+		return
+	frappe.db.sql("SET SESSION innodb_snapshot_isolation = OFF")
+	try:
+		yield
+	finally:
+		frappe.db.sql("SET SESSION innodb_snapshot_isolation = ON")
+
+
 def generate_otp():
 	"""Generates a cryptographically secure random OTP"""
 
@@ -208,6 +227,23 @@ def new_cart_quotation(party, email: str, contact_person: str | None = None):
 	if sale_price_list := frappe.get_cached_value("Commera Settings", "Commera Settings", "sale_price_list"):
 		quotation_doc.selling_price_list = sale_price_list
 	return quotation_doc
+
+
+def is_shoppers_address(address_name: str) -> bool:
+	"""Linked to the session shopper's Customer, which also covers addresses their guest checkouts filed."""
+	party = get_party(create=False)
+	return bool(
+		party
+		and frappe.db.exists(
+			"Dynamic Link",
+			{
+				"parenttype": "Address",
+				"parent": address_name,
+				"link_doctype": party.doctype,
+				"link_name": party.name,
+			},
+		)
+	)
 
 
 def get_address_docs(party=None):

@@ -7,12 +7,11 @@ from frappe.utils.data import cint, cstr
 from commera.api.cart import get_cart_price
 from commera.guest import is_guest, is_guest_checkout_enabled
 from commera.product_detail import size_sort_key
-from commera.utils import get_available_stocks, get_same_site_path
+from commera.utils import get_available_stocks, get_next_url
 
 no_cache = True
 
 MAX_CART_LINES = 25
-FORWARDED_PARAM_PREFIXES = ("utm_", "checkout[")
 
 
 def get_context(context):
@@ -201,29 +200,3 @@ def get_variants(variant_names: list[str]) -> dict[str, dict]:
 	for image in images:
 		variant_by_name[image.parent].images.append({"image": image.image})
 	return variant_by_name
-
-
-def get_next_url(return_to: str | None = None) -> str:
-	forwarded_params = [
-		(key, value)
-		for key, value in frappe.form_dict.items()
-		if key == "discount" or key.startswith(FORWARDED_PARAM_PREFIXES)
-	]
-	cart_url = f"/{frappe.local.lang}/cart"
-	destination = get_return_to_url(return_to, cart_url)
-	if destination:
-		query_string = urlencode(forwarded_params, doseq=True)
-		separator = "&" if "?" in destination else "?"
-		return f"{destination}{separator}{query_string}" if query_string else destination
-	if not is_guest():
-		forwarded_params = [("checkout", "1"), *forwarded_params]
-	elif is_guest_checkout_enabled():
-		cart_url = f"{cart_url}/checkout"
-	query_string = urlencode(forwarded_params, doseq=True)
-	return f"{cart_url}?{query_string}" if query_string else cart_url
-
-
-def get_return_to_url(return_to: str | None, cart_url: str) -> str | None:
-	if cstr(return_to).strip() == "cart":
-		return cart_url
-	return get_same_site_path(return_to)

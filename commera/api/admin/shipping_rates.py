@@ -13,8 +13,8 @@ from commera.api.admin.delivery_options import (
 	ensure_available,
 	is_available,
 )
-from commera.api.admin.orders import get_reporting_currency
 from commera.api.admin.settings import coerce_field_value, write_settings_fields
+from commera.utils import get_store_currency
 
 RULE_DOCTYPE = "Shipping Rule"
 BAND_DOCTYPE = "Shipping Rule Condition"
@@ -66,7 +66,7 @@ def build_screen() -> dict:
 	screen = {
 		"available": False,
 		"store_rule": None,
-		"currency": get_reporting_currency(),
+		"currency": get_store_currency(),
 		"rules": [],
 		"delivery_options": [],
 	}

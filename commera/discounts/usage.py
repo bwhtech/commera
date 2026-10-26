@@ -3,6 +3,7 @@ from frappe import _
 from frappe.query_builder.functions import Count, Sum
 from frappe.utils.data import cint, flt
 
+from commera.core import latest_committed_reads
 from commera.discounts.allocations import get_allocations
 from commera.discounts.cart_context import get_cart_context
 from commera.plugin_events import fire_event
@@ -107,6 +108,7 @@ def record_discount_uses(sales_order, method=None):
 		)
 
 
+@latest_committed_reads()
 def validate_discount_limits(sales_order, amounts: dict, base_amounts: dict, earlier_orders: list[str]):
 	# A locking read waits for a concurrent placement and sees its commit; a plain read would not (REPEATABLE READ).
 	cart = get_cart_context(sales_order)
@@ -157,6 +159,7 @@ def get_earlier_usage(filters: dict, earlier_orders: list[str]) -> tuple[int, fl
 	return cint(count), flt(amount)
 
 
+@latest_committed_reads()
 def add_usage(base_amounts: dict[str, float], codes: set[str], base_order_total: float):
 	# Increments, not recounts: the update reads the latest committed counter, whatever this snapshot holds.
 	discount = frappe.qb.DocType("Commera Discount")

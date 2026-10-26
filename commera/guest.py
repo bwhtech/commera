@@ -9,6 +9,8 @@ GUEST_CART_COOKIE_MAX_AGE = 30 * 24 * 60 * 60
 # Headless storefronts keep the token themselves and send it on each server-to-server call.
 CART_TOKEN_HEADER = "X-Commera-Cart-Token"
 CART_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{32,128}")
+# Only the storefront API takes the header, so a page or another method a browser opens never acts on it.
+STOREFRONT_API_PATH = re.compile(r"/api/(v[12]/)?method/commera\.api\.storefront\.")
 
 
 def is_guest() -> bool:
@@ -28,7 +30,7 @@ def get_guest_cart_token() -> str | None:
 	request = getattr(frappe.local, "request", None)
 	if not request:
 		return None
-	if token := request.headers.get(CART_TOKEN_HEADER):
+	if (token := request.headers.get(CART_TOKEN_HEADER)) and STOREFRONT_API_PATH.match(request.path):
 		validate_cart_token(token)
 		return token
 	return request.cookies.get(GUEST_CART_COOKIE)

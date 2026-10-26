@@ -4,6 +4,8 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, fmt_money, random_string
 
+from commera.utils import get_store_currency
+
 STANDARD_DELIVERY_OPTION = "Standard Delivery"
 
 
@@ -157,9 +159,10 @@ def create_price_lists():
 	"""Create price lists"""
 	print("  - Creating Price Lists...")
 
+	currency = get_store_currency()
 	price_lists = [
-		{"name": "Standard Selling", "currency": "USD", "enabled": 1, "buying": 0, "selling": 1},
-		{"name": "Sale Price List", "currency": "USD", "enabled": 1, "buying": 0, "selling": 1},
+		{"name": "Standard Selling", "currency": currency, "enabled": 1, "buying": 0, "selling": 1},
+		{"name": "Sale Price List", "currency": currency, "enabled": 1, "buying": 0, "selling": 1},
 	]
 
 	for pl_data in price_lists:

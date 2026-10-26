@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils.data import flt
+from frappe.utils.data import cstr, flt
 
 from commera.api.payments import cart_write_lock, save_cart_quotation, validate_cart_is_not_in_checkout
 from commera.api.shipping import get_checkout_summary, reprice_shipping_discount
@@ -9,7 +9,7 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import CommeraC
 from commera.core import _get_cart_quotation
 from commera.discounts.allocations import get_allocations
 from commera.guest import get_guest_cart_name, is_guest
-from commera.plugin_events import get_plugin_fieldnames, validate_plugin_fieldnames
+from commera.plugin_events import get_listed_items, get_plugin_fieldnames, validate_plugin_fieldnames
 from commera.sdk.catalog import get_line_products
 from commera.sdk.types import Cart, CheckoutSummary, NewCartLine, PricedCart
 
@@ -99,7 +99,11 @@ def get_priced_cart() -> PricedCart | None:
 
 
 def add_lines(lines: list[NewCartLine]) -> PricedCart:
-	"""The storefront shows new lines on the shopper's next page load."""
+	"""Only items a published product sells. The storefront shows new lines on the shopper's next page
+	load."""
+	item_codes = {cstr(line["item_code"]) for line in lines}
+	if unlisted := item_codes - get_listed_items(list(item_codes), sellable_only=True):
+		frappe.throw(_("{0} is not for sale.").format(", ".join(sorted(unlisted))))
 	cart = get_session_cart(create=True)
 	cart.add_lines(lines)
 	return save_server_cart(cart)

@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 
+from commera.order_access import is_shoppers_order
 from commera.utils import can_return, validate_document_access
 
 
@@ -8,7 +9,7 @@ from commera.utils import can_return, validate_document_access
 def return_items(sales_order_id: str, items: list | str):
 	order = validate_document_access("Sales Order", sales_order_id)
 	# Accounts User holds read on every Sales Order but no create on Delivery Note, which this inserts.
-	if order.owner != frappe.session.user:
+	if not is_shoppers_order(order):
 		frappe.has_permission("Delivery Note", ptype="create", throw=True)
 
 	items = frappe.parse_json(items)

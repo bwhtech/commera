@@ -17,6 +17,7 @@ from commera.search.result_card import (
 	RESULT_CARD_CATALOG,
 )
 from commera.storefront_plugins import clear_storefront_plugin_cache, get_enabled_storefront_apps
+from commera.utils import get_store_currency
 
 MAX_CONTENT_FIELDS = 15
 
@@ -125,10 +126,17 @@ class CommeraSettings(Document):
 	pass
 
 	def validate(self):
+		self.validate_price_list_currencies()
 		self.validate_a_payment_method_is_available()
 		self.validate_search_content_fields()
 		self.validate_search_result_fields()
 		sync_headless_oauth_client(self)
+
+	def validate_price_list_currencies(self):
+		currency = get_store_currency(self.company)
+		for fieldname in ("default_price_list", "sale_price_list"):
+			if self.has_value_changed(fieldname) and (price_list := self.get(fieldname)):
+				validate_price_list_currency(price_list, currency, self.meta.get_label(fieldname))
 
 	def validate_a_payment_method_is_available(self):
 		if self.cod_enabled or get_available_payment_modes():
@@ -374,3 +382,24 @@ def create_configurator_log():
 			"doctype": "Bulk Style Attribute Configurator Creation Log",
 		}
 	).insert(ignore_permissions=True)
+
+
+def validate_price_list_currency(price_list: str, currency: str, label: str):
+	price_list_currency = frappe.get_cached_value("Price List", price_list, "currency")
+	if price_list_currency != currency:
+		frappe.throw(
+			frappe._(
+				"{0} {1} is in {2}, but the store sells in {3}, the currency of its company. Pick a price list in {3}."
+			).format(label, price_list, price_list_currency, currency)
+		)
+
+
+def validate_store_price_list(doc, method=None):
+	settings = frappe.get_cached_doc("Commera Settings")
+	for fieldname in ("default_price_list", "sale_price_list"):
+		if settings.get(fieldname) == doc.name and doc.currency != get_store_currency(settings.company):
+			frappe.throw(
+				frappe._("{0} is the {1} of the store, which sells in {2}.").format(
+					doc.name, settings.meta.get_label(fieldname), get_store_currency(settings.company)
+				)
+			)

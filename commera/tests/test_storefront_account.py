@@ -3,10 +3,15 @@ import random
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from commera.api.payments import add_customer_address
 from commera.api.storefront import account
+from commera.core import get_party
+from commera.order_access import OWNER_ACCESS, get_order_access, get_shopper_order_condition
 from commera.sdk.types import CustomerAddress, CustomerProfile, ShopperOrder, ShopperOrderPage
 from commera.tests.test_admin_orders import make_test_sales_order
 from commera.tests.test_order_access import make_website_user
+from commera.utils import validate_document_access
+from commera.www.account.orders.index import get_orders_list
 
 ADDRESS = {
 	"address_type": "Shipping",
@@ -74,10 +79,74 @@ class TestStorefrontAccount(IntegrationTestCase):
 
 		with self.assertRaises(frappe.DoesNotExistError):
 			account.save_address({"name": address, "city": "Elsewhere"})
-		with self.assertRaises(frappe.DoesNotExistError):
+		with self.assertRaises(frappe.ValidationError):
 			account.delete_address(address)
 		self.assertNotIn(address, [row["name"] for row in account.list_addresses()])
 		self.assertEqual(frappe.db.get_value("Address", address, "city"), ADDRESS["city"])
+
+	def test_a_guest_checkout_address_on_the_shoppers_customer_is_theirs(self):
+		frappe.set_user(self.shopper)
+		customer = get_party(self.shopper).name
+		frappe.set_user(self.other)
+		other_customer = get_party(self.other).name
+		frappe.set_user("Administrator")
+		guest_address = add_customer_address(customer, {**ADDRESS, "address_line1": "Guest checkout"})
+		guest_address.db_set("owner", "Guest")
+		elsewhere = add_customer_address(other_customer, {**ADDRESS, "address_line1": "Elsewhere"})
+		elsewhere.db_set("owner", self.shopper)
+		frappe.set_user(self.shopper)
+
+		self.assertEqual(
+			account.save_address({"name": guest_address.name, "city": "Kollam"})["city"], "Kollam"
+		)
+		account.delete_address(guest_address.name)
+		self.assertFalse(frappe.db.exists("Address", guest_address.name))
+		with self.assertRaises(frappe.DoesNotExistError):
+			account.save_address({"name": elsewhere.name, "city": "Kollam"})
+		with self.assertRaises(frappe.ValidationError):
+			account.delete_address(elsewhere.name)
+
+	def test_an_address_type_other_than_billing_or_shipping_is_refused(self):
+		frappe.set_user(self.shopper)
+
+		with self.assertRaisesRegex(frappe.ValidationError, "Address type must be one of"):
+			account.save_address({**ADDRESS, "address_type": "Office"})
+		self.assertEqual(account.save_address({**ADDRESS, "address_type": None})["address_type"], "Shipping")
+
+	def test_a_guest_order_placed_with_the_shoppers_email_is_theirs_everywhere(self):
+		guest = self.make_order(contact_email=self.shopper, guest_cart=True)
+		other_email = self.make_order(contact_email=self.other, guest_cart=True)
+		signed_in = self.make_order(owner=self.other, contact_email=self.shopper)
+		# Checkout lowercases contact_email; the User keeps the case the shopper signed up with.
+		frappe.db.set_value("User", self.shopper, "email", self.shopper.upper())
+		frappe.set_user(self.shopper)
+
+		self.assertEqual(get_order_access(guest), OWNER_ACCESS)
+		self.assertIsNone(get_order_access(other_email))
+		self.assertIsNone(get_order_access(signed_in))
+		_, listed = get_orders_list([guest, other_email, signed_in])
+		self.assertEqual([order.name for order in listed], [guest])
+		self.assertEqual([order["name"] for order in account.list_orders()["orders"]], [guest])
+
+	def test_a_guest_order_placed_with_the_shoppers_email_opens_its_invoice_and_returns(self):
+		guest = self.make_order(contact_email=self.shopper, guest_cart=True)
+		other_email = self.make_order(contact_email=self.other, guest_cart=True)
+		frappe.set_user(self.shopper)
+
+		self.assertEqual(validate_document_access("Sales Order", guest).name, guest)
+		with self.assertRaises(frappe.PermissionError):
+			validate_document_access("Sales Order", other_email)
+
+	def test_a_guest_session_matches_no_order(self):
+		self.make_order(owner="Guest", contact_email=self.shopper, guest_cart=True)
+		sales_order = frappe.qb.DocType("Sales Order")
+		matched = (
+			frappe.qb.from_(sales_order)
+			.select(sales_order.name)
+			.where(get_shopper_order_condition("Guest"))
+			.run()
+		)
+		self.assertEqual(matched, ())
 
 	def test_orders_hold_the_shoppers_own_and_their_guest_orders_only(self):
 		own = self.make_order(owner=self.shopper)
@@ -105,6 +174,17 @@ class TestStorefrontAccount(IntegrationTestCase):
 	def make_order(self, owner: str = "Administrator", contact_email=None, guest_cart=False) -> str:
 		sales_order = make_test_sales_order()
 		sales_order.db_set({"owner": owner, "contact_email": contact_email})
+		# The Jinja order list reads only lines whose item has a Size attribute.
+		frappe.get_doc(
+			{
+				"doctype": "Item Variant Attribute",
+				"parent": sales_order.items[0].item_code,
+				"parenttype": "Item",
+				"parentfield": "attributes",
+				"attribute": "Size",
+				"attribute_value": "M",
+			}
+		).db_insert()
 		if guest_cart:
 			frappe.db.set_value(
 				"Sales Order Item",

@@ -649,14 +649,18 @@ def is_listed_item(item_code: str) -> bool:
 	return cstr(item_code) in get_listed_items([item_code])
 
 
-def get_listed_items(item_codes: list[str]) -> set[str]:
-	"""An item is on the storefront when a published Style Attribute Variant sells it or is styled on it."""
+def get_listed_items(item_codes: list[str], sellable_only: bool = False) -> set[str]:
+	"""An item is on the storefront when a published Style Attribute Variant sells it or, unless
+	`sellable_only`, is styled on it: product events fire for the template, but only a size can be bought."""
 	if not item_codes:
 		return set()
 
 	style_attribute_variant = DocType("Style Attribute Variant")
 	color_size_item = DocType("Color Size Item")
 	item_codes = {cstr(item_code) for item_code in item_codes}
+	is_listed = color_size_item.item_code.isin(list(item_codes))
+	if not sellable_only:
+		is_listed |= style_attribute_variant.item_style.isin(list(item_codes))
 	rows = (
 		frappe.qb.from_(style_attribute_variant)
 		.left_join(color_size_item)
@@ -666,13 +670,7 @@ def get_listed_items(item_codes: list[str]) -> set[str]:
 		)
 		.select(color_size_item.item_code, style_attribute_variant.item_style)
 		.distinct()
-		.where(
-			(style_attribute_variant.is_published == 1)
-			& (
-				color_size_item.item_code.isin(list(item_codes))
-				| style_attribute_variant.item_style.isin(list(item_codes))
-			)
-		)
+		.where((style_attribute_variant.is_published == 1) & is_listed)
 		.run()
 	)
 	return {cstr(code) for row in rows for code in row if cstr(code) in item_codes}

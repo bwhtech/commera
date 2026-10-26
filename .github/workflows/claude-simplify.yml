@@ -28,7 +28,7 @@ jobs:
       - name: Get frappe-implementer token
         id: app-token
         if: vars.FRAPPE_IMPLEMENTER_APP_ID != ''
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.FRAPPE_IMPLEMENTER_APP_ID }}
           private-key: ${{ secrets.FRAPPE_IMPLEMENTER_APP_PRIVATE_KEY }}

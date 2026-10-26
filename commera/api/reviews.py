@@ -6,6 +6,7 @@ from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cint, cstr, flt
 
 from commera.api.admin.orders import is_webshop_order
+from commera.order_access import get_shopper_order_condition
 
 MAX_COMMENT_LENGTH = 2000
 MAX_REVIEW_TITLE_LENGTH = 140
@@ -14,7 +15,7 @@ MAX_PAGE_LENGTH = 50
 
 
 def find_qualifying_purchase(variant: str) -> dict | None:
-	"""Keyed on Sales Order.owner, never Customer — core.py:105 mints a new Customer whenever the
+	"""Keyed on the shopper's orders, never Customer — core.py:105 mints a new Customer whenever the
 	Contact/Portal-User lookup misses, so a customer-keyed query under-reports."""
 	sales_order = frappe.qb.DocType("Sales Order")
 	sales_order_item = frappe.qb.DocType("Sales Order Item")
@@ -27,7 +28,7 @@ def find_qualifying_purchase(variant: str) -> dict | None:
 		.join(color_size_item)
 		.on(color_size_item.item_code == sales_order_item.item_code)
 		.select(sales_order.name.as_("sales_order"), sales_order_item.item_code.as_("item_code"))
-		.where(sales_order.owner == frappe.session.user)
+		.where(get_shopper_order_condition(frappe.session.user))
 		.where(is_webshop_order(sales_order))
 		.where(color_size_item.parenttype == "Style Attribute Variant")
 		.where(color_size_item.parent == variant)

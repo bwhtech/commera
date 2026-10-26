@@ -42,6 +42,8 @@ sequenceDiagram
   N->>C: cart.get_checkout_url
   C-->>N: single-use path, valid 5 minutes
   B->>C: GET cart.open_checkout?code=...
+  C-->>B: redirect to /storefront-cart, which POSTs the code
+  B->>C: POST cart.claim_checkout_cart
   C-->>B: commera_guest_cart cookie, redirect to the checkout
 ```
 
@@ -53,11 +55,11 @@ The catalogue and cart methods allow guests. The [account methods](#account-meth
 | --- | --- |
 | `products.get_products` | One page of product cards with the facets of the whole result. Each brand, colour and size facet value has its product count, as `{"value": "K&N", "count": 3}`. The other selected filters narrow each count, but the facet's own filter does not. `price` is the `min` and `max` sale price. Filters: `collection`, `query`, `brands`, `colors`, `sizes`, `min_price`, `max_price`, `on_sale`. `sort` is `default`, `price_low`, `price_high`, `name`, `new_arrival` or `discount`. |
 | `products.get_product` | One product: images, the colour option with sibling handles and stock, the size option, and one variant for each size with its price, list price and stock. |
-| `collections.get_collections`, `collections.get_collection` | Item Groups that hold a published product. |
+| `collections.get_collections`, `collections.get_collection` | Enabled menu tabs (top-level Ecommerce Categories), by route slug. |
 | `shop.get_shop` | Store name, currency, logo, the menu from Ecommerce Category, the footer, and the `copyright` line (None when it is not set). |
 | `shop.get_page` | A published Shop Web Page. |
 | `shop.get_translations` | `lang` is `en` or `ar`. Commera's own UI strings in that language, with the site's Translation records over them, as `{"Sign In": "تسجيل الدخول"}`. Frappe's strings are not included. Another language gets an error. |
-| `shop.get_sitemap` | Handles and change dates of indexable products, collections and pages, 5000 for each kind on a page. Without arguments, it returns page 1 of each kind. Set `kind` to `products`, `collections` or `pages`, and `page` to get one kind and one page. `total` gives the number of handles of each returned kind, and `page_size` gives the page size. |
+| `shop.get_sitemap` | Handles and change dates of indexable products, collections and pages. A page holds as many handles of each kind as the "Sitemap URLs Per Page" setting in Commera Settings. Without arguments, it returns page 1 of each kind. Set `kind` to `products`, `collections` or `pages`, and `page` to get one kind and one page. `total` gives the number of handles of each returned kind, and `page_size` gives the page size. |
 | `cart.get_cart`, `cart.add_lines`, `cart.update_lines`, `cart.remove_lines` | The priced server cart. Each line has the product handle, size and image. |
 | `cart.add_discount_code`, `cart.remove_discount_code` | The priced cart, with a reason for each code that takes nothing off. |
 | `cart.adopt_cart` | Signed in only. Moves the guest cart of the `X-Commera-Cart-Token` header into the account cart and returns the priced cart. |
@@ -99,12 +101,12 @@ Guest methods are rate-limited by IP address. Frappe reads the first address in 
 
 ## Checkout hand-off
 
-`get_checkout_url` stores a random code in Redis for five minutes. For a guest cart the code holds the cart token. For a signed-in shopper the code holds the user. `open_checkout` reads the code:
+`get_checkout_url` stores a random code in Redis. A guest code holds the cart token and lives five minutes. An account code holds the user and lives fifteen minutes, so the browser has time to sign in. `open_checkout` is a GET and changes nothing, so a link preview or a prefetch cannot use the code up:
 
-- Guest cart, guest browser: it sets the `commera_guest_cart` cookie to the token and redirects to the checkout.
-- Guest cart, signed-in browser: it merges the storefront cart into the account cart, as sign-in does.
+- Guest cart, guest browser: it redirects to `/storefront-cart`, whose form POSTs the code to `cart.claim_checkout_cart` by itself (a button when JavaScript is off). That POST moves the cart to a new random token, sets the `commera_guest_cart` cookie to that token and redirects to the checkout. The storefront's token no longer reaches the cart.
+- Guest cart, signed-in browser: `/storefront-cart` asks the shopper to confirm. The confirm POSTs to `cart.adopt_checkout_cart`, which merges the storefront cart into the account cart, as sign-in does.
 - Signed-in shopper, browser signed in as the same user: it redirects to the checkout of the account cart.
-- Signed-in shopper, any other browser: it keeps the code for five more minutes and redirects to `/storefront-login?prompt=login&redirect-to=<the open_checkout link>`. After sign-in, the browser opens the same link again. The checkout code never signs a browser in.
+- Signed-in shopper, any other browser: it redirects to `/storefront-login?prompt=login&redirect-to=<the open_checkout link>`. After sign-in, the browser opens the same link again. The checkout code never signs a browser in.
 - A used or expired code redirects to the cart.
 
 The code is used once, by the first browser that can use it.
@@ -130,6 +132,8 @@ In **Commera Settings > Storefront Apps > Headless Storefront**, set **Headless 
 | Skip Authorization | Yes |
 | Allowed Roles | `Customer` |
 | Token Endpoint Auth Method | `Client Secret Post` |
+
+Frappe's OAuth2 provider has no scope for a set of methods, so the access token can call any method the shopper can.
 
 Give the Client ID and Client Secret of that OAuth Client to the storefront server. Keep the secret on the server. When you clear the URL, Commera keeps the OAuth Client.
 

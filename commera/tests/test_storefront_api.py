@@ -6,19 +6,35 @@ from commera.api.storefront.collections import get_collection, get_collections
 from commera.api.storefront.products import get_product, get_products
 from commera.api.storefront.shop import get_page, get_sitemap, get_storefront_url
 from commera.sdk import catalog, shop
-from commera.sdk.catalog import get_collection_handle
 from commera.sdk.shop import get_menu_link
 from commera.sdk.types import Collection, Product, ProductCard, ProductPage, ProductVariant, Shop
 from commera.tests.test_product_details import ProductDetailPriceTestCase
+from commera.www.sitemap_segment import get_urls_per_page
 
 
 class TestStorefrontApi(ProductDetailPriceTestCase):
+	def setUp(self):
+		super().setUp()
+		self.collection = self.make_collection()
+
+	def make_collection(self, link_item_group=True) -> str:
+		category = frappe.new_doc("Ecommerce Category")
+		category.category_name = f"Details Tab {frappe.generate_hash(length=8)}"
+		category.enabled = 1
+		if link_item_group:
+			category.link_type = "Item Group"
+			category.append("link_item_groups", {"item_group": self.item_group})
+		category.insert(ignore_permissions=True)
+		frappe.local.commera_storefront_menu = None
+		self.addCleanup(setattr, frappe.local, "commera_storefront_menu", None)
+		return category.route_slug
+
 	def assert_shape(self, result: dict, shape):
 		self.assertEqual(set(result), shape.__required_keys__ | shape.__optional_keys__)
 
 	def test_shopper_reads_have_exactly_their_declared_keys(self):
 		route = self.make_priced_variant("SHAPE", default_rate=40, sale_rate=30)
-		page = catalog.list_products(collection=get_collection_handle(self.item_group))
+		page = catalog.list_products(collection=self.collection)
 		product = catalog.get_product(route)
 
 		self.assert_shape(page, ProductPage)
@@ -42,7 +58,7 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 			],
 			[("M", 80, 100)],
 		)
-		self.assertEqual(product["collection"]["handle"], get_collection_handle(self.item_group))
+		self.assertEqual(product["collection"]["handle"], self.collection)
 
 	def test_a_variant_without_stock_is_not_available(self):
 		route = self.make_priced_variant("NOSTOCK", default_rate=50)
@@ -59,10 +75,26 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		with self.assertRaises(frappe.DoesNotExistError):
 			get_product(route)
 
+	def test_an_unknown_product_is_not_found_without_naming_the_doctype(self):
+		frappe.local.message_log = []
+
+		with self.assertRaisesRegex(frappe.DoesNotExistError, "^Product no-such-product not found$"):
+			get_product("no-such-product")
+
+		self.assertEqual(frappe.local.message_log, [])
+
+	def test_facets_are_cached_for_each_filter_set(self):
+		with patch("commera.sdk.catalog.get_listing_facet_counts", return_value={}) as count_facets:
+			get_products(collection=self.collection, brands="No Brand")
+			get_products(collection=self.collection, brands="No Brand", page=2)
+			get_products(collection=self.collection, brands="Other Brand")
+
+		self.assertEqual(count_facets.call_count, 2)
+
 	def test_a_collection_lists_only_its_own_products(self):
 		route = self.make_priced_variant("LISTED", default_rate=30, sale_rate=20)
 
-		result = get_products(collection=get_collection_handle(self.item_group))
+		result = get_products(collection=self.collection)
 
 		self.assertEqual([card["handle"] for card in result["products"]], [route])
 		self.assertEqual(result["total"], 1)
@@ -83,7 +115,7 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 			frappe.db.set_value("Style Attribute Variant", variant, "item_style", item_code)
 			frappe.db.set_value("Item", item_code, "brand", brand)
 			colors.append(color)
-		collection = get_collection_handle(self.item_group)
+		collection = self.collection
 
 		facets = get_products(collection=collection)["facets"]
 
@@ -105,15 +137,25 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "Sort must be one of"):
 			get_products(sort="random")
 
-	def test_a_collection_needs_a_published_product(self):
-		handle = get_collection_handle(self.item_group)
+	def test_a_collection_is_an_enabled_menu_tab(self):
+		self.assertEqual(
+			get_collection(self.collection)["title"],
+			frappe.db.get_value("Ecommerce Category", {"route_slug": self.collection}, "display_name"),
+		)
+		self.assertIn(self.collection, [collection["handle"] for collection in get_collections()])
+
+		frappe.db.set_value("Ecommerce Category", {"route_slug": self.collection}, "enabled", 0)
+		frappe.local.commera_storefront_menu = None
 		with self.assertRaises(frappe.DoesNotExistError):
-			get_collection(handle)
+			get_collection(self.collection)
+		with self.assertRaises(frappe.DoesNotExistError):
+			get_products(collection=self.collection)
 
-		self.make_priced_variant("SHOWN", default_rate=10)
+	def test_a_tab_without_item_groups_lists_every_product_like_its_listing_page(self):
+		self.make_priced_variant("ALLTAB", default_rate=10)
+		every_product = self.make_collection(link_item_group=False)
 
-		self.assertEqual(get_collection(handle)["title"], self.item_group)
-		self.assertIn(handle, [collection["handle"] for collection in get_collections()])
+		self.assertEqual(get_products(collection=every_product)["total"], get_products()["total"])
 
 	def test_the_sitemap_leaves_out_noindex_products(self):
 		shown = self.make_priced_variant("INDEXED", default_rate=10)
@@ -131,16 +173,31 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		total = frappe.db.count("Style Attribute Variant", {"is_published": 1, "noindex": 0})
 
 		first = get_sitemap()
-		with patch("commera.sdk.shop.SITEMAP_PAGE_SIZE", 1):
+		with patch("commera.sdk.shop.get_urls_per_page", return_value=1):
 			second_page = get_sitemap(kind="products", page=2)
 
 		self.assertEqual(set(first), {"products", "collections", "pages", "total", "page", "page_size"})
-		self.assertEqual((first["page"], first["page_size"]), (1, 5000))
+		self.assertEqual((first["page"], first["page_size"]), (1, get_urls_per_page()))
 		self.assertEqual(first["total"]["products"], total)
 		self.assertEqual(first["total"]["collections"], len(first["collections"]))
 		self.assertEqual(set(second_page), {"products", "total", "page", "page_size"})
 		self.assertEqual(second_page["total"], {"products": total})
 		self.assertEqual(second_page["products"], first["products"][1:2])
+
+	def test_the_sitemap_lists_published_pages_and_collections_by_handle(self):
+		page = frappe.get_doc(
+			{
+				"doctype": "Shop Web Page",
+				"route": f"about-{self.suffix.lower()}",
+				"content": "About",
+				"published": 1,
+			}
+		).insert(ignore_permissions=True, set_name=f"About {self.suffix}")
+
+		sitemap = get_sitemap()
+
+		self.assertIn(page.route, [row["handle"] for row in sitemap["pages"]])
+		self.assertIn(self.collection, [row["handle"] for row in sitemap["collections"]])
 
 	def test_an_unknown_sitemap_kind_is_refused(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "Sitemap kind must be one of"):
@@ -168,14 +225,17 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 
 	def test_menu_links_name_their_target_and_the_api_adds_storefront_paths(self):
 		node = {"link_type": "Item Group", "item_groups": [self.item_group], "parent": "Root"}
-		handle = get_collection_handle(self.item_group)
+		handle = self.collection
 
-		self.assertEqual(get_menu_link(node), ("collection", handle))
+		self.assertEqual(get_menu_link(node, handle), ("collection", handle))
 		self.assertEqual(
-			get_menu_link({"link_type": "Brand", "brand": "K&N", "parent": ""}), ("brand", "K&N")
+			get_menu_link({"link_type": "Brand", "brand": "K&N", "parent": ""}, handle), ("brand", "K&N")
 		)
 		self.assertEqual(
-			get_menu_link({"link_type": "Item Group", "item_groups": [], "parent": ""}), ("all", None)
+			get_menu_link({"link_type": "", "item_groups": [], "parent": ""}, handle), ("collection", handle)
+		)
+		self.assertEqual(
+			get_menu_link({"link_type": "", "item_groups": [], "parent": "Root"}, handle), (None, None)
 		)
 		self.assertEqual(
 			get_storefront_url({"type": "collection", "target": handle}), f"/collections/{handle}"

@@ -22,3 +22,4 @@ commera.patches.allow_guest_on_order_detail
 commera.patches.move_service_shipping_rules_to_store_rule
 commera.patches.drop_frozen_order_field_order
 commera.patches.drop_frozen_core_field_order
+commera.patches.log_store_price_list_currency_mismatch

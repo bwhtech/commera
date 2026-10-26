@@ -5,10 +5,12 @@ from frappe.query_builder.functions import Count
 from frappe.utils.data import cint, cstr
 from pypika import Order
 
+from commera.api.payments import add_customer_address
 from commera.api.signup import validate_user_names
 from commera.api.users import delete_user_address
-from commera.core import get_address_docs, get_party
+from commera.core import get_address_docs, get_party, is_shoppers_address
 from commera.guest import is_guest
+from commera.order_access import OWNER_ACCESS, get_order_access, get_shopper_order_condition
 from commera.sdk.orders import read_order_results
 from commera.sdk.types import CustomerAddress, CustomerProfile, ShopperOrder, ShopperOrderPage
 
@@ -82,25 +84,22 @@ def save_address(address: dict) -> CustomerAddress:
 	if name := address.get("name"):
 		doc = get_own_address(name)
 		doc.update(values)
-		doc.save()
+		# Guest checkouts file addresses the shopper does not own; the Customer link is the ownership check.
+		doc.save(ignore_permissions=True)
 	else:
-		party = get_party(get_shopper())
-		doc = frappe.get_doc({"doctype": "Address", **values})
-		doc.address_title = doc.address_title or get_profile()["full_name"]
-		doc.append("links", {"link_doctype": party.doctype, "link_name": party.name})
-		doc.insert()
+		values["address_type"] = values.get("address_type") or "Shipping"
+		values["address_title"] = values.get("address_title") or get_profile()["full_name"]
+		doc = add_customer_address(get_party(get_shopper()).name, values)
 	return get_address_result(doc)
 
 
 def get_own_address(name: str):
-	shopper = get_shopper()
-	if frappe.db.get_value("Address", name, "owner") != shopper:
+	if not is_shoppers_address(name):
 		raise frappe.DoesNotExistError(_("Address {0} not found").format(name))
 	return frappe.get_doc("Address", name)
 
 
 def delete_address(name: str) -> None:
-	get_own_address(name)
 	delete_user_address(name)
 
 
@@ -115,7 +114,7 @@ def list_orders(page: int = 1, page_size: int = 10) -> ShopperOrderPage:
 	"""Newest first: the shopper's orders and guest orders placed with their email."""
 	page, page_size = max(cint(page), 1), min(max(cint(page_size), 1), MAX_ORDER_PAGE_SIZE)
 	sales_order = DocType("Sales Order")
-	condition = get_shopper_order_condition()
+	condition = get_shopper_order_condition(get_shopper())
 	total = frappe.qb.from_(sales_order).select(Count("*")).where(condition).run()[0][0]
 	names = (
 		frappe.qb.from_(sales_order)
@@ -136,34 +135,11 @@ def list_orders(page: int = 1, page_size: int = 10) -> ShopperOrderPage:
 
 
 def get_order(name: str) -> ShopperOrder:
-	sales_order = DocType("Sales Order")
-	is_shoppers = (
-		frappe.qb.from_(sales_order)
-		.select(sales_order.name)
-		.where((sales_order.name == name) & get_shopper_order_condition())
-		.run()
-	)
-	orders = read_order_results([name], ()) if is_shoppers else {}
+	get_shopper()
+	orders = read_order_results([name], ()) if get_order_access(name) == OWNER_ACCESS else {}
 	if cstr(name) not in orders:
 		raise frappe.DoesNotExistError(_("Order {0} not found").format(name))
 	return without_staff_fields(orders[cstr(name)])
-
-
-def get_shopper_order_condition():
-	"""Orders the shopper placed, and guest orders with their email: the OTP sign-in proved they own it."""
-	shopper = get_shopper()
-	sales_order, order_line, cart = DocType("Sales Order"), DocType("Sales Order Item"), DocType("Quotation")
-	guest_orders = (
-		frappe.qb.from_(order_line)
-		.join(cart)
-		.on(cart.name == order_line.prevdoc_docname)
-		.select(order_line.parent)
-		.where((order_line.parenttype == "Sales Order") & (cart.custom_guest_cart_key != ""))
-	)
-	email = frappe.db.get_value("User", shopper, "email")
-	return (sales_order.owner == shopper) | (
-		(sales_order.contact_email == email) & sales_order.name.isin(guest_orders)
-	)
 
 
 def without_staff_fields(order) -> ShopperOrder:

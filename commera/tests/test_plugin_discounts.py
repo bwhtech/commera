@@ -13,6 +13,7 @@ from commera.sdk import orders as orders_sdk
 from commera.tests import test_cart_checkout
 from commera.tests.test_discount_codes import CAP_RATE, SHIRT_RATE, DiscountCodeTestCase
 from commera.tests.test_payment_hooks import patch_app_hooks
+from commera.tests.test_server_cart import list_items
 
 
 def note_the_cart(event):
@@ -24,6 +25,10 @@ def refuse_zz_codes(quotation, code):
 
 
 class TestDiscountEvents(DiscountCodeTestCase):
+	def setUp(self):
+		super().setUp()
+		list_items(self.shirt, self.cap)
+
 	def test_a_placed_order_fires_discount_used(self):
 		code = self.create_code(percentage=10)
 
@@ -66,6 +71,7 @@ class TestDiscountEvents(DiscountCodeTestCase):
 class TestCartAttributes(DiscountCodeTestCase):
 	def setUp(self):
 		super().setUp()
+		list_items(self.shirt, self.cap)
 		sale_price_list = frappe.db.get_single_value("Commera Settings", "sale_price_list")
 		self.addCleanup(self.set_sale_price_list, sale_price_list)
 		self.set_sale_price_list(self.price_list)
@@ -91,6 +97,7 @@ class TestCartAttributes(DiscountCodeTestCase):
 class TestValidateDiscountCodeHook(DiscountCodeTestCase):
 	def setUp(self):
 		super().setUp()
+		list_items(self.shirt, self.cap)
 		patch_app_hooks(self, {"commera_hooks": {"validate_discount_code": [f"{__name__}.refuse_zz_codes"]}})
 
 	def test_a_refused_code_is_skipped_on_the_cart(self):

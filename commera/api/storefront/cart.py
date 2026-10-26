@@ -1,3 +1,4 @@
+import time
 from urllib.parse import urlencode
 
 import frappe
@@ -5,7 +6,11 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cint, cstr, sha256_hash
 
-from commera.commera_ecommerce.doctype.commera_cart.commera_cart import adopt_guest_cart, get_session_cart
+from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
+	adopt_guest_cart,
+	get_session_cart,
+	set_guest_cart_key,
+)
 from commera.guest import (
 	CART_TOKEN_HEADER,
 	get_guest_cart_token,
@@ -13,14 +18,14 @@ from commera.guest import (
 	set_guest_cart_cookie,
 	validate_cart_token,
 )
-from commera.plugin_events import get_listed_items
 from commera.sdk import cart as cart_sdk
 from commera.sdk.types import PricedCart
 from commera.seo import LANGUAGES
-from commera.www.cart.permalink import get_next_url
+from commera.utils import get_next_url
 
 CHECKOUT_CODE_PREFIX = "commera:storefront_checkout:"
 CHECKOUT_CODE_SECONDS = 5 * 60
+CHECKOUT_SIGN_IN_SECONDS = 10 * 60
 
 
 # Each call acts on the cart of the X-Commera-Cart-Token header the storefront server sends.
@@ -32,7 +37,7 @@ def get_cart() -> PricedCart | None:
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=600, seconds=60 * 60)
-def add_lines(lines: list | str) -> PricedCart:
+def add_lines(lines: list | str | None = None) -> PricedCart:
 	"""Add `[{item_code, qty, attributes}]`; only items a published product sells."""
 	lines = [
 		{
@@ -40,30 +45,36 @@ def add_lines(lines: list | str) -> PricedCart:
 			"qty": cint(line.get("qty") or 1),
 			"attributes": line.get("attributes"),
 		}
-		for line in frappe.parse_json(lines) or []
+		for line in get_list_of(lines, dict, _("Send the lines as a list of objects."))
 	]
-	if unlisted := {line["item_code"] for line in lines} - get_listed_items(
-		[line["item_code"] for line in lines]
-	):
-		frappe.throw(_("{0} is not for sale.").format(", ".join(sorted(unlisted))))
 	return cart_sdk.add_lines(lines)
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=600, seconds=60 * 60)
-def update_lines(lines: list | str) -> PricedCart:
+def update_lines(lines: list | str | None = None) -> PricedCart:
 	"""Set `[{line_id, qty}]`; a quantity of 0 removes the line."""
 	lines = [
 		{"line_id": cstr(line.get("line_id")), "qty": cint(line.get("qty"))}
-		for line in frappe.parse_json(lines) or []
+		for line in get_list_of(lines, dict, _("Send the lines as a list of objects."))
 	]
 	return cart_sdk.update_lines(lines)
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=600, seconds=60 * 60)
-def remove_lines(line_ids: list | str) -> PricedCart:
-	return cart_sdk.remove_lines([cstr(line_id) for line_id in frappe.parse_json(line_ids)])
+def remove_lines(line_ids: list | str | None = None) -> PricedCart:
+	return cart_sdk.remove_lines(get_list_of(line_ids, str, _("Send the line ids as a list of strings.")))
+
+
+def get_list_of(value: list | str | None, item_type: type, message: str) -> list:
+	try:
+		value = frappe.parse_json(value)
+	except ValueError:
+		value = None
+	if not isinstance(value, list) or not all(isinstance(item, item_type) for item in value):
+		frappe.throw(message)
+	return value
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
@@ -100,7 +111,15 @@ def get_checkout_url() -> dict:
 
 	handoff["lang"] = frappe.local.lang if frappe.local.lang in LANGUAGES else "en"
 	code = frappe.generate_hash(length=32)
-	frappe.cache.set_value(f"{CHECKOUT_CODE_PREFIX}{code}", handoff, expires_in_sec=CHECKOUT_CODE_SECONDS)
+	# An account code outlives a guest one: the browser may have to sign in before it can use it.
+	handoff["expires_at"] = (
+		time.time() + CHECKOUT_CODE_SECONDS + (CHECKOUT_SIGN_IN_SECONDS if "user" in handoff else 0)
+	)
+	frappe.cache.set_value(
+		f"{CHECKOUT_CODE_PREFIX}{code}",
+		handoff,
+		expires_in_sec=CHECKOUT_CODE_SECONDS + CHECKOUT_SIGN_IN_SECONDS,
+	)
 	return {"path": f"/api/method/commera.api.storefront.cart.open_checkout?code={code}"}
 
 
@@ -116,36 +135,65 @@ def get_checkout_handoff() -> dict:
 @frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=60, seconds=60)
 def open_checkout(code: str):
-	"""Bind the storefront cart to this browser, then go on to checkout in the storefront's language. A used
-	or old code opens the cart."""
-	key = f"{CHECKOUT_CODE_PREFIX}{cstr(code)}"
-	handoff = frappe.cache.get_value(key) or {}
-	if handoff:
-		frappe.local.lang = handoff["lang"]
+	"""Send the browser on with a checkout code. It writes nothing, so a link preview cannot use the code up."""
+	handoff = get_checkout_code(f"{CHECKOUT_CODE_PREFIX}{cstr(code)}")
+	if not handoff:
+		return redirect(f"/{frappe.local.lang}/cart")
 	if "user" in handoff:
-		return open_account_checkout(key, handoff)
+		return open_account_checkout(handoff)
+	redirect(get_handoff_page_url(code, handoff["lang"]))
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
+@rate_limit(limit=60, seconds=60)
+def claim_checkout_cart(code: str):
+	"""Move a guest checkout code's cart to this guest browser, then go on to checkout."""
+	if not is_guest():
+		return redirect(get_handoff_page_url(code))
+	key = f"{CHECKOUT_CODE_PREFIX}{cstr(code)}"
+	handoff = get_checkout_code(key)
+	if not handoff or "token" not in handoff:
+		return redirect(f"/{frappe.local.lang}/cart")
 
 	frappe.cache.delete_value(key)
-	token = handoff.get("token")
-	if token and is_guest():
-		set_guest_cart_cookie(token)
-	elif token:
-		adopt_guest_cart(sha256_hash(token))
-		# A GET is not committed unless asked; the merge must persist.
-		frappe.local.flags.commit = True
-
-	redirect(get_next_url() if token else f"/{frappe.local.lang}/cart")
+	# A new token, so the storefront's copy of the old one no longer reaches the cart.
+	set_guest_cart_key(sha256_hash(handoff["token"]), set_guest_cart_cookie(frappe.generate_hash(length=32)))
+	redirect(get_next_url())
 
 
-def open_account_checkout(key: str, handoff: dict):
-	"""Only a browser signed in as the handoff's user uses the code. Any other browser signs in first, then
-	comes back."""
+@frappe.whitelist(methods=["POST"])
+@rate_limit(limit=60, seconds=60 * 60, user_based=True)
+def adopt_checkout_cart(code: str):
+	"""Merge the guest cart of a checkout code into the signed-in shopper's cart, then go on to checkout."""
+	key = f"{CHECKOUT_CODE_PREFIX}{cstr(code)}"
+	handoff = get_checkout_code(key)
+	if not handoff or "token" not in handoff:
+		return redirect(f"/{frappe.local.lang}/cart")
+
+	frappe.cache.delete_value(key)
+	adopt_guest_cart(sha256_hash(handoff["token"]))
+	redirect(get_next_url())
+
+
+def get_handoff_page_url(code: str, lang: str | None = None) -> str:
+	params = {key: value for key, value in frappe.form_dict.items() if key not in ("cmd", "csrf_token")}
+	if lang and lang != "en":
+		params["_lang"] = lang
+	return f"/storefront-cart?{urlencode({**params, 'code': code})}"
+
+
+def get_checkout_code(key: str) -> dict | None:
+	handoff = frappe.cache.get_value(key)
+	if handoff and handoff["expires_at"] > time.time():
+		frappe.local.lang = handoff["lang"]
+		return handoff
+	return None
+
+
+def open_account_checkout(handoff: dict):
+	"""Only a browser signed in as the code's user goes on to checkout. Any other browser signs in first."""
 	if frappe.session.user == handoff["user"]:
-		frappe.cache.delete_value(key)
 		return redirect(get_next_url())
-
-	# The sign-in can take longer than the code would otherwise live.
-	frappe.cache.set_value(key, handoff, expires_in_sec=CHECKOUT_CODE_SECONDS)
 	query = {"prompt": "login", "redirect-to": frappe.request.full_path, "_lang": handoff["lang"]}
 	redirect(f"/storefront-login?{urlencode(query)}")
 

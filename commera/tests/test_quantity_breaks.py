@@ -21,6 +21,7 @@ class TestQuantityBreaks(DiscountCodeTestCase):
 
 	def create_bulk_item(self, rate_or_discount: str) -> str:
 		item_code = self.create_item(LIST_RATE)
+		test_server_cart.list_item(item_code)
 		frappe.db.set_value("Bin", {"item_code": item_code, "warehouse": self.warehouse}, "actual_qty", 100)
 		for min_qty, max_qty, rate, percentage in ((10, 49, 450, 10), (50, 0, 400, 20)):
 			frappe.get_doc(

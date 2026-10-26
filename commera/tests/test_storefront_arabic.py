@@ -3,7 +3,7 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 from commera.api.storefront.shop import get_translations
 from commera.sdk import catalog, shop
-from commera.sdk.catalog import get_collection_handle, get_line_products
+from commera.sdk.catalog import get_line_products
 from commera.sdk.shop import get_menu_item
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 
@@ -41,6 +41,7 @@ class TestStorefrontArabic(ProductDetailPriceTestCase):
 	def setUp(self):
 		super().setUp()
 		self.addCleanup(setattr, frappe.local, "lang", "en")
+		self.collection = self.make_collection()
 		self.route = self.make_priced_variant("ARABIC", default_rate=40)
 		self.variant = frappe.get_doc("Style Attribute Variant", {"route": self.route})
 		frappe.db.set_value(
@@ -52,6 +53,18 @@ class TestStorefrontArabic(ProductDetailPriceTestCase):
 				"custom_description_ar": "<p>وسادات الفرامل</p>",
 			},
 		)
+
+	def make_collection(self) -> str:
+		category = frappe.new_doc("Ecommerce Category")
+		category.category_name = f"Arabic Tab {frappe.generate_hash(length=8)}"
+		category.enabled = 1
+		category.link_type = "Item Group"
+		category.append("link_item_groups", {"item_group": self.item_group})
+		category.insert(ignore_permissions=True)
+		frappe.local.commera_storefront_menu = None
+		self.addCleanup(setattr, frappe.local, "commera_storefront_menu", None)
+		self.collection_title = category.display_name or category.category_name
+		return category.route_slug
 
 	def make_variant(self, item_code: str, route: str):
 		# The configurator gives every product its item style, so each product here gets its own Item.
@@ -70,7 +83,7 @@ class TestStorefrontArabic(ProductDetailPriceTestCase):
 		).insert(ignore_permissions=True)
 
 	def get_card_titles(self) -> dict[str, str]:
-		page = catalog.list_products(collection=get_collection_handle(self.item_group))
+		page = catalog.list_products(collection=self.collection)
 		return {card["handle"]: card["title"] for card in page["products"]}
 
 	def test_arabic_titles_and_descriptions_fall_back_to_english(self):
@@ -116,8 +129,8 @@ class TestStorefrontArabic(ProductDetailPriceTestCase):
 	def test_arabic_colour_facets_label_the_english_filter_value(self):
 		color = self.variant.attribute_value
 		self.add_translation(color, "أحمر")
-		self.add_translation(self.item_group, "مجموعة الفرامل")
-		collection = get_collection_handle(self.item_group)
+		self.add_translation(self.collection_title, "مجموعة الفرامل")
+		collection = self.collection
 
 		english = catalog.list_products(collection=collection)["facets"]["colors"]
 		frappe.local.lang = "ar"

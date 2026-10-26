@@ -392,7 +392,7 @@ class Product(TypedDict):
 
 
 class Collection(TypedDict):
-	"""An Item Group that holds a published product."""
+	"""An enabled menu tab (top-level Ecommerce Category); `handle` is its route slug."""
 
 	handle: str
 	title: str

@@ -1,5 +1,9 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
+
+from commera.api.signup import verify_checkout_otp, verify_signup_otp
 
 
 class TestHeadlessOAuthClient(IntegrationTestCase):
@@ -49,3 +53,20 @@ class TestHeadlessOAuthClient(IntegrationTestCase):
 	def test_a_url_that_is_not_web_is_refused(self):
 		with self.assertRaises(frappe.ValidationError):
 			self.save_storefront_url("ftp://shop.example.com")
+
+	def test_a_shopper_signed_up_by_otp_may_use_the_client(self):
+		client = frappe.get_doc(
+			"OAuth Client", self.save_storefront_url("https://otp.example.com").headless_oauth_client
+		)
+		self.addCleanup(frappe.set_user, "Administrator")
+
+		for sign_up in (
+			lambda email: verify_signup_otp(email, "Otp", "Shopper", "123456"),
+			lambda email: verify_checkout_otp(email, "123456"),
+		):
+			email = f"zz-oauth-{frappe.generate_hash(length=8)}@example.com"
+			frappe.cache.set_value(f"otp:{email}", "123456", expires_in_sec=60)
+			with self.subTest(email), patch.object(frappe.local, "login_manager", create=True):
+				sign_up(email)
+				frappe.set_user(email)
+				self.assertTrue(client.user_has_allowed_role())

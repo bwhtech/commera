@@ -33,6 +33,7 @@ from commera.api.analytics_dashboard import (
 	is_provider_configured,
 )
 from commera.discounts.allocations import get_allocations
+from commera.utils import get_store_currency
 
 ANALYTICS_SETTINGS_DOCTYPE = "Analytics Settings"
 
@@ -237,7 +238,7 @@ def get_revenue_report(months: int = REPORT_MONTHS_DEFAULT):
 	"""Monthly revenue/orders/discounts/refunds for the trailing N months, plus a vs-previous comparison.
 	Reuses orders.is_webshop_order, so drafts count as real sales here as on the Home screen and Orders list."""
 	frappe.only_for("System Manager")
-	from commera.api.admin.orders import get_reporting_currency, is_webshop_order
+	from commera.api.admin.orders import is_webshop_order
 
 	start, today, months = month_window(months)
 	buckets = build_month_buckets(start, today)
@@ -297,7 +298,7 @@ def get_revenue_report(months: int = REPORT_MONTHS_DEFAULT):
 	previous = read_window_totals(previous_start, previous_end)
 
 	return {
-		"currency": get_reporting_currency(),
+		"currency": get_store_currency(),
 		"months": series,
 		"stats": {
 			"revenue": {"value": total_revenue, "previous": previous["revenue"]},
@@ -390,7 +391,6 @@ def get_inventory_report(months: int = REPORT_MONTHS_DEFAULT):
 	today's selling price - "what my shelves are worth to sell", not ERPNext's landed-cost valuation."""
 	frappe.only_for("System Manager")
 	from commera.api.admin.inventory import get_inventory
-	from commera.api.admin.orders import get_reporting_currency
 
 	start, today, months = month_window(months)
 
@@ -472,7 +472,7 @@ def get_inventory_report(months: int = REPORT_MONTHS_DEFAULT):
 	]
 
 	return {
-		"currency": get_reporting_currency(),
+		"currency": get_store_currency(),
 		"stats": {
 			"stock_value": {"value": round(stock_value_now, 2)},
 			"units_on_hand": {"value": units_on_hand_now},

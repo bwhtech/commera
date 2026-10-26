@@ -8,11 +8,13 @@ DEFAULT_URLS_PER_SITEMAP = 50000
 LANGUAGES = ("en", "ar")
 
 
-def get_docs_per_page():
+def get_urls_per_page():
 	urls_per_sitemap = cint(frappe.db.get_single_value("Commera Settings", "sitemap_urls_per_page"))
-	if urls_per_sitemap <= 0:
-		urls_per_sitemap = DEFAULT_URLS_PER_SITEMAP
-	return urls_per_sitemap // len(LANGUAGES)
+	return urls_per_sitemap if urls_per_sitemap > 0 else DEFAULT_URLS_PER_SITEMAP
+
+
+def get_docs_per_page():
+	return get_urls_per_page() // len(LANGUAGES)
 
 
 SEGMENT_CONFIG = {
@@ -32,9 +34,12 @@ SEGMENT_CONFIG = {
 		"changefreq": "daily",
 		"priority": "0.6",
 	},
-	# No CMS page doctype yet, so this segment is the homepage only.
 	"pages": {
-		"doctype": None,
+		"doctype": "Shop Web Page",
+		"filters": {"published": 1, "noindex": 0},
+		"route_field": "route",
+		"build_path": lambda route: f"/page/{route}",
+		"include_homepage": True,
 		"changefreq": "daily",
 		"priority": "1.0",
 	},
@@ -66,16 +71,13 @@ def get_segment_filters(config):
 
 def segment_page_count(seg_type):
 	config = SEGMENT_CONFIG[seg_type]
-	if not config["doctype"]:
-		return 1
 	total = frappe.db.count(config["doctype"], get_segment_filters(config))
-	return -(-total // get_docs_per_page())  # ceil without float math
+	page_count = -(-total // get_docs_per_page())  # ceil without float math
+	return max(page_count, 1) if config.get("include_homepage") else page_count
 
 
 def latest_lastmod(seg_type):
 	config = SEGMENT_CONFIG[seg_type]
-	if not config["doctype"]:
-		return None
 	rows = frappe.get_all(
 		config["doctype"],
 		filters=get_segment_filters(config),
@@ -102,18 +104,8 @@ def get_context(context):
 	if not config or page < 1:
 		return
 
-	if not config["doctype"]:
-		if page == 1:
-			for lang in LANGUAGES:
-				urls.append(
-					{
-						"loc": get_url(f"/{lang}"),
-						"lastmod": None,
-						"changefreq": config["changefreq"],
-						"priority": config["priority"],
-					}
-				)
-		return
+	if page == 1 and config.get("include_homepage"):
+		add_localized(urls, "", None, config["changefreq"], config["priority"])
 
 	docs_per_page = get_docs_per_page()
 	route_field = config["route_field"]

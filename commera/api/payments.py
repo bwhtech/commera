@@ -64,6 +64,7 @@ class CheckoutPriceChangedError(frappe.ValidationError):
 
 
 COD_TOTAL_TTL_SECONDS = 24 * 60 * 60
+ADDRESS_TYPES = ("Billing", "Shipping")
 
 
 # ERPNext moved its transaction mappers to a sibling `mapper` module; both layouts are in the wild.
@@ -870,20 +871,30 @@ def add_shipping_address(party_name, address):
 
 
 def add_party_address(party_name, address: dict, address_type: str):
+	return add_customer_address(
+		party_name,
+		{
+			"address_type": address_type,
+			"city": address.get("city"),
+			"country": address.get("country"),
+			"state": address.get("state"),
+			"address_line1": address.get("full_address"),
+			"address_line2": address.get("landmark"),
+			"pincode": address.get("po_box"),
+			"phone": address.get("phone_number"),
+			"email_id": address.get("email"),
+		},
+	)
+
+
+def add_customer_address(party_name, values: dict):
+	"""`values` are Address fieldnames. Callers own the party: the insert skips Address permissions."""
 	if not party_name:
 		frappe.throw(_("Cannot save an address without a customer"))
+	address_type = values.get("address_type")
+	if address_type not in ADDRESS_TYPES:
+		frappe.throw(_("Address type must be one of {0}.").format(", ".join(ADDRESS_TYPES)))
 
-	values = {
-		"address_type": address_type,
-		"city": address.get("city"),
-		"country": address.get("country"),
-		"state": address.get("state"),
-		"address_line1": address.get("full_address"),
-		"address_line2": address.get("landmark"),
-		"pincode": address.get("po_box"),
-		"phone": address.get("phone_number"),
-		"email_id": address.get("email"),
-	}
 	# A Continue retried after a dropped response must not file the same address twice.
 	if existing_address := get_party_address(party_name, values):
 		return frappe.get_doc("Address", existing_address)

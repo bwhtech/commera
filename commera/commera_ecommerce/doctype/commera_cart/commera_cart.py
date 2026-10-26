@@ -397,6 +397,19 @@ def keep_guest_cart(login_manager=None):
 	adopt_guest_cart(get_guest_cart_key())
 
 
+def set_guest_cart_key(cart_key: str, new_cart_key: str):
+	frappe.db.set_value(
+		"Commera Cart", {"cart_key": cart_key}, "cart_key", new_cart_key, update_modified=False
+	)
+	frappe.db.set_value(
+		"Quotation",
+		{"custom_guest_cart_key": cart_key, "order_type": "Shopping Cart", "docstatus": 0},
+		"custom_guest_cart_key",
+		new_cart_key,
+		update_modified=False,
+	)
+
+
 def adopt_guest_cart(cart_key: str | None):
 	"""Move a guest cart into the signed-in shopper's cart. A failed merge is logged, never raised."""
 	guest_cart_name = cart_key and frappe.db.get_value("Commera Cart", {"cart_key": cart_key}, "name")
