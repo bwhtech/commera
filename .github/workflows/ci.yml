@@ -93,7 +93,7 @@ jobs:
           bench get-app commera $GITHUB_WORKSPACE
           bench setup requirements --dev
           bench get-app erpnext
-          bench get-app bwh_payments https://github.com/bwhtech/bwh_payments
+          bench get-app bwh_payments https://github.com/bwhtech/bwh_payments --branch v1-stable
           bench get-app bwh_shipping https://github.com/bwhtech/bwh_shipping
           bench new-site --db-root-password root --admin-password admin test_site
           bench --site test_site install-app erpnext
