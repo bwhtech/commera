@@ -13,6 +13,7 @@ from commera.plugins.registry import get_registry
 from commera.search.build import ensure_index_built
 from commera.search.record_builder import DEFAULT_CONTENT_FIELDS
 from commera.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
+from commera.shipping.providers import validate_providers
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import seed_default_routes
 from commera.storefront_plugins import sync_storefront_apps
 from commera.www.llms import DEFAULT_LLMS_TXT
@@ -67,6 +68,7 @@ def after_migrate():
 	assign_default_email_templates()
 	validate_plugins()
 	print_plugin_problems()
+	validate_providers()
 
 
 def print_plugin_problems():

@@ -14,9 +14,13 @@ from commera.api.admin.docfields import (
 	search_link_options,
 )
 from commera.api.admin.settings import coerce_field_value
-from commera.shipping.base_class import ShippingProviderBase
 from commera.shipping.doctype.shipping_service.shipping_service import create_shipping_services
-from commera.shipping.utils import get_provider_controller, resolve_provider
+from commera.shipping.providers import (
+	get_provider,
+	get_provider_class,
+	get_provider_doctypes,
+	resolve_provider,
+)
 
 SERVICE_DOCTYPE = "Shipping Service"
 PROFILE_DOCTYPE = "Shipping Provider Profile"
@@ -54,21 +58,15 @@ def build_editor_field_groups() -> list[dict]:
 def build_import_providers() -> list[dict]:
 	"""The enabled carriers that can list what their account actually sells.
 	A provider that books but publishes no catalogue - Shiprocket picks the courier itself - is left out."""
-	from frappe.model.base_document import get_controller
-
+	registered = set(get_provider_doctypes())
 	providers = []
 	for profile in frappe.get_all(
 		PROFILE_DOCTYPE, filters={"enabled": 1}, fields=["name", "provider_settings"], order_by="name asc"
 	):
-		if not (profile.provider_settings and frappe.db.exists("DocType", profile.provider_settings)):
+		if profile.provider_settings not in registered:
 			continue
-
-		# The controller class, not the settings Single: capability is a property of the code, and
-		# loading one Single per carrier to ask a question the class can answer is a query per row.
-		controller_class = get_controller(profile.provider_settings)
-		if not issubclass(controller_class, ShippingProviderBase):
-			continue
-		if not controller_class.supports(SERVICE_CHOICES_CAPABILITY):
+		# The class, not the settings Single: asking the class costs no query per carrier.
+		if not get_provider_class(profile.provider_settings).supports(SERVICE_CHOICES_CAPABILITY):
 			continue
 
 		providers.append({"provider": profile.name, "label": profile.name})
@@ -108,7 +106,7 @@ def resolve_enabled_provider(provider: str) -> str:
 def get_service_choices_controller(provider: str):
 	"""The settings Single behind an enabled profile, refusing anything the screen did not offer."""
 	profile = resolve_enabled_provider(provider)
-	controller = get_provider_controller(profile)
+	controller = get_provider(profile)
 	if not controller.supports(SERVICE_CHOICES_CAPABILITY):
 		frappe.throw(frappe._("{0} cannot list its carrier services").format(frappe.bold(profile)))
 

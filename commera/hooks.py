@@ -123,7 +123,14 @@ doctype_js = {
 
 after_install = "commera.migrate.after_install"
 after_migrate = "commera.migrate.after_migrate"
-after_app_install = "commera.storefront_plugins.sync_storefront_apps"
+after_app_install = [
+	"commera.storefront_plugins.sync_storefront_apps",
+	"commera.shipping.providers.validate_providers",
+]
+before_app_uninstall = "commera.shipping.providers.disable_app_profiles"
+
+# Commera's own carriers register the same way a plugin app's do.
+commera_hooks = {"shipping_providers": ["Shiprocket Shipping Settings", "AfterShip Shipping Settings"]}
 setup_wizard_complete = "commera.swatches.drop_unused_colour_attribute"
 
 

@@ -3,8 +3,6 @@
 
 """The dashboard Shipping Rules API: the store company's selling Shipping Rules and the one checkout uses."""
 
-from unittest.mock import patch
-
 import frappe
 from erpnext.accounts.doctype.shipping_rule.shipping_rule import (
 	ManyBlankToValuesError,
@@ -20,6 +18,7 @@ from commera.api.admin.shipping_rates import (
 	save_shipping_rule,
 	set_store_rule,
 )
+from commera.shipping.providers import use_providers
 from commera.tests.test_admin_delivery_options import AFTERSHIP_SETTINGS, create_provider_profile
 
 PROVIDER_PROFILE = "_Test Rates AfterShip"
@@ -46,9 +45,7 @@ class TestAdminShippingRules(IntegrationTestCase):
 		self.addCleanup(frappe.db.rollback)
 		frappe.set_user("Administrator")
 
-		quotes = patch("commera.shipping.pricing.get_live_quotes", return_value={})
-		quotes.start()
-		self.addCleanup(quotes.stop)
+		self.enterContext(use_providers({}))
 
 		# Every case starts from a store with no rule in use, so the demo's own rule is never edited.
 		frappe.db.set_single_value("Commera Settings", "shipping_rule", None)

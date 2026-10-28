@@ -2,8 +2,9 @@ import frappe
 from frappe import _
 from frappe.utils.data import cint, flt
 
+from commera.shipping.providers import get_available_shipping_providers, get_provider
 from commera.shipping.units import DEFAULT_VOLUMETRIC_DIVISOR
-from commera.shipping.utils import get_available_shipping_providers, get_default_origin
+from commera.shipping.utils import get_default_origin
 
 # ponytail: one notional box per consignment, since ERPNext parcel templates are optional and most stores
 # never fill them in; read a Shipment Parcel Template here once packing rules matter more than a rate.
@@ -121,8 +122,7 @@ def get_origin_address(delivery_note, provider: str) -> str | None:
 
 
 def get_provider_pickup_address(provider: str) -> str | None:
-	settings_doctype = frappe.get_cached_value("Shipping Provider Profile", provider, "provider_settings")
-	return frappe.get_single(settings_doctype).get("pickup_address")
+	return get_provider(provider).get("pickup_address")
 
 
 def build_parcels(delivery_note) -> list[dict]:
@@ -154,6 +154,5 @@ def build_items(delivery_note) -> list[dict]:
 
 
 def get_volumetric_divisor(provider: str) -> int:
-	settings_doctype = frappe.get_cached_value("Shipping Provider Profile", provider, "provider_settings")
-	divisor = cint(frappe.get_single(settings_doctype).get("volumetric_divisor"))
+	divisor = cint(get_provider(provider).get("volumetric_divisor"))
 	return divisor or DEFAULT_VOLUMETRIC_DIVISOR

@@ -1,7 +1,6 @@
 # Copyright (c) 2026, Build With Hussain and contributors
 # For license information, please see license.txt
 
-from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -15,6 +14,8 @@ from commera.shipping.pricing import (
 	price_service,
 	quote_services,
 )
+from commera.shipping.providers import use_providers
+from commera.shipping.testing import InMemoryShippingProvider
 from commera.shipping.tests.test_carrier_import import create_test_provider_profile
 
 
@@ -81,9 +82,7 @@ class PricingTestCase(IntegrationTestCase):
 	log commits mid-test and leaks rows past the rollback."""
 
 	def setUp(self):
-		live_quotes = patch("commera.shipping.pricing.get_live_quotes", return_value={})
-		self.get_live_quotes = live_quotes.start()
-		self.addCleanup(live_quotes.stop)
+		self.enterContext(use_providers({}))
 		# The enabled-services cache outlives the class rollback, so test services must not stay in it.
 		self.addCleanup(get_enabled_services.clear_cache)
 
@@ -170,9 +169,16 @@ class TestShippingRuleBandPricing(PricingTestCase):
 			"Courier", backup_charge=99, provider=provider, service_code="_test_code", markup_percent=10
 		)
 		rule = make_shipping_rule([band(courier, 0, 500, 40)])
-		self.get_live_quotes.return_value = {(provider, "_test_code"): {"amount": 100}}
+		carrier = InMemoryShippingProvider(rates=[{"service_code": "_test_code", "amount": 100}])
 
-		rows = quote_services(None, {}, [], {"base_net_total": 800}, shipping_rule=rule.name)
+		with use_providers({provider: carrier}):
+			rows = quote_services(
+				{"city": "Origin"},
+				{"city": "Destination"},
+				[{"weight": 1}],
+				{"base_net_total": 800},
+				rule.name,
+			)
 		row = next(row for row in rows if row["title"] == courier)
 
 		self.assertEqual(row["amount"], 110)

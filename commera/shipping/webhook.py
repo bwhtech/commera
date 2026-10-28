@@ -3,6 +3,8 @@ from frappe import _
 from frappe.integrations.utils import create_request_log
 from frappe.rate_limiter import rate_limit
 
+from commera.shipping.providers import get_provider
+
 WEBHOOK_ACCEPTED = {"status": "ok"}
 
 
@@ -24,7 +26,7 @@ def handle():
 	headers = dict(frappe.request.headers)
 
 	try:
-		result = frappe.get_single(profile.provider_settings).handle_webhook(payload, headers)
+		result = get_provider(profile.name).handle_webhook(payload, headers)
 	except Exception:
 		# The payload carries the customer's address and phone number, so only the provider and the
 		# traceback are recorded.

@@ -9,6 +9,7 @@ from frappe.utils import validate_url
 from frappe.utils.data import cint, flt, get_datetime, today
 
 from commera.shipping.exceptions import PartialBookingError
+from commera.shipping.providers import get_provider
 from commera.shipping.status import can_advance, is_terminal, validate_status
 from commera.shipping.units import DEFAULT_VOLUMETRIC_DIVISOR, billable_weight, normalise_parcels
 from commera.shipping.utils import get_address_payload
@@ -39,7 +40,7 @@ class ShippingRequest(Document):
 		"""The divisor is carrier policy, so the provider's own settings own it."""
 		if not self.provider:
 			return DEFAULT_VOLUMETRIC_DIVISOR
-		divisor = cint(getattr(self.get_controller(), "volumetric_divisor", 0))
+		divisor = cint(self.get_controller().get("volumetric_divisor"))
 		return divisor or DEFAULT_VOLUMETRIC_DIVISOR
 
 	def get_controller(self):
@@ -49,10 +50,7 @@ class ShippingRequest(Document):
 					self.name
 				)
 			)
-		provider_settings = frappe.get_cached_value(
-			"Shipping Provider Profile", self.provider, "provider_settings"
-		)
-		return frappe.get_single(provider_settings)
+		return get_provider(self.provider)
 
 	def get_parcels(self) -> list[dict]:
 		return normalise_parcels([parcel.as_dict() for parcel in self.parcels])
@@ -97,6 +95,8 @@ class ShippingRequest(Document):
 			frappe.throw(_("Select a shipping service before booking"))
 
 		controller = self.get_controller()
+		if not controller.supports("booking"):
+			frappe.throw(_("{0} cannot book shipments").format(frappe.bold(self.provider)))
 		resuming = bool(self.order_ref)
 		if resuming and not controller.supports("resume"):
 			frappe.throw(
@@ -175,9 +175,10 @@ class ShippingRequest(Document):
 				title=_("Cancellation Not Allowed"),
 			)
 
-		result = self.get_controller().cancel_shipment(
-			self.order_ref, shipment_ref=self.shipment_ref, awb=self.awb
-		)
+		controller = self.get_controller()
+		if not controller.supports("cancel"):
+			frappe.throw(_("{0} cannot cancel shipments").format(frappe.bold(self.provider)))
+		result = controller.cancel_shipment(self.order_ref, shipment_ref=self.shipment_ref, awb=self.awb)
 		self.status = "Cancelled"
 		self.provider_status = (result or {}).get("status")
 		self.save(ignore_permissions=True)
@@ -189,7 +190,10 @@ class ShippingRequest(Document):
 		if not self.awb:
 			frappe.throw(_("This shipment has no AWB yet, so there is nothing to track"))
 
-		tracking = self.get_controller().get_tracking(
+		controller = self.get_controller()
+		if not controller.supports("tracking"):
+			frappe.throw(_("{0} cannot track shipments").format(frappe.bold(self.provider)))
+		tracking = controller.get_tracking(
 			self.awb, shipment_ref=self.shipment_ref, tracking_ref=self.tracking_ref
 		)
 
