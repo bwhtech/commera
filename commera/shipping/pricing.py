@@ -3,7 +3,8 @@ from frappe import _
 from frappe.utils.caching import redis_cache
 from frappe.utils.data import cstr, flt
 
-from commera.shipping.utils import get_default_origin, get_provider_controller
+from commera.shipping.providers import get_enabled_profiles, get_provider
+from commera.shipping.utils import get_default_origin
 
 SERVICE_FIELDS = [
 	"name",
@@ -88,21 +89,24 @@ def get_live_quotes(
 		return {}
 
 	quotes = {}
+	enabled_profiles = set(get_enabled_profiles())
 	for provider in dict.fromkeys(service["provider"] for service in services if service.get("provider")):
-		provider_origin = origin or get_default_origin(provider)
-		if not provider_origin:
+		if provider not in enabled_profiles:
 			continue
-		for rate in get_provider_rates(provider, provider_origin, destination, parcels, cart, cod):
+		for rate in get_provider_rates(provider, origin, destination, parcels, cart, cod):
 			quotes[(provider, cstr(rate.get("service_code")))] = rate
 	return quotes
 
 
 def get_provider_rates(
-	provider: str, origin: dict, destination: dict, parcels: list[dict], cart: dict, cod: bool
+	provider: str, origin: dict | None, destination: dict, parcels: list[dict], cart: dict, cod: bool
 ) -> list[dict]:
-	# A carrier being slow, broken or unconfigured must degrade to backup pricing, never break checkout.
+	# A carrier being slow, broken, unconfigured or unregistered degrades to backup pricing.
 	try:
-		return get_provider_controller(provider).get_rates(
+		origin = origin or get_default_origin(provider)
+		if not origin:
+			return []
+		return get_provider(provider).get_rates(
 			origin,
 			destination,
 			parcels,

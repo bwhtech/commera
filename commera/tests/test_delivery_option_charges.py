@@ -1,7 +1,6 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 # Delivery options priced by the bands of the store's Shipping Rule that name them.
 
-from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -14,6 +13,7 @@ from commera.api.shipping import (
 	get_quoted_options,
 	reprice_selected_option,
 )
+from commera.shipping.providers import use_providers
 from commera.utils import get_delivery_configuration
 
 COMPANY = "Lifestyle Demo"
@@ -63,9 +63,7 @@ class TestDeliveryOptionCharges(IntegrationTestCase):
 		from commera.shipping.pricing import get_enabled_services
 
 		# The demo site has real AfterShip services, and a live rate call commits mid-test.
-		live_quotes = patch("commera.shipping.pricing.get_live_quotes", return_value={})
-		live_quotes.start()
-		self.addCleanup(live_quotes.stop)
+		self.enterContext(use_providers({}))
 		self.addCleanup(get_enabled_services.clear_cache)
 		self.addCleanup(set_store_rule, frappe.db.get_single_value("Commera Settings", "shipping_rule"))
 
