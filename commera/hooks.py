@@ -6,7 +6,7 @@ app_email = "rahul@buildwithhussain.com"
 app_license = "agpl-3.0"
 
 # frappe/payments deliberately absent: bwh_payments ships its own Payment Gateway Profile and base_class.
-required_apps = ["frappe/erpnext", "bwhtech/bwh_payments", "bwhtech/bwh_shipping"]
+required_apps = ["frappe/erpnext", "bwhtech/bwh_payments"]
 
 
 website_redirects = [
