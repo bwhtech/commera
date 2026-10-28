@@ -18,6 +18,12 @@ class ShippingProviderBase(ABC):
 	"""Contract for a `<Provider> Shipping Settings` Single that backs a Shipping Provider Profile.
 	Units are canonical: kg, cm, and major units of the named currency; see `units.normalise_parcel`."""
 
+	# Shown on the Integrations screen. `label` also names the carrier's Shipping Provider Profile.
+	label: str = ""
+	blurb: str = ""
+	docs_url: str = ""
+	logo: str = ""  # An image URL, such as /assets/<app>/images/<carrier>.svg
+
 	@abstractmethod
 	def get_rates(
 		self,
@@ -80,4 +86,4 @@ class ShippingProviderBase(ABC):
 		return getattr(cls, method_name) is not getattr(ShippingProviderBase, method_name)
 
 	def get_provider_name(self) -> str:
-		return self.__class__.__name__
+		return self.label or self.__class__.__name__

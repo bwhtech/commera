@@ -4,41 +4,32 @@
 import frappe
 
 from commera.api.admin.integrations import describe_integration, save_integration
+from commera.shipping.providers import get_provider_class, get_provider_doctypes
 
 PROFILE_DOCTYPE = "Shipping Provider Profile"
 PROFILE_SETTINGS_FIELDNAME = "provider_settings"
 WEBHOOK_PATH = "/api/method/commera.shipping.webhook.handle?provider={profile}"
 
-# Order here is the order the cards render in.
-SHIPPING_PROVIDERS = (
-	{
-		"slug": "shiprocket",
-		"label": "Shiprocket",
-		"blurb": "Courier aggregator for domestic India. Pincode-driven, COD supported.",
-		"settings_doctype": "Shiprocket Shipping Settings",
-		"docs_url": "https://apidocs.shiprocket.in/",
-	},
-	{
-		"slug": "aftership",
-		"label": "AfterShip",
-		"blurb": "Global labels and tracking across hundreds of carriers.",
-		"settings_doctype": "AfterShip Shipping Settings",
-		"docs_url": "https://www.aftership.com/docs/shipping/quickstart/api-quick-start",
-	},
-)
-
 
 def get_shipping_registry():
-	"""The carrier registry as integration entries, with what every carrier shares filled in."""
-	return [
-		{
-			**provider,
-			"profile_doctype": PROFILE_DOCTYPE,
-			"profile_settings_fieldname": PROFILE_SETTINGS_FIELDNAME,
-			"webhook_path": WEBHOOK_PATH,
-		}
-		for provider in SHIPPING_PROVIDERS
-	]
+	"""Every registered carrier as an integration entry, in hook order, which is the order the cards render in."""
+	return [get_shipping_entry(settings_doctype) for settings_doctype in get_provider_doctypes()]
+
+
+def get_shipping_entry(settings_doctype: str) -> dict:
+	provider_class = get_provider_class(settings_doctype)
+	label = provider_class.label or settings_doctype
+	return {
+		"slug": frappe.scrub(label),
+		"label": label,
+		"blurb": provider_class.blurb,
+		"settings_doctype": settings_doctype,
+		"docs_url": provider_class.docs_url,
+		"logo": provider_class.logo,
+		"profile_doctype": PROFILE_DOCTYPE,
+		"profile_settings_fieldname": PROFILE_SETTINGS_FIELDNAME,
+		"webhook_path": WEBHOOK_PATH,
+	}
 
 
 def get_shipping_integration(slug: str):
