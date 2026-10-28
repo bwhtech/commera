@@ -60,10 +60,10 @@ def make_store_rule(bands: list[dict], account: str | None = None):
 
 class TestDeliveryOptionCharges(IntegrationTestCase):
 	def setUp(self):
-		from bwh_shipping.bwh_shipping.pricing import get_enabled_services
+		from commera.shipping.pricing import get_enabled_services
 
 		# The demo site has real AfterShip services, and a live rate call commits mid-test.
-		live_quotes = patch("bwh_shipping.bwh_shipping.pricing.get_live_quotes", return_value={})
+		live_quotes = patch("commera.shipping.pricing.get_live_quotes", return_value={})
 		live_quotes.start()
 		self.addCleanup(live_quotes.stop)
 		self.addCleanup(get_enabled_services.clear_cache)
@@ -206,7 +206,7 @@ class TestDeliveryOptionCharges(IntegrationTestCase):
 		quotation.save(ignore_permissions=True)
 
 		# Without the stored 0 the fallback would re-price from the backup charge and bill the shopper.
-		from bwh_shipping.bwh_shipping.pricing import get_enabled_services
+		from commera.shipping.pricing import get_enabled_services
 
 		frappe.db.set_value("Shipping Service", self.standard, "enabled", 0)
 		get_enabled_services.clear_cache()
@@ -217,7 +217,7 @@ class TestDeliveryOptionCharges(IntegrationTestCase):
 		self.assertEqual(flt(quotation.custom_delivery_charge), 0)
 
 	def test_a_discounted_option_is_discounted_once_when_it_can_no_longer_be_quoted(self):
-		from bwh_shipping.bwh_shipping.pricing import get_enabled_services
+		from commera.shipping.pricing import get_enabled_services
 
 		self.make_tiered_rule()
 		discount = frappe.get_doc(

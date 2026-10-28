@@ -27,7 +27,7 @@ from commera.api.admin.plugins import (
 )
 from commera.plugins import registry
 from commera.plugins.places import GRAMMAR, PLACES, RECORD_DOCTYPES
-from commera.plugins.registry import get_registry, get_visible_plugins
+from commera.plugins.registry import get_app_title, get_registry, get_visible_plugins
 from commera.roles import COMMERA_USER, add_commera_roles
 from commera.sdk import API_VERSION
 from commera.tests.test_admin_order_plugin_events import make_order_event
@@ -35,7 +35,7 @@ from commera.tests.test_admin_orders import make_test_sales_order
 from commera.tests.test_plugin_events import patch_app_declarations
 from commera.www import commera as dashboard
 
-APP = "bwh_shipping"
+APP = "erpnext"
 OTHER_APP = "bwh_payments"
 FUNCTIONS = f"{APP}.commera_test_plugins"
 SETTINGS_DOCTYPE = "Google Settings"
@@ -239,7 +239,7 @@ class TestPluginDiscovery(PluginTestCase):
 
 		plugins = get_registry()
 
-		self.assertEqual(plugins["apps"], {APP: {"title": "Shipping"}})
+		self.assertEqual(plugins["apps"], {APP: {"title": get_app_title(APP)}})
 		self.assertEqual([entry["key"] for entry in plugins["entries"]], [f"{APP}:pages:jobs"])
 		self.assertEqual(plugins["problems"], [])
 
@@ -477,7 +477,7 @@ class TestPluginVisibility(PluginTestCase):
 			dashboard.get_context(context)
 
 		plugins = context.boot.plugins
-		self.assertEqual(plugins["apps"], {APP: {"title": "Shipping"}})
+		self.assertEqual(plugins["apps"], {APP: {"title": get_app_title(APP)}})
 		self.assertEqual(
 			[(entry["key"], entry["has_condition"], entry["has_method"]) for entry in plugins["entries"]],
 			[
@@ -709,7 +709,7 @@ class TestInstalledApps(PluginTestCase):
 
 		installed_app = self.get_installed_app(APP)
 
-		self.assertEqual(installed_app["title"], "Shipping")
+		self.assertEqual(installed_app["title"], get_app_title(APP))
 		self.assertEqual(
 			installed_app["entries"],
 			[{"place": "pages", "name": "jobs", "label": "Print jobs", "error": None}],

@@ -542,7 +542,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 
 	def test_an_app_built_for_another_api_version_is_skipped_and_logged(self):
 		outdated_handler = self.add_handler_to_app("bwh_payments", payment_hooks.record_plugin_event)
-		current_handler = self.add_handler_to_app("bwh_shipping", payment_hooks.record_plugin_event)
+		current_handler = self.add_handler_to_app("erpnext", payment_hooks.record_plugin_event)
 		patch_app_hooks(self, {"commera_events": {"product_updated": [outdated_handler, current_handler]}})
 		patch_app_declarations(
 			self,
@@ -551,7 +551,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 					"commera_api_version": [99],
 					"commera_events": {"product_updated": [outdated_handler]},
 				},
-				"bwh_shipping": {"commera_events": {"product_updated": [current_handler]}},
+				"erpnext": {"commera_events": {"product_updated": [current_handler]}},
 			},
 		)
 		started_at = now_datetime()
@@ -569,7 +569,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 			),
 			[current_handler],
 		)
-		self.assertIn("bwh_shipping doesn't declare commera_api_version", output.getvalue())
+		self.assertIn("erpnext doesn't declare commera_api_version", output.getvalue())
 		self.assertTrue(
 			frappe.get_all(
 				"Error Log",
@@ -584,11 +584,11 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 				"commera_api_version": [99],
 				"commera_events": {"product_updated": ["bwh_payments.on_product"]},
 			},
-			"bwh_shipping": {
+			"erpnext": {
 				"commera_api_version": [API_VERSION],
 				"commera_events": {
-					"product_updated": "bwh_shipping.on_product",
-					"inventory_changed": ["bwh_shipping.on_stock"],
+					"product_updated": "erpnext.on_product",
+					"inventory_changed": ["erpnext.on_stock"],
 				},
 			},
 			"commera": {"commera_events": {"product_updated": ["commera.on_product"]}},
@@ -598,7 +598,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		for declarations in app_declarations.values():
 			frappe.append_hook(merged_hooks, "commera_events", declarations["commera_events"])
 		patch_app_hooks(self, merged_hooks)
-		patch_app_declarations(self, {app: app_declarations[app] for app in ("bwh_payments", "bwh_shipping")})
+		patch_app_declarations(self, {app: app_declarations[app] for app in ("bwh_payments", "erpnext")})
 
 		with patch.object(frappe, "enqueue"):
 			fire_event("product_updated", "Item", self.item_code, key="merged")
@@ -610,7 +610,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 				pluck="handler",
 				order_by="idx asc",
 			),
-			["bwh_shipping.on_product", "commera.on_product"],
+			["erpnext.on_product", "commera.on_product"],
 		)
 
 	def test_an_event_or_checkout_name_commera_does_not_know_is_warned_about(self):
@@ -624,7 +624,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 						"order_paid": ["bwh_payments.paid"],
 					},
 				},
-				"bwh_shipping": {"commera_hooks": {"cart_fee": ["bwh_shipping.fees"]}},
+				"erpnext": {"commera_hooks": {"cart_fee": ["erpnext.fees"]}},
 			},
 		)
 		started_at = now_datetime()
@@ -633,7 +633,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 			validate_plugins()
 
 		self.assertIn("bwh_payments declares commera_events for order_payed, which", output.getvalue())
-		self.assertIn("bwh_shipping declares commera_hooks for cart_fee, which", output.getvalue())
+		self.assertIn("erpnext declares commera_hooks for cart_fee, which", output.getvalue())
 		self.assertNotIn("bwh_payments declares commera_hooks", output.getvalue())
 		self.assertTrue(
 			frappe.get_all(
