@@ -20,8 +20,10 @@ from commera.scaffold import (
 	get_app_from_folder,
 	get_dashboard_versions,
 )
+from commera.scaffold.shipping_provider import ShippingProviderScaffold
 from commera.scaffold.theme import ThemeScaffold
 from commera.sdk import API_VERSION
+from commera.shipping.base_class import ShippingProviderBase
 
 APP = "commera_test_plugin"
 
@@ -337,3 +339,58 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 		with self.assertRaisesRegex(click.ClickException, "can only inherit"):
 			scaffold.add_theme("Scaffold Check", "Classic", "Summer Theme")
 		self.assertFalse(self.theme_dir.exists())
+
+
+class TestShippingProviderScaffold(UnitTestCase):
+	def setUp(self):
+		directory = tempfile.TemporaryDirectory()
+		self.addCleanup(directory.cleanup)
+		self.app_root = make_app(Path(directory.name))
+		self.scaffold = ShippingProviderScaffold(APP, Path(directory.name))
+		self.folder = self.app_root / APP / frappe.scrub(self.scaffold.get_module()) / "doctype"
+
+	def load_controller(self):
+		path = self.folder / "delhivery_shipping_settings" / "delhivery_shipping_settings.py"
+		spec = importlib.util.spec_from_file_location("delhivery_shipping_settings", path)
+		module = importlib.util.module_from_spec(spec)
+		spec.loader.exec_module(module)
+		return module.DelhiveryShippingSettings
+
+	def test_a_new_carrier_gets_a_settings_single_registered_in_commera_hooks(self):
+		self.scaffold.add_shipping_provider("Delhivery")
+
+		hooks = get_hooks(self.app_root)
+		settings = json.loads(
+			(self.folder / "delhivery_shipping_settings" / "delhivery_shipping_settings.json").read_text()
+		)
+		controller = self.load_controller()
+		self.assertEqual(hooks["commera_hooks"], {"shipping_providers": ["Delhivery Shipping Settings"]})
+		self.assertIn("commera", hooks["required_apps"])
+		self.assertEqual(hooks["commera_api_version"], [API_VERSION])
+		self.assertEqual((settings["name"], settings["issingle"]), ("Delhivery Shipping Settings", 1))
+		self.assertTrue(issubclass(controller, ShippingProviderBase))
+		self.assertEqual(controller.label, "Delhivery")
+		self.assertFalse(controller.supports("booking"))
+
+	def test_existing_commera_hooks_keep_their_entries(self):
+		hooks_path = self.app_root / APP / "hooks.py"
+		hooks_path.write_text(
+			hooks_path.read_text() + '\ncommera_hooks = {"cart_fees": ["commera_test_plugin.fees"]}\n'
+		)
+
+		self.scaffold.add_shipping_provider("Delhivery")
+		self.scaffold.add_shipping_provider("Bluedart")
+
+		self.assertEqual(
+			get_hooks(self.app_root)["commera_hooks"],
+			{
+				"cart_fees": ["commera_test_plugin.fees"],
+				"shipping_providers": ["Delhivery Shipping Settings", "Bluedart Shipping Settings"],
+			},
+		)
+
+	def test_a_taken_or_bad_name_is_refused(self):
+		self.scaffold.add_shipping_provider("Delhivery")
+
+		self.assertRaises(click.ClickException, self.scaffold.add_shipping_provider, "Delhivery")
+		self.assertRaises(click.ClickException, self.scaffold.add_shipping_provider, "Del-hivery!")

@@ -90,6 +90,27 @@ def new_theme(context, name: str, theme_type: str, parent: str, app: str | None)
 		)
 
 
+@commera_commands.group("shipping-provider")
+def shipping_provider():
+	"""Shipping carriers in the app you are in."""
+
+
+@shipping_provider.command("new")
+@click.argument("label")
+@click.option("--app", help="App to add the carrier to, instead of the app you are in")
+def new_shipping_provider(label: str, app: str | None):
+	"""Add a carrier's settings DocType to an app and register it in commera_hooks."""
+	from commera.scaffold.shipping_provider import ShippingProviderScaffold
+
+	scaffold = get_current_app_scaffold(ShippingProviderScaffold, app)
+	for change, path in scaffold.add_shipping_provider(label):
+		click.echo(f"{change:<8} {path}")
+	click.secho(
+		"Next: implement get_rates, then bench --site <site> migrate. See docs/shipping-providers.md.",
+		fg="green",
+	)
+
+
 def get_current_app_scaffold(scaffold_class=None, app=None):
 	from frappe.utils import get_bench_path
 

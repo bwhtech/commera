@@ -63,7 +63,7 @@ Gateway callbacks are idempotent, so a replayed webhook racing a shopper's retur
 - **Shiprocket** — Courier aggregator for domestic India, with pincode serviceability.
 - **AfterShip** — Global labels and tracking across hundreds of carriers.
 
-Each carrier quotes its own rates at checkout, and delivery options control what shoppers actually pick from.
+Each carrier quotes its own rates at checkout, and delivery options control what shoppers actually pick from. An app can add a carrier through the `shipping_providers` hook. See [Shipping providers](docs/implementation/shipping-providers.md).
 
 <div>
 	<img width="1402" alt="Shipping carriers and delivery options settings" src=".github/screenshots/shipping.png">
