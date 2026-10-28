@@ -418,10 +418,11 @@ before_tests = "commera.install.before_tests"
 
 # Overriding Methods
 # ------------------------------
-#
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "commera.event.get_events"
-# }
+
+# Carriers still post tracking to the URL bwh_shipping had.
+override_whitelisted_methods = {
+	"bwh_shipping.bwh_shipping.webhook.handle": "commera.shipping.webhook.handle",
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
