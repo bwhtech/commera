@@ -118,6 +118,7 @@ def describe_integration(integration):
 		"missing": [],
 		"webhook_url": None,
 		"docs_url": integration.get("docs_url"),
+		"logo": integration.get("logo"),
 		"groups": [],
 	}
 	if not description["available"]:

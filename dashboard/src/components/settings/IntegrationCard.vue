@@ -25,7 +25,7 @@ const isLive = computed(() => props.card.enabled && !needsKeys.value)
 
 <template>
   <div class="flex items-center gap-3 py-3">
-    <IntegrationLogo :slug="card.slug" :label="card.label" />
+    <IntegrationLogo :slug="card.slug" :label="card.label" :logo="card.logo ?? ''" />
 
     <div class="min-w-0 flex-1">
       <div class="flex items-center gap-2">

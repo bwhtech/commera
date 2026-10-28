@@ -1,6 +1,7 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from commera.api.admin.shipping import get_shipping_registry
 from commera.plugins.providers import ProviderNotRegisteredError
 from commera.shipping.base_class import ShippingProviderBase
 from commera.shipping.pricing import get_enabled_services, quote_services
@@ -18,6 +19,7 @@ from commera.shipping.tests.test_pricing import make_service
 from commera.tests.test_payment_hooks import patch_app_hooks
 
 BUILT_IN_CARRIERS = ["Shiprocket Shipping Settings", "AfterShip Shipping Settings"]
+CARRIER_CARDS = [("shiprocket", "Shiprocket"), ("aftership", "AfterShip")]
 NOT_A_CARRIER = "Commera Settings"
 ORIGIN = {"city": "Mumbai"}
 DESTINATION = {"city": "Pune"}
@@ -46,6 +48,12 @@ class TestShippingProviderRegistry(IntegrationTestCase):
 
 	def test_commera_registers_its_carriers_through_the_public_hook(self):
 		self.assertEqual(get_provider_doctypes()[:2], BUILT_IN_CARRIERS)
+
+	def test_the_integrations_screen_lists_registered_carriers_from_their_class(self):
+		entries = get_shipping_registry()[:2]
+
+		self.assertEqual([(entry["slug"], entry["label"]) for entry in entries], CARRIER_CARDS)
+		self.assertTrue(all(entry["blurb"] and entry["docs_url"] for entry in entries))
 
 	def test_a_profile_cannot_point_at_an_unregistered_doctype(self):
 		profile = frappe.get_doc(

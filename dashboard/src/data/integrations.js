@@ -5,8 +5,8 @@ import { getIntegrationLogo, letterPlate } from '../components/integrations/logo
 // The vendor's own colour, and the one place in the app where non-semantic colour is
 // correct: it is the thing being recognised. Presentation only — everything else about
 // an integration (its fields, whether it is live, what it still needs) comes from the
-// server, so adding a provider to a registry in `commera/api/admin/` is enough to make
-// it appear here. A provider with no entry still renders, just without its colours.
+// server, so a payment provider in `commera/api/admin/` or a carrier an app registers in
+// commera_hooks appears here with no change. A provider with no entry still renders.
 const BRAND_MARKS = {
   razorpay: { mark: 'R', brand: '#0C2451' },
   stripe: { mark: 'S', brand: '#635BFF' },

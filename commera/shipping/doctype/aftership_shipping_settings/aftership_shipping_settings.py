@@ -54,8 +54,9 @@ FALLBACK_ALPHA_3 = {
 
 
 class AfterShipShippingSettings(Document, ShippingProviderBase):
-	def get_provider_name(self) -> str:
-		return "AfterShip"
+	label = "AfterShip"
+	blurb = "Global labels and tracking across hundreds of carriers."
+	docs_url = "https://www.aftership.com/docs/shipping/quickstart/api-quick-start"
 
 	# --- HTTP ----------------------------------------------------------------
 

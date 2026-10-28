@@ -61,8 +61,9 @@ SHIPROCKET_API_KEY_HEADER = "X-Api-Key"
 
 
 class ShiprocketShippingSettings(Document, ShippingProviderBase):
-	def get_provider_name(self) -> str:
-		return "Shiprocket"
+	label = "Shiprocket"
+	blurb = "Courier aggregator for domestic India. Pincode-driven, COD supported."
+	docs_url = "https://apidocs.shiprocket.in/"
 
 	# --- HTTP ----------------------------------------------------------------
 
