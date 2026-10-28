@@ -10,9 +10,6 @@ import { createAdminCaller } from './adminCaller'
  * and this store adopts it, the way theme.js does, rather than patching a row by hand.
  */
 
-// `false` until the server says otherwise, so a section that has not loaded reads as
-// unavailable rather than briefly claiming the store has no delivery options.
-const available = ref(false)
 const options = ref([])
 // The edit form's fields come from the doctype's own meta, in Desk layout order — so a
 // docfield added to the shipping service shows up here with no change to this app.
@@ -35,7 +32,6 @@ const enabledCount = computed(() => options.value.filter((option) => option.enab
 function apply(data) {
   if (!data) return
 
-  available.value = Boolean(data.available)
   options.value = data.options ?? []
   fieldGroups.value = data.field_groups ?? []
   importProviders.value = data.import_providers ?? []
@@ -73,13 +69,13 @@ async function carrierServices(provider) {
 
 export function useDeliveryOptions() {
   return {
-    available,
     options,
     fieldGroups,
     importProviders,
     linkOptionsPath,
     enabledCount,
     loadError,
+    loaded,
     loading,
     load,
     loadOnce,

@@ -1,0 +1,129 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:title",
+ "creation": "2026-08-20 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "title",
+  "description",
+  "column_break_head",
+  "provider",
+  "service_code",
+  "carrier",
+  "section_break_pricing",
+  "markup_percent",
+  "handling_fee",
+  "column_break_pricing",
+  "backup_charge"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "description": "What the customer sees at checkout, e.g. Express Delivery. Also the identifier stored on their order.",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "ETA text shown under the title, e.g. 1-2 business days.",
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "provider",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Provider",
+   "options": "Shipping Provider Profile",
+   "description": "Leave empty to deliver it yourself, priced by the store's Shipping Rule or its Backup Charge."
+  },
+  {
+   "description": "The provider's identifier for the carrier service to quote and book, e.g. a Shiprocket courier id.",
+   "fieldname": "service_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Service Code"
+  },
+  {
+   "description": "Carrier name for display and reporting. Not used to quote.",
+   "fieldname": "carrier",
+   "fieldtype": "Data",
+   "label": "Carrier"
+  },
+  {
+   "fieldname": "section_break_pricing",
+   "fieldtype": "Section Break",
+   "label": "Pricing"
+  },
+  {
+   "default": "0",
+   "description": "Added on top of the live carrier rate, to cushion quote-versus-invoice drift.",
+   "fieldname": "markup_percent",
+   "fieldtype": "Percent",
+   "label": "Markup %"
+  },
+  {
+   "default": "0",
+   "description": "Flat amount added after the markup.",
+   "fieldname": "handling_fee",
+   "fieldtype": "Currency",
+   "label": "Handling Fee"
+  },
+  {
+   "fieldname": "column_break_pricing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Charged when no band on the store's Shipping Rule covers the cart and the carrier gives no live quote. Always set this: an option with no band, no live rate and no backup charge is hidden at checkout rather than shown as free.",
+   "fieldname": "backup_charge",
+   "fieldtype": "Currency",
+   "label": "Backup Charge"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-30 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Shipping",
+ "name": "Shipping Service",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

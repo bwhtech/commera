@@ -4,16 +4,14 @@ from frappe.utils import create_batch
 from frappe.utils.data import cint, cstr, flt
 
 from commera.api.admin.orders import MAX_PAGE_LENGTH, describe_state, read_orders, read_paid_orders
-from commera.api.shipping import get_charge_lines, is_connector_installed, read_order_taxes
+from commera.api.shipping import get_charge_lines, read_order_taxes
 from commera.discounts.allocations import get_allocations
 from commera.plugin_events import read_shipping_addresses, validate_plugin_fieldnames
 from commera.sdk.types import Order
+from commera.shipping.fulfilment import build_parcels, get_provider_pickup_address
+from commera.shipping.status import validate_status
 
-__all__ = ["ShippingNotInstalled", "get_order", "get_orders", "record_shipment"]
-
-
-class ShippingNotInstalled(frappe.ValidationError):
-	pass
+__all__ = ["get_order", "get_orders", "record_shipment"]
 
 
 def get_order(sales_order: str | int, extra_fields: list[str] | tuple = ()) -> Order:
@@ -111,11 +109,6 @@ def record_shipment(
 ) -> str:
 	"""Upserts the order's Shipping Request on `awb`; its status never moves back. No Delivery Note is made.
 	Leave `provider` empty when a fulfilment partner shipped it; shoppers see `carrier` and `tracking_url`."""
-	if not is_connector_installed():
-		frappe.throw(_("Install bwh_shipping to record shipments."), ShippingNotInstalled)
-
-	from bwh_shipping.status import validate_status
-
 	validate_status(status)
 	if not cstr(awb).strip():
 		frappe.throw(_("A shipment needs its AWB."), frappe.ValidationError)
@@ -143,9 +136,7 @@ def record_shipment(
 
 
 def create_order_shipping_request(sales_order, provider, awb, carrier, status, events, tracking_url) -> str:
-	"""bwh_shipping's create_shipping_request, fed from the Sales Order instead of a Delivery Note."""
-	from bwh_shipping.fulfilment import build_parcels, get_provider_pickup_address
-
+	"""create_shipping_request, fed from the Sales Order instead of a Delivery Note."""
 	if provider and not frappe.db.exists("Shipping Provider Profile", provider):
 		frappe.throw(_("Shipping provider {0} does not exist.").format(provider), frappe.ValidationError)
 

@@ -1,0 +1,372 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:SHIP-{YY}-{#####}",
+ "creation": "2026-08-20 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "provider",
+  "shipping_service",
+  "service_code",
+  "carrier",
+  "column_break_head",
+  "status",
+  "provider_status",
+  "company",
+  "section_break_ref",
+  "ref_doctype",
+  "ref_docname",
+  "delivery_note",
+  "column_break_ref",
+  "customer_name",
+  "customer_phone",
+  "customer_email",
+  "section_break_route",
+  "origin_address",
+  "column_break_route",
+  "destination_address",
+  "section_break_parcels",
+  "parcels",
+  "billable_weight",
+  "column_break_value",
+  "declared_value",
+  "currency",
+  "cod",
+  "cod_amount",
+  "section_break_booking",
+  "order_ref",
+  "shipment_ref",
+  "awb",
+  "tracking_ref",
+  "tracking_url",
+  "column_break_booking",
+  "label_url",
+  "manifest_url",
+  "pickup_ref",
+  "pickup_date",
+  "section_break_cost",
+  "cost_amount",
+  "column_break_cost",
+  "cost_currency",
+  "section_break_tracking",
+  "tracking_events",
+  "last_webhook_event_id"
+ ],
+ "fields": [
+  {
+   "fieldname": "provider",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Provider",
+   "description": "Empty when a fulfilment partner shipped the parcel itself and only reports its tracking.",
+   "options": "Shipping Provider Profile"
+  },
+  {
+   "description": "The delivery option the customer chose and paid for, when this shipment came from a storefront order.",
+   "fieldname": "shipping_service",
+   "fieldtype": "Link",
+   "label": "Shipping Service",
+   "options": "Shipping Service"
+  },
+  {
+   "description": "Provider's own identifier for the carrier service to book.",
+   "fieldname": "service_code",
+   "fieldtype": "Data",
+   "label": "Service Code"
+  },
+  {
+   "fieldname": "carrier",
+   "fieldtype": "Data",
+   "label": "Carrier",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nReady To Ship\nPickup Scheduled\nIn Transit\nOut For Delivery\nUndelivered\nRTO\nDelivered\nCancelled\nLost",
+   "read_only": 1
+  },
+  {
+   "description": "The provider's own wording for the current state, kept for support questions.",
+   "fieldname": "provider_status",
+   "fieldtype": "Data",
+   "label": "Provider Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "section_break_ref",
+   "fieldtype": "Section Break",
+   "label": "Against"
+  },
+  {
+   "fieldname": "ref_doctype",
+   "fieldtype": "Link",
+   "label": "Reference Doctype",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ref_docname",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "label": "Reference Name",
+   "options": "ref_doctype",
+   "reqd": 1
+  },
+  {
+   "description": "The Delivery Note this consignment ships. A second Shipping Request for the same note is refused, so one parcel cannot get two labels.",
+   "fieldname": "delivery_note",
+   "fieldtype": "Link",
+   "label": "Delivery Note",
+   "options": "Delivery Note",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_ref",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name"
+  },
+  {
+   "fieldname": "customer_phone",
+   "fieldtype": "Data",
+   "label": "Customer Phone"
+  },
+  {
+   "fieldname": "customer_email",
+   "fieldtype": "Data",
+   "label": "Customer Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "section_break_route",
+   "fieldtype": "Section Break",
+   "label": "Route"
+  },
+  {
+   "fieldname": "origin_address",
+   "fieldtype": "Link",
+   "label": "Pickup Address",
+   "mandatory_depends_on": "eval:doc.provider",
+   "options": "Address"
+  },
+  {
+   "fieldname": "column_break_route",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "destination_address",
+   "fieldtype": "Link",
+   "label": "Delivery Address",
+   "options": "Address",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_parcels",
+   "fieldtype": "Section Break",
+   "label": "Parcels"
+  },
+  {
+   "fieldname": "parcels",
+   "fieldtype": "Table",
+   "label": "Parcels",
+   "options": "Shipping Parcel",
+   "reqd": 1
+  },
+  {
+   "description": "Greater of actual and volumetric weight, per parcel. This is what the carrier invoices.",
+   "fieldname": "billable_weight",
+   "fieldtype": "Float",
+   "label": "Billable Weight (kg)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_value",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Value declared to the carrier for insurance and customs.",
+   "fieldname": "declared_value",
+   "fieldtype": "Currency",
+   "label": "Declared Value",
+   "options": "currency"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "default": "0",
+   "fieldname": "cod",
+   "fieldtype": "Check",
+   "label": "Cash On Delivery"
+  },
+  {
+   "depends_on": "cod",
+   "fieldname": "cod_amount",
+   "fieldtype": "Currency",
+   "label": "COD Amount",
+   "options": "currency"
+  },
+  {
+   "fieldname": "section_break_booking",
+   "fieldtype": "Section Break",
+   "label": "Booking"
+  },
+  {
+   "description": "Provider's order handle. Written once the shipment is booked; a second booking is refused while it is set.",
+   "fieldname": "order_ref",
+   "fieldtype": "Data",
+   "label": "Order Reference",
+   "read_only": 1
+  },
+  {
+   "fieldname": "shipment_ref",
+   "fieldtype": "Data",
+   "label": "Shipment Reference",
+   "read_only": 1
+  },
+  {
+   "fieldname": "awb",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "AWB",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "description": "The provider's own handle for tracking, when it differs from the AWB (AfterShip registers a tracking object; Shiprocket tracks the AWB directly).",
+   "fieldname": "tracking_ref",
+   "fieldtype": "Data",
+   "label": "Tracking Reference",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tracking_url",
+   "fieldtype": "Small Text",
+   "label": "Tracking URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_booking",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "label_url",
+   "fieldtype": "Small Text",
+   "label": "Label URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "manifest_url",
+   "fieldtype": "Small Text",
+   "label": "Manifest URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pickup_ref",
+   "fieldtype": "Data",
+   "label": "Pickup Reference",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pickup_date",
+   "fieldtype": "Date",
+   "label": "Pickup Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_cost",
+   "fieldtype": "Section Break",
+   "label": "Carrier Cost"
+  },
+  {
+   "description": "What the carrier charged us, as opposed to what the customer paid at checkout.",
+   "fieldname": "cost_amount",
+   "fieldtype": "Currency",
+   "label": "Cost Amount",
+   "options": "cost_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_cost",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cost_currency",
+   "fieldtype": "Link",
+   "label": "Cost Currency",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_tracking",
+   "fieldtype": "Section Break",
+   "label": "Tracking"
+  },
+  {
+   "fieldname": "tracking_events",
+   "fieldtype": "Table",
+   "label": "Tracking Events",
+   "options": "Shipping Tracking Event",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_webhook_event_id",
+   "fieldtype": "Data",
+   "label": "Last Webhook Event ID",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-04 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Shipping",
+ "name": "Shipping Request",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "awb",
+ "track_changes": 1
+}

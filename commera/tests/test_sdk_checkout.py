@@ -188,10 +188,7 @@ class TestSdkCheckout(IntegrationTestCase):
 		self.fill_cart()
 		checkout.set_addresses(BILLING_ADDRESS)
 
-		with (
-			self.quote_express(50.0),
-			patch("commera.api.shipping.is_connector_installed", return_value=True),
-		):
+		with self.quote_express(50.0):
 			options = checkout_api.list_shipping_options()
 			state = checkout_api.set_shipping_option("ZZ Express")
 
@@ -207,7 +204,6 @@ class TestSdkCheckout(IntegrationTestCase):
 
 		with (
 			self.quote_express(),
-			patch("commera.api.shipping.is_connector_installed", return_value=True),
 			self.assertRaisesRegex(frappe.ValidationError, "is not available"),
 		):
 			checkout.set_shipping_option("ZZ Teleport")
@@ -217,7 +213,7 @@ class TestSdkCheckout(IntegrationTestCase):
 		checkout.set_addresses(BILLING_ADDRESS)
 		cart_sdk.add_lines([{"item_code": self.item, "qty": 2}])
 
-		with self.quote_express(), patch("commera.api.shipping.is_connector_installed", return_value=True):
+		with self.quote_express():
 			checkout.set_shipping_option("ZZ Express")
 
 		self.assertEqual([row.qty for row in _get_cart_quotation().items], [3])

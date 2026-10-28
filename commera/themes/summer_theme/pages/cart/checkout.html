@@ -729,7 +729,7 @@
 						const data = response.data || {};
 						this.shipping_options = data.options || [];
 						if (!this.shipping_options.length) {
-// No options is a legitimate configuration (a flat delivery rule), so this only explains itself when the connector offered a menu.
+// No options is a legitimate configuration (a flat delivery rule), so this only explains itself when the store offers a menu.
 							this.shipping_options_message = data.connector_missing ? "" : NO_SHIPPING_OPTIONS_MESSAGE;
 							return;
 						}

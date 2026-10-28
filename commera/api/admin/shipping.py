@@ -7,7 +7,7 @@ from commera.api.admin.integrations import describe_integration, save_integratio
 
 PROFILE_DOCTYPE = "Shipping Provider Profile"
 PROFILE_SETTINGS_FIELDNAME = "provider_settings"
-WEBHOOK_PATH = "/api/method/bwh_shipping.bwh_shipping.webhook.handle?provider={profile}"
+WEBHOOK_PATH = "/api/method/commera.shipping.webhook.handle?provider={profile}"
 
 # Order here is the order the cards render in.
 SHIPPING_PROVIDERS = (

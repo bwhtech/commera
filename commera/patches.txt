@@ -5,6 +5,7 @@ commera.patches.create_shop_themes_module
 commera.patches.rename_modules_and_commera_settings
 commera.patches.rename_item_discount_code_field
 commera.patches.rename_pixio_theme_to_summer
+commera.patches.move_bwh_shipping_into_commera
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated

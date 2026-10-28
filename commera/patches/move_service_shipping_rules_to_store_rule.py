@@ -8,10 +8,10 @@ NOT_MOVED_TITLE = "Delivery option Shipping Rule not moved"
 
 def execute():
 	"""Delivery options used to carry their own Shipping Rule; now the store rule's bands name the option."""
-	if "bwh_shipping" not in frappe.get_installed_apps():
+	if not frappe.db.table_exists("Shipping Service"):
 		return
 	# Customizations sync after post_model_sync patches, so the band's shipping_service column may not exist yet.
-	sync_customizations("bwh_shipping")
+	sync_customizations("commera")
 	move_service_shipping_rules_to_store_rule(get_legacy_service_rules())
 
 

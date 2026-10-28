@@ -6,7 +6,6 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.tests import IntegrationTestCase
 
-from commera.api.shipping import is_connector_installed
 from commera.checkout_hooks import PLUGIN_FEE_FIELD
 from commera.plugin_events import PLUGINS_USER, get_order_snapshot
 from commera.sdk import STORE_ORDER_TYPE, as_plugin_user, cart, catalog, orders
@@ -87,7 +86,7 @@ PUBLIC_NAMES = {
 		"search",
 	],
 	"commera.sdk.format": ["IMAGE_WIDTHS", "image_url", "money", "product_url"],
-	"commera.sdk.orders": ["ShippingNotInstalled", "get_order", "get_orders", "record_shipment"],
+	"commera.sdk.orders": ["get_order", "get_orders", "record_shipment"],
 	"commera.sdk.shop": ["get_menu", "get_page", "get_shop", "get_sitemap"],
 	"commera.sdk.types": [
 		"Address",
@@ -425,9 +424,10 @@ class TestSdk(IntegrationTestCase):
 		self.assertIsNone(frappe.db.get_value("Quotation", quotation.name, APP_FIELD))
 
 	def test_a_recorded_shipment_ships_then_delivers_the_order_and_never_goes_back(self):
-		if not is_connector_installed():
-			self.skipTest("bwh_shipping is not installed")
-		from bwh_shipping.tests.test_carrier_import import create_test_address, create_test_provider_profile
+		from commera.shipping.tests.test_carrier_import import (
+			create_test_address,
+			create_test_provider_profile,
+		)
 
 		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
@@ -467,9 +467,7 @@ class TestSdk(IntegrationTestCase):
 			orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="Teleported")
 
 	def test_a_carrier_named_after_the_first_record_is_saved(self):
-		if not is_connector_installed():
-			self.skipTest("bwh_shipping is not installed")
-		from bwh_shipping.tests.test_carrier_import import create_test_address
+		from commera.shipping.tests.test_carrier_import import create_test_address
 
 		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
@@ -482,11 +480,8 @@ class TestSdk(IntegrationTestCase):
 		self.assertEqual(frappe.db.get_value("Shipping Request", shipment, "carrier"), "Delhivery")
 
 	def test_a_partner_shipment_needs_no_provider_and_shows_the_shopper_its_link(self):
-		if not is_connector_installed():
-			self.skipTest("bwh_shipping is not installed")
-		from bwh_shipping.tests.test_carrier_import import create_test_address
-
 		from commera.api.shipping import get_order_tracking
+		from commera.shipping.tests.test_carrier_import import create_test_address
 
 		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)

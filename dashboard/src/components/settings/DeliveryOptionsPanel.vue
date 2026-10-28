@@ -132,11 +132,11 @@ function confirmDelete(option) {
           theme="gray"
           variant="subtle"
         />
-        <Dropdown v-if="store.available.value && importActions.length" :options="importActions">
+        <Dropdown v-if="store.loaded.value && importActions.length" :options="importActions">
           <Button label="Import from carrier" icon-right="lucide-chevron-down" />
         </Dropdown>
         <Button
-          v-if="store.available.value"
+          v-if="store.loaded.value"
           label="Add option"
           icon-left="lucide-plus"
           variant="solid"
@@ -163,16 +163,6 @@ function confirmDelete(option) {
         v-else-if="store.loading.value && !store.options.value.length"
         :rows="3"
         :lines="3"
-      />
-
-      <!-- The app that defines a shipping service is not installed, so there is nothing to
-           list and nothing to create — this is a state of the site, not a failure. -->
-      <EmptyState
-        v-else-if="!store.available.value"
-        compact
-        icon="lucide-package"
-        title="Delivery options arrive with the shipping app"
-        description="Install it to offer shoppers a choice at checkout; until then every order ships on whatever your carrier quotes."
       />
 
       <EmptyState

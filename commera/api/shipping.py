@@ -8,6 +8,11 @@ from commera.core import _get_cart_quotation
 from commera.discounts.allocations import get_allocations, get_discount_rows, get_price_discount_rows
 from commera.discounts.pricing import refresh_code_discounts
 from commera.discounts.shipping import apply_shipping_discounts, set_shipping_discount
+from commera.shipping.pricing import get_charge_account as get_rule_account
+from commera.shipping.pricing import get_charge_amount as get_option_charge_amount
+from commera.shipping.pricing import get_enabled_services, quote_services
+from commera.shipping.units import WEIGHT_IN_KG
+from commera.shipping.utils import get_address_payload
 from commera.utils import (
 	COD_CHARGE_DESCRIPTION,
 	get_charge_account_head,
@@ -27,11 +32,6 @@ DEFAULT_ITEM_WEIGHT_KG = 0.5
 RATES_CACHE_TTL_SECONDS = 30 * 60
 
 
-def is_connector_installed() -> bool:
-	"""bwh_shipping is a soft dependency: without it the storefront keeps the flat Shipping Rule."""
-	return "bwh_shipping" in frappe.get_installed_apps()
-
-
 # Guest checkout: refuses any caller without a guest cart cookie, and is rate limited.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=100, seconds=60 * 60)
@@ -48,7 +48,8 @@ def get_cart_shipping_options(quotation) -> dict:
 		return {"options": []}
 	if quotation.custom_is_store_pickup:
 		return {"options": [], "store_pickup": True}
-	if not is_connector_installed():
+	if not get_enabled_services():
+		# The key predates shipping in core; clients read it as "the store prices delivery by its flat rule".
 		return {"options": [], "connector_missing": True}
 	if not quotation.shipping_address_name:
 		return {"options": [], "address_missing": True}
@@ -56,7 +57,7 @@ def get_cart_shipping_options(quotation) -> dict:
 	try:
 		options = get_delivery_options(quotation)
 	except Exception:
-		# The connector failed, so checkout falls back to the flat Shipping Rule and says so.
+		# The carrier failed, so checkout falls back to the flat Shipping Rule and says so.
 		frappe.log_error(title="Shipping options could not be quoted")
 		return {"options": [], "unavailable": True}
 
@@ -122,9 +123,6 @@ def quote_options(quotation) -> list[dict]:
 
 	No origin is passed: one shared origin drops every option to its backup charge across countries.
 	"""
-	from bwh_shipping.bwh_shipping.pricing import quote_services
-	from bwh_shipping.bwh_shipping.utils import get_address_payload
-
 	return quote_services(
 		None,
 		get_address_payload(quotation.shipping_address_name),
@@ -173,8 +171,6 @@ def get_cart_weight(quotation) -> float:
 
 def to_kg(item_row) -> float:
 	"""An Item's weight in kg. An unconvertible UOM counts as unknown, so the default weight applies."""
-	from bwh_shipping.units import WEIGHT_IN_KG
-
 	unit = (item_row.weight_uom or "kg").strip().casefold()
 	factor = WEIGHT_IN_KG.get(unit)
 	if factor is None:
@@ -216,8 +212,6 @@ def save_delivery_option(quotation, delivery_option: str | None) -> dict:
 
 		if quotation.custom_is_store_pickup:
 			frappe.throw(_("This order is a store pickup, so it has no delivery option."))
-		if not is_connector_installed():
-			frappe.throw(_("Delivery options are not available on this store."))
 
 		option = find_option(quotation, delivery_option)
 		apply_delivery_option(quotation, option)
@@ -455,8 +449,6 @@ def reindex_taxes(quotation):
 
 def get_charge_account(shipping_rule: str | None) -> str:
 	"""The store Shipping Rule's account when it has one, else the store's charge account head."""
-	from bwh_shipping.bwh_shipping.pricing import get_charge_account as get_rule_account
-
 	return get_rule_account(shipping_rule) or get_charge_account_head()
 
 
@@ -475,17 +467,15 @@ def reprice_selected_option(quotation) -> bool:
 
 	Returns whether an option was applied, so the caller can fall back to the flat Shipping Rule.
 	"""
-	if not (quotation.custom_delivery_option and is_connector_installed()):
+	if not quotation.custom_delivery_option:
 		return False
-
-	from bwh_shipping.bwh_shipping.pricing import get_charge_amount
 
 	from commera.api.payments import CheckoutPriceChangedError
 
 	options = get_quoted_options(quotation)
 	if not any(option["title"] == quotation.custom_delivery_option for option in options):
 		# No longer quotable for this address, so fall back to its stored price rather than lose the charge.
-		amount = get_charge_amount(
+		amount = get_option_charge_amount(
 			quotation.custom_delivery_option,
 			get_cart_context(quotation),
 			# Before its shipping discount, which the hooks below take off again.
@@ -543,9 +533,6 @@ def copy_delivery_option_to_order(quotation_name: str, sales_order) -> None:
 def get_order_tracking(sales_order: str, key: str | None = None) -> dict:
 	"""Customer-facing tracking for one of their own orders, or one whose private link they hold."""
 	validate_document_access("Sales Order", sales_order, key)
-
-	if not is_connector_installed():
-		return {"has_tracking": False}
 
 	shipment = frappe.get_all(
 		"Shipping Request",

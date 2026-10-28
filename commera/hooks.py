@@ -111,6 +111,7 @@ importable_doctypes = ["Shop Theme"]
 doctype_js = {
 	"Item": ["public/js/extends/item.js", "public/js/extends/ecommerce_tab.js"],
 	"Sales Order": "public/js/extends/sales_order.js",
+	"Delivery Note": "public/js/extends/delivery_note.js",
 	"Style Attribute Variant": "public/js/extends/seo_listing.js",
 	"Ecommerce Category": "public/js/extends/seo_listing.js",
 	"Commera Settings": [

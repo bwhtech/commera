@@ -328,11 +328,8 @@ def get_open_order_filters() -> list:
 		["docstatus", "=", 1],
 		["status", "in", OPEN_STATUSES],
 		["name", "not in", get_returned_orders()],
+		["name", "not in", get_shipped_orders()],
 	]
-	from commera.api.shipping import is_connector_installed
-
-	if is_connector_installed():
-		filters.append(["name", "not in", get_shipped_orders()])
 	return filters
 
 
@@ -566,11 +563,6 @@ def read_order_lifecycles(order_names: list) -> dict:
 
 def read_shipment_stages(order_names: list, lifecycles: dict) -> None:
 	"""Fold each order's latest carrier status into its lifecycle, in one read."""
-	from commera.api.shipping import is_connector_installed
-
-	if not is_connector_installed():
-		return
-
 	# Newest first, first seen wins: a rebooked order carries a stale request that must not outrank it.
 	for request in frappe.get_all(
 		"Shipping Request",

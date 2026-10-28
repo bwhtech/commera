@@ -7,12 +7,7 @@ import frappe
 from frappe import _
 from frappe.utils.data import cint, cstr
 
-from commera.api.admin.delivery_options import (
-	SERVICE_DOCTYPE,
-	build_options,
-	ensure_available,
-	is_available,
-)
+from commera.api.admin.delivery_options import SERVICE_DOCTYPE, build_options
 from commera.api.admin.settings import coerce_field_value, write_settings_fields
 from commera.utils import get_store_currency
 
@@ -63,24 +58,15 @@ def build_rules(company: str) -> list[dict]:
 
 def build_screen() -> dict:
 	"""Everything the Shipping Rules screen renders, in one read."""
-	screen = {
-		"available": False,
-		"store_rule": None,
-		"currency": get_store_currency(),
-		"rules": [],
-		"delivery_options": [],
-	}
-	if not is_available():
-		return screen
-
 	frappe.has_permission(RULE_DOCTYPE, ptype="read", throw=True)
 
 	company = get_store_company()
-	screen["available"] = True
-	screen["store_rule"] = get_store_rule_name()
-	screen["delivery_options"] = build_options()
-	screen["rules"] = build_rules(company) if company else []
-	return screen
+	return {
+		"store_rule": get_store_rule_name(),
+		"currency": get_store_currency(),
+		"rules": build_rules(company) if company else [],
+		"delivery_options": build_options(),
+	}
 
 
 def get_freight_account(company: str) -> str | None:
@@ -178,7 +164,6 @@ def save_shipping_rule(
 ) -> dict:
 	"""Create a rule (no `name`) or replace an existing rule's bands. Returns the refreshed screen."""
 	frappe.only_for("System Manager")
-	ensure_available()
 
 	if name:
 		if label:
@@ -206,7 +191,6 @@ def save_shipping_rule(
 def delete_shipping_rule(name: str) -> dict:
 	"""Delete a rule checkout does not use. Returns the refreshed screen."""
 	frappe.only_for("System Manager")
-	ensure_available()
 
 	rule = get_listed_rule(name)
 	if rule.name == get_store_rule_name():
@@ -226,7 +210,6 @@ def delete_shipping_rule(name: str) -> dict:
 def set_store_rule(name: str) -> dict:
 	"""Make checkout charge this rule's bands. Returns the refreshed screen."""
 	frappe.only_for("System Manager")
-	ensure_available()
 
 	rule = get_listed_rule(name)
 	frappe.has_permission(RULE_DOCTYPE, ptype="read", doc=rule, throw=True)
