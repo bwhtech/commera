@@ -29,9 +29,9 @@ Only `get_rates` is required. Commera finds the other capabilities from the meth
 | Method | Capability | Required | Commera calls it to |
 | --- | --- | --- | --- |
 | `get_rates(request)` | None | Yes | Price the delivery options at checkout. |
-| `create_shipment(shipment)` | `booking` | No | Book a Shipping Request and buy its label. |
+| `create_shipment(shipment)` | `booking` | No | Book a Shipment and buy its label. |
 | `cancel_shipment(order_ref, shipment_ref, awb)` | `cancel` | No | Cancel a booking. |
-| `get_tracking(awb, shipment_ref, tracking_ref)` | `tracking` | No | Sync the status of a Shipping Request. |
+| `get_tracking(awb, shipment_ref, tracking_ref)` | `tracking` | No | Sync the status of a Shipment. |
 | `handle_webhook(payload, headers)` | `webhook` | No | Apply a tracking update that the carrier posts. |
 | `schedule_pickup(shipment_ref, pickup_date)` | `pickup` | No | Ask the carrier to collect a parcel. |
 | `generate_manifest(shipment_refs)` | `manifest` | No | Get the handover sheet. |

@@ -47,22 +47,22 @@ def handle():
 		log_webhook(provider, event_id=event_id, status="Failed")
 		return WEBHOOK_ACCEPTED
 
-	request_name = frappe.db.get_value("Shipping Request", {"awb": awb}, "name")
-	if not request_name:
+	shipment_name = frappe.db.get_value("Shipment", {"awb_number": awb, "docstatus": 1}, "name")
+	if not shipment_name:
 		log_webhook(provider, awb=awb, event_id=event_id, status="Failed")
 		return WEBHOOK_ACCEPTED
 
-	shipping_request = frappe.get_doc("Shipping Request", request_name)
-	if shipping_request.provider != provider:
+	shipment = frappe.get_doc("Shipment", shipment_name)
+	if shipment.custom_shipping_provider != provider:
 		frappe.log_error(
 			title=f"{provider} shipping webhook provider mismatch",
-			message=f"URL provider: {provider}, request provider: {shipping_request.provider}",
+			message=f"URL provider: {provider}, shipment provider: {shipment.custom_shipping_provider}",
 		)
 		log_webhook(provider, awb=awb, event_id=event_id, status="Failed")
 		return reject()
 
 	apply_status_as_administrator(
-		shipping_request, status, event_id, result.get("events"), result.get("provider_status")
+		shipment, status, event_id, result.get("events"), result.get("provider_status")
 	)
 	log_webhook(provider, awb=awb, event_id=event_id, status="Completed")
 	# A replayed delivery is still a success as far as the provider is concerned; anything else and it
@@ -71,7 +71,7 @@ def handle():
 
 
 def apply_status_as_administrator(
-	shipping_request,
+	shipment,
 	status: str,
 	event_id: str | None,
 	events: list | None,
@@ -82,7 +82,7 @@ def apply_status_as_administrator(
 	session_user = frappe.session.user
 	try:
 		frappe.set_user("Administrator")  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
-		shipping_request.apply_webhook_status(
+		shipment.apply_webhook_status(
 			status, event_id=event_id, events=events, provider_status=provider_status
 		)
 	finally:
@@ -102,5 +102,5 @@ def log_webhook(provider: str, awb: str | None = None, event_id: str | None = No
 		{"provider": provider, "awb": awb, "event_id": event_id},
 		service_name=f"{provider} Shipping Webhook",
 		status=status,
-		reference_doctype="Shipping Request",
+		reference_doctype="Shipment",
 	)

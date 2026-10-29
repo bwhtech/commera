@@ -437,7 +437,7 @@ class TestSdk(IntegrationTestCase):
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
 		sales_order.db_set(
 			{
-				"shipping_address_name": create_test_address("India"),
+				"shipping_address_name": create_test_address("India", "Customer", sales_order.customer),
 				"company_address": create_test_address("India"),
 			}
 		)
@@ -451,7 +451,7 @@ class TestSdk(IntegrationTestCase):
 			orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", events=[scan]),
 			shipment,
 		)
-		self.assertEqual(len(frappe.get_doc("Shipping Request", shipment).tracking_events), 1)
+		self.assertEqual(len(frappe.get_doc("Shipment", shipment).custom_tracking_events), 1)
 		update_sales_order_ecommerce_status(sales_order.name)
 		self.assertEqual(
 			frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status"), "Shipped"
@@ -465,7 +465,7 @@ class TestSdk(IntegrationTestCase):
 		orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="Delivered")
 		orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="In Transit")
 
-		self.assertEqual(frappe.db.get_value("Shipping Request", shipment, "status"), "Delivered")
+		self.assertEqual(frappe.db.get_value("Shipment", shipment, "custom_shipment_status"), "Delivered")
 		self.assertEqual(orders.get_order(sales_order.name)["stage"]["key"], "delivered")
 		with self.assertRaises(frappe.ValidationError):
 			orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="Teleported")
@@ -475,13 +475,18 @@ class TestSdk(IntegrationTestCase):
 
 		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
-		sales_order.db_set({"shipping_address_name": create_test_address("India"), "company_address": None})
+		sales_order.db_set(
+			{
+				"shipping_address_name": create_test_address("India", "Customer", sales_order.customer),
+				"company_address": create_test_address("India"),
+			}
+		)
 
 		shipment = orders.record_shipment(sales_order.name, awb="ZZ-LATE-CARRIER-AWB")
 		orders.record_shipment(sales_order.name, awb="ZZ-LATE-CARRIER-AWB", carrier="Delhivery")
 		orders.record_shipment(sales_order.name, awb="ZZ-LATE-CARRIER-AWB")
 
-		self.assertEqual(frappe.db.get_value("Shipping Request", shipment, "carrier"), "Delhivery")
+		self.assertEqual(frappe.db.get_value("Shipment", shipment, "carrier"), "Delhivery")
 
 	def test_a_partner_shipment_needs_no_provider_and_shows_the_shopper_its_link(self):
 		from commera.api.shipping import get_order_tracking
@@ -489,15 +494,18 @@ class TestSdk(IntegrationTestCase):
 
 		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
-		sales_order.db_set({"shipping_address_name": create_test_address("India"), "company_address": None})
+		sales_order.db_set(
+			{
+				"shipping_address_name": create_test_address("India", "Customer", sales_order.customer),
+				"company_address": create_test_address("India"),
+			}
+		)
 		tracking_url = "https://track.example.com/ZZ-PARTNER-AWB"
 
 		shipment = orders.record_shipment(
 			sales_order.name, awb="ZZ-PARTNER-AWB", carrier="Delhivery", tracking_url=tracking_url
 		)
-		self.assertFalse(
-			any(frappe.db.get_value("Shipping Request", shipment, ["provider", "origin_address"]))
-		)
+		self.assertFalse(frappe.db.get_value("Shipment", shipment, "custom_shipping_provider"))
 		update_sales_order_ecommerce_status(sales_order.name)
 		self.assertEqual(
 			frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status"), "Shipped"

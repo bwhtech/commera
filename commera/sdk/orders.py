@@ -8,7 +8,8 @@ from commera.api.shipping import get_charge_lines, read_order_taxes
 from commera.discounts.allocations import get_allocations
 from commera.plugin_events import read_shipping_addresses, validate_plugin_fieldnames
 from commera.sdk.types import Order
-from commera.shipping.fulfilment import build_parcels, get_provider_pickup_address
+from commera.shipping.fulfilment import get_provider_pickup_address, new_shipment
+from commera.shipping.shipment import get_order_shipments
 from commera.shipping.status import validate_status
 
 __all__ = ["get_order", "get_orders", "record_shipment"]
@@ -107,63 +108,50 @@ def record_shipment(
 	events: list[dict] | None = None,
 	tracking_url: str | None = None,
 ) -> str:
-	"""Upserts the order's Shipping Request on `awb`; its status never moves back. No Delivery Note is made.
+	"""Upserts the order's submitted Shipment on `awb`; its status never moves back. No Delivery Note is made.
 	Leave `provider` empty when a fulfilment partner shipped it; shoppers see `carrier` and `tracking_url`."""
 	validate_status(status)
 	if not cstr(awb).strip():
 		frappe.throw(_("A shipment needs its AWB."), frappe.ValidationError)
 	frappe.has_permission("Sales Order", doc=sales_order, ptype="read", throw=True)
 
-	request_name = frappe.db.get_value(
-		"Shipping Request",
-		{"ref_doctype": "Sales Order", "ref_docname": cstr(sales_order), "awb": awb},
-		"name",
-	)
-	if not request_name:
-		return create_order_shipping_request(
-			sales_order, provider, awb, carrier, status, events, tracking_url
-		)
+	shipments = get_order_shipments(sales_order, awb_number=awb, docstatus=1)
+	if not shipments:
+		return create_order_shipment(sales_order, provider, awb, carrier, status, events, tracking_url)
 
-	request = frappe.get_doc("Shipping Request", request_name)
-	request.check_permission("write")
-	request.lock_booking()
+	shipment = frappe.get_doc("Shipment", shipments[0].name)
+	shipment.check_permission("write")
+	shipment.lock_booking()
 	if tracking_url:
-		request.tracking_url = tracking_url
+		shipment.tracking_url = tracking_url
 	if carrier:
-		request.carrier = carrier
-	request.apply_status(status, events=events)
-	return request.name
+		shipment.carrier = carrier
+	shipment.apply_status(status, events=events)
+	return shipment.name
 
 
-def create_order_shipping_request(sales_order, provider, awb, carrier, status, events, tracking_url) -> str:
-	"""create_shipping_request, fed from the Sales Order instead of a Delivery Note."""
+def create_order_shipment(sales_order, provider, awb, carrier, status, events, tracking_url) -> str:
 	if provider and not frappe.db.exists("Shipping Provider Profile", provider):
 		frappe.throw(_("Shipping provider {0} does not exist.").format(provider), frappe.ValidationError)
 
 	order = frappe.get_doc("Sales Order", sales_order)
-	# A partner-made shipment left from the partner's warehouse, which the store does not know.
-	origin_address = (get_provider_pickup_address(provider) or order.company_address) if provider else None
-	request = frappe.get_doc(
+	# The store does not know a partner's warehouse, so a partner parcel ships from the store's address.
+	shipment = new_shipment(
+		order,
+		origin=(provider and get_provider_pickup_address(provider)) or order.company_address,
+		delivery_address=order.shipping_address_name or order.customer_address,
+	)
+	shipment.update(
 		{
-			"doctype": "Shipping Request",
-			"provider": provider,
+			"custom_sales_order": order.name,
+			"custom_shipping_provider": provider,
 			"carrier": carrier,
-			"awb": awb,
+			"awb_number": awb,
 			"tracking_url": tracking_url,
-			"status": status,
-			"company": order.company,
-			"ref_doctype": "Sales Order",
-			"ref_docname": order.name,
-			"origin_address": origin_address,
-			"destination_address": order.shipping_address_name or order.customer_address,
-			"customer_name": order.customer_name,
-			"customer_phone": order.contact_phone,
-			"customer_email": order.contact_email,
-			"currency": order.currency,
-			"declared_value": flt(order.grand_total),
-			"parcels": build_parcels(order),
+			"custom_shipment_status": status,
 		}
 	)
-	request.append_tracking_events(events)
-	request.insert()
-	return request.name
+	shipment.append_tracking_events(events)
+	shipment.insert()
+	shipment.submit()
+	return shipment.name

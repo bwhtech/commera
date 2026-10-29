@@ -112,6 +112,7 @@ doctype_js = {
 	"Item": ["public/js/extends/item.js", "public/js/extends/ecommerce_tab.js"],
 	"Sales Order": "public/js/extends/sales_order.js",
 	"Delivery Note": "public/js/extends/delivery_note.js",
+	"Shipment": "public/js/extends/shipment.js",
 	"Style Attribute Variant": "public/js/extends/seo_listing.js",
 	"Ecommerce Category": "public/js/extends/seo_listing.js",
 	"Commera Settings": [
@@ -209,7 +210,12 @@ doc_events = {
 		"on_cancel": "commera.utils.update_so_status_from_related_doc",
 		"on_trash": "commera.utils.update_so_status_from_related_doc",
 	},
-	"Shipping Request": {"on_update": "commera.utils.update_so_status_from_related_doc"},
+	"Shipment": {
+		"on_update": "commera.utils.update_so_status_from_related_doc",
+		"on_submit": "commera.utils.update_so_status_from_related_doc",
+		"on_update_after_submit": "commera.utils.update_so_status_from_related_doc",
+		"on_cancel": "commera.utils.update_so_status_from_related_doc",
+	},
 }
 
 jinja = {
@@ -374,6 +380,8 @@ add_to_apps_screen = [
 # DocType Class
 # ---------------
 # Override standard doctype classes
+
+extend_doctype_class = {"Shipment": ["commera.shipping.shipment.CommeraShipment"]}
 
 # override_doctype_class = {
 # 	"ToDo": "custom_app.overrides.CustomToDo"

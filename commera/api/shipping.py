@@ -12,6 +12,7 @@ from commera.shipping.base_class import RateItem
 from commera.shipping.pricing import get_charge_account as get_rule_account
 from commera.shipping.pricing import get_charge_amount as get_option_charge_amount
 from commera.shipping.pricing import has_delivery_options, quote_services
+from commera.shipping.shipment import get_order_shipments
 from commera.shipping.units import WEIGHT_IN_KG
 from commera.shipping.utils import get_address_payload
 from commera.utils import (
@@ -520,28 +521,24 @@ def get_order_tracking(sales_order: str, key: str | None = None) -> dict:
 	"""Customer-facing tracking for one of their own orders, or one whose private link they hold."""
 	validate_document_access("Sales Order", sales_order, key)
 
-	shipment = frappe.get_all(
-		"Shipping Request",
-		filters={"ref_doctype": "Sales Order", "ref_docname": sales_order},
-		fields=["name", "awb", "carrier", "status", "label_url", "tracking_url"],
-		order_by="creation desc",
-		limit=1,
+	shipments = get_order_shipments(
+		sales_order, fields=["name", "awb_number", "carrier", "custom_shipment_status", "tracking_url"]
 	)
-	if not shipment or not shipment[0].awb:
+	if not shipments or not shipments[0].awb_number:
 		return {"has_tracking": False}
 
-	request = shipment[0]
+	shipment = shipments[0]
 	events = frappe.get_all(
 		"Shipping Tracking Event",
-		filters={"parent": request.name, "parenttype": "Shipping Request"},
+		filters={"parent": shipment.name, "parenttype": "Shipment"},
 		fields=["timestamp", "status", "location", "message"],
 		order_by="timestamp desc",
 	)
 	return {
 		"has_tracking": True,
-		"awb": request.awb,
-		"carrier": request.carrier,
-		"status": request.status,
-		"tracking_url": request.tracking_url,
+		"awb": shipment.awb_number,
+		"carrier": shipment.carrier,
+		"status": shipment.custom_shipment_status,
+		"tracking_url": shipment.tracking_url,
 		"events": events,
 	}
