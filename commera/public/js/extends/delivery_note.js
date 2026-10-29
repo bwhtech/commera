@@ -8,13 +8,13 @@ frappe.ui.form.on('Delivery Note', {
 			__('Shipment'),
 			() => {
 				frappe.call({
-					method: 'commera.shipping.fulfilment.create_shipping_request',
+					method: 'commera.shipping.fulfilment.create_shipment',
 					args: { delivery_note: frm.doc.name },
 					freeze: true,
 					freeze_message: __('Drafting shipment...'),
 					callback(response) {
 						if (!response.message) return;
-						frappe.set_route('Form', 'Shipping Request', response.message);
+						frappe.set_route('Form', 'Shipment', response.message);
 					},
 				});
 			},

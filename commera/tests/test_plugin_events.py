@@ -40,6 +40,7 @@ from commera.plugin_events import (
 	validate_plugins,
 )
 from commera.sdk import API_VERSION
+from commera.shipping.testing import insert_shipment_record
 from commera.tests import test_admin_catalog
 from commera.tests import test_payment_hooks as payment_hooks
 from commera.tests.test_admin_orders import make_test_sales_order
@@ -95,17 +96,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		return sorted(frappe.get_all("Commera Event", {"reference_name": reference_name}, pluck="event"))
 
 	def book_parcel(self, sales_order, status):
-		parcel = frappe.get_doc(
-			{
-				"doctype": "Shipping Request",
-				"name": frappe.generate_hash(length=10),
-				"ref_doctype": "Sales Order",
-				"ref_docname": sales_order,
-				"status": status,
-			}
-		)
-		parcel.db_insert()
-		return parcel.name
+		return insert_shipment_record(sales_order, status)
 
 	def submitted_cod_order(self):
 		sales_order = self.place_cod_order_for_cart()
@@ -121,13 +112,13 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		update_sales_order_ecommerce_status(sales_order)
 		self.assertEqual(self.event_names(sales_order), ["order_placed"])
 
-		frappe.db.set_value("Shipping Request", parcel, "status", "In Transit")
+		frappe.db.set_value("Shipment", parcel, "custom_shipment_status", "In Transit")
 		update_sales_order_ecommerce_status(sales_order)
-		frappe.db.set_value("Shipping Request", parcel, "status", "Out For Delivery")
+		frappe.db.set_value("Shipment", parcel, "custom_shipment_status", "Out For Delivery")
 		update_sales_order_ecommerce_status(sales_order)
 		self.assertEqual(self.event_names(sales_order), ["order_fulfilled", "order_placed"])
 
-		frappe.db.set_value("Shipping Request", parcel, "status", "Delivered")
+		frappe.db.set_value("Shipment", parcel, "custom_shipment_status", "Delivered")
 		update_sales_order_ecommerce_status(sales_order)
 		update_sales_order_ecommerce_status(sales_order)
 
@@ -168,7 +159,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		parcel = self.book_parcel(sales_order, "Delivered")
 
 		update_sales_order_ecommerce_status(sales_order)
-		frappe.db.set_value("Shipping Request", parcel, "status", "RTO")
+		frappe.db.set_value("Shipment", parcel, "custom_shipment_status", "RTO")
 		update_sales_order_ecommerce_status(sales_order)
 
 		self.assertEqual(

@@ -300,7 +300,7 @@ def create_test_provider_profile() -> str:
 	return name
 
 
-def create_test_address(country: str) -> str:
+def create_test_address(country: str, link_doctype: str | None = None, link_name: str | None = None) -> str:
 	address = frappe.get_doc(
 		{
 			"doctype": "Address",
@@ -310,6 +310,7 @@ def create_test_address(country: str) -> str:
 			"city": "Mumbai",
 			"pincode": "400001",
 			"country": country,
+			"links": [{"link_doctype": link_doctype, "link_name": link_name}] if link_doctype else [],
 		}
 	).insert()
 	return address.name

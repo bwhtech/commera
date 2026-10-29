@@ -1,5 +1,7 @@
 import time
 
+import frappe
+
 from commera.shipping.base_class import RateRequest, ShippingProviderBase
 
 
@@ -59,3 +61,20 @@ class InMemoryShippingProvider(ShippingProviderBase):
 
 	def handle_webhook(self, payload: bytes, headers: dict) -> dict:
 		return {}
+
+
+def insert_shipment_record(sales_order: str, status: str, delivery_note: str | None = None) -> str:
+	"""A submitted Shipment row with only the fields order status reads, without ERPNext's validation."""
+	shipment = frappe.get_doc(
+		{
+			"doctype": "Shipment",
+			"name": frappe.generate_hash(length=10),
+			"docstatus": 1,
+			"custom_sales_order": sales_order,
+			"custom_shipment_status": status,
+		}
+	)
+	shipment.db_insert()
+	if delivery_note:
+		shipment.append("shipment_delivery_note", {"delivery_note": delivery_note}).db_insert()
+	return shipment.name
