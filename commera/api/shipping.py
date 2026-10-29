@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
-from frappe.utils.data import cstr, flt, sha256_hash
+from frappe.utils.data import cint, cstr, flt, sha256_hash
 
 from commera.checkout_hooks import PLUGIN_FEE_FIELD, apply_delivery_option_hooks, apply_plugin_fees
 from commera.core import _get_cart_quotation
@@ -167,7 +167,21 @@ def get_cart_parcels(quotation) -> list[dict]:
 			**DEFAULT_PARCEL_DIMENSIONS,
 			"weight": get_cart_weight(quotation) or DEFAULT_ITEM_WEIGHT_KG,
 			"count": 1,
+			"items": get_cart_items(quotation),
 		}
+	]
+
+
+def get_cart_items(quotation) -> list[dict]:
+	"""Line detail for providers that rate the products themselves, such as a print-on-demand partner."""
+	return [
+		{
+			"description": item.item_name,
+			"sku": item.item_code,
+			"quantity": cint(abs(flt(item.qty))) or 1,
+			"rate": flt(item.rate),
+		}
+		for item in quotation.items
 	]
 
 
