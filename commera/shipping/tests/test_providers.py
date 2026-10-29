@@ -62,12 +62,13 @@ class TestShippingProviderRegistry(IntegrationTestCase):
 		self.assertEqual([(entry["slug"], entry["label"]) for entry in entries], CARRIER_CARDS)
 		self.assertTrue(all(entry["blurb"] and entry["docs_url"] for entry in entries))
 
-	def test_a_profile_cannot_point_at_an_unregistered_doctype(self):
+	def test_an_enabled_profile_cannot_point_at_an_unregistered_doctype(self):
 		profile = frappe.get_doc(
 			{
 				"doctype": PROFILE_DOCTYPE,
 				"__newname": "_Test Not A Carrier",
 				"provider_settings": NOT_A_CARRIER,
+				"enabled": 1,
 			}
 		)
 
