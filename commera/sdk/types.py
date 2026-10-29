@@ -511,6 +511,9 @@ class ShippingOption(TypedDict):
 	amount: float
 	original_amount: float | None
 	is_free: bool
+	min_delivery_date: str | None
+	max_delivery_date: str | None
+	phone_required: bool
 
 
 class ShippingOptions(TypedDict):

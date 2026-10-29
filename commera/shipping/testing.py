@@ -1,4 +1,6 @@
-from commera.shipping.base_class import ShippingProviderBase
+import time
+
+from commera.shipping.base_class import RateRequest, ShippingProviderBase
 
 
 class InMemoryShippingProvider(ShippingProviderBase):
@@ -10,12 +12,14 @@ class InMemoryShippingProvider(ShippingProviderBase):
 		pickup_address: str | None = None,
 		volumetric_divisor: int = 0,
 		fail_rates: bool = False,
+		delay_seconds: float = 0,
 	):
 		self.rates = rates or []
 		self.pickup_address = pickup_address
 		self.volumetric_divisor = volumetric_divisor
 		self.fail_rates = fail_rates
-		self.rate_requests: list[dict] = []
+		self.delay_seconds = delay_seconds
+		self.rate_requests: list[RateRequest] = []
 		self.shipments: dict[str, dict] = {}
 		self.cancelled: list[str] = []
 		self.tracking: dict[str, dict] = {}
@@ -24,17 +28,9 @@ class InMemoryShippingProvider(ShippingProviderBase):
 		"""Read a setting the way callers read a settings Single."""
 		return getattr(self, key, default)
 
-	def get_rates(
-		self,
-		origin: dict,
-		destination: dict,
-		parcels: list[dict],
-		cod: bool = False,
-		declared_value: float = 0.0,
-	) -> list[dict]:
-		self.rate_requests.append(
-			{"origin": origin, "destination": destination, "parcels": parcels, "cod": cod}
-		)
+	def get_rates(self, request: RateRequest) -> list[dict]:
+		self.rate_requests.append(request)
+		time.sleep(self.delay_seconds)
 		if self.fail_rates:
 			raise ConnectionError("The in-memory carrier is down")
 		return [dict(rate) for rate in self.rates]

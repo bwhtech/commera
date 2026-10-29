@@ -134,6 +134,9 @@ def get_shipping_option(option: dict) -> ShippingOption:
 		"amount": flt(option["amount"]),
 		"original_amount": flt(option["original_amount"]) if option.get("original_amount") else None,
 		"is_free": not flt(option["amount"]),
+		"min_delivery_date": option.get("min_delivery_date"),
+		"max_delivery_date": option.get("max_delivery_date"),
+		"phone_required": bool(option.get("phone_required")),
 	}
 
 

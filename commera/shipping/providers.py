@@ -1,3 +1,6 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 import frappe
 from frappe import _
 from frappe.utils.caching import site_cache
@@ -35,9 +38,18 @@ def get_provider(profile: str) -> ShippingProviderBase:
 	return frappe.get_single(settings_doctype)
 
 
-def use_providers(providers: dict[str, ShippingProviderBase]):
-	"""Inside the block, only these Shipping Provider Profiles exist, backed by these objects."""
-	return registry.use_providers(KIND, providers)
+@contextmanager
+def use_providers(providers: dict[str, ShippingProviderBase]) -> Iterator[None]:
+	"""Inside the block, only these Shipping Provider Profiles exist, backed by these objects.
+	Cached rates are dropped on the way in and out, since they came from other objects."""
+	from commera.shipping.rates import clear_rates_cache
+
+	clear_rates_cache()
+	try:
+		with registry.use_providers(KIND, providers):
+			yield
+	finally:
+		clear_rates_cache()
 
 
 def get_enabled_profiles() -> list[str]:

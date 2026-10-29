@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+
+RATES_TIMEOUT_SECONDS = 10
 
 # Optional capabilities and the method that implements each. Ask `supports()` rather than
 # hard-coding which provider can do what.
@@ -14,6 +17,37 @@ OPTIONAL_CAPABILITIES = {
 }
 
 
+@dataclass(frozen=True)
+class RateItem:
+	item_code: str
+	item_name: str
+	product: str  # The template of a variant, else the item itself.
+	qty: float
+	weight: float  # kg for one unit; 0 when the Item has no weight.
+	rate: float  # One unit, in the request currency.
+
+
+@dataclass(frozen=True)
+class RateRequest:
+	"""What a carrier gets to price one cart. Money is in `currency`, weights in kg."""
+
+	origin: dict
+	destination: dict
+	parcels: list[dict]
+	items: list[RateItem] = field(default_factory=list)
+	currency: str = ""
+	locale: str = ""
+	subtotal: float = 0.0  # Net total of the items.
+	total: float = 0.0  # Grand total, after discounts and taxes.
+	discount: float = 0.0
+	customer: str | None = None
+	customer_group: str | None = None
+	cod: bool = False
+	declared_value: float = 0.0
+	# Answer within this, or the rates are dropped and checkout uses backup pricing.
+	timeout_seconds: int = RATES_TIMEOUT_SECONDS
+
+
 class ShippingProviderBase(ABC):
 	"""Contract for a `<Provider> Shipping Settings` Single that backs a Shipping Provider Profile.
 	Units are canonical: kg, cm, and major units of the named currency; see `units.normalise_parcel`."""
@@ -25,16 +59,9 @@ class ShippingProviderBase(ABC):
 	logo: str = ""  # An image URL, such as /assets/<app>/images/<carrier>.svg
 
 	@abstractmethod
-	def get_rates(
-		self,
-		origin: dict,
-		destination: dict,
-		parcels: list[dict],
-		cod: bool = False,
-		declared_value: float = 0.0,
-	) -> list[dict]:
-		"""Quote every service that can carry this consignment. Return [] when the provider does not
-		serve the route: the caller then prices from the backup charge."""
+	def get_rates(self, request: RateRequest) -> list[dict]:
+		"""One {"service_code", "service_name", "amount", "currency"} per service, with optional "description",
+		"min_delivery_date", "max_delivery_date" and "phone_required". [] when the route is not served."""
 
 	def create_shipment(self, shipment: dict) -> dict:
 		"""Book one consignment and buy its label. `tracking_ref` is optional: AfterShip tracks on its
