@@ -1,3 +1,4 @@
+import click
 import frappe
 from frappe.installer import remove_from_installed_apps
 from frappe.model.rename_doc import get_link_fields, update_link_field_values
@@ -16,6 +17,9 @@ def execute():
 			ignore_permissions=True
 		)
 
+	if OLD_APP not in frappe.get_installed_apps():
+		return
+
 	if frappe.db.exists("Module Def", OLD_MODULE):
 		# Every Link to the module: DocType, Custom Field, Property Setter and the rest.
 		update_link_field_values(get_link_fields("Module Def"), OLD_MODULE, MODULE, "Module Def")
@@ -24,7 +28,11 @@ def execute():
 
 	# Not uninstall-app: that drops the tables this patch keeps.
 	remove_from_installed_apps(OLD_APP)
-
-	frappe.cache.delete_value("app_modules")
-	frappe.client_cache.delete_value("installed_app_modules")
-	frappe.setup_module_map()
+	# Hooks stay site-cached past the removal; the rest of this migrate must not see bwh_shipping's.
+	frappe.clear_cache()
+	# The module map was built at connect; without a rebuild the model sync skips the Shipping module.
+	frappe.setup_module_map(include_all_apps=False)
+	click.secho(
+		"Shipping is part of Commera now. Run `bench remove-app bwh_shipping` once every site has migrated.",
+		fg="yellow",
+	)
