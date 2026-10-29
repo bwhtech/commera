@@ -1,7 +1,7 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 # The storefront checkout writes as the shopper, who has no Account read; see payments.save_cart_quotation.
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import frappe
 from frappe.model.document import Document
@@ -522,9 +522,10 @@ class TestCartCheckout(IntegrationTestCase):
 		self.set_cod_fee(0)
 
 	def quote_express(self, amount: float = 50.0):
-		return patch(
-			"commera.api.shipping.get_quoted_options",
-			return_value=[{"title": "ZZ Express", "amount": amount}],
+		return patch.multiple(
+			"commera.api.shipping",
+			has_delivery_options=Mock(return_value=True),
+			get_quoted_options=Mock(return_value=[{"title": "ZZ Express", "amount": amount}]),
 		)
 
 	def test_a_changed_cart_drops_the_delivery_option_priced_for_the_old_one(self):
