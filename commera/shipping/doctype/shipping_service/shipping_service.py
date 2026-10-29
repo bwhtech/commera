@@ -39,7 +39,7 @@ class ShippingService(Document):
 
 
 @frappe.whitelist()
-def create_shipping_services(provider: str, selections: list, default_rate: float = 0) -> list[str]:
+def create_shipping_services(provider: str, selections: list | str, default_rate: float = 0) -> list[str]:
 	"""Create Shipping Services from the importer selections. `default_rate` seeds the Backup Charge;
 	codes already imported for this provider are skipped."""
 	frappe.only_for("System Manager")

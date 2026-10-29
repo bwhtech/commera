@@ -85,6 +85,16 @@ class TestShippingProviderRegistry(IntegrationTestCase):
 		with self.assertRaisesRegex(ProviderNotRegisteredError, "_Test Orphan Carrier"):
 			validate_providers()
 
+	def test_a_profile_whose_app_is_gone_can_still_be_disabled(self):
+		profile = frappe.get_doc(
+			PROFILE_DOCTYPE, insert_unchecked_profile("_Test Gone Carrier", NOT_A_CARRIER)
+		)
+
+		profile.enabled = 0
+		profile.save()
+
+		validate_providers()
+
 	def test_uninstalling_an_app_disables_its_profiles(self):
 		profile = create_test_provider_profile()
 
@@ -182,6 +192,16 @@ class TestCarrierRates(IntegrationTestCase):
 
 		self.assertEqual((len(carrier.rate_requests), len(broken.rate_requests)), (1, 1))
 		self.assertLessEqual(failure_ttl, FAILURE_CACHE_TTL_SECONDS)
+
+	def test_saving_a_carriers_settings_drops_its_cached_rates(self):
+		carrier = InMemoryShippingProvider(rates=[{"service_code": "express", "amount": 40}])
+
+		with use_providers({self.profile: carrier}):
+			get_provider_rates(self.profile, self.get_request())
+			carrier.on_update()
+			get_provider_rates(self.profile, self.get_request())
+
+		self.assertEqual(len(carrier.rate_requests), 2)
 
 	def test_an_answer_after_the_timeout_counts_as_a_failure(self):
 		slow = InMemoryShippingProvider(rates=[{"service_code": "express", "amount": 40}], delay_seconds=0.05)

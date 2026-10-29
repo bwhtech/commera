@@ -504,7 +504,10 @@ def read_shiprocket_error(body) -> str | None:
 	errors = body.get("errors")
 	if isinstance(errors, dict):
 		# Shiprocket returns {"errors": {"field": ["problem", ...]}}.
-		return "; ".join(f"{field}: {', '.join(map(cstr, problems))}" for field, problems in errors.items())
+		return "; ".join(
+			f"{field}: {', '.join(cstr(problem) for problem in problems)}"
+			for field, problems in errors.items()
+		)
 	if errors:
 		return cstr(errors)
 	return None

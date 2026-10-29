@@ -106,7 +106,7 @@ def new_shipping_provider(label: str, app: str | None):
 	for change, path in scaffold.add_shipping_provider(label):
 		click.echo(f"{change:<8} {path}")
 	click.secho(
-		"Next: implement get_rates, then bench --site <site> migrate. See docs/shipping-providers.md.",
+		"Next: implement get_rates, then bench --site <site> migrate. See docs/implementation/shipping-providers.md.",
 		fg="green",
 	)
 

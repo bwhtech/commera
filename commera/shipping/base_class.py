@@ -58,6 +58,12 @@ class ShippingProviderBase(ABC):
 	docs_url: str = ""
 	logo: str = ""  # An image URL, such as /assets/<app>/images/<carrier>.svg
 
+	def on_update(self):
+		"""Credentials and the pickup address change every quote. A subclass that overrides this calls super()."""
+		from commera.shipping.rates import clear_rates_cache  # rates imports this module
+
+		clear_rates_cache()
+
 	@abstractmethod
 	def get_rates(self, request: RateRequest) -> list[dict]:
 		"""One {"service_code", "service_name", "amount", "currency"} per service, with optional "description",
