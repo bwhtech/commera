@@ -6,7 +6,6 @@ from unittest.mock import patch
 import frappe
 from frappe.model.document import Document
 from frappe.tests import IntegrationTestCase
-from frappe.utils.data import add_days, today
 
 from commera.api.cart import get_detail_for_cart_items, get_stock_shortfalls, validate_stock_available
 from commera.api.checkout import apply_shipping_rule
@@ -26,7 +25,7 @@ from commera.api.server_cart import sync_server_cart
 from commera.api.shipping import (
 	DELIVERY_CHARGE_DESCRIPTION,
 	apply_delivery_option,
-	get_cart_fingerprint,
+	get_cart_context,
 	get_checkout_summary,
 	get_order_charge_lines,
 	set_delivery_option,
@@ -35,6 +34,7 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_sess
 from commera.core import _get_cart_quotation
 from commera.discounts.codes import add_code
 from commera.sdk import cart as cart_sdk
+from commera.shipping.rates import get_rate_request, get_request_fingerprint
 from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.utils import get_available_stocks, get_pickup_addresses
 from commera.www.cart.checkout import get_context as get_checkout_context
@@ -58,6 +58,10 @@ DEFAULT_RATE = 120.0
 SALE_RATE = 90.0
 TAX_DESCRIPTION = "ZZ Output Tax"
 TAX_RATE = 18.0
+
+
+def get_carrier_fingerprint(quotation) -> str:
+	return get_request_fingerprint(get_rate_request(None, {}, [], get_cart_context(quotation)))
 
 
 class TestCartCheckout(IntegrationTestCase):
@@ -271,12 +275,12 @@ class TestCartCheckout(IntegrationTestCase):
 		frappe.set_user(self.shopper)
 		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
 		quotation = _get_cart_quotation()
-		fingerprint = get_cart_fingerprint(quotation)
+		fingerprint = get_carrier_fingerprint(quotation)
 
-		self.assertEqual(fingerprint, get_cart_fingerprint(quotation))
+		self.assertEqual(fingerprint, get_carrier_fingerprint(quotation))
 
 		quotation.items[0].qty = 2
-		self.assertNotEqual(fingerprint, get_cart_fingerprint(quotation))
+		self.assertNotEqual(fingerprint, get_carrier_fingerprint(quotation))
 
 	# -- checkout summary -------------------------------------------------------------------------
 
@@ -575,6 +579,22 @@ class TestCartCheckout(IntegrationTestCase):
 			checkout = initiate_checkout_with_mode(COD_PAYMENT_MODE, delivery_option="ZZ Express")
 
 		self.assertIn("payment_mode=COD", checkout["order_url"])
+
+	def test_a_rate_that_needs_a_phone_is_refused_without_one(self):
+		frappe.set_user(self.shopper)
+		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
+		update_quotation_address(self.address_payload())
+		quotation = _get_cart_quotation()
+		address = quotation.shipping_address_name or quotation.customer_address
+		frappe.db.set_value("Address", address, "phone", "")
+		frappe.db.set_value("Quotation", quotation.name, "contact_mobile", "")
+		options = [{"title": "ZZ Courier", "amount": 10.0, "phone_required": True}]
+
+		with (
+			patch("commera.api.shipping.get_quoted_options", return_value=options),
+			self.assertRaisesRegex(frappe.ValidationError, "needs a phone number"),
+		):
+			set_delivery_option("ZZ Courier")
 
 	def test_payment_refuses_a_total_the_shopper_was_not_shown(self):
 		self.prepare_cod_checkout()

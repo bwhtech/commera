@@ -8,7 +8,8 @@
  "field_order": [
   "provider_settings",
   "column_break_prov",
-  "enabled"
+  "enabled",
+  "offer_all_rates"
  ],
  "fields": [
   {
@@ -30,12 +31,19 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Enabled"
+  },
+  {
+   "default": "0",
+   "description": "Show every rate the carrier returns at checkout, not only the services set up as delivery options.",
+   "fieldname": "offer_all_rates",
+   "fieldtype": "Check",
+   "label": "Offer Every Carrier Rate"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-20 00:00:00.000000",
+ "modified": "2026-10-29 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Shipping",
  "name": "Shipping Provider Profile",

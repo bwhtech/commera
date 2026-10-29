@@ -12,7 +12,7 @@ from frappe.model.document import Document
 from frappe.utils import get_request_session
 from frappe.utils.data import cint, cstr, flt
 
-from commera.shipping.base_class import ShippingProviderBase
+from commera.shipping.base_class import RateRequest, ShippingProviderBase
 from commera.shipping.units import billable_weight, to_system_datetime
 from commera.shipping.utils import get_provider_profile
 
@@ -138,14 +138,7 @@ class AfterShipShippingSettings(Document, ShippingProviderBase):
 
 	# --- Contract ------------------------------------------------------------
 
-	def get_rates(
-		self,
-		origin: dict,
-		destination: dict,
-		parcels: list[dict],
-		cod: bool = False,
-		declared_value: float = 0.0,
-	) -> list[dict]:
+	def get_rates(self, request: RateRequest) -> list[dict]:
 		shipper_accounts = self.get_shipper_account_ids()
 		if not shipper_accounts:
 			return []
@@ -154,14 +147,16 @@ class AfterShipShippingSettings(Document, ShippingProviderBase):
 			"async": False,
 			"is_document": False,
 			"shipper_accounts": [{"id": account} for account in shipper_accounts],
-			"shipment": self.build_shipment(origin, destination, parcels, declared_value),
+			"shipment": self.build_shipment(
+				request.origin, request.destination, request.parcels, request.declared_value
+			),
 		}
 		data = self.request(
 			"POST",
 			self.get_shipping_base(),
 			"/rates",
 			payload,
-			timeout=cint(self.rates_timeout_seconds) or 10,
+			timeout=min(cint(self.rates_timeout_seconds) or request.timeout_seconds, request.timeout_seconds),
 		)
 		return [self.build_rate(rate) for rate in data.get("rates") or [] if is_quotable(rate)]
 

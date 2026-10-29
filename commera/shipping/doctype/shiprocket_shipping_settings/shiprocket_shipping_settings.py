@@ -10,7 +10,7 @@ from frappe.model.document import Document
 from frappe.utils import get_request_session
 from frappe.utils.data import cint, cstr, flt, today
 
-from commera.shipping.base_class import ShippingProviderBase
+from commera.shipping.base_class import RateRequest, ShippingProviderBase
 from commera.shipping.exceptions import PartialBookingError
 from commera.shipping.units import billable_weight, enclosing_dimensions, to_system_datetime
 
@@ -179,16 +179,9 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 
 	# --- Contract ------------------------------------------------------------
 
-	def get_rates(
-		self,
-		origin: dict,
-		destination: dict,
-		parcels: list[dict],
-		cod: bool = False,
-		declared_value: float = 0.0,
-	) -> list[dict]:
-		pickup_pincode = (origin or {}).get("pincode")
-		delivery_pincode = (destination or {}).get("pincode")
+	def get_rates(self, request: RateRequest) -> list[dict]:
+		pickup_pincode = (request.origin or {}).get("pincode")
+		delivery_pincode = (request.destination or {}).get("pincode")
 		if not (pickup_pincode and delivery_pincode):
 			# Shiprocket rates on pincodes only. A missing one is normal mid-checkout; the caller prices
 			# from the backup charge.
@@ -197,18 +190,18 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		params = {
 			"pickup_postcode": pickup_pincode,
 			"delivery_postcode": delivery_pincode,
-			"weight": billable_weight(parcels, self.get_volumetric_divisor()),
-			"cod": 1 if cod else 0,
-			"declared_value": flt(declared_value),
+			"weight": billable_weight(request.parcels, self.get_volumetric_divisor()),
+			"cod": 1 if request.cod else 0,
+			"declared_value": flt(request.declared_value),
 		}
 		response = self.request(
 			"GET",
 			"/courier/serviceability/",
 			params,
-			timeout=cint(self.rates_timeout_seconds) or 10,
+			timeout=min(cint(self.rates_timeout_seconds) or request.timeout_seconds, request.timeout_seconds),
 		)
 		couriers = ((response or {}).get("data") or {}).get("available_courier_companies") or []
-		return [self.build_rate(courier, cod) for courier in couriers if self.is_quotable(courier)]
+		return [self.build_rate(courier, request.cod) for courier in couriers if self.is_quotable(courier)]
 
 	def is_quotable(self, courier: dict) -> bool:
 		# A courier row with no id cannot be booked later, and one with no rate would be quoted to the

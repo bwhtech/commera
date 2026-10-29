@@ -1,6 +1,6 @@
 from frappe.model.document import Document
 
-from commera.shipping.base_class import ShippingProviderBase
+from commera.shipping.base_class import RateRequest, ShippingProviderBase
 
 
 class $class_name(Document, ShippingProviderBase):
@@ -8,13 +8,7 @@ class $class_name(Document, ShippingProviderBase):
 	blurb = ""
 	docs_url = ""
 
-	def get_rates(
-		self,
-		origin: dict,
-		destination: dict,
-		parcels: list[dict],
-		cod: bool = False,
-		declared_value: float = 0.0,
-	) -> list[dict]:
-		"""One {"service_code", "service_name", "amount", "currency"} per service, or [] off the route."""
+	def get_rates(self, request: RateRequest) -> list[dict]:
+		"""One {"service_code", "service_name", "amount", "currency"} per service, or [] off the route.
+		Answer within request.timeout_seconds, or checkout prices from backup charges."""
 		return []

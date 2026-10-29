@@ -3,8 +3,7 @@ from frappe import _
 from frappe.utils.caching import redis_cache
 from frappe.utils.data import cstr, flt
 
-from commera.shipping.providers import get_enabled_profiles, get_provider
-from commera.shipping.utils import get_default_origin
+from commera.shipping.rates import get_live_quotes, get_open_rate_profiles, get_rate_details, get_rate_request
 
 SERVICE_FIELDS = [
 	"name",
@@ -50,15 +49,24 @@ def quote_services(
 	shipping_rule: str | None = None,
 ) -> list[dict]:
 	"""Price every enabled Shipping Service for this cart: Shipping Rule band, else live rate, else
-	Backup Charge. Unpriceable services are dropped. Never raises: checkout must always render."""
+	Backup Charge, then add the rates of carriers set to offer all of them. Never raises."""
 	services = get_enabled_services()
-	if not services:
+	open_profiles = get_open_rate_profiles()
+	if not (services or open_profiles):
 		return []
+
+	request = get_rate_request(origin, destination, parcels, cart, cod)
+	providers = [service["provider"] for service in services if service.get("provider")] + open_profiles
+	rates_by_provider = get_live_quotes(providers, request)
+	quotes = {
+		(provider, cstr(rate.get("service_code"))): rate
+		for provider, rates in rates_by_provider.items()
+		for rate in rates
+	}
 
 	rule = get_shipping_rule(shipping_rule)
 	bands_by_service = get_rule_bands(rule)
 	band_value = get_band_value(rule, cart)
-	quotes = get_live_quotes(services, origin, destination, parcels, cart, cod)
 	rows = [
 		price_row(
 			service,
@@ -68,54 +76,45 @@ def quote_services(
 		)
 		for service in services
 	]
+	rows += get_open_rate_rows(rates_by_provider, open_profiles, services, cart)
 	return [row for row in rows if row is not None]
+
+
+def has_delivery_options() -> bool:
+	return bool(get_enabled_services() or get_open_rate_profiles())
 
 
 def quote_key(service: dict) -> tuple:
 	return (service.get("provider"), cstr(service.get("service_code")))
 
 
-def get_live_quotes(
-	services: list[dict],
-	origin: dict | None,
-	destination: dict,
-	parcels: list[dict],
-	cart: dict,
-	cod: bool,
-) -> dict:
-	"""Live rates keyed by (provider, service_code), one call per provider. Each provider ships from
-	its own pickup address unless `origin` is given."""
-	if not (destination and parcels):
-		return {}
-
-	quotes = {}
-	enabled_profiles = set(get_enabled_profiles())
-	for provider in dict.fromkeys(service["provider"] for service in services if service.get("provider")):
-		if provider not in enabled_profiles:
-			continue
-		for rate in get_provider_rates(provider, origin, destination, parcels, cart, cod):
-			quotes[(provider, cstr(rate.get("service_code")))] = rate
-	return quotes
+def get_open_rate_rows(
+	rates_by_provider: dict, open_profiles: list[str], services: list[dict], cart: dict
+) -> list[dict | None]:
+	"""A row per rate that no Shipping Service covers, titled like Shopify: carrier, then service."""
+	covered = {quote_key(service) for service in services}
+	return [
+		get_open_rate_row(provider, rate, cart)
+		for provider in open_profiles
+		for rate in rates_by_provider.get(provider, [])
+		if (provider, cstr(rate.get("service_code"))) not in covered
+	]
 
 
-def get_provider_rates(
-	provider: str, origin: dict | None, destination: dict, parcels: list[dict], cart: dict, cod: bool
-) -> list[dict]:
-	# A carrier being slow, broken, unconfigured or unregistered degrades to backup pricing.
-	try:
-		origin = origin or get_default_origin(provider)
-		if not origin:
-			return []
-		return get_provider(provider).get_rates(
-			origin,
-			destination,
-			parcels,
-			cod=cod,
-			declared_value=flt(cart.get("declared_value")),
-		)
-	except Exception:
-		frappe.log_error(title=f"{provider} checkout rates failed")
-		return []
+def get_open_rate_row(provider: str, rate: dict, cart: dict) -> dict | None:
+	amount = get_live_amount({}, rate, cart)
+	if amount is None:
+		return None
+	return {
+		"title": f"{provider} {rate.get('service_name') or rate.get('service_code')}",
+		"description": cstr(rate.get("description")),
+		"provider": provider,
+		"service_code": cstr(rate.get("service_code")),
+		"amount": amount,
+		"is_free": not amount,
+		"is_live_rate": True,
+		**get_rate_details(rate),
+	}
 
 
 def price_row(service: dict, quote: dict | None, cart: dict, band=None) -> dict | None:
@@ -125,13 +124,15 @@ def price_row(service: dict, quote: dict | None, cart: dict, band=None) -> dict 
 	amount, is_live_rate = priced
 	return {
 		"title": service["title"],
-		"description": cstr(service.get("description")),
+		"description": cstr(service.get("description") or (quote or {}).get("description")),
 		"provider": service.get("provider"),
 		"service_code": cstr(service.get("service_code")),
 		"amount": amount,
 		# The storefront gates its "Free" label on this: any zero final amount is free.
 		"is_free": not amount,
 		"is_live_rate": is_live_rate,
+		# A band or backup price still ships with the carrier, so its window and phone rule apply.
+		**get_rate_details(quote or {}),
 	}
 
 
