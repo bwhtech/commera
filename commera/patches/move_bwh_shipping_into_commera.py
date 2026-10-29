@@ -17,17 +17,20 @@ def execute():
 			ignore_permissions=True
 		)
 
-	if OLD_APP not in frappe.get_installed_apps():
+	# Checked apart from the app: a site may have dropped bwh_shipping from installed apps by hand.
+	has_old_module = frappe.db.exists("Module Def", OLD_MODULE)
+	has_old_app = OLD_APP in frappe.get_installed_apps()
+	if not (has_old_module or has_old_app):
 		return
 
-	if frappe.db.exists("Module Def", OLD_MODULE):
+	if has_old_module:
 		# Every Link to the module: DocType, Custom Field, Property Setter and the rest.
 		update_link_field_values(get_link_fields("Module Def"), OLD_MODULE, MODULE, "Module Def")
 		# Not delete_doc: Module Def.on_trash removes the module folder in developer mode.
 		frappe.db.delete("Module Def", OLD_MODULE)
-
-	# Not uninstall-app: that drops the tables this patch keeps.
-	remove_from_installed_apps(OLD_APP)
+	if has_old_app:
+		# Not uninstall-app: that drops the tables this patch keeps.
+		remove_from_installed_apps(OLD_APP)
 	# Hooks stay site-cached past the removal; the rest of this migrate must not see bwh_shipping's.
 	frappe.clear_cache()
 	# The module map was built at connect; without a rebuild the model sync skips the Shipping module.

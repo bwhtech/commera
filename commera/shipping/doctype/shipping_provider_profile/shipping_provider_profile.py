@@ -10,7 +10,9 @@ from commera.shipping.rates import clear_rates_cache
 
 class ShippingProviderProfile(Document):
 	def validate(self):
-		get_provider_class(self.provider_settings)
+		# A disabled profile may point at a removed app; migrate asks the operator to disable exactly those.
+		if self.enabled:
+			get_provider_class(self.provider_settings)
 
 	def on_update(self):
 		get_available_shipping_providers.clear_cache()

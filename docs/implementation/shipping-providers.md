@@ -83,7 +83,7 @@ Units are kg, cm and the major unit of the currency. Use `commera.shipping.units
 | `[]` | The options use a Shipping Rule band or their Backup Charge. | 15 minutes. |
 | An exception, or an answer after `timeout_seconds` | Commera logs the error. The options use a band or their Backup Charge. | 30 seconds. |
 
-There is no retry. A save of the Shipping Provider Profile clears the carrier's cached rates.
+There is no retry. A save of the carrier's settings or of its Shipping Provider Profile clears the cached rates.
 
 To hide, rename or reorder the options at checkout, use the `delivery_options` key of `commera_hooks`.
 

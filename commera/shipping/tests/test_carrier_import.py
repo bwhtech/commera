@@ -172,6 +172,15 @@ class TestCreateShippingServices(IntegrationTestCase):
 		self.assertEqual(service.carrier, "dhl")
 		self.assertTrue(service.enabled)
 
+	def test_the_desk_button_sends_selections_as_a_json_string(self):
+		selections = [
+			{"service_code": "acc-1|json_express", "service_name": "_Test Json Express", "carrier": "dhl"}
+		]
+
+		created = create_shipping_services(self.provider, frappe.as_json(selections))
+
+		self.assertEqual(created, ["_Test Json Express"])
+
 	def test_default_rate_seeds_the_backup_charge(self):
 		create_shipping_services(
 			self.provider,

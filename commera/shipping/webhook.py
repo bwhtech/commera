@@ -8,7 +8,8 @@ from commera.shipping.providers import get_provider
 WEBHOOK_ACCEPTED = {"status": "ok"}
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])
+# Carriers post unauthenticated; the carrier's own handle_webhook verifies the signature first.
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=120, seconds=60, ip_based=True)
 def handle():
 	"""Public provider callback. Everything here is untrusted until the provider's own check clears it."""
@@ -80,12 +81,12 @@ def apply_status_as_administrator(
 	# user so a long-lived worker does not keep Administrator.
 	session_user = frappe.session.user
 	try:
-		frappe.set_user("Administrator")
+		frappe.set_user("Administrator")  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
 		shipping_request.apply_webhook_status(
 			status, event_id=event_id, events=events, provider_status=provider_status
 		)
 	finally:
-		frappe.set_user(session_user)
+		frappe.set_user(session_user)  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
 
 
 def reject() -> dict:
