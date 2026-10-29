@@ -25,13 +25,6 @@ SHIPPING_PROVIDERS = (
 		"settings_doctype": "AfterShip Shipping Settings",
 		"docs_url": "https://www.aftership.com/docs/shipping/quickstart/api-quick-start",
 	},
-	{
-		"slug": "printful",
-		"label": "Printful",
-		"blurb": "Print-on-demand. Printful prints, packs and ships each order.",
-		"settings_doctype": "Printful Shipping Settings",
-		"docs_url": "https://developers.printful.com/docs/",
-	},
 )
 
 

@@ -2,7 +2,6 @@ from types import SimpleNamespace
 
 from frappe.tests import IntegrationTestCase
 
-from commera.api.admin.shipping import get_shipping_integration
 from commera.api.shipping import get_cart_parcels
 
 
@@ -23,11 +22,4 @@ class TestCartParcels(IntegrationTestCase):
 				{"description": "Tee", "sku": "_Test Printful Tee", "quantity": 2, "rate": 25.0},
 				{"description": "Mug", "sku": "_Test Printful Mug", "quantity": 1, "rate": 12.5},
 			],
-		)
-
-
-class TestShippingRegistry(IntegrationTestCase):
-	def test_printful_is_a_shipping_provider(self):
-		self.assertEqual(
-			get_shipping_integration("printful")["settings_doctype"], "Printful Shipping Settings"
 		)
