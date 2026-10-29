@@ -1,6 +1,6 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import frappe
 from bwh_payments.bwh_payments.doctype.gateway_payment_request.test_gateway_payment_request import (
@@ -432,7 +432,11 @@ class TestCheckoutHooks(IntegrationTestCase):
 		self.assertEqual(len(self.gateway_requests(quotation.name)), 1)
 
 	def quote_delivery_options(self):
-		quote_patch = patch("commera.api.shipping.get_quoted_options", return_value=QUOTED_OPTIONS)
+		quote_patch = patch.multiple(
+			"commera.api.shipping",
+			has_delivery_options=Mock(return_value=True),
+			get_quoted_options=Mock(return_value=QUOTED_OPTIONS),
+		)
 		quote_patch.start()
 		self.addCleanup(quote_patch.stop)
 
