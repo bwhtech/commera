@@ -8,6 +8,7 @@ from commera.api.payments import COD_PAYMENT_MODE
 from commera.commera_ecommerce.doctype.commera_settings.navbar.navbar_manager import (
 	seed_menu_when_empty,
 )
+from commera.customizations import create_customizations
 from commera.plugin_events import add_plugin_user, validate_plugins
 from commera.plugins.registry import get_registry
 from commera.search.build import ensure_index_built
@@ -25,6 +26,7 @@ ROBOTS_MARKER = "# managed by commera"
 def after_install():
 	# install_app syncs before commera is in installed_apps, so our importable_doctypes hook is skipped.
 	sync_for("commera")
+	create_customizations()
 	create_payment_modes()
 	try:
 		create_default_email_templates()
@@ -37,7 +39,6 @@ def after_install():
 		frappe.errprint(error_msg)
 		frappe.errprint(traceback.format_exc())
 
-	register_optional_doctype_links()
 	populate_search_settings()
 	ensure_storefront_search_index()
 	setup_robots_txt()
@@ -56,10 +57,10 @@ def activate_summer_theme():
 
 
 def after_migrate():
+	create_customizations()
 	sync_storefront_apps()
 	create_payment_modes()
 	add_plugin_user()
-	register_optional_doctype_links()
 	populate_search_settings()
 	ensure_storefront_search_index()
 	setup_robots_txt()
@@ -107,35 +108,6 @@ def ensure_storefront_search_index():
 		ensure_index_built()
 	except Exception:
 		frappe.log_error(traceback.format_exc(), "Storefront Search Index - ensure_index_built")
-
-
-def register_optional_doctype_links():
-	"""Add Customize Form connections for optional integrations whose doctypes come from tabby_frappe."""
-	add_sales_order_link_if_doctype_exists("Tabby Payment Request", "ref_docname")
-
-
-def add_sales_order_link_if_doctype_exists(link_doctype: str, link_fieldname: str):
-	if not frappe.db.exists("DocType", link_doctype):
-		return
-
-	customize_form = frappe.get_doc({"doctype": "Customize Form", "doc_type": "Sales Order"})
-	customize_form.run_method("fetch_to_customize")
-	if any(row.link_doctype == link_doctype for row in (customize_form.get("links") or [])):
-		return
-
-	customize_form.append(
-		"links",
-		{
-			"link_doctype": link_doctype,
-			"link_fieldname": link_fieldname,
-		},
-	)
-	try:
-		customize_form.save()
-	except Exception:
-		import traceback
-
-		frappe.log_error(traceback.format_exc(), f"commera: optional link for {link_doctype}")
 
 
 def create_payment_modes():

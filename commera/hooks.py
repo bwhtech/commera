@@ -124,6 +124,7 @@ doctype_js = {
 
 after_install = "commera.migrate.after_install"
 after_migrate = "commera.migrate.after_migrate"
+before_uninstall = "commera.customizations.delete_customizations"
 after_app_install = [
 	"commera.storefront_plugins.sync_storefront_apps",
 	"commera.shipping.providers.validate_providers",
@@ -345,7 +346,6 @@ add_to_apps_screen = [
 # Uninstallation
 # ------------
 
-# before_uninstall = "commera.uninstall.before_uninstall"
 # after_uninstall = "commera.uninstall.after_uninstall"
 
 # Integration Setup
