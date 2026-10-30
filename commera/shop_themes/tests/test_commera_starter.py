@@ -159,7 +159,7 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 			for page in ("index", "header_group", "footer_group"):
 				layout = get_theme_json([STARTER_DIR], f"layouts/{page}.json")
 				with self.subTest(page):
-					frappe.local.theme_editor_preview = frappe._dict(page=page, layout=layout)
+					frappe.local.theme_editor_preview = frappe._dict(layouts={page: layout})
 					try:
 						html = self.render_home([PRODUCT_CARD])
 					finally:
