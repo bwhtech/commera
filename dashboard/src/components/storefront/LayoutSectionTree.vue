@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { Button, Dropdown, Tree } from 'frappe-ui'
-import { canAddBlocks, maxBlocks } from '../../data/themeLayout'
+import { canAddBlocks, maxBlocks, pageLabel } from '../../data/themeLayout'
 
 const props = defineProps({
   editor: { type: Object, required: true },
@@ -22,8 +22,6 @@ const {
   moveSection,
   moveBlock,
 } = props.editor
-
-const PART_LABELS = { header_group: 'Header', footer_group: 'Footer' }
 
 const sectionKey = (group, sectionId) => `section:${group}:${sectionId}`
 const blockKey = (group, sectionId, blockId) => `block:${group}:${sectionId}:${blockId}`
@@ -75,7 +73,7 @@ const nodes = computed(() => {
     key: partKey(part.group),
     kind: 'part',
     group: part.group,
-    label: PART_LABELS[part.group] ?? 'Page',
+    label: pageLabel(part.group),
     children: sectionNodes(part),
   }))
 })

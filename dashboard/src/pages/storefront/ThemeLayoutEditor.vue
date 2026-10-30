@@ -8,7 +8,7 @@ import LayoutPreviewFrame from '../../components/storefront/LayoutPreviewFrame.v
 import LayoutSectionPicker from '../../components/storefront/LayoutSectionPicker.vue'
 import LayoutSectionTree from '../../components/storefront/LayoutSectionTree.vue'
 import LayoutSettingsPanel from '../../components/storefront/LayoutSettingsPanel.vue'
-import { SECTION_GROUPS, createLayoutEditor } from '../../data/themeLayout'
+import { SECTION_GROUPS, createLayoutEditor, pageLabel } from '../../data/themeLayout'
 import { errorMessage } from '../../data/errors'
 
 const LANGUAGES = [
@@ -56,11 +56,6 @@ const pageOptions = computed(() =>
       onClick: () => switchPage(page),
     })),
 )
-
-function pageLabel(page) {
-  if (page === 'index') return 'Home page'
-  return page.replace(/[_-]/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase())
-}
 
 function pickSection(type) {
   editor.addSection(pickingGroup.value, type)

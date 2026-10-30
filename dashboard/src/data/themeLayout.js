@@ -42,8 +42,15 @@ export function canAddBlocks(schema) {
   return Object.keys(schema?.blocks ?? {}).length > 0
 }
 
-
 export const SECTION_GROUPS = ['header_group', 'footer_group']
+
+const GROUP_LABELS = { header_group: 'Header group', footer_group: 'Footer group' }
+
+export function pageLabel(page) {
+  if (GROUP_LABELS[page]) return GROUP_LABELS[page]
+  if (page === 'index') return 'Home page'
+  return page.replace(/[_-]/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase())
+}
 
 const PART_ORDER = ['header_group', null, 'footer_group']
 
@@ -170,9 +177,8 @@ export function createLayoutEditor(theme) {
       state.settings = data.settings
       state.live = data.live
       const groups = SECTION_GROUPS.filter((group) => data.pages.includes(group) && group !== page)
-      const groupData = await Promise.all(
-        groups.map((group) => layoutCaller.call('get_editor', { theme, page: group })),
-      )
+      const groupData = []
+      for (const group of groups) groupData.push(await layoutCaller.call('get_editor', { theme, page: group }))
       state.parts = []
       for (const partData of [data, ...groupData.filter(Boolean)]) adoptPart(partData)
       state.parts.sort(
