@@ -1,7 +1,8 @@
 import frappe
 from frappe.contacts.doctype.address.address import get_company_address
-from frappe.modules.utils import sync_customizations
 from frappe.utils.data import getdate
+
+from commera.customizations import create_customizations
 
 OLD_DOCTYPES = ("Shipping Request", "Shipping Parcel")
 PARCEL_FIELDS = ("length", "width", "height", "weight", "count")
@@ -11,8 +12,8 @@ def execute():
 	"""Shipping Request moved to ERPNext's Shipment. The old doctypes are deleted once their rows are copied."""
 	if not frappe.db.table_exists("Shipping Request"):
 		return
-	# Customizations sync after post_model_sync patches, so Shipment's custom fields may not exist yet.
-	sync_customizations("commera")
+	# after_migrate creates customizations after the patches, so Shipment's custom fields may not exist yet.
+	create_customizations()
 
 	for request in frappe.get_all("Shipping Request", fields=["*"], order_by="creation asc"):
 		move_request(request)
