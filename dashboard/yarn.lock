@@ -255,6 +255,11 @@
   resolved "https://registry.yarnpkg.com/@oxc-project/types/-/types-0.155.0.tgz#a3525bff41bc0575839e95d2064635dd73dfef81"
   integrity sha512-SeE8JPwW1xs1tHeNycjUtUBdhorRa8o4jlvjwk49R7/Z291i+4DQa7JJIgOm/TaYQZx+QrPQbVJ/9c8dMIZN8Q==
 
+"@panzoom/panzoom@^4.6.0":
+  version "4.6.0"
+  resolved "https://registry.npmjs.org/@panzoom/panzoom/-/panzoom-4.6.0.tgz"
+  integrity sha512-3KxkY1lNKFn98fW5ZFR6vV0YzsXj3I4EQDyFWSXME6/cic86eSS7VjuqIjrA3PEpySo0r5fFtlX8eYCt4JPUFQ==
+
 "@popperjs/core@^2.9.0":
   version "2.11.8"
   resolved "https://registry.npmjs.org/@popperjs/core/-/core-2.11.8.tgz"
@@ -1835,7 +1840,7 @@ readdirp@~3.6.0:
   dependencies:
     picomatch "^2.2.1"
 
-reka-ui@^2.9.9:
+reka-ui@2.10.4, reka-ui@^2.9.9:
   version "2.10.4"
   resolved "https://registry.npmjs.org/reka-ui/-/reka-ui-2.10.4.tgz"
   integrity sha512-kbS5GAbkHkYj0EVKAg5ZPEPndhBjeUFSa1Aq5m5ftQwyHnB1v5tw8X6fcwfKH/ry3StPXblMWM1DW82MVS71cw==

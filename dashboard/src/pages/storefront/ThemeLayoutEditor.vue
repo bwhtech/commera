@@ -1,9 +1,11 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import { useEventListener, useMediaQuery } from '@vueuse/core'
-import { Badge, Button, Dropdown, Skeleton, TabButtons, dialog, toast } from 'frappe-ui'
+import { createReusableTemplate, useEventListener, useMediaQuery } from '@vueuse/core'
+import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui'
+import { Badge, Button, Dropdown, Skeleton, TabButtons, Tooltip, dialog, toast } from 'frappe-ui'
 import EmptyState from '../../components/EmptyState.vue'
+import LayoutPreviewCanvas from '../../components/storefront/LayoutPreviewCanvas.vue'
 import LayoutPreviewFrame from '../../components/storefront/LayoutPreviewFrame.vue'
 import LayoutSectionPicker from '../../components/storefront/LayoutSectionPicker.vue'
 import LayoutSectionTree from '../../components/storefront/LayoutSectionTree.vue'
@@ -19,6 +21,7 @@ const LANGUAGES = [
 const DEVICES = [
   { label: 'Desktop', value: 'desktop', icon: 'lucide-monitor' },
   { label: 'Mobile', value: 'mobile', icon: 'lucide-smartphone' },
+  { label: 'Desktop and mobile', value: 'both', icon: 'lucide-columns-2' },
 ]
 
 const PANELS = [
@@ -37,6 +40,71 @@ const pickingGroup = ref(null)
 
 const isWide = useMediaQuery('(min-width: 1024px)')
 const panel = ref('tree')
+
+const [DefineTreePanel, TreePanel] = createReusableTemplate()
+
+const treePanel = ref(null)
+const settingsPanel = ref(null)
+const treeOpen = ref(true)
+const settingsOpen = ref(true)
+const maximised = ref(null)
+
+const railItems = computed(() => [
+  { label: 'Sections', icon: 'lucide-list-tree', active: treeOpen.value, onClick: toggleTree },
+  {
+    label: 'Section settings',
+    icon: 'lucide-sliders-horizontal',
+    active: settingsOpen.value && state.selection?.kind !== 'theme',
+    onClick: () => toggleSettings(false),
+  },
+  {
+    label: 'Theme settings',
+    icon: 'lucide-palette',
+    active: settingsOpen.value && state.selection?.kind === 'theme',
+    onClick: () => toggleSettings(true),
+  },
+])
+
+function toggleTree() {
+  if (treeOpen.value) treePanel.value.collapse()
+  else treePanel.value.expand()
+}
+
+function toggleSettings(theme) {
+  const showingTheme = state.selection?.kind === 'theme'
+  if (settingsOpen.value && showingTheme === theme) {
+    settingsPanel.value.collapse()
+    return
+  }
+  if (theme) editor.select({ kind: 'theme' }, { scroll: false })
+  else if (showingTheme) editor.select(null)
+  settingsPanel.value.expand()
+}
+
+const PANEL_OPEN = { tree: treeOpen, settings: settingsOpen }
+
+function panelExpanded(name) {
+  PANEL_OPEN[name].value = true
+  maximised.value = null
+}
+
+function toggleMaximise() {
+  const previous = maximised.value
+  if (previous) {
+    maximised.value = null
+    if (previous.tree) treePanel.value.expand()
+    if (previous.settings) settingsPanel.value.expand()
+    return
+  }
+  maximised.value = { tree: treeOpen.value, settings: settingsOpen.value }
+  treePanel.value.collapse()
+  settingsPanel.value.collapse()
+}
+
+watch([treePanel, settingsPanel], () => {
+  if (treePanel.value) treeOpen.value = !treePanel.value.isCollapsed
+  if (settingsPanel.value) settingsOpen.value = !settingsPanel.value.isCollapsed
+})
 
 watch(
   () => state.selection,
@@ -140,32 +208,95 @@ useEventListener(window, 'beforeunload', (event) => {
         <TabButtons v-model="panel" class="w-full" :options="PANELS" aria-label="Panel" />
       </div>
 
-      <div class="flex min-h-0 flex-1">
-        <aside
-          v-show="isWide || panel === 'tree'"
-          class="w-full min-w-0 shrink-0 overflow-y-auto p-2 lg:w-72 lg:border-r lg:border-outline-gray-2"
-        >
-          <div v-if="!state.loaded" class="flex flex-col gap-2 p-2" aria-hidden="true">
-            <Skeleton v-for="row in 8" :key="row" class="h-6 w-full rounded-4" />
-          </div>
-          <LayoutSectionPicker
-            v-else-if="pickingGroup"
-            :schemas="state.schemas"
-            :group="pickingGroup"
-            @pick="pickSection"
-            @back="pickingGroup = null"
+      <DefineTreePanel>
+        <div v-if="!state.loaded" class="flex flex-col gap-2 p-2" aria-hidden="true">
+          <Skeleton v-for="row in 8" :key="row" class="h-6 w-full rounded-4" />
+        </div>
+        <LayoutSectionPicker
+          v-else-if="pickingGroup"
+          :schemas="state.schemas"
+          :group="pickingGroup"
+          @pick="pickSection"
+          @back="pickingGroup = null"
+        />
+        <LayoutSectionTree v-else :editor="editor" @add-section="pickingGroup = $event" />
+      </DefineTreePanel>
+
+      <div v-if="isWide" class="flex min-h-0 flex-1">
+        <nav class="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-outline-gray-2 py-2" aria-label="Panels">
+          <Tooltip v-for="item in railItems" :key="item.label" :text="item.label" placement="right">
+            <Button
+              :variant="item.active ? 'subtle' : 'ghost'"
+              :icon="item.icon"
+              :aria-label="item.label"
+              :aria-pressed="item.active"
+              @click="item.onClick"
+            />
+          </Tooltip>
+        </nav>
+
+        <SplitterGroup direction="horizontal" auto-save-id="commera-theme-editor-panels" class="min-w-0 flex-1">
+          <SplitterPanel
+            id="theme-editor-tree"
+            ref="treePanel"
+            :order="1"
+            size-unit="px"
+            :default-size="288"
+            :min-size="220"
+            :max-size="440"
+            collapsible
+            :collapsed-size="0"
+            class="!overflow-y-auto"
+            data-editor-panel="tree"
+            @collapse="treeOpen = false"
+            @expand="panelExpanded('tree')"
+          >
+            <div class="p-2">
+              <TreePanel />
+            </div>
+          </SplitterPanel>
+          <SplitterResizeHandle
+            class="relative z-10 w-0 border-l border-outline-gray-2 transition-colors after:absolute after:inset-y-0 after:-left-1 after:-right-1 after:content-[''] data-[state=drag]:border-outline-gray-4 data-[state=hover]:border-outline-gray-4"
+            data-editor-handle="tree"
           />
-          <LayoutSectionTree v-else :editor="editor" @add-section="pickingGroup = $event" />
+          <SplitterPanel id="theme-editor-preview" :order="2" class="min-w-0">
+            <LayoutPreviewCanvas :editor="editor" :maximised="Boolean(maximised)" @toggle-maximise="toggleMaximise" />
+          </SplitterPanel>
+          <SplitterResizeHandle
+            class="relative z-10 w-0 border-l border-outline-gray-2 transition-colors after:absolute after:inset-y-0 after:-left-1 after:-right-1 after:content-[''] data-[state=drag]:border-outline-gray-4 data-[state=hover]:border-outline-gray-4"
+            data-editor-handle="settings"
+          />
+          <SplitterPanel
+            id="theme-editor-settings"
+            ref="settingsPanel"
+            :order="3"
+            size-unit="px"
+            :default-size="320"
+            :min-size="260"
+            :max-size="480"
+            collapsible
+            :collapsed-size="0"
+            data-editor-panel="settings"
+            @collapse="settingsOpen = false"
+            @expand="panelExpanded('settings')"
+          >
+            <LayoutSettingsPanel v-if="state.loaded" :editor="editor" />
+          </SplitterPanel>
+        </SplitterGroup>
+      </div>
+
+      <div v-else class="flex min-h-0 flex-1">
+        <aside v-show="panel === 'tree'" class="w-full min-w-0 overflow-y-auto p-2">
+          <TreePanel />
         </aside>
 
-        <main v-show="isWide || panel === 'preview'" class="min-w-0 flex-1">
-          <LayoutPreviewFrame :editor="editor" />
+        <main v-show="panel === 'preview'" class="min-w-0 flex-1 bg-surface-gray-2 p-4">
+          <div class="h-full overflow-hidden rounded-5 border border-outline-gray-2 bg-surface-base shadow-sm">
+            <LayoutPreviewFrame :editor="editor" />
+          </div>
         </main>
 
-        <aside
-          v-show="isWide || panel === 'settings'"
-          class="w-full min-w-0 shrink-0 lg:w-80 lg:border-l lg:border-outline-gray-2"
-        >
+        <aside v-show="panel === 'settings'" class="w-full min-w-0">
           <LayoutSettingsPanel v-if="state.loaded" :editor="editor" />
         </aside>
       </div>

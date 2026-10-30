@@ -3,6 +3,7 @@ import { describe } from 'node:test'
 import { adminGet, adminPost, goto, uiTest, useSession, wait } from './harness.js'
 
 const SLOW_RENDER_MS = 1500
+const WORKSPACE_STORAGE = ['commera:theme-editor:canvas', 'commera-theme-editor-panels']
 
 const REFUSAL = {
   status: 417,
@@ -13,6 +14,57 @@ const REFUSAL = {
 async function findLiveSectionsTheme(page) {
   const data = await adminGet(page, 'theme.get_editor_data')
   return data.themes.find((theme) => theme.live && theme.theme_type === 'Sections') ?? null
+}
+
+async function openEditor(page, theme, { clearWorkspace = false } = {}) {
+  page.removeAllListeners('dialog')
+  page.on('dialog', (dialog) => dialog.accept())
+  await goto(page, `/storefront/theme/${encodeURIComponent(theme.name)}/editor`)
+  if (clearWorkspace) {
+    await page.evaluate((keys) => {
+      for (const key of Object.keys(localStorage)) {
+        if (keys.some((part) => key.includes(part))) localStorage.removeItem(key)
+      }
+    }, WORKSPACE_STORAGE)
+    await page.reload({ waitUntil: 'networkidle2' })
+  }
+  await page.waitForSelector('[data-tree-node^="section:"]', { timeout: 30000 })
+  await page.waitForSelector('[data-preview-frame="visible"]', { timeout: 30000 })
+}
+
+const panelWidth = (page, name) =>
+  page.$eval(`[data-editor-panel="${name}"]`, (element) => Math.round(element.getBoundingClientRect().width))
+
+const zoomLevel = (page) => page.$eval('[data-zoom-level]', (element) => Number.parseInt(element.textContent, 10))
+
+async function dragBy(page, selector, deltaX, deltaY = 0) {
+  const box = await (await page.$(selector)).boundingBox()
+  const startX = box.x + box.width / 2
+  const startY = box.y + Math.min(box.height / 2, 300)
+  await page.mouse.move(startX, startY)
+  await wait(100)
+  await page.mouse.down()
+  await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 8 })
+  await page.mouse.up()
+  await wait(300)
+}
+
+async function clickButton(page, label) {
+  await page.click(`button[aria-label="${label}"]`)
+  await wait(400)
+}
+
+function outlineShown(frame) {
+  return frame.evaluate(() =>
+    [...document.body.children].some(
+      (element) => element.style.outline.includes('solid') && element.style.display === 'block',
+    ),
+  )
+}
+
+async function visibleFrame(page, device) {
+  const handle = await page.$(`[data-preview-device="${device}"] iframe[data-preview-frame="visible"]`)
+  return handle.contentFrame()
 }
 
 describe('theme editor', () => {
@@ -151,5 +203,130 @@ describe('theme editor', () => {
       page.off('request', countPost)
       await adminPost(page, 'theme.save_theme_settings', { [field.fieldname]: field.value })
     }
+
+  uiTest(session, 'Panels resize, collapse to the rail and keep their size after a reload', async (t) => {
+    const { page } = session
+    const theme = await findLiveSectionsTheme(page)
+    if (!theme) return t.skip('the live theme is not a Sections theme')
+    await openEditor(page, theme, { clearWorkspace: true })
+
+    const treeWidth = await panelWidth(page, 'tree')
+    await dragBy(page, '[data-editor-handle="tree"]', 80)
+    const widened = await panelWidth(page, 'tree')
+    assert.ok(Math.abs(widened - treeWidth - 80) <= 4, `tree ${treeWidth} -> ${widened}`)
+
+    await clickButton(page, 'Sections')
+    assert.equal(await panelWidth(page, 'tree'), 0)
+    await clickButton(page, 'Sections')
+    assert.equal(await panelWidth(page, 'tree'), widened)
+
+    const settingsWidth = await panelWidth(page, 'settings')
+    await clickButton(page, 'Section settings')
+    assert.equal(await panelWidth(page, 'settings'), 0)
+    await clickButton(page, 'Theme settings')
+    assert.equal(await panelWidth(page, 'settings'), settingsWidth)
+    const settingsText = await page.$eval('[data-editor-panel="settings"]', (element) => element.innerText)
+    assert.ok(settingsText.includes('Theme settings'), 'the rail opens theme settings')
+
+    await clickButton(page, 'Section settings')
+    await page.reload({ waitUntil: 'networkidle2' })
+    await page.waitForSelector('[data-tree-node^="section:"]', { timeout: 30000 })
+    assert.equal(await panelWidth(page, 'tree'), widened)
+    assert.equal(await panelWidth(page, 'settings'), settingsWidth)
+  })
+
+  uiTest(session, 'The preview canvas zooms, pans and maximises', async (t) => {
+    const { page } = session
+    const theme = await findLiveSectionsTheme(page)
+    if (!theme) return t.skip('the live theme is not a Sections theme')
+    await openEditor(page, theme, { clearWorkspace: true })
+
+    const fit = await zoomLevel(page)
+    assert.ok(fit > 10 && fit <= 100, `fit is ${fit}%`)
+
+    const transform = () => page.$eval('[data-preview-stage]', (element) => element.style.transform)
+    const canvas = await (await page.$('[data-preview-canvas]')).boundingBox()
+    const atFit = await transform()
+    await page.mouse.move(canvas.x + 12, canvas.y + canvas.height - 80)
+    await wait(100)
+    await page.mouse.down()
+    await page.mouse.move(canvas.x + 112, canvas.y + canvas.height - 130, { steps: 8 })
+    await page.mouse.up()
+    assert.notEqual(await transform(), atFit, 'dragging the grey canvas pans it')
+
+    const overFrame = await transform()
+    await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2)
+    await page.keyboard.down('Space')
+    await wait(100)
+    await page.mouse.down()
+    await page.mouse.move(canvas.x + canvas.width / 2 - 100, canvas.y + canvas.height / 2, { steps: 8 })
+    await page.mouse.up()
+    await page.keyboard.up('Space')
+    assert.notEqual(await transform(), overFrame, 'holding Space pans over the preview')
+
+    await page.click('[data-zoom-level]')
+    await page.waitForSelector('[role="menuitem"]', { visible: true })
+    const [fitItem] = await page.$$('xpath/.//*[@role="menuitem"][normalize-space()="Zoom to fit"]')
+    await fitItem.click()
+    await wait(600)
+    assert.equal(await zoomLevel(page), fit, 'zoom to fit comes back to the same fit')
+    await clickButton(page, 'Zoom in')
+    await wait(400)
+    assert.ok((await zoomLevel(page)) > fit, 'zoom in grows')
+    await clickButton(page, 'Zoom out')
+    await clickButton(page, 'Zoom out')
+    await wait(400)
+    assert.ok((await zoomLevel(page)) < fit, 'zoom out shrinks')
+
+    await page.click('[data-zoom-level]')
+    await page.waitForSelector('[role="menuitem"]', { visible: true })
+    const [hundred] = await page.$$('xpath/.//*[@role="menuitem"][normalize-space()="100%"]')
+    await hundred.click()
+    await wait(600)
+    assert.equal(await zoomLevel(page), 100)
+
+    const treeWidth = await panelWidth(page, 'tree')
+    await clickButton(page, 'Maximise preview')
+    await wait(400)
+    assert.equal(await panelWidth(page, 'tree'), 0)
+    assert.equal(await panelWidth(page, 'settings'), 0)
+    await page.keyboard.press('Escape')
+    await wait(500)
+    assert.equal(await panelWidth(page, 'tree'), treeWidth)
+    await clickButton(page, 'Maximise preview')
+    await clickButton(page, 'Restore panels')
+    assert.equal(await panelWidth(page, 'tree'), treeWidth)
+  })
+
+  uiTest(session, 'Desktop and mobile previews side by side both follow the selection', async (t) => {
+    const { page } = session
+    const theme = await findLiveSectionsTheme(page)
+    if (!theme) return t.skip('the live theme is not a Sections theme')
+    await openEditor(page, theme, { clearWorkspace: true })
+
+    await page.click('[aria-label="Preview width"] [data-value="both"]')
+    await page.waitForSelector('[data-preview-device="mobile"] iframe[data-preview-frame="visible"]', {
+      timeout: 30000,
+    })
+    const desktop = await visibleFrame(page, 'desktop')
+    const mobile = await visibleFrame(page, 'mobile')
+    assert.equal(await desktop.evaluate(() => window.innerWidth), 1280 - 2)
+    assert.equal(await mobile.evaluate(() => window.innerWidth), 390 - 2)
+
+    await page.click('[data-tree-node^="section:"]')
+    await wait(800)
+    assert.ok(await outlineShown(desktop), 'desktop highlights the picked section')
+    assert.ok(await outlineShown(mobile), 'mobile highlights the picked section')
+
+    const picked = await mobile.evaluate(() => {
+      const sections = document.querySelectorAll('[data-commera-section]')
+      const section = sections[sections.length - 1]
+      section.click()
+      return section.dataset.commeraSection
+    })
+    await wait(800)
+    const selectedNode = await page.$eval('[data-tree-node][aria-current="true"]', (element) => element.dataset.treeNode)
+    assert.ok(selectedNode?.includes(picked), `a click in the mobile preview selects ${picked} (got ${selectedNode})`)
+    assert.ok(await outlineShown(desktop), 'the desktop preview follows a pick made on mobile')
   })
 })
