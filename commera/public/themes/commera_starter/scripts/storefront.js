@@ -94,8 +94,19 @@ document.addEventListener('alpine:init', () => {
 
 	Alpine.data('hero', (slide_count) => ({
 		slide: 0,
+		selected: false,
 
 		init() {
+			this.$el.addEventListener('commera:block:select', (event) => {
+				const slides = [...this.$el.querySelectorAll('[data-commera-block]')];
+				const index = slides.indexOf(event.target);
+				if (index === -1) return;
+				this.slide = index;
+				this.selected = true;
+			});
+			this.$el.addEventListener('commera:block:deselect', () => {
+				this.selected = false;
+			});
 			if (
 				slide_count < 2 ||
 				matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -103,7 +114,7 @@ document.addEventListener('alpine:init', () => {
 				return;
 			}
 			setInterval(() => {
-				this.slide = (this.slide + 1) % slide_count;
+				if (!this.selected) this.slide = (this.slide + 1) % slide_count;
 			}, 5000);
 		},
 	}));
