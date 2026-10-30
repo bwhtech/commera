@@ -123,6 +123,7 @@ async function uploadFile(event) {
   <SettingsProductsControl
     v-else-if="field.fieldtype === 'Products'"
     :model-value="modelValue ?? []"
+    :max="field.max_products"
     :disabled="disabled"
     @update:model-value="commit"
   />
@@ -162,6 +163,7 @@ async function uploadFile(event) {
     v-model="text"
     class="w-full sm:w-72"
     :rows="field.fieldtype === 'Code' ? 8 : 3"
+    :placeholder="field.placeholder"
     :disabled="disabled"
     @change="commit($event.target.value)"
   />
@@ -171,7 +173,7 @@ async function uploadFile(event) {
     v-model="text"
     class="w-full sm:w-72"
     :type="inputType(field)"
-    :placeholder="field.is_secret && field.is_set ? '••••••••' : ''"
+    :placeholder="field.is_secret && field.is_set ? '••••••••' : (field.placeholder ?? '')"
     :disabled="disabled"
     @change="commitText($event.target.value)"
   />

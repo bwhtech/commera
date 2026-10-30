@@ -8,6 +8,7 @@ const SEARCH_DEBOUNCE_MS = 300
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
+  max: { type: Number, default: 0 },
   disabled: { type: Boolean, default: false },
 })
 
@@ -36,8 +37,16 @@ const options = computed(() => {
   for (const code of props.modelValue) {
     if (!merged.has(code)) merged.set(code, { label: titles[code] ?? code, value: code })
   }
-  return [...merged.values()]
+  const full = props.max && props.modelValue.length >= props.max
+  return [...merged.values()].map((option) => ({
+    ...option,
+    disabled: Boolean(full) && !props.modelValue.includes(option.value),
+  }))
 })
+
+function update(codes) {
+  emit('update:modelValue', props.max ? codes.slice(0, props.max) : codes)
+}
 </script>
 
 <template>
@@ -51,7 +60,7 @@ const options = computed(() => {
       :filterable="false"
       :disabled="disabled"
       placeholder="Pick products"
-      @update:model-value="emit('update:modelValue', $event)"
+      @update:model-value="update"
     />
   </div>
 </template>

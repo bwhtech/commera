@@ -158,6 +158,11 @@ async function saveSetting(field, value) {
                 </p>
               </div>
             </button>
+            <Button
+              v-if="theme.theme_type === 'Sections'"
+              label="Customize"
+              :route="{ name: 'StorefrontThemeEditor', params: { theme: theme.name } }"
+            />
             <Badge v-if="theme.live" label="Live" theme="green" variant="subtle" />
             <Button v-else label="Activate" :loading="loading" @click="activate(theme)" />
           </div>

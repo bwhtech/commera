@@ -39,6 +39,13 @@ class TestAdminThemeLayout(IntegrationTestCase):
 		theme_environment = get_theme_environment(get_jenv(), get_render_theme_context()["dirs"])
 		return theme_environment.from_string("{{ render_layout('index') }}").render()
 
+	def test_get_editor_says_whether_the_theme_is_live(self):
+		activate_theme(SUMMER_THEME)
+		self.assertTrue(get_editor(SUMMER_THEME)["live"])
+
+		activate_theme(CLASSIC_THEME)
+		self.assertFalse(get_editor(SUMMER_THEME)["live"])
+
 	def test_get_editor_opens_the_theme_file_layout_when_nothing_is_saved(self):
 		editor = get_editor(SUMMER_THEME, "index")
 
