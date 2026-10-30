@@ -1,13 +1,20 @@
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
-from frappe.utils.data import cstr, flt, sha256_hash
+from frappe.utils.data import cstr, flt
 
 from commera.checkout_hooks import PLUGIN_FEE_FIELD, apply_delivery_option_hooks, apply_plugin_fees
 from commera.core import _get_cart_quotation
 from commera.discounts.allocations import get_allocations, get_discount_rows, get_price_discount_rows
 from commera.discounts.pricing import refresh_code_discounts
 from commera.discounts.shipping import apply_shipping_discounts, set_shipping_discount
+from commera.shipping.base_class import RateItem
+from commera.shipping.pricing import get_charge_account as get_rule_account
+from commera.shipping.pricing import get_charge_amount as get_option_charge_amount
+from commera.shipping.pricing import has_delivery_options, quote_services
+from commera.shipping.shipment import get_order_shipments
+from commera.shipping.units import WEIGHT_IN_KG
+from commera.shipping.utils import get_address_payload
 from commera.utils import (
 	COD_CHARGE_DESCRIPTION,
 	get_charge_account_head,
@@ -23,13 +30,6 @@ DELIVERY_CHARGE_DESCRIPTION = "Delivery Charges"
 # Shipment Parcel Template on Commera Settings once packing rules matter more than a rate estimate.
 DEFAULT_PARCEL_DIMENSIONS = {"length": 30.0, "width": 20.0, "height": 10.0}
 DEFAULT_ITEM_WEIGHT_KG = 0.5
-
-RATES_CACHE_TTL_SECONDS = 30 * 60
-
-
-def is_connector_installed() -> bool:
-	"""bwh_shipping is a soft dependency: without it the storefront keeps the flat Shipping Rule."""
-	return "bwh_shipping" in frappe.get_installed_apps()
 
 
 # Guest checkout: refuses any caller without a guest cart cookie, and is rate limited.
@@ -48,7 +48,8 @@ def get_cart_shipping_options(quotation) -> dict:
 		return {"options": []}
 	if quotation.custom_is_store_pickup:
 		return {"options": [], "store_pickup": True}
-	if not is_connector_installed():
+	if not has_delivery_options():
+		# The key predates shipping in core; clients read it as "the store prices delivery by its flat rule".
 		return {"options": [], "connector_missing": True}
 	if not quotation.shipping_address_name:
 		return {"options": [], "address_missing": True}
@@ -56,7 +57,7 @@ def get_cart_shipping_options(quotation) -> dict:
 	try:
 		options = get_delivery_options(quotation)
 	except Exception:
-		# The connector failed, so checkout falls back to the flat Shipping Rule and says so.
+		# The carrier failed, so checkout falls back to the flat Shipping Rule and says so.
 		frappe.log_error(title="Shipping options could not be quoted")
 		return {"options": [], "unavailable": True}
 
@@ -64,53 +65,12 @@ def get_cart_shipping_options(quotation) -> dict:
 
 
 def get_delivery_options(quotation) -> list[dict]:
-	# Only the raw quote is cached: an app's answer can depend on more than the cart fingerprint.
 	return apply_delivery_option_hooks(quotation, get_quoted_options(quotation), strict=False)
 
 
 def get_quoted_options(quotation) -> list[dict]:
-	"""Priced options for this cart, cached against a fingerprint of everything that changes the price.
-
-	Everything that changes a quote is in the key, so a stale price cannot outlive what it priced.
-	"""
-	cache_key = f"commera:shipping_rates:{quotation.name}:{get_cart_fingerprint(quotation)}"
-	cached = frappe.cache.get_value(cache_key)
-	if cached is not None:
-		return cached
-
-	options = quote_options(quotation)
-	frappe.cache.set_value(cache_key, options, expires_in_sec=RATES_CACHE_TTL_SECONDS)
-	return options
-
-
-def get_cart_fingerprint(quotation) -> str:
-	items = ";".join(f"{item.item_code}x{flt(item.qty)}" for item in quotation.items)
-	parts = (
-		quotation.shipping_address_name or "",
-		items,
-		str(flt(quotation.net_total)),
-		quotation.currency or "",
-		get_services_stamp(),
-		get_store_rule_stamp(),
-	)
-	return sha256_hash("|".join(parts))[:12]
-
-
-def get_services_stamp() -> str:
-	"""When the delivery options were last edited.
-
-	In the fingerprint because the cart cannot see a desk edit, which would otherwise stay cached.
-	"""
-	latest = frappe.get_all("Shipping Service", fields=["modified"], order_by="modified desc", limit=1)
-	return str(latest[0].modified) if latest else ""
-
-
-def get_store_rule_stamp() -> str:
-	"""The store Shipping Rule and when its bands were last edited, since those bands price the options."""
-	shipping_rule = get_store_shipping_rule()
-	if not shipping_rule:
-		return ""
-	return f"{shipping_rule}@{frappe.get_cached_value('Shipping Rule', shipping_rule, 'modified')}"
+	"""Priced options for this cart. Each carrier's rates are cached in commera.shipping.rates."""
+	return quote_options(quotation)
 
 
 def get_store_shipping_rule() -> str | None:
@@ -122,9 +82,6 @@ def quote_options(quotation) -> list[dict]:
 
 	No origin is passed: one shared origin drops every option to its backup charge across countries.
 	"""
-	from bwh_shipping.bwh_shipping.pricing import quote_services
-	from bwh_shipping.bwh_shipping.utils import get_address_payload
-
 	return quote_services(
 		None,
 		get_address_payload(quotation.shipping_address_name),
@@ -136,45 +93,64 @@ def quote_options(quotation) -> list[dict]:
 
 
 def get_cart_context(quotation) -> dict:
-	"""The figures the pricing engine needs to bracket a Shipping Rule band and convert its amount."""
+	"""What the pricing engine needs to bracket a Shipping Rule band, and what a carrier gets to price."""
+	items = get_cart_items(quotation)
+	customer = quotation.party_name if quotation.quotation_to == "Customer" else None
 	return {
 		"currency": quotation.currency,
 		"conversion_rate": flt(quotation.conversion_rate) or 1.0,
 		"base_net_total": flt(quotation.base_net_total),
 		"net_total": flt(quotation.net_total),
-		"weight": get_cart_weight(quotation),
+		"grand_total": flt(quotation.grand_total),
+		"discount_amount": flt(quotation.discount_amount),
+		"weight": get_items_weight(items),
 		"declared_value": flt(quotation.net_total),
+		"items": items,
+		"customer": customer,
+		"customer_group": frappe.get_cached_value("Customer", customer, "customer_group")
+		if customer
+		else None,
+		"locale": frappe.local.lang,
 	}
 
 
 def get_cart_weight(quotation) -> float:
-	"""Total cart weight in kg, from each item's own weight where ERPNext knows it.
+	return get_items_weight(get_cart_items(quotation))
 
-	One query, not a get_doc per line: this runs on every checkout render.
-	"""
+
+def get_items_weight(items: list[RateItem]) -> float:
+	"""Total weight in kg. An item with no weight counts as the default weight."""
+	return flt(sum(item.qty * (item.weight or DEFAULT_ITEM_WEIGHT_KG) for item in items), 3)
+
+
+def get_cart_items(quotation) -> list[RateItem]:
+	"""The cart lines a carrier prices, with each Item's own weight. One query: this runs on every render."""
 	item_codes = list({item.item_code for item in quotation.items})
 	if not item_codes:
-		return 0.0
+		return []
 
-	weights = frappe.get_all(
+	rows = frappe.get_all(
 		"Item",
 		filters={"name": ("in", item_codes)},
-		fields=["name", "weight_per_unit", "weight_uom"],
+		fields=["name", "weight_per_unit", "weight_uom", "variant_of"],
 	)
-	weight_by_item = {row.name: row for row in weights}
+	row_by_item = {row.name: row for row in rows}
+	return [get_rate_item(item, row_by_item.get(item.item_code)) for item in quotation.items]
 
-	total = 0.0
-	for item in quotation.items:
-		row = weight_by_item.get(item.item_code)
-		unit_weight = to_kg(row) if row else 0.0
-		total += abs(flt(item.qty)) * (unit_weight or DEFAULT_ITEM_WEIGHT_KG)
-	return flt(total, 3)
+
+def get_rate_item(item, row) -> RateItem:
+	return RateItem(
+		item_code=item.item_code,
+		item_name=cstr(item.item_name),
+		product=(row and row.variant_of) or item.item_code,
+		qty=abs(flt(item.qty)),
+		weight=to_kg(row) if row else 0.0,
+		rate=flt(item.rate),
+	)
 
 
 def to_kg(item_row) -> float:
 	"""An Item's weight in kg. An unconvertible UOM counts as unknown, so the default weight applies."""
-	from bwh_shipping.units import WEIGHT_IN_KG
-
 	unit = (item_row.weight_uom or "kg").strip().casefold()
 	factor = WEIGHT_IN_KG.get(unit)
 	if factor is None:
@@ -216,13 +192,18 @@ def save_delivery_option(quotation, delivery_option: str | None) -> dict:
 
 		if quotation.custom_is_store_pickup:
 			frappe.throw(_("This order is a store pickup, so it has no delivery option."))
-		if not is_connector_installed():
-			frappe.throw(_("Delivery options are not available on this store."))
 
 		option = find_option(quotation, delivery_option)
+		if option.get("phone_required") and not get_shipping_phone(quotation):
+			frappe.throw(_("{0} needs a phone number on the shipping address.").format(option["title"]))
 		apply_delivery_option(quotation, option)
 		save_cart_quotation(quotation)
 		return get_delivery_summary(quotation)
+
+
+def get_shipping_phone(quotation) -> str | None:
+	address = quotation.shipping_address_name or quotation.customer_address
+	return (address and frappe.db.get_value("Address", address, "phone")) or quotation.contact_mobile
 
 
 def find_option(quotation, delivery_option: str) -> dict:
@@ -455,8 +436,6 @@ def reindex_taxes(quotation):
 
 def get_charge_account(shipping_rule: str | None) -> str:
 	"""The store Shipping Rule's account when it has one, else the store's charge account head."""
-	from bwh_shipping.bwh_shipping.pricing import get_charge_account as get_rule_account
-
 	return get_rule_account(shipping_rule) or get_charge_account_head()
 
 
@@ -475,17 +454,15 @@ def reprice_selected_option(quotation) -> bool:
 
 	Returns whether an option was applied, so the caller can fall back to the flat Shipping Rule.
 	"""
-	if not (quotation.custom_delivery_option and is_connector_installed()):
+	if not quotation.custom_delivery_option:
 		return False
-
-	from bwh_shipping.bwh_shipping.pricing import get_charge_amount
 
 	from commera.api.payments import CheckoutPriceChangedError
 
 	options = get_quoted_options(quotation)
 	if not any(option["title"] == quotation.custom_delivery_option for option in options):
 		# No longer quotable for this address, so fall back to its stored price rather than lose the charge.
-		amount = get_charge_amount(
+		amount = get_option_charge_amount(
 			quotation.custom_delivery_option,
 			get_cart_context(quotation),
 			# Before its shipping discount, which the hooks below take off again.
@@ -544,31 +521,24 @@ def get_order_tracking(sales_order: str, key: str | None = None) -> dict:
 	"""Customer-facing tracking for one of their own orders, or one whose private link they hold."""
 	validate_document_access("Sales Order", sales_order, key)
 
-	if not is_connector_installed():
-		return {"has_tracking": False}
-
-	shipment = frappe.get_all(
-		"Shipping Request",
-		filters={"ref_doctype": "Sales Order", "ref_docname": sales_order},
-		fields=["name", "awb", "carrier", "status", "label_url", "tracking_url"],
-		order_by="creation desc",
-		limit=1,
+	shipments = get_order_shipments(
+		sales_order, fields=["name", "awb_number", "carrier", "custom_shipment_status", "tracking_url"]
 	)
-	if not shipment or not shipment[0].awb:
+	if not shipments or not shipments[0].awb_number:
 		return {"has_tracking": False}
 
-	request = shipment[0]
+	shipment = shipments[0]
 	events = frappe.get_all(
 		"Shipping Tracking Event",
-		filters={"parent": request.name, "parenttype": "Shipping Request"},
+		filters={"parent": shipment.name, "parenttype": "Shipment"},
 		fields=["timestamp", "status", "location", "message"],
 		order_by="timestamp desc",
 	)
 	return {
 		"has_tracking": True,
-		"awb": request.awb,
-		"carrier": request.carrier,
-		"status": request.status,
-		"tracking_url": request.tracking_url,
+		"awb": shipment.awb_number,
+		"carrier": shipment.carrier,
+		"status": shipment.custom_shipment_status,
+		"tracking_url": shipment.tracking_url,
 		"events": events,
 	}

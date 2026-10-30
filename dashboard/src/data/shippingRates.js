@@ -7,7 +7,6 @@ import { exactMoney } from './format'
  * value, in the company currency, which is also the currency `money` formats in.
  */
 
-const available = ref(false)
 const storeRule = ref(null)
 const currency = ref('')
 const rules = ref([])
@@ -24,7 +23,6 @@ const bands = computed(() => rules.value.find((rule) => rule.name === storeRule.
 function apply(data) {
   if (!data) return
 
-  available.value = Boolean(data.available)
   storeRule.value = data.store_rule ?? null
   currency.value = data.currency ?? ''
   rules.value = data.rules ?? []
@@ -56,7 +54,6 @@ function bandsFor(shippingService) {
 
 export function useShippingRates() {
   return {
-    available,
     storeRule,
     currency,
     rules,

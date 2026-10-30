@@ -782,14 +782,14 @@ def update_so_status_from_related_doc(doc, method):
 	elif doc.doctype == "Delivery Note":
 		sales_orders.update([d.against_sales_order for d in doc.items if d.against_sales_order])
 
-	elif doc.doctype == "Shipping Request":
-		if doc.ref_doctype == "Sales Order" and doc.ref_docname:
-			sales_orders.add(doc.ref_docname)
-		elif doc.delivery_note:
+	elif doc.doctype == "Shipment":
+		if doc.get("custom_sales_order"):
+			sales_orders.add(doc.custom_sales_order)
+		elif delivery_notes := [row.delivery_note for row in doc.shipment_delivery_note]:
 			sales_orders.update(
 				frappe.get_all(
 					"Delivery Note Item",
-					filters={"parent": doc.delivery_note, "against_sales_order": ["is", "set"]},
+					filters={"parent": ["in", delivery_notes], "against_sales_order": ["is", "set"]},
 					pluck="against_sales_order",
 				)
 			)
@@ -876,7 +876,7 @@ def get_fulfilment_status(sales_order_name) -> str:
 	supplier_status = get_supplier_status(sales_order_name, supplier_lines)
 	if len(supplier_lines) == len(lines):
 		return supplier_status
-	# Mixed order: a Shipping Request without a Delivery Note is the supplier's parcel, not the store's.
+	# Mixed order: a Shipment without a Delivery Note is the supplier's parcel, not the store's.
 	return get_earlier_status(get_store_status(sales_order_name, from_delivery_note=True), supplier_status)
 
 
@@ -921,19 +921,21 @@ def get_store_status(sales_order_name, from_delivery_note: bool | None = None) -
 
 
 def get_carrier_status(sales_order_name, from_delivery_note: bool | None = None) -> str | None:
-	filters = {"ref_doctype": "Sales Order", "ref_docname": sales_order_name, "docstatus": ["<", 2]}
+	filters = [["custom_sales_order", "=", sales_order_name], ["docstatus", "<", 2]]
 	if from_delivery_note is not None:
-		filters["delivery_note"] = ["is", "set" if from_delivery_note else "not set"]
-	requests = frappe.get_all(
-		"Shipping Request",
+		filters.append(
+			["Shipment Delivery Note", "delivery_note", "is", "set" if from_delivery_note else "not set"]
+		)
+	shipments = frappe.get_all(
+		"Shipment",
 		filters=filters,
-		fields=["status"],
+		fields=["custom_shipment_status"],
 		order_by="creation desc",
 		limit=1,
 	)
-	if not requests:
+	if not shipments:
 		return None
-	return SHIPMENT_STATUS_LADDER.get(cstr(requests[0].status))
+	return SHIPMENT_STATUS_LADDER.get(cstr(shipments[0].custom_shipment_status))
 
 
 def get_delivery_note_lines(sales_order_name, docstatus=None) -> list[dict]:

@@ -1,0 +1,14 @@
+from frappe.model.document import Document
+
+from commera.shipping.base_class import RateRequest, ShippingProviderBase
+
+
+class $class_name(Document, ShippingProviderBase):
+	label = "$label"
+	blurb = ""
+	docs_url = ""
+
+	def get_rates(self, request: RateRequest) -> list[dict]:
+		"""One {"service_code", "service_name", "amount", "currency"} per service, or [] off the route.
+		Answer within request.timeout_seconds, or checkout prices from backup charges."""
+		return []

@@ -6,7 +6,7 @@ app_email = "rahul@buildwithhussain.com"
 app_license = "agpl-3.0"
 
 # frappe/payments deliberately absent: bwh_payments ships its own Payment Gateway Profile and base_class.
-required_apps = ["frappe/erpnext", "bwhtech/bwh_payments", "bwhtech/bwh_shipping"]
+required_apps = ["frappe/erpnext", "bwhtech/bwh_payments"]
 
 
 website_redirects = [
@@ -111,6 +111,8 @@ importable_doctypes = ["Shop Theme"]
 doctype_js = {
 	"Item": ["public/js/extends/item.js", "public/js/extends/ecommerce_tab.js"],
 	"Sales Order": "public/js/extends/sales_order.js",
+	"Delivery Note": "public/js/extends/delivery_note.js",
+	"Shipment": "public/js/extends/shipment.js",
 	"Style Attribute Variant": "public/js/extends/seo_listing.js",
 	"Ecommerce Category": "public/js/extends/seo_listing.js",
 	"Commera Settings": [
@@ -122,7 +124,15 @@ doctype_js = {
 
 after_install = "commera.migrate.after_install"
 after_migrate = "commera.migrate.after_migrate"
-after_app_install = "commera.storefront_plugins.sync_storefront_apps"
+before_uninstall = "commera.customizations.delete_customizations"
+after_app_install = [
+	"commera.storefront_plugins.sync_storefront_apps",
+	"commera.shipping.providers.validate_providers",
+]
+before_app_uninstall = "commera.shipping.providers.disable_app_profiles"
+
+# Commera's own carriers register the same way a plugin app's do.
+commera_hooks = {"shipping_providers": ["Shiprocket Shipping Settings", "AfterShip Shipping Settings"]}
 setup_wizard_complete = "commera.swatches.drop_unused_colour_attribute"
 
 
@@ -201,7 +211,12 @@ doc_events = {
 		"on_cancel": "commera.utils.update_so_status_from_related_doc",
 		"on_trash": "commera.utils.update_so_status_from_related_doc",
 	},
-	"Shipping Request": {"on_update": "commera.utils.update_so_status_from_related_doc"},
+	"Shipment": {
+		"on_update": "commera.utils.update_so_status_from_related_doc",
+		"on_submit": "commera.utils.update_so_status_from_related_doc",
+		"on_update_after_submit": "commera.utils.update_so_status_from_related_doc",
+		"on_cancel": "commera.utils.update_so_status_from_related_doc",
+	},
 }
 
 jinja = {
@@ -331,7 +346,6 @@ add_to_apps_screen = [
 # Uninstallation
 # ------------
 
-# before_uninstall = "commera.uninstall.before_uninstall"
 # after_uninstall = "commera.uninstall.after_uninstall"
 
 # Integration Setup
@@ -366,6 +380,8 @@ add_to_apps_screen = [
 # DocType Class
 # ---------------
 # Override standard doctype classes
+
+extend_doctype_class = {"Shipment": ["commera.shipping.shipment.CommeraShipment"]}
 
 # override_doctype_class = {
 # 	"ToDo": "custom_app.overrides.CustomToDo"
@@ -410,10 +426,11 @@ before_tests = "commera.install.before_tests"
 
 # Overriding Methods
 # ------------------------------
-#
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "commera.event.get_events"
-# }
+
+# Carriers still post tracking to the URL bwh_shipping had.
+override_whitelisted_methods = {
+	"bwh_shipping.bwh_shipping.webhook.handle": "commera.shipping.webhook.handle",
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,

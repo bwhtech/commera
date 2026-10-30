@@ -1,0 +1,189 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-20 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "column_break_mode",
+  "test_mode",
+  "section_break_creds",
+  "api_key",
+  "column_break_creds",
+  "shipper_account_id",
+  "section_break_hosts",
+  "shipping_test_host",
+  "shipping_production_host",
+  "column_break_hosts",
+  "tracking_host",
+  "tracking_api_version",
+  "section_break_pickup",
+  "pickup_address",
+  "column_break_pickup",
+  "currency",
+  "section_break_rating",
+  "volumetric_divisor",
+  "column_break_rating",
+  "rates_timeout_seconds",
+  "section_break_webhook",
+  "webhook_secret"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "column_break_mode",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Uses the sandbox host, where labels and AWBs are real objects but no carrier is ever paid.",
+   "fieldname": "test_mode",
+   "fieldtype": "Check",
+   "label": "Test Mode"
+  },
+  {
+   "fieldname": "section_break_creds",
+   "fieldtype": "Section Break",
+   "label": "API Credentials"
+  },
+  {
+   "description": "AfterShip API key, sent as the <b>as-api-key</b> header. Sandbox and production keys are different.",
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_creds",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default shipper account to rate and buy against. Leave blank to rate-shop every account on the key.",
+   "fieldname": "shipper_account_id",
+   "fieldtype": "Data",
+   "label": "Shipper Account ID"
+  },
+  {
+   "fieldname": "section_break_hosts",
+   "fieldtype": "Section Break",
+   "label": "Hosts"
+  },
+  {
+   "default": "https://sandbox-api.aftership.com/postmen/v3",
+   "fieldname": "shipping_test_host",
+   "fieldtype": "Data",
+   "label": "Shipping Sandbox Host"
+  },
+  {
+   "default": "https://api.aftership.com/postmen/v3",
+   "fieldname": "shipping_production_host",
+   "fieldtype": "Data",
+   "label": "Shipping Production Host"
+  },
+  {
+   "fieldname": "column_break_hosts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "https://api.aftership.com/tracking",
+   "description": "Tracking is a separate AfterShip product with its own host, and has no sandbox of its own.",
+   "fieldname": "tracking_host",
+   "fieldtype": "Data",
+   "label": "Tracking Host"
+  },
+  {
+   "default": "2025-07",
+   "fieldname": "tracking_api_version",
+   "fieldtype": "Data",
+   "label": "Tracking API Version"
+  },
+  {
+   "fieldname": "section_break_pickup",
+   "fieldtype": "Section Break",
+   "label": "Pickup"
+  },
+  {
+   "description": "Ship-from address used when quoting rates at checkout.",
+   "fieldname": "pickup_address",
+   "fieldtype": "Link",
+   "label": "Pickup Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "column_break_pickup",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Fallback currency when a quote does not name one.",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "section_break_rating",
+   "fieldtype": "Section Break",
+   "label": "Rating"
+  },
+  {
+   "default": "5000",
+   "fieldname": "volumetric_divisor",
+   "fieldtype": "Int",
+   "label": "Volumetric Divisor"
+  },
+  {
+   "fieldname": "column_break_rating",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "10",
+   "description": "How long a checkout rate call may take before options fall back to their backup price.",
+   "fieldname": "rates_timeout_seconds",
+   "fieldtype": "Int",
+   "label": "Rates Timeout (seconds)"
+  },
+  {
+   "fieldname": "section_break_webhook",
+   "fieldtype": "Section Break",
+   "label": "Webhook"
+  },
+  {
+   "description": "AfterShip signs each webhook with this secret (base64 HMAC-SHA256 in the <b>aftership-hmac-sha256</b> header). Without it a delivery cannot be verified.",
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook Secret"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-20 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Shipping",
+ "name": "AfterShip Shipping Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

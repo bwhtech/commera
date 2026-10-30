@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 """The Delivery Options screen: the Shipping Services a shopper picks between at checkout.
-bwh_shipping owns the doctype; this module is only the dashboard's way into it."""
+This module is only the dashboard's way into the doctype."""
 
 import frappe
 from frappe.utils.data import cint, cstr
@@ -14,7 +14,13 @@ from commera.api.admin.docfields import (
 	search_link_options,
 )
 from commera.api.admin.settings import coerce_field_value
-from commera.api.shipping import is_connector_installed
+from commera.shipping.doctype.shipping_service.shipping_service import create_shipping_services
+from commera.shipping.providers import (
+	get_provider,
+	get_provider_class,
+	get_provider_doctypes,
+	resolve_provider,
+)
 
 SERVICE_DOCTYPE = "Shipping Service"
 PROFILE_DOCTYPE = "Shipping Provider Profile"
@@ -38,16 +44,6 @@ OPTION_FIELDS = (
 )
 
 
-def is_available() -> bool:
-	"""bwh_shipping is a soft dependency: without it the screen says so rather than erroring."""
-	return is_connector_installed() and bool(frappe.db.exists("DocType", SERVICE_DOCTYPE))
-
-
-def ensure_available():
-	if not is_available():
-		frappe.throw(frappe._("Delivery options need the shipping connector, which is not installed."))
-
-
 def build_options() -> list[dict]:
 	"""Every delivery option the store has: the ones checkout offers first, each group by title."""
 	return frappe.get_all(SERVICE_DOCTYPE, fields=list(OPTION_FIELDS), order_by="enabled desc, title asc")
@@ -62,22 +58,15 @@ def build_editor_field_groups() -> list[dict]:
 def build_import_providers() -> list[dict]:
 	"""The enabled carriers that can list what their account actually sells.
 	A provider that books but publishes no catalogue - Shiprocket picks the courier itself - is left out."""
-	from bwh_shipping.base_class import ShippingProviderBase
-	from frappe.model.base_document import get_controller
-
+	registered = set(get_provider_doctypes())
 	providers = []
 	for profile in frappe.get_all(
 		PROFILE_DOCTYPE, filters={"enabled": 1}, fields=["name", "provider_settings"], order_by="name asc"
 	):
-		if not (profile.provider_settings and frappe.db.exists("DocType", profile.provider_settings)):
+		if profile.provider_settings not in registered:
 			continue
-
-		# The controller class, not the settings Single: capability is a property of the code, and
-		# loading one Single per carrier to ask a question the class can answer is a query per row.
-		controller_class = get_controller(profile.provider_settings)
-		if not issubclass(controller_class, ShippingProviderBase):
-			continue
-		if not controller_class.supports(SERVICE_CHOICES_CAPABILITY):
+		# The class, not the settings Single: asking the class costs no query per carrier.
+		if not get_provider_class(profile.provider_settings).supports(SERVICE_CHOICES_CAPABILITY):
 			continue
 
 		providers.append({"provider": profile.name, "label": profile.name})
@@ -87,19 +76,9 @@ def build_import_providers() -> list[dict]:
 
 def build_screen() -> dict:
 	"""Everything the Delivery Options screen renders, in one read."""
-	if not is_available():
-		return {
-			"available": False,
-			"options": [],
-			"field_groups": [],
-			"import_providers": [],
-			"link_options_path": "",
-		}
-
 	frappe.has_permission(SERVICE_DOCTYPE, ptype="read", throw=True)
 
 	return {
-		"available": True,
 		"options": build_options(),
 		"field_groups": build_editor_field_groups(),
 		"import_providers": build_import_providers(),
@@ -118,8 +97,6 @@ def get_editable_docfield_map() -> dict:
 
 def resolve_enabled_provider(provider: str) -> str:
 	"""The enabled Shipping Provider Profile a request names, refusing one the screen never offered."""
-	from bwh_shipping.bwh_shipping.utils import resolve_provider
-
 	profile = resolve_provider(provider)
 	if not profile:
 		frappe.throw(frappe._("Shipping provider {0} is not enabled").format(cstr(provider)))
@@ -128,10 +105,8 @@ def resolve_enabled_provider(provider: str) -> str:
 
 def get_service_choices_controller(provider: str):
 	"""The settings Single behind an enabled profile, refusing anything the screen did not offer."""
-	from bwh_shipping.bwh_shipping.utils import get_provider_controller
-
 	profile = resolve_enabled_provider(provider)
-	controller = get_provider_controller(profile)
+	controller = get_provider(profile)
 	if not controller.supports(SERVICE_CHOICES_CAPABILITY):
 		frappe.throw(frappe._("{0} cannot list its carrier services").format(frappe.bold(profile)))
 
@@ -151,7 +126,6 @@ def save_delivery_option(name: str | None = None, values: dict | str | None = No
 	"""Create a delivery option, or edit one; a blank `name` creates. Returns the refreshed screen.
 	The title is fixed on edit: Sales Order.custom_delivery_option stores the title string, not a link."""
 	frappe.only_for("System Manager")
-	ensure_available()
 	frappe.has_permission(SERVICE_DOCTYPE, ptype="write", throw=True)
 
 	values = frappe.parse_json(values) if values else {}
@@ -190,7 +164,6 @@ def save_delivery_option(name: str | None = None, values: dict | str | None = No
 def toggle_delivery_option(name: str, enabled: int | str) -> dict:
 	"""Offer a delivery option at checkout, or stop offering it. Returns the refreshed screen."""
 	frappe.only_for("System Manager")
-	ensure_available()
 	frappe.has_permission(SERVICE_DOCTYPE, ptype="write", throw=True)
 
 	# Saved as a Document, never db_set: on_update is what clears the cached list checkout quotes from,
@@ -206,7 +179,6 @@ def toggle_delivery_option(name: str, enabled: int | str) -> dict:
 def delete_delivery_option(name: str) -> dict:
 	"""Remove a delivery option. Returns the refreshed screen."""
 	frappe.only_for("System Manager")
-	ensure_available()
 
 	frappe.delete_doc(SERVICE_DOCTYPE, cstr(name))
 	return build_screen()
@@ -216,7 +188,6 @@ def delete_delivery_option(name: str) -> dict:
 def get_carrier_service_choices(provider: str) -> dict:
 	"""What one carrier account can actually sell, ready to be picked from and imported."""
 	frappe.only_for("System Manager")
-	ensure_available()
 
 	return get_service_choices_controller(provider).get_service_choices()
 
@@ -226,11 +197,6 @@ def import_carrier_services(provider: str, selections: list | str, default_rate:
 	"""Turn the picked carrier services into delivery options. Returns the refreshed screen.
 	`default_rate` seeds each option's Backup Charge - used when no Shipping Rule band or live quote covers it."""
 	frappe.only_for("System Manager")
-	ensure_available()
-
-	from bwh_shipping.bwh_shipping.doctype.shipping_service.shipping_service import (
-		create_shipping_services,
-	)
 
 	# Skips a service_code already imported for this profile, so re-importing after adding a carrier
 	# adds only what is new.
@@ -243,7 +209,6 @@ def get_link_options(doctype: str, search_text: str | None = None):
 	"""Options for a Link control on the delivery-option form. Scoped to what a Shipping Service links to -
 	its provider profile - so the picker cannot be turned on an unrelated doctype."""
 	frappe.only_for("System Manager")
-	ensure_available()
 
 	if doctype not in get_linked_doctypes(SERVICE_DOCTYPE):
 		frappe.throw(frappe._("A delivery option cannot link to {0}.").format(doctype))

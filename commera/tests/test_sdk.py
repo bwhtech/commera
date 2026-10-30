@@ -6,7 +6,6 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.tests import IntegrationTestCase
 
-from commera.api.shipping import is_connector_installed
 from commera.checkout_hooks import PLUGIN_FEE_FIELD
 from commera.plugin_events import PLUGINS_USER, get_order_snapshot
 from commera.sdk import STORE_ORDER_TYPE, as_plugin_user, cart, catalog, orders
@@ -87,7 +86,7 @@ PUBLIC_NAMES = {
 		"search",
 	],
 	"commera.sdk.format": ["IMAGE_WIDTHS", "image_url", "money", "product_url"],
-	"commera.sdk.orders": ["ShippingNotInstalled", "get_order", "get_orders", "record_shipment"],
+	"commera.sdk.orders": ["get_order", "get_orders", "record_shipment"],
 	"commera.sdk.shop": ["get_menu", "get_page", "get_shop", "get_sitemap"],
 	"commera.sdk.types": [
 		"Address",
@@ -199,7 +198,11 @@ class TestSdk(IntegrationTestCase):
 
 	def setUp(self):
 		self.addCleanup(frappe.set_user, "Administrator")
-		patch_app_hooks(self, {"commera_hooks": {"cart_fees": [f"{__name__}.charge_note_fee"]}})
+		commera_hooks = {
+			**frappe.get_hooks("commera_hooks", {}),
+			"cart_fees": [f"{__name__}.charge_note_fee"],
+		}
+		patch_app_hooks(self, {"commera_hooks": commera_hooks})
 		test_plugin_events.patch_app_declarations(
 			self, {APP: {"commera_events": {"order_paid": [f"{APP}.paid"]}}}
 		)
@@ -425,15 +428,16 @@ class TestSdk(IntegrationTestCase):
 		self.assertIsNone(frappe.db.get_value("Quotation", quotation.name, APP_FIELD))
 
 	def test_a_recorded_shipment_ships_then_delivers_the_order_and_never_goes_back(self):
-		if not is_connector_installed():
-			self.skipTest("bwh_shipping is not installed")
-		from bwh_shipping.tests.test_carrier_import import create_test_address, create_test_provider_profile
+		from commera.shipping.tests.test_carrier_import import (
+			create_test_address,
+			create_test_provider_profile,
+		)
 
 		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
 		sales_order.db_set(
 			{
-				"shipping_address_name": create_test_address("India"),
+				"shipping_address_name": create_test_address("India", "Customer", sales_order.customer),
 				"company_address": create_test_address("India"),
 			}
 		)
@@ -447,7 +451,7 @@ class TestSdk(IntegrationTestCase):
 			orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", events=[scan]),
 			shipment,
 		)
-		self.assertEqual(len(frappe.get_doc("Shipping Request", shipment).tracking_events), 1)
+		self.assertEqual(len(frappe.get_doc("Shipment", shipment).custom_tracking_events), 1)
 		update_sales_order_ecommerce_status(sales_order.name)
 		self.assertEqual(
 			frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status"), "Shipped"
@@ -461,44 +465,47 @@ class TestSdk(IntegrationTestCase):
 		orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="Delivered")
 		orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="In Transit")
 
-		self.assertEqual(frappe.db.get_value("Shipping Request", shipment, "status"), "Delivered")
+		self.assertEqual(frappe.db.get_value("Shipment", shipment, "custom_shipment_status"), "Delivered")
 		self.assertEqual(orders.get_order(sales_order.name)["stage"]["key"], "delivered")
 		with self.assertRaises(frappe.ValidationError):
 			orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="Teleported")
 
 	def test_a_carrier_named_after_the_first_record_is_saved(self):
-		if not is_connector_installed():
-			self.skipTest("bwh_shipping is not installed")
-		from bwh_shipping.tests.test_carrier_import import create_test_address
+		from commera.shipping.tests.test_carrier_import import create_test_address
 
 		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
-		sales_order.db_set({"shipping_address_name": create_test_address("India"), "company_address": None})
+		sales_order.db_set(
+			{
+				"shipping_address_name": create_test_address("India", "Customer", sales_order.customer),
+				"company_address": create_test_address("India"),
+			}
+		)
 
 		shipment = orders.record_shipment(sales_order.name, awb="ZZ-LATE-CARRIER-AWB")
 		orders.record_shipment(sales_order.name, awb="ZZ-LATE-CARRIER-AWB", carrier="Delhivery")
 		orders.record_shipment(sales_order.name, awb="ZZ-LATE-CARRIER-AWB")
 
-		self.assertEqual(frappe.db.get_value("Shipping Request", shipment, "carrier"), "Delhivery")
+		self.assertEqual(frappe.db.get_value("Shipment", shipment, "carrier"), "Delhivery")
 
 	def test_a_partner_shipment_needs_no_provider_and_shows_the_shopper_its_link(self):
-		if not is_connector_installed():
-			self.skipTest("bwh_shipping is not installed")
-		from bwh_shipping.tests.test_carrier_import import create_test_address
-
 		from commera.api.shipping import get_order_tracking
+		from commera.shipping.tests.test_carrier_import import create_test_address
 
 		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
-		sales_order.db_set({"shipping_address_name": create_test_address("India"), "company_address": None})
+		sales_order.db_set(
+			{
+				"shipping_address_name": create_test_address("India", "Customer", sales_order.customer),
+				"company_address": create_test_address("India"),
+			}
+		)
 		tracking_url = "https://track.example.com/ZZ-PARTNER-AWB"
 
 		shipment = orders.record_shipment(
 			sales_order.name, awb="ZZ-PARTNER-AWB", carrier="Delhivery", tracking_url=tracking_url
 		)
-		self.assertFalse(
-			any(frappe.db.get_value("Shipping Request", shipment, ["provider", "origin_address"]))
-		)
+		self.assertFalse(frappe.db.get_value("Shipment", shipment, "custom_shipping_provider"))
 		update_sales_order_ecommerce_status(sales_order.name)
 		self.assertEqual(
 			frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status"), "Shipped"

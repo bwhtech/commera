@@ -6,6 +6,7 @@ from frappe.utils.data import flt
 
 from commera.api.payments import make_sales_invoice
 from commera.sdk import STORE_ORDER_TYPE
+from commera.shipping.testing import insert_shipment_record
 from commera.tests.test_admin_orders import make_drop_ship_order, make_test_sales_order
 from commera.utils import can_return, update_sales_order_ecommerce_status
 
@@ -48,16 +49,7 @@ class TestOrderStatus(IntegrationTestCase):
 		return sales_return
 
 	def book_parcel(self, sales_order, status, delivery_note=None):
-		frappe.get_doc(
-			{
-				"doctype": "Shipping Request",
-				"name": frappe.generate_hash(length=10),
-				"ref_doctype": "Sales Order",
-				"ref_docname": sales_order.name,
-				"delivery_note": delivery_note,
-				"status": status,
-			}
-		).db_insert()
+		insert_shipment_record(sales_order.name, status, delivery_note)
 
 	def status_of(self, sales_order):
 		update_sales_order_ecommerce_status(sales_order.name)

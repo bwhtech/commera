@@ -328,11 +328,8 @@ def get_open_order_filters() -> list:
 		["docstatus", "=", 1],
 		["status", "in", OPEN_STATUSES],
 		["name", "not in", get_returned_orders()],
+		["name", "not in", get_shipped_orders()],
 	]
-	from commera.api.shipping import is_connector_installed
-
-	if is_connector_installed():
-		filters.append(["name", "not in", get_shipped_orders()])
 	return filters
 
 
@@ -357,21 +354,20 @@ def get_returned_orders():
 def get_shipped_orders():
 	"""The orders whose parcel has physically moved, as a subquery. Only the latest shipment counts: a
 	rebooked order carries a stale older request that must not settle it."""
-	shipping_request = frappe.qb.DocType("Shipping Request")
+	shipment = frappe.qb.DocType("Shipment")
 	newest_moved = Max(
 		Case()
-		.when(shipping_request.status.isin(SETTLED_SHIPMENT_STATUSES), shipping_request.creation)
+		.when(shipment.custom_shipment_status.isin(SETTLED_SHIPMENT_STATUSES), shipment.creation)
 		.else_(None)
 	)
 	return (
-		frappe.qb.from_(shipping_request)
-		.select(shipping_request.ref_docname)
-		.where(shipping_request.ref_doctype == "Sales Order")
-		.where(shipping_request.docstatus < 2)
-		.where(shipping_request.ref_docname.notnull())
-		.where(shipping_request.ref_docname != "")
-		.groupby(shipping_request.ref_docname)
-		.having(newest_moved == Max(shipping_request.creation))
+		frappe.qb.from_(shipment)
+		.select(shipment.custom_sales_order)
+		.where(shipment.docstatus < 2)
+		.where(shipment.custom_sales_order.notnull())
+		.where(shipment.custom_sales_order != "")
+		.groupby(shipment.custom_sales_order)
+		.having(newest_moved == Max(shipment.creation))
 	)
 
 
@@ -566,33 +562,26 @@ def read_order_lifecycles(order_names: list) -> dict:
 
 def read_shipment_stages(order_names: list, lifecycles: dict) -> None:
 	"""Fold each order's latest carrier status into its lifecycle, in one read."""
-	from commera.api.shipping import is_connector_installed
-
-	if not is_connector_installed():
-		return
-
-	# Newest first, first seen wins: a rebooked order carries a stale request that must not outrank it.
-	for request in frappe.get_all(
-		"Shipping Request",
-		filters={"ref_doctype": "Sales Order", "ref_docname": ["in", order_names], "docstatus": ["<", 2]},
-		fields=["ref_docname", "status", "awb", "creation", "modified", "pickup_date"],
+	# Newest first, first seen wins: a rebooked order carries a stale shipment that must not outrank it.
+	for shipment in frappe.get_all(
+		"Shipment",
+		filters={"custom_sales_order": ["in", order_names], "docstatus": ["<", 2]},
+		fields=["custom_sales_order", "custom_shipment_status", "creation", "modified", "pickup_date"],
 		order_by="creation desc",
 	):
-		lifecycle = lifecycles.get(cstr(request.ref_docname))
+		lifecycle = lifecycles.get(cstr(shipment.custom_sales_order))
 		if lifecycle is None or "stage_from_shipment" in lifecycle:
 			continue
-		stage = SHIPMENT_STAGES.get(cstr(request.status))
+		stage = SHIPMENT_STAGES.get(cstr(shipment.custom_shipment_status))
 		lifecycle.stage_from_shipment = stage
 		if stage in ("shipped", "delivered", "returned"):
 			# The carrier's pickup date wins over the booking date where the provider gave one.
-			keep_earliest(lifecycle, "shipped_on", request.pickup_date or request.creation)
+			keep_earliest(lifecycle, "shipped_on", shipment.pickup_date or shipment.creation)
 		if stage in ("delivered", "returned"):
-			# The request's last write is when it landed on the status it now holds.
-			# ponytail: the request's last write stands in for the delivery scan, revisit by reading
-			# the Shipping Tracking Event row once the connector records them on this site
-			# Kept apart from the return note's posting date: one is a date, the other a datetime.
+			# ponytail: the shipment's last write stands in for the delivery scan; read its Shipping Tracking
+			# Event rows instead. Kept apart from the return note's posting date, which is a date.
 			field = "delivered_on" if stage == "delivered" else "carrier_returned_on"
-			keep_latest(lifecycle, field, request.modified)
+			keep_latest(lifecycle, field, shipment.modified)
 
 
 def get_order_charges(order):

@@ -1,0 +1,167 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-20 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "column_break_mode",
+  "test_mode",
+  "section_break_creds",
+  "email",
+  "column_break_creds",
+  "password",
+  "section_break_pickup",
+  "pickup_location",
+  "pickup_address",
+  "column_break_pickup",
+  "channel_id",
+  "currency",
+  "section_break_rating",
+  "volumetric_divisor",
+  "column_break_rating",
+  "rates_timeout_seconds",
+  "section_break_webhook",
+  "webhook_secret"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "column_break_mode",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Shiprocket has no separate sandbox host: a test account uses the same API. This flag only records which account is in use.",
+   "fieldname": "test_mode",
+   "fieldtype": "Check",
+   "label": "Test Mode"
+  },
+  {
+   "fieldname": "section_break_creds",
+   "fieldtype": "Section Break",
+   "label": "API Credentials"
+  },
+  {
+   "description": "The Shiprocket API user's email. Create a dedicated API user under Settings &gt; API in the Shiprocket panel; a normal login will not authenticate here.",
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_creds",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "password",
+   "fieldtype": "Password",
+   "label": "Password",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_pickup",
+   "fieldtype": "Section Break",
+   "label": "Pickup"
+  },
+  {
+   "description": "The pickup location <b>nickname</b> exactly as registered in the Shiprocket panel. Shiprocket will not accept an address pushed from here; it only accepts a nickname it already knows.",
+   "fieldname": "pickup_location",
+   "fieldtype": "Data",
+   "label": "Pickup Location Nickname",
+   "reqd": 1
+  },
+  {
+   "description": "The same location as an ERPNext Address. Its pincode is the origin used when quoting rates.",
+   "fieldname": "pickup_address",
+   "fieldtype": "Link",
+   "label": "Pickup Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "column_break_pickup",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Optional Shiprocket channel id. Leave blank to use the account's default channel.",
+   "fieldname": "channel_id",
+   "fieldtype": "Data",
+   "label": "Channel ID"
+  },
+  {
+   "default": "INR",
+   "description": "Shiprocket bills in INR only; this is the currency its quoted rates are read as.",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "section_break_rating",
+   "fieldtype": "Section Break",
+   "label": "Rating"
+  },
+  {
+   "default": "5000",
+   "description": "Volumetric weight divisor for cm/kg. 5000 is the standard domestic figure; change it only if your Shiprocket contract says otherwise.",
+   "fieldname": "volumetric_divisor",
+   "fieldtype": "Int",
+   "label": "Volumetric Divisor"
+  },
+  {
+   "fieldname": "column_break_rating",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "10",
+   "description": "How long a checkout rate call may take before the option falls back to its backup price. Checkout must never hang on a carrier.",
+   "fieldname": "rates_timeout_seconds",
+   "fieldtype": "Int",
+   "label": "Rates Timeout (seconds)"
+  },
+  {
+   "fieldname": "section_break_webhook",
+   "fieldtype": "Section Break",
+   "label": "Webhook"
+  },
+  {
+   "description": "Shiprocket does not sign its webhooks. It sends back whatever token you set as the <b>x-api-key</b> in its webhook configuration, so paste the same value here — without it, anyone could post a delivery status for any order.",
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook Token (x-api-key)"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-20 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Shipping",
+ "name": "Shiprocket Shipping Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
