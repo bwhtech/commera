@@ -90,7 +90,7 @@
 		const { type, ...data } = event.data || {};
 		if (type === 'commera:highlight') highlight(data);
 		if (type === 'commera:scroll-to')
-			window.scrollTo({ top: Number(data.y) || 0 });
+			window.scrollTo({ top: Number(data.y) || 0, behavior: 'instant' });
 	});
 
 	window.addEventListener('resize', refresh_outline);

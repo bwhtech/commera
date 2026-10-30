@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { Button, Dropdown, Tree } from 'frappe-ui'
 import { canAddBlocks, maxBlocks } from '../../data/themeLayout'
 
@@ -96,9 +96,16 @@ watch(
   () => state.selection,
   (selection) => {
     if (selection?.kind === 'block') expand(sectionKey(selection.group, selection.section))
+    if (selection?.group) expand(partKey(selection.group))
+    revealSelectedRow()
   },
   { immediate: true },
 )
+
+async function revealSelectedRow() {
+  await nextTick()
+  document.querySelector('[data-section-tree] [aria-current="true"]')?.scrollIntoView({ block: 'nearest' })
+}
 
 function isSelected(node) {
   const selection = state.selection
@@ -165,8 +172,8 @@ function rowActions(node) {
   <div class="flex flex-col gap-1" data-section-tree>
     <button
       type="button"
-      class="flex w-full items-center gap-2 rounded-4 px-2 py-1.5 text-start text-base text-ink-gray-8 hover:bg-surface-gray-2"
-      :class="{ 'bg-surface-gray-3 font-medium': state.selection?.kind === 'theme' }"
+      class="flex w-full items-center gap-2 rounded-5 px-1.5 py-1.5 text-start text-base text-ink-gray-8"
+      :class="state.selection?.kind === 'theme' ? 'bg-surface-gray-3 font-medium' : 'hover:bg-surface-gray-2'"
       data-tree-theme-settings
       @click="select({ kind: 'theme' }, { scroll: false })"
     >
@@ -190,6 +197,7 @@ function rowActions(node) {
       node-key="key"
       draggable
       guides="lines"
+      class="[&_[data-slot=row]:has([aria-current=true])]:bg-surface-gray-3"
       :move="canDrop"
       @drag-end="onDragEnd"
     >
@@ -200,11 +208,9 @@ function rowActions(node) {
         <button
           v-else
           type="button"
-          class="min-w-0 flex-1 truncate rounded-4 px-1 text-start text-base"
-          :class="[
-            { 'bg-surface-gray-3 font-medium': isSelected(node) },
-            node.hidden ? 'text-ink-gray-4' : 'text-ink-gray-8',
-          ]"
+          class="min-w-0 flex-1 truncate text-start text-base"
+          :class="[isSelected(node) ? 'font-medium' : '', node.hidden ? 'text-ink-gray-4' : 'text-ink-gray-8']"
+          :aria-current="isSelected(node) ? 'true' : undefined"
           :data-tree-node="node.key"
           @click.stop="selectNode(node)"
         >

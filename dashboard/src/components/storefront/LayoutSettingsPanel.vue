@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useDebounceFn } from '@vueuse/core'
 import { Button } from 'frappe-ui'
 import SettingsFieldControl from '../settings/SettingsFieldControl.vue'
 import { sectionSettingToField } from '../../utils/sectionSettingToField'
@@ -39,8 +40,12 @@ function remove() {
   else removeSection(current.group, current.section.id)
 }
 
+const TYPING_PAUSE_MS = 400
+const renderAfterTyping = useDebounceFn(commit, TYPING_PAUSE_MS)
+
 function update(setting, value) {
   setSetting(selected.value.owner, setting, value)
+  if (isTranslatable(setting)) renderAfterTyping()
 }
 
 function settle(setting, value) {

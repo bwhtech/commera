@@ -9,22 +9,24 @@ const props = defineProps({
 
 const { state, selectFromPreview } = props.editor
 
-const FRAME_NAME = 'commera-theme-editor-preview'
+const FRAME_NAMES = ['commera-theme-editor-preview-0', 'commera-theme-editor-preview-1']
+const MAX_SCROLL_WAIT_FRAMES = 10
 
-const frame = ref(null)
+const frames = []
 const form = ref(null)
 const csrfInput = ref(null)
-const ready = ref(false)
-let scrollY = 0
+const visibleIndex = ref(null)
+let latestRender = 0
 
 const action = computed(() => {
   const params = new URLSearchParams({ theme: state.theme, page: state.page, lang: state.language })
   return `/theme_editor_preview?${params}`
 })
 
-function post(type, data = {}) {
-  if (!ready.value) return
-  frame.value?.contentWindow?.postMessage({ type, ...data }, window.location.origin)
+const visibleWindow = () => frames[visibleIndex.value]?.contentWindow
+
+function post(type, data = {}, target = visibleWindow()) {
+  target?.postMessage({ type, ...data }, window.location.origin)
 }
 
 function highlightTarget() {
@@ -38,8 +40,10 @@ function highlightTarget() {
 
 function render() {
   if (!form.value || !state.loaded) return
-  ready.value = false
-  form.value.action = action.value
+  latestRender += 1
+  const hiddenIndex = visibleIndex.value === 0 ? 1 : 0
+  form.value.target = FRAME_NAMES[hiddenIndex]
+  form.value.action = `${action.value}&render=${latestRender}`
   for (const input of form.value.querySelectorAll('input[data-part]')) input.remove()
   for (const part of state.parts) {
     const input = document.createElement('input')
@@ -53,15 +57,32 @@ function render() {
   form.value.submit()
 }
 
+const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve))
+
+async function swapIn(index, renderNumber) {
+  const target = frames[index].contentWindow
+  if (target.document.readyState !== 'complete') {
+    await new Promise((resolve) => target.addEventListener('load', resolve, { once: true }))
+  }
+  if (renderNumber !== latestRender) return
+  const scrollY = visibleWindow()?.scrollY ?? 0
+  post('commera:scroll-to', { y: scrollY }, target)
+  post('commera:highlight', { ...highlightTarget(), scroll: false }, target)
+  for (let count = 0; count < MAX_SCROLL_WAIT_FRAMES && Math.abs(target.scrollY - scrollY) > 1; count += 1) {
+    await nextFrame()
+  }
+  if (renderNumber === latestRender) visibleIndex.value = index
+}
+
 useEventListener(window, 'message', (event) => {
-  if (event.origin !== window.location.origin || event.source !== frame.value?.contentWindow) return
+  if (event.origin !== window.location.origin) return
+  const index = frames.findIndex((frame) => frame?.contentWindow === event.source)
+  if (index === -1) return
   const { type, ...data } = event.data || {}
-  if (type === 'commera:scroll') scrollY = Number(data.y) || 0
-  if (type === 'commera:select') selectFromPreview(data)
-  if (type === 'commera:preview-ready') {
-    ready.value = true
-    post('commera:scroll-to', { y: scrollY })
-    post('commera:highlight', { ...highlightTarget(), scroll: false })
+  if (type === 'commera:select' && index === visibleIndex.value) selectFromPreview(data)
+  if (type === 'commera:preview-ready' && index !== visibleIndex.value) {
+    const renderNumber = Number(new URLSearchParams(event.source.location.search).get('render'))
+    if (renderNumber === latestRender) swapIn(index, renderNumber)
   }
 })
 
@@ -81,18 +102,21 @@ watch(
 <template>
   <div class="flex h-full justify-center overflow-hidden bg-surface-gray-2 p-4">
     <div
-      class="h-full overflow-hidden rounded-5 border border-outline-gray-2 bg-surface-base shadow-sm"
+      class="relative h-full overflow-hidden rounded-5 border border-outline-gray-2 bg-surface-base shadow-sm"
       :class="state.device === 'mobile' ? 'w-96' : 'w-full'"
     >
       <iframe
-        ref="frame"
-        :name="FRAME_NAME"
+        v-for="(name, index) in FRAME_NAMES"
+        :key="name"
+        :ref="(element) => (frames[index] = element)"
+        :name="name"
         title="Storefront preview"
-        class="size-full"
-        data-preview-frame
+        class="absolute inset-0 size-full"
+        :class="{ 'pointer-events-none invisible': index !== visibleIndex }"
+        :data-preview-frame="index === visibleIndex ? 'visible' : 'hidden'"
       />
     </div>
-    <form ref="form" method="post" :target="FRAME_NAME" class="hidden">
+    <form ref="form" method="post" class="hidden">
       <input ref="csrfInput" type="hidden" name="csrf_token" />
     </form>
   </div>
