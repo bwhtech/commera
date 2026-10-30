@@ -351,6 +351,8 @@ class CommeraShipment:
 				self.custom_last_webhook_event_id = event_id
 
 		if advanced or appended or describes_current_state:
+			# A scan must land even on a Shipment migrated from a Shipping Request without a pickup address.
+			self.flags.ignore_mandatory = True
 			self.save(ignore_permissions=True)
 		return advanced
 
