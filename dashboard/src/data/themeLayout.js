@@ -202,8 +202,10 @@ export function createLayoutEditor(theme) {
   }
 
   const save = () => runOnParts('save_draft', state.parts.filter(isUnsaved))
-  const publish = () =>
-    runOnParts('publish', state.parts.filter((part) => isUnsaved(part) || isUnpublished(part)))
+  async function publish() {
+    if (!(await saveIfChanged())) return false
+    return runOnParts('publish', state.parts.filter(isUnpublished))
+  }
   const discard = () => runOnParts('discard', [...state.parts], false)
 
   async function saveIfChanged() {
