@@ -1,14 +1,19 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from commera.customizations import MODULES, create_customizations, delete_customizations
+from commera.customizations import (
+	MODULES,
+	create_customizations,
+	delete_customizations,
+	get_fields_by_doctype,
+)
 
 
 def get_present_fields() -> set[tuple[str, str]]:
 	return {
 		(doctype, field["fieldname"])
 		for module in MODULES
-		for doctype, fields in module.CUSTOM_FIELDS.items()
+		for doctype, fields in get_fields_by_doctype(module.CUSTOM_FIELDS).items()
 		for field in fields
 		if frappe.db.exists("Custom Field", {"dt": doctype, "fieldname": field["fieldname"]})
 	}
@@ -50,7 +55,7 @@ class TestCustomizations(IntegrationTestCase):
 			{
 				(doctype, field["fieldname"])
 				for m in MODULES
-				for doctype, fields in m.CUSTOM_FIELDS.items()
+				for doctype, fields in get_fields_by_doctype(m.CUSTOM_FIELDS).items()
 				for field in fields
 			},
 		)
