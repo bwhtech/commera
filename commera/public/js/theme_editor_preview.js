@@ -109,7 +109,6 @@
 		);
 		pending_scroll = Boolean(scroll);
 		resize_observer.disconnect();
-		// A theme may reveal the selected block in response (a carousel slide), and only the observer sees it get a size.
 		for (const element of highlighted) resize_observer.observe(element);
 		refresh_outlines();
 	}
