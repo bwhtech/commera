@@ -26,5 +26,6 @@ commera.patches.drop_frozen_core_field_order
 commera.patches.log_store_price_list_currency_mismatch
 commera.patches.move_summer_theme_settings_to_home_layout
 commera.patches.set_shop_theme_type
+commera.patches.move_shipping_requests_to_shipment
 commera.patches.seed_account_auth_routes
 commera.patches.add_commera_admin_to_item_writers
