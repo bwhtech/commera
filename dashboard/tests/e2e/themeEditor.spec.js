@@ -69,11 +69,7 @@ async function clickButton(page, label) {
 }
 
 function outlineShown(frame) {
-  return frame.evaluate(() =>
-    [...document.body.children].some(
-      (element) => element.style.outline.includes('solid') && element.style.display === 'block',
-    ),
-  )
+  return frame.evaluate(() => document.querySelectorAll('[data-commera-outline]').length > 0)
 }
 
 async function visibleFrame(page, device) {
@@ -217,6 +213,7 @@ describe('theme editor', () => {
       page.off('request', countPost)
       await adminPost(page, 'theme.save_theme_settings', { [field.fieldname]: field.value })
     }
+  })
 
   uiTest(session, 'Panels resize, collapse to the rail and keep their size after a reload', async (t) => {
     const { page } = session
@@ -336,11 +333,12 @@ describe('theme editor', () => {
     if (!theme) return t.skip('the live theme is not a Sections theme')
     await openEditor(page, theme, { clearWorkspace: true })
 
-    const deals = await page.$$eval('[data-tree-node^="section:"]', (nodes) =>
-      nodes.find((node) => node.innerText.trim().startsWith('Deals'))?.dataset.treeNode,
-    )
-    if (!deals) return t.skip('the home page has no Deals section')
-    const [, group, section] = deals.split(':')
+    const target = await page.$$eval('[data-tree-node^="section:index:"]', (nodes) => {
+      const deals = nodes.find((node) => node.innerText.trim().startsWith('Deals'))
+      return (deals ?? nodes[nodes.length - 2])?.dataset.treeNode
+    })
+    if (!target) return t.skip('the home page has too few sections to scroll between')
+    const [, group, section] = target.split(':')
 
     await page.click('[aria-label="Preview width"] [data-value="both"]')
     await page.waitForSelector('[data-preview-device="mobile"] iframe[data-preview-frame="visible"]', {
@@ -358,7 +356,7 @@ describe('theme editor', () => {
         group,
         section,
       )
-    const scrollDesktopToDeals = () =>
+    const scrollDesktopToTarget = () =>
       desktop.evaluate(
         (group, section) => {
           const element = document.querySelector(`[data-commera-group="${group}"][data-commera-section="${section}"]`)
@@ -370,10 +368,10 @@ describe('theme editor', () => {
 
     const [linkButton] = await page.$$('xpath/.//button[normalize-space()="Link scroll"]')
     await linkButton.click()
-    await scrollDesktopToDeals()
+    await scrollDesktopToTarget()
     await wait(800)
-    assert.ok(Math.abs(await sectionTop(desktop)) <= 2, 'desktop shows Deals at the top')
-    assert.ok(Math.abs(await sectionTop(mobile)) <= 2, `mobile follows to Deals (top ${await sectionTop(mobile)})`)
+    assert.ok(Math.abs(await sectionTop(desktop)) <= 2, `desktop shows ${section} at the top`)
+    assert.ok(Math.abs(await sectionTop(mobile)) <= 2, `mobile follows to ${section} (top ${await sectionTop(mobile)})`)
 
     await linkButton.click()
     const mobileScroll = await mobile.evaluate(() => window.scrollY)
