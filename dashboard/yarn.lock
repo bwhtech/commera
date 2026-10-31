@@ -1835,7 +1835,7 @@ readdirp@~3.6.0:
   dependencies:
     picomatch "^2.2.1"
 
-reka-ui@^2.9.9:
+reka-ui@2.10.4, reka-ui@^2.9.9:
   version "2.10.4"
   resolved "https://registry.npmjs.org/reka-ui/-/reka-ui-2.10.4.tgz"
   integrity sha512-kbS5GAbkHkYj0EVKAg5ZPEPndhBjeUFSa1Aq5m5ftQwyHnB1v5tw8X6fcwfKH/ry3StPXblMWM1DW82MVS71cw==

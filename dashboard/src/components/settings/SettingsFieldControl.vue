@@ -57,7 +57,10 @@ function inputType(field) {
 }
 
 function selectOptions(field) {
-  return (field.options ?? '').split('\n').filter(Boolean)
+  return (field.options ?? '')
+    .split('\n')
+    .filter(Boolean)
+    .map((value) => ({ label: field.option_labels?.[value] ?? value, value }))
 }
 
 async function uploadFile(event) {

@@ -1,15 +1,19 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, useId, watch } from 'vue'
 import { useEventListener } from '@vueuse/core'
+import { toast } from 'frappe-ui'
 import { SECTION_GROUPS } from '../../data/themeLayout'
 
 const props = defineProps({
   editor: { type: Object, required: true },
 })
 
+const emit = defineEmits(['scroll'])
+
 const { state, selectFromPreview } = props.editor
 
-const FRAME_NAMES = ['commera-theme-editor-preview-0', 'commera-theme-editor-preview-1']
+const frameId = useId()
+const FRAME_NAMES = [`commera-theme-editor-preview-${frameId}-0`, `commera-theme-editor-preview-${frameId}-1`]
 const MAX_SCROLL_WAIT_FRAMES = 10
 const RENDERING_DELAY_MS = 150
 
@@ -19,6 +23,7 @@ const csrfInput = ref(null)
 const visibleIndex = ref(null)
 const rendering = ref(false)
 let latestRender = 0
+let readyRender = 0
 let lastPosted = null
 let renderingTimer = null
 
@@ -70,6 +75,16 @@ function render() {
   renderingTimer = setTimeout(() => (rendering.value = true), RENDERING_DELAY_MS)
 }
 
+const renderNumberOf = (index) => Number(new URLSearchParams(frames[index].contentWindow.location.search).get('render'))
+
+function onFrameLoad(index) {
+  if (index === visibleIndex.value || renderNumberOf(index) !== latestRender || readyRender === latestRender) return
+  clearTimeout(renderingTimer)
+  rendering.value = false
+  lastPosted = null
+  toast.error('The preview could not be updated. Your changes are kept.', { id: 'theme-preview-failed' })
+}
+
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve))
 
 async function swapIn(index, renderNumber) {
@@ -96,11 +111,15 @@ useEventListener(window, 'message', (event) => {
   if (index === -1) return
   const { type, ...data } = event.data || {}
   if (type === 'commera:select' && index === visibleIndex.value) selectFromPreview(data)
+  if (type === 'commera:scroll' && index === visibleIndex.value) emit('scroll', data)
   if (type === 'commera:preview-ready' && index !== visibleIndex.value) {
-    const renderNumber = Number(new URLSearchParams(event.source.location.search).get('render'))
+    const renderNumber = renderNumberOf(index)
+    readyRender = renderNumber
     if (renderNumber === latestRender) swapIn(index, renderNumber)
   }
 })
+
+defineExpose({ scrollToSection: (position) => post('commera:scroll-to-section', position) })
 
 onMounted(render)
 watch(() => [state.previewToken, state.language], render)
@@ -116,31 +135,27 @@ watch(
 </script>
 
 <template>
-  <div class="flex h-full justify-center overflow-hidden bg-surface-gray-2 p-4">
+  <div class="relative size-full">
+    <iframe
+      v-for="(name, index) in FRAME_NAMES"
+      :key="name"
+      :ref="(element) => (frames[index] = element)"
+      :name="name"
+      title="Storefront preview"
+      class="absolute inset-0 size-full"
+      :class="{ 'pointer-events-none invisible': index !== visibleIndex }"
+      :data-preview-frame="index === visibleIndex ? 'visible' : 'hidden'"
+      @load="onFrameLoad(index)"
+    />
     <div
-      class="relative h-full overflow-hidden rounded-5 border border-outline-gray-2 bg-surface-base shadow-sm"
-      :class="state.device === 'mobile' ? 'w-96' : 'w-full'"
+      v-if="rendering"
+      data-preview-rendering
+      class="absolute inset-0 bg-black-overlay-100 backdrop-blur-[1px]"
+      role="progressbar"
+      aria-label="Updating preview"
     >
-      <iframe
-        v-for="(name, index) in FRAME_NAMES"
-        :key="name"
-        :ref="(element) => (frames[index] = element)"
-        :name="name"
-        title="Storefront preview"
-        class="absolute inset-0 size-full"
-        :class="{ 'pointer-events-none invisible': index !== visibleIndex }"
-        :data-preview-frame="index === visibleIndex ? 'visible' : 'hidden'"
-      />
-      <div
-        v-if="rendering"
-        data-preview-rendering
-        class="absolute inset-0 bg-black-overlay-100 backdrop-blur-[1px]"
-        role="progressbar"
-        aria-label="Updating preview"
-      >
-        <div class="h-0.5 overflow-hidden bg-surface-gray-3">
-          <div class="preview-progress h-full w-1/3 bg-surface-gray-7" />
-        </div>
+      <div class="h-0.5 overflow-hidden bg-surface-gray-3">
+        <div class="preview-progress h-full w-1/3 bg-surface-gray-7" />
       </div>
     </div>
     <form ref="form" method="post" class="hidden">

@@ -30,6 +30,11 @@ test('select options become newline separated docfield options', () => {
   assert.equal(field.label, 'source')
 })
 
+test('select options get readable labels', () => {
+  const field = sectionSettingToField({ id: 'source', type: 'select', options: ['hand_picked', 'on_sale', 'main-menu'] })
+  assert.deepEqual(field.option_labels, { hand_picked: 'Hand picked', on_sale: 'On sale', 'main-menu': 'Main menu' })
+})
+
 test('an unknown type is refused', () => {
   assert.throws(() => sectionSettingToField({ id: 'video', type: 'video' }), /Unknown section setting type/)
 })
