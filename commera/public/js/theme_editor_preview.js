@@ -2,7 +2,7 @@
 	const origin = window.location.origin;
 	const target_selector = '[data-commera-block], [data-commera-section]';
 	const outline_style =
-		'position:absolute;pointer-events:none;z-index:2147483647;outline:2px solid #171717;outline-offset:-2px;box-shadow:0 0 0 2px #fff inset';
+		'position:absolute;pointer-events:none;z-index:2147483647;outline:2px solid #171717;outline-offset:2px;box-shadow:0 0 0 2px #fff';
 	let highlighted = [];
 	let outlines = [];
 	let selected_blocks = [];
