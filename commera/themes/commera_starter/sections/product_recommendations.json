@@ -1,6 +1,7 @@
 {
 	"name": "Product recommendations",
 	"category": "Products",
+	"pages": ["product"],
 	"settings": [
 		{ "id": "title", "type": "text", "label": "Title", "default": "You may also like" },
 		{ "id": "limit", "type": "number", "label": "Products to show", "default": 4 }

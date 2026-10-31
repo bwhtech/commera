@@ -1,6 +1,8 @@
 {
 	"name": "Product",
 	"category": "Products",
+	"pages": ["product"],
+	"required": true,
 	"settings": [
 		{ "id": "show_rating", "type": "checkbox", "label": "Show rating", "default": true },
 		{ "id": "show_quantity", "type": "checkbox", "label": "Show quantity", "default": true },

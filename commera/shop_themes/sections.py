@@ -255,7 +255,9 @@ def validate_layout(theme_context, layout, page=None):
 		schema = get_section_schema(theme_context["dirs"], section["type"])
 		if not schema:
 			frappe.throw(_("Section type {0} does not exist in this theme.").format(section["type"]))
-		if group not in (schema.get("groups") or DEFAULT_SECTION_GROUPS):
+		if group not in (schema.get("groups") or DEFAULT_SECTION_GROUPS) or (
+			page and schema.get("pages") and page not in schema["pages"]
+		):
 			frappe.throw(_("Section type {0} cannot be used in {1}.").format(section["type"], page or group))
 		if not isinstance(section.get("hidden", False), bool):
 			frappe.throw(_("Section {0}: hidden must be true or false.").format(section["id"]))
@@ -263,6 +265,17 @@ def validate_layout(theme_context, layout, page=None):
 		validate_blocks(schema, section, references)
 
 	validate_references(theme_context, references)
+	if page:
+		validate_required_sections(theme_context, layout, page)
+
+
+def validate_required_sections(theme_context, layout, page):
+	default_layout = get_theme_json(theme_context["dirs"], f"layouts/{page}.json") or {}
+	shown = {section["type"] for section in layout["sections"] if not section.get("hidden")}
+	for section in default_layout.get("sections") or []:
+		schema = get_section_schema(theme_context["dirs"], section["type"]) or {}
+		if schema.get("required") and section["type"] not in shown:
+			frappe.throw(_("The {0} page needs its {1} section.").format(page, section["type"]))
 
 
 def validate_blocks(schema, section, references):
