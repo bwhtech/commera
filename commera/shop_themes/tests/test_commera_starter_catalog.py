@@ -69,6 +69,33 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 				validate_layout(self.theme_context, layout, page)
 				self.assertEqual(layout["sections"][0]["type"], main_section)
 
+	def test_a_main_section_is_refused_outside_its_page(self):
+		for page, main_section in CATALOG_LAYOUTS.items():
+			with self.subTest(page), self.assertRaises(frappe.ValidationError):
+				validate_layout(
+					self.theme_context, {"sections": [{"id": "probe", "type": main_section}]}, "index"
+				)
+
+		with self.assertRaises(frappe.ValidationError):
+			validate_layout(
+				self.theme_context, {"sections": [{"id": "probe", "type": "product_recommendations"}]}, "page"
+			)
+
+	def test_a_page_layout_is_refused_without_its_main_section(self):
+		for page, main_section in CATALOG_LAYOUTS.items():
+			with self.subTest(page):
+				with self.assertRaises(frappe.ValidationError):
+					validate_layout(self.theme_context, {"sections": []}, page)
+				with self.assertRaises(frappe.ValidationError):
+					validate_layout(
+						self.theme_context,
+						{"sections": [{"id": "main", "type": main_section, "hidden": True}]},
+						page,
+					)
+				validate_layout(
+					self.theme_context, {"sections": [{"id": "main", "type": main_section}]}, page
+				)
+
 	def test_the_listing_shows_published_products_with_filters_and_sorting(self):
 		product = self.get_any_product()
 
