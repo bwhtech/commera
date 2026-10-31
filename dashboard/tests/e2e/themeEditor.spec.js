@@ -3,7 +3,7 @@ import { describe } from 'node:test'
 import { adminGet, adminPost, goto, uiTest, useSession, wait } from './harness.js'
 
 const SLOW_RENDER_MS = 1500
-const WORKSPACE_STORAGE = ['commera:theme-editor:canvas', 'commera-theme-editor-panels']
+const WORKSPACE_STORAGE = ['commera:theme-editor:zoom', 'commera-theme-editor-panels']
 
 const REFUSAL = {
   status: 417,
@@ -35,7 +35,21 @@ async function openEditor(page, theme, { clearWorkspace = false } = {}) {
 const panelWidth = (page, name) =>
   page.$eval(`[data-editor-panel="${name}"]`, (element) => Math.round(element.getBoundingClientRect().width))
 
-const zoomLevel = (page) => page.$eval('[data-zoom-level]', (element) => Number.parseInt(element.textContent, 10))
+const previewScale = (page) => page.$eval('[data-preview-canvas]', (element) => Number(element.dataset.previewScale))
+
+const box = async (page, selector) => (await page.$(selector)).boundingBox()
+
+async function setZoom(page, value) {
+  await page.click(`[aria-label="Preview zoom"] [data-value="${value}"]`)
+  await wait(500)
+}
+
+async function wheelOver(page, device) {
+  const frame = await box(page, `[data-preview-device="${device}"] iframe[data-preview-frame="visible"]`)
+  await page.mouse.move(frame.x + frame.width / 2, frame.y + frame.height / 2)
+  await page.mouse.wheel({ deltaY: 600 })
+  await wait(600)
+}
 
 async function dragBy(page, selector, deltaX, deltaY = 0) {
   const box = await (await page.$(selector)).boundingBox()
@@ -235,55 +249,31 @@ describe('theme editor', () => {
     assert.equal(await panelWidth(page, 'settings'), settingsWidth)
   })
 
-  uiTest(session, 'The preview canvas zooms, pans and maximises', async (t) => {
+  uiTest(session, 'The preview fits the canvas, scrolls its own page and maximises', async (t) => {
     const { page } = session
     const theme = await findLiveSectionsTheme(page)
     if (!theme) return t.skip('the live theme is not a Sections theme')
     await openEditor(page, theme, { clearWorkspace: true })
 
-    const fit = await zoomLevel(page)
-    assert.ok(fit > 10 && fit <= 100, `fit is ${fit}%`)
+    const canvas = await box(page, '[data-preview-canvas]')
+    const fit = await previewScale(page)
+    const frameBefore = await box(page, '[data-preview-device="desktop"] iframe[data-preview-frame="visible"]')
+    assert.ok(fit > 0.1 && fit <= 1, `fit is ${fit}`)
+    assert.ok(frameBefore.x >= canvas.x && frameBefore.x + frameBefore.width <= canvas.x + canvas.width + 1, 'fit keeps the desktop frame inside the canvas')
+    assert.ok(frameBefore.y + frameBefore.height <= canvas.y + canvas.height, 'the frame ends inside the canvas')
 
-    const transform = () => page.$eval('[data-preview-stage]', (element) => element.style.transform)
-    const canvas = await (await page.$('[data-preview-canvas]')).boundingBox()
-    const atFit = await transform()
-    await page.mouse.move(canvas.x + 12, canvas.y + canvas.height - 80)
-    await wait(100)
-    await page.mouse.down()
-    await page.mouse.move(canvas.x + 112, canvas.y + canvas.height - 130, { steps: 8 })
-    await page.mouse.up()
-    assert.notEqual(await transform(), atFit, 'dragging the grey canvas pans it')
+    const desktop = await visibleFrame(page, 'desktop')
+    const scrolledBefore = await desktop.evaluate(() => window.scrollY)
+    await wheelOver(page, 'desktop')
+    assert.ok((await desktop.evaluate(() => window.scrollY)) > scrolledBefore, 'the wheel scrolls the storefront page')
+    assert.deepEqual(await box(page, '[data-preview-device="desktop"] iframe[data-preview-frame="visible"]'), frameBefore, 'the frame does not move')
 
-    const overFrame = await transform()
-    await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2)
-    await page.keyboard.down('Space')
-    await wait(100)
-    await page.mouse.down()
-    await page.mouse.move(canvas.x + canvas.width / 2 - 100, canvas.y + canvas.height / 2, { steps: 8 })
-    await page.mouse.up()
-    await page.keyboard.up('Space')
-    assert.notEqual(await transform(), overFrame, 'holding Space pans over the preview')
-
-    await page.click('[data-zoom-level]')
-    await page.waitForSelector('[role="menuitem"]', { visible: true })
-    const [fitItem] = await page.$$('xpath/.//*[@role="menuitem"][normalize-space()="Zoom to fit"]')
-    await fitItem.click()
-    await wait(600)
-    assert.equal(await zoomLevel(page), fit, 'zoom to fit comes back to the same fit')
-    await clickButton(page, 'Zoom in')
-    await wait(400)
-    assert.ok((await zoomLevel(page)) > fit, 'zoom in grows')
-    await clickButton(page, 'Zoom out')
-    await clickButton(page, 'Zoom out')
-    await wait(400)
-    assert.ok((await zoomLevel(page)) < fit, 'zoom out shrinks')
-
-    await page.click('[data-zoom-level]')
-    await page.waitForSelector('[role="menuitem"]', { visible: true })
-    const [hundred] = await page.$$('xpath/.//*[@role="menuitem"][normalize-space()="100%"]')
-    await hundred.click()
-    await wait(600)
-    assert.equal(await zoomLevel(page), 100)
+    await setZoom(page, '1')
+    assert.equal(await previewScale(page), 1)
+    await setZoom(page, '0.75')
+    assert.equal(await previewScale(page), 0.75)
+    await setZoom(page, 'fit')
+    assert.equal(await previewScale(page), fit)
 
     const treeWidth = await panelWidth(page, 'tree')
     await clickButton(page, 'Maximise preview')
@@ -310,8 +300,18 @@ describe('theme editor', () => {
     })
     const desktop = await visibleFrame(page, 'desktop')
     const mobile = await visibleFrame(page, 'mobile')
-    assert.equal(await desktop.evaluate(() => window.innerWidth), 1280 - 2)
-    assert.equal(await mobile.evaluate(() => window.innerWidth), 390 - 2)
+    assert.equal(await desktop.evaluate(() => window.innerWidth), 1280)
+    assert.equal(await mobile.evaluate(() => window.innerWidth), 390)
+
+    const canvas = await box(page, '[data-preview-canvas]')
+    const desktopBox = await box(page, '[data-preview-device="desktop"]')
+    const mobileBox = await box(page, '[data-preview-device="mobile"]')
+    assert.ok(desktopBox.x >= canvas.x && mobileBox.x + mobileBox.width <= canvas.x + canvas.width + 1, 'both frames fit')
+
+    const desktopScroll = await desktop.evaluate(() => window.scrollY)
+    await wheelOver(page, 'mobile')
+    assert.ok((await mobile.evaluate(() => window.scrollY)) > 0, 'the mobile page scrolls')
+    assert.equal(await desktop.evaluate(() => window.scrollY), desktopScroll, 'the desktop page stays where it was')
 
     await page.click('[data-tree-node^="section:"]')
     await wait(800)
