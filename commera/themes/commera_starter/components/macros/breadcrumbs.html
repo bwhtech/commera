@@ -1,0 +1,8 @@
+{% macro breadcrumbs(links) %}
+<nav aria-label="{{ _('Breadcrumb') }}" class="text-sm text-ink-gray-6">
+	{%- for link in links %}
+	{%- if not loop.first %} / {% endif %}
+	{%- if link.url %}<a href="{{ link.url }}" class="hover:text-ink-gray-9">{{ link.label }}</a>{% else %}<span aria-current="page">{{ link.label }}</span>{% endif %}
+	{%- endfor %}
+</nav>
+{%- endmacro %}

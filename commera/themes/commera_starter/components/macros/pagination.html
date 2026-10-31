@@ -1,0 +1,23 @@
+{% from "components/macros/icons.html" import icon %}
+
+{% macro pagination(page, last_page, page_url) %}
+{% if last_page > 1 %}
+<nav class="mt-16 flex items-center justify-center gap-1" aria-label="{{ _('Pages') }}">
+	{% if page > 1 %}
+	<a href="{{ page_url(page - 1) }}" class="grid size-8 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3" aria-label="{{ _('Previous page') }}">{{ icon("left", "size-4 rtl:-scale-x-100") }}</a>
+	{% endif %}
+	{% for number in range(1, last_page + 1) %}
+	{% if number == page %}
+	<span class="grid size-8 place-items-center rounded-lg bg-brand text-base text-on-brand" aria-current="page">{{ number }}</span>
+	{% elif number == 1 or number == last_page or (number - page) | abs <= 1 %}
+	<a href="{{ page_url(number) }}" class="grid size-8 place-items-center rounded-lg text-base text-ink-gray-8 hover:bg-surface-gray-3">{{ number }}</a>
+	{% elif number == 2 or number == last_page - 1 %}
+	<span class="px-1 text-ink-gray-6">…</span>
+	{% endif %}
+	{% endfor %}
+	{% if page < last_page %}
+	<a href="{{ page_url(page + 1) }}" class="grid size-8 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3" aria-label="{{ _('Next page') }}">{{ icon("right", "size-4 rtl:-scale-x-100") }}</a>
+	{% endif %}
+</nav>
+{% endif %}
+{%- endmacro %}
