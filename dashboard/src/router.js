@@ -31,6 +31,12 @@ const routes = [
   { path: '/analytics/inventory', name: 'InventoryReport', component: () => import('./pages/analytics/Inventory.vue') },
   { path: '/analytics/storefront', name: 'StorefrontReport', component: () => import('./pages/analytics/Storefront.vue') },
   { path: '/storefront/theme', name: 'StorefrontTheme', component: () => import('./pages/storefront/Theme.vue') },
+  {
+    path: '/storefront/theme/:theme/editor',
+    name: 'StorefrontThemeEditor',
+    component: () => import('./pages/storefront/ThemeLayoutEditor.vue'),
+    meta: { fullscreen: true },
+  },
   { path: '/storefront/navigation', name: 'StorefrontNavigation', component: () => import('./pages/storefront/Navigation.vue') },
   { path: '/storefront/pages', name: 'StorefrontPages', component: () => import('./pages/storefront/Pages.vue') },
   // A Shop Web Page is named by its title, so this shadows a page literally titled "new" —

@@ -42,6 +42,7 @@ class TestAdminTheme(IntegrationTestCase):
 		self.assertEqual(data["active_theme"], SUMMER_THEME)
 		self.assertTrue(self.find_theme(data["themes"], SUMMER_THEME)["live"])
 		self.assertFalse(self.find_theme(data["themes"], BASE_THEME)["live"])
+		self.assertEqual(self.find_theme(data["themes"], SUMMER_THEME)["theme_type"], "Sections")
 		# Live first: the screen leads with the theme the storefront is actually serving.
 		self.assertTrue(data["themes"][0]["live"])
 

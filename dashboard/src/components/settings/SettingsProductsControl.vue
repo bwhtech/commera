@@ -1,13 +1,14 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { refDebounced } from '@vueuse/core'
-import { MultiSelect } from 'frappe-ui'
+import { Button, MultiSelect } from 'frappe-ui'
 import { useMethodRead } from '../../data/api'
 
 const SEARCH_DEBOUNCE_MS = 300
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
+  max: { type: Number, default: 0 },
   disabled: { type: Boolean, default: false },
 })
 
@@ -36,8 +37,16 @@ const options = computed(() => {
   for (const code of props.modelValue) {
     if (!merged.has(code)) merged.set(code, { label: titles[code] ?? code, value: code })
   }
-  return [...merged.values()]
+  const full = props.max && props.modelValue.length >= props.max
+  return [...merged.values()].map((option) => ({
+    ...option,
+    disabled: Boolean(full) && !props.modelValue.includes(option.value),
+  }))
 })
+
+function update(codes) {
+  emit('update:modelValue', props.max ? codes.slice(0, props.max) : codes)
+}
 </script>
 
 <template>
@@ -51,7 +60,13 @@ const options = computed(() => {
       :filterable="false"
       :disabled="disabled"
       placeholder="Pick products"
-      @update:model-value="emit('update:modelValue', $event)"
-    />
+      @update:model-value="update"
+    >
+      <template #footer="{ clear }">
+        <div v-if="modelValue.length" class="border-t border-outline-gray-1 px-2 py-1.5">
+          <Button variant="ghost" size="sm" @click="clear">Clear All</Button>
+        </div>
+      </template>
+    </MultiSelect>
   </div>
 </template>

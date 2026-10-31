@@ -21,7 +21,7 @@ def build_themes(active_theme):
 	"""Every installed theme, live one first, with what each inherits from."""
 	themes = frappe.get_all(
 		"Shop Theme",
-		fields=["name", "theme_name", "parent_theme", "is_standard", "theme_settings"],
+		fields=["name", "theme_name", "parent_theme", "is_standard", "theme_settings", "theme_type"],
 		order_by="theme_name asc",
 	)
 

@@ -7,7 +7,7 @@ import frappe
 from frappe import _
 
 from commera.api.admin.theme import build_theme_settings
-from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context
+from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
 from commera.shop_themes.sections import get_section_schema, get_theme_json
 
 EDITOR_ROLES = ("System Manager", "Website Manager")
@@ -96,6 +96,7 @@ def get_editor(theme: str, page: str = "index"):
 	return {
 		"theme": theme,
 		"theme_type": theme_context["theme_type"],
+		"live": theme == resolve_active_theme(),
 		"pages": get_pages(theme_context["dirs"]),
 		"section_schemas": get_section_schemas(theme_context["dirs"]),
 		"settings": build_theme_settings(theme),

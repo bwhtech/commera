@@ -27,7 +27,8 @@ provide(routeLocationKey, shallowReactive(shellRoute))
 
 <template>
   <FrappeUIProvider>
-    <component :is="Layout">
+    <router-view v-if="visibleRoute.meta.fullscreen" :route="visibleRoute" />
+    <component :is="Layout" v-else>
       <router-view :route="visibleRoute" />
     </component>
 
