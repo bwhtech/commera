@@ -35,7 +35,7 @@ Run one spec on its own with `node --test tests/e2e/catalog.spec.js`.
 | `storefront.spec.js` | The navigation tree editor and the footer column editor, asserted after a reload. |
 | `checkout.spec.js` | A new shopper signs up on the storefront, places a COD order, and finds it in `/account/orders`. |
 | `discounts.spec.js` | A cart link's `?discount=` code is shown at checkout and reaches the COD order, `mode=add` keeps the cart and adds the code, a code typed into the default theme's promo box reaches the open checkout, and signing in merges the guest cart into the account's. |
-| `themeEditor.spec.js` | Publish in the theme editor saves every changed part before publishing any, so a refused save leaves the live store untouched. Skips unless the live theme is a Sections theme. |
+| `themeEditor.spec.js` | Publish in the theme editor saves every changed part before publishing any, so a refused save leaves the live store untouched; a slow preview render dims the preview until the new page swaps in, and the swapped page skips its entrance animations. Skips unless the live theme is a Sections theme. |
 
 Not covered, because there is nothing behind them yet: **Storefront > Theme** and
 **Storefront > Pages** are mock screens with no endpoint, and **Product types** has no
