@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, useId, watch } from 'vue'
 import { useEventListener } from '@vueuse/core'
+import { toast } from 'frappe-ui'
 import { SECTION_GROUPS } from '../../data/themeLayout'
 
 const props = defineProps({
@@ -22,6 +23,7 @@ const csrfInput = ref(null)
 const visibleIndex = ref(null)
 const rendering = ref(false)
 let latestRender = 0
+let readyRender = 0
 let lastPosted = null
 let renderingTimer = null
 
@@ -73,6 +75,16 @@ function render() {
   renderingTimer = setTimeout(() => (rendering.value = true), RENDERING_DELAY_MS)
 }
 
+const renderNumberOf = (index) => Number(new URLSearchParams(frames[index].contentWindow.location.search).get('render'))
+
+function onFrameLoad(index) {
+  if (index === visibleIndex.value || renderNumberOf(index) !== latestRender || readyRender === latestRender) return
+  clearTimeout(renderingTimer)
+  rendering.value = false
+  lastPosted = null
+  toast.error('The preview could not be updated. Your changes are kept.', { id: 'theme-preview-failed' })
+}
+
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve))
 
 async function swapIn(index, renderNumber) {
@@ -101,7 +113,8 @@ useEventListener(window, 'message', (event) => {
   if (type === 'commera:select' && index === visibleIndex.value) selectFromPreview(data)
   if (type === 'commera:scroll' && index === visibleIndex.value) emit('scroll', data)
   if (type === 'commera:preview-ready' && index !== visibleIndex.value) {
-    const renderNumber = Number(new URLSearchParams(event.source.location.search).get('render'))
+    const renderNumber = renderNumberOf(index)
+    readyRender = renderNumber
     if (renderNumber === latestRender) swapIn(index, renderNumber)
   }
 })
@@ -132,6 +145,7 @@ watch(
       class="absolute inset-0 size-full"
       :class="{ 'pointer-events-none invisible': index !== visibleIndex }"
       :data-preview-frame="index === visibleIndex ? 'visible' : 'hidden'"
+      @load="onFrameLoad(index)"
     />
     <div
       v-if="rendering"

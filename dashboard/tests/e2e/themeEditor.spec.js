@@ -164,6 +164,40 @@ describe('theme editor', () => {
     }
   })
 
+  uiTest(session, 'A failed preview render clears the overlay and keeps the last page usable', async (t) => {
+    const { page } = session
+    const theme = await findLiveSectionsTheme(page)
+    if (!theme) return t.skip('the live theme is not a Sections theme')
+    await openEditor(page, theme)
+    await page.waitForSelector('[data-preview-rendering]', { hidden: true, timeout: 30000 })
+
+    await page.setRequestInterception(true)
+    const intercept = (request) => {
+      if (request.method() === 'POST' && request.url().includes('/theme_editor_preview')) {
+        const badGateway = { status: 502, contentType: 'text/html', body: '<h1>502 Bad Gateway</h1>' }
+        setTimeout(() => request.respond(badGateway), SLOW_RENDER_MS)
+      } else request.continue()
+    }
+    page.on('request', intercept)
+
+    try {
+      await page.click('[data-tree-node^="section:"]')
+      await page.waitForSelector('button[aria-label^="Hide "]', { visible: true })
+      await page.click('button[aria-label^="Hide "]')
+      await page.waitForSelector('[data-preview-rendering]', { visible: true, timeout: SLOW_RENDER_MS })
+      await page.waitForSelector('[data-preview-rendering]', { hidden: true, timeout: 5000 })
+      const body = await page.evaluate(() => document.body.innerText)
+      assert.ok(body.includes('The preview could not be updated'), 'the merchant is told the preview did not update')
+      const shown = await (await visibleFrame(page, 'desktop')).evaluate(() => document.body.innerText)
+      assert.ok(!shown.includes('502 Bad Gateway'), 'the last good page stays in the preview')
+    } finally {
+      page.off('request', intercept)
+      await page.setRequestInterception(false)
+      await page.click('button[aria-label^="Show "]')
+      await wait(500)
+    }
+  })
+
   uiTest(session, 'Saving a theme setting re-renders the preview once with the new value', async (t) => {
     const { page } = session
     const theme = await findLiveSectionsTheme(page)
