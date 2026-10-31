@@ -79,6 +79,7 @@ export function createLayoutEditor(theme) {
     device: 'desktop',
     selection: null,
     previewToken: 0,
+    settingsRevision: 0,
     scrollRequest: 0,
     loaded: false,
     loadError: null,
@@ -348,6 +349,7 @@ export function createLayoutEditor(theme) {
     const data = await themeCaller.call('save_theme_settings', { [field.fieldname]: value })
     if (!data) return false
     field.value = value
+    state.settingsRevision += 1
     commit()
     return true
   }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe } from 'node:test'
-import { adminGet, goto, uiTest, useSession, wait } from './harness.js'
+import { adminGet, adminPost, goto, uiTest, useSession, wait } from './harness.js'
 
 const SLOW_RENDER_MS = 1500
 
@@ -99,6 +99,57 @@ describe('theme editor', () => {
     } finally {
       page.off('request', intercept)
       await page.setRequestInterception(false)
+    }
+  })
+
+  uiTest(session, 'Saving a theme setting re-renders the preview once with the new value', async (t) => {
+    const { page } = session
+    const theme = await findLiveSectionsTheme(page)
+    if (!theme) return t.skip('the live theme is not a Sections theme')
+
+    await goto(page, `/storefront/theme/${encodeURIComponent(theme.name)}/editor`)
+    await page.waitForFunction(
+      () => document.querySelector('iframe[data-preview-frame="visible"]')?.contentDocument?.querySelector('[data-commera-section]'),
+      { timeout: 30000 },
+    )
+    const [settingsRow] = await page.$$('xpath/.//button[normalize-space()="Theme settings"]')
+    await settingsRow.click()
+    await page.waitForSelector('[id^="theme-"]', { visible: true })
+
+    const field = await page.evaluate(() => {
+      const preview = document.querySelector('iframe[data-preview-frame="visible"]').contentDocument.documentElement.outerHTML
+      const inputs = [...document.querySelectorAll('input[id^="theme-"]')].filter((element) => element.type === 'text')
+      const input =
+        inputs.find((element) => element.id.endsWith('_url')) ??
+        inputs.find((element) => element.value && preview.includes(element.value))
+      return input && { id: input.id, fieldname: input.id.replace('theme-', ''), value: input.value }
+    })
+    if (!field) return t.skip('no theme setting of this theme shows in the preview')
+
+    const changed = field.fieldname.endsWith('_url') ? `https://example.com/e2e-${Date.now()}` : `${field.value} E2E`
+    const posts = []
+    const countPost = (request) => {
+      if (request.method() === 'POST' && request.url().includes('/theme_editor_preview')) posts.push(request.url())
+    }
+    page.on('request', countPost)
+
+    try {
+      await page.click(`#${field.id}`, { clickCount: 3 })
+      await page.keyboard.type(changed)
+      await page.keyboard.press('Tab')
+      await page.waitForFunction(
+        (text) =>
+          document
+            .querySelector('iframe[data-preview-frame="visible"]')
+            .contentDocument.documentElement.outerHTML.includes(text),
+        { timeout: 30000 },
+        changed,
+      )
+      await wait(1000)
+      assert.equal(posts.length, 1, 'one preview render for one saved setting')
+    } finally {
+      page.off('request', countPost)
+      await adminPost(page, 'theme.save_theme_settings', { [field.fieldname]: field.value })
     }
   })
 })

@@ -48,7 +48,7 @@ function render() {
     SECTION_GROUPS.includes(part.group) ? `${part.group}_layout` : 'layout',
     JSON.stringify(part.layout),
   ])
-  const posted = JSON.stringify([action.value, layouts])
+  const posted = JSON.stringify([action.value, state.settingsRevision, layouts])
   if (posted === lastPosted) return
   lastPosted = posted
   latestRender += 1
