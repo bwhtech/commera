@@ -1,7 +1,7 @@
-{% macro image(path, alt="", width=640, class="aspect-[3/4] w-full rounded-xl object-cover object-top") %}
+{% macro image(path, alt="", width=640, class="aspect-[3/4] w-full rounded-xl object-cover object-top", loading="lazy") %}
 {%- set src = commera.format.image_url(path, width) if path else None -%}
 {% if src %}
-<img src="{{ src }}" alt="{{ alt or '' }}" loading="lazy" class="{{ class }}">
+<img src="{{ src }}" alt="{{ alt or '' }}" loading="{{ loading }}" class="{{ class }}">
 {% else %}
 <div class="{{ class }} bg-surface-gray-2"></div>
 {% endif %}
