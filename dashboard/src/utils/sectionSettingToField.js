@@ -10,6 +10,10 @@ const FIELDTYPES = {
   products: 'Products',
 }
 
+export function readableName(code) {
+  return code.replace(/[_-]/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase())
+}
+
 export function sectionSettingToField(setting) {
   const fieldtype = FIELDTYPES[setting.type]
   if (!fieldtype) throw new Error(`Unknown section setting type: ${setting.type}`)
@@ -19,6 +23,10 @@ export function sectionSettingToField(setting) {
     label: setting.label ?? setting.id,
     fieldtype,
     options: setting.type === 'select' ? (setting.options ?? []).join('\n') : undefined,
+    option_labels:
+      setting.type === 'select'
+        ? Object.fromEntries((setting.options ?? []).map((option) => [option, readableName(option)]))
+        : undefined,
     default: setting.default,
   }
 }

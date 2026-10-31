@@ -1,5 +1,6 @@
 import { computed, reactive } from 'vue'
 import { createAdminCaller } from './adminCaller'
+import { readableName } from '../utils/sectionSettingToField'
 
 const DEFAULT_MAX_BLOCKS = 50
 const DEFAULT_MAX_PRODUCTS = 8
@@ -49,7 +50,7 @@ const GROUP_LABELS = { header_group: 'Header group', footer_group: 'Footer group
 export function pageLabel(page) {
   if (GROUP_LABELS[page]) return GROUP_LABELS[page]
   if (page === 'index') return 'Home page'
-  return page.replace(/[_-]/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase())
+  return readableName(page)
 }
 
 const PART_ORDER = ['header_group', null, 'footer_group']
