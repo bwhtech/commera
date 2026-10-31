@@ -14,6 +14,7 @@ __all__ = [
 	"CheckoutSummary",
 	"Collection",
 	"ContentPage",
+	"Country",
 	"CustomerAddress",
 	"CustomerProfile",
 	"Discount",
@@ -47,6 +48,7 @@ __all__ = [
 	"ShippingOptions",
 	"Shop",
 	"ShopperOrder",
+	"ShopperOrderDetail",
 	"ShopperOrderPage",
 	"Sitemap",
 	"SitemapEntry",
@@ -125,6 +127,10 @@ class ShopperOrder(TypedDict):
 	plugin_fields: dict[str, Any]
 	discounts: list["DiscountAllocation"]
 	attributes: dict[str, str]
+
+
+class ShopperOrderDetail(ShopperOrder):
+	access: str
 
 
 class Order(ShopperOrder):
@@ -461,6 +467,11 @@ class Shop(TypedDict):
 	favicon: str
 	menu: list[MenuItem]
 	footer: list[FooterSection]
+
+
+class Country(TypedDict):
+	name: str
+	title: str
 
 
 class ContentPage(TypedDict):

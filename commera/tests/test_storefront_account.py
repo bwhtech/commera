@@ -6,8 +6,13 @@ from frappe.tests import IntegrationTestCase
 from commera.api.payments import add_customer_address
 from commera.api.storefront import account
 from commera.core import get_party
-from commera.order_access import OWNER_ACCESS, get_order_access, get_shopper_order_condition
-from commera.sdk.types import CustomerAddress, CustomerProfile, ShopperOrder, ShopperOrderPage
+from commera.order_access import (
+	OWNER_ACCESS,
+	get_order_access,
+	get_shopper_order_condition,
+	reset_order_access_key,
+)
+from commera.sdk.types import CustomerAddress, CustomerProfile, ShopperOrderDetail, ShopperOrderPage
 from commera.tests.test_admin_orders import make_test_sales_order
 from commera.tests.test_order_access import make_website_user
 from commera.tests.test_storefront_api import get_shopper_messages
@@ -165,16 +170,62 @@ class TestStorefrontAccount(IntegrationTestCase):
 		self.assertEqual((page["total"], page["page_size"]), (2, 1))
 		names = {page["orders"][0]["name"], account.list_orders(page=2, page_size=1)["orders"][0]["name"]}
 		self.assertEqual(names, {own, guest})
-		self.assert_shape(account.get_order(guest), ShopperOrder)
+		order = account.get_order(guest)
+		self.assert_shape(order, ShopperOrderDetail)
+		self.assertEqual(order["access"], "owner")
 
 	def test_a_shopper_cannot_read_another_shoppers_order(self):
 		order = self.make_order(owner=self.other)
+		reset_order_access_key(frappe.get_doc("Sales Order", order))
 		frappe.set_user(self.shopper)
 
-		frappe.local.message_log = []
-		with self.assertRaises(frappe.DoesNotExistError):
-			account.get_order(order)
-		self.assertEqual(get_shopper_messages(), [f"Order {order} not found"])
+		for key in (None, "wrong-key"):
+			frappe.local.message_log = []
+			with self.subTest(key=key), self.assertRaises(frappe.PermissionError):
+				account.get_order(order, key)
+			self.assertEqual(get_shopper_messages(), [])
+
+	def test_an_order_link_key_opens_the_order_for_a_guest(self):
+		order = self.make_order(contact_email=self.shopper)
+		key = reset_order_access_key(frappe.get_doc("Sales Order", order))
+		frappe.set_user("Guest")
+
+		opened = account.get_order(order, key)
+
+		self.assert_shape(opened, ShopperOrderDetail)
+		self.assertEqual((opened["name"], opened["access"], opened["email"]), (order, "full", self.shopper))
+
+	def test_a_wrong_or_missing_key_is_refused_alike(self):
+		order = self.make_order(contact_email=self.shopper)
+		reset_order_access_key(frappe.get_doc("Sales Order", order))
+		frappe.set_user("Guest")
+
+		for key in (None, "", "wrong-key"):
+			frappe.local.message_log = []
+			with self.subTest(key=key), self.assertRaises(frappe.PermissionError):
+				account.get_order(order, key)
+			self.assertEqual(get_shopper_messages(), [])
+
+	def test_an_expired_order_link_hides_the_address_and_payment(self):
+		order = self.make_order(contact_email=self.shopper)
+		sales_order = frappe.get_doc("Sales Order", order)
+		key = reset_order_access_key(sales_order)
+		sales_order.db_set(
+			{
+				"custom_ecommerce_payment_mode": "COD",
+				"custom_order_access_key_issued_on": frappe.utils.add_days(frappe.utils.now_datetime(), -10),
+			}
+		)
+		frappe.db.set_single_value("Commera Settings", "guest_order_link_days", 7)
+		frappe.set_user("Guest")
+
+		opened = account.get_order(order, key)
+
+		self.assertEqual(opened["access"], "limited")
+		self.assertEqual(
+			[opened[field] for field in ("shipping_address", "email", "phone", "payment_mode")], [None] * 4
+		)
+		self.assertEqual(opened["name"], order)
 
 	def make_order(self, owner: str = "Administrator", contact_email=None, guest_cart=False) -> str:
 		sales_order = make_test_sales_order()

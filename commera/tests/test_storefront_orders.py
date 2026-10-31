@@ -6,7 +6,7 @@ from frappe.tests import IntegrationTestCase
 from commera.api.admin.orders import fulfil_order
 from commera.api.storefront import orders
 from commera.order_access import set_order_access_key
-from commera.sdk.types import ReturnOptions, ShopperOrder
+from commera.sdk.types import ReturnOptions, ShopperOrderDetail
 from commera.tests.test_admin_orders import make_test_sales_order
 from commera.tests.test_order_access import make_website_user
 
@@ -31,7 +31,9 @@ class TestStorefrontOrders(IntegrationTestCase):
 
 		order = orders.cancel_order(self.sales_order.name)
 
-		self.assertEqual(set(order), ShopperOrder.__required_keys__ | ShopperOrder.__optional_keys__)
+		self.assertEqual(
+			set(order), ShopperOrderDetail.__required_keys__ | ShopperOrderDetail.__optional_keys__
+		)
 		self.assertTrue(order["is_cancelled"])
 
 	def test_only_the_shopper_acts_on_their_order(self):

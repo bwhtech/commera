@@ -4,10 +4,10 @@ import frappe
 
 from commera.api.storefront.collections import get_collection, get_collections
 from commera.api.storefront.products import get_product, get_products
-from commera.api.storefront.shop import get_page, get_sitemap, get_storefront_url
+from commera.api.storefront.shop import get_page, get_sitemap, get_storefront_url, list_countries
 from commera.sdk import catalog, shop
 from commera.sdk.shop import get_menu_link
-from commera.sdk.types import Collection, Product, ProductCard, ProductPage, ProductVariant, Shop
+from commera.sdk.types import Collection, Country, Product, ProductCard, ProductPage, ProductVariant, Shop
 from commera.shop_themes.sections import get_section_products
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.www.sitemap_segment import get_urls_per_page
@@ -48,6 +48,15 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		self.assert_shape(product["variants"][0], ProductVariant)
 		self.assert_shape(catalog.list_collections()[0], Collection)
 		self.assert_shape(shop.get_shop(), Shop)
+
+	def test_countries_are_listed_by_title_with_the_record_name_an_address_stores(self):
+		countries = list_countries()
+
+		self.assert_shape(countries[0], Country)
+		self.assertIn({"name": "India", "title": "India"}, countries)
+		self.assertEqual(countries, sorted(countries, key=lambda country: country["title"]))
+		names = [country["name"] for country in countries]
+		self.assertEqual(frappe.db.count("Country", {"name": ("in", names)}), len(names))
 
 	def test_a_product_lists_its_sizes_as_variants_with_sale_and_list_prices(self):
 		route = self.make_priced_variant("API", default_rate=100, sale_rate=80)
