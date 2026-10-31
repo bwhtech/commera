@@ -1,0 +1,42 @@
+{% from "components/macros/icons.html" import icon %}
+{% set language = frappe.lang or "en" %}
+
+<div x-show="!$store.cart.count" class="flex flex-1 flex-col items-center justify-center gap-4 px-5 text-center">
+	<p class="text-p-base text-ink-gray-6">{{ _("Your cart is empty.") }}</p>
+	<a href="/{{ language }}/products" class="inline-flex h-10 items-center justify-center rounded-lg bg-brand px-3 text-lg font-medium text-on-brand hover:bg-brand-hover">{{ _("Continue shopping") }}</a>
+</div>
+
+<ul x-show="$store.cart.count" class="flex-1 divide-y divide-outline-gray-2 overflow-y-auto px-5">
+	<template x-for="line in $store.cart.cart?.lines ?? []" :key="line.line_id">
+		<li class="flex gap-4 py-5">
+			<a :href="line.product && $store.cart.product_url(line.product)" class="w-20 shrink-0 overflow-hidden rounded-lg bg-surface-gray-2">
+				<img x-show="line.product?.image" :src="line.product?.image" alt="" class="aspect-[3/4] w-full object-cover object-top">
+			</a>
+			<div class="flex min-w-0 flex-1 flex-col">
+				<div class="flex justify-between gap-3">
+					<p class="text-base" x-text="line.product?.title ?? line.title"></p>
+					<p class="shrink-0 text-base" x-text="$store.cart.money(line.amount)"></p>
+				</div>
+				<p class="mt-1 text-sm text-ink-gray-6" x-show="line.product?.variant_title" x-text="line.product?.variant_title"></p>
+				<div class="mt-auto flex items-center justify-between pt-3">
+					<div class="flex h-8 items-center rounded-lg bg-surface-gray-2">
+						<button type="button" @click="$store.cart.set_quantity(line, line.qty - 1)" :disabled="$store.cart.busy" class="grid size-8 place-items-center text-ink-gray-8 disabled:text-ink-gray-4" aria-label="{{ _('Less') }}">{{ icon("minus", "size-4") }}</button>
+						<span class="w-6 text-center text-base" x-text="line.qty"></span>
+						<button type="button" @click="$store.cart.set_quantity(line, line.qty + 1)" :disabled="$store.cart.busy" class="grid size-8 place-items-center text-ink-gray-8 disabled:text-ink-gray-4" aria-label="{{ _('More') }}">{{ icon("plus", "size-4") }}</button>
+					</div>
+					<button type="button" @click="$store.cart.remove(line)" :disabled="$store.cart.busy" class="text-sm text-ink-gray-6 underline hover:text-ink-gray-9">{{ _("Remove") }}</button>
+				</div>
+			</div>
+		</li>
+	</template>
+</ul>
+
+<div x-show="$store.cart.count" class="border-t border-outline-gray-2 px-5 py-4">
+	<p x-show="$store.cart.error" x-text="$store.cart.error" class="mb-3 text-sm text-ink-red-4"></p>
+	<div class="flex justify-between text-lg">
+		<span>{{ _("Subtotal") }}</span>
+		<span x-text="$store.cart.money($store.cart.cart?.total)"></span>
+	</div>
+	<p class="mt-1 text-sm text-ink-gray-6">{{ _("Shipping and taxes are worked out at checkout.") }}</p>
+	<button type="button" @click="$store.cart.checkout()" :disabled="$store.cart.busy" class="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg bg-brand px-3 text-lg font-medium text-on-brand hover:bg-brand-hover">{{ _("Check out") }}</button>
+</div>

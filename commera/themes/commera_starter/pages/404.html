@@ -1,0 +1,23 @@
+{% extends "components/base.html" %}
+{% from "components/macros/product_card.html" import product_card with context %}
+{% from "components/macros/search_form.html" import search_form %}
+
+{% block uncontained_body %}
+<section class="flex flex-col items-center px-5 py-24 text-center md:px-12">
+	<p class="text-sm text-ink-gray-6">404</p>
+	<h1 class="mt-3 text-8xl">{{ _("Page not found") }}</h1>
+	<p class="mt-4 text-p-base text-ink-gray-6">{{ _("This page has moved or is no longer here.") }}</p>
+	<div class="mt-8 flex w-full justify-center">{{ search_form() }}</div>
+	<a href="/{{ frappe.lang or 'en' }}" class="mt-6 inline-flex h-10 items-center justify-center rounded-lg border border-outline-gray-2 bg-surface-base px-3 text-lg font-medium text-ink-gray-8 hover:border-outline-gray-3">{{ _("Back to home") }}</a>
+</section>
+{% if new_arrivals %}
+<section class="px-5 pb-20 md:px-12">
+	<h2 class="text-3xl">{{ _("New arrivals") }}</h2>
+	<div class="mt-8 grid grid-cols-2 gap-x-5 gap-y-10 md:grid-cols-4 md:gap-x-8">
+		{% for product in new_arrivals %}
+		{{ product_card(product) }}
+		{% endfor %}
+	</div>
+</section>
+{% endif %}
+{% endblock %}

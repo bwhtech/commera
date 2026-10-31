@@ -1,0 +1,7 @@
+{
+	"name": "Page content",
+	"category": "Text",
+	"settings": [{ "id": "show_title", "type": "checkbox", "label": "Show title", "default": true }],
+	"blocks": {},
+	"max_blocks": 0
+}

@@ -1,0 +1,8 @@
+{% extends "components/base.html" %}
+
+{% block uncontained_body %}
+<section x-data class="mx-auto flex max-w-2xl flex-col px-5 py-10">
+	<h1 class="px-5 text-8xl">{{ _("Cart") }} <span class="text-ink-gray-6" x-cloak x-show="$store.cart.count" x-text="'(' + $store.cart.count + ')'"></span></h1>
+	{% include "components/cart_contents.html" %}
+</section>
+{% endblock %}
