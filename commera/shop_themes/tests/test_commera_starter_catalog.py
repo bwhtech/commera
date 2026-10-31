@@ -16,6 +16,7 @@ CATALOG_LAYOUTS = {
 	"products": "main_collection",
 	"search": "main_search",
 	"product": "main_product",
+	"page": "main_page",
 }
 
 
@@ -132,3 +133,36 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		self.assertIn("Add to cart", html)
 		self.assertIn("Shipping &amp; returns", html)
 		self.assertIn('"@type": "Product"', html)
+
+	def test_an_unknown_product_renders_the_theme_404(self):
+		status, html = self.render(
+			"pages/products/details.html", "/en/products/zz-no-such-product", route="zz-no-such-product"
+		)
+
+		self.assertEqual(status, 404)
+		self.assertIn("Page not found", html)
+		self.assertIn('name="search"', html)
+
+	def test_the_content_page_renders_the_published_page(self):
+		page = frappe.new_doc("Shop Web Page")
+		page.name = "ZZ Starter Returns"
+		page.route = "zz-starter-returns"
+		page.content = "<p>ZZ starter returns body</p>"
+		page.published = 1
+		page.insert()
+
+		status, html = self.render(
+			"pages/shop_web_page.html", "/en/page/zz-starter-returns", route=page.route
+		)
+
+		self.assertEqual(status, 200)
+		self.assertIn("ZZ Starter Returns</h1>", html)
+		self.assertIn("ZZ starter returns body", html)
+
+	def test_the_cart_page_and_the_drawer_share_the_cart_contents(self):
+		status, html = self.render("pages/cart/cart.html", "/en/cart")
+
+		self.assertEqual(status, 200)
+		self.assertEqual(html.count("Your cart is empty."), 2)
+		self.assertEqual(html.count("$store.cart.checkout()"), 2)
+		self.assertIn("noindex", html)
