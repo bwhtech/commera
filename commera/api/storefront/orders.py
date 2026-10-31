@@ -4,12 +4,12 @@ from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cstr
 
 from commera.sdk import account
-from commera.sdk.types import OrderTracking, ReturnOptions, ShopperOrder
+from commera.sdk.types import OrderTracking, ReturnOptions, ShopperOrderDetail
 
 
 @frappe.whitelist(methods=["POST"])
 @rate_limit(limit=30, seconds=60 * 60, user_based=True)
-def cancel_order(name: str) -> ShopperOrder:
+def cancel_order(name: str) -> ShopperOrderDetail:
 	return account.cancel_order(cstr(name))
 
 

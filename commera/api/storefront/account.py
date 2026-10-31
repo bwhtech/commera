@@ -4,7 +4,7 @@ from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cstr
 
 from commera.sdk import account
-from commera.sdk.types import CustomerAddress, CustomerProfile, ShopperOrder, ShopperOrderPage
+from commera.sdk.types import CustomerAddress, CustomerProfile, ShopperOrderDetail, ShopperOrderPage
 
 
 # Signed-in shoppers only: the storefront server sends their OAuth access token as a Bearer header.
@@ -50,7 +50,7 @@ def list_orders(page: int = 1, page_size: int = 10) -> ShopperOrderPage:
 	return account.list_orders(page, page_size)
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=300, seconds=60, user_based=True)
-def get_order(name: str) -> ShopperOrder:
-	return account.get_order(cstr(name))
+def get_order(name: str, key: str | None = None) -> ShopperOrderDetail:
+	return account.get_order(cstr(name), key)

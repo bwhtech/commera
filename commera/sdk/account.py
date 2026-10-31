@@ -16,7 +16,13 @@ from commera.api.signup import validate_user_names
 from commera.api.users import delete_user_address
 from commera.core import get_address_docs, get_party, is_shoppers_address
 from commera.guest import is_guest
-from commera.order_access import OWNER_ACCESS, get_order_access, get_shopper_order_condition
+from commera.order_access import (
+	FULL_ACCESS,
+	LIMITED_ACCESS,
+	OWNER_ACCESS,
+	get_order_access,
+	get_shopper_order_condition,
+)
 from commera.sdk.orders import read_order_results
 from commera.sdk.types import (
 	CustomerAddress,
@@ -24,6 +30,7 @@ from commera.sdk.types import (
 	OrderTracking,
 	ReturnOptions,
 	ShopperOrder,
+	ShopperOrderDetail,
 	ShopperOrderPage,
 )
 from commera.utils import get_return_deadline, validate_document_access
@@ -59,6 +66,7 @@ ADDRESS_FIELDS = (
 	"is_shipping_address",
 )
 MAX_ORDER_PAGE_SIZE = 50
+LIMITED_LINK_HIDDEN_FIELDS = ("shipping_address", "email", "phone", "payment_mode")
 
 return_api = importlib.import_module("commera.api.return")
 
@@ -156,10 +164,13 @@ def list_orders(page: int = 1, page_size: int = 10) -> ShopperOrderPage:
 	}
 
 
-def get_order(name: str) -> ShopperOrder:
-	get_own_order(name)
-	orders = read_order_results([name], ())
-	return without_staff_fields(orders[cstr(name)])
+def get_order(name: str, key: str | None = None) -> ShopperOrderDetail:
+	validate_document_access("Sales Order", name, key)
+	access = get_order_access(name, key) or FULL_ACCESS
+	order = without_staff_fields(read_order_results([name], ())[cstr(name)])
+	if access == LIMITED_ACCESS:
+		order.update(dict.fromkeys(LIMITED_LINK_HIDDEN_FIELDS))
+	return {**order, "access": access}
 
 
 def get_own_order(name: str) -> str:
@@ -169,7 +180,7 @@ def get_own_order(name: str) -> str:
 	return cstr(name)
 
 
-def cancel_order(name: str) -> ShopperOrder:
+def cancel_order(name: str) -> ShopperOrderDetail:
 	cancel_sales_order(get_own_order(name))
 	return get_order(name)
 
