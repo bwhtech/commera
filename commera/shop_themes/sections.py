@@ -275,7 +275,9 @@ def validate_required_sections(theme_context, layout, page):
 	for section in default_layout.get("sections") or []:
 		schema = get_section_schema(theme_context["dirs"], section["type"]) or {}
 		if schema.get("required") and section["type"] not in shown:
-			frappe.throw(_("The {0} page needs its {1} section.").format(page, section["type"]))
+			frappe.throw(
+				_("The {0} page needs its {1} section.").format(page, schema.get("name") or section["type"])
+			)
 
 
 def validate_blocks(schema, section, references):
