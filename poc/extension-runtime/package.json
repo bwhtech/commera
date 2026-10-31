@@ -1,0 +1,19 @@
+{
+  "name": "commera-extension-runtime-poc",
+  "private": true,
+  "workspaces": [
+    "host",
+    "kit",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:host": "npm run build -w host",
+    "build:apps": "npm run build -w apps/printful && npm run build -w apps/broken",
+    "build": "npm run build:host && npm run build:apps",
+    "serve": "node server.mjs",
+    "verify": "node verify.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.55"
+  }
+}
