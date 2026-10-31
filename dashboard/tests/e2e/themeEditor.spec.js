@@ -249,6 +249,38 @@ describe('theme editor', () => {
     }
   })
 
+  uiTest(session, 'A refused theme setting goes back to its saved value', async (t) => {
+    const { page } = session
+    const theme = await findLiveSectionsTheme(page)
+    if (!theme) return t.skip('the live theme is not a Sections theme')
+    await openEditor(page, theme)
+    await page.click('[data-tree-theme-settings]')
+    await page.waitForSelector('[id^="theme-"]', { visible: true })
+    const field = await page.evaluate(() => {
+      const input = [...document.querySelectorAll('input[id^="theme-"]')].find((element) => element.type === 'text')
+      return input && { id: input.id, value: input.value }
+    })
+    if (!field) return t.skip('this theme has no text theme setting')
+
+    await page.setRequestInterception(true)
+    const intercept = (request) => {
+      if (request.url().includes('theme.save_theme_settings')) request.respond(REFUSAL)
+      else request.continue()
+    }
+    page.on('request', intercept)
+
+    try {
+      await page.click(`#${field.id}`)
+      await page.keyboard.type(' refused')
+      await page.keyboard.press('Tab')
+      await wait(1500)
+      assert.equal(await page.$eval(`#${field.id}`, (element) => element.value), field.value)
+    } finally {
+      page.off('request', intercept)
+      await page.setRequestInterception(false)
+    }
+  })
+
   uiTest(session, 'Panels resize, collapse to the rail and keep their size after a reload', async (t) => {
     const { page } = session
     const theme = await findLiveSectionsTheme(page)

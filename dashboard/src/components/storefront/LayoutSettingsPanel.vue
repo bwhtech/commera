@@ -66,6 +66,10 @@ watch(
   { immediate: true },
 )
 
+async function saveTheme(field, value) {
+  if (!(await saveThemeSetting(field, value))) themeValues.value[field.fieldname] = field.value ?? ''
+}
+
 function plainText(html) {
   if (!html) return ''
   const element = document.createElement('div')
@@ -104,7 +108,7 @@ function plainText(html) {
               :class="field.fieldtype === 'Check' ? undefined : '!w-full'"
               :field="field"
               :disabled="!state.live || editor.busy.value"
-              @change="saveThemeSetting(field, $event)"
+              @change="saveTheme(field, $event)"
             />
             <p v-if="plainText(field.description)" class="mt-1 text-sm text-ink-gray-5">
               {{ plainText(field.description) }}
