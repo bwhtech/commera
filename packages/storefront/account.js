@@ -24,6 +24,6 @@ export async function list_orders({ page, page_size } = {}) {
 	return get('account.list_orders', { page, page_size });
 }
 
-export async function get_order(name) {
-	return get('account.get_order', { name });
+export async function get_order(name, key) {
+	return get('account.get_order', { name, key });
 }

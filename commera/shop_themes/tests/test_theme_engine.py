@@ -159,6 +159,29 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 		matched_route, _match = match_route(compiled["routes"], "en/not-a-real-route")
 		self.assertIsNone(matched_route)
 
+	def test_the_login_and_signup_routes_render_from_a_theme_that_ships_them(self):
+		seed_default_routes()
+		theme_dir = tempfile.mkdtemp(prefix="shop_theme_account_")
+		self.addCleanup(shutil.rmtree, theme_dir)
+		os.makedirs(os.path.join(theme_dir, "pages", "account"))
+		for page in ("login", "signup"):
+			with open(os.path.join(theme_dir, "pages", "account", f"{page}.html"), "w") as page_file:
+				page_file.write(page)
+
+		theme_context = {"theme_name": "Account Probe", "dirs": [theme_dir]}
+		with patch("commera.shop_themes.theme_resolver.get_render_theme_context", return_value=theme_context):
+			for path in ("en/account/login", "ar/account/signup"):
+				renderer = ThemePageRenderer(path)
+				self.assertTrue(renderer.can_render(), path)
+				self.assertEqual(renderer.template_path, f"pages/account/{path.rsplit('/', 1)[-1]}.html")
+				self.assertFalse(renderer.requires_auth)
+
+	def test_summer_leaves_the_login_and_signup_routes_to_stock_routing(self):
+		seed_default_routes()
+		self.activate("Summer Theme")
+		for path in ("en/account/login", "en/account/signup"):
+			self.assertFalse(ThemePageRenderer(path).can_render(), path)
+
 	def test_invalid_regex_in_a_route_throws_on_save(self):
 		settings = frappe.get_single("Shop Theme Settings")
 		settings.append("routes", {"url_pattern": "(unterminated", "template_path": "pages/x.html"})
