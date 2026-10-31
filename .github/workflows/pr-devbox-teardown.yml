@@ -1,0 +1,23 @@
+name: PR Devbox Teardown
+
+on:
+  pull_request_target:
+    types: [closed]
+
+jobs:
+  teardown:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      BENCHSPACE_API_KEY: ${{ secrets.BENCHSPACE_API_KEY }}
+      BENCHSPACE_API_SECRET: ${{ secrets.BENCHSPACE_API_SECRET }}
+    steps:
+      - uses: actions/checkout@v7
+        if: env.BENCHSPACE_API_KEY != ''
+        with:
+          persist-credentials: false
+
+      - name: Delete the pull request's devbox
+        if: env.BENCHSPACE_API_KEY != ''
+        run: .github/scripts/pr-devbox.sh down "${{ github.event.pull_request.number }}"
