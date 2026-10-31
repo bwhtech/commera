@@ -29,6 +29,29 @@ function typeahead() {
 	};
 }
 
+function listing_filters() {
+	return {
+		open: '',
+
+		toggle(name) {
+			this.open = this.open === name ? '' : name;
+		},
+
+		apply() {
+			const values = {};
+			for (const [key, value] of new FormData(this.$el)) {
+				if (value !== '') {
+					values[key] = values[key] ? `${values[key]},${value}` : value;
+				}
+			}
+			const query = new URLSearchParams(values).toString();
+			globalThis.location.assign(
+				query ? `${this.$el.action}?${query}` : this.$el.action,
+			);
+		},
+	};
+}
+
 document.addEventListener('alpine:init', () => {
 	Alpine.store('cart', {
 		cart: null,
@@ -81,6 +104,7 @@ document.addEventListener('alpine:init', () => {
 	});
 
 	Alpine.data('typeahead', typeahead);
+	Alpine.data('listing_filters', listing_filters);
 
 	Alpine.data('search_modal', () => ({
 		...typeahead(),

@@ -1,0 +1,11 @@
+{
+	"name": "Product list",
+	"category": "Products",
+	"settings": [
+		{ "id": "show_filters", "type": "checkbox", "label": "Show filters", "default": true },
+		{ "id": "show_sort", "type": "checkbox", "label": "Show sorting", "default": true },
+		{ "id": "columns", "type": "select", "label": "Products per row on desktop", "options": ["3", "4"], "default": "3" }
+	],
+	"blocks": {},
+	"max_blocks": 0
+}

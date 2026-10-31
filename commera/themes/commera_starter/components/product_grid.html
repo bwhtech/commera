@@ -1,0 +1,55 @@
+{% from "components/macros/icons.html" import icon %}
+{% from "components/macros/pagination.html" import pagination %}
+{% from "components/macros/product_card.html" import product_card with context %}
+{% set facets = listing.facets %}
+{% set facet_filters = [("sizes", _("Size"), facets.sizes), ("colors", _("Colour"), facets.colors), ("brands", _("Brand"), facets.brands)] %}
+
+<form id="listing-filters" action="/{{ frappe.lang or 'en' }}/products" x-data="listing_filters" @submit.prevent="apply()" @change="apply()">
+	{% if query %}<input type="hidden" name="search" value="{{ query }}">{% endif %}
+	{% if collection %}<input type="hidden" name="category" value="{{ collection.handle }}">{% endif %}
+	{% if section.settings.show_filters %}
+	<div class="mt-8 flex flex-wrap gap-2" @click.outside="open = ''" @keydown.escape="open = ''">
+		{% for key, label, values in facet_filters if values %}
+		<div class="relative">
+			<button type="button" @click="toggle('{{ key }}')" :aria-expanded="open === '{{ key }}'" class="inline-flex h-8 items-center gap-1 rounded-lg border border-outline-gray-2 bg-surface-base px-2.5 text-base font-medium text-ink-gray-8 hover:border-outline-gray-3">{{ label }}{{ icon("down", "size-4") }}</button>
+			<div x-cloak x-show="open === '{{ key }}'" class="absolute start-0 top-full z-20 mt-1 max-h-72 w-56 overflow-y-auto rounded-xl border border-outline-gray-2 bg-surface-base p-1.5 shadow-lg">
+				{% for facet in values %}
+				<label class="flex h-8 items-center gap-2 rounded-lg px-2 text-base text-ink-gray-8 hover:bg-surface-gray-3">
+					<input type="checkbox" name="{{ key }}" value="{{ facet.value }}" {{ "checked" if facet.value in selected[key] }} class="size-4 accent-current">
+					<span class="flex-1">{{ facet.value }}</span>
+					<span class="text-sm text-ink-gray-5">{{ facet.count }}</span>
+				</label>
+				{% endfor %}
+			</div>
+		</div>
+		{% endfor %}
+		<div class="relative">
+			<button type="button" @click="toggle('price')" :aria-expanded="open === 'price'" class="inline-flex h-8 items-center gap-1 rounded-lg border border-outline-gray-2 bg-surface-base px-2.5 text-base font-medium text-ink-gray-8 hover:border-outline-gray-3">{{ _("Price") }}{{ icon("down", "size-4") }}</button>
+			<div x-cloak x-show="open === 'price'" @change.stop class="absolute start-0 top-full z-20 mt-1 w-64 rounded-xl border border-outline-gray-2 bg-surface-base p-3 shadow-lg">
+				<div class="flex gap-2">
+					<input type="number" name="min" min="0" value="{{ selected.min if selected.min is not none }}" placeholder="{{ facets.price.min | int }}" aria-label="{{ _('Lowest price') }}" class="h-8 w-full min-w-0 rounded-lg bg-surface-gray-2 px-2 text-base text-ink-gray-8 outline-none">
+					<input type="number" name="max" min="0" value="{{ selected.max if selected.max is not none }}" placeholder="{{ facets.price.max | int }}" aria-label="{{ _('Highest price') }}" class="h-8 w-full min-w-0 rounded-lg bg-surface-gray-2 px-2 text-base text-ink-gray-8 outline-none">
+				</div>
+				<label class="mt-3 flex items-center gap-2 text-base text-ink-gray-8"><input type="checkbox" name="has_discount" value="1" {{ "checked" if selected.has_discount }} class="size-4 accent-current">{{ _("On sale only") }}</label>
+				<button type="submit" class="mt-3 inline-flex h-8 w-full items-center justify-center rounded-lg bg-brand px-2.5 text-base font-medium text-on-brand hover:bg-brand-hover">{{ _("Apply") }}</button>
+			</div>
+		</div>
+	</div>
+	{% if chips %}
+	<div class="mt-3 flex flex-wrap items-center gap-2">
+		{% for chip in chips %}
+		<a href="{{ chip.url }}" class="inline-flex h-6 items-center gap-1 rounded-full bg-surface-gray-2 px-2 text-sm text-ink-gray-7 hover:bg-surface-gray-3" aria-label="{{ _('Remove {0}').format(chip.label) }}">{{ chip.label }}{{ icon("close", "size-3") }}</a>
+		{% endfor %}
+		<a href="{{ reset_url }}" class="inline-flex h-6 items-center rounded-lg px-1.5 text-sm text-ink-gray-7 underline hover:bg-surface-gray-3">{{ _("Reset") }}</a>
+	</div>
+	{% endif %}
+	{% endif %}
+</form>
+
+<div class="mt-10 grid grid-cols-2 gap-x-5 gap-y-12 md:gap-x-8 {{ 'md:grid-cols-4' if section.settings.columns == '4' else 'md:grid-cols-3' }}">
+	{% for product in listing.products %}
+	{{ product_card(product) }}
+	{% endfor %}
+</div>
+
+{{ pagination(listing.page, last_page, page_url) }}
