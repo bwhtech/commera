@@ -1,0 +1,27 @@
+{
+	"sections": [
+		{
+			"id": "main",
+			"type": "main_product",
+			"hidden": false,
+			"settings": {},
+			"blocks": [
+				{
+					"id": "shipping",
+					"type": "collapsible",
+					"settings": {
+						"title": "Shipping & returns",
+						"text": "Delivery and return options are shown at checkout."
+					}
+				}
+			]
+		},
+		{
+			"id": "recommendations",
+			"type": "product_recommendations",
+			"hidden": false,
+			"settings": {},
+			"blocks": []
+		}
+	]
+}

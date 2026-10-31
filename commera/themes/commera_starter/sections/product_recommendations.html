@@ -1,0 +1,12 @@
+{% from "components/macros/product_card.html" import product_card with context %}
+{% set products = commera.catalog.get_recommendations(product.handle, section.settings.limit | int or 4) if product is defined and product else [] %}
+{% if products %}
+<section class="px-5 py-20 md:px-12">
+	<h2 class="text-3xl">{{ section.settings.title }}</h2>
+	<div class="mt-8 grid grid-cols-2 gap-x-5 gap-y-10 md:grid-cols-4 md:gap-x-8">
+		{% for recommended in products %}
+		{{ product_card(recommended) }}
+		{% endfor %}
+	</div>
+</section>
+{% endif %}

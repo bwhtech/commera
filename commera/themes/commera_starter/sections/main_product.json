@@ -1,0 +1,19 @@
+{
+	"name": "Product",
+	"category": "Products",
+	"settings": [
+		{ "id": "show_rating", "type": "checkbox", "label": "Show rating", "default": true },
+		{ "id": "show_quantity", "type": "checkbox", "label": "Show quantity", "default": true },
+		{ "id": "show_wishlist", "type": "checkbox", "label": "Show wishlist button", "default": true }
+	],
+	"blocks": {
+		"collapsible": {
+			"name": "Collapsible text",
+			"settings": [
+				{ "id": "title", "type": "text", "label": "Title", "default": "Shipping & returns" },
+				{ "id": "text", "type": "textarea", "label": "Text", "default": "" }
+			]
+		}
+	},
+	"max_blocks": 4
+}

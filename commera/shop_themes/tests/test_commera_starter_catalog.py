@@ -15,6 +15,7 @@ STARTER_DIR = os.path.join(frappe.get_app_path("commera"), "themes", "commera_st
 CATALOG_LAYOUTS = {
 	"products": "main_collection",
 	"search": "main_search",
+	"product": "main_product",
 }
 
 
@@ -118,3 +119,16 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		self.assertEqual(status, 200)
 		self.assertIn("Nothing matches your search.", html)
 		self.assertIn('value="zzqqxx-no-match"', html)
+
+	def test_the_product_page_renders_the_product_form_and_recommendations(self):
+		handle = self.get_any_product()["handle"]
+		product = commera.sdk.catalog.get_product(handle)
+
+		status, html = self.render("pages/products/details.html", f"/en/products/{handle}", route=handle)
+
+		self.assertEqual(status, 200)
+		self.assertIn(f">{product['title']}</h1>", html.replace("&#39;", "'"))
+		self.assertIn("product_form(", html)
+		self.assertIn("Add to cart", html)
+		self.assertIn("Shipping &amp; returns", html)
+		self.assertIn('"@type": "Product"', html)

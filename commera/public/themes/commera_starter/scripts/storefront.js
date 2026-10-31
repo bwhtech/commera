@@ -29,6 +29,117 @@ function typeahead() {
 	};
 }
 
+function product_form(product) {
+	return {
+		...product,
+		size: product.size,
+		qty: 1,
+		image: 0,
+		busy: false,
+		error: '',
+		missing_size: false,
+		saved: product.in_wishlist,
+		add_button_visible: true,
+
+		init() {
+			new IntersectionObserver(([entry]) => {
+				this.add_button_visible = entry.isIntersecting;
+			}).observe(this.$refs.add_button);
+		},
+
+		get size_option() {
+			return product.options.find(
+				(option) => !option.values.some((value) => value.handle),
+			);
+		},
+
+		get variant() {
+			const selected = this.size_option
+				? { [this.size_option.name]: this.size }
+				: {};
+			return commera.product.select_variant(product, selected);
+		},
+
+		get price() {
+			return this.variant?.price ?? product.price;
+		},
+
+		get compare_at_price() {
+			return this.variant?.compare_at_price;
+		},
+
+		get discount() {
+			return Math.round((1 - this.price / this.compare_at_price) * 100);
+		},
+
+		money(amount) {
+			return commera.format.money(amount, product.currency);
+		},
+
+		move_image(step, count) {
+			this.image = (this.image + step + count) % count;
+		},
+
+		async save(change) {
+			this.busy = true;
+			this.error = '';
+			try {
+				await change();
+			} catch (error) {
+				this.error = error.message;
+			} finally {
+				this.busy = false;
+			}
+		},
+
+		async add_to_cart() {
+			this.missing_size = !this.variant;
+			if (this.missing_size) {
+				return;
+			}
+			await this.save(async () => {
+				await commera.cart.add_lines([
+					{ item_code: this.variant.id, qty: this.qty },
+				]);
+				Alpine.store('cart').open = true;
+			});
+		},
+
+		async toggle_wishlist() {
+			if (product.is_guest) {
+				globalThis.location.assign(
+					`/login?redirect-to=${encodeURIComponent(location.pathname)}`,
+				);
+				return;
+			}
+			await this.save(async () => {
+				await (this.saved
+					? commera.wishlist.remove(product.id)
+					: commera.wishlist.add(product.id));
+				this.saved = !this.saved;
+			});
+		},
+	};
+}
+
+function accordion(section_id) {
+	return {
+		open: 'description',
+
+		select(event) {
+			if (event.detail.section !== section_id) {
+				return;
+			}
+			const block = [
+				...this.$root.querySelectorAll('[data-commera-block]'),
+			].find((element) => element.dataset.commeraBlock === event.detail.id);
+			if (block) {
+				this.open = block.dataset.accordionKey;
+			}
+		},
+	};
+}
+
 function listing_filters() {
 	return {
 		open: '',
@@ -104,7 +215,9 @@ document.addEventListener('alpine:init', () => {
 	});
 
 	Alpine.data('typeahead', typeahead);
+	Alpine.data('product_form', product_form);
 	Alpine.data('listing_filters', listing_filters);
+	Alpine.data('accordion', accordion);
 
 	Alpine.data('search_modal', () => ({
 		...typeahead(),
