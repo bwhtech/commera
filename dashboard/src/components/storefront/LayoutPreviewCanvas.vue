@@ -29,6 +29,13 @@ const ZOOMS = [
 const canvas = ref(null)
 const { width: canvasWidth, height: canvasHeight } = useElementSize(canvas)
 const zooms = useLocalStorage('commera:theme-editor:zoom', {})
+const linkScroll = useLocalStorage('commera:theme-editor:link-scroll', false)
+const previews = {}
+
+function followScroll(source, position) {
+  if (!linkScroll.value || state.device !== 'both' || !position.section) return
+  previews[source === 'desktop' ? 'mobile' : 'desktop']?.scrollToSection(position)
+}
 
 const zoom = computed({
   get: () => zooms.value[state.device] ?? 'fit',
@@ -77,7 +84,11 @@ onKeyStroke('Escape', (event) => {
               class="origin-top-left"
               :style="{ width: `${frame.width}px`, height: `${frame.height}px`, transform: `scale(${layout.scale})` }"
             >
-              <LayoutPreviewFrame :editor="editor" />
+              <LayoutPreviewFrame
+                :ref="(preview) => (previews[frame.key] = preview)"
+                :editor="editor"
+                @scroll="followScroll(frame.key, $event)"
+              />
             </div>
           </div>
         </div>
@@ -89,6 +100,14 @@ onKeyStroke('Escape', (event) => {
       data-zoom-controls
     >
       <TabButtons v-model="zoom" :options="ZOOMS" aria-label="Preview zoom" />
+      <Button
+        v-if="state.device === 'both'"
+        :variant="linkScroll ? 'subtle' : 'ghost'"
+        icon-left="lucide-link"
+        label="Link scroll"
+        :aria-pressed="linkScroll"
+        @click="linkScroll = !linkScroll"
+      />
       <div class="mx-0.5 h-4 border-l border-outline-gray-2" />
       <Button
         variant="ghost"

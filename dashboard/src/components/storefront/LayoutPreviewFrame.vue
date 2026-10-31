@@ -7,6 +7,8 @@ const props = defineProps({
   editor: { type: Object, required: true },
 })
 
+const emit = defineEmits(['scroll'])
+
 const { state, selectFromPreview } = props.editor
 
 const frameId = useId()
@@ -97,11 +99,14 @@ useEventListener(window, 'message', (event) => {
   if (index === -1) return
   const { type, ...data } = event.data || {}
   if (type === 'commera:select' && index === visibleIndex.value) selectFromPreview(data)
+  if (type === 'commera:scroll' && index === visibleIndex.value) emit('scroll', data)
   if (type === 'commera:preview-ready' && index !== visibleIndex.value) {
     const renderNumber = Number(new URLSearchParams(event.source.location.search).get('render'))
     if (renderNumber === latestRender) swapIn(index, renderNumber)
   }
 })
+
+defineExpose({ scrollToSection: (position) => post('commera:scroll-to-section', position) })
 
 onMounted(render)
 watch(() => [state.previewToken, state.language], render)

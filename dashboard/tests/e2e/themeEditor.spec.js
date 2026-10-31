@@ -3,7 +3,7 @@ import { describe } from 'node:test'
 import { adminGet, adminPost, goto, uiTest, useSession, wait } from './harness.js'
 
 const SLOW_RENDER_MS = 1500
-const WORKSPACE_STORAGE = ['commera:theme-editor:zoom', 'commera-theme-editor-panels']
+const WORKSPACE_STORAGE = ['commera:theme-editor:zoom', 'commera:theme-editor:link-scroll', 'commera-theme-editor-panels']
 
 const REFUSAL = {
   status: 417,
@@ -328,5 +328,57 @@ describe('theme editor', () => {
     const selectedNode = await page.$eval('[data-tree-node][aria-current="true"]', (element) => element.dataset.treeNode)
     assert.ok(selectedNode?.includes(picked), `a click in the mobile preview selects ${picked} (got ${selectedNode})`)
     assert.ok(await outlineShown(desktop), 'the desktop preview follows a pick made on mobile')
+  })
+
+  uiTest(session, 'Link scroll keeps the same section at the top of both previews', async (t) => {
+    const { page } = session
+    const theme = await findLiveSectionsTheme(page)
+    if (!theme) return t.skip('the live theme is not a Sections theme')
+    await openEditor(page, theme, { clearWorkspace: true })
+
+    const deals = await page.$$eval('[data-tree-node^="section:"]', (nodes) =>
+      nodes.find((node) => node.innerText.trim().startsWith('Deals'))?.dataset.treeNode,
+    )
+    if (!deals) return t.skip('the home page has no Deals section')
+    const [, group, section] = deals.split(':')
+
+    await page.click('[aria-label="Preview width"] [data-value="both"]')
+    await page.waitForSelector('[data-preview-device="mobile"] iframe[data-preview-frame="visible"]', {
+      timeout: 30000,
+    })
+    await wait(1000)
+    const desktop = await visibleFrame(page, 'desktop')
+    const mobile = await visibleFrame(page, 'mobile')
+    const sectionTop = (frame) =>
+      frame.evaluate(
+        (group, section) =>
+          document
+            .querySelector(`[data-commera-group="${group}"][data-commera-section="${section}"]`)
+            .getBoundingClientRect().top,
+        group,
+        section,
+      )
+    const scrollDesktopToDeals = () =>
+      desktop.evaluate(
+        (group, section) => {
+          const element = document.querySelector(`[data-commera-group="${group}"][data-commera-section="${section}"]`)
+          window.scrollTo({ top: element.getBoundingClientRect().top + window.scrollY, behavior: 'instant' })
+        },
+        group,
+        section,
+      )
+
+    const [linkButton] = await page.$$('xpath/.//button[normalize-space()="Link scroll"]')
+    await linkButton.click()
+    await scrollDesktopToDeals()
+    await wait(800)
+    assert.ok(Math.abs(await sectionTop(desktop)) <= 2, 'desktop shows Deals at the top')
+    assert.ok(Math.abs(await sectionTop(mobile)) <= 2, `mobile follows to Deals (top ${await sectionTop(mobile)})`)
+
+    await linkButton.click()
+    const mobileScroll = await mobile.evaluate(() => window.scrollY)
+    await desktop.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
+    await wait(800)
+    assert.equal(await mobile.evaluate(() => window.scrollY), mobileScroll, 'with Link scroll off the mobile page stays put')
   })
 })
