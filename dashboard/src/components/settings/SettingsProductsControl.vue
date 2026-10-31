@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { refDebounced } from '@vueuse/core'
-import { MultiSelect } from 'frappe-ui'
+import { Button, MultiSelect } from 'frappe-ui'
 import { useMethodRead } from '../../data/api'
 
 const SEARCH_DEBOUNCE_MS = 300
@@ -61,6 +61,12 @@ function update(codes) {
       :disabled="disabled"
       placeholder="Pick products"
       @update:model-value="update"
-    />
+    >
+      <template #footer="{ clear }">
+        <div v-if="modelValue.length" class="border-t border-outline-gray-1 px-2 py-1.5">
+          <Button variant="ghost" size="sm" @click="clear">Clear All</Button>
+        </div>
+      </template>
+    </MultiSelect>
   </div>
 </template>
