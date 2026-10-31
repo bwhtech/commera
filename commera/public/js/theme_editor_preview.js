@@ -3,6 +3,23 @@
 	const target_selector = '[data-commera-block], [data-commera-section]';
 	let highlighted = null;
 
+	if (Number(new URLSearchParams(window.location.search).get('render')) > 1) {
+		const settled = document.createElement('style');
+		settled.textContent =
+			'.wow{visibility:visible!important;animation:none!important}';
+		const held = document.createElement('style');
+		held.textContent =
+			'*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;transition-delay:0s!important}';
+		document.head.append(settled, held);
+		window.addEventListener('load', () => {
+			held.remove();
+			for (const animation of document.getAnimations()) {
+				if (Number.isFinite(animation.effect?.getComputedTiming().endTime))
+					animation.finish();
+			}
+		});
+	}
+
 	const outline = document.createElement('div');
 	outline.style.cssText =
 		'position:absolute;pointer-events:none;z-index:2147483647;display:none;outline:2px solid #171717;outline-offset:-2px;box-shadow:0 0 0 2px #fff inset';
