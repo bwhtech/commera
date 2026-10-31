@@ -249,6 +249,17 @@ describe('theme editor', () => {
     }
   })
 
+  uiTest(session, 'A theme that is not active is never called live', async (t) => {
+    const { page } = session
+    const data = await adminGet(page, 'theme.get_editor_data')
+    const theme = data.themes.find((candidate) => !candidate.live && candidate.theme_type === 'Sections')
+    if (!theme) return t.skip('every Sections theme is live')
+    await openEditor(page, theme)
+    const header = await page.$eval('header', (element) => element.innerText)
+    assert.ok(!/\bLive\b/.test(header), `the header says "${header.replace(/\s+/g, ' ')}"`)
+    assert.ok(header.includes('Not live'), 'the badge says the theme is not live')
+  })
+
   uiTest(session, 'A refused theme setting goes back to its saved value', async (t) => {
     const { page } = session
     const theme = await findLiveSectionsTheme(page)

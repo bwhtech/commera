@@ -135,7 +135,8 @@ async function save() {
 }
 
 async function publish() {
-  if (await editor.publish()) toast.success('Published to your store')
+  if (!(await editor.publish())) return
+  toast.success(state.live ? 'Published to your store' : `Published. Activate ${state.theme} to show it in your store.`)
 }
 
 function discard() {
@@ -170,7 +171,8 @@ useEventListener(window, 'beforeunload', (event) => {
         <span class="truncate text-base font-medium text-ink-gray-9">{{ state.theme }}</span>
         <template v-if="state.loaded && !state.loadError">
           <Badge v-if="hasUnpublishedChanges" label="Unpublished changes" theme="orange" variant="subtle" />
-          <Badge v-else label="Live" theme="green" variant="subtle" />
+          <Badge v-else-if="state.live" label="Live" theme="green" variant="subtle" />
+          <Badge v-else label="Not live" theme="gray" variant="subtle" />
         </template>
       </div>
 
