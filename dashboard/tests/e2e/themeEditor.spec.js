@@ -379,4 +379,41 @@ describe('theme editor', () => {
     await wait(800)
     assert.equal(await mobile.evaluate(() => window.scrollY), mobileScroll, 'with Link scroll off the mobile page stays put')
   })
+
+  uiTest(session, 'Typing Arabic over a default text keeps the English default', async (t) => {
+    const { page } = session
+    const theme = await findLiveSectionsTheme(page)
+    if (!theme) return t.skip('the live theme is not a Sections theme')
+    const editorData = await adminGet(page, 'theme_layout.get_editor', { theme: theme.name, page: 'index' })
+    const schema = editorData.section_schemas.find(
+      (candidate) =>
+        (candidate.groups ?? ['pages']).includes('pages') &&
+        candidate.settings?.some((setting) => setting.type === 'text' && setting.default),
+    )
+    if (!schema) return t.skip('no home page section has a text setting with a default')
+    const setting = schema.settings.find((candidate) => candidate.type === 'text' && candidate.default)
+    await openEditor(page, theme)
+
+    const [addButton] = await page.$$(
+      'xpath/.//button[normalize-space()="Add section" or @aria-label="Add section to Home page"]',
+    )
+    await addButton.click()
+    await page.click(`[data-section-type="${schema.type}"]`)
+    const input = `[data-settings-panel] #setting-${setting.id}`
+    await page.waitForSelector(input, { visible: true })
+
+    try {
+      await page.click('[aria-label="Language"] [data-value="ar"]')
+      await page.click(input)
+      await page.keyboard.type('عرض خاص')
+      await page.keyboard.press('Tab')
+      await page.click('[aria-label="Language"] [data-value="en"]')
+      await wait(500)
+      assert.equal(await page.$eval(input, (element) => element.value), setting.default)
+    } finally {
+      await page.click('[aria-label="Language"] [data-value="en"]')
+      await page.click('[data-settings-panel] button[aria-label="Remove section"]')
+      await wait(500)
+    }
+  })
 })

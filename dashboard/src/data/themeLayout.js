@@ -346,7 +346,7 @@ export function createLayoutEditor(theme) {
   function setSetting(owner, setting, value) {
     owner.settings ??= {}
     owner.settings[setting.id] = isTranslatable(setting)
-      ? translatedValue(owner.settings[setting.id], value)
+      ? translatedValue(owner.settings[setting.id] ?? setting.default, value)
       : value
   }
 
