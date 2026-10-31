@@ -3,7 +3,7 @@
   dropdown_open: false,
   async change_language(lang) {
       if (lang === this.current_lang) return; // Do nothing if already selected
-      let newUrl = window.location.pathname.replace(/^\/(en|ar)/, `/${lang}`);
+      let newUrl = window.location.pathname.replace(/^\/(en|ar)/, `/${lang}`) + window.location.search;
       Alpine.store('i18n').i18n = {};
       Alpine.store('i18n').lastFetched = null;
       await Alpine.store('i18n').init();
