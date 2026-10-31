@@ -28,6 +28,12 @@ const fields = computed(() => {
   })
 })
 
+const blockNames = computed(() =>
+  Object.entries(selected.value?.schema?.blocks ?? {})
+    .map(([type, blockSchema]) => blockSchema.name ?? type)
+    .join(' or '),
+)
+
 function back() {
   const current = selected.value
   if (current?.kind === 'block') select({ kind: 'section', group: current.group, section: current.section.id })
@@ -147,7 +153,10 @@ function plainText(html) {
     </div>
 
     <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-      <p v-if="!fields.length" class="text-p-sm text-ink-gray-5">
+      <p v-if="!fields.length && blockNames" class="text-p-sm text-ink-gray-5">
+        This section has no settings of its own. Add a {{ blockNames }} with the + on its row in the list.
+      </p>
+      <p v-else-if="!fields.length" class="text-p-sm text-ink-gray-5">
         This {{ selected.kind }} has no settings. Drag it in the list to move it.
       </p>
       <div class="flex flex-col gap-4">

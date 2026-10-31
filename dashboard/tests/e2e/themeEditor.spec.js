@@ -249,6 +249,37 @@ describe('theme editor', () => {
     }
   })
 
+  uiTest(session, 'A new section made only of blocks says how to add its first block', async (t) => {
+    const { page } = session
+    const theme = await findLiveSectionsTheme(page)
+    if (!theme) return t.skip('the live theme is not a Sections theme')
+    const editorData = await adminGet(page, 'theme_layout.get_editor', { theme: theme.name, page: 'index' })
+    const schema = editorData.section_schemas.find(
+      (candidate) =>
+        (candidate.groups ?? ['pages']).includes('pages') &&
+        !candidate.settings?.length &&
+        Object.keys(candidate.blocks ?? {}).length,
+    )
+    if (!schema) return t.skip('this theme has no home page section made only of blocks')
+    await openEditor(page, theme)
+
+    const [addButton] = await page.$$(
+      'xpath/.//button[normalize-space()="Add section" or @aria-label="Add section to Home page"]',
+    )
+    await addButton.click()
+    await page.click(`[data-section-type="${schema.type}"]`)
+    await page.waitForSelector('[data-settings-panel]', { visible: true })
+    try {
+      const panel = await page.$eval('[data-settings-panel]', (element) => element.innerText)
+      const blockName = Object.values(schema.blocks)[0].name
+      assert.ok(panel.includes(`Add a ${blockName}`), `the panel says "${panel.replace(/\s+/g, ' ')}"`)
+      assert.ok(!panel.includes('Drag it in the list'), 'it does not point the merchant at dragging')
+    } finally {
+      await page.click('[data-settings-panel] button[aria-label="Remove section"]')
+      await wait(500)
+    }
+  })
+
   uiTest(session, 'A theme that is not active is never called live', async (t) => {
     const { page } = session
     const data = await adminGet(page, 'theme.get_editor_data')
