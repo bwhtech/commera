@@ -17,6 +17,7 @@ from commera.sdk.types import (
 	CheckoutState,
 	PaymentMethod,
 	PaymentSession,
+	PickupLocation,
 	PlacedOrder,
 	ShippingOption,
 	ShippingOptions,
@@ -108,6 +109,14 @@ class TestSdkCheckout(IntegrationTestCase):
 		)
 		self.assertEqual(state["summary"]["items_total"], 2 * test_cart_checkout.SALE_RATE)
 
+	def test_the_checkout_reads_back_after_the_address_step(self):
+		self.fill_cart(qty=2)
+		self.assertIsNone(checkout_api.get())
+
+		saved_state = checkout.set_addresses(BILLING_ADDRESS)
+
+		self.assertEqual(checkout_api.get(), saved_state)
+
 	def test_a_shopper_ships_to_a_saved_address(self):
 		self.fill_cart()
 		saved_address = checkout.set_addresses(SHIPPING_ADDRESS)["billing_address"]["name"]
@@ -171,6 +180,26 @@ class TestSdkCheckout(IntegrationTestCase):
 		self.assertTrue(state["is_store_pickup"])
 		self.assertEqual(state["store"], warehouse)
 		self.assertEqual(checkout.list_shipping_options()["reason"], "store_pickup")
+
+	def test_pickup_locations_list_warehouses_with_a_shop_address(self):
+		self.set_store_pickup(1)
+		warehouse = self.create_pickup_warehouse()
+		without_address = self.create_pickup_warehouse(with_address=False)
+
+		locations = {location["id"]: location for location in checkout_api.list_pickup_locations()}
+
+		self.assert_shape(locations[warehouse], PickupLocation)
+		self.assertEqual(
+			(locations[warehouse]["title"], locations[warehouse]["address_line1"]),
+			("ZZ Pickup Counter", "1 Pickup Street"),
+		)
+		self.assertNotIn(without_address, locations)
+
+	def test_no_pickup_locations_while_store_pickup_is_off(self):
+		self.set_store_pickup(0)
+		self.create_pickup_warehouse()
+
+		self.assertEqual(checkout.list_pickup_locations(), [])
 
 	def test_pickup_is_refused_while_store_pickup_is_off(self):
 		self.set_store_pickup(0)

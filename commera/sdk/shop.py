@@ -6,7 +6,7 @@ from commera.branding import get_brand_assets
 from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import get_page_by_route
 from commera.sdk.types import ContentPage, Country, FooterSection, Menu, MenuItem, Shop, Sitemap, SitemapEntry
 from commera.shop_data import get_storefront_menu
-from commera.utils import get_country_list, get_store_currency
+from commera.utils import get_country_list, get_store_company, get_store_currency
 from commera.www.sitemap_segment import SEGMENT_CONFIG, get_segment_filters, get_urls_per_page
 
 __all__ = ["get_menu", "get_page", "get_shop", "get_sitemap", "list_countries"]
@@ -22,6 +22,7 @@ def get_shop() -> Shop:
 		"name": settings.store_name or frappe.get_website_settings("app_name") or "Commera",
 		"description": settings.default_meta_description or "",
 		"currency": get_store_currency(),
+		"country": get_store_country(),
 		"logo": brand.logo,
 		"favicon": brand.favicon,
 		"menu": get_main_menu_items(),
@@ -43,6 +44,13 @@ def get_menu(handle: str) -> Menu | None:
 			"items": [get_footer_menu_item(section) for section in sections],
 		}
 	return None
+
+
+def get_store_country() -> str | None:
+	company = get_store_company()
+	return (company and frappe.get_cached_value("Company", company, "country")) or (
+		frappe.defaults.get_global_default("country")
+	)
 
 
 def list_countries() -> list[Country]:
