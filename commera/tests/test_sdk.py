@@ -154,6 +154,7 @@ PUBLIC_NAMES = {
 		"CheckoutState",
 		"PaymentMethod",
 		"PaymentSession",
+		"PickupLocation",
 		"PlacedOrder",
 		"ShippingOption",
 		"ShippingOptions",
@@ -161,7 +162,9 @@ PUBLIC_NAMES = {
 	],
 	"commera.sdk.checkout": [
 		"complete",
+		"get",
 		"list_payment_methods",
+		"list_pickup_locations",
 		"list_shipping_options",
 		"set_addresses",
 		"set_shipping_option",

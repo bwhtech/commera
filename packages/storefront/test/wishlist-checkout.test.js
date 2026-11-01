@@ -18,6 +18,13 @@ const endpoint_calls = [
 		() => wishlist.remove('blue-runner'),
 		{ product: 'blue-runner' },
 	],
+	['checkout.get', 'GET', () => checkout.get(), undefined],
+	[
+		'checkout.list_pickup_locations',
+		'GET',
+		() => checkout.list_pickup_locations(),
+		undefined,
+	],
 	[
 		'checkout.set_addresses',
 		'POST',
