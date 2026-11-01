@@ -427,6 +427,10 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 
 		self.assert_starter_copy()
 		self.assertEqual(theme.theme_settings, "Scaffold Check Settings")
+		self.assertEqual(theme.is_standard, 1)
+		self.assertEqual(
+			json.loads(self.export_path.read_text())["theme_settings"], "Scaffold Check Settings"
+		)
 		self.assertEqual(
 			[field.fieldname for field in frappe.get_meta("Scaffold Check Settings").fields],
 			[field.fieldname for field in frappe.get_meta(STARTER_THEME_SETTINGS).fields],

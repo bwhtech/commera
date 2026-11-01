@@ -36,6 +36,8 @@ class ShopTheme(Document):
 		self.validate_unique_slug()
 		if self.is_new():
 			self.validate_theme_folder_can_exist()
+			if self.can_scaffold() and not os.path.isdir(self.get_folder()):
+				self.is_standard = 1
 		if self.theme_type == "Classic":
 			self.validate_classic_folders()
 		if self.parent_theme:
