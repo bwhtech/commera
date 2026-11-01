@@ -471,25 +471,34 @@ function order_confirmation() {
 				this.status = 'failed';
 				return;
 			}
+			let result;
 			try {
-				const result = await commera.checkout.complete(reference_id);
-				this.order = result.order;
-				this.status =
-					{ Paid: 'paid', Pending: 'pending' }[result.status] ?? 'failed';
+				result = await commera.checkout.complete(reference_id);
 			} catch {
 				this.status = 'failed';
 				return;
 			}
-			Alpine.store('cart').cart = await commera.cart.get();
-			if (this.order) {
-				const key = new URL(
-					this.order.link,
-					globalThis.location.origin,
-				).searchParams.get('key');
-				this.details = await commera.account
-					.get_order(this.order.name, key ?? undefined)
-					.catch(() => null);
+			const [cart, details] = await Promise.all([
+				commera.cart.get().catch(() => null),
+				result.order ? this.get_details(result.order) : null,
+			]);
+			if (cart) {
+				Alpine.store('cart').cart = cart;
 			}
+			this.order = result.order;
+			this.details = details;
+			this.status =
+				{ Paid: 'paid', Pending: 'pending' }[result.status] ?? 'failed';
+		},
+
+		get_details(order) {
+			const key = new URL(
+				order.link,
+				globalThis.location.origin,
+			).searchParams.get('key');
+			return commera.account
+				.get_order(order.name, key ?? undefined)
+				.catch(() => null);
 		},
 
 		money(amount) {
