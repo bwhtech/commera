@@ -28,6 +28,7 @@ from commera.api.admin.plugins import (
 from commera.plugins import registry
 from commera.plugins.places import GRAMMAR, PLACES, RECORD_DOCTYPES
 from commera.plugins.registry import get_registry, get_visible_plugins
+from commera.roles import COMMERA_USER, add_commera_roles
 from commera.sdk import API_VERSION
 from commera.tests.test_admin_order_plugin_events import make_order_event
 from commera.tests.test_admin_orders import make_test_sales_order
@@ -162,7 +163,8 @@ class PluginTestCase(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		create_user(STOCK_USER, "Item Manager", "Stock User")
+		add_commera_roles()
+		create_user(STOCK_USER, "Item Manager", "Stock User").add_roles(COMMERA_USER)
 		create_user(SALES_USER, "Sales User")
 		create_user(OUTSIDER, "Item Manager")
 		create_user(SYSTEM_MANAGER, "Stock User", "Sales User", "System Manager")

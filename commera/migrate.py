@@ -10,6 +10,7 @@ from commera.commera_ecommerce.doctype.commera_settings.navbar.navbar_manager im
 )
 from commera.plugin_events import add_plugin_user, validate_plugins
 from commera.plugins.registry import get_registry
+from commera.roles import add_commera_roles
 from commera.search.build import ensure_index_built
 from commera.search.record_builder import DEFAULT_CONTENT_FIELDS
 from commera.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
@@ -25,6 +26,7 @@ def after_install():
 	# install_app syncs before commera is in installed_apps, so our importable_doctypes hook is skipped.
 	sync_for("commera")
 	create_payment_modes()
+	add_commera_roles()
 	try:
 		create_default_email_templates()
 		assign_default_email_templates()
@@ -57,6 +59,7 @@ def activate_summer_theme():
 def after_migrate():
 	sync_storefront_apps()
 	create_payment_modes()
+	add_commera_roles()
 	add_plugin_user()
 	register_optional_doctype_links()
 	populate_search_settings()

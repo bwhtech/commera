@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { firstPageRoute } from './ia/plugins'
+import { isAdmin } from './data/boot'
+import { firstPageRoute, firstPluginRoute } from './ia/plugins'
 import { SETTINGS_TABS } from './ia/settings'
 import { attachSettingsRouter, DEFAULT_SETTINGS_TAB, SETTINGS_ROUTE_NAME } from './ia/settingsRoute'
 
@@ -64,6 +65,7 @@ const routes = [
       firstPageRoute(to.params.app) ?? { name: 'NotFound', params: { pathMatch: to.path.slice(1).split('/') } },
   },
   { path: '/plugins/:app/:page/:path(.*)*', name: 'PluginPage', component: () => import('./pages/PluginPage.vue') },
+  { path: '/no-pages', name: 'NoPages', component: () => import('./pages/NoPages.vue') },
   // Last, so it only catches what nothing above claimed: without it an unknown path rendered the
   // shell with an empty content area, which reads as a screen that failed to load.
   { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('./pages/NotFound.vue') },
@@ -78,3 +80,9 @@ export const router = createRouter({
 // ia/settingsRoute derives the dialog's open/tab state from the URL, and needs the
 // instance to push and to remember the page the dialog was opened over.
 attachSettingsRouter(router)
+
+router.beforeEach((to) => {
+  if (isAdmin || to.path.startsWith('/plugins/')) return true
+  const target = firstPluginRoute() ?? '/no-pages'
+  return to.path === target ? true : { path: target, replace: true }
+})
