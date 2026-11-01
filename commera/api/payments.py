@@ -51,7 +51,7 @@ from commera.guest import (
 	validate_guest_checkout_enabled,
 )
 from commera.order_access import get_order_link, set_order_access_key
-from commera.plugin_events import fire_event
+from commera.plugin_events import fire_event, get_plugin_fieldnames
 from commera.utils import (
 	get_charge_account_head,
 	get_pickup_addresses,
@@ -875,20 +875,19 @@ def add_shipping_address(party_name, address):
 
 
 def add_party_address(party_name, address: dict, address_type: str):
-	return add_customer_address(
-		party_name,
-		{
-			"address_type": address_type,
-			"city": address.get("city"),
-			"country": address.get("country"),
-			"state": address.get("state"),
-			"address_line1": address.get("full_address"),
-			"address_line2": address.get("landmark"),
-			"pincode": address.get("po_box"),
-			"phone": address.get("phone_number"),
-			"email_id": address.get("email"),
-		},
-	)
+	values = {
+		"address_type": address_type,
+		"city": address.get("city"),
+		"country": address.get("country"),
+		"state": address.get("state"),
+		"address_line1": address.get("full_address"),
+		"address_line2": address.get("landmark"),
+		"pincode": address.get("po_box"),
+		"phone": address.get("phone_number"),
+		"email_id": address.get("email"),
+	}
+	values.update(get_plugin_address_values(address))
+	return add_customer_address(party_name, values)
 
 
 def add_customer_address(party_name, values: dict):
@@ -910,6 +909,17 @@ def add_customer_address(party_name, values: dict):
 	address_doc.append("links", {"link_doctype": "Customer", "link_name": party_name})
 	address_doc.insert(ignore_permissions=True)
 	return address_doc
+
+
+def get_plugin_address_values(address: dict) -> dict:
+	"""The Address fields an installed Commera plugin owns (`<app>_...`) that the checkout form sent.
+
+	A field the form did not send is left out, so it neither blanks the field nor joins the dedupe."""
+	return {
+		fieldname: address.get(fieldname) or None
+		for fieldname in get_plugin_fieldnames("Address")
+		if fieldname in address
+	}
 
 
 def get_party_address(party_name: str, values: dict) -> str | None:
