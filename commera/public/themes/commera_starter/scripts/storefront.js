@@ -223,6 +223,281 @@ function order_summary() {
 	};
 }
 
+function blank_address(country) {
+	return {
+		first_name: '',
+		last_name: '',
+		address_line1: '',
+		address_line2: '',
+		city: '',
+		state: '',
+		pincode: '',
+		country: country ?? '',
+		phone: '',
+	};
+}
+
+function address_form(address, country) {
+	const form = blank_address(country);
+	for (const key of Object.keys(form)) {
+		form[key] = address[key] ?? form[key];
+	}
+	return form;
+}
+
+function checkout(config) {
+	return {
+		config,
+		state: null,
+		ready: false,
+		sign_in_required: false,
+		editing_address: true,
+		email: config.email ?? '',
+		delivery_method: 'ship',
+		pickup_location: '',
+		billing_same: true,
+		choices: {
+			shipping: config.saved_addresses[0] ?? 'new',
+			billing: config.saved_addresses[0] ?? 'new',
+		},
+		forms: {
+			shipping: blank_address(config.country),
+			billing: blank_address(config.country),
+		},
+		shipping_options: [],
+		shipping_reason: null,
+		payment_methods: [],
+		payment_method: '',
+		summary_open: false,
+		step: 'address',
+		busy: false,
+		error: '',
+
+		async init() {
+			globalThis.addEventListener('commera:cart-updated', () => this.refresh());
+			try {
+				this.state = await commera.checkout.get();
+			} catch (error) {
+				this.sign_in_required = error.status === 403;
+				this.error = error.message;
+			}
+			if (this.state) {
+				this.restore_state();
+			}
+			if (!this.editing_address) {
+				await this.load_options();
+			}
+			this.ready = true;
+		},
+
+		restore_state() {
+			const { state } = this;
+			if (state.email && this.config.is_guest) {
+				this.email = state.email;
+			}
+			if (state.is_store_pickup) {
+				this.delivery_method = 'pickup';
+				this.pickup_location = state.store;
+			} else if (state.shipping_address) {
+				this.restore_address('shipping', state.shipping_address);
+				this.billing_same =
+					state.billing_address?.name === state.shipping_address.name;
+				if (!this.billing_same && state.billing_address) {
+					this.restore_address('billing', state.billing_address);
+				}
+			}
+			this.editing_address = !(state.is_store_pickup || state.shipping_address);
+		},
+
+		restore_address(kind, address) {
+			if (this.config.saved_addresses.includes(address.name)) {
+				this.choices[kind] = address.name;
+				return;
+			}
+			this.choices[kind] = 'new';
+			this.forms[kind] = address_form(address, this.config.country);
+		},
+
+		async refresh() {
+			if (!this.state) {
+				return;
+			}
+			await save_change(this, async () => {
+				this.state = await commera.checkout.get();
+				if (!this.editing_address) {
+					await this.load_options();
+				}
+			});
+		},
+
+		async load_options() {
+			const [shipping, payment_methods] = await Promise.all([
+				this.state?.is_store_pickup
+					? { options: [], reason: 'store_pickup' }
+					: commera.checkout.list_shipping_options(),
+				commera.checkout.list_payment_methods(),
+			]);
+			this.shipping_options = shipping.options;
+			this.shipping_reason = shipping.reason;
+			this.payment_methods = payment_methods;
+			if (
+				!payment_methods.some((method) => method.id === this.payment_method)
+			) {
+				this.payment_method = payment_methods[0]?.id ?? '';
+			}
+		},
+
+		address_input(kind) {
+			return this.choices[kind] === 'new'
+				? { ...this.forms[kind] }
+				: this.choices[kind];
+		},
+
+		async save_address() {
+			this.step = 'address';
+			const email = this.config.is_guest ? this.email.trim() : undefined;
+			await save_change(this, async () => {
+				this.state =
+					this.delivery_method === 'pickup'
+						? await commera.checkout.set_store_pickup({
+								warehouse: this.pickup_location,
+								email,
+						  })
+						: await commera.checkout.set_addresses({
+								billing_address: this.address_input(
+									this.billing_same ? 'shipping' : 'billing',
+								),
+								shipping_address: this.billing_same
+									? undefined
+									: this.address_input('shipping'),
+								email,
+						  });
+				await this.load_options();
+				this.editing_address = false;
+			});
+		},
+
+		async choose_shipping_option(option_id) {
+			this.step = 'shipping';
+			await save_change(this, async () => {
+				this.state = await commera.checkout.set_shipping_option(option_id);
+				this.payment_methods = await commera.checkout.list_payment_methods();
+			});
+		},
+
+		async pay() {
+			this.step = 'payment';
+			this.busy = true;
+			this.error = '';
+			try {
+				const session = await commera.checkout.start_payment({
+					payment_method: this.payment_method,
+					expected_total: this.total,
+				});
+				globalThis.location.assign(session.redirect_url);
+			} catch (error) {
+				this.error = error.message;
+				this.busy = false;
+				if (error.exc_type === 'CheckoutPriceChangedError') {
+					await this.refresh();
+				}
+			}
+		},
+
+		get is_cash_on_delivery() {
+			return this.payment_methods.some(
+				(method) =>
+					method.id === this.payment_method && method.is_cash_on_delivery,
+			);
+		},
+
+		get summary() {
+			const summary = this.state?.summary;
+			return this.is_cash_on_delivery ? summary?.cash_on_delivery : summary;
+		},
+
+		get total() {
+			return this.summary?.total ?? this.$store.cart.cart?.total ?? 0;
+		},
+
+		get needs_shipping_option() {
+			return (
+				!this.state?.is_store_pickup &&
+				this.shipping_options.length > 0 &&
+				!this.state?.shipping_option
+			);
+		},
+
+		get shipping_pending() {
+			return this.editing_address || this.needs_shipping_option;
+		},
+
+		get address_recap() {
+			if (this.state?.is_store_pickup) {
+				return this.config.pickup_titles[this.state.store] ?? this.state.store;
+			}
+			const address = this.state?.shipping_address ?? {};
+			return [
+				address.address_line1,
+				address.address_line2,
+				address.city,
+				address.state,
+				address.pincode,
+				address.country,
+			]
+				.filter(Boolean)
+				.join(', ');
+		},
+
+		money(amount) {
+			return this.$store.cart.money(amount);
+		},
+	};
+}
+
+function order_confirmation() {
+	return {
+		status: 'checking',
+		order: null,
+		details: null,
+
+		async init() {
+			const params = new URLSearchParams(globalThis.location.search);
+			const reference_id =
+				params.get('reference_id') ??
+				params.get('payment_id') ??
+				params.get('session_id');
+			if (!reference_id) {
+				this.status = 'failed';
+				return;
+			}
+			try {
+				const result = await commera.checkout.complete(reference_id);
+				this.order = result.order;
+				this.status =
+					{ Paid: 'paid', Pending: 'pending' }[result.status] ?? 'failed';
+			} catch {
+				this.status = 'failed';
+				return;
+			}
+			Alpine.store('cart').cart = await commera.cart.get();
+			if (this.order) {
+				const key = new URL(
+					this.order.link,
+					globalThis.location.origin,
+				).searchParams.get('key');
+				this.details = await commera.account
+					.get_order(this.order.name, key ?? undefined)
+					.catch(() => null);
+			}
+		},
+
+		money(amount) {
+			return commera.format.money(amount, this.order?.currency);
+		},
+	};
+}
+
 document.addEventListener('alpine:init', () => {
 	Alpine.store('cart', {
 		cart: null,
@@ -271,6 +546,8 @@ document.addEventListener('alpine:init', () => {
 	Alpine.data('listing_filters', listing_filters);
 	Alpine.data('accordion', accordion);
 	Alpine.data('order_summary', order_summary);
+	Alpine.data('checkout', checkout);
+	Alpine.data('order_confirmation', order_confirmation);
 
 	Alpine.data('search_modal', () => ({
 		...typeahead(),
