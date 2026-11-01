@@ -42,7 +42,7 @@
 			<button type="button" @click="$dispatch('open-search')" class="hidden size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:grid" aria-label="{{ _('Search') }}">{{ icon("search") }}</button>
 			{% endif %}
 			{% if section.settings.show_account %}
-			<a href="/{{ language }}/account" class="hidden size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:grid" aria-label="{{ _('Account') }}">{{ icon("user") }}</a>
+			<a href="/{{ language }}/account/orders" class="hidden size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:grid" aria-label="{{ _('Account') }}">{{ icon("user") }}</a>
 			{% endif %}
 			{% if section.settings.show_wishlist %}
 			<a href="/{{ language }}/account/wishlist" class="hidden size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:grid" aria-label="{{ _('Wishlist') }}">{{ icon("heart") }}</a>

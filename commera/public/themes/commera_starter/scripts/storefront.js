@@ -41,6 +41,19 @@ function typeahead() {
 	};
 }
 
+function form_state() {
+	return {
+		busy: false,
+		error: '',
+		saved: false,
+
+		async submit(change) {
+			this.saved = false;
+			await save_change(this, change);
+		},
+	};
+}
+
 function product_form(product) {
 	return {
 		...product,
@@ -258,6 +271,65 @@ document.addEventListener('alpine:init', () => {
 		show() {
 			this.open = true;
 			this.$nextTick(() => this.$refs.search_input.focus());
+		},
+	}));
+
+	Alpine.data('wishlist', (count) => ({
+		...form_state(),
+		count,
+		removed: [],
+
+		async remove(product) {
+			await this.submit(async () => {
+				const wishlist = await commera.wishlist.remove(product);
+				this.removed.push(product);
+				this.count = wishlist.count;
+			});
+		},
+	}));
+
+	Alpine.data('profile_form', (profile) => ({
+		...form_state(),
+		profile,
+
+		async save() {
+			await this.submit(async () => {
+				this.profile = await commera.account.update_profile(this.profile);
+				this.saved = true;
+			});
+		},
+	}));
+
+	Alpine.data('address_book', (addresses) => ({
+		...form_state(),
+		addresses,
+		form: null,
+
+		edit(address = {}) {
+			this.error = '';
+			this.form = { ...address };
+		},
+
+		close() {
+			this.error = '';
+			this.form = null;
+		},
+
+		async save() {
+			await this.submit(async () => {
+				await commera.account.save_address(this.form);
+				this.addresses = await commera.account.list_addresses();
+				this.form = null;
+			});
+		},
+
+		async remove(address) {
+			await this.submit(async () => {
+				await commera.account.delete_address(address.name);
+				this.addresses = this.addresses.filter(
+					(entry) => entry.name !== address.name,
+				);
+			});
 		},
 	}));
 

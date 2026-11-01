@@ -37,7 +37,7 @@
 			{% if section.settings.show_account or section.settings.show_wishlist %}
 			<div class="mt-4 border-t border-outline-gray-2 pt-4">
 				{% if section.settings.show_account %}
-				<a href="/{{ language }}/account" class="flex h-10 items-center gap-2 rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ icon("user") }} {{ _("Account") }}</a>
+				<a href="/{{ language }}/account/orders" class="flex h-10 items-center gap-2 rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ icon("user") }} {{ _("Account") }}</a>
 				{% endif %}
 				{% if section.settings.show_wishlist %}
 				<a href="/{{ language }}/account/wishlist" class="flex h-10 items-center gap-2 rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ icon("heart") }} {{ _("Wishlist") }}</a>
