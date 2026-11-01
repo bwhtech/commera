@@ -1,7 +1,7 @@
 {% from "components/macros/form.html" import field, submit_button %}
 
 {% macro auth_form(mode, redirect="", heading="h2") %}
-<div x-data='auth_form({{ {"mode": mode, "redirect": redirect} | tojson }})' class="flex flex-col gap-6">
+<div x-data='auth_form({{ {"mode": mode, "redirect": redirect} | tojson }})' @open-auth.window="redirect = $event.detail?.redirect ?? ''" class="flex flex-col gap-6">
 	<{{ heading }} class="text-3xl">
 		<span x-show="mode === 'login'">{{ _("Log in") }}</span>
 		<span x-cloak x-show="mode === 'signup'">{{ _("Create an account") }}</span>

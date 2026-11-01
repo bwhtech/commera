@@ -41,7 +41,7 @@
 				<a href="/{{ language }}/account/{{ 'login' if is_guest else 'orders' }}" {% if is_guest %}@click.prevent="open = false; $dispatch('open-auth')"{% endif %} class="flex h-10 items-center gap-2 rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ icon("user") }} {{ _("Account") }}</a>
 				{% endif %}
 				{% if section.settings.show_wishlist %}
-				<a href="/{{ language }}/account/wishlist" class="flex h-10 items-center gap-2 rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ icon("heart") }} {{ _("Wishlist") }}</a>
+				<a href="/{{ language }}/account/wishlist" {% if is_guest %}@click.prevent="open = false; $dispatch('open-auth', { redirect: $el.pathname })"{% endif %} class="flex h-10 items-center gap-2 rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ icon("heart") }} {{ _("Wishlist") }}</a>
 				{% endif %}
 			</div>
 			{% endif %}

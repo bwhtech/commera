@@ -70,6 +70,14 @@ function product_form(product) {
 			new IntersectionObserver(([entry]) => {
 				this.add_button_visible = entry.isIntersecting;
 			}).observe(this.$refs.add_button);
+			const url = new URL(location.href);
+			if (url.searchParams.has('save_to_wishlist')) {
+				url.searchParams.delete('save_to_wishlist');
+				history.replaceState(null, '', url);
+				if (!product.is_guest && !this.saved) {
+					this.toggle_wishlist();
+				}
+			}
 		},
 
 		get size_option() {
@@ -124,9 +132,9 @@ function product_form(product) {
 
 		async toggle_wishlist() {
 			if (product.is_guest) {
-				globalThis.location.assign(
-					`/login?redirect-to=${encodeURIComponent(location.pathname)}`,
-				);
+				const url = new URL(location.href);
+				url.searchParams.set('save_to_wishlist', '1');
+				this.$dispatch('open-auth', { redirect: url.pathname + url.search });
 				return;
 			}
 			await this.save(async () => {
@@ -336,6 +344,7 @@ document.addEventListener('alpine:init', () => {
 	Alpine.data('auth_form', ({ mode, redirect }) => ({
 		...form_state(),
 		mode,
+		redirect,
 		step: 'details',
 		first_name: '',
 		last_name: '',
@@ -391,8 +400,8 @@ document.addEventListener('alpine:init', () => {
 						code: this.code,
 					});
 				}
-				if (redirect) {
-					location.assign(redirect);
+				if (this.redirect) {
+					location.assign(this.redirect);
 				} else {
 					location.reload();
 				}
