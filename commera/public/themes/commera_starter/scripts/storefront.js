@@ -333,6 +333,76 @@ document.addEventListener('alpine:init', () => {
 		},
 	}));
 
+	Alpine.data('order_detail', ({ name, key, is_owner, is_cancelled }) => ({
+		...form_state(),
+		tracking: {},
+		returns: {},
+		invoice_url: null,
+		confirm_cancel: false,
+		show_return: false,
+		selected: [],
+		reasons: {},
+		item_codes: [],
+
+		async init() {
+			this.item_codes = [...this.$el.querySelectorAll('[data-item]')].map(
+				(element) => element.dataset.item,
+			);
+			this.tracking = await commera.orders.get_tracking(name, key);
+			if (is_owner && !is_cancelled) {
+				[this.returns, this.invoice_url] = await Promise.all([
+					commera.orders.get_return_options(name),
+					commera.orders.get_invoice_url(name),
+				]);
+			}
+		},
+
+		get returnable_codes() {
+			const locked = [
+				...(this.returns.returned_items ?? []),
+				...(this.returns.pending_items ?? []),
+			];
+			return this.item_codes.filter((item_code) => !locked.includes(item_code));
+		},
+
+		async cancel() {
+			await this.submit(async () => {
+				await commera.orders.cancel(name);
+				location.reload();
+			});
+		},
+
+		async request_return() {
+			await this.submit(async () => {
+				this.returns = await commera.orders.request_return(
+					name,
+					this.selected.map((item_code) => ({
+						item_code,
+						reason: this.reasons[item_code],
+					})),
+				);
+				this.selected = [];
+				this.show_return = false;
+			});
+		},
+	}));
+
+	Alpine.data('track_order', () => ({
+		...form_state(),
+		order_number: '',
+		email: '',
+		message: '',
+
+		async send() {
+			await this.submit(async () => {
+				this.message = await commera.orders.send_order_link({
+					order_number: this.order_number,
+					email: this.email,
+				});
+			});
+		},
+	}));
+
 	Alpine.data('hero', (slide_count) => ({
 		slide: 0,
 

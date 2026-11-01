@@ -152,3 +152,38 @@ Email,البريد الإلكتروني
 Save,حفظ
 Remove from wishlist,إزالة من قائمة الأمنيات
 Your wishlist is empty.,قائمة أمنياتك فارغة.
+Email address,البريد الإلكتروني
+Placed on {0},تم الطلب في {0}
+Download invoice,تنزيل الفاتورة
+Return items,إرجاع المنتجات
+Cancel order,إلغاء الطلب
+"This order link is older, so the delivery address and payment details are hidden.",رابط هذا الطلب قديم، لذلك تم إخفاء عنوان التوصيل وتفاصيل الدفع.
+Get a new link by email,احصل على رابط جديد عبر البريد الإلكتروني
+Cancel this order? This cannot be undone.,هل تريد إلغاء هذا الطلب؟ لا يمكن التراجع عن ذلك.
+"Yes, cancel it",نعم، ألغِه
+Keep order,الاحتفاظ بالطلب
+Choose items to return,اختر المنتجات التي تريد إرجاعها
+Reason for return,سبب الإرجاع
+Request return,طلب الإرجاع
+Your return request is being processed.,جارٍ معالجة طلب الإرجاع.
+Items,المنتجات
+Size,المقاس
+Order total,إجمالي الطلب
+Delivery,التوصيل
+Track your parcel,تتبع شحنتك
+Delivery address,عنوان التوصيل
+Payment,الدفع
+Paid,مدفوع
+Payment pending,الدفع معلق
+Back to orders,العودة إلى الطلبات
+1 item,منتج واحد
+{0} items,{0} منتجات
+You have not placed an order yet.,لم تقم بأي طلب بعد.
+Start shopping,ابدأ التسوق
+Track order,تتبع الطلب
+Enter your order number and the email you checked out with. We will email you a link to the order.,أدخل رقم طلبك والبريد الإلكتروني الذي استخدمته عند الدفع، وسنرسل إليك رابط الطلب عبر البريد الإلكتروني.
+Order number,رقم الطلب
+Email me the link,أرسل لي الرابط
+Shipping,الشحن
+Cash on delivery fee,رسوم الدفع عند الاستلام
+Rounding adjustment,تعديل التقريب

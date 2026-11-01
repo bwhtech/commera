@@ -6,15 +6,17 @@
 	("wishlist", _("Wishlist"), "/" ~ language ~ "/account/wishlist"),
 ] %}
 
-{% macro account_shell(active, title) %}
+{% macro account_shell(active, title, show_nav=True) %}
 <section class="px-5 py-12 md:px-12 md:py-20">
 	<h1 class="text-4xl">{{ title }}</h1>
 	<div class="mt-8 flex flex-col gap-8 md:mt-12 md:flex-row md:gap-16">
+		{% if show_nav %}
 		<nav class="flex shrink-0 gap-1 overflow-x-auto md:w-48 md:flex-col" aria-label="{{ _('Account') }}">
 			{% for key, label, url in account_links %}
 			<a href="{{ url }}" {% if key == active %}aria-current="page"{% endif %} class="{{ 'bg-surface-gray-3 text-ink-gray-9' if key == active else 'text-ink-gray-7 hover:bg-surface-gray-2' }} inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-base">{{ label }}</a>
 			{% endfor %}
 		</nav>
+		{% endif %}
 		<div class="min-w-0 flex-1">{{ caller() }}</div>
 	</div>
 </section>
