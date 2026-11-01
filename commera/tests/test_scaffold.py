@@ -22,8 +22,14 @@ from commera.scaffold import (
 )
 from commera.scaffold.theme import ThemeScaffold
 from commera.sdk import API_VERSION
+from commera.shop_themes.doctype.shop_theme.shop_theme import STARTER_THEME_SETTINGS
+from commera.shop_themes.sections import get_theme_json, validate_layout
 
 APP = "commera_test_plugin"
+STARTER_DIRS = {
+	"themes": Path(frappe.get_app_path("commera"), "themes", "commera_starter"),
+	"public/themes": Path(frappe.get_app_path("commera"), "public", "themes", "commera_starter"),
+}
 
 
 def make_app(apps_path: Path, app: str = APP) -> Path:
@@ -45,6 +51,18 @@ def read_tree(root: Path) -> dict[str, str]:
 	return {
 		str(path.relative_to(root)): path.read_text() for path in sorted(root.rglob("*")) if path.is_file()
 	}
+
+
+def list_files(root: Path) -> set[str]:
+	return {
+		str(path.relative_to(root))
+		for path in root.rglob("*")
+		if path.is_file() and "__pycache__" not in path.parts and "node_modules" not in path.parts
+	}
+
+
+def get_fieldnames(doctype: dict) -> list[str]:
+	return [field["fieldname"] for field in doctype["fields"]]
 
 
 def get_hooks(app_root: Path) -> dict:
@@ -358,3 +376,77 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 		with self.assertRaisesRegex(click.ClickException, "can only inherit"):
 			scaffold.add_theme("Scaffold Check", "Classic", "Summer Theme")
 		self.assertFalse(self.theme_dir.exists())
+
+	def assert_starter_copy(self):
+		for folder, starter_dir in STARTER_DIRS.items():
+			copy_dir = self.theme_dir.parents[1] / folder / "scaffold_check"
+			self.assertEqual(list_files(copy_dir), list_files(starter_dir))
+			for path in copy_dir.rglob("*"):
+				if path.is_file() and path.suffix in (".css", ".html", ".js", ".json", ".md", ".py"):
+					text = path.read_text()
+					self.assertNotIn("commera_starter", text, path)
+					self.assertNotIn("Commera Starter", text, path)
+		self.assertTrue((self.theme_dir / "README.md").read_text().startswith("# Scaffold Check\n"))
+
+	def test_a_sections_theme_without_a_parent_is_a_copy_of_the_starter(self):
+		changes = ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Sections", None)
+
+		self.assert_starter_copy()
+		settings_dir = self.export_path.parents[2] / "doctype" / "scaffold_check_settings"
+		settings = json.loads((settings_dir / "scaffold_check_settings.json").read_text())
+		starter_settings = frappe.get_meta(STARTER_THEME_SETTINGS)
+		self.assertEqual(settings["name"], "Scaffold Check Settings")
+		self.assertEqual(settings["module"], self.module)
+		self.assertEqual(settings["issingle"], 1)
+		self.assertEqual(get_fieldnames(settings), [field.fieldname for field in starter_settings.fields])
+		self.assertTrue((settings_dir / "scaffold_check_settings.py").is_file())
+		self.assertIn(("created", str(settings_dir.relative_to(self.apps_path / APP))), changes)
+
+		self.assertNotIn("__islocal", settings)
+		theme = json.loads(self.export_path.read_text())
+		self.assertEqual(theme["theme_settings"], "Scaffold Check Settings")
+		self.assertNotIn("parent_theme", theme)
+
+		frappe.get_doc({"doctype": "Module Def", "module_name": self.module, "app_name": APP}).insert()
+		import_file_by_path(str(settings_dir / "scaffold_check_settings.json"))
+		import_file_by_path(str(self.export_path))
+		self.assertEqual(
+			frappe.db.get_value("Shop Theme", "Scaffold Check", "theme_settings"), "Scaffold Check Settings"
+		)
+		self.assertEqual(
+			[field.fieldname for field in frappe.get_meta("Scaffold Check Settings").fields],
+			[field.fieldname for field in starter_settings.fields],
+		)
+
+	def test_a_desk_sections_theme_without_a_parent_gets_its_own_settings(self):
+		frappe.get_doc({"doctype": "Module Def", "module_name": self.module, "app_name": APP}).insert()
+		theme = frappe.new_doc("Shop Theme")
+		theme.update({"theme_name": "Scaffold Check", "theme_type": "Sections", "module": self.module})
+		theme.flags.scaffold = True
+		theme.insert()
+
+		self.assert_starter_copy()
+		self.assertEqual(theme.theme_settings, "Scaffold Check Settings")
+		self.assertEqual(
+			[field.fieldname for field in frappe.get_meta("Scaffold Check Settings").fields],
+			[field.fieldname for field in frappe.get_meta(STARTER_THEME_SETTINGS).fields],
+		)
+		theme_context = {
+			"theme_name": "Scaffold Check",
+			"theme_type": "Sections",
+			"names": ["Scaffold Check"],
+			"dirs": [str(self.theme_dir)],
+			"apps": {"Scaffold Check": APP},
+			"settings_doctype": "Scaffold Check Settings",
+		}
+		for page in ("index", "header_group", "footer_group"):
+			with self.subTest(page):
+				layout = get_theme_json([str(self.theme_dir)], f"layouts/{page}.json")
+				validate_layout(theme_context, layout, page)
+
+	def test_a_sections_theme_with_a_parent_stays_minimal(self):
+		ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Sections", "Shop Base Theme")
+
+		self.assertFalse((self.theme_dir / "components").exists())
+		self.assertFalse((self.export_path.parents[2] / "doctype" / "scaffold_check_settings").exists())
+		self.assertNotIn("theme_settings", json.loads(self.export_path.read_text()))

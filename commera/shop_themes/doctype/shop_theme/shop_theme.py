@@ -21,6 +21,9 @@ THEME_FOLDERS = {
 }
 SECTIONS_ONLY_FOLDERS = ("sections", "layouts")
 THEME_STARTER_DIR = Path(__file__).parents[3] / "scaffold" / "starter" / "theme"
+STARTER_THEME = "Commera Starter"
+STARTER_THEME_SETTINGS = "Commera Starter Settings"
+STARTER_TEXT_SUFFIXES = (".css", ".html", ".js", ".json", ".md", ".py", ".txt")
 
 THEME_CONTEXT_CACHE_KEY = "shop_theme_context"
 STYLE_TAB = "style_tab"
@@ -79,8 +82,20 @@ class ShopTheme(Document):
 
 	def after_insert(self):
 		# A read-only apps volume would otherwise break the insert itself.
-		if self.can_scaffold():
-			self.flags.scaffold_changes = scaffold_theme(self.theme_name, self.module, self.theme_type)
+		if not self.can_scaffold():
+			return
+
+		copies_starter = self.copies_starter() and not os.path.isdir(self.get_folder())
+		self.flags.scaffold_changes = scaffold_theme(
+			self.theme_name, self.module, self.theme_type, parent_theme=self.parent_theme
+		)
+		if copies_starter:
+			settings_doctype = f"{self.theme_name} Settings"
+			copy_starter_settings_doctype(settings_doctype, self.module).insert()
+			self.db_set("theme_settings", settings_doctype)
+
+	def copies_starter(self):
+		return self.theme_type == "Sections" and not self.parent_theme
 
 	@frappe.whitelist(methods=["POST"])
 	def scaffold_theme_settings(self):
@@ -274,12 +289,30 @@ def create_theme_settings_doctype(doctype_name, module=None):
 	return doctype
 
 
-def scaffold_theme(theme_name, module=None, theme_type="Classic", app=None):
+def copy_starter_settings_doctype(doctype_name, module=None):
+	doctype = frappe.copy_doc(frappe.get_doc("DocType", STARTER_THEME_SETTINGS))
+	doctype.update(
+		{
+			"name": doctype_name,
+			"module": module or DEFAULT_THEME_MODULE,
+			"custom": 0 if frappe.conf.developer_mode else 1,
+		}
+	)
+	return doctype
+
+
+def scaffold_theme(theme_name, module=None, theme_type="Classic", app=None, parent_theme=None):
 	app_path = Path(frappe.get_app_path(app or get_app_for_module(module)))
 	slug = frappe.scrub(theme_name)
 	theme_dir = Path(get_contained_path(app_path / "themes", slug))
 	if theme_dir.exists():
 		return [("skipped", str(theme_dir.relative_to(app_path.parent)))]
+
+	if theme_type == "Sections" and not parent_theme:
+		return [
+			("created", str(target_dir.relative_to(app_path.parent)))
+			for target_dir in copy_starter_theme(theme_name, app_path)
+		]
 
 	for folder in THEME_FOLDERS[theme_type]:
 		(theme_dir / folder).mkdir(parents=True, exist_ok=True)
@@ -298,6 +331,31 @@ def scaffold_theme(theme_name, module=None, theme_type="Classic", app=None):
 		path.write_text(Template(starter.read_text()).safe_substitute(theme_name=theme_name))
 		changes.append(("created", str(path.relative_to(app_path.parent))))
 	return changes
+
+
+def copy_starter_theme(theme_name, app_path):
+	starter_app_path = Path(frappe.get_app_path(DEFAULT_THEME_APP))
+	starter_slug = frappe.scrub(STARTER_THEME)
+	slug = frappe.scrub(theme_name)
+	copies = [
+		(starter_app_path / base_dir / starter_slug, Path(get_contained_path(app_path / base_dir, slug)))
+		for base_dir in ("themes", "public/themes")
+	]
+	for source_dir, target_dir in copies:
+		shutil.copytree(
+			source_dir,
+			target_dir,
+			ignore=shutil.ignore_patterns("__pycache__", "node_modules"),
+			dirs_exist_ok=True,
+		)
+		for path in target_dir.rglob("*"):
+			if path.suffix not in STARTER_TEXT_SUFFIXES or not path.is_file():
+				continue
+			text = path.read_text()
+			renamed = text.replace(STARTER_THEME, theme_name).replace(starter_slug, slug)
+			if renamed != text:
+				path.write_text(renamed)
+	return [target_dir for source_dir, target_dir in copies]
 
 
 def get_theme_names(theme_name):
