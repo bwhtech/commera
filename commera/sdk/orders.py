@@ -54,6 +54,7 @@ def read_order_results(sales_orders: list, extra_fields) -> dict[str, Order]:
 
 
 def get_order_result(order, paid_orders: set, taxes: list, shipping_address, extra_fields) -> Order:
+	charge_lines = get_charge_lines(taxes, order.shipping_rule)
 	return {
 		"name": order.name,
 		"customer": order.customer,
@@ -68,6 +69,7 @@ def get_order_result(order, paid_orders: set, taxes: list, shipping_address, ext
 		"net_total": flt(order.net_total),
 		"grand_total": flt(order.grand_total),
 		"rounded_total": flt(order.rounded_total),
+		"rounding_adjustment": flt(order.rounding_adjustment),
 		"base_grand_total": flt(order.base_grand_total),
 		"base_rounded_total": flt(order.base_rounded_total),
 		"payment_mode": order.custom_ecommerce_payment_mode,
@@ -75,7 +77,10 @@ def get_order_result(order, paid_orders: set, taxes: list, shipping_address, ext
 		"is_cancelled": cint(order.docstatus) == 2,
 		"status": order.custom_ecommerce_status,
 		"stage": describe_state(order, order.lifecycle),
-		"plugin_fees": get_charge_lines(taxes, order.shipping_rule)["plugin_fees"],
+		"shipping": charge_lines["shipping"],
+		"cod_charge": charge_lines["cod_charge"],
+		"plugin_fees": charge_lines["plugin_fees"],
+		"taxes": charge_lines["taxes"],
 		"items": [
 			{
 				"line_id": line.name,

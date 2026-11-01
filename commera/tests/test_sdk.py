@@ -23,7 +23,12 @@ from commera.sdk.types import (
 	Stage,
 )
 from commera.tests import test_cart_checkout, test_checkout_hooks, test_plugin_events
-from commera.tests.test_admin_orders import ensure_fiscal_year, get_company_account, make_test_sales_order
+from commera.tests.test_admin_orders import (
+	ensure_fiscal_year,
+	get_company_account,
+	make_shipping_rule,
+	make_test_sales_order,
+)
 from commera.tests.test_payment_hooks import patch_app_hooks
 from commera.utils import update_sales_order_ecommerce_status
 
@@ -283,6 +288,38 @@ class TestSdk(IntegrationTestCase):
 			[(line["line_id"], line["qty"]) for line in order["items"]],
 			[(row.name, row.qty) for row in sales_order.items],
 		)
+
+	def test_an_order_reads_its_charges_from_its_own_rows_and_they_add_up_to_its_total(self):
+		shipping_rule = make_shipping_rule(40).name
+		sales_order = make_test_sales_order(
+			order_type=STORE_ORDER_TYPE, submit=False, shipping_rule=shipping_rule, cod_charge=15
+		)
+		sales_order.append(
+			"taxes",
+			{
+				"description": "ZZ VAT",
+				"charge_type": "On Net Total",
+				"account_head": get_company_account(
+					exclude=frappe.db.get_value("Shipping Rule", shipping_rule, "account")
+				),
+				"rate": 10,
+				"included_in_print_rate": 0,
+			},
+		)
+		sales_order.save()
+		sales_order.submit()
+
+		order = orders.get_order(sales_order.name)
+
+		self.assertEqual((order["shipping"], order["cod_charge"]), (40, 15))
+		self.assertEqual(order["taxes"], [{"description": "ZZ VAT", "amount": sales_order.net_total / 10}])
+		self.assertEqual(order["rounding_adjustment"], sales_order.rounding_adjustment)
+		order_discounts = sum(
+			discount["amount"] for discount in order["discounts"] if discount["discount_class"] != "Product"
+		)
+		charges = order["shipping"] + order["cod_charge"]
+		charges += sum(charge["amount"] for charge in order["taxes"] + order["plugin_fees"])
+		self.assertAlmostEqual(order["total"] - order_discounts + charges, order["grand_total"], places=2)
 
 	def test_a_cancelled_order_and_one_placed_outside_the_store_read_as_such(self):
 		cancelled = self.make_store_order()

@@ -113,6 +113,7 @@ class ShopperOrder(TypedDict):
 	net_total: float
 	grand_total: float
 	rounded_total: float
+	rounding_adjustment: float
 	base_grand_total: float
 	base_rounded_total: float
 	payment_mode: str | None
@@ -122,7 +123,10 @@ class ShopperOrder(TypedDict):
 	status: str | None
 	# The dashboard's badge for the order, so a card matches the order screen.
 	stage: Stage
+	shipping: float
+	cod_charge: float
 	plugin_fees: list[Charge]
+	taxes: list[Charge]
 	items: list[OrderLine]
 	plugin_fields: dict[str, Any]
 	discounts: list["DiscountAllocation"]

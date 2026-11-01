@@ -39,6 +39,7 @@ ORDER_FIELDS = (
 	"total_taxes_and_charges",
 	"grand_total",
 	"rounded_total",
+	"rounding_adjustment",
 	"base_grand_total",
 	"base_rounded_total",
 	"shipping_rule",
