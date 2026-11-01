@@ -1,8 +1,20 @@
 {% extends "components/base.html" %}
+{% from "components/order_summary.html" import order_summary %}
 
 {% block uncontained_body %}
-<section x-data class="mx-auto flex max-w-2xl flex-col px-5 py-10">
-	<h1 class="px-5 text-8xl">{{ _("Cart") }} <span class="text-ink-gray-6" x-cloak x-show="$store.cart.count" x-text="'(' + $store.cart.count + ')'"></span></h1>
-	{% include "components/cart_contents.html" %}
+<section x-data class="px-5 pb-20 pt-10 md:px-12">
+	<h1 class="text-8xl">{{ _("Cart") }} <span class="text-ink-gray-6" x-cloak x-show="$store.cart.count" x-text="'(' + $store.cart.count + ')'"></span></h1>
+	<div :class="$store.cart.count && 'lg:grid-cols-[minmax(0,1fr)_24rem]'" class="mt-6 grid gap-8 lg:items-start lg:gap-12">
+		<div class="-mx-5 flex flex-col">
+			{% include "components/cart_contents.html" %}
+		</div>
+		<aside x-cloak x-show="$store.cart.count" class="rounded-xl bg-surface-gray-1 p-5 lg:sticky lg:top-24">
+			<h2 class="mb-4 text-3xl">{{ _("Order summary") }}</h2>
+			{{ order_summary() }}
+			<p class="mt-2 text-sm text-ink-gray-6">{{ _("Shipping and taxes are worked out at checkout.") }}</p>
+			<p x-show="$store.cart.error" x-text="$store.cart.error" class="mt-3 text-sm text-ink-red-6"></p>
+			<button type="button" @click="$store.cart.checkout()" :disabled="$store.cart.busy" class="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand px-3 text-lg font-medium text-on-brand hover:bg-brand-hover">{{ _("Check out") }}</button>
+		</aside>
+	</div>
 </section>
 {% endblock %}

@@ -4,6 +4,18 @@ function product_url(product) {
 	)}`;
 }
 
+async function save_change(state, change) {
+	state.busy = true;
+	state.error = '';
+	try {
+		await change();
+	} catch (error) {
+		state.error = error.message;
+	} finally {
+		state.busy = false;
+	}
+}
+
 function typeahead() {
 	return {
 		query: '',
@@ -80,16 +92,8 @@ function product_form(product) {
 			this.image = (this.image + step + count) % count;
 		},
 
-		async save(change) {
-			this.busy = true;
-			this.error = '';
-			try {
-				await change();
-			} catch (error) {
-				this.error = error.message;
-			} finally {
-				this.busy = false;
-			}
+		save(change) {
+			return save_change(this, change);
 		},
 
 		async add_to_cart() {
@@ -163,6 +167,41 @@ function listing_filters() {
 	};
 }
 
+function order_summary() {
+	return {
+		code: '',
+		busy: false,
+		error: '',
+
+		get cart() {
+			return this.$store.cart.cart;
+		},
+
+		get subtotal() {
+			return (this.cart?.discounts ?? []).reduce(
+				(subtotal, discount) => subtotal + discount.amount,
+				this.cart?.total ?? 0,
+			);
+		},
+
+		money(amount) {
+			return this.$store.cart.money(amount);
+		},
+
+		async apply_code() {
+			const code = this.code.trim();
+			await save_change(this, async () => {
+				await commera.cart.apply_discount(code);
+				this.code = '';
+			});
+		},
+
+		async remove_code(code) {
+			await save_change(this, () => commera.cart.remove_discount(code));
+		},
+	};
+}
+
 document.addEventListener('alpine:init', () => {
 	Alpine.store('cart', {
 		cart: null,
@@ -181,16 +220,8 @@ document.addEventListener('alpine:init', () => {
 			this.cart = await commera.cart.get();
 		},
 
-		async save(change) {
-			this.busy = true;
-			this.error = '';
-			try {
-				await change();
-			} catch (error) {
-				this.error = error.message;
-			} finally {
-				this.busy = false;
-			}
+		save(change) {
+			return save_change(this, change);
 		},
 
 		async set_quantity(line, qty) {
@@ -218,6 +249,7 @@ document.addEventListener('alpine:init', () => {
 	Alpine.data('product_form', product_form);
 	Alpine.data('listing_filters', listing_filters);
 	Alpine.data('accordion', accordion);
+	Alpine.data('order_summary', order_summary);
 
 	Alpine.data('search_modal', () => ({
 		...typeahead(),

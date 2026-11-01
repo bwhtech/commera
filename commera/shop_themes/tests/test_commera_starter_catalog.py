@@ -165,4 +165,6 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		self.assertEqual(status, 200)
 		self.assertEqual(html.count("Your cart is empty."), 2)
 		self.assertEqual(html.count("$store.cart.checkout()"), 2)
+		self.assertIn('x-data="order_summary"', html)
+		self.assertIn('id="discount-code"', html)
 		self.assertIn("noindex", html)

@@ -1,0 +1,46 @@
+{% from "components/macros/icons.html" import icon %}
+
+{% macro order_summary(total="cart?.total") -%}
+<div x-data="order_summary" class="flex flex-col gap-3 text-base">
+	<div class="flex justify-between">
+		<span>{{ _("Subtotal") }}</span>
+		<span x-text="money(subtotal)"></span>
+	</div>
+	<template x-for="(discount, index) in cart?.discounts ?? []" :key="index">
+		<div class="flex justify-between gap-3 text-ink-gray-7">
+			<span>{{ _("Discount") }}<span x-show="discount.label" x-text="' (' + discount.label + ')'"></span></span>
+			<span dir="ltr" x-text="'−' + money(discount.amount)"></span>
+		</div>
+	</template>
+	<template x-for="(fee, index) in cart?.plugin_fees ?? []" :key="index">
+		<div class="flex justify-between gap-3">
+			<span x-text="fee.description"></span>
+			<span x-text="money(fee.amount)"></span>
+		</div>
+	</template>
+	{% if caller is defined %}{{ caller() }}{% endif %}
+
+	<form @submit.prevent="apply_code()" class="mt-2 flex gap-2">
+		<label for="discount-code" class="sr-only">{{ _("Discount code") }}</label>
+		<input id="discount-code" x-model="code" autocomplete="off" placeholder="{{ _('Discount code') }}" class="h-10 min-w-0 flex-1 rounded-lg border border-outline-gray-2 bg-surface-base px-3 text-lg text-ink-gray-8 outline-none placeholder:text-ink-gray-4 focus:border-outline-gray-4 focus:shadow-sm">
+		<button type="submit" :disabled="busy || !code.trim()" class="h-10 shrink-0 rounded-lg border border-outline-gray-2 bg-surface-base px-3 text-lg font-medium text-ink-gray-8 hover:border-outline-gray-3 disabled:text-ink-gray-4">{{ _("Apply") }}</button>
+	</form>
+	<p x-show="error" x-text="error" role="alert" class="text-sm text-ink-red-6"></p>
+	<ul x-show="cart?.discount_codes?.length" class="flex flex-col gap-2">
+		<template x-for="code_state in cart?.discount_codes ?? []" :key="code_state.code">
+			<li>
+				<span class="inline-flex h-8 items-center gap-1 rounded-lg bg-surface-gray-3 ps-3 text-sm font-medium text-ink-gray-8">
+					<span x-text="code_state.code"></span>
+					<button type="button" @click="remove_code(code_state.code)" :disabled="busy" class="grid size-8 place-items-center rounded-lg text-ink-gray-6 hover:text-ink-gray-9" aria-label="{{ _('Remove discount code') }}">{{ icon("close", "size-4") }}</button>
+				</span>
+				<p x-show="code_state.reason" x-text="code_state.reason" class="mt-1 text-sm text-ink-gray-6"></p>
+			</li>
+		</template>
+	</ul>
+
+	<div class="mt-2 flex justify-between border-t border-outline-gray-2 pt-4 text-xl font-medium">
+		<span>{{ _("Total") }}</span>
+		<span x-text="money({{ total }})"></span>
+	</div>
+</div>
+{%- endmacro %}
