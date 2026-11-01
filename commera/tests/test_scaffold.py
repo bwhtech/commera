@@ -444,6 +444,17 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 				layout = get_theme_json([str(self.theme_dir)], f"layouts/{page}.json")
 				validate_layout(theme_context, layout, page)
 
+	def test_an_installed_app_lists_the_settings_doctype_it_created(self):
+		frappe.get_doc({"doctype": "Module Def", "module_name": self.module, "app_name": APP}).insert()
+		with patch.object(ThemeScaffold, "is_installed", return_value=True):
+			changes = ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Sections", None)
+
+		settings_dir = self.export_path.parents[2] / "doctype" / "scaffold_check_settings"
+		self.assertIn(("created", str(settings_dir.relative_to(self.apps_path / APP))), changes)
+		self.assertEqual(
+			frappe.db.get_value("Shop Theme", "Scaffold Check", "theme_settings"), "Scaffold Check Settings"
+		)
+
 	def test_a_sections_theme_with_a_parent_stays_minimal(self):
 		ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Sections", "Shop Base Theme")
 

@@ -68,6 +68,8 @@ class ThemeScaffold(AppScaffold):
 		theme.flags.scaffold = True
 		theme.insert()
 		self.changes.extend(theme.flags.scaffold_changes)
+		if theme.theme_settings:
+			self.add_settings_doctype_change(theme)
 
 	def write_theme_files(self, theme):
 		validate_theme_name(theme.theme_name)
@@ -91,20 +93,19 @@ class ThemeScaffold(AppScaffold):
 		)
 		with redirect_stdout(io.StringIO()):
 			if theme.copies_starter():
-				theme.theme_settings = self.write_settings_doctype_files(theme)
+				self.write_settings_doctype_files(theme)
 			write_document_file(theme, record_module=theme.module)
 
-	def write_settings_doctype_files(self, theme) -> str:
+	def write_settings_doctype_files(self, theme):
 		settings_doctype = copy_starter_settings_doctype(f"{theme.theme_name} Settings", theme.module)
 		settings_doctype.set("__islocal", None)
 		write_document_file(settings_doctype, record_module=theme.module)
 		settings_doctype.make_controller_template()
-		self.changes.append(
-			(
-				"created",
-				self.get_relative_path(
-					Path(frappe.get_module_path(theme.module), "doctype", frappe.scrub(settings_doctype.name))
-				),
-			)
+		theme.theme_settings = settings_doctype.name
+		self.add_settings_doctype_change(theme)
+
+	def add_settings_doctype_change(self, theme):
+		settings_dir = Path(
+			frappe.get_module_path(theme.module), "doctype", frappe.scrub(theme.theme_settings)
 		)
-		return settings_doctype.name
+		self.changes.append(("created", self.get_relative_path(settings_dir)))
