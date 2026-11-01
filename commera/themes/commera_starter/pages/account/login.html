@@ -1,0 +1,10 @@
+{% extends "components/base.html" %}
+{% from "components/auth_form.html" import auth_form with context %}
+
+{% block auth_modal %}{% endblock %}
+
+{% block body %}
+<section class="px-5 py-12 md:py-20">
+	<div class="mx-auto max-w-md">{{ auth_form("login", redirect_to, heading="h1") }}</div>
+</section>
+{% endblock %}

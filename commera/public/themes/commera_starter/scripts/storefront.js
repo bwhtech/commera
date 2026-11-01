@@ -333,6 +333,80 @@ document.addEventListener('alpine:init', () => {
 		},
 	}));
 
+	Alpine.data('auth_form', ({ mode, redirect }) => ({
+		...form_state(),
+		mode,
+		step: 'details',
+		first_name: '',
+		last_name: '',
+		email: '',
+		code: '',
+		resent: false,
+
+		switch_mode(next_mode) {
+			this.mode = next_mode;
+			this.step = 'details';
+			this.code = '';
+			this.error = '';
+		},
+
+		async request_code() {
+			if (this.mode === 'login') {
+				await commera.auth.send_login_code(this.email);
+			} else {
+				await commera.auth.send_signup_code({
+					email: this.email,
+					first_name: this.first_name,
+					last_name: this.last_name,
+				});
+			}
+		},
+
+		async send_code() {
+			await this.submit(async () => {
+				await this.request_code();
+				this.resent = false;
+				this.code = '';
+				this.step = 'code';
+			});
+		},
+
+		async resend_code() {
+			await this.submit(async () => {
+				await this.request_code();
+				this.resent = true;
+			});
+		},
+
+		async verify() {
+			this.resent = false;
+			await this.submit(async () => {
+				if (this.mode === 'login') {
+					await commera.auth.log_in({ email: this.email, code: this.code });
+				} else {
+					await commera.auth.sign_up({
+						email: this.email,
+						first_name: this.first_name,
+						last_name: this.last_name,
+						code: this.code,
+					});
+				}
+				if (redirect) {
+					location.assign(redirect);
+				} else {
+					location.reload();
+				}
+			});
+		},
+	}));
+
+	Alpine.data('log_out_button', () => ({
+		async log_out() {
+			await commera.auth.log_out();
+			location.assign(`/${document.documentElement.lang}`);
+		},
+	}));
+
 	Alpine.data('order_detail', ({ name, key, is_owner, is_cancelled }) => ({
 		...form_state(),
 		tracking: {},

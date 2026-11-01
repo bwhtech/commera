@@ -53,6 +53,7 @@
 	{% block header %}{{ render_layout("header_group") }}{% endblock %}
 	{% include "components/search_modal.html" %}
 	{% include "components/cart_drawer.html" %}
+	{% block auth_modal %}{% if frappe.session.user == "Guest" %}{% include "components/auth_modal.html" %}{% endif %}{% endblock %}
 
 	<main class="flex-1">
 		{% block body %}{% endblock %}
