@@ -422,8 +422,8 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 		frappe.get_doc({"doctype": "Module Def", "module_name": self.module, "app_name": APP}).insert()
 		theme = frappe.new_doc("Shop Theme")
 		theme.update({"theme_name": "Scaffold Check", "theme_type": "Sections", "module": self.module})
-		theme.flags.scaffold = True
-		theme.insert()
+		with patch.dict(frappe.conf, {"developer_mode": 1}):
+			theme.insert()
 
 		self.assert_starter_copy()
 		self.assertEqual(theme.theme_settings, "Scaffold Check Settings")
