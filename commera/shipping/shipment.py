@@ -1,6 +1,5 @@
 import frappe
 from frappe import _
-from frappe.integrations.utils import create_request_log
 from frappe.utils import validate_url
 from frappe.utils.data import cstr, flt, get_datetime, today
 
@@ -42,6 +41,19 @@ class CommeraShipment:
 	def on_submit(self):
 		super().on_submit()
 		self.db_set("status", self.get_erpnext_status())
+
+	def before_cancel(self):
+		if (
+			self.custom_order_ref
+			and self.custom_shipment_status in CANCELLABLE_STATUSES
+			and not self.flags.cancelling_with_carrier
+		):
+			frappe.throw(
+				_(
+					"This shipment is booked with {0}. Use Cancel With Carrier so the label is cancelled too."
+				).format(frappe.bold(self.custom_shipping_provider)),
+				title=_("Booked With Carrier"),
+			)
 
 	def validate_tracking_url(self):
 		# Shoppers open this link from the storefront, so only web links are stored.
@@ -127,6 +139,7 @@ class CommeraShipment:
 	def book(self) -> dict:
 		"""Book the consignment and buy its label. Resumes an order a previous attempt left at the
 		carrier instead of creating a second one."""
+		self.check_permission("submit")
 		self.lock_booking()
 
 		if self.awb_number:
@@ -159,12 +172,16 @@ class CommeraShipment:
 		# ponytail: the intent log shares this transaction, so a crash between the carrier call and the
 		# commit loses the record of a label that was really bought; reconcile from the carrier's own
 		# dashboard. Committing it first would release the row lock and re-open the double-booking window.
-		request_log = create_request_log(
-			{"shipment": self.name, "service_code": self.custom_service_code},
-			service_name=f"{self.custom_shipping_provider} Booking",
-			reference_doctype=self.doctype,
-			reference_docname=self.name,
-		)
+		# Not create_request_log: it commits, which releases the row lock and lets a second click book again.
+		request_log = frappe.get_doc(
+			{
+				"doctype": "Integration Request",
+				"integration_request_service": f"{self.custom_shipping_provider} Booking",
+				"data": frappe.as_json({"shipment": self.name, "service_code": self.custom_service_code}),
+				"reference_doctype": self.doctype,
+				"reference_docname": self.name,
+			}
+		).insert(ignore_permissions=True)
 
 		try:
 			if resuming:
@@ -219,6 +236,7 @@ class CommeraShipment:
 
 	@frappe.whitelist()
 	def cancel_booking(self) -> dict:
+		self.check_permission("cancel")
 		self.lock_booking()
 
 		if not self.custom_order_ref:
@@ -238,6 +256,7 @@ class CommeraShipment:
 		# Cancelled before the carrier call, so a refusal here rolls back before the booking is lost.
 		if self.docstatus == 1:
 			self.flags.ignore_permissions = True
+			self.flags.cancelling_with_carrier = True
 			self.cancel()
 		result = controller.cancel_shipment(
 			self.custom_order_ref, shipment_ref=self.shipment_id, awb=self.awb_number
@@ -250,6 +269,7 @@ class CommeraShipment:
 	@frappe.whitelist()
 	def sync_status(self) -> str:
 		"""Re-read the authoritative status from the carrier. Never trust a stale local state."""
+		self.check_permission("write")
 		if not self.awb_number:
 			frappe.throw(_("This shipment has no AWB yet, so there is nothing to track"))
 
@@ -272,6 +292,8 @@ class CommeraShipment:
 
 	@frappe.whitelist()
 	def schedule_pickup(self, pickup_date: str | None = None) -> dict:
+		self.check_permission("write")
+		self.lock_booking()
 		controller = self.get_controller()
 		if not controller.supports("pickup"):
 			frappe.throw(_("{0} cannot schedule pickups").format(frappe.bold(self.custom_shipping_provider)))
@@ -290,6 +312,7 @@ class CommeraShipment:
 
 	@frappe.whitelist()
 	def generate_manifest(self) -> dict:
+		self.check_permission("write")
 		controller = self.get_controller()
 		if not controller.supports("manifest"):
 			frappe.throw(

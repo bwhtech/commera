@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
@@ -57,6 +59,29 @@ class TestShipmentBooking(IntegrationTestCase):
 			(shipment.awb_number, shipment.custom_shipment_status), ("AWB-MEM-1", "Ready To Ship")
 		)
 		self.assertEqual(self.carrier.shipments["MEM-1"]["order_reference"], self.sales_order)
+
+	def test_a_carrier_rate_without_a_shipping_service_still_ships(self):
+		frappe.db.set_value("Sales Order", self.sales_order, "custom_delivery_option", "Carrier Surface")
+
+		shipment = frappe.get_doc("Shipment", create_shipment(self.delivery_note))
+
+		self.assertEqual(
+			(shipment.custom_service_code, shipment.custom_shipping_service), (SERVICE_CODE, None)
+		)
+
+	def test_booking_holds_its_lock_until_the_carrier_answers(self):
+		shipment = frappe.get_doc("Shipment", create_shipment(self.delivery_note))
+
+		with patch.object(frappe.db, "commit", side_effect=AssertionError("committed mid-booking")):
+			shipment.book()
+
+		self.assertEqual(shipment.docstatus, 1)
+
+	def test_a_booked_shipment_cancels_only_with_the_carrier(self):
+		shipment = self.book()
+
+		self.assertRaises(frappe.ValidationError, shipment.cancel)
+		self.assertEqual(self.carrier.cancelled, [])
 
 	def test_a_delivery_note_ships_once(self):
 		create_shipment(self.delivery_note)

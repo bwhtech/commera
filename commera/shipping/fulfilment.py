@@ -46,7 +46,8 @@ def create_shipment(delivery_note: str) -> str:
 		{
 			"custom_sales_order": sales_order,
 			"custom_shipping_provider": provider,
-			"custom_shipping_service": choice.get("delivery_option"),
+			# An "every carrier rate" option is titled by the carrier and has no Shipping Service.
+			"custom_shipping_service": frappe.db.exists("Shipping Service", choice.get("delivery_option")),
 			"custom_service_code": choice.get("service_code"),
 		}
 	)
