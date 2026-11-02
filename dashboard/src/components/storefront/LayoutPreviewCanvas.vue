@@ -1,9 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { onKeyStroke, useElementSize, useLocalStorage } from '@vueuse/core'
-import { Button, Dropdown, TabButtons } from 'frappe-ui'
+import { Button, TabButtons } from 'frappe-ui'
 import LayoutPreviewFrame from './LayoutPreviewFrame.vue'
-import { previewMenu } from './previewMenu'
+import PreviewOptions from './PreviewOptions.vue'
 
 const props = defineProps({
   editor: { type: Object, required: true },
@@ -36,8 +36,6 @@ function followScroll(source, position) {
   if (state.device !== 'both' || !position.section) return
   previews[source === 'desktop' ? 'mobile' : 'desktop']?.scrollToSection(position)
 }
-
-const menu = computed(() => previewMenu(state))
 
 const zoom = computed({
   get: () => zooms.value[state.device] ?? 'fit',
@@ -110,9 +108,7 @@ onKeyStroke('Escape', (event) => {
         :aria-pressed="maximised"
         @click="emit('toggle-maximise')"
       />
-      <Dropdown :options="menu" side="top" align="end">
-        <Button variant="ghost" icon="lucide-ellipsis" aria-label="More preview options" />
-      </Dropdown>
+      <PreviewOptions :state="state" />
     </div>
   </div>
 </template>

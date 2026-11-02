@@ -11,7 +11,7 @@ import LayoutSectionPicker from '../../components/storefront/LayoutSectionPicker
 import LayoutSectionTree from '../../components/storefront/LayoutSectionTree.vue'
 import LayoutSettingsPanel from '../../components/storefront/LayoutSettingsPanel.vue'
 import ThemeSettingsPanel from '../../components/storefront/ThemeSettingsPanel.vue'
-import { previewMenu } from '../../components/storefront/previewMenu'
+import PreviewOptions from '../../components/storefront/PreviewOptions.vue'
 import { SECTION_GROUPS, createLayoutEditor, pageLabel } from '../../data/themeLayout'
 import { errorMessage } from '../../data/errors'
 
@@ -86,8 +86,6 @@ const breadcrumbs = computed(() => [
   { label: 'Themes', route: { name: 'StorefrontTheme' } },
   { label: state.theme },
 ])
-
-const narrowPreviewMenu = computed(() => previewMenu(state, { devices: false }))
 
 async function toggleMaximise() {
   const previous = maximised.value
@@ -238,9 +236,7 @@ useEventListener(window, 'beforeunload', (event) => {
     <template v-else>
       <div v-if="!isWide" class="flex shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3 py-2">
         <TabButtons v-model="panel" class="min-w-0 flex-1" :options="PANELS" aria-label="Panel" />
-        <Dropdown :options="narrowPreviewMenu" align="end">
-          <Button variant="ghost" icon="lucide-ellipsis" aria-label="More preview options" />
-        </Dropdown>
+        <PreviewOptions :state="state" :devices="false" />
       </div>
 
       <DefineTreePanel>
