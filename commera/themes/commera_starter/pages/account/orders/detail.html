@@ -1,0 +1,147 @@
+{% extends "components/base.html" %}
+{% from "components/account_shell.html" import account_shell with context %}
+{% from "components/macros/order_status.html" import order_status %}
+{% from "components/macros/image.html" import image with context %}
+{% from "components/macros/icons.html" import icon %}
+{% set language = frappe.lang or "en" %}
+{% set order_key = frappe.form_dict.key or None %}
+{% set order = commera.account.get_order(frappe.form_dict.order_id, order_key) %}
+{% set is_owner = order.access == "owner" %}
+{% set can_cancel = is_owner and order.stage.key in ("confirmation_pending", "to_fulfil") %}
+{% set address = order.shipping_address %}
+{% set detail_config = {"name": order.name, "key": order_key, "is_owner": is_owner, "is_cancelled": order.is_cancelled} %}
+
+{% macro summary_row(label, amount, class="text-ink-gray-7", sign="") %}
+<div class="{{ class }} flex justify-between gap-4"><dt>{{ label }}</dt><dd><bdi>{{ sign }}{{ commera.format.money(amount, order.currency) }}</bdi></dd></div>
+{%- endmacro %}
+
+{% block body %}
+{% call account_shell("orders", _("Order") ~ " " ~ order.name, show_nav=is_owner) %}
+<div x-data='order_detail({{ detail_config | tojson }})' class="flex flex-col gap-10">
+	<div class="flex flex-wrap items-center justify-between gap-4">
+		<div class="flex flex-wrap items-center gap-3">
+			{{ order_status(order.stage) }}
+			<p class="text-p-base text-ink-gray-6">{{ _("Placed on {0}").format("<bdi>" ~ frappe.utils.format_date(order.placed_on, "medium") ~ "</bdi>") }}</p>
+		</div>
+		{% if is_owner %}
+		<div class="flex flex-wrap gap-2">
+			<a x-cloak x-show="invoice_url" :href="invoice_url" target="_blank" rel="noopener" class="inline-flex h-9 items-center rounded-lg bg-surface-gray-2 px-3 text-base text-ink-gray-8 hover:bg-surface-gray-3">{{ _("Download invoice") }}</a>
+			<button type="button" x-cloak x-show="returns.can_return && returnable_codes.length" @click="show_return = !show_return" class="inline-flex h-9 items-center rounded-lg bg-surface-gray-2 px-3 text-base text-ink-gray-8 hover:bg-surface-gray-3">{{ _("Return items") }}</button>
+			{% if can_cancel %}
+			<button type="button" @click="confirm_cancel = true" class="inline-flex h-9 items-center rounded-lg bg-surface-gray-2 px-3 text-base text-ink-red-6 hover:bg-surface-gray-3">{{ _("Cancel order") }}</button>
+			{% endif %}
+		</div>
+		{% endif %}
+	</div>
+
+	<p x-cloak x-show="error" x-text="error" class="text-sm text-ink-red-6" role="alert"></p>
+
+	{% if order.access == "limited" %}
+	<p class="rounded-lg bg-surface-gray-2 p-4 text-p-base text-ink-gray-7">{{ _("This order link is older, so the delivery address and payment details are hidden.") }} <a href="/{{ language }}/track-order" class="text-ink-gray-9 underline">{{ _("Get a new link by email") }}</a></p>
+	{% endif %}
+
+	{% if can_cancel %}
+	<div x-cloak x-show="confirm_cancel" class="flex flex-col gap-4 rounded-lg border border-outline-gray-2 p-5">
+		<p class="text-p-base text-ink-gray-8">{{ _("Cancel this order? This cannot be undone.") }}</p>
+		<div class="flex gap-2">
+			<button type="button" @click="cancel()" :disabled="busy" class="inline-flex h-9 items-center rounded-lg bg-surface-red-2 px-3 text-base font-medium text-ink-red-6 hover:bg-surface-red-3 disabled:opacity-60">{{ _("Yes, cancel it") }}</button>
+			<button type="button" @click="confirm_cancel = false" class="inline-flex h-9 items-center rounded-lg px-3 text-base text-ink-gray-8 hover:bg-surface-gray-2">{{ _("Keep order") }}</button>
+		</div>
+	</div>
+	{% endif %}
+
+	{% if is_owner %}
+	<form x-cloak x-show="show_return" @submit.prevent="request_return()" class="flex flex-col gap-4 rounded-lg border border-outline-gray-2 p-5">
+		<h2 class="text-xl">{{ _("Choose items to return") }}</h2>
+		{% for line in order["items"] %}
+		<div data-item="{{ line.item_code }}" x-show="returnable_codes.includes($el.dataset.item)" class="flex flex-col gap-3 md:flex-row md:items-center">
+			<label class="flex min-w-0 flex-1 items-center gap-2 text-base text-ink-gray-8">
+				<input type="checkbox" value="{{ line.item_code }}" x-model="selected" class="size-4 rounded accent-brand">
+				<span class="truncate">{{ line.title }}</span>
+			</label>
+			<select x-model="reasons[$el.parentElement.dataset.item]" aria-label="{{ _('Reason for return') }}" class="h-10 rounded-lg border border-transparent bg-surface-gray-2 px-3 text-base text-ink-gray-8 hover:bg-surface-gray-3 focus:border-outline-gray-4 md:w-56">
+				<option value="">{{ _("Reason for return") }}</option>
+				<template x-for="reason in returns.reasons" :key="reason.name">
+					<option :value="reason.name" x-text="reason.label"></option>
+				</template>
+			</select>
+		</div>
+		{% endfor %}
+		<div>
+			<button type="submit" :disabled="busy || !selected.length" class="inline-flex h-10 items-center justify-center rounded-lg bg-brand px-4 text-lg font-medium text-on-brand hover:bg-brand-hover disabled:opacity-60">{{ _("Request return") }}</button>
+		</div>
+	</form>
+	<p x-cloak x-show="returns.pending_items && returns.pending_items.length" class="text-p-base text-ink-gray-6">{{ _("Your return request is being processed.") }}</p>
+	{% endif %}
+
+	<section>
+		<h2 class="text-xl">{{ _("Items") }}</h2>
+		<ul class="mt-4 divide-y divide-outline-gray-1 border-y border-outline-gray-1">
+			{% for line in order["items"] %}
+			<li class="flex items-center gap-4 py-4">
+				{{ image(line.image, width=160, class="size-16 shrink-0 rounded-lg object-cover") }}
+				<div class="min-w-0 flex-1">
+					<p class="text-base text-ink-gray-9">{{ line.title }}</p>
+					<p class="mt-1 text-sm text-ink-gray-6">{% if line.size %}{{ _("Size") }} {{ line.size }} · {% endif %}<bdi>{{ line.qty | int }} × {{ commera.format.money(line.rate, order.currency) }}</bdi></p>
+				</div>
+				<p class="shrink-0 text-base text-ink-gray-9"><bdi>{{ commera.format.money(line.amount, order.currency) }}</bdi></p>
+			</li>
+			{% endfor %}
+		</ul>
+		<dl class="ms-auto mt-4 flex max-w-sm flex-col gap-2 text-base">
+			{{ summary_row(_("Subtotal"), order.total) }}
+			{% for discount in order.discounts | rejectattr("discount_class", "equalto", "Product") %}
+			{{ summary_row(discount.title, discount.amount, "text-ink-green-6", "−") }}
+			{% endfor %}
+			{% if order.shipping %}{{ summary_row(_("Shipping"), order.shipping) }}{% endif %}
+			{% if order.cod_charge %}{{ summary_row(_("Cash on delivery fee"), order.cod_charge) }}{% endif %}
+			{% for charge in order.taxes + order.plugin_fees %}
+			{{ summary_row(charge.description, charge.amount) }}
+			{% endfor %}
+			{% if order.rounded_total and order.rounding_adjustment %}{{ summary_row(_("Rounding adjustment"), order.rounding_adjustment) }}{% endif %}
+			<div class="flex justify-between gap-4 border-t border-outline-gray-1 pt-2 text-lg font-medium text-ink-gray-9"><dt>{{ _("Order total") }}</dt><dd><bdi>{{ commera.format.money(order.rounded_total or order.grand_total, order.currency) }}</bdi></dd></div>
+		</dl>
+	</section>
+
+	<section x-cloak x-show="tracking.has_tracking">
+		<h2 class="text-xl">{{ _("Delivery") }}</h2>
+		<p class="mt-2 text-p-base text-ink-gray-7"><bdi x-text="[tracking.carrier, tracking.awb, tracking.status].filter(Boolean).join(' · ')"></bdi> <a x-show="tracking.tracking_url" :href="tracking.tracking_url" target="_blank" rel="noopener noreferrer" class="text-ink-gray-9 underline">{{ _("Track your parcel") }}</a></p>
+		<ol class="mt-4 flex flex-col gap-4 border-s border-outline-gray-2 ps-5">
+			<template x-for="event in tracking.events || []" :key="event.timestamp + event.status">
+				<li>
+					<p class="text-base text-ink-gray-9" x-text="event.message || event.status"></p>
+					<p class="text-sm text-ink-gray-6"><bdi x-text="[event.timestamp, event.location].filter(Boolean).join(' · ')"></bdi></p>
+				</li>
+			</template>
+		</ol>
+	</section>
+
+	{% if order.access != "limited" %}
+	<section class="grid gap-8 md:grid-cols-2">
+		<div>
+			<h2 class="text-xl">{{ _("Delivery address") }}</h2>
+			{% if address %}
+			<div class="mt-3 text-p-base text-ink-gray-7">
+				<p><bdi>{{ ", ".join([address.address_line1, address.address_line2] | select) }}</bdi></p>
+				<p><bdi>{{ ", ".join([address.city, address.state, address.pincode] | select) }}</bdi></p>
+				<p><bdi>{{ address.country }}</bdi></p>
+				{% if address.phone %}<p><bdi dir="ltr">{{ address.phone }}</bdi></p>{% endif %}
+			</div>
+			{% else %}
+			<p class="mt-3 text-p-base text-ink-gray-6">—</p>
+			{% endif %}
+		</div>
+		<div>
+			<h2 class="text-xl">{{ _("Payment") }}</h2>
+			<p class="mt-3 text-p-base text-ink-gray-7">{% if order.payment_mode == "COD" %}{{ _("Cash on delivery") }}{% elif order.is_paid %}{{ _("Paid") }}{% else %}{{ _("Payment pending") }}{% endif %}</p>
+			{% if order.email %}<p class="text-p-base text-ink-gray-7"><bdi>{{ order.email }}</bdi></p>{% endif %}
+		</div>
+	</section>
+	{% endif %}
+
+	{% if is_owner %}
+	<a href="/{{ language }}/account/orders" class="inline-flex items-center gap-1 self-start text-base text-ink-gray-8 underline hover:text-ink-gray-9">{{ icon("left", "size-4 rtl:rotate-180") }}{{ _("Back to orders") }}</a>
+	{% endif %}
+</div>
+{% endcall %}
+{% endblock %}

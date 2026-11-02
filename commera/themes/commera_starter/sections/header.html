@@ -1,6 +1,7 @@
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/menu_link.html" import menu_link %}
 {% set language = frappe.lang or "en" %}
+{% set is_guest = frappe.session.user == "Guest" %}
 {% set main_menu = commera.shop.get_menu(section.settings.menu or "main-menu") %}
 {% set menu_items = main_menu["items"] if main_menu else [] %}
 {% set logo_at_start = section.settings.logo_position == "start" %}
@@ -42,10 +43,10 @@
 			<button type="button" @click="$dispatch('open-search')" class="hidden size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:grid" aria-label="{{ _('Search') }}">{{ icon("search") }}</button>
 			{% endif %}
 			{% if section.settings.show_account %}
-			<a href="/{{ language }}/account" class="hidden size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:grid" aria-label="{{ _('Account') }}">{{ icon("user") }}</a>
+			<a href="/{{ language }}/account/{{ 'login' if is_guest else 'orders' }}" {% if is_guest %}@click.prevent="$dispatch('open-auth')"{% endif %} class="hidden size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:grid" aria-label="{{ _('Account') }}">{{ icon("user") }}</a>
 			{% endif %}
 			{% if section.settings.show_wishlist %}
-			<a href="/{{ language }}/account/wishlist" class="hidden size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:grid" aria-label="{{ _('Wishlist') }}">{{ icon("heart") }}</a>
+			<a href="/{{ language }}/account/wishlist" {% if is_guest %}@click.prevent="$dispatch('open-auth', { redirect: $el.pathname })"{% endif %} class="hidden size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:grid" aria-label="{{ _('Wishlist') }}">{{ icon("heart") }}</a>
 			{% endif %}
 			<a href="/{{ language }}/cart" @click.prevent="$dispatch('open-cart')" class="relative grid size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3" aria-label="{{ _('Cart') }}">
 				{{ icon("bag") }}

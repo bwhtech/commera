@@ -41,6 +41,19 @@ function typeahead() {
 	};
 }
 
+function form_state() {
+	return {
+		busy: false,
+		error: '',
+		saved: false,
+
+		async submit(change) {
+			this.saved = false;
+			await save_change(this, change);
+		},
+	};
+}
+
 function product_form(product) {
 	return {
 		...product,
@@ -57,6 +70,14 @@ function product_form(product) {
 			new IntersectionObserver(([entry]) => {
 				this.add_button_visible = entry.isIntersecting;
 			}).observe(this.$refs.add_button);
+			const url = new URL(location.href);
+			if (url.searchParams.has('save_to_wishlist')) {
+				url.searchParams.delete('save_to_wishlist');
+				history.replaceState(null, '', url);
+				if (!product.is_guest && !this.saved) {
+					this.toggle_wishlist();
+				}
+			}
 		},
 
 		get size_option() {
@@ -111,9 +132,9 @@ function product_form(product) {
 
 		async toggle_wishlist() {
 			if (product.is_guest) {
-				globalThis.location.assign(
-					`/login?redirect-to=${encodeURIComponent(location.pathname)}`,
-				);
+				const url = new URL(location.href);
+				url.searchParams.set('save_to_wishlist', '1');
+				this.$dispatch('open-auth', { redirect: url.pathname + url.search });
 				return;
 			}
 			await this.save(async () => {
@@ -258,6 +279,210 @@ document.addEventListener('alpine:init', () => {
 		show() {
 			this.open = true;
 			this.$nextTick(() => this.$refs.search_input.focus());
+		},
+	}));
+
+	Alpine.data('wishlist', (count) => ({
+		...form_state(),
+		count,
+		removed: [],
+
+		async remove(product) {
+			await this.submit(async () => {
+				const wishlist = await commera.wishlist.remove(product);
+				this.removed.push(product);
+				this.count = wishlist.count;
+			});
+		},
+	}));
+
+	Alpine.data('profile_form', (profile) => ({
+		...form_state(),
+		profile,
+
+		async save() {
+			await this.submit(async () => {
+				this.profile = await commera.account.update_profile(this.profile);
+				this.saved = true;
+			});
+		},
+	}));
+
+	Alpine.data('address_book', (addresses) => ({
+		...form_state(),
+		addresses,
+		form: null,
+
+		edit(address = {}) {
+			this.error = '';
+			this.form = { ...address };
+		},
+
+		close() {
+			this.error = '';
+			this.form = null;
+		},
+
+		async save() {
+			await this.submit(async () => {
+				await commera.account.save_address(this.form);
+				this.addresses = await commera.account.list_addresses();
+				this.form = null;
+			});
+		},
+
+		async remove(address) {
+			await this.submit(async () => {
+				await commera.account.delete_address(address.name);
+				this.addresses = this.addresses.filter(
+					(entry) => entry.name !== address.name,
+				);
+			});
+		},
+	}));
+
+	Alpine.data('auth_form', ({ mode, redirect }) => ({
+		...form_state(),
+		mode,
+		redirect,
+		step: 'details',
+		first_name: '',
+		last_name: '',
+		email: '',
+		code: '',
+		resent: false,
+
+		switch_mode(next_mode) {
+			this.mode = next_mode;
+			this.step = 'details';
+			this.code = '';
+			this.error = '';
+		},
+
+		async request_code() {
+			if (this.mode === 'login') {
+				await commera.auth.send_login_code(this.email);
+			} else {
+				await commera.auth.send_signup_code({
+					email: this.email,
+					first_name: this.first_name,
+					last_name: this.last_name,
+				});
+			}
+		},
+
+		async send_code() {
+			await this.submit(async () => {
+				await this.request_code();
+				this.resent = false;
+				this.code = '';
+				this.step = 'code';
+			});
+		},
+
+		async resend_code() {
+			await this.submit(async () => {
+				await this.request_code();
+				this.resent = true;
+			});
+		},
+
+		async verify() {
+			this.resent = false;
+			await this.submit(async () => {
+				if (this.mode === 'login') {
+					await commera.auth.log_in({ email: this.email, code: this.code });
+				} else {
+					await commera.auth.sign_up({
+						email: this.email,
+						first_name: this.first_name,
+						last_name: this.last_name,
+						code: this.code,
+					});
+				}
+				if (this.redirect) {
+					location.assign(this.redirect);
+				} else {
+					location.reload();
+				}
+			});
+		},
+	}));
+
+	Alpine.data('log_out_button', () => ({
+		async log_out() {
+			await commera.auth.log_out();
+			location.assign(`/${document.documentElement.lang}`);
+		},
+	}));
+
+	Alpine.data('order_detail', ({ name, key, is_owner, is_cancelled }) => ({
+		...form_state(),
+		tracking: {},
+		returns: {},
+		invoice_url: null,
+		confirm_cancel: false,
+		show_return: false,
+		selected: [],
+		reasons: {},
+		item_codes: [],
+
+		async init() {
+			this.item_codes = [...this.$el.querySelectorAll('[data-item]')].map(
+				(element) => element.dataset.item,
+			);
+			this.tracking = await commera.orders.get_tracking(name, key);
+			if (is_owner && !is_cancelled) {
+				[this.returns, this.invoice_url] = await Promise.all([
+					commera.orders.get_return_options(name),
+					commera.orders.get_invoice_url(name),
+				]);
+			}
+		},
+
+		get returnable_codes() {
+			const locked = [
+				...(this.returns.returned_items ?? []),
+				...(this.returns.pending_items ?? []),
+			];
+			return this.item_codes.filter((item_code) => !locked.includes(item_code));
+		},
+
+		async cancel() {
+			await this.submit(async () => {
+				await commera.orders.cancel(name);
+				location.reload();
+			});
+		},
+
+		async request_return() {
+			await this.submit(async () => {
+				this.returns = await commera.orders.request_return(
+					name,
+					this.selected.map((item_code) => ({
+						item_code,
+						reason: this.reasons[item_code],
+					})),
+				);
+				this.selected = [];
+				this.show_return = false;
+			});
+		},
+	}));
+
+	Alpine.data('track_order', () => ({
+		...form_state(),
+		order_number: '',
+		email: '',
+		message: '',
+
+		async send() {
+			await this.submit(async () => {
+				this.message = await commera.orders.send_order_link({
+					order_number: this.order_number,
+					email: this.email,
+				});
+			});
 		},
 	}));
 
