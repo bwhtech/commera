@@ -3,7 +3,7 @@ import { describe } from 'node:test'
 import { adminGet, adminPost, goto, uiTest, useSession, wait } from './harness.js'
 
 const SLOW_RENDER_MS = 1500
-const WORKSPACE_STORAGE = ['commera:theme-editor:zoom', 'commera:theme-editor:link-scroll', 'commera-theme-editor-panels']
+const WORKSPACE_STORAGE = ['commera:theme-editor:zoom', 'commera-theme-editor-panels']
 
 const REFUSAL = {
   status: 417,
@@ -63,6 +63,25 @@ async function dragBy(page, selector, deltaX, deltaY = 0) {
   await wait(300)
 }
 
+async function openThemeSettings(page) {
+  await page.click('[data-theme-settings-toggle]')
+  await page.waitForFunction(
+    () => {
+      const panel = document.querySelector('[data-theme-layout-editor] > aside')
+      const column = document.querySelector('[data-editor-panel="settings"]')
+      return panel && Math.round(panel.getBoundingClientRect().width) === Math.round(column.getBoundingClientRect().width)
+    },
+    { timeout: 5000 },
+  )
+}
+
+async function pickPreviewOption(page, label) {
+  await page.click('[data-zoom-controls] button[aria-label="More preview options"]')
+  const [item] = await page.$$(`xpath/.//*[@role="menuitem"][normalize-space()="${label}"]`)
+  await item.click()
+  await wait(400)
+}
+
 async function clickButton(page, label) {
   await page.click(`button[aria-label="${label}"]`)
   await wait(400)
@@ -80,7 +99,53 @@ async function visibleFrame(page, device) {
 describe('theme editor', () => {
   const session = useSession()
 
-  uiTest(session, 'Publish saves every part first, so a refused save publishes nothing', async (t) => {
+  uiTest(session, 'The top bar keeps all three actions and says why one is off', async (t) => {
+    const { page } = session
+    const theme = await findLiveSectionsTheme(page)
+    if (!theme) return t.skip('the live theme is not a Sections theme')
+    await openEditor(page, theme)
+    const enabled = () =>
+      page.$$eval('header button', (buttons) =>
+        Object.fromEntries(
+          buttons
+            .filter((button) => ['Discard', 'Save', 'Publish'].includes(button.textContent.trim()))
+            .map((button) => [button.textContent.trim(), !button.disabled]),
+        ),
+      )
+    const tooltipFor = async (label) => {
+      const [button] = await page.$$(`xpath/.//header//button[normalize-space()="${label}"]`)
+      await (await button.evaluateHandle((element) => element.parentElement)).hover()
+      await page.waitForSelector('[role="tooltip"]', { visible: true, timeout: 3000 })
+      const text = await page.$eval('[role="tooltip"]', (element) => element.textContent.trim())
+      await page.mouse.move(0, 400)
+      await wait(300)
+      return text
+    }
+
+    const pending = (await page.$eval('header', (element) => element.innerText)).includes('Unpublished changes')
+    if (pending) {
+      assert.deepEqual(await enabled(), { Discard: true, Save: false, Publish: true })
+      assert.equal(await tooltipFor('Save'), 'No unsaved changes')
+    } else {
+      assert.ok((await page.$eval('header', (element) => element.innerText)).includes('Published'))
+      assert.deepEqual(await enabled(), { Discard: false, Save: false, Publish: false })
+      assert.equal(await tooltipFor('Discard'), 'Nothing to discard')
+      assert.equal(await tooltipFor('Publish'), 'Everything is already live')
+    }
+
+    await page.click('[data-tree-node^="section:"]')
+    await page.waitForSelector('[data-settings-panel] button[aria-label="Hide section"]', { visible: true })
+    await page.click('[data-settings-panel] button[aria-label="Hide section"]')
+    await wait(300)
+    assert.deepEqual(await enabled(), { Discard: true, Save: true, Publish: false })
+    assert.equal(await tooltipFor('Publish'), 'Save your changes first')
+
+    await page.click('[data-settings-panel] button[aria-label="Show section"]')
+    await wait(300)
+    assert.equal((await enabled()).Save, false, 'undoing the edit leaves nothing to save')
+  })
+
+  uiTest(session, 'A refused save keeps the edit unsaved and publishes nothing', async (t) => {
     const { page } = session
     const theme = await findLiveSectionsTheme(page)
     if (!theme) return t.skip('the live theme is not a Sections theme')
@@ -103,13 +168,17 @@ describe('theme editor', () => {
       await page.click('button[aria-label^="Hide "]')
       await wait(500)
 
-      const [publishButton] = await page.$$('xpath/.//button[normalize-space()="Publish"]')
-      await publishButton.click()
+      const header = () => page.$eval('header', (element) => element.innerText)
+      const publishOn = () => page.$eval('xpath/.//header//button[normalize-space()="Publish"]', (button) => !button.disabled)
+      assert.ok(!(await publishOn()), 'Publish waits until the edit is saved')
+      const [saveButton] = await page.$$('xpath/.//header//button[normalize-space()="Save"]')
+      await saveButton.click()
       await wait(2500)
 
       assert.deepEqual(calls, ['save_draft'])
-      const body = await page.evaluate(() => document.body.innerText)
-      assert.ok(body.includes('Unpublished changes'), 'the edit is kept and still unpublished')
+      assert.ok((await header()).includes('Unpublished changes'), 'the edit is kept and still unpublished')
+      const saveOn = await page.$eval('xpath/.//header//button[normalize-space()="Save"]', (button) => !button.disabled)
+      assert.ok(saveOn, 'Save stays on so the edit can be retried')
       await page.click('button[aria-label^="Show "]')
       await wait(500)
     } finally {
@@ -208,13 +277,13 @@ describe('theme editor', () => {
       () => document.querySelector('iframe[data-preview-frame="visible"]')?.contentDocument?.querySelector('[data-commera-section]'),
       { timeout: 30000 },
     )
-    const [settingsRow] = await page.$$('xpath/.//button[normalize-space()="Theme settings"]')
-    await settingsRow.click()
-    await page.waitForSelector('[id^="theme-"]', { visible: true })
+    await openThemeSettings(page)
 
     const field = await page.evaluate(() => {
       const preview = document.querySelector('iframe[data-preview-frame="visible"]').contentDocument.documentElement.outerHTML
-      const inputs = [...document.querySelectorAll('input[id^="theme-"]')].filter((element) => element.type === 'text')
+      const inputs = [...document.querySelectorAll('input[id^="theme-"]')].filter(
+        (element) => element.type === 'text' && !element.readOnly && !element.disabled,
+      )
       const input =
         inputs.find((element) => element.id.endsWith('_url')) ??
         inputs.find((element) => element.value && preview.includes(element.value))
@@ -232,7 +301,7 @@ describe('theme editor', () => {
     try {
       await page.click(`#${field.id}`, { clickCount: 3 })
       await page.keyboard.type(changed)
-      await page.keyboard.press('Tab')
+      await page.click('[data-theme-settings-panel] > :last-child button')
       await page.waitForFunction(
         (text) =>
           document
@@ -291,15 +360,16 @@ describe('theme editor', () => {
     assert.ok(header.includes('Not live'), 'the badge says the theme is not live')
   })
 
-  uiTest(session, 'A refused theme setting goes back to its saved value', async (t) => {
+  uiTest(session, 'A refused theme settings save keeps what was typed', async (t) => {
     const { page } = session
     const theme = await findLiveSectionsTheme(page)
     if (!theme) return t.skip('the live theme is not a Sections theme')
     await openEditor(page, theme)
-    await page.click('[data-tree-theme-settings]')
-    await page.waitForSelector('[id^="theme-"]', { visible: true })
+    await openThemeSettings(page)
     const field = await page.evaluate(() => {
-      const input = [...document.querySelectorAll('input[id^="theme-"]')].find((element) => element.type === 'text')
+      const input = [...document.querySelectorAll('input[id^="theme-"]')].find(
+        (element) => element.type === 'text' && !element.readOnly && !element.disabled,
+      )
       return input && { id: input.id, value: input.value }
     })
     if (!field) return t.skip('this theme has no text theme setting')
@@ -312,18 +382,22 @@ describe('theme editor', () => {
     page.on('request', intercept)
 
     try {
+      const saveDisabled = () => page.$eval('[data-theme-settings-panel] > :last-child button', (button) => button.disabled)
+      assert.ok(await saveDisabled(), 'Save is off until something changes')
       await page.click(`#${field.id}`)
       await page.keyboard.type(' refused')
-      await page.keyboard.press('Tab')
+      assert.ok(!(await saveDisabled()), 'Save turns on after a change')
+      await page.click('[data-theme-settings-panel] > :last-child button')
       await wait(1500)
-      assert.equal(await page.$eval(`#${field.id}`, (element) => element.value), field.value)
+      assert.equal(await page.$eval(`#${field.id}`, (element) => element.value), `${field.value} refused`)
+      assert.ok(!(await saveDisabled()), 'Save stays on so the change can be retried')
     } finally {
       page.off('request', intercept)
       await page.setRequestInterception(false)
     }
   })
 
-  uiTest(session, 'Panels resize, collapse to the rail and keep their size after a reload', async (t) => {
+  uiTest(session, 'The tree resizes, never folds away, and keeps its size after a reload', async (t) => {
     const { page } = session
     const theme = await findLiveSectionsTheme(page)
     if (!theme) return t.skip('the live theme is not a Sections theme')
@@ -334,20 +408,17 @@ describe('theme editor', () => {
     const widened = await panelWidth(page, 'tree')
     assert.ok(Math.abs(widened - treeWidth - 80) <= 4, `tree ${treeWidth} -> ${widened}`)
 
-    await clickButton(page, 'Sections')
-    assert.equal(await panelWidth(page, 'tree'), 0)
-    await clickButton(page, 'Sections')
-    assert.equal(await panelWidth(page, 'tree'), widened)
+    await dragBy(page, '[data-editor-handle="tree"]', -600)
+    assert.ok(Math.abs((await panelWidth(page, 'tree')) - 220) <= 2, 'a hard drag stops at the minimum, it never folds the tree away')
+    await dragBy(page, '[data-editor-handle="tree"]', widened - 220)
 
     const settingsWidth = await panelWidth(page, 'settings')
-    await clickButton(page, 'Section settings')
-    assert.equal(await panelWidth(page, 'settings'), 0)
-    await clickButton(page, 'Theme settings')
-    assert.equal(await panelWidth(page, 'settings'), settingsWidth)
-    const settingsText = await page.$eval('[data-editor-panel="settings"]', (element) => element.innerText)
-    assert.ok(settingsText.includes('Theme settings'), 'the rail opens theme settings')
+    await openThemeSettings(page)
+    const overlayWidth = await page.$eval('[data-theme-layout-editor] > aside', (element) => element.getBoundingClientRect().width)
+    assert.equal(Math.round(overlayWidth), settingsWidth, 'theme settings cover the settings column exactly')
+    await clickButton(page, 'Close theme settings')
+    assert.equal(await page.$('[data-theme-settings-panel]'), null)
 
-    await clickButton(page, 'Section settings')
     await page.reload({ waitUntil: 'networkidle2' })
     await page.waitForSelector('[data-tree-node^="section:"]', { timeout: 30000 })
     assert.equal(await panelWidth(page, 'tree'), widened)
@@ -399,7 +470,7 @@ describe('theme editor', () => {
     if (!theme) return t.skip('the live theme is not a Sections theme')
     await openEditor(page, theme, { clearWorkspace: true })
 
-    await page.click('[aria-label="Preview width"] [data-value="both"]')
+    await pickPreviewOption(page, 'Desktop and mobile')
     await page.waitForSelector('[data-preview-device="mobile"] iframe[data-preview-frame="visible"]', {
       timeout: 30000,
     })
@@ -435,7 +506,7 @@ describe('theme editor', () => {
     assert.ok(await outlineShown(desktop), 'the desktop preview follows a pick made on mobile')
   })
 
-  uiTest(session, 'Link scroll keeps the same section at the top of both previews', async (t) => {
+  uiTest(session, 'Desktop and mobile previews keep the same section at the top', async (t) => {
     const { page } = session
     const theme = await findLiveSectionsTheme(page)
     if (!theme) return t.skip('the live theme is not a Sections theme')
@@ -448,7 +519,7 @@ describe('theme editor', () => {
     if (!target) return t.skip('the home page has too few sections to scroll between')
     const [, group, section] = target.split(':')
 
-    await page.click('[aria-label="Preview width"] [data-value="both"]')
+    await pickPreviewOption(page, 'Desktop and mobile')
     await page.waitForSelector('[data-preview-device="mobile"] iframe[data-preview-frame="visible"]', {
       timeout: 30000,
     })
@@ -474,18 +545,10 @@ describe('theme editor', () => {
         section,
       )
 
-    const [linkButton] = await page.$$('xpath/.//button[normalize-space()="Link scroll"]')
-    await linkButton.click()
     await scrollDesktopToTarget()
     await wait(800)
     assert.ok(Math.abs(await sectionTop(desktop)) <= 2, `desktop shows ${section} at the top`)
     assert.ok(Math.abs(await sectionTop(mobile)) <= 2, `mobile follows to ${section} (top ${await sectionTop(mobile)})`)
-
-    await linkButton.click()
-    const mobileScroll = await mobile.evaluate(() => window.scrollY)
-    await desktop.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
-    await wait(800)
-    assert.equal(await mobile.evaluate(() => window.scrollY), mobileScroll, 'with Link scroll off the mobile page stays put')
   })
 
   uiTest(session, 'Typing Arabic over a default text keeps the English default', async (t) => {
@@ -511,15 +574,15 @@ describe('theme editor', () => {
     await page.waitForSelector(input, { visible: true })
 
     try {
-      await page.click('[aria-label="Language"] [data-value="ar"]')
+      await pickPreviewOption(page, 'Right to left')
       await page.click(input)
       await page.keyboard.type('عرض خاص')
       await page.keyboard.press('Tab')
-      await page.click('[aria-label="Language"] [data-value="en"]')
+      await pickPreviewOption(page, 'Left to right')
       await wait(500)
       assert.equal(await page.$eval(input, (element) => element.value), setting.default)
     } finally {
-      await page.click('[aria-label="Language"] [data-value="en"]')
+      await pickPreviewOption(page, 'Left to right')
       await page.click('[data-settings-panel] button[aria-label="Remove section"]')
       await wait(500)
     }

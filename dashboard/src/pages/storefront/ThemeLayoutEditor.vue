@@ -1,28 +1,19 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute } from 'vue-router'
 import { createReusableTemplate, useEventListener, useMediaQuery } from '@vueuse/core'
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui'
-import { Badge, Button, Dropdown, Skeleton, TabButtons, Tooltip, dialog, toast } from 'frappe-ui'
+import { Badge, Breadcrumbs, Button, Dropdown, Skeleton, TabButtons, Tooltip, dialog, toast } from 'frappe-ui'
 import EmptyState from '../../components/EmptyState.vue'
 import LayoutPreviewCanvas from '../../components/storefront/LayoutPreviewCanvas.vue'
 import LayoutPreviewFrame from '../../components/storefront/LayoutPreviewFrame.vue'
 import LayoutSectionPicker from '../../components/storefront/LayoutSectionPicker.vue'
 import LayoutSectionTree from '../../components/storefront/LayoutSectionTree.vue'
 import LayoutSettingsPanel from '../../components/storefront/LayoutSettingsPanel.vue'
+import ThemeSettingsPanel from '../../components/storefront/ThemeSettingsPanel.vue'
+import { previewMenu } from '../../components/storefront/previewMenu'
 import { SECTION_GROUPS, createLayoutEditor, pageLabel } from '../../data/themeLayout'
 import { errorMessage } from '../../data/errors'
-
-const LANGUAGES = [
-  { label: 'EN', value: 'en' },
-  { label: 'AR', value: 'ar' },
-]
-
-const DEVICES = [
-  { label: 'Desktop', value: 'desktop', icon: 'lucide-monitor' },
-  { label: 'Mobile', value: 'mobile', icon: 'lucide-smartphone' },
-  { label: 'Desktop and mobile', value: 'both', icon: 'lucide-columns-2' },
-]
 
 const PANELS = [
   { label: 'Sections', value: 'tree' },
@@ -31,7 +22,6 @@ const PANELS = [
 ]
 
 const route = useRoute()
-const router = useRouter()
 
 const editor = createLayoutEditor(String(route.params.theme))
 const { state, hasUnsavedChanges, hasUnpublishedChanges, busy, saveIfChanged, switchPage } = editor
@@ -39,77 +29,94 @@ const { state, hasUnsavedChanges, hasUnpublishedChanges, busy, saveIfChanged, sw
 const pickingGroup = ref(null)
 
 const isWide = useMediaQuery('(min-width: 1024px)')
+const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
 const panel = ref('tree')
 
 const [DefineTreePanel, TreePanel] = createReusableTemplate()
 
 const treePanel = ref(null)
-const settingsPanel = ref(null)
-const treeOpen = ref(true)
 const settingsOpen = ref(true)
 const maximised = ref(null)
 
-const railItems = computed(() => [
-  { label: 'Sections', icon: 'lucide-list-tree', active: treeOpen.value, onClick: toggleTree },
-  {
-    label: 'Section settings',
-    icon: 'lucide-sliders-horizontal',
-    active: settingsOpen.value && state.selection?.kind !== 'theme',
-    onClick: () => toggleSettings(false),
-  },
-  {
-    label: 'Theme settings',
-    icon: 'lucide-palette',
-    active: settingsOpen.value && state.selection?.kind === 'theme',
-    onClick: () => toggleSettings(true),
-  },
+const themeSettingsOpen = ref(false)
+const themeSettingsDirty = ref(false)
+const themeSettingsMounted = ref(false)
+
+watch(themeSettingsOpen, (open) => {
+  if (!open && (reducedMotion.value || !isWide.value)) themeSettingsMounted.value = false
+})
+
+
+function showSettingsSlot() {
+  if (!isWide.value) panel.value = 'settings'
+  else if (!maximised.value) settingsOpen.value = true
+}
+
+function leaveThemeSettings(then) {
+  if (!themeSettingsDirty.value) {
+    themeSettingsOpen.value = false
+    then?.()
+    return
+  }
+  dialog.confirm({
+    title: 'Discard unsaved theme settings?',
+    message: 'The changes you have not saved are lost.',
+    theme: 'red',
+    confirmLabel: 'Discard',
+    onConfirm: () => {
+      themeSettingsDirty.value = false
+      themeSettingsOpen.value = false
+      then?.()
+    },
+  })
+}
+
+async function toggleThemeSettings() {
+  if (themeSettingsOpen.value) return leaveThemeSettings()
+  editor.select(null)
+  if (!isWide.value) panel.value = 'settings'
+  else {
+    themeSettingsMounted.value = true
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  }
+  themeSettingsOpen.value = true
+}
+
+const breadcrumbs = computed(() => [
+  { label: 'Themes', route: { name: 'StorefrontTheme' } },
+  { label: state.theme },
 ])
 
-function toggleTree() {
-  if (treeOpen.value) treePanel.value.collapse()
-  else treePanel.value.expand()
-}
+const narrowPreviewMenu = computed(() => previewMenu(state, { devices: false }))
 
-function toggleSettings(theme) {
-  const showingTheme = state.selection?.kind === 'theme'
-  if (settingsOpen.value && showingTheme === theme) {
-    settingsPanel.value.collapse()
-    return
-  }
-  if (theme) editor.select({ kind: 'theme' }, { scroll: false })
-  else if (showingTheme) editor.select(null)
-  settingsPanel.value.expand()
-}
-
-const PANEL_OPEN = { tree: treeOpen, settings: settingsOpen }
-
-function panelExpanded(name) {
-  PANEL_OPEN[name].value = true
-  maximised.value = null
-}
-
-function toggleMaximise() {
+async function toggleMaximise() {
   const previous = maximised.value
   if (previous) {
+    treePanel.value.expand()
+    await nextTick()
     maximised.value = null
-    if (previous.tree) treePanel.value.expand()
-    if (previous.settings) settingsPanel.value.expand()
+    settingsOpen.value = previous.settings
+    await nextTick()
+    treePanel.value.resize(previous.treeSize)
     return
   }
-  maximised.value = { tree: treeOpen.value, settings: settingsOpen.value }
+  maximised.value = { settings: settingsOpen.value, treeSize: treePanel.value.getSize() }
+  await nextTick()
   treePanel.value.collapse()
-  settingsPanel.value.collapse()
+  settingsOpen.value = false
 }
-
-watch([treePanel, settingsPanel], () => {
-  if (treePanel.value) treeOpen.value = !treePanel.value.isCollapsed
-  if (settingsPanel.value) settingsOpen.value = !settingsPanel.value.isCollapsed
-})
 
 watch(
   () => state.selection,
   (selection) => {
-    if (selection && !isWide.value) panel.value = 'settings'
+    if (!selection) return
+    if (themeSettingsOpen.value && themeSettingsDirty.value) {
+      editor.select(null)
+      leaveThemeSettings(() => editor.select(selection))
+      return
+    }
+    themeSettingsOpen.value = false
+    showSettingsSlot()
   },
 )
 
@@ -141,7 +148,7 @@ async function publish() {
 
 function discard() {
   dialog.confirm({
-    title: 'Discard unpublished changes?',
+    title: 'Discard all unpublished changes?',
     message: 'The layout goes back to what your store shows now.',
     theme: 'red',
     confirmLabel: 'Discard',
@@ -151,6 +158,31 @@ function discard() {
   })
 }
 
+const actions = computed(() => [
+  {
+    label: 'Discard',
+    variant: 'subtle',
+    reason: hasUnpublishedChanges.value ? null : 'Nothing to discard',
+    onClick: discard,
+  },
+  {
+    label: 'Save',
+    variant: 'solid',
+    reason: hasUnsavedChanges.value ? null : 'No unsaved changes',
+    onClick: save,
+  },
+  {
+    label: 'Publish',
+    variant: 'solid',
+    reason: hasUnsavedChanges.value
+      ? 'Save your changes first'
+      : hasUnpublishedChanges.value
+        ? null
+        : 'Everything is already live',
+    onClick: publish,
+  },
+])
+
 onBeforeRouteLeave(async () => (state.loadError ? true : await saveIfChanged()))
 
 useEventListener(window, 'beforeunload', (event) => {
@@ -159,20 +191,17 @@ useEventListener(window, 'beforeunload', (event) => {
 </script>
 
 <template>
-  <div class="flex h-screen flex-col bg-surface-base" data-theme-layout-editor>
-    <header class="flex shrink-0 flex-wrap items-center gap-2 border-b border-outline-gray-2 px-3 py-2">
-      <Button
-        variant="ghost"
-        icon-left="lucide-arrow-left"
-        label="Themes"
-        @click="router.push({ name: 'StorefrontTheme' })"
-      />
+  <div class="relative flex h-screen flex-col bg-surface-base" data-theme-layout-editor>
+    <header
+      class="flex shrink-0 flex-wrap items-center gap-2 border-b border-outline-gray-2 px-3 py-2 transition-[margin] duration-200 motion-reduce:transition-none"
+      :class="{ 'me-80': themeSettingsOpen && isWide }"
+    >
       <div class="flex min-w-0 items-center gap-2">
-        <span class="truncate text-base font-medium text-ink-gray-9">{{ state.theme }}</span>
+        <Breadcrumbs class="min-w-0" :items="breadcrumbs" />
         <template v-if="state.loaded && !state.loadError">
           <Badge v-if="hasUnpublishedChanges" label="Unpublished changes" theme="orange" variant="subtle" />
-          <Badge v-else-if="state.live" label="Live" theme="green" variant="subtle" />
-          <Badge v-else label="Not live" theme="gray" variant="subtle" />
+          <Badge v-else label="Published" theme="green" variant="subtle" />
+          <Badge v-if="!state.live" label="Not live" theme="gray" variant="subtle" />
         </template>
       </div>
 
@@ -180,20 +209,21 @@ useEventListener(window, 'beforeunload', (event) => {
         <Dropdown :options="pageOptions">
           <Button icon-left="lucide-file" icon-right="lucide-chevron-down" :label="pageLabel(state.page)" />
         </Dropdown>
-        <TabButtons v-model="state.language" :options="LANGUAGES" aria-label="Language" />
-        <TabButtons v-if="isWide" v-model="state.device" :options="DEVICES" aria-label="Preview width" />
       </div>
 
       <div class="ms-auto flex items-center gap-2 lg:ms-0">
-        <Button variant="ghost" label="Discard" :disabled="!hasUnpublishedChanges || busy" @click="discard" />
-        <Button label="Save" :disabled="!hasUnsavedChanges" :loading="busy" @click="save" />
-        <Button
-          variant="solid"
-          label="Publish"
-          :disabled="!hasUnpublishedChanges && !hasUnsavedChanges"
-          :loading="busy"
-          @click="publish"
-        />
+        <Tooltip v-for="action in actions" :key="action.label" :text="action.reason" :disabled="!action.reason">
+          <span class="inline-flex" :tabindex="action.reason ? 0 : undefined">
+            <Button
+              :variant="action.variant"
+              :label="action.label"
+              :class="{ 'pointer-events-none': action.reason }"
+              :disabled="Boolean(action.reason)"
+              :loading="!action.reason && busy"
+              @click="action.onClick"
+            />
+          </span>
+        </Tooltip>
       </div>
     </header>
 
@@ -206,8 +236,11 @@ useEventListener(window, 'beforeunload', (event) => {
     />
 
     <template v-else>
-      <div v-if="!isWide" class="shrink-0 border-b border-outline-gray-2 px-3 py-2">
-        <TabButtons v-model="panel" class="w-full" :options="PANELS" aria-label="Panel" />
+      <div v-if="!isWide" class="flex shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3 py-2">
+        <TabButtons v-model="panel" class="min-w-0 flex-1" :options="PANELS" aria-label="Panel" />
+        <Dropdown :options="narrowPreviewMenu" align="end">
+          <Button variant="ghost" icon="lucide-ellipsis" aria-label="More preview options" />
+        </Dropdown>
       </div>
 
       <DefineTreePanel>
@@ -225,18 +258,6 @@ useEventListener(window, 'beforeunload', (event) => {
       </DefineTreePanel>
 
       <div v-if="isWide" class="flex min-h-0 flex-1">
-        <nav class="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-outline-gray-2 py-2" aria-label="Panels">
-          <Tooltip v-for="item in railItems" :key="item.label" :text="item.label" placement="right">
-            <Button
-              :variant="item.active ? 'subtle' : 'ghost'"
-              :icon="item.icon"
-              :aria-label="item.label"
-              :aria-pressed="item.active"
-              @click="item.onClick"
-            />
-          </Tooltip>
-        </nav>
-
         <SplitterGroup direction="horizontal" auto-save-id="commera-theme-editor-panels" class="min-w-0 flex-1">
           <SplitterPanel
             id="theme-editor-tree"
@@ -246,15 +267,24 @@ useEventListener(window, 'beforeunload', (event) => {
             :default-size="288"
             :min-size="220"
             :max-size="440"
-            collapsible
+            :collapsible="Boolean(maximised)"
             :collapsed-size="0"
-            class="!overflow-y-auto"
+            class="flex flex-col"
             data-editor-panel="tree"
-            @collapse="treeOpen = false"
-            @expand="panelExpanded('tree')"
           >
-            <div class="p-2">
+            <div class="min-h-0 flex-1 overflow-y-auto p-2">
               <TreePanel />
+            </div>
+            <div class="shrink-0 border-t border-outline-gray-2 p-2">
+              <Button
+                class="w-full !justify-start"
+                :variant="themeSettingsOpen ? 'subtle' : 'ghost'"
+                icon-left="lucide-settings"
+                label="Theme settings"
+                :aria-pressed="themeSettingsOpen"
+                data-theme-settings-toggle
+                @click="toggleThemeSettings"
+              />
             </div>
           </SplitterPanel>
           <SplitterResizeHandle
@@ -264,32 +294,32 @@ useEventListener(window, 'beforeunload', (event) => {
           <SplitterPanel id="theme-editor-preview" :order="2" class="min-w-0">
             <LayoutPreviewCanvas :editor="editor" :maximised="Boolean(maximised)" @toggle-maximise="toggleMaximise" />
           </SplitterPanel>
-          <SplitterResizeHandle
-            class="relative z-10 w-0 border-l border-outline-gray-2 transition-colors after:absolute after:inset-y-0 after:-left-1 after:-right-1 after:content-[''] data-[state=drag]:border-outline-gray-4 data-[state=hover]:border-outline-gray-4"
-            data-editor-handle="settings"
-          />
-          <SplitterPanel
-            id="theme-editor-settings"
-            ref="settingsPanel"
-            :order="3"
-            size-unit="px"
-            :default-size="320"
-            :min-size="260"
-            :max-size="480"
-            collapsible
-            :collapsed-size="0"
-            data-editor-panel="settings"
-            @collapse="settingsOpen = false"
-            @expand="panelExpanded('settings')"
-          >
-            <LayoutSettingsPanel v-if="state.loaded" :editor="editor" />
-          </SplitterPanel>
         </SplitterGroup>
+        <aside
+          v-show="settingsOpen"
+          id="theme-editor-settings"
+          class="w-80 shrink-0 border-s border-outline-gray-2"
+          data-editor-panel="settings"
+        >
+          <LayoutSettingsPanel v-if="state.loaded" :editor="editor" />
+        </aside>
       </div>
 
       <div v-else class="flex min-h-0 flex-1">
-        <aside v-show="panel === 'tree'" class="w-full min-w-0 overflow-y-auto p-2">
-          <TreePanel />
+        <aside v-show="panel === 'tree'" class="flex w-full min-w-0 flex-col">
+          <div class="min-h-0 flex-1 overflow-y-auto p-2">
+            <TreePanel />
+          </div>
+          <div class="shrink-0 border-t border-outline-gray-2 p-2">
+            <Button
+              class="w-full !justify-start"
+              variant="ghost"
+              icon-left="lucide-settings"
+              label="Theme settings"
+              data-theme-settings-toggle
+              @click="toggleThemeSettings"
+            />
+          </div>
         </aside>
 
         <main v-show="panel === 'preview'" class="min-w-0 flex-1 bg-surface-gray-2 p-4">
@@ -299,9 +329,31 @@ useEventListener(window, 'beforeunload', (event) => {
         </main>
 
         <aside v-show="panel === 'settings'" class="w-full min-w-0">
-          <LayoutSettingsPanel v-if="state.loaded" :editor="editor" />
+          <template v-if="state.loaded">
+            <ThemeSettingsPanel
+              v-if="themeSettingsOpen"
+              :editor="editor"
+              @close="leaveThemeSettings()"
+              @dirty="themeSettingsDirty = $event"
+            />
+            <LayoutSettingsPanel v-else :editor="editor" />
+          </template>
         </aside>
       </div>
     </template>
+
+    <aside
+      v-if="isWide && state.loaded && themeSettingsMounted"
+      class="absolute inset-y-0 end-0 z-20 overflow-hidden border-s border-outline-gray-2 bg-surface-base transition-[width] duration-200 motion-reduce:transition-none"
+      :class="themeSettingsOpen ? 'w-80' : 'w-0'"
+      @transitionend.self="themeSettingsMounted = themeSettingsOpen"
+    >
+      <ThemeSettingsPanel
+        class="absolute inset-y-0 end-0 w-80"
+        :editor="editor"
+        @close="leaveThemeSettings()"
+        @dirty="themeSettingsDirty = $event"
+      />
+    </aside>
   </div>
 </template>

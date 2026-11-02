@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { Button } from 'frappe-ui'
 import SettingsFieldControl from '../settings/SettingsFieldControl.vue'
@@ -12,7 +12,7 @@ const props = defineProps({
 
 const { state, selected, select, settingValue, settingPlaceholder, setSetting, commit, toggleHidden } =
   props.editor
-const { removeSection, removeBlock, saveThemeSetting } = props.editor
+const { removeSection, removeBlock } = props.editor
 
 const fields = computed(() => {
   const current = selected.value
@@ -58,74 +58,10 @@ function settle(setting, value) {
   setSetting(selected.value.owner, setting, value)
   commit()
 }
-
-const themeValues = ref({})
-watch(
-  () => state.settings,
-  (settings) => {
-    themeValues.value = Object.fromEntries(
-      (settings.groups ?? []).flatMap((group) =>
-        group.fields.map((field) => [field.fieldname, field.value ?? '']),
-      ),
-    )
-  },
-  { immediate: true },
-)
-
-async function saveTheme(field, value) {
-  if (!(await saveThemeSetting(field, value))) themeValues.value[field.fieldname] = field.value ?? ''
-}
-
-function plainText(html) {
-  if (!html) return ''
-  const element = document.createElement('div')
-  element.innerHTML = html
-  return element.textContent.replace(/\s+/g, ' ').trim()
-}
 </script>
 
 <template>
-  <div v-if="selected?.kind === 'theme'" class="flex h-full flex-col" data-settings-panel>
-    <div class="border-b border-outline-gray-2 px-4 py-3">
-      <div class="flex items-center gap-1">
-        <Button variant="ghost" icon="lucide-arrow-left" aria-label="Back" @click="select(null)" />
-        <h2 class="min-w-0 flex-1 truncate text-lg-semibold text-ink-gray-9">Theme settings</h2>
-      </div>
-      <p v-if="state.live" class="mt-1 text-p-sm text-ink-gray-5">
-        These apply to every page of your store as soon as you change them. Publish is not needed.
-      </p>
-      <p v-else class="mt-1 text-p-sm text-ink-gray-5">Activate {{ state.theme }} to change its settings.</p>
-    </div>
-
-    <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-      <p v-if="!state.settings.groups?.length" class="text-p-sm text-ink-gray-5">
-        This theme ships no settings of its own.
-      </p>
-      <div v-for="group in state.settings.groups" :key="group.label" class="mb-6">
-        <p class="text-sm text-ink-gray-5">{{ group.label }}</p>
-        <div class="mt-2 flex flex-col gap-4">
-          <div v-for="field in group.fields" :key="field.fieldname">
-            <label class="mb-1.5 block text-base text-ink-gray-6" :for="`theme-${field.fieldname}`">
-              {{ field.label }}
-            </label>
-            <SettingsFieldControl
-              :id="`theme-${field.fieldname}`"
-              v-model="themeValues[field.fieldname]"
-              :class="field.fieldtype === 'Check' ? undefined : '!w-full'"
-              :field="field"
-              :disabled="!state.live || editor.busy.value"
-              @change="saveTheme(field, $event)"
-            />
-            <p v-if="plainText(field.description)" class="mt-1 text-sm text-ink-gray-5">
-              {{ plainText(field.description) }}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div v-else-if="selected" class="flex h-full flex-col" data-settings-panel>
+  <div v-if="selected" class="flex h-full flex-col" data-settings-panel>
     <div class="border-b border-outline-gray-2 px-4 py-3">
       <div class="flex items-center gap-1">
         <Button
