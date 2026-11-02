@@ -110,10 +110,7 @@ def list_addresses() -> list[CustomerAddress]:
 
 
 def save_address(address: dict) -> CustomerAddress:
-	"""Update the shopper's own address when `name` is set, else add one to their Customer.
-
-	`plugin_fields` sets Address fields installed Commera plugins own, as on the cart; an update only touches the
-	ones it sends."""
+	"""Update the shopper's own address when `name` is set, else add one to their Customer."""
 	values = {fieldname: address.get(fieldname) for fieldname in ADDRESS_FIELDS if fieldname in address}
 	plugin_fields = address.get("plugin_fields") or {}
 	if not isinstance(plugin_fields, dict):

@@ -11,6 +11,7 @@ from frappe.utils import get_fullname
 from frappe.utils.nestedset import get_root_of
 
 from commera.guest import get_guest_cart_name, is_guest, validate_guest_checkout_enabled
+from commera.plugin_events import get_plugin_fieldnames
 
 COD_PAYMENT_MODE = "COD"
 OTP_EXPIRY_SECONDS = 5 * 60
@@ -319,6 +320,7 @@ def get_address_docs(party=None):
 			"email_id",
 			"is_primary_address",
 			"is_shipping_address",
+			*get_plugin_fieldnames("Address"),
 		],
 	)
 

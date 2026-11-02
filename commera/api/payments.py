@@ -912,9 +912,7 @@ def add_customer_address(party_name, values: dict):
 
 
 def get_plugin_address_values(address: dict) -> dict:
-	"""The Address fields an installed Commera plugin owns (`<app>_...`) that the checkout form sent.
-
-	A field the form did not send is left out, so it neither blanks the field nor joins the dedupe."""
+	# An unsent field must stay out: as None it would blank the field and join the dedupe filter.
 	return {
 		fieldname: address.get(fieldname) or None
 		for fieldname in get_plugin_fieldnames("Address")

@@ -1,11 +1,5 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 
-"""Plugin fields on Address: the `<app>_...` fields an installed Commera plugin owns.
-
-Checkout copies the ones its form sends, and the account SDK reads and writes them under `plugin_fields`, as the
-cart and orders already do. With no plugin installed, saving an address behaves exactly as before.
-"""
-
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -30,7 +24,6 @@ CHECKOUT_ADDRESS = {
 	PLUGIN_FIELD: "LOCATION-1",
 }
 
-# What add_party_address built before plugin fields were copied.
 TODAYS_VALUES = {
 	"address_type": "Billing",
 	"city": "Riyadh",
@@ -106,8 +99,6 @@ class TestCheckoutAddressPluginFields(IntegrationTestCase):
 
 
 class StoredAddress(dict):
-	"""An Address stand-in: `name` plus dict-backed `get`, like a Document."""
-
 	def __init__(self, name: str, **values):
 		super().__init__(values)
 		self.name = name
@@ -122,10 +113,7 @@ SDK_ADDRESS = {
 
 
 class TestAccountSdkAddressPluginFields(IntegrationTestCase):
-	"""The account SDK (account page and headless storefronts) reads and writes them under `plugin_fields`."""
-
 	def owned(self, *fieldnames):
-		"""Patch where both the SDK and `validate_plugin_fieldnames` look the plugin fields up."""
 		for target in (
 			"commera.sdk.account.get_plugin_fieldnames",
 			"commera.plugin_events.get_plugin_fieldnames",
