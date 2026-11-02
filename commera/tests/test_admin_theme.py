@@ -13,6 +13,7 @@ from commera.api.admin.theme import (
 	get_editor_data,
 	save_theme_settings,
 )
+from commera.api.admin.theme_layout import get_editor, get_preview_entries
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context
 from commera.shop_themes.sections import (
 	clear_layout_cache,
@@ -367,8 +368,10 @@ class TestThemeEditorLayoutPagePreview(ProductDetailPriceTestCase):
 			self.addCleanup(clear_layout_cache, STARTER_THEME, page)
 		activate_theme(STARTER_THEME)
 
-	def render(self, page, layout=None):
-		frappe.local.form_dict = frappe._dict(lang="en", theme=STARTER_THEME, page=page, layout=layout)
+	def render(self, page, layout=None, entry=None):
+		frappe.local.form_dict = frappe._dict(
+			lang="en", theme=STARTER_THEME, page=page, layout=layout, entry=entry
+		)
 		context = frappe._dict()
 		theme_editor_preview.get_context(context)
 		return context.rendered_html
@@ -410,3 +413,67 @@ class TestThemeEditorLayoutPagePreview(ProductDetailPriceTestCase):
 		self.assertIn("Publish a product to preview the product page.", self.render("product"))
 		self.assertIn("Publish a product to preview the search page.", self.render("search"))
 		self.assertIn("Publish a page to preview the page layout.", self.render("page"))
+
+	def test_the_empty_preview_tells_the_editor_it_is_ready(self):
+		frappe.db.set_value("Shop Web Page", {"published": 1}, "published", 0)
+
+		html = self.render("page", layout=self.starter_layout("page"))
+
+		self.assertIn("Publish a page to preview the page layout.", html)
+		self.assertIn("/assets/commera/js/theme_editor_preview.js", html)
+		self.assertNotIn("theme_editor_preview.js", self.render("page"))
+
+	def test_the_chosen_product_and_page_render_in_place_of_the_newest(self):
+		first_route = self.make_priced_variant("ENTRYONE", default_rate=40)
+		second_route = self.make_priced_variant("ENTRYTWO", default_rate=40)
+		save_page(title="ZZ Entry One", content="<p>Entry one body</p>", route="zz-entry-one", published=1)
+		save_page(title="ZZ Entry Two", content="<p>Entry two body</p>", route="zz-entry-two", published=1)
+
+		for route in (first_route, second_route):
+			self.assertIn(f"Display {route}", self.render("product", entry=route))
+		self.assertIn("Entry one body", self.render("page", entry="zz-entry-one"))
+		self.assertIn("Entry two body", self.render("page", entry="zz-entry-two"))
+
+	def test_an_entry_that_is_not_live_falls_back_to_the_default(self):
+		self.make_priced_variant("FALLBACK", default_rate=40)
+		save_page(title="ZZ Live Page", content="<p>Live body</p>", route="zz-live-page", published=1)
+		save_page(title="ZZ Draft Page", content="<p>Draft body</p>", route="zz-draft-page", published=0)
+
+		self.assertEqual(self.render("product", entry="no-such-product"), self.render("product"))
+		draft_preview = self.render("page", entry="zz-draft-page")
+		self.assertNotIn("Draft body", draft_preview)
+		self.assertEqual(draft_preview, self.render("page"))
+
+	def test_search_and_collection_entries_reach_the_listing(self):
+		self.make_priced_variant("SEARCHABLE", default_rate=40)
+
+		self.assertIn("zzunlikelyterm", self.render("search", entry="zzunlikelyterm"))
+		self.assertEqual(self.render("products", entry="no-such-collection"), self.render("products"))
+
+	def test_preview_entries_list_live_records_and_resolve_the_current_one(self):
+		save_page(title="ZZ Listed Page", content="<p>Listed</p>", route="zz-listed-page", published=1)
+		save_page(title="ZZ Hidden Page", content="<p>Hidden</p>", route="zz-hidden-page", published=0)
+
+		listed = get_preview_entries(STARTER_THEME, "page", search="ZZ")
+		self.assertEqual([entry["value"] for entry in listed["entries"]], ["zz-listed-page"])
+		self.assertEqual(
+			get_preview_entries(STARTER_THEME, "page", selected="zz-hidden-page")["current"]["value"],
+			get_preview_entries(STARTER_THEME, "page")["current"]["value"],
+		)
+
+		collections = get_preview_entries(STARTER_THEME, "products", selected="no-such-collection")
+		self.assertEqual(collections["entries"][0], {"value": "", "title": "All products"})
+		self.assertEqual(collections["current"], {"value": "", "title": "All products"})
+
+		search = get_preview_entries(STARTER_THEME, "search", search="linen")
+		self.assertEqual(search["entries"][0], {"value": "linen", "title": 'Search for "linen"'})
+
+	def test_only_layout_pages_with_records_offer_entries(self):
+		self.assertFalse(get_editor(STARTER_THEME, "index")["has_preview_entries"])
+		self.assertTrue(get_editor(STARTER_THEME, "page")["has_preview_entries"])
+
+	def test_only_managers_list_preview_entries(self):
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user("Guest")
+
+		self.assertRaises(frappe.PermissionError, get_preview_entries, STARTER_THEME, "page")

@@ -6,13 +6,13 @@ from frappe import _
 from frappe.utils import escape_html
 from markupsafe import Markup
 
-from commera.sdk import catalog
 from commera.shop_themes.chrome_preview import (
 	TRACKING_BLANKED_BLOCKS,
 	find_layout_template,
 	render_page_preview,
 )
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
+from commera.shop_themes.preview_entries import PREVIEW_ENTRY_PAGES, resolve_entry
 from commera.shop_themes.sections import SECTION_GROUPS
 from commera.shop_themes.theme_resolver import find_theme_file
 
@@ -51,14 +51,19 @@ def get_context(context):
 		return
 
 	message = no_preview_message(theme, page, page_template)
+	editor_hint = f'<p class="mt-2 text-base">{escape_html(_("You can still edit this layout."))}</p>'
 	context.rendered_html = f"""<!DOCTYPE html>
 <html lang="{escape_html(lang)}">
 <head>
 <meta charset="UTF-8">
 <link rel="stylesheet" href="/assets/commera/css/tailwind.css">
+{EDITOR_HEAD_HTML if layouts else ""}
 </head>
 <body class="grid min-h-screen place-items-center bg-gray-50 p-6 text-center text-gray-500">
-<p>{escape_html(message)}</p>
+<div class="max-w-sm">
+<p class="text-xl font-medium text-gray-900">{escape_html(message)}</p>
+{editor_hint if layouts else ""}
+</div>
 </body>
 </html>"""
 
@@ -141,25 +146,14 @@ def no_preview_message(theme, page, page_template):
 
 
 def get_sample_form(page):
-	if page in ("product", "search"):
-		newest_products = catalog.list_products(sort="new_arrival", page_size=1)["products"]
-		if not newest_products:
-			return None
-		product = newest_products[0]
-		return (
-			frappe._dict(route=product["handle"])
-			if page == "product"
-			else frappe._dict(search=product["title"])
-		)
+	if page not in PREVIEW_ENTRY_PAGES:
+		return frappe._dict()
 
-	if page == "page":
-		routes = frappe.get_all(
-			"Shop Web Page",
-			filters={"published": 1, "route": ["is", "set"]},
-			order_by="modified desc",
-			limit=1,
-			pluck="route",
-		)
-		return frappe._dict(route=routes[0]) if routes else None
-
-	return frappe._dict()
+	entry = resolve_entry(page, frappe.form_dict.get("entry"))
+	if entry is None:
+		return None
+	if page == "search":
+		return frappe._dict(search=entry["value"])
+	if page == "products":
+		return frappe._dict(category=entry["value"]) if entry["value"] else frappe._dict()
+	return frappe._dict(route=entry["value"])

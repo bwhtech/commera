@@ -10,6 +10,7 @@ import LayoutPreviewFrame from '../../components/storefront/LayoutPreviewFrame.v
 import LayoutSectionPicker from '../../components/storefront/LayoutSectionPicker.vue'
 import LayoutSectionTree from '../../components/storefront/LayoutSectionTree.vue'
 import LayoutSettingsPanel from '../../components/storefront/LayoutSettingsPanel.vue'
+import PreviewEntryPicker from '../../components/storefront/PreviewEntryPicker.vue'
 import ThemeSettingsPanel from '../../components/storefront/ThemeSettingsPanel.vue'
 import PreviewOptions from '../../components/storefront/PreviewOptions.vue'
 import { SECTION_GROUPS, createLayoutEditor, pageLabel } from '../../data/themeLayout'
@@ -207,6 +208,7 @@ useEventListener(window, 'beforeunload', (event) => {
         <Dropdown :options="pageOptions">
           <Button icon-left="lucide-file" icon-right="lucide-chevron-down" :label="pageLabel(state.page)" />
         </Dropdown>
+        <PreviewEntryPicker v-if="state.loaded && state.hasPreviewEntries" :editor="editor" />
       </div>
 
       <div class="ms-auto flex items-center gap-2 lg:ms-0">
