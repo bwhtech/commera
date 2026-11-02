@@ -1,6 +1,9 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
+import os
+import re
+
 import frappe
 
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
@@ -18,6 +21,8 @@ TRACKING_BLANKED_BLOCKS = ("seo", "json_ld", "analytics_head", "analytics_events
 
 # A chrome preview frames the header or the footer, so the page content between them goes too.
 COMMON_BLANKED_BLOCKS = (*TRACKING_BLANKED_BLOCKS, "body", "uncontained_body")
+
+RENDER_LAYOUT_CALL = re.compile(r"render_layout\(([^)]*)\)")
 
 # Both naming conventions: the base theme uses `header`/`footer`, Summer `site_header`/`site_footer`.
 # Not chrome_top/chrome_bottom: Summer opens .page-wraper in one and closes it in the other.
@@ -80,6 +85,30 @@ def render_page_preview(page_template, blanked_blocks, theme_name=None, head_htm
 			context,
 			theme_name=theme_name,
 		)
+
+
+def find_layout_template(theme_dirs, page):
+	quoted_page = re.compile(rf"[\"']{re.escape(page)}[\"']")
+	for theme_dir in theme_dirs:
+		for directory, subdirectories, file_names in os.walk(os.path.join(theme_dir, "pages")):
+			subdirectories.sort()
+			for file_name in sorted(file_names):
+				template_path = os.path.join(directory, file_name)
+				relative_path = os.path.relpath(template_path, theme_dir)
+				if (
+					file_name.endswith(".html")
+					and find_theme_file(theme_dirs, relative_path) == template_path
+					and renders_layout(template_path, quoted_page)
+				):
+					return relative_path
+	return None
+
+
+def renders_layout(template_path, quoted_page):
+	# nosemgrep: frappe-semgrep-rules.rules.security.frappe-security-file-traversal
+	with open(template_path) as template_file:
+		source = template_file.read()
+	return any(quoted_page.search(arguments) for arguments in RENDER_LAYOUT_CALL.findall(source))
 
 
 def get_preview_context(preview_settings, lang):

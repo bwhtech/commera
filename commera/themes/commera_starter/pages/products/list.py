@@ -44,7 +44,6 @@ def get_context(context):
 			collection=context.collection["handle"] if context.collection else None, **arguments
 		)
 
-	context.listing_layout = "search" if context.query else "products"
 	context.last_page = ceil(context.listing["total"] / PAGE_SIZE)
 	context.page_url = lambda page: get_listing_url(context, page=page)
 	context.chips = get_chips(context)
