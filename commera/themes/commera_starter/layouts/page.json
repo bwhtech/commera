@@ -1,0 +1,11 @@
+{
+	"sections": [
+		{
+			"id": "main",
+			"type": "main_page",
+			"hidden": false,
+			"settings": {},
+			"blocks": []
+		}
+	]
+}
