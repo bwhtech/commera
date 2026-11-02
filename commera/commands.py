@@ -59,7 +59,7 @@ def theme():
 @click.option(
 	"--parent",
 	help="Shop Theme to inherit from: Shop Base Theme or one of the same type. "
-	"A sections theme without one starts as a copy of Commera Starter; "
+	"A sections theme without one starts as a copy of the theme ticked Use as Starter; "
 	"a classic theme without one inherits from Shop Base Theme",
 )
 @click.option("--app", help="App to add the theme to, instead of the app you are in")

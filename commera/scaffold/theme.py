@@ -92,12 +92,15 @@ class ThemeScaffold(AppScaffold):
 			)
 		)
 		with redirect_stdout(io.StringIO()):
-			if theme.copies_starter():
-				self.write_settings_doctype_files(theme)
+			starter = theme.get_starter()
+			if starter and starter.theme_settings:
+				self.write_settings_doctype_files(theme, starter.theme_settings)
 			write_document_file(theme, record_module=theme.module)
 
-	def write_settings_doctype_files(self, theme):
-		settings_doctype = copy_starter_settings_doctype(f"{theme.theme_name} Settings", theme.module)
+	def write_settings_doctype_files(self, theme, starter_settings):
+		settings_doctype = copy_starter_settings_doctype(
+			f"{theme.theme_name} Settings", starter_settings, theme.module
+		)
 		settings_doctype.set("__islocal", None)
 		write_document_file(settings_doctype, record_module=theme.module)
 		settings_doctype.make_controller_template()

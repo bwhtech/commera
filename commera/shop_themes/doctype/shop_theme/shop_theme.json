@@ -10,6 +10,7 @@
   "theme_type",
   "module",
   "is_standard",
+  "use_as_starter",
   "theme_settings",
   "column_break_main",
   "parent_theme",
@@ -51,6 +52,14 @@
    "label": "Is Standard"
   },
   {
+   "default": "0",
+   "depends_on": "is_standard",
+   "description": "bench commera theme new copies this theme when no parent is given. One starter per theme type.",
+   "fieldname": "use_as_starter",
+   "fieldtype": "Check",
+   "label": "Use as Starter"
+  },
+  {
    "description": "Single DocType holding this theme's editable settings. Use the 'Scaffold Theme Settings' button to create one.",
    "fieldname": "theme_settings",
    "fieldtype": "Link",
@@ -82,7 +91,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-26 12:00:00.000000",
+ "modified": "2026-11-02 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Shop Themes",
  "name": "Shop Theme",

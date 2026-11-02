@@ -22,10 +22,11 @@ from commera.scaffold import (
 )
 from commera.scaffold.theme import ThemeScaffold
 from commera.sdk import API_VERSION
-from commera.shop_themes.doctype.shop_theme.shop_theme import STARTER_THEME_SETTINGS
 from commera.shop_themes.sections import get_theme_json, validate_layout
 
 APP = "commera_test_plugin"
+STARTER = "Commera Starter"
+STARTER_SETTINGS = "Commera Starter Settings"
 STARTER_DIRS = {
 	"themes": Path(frappe.get_app_path("commera"), "themes", "commera_starter"),
 	"public/themes": Path(frappe.get_app_path("commera"), "public", "themes", "commera_starter"),
@@ -319,6 +320,8 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 		frappe.local.module_app[frappe.scrub(self.module)] = APP
 		self.addCleanup(frappe.local.module_app.pop, frappe.scrub(self.module))
 		self.addCleanup(frappe.db.rollback)
+		frappe.db.set_value("Shop Theme", {"use_as_starter": 1}, "use_as_starter", 0)
+		frappe.db.set_value("Shop Theme", STARTER, "use_as_starter", 1)
 		self.theme_dir = app_root / APP / "themes" / "scaffold_check"
 		self.export_path = (
 			app_root
@@ -394,7 +397,7 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 		self.assert_starter_copy()
 		settings_dir = self.export_path.parents[2] / "doctype" / "scaffold_check_settings"
 		settings = json.loads((settings_dir / "scaffold_check_settings.json").read_text())
-		starter_settings = frappe.get_meta(STARTER_THEME_SETTINGS)
+		starter_settings = frappe.get_meta(STARTER_SETTINGS)
 		self.assertEqual(settings["name"], "Scaffold Check Settings")
 		self.assertEqual(settings["module"], self.module)
 		self.assertEqual(settings["issingle"], 1)
@@ -433,7 +436,7 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 		)
 		self.assertEqual(
 			[field.fieldname for field in frappe.get_meta("Scaffold Check Settings").fields],
-			[field.fieldname for field in frappe.get_meta(STARTER_THEME_SETTINGS).fields],
+			[field.fieldname for field in frappe.get_meta(STARTER_SETTINGS).fields],
 		)
 		theme_context = {
 			"theme_name": "Scaffold Check",
@@ -465,3 +468,61 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 		self.assertFalse((self.theme_dir / "components").exists())
 		self.assertFalse((self.export_path.parents[2] / "doctype" / "scaffold_check_settings").exists())
 		self.assertNotIn("theme_settings", json.loads(self.export_path.read_text()))
+
+	def insert_desk_theme(self, theme_name):
+		theme = frappe.new_doc("Shop Theme")
+		theme.update({"theme_name": theme_name, "theme_type": "Sections", "module": self.module})
+		with patch.dict(frappe.conf, {"developer_mode": 1}):
+			theme.insert()
+		return theme
+
+	def test_no_ticked_starter_gives_minimal_folders(self):
+		frappe.db.set_value("Shop Theme", STARTER, "use_as_starter", 0)
+
+		ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Sections", None)
+
+		self.assertTrue((self.theme_dir / "layouts" / "index.json").is_file())
+		self.assertFalse((self.theme_dir / "components").exists())
+		self.assertFalse((self.export_path.parents[2] / "doctype" / "scaffold_check_settings").exists())
+		self.assertNotIn("theme_settings", json.loads(self.export_path.read_text()))
+
+	def test_a_second_starter_for_one_theme_type_is_refused(self):
+		frappe.get_doc({"doctype": "Module Def", "module_name": self.module, "app_name": APP}).insert()
+		theme = self.insert_desk_theme("Scaffold Check")
+
+		theme.use_as_starter = 1
+		with self.assertRaisesRegex(frappe.ValidationError, f"{STARTER} is already the Sections starter"):
+			theme.save()
+
+		theme.reload()
+		theme.update({"use_as_starter": 1, "is_standard": 0})
+		frappe.db.set_value("Shop Theme", STARTER, "use_as_starter", 0)
+		with self.assertRaisesRegex(frappe.ValidationError, "Only a standard theme"):
+			theme.save()
+
+	def test_the_copy_follows_the_ticked_starter(self):
+		frappe.get_doc({"doctype": "Module Def", "module_name": self.module, "app_name": APP}).insert()
+		starter = self.insert_desk_theme("Scaffold Check")
+		(self.theme_dir / "notes.md").write_text("Scaffold Check notes")
+		starter_settings = frappe.get_doc("DocType", "Scaffold Check Settings")
+		starter_settings.append(
+			"fields", {"fieldname": "scaffold_note", "fieldtype": "Data", "label": "Note"}
+		)
+		with patch.dict(frappe.conf, {"developer_mode": 1}):
+			starter_settings.save()
+			frappe.db.set_value("Shop Theme", STARTER, "use_as_starter", 0)
+			starter.use_as_starter = 1
+			starter.save()
+
+		ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Copy", "Sections", None)
+
+		copy_dir = self.theme_dir.parent / "scaffold_copy"
+		self.assertEqual(list_files(copy_dir), list_files(self.theme_dir))
+		self.assertEqual((copy_dir / "notes.md").read_text(), "Scaffold Copy notes")
+		settings_dir = self.export_path.parents[2] / "doctype" / "scaffold_copy_settings"
+		settings = json.loads((settings_dir / "scaffold_copy_settings.json").read_text())
+		self.assertEqual(
+			get_fieldnames(settings),
+			[field.fieldname for field in frappe.get_meta("Scaffold Check Settings").fields],
+		)
+		self.assertIn("scaffold_note", get_fieldnames(settings))
