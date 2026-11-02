@@ -52,6 +52,10 @@ def get_fields_by_doctype(custom_fields: dict) -> dict[str, list[dict]]:
 
 
 def create_property_setter(setter: dict):
+	# A search_index Property Setter alone never alters the table.
+	if setter["property"] == "search_index" and setter["value"] == "1":
+		frappe.db.add_index(setter["doctype"], [setter["fieldname"]])
+
 	filters = {
 		"doc_type": setter["doctype"],
 		"field_name": setter["fieldname"],
