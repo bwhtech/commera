@@ -4,12 +4,12 @@ from frappe.utils.data import cint, cstr
 
 from commera.branding import get_brand_assets
 from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import get_page_by_route
-from commera.sdk.types import ContentPage, FooterSection, Menu, MenuItem, Shop, Sitemap, SitemapEntry
+from commera.sdk.types import ContentPage, Country, FooterSection, Menu, MenuItem, Shop, Sitemap, SitemapEntry
 from commera.shop_data import get_storefront_menu
-from commera.utils import get_store_currency
+from commera.utils import get_country_list, get_store_currency
 from commera.www.sitemap_segment import SEGMENT_CONFIG, get_segment_filters, get_urls_per_page
 
-__all__ = ["get_menu", "get_page", "get_shop", "get_sitemap"]
+__all__ = ["get_menu", "get_page", "get_shop", "get_sitemap", "list_countries"]
 
 SITEMAP_KINDS = tuple(SEGMENT_CONFIG)
 
@@ -43,6 +43,11 @@ def get_menu(handle: str) -> Menu | None:
 			"items": [get_footer_menu_item(section) for section in sections],
 		}
 	return None
+
+
+def list_countries() -> list[Country]:
+	countries = [{"name": country["name"], "title": _(country["name"])} for country in get_country_list()]
+	return sorted(countries, key=lambda country: country["title"])
 
 
 def get_main_menu_items() -> list[MenuItem]:

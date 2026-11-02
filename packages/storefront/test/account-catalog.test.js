@@ -4,6 +4,7 @@ import * as account from '../account.js';
 import * as collections from '../collections.js';
 import * as products from '../products.js';
 import { StorefrontError } from '../request.js';
+import * as shop from '../shop.js';
 import { add_fake_fetch } from './fake-fetch.js';
 
 const API_ROOT = '/api/v2/method/commera.api.storefront';
@@ -54,6 +55,14 @@ const endpoint_calls = [
 		'?name=SAL-ORD-0001',
 		undefined,
 	],
+	[
+		'account.get_order',
+		'GET',
+		() => account.get_order('SAL-ORD-0001', 'order-key'),
+		'?name=SAL-ORD-0001&key=order-key',
+		undefined,
+	],
+	['shop.list_countries', 'GET', () => shop.list_countries(), '', undefined],
 	[
 		'products.get_product',
 		'GET',
@@ -124,25 +133,18 @@ test('products.get_list leaves out empty lists and a false on_sale', async () =>
 	assert.equal(calls[0].url, `${API_ROOT}.products.get_products?query=runner`);
 });
 
-test('account.get_order raises the server message for another shopper’s order', async () => {
+test('account.get_order is refused for another shopper’s order', async () => {
 	add_fake_fetch({
 		get_order: {
-			status: 404,
-			body: {
-				errors: [
-					{
-						type: 'DoesNotExistError',
-						message: 'Order SAL-ORD-0002 not found',
-					},
-				],
-			},
+			status: 403,
+			body: { errors: [{ type: 'PermissionError', message: '' }] },
 		},
 	});
 	await assert.rejects(account.get_order('SAL-ORD-0002'), (error) => {
 		assert.ok(error instanceof StorefrontError);
-		assert.equal(error.status, 404);
-		assert.equal(error.exc_type, 'DoesNotExistError');
-		assert.equal(error.message, 'Order SAL-ORD-0002 not found');
+		assert.equal(error.status, 403);
+		assert.equal(error.exc_type, 'PermissionError');
+		assert.equal(error.message, 'Not permitted.');
 		return true;
 	});
 });

@@ -14,6 +14,7 @@ __all__ = [
 	"CheckoutSummary",
 	"Collection",
 	"ContentPage",
+	"Country",
 	"CustomerAddress",
 	"CustomerProfile",
 	"Discount",
@@ -47,6 +48,7 @@ __all__ = [
 	"ShippingOptions",
 	"Shop",
 	"ShopperOrder",
+	"ShopperOrderDetail",
 	"ShopperOrderPage",
 	"Sitemap",
 	"SitemapEntry",
@@ -111,6 +113,7 @@ class ShopperOrder(TypedDict):
 	net_total: float
 	grand_total: float
 	rounded_total: float
+	rounding_adjustment: float
 	base_grand_total: float
 	base_rounded_total: float
 	payment_mode: str | None
@@ -120,11 +123,18 @@ class ShopperOrder(TypedDict):
 	status: str | None
 	# The dashboard's badge for the order, so a card matches the order screen.
 	stage: Stage
+	shipping: float
+	cod_charge: float
 	plugin_fees: list[Charge]
+	taxes: list[Charge]
 	items: list[OrderLine]
 	plugin_fields: dict[str, Any]
 	discounts: list["DiscountAllocation"]
 	attributes: dict[str, str]
+
+
+class ShopperOrderDetail(ShopperOrder):
+	access: str
 
 
 class Order(ShopperOrder):
@@ -461,6 +471,11 @@ class Shop(TypedDict):
 	favicon: str
 	menu: list[MenuItem]
 	footer: list[FooterSection]
+
+
+class Country(TypedDict):
+	name: str
+	title: str
 
 
 class ContentPage(TypedDict):
