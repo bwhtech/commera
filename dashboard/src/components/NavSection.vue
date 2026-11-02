@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue'
-import { KeyboardShortcut, SidebarItem, SidebarLabel } from 'frappe-ui'
+import { computed, inject, ref } from 'vue'
+import { KeyboardShortcut, SidebarItem, SidebarLabel, sidebarCollapsedKey } from 'frappe-ui'
 
 const props = defineProps({
   section: { type: Object, required: true },
@@ -14,6 +14,8 @@ const opened = ref({})
 const holdsRoute = (item) => item.children.some((child) => child.to && child.to === props.activeTarget)
 const isOpen = (item) => opened.value[item.to] ?? holdsRoute(item)
 const toggle = (item) => (opened.value[item.to] = !isOpen(item))
+
+const isCollapsed = inject(sidebarCollapsedKey, computed(() => false))
 </script>
 
 <template>
@@ -38,7 +40,7 @@ const toggle = (item) => (opened.value[item.to] = !isOpen(item))
               />
             </template>
           </SidebarItem>
-          <div v-show="isOpen(item)" class="space-y-0.5 pl-5">
+          <div v-show="isOpen(item)" class="space-y-0.5" :class="isCollapsed ? '' : 'pl-5'">
             <!-- A child without `to` is a plugin's sidebar action: it runs on click and never takes active state. -->
             <SidebarItem
               v-for="child in item.children"
