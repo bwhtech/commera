@@ -46,6 +46,10 @@ class TestSdkStorefront(ProductDetailPriceTestCase):
 		self.assertNotIn(hidden_title, [item["title"] for item in menu["items"]])
 		self.assertEqual(shop.get_shop()["menu"], menu["items"])
 
+	def test_the_shop_names_the_store_companys_country(self):
+		company = frappe.get_cached_value("Commera Settings", "Commera Settings", "company")
+		self.assertEqual(shop.get_shop()["country"], frappe.get_cached_value("Company", company, "country"))
+
 	def test_footer_menu_nests_each_sections_links(self):
 		menu = shop.get_menu("footer")
 

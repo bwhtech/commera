@@ -1,0 +1,6 @@
+{% from "components/macros/summary_line.html" import summary_line %}
+<ul class="mb-5 flex flex-col gap-4 border-b border-outline-gray-2 pb-5">
+	<template x-for="line in $store.cart.cart?.lines ?? []" :key="line.line_id">
+		{{ summary_line("line.product?.image", "line.product?.title ?? line.title", "line.product?.variant_title", "line.qty", "$store.cart.money(line.amount)") }}
+	</template>
+</ul>

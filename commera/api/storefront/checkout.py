@@ -4,7 +4,20 @@ from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cstr, flt
 
 from commera.sdk import checkout
-from commera.sdk.types import CheckoutResult, CheckoutState, PaymentMethod, PaymentSession, ShippingOptions
+from commera.sdk.types import (
+	CheckoutResult,
+	CheckoutState,
+	PaymentMethod,
+	PaymentSession,
+	PickupLocation,
+	ShippingOptions,
+)
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
+@rate_limit(limit=1200, seconds=60 * 60)
+def get() -> CheckoutState | None:
+	return checkout.get()
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
@@ -27,6 +40,12 @@ def get_address(address: dict | str) -> dict | str:
 	if not isinstance(address, dict | str):
 		frappe.throw(_("Send an address as an object or as the name of a saved address."))
 	return address
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
+@rate_limit(limit=300, seconds=60 * 60)
+def list_pickup_locations() -> list[PickupLocation]:
+	return checkout.list_pickup_locations()
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method

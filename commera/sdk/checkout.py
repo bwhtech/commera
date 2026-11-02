@@ -26,14 +26,18 @@ from commera.sdk.types import (
 	CheckoutState,
 	PaymentMethod,
 	PaymentSession,
+	PickupLocation,
 	ShippingOption,
 	ShippingOptions,
 )
+from commera.utils import get_directions_url, get_pickup_addresses, get_pickup_warehouses
 from commera.www.cart.checkout import cart_needs_refresh
 
 __all__ = [
 	"complete",
+	"get",
 	"list_payment_methods",
+	"list_pickup_locations",
 	"list_shipping_options",
 	"set_addresses",
 	"set_shipping_option",
@@ -65,6 +69,11 @@ CHECKOUT_ADDRESS_KEYS = {
 NO_OPTIONS_REASONS = ("store_pickup", "connector_missing", "address_missing", "unavailable")
 
 
+def get() -> CheckoutState | None:
+	quotation = get_open_checkout()
+	return get_checkout_state(quotation) if quotation else None
+
+
 def set_addresses(
 	billing_address: dict | str, shipping_address: dict | str | None = None, email: str | None = None
 ) -> CheckoutState:
@@ -87,6 +96,24 @@ def set_store_pickup(warehouse: str, email: str | None = None) -> CheckoutState:
 		"billing_address": {"email": email},
 	}
 	return save_checkout_address(address, email)
+
+
+def list_pickup_locations() -> list[PickupLocation]:
+	if not frappe.get_cached_value("Commera Settings", "Commera Settings", "store_pickup_enabled"):
+		return []
+	return [
+		{
+			"id": warehouse,
+			"title": address.address_title or warehouse,
+			**{
+				fieldname: address.get(fieldname)
+				for fieldname in ADDRESS_FIELDS
+				if fieldname != "address_title"
+			},
+			"directions_url": get_directions_url(address.custom_store_location) or None,
+		}
+		for warehouse, address in get_pickup_addresses(get_pickup_warehouses()).items()
+	]
 
 
 def save_checkout_address(address: dict, email: str | None) -> CheckoutState:

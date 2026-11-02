@@ -30,6 +30,7 @@ __all__ = [
 	"OrderTracking",
 	"PaymentMethod",
 	"PaymentSession",
+	"PickupLocation",
 	"PlacedOrder",
 	"PricedCart",
 	"PricedCartLine",
@@ -467,6 +468,7 @@ class Shop(TypedDict):
 	name: str
 	description: str
 	currency: str
+	country: str | None
 	logo: str
 	favicon: str
 	menu: list[MenuItem]
@@ -571,6 +573,19 @@ class PaymentMethod(TypedDict):
 	id: str
 	title: str
 	is_cash_on_delivery: bool
+
+
+class PickupLocation(TypedDict):
+	id: str
+	title: str
+	address_line1: str
+	address_line2: str | None
+	city: str
+	state: str | None
+	pincode: str | None
+	country: str
+	phone: str | None
+	directions_url: str | None
 
 
 class PaymentSession(TypedDict):
