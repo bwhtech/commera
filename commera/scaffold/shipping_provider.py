@@ -4,7 +4,8 @@ import re
 from string import Template
 
 import click
-from frappe.utils import now, scrub
+from frappe import scrub
+from frappe.utils import now
 
 from commera.scaffold import AppScaffold, add_assignment, get_assignments, get_starter, set_required_apps
 from commera.sdk import API_VERSION

@@ -2,9 +2,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 import frappe
-from frappe import _
+from frappe import _, scrub
 from frappe.model.base_document import get_controller
-from frappe.utils import scrub
 
 from commera.plugin_events import is_supported_app
 
