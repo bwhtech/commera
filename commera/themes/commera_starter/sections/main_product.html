@@ -1,0 +1,109 @@
+{% from "components/macros/breadcrumbs.html" import breadcrumbs %}
+{% from "components/macros/icons.html" import icon %}
+{% from "components/macros/image.html" import image with context %}
+{% if product is defined and product %}
+{% set colour_option = product.options | selectattr("values") | selectattr("values.0.handle") | first %}
+{% set size_option = product.options | reject("equalto", colour_option) | first %}
+{% set variant = product.variants | selectattr("id", "equalto", product.selected_variant_id) | first or product.variants | first %}
+{% set payload = {"id": product.id, "currency": product.currency, "price": product.price, "options": product.options, "variants": product.variants, "size": variant.title if size_option and variant else "", "in_wishlist": in_wishlist, "is_guest": frappe.session.user == "Guest"} %}
+<section x-data='product_form({{ payload | tojson }})' class="pt-6">
+	<div class="grid gap-10 px-5 md:grid-cols-[3fr_2fr] md:px-12">
+		<div>
+			<div class="relative">
+				{% for path in product.images or [None] %}
+				<div x-show="image === {{ loop.index0 }}"{{ " x-cloak" if not loop.first }}>{{ image(path, product.title, 1200, loading="eager" if loop.first else "lazy") }}</div>
+				{% endfor %}
+				{% if product.images | length > 1 %}
+				<button type="button" @click="move_image(-1, {{ product.images | length }})" class="absolute start-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-lg bg-surface-base text-ink-gray-8" aria-label="{{ _('Previous photo') }}">{{ icon("left", "size-5 rtl:-scale-x-100") }}</button>
+				<button type="button" @click="move_image(1, {{ product.images | length }})" class="absolute end-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-lg bg-surface-base text-ink-gray-8" aria-label="{{ _('Next photo') }}">{{ icon("right", "size-5 rtl:-scale-x-100") }}</button>
+				{% endif %}
+			</div>
+			{% if product.images | length > 1 %}
+			<div class="mt-3 grid grid-cols-4 gap-3">
+				{% for path in product.images %}
+				<button type="button" @click="image = {{ loop.index0 }}" :class="image === {{ loop.index0 }} ? 'outline-2 outline-outline-gray-9' : 'opacity-60'" class="overflow-hidden rounded-lg outline-offset-2" aria-label="{{ _('Photo {0}').format(loop.index) }}">{{ image(path, "", 240, "aspect-[3/4] w-full object-cover object-top") }}</button>
+				{% endfor %}
+			</div>
+			{% endif %}
+		</div>
+
+		<div class="md:sticky md:top-24 md:self-start md:pt-4">
+			{{ breadcrumbs(breadcrumb_links) }}
+			<h1 class="mt-3 text-6xl">{{ product.title }}</h1>
+			<p class="mt-3 flex items-center gap-2 text-xl">
+				<span x-text="money(price)">{{ commera.format.money(variant.price if variant else product.price, product.currency) }}</span>
+				<span x-show="compare_at_price" x-text="money(compare_at_price)" class="text-base text-ink-gray-6 line-through"></span>
+				<span x-show="compare_at_price" x-text="'−' + discount + '%'" dir="ltr" class="inline-flex h-5 items-center rounded-full bg-surface-gray-2 px-1.5 text-xs text-ink-gray-7"></span>
+			</p>
+			{% if section.settings.show_rating and product.rating.count %}
+			<p class="mt-2 flex items-center gap-1.5 text-sm text-ink-gray-6">{{ icon("star", "size-4 fill-current text-ink-gray-9") }}{{ _("{0} · {1} reviews").format(product.rating.average | round(1), product.rating.count) }}</p>
+			{% endif %}
+
+			{% if colour_option %}
+			<div class="mt-8">
+				<p class="text-base">{{ colour_option.name }}: <span class="text-ink-gray-6">{{ product.color }}</span></p>
+				<div class="mt-2 flex flex-wrap gap-2">
+					{% for value in colour_option["values"] %}
+					<a href="{{ commera.format.product_url(value.handle) }}" {{ 'aria-current="page"' | safe if value.selected }} class="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-lg font-medium {{ 'bg-brand text-on-brand' if value.selected else 'border border-outline-gray-2 bg-surface-base text-ink-gray-8 hover:border-outline-gray-3' }} {{ 'line-through opacity-60' if not value.available }}">
+						{% if value.swatch and value.swatch.image %}{{ image(value.swatch.image, "", 64, "size-5 rounded-full object-cover") }}{% endif %}
+						{{ value.name }}
+					</a>
+					{% endfor %}
+				</div>
+			</div>
+			{% endif %}
+
+			{% if size_option %}
+			<div class="mt-6">
+				<p class="text-base">{{ size_option.name }}: <span class="text-ink-gray-6" x-text="size"></span></p>
+				<div class="mt-2 flex flex-wrap gap-2">
+					{% for size_variant in product.variants %}
+					<button type="button" @click="size = variants[{{ loop.index0 }}].title" {{ "disabled" if not size_variant.available }} :class="size === variants[{{ loop.index0 }}].title ? 'border-transparent bg-brand text-on-brand' : 'border-outline-gray-2 bg-surface-base text-ink-gray-8 hover:border-outline-gray-3'" class="h-10 min-w-12 rounded-lg border px-3 text-lg font-medium disabled:border-transparent disabled:bg-surface-gray-2 disabled:text-ink-gray-4 disabled:line-through">{{ size_variant.title }}</button>
+					{% endfor %}
+				</div>
+			</div>
+			{% endif %}
+
+			<div class="mt-6 flex gap-2">
+				{% if section.settings.show_quantity %}
+				<div class="flex h-10 items-center rounded-lg bg-surface-gray-2">
+					<button type="button" @click="qty = Math.max(qty - 1, 1)" class="grid size-10 place-items-center text-ink-gray-8" aria-label="{{ _('Less') }}">{{ icon("minus", "size-4") }}</button>
+					<span class="w-6 text-center text-lg" x-text="qty">1</span>
+					<button type="button" @click="qty++" class="grid size-10 place-items-center text-ink-gray-8" aria-label="{{ _('More') }}">{{ icon("plus", "size-4") }}</button>
+				</div>
+				{% endif %}
+				<button type="button" x-ref="add_button" @click="add_to_cart()" :disabled="busy || (variant && !variant.available)" class="inline-flex h-10 flex-1 items-center justify-center rounded-lg bg-brand px-3 text-lg font-medium text-on-brand hover:bg-brand-hover disabled:opacity-60">
+					<span x-show="!variant || variant.available">{{ _("Add to cart") }}</span>
+					<span x-cloak x-show="variant && !variant.available">{{ _("Sold out") }}</span>
+				</button>
+				{% if section.settings.show_wishlist %}
+				<button type="button" @click="toggle_wishlist()" :disabled="busy" :aria-pressed="saved" :class="saved && '[&_svg]:fill-current'" class="grid size-10 place-items-center rounded-lg border border-outline-gray-2 bg-surface-base text-ink-gray-8 hover:border-outline-gray-3" aria-label="{{ _('Add to wishlist') }}">{{ icon("heart") }}</button>
+				{% endif %}
+			</div>
+			<p x-cloak x-show="missing_size" class="mt-2 text-sm text-ink-red-4">{{ _("Choose a size first.") }}</p>
+			<p x-cloak x-show="error" x-text="error" class="mt-2 text-sm text-ink-red-4"></p>
+			<p x-cloak x-show="variant?.available && variant?.quantity_available !== null && variant?.quantity_available <= 3" data-template="{{ _('Only {0} left') }}" x-text="$el.dataset.template.replace('{0}', variant?.quantity_available)" class="mt-2 text-sm text-ink-gray-6"></p>
+
+			<div x-data='accordion({{ section.id | tojson }})' x-on:commera:block:select="select($event)" class="mt-8 border-t border-outline-gray-2">
+				{% if product.description_html %}
+				<div class="border-b border-outline-gray-2">
+					<button type="button" @click="open = open === 'description' ? '' : 'description'" :aria-expanded="open === 'description'" class="flex h-12 w-full items-center justify-between text-base">{{ _("Description") }}{{ icon("down", "size-4") }}</button>
+					<div x-show="open === 'description'" class="pb-4 text-p-base text-ink-gray-6 [&_p+p]:mt-3">{{ product.description_html | safe }}</div>
+				</div>
+				{% endif %}
+				{% for block in section.blocks %}
+				<div class="border-b border-outline-gray-2" data-accordion-key="block-{{ loop.index }}"{{ block.editor_attributes }}>
+					<button type="button" @click="open = open === 'block-{{ loop.index }}' ? '' : 'block-{{ loop.index }}'" :aria-expanded="open === 'block-{{ loop.index }}'" class="flex h-12 w-full items-center justify-between text-base">{{ block.settings.title }}{{ icon("down", "size-4") }}</button>
+					<p x-cloak x-show="open === 'block-{{ loop.index }}'" class="pb-4 text-p-base text-ink-gray-6">{{ block.settings.text }}</p>
+				</div>
+				{% endfor %}
+			</div>
+		</div>
+	</div>
+
+	<div x-cloak x-show="!add_button_visible" class="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-outline-gray-2 bg-surface-base px-5 py-3 md:hidden">
+		<p class="flex-1 text-lg" x-text="money(price)">{{ commera.format.money(variant.price if variant else product.price, product.currency) }}</p>
+		<button type="button" @click="add_to_cart()" :disabled="busy || (variant && !variant.available)" class="inline-flex h-10 items-center justify-center rounded-lg bg-brand px-4 text-lg font-medium text-on-brand disabled:opacity-60">{{ _("Add to cart") }}</button>
+	</div>
+</section>
+{% endif %}

@@ -49,12 +49,12 @@
 	{{ format_plugin_includes("css") }}
 </head>
 
-<body class="bg-surface-base text-ink-gray-9">
+<body class="flex min-h-dvh flex-col bg-surface-base text-ink-gray-9">
 	{% block header %}{{ render_layout("header_group") }}{% endblock %}
 	{% include "components/search_modal.html" %}
 	{% include "components/cart_drawer.html" %}
 
-	<main>
+	<main class="flex-1">
 		{% block body %}{% endblock %}
 		{% block uncontained_body %}{% endblock %}
 	</main>

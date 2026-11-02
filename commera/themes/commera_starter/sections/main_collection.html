@@ -1,0 +1,18 @@
+{% from "components/macros/breadcrumbs.html" import breadcrumbs %}
+{% if listing is defined %}
+{% set title = collection.title if collection else _("All products") %}
+<section x-data class="px-5 pb-20 pt-6 md:px-12">
+	{{ breadcrumbs([{"label": _("Home"), "url": "/" ~ (frappe.lang or "en")}, {"label": title}]) }}
+	<div class="mt-4 flex flex-wrap items-end justify-between gap-4">
+		<div>
+			<h1 class="text-8xl">{{ title }}</h1>
+			<p class="mt-1 text-base text-ink-gray-6">{{ _("{0} pieces").format(listing.total) }}</p>
+		</div>
+		{% if section.settings.show_sort %}{% include "components/sort_select.html" %}{% endif %}
+	</div>
+	{% include "components/product_grid.html" %}
+	{% if not listing.products %}
+	<p class="py-20 text-center text-p-base text-ink-gray-6">{{ _("No products match these filters.") }}</p>
+	{% endif %}
+</section>
+{% endif %}
