@@ -1,5 +1,5 @@
 {% extends "components/base.html" %}
 
 {% block uncontained_body %}
-	{{ render_layout(listing_layout) }}
+	{{ render_layout("search" if query else "products") }}
 {% endblock %}

@@ -6,6 +6,7 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from commera.api.admin.pages import save_page
 from commera.api.admin.theme import (
 	activate_theme,
 	build_editor_data,
@@ -13,13 +14,22 @@ from commera.api.admin.theme import (
 	save_theme_settings,
 )
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context
-from commera.shop_themes.sections import clear_layout_cache, get_section, get_section_schema
+from commera.shop_themes.sections import (
+	clear_layout_cache,
+	get_section,
+	get_section_schema,
+	get_theme_json,
+)
+from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.www import theme_editor_preview
 
 SUMMER_THEME = "Summer Theme"
 STARTER_THEME = "Commera Starter"
 BASE_THEME = "Shop Base Theme"
 DEFAULT_THEME = "Shop Default Theme"
+
+
+STARTER_LAYOUT_PAGES = ("index", "product", "products", "search", "page")
 
 
 class TestAdminTheme(IntegrationTestCase):
@@ -343,3 +353,60 @@ class TestThemeEditorGroupPreview(IntegrationTestCase):
 		frappe.set_user("Guest")
 		frappe.local.form_dict = frappe._dict()
 		return get_response_content("/en")
+
+
+class TestThemeEditorLayoutPagePreview(ProductDetailPriceTestCase):
+	def setUp(self):
+		super().setUp()
+		self.addCleanup(frappe.clear_cache)
+		self.addCleanup(frappe.db.rollback)
+		frappe.set_user("Administrator")
+		frappe.db.delete("Theme Layout", {"theme": STARTER_THEME})
+		for page in STARTER_LAYOUT_PAGES:
+			clear_layout_cache(STARTER_THEME, page)
+			self.addCleanup(clear_layout_cache, STARTER_THEME, page)
+		activate_theme(STARTER_THEME)
+
+	def render(self, page, layout=None):
+		frappe.local.form_dict = frappe._dict(lang="en", theme=STARTER_THEME, page=page, layout=layout)
+		context = frappe._dict()
+		theme_editor_preview.get_context(context)
+		return context.rendered_html
+
+	def starter_layout(self, page):
+		return frappe.as_json(
+			get_theme_json(build_theme_context(STARTER_THEME)["dirs"], f"layouts/{page}.json")
+		)
+
+	def test_each_starter_layout_renders_its_own_page(self):
+		route = self.make_priced_variant("PREVIEW", default_rate=40)
+		save_page(
+			title="ZZ Preview Page", content="<p>Preview page body</p>", route="zz-preview-page", published=1
+		)
+
+		for page in STARTER_LAYOUT_PAGES:
+			with self.subTest(page=page):
+				html = self.render(page, layout=self.starter_layout(page))
+
+				self.assertIn(f'data-commera-group="{page}"', html)
+				for other_page in set(STARTER_LAYOUT_PAGES) - {page}:
+					self.assertNotIn(f'data-commera-group="{other_page}"', html)
+
+		self.assertIn(f"Display {route}", self.render("product"))
+		self.assertIn("Preview page body", self.render("page"))
+
+	def test_the_preview_leaves_the_editors_own_request_form_alone(self):
+		self.make_priced_variant("FORM", default_rate=40)
+
+		self.render("product")
+
+		self.assertEqual(frappe.form_dict.page, "product")
+		self.assertIsNone(frappe.form_dict.get("route"))
+
+	def test_a_page_with_nothing_to_show_says_so_instead_of_framing_a_404(self):
+		frappe.db.set_value("Style Attribute Variant", {"is_published": 1}, "is_published", 0)
+		frappe.db.set_value("Shop Web Page", {"published": 1}, "published", 0)
+
+		self.assertIn("Publish a product to preview the product page.", self.render("product"))
+		self.assertIn("Publish a product to preview the search page.", self.render("search"))
+		self.assertIn("Publish a page to preview the page layout.", self.render("page"))

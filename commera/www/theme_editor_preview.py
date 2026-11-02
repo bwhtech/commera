@@ -6,13 +6,19 @@ from frappe import _
 from frappe.utils import escape_html
 from markupsafe import Markup
 
-from commera.shop_themes.chrome_preview import TRACKING_BLANKED_BLOCKS, render_page_preview
+from commera.sdk import catalog
+from commera.shop_themes.chrome_preview import (
+	TRACKING_BLANKED_BLOCKS,
+	find_layout_template,
+	render_page_preview,
+)
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
 from commera.shop_themes.sections import SECTION_GROUPS
 from commera.shop_themes.theme_resolver import find_theme_file
 
 no_cache = True
 
+HOME_PAGE_TEMPLATE = "pages/index.html"
 PREVIEW_LANGUAGES = ("en", "ar")
 EDITOR_ROLES = ("System Manager", "Website Manager")
 
@@ -26,7 +32,8 @@ def get_context(context):
 	frappe.only_for(EDITOR_ROLES)
 
 	theme = requested_theme()
-	page = requested_page(theme)
+	theme_dirs = get_theme_context(theme or resolve_active_theme())["dirs"]
+	page = requested_page(theme_dirs)
 	layouts = requested_layouts(page)
 
 	lang = frappe.form_dict.get("lang")
@@ -36,23 +43,14 @@ def get_context(context):
 	# The themed page reads its language off frappe.lang, so the ?lang switch must move it here.
 	frappe.local.lang = lang
 
-	head_html = ""
-	if layouts:
-		frappe.local.theme_editor_preview = frappe._dict(layouts=layouts)
-		head_html = EDITOR_HEAD_HTML
-
-	try:
-		rendered = render_page_preview(
-			f"pages/{page}.html", TRACKING_BLANKED_BLOCKS, theme_name=theme, head_html=head_html
-		)
-	finally:
-		frappe.local.theme_editor_preview = None
-
+	page_template = find_page_template(theme_dirs, page)
+	sample_form = get_sample_form(page) if page_template else None
+	rendered = sample_form is not None and render_layout_page(page_template, sample_form, theme, layouts)
 	if rendered:
 		context.rendered_html = rendered
 		return
 
-	# No theme to render, or one that ships no home page: the pane says so rather than framing a 404.
+	message = no_preview_message(theme, page, page_template)
 	context.rendered_html = f"""<!DOCTYPE html>
 <html lang="{escape_html(lang)}">
 <head>
@@ -60,9 +58,33 @@ def get_context(context):
 <link rel="stylesheet" href="/assets/commera/css/tailwind.css">
 </head>
 <body class="grid min-h-screen place-items-center bg-gray-50 p-6 text-center text-gray-500">
-<p>{escape_html(no_preview_message(theme))}</p>
+<p>{escape_html(message)}</p>
 </body>
 </html>"""
+
+
+def find_page_template(theme_dirs, page):
+	page_template = find_layout_template(theme_dirs, page)
+	if not page_template and page == "index" and find_theme_file(theme_dirs, HOME_PAGE_TEMPLATE):
+		return HOME_PAGE_TEMPLATE
+	return page_template
+
+
+def render_layout_page(page_template, sample_form, theme, layouts):
+	request_form = frappe.local.form_dict
+	frappe.local.form_dict = sample_form
+	if layouts:
+		frappe.local.theme_editor_preview = frappe._dict(layouts=layouts)
+	try:
+		return render_page_preview(
+			page_template,
+			TRACKING_BLANKED_BLOCKS,
+			theme_name=theme,
+			head_html=EDITOR_HEAD_HTML if layouts else "",
+		)
+	finally:
+		frappe.local.theme_editor_preview = None
+		frappe.local.form_dict = request_form
 
 
 def requested_theme():
@@ -74,16 +96,14 @@ def requested_theme():
 	return theme
 
 
-def requested_page(theme):
+def requested_page(theme_dirs):
 	page = frappe.form_dict.get("page") or "index"
 	if page == "index":
 		return page
 	if (
 		not isinstance(page, str)
 		or not page.replace("_", "").replace("-", "").isalnum()
-		or not find_theme_file(
-			get_theme_context(theme or resolve_active_theme())["dirs"], f"layouts/{page}.json"
-		)
+		or not find_theme_file(theme_dirs, f"layouts/{page}.json")
 	):
 		frappe.throw(_("This theme has no {0} page to preview.").format(page), frappe.DoesNotExistError)
 
@@ -107,8 +127,39 @@ def requested_layout(field):
 	return layout
 
 
-def no_preview_message(theme):
+def no_preview_message(theme, page, page_template):
+	if page_template and page == "page":
+		return frappe._("Publish a page to preview the page layout.")
+	if page_template:
+		return frappe._("Publish a product to preview the {0} page.").format(page)
+	if page != "index":
+		return frappe._("This theme has no {0} page to preview.").format(page)
 	if theme:
 		return frappe._("{0} has no home page to preview.").format(theme)
 
 	return frappe._("The live theme has no home page to preview.")
+
+
+def get_sample_form(page):
+	if page in ("product", "search"):
+		newest_products = catalog.list_products(sort="new_arrival", page_size=1)["products"]
+		if not newest_products:
+			return None
+		product = newest_products[0]
+		return (
+			frappe._dict(route=product["handle"])
+			if page == "product"
+			else frappe._dict(search=product["title"])
+		)
+
+	if page == "page":
+		routes = frappe.get_all(
+			"Shop Web Page",
+			filters={"published": 1, "route": ["is", "set"]},
+			order_by="modified desc",
+			limit=1,
+			pluck="route",
+		)
+		return frappe._dict(route=routes[0]) if routes else None
+
+	return frappe._dict()
