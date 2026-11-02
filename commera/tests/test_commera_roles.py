@@ -1,12 +1,21 @@
 from unittest.mock import patch
 
 import frappe
+from frappe.apps import get_default_path
 from frappe.core.doctype.user_permission.test_user_permission import create_user
 from frappe.tests import IntegrationTestCase
+from frappe.utils import set_request
+from frappe.website.serve import get_response
 
 from commera.api.permission import has_app_permission
 from commera.patches import add_commera_admin_to_item_writers
-from commera.roles import ADMIN_PERMISSIONS, COMMERA_ADMIN, COMMERA_USER, add_commera_roles
+from commera.roles import (
+	ADMIN_PERMISSIONS,
+	COMMERA_ADMIN,
+	COMMERA_USER,
+	add_commera_roles,
+	save_commera_default_app,
+)
 from commera.tests.test_plugins import OTHER_APP, PluginTestCase, page
 from commera.www import commera as dashboard
 
@@ -21,6 +30,8 @@ PATCH_WEBSITE_USER = "roles-patch-website-user@example.com"
 PATCH_STOCK_USER = "roles-patch-stock-user@example.com"
 GRANTED_ADMIN = "roles-granted-admin@example.com"
 GRANTED_USER = "roles-granted-user@example.com"
+LANDING_PICKER = "roles-landing-picker@example.com"
+LANDING_ADMIN = "roles-landing-admin@example.com"
 
 
 def make_website_user(email: str, *roles: str):
@@ -108,3 +119,38 @@ class TestCommeraRoles(IntegrationTestCase):
 		for user in (PATCH_DISABLED_ITEM_WRITER, PATCH_WEBSITE_USER, PATCH_STOCK_USER):
 			with self.subTest(user=user):
 				self.assertNotIn(COMMERA_ADMIN, frappe.get_roles(user))
+
+
+class TestCommeraUserLanding(IntegrationTestCase):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		add_commera_roles()
+		create_user(LANDING_PICKER, COMMERA_USER, "Stock User")
+		create_user(LANDING_ADMIN, COMMERA_ADMIN, COMMERA_USER)
+
+	def get_desk_response(self, user: str, path: str):
+		with self.set_user(user):
+			set_request(method="GET", path=path)
+			return get_response()
+
+	def test_a_commera_user_lands_on_commera_after_login(self):
+		save_commera_default_app(frappe._dict(user=LANDING_PICKER))
+
+		self.assertEqual(frappe.db.get_value("User", LANDING_PICKER, "default_app"), "commera")
+		with self.set_user(LANDING_PICKER):
+			self.assertEqual(get_default_path(), "/commera")
+
+	def test_login_leaves_an_admins_default_app_alone(self):
+		save_commera_default_app(frappe._dict(user=LANDING_ADMIN))
+		self.assertFalse(frappe.db.get_value("User", LANDING_ADMIN, "default_app"))
+
+	def test_a_commera_user_is_sent_from_desk_to_commera(self):
+		for path in ("/desk", "/desk/stock-entry"):
+			with self.subTest(path=path):
+				response = self.get_desk_response(LANDING_PICKER, path)
+				self.assertEqual(response.status_code, 301)
+				self.assertTrue(response.headers["Location"].endswith("/commera"))
+
+	def test_an_admin_with_commera_user_keeps_desk(self):
+		self.assertEqual(self.get_desk_response(LANDING_ADMIN, "/desk").status_code, 200)

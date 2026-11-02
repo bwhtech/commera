@@ -1,4 +1,5 @@
 import frappe
+from frappe.apps import DESK_APP_PATTERN
 from frappe.core.doctype.doctype.doctype import validate_permissions_for_doctype
 from frappe.permissions import setup_custom_perms
 
@@ -60,3 +61,20 @@ def add_admin_permission(doctype: str, permission_types: tuple[str, ...]):
 
 def is_commera_admin(user: str | None = None) -> bool:
 	return bool({COMMERA_ADMIN, "System Manager"} & set(frappe.get_roles(user)))
+
+
+def is_commera_user_only(user: str | None = None) -> bool:
+	roles = set(frappe.get_roles(user))
+	return COMMERA_USER in roles and not {COMMERA_ADMIN, "System Manager"} & roles
+
+
+def save_commera_default_app(login_manager):
+	user = login_manager.user
+	if is_commera_user_only(user) and frappe.db.get_value("User", user, "default_app") != "commera":
+		frappe.db.set_value("User", user, "default_app", "commera")
+
+
+def redirect_commera_users_from_desk(context):
+	request = getattr(frappe.local, "request", None)
+	if request and DESK_APP_PATTERN.match(request.path) and is_commera_user_only():
+		frappe.redirect("/commera")

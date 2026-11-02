@@ -93,6 +93,7 @@ website_route_rules = [
 
 before_request = ["commera.utils.before_request"]
 on_session_creation = "commera.commera_ecommerce.doctype.commera_cart.commera_cart.keep_guest_cart"
+on_login = "commera.roles.save_commera_default_app"
 
 # Runs before every core renderer (frappe/website/path_resolver.py); can_render() opts out when no theme.
 page_renderer = ["commera.shop_themes.theme_resolver.ThemePageRenderer"]
@@ -226,7 +227,10 @@ jinja = {
 	],
 }
 
-update_website_context = "commera.website_context.update_website_context"
+update_website_context = [
+	"commera.website_context.update_website_context",
+	"commera.roles.redirect_commera_users_from_desk",
+]
 
 # GDPR erasure: the event log stores the signed-in email as plain Data, so core is told which column to redact.
 user_data_fields = [
