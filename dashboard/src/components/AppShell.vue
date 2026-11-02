@@ -5,6 +5,7 @@ import { DesktopShell, ScrollArea, Sidebar, SidebarHeader } from 'frappe-ui'
 import { activeNavTarget, productName, sections } from '../ia/nav'
 import logoUrl from '../assets/commera.svg'
 import { useAccountMenu } from '../data/account'
+import { isAdmin } from '../data/boot'
 import { useAdminRead, useMethodRead } from '../data/api'
 import NavSection from './NavSection.vue'
 import SetupBanner from './firstrun/SetupBanner.vue'
@@ -63,7 +64,7 @@ const headerMenu = computed(() => [
             <ScrollArea v-scroll-fade class="min-h-0 flex-1" viewport-class="pt-1 pb-10">
               <NavSection v-for="section in sections" :key="section.id" :section="section" :active-target="activeTarget" />
             </ScrollArea>
-            <SetupBanner />
+            <SetupBanner v-if="isAdmin" />
           </div>
         </Sidebar>
       </template>

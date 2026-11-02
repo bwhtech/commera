@@ -15,6 +15,7 @@ export function bootValue(key, fallback) {
 export const language = bootValue('lang', 'en')
 export const isRtl = bootValue('is_rtl', false)
 export const direction = isRtl ? 'rtl' : 'ltr'
+export const isAdmin = bootValue('is_admin', false)
 
 // frappe-ui ships Tailwind `rtl:` variants that only fire under a `dir` on an
 // ancestor, so the mirroring for the whole shell hangs off this one attribute

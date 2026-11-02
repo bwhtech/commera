@@ -2,6 +2,7 @@
 import { computed, defineAsyncComponent, provide, shallowReactive } from 'vue'
 import { START_LOCATION, routeLocationKey } from 'vue-router'
 import { FrappeUIProvider } from 'frappe-ui'
+import { isAdmin } from './data/boot'
 import { visibleRoute } from './ia/settingsRoute'
 import { useIsMobile } from './utils/useIsMobile'
 import AppShell from './components/AppShell.vue'
@@ -34,10 +35,12 @@ provide(routeLocationKey, shallowReactive(shellRoute))
 
     <!-- One instance for the whole app, outside the layout so both shells reach
          them; opened from the workspace menu and the sidebar footer. -->
-    <AppSettingsDialog />
-    <SearchPalette />
-    <ImportDialog />
-    <AddProductDialog />
+    <template v-if="isAdmin">
+      <AppSettingsDialog />
+      <SearchPalette />
+      <ImportDialog />
+      <AddProductDialog />
+    </template>
   </FrappeUIProvider>
 </template>
 

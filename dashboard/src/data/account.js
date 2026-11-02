@@ -1,5 +1,6 @@
 import { openSettings } from '../ia/settings'
 import { useMethodAction } from './api'
+import { isAdmin } from './boot'
 
 // The storefront is served by this same site, so it is the origin's root — a
 // bare '/' redirects to the shopper's language.
@@ -23,10 +24,13 @@ export function useAccountMenu() {
     window.location.replace('/login')
   }
 
+  const logoutItem = { label: 'Log out', icon: 'lucide-log-out', onClick: logout }
+  if (!isAdmin) return [logoutItem]
+
   return [
     { label: 'Settings', icon: 'lucide-settings', onClick: () => openSettings() },
     { label: 'Appearance', icon: 'lucide-sun-moon', onClick: () => openSettings('appearance') },
     { label: 'View storefront', icon: 'lucide-external-link', onClick: openStorefront },
-    { label: 'Log out', icon: 'lucide-log-out', onClick: logout },
+    logoutItem,
   ]
 }

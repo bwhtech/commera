@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { BottomSheet, Icon, MobileNav, MobileNavItem, MobileShell } from 'frappe-ui'
 import { useAccountMenu } from '../data/account'
+import { isAdmin } from '../data/boot'
 import { activeNavTarget, sections } from '../ia/nav'
 
 // The four destinations that earn a permanent tab. Everything else is reached
@@ -12,7 +13,10 @@ const TAB_TARGETS = ['/', '/orders', '/products', '/customers']
 // Read the tabs off the shared nav definition rather than restating them, so a
 // label or icon change in the sidebar lands here too.
 const navItems = sections.flatMap((section) => section.items)
-const tabs = TAB_TARGETS.map((to) => navItems.find((item) => item.to === to)).filter(Boolean)
+const tabs = isAdmin
+  ? TAB_TARGETS.map((to) => navItems.find((item) => item.to === to)).filter(Boolean)
+  : navItems.filter((item) => item.to).slice(0, TAB_TARGETS.length)
+const tabTargets = tabs.map((tab) => tab.to)
 
 // The sheet is one flat list per section: a parent row (Analytics) is a
 // disclosure rather than a destination, so its reports stand in for it.
@@ -23,7 +27,7 @@ const moreSections = [
       label: section.label,
       items: section.items
         .flatMap((item) => item.children ?? [item])
-        .filter((item) => !TAB_TARGETS.includes(item.to)),
+        .filter((item) => !tabTargets.includes(item.to)),
     }))
     .filter((section) => section.items.length),
   // A phone never renders the sidebar, so its store menu has no other way in.
@@ -37,7 +41,7 @@ const route = useRoute()
 const activeTarget = computed(() => activeNavTarget(route.path))
 
 // "More" stays lit for anything that has no tab of its own.
-const moreIsActive = computed(() => Boolean(activeTarget.value) && !TAB_TARGETS.includes(activeTarget.value))
+const moreIsActive = computed(() => Boolean(activeTarget.value) && !tabTargets.includes(activeTarget.value))
 
 const moreOpen = ref(false)
 

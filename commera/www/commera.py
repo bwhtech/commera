@@ -8,6 +8,7 @@ from frappe.utils.jinja_globals import is_rtl
 from commera.api.admin.orders import get_reporting_currency_symbol
 from commera.api.permission import has_app_permission
 from commera.plugins.registry import get_visible_plugins
+from commera.roles import is_commera_admin
 from commera.utils import get_store_currency
 
 no_cache = 1
@@ -52,6 +53,7 @@ def get_boot():
 			"currency": currency,
 			"currency_symbol": get_reporting_currency_symbol(currency),
 			"plugins": get_visible_plugins(frappe.session.user),
+			"is_admin": is_commera_admin(),
 		}
 	)
 	frappe.db.commit()  # nosemgrep
