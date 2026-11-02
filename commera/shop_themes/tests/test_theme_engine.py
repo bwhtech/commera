@@ -456,6 +456,41 @@ class IntegrationTestThemedRendering(IntegrationTestCase):
 		self.assertIn("card", html)
 
 
+class IntegrationTestThemedNotFound(IntegrationTestCase):
+	def setUp(self):
+		self.theme_dir = tempfile.mkdtemp(prefix="shop_theme_not_found_")
+		self.addCleanup(shutil.rmtree, self.theme_dir)
+		os.makedirs(os.path.join(self.theme_dir, "pages"))
+		self.write_theme_file("pages/probe.html", "found")
+		self.write_theme_file(
+			"pages/probe.py",
+			"import frappe\n\n\ndef get_context(context):\n\traise frappe.DoesNotExistError\n",
+		)
+
+	def write_theme_file(self, relative_path, source):
+		with open(os.path.join(self.theme_dir, relative_path), "w") as theme_file:
+			theme_file.write(source)
+
+	def render_probe(self):
+		renderer = ThemePageRenderer("en/probe")
+		renderer.theme_dirs = [self.theme_dir]
+		renderer.template_path = "pages/probe.html"
+		return renderer.render()
+
+	def test_a_missing_record_renders_the_theme_404_uncached(self):
+		self.write_theme_file("pages/404.html", "theme not found")
+
+		response = self.render_probe()
+
+		self.assertEqual(response.status_code, 404)
+		self.assertEqual(response.headers["Cache-Control"], "no-store")
+		self.assertEqual(response.get_data(as_text=True), "theme not found")
+
+	def test_a_theme_without_404_html_leaves_the_miss_to_frappe(self):
+		with self.assertRaises(frappe.DoesNotExistError):
+			self.render_probe()
+
+
 class IntegrationTestThemeSettingsContext(IntegrationTestCase):
 	settings_doctype = "Test Theme Settings Context"
 

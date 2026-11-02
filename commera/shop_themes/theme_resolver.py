@@ -49,6 +49,8 @@ THEME_OVERRIDABLE_PREFIX = "components/"
 
 DEFAULT_APP_NAME = "Commera"
 
+NOT_FOUND_TEMPLATE = "pages/404.html"
+
 
 def find_theme_file(theme_dirs, relative_path):
 	for theme_dir in theme_dirs:
@@ -153,9 +155,22 @@ class ThemePageRenderer:
 			raise frappe.PermissionError
 
 		context = build_base_context(self.match)
-		run_page_controller(self.theme_dirs, self.template_path, context)
+		try:
+			run_page_controller(self.theme_dirs, self.template_path, context)
+		except (frappe.PageDoesNotExistError, frappe.DoesNotExistError):
+			if not find_theme_file(self.theme_dirs, NOT_FOUND_TEMPLATE):
+				raise
+			return self.render_not_found()
 		html = self.render_with_theme_loader(context)
 		return build_response(self.path, html, self.http_status_code or 200)
+
+	def render_not_found(self):
+		frappe.clear_last_message()
+		self.template_path = NOT_FOUND_TEMPLATE
+		context = build_base_context(None)
+		run_page_controller(self.theme_dirs, self.template_path, context)
+		html = self.render_with_theme_loader(context)
+		return build_response(self.path, html, 404, {"Cache-Control": "no-store"})
 
 	def render_with_theme_loader(self, context):
 		theme_env = get_theme_environment(get_jenv(), self.theme_dirs)
