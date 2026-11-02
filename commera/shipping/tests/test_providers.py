@@ -14,9 +14,9 @@ from commera.shipping.providers import (
 	use_providers,
 	validate_providers,
 )
+from commera.shipping.cache import RATES_CACHE_PREFIX
 from commera.shipping.rates import (
 	FAILURE_CACHE_TTL_SECONDS,
-	RATES_CACHE_PREFIX,
 	get_provider_rates,
 	get_request_fingerprint,
 )

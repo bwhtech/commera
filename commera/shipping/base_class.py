@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+from commera.shipping.cache import clear_rates_cache
+
 RATES_TIMEOUT_SECONDS = 10
 
 OPTIONAL_CAPABILITIES = {
@@ -57,8 +59,6 @@ class ShippingProviderBase(ABC):
 
 	def on_update(self):
 		"""Credentials and the pickup address change every quote. An override calls super()."""
-		from commera.shipping.rates import clear_rates_cache  # rates imports this module
-
 		clear_rates_cache()
 
 	@abstractmethod

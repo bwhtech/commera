@@ -6,12 +6,12 @@ import frappe
 from frappe.utils.data import add_days, cint, cstr, flt, getdate, sha256_hash, today
 
 from commera.shipping.base_class import RateRequest
+from commera.shipping.cache import RATES_CACHE_PREFIX
 from commera.shipping.providers import PROFILE_DOCTYPE, get_enabled_profiles, get_provider
 from commera.shipping.utils import get_default_origin
 
 RATES_CACHE_TTL_SECONDS = 15 * 60
 FAILURE_CACHE_TTL_SECONDS = 30
-RATES_CACHE_PREFIX = "commera:carrier_rates:"
 
 
 class CarrierTimeoutError(Exception):
@@ -92,10 +92,6 @@ def get_request_fingerprint(request: RateRequest) -> str:
 	fields = asdict(request)
 	fields.pop("timeout_seconds")
 	return sha256_hash(json.dumps(fields, sort_keys=True, default=str))[:16]
-
-
-def clear_rates_cache(provider: str | None = None):
-	frappe.cache.delete_keys(f"{RATES_CACHE_PREFIX}{provider + ':' if provider else ''}")
 
 
 def get_rate_details(rate: dict) -> dict:

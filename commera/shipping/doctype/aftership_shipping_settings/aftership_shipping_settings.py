@@ -6,6 +6,7 @@ import hashlib
 import hmac
 
 import frappe
+import pycountry
 from frappe import _
 from frappe.integrations.utils import create_request_log
 from frappe.model.document import Document
@@ -440,8 +441,6 @@ def alpha_3(country: str | None) -> str | None:
 
 	code = cstr(frappe.db.get_value("Country", country, "code")).upper()
 	try:
-		import pycountry
-
 		match = None
 		if code:
 			match = pycountry.countries.get(alpha_2=code)

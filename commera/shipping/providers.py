@@ -7,6 +7,7 @@ from frappe.utils.caching import site_cache
 
 from commera.plugins import providers as registry
 from commera.shipping.base_class import ShippingProviderBase
+from commera.shipping.cache import clear_rates_cache
 
 KIND = "shipping_providers"
 PROFILE_DOCTYPE = "Shipping Provider Profile"
@@ -39,8 +40,6 @@ def get_provider(profile: str) -> ShippingProviderBase:
 
 @contextmanager
 def use_providers(providers: dict[str, ShippingProviderBase]) -> Iterator[None]:
-	from commera.shipping.rates import clear_rates_cache
-
 	clear_rates_cache()
 	try:
 		with registry.use_providers(KIND, providers):
