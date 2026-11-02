@@ -78,8 +78,7 @@ def band(
 
 
 class PricingTestCase(IntegrationTestCase):
-	"""No test may reach a real carrier: the demo site has live services enabled, and a live call's request
-	log commits mid-test and leaks rows past the rollback."""
+	"""No real carrier calls: a live call's request log commits mid-test and leaks rows past the rollback."""
 
 	def setUp(self):
 		self.enterContext(use_providers({}))

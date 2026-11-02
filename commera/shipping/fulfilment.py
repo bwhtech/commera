@@ -6,20 +6,15 @@ from frappe.utils.data import cint, cstr, flt, today
 
 from commera.shipping.providers import get_available_shipping_providers, get_provider
 
-# ponytail: one notional box per consignment, since ERPNext parcel templates are optional and most stores
-# never fill them in; read a Shipment Parcel Template here once packing rules matter more than a rate.
 DEFAULT_PARCEL_DIMENSIONS = {"length": 30.0, "width": 20.0, "height": 10.0}
 DEFAULT_ITEM_WEIGHT_KG = 0.5
 
-# Optional custom fields a storefront sets on the Sales Order at checkout. Without them the Shipment
-# uses the default provider.
 ORDER_CHOICE_FIELDS = ("custom_shipping_provider", "custom_shipping_service_code", "custom_delivery_option")
 DESCRIPTION_LENGTH = 140
 
 
 @frappe.whitelist()
 def create_shipment(delivery_note: str) -> str:
-	"""Draft a Shipment for a Delivery Note, honouring what the customer paid for."""
 	source = frappe.get_doc("Delivery Note", delivery_note)
 	source.check_permission("read")
 
@@ -57,7 +52,6 @@ def create_shipment(delivery_note: str) -> str:
 
 
 def new_shipment(source, origin: str | None, delivery_address: str | None):
-	"""A draft Shipment from the store to the customer of `source`, a Sales Order or Delivery Note."""
 	origin = origin or get_company_address(source.company).company_address
 	if not origin:
 		frappe.throw(_("Set an address for {0} to ship from.").format(frappe.bold(source.company)))
@@ -82,8 +76,7 @@ def new_shipment(source, origin: str | None, delivery_address: str | None):
 
 
 def link_address_to_company(address: str, company: str):
-	"""ERPNext ships only from an address linked to the company. A carrier's pickup address is the store's
-	own warehouse, so it is linked on first use."""
+	"""ERPNext ships only from a company-linked address, so the pickup address is linked on first use."""
 	if is_linked_to_party("Address", address, "Company", company):
 		return
 	address_doc = frappe.get_doc("Address", address)
@@ -97,8 +90,7 @@ def describe_contents(source) -> str:
 
 
 def validate_carrier_booking(choice: dict):
-	"""An option the store delivers itself has no carrier to book, and the default-provider fallback
-	would otherwise buy a label the shopper never paid for."""
+	"""Without this, the default-provider fallback would buy a label the shopper never paid for."""
 	delivery_option = choice.get("delivery_option")
 	if not delivery_option or choice.get("provider"):
 		return
@@ -112,7 +104,6 @@ def validate_carrier_booking(choice: dict):
 
 
 def get_open_shipment(delivery_note: str) -> str | None:
-	"""A second Shipment for the same Delivery Note would buy a second label for one parcel."""
 	shipments = frappe.get_all(
 		"Shipment",
 		filters=[["docstatus", "<", 2], ["Shipment Delivery Note", "delivery_note", "=", delivery_note]],
@@ -130,7 +121,6 @@ def get_sales_order(delivery_note) -> str | None:
 
 
 def get_order_choice(sales_order: str | None) -> dict:
-	"""What the customer chose at checkout. The fields are optional custom fields, hence `has_field`."""
 	if not sales_order:
 		return {}
 
@@ -157,12 +147,11 @@ def get_provider_pickup_address(provider: str) -> str | None:
 
 
 def build_parcels(delivery_note) -> list[dict]:
-	"""One parcel sized from the delivery's own weights, so the carrier is not quoted an empty box."""
 	return [{**DEFAULT_PARCEL_DIMENSIONS, "weight": get_delivery_weight(delivery_note), "count": 1}]
 
 
 def get_delivery_weight(delivery_note) -> float:
-	"""Total weight in kg. ERPNext's `total_weight` per row is already qty x unit weight."""
+	"""ERPNext's `total_weight` per row is already qty x unit weight."""
 	total = 0.0
 	for row in delivery_note.items:
 		# A return carries negative quantities, but a physical parcel never weighs less than nothing.

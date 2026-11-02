@@ -132,7 +132,6 @@ after_app_install = [
 ]
 before_app_uninstall = "commera.shipping.providers.disable_app_profiles"
 
-# Commera's own carriers register the same way a plugin app's do.
 commera_hooks = {"shipping_providers": ["Shiprocket Shipping Settings", "AfterShip Shipping Settings"]}
 setup_wizard_complete = [
 	"commera.swatches.drop_unused_colour_attribute",

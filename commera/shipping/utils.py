@@ -5,7 +5,6 @@ from commera.shipping.providers import get_provider
 
 
 def get_provider_profile(provider_settings: str) -> str:
-	"""The enabled Shipping Provider Profile backed by a settings Single."""
 	profiles = frappe.get_all(
 		"Shipping Provider Profile",
 		filters={"provider_settings": provider_settings, "enabled": 1},
@@ -20,7 +19,6 @@ def get_provider_profile(provider_settings: str) -> str:
 
 
 def get_address_payload(address_name: str, contact_name: str | None = None) -> dict:
-	"""One ERPNext Address in the shape ShippingProviderBase expects."""
 	if not address_name:
 		frappe.throw(_("An address is required to quote or book a shipment"))
 	address = frappe.get_cached_doc("Address", address_name)
@@ -39,8 +37,6 @@ def get_address_payload(address_name: str, contact_name: str | None = None) -> d
 
 
 def get_default_origin(provider: str) -> dict | None:
-	"""Where a checkout quote ships from: the provider's `pickup_address`, by convention.
-	A provider without that field has no default origin."""
 	address_name = get_provider(provider).get("pickup_address")
 	if not address_name:
 		return None

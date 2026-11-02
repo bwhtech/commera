@@ -3,8 +3,6 @@ from dataclasses import dataclass, field
 
 RATES_TIMEOUT_SECONDS = 10
 
-# Optional capabilities and the method that implements each. Ask `supports()` rather than
-# hard-coding which provider can do what.
 OPTIONAL_CAPABILITIES = {
 	"booking": "create_shipment",
 	"cancel": "cancel_shipment",
@@ -49,8 +47,7 @@ class RateRequest:
 
 
 class ShippingProviderBase(ABC):
-	"""Contract for a `<Provider> Shipping Settings` Single that backs a Shipping Provider Profile.
-	Units are canonical: kg, cm, and major units of the named currency; see `units.normalise_parcel`."""
+	"""A `<Provider> Shipping Settings` Single. Units are canonical: kg, cm, major currency units."""
 
 	# Shown on the Integrations screen. `label` also names the carrier's Shipping Provider Profile.
 	label: str = ""
@@ -59,19 +56,17 @@ class ShippingProviderBase(ABC):
 	logo: str = ""  # An image URL, such as /assets/<app>/images/<carrier>.svg
 
 	def on_update(self):
-		"""Credentials and the pickup address change every quote. A subclass that overrides this calls super()."""
+		"""Credentials and the pickup address change every quote. An override calls super()."""
 		from commera.shipping.rates import clear_rates_cache  # rates imports this module
 
 		clear_rates_cache()
 
 	@abstractmethod
 	def get_rates(self, request: RateRequest) -> list[dict]:
-		"""One {"service_code", "service_name", "amount", "currency"} per service, with optional "description",
-		"min_delivery_date", "max_delivery_date" and "phone_required". [] when the route is not served."""
+		"""One {"service_code", "service_name", "amount", "currency"} per service; [] if not served."""
 
 	def create_shipment(self, shipment: dict) -> dict:
-		"""Book one consignment and buy its label. `tracking_ref` is optional: AfterShip tracks on its
-		own id, Shiprocket on the AWB."""
+		"""Book one consignment and buy its label. `tracking_ref` is optional."""
 		raise NotImplementedError(f"{self.get_provider_name()} cannot book shipments")
 
 	def cancel_shipment(
@@ -87,8 +82,7 @@ class ShippingProviderBase(ABC):
 		raise NotImplementedError(f"{self.get_provider_name()} cannot track shipments")
 
 	def handle_webhook(self, payload: bytes, headers: dict) -> dict:
-		"""Verify the delivery is really from the provider, then return {} to ignore it, or
-		{"awb", "status", "event_id", "events"}."""
+		"""Verify the sender, then return {} to ignore it, or {"awb", "status", "event_id", "events"}."""
 		raise NotImplementedError(f"{self.get_provider_name()} sends no webhooks")
 
 	def schedule_pickup(self, shipment_ref: str, pickup_date: str | None = None) -> dict:
@@ -100,19 +94,16 @@ class ShippingProviderBase(ABC):
 		raise NotImplementedError(f"{self.get_provider_name()} cannot generate manifests")
 
 	def resume_booking(self, order_ref: str, shipment_ref: str, service_code: str | None = None) -> dict:
-		"""Finish a booking that already exists at the provider, returning the `create_shipment` shape.
-		Without it a retry creates a second order for one parcel."""
+		"""Finish a booking that already exists at the provider; return the `create_shipment` shape."""
 		raise NotImplementedError(f"{self.get_provider_name()} cannot resume a partial booking")
 
 	def get_service_choices(self) -> dict:
-		"""Carrier services this account can sell, as {"provider", "accounts"}, for the Shipping Service
-		importer. Each `service_code` round-trips into `get_rates` and `create_shipment` unchanged."""
+		"""Services this account sells, as {"provider", "accounts"}; each `service_code` must round-trip."""
 		raise NotImplementedError(f"{self.get_provider_name()} cannot list its carrier services")
 
 	@classmethod
 	def supports(cls, capability: str) -> bool:
-		"""Whether this provider overrides an optional capability. A classmethod, so a caller can ask
-		without loading the settings Single."""
+		"""Whether this provider overrides an optional capability, without loading the settings Single."""
 		method_name = OPTIONAL_CAPABILITIES.get(capability)
 		if not method_name:
 			return False

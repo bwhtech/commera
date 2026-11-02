@@ -2,8 +2,7 @@ import frappe
 
 
 class PartialBookingError(frappe.ValidationError):
-	"""A booking that created something at the provider, then failed. `booking` holds the handles the
-	caller must persist, or a retry creates a second order for one parcel."""
+	"""A booking that failed after creating something at the provider; the caller must persist `booking`."""
 
 	def __init__(self, message: str, booking: dict | None = None):
 		super().__init__(message)

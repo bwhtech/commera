@@ -16,7 +16,6 @@ LABEL_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9 ]{0,60}")
 
 class ShippingProviderScaffold(AppScaffold):
 	def add_shipping_provider(self, label: str) -> list[tuple[str, str]]:
-		"""Write a carrier's settings Single and register it, ready for `bench migrate`."""
 		label = label.strip()
 		if not LABEL_PATTERN.fullmatch(label):
 			raise click.ClickException("Name the carrier with letters, digits and spaces, such as Delhivery")

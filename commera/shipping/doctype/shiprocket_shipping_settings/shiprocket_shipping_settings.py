@@ -16,15 +16,13 @@ from commera.shipping.units import billable_weight, enclosing_dimensions, to_sys
 
 SHIPROCKET_BASE_URL = "https://apiv2.shiprocket.in/v1/external"
 
-# Shiprocket tokens last 10 days. Cached in Redis to keep the credential out of the database;
-# expired early so a long request cannot race the boundary.
+# Cached in Redis to keep the credential out of the database; expired early so a request cannot race it.
 TOKEN_CACHE_KEY = "commera:shiprocket_token"
 TOKEN_TTL_SECONDS = 8 * 24 * 60 * 60
 
 DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_CURRENCY = "INR"
 
-# Unmapped states are logged, not applied, so they cannot advance or close a shipment.
 # Compared casefolded: the API capitalisation is inconsistent.
 SHIPROCKET_STATUS_MAP = {
 	"new": "Ready To Ship",
@@ -55,8 +53,7 @@ SHIPROCKET_STATUS_MAP = {
 	"damaged": "Lost",
 }
 
-# `dict(frappe.request.headers)` loses werkzeug's case-insensitivity, so this has to match the canonical
-# title-case werkzeug hands over, not Shiprocket's documented lowercase spelling.
+# dict(frappe.request.headers) is case-sensitive, so this matches werkzeug's title-case spelling.
 SHIPROCKET_API_KEY_HEADER = "X-Api-Key"
 
 
@@ -64,8 +61,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 	label = "Shiprocket"
 	blurb = "Courier aggregator for domestic India. Pincode-driven, COD supported."
 	docs_url = "https://apidocs.shiprocket.in/"
-
-	# --- HTTP ----------------------------------------------------------------
 
 	def get_token(self, refresh: bool = False) -> str:
 		if not refresh:
@@ -94,8 +89,7 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		return cstr(token)
 
 	def request(self, method: str, endpoint: str, payload: dict | None = None, timeout: int | None = None):
-		"""Call Shiprocket, refreshing the cached token once on a 401. A token can be invalidated before
-		its nominal expiry."""
+		"""A token can be invalidated before its nominal expiry, so a 401 refreshes it once."""
 		try:
 			return self.authorised_send(method, endpoint, payload, timeout)
 		except PermissionError:
@@ -126,8 +120,7 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		params: dict | None = None,
 		timeout: int | None = None,
 	):
-		"""Send one Shiprocket HTTP call. Uses `get_request_session` because `make_*_request` takes no
-		timeout, and a hung call at checkout holds a worker."""
+		"""Not `make_*_request`: it takes no timeout, and a hung call at checkout holds a worker."""
 		url = f"{SHIPROCKET_BASE_URL}{endpoint}"
 		try:
 			response = get_request_session().request(
@@ -143,8 +136,7 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 			frappe.throw(_("Could not reach Shiprocket: {0}").format(cstr(exception)))
 
 		if response.status_code == 401:
-			# Surfaced as PermissionError so `request` can tell "stale token, retry" apart from a real
-			# rejection; every other non-2xx is terminal.
+			# PermissionError lets `request` tell "stale token, retry" from a real rejection.
 			raise PermissionError("Shiprocket rejected the token")
 
 		body = self.read_body(response, endpoint)
@@ -164,8 +156,7 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 			frappe.throw(_("Shiprocket returned an unreadable response"))
 
 	def log_request(self, endpoint: str, output=None, error=None):
-		# The payload carries the customer's name, address and phone number, so only the endpoint and the
-		# outcome are logged.
+		# The payload carries customer PII, so only the endpoint and the outcome are logged.
 		create_request_log(
 			{"endpoint": endpoint},
 			service_name="Shiprocket",
@@ -177,14 +168,10 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 			status="Failed" if error else "Completed",
 		)
 
-	# --- Contract ------------------------------------------------------------
-
 	def get_rates(self, request: RateRequest) -> list[dict]:
 		pickup_pincode = (request.origin or {}).get("pincode")
 		delivery_pincode = (request.destination or {}).get("pincode")
 		if not (pickup_pincode and delivery_pincode):
-			# Shiprocket rates on pincodes only. A missing one is normal mid-checkout; the caller prices
-			# from the backup charge.
 			return []
 
 		params = {
@@ -204,8 +191,7 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		return [self.build_rate(courier, request.cod) for courier in couriers if self.is_quotable(courier)]
 
 	def is_quotable(self, courier: dict) -> bool:
-		# A courier row with no id cannot be booked later, and one with no rate would be quoted to the
-		# shopper as free.
+		# A courier with no id cannot be booked later, and one with no rate would be quoted as free.
 		return bool(courier.get("courier_company_id")) and flt(courier.get("rate")) > 0
 
 	def build_rate(self, courier: dict, cod: bool) -> dict:
@@ -220,16 +206,14 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		}
 
 	def create_shipment(self, shipment: dict) -> dict:
-		"""Book in three calls: order, AWB, label. No rollback exists, so each stage reports what it
-		created even when a later one fails, and a label failure keeps the AWB."""
+		"""No rollback exists, so each stage reports what it created even when a later one fails."""
 		order = self.create_order(shipment)
 		shipment_ref = cstr(order.get("shipment_id"))
 		order_ref = cstr(order.get("order_id"))
 		if not shipment_ref:
 			frappe.throw(_("Shiprocket created no shipment for this order"))
 
-		# From here the order exists at Shiprocket. Any failure has to carry these handles back out, or the
-		# next attempt creates a second order for the same parcel and orphans this one.
+		# The order now exists at Shiprocket; failures must carry these handles out, or a retry orphans it.
 		booking = {"order_ref": order_ref, "shipment_ref": shipment_ref}
 		try:
 			awb_details = self.assign_awb(shipment_ref, shipment.get("service_code"))
@@ -248,15 +232,12 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 			"awb": awb,
 			"carrier": awb_details.get("courier_name"),
 			"label_url": self.generate_label(shipment_ref),
-			# Shiprocket's `charges`/`rate` here is what it will invoice, which is not always the quote the
-			# shopper was shown; the difference is exactly what markup and handling fees exist to absorb.
 			"cost_amount": flt(awb_details.get("charges") or awb_details.get("rate")),
 			"cost_currency": self.get_currency(),
 			"status": order.get("status"),
 		}
 
 	def resume_booking(self, order_ref: str, shipment_ref: str, service_code: str | None = None) -> dict:
-		"""Finish a booking whose order already exists at Shiprocket, without creating a second one."""
 		awb_details = self.assign_awb(shipment_ref, service_code)
 		awb = cstr(awb_details.get("awb_code"))
 		if not awb:
@@ -319,12 +300,10 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		if service_code:
 			payload["courier_id"] = service_code
 		response = self.request("POST", "/courier/assign/awb", payload) or {}
-		# Shiprocket nests the useful half of this response one level down.
 		return (response.get("response") or {}).get("data") or {}
 
 	def generate_label(self, shipment_ref: str) -> str | None:
-		"""Non-fatal: the AWB is already booked, and raising here would lose it. The label can be
-		regenerated from the desk, so a failure is logged and the booking stands."""
+		"""Non-fatal: the AWB is already booked, and raising here would lose it."""
 		try:
 			response = self.request("POST", "/courier/generate/label", {"shipment_id": [shipment_ref]})
 			return (response or {}).get("label_url")
@@ -344,7 +323,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 	def get_tracking(
 		self, awb: str, shipment_ref: str | None = None, tracking_ref: str | None = None
 	) -> dict:
-		# Shiprocket tracks on the AWB itself, so it has no separate tracking handle to use.
 		response = self.request("GET", f"/courier/track/awb/{awb}")
 		tracking = read_tracking_data(response)
 		scans = tracking.get("shipment_track_activities") or []
@@ -356,8 +334,7 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		}
 
 	def handle_webhook(self, payload: bytes, headers: dict) -> dict:
-		"""Shiprocket does not sign webhooks; it echoes a static `x-api-key` token. A missing configured
-		token is a hard failure, not a skipped check."""
+		"""Shiprocket does not sign webhooks; a missing configured token fails hard, not skips the check."""
 		webhook_token = self.get_password("webhook_secret", raise_exception=False)
 		if not webhook_token:
 			frappe.throw(_("Webhook token is not configured in Shiprocket Shipping Settings"))
@@ -365,8 +342,7 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		supplied_token = headers.get(SHIPROCKET_API_KEY_HEADER)
 		if not supplied_token:
 			frappe.throw(_("Missing {0} header").format(SHIPROCKET_API_KEY_HEADER))
-		# Compared as bytes: compare_digest raises TypeError on a non-ASCII str, which would surface as an
-		# unexplained TypeError instead of the mismatch this actually is.
+		# Compared as bytes: compare_digest raises TypeError on a non-ASCII str.
 		if not hmac.compare_digest(webhook_token.encode(), supplied_token.encode()):
 			frappe.throw(_("Shiprocket webhook token does not match"))
 
@@ -375,16 +351,14 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		provider_status = cstr(event.get("current_status"))
 		status = map_status(provider_status)
 		if not (awb and status):
-			# Either an event for something we do not track, or a status this app deliberately does not
-			# map. Returning {} accepts the delivery so Shiprocket stops retrying it.
+			# Returning {} accepts the delivery so Shiprocket stops retrying it.
 			return {}
 
 		return {
 			"awb": awb,
 			"status": status,
 			"provider_status": provider_status,
-			# Shiprocket has no event id of its own, so the status timestamp is the closest thing to one:
-			# it is what makes a redelivery of the same scan recognisable as a replay.
+			# Shiprocket has no event id, so the status timestamp is what recognises a replay.
 			"event_id": cstr(event.get("current_timestamp") or event.get("etd") or provider_status),
 			"events": [build_event(scan) for scan in event.get("scans") or []],
 		}
@@ -404,8 +378,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		response = self.request("POST", "/manifests/generate", {"shipment_id": shipment_refs}) or {}
 		return {"manifest_url": response.get("manifest_url")}
 
-	# --- Helpers -------------------------------------------------------------
-
 	def get_currency(self) -> str:
 		return self.currency or DEFAULT_CURRENCY
 
@@ -414,7 +386,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 
 	@frappe.whitelist()
 	def test_connection(self) -> dict:
-		"""Prove the credentials and the pickup nickname before an order depends on them."""
 		self.login()
 		response = self.request("GET", "/settings/company/pickup") or {}
 		locations = (response.get("data") or {}).get("shipping_address") or []
@@ -433,7 +404,6 @@ def map_status(provider_status: str | None) -> str | None:
 
 
 def read_tracking_data(response) -> dict:
-	"""Shiprocket returns tracking as {"<awb>": {"tracking_data": {...}}} or as a bare tracking_data."""
 	if not isinstance(response, dict):
 		return {}
 	if "tracking_data" in response:
@@ -452,8 +422,7 @@ def read_current_status(tracking: dict) -> str | None:
 
 
 def build_event(scan: dict) -> dict:
-	# Shiprocket spells the same scan differently across endpoints (`date`/`status`/`activity` from
-	# tracking, `sr-status-label`/`location` from the webhook), so both spellings are read.
+	# Shiprocket spells the same scan differently in tracking and webhook payloads, so both are read.
 	return {
 		"timestamp": to_system_datetime(scan.get("date") or scan.get("updated_date") or scan.get("time")),
 		"status": scan.get("sr-status-label") or scan.get("status") or scan.get("sr_status_label"),
@@ -463,8 +432,7 @@ def build_event(scan: dict) -> dict:
 
 
 def build_order_items(shipment: dict) -> list[dict]:
-	"""Shiprocket rejects an order with no line items. Without Delivery Note lines, use one line for
-	the whole parcel."""
+	"""Shiprocket rejects an order with no line items."""
 	items = []
 	for parcel in shipment.get("parcels") or []:
 		for item in parcel.get("items") or []:
@@ -489,7 +457,7 @@ def build_order_items(shipment: dict) -> list[dict]:
 
 
 def split_name(full_name: str | None) -> dict:
-	"""Shiprocket takes first and last name separately and rejects a blank first name."""
+	"""Shiprocket rejects a blank first name."""
 	parts = cstr(full_name).split()
 	if not parts:
 		return {"first": _("Customer"), "last": ""}
@@ -503,7 +471,6 @@ def read_shiprocket_error(body) -> str | None:
 		return cstr(message)
 	errors = body.get("errors")
 	if isinstance(errors, dict):
-		# Shiprocket returns {"errors": {"field": ["problem", ...]}}.
 		return "; ".join(
 			f"{field}: {', '.join(cstr(problem) for problem in problems)}"
 			for field, problems in errors.items()
@@ -514,7 +481,6 @@ def read_shiprocket_error(body) -> str | None:
 
 
 def summarise(body) -> dict:
-	"""Shiprocket echoes the customer's name, address and phone number, so only ids are logged."""
 	if not isinstance(body, dict):
 		return {}
 	return {

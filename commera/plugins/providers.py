@@ -17,7 +17,6 @@ def get_declared_doctypes(kind: str) -> list[str]:
 
 
 def get_provider_doctypes(kind: str) -> list[str]:
-	"""The settings DocTypes that apps declare in commera_hooks[kind], minus apps built for another API."""
 	return [
 		doctype
 		for doctype in get_declared_doctypes(kind)
@@ -46,7 +45,6 @@ def get_provider_class(kind: str, doctype: str, base_class: type) -> type:
 
 
 def get_provider_problems(kind: str, base_class: type) -> list[str]:
-	"""What is wrong with each declared provider, so migrate and app install can stop on it."""
 	problems = []
 	for doctype in get_declared_doctypes(kind):
 		if not frappe.db.exists("DocType", doctype):
@@ -60,7 +58,6 @@ def get_provider_problems(kind: str, base_class: type) -> list[str]:
 
 @contextmanager
 def use_providers(kind: str, providers: dict[str, object]) -> Iterator[None]:
-	"""Inside the block, only these providers exist, as these objects. Made for tests."""
 	overrides = frappe.local.flags.setdefault("commera_provider_overrides", {})
 	previous = overrides.get(kind)
 	overrides[kind] = providers

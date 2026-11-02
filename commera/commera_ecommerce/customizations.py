@@ -1,4 +1,3 @@
-# A tuple key adds the same fields to each doctype in it.
 CUSTOM_FIELDS = {
 	"Address": [
 		{

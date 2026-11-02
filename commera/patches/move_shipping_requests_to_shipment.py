@@ -9,7 +9,6 @@ PARCEL_FIELDS = ("length", "width", "height", "weight", "count")
 
 
 def execute():
-	"""Shipping Request moved to ERPNext's Shipment. The old doctypes are deleted once their rows are copied."""
 	if not frappe.db.table_exists("Shipping Request"):
 		return
 	# after_migrate creates customizations after the patches, so Shipment's custom fields may not exist yet.
@@ -24,8 +23,7 @@ def execute():
 
 
 def move_request(request):
-	"""Inserted without ERPNext's validation: a booked parcel stays on record even when its old row lacks a
-	field Shipment requires."""
+	"""Inserted without validation: a booked parcel stays on record even if its old row lacks a field."""
 	shipment = frappe.new_doc("Shipment")
 	shipment.update(get_shipment_fields(request))
 	shipment.docstatus = get_docstatus(request)
@@ -100,7 +98,6 @@ def get_shipment_fields(request) -> dict:
 
 
 def get_docstatus(request) -> int:
-	"""A booked or partner-recorded parcel is submitted; an unbooked one stays a draft."""
 	if request.status == "Cancelled":
 		return 2
 	return 1 if request.awb or request.order_ref or not request.provider else 0

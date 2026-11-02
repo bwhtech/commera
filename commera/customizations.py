@@ -9,12 +9,10 @@ from commera.commera_ecommerce import customizations as ecommerce
 from commera.shipping import customizations as shipping
 
 MODULES = (ecommerce, shipping)
-# Connections on the Sales Order dashboard, added only when the payment app is installed.
 SALES_ORDER_LINKS = {"Gateway Payment Request": "ref_docname", "Tabby Payment Request": "ref_docname"}
 
 
 def create_customizations():
-	"""Create or update Commera's Custom Fields, Property Setters and Sales Order connections."""
 	for module in MODULES:
 		create_custom_fields(module.CUSTOM_FIELDS)
 		for setter in module.PROPERTY_SETTERS:
@@ -25,7 +23,6 @@ def create_customizations():
 
 
 def delete_customizations():
-	"""Remove everything create_customizations adds. Frappe keeps the columns and their data."""
 	for module in MODULES:
 		delete_custom_fields(get_fields_by_doctype(module.CUSTOM_FIELDS))
 		bulk_delete_property_setters(

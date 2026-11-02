@@ -1,5 +1,3 @@
-// Start a shipment from a submitted Delivery Note. The button only appears once the note is submitted:
-// booking a carrier against a draft would commit a real consignment for goods nobody has agreed to send.
 frappe.ui.form.on('Delivery Note', {
 	refresh(frm) {
 		if (frm.doc.docstatus !== 1) return;

@@ -563,7 +563,7 @@ def read_order_lifecycles(order_names: list) -> dict:
 
 def read_shipment_stages(order_names: list, lifecycles: dict) -> None:
 	"""Fold each order's latest carrier status into its lifecycle, in one read."""
-	# Newest first, first seen wins: a rebooked order carries a stale shipment that must not outrank it.
+	# Newest first, first seen wins: a rebooked order's stale shipment must not outrank it.
 	for shipment in frappe.get_all(
 		"Shipment",
 		filters={"custom_sales_order": ["in", order_names], "docstatus": ["<", 2]},
@@ -579,8 +579,6 @@ def read_shipment_stages(order_names: list, lifecycles: dict) -> None:
 			# The carrier's pickup date wins over the booking date where the provider gave one.
 			keep_earliest(lifecycle, "shipped_on", shipment.pickup_date or shipment.creation)
 		if stage in ("delivered", "returned"):
-			# ponytail: the shipment's last write stands in for the delivery scan; read its Shipping Tracking
-			# Event rows instead. Kept apart from the return note's posting date, which is a date.
 			field = "delivered_on" if stage == "delivered" else "carrier_returned_on"
 			keep_latest(lifecycle, field, shipment.modified)
 

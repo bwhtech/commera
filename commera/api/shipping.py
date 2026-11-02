@@ -49,7 +49,7 @@ def get_cart_shipping_options(quotation) -> dict:
 	if quotation.custom_is_store_pickup:
 		return {"options": [], "store_pickup": True}
 	if not has_delivery_options():
-		# The key predates shipping in core; clients read it as "the store prices delivery by its flat rule".
+		# Legacy key name: clients read it as "the store prices delivery by its flat rule".
 		return {"options": [], "connector_missing": True}
 	if not quotation.shipping_address_name:
 		return {"options": [], "address_missing": True}
@@ -57,7 +57,6 @@ def get_cart_shipping_options(quotation) -> dict:
 	try:
 		options = get_delivery_options(quotation)
 	except Exception:
-		# The carrier failed, so checkout falls back to the flat Shipping Rule and says so.
 		frappe.log_error(title="Shipping options could not be quoted")
 		return {"options": [], "unavailable": True}
 
@@ -69,7 +68,6 @@ def get_delivery_options(quotation) -> list[dict]:
 
 
 def get_quoted_options(quotation) -> list[dict]:
-	"""Priced options for this cart. Each carrier's rates are cached in commera.shipping.rates."""
 	return quote_options(quotation)
 
 
@@ -93,7 +91,6 @@ def quote_options(quotation) -> list[dict]:
 
 
 def get_cart_context(quotation) -> dict:
-	"""What the pricing engine needs to bracket a Shipping Rule band, and what a carrier gets to price."""
 	items = get_cart_items(quotation)
 	customer = quotation.party_name if quotation.quotation_to == "Customer" else None
 	return {
@@ -119,12 +116,10 @@ def get_cart_weight(quotation) -> float:
 
 
 def get_items_weight(items: list[RateItem]) -> float:
-	"""Total weight in kg. An item with no weight counts as the default weight."""
 	return flt(sum(item.qty * (item.weight or DEFAULT_ITEM_WEIGHT_KG) for item in items), 3)
 
 
 def get_cart_items(quotation) -> list[RateItem]:
-	"""The cart lines a carrier prices, with each Item's own weight. One query: this runs on every render."""
 	item_codes = list({item.item_code for item in quotation.items})
 	if not item_codes:
 		return []

@@ -39,7 +39,6 @@ class RatesOnlyProvider(ShippingProviderBase):
 
 
 def insert_unchecked_profile(name: str, provider_settings: str) -> str:
-	"""A profile saved before its app was removed, which validate() would now refuse."""
 	profile = frappe.new_doc(PROFILE_DOCTYPE)
 	profile.name = name
 	profile.provider_settings = provider_settings
@@ -155,9 +154,6 @@ class TestInMemoryCarrier(IntegrationTestCase):
 
 
 class TestCarrierRates(IntegrationTestCase):
-	"""Carrier-calculated rates behave like Shopify's CarrierService: the carrier sees the cart, a good
-	answer is reused for 15 minutes, a failure or a late answer for 30 seconds."""
-
 	def setUp(self):
 		self.addCleanup(frappe.db.rollback)
 		self.addCleanup(get_enabled_services.clear_cache)

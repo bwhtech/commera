@@ -43,8 +43,6 @@ def courier(slug, ship_from, service_types):
 
 
 class TestBuildDeliveryOptionChoices(IntegrationTestCase):
-	"""What the importer offers: one group per shipper account, filtered to couriers that can collect."""
-
 	def test_account_is_grouped_with_its_couriers_services(self):
 		choices = build_delivery_option_choices(
 			[shipper_account("acc-1", "dhl", "DHL Sandbox")],
@@ -58,8 +56,6 @@ class TestBuildDeliveryOptionChoices(IntegrationTestCase):
 		self.assertEqual(
 			choices[0]["services"],
 			[
-				# The account id has to survive into the Service Code, because buying a label needs both it
-				# and the service type.
 				{"service_code": "acc-1|dhl_express", "service_name": "Express"},
 				{"service_code": "acc-1|dhl_economy", "service_name": "Economy"},
 			],
@@ -89,7 +85,6 @@ class TestBuildDeliveryOptionChoices(IntegrationTestCase):
 		self.assertEqual(choices, [])
 
 	def test_courier_with_no_service_types_is_dropped(self):
-		"""Importing it would create an option with a service type nobody can book."""
 		choices = build_delivery_option_choices(
 			[shipper_account("acc-1", "dhl")], [courier("dhl", "Global", [])], "IND"
 		)
@@ -98,8 +93,6 @@ class TestBuildDeliveryOptionChoices(IntegrationTestCase):
 
 
 class TestOriginCanShipFrom(IntegrationTestCase):
-	"""`ship_from` is one string in three spellings, and getting it wrong offers uncollectable services."""
-
 	def test_global_covers_every_origin(self):
 		self.assertTrue(origin_can_ship_from("Global", "IND"))
 		self.assertTrue(origin_can_ship_from("global", "USA"))
@@ -114,14 +107,11 @@ class TestOriginCanShipFrom(IntegrationTestCase):
 		self.assertFalse(origin_can_ship_from("HKG,SGP,MYS", "IND"))
 
 	def test_empty_ship_from_matches_nothing(self):
-		"""A courier that names no origin cannot be shown to collect from ours."""
 		for value in (None, "", "   "):
 			self.assertFalse(origin_can_ship_from(value, "IND"))
 
 
 class TestAlpha3(IntegrationTestCase):
-	"""AfterShip only accepts alpha-3, and the site stores alpha-2 on Country."""
-
 	def test_resolved_from_the_countrys_stored_alpha_2_code(self):
 		self.assertEqual(frappe.db.get_value("Country", "India", "code"), "in")
 		self.assertEqual(alpha_3("India"), "IND")
@@ -132,18 +122,14 @@ class TestAlpha3(IntegrationTestCase):
 		self.assertEqual(alpha_3("Iceland"), "ISL")
 
 	def test_no_country_is_not_an_error(self):
-		"""An address with no country is a validation problem for the caller, not a crash here."""
 		self.assertIsNone(alpha_3(None))
 
 	def test_unresolvable_country_throws(self):
-		"""Kosovo has no assigned ISO code, so neither route resolves it. A quote must fail loudly rather
-		than send AfterShip an origin it will reject."""
 		self.assertRaises(frappe.ValidationError, alpha_3, "Kosovo")
 
 
 class TestCreateShippingServices(IntegrationTestCase):
-	# Frappe rolls a test run back per class, not per test, so every case here uses its own service codes
-	# and titles; sharing them would make one test's inserts another's "already imported".
+	# Frappe rolls back per class, not per test, so every case uses its own service codes and titles.
 
 	def setUp(self):
 		self.provider = create_test_provider_profile()
@@ -192,7 +178,6 @@ class TestCreateShippingServices(IntegrationTestCase):
 		self.assertEqual(charge, 250)
 
 	def test_reimport_skips_what_is_already_there(self):
-		"""Re-running the import after adding a carrier must add only the new rows, not duplicate the old."""
 		selections = [
 			{"service_code": "acc-1|redo_express", "service_name": "_Test Redo Express", "carrier": "dhl"}
 		]
@@ -210,7 +195,6 @@ class TestCreateShippingServices(IntegrationTestCase):
 		self.assertEqual(frappe.db.count("Shipping Service", {"service_code": "acc-1|redo_express"}), 1)
 
 	def test_clashing_service_names_are_suffixed_with_the_carrier(self):
-		"""Title is the autoname, so two carriers selling "Express" would otherwise collide on insert."""
 		created = create_shipping_services(
 			self.provider,
 			[
@@ -226,8 +210,6 @@ class TestCreateShippingServices(IntegrationTestCase):
 
 
 class TestGetServiceChoices(IntegrationTestCase):
-	"""The whitelisted entry point, with the AfterShip HTTP layer stubbed out."""
-
 	def setUp(self):
 		self.provider = create_test_provider_profile()
 		self.settings = frappe.get_single(SETTINGS_DOCTYPE)
@@ -248,7 +230,6 @@ class TestGetServiceChoices(IntegrationTestCase):
 			accounts=[shipper_account("acc-1", "dhl", "DHL"), shipper_account("acc-2", "fedex", "FedEx")],
 			couriers=[
 				courier("dhl", "IND", [("dhl_express", "Express")]),
-				# Collects only from Hong Kong, so it cannot serve an Indian pickup address.
 				courier("fedex", "HKG", [("fedex_pri", "Priority")]),
 			],
 		):
@@ -258,7 +239,6 @@ class TestGetServiceChoices(IntegrationTestCase):
 		self.assertEqual([account["carrier"] for account in choices["accounts"]], ["dhl"])
 
 	def test_a_configured_shipper_account_narrows_the_import(self):
-		"""Rates are only shopped against that account, so importing another one's services is dead weight."""
 		self.settings.shipper_account_id = "acc-2"
 		with self.stubbed_carrier_calls(
 			accounts=[shipper_account("acc-1", "dhl", "DHL"), shipper_account("acc-2", "fedex", "FedEx")],
@@ -272,12 +252,10 @@ class TestGetServiceChoices(IntegrationTestCase):
 		self.assertEqual([account["carrier"] for account in choices["accounts"]], ["fedex"])
 
 	def test_only_a_provider_that_implements_it_advertises_the_capability(self):
-		"""The importer is offered off `supports()`, so Shiprocket must not appear to have a catalogue."""
 		self.assertTrue(AfterShipShippingSettings.supports("service_choices"))
 		self.assertFalse(ShiprocketShippingSettings.supports("service_choices"))
 
 	def stubbed_carrier_calls(self, accounts, couriers):
-		"""Neutralise only the outbound boundary: no AfterShip traffic; everything else is real."""
 		return patch.multiple(
 			AfterShipShippingSettings,
 			get_password=lambda *args, **kwargs: "test-key",

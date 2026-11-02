@@ -14,8 +14,6 @@ class ShippingService(Document):
 		self.validate_bookable()
 
 	def validate_bookable(self):
-		# Catch gaps at config time, not on a paid order. A service with no provider is delivered by
-		# the store itself and has nothing to book.
 		if not self.enabled or not self.provider:
 			return
 		if not self.service_code:
@@ -40,8 +38,6 @@ class ShippingService(Document):
 
 @frappe.whitelist()
 def create_shipping_services(provider: str, selections: list | str, default_rate: float = 0) -> list[str]:
-	"""Create Shipping Services from the importer selections. `default_rate` seeds the Backup Charge;
-	codes already imported for this provider are skipped."""
 	frappe.only_for("System Manager")
 	selections = frappe.parse_json(selections)
 	if not selections:
@@ -53,7 +49,6 @@ def create_shipping_services(provider: str, selections: list | str, default_rate
 			"Shipping Service", filters={"provider": provider}, fields=["service_code"]
 		)
 	}
-	# Title is the autoname, so a clash is a save error rather than a second row.
 	used_titles = set(frappe.get_all("Shipping Service", pluck="title"))
 
 	created, skipped = [], []
@@ -93,8 +88,7 @@ def create_shipping_services(provider: str, selections: list | str, default_rate
 
 
 def get_unique_title(service_name: str, carrier: str, used_titles: set) -> str:
-	"""Two carriers routinely sell a service called "Express", and Title is this doctype's autoname, so an
-	imported row is suffixed with its carrier (then a counter) rather than failing the whole import."""
+	"""Title is the autoname and carriers share names like "Express", so a clash is suffixed, not fatal."""
 	if service_name not in used_titles:
 		return service_name
 

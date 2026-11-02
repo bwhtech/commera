@@ -1,7 +1,6 @@
 import frappe
 from frappe import _
 
-# Unmapped provider states are left out, so they can neither advance nor close a shipment.
 SHIPMENT_STATUSES = (
 	"Draft",
 	"Ready To Ship",
@@ -15,8 +14,7 @@ SHIPMENT_STATUSES = (
 	"Lost",
 )
 
-# Carriers send scans out of order and replay history, so a status applies only when it ranks
-# higher than the stored one. The three endings share the top rank.
+# Carriers send scans out of order and replay history, so a status applies only when it ranks higher.
 STATUS_RANK = {
 	"Draft": 0,
 	"Ready To Ship": 1,
@@ -30,8 +28,7 @@ STATUS_RANK = {
 	"Lost": 7,
 }
 
-# Where a shipment stops. A later scan on one of these is a duplicate or a replay, and applying it would
-# un-deliver a delivered order.
+# A later scan on one of these is a duplicate or a replay; applying it would un-deliver an order.
 TERMINAL_STATUSES = ("Delivered", "Cancelled", "Lost")
 
 
@@ -41,7 +38,6 @@ def validate_status(status: str):
 
 
 def can_advance(current: str, new: str) -> bool:
-	"""Whether a provider-reported status may overwrite the stored one."""
 	if new not in STATUS_RANK or new == current:
 		return False
 	if current in TERMINAL_STATUSES:

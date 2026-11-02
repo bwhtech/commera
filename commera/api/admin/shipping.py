@@ -12,7 +12,6 @@ WEBHOOK_PATH = "/api/method/commera.shipping.webhook.handle?provider={profile}"
 
 
 def get_shipping_registry():
-	"""Every registered carrier as an integration entry, in hook order, which is the order the cards render in."""
 	return [get_shipping_entry(settings_doctype) for settings_doctype in get_provider_doctypes()]
 
 

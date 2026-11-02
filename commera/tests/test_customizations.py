@@ -44,8 +44,6 @@ def has_payment_request_link() -> bool:
 
 
 class TestCustomizations(IntegrationTestCase):
-	"""Commera's Custom Fields, Property Setters and Sales Order links come from Python and leave with the app."""
-
 	def test_setup_creates_every_field_and_setter_and_is_repeatable(self):
 		create_customizations()
 		create_customizations()

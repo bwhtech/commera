@@ -11,7 +11,6 @@ from commera.shipping.utils import get_address_payload
 
 CANCELLABLE_STATUSES = ("Draft", "Ready To Ship", "Pickup Scheduled")
 
-# ERPNext's coarse tracking status for each Commera shipment status.
 TRACKING_STATUSES = {
 	"Pickup Scheduled": "In Progress",
 	"In Transit": "In Progress",
@@ -25,8 +24,7 @@ COMPLETED_STATUSES = ("Delivered", "Lost")
 
 
 class CommeraShipment:
-	"""Carrier booking and tracking on ERPNext's Shipment. Commera owns `custom_shipment_status`; ERPNext's
-	`status` and `tracking_status` follow it."""
+	"""Commera owns `custom_shipment_status`; ERPNext's `status` and `tracking_status` follow it."""
 
 	def validate(self):
 		super().validate()
@@ -90,7 +88,6 @@ class CommeraShipment:
 		return [row.delivery_note for row in self.shipment_delivery_note]
 
 	def get_customer(self) -> frappe._dict:
-		"""Who receives the parcel: the Delivery Note's contact, else the Sales Order's."""
 		if delivery_notes := self.get_delivery_notes():
 			return frappe.db.get_value(
 				"Delivery Note",
@@ -106,7 +103,7 @@ class CommeraShipment:
 		)
 
 	def get_declared_value(self) -> float:
-		"""The goods' value in `custom_currency`. ERPNext's value_of_goods is in the company currency."""
+		"""In `custom_currency`; ERPNext's value_of_goods is in the company currency."""
 		if delivery_notes := self.get_delivery_notes():
 			return flt(
 				sum(frappe.get_all("Delivery Note", {"name": ("in", delivery_notes)}, pluck="grand_total"))
@@ -130,15 +127,12 @@ class CommeraShipment:
 		}
 
 	def lock_booking(self):
-		"""Take a row lock and reload, so two concurrent bookings cannot both pass the already-booked
-		guard. Held until the transaction commits."""
+		"""Held until commit, so two concurrent bookings cannot both pass the already-booked guard."""
 		frappe.db.get_value("Shipment", self.name, ["awb_number", "custom_order_ref"], for_update=True)
 		self.reload()
 
 	@frappe.whitelist()
 	def book(self) -> dict:
-		"""Book the consignment and buy its label. Resumes an order a previous attempt left at the
-		carrier instead of creating a second one."""
 		self.check_permission("submit")
 		self.lock_booking()
 
@@ -163,16 +157,11 @@ class CommeraShipment:
 				title=_("Partial Booking"),
 			)
 
-		# Submitted before the carrier call, so ERPNext's checks refuse a bad shipment before a label is
-		# bought. A carrier failure rolls the submit back.
+		# Submitted before the carrier call so ERPNext refuses a bad shipment before a label is bought.
 		if self.docstatus == 0:
 			self.flags.ignore_permissions = True
 			self.submit()
 
-		# ponytail: the intent log shares this transaction, so a crash between the carrier call and the
-		# commit loses the record of a label that was really bought; reconcile from the carrier's own
-		# dashboard. Committing it first would release the row lock and re-open the double-booking window.
-		# Not create_request_log: it commits, which releases the row lock and lets a second click book again.
 		request_log = frappe.get_doc(
 			{
 				"doctype": "Integration Request",
@@ -191,8 +180,7 @@ class CommeraShipment:
 			else:
 				result = controller.create_shipment(self.get_shipment_payload())
 		except PartialBookingError as partial:
-			# Committed so the handles survive the rollback this exception triggers; else the retry books
-			# a second consignment.
+			# Committed so the handles survive this exception's rollback, or a retry books a second one.
 			self.record_partial_booking(partial.booking)
 			request_log.db_set("status", "Failed", update_modified=False)
 			raise
@@ -226,10 +214,8 @@ class CommeraShipment:
 		self.custom_label_url = result.get("label_url")
 		self.shipment_amount = flt(result.get("cost_amount"))
 		self.custom_cost_currency = result.get("cost_currency")
-		# Optional: only carriers whose tracking handle differs from the AWB report one.
 		self.custom_tracking_ref = result.get("tracking_ref")
-		# The carrier may report its own booked state, but the ladder position is ours: a booked
-		# consignment is Ready To Ship until a carrier scan says otherwise.
+		# Booked is Ready To Ship on our ladder until a carrier scan says otherwise, whatever it reports.
 		self.custom_provider_status = result.get("status")
 		self.custom_shipment_status = "Ready To Ship"
 		self.save(ignore_permissions=True)
@@ -268,7 +254,6 @@ class CommeraShipment:
 
 	@frappe.whitelist()
 	def sync_status(self) -> str:
-		"""Re-read the authoritative status from the carrier. Never trust a stale local state."""
 		self.check_permission("write")
 		if not self.awb_number:
 			frappe.throw(_("This shipment has no AWB yet, so there is nothing to track"))
@@ -280,8 +265,7 @@ class CommeraShipment:
 			self.awb_number, shipment_ref=self.shipment_id, tracking_ref=self.custom_tracking_ref
 		)
 
-		# The carrier round-trip is slow, so the lock is taken after it and picks up whatever a webhook
-		# committed meanwhile. Without it this save races that webhook into a TimestampMismatchError.
+		# Locked after the slow carrier call, or this save races a webhook into TimestampMismatchError.
 		self.lock_booking()
 		self.apply_status(
 			(tracking or {}).get("status"),
@@ -303,8 +287,7 @@ class CommeraShipment:
 		result = controller.schedule_pickup(self.shipment_id, pickup_date=pickup_date or today())
 		self.custom_pickup_ref = (result or {}).get("pickup_ref")
 		self.pickup_date = (result or {}).get("scheduled_date") or pickup_date or today()
-		# Only a real advance: a pickup scheduled on an already-collected consignment must not drag it
-		# back down the ladder.
+		# Only a real advance: a pickup on an already-collected consignment must not drag it back.
 		if can_advance(self.custom_shipment_status, "Pickup Scheduled"):
 			self.custom_shipment_status = "Pickup Scheduled"
 		self.save(ignore_permissions=True)
@@ -332,14 +315,12 @@ class CommeraShipment:
 		events: list | None = None,
 		provider_status: str | None = None,
 	) -> bool:
-		"""Apply a verified carrier status. Return False when the event is a replay or not applicable."""
 		self.lock_booking()
 
 		if event_id and self.custom_last_webhook_event_id == event_id:
 			return False
 
-		# The replay id records only APPLIED events, so a rejected scan cannot take the replay guard from
-		# the event that did take effect.
+		# The replay id records only APPLIED events, so a rejected scan cannot take the replay guard.
 		return self.apply_status(status, provider_status=provider_status, events=events, event_id=event_id)
 
 	def apply_status(
@@ -349,8 +330,6 @@ class CommeraShipment:
 		events: list | None = None,
 		event_id: str | None = None,
 	) -> bool:
-		"""Move the shipment along the ladder, recording scans either way. Returns whether `status` was
-		applied."""
 		appended = self.append_tracking_events(events)
 		advanced = bool(status) and can_advance(self.custom_shipment_status, status)
 
@@ -358,14 +337,12 @@ class CommeraShipment:
 			validate_status(status)
 			self.custom_shipment_status = status
 		elif status and status != self.custom_shipment_status and is_terminal(self.custom_shipment_status):
-			# Worth knowing about: the carrier disagrees with a state we already treated as final.
 			frappe.log_error(
 				title=f"Shipment {self.name} status conflict",
 				message=f"stored: {self.custom_shipment_status}, carrier reported: {status}",
 			)
 
-		# Record the carrier wording and replay id only when this event matches the current status, so a
-		# stale scan cannot relabel the shipment or claim the replay slot.
+		# Only when this event matches the current status: a stale scan must not relabel or take the replay.
 		describes_current_state = bool(status) and status == self.custom_shipment_status
 		if describes_current_state:
 			if provider_status:
@@ -380,7 +357,6 @@ class CommeraShipment:
 		return advanced
 
 	def append_tracking_events(self, events: list | None) -> bool:
-		"""Add scans we have not already recorded. Returns whether anything was added."""
 		if not events:
 			return False
 
@@ -406,8 +382,7 @@ class CommeraShipment:
 
 
 def get_event_key(event: dict) -> tuple:
-	"""Identity of a scan: its event id, else its fields. Timestamps go through get_datetime because stored
-	rows hold datetimes and payloads hold strings."""
+	"""get_datetime because stored rows hold datetimes and payloads hold strings."""
 	if event.get("event_id"):
 		return ("id", event["event_id"])
 	timestamp = event.get("timestamp")
@@ -420,7 +395,6 @@ def get_event_key(event: dict) -> tuple:
 
 
 def get_order_shipments(sales_order: str, fields: list | None = None, **filters) -> list[frappe._dict]:
-	"""The order's live shipments, newest first."""
 	return frappe.get_all(
 		"Shipment",
 		filters={"custom_sales_order": cstr(sales_order), "docstatus": ("<", 2), **filters},

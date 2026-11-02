@@ -5,8 +5,6 @@ from frappe import _
 from frappe.utils import get_datetime, get_system_timezone
 from frappe.utils.data import cint, flt
 
-# Canonical units at the provider boundary are kg and cm (see ShippingProviderBase). ERPNext stores
-# parcel templates in whatever the site chose, so everything is converted once, here, on the way in.
 WEIGHT_IN_KG = {
 	"kg": 1.0,
 	"kgs": 1.0,
@@ -33,8 +31,7 @@ LENGTH_IN_CM = {
 	"foot": 30.48,
 }
 
-# Volumetric divisor for cm/kg. 5000 is the domestic figure Shiprocket's couriers use; a provider
-# with a different contract passes its own.
+# 5000 is the domestic cm/kg divisor Shiprocket's couriers use.
 DEFAULT_VOLUMETRIC_DIVISOR = 5000
 
 WEIGHT_PRECISION = 3
@@ -50,7 +47,7 @@ def to_cm(value: float, unit: str = "cm") -> float:
 
 
 def get_factor(table: dict, unit: str, kind: str) -> float:
-	"""Refuse an unknown unit. A default factor of 1 would ship grams as kilograms."""
+	"""A default factor of 1 would ship grams as kilograms."""
 	key = (unit or "").strip().casefold().rstrip(".")
 	if key in table:
 		return table[key]
@@ -58,7 +55,6 @@ def get_factor(table: dict, unit: str, kind: str) -> float:
 
 
 def normalise_parcel(parcel: dict) -> dict:
-	"""Return one parcel in canonical units, with its count preserved."""
 	weight_unit = parcel.get("weight_unit") or "kg"
 	length_unit = parcel.get("length_unit") or "cm"
 	return {
@@ -85,8 +81,6 @@ def volumetric_weight(parcel: dict, divisor: int = DEFAULT_VOLUMETRIC_DIVISOR) -
 
 
 def billable_weight(parcels: list[dict], divisor: int = DEFAULT_VOLUMETRIC_DIVISOR) -> float:
-	"""Total chargeable weight: per parcel, the greater of actual and volumetric. Compared per parcel
-	because carriers rate each box."""
 	total = 0.0
 	for parcel in parcels:
 		chargeable = max(flt(parcel.get("weight")), volumetric_weight(parcel, divisor))
@@ -95,14 +89,12 @@ def billable_weight(parcels: list[dict], divisor: int = DEFAULT_VOLUMETRIC_DIVIS
 
 
 def total_weight(parcels: list[dict]) -> float:
-	"""Actual scale weight of the consignment, ignoring volumetric rating."""
 	total = sum(flt(parcel.get("weight")) * (cint(parcel.get("count")) or 1) for parcel in parcels)
 	return flt(total, WEIGHT_PRECISION)
 
 
 def enclosing_dimensions(parcels: list[dict]) -> dict:
-	"""One length/width/height for providers that book a consignment. Length is summed and the rest
-	take the maximum, which overstates on purpose to avoid a carrier reweigh charge."""
+	"""Overstates on purpose to avoid a carrier reweigh charge."""
 	if not parcels:
 		frappe.throw(_("At least one parcel is needed to quote or book a shipment"))
 	return {
@@ -116,8 +108,7 @@ def enclosing_dimensions(parcels: list[dict]) -> dict:
 
 
 def to_system_datetime(value):
-	"""A provider's timestamp as a naive datetime in system time. MySQL Datetime columns reject an
-	offset, so aware values are converted first; naive values pass through."""
+	"""MySQL Datetime columns reject an offset, so aware values are converted to naive system time."""
 	if not value:
 		return None
 

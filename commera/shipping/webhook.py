@@ -12,7 +12,6 @@ WEBHOOK_ACCEPTED = {"status": "ok"}
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=120, seconds=60, ip_based=True)
 def handle():
-	"""Public provider callback. Everything here is untrusted until the provider's own check clears it."""
 	provider = frappe.request.args.get("provider")
 	if not provider:
 		return reject()
@@ -29,8 +28,7 @@ def handle():
 	try:
 		result = get_provider(profile.name).handle_webhook(payload, headers)
 	except Exception:
-		# The payload carries the customer's address and phone number, so only the provider and the
-		# traceback are recorded.
+		# The payload carries the customer's address and phone, so only the provider and traceback are logged.
 		frappe.log_error(title=f"{provider} shipping webhook verification failed")
 		log_webhook(provider, status="Failed")
 		return reject()
@@ -65,8 +63,7 @@ def handle():
 		shipment, status, event_id, result.get("events"), result.get("provider_status")
 	)
 	log_webhook(provider, awb=awb, event_id=event_id, status="Completed")
-	# A replayed delivery is still a success as far as the provider is concerned; anything else and it
-	# keeps retrying forever.
+	# A replay is still a success to the provider; anything else and it keeps retrying forever.
 	return WEBHOOK_ACCEPTED
 
 
@@ -77,8 +74,7 @@ def apply_status_as_administrator(
 	events: list | None,
 	provider_status: str | None = None,
 ):
-	# The callback runs as Guest, but the Sales Order write-back needs a real user. Restore the
-	# user so a long-lived worker does not keep Administrator.
+	# Restore the user so a long-lived worker does not keep Administrator.
 	session_user = frappe.session.user
 	try:
 		frappe.set_user("Administrator")  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
@@ -90,8 +86,7 @@ def apply_status_as_administrator(
 
 
 def reject() -> dict:
-	"""One opaque 400 for every verification failure, so a caller cannot probe configured providers.
-	Clearing the message log stops a verifier's `frappe.throw` from leaking in `_server_messages`."""
+	"""Opaque so a caller cannot probe providers; clearing the message log stops `frappe.throw` leaking."""
 	frappe.local.message_log = []
 	frappe.local.response["http_status_code"] = 400
 	return {"status": "error", "message": _("Webhook could not be verified")}

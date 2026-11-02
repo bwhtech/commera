@@ -14,7 +14,7 @@ import { escapeXml, getIntegrationLogo } from './logos'
 const props = defineProps({
   slug: { type: String, required: true },
   label: { type: String, default: '' },
-  // An image URL from a plugin app's provider class. An <img>, never v-html.
+  // A plugin app's image URL: an <img>, never v-html.
   logo: { type: String, default: '' },
   // A provider row carries the full plate; a group heading inside a form wants a
   // smaller one, so the plate is not louder than the heading it belongs to.

@@ -6,8 +6,6 @@ from commera.shipping.base_class import RateRequest, ShippingProviderBase
 
 
 class InMemoryShippingProvider(ShippingProviderBase):
-	"""A carrier that keeps rates, bookings and tracking in memory. Use it with `providers.use_providers`."""
-
 	def __init__(
 		self,
 		rates: list[dict] | None = None,
@@ -27,7 +25,6 @@ class InMemoryShippingProvider(ShippingProviderBase):
 		self.tracking: dict[str, dict] = {}
 
 	def get(self, key: str, default=None):
-		"""Read a setting the way callers read a settings Single."""
 		return getattr(self, key, default)
 
 	def get_rates(self, request: RateRequest) -> list[dict]:
@@ -64,7 +61,6 @@ class InMemoryShippingProvider(ShippingProviderBase):
 
 
 def insert_shipment_record(sales_order: str, status: str, delivery_note: str | None = None) -> str:
-	"""A submitted Shipment row with only the fields order status reads, without ERPNext's validation."""
 	shipment = frappe.get_doc(
 		{
 			"doctype": "Shipment",

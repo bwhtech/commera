@@ -1,5 +1,3 @@
-// Bulk-create Shipping Services from what a carrier account actually sells.
-
 frappe.listview_settings['Shipping Service'] = {
 	onload(list_view) {
 		list_view.page.add_inner_button(__('Import from Carrier'), () =>

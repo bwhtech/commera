@@ -18,8 +18,7 @@ SERVICE_FIELDS = [
 	"backup_charge",
 ]
 
-# Sentinel for a service that cannot be priced for this destination. Not None or 0.0, so a
-# caller cannot mistake it for free.
+# Not None or 0.0, so a caller cannot mistake an unpriceable service for free.
 UNPRICEABLE = object()
 
 SERVICES_CACHE_TTL_SECONDS = 60 * 60
@@ -27,7 +26,7 @@ SERVICES_CACHE_TTL_SECONDS = 60 * 60
 
 @redis_cache(ttl=SERVICES_CACHE_TTL_SECONDS)
 def get_enabled_services() -> list[dict]:
-	# Read on every checkout render. Shipping Service.on_update/on_trash clear this.
+	# Shipping Service.on_update/on_trash clear this.
 	return frappe.get_all(
 		"Shipping Service",
 		filters={"enabled": 1},
@@ -37,7 +36,7 @@ def get_enabled_services() -> list[dict]:
 
 
 def find_service(title: str) -> dict | None:
-	"""Look up a service by title, enabled or not: payment must price a selection disabled mid-checkout."""
+	"""Enabled or not: payment must price a selection disabled mid-checkout."""
 	return frappe.db.get_value("Shipping Service", title, SERVICE_FIELDS, as_dict=True)
 
 
@@ -49,8 +48,6 @@ def quote_services(
 	cod: bool = False,
 	shipping_rule: str | None = None,
 ) -> list[dict]:
-	"""Price every enabled Shipping Service for this cart: Shipping Rule band, else live rate, else
-	Backup Charge, then add the rates of carriers set to offer all of them. Never raises."""
 	services = get_enabled_services()
 	open_profiles = get_open_rate_profiles()
 	if not (services or open_profiles):
@@ -92,7 +89,6 @@ def quote_key(service: dict) -> tuple:
 def get_open_rate_rows(
 	rates_by_provider: dict, open_profiles: list[str], services: list[dict], cart: dict
 ) -> list[dict | None]:
-	"""A row per rate that no Shipping Service covers, titled like Shopify: carrier, then service."""
 	covered = {quote_key(service) for service in services}
 	return [
 		get_open_rate_row(provider, rate, cart)
@@ -132,18 +128,15 @@ def price_row(service: dict, quote: dict | None, cart: dict, band=None) -> dict 
 		# The storefront gates its "Free" label on this: any zero final amount is free.
 		"is_free": not amount,
 		"is_live_rate": is_live_rate,
-		# A band or backup price still ships with the carrier, so its window and phone rule apply.
 		**get_rate_details(quote or {}),
 	}
 
 
 def price_service(service: dict, quote: dict | None, cart: dict, band=None):
-	"""(amount, is_live_rate) for this service, or UNPRICEABLE when nothing prices it for this cart."""
 	if band is not None:
 		if band.free_shipping:
 			return 0.0, False
-		# Shipping Rule bands are in COMPANY currency, the same as ERPNext's
-		# add_shipping_rule_to_tax_table assumes; convert back to what the cart is priced in.
+		# Bands are in company currency, as ERPNext's add_shipping_rule_to_tax_table assumes.
 		return flt(flt(band.shipping_amount) / get_conversion_rate(cart), 2), False
 
 	live_amount = get_live_amount(service, quote, cart)
@@ -167,7 +160,6 @@ def get_shipping_rule(shipping_rule: str | None):
 
 
 def get_rule_bands(rule) -> dict[str, list]:
-	"""The rule's bands grouped by Shipping Service. Bands with no service are left to ERPNext."""
 	bands = {}
 	for condition in rule.conditions if rule else []:
 		if condition.shipping_service:
@@ -176,20 +168,18 @@ def get_rule_bands(rule) -> dict[str, list]:
 
 
 def get_band_value(rule, cart: dict) -> float:
-	# ERPNext's ShippingRule.apply brackets a Net Weight rule on total weight and every other rule on
-	# base_net_total, so a weight rule must never be matched against the cart's value.
+	# ERPNext brackets a Net Weight rule on total weight and every other rule on base_net_total.
 	if rule and rule.calculate_based_on == "Net Weight":
 		return flt(cart.get("weight"))
 	return flt(cart.get("base_net_total"))
 
 
 def get_covering_band(bands: list | None, value: float):
-	"""The band that brackets `value`, or None. A `to_value` of 0 means "and above"."""
+	"""A `to_value` of 0 means "and above"."""
 	for band in bands or []:
 		if flt(band.from_value) <= value and (not band.to_value or value <= flt(band.to_value)):
 			return band
-	# Deliberately no fallback band: a cart outside every band falls through to the Backup Charge rather
-	# than shipping free. ERPNext allows one open-ended band per rule, so only one service can be "and above".
+	# No fallback band: a cart outside every band must fall through to the Backup Charge, not ship free.
 	return None
 
 
@@ -198,14 +188,12 @@ def get_conversion_rate(cart: dict) -> float:
 
 
 def get_live_amount(service: dict, quote: dict | None, cart: dict) -> float | None:
-	"""The marked-up live carrier amount, or None when there is no usable quote."""
 	if not quote:
 		return None
 
 	amount = convert_to_cart_currency(flt(quote.get("amount")), quote.get("currency"), cart)
 	if amount is None:
-		# A quote in a currency we cannot convert today. Charging the number verbatim would bill rupees as
-		# riyals, so the option falls back to its backup charge instead.
+		# Unconvertible currency: charging the number verbatim would bill rupees as riyals.
 		return None
 
 	marked_up = amount * (1 + flt(service.get("markup_percent")) / 100) + flt(service.get("handling_fee"))
@@ -236,8 +224,7 @@ def get_charge_amount(
 	quoted_amount: float | None = None,
 	shipping_rule: str | None = None,
 ) -> float:
-	"""What to bill for a chosen delivery option. `quoted_amount` must come from server-side storage.
-	Without it the option is re-priced, and a live-rate-only option fails loudly."""
+	"""`quoted_amount` must come from server-side storage, never the client."""
 	if quoted_amount is not None:
 		return flt(quoted_amount, 2)
 
@@ -262,8 +249,6 @@ def get_charge_amount(
 
 
 def get_charge_account(shipping_rule: str | None) -> str | None:
-	"""The account a delivery fee should post against: the store's Shipping Rule account, else None so the
-	caller falls back to its own default."""
 	if not shipping_rule:
 		return None
 	return frappe.get_cached_value("Shipping Rule", shipping_rule, "account")

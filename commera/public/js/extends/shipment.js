@@ -1,5 +1,3 @@
-// Carrier actions on a Shipment. Every button is gated on the state the document is actually in, so an
-// operator cannot double-book a parcel or ask a carrier for something it cannot do.
 frappe.ui.form.on('Shipment', {
 	refresh(frm) {
 		const provider = frm.doc.custom_shipping_provider;
@@ -69,7 +67,6 @@ frappe.ui.form.on('Shipment', {
 });
 
 function confirm_and_run(frm, message, method) {
-	// Booking, pickup and cancellation reach a carrier and cost money or send a van.
 	frappe.confirm(message, () => run(frm, method));
 }
 

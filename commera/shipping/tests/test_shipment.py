@@ -15,8 +15,6 @@ SERVICE_CODE = "express"
 
 
 class TestShipmentBooking(IntegrationTestCase):
-	"""A Shipment from a Delivery Note, booked with the in-memory carrier."""
-
 	def setUp(self):
 		self.addCleanup(frappe.db.rollback)
 		self.profile = create_test_provider_profile()

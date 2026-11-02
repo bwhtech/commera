@@ -21,7 +21,6 @@ def get_provider_class(settings_doctype: str) -> type[ShippingProviderBase]:
 
 
 def get_provider(profile: str) -> ShippingProviderBase:
-	"""The carrier behind a Shipping Provider Profile."""
 	overrides = registry.get_provider_overrides(KIND)
 	if overrides is not None:
 		if profile not in overrides:
@@ -40,8 +39,6 @@ def get_provider(profile: str) -> ShippingProviderBase:
 
 @contextmanager
 def use_providers(providers: dict[str, ShippingProviderBase]) -> Iterator[None]:
-	"""Inside the block, only these Shipping Provider Profiles exist, backed by these objects.
-	Cached rates are dropped on the way in and out, since they came from other objects."""
 	from commera.shipping.rates import clear_rates_cache
 
 	clear_rates_cache()
@@ -59,13 +56,11 @@ def get_enabled_profiles() -> list[str]:
 
 @site_cache(ttl=60 * 60)
 def get_available_shipping_providers() -> list[str]:
-	# Profile on_update/on_trash clear only the worker that saved; the TTL bounds how long
-	# other workers keep a stale list.
+	# Profile on_update/on_trash clear only the saving worker; the TTL bounds the others' staleness.
 	return frappe.get_all(PROFILE_DOCTYPE, filters={"enabled": 1}, pluck="name")
 
 
 def resolve_provider(provider: str) -> str | None:
-	"""Return the enabled Shipping Provider Profile matching a client-supplied name, case-insensitively."""
 	requested = (provider or "").strip().casefold()
 	if not requested:
 		return None
@@ -76,7 +71,6 @@ def resolve_provider(provider: str) -> str | None:
 
 
 def validate_providers(app_name: str | None = None):
-	"""Runs after migrate and app install, so a broken carrier stops the operator, not a shopper."""
 	problems = registry.get_provider_problems(KIND, ShippingProviderBase)
 	registered = set(get_provider_doctypes())
 	for profile in frappe.get_all(PROFILE_DOCTYPE, {"enabled": 1}, ["name", "provider_settings"]):
@@ -91,7 +85,6 @@ def validate_providers(app_name: str | None = None):
 
 
 def disable_app_profiles(app_name: str):
-	"""Uninstall drops the app's settings DocType, so its enabled profiles are switched off first."""
 	for profile in frappe.get_all(PROFILE_DOCTYPE, {"enabled": 1}, ["name", "provider_settings"]):
 		if registry.get_doctype_app(profile.provider_settings) != app_name:
 			continue

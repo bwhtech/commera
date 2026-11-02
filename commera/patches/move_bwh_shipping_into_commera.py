@@ -9,8 +9,7 @@ OLD_APP = "bwh_shipping"
 
 
 def execute():
-	"""File the bwh_shipping doctypes and customizations under Commera's Shipping module, then drop the app.
-	Must stay pre-model-sync, so the sync reads the doctypes from Commera. No table or record moves."""
+	"""Must stay pre-model-sync, so the sync reads the doctypes from Commera."""
 	# Migrate's sync_module_defs usually adds the module from modules.txt before patches run.
 	if not frappe.db.exists("Module Def", MODULE):
 		frappe.get_doc({"doctype": "Module Def", "module_name": MODULE, "app_name": "commera"}).insert(
@@ -24,7 +23,6 @@ def execute():
 		return
 
 	if has_old_module:
-		# Every Link to the module: DocType, Custom Field, Property Setter and the rest.
 		update_link_field_values(get_link_fields("Module Def"), OLD_MODULE, MODULE, "Module Def")
 		# Not delete_doc: Module Def.on_trash removes the module folder in developer mode.
 		frappe.db.delete("Module Def", OLD_MODULE)

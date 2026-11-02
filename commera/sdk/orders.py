@@ -113,8 +113,7 @@ def record_shipment(
 	events: list[dict] | None = None,
 	tracking_url: str | None = None,
 ) -> str:
-	"""Upserts the order's submitted Shipment on `awb`; its status never moves back. No Delivery Note is made.
-	Leave `provider` empty when a fulfilment partner shipped it; shoppers see `carrier` and `tracking_url`."""
+	"""Upsert the order's submitted Shipment on `awb`; leave `provider` empty for a fulfilment partner."""
 	validate_status(status)
 	if not cstr(awb).strip():
 		frappe.throw(_("A shipment needs its AWB."), frappe.ValidationError)
@@ -140,7 +139,6 @@ def create_order_shipment(sales_order, provider, awb, carrier, status, events, t
 		frappe.throw(_("Shipping provider {0} does not exist.").format(provider), frappe.ValidationError)
 
 	order = frappe.get_doc("Sales Order", sales_order)
-	# The store does not know a partner's warehouse, so a partner parcel ships from the store's address.
 	shipment = new_shipment(
 		order,
 		origin=(provider and get_provider_pickup_address(provider)) or order.company_address,

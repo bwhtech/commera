@@ -9,8 +9,6 @@ from commera.shipping.base_class import RateRequest
 from commera.shipping.providers import PROFILE_DOCTYPE, get_enabled_profiles, get_provider
 from commera.shipping.utils import get_default_origin
 
-# The same windows Shopify uses for carrier-calculated rates: a good answer is reused for 15 minutes,
-# a failure for 30 seconds, so one outage does not pin backup prices for long.
 RATES_CACHE_TTL_SECONDS = 15 * 60
 FAILURE_CACHE_TTL_SECONDS = 30
 RATES_CACHE_PREFIX = "commera:carrier_rates:"
@@ -41,7 +39,6 @@ def get_rate_request(
 
 
 def get_open_rate_profiles() -> list[str]:
-	"""Enabled carriers set to offer every rate they return, not only the ones set up as services."""
 	return [
 		profile
 		for profile in get_enabled_profiles()
@@ -50,8 +47,6 @@ def get_open_rate_profiles() -> list[str]:
 
 
 def get_live_quotes(providers: list[str], request: RateRequest) -> dict[str, list[dict]]:
-	"""Each enabled carrier's rates, one call per carrier. Each ships from its own pickup address unless
-	the request names an origin."""
 	if not (request.destination and request.parcels):
 		return {}
 
@@ -64,7 +59,6 @@ def get_live_quotes(providers: list[str], request: RateRequest) -> dict[str, lis
 
 
 def get_provider_rates(provider: str, request: RateRequest) -> list[dict]:
-	"""A slow, broken, unconfigured or unregistered carrier gets no rates, so checkout uses backup pricing."""
 	cache_key = f"{RATES_CACHE_PREFIX}{provider}:{get_request_fingerprint(request)}"
 	cached = frappe.cache.get_value(cache_key)
 	if cached is not None:
@@ -105,8 +99,6 @@ def clear_rates_cache(provider: str | None = None):
 
 
 def get_rate_details(rate: dict) -> dict:
-	"""The delivery window and phone rule a live rate carries. A window comes from transit days when the
-	carrier gives no dates."""
 	transit_days = cint(rate.get("transit_days"))
 	estimate = str(add_days(today(), transit_days)) if transit_days else None
 	return {

@@ -959,7 +959,6 @@ def update_delivery_charges(quotation):
 		save_cart_quotation(quotation)
 		return
 
-	# With no option chosen, the flat Shipping Rule applies instead.
 	if not reprice_selected_option(quotation):
 		set_charges(quotation)
 	save_cart_quotation(quotation)
