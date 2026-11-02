@@ -1,4 +1,5 @@
 import frappe
+from erpnext.setup.utils import get_exchange_rate
 from frappe import _
 from frappe.utils.caching import redis_cache
 from frappe.utils.data import cstr, flt
@@ -215,10 +216,6 @@ def convert_to_cart_currency(amount: float, currency: str | None, cart: dict) ->
 	cart_currency = cart.get("currency")
 	if not currency or not cart_currency or currency == cart_currency:
 		return amount
-
-	# Imported lazily: this is the only line in the pricing engine that needs erpnext, and a rate lookup
-	# failing must not stop the module loading.
-	from erpnext.setup.utils import get_exchange_rate
 
 	try:
 		conversion = flt(get_exchange_rate(currency, cart_currency))
