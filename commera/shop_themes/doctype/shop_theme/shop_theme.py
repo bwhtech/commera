@@ -21,6 +21,7 @@ THEME_FOLDERS = {
 }
 SECTIONS_ONLY_FOLDERS = ("sections", "layouts")
 THEME_STARTER_DIR = Path(__file__).parents[3] / "scaffold" / "starter" / "theme"
+STARTER_TEXT_SUFFIXES = (".css", ".html", ".js", ".json", ".md", ".py", ".txt")
 
 THEME_CONTEXT_CACHE_KEY = "shop_theme_context"
 STYLE_TAB = "style_tab"
@@ -33,6 +34,10 @@ class ShopTheme(Document):
 		self.validate_unique_slug()
 		if self.is_new():
 			self.validate_theme_folder_can_exist()
+			if self.can_scaffold() and not os.path.isdir(self.get_folder()):
+				self.is_standard = 1
+		if self.use_as_starter:
+			self.validate_starter()
 		if self.theme_type == "Classic":
 			self.validate_classic_folders()
 		if self.parent_theme:
@@ -66,6 +71,21 @@ class ShopTheme(Document):
 				).format(self.theme_name)
 			)
 
+	def validate_starter(self):
+		if not self.is_standard or not os.path.isdir(self.get_folder()):
+			frappe.throw(frappe._("Only a standard theme with a theme folder can be used as a starter"))
+
+		starter = frappe.db.get_value(
+			"Shop Theme",
+			{"use_as_starter": 1, "theme_type": self.theme_type, "name": ("!=", self.name or "")},
+		)
+		if starter:
+			frappe.throw(
+				frappe._("{0} is already the {1} starter. Untick Use as Starter there first.").format(
+					starter, self.theme_type
+				)
+			)
+
 	def validate_classic_folders(self):
 		theme_dir = self.get_folder()
 		for folder in SECTIONS_ONLY_FOLDERS:
@@ -79,8 +99,22 @@ class ShopTheme(Document):
 
 	def after_insert(self):
 		# A read-only apps volume would otherwise break the insert itself.
-		if self.can_scaffold():
-			self.flags.scaffold_changes = scaffold_theme(self.theme_name, self.module, self.theme_type)
+		if not self.can_scaffold():
+			return
+
+		starter = None if os.path.isdir(self.get_folder()) else self.get_starter()
+		self.flags.scaffold_changes = scaffold_theme(
+			self.theme_name, self.module, self.theme_type, parent_theme=self.parent_theme
+		)
+		if starter and starter.theme_settings:
+			settings_doctype = f"{self.theme_name} Settings"
+			copy_starter_settings_doctype(settings_doctype, starter.theme_settings, self.module).insert()
+			self.db_set("theme_settings", settings_doctype)
+
+	def get_starter(self):
+		if self.parent_theme:
+			return None
+		return get_starter_theme(self.theme_type)
 
 	@frappe.whitelist(methods=["POST"])
 	def scaffold_theme_settings(self):
@@ -274,12 +308,40 @@ def create_theme_settings_doctype(doctype_name, module=None):
 	return doctype
 
 
-def scaffold_theme(theme_name, module=None, theme_type="Classic", app=None):
+def get_starter_theme(theme_type):
+	return frappe.db.get_value(
+		"Shop Theme",
+		{"use_as_starter": 1, "theme_type": theme_type},
+		["name", "module", "theme_settings"],
+		as_dict=True,
+	)
+
+
+def copy_starter_settings_doctype(doctype_name, starter_settings, module=None):
+	doctype = frappe.copy_doc(frappe.get_doc("DocType", starter_settings))
+	doctype.update(
+		{
+			"name": doctype_name,
+			"module": module or DEFAULT_THEME_MODULE,
+			"custom": 0 if frappe.conf.developer_mode else 1,
+		}
+	)
+	return doctype
+
+
+def scaffold_theme(theme_name, module=None, theme_type="Classic", app=None, parent_theme=None):
 	app_path = Path(frappe.get_app_path(app or get_app_for_module(module)))
 	slug = frappe.scrub(theme_name)
 	theme_dir = Path(get_contained_path(app_path / "themes", slug))
 	if theme_dir.exists():
 		return [("skipped", str(theme_dir.relative_to(app_path.parent)))]
+
+	starter = None if parent_theme else get_starter_theme(theme_type)
+	if starter:
+		return [
+			("created", str(target_dir.relative_to(app_path.parent)))
+			for target_dir in copy_starter_theme(theme_name, app_path, starter)
+		]
 
 	for folder in THEME_FOLDERS[theme_type]:
 		(theme_dir / folder).mkdir(parents=True, exist_ok=True)
@@ -298,6 +360,31 @@ def scaffold_theme(theme_name, module=None, theme_type="Classic", app=None):
 		path.write_text(Template(starter.read_text()).safe_substitute(theme_name=theme_name))
 		changes.append(("created", str(path.relative_to(app_path.parent))))
 	return changes
+
+
+def copy_starter_theme(theme_name, app_path, starter):
+	starter_app_path = Path(frappe.get_app_path(get_app_for_module(starter.module)))
+	starter_slug = frappe.scrub(starter.name)
+	slug = frappe.scrub(theme_name)
+	copies = [
+		(starter_app_path / base_dir / starter_slug, Path(get_contained_path(app_path / base_dir, slug)))
+		for base_dir in ("themes", "public/themes")
+	]
+	for source_dir, target_dir in copies:
+		shutil.copytree(
+			source_dir,
+			target_dir,
+			ignore=shutil.ignore_patterns("__pycache__", "node_modules"),
+			dirs_exist_ok=True,
+		)
+		for path in target_dir.rglob("*"):
+			if path.suffix not in STARTER_TEXT_SUFFIXES or not path.is_file():
+				continue
+			text = path.read_text()
+			renamed = text.replace(starter.name, theme_name).replace(starter_slug, slug)
+			if renamed != text:
+				path.write_text(renamed)
+	return [target_dir for source_dir, target_dir in copies]
 
 
 def get_theme_names(theme_name):

@@ -58,13 +58,13 @@ def theme():
 )
 @click.option(
 	"--parent",
-	default="Shop Base Theme",
-	show_default=True,
-	help="Shop Theme to inherit from: Shop Base Theme or one of the same type",
+	help="Shop Theme to inherit from: Shop Base Theme or one of the same type. "
+	"A sections theme without one starts as a copy of the theme ticked Use as Starter; "
+	"a classic theme without one inherits from Shop Base Theme",
 )
 @click.option("--app", help="App to add the theme to, instead of the app you are in")
 @pass_context
-def new_theme(context, name: str, theme_type: str, parent: str, app: str | None):
+def new_theme(context, name: str, theme_type: str, parent: str | None, app: str | None):
 	"""Add a storefront theme to an app and create its Shop Theme record."""
 	import frappe
 
@@ -76,6 +76,8 @@ def new_theme(context, name: str, theme_type: str, parent: str, app: str | None)
 	frappe.connect()
 	try:
 		installed = scaffold.is_installed()
+		if theme_type == "classic" and not parent:
+			parent = "Shop Base Theme"
 		for change, path in scaffold.add_theme(name, theme_type.title(), parent):
 			click.echo(f"{change:<8} {path}")
 		frappe.db.commit()  # nosemgrep
