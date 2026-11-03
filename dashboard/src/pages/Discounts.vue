@@ -1,9 +1,10 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Button, TabButtons } from 'frappe-ui'
+import { Button } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
+import ListTabs from '../components/ListTabs.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ListPagination from '../components/ListPagination.vue'
 import ListSkeleton from '../components/ListSkeleton.vue'
@@ -60,8 +61,8 @@ function usage(row) {
 
   <PageBody>
     <div class="flex flex-wrap items-center gap-2">
-      <TabButtons v-model="tab" size="sm" :options="TABS" />
-      <SearchInput v-model="query" class="ml-auto w-56" placeholder="Search titles and codes" :debounce="300" />
+      <ListTabs v-model="tab" :options="TABS" />
+      <SearchInput v-model="query" class="min-w-0 flex-1 basis-40 sm:ml-auto sm:w-56 sm:flex-none sm:basis-auto" placeholder="Search titles and codes" :debounce="300" />
     </div>
 
     <div class="mt-3 overflow-x-auto">

@@ -1,3 +1,4 @@
+import { isCloudBillingAvailable } from '../data/cloudBilling'
 import { pluginSettingsTabs } from './plugins'
 
 // Derived from the URL in ia/settingsRoute; re-exported because this is still the door the
@@ -67,6 +68,18 @@ export const SETTINGS_TABS = [
     icon: 'lucide-sliders-horizontal',
     keywords: ['developer', 'api', 'reset', 'danger', 'cache', 'debug'],
   },
+  // Only on a Frappe Cloud v2 site, for a System Manager: elsewhere /settings/billing falls
+  // back to General and the palette never offers it.
+  ...(isCloudBillingAvailable
+    ? [
+        {
+          value: 'billing',
+          label: 'Billing',
+          icon: 'lucide-receipt',
+          keywords: ['billing', 'plan', 'subscription', 'invoice', 'payment method', 'trial', 'frappe cloud'],
+        },
+      ]
+    : []),
   // Each installed plugin's own tab, appended so the search palette finds them as well.
   ...pluginSettingsTabs(),
 ]

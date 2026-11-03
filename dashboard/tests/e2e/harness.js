@@ -293,6 +293,17 @@ export function uiTest(session, name, fn, { timeout = 120000 } = {}) {
 }
 
 // favicon 404s come from the Frappe shell, not the dashboard, and are not a defect.
+// Test benches run on Pilot, which writes the credentials that make Frappe call a site "Frappe
+// Cloud v2" but has no Cloud behind it, so the trial card's one billing read is refused (417).
+// That refusal is the bench's, not the dashboard's; the browser echoes it as a console line.
+const BILLING_READ = 'cloud_settings.get_billing'
+
 export function realProblems(problems) {
-  return [...new Set(problems)].filter((entry) => !entry.includes('favicon'))
+  const unique = [...new Set(problems)].filter((entry) => !entry.includes('favicon'))
+  const billingRefused = unique.some((entry) => entry.startsWith('HTTP 417') && entry.includes(BILLING_READ))
+  return unique.filter((entry) => {
+    if (!billingRefused) return true
+    if (entry.includes(BILLING_READ)) return false
+    return !entry.includes('status of 417')
+  })
 }

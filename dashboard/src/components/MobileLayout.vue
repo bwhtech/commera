@@ -5,6 +5,7 @@ import { BottomSheet, Icon, MobileNav, MobileNavItem, MobileShell } from 'frappe
 import { useAccountMenu } from '../data/account'
 import { isAdmin } from '../data/boot'
 import { activeNavTarget, sections } from '../ia/nav'
+import TrialCard from './TrialCard.vue'
 
 // The four destinations that earn a permanent tab. Everything else is reached
 // through "More", so the bar stays thumb-sized on a 375px screen.
@@ -74,6 +75,8 @@ function closeMore(item) {
 
   <BottomSheet v-model:open="moreOpen" title="More">
     <div class="px-2 pb-8">
+      <!-- A phone has no sidebar, so the trial card heads the sheet that stands in for it. -->
+      <TrialCard class="mx-1 mb-2" @open="moreOpen = false" />
       <div v-for="section in moreSections" :key="section.id" class="pt-2 first:pt-0">
         <p v-if="section.label" class="px-3 pb-1 pt-2 text-xs-medium text-ink-gray-5">{{ section.label }}</p>
 
