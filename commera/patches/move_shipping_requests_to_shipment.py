@@ -3,6 +3,7 @@ from frappe.contacts.doctype.address.address import get_company_address
 from frappe.utils.data import getdate
 
 from commera.customizations import create_customizations
+from commera.shipping.shipment import sync_erpnext_status
 
 OLD_DOCTYPES = ("Shipping Request", "Shipping Parcel")
 PARCEL_FIELDS = ("length", "width", "height", "weight", "count")
@@ -32,7 +33,7 @@ def move_request(request):
 	if request.delivery_note:
 		shipment.append("shipment_delivery_note", {"delivery_note": request.delivery_note})
 
-	shipment.sync_erpnext_status()
+	sync_erpnext_status(shipment)
 	shipment.status = {0: "Draft", 2: "Cancelled"}.get(shipment.docstatus, shipment.status)
 	shipment.set_new_name()
 	shipment.set_parent_in_children()
