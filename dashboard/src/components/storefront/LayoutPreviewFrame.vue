@@ -16,6 +16,7 @@ const frameId = useId()
 const FRAME_NAMES = [`commera-theme-editor-preview-${frameId}-0`, `commera-theme-editor-preview-${frameId}-1`]
 const MAX_SCROLL_WAIT_FRAMES = 10
 const RENDERING_DELAY_MS = 150
+const READY_GRACE_MS = 500
 
 const frames = []
 const form = ref(null)
@@ -45,6 +46,11 @@ function highlightTarget() {
   }
   if (selection?.kind === 'block') return { group: selection.group, id: selection.block, section: selection.section }
   return { group: null, id: null, section: null }
+}
+
+function highlight(scroll, target) {
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--outline-blue-6').trim()
+  post('commera:highlight', { ...highlightTarget(), color, scroll }, target)
 }
 
 function render() {
@@ -77,7 +83,8 @@ function render() {
 
 const renderNumberOf = (index) => Number(new URLSearchParams(frames[index].contentWindow.location.search).get('render'))
 
-function onFrameLoad(index) {
+async function onFrameLoad(index) {
+  await new Promise((resolve) => setTimeout(resolve, READY_GRACE_MS))
   if (index === visibleIndex.value || renderNumberOf(index) !== latestRender || readyRender === latestRender) return
   clearTimeout(renderingTimer)
   rendering.value = false
@@ -95,7 +102,7 @@ async function swapIn(index, renderNumber) {
   if (renderNumber !== latestRender) return
   const scrollY = visibleWindow()?.scrollY ?? 0
   post('commera:scroll-to', { y: scrollY }, target)
-  post('commera:highlight', { ...highlightTarget(), scroll: false }, target)
+  highlight(false, target)
   for (let count = 0; count < MAX_SCROLL_WAIT_FRAMES && Math.abs(target.scrollY - scrollY) > 1; count += 1) {
     await nextFrame()
   }
@@ -125,11 +132,11 @@ onMounted(render)
 watch(() => [state.previewToken, state.language], render)
 watch(
   () => state.scrollRequest,
-  () => post('commera:highlight', { ...highlightTarget(), scroll: true }),
+  () => highlight(true),
 )
 watch(
   () => state.selection,
-  () => post('commera:highlight', { ...highlightTarget(), scroll: false }),
+  () => highlight(false),
   { deep: true },
 )
 </script>

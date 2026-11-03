@@ -23,6 +23,7 @@ from commera.order_access import (
 	get_order_access,
 	get_shopper_order_condition,
 )
+from commera.plugin_events import get_plugin_fieldnames, validate_plugin_fieldnames
 from commera.sdk.orders import read_order_results
 from commera.sdk.types import (
 	CustomerAddress,
@@ -111,6 +112,11 @@ def list_addresses() -> list[CustomerAddress]:
 def save_address(address: dict) -> CustomerAddress:
 	"""Update the shopper's own address when `name` is set, else add one to their Customer."""
 	values = {fieldname: address.get(fieldname) for fieldname in ADDRESS_FIELDS if fieldname in address}
+	plugin_fields = address.get("plugin_fields") or {}
+	if not isinstance(plugin_fields, dict):
+		frappe.throw(_("Send plugin_fields as an object."))
+	validate_plugin_fieldnames("Address", plugin_fields)
+	values |= plugin_fields
 	if name := address.get("name"):
 		doc = get_own_address(name)
 		doc.update(values)
@@ -137,6 +143,9 @@ def get_address_result(address) -> CustomerAddress:
 	result = {"name": address.name, **{fieldname: address.get(fieldname) for fieldname in ADDRESS_FIELDS}}
 	for fieldname in ("is_primary_address", "is_shipping_address"):
 		result[fieldname] = bool(cint(result[fieldname]))
+	result["plugin_fields"] = {
+		fieldname: address.get(fieldname) for fieldname in get_plugin_fieldnames("Address")
+	}
 	return result
 
 

@@ -159,8 +159,10 @@ All account methods are in `commera.api.storefront.account`, need a signed-in sh
 ```
 
 ```json
-{"name": "Asha Menon-Shipping", "address_title": "Asha Menon", "address_type": "Shipping", "address_line1": "12 Harbour Road", "address_line2": null, "city": "Kochi", "state": null, "pincode": null, "country": "India", "phone": "9876543210", "email_id": null, "is_primary_address": false, "is_shipping_address": false}
+{"name": "Asha Menon-Shipping", "address_title": "Asha Menon", "address_type": "Shipping", "address_line1": "12 Harbour Road", "address_line2": null, "city": "Kochi", "state": null, "pincode": null, "country": "India", "phone": "9876543210", "email_id": null, "is_primary_address": false, "is_shipping_address": false, "plugin_fields": {}}
 ```
+
+`plugin_fields` holds the Address fields that installed Commera plugins own (named `<app>_...`), as on the cart and orders. `save_address` sets them from `plugin_fields`, and refuses a field no installed plugin owns. Checkout saves the plugin fields its address form sends.
 
 `ShopperOrder` is the SDK `Order` without the staff `tags`. A shopper can change or delete only an address that they made. An address from a guest checkout shows in the list, but a change to it gets HTTP 404. An order of another shopper, or an order that does not exist, gets HTTP 404.
 
