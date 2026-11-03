@@ -1216,6 +1216,7 @@ def create_product(
 	for option, sizes in option_sizes:
 		for size in sizes:
 			size_item = create_variant(item_template.name, {option_attribute: option, size_attribute: size})
+			size_item.item_name = get_variant_title(title, option, size)
 			size_item.insert()
 
 	configurator = frappe.new_doc("Style Attribute Configurator")
@@ -1392,11 +1393,14 @@ def save_product_options(item_template: str, add: list | str | None = None, remo
 		frappe.db.set_value("Item", {"name": ["in", restored_codes]}, "disabled", 0)
 
 	item_code_by_key = {key: item.name for key, item in existing_items.items()}
+	template_title = frappe.db.get_value("Item", item_template, "item_name")
 	created_codes = []
 	for key, (option, size) in add_pairs.items():
 		if key in item_code_by_key:
 			continue
-		size_item = create_variant(item_template, {option_attribute: option, SIZE_ATTRIBUTE: size}).insert()
+		size_item = create_variant(item_template, {option_attribute: option, SIZE_ATTRIBUTE: size})
+		size_item.item_name = get_variant_title(template_title, option, size)
+		size_item.insert()
 		item_code_by_key[key] = size_item.name
 		created_codes.append(size_item.name)
 
@@ -1408,6 +1412,12 @@ def save_product_options(item_template: str, add: list | str | None = None, remo
 	add_changed_products([item_template], "options")
 
 	return {"created": len(created_codes), "disabled": len(disabled_codes), "restored": len(restored_codes)}
+
+
+def get_variant_title(title: str, option: str, size: str) -> str:
+	# ERPNext names a variant "<title>-<abbreviations>", which the storefront would show as is.
+	shown = [value for value in (option, size) if value not in (DEFAULT_OPTION_VALUE, DEFAULT_SIZE_VALUE)]
+	return " - ".join([title, *shown])
 
 
 def add_option_rows(configurator: str, item_template: str, options: list) -> None:

@@ -127,6 +127,7 @@ after_app_install = "commera.storefront_plugins.sync_storefront_apps"
 setup_wizard_complete = [
 	"commera.swatches.drop_unused_colour_attribute",
 	"commera.cloud.link.queue_initial_link",
+	"commera.plugin_events.add_plugin_user",
 ]
 
 
@@ -166,6 +167,7 @@ doc_events = {
 			"commera.plugin_events.on_sales_order_cancel",
 			"commera.plugin_events.on_sales_order_stock_reservation",
 		],
+		"on_trash": "commera.doc_events.sales_order.on_trash",
 	},
 	"Stock Ledger Entry": {
 		"after_insert": [

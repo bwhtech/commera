@@ -52,7 +52,7 @@ function commitNumber(fieldname, event, label) {
     <div v-else class="divide-y divide-outline-gray-1">
       <SettingsRow
         title="Offer cash on delivery"
-        description="Off, and checkout stops offering it — placed orders are unaffected."
+        description="When off, checkout stops offering it — placed orders are unaffected."
       >
         <Switch
           size="sm"

@@ -719,6 +719,14 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		self.assertNotIn("Customer", roles)
 		self.assertTrue(frappe.has_permission("Account", "read", user=PLUGINS_USER))
 
+	def test_the_plugin_user_waits_for_the_setup_wizard(self):
+		frappe.delete_doc("User", PLUGINS_USER, ignore_permissions=True, force=True)
+
+		with patch("frappe.is_setup_complete", return_value=False):
+			add_plugin_user()
+
+		self.assertFalse(frappe.db.exists("User", PLUGINS_USER))
+
 	def test_old_item_events_are_cleared_but_order_events_and_unsent_ones_are_kept(self):
 		old_product_update = self.add_event("product_updated", "Done", days_old=15)
 		old_stock_update = self.add_event("inventory_changed", "Failed", days_old=15)

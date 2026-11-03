@@ -198,6 +198,14 @@ function order_summary() {
 			return this.$store.cart.cart;
 		},
 
+		get discount_codes() {
+			return this.summary?.discount_codes ?? this.cart?.discount_codes ?? [];
+		},
+
+		get discounts() {
+			return this.summary?.discounts ?? this.cart?.discounts ?? [];
+		},
+
 		get subtotal() {
 			return (this.cart?.discounts ?? []).reduce(
 				(subtotal, discount) => subtotal + discount.amount,
@@ -417,7 +425,17 @@ function checkout(config) {
 		},
 
 		get total() {
-			return this.summary?.total ?? this.$store.cart.cart?.total ?? 0;
+			const total = this.summary?.total ?? this.$store.cart.cart?.total ?? 0;
+			return this.shipping_pending
+				? total - (this.summary?.shipping ?? 0)
+				: total;
+		},
+
+		get shipping_amount() {
+			return (this.summary?.shipping_discounts ?? []).reduce(
+				(shipping, discount) => shipping + discount.amount,
+				this.summary?.shipping ?? 0,
+			);
 		},
 
 		get needs_shipping_option() {

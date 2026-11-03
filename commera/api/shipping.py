@@ -4,9 +4,11 @@ from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cstr, flt, sha256_hash
 
 from commera.checkout_hooks import PLUGIN_FEE_FIELD, apply_delivery_option_hooks, apply_plugin_fees
+from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_code_states
 from commera.core import _get_cart_quotation
 from commera.discounts.allocations import get_allocations, get_discount_rows, get_price_discount_rows
 from commera.discounts.pricing import refresh_code_discounts
+from commera.discounts.selection import get_discount_codes
 from commera.discounts.shipping import apply_shipping_discounts, set_shipping_discount
 from commera.utils import (
 	COD_CHARGE_DESCRIPTION,
@@ -367,6 +369,8 @@ def get_checkout_summary(quotation) -> dict:
 		account_head = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
 		add_cod_charge(preview, cod_charge, account_head)
 	summary["cash_on_delivery"] = get_charge_summary(preview)
+	if get_discount_codes(preview):
+		summary["cash_on_delivery"]["discount_codes"] = get_code_states(preview)
 	return summary
 
 

@@ -195,4 +195,5 @@ class TestAdminDiscounts(DiscountCodeTestCase):
 		self.assertEqual(result["discount"], 0)
 		[reason] = result["reasons"]
 		self.assertIn("410", reason)
-		self.assertIn("more to use", reason)
+		self.assertTrue(reason.startswith("Add "))
+		self.assertTrue(reason.endswith("more to use this discount."))

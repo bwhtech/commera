@@ -342,7 +342,7 @@
 									{{ _("Apply") }}
 								</button>
 							</div>
-							{{ discount_code_chips("discount_codes", "$store.cart.saving_code", "remove_discount_code", classes="mt-3") }}
+							{{ discount_code_chips("active_discount_codes", "$store.cart.saving_code", "remove_discount_code", classes="mt-3") }}
 						</div>
 
 						<table>
@@ -660,8 +660,9 @@
 				async add_discount_code(code) {
 					const priced_cart = await this.$store.cart.add_discount_code(code);
 					if (!priced_cart) return false;
-					toast({{ _("Discount code applied") | tojson }}, { type: "success" });
 					this.set_discount_codes(priced_cart);
+					const reason = this.active_discount_codes.find((state) => state.code === code.toUpperCase())?.reason;
+					toast(reason || {{ _("Discount code applied") | tojson }}, { type: reason ? "warning" : "success" });
 					return true;
 				},
 
@@ -690,6 +691,10 @@
 				get shipping_amount() {
 					const discounts = this.active_summary.shipping_discounts || [];
 					return this.active_summary.shipping + discounts.reduce((sum, discount) => sum + discount.amount, 0);
+				},
+
+				get active_discount_codes() {
+					return this.active_summary.discount_codes ?? this.discount_codes;
 				},
 
 				get active_summary() {
