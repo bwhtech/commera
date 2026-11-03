@@ -49,6 +49,17 @@ class OnboardingSetupArgsTestCase(IntegrationTestCase):
 		for key in ("email", "password", "full_name"):
 			self.assertNotIn(key, args)
 
+	def test_args_keep_the_site_telemetry_choice(self):
+		read_setting = frappe.get_system_settings
+		for value in (0, 1):
+
+			def telemetry_is(key, value=value):
+				return value if key == "enable_telemetry" else read_setting(key)
+
+			with self.subTest(value=value), patch("frappe.get_system_settings", side_effect=telemetry_is):
+				args = onboarding.build_setup_args("Zz Shop", "India", "INR", "Asia/Kolkata")
+				self.assertEqual(args["enable_telemetry"], value)
+
 	def test_args_take_explicit_month_and_abbr(self):
 		args = onboarding.build_setup_args(
 			"Zz Shop", "India", "INR", "Asia/Kolkata", "Standard with Numbers", 1, "ZZQ"

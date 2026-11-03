@@ -113,6 +113,9 @@ def build_setup_args(
 		"chart_of_accounts": chart_of_accounts or DEFAULT_CHART_OF_ACCOUNTS,
 		"fy_start_date": fy_start_date,
 		"fy_end_date": fy_end_date,
+		# The wizard writes this back to System Settings when it finishes; left out, it reads as 0
+		# and turns telemetry off on every new store.
+		"enable_telemetry": frappe.get_system_settings("enable_telemetry"),
 	}
 
 
