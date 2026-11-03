@@ -7,6 +7,10 @@
  "field_order": [
   "branding_section",
   "store_name",
+  "store_category",
+  "onboarding_completed",
+  "store_setup_status",
+  "store_setup_error",
   "company",
   "column_break_brand",
   "brand_logo",
@@ -160,6 +164,35 @@
    "fieldname": "store_name",
    "fieldtype": "Data",
    "label": "Store Name"
+  },
+  {
+   "fieldname": "store_category",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Store Category"
+  },
+  {
+   "default": "0",
+   "fieldname": "onboarding_completed",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Onboarding Completed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "store_setup_status",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Store Setup Status",
+   "options": "\nrunning\ndone\nfailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "store_setup_error",
+   "fieldtype": "Small Text",
+   "hidden": 1,
+   "label": "Store Setup Error",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_brand",
@@ -953,7 +986,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-23 10:00:00.000000",
+ "modified": "2026-11-02 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Settings",

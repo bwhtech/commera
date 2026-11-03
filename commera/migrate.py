@@ -47,6 +47,13 @@ def after_install():
 	activate_summer_theme()
 	seed_menu_when_empty()
 	add_plugin_user()
+	set_default_app()
+
+
+def set_default_app():
+	"""Land the site owner on /commera after login, where onboarding runs, unless a default is chosen."""
+	if not frappe.db.get_single_value("System Settings", "default_app"):
+		frappe.db.set_single_value("System Settings", "default_app", "commera")
 
 
 def activate_summer_theme():

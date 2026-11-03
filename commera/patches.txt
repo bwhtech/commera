@@ -27,3 +27,4 @@ commera.patches.move_summer_theme_settings_to_home_layout
 commera.patches.set_shop_theme_type
 commera.patches.seed_account_auth_routes
 commera.patches.add_commera_admin_to_item_writers
+commera.patches.mark_existing_sites_onboarded

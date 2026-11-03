@@ -95,6 +95,7 @@ class CommeraSettings(Document):
 		logo_url: DF.Data | None
 		newsletter_description: DF.Text | None
 		newsletter_title: DF.Data | None
+		onboarding_completed: DF.Check
 		order_cancellation_email_template: DF.Link
 		order_confirmation_email_template: DF.Link
 		payment_methods_image: DF.AttachImage | None
@@ -119,8 +120,11 @@ class CommeraSettings(Document):
 		shipping_rule: DF.Link | None
 		sitemap_urls_per_page: DF.Int
 		snapchat_url: DF.Data | None
+		store_category: DF.Data | None
 		store_name: DF.Data | None
 		store_pickup_enabled: DF.Check
+		store_setup_error: DF.SmallText | None
+		store_setup_status: DF.Literal["", "running", "done", "failed"]
 		storefront_apps: DF.Table[CommeraStorefrontApp]
 		strikethrough_color: DF.Color | None
 		tiktok_url: DF.Data | None
