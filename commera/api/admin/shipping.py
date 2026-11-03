@@ -4,6 +4,7 @@
 import frappe
 
 from commera.api.admin.integrations import describe_integration, save_integration
+from commera.telemetry import configuration
 
 PROFILE_DOCTYPE = "Shipping Provider Profile"
 PROFILE_SETTINGS_FIELDNAME = "provider_settings"
@@ -62,6 +63,8 @@ def save_shipping_integration(slug: str, enabled: int | str, values: dict | str 
 	"""Save one carrier's credentials and turn it on or off. Returns the refreshed card."""
 	frappe.only_for("System Manager")
 
-	return save_integration(
-		get_shipping_integration(slug), enabled, frappe.parse_json(values) if values else {}
-	)
+	integration = get_shipping_integration(slug)
+	before = configuration.get_integration_state(integration)
+	card = save_integration(integration, enabled, frappe.parse_json(values) if values else {})
+	configuration.shipping_integration_saved(integration, before, card)
+	return card

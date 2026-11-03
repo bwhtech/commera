@@ -14,6 +14,7 @@ from commera.api.admin.delivery_options import (
 	is_available,
 )
 from commera.api.admin.settings import coerce_field_value, write_settings_fields
+from commera.telemetry import configuration
 from commera.utils import get_store_currency
 
 RULE_DOCTYPE = "Shipping Rule"
@@ -195,6 +196,7 @@ def save_shipping_rule(
 	# Overlaps and a second open-ended band are refused by ShippingRule.validate.
 	rule.set("conditions", parse_conditions(conditions))
 	rule.save()
+	configuration.shipping_rule_saved(rule)
 
 	if cint(use_at_checkout):
 		write_settings_fields(("shipping_rule",), {"shipping_rule": rule.name})

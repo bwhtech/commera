@@ -3,6 +3,7 @@
 // are matched to a product colour by file name (imports.match_import_images).
 import { reactive } from 'vue'
 import { useAdminAction } from './api'
+import { capture } from '../telemetry'
 
 export const STEPS = [
   { key: 'source', label: 'Source', icon: 'lucide-plug', hint: 'Where the products live today' },
@@ -70,9 +71,11 @@ export function resetImport() {
   Object.assign(imp, blankImport())
 }
 
-export function openImport() {
+// `surface` is docs/telemetry.md's `products_import_opened.surface`: where the owner opened it from.
+export function openImport(surface) {
   if (imp.finished || imp.file) resetImport()
   imp.open = true
+  capture('products_import_opened', { surface })
 }
 
 export function closeImport() {

@@ -206,7 +206,8 @@ def save_integration(integration, enabled, values):
 						frappe.get_meta(settings_doctype).get_label(fieldname) for fieldname in missing
 					),
 					integration["label"],
-				)
+				),
+				frappe.MandatoryError,
 			)
 
 	if settings.meta.has_field(ENABLED_FIELDNAME):

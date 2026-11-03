@@ -151,7 +151,8 @@ class CommeraSettings(Document):
 				validate_price_list_currency(price_list, currency, self.meta.get_label(fieldname))
 
 	def validate_a_payment_method_is_available(self):
-		if self.cod_enabled or get_available_payment_modes():
+		"""A new store starts with none; only turning off cash on delivery can remove the last one."""
+		if self.cod_enabled or not self.has_value_changed("cod_enabled") or get_available_payment_modes():
 			return
 		frappe.throw(
 			frappe._("Enable cash on delivery or at least one Payment Gateway Profile before saving.")

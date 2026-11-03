@@ -1,4 +1,5 @@
-// `done` is not wired to the server yet — no endpoint reports setup state.
+// The setup checklist's shape, with no imports so tests/unit can load it under plain node. Which
+// steps are done is the server's answer (data/setupState.js), the same facts the milestones read.
 export const SETUP_STEPS = [
   {
     key: 'product',
@@ -34,6 +35,12 @@ export const SETUP_STEPS = [
   },
 ]
 
-export function stepsWithProgress(doneCount) {
-  return SETUP_STEPS.map((step, index) => ({ ...step, done: index < doneCount }))
+// `state` is get_setup_state's answer: one boolean per step key.
+export function stepsFromState(state) {
+  return SETUP_STEPS.map((step) => ({ ...step, done: state?.[step.key] === true }))
+}
+
+// docs/telemetry.md's `steps_done`, 0 to 4.
+export function countStepsDone(state) {
+  return stepsFromState(state).filter((step) => step.done).length
 }

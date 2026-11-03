@@ -10,6 +10,7 @@ from commera.api.admin.theme import build_theme_settings
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
 from commera.shop_themes.preview_entries import PREVIEW_ENTRY_PAGES, list_entries, resolve_entry
 from commera.shop_themes.sections import get_inherited_layout, get_section_schema
+from commera.telemetry import milestones
 
 EDITOR_ROLES = ("System Manager", "Website Manager")
 
@@ -149,7 +150,9 @@ def publish(theme: str, page: str, layout: str | dict):
 	theme_context = get_editable_theme_context(theme)
 	validate_page(theme_context, page)
 
+	was_customized = milestones.get_theme_state()
 	save_draft_layout(theme_context, page, layout).publish()
+	milestones.theme_saved(was_customized)
 	return build_layout_state(theme_context, page)
 
 

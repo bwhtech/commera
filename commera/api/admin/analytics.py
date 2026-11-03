@@ -33,6 +33,7 @@ from commera.api.analytics_dashboard import (
 	is_provider_configured,
 )
 from commera.discounts.allocations import get_allocations
+from commera.telemetry import configuration
 from commera.utils import get_store_currency
 
 ANALYTICS_SETTINGS_DOCTYPE = "Analytics Settings"
@@ -111,6 +112,7 @@ def save_analytics_settings(**kwargs):
 
 	meta = frappe.get_meta(ANALYTICS_SETTINGS_DOCTYPE)
 	settings = frappe.get_doc(ANALYTICS_SETTINGS_DOCTYPE)
+	providers_before = configuration.get_analytics_providers(settings)
 
 	for fieldname in PLAIN_FIELDS:
 		if fieldname not in kwargs:
@@ -129,6 +131,7 @@ def save_analytics_settings(**kwargs):
 
 	settings.save()
 	frappe.clear_document_cache(ANALYTICS_SETTINGS_DOCTYPE)
+	configuration.analytics_saved(providers_before, settings)
 	return get_analytics_settings()
 
 

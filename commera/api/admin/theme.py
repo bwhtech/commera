@@ -9,6 +9,7 @@ from frappe.utils import get_url_to_form
 from commera.api.admin.docfields import build_field_groups, get_child_tables, get_editable_docfields
 from commera.api.admin.settings import coerce_field_value
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
+from commera.telemetry import configuration, milestones
 
 THEME_SETTINGS_DOCTYPE = "Shop Theme Settings"
 
@@ -77,9 +78,13 @@ def activate_theme(theme: str):
 
 	# Saved as a Document, never db_set: on_update is what clears the compiled routes and the
 	# memoised render context, and a themed page keeps serving the old theme without it.
+	was_customized = milestones.get_theme_state()
 	settings = frappe.get_doc(THEME_SETTINGS_DOCTYPE)
+	previous_theme = settings.active_theme
 	settings.active_theme = theme
 	settings.save()
+	configuration.theme_activated(previous_theme, theme)
+	milestones.theme_saved(was_customized)
 
 	return build_editor_data()
 
@@ -95,7 +100,9 @@ def save_theme_settings(**values):
 
 	frappe.has_permission(settings_doctype, ptype="write", throw=True)
 
+	was_customized = milestones.get_theme_state()
 	write_docfield_values(settings_doctype, values)
+	milestones.theme_saved(was_customized)
 	return build_editor_data()
 
 

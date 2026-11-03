@@ -123,7 +123,10 @@ doctype_js = {
 
 after_install = ["commera.migrate.after_install", "commera.cloud.link.queue_initial_link"]
 after_migrate = "commera.migrate.after_migrate"
-after_app_install = "commera.storefront_plugins.sync_storefront_apps"
+after_app_install = [
+	"commera.storefront_plugins.sync_storefront_apps",
+	"commera.telemetry.configuration.on_app_install",
+]
 setup_wizard_complete = [
 	"commera.swatches.drop_unused_colour_attribute",
 	"commera.cloud.link.queue_initial_link",
@@ -141,8 +144,15 @@ doc_events = {
 		"validate": "commera.doc_events.price_list.validate",
 	},
 	"Gateway Payment Request": {
+		"after_insert": "commera.telemetry.milestones.on_gateway_payment_request_insert",
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},
+	"Commera Settings": {"on_update": "commera.telemetry.configuration.on_settings_update"},
+	"Commera Event": {"after_insert": "commera.telemetry.milestones.on_commera_event_insert"},
+	"Style Attribute Configurator": {"after_insert": "commera.telemetry.milestones.on_product_insert"},
+	"Shipping Rule": {"after_insert": "commera.telemetry.milestones.on_shipping_rule_insert"},
+	"Shop Web Page": {"after_insert": "commera.telemetry.configuration.on_page_insert"},
+	"Commera Discount": {"after_insert": "commera.telemetry.configuration.on_discount_insert"},
 	"Quotation": {
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
 		"validate": "commera.discounts.pricing.apply_code_discounts",
@@ -182,6 +192,7 @@ doc_events = {
 		"on_update": [
 			"commera.search.sync.on_update",
 			"commera.plugin_events.on_style_attribute_variant_update",
+			"commera.telemetry.milestones.on_variant_update",
 		],
 		"after_rename": "commera.search.sync.after_rename",
 		"on_trash": "commera.search.sync.on_trash",
@@ -519,5 +530,6 @@ scheduler_events = {
 		"commera.commera_ecommerce.doctype.commera_cart.commera_cart.delete_abandoned_guest_carts",
 		"commera.search.build.rebuild_index_nightly",
 		"commera.og.generator.clear_old_cards",
+		"commera.telemetry.scan.send_site_profile",
 	],
 }

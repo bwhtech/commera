@@ -4,11 +4,13 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, fmt_money, random_string
 
+from commera.telemetry import data_source
 from commera.utils import get_store_currency
 
 STANDARD_DELIVERY_OPTION = "Standard Delivery"
 
 
+@data_source("demo_data")
 def install_demo_data():
 	"""Main function to install all demo data"""
 	frappe.flags.in_demo_data = True

@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { STEP_INDEX, abbreviate, canFinish, clampStep, missingField, resumeStep, toOptions } from '../../src/ia/onboardingSteps.js'
+import {
+  STEP_INDEX,
+  abbreviate,
+  canFinish,
+  clampStep,
+  missingField,
+  resumeStep,
+  secondsSince,
+  toOptions,
+} from '../../src/ia/onboardingSteps.js'
 
 const filled = { fullName: 'Aisha Khan', password: '', storeName: 'Indigo Loom', storeCategory: 'Fashion' }
 
@@ -38,4 +47,11 @@ test('toOptions turns plain strings into label/value pairs and keeps objects', (
   assert.deepEqual(toOptions(['INR']), [{ label: 'INR', value: 'INR' }])
   assert.deepEqual(toOptions([{ label: 'A', value: 1 }]), [{ label: 'A', value: 1 }])
   assert.deepEqual(toOptions(undefined), [])
+})
+
+test('secondsSince rounds to whole seconds and never goes below zero', () => {
+  assert.equal(secondsSince(1_000, 1_000), 0)
+  assert.equal(secondsSince(1_000, 42_400), 41)
+  assert.equal(secondsSince(1_000, 42_600), 42)
+  assert.equal(secondsSince(5_000, 1_000), 0)
 })

@@ -44,6 +44,30 @@ async function writeSettings(page, values) {
   if (response.status >= 400) throw new Error(`PUT ${SETTINGS} -> HTTP ${response.status}: ${response.body.slice(0, 300)}`)
 }
 
+// Every dashboard event posts to Commera's own record_event, and only when the boot says telemetry
+// is on. The boot key is turned on in the page, each post is recorded here, and the request still
+// goes to the server, so the server's refusal of an unknown event would fail the spec.
+const RECORD_EVENT = '/api/v2/method/commera.api.admin.telemetry.record_event'
+
+async function recordTelemetry(page) {
+  const posted = []
+  await page.evaluateOnNewDocument(() => {
+    let boot
+    Object.defineProperty(window, 'telemetry', {
+      configurable: true,
+      get: () => boot,
+      set: () => (boot = { enabled: true, site_age: 1 }),
+    })
+  })
+  await page.setRequestInterception(true)
+  page.on('request', (request) => {
+    if (request.isInterceptResolutionHandled()) return
+    if (new URL(request.url()).pathname === RECORD_EVENT) posted.push(JSON.parse(request.postData() || '{}'))
+    return request.continue()
+  })
+  return posted
+}
+
 const stepShown = (page, key) => page.waitForSelector(`[data-onboarding-step="${key}"]`, { visible: true, timeout: 20000 })
 
 async function pressContinue(page, nextKey) {
@@ -72,6 +96,7 @@ async function pickFromCombobox(page, placeholder, value) {
 describe('onboarding', () => {
   const session = useSession()
   const original = {}
+  let telemetryEvents = []
 
   before(async () => {
     const { page } = session
@@ -90,6 +115,7 @@ describe('onboarding', () => {
       country: record.country,
     })
     if (original.onboardingCompleted) await writeSettings(page, { onboarding_completed: 0 })
+    telemetryEvents = await recordTelemetry(page)
   })
 
   onCleanup(session, async ({ page }) => {
@@ -124,7 +150,7 @@ describe('onboarding', () => {
       await pressContinue(page, 'store')
 
       const storeName = await page.$('[data-onboarding-step="store"] input')
-      await storeName.click({ clickCount: 3 })
+      await storeName.click({ count: 3 })
       await storeName.type(STORE_NAME, { delay: 10 })
       await clickByText(page, '[data-onboarding-step="store"] button', 'Fashion')
       if (!original.country) await pickFromCombobox(page, 'Search countries', 'India')
@@ -179,6 +205,32 @@ describe('onboarding', () => {
       await clickByText(page, '[data-onboarding] button', 'Skip', { pause: 300 })
       await stepShown(page, 'done')
       assert.ok((await text(page)).includes(`${STORE_NAME} is live`))
+
+      const sent = (name) => telemetryEvents.filter((entry) => entry.event === name).map((entry) => entry.properties)
+      assert.deepEqual(sent('products_import_opened').map(({ surface }) => surface), ['onboarding'])
+      assert.ok(sent('pageview').length, 'a new site sends page views')
+      assert.ok(sent('pageview').every(({ route }) => route.startsWith('/') && !route.includes(STORE_NAME)))
+
+      // The funnel, named as Frappe's setup wizard names its own.
+      // The spec's own reload at the start left the first onboarding page open on `you`.
+      assert.deepEqual(sent('left_setup').map(({ step }) => step), ['you'])
+      // Once for the page the reload left, once for the run itself.
+      assert.equal(sent('started_setup').length, 2)
+      const { step: startStep, resumed, total_steps: totalSteps } = sent('started_setup').at(-1)
+      assert.deepEqual({ startStep, resumed, totalSteps }, { startStep: 'you', resumed: false, totalSteps: 7 })
+      assert.deepEqual(
+        sent('completed_setup_step').map(({ step, step_number }) => `${step_number}:${step}`),
+        ['1:you', '2:store', '2:store', '3:brand', '4:theme', '5:selling'],
+      )
+      assert.deepEqual(sent('skipped_setup_step').map(({ step }) => step), ['products'])
+      assert.ok(
+        [...sent('completed_setup_step'), ...sent('skipped_setup_step')].every(
+          (properties) => properties.total_steps === 7 && Number.isInteger(properties.duration_seconds),
+        ),
+      )
+      assert.deepEqual(sent('went_back_in_setup'), [{ from_step: 'brand', to_step: 'store' }])
+      assert.equal(sent('onboarding_accounting_opened').length, 1)
+      assert.ok(!JSON.stringify(telemetryEvents).includes(STORE_NAME), 'no event carries the store name')
 
       await clickByText(page, '[data-onboarding] button', 'Go to dashboard', { pause: 300 })
       // A store whose currency changed reloads into the dashboard instead of switching in place.

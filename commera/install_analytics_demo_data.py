@@ -10,6 +10,8 @@ import frappe
 from frappe import _
 from frappe.utils.data import add_days, add_to_date, cint, flt, get_datetime, getdate, now_datetime
 
+from commera.telemetry import data_source
+
 EVENT_NAME_PREFIX = "dmoev"
 SESSION_PREFIX = "dmo-"
 LEGACY_SESSION_PREFIX = "dmolegacy-"
@@ -797,6 +799,7 @@ def get_existing_webshop_orders():
 	return frappe.get_all("Sales Order", filters={"order_type": "Shopping Cart"}, pluck="name")
 
 
+@data_source("demo_data")
 def install_analytics_demo_data(confirm_production=0):
 	"""Seed ~60 days of storefront analytics events, orders, and abandoned carts."""
 	ensure_demo_site(confirm_production)

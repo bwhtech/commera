@@ -56,3 +56,8 @@ export function abbreviate(name, maxLength = 5) {
 export function toOptions(values) {
   return (values ?? []).map((value) => (typeof value === 'string' ? { label: value, value } : value))
 }
+
+// Whole seconds since `since` (a Date.now() value), for the funnel's `duration_seconds`.
+export function secondsSince(since, now = Date.now()) {
+  return Math.max(0, Math.round((now - since) / 1000))
+}

@@ -12,6 +12,11 @@ from commera.guest import is_guest
 SETTINGS = "Commera Settings"
 CACHE_KEY = "commera_storefront_plugins"
 SLOTS = ("cart_banner", "checkout_banner", "page_overlay")
+STOREFRONT_HOOKS = (
+	"commera_storefront_include_css",
+	"commera_storefront_include_js",
+	"commera_storefront_blocks",
+)
 INCLUDE_TAGS = {"css": '<link rel="stylesheet" href="{0}">', "js": '<script defer src="{0}"></script>'}
 
 
@@ -106,11 +111,10 @@ def get_enabled_storefront_apps(settings) -> set[str]:
 
 def sync_storefront_apps(app_name: str | None = None):
 	settings = frappe.get_single(SETTINGS)
-	hooks = ("commera_storefront_include_css", "commera_storefront_include_js", "commera_storefront_blocks")
 	declaring_apps = {
 		app
 		for app in frappe.get_installed_apps()
-		if any(frappe.get_hooks(hook, None, app_name=app) for hook in hooks)
+		if any(frappe.get_hooks(hook, None, app_name=app) for hook in STOREFRONT_HOOKS)
 	}
 	listed_apps = {row.app for row in settings.storefront_apps}
 

@@ -117,12 +117,13 @@ class TestNavbarFlow(IntegrationTestCase):
 				}
 				self.assertEqual(changed, {}, f"{doctype} {old_row['name']} was written to: {changed}")
 
-	def nested_set_problems(self):
-		rows = frappe.get_all(
-			"Ecommerce Category",
-			fields=["name", "lft", "rgt", "parent_ecommerce_category"],
-			limit_page_length=0,
-		)
+	def nested_set_problems(self, doctype="Ecommerce Category", parent_field="parent_ecommerce_category"):
+		rows = [
+			frappe._dict(row, parent_ecommerce_category=row.get(parent_field))
+			for row in frappe.get_all(
+				doctype, fields=["name", "lft", "rgt", parent_field], limit_page_length=0
+			)
+		]
 		by_name = {row.name: row for row in rows}
 		problems = []
 		for row in rows:
@@ -252,11 +253,6 @@ class TestNavbarFlow(IntegrationTestCase):
 		self.assert_master_data_untouched(before)
 		self.assert_nested_set_valid("after editing an imported branch")
 
-	def account_tree_snapshot(self):
-		return frappe.get_all(
-			"Account", fields=["name", "lft", "rgt"], order_by="name asc", limit_page_length=0
-		)
-
 	def test_a_menu_import_leaves_the_erpnext_account_tree_intact(self):
 		"""Regression: the import held core's request-global ``ignore_update_nsm``, which ERPNext's
 		Account reads, so an Account written mid-import landed with stale lft/rgt."""
@@ -308,11 +304,12 @@ class TestNavbarFlow(IntegrationTestCase):
 		self.assertGreater(account.lft, 0, "the Account landed with no nested-set bounds")
 		self.assertEqual(account.rgt, account.lft + 1)
 
-		# And nothing else in the chart moved either: a rebuild has to be a no-op.
-		before = self.account_tree_snapshot()
-		rebuild_tree("Account")
+		# And the rest of the chart is still a valid tree. Not a rebuild-is-a-no-op check: a rebuild sorts
+		# siblings by name, so it moves a valid chart whose accounts were created out of name order.
 		self.assertEqual(
-			before, self.account_tree_snapshot(), "the menu import corrupted the chart of accounts"
+			self.nested_set_problems("Account", "parent_account"),
+			[],
+			"the menu import corrupted the chart of accounts",
 		)
 
 	def test_deleting_a_freshly_imported_node_reclaims_its_bounds(self):

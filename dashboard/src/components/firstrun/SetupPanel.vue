@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button } from 'frappe-ui'
 import commeraLogo from '../../assets/commera.svg'
-import { dismissSetup, skipSetup } from '../../ia/firstRun'
+import { captureSetupStepOpened, dismissSetup, skipSetup } from '../../ia/firstRun'
 import { REVEAL_EASE, useReveal } from '../../utils/reveal'
 import MaximizeIcon from './MaximizeIcon.vue'
 import MinimizeIcon from './MinimizeIcon.vue'
@@ -33,6 +33,7 @@ function setAll(done) {
 
 function openStep(step) {
   if (step.done) return
+  captureSetupStepOpened(step, 'panel')
   router.push(step.to)
 }
 </script>

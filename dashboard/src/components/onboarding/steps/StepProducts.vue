@@ -10,7 +10,7 @@ const isStoreReady = computed(() => storeSetup.status === 'done')
 
 const SOURCES = [
   { key: 'shopify', label: 'Import from Shopify', icon: 'lucide-arrow-down-to-line', comingSoon: true },
-  { key: 'csv', label: 'Import a CSV', icon: 'lucide-file-spreadsheet', open: openImport },
+  { key: 'csv', label: 'Import a CSV', icon: 'lucide-file-spreadsheet', open: () => openImport('onboarding') },
   { key: 'manual', label: 'Add a product', icon: 'lucide-plus', open: openAddProduct },
 ]
 </script>
