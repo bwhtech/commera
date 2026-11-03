@@ -30,6 +30,7 @@ let renderingTimer = null
 
 const action = computed(() => {
   const params = new URLSearchParams({ theme: state.theme, page: state.page, lang: state.language })
+  if (state.previewEntry !== null) params.set('entry', state.previewEntry)
   return `/theme_editor_preview?${params}`
 })
 

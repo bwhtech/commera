@@ -8,6 +8,7 @@ from frappe import _
 
 from commera.api.admin.theme import build_theme_settings
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
+from commera.shop_themes.preview_entries import PREVIEW_ENTRY_PAGES, list_entries, resolve_entry
 from commera.shop_themes.sections import get_section_schema, get_theme_json
 
 EDITOR_ROLES = ("System Manager", "Website Manager")
@@ -100,8 +101,18 @@ def get_editor(theme: str, page: str = "index"):
 		"pages": get_pages(theme_context["dirs"]),
 		"section_schemas": get_section_schemas(theme_context["dirs"]),
 		"settings": build_theme_settings(theme),
+		"has_preview_entries": page in PREVIEW_ENTRY_PAGES,
 		**build_layout_state(theme_context, page),
 	}
+
+
+@frappe.whitelist()
+def get_preview_entries(
+	theme: str, page: str, search: str | None = None, start: int = 0, selected: str | None = None
+):
+	validate_page(get_editable_theme_context(theme), page)
+
+	return {**list_entries(page, search, start), "current": resolve_entry(page, selected)}
 
 
 def save_draft_layout(theme_context, page, layout):
