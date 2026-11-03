@@ -7,7 +7,7 @@ One row per event Commera sends to Pulse. After this spec is accepted, this file
 
 ## Why
 
-Commera sends no product telemetry. We cannot tell how many stores run, where a new merchant stops between signup and the first paid order, which payment gateways they connect, or whether stores stay alive after launch.
+Commera sends no product telemetry. We cannot tell how many stores run, where a new merchant stops between setup and the first order, which payment gateways they connect, or whether stores stay alive after launch.
 
 ## How it works (shared with Frappe and Wiki)
 
@@ -42,8 +42,8 @@ Events exist to answer these. An event that answers no question stays in Planned
 | # | Question | Read from |
 |---|---|---|
 | 1 | How many stores run Commera, and how many are active weekly | `active_site`, `site_profile` as denominator |
-| 2 | Where do new stores stop between install and first paid order | funnel of `store_milestone_reached.milestone` |
-| 3 | How long does a store take to activate | `store_milestone_reached.days_since_install` for `first_order_paid` |
+| 2 | Where do new stores stop between install and first order | funnel of `store_milestone_reached.milestone` |
+| 3 | How long does a store take to activate | `store_milestone_reached.days_since_install` for `first_order_placed` |
 | 4 | Does the setup panel help, or do merchants skip it | `setup_step_opened`, `setup_skipped`, `setup_dismissed`, then milestones by cohort |
 | 12 | Where do owners stop inside first-run onboarding, and how long does it take | `started_setup`, `completed_setup_step`, `skipped_setup_step`, `went_back_in_setup`, `left_setup`, `onboarding_completed` |
 | 13 | Does the background store setup succeed, and how long do owners wait for it | `store_setup_started`, `store_setup_finished` |
@@ -78,8 +78,8 @@ The funnel a new store goes through. It starts with first-run onboarding (`start
 
 - **Onboarded** = `onboarding_completed`.
 - **Set up** = `first_product_created`, `payment_method_enabled` and `shipping_configured` all reached. This is the same list the setup panel shows (`dashboard/src/data/firstRun.js`), read from the same server method (`get_setup_state`).
-- **Activated** = `first_order_paid`, from a shopper who is not a store user, on a gateway in live mode or by cash on delivery.
-- **Retained** = at least one paid order in each of the 4 weeks after activation (read from `site_profile`).
+- **Activated** = `first_order_placed`, by any payment method, paid or not. Test payments and orders placed by store users count for now.
+- **Retained** = at least one order in each of the 4 weeks after activation (read from `site_profile`).
 
 Milestones are derived from the database at the moment the count changes from 0 to 1. Commera stores no "milestone sent" flag, so there is one owner for the fact. A milestone can fire twice only if the data is deleted and created again, which is acceptable.
 
@@ -158,7 +158,7 @@ Plan changes and payments happen inside Frappe Cloud's own panel, which Frappe C
 
 | Event | Half | Fires when | Properties | Question |
 |---|---|---|---|---|
-| `store_milestone_reached` | backend | see Activation | `milestone`, `days_since_install`, `source`. Plus on `payment_method_enabled`, `first_gateway_checkout` and `first_order_paid`: `payment_method` (gateway slug or `cod`). On `first_order_paid`: `is_guest` | 2, 3, 5 |
+| `store_milestone_reached` | backend | see Activation | `milestone`, `days_since_install`, `source`. Plus on `payment_method_enabled`, `first_gateway_checkout`, `first_order_placed` and `first_order_paid`: `payment_method` (gateway slug or `cod`). On `first_order_placed` and `first_order_paid`: `is_guest` | 2, 3, 5 |
 
 ### Store configuration (backend)
 
@@ -208,7 +208,7 @@ Sent from the daily scan when a value changes. Only on Frappe Cloud, where `fc_t
 |---|---|
 | `store_country` | ISO country code of the store company |
 | `store_currency` | ISO currency code |
-| `commera_activated` | bool, `first_order_paid` reached |
+| `commera_activated` | bool, a store order has been placed (`first_order_placed`) |
 | `catalogue_size_bucket` | `lt_10`, `10_100`, `100_1000`, `gt_1000` |
 
 ## Plan
@@ -241,12 +241,13 @@ The rest of "Store configuration".
 
 ## Decisions
 
-1. **Activation** is `first_order_paid`. `first_order_placed` is also sent, so a COD-heavy store can be read on the placed step.
-2. **Test orders.** `live_mode` is sent where the gateway settings have a test flag, and left out where they do not. Activation is not filtered on it yet; the funnel can filter by `live_mode` later.
-3. **Signup** is Commera Cloud's to send, later. The funnel here starts at `started_setup`.
-4. **Headless storefronts** are not split by channel yet.
-5. **Money buckets** use fixed bands in the store currency (`lt_100` to `gt_1m`). Compare stores across currencies with the team's `store_currency`.
-6. **Shopify import** sends no `products_imported` and does not set the `import` source yet. It lands with that import.
+1. **Activation** is `first_order_placed`, with every payment method counted, paid or not. `first_order_paid` is still sent as a later funnel step.
+2. **Test orders.** `live_mode` is sent where the gateway settings have a test flag, and left out where they do not. Activation does not filter on it, so a merchant's own test order counts for now.
+3. **Signup** is not tracked. The funnel starts at `started_setup`.
+4. **Cash on delivery is off by default**, so a new store has no payment method until the owner turns one on, in the onboarding selling step or in Settings → Payments. That turn is what sends `payment_method_enabled`. When it was on by default, every store already had one method, and the milestone never fired.
+5. **Headless storefronts** are not tracked. Their orders count the same as storefront orders.
+6. **Money buckets** use fixed bands in the store currency (`lt_100` to `gt_1m`). Compare stores across currencies with the team's `store_currency`.
+7. **Shopify import** sends no `products_imported` and does not set the `import` source yet. It lands with that import.
 
 ## Not tracked
 

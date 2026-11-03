@@ -123,14 +123,19 @@ def on_commera_event_insert(doc, method=None):
 	if doc.reference_doctype != "Sales Order":
 		return
 	if doc.event == "order_placed":
-		order_placed()
+		order_placed(doc.reference_name)
 	elif doc.event == "order_paid":
 		order_paid(doc.reference_name)
 
 
-def order_placed():
+def order_placed(sales_order: str):
 	if has_exactly_one("Sales Order", {"order_type": STORE_ORDER_TYPE, "docstatus": 1}):
-		reach("first_order_placed")
+		payment_mode = frappe.db.get_value("Sales Order", sales_order, "custom_ecommerce_payment_mode")
+		reach(
+			"first_order_placed",
+			payment_method=get_payment_method(payment_mode),
+			is_guest=is_guest_order(sales_order),
+		)
 
 
 def order_paid(sales_order: str):

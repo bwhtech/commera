@@ -286,6 +286,12 @@ class PaymentMilestoneTestCase(TelemetryTestCase):
 	def with_defaults(self, gateway: str, reason: str) -> dict:
 		return {**telemetry.default_properties(), "gateway": gateway, "reason": reason}
 
+	def test_cod_switched_on_in_onboarding(self):
+		onboarding_api.save_selling(1, 1)
+
+		reached = self.get_milestones("payment_method_enabled")
+		self.assertEqual([properties["payment_method"] for properties in reached], ["cod"])
+
 	def test_cod_switched_on_in_settings(self):
 		settings = frappe.get_doc(SETTINGS)
 		settings.cod_enabled = 1
@@ -358,7 +364,10 @@ class OrderMilestoneTestCase(TelemetryTestCase):
 		for _order in range(11):
 			self.add_order()
 
-		self.assertEqual(len(self.get_milestones("first_order_placed")), 1)
+		placed = self.get_milestones("first_order_placed")
+		self.assertEqual(len(placed), 1)
+		self.assertEqual(placed[0]["payment_method"], "cod")
+		self.assertFalse(placed[0]["is_guest"])
 		paid = self.get_milestones("first_order_paid")
 		self.assertEqual(len(paid), 1)
 		self.assertEqual(paid[0]["payment_method"], "cod")
@@ -593,3 +602,8 @@ class SiteProfileTestCase(TelemetryTestCase):
 			set(identify.call_args.args[0]),
 			{"store_country", "store_currency", "commera_activated", "catalogue_size_bucket"},
 		)
+
+	def test_an_unpaid_order_activates_the_store(self):
+		insert_raw("Sales Order", order_type="Shopping Cart", docstatus=1, per_billed=0)
+
+		self.assertTrue(scan.get_team_properties()["commera_activated"])

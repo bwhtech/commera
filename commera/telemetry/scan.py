@@ -287,7 +287,7 @@ def get_team_properties() -> dict:
 	return {
 		"store_country": get_country_code(country),
 		"store_currency": currency,
-		"commera_activated": bool(get_settled_orders_query().limit(1).run()),
+		"commera_activated": bool(frappe.db.exists("Sales Order", STORE_ORDERS)),
 		"catalogue_size_bucket": rows_bucket(setup_state.count_products()),
 	}
 
