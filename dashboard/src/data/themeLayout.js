@@ -16,7 +16,7 @@ const themeCaller = createAdminCaller('theme.')
 
 const thumbnailAction = effectScope(true).run(() => useAdminAction('theme_layout.save_thumbnail', { quiet: true }))
 
-const THUMBNAIL_SIZE = { width: 1280, height: 800, scale: 0.5 }
+const THUMBNAIL_SIZE = { width: 1280, height: 800, scale: 2, outputWidth: 480, quality: 0.85 }
 
 export async function saveThemeThumbnail(theme) {
   const params = new URLSearchParams({ theme, page: 'index', lang: 'en' })
@@ -25,6 +25,11 @@ export async function saveThemeThumbnail(theme) {
     beforeCapture: (frameDocument) => {
       const root = frameDocument.documentElement
       if (root.dataset.colorScheme === 'System') root.dataset.theme = 'light'
+      for (const element of frameDocument.querySelectorAll('.wow')) {
+        element.classList.remove('wow')
+        element.style.visibility = 'visible'
+        element.style.animation = 'none'
+      }
     },
   })
   await thumbnailAction.submit({ theme, image })

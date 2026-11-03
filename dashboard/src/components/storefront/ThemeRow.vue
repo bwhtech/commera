@@ -18,25 +18,29 @@ const meta = computed(() => (isClassic.value ? props.theme.source : `Built with 
 const editorRoute = computed(() =>
   isClassic.value ? null : { name: 'StorefrontThemeEditor', params: { theme: props.theme.name } },
 )
+const imageSize = computed(() => (props.featured ? 'aspect-[16/10] w-full sm:w-60' : 'aspect-[16/10] w-28 sm:w-40'))
 </script>
 
 <template>
   <div
-    class="relative flex items-center gap-3 sm:gap-4"
-    :class="[featured ? 'px-4 py-5' : 'px-4 py-3', editorRoute ? 'hover:bg-surface-gray-1' : 'cursor-default']"
+    class="relative flex gap-3 sm:items-center sm:gap-4"
+    :class="[
+      featured ? 'flex-col px-4 py-5 sm:flex-row' : 'items-center px-4 py-3',
+      editorRoute ? 'hover:bg-surface-gray-1' : 'cursor-default',
+    ]"
   >
     <Thumb
       v-if="theme.thumbnail"
       :image="theme.thumbnail"
-      :size="featured ? 'aspect-[16/10] w-28 sm:w-44' : 'aspect-[16/10] w-16 sm:w-20'"
-      class="border border-outline-gray-2"
+      :size="imageSize"
+      class="border border-outline-gray-2 object-top"
       :class="{ 'opacity-50': muted }"
       data-theme-thumbnail
     />
     <span
       v-else
-      class="aspect-[16/10] shrink-0 rounded-4 bg-surface-gray-3"
-      :class="[featured ? 'w-28 sm:w-44' : 'w-16 sm:w-20', { 'opacity-50': muted }]"
+      class="shrink-0 rounded-4 bg-surface-gray-3"
+      :class="[imageSize, { 'opacity-50': muted }]"
       aria-hidden="true"
     />
     <div class="min-w-0 flex-1">
@@ -75,7 +79,7 @@ const editorRoute = computed(() =>
     </Button>
     <span
       class="lucide-chevron-right size-4 shrink-0 text-ink-gray-5"
-      :class="{ invisible: !editorRoute }"
+      :class="{ invisible: !editorRoute, 'hidden sm:block': featured }"
       aria-hidden="true"
     />
   </div>

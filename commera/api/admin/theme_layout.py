@@ -188,7 +188,7 @@ def save_thumbnail(theme: str, image: str):
 
 	thumbnail = frappe.get_doc(
 		doctype="File",
-		file_name=f"{frappe.scrub(theme)}-thumbnail.{extension}",
+		file_name=f"{frappe.scrub(theme)}-thumbnail-{frappe.generate_hash(length=8)}.{extension}",
 		content=content,
 		is_private=0,
 		attached_to_doctype="Shop Theme",

@@ -177,6 +177,7 @@ class TestThemeThumbnail(IntegrationTestCase):
 
 		self.assertEqual(self.thumbnail_files(), [frappe.db.get_value("File", {"file_url": second_url})])
 		self.assertFalse(frappe.db.exists("File", first_file.name))
+		self.assertNotEqual(second_url, first_url)
 		self.assertEqual(frappe.db.get_value("Shop Theme", SUMMER_THEME, "thumbnail"), second_url)
 
 	def test_save_thumbnail_refuses_anything_but_an_image(self):

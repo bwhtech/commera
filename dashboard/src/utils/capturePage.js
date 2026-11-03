@@ -1,4 +1,4 @@
-import { domToWebp } from 'modern-screenshot'
+import { domToCanvas } from 'modern-screenshot'
 import { embeddedFontCss } from './embeddedFontCss'
 
 const IMAGE_WAIT_MS = 5000
@@ -40,7 +40,17 @@ function settleAnimations(frameDocument) {
   return Promise.race([Promise.all(finite.map((animation) => animation.finished.catch(() => null))), timeout])
 }
 
-export async function capturePage(url, { width, height, scale = 1, beforeCapture } = {}) {
+function resizeToWebp(source, width, height, quality) {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  context.imageSmoothingQuality = 'high'
+  context.drawImage(source, 0, 0, width, height)
+  return canvas.toDataURL('image/webp', quality)
+}
+
+export async function capturePage(url, { width, height, scale = 1, outputWidth = width, quality = 0.85, beforeCapture } = {}) {
   const frame = document.createElement('iframe')
   frame.width = String(width)
   frame.height = String(height)
@@ -53,17 +63,17 @@ export async function capturePage(url, { width, height, scale = 1, beforeCapture
     const frameDocument = frame.contentDocument
     beforeCapture?.(frameDocument)
     await Promise.all([frameDocument.fonts.ready, settleImages(frameDocument), settleAnimations(frameDocument)])
-    return await domToWebp(frameDocument.documentElement, {
+    const canvas = await domToCanvas(frameDocument.documentElement, {
       width,
       height,
       scale,
-      quality: 0.8,
       filter: startsAbove(height),
       onCloneEachNode: dropNonXmlAttributes,
       timeout: IMAGE_WAIT_MS,
       font: { cssText: await embeddedFontCss(frameDocument) },
       backgroundColor: frame.contentWindow.getComputedStyle(frameDocument.body).backgroundColor,
     })
+    return resizeToWebp(canvas, outputWidth, Math.round((outputWidth * height) / width), quality)
   } finally {
     frame.remove()
   }
