@@ -133,9 +133,8 @@ def run_frappe_setup(setup_args: dict):
 
 def seed_commera_settings(company: str):
 	"""Fill the mandatory Commera Settings fields, which any later save() would otherwise trip on."""
-	# A locking read: the job's transaction began before ERPNext's setup ran, and the owner keeps saving
-	# brand and selling meanwhile. A plain read returns the job's stale snapshot, which save() then
-	# refuses as modified; FOR UPDATE reads the latest commit and holds off writes until this one ends.
+	# FOR UPDATE: a plain read returns this job's stale snapshot, which save() refuses once the owner
+	# has saved brand or selling meanwhile; a locking read sees the latest commit.
 	settings = frappe.get_doc(SETTINGS_DOCTYPE, SETTINGS_DOCTYPE, for_update=True)
 	settings.company = company
 	for fieldname, template in DEFAULT_EMAIL_TEMPLATES.items():
