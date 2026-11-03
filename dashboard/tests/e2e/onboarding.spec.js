@@ -44,6 +44,44 @@ async function writeSettings(page, values) {
   if (response.status >= 400) throw new Error(`PUT ${SETTINGS} -> HTTP ${response.status}: ${response.body.slice(0, 300)}`)
 }
 
+// The telemetry plugin reads boot_config from the site and imports the Pulse client from its CDN.
+// Both are answered here: telemetry turns on, and the stand-in client keeps every capture on
+// `window.__pulseEvents` instead of sending it, so the spec sees exactly what left the browser.
+const BOOT_CONFIG = '/api/method/frappe.utils.telemetry.pulse.client.boot_config'
+const PULSE_CLIENT = 'https://pulse.m.frappe.cloud/assets/pulse/js/pulse_client.js'
+const PULSE_STAND_IN = `export class PulseClient {
+  async init() { return true }
+  setEnabled() {}
+  capture(event, app, props = {}) { (window.__pulseEvents ||= []).push({ event, app, props }) }
+  getDistinctId() { return '' }
+  flush() {}
+  stop() {}
+}`
+
+async function stubPulse(page) {
+  // The login already loaded the real client into the HTTP cache, which a cached hit would serve past the stub.
+  await page.setCacheEnabled(false)
+  await page.setRequestInterception(true)
+  page.on('request', (request) => {
+    if (request.isInterceptResolutionHandled()) return
+    const url = request.url()
+    if (url.startsWith(PULSE_CLIENT)) {
+      return request.respond({
+        contentType: 'application/javascript',
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: PULSE_STAND_IN,
+      })
+    }
+    if (new URL(url).pathname === BOOT_CONFIG) {
+      const config = { enabled: true, host: 'https://pulse.invalid', client_url: PULSE_CLIENT, key: 'test', site: 'x', site_age: 1 }
+      return request.respond({ contentType: 'application/json', body: JSON.stringify({ message: config }) })
+    }
+    return request.continue()
+  })
+}
+
+const pulseEvents = (page) => page.evaluate(() => window.__pulseEvents ?? [])
+
 const stepShown = (page, key) => page.waitForSelector(`[data-onboarding-step="${key}"]`, { visible: true, timeout: 20000 })
 
 async function pressContinue(page, nextKey) {
@@ -90,6 +128,7 @@ describe('onboarding', () => {
       country: record.country,
     })
     if (original.onboardingCompleted) await writeSettings(page, { onboarding_completed: 0 })
+    await stubPulse(page)
   })
 
   onCleanup(session, async ({ page }) => {
@@ -124,7 +163,7 @@ describe('onboarding', () => {
       await pressContinue(page, 'store')
 
       const storeName = await page.$('[data-onboarding-step="store"] input')
-      await storeName.click({ clickCount: 3 })
+      await storeName.click({ count: 3 })
       await storeName.type(STORE_NAME, { delay: 10 })
       await clickByText(page, '[data-onboarding-step="store"] button', 'Fashion')
       if (!original.country) await pickFromCombobox(page, 'Search countries', 'India')
@@ -176,6 +215,25 @@ describe('onboarding', () => {
       await clickByText(page, '[data-onboarding] button', 'Skip', { pause: 300 })
       await stepShown(page, 'done')
       assert.ok((await text(page)).includes(`${STORE_NAME} is live`))
+
+      // Read before the dashboard opens: a reload there would clear the page's record.
+      const events = await pulseEvents(page)
+      assert.ok(events.length && events.every((entry) => entry.app === 'commera'), 'every event is sent as commera')
+      const named = (name) => events.filter((entry) => entry.event === name).map((entry) => entry.props)
+      assert.deepEqual(
+        named('onboarding_started').map(({ step, resumed }) => ({ step, resumed })),
+        [{ step: 'you', resumed: false }],
+      )
+      assert.deepEqual(
+        named('onboarding_step_completed').map(({ step, action }) => `${step}:${action}`),
+        ['you:continue', 'store:continue', 'store:continue', 'brand:continue', 'theme:continue', 'selling:continue', 'products:skip'],
+      )
+      assert.ok(named('onboarding_step_completed').every((props) => /^(lt_10s|10_30s|30_120s|gt_120s)$/.test(props.duration_bucket)))
+      assert.deepEqual(named('onboarding_back_pressed').map(({ step }) => step), ['brand'])
+      assert.equal(named('onboarding_accounting_opened').length, 1)
+      assert.deepEqual(named('products_import_opened').map(({ surface }) => surface), ['onboarding'])
+      assert.ok(named('pageview').every((props) => !String(props.route).includes(STORE_NAME)), 'a pageview sends the route pattern only')
+      assert.ok(!JSON.stringify(events).includes(STORE_NAME), 'no event carries the store name')
 
       await clickByText(page, '[data-onboarding] button', 'Go to dashboard', { pause: 300 })
       // A store whose currency changed reloads into the dashboard instead of switching in place.

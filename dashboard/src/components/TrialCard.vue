@@ -10,7 +10,7 @@ loadBillingOnce()
 
 function openBilling() {
   emit('open')
-  openSettings('billing')
+  openSettings('billing', { billingSurface: 'trial_card' })
 }
 </script>
 

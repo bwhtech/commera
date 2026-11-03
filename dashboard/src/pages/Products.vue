@@ -142,7 +142,7 @@ function moveToCollection() {
 <template>
   <AppPageHeader title="Products">
     <template #actions>
-      <ResponsiveButton label="Import" icon="lucide-upload" @click="openImport" />
+      <ResponsiveButton label="Import" icon="lucide-upload" @click="openImport('products')" />
       <Button label="Add product" icon-left="lucide-plus" variant="solid" theme="gray" @click="openAddProduct" />
     </template>
   </AppPageHeader>
@@ -259,7 +259,7 @@ function moveToCollection() {
       filtered-title="No products match"
       filtered-description="Change the filters, or import a catalogue to get started."
     >
-      <Button label="Import CSV" icon-left="lucide-upload" variant="solid" theme="gray" class="mt-2" @click="openImport" />
+      <Button label="Import CSV" icon-left="lucide-upload" variant="solid" theme="gray" class="mt-2" @click="openImport('products')" />
     </EmptyState>
   </PageBody>
 </template>

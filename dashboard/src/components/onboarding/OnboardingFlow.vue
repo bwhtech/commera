@@ -34,7 +34,8 @@ import {
   lookFor,
   readSavedStep,
 } from '../../ia/onboarding'
-import { canFinish, missingField, resumeStep } from '../../ia/onboardingSteps'
+import { STEP_INDEX, canFinish, missingField, resumeStep, stepDurationBucket } from '../../ia/onboardingSteps'
+import { useTelemetry } from '../../telemetry'
 import { useEntrance } from '../../utils/reveal'
 import OnboardingPreview from './OnboardingPreview.vue'
 import StepYou from './steps/StepYou.vue'
@@ -66,6 +67,7 @@ const SLIDES = {
 }
 
 const router = useRouter()
+const { capture } = useTelemetry()
 const { themes, activeTheme, load: loadThemes, mutate: mutateTheme } = useTheme()
 
 const saving = ref(false)
@@ -101,9 +103,33 @@ async function load() {
   goToStep(resumeStep(readSavedStep(), storeSetup.status))
 }
 
+// Set as a step shows, so `duration_bucket` is the time the owner spent on that step.
+let stepShownAt = Date.now()
+watch(
+  () => flow.index,
+  () => (stepShownAt = Date.now()),
+)
+
+function leaveStep(action) {
+  capture('onboarding_step_completed', {
+    step: step.value.key,
+    action,
+    duration_bucket: stepDurationBucket(Date.now() - stepShownAt),
+  })
+  goToStep(flow.index + 1)
+}
+
+function goBack() {
+  capture('onboarding_back_pressed', { step: step.value.key })
+  goToStep(flow.index - 1)
+}
+
 onMounted(async () => {
   await Promise.all([load(), loadThemes()])
   draft.theme = draft.theme || activeTheme.value || ''
+  // After load(): the step it opens at is the one a reload resumed to.
+  if (record.value) capture('onboarding_started', { step: step.value.key, resumed: flow.index > STEP_INDEX.you })
+  stepShownAt = Date.now()
 })
 
 function storeSetupValues() {
@@ -141,7 +167,7 @@ async function next() {
   saving.value = true
   const saved = await (SAVES[step.value.key]?.() ?? true)
   saving.value = false
-  if (saved) goToStep(flow.index + 1)
+  if (saved) leaveStep('continue')
 }
 
 async function retrySetup() {
@@ -198,7 +224,7 @@ watch(
           icon-left="lucide-arrow-left"
           label="Back"
           :disabled="saving"
-          @click="goToStep(flow.index - 1)"
+          @click="goBack"
         />
         <div class="ml-auto" aria-live="polite">
           <Transition
@@ -288,7 +314,7 @@ watch(
 
               <div v-if="step.key !== 'done'" class="mt-auto space-y-1 pt-8">
                 <Button type="submit" variant="solid" size="md" label="Continue" class="w-full" :loading="saving" />
-                <Button v-if="step.optional" variant="ghost" size="md" label="Skip" class="w-full" :disabled="saving" @click="goToStep(flow.index + 1)" />
+                <Button v-if="step.optional" variant="ghost" size="md" label="Skip" class="w-full" :disabled="saving" @click="leaveStep('skip')" />
               </div>
             </form>
           </Transition>

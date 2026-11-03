@@ -56,3 +56,11 @@ export function abbreviate(name, maxLength = 5) {
 export function toOptions(values) {
   return (values ?? []).map((value) => (typeof value === 'string' ? { label: value, value } : value))
 }
+
+// docs/telemetry.md's `duration_bucket` for time on one step. Buckets, never the seconds themselves.
+export function stepDurationBucket(milliseconds) {
+  if (milliseconds < 10_000) return 'lt_10s'
+  if (milliseconds < 30_000) return '10_30s'
+  if (milliseconds < 120_000) return '30_120s'
+  return 'gt_120s'
+}

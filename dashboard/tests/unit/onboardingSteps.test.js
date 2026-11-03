@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { STEP_INDEX, abbreviate, canFinish, clampStep, missingField, resumeStep, toOptions } from '../../src/ia/onboardingSteps.js'
+import {
+  STEP_INDEX,
+  abbreviate,
+  canFinish,
+  clampStep,
+  missingField,
+  resumeStep,
+  stepDurationBucket,
+  toOptions,
+} from '../../src/ia/onboardingSteps.js'
 
 const filled = { fullName: 'Aisha Khan', password: '', storeName: 'Indigo Loom', storeCategory: 'Fashion' }
 
@@ -38,4 +47,15 @@ test('toOptions turns plain strings into label/value pairs and keeps objects', (
   assert.deepEqual(toOptions(['INR']), [{ label: 'INR', value: 'INR' }])
   assert.deepEqual(toOptions([{ label: 'A', value: 1 }]), [{ label: 'A', value: 1 }])
   assert.deepEqual(toOptions(undefined), [])
+})
+
+test('stepDurationBucket buckets the time on a step at the docs/telemetry.md edges', () => {
+  assert.equal(stepDurationBucket(0), 'lt_10s')
+  assert.equal(stepDurationBucket(9_999), 'lt_10s')
+  assert.equal(stepDurationBucket(10_000), '10_30s')
+  assert.equal(stepDurationBucket(29_999), '10_30s')
+  assert.equal(stepDurationBucket(30_000), '30_120s')
+  assert.equal(stepDurationBucket(119_999), '30_120s')
+  assert.equal(stepDurationBucket(120_000), 'gt_120s')
+  assert.equal(stepDurationBucket(3_600_000), 'gt_120s')
 })

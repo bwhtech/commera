@@ -1,9 +1,12 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { Button } from 'frappe-ui'
+import { loadSetupState } from '../../data/setupState'
 import { reopenSetup, setupDismissed, useSetupSteps } from '../../ia/firstRun'
 
 const { steps, settingUp } = useSetupSteps()
+
+onMounted(loadSetupState)
 
 const doneCount = computed(() => steps.value.filter((step) => step.done).length)
 </script>

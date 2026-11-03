@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import frappeui from 'frappe-ui/vite'
+import frameworkUI from '@framework/ui/vite'
 import { pluginDevServer } from './pluginDevServer.js'
 
 // The bare specifiers an app page may import, each mapped to a runtime entry whose chunk keeps its export names,
@@ -90,6 +91,7 @@ export default defineConfig({
       },
     }),
     vue(),
+    frameworkUI(),
     sharedRuntime(),
     pluginDevServer(),
   ],

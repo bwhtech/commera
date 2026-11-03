@@ -59,9 +59,10 @@ export const visibleRoute = computed(() =>
   settings.open && backgroundRoute.value ? backgroundRoute.value : router.currentRoute.value,
 )
 
-// An unknown tab is normalised by the route record's beforeEnter.
-export function openSettings(tab) {
-  router.push({ name: SETTINGS_ROUTE_NAME, params: { tab } })
+// An unknown tab is normalised by the route record's beforeEnter. `state` lands on
+// `history.state`, for a panel that must know how it was reached without it showing in the URL.
+export function openSettings(tab, state) {
+  router.push({ name: SETTINGS_ROUTE_NAME, params: { tab }, state })
 }
 
 // push, not back(): a cold-opened link has no history inside the app.

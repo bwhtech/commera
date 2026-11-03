@@ -1,7 +1,8 @@
 import { createApp } from 'vue'
 import { FrappeUI, useColorScheme } from 'frappe-ui'
 import { router } from './router'
-import { applyDocumentDirection } from './data/boot'
+import { applyDocumentDirection, isSignedIn } from './data/boot'
+import { installTelemetry } from './telemetry'
 import { scrollFade } from './utils/scrollFade'
 import './style.css'
 import App from './App.vue'
@@ -18,4 +19,6 @@ const app = createApp(App)
 app.use(router)
 app.use(FrappeUI)
 app.directive('scroll-fade', scrollFade)
+// docs/telemetry.md: the merchant is the product user, so nothing goes out without a session.
+if (isSignedIn) installTelemetry(app, router)
 app.mount('#app')

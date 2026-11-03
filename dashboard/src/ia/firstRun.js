@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { stepsWithProgress } from '../data/firstRun'
+import { setupSteps, setupStepsDone } from '../data/setupState'
+import { useTelemetry } from '../telemetry'
 
 const STORAGE_KEY = 'commera:welcome-seen'
 
@@ -54,14 +55,23 @@ function writeFlag(key, value) {
 export const setupDismissed = ref(readFlag(DISMISSED_KEY))
 export const setupSkipped = ref(readFlag(SKIPPED_KEY))
 
+const telemetry = useTelemetry()
+
 export function dismissSetup() {
   setupDismissed.value = true
   writeFlag(DISMISSED_KEY, true)
+  telemetry.capture('setup_dismissed', { steps_done: setupStepsDone.value })
 }
 
 export function skipSetup() {
   setupSkipped.value = true
   writeFlag(SKIPPED_KEY, true)
+  telemetry.capture('setup_skipped', { steps_done: setupStepsDone.value })
+}
+
+// `surface` is `panel` or `banner`, docs/telemetry.md's `setup_step_opened.surface`.
+export function captureSetupStepOpened(step, surface) {
+  telemetry.capture('setup_step_opened', { step: step.key, surface, steps_done: setupStepsDone.value })
 }
 
 export function reopenSetup() {
@@ -70,19 +80,14 @@ export function reopenSetup() {
 }
 
 // Banner and panel live in different trees, so the list they share is derived
-// here rather than passed down.
+// here rather than passed down. The screen that shows them calls loadSetupState().
+// The checklist is still a preview: it shows only with `?setup` (or `?replay`) until it is turned
+// on for every store, so stores set up before onboarding existed do not get it unasked.
 export function useSetupSteps() {
   const route = useRoute()
-
-  const doneCount = computed(() => {
-    const done = Number(route.query.done)
-    return Number.isInteger(done) ? done : null
-  })
-
-  const steps = computed(() => (doneCount.value === null ? [] : stepsWithProgress(doneCount.value)))
+  const isPreview = computed(() => 'setup' in route.query || 'replay' in route.query)
   const settingUp = computed(
-    () => !setupSkipped.value && steps.value.length > 0 && steps.value.some((step) => !step.done),
+    () => isPreview.value && !setupSkipped.value && setupSteps.value.some((step) => !step.done),
   )
-
-  return { steps, settingUp }
+  return { steps: setupSteps, settingUp }
 }

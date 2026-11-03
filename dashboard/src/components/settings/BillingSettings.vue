@@ -2,7 +2,8 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { ErrorMessage } from 'frappe-ui'
 import { closeCloudSettings, openCloudSettings } from '@frappe/cloud-sdk'
-import { cloudContext, refreshBilling } from '../../data/cloudBilling'
+import { billing, cloudContext, refreshBilling } from '../../data/cloudBilling'
+import { useTelemetry } from '../../telemetry'
 
 // True while one of the Cloud panel's own menus or dialogs is open; AppSettingsDialog's
 // setOpen explains why Settings must not close then.
@@ -11,6 +12,10 @@ const overlayOpen = defineModel('overlayOpen', { type: Boolean, default: false }
 const target = ref(null)
 const error = ref('')
 let overlayWatcher
+
+const { capture } = useTelemetry()
+// TrialCard opens Settings with this on history.state; every other way in is Settings itself.
+const surface = window.history.state?.billingSurface === 'trial_card' ? 'trial_card' : 'settings'
 
 // The runtime toggles `overlay-open` on its <fc-cloud-settings> host whenever a layer opens.
 function watchOverlays() {
@@ -21,6 +26,7 @@ function watchOverlays() {
 }
 
 onMounted(async () => {
+  capture('billing_opened', { surface, trial: Boolean(billing.value?.trial) })
   try {
     await openCloudSettings({
       context: cloudContext,

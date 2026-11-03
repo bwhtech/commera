@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Button } from 'frappe-ui'
 import {
@@ -10,6 +10,7 @@ import {
   setupDismissed,
   useSetupSteps,
 } from '../../ia/firstRun'
+import { loadSetupState } from '../../data/setupState'
 import { useIsMobile } from '../../utils/useIsMobile'
 import SetupPanel from './SetupPanel.vue'
 import WelcomeGreeting from './WelcomeGreeting.vue'
@@ -17,6 +18,8 @@ import WelcomeGreeting from './WelcomeGreeting.vue'
 const route = useRoute()
 
 const { steps, settingUp } = useSetupSteps()
+
+onMounted(loadSetupState)
 
 // A fixed 20rem panel is the whole screen at phone width, and the sidebar banner
 // cannot stand in: AppShell is swapped for MobileLayout below `sm`.
@@ -55,9 +58,9 @@ function replay() {
   />
   <SetupPanel v-if="showPanel && handedOver" :key="`panel-${replayCount}`" :steps="steps" />
 
-  <!-- Rides on `?done=`, so it is never on a real load. -->
+  <!-- Rides on `?replay`, so it is never on a real load. -->
   <div
-    v-if="settingUp && greetingDone && !isMobile"
+    v-if="forced && settingUp && greetingDone && !isMobile"
     class="fixed bottom-5 left-[15rem] z-[60] flex items-center gap-2"
   >
     <Button icon-left="lucide-rotate-ccw" label="Replay" class="shadow-lg" @click="replay" />

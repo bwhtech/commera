@@ -17,6 +17,12 @@ export const isRtl = bootValue('is_rtl', false)
 export const direction = isRtl ? 'rtl' : 'ltr'
 export const isAdmin = bootValue('is_admin', false)
 
+// Frappe's own session cookie: a guest carries `Guest` or none. /commera redirects a guest to the
+// login before the shell loads, but a cached shell or a dev server can still mount without a session.
+export const isSignedIn = document.cookie
+  .split('; ')
+  .some((cookie) => cookie.startsWith('user_id=') && cookie !== 'user_id=Guest')
+
 // frappe-ui ships Tailwind `rtl:` variants that only fire under a `dir` on an
 // ancestor, so the mirroring for the whole shell hangs off this one attribute
 // rather than a per-component flag.

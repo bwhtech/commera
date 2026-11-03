@@ -4,6 +4,7 @@ import { Combobox, FormControl, Select, TextInput } from 'frappe-ui'
 import { getCountryDefaults, storeSetup } from '../../../data/onboarding'
 import { CATEGORIES, draft, flow } from '../../../ia/onboarding'
 import { abbreviate, missingField, toOptions } from '../../../ia/onboardingSteps'
+import { useTelemetry } from '../../../telemetry'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -19,6 +20,12 @@ const STANDARD_CHARTS = ['Standard', 'Standard with Numbers']
 const countryCharts = ref(null)
 
 const showAccounting = ref(false)
+const { capture } = useTelemetry()
+
+function toggleAccounting() {
+  showAccounting.value = !showAccounting.value
+  if (showAccounting.value) capture('onboarding_accounting_opened')
+}
 const missing = computed(() => (flow.showErrors ? missingField('store', draft) : ''))
 
 // Once setup has made the company, its country, currency and books are fixed.
@@ -97,7 +104,7 @@ watch(
         class="flex items-center gap-1 text-sm text-ink-gray-5 transition-colors hover:text-ink-gray-7"
         :aria-expanded="showAccounting"
         data-onboarding-accounting
-        @click="showAccounting = !showAccounting"
+        @click="toggleAccounting"
       >
         {{ accountingSummary }}
         <span
