@@ -6,8 +6,10 @@ from frappe import _
 from frappe.core.doctype.user.user import get_timezones
 from frappe.utils.data import cint, cstr
 
-from commera import onboarding
+from commera import onboarding, setup_state
 from commera.api.admin.settings import read_branding_fields, write_branding_fields
+from commera.telemetry import milestones
+from commera.telemetry import onboarding as onboarding_telemetry
 
 SETTINGS_DOCTYPE = "Commera Settings"
 ONBOARDING_ROLE = "System Manager"
@@ -151,7 +153,9 @@ def start_store_setup(
 	args = onboarding.build_setup_args(
 		store_name, country, currency, time_zone, chart_of_accounts, start_month, company_abbr
 	)
-	return onboarding.queue_store_setup(args)
+	queued = onboarding.queue_store_setup(args)
+	onboarding_telemetry.store_setup_started(args, fiscal_year_start_month, company_abbr, status["status"])
+	return queued
 
 
 @frappe.whitelist(methods=["GET"])
@@ -180,8 +184,10 @@ def save_selling(cod_enabled: int, allow_guest_checkout: int):
 	frappe.only_for(ONBOARDING_ROLE)
 
 	values = {"cod_enabled": cint(cod_enabled), "allow_guest_checkout": cint(allow_guest_checkout)}
+	was_cod_enabled = milestones.get_cod_state()
 	# set_single_value adds `modified` to the dict it is given, so it gets a copy.
 	frappe.db.set_single_value(SETTINGS_DOCTYPE, dict(values))
+	milestones.cod_saved(was_cod_enabled)
 	return {key: bool(value) for key, value in values.items()}
 
 
@@ -190,4 +196,12 @@ def complete_onboarding():
 	frappe.only_for(ONBOARDING_ROLE)
 
 	frappe.db.set_single_value(SETTINGS_DOCTYPE, "onboarding_completed", 1)
+	onboarding_telemetry.onboarding_completed()
 	return {"onboarding_completed": True}
+
+
+@frappe.whitelist(methods=["GET"])
+def get_setup_state():
+	"""The four setup panel steps as booleans, from the same facts the activation milestones read."""
+	frappe.has_permission(SETTINGS_DOCTYPE, ptype="read", throw=True)
+	return setup_state.get_setup_state()

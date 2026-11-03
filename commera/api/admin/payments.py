@@ -5,6 +5,7 @@ import frappe
 
 from commera.api.admin.integrations import describe_integration, save_integration
 from commera.migrate import add_payment_mode
+from commera.telemetry import configuration
 
 PROFILE_DOCTYPE = "Payment Gateway Profile"
 PROFILE_SETTINGS_FIELDNAME = "gateway_settings"
@@ -83,6 +84,12 @@ def save_payment_integration(slug: str, enabled: int | str, values: dict | str |
 	"""Save one gateway's credentials and turn it on or off. Returns the refreshed card."""
 	frappe.only_for("System Manager")
 
-	return save_integration(
-		get_payment_integration(slug), enabled, frappe.parse_json(values) if values else {}
-	)
+	integration = get_payment_integration(slug)
+	before = configuration.get_integration_state(integration)
+	try:
+		card = save_integration(integration, enabled, frappe.parse_json(values) if values else {})
+	except Exception as exception:
+		configuration.payment_gateway_save_failed(integration, exception)
+		raise
+	configuration.payment_gateway_saved(integration, before, card)
+	return card

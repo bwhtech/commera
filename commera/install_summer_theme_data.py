@@ -3,6 +3,7 @@
 import frappe
 
 from commera.install_fashion_demo_data import IMAGE_ROOT
+from commera.telemetry import data_source
 
 SETTINGS_DOCTYPE = "Summer Theme Settings"
 
@@ -98,6 +99,7 @@ SOCIAL_URLS = {
 }
 
 
+@data_source("demo_data")
 def install_summer_theme_data():
 	"""Seed the Summer homepage copy, banners and picks. Safe to re-run."""
 	settings = frappe.get_doc(SETTINGS_DOCTYPE)

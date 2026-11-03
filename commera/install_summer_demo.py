@@ -22,6 +22,7 @@ from commera.install_fashion_demo_data import (
 )
 from commera.install_summer_theme_data import HERO_SLIDES, PRODUCTS_URL, install_summer_theme_data
 from commera.migrate import activate_summer_theme
+from commera.telemetry import data_source
 
 DEMO_SIZES = DEFAULT_SIZES
 SALE_PRICE_LIST = "Sale Price List"
@@ -120,6 +121,7 @@ FOOTER_SECTIONS = (
 )
 
 
+@data_source("demo_data")
 def install_summer_demo():
 	"""Seed a demo storefront end to end in the company's own currency. Safe to re-run."""
 	company = get_demo_company()

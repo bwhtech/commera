@@ -2,7 +2,10 @@
 
 import frappe
 
+from commera.telemetry import data_source
 
+
+@data_source("demo_data")
 def publish_all_demo_items():
 	"""Publish all demo product items to website"""
 

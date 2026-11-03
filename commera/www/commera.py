@@ -10,6 +10,7 @@ from commera.api.permission import has_app_permission
 from commera.onboarding import is_onboarding_pending
 from commera.plugins.registry import get_visible_plugins
 from commera.roles import is_commera_admin
+from commera.telemetry import capture, default_properties
 from commera.utils import get_store_currency
 
 no_cache = 1
@@ -22,6 +23,7 @@ def get_context(context):
 
 	context.boot = get_boot()
 	context.no_cache = 1
+	capture("active_site", interval="1d")
 
 
 @frappe.whitelist(methods=["GET"])
@@ -57,6 +59,7 @@ def get_boot():
 			"is_admin": is_commera_admin(),
 			"onboarding_pending": is_onboarding_pending(),
 			"cloud_settings": get_cloud_settings(),
+			"telemetry": default_properties(),
 		}
 	)
 	frappe.db.commit()  # nosemgrep

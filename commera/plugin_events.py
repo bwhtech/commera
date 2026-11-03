@@ -427,6 +427,12 @@ def add_plugin_user():
 
 def get_settled_cod_orders_query():
 	sales_order = DocType("Sales Order")
+	return get_settled_orders_query().where(sales_order.custom_ecommerce_payment_mode == "COD")
+
+
+def get_settled_orders_query():
+	"""Store orders billed in full with no invoice left to pay."""
+	sales_order = DocType("Sales Order")
 	unpaid_invoice = DocType("Sales Invoice").as_("unpaid_invoice")
 	unpaid_invoice_item = DocType("Sales Invoice Item").as_("unpaid_invoice_item")
 	unpaid_invoices = (
@@ -445,7 +451,6 @@ def get_settled_cod_orders_query():
 		.select(sales_order.name)
 		.where(
 			(sales_order.order_type == STORE_ORDER_TYPE)
-			& (sales_order.custom_ecommerce_payment_mode == "COD")
 			& (sales_order.docstatus == 1)
 			& (sales_order.per_billed >= 100)
 			& ExistsCriterion(unpaid_invoices).negate()

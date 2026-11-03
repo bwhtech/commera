@@ -15,6 +15,7 @@ from frappe.utils.data import cint, cstr, flt
 from frappe.utils.xlsxutils import build_xlsx_response, read_xlsx_file_from_attached_file
 
 from commera.api.admin.catalog import create_product
+from commera.telemetry import configuration, data_source
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
 TEMPLATE_HEADERS = [
@@ -501,6 +502,7 @@ def validate_import(file_url: str, column_mapping: dict | str | None = None):
 
 
 @frappe.whitelist(methods=["POST"])
+@data_source("import")
 def run_import(
 	file_url: str, column_mapping: dict | str | None = None, image_assignments: dict | str | None = None
 ):
@@ -585,6 +587,9 @@ def run_import(
 		if row["issue"] and row["issue"]["level"] == "error"
 	]
 
+	configuration.products_imported(
+		len(result["rows"]), len(created), len(validation_errors) + len(creation_errors)
+	)
 	return {
 		"created": created,
 		"created_count": len(created),

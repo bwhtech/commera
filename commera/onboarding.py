@@ -6,9 +6,10 @@ from frappe.core.doctype.installed_applications.installed_applications import (
 )
 from frappe.desk.page.setup_wizard.setup_wizard import setup_complete, update_global_settings
 from frappe.utils.background_jobs import is_job_enqueued
-from frappe.utils.data import add_days, add_years, get_abbr, getdate
+from frappe.utils.data import add_days, add_years, get_abbr, getdate, now_datetime
 
 from commera.migrate import DEFAULT_EMAIL_TEMPLATES, create_payment_modes
+from commera.telemetry import onboarding as onboarding_telemetry
 
 SETTINGS_DOCTYPE = "Commera Settings"
 DEFAULT_PRICE_LIST = "Standard Selling"
@@ -178,13 +179,14 @@ def queue_store_setup(args: dict) -> dict:
 		deduplicate=True,
 		enqueue_after_commit=True,
 		setup_args=args,
+		queued_at=now_datetime(),
 	)
 	return {"status": "running", "error": None}
 
 
-def run_store_setup(setup_args: dict):
+def run_store_setup(setup_args: dict, queued_at=None):
 	"""Background job, run as the owner who queued it: setup, then the Commera Settings a store sells with."""
-	status, error = "done", None
+	status, error, failure = "done", None, None
 	try:
 		run_frappe_setup(setup_args)
 		seed_commera_settings(setup_args["company_name"])
@@ -194,9 +196,10 @@ def run_store_setup(setup_args: dict):
 		frappe.db.rollback()
 		frappe.log_error(title="Commera store setup failed")
 		message = frappe.response.get("setup_wizard_failure_message") or str(exception)
-		status, error = "failed", _("Store setup failed: {0}").format(message)
+		status, error, failure = "failed", _("Store setup failed: {0}").format(message), exception
 
 	set_setup_status(status, error)
+	onboarding_telemetry.store_setup_finished(queued_at, failure)
 	# after_commit: the job runner commits on return, and a client that refetches must see the data.
 	frappe.publish_realtime(
 		SETUP_REALTIME_EVENT, {"status": status, "error": error}, user=frappe.session.user, after_commit=True

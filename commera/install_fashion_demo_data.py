@@ -6,6 +6,7 @@ from commera.install_demo_data import (
 	ensure_warehouse_exists,
 	get_root_item_group,
 )
+from commera.telemetry import data_source
 
 IMAGE_ROOT = "/assets/commera/themes/summer_theme/images"
 
@@ -186,6 +187,7 @@ FASHION_PRODUCTS = (
 )
 
 
+@data_source("demo_data")
 def install_fashion_demo_data():
 	"""Seed the fashion catalogue and retire the car-part one. Safe to re-run."""
 	add_color_attribute_values()

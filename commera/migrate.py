@@ -14,6 +14,7 @@ from commera.roles import add_commera_roles
 from commera.search.build import ensure_index_built
 from commera.search.record_builder import DEFAULT_CONTENT_FIELDS
 from commera.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
+from commera.setup_state import DEFAULT_THEME
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import seed_default_routes
 from commera.storefront_plugins import sync_storefront_apps
 from commera.www.llms import DEFAULT_LLMS_TXT
@@ -58,7 +59,7 @@ def set_default_app():
 
 def activate_summer_theme():
 	settings = frappe.get_doc("Shop Theme Settings")
-	settings.active_theme = "Summer Theme"
+	settings.active_theme = DEFAULT_THEME
 	settings.dynamic_pages_enabled = 1
 	settings.save(ignore_permissions=True)
 
