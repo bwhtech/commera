@@ -2,7 +2,8 @@
 	const origin = window.location.origin;
 	const target_selector = '[data-commera-block], [data-commera-section]';
 	const outline_style =
-		'position:absolute;pointer-events:none;z-index:2147483647;outline:2px solid #171717;outline-offset:2px;box-shadow:0 0 0 2px #fff';
+		'position:absolute;pointer-events:none;z-index:2147483647;outline:2px solid;outline-offset:-2px';
+	let outline_color = 'Highlight';
 	let highlighted = [];
 	let outlines = [];
 	let selected_blocks = [];
@@ -53,11 +54,15 @@
 			.filter((rect) => rect.width || rect.height);
 		if (!rects.length) return null;
 		const top = Math.min(...rects.map((rect) => rect.top));
-		const left = Math.min(...rects.map((rect) => rect.left));
+		const left = Math.max(0, Math.min(...rects.map((rect) => rect.left)));
+		const right = Math.min(
+			document.documentElement.clientWidth,
+			Math.max(...rects.map((rect) => rect.right)),
+		);
 		return {
 			top: top + window.scrollY,
 			left: left + window.scrollX,
-			width: Math.max(...rects.map((rect) => rect.right)) - left,
+			width: right - left,
 			height: Math.max(...rects.map((rect) => rect.bottom)) - top,
 		};
 	}
@@ -72,6 +77,7 @@
 				outline.dataset.commeraOutline = '';
 				outline.style.cssText = outline_style;
 				Object.assign(outline.style, {
+					outlineColor: outline_color,
 					top: `${rect.top}px`,
 					left: `${rect.left}px`,
 					width: `${rect.width}px`,
@@ -103,7 +109,8 @@
 		dispatch(selected_blocks, 'commera:block:select', selected_detail);
 	}
 
-	function highlight({ group, section, id, scroll }) {
+	function highlight({ group, section, id, scroll, color }) {
+		if (color) outline_color = color;
 		highlighted = group && section ? find_targets(group, section, id) : [];
 		select_blocks(
 			highlighted.filter((element) => element.dataset.commeraBlock),

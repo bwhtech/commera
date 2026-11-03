@@ -120,8 +120,6 @@ export function createLayoutEditor(theme) {
   const selected = computed(() => {
     const selection = state.selection
     if (!selection) return null
-    if (selection.kind === 'theme') return { kind: 'theme' }
-
     const section = findSection(selection.group, selection.section)
     const sectionSchema = schemaByType.value[section?.type]
     if (!section || !sectionSchema) return null
@@ -165,7 +163,7 @@ export function createLayoutEditor(theme) {
   }
 
   function forgetLostSelection() {
-    if (state.selection && state.selection.kind !== 'theme' && !selected.value) state.selection = null
+    if (state.selection && !selected.value) state.selection = null
   }
 
   async function load(page = state.page) {
@@ -351,11 +349,12 @@ export function createLayoutEditor(theme) {
       : value
   }
 
-  async function saveThemeSetting(field, value) {
-    if (value === (field.value ?? '')) return false
-    const data = await themeCaller.call('save_theme_settings', { [field.fieldname]: value })
+  async function saveThemeSettings(changes) {
+    const data = await themeCaller.call('save_theme_settings', changes)
     if (!data) return false
-    field.value = value
+    for (const field of state.settings.groups.flatMap((group) => group.fields)) {
+      if (field.fieldname in changes) field.value = changes[field.fieldname]
+    }
     state.settingsRevision += 1
     commit()
     return true
@@ -389,7 +388,7 @@ export function createLayoutEditor(theme) {
     settingValue,
     settingPlaceholder,
     setSetting,
-    saveThemeSetting,
+    saveThemeSettings,
     commit,
   }
 }

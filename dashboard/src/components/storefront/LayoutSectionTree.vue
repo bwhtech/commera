@@ -168,18 +168,7 @@ function rowActions(node) {
 
 <template>
   <div class="flex flex-col gap-1" data-section-tree>
-    <button
-      type="button"
-      class="flex w-full items-center gap-2 rounded-5 px-1.5 py-1.5 text-start text-base text-ink-gray-8"
-      :class="state.selection?.kind === 'theme' ? 'bg-surface-gray-3 font-medium' : 'hover:bg-surface-gray-2'"
-      data-tree-theme-settings
-      @click="select({ kind: 'theme' }, { scroll: false })"
-    >
-      <span class="lucide-palette size-4 text-ink-gray-6" aria-hidden="true" />
-      Theme settings
-    </button>
-
-    <div v-if="!grouped" class="mt-2 flex items-center justify-between px-2">
+    <div v-if="!grouped" class="flex items-center justify-between px-2">
       <p class="text-sm text-ink-gray-5">Sections</p>
       <Button
         variant="ghost"
@@ -230,8 +219,15 @@ function rowActions(node) {
             </template>
           </Button>
         </div>
+        <span
+          v-else-if="node.hidden && !isSelected(node)"
+          class="grid size-6 shrink-0 place-items-center group-focus-within/row:hidden group-hover/row:hidden"
+          aria-hidden="true"
+        >
+          <span class="lucide-eye-off size-4 text-ink-gray-4" />
+        </span>
         <div
-          v-else
+          v-if="node.kind !== 'part'"
           class="shrink-0 items-center focus-within:flex group-hover/row:flex"
           :class="isSelected(node) ? 'flex' : 'hidden'"
           @click.stop
