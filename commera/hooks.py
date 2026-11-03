@@ -121,10 +121,13 @@ doctype_js = {
 	],
 }
 
-after_install = "commera.migrate.after_install"
+after_install = ["commera.migrate.after_install", "commera.cloud.link.queue_initial_link"]
 after_migrate = "commera.migrate.after_migrate"
 after_app_install = "commera.storefront_plugins.sync_storefront_apps"
-setup_wizard_complete = "commera.swatches.drop_unused_colour_attribute"
+setup_wizard_complete = [
+	"commera.swatches.drop_unused_colour_attribute",
+	"commera.cloud.link.queue_initial_link",
+]
 
 
 doc_events = {
@@ -502,6 +505,7 @@ scheduler_events = {
 	},
 	"hourly": [
 		"commera.plugin_events.sweep_missed_cod_payments",
+		"commera.cloud.link.queue_link_if_pending",
 	],
 	# Long queue, not the short one: sync_status() is a gateway round-trip per pending request, so a
 	# slow gateway would otherwise sit on a worker the whole storefront shares.
