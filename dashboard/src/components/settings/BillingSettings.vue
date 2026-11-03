@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { ErrorMessage } from 'frappe-ui'
 import { closeCloudSettings, openCloudSettings } from '@frappe/cloud-sdk'
 import { billing, cloudContext, refreshBilling } from '../../data/cloudBilling'
-import { useTelemetry } from '../../telemetry'
+import { capture } from '../../telemetry'
 
 // True while one of the Cloud panel's own menus or dialogs is open; AppSettingsDialog's
 // setOpen explains why Settings must not close then.
@@ -13,7 +13,6 @@ const target = ref(null)
 const error = ref('')
 let overlayWatcher
 
-const { capture } = useTelemetry()
 // TrialCard opens Settings with this on history.state; every other way in is Settings itself.
 const surface = window.history.state?.billingSurface === 'trial_card' ? 'trial_card' : 'settings'
 

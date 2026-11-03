@@ -1,5 +1,5 @@
 import { onBeforeUnmount, onMounted, watch } from 'vue'
-import { sendSetupEvent } from '../../data/setupFunnel'
+import { capture } from '../../telemetry'
 import { STEPS, secondsSince } from '../../ia/onboardingSteps'
 
 // The funnel as Frappe's wizard reports its own: started, each step completed or skipped with the
@@ -20,7 +20,7 @@ export function useSetupFunnel(currentStep) {
 
   function onLeave() {
     if (isFinishing) return
-    sendSetupEvent('left_setup', { step: currentStep(), duration_seconds: secondsSince(shownAt) }, { keepalive: true })
+    capture('left_setup', { step: currentStep(), duration_seconds: secondsSince(shownAt) }, { keepalive: true })
   }
   onMounted(() => window.addEventListener('pagehide', onLeave))
   onBeforeUnmount(() => window.removeEventListener('pagehide', onLeave))
@@ -28,11 +28,11 @@ export function useSetupFunnel(currentStep) {
   return {
     started: ({ resumed }) => {
       shownAt = Date.now()
-      sendSetupEvent('started_setup', { step: currentStep(), resumed, total_steps: STEPS.length })
+      capture('started_setup', { step: currentStep(), resumed, total_steps: STEPS.length })
     },
     settled: (key, action) =>
-      sendSetupEvent(action === 'skip' ? 'skipped_setup_step' : 'completed_setup_step', stepProperties(key)),
-    wentBack: (fromKey, toKey) => sendSetupEvent('went_back_in_setup', { from_step: fromKey, to_step: toKey }),
+      capture(action === 'skip' ? 'skipped_setup_step' : 'completed_setup_step', stepProperties(key)),
+    wentBack: (fromKey, toKey) => capture('went_back_in_setup', { from_step: fromKey, to_step: toKey }),
     finishing: () => (isFinishing = true),
     finishFailed: () => (isFinishing = false),
   }

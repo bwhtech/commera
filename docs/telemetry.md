@@ -12,7 +12,7 @@ Commera sends no product telemetry. We cannot tell how many stores run, where a 
 ## How it works (shared with Frappe and Wiki)
 
 - **Backend:** `frappe.utils.telemetry.capture(event, "commera", properties=..., interval=...)`. It is a no-op when telemetry is off and never raises. It anonymizes the user (site-salted hash), adds the site and `fc_team`, and queues the event in Redis. The `send_queued_events` scheduler job flushes the queue to Pulse. `interval="1d"` keeps one row per user per day and ignores properties.
-- **Frontend:** `telemetryPlugin` / `useTelemetry()` from `@framework/ui` (`frappe/ui/src/telemetry`). It reads `boot_config` and posts straight to Pulse from the browser. With `router` passed, it sends a `pageview` with the route pattern on sites younger than 15 days.
+- **Frontend:** `capture(event, properties)` in `dashboard/src/telemetry.js` posts to Commera's own `telemetry.record_event`. That method passes on only the events and values listed in `commera/telemetry/dashboard.py`, adds the shared properties and sends through the backend `capture`. The browser never loads a Pulse client or talks to Pulse, so there is no cross-origin script and no extra dependency, and `left_setup` can go out with `keepalive` while the page closes. This is Raven's pattern. `trackPageviews(router)` sends a `pageview` with the route pattern on sites younger than 15 days, which is Frappe's own rule.
 - **Free:** `app_heartbeat` is already sent for every `/api/method/commera.*` call (throttled to once per 6 h).
 - **Team profile:** `frappe.utils.telemetry.pulse.client.identify(properties)` upserts attributes on the Frappe Cloud team. Commera uses it for slow-changing store facts (country, currency) so that every event can be segmented without carrying them.
 
@@ -96,15 +96,15 @@ Two more properties go on every milestone so the funnel can be read without join
 - Enum values come from a fixed registry in code (gateway slugs from `PAYMENT_GATEWAYS`, carrier slugs from the shipping registry, built-in theme names). A value outside the registry is sent as `other`, so a custom plugin or theme name never leaks.
 - The user is always the anonymized id that Frappe and the Pulse client add. Commera never passes a user.
 - Backend is the default for anything that changes data. The frontend sends only what the server never sees (setup panel clicks, welcome screen, command palette).
-- The frontend plugin is installed only in the `/commera` dashboard, only for a signed-in user. The storefront sends nothing to Pulse.
+- Only the `/commera` dashboard sends frontend events, and its boot only reaches a signed-in store user. The boot key `telemetry` (`enabled`, `site_age`) is `{enabled: false}` when telemetry is off, and then the dashboard sends no request at all. The storefront sends nothing to Pulse.
 - Facts about the store come from the daily scan, never from a request path.
-- Backend sends through `commera.telemetry.capture(event, interval=None, **props)`. Work done only to build an event goes in a function wrapped with `@telemetry_event`, which runs only when telemetry is on and swallows every error. Frontend sends through `dashboard/src/telemetry.js` `useTelemetry().capture(event, props)`. Both add the shared properties and swallow every error. Telemetry never fails the action it reports on.
+- Backend sends through `commera.telemetry.capture(event, interval=None, **props)`. Work done only to build an event goes in a function wrapped with `@telemetry_event`, which runs only when telemetry is on and swallows every error. Frontend sends through `dashboard/src/telemetry.js` `capture(event, props)`, which swallows every error. A new frontend event needs a row here and an entry in `commera/telemetry/dashboard.py`, or the server refuses it. Telemetry never fails the action it reports on.
 
 ## Properties on every event
 
 | Property | Source | Value |
 |---|---|---|
-| `app_version` | `commera.__version__`; frontend from the boot key `telemetry` | e.g. `1.0.0` |
+| `app_version` | `commera.__version__`, added on the server for frontend events too | e.g. `1.0.0` |
 | `hosting` | `commera_cloud` installed → `commera_cloud`, else `fc_team` set → `frappe_cloud`, else `self_hosted` | enum |
 | site, user, team, timestamp | Pulse client | automatic |
 
@@ -115,13 +115,13 @@ Two more properties go on every milestone so the funnel can be read without join
 | Event | Half | Fires when | Properties | Question |
 |---|---|---|---|---|
 | `active_site` | backend, `interval="1d"` | `www/commera.py:get_context` serves the dashboard to a signed-in user | | 1 |
-| `pageview` | frontend | a router navigation, on sites younger than 15 days. Sent by the framework plugin itself, so it carries no shared properties | `route`: the matched route pattern, never the URL | 1, 4 |
+| `pageview` | frontend, through the server | a router navigation, on sites younger than 15 days | `route`: the matched route pattern, never the URL. The server drops anything that is not a path pattern | 1, 4 |
 
 ### First-run onboarding
 
 The owner's first visit opens `OnboardingFlow` instead of the dashboard (steps in `dashboard/src/ia/onboardingSteps.js`: `you`, `store`, `brand`, `theme`, `selling`, `products`, `done`). The server sends what it saves; the browser sends only the clicks the server never sees.
 
-The funnel events use the names of Frappe's own setup wizard (`frappe/desk/page/setup_wizard/setup_wizard.js`), as Raven's do, with app `commera`. One funnel query then reads Frappe, Raven and Commera alike. The browser does not send them to Pulse itself: it posts them to `onboarding.record_setup_event` (`dashboard/src/data/setupFunnel.js`), which passes on only the events below, known step names and whole numbers. That also lets `left_setup` go out with `keepalive` while the page closes. A site with telemetry off sends no request: the boot key `telemetry.enabled` says so.
+The funnel events use the names of Frappe's own setup wizard (`frappe/desk/page/setup_wizard/setup_wizard.js`), as Raven's do, with app `commera`. One funnel query then reads Frappe, Raven and Commera alike. Like every frontend event, they go through `telemetry.record_event`, which keeps only known step names and whole numbers; `left_setup` is sent with `keepalive`.
 
 | Event | Half | Fires when | Properties | Question |
 |---|---|---|---|---|
@@ -217,15 +217,15 @@ All phases ship together, stacked on the onboarding and billing change (PR #375)
 
 ### Phase 0: prerequisites
 
-1. Link `@framework/ui` into `dashboard/` (`package.json` link and `frameworkUI()` in `vite.config`), as Wiki did. The dashboard is on `frappe-ui` 1.0.2, which is above the `>=1.0.0-beta.63` floor.
+1. `telemetry.record_event` and `commera/telemetry/dashboard.py`, the list of frontend events and the values each may carry.
 2. Add `onboarding.get_setup_state` and wire `firstRun.js` `done` to it.
 
 ### Phase 1: tracer bullet
 
 - `commera/telemetry/`: `capture`, `default_properties` and the bucket helpers in `__init__.py`; `milestones.py`, `onboarding.py`, `configuration.py`, `scan.py`. The setup facts the milestones and the setup panel share are in `commera/setup_state.py`.
 - `active_site` in `www/commera.py:get_context`.
-- `dashboard/src/telemetry.js` and `app.use(telemetryPlugin, { app_name: 'commera', router })` once signed in, which gives `pageview`.
-- Done when one `active_site` is in the server queue and one `pageview` leaves the browser with `app: "commera"`. Verify on `commera.localhost` with `pulse_api_key` and `pulse_force_enabled` set; Playwright stubs `boot_config` and the Pulse client.
+- `dashboard/src/telemetry.js` (`capture`, `trackPageviews`).
+- Done when one `active_site` and one `pageview` are in the server queue with `app: "commera"`. The onboarding e2e turns the boot key on and records each `record_event` post.
 
 ### Phase 2: activation funnel
 

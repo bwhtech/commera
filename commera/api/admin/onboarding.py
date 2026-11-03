@@ -200,16 +200,6 @@ def complete_onboarding():
 	return {"onboarding_completed": True}
 
 
-@frappe.whitelist(methods=["POST"])
-def record_setup_event(event: str, properties: dict | str | None = None):
-	"""One event of the onboarding funnel, from the browser. Sent here rather than straight to Pulse so
-	a page being closed can still send it (`keepalive`), and so only known events and values go out."""
-	frappe.only_for(ONBOARDING_ROLE)
-	if event not in onboarding_telemetry.SETUP_EVENTS:
-		frappe.throw(_("Unknown onboarding event: {0}").format(event))
-	onboarding_telemetry.record_setup_event(event, properties)
-
-
 @frappe.whitelist(methods=["GET"])
 def get_setup_state():
 	"""The four setup panel steps as booleans, from the same facts the activation milestones read."""

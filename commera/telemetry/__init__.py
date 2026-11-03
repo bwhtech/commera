@@ -7,7 +7,7 @@ import frappe
 from frappe.utils import telemetry as frappe_telemetry
 from frappe.utils import time_diff_in_seconds
 from frappe.utils.data import now_datetime
-from frappe.utils.telemetry import is_pulse_enabled
+from frappe.utils.telemetry import is_pulse_enabled, site_age
 
 import commera
 from commera.plugin_events import PLUGINS_USER
@@ -54,8 +54,10 @@ def get_hosting() -> str:
 
 
 def get_boot_config() -> dict:
-	"""The dashboard's boot key: the shared properties, and whether to send anything at all."""
-	return {**default_properties(), "enabled": is_pulse_enabled()}
+	"""The dashboard's boot key: whether to send anything at all, and the site's age for `pageview`."""
+	if not is_pulse_enabled():
+		return {"enabled": False}
+	return {"enabled": True, "site_age": site_age()}
 
 
 def capture(event: str, interval: str | None = None, **props):

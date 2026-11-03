@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { setupSteps, setupStepsDone } from '../data/setupState'
-import { useTelemetry } from '../telemetry'
+import { capture } from '../telemetry'
 
 const STORAGE_KEY = 'commera:welcome-seen'
 
@@ -55,23 +55,21 @@ function writeFlag(key, value) {
 export const setupDismissed = ref(readFlag(DISMISSED_KEY))
 export const setupSkipped = ref(readFlag(SKIPPED_KEY))
 
-const telemetry = useTelemetry()
-
 export function dismissSetup() {
   setupDismissed.value = true
   writeFlag(DISMISSED_KEY, true)
-  telemetry.capture('setup_dismissed', { steps_done: setupStepsDone.value })
+  capture('setup_dismissed', { steps_done: setupStepsDone.value })
 }
 
 export function skipSetup() {
   setupSkipped.value = true
   writeFlag(SKIPPED_KEY, true)
-  telemetry.capture('setup_skipped', { steps_done: setupStepsDone.value })
+  capture('setup_skipped', { steps_done: setupStepsDone.value })
 }
 
 // `surface` is `panel` or `banner`, docs/telemetry.md's `setup_step_opened.surface`.
 export function captureSetupStepOpened(step, surface) {
-  telemetry.capture('setup_step_opened', { step: step.key, surface, steps_done: setupStepsDone.value })
+  capture('setup_step_opened', { step: step.key, surface, steps_done: setupStepsDone.value })
 }
 
 export function reopenSetup() {

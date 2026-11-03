@@ -3,9 +3,7 @@
 // are matched to a product colour by file name (imports.match_import_images).
 import { reactive } from 'vue'
 import { useAdminAction } from './api'
-import { useTelemetry } from '../telemetry'
-
-const telemetry = useTelemetry()
+import { capture } from '../telemetry'
 
 export const STEPS = [
   { key: 'source', label: 'Source', icon: 'lucide-plug', hint: 'Where the products live today' },
@@ -77,7 +75,7 @@ export function resetImport() {
 export function openImport(surface) {
   if (imp.finished || imp.file) resetImport()
   imp.open = true
-  telemetry.capture('products_import_opened', { surface })
+  capture('products_import_opened', { surface })
 }
 
 export function closeImport() {

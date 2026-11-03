@@ -1,31 +1,42 @@
-// Product telemetry to Pulse. docs/telemetry.md is the only definition of an event's name and
-// properties; an event that is not in its tables does not go out.
-import { telemetryPlugin, useTelemetry as useFrameworkTelemetry } from '@framework/ui/telemetry/index.ts'
+// Product telemetry. docs/telemetry.md is the only definition of an event's name and properties.
+//
+// The browser never talks to Pulse. Every event posts to Commera's own record_event, which passes
+// on only the events and values the spec lists, adds the shared properties, and sends nothing when
+// telemetry is off. A second deliberate exception to "one door to the server", beside
+// data/cloudBilling.js: `left_setup` goes out as the page closes, and only fetch's `keepalive`
+// outlives the page; useCall has no such option.
+import { methodUrl } from './data/api'
 import { bootValue } from './data/boot'
 
-// get_boot's `telemetry` key. Picked rather than spread, so a key added to the boot for another
-// reason never rides every event.
-const { app_version: appVersion, hosting } = bootValue('telemetry', {}) ?? {}
-const sharedProperties = { app_version: appVersion, hosting }
+// get_boot's `telemetry` key. A site with telemetry off sends no request at all.
+const config = bootValue('telemetry', {}) ?? {}
 
-// The plugin turns itself on only after it has fetched boot_config and imported the Pulse client,
-// and drops every capture before that. OnboardingFlow sends its first event as it mounts, which is
-// well inside that window, so captures wait for the install to settle.
-let ready = Promise.resolve()
+// Frappe's own rule for desk and its SPAs: page views only while a site is new.
+const NEW_SITE_DAYS = 15
 
-// Called instead of app.use() because app.use() throws the install's promise away.
-export function installTelemetry(app, router) {
-  ready = Promise.resolve(telemetryPlugin.install(app, { app_name: 'commera', router })).catch(() => {})
+// Best effort: a failure is ignored, and an event is lost if the page is gone before it is sent.
+export function capture(event, properties = {}, { keepalive = false } = {}) {
+  if (config.enabled !== true) return
+  fetch(methodUrl('telemetry.record_event'), {
+    method: 'POST',
+    keepalive,
+    credentials: 'same-origin',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-Frappe-CSRF-Token': bootValue('csrf_token', ''),
+    },
+    body: JSON.stringify({ event, properties }),
+  }).catch(() => {})
 }
 
-export function useTelemetry() {
-  const telemetry = useFrameworkTelemetry()
-  return {
-    // Telemetry must never fail the action it reports on, so every error stops here.
-    capture(event, properties = {}) {
-      ready
-        .then(() => telemetry.capture(event, { ...properties, ...sharedProperties }))
-        .catch((error) => console.warn('[commera] telemetry capture failed', event, error))
-    },
-  }
+// One `pageview` per navigation, with the matched route pattern (`/products/:id`), never the URL.
+export function trackPageviews(router) {
+  if (config.enabled !== true || config.site_age > NEW_SITE_DAYS) return
+  let lastFullPath = ''
+  router.afterEach((to) => {
+    if (to.fullPath === lastFullPath) return
+    lastFullPath = to.fullPath
+    capture('pageview', { route: to.matched.at(-1)?.path || 'unmatched' })
+  })
 }
