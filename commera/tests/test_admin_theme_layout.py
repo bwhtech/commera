@@ -1,20 +1,29 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 # See license.txt
 
+import base64
 import copy
+import io
 
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils.jinja import get_jenv
+from PIL import Image
 
 from commera.api.admin.theme import activate_theme
-from commera.api.admin.theme_layout import discard, get_editor, publish, save_draft
+from commera.api.admin.theme_layout import discard, get_editor, publish, save_draft, save_thumbnail
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context
 from commera.shop_themes.sections import clear_layout_cache
 from commera.shop_themes.theme_resolver import get_theme_environment
 
 SUMMER_THEME = "Summer Theme"
 CLASSIC_THEME = "Shop Default Theme"
+
+
+def image_data_url(image_format, color="red"):
+	buffer = io.BytesIO()
+	Image.new("RGB", (8, 5), color).save(buffer, format=image_format)
+	return f"data:image/{image_format.lower()};base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
 
 class TestAdminThemeLayout(IntegrationTestCase):
@@ -121,3 +130,64 @@ class TestAdminThemeLayout(IntegrationTestCase):
 		self.assertRaises(frappe.PermissionError, save_draft, SUMMER_THEME, "index", self.file_layout)
 		self.assertRaises(frappe.PermissionError, publish, SUMMER_THEME, "index", self.file_layout)
 		self.assertRaises(frappe.PermissionError, discard, SUMMER_THEME, "index")
+		self.assertRaises(frappe.PermissionError, save_thumbnail, SUMMER_THEME, image_data_url("WEBP"))
+
+
+class TestThemeThumbnail(IntegrationTestCase):
+	def setUp(self):
+		frappe.set_user("Administrator")
+		self.addCleanup(frappe.db.rollback)
+		self.addCleanup(self.delete_thumbnail_files)
+		self.addCleanup(frappe.set_user, "Administrator")
+		self.delete_thumbnail_files()
+
+	def delete_thumbnail_files(self):
+		frappe.db.set_value("Shop Theme", SUMMER_THEME, "thumbnail", None, update_modified=False)
+		for file_name in self.thumbnail_files():
+			frappe.delete_doc("File", file_name, ignore_permissions=True)
+
+	def thumbnail_files(self):
+		return frappe.get_all(
+			"File",
+			filters={
+				"attached_to_doctype": "Shop Theme",
+				"attached_to_name": SUMMER_THEME,
+				"attached_to_field": "thumbnail",
+			},
+			pluck="name",
+		)
+
+	def test_save_thumbnail_attaches_a_public_image_without_touching_modified(self):
+		modified = frappe.db.get_value("Shop Theme", SUMMER_THEME, "modified")
+
+		file_url = save_thumbnail(SUMMER_THEME, image_data_url("WEBP"))
+
+		self.assertEqual(frappe.db.get_value("Shop Theme", SUMMER_THEME, "thumbnail"), file_url)
+		self.assertEqual(frappe.db.get_value("Shop Theme", SUMMER_THEME, "modified"), modified)
+		thumbnail = frappe.get_doc("File", {"file_url": file_url})
+		self.assertFalse(thumbnail.is_private)
+		self.assertTrue(file_url.endswith(".webp"))
+		self.assertTrue(thumbnail.exists_on_disk())
+
+	def test_save_thumbnail_replaces_the_previous_file(self):
+		first_url = save_thumbnail(SUMMER_THEME, image_data_url("WEBP", "red"))
+		first_file = frappe.get_doc("File", {"file_url": first_url})
+
+		second_url = save_thumbnail(SUMMER_THEME, image_data_url("PNG", "blue"))
+
+		self.assertEqual(self.thumbnail_files(), [frappe.db.get_value("File", {"file_url": second_url})])
+		self.assertFalse(frappe.db.exists("File", first_file.name))
+		self.assertNotEqual(second_url, first_url)
+		self.assertEqual(frappe.db.get_value("Shop Theme", SUMMER_THEME, "thumbnail"), second_url)
+
+	def test_save_thumbnail_refuses_anything_but_an_image(self):
+		not_an_image = f"data:image/webp;base64,{base64.b64encode(b'<svg onload=alert(1)>').decode()}"
+
+		self.assertRaises(frappe.ValidationError, save_thumbnail, SUMMER_THEME, not_an_image)
+		self.assertEqual(self.thumbnail_files(), [])
+
+	def test_save_thumbnail_needs_an_editable_theme(self):
+		image = image_data_url("WEBP")
+
+		self.assertRaises(frappe.ValidationError, save_thumbnail, CLASSIC_THEME, image)
+		self.assertRaises(frappe.DoesNotExistError, save_thumbnail, "zz-no-such-theme", image)

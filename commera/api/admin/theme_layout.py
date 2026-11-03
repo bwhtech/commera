@@ -5,6 +5,7 @@ import os
 
 import frappe
 from frappe import _
+from frappe.core.doctype.file.utils import decode_file_content
 
 from commera.api.admin.theme import build_theme_settings
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
@@ -12,6 +13,7 @@ from commera.shop_themes.preview_entries import PREVIEW_ENTRY_PAGES, list_entrie
 from commera.shop_themes.sections import get_inherited_layout, get_section_schema
 
 EDITOR_ROLES = ("System Manager", "Website Manager")
+MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
 
 
 def get_editable_theme_context(theme):
@@ -151,6 +153,55 @@ def publish(theme: str, page: str, layout: str | dict):
 
 	save_draft_layout(theme_context, page, layout).publish()
 	return build_layout_state(theme_context, page)
+
+
+def detect_image_extension(content):
+	if content.startswith(b"RIFF") and content[8:12] == b"WEBP":
+		return "webp"
+	if content.startswith(b"\x89PNG"):
+		return "png"
+	if content.startswith(b"\xff\xd8\xff"):
+		return "jpg"
+	return None
+
+
+@frappe.whitelist(methods=["POST"])
+def save_thumbnail(theme: str, image: str):
+	get_editable_theme_context(theme)
+
+	content = decode_file_content(image)
+	extension = detect_image_extension(content)
+	if not extension:
+		frappe.throw(_("A thumbnail must be a WebP, PNG or JPEG image."))
+	if len(content) > MAX_THUMBNAIL_BYTES:
+		frappe.throw(_("A thumbnail must be smaller than 2 MB."))
+
+	previous_files = frappe.get_all(
+		"File",
+		filters={
+			"attached_to_doctype": "Shop Theme",
+			"attached_to_name": theme,
+			"attached_to_field": "thumbnail",
+		},
+		pluck="name",
+	)
+
+	thumbnail = frappe.get_doc(
+		doctype="File",
+		file_name=f"{frappe.scrub(theme)}-thumbnail-{frappe.generate_hash(length=8)}.{extension}",
+		content=content,
+		is_private=0,
+		attached_to_doctype="Shop Theme",
+		attached_to_name=theme,
+		attached_to_field="thumbnail",
+	).insert()
+
+	frappe.db.set_value("Shop Theme", theme, "thumbnail", thumbnail.file_url, update_modified=False)
+
+	for file_name in previous_files:
+		frappe.delete_doc("File", file_name, ignore_permissions=True)
+
+	return thumbnail.file_url
 
 
 @frappe.whitelist(methods=["POST"])

@@ -13,7 +13,7 @@ import LayoutSettingsPanel from '../../components/storefront/LayoutSettingsPanel
 import PreviewEntryPicker from '../../components/storefront/PreviewEntryPicker.vue'
 import ThemeSettingsPanel from '../../components/storefront/ThemeSettingsPanel.vue'
 import PreviewOptions from '../../components/storefront/PreviewOptions.vue'
-import { SECTION_GROUPS, createLayoutEditor, pageLabel } from '../../data/themeLayout'
+import { SECTION_GROUPS, createLayoutEditor, pageLabel, saveThemeThumbnail } from '../../data/themeLayout'
 import { errorMessage } from '../../data/errors'
 
 const PANELS = [
@@ -168,6 +168,7 @@ async function publish() {
   if (!hasChanges.value) return toast.info('Already published')
   if (!(await track('Publish', () => editor.publish()))) return
   toast.success(state.live ? 'Published to your store' : `Published. Activate ${state.theme} to show it in your store.`)
+  saveThemeThumbnail(state.theme).catch((error) => console.error('Theme thumbnail was not saved', error))
 }
 
 function discard() {

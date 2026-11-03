@@ -1,8 +1,9 @@
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, effectScope, reactive, ref, watch } from 'vue'
 import { refDebounced } from '@vueuse/core'
 import { createAdminCaller } from './adminCaller'
-import { useAdminRead } from './api'
+import { useAdminAction, useAdminRead } from './api'
 import { rememberPreviewEntry, rememberedPreviewEntry } from '../ia/previewEntry'
+import { capturePage } from '../utils/capturePage'
 import { readableName } from '../utils/sectionSettingToField'
 
 const DEFAULT_MAX_BLOCKS = 50
@@ -12,6 +13,27 @@ const TRANSLATABLE_TYPES = ['text', 'textarea']
 
 const layoutCaller = createAdminCaller('theme_layout.')
 const themeCaller = createAdminCaller('theme.')
+
+const thumbnailAction = effectScope(true).run(() => useAdminAction('theme_layout.save_thumbnail', { quiet: true }))
+
+const THUMBNAIL_SIZE = { width: 1280, height: 800, scale: 2, outputWidth: 480, quality: 0.85 }
+
+export async function saveThemeThumbnail(theme) {
+  const params = new URLSearchParams({ theme, page: 'index', lang: 'en' })
+  const image = await capturePage(`/theme_editor_preview?${params}`, {
+    ...THUMBNAIL_SIZE,
+    beforeCapture: (frameDocument) => {
+      const root = frameDocument.documentElement
+      if (root.dataset.colorScheme === 'System') root.dataset.theme = 'light'
+      for (const element of frameDocument.querySelectorAll('.wow')) {
+        element.classList.remove('wow')
+        element.style.visibility = 'visible'
+        element.style.animation = 'none'
+      }
+    },
+  })
+  await thumbnailAction.submit({ theme, image })
+}
 
 const clone = (value) => JSON.parse(JSON.stringify(value))
 
