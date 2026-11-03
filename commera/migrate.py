@@ -52,9 +52,11 @@ def after_install():
 
 
 def set_default_app():
-	"""Land the site owner on /commera after login, where onboarding runs, unless a default is chosen."""
-	if not frappe.db.get_single_value("System Settings", "default_app"):
-		frappe.db.set_single_value("System Settings", "default_app", "commera")
+	"""On a fresh site only, land the owner on /commera. On a site in use, a site-wide default would
+	send every ERPNext user to a dashboard they cannot open; onboarding sets the owner's own instead."""
+	if frappe.is_setup_complete() or frappe.db.get_single_value("System Settings", "default_app"):
+		return
+	frappe.db.set_single_value("System Settings", "default_app", "commera")
 
 
 def activate_summer_theme():
