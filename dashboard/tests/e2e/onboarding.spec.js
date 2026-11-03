@@ -141,10 +141,8 @@ describe('onboarding', () => {
       assert.equal(await page.$eval('[data-onboarding-step="store"] input', (input) => input.value), STORE_NAME)
       await pressContinue(page, 'brand')
 
-      await page.waitForSelector('[data-onboarding-setup="done"], [data-onboarding-setup="failed"]', { timeout: SETUP_TIMEOUT })
-      const failure = await page.$('[data-onboarding-setup="failed"]')
-      assert.equal(failure, null, 'the store setup finished: ' + (failure ? await text(page) : ''))
-
+      // An owner does not wait for the store setup: brand, theme and selling save while it still runs,
+      // which is what a setup job holding a stale copy of Commera Settings would trip over.
       await clickUnpressed(page, '[data-onboarding-colour]')
       const pickedColour = await page.$eval('[data-onboarding-colour][aria-pressed="true"]', (button) =>
         button.getAttribute('aria-label').replace('Use ', ''),
@@ -165,6 +163,11 @@ describe('onboarding', () => {
       const shopify = await page.$('[data-onboarding-source="shopify"]')
       assert.ok(await shopify.evaluate((button) => button.disabled), 'Shopify import cannot be started yet')
       assert.ok((await shopify.evaluate((button) => button.innerText)).includes('Coming soon'))
+      // The products step needs the store: its CSV import waits for the setup to finish.
+      await page.waitForSelector('[data-onboarding-setup="done"], [data-onboarding-setup="failed"]', { timeout: SETUP_TIMEOUT })
+      const failure = await page.$('[data-onboarding-setup="failed"]')
+      assert.equal(failure, null, 'the store setup finished: ' + (failure ? await text(page) : ''))
+
       await page.waitForSelector('[data-onboarding-source="csv"]:not([disabled])', { timeout: 20000 })
       await page.click('[data-onboarding-source="csv"]')
       // The import dialog is bare and not dismissible (Esc would drop a half-mapped file), so it is
