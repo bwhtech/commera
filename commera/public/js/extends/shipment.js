@@ -69,13 +69,12 @@ function confirm_and_run(frm, message, method) {
 	frappe.confirm(message, () => run(frm, method));
 }
 
-function run(frm, method) {
-	frm
-		.call({
-			doc: frm.doc,
-			method,
-			freeze: true,
-			freeze_message: __('Talking to the carrier...'),
-		})
-		.then(() => frm.reload_doc());
+async function run(frm, method) {
+	await frappe.call({
+		method: `commera.shipping.shipment.${method}`,
+		args: { shipment: frm.doc.name },
+		freeze: true,
+		freeze_message: __('Talking to the carrier...'),
+	});
+	await frm.reload_doc();
 }

@@ -23,348 +23,375 @@ TRACKING_STATUSES = {
 COMPLETED_STATUSES = ("Delivered", "Lost")
 
 
-class CommeraShipment:
-	def validate(self):
-		super().validate()
-		self.validate_tracking_url()
-		self.sync_erpnext_status()
+def validate_carrier_cancel(shipment):
+	if (
+		shipment.custom_order_ref
+		and shipment.custom_shipment_status in CANCELLABLE_STATUSES
+		and not shipment.flags.cancelling_with_carrier
+	):
+		frappe.throw(
+			_(
+				"This shipment is booked with {0}. Use Cancel With Carrier so the label is cancelled too."
+			).format(frappe.bold(shipment.custom_shipping_provider)),
+			title=_("Booked With Carrier"),
+		)
 
-	def before_update_after_submit(self):
-		super().before_update_after_submit()
-		self.validate_tracking_url()
-		self.sync_erpnext_status()
 
-	def on_submit(self):
-		super().on_submit()
-		self.db_set("status", self.get_erpnext_status())
+def validate_tracking_url(shipment):
+	if shipment.tracking_url:
+		validate_url(shipment.tracking_url, throw=True, valid_schemes=("http", "https"))
 
-	def before_cancel(self):
-		if (
-			self.custom_order_ref
-			and self.custom_shipment_status in CANCELLABLE_STATUSES
-			and not self.flags.cancelling_with_carrier
-		):
-			frappe.throw(
-				_(
-					"This shipment is booked with {0}. Use Cancel With Carrier so the label is cancelled too."
-				).format(frappe.bold(self.custom_shipping_provider)),
-				title=_("Booked With Carrier"),
+
+def sync_erpnext_status(shipment):
+	shipment.service_provider = shipment.custom_shipping_provider or shipment.service_provider
+	shipment.tracking_status = TRACKING_STATUSES.get(shipment.custom_shipment_status, "")
+	shipment.tracking_status_info = shipment.custom_provider_status
+	if shipment.docstatus == 1:
+		shipment.status = get_erpnext_status(shipment)
+
+
+def get_erpnext_status(shipment) -> str:
+	if shipment.custom_shipment_status == "Cancelled":
+		return "Cancelled"
+	if shipment.custom_shipment_status in COMPLETED_STATUSES:
+		return "Completed"
+	return "Booked" if shipment.awb_number else "Submitted"
+
+
+def get_controller(shipment):
+	if not shipment.custom_shipping_provider:
+		frappe.throw(
+			_("{0} was shipped by a fulfilment partner, so there is no carrier to call.").format(
+				shipment.name
 			)
+		)
+	return get_provider(shipment.custom_shipping_provider)
 
-	def validate_tracking_url(self):
-		if self.tracking_url:
-			validate_url(self.tracking_url, throw=True, valid_schemes=("http", "https"))
 
-	def sync_erpnext_status(self):
-		self.service_provider = self.custom_shipping_provider or self.service_provider
-		self.tracking_status = TRACKING_STATUSES.get(self.custom_shipment_status, "")
-		self.tracking_status_info = self.custom_provider_status
-		if self.docstatus == 1:
-			self.status = self.get_erpnext_status()
+def get_parcels(shipment) -> list[dict]:
+	return normalise_parcels([parcel.as_dict() for parcel in shipment.shipment_parcel])
 
-	def get_erpnext_status(self) -> str:
-		if self.custom_shipment_status == "Cancelled":
-			return "Cancelled"
-		if self.custom_shipment_status in COMPLETED_STATUSES:
-			return "Completed"
-		return "Booked" if self.awb_number else "Submitted"
 
-	def get_controller(self):
-		if not self.custom_shipping_provider:
-			frappe.throw(
-				_("{0} was shipped by a fulfilment partner, so there is no carrier to call.").format(
-					self.name
-				)
-			)
-		return get_provider(self.custom_shipping_provider)
+def get_delivery_notes(shipment) -> list[str]:
+	return [row.delivery_note for row in shipment.shipment_delivery_note]
 
-	def get_parcels(self) -> list[dict]:
-		return normalise_parcels([parcel.as_dict() for parcel in self.shipment_parcel])
 
-	def get_delivery_notes(self) -> list[str]:
-		return [row.delivery_note for row in self.shipment_delivery_note]
-
-	def get_customer(self) -> frappe._dict:
-		if delivery_notes := self.get_delivery_notes():
-			return frappe.db.get_value(
-				"Delivery Note",
-				delivery_notes[0],
-				["customer_name as name", "contact_mobile as phone", "contact_email as email"],
-				as_dict=True,
-			)
+def get_customer(shipment) -> frappe._dict:
+	if delivery_notes := get_delivery_notes(shipment):
 		return frappe.db.get_value(
-			"Sales Order",
-			self.custom_sales_order,
-			["customer_name as name", "contact_phone as phone", "contact_email as email"],
+			"Delivery Note",
+			delivery_notes[0],
+			["customer_name as name", "contact_mobile as phone", "contact_email as email"],
 			as_dict=True,
 		)
+	return frappe.db.get_value(
+		"Sales Order",
+		shipment.custom_sales_order,
+		["customer_name as name", "contact_phone as phone", "contact_email as email"],
+		as_dict=True,
+	)
 
-	def get_declared_value(self) -> float:
-		if delivery_notes := self.get_delivery_notes():
-			return flt(
-				sum(frappe.get_all("Delivery Note", {"name": ("in", delivery_notes)}, pluck="grand_total"))
-			)
-		return flt(frappe.db.get_value("Sales Order", self.custom_sales_order, "grand_total"))
 
-	def get_shipment_payload(self) -> dict:
-		customer = self.get_customer() or frappe._dict()
-		return {
-			"reference": self.name,
-			"order_reference": self.custom_sales_order or self.name,
-			"service_code": self.custom_service_code,
-			"origin": get_address_payload(self.pickup_address_name),
-			"destination": get_address_payload(self.delivery_address_name, customer.name),
-			"parcels": self.get_parcels(),
-			"declared_value": self.get_declared_value(),
-			"currency": self.custom_currency,
-			"cod": bool(self.custom_cod),
-			"cod_amount": flt(self.custom_cod_amount),
-			"customer": {"name": customer.name, "phone": customer.phone, "email": customer.email},
+def get_declared_value(shipment) -> float:
+	if delivery_notes := get_delivery_notes(shipment):
+		return flt(
+			sum(frappe.get_all("Delivery Note", {"name": ("in", delivery_notes)}, pluck="grand_total"))
+		)
+	return flt(frappe.db.get_value("Sales Order", shipment.custom_sales_order, "grand_total"))
+
+
+def get_shipment_payload(shipment) -> dict:
+	customer = get_customer(shipment) or frappe._dict()
+	return {
+		"reference": shipment.name,
+		"order_reference": shipment.custom_sales_order or shipment.name,
+		"service_code": shipment.custom_service_code,
+		"origin": get_address_payload(shipment.pickup_address_name),
+		"destination": get_address_payload(shipment.delivery_address_name, customer.name),
+		"parcels": get_parcels(shipment),
+		"declared_value": get_declared_value(shipment),
+		"currency": shipment.custom_currency,
+		"cod": bool(shipment.custom_cod),
+		"cod_amount": flt(shipment.custom_cod_amount),
+		"customer": {"name": customer.name, "phone": customer.phone, "email": customer.email},
+	}
+
+
+def lock_booking(shipment):
+	frappe.db.get_value("Shipment", shipment.name, ["awb_number", "custom_order_ref"], for_update=True)
+	shipment.reload()
+
+
+@frappe.whitelist()
+def book(shipment: str) -> dict:
+	shipment_doc = frappe.get_doc("Shipment", shipment)
+	shipment_doc.check_permission("submit")
+	lock_booking(shipment_doc)
+
+	if shipment_doc.awb_number:
+		frappe.throw(
+			_("This shipment is already booked with AWB {0}").format(frappe.bold(shipment_doc.awb_number)),
+			title=_("Already Booked"),
+		)
+	if not shipment_doc.custom_service_code:
+		frappe.throw(_("Select a shipping service before booking"))
+
+	controller = get_controller(shipment_doc)
+	if not controller.supports("booking"):
+		frappe.throw(
+			_("{0} cannot book shipments").format(frappe.bold(shipment_doc.custom_shipping_provider))
+		)
+	resuming = bool(shipment_doc.custom_order_ref)
+	if resuming and not controller.supports("resume"):
+		frappe.throw(
+			_(
+				"An order for this shipment already exists at {0} ({1}), and it cannot finish a partial"
+				" booking. Cancel that order in the carrier's dashboard before trying again."
+			).format(
+				frappe.bold(shipment_doc.custom_shipping_provider), frappe.bold(shipment_doc.custom_order_ref)
+			),
+			title=_("Partial Booking"),
+		)
+
+	if shipment_doc.docstatus == 0:
+		shipment_doc.flags.ignore_permissions = True
+		shipment_doc.submit()
+
+	request_log = frappe.get_doc(
+		{
+			"doctype": "Integration Request",
+			"integration_request_service": f"{shipment_doc.custom_shipping_provider} Booking",
+			"data": frappe.as_json(
+				{"shipment": shipment_doc.name, "service_code": shipment_doc.custom_service_code}
+			),
+			"reference_doctype": shipment_doc.doctype,
+			"reference_docname": shipment_doc.name,
 		}
+	).insert(ignore_permissions=True)
 
-	def lock_booking(self):
-		frappe.db.get_value("Shipment", self.name, ["awb_number", "custom_order_ref"], for_update=True)
-		self.reload()
-
-	@frappe.whitelist()
-	def book(self) -> dict:
-		self.check_permission("submit")
-		self.lock_booking()
-
-		if self.awb_number:
-			frappe.throw(
-				_("This shipment is already booked with AWB {0}").format(frappe.bold(self.awb_number)),
-				title=_("Already Booked"),
+	try:
+		if resuming:
+			result = controller.resume_booking(
+				shipment_doc.custom_order_ref, shipment_doc.shipment_id, shipment_doc.custom_service_code
 			)
-		if not self.custom_service_code:
-			frappe.throw(_("Select a shipping service before booking"))
+		else:
+			result = controller.create_shipment(get_shipment_payload(shipment_doc))
+	except PartialBookingError as partial:
+		record_partial_booking(shipment_doc, partial.booking)
+		request_log.db_set("status", "Failed", update_modified=False)
+		raise
+	except Exception:
+		request_log.db_set("status", "Failed", update_modified=False)
+		raise
 
-		controller = self.get_controller()
-		if not controller.supports("booking"):
-			frappe.throw(_("{0} cannot book shipments").format(frappe.bold(self.custom_shipping_provider)))
-		resuming = bool(self.custom_order_ref)
-		if resuming and not controller.supports("resume"):
-			frappe.throw(
-				_(
-					"An order for this shipment already exists at {0} ({1}), and it cannot finish a partial"
-					" booking. Cancel that order in the carrier's dashboard before trying again."
-				).format(frappe.bold(self.custom_shipping_provider), frappe.bold(self.custom_order_ref)),
-				title=_("Partial Booking"),
-			)
+	apply_booking_result(shipment_doc, result)
+	request_log.db_set("status", "Completed", update_modified=False)
+	return {
+		"awb": shipment_doc.awb_number,
+		"label_url": shipment_doc.custom_label_url,
+		"status": shipment_doc.custom_shipment_status,
+	}
 
-		if self.docstatus == 0:
-			self.flags.ignore_permissions = True
-			self.submit()
 
-		request_log = frappe.get_doc(
+def record_partial_booking(shipment, booking: dict):
+	if not booking:
+		return
+	for field, value in (
+		("custom_order_ref", booking.get("order_ref")),
+		("shipment_id", booking.get("shipment_ref")),
+	):
+		if value:
+			shipment.db_set(field, value, update_modified=False, commit=True)
+
+
+def apply_booking_result(shipment, result: dict):
+	shipment.custom_order_ref = result.get("order_ref")
+	shipment.shipment_id = result.get("shipment_ref")
+	shipment.awb_number = result.get("awb")
+	shipment.carrier = result.get("carrier")
+	shipment.custom_label_url = result.get("label_url")
+	shipment.shipment_amount = flt(result.get("cost_amount"))
+	shipment.custom_cost_currency = result.get("cost_currency")
+	shipment.custom_tracking_ref = result.get("tracking_ref")
+	shipment.custom_provider_status = result.get("status")
+	shipment.custom_shipment_status = "Ready To Ship"
+	shipment.save(ignore_permissions=True)
+
+
+@frappe.whitelist()
+def cancel_booking(shipment: str) -> dict:
+	shipment_doc = frappe.get_doc("Shipment", shipment)
+	shipment_doc.check_permission("cancel")
+	lock_booking(shipment_doc)
+
+	if not shipment_doc.custom_order_ref:
+		frappe.throw(_("This shipment was never booked, so there is nothing to cancel"))
+	if shipment_doc.custom_shipment_status not in CANCELLABLE_STATUSES:
+		frappe.throw(
+			_("A shipment in status {0} can no longer be cancelled with the carrier").format(
+				frappe.bold(_(shipment_doc.custom_shipment_status))
+			),
+			title=_("Cancellation Not Allowed"),
+		)
+
+	controller = get_controller(shipment_doc)
+	if not controller.supports("cancel"):
+		frappe.throw(
+			_("{0} cannot cancel shipments").format(frappe.bold(shipment_doc.custom_shipping_provider))
+		)
+
+	if shipment_doc.docstatus == 1:
+		shipment_doc.flags.ignore_permissions = True
+		shipment_doc.flags.cancelling_with_carrier = True
+		shipment_doc.cancel()
+	result = controller.cancel_shipment(
+		shipment_doc.custom_order_ref, shipment_ref=shipment_doc.shipment_id, awb=shipment_doc.awb_number
+	)
+	shipment_doc.db_set(
+		{"custom_shipment_status": "Cancelled", "custom_provider_status": (result or {}).get("status")}
+	)
+	return {"status": shipment_doc.custom_shipment_status}
+
+
+@frappe.whitelist()
+def sync_status(shipment: str) -> str:
+	shipment_doc = frappe.get_doc("Shipment", shipment)
+	shipment_doc.check_permission("write")
+	if not shipment_doc.awb_number:
+		frappe.throw(_("This shipment has no AWB yet, so there is nothing to track"))
+
+	controller = get_controller(shipment_doc)
+	if not controller.supports("tracking"):
+		frappe.throw(
+			_("{0} cannot track shipments").format(frappe.bold(shipment_doc.custom_shipping_provider))
+		)
+	tracking = controller.get_tracking(
+		shipment_doc.awb_number,
+		shipment_ref=shipment_doc.shipment_id,
+		tracking_ref=shipment_doc.custom_tracking_ref,
+	)
+
+	lock_booking(shipment_doc)
+	apply_status(
+		shipment_doc,
+		(tracking or {}).get("status"),
+		provider_status=(tracking or {}).get("provider_status"),
+		events=(tracking or {}).get("events"),
+	)
+	return shipment_doc.custom_shipment_status
+
+
+@frappe.whitelist()
+def schedule_pickup(shipment: str, pickup_date: str | None = None) -> dict:
+	shipment_doc = frappe.get_doc("Shipment", shipment)
+	shipment_doc.check_permission("write")
+	lock_booking(shipment_doc)
+	controller = get_controller(shipment_doc)
+	if not controller.supports("pickup"):
+		frappe.throw(
+			_("{0} cannot schedule pickups").format(frappe.bold(shipment_doc.custom_shipping_provider))
+		)
+	if not shipment_doc.shipment_id:
+		frappe.throw(_("Book this shipment before scheduling a pickup"))
+
+	result = controller.schedule_pickup(shipment_doc.shipment_id, pickup_date=pickup_date or today())
+	shipment_doc.custom_pickup_ref = (result or {}).get("pickup_ref")
+	shipment_doc.pickup_date = (result or {}).get("scheduled_date") or pickup_date or today()
+	if can_advance(shipment_doc.custom_shipment_status, "Pickup Scheduled"):
+		shipment_doc.custom_shipment_status = "Pickup Scheduled"
+	shipment_doc.save(ignore_permissions=True)
+	return result or {}
+
+
+@frappe.whitelist()
+def generate_manifest(shipment: str) -> dict:
+	shipment_doc = frappe.get_doc("Shipment", shipment)
+	shipment_doc.check_permission("write")
+	controller = get_controller(shipment_doc)
+	if not controller.supports("manifest"):
+		frappe.throw(
+			_("{0} cannot generate manifests").format(frappe.bold(shipment_doc.custom_shipping_provider))
+		)
+	if not shipment_doc.shipment_id:
+		frappe.throw(_("Book this shipment before generating a manifest"))
+
+	result = controller.generate_manifest([shipment_doc.shipment_id])
+	shipment_doc.db_set("custom_manifest_url", (result or {}).get("manifest_url"))
+	return result or {}
+
+
+def apply_webhook_status(
+	shipment,
+	status: str,
+	event_id: str | None = None,
+	events: list | None = None,
+	provider_status: str | None = None,
+) -> bool:
+	lock_booking(shipment)
+
+	if event_id and shipment.custom_last_webhook_event_id == event_id:
+		return False
+
+	return apply_status(shipment, status, provider_status=provider_status, events=events, event_id=event_id)
+
+
+def apply_status(
+	shipment,
+	status: str | None,
+	provider_status: str | None = None,
+	events: list | None = None,
+	event_id: str | None = None,
+) -> bool:
+	appended = append_tracking_events(shipment, events)
+	advanced = bool(status) and can_advance(shipment.custom_shipment_status, status)
+
+	if advanced:
+		validate_status(status)
+		shipment.custom_shipment_status = status
+	elif (
+		status and status != shipment.custom_shipment_status and is_terminal(shipment.custom_shipment_status)
+	):
+		frappe.log_error(
+			title=f"Shipment {shipment.name} status conflict",
+			message=f"stored: {shipment.custom_shipment_status}, carrier reported: {status}",
+		)
+
+	describes_current_state = bool(status) and status == shipment.custom_shipment_status
+	if describes_current_state:
+		if provider_status:
+			shipment.custom_provider_status = provider_status
+		if event_id:
+			shipment.custom_last_webhook_event_id = event_id
+
+	if advanced or appended or describes_current_state:
+		shipment.flags.ignore_mandatory = True
+		shipment.save(ignore_permissions=True)
+	return advanced
+
+
+def append_tracking_events(shipment, events: list | None) -> bool:
+	if not events:
+		return False
+
+	seen = {get_event_key(event.as_dict()) for event in shipment.custom_tracking_events}
+	appended = False
+	for event in events:
+		key = get_event_key(event)
+		if key in seen:
+			continue
+		shipment.append(
+			"custom_tracking_events",
 			{
-				"doctype": "Integration Request",
-				"integration_request_service": f"{self.custom_shipping_provider} Booking",
-				"data": frappe.as_json({"shipment": self.name, "service_code": self.custom_service_code}),
-				"reference_doctype": self.doctype,
-				"reference_docname": self.name,
-			}
-		).insert(ignore_permissions=True)
-
-		try:
-			if resuming:
-				result = controller.resume_booking(
-					self.custom_order_ref, self.shipment_id, self.custom_service_code
-				)
-			else:
-				result = controller.create_shipment(self.get_shipment_payload())
-		except PartialBookingError as partial:
-			self.record_partial_booking(partial.booking)
-			request_log.db_set("status", "Failed", update_modified=False)
-			raise
-		except Exception:
-			request_log.db_set("status", "Failed", update_modified=False)
-			raise
-
-		self.apply_booking_result(result)
-		request_log.db_set("status", "Completed", update_modified=False)
-		return {
-			"awb": self.awb_number,
-			"label_url": self.custom_label_url,
-			"status": self.custom_shipment_status,
-		}
-
-	def record_partial_booking(self, booking: dict):
-		if not booking:
-			return
-		for field, value in (
-			("custom_order_ref", booking.get("order_ref")),
-			("shipment_id", booking.get("shipment_ref")),
-		):
-			if value:
-				self.db_set(field, value, update_modified=False, commit=True)
-
-	def apply_booking_result(self, result: dict):
-		self.custom_order_ref = result.get("order_ref")
-		self.shipment_id = result.get("shipment_ref")
-		self.awb_number = result.get("awb")
-		self.carrier = result.get("carrier")
-		self.custom_label_url = result.get("label_url")
-		self.shipment_amount = flt(result.get("cost_amount"))
-		self.custom_cost_currency = result.get("cost_currency")
-		self.custom_tracking_ref = result.get("tracking_ref")
-		self.custom_provider_status = result.get("status")
-		self.custom_shipment_status = "Ready To Ship"
-		self.save(ignore_permissions=True)
-
-	@frappe.whitelist()
-	def cancel_booking(self) -> dict:
-		self.check_permission("cancel")
-		self.lock_booking()
-
-		if not self.custom_order_ref:
-			frappe.throw(_("This shipment was never booked, so there is nothing to cancel"))
-		if self.custom_shipment_status not in CANCELLABLE_STATUSES:
-			frappe.throw(
-				_("A shipment in status {0} can no longer be cancelled with the carrier").format(
-					frappe.bold(_(self.custom_shipment_status))
-				),
-				title=_("Cancellation Not Allowed"),
-			)
-
-		controller = self.get_controller()
-		if not controller.supports("cancel"):
-			frappe.throw(_("{0} cannot cancel shipments").format(frappe.bold(self.custom_shipping_provider)))
-
-		if self.docstatus == 1:
-			self.flags.ignore_permissions = True
-			self.flags.cancelling_with_carrier = True
-			self.cancel()
-		result = controller.cancel_shipment(
-			self.custom_order_ref, shipment_ref=self.shipment_id, awb=self.awb_number
+				"timestamp": get_datetime(event.get("timestamp")) if event.get("timestamp") else None,
+				"status": event.get("status"),
+				"location": event.get("location"),
+				"message": event.get("message"),
+				"event_id": event.get("event_id"),
+			},
 		)
-		self.db_set(
-			{"custom_shipment_status": "Cancelled", "custom_provider_status": (result or {}).get("status")}
-		)
-		return {"status": self.custom_shipment_status}
-
-	@frappe.whitelist()
-	def sync_status(self) -> str:
-		self.check_permission("write")
-		if not self.awb_number:
-			frappe.throw(_("This shipment has no AWB yet, so there is nothing to track"))
-
-		controller = self.get_controller()
-		if not controller.supports("tracking"):
-			frappe.throw(_("{0} cannot track shipments").format(frappe.bold(self.custom_shipping_provider)))
-		tracking = controller.get_tracking(
-			self.awb_number, shipment_ref=self.shipment_id, tracking_ref=self.custom_tracking_ref
-		)
-
-		self.lock_booking()
-		self.apply_status(
-			(tracking or {}).get("status"),
-			provider_status=(tracking or {}).get("provider_status"),
-			events=(tracking or {}).get("events"),
-		)
-		return self.custom_shipment_status
-
-	@frappe.whitelist()
-	def schedule_pickup(self, pickup_date: str | None = None) -> dict:
-		self.check_permission("write")
-		self.lock_booking()
-		controller = self.get_controller()
-		if not controller.supports("pickup"):
-			frappe.throw(_("{0} cannot schedule pickups").format(frappe.bold(self.custom_shipping_provider)))
-		if not self.shipment_id:
-			frappe.throw(_("Book this shipment before scheduling a pickup"))
-
-		result = controller.schedule_pickup(self.shipment_id, pickup_date=pickup_date or today())
-		self.custom_pickup_ref = (result or {}).get("pickup_ref")
-		self.pickup_date = (result or {}).get("scheduled_date") or pickup_date or today()
-		if can_advance(self.custom_shipment_status, "Pickup Scheduled"):
-			self.custom_shipment_status = "Pickup Scheduled"
-		self.save(ignore_permissions=True)
-		return result or {}
-
-	@frappe.whitelist()
-	def generate_manifest(self) -> dict:
-		self.check_permission("write")
-		controller = self.get_controller()
-		if not controller.supports("manifest"):
-			frappe.throw(
-				_("{0} cannot generate manifests").format(frappe.bold(self.custom_shipping_provider))
-			)
-		if not self.shipment_id:
-			frappe.throw(_("Book this shipment before generating a manifest"))
-
-		result = controller.generate_manifest([self.shipment_id])
-		self.db_set("custom_manifest_url", (result or {}).get("manifest_url"))
-		return result or {}
-
-	def apply_webhook_status(
-		self,
-		status: str,
-		event_id: str | None = None,
-		events: list | None = None,
-		provider_status: str | None = None,
-	) -> bool:
-		self.lock_booking()
-
-		if event_id and self.custom_last_webhook_event_id == event_id:
-			return False
-
-		return self.apply_status(status, provider_status=provider_status, events=events, event_id=event_id)
-
-	def apply_status(
-		self,
-		status: str | None,
-		provider_status: str | None = None,
-		events: list | None = None,
-		event_id: str | None = None,
-	) -> bool:
-		appended = self.append_tracking_events(events)
-		advanced = bool(status) and can_advance(self.custom_shipment_status, status)
-
-		if advanced:
-			validate_status(status)
-			self.custom_shipment_status = status
-		elif status and status != self.custom_shipment_status and is_terminal(self.custom_shipment_status):
-			frappe.log_error(
-				title=f"Shipment {self.name} status conflict",
-				message=f"stored: {self.custom_shipment_status}, carrier reported: {status}",
-			)
-
-		describes_current_state = bool(status) and status == self.custom_shipment_status
-		if describes_current_state:
-			if provider_status:
-				self.custom_provider_status = provider_status
-			if event_id:
-				self.custom_last_webhook_event_id = event_id
-
-		if advanced or appended or describes_current_state:
-			self.flags.ignore_mandatory = True
-			self.save(ignore_permissions=True)
-		return advanced
-
-	def append_tracking_events(self, events: list | None) -> bool:
-		if not events:
-			return False
-
-		seen = {get_event_key(event.as_dict()) for event in self.custom_tracking_events}
-		appended = False
-		for event in events:
-			key = get_event_key(event)
-			if key in seen:
-				continue
-			self.append(
-				"custom_tracking_events",
-				{
-					"timestamp": get_datetime(event.get("timestamp")) if event.get("timestamp") else None,
-					"status": event.get("status"),
-					"location": event.get("location"),
-					"message": event.get("message"),
-					"event_id": event.get("event_id"),
-				},
-			)
-			seen.add(key)
-			appended = True
-		return appended
+		seen.add(key)
+		appended = True
+	return appended
 
 
 def get_event_key(event: dict) -> tuple:

@@ -215,10 +215,13 @@ doc_events = {
 		"on_trash": "commera.utils.update_so_status_from_related_doc",
 	},
 	"Shipment": {
-		"on_update": "commera.utils.update_so_status_from_related_doc",
-		"on_submit": "commera.utils.update_so_status_from_related_doc",
-		"on_update_after_submit": "commera.utils.update_so_status_from_related_doc",
-		"on_cancel": "commera.utils.update_so_status_from_related_doc",
+		"validate": "commera.doc_events.shipment.validate",
+		"before_update_after_submit": "commera.doc_events.shipment.before_update_after_submit",
+		"on_update": "commera.doc_events.shipment.on_update",
+		"on_submit": "commera.doc_events.shipment.on_submit",
+		"on_update_after_submit": "commera.doc_events.shipment.on_update_after_submit",
+		"before_cancel": "commera.doc_events.shipment.before_cancel",
+		"on_cancel": "commera.doc_events.shipment.on_cancel",
 	},
 }
 
@@ -387,7 +390,6 @@ add_to_apps_screen = [
 # ---------------
 # Override standard doctype classes
 
-extend_doctype_class = {"Shipment": ["commera.shipping.shipment.CommeraShipment"]}
 
 # override_doctype_class = {
 # 	"ToDo": "custom_app.overrides.CustomToDo"
@@ -434,6 +436,7 @@ before_tests = "commera.install.before_tests"
 # ------------------------------
 
 override_whitelisted_methods = {
+	# Carriers set up before the move still post to the bwh_shipping URL; drop once they use the new one.
 	"bwh_shipping.bwh_shipping.webhook.handle": "commera.shipping.webhook.handle",
 }
 #

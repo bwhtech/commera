@@ -4,6 +4,7 @@ from frappe.integrations.utils import create_request_log
 from frappe.rate_limiter import rate_limit
 
 from commera.shipping.providers import get_provider
+from commera.shipping.shipment import apply_webhook_status
 
 WEBHOOK_ACCEPTED = {"status": "ok"}
 
@@ -74,8 +75,8 @@ def apply_status_as_administrator(
 	session_user = frappe.session.user
 	try:
 		frappe.set_user("Administrator")  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
-		shipment.apply_webhook_status(
-			status, event_id=event_id, events=events, provider_status=provider_status
+		apply_webhook_status(
+			shipment, status, event_id=event_id, events=events, provider_status=provider_status
 		)
 	finally:
 		frappe.set_user(session_user)  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser

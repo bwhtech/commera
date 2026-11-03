@@ -9,7 +9,7 @@ from commera.discounts.allocations import get_allocations
 from commera.plugin_events import read_shipping_addresses, validate_plugin_fieldnames
 from commera.sdk.types import Order
 from commera.shipping.fulfilment import get_provider_pickup_address, new_shipment
-from commera.shipping.shipment import get_order_shipments
+from commera.shipping.shipment import append_tracking_events, apply_status, get_order_shipments, lock_booking
 from commera.shipping.status import validate_status
 
 __all__ = ["get_order", "get_orders", "record_shipment"]
@@ -124,12 +124,12 @@ def record_shipment(
 
 	shipment = frappe.get_doc("Shipment", shipments[0].name)
 	shipment.check_permission("write")
-	shipment.lock_booking()
+	lock_booking(shipment)
 	if tracking_url:
 		shipment.tracking_url = tracking_url
 	if carrier:
 		shipment.carrier = carrier
-	shipment.apply_status(status, events=events)
+	apply_status(shipment, status, events=events)
 	return shipment.name
 
 
@@ -153,7 +153,7 @@ def create_order_shipment(sales_order, provider, awb, carrier, status, events, t
 			"custom_shipment_status": status,
 		}
 	)
-	shipment.append_tracking_events(events)
+	append_tracking_events(shipment, events)
 	shipment.insert()
 	shipment.submit()
 	return shipment.name

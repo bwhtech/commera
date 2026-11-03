@@ -6,6 +6,7 @@ from frappe.tests import IntegrationTestCase
 from commera.sdk import STORE_ORDER_TYPE
 from commera.shipping.fulfilment import create_shipment
 from commera.shipping.providers import use_providers
+from commera.shipping.shipment import book, cancel_booking, sync_status
 from commera.shipping.testing import InMemoryShippingProvider
 from commera.shipping.tests.test_carrier_import import create_test_address, create_test_provider_profile
 from commera.tests.test_admin_orders import make_test_sales_order
@@ -34,9 +35,9 @@ class TestShipmentBooking(IntegrationTestCase):
 		self.delivery_note = deliver(sales_order).name
 
 	def book(self):
-		shipment = frappe.get_doc("Shipment", create_shipment(self.delivery_note))
-		shipment.book()
-		return shipment
+		shipment = create_shipment(self.delivery_note)
+		book(shipment)
+		return frappe.get_doc("Shipment", shipment)
 
 	def test_a_shipment_is_drafted_with_the_customers_choice(self):
 		shipment = frappe.get_doc("Shipment", create_shipment(self.delivery_note))
@@ -71,8 +72,9 @@ class TestShipmentBooking(IntegrationTestCase):
 		shipment = frappe.get_doc("Shipment", create_shipment(self.delivery_note))
 
 		with patch.object(frappe.db, "commit", side_effect=AssertionError("committed mid-booking")):
-			shipment.book()
+			book(shipment.name)
 
+		shipment.reload()
 		self.assertEqual(shipment.docstatus, 1)
 
 	def test_a_booked_shipment_cancels_only_with_the_carrier(self):
@@ -89,7 +91,7 @@ class TestShipmentBooking(IntegrationTestCase):
 	def test_cancelling_the_booking_cancels_the_shipment_and_frees_the_delivery_note(self):
 		shipment = self.book()
 
-		shipment.cancel_booking()
+		cancel_booking(shipment.name)
 
 		shipment.reload()
 		self.assertEqual((shipment.docstatus, shipment.custom_shipment_status), (2, "Cancelled"))
@@ -101,7 +103,7 @@ class TestShipmentBooking(IntegrationTestCase):
 		scan = {"timestamp": "2026-10-01 10:00:00", "status": "Delivered", "message": "Handed over"}
 		self.carrier.tracking[shipment.awb_number] = {"status": "Delivered", "events": [scan]}
 
-		shipment.sync_status()
+		sync_status(shipment.name)
 
 		shipment.reload()
 		self.assertEqual(
