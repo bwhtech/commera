@@ -9,6 +9,7 @@ import { isAdmin } from '../data/boot'
 import { useAdminRead, useMethodRead } from '../data/api'
 import NavSection from './NavSection.vue'
 import SetupBanner from './firstrun/SetupBanner.vue'
+import TrialCard from './TrialCard.vue'
 
 const route = useRoute()
 
@@ -64,7 +65,10 @@ const headerMenu = computed(() => [
             <ScrollArea v-scroll-fade class="min-h-0 flex-1" viewport-class="pt-1 pb-10">
               <NavSection v-for="section in sections" :key="section.id" :section="section" :active-target="activeTarget" />
             </ScrollArea>
-            <SetupBanner v-if="isAdmin" />
+            <div class="flex flex-col gap-2">
+              <TrialCard />
+              <SetupBanner v-if="isAdmin" />
+            </div>
           </div>
         </Sidebar>
       </template>

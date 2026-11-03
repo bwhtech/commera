@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   Button,
   Icon,
@@ -14,6 +14,7 @@ import {
 import AdvancedSettings from './AdvancedSettings.vue'
 import AppearancePicker from './AppearancePicker.vue'
 import AppsSettings from './AppsSettings.vue'
+import BillingSettings from './BillingSettings.vue'
 import CashOnDeliverySettings from './CashOnDeliverySettings.vue'
 import CheckoutSettings from './CheckoutSettings.vue'
 import PluginSettingsPanel from './PluginSettingsPanel.vue'
@@ -24,6 +25,7 @@ import IntegrationTabPanel from './IntegrationTabPanel.vue'
 import LocationsSettings from './LocationsSettings.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import ShippingSections from './ShippingSections.vue'
+import { isCloudBillingAvailable } from '../../data/cloudBilling'
 import { paymentIntegrations, shippingIntegrations } from '../../data/integrations'
 import { pickupLocations } from '../../data/pickupLocations'
 import { pluginSettingsTabs } from '../../ia/plugins'
@@ -43,6 +45,19 @@ const tab = computed({
   get: () => (isMobile.value ? settings.pickedTab : settings.tab),
   set: (value) => (settings.tab = value),
 })
+
+const isCloudOverlayOpen = ref(false)
+
+// An Esc or outside click meant for one of the Cloud billing panel's menus also reaches this
+// dialog: the panel is a separate Vue app in a shadow root, with its own reka-ui layer stack
+// listening on the same `window`, and its inline runtime closes a menu on an outside click by
+// dispatching a synthetic Escape. The close is ignored here rather than refused with
+// `dismissible: false`, because that calls preventDefault() on the shared event, and the
+// Cloud menu then sees defaultPrevented and stays open.
+function setOpen(isOpen) {
+  if (!isOpen && isCloudOverlayOpen.value) return
+  settings.open = isOpen
+}
 
 function goBack() {
   if (settings.pickedTab) settings.tab = ''
@@ -64,7 +79,12 @@ watch(
 </script>
 
 <template>
-  <SettingsDialog v-model:open="settings.open" v-model:tab="tab" :unmount-on-hide="false">
+  <SettingsDialog
+    :open="settings.open"
+    v-model:tab="tab"
+    :unmount-on-hide="false"
+    @update:open="setOpen"
+  >
     <template #title>Commera settings</template>
 
     <header class="flex h-12 shrink-0 items-center gap-1 border-b border-outline-gray-1 px-2 sm:hidden">
@@ -138,6 +158,13 @@ watch(
         <SettingsNavItem value="advanced">
           <template #prefix><span class="lucide-sliders-horizontal size-4" aria-hidden="true" /></template>
           Advanced
+        </SettingsNavItem>
+      </SettingsNavGroup>
+
+      <SettingsNavGroup v-if="isCloudBillingAvailable" label="Frappe Cloud">
+        <SettingsNavItem value="billing">
+          <template #prefix><span class="lucide-receipt size-4" aria-hidden="true" /></template>
+          Billing
         </SettingsNavItem>
       </SettingsNavGroup>
 
@@ -222,6 +249,12 @@ watch(
 
       <SettingsPanel value="advanced" class="min-w-0">
         <AdvancedSettings :active="settings.open && settings.tab === 'advanced'" />
+      </SettingsPanel>
+
+      <!-- Mounted only while shown, unlike the panels kept alive by unmount-on-hide: leaving the
+           tab closes the Cloud panel, and its onClose re-reads the billing for the trial card. -->
+      <SettingsPanel v-if="isCloudBillingAvailable" value="billing" class="min-w-0">
+        <BillingSettings v-if="settings.open && tab === 'billing'" v-model:overlay-open="isCloudOverlayOpen" />
       </SettingsPanel>
     </SettingsContent>
   </SettingsDialog>
