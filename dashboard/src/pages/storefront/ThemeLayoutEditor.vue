@@ -37,6 +37,7 @@ const [DefineTreePanel, TreePanel] = createReusableTemplate()
 const treePanel = ref(null)
 const settingsOpen = ref(true)
 const maximised = ref(null)
+const pendingAction = ref(null)
 
 const themeSettingsOpen = ref(false)
 const themeSettingsDirty = ref(false)
@@ -135,12 +136,21 @@ function pickSection(type) {
   pickingGroup.value = null
 }
 
+async function track(label, work) {
+  pendingAction.value = label
+  try {
+    return await work()
+  } finally {
+    pendingAction.value = null
+  }
+}
+
 async function save() {
-  if (await editor.save()) toast.success('Draft saved')
+  if (await track('Save', () => editor.save())) toast.success('Draft saved')
 }
 
 async function publish() {
-  if (!(await editor.publish())) return
+  if (!(await track('Publish', () => editor.publish()))) return
   toast.success(state.live ? 'Published to your store' : `Published. Activate ${state.theme} to show it in your store.`)
 }
 
@@ -151,7 +161,7 @@ function discard() {
     theme: 'red',
     confirmLabel: 'Discard',
     onConfirm: async () => {
-      if (await editor.discard()) toast.success('Changes discarded')
+      if (await track('Discard', () => editor.discard())) toast.success('Changes discarded')
     },
   })
 }
@@ -216,8 +226,8 @@ useEventListener(window, 'beforeunload', (event) => {
               :variant="action.variant"
               :label="action.label"
               :class="{ 'pointer-events-none': action.reason }"
-              :disabled="Boolean(action.reason)"
-              :loading="!action.reason && busy"
+              :disabled="Boolean(action.reason) || (busy && pendingAction !== action.label)"
+              :loading="pendingAction === action.label"
               @click="action.onClick"
             />
           </span>

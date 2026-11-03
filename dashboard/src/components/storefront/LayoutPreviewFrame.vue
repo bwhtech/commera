@@ -1,7 +1,7 @@
 <script setup>
-import { computed, onMounted, ref, useId, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { useEventListener } from '@vueuse/core'
-import { toast } from 'frappe-ui'
+import { toast, useColorScheme } from 'frappe-ui'
 import { SECTION_GROUPS } from '../../data/themeLayout'
 
 const props = defineProps({
@@ -27,6 +27,7 @@ let latestRender = 0
 let readyRender = 0
 let lastPosted = null
 let renderingTimer = null
+let unmounted = false
 
 const action = computed(() => {
   const params = new URLSearchParams({ theme: state.theme, page: state.page, lang: state.language })
@@ -85,7 +86,7 @@ const renderNumberOf = (index) => Number(new URLSearchParams(frames[index].conte
 
 async function onFrameLoad(index) {
   await new Promise((resolve) => setTimeout(resolve, READY_GRACE_MS))
-  if (index === visibleIndex.value || renderNumberOf(index) !== latestRender || readyRender === latestRender) return
+  if (unmounted || index === visibleIndex.value || renderNumberOf(index) !== latestRender || readyRender === latestRender) return
   clearTimeout(renderingTimer)
   rendering.value = false
   lastPosted = null
@@ -126,9 +127,12 @@ useEventListener(window, 'message', (event) => {
   }
 })
 
+const { resolvedColorScheme } = useColorScheme()
+
 defineExpose({ scrollToSection: (position) => post('commera:scroll-to-section', position) })
 
 onMounted(render)
+onBeforeUnmount(() => (unmounted = true))
 watch(() => [state.previewToken, state.language], render)
 watch(
   () => state.scrollRequest,
@@ -139,6 +143,7 @@ watch(
   () => highlight(false),
   { deep: true },
 )
+watch(resolvedColorScheme, () => highlight(false))
 </script>
 
 <template>
