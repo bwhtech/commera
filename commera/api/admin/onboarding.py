@@ -146,6 +146,7 @@ def start_store_setup(
 		SETTINGS_DOCTYPE, {"store_name": store_name, "store_category": cstr(store_category).strip()}
 	)
 	if status["status"] == "done":
+		onboarding.adopt_existing_company()
 		return status
 
 	args = onboarding.build_setup_args(
@@ -190,4 +191,5 @@ def complete_onboarding():
 	frappe.only_for(ONBOARDING_ROLE)
 
 	frappe.db.set_single_value(SETTINGS_DOCTYPE, "onboarding_completed", 1)
+	onboarding.set_owner_default_app(frappe.session.user)
 	return {"onboarding_completed": True}

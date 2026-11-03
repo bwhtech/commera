@@ -6,6 +6,7 @@ from frappe.tests import IntegrationTestCase
 from commera import onboarding
 from commera.api.admin import onboarding as onboarding_api
 from commera.install import TEST_ABBR, TEST_COMPANY
+from commera.migrate import set_default_app
 from commera.roles import COMMERA_ADMIN
 from commera.www.commera import get_boot
 
@@ -236,3 +237,78 @@ class OnboardingAccessTestCase(IntegrationTestCase):
 		self.assertEqual(onboarding_api.save_brand(primary_color="#1d4ed8")["primary_color"], "#1d4ed8")
 		with self.assertRaises(frappe.ValidationError):
 			onboarding_api.save_brand(primary_color="red; background: url(x)")
+
+
+class InstallOnSiteInUseTestCase(IntegrationTestCase):
+	"""Commera installed on a site whose Frappe setup already ran, next to people using ERPNext."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		system_default = frappe.db.get_single_value("System Settings", "default_app")
+		user_default = frappe.db.get_value("User", "Administrator", "default_app")
+		company = frappe.db.get_single_value(SETTINGS, "company")
+		self.addCleanup(frappe.db.set_single_value, "System Settings", "default_app", system_default)
+		self.addCleanup(frappe.db.set_value, "User", "Administrator", "default_app", user_default)
+		self.addCleanup(frappe.db.set_single_value, SETTINGS, "company", company)
+		frappe.db.set_single_value("System Settings", "default_app", "")
+		frappe.db.set_value("User", "Administrator", "default_app", "")
+
+	def test_fresh_site_lands_everyone_on_commera(self):
+		with patch("frappe.is_setup_complete", return_value=False):
+			set_default_app()
+
+		self.assertEqual(frappe.db.get_single_value("System Settings", "default_app"), "commera")
+
+	def test_site_in_use_keeps_its_landing_page(self):
+		set_default_app()
+
+		self.assertFalse(frappe.db.get_single_value("System Settings", "default_app"))
+
+	def test_a_chosen_default_is_kept(self):
+		frappe.db.set_single_value("System Settings", "default_app", "erpnext")
+		with patch("frappe.is_setup_complete", return_value=False):
+			set_default_app()
+
+		self.assertEqual(frappe.db.get_single_value("System Settings", "default_app"), "erpnext")
+
+	def test_finishing_onboarding_lands_only_the_owner_on_commera(self):
+		onboarding_api.complete_onboarding()
+
+		self.assertEqual(frappe.db.get_value("User", "Administrator", "default_app"), "commera")
+		self.assertFalse(frappe.db.get_single_value("System Settings", "default_app"))
+
+	def test_owner_keeps_their_own_choice(self):
+		frappe.db.set_value("User", "Administrator", "default_app", "erpnext")
+		onboarding_api.complete_onboarding()
+
+		self.assertEqual(frappe.db.get_value("User", "Administrator", "default_app"), "erpnext")
+
+	def test_no_owner_default_where_the_site_already_lands_on_commera(self):
+		frappe.db.set_single_value("System Settings", "default_app", "commera")
+		onboarding_api.complete_onboarding()
+
+		self.assertFalse(frappe.db.get_value("User", "Administrator", "default_app"))
+
+	def test_store_step_adopts_the_default_company(self):
+		frappe.db.set_single_value(SETTINGS, "company", "")
+		with patch("frappe.enqueue") as enqueue:
+			result = onboarding_api.start_store_setup(**STORE)
+
+		self.assertEqual(result["status"], "done")
+		enqueue.assert_not_called()
+		default_company = frappe.db.get_single_value("Global Defaults", "default_company")
+		self.assertTrue(default_company)
+		self.assertEqual(frappe.db.get_single_value(SETTINGS, "company"), default_company)
+		self.assertTrue(frappe.db.get_single_value(SETTINGS, "ecommerce_warehouse"))
+
+	def test_store_step_fills_the_rest_for_a_company_already_chosen(self):
+		warehouse = frappe.db.get_single_value(SETTINGS, "ecommerce_warehouse")
+		self.addCleanup(frappe.db.set_single_value, SETTINGS, "ecommerce_warehouse", warehouse)
+		frappe.db.set_single_value(SETTINGS, {"company": TEST_COMPANY, "ecommerce_warehouse": ""})
+		onboarding_api.start_store_setup(**STORE)
+
+		self.assertEqual(frappe.db.get_single_value(SETTINGS, "company"), TEST_COMPANY)
+		self.assertEqual(
+			frappe.db.get_single_value(SETTINGS, "ecommerce_warehouse"),
+			onboarding.get_company_warehouse(TEST_COMPANY),
+		)

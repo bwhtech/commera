@@ -145,6 +145,25 @@ def seed_commera_settings(company: str):
 	settings.save(ignore_permissions=True)
 
 
+def adopt_existing_company():
+	"""A site set up before Commera gets what the setup job fills, for its store company or ERPNext's default."""
+	company = frappe.db.get_single_value(SETTINGS_DOCTYPE, "company") or frappe.db.get_single_value(
+		"Global Defaults", "default_company"
+	)
+	if not company and frappe.db.count("Company") == 1:
+		company = frappe.db.get_value("Company", {}, "name")
+	if company:
+		seed_commera_settings(company)
+
+
+def set_owner_default_app(user: str):
+	"""Where the site's default app is not Commera, only the owner who ran onboarding lands on it."""
+	if frappe.db.get_single_value("System Settings", "default_app") == "commera":
+		return
+	if not frappe.db.get_value("User", user, "default_app"):
+		frappe.db.set_value("User", user, "default_app", "commera")
+
+
 def get_company_warehouse(company: str) -> str | None:
 	"""ERPNext's default warehouse for the company ("Stores"), not the first one in the tree (in transit)."""
 	return frappe.get_cached_value("Company", company, "default_warehouse") or frappe.db.get_value(
