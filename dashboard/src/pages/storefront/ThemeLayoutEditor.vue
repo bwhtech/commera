@@ -84,7 +84,7 @@ async function toggleThemeSettings() {
 
 const breadcrumbs = computed(() => [
   { label: 'Themes', route: { name: 'StorefrontTheme' } },
-  { label: state.theme },
+  { label: state.theme, route: { name: 'StorefrontThemeDetail', params: { theme: state.theme } } },
 ])
 
 async function toggleMaximise() {

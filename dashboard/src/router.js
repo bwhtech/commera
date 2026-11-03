@@ -31,7 +31,12 @@ const routes = [
   { path: '/analytics/revenue', name: 'RevenueReport', component: () => import('./pages/analytics/Revenue.vue') },
   { path: '/analytics/inventory', name: 'InventoryReport', component: () => import('./pages/analytics/Inventory.vue') },
   { path: '/analytics/storefront', name: 'StorefrontReport', component: () => import('./pages/analytics/Storefront.vue') },
-  { path: '/storefront/theme', name: 'StorefrontTheme', component: () => import('./pages/storefront/Theme.vue') },
+  { path: '/storefront/theme', name: 'StorefrontTheme', component: () => import('./pages/storefront/Themes.vue') },
+  {
+    path: '/storefront/theme/:theme',
+    name: 'StorefrontThemeDetail',
+    component: () => import('./pages/storefront/ThemeDetail.vue'),
+  },
   {
     path: '/storefront/theme/:theme/editor',
     name: 'StorefrontThemeEditor',

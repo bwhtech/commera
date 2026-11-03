@@ -20,7 +20,7 @@ const ROUTES = [
   ['/analytics/revenue', 'Revenue'],
   ['/analytics/inventory', 'Inventory'],
   ['/analytics/storefront', 'Storefront'],
-  ['/storefront/theme', 'Theme'],
+  ['/storefront/theme', 'Themes'],
   ['/storefront/navigation', 'Navigation'],
   ['/storefront/pages', 'Pages'],
 ]

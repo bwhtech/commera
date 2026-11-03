@@ -27,6 +27,7 @@ def build_themes(active_theme):
 
 	for theme in themes:
 		theme.live = theme.name == active_theme
+		theme.settings_desk_url = get_url_to_form(theme.theme_settings) if theme.theme_settings else None
 
 	return sorted(themes, key=lambda theme: not theme.live)
 
