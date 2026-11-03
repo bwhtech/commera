@@ -19,4 +19,14 @@ export default {
     ...readPluginApps().map((app) => `${sourceDirOf(app)}/**/*.{vue,js,ts}`),
   ],
   safelist: pluginIcons.map((name) => `lucide-${name}`),
+  theme: {
+    extend: {
+      // Named so motion reads `ease-out-strong` instead of a bezier pasted per class. Out is for
+      // anything entering or answering a press; in-out for something already on screen moving.
+      transitionTimingFunction: {
+        'out-strong': 'cubic-bezier(0.23, 1, 0.32, 1)',
+        'in-out-strong': 'cubic-bezier(0.77, 0, 0.175, 1)',
+      },
+    },
+  },
 }
