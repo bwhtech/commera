@@ -127,6 +127,7 @@ after_app_install = "commera.storefront_plugins.sync_storefront_apps"
 setup_wizard_complete = [
 	"commera.swatches.drop_unused_colour_attribute",
 	"commera.cloud.link.queue_initial_link",
+	"commera.plugin_events.add_plugin_user",
 ]
 
 
