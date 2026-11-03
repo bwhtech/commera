@@ -71,6 +71,8 @@ class TestCartCheckout(IntegrationTestCase):
 
 	def setUp(self):
 		self.addCleanup(frappe.set_user, "Administrator")
+		# A new store starts with cash on delivery off; the cash on delivery tests need it on.
+		frappe.db.set_single_value("Commera Settings", "cod_enabled", 1)
 		self.shopper = self.create_shopper()
 		self.discounted_item = self.create_item(sale_rate=SALE_RATE)
 		self.full_price_item = self.create_item(sale_rate=None)
