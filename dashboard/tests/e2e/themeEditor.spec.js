@@ -424,17 +424,22 @@ describe('theme editor', () => {
     assert.ok(Math.abs((await panelWidth(page, 'tree')) - 220) <= 2, 'a hard drag stops at the minimum, it never folds the tree away')
     await dragBy(page, '[data-editor-handle="tree"]', widened - 220)
 
-    const settingsWidth = await panelWidth(page, 'settings')
+    assert.equal(await panelWidth(page, 'settings'), 0, 'with nothing selected there is no settings column')
     await openThemeSettings(page)
-    const overlayWidth = await page.$eval('[data-theme-layout-editor] > aside', (element) => element.getBoundingClientRect().width)
-    assert.equal(Math.round(overlayWidth), settingsWidth, 'theme settings cover the settings column exactly')
     await clickButton(page, 'Close theme settings')
-    assert.equal(await page.$('[data-theme-settings-panel]'), null)
+    assert.equal(await page.$('[data-theme-settings-panel]'), null, 'theme settings close at once')
+    assert.equal(await panelWidth(page, 'settings'), 0, 'closing with nothing selected folds the column away')
+    await page.click('[data-tree-node^="section:"]')
+    const settingsWidth = await panelWidth(page, 'settings')
+    assert.ok(settingsWidth > 0, 'selecting a section opens its settings')
+    await openThemeSettings(page)
+    await clickButton(page, 'Close theme settings')
+    assert.ok(await page.$('[data-settings-panel]'), 'closing goes back to the section that was selected')
 
     await page.reload({ waitUntil: 'networkidle2' })
     await page.waitForSelector('[data-tree-node^="section:"]', { timeout: 30000 })
     assert.equal(await panelWidth(page, 'tree'), widened)
-    assert.equal(await panelWidth(page, 'settings'), settingsWidth)
+    assert.equal(await panelWidth(page, 'settings'), 0, 'a reload starts with nothing selected')
   })
 
   uiTest(session, 'The preview fits the canvas, scrolls its own page and maximises', async (t) => {
