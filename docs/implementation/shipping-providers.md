@@ -100,7 +100,7 @@ Commera reads `pickup_address` and `volumetric_divisor` from the settings with `
 
 ## Webhooks
 
-Set the carrier to post to `/api/method/commera.shipping.webhook.handle?provider=<Profile name>`. The Integrations screen shows this URL. `handle_webhook` must verify that the request comes from the carrier. It returns `{}` to ignore the request, or `{"awb", "status", "event_id", "events"}`.
+Set the carrier to post to `/api/v2/method/commera.shipping.webhook.handle?provider=<Profile name>`. The Integrations screen shows this URL. `handle_webhook` must verify that the request comes from the carrier. It returns `{}` to ignore the request, or `{"awb", "status", "event_id", "events"}`.
 
 ## Checks and failures
 

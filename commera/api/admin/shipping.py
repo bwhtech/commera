@@ -8,7 +8,7 @@ from commera.shipping.providers import get_provider_class, get_provider_doctypes
 
 PROFILE_DOCTYPE = "Shipping Provider Profile"
 PROFILE_SETTINGS_FIELDNAME = "provider_settings"
-WEBHOOK_PATH = "/api/method/commera.shipping.webhook.handle?provider={profile}"
+WEBHOOK_PATH = "/api/v2/method/commera.shipping.webhook.handle?provider={profile}"
 
 
 def get_shipping_registry():
