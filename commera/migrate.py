@@ -8,12 +8,14 @@ from commera.api.payments import COD_PAYMENT_MODE
 from commera.commera_ecommerce.doctype.commera_settings.navbar.navbar_manager import (
 	seed_menu_when_empty,
 )
+from commera.customizations import create_customizations
 from commera.plugin_events import add_plugin_user, validate_plugins
 from commera.plugins.registry import get_registry
 from commera.roles import add_commera_roles
 from commera.search.build import ensure_index_built
 from commera.search.record_builder import DEFAULT_CONTENT_FIELDS
 from commera.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
+from commera.shipping.providers import validate_providers
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import seed_default_routes
 from commera.storefront_plugins import sync_storefront_apps
 from commera.www.llms import DEFAULT_LLMS_TXT
@@ -25,6 +27,7 @@ ROBOTS_MARKER = "# managed by commera"
 def after_install():
 	# install_app syncs before commera is in installed_apps, so our importable_doctypes hook is skipped.
 	sync_for("commera")
+	create_customizations()
 	create_payment_modes()
 	add_commera_roles()
 	try:
@@ -38,7 +41,6 @@ def after_install():
 		frappe.errprint(error_msg)
 		frappe.errprint(traceback.format_exc())
 
-	register_optional_doctype_links()
 	populate_search_settings()
 	ensure_storefront_search_index()
 	setup_robots_txt()
@@ -66,11 +68,11 @@ def activate_summer_theme():
 
 
 def after_migrate():
+	create_customizations()
 	sync_storefront_apps()
 	create_payment_modes()
 	add_commera_roles()
 	add_plugin_user()
-	register_optional_doctype_links()
 	populate_search_settings()
 	ensure_storefront_search_index()
 	setup_robots_txt()
@@ -79,6 +81,7 @@ def after_migrate():
 	assign_default_email_templates()
 	validate_plugins()
 	print_plugin_problems()
+	validate_providers()
 
 
 def print_plugin_problems():
@@ -117,35 +120,6 @@ def ensure_storefront_search_index():
 		ensure_index_built()
 	except Exception:
 		frappe.log_error(traceback.format_exc(), "Storefront Search Index - ensure_index_built")
-
-
-def register_optional_doctype_links():
-	"""Add Customize Form connections for optional integrations whose doctypes come from tabby_frappe."""
-	add_sales_order_link_if_doctype_exists("Tabby Payment Request", "ref_docname")
-
-
-def add_sales_order_link_if_doctype_exists(link_doctype: str, link_fieldname: str):
-	if not frappe.db.exists("DocType", link_doctype):
-		return
-
-	customize_form = frappe.get_doc({"doctype": "Customize Form", "doc_type": "Sales Order"})
-	customize_form.run_method("fetch_to_customize")
-	if any(row.link_doctype == link_doctype for row in (customize_form.get("links") or [])):
-		return
-
-	customize_form.append(
-		"links",
-		{
-			"link_doctype": link_doctype,
-			"link_fieldname": link_fieldname,
-		},
-	)
-	try:
-		customize_form.save()
-	except Exception:
-		import traceback
-
-		frappe.log_error(traceback.format_exc(), f"commera: optional link for {link_doctype}")
 
 
 def create_payment_modes():
