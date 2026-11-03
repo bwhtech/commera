@@ -198,6 +198,14 @@ function order_summary() {
 			return this.$store.cart.cart;
 		},
 
+		get discount_codes() {
+			return this.summary?.discount_codes ?? this.cart?.discount_codes ?? [];
+		},
+
+		get discounts() {
+			return this.summary?.discounts ?? this.cart?.discounts ?? [];
+		},
+
 		get subtotal() {
 			return (this.cart?.discounts ?? []).reduce(
 				(subtotal, discount) => subtotal + discount.amount,

@@ -6,7 +6,7 @@
 		<span>{{ _("Subtotal") }}</span>
 		<span x-text="money(subtotal)"></span>
 	</div>
-	<template x-for="(discount, index) in cart?.discounts ?? []" :key="index">
+	<template x-for="(discount, index) in discounts" :key="index">
 		<div class="flex justify-between gap-3 text-ink-gray-7">
 			<span>{{ _("Discount") }}<span x-show="discount.label" x-text="' (' + discount.label + ')'"></span></span>
 			<span dir="ltr" x-text="'−' + money(discount.amount)"></span>
@@ -26,8 +26,8 @@
 		<button type="submit" :disabled="busy || !code.trim()" class="h-10 shrink-0 rounded-lg border border-outline-gray-2 bg-surface-base px-3 text-lg font-medium text-ink-gray-8 hover:border-outline-gray-3 disabled:text-ink-gray-4">{{ _("Apply") }}</button>
 	</form>
 	<p x-show="error" x-text="error" role="alert" class="text-sm text-ink-red-6"></p>
-	<ul x-show="cart?.discount_codes?.length" class="flex flex-col gap-2">
-		<template x-for="code_state in cart?.discount_codes ?? []" :key="code_state.code">
+	<ul x-show="discount_codes.length" class="flex flex-col gap-2">
+		<template x-for="code_state in discount_codes" :key="code_state.code">
 			<li>
 				<span class="inline-flex h-8 items-center gap-1 rounded-lg bg-surface-gray-3 ps-3 text-sm font-medium text-ink-gray-8">
 					<span x-text="code_state.code"></span>

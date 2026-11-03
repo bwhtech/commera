@@ -683,6 +683,17 @@ class TestDiscountSelection(DiscountCodeTestCase):
 
 		self.assertFalse(quotation.custom_code_order_discount)
 
+	def test_cash_on_delivery_checkout_says_why_a_prepaid_code_gives_nothing(self):
+		frappe.db.set_value("Commera Discount", {"method": "Automatic"}, "enabled", 0)
+		prepaid = self.create_code(percentage=20, payment_condition="Prepaid")
+		other = self.create_code(percentage=10)
+		quotation = self.create_quotation({self.shirt: 1}, (prepaid, other))
+
+		states = get_checkout_summary(quotation)["cash_on_delivery"]["discount_codes"]
+
+		self.assertEqual([state["applied"] for state in states], [False, True])
+		self.assertIn("prepaid orders only", states[0]["reason"])
+
 	def test_a_customer_group_discount_skips_other_groups_and_guests(self):
 		group = frappe.get_doc(
 			{"doctype": "Customer Group", "customer_group_name": f"ZZ VIP {frappe.generate_hash(length=6)}"}
