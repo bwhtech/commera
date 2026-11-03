@@ -8,7 +8,9 @@ SECTIONS_THEME = "Summer Theme"
 def execute():
 	parents = dict(frappe.get_all("Shop Theme", fields=["name", "parent_theme"], as_list=True))
 	sections_themes = {name for name in parents if is_sections_theme(name, parents)}
-	frappe.db.set_value("Shop Theme", {"name": ("is", "set")}, "theme_type", "Classic", update_modified=False)
+	frappe.db.set_value(
+		"Shop Theme", {"theme_type": ("is", "not set")}, "theme_type", "Classic", update_modified=False
+	)
 	if sections_themes:
 		frappe.db.set_value(
 			"Shop Theme",
