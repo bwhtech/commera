@@ -66,7 +66,7 @@ function detailRoute(theme) {
               <span class="truncate text-lg-semibold text-ink-gray-9">{{ liveTheme.theme_name }}</span>
               <Badge label="Live" theme="green" variant="subtle" />
             </span>
-            <span class="mt-1 block truncate text-sm text-ink-gray-5">
+            <span class="mt-1 block text-sm text-ink-gray-5 sm:truncate">
               {{ themeKind(liveTheme) }} · {{ themeNote(liveTheme) }}
             </span>
           </span>
@@ -90,7 +90,7 @@ function detailRoute(theme) {
             </span>
             <span class="min-w-0 flex-1">
               <span class="block truncate text-base text-ink-gray-8">{{ theme.theme_name }}</span>
-              <span class="mt-1 block truncate text-sm text-ink-gray-5">
+              <span class="mt-1 block text-sm text-ink-gray-5 sm:truncate">
                 {{ themeKind(theme) }} · {{ themeNote(theme) }}
               </span>
             </span>
