@@ -166,6 +166,7 @@ doc_events = {
 			"commera.plugin_events.on_sales_order_cancel",
 			"commera.plugin_events.on_sales_order_stock_reservation",
 		],
+		"on_trash": "commera.doc_events.sales_order.on_trash",
 	},
 	"Stock Ledger Entry": {
 		"after_insert": [
