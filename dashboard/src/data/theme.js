@@ -26,11 +26,6 @@ export function themeKind(theme) {
   return theme.theme_type === 'Sections' ? 'Built with sections' : 'Classic'
 }
 
-export function themeNote(theme) {
-  if (theme.parent_theme) return `Extends ${theme.parent_theme}`
-  return 'No parent theme'
-}
-
 export function useTheme() {
   return { themes, loadError, loading, load, activate }
 }

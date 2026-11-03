@@ -21,15 +21,32 @@ def build_themes(active_theme):
 	"""Every installed theme, live one first, with what each inherits from."""
 	themes = frappe.get_all(
 		"Shop Theme",
-		fields=["name", "theme_name", "parent_theme", "is_standard", "theme_settings", "theme_type"],
+		fields=[
+			"name",
+			"theme_name",
+			"parent_theme",
+			"is_standard",
+			"theme_settings",
+			"theme_type",
+			"module.app_name as app",
+		],
 		order_by="theme_name asc",
 	)
 
 	for theme in themes:
 		theme.live = theme.name == active_theme
+		theme.source = get_theme_source(theme)
+		theme.desk_url = get_url_to_form("Shop Theme", theme.name)
 		theme.settings_desk_url = get_url_to_form(theme.theme_settings) if theme.theme_settings else None
 
 	return sorted(themes, key=lambda theme: not theme.live)
+
+
+def get_theme_source(theme):
+	if not theme.is_standard or not theme.app:
+		return frappe._("Made on this site")
+
+	return (frappe.get_hooks("app_title", app_name=theme.app) or [theme.app])[0]
 
 
 def build_theme_settings(active_theme):
