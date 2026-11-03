@@ -4,7 +4,7 @@ import { Combobox, FormControl, Select, TextInput } from 'frappe-ui'
 import { getCountryDefaults, storeSetup } from '../../../data/onboarding'
 import { CATEGORIES, draft, flow } from '../../../ia/onboarding'
 import { abbreviate, missingField, toOptions } from '../../../ia/onboardingSteps'
-import { useTelemetry } from '../../../telemetry'
+import { sendSetupEvent } from '../../../data/setupFunnel'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -20,11 +20,10 @@ const STANDARD_CHARTS = ['Standard', 'Standard with Numbers']
 const countryCharts = ref(null)
 
 const showAccounting = ref(false)
-const { capture } = useTelemetry()
 
 function toggleAccounting() {
   showAccounting.value = !showAccounting.value
-  if (showAccounting.value) capture('onboarding_accounting_opened')
+  if (showAccounting.value) sendSetupEvent('onboarding_accounting_opened')
 }
 const missing = computed(() => (flow.showErrors ? missingField('store', draft) : ''))
 

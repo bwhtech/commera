@@ -137,6 +137,13 @@ class TelemetryCaptureTestCase(TelemetryTestCase):
 			with patch("frappe.get_installed_apps", return_value=["frappe", "commera", "commera_cloud"]):
 				self.assertEqual(telemetry.get_hosting(), "commera_cloud")
 
+	def test_boot_config_says_whether_telemetry_is_on(self):
+		self.assertTrue(telemetry.get_boot_config()["enabled"])
+		self.pulse_enabled.return_value = False
+		config = telemetry.get_boot_config()
+		self.assertFalse(config["enabled"])
+		self.assertEqual(config["app_version"], commera.__version__)
+
 	def test_capture_adds_default_properties(self):
 		telemetry.capture("zz_event", interval="1d", step="you")
 
@@ -487,6 +494,57 @@ class OnboardingEventsTestCase(TelemetryTestCase):
 		onboarding_telemetry.onboarding_completed()
 
 		self.assertEqual(self.get_events("onboarding_completed")[0]["store_category"], "other")
+
+
+class SetupFunnelTestCase(TelemetryTestCase):
+	def test_known_event_goes_out_with_only_known_values(self):
+		onboarding_api.record_setup_event(
+			"completed_setup_step",
+			{
+				"step": "store",
+				"step_number": "2",
+				"total_steps": 7,
+				"duration_seconds": 41,
+				"store_name": STORE_NAME,
+			},
+		)
+
+		completed = self.get_events("completed_setup_step")[0]
+		self.assertEqual(completed["step"], "store")
+		self.assertEqual(completed["step_number"], 2)
+		self.assertEqual(completed["total_steps"], 7)
+		self.assertEqual(completed["duration_seconds"], 41)
+		self.assertNotIn("store_name", completed)
+		self.assertNotIn(STORE_NAME, json.dumps(completed))
+		self.assertEqual(self.capture.call_args.args[1], "commera")
+
+	def test_unknown_step_names_are_dropped(self):
+		onboarding_api.record_setup_event(
+			"went_back_in_setup", json.dumps({"from_step": "brand", "to_step": STORE_NAME})
+		)
+
+		self.assertEqual(self.get_events("went_back_in_setup")[0].get("from_step"), "brand")
+		self.assertNotIn("to_step", self.get_events("went_back_in_setup")[0])
+
+	def test_unknown_event_is_refused(self):
+		with self.assertRaises(frappe.ValidationError):
+			onboarding_api.record_setup_event("anything_goes", {})
+		self.capture.assert_not_called()
+
+	def test_malformed_properties_never_fail_the_request(self):
+		onboarding_api.record_setup_event("left_setup", "{not json")
+		onboarding_api.record_setup_event("left_setup", "[1, 2]")
+
+	def test_store_admin_without_system_manager_is_refused(self):
+		email = "zz-telemetry-store-admin@example.com"
+		if not frappe.db.exists("User", email):
+			user = frappe.new_doc("User")
+			user.email, user.first_name = email, "Zz"
+			user.flags.no_welcome_mail = True
+			user.insert(ignore_permissions=True)
+		frappe.set_user(email)
+		with self.assertRaises(frappe.PermissionError):
+			onboarding_api.record_setup_event("started_setup", {})
 
 
 class SiteProfileTestCase(TelemetryTestCase):

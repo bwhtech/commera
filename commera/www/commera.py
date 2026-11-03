@@ -10,7 +10,7 @@ from commera.api.permission import has_app_permission
 from commera.onboarding import is_onboarding_pending
 from commera.plugins.registry import get_visible_plugins
 from commera.roles import is_commera_admin
-from commera.telemetry import capture, default_properties
+from commera.telemetry import capture, get_boot_config
 from commera.utils import get_store_currency
 
 no_cache = 1
@@ -59,7 +59,7 @@ def get_boot():
 			"is_admin": is_commera_admin(),
 			"onboarding_pending": is_onboarding_pending(),
 			"cloud_settings": get_cloud_settings(),
-			"telemetry": default_properties(),
+			"telemetry": get_boot_config(),
 		}
 	)
 	frappe.db.commit()  # nosemgrep

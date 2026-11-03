@@ -34,10 +34,10 @@ import {
   lookFor,
   readSavedStep,
 } from '../../ia/onboarding'
-import { STEP_INDEX, canFinish, missingField, resumeStep, stepDurationBucket } from '../../ia/onboardingSteps'
-import { useTelemetry } from '../../telemetry'
+import { STEPS, STEP_INDEX, canFinish, missingField, resumeStep } from '../../ia/onboardingSteps'
 import { useEntrance } from '../../utils/reveal'
 import OnboardingPreview from './OnboardingPreview.vue'
+import { useSetupFunnel } from './useSetupFunnel'
 import StepYou from './steps/StepYou.vue'
 import StepStore from './steps/StepStore.vue'
 import StepBrand from './steps/StepBrand.vue'
@@ -67,7 +67,6 @@ const SLIDES = {
 }
 
 const router = useRouter()
-const { capture } = useTelemetry()
 const { themes, activeTheme, load: loadThemes, mutate: mutateTheme } = useTheme()
 
 const saving = ref(false)
@@ -103,24 +102,15 @@ async function load() {
   goToStep(resumeStep(readSavedStep(), storeSetup.status))
 }
 
-// Set as a step shows, so `duration_bucket` is the time the owner spent on that step.
-let stepShownAt = Date.now()
-watch(
-  () => flow.index,
-  () => (stepShownAt = Date.now()),
-)
+const funnel = useSetupFunnel(() => step.value.key)
 
 function leaveStep(action) {
-  capture('onboarding_step_completed', {
-    step: step.value.key,
-    action,
-    duration_bucket: stepDurationBucket(Date.now() - stepShownAt),
-  })
+  funnel.settled(step.value.key, action)
   goToStep(flow.index + 1)
 }
 
 function goBack() {
-  capture('onboarding_back_pressed', { step: step.value.key })
+  funnel.wentBack(step.value.key, STEPS[flow.index - 1].key)
   goToStep(flow.index - 1)
 }
 
@@ -128,8 +118,7 @@ onMounted(async () => {
   await Promise.all([load(), loadThemes()])
   draft.theme = draft.theme || activeTheme.value || ''
   // After load(): the step it opens at is the one a reload resumed to.
-  if (record.value) capture('onboarding_started', { step: step.value.key, resumed: flow.index > STEP_INDEX.you })
-  stepShownAt = Date.now()
+  if (record.value) funnel.started({ resumed: flow.index > STEP_INDEX.you })
 })
 
 function storeSetupValues() {
@@ -179,9 +168,11 @@ async function retrySetup() {
 async function finish() {
   if (!isReady.value) return
   finishing.value = true
+  funnel.finishing()
   const completed = await completeOnboarding()
   if (!completed) {
     finishing.value = false
+    funnel.finishFailed()
     return
   }
   // The dashboard's checklist is what comes next; its full-screen greeting would only repeat this one.

@@ -53,6 +53,11 @@ def get_hosting() -> str:
 	return "frappe_cloud" if frappe.conf.get("fc_team") else "self_hosted"
 
 
+def get_boot_config() -> dict:
+	"""The dashboard's boot key: the shared properties, and whether to send anything at all."""
+	return {**default_properties(), "enabled": is_pulse_enabled()}
+
+
 def capture(event: str, interval: str | None = None, **props):
 	"""Send one event. Telemetry never fails the action it reports on."""
 	with suppress(Exception):

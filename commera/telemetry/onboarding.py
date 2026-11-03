@@ -25,6 +25,41 @@ CHARTS_OF_ACCOUNTS = {"Standard": "standard", "Standard with Numbers": "standard
 STORE_CATEGORIES = ("Fashion", "Beauty", "Home", "Food", "Electronics", "Other")
 MINUTES_BUCKETS = ((5, "lt_5"), (15, "5_15"), (60, "15_60"))
 
+# The keys of STEPS in dashboard/src/ia/onboardingSteps.js.
+SETUP_STEPS = ("you", "store", "brand", "theme", "selling", "products", "done")
+# The funnel, named as Frappe's setup wizard names its own (and Raven's), so one funnel reads all three.
+SETUP_EVENTS = (
+	"started_setup",
+	"completed_setup_step",
+	"skipped_setup_step",
+	"went_back_in_setup",
+	"left_setup",
+	"onboarding_accounting_opened",
+)
+STEP_PROPERTIES = ("step", "from_step", "to_step")
+COUNT_PROPERTIES = ("step_number", "total_steps", "duration_seconds")
+FLAG_PROPERTIES = ("resumed",)
+
+
+def get_known_setup_properties(properties: dict) -> dict:
+	"""Only the known properties, with step names checked: the browser's values are never trusted."""
+	known = {}
+	for key in STEP_PROPERTIES:
+		if properties.get(key) in SETUP_STEPS:
+			known[key] = properties[key]
+	for key in COUNT_PROPERTIES:
+		if properties.get(key) is not None:
+			known[key] = cint(properties[key])
+	for key in FLAG_PROPERTIES:
+		if key in properties:
+			known[key] = bool(properties[key])
+	return known
+
+
+@telemetry_event
+def record_setup_event(event: str, properties: dict | str | None):
+	capture(event, **get_known_setup_properties(frappe.parse_json(properties) or {}))
+
 
 @telemetry_event
 def store_setup_started(args: dict, fiscal_year_start_month, company_abbr: str | None, previous_status: str):

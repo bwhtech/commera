@@ -7,7 +7,7 @@ import {
   clampStep,
   missingField,
   resumeStep,
-  stepDurationBucket,
+  secondsSince,
   toOptions,
 } from '../../src/ia/onboardingSteps.js'
 
@@ -49,13 +49,9 @@ test('toOptions turns plain strings into label/value pairs and keeps objects', (
   assert.deepEqual(toOptions(undefined), [])
 })
 
-test('stepDurationBucket buckets the time on a step at the docs/telemetry.md edges', () => {
-  assert.equal(stepDurationBucket(0), 'lt_10s')
-  assert.equal(stepDurationBucket(9_999), 'lt_10s')
-  assert.equal(stepDurationBucket(10_000), '10_30s')
-  assert.equal(stepDurationBucket(29_999), '10_30s')
-  assert.equal(stepDurationBucket(30_000), '30_120s')
-  assert.equal(stepDurationBucket(119_999), '30_120s')
-  assert.equal(stepDurationBucket(120_000), 'gt_120s')
-  assert.equal(stepDurationBucket(3_600_000), 'gt_120s')
+test('secondsSince rounds to whole seconds and never goes below zero', () => {
+  assert.equal(secondsSince(1_000, 1_000), 0)
+  assert.equal(secondsSince(1_000, 42_400), 41)
+  assert.equal(secondsSince(1_000, 42_600), 42)
+  assert.equal(secondsSince(5_000, 1_000), 0)
 })

@@ -57,10 +57,7 @@ export function toOptions(values) {
   return (values ?? []).map((value) => (typeof value === 'string' ? { label: value, value } : value))
 }
 
-// docs/telemetry.md's `duration_bucket` for time on one step. Buckets, never the seconds themselves.
-export function stepDurationBucket(milliseconds) {
-  if (milliseconds < 10_000) return 'lt_10s'
-  if (milliseconds < 30_000) return '10_30s'
-  if (milliseconds < 120_000) return '30_120s'
-  return 'gt_120s'
+// Whole seconds since `since` (a Date.now() value), for the funnel's `duration_seconds`.
+export function secondsSince(since, now = Date.now()) {
+  return Math.max(0, Math.round((now - since) / 1000))
 }

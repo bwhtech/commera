@@ -45,7 +45,7 @@ Events exist to answer these. An event that answers no question stays in Planned
 | 2 | Where do new stores stop between install and first paid order | funnel of `store_milestone_reached.milestone` |
 | 3 | How long does a store take to activate | `store_milestone_reached.days_since_install` for `first_order_paid` |
 | 4 | Does the setup panel help, or do merchants skip it | `setup_step_opened`, `setup_skipped`, `setup_dismissed`, then milestones by cohort |
-| 12 | Where do owners stop inside first-run onboarding, and how long does it take | `onboarding_started`, `onboarding_step_completed`, `onboarding_back_pressed`, `onboarding_completed` |
+| 12 | Where do owners stop inside first-run onboarding, and how long does it take | `started_setup`, `completed_setup_step`, `skipped_setup_step`, `went_back_in_setup`, `left_setup`, `onboarding_completed` |
 | 13 | Does the background store setup succeed, and how long do owners wait for it | `store_setup_started`, `store_setup_finished` |
 | 14 | Does anyone open the accounting disclosure or override the chart of accounts | `onboarding_accounting_opened`, `store_setup_started.*_overridden` |
 | 15 | What do new stores pick in onboarding: category, logo, colour, theme, cash on delivery, guest checkout | `onboarding_completed` |
@@ -60,7 +60,7 @@ Events exist to answer these. An event that answers no question stays in Planned
 
 ## Activation
 
-The funnel a new store goes through. It starts with first-run onboarding (`onboarding_started`, `store_setup_finished`, `onboarding_completed`, see Onboarding). After that, each step is one `store_milestone_reached` with that `milestone`. Sites that were set up before onboarding existed are marked onboarded by a patch and send no onboarding events; `active_site` counts them.
+The funnel a new store goes through. It starts with first-run onboarding (`started_setup`, `store_setup_finished`, `onboarding_completed`, see First-run onboarding). After that, each step is one `store_milestone_reached` with that `milestone`. Sites that were set up before onboarding existed are marked onboarded by a patch and send no onboarding events; `active_site` counts them.
 
 | Order | `milestone` | Fires when | Owner of the fact |
 |---|---|---|---|
@@ -121,12 +121,16 @@ Two more properties go on every milestone so the funnel can be read without join
 
 The owner's first visit opens `OnboardingFlow` instead of the dashboard (steps in `dashboard/src/ia/onboardingSteps.js`: `you`, `store`, `brand`, `theme`, `selling`, `products`, `done`). The server sends what it saves; the browser sends only the clicks the server never sees.
 
+The funnel events use the names of Frappe's own setup wizard (`frappe/desk/page/setup_wizard/setup_wizard.js`), as Raven's do, with app `commera`. One funnel query then reads Frappe, Raven and Commera alike. The browser does not send them to Pulse itself: it posts them to `onboarding.record_setup_event` (`dashboard/src/data/setupFunnel.js`), which passes on only the events below, known step names and whole numbers. That also lets `left_setup` go out with `keepalive` while the page closes. A site with telemetry off sends no request: the boot key `telemetry.enabled` says so.
+
 | Event | Half | Fires when | Properties | Question |
 |---|---|---|---|---|
-| `onboarding_started` | frontend | `OnboardingFlow` mounts | `step`: the step it opens at. `resumed`: bool, a reload resumed past `you` | 12 |
-| `onboarding_step_completed` | frontend | Continue or Skip leaves a step | `step`. `action`: `continue`, `skip`. `duration_bucket`: time on the step, `lt_10s`, `10_30s`, `30_120s`, `gt_120s` | 12 |
-| `onboarding_back_pressed` | frontend | Back on a step | `step`: the step that was left | 12 |
-| `onboarding_accounting_opened` | frontend | the accounting line on the `store` step opens | | 14 |
+| `started_setup` | frontend, through the server | `OnboardingFlow` has loaded | `step`: the step it opens at. `resumed`: bool, a reload resumed past `you`. `total_steps` | 12 |
+| `completed_setup_step` | frontend, through the server | Continue saves a step and moves on | `step`, `step_number` (1-based), `total_steps`, `duration_seconds`: time on the step, save included | 12 |
+| `skipped_setup_step` | frontend, through the server | Skip on an optional step (`brand`, `products`) | as `completed_setup_step` | 12 |
+| `went_back_in_setup` | frontend, through the server | Back on a step | `from_step`, `to_step` | 12 |
+| `left_setup` | frontend, through the server, `keepalive` | the page closes or reloads before Go to dashboard | `step`: the step on screen. `duration_seconds` on it | 12 |
+| `onboarding_accounting_opened` | frontend, through the server | the accounting line on the `store` step opens | | 14 |
 | `products_import_opened` | frontend | the CSV import dialog opens | `surface`: `onboarding`, `products`, `search` (the command palette) | 2, 10 |
 | `store_setup_started` | backend | `start_store_setup` queues ERPNext's setup (not when it is already done or running) | `country`: ISO code. `currency`: ISO code. `chart_of_accounts`: `standard`, `standard_with_numbers`, `other`. `chart_overridden`, `fiscal_month_overridden`, `abbr_overridden`: bool, the owner changed the default. `is_retry`: bool, a failed setup is started again | 13, 14 |
 | `store_setup_finished` | backend | `run_store_setup` ends | `outcome`: `done`, `failed`. `duration_bucket`: `lt_30s`, `30_60s`, `60_120s`, `gt_120s`. `error_kind`: exception class bucket on failure, never the message | 13 |
@@ -239,7 +243,7 @@ The rest of "Store configuration".
 
 1. **Activation** is `first_order_paid`. `first_order_placed` is also sent, so a COD-heavy store can be read on the placed step.
 2. **Test orders.** `live_mode` is sent where the gateway settings have a test flag, and left out where they do not. Activation is not filtered on it yet; the funnel can filter by `live_mode` later.
-3. **Signup** is Commera Cloud's to send, later. The funnel here starts at `onboarding_started`.
+3. **Signup** is Commera Cloud's to send, later. The funnel here starts at `started_setup`.
 4. **Headless storefronts** are not split by channel yet.
 5. **Money buckets** use fixed bands in the store currency (`lt_100` to `gt_1m`). Compare stores across currencies with the team's `store_currency`.
 6. **Shopify import** sends no `products_imported` and does not set the `import` source yet. It lands with that import.

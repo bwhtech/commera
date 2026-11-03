@@ -44,10 +44,14 @@ async function writeSettings(page, values) {
   if (response.status >= 400) throw new Error(`PUT ${SETTINGS} -> HTTP ${response.status}: ${response.body.slice(0, 300)}`)
 }
 
-// The telemetry plugin reads boot_config from the site and imports the Pulse client from its CDN.
-// Both are answered here: telemetry turns on, and the stand-in client keeps every capture on
-// `window.__pulseEvents` instead of sending it, so the spec sees exactly what left the browser.
+// Two halves of telemetry are answered here, so the spec sees exactly what left the browser:
+// - The framework plugin reads boot_config and imports the Pulse client from its CDN. The stand-in
+//   client keeps every capture on `window.__pulseEvents` instead of sending it.
+// - The onboarding funnel posts to Commera's own record_setup_event, and only when the boot says
+//   telemetry is on. The boot key is turned on in the page, each post is recorded here, and the
+//   request still goes to the server, so the server's refusal of an unknown event would fail the spec.
 const BOOT_CONFIG = '/api/method/frappe.utils.telemetry.pulse.client.boot_config'
+const SETUP_EVENT = '/api/v2/method/commera.api.admin.onboarding.record_setup_event'
 const PULSE_CLIENT = 'https://pulse.m.frappe.cloud/assets/pulse/js/pulse_client.js'
 const PULSE_STAND_IN = `export class PulseClient {
   async init() { return true }
@@ -58,7 +62,16 @@ const PULSE_STAND_IN = `export class PulseClient {
   stop() {}
 }`
 
-async function stubPulse(page) {
+async function stubTelemetry(page) {
+  const setupEvents = []
+  await page.evaluateOnNewDocument(() => {
+    let boot
+    Object.defineProperty(window, 'telemetry', {
+      configurable: true,
+      get: () => boot,
+      set: (value) => (boot = { ...value, enabled: true }),
+    })
+  })
   // The login already loaded the real client into the HTTP cache, which a cached hit would serve past the stub.
   await page.setCacheEnabled(false)
   await page.setRequestInterception(true)
@@ -72,12 +85,15 @@ async function stubPulse(page) {
         body: PULSE_STAND_IN,
       })
     }
-    if (new URL(url).pathname === BOOT_CONFIG) {
+    const path = new URL(url).pathname
+    if (path === BOOT_CONFIG) {
       const config = { enabled: true, host: 'https://pulse.invalid', client_url: PULSE_CLIENT, key: 'test', site: 'x', site_age: 1 }
       return request.respond({ contentType: 'application/json', body: JSON.stringify({ message: config }) })
     }
+    if (path === SETUP_EVENT) setupEvents.push(JSON.parse(request.postData() || '{}'))
     return request.continue()
   })
+  return setupEvents
 }
 
 const pulseEvents = (page) => page.evaluate(() => window.__pulseEvents ?? [])
@@ -110,6 +126,7 @@ async function pickFromCombobox(page, placeholder, value) {
 describe('onboarding', () => {
   const session = useSession()
   const original = {}
+  let setupEvents = []
 
   before(async () => {
     const { page } = session
@@ -128,7 +145,7 @@ describe('onboarding', () => {
       country: record.country,
     })
     if (original.onboardingCompleted) await writeSettings(page, { onboarding_completed: 0 })
-    await stubPulse(page)
+    setupEvents = await stubTelemetry(page)
   })
 
   onCleanup(session, async ({ page }) => {
@@ -218,22 +235,37 @@ describe('onboarding', () => {
 
       // Read before the dashboard opens: a reload there would clear the page's record.
       const events = await pulseEvents(page)
-      assert.ok(events.length && events.every((entry) => entry.app === 'commera'), 'every event is sent as commera')
-      const named = (name) => events.filter((entry) => entry.event === name).map((entry) => entry.props)
+      assert.ok(events.every((entry) => entry.app === 'commera'), 'every plugin event is sent as commera')
       assert.deepEqual(
-        named('onboarding_started').map(({ step, resumed }) => ({ step, resumed })),
-        [{ step: 'you', resumed: false }],
+        events.filter((entry) => entry.event === 'products_import_opened').map((entry) => entry.props.surface),
+        ['onboarding'],
       )
+      assert.ok(
+        events.filter((entry) => entry.event === 'pageview').every((entry) => !String(entry.props.route).includes(STORE_NAME)),
+        'a pageview sends the route pattern only',
+      )
+
+      // The funnel, named as Frappe's setup wizard names its own.
+      const funnel = (name) => setupEvents.filter((entry) => entry.event === name).map((entry) => entry.properties)
+      // The spec's own reload at the start left the first onboarding page open on `you`.
+      assert.deepEqual(funnel('left_setup').map(({ step }) => step), ['you'])
+      // Once for the page the reload left, once for the run itself.
+      assert.equal(funnel('started_setup').length, 2)
+      const { step: startStep, resumed, total_steps: totalSteps } = funnel('started_setup').at(-1)
+      assert.deepEqual({ startStep, resumed, totalSteps }, { startStep: 'you', resumed: false, totalSteps: 7 })
       assert.deepEqual(
-        named('onboarding_step_completed').map(({ step, action }) => `${step}:${action}`),
-        ['you:continue', 'store:continue', 'store:continue', 'brand:continue', 'theme:continue', 'selling:continue', 'products:skip'],
+        funnel('completed_setup_step').map(({ step, step_number }) => `${step_number}:${step}`),
+        ['1:you', '2:store', '2:store', '3:brand', '4:theme', '5:selling'],
       )
-      assert.ok(named('onboarding_step_completed').every((props) => /^(lt_10s|10_30s|30_120s|gt_120s)$/.test(props.duration_bucket)))
-      assert.deepEqual(named('onboarding_back_pressed').map(({ step }) => step), ['brand'])
-      assert.equal(named('onboarding_accounting_opened').length, 1)
-      assert.deepEqual(named('products_import_opened').map(({ surface }) => surface), ['onboarding'])
-      assert.ok(named('pageview').every((props) => !String(props.route).includes(STORE_NAME)), 'a pageview sends the route pattern only')
-      assert.ok(!JSON.stringify(events).includes(STORE_NAME), 'no event carries the store name')
+      assert.deepEqual(funnel('skipped_setup_step').map(({ step }) => step), ['products'])
+      assert.ok(
+        [...funnel('completed_setup_step'), ...funnel('skipped_setup_step')].every(
+          (properties) => properties.total_steps === 7 && Number.isInteger(properties.duration_seconds),
+        ),
+      )
+      assert.deepEqual(funnel('went_back_in_setup'), [{ from_step: 'brand', to_step: 'store' }])
+      assert.equal(funnel('onboarding_accounting_opened').length, 1)
+      assert.ok(!JSON.stringify([events, setupEvents]).includes(STORE_NAME), 'no event carries the store name')
 
       await clickByText(page, '[data-onboarding] button', 'Go to dashboard', { pause: 300 })
       // A store whose currency changed reloads into the dashboard instead of switching in place.
