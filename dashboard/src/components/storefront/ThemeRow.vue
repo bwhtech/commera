@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Badge, Button } from 'frappe-ui'
+import Thumb from '../Thumb.vue'
 
 const props = defineProps({
   theme: { type: Object, required: true },
@@ -24,7 +25,16 @@ const editorRoute = computed(() =>
     class="relative flex items-center gap-3 sm:gap-4"
     :class="[featured ? 'px-4 py-5' : 'px-4 py-3', editorRoute ? 'hover:bg-surface-gray-1' : 'cursor-default']"
   >
+    <Thumb
+      v-if="theme.thumbnail"
+      :image="theme.thumbnail"
+      :size="featured ? 'aspect-[16/10] w-28 sm:w-44' : 'aspect-[16/10] w-16 sm:w-20'"
+      class="border border-outline-gray-2"
+      :class="{ 'opacity-50': muted }"
+      data-theme-thumbnail
+    />
     <span
+      v-else
       class="aspect-[16/10] shrink-0 rounded-4 bg-surface-gray-3"
       :class="[featured ? 'w-28 sm:w-44' : 'w-16 sm:w-20', { 'opacity-50': muted }]"
       aria-hidden="true"

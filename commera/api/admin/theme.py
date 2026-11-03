@@ -32,6 +32,7 @@ def build_themes(active_theme):
 			"is_standard",
 			"theme_settings",
 			"theme_type",
+			"thumbnail",
 			"module.app_name as app",
 		],
 		order_by="theme_name asc",

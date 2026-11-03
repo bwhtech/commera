@@ -13,6 +13,7 @@
   "use_as_starter",
   "theme_settings",
   "column_break_main",
+  "thumbnail",
   "parent_theme",
   "section_break_config",
   "config"
@@ -71,6 +72,14 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "A picture of the theme's home page, taken when it is published from the theme editor.",
+   "fieldname": "thumbnail",
+   "fieldtype": "Attach Image",
+   "label": "Thumbnail",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
    "description": "Inherit from this theme. A template or asset missing here falls back to the parent theme.",
    "fieldname": "parent_theme",
    "fieldtype": "Link",
@@ -89,9 +98,10 @@
    "label": "Config"
   }
  ],
+ "image_field": "thumbnail",
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-02 12:00:00.000000",
+ "modified": "2026-11-03 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Shop Themes",
  "name": "Shop Theme",
