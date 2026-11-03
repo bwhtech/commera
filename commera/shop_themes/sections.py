@@ -49,17 +49,36 @@ def get_section_schema(theme_dirs, section_type):
 	return get_theme_json(theme_dirs, f"sections/{section_type}.json")
 
 
-def get_page_layout(theme_name, theme_dirs, page):
-	cache_key = f"{LAYOUT_CACHE_PREFIX}{theme_name}:{page}"
-	cached = frappe.cache.get_value(cache_key)
-	if cached is None:
-		published_layout = frappe.db.get_value(
-			"Theme Layout", {"theme": theme_name, "page": page}, "published_layout"
+def get_published_layouts(theme_names, page):
+	cache_keys = {name: f"{LAYOUT_CACHE_PREFIX}{name}:{page}" for name in theme_names}
+	cached = {name: frappe.cache.get_value(cache_key) for name, cache_key in cache_keys.items()}
+	if any(entry is None for entry in cached.values()):
+		published_layouts = dict(
+			frappe.get_all(
+				"Theme Layout",
+				filters={"theme": ("in", theme_names), "page": page},
+				fields=["theme", "published_layout"],
+				as_list=True,
+			)
 		)
-		cached = {"layout": frappe.parse_json(published_layout) if published_layout else None}
-		frappe.cache.set_value(cache_key, cached)
+		for name, cache_key in cache_keys.items():
+			published_layout = published_layouts.get(name)
+			cached[name] = {"layout": frappe.parse_json(published_layout) if published_layout else None}
+			frappe.cache.set_value(cache_key, cached[name])
 
-	return cached["layout"] or get_theme_json(theme_dirs, f"layouts/{page}.json") or {"sections": []}
+	return {name: entry["layout"] for name, entry in cached.items()}
+
+
+def get_inherited_layout(theme_names, theme_dirs, page):
+	published_layouts = get_published_layouts(theme_names, page)
+	return next(
+		(published_layouts[name] for name in theme_names if published_layouts[name]),
+		None,
+	) or get_theme_json(theme_dirs, f"layouts/{page}.json")
+
+
+def get_page_layout(theme_context, page):
+	return get_inherited_layout(theme_context["names"], theme_context["dirs"], page) or {"sections": []}
 
 
 def get_editor_preview():
@@ -167,7 +186,7 @@ def render_layout(context, page):
 	editor_preview = get_editor_preview()
 	layout = editor_preview.layouts.get(page) if editor_preview else None
 	if layout is None:
-		layout = get_page_layout(theme_context["theme_name"], theme_dirs, page)
+		layout = get_page_layout(theme_context, page)
 	section_context = {**context.get_all(), "commera": commera.sdk}
 	editor_group = page if editor_preview else None
 	html = [

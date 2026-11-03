@@ -19,7 +19,7 @@ const DIRECTIONS = [
 </script>
 
 <template>
-  <Popover side="top" align="end" :offset="8">
+  <Popover side="top" align="center" :offset="8">
     <template #trigger="{ open }">
       <Button
         :variant="open ? 'subtle' : 'ghost'"

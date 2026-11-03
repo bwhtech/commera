@@ -27,7 +27,7 @@ class TestAdminThemeLayout(IntegrationTestCase):
 
 		frappe.db.delete("Theme Layout", {"theme": SUMMER_THEME, "page": "index"})
 		clear_layout_cache(SUMMER_THEME, "index")
-		self.file_layout = get_editor(SUMMER_THEME)["theme_file_layout"]
+		self.file_layout = get_editor(SUMMER_THEME)["default_layout"]
 
 	def edited_layout(self, heading):
 		layout = copy.deepcopy(self.file_layout)
@@ -53,13 +53,13 @@ class TestAdminThemeLayout(IntegrationTestCase):
 		self.assertIn("index", editor["pages"])
 		self.assertIsNone(editor["published_layout"])
 		self.assertFalse(editor["has_unpublished_changes"])
-		self.assertEqual(editor["draft_layout"], editor["theme_file_layout"])
+		self.assertEqual(editor["draft_layout"], editor["default_layout"])
 		self.assertEqual(editor["settings"]["doctype"], "Summer Theme Settings")
 
 		schemas = {schema["type"]: schema for schema in editor["section_schemas"]}
 		self.assertEqual(schemas["hero_slider"]["category"], "Banners")
 		self.assertIn("slide", schemas["hero_slider"]["blocks"])
-		for section in editor["theme_file_layout"]["sections"]:
+		for section in editor["default_layout"]["sections"]:
 			self.assertIn(section["type"], schemas)
 
 	def test_save_draft_round_trips_without_touching_the_live_layout(self):
