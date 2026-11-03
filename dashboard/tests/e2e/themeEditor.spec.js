@@ -102,12 +102,12 @@ async function visibleFrame(page, device) {
 describe('theme editor', () => {
   const session = useSession()
 
-  uiTest(session, 'The top bar keeps all three actions and says why one is off', async (t) => {
+  uiTest(session, 'The top bar keeps Save and Publish on and shows Discard only with something to discard', async (t) => {
     const { page } = session
     const theme = await findLiveSectionsTheme(page)
     if (!theme) return t.skip('the live theme is not a Sections theme')
     await openEditor(page, theme)
-    const enabled = () =>
+    const shown = () =>
       page.$$eval('header button', (buttons) =>
         Object.fromEntries(
           buttons
@@ -115,37 +115,35 @@ describe('theme editor', () => {
             .map((button) => [button.textContent.trim(), !button.disabled]),
         ),
       )
-    const tooltipFor = async (label) => {
+    const toastAfter = async (label, message) => {
       const [button] = await page.$$(`xpath/.//header//button[normalize-space()="${label}"]`)
-      await (await button.evaluateHandle((element) => element.parentElement)).hover()
-      await page.waitForSelector('[role="tooltip"]', { visible: true, timeout: 3000 })
-      const text = await page.$eval('[role="tooltip"]', (element) => element.textContent.trim())
-      await page.mouse.move(0, 400)
-      await wait(300)
-      return text
+      await button.click()
+      await page.waitForFunction(
+        (message) => [...document.querySelectorAll('[data-sonner-toast]')].some((node) => node.textContent.includes(message)),
+        { timeout: 5000 },
+        message,
+      )
     }
 
     const pending = (await page.$eval('header', (element) => element.innerText)).includes('Unpublished changes')
     if (pending) {
-      assert.deepEqual(await enabled(), { Discard: true, Save: false, Publish: true })
-      assert.equal(await tooltipFor('Save'), 'No unsaved changes')
+      assert.deepEqual(await shown(), { Discard: true, Save: true, Publish: true })
     } else {
       assert.ok((await page.$eval('header', (element) => element.innerText)).includes('Published'))
-      assert.deepEqual(await enabled(), { Discard: false, Save: false, Publish: false })
-      assert.equal(await tooltipFor('Discard'), 'Nothing to discard')
-      assert.equal(await tooltipFor('Publish'), 'Everything is already live')
+      assert.deepEqual(await shown(), { Save: true, Publish: true }, 'nothing to discard, so no Discard')
+      await toastAfter('Publish', 'Already published')
     }
+    await toastAfter('Save', 'Nothing to save')
 
     await page.click('[data-tree-node^="section:"]')
     await page.waitForSelector('[data-settings-panel] button[aria-label="Hide section"]', { visible: true })
     await page.click('[data-settings-panel] button[aria-label="Hide section"]')
     await wait(300)
-    assert.deepEqual(await enabled(), { Discard: true, Save: true, Publish: false })
-    assert.equal(await tooltipFor('Publish'), 'Save your changes first')
+    assert.deepEqual(await shown(), { Discard: true, Save: true, Publish: true })
 
     await page.click('[data-settings-panel] button[aria-label="Show section"]')
     await wait(300)
-    assert.equal((await enabled()).Save, false, 'undoing the edit leaves nothing to save')
+    assert.equal('Discard' in (await shown()), pending, 'undoing the edit leaves only what was there before')
   })
 
   uiTest(session, 'A refused save keeps the edit unsaved and publishes nothing', async (t) => {
@@ -172,8 +170,6 @@ describe('theme editor', () => {
       await wait(500)
 
       const header = () => page.$eval('header', (element) => element.innerText)
-      const publishOn = () => page.$eval('xpath/.//header//button[normalize-space()="Publish"]', (button) => !button.disabled)
-      assert.ok(!(await publishOn()), 'Publish waits until the edit is saved')
       const [saveButton] = await page.$$('xpath/.//header//button[normalize-space()="Save"]')
       await saveButton.click()
       await wait(300)

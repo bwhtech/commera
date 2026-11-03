@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute } from 'vue-router'
 import { createReusableTemplate, useEventListener, useLocalStorage, useMediaQuery } from '@vueuse/core'
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui'
-import { Badge, Breadcrumbs, Button, Dropdown, Skeleton, TabButtons, Tooltip, dialog, toast } from 'frappe-ui'
+import { Badge, Breadcrumbs, Button, Dropdown, Skeleton, TabButtons, dialog, toast } from 'frappe-ui'
 import EmptyState from '../../components/EmptyState.vue'
 import LayoutPreviewCanvas from '../../components/storefront/LayoutPreviewCanvas.vue'
 import LayoutPreviewFrame from '../../components/storefront/LayoutPreviewFrame.vue'
@@ -157,11 +157,15 @@ async function track(label, work) {
   }
 }
 
+const hasChanges = computed(() => hasUnsavedChanges.value || hasUnpublishedChanges.value)
+
 async function save() {
+  if (!hasUnsavedChanges.value) return toast.info('Nothing to save')
   if (await track('Save', () => editor.save())) toast.success('Draft saved')
 }
 
 async function publish() {
+  if (!hasChanges.value) return toast.info('Already published')
   if (!(await track('Publish', () => editor.publish()))) return
   toast.success(state.live ? 'Published to your store' : `Published. Activate ${state.theme} to show it in your store.`)
 }
@@ -179,28 +183,9 @@ function discard() {
 }
 
 const actions = computed(() => [
-  {
-    label: 'Discard',
-    variant: 'subtle',
-    reason: hasUnpublishedChanges.value ? null : 'Nothing to discard',
-    onClick: discard,
-  },
-  {
-    label: 'Save',
-    variant: 'solid',
-    reason: hasUnsavedChanges.value ? null : 'No unsaved changes',
-    onClick: save,
-  },
-  {
-    label: 'Publish',
-    variant: 'solid',
-    reason: hasUnsavedChanges.value
-      ? 'Save your changes first'
-      : hasUnpublishedChanges.value
-        ? null
-        : 'Everything is already live',
-    onClick: publish,
-  },
+  ...(hasChanges.value ? [{ label: 'Discard', variant: 'subtle', onClick: discard }] : []),
+  { label: 'Save', variant: 'solid', onClick: save },
+  { label: 'Publish', variant: 'solid', onClick: publish },
 ])
 
 onBeforeRouteLeave(async () => (state.loadError ? true : await saveIfChanged()))
@@ -233,18 +218,15 @@ useEventListener(window, 'beforeunload', (event) => {
       </div>
 
       <div class="ms-auto flex items-center gap-2 lg:ms-0">
-        <Tooltip v-for="action in actions" :key="action.label" :text="action.reason" :disabled="!action.reason">
-          <span class="inline-flex" :tabindex="action.reason ? 0 : undefined">
-            <Button
-              :variant="action.variant"
-              :label="action.label"
-              :class="{ 'pointer-events-none': action.reason }"
-              :disabled="Boolean(action.reason) || (busy && pendingAction !== action.label)"
-              :loading="pendingAction === action.label"
-              @click="action.onClick"
-            />
-          </span>
-        </Tooltip>
+        <Button
+          v-for="action in actions"
+          :key="action.label"
+          :variant="action.variant"
+          :label="action.label"
+          :disabled="busy && pendingAction !== action.label"
+          :loading="pendingAction === action.label"
+          @click="action.onClick"
+        />
       </div>
     </header>
 
