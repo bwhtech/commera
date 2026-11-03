@@ -71,7 +71,7 @@ function createPart(group, data) {
     group,
     layout,
     savedLayout: stableJson(data.draft_layout),
-    liveLayout: stableJson(data.published_layout ?? data.theme_file_layout),
+    liveLayout: stableJson(data.published_layout ?? data.default_layout),
   }
 }
 
