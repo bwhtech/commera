@@ -24,8 +24,6 @@ COMPLETED_STATUSES = ("Delivered", "Lost")
 
 
 class CommeraShipment:
-	"""Commera owns `custom_shipment_status`; ERPNext's `status` and `tracking_status` follow it."""
-
 	def validate(self):
 		super().validate()
 		self.validate_tracking_url()
@@ -54,7 +52,6 @@ class CommeraShipment:
 			)
 
 	def validate_tracking_url(self):
-		# Shoppers open this link from the storefront, so only web links are stored.
 		if self.tracking_url:
 			validate_url(self.tracking_url, throw=True, valid_schemes=("http", "https"))
 
@@ -103,7 +100,6 @@ class CommeraShipment:
 		)
 
 	def get_declared_value(self) -> float:
-		"""In `custom_currency`; ERPNext's value_of_goods is in the company currency."""
 		if delivery_notes := self.get_delivery_notes():
 			return flt(
 				sum(frappe.get_all("Delivery Note", {"name": ("in", delivery_notes)}, pluck="grand_total"))
@@ -127,7 +123,6 @@ class CommeraShipment:
 		}
 
 	def lock_booking(self):
-		"""Held until commit, so two concurrent bookings cannot both pass the already-booked guard."""
 		frappe.db.get_value("Shipment", self.name, ["awb_number", "custom_order_ref"], for_update=True)
 		self.reload()
 
@@ -157,7 +152,6 @@ class CommeraShipment:
 				title=_("Partial Booking"),
 			)
 
-		# Submitted before the carrier call so ERPNext refuses a bad shipment before a label is bought.
 		if self.docstatus == 0:
 			self.flags.ignore_permissions = True
 			self.submit()
@@ -180,7 +174,6 @@ class CommeraShipment:
 			else:
 				result = controller.create_shipment(self.get_shipment_payload())
 		except PartialBookingError as partial:
-			# Committed so the handles survive this exception's rollback, or a retry books a second one.
 			self.record_partial_booking(partial.booking)
 			request_log.db_set("status", "Failed", update_modified=False)
 			raise
@@ -215,7 +208,6 @@ class CommeraShipment:
 		self.shipment_amount = flt(result.get("cost_amount"))
 		self.custom_cost_currency = result.get("cost_currency")
 		self.custom_tracking_ref = result.get("tracking_ref")
-		# Booked is Ready To Ship on our ladder until a carrier scan says otherwise, whatever it reports.
 		self.custom_provider_status = result.get("status")
 		self.custom_shipment_status = "Ready To Ship"
 		self.save(ignore_permissions=True)
@@ -239,7 +231,6 @@ class CommeraShipment:
 		if not controller.supports("cancel"):
 			frappe.throw(_("{0} cannot cancel shipments").format(frappe.bold(self.custom_shipping_provider)))
 
-		# Cancelled before the carrier call, so a refusal here rolls back before the booking is lost.
 		if self.docstatus == 1:
 			self.flags.ignore_permissions = True
 			self.flags.cancelling_with_carrier = True
@@ -265,7 +256,6 @@ class CommeraShipment:
 			self.awb_number, shipment_ref=self.shipment_id, tracking_ref=self.custom_tracking_ref
 		)
 
-		# Locked after the slow carrier call, or this save races a webhook into TimestampMismatchError.
 		self.lock_booking()
 		self.apply_status(
 			(tracking or {}).get("status"),
@@ -287,7 +277,6 @@ class CommeraShipment:
 		result = controller.schedule_pickup(self.shipment_id, pickup_date=pickup_date or today())
 		self.custom_pickup_ref = (result or {}).get("pickup_ref")
 		self.pickup_date = (result or {}).get("scheduled_date") or pickup_date or today()
-		# Only a real advance: a pickup on an already-collected consignment must not drag it back.
 		if can_advance(self.custom_shipment_status, "Pickup Scheduled"):
 			self.custom_shipment_status = "Pickup Scheduled"
 		self.save(ignore_permissions=True)
@@ -320,7 +309,6 @@ class CommeraShipment:
 		if event_id and self.custom_last_webhook_event_id == event_id:
 			return False
 
-		# The replay id records only APPLIED events, so a rejected scan cannot take the replay guard.
 		return self.apply_status(status, provider_status=provider_status, events=events, event_id=event_id)
 
 	def apply_status(
@@ -342,7 +330,6 @@ class CommeraShipment:
 				message=f"stored: {self.custom_shipment_status}, carrier reported: {status}",
 			)
 
-		# Only when this event matches the current status: a stale scan must not relabel or take the replay.
 		describes_current_state = bool(status) and status == self.custom_shipment_status
 		if describes_current_state:
 			if provider_status:
@@ -351,7 +338,6 @@ class CommeraShipment:
 				self.custom_last_webhook_event_id = event_id
 
 		if advanced or appended or describes_current_state:
-			# A scan must land even on a Shipment migrated from a Shipping Request without a pickup address.
 			self.flags.ignore_mandatory = True
 			self.save(ignore_permissions=True)
 		return advanced
@@ -382,7 +368,6 @@ class CommeraShipment:
 
 
 def get_event_key(event: dict) -> tuple:
-	"""get_datetime because stored rows hold datetimes and payloads hold strings."""
 	if event.get("event_id"):
 		return ("id", event["event_id"])
 	timestamp = event.get("timestamp")

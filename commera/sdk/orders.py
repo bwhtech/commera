@@ -113,7 +113,6 @@ def record_shipment(
 	events: list[dict] | None = None,
 	tracking_url: str | None = None,
 ) -> str:
-	"""Upsert the order's submitted Shipment on `awb`; leave `provider` empty for a fulfilment partner."""
 	validate_status(status)
 	if not cstr(awb).strip():
 		frappe.throw(_("A shipment needs its AWB."), frappe.ValidationError)

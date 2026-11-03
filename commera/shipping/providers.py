@@ -55,7 +55,6 @@ def get_enabled_profiles() -> list[str]:
 
 @site_cache(ttl=60 * 60)
 def get_available_shipping_providers() -> list[str]:
-	# Profile on_update/on_trash clear only the saving worker; the TTL bounds the others' staleness.
 	return frappe.get_all(PROFILE_DOCTYPE, filters={"enabled": 1}, pluck="name")
 
 

@@ -563,7 +563,6 @@ def read_order_lifecycles(order_names: list) -> dict:
 
 def read_shipment_stages(order_names: list, lifecycles: dict) -> None:
 	"""Fold each order's latest carrier status into its lifecycle, in one read."""
-	# Newest first, first seen wins: a rebooked order's stale shipment must not outrank it.
 	for shipment in frappe.get_all(
 		"Shipment",
 		filters={"custom_sales_order": ["in", order_names], "docstatus": ["<", 2]},

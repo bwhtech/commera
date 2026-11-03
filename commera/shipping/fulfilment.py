@@ -41,7 +41,6 @@ def create_shipment(delivery_note: str) -> str:
 		{
 			"custom_sales_order": sales_order,
 			"custom_shipping_provider": provider,
-			# An "every carrier rate" option is titled by the carrier and has no Shipping Service.
 			"custom_shipping_service": frappe.db.exists("Shipping Service", choice.get("delivery_option")),
 			"custom_service_code": choice.get("service_code"),
 		}
@@ -76,7 +75,6 @@ def new_shipment(source, origin: str | None, delivery_address: str | None):
 
 
 def link_address_to_company(address: str, company: str):
-	"""ERPNext ships only from a company-linked address, so the pickup address is linked on first use."""
 	if is_linked_to_party("Address", address, "Company", company):
 		return
 	address_doc = frappe.get_doc("Address", address)
@@ -90,7 +88,6 @@ def describe_contents(source) -> str:
 
 
 def validate_carrier_booking(choice: dict):
-	"""Without this, the default-provider fallback would buy a label the shopper never paid for."""
 	delivery_option = choice.get("delivery_option")
 	if not delivery_option or choice.get("provider"):
 		return
@@ -151,9 +148,7 @@ def build_parcels(delivery_note) -> list[dict]:
 
 
 def get_delivery_weight(delivery_note) -> float:
-	"""ERPNext's `total_weight` per row is already qty x unit weight."""
 	total = 0.0
 	for row in delivery_note.items:
-		# A return carries negative quantities, but a physical parcel never weighs less than nothing.
 		total += abs(flt(row.total_weight)) or abs(flt(row.qty)) * DEFAULT_ITEM_WEIGHT_KG
 	return flt(total, 3) or DEFAULT_ITEM_WEIGHT_KG

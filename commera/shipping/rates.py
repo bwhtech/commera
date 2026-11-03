@@ -84,7 +84,6 @@ def call_carrier(provider: str, request: RateRequest) -> list[dict]:
 	elapsed = time.monotonic() - started
 	if elapsed > request.timeout_seconds:
 		raise CarrierTimeoutError(f"{provider} answered in {elapsed:.1f}s, over {request.timeout_seconds}s")
-	# Normalised here, so a carrier's malformed date counts as its failure rather than breaking checkout.
 	return [{**rate, **get_rate_details(rate)} for rate in rates or []]
 
 

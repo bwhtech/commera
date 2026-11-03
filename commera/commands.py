@@ -101,7 +101,6 @@ def shipping_provider():
 @click.argument("label")
 @click.option("--app", help="App to add the carrier to, instead of the app you are in")
 def new_shipping_provider(label: str, app: str | None):
-	"""Add a carrier's settings DocType to an app and register it in commera_hooks."""
 	from commera.scaffold.shipping_provider import ShippingProviderScaffold
 
 	scaffold = get_current_app_scaffold(ShippingProviderScaffold, app)

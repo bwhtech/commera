@@ -31,7 +31,6 @@ LENGTH_IN_CM = {
 	"foot": 30.48,
 }
 
-# 5000 is the domestic cm/kg divisor Shiprocket's couriers use.
 DEFAULT_VOLUMETRIC_DIVISOR = 5000
 
 WEIGHT_PRECISION = 3
@@ -47,7 +46,6 @@ def to_cm(value: float, unit: str = "cm") -> float:
 
 
 def get_factor(table: dict, unit: str, kind: str) -> float:
-	"""A default factor of 1 would ship grams as kilograms."""
 	key = (unit or "").strip().casefold().rstrip(".")
 	if key in table:
 		return table[key]
@@ -94,7 +92,6 @@ def total_weight(parcels: list[dict]) -> float:
 
 
 def enclosing_dimensions(parcels: list[dict]) -> dict:
-	"""Overstates on purpose to avoid a carrier reweigh charge."""
 	if not parcels:
 		frappe.throw(_("At least one parcel is needed to quote or book a shipment"))
 	return {
@@ -108,7 +105,6 @@ def enclosing_dimensions(parcels: list[dict]) -> dict:
 
 
 def to_system_datetime(value):
-	"""MySQL Datetime columns reject an offset, so aware values are converted to naive system time."""
 	if not value:
 		return None
 

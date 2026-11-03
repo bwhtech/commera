@@ -16,14 +16,12 @@ from commera.shipping.units import billable_weight, enclosing_dimensions, to_sys
 
 SHIPROCKET_BASE_URL = "https://apiv2.shiprocket.in/v1/external"
 
-# Cached in Redis to keep the credential out of the database; expired early so a request cannot race it.
 TOKEN_CACHE_KEY = "commera:shiprocket_token"
 TOKEN_TTL_SECONDS = 8 * 24 * 60 * 60
 
 DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_CURRENCY = "INR"
 
-# Compared casefolded: the API capitalisation is inconsistent.
 SHIPROCKET_STATUS_MAP = {
 	"new": "Ready To Ship",
 	"invoiced": "Ready To Ship",
@@ -53,7 +51,6 @@ SHIPROCKET_STATUS_MAP = {
 	"damaged": "Lost",
 }
 
-# dict(frappe.request.headers) is case-sensitive, so this matches werkzeug's title-case spelling.
 SHIPROCKET_API_KEY_HEADER = "X-Api-Key"
 
 
@@ -74,7 +71,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		if not (self.email and password):
 			frappe.throw(_("Set the Shiprocket API email and password before using this provider"))
 
-		# Deliberately not via `request()`: that would ask for a token and recurse into login.
 		response = self.send(
 			"POST",
 			"/auth/login",
@@ -89,7 +85,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		return cstr(token)
 
 	def request(self, method: str, endpoint: str, payload: dict | None = None, timeout: int | None = None):
-		"""A token can be invalidated before its nominal expiry, so a 401 refreshes it once."""
 		try:
 			return self.authorised_send(method, endpoint, payload, timeout)
 		except PermissionError:
@@ -120,7 +115,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		params: dict | None = None,
 		timeout: int | None = None,
 	):
-		"""Not `make_*_request`: it takes no timeout, and a hung call at checkout holds a worker."""
 		url = f"{SHIPROCKET_BASE_URL}{endpoint}"
 		try:
 			response = get_request_session().request(
@@ -136,7 +130,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 			frappe.throw(_("Could not reach Shiprocket: {0}").format(cstr(exception)))
 
 		if response.status_code == 401:
-			# PermissionError lets `request` tell "stale token, retry" from a real rejection.
 			raise PermissionError("Shiprocket rejected the token")
 
 		body = self.read_body(response, endpoint)
@@ -156,7 +149,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 			frappe.throw(_("Shiprocket returned an unreadable response"))
 
 	def log_request(self, endpoint: str, output=None, error=None):
-		# The payload carries customer PII, so only the endpoint and the outcome are logged.
 		create_request_log(
 			{"endpoint": endpoint},
 			service_name="Shiprocket",
@@ -191,7 +183,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		return [self.build_rate(courier, request.cod) for courier in couriers if self.is_quotable(courier)]
 
 	def is_quotable(self, courier: dict) -> bool:
-		# A courier with no id cannot be booked later, and one with no rate would be quoted as free.
 		return bool(courier.get("courier_company_id")) and flt(courier.get("rate")) > 0
 
 	def build_rate(self, courier: dict, cod: bool) -> dict:
@@ -206,14 +197,12 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		}
 
 	def create_shipment(self, shipment: dict) -> dict:
-		"""No rollback exists, so each stage reports what it created even when a later one fails."""
 		order = self.create_order(shipment)
 		shipment_ref = cstr(order.get("shipment_id"))
 		order_ref = cstr(order.get("order_id"))
 		if not shipment_ref:
 			frappe.throw(_("Shiprocket created no shipment for this order"))
 
-		# The order now exists at Shiprocket; failures must carry these handles out, or a retry orphans it.
 		booking = {"order_ref": order_ref, "shipment_ref": shipment_ref}
 		try:
 			awb_details = self.assign_awb(shipment_ref, shipment.get("service_code"))
@@ -303,7 +292,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		return (response.get("response") or {}).get("data") or {}
 
 	def generate_label(self, shipment_ref: str) -> str | None:
-		"""Non-fatal: the AWB is already booked, and raising here would lose it."""
 		try:
 			response = self.request("POST", "/courier/generate/label", {"shipment_id": [shipment_ref]})
 			return (response or {}).get("label_url")
@@ -334,7 +322,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		}
 
 	def handle_webhook(self, payload: bytes, headers: dict) -> dict:
-		"""Shiprocket does not sign webhooks; a missing configured token fails hard, not skips the check."""
 		webhook_token = self.get_password("webhook_secret", raise_exception=False)
 		if not webhook_token:
 			frappe.throw(_("Webhook token is not configured in Shiprocket Shipping Settings"))
@@ -342,7 +329,6 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		supplied_token = headers.get(SHIPROCKET_API_KEY_HEADER)
 		if not supplied_token:
 			frappe.throw(_("Missing {0} header").format(SHIPROCKET_API_KEY_HEADER))
-		# Compared as bytes: compare_digest raises TypeError on a non-ASCII str.
 		if not hmac.compare_digest(webhook_token.encode(), supplied_token.encode()):
 			frappe.throw(_("Shiprocket webhook token does not match"))
 
@@ -351,14 +337,12 @@ class ShiprocketShippingSettings(Document, ShippingProviderBase):
 		provider_status = cstr(event.get("current_status"))
 		status = map_status(provider_status)
 		if not (awb and status):
-			# Returning {} accepts the delivery so Shiprocket stops retrying it.
 			return {}
 
 		return {
 			"awb": awb,
 			"status": status,
 			"provider_status": provider_status,
-			# Shiprocket has no event id, so the status timestamp is what recognises a replay.
 			"event_id": cstr(event.get("current_timestamp") or event.get("etd") or provider_status),
 			"events": [build_event(scan) for scan in event.get("scans") or []],
 		}
@@ -422,7 +406,6 @@ def read_current_status(tracking: dict) -> str | None:
 
 
 def build_event(scan: dict) -> dict:
-	# Shiprocket spells the same scan differently in tracking and webhook payloads, so both are read.
 	return {
 		"timestamp": to_system_datetime(scan.get("date") or scan.get("updated_date") or scan.get("time")),
 		"status": scan.get("sr-status-label") or scan.get("status") or scan.get("sr_status_label"),
@@ -432,7 +415,6 @@ def build_event(scan: dict) -> dict:
 
 
 def build_order_items(shipment: dict) -> list[dict]:
-	"""Shiprocket rejects an order with no line items."""
 	items = []
 	for parcel in shipment.get("parcels") or []:
 		for item in parcel.get("items") or []:
@@ -457,7 +439,6 @@ def build_order_items(shipment: dict) -> list[dict]:
 
 
 def split_name(full_name: str | None) -> dict:
-	"""Shiprocket rejects a blank first name."""
 	parts = cstr(full_name).split()
 	if not parts:
 		return {"first": _("Customer"), "last": ""}

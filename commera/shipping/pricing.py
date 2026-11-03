@@ -18,7 +18,6 @@ SERVICE_FIELDS = [
 	"backup_charge",
 ]
 
-# Not None or 0.0, so a caller cannot mistake an unpriceable service for free.
 UNPRICEABLE = object()
 
 SERVICES_CACHE_TTL_SECONDS = 60 * 60
@@ -26,7 +25,6 @@ SERVICES_CACHE_TTL_SECONDS = 60 * 60
 
 @redis_cache(ttl=SERVICES_CACHE_TTL_SECONDS)
 def get_enabled_services() -> list[dict]:
-	# Shipping Service.on_update/on_trash clear this.
 	return frappe.get_all(
 		"Shipping Service",
 		filters={"enabled": 1},
@@ -36,7 +34,6 @@ def get_enabled_services() -> list[dict]:
 
 
 def find_service(title: str) -> dict | None:
-	"""Enabled or not: payment must price a selection disabled mid-checkout."""
 	return frappe.db.get_value("Shipping Service", title, SERVICE_FIELDS, as_dict=True)
 
 
@@ -125,7 +122,6 @@ def price_row(service: dict, quote: dict | None, cart: dict, band=None) -> dict 
 		"provider": service.get("provider"),
 		"service_code": cstr(service.get("service_code")),
 		"amount": amount,
-		# The storefront gates its "Free" label on this: any zero final amount is free.
 		"is_free": not amount,
 		"is_live_rate": is_live_rate,
 		**get_rate_details(quote or {}),
@@ -136,7 +132,6 @@ def price_service(service: dict, quote: dict | None, cart: dict, band=None):
 	if band is not None:
 		if band.free_shipping:
 			return 0.0, False
-		# Bands are in company currency, as ERPNext's add_shipping_rule_to_tax_table assumes.
 		return flt(flt(band.shipping_amount) / get_conversion_rate(cart), 2), False
 
 	live_amount = get_live_amount(service, quote, cart)
@@ -168,18 +163,15 @@ def get_rule_bands(rule) -> dict[str, list]:
 
 
 def get_band_value(rule, cart: dict) -> float:
-	# ERPNext brackets a Net Weight rule on total weight and every other rule on base_net_total.
 	if rule and rule.calculate_based_on == "Net Weight":
 		return flt(cart.get("weight"))
 	return flt(cart.get("base_net_total"))
 
 
 def get_covering_band(bands: list | None, value: float):
-	"""A `to_value` of 0 means "and above"."""
 	for band in bands or []:
 		if flt(band.from_value) <= value and (not band.to_value or value <= flt(band.to_value)):
 			return band
-	# No fallback band: a cart outside every band must fall through to the Backup Charge, not ship free.
 	return None
 
 
@@ -193,7 +185,6 @@ def get_live_amount(service: dict, quote: dict | None, cart: dict) -> float | No
 
 	amount = convert_to_cart_currency(flt(quote.get("amount")), quote.get("currency"), cart)
 	if amount is None:
-		# Unconvertible currency: charging the number verbatim would bill rupees as riyals.
 		return None
 
 	marked_up = amount * (1 + flt(service.get("markup_percent")) / 100) + flt(service.get("handling_fee"))
@@ -224,7 +215,6 @@ def get_charge_amount(
 	quoted_amount: float | None = None,
 	shipping_rule: str | None = None,
 ) -> float:
-	"""`quoted_amount` must come from server-side storage, never the client."""
 	if quoted_amount is not None:
 		return flt(quoted_amount, 2)
 

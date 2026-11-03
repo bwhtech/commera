@@ -88,7 +88,6 @@ def create_shipping_services(provider: str, selections: list | str, default_rate
 
 
 def get_unique_title(service_name: str, carrier: str, used_titles: set) -> str:
-	"""Title is the autoname and carriers share names like "Express", so a clash is suffixed, not fatal."""
 	if service_name not in used_titles:
 		return service_name
 

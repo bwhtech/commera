@@ -62,7 +62,6 @@ class TestCustomizations(IntegrationTestCase):
 		self.assertTrue(has_payment_request_link())
 
 	def test_uninstall_removes_every_field_and_setter(self):
-		# Custom Field changes run DDL, which commits, so restore and commit instead of rolling back.
 		self.addCleanup(frappe.db.commit)
 		self.addCleanup(create_customizations)
 

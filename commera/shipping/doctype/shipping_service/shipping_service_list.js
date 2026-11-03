@@ -7,7 +7,6 @@ frappe.listview_settings['Shipping Service'] = {
 };
 
 async function open_carrier_import_dialog(list_view) {
-	// run_doc_method so the call checks read permission on AfterShip Shipping Settings.
 	const choices = await frappe.xcall('run_doc_method', {
 		dt: 'AfterShip Shipping Settings',
 		method: 'get_service_choices',

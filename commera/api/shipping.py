@@ -49,7 +49,6 @@ def get_cart_shipping_options(quotation) -> dict:
 	if quotation.custom_is_store_pickup:
 		return {"options": [], "store_pickup": True}
 	if not has_delivery_options():
-		# Legacy key name: clients read it as "the store prices delivery by its flat rule".
 		return {"options": [], "connector_missing": True}
 	if not quotation.shipping_address_name:
 		return {"options": [], "address_missing": True}

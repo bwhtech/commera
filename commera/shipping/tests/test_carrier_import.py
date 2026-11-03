@@ -129,8 +129,6 @@ class TestAlpha3(IntegrationTestCase):
 
 
 class TestCreateShippingServices(IntegrationTestCase):
-	# Frappe rolls back per class, not per test, so every case uses its own service codes and titles.
-
 	def setUp(self):
 		self.provider = create_test_provider_profile()
 

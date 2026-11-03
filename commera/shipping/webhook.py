@@ -8,7 +8,6 @@ from commera.shipping.providers import get_provider
 WEBHOOK_ACCEPTED = {"status": "ok"}
 
 
-# Carriers post unauthenticated; the carrier's own handle_webhook verifies the signature first.
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=120, seconds=60, ip_based=True)
 def handle():
@@ -28,7 +27,6 @@ def handle():
 	try:
 		result = get_provider(profile.name).handle_webhook(payload, headers)
 	except Exception:
-		# The payload carries the customer's address and phone, so only the provider and traceback are logged.
 		frappe.log_error(title=f"{provider} shipping webhook verification failed")
 		log_webhook(provider, status="Failed")
 		return reject()
@@ -63,7 +61,6 @@ def handle():
 		shipment, status, event_id, result.get("events"), result.get("provider_status")
 	)
 	log_webhook(provider, awb=awb, event_id=event_id, status="Completed")
-	# A replay is still a success to the provider; anything else and it keeps retrying forever.
 	return WEBHOOK_ACCEPTED
 
 
@@ -74,7 +71,6 @@ def apply_status_as_administrator(
 	events: list | None,
 	provider_status: str | None = None,
 ):
-	# Restore the user so a long-lived worker does not keep Administrator.
 	session_user = frappe.session.user
 	try:
 		frappe.set_user("Administrator")  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
@@ -86,7 +82,6 @@ def apply_status_as_administrator(
 
 
 def reject() -> dict:
-	"""Opaque so a caller cannot probe providers; clearing the message log stops `frappe.throw` leaking."""
 	frappe.local.message_log = []
 	frappe.local.response["http_status_code"] = 400
 	return {"status": "error", "message": _("Webhook could not be verified")}

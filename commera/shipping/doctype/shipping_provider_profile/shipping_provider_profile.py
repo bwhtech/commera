@@ -10,7 +10,6 @@ from commera.shipping.providers import get_available_shipping_providers, get_pro
 
 class ShippingProviderProfile(Document):
 	def validate(self):
-		# A disabled profile may point at a removed app; migrate asks the operator to disable exactly those.
 		if self.enabled:
 			get_provider_class(self.provider_settings)
 

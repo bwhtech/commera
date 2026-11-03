@@ -48,7 +48,6 @@ frappe.ui.form.on('Shipment', {
 			}
 		}
 
-		// Mirrors CANCELLABLE_STATUSES on the server, which still refuses anything later.
 		if (
 			frm.doc.custom_order_ref &&
 			['Draft', 'Ready To Ship', 'Pickup Scheduled'].includes(

@@ -1,8 +1,6 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
-"""The Delivery Options screen: the Shipping Services a shopper picks between at checkout.
-This module is only the dashboard's way into the doctype."""
 
 import frappe
 from frappe.utils.data import cint, cstr
@@ -65,7 +63,6 @@ def build_import_providers() -> list[dict]:
 	):
 		if profile.provider_settings not in registered:
 			continue
-		# The class, not the settings Single: asking the class costs no query per carrier.
 		if not get_provider_class(profile.provider_settings).supports(SERVICE_CHOICES_CAPABILITY):
 			continue
 

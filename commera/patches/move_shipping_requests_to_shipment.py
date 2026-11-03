@@ -11,7 +11,6 @@ PARCEL_FIELDS = ("length", "width", "height", "weight", "count")
 def execute():
 	if not frappe.db.table_exists("Shipping Request"):
 		return
-	# after_migrate creates customizations after the patches, so Shipment's custom fields may not exist yet.
 	create_customizations()
 
 	for request in frappe.get_all("Shipping Request", fields=["*"], order_by="creation asc"):
@@ -23,7 +22,6 @@ def execute():
 
 
 def move_request(request):
-	"""Inserted without validation: a booked parcel stays on record even if its old row lacks a field."""
 	shipment = frappe.new_doc("Shipment")
 	shipment.update(get_shipment_fields(request))
 	shipment.docstatus = get_docstatus(request)

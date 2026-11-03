@@ -433,7 +433,6 @@ before_tests = "commera.install.before_tests"
 # Overriding Methods
 # ------------------------------
 
-# Carriers still post tracking to the URL bwh_shipping had.
 override_whitelisted_methods = {
 	"bwh_shipping.bwh_shipping.webhook.handle": "commera.shipping.webhook.handle",
 }

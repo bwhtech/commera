@@ -21,7 +21,6 @@ DEFAULT_TIMEOUT_SECONDS = 30
 
 SERVICE_CODE_SEPARATOR = "|"
 
-# `Exception` and `Expired` need a human, so an unattended webhook must not apply them.
 AFTERSHIP_TAG_MAP = {
 	"Pending": "Ready To Ship",
 	"InfoReceived": "Ready To Ship",
@@ -32,7 +31,6 @@ AFTERSHIP_TAG_MAP = {
 	"Delivered": "Delivered",
 }
 
-# dict(frappe.request.headers) is case-sensitive, so this matches werkzeug's title-case spelling.
 AFTERSHIP_SIGNATURE_HEADER = "Aftership-Hmac-Sha256"
 
 FALLBACK_ALPHA_3 = {
@@ -74,7 +72,6 @@ class AfterShipShippingSettings(Document, ShippingProviderBase):
 		payload: dict | None = None,
 		timeout: int | None = None,
 	) -> dict:
-		"""Business errors come back as HTTP 200 with a failing `meta.code`."""
 		url = f"{base}{path}"
 		try:
 			response = get_request_session().request(
@@ -116,7 +113,6 @@ class AfterShipShippingSettings(Document, ShippingProviderBase):
 		frappe.throw(_("AfterShip rejected the request: {0}").format(message))
 
 	def log_request(self, path: str, output=None, error=None):
-		# The payload carries customer PII, so only the endpoint and the outcome are recorded.
 		create_request_log(
 			{"endpoint": path},
 			service_name="AfterShip",
@@ -173,7 +169,6 @@ class AfterShipShippingSettings(Document, ShippingProviderBase):
 			"amount": flt(charge.get("amount")),
 			"currency": charge.get("currency") or self.currency,
 			"transit_days": cint(rate.get("transit_time")),
-			# AfterShip's rates say nothing about COD; guessing True offers it where it can't be collected.
 			"cod_available": False,
 		}
 
@@ -215,7 +210,6 @@ class AfterShipShippingSettings(Document, ShippingProviderBase):
 		}
 
 	def register_tracking(self, awb: str | None, carrier: str | None, shipment: dict) -> str | None:
-		"""Never fatal: a key without the Tracking product gets a permission error; the label is paid for."""
 		if not (awb and carrier):
 			return None
 
@@ -270,7 +264,6 @@ class AfterShipShippingSettings(Document, ShippingProviderBase):
 		if not signature:
 			frappe.throw(_("Missing {0} header").format(AFTERSHIP_SIGNATURE_HEADER))
 
-		# Signed over the raw bytes, so a re-serialised body fails every delivery for no visible reason.
 		expected = base64.b64encode(hmac.new(secret.encode(), payload, hashlib.sha256).digest()).decode()
 		if not hmac.compare_digest(expected.encode(), signature.encode()):
 			frappe.throw(_("AfterShip webhook signature does not match"))
@@ -325,7 +318,6 @@ class AfterShipShippingSettings(Document, ShippingProviderBase):
 		}
 
 	def build_default_item(self, declared_value: float) -> dict:
-		"""AfterShip rejects a parcel with no items."""
 		return {
 			"description": "Goods",
 			"quantity": 1,
@@ -335,7 +327,6 @@ class AfterShipShippingSettings(Document, ShippingProviderBase):
 		}
 
 	def build_address(self, address: dict) -> dict:
-		"""AfterShip rejects empty-string fields outright."""
 		payload = {
 			"contact_name": address.get("contact_name"),
 			"company_name": address.get("company_name"),
@@ -383,7 +374,6 @@ class AfterShipShippingSettings(Document, ShippingProviderBase):
 
 		accounts = self.list_shipper_accounts()
 		if self.shipper_account_id:
-			# Rates are shopped only against the configured account; another account's services never quote.
 			accounts = [account for account in accounts if account.get("id") == self.shipper_account_id]
 
 		return {
@@ -408,7 +398,6 @@ def split_service_code(service_code: str | None) -> tuple[str | None, str | None
 
 
 def is_quotable(rate: dict) -> bool:
-	# The sandbox returns placeholder rows with a null service_type that cannot be bought.
 	if rate.get("error_message"):
 		return False
 	return bool(rate.get("service_type")) and flt((rate.get("total_charge") or {}).get("amount")) > 0
@@ -458,7 +447,6 @@ def alpha_3(country: str | None) -> str | None:
 
 
 def origin_can_ship_from(ship_from: str | None, origin: str) -> bool:
-	"""AfterShip's courier `ship_from` is one string: "Global", one alpha-3, or a comma list ("HKG,SGP")."""
 	ship_from = cstr(ship_from).strip()
 	if not ship_from:
 		return False

@@ -1,7 +1,7 @@
 <script setup>
 /**
- * A provider's plate: its real logo where the registry has one, the image a plugin app
- * names as `logo`, else its letter on its own colour.
+ * A provider's plate: its real logo where the registry has one, and its letter on its own
+ * colour where it does not, so a provider the dashboard has never heard of still renders.
  *
  * The markup handed to `v-html` is composed entirely from `logos.js`'s own string
  * literals; the only server value that reaches it is the label, which is XML-escaped into
@@ -14,7 +14,6 @@ import { escapeXml, getIntegrationLogo } from './logos'
 const props = defineProps({
   slug: { type: String, required: true },
   label: { type: String, default: '' },
-  // A plugin app's image URL: an <img>, never v-html.
   logo: { type: String, default: '' },
   // A provider row carries the full plate; a group heading inside a form wants a
   // smaller one, so the plate is not louder than the heading it belongs to.

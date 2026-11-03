@@ -78,11 +78,8 @@ def band(
 
 
 class PricingTestCase(IntegrationTestCase):
-	"""No real carrier calls: a live call's request log commits mid-test and leaks rows past the rollback."""
-
 	def setUp(self):
 		self.enterContext(use_providers({}))
-		# The enabled-services cache outlives the class rollback, so test services must not stay in it.
 		self.addCleanup(get_enabled_services.clear_cache)
 
 	def get_quoted_amounts(self, cart: dict, shipping_rule: str | None = None) -> dict:

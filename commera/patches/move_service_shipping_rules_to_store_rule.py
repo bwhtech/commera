@@ -11,7 +11,6 @@ def execute():
 	"""Delivery options used to carry their own Shipping Rule; now the store rule's bands name the option."""
 	if not frappe.db.table_exists("Shipping Service"):
 		return
-	# after_migrate creates customizations after the patches, so the band's shipping_service column may not exist yet.
 	create_customizations()
 	move_service_shipping_rules_to_store_rule(get_legacy_service_rules())
 

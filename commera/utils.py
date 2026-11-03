@@ -880,7 +880,6 @@ def get_fulfilment_status(sales_order_name) -> str:
 	supplier_status = get_supplier_status(sales_order_name, supplier_lines)
 	if len(supplier_lines) == len(lines):
 		return supplier_status
-	# Mixed order: a Shipment without a Delivery Note is the supplier's parcel, not the store's.
 	return get_earlier_status(get_store_status(sales_order_name, from_delivery_note=True), supplier_status)
 
 

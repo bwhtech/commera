@@ -9,7 +9,6 @@ from frappe.tests import IntegrationTestCase
 from commera.shipping.units import to_system_datetime
 
 
-# Saving System Settings needs fields a bare CI site lacks, so the zone is pinned where it is read.
 @patch("commera.shipping.units.get_system_timezone", return_value="Asia/Kolkata")
 class TestToSystemDatetime(IntegrationTestCase):
 	def test_offset_aware_timestamp_keeps_the_instant(self, _timezone):

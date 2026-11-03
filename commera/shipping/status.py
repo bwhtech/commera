@@ -14,7 +14,6 @@ SHIPMENT_STATUSES = (
 	"Lost",
 )
 
-# Carriers send scans out of order and replay history, so a status applies only when it ranks higher.
 STATUS_RANK = {
 	"Draft": 0,
 	"Ready To Ship": 1,
@@ -28,7 +27,6 @@ STATUS_RANK = {
 	"Lost": 7,
 }
 
-# A later scan on one of these is a duplicate or a replay; applying it would un-deliver an order.
 TERMINAL_STATUSES = ("Delivered", "Cancelled", "Lost")
 
 
