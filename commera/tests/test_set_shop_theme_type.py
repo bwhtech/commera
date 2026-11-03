@@ -39,7 +39,9 @@ class TestSetShopThemeType(IntegrationTestCase):
 
 		set_shop_theme_type.execute()
 		import_file_by_path(
-			frappe.get_app_path("commera", "shop_themes", "shop_theme", "commera_starter", "commera_starter.json")
+			frappe.get_app_path(
+				"commera", "shop_themes", "shop_theme", "commera_starter", "commera_starter.json"
+			)
 		)
 
 		self.assertEqual(self.get_theme_types()[STARTER], "Sections")
