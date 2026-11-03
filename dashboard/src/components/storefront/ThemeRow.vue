@@ -55,7 +55,7 @@ const editorRoute = computed(() =>
     <Button
       v-if="!theme.live && !theme.is_base"
       class="relative z-10"
-      label="Activate"
+      label="Switch Theme"
       :loading="activating"
       :disabled="disabled"
       @click="$emit('activate', theme)"

@@ -20,11 +20,11 @@ const libraryThemes = computed(() => themes.value.filter((theme) => !theme.live)
 function confirmActivate(theme) {
   const previous = liveTheme.value?.theme_name
   dialog.confirm({
-    title: `Activate ${theme.theme_name}?`,
+    title: `Switch to ${theme.theme_name}?`,
     message: previous
       ? `Shoppers see ${theme.theme_name} straight away. ${previous} moves to the theme library and keeps all its changes.`
       : `Shoppers see ${theme.theme_name} straight away.`,
-    confirmLabel: 'Activate',
+    confirmLabel: 'Switch Theme',
     onConfirm: async () => {
       activatingName.value = theme.name
       try {
