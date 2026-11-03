@@ -158,7 +158,7 @@ describe('theme editor', () => {
     const intercept = (request) => {
       const method = request.url().match(/theme_layout\.(save_draft|publish)$/)?.[1]
       if (method) calls.push(method)
-      if (method === 'save_draft') request.respond(REFUSAL)
+      if (method === 'save_draft') setTimeout(() => request.respond(REFUSAL), SLOW_RENDER_MS)
       else request.continue()
     }
     page.on('request', intercept)
@@ -176,6 +176,15 @@ describe('theme editor', () => {
       assert.ok(!(await publishOn()), 'Publish waits until the edit is saved')
       const [saveButton] = await page.$$('xpath/.//header//button[normalize-space()="Save"]')
       await saveButton.click()
+      await wait(300)
+      const states = await page.$$eval('header button', (buttons) =>
+        Object.fromEntries(
+          buttons
+            .filter((button) => ['Discard', 'Save', 'Publish'].includes(button.textContent.trim()))
+            .map((button) => [button.textContent.trim(), button.getAttribute('aria-busy') ? 'loading' : button.disabled ? 'disabled' : 'enabled']),
+        ),
+      )
+      assert.deepEqual(states, { Discard: 'disabled', Save: 'loading', Publish: 'disabled' })
       await wait(2500)
 
       assert.deepEqual(calls, ['save_draft'])
