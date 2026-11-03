@@ -1,0 +1,76 @@
+{
+ "actions": [],
+ "creation": "2026-11-03 12:00:00.000000",
+ "description": "The link to Commera Cloud. Frappe Cloud sites link themselves.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "site",
+  "team",
+  "column_break_link",
+  "server_url",
+  "linked_on",
+  "site_key"
+ ],
+ "fields": [
+  {
+   "description": "The hostname that Commera Cloud linked.",
+   "fieldname": "site",
+   "fieldtype": "Data",
+   "label": "Linked Site",
+   "read_only": 1
+  },
+  {
+   "fieldname": "team",
+   "fieldtype": "Data",
+   "label": "Team",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_link",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "server_url",
+   "fieldtype": "Data",
+   "label": "Server URL",
+   "options": "URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "linked_on",
+   "fieldtype": "Datetime",
+   "label": "Linked On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "site_key",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "Site Key",
+   "length": 200,
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-03 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Commera Ecommerce",
+ "name": "Commera Cloud Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
