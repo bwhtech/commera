@@ -2,20 +2,20 @@
 
 {% macro order_summary(total="cart?.total") -%}
 <div x-data="order_summary" class="flex flex-col gap-3 text-base">
-	<div class="flex justify-between">
-		<span>{{ _("Subtotal") }}</span>
-		<span x-text="money(subtotal)"></span>
+	<div class="flex justify-between gap-3">
+		<span class="min-w-0 truncate" title="{{ _("Subtotal") }}">{{ _("Subtotal") }}</span>
+		<span class="shrink-0 whitespace-nowrap" x-text="money(subtotal)"></span>
 	</div>
 	<template x-for="(discount, index) in discounts" :key="index">
 		<div class="flex justify-between gap-3 text-ink-gray-7">
-			<span>{{ _("Discount") }}<span x-show="discount.label" x-text="' (' + discount.label + ')'"></span></span>
-			<span dir="ltr" x-text="'−' + money(discount.amount)"></span>
+			<span class="min-w-0 truncate" :title='{{ _("Discount") | tojson }} + (discount.label ? " (" + discount.label + ")" : "")'>{{ _("Discount") }}<span x-show="discount.label" x-text="' (' + discount.label + ')'"></span></span>
+			<span dir="ltr" class="shrink-0 whitespace-nowrap" x-text="'−' + money(discount.amount)"></span>
 		</div>
 	</template>
 	<template x-for="(fee, index) in cart?.plugin_fees ?? []" :key="index">
 		<div class="flex justify-between gap-3">
-			<span x-text="fee.description"></span>
-			<span x-text="money(fee.amount)"></span>
+			<span class="min-w-0 truncate" :title="fee.description" x-text="fee.description"></span>
+			<span class="shrink-0 whitespace-nowrap" x-text="money(fee.amount)"></span>
 		</div>
 	</template>
 	{% if caller is defined %}{{ caller() }}{% endif %}
@@ -38,9 +38,9 @@
 		</template>
 	</ul>
 
-	<div class="mt-2 flex justify-between border-t border-outline-gray-2 pt-4 text-xl font-medium">
-		<span>{{ _("Order total") }}</span>
-		<span x-text="money({{ total }})"></span>
+	<div class="mt-2 flex justify-between gap-3 border-t border-outline-gray-2 pt-4 text-xl font-medium">
+		<span class="min-w-0 truncate" title="{{ _("Order total") }}">{{ _("Order total") }}</span>
+		<span class="shrink-0 whitespace-nowrap" x-text="money({{ total }})"></span>
 	</div>
 </div>
 {%- endmacro %}
