@@ -8,7 +8,11 @@ from frappe.utils import get_url_to_form
 
 from commera.api.admin.docfields import build_field_groups, get_child_tables, get_editable_docfields
 from commera.api.admin.settings import coerce_field_value
-from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
+from commera.shop_themes.doctype.shop_theme.shop_theme import (
+	BASE_THEME,
+	get_theme_context,
+	resolve_active_theme,
+)
 
 THEME_SETTINGS_DOCTYPE = "Shop Theme Settings"
 
@@ -35,9 +39,8 @@ def build_themes(active_theme):
 
 	for theme in themes:
 		theme.live = theme.name == active_theme
+		theme.is_base = theme.name == BASE_THEME
 		theme.source = get_theme_source(theme)
-		theme.desk_url = get_url_to_form("Shop Theme", theme.name)
-		theme.settings_desk_url = get_url_to_form(theme.theme_settings) if theme.theme_settings else None
 
 	return sorted(themes, key=lambda theme: not theme.live)
 

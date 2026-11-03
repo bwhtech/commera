@@ -22,10 +22,6 @@ async function activate(theme) {
   return true
 }
 
-export function themeKind(theme) {
-  return theme.theme_type === 'Sections' ? 'Built with sections' : 'Classic'
-}
-
 export function useTheme() {
   return { themes, loadError, loading, load, activate }
 }
