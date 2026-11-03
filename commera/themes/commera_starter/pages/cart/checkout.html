@@ -143,9 +143,9 @@
 				{% call order_summary(total="total") %}
 				<div class="flex justify-between gap-3">
 					<span>{{ _("Shipping") }}</span>
-					<span x-show="shipping_pending" class="text-ink-gray-6">{{ _("Choose an option") }}</span><span x-show="!shipping_pending" x-text="money(summary?.shipping ?? 0)"></span>
+					<span x-show="shipping_pending" class="text-ink-gray-6">{{ _("Choose an option") }}</span><span x-show="!shipping_pending" x-text="money(shipping_amount)"></span>
 				</div>
-				<template x-for="(discount, index) in summary?.shipping_discounts ?? []" :key="index">
+				<template x-for="(discount, index) in shipping_pending ? [] : summary?.shipping_discounts ?? []" :key="index">
 					<div class="flex justify-between gap-3 text-ink-gray-7">
 						<span>{{ _("Delivery discount") }}<span x-show="discount.label" x-text="' (' + discount.label + ')'"></span></span>
 						<span dir="ltr" x-text="'−' + money(discount.amount)"></span>
