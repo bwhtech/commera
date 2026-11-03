@@ -5,6 +5,7 @@ from frappe.utils import add_days, today
 from commera.api.admin.shipping import get_shipping_registry
 from commera.plugins.providers import ProviderNotRegisteredError
 from commera.shipping.base_class import RateItem, RateRequest, ShippingProviderBase
+from commera.shipping.cache import RATES_CACHE_PREFIX
 from commera.shipping.pricing import get_enabled_services, quote_services
 from commera.shipping.providers import (
 	PROFILE_DOCTYPE,
@@ -14,7 +15,6 @@ from commera.shipping.providers import (
 	use_providers,
 	validate_providers,
 )
-from commera.shipping.cache import RATES_CACHE_PREFIX
 from commera.shipping.rates import (
 	FAILURE_CACHE_TTL_SECONDS,
 	get_provider_rates,
