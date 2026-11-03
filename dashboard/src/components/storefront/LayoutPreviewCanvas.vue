@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { onKeyStroke, useElementSize, useLocalStorage } from '@vueuse/core'
 import { Button, TabButtons } from 'frappe-ui'
 import LayoutPreviewFrame from './LayoutPreviewFrame.vue'
+import PreviewOptions from './PreviewOptions.vue'
 
 const props = defineProps({
   editor: { type: Object, required: true },
@@ -29,11 +30,10 @@ const ZOOMS = [
 const canvas = ref(null)
 const { width: canvasWidth, height: canvasHeight } = useElementSize(canvas)
 const zooms = useLocalStorage('commera:theme-editor:zoom', {})
-const linkScroll = useLocalStorage('commera:theme-editor:link-scroll', false)
 const previews = {}
 
 function followScroll(source, position) {
-  if (!linkScroll.value || state.device !== 'both' || !position.section) return
+  if (state.device !== 'both' || !position.section) return
   previews[source === 'desktop' ? 'mobile' : 'desktop']?.scrollToSection(position)
 }
 
@@ -100,14 +100,6 @@ onKeyStroke('Escape', (event) => {
       data-zoom-controls
     >
       <TabButtons v-model="zoom" :options="ZOOMS" aria-label="Preview zoom" />
-      <Button
-        v-if="state.device === 'both'"
-        :variant="linkScroll ? 'subtle' : 'ghost'"
-        icon-left="lucide-link"
-        label="Link scroll"
-        :aria-pressed="linkScroll"
-        @click="linkScroll = !linkScroll"
-      />
       <div class="mx-0.5 h-4 border-l border-outline-gray-2" />
       <Button
         variant="ghost"
@@ -116,6 +108,7 @@ onKeyStroke('Escape', (event) => {
         :aria-pressed="maximised"
         @click="emit('toggle-maximise')"
       />
+      <PreviewOptions :state="state" />
     </div>
   </div>
 </template>

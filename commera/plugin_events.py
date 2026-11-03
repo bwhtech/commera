@@ -32,7 +32,7 @@ SHIPPING_ADDRESS_FIELDS = (
 	"phone",
 )
 COD_SWEEP_LOOKBACK_DAYS = 30
-EXTENDED_DOCTYPES = ("Sales Order", "Quotation", "Sales Invoice", "Item", "Customer")
+EXTENDED_DOCTYPES = ("Sales Order", "Quotation", "Sales Invoice", "Item", "Customer", "Address")
 CHANGED_PRODUCTS_FLAG = "commera_changed_products"
 CHANGED_ITEMS_FLAG = "commera_changed_items"
 

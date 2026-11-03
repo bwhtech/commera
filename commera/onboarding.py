@@ -120,16 +120,16 @@ def build_setup_args(
 	}
 
 
-def run_frappe_setup(args: dict):
-	"""Run Frappe and ERPNext setup with `args` and fail loudly unless the company now exists."""
+def run_frappe_setup(setup_args: dict):
+	"""Run Frappe and ERPNext setup with `setup_args` and fail loudly unless the company now exists."""
 	# Once frappe's own stage counts as done (an earlier, failed run marks it), setup_complete skips it and
 	# later stages read country/currency off System Settings: run it here so they find this store's region.
 	if "frappe" in get_setup_wizard_completed_apps():
-		update_global_settings(frappe._dict(args))
-	setup_complete(args)
+		update_global_settings(frappe._dict(setup_args))
+	setup_complete(setup_args)
 
-	if not frappe.db.exists("Company", args["company_name"]):
-		raise RuntimeError(f"Setup did not create company {args['company_name']}")
+	if not frappe.db.exists("Company", setup_args["company_name"]):
+		raise RuntimeError(f"Setup did not create company {setup_args['company_name']}")
 
 
 def seed_commera_settings(company: str):
@@ -168,7 +168,7 @@ def set_setup_status(status: str, error: str | None = None):
 	frappe.db.set_single_value(SETTINGS_DOCTYPE, {"store_setup_status": status, "store_setup_error": error})
 
 
-def queue_store_setup(args: dict) -> dict:
+def queue_store_setup(setup_args: dict) -> dict:
 	"""Mark setup running and enqueue its job; deduplicate keeps a second click from queueing another."""
 	set_setup_status("running")
 	frappe.enqueue(
@@ -178,7 +178,7 @@ def queue_store_setup(args: dict) -> dict:
 		job_id=SETUP_JOB_ID,
 		deduplicate=True,
 		enqueue_after_commit=True,
-		setup_args=args,
+		setup_args=setup_args,
 		queued_at=now_datetime(),
 	)
 	return {"status": "running", "error": None}

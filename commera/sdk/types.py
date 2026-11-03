@@ -154,6 +154,7 @@ class CustomerAddress(Address):
 	email_id: str | None
 	is_primary_address: bool
 	is_shipping_address: bool
+	plugin_fields: dict[str, Any]
 
 
 class CustomerProfile(TypedDict):

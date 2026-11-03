@@ -79,7 +79,7 @@ export default defineConfig({
         // whatever webserver_port common_site_config says and routes by the request's
         // Host, so browse the app at <site>:8080 to hit the right site.
         port: 8080,
-        source: '^/(app|login|api|assets|files|private)(/|\\?|$)',
+        source: '^/(app|login|api|assets|files|private|theme_editor_preview|footer_editor_preview|navbar_editor_preview)(/|\\?|$)',
       },
       jinjaBootData: true,
       buildConfig: {
