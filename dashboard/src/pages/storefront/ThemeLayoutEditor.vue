@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute } from 'vue-router'
-import { createReusableTemplate, useEventListener, useMediaQuery } from '@vueuse/core'
+import { createReusableTemplate, useEventListener, useLocalStorage, useMediaQuery } from '@vueuse/core'
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui'
 import { Badge, Breadcrumbs, Button, Dropdown, Skeleton, TabButtons, Tooltip, dialog, toast } from 'frappe-ui'
 import EmptyState from '../../components/EmptyState.vue'
@@ -30,21 +30,30 @@ const { state, hasUnsavedChanges, hasUnpublishedChanges, busy, saveIfChanged, sw
 const pickingGroup = ref(null)
 
 const isWide = useMediaQuery('(min-width: 1024px)')
-const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
 const panel = ref('tree')
 
 const [DefineTreePanel, TreePanel] = createReusableTemplate()
 
 const treePanel = ref(null)
+const treeWidth = useLocalStorage('commera-theme-editor-panels', 288)
 const settingsOpen = ref(true)
 const maximised = ref(null)
+const pendingAction = ref(null)
 
 const themeSettingsOpen = ref(false)
 const themeSettingsDirty = ref(false)
 const themeSettingsMounted = ref(false)
+let selectionBeforeThemeSettings = null
+
+const hasSettings = computed(() => Boolean(state.selection) || themeSettingsOpen.value)
+const panels = computed(() => PANELS.filter((option) => option.value !== 'settings' || hasSettings.value))
 
 watch(themeSettingsOpen, (open) => {
-  if (!open && (reducedMotion.value || !isWide.value)) themeSettingsMounted.value = false
+  if (!open) themeSettingsMounted.value = false
+})
+
+watch(hasSettings, (shown) => {
+  if (!shown && panel.value === 'settings') panel.value = 'tree'
 })
 
 
@@ -53,12 +62,15 @@ function showSettingsSlot() {
   else if (!maximised.value) settingsOpen.value = true
 }
 
+function closeThemeSettings(then) {
+  themeSettingsOpen.value = false
+  if (then) then()
+  else if (selectionBeforeThemeSettings) editor.select(selectionBeforeThemeSettings, { scroll: false })
+  selectionBeforeThemeSettings = null
+}
+
 function leaveThemeSettings(then) {
-  if (!themeSettingsDirty.value) {
-    themeSettingsOpen.value = false
-    then?.()
-    return
-  }
+  if (!themeSettingsDirty.value) return closeThemeSettings(then)
   dialog.confirm({
     title: 'Discard unsaved theme settings?',
     message: 'The changes you have not saved are lost.',
@@ -66,14 +78,14 @@ function leaveThemeSettings(then) {
     confirmLabel: 'Discard',
     onConfirm: () => {
       themeSettingsDirty.value = false
-      themeSettingsOpen.value = false
-      then?.()
+      closeThemeSettings(then)
     },
   })
 }
 
 async function toggleThemeSettings() {
   if (themeSettingsOpen.value) return leaveThemeSettings()
+  selectionBeforeThemeSettings = state.selection
   editor.select(null)
   if (!isWide.value) panel.value = 'settings'
   else {
@@ -136,12 +148,21 @@ function pickSection(type) {
   pickingGroup.value = null
 }
 
+async function track(label, work) {
+  pendingAction.value = label
+  try {
+    return await work()
+  } finally {
+    pendingAction.value = null
+  }
+}
+
 async function save() {
-  if (await editor.save()) toast.success('Draft saved')
+  if (await track('Save', () => editor.save())) toast.success('Draft saved')
 }
 
 async function publish() {
-  if (!(await editor.publish())) return
+  if (!(await track('Publish', () => editor.publish()))) return
   toast.success(state.live ? 'Published to your store' : `Published. Activate ${state.theme} to show it in your store.`)
 }
 
@@ -152,7 +173,7 @@ function discard() {
     theme: 'red',
     confirmLabel: 'Discard',
     onConfirm: async () => {
-      if (await editor.discard()) toast.success('Changes discarded')
+      if (await track('Discard', () => editor.discard())) toast.success('Changes discarded')
     },
   })
 }
@@ -192,8 +213,8 @@ useEventListener(window, 'beforeunload', (event) => {
 <template>
   <div class="relative flex h-screen flex-col bg-surface-base" data-theme-layout-editor>
     <header
-      class="flex shrink-0 flex-wrap items-center gap-2 border-b border-outline-gray-2 px-3 py-2 transition-[margin] duration-200 motion-reduce:transition-none"
-      :class="{ 'me-80': themeSettingsOpen && isWide }"
+      class="flex shrink-0 flex-wrap items-center gap-2 border-b border-outline-gray-2 px-3 py-2"
+      :class="{ 'me-80 transition-[margin] duration-200 motion-reduce:transition-none': themeSettingsOpen && isWide }"
     >
       <div class="flex min-w-0 items-center gap-2">
         <Breadcrumbs class="min-w-0" :items="breadcrumbs" />
@@ -218,8 +239,8 @@ useEventListener(window, 'beforeunload', (event) => {
               :variant="action.variant"
               :label="action.label"
               :class="{ 'pointer-events-none': action.reason }"
-              :disabled="Boolean(action.reason)"
-              :loading="!action.reason && busy"
+              :disabled="Boolean(action.reason) || (busy && pendingAction !== action.label)"
+              :loading="pendingAction === action.label"
               @click="action.onClick"
             />
           </span>
@@ -237,7 +258,7 @@ useEventListener(window, 'beforeunload', (event) => {
 
     <template v-else>
       <div v-if="!isWide" class="flex shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3 py-2">
-        <TabButtons v-model="panel" class="min-w-0 flex-1" :options="PANELS" aria-label="Panel" />
+        <TabButtons v-model="panel" class="min-w-0 flex-1" :options="panels" aria-label="Panel" />
         <PreviewOptions :state="state" :devices="false" />
       </div>
 
@@ -256,19 +277,20 @@ useEventListener(window, 'beforeunload', (event) => {
       </DefineTreePanel>
 
       <div v-if="isWide" class="flex min-h-0 flex-1">
-        <SplitterGroup direction="horizontal" auto-save-id="commera-theme-editor-panels" class="min-w-0 flex-1">
+        <SplitterGroup direction="horizontal" class="min-w-0 flex-1">
           <SplitterPanel
             id="theme-editor-tree"
             ref="treePanel"
             :order="1"
             size-unit="px"
-            :default-size="288"
+            :default-size="treeWidth"
             :min-size="220"
             :max-size="440"
             :collapsible="Boolean(maximised)"
             :collapsed-size="0"
             class="flex flex-col"
             data-editor-panel="tree"
+            @resize="treePanel && !maximised && (treeWidth = Math.round(treePanel.getSize()))"
           >
             <div class="min-h-0 flex-1 overflow-y-auto p-2">
               <TreePanel />
@@ -294,12 +316,12 @@ useEventListener(window, 'beforeunload', (event) => {
           </SplitterPanel>
         </SplitterGroup>
         <aside
-          v-show="settingsOpen"
+          v-show="settingsOpen && hasSettings"
           id="theme-editor-settings"
           class="w-80 shrink-0 border-s border-outline-gray-2"
           data-editor-panel="settings"
         >
-          <LayoutSettingsPanel v-if="state.loaded" :editor="editor" />
+          <LayoutSettingsPanel v-if="state.loaded && state.selection" :editor="editor" />
         </aside>
       </div>
 
@@ -344,7 +366,6 @@ useEventListener(window, 'beforeunload', (event) => {
       v-if="isWide && state.loaded && themeSettingsMounted"
       class="absolute inset-y-0 end-0 z-20 overflow-hidden border-s border-outline-gray-2 bg-surface-base transition-[width] duration-200 motion-reduce:transition-none"
       :class="themeSettingsOpen ? 'w-80' : 'w-0'"
-      @transitionend.self="themeSettingsMounted = themeSettingsOpen"
     >
       <ThemeSettingsPanel
         class="absolute inset-y-0 end-0 w-80"

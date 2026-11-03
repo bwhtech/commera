@@ -91,7 +91,7 @@ async function uploadFile(event) {
     <input
       :value="text"
       type="color"
-      class="size-7 shrink-0 cursor-pointer rounded-4 border border-outline-gray-2 bg-surface-base"
+      class="size-7 shrink-0 cursor-pointer rounded-full border border-outline-gray-3 bg-surface-base [&::-moz-color-swatch]:rounded-full [&::-moz-color-swatch]:border-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-0"
       :disabled="disabled"
       :aria-label="field.label"
       @input="emit('update:modelValue', $event.target.value)"

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Button, FormLabel, ScrollArea, toast } from 'frappe-ui'
+import { Button, FormLabel, ScrollArea } from 'frappe-ui'
 import SettingsFieldControl from '../settings/SettingsFieldControl.vue'
 
 const props = defineProps({
@@ -38,7 +38,7 @@ watch(isDirty, (dirty) => emit('dirty', dirty), { immediate: true })
 async function save() {
   saving.value = true
   try {
-    if (await saveThemeSettings(changes.value)) toast.success('Theme settings saved')
+    await saveThemeSettings(changes.value)
   } finally {
     saving.value = false
   }
