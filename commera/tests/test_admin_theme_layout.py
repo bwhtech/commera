@@ -142,6 +142,7 @@ class TestThemeThumbnail(IntegrationTestCase):
 		self.delete_thumbnail_files()
 
 	def delete_thumbnail_files(self):
+		frappe.db.set_value("Shop Theme", SUMMER_THEME, "thumbnail", None, update_modified=False)
 		for file_name in self.thumbnail_files():
 			frappe.delete_doc("File", file_name, ignore_permissions=True)
 
@@ -175,7 +176,7 @@ class TestThemeThumbnail(IntegrationTestCase):
 		second_url = save_thumbnail(SUMMER_THEME, image_data_url("PNG", "blue"))
 
 		self.assertEqual(self.thumbnail_files(), [frappe.db.get_value("File", {"file_url": second_url})])
-		self.assertFalse(first_file.exists_on_disk())
+		self.assertFalse(frappe.db.exists("File", first_file.name))
 		self.assertEqual(frappe.db.get_value("Shop Theme", SUMMER_THEME, "thumbnail"), second_url)
 
 	def test_save_thumbnail_refuses_anything_but_an_image(self):
