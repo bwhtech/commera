@@ -1,9 +1,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Button, TabButtons, toast } from 'frappe-ui'
+import { Button, toast } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListHeaderCellSort, ListRow, ListRows } from 'frappe-ui/list'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
+import ResponsiveButton from '../components/ResponsiveButton.vue'
+import ListTabs from '../components/ListTabs.vue'
 import ListPagination from '../components/ListPagination.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -143,15 +145,15 @@ function printDeliveryNotes() {
 
   <PageBody>
     <div class="flex flex-wrap items-center gap-2">
-      <TabButtons v-model="tab" size="sm" :options="TABS" />
+      <ListTabs v-model="tab" :options="TABS" />
       <SearchInput
         v-model="query"
-        class="ml-auto w-56"
+        class="min-w-0 flex-1 basis-40 sm:ml-auto sm:w-56 sm:flex-none sm:basis-auto"
         placeholder="Search orders"
       />
-      <Button
+      <ResponsiveButton
         :label="selecting ? 'Cancel selection' : 'Select'"
-        icon-left="lucide-list-checks"
+        icon="lucide-list-checks"
         :variant="selecting ? 'solid' : 'subtle'"
         theme="gray"
         @click="selecting ? endSelecting() : (selecting = true)"
