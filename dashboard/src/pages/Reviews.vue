@@ -1,9 +1,10 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Avatar, Rating, Switch, TabButtons, toast } from 'frappe-ui'
+import { Avatar, Rating, Switch, toast } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
+import ListTabs from '../components/ListTabs.vue'
 import ListPagination from '../components/ListPagination.vue'
 import ListSkeleton from '../components/ListSkeleton.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -75,10 +76,10 @@ async function togglePublished(row) {
 
   <PageBody>
     <div class="flex flex-wrap items-center gap-2">
-      <TabButtons v-model="tab" size="sm" :options="TABS" />
+      <ListTabs v-model="tab" :options="TABS" />
       <SearchInput
         v-model="query"
-        class="ml-auto w-56"
+        class="min-w-0 flex-1 basis-40 sm:ml-auto sm:w-56 sm:flex-none sm:basis-auto"
         placeholder="Search reviews"
       />
     </div>

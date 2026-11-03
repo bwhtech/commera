@@ -95,10 +95,10 @@ function adjust() {
   <PageBody>
     <div class="flex flex-wrap items-center gap-3">
       <Switch v-model="lowOnly" label="Low stock only" size="sm" />
-      <SearchInput v-model="query" class="ml-auto w-56" placeholder="Search SKU or product" />
-      <Button
+      <SearchInput v-model="query" class="min-w-0 flex-1 basis-40 sm:ml-auto sm:w-56 sm:flex-none sm:basis-auto" placeholder="Search SKU or product" />
+      <ResponsiveButton
         :label="selecting ? 'Cancel selection' : 'Select'"
-        icon-left="lucide-list-checks"
+        icon="lucide-list-checks"
         :variant="selecting ? 'solid' : 'subtle'"
         theme="gray"
         @click="selecting ? endSelecting() : (selecting = true)"
