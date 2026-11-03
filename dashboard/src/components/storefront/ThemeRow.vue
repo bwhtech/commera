@@ -55,11 +55,14 @@ const editorRoute = computed(() =>
     <Button
       v-if="!theme.live && !theme.is_base"
       class="relative z-10"
-      label="Switch Theme"
+      aria-label="Switch Theme"
       :loading="activating"
       :disabled="disabled"
       @click="$emit('activate', theme)"
-    />
+    >
+      <span class="sm:hidden">Switch</span>
+      <span class="hidden sm:inline">Switch Theme</span>
+    </Button>
     <span
       class="lucide-chevron-right size-4 shrink-0 text-ink-gray-5"
       :class="{ invisible: !editorRoute }"
