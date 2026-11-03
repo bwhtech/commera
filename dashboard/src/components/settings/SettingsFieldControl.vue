@@ -88,15 +88,21 @@ async function uploadFile(event) {
   />
 
   <div v-else-if="field.fieldtype === 'Color'" class="flex w-full items-center gap-2 sm:w-72">
-    <input
-      :value="text"
-      type="color"
-      class="size-7 shrink-0 cursor-pointer rounded-full border border-outline-gray-3 bg-surface-base [&::-moz-color-swatch]:rounded-full [&::-moz-color-swatch]:border-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-0"
-      :disabled="disabled"
-      :aria-label="field.label"
-      @input="emit('update:modelValue', $event.target.value)"
-      @change="commit($event.target.value)"
-    />
+    <label
+      class="relative size-7 shrink-0 cursor-pointer rounded-full border border-outline-gray-3 bg-surface-base has-[:disabled]:cursor-not-allowed has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-outline-gray-3"
+      :style="{ backgroundColor: text }"
+      data-colour-swatch
+    >
+      <input
+        :value="text"
+        type="color"
+        class="sr-only"
+        :disabled="disabled"
+        :aria-label="field.label"
+        @input="emit('update:modelValue', $event.target.value)"
+        @change="commit($event.target.value)"
+      />
+    </label>
     <TextInput
       v-model="text"
       class="min-w-0 flex-1"
