@@ -102,12 +102,12 @@ async function visibleFrame(page, device) {
 describe('theme editor', () => {
   const session = useSession()
 
-  uiTest(session, 'The top bar keeps all three actions and says why one is off', async (t) => {
+  uiTest(session, 'The top bar keeps Save and Publish on and shows Discard only with something to discard', async (t) => {
     const { page } = session
     const theme = await findLiveSectionsTheme(page)
     if (!theme) return t.skip('the live theme is not a Sections theme')
     await openEditor(page, theme)
-    const enabled = () =>
+    const shown = () =>
       page.$$eval('header button', (buttons) =>
         Object.fromEntries(
           buttons
@@ -115,37 +115,35 @@ describe('theme editor', () => {
             .map((button) => [button.textContent.trim(), !button.disabled]),
         ),
       )
-    const tooltipFor = async (label) => {
+    const toastAfter = async (label, message) => {
       const [button] = await page.$$(`xpath/.//header//button[normalize-space()="${label}"]`)
-      await (await button.evaluateHandle((element) => element.parentElement)).hover()
-      await page.waitForSelector('[role="tooltip"]', { visible: true, timeout: 3000 })
-      const text = await page.$eval('[role="tooltip"]', (element) => element.textContent.trim())
-      await page.mouse.move(0, 400)
-      await wait(300)
-      return text
+      await button.click()
+      await page.waitForFunction(
+        (message) => [...document.querySelectorAll('[data-sonner-toast]')].some((node) => node.textContent.includes(message)),
+        { timeout: 5000 },
+        message,
+      )
     }
 
     const pending = (await page.$eval('header', (element) => element.innerText)).includes('Unpublished changes')
     if (pending) {
-      assert.deepEqual(await enabled(), { Discard: true, Save: false, Publish: true })
-      assert.equal(await tooltipFor('Save'), 'No unsaved changes')
+      assert.deepEqual(await shown(), { Discard: true, Save: true, Publish: true })
     } else {
       assert.ok((await page.$eval('header', (element) => element.innerText)).includes('Published'))
-      assert.deepEqual(await enabled(), { Discard: false, Save: false, Publish: false })
-      assert.equal(await tooltipFor('Discard'), 'Nothing to discard')
-      assert.equal(await tooltipFor('Publish'), 'Everything is already live')
+      assert.deepEqual(await shown(), { Save: true, Publish: true }, 'nothing to discard, so no Discard')
+      await toastAfter('Publish', 'Already published')
     }
+    await toastAfter('Save', 'Nothing to save')
 
     await page.click('[data-tree-node^="section:"]')
     await page.waitForSelector('[data-settings-panel] button[aria-label="Hide section"]', { visible: true })
     await page.click('[data-settings-panel] button[aria-label="Hide section"]')
     await wait(300)
-    assert.deepEqual(await enabled(), { Discard: true, Save: true, Publish: false })
-    assert.equal(await tooltipFor('Publish'), 'Save your changes first')
+    assert.deepEqual(await shown(), { Discard: true, Save: true, Publish: true })
 
     await page.click('[data-settings-panel] button[aria-label="Show section"]')
     await wait(300)
-    assert.equal((await enabled()).Save, false, 'undoing the edit leaves nothing to save')
+    assert.equal('Discard' in (await shown()), pending, 'undoing the edit leaves only what was there before')
   })
 
   uiTest(session, 'A refused save keeps the edit unsaved and publishes nothing', async (t) => {
@@ -158,7 +156,7 @@ describe('theme editor', () => {
     const intercept = (request) => {
       const method = request.url().match(/theme_layout\.(save_draft|publish)$/)?.[1]
       if (method) calls.push(method)
-      if (method === 'save_draft') request.respond(REFUSAL)
+      if (method === 'save_draft') setTimeout(() => request.respond(REFUSAL), SLOW_RENDER_MS)
       else request.continue()
     }
     page.on('request', intercept)
@@ -172,10 +170,17 @@ describe('theme editor', () => {
       await wait(500)
 
       const header = () => page.$eval('header', (element) => element.innerText)
-      const publishOn = () => page.$eval('xpath/.//header//button[normalize-space()="Publish"]', (button) => !button.disabled)
-      assert.ok(!(await publishOn()), 'Publish waits until the edit is saved')
       const [saveButton] = await page.$$('xpath/.//header//button[normalize-space()="Save"]')
       await saveButton.click()
+      await wait(300)
+      const states = await page.$$eval('header button', (buttons) =>
+        Object.fromEntries(
+          buttons
+            .filter((button) => ['Discard', 'Save', 'Publish'].includes(button.textContent.trim()))
+            .map((button) => [button.textContent.trim(), button.getAttribute('aria-busy') ? 'loading' : button.disabled ? 'disabled' : 'enabled']),
+        ),
+      )
+      assert.deepEqual(states, { Discard: 'disabled', Save: 'loading', Publish: 'disabled' })
       await wait(2500)
 
       assert.deepEqual(calls, ['save_draft'])
@@ -415,17 +420,22 @@ describe('theme editor', () => {
     assert.ok(Math.abs((await panelWidth(page, 'tree')) - 220) <= 2, 'a hard drag stops at the minimum, it never folds the tree away')
     await dragBy(page, '[data-editor-handle="tree"]', widened - 220)
 
-    const settingsWidth = await panelWidth(page, 'settings')
+    assert.equal(await panelWidth(page, 'settings'), 0, 'with nothing selected there is no settings column')
     await openThemeSettings(page)
-    const overlayWidth = await page.$eval('[data-theme-layout-editor] > aside', (element) => element.getBoundingClientRect().width)
-    assert.equal(Math.round(overlayWidth), settingsWidth, 'theme settings cover the settings column exactly')
     await clickButton(page, 'Close theme settings')
-    assert.equal(await page.$('[data-theme-settings-panel]'), null)
+    assert.equal(await page.$('[data-theme-settings-panel]'), null, 'theme settings close at once')
+    assert.equal(await panelWidth(page, 'settings'), 0, 'closing with nothing selected folds the column away')
+    await page.click('[data-tree-node^="section:"]')
+    const settingsWidth = await panelWidth(page, 'settings')
+    assert.ok(settingsWidth > 0, 'selecting a section opens its settings')
+    await openThemeSettings(page)
+    await clickButton(page, 'Close theme settings')
+    assert.ok(await page.$('[data-settings-panel]'), 'closing goes back to the section that was selected')
 
     await page.reload({ waitUntil: 'networkidle2' })
     await page.waitForSelector('[data-tree-node^="section:"]', { timeout: 30000 })
     assert.equal(await panelWidth(page, 'tree'), widened)
-    assert.equal(await panelWidth(page, 'settings'), settingsWidth)
+    assert.equal(await panelWidth(page, 'settings'), 0, 'a reload starts with nothing selected')
   })
 
   uiTest(session, 'The preview fits the canvas, scrolls its own page and maximises', async (t) => {

@@ -8,7 +8,8 @@ from frappe import _
 
 from commera.api.admin.theme import build_theme_settings
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
-from commera.shop_themes.sections import get_section_schema, get_theme_json
+from commera.shop_themes.preview_entries import PREVIEW_ENTRY_PAGES, list_entries, resolve_entry
+from commera.shop_themes.sections import get_inherited_layout, get_section_schema
 
 EDITOR_ROLES = ("System Manager", "Website Manager")
 
@@ -64,8 +65,12 @@ def parse_layout(layout):
 	return frappe.parse_json(layout) if layout else None
 
 
+def get_default_layout(theme_context, page):
+	return get_inherited_layout(theme_context["names"][1:], theme_context["dirs"], page)
+
+
 def build_layout_state(theme_context, page):
-	theme_file_layout = get_theme_json(theme_context["dirs"], f"layouts/{page}.json")
+	default_layout = get_default_layout(theme_context, page)
 	saved = (
 		frappe.db.get_value(
 			"Theme Layout",
@@ -77,13 +82,13 @@ def build_layout_state(theme_context, page):
 	)
 
 	published_layout = parse_layout(saved.published_layout)
-	live_layout = published_layout or theme_file_layout
+	live_layout = published_layout or default_layout
 	draft_layout = parse_layout(saved.draft_layout) or live_layout
 	return {
 		"page": page,
 		"draft_layout": draft_layout,
 		"published_layout": published_layout,
-		"theme_file_layout": theme_file_layout,
+		"default_layout": default_layout,
 		"has_unpublished_changes": draft_layout != live_layout,
 	}
 
@@ -100,8 +105,18 @@ def get_editor(theme: str, page: str = "index"):
 		"pages": get_pages(theme_context["dirs"]),
 		"section_schemas": get_section_schemas(theme_context["dirs"]),
 		"settings": build_theme_settings(theme),
+		"has_preview_entries": page in PREVIEW_ENTRY_PAGES,
 		**build_layout_state(theme_context, page),
 	}
+
+
+@frappe.whitelist()
+def get_preview_entries(
+	theme: str, page: str, search: str | None = None, start: int = 0, selected: str | None = None
+):
+	validate_page(get_editable_theme_context(theme), page)
+
+	return {**list_entries(page, search, start), "current": resolve_entry(page, selected)}
 
 
 def save_draft_layout(theme_context, page, layout):
@@ -147,7 +162,7 @@ def discard(theme: str, page: str):
 	if name:
 		theme_layout = frappe.get_doc("Theme Layout", name)
 		theme_layout.draft_layout = theme_layout.published_layout or frappe.as_json(
-			get_theme_json(theme_context["dirs"], f"layouts/{page}.json")
+			get_default_layout(theme_context, page)
 		)
 		theme_layout.save()
 

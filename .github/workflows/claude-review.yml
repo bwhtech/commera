@@ -113,6 +113,15 @@ jobs:
           REVIEW_COMMIT: ${{ steps.pr.outputs.head }}
         run: .github/scripts/post-review.sh "$PR_NUMBER" review.json "${{ steps.app-token.outputs.app-slug || 'github-actions' }}"
 
+      - name: Offer to apply the fixes
+        if: hashFiles('review.json') != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+        run: |
+          if jq -e '.event == "REQUEST_CHANGES"' review.json > /dev/null; then
+            .github/scripts/offer-fix.sh "$PR_NUMBER" "${{ steps.app-token.outputs.app-slug || 'github-actions' }}"
+          fi
+
       - name: Report the outcome
         if: always() && github.event_name == 'issue_comment'
         env:

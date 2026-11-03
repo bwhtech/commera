@@ -1,9 +1,13 @@
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { refDebounced } from '@vueuse/core'
 import { createAdminCaller } from './adminCaller'
+import { useAdminRead } from './api'
+import { rememberPreviewEntry, rememberedPreviewEntry } from '../ia/previewEntry'
 import { readableName } from '../utils/sectionSettingToField'
 
 const DEFAULT_MAX_BLOCKS = 50
 const DEFAULT_MAX_PRODUCTS = 8
+const SEARCH_DEBOUNCE_MS = 300
 const TRANSLATABLE_TYPES = ['text', 'textarea']
 
 const layoutCaller = createAdminCaller('theme_layout.')
@@ -67,7 +71,7 @@ function createPart(group, data) {
     group,
     layout,
     savedLayout: stableJson(data.draft_layout),
-    liveLayout: stableJson(data.published_layout ?? data.theme_file_layout),
+    liveLayout: stableJson(data.published_layout ?? data.default_layout),
   }
 }
 
@@ -79,6 +83,8 @@ export function createLayoutEditor(theme) {
     theme,
     page: 'index',
     pages: [],
+    hasPreviewEntries: false,
+    previewEntry: null,
     schemas: [],
     settings: { doctype: null, groups: [] },
     live: false,
@@ -172,6 +178,8 @@ export function createLayoutEditor(theme) {
     if (data) {
       state.page = data.page
       state.pages = data.pages
+      state.hasPreviewEntries = data.has_preview_entries
+      state.previewEntry = data.has_preview_entries ? rememberedPreviewEntry(theme, data.page) : null
       state.schemas = data.section_schemas
       state.settings = data.settings
       state.live = data.live
@@ -216,6 +224,12 @@ export function createLayoutEditor(theme) {
 
   async function saveIfChanged() {
     return hasUnsavedChanges.value ? save() : true
+  }
+
+  function setPreviewEntry(entry) {
+    state.previewEntry = entry
+    rememberPreviewEntry(theme, state.page, entry)
+    commit()
   }
 
   async function switchPage(page) {
@@ -374,6 +388,7 @@ export function createLayoutEditor(theme) {
     discard,
     saveIfChanged,
     switchPage,
+    setPreviewEntry,
     select,
     selectFromPreview,
     addSection,
@@ -391,4 +406,37 @@ export function createLayoutEditor(theme) {
     saveThemeSettings,
     commit,
   }
+}
+
+export function usePreviewEntries(state) {
+  const query = ref('')
+  const search = refDebounced(query, SEARCH_DEBOUNCE_MS)
+  const start = ref(0)
+  const entries = ref([])
+
+  const results = useAdminRead('theme_layout.get_preview_entries', {
+    params: () => ({
+      theme: state.theme,
+      page: state.page,
+      search: search.value,
+      start: start.value,
+      selected: state.previewEntry,
+    }),
+    refetch: true,
+  })
+
+  watch([search, () => state.page, () => state.previewEntry], () => (start.value = 0))
+  watch(
+    () => results.data,
+    (data) => {
+      if (!data) return
+      entries.value = start.value ? [...entries.value, ...data.entries] : data.entries
+    },
+  )
+
+  const current = computed(() => results.data?.current ?? null)
+  const hasMore = computed(() => Boolean(results.data?.has_more))
+  const showMore = () => (start.value = entries.value.length)
+
+  return { query, results, entries, current, hasMore, showMore }
 }
