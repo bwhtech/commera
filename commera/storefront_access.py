@@ -10,6 +10,15 @@ SETTINGS_DOCTYPE = "Commera Settings"
 STOREFRONT_SEGMENTS = frozenset({"", "en", "ar", "cart"})
 
 
+def get_store_name() -> str:
+	"""The name set in onboarding, else the site's app name: the one a store set up before Commera has."""
+	return (
+		frappe.get_cached_doc(SETTINGS_DOCTYPE).store_name
+		or frappe.get_cached_doc("Website Settings").app_name
+		or ""
+	)
+
+
 def is_storefront_published() -> bool:
 	return bool(frappe.get_cached_doc(SETTINGS_DOCTYPE).storefront_published)
 
@@ -35,12 +44,11 @@ class PrivateStorefrontPage:
 		return frappe.session.user == "Guest" or not has_app_permission()
 
 	def render(self):
-		settings = frappe.get_cached_doc(SETTINGS_DOCTYPE)
 		website_settings = frappe.get_cached_doc("Website Settings")
 		# A file template, loaded by path: nothing here compiles a string as a template.
 		html = frappe.get_template("templates/storefront_private.html").render(
 			{
-				"store_name": settings.store_name or website_settings.app_name or "",
+				"store_name": get_store_name(),
 				"logo": website_settings.banner_image,
 				"favicon": website_settings.favicon,
 			},

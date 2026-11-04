@@ -9,6 +9,7 @@ export function buildHomeTasks(home, domain, siteHost) {
   const tasks = [
     {
       key: 'products',
+      noun: 'products',
       title: 'Add your products',
       description: 'Your store has nothing to sell until you add a product and publish it.',
       action: 'Add product',
@@ -18,6 +19,7 @@ export function buildHomeTasks(home, domain, siteHost) {
     },
     {
       key: 'payments',
+      noun: 'payments',
       // With cash on delivery on, the store can already take orders, so gateways are optional.
       title: home.cod_enabled ? 'Take online payments' : 'Set up payments',
       description: PAYMENTS_DESCRIPTION,
@@ -28,6 +30,7 @@ export function buildHomeTasks(home, domain, siteHost) {
     },
     {
       key: 'shipping',
+      noun: 'shipping',
       title: 'Set up shipping',
       description: 'Add delivery options or a shipping rule so checkout can quote delivery.',
       action: 'Set up shipping',
@@ -90,4 +93,43 @@ export function needsPreviewCapture(preview, now = Date.now()) {
   if (!preview?.can_capture) return false
   if (!preview.image || !preview.captured_on) return true
   return now - new Date(preview.captured_on.replace(' ', 'T')).getTime() > PREVIEW_MAX_AGE_MS
+}
+
+const LIST = new Intl.ListFormat('en', { type: 'conjunction' })
+
+/** "payments and shipping": the blocking tasks, named for the publish dialog's warning. */
+export function listBlockers(tasks) {
+  return LIST.format(tasks.map((task) => task.noun))
+}
+
+/** The address-bar slug the domain card draws: the store name with everything but letters and digits dropped. */
+export function storeSlug(storeName) {
+  return (storeName ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '') || 'yourstore'
+}
+
+/** The hero's status line and copy, from whether the store is live and how many tasks still block a sale. */
+export function describeStoreStatus(isLive, blockerCount) {
+  if (isLive) {
+    return {
+      dot: 'bg-surface-green-7',
+      label: 'Live',
+      headline: 'Your store is open for business',
+      subline: 'Here is what will make your store even better.',
+    }
+  }
+  const headline = 'Your store is taking shape'
+  if (blockerCount) {
+    return {
+      dot: 'bg-surface-amber-7',
+      label: `${blockerCount} ${blockerCount === 1 ? 'step' : 'steps'} before you can sell`,
+      headline,
+      subline: 'Finish the essentials, then publish when you are ready.',
+    }
+  }
+  return {
+    dot: 'bg-surface-gray-5',
+    label: 'Ready to publish',
+    headline,
+    subline: 'You can take orders now. Publish to open the doors.',
+  }
 }

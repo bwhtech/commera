@@ -7,8 +7,9 @@ from frappe.utils.data import cint
 from commera.api.admin.integrations import is_profile_enabled
 from commera.api.admin.payments import get_payment_registry
 from commera.api.admin.theme_layout import EDITOR_ROLES
-from commera.roles import is_commera_admin
+from commera.roles import COMMERA_ADMIN
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
+from commera.storefront_access import get_store_name
 
 SETTINGS_DOCTYPE = "Commera Settings"
 PUBLISH_ROLE = "System Manager"
@@ -25,10 +26,6 @@ def has_online_payments() -> bool:
 def has_shipping(settings) -> bool:
 	"""A delivery option on offer, or a store shipping rule, is enough for checkout to quote delivery."""
 	return bool(settings.shipping_rule or frappe.db.exists("Shipping Service", {"enabled": 1}))
-
-
-def get_brand_logo() -> str | None:
-	return frappe.get_cached_doc("Website Settings").banner_image
 
 
 def get_store_preview(theme: str) -> dict:
@@ -51,16 +48,14 @@ def get_store_preview(theme: str) -> dict:
 @frappe.whitelist(methods=["GET"])
 def get_home():
 	"""What the Home screen needs: whether the store is live and which setup tasks are done."""
-	if not is_commera_admin():
-		raise frappe.PermissionError
+	frappe.only_for((COMMERA_ADMIN, PUBLISH_ROLE))
 
 	settings = frappe.get_cached_doc(SETTINGS_DOCTYPE)
-	brand_logo = get_brand_logo()
 	theme = resolve_active_theme()
 	return {
 		"published": bool(settings.storefront_published),
 		"can_publish": PUBLISH_ROLE in frappe.get_roles(),
-		"store_name": settings.store_name or frappe.get_cached_doc("Website Settings").app_name,
+		"store_name": get_store_name(),
 		"store_category": settings.store_category,
 		"country": frappe.db.get_single_value("System Settings", "country"),
 		"primary_color": settings.primary_color,
@@ -73,7 +68,7 @@ def get_home():
 			"products": has_published_product(),
 			"payments": has_online_payments(),
 			"shipping": has_shipping(settings),
-			"brand": bool(brand_logo),
+			"brand": bool(frappe.get_cached_doc("Website Settings").banner_image),
 		},
 	}
 

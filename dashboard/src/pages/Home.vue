@@ -9,10 +9,11 @@ import TaskHeading from '../components/home/TaskHeading.vue'
 import TaskList from '../components/home/TaskList.vue'
 import { trySubmit, useAdminAction, useAdminRead } from '../data/api'
 import { customDomain, loadDomains } from '../data/cloudDomains'
-import { buildHomeTasks, needsPreviewCapture } from '../data/home'
+import { buildHomeTasks, describeStoreStatus, listBlockers, needsPreviewCapture, storeSlug } from '../data/home'
 import { captureStorePreview } from '../data/storePreview'
 import { dismissTask, dismissedTasks, homeArrival, restoreTasks } from '../ia/homeTasks'
 import { lookFor } from '../ia/onboarding'
+import { whenIdle } from '../utils/whenIdle'
 
 const homeRequest = useAdminRead('home.get_home')
 const publishAction = useAdminAction('home.set_storefront_published')
@@ -21,9 +22,6 @@ const home = computed(() => homeRequest.data)
 
 // A missing or day-old preview is captured once, after the page has settled: the capture renders the
 // homepage in a hidden frame, which is work Home's first paint should not wait on.
-// Safari has no requestIdleCallback, so it waits a second instead.
-const whenIdle = (callback) =>
-  'requestIdleCallback' in window ? requestIdleCallback(callback, { timeout: 3000 }) : setTimeout(callback, 1000)
 
 watch(home, (record) => {
   if (!needsPreviewCapture(record?.preview)) return
@@ -55,10 +53,11 @@ const visibleTasks = computed(() => openTasks.value.filter((task) => !dismissedT
 const dismissedCount = computed(() => openTasks.value.length - visibleTasks.value.length)
 const blockers = computed(() => openTasks.value.filter((task) => task.required))
 
-const storeLook = computed(() => {
+// What the card drawings personalise: the store's slug, category, country, brand colour and theme look.
+const artStore = computed(() => {
   const record = home.value ?? {}
   return {
-    slug: (record.store_name || 'yourstore').toLowerCase().replace(/[^a-z0-9]+/g, '') || 'yourstore',
+    slug: storeSlug(record.store_name),
     category: record.store_category,
     country: record.country,
     codEnabled: record.cod_enabled,
@@ -67,22 +66,10 @@ const storeLook = computed(() => {
   }
 })
 
-const status = computed(() => {
-  if (isLive.value) return { dot: 'bg-surface-green-7', label: 'Live' }
-  const count = blockers.value.length
-  if (count) return { dot: 'bg-surface-amber-7', label: `${count} ${count === 1 ? 'step' : 'steps'} before you can sell` }
-  return { dot: 'bg-surface-gray-5', label: 'Ready to publish' }
-})
-const headline = computed(() => (isLive.value ? 'Your store is open for business' : 'Your store is taking shape'))
-const subline = computed(() => {
-  if (isLive.value) return 'Here is what will make your store even better.'
-  if (blockers.value.length) return 'Finish the essentials, then publish when you are ready.'
-  return 'You can take orders now. Publish to open the doors.'
-})
+const status = computed(() => describeStoreStatus(isLive.value, blockers.value.length))
 
 const publishOpen = ref(false)
 const unpublishOpen = ref(false)
-const blockerNames = computed(() => blockers.value.map((task) => task.key).join(' and '))
 const storeName = computed(() => home.value?.store_name || 'your store')
 
 async function setPublished(published, close) {
@@ -129,8 +116,8 @@ async function copyLink() {
               <span class="size-2 rounded-full" :class="status.dot" />
               {{ status.label }}
             </div>
-            <h1 class="mt-3 text-3xl-semibold text-ink-gray-9">{{ headline }}</h1>
-            <p class="mt-2 text-p-lg text-ink-gray-6">{{ subline }}</p>
+            <h1 class="mt-3 text-3xl-semibold text-ink-gray-9">{{ status.headline }}</h1>
+            <p class="mt-2 text-p-lg text-ink-gray-6">{{ status.subline }}</p>
             <div class="mt-6 flex flex-wrap items-center gap-2">
               <template v-if="isLive">
                 <Button variant="solid" size="md" label="View store" icon-right="lucide-arrow-up-right" :href="storeUrl" />
@@ -185,7 +172,7 @@ async function copyLink() {
                 :dismissed-count="dismissedCount"
                 @restore="restoreTasks"
               />
-              <TaskList :tasks="visibleTasks" :store="storeLook" @dismiss="dismissTask" />
+              <TaskList :tasks="visibleTasks" :store="artStore" @dismiss="dismissTask" />
             </section>
           </template>
         </StoreOverview>
@@ -198,7 +185,7 @@ async function copyLink() {
             :dismissed-count="dismissedCount"
             @restore="restoreTasks"
           />
-          <TaskList :tasks="visibleTasks" :store="storeLook" @dismiss="dismissTask" />
+          <TaskList :tasks="visibleTasks" :store="artStore" @dismiss="dismissTask" />
         </section>
 
         <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
@@ -215,7 +202,7 @@ async function copyLink() {
     :theme="blockers.length ? 'amber' : 'green'"
     :message="
       blockers.length
-        ? `You have not set up ${blockerNames} yet. Visitors can browse, but checkout will not work.`
+        ? `You have not set up ${listBlockers(blockers)} yet. Visitors can browse, but checkout will not work.`
         : `Anyone with the link to ${host} can browse and buy. You can make it private again any time.`
     "
     :actions="publishActions"
