@@ -112,9 +112,8 @@ async function copyLink() {
         </div>
       </Transition>
 
-      <!-- min-w-0: the URL line truncates instead of pushing the column past the preview. -->
       <Transition v-bind="entrance(1)">
-        <div class="min-w-0 flex-1">
+        <div class="flex-1">
           <!-- The skeleton hands over with a short cross-fade, so the copy arrives instead of snapping
                in. Out-in, because both sit in the same spot. -->
           <Transition
@@ -156,9 +155,10 @@ async function copyLink() {
                   <Button size="md" label="Preview" icon-right="lucide-arrow-up-right" :href="storeUrl" />
                 </template>
               </div>
-              <p class="mt-3 flex min-w-0 items-center gap-1.5 text-sm text-ink-gray-5">
-                <span class="size-3.5 shrink-0" :class="isLive ? 'lucide-globe' : 'lucide-lock'" aria-hidden="true" />
-                <span class="truncate">{{ isLive ? host : 'Visitors see a coming-soon page.' }}</span>
+              <!-- Private only: a live store's address is already in the preview's address bar. -->
+              <p v-if="!isLive" class="mt-3 flex items-center gap-1.5 text-sm text-ink-gray-5">
+                <span class="lucide-lock size-3.5 shrink-0" aria-hidden="true" />
+                Visitors see a coming-soon page.
               </p>
             </div>
 
