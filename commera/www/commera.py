@@ -10,6 +10,7 @@ from commera.api.permission import has_app_permission
 from commera.onboarding import is_onboarding_pending
 from commera.plugins.registry import get_visible_plugins
 from commera.roles import is_commera_admin
+from commera.storefront_access import is_storefront_published
 from commera.utils import get_store_currency
 
 no_cache = 1
@@ -57,6 +58,9 @@ def get_boot():
 			"is_admin": is_commera_admin(),
 			"onboarding_pending": is_onboarding_pending(),
 			"cloud_settings": get_cloud_settings(),
+			# Home's preview badge and layout are decided before its own read lands, so a live store
+			# never paints as Private first.
+			"storefront_published": is_storefront_published(),
 		}
 	)
 	frappe.db.commit()  # nosemgrep

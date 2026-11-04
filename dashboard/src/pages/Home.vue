@@ -11,6 +11,7 @@ import { trySubmit, useAdminAction, useAdminRead } from '../data/api'
 import { customDomain, loadDomains } from '../data/cloudDomains'
 import { buildHomeTasks, describeStoreStatus, listBlockers, needsPreviewCapture, storeSlug } from '../data/home'
 import { captureStorePreview } from '../data/storePreview'
+import { isStorefrontPublished } from '../data/storefront'
 import { dismissTask, dismissedTasks, homeArrival, restoreTasks } from '../ia/homeTasks'
 import { lookFor } from '../ia/onboarding'
 import { whenIdle } from '../utils/whenIdle'
@@ -43,7 +44,11 @@ const entrance = (step) => ({
   enterFromClass: 'translate-y-2 opacity-0 motion-reduce:translate-y-0',
 })
 
-const isLive = computed(() => Boolean(home.value?.published))
+watch(home, (record) => {
+  if (record) isStorefrontPublished.value = record.published
+})
+
+const isLive = isStorefrontPublished
 const host = computed(() => customDomain.value?.status === 'connected' ? customDomain.value.name : window.location.host)
 const storeUrl = computed(() => `${window.location.protocol}//${host.value}/`)
 
@@ -73,6 +78,7 @@ const storeName = computed(() => home.value?.store_name || 'your store')
 
 async function setPublished(published, close) {
   if (!(await trySubmit(publishAction, { published: published ? 1 : 0 }))) return
+  isStorefrontPublished.value = published
   close()
   homeRequest.reload()
   if (published) toast.success(`${storeName.value} is live`)
@@ -109,51 +115,61 @@ async function copyLink() {
       <!-- min-w-0: the URL line truncates instead of pushing the column past the preview. -->
       <Transition v-bind="entrance(1)">
         <div class="min-w-0 flex-1">
-          <template v-if="home">
-            <div class="flex items-center gap-2 text-sm text-ink-gray-7">
-              <span class="size-2 rounded-full" :class="status.dot" />
-              {{ status.label }}
+          <!-- The skeleton hands over with a short cross-fade, so the copy arrives instead of snapping
+               in. Out-in, because both sit in the same spot. -->
+          <Transition
+            mode="out-in"
+            enter-active-class="transition-opacity duration-200 ease-out-strong"
+            enter-from-class="opacity-0"
+            leave-active-class="transition-opacity duration-100 ease-out-strong"
+            leave-to-class="opacity-0"
+          >
+            <div v-if="home" key="copy">
+              <div class="flex items-center gap-2 text-sm text-ink-gray-7">
+                <span class="size-2 rounded-full" :class="status.dot" />
+                {{ status.label }}
+              </div>
+              <h1 class="mt-3 text-3xl-semibold text-ink-gray-9">{{ status.headline }}</h1>
+              <p class="mt-2 text-p-lg text-ink-gray-6">{{ status.subline }}</p>
+              <div class="mt-6 flex flex-wrap items-center gap-2">
+                <template v-if="isLive">
+                  <Button variant="solid" size="md" label="View store" icon-right="lucide-arrow-up-right" :href="storeUrl" />
+                  <Button size="md" label="Copy link" icon-left="lucide-copy" @click="copyLink" />
+                  <Button
+                    v-if="home.can_publish"
+                    variant="ghost"
+                    size="md"
+                    label="Make private"
+                    icon-left="lucide-lock"
+                    @click="unpublishOpen = true"
+                  />
+                </template>
+                <template v-else>
+                  <Button
+                    v-if="home.can_publish"
+                    variant="solid"
+                    size="md"
+                    label="Publish store"
+                    icon-left="lucide-rocket"
+                    @click="publishOpen = true"
+                  />
+                  <Button size="md" label="Preview" icon-right="lucide-arrow-up-right" :href="storeUrl" />
+                </template>
+              </div>
+              <p class="mt-3 flex min-w-0 items-center gap-1.5 text-sm text-ink-gray-5">
+                <span class="size-3.5 shrink-0" :class="isLive ? 'lucide-globe' : 'lucide-lock'" aria-hidden="true" />
+                <span class="truncate">{{ isLive ? host : 'Visitors see a coming-soon page.' }}</span>
+              </p>
             </div>
-            <h1 class="mt-3 text-3xl-semibold text-ink-gray-9">{{ status.headline }}</h1>
-            <p class="mt-2 text-p-lg text-ink-gray-6">{{ status.subline }}</p>
-            <div class="mt-6 flex flex-wrap items-center gap-2">
-              <template v-if="isLive">
-                <Button variant="solid" size="md" label="View store" icon-right="lucide-arrow-up-right" :href="storeUrl" />
-                <Button size="md" label="Copy link" icon-left="lucide-copy" @click="copyLink" />
-                <Button
-                  v-if="home.can_publish"
-                  variant="ghost"
-                  size="md"
-                  label="Make private"
-                  icon-left="lucide-lock"
-                  @click="unpublishOpen = true"
-                />
-              </template>
-              <template v-else>
-                <Button
-                  v-if="home.can_publish"
-                  variant="solid"
-                  size="md"
-                  label="Publish store"
-                  icon-left="lucide-rocket"
-                  @click="publishOpen = true"
-                />
-                <Button size="md" label="Preview" icon-right="lucide-arrow-up-right" :href="storeUrl" />
-              </template>
-            </div>
-            <p class="mt-3 flex min-w-0 items-center gap-1.5 text-sm text-ink-gray-5">
-              <span class="size-3.5 shrink-0" :class="isLive ? 'lucide-globe' : 'lucide-lock'" aria-hidden="true" />
-              <span class="truncate">{{ isLive ? host : 'Visitors see a coming-soon page.' }}</span>
-            </p>
-          </template>
 
-          <!-- The finished column's rows, so nothing moves when the read lands. -->
-          <div v-else aria-hidden="true">
-            <Skeleton class="h-4 w-40 rounded-4" />
-            <Skeleton class="mt-3 h-9 w-full max-w-sm rounded-4" />
-            <Skeleton class="mt-2 h-5 w-64 rounded-4" />
-            <Skeleton class="mt-6 h-8 w-56 rounded-4" />
-          </div>
+            <!-- The finished column's rows, so nothing moves when the read lands. -->
+            <div v-else key="skeleton" aria-hidden="true">
+              <Skeleton class="h-4 w-40 rounded-4" />
+              <Skeleton class="mt-3 h-9 w-full max-w-sm rounded-4" />
+              <Skeleton class="mt-2 h-5 w-64 rounded-4" />
+              <Skeleton class="mt-6 h-8 w-56 rounded-4" />
+            </div>
+          </Transition>
         </div>
       </Transition>
     </section>
