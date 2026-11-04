@@ -1,8 +1,20 @@
 import frappe
+from bwh_payments_core.contract import PaymentGatewayBase
 from frappe import _
 from frappe.utils.caching import site_cache
 
+from commera.plugins import providers as registry
+
+KIND = "payment_connectors"
 PROFILE_DOCTYPE = "Payment Gateway Profile"
+
+
+def get_connector_doctypes() -> list[str]:
+	return registry.get_provider_doctypes(KIND)
+
+
+def get_connector_class(settings_doctype: str) -> type[PaymentGatewayBase]:
+	return registry.get_provider_class(KIND, settings_doctype, PaymentGatewayBase)
 
 
 @site_cache(ttl=60 * 60)
@@ -44,3 +56,8 @@ def resolve_payment_mode(payment_mode: str) -> str | None:
 def refuse_bwh_payments(app_name: str):
 	if app_name == "bwh_payments":
 		frappe.throw(_("Payments are part of Commera, so bwh_payments cannot be installed alongside it."))
+
+
+def validate_connectors(app_name: str | None = None):
+	if problems := registry.get_provider_problems(KIND, PaymentGatewayBase):
+		frappe.throw("<br>".join(problems), registry.ProviderNotRegisteredError)
