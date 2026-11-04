@@ -1145,8 +1145,7 @@ def create_product(
 	size_abbreviations: dict | str | None = None,
 	item_code: str | None = None,
 ):
-	"""Create a sellable product; company, warehouse, price list, UOM and naming series come from Commera
-	Settings. Both axes are always written whatever the caller omits - see the note above SIZE_ATTRIBUTE.
+	"""Both axes are always written whatever the caller omits - see the note above SIZE_ATTRIBUTE.
 	`item_code` names the Item when the title alone is not unique, as with an imported store."""
 	frappe.has_permission("Item", ptype="create", throw=True)
 
@@ -1165,7 +1164,9 @@ def create_product(
 
 	item_code = cstr(item_code).strip() or title
 	if frappe.db.exists("Item", item_code):
-		frappe.throw(_("A product called {0} already exists. Give this one a different title.").format(item_code))
+		frappe.throw(
+			_("A product called {0} already exists. Give this one a different title.").format(item_code)
+		)
 
 	# A book has neither a colour nor a size, so both axes fall back to a single hidden value - an owner who
 	# named no options hangs on the fallback axis, not on whichever attribute the form had selected.

@@ -1,8 +1,5 @@
-"""GraphQL Admin API queries, checked against API version 2026-10.
-
-Bulk queries allow five connections, nested at most two deep. Each resource lists its query versions
-from newest to oldest: the importer tries the next one when Shopify says a field does not exist,
-for example after it removes a deprecated field."""
+"""GraphQL Admin API queries for 2026-10. Bulk queries allow five connections, two levels deep.
+Each resource lists queries newest first; the next runs when Shopify says a field does not exist."""
 
 SHOP_QUERY = """
 {
@@ -36,10 +33,8 @@ PRODUCT_VARIANT_FIELDS = """
 	inventoryItem { tracked measurement { weight { unit value } } }
 """
 
-# ProductVariant.barcode and ProductVariant.image are deprecated in 2026-10. Their replacements,
-# barcodes and media, are connections, and a connection under variants would be a third level of
-# nesting, which a bulk query refuses. So the first query keeps the deprecated fields while they
-# last, and the second runs without them.
+# ProductVariant.barcode and image are deprecated in 2026-10, and their replacements would be a third
+# bulk nesting level. The first query keeps them while they last; the second runs without them.
 PRODUCT_VARIANT_DEPRECATED_FIELDS = " barcode image { url }"
 
 PRODUCTS_QUERY = """

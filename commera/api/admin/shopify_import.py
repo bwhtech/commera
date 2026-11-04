@@ -116,7 +116,7 @@ def disconnect() -> dict:
 
 
 @frappe.whitelist(methods=["POST"])
-def save_option(fieldname: str, value=None) -> dict:
+def save_option(fieldname: str, value: str | int | None = None) -> dict:
 	frappe.has_permission(SETTINGS_DOCTYPE, "write", throw=True)
 	if fieldname not in OPTION_FIELDS:
 		frappe.throw(_("{0} is not an import option").format(fieldname))

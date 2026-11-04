@@ -11,8 +11,8 @@ COUNT_FIELDS = {CREATED: "created_count", UPDATED: "updated_count", SKIPPED: "sk
 
 
 def execute_run(run_name: str) -> None:
-	"""Background job entry. The import writes Items, Customers, stock and website settings, so it
-	runs as Administrator. Only a user who may start a run can queue it."""
+	"""Only a user who may start a run can queue it."""
+	# nosemgrep: frappe-setuser  # the import writes Items, Customers, stock and website settings
 	frappe.set_user("Administrator")
 	ImportRunner(frappe.get_doc("Shopify Import Run", run_name)).execute()
 
@@ -59,7 +59,7 @@ class ImportRunner:
 		except Exception as error:
 			frappe.db.rollback()
 			self.has_failures = True
-			self.run.add_issue(resource, _("Could not read from Shopify: {0}").format(error))
+			self.run.add_issue(resource, _("Could not read from Shopify: {0}").format(str(error)))
 			progress.db_set("status", "Failed", commit=True)
 			return
 
@@ -73,7 +73,7 @@ class ImportRunner:
 		except Exception as error:
 			frappe.db.rollback()
 			self.has_failures = True
-			self.run.add_issue(resource, _("Could not finish: {0}").format(error))
+			self.run.add_issue(resource, _("Could not finish: {0}").format(str(error)))
 			status = "Failed"
 		progress.db_set("status", status, commit=True)
 
@@ -98,4 +98,5 @@ class ImportRunner:
 		# A message from one record must not show up as the message of the next one.
 		frappe.clear_messages()
 		progress.db_set(fieldname, (progress.get(fieldname) or 0) + 1)
+		# nosemgrep: frappe-manual-commit  # each record is kept on its own; a later failure must not undo it
 		frappe.db.commit()

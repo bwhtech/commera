@@ -10,9 +10,8 @@ from commera.shopify.queries import CUSTOMER_QUERIES
 
 
 class CustomerImporter(ResourceImporter):
-	"""A Shopify customer becomes a Customer with a Contact and Addresses. No User is made, so no email
-	goes out. When the shopper signs in to Commera with the same email, Commera links them to this
-	Customer through the Contact."""
+	"""No User is made, so no email goes out. A shopper who signs in with the same email is linked to
+	this Customer through the Contact."""
 
 	resource = "Customers"
 	queries = CUSTOMER_QUERIES

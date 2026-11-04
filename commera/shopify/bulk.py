@@ -12,13 +12,8 @@ def get_numeric_id(gid: str) -> str:
 
 
 def assemble_bulk_records(lines: Iterable[dict]) -> Iterator[dict]:
-	"""Put the child lines of a bulk JSONL file back under their parent.
-
-	Each line of a nested connection carries `__parentId`. Children are grouped by the type in
-	their ID, under `children`, for example `record["children"]["ProductVariant"]`. Shopify writes a
-	parent before its children, but does not promise that the children follow it directly, so the
-	whole file is read before the first record is returned.
-	"""
+	"""Children land under `record["children"][<type in their ID>]`. Shopify does not promise that
+	children follow their parent directly, so the whole file is read first."""
 	roots = []
 	records_by_id = {}
 	for line in lines:

@@ -56,11 +56,8 @@ def is_default_option(option: dict) -> bool:
 
 
 def plan_product(product: dict, page_option_names: list[str]) -> ProductPlan:
-	"""Pick the option that makes pages, and join every other option into the size label.
-
-	`page_option_names` holds casefolded Shopify option names, for example ["color", "colour"].
-	A product with no matching option gets one page, and all its options go to the size picker.
-	"""
+	"""`page_option_names` are casefolded, for example ["color", "colour"]. Without a matching
+	option the product gets one page, and every option goes to the size label."""
 	option_names = [cstr(option["name"]) for option in get_real_options(product)]
 	page_option = next((name for name in option_names if name.casefold() in page_option_names), None)
 	plan = ProductPlan(page_option=page_option, size_options=[n for n in option_names if n != page_option])
