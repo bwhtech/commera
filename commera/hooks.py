@@ -263,6 +263,7 @@ doc_events = {
 		]
 	},
 	"Item": {
+		"validate": "commera.product_collections.sync_collections",
 		"on_update": "commera.plugin_events.on_item_update",
 		"on_change": "commera.search.source_sync.on_source_change",
 		"after_rename": "commera.search.source_sync.on_source_rename",

@@ -6,6 +6,7 @@ from frappe.utils.data import cint, flt, getdate, today
 from frappe.utils.nestedset import get_descendants_of
 
 from commera.discounts.codes import add_code, normalize_code
+from commera.product_collections import get_item_collections
 
 PRODUCT = "Product"
 ORDER = "Order"
@@ -216,9 +217,14 @@ class CommeraDiscount(Document):
 				return True
 			if target.target_type == "Brand" and target.target == item.brand:
 				return True
-			if target.target_type == "Item Group" and item.item_group in get_item_group_tree(target.target):
+			if target.target_type == "Item Group" and self.is_in_item_group(item, target.target):
 				return True
 		return False
+
+	def is_in_item_group(self, item, item_group: str) -> bool:
+		"""A line matches when any of its product's collections sits in the target's tree."""
+		collections = {item.item_group, *get_item_collections(item.item_code)}
+		return not get_item_group_tree(item_group).isdisjoint(collections)
 
 	def get_line_discounts(self, cart) -> dict[int, float]:
 		# Keyed by idx: an unsaved preview's rows have no name.
