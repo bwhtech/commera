@@ -45,7 +45,7 @@ const sort = ref({ key: 'updated', direction: 'desc' })
 const page = ref(1)
 const pageSize = ref(20)
 
-const { collectionOptions: collectionPickerOptions, loading: movingToCollection, load: loadCollections } =
+const { collectionOptions: collectionPickerOptions, loading: changingCollections, load: loadCollections } =
   useCollections()
 loadCollections()
 
@@ -154,15 +154,21 @@ async function archiveSelected() {
   })
 }
 
-function moveToCollection() {
+function changeCollection(mode) {
   const itemTemplates = [...selection.value]
   pickCollectionFor(itemTemplates, {
     label: itemTemplates.length === 1 ? __('1 product') : __('{0} products', [itemTemplates.length]),
+    mode,
     onDone: () => {
       endSelecting()
       productsRequest.reload()
     },
   })
+}
+
+function collectionSummary(product) {
+  const others = (product.collections?.length ?? 1) - 1
+  return others > 0 ? `${product.collection} +${others}` : (product.collection ?? '—')
 }
 </script>
 
@@ -197,13 +203,14 @@ function moveToCollection() {
       :count="selection.length"
       :selected-label="selection.length === 1 ? __('1 product selected') : __('{0} products selected', [selection.length])"
       :empty-label="__('Select products to act on them')"
-      :busy="Boolean(bulkRunning) || movingToCollection"
+      :busy="Boolean(bulkRunning) || changingCollections"
       @done="endSelecting"
     >
+      <Button :label="__('Add to collection')" :loading="changingCollections" @click="changeCollection('add')" />
       <Button
-        :label="__('Move to collection')"
-        :loading="movingToCollection"
-        @click="moveToCollection"
+        :label="__('Remove from collection')"
+        :loading="changingCollections"
+        @click="changeCollection('remove')"
       />
       <Button
         :label="__('Archive')"
@@ -258,7 +265,11 @@ function moveToCollection() {
             </div>
           </ListCell>
           <ListCell><StatusBadge :status="item.disabled ? 'archived' : 'active'" /></ListCell>
-          <ListCell><span class="text-base text-ink-gray-7">{{ item.collection ?? '—' }}</span></ListCell>
+          <ListCell>
+            <span class="truncate text-base text-ink-gray-7" :title="item.collections?.join(', ')">
+              {{ collectionSummary(item) }}
+            </span>
+          </ListCell>
           <ListCell>
             <span class="w-full text-end text-base tabular-nums" :class="stockTone(item.stock)">
               {{ __('{0} in stock', [item.stock]) }}
