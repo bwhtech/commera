@@ -6,12 +6,9 @@ const props = defineProps({
   live: { type: Boolean, default: false },
   url: { type: String, required: true },
   host: { type: String, required: true },
-  // The live theme's saved homepage thumbnail, or null until one exists.
   image: { type: String, default: null },
 })
 
-// `loaded` gates the fade, `failed` drops a broken file back to the placeholder. A new image (a fresh
-// capture) starts both over.
 const loaded = ref(false)
 const failed = ref(false)
 watch(

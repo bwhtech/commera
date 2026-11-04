@@ -1,10 +1,6 @@
 <script setup>
 import { computed } from 'vue'
 
-/**
- * The shipping card's drawing: a delivery route on a quiet street map, from the store to a
- * customer's door. On hover the truck drives further along the same curve the line draws.
- */
 const props = defineProps({ country: { type: String, default: '' } })
 
 // One curve drives both the drawn road and the truck, in px of the fixed 280×144 stage; the stage
@@ -28,7 +24,6 @@ const city = computed(() => CITIES[props.country] ?? 'Your customer')
        its dash offset is 100 minus the same number, and line and truck always meet. -->
   <div class="relative h-36 w-[17.5rem] shrink-0">
     <svg class="absolute inset-0" width="280" height="144" viewBox="0 0 280 144" fill="none" aria-hidden="true">
-      <!-- Streets: wide, faint and round-capped, so they read as a map and stay behind the route. -->
       <g class="text-ink-gray-2" stroke="currentColor" stroke-width="8" stroke-linecap="round" opacity="0.6">
         <path d="M -10 78 H 96" />
         <path d="M 184 62 H 290" />
@@ -50,7 +45,6 @@ const city = computed(() => CITIES[props.country] ?? 'Your customer')
       <span class="lucide-store size-[1.125rem] text-ink-gray-7" aria-hidden="true" />
     </span>
 
-    <!-- Both ends share one light treatment; the dark truck between them is the scene's single weight. -->
     <span class="absolute left-[13.5rem] top-[2.625rem] flex size-10 items-center justify-center rounded-full bg-surface-base shadow-md ring-1 ring-outline-gray-1">
       <span class="lucide-house size-[1.125rem] text-ink-gray-7" aria-hidden="true" />
     </span>

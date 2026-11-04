@@ -159,7 +159,6 @@ async function finish() {
     finishing.value = false
     return
   }
-  // Home is what comes next, and stages its entrance once for the hand-off.
   homeArrival.playEntrance = true
   // format.js reads the boot's currency once at load. Setup may have changed it, and then every
   // money figure would wear the old symbol until a reload.

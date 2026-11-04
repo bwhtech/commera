@@ -53,7 +53,6 @@ const visibleTasks = computed(() => openTasks.value.filter((task) => !dismissedT
 const dismissedCount = computed(() => openTasks.value.length - visibleTasks.value.length)
 const blockers = computed(() => openTasks.value.filter((task) => task.required))
 
-// What the card drawings personalise: the store's slug, category, country, brand colour and theme look.
 const artStore = computed(() => {
   const record = home.value ?? {}
   return {
@@ -100,7 +99,6 @@ async function copyLink() {
   <AppPageHeader title="Home" />
 
   <PageBody width="wide">
-    <!-- Hero row: the store on the left, what it is and what to do next on the right. -->
     <section class="flex flex-col gap-10 pt-4 sm:flex-row sm:items-center sm:gap-12">
       <Transition v-bind="entrance(0)">
         <div class="shrink-0">

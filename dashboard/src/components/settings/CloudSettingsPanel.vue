@@ -4,7 +4,6 @@ import { ErrorMessage } from 'frappe-ui'
 import { closeCloudSettings, openCloudSettings } from '@frappe/cloud-sdk'
 import { cloudContext } from '../../data/cloudBilling'
 
-// One Frappe Cloud panel embedded in Settings: Billing and Domains each mount their own.
 const props = defineProps({
   panel: { type: String, required: true },
   // Runs when the panel closes, so whatever on the dashboard reads that panel's data reads it again.

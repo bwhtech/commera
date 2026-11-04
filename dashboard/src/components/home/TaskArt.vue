@@ -4,11 +4,6 @@ import { SAMPLE_PRODUCTS } from '../../ia/onboarding'
 import SwatchDot from '../SwatchDot.vue'
 import ShippingArt from './ShippingArt.vue'
 
-/**
- * The drawing at the top of a task card. Each one is a small physical scene: objects rest on a soft
- * floor shadow, and hovering the card (the parent `group`) nudges them toward the card's action.
- * Every moving piece shares one curve; reduced motion keeps the rest state.
- */
 const props = defineProps({
   kind: { type: String, required: true },
   // `{ slug, category, country, codEnabled, primaryColor, look }`, from Home's read.
@@ -36,7 +31,6 @@ const swatches = computed(() => [props.store.primaryColor, null, null])
 
 <template>
   <div class="relative flex h-36 items-center justify-center overflow-hidden rounded-4 bg-surface-gray-1" aria-hidden="true">
-    <!-- The floor: a blurred shadow under the scene so objects read as resting, not pasted. -->
     <span class="absolute bottom-6 h-3 w-40 rounded-full bg-surface-gray-4 opacity-60 blur-md" />
 
     <template v-if="kind === 'payments'">
@@ -67,7 +61,6 @@ const swatches = computed(() => [props.store.primaryColor, null, null])
 
     <ShippingArt v-else-if="kind === 'shipping'" :country="store.country" />
 
-    <!-- A fanned hand of product cards from the store's own category; hover spreads the fan. -->
     <div v-else-if="kind === 'products'" class="flex items-end">
       <div class="relative h-[5.75rem] w-44">
         <div
@@ -90,7 +83,6 @@ const swatches = computed(() => [props.store.primaryColor, null, null])
       </div>
     </div>
 
-    <!-- The store in its own look, with the owner's brand colour; swatches spread like a fan deck. -->
     <div v-else-if="kind === 'brand'" class="flex items-center gap-5">
       <div
         class="w-36 overflow-hidden rounded-4 bg-surface-base shadow-lg ring-1 ring-outline-gray-1 transition-transform duration-300 ease-out-strong motion-reduce:transition-none group-hover:-translate-y-1"
@@ -127,7 +119,6 @@ const swatches = computed(() => [props.store.primaryColor, null, null])
           <span class="text-ink-gray-5">www.</span><span class="font-medium text-ink-gray-9">{{ store.slug }}</span><span class="text-ink-gray-9">.com</span>
         </span>
       </div>
-      <!-- The cursor drifts onto the address on hover: the card's action, previewed. -->
       <span
         class="lucide-mouse-pointer-2 absolute bottom-5 right-14 size-7 fill-current text-ink-gray-9 drop-shadow transition-transform duration-300 ease-out-strong motion-reduce:transition-none group-hover:-translate-x-6 group-hover:-translate-y-4"
       />

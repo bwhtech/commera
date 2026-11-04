@@ -86,8 +86,6 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
 </script>
 
 <template>
-  <!-- A live store's numbers, under Home's hero. The setup cards slot in under the stats strip, so
-       what to do next sits above the detail. -->
   <div>
     <ReportStats
       :stats="kpiTiles"

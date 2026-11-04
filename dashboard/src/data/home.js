@@ -88,7 +88,6 @@ export function describeDomains(domains) {
 // A day old is stale: the thumbnail is the theme's homepage, and products, logo and prices move under it.
 export const PREVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
-/** Whether Home should capture the storefront again: `preview` is `home.get_home`'s `preview`. */
 export function needsPreviewCapture(preview, now = Date.now()) {
   if (!preview?.can_capture) return false
   if (!preview.image || !preview.captured_on) return true
@@ -97,17 +96,14 @@ export function needsPreviewCapture(preview, now = Date.now()) {
 
 const LIST = new Intl.ListFormat('en', { type: 'conjunction' })
 
-/** "payments and shipping": the blocking tasks, named for the publish dialog's warning. */
 export function listBlockers(tasks) {
   return LIST.format(tasks.map((task) => task.noun))
 }
 
-/** The address-bar slug the domain card draws: the store name with everything but letters and digits dropped. */
 export function storeSlug(storeName) {
   return (storeName ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '') || 'yourstore'
 }
 
-/** The hero's status line and copy, from whether the store is live and how many tasks still block a sale. */
 export function describeStoreStatus(isLive, blockerCount) {
   if (isLive) {
     return {
