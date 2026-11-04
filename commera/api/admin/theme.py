@@ -107,18 +107,21 @@ def activate_theme(theme: str):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_theme_settings(**values):
-	"""Write the live theme's own settings. Returns the refreshed screen."""
+def save_theme_settings(theme: str, **values):
+	"""Write the edited theme's own settings. Returns its refreshed settings."""
 	frappe.has_permission(THEME_SETTINGS_DOCTYPE, ptype="read", throw=True)
 
-	settings_doctype = get_theme_settings_doctype(resolve_active_theme())
+	if not frappe.db.exists("Shop Theme", theme):
+		frappe.throw(frappe._("Theme {0} is not installed on this site").format(theme))
+
+	settings_doctype = get_theme_settings_doctype(theme)
 	if not settings_doctype:
-		frappe.throw(frappe._("The live theme has no settings to save"))
+		frappe.throw(frappe._("Theme {0} has no settings to save").format(theme))
 
 	frappe.has_permission(settings_doctype, ptype="write", throw=True)
 
 	write_docfield_values(settings_doctype, values)
-	return build_editor_data()
+	return build_theme_settings(theme)
 
 
 def write_docfield_values(settings_doctype, values):

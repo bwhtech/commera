@@ -386,7 +386,7 @@ export function createLayoutEditor(theme) {
   }
 
   async function saveThemeSettings(changes) {
-    const data = await themeCaller.call('save_theme_settings', changes)
+    const data = await themeCaller.call('save_theme_settings', { theme: state.theme, ...changes })
     if (!data) return false
     for (const field of state.settings.groups.flatMap((group) => group.fields)) {
       if (field.fieldname in changes) field.value = changes[field.fieldname]
