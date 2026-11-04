@@ -1,0 +1,7 @@
+from frappe.model.document import Document
+
+from $package.gateway import ${prefix}Gateway
+
+
+class ${prefix}GatewaySettings(Document, ${prefix}Gateway):
+	pass

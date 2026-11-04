@@ -66,13 +66,25 @@ class AppScaffold:
 		self.add_file(self.source_dir / "README.md", self.format_starter("README.md"))
 		return self.changes
 
-	def install_packages(self):
-		click.echo("Running yarn install…")
+	def install_packages(self, command: tuple[str, ...] = ("yarn", "install")):
+		click.echo(f"Running {' '.join(command)}…")
 		try:
 			# nosemgrep: frappe-subprocess-exec
-			subprocess.run(["yarn", "install"], cwd=self.app_root, check=True)
+			subprocess.run(list(command), cwd=self.app_root, check=True)
 		except (FileNotFoundError, subprocess.CalledProcessError) as error:
-			raise click.ClickException(f"yarn install failed in {self.app_root}: {error}")
+			raise click.ClickException(f"{' '.join(command)} failed in {self.app_root}: {error}")
+
+	def get_module(self) -> str:
+		modules = (self.app_root / self.app / "modules.txt").read_text().split("\n")
+		return next(module.strip() for module in modules if module.strip())
+
+	def add_provider_hooks(self, doctype: str, kind: str):
+		text = self.hooks_path.read_text()
+		updated = add_assignment(
+			set_required_apps(text), "commera_api_version", f"[{API_VERSION}]", "required_apps"
+		)
+		updated = add_hook_entry(updated, "commera_hooks", kind, doctype)
+		self.write_change(self.hooks_path, updated, text != updated)
 
 	def add_hooks(self):
 		text = self.hooks_path.read_text()
@@ -193,11 +205,17 @@ class AppScaffold:
 			raise click.ClickException(f"{self.app}/api.py already has {function}; pick another name")
 		self.write_change(path, text.rstrip("\n") + "\n" + source, True)
 
-	def format_starter(self, name: str) -> str:
+	def format_starter(self, name: str, **values: str) -> str:
 		label = self.get_app_title().replace("\\", "\\\\").replace("'", "\\'")
 		# nosemgrep: frappe-direct-jinja-construction
 		return Template(get_starter(name)).safe_substitute(
-			app_name=self.app, label=label, page_name=self.page_name, icon=STARTER_ICON
+			{
+				"app_name": self.app,
+				"label": label,
+				"page_name": self.page_name,
+				"icon": STARTER_ICON,
+				**values,
+			}
 		)
 
 	@property
@@ -284,6 +302,28 @@ def add_assignment(text: str, name: str, literal: str, after: str) -> str:
 	return insert_after(
 		text.splitlines(keepends=True), assignments[after].end_lineno, f"{name} = {literal}\n"
 	)
+
+
+def add_hook_entry(text: str, hook: str, key: str, value: str) -> str:
+	assignment = get_assignments(text).get(hook)
+	if not assignment:
+		return add_assignment(text, hook, json.dumps({key: [value]}), "commera_api_version")
+
+	try:
+		hooks = ast.literal_eval(assignment.value)
+	except ValueError:
+		hooks = None
+	if not isinstance(hooks, dict):
+		raise click.ClickException(
+			f"{hook} in hooks.py is not a plain dict; add {value} to {hook}[{key!r}] by hand"
+		)
+	if value in hooks.get(key, []):
+		return text
+
+	hooks[key] = [*hooks.get(key, []), value]
+	lines = text.splitlines(keepends=True)
+	lines[assignment.lineno - 1 : assignment.end_lineno] = [f"{hook} = {json.dumps(hooks)}\n"]
+	return "".join(lines)
 
 
 def get_metadata_end(text: str) -> int:

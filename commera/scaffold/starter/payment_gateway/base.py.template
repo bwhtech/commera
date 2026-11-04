@@ -1,0 +1,27 @@
+from abc import ABC, abstractmethod
+
+from bwh_payments_core.connectors import GatewayModel
+
+
+class ${prefix}Payment(GatewayModel):
+	id: str
+	url: str | None = None
+	status: str | None = None
+	currency: str | None = None
+
+
+class ${prefix}Refund(GatewayModel):
+	id: str | None = None
+	status: str | None = None
+	amount: int | None = None
+
+
+class Base${prefix}Client(ABC):
+	@abstractmethod
+	def create_payment(self, params: dict) -> ${prefix}Payment: ...
+
+	@abstractmethod
+	def get_payment(self, payment_id: str) -> ${prefix}Payment: ...
+
+	@abstractmethod
+	def create_refund(self, params: dict) -> ${prefix}Refund: ...
