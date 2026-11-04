@@ -4,7 +4,8 @@
 	"private": true,
 	"description": "Tailwind toolchain for commera themes. Build each theme from inside its own directory - running from commera/themes/ moves Tailwind v4's source-detection root and every theme absorbs the others' utilities.",
 	"scripts": {
-		"build:shop_default_theme": "cd shop_default_theme && npx @tailwindcss/cli -i tailwind.input.css -o ../../public/themes/shop_default_theme/tailwind.output.css --minify"
+		"build:shop_default_theme": "cd shop_default_theme && npx @tailwindcss/cli -i tailwind.input.css -o ../../public/themes/shop_default_theme/tailwind.output.css --minify",
+		"build:commera_starter": "cd commera_starter && npx @tailwindcss/cli -i tailwind.input.css -o ../../public/themes/commera_starter/tailwind.output.css --minify"
 	},
 	"devDependencies": {
 		"@tailwindcss/cli": "^4.0.14",

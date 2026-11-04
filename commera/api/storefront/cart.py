@@ -118,7 +118,7 @@ def get_checkout_url() -> dict:
 		handoff,
 		expires_in_sec=CHECKOUT_CODE_SECONDS + CHECKOUT_SIGN_IN_SECONDS,
 	)
-	return {"path": f"/api/method/commera.api.storefront.cart.open_checkout?code={code}"}
+	return {"path": f"/api/v2/method/commera.api.storefront.cart.open_checkout?code={code}"}
 
 
 def get_checkout_handoff() -> dict:

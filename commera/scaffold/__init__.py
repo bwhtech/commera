@@ -31,8 +31,10 @@ PLACE_KINDS = {
 
 
 class AppScaffold:
+	allow_host_app = False
+
 	def __init__(self, app: str, apps_path: Path):
-		if app == "commera":
+		if app == "commera" and not self.allow_host_app:
 			raise click.ClickException("commera is the host app; run this inside the app that extends it")
 		self.app = app
 		self.app_root = Path(apps_path) / app

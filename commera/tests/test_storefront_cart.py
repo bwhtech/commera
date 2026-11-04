@@ -48,7 +48,7 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 		self,
 		token: str | None,
 		user: str = "Guest",
-		path: str = "/api/method/commera.api.storefront.cart.get_cart",
+		path: str = "/api/v2/method/commera.api.storefront.cart.get_cart",
 	):
 		if not hasattr(frappe.local, "request"):
 			self.addCleanup(delattr, frappe.local, "request")

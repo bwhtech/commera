@@ -187,8 +187,6 @@ def save_standard_delivery_option(
 	flat_charge: float, free_shipping_above: float, currency: str
 ) -> str | None:
 	"""The delivery option the store's Shipping Rule bands price; created once, then left to the merchant."""
-	if "bwh_shipping" not in frappe.get_installed_apps():
-		return None
 	if frappe.db.exists("Shipping Service", STANDARD_DELIVERY_OPTION):
 		return STANDARD_DELIVERY_OPTION
 

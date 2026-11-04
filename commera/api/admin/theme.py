@@ -8,36 +8,49 @@ from frappe.utils import get_url_to_form
 
 from commera.api.admin.docfields import build_field_groups, get_child_tables, get_editable_docfields
 from commera.api.admin.settings import coerce_field_value
-from commera.shop_themes.doctype.shop_theme.shop_theme import resolve_active_theme
+from commera.shop_themes.doctype.shop_theme.shop_theme import (
+	BASE_THEME,
+	get_theme_context,
+	resolve_active_theme,
+)
 
 THEME_SETTINGS_DOCTYPE = "Shop Theme Settings"
 
 
 def get_theme_settings_doctype(theme):
-	"""The settings Single a theme carries, or None when it ships no settings of its own."""
-	if not theme:
-		return None
-
-	settings_doctype = frappe.db.get_value("Shop Theme", theme, "theme_settings")
-	# A theme exported from another site can name a doctype this site never installed.
-	if not settings_doctype or not frappe.db.exists("DocType", settings_doctype):
-		return None
-
-	return settings_doctype
+	return get_theme_context(theme)["settings_doctype"]
 
 
 def build_themes(active_theme):
 	"""Every installed theme, live one first, with what each inherits from."""
 	themes = frappe.get_all(
 		"Shop Theme",
-		fields=["name", "theme_name", "parent_theme", "is_standard", "theme_settings"],
+		fields=[
+			"name",
+			"theme_name",
+			"parent_theme",
+			"is_standard",
+			"theme_settings",
+			"theme_type",
+			"thumbnail",
+			"module.app_name as app",
+		],
 		order_by="theme_name asc",
 	)
 
 	for theme in themes:
 		theme.live = theme.name == active_theme
+		theme.is_base = theme.name == BASE_THEME
+		theme.source = get_theme_source(theme)
 
 	return sorted(themes, key=lambda theme: not theme.live)
+
+
+def get_theme_source(theme):
+	if not theme.is_standard or not theme.app:
+		return frappe._("Made on this site")
+
+	return (frappe.get_hooks("app_title", app_name=theme.app) or [theme.app])[0]
 
 
 def build_theme_settings(active_theme):

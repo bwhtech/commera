@@ -1,0 +1,94 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+import frappe
+from frappe import _
+from frappe.utils.caching import site_cache
+
+from commera.plugins import providers as registry
+from commera.shipping.base_class import ShippingProviderBase
+from commera.shipping.cache import clear_rates_cache
+
+KIND = "shipping_providers"
+PROFILE_DOCTYPE = "Shipping Provider Profile"
+
+
+def get_provider_doctypes() -> list[str]:
+	return registry.get_provider_doctypes(KIND)
+
+
+def get_provider_class(settings_doctype: str) -> type[ShippingProviderBase]:
+	return registry.get_provider_class(KIND, settings_doctype, ShippingProviderBase)
+
+
+def get_provider(profile: str) -> ShippingProviderBase:
+	overrides = registry.get_provider_overrides(KIND)
+	if overrides is not None:
+		if profile not in overrides:
+			frappe.throw(
+				_("{0} is not a registered provider").format(frappe.bold(profile)),
+				registry.ProviderNotRegisteredError,
+			)
+		return overrides[profile]
+
+	settings_doctype = frappe.get_cached_value(PROFILE_DOCTYPE, profile, "provider_settings")
+	if not settings_doctype:
+		frappe.throw(_("Shipping Provider Profile {0} has no settings doctype").format(frappe.bold(profile)))
+	get_provider_class(settings_doctype)
+	return frappe.get_single(settings_doctype)
+
+
+@contextmanager
+def use_providers(providers: dict[str, ShippingProviderBase]) -> Iterator[None]:
+	clear_rates_cache()
+	try:
+		with registry.use_providers(KIND, providers):
+			yield
+	finally:
+		clear_rates_cache()
+
+
+def get_enabled_profiles() -> list[str]:
+	overrides = registry.get_provider_overrides(KIND)
+	return list(overrides) if overrides is not None else get_available_shipping_providers()
+
+
+@site_cache(ttl=60 * 60)
+def get_available_shipping_providers() -> list[str]:
+	return frappe.get_all(PROFILE_DOCTYPE, filters={"enabled": 1}, pluck="name")
+
+
+def resolve_provider(provider: str) -> str | None:
+	requested = (provider or "").strip().casefold()
+	if not requested:
+		return None
+	for profile in get_enabled_profiles():
+		if profile.casefold() == requested:
+			return profile
+	return None
+
+
+def validate_providers(app_name: str | None = None):
+	problems = registry.get_provider_problems(KIND, ShippingProviderBase)
+	registered = set(get_provider_doctypes())
+	for profile in frappe.get_all(PROFILE_DOCTYPE, {"enabled": 1}, ["name", "provider_settings"]):
+		if profile.provider_settings not in registered:
+			problems.append(
+				f"Shipping Provider Profile {profile.name} uses {profile.provider_settings}, which is not "
+				"registered: its app is missing or built for another Commera API. Disable the profile."
+			)
+
+	if problems:
+		frappe.throw("<br>".join(problems), registry.ProviderNotRegisteredError)
+
+
+def disable_app_profiles(app_name: str):
+	for profile in frappe.get_all(PROFILE_DOCTYPE, {"enabled": 1}, ["name", "provider_settings"]):
+		if registry.get_doctype_app(profile.provider_settings) != app_name:
+			continue
+		frappe.db.set_value(PROFILE_DOCTYPE, profile.name, "enabled", 0)
+		message = f"Shipping Provider Profile {profile.name} was disabled because {app_name} was uninstalled."
+		print(message)
+		frappe.log_error(title="Shipping provider disabled", message=message)
+
+	get_available_shipping_providers.clear_cache()

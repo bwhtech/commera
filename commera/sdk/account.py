@@ -1,3 +1,6 @@
+import importlib
+from urllib.parse import urlencode
+
 import frappe
 from frappe import _
 from frappe.query_builder import DocType
@@ -5,22 +8,47 @@ from frappe.query_builder.functions import Count
 from frappe.utils.data import cint, cstr
 from pypika import Order
 
+from commera.api.order_link import email_order_link
+from commera.api.orders import cancel_order as cancel_sales_order
 from commera.api.payments import add_customer_address
+from commera.api.shipping import read_order_tracking
 from commera.api.signup import validate_user_names
 from commera.api.users import delete_user_address
 from commera.core import get_address_docs, get_party, is_shoppers_address
 from commera.guest import is_guest
-from commera.order_access import OWNER_ACCESS, get_order_access, get_shopper_order_condition
+from commera.order_access import (
+	FULL_ACCESS,
+	LIMITED_ACCESS,
+	OWNER_ACCESS,
+	get_order_access,
+	get_shopper_order_condition,
+)
+from commera.plugin_events import get_plugin_fieldnames, validate_plugin_fieldnames
 from commera.sdk.orders import read_order_results
-from commera.sdk.types import CustomerAddress, CustomerProfile, ShopperOrder, ShopperOrderPage
+from commera.sdk.types import (
+	CustomerAddress,
+	CustomerProfile,
+	OrderTracking,
+	ReturnOptions,
+	ShopperOrder,
+	ShopperOrderDetail,
+	ShopperOrderPage,
+)
+from commera.utils import get_return_deadline, validate_document_access
 
 __all__ = [
+	"cancel_order",
 	"delete_address",
+	"get_invoice_url",
 	"get_order",
+	"get_order_tracking",
 	"get_profile",
+	"get_return_options",
 	"list_addresses",
 	"list_orders",
+	"request_return",
 	"save_address",
+	"send_order_link",
 	"update_profile",
 ]
 
@@ -39,6 +67,9 @@ ADDRESS_FIELDS = (
 	"is_shipping_address",
 )
 MAX_ORDER_PAGE_SIZE = 50
+LIMITED_LINK_HIDDEN_FIELDS = ("shipping_address", "email", "phone", "payment_mode")
+
+return_api = importlib.import_module("commera.api.return")
 
 
 def get_shopper() -> str:
@@ -81,6 +112,11 @@ def list_addresses() -> list[CustomerAddress]:
 def save_address(address: dict) -> CustomerAddress:
 	"""Update the shopper's own address when `name` is set, else add one to their Customer."""
 	values = {fieldname: address.get(fieldname) for fieldname in ADDRESS_FIELDS if fieldname in address}
+	plugin_fields = address.get("plugin_fields") or {}
+	if not isinstance(plugin_fields, dict):
+		frappe.throw(_("Send plugin_fields as an object."))
+	validate_plugin_fieldnames("Address", plugin_fields)
+	values |= plugin_fields
 	if name := address.get("name"):
 		doc = get_own_address(name)
 		doc.update(values)
@@ -95,7 +131,7 @@ def save_address(address: dict) -> CustomerAddress:
 
 def get_own_address(name: str):
 	if not is_shoppers_address(name):
-		raise frappe.DoesNotExistError(_("Address {0} not found").format(name))
+		frappe.throw(_("Address {0} not found").format(name), frappe.DoesNotExistError)
 	return frappe.get_doc("Address", name)
 
 
@@ -107,6 +143,9 @@ def get_address_result(address) -> CustomerAddress:
 	result = {"name": address.name, **{fieldname: address.get(fieldname) for fieldname in ADDRESS_FIELDS}}
 	for fieldname in ("is_primary_address", "is_shipping_address"):
 		result[fieldname] = bool(cint(result[fieldname]))
+	result["plugin_fields"] = {
+		fieldname: address.get(fieldname) for fieldname in get_plugin_fieldnames("Address")
+	}
 	return result
 
 
@@ -134,12 +173,69 @@ def list_orders(page: int = 1, page_size: int = 10) -> ShopperOrderPage:
 	}
 
 
-def get_order(name: str) -> ShopperOrder:
+def get_order(name: str, key: str | None = None) -> ShopperOrderDetail:
+	validate_document_access("Sales Order", name, key)
+	access = get_order_access(name, key) or FULL_ACCESS
+	order = without_staff_fields(read_order_results([name], ())[cstr(name)])
+	if access == LIMITED_ACCESS:
+		order.update(dict.fromkeys(LIMITED_LINK_HIDDEN_FIELDS))
+	return {**order, "access": access}
+
+
+def get_own_order(name: str) -> str:
 	get_shopper()
-	orders = read_order_results([name], ()) if get_order_access(name) == OWNER_ACCESS else {}
-	if cstr(name) not in orders:
-		raise frappe.DoesNotExistError(_("Order {0} not found").format(name))
-	return without_staff_fields(orders[cstr(name)])
+	if get_order_access(name) != OWNER_ACCESS:
+		frappe.throw(_("Order {0} not found").format(name), frappe.DoesNotExistError)
+	return cstr(name)
+
+
+def cancel_order(name: str) -> ShopperOrderDetail:
+	cancel_sales_order(get_own_order(name))
+	return get_order(name)
+
+
+def get_return_options(name: str) -> ReturnOptions:
+	name = get_own_order(name)
+	settings = frappe.get_cached_doc("Commera Settings")
+	return_by = get_return_deadline(name, settings.return_period) if settings.return_period else None
+	returned = return_api.get_returned_items(name)
+	return {
+		"can_return": bool(return_by) and frappe.utils.now_datetime() <= return_by,
+		"return_by": return_by,
+		"reasons": [
+			{"name": reason.name, "label": reason.display_name} for reason in settings.reason_for_return
+		],
+		"returned_items": returned["returned_items"],
+		"pending_items": returned["returned_items_in_draft"],
+	}
+
+
+def request_return(name: str, items: list[dict]) -> ReturnOptions:
+	return_api.return_items(get_own_order(name), items)
+	return get_return_options(name)
+
+
+def get_invoice_url(name: str) -> str | None:
+	invoices = frappe.get_all(
+		"Sales Invoice Item",
+		filters={"sales_order": get_own_order(name), "docstatus": 1},
+		pluck="parent",
+		limit=1,
+	)
+	if not invoices:
+		return None
+	print_format = frappe.get_cached_value("Commera Settings", "Commera Settings", "print_format")
+	query = urlencode({"doctype": "Sales Invoice", "name": invoices[0], "format": print_format or "Standard"})
+	return f"/api/method/frappe.utils.print_format.download_pdf?{query}"
+
+
+def get_order_tracking(name: str, key: str | None = None) -> OrderTracking:
+	validate_document_access("Sales Order", name, key)
+	return read_order_tracking(cstr(name))
+
+
+def send_order_link(order_number: str, email: str) -> str:
+	return email_order_link(order_number, email)
 
 
 def without_staff_fields(order) -> ShopperOrder:

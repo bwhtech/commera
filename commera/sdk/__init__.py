@@ -6,7 +6,18 @@ from frappe import _
 
 API_VERSION = 1
 STORE_ORDER_TYPE = "Shopping Cart"
-MODULES = ("account", "cart", "catalog", "discounts", "orders", "shop")
+MODULES = (
+	"account",
+	"auth",
+	"cart",
+	"catalog",
+	"discounts",
+	"format",
+	"orders",
+	"shop",
+	"checkout",
+	"wishlist",
+)
 
 __all__ = ["API_VERSION", "STORE_ORDER_TYPE", "as_plugin_user", *MODULES]
 

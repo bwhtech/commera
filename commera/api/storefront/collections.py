@@ -17,4 +17,4 @@ def get_collections() -> list[Collection]:
 def get_collection(handle: str) -> Collection:
 	if collection := catalog.get_collection(handle):
 		return collection
-	raise frappe.DoesNotExistError(_("Collection {0} not found").format(handle))
+	frappe.throw(_("Collection {0} not found").format(handle), frappe.DoesNotExistError)

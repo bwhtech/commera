@@ -1,0 +1,26 @@
+{
+	"name": "Footer",
+	"category": "Footer",
+	"groups": ["footer_group"],
+	"settings": [{ "id": "copyright", "type": "text", "label": "Copyright text", "default": "" }],
+	"blocks": {
+		"menu": {
+			"name": "Menu columns",
+			"settings": [
+				{ "id": "menu", "type": "select", "label": "Menu", "options": ["footer", "main-menu"], "default": "footer" }
+			]
+		},
+		"text": {
+			"name": "Text column",
+			"settings": [
+				{ "id": "heading", "type": "text", "label": "Heading", "default": "" },
+				{ "id": "text", "type": "textarea", "label": "Text", "default": "" }
+			]
+		},
+		"social": {
+			"name": "Social links",
+			"settings": [{ "id": "heading", "type": "text", "label": "Heading", "default": "Follow" }]
+		}
+	},
+	"max_blocks": 6
+}

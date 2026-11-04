@@ -1,0 +1,6 @@
+{% macro price(product) %}
+<span>{{ commera.format.money(product.price, product.currency) }}</span>
+{%- if product.compare_at_price and product.compare_at_price > product.price %}
+<span class="text-ink-gray-6 line-through">{{ commera.format.money(product.compare_at_price, product.currency) }}</span>
+{%- endif %}
+{%- endmacro %}

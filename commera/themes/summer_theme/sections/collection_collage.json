@@ -1,0 +1,19 @@
+{
+	"name": "Collection collage",
+	"category": "Collections",
+	"settings": [],
+	"blocks": {
+		"image": {
+			"name": "Image",
+			"settings": [
+				{
+					"id": "image",
+					"type": "image",
+					"label": "Image",
+					"default": ""
+				}
+			]
+		}
+	},
+	"max_blocks": 5
+}

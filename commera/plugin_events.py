@@ -32,7 +32,7 @@ SHIPPING_ADDRESS_FIELDS = (
 	"phone",
 )
 COD_SWEEP_LOOKBACK_DAYS = 30
-EXTENDED_DOCTYPES = ("Sales Order", "Quotation", "Sales Invoice", "Item", "Customer")
+EXTENDED_DOCTYPES = ("Sales Order", "Quotation", "Sales Invoice", "Item", "Customer", "Address")
 CHANGED_PRODUCTS_FLAG = "commera_changed_products"
 CHANGED_ITEMS_FLAG = "commera_changed_items"
 
@@ -399,7 +399,10 @@ def retry_delivery(delivery: str):
 	)
 
 
-def add_plugin_user():
+def add_plugin_user(setup_args=None):
+	# Frappe counts any System User as its setup wizard done, then skips the country slide and ERPNext fails.
+	if not frappe.is_setup_complete():
+		return
 	if not frappe.db.exists("User", PLUGINS_USER):
 		user = frappe.new_doc("User")
 		user.update(

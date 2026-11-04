@@ -6,7 +6,7 @@ app_email = "rahul@buildwithhussain.com"
 app_license = "agpl-3.0"
 
 # frappe/payments deliberately absent: bwh_payments ships its own Payment Gateway Profile and base_class.
-required_apps = ["frappe/erpnext", "bwhtech/bwh_payments", "bwhtech/bwh_shipping"]
+required_apps = ["frappe/erpnext", "bwhtech/bwh_payments"]
 
 
 website_redirects = [
@@ -93,6 +93,7 @@ website_route_rules = [
 
 before_request = ["commera.utils.before_request"]
 on_session_creation = "commera.commera_ecommerce.doctype.commera_cart.commera_cart.keep_guest_cart"
+on_login = "commera.roles.save_commera_default_app"
 
 # Runs before every core renderer (frappe/website/path_resolver.py); can_render() opts out when no theme.
 page_renderer = ["commera.shop_themes.theme_resolver.ThemePageRenderer"]
@@ -111,6 +112,8 @@ importable_doctypes = ["Shop Theme"]
 doctype_js = {
 	"Item": ["public/js/extends/item.js", "public/js/extends/ecommerce_tab.js"],
 	"Sales Order": "public/js/extends/sales_order.js",
+	"Delivery Note": "public/js/extends/delivery_note.js",
+	"Shipment": "public/js/extends/shipment.js",
 	"Style Attribute Variant": "public/js/extends/seo_listing.js",
 	"Ecommerce Category": "public/js/extends/seo_listing.js",
 	"Commera Settings": [
@@ -120,10 +123,21 @@ doctype_js = {
 	],
 }
 
-after_install = "commera.migrate.after_install"
+after_install = ["commera.migrate.after_install", "commera.cloud.link.queue_initial_link"]
 after_migrate = "commera.migrate.after_migrate"
-after_app_install = "commera.storefront_plugins.sync_storefront_apps"
-setup_wizard_complete = "commera.swatches.drop_unused_colour_attribute"
+before_uninstall = "commera.customizations.delete_customizations"
+after_app_install = [
+	"commera.storefront_plugins.sync_storefront_apps",
+	"commera.shipping.providers.validate_providers",
+]
+before_app_uninstall = "commera.shipping.providers.disable_app_profiles"
+
+commera_hooks = {"shipping_providers": ["Shiprocket Shipping Settings", "AfterShip Shipping Settings"]}
+setup_wizard_complete = [
+	"commera.swatches.drop_unused_colour_attribute",
+	"commera.cloud.link.queue_initial_link",
+	"commera.plugin_events.add_plugin_user",
+]
 
 
 doc_events = {
@@ -162,6 +176,7 @@ doc_events = {
 			"commera.plugin_events.on_sales_order_cancel",
 			"commera.plugin_events.on_sales_order_stock_reservation",
 		],
+		"on_trash": "commera.doc_events.sales_order.on_trash",
 	},
 	"Stock Ledger Entry": {
 		"after_insert": [
@@ -201,7 +216,15 @@ doc_events = {
 		"on_cancel": "commera.utils.update_so_status_from_related_doc",
 		"on_trash": "commera.utils.update_so_status_from_related_doc",
 	},
-	"Shipping Request": {"on_update": "commera.utils.update_so_status_from_related_doc"},
+	"Shipment": {
+		"validate": "commera.doc_events.shipment.validate",
+		"before_update_after_submit": "commera.doc_events.shipment.before_update_after_submit",
+		"on_update": "commera.doc_events.shipment.on_update",
+		"on_submit": "commera.doc_events.shipment.on_submit",
+		"on_update_after_submit": "commera.doc_events.shipment.on_update_after_submit",
+		"before_cancel": "commera.doc_events.shipment.before_cancel",
+		"on_cancel": "commera.doc_events.shipment.on_cancel",
+	},
 }
 
 jinja = {
@@ -213,17 +236,24 @@ jinja = {
 		"commera.utils.get_currency_symbol",
 		"commera.search.result_card.get_search_result_fields",
 		"commera.search.typeahead.get_typeahead",
+		"commera.sdk.format.product_url",
 		"commera.seo_jinja",
 		"commera.shop_data.get_header_data",
 		"commera.shop_data.get_storefront_menu",
 		"commera.shop_themes.jinja_helpers.shop_theme_asset_url",
 		"commera.shop_themes.jinja_helpers.shop_theme_config",
+		"commera.shop_themes.jinja_helpers.format_shop_theme_css",
+		"commera.shop_themes.sections.render_layout",
 		"commera.storefront_plugins.format_plugin_includes",
 		"commera.storefront_plugins.plugin_slot",
 	],
 }
 
-update_website_context = "commera.website_context.update_website_context"
+update_website_context = [
+	"commera.website_context.update_website_context",
+	"commera.roles.redirect_commera_users_from_desk",
+	"commera.onboarding.redirect_owner_from_desk",
+]
 
 # GDPR erasure: the event log stores the signed-in email as plain Data, so core is told which column to redact.
 user_data_fields = [
@@ -328,7 +358,6 @@ add_to_apps_screen = [
 # Uninstallation
 # ------------
 
-# before_uninstall = "commera.uninstall.before_uninstall"
 # after_uninstall = "commera.uninstall.after_uninstall"
 
 # Integration Setup
@@ -363,6 +392,7 @@ add_to_apps_screen = [
 # DocType Class
 # ---------------
 # Override standard doctype classes
+
 
 # override_doctype_class = {
 # 	"ToDo": "custom_app.overrides.CustomToDo"
@@ -407,10 +437,11 @@ before_tests = "commera.install.before_tests"
 
 # Overriding Methods
 # ------------------------------
-#
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "commera.event.get_events"
-# }
+
+override_whitelisted_methods = {
+	# Carriers set up before the move still post to the bwh_shipping URL; drop once they use the new one.
+	"bwh_shipping.bwh_shipping.webhook.handle": "commera.shipping.webhook.handle",
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
@@ -495,6 +526,7 @@ scheduler_events = {
 	},
 	"hourly": [
 		"commera.plugin_events.sweep_missed_cod_payments",
+		"commera.cloud.link.queue_link_if_pending",
 	],
 	# Long queue, not the short one: sync_status() is a gateway round-trip per pending request, so a
 	# slow gateway would otherwise sit on a worker the whole storefront shares.

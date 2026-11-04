@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Any, TypedDict
 
 __all__ = [
@@ -9,9 +9,12 @@ __all__ = [
 	"CatalogItem",
 	"Charge",
 	"ChargeSummary",
+	"CheckoutResult",
+	"CheckoutState",
 	"CheckoutSummary",
 	"Collection",
 	"ContentPage",
+	"Country",
 	"CustomerAddress",
 	"CustomerProfile",
 	"Discount",
@@ -19,10 +22,16 @@ __all__ = [
 	"DiscountInput",
 	"FacetValue",
 	"FooterSection",
+	"Menu",
 	"MenuItem",
 	"NewCartLine",
 	"Order",
 	"OrderLine",
+	"OrderTracking",
+	"PaymentMethod",
+	"PaymentSession",
+	"PickupLocation",
+	"PlacedOrder",
 	"PricedCart",
 	"PricedCartLine",
 	"Product",
@@ -33,12 +42,22 @@ __all__ = [
 	"ProductPage",
 	"ProductVariant",
 	"Rating",
+	"ReturnOptions",
+	"ReturnReason",
+	"SearchResults",
+	"ShippingOption",
+	"ShippingOptions",
 	"Shop",
 	"ShopperOrder",
+	"ShopperOrderDetail",
 	"ShopperOrderPage",
 	"Sitemap",
 	"SitemapEntry",
 	"Stage",
+	"TrackingEvent",
+	"Typeahead",
+	"TypeaheadLink",
+	"Wishlist",
 ]
 
 
@@ -95,6 +114,7 @@ class ShopperOrder(TypedDict):
 	net_total: float
 	grand_total: float
 	rounded_total: float
+	rounding_adjustment: float
 	base_grand_total: float
 	base_rounded_total: float
 	payment_mode: str | None
@@ -104,11 +124,18 @@ class ShopperOrder(TypedDict):
 	status: str | None
 	# The dashboard's badge for the order, so a card matches the order screen.
 	stage: Stage
+	shipping: float
+	cod_charge: float
 	plugin_fees: list[Charge]
+	taxes: list[Charge]
 	items: list[OrderLine]
 	plugin_fields: dict[str, Any]
 	discounts: list["DiscountAllocation"]
 	attributes: dict[str, str]
+
+
+class ShopperOrderDetail(ShopperOrder):
+	access: str
 
 
 class Order(ShopperOrder):
@@ -127,6 +154,7 @@ class CustomerAddress(Address):
 	email_id: str | None
 	is_primary_address: bool
 	is_shipping_address: bool
+	plugin_fields: dict[str, Any]
 
 
 class CustomerProfile(TypedDict):
@@ -309,6 +337,7 @@ class ProductCard(TypedDict):
 	handle: str
 	title: str
 	vendor: str | None
+	product_type: str | None
 	color: str | None
 	image: str | None
 	hover_image: str | None
@@ -339,6 +368,22 @@ class ProductPage(TypedDict):
 	page: int
 	page_size: int
 	facets: ProductFacets
+
+
+class SearchResults(ProductPage):
+	query: str
+
+
+class TypeaheadLink(TypedDict):
+	title: str
+	url: str
+
+
+class Typeahead(TypedDict):
+	query: str
+	corrected_query: str | None
+	products: list[ProductCard]
+	categories: list[TypeaheadLink]
 
 
 class ProductOptionValue(TypedDict, total=False):
@@ -405,7 +450,14 @@ class MenuItem(TypedDict):
 	title: str
 	type: str | None
 	target: str | None
+	url: str | None
 	items: list["MenuItem"]
+
+
+class Menu(TypedDict):
+	handle: str
+	title: str
+	items: list[MenuItem]
 
 
 class FooterSection(TypedDict):
@@ -417,10 +469,16 @@ class Shop(TypedDict):
 	name: str
 	description: str
 	currency: str
+	country: str | None
 	logo: str
 	favicon: str
 	menu: list[MenuItem]
 	footer: list[FooterSection]
+
+
+class Country(TypedDict):
+	name: str
+	title: str
 
 
 class ContentPage(TypedDict):
@@ -449,3 +507,103 @@ class Sitemap(SitemapPage, total=False):
 	products: list[SitemapEntry]
 	collections: list[SitemapEntry]
 	pages: list[SitemapEntry]
+
+
+class Wishlist(TypedDict):
+	products: list[ProductCard]
+	count: int
+
+
+class CheckoutState(TypedDict):
+	cart: str
+	email: str | None
+	billing_address: Address | None
+	shipping_address: Address | None
+	is_store_pickup: bool
+	store: str | None
+	shipping_option: str | None
+	summary: CheckoutSummary
+
+
+class ReturnReason(TypedDict):
+	name: str
+	label: str
+
+
+class ReturnOptions(TypedDict):
+	can_return: bool
+	return_by: datetime | None
+	reasons: list[ReturnReason]
+	returned_items: list[str]
+	pending_items: list[str]
+
+
+class TrackingEvent(TypedDict):
+	timestamp: datetime
+	status: str | None
+	location: str | None
+	message: str | None
+
+
+class OrderTracking(TypedDict, total=False):
+	has_tracking: bool
+	awb: str
+	carrier: str | None
+	status: str | None
+	tracking_url: str | None
+	events: list[TrackingEvent]
+
+
+class ShippingOption(TypedDict):
+	id: str
+	title: str
+	description: str | None
+	provider: str | None
+	amount: float
+	original_amount: float | None
+	is_free: bool
+	min_delivery_date: str | None
+	max_delivery_date: str | None
+	phone_required: bool
+
+
+class ShippingOptions(TypedDict):
+	options: list[ShippingOption]
+	selected: str | None
+	reason: str | None
+
+
+class PaymentMethod(TypedDict):
+	id: str
+	title: str
+	is_cash_on_delivery: bool
+
+
+class PickupLocation(TypedDict):
+	id: str
+	title: str
+	address_line1: str
+	address_line2: str | None
+	city: str
+	state: str | None
+	pincode: str | None
+	country: str
+	phone: str | None
+	directions_url: str | None
+
+
+class PaymentSession(TypedDict):
+	redirect_url: str
+	reference_id: str
+
+
+class PlacedOrder(TypedDict):
+	name: str
+	link: str
+	grand_total: float
+	currency: str
+
+
+class CheckoutResult(TypedDict):
+	status: str
+	order: PlacedOrder | None

@@ -1,0 +1,10 @@
+<section class="px-5 py-24 text-center md:px-12">
+	<h2 class="text-5xl">{{ section.settings.heading }}</h2>
+	{% if section.settings.text %}
+	<p class="mt-3 text-p-base text-ink-gray-6">{{ section.settings.text }}</p>
+	{% endif %}
+	<form x-data @submit.prevent class="mx-auto mt-8 flex max-w-md gap-2">
+		<input type="email" name="email" required placeholder="{{ section.settings.placeholder }}" aria-label="{{ section.settings.placeholder }}" class="h-10 min-w-0 flex-1 rounded-lg border border-transparent bg-surface-gray-2 px-3 text-lg text-ink-gray-8 outline-none placeholder:text-ink-gray-4 hover:bg-surface-gray-3 focus:border-outline-gray-4 focus:bg-surface-base focus:shadow-sm">
+		<button type="submit" class="inline-flex h-10 items-center justify-center rounded-lg bg-brand px-3 text-lg font-medium text-on-brand hover:bg-brand-hover">{{ section.settings.button_label }}</button>
+	</form>
+</section>

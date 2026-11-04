@@ -10,6 +10,10 @@ from commera.order_access import get_order_link, reset_order_access_key
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=10, seconds=60 * 60)
 def send_order_link(order_number: str, email: str) -> str:
+	return email_order_link(order_number, email)
+
+
+def email_order_link(order_number: str, email: str) -> str:
 	order_number = cstr(order_number).strip()
 	email = cstr(email).strip().lower()
 	if order_number and email:

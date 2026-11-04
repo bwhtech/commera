@@ -1,10 +1,14 @@
 {# Quick View and Add To Cart link to the product page: the cart store refuses an item without a chosen size variant. #}
 {% from "templates/macros/reviews.html" import star_svg %}
 
-{% macro variant_display_name(variant) -%}
-{%- set base_name = variant.item_name if frappe.lang == "en" else (variant.custom_item_name_ar or variant.item_name) -%}
-{%- set colour = variant.attribute_value if variant.attribute_value and variant.attribute_value not in base_name else "" -%}
-{{- base_name ~ (" - " ~ colour if colour else "") -}}
+{% macro variant_display_name(product) -%}
+{%- set colour = product.color if product.color and product.color not in (product.title or "") else "" -%}
+{{- product.title ~ (" - " ~ colour if colour else "") -}}
+{%- endmacro %}
+
+
+{% macro card_discount(product) -%}
+{{- ((1 - product.price / product.compare_at_price) * 100) | round | int if product.compare_at_price else 0 -}}
 {%- endmacro %}
 
 
@@ -104,18 +108,28 @@
 {% endmacro %}
 
 
-{% macro variant_card(variant, style="", wow_delay="") %}
+{% macro variant_card(product, style="", wow_delay="") %}
+{% set wishlist_item = {
+    "route": product.handle,
+    "image": product.image,
+    "brand": product.vendor,
+    "item_name": product.title,
+    "custom_item_name_ar": product.title if frappe.lang == "ar" else None,
+    "attribute_value": product.color,
+    "sale_price": product.price,
+    "default_price": product.compare_at_price or product.price,
+} %}
 {{ product_card(
-    image=variant.image,
-    product_name=variant_display_name(variant),
-    formatted_price=variant.sale_price,
-    original_price=variant.default_price,
-    discount=variant.discount_percent,
-    route=variant.route,
+    image=product.image,
+    product_name=variant_display_name(product),
+    formatted_price=product.price,
+    original_price=product.compare_at_price,
+    discount=card_discount(product) | int,
+    route=product.handle,
     style=style,
     wow_delay=wow_delay,
-    product_obj=variant,
-    average_rating=variant.average_rating,
-    review_count=variant.review_count
+    product_obj=wishlist_item,
+    average_rating=product.rating.average,
+    review_count=product.rating.count
 ) }}
 {% endmacro %}

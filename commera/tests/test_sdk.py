@@ -6,7 +6,6 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.tests import IntegrationTestCase
 
-from commera.api.shipping import is_connector_installed
 from commera.checkout_hooks import PLUGIN_FEE_FIELD
 from commera.plugin_events import PLUGINS_USER, get_order_snapshot
 from commera.sdk import STORE_ORDER_TYPE, as_plugin_user, cart, catalog, orders
@@ -23,7 +22,12 @@ from commera.sdk.types import (
 	Stage,
 )
 from commera.tests import test_cart_checkout, test_checkout_hooks, test_plugin_events
-from commera.tests.test_admin_orders import ensure_fiscal_year, get_company_account, make_test_sales_order
+from commera.tests.test_admin_orders import (
+	ensure_fiscal_year,
+	get_company_account,
+	make_shipping_rule,
+	make_test_sales_order,
+)
 from commera.tests.test_payment_hooks import patch_app_hooks
 from commera.utils import update_sales_order_ecommerce_status
 
@@ -34,21 +38,32 @@ PUBLIC_NAMES = {
 		"STORE_ORDER_TYPE",
 		"account",
 		"as_plugin_user",
+		"auth",
 		"cart",
 		"catalog",
 		"discounts",
+		"format",
 		"orders",
 		"shop",
+		"checkout",
+		"wishlist",
 	],
 	"commera.sdk.account": [
+		"cancel_order",
 		"delete_address",
+		"get_invoice_url",
 		"get_order",
+		"get_order_tracking",
 		"get_profile",
+		"get_return_options",
 		"list_addresses",
 		"list_orders",
+		"request_return",
 		"save_address",
+		"send_order_link",
 		"update_profile",
 	],
+	"commera.sdk.auth": ["log_in", "log_out", "send_login_code", "send_signup_code", "sign_up"],
 	"commera.sdk.cart": [
 		"add_discount_code",
 		"add_lines",
@@ -75,11 +90,17 @@ PUBLIC_NAMES = {
 		"get_collection",
 		"get_items",
 		"get_product",
+		"get_product_cards_for",
+		"get_recommendations",
+		"get_typeahead",
+		"list_brands",
 		"list_collections",
 		"list_products",
+		"search",
 	],
-	"commera.sdk.orders": ["ShippingNotInstalled", "get_order", "get_orders", "record_shipment"],
-	"commera.sdk.shop": ["get_page", "get_shop", "get_sitemap"],
+	"commera.sdk.format": ["IMAGE_WIDTHS", "image_url", "money", "product_url"],
+	"commera.sdk.orders": ["get_order", "get_orders", "record_shipment"],
+	"commera.sdk.shop": ["get_menu", "get_page", "get_shop", "get_sitemap", "list_countries"],
 	"commera.sdk.types": [
 		"Address",
 		"Cart",
@@ -91,6 +112,7 @@ PUBLIC_NAMES = {
 		"CheckoutSummary",
 		"Collection",
 		"ContentPage",
+		"Country",
 		"CustomerAddress",
 		"CustomerProfile",
 		"Discount",
@@ -98,10 +120,12 @@ PUBLIC_NAMES = {
 		"DiscountInput",
 		"FacetValue",
 		"FooterSection",
+		"Menu",
 		"MenuItem",
 		"NewCartLine",
 		"Order",
 		"OrderLine",
+		"OrderTracking",
 		"PricedCart",
 		"PricedCartLine",
 		"Product",
@@ -112,13 +136,41 @@ PUBLIC_NAMES = {
 		"ProductPage",
 		"ProductVariant",
 		"Rating",
+		"ReturnOptions",
+		"ReturnReason",
+		"SearchResults",
 		"Shop",
 		"ShopperOrder",
+		"ShopperOrderDetail",
 		"ShopperOrderPage",
 		"Sitemap",
 		"SitemapEntry",
 		"Stage",
+		"TrackingEvent",
+		"Typeahead",
+		"TypeaheadLink",
+		"CheckoutResult",
+		"CheckoutState",
+		"PaymentMethod",
+		"PaymentSession",
+		"PickupLocation",
+		"PlacedOrder",
+		"ShippingOption",
+		"ShippingOptions",
+		"Wishlist",
 	],
+	"commera.sdk.checkout": [
+		"complete",
+		"get",
+		"list_payment_methods",
+		"list_pickup_locations",
+		"list_shipping_options",
+		"set_addresses",
+		"set_shipping_option",
+		"set_store_pickup",
+		"start_payment",
+	],
+	"commera.sdk.wishlist": ["add_to_wishlist", "get_wishlist", "remove_from_wishlist"],
 }
 APP = "bwh_payments"
 APP_FIELD = f"{APP}_zz_sdk_note"
@@ -168,7 +220,11 @@ class TestSdk(IntegrationTestCase):
 
 	def setUp(self):
 		self.addCleanup(frappe.set_user, "Administrator")
-		patch_app_hooks(self, {"commera_hooks": {"cart_fees": [f"{__name__}.charge_note_fee"]}})
+		commera_hooks = {
+			**frappe.get_hooks("commera_hooks", {}),
+			"cart_fees": [f"{__name__}.charge_note_fee"],
+		}
+		patch_app_hooks(self, {"commera_hooks": commera_hooks})
 		test_plugin_events.patch_app_declarations(
 			self, {APP: {"commera_events": {"order_paid": [f"{APP}.paid"]}}}
 		)
@@ -238,6 +294,38 @@ class TestSdk(IntegrationTestCase):
 			[(line["line_id"], line["qty"]) for line in order["items"]],
 			[(row.name, row.qty) for row in sales_order.items],
 		)
+
+	def test_an_order_reads_its_charges_from_its_own_rows_and_they_add_up_to_its_total(self):
+		shipping_rule = make_shipping_rule(40).name
+		sales_order = make_test_sales_order(
+			order_type=STORE_ORDER_TYPE, submit=False, shipping_rule=shipping_rule, cod_charge=15
+		)
+		sales_order.append(
+			"taxes",
+			{
+				"description": "ZZ VAT",
+				"charge_type": "On Net Total",
+				"account_head": get_company_account(
+					exclude=frappe.db.get_value("Shipping Rule", shipping_rule, "account")
+				),
+				"rate": 10,
+				"included_in_print_rate": 0,
+			},
+		)
+		sales_order.save()
+		sales_order.submit()
+
+		order = orders.get_order(sales_order.name)
+
+		self.assertEqual((order["shipping"], order["cod_charge"]), (40, 15))
+		self.assertEqual(order["taxes"], [{"description": "ZZ VAT", "amount": sales_order.net_total / 10}])
+		self.assertEqual(order["rounding_adjustment"], sales_order.rounding_adjustment)
+		order_discounts = sum(
+			discount["amount"] for discount in order["discounts"] if discount["discount_class"] != "Product"
+		)
+		charges = order["shipping"] + order["cod_charge"]
+		charges += sum(charge["amount"] for charge in order["taxes"] + order["plugin_fees"])
+		self.assertAlmostEqual(order["total"] - order_discounts + charges, order["grand_total"], places=2)
 
 	def test_a_cancelled_order_and_one_placed_outside_the_store_read_as_such(self):
 		cancelled = self.make_store_order()
@@ -394,15 +482,16 @@ class TestSdk(IntegrationTestCase):
 		self.assertIsNone(frappe.db.get_value("Quotation", quotation.name, APP_FIELD))
 
 	def test_a_recorded_shipment_ships_then_delivers_the_order_and_never_goes_back(self):
-		if not is_connector_installed():
-			self.skipTest("bwh_shipping is not installed")
-		from bwh_shipping.tests.test_carrier_import import create_test_address, create_test_provider_profile
+		from commera.shipping.tests.test_carrier_import import (
+			create_test_address,
+			create_test_provider_profile,
+		)
 
 		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
 		sales_order.db_set(
 			{
-				"shipping_address_name": create_test_address("India"),
+				"shipping_address_name": create_test_address("India", "Customer", sales_order.customer),
 				"company_address": create_test_address("India"),
 			}
 		)
@@ -416,7 +505,7 @@ class TestSdk(IntegrationTestCase):
 			orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", events=[scan]),
 			shipment,
 		)
-		self.assertEqual(len(frappe.get_doc("Shipping Request", shipment).tracking_events), 1)
+		self.assertEqual(len(frappe.get_doc("Shipment", shipment).custom_tracking_events), 1)
 		update_sales_order_ecommerce_status(sales_order.name)
 		self.assertEqual(
 			frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status"), "Shipped"
@@ -430,44 +519,47 @@ class TestSdk(IntegrationTestCase):
 		orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="Delivered")
 		orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="In Transit")
 
-		self.assertEqual(frappe.db.get_value("Shipping Request", shipment, "status"), "Delivered")
+		self.assertEqual(frappe.db.get_value("Shipment", shipment, "custom_shipment_status"), "Delivered")
 		self.assertEqual(orders.get_order(sales_order.name)["stage"]["key"], "delivered")
 		with self.assertRaises(frappe.ValidationError):
 			orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="Teleported")
 
 	def test_a_carrier_named_after_the_first_record_is_saved(self):
-		if not is_connector_installed():
-			self.skipTest("bwh_shipping is not installed")
-		from bwh_shipping.tests.test_carrier_import import create_test_address
+		from commera.shipping.tests.test_carrier_import import create_test_address
 
 		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
-		sales_order.db_set({"shipping_address_name": create_test_address("India"), "company_address": None})
+		sales_order.db_set(
+			{
+				"shipping_address_name": create_test_address("India", "Customer", sales_order.customer),
+				"company_address": create_test_address("India"),
+			}
+		)
 
 		shipment = orders.record_shipment(sales_order.name, awb="ZZ-LATE-CARRIER-AWB")
 		orders.record_shipment(sales_order.name, awb="ZZ-LATE-CARRIER-AWB", carrier="Delhivery")
 		orders.record_shipment(sales_order.name, awb="ZZ-LATE-CARRIER-AWB")
 
-		self.assertEqual(frappe.db.get_value("Shipping Request", shipment, "carrier"), "Delhivery")
+		self.assertEqual(frappe.db.get_value("Shipment", shipment, "carrier"), "Delhivery")
 
 	def test_a_partner_shipment_needs_no_provider_and_shows_the_shopper_its_link(self):
-		if not is_connector_installed():
-			self.skipTest("bwh_shipping is not installed")
-		from bwh_shipping.tests.test_carrier_import import create_test_address
-
 		from commera.api.shipping import get_order_tracking
+		from commera.shipping.tests.test_carrier_import import create_test_address
 
 		patch_app_hooks(self, {"commera_events": {"order_fulfilled": [], "order_delivered": []}})
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
-		sales_order.db_set({"shipping_address_name": create_test_address("India"), "company_address": None})
+		sales_order.db_set(
+			{
+				"shipping_address_name": create_test_address("India", "Customer", sales_order.customer),
+				"company_address": create_test_address("India"),
+			}
+		)
 		tracking_url = "https://track.example.com/ZZ-PARTNER-AWB"
 
 		shipment = orders.record_shipment(
 			sales_order.name, awb="ZZ-PARTNER-AWB", carrier="Delhivery", tracking_url=tracking_url
 		)
-		self.assertFalse(
-			any(frappe.db.get_value("Shipping Request", shipment, ["provider", "origin_address"]))
-		)
+		self.assertFalse(frappe.db.get_value("Shipment", shipment, "custom_shipping_provider"))
 		update_sales_order_ecommerce_status(sales_order.name)
 		self.assertEqual(
 			frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status"), "Shipped"

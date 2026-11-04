@@ -28,15 +28,13 @@ async function add_scaffold_button(frm, settings_doctype) {
 				settings_doctype,
 			]),
 			async () => {
-				const response = await frm.call('scaffold_theme_settings');
-				if (!response.message) {
-					return;
-				}
+				await frm.call('scaffold_theme_settings');
 				frappe.show_alert({
-					message: __('Created {0}', [response.message]),
-					indicator: 'green',
+					message: __('Creating {0}. This form refreshes when it is ready.', [
+						settings_doctype,
+					]),
+					indicator: 'blue',
 				});
-				frm.reload_doc();
 			},
 		);
 	});

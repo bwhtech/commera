@@ -247,7 +247,7 @@ class TestServerCart(DiscountCodeTestCase):
 		self,
 		token: str | None = None,
 		header: bool = False,
-		path: str = "/api/method/commera.api.storefront.cart.get_cart",
+		path: str = "/api/v2/method/commera.api.storefront.cart.get_cart",
 	):
 		token = token or frappe.generate_hash(length=32)
 		headers = {CART_TOKEN_HEADER: token} if header else {"Cookie": f"{GUEST_CART_COOKIE}={token}"}

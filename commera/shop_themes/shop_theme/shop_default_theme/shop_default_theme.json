@@ -11,5 +11,6 @@
  "owner": "Administrator",
  "parent_theme": "Shop Base Theme",
  "theme_name": "Shop Default Theme",
- "theme_settings": "Shop Default Theme Settings"
+ "theme_settings": "Shop Default Theme Settings",
+ "theme_type": "Classic"
 }

@@ -4,12 +4,12 @@ from frappe.utils.data import cint, cstr
 
 from commera.branding import get_brand_assets
 from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import get_page_by_route
-from commera.sdk.types import ContentPage, FooterSection, MenuItem, Shop, Sitemap, SitemapEntry
+from commera.sdk.types import ContentPage, Country, FooterSection, Menu, MenuItem, Shop, Sitemap, SitemapEntry
 from commera.shop_data import get_storefront_menu
-from commera.utils import get_store_currency
+from commera.utils import get_country_list, get_store_company, get_store_currency
 from commera.www.sitemap_segment import SEGMENT_CONFIG, get_segment_filters, get_urls_per_page
 
-__all__ = ["get_page", "get_shop", "get_sitemap"]
+__all__ = ["get_menu", "get_page", "get_shop", "get_sitemap", "list_countries"]
 
 SITEMAP_KINDS = tuple(SEGMENT_CONFIG)
 
@@ -22,10 +22,56 @@ def get_shop() -> Shop:
 		"name": settings.store_name or frappe.get_website_settings("app_name") or "Commera",
 		"description": settings.default_meta_description or "",
 		"currency": get_store_currency(),
+		"country": get_store_country(),
 		"logo": brand.logo,
 		"favicon": brand.favicon,
-		"menu": [get_menu_item(node) for node in get_storefront_menu() if node.get("visible", 1)],
+		"menu": get_main_menu_items(),
 		"footer": [get_footer_section(row.footer_section) for row in get_footer_rows(settings)],
+	}
+
+
+def get_menu(handle: str) -> Menu | None:
+	if handle == "main-menu":
+		return {"handle": handle, "title": _("Main menu"), "items": get_main_menu_items()}
+	if handle == "footer":
+		sections = [
+			get_footer_section(row.footer_section)
+			for row in get_footer_rows(frappe.get_cached_doc("Commera Settings"))
+		]
+		return {
+			"handle": handle,
+			"title": _("Footer"),
+			"items": [get_footer_menu_item(section) for section in sections],
+		}
+	return None
+
+
+def get_store_country() -> str | None:
+	company = get_store_company()
+	return (company and frappe.get_cached_value("Company", company, "country")) or (
+		frappe.defaults.get_global_default("country")
+	)
+
+
+def list_countries() -> list[Country]:
+	countries = [{"name": country["name"], "title": _(country["name"])} for country in get_country_list()]
+	return sorted(countries, key=lambda country: country["title"])
+
+
+def get_main_menu_items() -> list[MenuItem]:
+	return [get_menu_item(node) for node in get_storefront_menu() if node.get("visible", 1)]
+
+
+def get_footer_menu_item(section: FooterSection) -> MenuItem:
+	return {
+		"title": section["title"],
+		"type": None,
+		"target": None,
+		"url": None,
+		"items": [
+			{"title": link["title"], "type": "url", "target": link["url"], "url": link["url"], "items": []}
+			for link in section["links"]
+		],
 	}
 
 
@@ -82,6 +128,7 @@ def get_menu_item(node: dict, root_slug: str | None = None) -> MenuItem:
 		"title": node["label"],
 		"type": link_type,
 		"target": target,
+		"url": node.get("href"),
 		"items": [
 			get_menu_item(child, root_slug) for child in node.get("children") or [] if child.get("visible", 1)
 		],

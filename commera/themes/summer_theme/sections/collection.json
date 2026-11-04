@@ -1,0 +1,43 @@
+{
+	"name": "Collection banners",
+	"category": "Banners",
+	"settings": [],
+	"blocks": {
+		"banner": {
+			"name": "Banner",
+			"settings": [
+				{
+					"id": "image",
+					"type": "image",
+					"label": "Image",
+					"default": ""
+				},
+				{
+					"id": "badge_label",
+					"type": "text",
+					"label": "Badge",
+					"default": ""
+				},
+				{
+					"id": "heading",
+					"type": "text",
+					"label": "Heading",
+					"default": ""
+				},
+				{
+					"id": "cta_label",
+					"type": "text",
+					"label": "Button label",
+					"default": ""
+				},
+				{
+					"id": "url",
+					"type": "url",
+					"label": "Button link",
+					"default": ""
+				}
+			]
+		}
+	},
+	"max_blocks": 2
+}

@@ -10,6 +10,7 @@ from frappe.geo.country_info import get_all
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Count, Min, Sum
 from frappe.utils import add_days, cint, create_batch, cstr, flt, get_datetime, now_datetime
+from frappe.utils.caching import request_cache
 from frappe.utils.data import strip_html
 from pypika import Order
 
@@ -111,6 +112,7 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 	query = get_product_base_query(filters, product_list)
 	style_attribute_variant = DocType("Style Attribute Variant")
 	website_slideshow_item = DocType("Website Slideshow Item")
+	hover_slideshow_item = DocType("Website Slideshow Item").as_("hover_slideshow_item")
 	color_size_item = DocType("Color Size Item")
 	item_price_default = DocType("Item Price").as_("ip_default")
 	item_price_sale = DocType("Item Price").as_("ip_sale")
@@ -130,7 +132,9 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 		.else_(0)
 	)
 	query = (
-		query.select(
+		query.left_join(hover_slideshow_item)
+		.on((hover_slideshow_item.parent == style_attribute_variant.name) & (hover_slideshow_item.idx == 2))
+		.select(
 			style_attribute_variant.name,
 			style_attribute_variant.route,
 			style_attribute_variant.item_style,
@@ -148,6 +152,7 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 			Min(item_price_default.price_list_rate).as_("default_price"),
 			Min(item_price_sale.price_list_rate).as_("sale_price"),
 			website_slideshow_item.image.as_("image"),
+			hover_slideshow_item.image.as_("hover_image"),
 			discount_expr.as_("discount_percent").as_("discount_percent"),
 		)
 		.groupby(style_attribute_variant.name)
@@ -417,13 +422,21 @@ def get_store_currency(company: str | None = None) -> str:
 	return currency or frappe.defaults.get_global_default("currency")
 
 
-def get_currency_symbol():
-	currency = get_store_currency()
+def get_currency_symbol(currency: str | None = None):
+	currency = currency or get_store_currency()
 	# Riyal has no glyph in the fonts the themes ship, so SAR alone borrows the icon font.
 	if currency == "SAR":
 		return '<span class="saudi-currency-symbol pe-0.5"></span>'
 	# A code needs a gap before the amount; a plain space collapses inside the flex price wrappers.
 	return frappe.get_cached_value("Currency", currency, "symbol") or f"{currency}\u00a0"
+
+
+@request_cache
+def get_currency_symbols() -> dict[str, str]:
+	currencies = frappe.get_all(
+		"Price List", filters={"enabled": 1, "selling": 1}, pluck="currency", distinct=True
+	)
+	return {currency: get_currency_symbol(currency) for currency in {*currencies, get_store_currency()}}
 
 
 def get_addresses(party=None, address_type="Billing"):
@@ -648,13 +661,17 @@ def get_page_size():
 def can_return(order_name, return_period_days):
 	"""Check if the order is still within the return period."""
 
+	return_deadline = get_return_deadline(order_name, return_period_days)
+	return bool(return_deadline) and now_datetime() <= return_deadline
+
+
+def get_return_deadline(order_name, return_period_days):
 	delivered_on = [
 		line.creation for line in get_delivery_note_lines(order_name, docstatus=1) if not line.is_return
 	]
 	if not delivered_on:
-		return False
-	return_deadline = add_days(get_datetime(max(delivered_on)), cint(return_period_days))
-	return now_datetime() <= return_deadline
+		return None
+	return add_days(get_datetime(max(delivered_on)), cint(return_period_days))
 
 
 def get_available_stock(item_code, warehouse):
@@ -769,14 +786,14 @@ def update_so_status_from_related_doc(doc, method):
 	elif doc.doctype == "Delivery Note":
 		sales_orders.update([d.against_sales_order for d in doc.items if d.against_sales_order])
 
-	elif doc.doctype == "Shipping Request":
-		if doc.ref_doctype == "Sales Order" and doc.ref_docname:
-			sales_orders.add(doc.ref_docname)
-		elif doc.delivery_note:
+	elif doc.doctype == "Shipment":
+		if doc.get("custom_sales_order"):
+			sales_orders.add(doc.custom_sales_order)
+		elif delivery_notes := [row.delivery_note for row in doc.shipment_delivery_note]:
 			sales_orders.update(
 				frappe.get_all(
 					"Delivery Note Item",
-					filters={"parent": doc.delivery_note, "against_sales_order": ["is", "set"]},
+					filters={"parent": ["in", delivery_notes], "against_sales_order": ["is", "set"]},
 					pluck="against_sales_order",
 				)
 			)
@@ -863,7 +880,6 @@ def get_fulfilment_status(sales_order_name) -> str:
 	supplier_status = get_supplier_status(sales_order_name, supplier_lines)
 	if len(supplier_lines) == len(lines):
 		return supplier_status
-	# Mixed order: a Shipping Request without a Delivery Note is the supplier's parcel, not the store's.
 	return get_earlier_status(get_store_status(sales_order_name, from_delivery_note=True), supplier_status)
 
 
@@ -908,19 +924,21 @@ def get_store_status(sales_order_name, from_delivery_note: bool | None = None) -
 
 
 def get_carrier_status(sales_order_name, from_delivery_note: bool | None = None) -> str | None:
-	filters = {"ref_doctype": "Sales Order", "ref_docname": sales_order_name, "docstatus": ["<", 2]}
+	filters = [["custom_sales_order", "=", sales_order_name], ["docstatus", "<", 2]]
 	if from_delivery_note is not None:
-		filters["delivery_note"] = ["is", "set" if from_delivery_note else "not set"]
-	requests = frappe.get_all(
-		"Shipping Request",
+		filters.append(
+			["Shipment Delivery Note", "delivery_note", "is", "set" if from_delivery_note else "not set"]
+		)
+	shipments = frappe.get_all(
+		"Shipment",
 		filters=filters,
-		fields=["status"],
+		fields=["custom_shipment_status"],
 		order_by="creation desc",
 		limit=1,
 	)
-	if not requests:
+	if not shipments:
 		return None
-	return SHIPMENT_STATUS_LADDER.get(cstr(requests[0].status))
+	return SHIPMENT_STATUS_LADDER.get(cstr(shipments[0].custom_shipment_status))
 
 
 def get_delivery_note_lines(sales_order_name, docstatus=None) -> list[dict]:

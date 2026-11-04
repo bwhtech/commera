@@ -1,0 +1,14 @@
+{% set stage_classes = {
+	"delivered": "bg-surface-green-2 text-ink-green-6",
+	"fulfilled": "bg-surface-green-2 text-ink-green-6",
+	"to_fulfil": "bg-surface-amber-2 text-ink-amber-6",
+	"delivery_note_drafted": "bg-surface-amber-2 text-ink-amber-6",
+	"packed": "bg-surface-amber-2 text-ink-amber-6",
+	"partly_fulfilled": "bg-surface-amber-2 text-ink-amber-6",
+	"shipped": "bg-surface-blue-2 text-ink-blue-6",
+	"cancelled": "bg-surface-red-2 text-ink-red-6",
+} %}
+
+{% macro order_status(stage) %}
+<span class="{{ stage_classes.get(stage.key, 'bg-surface-gray-2 text-ink-gray-7') }} inline-flex h-6 shrink-0 items-center rounded-full px-2.5 text-sm font-medium">{{ stage.label }}</span>
+{%- endmacro %}

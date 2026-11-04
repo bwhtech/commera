@@ -75,6 +75,16 @@ DEFAULT_ROUTES = [
 		"template_path": "pages/account/address.html",
 		"requires_auth": 1,
 	},
+	{
+		"url_pattern": rf"^{LANG}/account/login$",
+		"template_path": "pages/account/login.html",
+		"requires_auth": 0,
+	},
+	{
+		"url_pattern": rf"^{LANG}/account/signup$",
+		"template_path": "pages/account/signup.html",
+		"requires_auth": 0,
+	},
 	# requires_auth 0 on purpose: a published content page is public, and the controller is what lets
 	# an editor preview an unpublished one.
 	{

@@ -25,7 +25,7 @@
     <link rel="stylesheet" href="{{ shop_theme_asset_url('tailwind.output.css') }}">
 
     {# A theme's own tokens must not redefine the --ls-* variables the merchant's colour pickers drive. #}
-    {{ format_theme_css()|safe }}
+    {{ format_theme_css()|safe }}{{ format_shop_theme_css() }}
 
     <script src="{{ shop_theme_asset_url('scripts/vendor/alpinejs/plugins/persist.js') }}"></script>
     <script src="{{ shop_theme_asset_url('scripts/vendor/alpinejs/plugins/collapse.js') }}"></script>

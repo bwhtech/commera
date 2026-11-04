@@ -4,12 +4,17 @@ import frappe
 
 from commera.api.storefront.collections import get_collection, get_collections
 from commera.api.storefront.products import get_product, get_products
-from commera.api.storefront.shop import get_page, get_sitemap, get_storefront_url
+from commera.api.storefront.shop import get_page, get_sitemap, get_storefront_url, list_countries
 from commera.sdk import catalog, shop
 from commera.sdk.shop import get_menu_link
-from commera.sdk.types import Collection, Product, ProductCard, ProductPage, ProductVariant, Shop
+from commera.sdk.types import Collection, Country, Product, ProductCard, ProductPage, ProductVariant, Shop
+from commera.shop_themes.sections import get_section_products
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.www.sitemap_segment import get_urls_per_page
+
+
+def get_shopper_messages() -> list[str]:
+	return [entry.message for entry in frappe.get_message_log()]
 
 
 class TestStorefrontApi(ProductDetailPriceTestCase):
@@ -43,6 +48,15 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		self.assert_shape(product["variants"][0], ProductVariant)
 		self.assert_shape(catalog.list_collections()[0], Collection)
 		self.assert_shape(shop.get_shop(), Shop)
+
+	def test_countries_are_listed_by_title_with_the_record_name_an_address_stores(self):
+		countries = list_countries()
+
+		self.assert_shape(countries[0], Country)
+		self.assertIn({"name": "India", "title": "India"}, countries)
+		self.assertEqual(countries, sorted(countries, key=lambda country: country["title"]))
+		names = [country["name"] for country in countries]
+		self.assertEqual(frappe.db.count("Country", {"name": ("in", names)}), len(names))
 
 	def test_a_product_lists_its_sizes_as_variants_with_sale_and_list_prices(self):
 		route = self.make_priced_variant("API", default_rate=100, sale_rate=80)
@@ -81,6 +95,29 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		with self.assertRaisesRegex(frappe.DoesNotExistError, "^Product no-such-product not found$"):
 			get_product("no-such-product")
 
+		self.assertEqual(get_shopper_messages(), ["Product no-such-product not found"])
+
+	def test_a_missing_record_reaches_the_shopper_as_a_message(self):
+		missing_reads = [
+			("Collection no-such-collection not found", lambda: get_collection("no-such-collection")),
+			(
+				"Collection no-such-collection not found",
+				lambda: get_products(collection="no-such-collection"),
+			),
+			("Page no-such-page not found", lambda: get_page("no-such-page")),
+		]
+		for message, read in missing_reads:
+			with self.subTest(message=message):
+				frappe.local.message_log = []
+				with self.assertRaises(frappe.DoesNotExistError):
+					read()
+				self.assertEqual(get_shopper_messages(), [message])
+
+	def test_a_section_on_a_missing_collection_shows_nothing_and_no_message(self):
+		frappe.local.message_log = []
+		settings = frappe._dict(source="collection", collection="no-such-collection")
+
+		self.assertEqual(get_section_products(settings, 4), [])
 		self.assertEqual(frappe.local.message_log, [])
 
 	def test_facets_are_cached_for_each_filter_set(self):
@@ -132,6 +169,30 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		self.assertEqual([brand["value"] for brand in narrowed["brands"]], brands)
 		self.assertEqual(narrowed["colors"], [{"value": colors[0], "count": 1}])
 		self.assertEqual(narrowed["sizes"], [{"value": "M", "count": 1}])
+
+	def test_picked_product_cards_keep_the_picked_order(self):
+		routes = [self.make_priced_variant(label, default_rate=30) for label in ("FIRST", "SECOND")]
+		names = [frappe.db.get_value("Style Attribute Variant", {"route": route}) for route in routes]
+
+		cards = catalog.get_product_cards_for([names[1], names[0]])
+
+		self.assertEqual([card["handle"] for card in cards], [routes[1], routes[0]])
+		self.assertEqual(cards[0]["product_type"], self.item_group)
+
+	def test_a_product_card_is_titled_in_the_shoppers_language(self):
+		if not frappe.db.has_column("Item", "custom_item_name_ar"):
+			self.skipTest("Item has no custom_item_name_ar field on this site")
+		route = self.make_priced_variant("ARABIC", default_rate=30)
+		name, item_style = frappe.db.get_value(
+			"Style Attribute Variant", {"route": route}, ["name", "item_style"]
+		)
+		frappe.db.set_value("Item", item_style, "custom_item_name_ar", "قميص تجريبي")
+		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
+
+		frappe.local.lang = "ar"
+		self.assertEqual(catalog.get_product_cards_for([name])[0]["title"], "قميص تجريبي")
+		frappe.local.lang = "en"
+		self.assertNotEqual(catalog.get_product_cards_for([name])[0]["title"], "قميص تجريبي")
 
 	def test_an_unknown_sort_is_refused(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "Sort must be one of"):

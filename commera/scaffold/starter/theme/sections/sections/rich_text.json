@@ -1,0 +1,10 @@
+{
+	"name": "Rich text",
+	"category": "Text",
+	"settings": [
+		{ "id": "heading", "type": "text", "label": "Heading", "default": "Your headline here" },
+		{ "id": "text", "type": "textarea", "label": "Text", "default": "A few sentences about your store." }
+	],
+	"blocks": {},
+	"max_blocks": 0
+}

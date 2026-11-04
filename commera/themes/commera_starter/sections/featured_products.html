@@ -1,0 +1,15 @@
+{% from "components/macros/product_card.html" import product_card with context %}
+{% set language = frappe.lang or "en" %}
+<section class="px-5 py-20 md:px-12">
+	<div class="flex items-center justify-between">
+		<h2 class="text-3xl">{{ section.settings.title }}</h2>
+		{% if section.settings.link_label %}
+		<a href="{{ section.settings.link_url or '/' ~ language ~ '/products' }}" class="inline-flex h-8 items-center rounded-lg border border-outline-gray-2 bg-surface-base px-2.5 text-base font-medium text-ink-gray-8 hover:border-outline-gray-3">{{ section.settings.link_label }}</a>
+		{% endif %}
+	</div>
+	<div class="mt-10 grid grid-cols-2 gap-x-5 gap-y-12 md:grid-cols-4 md:gap-x-8">
+		{% for product in section.products %}
+		{{ product_card(product) }}
+		{% endfor %}
+	</div>
+</section>

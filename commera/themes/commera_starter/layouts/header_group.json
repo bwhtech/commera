@@ -1,0 +1,6 @@
+{
+	"sections": [
+		{ "id": "announcement", "type": "announcement_bar", "hidden": false, "settings": {}, "blocks": [] },
+		{ "id": "header", "type": "header", "hidden": false, "settings": {}, "blocks": [] }
+	]
+}

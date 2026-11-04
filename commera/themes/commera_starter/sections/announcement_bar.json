@@ -1,0 +1,11 @@
+{
+	"name": "Announcement bar",
+	"category": "Header",
+	"groups": ["header_group"],
+	"settings": [
+		{ "id": "text", "type": "text", "label": "Text", "default": "" },
+		{ "id": "url", "type": "url", "label": "Link", "default": "" }
+	],
+	"blocks": {},
+	"max_blocks": 0
+}

@@ -307,7 +307,7 @@ def test_discount(
 		draft.set(table, [{field: row.get(field) for field in fields} for row in values.get(table) or []])
 	# The test shows the rules' effect today, whatever the switch and dates say.
 	draft.update(
-		{"enabled": 1, "starts_on": None, "ends_on": None, "title": draft.title or _("This discount")}
+		{"enabled": 1, "starts_on": None, "ends_on": None, "title": draft.title or _("this discount")}
 	)
 	flags = {
 		"commera_discounts": [draft],
@@ -334,7 +334,9 @@ def test_discount(
 		"subtotal": subtotal,
 		"discount": subtotal - flt(quotation.net_total),
 		"total": flt(quotation.net_total),
-		"reasons": [reason] if (reason := get_unmet_reason(draft, get_cart_context(quotation))) else [],
+		"reasons": [reason[0].upper() + reason[1:]]
+		if (reason := get_unmet_reason(draft, get_cart_context(quotation)))
+		else [],
 	}
 
 

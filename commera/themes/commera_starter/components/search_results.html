@@ -1,0 +1,16 @@
+<div x-cloak x-show="results && (results.products.length || results.categories.length)" class="divide-y divide-outline-gray-2 text-start">
+	<div x-show="results?.products.length" class="py-1.5">
+		<template x-for="product in results?.products ?? []" :key="product.id">
+			<a :href="product_url(product)" class="flex items-center gap-3 rounded-lg p-2 hover:bg-surface-gray-3">
+				<span class="aspect-[3/4] w-10 shrink-0 overflow-hidden rounded-md bg-surface-gray-2"><img x-show="product.image" :src="product.image" alt="" class="size-full object-cover object-top"></span>
+				<span class="flex-1 text-base text-ink-gray-8" x-text="product.title"></span>
+				<span class="text-base text-ink-gray-8" x-text="money(product)"></span>
+			</a>
+		</template>
+	</div>
+	<div x-show="results?.categories.length" class="py-1.5">
+		<template x-for="category in results?.categories ?? []" :key="category.url">
+			<a :href="category.url" class="flex h-7 items-center rounded-lg px-2 text-base text-ink-gray-8 hover:bg-surface-gray-3" x-text="category.title"></a>
+		</template>
+	</div>
+</div>

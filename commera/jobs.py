@@ -93,9 +93,11 @@ def send_product_back_in_stock_email(doc, method):
 	)
 	if doc.warehouse != ecommerce_warehouse:
 		return
+	# The jobs read the voucher, which a worker sees only after this transaction commits.
 	if doc.voucher_type == "Stock Entry":
 		frappe.enqueue(
 			send_product_in_stock_email_stock_entry,
+			enqueue_after_commit=True,
 			doc=doc,
 			warehouse=ecommerce_warehouse,
 		)
@@ -103,6 +105,7 @@ def send_product_back_in_stock_email(doc, method):
 	if doc.voucher_type == "Purchase Receipt":
 		frappe.enqueue(
 			send_product_in_stock_email_purchase_receipt,
+			enqueue_after_commit=True,
 			doc=doc,
 			warehouse=ecommerce_warehouse,
 		)
@@ -110,6 +113,7 @@ def send_product_back_in_stock_email(doc, method):
 	if doc.voucher_type == "Stock Reconciliation":
 		frappe.enqueue(
 			send_product_in_stock_email_stock_reconciliation,
+			enqueue_after_commit=True,
 			doc=doc,
 			warehouse=ecommerce_warehouse,
 		)

@@ -21,6 +21,7 @@ HANDLER_HOOKS = {
 		"cart_fees",
 		"delivery_options",
 		"payment_methods",
+		"shipping_providers",
 	),
 }
 

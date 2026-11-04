@@ -683,6 +683,17 @@ class TestDiscountSelection(DiscountCodeTestCase):
 
 		self.assertFalse(quotation.custom_code_order_discount)
 
+	def test_cash_on_delivery_checkout_says_why_a_prepaid_code_gives_nothing(self):
+		frappe.db.set_value("Commera Discount", {"method": "Automatic"}, "enabled", 0)
+		prepaid = self.create_code(percentage=20, payment_condition="Prepaid")
+		other = self.create_code(percentage=10)
+		quotation = self.create_quotation({self.shirt: 1}, (prepaid, other))
+
+		states = get_checkout_summary(quotation)["cash_on_delivery"]["discount_codes"]
+
+		self.assertEqual([state["applied"] for state in states], [False, True])
+		self.assertIn("prepaid orders only", states[0]["reason"])
+
 	def test_a_customer_group_discount_skips_other_groups_and_guests(self):
 		group = frappe.get_doc(
 			{"doctype": "Customer Group", "customer_group_name": f"ZZ VIP {frappe.generate_hash(length=6)}"}
@@ -1039,6 +1050,21 @@ class TestDiscountsOnOrders(DiscountCodeTestCase):
 		amended = self.amend(sales_order)
 		self.assertEqual(amended.custom_code_order_discount, 10)
 		self.assertEqual(self.get_usage(discount, code), (1, 10, 1, [(sales_order.name, 10)]))
+
+	def test_a_draft_order_with_storefront_analytics_can_be_deleted(self):
+		sales_order = self.place_order(self.create_quotation({self.shirt: 1}))
+		event = frappe.get_doc(
+			{
+				"doctype": "Storefront Analytics Event",
+				"event": "purchase",
+				"session_id": frappe.generate_hash(length=10),
+				"order_id": sales_order.name,
+			}
+		).insert(ignore_permissions=True)
+
+		frappe.delete_doc("Sales Order", sales_order.name, ignore_permissions=True)
+
+		self.assertIsNone(frappe.db.get_value("Storefront Analytics Event", event.name, "order_id"))
 
 	def test_a_deleted_order_keeps_its_discount_use(self):
 		discount = self.create_discount(amount=10, usage_limit=5)

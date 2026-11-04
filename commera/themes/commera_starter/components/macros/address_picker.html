@@ -1,0 +1,50 @@
+{% macro address_input(kind, field, label, autocomplete, required=True, type="text") -%}
+<label class="flex flex-col gap-1.5">
+	<span class="text-sm text-ink-gray-6">{{ label }}</span>
+	<input type="{{ type }}" x-model="forms.{{ kind }}.{{ field }}" autocomplete="{{ kind }} {{ autocomplete }}" {{ "required" if required }} class="h-10 w-full min-w-0 rounded-lg border border-outline-gray-2 bg-surface-base px-3 text-lg text-ink-gray-8 outline-none focus:border-outline-gray-4 focus:shadow-sm">
+</label>
+{%- endmacro %}
+
+{% macro address_picker(kind, countries, saved_addresses) -%}
+<div class="flex flex-col gap-3">
+	{% if saved_addresses %}
+	<div role="radiogroup" class="flex flex-col gap-2">
+		{% for address in saved_addresses %}
+		<label class="flex cursor-pointer items-start gap-3 rounded-lg border border-outline-gray-2 p-4 has-[:checked]:border-outline-gray-5">
+			<input type="radio" name="{{ kind }}_address" value="{{ address.name }}" x-model="choices.{{ kind }}" class="mt-1 size-4 accent-current">
+			<span class="flex flex-col gap-0.5 text-base">
+				<span class="font-medium">{{ address.address_title or address.address_line1 }}</span>
+				<span class="text-ink-gray-6"><bdi>{{ [address.address_line1, address.address_line2, address.city, address.state, address.pincode, address.country] | select | join(", ") }}</bdi></span>
+			</span>
+		</label>
+		{% endfor %}
+		<label class="flex cursor-pointer items-center gap-3 rounded-lg border border-outline-gray-2 p-4 text-base has-[:checked]:border-outline-gray-5">
+			<input type="radio" name="{{ kind }}_address" value="new" x-model="choices.{{ kind }}" class="size-4 accent-current">
+			{{ _("Use a new address") }}
+		</label>
+	</div>
+	{% endif %}
+	<div x-show="choices.{{ kind }} === 'new'" class="grid gap-3 sm:grid-cols-2">
+		<template x-if="choices.{{ kind }} === 'new'">
+			<div class="contents">
+				{{ address_input(kind, "first_name", _("First name"), "given-name") }}
+				{{ address_input(kind, "last_name", _("Last name"), "family-name", required=False) }}
+				<div class="sm:col-span-2">{{ address_input(kind, "address_line1", _("Address"), "address-line1") }}</div>
+				<div class="sm:col-span-2">{{ address_input(kind, "address_line2", _("Apartment, suite, landmark (optional)"), "address-line2", required=False) }}</div>
+				{{ address_input(kind, "city", _("City"), "address-level2") }}
+				{{ address_input(kind, "state", _("State"), "address-level1", required=False) }}
+				{{ address_input(kind, "pincode", _("Postcode"), "postal-code") }}
+				<label class="flex flex-col gap-1.5">
+					<span class="text-sm text-ink-gray-6">{{ _("Country") }}</span>
+					<select x-model="forms.{{ kind }}.country" autocomplete="{{ kind }} country-name" required class="h-10 w-full min-w-0 rounded-lg border border-outline-gray-2 bg-surface-base px-2.5 text-lg text-ink-gray-8 outline-none focus:border-outline-gray-4">
+						{% for country in countries %}
+						<option value="{{ country.name }}">{{ country.title }}</option>
+						{% endfor %}
+					</select>
+				</label>
+				<div class="sm:col-span-2">{{ address_input(kind, "phone", _("Phone"), "tel", type="tel") }}</div>
+			</div>
+		</template>
+	</div>
+</div>
+{%- endmacro %}

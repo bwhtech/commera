@@ -1,0 +1,7 @@
+{% if section.settings.text %}
+{% if section.settings.url %}
+<a href="{{ section.settings.url }}" class="block bg-surface-gray-2 py-2 text-center text-xs text-ink-gray-7">{{ section.settings.text }}</a>
+{% else %}
+<p class="bg-surface-gray-2 py-2 text-center text-xs text-ink-gray-7">{{ section.settings.text }}</p>
+{% endif %}
+{% endif %}

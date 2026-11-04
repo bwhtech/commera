@@ -3,7 +3,7 @@
 
 import copy
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -356,6 +356,9 @@ class TestStorefrontSearch(SearchCatalogue, IntegrationTestCase):
 		self.assertEqual(qb_card["item_group"], ITEM_GROUP)
 		self.assertEqual([size["size"] for size in qb_card["sizes"]], ["8", "10"])
 		self.assertEqual(qb_card["effective_price"], index_card["effective_price"])
+		self.assertEqual(qb_card["image"], index_card["image"])
+		self.assertEqual(qb_card["hover_image"], "/files/zz-b.png")
+		self.assertEqual(qb_card["hover_image"], index_card["hover_image"])
 
 	def test_search_endpoint_shape_survives_the_grid_switch(self):
 		from commera.api.utils import get_search_results
@@ -564,6 +567,12 @@ class TestStorefrontSearch(SearchCatalogue, IntegrationTestCase):
 		self.assertIsInstance(utils.get_product_list({"search": SEARCH_TOKEN}), list)
 
 	# -- endpoint hardening --------------------------------------------------------------------------
+
+	def test_rebuild_index_answers_with_json(self):
+		with patch("frappe.enqueue", return_value=MagicMock()) as enqueue:
+			response = build.rebuild_index()
+		enqueue.assert_called_once()
+		self.assertIsNone(response)
 
 	def test_rebuild_index_requires_system_manager(self):
 		# frappe.only_for early-returns under frappe.flags.in_test, so toggle it off to exercise the guard.

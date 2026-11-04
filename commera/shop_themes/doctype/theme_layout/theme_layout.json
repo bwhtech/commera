@@ -1,0 +1,71 @@
+{
+ "actions": [],
+ "autoname": "format:{theme}-{page}",
+ "creation": "2026-10-26 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "theme",
+  "page",
+  "draft_layout",
+  "published_layout"
+ ],
+ "fields": [
+  {
+   "fieldname": "theme",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Theme",
+   "options": "Shop Theme",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "page",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Page",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "draft_layout",
+   "fieldtype": "JSON",
+   "label": "Draft Layout"
+  },
+  {
+   "fieldname": "published_layout",
+   "fieldtype": "JSON",
+   "label": "Published Layout",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-26 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Shop Themes",
+ "name": "Theme Layout",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "Website Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

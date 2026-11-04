@@ -43,7 +43,7 @@ def get_products(
 def get_product(handle: str) -> Product:
 	if product := catalog.get_product(handle):
 		return product
-	raise frappe.DoesNotExistError(_("Product {0} not found").format(handle))
+	frappe.throw(_("Product {0} not found").format(handle), frappe.DoesNotExistError)
 
 
 def get_list(value: list | str | None) -> list[str]:

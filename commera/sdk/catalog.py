@@ -21,9 +21,12 @@ from commera.sdk.types import (
 	ProductCard,
 	ProductOption,
 	ProductPage,
+	SearchResults,
+	Typeahead,
 )
 from commera.search.facets import get_listing_facet_counts, get_price_range
 from commera.search.record_builder import images_for_variants, rates_by_item_code, sizes_for_variants
+from commera.search.typeahead import get_typeahead as get_search_typeahead
 from commera.shop_data import get_storefront_menu
 from commera.swatches import get_swatch_map
 from commera.utils import (
@@ -33,14 +36,20 @@ from commera.utils import (
 	get_store_currency,
 	get_total_product_count,
 )
+from commera.www.products.details import get_recommended_products
 
 __all__ = [
 	"SORT_KEYS",
 	"get_collection",
 	"get_items",
 	"get_product",
+	"get_product_cards_for",
+	"get_recommendations",
+	"get_typeahead",
+	"list_brands",
 	"list_collections",
 	"list_products",
+	"search",
 ]
 
 SORT_KEYS = ("default", "price_low", "price_high", "name", "new_arrival", "discount")
@@ -148,6 +157,79 @@ def list_products(
 	}
 
 
+def search(query: str, page: int = 1, page_size: int = 24, sort: str = "default", **filters) -> SearchResults:
+	query = cstr(query).strip()
+	if not query:
+		page, page_size = max(cint(page), 1), min(max(cint(page_size), 1), MAX_PAGE_SIZE)
+		return {
+			"query": query,
+			"products": [],
+			"total": 0,
+			"page": page,
+			"page_size": page_size,
+			"facets": {"brands": [], "colors": [], "sizes": [], "price": get_price_facet()},
+		}
+	return {
+		"query": query,
+		**list_products(query=query, page=page, page_size=page_size, sort=sort, **filters),
+	}
+
+
+def get_typeahead(query: str, limit: int = 6) -> Typeahead:
+	typeahead = get_search_typeahead(query, limit)
+	return {
+		"query": typeahead["query"],
+		"corrected_query": typeahead["corrected_query"],
+		"products": get_product_cards(typeahead["products"]),
+		"categories": [{"title": link["label"], "url": link["url"]} for link in typeahead["categories"]],
+	}
+
+
+def get_recommendations(handle: str, limit: int = 8) -> list[ProductCard]:
+	product_variant = frappe.db.get_value(
+		"Style Attribute Variant",
+		{"route": cstr(handle), "is_published": 1},
+		["item_group", "configurator"],
+		as_dict=True,
+	)
+	if not product_variant:
+		return []
+	return get_product_cards(
+		get_recommended_products(product_variant, limit=min(max(cint(limit), 1), MAX_PAGE_SIZE))
+	)
+
+
+def get_product_cards_for(item_codes: list[str] | None = None, limit: int = 8) -> list[ProductCard]:
+	item_codes = [cstr(code) for code in item_codes or [] if code]
+	if not item_codes:
+		return get_product_cards(get_product_list(page_length=min(max(cint(limit), 1), MAX_PAGE_SIZE)))
+	published_codes = frappe.get_all(
+		"Style Attribute Variant", filters={"name": ("in", item_codes), "is_published": 1}, pluck="name"
+	)
+	if not published_codes:
+		return []
+	cards_by_name = {
+		card["name"]: card
+		for card in get_product_list(product_list=published_codes, page_length=len(published_codes))
+	}
+	return get_product_cards([cards_by_name[code] for code in item_codes if code in cards_by_name])
+
+
+def list_brands() -> list[dict]:
+	brand = frappe.qb.DocType("Brand")
+	item = frappe.qb.DocType("Item")
+	return (
+		frappe.qb.from_(brand)
+		.join(item)
+		.on(item.brand == brand.name)
+		.select(brand.name, brand.image)
+		.where(item.disabled == 0)
+		.distinct()
+		.orderby(brand.name)
+		.run(as_dict=True)
+	)
+
+
 def get_facets(filters: dict) -> dict[str, list[FacetValue]]:
 	cache_key = f"{FACETS_CACHE_PREFIX}{sha256_hash(frappe.as_json(filters))}"
 	facets = frappe.cache.get_value(cache_key)
@@ -228,7 +310,7 @@ def get_collection_filters(handle: str) -> dict:
 	"""The listing filters of the menu tab's own link, as its `/products?category=` href carries them."""
 	root = next((node for node in get_storefront_menu() if node["route_slug"] == handle), None)
 	if not root:
-		raise frappe.DoesNotExistError(_("Collection {0} not found").format(handle))
+		frappe.throw(_("Collection {0} not found").format(handle), frappe.DoesNotExistError)
 	return {"category": root["route_slug"], "subcategory": root["item_groups"]}
 
 
@@ -252,8 +334,9 @@ def get_product_card(card: dict, stock: dict, currency: str) -> ProductCard:
 	return {
 		"id": card["name"],
 		"handle": card["route"],
-		"title": card["display_name"] or card["item_name"],
+		"title": get_card_title(card),
 		"vendor": card["brand"],
+		"product_type": card["item_group"],
 		"color": card["attribute_value"],
 		"image": card["image"],
 		"hover_image": card["hover_image"],
@@ -264,6 +347,12 @@ def get_product_card(card: dict, stock: dict, currency: str) -> ProductCard:
 		"rating": {"average": flt(card["average_rating"]), "count": cint(card["review_count"])},
 		"updated_at": card["modified"],
 	}
+
+
+def get_card_title(card: dict) -> str:
+	if frappe.local.lang == "ar" and card["custom_item_name_ar"]:
+		return card["custom_item_name_ar"]
+	return card["display_name"] or card["item_name"]
 
 
 def get_variants(sizes: list[dict]) -> list[dict]:

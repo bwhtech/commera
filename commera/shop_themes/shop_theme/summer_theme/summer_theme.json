@@ -11,5 +11,6 @@
  "owner": "Administrator",
  "parent_theme": "Shop Base Theme",
  "theme_name": "Summer Theme",
- "theme_settings": "Summer Theme Settings"
+ "theme_settings": "Summer Theme Settings",
+ "theme_type": "Sections"
 }

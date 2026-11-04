@@ -14,7 +14,8 @@ def enqueue_full_rebuild(deduplicate=False):
 def rebuild_index():
 	"""Manual entry: enqueue a full rebuild, restricted to System Manager and rate-limited."""
 	frappe.only_for("System Manager")
-	return enqueue_full_rebuild()
+	# An enqueue can return an RQ Job, which the JSON response cannot serialise.
+	enqueue_full_rebuild()
 
 
 def rebuild_index_nightly():

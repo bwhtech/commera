@@ -1,0 +1,161 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "creation": "2026-10-27 11:24:07.533749",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "brand_tab",
+  "logo",
+  "color_scheme",
+  "corners",
+  "social_section",
+  "instagram_url",
+  "facebook_url",
+  "x_url",
+  "column_break_social",
+  "pinterest_url",
+  "youtube_url",
+  "style_tab",
+  "brand_color",
+  "brand_text_color",
+  "column_break_style",
+  "font",
+  "heading_font"
+ ],
+ "fields": [
+  {
+   "fieldname": "brand_tab",
+   "fieldtype": "Tab Break",
+   "label": "Brand"
+  },
+  {
+   "fieldname": "logo",
+   "fieldtype": "Attach Image",
+   "label": "Logo",
+   "description": "Shown in the header. Without one, the store name is shown."
+  },
+  {
+   "fieldname": "color_scheme",
+   "fieldtype": "Select",
+   "label": "Colour Scheme",
+   "options": "System\nLight\nDark",
+   "default": "System"
+  },
+  {
+   "fieldname": "corners",
+   "fieldtype": "Select",
+   "label": "Corners",
+   "options": "Square\nSubtle\nDefault\nRounded",
+   "default": "Default"
+  },
+  {
+   "fieldname": "social_section",
+   "fieldtype": "Section Break",
+   "label": "Social Links"
+  },
+  {
+   "fieldname": "instagram_url",
+   "fieldtype": "Data",
+   "label": "Instagram",
+   "options": "URL"
+  },
+  {
+   "fieldname": "facebook_url",
+   "fieldtype": "Data",
+   "label": "Facebook",
+   "options": "URL"
+  },
+  {
+   "fieldname": "x_url",
+   "fieldtype": "Data",
+   "label": "X",
+   "options": "URL"
+  },
+  {
+   "fieldname": "column_break_social",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pinterest_url",
+   "fieldtype": "Data",
+   "label": "Pinterest",
+   "options": "URL"
+  },
+  {
+   "fieldname": "youtube_url",
+   "fieldtype": "Data",
+   "label": "YouTube",
+   "options": "URL"
+  },
+  {
+   "fieldname": "style_tab",
+   "fieldtype": "Tab Break",
+   "label": "Style"
+  },
+  {
+   "fieldname": "brand_color",
+   "fieldtype": "Color",
+   "label": "Brand Colour",
+   "description": "Fill of the main buttons and the cart count. Empty follows light and dark mode."
+  },
+  {
+   "fieldname": "brand_text_color",
+   "fieldtype": "Color",
+   "label": "Text on Brand Colour"
+  },
+  {
+   "fieldname": "column_break_style",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "font",
+   "fieldtype": "Data",
+   "label": "Font",
+   "description": "A Google Fonts family name, such as Lora. Empty uses Inter."
+  },
+  {
+   "fieldname": "heading_font",
+   "fieldtype": "Data",
+   "label": "Heading Font",
+   "description": "A Google Fonts family name. Empty uses the font above."
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-10-27 11:24:07.533749",
+ "modified_by": "Administrator",
+ "module": "Shop Themes",
+ "name": "Commera Starter Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

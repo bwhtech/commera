@@ -1,0 +1,16 @@
+{
+	"name": "Collection tiles",
+	"category": "Collections",
+	"settings": [],
+	"blocks": {
+		"tile": {
+			"name": "Tile",
+			"settings": [
+				{ "id": "collection", "type": "collection", "label": "Collection", "default": "" },
+				{ "id": "title", "type": "text", "label": "Title", "default": "" },
+				{ "id": "image", "type": "image", "label": "Image", "default": "" }
+			]
+		}
+	},
+	"max_blocks": 6
+}

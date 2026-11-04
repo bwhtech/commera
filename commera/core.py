@@ -6,12 +6,15 @@ import frappe.defaults
 from frappe import _
 from frappe.contacts.doctype.address.address import get_address_display
 from frappe.contacts.doctype.contact.contact import get_contact_name
+from frappe.query_builder import DocType
 from frappe.utils import get_fullname
 from frappe.utils.nestedset import get_root_of
 
 from commera.guest import get_guest_cart_name, is_guest, validate_guest_checkout_enabled
+from commera.plugin_events import get_plugin_fieldnames
 
 COD_PAYMENT_MODE = "COD"
+OTP_EXPIRY_SECONDS = 5 * 60
 
 
 def is_cod(payment_mode: str | None) -> bool:
@@ -63,11 +66,21 @@ def generate_otp():
 	return int.from_bytes(os.urandom(5), byteorder="big") % 900000 + 100000
 
 
-def send_otp(email):
+def get_otp_key(email: str, purpose: str | None = None) -> str:
+	return f"otp:{purpose}:{email}" if purpose else f"otp:{email}"
+
+
+def get_otp_attempts_key(email: str, purpose: str) -> str:
+	return f"otp_attempts:{purpose}:{email}"
+
+
+def send_otp(email, purpose: str | None = None):
 	"""Generate OTP and store it temporarily in Redis"""
 
 	otp = generate_otp()
-	frappe.cache.set_value(f"otp:{email}", otp, expires_in_sec=5 * 60)
+	frappe.cache.set_value(get_otp_key(email, purpose), otp, expires_in_sec=OTP_EXPIRY_SECONDS)
+	if purpose:
+		frappe.cache.delete_value(get_otp_attempts_key(email, purpose))
 
 	if frappe.conf.developer_mode:
 		print(f"OTP for {email}: {otp}")
@@ -111,10 +124,10 @@ def create_party(email: str, customer_name: str, portal_user: str | None = None)
 			"territory": _get_default_territory(),
 		}
 	)
-	if portal_user:
-		customer.append("portal_users", {"user": portal_user})
 	customer.flags.ignore_mandatory = True
 	customer.insert(ignore_permissions=True)
+	if portal_user:
+		add_portal_user_after_linking_contacts(customer, portal_user)
 
 	contact = frappe.new_doc("Contact")
 	contact.update({"first_name": customer_name, "email_ids": [{"email_id": email, "is_primary": 1}]})
@@ -123,6 +136,28 @@ def create_party(email: str, customer_name: str, portal_user: str | None = None)
 	contact.insert(ignore_permissions=True)
 
 	return customer, contact
+
+
+def add_portal_user_after_linking_contacts(customer, user: str):
+	contact, contact_email = DocType("Contact"), DocType("Contact Email")
+	contact_names = (
+		frappe.qb.from_(contact)
+		.left_join(contact_email)
+		.on(contact_email.parent == contact.name)
+		.select(contact.name)
+		.distinct()
+		.where((contact.user == user) | (contact.email_id == user) | (contact_email.email_id == user))
+		.run(pluck=True)
+	)
+	with latest_committed_reads():
+		for contact_name in contact_names:
+			contact_doc = frappe.get_doc("Contact", contact_name, for_update=True)
+			if not contact_doc.has_link("Customer", customer.name):
+				contact_doc.append("links", {"link_doctype": "Customer", "link_name": customer.name})
+				contact_doc.save(ignore_permissions=True)
+
+	customer.append("portal_users", {"user": user})
+	customer.save(ignore_permissions=True)
 
 
 def get_customer_contact(email: str) -> tuple[str, str] | None:
@@ -285,6 +320,7 @@ def get_address_docs(party=None):
 			"email_id",
 			"is_primary_address",
 			"is_shipping_address",
+			*get_plugin_fieldnames("Address"),
 		],
 	)
 

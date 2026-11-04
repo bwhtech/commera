@@ -1,14 +1,17 @@
 import importlib.util
 import json
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
 import click
 import frappe
-from frappe.tests import UnitTestCase
+from frappe.modules.import_file import import_file_by_path
+from frappe.tests import IntegrationTestCase, UnitTestCase
 from frappe.utils.boilerplate import _create_app_boilerplate
 
+from commera.commands import get_current_app_scaffold
 from commera.plugins.places import ICONS, PLACES
 from commera.scaffold import (
 	LOGO_COLOURS,
@@ -17,9 +20,19 @@ from commera.scaffold import (
 	get_app_from_folder,
 	get_dashboard_versions,
 )
+from commera.scaffold.shipping_provider import ShippingProviderScaffold
+from commera.scaffold.theme import ThemeScaffold
 from commera.sdk import API_VERSION
+from commera.shipping.base_class import ShippingProviderBase
+from commera.shop_themes.sections import get_theme_json, validate_layout
 
 APP = "commera_test_plugin"
+STARTER = "Commera Starter"
+STARTER_SETTINGS = "Commera Starter Settings"
+STARTER_DIRS = {
+	"themes": Path(frappe.get_app_path("commera"), "themes", "commera_starter"),
+	"public/themes": Path(frappe.get_app_path("commera"), "public", "themes", "commera_starter"),
+}
 
 
 def make_app(apps_path: Path, app: str = APP) -> Path:
@@ -43,10 +56,27 @@ def read_tree(root: Path) -> dict[str, str]:
 	}
 
 
+def list_files(root: Path) -> set[str]:
+	return {
+		str(path.relative_to(root))
+		for path in root.rglob("*")
+		if path.is_file() and "__pycache__" not in path.parts and "node_modules" not in path.parts
+	}
+
+
+def get_fieldnames(doctype: dict) -> list[str]:
+	return [field["fieldname"] for field in doctype["fields"]]
+
+
 def get_hooks(app_root: Path) -> dict:
 	namespace = {}
 	exec((app_root / APP / "hooks.py").read_text(), namespace)
 	return namespace
+
+
+def forget_app_modules():
+	for name in [name for name in sys.modules if name == APP or name.startswith(f"{APP}.")]:
+		sys.modules.pop(name)
 
 
 class TestScaffold(UnitTestCase):
@@ -276,3 +306,280 @@ class TestAddPlace(UnitTestCase):
 		module = importlib.util.module_from_spec(spec)
 		spec.loader.exec_module(module)
 		return module
+
+
+class IntegrationTestThemeScaffold(IntegrationTestCase):
+	def setUp(self):
+		directory = tempfile.TemporaryDirectory()
+		self.addCleanup(directory.cleanup)
+		self.apps_path = Path(directory.name)
+		app_root = make_app(self.apps_path)
+		sys.path.insert(0, str(app_root))
+		self.addCleanup(sys.path.remove, str(app_root))
+		forget_app_modules()
+		self.addCleanup(forget_app_modules)
+		self.module = frappe.get_module_list(APP)[0]
+		frappe.local.module_app[frappe.scrub(self.module)] = APP
+		self.addCleanup(frappe.local.module_app.pop, frappe.scrub(self.module))
+		self.addCleanup(frappe.db.rollback)
+		frappe.db.set_value("Shop Theme", {"use_as_starter": 1}, "use_as_starter", 0)
+		frappe.db.set_value("Shop Theme", STARTER, "use_as_starter", 1)
+		self.theme_dir = app_root / APP / "themes" / "scaffold_check"
+		self.export_path = (
+			app_root
+			/ APP
+			/ frappe.scrub(self.module)
+			/ "shop_theme"
+			/ "scaffold_check"
+			/ "scaffold_check.json"
+		)
+
+	def test_a_theme_can_be_added_to_commera_by_name(self):
+		scaffold = get_current_app_scaffold(ThemeScaffold, "commera")
+		self.assertEqual(scaffold.app, "commera")
+		self.assertEqual(scaffold.get_theme_module(), "Shop Themes")
+
+	def test_an_uninstalled_app_gets_the_files_and_the_record_on_install(self):
+		changes = ThemeScaffold(APP, self.apps_path).add_theme(
+			"Scaffold Check", "Sections", "Shop Base Theme"
+		)
+
+		self.assertTrue((self.theme_dir / "README.md").is_file())
+		self.assertTrue((self.theme_dir / "layouts" / "index.json").is_file())
+		self.assertIn(("created", str(self.export_path.relative_to(self.apps_path / APP))), changes)
+		self.assertFalse(frappe.db.exists("Shop Theme", "Scaffold Check"))
+
+		frappe.get_doc({"doctype": "Module Def", "module_name": self.module, "app_name": APP}).insert()
+		import_file_by_path(str(self.export_path))
+		self.assertEqual(
+			frappe.db.get_value(
+				"Shop Theme", "Scaffold Check", ["theme_type", "parent_theme", "module", "is_standard"]
+			),
+			("Sections", "Shop Base Theme", self.module, 1),
+		)
+
+	def test_a_theme_lands_where_the_app_is_imported_from(self):
+		directory = tempfile.TemporaryDirectory()
+		self.addCleanup(directory.cleanup)
+		worktree = make_app(Path(directory.name))
+		sys.path.insert(0, str(worktree))
+		self.addCleanup(sys.path.remove, str(worktree))
+		forget_app_modules()
+
+		changes = ThemeScaffold(APP, self.apps_path).add_theme(
+			"Scaffold Check", "Sections", "Shop Base Theme"
+		)
+
+		export_path = worktree / self.export_path.relative_to(self.apps_path / APP)
+		self.assertTrue(export_path.is_file())
+		self.assertIn(("created", str(export_path.relative_to(worktree))), changes)
+
+	def test_an_uninstalled_app_still_checks_the_parent(self):
+		scaffold = ThemeScaffold(APP, self.apps_path)
+		with self.assertRaisesRegex(click.ClickException, "does not exist"):
+			scaffold.add_theme("Scaffold Check", "Sections", "No Such Theme")
+		with self.assertRaisesRegex(click.ClickException, "can only inherit"):
+			scaffold.add_theme("Scaffold Check", "Classic", "Summer Theme")
+		self.assertFalse(self.theme_dir.exists())
+
+	def assert_starter_copy(self):
+		for folder, starter_dir in STARTER_DIRS.items():
+			copy_dir = self.theme_dir.parents[1] / folder / "scaffold_check"
+			self.assertEqual(list_files(copy_dir), list_files(starter_dir))
+			for path in copy_dir.rglob("*"):
+				if path.is_file() and path.suffix in (".css", ".html", ".js", ".json", ".md", ".py"):
+					text = path.read_text()
+					self.assertNotIn("commera_starter", text, path)
+					self.assertNotIn("Commera Starter", text, path)
+		self.assertTrue((self.theme_dir / "README.md").read_text().startswith("# Scaffold Check\n"))
+
+	def test_a_sections_theme_without_a_parent_is_a_copy_of_the_starter(self):
+		changes = ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Sections", None)
+
+		self.assert_starter_copy()
+		settings_dir = self.export_path.parents[2] / "doctype" / "scaffold_check_settings"
+		settings = json.loads((settings_dir / "scaffold_check_settings.json").read_text())
+		starter_settings = frappe.get_meta(STARTER_SETTINGS)
+		self.assertEqual(settings["name"], "Scaffold Check Settings")
+		self.assertEqual(settings["module"], self.module)
+		self.assertEqual(settings["issingle"], 1)
+		self.assertEqual(get_fieldnames(settings), [field.fieldname for field in starter_settings.fields])
+		self.assertTrue((settings_dir / "scaffold_check_settings.py").is_file())
+		self.assertIn(("created", str(settings_dir.relative_to(self.apps_path / APP))), changes)
+
+		self.assertNotIn("__islocal", settings)
+		theme = json.loads(self.export_path.read_text())
+		self.assertEqual(theme["theme_settings"], "Scaffold Check Settings")
+		self.assertNotIn("parent_theme", theme)
+
+		frappe.get_doc({"doctype": "Module Def", "module_name": self.module, "app_name": APP}).insert()
+		import_file_by_path(str(settings_dir / "scaffold_check_settings.json"))
+		import_file_by_path(str(self.export_path))
+		self.assertEqual(
+			frappe.db.get_value("Shop Theme", "Scaffold Check", "theme_settings"), "Scaffold Check Settings"
+		)
+		self.assertEqual(
+			[field.fieldname for field in frappe.get_meta("Scaffold Check Settings").fields],
+			[field.fieldname for field in starter_settings.fields],
+		)
+
+	def test_a_desk_sections_theme_without_a_parent_gets_its_own_settings(self):
+		frappe.get_doc({"doctype": "Module Def", "module_name": self.module, "app_name": APP}).insert()
+		theme = frappe.new_doc("Shop Theme")
+		theme.update({"theme_name": "Scaffold Check", "theme_type": "Sections", "module": self.module})
+		with patch.dict(frappe.conf, {"developer_mode": 1}):
+			theme.insert()
+
+		self.assert_starter_copy()
+		self.assertEqual(theme.theme_settings, "Scaffold Check Settings")
+		self.assertEqual(theme.is_standard, 1)
+		self.assertEqual(
+			json.loads(self.export_path.read_text())["theme_settings"], "Scaffold Check Settings"
+		)
+		self.assertEqual(
+			[field.fieldname for field in frappe.get_meta("Scaffold Check Settings").fields],
+			[field.fieldname for field in frappe.get_meta(STARTER_SETTINGS).fields],
+		)
+		theme_context = {
+			"theme_name": "Scaffold Check",
+			"theme_type": "Sections",
+			"names": ["Scaffold Check"],
+			"dirs": [str(self.theme_dir)],
+			"apps": {"Scaffold Check": APP},
+			"settings_doctype": "Scaffold Check Settings",
+		}
+		for page in ("index", "header_group", "footer_group"):
+			with self.subTest(page):
+				layout = get_theme_json([str(self.theme_dir)], f"layouts/{page}.json")
+				validate_layout(theme_context, layout, page)
+
+	def test_an_installed_app_lists_the_settings_doctype_it_created(self):
+		frappe.get_doc({"doctype": "Module Def", "module_name": self.module, "app_name": APP}).insert()
+		with patch.object(ThemeScaffold, "is_installed", return_value=True):
+			changes = ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Sections", None)
+
+		settings_dir = self.export_path.parents[2] / "doctype" / "scaffold_check_settings"
+		self.assertIn(("created", str(settings_dir.relative_to(self.apps_path / APP))), changes)
+		self.assertEqual(
+			frappe.db.get_value("Shop Theme", "Scaffold Check", "theme_settings"), "Scaffold Check Settings"
+		)
+
+	def test_a_sections_theme_with_a_parent_stays_minimal(self):
+		ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Sections", "Shop Base Theme")
+
+		self.assertFalse((self.theme_dir / "components").exists())
+		self.assertFalse((self.export_path.parents[2] / "doctype" / "scaffold_check_settings").exists())
+		self.assertNotIn("theme_settings", json.loads(self.export_path.read_text()))
+
+	def insert_desk_theme(self, theme_name):
+		theme = frappe.new_doc("Shop Theme")
+		theme.update({"theme_name": theme_name, "theme_type": "Sections", "module": self.module})
+		with patch.dict(frappe.conf, {"developer_mode": 1}):
+			theme.insert()
+		return theme
+
+	def test_no_ticked_starter_gives_minimal_folders(self):
+		frappe.db.set_value("Shop Theme", STARTER, "use_as_starter", 0)
+
+		ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Sections", None)
+
+		self.assertTrue((self.theme_dir / "layouts" / "index.json").is_file())
+		self.assertFalse((self.theme_dir / "components").exists())
+		self.assertFalse((self.export_path.parents[2] / "doctype" / "scaffold_check_settings").exists())
+		self.assertNotIn("theme_settings", json.loads(self.export_path.read_text()))
+
+	def test_a_second_starter_for_one_theme_type_is_refused(self):
+		frappe.get_doc({"doctype": "Module Def", "module_name": self.module, "app_name": APP}).insert()
+		theme = self.insert_desk_theme("Scaffold Check")
+
+		theme.use_as_starter = 1
+		with self.assertRaisesRegex(frappe.ValidationError, f"{STARTER} is already the Sections starter"):
+			theme.save()
+
+		theme.reload()
+		theme.update({"use_as_starter": 1, "is_standard": 0})
+		frappe.db.set_value("Shop Theme", STARTER, "use_as_starter", 0)
+		with self.assertRaisesRegex(frappe.ValidationError, "Only a standard theme"):
+			theme.save()
+
+	def test_the_copy_follows_the_ticked_starter(self):
+		frappe.get_doc({"doctype": "Module Def", "module_name": self.module, "app_name": APP}).insert()
+		starter = self.insert_desk_theme("Scaffold Check")
+		(self.theme_dir / "notes.md").write_text("Scaffold Check notes")
+		starter_settings = frappe.get_doc("DocType", "Scaffold Check Settings")
+		starter_settings.append(
+			"fields", {"fieldname": "scaffold_note", "fieldtype": "Data", "label": "Note"}
+		)
+		with patch.dict(frappe.conf, {"developer_mode": 1}):
+			starter_settings.save()
+			frappe.db.set_value("Shop Theme", STARTER, "use_as_starter", 0)
+			starter.use_as_starter = 1
+			starter.save()
+
+		ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Copy", "Sections", None)
+
+		copy_dir = self.theme_dir.parent / "scaffold_copy"
+		self.assertEqual(list_files(copy_dir), list_files(self.theme_dir))
+		self.assertEqual((copy_dir / "notes.md").read_text(), "Scaffold Copy notes")
+		settings_dir = self.export_path.parents[2] / "doctype" / "scaffold_copy_settings"
+		settings = json.loads((settings_dir / "scaffold_copy_settings.json").read_text())
+		self.assertEqual(
+			get_fieldnames(settings),
+			[field.fieldname for field in frappe.get_meta("Scaffold Check Settings").fields],
+		)
+		self.assertIn("scaffold_note", get_fieldnames(settings))
+
+
+class TestShippingProviderScaffold(UnitTestCase):
+	def setUp(self):
+		directory = tempfile.TemporaryDirectory()
+		self.addCleanup(directory.cleanup)
+		self.app_root = make_app(Path(directory.name))
+		self.scaffold = ShippingProviderScaffold(APP, Path(directory.name))
+		self.folder = self.app_root / APP / frappe.scrub(self.scaffold.get_module()) / "doctype"
+
+	def load_controller(self):
+		path = self.folder / "delhivery_shipping_settings" / "delhivery_shipping_settings.py"
+		spec = importlib.util.spec_from_file_location("delhivery_shipping_settings", path)
+		module = importlib.util.module_from_spec(spec)
+		spec.loader.exec_module(module)
+		return module.DelhiveryShippingSettings
+
+	def test_a_new_carrier_gets_a_settings_single_registered_in_commera_hooks(self):
+		self.scaffold.add_shipping_provider("Delhivery")
+
+		hooks = get_hooks(self.app_root)
+		settings = json.loads(
+			(self.folder / "delhivery_shipping_settings" / "delhivery_shipping_settings.json").read_text()
+		)
+		controller = self.load_controller()
+		self.assertEqual(hooks["commera_hooks"], {"shipping_providers": ["Delhivery Shipping Settings"]})
+		self.assertIn("commera", hooks["required_apps"])
+		self.assertEqual(hooks["commera_api_version"], [API_VERSION])
+		self.assertEqual((settings["name"], settings["issingle"]), ("Delhivery Shipping Settings", 1))
+		self.assertTrue(issubclass(controller, ShippingProviderBase))
+		self.assertEqual(controller.label, "Delhivery")
+		self.assertFalse(controller.supports("booking"))
+
+	def test_existing_commera_hooks_keep_their_entries(self):
+		hooks_path = self.app_root / APP / "hooks.py"
+		hooks_path.write_text(
+			hooks_path.read_text() + '\ncommera_hooks = {"cart_fees": ["commera_test_plugin.fees"]}\n'
+		)
+
+		self.scaffold.add_shipping_provider("Delhivery")
+		self.scaffold.add_shipping_provider("Bluedart")
+
+		self.assertEqual(
+			get_hooks(self.app_root)["commera_hooks"],
+			{
+				"cart_fees": ["commera_test_plugin.fees"],
+				"shipping_providers": ["Delhivery Shipping Settings", "Bluedart Shipping Settings"],
+			},
+		)
+
+	def test_a_taken_or_bad_name_is_refused(self):
+		self.scaffold.add_shipping_provider("Delhivery")
+
+		self.assertRaises(click.ClickException, self.scaffold.add_shipping_provider, "Delhivery")
+		self.assertRaises(click.ClickException, self.scaffold.add_shipping_provider, "Del-hivery!")

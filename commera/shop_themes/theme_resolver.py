@@ -9,11 +9,14 @@ from frappe.website.utils import build_response
 from jinja2 import BaseLoader, BytecodeCache, TemplateNotFound
 from jinja2.utils import LRUCache
 
+import commera.sdk
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	get_render_theme_context,
 	is_within_directory,
 )
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import get_compiled_routes
+from commera.shop_themes.jinja_helpers import get_shop_theme_settings
+from commera.utils import get_currency_symbols, get_store_currency
 
 # page_renderer runs before every built-in renderer: a segment missing here is a route hijack, not a 404.
 RESERVED_PATH_SEGMENTS = frozenset(
@@ -45,6 +48,8 @@ DYNAMIC_PAGE_LANG_PREFIXES = frozenset({"en", "ar"})
 THEME_OVERRIDABLE_PREFIX = "components/"
 
 DEFAULT_APP_NAME = "Commera"
+
+NOT_FOUND_TEMPLATE = "pages/404.html"
 
 
 def find_theme_file(theme_dirs, relative_path):
@@ -150,9 +155,22 @@ class ThemePageRenderer:
 			raise frappe.PermissionError
 
 		context = build_base_context(self.match)
-		run_page_controller(self.theme_dirs, self.template_path, context)
+		try:
+			run_page_controller(self.theme_dirs, self.template_path, context)
+		except (frappe.PageDoesNotExistError, frappe.DoesNotExistError):
+			if not find_theme_file(self.theme_dirs, NOT_FOUND_TEMPLATE):
+				raise
+			return self.render_not_found()
 		html = self.render_with_theme_loader(context)
 		return build_response(self.path, html, self.http_status_code or 200)
+
+	def render_not_found(self):
+		frappe.clear_last_message()
+		self.template_path = NOT_FOUND_TEMPLATE
+		context = build_base_context(None)
+		run_page_controller(self.theme_dirs, self.template_path, context)
+		html = self.render_with_theme_loader(context)
+		return build_response(self.path, html, 404, {"Cache-Control": "no-store"})
 
 	def render_with_theme_loader(self, context):
 		theme_env = get_theme_environment(get_jenv(), self.theme_dirs)
@@ -263,6 +281,16 @@ def build_base_context(match):
 		apply_route_groups(match, context)
 
 	apply_website_settings(context)
+	context.theme = get_shop_theme_settings()
+	context.commera_header_content = frappe.render_template(  # nosemgrep: frappe-ssti
+		"templates/includes/commera-header-content.html",
+		{
+			"csrf_token": frappe.session.data.csrf_token,
+			"store_currency": get_store_currency(),
+			"currency_symbols": get_currency_symbols(),
+		},
+	)
+	context.commera = commera.sdk
 	apply_website_context_hooks(context)
 
 	return context

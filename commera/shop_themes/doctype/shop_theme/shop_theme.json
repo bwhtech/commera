@@ -7,10 +7,13 @@
  "engine": "InnoDB",
  "field_order": [
   "theme_name",
+  "theme_type",
   "module",
   "is_standard",
+  "use_as_starter",
   "theme_settings",
   "column_break_main",
+  "thumbnail",
   "parent_theme",
   "section_break_config",
   "config"
@@ -23,6 +26,16 @@
    "label": "Theme Name",
    "reqd": 1,
    "unique": 1
+  },
+  {
+   "default": "Classic",
+   "description": "Classic themes hardcode their pages. Sections themes build pages from sections/ and layouts/ that shops can rearrange.",
+   "fieldname": "theme_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Theme Type",
+   "options": "Classic\nSections",
+   "reqd": 1
   },
   {
    "default": "Shop Themes",
@@ -40,6 +53,14 @@
    "label": "Is Standard"
   },
   {
+   "default": "0",
+   "depends_on": "is_standard",
+   "description": "bench commera theme new copies this theme when no parent is given. One starter per theme type.",
+   "fieldname": "use_as_starter",
+   "fieldtype": "Check",
+   "label": "Use as Starter"
+  },
+  {
    "description": "Single DocType holding this theme's editable settings. Use the 'Scaffold Theme Settings' button to create one.",
    "fieldname": "theme_settings",
    "fieldtype": "Link",
@@ -49,6 +70,14 @@
   {
    "fieldname": "column_break_main",
    "fieldtype": "Column Break"
+  },
+  {
+   "description": "A picture of the theme's home page, taken when it is published from the theme editor.",
+   "fieldname": "thumbnail",
+   "fieldtype": "Attach Image",
+   "label": "Thumbnail",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "description": "Inherit from this theme. A template or asset missing here falls back to the parent theme.",
@@ -69,9 +98,10 @@
    "label": "Config"
   }
  ],
+ "image_field": "thumbnail",
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-16 12:00:00",
+ "modified": "2026-11-03 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Shop Themes",
  "name": "Shop Theme",
