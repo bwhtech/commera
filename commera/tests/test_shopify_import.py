@@ -226,9 +226,9 @@ class ShopifyImportTestCase(IntegrationTestCase):
 		self.commit_patch.stop()
 		self.download_patch.stop()
 
-	def run_import(self, records, resources):
+	def run_import(self, records, resources, shop=None):
 		run = start_run("Import", resources)
-		with patch("commera.shopify.runner.ShopifyClient", return_value=FakeShopifyClient(records)):
+		with patch("commera.shopify.runner.ShopifyClient", return_value=FakeShopifyClient(records, shop)):
 			ImportRunner(frappe.get_doc("Shopify Import Run", run.name)).execute()
 		return frappe.get_doc("Shopify Import Run", run.name)
 
@@ -413,3 +413,17 @@ class TestCollectionCustomerPageImport(ShopifyImportTestCase):
 		self.assertEqual(
 			frappe.db.get_value("Shop Web Page", get_linked_name(page["id"]), "route"), page["handle"]
 		)
+
+
+class TestStoreImport(ShopifyImportTestCase):
+	def test_store_details_fill_empty_fields_without_a_payment_method(self):
+		frappe.db.set_single_value("Commera Settings", {"store_name": None, "cod_enabled": 0})
+		shop = {"name": f"Shop {self.suffix}", "currencyCode": "INR", "primaryDomain": {"host": "shop.test"}}
+		with patch(
+			"commera.commera_ecommerce.doctype.commera_settings.commera_settings.get_available_payment_modes",
+			return_value=[],
+		):
+			run = self.run_import({}, ["Store"], shop)
+
+		self.assertEqual(self.get_counts(run, "Store")["failed"], 0)
+		self.assertEqual(frappe.db.get_single_value("Commera Settings", "store_name"), shop["name"])

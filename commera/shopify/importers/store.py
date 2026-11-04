@@ -37,15 +37,16 @@ class StoreImporter(ResourceImporter):
 				).format(shop["currencyCode"], store_currency),
 			)
 
+		# db_set, not save: a full save checks payments and price lists, which a new store may not
+		# have set up yet, and nothing in Commera Settings reacts to these fields.
 		commera_settings = frappe.get_single("Commera Settings")
-		changed = False
-		for fieldname, read in STORE_FIELDS.items():
-			value = cstr(read(shop)).strip()
-			if value and not commera_settings.get(fieldname):
-				commera_settings.set(fieldname, value)
-				changed = True
-		if changed:
-			commera_settings.save(ignore_permissions=True)
+		empty_fields = {
+			fieldname: value
+			for fieldname, read in STORE_FIELDS.items()
+			if (value := cstr(read(shop)).strip()) and not commera_settings.get(fieldname)
+		}
+		if empty_fields:
+			commera_settings.db_set(empty_fields)
 		return UPDATED
 
 
