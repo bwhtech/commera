@@ -609,7 +609,7 @@ class TestServerCart(DiscountCodeTestCase):
 		cart_sdk.add_lines([{"item_code": self.cap, "qty": 2}])
 
 		with patch(
-			"bwh_payments.bwh_payments.doctype.gateway_payment_request.gateway_payment_request"
+			"commera.payment_gateways.doctype.gateway_payment_request.gateway_payment_request"
 			".GatewayPaymentRequest.release_if_unpaid",
 			return_value=False,
 		):

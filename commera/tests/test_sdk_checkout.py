@@ -36,7 +36,7 @@ BILLING_ADDRESS = {
 }
 SHIPPING_ADDRESS = {**BILLING_ADDRESS, "address_line1": "2 Shipping Street"}
 GATEWAY_REQUEST_CLASS = (
-	"bwh_payments.bwh_payments.doctype.gateway_payment_request.gateway_payment_request.GatewayPaymentRequest"
+	"commera.payment_gateways.doctype.gateway_payment_request.gateway_payment_request.GatewayPaymentRequest"
 )
 
 
