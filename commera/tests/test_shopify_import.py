@@ -3,6 +3,7 @@
 # into Commera through a fake Shopify client.
 
 from unittest.mock import patch
+from urllib.parse import quote
 
 import frappe
 from frappe.tests import IntegrationTestCase, UnitTestCase
@@ -13,6 +14,7 @@ from commera.commera_ecommerce.doctype.shopify_import_settings.shopify_import_se
 )
 from commera.commera_ecommerce.doctype.shopify_record_link.shopify_record_link import get_linked_name
 from commera.shopify.bulk import assemble_bulk_records
+from commera.shopify.files import copy_html_images
 from commera.shopify.mapping import plan_product
 from commera.shopify.runner import ImportRunner
 from commera.shopify.scan import get_product_findings
@@ -34,6 +36,7 @@ def make_product(
 				{
 					"id": f"gid://shopify/ProductVariant/{suffix}{position}",
 					"title": " / ".join(combo),
+					"sku": f"SKU-{suffix}-{position}",
 					"price": "40.00",
 					"compareAtPrice": "50.00",
 					"inventoryQuantity": 3,
@@ -184,6 +187,47 @@ class TestCustomerAddresses(UnitTestCase):
 		self.assertEqual(get_addresses({"addresses": [child]}), [child])
 
 
+class TestDescriptionImages(UnitTestCase):
+	def test_shopify_images_are_copied_and_other_images_are_kept(self):
+		html = (
+			'<p><img src="https://cdn.shopify.com/s/files/1/a.jpg?v=1" alt="A">'
+			"<img src='/cdn/shop/files/b.png'>"
+			'<img src="https://images.example.com/c.jpg"></p>'
+		)
+		downloaded = []
+
+		def fake_download(url, doctype, name, cache):
+			downloaded.append(url)
+			return f"/files/{url.rsplit('/', 1)[-1].split('?')[0]}"
+
+		with patch("commera.shopify.files.download_image", side_effect=fake_download):
+			result, failed = copy_html_images(html, "Item", "X", {}, "shop.myshopify.com")
+
+		self.assertEqual(
+			downloaded,
+			[
+				"https://cdn.shopify.com/s/files/1/a.jpg?v=1",
+				"https://shop.myshopify.com/cdn/shop/files/b.png",
+			],
+		)
+		self.assertEqual(
+			result,
+			'<p><img src="/files/a.jpg" alt="A">'
+			"<img src='/files/b.png'>"
+			'<img src="https://images.example.com/c.jpg"></p>',
+		)
+		self.assertEqual(failed, [])
+
+	def test_an_image_that_fails_to_download_keeps_its_shopify_url(self):
+		html = '<img src="https://cdn.shopify.com/s/files/1/gone.jpg">'
+		with patch(
+			"commera.shopify.files.download_image", side_effect=frappe.ValidationError("not an image")
+		):
+			result, failed = copy_html_images(html, "Item", "X", {}, "shop.myshopify.com")
+		self.assertEqual(result, html)
+		self.assertEqual(failed, ["https://cdn.shopify.com/s/files/1/gone.jpg"])
+
+
 class TestShopDomain(UnitTestCase):
 	def test_a_pasted_url_or_handle_becomes_the_myshopify_domain(self):
 		self.assertEqual(
@@ -264,6 +308,8 @@ class TestProductImport(ShopifyImportTestCase):
 
 		size_item = get_linked_name(product["children"]["ProductVariant"][0]["id"])
 		self.assertEqual(frappe.db.get_value("Item", size_item, "weight_per_unit"), 250)
+		self.assertEqual(frappe.db.get_value("Item", size_item, "custom_sku"), f"SKU-{self.suffix}-1")
+		self.assertFalse(frappe.db.get_value("Item", item_template, "custom_sku"))
 		sale_price_list = frappe.db.get_single_value("Commera Settings", "sale_price_list")
 		self.assertEqual(
 			frappe.db.get_value(
@@ -276,6 +322,25 @@ class TestProductImport(ShopifyImportTestCase):
 			frappe.db.get_value("Bin", {"item_code": size_item, "warehouse": warehouse}, "actual_qty"), 3
 		)
 
+	def test_description_images_are_copied_or_reported_when_erpnext_removes_them(self):
+		product = make_product(self.suffix)
+		product["descriptionHtml"] = '<p>Soft.</p><img src="https://cdn.shopify.com/s/files/1/soft.jpg">'
+		frappe.db.set_single_value("Stock Settings", "clean_description_html", 0)
+		with patch("commera.shopify.files.download_image", return_value="/files/soft.jpg"):
+			run = self.run_import({"products": [product]}, ["Products"])
+
+		self.assertEqual(
+			frappe.db.get_value("Item", get_linked_name(product["id"]), "description"),
+			'<p>Soft.</p><img src="/files/soft.jpg">',
+		)
+		self.assertFalse([issue for issue in run.issues if "Clean Description HTML" in issue.message])
+
+		product["updatedAt"] = "2026-10-02T10:00:00Z"
+		frappe.db.set_single_value("Stock Settings", "clean_description_html", 1)
+		with patch("commera.shopify.files.download_image", return_value="/files/soft.jpg"):
+			run = self.run_import({"products": [product]}, ["Products"])
+		self.assertTrue([issue for issue in run.issues if "Clean Description HTML" in issue.message])
+
 	def test_a_second_run_skips_an_unchanged_product_and_updates_a_changed_one(self):
 		product = make_product(self.suffix)
 		self.run_import({"products": [product]}, ["Products"])
@@ -287,10 +352,12 @@ class TestProductImport(ShopifyImportTestCase):
 		for variant in changed["children"]["ProductVariant"]:
 			variant["price"] = "35.00"
 			variant["inventoryQuantity"] = 1
+			variant["sku"] = f"NEW-{variant['sku']}"
 		run = self.run_import({"products": [changed]}, ["Products"])
 		self.assertEqual(self.get_counts(run, "Products")["updated"], 1)
 
 		size_item = get_linked_name(changed["children"]["ProductVariant"][0]["id"])
+		self.assertEqual(frappe.db.get_value("Item", size_item, "custom_sku"), f"NEW-SKU-{self.suffix}-1")
 		sale_price_list = frappe.db.get_single_value("Commera Settings", "sale_price_list")
 		self.assertEqual(
 			frappe.db.get_value(
@@ -345,6 +412,8 @@ class TestCollectionCustomerPageImport(ShopifyImportTestCase):
 			"id": f"gid://shopify/Collection/{self.suffix}",
 			"handle": f"summer-{self.suffix}".lower(),
 			"title": f"Summer {self.suffix}",
+			"descriptionHtml": "<p>Light layers.</p>",
+			"seo": {"title": "Summer edit", "description": "Light layers for warm days."},
 			"updatedAt": "2026-10-01T10:00:00Z",
 			"children": {"Product": [{"id": product["id"]}]},
 		}
@@ -357,8 +426,27 @@ class TestCollectionCustomerPageImport(ShopifyImportTestCase):
 		self.assertEqual(
 			frappe.db.get_value("Item", get_linked_name(product["id"]), "item_group"), item_group
 		)
-		sources = {row.source for row in frappe.get_single("Website Settings").route_redirects}
-		self.assertIn(f"collections/summer\\-{self.suffix.lower()}", sources)
+		self.assertEqual(
+			frappe.db.get_value(
+				"Item Group",
+				item_group,
+				["custom_description", "custom_meta_title", "custom_meta_description"],
+			),
+			("<p>Light layers.</p>", "Summer edit", "Light layers for warm days."),
+		)
+		# Shopify keeps updatedAt when only the text changes.
+		collection["seo"] = {"title": "Summer sale", "description": ""}
+		run = self.run_import({"collections": [collection]}, ["Collections"])
+		self.assertEqual(self.get_counts(run, "Collections")["updated"], 1)
+		self.assertEqual(frappe.db.get_value("Item Group", item_group, "custom_meta_title"), "Summer sale")
+		run = self.run_import({"collections": [collection]}, ["Collections"])
+		self.assertEqual(self.get_counts(run, "Collections")["skipped"], 1)
+
+		targets = {row.source: row.target for row in frappe.get_single("Website Settings").route_redirects}
+		self.assertEqual(
+			targets[f"collections/summer\\-{self.suffix.lower()}"],
+			f"/en/products?subcategory={quote(item_group)}",
+		)
 
 	def test_a_customer_gets_a_contact_and_an_address_and_is_not_duplicated(self):
 		email = f"shopper-{self.suffix.lower()}@example.com"
@@ -427,3 +515,30 @@ class TestStoreImport(ShopifyImportTestCase):
 
 		self.assertEqual(self.get_counts(run, "Store")["failed"], 0)
 		self.assertEqual(frappe.db.get_single_value("Commera Settings", "store_name"), shop["name"])
+
+
+class TestCollectionListing(IntegrationTestCase):
+	def test_a_listing_of_one_collection_carries_its_text(self):
+		from commera.api.admin.catalog import create_collection
+		from commera.www.products.list import get_collection_header
+
+		item_group = create_collection(f"Listing {frappe.generate_hash(length=6)}")["name"]
+		frappe.db.set_value(
+			"Item Group",
+			item_group,
+			{"custom_description": "<p>Warm wool.</p>", "custom_meta_title": "Wool edit"},
+		)
+
+		collection = get_collection_header([item_group])
+		self.assertEqual(collection.description, "<p>Warm wool.</p>")
+		self.assertEqual(collection.meta_title, "Wool edit")
+		self.assertIsNone(get_collection_header([item_group, "Another"]))
+
+	def test_a_shopify_product_link_inside_a_collection_opens_the_product(self):
+		from frappe.website.path_resolver import resolve_redirect
+
+		path = "collections/summer/products/linen-shirt"
+		frappe.cache.hdel("website_redirects", path)
+		with self.assertRaises(frappe.Redirect):
+			resolve_redirect(path)
+		self.assertEqual(frappe.flags.redirect_location, "/en/products/linen-shirt")

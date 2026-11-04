@@ -77,6 +77,14 @@ CUSTOM_FIELDS = {
 			"label": "Variant Grid",
 			"insert_after": "custom_ecommerce_tab",
 		},
+		{
+			"fieldname": "custom_sku",
+			"fieldtype": "Data",
+			"label": "SKU",
+			"insert_after": "item_name",
+			"no_copy": 1,
+			"search_index": 1,
+		},
 	],
 	"Item Group": [
 		{
@@ -88,7 +96,34 @@ CUSTOM_FIELDS = {
 			"in_list_view": 1,
 			"in_standard_filter": 1,
 			"translatable": 1,
-		}
+		},
+		{
+			"fieldname": "custom_storefront_section",
+			"fieldtype": "Section Break",
+			"label": "Storefront",
+			"insert_after": "taxes",
+		},
+		{
+			"fieldname": "custom_description",
+			"fieldtype": "Text Editor",
+			"label": "Description",
+			"insert_after": "custom_storefront_section",
+			"translatable": 1,
+		},
+		{
+			"fieldname": "custom_meta_title",
+			"fieldtype": "Data",
+			"label": "Meta Title",
+			"insert_after": "custom_description",
+			"translatable": 1,
+		},
+		{
+			"fieldname": "custom_meta_description",
+			"fieldtype": "Small Text",
+			"label": "Meta Description",
+			"insert_after": "custom_meta_title",
+			"translatable": 1,
+		},
 	],
 	"Quotation": [
 		{

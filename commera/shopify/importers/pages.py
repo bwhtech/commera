@@ -37,6 +37,11 @@ class PageImporter(ResourceImporter):
 		page_doc.content = page.get("body") or page["title"]
 		page_doc.published = cint(page.get("isPublished"))
 		page_doc.save(ignore_permissions=True)
+		# After the save, so the copied images can attach to a page that exists.
+		content = self.get_html_with_local_images(page, page_doc.content, PAGE_DOCTYPE, page_doc.name)
+		if content != page_doc.content:
+			page_doc.content = content
+			page_doc.save(ignore_permissions=True)
 
 		self.redirects[f"pages/{page['handle']}"] = PAGE_URL_PREFIX + page_doc.route
 		save_link(

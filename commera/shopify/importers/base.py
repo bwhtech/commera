@@ -1,9 +1,11 @@
 from typing import ClassVar
 from zoneinfo import ZoneInfo
 
+from frappe import _
 from frappe.utils import get_datetime, get_system_timezone
 
 from commera.shopify.client import ShopifyApiError
+from commera.shopify.files import copy_html_images
 from commera.shopify.queries import build_query
 
 CREATED = "created"
@@ -40,6 +42,19 @@ class ResourceImporter:
 
 	def warn(self, record: dict, message: str) -> None:
 		self.runner.run.add_issue(self.resource, message, "Warning", record.get("id"), self.get_title(record))
+
+	def get_html_with_local_images(self, record: dict, html: str | None, doctype: str, name: str) -> str:
+		html, failed = copy_html_images(
+			html, doctype, name, self.context.setdefault("files", {}), self.settings.shop_domain
+		)
+		if failed:
+			self.warn(
+				record,
+				_("{0} images in the description could not be copied and still load from Shopify.").format(
+					len(failed)
+				),
+			)
+		return html
 
 	def is_unchanged(self, link, record: dict) -> bool:
 		updated_at = to_system_datetime(record.get("updatedAt"))

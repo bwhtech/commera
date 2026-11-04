@@ -74,7 +74,7 @@ Evidence paths are relative to the repository root.
 | G1 | The template takes 2 attributes only, and the second must be named `Size`. Shopify allows 3 options with any name. | `commera/api/admin/catalog.py:1188`, `:1212` | First: join options 2 and 3 into the size label, for example "M / Cotton", and show a warning. Later: let the second axis be any attribute and allow a third. |
 | G2 | A single option that is not a color (for example Material) makes one page per value. | `catalog.py:1130-1172` | Add a rule that chooses which option makes pages. All other options go to the size picker. |
 | G3 | An Item is named after its title, and a repeated title is refused. Shopify titles are not unique. | `catalog.py:1157` | Name Items by a naming series or the handle. Keep the title in `item_name`. |
-| G4 | `create_product` cannot set SKU, barcode, weight or brand. | `catalog.py:1218` | Add the parameters. The Item fields exist. |
+| G4 | `create_product` cannot set SKU, barcode, weight or brand. | `catalog.py:1218` | Done in the import: it sets them after `create_product`. SKU is a new `Item.custom_sku` field. |
 | G5 | Images live only on each Style Attribute Variant. There are no product-level images. Alt text is not shown. Video is not supported. | `commera/templates/macros/item_card.html:43` | Copy product images to each page. Show alt text. Video later. |
 | G6 | A page without images and sizes cannot be published. | `catalog.py:701-707` | Attach images before publish. List products without images in the scan report. |
 | G7 | A route is set from `scrub(name)` only when empty. | `commera/commera_ecommerce/doctype/style_attribute_variant/style_attribute_variant.py:57` | Set the route from the handle and the option value. Add a redirect for each page. |
@@ -86,7 +86,7 @@ Evidence paths are relative to the repository root.
 | G8 | A product has one collection (`Item.item_group`). A Shopify product can be in many. | `commera/utils.py:295` | Add a many-to-many link from collection to product. This is the largest model change. |
 | G9 | No smart collections. | — | First: import each smart collection as a fixed product list. Later: a rule engine. |
 | G10 | No product tags, product type or metafields. | — | Add tags. They also feed smart collections and filters. Map type to a field. Metafields become Custom Fields, with a way to show them. |
-| G11 | No collection description. No manual product order in a collection. | — | Add both. |
+| G11 | No manual product order in a collection. The collection description and SEO fields are done (`Item Group.custom_description`, `custom_meta_title`, `custom_meta_description`). | — | Add a sort order to the product-to-collection link of G8. |
 | G12 | The storefront sells from one warehouse. | `commera/api/cart.py:27` | First: import the primary location. Later: add stock across warehouses. |
 | G13 | No "continue selling when out of stock". | `commera/api/cart.py:39` | Add a flag on the product. |
 | G14 | No customer tags. No marketing consent ([#124](https://github.com/bwhtech/commera/issues/124)). No Address helper outside the storefront account API. | `commera/core.py:115` | Add tags, consent fields and an Address helper. |

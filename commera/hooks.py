@@ -12,6 +12,8 @@ required_apps = ["frappe/erpnext", "bwhtech/bwh_payments"]
 website_redirects = [
 	{"source": "/products", "target": "/en/products"},
 	{"source": "/products/(.*)", "target": r"/en/products/\1"},
+	# Shopify links a product inside a collection as /collections/<collection>/products/<handle>.
+	{"source": "/collections/[^/]+/products/(.*)", "target": r"/en/products/\1"},
 	{"source": "/", "target": "/en"},
 	{"source": "/cart", "target": "/en/cart"},
 	{"source": "/cart/checkout", "target": "/en/cart/checkout"},

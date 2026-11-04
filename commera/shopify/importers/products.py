@@ -83,7 +83,7 @@ class ProductImporter(ResourceImporter):
 			option_sizes=plan.get_option_sizes(DEFAULT_OPTION_VALUE),
 		)["name"]
 		# Saving the template copies its fields down to the size Items, so it goes first.
-		update_template(item_template, product)
+		self.save_template(item_template, product)
 
 		items_by_pair = get_variant_items_by_pair(item_template, option_attribute or DEFAULT_OPTION_ATTRIBUTE)
 		for page_value, rows in plan.pages.items():
@@ -102,14 +102,16 @@ class ProductImporter(ResourceImporter):
 		return item_template
 
 	def update_product(self, item_template: str, product: dict) -> None:
-		update_template(item_template, product)
+		self.save_template(item_template, product)
 		plan = plan_product(product, self.settings.page_option_name_keys)
-		missing = [
-			row.variant.get("title")
-			for rows in plan.pages.values()
-			for row in rows
-			if not get_linked_name(row.variant["id"])
-		]
+		missing = []
+		for rows in plan.pages.values():
+			for row in rows:
+				item_code = get_linked_name(row.variant["id"])
+				if item_code:
+					save_sku(item_code, row.variant)
+				else:
+					missing.append(row.variant.get("title"))
 		if missing:
 			self.warn(
 				product,
@@ -118,6 +120,21 @@ class ProductImporter(ResourceImporter):
 				),
 			)
 		ProductPageWriter(self, product, plan, item_template).update_pages()
+
+	def save_template(self, item_template: str, product: dict) -> None:
+		description = self.get_html_with_local_images(
+			product, product.get("descriptionHtml"), "Item", item_template
+		)
+		update_template(item_template, product, description)
+		if "<img" in cstr(description) and "<img" not in cstr(
+			frappe.db.get_value("Item", item_template, "description")
+		):
+			self.warn(
+				product,
+				_(
+					"ERPNext removed the images from the description. Turn off Clean Description HTML in Stock Settings to keep them."
+				),
+			)
 
 	def get_option_attribute(self, plan) -> str | None:
 		if not plan.has_page_option:
@@ -150,10 +167,10 @@ def get_free_item_code(product: dict) -> str:
 	frappe.throw(_("No free product code for {0}").format(title))
 
 
-def update_template(item_template: str, product: dict) -> None:
+def update_template(item_template: str, product: dict, description: str) -> None:
 	item = frappe.get_doc("Item", item_template)
 	item.item_name = cstr(product["title"]).strip() or item.item_name
-	item.description = product.get("descriptionHtml") or item.description
+	item.description = description or item.description
 	item.disabled = cint(product.get("status") == "ARCHIVED")
 	if product.get("vendor"):
 		item.brand = ensure_brand(product["vendor"])
@@ -167,7 +184,12 @@ def ensure_brand(vendor: str) -> str:
 	return vendor
 
 
+def save_sku(item_code: str, variant: dict) -> None:
+	frappe.db.set_value("Item", item_code, "custom_sku", cstr(variant.get("sku")).strip() or None)
+
+
 def update_size_item(item_code: str, variant: dict) -> None:
+	save_sku(item_code, variant)
 	weight = ((variant.get("inventoryItem") or {}).get("measurement") or {}).get("weight") or {}
 	if flt(weight.get("value")) and WEIGHT_UNITS.get(weight.get("unit")):
 		frappe.db.set_value(
