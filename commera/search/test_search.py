@@ -235,6 +235,40 @@ class TestStorefrontSearch(SearchCatalogue, IntegrationTestCase):
 		self.assertEqual(set(facets["category"]), {ITEM_GROUP_BLUE})
 		self.assertEqual(list(facets["size"]), ["38", "40"])
 
+	def test_a_product_lists_under_every_collection_it_sits_in(self):
+		# Red's page is filed under ITEM_GROUP; its product joining blue's collection lists it there too.
+		self.add_style_to_collection(ITEM_GROUP_BLUE)
+		self.rebuild_index()
+		engine = SqliteProductSearch()
+
+		filters = {"search": SEARCH_TOKEN, "subcategory": [ITEM_GROUP_BLUE]}
+		self.assertEqual(set(engine.search_products(filters)), {self.red, self.blue})
+		self.assertEqual(engine.search_count(filters), 2)
+		scoped = {"search": SEARCH_TOKEN, "category_item_groups": [ITEM_GROUP_BLUE]}
+		self.assertEqual(set(engine.search_products(scoped)), {self.red, self.blue})
+		self.assertEqual(
+			engine.facet_counts({"search": SEARCH_TOKEN})["category"], {ITEM_GROUP: 1, ITEM_GROUP_BLUE: 2}
+		)
+
+		# frappe.qb sees green too: it is published, only kept out of the test index.
+		browse = {"category_item_groups": [ITEM_GROUP_BLUE]}
+		grid = {card["name"] for card in utils.get_product_list_qb(browse)}
+		self.assertEqual(grid, {self.red, self.blue, self.green})
+		self.assertEqual(utils.get_product_count_qb(browse), 3)
+
+	def add_style_to_collection(self, item_group):
+		"""File the fixture product under one more collection, as a row the product owns."""
+		frappe.get_doc(
+			{
+				"doctype": "Product Collection",
+				"parent": STYLE_ITEM,
+				"parenttype": "Item",
+				"parentfield": "custom_collections",
+				"item_group": item_group,
+			}
+		).db_insert()
+		self.addCleanup(frappe.db.delete, "Product Collection", {"parent": STYLE_ITEM})
+
 	def test_listing_tab_narrows_to_its_item_groups(self):
 		from commera.www.products import list as product_list_page
 

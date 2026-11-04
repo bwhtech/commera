@@ -26,10 +26,10 @@ NOT_READY_TTL = 60
 FACETS = {
 	"brand": ("brand", "brands"),
 	"color": ("color", "colors"),
-	"category": ("item_group", "subcategory"),
+	"category": ("collections", "subcategory"),
 	"size": ("sizes", "sizes"),
 }
-LIST_FILTERS = {"subcategory": "item_group", "brands": "brand", "colors": "color", "sizes": "sizes"}
+LIST_FILTERS = {"subcategory": "collections", "brands": "brand", "colors": "color", "sizes": "sizes"}
 # sort_by -> (field, direction). Every engine breaks ties on `name`, so pages never overlap.
 SORTS = {
 	"price_low": ("effective_price", "asc"),
@@ -277,7 +277,7 @@ def filter_clauses(filters, drop_key):
 			clauses.append(("in", field, [str(value) for value in filters[key]]))
 	# The ?category= tab scope is no facet, so it is never dropped.
 	if filters.get("category_item_groups"):
-		clauses.append(("in", "item_group", [str(value) for value in filters["category_item_groups"]]))
+		clauses.append(("in", "collections", [str(value) for value in filters["category_item_groups"]]))
 	if min_price := flt(filters.get("min_price")):
 		clauses.append((">=", "effective_price", min_price))
 	if max_price := flt(filters.get("max_price")):
@@ -297,6 +297,7 @@ def product_document(record):
 		"title_ar": card.get("custom_item_name_ar") or "",
 		"content": record["content"],
 		"item_group": record["item_group"],
+		"collections": record["collections"],
 		"brand": record["brand"],
 		"color": record["color"],
 		"sizes": [size["size"] for size in sizes if size.get("size")],

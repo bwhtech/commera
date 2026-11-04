@@ -252,6 +252,8 @@ def get_product_count_qb(filters=None, product_list=None):
 
 
 def get_product_base_query(filters=None, product_list=None):
+	from commera.product_collections import variant_in_collections
+
 	commera_settings = frappe.get_cached_doc("Commera Settings")
 	default_price_list = commera_settings.default_price_list
 	sale_price_list = commera_settings.sale_price_list
@@ -292,10 +294,9 @@ def get_product_base_query(filters=None, product_list=None):
 	if filters:
 		if filters.get("has_discount"):
 			query = query.where(item_price_default.price_list_rate > item_price_sale.price_list_rate)
-		if filters.get("category_item_groups"):
-			query = query.where(style_attribute_variant.item_group.isin(filters["category_item_groups"]))
-		if filters.get("subcategory"):
-			query = query.where(style_attribute_variant.item_group.isin(filters["subcategory"]))
+		for key in ("category_item_groups", "subcategory"):
+			if filters.get(key):
+				query = query.where(variant_in_collections(style_attribute_variant, filters[key]))
 		if filters.get("colors"):
 			query = query.where(style_attribute_variant.attribute_value.isin(filters["colors"]))
 		if filters.get("sizes"):

@@ -2,6 +2,7 @@ import frappe
 from frappe.utils import cint, create_batch, cstr
 
 from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import root_filter
+from commera.product_collections import get_product_collections
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
 # The only doctypes reachable from a variant (itself, its Item, its Style Attribute Configurator).
@@ -96,6 +97,7 @@ def build_product_search_records(variant_names=None):
 
 	item_styles = list({variant.item_style for variant in variants if variant.item_style})
 	item_by_style = items_for_item_styles(item_styles, item_content_fields)
+	collections_by_style = get_product_collections(item_styles)
 
 	configurator_names = list({variant.configurator for variant in variants if variant.configurator})
 	configurator_by_name = configurators_for(configurator_names, configurator_content_fields)
@@ -115,6 +117,7 @@ def build_product_search_records(variant_names=None):
 				"title": variant.display_name or "",
 				"content": build_content(configured_fields, variant, item, configurator),
 				"item_group": variant.item_group or "",
+				"collections": record_collections(variant, collections_by_style),
 				"brand": item.get("brand") or "",
 				"color": variant.attribute_value or "",
 				"sizes": sizes_by_variant.get(variant.name, []),
@@ -128,6 +131,12 @@ def build_product_search_records(variant_names=None):
 			}
 		)
 	return records
+
+
+def record_collections(variant, collections_by_style):
+	"""Every collection a page matches: its own item_group, then its product's collections."""
+	collections = [variant.item_group, *collections_by_style.get(variant.item_style, [])]
+	return list(dict.fromkeys(filter(None, collections)))
 
 
 def build_content(configured_fields, variant, item, configurator):

@@ -15,6 +15,12 @@ from commera.api.variant_pricing import (
 	set_variant_prices,
 )
 from commera.plugin_events import add_changed_products
+from commera.product_collections import (
+	COLLECTIONS_FIELD,
+	PRODUCT_COLLECTION,
+	get_product_collections,
+	set_collections,
+)
 from commera.swatches import COLOUR_ATTRIBUTE, ensure_default_swatch, get_swatch_map
 from commera.utils import (
 	IN_CLAUSE_CHUNK_SIZE,
@@ -72,11 +78,9 @@ def get_products(
 
 	templates_by_configurator = {row.name: row.item_template for row in configurators}
 
-	item_filters = {"name": ["in", list(set(templates_by_configurator.values()))]}
+	item_filters = {"name": ["in", product_names(templates_by_configurator.values(), collection)]}
 	if search:
 		item_filters["item_name"] = ["like", f"%{search}%"]
-	if collection:
-		item_filters["item_group"] = collection
 	if disabled is not None:
 		item_filters["disabled"] = cint(disabled)
 
@@ -93,6 +97,7 @@ def get_products(
 		return {"products": [], "total": total, "currency": currency}
 
 	template_names = {row.name for row in templates}
+	collections_by_template = get_product_collections(template_names)
 	page_configurators = [
 		name for name, template in templates_by_configurator.items() if template in template_names
 	]
@@ -154,6 +159,7 @@ def get_products(
 					None,
 				),
 				"collection": template.item_group,
+				"collections": collections_by_template.get(template.name) or [template.item_group],
 				"disabled": bool(template.disabled),
 				"updated": template.modified,
 				"variant_count": len(template_variants),
@@ -322,6 +328,31 @@ def get_collection(collection: str) -> str:
 	return item_group.name
 
 
+def parse_collections(collections: list | str) -> list:
+	"""A product's requested collections, checked and deduplicated, primary first."""
+	collections = frappe.parse_json(collections) if isinstance(collections, str) else collections
+	if not isinstance(collections, list) or not collections:
+		frappe.throw(_("Choose at least one collection."))
+	return list(dict.fromkeys(get_collection(collection) for collection in collections))
+
+
+def current_collections(item) -> list:
+	return [row.item_group for row in item.get(COLLECTIONS_FIELD)] or [item.item_group]
+
+
+def product_names(item_templates, collection: str | None = None) -> list:
+	"""The given products, narrowed to those in `collection` when one is given."""
+	item_templates = set(item_templates)
+	if collection:
+		members = frappe.get_all(
+			PRODUCT_COLLECTION,
+			filters={"parenttype": "Item", "parentfield": COLLECTIONS_FIELD, "item_group": collection},
+			pluck="parent",
+		)
+		item_templates &= set(members)
+	return list(item_templates)
+
+
 def get_variant_names(item_templates: list) -> list:
 	"""Every option of a set of products, in two queries however many products are passed."""
 	if not item_templates:
@@ -338,8 +369,9 @@ def get_variant_names(item_templates: list) -> list:
 
 
 def save_variant_collections(item_templates: list) -> None:
-	"""Re-file these products' options under the collection the products now carry - the storefront indexes
-	Style Attribute Variant.item_group, and update_item_group() only fills it while blank."""
+	"""Re-file these products' options under the primary collection the products now carry, and re-index
+	them for their other collections - update_item_group() only fills Style Attribute Variant.item_group
+	while blank."""
 	for variant_name in get_variant_names(item_templates):
 		# ponytail: one save per option so update_item_group and the search sync hooks run; move to
 		# a background job if a store ever files more options at once than a request can carry.
@@ -369,11 +401,9 @@ def get_pricing_rows(
 		return {"rows": [], "total": 0, "currency": currency}
 	templates_by_configurator = {row.name: row.item_template for row in configurators}
 
-	item_filters = {"name": ["in", list(set(templates_by_configurator.values()))]}
+	item_filters = {"name": ["in", product_names(templates_by_configurator.values(), collection)]}
 	if search:
 		item_filters["item_name"] = ["like", f"%{search}%"]
-	if collection:
-		item_filters["item_group"] = collection
 
 	templates = frappe.get_all("Item", filters=item_filters, fields=["name", "item_name"])
 	if not templates:
@@ -520,6 +550,7 @@ def get_product(item_template: str):
 		"title": template.item_name,
 		"image": template.image,
 		"collection": template.item_group,
+		"collections": get_product_collections([template.name]).get(template.name) or [template.item_group],
 		"description": template.description,
 		"disabled": bool(template.disabled),
 		"updated": template.modified,
@@ -755,16 +786,17 @@ def list_collections(search: str | None = None, start: int = 0, page_length: int
 
 
 def get_collection_product_counts(collection_names):
-	"""How many items sit in each collection, in one grouped query regardless of how many collections."""
+	"""How many products sit in each collection, in one grouped query regardless of how many collections."""
 	if not collection_names:
 		return {}
 
-	item = frappe.qb.DocType("Item")
+	row = frappe.qb.DocType(PRODUCT_COLLECTION)
 	rows = (
-		frappe.qb.from_(item)
-		.select(item.item_group, Count(item.name).as_("count"))
-		.where(item.item_group.isin(collection_names))
-		.groupby(item.item_group)
+		frappe.qb.from_(row)
+		.select(row.item_group, Count(row.parent).distinct().as_("count"))
+		.where((row.parenttype == "Item") & (row.parentfield == COLLECTIONS_FIELD))
+		.where(row.item_group.isin(collection_names))
+		.groupby(row.item_group)
 	).run(as_dict=True)
 
 	return {row.item_group: row.count for row in rows}
@@ -807,7 +839,31 @@ def create_collection(title: str):
 
 @frappe.whitelist(methods=["POST"])
 def add_products_to_collection(item_templates: list | str, collection: str):
-	"""File a selection of products under one collection, options included.
+	"""Add a selection of products to one more collection. Their other collections stay."""
+	item_group = get_collection(collection)
+	updated = change_collections(item_templates, lambda item, current: [*current, item_group])
+	return {"updated": updated, "collection": item_group}
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_products_from_collection(item_templates: list | str, collection: str):
+	"""Take a selection of products out of one collection. A product keeps at least one collection."""
+
+	def remove(item, current):
+		remaining = [name for name in current if name != collection]
+		if not remaining:
+			frappe.throw(
+				_("{0} is only in {1}, and a product needs at least one collection.").format(
+					item.item_name, collection
+				)
+			)
+		return remaining
+
+	return {"updated": change_collections(item_templates, remove), "collection": collection}
+
+
+def change_collections(item_templates: list | str, change) -> list:
+	"""Apply `change(item, collections) -> collections` to each selected product, options included.
 	The options are re-filed too - see save_variant_collections."""
 	frappe.has_permission("Item", ptype="write", throw=True)
 
@@ -815,9 +871,7 @@ def add_products_to_collection(item_templates: list | str, collection: str):
 	if not isinstance(item_templates, list) or not item_templates:
 		frappe.throw(_("Select at least one product."))
 	if len(item_templates) > BULK_PRODUCT_LIMIT:
-		frappe.throw(_("Add at most {0} products to a collection at a time.").format(BULK_PRODUCT_LIMIT))
-
-	item_group = get_collection(collection)
+		frappe.throw(_("Change at most {0} products at a time.").format(BULK_PRODUCT_LIMIT))
 
 	updated = []
 	for item_template in item_templates:
@@ -825,13 +879,16 @@ def add_products_to_collection(item_templates: list | str, collection: str):
 		# store ever needs to file more than BULK_PRODUCT_LIMIT products in one go
 		item = frappe.get_doc("Item", item_template)
 		item.check_permission("write")
-		item.item_group = item_group
+		current = current_collections(item)
+		collections = list(dict.fromkeys(change(item, current)))
+		if collections == current:
+			continue
+		set_collections(item, collections)
 		item.save()
 		updated.append(item.name)
 
 	save_variant_collections(updated)
-
-	return {"updated": updated, "collection": item_group}
+	return updated
 
 
 @frappe.whitelist()
@@ -1135,7 +1192,7 @@ DEFAULT_SIZE_VALUE = "One Size"
 @frappe.whitelist(methods=["POST"])
 def create_product(
 	title: str,
-	collection: str,
+	collection: str | None = None,
 	option_attribute: str | None = None,
 	size_attribute: str | None = None,
 	option_sizes: list | str | None = None,
@@ -1143,6 +1200,7 @@ def create_product(
 	sale_price: float | str | None = None,
 	option_abbreviations: dict | str | None = None,
 	size_abbreviations: dict | str | None = None,
+	collections: list | str | None = None,
 ):
 	"""Create a sellable product; company, warehouse, price list, UOM and naming series come from Commera
 	Settings. Both axes are always written whatever the caller omits - see the note above SIZE_ATTRIBUTE."""
@@ -1186,8 +1244,7 @@ def create_product(
 
 	option_sizes = parse_option_sizes(option_sizes)
 
-	if not frappe.db.exists("Item Group", collection):
-		frappe.throw(_("Collection {0} does not exist. Create it first.").format(collection))
+	collections = parse_collections(collections if collections is not None else [collection])
 
 	option_sizes = resolve_option_sizes(
 		option_attribute,
@@ -1204,7 +1261,7 @@ def create_product(
 	item_template = frappe.new_doc("Item")
 	item_template.item_code = title
 	item_template.item_name = title
-	item_template.item_group = collection
+	set_collections(item_template, collections)
 	item_template.stock_uom = get_default_stock_uom()
 	item_template.is_stock_item = 1
 	item_template.has_variants = 1
@@ -1621,7 +1678,9 @@ def update_product(
 	collection: str | None = None,
 	description: str | None = None,
 	disabled: int | str | None = None,
+	collections: list | str | None = None,
 ):
+	"""`collections` replaces the product's collections; `collection` alone only changes the primary."""
 	frappe.has_permission("Item", doc=item_template, ptype="write", throw=True)
 
 	item = frappe.get_doc("Item", item_template)
@@ -1631,15 +1690,18 @@ def update_product(
 		if not title:
 			frappe.throw(_("Title is required."))
 		item.item_name = title
-	if collection is not None:
-		item.item_group = get_collection(collection)
+	collections_changed = collections is not None or collection is not None
+	if collections is None and collection is not None:
+		collections = [collection, *current_collections(item)]
+	if collections_changed:
+		set_collections(item, parse_collections(collections))
 	if description is not None:
 		item.description = description
 	if disabled is not None:
 		item.disabled = cint(disabled)
 	item.save()
 
-	if collection is not None:
+	if collections_changed:
 		save_variant_collections([item.name])
 
 	return {"name": item.name}

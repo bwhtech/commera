@@ -184,7 +184,10 @@ doc_events = {
 			"commera.plugin_events.on_stock_ledger_entry_insert",
 		]
 	},
-	"Item": {"on_update": "commera.plugin_events.on_item_update"},
+	"Item": {
+		"validate": "commera.product_collections.sync_collections",
+		"on_update": "commera.plugin_events.on_item_update",
+	},
 	"Item Price": {
 		"on_update": "commera.plugin_events.on_item_price_change",
 		"on_trash": "commera.plugin_events.on_item_price_change",

@@ -8,6 +8,7 @@ from frappe.utils import cint, create_batch
 
 from commera.commera_ecommerce.doctype.commera_settings.editor_input import parse_list
 from commera.plugin_events import add_changed_products, get_handlers
+from commera.product_collections import variant_in_collections
 from commera.search.sync import enqueue_upsert_many
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
@@ -49,7 +50,7 @@ def get_variants_to_publish(publish, names=None, item_groups=None, require_compl
 			if name_chunk is not None:
 				query = query.where(variant.name.isin(name_chunk))
 			if item_group_chunk is not None:
-				query = query.where(variant.item_group.isin(item_group_chunk))
+				query = query.where(variant_in_collections(variant, item_group_chunk))
 			found.extend(row.name for row in query.run(as_dict=True))
 
 	return list(dict.fromkeys(found))

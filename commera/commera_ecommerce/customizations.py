@@ -77,6 +77,16 @@ CUSTOM_FIELDS = {
 			"label": "Variant Grid",
 			"insert_after": "custom_ecommerce_tab",
 		},
+		{
+			"fieldname": "custom_collections",
+			"fieldtype": "Table",
+			"label": "Collections",
+			"description": "The first collection is the primary one and sets the Item Group.",
+			"insert_after": "custom_ecommerce_variant_grid",
+			"options": "Product Collection",
+			# ERPNext copies a template's fields onto its size Items; the rows belong to the template only.
+			"no_copy": 1,
+		},
 	],
 	"Item Group": [
 		{

@@ -30,3 +30,4 @@ commera.patches.move_shipping_requests_to_shipment
 commera.patches.seed_account_auth_routes
 commera.patches.add_commera_admin_to_item_writers
 commera.patches.mark_existing_sites_onboarded
+commera.patches.add_products_to_their_collection

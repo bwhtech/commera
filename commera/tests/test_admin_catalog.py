@@ -3,6 +3,7 @@
 # what a refusal costs, and whether filing a product under a collection moves the storefront too.
 
 import os
+from unittest.mock import patch
 
 import frappe
 
@@ -10,11 +11,15 @@ from commera.api.admin.catalog import (
 	add_products_to_collection,
 	create_product,
 	delete_product,
+	get_collection_product_counts,
 	get_product,
 	get_product_chain,
+	get_products,
+	remove_products_from_collection,
 	save_product_options,
 	update_product,
 )
+from commera.patches import add_products_to_their_collection
 from commera.tests.test_product_onboarding import ProductOnboardingTestCase
 
 
@@ -153,8 +158,8 @@ class TestDeleteProduct(DeleteProductTestCase):
 
 
 class TestProductCollection(DeleteProductTestCase):
-	"""Style Attribute Variant carries its own item_group, and that copy - not Item.item_group - is what
-	the storefront category pages and the search index read."""
+	"""A product sits in one or more collections. Style Attribute Variant carries its own copy of the
+	primary one, and that copy - not Item.item_group - is what the storefront category pages read."""
 
 	def setUp(self):
 		super().setUp()
@@ -177,26 +182,104 @@ class TestProductCollection(DeleteProductTestCase):
 			pluck="item_group",
 		)
 
-	def test_a_bulk_move_takes_the_options_with_it(self):
+	def get_collections(self):
+		return get_product(self.item_template)["collections"]
+
+	def test_adding_a_collection_keeps_the_others(self):
 		add_products_to_collection([self.item_template], self.other_collection)
 
+		self.assertEqual(self.get_collections(), [self.item_group, self.other_collection])
+		self.assertEqual(frappe.db.get_value("Item", self.item_template, "item_group"), self.item_group)
+		self.assertEqual(set(self.get_variant_collections()), {self.item_group})
+		listed = get_products(collection=self.other_collection)["products"]
+		self.assertEqual([product["name"] for product in listed], [self.item_template])
+		self.assertEqual(listed[0]["collections"], [self.item_group, self.other_collection])
+		self.assertEqual(get_collection_product_counts([self.other_collection]), {self.other_collection: 1})
+
+	def test_removing_the_primary_promotes_the_next_collection(self):
+		add_products_to_collection([self.item_template], self.other_collection)
+		remove_products_from_collection([self.item_template], self.item_group)
+
+		self.assertEqual(self.get_collections(), [self.other_collection])
 		self.assertEqual(frappe.db.get_value("Item", self.item_template, "item_group"), self.other_collection)
 		self.assertEqual(set(self.get_variant_collections()), {self.other_collection})
+		listed = get_products(collection=self.item_group)["products"]
+		self.assertNotIn(self.item_template, [product["name"] for product in listed])
 
-	def test_the_product_screen_moves_the_options_the_same_way(self):
+	def test_a_product_keeps_its_last_collection(self):
+		with self.assertRaises(frappe.ValidationError):
+			remove_products_from_collection([self.item_template], self.item_group)
+		self.assertEqual(self.get_collections(), [self.item_group])
+
+	def test_the_product_screen_sets_the_primary_and_keeps_the_rest(self):
 		update_product(self.item_template, collection=self.other_collection)
 
+		self.assertEqual(self.get_collections(), [self.other_collection, self.item_group])
 		self.assertEqual(set(self.get_variant_collections()), {self.other_collection})
 
-	def test_both_writers_refuse_a_collection_that_holds_other_collections(self):
-		"""One answer to "is this a valid collection?": update_product used to accept a structural
-		parent that add_products_to_collection refused."""
+	def test_the_product_screen_replaces_the_collections(self):
+		update_product(self.item_template, collections=[self.other_collection, self.item_group])
+		self.assertEqual(self.get_collections(), [self.other_collection, self.item_group])
+
+		update_product(self.item_template, collections=[self.item_group])
+		self.assertEqual(self.get_collections(), [self.item_group])
+		self.assertEqual(set(self.get_variant_collections()), {self.item_group})
+
+	def test_a_new_product_can_start_in_several_collections(self):
+		item_template = create_product(
+			title=f"Several {frappe.generate_hash(length=6).upper()}",
+			collections=[self.other_collection, self.item_group],
+		)["name"]
+
+		self.assertEqual(get_product(item_template)["collections"], [self.other_collection, self.item_group])
+		self.assertEqual(frappe.db.get_value("Item", item_template, "item_group"), self.other_collection)
+
+	def test_every_writer_refuses_a_collection_that_holds_other_collections(self):
 		for move in (
 			lambda: add_products_to_collection([self.item_template], "All Item Groups"),
 			lambda: update_product(self.item_template, collection="All Item Groups"),
+			lambda: update_product(self.item_template, collections=[self.item_group, "All Item Groups"]),
 		):
 			with self.assertRaises(frappe.ValidationError):
 				move()
+
+	def test_a_desk_edit_of_the_item_group_makes_it_the_primary(self):
+		item = frappe.get_doc("Item", self.item_template)
+		item.append("custom_collections", {"item_group": self.item_group})
+		item.item_group = self.other_collection
+		item.save()
+
+		self.assertEqual(self.get_collections(), [self.other_collection, self.item_group])
+
+		# Reordering the rows alone moves item_group with them.
+		item.reload()
+		item.set("custom_collections", list(reversed(item.custom_collections)))
+		item.save()
+		self.assertEqual(frappe.db.get_value("Item", self.item_template, "item_group"), self.item_group)
+		self.assertEqual(self.get_collections(), [self.item_group, self.other_collection])
+
+	def test_a_discount_on_a_secondary_collection_applies_to_the_product(self):
+		discount = frappe.new_doc("Commera Discount")
+		discount.append(
+			"targets", {"role": "Applies To", "target_type": "Item Group", "target": self.other_collection}
+		)
+		size = frappe._dict(
+			item_code=get_product_chain(self.item_template)["item_codes"][0], item_group=self.item_group
+		)
+		self.assertFalse(discount.has_target_match(size, "Applies To"))
+
+		add_products_to_collection([self.item_template], self.other_collection)
+		self.assertTrue(discount.has_target_match(size, "Applies To"))
+
+	@patch("commera.patches.add_products_to_their_collection.enqueue_full_rebuild")
+	def test_the_patch_files_existing_products_under_their_item_group(self, enqueue_full_rebuild):
+		frappe.db.delete("Product Collection", {"parenttype": "Item", "parent": self.item_template})
+
+		add_products_to_their_collection.execute()
+		add_products_to_their_collection.execute()
+
+		self.assertEqual(self.get_collections(), [self.item_group])
+		enqueue_full_rebuild.assert_called_once()
 
 
 class TestSaveProductOptions(DeleteProductTestCase):
