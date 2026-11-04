@@ -6,7 +6,6 @@ import { cloudContext } from '../../data/cloudBilling'
 
 const props = defineProps({
   panel: { type: String, required: true },
-  // Runs when the panel closes, so whatever on the dashboard reads that panel's data reads it again.
   onClose: { type: Function, default: undefined },
 })
 

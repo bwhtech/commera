@@ -12,7 +12,6 @@ defineEmits(['dismiss'])
 <template>
   <div class="group relative flex flex-col rounded-6 border border-outline-gray-1 bg-surface-base p-2 shadow-sm">
     <TaskArt :kind="task.key" :store="store" />
-    <!-- Hidden until hover only where hover is real; on touch the button is always there. -->
     <Tooltip text="Dismiss card">
       <Button
         icon="lucide-x"

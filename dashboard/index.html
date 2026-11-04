@@ -3,9 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
-    <!-- The phone's status bar and browser chrome take this colour: --surface-base, the colour at the
-         top of every screen, as hex because a meta tag cannot read a variable. The script below
-         keeps it on the scheme the app actually shows when the owner overrides the system one. -->
+    <!-- --surface-base as hex: a meta tag cannot read a variable. -->
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#171717" />
     <link rel="icon" type="image/svg+xml" href="/src/assets/commera.svg" />
@@ -49,8 +47,7 @@
       } catch (error) {
         /* private mode — prefers-color-scheme still covers everything but an explicit choice */
       }
-      // An explicit choice pins both tags to its colour; frappe-ui's switch flips `data-theme`, so
-      // watching the attribute follows every later toggle too.
+      // An explicit choice pins both tags to its colour; frappe-ui's switch flips `data-theme`.
       function syncThemeColor() {
         var scheme = document.documentElement.getAttribute('data-theme')
         var colours = { light: '#ffffff', dark: '#171717' }

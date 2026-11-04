@@ -1,7 +1,10 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
+from zoneinfo import ZoneInfo
+
 import frappe
+from frappe.utils import get_system_timezone
 from frappe.utils.data import cint
 
 from commera.api.admin.integrations import is_profile_enabled
@@ -9,9 +12,8 @@ from commera.api.admin.payments import get_payment_registry
 from commera.api.admin.theme_layout import EDITOR_ROLES
 from commera.roles import COMMERA_ADMIN
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
-from commera.storefront_access import get_store_name
+from commera.storefront_access import SETTINGS_DOCTYPE, get_store_name
 
-SETTINGS_DOCTYPE = "Commera Settings"
 PUBLISH_ROLE = "System Manager"
 
 
@@ -24,13 +26,10 @@ def has_online_payments() -> bool:
 
 
 def has_shipping(settings) -> bool:
-	"""A delivery option on offer, or a store shipping rule, is enough for checkout to quote delivery."""
 	return bool(settings.shipping_rule or frappe.db.exists("Shipping Service", {"enabled": 1}))
 
 
 def get_store_preview(theme: str) -> dict:
-	"""The live theme's homepage thumbnail, which the theme editor saves on publish, and whether Home
-	may capture a fresh one: only a Sections theme has a preview page to capture, and only an editor may."""
 	image = frappe.db.get_value("Shop Theme", theme, "thumbnail")
 	captured_on = image and frappe.db.get_value(
 		"File",
@@ -39,7 +38,8 @@ def get_store_preview(theme: str) -> dict:
 	)
 	return {
 		"image": image,
-		"captured_on": captured_on,
+		"captured_on": captured_on
+		and captured_on.replace(tzinfo=ZoneInfo(get_system_timezone())).isoformat(),
 		"can_capture": get_theme_context(theme)["theme_type"] == "Sections"
 		and bool(set(EDITOR_ROLES) & set(frappe.get_roles())),
 	}
@@ -47,7 +47,6 @@ def get_store_preview(theme: str) -> dict:
 
 @frappe.whitelist(methods=["GET"])
 def get_home():
-	"""What the Home screen needs: whether the store is live and which setup tasks are done."""
 	frappe.only_for((COMMERA_ADMIN, PUBLISH_ROLE))
 
 	settings = frappe.get_cached_doc(SETTINGS_DOCTYPE)
@@ -59,7 +58,6 @@ def get_home():
 		"store_category": settings.store_category,
 		"country": frappe.db.get_single_value("System Settings", "country"),
 		"primary_color": settings.primary_color,
-		# The brand card draws the store in a look matched to its theme, by name and by place in the list.
 		"theme": theme,
 		"theme_names": frappe.get_all("Shop Theme", pluck="name", order_by="theme_name asc"),
 		"cod_enabled": bool(settings.cod_enabled),
@@ -75,7 +73,6 @@ def get_home():
 
 @frappe.whitelist(methods=["POST"])
 def set_storefront_published(published: int | str):
-	"""Open the storefront to visitors, or take it back to the coming-soon page."""
 	frappe.only_for(PUBLISH_ROLE)
 
 	frappe.db.set_single_value(SETTINGS_DOCTYPE, "storefront_published", cint(published))

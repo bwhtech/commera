@@ -91,7 +91,6 @@
 		<dl class="ms-auto mt-4 flex max-w-sm flex-col gap-2 text-base">
 			{{ summary_row(_("Subtotal"), order.total) }}
 			{% for discount in order.discounts | rejectattr("discount_class", "equalto", "Product") %}
-			{#- Named like the confirmation page. Orders placed before allocations stored a title carry only the code. #}
 			{%- set discount_name = discount.code or discount.title %}
 			{{ summary_row(_("Discount") ~ (" (" ~ discount_name ~ ")" if discount_name else ""), discount.amount, "text-ink-green-6", "−") }}
 			{% endfor %}

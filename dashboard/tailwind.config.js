@@ -20,8 +20,7 @@ export default {
   ],
   safelist: pluginIcons.map((name) => `lucide-${name}`),
   plugins: [
-    // The preset's hoverOnlyWhenSupported already gates `hover:` and `group-hover:`. This is for the
-    // other half: something hidden until hover, which must stay visible on a screen that cannot hover.
+    // For something hidden until hover, which must stay visible on a screen that cannot hover.
     ({ addVariant }) => addVariant('can-hover', '@media (hover: hover) and (pointer: fine)'),
   ],
   theme: {

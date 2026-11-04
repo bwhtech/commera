@@ -2,16 +2,27 @@ import frappe
 from frappe.website.utils import build_response
 
 from commera.api.permission import has_app_permission
+from commera.seo import LANGUAGES
 
 SETTINGS_DOCTYPE = "Commera Settings"
 
-# The storefront's own pages: the language-prefixed routes, plus the unprefixed cart permalink.
-# Login, the dashboard, Desk, files and the API are left alone, so staff can still sign in.
-STOREFRONT_SEGMENTS = frozenset({"", "en", "ar", "cart"})
+# Unprefixed www pages render without the language prefix; sitemap* and llms.txt list the catalogue.
+STOREFRONT_SEGMENTS = frozenset(
+	{
+		"",
+		*LANGUAGES,
+		"index",
+		"cart",
+		"account",
+		"storefront-cart",
+		"storefront-login",
+		"og-image",
+		"llms.txt",
+	}
+)
 
 
 def get_store_name() -> str:
-	"""The name set in onboarding, else the site's app name: the one a store set up before Commera has."""
 	return (
 		frappe.get_cached_doc(SETTINGS_DOCTYPE).store_name
 		or frappe.get_cached_doc("Website Settings").app_name
@@ -24,15 +35,11 @@ def is_storefront_published() -> bool:
 
 
 def is_storefront_path(path: str) -> bool:
-	return path.strip("/").split("/", 1)[0] in STOREFRONT_SEGMENTS
+	segment = path.strip("/").split("/", 1)[0]
+	return segment in STOREFRONT_SEGMENTS or segment.startswith("sitemap")
 
 
 class PrivateStorefrontPage:
-	"""Answers every storefront page with a coming-soon page while the store is private.
-
-	Listed first in `page_renderer`, so it runs before the theme engine and Frappe's own renderers.
-	"""
-
 	def __init__(self, path, http_status_code=None):
 		self.path = path
 
@@ -45,7 +52,6 @@ class PrivateStorefrontPage:
 
 	def render(self):
 		website_settings = frappe.get_cached_doc("Website Settings")
-		# A file template, loaded by path: nothing here compiles a string as a template.
 		html = frappe.get_template("templates/storefront_private.html").render(
 			{
 				"store_name": get_store_name(),
@@ -53,7 +59,6 @@ class PrivateStorefrontPage:
 				"favicon": website_settings.favicon,
 			},
 		)
-		# 503 tells crawlers the page is coming back, so nothing is indexed as the store's content.
 		return build_response(
 			self.path,
 			html,

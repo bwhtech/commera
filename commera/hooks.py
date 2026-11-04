@@ -95,8 +95,7 @@ before_request = ["commera.utils.before_request"]
 on_session_creation = "commera.commera_ecommerce.doctype.commera_cart.commera_cart.keep_guest_cart"
 on_login = "commera.roles.save_commera_default_app"
 
-# Runs before every core renderer (frappe/website/path_resolver.py). The private-store page goes
-# first so a store that is not published yet never reaches the theme engine.
+# Runs before every core renderer (frappe/website/path_resolver.py); the private-store gate must stay first.
 page_renderer = [
 	"commera.storefront_access.PrivateStorefrontPage",
 	"commera.shop_themes.theme_resolver.ThemePageRenderer",

@@ -10,8 +10,7 @@ const props = defineProps({
 })
 defineEmits(['restore'])
 
-// Listed rather than computed: Tailwind only generates class names it can read. Five tasks at most,
-// four off Frappe Cloud; scaleX, not width, so the fill moves without triggering layout.
+// Listed rather than computed: Tailwind only generates class names it can read. Four tasks, five on Frappe Cloud.
 const FILLS = {
   4: ['scale-x-0', 'scale-x-[0.25]', 'scale-x-50', 'scale-x-75', 'scale-x-100'],
   5: ['scale-x-0', 'scale-x-[0.2]', 'scale-x-[0.4]', 'scale-x-[0.6]', 'scale-x-[0.8]', 'scale-x-100'],

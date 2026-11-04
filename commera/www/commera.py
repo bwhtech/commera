@@ -58,8 +58,6 @@ def get_boot():
 			"is_admin": is_commera_admin(),
 			"onboarding_pending": is_onboarding_pending(),
 			"cloud_settings": get_cloud_settings(),
-			# Home's preview badge and layout are decided before its own read lands, so a live store
-			# never paints as Private first.
 			"storefront_published": is_storefront_published(),
 		}
 	)

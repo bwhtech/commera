@@ -81,7 +81,6 @@ export const SETTINGS_TABS = [
         },
       ]
     : []),
-  // Same gate as Billing: the domains are Frappe Cloud's, and only its panel can change them.
   ...(isCloudDomainsAvailable
     ? [
         {

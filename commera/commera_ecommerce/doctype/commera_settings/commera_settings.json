@@ -922,16 +922,16 @@
    "label": "Navbar"
   },
   {
-   "description": "Manage the storefront's top navigation tabs, columns, links and brands here instead of jumping between Ecommerce Category, Item Group and Brand.",
    "fieldname": "navbar_editor",
    "fieldtype": "HTML",
-   "label": "Navbar Editor"
+   "label": "Navbar Editor",
+   "description": "Manage the storefront's top navigation tabs, columns, links and brands here instead of jumping between Ecommerce Category, Item Group and Brand."
   },
   {
-   "description": "Manage footer columns and links here instead of jumping between Footer Section Config and Footer Link.",
    "fieldname": "footer_editor",
    "fieldtype": "HTML",
-   "label": "Footer Editor"
+   "label": "Footer Editor",
+   "description": "Manage footer columns and links here instead of jumping between Footer Section Config and Footer Link."
   },
   {
    "default": "1",

@@ -38,11 +38,7 @@ watch(
         <span class="w-8" />
       </div>
 
-      <!-- A saved image, never a live frame: the thumbnail is captured once from the editor's preview
-           page, which carries no tracking, so Home stays light and never counts as a storefront visit.
-           The placeholder sits underneath, so a slow, missing or broken image leaves a store-shaped
-           skeleton rather than an empty box. 18rem is the thumbnail's 16:10 at 30rem wide; the
-           phone's shorter box crops it from the top. -->
+      <!-- 18rem is the thumbnail's 16:10 at 30rem wide. -->
       <div class="relative h-52 overflow-hidden sm:h-72">
         <div class="absolute inset-0 flex flex-col gap-3 p-4" aria-hidden="true">
           <div class="flex items-center justify-between">
@@ -76,7 +72,6 @@ watch(
       </div>
     </a>
 
-    <!-- Colours cross-fade while the label swaps out-in, so publishing reads as one change, not two. -->
     <div
       class="absolute -bottom-3.5 left-1/2 flex -translate-x-1/2 items-center rounded-full border px-3 py-1 text-sm shadow-md transition-colors duration-200"
       :class="live ? 'border-outline-green-2 bg-surface-green-2 text-ink-green-7' : 'border-transparent bg-surface-gray-9 text-ink-base'"

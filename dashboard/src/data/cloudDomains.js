@@ -5,10 +5,8 @@ import { getDomains } from '@frappe/cloud-sdk/api'
 import { cloudContext } from './cloudBilling'
 import { describeDomains } from './home'
 
-// Same gate as Billing: a Frappe Cloud v2 site and a System Manager, decided on the server.
 export const isCloudDomainsAvailable = cloudContext.enabled === true
 
-// Short, because the answer moves on its own while DNS and the certificate settle.
 const CACHE_MS = 10 * 60 * 1000
 
 const cached = useStorage('commera:cloud-domains', null, undefined, { serializer: StorageSerializers.object })
@@ -21,7 +19,6 @@ export async function refreshDomains() {
   try {
     cached.value = { domains: await getDomains(), fetchedAt: Date.now() }
   } catch (error) {
-    // A Home card is a hint, not a screen: an unreadable answer hides the card rather than toasting.
     console.warn('[commera] could not read the Frappe Cloud domains', error)
     cached.value = { domains: null, fetchedAt: Date.now() }
   }

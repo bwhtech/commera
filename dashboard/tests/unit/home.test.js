@@ -63,27 +63,24 @@ test('a custom domain is connected only once it is primary and has a certificate
   assert.deepEqual(describeDomains({ domains: [{ ...site, is_primary: true }] }), { status: 'none', name: null })
   assert.deepEqual(describeDomains({ domains: [site, custom()] }), { status: 'pending', name: 'shop.com' })
   assert.deepEqual(describeDomains({ domains: [site, custom({ is_primary: true })] }), { status: 'pending', name: 'shop.com' })
+  assert.deepEqual(describeDomains({ domains: [site, custom({ tls: true })] }), { status: 'ready', name: 'shop.com' })
   assert.deepEqual(describeDomains({ domains: [site, custom({ is_primary: true, tls: true })] }), {
     status: 'connected',
     name: 'shop.com',
   })
 })
 
-// Frappe's `creation` shape, in local time, which is how the browser reads a bare timestamp.
-const siteTimestamp = (date) => {
-  const pad = (number) => String(number).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-}
-
 test('the preview is captured when missing or a day old, and only by someone who can', () => {
-  const now = new Date('2026-11-04T12:00:00').getTime()
-  const at = (ms) => siteTimestamp(new Date(now - ms))
+  const now = new Date('2026-11-04T12:00:00Z').getTime()
+  const at = (ms) => new Date(now - ms).toISOString().replace('Z', '+00:00')
 
   assert.equal(needsPreviewCapture(null, now), false)
   assert.equal(needsPreviewCapture({ can_capture: false, image: null }, now), false)
   assert.equal(needsPreviewCapture({ can_capture: true, image: null, captured_on: null }, now), true)
   assert.equal(needsPreviewCapture({ can_capture: true, image: '/files/a.webp', captured_on: at(60_000) }, now), false)
   assert.equal(needsPreviewCapture({ can_capture: true, image: '/files/a.webp', captured_on: at(PREVIEW_MAX_AGE_MS + 60_000) }, now), true)
+  const kolkataFreshCapture = '2026-11-04T17:00:00+05:30'
+  assert.equal(needsPreviewCapture({ can_capture: true, image: '/files/a.webp', captured_on: kolkataFreshCapture }, now), false)
 })
 
 test('the publish warning names the blocking tasks as a sentence list', () => {

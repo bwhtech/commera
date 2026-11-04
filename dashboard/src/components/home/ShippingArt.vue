@@ -3,9 +3,8 @@ import { computed } from 'vue'
 
 const props = defineProps({ country: { type: String, default: '' } })
 
-// One curve drives both the drawn road and the truck, in px of the fixed 280×144 stage; the stage
-// never scales, because offset-path and the SVG must share one coordinate space. The truck's
-// `[offset-path:…]` class repeats it with `_` for spaces (Tailwind cannot read a variable): change both.
+// The truck's `[offset-path:…]` class repeats this with `_` for spaces (Tailwind cannot read a
+// variable): change both. The stage never scales, so offset-path and the SVG share one coordinate space.
 const ROUTE = 'M 44 78 C 90 78, 104 54, 140 62 C 176 70, 194 62, 236 62'
 
 const CITIES = {
@@ -20,8 +19,8 @@ const city = computed(() => CITIES[props.country] ?? 'Your customer')
 </script>
 
 <template>
-  <!-- Covered share of the route: 38% at rest, 74% on hover. The solid line has pathLength=100, so
-       its dash offset is 100 minus the same number, and line and truck always meet. -->
+  <!-- The truck's offset-distance (38%, 74% on hover) and the line's dash offset (62, 26) sum to
+       100, so line and truck always meet. -->
   <div class="relative h-36 w-[17.5rem] shrink-0">
     <svg class="absolute inset-0" width="280" height="144" viewBox="0 0 280 144" fill="none" aria-hidden="true">
       <g class="text-ink-gray-2" stroke="currentColor" stroke-width="8" stroke-linecap="round" opacity="0.6">
@@ -49,7 +48,6 @@ const city = computed(() => CITIES[props.country] ?? 'Your customer')
       <span class="lucide-house size-[1.125rem] text-ink-gray-7" aria-hidden="true" />
     </span>
 
-    <!-- offset-rotate is pinned to 0 so the truck stays upright instead of tilting with the road. -->
     <span
       class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full bg-surface-gray-9 shadow-lg transition-[offset-distance] duration-[600ms] ease-in-out-strong [offset-anchor:center] [offset-distance:38%] [offset-path:path('M_44_78_C_90_78,_104_54,_140_62_C_176_70,_194_62,_236_62')] [offset-rotate:0deg] motion-reduce:transition-none group-hover:[offset-distance:74%]"
     >

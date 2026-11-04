@@ -11,7 +11,7 @@ const props = defineProps({
 })
 
 const PRODUCT_TILES = ['bg-surface-amber-2', 'bg-surface-blue-2', 'bg-surface-green-2']
-// Fanned out from the middle card. Listed per position: Tailwind only generates names it can read.
+// Listed per position: Tailwind only generates names it can read.
 const FAN = [
   'origin-bottom -translate-x-[115%] -rotate-[9deg] shadow-sm group-hover:-translate-x-[130%] group-hover:-rotate-[13deg]',
   'z-10 -translate-y-1 shadow-lg group-hover:-translate-y-2.5',

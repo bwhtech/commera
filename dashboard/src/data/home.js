@@ -1,10 +1,4 @@
-const PAYMENTS_DESCRIPTION = 'Connect payment gateways like Stripe or Razorpay, or configure COD.'
-
-/**
- * The Home setup cards, in the order of a first sale: something to sell, a way to be paid, a way to
- * deliver, then polish. `home` is `home.get_home`'s answer; `domain` is `describeDomains()`'s, and
- * null leaves the domain card out — off Frappe Cloud there is no domain panel to send the owner to.
- */
+// A null `domain` leaves the domain card out: off Frappe Cloud there is no domain panel to send the owner to.
 export function buildHomeTasks(home, domain, siteHost) {
   const tasks = [
     {
@@ -20,9 +14,8 @@ export function buildHomeTasks(home, domain, siteHost) {
     {
       key: 'payments',
       noun: 'payments',
-      // With cash on delivery on, the store can already take orders, so gateways are optional.
       title: home.cod_enabled ? 'Take online payments' : 'Set up payments',
-      description: PAYMENTS_DESCRIPTION,
+      description: 'Connect payment gateways like Stripe or Razorpay, or configure COD.',
       action: 'Set up payments',
       route: '/settings/payments',
       required: !home.cod_enabled,
@@ -52,6 +45,16 @@ export function buildHomeTasks(home, domain, siteHost) {
 }
 
 function buildDomainTask(domain, siteHost) {
+  if (domain.status === 'ready') {
+    return {
+      key: 'domain',
+      title: 'Make your domain primary',
+      description: `${domain.name} is connected. Make it the primary domain so shoppers land on it.`,
+      action: 'Open domains',
+      route: '/settings/domains',
+      done: false,
+    }
+  }
   if (domain.status === 'pending') {
     return {
       key: 'domain',
@@ -72,26 +75,23 @@ function buildDomainTask(domain, siteHost) {
   }
 }
 
-/**
- * Where the store's custom domain has got: `none` until one is added, `pending` until it is the
- * primary domain with a certificate, then `connected`. Null when the domains cannot be read.
- */
 export function describeDomains(domains) {
   if (!domains) return null
   const custom = domains.domains.filter((domain) => !domain.is_default)
   const connected = custom.find((domain) => domain.is_primary && domain.tls)
   if (connected) return { status: 'connected', name: connected.domain }
+  const ready = custom.find((domain) => domain.tls)
+  if (ready) return { status: 'ready', name: ready.domain }
   if (custom.length) return { status: 'pending', name: custom[0].domain }
   return { status: 'none', name: null }
 }
 
-// A day old is stale: the thumbnail is the theme's homepage, and products, logo and prices move under it.
 export const PREVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
 export function needsPreviewCapture(preview, now = Date.now()) {
   if (!preview?.can_capture) return false
   if (!preview.image || !preview.captured_on) return true
-  return now - new Date(preview.captured_on.replace(' ', 'T')).getTime() > PREVIEW_MAX_AGE_MS
+  return now - new Date(preview.captured_on).getTime() > PREVIEW_MAX_AGE_MS
 }
 
 const LIST = new Intl.ListFormat('en', { type: 'conjunction' })
@@ -105,7 +105,6 @@ export function storeSlug(storeName) {
 }
 
 export function describeStoreStatus(isLive, blockerCount) {
-  // No status line once live: the preview's badge already says it, and the headline says the rest.
   if (isLive) {
     return {
       dot: null,

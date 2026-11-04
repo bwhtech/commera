@@ -1,5 +1,3 @@
-"""A store starts private: visitors get a coming-soon page until the owner publishes it from Home."""
-
 import frappe
 from frappe.core.doctype.user_permission.test_user_permission import create_user
 from frappe.tests import IntegrationTestCase
@@ -38,7 +36,19 @@ class TestStorefrontAccess(IntegrationTestCase):
 		return get_response().status_code
 
 	def test_only_storefront_paths_are_gated(self):
-		for path in ("/", "/en", "/en/products", "/ar/cart", "/cart/ITEM-1"):
+		for path in (
+			"/",
+			"/en",
+			"/en/products",
+			"/ar/cart",
+			"/cart/ITEM-1",
+			"/index",
+			"/account/dashboard",
+			"/storefront-cart",
+			"/sitemap.xml",
+			"/sitemap-product-1.xml",
+			"/llms.txt",
+		):
 			with self.subTest(path=path):
 				self.assertTrue(is_storefront_path(path))
 		for path in ("/commera", "/login", "/app/item", "/api/method/ping", "/files/a.png"):

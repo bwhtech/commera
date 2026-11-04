@@ -9,14 +9,11 @@ defineEmits(['finish'])
 </script>
 
 <template>
-  <!-- No store address here: the storefront is this same site, and it starts private. Home shows
-       the address once the owner publishes. -->
   <div class="space-y-6">
     <p class="flex items-start gap-2 text-p-base text-ink-gray-6">
       <span class="lucide-lock mt-0.5 size-4 shrink-0" aria-hidden="true" />
       Only you can see it for now. Publish it from Home when you are ready.
     </p>
-    <!-- The button only exists once setup is done; until then its skeleton holds the same box. -->
     <Button
       v-if="isReady"
       variant="solid"
@@ -26,6 +23,6 @@ defineEmits(['finish'])
       :loading="finishing"
       @click="$emit('finish')"
     />
-    <Skeleton v-else class="h-8 w-full rounded-4" aria-label="Finishing setup" />
+    <Skeleton v-else role="status" class="h-8 w-full rounded-4" aria-label="Finishing setup" />
   </div>
 </template>

@@ -21,31 +21,25 @@ const publishAction = useAdminAction('home.set_storefront_published')
 
 const home = computed(() => homeRequest.data)
 
-// A missing or day-old preview is captured once, after the page has settled: the capture renders the
-// homepage in a hidden frame, which is work Home's first paint should not wait on.
-
-watch(home, (record) => {
+watch(home, (record, previousRecord, onCleanup) => {
+  if (record) isStorefrontPublished.value = record.published
   if (!needsPreviewCapture(record?.preview)) return
-  whenIdle(async () => {
-    if (await captureStorePreview(record.theme)) homeRequest.reload()
-  })
+  onCleanup(
+    whenIdle(async () => {
+      if (await captureStorePreview(record.theme)) homeRequest.reload()
+    }),
+  )
 })
 
 onMounted(loadDomains)
 
-// Staged only on a page load and on the hand-off from onboarding; see ia/homeTasks.
 const playEntrance = homeArrival.playEntrance
 homeArrival.playEntrance = false
-// 75ms apart reads as one sequence: the store, then what to do with it, then the list.
 const STAGGER = ['delay-0', 'delay-75', 'delay-150']
 const entrance = (step) => ({
   appear: playEntrance,
   enterActiveClass: ['transition-[opacity,transform] duration-500 ease-out-strong', STAGGER[step]].join(' '),
   enterFromClass: 'translate-y-2 opacity-0 motion-reduce:translate-y-0',
-})
-
-watch(home, (record) => {
-  if (record) isStorefrontPublished.value = record.published
 })
 
 const isLive = isStorefrontPublished
@@ -55,6 +49,7 @@ const storeUrl = computed(() => `${window.location.protocol}//${host.value}/`)
 const tasks = computed(() => (home.value ? buildHomeTasks(home.value, customDomain.value, window.location.host) : []))
 const openTasks = computed(() => tasks.value.filter((task) => !task.done))
 const visibleTasks = computed(() => openTasks.value.filter((task) => !dismissedTasks.value.includes(task.key)))
+const doneCount = computed(() => tasks.value.length - openTasks.value.length)
 const dismissedCount = computed(() => openTasks.value.length - visibleTasks.value.length)
 const blockers = computed(() => openTasks.value.filter((task) => task.required))
 
@@ -81,8 +76,7 @@ async function setPublished(published, close) {
   isStorefrontPublished.value = published
   close()
   homeRequest.reload()
-  if (published) toast.success(`${storeName.value} is live`)
-  else toast.success('Your store is private again')
+  toast.success(published ? `${storeName.value} is live` : 'Your store is private again')
 }
 
 const publishActions = computed(() => {
@@ -114,8 +108,6 @@ async function copyLink() {
 
       <Transition v-bind="entrance(1)">
         <div class="flex-1">
-          <!-- The skeleton hands over with a short cross-fade, so the copy arrives instead of snapping
-               in. Out-in, because both sit in the same spot. -->
           <Transition
             mode="out-in"
             enter-active-class="transition-opacity duration-200 ease-out-strong"
@@ -155,14 +147,12 @@ async function copyLink() {
                   <Button size="md" label="Preview" icon-right="lucide-arrow-up-right" :href="storeUrl" />
                 </template>
               </div>
-              <!-- Private only: a live store's address is already in the preview's address bar. -->
               <p v-if="!isLive" class="mt-3 flex items-center gap-1.5 text-sm text-ink-gray-5">
                 <span class="lucide-lock size-3.5 shrink-0" aria-hidden="true" />
                 Visitors see a coming-soon page.
               </p>
             </div>
 
-            <!-- The finished column's rows, so nothing moves when the read lands. -->
             <div v-else key="skeleton" aria-hidden="true">
               <Skeleton v-if="!isLive" class="mb-3 h-4 w-40 rounded-4" />
               <Skeleton class="h-9 w-full max-w-sm rounded-4" />
@@ -181,7 +171,7 @@ async function copyLink() {
             <section v-if="openTasks.length" class="mt-10">
               <TaskHeading
                 title="Grow your store"
-                :done="tasks.length - openTasks.length"
+                :done="doneCount"
                 :total="tasks.length"
                 :dismissed-count="dismissedCount"
                 @restore="restoreTasks"
@@ -194,7 +184,7 @@ async function copyLink() {
         <section v-else-if="home">
           <TaskHeading
             title="Get ready to sell"
-            :done="tasks.length - openTasks.length"
+            :done="doneCount"
             :total="tasks.length"
             :dismissed-count="dismissedCount"
             @restore="restoreTasks"
