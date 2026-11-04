@@ -1,7 +1,6 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 
 import frappe
-from bwh_payments.bwh_payments.utils import get_available_payment_modes
 from frappe.tests import IntegrationTestCase
 from frappe.utils.password import get_decrypted_password
 
@@ -11,6 +10,7 @@ from commera.api.admin.integrations import (
 	get_link_options,
 )
 from commera.api.admin.payments import get_payment_integrations, save_payment_integration
+from commera.payment_gateways.connectors import get_available_payment_modes
 
 SLUG = "razorpay"
 GATEWAY = "Razorpay"

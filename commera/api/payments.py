@@ -1,7 +1,6 @@
 from contextlib import contextmanager
 
 import frappe
-from bwh_payments.bwh_payments.utils import get_available_payment_modes, resolve_payment_mode
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 from frappe import _
@@ -51,6 +50,7 @@ from commera.guest import (
 	validate_guest_checkout_enabled,
 )
 from commera.order_access import get_order_link, set_order_access_key
+from commera.payment_gateways.connectors import get_available_payment_modes, resolve_payment_mode
 from commera.plugin_events import fire_event, get_plugin_fieldnames
 from commera.utils import (
 	get_charge_account_head,
