@@ -1,0 +1,61 @@
+import unittest
+
+import frappe
+
+from $package.gateway import ${prefix}Gateway
+from $package.stub import Stub${prefix}Client, build_payment_event, sign_payload
+
+WEBHOOK_SECRET = "test_webhook_secret"
+
+
+class ${prefix}Settings(${prefix}Gateway):
+	api_key = "test_api_key"
+	webhook_secret = WEBHOOK_SECRET
+
+	def get_password(self, fieldname: str, raise_exception: bool = True):
+		return getattr(self, fieldname)
+
+
+class Test${prefix}Gateway(unittest.TestCase):
+	def setUp(self):
+		Stub${prefix}Client.reset()
+		self.settings = ${prefix}Settings()
+
+	def test_tests_never_reach_the_live_client(self):
+		self.assertIsInstance(self.settings.get_client(), Stub${prefix}Client)
+
+	def test_a_session_charges_minor_units_and_redirects(self):
+		session = self.settings.create_session(12.34, "USD", reference="REF-1")
+
+		self.assertEqual(Stub${prefix}Client.created_payments[-1]["amount"], 1234)
+		self.assertIn(session.session_id, session.redirect_url)
+
+	def test_a_paid_session_reports_paid(self):
+		session = self.settings.create_session(100, "USD")
+		self.assertEqual(self.settings.get_payment_status(session.session_id), "Pending")
+
+		Stub${prefix}Client.pay(session.session_id)
+
+		self.assertEqual(self.settings.get_payment_status(session.session_id), "Paid")
+
+	def test_a_refund_sends_minor_units_in_the_session_currency(self):
+		session = self.settings.create_session(100, "USD")
+
+		result = self.settings.refund_payment(session.session_id, 40)
+
+		self.assertEqual(Stub${prefix}Client.created_refunds[-1]["amount"], 4000)
+		self.assertEqual((result.status, result.amount), ("succeeded", 40))
+
+	def test_a_signed_webhook_becomes_an_event(self):
+		payload = build_payment_event("pay_1")
+
+		event = self.settings.handle_webhook(payload, {"X-Signature": sign_payload(payload, WEBHOOK_SECRET)})
+
+		self.assertEqual((event.session_id, event.status), ("pay_1", "Paid"))
+
+	def test_a_forged_or_unsigned_webhook_is_refused(self):
+		payload = build_payment_event("pay_1")
+
+		for headers in ({"X-Signature": sign_payload(payload, "wrong")}, {}):
+			with self.assertRaises(frappe.ValidationError):
+				self.settings.handle_webhook(payload, headers)

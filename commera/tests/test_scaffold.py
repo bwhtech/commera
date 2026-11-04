@@ -1,12 +1,17 @@
 import importlib.util
+import io
 import json
 import sys
 import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import bwh_payments_core.connectors
 import click
 import frappe
+from bwh_payments_core.contract import PaymentGatewayBase
+from frappe.model.document import Document
 from frappe.modules.import_file import import_file_by_path
 from frappe.tests import IntegrationTestCase, UnitTestCase
 from frappe.utils.boilerplate import _create_app_boilerplate
@@ -19,6 +24,11 @@ from commera.scaffold import (
 	AppScaffold,
 	get_app_from_folder,
 	get_dashboard_versions,
+)
+from commera.scaffold.payment_gateway import (
+	LibraryConnectorScaffold,
+	PaymentGatewayScaffold,
+	get_payment_gateway_scaffold,
 )
 from commera.scaffold.shipping_provider import ShippingProviderScaffold
 from commera.scaffold.theme import ThemeScaffold
@@ -61,6 +71,14 @@ def list_files(root: Path) -> set[str]:
 		str(path.relative_to(root))
 		for path in root.rglob("*")
 		if path.is_file() and "__pycache__" not in path.parts and "node_modules" not in path.parts
+	}
+
+
+def read_tree_without_git(root: Path) -> dict[str, str]:
+	return {
+		str(path.relative_to(root)): path.read_text()
+		for path in sorted(root.rglob("*"))
+		if path.is_file() and ".git" not in path.relative_to(root).parts
 	}
 
 
@@ -583,3 +601,223 @@ class TestShippingProviderScaffold(UnitTestCase):
 
 		self.assertRaises(click.ClickException, self.scaffold.add_shipping_provider, "Delhivery")
 		self.assertRaises(click.ClickException, self.scaffold.add_shipping_provider, "Del-hivery!")
+
+
+CONNECTOR_FILES = {"__init__.py", "gateway.py", "base.py", "live.py", "stub.py"}
+
+
+class TestPaymentGatewayScaffold(UnitTestCase):
+	def setUp(self):
+		directory = tempfile.TemporaryDirectory()
+		self.addCleanup(directory.cleanup)
+		self.bench = Path(directory.name)
+		self.apps_path = self.bench / "apps"
+		self.apps_path.mkdir()
+		(self.bench / "sites").mkdir()
+		self.apps_txt = self.bench / "sites" / "apps.txt"
+		self.apps_txt.write_text("frappe\ncommera\n")
+		forget_app_modules()
+		self.addCleanup(forget_app_modules)
+
+	def get_scaffold(self, folder: Path, **kwargs):
+		return get_payment_gateway_scaffold("Tamara", folder, self.apps_path, **kwargs)
+
+	def add_library(self) -> Path:
+		root = self.bench / "bwh_payments_core_repo"
+		(root / "bwh_payments_core" / "connectors").mkdir(parents=True)
+		(root / "bwh_payments_core" / "connectors" / "__init__.py").write_text("# keep\n")
+		(root / "pyproject.toml").write_text('[project]\nname = "bwh-payments-core"\n')
+		return root
+
+	def run_generated_test(self, path: Path, module_name: str):
+		spec = importlib.util.spec_from_file_location(module_name, path)
+		module = importlib.util.module_from_spec(spec)
+		spec.loader.exec_module(module)
+		suite = unittest.defaultTestLoader.loadTestsFromModule(module)
+		result = unittest.TextTestRunner(stream=io.StringIO()).run(suite)
+		self.assertEqual(result.testsRun, 6)
+		self.assertTrue(result.wasSuccessful(), result.failures + result.errors)
+
+	def assert_app_gateway(self, app_root: Path, app: str = APP):
+		package = app_root / app
+		self.assertEqual(
+			{path.name for path in (package / "connectors" / "tamara").iterdir()},
+			CONNECTOR_FILES | {"test_tamara.py"},
+		)
+		module = next(line for line in (package / "modules.txt").read_text().split("\n") if line.strip())
+		folder = package / frappe.scrub(module) / "doctype" / "tamara_gateway_settings"
+		settings = json.loads((folder / "tamara_gateway_settings.json").read_text())
+		self.assertEqual((settings["name"], settings["issingle"]), ("Tamara Gateway Settings", 1))
+
+		namespace = {}
+		exec((package / "hooks.py").read_text(), namespace)
+		self.assertEqual(namespace["commera_hooks"], {"payment_connectors": ["Tamara Gateway Settings"]})
+		self.assertIn("commera", namespace["required_apps"])
+		self.assertEqual(namespace["commera_api_version"], [API_VERSION])
+		return folder, settings
+
+	def test_inside_the_library_only_a_connector_and_a_test_are_added(self):
+		root = self.add_library()
+
+		scaffold = self.get_scaffold(root / "bwh_payments_core" / "connectors")
+		self.assertIsInstance(scaffold, LibraryConnectorScaffold)
+		scaffold.add_payment_gateway("Tamara")
+
+		connector = root / "bwh_payments_core" / "connectors" / "tamara"
+		self.assertEqual({path.name for path in connector.iterdir()}, CONNECTOR_FILES)
+		self.assertEqual(
+			list_files(root) - {f"bwh_payments_core/connectors/tamara/{name}" for name in CONNECTOR_FILES},
+			{"pyproject.toml", "bwh_payments_core/connectors/__init__.py", "tests/test_tamara.py"},
+		)
+		self.assertEqual((root / "bwh_payments_core" / "connectors" / "__init__.py").read_text(), "# keep\n")
+		self.assertEqual(list(self.apps_path.iterdir()), [])
+		gateway = (connector / "gateway.py").read_text()
+		self.assertIn("from bwh_payments_core.connectors.tamara.base import BaseTamaraClient\n", gateway)
+		self.assertIn("from frappe import _\n\nfrom bwh_payments_core", gateway)
+
+	def test_the_generated_library_test_passes(self):
+		root = self.add_library()
+		self.get_scaffold(root).add_payment_gateway("Tamara")
+		connectors = str(root / "bwh_payments_core" / "connectors")
+		bwh_payments_core.connectors.__path__.append(connectors)
+		self.addCleanup(bwh_payments_core.connectors.__path__.remove, connectors)
+		self.addCleanup(self.forget_modules, "bwh_payments_core.connectors.tamara")
+
+		self.run_generated_test(root / "tests" / "test_tamara.py", "test_library_tamara")
+
+	def test_inside_an_app_a_connector_and_a_single_are_added(self):
+		app_root = make_app(self.apps_path)
+
+		scaffold = self.get_scaffold(app_root / APP / "public")
+		self.assertIsInstance(scaffold, PaymentGatewayScaffold)
+		scaffold.add_payment_gateway("Tamara")
+
+		self.assert_app_gateway(app_root)
+		self.assertEqual(self.apps_txt.read_text(), "frappe\ncommera\n")
+
+	def test_the_app_option_wins_over_the_folder(self):
+		app_root = make_app(self.apps_path)
+
+		self.get_scaffold(self.add_library(), app=APP).add_payment_gateway("Tamara")
+
+		self.assert_app_gateway(app_root)
+
+	def test_the_single_controller_is_a_document_on_the_library_contract(self):
+		app_root = make_app(self.apps_path)
+		self.get_scaffold(app_root).add_payment_gateway("Tamara")
+		folder, settings = self.assert_app_gateway(app_root)
+		sys.path.insert(0, str(app_root))
+		self.addCleanup(sys.path.remove, str(app_root))
+
+		spec = importlib.util.spec_from_file_location(
+			"tamara_gateway_settings", folder / "tamara_gateway_settings.py"
+		)
+		module = importlib.util.module_from_spec(spec)
+		spec.loader.exec_module(module)
+
+		controller = module.TamaraGatewaySettings
+		self.assertTrue(issubclass(controller, Document))
+		self.assertTrue(issubclass(controller, PaymentGatewayBase))
+		self.assertEqual(controller.__abstractmethods__, frozenset())
+		self.assertEqual(controller.label, "Tamara")
+		self.assertLessEqual(set(controller.credential_fields), set(get_fieldnames(settings)))
+
+	def test_the_generated_app_test_passes(self):
+		app_root = make_app(self.apps_path)
+		self.get_scaffold(app_root).add_payment_gateway("Tamara")
+		sys.path.insert(0, str(app_root))
+		self.addCleanup(sys.path.remove, str(app_root))
+
+		self.run_generated_test(
+			app_root / APP / "connectors" / "tamara" / "test_tamara.py", "test_app_tamara"
+		)
+
+	def create_app_from_the_bench_folder(self, **kwargs):
+		with patch.object(PaymentGatewayScaffold, "install_packages") as install:
+			scaffold = self.get_scaffold(self.bench, **kwargs)
+			changes = scaffold.add_payment_gateway("Tamara")
+		return scaffold, changes, install
+
+	def test_outside_any_app_a_new_app_is_created_and_added_to_the_bench(self):
+		scaffold, _changes, install = self.create_app_from_the_bench_folder()
+
+		self.assertEqual(scaffold.app, "commera_tamara")
+		self.assert_app_gateway(self.apps_path / "commera_tamara", "commera_tamara")
+		self.assertTrue((self.apps_path / "commera_tamara" / ".git").is_dir())
+		install.assert_called_once_with((sys.executable, "-m", "pip", "install", "--quiet", "-e", "."))
+		self.assertEqual(self.apps_txt.read_text(), "frappe\ncommera\ncommera_tamara\n")
+
+	def test_the_app_name_option_names_the_new_app(self):
+		scaffold, _changes, _run = self.create_app_from_the_bench_folder(app_name="acme_pay")
+
+		self.assertEqual(scaffold.app, "acme_pay")
+		self.assert_app_gateway(self.apps_path / "acme_pay", "acme_pay")
+
+	def test_a_second_run_changes_nothing(self):
+		app_root = make_app(self.apps_path)
+		library = self.add_library()
+		for name, folder, root in (
+			("app", app_root, app_root),
+			("library", library, library),
+			("new app", self.bench, self.apps_path / "commera_tamara"),
+		):
+			with self.subTest(name), patch.object(PaymentGatewayScaffold, "install_packages") as install:
+				self.get_scaffold(folder).add_payment_gateway("Tamara")
+				before = read_tree_without_git(root), self.apps_txt.read_text()
+				install.reset_mock()
+
+				changes = self.get_scaffold(folder).add_payment_gateway("Tamara")
+
+				self.assertEqual({change for change, _path in changes}, {"skipped"})
+				self.assertEqual((read_tree_without_git(root), self.apps_txt.read_text()), before)
+				install.assert_not_called()
+
+	def test_a_failed_install_is_retried_on_the_next_run(self):
+		with (
+			patch.object(
+				PaymentGatewayScaffold, "install_packages", side_effect=click.ClickException("no pip")
+			),
+			self.assertRaisesRegex(click.ClickException, "no pip"),
+		):
+			self.get_scaffold(self.bench)
+		self.assertEqual(self.apps_txt.read_text(), "frappe\ncommera\n")
+
+		self.create_app_from_the_bench_folder()
+
+		self.assertEqual(self.apps_txt.read_text(), "frappe\ncommera\ncommera_tamara\n")
+
+	def test_a_second_gateway_keeps_the_first_in_the_hooks(self):
+		app_root = make_app(self.apps_path)
+		self.get_scaffold(app_root).add_payment_gateway("Tamara")
+
+		get_payment_gateway_scaffold("Buy Now", app_root, self.apps_path).add_payment_gateway("Buy Now")
+
+		self.assertEqual(
+			get_hooks(app_root)["commera_hooks"],
+			{"payment_connectors": ["Tamara Gateway Settings", "Buy Now Gateway Settings"]},
+		)
+		self.assertTrue((app_root / APP / "connectors" / "buy_now" / "gateway.py").is_file())
+
+	def test_a_bad_name_or_a_stray_app_name_is_refused(self):
+		app_root = make_app(self.apps_path)
+		for label in ("Ta-mara!", "class", "9 Pay"):
+			with self.subTest(label), self.assertRaisesRegex(click.ClickException, "Name the gateway"):
+				get_payment_gateway_scaffold(label, app_root, self.apps_path)
+		with self.assertRaisesRegex(click.ClickException, "Name the app"):
+			self.get_scaffold(self.bench, app_name="Not An App")
+		for kwargs in ({"folder": app_root}, {"folder": self.bench, "app": APP}):
+			with self.assertRaisesRegex(click.ClickException, "--app-name names a new app"):
+				self.get_scaffold(app_name="other_app", **kwargs)
+		self.assertEqual({path.name for path in self.apps_path.iterdir()}, {APP})
+
+	def test_a_gateway_commera_ships_or_the_host_app_is_refused(self):
+		app_root = make_app(self.apps_path)
+		with self.assertRaisesRegex(click.ClickException, "Commera already ships Stripe Gateway Settings"):
+			get_payment_gateway_scaffold("Stripe", app_root, self.apps_path).add_payment_gateway("Stripe")
+		self.assertFalse((app_root / APP / "connectors").exists())
+		with self.assertRaisesRegex(click.ClickException, "host app"):
+			self.get_scaffold(self.bench, app="commera")
+
+	def forget_modules(self, prefix: str):
+		for name in [name for name in sys.modules if name.startswith(prefix)]:
+			sys.modules.pop(name)

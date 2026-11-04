@@ -112,6 +112,36 @@ def new_shipping_provider(label: str, app: str | None):
 	)
 
 
+@commera_commands.group("payment-gateway", help="Payment gateways: a connector and the settings it reads.")
+def payment_gateway():
+	pass
+
+
+@payment_gateway.command(
+	"new",
+	help="Add a gateway to the bwh_payments_core repo or the app you are in. "
+	"Anywhere else, create an app for it.",
+)
+@click.argument("label")
+@click.option("--app", help="App to add the gateway to, instead of the app you are in")
+@click.option("--app-name", help="Name of the app to create, when run outside any app")
+def new_payment_gateway(label: str, app: str | None, app_name: str | None):
+	from frappe.utils import get_bench_path
+
+	from commera.scaffold.payment_gateway import get_payment_gateway_scaffold
+
+	scaffold = get_payment_gateway_scaffold(
+		label,
+		Path(os.environ.get("PWD") or os.getcwd()),
+		Path(get_bench_path()) / "apps",
+		app,
+		app_name,
+	)
+	for change, path in scaffold.add_payment_gateway(label):
+		click.echo(f"{change:<8} {path}")
+	click.secho(scaffold.next_step, fg="green")
+
+
 def get_current_app_scaffold(scaffold_class=None, app=None):
 	from frappe.utils import get_bench_path
 
