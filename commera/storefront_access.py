@@ -37,8 +37,8 @@ class PrivateStorefrontPage:
 	def render(self):
 		settings = frappe.get_cached_doc(SETTINGS_DOCTYPE)
 		website_settings = frappe.get_cached_doc("Website Settings")
-		html = frappe.render_template(
-			"templates/storefront_private.html",
+		# A file template, loaded by path: nothing here compiles a string as a template.
+		html = frappe.get_template("templates/storefront_private.html").render(
 			{
 				"store_name": settings.store_name or website_settings.app_name or "",
 				"logo": website_settings.banner_image,
