@@ -4,7 +4,6 @@ from frappe.website.utils import build_response
 from commera.api.permission import has_app_permission
 
 SETTINGS_DOCTYPE = "Commera Settings"
-PRIVATE_TEMPLATE = "templates/storefront_private.html"
 
 # The storefront's own pages: the language-prefixed routes, plus the unprefixed cart permalink.
 # Login, the dashboard, Desk, files and the API are left alone, so staff can still sign in.
@@ -39,7 +38,7 @@ class PrivateStorefrontPage:
 		settings = frappe.get_cached_doc(SETTINGS_DOCTYPE)
 		website_settings = frappe.get_cached_doc("Website Settings")
 		html = frappe.render_template(
-			PRIVATE_TEMPLATE,
+			"templates/storefront_private.html",
 			{
 				"store_name": settings.store_name or website_settings.app_name or "",
 				"logo": website_settings.banner_image,

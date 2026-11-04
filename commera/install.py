@@ -86,6 +86,8 @@ def seed_test_commera_settings():
 	seed_commera_settings(TEST_COMPANY)
 	# Not mandatory, but the cart and search suites read it straight off this Single to build fixtures.
 	frappe.db.set_single_value("Commera Settings", "sale_price_list", seed_sale_price_list())
+	# A new store starts private; the storefront suites render pages as Guest, so the test store is open.
+	frappe.db.set_single_value("Commera Settings", "storefront_published", 1)
 
 
 def seed_sale_price_list() -> str:
