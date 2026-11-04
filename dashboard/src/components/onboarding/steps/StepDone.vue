@@ -1,40 +1,31 @@
 <script setup>
-import { Button, toast } from 'frappe-ui'
+import { Button, Skeleton } from 'frappe-ui'
 
 defineProps({
   finishing: { type: Boolean, default: false },
   isReady: { type: Boolean, default: false },
 })
 defineEmits(['finish'])
-
-// The storefront is served from the same site as the dashboard.
-const storeUrl = window.location.origin
-const storeHost = window.location.host
-
-async function copyLink() {
-  try {
-    await navigator.clipboard.writeText(storeUrl)
-    toast.success('Copied')
-  } catch {
-    toast.error('Could not copy the link')
-  }
-}
 </script>
 
 <template>
-  <div class="space-y-3">
-    <div class="flex items-center gap-2 rounded-4 bg-surface-gray-2 py-1 pl-3 pr-1">
-      <span class="min-w-0 flex-1 truncate text-base text-ink-gray-8" data-onboarding-store-url>{{ storeHost }}</span>
-      <Button variant="ghost" icon="lucide-copy" aria-label="Copy store link" @click="copyLink" />
-      <Button variant="ghost" icon="lucide-external-link" aria-label="Open store" :href="storeUrl" />
-    </div>
+  <!-- No store address here: the storefront is this same site, and it starts private. Home shows
+       the address once the owner publishes. -->
+  <div class="space-y-6">
+    <p class="flex items-start gap-2 text-p-base text-ink-gray-6">
+      <span class="lucide-lock mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      Only you can see it for now. Publish it from Home when you are ready.
+    </p>
+    <!-- The button only exists once setup is done; until then its skeleton holds the same box. -->
     <Button
+      v-if="isReady"
       variant="solid"
       size="md"
       class="w-full"
-      label="Go to dashboard"
-      :loading="finishing || !isReady"
+      label="Go to Home"
+      :loading="finishing"
       @click="$emit('finish')"
     />
+    <Skeleton v-else class="h-8 w-full rounded-4" aria-label="Finishing setup" />
   </div>
 </template>

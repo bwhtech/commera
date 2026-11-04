@@ -7,7 +7,7 @@ import { goto, realProblems, text, uiTest, useSession } from './harness.js'
 // route -> a string that only that screen renders, so "it loaded" cannot be
 // satisfied by the shell alone.
 const ROUTES = [
-  ['/', 'Overview'],
+  ['/', 'Your store is'],
   ['/orders', 'Orders'],
   ['/products', 'Products'],
   ['/collections', 'Collections'],

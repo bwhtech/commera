@@ -1,4 +1,5 @@
 import { isCloudBillingAvailable } from '../data/cloudBilling'
+import { isCloudDomainsAvailable } from '../data/cloudDomains'
 import { pluginSettingsTabs } from './plugins'
 
 // Derived from the URL in ia/settingsRoute; re-exported because this is still the door the
@@ -77,6 +78,17 @@ export const SETTINGS_TABS = [
           label: 'Billing',
           icon: 'lucide-receipt',
           keywords: ['billing', 'plan', 'subscription', 'invoice', 'payment method', 'trial', 'frappe cloud'],
+        },
+      ]
+    : []),
+  // Same gate as Billing: the domains are Frappe Cloud's, and only its panel can change them.
+  ...(isCloudDomainsAvailable
+    ? [
+        {
+          value: 'domains',
+          label: 'Domains',
+          icon: 'lucide-globe',
+          keywords: ['domain', 'custom domain', 'dns', 'ssl', 'certificate', 'url', 'address', 'frappe cloud'],
         },
       ]
     : []),

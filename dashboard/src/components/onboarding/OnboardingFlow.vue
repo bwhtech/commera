@@ -22,7 +22,7 @@ import {
 import { useTheme } from '../../data/theme'
 import { addProduct } from '../../data/addProduct'
 import { imp as productImport } from '../../data/importFlow'
-import { markWelcomeSeen } from '../../ia/firstRun'
+import { homeArrival } from '../../ia/homeTasks'
 import {
   adoptRecord,
   closeOnboarding,
@@ -91,7 +91,7 @@ const stepProps = computed(() => {
 
 const title = computed(() => {
   if (step.value.key === 'you') return draft.fullName ? `Welcome, ${draft.fullName.trim().split(' ')[0]}` : step.value.title
-  if (step.value.key === 'done') return `${draft.storeName.trim() || 'Your store'} is live`
+  if (step.value.key === 'done') return `${draft.storeName.trim() || 'Your store'} is ready`
   return step.value.title
 })
 
@@ -159,8 +159,8 @@ async function finish() {
     finishing.value = false
     return
   }
-  // The dashboard's checklist is what comes next; its full-screen greeting would only repeat this one.
-  markWelcomeSeen()
+  // Home is what comes next, and stages its entrance once for the hand-off.
+  homeArrival.playEntrance = true
   // format.js reads the boot's currency once at load. Setup may have changed it, and then every
   // money figure would wear the old symbol until a reload.
   if (bootValue('currency', '') !== draft.currency) {

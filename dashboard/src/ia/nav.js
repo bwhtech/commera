@@ -2,8 +2,8 @@ import { isAdmin } from '../data/boot'
 import { pluginNavItems } from './plugins'
 import { search } from './search'
 
-// The three reports. Overview carries the headline numbers, so none of them
-// repeats it: each answers a question the dashboard deliberately does not.
+// The three reports. Home carries a live store's headline numbers, so none of
+// them repeats them: each answers a question Home deliberately does not.
 export const REPORTS = [
   { label: 'Revenue', icon: 'lucide-banknote', to: '/analytics/revenue' },
   { label: 'Inventory', icon: 'lucide-boxes', to: '/analytics/inventory' },
@@ -11,7 +11,7 @@ export const REPORTS = [
 ]
 
 const ITEM = {
-  overview: { label: 'Overview', icon: 'lucide-layout-dashboard', to: '/' },
+  home: { label: 'Home', icon: 'lucide-house', to: '/' },
   search: {
     label: 'Search',
     icon: 'lucide-search',
@@ -39,7 +39,7 @@ const ITEM = {
 const coreSections = [
   {
     id: 'primary',
-    items: [ITEM.overview, ITEM.search, ITEM.orders, ITEM.customers, ITEM.discounts, ITEM.analytics],
+    items: [ITEM.home, ITEM.search, ITEM.orders, ITEM.customers, ITEM.discounts, ITEM.analytics],
   },
   { id: 'catalog', label: 'Catalog', items: [ITEM.products, ITEM.collections, ITEM.attributes] },
   { id: 'storefront', label: 'Storefront', items: [ITEM.theme, ITEM.navigation, ITEM.pages, ITEM.reviews] },

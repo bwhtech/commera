@@ -5,12 +5,10 @@ import { DesktopShell, ScrollArea, Sidebar, SidebarHeader } from 'frappe-ui'
 import { activeNavTarget, productName, sections } from '../ia/nav'
 import logoUrl from '../assets/commera.svg'
 import { useAccountMenu } from '../data/account'
-import { isAdmin } from '../data/boot'
 import { useAdminRead, useMethodRead } from '../data/api'
 import { sidebarCollapsed, toggleSidebar } from '../ia/sidebar'
 import NavSection from './NavSection.vue'
 import SidebarEdge from './SidebarEdge.vue'
-import SetupBanner from './firstrun/SetupBanner.vue'
 import TrialCard from './TrialCard.vue'
 
 const route = useRoute()
@@ -79,11 +77,8 @@ const headerMenu = computed(() => [
             <ScrollArea v-scroll-fade class="min-h-0 flex-1" viewport-class="pt-1 pb-10">
               <NavSection v-for="section in sections" :key="section.id" :section="section" :active-target="activeTarget" />
             </ScrollArea>
-            <!-- A narrow icon rail has no room for either card. -->
-            <div v-if="!sidebarCollapsed" class="flex flex-col gap-2">
-              <TrialCard />
-              <SetupBanner v-if="isAdmin" />
-            </div>
+            <!-- A narrow icon rail has no room for the card. -->
+            <TrialCard v-if="!sidebarCollapsed" />
           </div>
         </Sidebar>
         <SidebarEdge controls="commera-sidebar" :collapsed="sidebarCollapsed" label="sidebar" @toggle="toggleSidebar" />

@@ -14,7 +14,7 @@ import {
 import AdvancedSettings from './AdvancedSettings.vue'
 import AppearancePicker from './AppearancePicker.vue'
 import AppsSettings from './AppsSettings.vue'
-import BillingSettings from './BillingSettings.vue'
+import CloudSettingsPanel from './CloudSettingsPanel.vue'
 import CashOnDeliverySettings from './CashOnDeliverySettings.vue'
 import CheckoutSettings from './CheckoutSettings.vue'
 import PluginSettingsPanel from './PluginSettingsPanel.vue'
@@ -25,7 +25,8 @@ import IntegrationTabPanel from './IntegrationTabPanel.vue'
 import LocationsSettings from './LocationsSettings.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import ShippingSections from './ShippingSections.vue'
-import { isCloudBillingAvailable } from '../../data/cloudBilling'
+import { isCloudBillingAvailable, refreshBilling } from '../../data/cloudBilling'
+import { isCloudDomainsAvailable, refreshDomains } from '../../data/cloudDomains'
 import { paymentIntegrations, shippingIntegrations } from '../../data/integrations'
 import { pickupLocations } from '../../data/pickupLocations'
 import { pluginSettingsTabs } from '../../ia/plugins'
@@ -166,6 +167,10 @@ watch(
           <template #prefix><span class="lucide-receipt size-4" aria-hidden="true" /></template>
           Billing
         </SettingsNavItem>
+        <SettingsNavItem v-if="isCloudDomainsAvailable" value="domains">
+          <template #prefix><span class="lucide-globe size-4" aria-hidden="true" /></template>
+          Domains
+        </SettingsNavItem>
       </SettingsNavGroup>
 
       <SettingsNavGroup v-if="pluginTabs.length" label="Installed plugins">
@@ -252,9 +257,23 @@ watch(
       </SettingsPanel>
 
       <!-- Mounted only while shown, unlike the panels kept alive by unmount-on-hide: leaving the
-           tab closes the Cloud panel, and its onClose re-reads the billing for the trial card. -->
+           tab closes the Cloud panel, and its onClose re-reads what the dashboard shows from it:
+           choosing a plan ends the trial card, and adding a domain moves Home's domain card. -->
       <SettingsPanel v-if="isCloudBillingAvailable" value="billing" class="min-w-0">
-        <BillingSettings v-if="settings.open && tab === 'billing'" v-model:overlay-open="isCloudOverlayOpen" />
+        <CloudSettingsPanel
+          v-if="settings.open && tab === 'billing'"
+          v-model:overlay-open="isCloudOverlayOpen"
+          panel="billing"
+          :on-close="refreshBilling"
+        />
+      </SettingsPanel>
+      <SettingsPanel v-if="isCloudDomainsAvailable" value="domains" class="min-w-0">
+        <CloudSettingsPanel
+          v-if="settings.open && tab === 'domains'"
+          v-model:overlay-open="isCloudOverlayOpen"
+          panel="domains"
+          :on-close="refreshDomains"
+        />
       </SettingsPanel>
     </SettingsContent>
   </SettingsDialog>

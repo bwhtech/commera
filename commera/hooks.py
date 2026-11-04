@@ -95,8 +95,12 @@ before_request = ["commera.utils.before_request"]
 on_session_creation = "commera.commera_ecommerce.doctype.commera_cart.commera_cart.keep_guest_cart"
 on_login = "commera.roles.save_commera_default_app"
 
-# Runs before every core renderer (frappe/website/path_resolver.py); can_render() opts out when no theme.
-page_renderer = ["commera.shop_themes.theme_resolver.ThemePageRenderer"]
+# Runs before every core renderer (frappe/website/path_resolver.py). The private-store page goes
+# first so a store that is not published yet never reaches the theme engine.
+page_renderer = [
+	"commera.storefront_access.PrivateStorefrontPage",
+	"commera.shop_themes.theme_resolver.ThemePageRenderer",
+]
 
 # frappe.clear_cache() flushes redis but not frappe.local, where the theme engine memoises - hence these.
 clear_cache = [
