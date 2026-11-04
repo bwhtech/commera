@@ -136,7 +136,7 @@ def build_product_search_records(variant_names=None):
 def record_collections(variant, collections_by_style):
 	"""Every collection a page matches: its own item_group, then its product's collections."""
 	collections = [variant.item_group, *collections_by_style.get(variant.item_style, [])]
-	return list(dict.fromkeys(filter(None, collections)))
+	return list(dict.fromkeys(collection for collection in collections if collection))
 
 
 def build_content(configured_fields, variant, item, configurator):

@@ -1,8 +1,5 @@
-"""A product (Item template) sits in one or more collections: its Product Collection rows.
-
-The rows are the one owner. Item.item_group stays as the primary collection, the first row, because
-ERPNext requires it and breadcrumbs, size charts and Style Attribute Variant.item_group read it.
-"""
+"""A product's Product Collection rows own its collections. Item.item_group mirrors the first row,
+because ERPNext requires it and breadcrumbs, size charts and page item_group read it."""
 
 import frappe
 from frappe.query_builder import DocType
@@ -23,7 +20,7 @@ def sync_collections(doc, method=None):
 	# A direct item_group edit (desk, ERPNext, an import) makes that group the primary.
 	if doc.item_group and doc.has_value_changed("item_group"):
 		collections.insert(0, doc.item_group)
-	collections = list(dict.fromkeys(filter(None, collections)))
+	collections = list(dict.fromkeys(collection for collection in collections if collection))
 	if not collections:
 		return
 

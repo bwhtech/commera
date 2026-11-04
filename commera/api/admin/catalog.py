@@ -369,9 +369,8 @@ def get_variant_names(item_templates: list) -> list:
 
 
 def save_variant_collections(item_templates: list) -> None:
-	"""Re-file these products' options under the primary collection the products now carry, and re-index
-	them for their other collections - update_item_group() only fills Style Attribute Variant.item_group
-	while blank."""
+	"""Re-file the products' pages under their primary collection and re-index the rest.
+	update_item_group() only fills Style Attribute Variant.item_group while it is blank."""
 	for variant_name in get_variant_names(item_templates):
 		# ponytail: one save per option so update_item_group and the search sync hooks run; move to
 		# a background job if a store ever files more options at once than a request can carry.
