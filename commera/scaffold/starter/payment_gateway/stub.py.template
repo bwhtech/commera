@@ -1,0 +1,54 @@
+import hashlib
+import hmac
+import json
+from typing import ClassVar
+
+import frappe
+
+from $package.base import Base${prefix}Client, ${prefix}Payment, ${prefix}Refund
+
+
+class Stub${prefix}Client(Base${prefix}Client):
+	payments: ClassVar[dict[str, ${prefix}Payment]] = {}
+	created_payments: ClassVar[list[dict]] = []
+	created_refunds: ClassVar[list[dict]] = []
+
+	@classmethod
+	def reset(cls):
+		cls.payments = {}
+		cls.created_payments = []
+		cls.created_refunds = []
+
+	@classmethod
+	def pay(cls, payment_id: str):
+		cls.payments[payment_id].status = "paid"
+
+	def create_payment(self, params: dict) -> ${prefix}Payment:
+		self.created_payments.append(params)
+		payment_id = f"pay_test_{frappe.generate_hash(length=12)}"
+		self.payments[payment_id] = ${prefix}Payment(
+			id=payment_id,
+			url=f"https://checkout.$slug.test/{payment_id}",
+			status="pending",
+			currency=params["currency"],
+		)
+		return self.get_payment(payment_id)
+
+	def get_payment(self, payment_id: str) -> ${prefix}Payment:
+		return self.payments[payment_id].model_copy()
+
+	def create_refund(self, params: dict) -> ${prefix}Refund:
+		self.created_refunds.append(params)
+		return ${prefix}Refund(
+			id=f"re_test_{frappe.generate_hash(length=12)}", status="succeeded", amount=params["amount"]
+		)
+
+
+def build_payment_event(payment_id: str, status: str = "paid") -> bytes:
+	return json.dumps(
+		{"id": f"evt_{frappe.generate_hash(length=12)}", "data": {"id": payment_id, "status": status}}
+	).encode()
+
+
+def sign_payload(payload: bytes, secret: str) -> str:
+	return hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()

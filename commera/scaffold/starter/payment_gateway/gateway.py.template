@@ -1,0 +1,78 @@
+import hashlib
+import hmac
+import json
+
+import frappe
+$imports
+
+STATUS_MAP = {
+	"paid": "Paid",
+	"pending": "Pending",
+	"failed": "Not Paid",
+	"expired": "Expired",
+}
+SIGNATURE_HEADER = "X-Signature"
+
+
+class ${prefix}Gateway(PaymentGatewayBase):
+	label = "$label"
+	credential_fields = ("api_key", "webhook_secret")
+	description = ""
+	docs_url = ""
+
+	def get_gateway_name(self) -> str:
+		return "$label"
+
+	def get_client(self) -> Base${prefix}Client:
+		if frappe.in_test:
+			return Stub${prefix}Client()
+
+		return Live${prefix}Client(self.get_password("api_key"))
+
+	def create_session(
+		self,
+		amount: float,
+		currency: str,
+		reference: str | None = None,
+		customer: dict | None = None,
+		return_url: str | None = None,
+	) -> CheckoutSession:
+		validate_transaction_currency(currency)
+		payment = self.get_client().create_payment(
+			{
+				"amount": to_minor_units(amount, currency),
+				"currency": currency,
+				"reference": reference,
+				"customer_email": (customer or {}).get("email"),
+				"return_url": return_url,
+			}
+		)
+		return CheckoutSession(session_id=payment.id, redirect_url=payment.url)
+
+	def get_payment_status(self, session_id: str) -> str:
+		return STATUS_MAP.get(self.get_client().get_payment(session_id).status, "Pending")
+
+	def refund_payment(self, session_id: str, amount: float, currency: str | None = None) -> RefundResult:
+		client = self.get_client()
+		currency = currency or client.get_payment(session_id).currency
+		refund = client.create_refund({"payment_id": session_id, "amount": to_minor_units(amount, currency)})
+		if refund.status not in ("succeeded", "pending"):
+			frappe.throw(_("Refund failed with status: {0}").format(refund.status))
+
+		return RefundResult(refund_id=refund.id, status=refund.status, amount=amount)
+
+	def handle_webhook(self, payload: bytes, headers: dict) -> WebhookEvent | None:
+		webhook_secret = self.get_password("webhook_secret")
+		if not webhook_secret:
+			frappe.throw(_("Webhook secret is not configured in $doctype"))
+
+		expected = hmac.new(webhook_secret.encode(), payload, hashlib.sha256).hexdigest()
+		if not hmac.compare_digest(expected, headers.get(SIGNATURE_HEADER) or ""):
+			frappe.throw(_("Invalid $label webhook signature"))
+
+		event = json.loads(payload)
+		return WebhookEvent(
+			session_id=event["data"]["id"],
+			status=STATUS_MAP.get(event["data"]["status"], "Pending"),
+			event_id=event["id"],
+		)
