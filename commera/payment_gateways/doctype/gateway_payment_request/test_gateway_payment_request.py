@@ -63,15 +63,6 @@ class TestGatewayPaymentRequest(IntegrationTestCase):
 		super().setUpClass()
 		cls.reference = frappe.get_doc({"doctype": "ToDo", "description": "payment engine test"}).insert()
 		cls.gateway = testing.configure_test_gateway()
-		frappe.db.commit()
-
-	@classmethod
-	def tearDownClass(cls):
-		frappe.db.rollback()
-		testing.remove_test_gateway()
-		frappe.delete_doc("ToDo", cls.reference.name, force=True)
-		frappe.db.commit()
-		super().tearDownClass()
 
 	def setUp(self):
 		testing.reset()
