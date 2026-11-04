@@ -5,42 +5,11 @@ import frappe
 
 from commera.api.admin.integrations import describe_integration, save_integration
 from commera.migrate import add_payment_mode
+from commera.payment_gateways.connectors import get_connector_class, get_connector_doctypes
 
 PROFILE_DOCTYPE = "Payment Gateway Profile"
 PROFILE_SETTINGS_FIELDNAME = "gateway_settings"
 WEBHOOK_PATH = "/api/method/commera.payment_gateways.api.handle_webhook?gateway={profile}"
-
-# Order here is the order the cards render in.
-PAYMENT_GATEWAYS = (
-	{
-		"slug": "razorpay",
-		"label": "Razorpay",
-		"blurb": "Cards, UPI, netbanking and wallets. India.",
-		"settings_doctype": "Razorpay Gateway Settings",
-		"docs_url": "https://dashboard.razorpay.com/app/website-app-settings/webhooks",
-	},
-	{
-		"slug": "stripe",
-		"label": "Stripe",
-		"blurb": "Cards and wallets, worldwide.",
-		"settings_doctype": "Stripe Gateway Settings",
-		"docs_url": "https://dashboard.stripe.com/apikeys",
-	},
-	{
-		"slug": "telr",
-		"label": "Telr",
-		"blurb": "Cards and local methods across the GCC.",
-		"settings_doctype": "Telr Gateway Settings",
-		"docs_url": "https://telr.com/support/knowledge-base/hosted-payment-page-integration-guide/",
-	},
-	{
-		"slug": "tabby",
-		"label": "Tabby",
-		"blurb": "Buy now, pay later in four instalments. MENA.",
-		"settings_doctype": "Tabby Gateway Settings",
-		"docs_url": "https://docs.tabby.ai/",
-	},
-)
 
 
 def add_gateway_payment_mode(integration):
@@ -49,17 +18,24 @@ def add_gateway_payment_mode(integration):
 
 
 def get_payment_registry():
-	"""The gateway registry as integration entries, with what every payment gateway shares filled in."""
-	return [
-		{
-			**gateway,
-			"profile_doctype": PROFILE_DOCTYPE,
-			"profile_settings_fieldname": PROFILE_SETTINGS_FIELDNAME,
-			"webhook_path": WEBHOOK_PATH,
-			"on_enable": add_gateway_payment_mode,
-		}
-		for gateway in PAYMENT_GATEWAYS
-	]
+	return [get_payment_entry(settings_doctype) for settings_doctype in get_connector_doctypes()]
+
+
+def get_payment_entry(settings_doctype: str) -> dict:
+	connector = get_connector_class(settings_doctype)
+	label = connector.label or settings_doctype
+	return {
+		"slug": frappe.scrub(label),
+		"label": label,
+		"blurb": connector.description,
+		"settings_doctype": settings_doctype,
+		"docs_url": connector.docs_url,
+		"logo": connector.logo,
+		"profile_doctype": PROFILE_DOCTYPE,
+		"profile_settings_fieldname": PROFILE_SETTINGS_FIELDNAME,
+		"webhook_path": WEBHOOK_PATH,
+		"on_enable": add_gateway_payment_mode,
+	}
 
 
 def get_payment_integration(slug: str):

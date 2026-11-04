@@ -14,6 +14,10 @@ def get_connector_doctypes() -> list[str]:
 	return registry.get_provider_doctypes(KIND)
 
 
+def get_connector_class(settings_doctype: str) -> type[PaymentGatewayBase]:
+	return registry.get_provider_class(KIND, settings_doctype, PaymentGatewayBase)
+
+
 @site_cache(ttl=60 * 60)
 def get_available_payment_modes() -> list[str]:
 	return frappe.get_all(PROFILE_DOCTYPE, filters={"enabled": 1}, pluck="name")

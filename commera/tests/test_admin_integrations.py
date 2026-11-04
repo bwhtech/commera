@@ -1,6 +1,10 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 
+from unittest.mock import patch
+
 import frappe
+from bwh_payments_core.contract import PaymentGatewayBase
+from frappe.model.base_document import get_controller
 from frappe.tests import IntegrationTestCase
 from frappe.utils.password import get_decrypted_password
 
@@ -10,7 +14,8 @@ from commera.api.admin.integrations import (
 	get_link_options,
 )
 from commera.api.admin.payments import get_payment_integrations, save_payment_integration
-from commera.payment_gateways.connectors import get_available_payment_modes
+from commera.payment_gateways.connectors import get_available_payment_modes, get_connector_doctypes
+from commera.tests.test_payment_hooks import patch_app_hooks
 
 SLUG = "razorpay"
 GATEWAY = "Razorpay"
@@ -23,6 +28,36 @@ FULL_CREDENTIALS = {
 	"key_secret": KEY_SECRET,
 	"webhook_secret": WEBHOOK_SECRET,
 }
+
+
+BUILT_IN_CARDS = [
+	(
+		"razorpay",
+		"Razorpay",
+		"Cards, UPI, netbanking and wallets. India.",
+		"https://dashboard.razorpay.com/app/website-app-settings/webhooks",
+	),
+	("stripe", "Stripe", "Cards and wallets, worldwide.", "https://dashboard.stripe.com/apikeys"),
+	(
+		"telr",
+		"Telr",
+		"Cards and local methods across the GCC.",
+		"https://telr.com/support/knowledge-base/hosted-payment-page-integration-guide/",
+	),
+	("tabby", "Tabby", "Buy now, pay later in four instalments. MENA.", "https://docs.tabby.ai/"),
+]
+PLUGIN_CONNECTOR_DOCTYPE = "Commera Settings"
+
+
+class PluginConnector(PaymentGatewayBase):
+	label = "Acme Pay"
+	description = "A gateway from a plugin app."
+	docs_url = "https://acme.example/keys"
+	logo = "/assets/acme_pay/logo.svg"
+
+
+def get_plugin_controller(doctype):
+	return PluginConnector if doctype == PLUGIN_CONNECTOR_DOCTYPE else get_controller(doctype)
 
 
 def get_stored_password(fieldname):
@@ -136,6 +171,34 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 				"enabled",
 				[field["fieldname"] for group in card["groups"] for field in group["fields"]],
 			)
+
+	def test_the_cards_come_from_the_connector_classes_in_registry_order(self):
+		cards = get_payment_integrations()
+
+		self.assertEqual(
+			[(card["slug"], card["label"], card["blurb"], card["docs_url"]) for card in cards],
+			BUILT_IN_CARDS,
+		)
+		self.assertEqual([card["logo"] for card in cards], [None] * len(BUILT_IN_CARDS))
+
+	def test_a_connector_from_a_plugin_app_gets_a_card(self):
+		patch_app_hooks(
+			self,
+			{"commera_hooks": {"payment_connectors": [*get_connector_doctypes(), PLUGIN_CONNECTOR_DOCTYPE]}},
+		)
+
+		with patch("commera.plugins.providers.get_controller", get_plugin_controller):
+			cards = get_payment_integrations()
+
+		self.assertEqual([card["slug"] for card in cards[:-1]], [card[0] for card in BUILT_IN_CARDS])
+		plugin_card = cards[-1]
+		self.assertEqual(plugin_card["slug"], "acme_pay")
+		self.assertEqual(plugin_card["label"], "Acme Pay")
+		self.assertEqual(plugin_card["blurb"], "A gateway from a plugin app.")
+		self.assertEqual(plugin_card["docs_url"], "https://acme.example/keys")
+		self.assertEqual(plugin_card["logo"], "/assets/acme_pay/logo.svg")
+		self.assertTrue(plugin_card["available"])
+		self.assertTrue(plugin_card["webhook_url"].endswith("gateway=Acme Pay"))
 
 	def test_a_gateway_whose_app_is_gone_is_reported_unavailable(self):
 		card = describe_integration(
