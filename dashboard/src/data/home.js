@@ -105,10 +105,11 @@ export function storeSlug(storeName) {
 }
 
 export function describeStoreStatus(isLive, blockerCount) {
+  // No status line once live: the preview's badge already says it, and the headline says the rest.
   if (isLive) {
     return {
-      dot: 'bg-surface-green-7',
-      label: 'Live',
+      dot: null,
+      label: null,
       headline: 'Your store is open for business',
       subline: 'Here is what will make your store even better.',
     }

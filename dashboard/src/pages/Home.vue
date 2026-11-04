@@ -125,11 +125,11 @@ async function copyLink() {
             leave-to-class="opacity-0"
           >
             <div v-if="home" key="copy">
-              <div class="flex items-center gap-2 text-sm text-ink-gray-7">
+              <div v-if="status.label" class="mb-3 flex items-center gap-2 text-sm text-ink-gray-7">
                 <span class="size-2 rounded-full" :class="status.dot" />
                 {{ status.label }}
               </div>
-              <h1 class="mt-3 text-3xl-semibold text-ink-gray-9">{{ status.headline }}</h1>
+              <h1 class="text-3xl-semibold text-ink-gray-9">{{ status.headline }}</h1>
               <p class="mt-2 text-p-lg text-ink-gray-6">{{ status.subline }}</p>
               <div class="mt-6 flex flex-wrap items-center gap-2">
                 <template v-if="isLive">
@@ -164,8 +164,8 @@ async function copyLink() {
 
             <!-- The finished column's rows, so nothing moves when the read lands. -->
             <div v-else key="skeleton" aria-hidden="true">
-              <Skeleton class="h-4 w-40 rounded-4" />
-              <Skeleton class="mt-3 h-9 w-full max-w-sm rounded-4" />
+              <Skeleton v-if="!isLive" class="mb-3 h-4 w-40 rounded-4" />
+              <Skeleton class="h-9 w-full max-w-sm rounded-4" />
               <Skeleton class="mt-2 h-5 w-64 rounded-4" />
               <Skeleton class="mt-6 h-8 w-56 rounded-4" />
             </div>

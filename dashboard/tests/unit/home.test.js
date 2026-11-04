@@ -104,4 +104,5 @@ test('the hero copy follows the store from blocked, to ready, to live', () => {
   assert.equal(describeStoreStatus(false, 0).label, 'Ready to publish')
   assert.equal(describeStoreStatus(false, 0).headline, 'Your store is taking shape')
   assert.equal(describeStoreStatus(true, 2).headline, 'Your store is open for business')
+  assert.equal(describeStoreStatus(true, 2).label, null)
 })
