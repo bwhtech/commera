@@ -17,22 +17,21 @@ const statusOptions = [
 const { collectionOptions, load: loadCollections } = useCollections()
 loadCollections()
 
-// The first collection is the primary one (Item.item_group): breadcrumbs, size charts and the
-// product page's own collection read it. MultiSelect keeps values in the order they were picked,
-// and its trigger collapses to "N selected", so the description names the primary.
-const primaryHint = computed(() =>
-  props.product.collections?.length
-    ? `${props.product.collections[0]} is the primary collection, the first one picked.`
-    : 'The first collection picked is the primary one.',
-)
+// The first pick is the primary collection (Item.item_group). The trigger collapses to
+// "N selected", so the description lists the picks and marks the primary.
+const collectionsHint = computed(() => {
+  const [primary, ...others] = props.product.collections ?? []
+  if (!primary) return 'The first collection picked is the primary one.'
+  return [`${primary} (primary)`, ...others].join(', ')
+})
 </script>
 
 <template>
-  <section :class="layout === 'stacked' ? '' : 'space-y-4'">
+  <section :class="layout === 'stacked' ? '' : 'border-b border-outline-gray-1 px-4 py-4'">
     <h2 v-if="layout === 'stacked'" class="text-lg-semibold text-ink-gray-8">Organisation</h2>
     <h3 v-else class="text-sm text-ink-gray-5">Organisation</h3>
 
-    <div :class="layout === 'stacked' ? 'mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2' : 'mt-4 space-y-4'">
+    <div :class="layout === 'stacked' ? 'mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2' : 'mt-3 space-y-4'">
       <!-- Status is read-only here: it is really Item.disabled, and the page's
            "Archive"/"Restore from archive" action (in the ⋯ menu) is the one real
            write path for it — a second editable control here would just race it. -->
@@ -42,7 +41,7 @@ const primaryHint = computed(() =>
         class="w-full"
         :class="layout === 'stacked' ? 'sm:col-span-2' : ''"
         label="Collections"
-        :description="primaryHint"
+        :description="collectionsHint"
         :options="collectionOptions"
       />
     </div>

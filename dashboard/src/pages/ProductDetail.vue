@@ -191,7 +191,8 @@ const loadFailure = computed(() =>
             <VariantEditor :product="product" @saved="productRequest.reload()" />
             <ProductStock :product="product" @received="productRequest.reload()" />
             <ProductStorefront :product="product" />
-            <ProductOrganization :product="product" />
+            <!-- From lg up it sits at the top of the rail, beside the form. -->
+            <ProductOrganization class="lg:hidden" :product="product" />
           </div>
 
           <!-- Below lg the rail is hidden, so the apps' cards stack under the form instead. -->
@@ -203,6 +204,7 @@ const loadFailure = computed(() =>
 
       <aside class="hidden w-[19rem] shrink-0 flex-col border-l border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
+          <ProductOrganization :product="product" layout="rail" />
           <ProductSummaryPanel :product="product" :stats="stats" />
           <PluginSlot v-if="hasRail" :entries="cards" :record="record" frame="rail" @reload="reloadPlugins" />
         </ScrollArea>
