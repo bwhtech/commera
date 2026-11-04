@@ -43,7 +43,7 @@ class TestOrderRefunds(IntegrationTestCase):
 
 	@classmethod
 	def ensure_mode_of_payment(cls):
-		"""bwh_payments only mirrors a payout when the mode of payment is named after the gateway."""
+		"""A payout reaches the gateway only when the mode of payment is named after it."""
 		if not frappe.db.exists("Mode of Payment", GATEWAY):
 			frappe.get_doc(
 				{"doctype": "Mode of Payment", "mode_of_payment": GATEWAY, "enabled": 1, "type": "Bank"}
@@ -145,7 +145,7 @@ class TestOrderRefunds(IntegrationTestCase):
 		self.assertEqual(refund.payment_type, "Pay")
 		self.assertEqual(refund.docstatus, 1)
 		self.assertAlmostEqual(flt(refund.paid_amount), flt(sales_order.grand_total))
-		# Both are load-bearing for bwh_payments.refund_on_payment_entry, which will not mirror the
+		# Both are load-bearing for refund_on_payment_entry, which will not mirror the
 		# payout to the gateway unless the reference_no and the mode of payment both match.
 		self.assertEqual(refund.reference_no, self.gateway_reference)
 		self.assertEqual(refund.mode_of_payment, GATEWAY)

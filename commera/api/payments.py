@@ -449,7 +449,7 @@ def create_payment_entry(sales_invoice, payment_mode: str, paid_amount: float, r
 	payment_entry = get_payment_entry("Sales Invoice", sales_invoice.name, party_amount=allocated)
 	payment_entry.mode_of_payment = gateway_mode_of_payment(payment_mode)
 	if reference_no:
-		# Load-bearing: bwh_payments matches a refund Payment Entry back to its gateway session on this.
+		# Load-bearing: a refund Payment Entry is matched back to its gateway session on this.
 		payment_entry.reference_no = reference_no
 		payment_entry.reference_date = getdate()
 
