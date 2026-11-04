@@ -322,7 +322,7 @@ describe('theme editor', () => {
       assert.equal(posts.length, 1, 'one preview render for one saved setting')
     } finally {
       page.off('request', countPost)
-      await adminPost(page, 'theme.save_theme_settings', { [field.fieldname]: field.value })
+      await adminPost(page, 'theme.save_theme_settings', { theme: theme.name, [field.fieldname]: field.value })
     }
   })
 
