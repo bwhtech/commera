@@ -83,27 +83,53 @@ class TestAdminTheme(IntegrationTestCase):
 		self.assertRaises(frappe.ValidationError, activate_theme, "ZZ No Such Theme")
 
 	def test_save_theme_settings_writes_the_live_themes_single(self):
-		data = save_theme_settings(categories_title="ZZ Categories")
+		data = save_theme_settings(SUMMER_THEME, categories_title="ZZ Categories")
 
 		self.assertEqual(
 			frappe.db.get_single_value("Summer Theme Settings", "categories_title"), "ZZ Categories"
 		)
-		# The write answers with the whole screen, so the editor never renders a stale value.
 		saved = next(
 			field
-			for group in data["settings"]["groups"]
+			for group in data["groups"]
 			for field in group["fields"]
 			if field["fieldname"] == "categories_title"
 		)
 		self.assertEqual(saved["value"], "ZZ Categories")
 
+	def test_save_theme_settings_writes_the_edited_theme_not_the_live_one(self):
+		live_title = frappe.db.get_single_value("Summer Theme Settings", "categories_title")
+
+		data = save_theme_settings(STARTER_THEME, instagram_url="https://instagram.com/zz")
+
+		self.assertEqual(data["doctype"], "Commera Starter Settings")
+		self.assertEqual(
+			frappe.db.get_single_value("Commera Starter Settings", "instagram_url"),
+			"https://instagram.com/zz",
+		)
+		self.assertEqual(frappe.db.get_single_value("Summer Theme Settings", "categories_title"), live_title)
+		self.assertRaises(
+			frappe.ValidationError, save_theme_settings, STARTER_THEME, categories_title="ZZ Categories"
+		)
+
+	def test_save_theme_settings_refuses_a_theme_without_settings(self):
+		self.assertRaises(frappe.ValidationError, save_theme_settings, BASE_THEME, categories_title="ZZ")
+
+	def test_save_theme_settings_needs_write_on_the_themes_settings(self):
+		frappe.set_user("Guest")
+		self.assertRaises(
+			frappe.PermissionError,
+			save_theme_settings,
+			STARTER_THEME,
+			instagram_url="https://instagram.com/zz",
+		)
+
 	def test_save_theme_settings_refuses_a_field_the_screen_does_not_render(self):
 		# hero_slides is a child table: writing rows through a field save would silently drop them.
-		self.assertRaises(frappe.ValidationError, save_theme_settings, hero_slides="oops")
+		self.assertRaises(frappe.ValidationError, save_theme_settings, SUMMER_THEME, hero_slides="oops")
 
 	def test_save_theme_settings_refuses_a_field_of_another_doctype(self):
 		# Every theme owns its own settings: a field off some other Single is not this screen's to write.
-		self.assertRaises(frappe.ValidationError, save_theme_settings, store_name="ZZ Store")
+		self.assertRaises(frappe.ValidationError, save_theme_settings, SUMMER_THEME, store_name="ZZ Store")
 
 
 def hero_layout(caption, hidden=False, section_id="hero"):
