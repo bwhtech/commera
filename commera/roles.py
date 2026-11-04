@@ -26,6 +26,7 @@ ADMIN_PERMISSIONS = {
 	"Ecommerce Category": ("read",),
 	"Shop Theme Settings": ("read", "write"),
 	"Commera Settings": ("read",),
+	"Commera Webhook": ("read", "write", "create", "delete"),
 }
 
 

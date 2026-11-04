@@ -38,6 +38,7 @@ EXTENDED_DOCTYPES = ("Sales Order", "Quotation", "Sales Invoice", "Item", "Custo
 CHANGED_PRODUCTS_FLAG = "commera_changed_products"
 CHANGED_ITEMS_FLAG = "commera_changed_items"
 CHANGED_STOREFRONT_FLAG = "commera_changed_storefront"
+CHANGED_CUSTOMERS_FLAG = "commera_changed_customers"
 
 
 def fire_event(
@@ -388,18 +389,21 @@ def retry_delivery(delivery: str):
 		frappe.throw(_("Delivery {0} not found").format(delivery), frappe.DoesNotExistError)
 	if failed_delivery.status != "Failed":
 		frappe.throw(_("Only a failed delivery can be retried."))
+	queue_delivery_now(delivery)
 
+
+def queue_delivery_now(delivery: str):
+	"""Run the delivery on its lane's next job, whatever retry it waits for or however it ended."""
+	parent, app = frappe.db.get_value("Commera Event Delivery", delivery, ["parent", "app"])
 	frappe.db.set_value(
 		"Commera Event Delivery",
 		delivery,
 		{"status": "Queued", "next_retry_at": now_datetime(), "finished_at": None},
 	)
 	event, reference_doctype, reference_name = frappe.db.get_value(
-		"Commera Event", failed_delivery.parent, ["event", "reference_doctype", "reference_name"]
+		"Commera Event", parent, ["event", "reference_doctype", "reference_name"]
 	)
-	enqueue_app_deliveries(
-		failed_delivery.app, reference_doctype, reference_name, get_lane_event(reference_doctype, event)
-	)
+	enqueue_app_deliveries(app, reference_doctype, reference_name, get_lane_event(reference_doctype, event))
 
 
 def add_plugin_user(setup_args=None):
@@ -800,6 +804,55 @@ def sweep_missed_cod_payments():
 def on_sales_order_cancel(doc, method=None):
 	if doc.get("order_type") == STORE_ORDER_TYPE:
 		fire_event("order_cancelled", "Sales Order", doc.name)
+
+
+def on_sales_order_update_after_submit(doc, method=None):
+	if doc.get("order_type") == STORE_ORDER_TYPE and get_handlers("commera_events", "order_updated"):
+		# Keyed on the save, so each save fires once and a retried hook never fires it twice.
+		fire_event(
+			"order_updated",
+			"Sales Order",
+			doc.name,
+			data={"status": doc.get("custom_ecommerce_status")},
+			key=cstr(doc.modified),
+		)
+
+
+def on_customer_insert(doc, method=None):
+	add_customer_change(doc.name, "customer_created")
+
+
+def on_customer_update(doc, method=None):
+	if not doc.flags.in_insert:
+		add_customer_change(doc.name, "customer_updated")
+
+
+def on_address_change(doc, method=None):
+	for link in doc.links:
+		if link.link_doctype == "Customer" and link.link_name:
+			add_customer_change(link.link_name, "customer_updated")
+
+
+def add_customer_change(customer: str, event: str):
+	"""One event per customer per transaction: a customer created with its address is only created."""
+	if not get_handlers("commera_events", event):
+		return
+	changes = get_transaction_batch(CHANGED_CUSTOMERS_FLAG, dict, enqueue_customer_changes)
+	if changes.get(customer) != "customer_created":
+		changes[customer] = event
+
+
+def enqueue_customer_changes():
+	for customer, event in (frappe.local.flags.pop(CHANGED_CUSTOMERS_FLAG, None) or {}).items():
+		frappe.enqueue(fire_customer_event, event=event, customer=customer)
+
+
+def fire_customer_event(event: str, customer: str):
+	data = frappe.db.get_value(
+		"Customer", customer, ["name as customer", "customer_name", "email_id", "mobile_no"], as_dict=True
+	)
+	if data:
+		fire_event(event, "Customer", customer, data=data, repeatable=event == "customer_updated")
 
 
 def validate_plugins():

@@ -1,27 +1,23 @@
 {
  "actions": [],
- "autoname": "field:title",
+ "autoname": "hash",
  "creation": "2026-10-22 12:00:00.000000",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "title",
   "url",
   "enabled",
   "column_break_url",
   "secret",
   "section_break_events",
-  "events"
+  "events",
+  "section_break_failures",
+  "failed_attempts",
+  "failure_window_started_at",
+  "column_break_failures",
+  "auto_disabled_at"
  ],
  "fields": [
-  {
-   "fieldname": "title",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Title",
-   "reqd": 1,
-   "unique": 1
-  },
   {
    "description": "Commera posts each event here as JSON.",
    "fieldname": "url",
@@ -43,11 +39,11 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Signs each request: X-Commera-Hmac-Sha256 is the base64 HMAC-SHA256 of the body with this secret.",
+   "description": "Signs each request: X-Commera-Hmac-Sha256 is the base64 HMAC-SHA256 of the body with this secret. Commera generates one when you leave it empty.",
    "fieldname": "secret",
    "fieldtype": "Password",
    "label": "Secret",
-   "reqd": 1
+   "no_copy": 1
   },
   {
    "fieldname": "section_break_events",
@@ -59,14 +55,46 @@
    "label": "Events",
    "options": "Commera Webhook Event",
    "reqd": 1
+  },
+  {
+   "fieldname": "section_break_failures",
+   "fieldtype": "Section Break",
+   "label": "Failures"
+  },
+  {
+   "description": "Failed attempts since the failure window started. At 10 within 24 hours, Commera turns the webhook off.",
+   "fieldname": "failed_attempts",
+   "fieldtype": "Int",
+   "label": "Failed Attempts",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "failure_window_started_at",
+   "fieldtype": "Datetime",
+   "label": "Failure Window Started At",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_failures",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "auto_disabled_at",
+   "fieldtype": "Datetime",
+   "label": "Turned Off At",
+   "description": "When Commera turned the webhook off after too many failed attempts.",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "links": [],
- "modified": "2026-10-22 12:00:00.000000",
+ "modified": "2026-11-04 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Webhook",
- "naming_rule": "By fieldname",
+ "naming_rule": "Random",
  "owner": "Administrator",
  "permissions": [
   {
@@ -85,5 +113,5 @@
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
- "title_field": "title"
+ "title_field": "url"
 }
