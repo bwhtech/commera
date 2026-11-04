@@ -3,13 +3,8 @@
 from unittest.mock import Mock, patch
 
 import frappe
-from bwh_payments.bwh_payments.doctype.gateway_payment_request.test_gateway_payment_request import (
-	GATEWAY,
-	configure_stripe_gateway,
-	remove_stripe_gateway,
-)
-from bwh_payments.currency import to_minor_units
-from bwh_payments.services.stripe.stub import StubStripeClient
+from bwh_payments_core.connectors.stripe.stub import StubStripeClient
+from bwh_payments_core.currency import to_minor_units
 from frappe.deferred_insert import queue_prefix
 from frappe.tests import IntegrationTestCase
 
@@ -30,6 +25,11 @@ from commera.api.shipping import (
 	set_delivery_option,
 )
 from commera.core import _get_cart_quotation
+from commera.payment_gateways.doctype.gateway_payment_request.test_gateway_payment_request import (
+	GATEWAY,
+	configure_stripe_gateway,
+	remove_stripe_gateway,
+)
 from commera.tests import test_cart_checkout
 from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.tests.test_payment_hooks import patch_app_hooks
