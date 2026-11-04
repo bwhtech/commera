@@ -1,0 +1,161 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-20 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "column_break_mode",
+  "test_mode",
+  "treat_authorised_as_paid",
+  "send_razorpay_notifications",
+  "section_break_keys",
+  "key_id",
+  "currency",
+  "column_break_keys",
+  "key_secret",
+  "section_break_webhook",
+  "webhook_secret",
+  "section_break_urls",
+  "success_url",
+  "column_break_urls",
+  "failure_url",
+  "column_break_urls_two",
+  "cancelled_url"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "column_break_mode",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Test Mode is decided by which key pair you paste in: Razorpay test keys start with <b>rzp_test_</b>. This flag only records which pair is in use.",
+   "fieldname": "test_mode",
+   "fieldtype": "Check",
+   "label": "Test Mode"
+  },
+  {
+   "default": "0",
+   "description": "Razorpay can authorise a payment without capturing it. Only turn this on if your Razorpay account captures automatically \u2014 on a manual-capture account it would release goods against funds that were never captured.",
+   "fieldname": "treat_authorised_as_paid",
+   "fieldtype": "Check",
+   "label": "Treat Authorised As Paid"
+  },
+  {
+   "default": "0",
+   "description": "Lets Razorpay SMS and email the payment link to the shopper, and chase them if they do not pay. Off by default: the shopper is already on the payment page, and each message is billable.",
+   "fieldname": "send_razorpay_notifications",
+   "fieldtype": "Check",
+   "label": "Send Razorpay Notifications To Shopper"
+  },
+  {
+   "fieldname": "section_break_keys",
+   "fieldtype": "Section Break",
+   "label": "API Keys"
+  },
+  {
+   "fieldname": "key_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Key ID",
+   "reqd": 1
+  },
+  {
+   "description": "Fallback currency when the payment request does not carry one.",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "column_break_keys",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "key_secret",
+   "fieldtype": "Password",
+   "in_list_view": 1,
+   "label": "Key Secret",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_webhook",
+   "fieldtype": "Section Break",
+   "label": "Webhook"
+  },
+  {
+   "description": "Optional, and different from the Key Secret. Until it is set, webhook deliveries are rejected and payment status is only picked up by polling.",
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "in_list_view": 1,
+   "label": "Webhook Secret"
+  },
+  {
+   "fieldname": "section_break_urls",
+   "fieldtype": "Section Break",
+   "label": "Redirect URLs"
+  },
+  {
+   "fieldname": "success_url",
+   "fieldtype": "Data",
+   "label": "Success URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "column_break_urls",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "A Payment Link carries only one callback, so Razorpay never redirects here; it is the URL the storefront uses when a payment fails.",
+   "fieldname": "failure_url",
+   "fieldtype": "Data",
+   "label": "Failure URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "column_break_urls_two",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "A Payment Link carries only one callback, so Razorpay never redirects here; it is the URL the storefront uses when a shopper abandons checkout.",
+   "fieldname": "cancelled_url",
+   "fieldtype": "Data",
+   "label": "Cancelled URL",
+   "options": "URL"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-20 09:09:56.149405",
+ "modified_by": "Administrator",
+ "module": "Payment Gateways",
+ "name": "Razorpay Gateway Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

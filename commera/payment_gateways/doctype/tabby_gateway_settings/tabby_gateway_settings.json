@@ -1,0 +1,151 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-20 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "column_break_mode",
+  "currency",
+  "section_break_keys",
+  "merchant_code",
+  "column_break_keys",
+  "key_secret",
+  "section_break_webhook",
+  "webhook_secret",
+  "column_break_webhook",
+  "webhook_ips",
+  "section_break_urls",
+  "success_url",
+  "column_break_urls",
+  "failure_url",
+  "column_break_urls_two",
+  "cancelled_url"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "column_break_mode",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Fallback currency when the payment request does not carry one. Tabby settles in SAR, AED, KWD, BHD and QAR only.",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "section_break_keys",
+   "fieldtype": "Section Break",
+   "label": "API Keys"
+  },
+  {
+   "description": "Your Tabby merchant code for this market. One code serves one currency, so a SAR store and an AED store each need their own Tabby Gateway Settings and their own Payment Gateway Profile.",
+   "fieldname": "merchant_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Merchant Code",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_keys",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Tabby's secret API key. Sent as a Bearer token on every call.",
+   "fieldname": "key_secret",
+   "fieldtype": "Password",
+   "in_list_view": 1,
+   "label": "Key Secret",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_webhook",
+   "fieldtype": "Section Break",
+   "label": "Webhook"
+  },
+  {
+   "description": "A token <b>you</b> choose and register with Tabby, not one Tabby issues. Tabby does not sign its webhooks; it only echoes this value back in the <b>X-Webhook-Signature</b> header, which is all that separates a real delivery from a forged one.",
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "in_list_view": 1,
+   "label": "Webhook Secret",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_webhook",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "34.166.36.90\n34.166.35.211\n34.166.34.222\n34.166.37.207\n34.93.76.191",
+   "description": "One IP per line. Webhook deliveries from any other address are refused. Tabby rotates infrastructure, so update this list if deliveries start failing. Leave blank to accept any source IP.",
+   "fieldname": "webhook_ips",
+   "fieldtype": "Small Text",
+   "label": "Webhook Source IPs"
+  },
+  {
+   "fieldname": "section_break_urls",
+   "fieldtype": "Section Break",
+   "label": "Redirect URLs"
+  },
+  {
+   "fieldname": "success_url",
+   "fieldtype": "Data",
+   "label": "Success URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "column_break_urls",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "failure_url",
+   "fieldtype": "Data",
+   "label": "Failure URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "column_break_urls_two",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cancelled_url",
+   "fieldtype": "Data",
+   "label": "Cancelled URL",
+   "options": "URL"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-20 10:39:21.480926",
+ "modified_by": "Administrator",
+ "module": "Payment Gateways",
+ "name": "Tabby Gateway Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
