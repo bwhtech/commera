@@ -1,10 +1,22 @@
 import frappe
-from erpnext.stock.doctype.shipment.shipment import is_linked_to_party
 from frappe import _
 from frappe.contacts.doctype.address.address import get_company_address
 from frappe.utils.data import cint, cstr, flt, today
 
 from commera.shipping.providers import get_available_shipping_providers, get_provider
+
+try:
+	from erpnext.stock.doctype.shipment.shipment import is_linked_to_party
+except ImportError:
+
+	def is_linked_to_party(doctype, name, party_type, party):
+		return bool(
+			frappe.db.exists(
+				"Dynamic Link",
+				{"parenttype": doctype, "parent": name, "link_doctype": party_type, "link_name": party},
+			)
+		)
+
 
 DEFAULT_PARCEL_DIMENSIONS = {"length": 30.0, "width": 20.0, "height": 10.0}
 DEFAULT_ITEM_WEIGHT_KG = 0.5
