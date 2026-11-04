@@ -23,9 +23,8 @@ from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category imp
 	get_menu_tree,
 )
 from commera.search.sync import enqueue_upsert, enqueue_upsert_many
+from commera.shop_data import get_category_item_groups
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
-
-ITEM_GROUP_RANGE_CHUNK_SIZE = 100
 
 PRODUCT_PAGE_LENGTH = 50
 MAX_PRODUCT_PAGE_LENGTH = 200
@@ -412,48 +411,9 @@ def get_menu_node(name):
 	return node
 
 
-def get_subtree_item_groups(node):
-	item_groups = []
-	pending = [node]
-	while pending:
-		current = pending.pop()
-		item_groups.extend(current["item_groups"])
-		pending.extend(current["children"])
-	return list(dict.fromkeys(item_groups))
-
-
-def get_item_groups_with_descendants(item_groups):
-	if not item_groups:
-		return []
-
-	bands = []
-	for offset in range(0, len(item_groups), IN_CLAUSE_CHUNK_SIZE):
-		chunk = item_groups[offset : offset + IN_CLAUSE_CHUNK_SIZE]
-		bands.extend(frappe.get_all("Item Group", filters={"name": ["in", chunk]}, fields=["lft", "rgt"]))
-
-	item_group = frappe.qb.DocType("Item Group")
-	expanded = list(item_groups)
-	for offset in range(0, len(bands), ITEM_GROUP_RANGE_CHUNK_SIZE):
-		within_any_band = None
-		for band in bands[offset : offset + ITEM_GROUP_RANGE_CHUNK_SIZE]:
-			within_band = (item_group.lft >= band.lft) & (item_group.rgt <= band.rgt)
-			within_any_band = within_band if within_any_band is None else (within_any_band | within_band)
-
-		expanded.extend(
-			row.name
-			for row in frappe.qb.from_(item_group)
-			.select(item_group.name)
-			.where(within_any_band)
-			.orderby(item_group.lft)
-			.run(as_dict=True)
-		)
-
-	return list(dict.fromkeys(expanded))
-
-
 def get_cascade_scope(name):
 	node = get_menu_node(name)
-	return node["label"], get_item_groups_with_descendants(get_subtree_item_groups(node))
+	return node["label"], get_category_item_groups(node)
 
 
 def get_cascade_counts(item_groups):

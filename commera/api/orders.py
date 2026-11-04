@@ -5,6 +5,7 @@ from frappe.utils import flt
 
 from commera.api.payments import system_user_session
 from commera.api.shipping import get_charge_amount
+from commera.order_access import is_shoppers_order
 from commera.plugin_events import fire_order_refunded
 from commera.utils import update_sales_order_ecommerce_status, validate_document_access
 
@@ -170,7 +171,7 @@ def validate_can_cancel(order_doc):
 	if frappe.db.exists("Delivery Note Item", {"against_sales_order": order_doc.name, "docstatus": ["<", 2]}):
 		frappe.throw(_("This order is already being prepared for shipment."))
 
-	if order_doc.owner != frappe.session.user:
+	if not is_shoppers_order(order_doc):
 		frappe.throw(_("Action not allowed"))
 
 

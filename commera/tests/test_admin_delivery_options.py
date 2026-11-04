@@ -3,7 +3,6 @@
 
 """The dashboard Delivery Options API: managing Shipping Services without opening Desk."""
 
-import unittest
 from unittest.mock import patch
 
 import frappe
@@ -24,8 +23,6 @@ AFTERSHIP_SETTINGS = "AfterShip Shipping Settings"
 SHIPROCKET_SETTINGS = "Shiprocket Shipping Settings"
 AFTERSHIP_PROFILE = "_Test Delivery AfterShip"
 SHIPROCKET_PROFILE = "_Test Delivery Shiprocket"
-
-CONNECTOR_APP = "bwh_shipping"
 
 
 def create_provider_profile(name: str, provider_settings: str, enabled: int = 1) -> str:
@@ -49,9 +46,6 @@ def field_names(screen):
 	return [field["fieldname"] for group in screen["field_groups"] for field in group["fields"]]
 
 
-@unittest.skipUnless(
-	CONNECTOR_APP in frappe.get_installed_apps(), "delivery options need the shipping connector"
-)
 class TestAdminDeliveryOptions(IntegrationTestCase):
 	# Frappe rolls a test run back per class, so each case uses its own titles; sharing them would make
 	# one case's inserts another's pre-existing row.
@@ -95,7 +89,6 @@ class TestAdminDeliveryOptions(IntegrationTestCase):
 
 		screen = get_delivery_options()
 
-		self.assertTrue(screen["available"])
 		option = find_option(screen, "_Test List Express")
 		self.assertEqual(option["provider"], self.provider)
 		self.assertEqual(option["backup_charge"], 100)
@@ -142,7 +135,6 @@ class TestAdminDeliveryOptions(IntegrationTestCase):
 		self.assertEqual(option["description"], "1-2 days")
 		self.assertEqual(option["markup_percent"], 5)
 		# The write answers with the whole screen, so the editor never renders a stale list.
-		self.assertTrue(screen["available"])
 
 	def test_edit_updates_the_option_it_names(self):
 		self.create_option("_Test Edit Express")
@@ -267,7 +259,7 @@ class TestAdminDeliveryOptions(IntegrationTestCase):
 
 	def stubbed_carrier_calls(self):
 		"""Neutralise only the outbound boundary — no AfterShip traffic, everything else is real."""
-		from bwh_shipping.bwh_shipping.doctype.aftership_shipping_settings.aftership_shipping_settings import (
+		from commera.shipping.doctype.aftership_shipping_settings.aftership_shipping_settings import (
 			AfterShipShippingSettings,
 		)
 
@@ -286,39 +278,6 @@ class TestAdminDeliveryOptions(IntegrationTestCase):
 				}
 			],
 		)
-
-
-class TestDeliveryOptionsWithoutTheConnector(IntegrationTestCase):
-	"""bwh_shipping is a soft dependency: the screen degrades rather than breaking."""
-
-	def setUp(self):
-		self.addCleanup(frappe.db.rollback)
-		frappe.set_user("Administrator")
-
-	def without_the_connector(self):
-		# The real is_connector_installed() still runs; only the installed-app list it reads is narrowed,
-		# so this exercises the same code path a site without bwh_shipping takes.
-		installed = [app for app in frappe.get_installed_apps() if app != CONNECTOR_APP]
-		return patch.object(frappe, "get_installed_apps", return_value=installed)
-
-	def test_screen_reports_itself_unavailable_and_empty(self):
-		with self.without_the_connector():
-			screen = build_screen()
-
-		self.assertEqual(
-			screen,
-			{
-				"available": False,
-				"options": [],
-				"field_groups": [],
-				"import_providers": [],
-				"link_options_path": "",
-			},
-		)
-
-	def test_a_write_refuses_rather_than_half_working(self):
-		with self.without_the_connector():
-			self.assertRaises(frappe.ValidationError, save_delivery_option, values={"title": "_Test Nope"})
 
 
 def create_pickup_address() -> str:

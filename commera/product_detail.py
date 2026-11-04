@@ -19,13 +19,11 @@ def size_sort_key(size):
 
 
 def get_product_detail(route, selected_size=None):
-	try:
-		product_variant = frappe.get_doc("Style Attribute Variant", {"route": route})
-	except frappe.DoesNotExistError:
+	# get_doc of a missing record queues a "not found" message that reaches the response even when caught.
+	name = frappe.db.get_value("Style Attribute Variant", {"route": route, "is_published": 1}, "name")
+	if not name:
 		return None
-
-	if not product_variant.is_published:
-		return None
+	product_variant = frappe.get_doc("Style Attribute Variant", name)
 
 	product = frappe.get_doc("Item", product_variant.item_style)
 	commera_settings = frappe.get_cached_doc("Commera Settings")

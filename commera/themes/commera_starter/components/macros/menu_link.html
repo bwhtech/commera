@@ -1,0 +1,3 @@
+{% macro menu_link(item, class) %}
+{% if item["url"] %}<a href="{{ item['url'] }}" class="{{ class }}">{{ item["title"] }}</a>{% else %}<span class="{{ class }}">{{ item["title"] }}</span>{% endif %}
+{%- endmacro %}

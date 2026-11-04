@@ -1,7 +1,8 @@
-{% macro signup_modal(mode="auth") %}
+{% macro signup_modal(mode="auth", open=False, redirect_to=None) %}
 
 <div x-data="{
-    is_open: false,
+    is_open: {{ 'true' if open else 'false' }},
+    redirect_to: {{ redirect_to|tojson|forceescape }},
     otp_sent: false,
     first_name:'',
     last_name:'',

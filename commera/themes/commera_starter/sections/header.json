@@ -1,0 +1,20 @@
+{
+	"name": "Header",
+	"category": "Header",
+	"groups": ["header_group"],
+	"settings": [
+		{
+			"id": "logo_position",
+			"type": "select",
+			"label": "Logo position",
+			"options": ["center", "start"],
+			"default": "center"
+		},
+		{ "id": "menu", "type": "select", "label": "Menu", "options": ["main-menu", "footer"], "default": "main-menu" },
+		{ "id": "show_search", "type": "checkbox", "label": "Show search", "default": true },
+		{ "id": "show_account", "type": "checkbox", "label": "Show account", "default": true },
+		{ "id": "show_wishlist", "type": "checkbox", "label": "Show wishlist", "default": true }
+	],
+	"blocks": {},
+	"max_blocks": 0
+}

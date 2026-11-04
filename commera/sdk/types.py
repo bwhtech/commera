@@ -1,23 +1,63 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Any, TypedDict
 
 __all__ = [
 	"Address",
 	"Cart",
 	"CartLine",
+	"CartLineProduct",
 	"CatalogItem",
 	"Charge",
 	"ChargeSummary",
+	"CheckoutResult",
+	"CheckoutState",
 	"CheckoutSummary",
+	"Collection",
+	"ContentPage",
+	"Country",
+	"CustomerAddress",
+	"CustomerProfile",
 	"Discount",
 	"DiscountAllocation",
 	"DiscountInput",
+	"FacetValue",
+	"FooterSection",
+	"Menu",
+	"MenuItem",
 	"NewCartLine",
 	"Order",
 	"OrderLine",
+	"OrderTracking",
+	"PaymentMethod",
+	"PaymentSession",
+	"PickupLocation",
+	"PlacedOrder",
 	"PricedCart",
 	"PricedCartLine",
+	"Product",
+	"ProductCard",
+	"ProductFacets",
+	"ProductOption",
+	"ProductOptionValue",
+	"ProductPage",
+	"ProductVariant",
+	"Rating",
+	"ReturnOptions",
+	"ReturnReason",
+	"SearchResults",
+	"ShippingOption",
+	"ShippingOptions",
+	"Shop",
+	"ShopperOrder",
+	"ShopperOrderDetail",
+	"ShopperOrderPage",
+	"Sitemap",
+	"SitemapEntry",
 	"Stage",
+	"TrackingEvent",
+	"Typeahead",
+	"TypeaheadLink",
+	"Wishlist",
 ]
 
 
@@ -57,7 +97,7 @@ class OrderLine(TypedDict):
 	attributes: dict[str, str]
 
 
-class Order(TypedDict):
+class ShopperOrder(TypedDict):
 	"""Money is in `currency`; the `base_` totals are in the company currency."""
 
 	name: str | int
@@ -74,6 +114,7 @@ class Order(TypedDict):
 	net_total: float
 	grand_total: float
 	rounded_total: float
+	rounding_adjustment: float
 	base_grand_total: float
 	base_rounded_total: float
 	payment_mode: str | None
@@ -83,12 +124,45 @@ class Order(TypedDict):
 	status: str | None
 	# The dashboard's badge for the order, so a card matches the order screen.
 	stage: Stage
+	shipping: float
+	cod_charge: float
 	plugin_fees: list[Charge]
+	taxes: list[Charge]
 	items: list[OrderLine]
-	tags: list[str]
 	plugin_fields: dict[str, Any]
 	discounts: list["DiscountAllocation"]
 	attributes: dict[str, str]
+
+
+class ShopperOrderDetail(ShopperOrder):
+	access: str
+
+
+class Order(ShopperOrder):
+	tags: list[str]
+
+
+class ShopperOrderPage(TypedDict):
+	orders: list[ShopperOrder]
+	total: int
+	page: int
+	page_size: int
+
+
+class CustomerAddress(Address):
+	address_type: str
+	email_id: str | None
+	is_primary_address: bool
+	is_shipping_address: bool
+	plugin_fields: dict[str, Any]
+
+
+class CustomerProfile(TypedDict):
+	email: str
+	first_name: str
+	last_name: str | None
+	full_name: str
+	phone: str | None
 
 
 class CartLine(TypedDict):
@@ -161,6 +235,16 @@ class NewCartLine(TypedDict, total=False):
 	selected: bool
 
 
+class CartLineProduct(TypedDict):
+	"""The published product that sells a cart line's item."""
+
+	handle: str
+	title: str
+	# The size.
+	variant_title: str
+	image: str | None
+
+
 class PricedCartLine(TypedDict):
 	line_id: str
 	item_code: str
@@ -175,6 +259,8 @@ class PricedCartLine(TypedDict):
 	# The Commera Discount on this line.
 	discount: str | None
 	amount: float
+	# None when no published product sells the item any more.
+	product: CartLineProduct | None
 
 
 class DiscountRow(TypedDict):
@@ -190,9 +276,12 @@ class PricedCart(TypedDict):
 	version: str
 	attributes: dict[str, str]
 	currency: str
-	# {"code", "class"}, where class is "Product" or "Order".
+	# {"code", "title", "discount_class", "applied", "reason"}; reason says why an unapplied code gives nothing.
 	discount_codes: list[dict]
+	# {"title", "amount"} of each automatic discount the cart gets.
+	automatic_discounts: list[dict]
 	lines: list[PricedCartLine]
+	total_quantity: int
 	discounts: list[DiscountRow]
 	subtotal: float
 	order_discount: float
@@ -234,3 +323,287 @@ class CatalogItem(TypedDict):
 	available_qty: float
 	# Drop-shipped or not stock-tracked: sellable whatever available_qty says.
 	unlimited: bool
+
+
+class Rating(TypedDict):
+	average: float
+	count: int
+
+
+class ProductCard(TypedDict):
+	"""A published product as a shopper sees it in a grid. Image paths are site-relative or absolute."""
+
+	id: str
+	handle: str
+	title: str
+	vendor: str | None
+	product_type: str | None
+	color: str | None
+	image: str | None
+	hover_image: str | None
+	currency: str
+	price: float
+	compare_at_price: float | None
+	available: bool
+	rating: Rating
+	updated_at: str | None
+
+
+class FacetValue(TypedDict):
+	value: str
+	# Products with this value under every other selected filter.
+	count: int
+
+
+class ProductFacets(TypedDict):
+	brands: list[FacetValue]
+	colors: list[FacetValue]
+	sizes: list[FacetValue]
+	price: dict[str, float]
+
+
+class ProductPage(TypedDict):
+	products: list[ProductCard]
+	total: int
+	page: int
+	page_size: int
+	facets: ProductFacets
+
+
+class SearchResults(ProductPage):
+	query: str
+
+
+class TypeaheadLink(TypedDict):
+	title: str
+	url: str
+
+
+class Typeahead(TypedDict):
+	query: str
+	corrected_query: str | None
+	products: list[ProductCard]
+	categories: list[TypeaheadLink]
+
+
+class ProductOptionValue(TypedDict, total=False):
+	name: str
+	# Colour values only: the sibling product's handle, whether it is this one, and its stock and swatch.
+	handle: str
+	selected: bool
+	available: bool
+	swatch: dict | None
+
+
+class ProductOption(TypedDict):
+	name: str
+	values: list[ProductOptionValue]
+
+
+class ProductVariant(TypedDict):
+	"""One size of a product."""
+
+	id: str
+	title: str
+	price: float
+	compare_at_price: float | None
+	available: bool
+	# None when the item is sold without stock tracking.
+	quantity_available: float | None
+
+
+class Product(TypedDict):
+	"""One colour of a style: sibling colours are the colour option, sizes are the variants."""
+
+	id: str
+	handle: str
+	title: str
+	vendor: str | None
+	color: str | None
+	description_html: str
+	images: list[str]
+	collection: dict | None
+	currency: str
+	price: float
+	available: bool
+	options: list[ProductOption]
+	variants: list[ProductVariant]
+	selected_variant_id: str | None
+	rating: Rating
+	seo: dict
+	updated_at: str
+
+
+class Collection(TypedDict):
+	"""An enabled menu tab (top-level Ecommerce Category); `handle` is its route slug."""
+
+	handle: str
+	title: str
+	image: str | None
+	updated_at: str
+
+
+class MenuItem(TypedDict):
+	"""`type` is "collection" (target: a collection handle), "brand" (target: the brand), "url" (target:
+	the URL) or "all" (every product); a node with no link has type None."""
+
+	title: str
+	type: str | None
+	target: str | None
+	url: str | None
+	items: list["MenuItem"]
+
+
+class Menu(TypedDict):
+	handle: str
+	title: str
+	items: list[MenuItem]
+
+
+class FooterSection(TypedDict):
+	title: str
+	links: list[dict[str, str]]
+
+
+class Shop(TypedDict):
+	name: str
+	description: str
+	currency: str
+	country: str | None
+	logo: str
+	favicon: str
+	menu: list[MenuItem]
+	footer: list[FooterSection]
+
+
+class Country(TypedDict):
+	name: str
+	title: str
+
+
+class ContentPage(TypedDict):
+	handle: str
+	title: str
+	body_html: str
+	seo: dict
+	updated_at: str
+
+
+class SitemapEntry(TypedDict):
+	handle: str
+	updated_at: str
+
+
+class SitemapPage(TypedDict):
+	# Handles of each returned kind.
+	total: dict[str, int]
+	page: int
+	page_size: int
+
+
+class Sitemap(SitemapPage, total=False):
+	"""Only the asked kind, or every kind when none is asked."""
+
+	products: list[SitemapEntry]
+	collections: list[SitemapEntry]
+	pages: list[SitemapEntry]
+
+
+class Wishlist(TypedDict):
+	products: list[ProductCard]
+	count: int
+
+
+class CheckoutState(TypedDict):
+	cart: str
+	email: str | None
+	billing_address: Address | None
+	shipping_address: Address | None
+	is_store_pickup: bool
+	store: str | None
+	shipping_option: str | None
+	summary: CheckoutSummary
+
+
+class ReturnReason(TypedDict):
+	name: str
+	label: str
+
+
+class ReturnOptions(TypedDict):
+	can_return: bool
+	return_by: datetime | None
+	reasons: list[ReturnReason]
+	returned_items: list[str]
+	pending_items: list[str]
+
+
+class TrackingEvent(TypedDict):
+	timestamp: datetime
+	status: str | None
+	location: str | None
+	message: str | None
+
+
+class OrderTracking(TypedDict, total=False):
+	has_tracking: bool
+	awb: str
+	carrier: str | None
+	status: str | None
+	tracking_url: str | None
+	events: list[TrackingEvent]
+
+
+class ShippingOption(TypedDict):
+	id: str
+	title: str
+	description: str | None
+	provider: str | None
+	amount: float
+	original_amount: float | None
+	is_free: bool
+	min_delivery_date: str | None
+	max_delivery_date: str | None
+	phone_required: bool
+
+
+class ShippingOptions(TypedDict):
+	options: list[ShippingOption]
+	selected: str | None
+	reason: str | None
+
+
+class PaymentMethod(TypedDict):
+	id: str
+	title: str
+	is_cash_on_delivery: bool
+
+
+class PickupLocation(TypedDict):
+	id: str
+	title: str
+	address_line1: str
+	address_line2: str | None
+	city: str
+	state: str | None
+	pincode: str | None
+	country: str
+	phone: str | None
+	directions_url: str | None
+
+
+class PaymentSession(TypedDict):
+	redirect_url: str
+	reference_id: str
+
+
+class PlacedOrder(TypedDict):
+	name: str
+	link: str
+	grand_total: float
+	currency: str
+
+
+class CheckoutResult(TypedDict):
+	status: str
+	order: PlacedOrder | None

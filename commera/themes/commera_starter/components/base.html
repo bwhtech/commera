@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="{{ frappe.lang or 'en' }}" dir="{{ 'rtl' if is_rtl else 'ltr' }}" data-color-scheme="{{ theme.color_scheme or 'System' }}" data-corners="{{ theme.corners or 'Default' }}">
+{% from "templates/macros/seo.html" import seo_meta, json_ld_block %}
+{% set favicon = get_brand_assets().favicon %}
+{% set google_fonts = [theme.font, theme.heading_font] | select | unique | list %}
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<script>
+		(() => {
+			const root = document.documentElement;
+			const query = matchMedia('(prefers-color-scheme: dark)');
+			const apply = () => {
+				const scheme = root.dataset.colorScheme;
+				root.dataset.theme = scheme === 'System' ? (query.matches ? 'dark' : 'light') : scheme.toLowerCase();
+			};
+			apply();
+			query.addEventListener('change', apply);
+		})();
+	</script>
+
+	{% block seo %}{{ seo_meta(seo if seo is defined and seo else seo_page_meta()) }}{% endblock %}
+	{% block json_ld %}{{ json_ld_block(json_ld if json_ld is defined and json_ld else seo_org_jsonld()) }}{% endblock %}
+
+	{% block analytics_head %}
+	{% include "templates/includes/ga4.html" %}
+	{% include "templates/includes/meta-pixel.html" %}
+	{% include "templates/includes/custom-tracking-scripts.html" %}
+	{% endblock %}
+
+	<link rel="apple-touch-icon" sizes="180x180" href="{{ favicon }}">
+	<link rel="icon" type="image/png" sizes="32x32" href="{{ favicon }}">
+	<link rel="icon" type="image/png" sizes="16x16" href="{{ favicon }}">
+
+	{% if google_fonts %}
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?{% for font in google_fonts %}family={{ font | urlencode }}&{% endfor %}display=swap">
+	{% endif %}
+	<link rel="preload" href="/assets/frappe/css/fonts/inter/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
+	<link rel="stylesheet" href="{{ shop_theme_asset_url('tailwind.output.css') }}">
+	{{ format_shop_theme_css() }}
+
+	{{ commera_header_content }}
+	<script defer src="{{ shop_theme_asset_url('scripts/storefront.js') }}"></script>
+	<script defer src="/assets/commera/js/vendor/alpinejs/core.js"></script>
+	{% block head %}{% endblock %}
+	{{ format_plugin_includes("css") }}
+</head>
+
+<body class="flex min-h-dvh flex-col bg-surface-base text-ink-gray-9">
+	{% block header %}{{ render_layout("header_group") }}{% endblock %}
+	{% include "components/search_modal.html" %}
+	{% include "components/cart_drawer.html" %}
+	{% block auth_modal %}{% if frappe.session.user == "Guest" %}{% include "components/auth_modal.html" %}{% endif %}{% endblock %}
+
+	<main class="flex-1">
+		{% block body %}{% endblock %}
+		{% block uncontained_body %}{% endblock %}
+	</main>
+
+	{% block footer %}{{ render_layout("footer_group") }}{% endblock %}
+	{% block analytics_events %}{% include "templates/includes/analytics-events.html" %}{% endblock %}
+	{{ plugin_slot("page_overlay") }}
+	{{ format_plugin_includes("js") }}
+	{% block script %}{% endblock %}
+</body>
+</html>

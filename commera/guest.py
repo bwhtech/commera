@@ -1,9 +1,16 @@
+import re
+
 import frappe
 from frappe import _
 from frappe.utils.data import cint, sha256_hash
 
 GUEST_CART_COOKIE = "commera_guest_cart"
 GUEST_CART_COOKIE_MAX_AGE = 30 * 24 * 60 * 60
+# Headless storefronts keep the token themselves and send it on each server-to-server call.
+CART_TOKEN_HEADER = "X-Commera-Cart-Token"
+CART_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{32,128}")
+# Only the storefront API takes the header, so a page or another method a browser opens never acts on it.
+STOREFRONT_API_PATH = re.compile(r"/api/(v[12]/)?method/commera\.api\.storefront\.")
 
 
 def is_guest() -> bool:
@@ -21,7 +28,17 @@ def validate_guest_checkout_enabled():
 
 def get_guest_cart_token() -> str | None:
 	request = getattr(frappe.local, "request", None)
-	return request.cookies.get(GUEST_CART_COOKIE) if request else None
+	if not request:
+		return None
+	if (token := request.headers.get(CART_TOKEN_HEADER)) and STOREFRONT_API_PATH.match(request.path):
+		validate_cart_token(token)
+		return token
+	return request.cookies.get(GUEST_CART_COOKIE)
+
+
+def validate_cart_token(token: str):
+	if not CART_TOKEN_PATTERN.fullmatch(token):
+		frappe.throw(_("A cart token is 32 to 128 letters, digits, hyphens or underscores."))
 
 
 def get_guest_cart_key() -> str | None:
@@ -29,9 +46,9 @@ def get_guest_cart_key() -> str | None:
 	return sha256_hash(token) if token else None
 
 
-def set_guest_cart_cookie() -> str:
-	"""Keep the browser's cart token, or issue one, and return the key the cart is stored under."""
-	token = get_guest_cart_token() or frappe.generate_hash(length=32)
+def set_guest_cart_cookie(token: str | None = None) -> str:
+	"""Keep the given or the browser's cart token, or issue one, and return the key the cart is stored under."""
+	token = token or get_guest_cart_token() or frappe.generate_hash(length=32)
 	frappe.local.cookie_manager.set_cookie(
 		GUEST_CART_COOKIE, token, max_age=GUEST_CART_COOKIE_MAX_AGE, httponly=True, samesite="Lax"
 	)

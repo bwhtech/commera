@@ -6,7 +6,10 @@
 {% set card_fields = get_search_result_fields() %}
 <div x-data="{
     is_open: false,
-    products :[],
+    products: [],
+    categories: [],
+    corrected_query: null,
+    latest_request: 0,
     query_state: window.query_state,
     search_term: window.query_state?.search ? window.query_state.search : '',
     update_search(){
@@ -14,14 +17,22 @@
         window.location.href = `/{{frappe.lang}}/products?search=${this.search_term}`
     },
     async get_search_results() {
-        if (this.search_term.length < 1) {
+        const term = this.search_term.trim();
+        // Answers can arrive out of order; only the newest request may paint.
+        const request_id = ++this.latest_request;
+        if (term.length < 1) {
             this.products = [];
+            this.categories = [];
+            this.corrected_query = null;
             return;
         }
-        const data = await frappe_call('/api/v2/method/commera.api.utils.get_search_results',
-            {search:this.search_term}
-        );
-        this.products = data.data;
+        const data = await frappe_call('/api/v2/method/commera.api.search.typeahead', {q: term});
+        if (request_id !== this.latest_request) {
+            return;
+        }
+        this.products = data.data.products;
+        this.categories = data.data.categories;
+        this.corrected_query = data.data.corrected_query;
     },
     init(){
         this.get_search_results();
@@ -51,6 +62,15 @@
                 </button>
             </div>
             <div class="max-w-4xl w-full mx-auto mt-10 px-6 md:px-10">
+                <p class="text-sm my-2" x-cloak x-show="corrected_query">
+                    {{ _("Showing results for") }} <span class="font-medium" x-text="corrected_query"></span>
+                </p>
+                <div class="flex flex-wrap gap-2 my-4" x-cloak x-show="categories.length > 0">
+                    <template x-for="category in categories" :key="category.name">
+                        <a :href="category.url" class="text-sm border border-gray-300 rounded-full px-3 py-1 hover:bg-gray-100"
+                            x-text="category.label"></a>
+                    </template>
+                </div>
                 <h3 class="text-sm my-4" x-show="products.length > 0">{{_("Search Results")}}</h3>
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-6">
                     <template x-for="(product, index) in products" :key="index">

@@ -1,0 +1,14 @@
+{
+	"sections": [
+		{
+			"id": "welcome",
+			"type": "rich_text",
+			"hidden": false,
+			"settings": {
+				"heading": "Welcome to $theme_name",
+				"text": "Edit layouts/index.json, or add sections in sections/."
+			},
+			"blocks": []
+		}
+	]
+}

@@ -1,3 +1,4 @@
+import { isAdmin } from '../data/boot'
 import { pluginNavItems } from './plugins'
 import { search } from './search'
 
@@ -26,7 +27,7 @@ const ITEM = {
   products: { label: 'Products', icon: 'lucide-package', to: '/products' },
   collections: { label: 'Collections', icon: 'lucide-layers', to: '/collections' },
   attributes: { label: 'Attributes', icon: 'lucide-tags', to: '/attributes' },
-  theme: { label: 'Theme', icon: 'lucide-palette', to: '/storefront/theme' },
+  theme: { label: 'Themes', icon: 'lucide-palette', to: '/storefront/theme' },
   navigation: { label: 'Navigation', icon: 'lucide-list-tree', to: '/storefront/navigation' },
   pages: { label: 'Pages', icon: 'lucide-file-text', to: '/storefront/pages' },
   reviews: { label: 'Reviews', icon: 'lucide-star', to: '/reviews' },
@@ -47,7 +48,9 @@ const coreSections = [
 const pluginItems = pluginNavItems()
 
 // Installed plugins sit in their own section after the core ones, which only shows when it has rows.
-export const sections = [...coreSections, ...(pluginItems.length ? [{ id: 'plugins', label: 'Plugins', items: pluginItems }] : [])]
+const pluginSections = pluginItems.length ? [{ id: 'plugins', label: 'Plugins', items: pluginItems }] : []
+
+export const sections = isAdmin ? [...coreSections, ...pluginSections] : pluginSections
 
 // SidebarItem only infers active state from an exact route match, so a detail
 // route (/products/p-2) would leave its section unlit. Resolve it here instead:

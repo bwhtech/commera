@@ -76,6 +76,14 @@ export function firstPageRoute(app) {
   return first ? pageRoute(first) : null
 }
 
+export function firstPluginRoute() {
+  const sidebarRoute = pluginNavItems()
+    .flatMap((item) => item.children ?? [item])
+    .find((item) => item.to)?.to
+  const [firstPage] = placeEntries('pages')
+  return sidebarRoute ?? (firstPage ? pageRoute(firstPage) : null)
+}
+
 function navItem(entry) {
   return entry.place === 'sidebar'
     ? { label: entry.label, icon: pluginIcon(entry), onClick: () => runSidebarAction(entry) }

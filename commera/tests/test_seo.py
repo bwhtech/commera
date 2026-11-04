@@ -360,7 +360,7 @@ class TestSitemapIndex(SitemapFixtureMixin, IntegrationTestCase):
 		self.assertEqual(len(self.child_pages(context, "products")), expected)
 
 	def test_pages_segment_has_exactly_one_child(self):
-		# The homepage-only segment never paginates, so it always contributes one child.
+		# The homepage keeps one child here even on a store without any Shop Web Page.
 		context = self.get_index()
 		self.assertEqual(len(self.child_pages(context, "pages")), 1)
 
@@ -412,12 +412,31 @@ class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
 		self.assertIn(self.url("/en"), locs)
 		self.assertIn(self.url("/ar"), locs)
 
-	def test_pages_segment_is_homepage_only(self):
-		# commera has no CMS page doctype, so this segment carries exactly the two homepage URLs.
-		self.assertEqual(
-			self.locs("pages", 1),
-			{self.url("/en"), self.url("/ar")},
-		)
+	def test_pages_segment_lists_published_indexable_shop_web_pages(self):
+		shown = self.make_page("shown", published=1, noindex=0)
+		hidden = [
+			self.make_page("draft", published=0, noindex=0),
+			self.make_page("noindex", published=1, noindex=1),
+		]
+
+		locs = self.locs("pages", 1)
+
+		self.assertIn(self.url(f"/en/page/{shown.route}"), locs)
+		self.assertIn(self.url(f"/ar/page/{shown.route}"), locs)
+		for page in hidden:
+			self.assertNotIn(self.url(f"/en/page/{page.route}"), locs)
+
+	def make_page(self, label, published, noindex):
+		suffix = frappe.generate_hash(length=6)
+		return frappe.get_doc(
+			{
+				"doctype": "Shop Web Page",
+				"route": f"seo-{label}-{suffix}",
+				"content": label,
+				"published": published,
+				"noindex": noindex,
+			}
+		).insert(ignore_permissions=True, set_name=f"SEO {label} {suffix}")
 
 	def test_pages_segment_has_a_single_child(self):
 		self.assertEqual(sitemap_segment.segment_page_count("pages"), 1)
@@ -426,8 +445,11 @@ class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
 		# The homepage must not be duplicated onto a phantom second child sitemap.
 		self.assertEqual(self.run_segment("pages", 2).urls, [])
 
-	def test_pages_segment_has_no_lastmod_source(self):
-		self.assertIsNone(sitemap_segment.latest_lastmod("pages"))
+	def test_pages_segment_lastmod_follows_its_newest_page(self):
+		page = self.make_page("fresh", published=1, noindex=0)
+		self.assertEqual(
+			sitemap_segment.latest_lastmod("pages"), sitemap_segment.format_lastmod(page.modified)
+		)
 
 	def test_page_never_exceeds_url_cap(self):
 		# One product route per language; a full page must stay within the sitemaps.org 50k-URL ceiling.

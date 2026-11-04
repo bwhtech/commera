@@ -1,0 +1,24 @@
+{
+	"name": "Image with text",
+	"category": "Text",
+	"settings": [
+		{ "id": "image", "type": "image", "label": "Image", "default": "images/about-pic1.webp" },
+		{ "id": "badge", "type": "text", "label": "Badge", "default": "Our process" },
+		{
+			"id": "heading",
+			"type": "textarea",
+			"label": "Heading",
+			"default": "“We make fewer things, and we make them slowly.”"
+		},
+		{
+			"id": "text",
+			"type": "textarea",
+			"label": "Text",
+			"default": "Every piece is cut and sewn in small runs in Jaipur and Tiruppur."
+		},
+		{ "id": "button_label", "type": "text", "label": "Button label", "default": "Read the journal" },
+		{ "id": "button_url", "type": "url", "label": "Button link", "default": "" }
+	],
+	"blocks": {},
+	"max_blocks": 0
+}

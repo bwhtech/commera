@@ -1,0 +1,17 @@
+{% from "components/macros/image.html" import image with context %}
+{% set language = frappe.lang or "en" %}
+<section class="mx-5 grid items-center gap-10 rounded-2xl bg-surface-gray-1 p-5 md:mx-12 md:grid-cols-2 md:p-8">
+	{{ image(section.settings.image, "", 960, "w-full rounded-xl") }}
+	<div class="md:ps-10">
+		{% if section.settings.badge %}
+		<span class="inline-flex h-6 items-center rounded-full bg-surface-gray-3 px-2 text-sm text-ink-gray-7">{{ section.settings.badge }}</span>
+		{% endif %}
+		<p class="mt-4 text-6xl">{{ section.settings.heading }}</p>
+		{% if section.settings.text %}
+		<p class="mt-5 text-p-base text-ink-gray-6">{{ section.settings.text }}</p>
+		{% endif %}
+		{% if section.settings.button_label %}
+		<a href="{{ section.settings.button_url or '/' ~ language ~ '/products' }}" class="mt-6 inline-flex h-8 items-center rounded-lg border border-outline-gray-2 bg-surface-base px-2.5 text-base font-medium text-ink-gray-8 hover:border-outline-gray-3">{{ section.settings.button_label }}</a>
+		{% endif %}
+	</div>
+</section>

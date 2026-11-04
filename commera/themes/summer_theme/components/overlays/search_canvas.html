@@ -39,6 +39,17 @@
 		<div id="summer-search-results" aria-live="polite">
 			<h5 class="mb-3" x-cloak x-show="loading">{{ _("Searching") }}&hellip;</h5>
 
+			<h5 class="mb-3" x-cloak x-show="!loading && corrected_query">
+				{{ _("Showing results for") }} &ldquo;<span x-text="corrected_query"></span>&rdquo;
+			</h5>
+
+			<ul class="recent-tag mb-3" x-cloak x-show="!loading && categories.length">
+				<li class="pe-0"><span>{{ _("Categories") }} :</span></li>
+				<template x-for="category in categories" :key="category.name">
+					<li><a :href="category.url" x-text="category.label"></a></li>
+				</template>
+			</ul>
+
 			<template x-if="!loading && matched_term && !products.length">
 				<h5 class="mb-3">{{ _("No products found for") }} &ldquo;<span x-text="matched_term"></span>&rdquo;</h5>
 			</template>

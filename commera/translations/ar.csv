@@ -78,3 +78,163 @@ Brand logo,شعار المتجر
 Footer logo,شعار التذييل
 Favicon,أيقونة الموقع
 Store name,اسم المتجر
+Showing results for,عرض النتائج لـ
+Categories,الفئات
+Search products,ابحث في المنتجات
+All products,كل المنتجات
+Breadcrumb,مسار التنقل
+Sort,ترتيب
+Newest,الأحدث
+"Price, low to high",السعر: من الأقل إلى الأعلى
+"Price, high to low",السعر: من الأعلى إلى الأقل
+Biggest discount,أكبر خصم
+Relevance,الأكثر صلة
+Lowest price,أدنى سعر
+Highest price,أعلى سعر
+On sale,عليه خصم
+On sale only,المنتجات المخفضة فقط
+From {0},من {0}
+Up to {0},حتى {0}
+Remove {0},إزالة {0}
+{0} pieces,{0} قطعة
+No products match these filters.,لا توجد منتجات تطابق هذه الفلاتر.
+Search: {0},بحث: {0}
+Results for “{0}”,نتائج البحث عن “{0}”
+Nothing matches your search. Try another word.,لا توجد نتائج لبحثك. جرّب كلمة أخرى.
+Pages,الصفحات
+Previous page,الصفحة السابقة
+Next page,الصفحة التالية
+Previous photo,الصورة السابقة
+Next photo,الصورة التالية
+Photo {0},الصورة {0}
+{0} · {1} reviews,{0} · {1} تقييمًا
+Add to cart,أضف إلى السلة
+Sold out,نفدت الكمية
+Add to wishlist,أضف إلى المفضلة
+Choose a size first.,اختر المقاس أولًا.
+Only {0} left,تبقّى {0} فقط
+Cart,السلة
+Your cart is empty.,سلتك فارغة.
+Continue shopping,متابعة التسوق
+Order summary,ملخص الطلب
+Subtotal,المجموع الفرعي
+Discount code,رمز الخصم
+Remove discount code,إزالة رمز الخصم
+Shipping and taxes are worked out at checkout.,تُحسب رسوم الشحن والضرائب عند إتمام الطلب.
+Check out,إتمام الطلب
+This page has moved or is no longer here.,نُقلت هذه الصفحة أو لم تعد موجودة.
+Back to home,العودة إلى الرئيسية
+New arrivals,وصل حديثًا
+Addresses,العناوين
+Wishlist,قائمة الأمنيات
+Account,الحساب
+Default address,العنوان الافتراضي
+Edit,تعديل
+Delete,حذف
+First name,الاسم الأول
+Last name,اسم العائلة
+Saved.,تم الحفظ.
+Add address,إضافة عنوان
+Back,رجوع
+Edit address,تعديل العنوان
+New address,عنوان جديد
+Address,العنوان
+"Apartment, suite, etc.",الشقة، الجناح، إلخ.
+City,المدينة
+State,المنطقة
+Postal code,الرمز البريدي
+Country,الدولة
+Select a country,اختر دولة
+Phone,الهاتف
+Use as my default address,استخدامه كعنواني الافتراضي
+Save address,حفظ العنوان
+Email,البريد الإلكتروني
+Save,حفظ
+Remove from wishlist,إزالة من قائمة الأمنيات
+Your wishlist is empty.,قائمة أمنياتك فارغة.
+Email address,البريد الإلكتروني
+Placed on {0},تم الطلب في {0}
+Download invoice,تنزيل الفاتورة
+Return items,إرجاع المنتجات
+Cancel order,إلغاء الطلب
+"This order link is older, so the delivery address and payment details are hidden.",رابط هذا الطلب قديم، لذلك تم إخفاء عنوان التوصيل وتفاصيل الدفع.
+Get a new link by email,احصل على رابط جديد عبر البريد الإلكتروني
+Cancel this order? This cannot be undone.,هل تريد إلغاء هذا الطلب؟ لا يمكن التراجع عن ذلك.
+"Yes, cancel it",نعم، ألغِه
+Keep order,الاحتفاظ بالطلب
+Choose items to return,اختر المنتجات التي تريد إرجاعها
+Reason for return,سبب الإرجاع
+Request return,طلب الإرجاع
+Your return request is being processed.,جارٍ معالجة طلب الإرجاع.
+Items,المنتجات
+Size,المقاس
+Order total,إجمالي الطلب
+Delivery,التوصيل
+Track your parcel,تتبع شحنتك
+Delivery address,عنوان التوصيل
+Payment,الدفع
+Paid,مدفوع
+Payment pending,الدفع معلق
+Back to orders,العودة إلى الطلبات
+1 item,منتج واحد
+{0} items,{0} منتجات
+You have not placed an order yet.,لم تقم بأي طلب بعد.
+Start shopping,ابدأ التسوق
+Track order,تتبع الطلب
+Enter your order number and the email you checked out with. We will email you a link to the order.,أدخل رقم طلبك والبريد الإلكتروني الذي استخدمته عند الدفع، وسنرسل إليك رابط الطلب عبر البريد الإلكتروني.
+Order number,رقم الطلب
+Email me the link,أرسل لي الرابط
+Shipping,الشحن
+Cash on delivery fee,رسوم الدفع عند الاستلام
+Rounding adjustment,تعديل التقريب
+Log out,تسجيل الخروج
+Log in,تسجيل الدخول
+Create an account,إنشاء حساب
+Send code,إرسال الرمز
+"If an account exists for this email, we have sent it a code.",إذا كان هناك حساب بهذا البريد الإلكتروني، فقد أرسلنا إليه رمزًا.
+We have sent a code to this email.,أرسلنا رمزًا إلى هذا البريد الإلكتروني.
+Code,الرمز
+We have sent a new code.,أرسلنا رمزًا جديدًا.
+Create account,إنشاء الحساب
+Resend code,إعادة إرسال الرمز
+Change email,تغيير البريد الإلكتروني
+New here?,جديد هنا؟
+Already have an account?,لديك حساب بالفعل؟
+Close,إغلاق
+Checkout,الدفع
+Contact,معلومات التواصل
+Signed in as,تم تسجيل الدخول باسم
+Change,تغيير
+Ship to,الشحن إلى
+Pick up from,الاستلام من
+Ship,شحن
+Pick up,استلام
+Directions,الاتجاهات
+Use a new address,استخدام عنوان جديد
+"Apartment, suite, landmark (optional)",الشقة، الجناح، علامة مميزة (اختياري)
+Postcode,الرمز البريدي
+Billing address is the same,عنوان الفاتورة هو نفسه
+Billing address,عنوان الفاتورة
+Continue,متابعة
+Delivery option,طريقة التوصيل
+We can't deliver to this address yet. Try another address.,لا يمكننا التوصيل إلى هذا العنوان حاليًا. جرّب عنوانًا آخر.
+Standard delivery. The charge is shown in your order summary.,توصيل عادي. تظهر الرسوم في ملخص طلبك.
+Free,مجاني
+Choose a delivery option first.,اختر طريقة التوصيل أولًا.
+No payment methods are available. Please contact the store.,لا تتوفر طرق دفع. يرجى التواصل مع المتجر.
+Pay,ادفع
+Choose an option,اختر خيارًا
+Delivery discount,خصم التوصيل
+Discount,خصم
+Rounding,التقريب
+Apply,تطبيق
+Please sign in to check out.,يرجى تسجيل الدخول لإتمام الطلب.
+Sign in,تسجيل الدخول
+Order confirmed,تم تأكيد الطلب
+Thank you for your order,شكرًا لطلبك
+Your payment is received. Your order number will be in your confirmation email.,تم استلام دفعتك. ستجد رقم طلبك في رسالة التأكيد.
+View order,عرض الطلب
+Payment not completed,لم يكتمل الدفع
+We are waiting for your payment to be confirmed. Refresh this page in a minute.,ننتظر تأكيد دفعتك. حدّث هذه الصفحة بعد دقيقة.
+We could not confirm a payment for this order. Your cart is still saved.,لم نتمكن من تأكيد الدفع لهذا الطلب. سلتك لا تزال محفوظة.
+Back to checkout,العودة إلى الدفع

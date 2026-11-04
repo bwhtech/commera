@@ -1,0 +1,7 @@
+<label class="flex items-center gap-2 text-base text-ink-gray-6">{{ _("Sort") }}
+	<select name="sort_by" form="listing-filters" @change="$el.form.requestSubmit()" class="h-8 rounded-lg border border-transparent bg-surface-gray-2 px-2.5 text-base text-ink-gray-8 outline-none hover:bg-surface-gray-3">
+		{% for value, label in sort_options %}
+		<option value="{{ value }}" {{ "selected" if value == selected.sort_by }}>{{ label }}</option>
+		{% endfor %}
+	</select>
+</label>

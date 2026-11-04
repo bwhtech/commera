@@ -1,0 +1,18 @@
+{% extends "templates/layout.html" %}
+{% from "templates/macros/signup_modal.html" import signup_modal %}
+
+{% block body %}
+<div class="max-w-md mx-auto py-16 text-center">
+    <h1 class="text-2xl font-medium text-gray-900">{{ _("Sign In") }}</h1>
+    {% if signed_in_user %}
+    <p class="mt-3 text-sm text-gray-600">
+        {{ _("You are signed in as {0}. Sign in with the account that you use on the storefront.").format(signed_in_user|e) }}
+    </p>
+    {% endif %}
+    <div class="mt-6">
+        {% call signup_modal("checkout", open=True, redirect_to=redirect_to) %}
+        <span class="inline-block bg-primary text-white rounded-lg px-8 py-2">{{ _("Continue with email") }}</span>
+        {% endcall %}
+    </div>
+</div>
+{% endblock %}

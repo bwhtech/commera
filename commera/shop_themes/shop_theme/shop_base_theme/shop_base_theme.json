@@ -9,5 +9,6 @@
  "module": "Shop Themes",
  "name": "Shop Base Theme",
  "owner": "Administrator",
- "theme_name": "Shop Base Theme"
+ "theme_name": "Shop Base Theme",
+ "theme_type": "Classic"
 }

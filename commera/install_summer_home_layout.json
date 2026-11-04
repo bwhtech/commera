@@ -1,0 +1,369 @@
+{
+	"sections": [
+		{
+			"id": "hero",
+			"type": "hero_slider",
+			"hidden": false,
+			"settings": {
+				"caption_label": "Summer Collection",
+				"caption": "Trendy and Classic for the New Season"
+			},
+			"blocks": [
+				{
+					"id": "slide-1",
+					"type": "slide",
+					"settings": {
+						"image": "images/banner/banner-media.png",
+						"thumbnail_label": "Winter",
+						"heading": "Beautiful Woman Purple Sweater.",
+						"subheading": "₹3,999",
+						"cta_label": "More Collection Explore",
+						"url": "/en/products"
+					}
+				},
+				{
+					"id": "slide-2",
+					"type": "slide",
+					"settings": {
+						"image": "images/banner/banner-media2.png",
+						"thumbnail_label": "Summer",
+						"heading": "Shot Slad Curly Woman.",
+						"subheading": "₹1,499",
+						"cta_label": "More Collection Explore",
+						"url": "/en/products"
+					}
+				},
+				{
+					"id": "slide-3",
+					"type": "slide",
+					"settings": {
+						"image": "images/banner/banner-media4.png",
+						"thumbnail_label": "Leggings",
+						"heading": "Athletic Mesh Sports Leggings.",
+						"subheading": "₹3,799",
+						"cta_label": "More Collection Explore",
+						"url": "/en/products"
+					}
+				},
+				{
+					"id": "slide-4",
+					"type": "slide",
+					"settings": {
+						"image": "images/banner/banner-media5.png",
+						"thumbnail_label": "Dress",
+						"heading": "Curly Girl Beautiful Dress.",
+						"subheading": "₹2,499",
+						"cta_label": "More Collection Explore",
+						"url": "/en/products"
+					}
+				}
+			]
+		},
+		{
+			"id": "categories",
+			"type": "category_strip",
+			"hidden": false,
+			"settings": {
+				"title": "Featured Categories",
+				"description": "Discover the most trending products in Summer."
+			},
+			"blocks": [
+				{
+					"id": "category-1",
+					"type": "category",
+					"settings": {
+						"image": "images/shop/product/clothes/1.png",
+						"heading": "Shirts",
+						"url": "/en/products"
+					}
+				},
+				{
+					"id": "category-2",
+					"type": "category",
+					"settings": {
+						"image": "images/shop/product/clothes/2.png",
+						"heading": "Shorts",
+						"url": "/en/products"
+					}
+				},
+				{
+					"id": "category-3",
+					"type": "category",
+					"settings": {
+						"image": "images/shop/product/clothes/3.png",
+						"heading": "t-Shirt",
+						"url": "/en/products"
+					}
+				},
+				{
+					"id": "category-4",
+					"type": "category",
+					"settings": {
+						"image": "images/shop/product/clothes/4.png",
+						"heading": "t-Jeans",
+						"url": "/en/products"
+					}
+				},
+				{
+					"id": "category-5",
+					"type": "category",
+					"settings": {
+						"image": "images/shop/product/clothes/5.png",
+						"heading": "Dresses",
+						"url": "/en/products"
+					}
+				}
+			]
+		},
+		{
+			"id": "marquee",
+			"type": "marquee",
+			"hidden": false,
+			"settings": {},
+			"blocks": []
+		},
+		{
+			"id": "popular",
+			"type": "products_grid",
+			"hidden": false,
+			"settings": {
+				"title": "Most popular products",
+				"source": "hand_picked",
+				"products": [
+					"KNIT-CARDIGAN - Pink",
+					"SWAGGER-SUIT - Pink",
+					"DENIM-SKINNY-JEANS - Blue",
+					"MESH-LEGGINGS - Red",
+					"DENIM-OVERALL-SHORTS - Blue",
+					"PRINTED-SPREAD-SHIRT - Maroon"
+				]
+			},
+			"blocks": []
+		},
+		{
+			"id": "collection",
+			"type": "collection",
+			"hidden": false,
+			"settings": {},
+			"blocks": [
+				{
+					"id": "banner-1",
+					"type": "banner",
+					"settings": {
+						"image": "images/collection/1.png",
+						"badge_label": "Sale Up to 50% Off",
+						"heading": "Summer Edit",
+						"cta_label": "Shop Now",
+						"url": "/en/products"
+					}
+				},
+				{
+					"id": "banner-2",
+					"type": "banner",
+					"settings": {
+						"image": "images/collection/2.png",
+						"badge_label": "Sale Up to 50% Off",
+						"heading": "New Summer Collection",
+						"cta_label": "Shop Now",
+						"url": "/en/products"
+					}
+				}
+			]
+		},
+		{
+			"id": "similar",
+			"type": "similar_products",
+			"hidden": false,
+			"settings": {
+				"source": "hand_picked",
+				"products": [
+					"DENIM-SKINNY-JEANS - Navy",
+					"MESH-LEGGINGS - Red",
+					"MESH-LEGGINGS - Crimson",
+					"DENIM-OVERALL-SHORTS - Blue",
+					"PRINTED-SPREAD-SHIRT - Maroon",
+					"PRINTED-SPREAD-SHIRT - Rust"
+				]
+			},
+			"blocks": []
+		},
+		{
+			"id": "essentials",
+			"type": "everyday_essentials",
+			"hidden": false,
+			"settings": {
+				"source": "hand_picked",
+				"products": [
+					"KNIT-CARDIGAN - Pink",
+					"SWAGGER-SUIT - Pink",
+					"DENIM-SKINNY-JEANS - Blue",
+					"MESH-LEGGINGS - Red",
+					"DENIM-OVERALL-SHORTS - Blue",
+					"PRINTED-SPREAD-SHIRT - Maroon"
+				]
+			},
+			"blocks": []
+		},
+		{
+			"id": "deals",
+			"type": "deals",
+			"hidden": false,
+			"settings": {
+				"title": "Blockbuster deals",
+				"link_label": "See all deals",
+				"source": "hand_picked",
+				"products": [
+					"CHECKERED-SLIM-SHIRT - Blue",
+					"SOLID-CUTAWAY-SHIRT - Gray",
+					"CHECKERED-SPREAD-SHIRT - Red",
+					"KNIT-CARDIGAN - Purple"
+				]
+			},
+			"blocks": []
+		},
+		{
+			"id": "offers",
+			"type": "offers",
+			"hidden": false,
+			"settings": {
+				"title": "Featured offer for you"
+			},
+			"blocks": [
+				{
+					"id": "offer-1",
+					"type": "banner",
+					"settings": {
+						"image": "images/collection/3.png",
+						"badge_label": "20% Off",
+						"heading": "Luxury Bras",
+						"cta_label": "Collect Now",
+						"url": "/en/products"
+					}
+				},
+				{
+					"id": "offer-2",
+					"type": "banner",
+					"settings": {
+						"image": "images/collection/4.png",
+						"badge_label": "Sale Up to 50% Off",
+						"heading": "Summer",
+						"cta_label": "Collect Now",
+						"url": "/en/products"
+					}
+				},
+				{
+					"id": "offer-3",
+					"type": "banner",
+					"settings": {
+						"image": "images/collection/5.png",
+						"badge_label": "20% Off",
+						"heading": "Swimwear",
+						"cta_label": "Collect Now",
+						"url": "/en/products"
+					}
+				}
+			]
+		},
+		{
+			"id": "featured",
+			"type": "featured",
+			"hidden": false,
+			"settings": {
+				"title": "Featured now",
+				"source": "hand_picked",
+				"products": [
+					"SWAGGER-SUIT - Blush",
+					"DENIM-SKINNY-JEANS - Navy",
+					"MESH-LEGGINGS - Crimson",
+					"PRINTED-SPREAD-SHIRT - Rust"
+				]
+			},
+			"blocks": []
+		},
+		{
+			"id": "recent",
+			"type": "recent_additions",
+			"hidden": false,
+			"settings": {
+				"source": "hand_picked",
+				"products": [
+					"KNIT-CARDIGAN - Pink",
+					"KNIT-CARDIGAN - Purple",
+					"SWAGGER-SUIT - Pink",
+					"SWAGGER-SUIT - Gray",
+					"SWAGGER-SUIT - Blush",
+					"DENIM-SKINNY-JEANS - Blue"
+				]
+			},
+			"blocks": []
+		},
+		{
+			"id": "sponsored",
+			"type": "sponsored_brands",
+			"hidden": false,
+			"settings": {
+				"source": "hand_picked",
+				"products": [
+					"KNIT-CARDIGAN - Pink",
+					"SWAGGER-SUIT - Pink",
+					"DENIM-SKINNY-JEANS - Blue",
+					"MESH-LEGGINGS - Red",
+					"DENIM-OVERALL-SHORTS - Blue",
+					"PRINTED-SPREAD-SHIRT - Maroon",
+					"CHECKERED-SLIM-SHIRT - Blue",
+					"SOLID-CUTAWAY-SHIRT - Gray",
+					"CHECKERED-SPREAD-SHIRT - Red",
+					"KNIT-CARDIGAN - Purple",
+					"SWAGGER-SUIT - Blush",
+					"DENIM-SKINNY-JEANS - Navy",
+					"MESH-LEGGINGS - Crimson",
+					"PRINTED-SPREAD-SHIRT - Rust"
+				]
+			},
+			"blocks": []
+		},
+		{
+			"id": "collage",
+			"type": "collection_collage",
+			"hidden": false,
+			"settings": {},
+			"blocks": [
+				{
+					"id": "collage-1",
+					"type": "image",
+					"settings": {
+						"image": "images/shop/product/clothes/1.png"
+					}
+				},
+				{
+					"id": "collage-2",
+					"type": "image",
+					"settings": {
+						"image": "images/shop/product/clothes/2.png"
+					}
+				},
+				{
+					"id": "collage-3",
+					"type": "image",
+					"settings": {
+						"image": "images/shop/product/clothes/3.png"
+					}
+				},
+				{
+					"id": "collage-4",
+					"type": "image",
+					"settings": {
+						"image": "images/shop/product/clothes/4.png"
+					}
+				},
+				{
+					"id": "collage-5",
+					"type": "image",
+					"settings": {
+						"image": "images/shop/product/clothes/5.png"
+					}
+				}
+			]
+		}
+	]
+}

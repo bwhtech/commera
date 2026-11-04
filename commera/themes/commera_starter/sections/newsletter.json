@@ -1,0 +1,36 @@
+{
+	"name": "Newsletter",
+	"category": "Forms",
+	"groups": [
+		"pages",
+		"footer_group"
+	],
+	"settings": [
+		{
+			"id": "heading",
+			"type": "text",
+			"label": "Heading",
+			"default": "Letters from the studio"
+		},
+		{
+			"id": "text",
+			"type": "textarea",
+			"label": "Text",
+			"default": "New pieces and long reads, once a month."
+		},
+		{
+			"id": "placeholder",
+			"type": "text",
+			"label": "Field placeholder",
+			"default": "Email address"
+		},
+		{
+			"id": "button_label",
+			"type": "text",
+			"label": "Button label",
+			"default": "Subscribe"
+		}
+	],
+	"blocks": {},
+	"max_blocks": 0
+}

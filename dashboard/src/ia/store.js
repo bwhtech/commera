@@ -6,6 +6,7 @@ import { reactive, watch } from 'vue'
 // Settings → Appearance.
 const DEFAULTS = {
   density: 60,
+  sidebarCollapsed: false,
 }
 
 const STORAGE_KEY = 'commera:ui'

@@ -3,9 +3,6 @@
 
 """The dashboard Shipping Rules API: the store company's selling Shipping Rules and the one checkout uses."""
 
-import unittest
-from unittest.mock import patch
-
 import frappe
 from erpnext.accounts.doctype.shipping_rule.shipping_rule import (
 	ManyBlankToValuesError,
@@ -21,9 +18,9 @@ from commera.api.admin.shipping_rates import (
 	save_shipping_rule,
 	set_store_rule,
 )
+from commera.shipping.providers import use_providers
 from commera.tests.test_admin_delivery_options import AFTERSHIP_SETTINGS, create_provider_profile
 
-CONNECTOR_APP = "bwh_shipping"
 PROVIDER_PROFILE = "_Test Rates AfterShip"
 RULE_LABEL = "_Test Rates Rule"
 
@@ -40,9 +37,6 @@ def get_band_ranges(rule):
 	return [(band["from_value"], band["to_value"]) for band in rule["bands"]]
 
 
-@unittest.skipUnless(
-	CONNECTOR_APP in frappe.get_installed_apps(), "shipping rules need the shipping connector"
-)
 class TestAdminShippingRules(IntegrationTestCase):
 	def setUp(self):
 		self.addCleanup(frappe.set_user, "Administrator")
@@ -51,9 +45,7 @@ class TestAdminShippingRules(IntegrationTestCase):
 		self.addCleanup(frappe.db.rollback)
 		frappe.set_user("Administrator")
 
-		quotes = patch("bwh_shipping.bwh_shipping.pricing.get_live_quotes", return_value={})
-		quotes.start()
-		self.addCleanup(quotes.stop)
+		self.enterContext(use_providers({}))
 
 		# Every case starts from a store with no rule in use, so the demo's own rule is never edited.
 		frappe.db.set_single_value("Commera Settings", "shipping_rule", None)
@@ -84,7 +76,6 @@ class TestAdminShippingRules(IntegrationTestCase):
 	def test_screen_lists_the_options_and_currency(self):
 		screen = get_shipping_rules()
 
-		self.assertTrue(screen["available"])
 		self.assertIsNone(screen["store_rule"])
 		company = frappe.db.get_single_value("Commera Settings", "company")
 		self.assertEqual(screen["currency"], frappe.db.get_value("Company", company, "default_currency"))

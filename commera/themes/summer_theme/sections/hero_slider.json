@@ -1,0 +1,62 @@
+{
+	"name": "Hero slider",
+	"category": "Banners",
+	"settings": [
+		{
+			"id": "caption_label",
+			"type": "text",
+			"label": "Caption label",
+			"default": ""
+		},
+		{
+			"id": "caption",
+			"type": "text",
+			"label": "Caption",
+			"default": ""
+		}
+	],
+	"blocks": {
+		"slide": {
+			"name": "Slide",
+			"settings": [
+				{
+					"id": "image",
+					"type": "image",
+					"label": "Image",
+					"default": ""
+				},
+				{
+					"id": "thumbnail_label",
+					"type": "text",
+					"label": "Thumbnail label",
+					"default": ""
+				},
+				{
+					"id": "heading",
+					"type": "text",
+					"label": "Heading",
+					"default": ""
+				},
+				{
+					"id": "subheading",
+					"type": "text",
+					"label": "Subheading",
+					"default": ""
+				},
+				{
+					"id": "cta_label",
+					"type": "text",
+					"label": "Button label",
+					"default": ""
+				},
+				{
+					"id": "url",
+					"type": "url",
+					"label": "Button link",
+					"default": ""
+				}
+			]
+		}
+	},
+	"max_blocks": 8
+}

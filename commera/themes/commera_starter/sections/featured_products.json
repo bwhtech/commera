@@ -1,0 +1,21 @@
+{
+	"name": "Featured products",
+	"category": "Products",
+	"max_products": 8,
+	"settings": [
+		{ "id": "title", "type": "text", "label": "Title", "default": "New arrivals" },
+		{ "id": "link_label", "type": "text", "label": "Link label", "default": "View all" },
+		{ "id": "link_url", "type": "url", "label": "Link", "default": "" },
+		{
+			"id": "source",
+			"type": "select",
+			"label": "Products to show",
+			"options": ["newest", "on_sale", "collection", "hand_picked"],
+			"default": "newest"
+		},
+		{ "id": "collection", "type": "collection", "label": "Collection", "default": "" },
+		{ "id": "products", "type": "products", "label": "Products", "default": [] }
+	],
+	"blocks": {},
+	"max_blocks": 0
+}

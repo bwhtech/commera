@@ -1,0 +1,44 @@
+{
+	"name": "Category strip",
+	"category": "Collections",
+	"settings": [
+		{
+			"id": "title",
+			"type": "text",
+			"label": "Title",
+			"default": ""
+		},
+		{
+			"id": "description",
+			"type": "textarea",
+			"label": "Description",
+			"default": ""
+		}
+	],
+	"blocks": {
+		"category": {
+			"name": "Category",
+			"settings": [
+				{
+					"id": "image",
+					"type": "image",
+					"label": "Image",
+					"default": ""
+				},
+				{
+					"id": "heading",
+					"type": "text",
+					"label": "Heading",
+					"default": ""
+				},
+				{
+					"id": "url",
+					"type": "url",
+					"label": "Link",
+					"default": ""
+				}
+			]
+		}
+	},
+	"max_blocks": 12
+}

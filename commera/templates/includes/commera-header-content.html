@@ -1,0 +1,9 @@
+<script>
+	window.commera_storefront_config = {{ {
+		"csrf_token": csrf_token,
+		"number_format": frappe.number_format.string,
+		"store_currency": store_currency,
+		"currency_symbols": currency_symbols,
+	} | tojson }};
+</script>
+{{ include_script("commera-storefront.bundle.js") }}

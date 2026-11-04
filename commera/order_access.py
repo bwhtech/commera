@@ -2,6 +2,8 @@ import hmac
 from urllib.parse import urlencode
 
 import frappe
+from frappe.query_builder import DocType
+from frappe.query_builder.functions import Lower
 from frappe.utils import add_days, cint, cstr, get_datetime, get_url, now_datetime
 
 OWNER_ACCESS = "owner"
@@ -44,9 +46,45 @@ def get_order_access(order_name: str | int, key: str | None = None) -> str | Non
 	order = frappe.db.get_value("Sales Order", order_name, ORDER_ACCESS_FIELDS, as_dict=True)
 	if not order:
 		return None
-	if frappe.session.user != "Guest" and order.owner == frappe.session.user:
+	if is_shoppers_order(order):
 		return OWNER_ACCESS
 	return get_key_access(order, key)
+
+
+def is_shoppers_order(order) -> bool:
+	user = frappe.session.user
+	if user == "Guest":
+		return False
+	if order.owner == user:
+		return True
+	sales_order = DocType("Sales Order")
+	return bool(
+		frappe.qb.from_(sales_order)
+		.select(sales_order.name)
+		.where((sales_order.name == order.name) & get_shopper_order_condition(user))
+		.run()
+	)
+
+
+def get_shopper_order_condition(user: str):
+	"""Orders the user placed, and guest-cart orders placed with their email: signing in proved they own it."""
+	sales_order = DocType("Sales Order")
+	if user == "Guest":
+		# Match nothing: `owner == "Guest"` would hand a guest every order a guest session owns.
+		return sales_order.name.isnull()
+	order_line, cart = DocType("Sales Order Item"), DocType("Quotation")
+	guest_orders = (
+		frappe.qb.from_(order_line)
+		.join(cart)
+		.on(cart.name == order_line.prevdoc_docname)
+		.select(order_line.parent)
+		.where((order_line.parenttype == "Sales Order") & (cart.custom_guest_cart_key != ""))
+	)
+	email = cstr(frappe.db.get_value("User", user, "email")).lower()
+	# Checkout lowercases contact_email, but User.email keeps the case the shopper signed up with.
+	return (sales_order.owner == user) | (
+		(Lower(sales_order.contact_email) == email) & sales_order.name.isin(guest_orders)
+	)
 
 
 def get_key_access(order, key: str | None) -> str | None:

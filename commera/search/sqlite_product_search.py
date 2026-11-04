@@ -1,13 +1,21 @@
 import difflib
+import os
+import re
 import sqlite3
-import time
 from typing import ClassVar
 
 import frappe
 from frappe.search.sqlite_search import MAX_EDIT_DISTANCE, MIN_WORD_LENGTH, SQLiteSearch
 from frappe.utils import create_batch, flt
 
-from commera.search.engine import empty_result, is_query_too_short
+from commera.search.engine import (
+	CARD_COLUMNS,
+	MIN_QUERY_LENGTH,
+	SearchEngineBase,
+	empty_facets,
+	empty_typeahead,
+	is_query_too_short,
+)
 from commera.search.record_builder import (
 	build_category_search_records,
 	build_product_search_records,
@@ -21,8 +29,14 @@ SQLITE_PARAM_CHUNK_SIZE = 500
 # Ceiling for the edit-distance fallback below; beyond 2 edits the "correction" is a different word.
 MAX_EDIT_DISTANCE_FALLBACK = 2
 
+SEARCH_CLASS_PATH = "commera.search.sqlite_product_search.SqliteProductSearch"
+CORE_BUILD_INDEX = "frappe.search.sqlite_search.build_index"
+BUILD_TIMEOUT = 2 * 60 * 60 + 10 * 60
 
-class SqliteProductSearch(SQLiteSearch):
+ARABIC_PATTERN = re.compile("[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]")
+
+
+class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	INDEX_NAME = "commera_product_search.db"
 
 	INDEX_SCHEMA: ClassVar = {
@@ -31,30 +45,7 @@ class SqliteProductSearch(SQLiteSearch):
 		"tokenizer": "unicode61 remove_diacritics 2",
 	}
 
-	PRODUCT_DETAIL_COLUMNS: ClassVar = (
-		"doc_id",
-		"name",
-		"route",
-		"item_style",
-		"display_name",
-		"attribute_value",
-		"brand",
-		"is_stock_item",
-		"item_name",
-		"custom_item_name_ar",
-		"variant_item_code",
-		"image",
-		"hover_image",
-		"item_group",
-		"color",
-		"default_price",
-		"sale_price",
-		"effective_price",
-		"discount_percent",
-		"has_discount",
-		"sale_end_date",
-		"modified",
-	)
+	PRODUCT_DETAIL_COLUMNS: ClassVar = ("doc_id", *CARD_COLUMNS)
 
 	INDEXABLE_DOCTYPES: ClassVar = {
 		"Style Attribute Variant": {
@@ -83,6 +74,14 @@ class SqliteProductSearch(SQLiteSearch):
 
 	def get_search_filters(self):
 		return {}
+
+	def can_rank(self, term):
+		"""True for a term of at least MIN_QUERY_LENGTH that is not Arabic, once the index exists."""
+		# The FTS tokenizer has no Arabic stemming, so an Arabic term goes back to frappe.qb.
+		term = (term or "").strip()
+		if len(term) < MIN_QUERY_LENGTH or is_arabic_query(term):
+			return False
+		return self.index_exists()
 
 	# -- index shape ----------------------------------------------------------------------------
 
@@ -142,6 +141,43 @@ class SqliteProductSearch(SQLiteSearch):
 			else:
 				definitions.append(f"{column} TEXT")
 		return definitions
+
+	# -- builds ---------------------------------------------------------------------------------
+
+	def enqueue_full_rebuild(self, deduplicate=False):
+		"""Enqueue a full rebuild on the long queue. Returns the enqueue payload."""
+		# Core builds into a temp DB and renames it over the live one, so the index keeps serving.
+		return frappe.enqueue(
+			CORE_BUILD_INDEX,
+			queue="long",
+			enqueue_after_commit=True,
+			timeout=BUILD_TIMEOUT,
+			job_id=SEARCH_CLASS_PATH if deduplicate else None,
+			deduplicate=deduplicate,
+			search_class_path=SEARCH_CLASS_PATH,
+			force=True,
+		)
+
+	def ensure_index_built(self):
+		"""Build the index when it is absent, or resume a build that died part-way through."""
+		# No sqlite_search hook here, so core's own resume never sees this index; a leftover temp DB is
+		# the only trace of an interrupted build.
+		is_continuation = os.path.exists(self._get_db_path(is_temp=True))
+		if self.index_exists() and not is_continuation:
+			return None
+		if not frappe.db.exists("Style Attribute Variant", {"is_published": 1}):
+			return None
+		return frappe.enqueue(
+			CORE_BUILD_INDEX,
+			queue="long",
+			enqueue_after_commit=True,
+			timeout=BUILD_TIMEOUT,
+			job_id=f"{SEARCH_CLASS_PATH}_continuation" if is_continuation else SEARCH_CLASS_PATH,
+			deduplicate=True,
+			search_class_path=SEARCH_CLASS_PATH,
+			force=is_continuation,
+			is_continuation=is_continuation,
+		)
 
 	# -- record overlay -------------------------------------------------------------------------
 
@@ -327,7 +363,7 @@ class SqliteProductSearch(SQLiteSearch):
 
 	COLUMN_TO_NARROW_KEY: ClassVar = {column: key for key, column in NARROW_KEY_TO_COLUMN.items()}
 
-	def facet_counts(self, fts_query, filters=None):
+	def count_facets(self, fts_query, filters=None):
 		"""Sidebar counts per facet, each narrowed by every OTHER selected filter but not by its own."""
 		# Must match the frappe.qb sidebar: www/products/list.py pops the facet's own key before querying.
 		selected = filters or {}
@@ -370,6 +406,11 @@ class SqliteProductSearch(SQLiteSearch):
 			placeholders = ", ".join("?" for _ in values)
 			clauses.append(f" AND {prefix}{column} IN ({placeholders})")
 			params.extend(values)
+		# The ?category= tab scope is not a facet: no facet drops it, so it narrows every count too.
+		if selected.get("category_item_groups"):
+			placeholders = ", ".join("?" for _ in selected["category_item_groups"])
+			clauses.append(f" AND {prefix}item_group IN ({placeholders})")
+			params.extend(selected["category_item_groups"])
 		if drop_key != "sizes" and selected.get("sizes"):
 			placeholders = ", ".join("?" for _ in selected["sizes"])
 			clauses.append(
@@ -453,12 +494,11 @@ class SqliteProductSearch(SQLiteSearch):
 		)
 		return rows[0]["count"] if rows else 0
 
-	def search(self, query, limit=20, facet_filters=None):
+	def typeahead(self, query, limit=6):
 		if is_query_too_short(query) or not self.index_exists():
-			return empty_result()
+			return empty_typeahead()
 
 		raw = super().search(query)
-
 		product_names = []
 		category_names = []
 		for hit in raw["results"]:
@@ -467,30 +507,22 @@ class SqliteProductSearch(SQLiteSearch):
 			else:
 				product_names.append(hit["name"])
 
-		search_ms = raw["summary"]["duration"] * 1000
-
-		facet_start = time.time()
-		facets = {"brand": {}, "color": {}, "size": {}, "category": {}}
-		expanded_query, _corrections = self._expand_query_with_corrections(query)
-		facets.update(self.facet_counts(self._prepare_fts_query(expanded_query), facet_filters))
-		facet_ms = (time.time() - facet_start) * 1000
-
 		raw_corrections = raw["summary"].get("corrected_words") or {}
-		corrected_words = {
-			original: suggestion
-			for original, suggestion in raw_corrections.items()
-			if original.lower() != suggestion.lower()
-		}
-
 		return {
 			"product_names": product_names[:limit],
 			"category_names": category_names[:limit],
-			"corrected_words": corrected_words,
-			"facets": facets,
-			"duration_ms": search_ms + facet_ms,
-			"search_ms": round(search_ms, 3),
-			"facet_ms": round(facet_ms, 3),
+			"corrected_words": {
+				original: suggestion
+				for original, suggestion in raw_corrections.items()
+				if original.lower() != suggestion.lower()
+			},
 		}
+
+	def facet_counts(self, filters):
+		fts_query = self.fts_query_for((filters.get("search") or "").strip())
+		if not fts_query:
+			return empty_facets()
+		return {**empty_facets(), **self.count_facets(fts_query, filters)}
 
 	# -- spell correction -----------------------------------------------------------------------
 
@@ -614,3 +646,8 @@ def levenshtein_distance(source, target):
 		previous_row = current_row
 
 	return previous_row[-1]
+
+
+def is_arabic_query(text):
+	"""True if the text carries any Arabic-script character."""
+	return bool(ARABIC_PATTERN.search(text or ""))

@@ -3,17 +3,26 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import cint, cstr, validate_email_address
 
-from commera.core import send_otp
+from commera.core import OTP_EXPIRY_SECONDS, get_otp_attempts_key, get_otp_key, send_otp
+
+MAX_OTP_ATTEMPTS = 5
 
 
-def verify_otp(email: str, otp: str):
-	"""Check the OTP and burn it, a code is single-use."""
-	cache_key = f"otp:{email}"
+def verify_otp(email: str, otp: str, purpose: str | None = None):
+	cache_key = get_otp_key(email, purpose)
 	stored_otp = frappe.cache.get_value(cache_key)
-	if not stored_otp or cint(otp) != cint(stored_otp):
-		frappe.throw(_("Invalid OTP"))
+	if stored_otp and cint(otp) == cint(stored_otp):
+		frappe.cache.delete_value(cache_key)
+		return
 
-	frappe.cache.delete_value(cache_key)
+	if stored_otp and purpose:
+		attempts_key = frappe.cache.make_key(get_otp_attempts_key(email, purpose))
+		attempts = frappe.cache.incrby(attempts_key, 1)
+		frappe.cache.expire(attempts_key, OTP_EXPIRY_SECONDS)
+		if attempts >= MAX_OTP_ATTEMPTS:
+			frappe.cache.delete_value(cache_key)
+			frappe.throw(_("Too many wrong codes. Please ask for a new one."))
+	frappe.throw(_("Invalid code") if purpose else _("Invalid OTP"))
 
 
 def validate_user_names(first_name: str, last_name: str):
@@ -68,18 +77,7 @@ def send_login_otp(email: str):
 def verify_signup_otp(email: str, first_name: str, last_name: str, otp: str):
 	validate_user_names(first_name, last_name)
 	verify_otp(email, otp)
-
-	user = frappe.get_doc(
-		{
-			"doctype": "User",
-			"email": email,
-			"first_name": first_name,
-			"last_name": last_name,
-			"enabled": 1,
-		}
-	)
-	user.insert(ignore_permissions=True)
-
+	create_shopper_user(email, first_name, last_name)
 	frappe.local.login_manager.login_as(email)
 
 
@@ -89,6 +87,19 @@ def verify_signup_otp(email: str, first_name: str, last_name: str, otp: str):
 def verify_login_otp(email: str, otp: str):
 	verify_otp(email, otp)
 	frappe.local.login_manager.login_as(email)
+
+
+def create_shopper_user(email: str, first_name: str, last_name: str | None = None) -> str:
+	user = frappe.get_doc(
+		{
+			"doctype": "User",
+			"email": email,
+			"first_name": first_name,
+			"last_name": last_name,
+			"enabled": 1,
+		}
+	).insert(ignore_permissions=True)
+	return user.name
 
 
 def get_placeholder_first_name(email: str) -> str:
@@ -114,14 +125,7 @@ def verify_checkout_otp(email: str, otp: str):
 
 	enabled = frappe.db.get_value("User", email, "enabled")
 	if enabled is None:
-		frappe.get_doc(
-			{
-				"doctype": "User",
-				"email": email,
-				"first_name": get_placeholder_first_name(email),
-				"enabled": 1,
-			}
-		).insert(ignore_permissions=True)
+		create_shopper_user(email, get_placeholder_first_name(email))
 	elif not enabled:
 		frappe.throw(_("This account is disabled."), frappe.AuthenticationError)
 

@@ -1,0 +1,76 @@
+{
+ "actions": [],
+ "creation": "$timestamp",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "api_key",
+  "column_break_credentials",
+  "pickup_address",
+  "section_break_rates",
+  "currency",
+  "column_break_rates",
+  "volumetric_divisor"
+ ],
+ "fields": [
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_credentials",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Checkout quotes ship from this address.",
+   "fieldname": "pickup_address",
+   "fieldtype": "Link",
+   "label": "Pickup Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "section_break_rates",
+   "fieldtype": "Section Break",
+   "label": "Rates"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "column_break_rates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "volumetric_divisor",
+   "fieldtype": "Int",
+   "label": "Volumetric Divisor"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "$timestamp",
+ "modified_by": "Administrator",
+ "module": "$module",
+ "name": "$doctype",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

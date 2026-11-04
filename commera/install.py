@@ -2,11 +2,12 @@ import frappe
 from frappe.utils.data import getdate
 from frappe.utils.nestedset import get_root_of
 
+from commera.onboarding import run_frappe_setup, seed_commera_settings
+
 TEST_COMPANY = "Lifestyle Demo"
 TEST_ABBR = "LSD"
 TEST_CURRENCY = "INR"
 TEST_ITEM_GROUP = "Interior Accessories"
-DEFAULT_PRICE_LIST = "Standard Selling"
 SALE_PRICE_LIST = "Sale Price List"
 
 
@@ -15,7 +16,7 @@ def before_tests():
 	complete_setup_wizard()
 	seed_erpnext_test_defaults()
 	seed_storefront_item_group()
-	seed_commera_settings()
+	seed_test_commera_settings()
 
 	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist seed data before the test run begins
 
@@ -26,16 +27,8 @@ def complete_setup_wizard():
 	if frappe.is_setup_complete():
 		return
 
-	from frappe.desk.page.setup_wizard.setup_wizard import setup_complete
-
-	# Once frappe's own stage counts as done, later stages take country/currency from System Settings, not
-	# from these args, and ERPNext's fixtures crash on a blank country.
-	frappe.db.set_single_value(
-		"System Settings", {"country": "India", "currency": TEST_CURRENCY, "time_zone": "Asia/Kolkata"}
-	)
-
 	today = getdate()
-	setup_complete(
+	run_frappe_setup(
 		{
 			"language": "English",
 			"email": "test@lifestyle.local",
@@ -51,11 +44,6 @@ def complete_setup_wizard():
 			"fy_end_date": today.replace(month=12, day=31).isoformat(),
 		}
 	)
-
-	# The wizard deliberately swallows its own exceptions so a real user can still reach the desk. Here
-	# that would hand the suite 100+ unrelated link errors instead of naming the one thing that failed.
-	if not frappe.db.exists("Company", TEST_COMPANY):
-		raise RuntimeError(f"Test setup failed: the setup wizard did not create company {TEST_COMPANY}")
 
 
 def seed_erpnext_test_defaults():
@@ -94,22 +82,10 @@ def seed_storefront_item_group():
 	).insert(ignore_permissions=True)
 
 
-def seed_commera_settings():
-	"""Fill the four mandatory Commera Settings fields, which any later save() would otherwise trip on."""
-	settings = frappe.get_single("Commera Settings")
-	settings.company = TEST_COMPANY
-	settings.order_confirmation_email_template = "Order Confirmation"
-	settings.order_cancellation_email_template = "Order Cancellation"
-	settings.item_in_stock_email_template = "Item In Stock"
-
-	# Not mandatory on the doctype, but the cart and search suites read all three straight off this
-	# Single to build their own fixtures, and an Item Price with a blank price list will not insert.
-	settings.default_price_list = DEFAULT_PRICE_LIST
-	settings.sale_price_list = seed_sale_price_list()
-	settings.ecommerce_warehouse = frappe.db.get_value(
-		"Warehouse", {"company": TEST_COMPANY, "is_group": 0}, "name"
-	)
-	settings.save(ignore_permissions=True)
+def seed_test_commera_settings():
+	seed_commera_settings(TEST_COMPANY)
+	# Not mandatory, but the cart and search suites read it straight off this Single to build fixtures.
+	frappe.db.set_single_value("Commera Settings", "sale_price_list", seed_sale_price_list())
 
 
 def seed_sale_price_list() -> str:

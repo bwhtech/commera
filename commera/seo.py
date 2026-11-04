@@ -4,6 +4,7 @@ import frappe
 from frappe.utils import cstr, flt, get_url, strip_html_tags
 
 from commera.branding import get_configured_brand_assets
+from commera.utils import get_store_currency
 
 META_DESCRIPTION_MAX_LENGTH = 160
 
@@ -75,7 +76,7 @@ def apply_title_template(title=None):
 
 
 def get_site_currency():
-	return cstr(frappe.db.get_single_value("Global Defaults", "default_currency")) or "INR"
+	return get_store_currency()
 
 
 def swap_lang_in_path(path, target_lang):

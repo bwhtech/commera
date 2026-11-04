@@ -1,6 +1,6 @@
 import re
 from functools import lru_cache
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 import frappe
 from erpnext.selling.doctype.customer.customer import (
@@ -10,11 +10,13 @@ from frappe.geo.country_info import get_all
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Count, Min, Sum
 from frappe.utils import add_days, cint, create_batch, cstr, flt, get_datetime, now_datetime
+from frappe.utils.caching import request_cache
 from frappe.utils.data import strip_html
 from pypika import Order
 
 from commera.core import get_address_docs, get_party
-from commera.order_access import get_key_access
+from commera.guest import is_guest, is_guest_checkout_enabled
+from commera.order_access import get_key_access, is_shoppers_order
 from commera.plugin_events import SHIPPING_ADDRESS_FIELDS, STORE_ORDER_TYPE, fire_event, get_order_snapshot
 
 # Ceiling for any IN (...) list this app sends to MariaDB/Postgres.
@@ -42,7 +44,7 @@ def validate_document_access(doctype: str, name: str | int, key: str | None = No
 	document = frappe.get_doc(doctype, name)
 	if document.owner == frappe.session.user:
 		return document
-	if doctype == "Sales Order" and get_key_access(document, key):
+	if doctype == "Sales Order" and (is_shoppers_order(document) or get_key_access(document, key)):
 		return document
 	if frappe.has_permission(doctype, "read", document):
 		return document
@@ -88,7 +90,11 @@ def get_product_list(filters=None, product_list=None, page=1, page_length=30, so
 	if product_list is not None or search_query.use_qb_fallback(filters):
 		return get_product_list_qb(filters, product_list, page, page_length, sort_by)
 
-	ranked_names = get_search_engine().search_products(filters, page, page_length, sort_by)
+	ranked_names = search_query.read_or_fall_back(
+		lambda: get_search_engine().search_products(filters, page, page_length, sort_by), lambda: None
+	)
+	if ranked_names is None:
+		return get_product_list_qb(filters, product_list, page, page_length, sort_by)
 	if not ranked_names:
 		return []
 
@@ -106,6 +112,7 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 	query = get_product_base_query(filters, product_list)
 	style_attribute_variant = DocType("Style Attribute Variant")
 	website_slideshow_item = DocType("Website Slideshow Item")
+	hover_slideshow_item = DocType("Website Slideshow Item").as_("hover_slideshow_item")
 	color_size_item = DocType("Color Size Item")
 	item_price_default = DocType("Item Price").as_("ip_default")
 	item_price_sale = DocType("Item Price").as_("ip_sale")
@@ -125,7 +132,9 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 		.else_(0)
 	)
 	query = (
-		query.select(
+		query.left_join(hover_slideshow_item)
+		.on((hover_slideshow_item.parent == style_attribute_variant.name) & (hover_slideshow_item.idx == 2))
+		.select(
 			style_attribute_variant.name,
 			style_attribute_variant.route,
 			style_attribute_variant.item_style,
@@ -143,6 +152,7 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 			Min(item_price_default.price_list_rate).as_("default_price"),
 			Min(item_price_sale.price_list_rate).as_("sale_price"),
 			website_slideshow_item.image.as_("image"),
+			hover_slideshow_item.image.as_("hover_image"),
 			discount_expr.as_("discount_percent").as_("discount_percent"),
 		)
 		.groupby(style_attribute_variant.name)
@@ -168,8 +178,8 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 
 def shape_product_cards(cards):
 	"""Give every product card the one storefront card shape, whichever grid built it."""
+	from commera.search.engine import CARD_COLUMNS
 	from commera.search.record_builder import sizes_for_variants
-	from commera.search.sqlite_product_search import SqliteProductSearch
 
 	if not cards:
 		return cards
@@ -180,9 +190,8 @@ def shape_product_cards(cards):
 	for card in cards:
 		if card.get("sizes") is None:
 			card["sizes"] = sizes_by_variant.get(card["name"], [])
-		for column in SqliteProductSearch.PRODUCT_DETAIL_COLUMNS:
-			if column != "doc_id":
-				card.setdefault(column, None)
+		for column in CARD_COLUMNS:
+			card.setdefault(column, None)
 		card.setdefault("average_rating", None)
 		card.setdefault("review_count", None)
 		# Mirrors record_builder.aggregate_prices so both grids agree on the price they filter and sort by.
@@ -225,7 +234,10 @@ def get_total_product_count(filters=None, product_list=None):
 	from commera.search.engine_cache import get_search_engine
 
 	if product_list is None and not search_query.use_qb_fallback(filters):
-		return get_search_engine().search_count(filters)
+		return search_query.read_or_fall_back(
+			lambda: get_search_engine().search_count(filters),
+			lambda: get_product_count_qb(filters, product_list),
+		)
 	return get_product_count_qb(filters, product_list)
 
 
@@ -280,6 +292,8 @@ def get_product_base_query(filters=None, product_list=None):
 	if filters:
 		if filters.get("has_discount"):
 			query = query.where(item_price_default.price_list_rate > item_price_sale.price_list_rate)
+		if filters.get("category_item_groups"):
+			query = query.where(style_attribute_variant.item_group.isin(filters["category_item_groups"]))
 		if filters.get("subcategory"):
 			query = query.where(style_attribute_variant.item_group.isin(filters["subcategory"]))
 		if filters.get("colors"):
@@ -304,6 +318,9 @@ def get_product_base_query(filters=None, product_list=None):
 				| (style_attribute_variant.item_group.like(f"%{search}%"))
 				| (item.name.like(f"%{search}%"))
 			)
+			# SQLite sends every Arabic term here, so the Arabic item name must be searchable too.
+			if frappe.db.has_column("Item", "custom_item_name_ar"):
+				search_condition |= item.custom_item_name_ar.like(f"%{search}%")
 			if child_categories:
 				search_condition |= style_attribute_variant.item_group.isin(child_categories)
 
@@ -393,13 +410,33 @@ def format_theme_css():
 	return frappe.get_cached_doc("Commera Settings", "Commera Settings").generate_theme_css()
 
 
-def get_currency_symbol():
-	currency = frappe.get_cached_value("Global Defaults", "Global Defaults", "default_currency")
+def get_store_company() -> str | None:
+	return frappe.get_cached_value("Commera Settings", "Commera Settings", "company") or (
+		frappe.defaults.get_global_default("company")
+	)
+
+
+def get_store_currency(company: str | None = None) -> str:
+	company = company or get_store_company()
+	currency = frappe.get_cached_value("Company", company, "default_currency") if company else None
+	return currency or frappe.defaults.get_global_default("currency")
+
+
+def get_currency_symbol(currency: str | None = None):
+	currency = currency or get_store_currency()
 	# Riyal has no glyph in the fonts the themes ship, so SAR alone borrows the icon font.
 	if currency == "SAR":
 		return '<span class="saudi-currency-symbol pe-0.5"></span>'
 	# A code needs a gap before the amount; a plain space collapses inside the flex price wrappers.
 	return frappe.get_cached_value("Currency", currency, "symbol") or f"{currency}\u00a0"
+
+
+@request_cache
+def get_currency_symbols() -> dict[str, str]:
+	currencies = frappe.get_all(
+		"Price List", filters={"enabled": 1, "selling": 1}, pluck="currency", distinct=True
+	)
+	return {currency: get_currency_symbol(currency) for currency in {*currencies, get_store_currency()}}
 
 
 def get_addresses(party=None, address_type="Billing"):
@@ -550,6 +587,47 @@ def get_local_lang_url(path: str) -> str:
 	return path
 
 
+def get_same_site_path(path: str | None) -> str | None:
+	"""`path` when it stays on this site, else None."""
+	path = cstr(path).strip()
+	# Browsers drop tabs and newlines, so "/\t/host" would become "//host".
+	if any(character.isspace() or not character.isprintable() for character in path):
+		return None
+	# Only a path on this site: "//host" and "/\host" would leave it, and a scheme would too.
+	if path.startswith("/") and not path.startswith(("//", "/\\")) and "://" not in path:
+		return path
+	return None
+
+
+FORWARDED_PARAM_PREFIXES = ("utm_", "checkout[")
+
+
+def get_next_url(return_to: str | None = None) -> str:
+	forwarded_params = [
+		(key, value)
+		for key, value in frappe.form_dict.items()
+		if key == "discount" or key.startswith(FORWARDED_PARAM_PREFIXES)
+	]
+	cart_url = f"/{frappe.local.lang}/cart"
+	destination = get_return_to_url(return_to, cart_url)
+	if destination:
+		query_string = urlencode(forwarded_params, doseq=True)
+		separator = "&" if "?" in destination else "?"
+		return f"{destination}{separator}{query_string}" if query_string else destination
+	if not is_guest():
+		forwarded_params = [("checkout", "1"), *forwarded_params]
+	elif is_guest_checkout_enabled():
+		cart_url = f"{cart_url}/checkout"
+	query_string = urlencode(forwarded_params, doseq=True)
+	return f"{cart_url}?{query_string}" if query_string else cart_url
+
+
+def get_return_to_url(return_to: str | None, cart_url: str) -> str | None:
+	if cstr(return_to).strip() == "cart":
+		return cart_url
+	return get_same_site_path(return_to)
+
+
 def get_login_url_for_current_page() -> str:
 	"""Login link that lands the shopper back on the page that refused them, query string intact."""
 	# The login page reads `redirect-to` off its own query string: unencoded, it truncates at the first `&`.
@@ -583,13 +661,17 @@ def get_page_size():
 def can_return(order_name, return_period_days):
 	"""Check if the order is still within the return period."""
 
+	return_deadline = get_return_deadline(order_name, return_period_days)
+	return bool(return_deadline) and now_datetime() <= return_deadline
+
+
+def get_return_deadline(order_name, return_period_days):
 	delivered_on = [
 		line.creation for line in get_delivery_note_lines(order_name, docstatus=1) if not line.is_return
 	]
 	if not delivered_on:
-		return False
-	return_deadline = add_days(get_datetime(max(delivered_on)), cint(return_period_days))
-	return now_datetime() <= return_deadline
+		return None
+	return add_days(get_datetime(max(delivered_on)), cint(return_period_days))
 
 
 def get_available_stock(item_code, warehouse):
@@ -704,14 +786,14 @@ def update_so_status_from_related_doc(doc, method):
 	elif doc.doctype == "Delivery Note":
 		sales_orders.update([d.against_sales_order for d in doc.items if d.against_sales_order])
 
-	elif doc.doctype == "Shipping Request":
-		if doc.ref_doctype == "Sales Order" and doc.ref_docname:
-			sales_orders.add(doc.ref_docname)
-		elif doc.delivery_note:
+	elif doc.doctype == "Shipment":
+		if doc.get("custom_sales_order"):
+			sales_orders.add(doc.custom_sales_order)
+		elif delivery_notes := [row.delivery_note for row in doc.shipment_delivery_note]:
 			sales_orders.update(
 				frappe.get_all(
 					"Delivery Note Item",
-					filters={"parent": doc.delivery_note, "against_sales_order": ["is", "set"]},
+					filters={"parent": ["in", delivery_notes], "against_sales_order": ["is", "set"]},
 					pluck="against_sales_order",
 				)
 			)
@@ -798,7 +880,6 @@ def get_fulfilment_status(sales_order_name) -> str:
 	supplier_status = get_supplier_status(sales_order_name, supplier_lines)
 	if len(supplier_lines) == len(lines):
 		return supplier_status
-	# Mixed order: a Shipping Request without a Delivery Note is the supplier's parcel, not the store's.
 	return get_earlier_status(get_store_status(sales_order_name, from_delivery_note=True), supplier_status)
 
 
@@ -843,19 +924,21 @@ def get_store_status(sales_order_name, from_delivery_note: bool | None = None) -
 
 
 def get_carrier_status(sales_order_name, from_delivery_note: bool | None = None) -> str | None:
-	filters = {"ref_doctype": "Sales Order", "ref_docname": sales_order_name, "docstatus": ["<", 2]}
+	filters = [["custom_sales_order", "=", sales_order_name], ["docstatus", "<", 2]]
 	if from_delivery_note is not None:
-		filters["delivery_note"] = ["is", "set" if from_delivery_note else "not set"]
-	requests = frappe.get_all(
-		"Shipping Request",
+		filters.append(
+			["Shipment Delivery Note", "delivery_note", "is", "set" if from_delivery_note else "not set"]
+		)
+	shipments = frappe.get_all(
+		"Shipment",
 		filters=filters,
-		fields=["status"],
+		fields=["custom_shipment_status"],
 		order_by="creation desc",
 		limit=1,
 	)
-	if not requests:
+	if not shipments:
 		return None
-	return SHIPMENT_STATUS_LADDER.get(cstr(requests[0].status))
+	return SHIPMENT_STATUS_LADDER.get(cstr(shipments[0].custom_shipment_status))
 
 
 def get_delivery_note_lines(sales_order_name, docstatus=None) -> list[dict]:

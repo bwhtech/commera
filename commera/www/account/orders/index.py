@@ -4,6 +4,7 @@ import frappe
 from frappe.query_builder import DocType
 from pypika import CustomFunction, Order
 
+from commera.order_access import get_shopper_order_condition
 from commera.utils import get_current_page, get_rounded_or_grand_total
 
 
@@ -113,7 +114,7 @@ def get_orders_list(order_id_list=None, page=1, page_length=6, owned_only=True):
 		.where(item_variant_attribute.attribute == "Size")
 	)
 	if owned_only:
-		base_query = base_query.where(sales_order.owner == frappe.session.user)
+		base_query = base_query.where(get_shopper_order_condition(frappe.session.user))
 
 	if order_id_list:
 		base_query = base_query.where(sales_order.name.isin(order_id_list))

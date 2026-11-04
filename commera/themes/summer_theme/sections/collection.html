@@ -1,0 +1,30 @@
+{% if section.blocks %}
+<section class="adv-area">
+	<div class="container-fluid px-0">
+		<div class="row product-style2 g-0">
+			{% for banner in section.blocks %}
+			<div class="col-lg-6 col-md-12 wow fadeInUp" data-wow-delay="{{ "%.1f" | format(0.1 * loop.index) }}s">
+				<div class="product-box style-4">
+					<div class="product-media"{% if banner.settings.image %} style="background-image: url('{{ banner.settings.image }}');"{% endif %}></div>
+					{% if loop.first %}
+					<div class="sale-box">
+						{% if banner.settings.badge_label %}<div class="badge style-1 mb-1">{{ banner.settings.badge_label }}</div>{% endif %}
+						<h2 class="sale-name">{{ banner.settings.heading }}</h2>
+						{% if banner.settings.cta_label %}<a href="{{ banner.settings.url or '#' }}" class="btn btn-outline-secondary btn-lg text-uppercase">{{ banner.settings.cta_label }}</a>{% endif %}
+					</div>
+					{% else %}
+					<div class="product-content">
+						<div class="main-content">
+							{% if banner.settings.badge_label %}<div class="badge style-1 mb-3">{{ banner.settings.badge_label }}</div>{% endif %}
+							<h2 class="product-name">{{ banner.settings.heading }}</h2>
+						</div>
+						{% if banner.settings.cta_label %}<a href="{{ banner.settings.url or '#' }}" class="btn btn-secondary btn-lg text-uppercase">{{ banner.settings.cta_label }}</a>{% endif %}
+					</div>
+					{% endif %}
+				</div>
+			</div>
+			{% endfor %}
+		</div>
+	</div>
+</section>
+{% endif %}

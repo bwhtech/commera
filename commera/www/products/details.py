@@ -92,7 +92,7 @@ def add_seo(context, detail):
 	]
 
 
-def get_recommended_products(product_variant):
+def get_recommended_products(product_variant, limit=8):
 	style_attribute_variants = frappe.get_all(
 		"Style Attribute Variant",
 		filters={
@@ -101,7 +101,7 @@ def get_recommended_products(product_variant):
 			"configurator": ["not in", [product_variant.configurator]],
 		},
 		pluck="name",
-		limit=8,
+		limit=limit,
 	)
 
 	return get_product_list(product_list=style_attribute_variants)

@@ -171,6 +171,8 @@ Navigate to: **Desk → Commera Ecommerce → Commera Settings**
 1. **Default Price List**: Select your main selling price list (e.g., "Standard Selling")
 2. **Sale Price List**: Select price list for sale/discounted items (optional)
 
+Both price lists must be in the currency of the Commera company. The store shows and charges every price in that currency, and Commera Settings refuses a price list in another currency.
+
 #### B. Warehouse Configuration
 - **Ecommerce Warehouse**: Select the warehouse that will be used for e-commerce orders
   - This should be a warehouse with actual stock available

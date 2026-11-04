@@ -86,7 +86,7 @@ function confirmDelete(rule) {
     >
       <template #actions>
         <Button
-          v-if="store.available.value"
+          v-if="store.loaded.value"
           label="Add rule"
           icon-left="lucide-plus"
           variant="solid"
@@ -111,14 +111,6 @@ function confirmDelete(rule) {
         v-else-if="!store.loaded.value || (store.loading.value && !store.rules.value.length)"
         :rows="2"
         :lines="2"
-      />
-
-      <EmptyState
-        v-else-if="!store.available.value"
-        compact
-        icon="lucide-package"
-        title="Shipping rules arrive with the shipping app"
-        description="Install it to charge shipping by order value."
       />
 
       <EmptyState

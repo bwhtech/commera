@@ -16,7 +16,12 @@ from commera.api.variant_pricing import (
 )
 from commera.plugin_events import add_changed_products
 from commera.swatches import COLOUR_ATTRIBUTE, ensure_default_swatch, get_swatch_map
-from commera.utils import IN_CLAUSE_CHUNK_SIZE, get_first_option_photos, get_product_covers
+from commera.utils import (
+	IN_CLAUSE_CHUNK_SIZE,
+	get_first_option_photos,
+	get_product_covers,
+	get_store_currency,
+)
 
 PAGE_LENGTH = 20
 BULK_PRODUCT_LIMIT = 100
@@ -53,10 +58,7 @@ def get_products(
 	"""
 	frappe.has_permission("Item", ptype="read", throw=True)
 
-	# Imported here because orders imports this module at import time; a module-level import would cycle.
-	from commera.api.admin.orders import get_reporting_currency
-
-	currency = get_reporting_currency()
+	currency = get_store_currency()
 
 	start = cint(start)
 	page_length = cint(page_length) or PAGE_LENGTH
@@ -357,9 +359,7 @@ def get_pricing_rows(
 	get_products()'s batched joins at variant grain, carrying each variant's own default_rate/sale_rate."""
 	frappe.has_permission("Item", ptype="read", throw=True)
 
-	from commera.api.admin.orders import get_reporting_currency
-
-	currency = get_reporting_currency()
+	currency = get_store_currency()
 
 	start = cint(start)
 	page_length = cint(page_length) or PAGE_LENGTH
@@ -582,9 +582,7 @@ def get_top_products(limit: int = TOP_PRODUCTS_LIMIT):
 	size, so this walks size -> variant -> configurator and sums in SQL; drafts count, as is_webshop_order does."""
 	frappe.has_permission("Item", ptype="read", throw=True)
 
-	# Delayed import: orders.py imports this module at import time, so a module-level import here
-	# would cycle - same guard get_products() above already uses for get_reporting_currency.
-	from commera.api.admin.orders import get_reporting_currency, is_webshop_order
+	from commera.api.admin.orders import is_webshop_order
 
 	sales_order = frappe.qb.DocType("Sales Order")
 	sales_order_item = frappe.qb.DocType("Sales Order Item")
@@ -613,7 +611,7 @@ def get_top_products(limit: int = TOP_PRODUCTS_LIMIT):
 		.limit(cint(limit) or TOP_PRODUCTS_LIMIT)
 		.run()
 	)
-	currency = get_reporting_currency()
+	currency = get_store_currency()
 	if not rows:
 		return {"products": [], "currency": currency}
 
@@ -1218,6 +1216,7 @@ def create_product(
 	for option, sizes in option_sizes:
 		for size in sizes:
 			size_item = create_variant(item_template.name, {option_attribute: option, size_attribute: size})
+			size_item.item_name = get_variant_title(title, option, size)
 			size_item.insert()
 
 	configurator = frappe.new_doc("Style Attribute Configurator")
@@ -1394,11 +1393,14 @@ def save_product_options(item_template: str, add: list | str | None = None, remo
 		frappe.db.set_value("Item", {"name": ["in", restored_codes]}, "disabled", 0)
 
 	item_code_by_key = {key: item.name for key, item in existing_items.items()}
+	template_title = frappe.db.get_value("Item", item_template, "item_name")
 	created_codes = []
 	for key, (option, size) in add_pairs.items():
 		if key in item_code_by_key:
 			continue
-		size_item = create_variant(item_template, {option_attribute: option, SIZE_ATTRIBUTE: size}).insert()
+		size_item = create_variant(item_template, {option_attribute: option, SIZE_ATTRIBUTE: size})
+		size_item.item_name = get_variant_title(template_title, option, size)
+		size_item.insert()
 		item_code_by_key[key] = size_item.name
 		created_codes.append(size_item.name)
 
@@ -1410,6 +1412,12 @@ def save_product_options(item_template: str, add: list | str | None = None, remo
 	add_changed_products([item_template], "options")
 
 	return {"created": len(created_codes), "disabled": len(disabled_codes), "restored": len(restored_codes)}
+
+
+def get_variant_title(title: str, option: str, size: str) -> str:
+	# ERPNext names a variant "<title>-<abbreviations>", which the storefront would show as is.
+	shown = [value for value in (option, size) if value not in (DEFAULT_OPTION_VALUE, DEFAULT_SIZE_VALUE)]
+	return " - ".join([title, *shown])
 
 
 def add_option_rows(configurator: str, item_template: str, options: list) -> None:

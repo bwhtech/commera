@@ -56,9 +56,11 @@
 							<h1 class="h4 title mb-1">
 								{% if frappe.lang == "ar" %}{{ product.custom_item_name_ar or product_variant.display_name }}{% else %}{{ product_variant.display_name }}{% endif %}
 							</h1>
+							{% if product.brand %}
 							<div class="review-num">
 								<a href="/{{ frappe.lang or 'en' }}/products?brands={{ product.brand | urlencode }}">{{ product.brand }}</a>
 							</div>
+							{% endif %}
 						</div>
 					</div>
 

@@ -1,0 +1,51 @@
+{% extends "components/base.html" %}
+{% from "components/account_shell.html" import account_shell with context %}
+{% from "components/macros/form.html" import field, checkbox, submit_button, form_message %}
+{% from "components/macros/icons.html" import icon %}
+{% set addresses = commera.account.list_addresses() %}
+{% set countries = commera.shop.list_countries() %}
+
+{% block body %}
+{% call account_shell("address", _("Addresses")) %}
+<div x-data='address_book({{ addresses | tojson }})'>
+	<div x-show="!form">
+		<p x-cloak x-show="error" x-text="error" class="mb-4 text-sm text-ink-red-6" role="alert"></p>
+		<div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+			<template x-for="address in addresses" :key="address.name">
+				<div>{% include "components/address_card.html" %}</div>
+			</template>
+			<button type="button" @click="edit()" class="flex min-h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-outline-gray-3 text-base text-ink-gray-7 hover:bg-surface-gray-1">{{ icon("plus") }} {{ _("Add address") }}</button>
+		</div>
+	</div>
+
+	<form x-cloak x-show="form" @submit.prevent="save" class="grid max-w-lg gap-5">
+		<button type="button" @click="close" class="inline-flex items-center gap-1 justify-self-start text-base text-ink-gray-7 hover:text-ink-gray-9">{{ icon("left", "size-4 rtl:rotate-180") }} {{ _("Back") }}</button>
+		<h2 class="text-2xl"><span x-show="form?.name">{{ _("Edit address") }}</span><span x-show="!form?.name">{{ _("New address") }}</span></h2>
+		<template x-if="form">
+			<div class="grid gap-5">
+				{{ field("address_line1", _("Address"), "form.address_line1", required=True, autocomplete="address-line1") }}
+				{{ field("address_line2", _("Apartment, suite, etc."), "form.address_line2", autocomplete="address-line2") }}
+				<div class="grid gap-5 sm:grid-cols-2">
+					{{ field("city", _("City"), "form.city", required=True, autocomplete="address-level2") }}
+					{{ field("state", _("State"), "form.state", autocomplete="address-level1") }}
+				</div>
+				<div class="grid gap-5 sm:grid-cols-2">
+					{{ field("pincode", _("Postal code"), "form.pincode", autocomplete="postal-code") }}
+					<label class="block">
+						<span class="text-sm text-ink-gray-7">{{ _("Country") }}</span>
+						<select name="country" x-model="form.country" required autocomplete="country-name" class="mt-1.5 h-10 w-full rounded-lg border border-transparent bg-surface-gray-2 px-3 text-lg text-ink-gray-8 outline-none hover:bg-surface-gray-3 focus:border-outline-gray-4 focus:bg-surface-base">
+							<option value="">{{ _("Select a country") }}</option>
+							{% for country in countries %}<option value="{{ country.name }}">{{ country.title }}</option>{% endfor %}
+						</select>
+					</label>
+				</div>
+				{{ field("phone", _("Phone"), "form.phone", type="tel", autocomplete="tel") }}
+				{{ checkbox(_("Use as my default address"), "form.is_primary_address") }}
+			</div>
+		</template>
+		{{ form_message() }}
+		<div>{{ submit_button(_("Save address")) }}</div>
+	</form>
+</div>
+{% endcall %}
+{% endblock %}

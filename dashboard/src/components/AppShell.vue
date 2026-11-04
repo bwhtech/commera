@@ -5,9 +5,13 @@ import { DesktopShell, ScrollArea, Sidebar, SidebarHeader } from 'frappe-ui'
 import { activeNavTarget, productName, sections } from '../ia/nav'
 import logoUrl from '../assets/commera.svg'
 import { useAccountMenu } from '../data/account'
+import { isAdmin } from '../data/boot'
 import { useAdminRead, useMethodRead } from '../data/api'
+import { sidebarCollapsed, toggleSidebar } from '../ia/sidebar'
 import NavSection from './NavSection.vue'
+import SidebarEdge from './SidebarEdge.vue'
 import SetupBanner from './firstrun/SetupBanner.vue'
+import TrialCard from './TrialCard.vue'
 
 const route = useRoute()
 
@@ -53,9 +57,21 @@ const headerMenu = computed(() => [
   <div class="h-screen w-full bg-surface-base text-ink-gray-9">
     <DesktopShell :scroll="!route.meta.split">
       <template #sidebar>
-        <Sidebar width="14rem" class="border-r border-outline-gray-1">
+        <Sidebar
+          id="commera-sidebar"
+          width="14rem"
+          collapsed-width="3rem"
+          :collapsed="sidebarCollapsed"
+          class="motion-reduce:transition-none"
+        >
           <div class="flex h-full flex-col p-2">
-            <SidebarHeader :title="productName" :subtitle="storeName" :menu-items="headerMenu">
+            <SidebarHeader
+              :title="productName"
+              :subtitle="storeName"
+              :menu-items="headerMenu"
+              class="transition-[margin] duration-300 ease-in-out motion-reduce:transition-none"
+              :class="sidebarCollapsed ? '-ml-2' : ''"
+            >
               <template #prefix>
                 <img :src="logoUrl" alt="" class="h-full w-full object-cover" />
               </template>
@@ -63,9 +79,14 @@ const headerMenu = computed(() => [
             <ScrollArea v-scroll-fade class="min-h-0 flex-1" viewport-class="pt-1 pb-10">
               <NavSection v-for="section in sections" :key="section.id" :section="section" :active-target="activeTarget" />
             </ScrollArea>
-            <SetupBanner />
+            <!-- A narrow icon rail has no room for either card. -->
+            <div v-if="!sidebarCollapsed" class="flex flex-col gap-2">
+              <TrialCard />
+              <SetupBanner v-if="isAdmin" />
+            </div>
           </div>
         </Sidebar>
+        <SidebarEdge controls="commera-sidebar" :collapsed="sidebarCollapsed" label="sidebar" @toggle="toggleSidebar" />
       </template>
 
       <slot />

@@ -1,0 +1,58 @@
+{% from "components/macros/icons.html" import icon %}
+{% from "components/macros/menu_link.html" import menu_link %}
+{% set language = frappe.lang or "en" %}
+{% set is_guest = frappe.session.user == "Guest" %}
+{% set main_menu = commera.shop.get_menu(section.settings.menu or "main-menu") %}
+{% set menu_items = main_menu["items"] if main_menu else [] %}
+{% set logo_at_start = section.settings.logo_position == "start" %}
+
+<header x-data class="relative z-40">
+	<div class="{{ 'flex items-center gap-6' if logo_at_start else 'grid grid-cols-3 items-center' }} px-5 py-4 md:px-12">
+		<div class="flex items-center gap-1">
+			<button type="button" @click="$dispatch('open-menu')" class="grid size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:hidden" aria-label="{{ _('Menu') }}">{{ icon("menu") }}</button>
+			{% for item in menu_items %}
+			{% if item["items"] %}
+			<div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false" class="relative hidden md:block">
+				<button type="button" @click="open = !open" :aria-expanded="open" :class="open && 'bg-surface-gray-4'" class="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-base text-ink-gray-8 hover:bg-surface-gray-3">{{ item["title"] }} {{ icon("down", "size-4") }}</button>
+				<div x-cloak x-show="open" class="absolute start-0 top-full z-50 mt-1 min-w-48 divide-y divide-outline-elevation-2 rounded-xl bg-surface-elevation-2 text-start shadow-2xl ring-1 ring-outline-gray-2">
+					{% for group in item["items"] if group["items"] %}
+					<div class="p-1.5">
+						<p class="flex h-7 items-center px-2 text-sm font-medium text-ink-gray-6">{{ group["title"] }}</p>
+						{% for link in group["items"] %}{{ menu_link(link, "flex h-7 items-center rounded-lg px-2 text-base text-ink-gray-8 hover:bg-surface-gray-3") }}{% endfor %}
+					</div>
+					{% endfor %}
+					{% set leaf_links %}
+						{%- for link in item["items"] if not link["items"] %}{{ menu_link(link, "flex h-7 items-center rounded-lg px-2 text-base text-ink-gray-8 hover:bg-surface-gray-3") }}{% endfor -%}
+						{%- if item["url"] %}<a href="{{ item['url'] }}" class="flex h-7 items-center rounded-lg px-2 text-base text-ink-gray-8 hover:bg-surface-gray-3">{{ _("View all") }}</a>{% endif -%}
+					{% endset %}
+					{% if leaf_links | trim %}<div class="p-1.5">{{ leaf_links }}</div>{% endif %}
+				</div>
+			</div>
+			{% else %}
+			{{ menu_link(item, "hidden h-8 items-center rounded-lg px-2.5 text-base text-ink-gray-8 hover:bg-surface-gray-3 md:inline-flex") }}
+			{% endif %}
+			{% endfor %}
+		</div>
+
+		<a href="/{{ language }}" class="{{ 'md:order-first' if logo_at_start else 'justify-self-center text-center' }} text-lg font-semibold uppercase tracking-widest">
+			{% if theme.logo %}<img src="{{ theme.logo }}" alt="{{ app_name }}" class="h-8 w-auto">{% else %}{{ app_name }}{% endif %}
+		</a>
+
+		<div class="{{ 'ms-auto' if logo_at_start }} flex items-center justify-end gap-1">
+			{% if section.settings.show_search %}
+			<button type="button" @click="$dispatch('open-search')" class="hidden size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:grid" aria-label="{{ _('Search') }}">{{ icon("search") }}</button>
+			{% endif %}
+			{% if section.settings.show_account %}
+			<a href="/{{ language }}/account/{{ 'login' if is_guest else 'orders' }}" {% if is_guest %}@click.prevent="$dispatch('open-auth')"{% endif %} class="hidden size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:grid" aria-label="{{ _('Account') }}">{{ icon("user") }}</a>
+			{% endif %}
+			{% if section.settings.show_wishlist %}
+			<a href="/{{ language }}/account/wishlist" {% if is_guest %}@click.prevent="$dispatch('open-auth', { redirect: $el.pathname })"{% endif %} class="hidden size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 md:grid" aria-label="{{ _('Wishlist') }}">{{ icon("heart") }}</a>
+			{% endif %}
+			<a href="/{{ language }}/cart" @click.prevent="$dispatch('open-cart')" class="relative grid size-10 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3" aria-label="{{ _('Cart') }}">
+				{{ icon("bag") }}
+				<span x-cloak x-show="$store.cart.count" x-text="$store.cart.count" class="absolute end-0.5 top-0.5 grid h-4 min-w-4 place-content-center rounded-full bg-brand px-1 text-2xs text-on-brand"></span>
+			</a>
+		</div>
+	</div>
+	{% include "components/mobile_menu.html" %}
+</header>

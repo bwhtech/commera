@@ -1,7 +1,10 @@
 import frappe
 
+from commera.roles import COMMERA_ADMIN, COMMERA_USER
 
-def has_app_permission() -> bool:
-	"""Gate for the Desk apps screen. The dashboard shell refuses anyone who cannot write Items, so
-	the tile answers the same question rather than offering a link that throws on arrival."""
-	return bool(frappe.has_permission("Item", ptype="write"))
+
+def has_app_permission(user: str | None = None) -> bool:
+	user = user or frappe.session.user
+	if frappe.get_cached_value("User", user, "user_type") != "System User":
+		return False
+	return bool({COMMERA_ADMIN, COMMERA_USER, "System Manager"} & set(frappe.get_roles(user)))

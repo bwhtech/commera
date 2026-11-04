@@ -227,6 +227,21 @@ class TestSaveProductOptions(DeleteProductTestCase):
 		self.assertEqual(list(crimson), ["S", "M", "L", "XL"])
 		self.assertEqual((crimson["L"]["default_rate"], crimson["L"]["sale_rate"]), (500, 400))
 
+	def test_sizes_are_named_after_the_product_not_the_item_code(self):
+		save_product_options(self.item_template, add=[{"option": "Teal", "size": "M"}])
+		book = create_product(
+			title=f"Book {frappe.generate_hash(length=6).upper()}", collection=self.item_group
+		)
+
+		names = frappe.get_all("Item", filters={"variant_of": self.item_template}, pluck="item_name")
+		self.assertEqual(
+			sorted(names),
+			[f"{self.item_template} - {option}" for option in ("Crimson - M", "Crimson - S", "Teal - M")],
+		)
+		self.assertEqual(
+			frappe.get_all("Item", filters={"variant_of": book["name"]}, pluck="item_name"), [book["name"]]
+		)
+
 	def test_a_new_option_gets_its_own_storefront_row(self):
 		result = save_product_options(self.item_template, add=[{"option": "Teal", "size": "M"}])
 

@@ -14,6 +14,7 @@ const props = defineProps({
   // Only for a control inside a form; a settings row already names its control.
   label: { type: String, default: '' },
   required: { type: Boolean, default: false },
+  disabled: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -45,6 +46,7 @@ const options = computed(() => {
       :options="options"
       :label="label || undefined"
       :required="required"
+      :disabled="disabled"
       :filterable="false"
       :loading="search.results.loading"
       :placeholder="`Search ${field.options}`"

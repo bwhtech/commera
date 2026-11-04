@@ -1,0 +1,28 @@
+{
+	"name": "Hero",
+	"category": "Banners",
+	"settings": [
+		{ "id": "badge", "type": "text", "label": "Badge", "default": "Autumn / Winter 2026" },
+		{ "id": "heading", "type": "text", "label": "Heading", "default": "Clothes made to be lived in." },
+		{
+			"id": "text",
+			"type": "textarea",
+			"label": "Text",
+			"default": "Linen, wool and cotton in quiet colours. Cut to last more than one season."
+		},
+		{ "id": "primary_label", "type": "text", "label": "Button label", "default": "Shop the edit" },
+		{ "id": "primary_url", "type": "url", "label": "Button link", "default": "" },
+		{ "id": "secondary_label", "type": "text", "label": "Second button label", "default": "Lookbook" },
+		{ "id": "secondary_url", "type": "url", "label": "Second button link", "default": "" }
+	],
+	"blocks": {
+		"slide": {
+			"name": "Slide",
+			"settings": [
+				{ "id": "image", "type": "image", "label": "Image", "default": "" },
+				{ "id": "alt", "type": "text", "label": "Image description", "default": "" }
+			]
+		}
+	},
+	"max_blocks": 5
+}

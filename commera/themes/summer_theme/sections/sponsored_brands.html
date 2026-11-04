@@ -1,0 +1,45 @@
+{% from "components/macros/product_card.html" import card_discount %}
+{% set sponsored_brands = commera.catalog.list_brands() %}
+{% set picks = section.products %}
+{% if sponsored_brands %}
+<section class="content-inner-2 overflow-hidden">
+	<div class="container">
+		<div class="section-head style-1 wow fadeInUp d-flex justify-content-between" data-wow-delay="0.2s">
+			<div class="left-content">
+				<h2 class="title">{{ _("Sponsored") }}</h2>
+			</div>
+			<a href="/{{ frappe.lang or 'en' }}/products" class="text-secondary font-14 d-flex align-items-center gap-1">{{ _("See All") }}
+				<i class="icon feather icon-chevron-right font-18"></i>
+			</a>
+		</div>
+		<div class="swiper swiper-company" data-summer-carousel="sponsored">
+			<div class="swiper-wrapper">
+				{% for brand in sponsored_brands %}
+				{% set brand_picks = picks | selectattr("vendor", "equalto", brand.name) | list %}
+				{% set brand_url = "/" ~ (frappe.lang or "en") ~ "/products?brands=" ~ (brand.name | urlencode) %}
+				<div class="swiper-slide">
+					<div class="company-box style-1 wow fadeInUp" data-wow-delay="{{ "%.1fs" | format(0.2 + 0.2 * loop.index) }}">
+						<div class="dz-media">
+							<img src="{{ shop_theme_asset_url('images/company/' ~ (loop.index0 % 3 + 1) ~ '.jpg') }}" alt="" class="company-img">
+							{% if brand.image %}
+							<a href="{{ brand_url }}"><img src="{{ brand.image }}" alt="{{ brand.name }}" class="logo"></a>
+							{% else %}
+							<a href="{{ brand_url }}" class="logo brand-name">{{ brand.name }}</a>
+							{% endif %}
+						</div>
+						<div class="dz-content">
+							<h6 class="title"><a href="{{ brand_url }}">{{ brand.name }}</a></h6>
+							{% if brand_picks %}
+							{% set brand_discount = namespace(percent=0) %}
+							{% for pick in brand_picks %}{% set brand_discount.percent = [brand_discount.percent, card_discount(pick) | int] | max %}{% endfor %}
+							<span class="sale-title">{{ _("Up to {0}% Off").format(brand_discount.percent) }}</span>
+							{% endif %}
+						</div>
+					</div>
+				</div>
+				{% endfor %}
+			</div>
+		</div>
+	</div>
+</section>
+{% endif %}

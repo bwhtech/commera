@@ -1,0 +1,10 @@
+{% from "components/auth_form.html" import auth_form with context %}
+{% from "components/macros/icons.html" import icon %}
+
+<div x-data="{ open: false }" x-cloak x-show="open" @open-auth.window="open = true" @keydown.escape.window="open = false" class="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-label="{{ _('Log in') }}">
+	<div @click="open = false" class="absolute inset-0 bg-surface-alpha-gray-6"></div>
+	<div class="relative max-h-full w-full max-w-md overflow-y-auto rounded-xl bg-surface-base p-6 shadow-2xl">
+		<button type="button" @click="open = false" class="absolute end-3 top-3 grid size-9 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3" aria-label="{{ _('Close') }}">{{ icon("close", "size-4") }}</button>
+		{{ auth_form("login") }}
+	</div>
+</div>

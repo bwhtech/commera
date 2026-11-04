@@ -14,8 +14,8 @@
 		<div class="swiper-btn-center-lr">
 			<div class="swiper swiper-four" data-summer-carousel="related-products">
 				<div class="swiper-wrapper">
-					{% for variant in recommended_items %}
-					<div class="swiper-slide card-container">{{ variant_card(variant, wow_delay="%.1fs" | format(0.2 + 0.2 * loop.index)) }}</div>
+					{% for product in recommended_items %}
+					<div class="swiper-slide card-container">{{ variant_card(product, wow_delay="%.1fs" | format(0.2 + 0.2 * loop.index)) }}</div>
 					{% endfor %}
 				</div>
 			</div>

@@ -1,6 +1,5 @@
 {% extends "components/theme_layout.html" %}
 
-{% set settings = shop_theme_config() %}
 {# Only the home page runs a full-bleed hero under the bar; every other page gets Pixio's plain inner-page header. #}
 {% set header_class = "style-1 header-transparent" %}
 
@@ -11,19 +10,7 @@
 {% endblock %}
 
 {% block uncontained_body %}
-	{% if settings.hero_slides %}{% include "components/sections/hero_slider.html" %}{% endif %}
-	{% if settings.shop_by_category %}{% include "components/sections/category_strip.html" %}{% endif %}
-	{% if header_data.navigation_menu %}{% include "components/sections/marquee.html" %}{% endif %}
-	{% if picked_products.best_picks %}{% include "components/sections/products_grid.html" %}{% endif %}
-	{% if settings.collection_banners %}{% include "components/sections/collection.html" %}{% endif %}
-	{% if best_picks %}{% include "components/sections/similar_products.html" %}{% endif %}
-	{% if picked_products.best_picks %}{% include "components/sections/everyday_essentials.html" %}{% endif %}
-	{% if picked_products.deal_picks %}{% include "components/sections/deals.html" %}{% endif %}
-	{% if settings.offer_banners %}{% include "components/sections/offers.html" %}{% endif %}
-	{% if picked_products.featured_picks %}{% include "components/sections/featured.html" %}{% endif %}
-	{% if new_arrivals %}{% include "components/sections/recent_additions.html" %}{% endif %}
-	{% include "components/sections/sponsored_brands.html" %}
-	{% if header_data.navigation_menu %}{% include "components/sections/collection_collage.html" %}{% endif %}
+	{{ render_layout("index") }}
 {% endblock %}
 
 {% block script %}

@@ -1,0 +1,15 @@
+{
+	"sections": [
+		{ "id": "newsletter", "type": "newsletter", "hidden": true, "settings": {}, "blocks": [] },
+		{
+			"id": "footer",
+			"type": "footer",
+			"hidden": false,
+			"settings": {},
+			"blocks": [
+				{ "id": "footer-menu", "type": "menu", "settings": { "menu": "footer" } },
+				{ "id": "social", "type": "social", "settings": {} }
+			]
+		}
+	]
+}

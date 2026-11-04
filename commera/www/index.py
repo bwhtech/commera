@@ -20,8 +20,11 @@ def get_context(context):
 	context["new_arrivals"] = new_arrivals
 	context["best_picks"] = best_picks
 
-	context.show_breadcrumb = False
+	set_home_seo(context)
 
+
+def set_home_seo(context):
+	context.show_breadcrumb = False
 	settings = seo.get_seo_settings()
 	context.seo = seo.build_page_seo(
 		{

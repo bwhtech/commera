@@ -1,0 +1,47 @@
+{
+	"sections": [
+		{
+			"id": "hero",
+			"type": "hero",
+			"hidden": false,
+			"settings": {},
+			"blocks": [
+				{ "id": "slide-1", "type": "slide", "settings": { "image": "images/banner-banner-media2.webp" } },
+				{ "id": "slide-2", "type": "slide", "settings": { "image": "images/collection-3.webp" } },
+				{ "id": "slide-3", "type": "slide", "settings": { "image": "images/about-pic3.webp" } }
+			]
+		},
+		{
+			"id": "new-arrivals",
+			"type": "featured_products",
+			"hidden": false,
+			"settings": { "source": "newest" },
+			"blocks": []
+		},
+		{
+			"id": "collections",
+			"type": "collection_tiles",
+			"hidden": false,
+			"settings": {},
+			"blocks": [
+				{ "id": "tile-1", "type": "tile", "settings": { "title": "Women", "image": "images/about-pic3.webp" } },
+				{ "id": "tile-2", "type": "tile", "settings": { "title": "Men", "image": "images/collection-2.webp" } },
+				{ "id": "tile-3", "type": "tile", "settings": { "title": "Basics", "image": "images/files-2.webp" } }
+			]
+		},
+		{
+			"id": "our-process",
+			"type": "image_with_text",
+			"hidden": false,
+			"settings": {},
+			"blocks": []
+		},
+		{
+			"id": "newsletter",
+			"type": "newsletter",
+			"hidden": false,
+			"settings": {},
+			"blocks": []
+		}
+	]
+}

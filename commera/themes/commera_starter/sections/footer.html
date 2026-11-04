@@ -1,0 +1,40 @@
+{% from "components/macros/menu_link.html" import menu_link %}
+{% set social_links = [
+	(_("Instagram"), theme.instagram_url),
+	(_("Facebook"), theme.facebook_url),
+	(_("X"), theme.x_url),
+	(_("Pinterest"), theme.pinterest_url),
+	(_("YouTube"), theme.youtube_url),
+] | selectattr(1) | list %}
+
+<footer class="grid grid-cols-2 gap-8 border-t border-outline-gray-2 px-5 py-14 text-sm md:grid-cols-4 md:px-12">
+	<div>
+		<p class="font-semibold uppercase tracking-widest">{{ app_name }}</p>
+		<p class="mt-3 text-ink-gray-6">{{ section.settings.copyright or "© {0} {1}".format(frappe.utils.getdate().year, app_name) }}</p>
+	</div>
+	{% for block in section.blocks %}
+	{% if block.type == "menu" %}
+	{% set menu = commera.shop.get_menu(block.settings.menu or "footer") %}
+	{% for column in (menu["items"] if menu else []) %}
+	<div class="space-y-2 text-ink-gray-6"{{ block.editor_attributes }}>
+		<p class="text-ink-gray-9">{{ column["title"] }}</p>
+		{% for link in column["items"] %}
+		{{ menu_link(link, "block hover:text-ink-gray-9") }}
+		{% endfor %}
+	</div>
+	{% endfor %}
+	{% elif block.type == "text" %}
+	<div class="space-y-2 text-ink-gray-6"{{ block.editor_attributes }}>
+		{% if block.settings.heading %}<p class="text-ink-gray-9">{{ block.settings.heading }}</p>{% endif %}
+		<p class="text-p-sm">{{ block.settings.text }}</p>
+	</div>
+	{% elif block.type == "social" and social_links %}
+	<div class="space-y-2 text-ink-gray-6"{{ block.editor_attributes }}>
+		<p class="text-ink-gray-9">{{ block.settings.heading }}</p>
+		{% for label, url in social_links %}
+		<a href="{{ url }}" target="_blank" rel="noopener" class="block hover:text-ink-gray-9">{{ label }}</a>
+		{% endfor %}
+	</div>
+	{% endif %}
+	{% endfor %}
+</footer>

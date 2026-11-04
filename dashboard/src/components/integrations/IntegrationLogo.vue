@@ -9,11 +9,12 @@
  */
 import { computed } from 'vue'
 import { brandFor } from '../../data/integrations'
-import { escapeXml } from './logos'
+import { escapeXml, getIntegrationLogo } from './logos'
 
 const props = defineProps({
   slug: { type: String, required: true },
   label: { type: String, default: '' },
+  logo: { type: String, default: '' },
   // A provider row carries the full plate; a group heading inside a form wants a
   // smaller one, so the plate is not louder than the heading it belongs to.
   size: { type: String, default: 'md', validator: (value) => ['sm', 'md'].includes(value) },
@@ -29,6 +30,14 @@ const markup = computed(() => {
 
 <template>
   <div
+    v-if="logo && !getIntegrationLogo(slug)"
+    class="shrink-0 overflow-hidden rounded-5 border border-outline-gray-2 bg-surface-base p-1.5"
+    :class="plateClass"
+  >
+    <img :src="logo" :alt="label" class="h-full w-full object-contain" />
+  </div>
+  <div
+    v-else
     class="shrink-0 overflow-hidden rounded-5 border border-outline-gray-2"
     :class="plateClass"
     v-html="markup"

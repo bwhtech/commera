@@ -1,0 +1,22 @@
+{% extends "components/base.html" %}
+{% from "components/account_shell.html" import account_shell with context %}
+{% from "components/macros/form.html" import field, submit_button, form_message %}
+{% set profile = commera.account.get_profile() %}
+
+{% block body %}
+{% call account_shell("profile", _("Profile")) %}
+<form x-data='profile_form({{ profile | tojson }})' @submit.prevent="save" class="grid max-w-lg gap-5">
+	<div class="grid gap-5 sm:grid-cols-2">
+		{{ field("first_name", _("First name"), "profile.first_name", required=True, autocomplete="given-name") }}
+		{{ field("last_name", _("Last name"), "profile.last_name", autocomplete="family-name") }}
+	</div>
+	<label class="block">
+		<span class="text-sm text-ink-gray-7">{{ _("Email") }}</span>
+		<input type="email" value="{{ profile.email }}" disabled class="mt-1.5 h-10 w-full rounded-lg bg-surface-gray-1 px-3 text-lg text-ink-gray-5">
+	</label>
+	{{ field("phone", _("Phone"), "profile.phone", type="tel", autocomplete="tel") }}
+	{{ form_message() }}
+	<div>{{ submit_button(_("Save")) }}</div>
+</form>
+{% endcall %}
+{% endblock %}

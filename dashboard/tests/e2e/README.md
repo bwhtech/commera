@@ -35,6 +35,8 @@ Run one spec on its own with `node --test tests/e2e/catalog.spec.js`.
 | `storefront.spec.js` | The navigation tree editor and the footer column editor, asserted after a reload. |
 | `checkout.spec.js` | A new shopper signs up on the storefront, places a COD order, and finds it in `/account/orders`. |
 | `discounts.spec.js` | A cart link's `?discount=` code is shown at checkout and reaches the COD order, `mode=add` keeps the cart and adds the code, a code typed into the default theme's promo box reaches the open checkout, and signing in merges the guest cart into the account's. |
+| `themeEditor.spec.js` | Publish in the theme editor saves every changed part before publishing any, so a refused save leaves the live store untouched; a slow preview render dims the preview until the new page swaps in, and the swapped page skips its entrance animations; saving a theme setting re-renders the preview once with the new value. Skips unless the live theme is a Sections theme. |
+| `onboarding.spec.js` | First-run onboarding with real clicks: every step, Back reversing one, the accounting disclosure, waiting for the background store setup to report Ready (up to 3 min on a fresh site), a brand colour, a theme, a selling switch, Shopify shown as coming soon, the CSV import dialog opened and closed, then Go to dashboard; asserts the store name, flag, colour, switch and theme server-side and that a reload stays on the dashboard. On a store already set up it clears `onboarding_completed` first and restores the flag, store name, category, brand, selling switches and live theme afterwards. |
 
 Not covered, because there is nothing behind them yet: **Storefront > Theme** and
 **Storefront > Pages** are mock screens with no endpoint, and **Product types** has no
@@ -79,3 +81,4 @@ and removed by hand.
 - **The signup OTP** lives only in Redis, so `checkout.spec.js` shells out to
   `bench --site <site> console` to read it. It is the one place the suite does not go
   through HTTP, because there is no HTTP route to a one-time code.
+- **The onboarding spec reopens onboarding** on a set-up store by clearing `onboarding_completed`, and switches the live theme. A killed run leaves the flag cleared (the dashboard opens onto onboarding) and the theme switched; on a fresh site the company its store setup made cannot be undone.
