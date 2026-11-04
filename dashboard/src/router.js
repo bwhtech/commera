@@ -14,6 +14,7 @@ const routes = [
   { path: '/products/:id', name: 'ProductDetail', component: () => import('./pages/ProductDetail.vue'), meta: { split: true } },
   { path: '/products/:id/variants/:variantId', name: 'VariantDetail', component: () => import('./pages/VariantDetail.vue') },
   { path: '/collections', name: 'Collections', component: () => import('./pages/Collections.vue') },
+  { path: '/import/shopify', name: 'ShopifyImport', component: () => import('./pages/ShopifyImport.vue') },
   { path: '/attributes', name: 'Attributes', component: () => import('./pages/Attributes.vue') },
   { path: '/inventory', name: 'Inventory', component: () => import('./pages/Inventory.vue') },
   { path: '/inventory/adjustments', name: 'Adjustments', component: () => import('./pages/Adjustments.vue') },
