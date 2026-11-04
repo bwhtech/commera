@@ -51,8 +51,9 @@ function back() {
     @update:open="(v) => (v ? null : closeImport())"
   >
     <!-- The panel has to fit the window with its own footer visible: the
-         dialog's own margins take 8rem, everything else is the body's scroll. -->
-    <div class="flex max-h-[calc(100vh-8rem)] flex-col">
+         dialog's own margins take 8rem, everything else is the body's scroll. dvh, not vh: on a
+         phone vh is the height with the address bar hidden, which would push the footer off. -->
+    <div class="flex max-h-[calc(100dvh-8rem)] flex-col">
       <div class="flex items-center gap-3 border-b border-outline-gray-1 px-6 py-4">
         <span class="text-lg-semibold text-ink-gray-9">Import products</span>
         <Badge

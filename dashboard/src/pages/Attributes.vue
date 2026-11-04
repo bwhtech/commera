@@ -71,7 +71,7 @@ function editAttribute(attribute) {
          work down a long set of attributes. -->
     <ScrollArea v-scroll-fade
       v-else-if="attributes.length"
-      class="max-h-[calc(100vh-15rem)] border-y border-outline-gray-1"
+      class="max-h-[calc(100dvh-15rem)] border-y border-outline-gray-1"
     >
       <div class="divide-y divide-outline-gray-1">
         <div
