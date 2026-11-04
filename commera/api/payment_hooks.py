@@ -1,5 +1,5 @@
 import frappe
-from bwh_payments.currency import to_minor_units
+from bwh_payments_core.currency import to_minor_units
 from frappe import _
 from frappe.utils.data import flt, fmt_money
 

@@ -8,7 +8,7 @@ from commera.migrate import add_payment_mode
 
 PROFILE_DOCTYPE = "Payment Gateway Profile"
 PROFILE_SETTINGS_FIELDNAME = "gateway_settings"
-WEBHOOK_PATH = "/api/method/bwh_payments.bwh_payments.webhook.handle?gateway={profile}"
+WEBHOOK_PATH = "/api/method/commera.payment_gateways.api.handle_webhook?gateway={profile}"
 
 # Order here is the order the cards render in.
 PAYMENT_GATEWAYS = (

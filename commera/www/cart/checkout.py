@@ -1,5 +1,4 @@
 import frappe
-from bwh_payments.api import get_gateway_options
 from frappe import _
 from frappe.query_builder import DocType
 from frappe.rate_limiter import rate_limit
@@ -29,6 +28,7 @@ from commera.localization.address_countries import AddressCountries
 from commera.localization.cart_currency import get_cart_delivery_configuration
 from commera.localization.market_prices import MarketPrices
 from commera.localization.resolver import get_localization
+from commera.payment_gateways.connectors import get_available_payment_modes
 from commera.sdk.catalog import set_product_titles
 from commera.utils import (
 	format_addresses,
@@ -78,7 +78,7 @@ def get_context(context, allow_guest: bool = False):
 	context.payment_gateways = [method for method in payment_methods if method != COD_PAYMENT_MODE]
 	context.show_cod = int(COD_PAYMENT_MODE in payment_methods)
 	# The list refreshes in the browser after the address step, so label every enabled gateway.
-	context.payment_gateway_labels = {option.name: _(option.name) for option in get_gateway_options()}
+	context.payment_gateway_labels = {gateway: _(gateway) for gateway in get_available_payment_modes()}
 	countries = AddressCountries.current()
 	context.phone_country_list = get_country_list()
 	context.country_list = countries.within(context.phone_country_list)

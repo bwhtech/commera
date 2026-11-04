@@ -2,8 +2,6 @@ from contextlib import contextmanager
 from urllib.parse import urlencode
 
 import frappe
-from bwh_payments.api import get_gateway_options
-from bwh_payments.bwh_payments.utils import get_available_payment_modes, resolve_payment_mode
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 from erpnext.accounts.general_ledger import get_debit_credit_allowance
@@ -70,6 +68,11 @@ from commera.localization import url
 from commera.localization.address_countries import AddressCountries
 from commera.localization.market_prices import MarketPrices
 from commera.order_access import get_order_link, set_order_access_key
+from commera.payment_gateways.connectors import (
+	get_available_payment_modes,
+	get_payment_modes_for_currency,
+	resolve_payment_mode,
+)
 from commera.plugin_events import fire_event, get_plugin_fieldnames
 from commera.utils import (
 	get_charge_account_head,
@@ -265,7 +268,7 @@ def validate_invoice_currency(quotation):
 def get_checkout_payment_methods(quotation, strict: bool = False) -> list[str]:
 	"""Gateways that can charge the cart's currency, and cash on delivery, which has no currency limit."""
 	currency = quotation.currency if quotation else MarketPrices.current().currency
-	payment_methods = [option.name for option in get_gateway_options(currency)]
+	payment_methods = get_payment_modes_for_currency(currency)
 	if frappe.get_cached_value("Commera Settings", "Commera Settings", "cod_enabled"):
 		payment_methods.append(COD_PAYMENT_MODE)
 	if not quotation:

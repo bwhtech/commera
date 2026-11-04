@@ -5,8 +5,8 @@ app_description = "Ecommerce extension for ERPNext"
 app_email = "rahul@buildwithhussain.com"
 app_license = "agpl-3.0"
 
-# frappe/payments deliberately absent: bwh_payments ships its own Payment Gateway Profile and base_class.
-required_apps = ["frappe/erpnext", "bwhtech/bwh_payments"]
+# frappe/payments deliberately absent: Commera ships its own Payment Gateway Profile on bwh_payments_core.
+required_apps = ["frappe/erpnext"]
 
 
 # Only language-independent rules: commera.localization.routing redirects /<default>/* and /account.
@@ -96,6 +96,7 @@ before_uninstall = "commera.customizations.delete_customizations"
 after_app_install = [
 	"commera.storefront_plugins.sync_storefront_apps",
 	"commera.shipping.providers.validate_providers",
+	"commera.payment_gateways.connectors.validate_connectors",
 ]
 before_app_uninstall = "commera.shipping.providers.disable_app_profiles"
 
@@ -154,6 +155,12 @@ commera_hooks = {
 			"adapter": "commera.shop_themes.section_translations.ThemeSectionResource",
 			"label": "Theme",
 		},
+	],
+	"payment_connectors": [
+		"Razorpay Gateway Settings",
+		"Stripe Gateway Settings",
+		"Telr Gateway Settings",
+		"Tabby Gateway Settings",
 	],
 }
 setup_wizard_complete = [
@@ -304,7 +311,7 @@ doc_events = {
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 		"on_submit": "commera.utils.update_so_status_from_related_doc",
 	},
-	"Payment Entry": {"on_submit": "commera.plugin_events.on_payment_entry_submit"},
+	"Payment Entry": {"on_submit": "commera.doc_events.payment_entry.on_submit"},
 	"Delivery Note": {
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
 		"validate": "commera.discounts.pricing.apply_code_discounts",
@@ -552,6 +559,8 @@ before_tests = "commera.install.before_tests"
 override_whitelisted_methods = {
 	# Carriers set up before the move still post to the bwh_shipping URL; drop once they use the new one.
 	"bwh_shipping.bwh_shipping.webhook.handle": "commera.shipping.webhook.handle",
+	# Gateway dashboards set up before the move still post to the bwh_payments URL.
+	"bwh_payments.bwh_payments.webhook.handle": "commera.payment_gateways.api.handle_webhook",
 }
 #
 # each overriding function accepts a `data` argument;
