@@ -4,12 +4,7 @@ import importlib
 from unittest.mock import patch
 
 import frappe
-from bwh_payments.bwh_payments.doctype.gateway_payment_request.test_gateway_payment_request import (
-	GATEWAY,
-	configure_stripe_gateway,
-	remove_stripe_gateway,
-)
-from bwh_payments.services.stripe.stub import StubStripeClient
+from bwh_payments_core.connectors.stripe.stub import StubStripeClient
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date, get_year_ending, get_year_start, getdate, now_datetime
 from frappe.utils.data import flt
@@ -26,6 +21,11 @@ from commera.api.payments import (
 	validate_invoice_currency,
 )
 from commera.jobs import delete_old_draft_quotations, sync_pending_gateway_payments
+from commera.payment_gateways.doctype.gateway_payment_request.test_gateway_payment_request import (
+	GATEWAY,
+	configure_stripe_gateway,
+	remove_stripe_gateway,
+)
 from commera.plugin_events import (
 	PLUGINS_USER,
 	RETRY_DELAYS_IN_MINUTES,
@@ -993,7 +993,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		sales_order.flags.ignore_permissions = True
 		sales_order.submit()
 		sales_invoice = self.submit_invoice_for(sales_order, qty=2)
-		with patch("commera.plugin_events.on_payment_entry_submit"):
+		with patch("commera.doc_events.payment_entry.on_payment_entry_submit"):
 			create_payment_entry(sales_invoice, GATEWAY, sales_invoice.outstanding_amount, None)
 		self.assertEqual(self.plugin_events(sales_order.name), ["order_placed"])
 
@@ -1153,7 +1153,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		)
 
 	def test_a_failing_app_is_retried_on_schedule_then_failed_without_holding_up_another(self):
-		broken_handler = self.add_handler_to_app("bwh_payments", raise_from_plugin_event)
+		broken_handler = self.add_handler_to_app("frappe", raise_from_plugin_event)
 		patch_app_hooks(
 			self, {"commera_events": {"order_placed": [broken_handler, f"{__name__}.record_plugin_event"]}}
 		)
@@ -1162,7 +1162,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		placed_at = now_datetime()
 		sales_order = self.place_cod_order_for_cart().name
-		broken = self.delivery(sales_order, "order_placed", app="bwh_payments")
+		broken = self.delivery(sales_order, "order_placed", app="frappe")
 		self.assertEqual(broken.attempts, 1)
 		self.assertGreaterEqual(
 			broken.next_retry_at, add_to_date(placed_at, minutes=RETRY_DELAYS_IN_MINUTES[0])
@@ -1173,15 +1173,13 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		with self.freeze_time(add_to_date(broken.next_retry_at, seconds=-1)):
 			run_due_deliveries()
-		self.assertEqual(
-			self.delivery(sales_order, "order_placed", app="bwh_payments").attempts, 1, "not due yet"
-		)
+		self.assertEqual(self.delivery(sales_order, "order_placed", app="frappe").attempts, 1, "not due yet")
 
 		for delay in RETRY_DELAYS_IN_MINUTES[1:]:
 			retried_at = broken.next_retry_at
 			with self.freeze_time(retried_at):
 				run_due_deliveries()
-			broken = self.delivery(sales_order, "order_placed", app="bwh_payments")
+			broken = self.delivery(sales_order, "order_placed", app="frappe")
 			self.assertEqual(
 				(broken.status, broken.next_retry_at), ("Queued", add_to_date(retried_at, minutes=delay))
 			)
@@ -1189,7 +1187,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		with self.freeze_time(broken.next_retry_at):
 			run_due_deliveries()
 
-		broken = self.delivery(sales_order, "order_placed", app="bwh_payments")
+		broken = self.delivery(sales_order, "order_placed", app="frappe")
 		self.assertEqual((broken.status, broken.attempts, broken.next_retry_at), ("Failed", 6, None))
 		self.assertEqual(frappe.get_doc("Error Log", broken.last_error).reference_name, sales_order)
 		self.assertEqual(self.delivery(sales_order, "order_placed").status, "Done")
@@ -1200,15 +1198,15 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		)
 
 	def test_a_failed_delivery_runs_again_when_staff_retry_it(self):
-		self.add_handler_to_app("bwh_payments", raise_from_plugin_event)
-		handler = self.add_handler_to_app("bwh_payments", record_plugin_event)
+		self.add_handler_to_app("frappe", raise_from_plugin_event)
+		handler = self.add_handler_to_app("frappe", record_plugin_event)
 		patch_app_hooks(
-			self, {"commera_events": {"order_placed": ["bwh_payments.commera_test_raise_from_plugin_event"]}}
+			self, {"commera_events": {"order_placed": ["frappe.commera_test_raise_from_plugin_event"]}}
 		)
 		calls = self.record_plugin_events()
 		self.run_enqueued_jobs_now()
 		sales_order = self.place_cod_order_for_cart().name
-		failed = self.delivery(sales_order, "order_placed", app="bwh_payments")
+		failed = self.delivery(sales_order, "order_placed", app="frappe")
 		frappe.db.set_value("Commera Event Delivery", failed.name, {"status": "Failed", "attempts": 6})
 		frappe.db.set_value("Commera Event Delivery", failed.name, "handler", handler)
 
@@ -1218,6 +1216,6 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		frappe.set_user("Administrator")
 		retry_delivery(failed.name)
 
-		retried = self.delivery(sales_order, "order_placed", app="bwh_payments")
+		retried = self.delivery(sales_order, "order_placed", app="frappe")
 		self.assertEqual((retried.status, retried.attempts), ("Done", 7))
 		self.assertEqual([event.id for event, user in calls], [f"{sales_order}-order_placed"])

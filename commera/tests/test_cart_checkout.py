@@ -651,7 +651,7 @@ class TestCartCheckout(IntegrationTestCase):
 			return True
 
 		with patch(
-			"bwh_payments.bwh_payments.doctype.gateway_payment_request.gateway_payment_request"
+			"commera.payment_gateways.doctype.gateway_payment_request.gateway_payment_request"
 			".GatewayPaymentRequest.release_if_unpaid",
 			release,
 		):

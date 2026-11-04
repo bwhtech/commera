@@ -534,13 +534,13 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		)
 
 	def test_an_app_built_for_another_api_version_is_skipped_and_logged(self):
-		outdated_handler = self.add_handler_to_app("bwh_payments", payment_hooks.record_plugin_event)
+		outdated_handler = self.add_handler_to_app("frappe", payment_hooks.record_plugin_event)
 		current_handler = self.add_handler_to_app("erpnext", payment_hooks.record_plugin_event)
 		patch_app_hooks(self, {"commera_events": {"product_updated": [outdated_handler, current_handler]}})
 		patch_app_declarations(
 			self,
 			{
-				"bwh_payments": {
+				"frappe": {
 					"commera_api_version": [99],
 					"commera_events": {"product_updated": [outdated_handler]},
 				},
@@ -566,16 +566,16 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		self.assertTrue(
 			frappe.get_all(
 				"Error Log",
-				{"method": "bwh_payments does not support this Commera", "creation": [">=", started_at]},
+				{"method": "frappe does not support this Commera", "creation": [">=", started_at]},
 				limit=1,
 			)
 		)
 
 	def test_each_apps_handlers_for_an_event_are_delivered_in_app_order(self):
 		app_declarations = {
-			"bwh_payments": {
+			"frappe": {
 				"commera_api_version": [99],
-				"commera_events": {"product_updated": ["bwh_payments.on_product"]},
+				"commera_events": {"product_updated": ["frappe.on_product"]},
 			},
 			"erpnext": {
 				"commera_api_version": [API_VERSION],
@@ -591,7 +591,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		for declarations in app_declarations.values():
 			frappe.append_hook(merged_hooks, "commera_events", declarations["commera_events"])
 		patch_app_hooks(self, merged_hooks)
-		patch_app_declarations(self, {app: app_declarations[app] for app in ("bwh_payments", "erpnext")})
+		patch_app_declarations(self, {app: app_declarations[app] for app in ("frappe", "erpnext")})
 
 		with patch.object(frappe, "enqueue"):
 			fire_event("product_updated", "Item", self.item_code, key="merged")
@@ -610,11 +610,11 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		patch_app_declarations(
 			self,
 			{
-				"bwh_payments": {
+				"frappe": {
 					"commera_api_version": [API_VERSION],
 					"commera_events": {
-						"order_payed": ["bwh_payments.paid"],
-						"order_paid": ["bwh_payments.paid"],
+						"order_payed": ["frappe.paid"],
+						"order_paid": ["frappe.paid"],
 					},
 				},
 				"erpnext": {"commera_hooks": {"cart_fee": ["erpnext.fees"]}},
@@ -625,13 +625,13 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		with redirect_stdout(StringIO()) as output:
 			validate_plugins()
 
-		self.assertIn("bwh_payments declares commera_events for order_payed, which", output.getvalue())
+		self.assertIn("frappe declares commera_events for order_payed, which", output.getvalue())
 		self.assertIn("erpnext declares commera_hooks for cart_fee, which", output.getvalue())
-		self.assertNotIn("bwh_payments declares commera_hooks", output.getvalue())
+		self.assertNotIn("frappe declares commera_hooks", output.getvalue())
 		self.assertTrue(
 			frappe.get_all(
 				"Error Log",
-				{"method": "bwh_payments declares unknown commera_events", "creation": [">=", started_at]},
+				{"method": "frappe declares unknown commera_events", "creation": [">=", started_at]},
 				limit=1,
 			)
 		)
@@ -652,27 +652,27 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		patch_app_declarations(
 			self,
 			{
-				"bwh_payments": {
+				"frappe": {
 					"commera_api_version": [1],
-					"commera_events": {"order_paid": ["bwh_payments.paid"]},
+					"commera_events": {"order_paid": ["frappe.paid"]},
 				}
 			},
 		)
 		# db_insert, not insert: a real Custom Field alters the table, and the DDL would commit the test.
-		self.add_custom_field("Item", "zz_gift_wrap", "BWH Payments")
-		self.add_custom_field("Item", "bwh_payments_zz_gift_note", "BWH Payments")
+		self.add_custom_field("Item", "zz_gift_wrap", "Core")
+		self.add_custom_field("Item", "frappe_zz_gift_note", "Core")
 		self.add_custom_field("Customer", "zz_loyalty_tier", "Commera Ecommerce")
 
 		with redirect_stdout(StringIO()) as output:
 			validate_plugins()
 
-		self.assertIn("Item.zz_gift_wrap (bwh_payments)", output.getvalue())
-		self.assertNotIn("bwh_payments_zz_gift_note", output.getvalue())
+		self.assertIn("Item.zz_gift_wrap (frappe)", output.getvalue())
+		self.assertNotIn("frappe_zz_gift_note", output.getvalue())
 		self.assertNotIn("zz_loyalty_tier", output.getvalue())
 
 	def test_a_failing_product_handler_never_holds_up_the_same_items_stock_updates(self):
-		broken_handler = self.add_handler_to_app("bwh_payments", payment_hooks.raise_from_plugin_event)
-		stock_handler = self.add_handler_to_app("bwh_payments", payment_hooks.record_plugin_event)
+		broken_handler = self.add_handler_to_app("frappe", payment_hooks.raise_from_plugin_event)
+		stock_handler = self.add_handler_to_app("frappe", payment_hooks.record_plugin_event)
 		patch_app_hooks(
 			self,
 			{"commera_events": {"product_updated": [broken_handler], "inventory_changed": [stock_handler]}},
@@ -698,7 +698,7 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 				"reference_doctype": "Item",
 				"reference_name": self.item_code,
 				"event_key": event_key,
-				"deliveries": [{"app": "bwh_payments", "handler": "bwh_payments.handler", "status": status}],
+				"deliveries": [{"app": "frappe", "handler": "frappe.handler", "status": status}],
 			}
 		).insert(ignore_permissions=True)
 		frappe.db.set_value("Commera Event", event_key, "creation", add_days(now_datetime(), -days_old))
