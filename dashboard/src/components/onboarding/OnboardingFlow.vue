@@ -66,7 +66,8 @@ const SLIDES = {
 }
 
 const router = useRouter()
-const { themes, activeTheme, load: loadThemes, mutate: mutateTheme } = useTheme()
+const { themes, load: loadThemes, activate: activateTheme } = useTheme()
+const activeTheme = computed(() => themes.value.find((theme) => theme.live)?.name ?? '')
 
 const saving = ref(false)
 const finishing = ref(false)
@@ -121,7 +122,7 @@ function storeSetupValues() {
 
 async function activatePickedTheme() {
   if (!draft.theme || draft.theme === activeTheme.value) return true
-  return Boolean(await mutateTheme('activate_theme', { theme: draft.theme }))
+  return activateTheme(draft.theme)
 }
 
 // What Continue writes before moving on. A step missing here has nothing of its own to save.
