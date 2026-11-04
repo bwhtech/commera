@@ -17,16 +17,14 @@ const statusOptions = [
 const { collectionOptions, load: loadCollections } = useCollections()
 loadCollections()
 
-// Item.item_group is a single collection, not the mock's array of them — the
-// MultiSelect widget stays (it is the approved control), wrapped around one
-// value, so picking a second collection here replaces the first rather than
-// adding to it.
-const productCollections = computed({
-  get: () => (props.product.collection ? [props.product.collection] : []),
-  set: (values) => {
-    props.product.collection = values.at(-1) ?? null
-  },
-})
+// The first collection is the primary one (Item.item_group): breadcrumbs, size charts and the
+// product page's own collection read it. MultiSelect keeps values in the order they were picked,
+// and its trigger collapses to "N selected", so the description names the primary.
+const primaryHint = computed(() =>
+  props.product.collections?.length
+    ? `${props.product.collections[0]} is the primary collection, the first one picked.`
+    : 'The first collection picked is the primary one.',
+)
 </script>
 
 <template>
@@ -40,10 +38,11 @@ const productCollections = computed({
            write path for it — a second editable control here would just race it. -->
       <Select :model-value="product.status" class="w-full" label="Status" :options="statusOptions" disabled />
       <MultiSelect
-        v-model="productCollections"
+        v-model="product.collections"
         class="w-full"
         :class="layout === 'stacked' ? 'sm:col-span-2' : ''"
         label="Collections"
+        :description="primaryHint"
         :options="collectionOptions"
       />
     </div>

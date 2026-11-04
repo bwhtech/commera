@@ -105,11 +105,14 @@ export function buildProductActions(product, router, handlers = {}) {
           label: 'Add to collection',
           icon: 'lucide-layers',
           onClick: () =>
-            pickCollectionFor([product.id], {
-              label: product.title,
-              currentCollection: product.collection ?? '',
-              onDone: handlers.onReload,
-            }),
+            pickCollectionFor([product.id], { label: product.title, onDone: handlers.onReload }),
+        },
+        product.collections?.length > 1 && {
+          key: 'remove-collection',
+          label: 'Remove from collection',
+          icon: 'lucide-layers-2',
+          onClick: () =>
+            pickCollectionFor([product.id], { label: product.title, mode: 'remove', onDone: handlers.onReload }),
         },
       ],
     },

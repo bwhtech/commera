@@ -45,7 +45,7 @@ watch(
       id: data.name,
       title: data.title,
       description: data.description,
-      collection: data.collection,
+      collections: data.collections,
       // Item only carries a disabled flag — there is no "draft" state in the
       // catalog (same fact Products.vue's list screen already works around).
       status: data.disabled ? 'archived' : 'active',
@@ -126,7 +126,7 @@ async function save() {
   const saved = await trySubmit(updateAction, {
     item_template: product.value.id,
     title: product.value.title,
-    collection: product.value.collection,
+    collections: product.value.collections,
     description: product.value.description,
   })
   if (!saved) return
