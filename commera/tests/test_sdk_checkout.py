@@ -148,6 +148,23 @@ class TestSdkCheckout(IntegrationTestCase):
 		self.assertEqual(state["email"], "zz-guest@example.com")
 		self.assertTrue(frappe.db.get_value("Quotation", state["cart"], "custom_guest_cart_key"))
 
+	def test_a_guest_checkout_refreshes_from_the_changed_cart(self):
+		other_item = self.create_item(sale_rate=test_cart_checkout.SALE_RATE)
+		self.list_item(other_item)
+		self.allow_guest_checkout()
+		self.send_cart_token(frappe.generate_hash(length=32))
+		priced = cart_sdk.add_lines([{"item_code": self.item, "qty": 1}])
+		state = checkout.set_addresses(BILLING_ADDRESS, email="zz-guest@example.com")
+		cart_sdk.remove_lines([priced["lines"][0]["line_id"]])
+		cart_sdk.add_lines([{"item_code": other_item, "qty": 1}])
+
+		refreshed = checkout.refresh()
+
+		self.assertEqual(refreshed["cart"], state["cart"])
+		self.assertEqual(
+			[row.item_code for row in frappe.get_doc("Quotation", state["cart"]).items], [other_item]
+		)
+
 	def test_a_guest_must_type_an_email_and_cannot_use_a_saved_address(self):
 		self.allow_guest_checkout()
 		self.send_cart_token(frappe.generate_hash(length=32))

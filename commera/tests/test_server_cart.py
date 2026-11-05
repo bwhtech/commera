@@ -28,6 +28,7 @@ from commera.discounts.codes import generate_codes, get_code_discount
 from commera.discounts.shipping import apply_shipping_discounts
 from commera.guest import CART_TOKEN_HEADER, GUEST_CART_COOKIE
 from commera.sdk import cart as cart_sdk
+from commera.sdk import checkout as checkout_sdk
 from commera.tests.test_delivery_option_charges import make_store_rule, set_store_rule
 from commera.tests.test_discount_codes import CAP_RATE, SHIRT_RATE, DiscountCodeTestCase
 from commera.www.cart.checkout import cart_needs_refresh, refresh_checkout_cart, set_cart_context
@@ -616,6 +617,90 @@ class TestServerCart(DiscountCodeTestCase):
 			self.assertEqual(refresh_checkout_cart(), {"refreshed": False, "redirect": None})
 
 		self.assertEqual([(row.item_code, row.qty) for row in _get_cart_quotation().items], [(self.shirt, 1)])
+
+	def swap_shirt_for_cap(self):
+		line = cart_sdk.get_priced_cart()["lines"][0]
+		cart_sdk.remove_lines([line["line_id"]])
+		return cart_sdk.add_lines([{"item_code": self.cap, "qty": 1}])
+
+	def test_refreshing_checkout_rebuilds_it_from_a_changed_cart(self):
+		code = self.create_code(percentage=10)
+		sync_server_cart([{"item_code": self.shirt, "qty": 1}])
+		generate_quotation_for_cart({})
+		self.swap_shirt_for_cap()
+		priced = cart_sdk.add_discount_code(code)
+		self.assertEqual(checkout_sdk.get()["summary"]["items_total"], SHIRT_RATE)
+
+		summary = checkout_sdk.refresh()["summary"]
+
+		self.assertEqual([row.item_code for row in _get_cart_quotation().items], [self.cap])
+		self.assertEqual(summary["items_total"], CAP_RATE)
+		self.assertEqual(
+			[row["amount"] for row in summary["discounts"]], [row["amount"] for row in priced["discounts"]]
+		)
+		self.assertEqual(summary["total"] - summary["shipping"], priced["total"])
+
+	def test_refreshing_checkout_picks_up_a_guest_cart_merged_on_sign_in(self):
+		sync_server_cart([{"item_code": self.shirt, "qty": 1}])
+		generate_quotation_for_cart({})
+		self.use_guest_cart()
+		frappe.set_user("Guest")
+		cart_sdk.add_lines([{"item_code": self.cap, "qty": 1}])
+		frappe.set_user(self.shopper)
+		keep_guest_cart()
+
+		self.assertEqual(checkout_sdk.refresh()["summary"]["items_total"], SHIRT_RATE + CAP_RATE)
+
+	def test_refreshing_checkout_with_nothing_selected_shows_no_stale_totals(self):
+		sync_server_cart([{"item_code": self.shirt, "qty": 1}])
+		generate_quotation_for_cart({})
+		sync_server_cart([{"item_code": self.shirt, "qty": 1, "selected": 0}])
+
+		self.assertIsNone(checkout_sdk.refresh())
+
+	def test_refreshing_an_unchanged_checkout_writes_nothing(self):
+		sync_server_cart([{"item_code": self.shirt, "qty": 1}])
+		quotation = generate_quotation_for_cart({})
+		before = frappe.db.get_value("Quotation", quotation.name, "modified")
+
+		checkout_sdk.refresh()
+
+		self.assertEqual(frappe.db.get_value("Quotation", quotation.name, "modified"), before)
+
+	def test_refreshing_checkout_leaves_a_cart_in_payment_alone(self):
+		sync_server_cart([{"item_code": self.shirt, "qty": 1}])
+		quotation = generate_quotation_for_cart({})
+		self.create_pending_payment_request(quotation.name)
+		self.swap_shirt_for_cap()
+
+		with patch(
+			"bwh_payments.bwh_payments.doctype.gateway_payment_request.gateway_payment_request"
+			".GatewayPaymentRequest.release_if_unpaid",
+			return_value=False,
+		):
+			state = checkout_sdk.refresh()
+
+		self.assertEqual(state["summary"]["items_total"], SHIRT_RATE)
+		self.assertEqual([row.item_code for row in _get_cart_quotation().items], [self.shirt])
+
+	def test_a_checkout_summary_shows_the_same_subtotal_as_the_cart(self):
+		self.create_automatic_discount(percentage=5, item_codes=[self.cap])
+		product_code = self.create_code(percentage=10, item_codes=[self.shirt])
+		order_code = self.create_code(amount=7)
+		sync_server_cart([{"item_code": self.shirt, "qty": 2}, {"item_code": self.cap, "qty": 1}])
+		cart_sdk.add_discount_code(product_code)
+		priced = cart_sdk.add_discount_code(order_code)
+		generate_quotation_for_cart({})
+
+		summary = checkout_sdk.get()["summary"]
+
+		self.assertEqual(
+			summary["items_total"], priced["total"] + sum(row["amount"] for row in priced["discounts"])
+		)
+		self.assertEqual(
+			summary["total"],
+			summary["items_total"] - sum(row["amount"] for row in summary["discounts"]) + summary["shipping"],
+		)
 
 	def create_pending_payment_request(self, quotation_name: str):
 		payment_request = frappe.new_doc("Gateway Payment Request")

@@ -19,6 +19,7 @@ const endpoint_calls = [
 		{ product: 'blue-runner' },
 	],
 	['checkout.get', 'GET', () => checkout.get(), undefined],
+	['checkout.refresh', 'POST', () => checkout.refresh(), {}],
 	[
 		'checkout.list_pickup_locations',
 		'GET',

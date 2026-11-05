@@ -21,6 +21,12 @@ def get() -> CheckoutState | None:
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
+@rate_limit(limit=300, seconds=60 * 60)
+def refresh() -> CheckoutState | None:
+	return checkout.refresh()
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=100, seconds=60 * 60)
 def set_addresses(
 	billing_address: dict | str,

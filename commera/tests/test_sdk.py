@@ -165,6 +165,7 @@ PUBLIC_NAMES = {
 		"list_payment_methods",
 		"list_pickup_locations",
 		"list_shipping_options",
+		"refresh",
 		"set_addresses",
 		"set_shipping_option",
 		"set_store_pickup",
