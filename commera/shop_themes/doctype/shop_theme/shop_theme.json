@@ -14,6 +14,7 @@
   "theme_settings",
   "column_break_main",
   "thumbnail",
+  "thumbnail_dark",
   "parent_theme",
   "section_break_config",
   "config"
@@ -80,6 +81,14 @@
    "read_only": 1
   },
   {
+   "description": "The same picture with the storefront in dark mode. Themes without a dark mode reuse the light picture.",
+   "fieldname": "thumbnail_dark",
+   "fieldtype": "Attach Image",
+   "label": "Dark Thumbnail",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
    "description": "Inherit from this theme. A template or asset missing here falls back to the parent theme.",
    "fieldname": "parent_theme",
    "fieldtype": "Link",
@@ -101,7 +110,7 @@
  "image_field": "thumbnail",
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-03 12:00:00.000000",
+ "modified": "2026-11-05 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Shop Themes",
  "name": "Shop Theme",

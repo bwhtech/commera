@@ -15,7 +15,7 @@ export async function captureStorePreview(theme) {
 }
 
 export async function captureMissingThumbnails(themes, onCaptured) {
-  const missing = themes.filter((theme) => theme.theme_type === 'Sections' && !theme.thumbnail)
+  const missing = themes.filter((theme) => theme.theme_type === 'Sections' && (!theme.thumbnail || !theme.thumbnail_dark))
   for (const theme of missing) {
     if (await captureStorePreview(theme.name)) await onCaptured(theme)
   }

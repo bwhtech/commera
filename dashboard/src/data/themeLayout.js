@@ -18,13 +18,15 @@ const thumbnailAction = effectScope(true).run(() => useAdminAction('theme_layout
 
 const THUMBNAIL_SIZE = { width: 1280, height: 800, scale: 2, outputWidth: 480, quality: 0.85 }
 
-export async function saveThemeThumbnail(theme) {
+async function captureThumbnail(theme, scheme) {
   const params = new URLSearchParams({ theme, page: 'index', lang: 'en' })
+  let followsSystem = false
   const image = await capturePage(`/theme_editor_preview?${params}`, {
     ...THUMBNAIL_SIZE,
     beforeCapture: (frameDocument) => {
       const root = frameDocument.documentElement
-      if (root.dataset.colorScheme === 'System') root.dataset.theme = 'light'
+      followsSystem = root.dataset.colorScheme === 'System'
+      if (followsSystem) root.dataset.theme = scheme
       for (const element of frameDocument.querySelectorAll('.wow')) {
         element.classList.remove('wow')
         element.style.visibility = 'visible'
@@ -32,7 +34,14 @@ export async function saveThemeThumbnail(theme) {
       }
     },
   })
-  await thumbnailAction.submit({ theme, image })
+  return { image, followsSystem }
+}
+
+export async function saveThemeThumbnail(theme) {
+  const light = await captureThumbnail(theme, 'light')
+  await thumbnailAction.submit({ theme, image: light.image, scheme: 'light' })
+  const dark = light.followsSystem ? await captureThumbnail(theme, 'dark') : light
+  await thumbnailAction.submit({ theme, image: dark.image, scheme: 'dark' })
 }
 
 const clone = (value) => JSON.parse(JSON.stringify(value))
