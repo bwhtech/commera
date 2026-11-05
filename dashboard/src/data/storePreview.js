@@ -1,9 +1,8 @@
-// One try per page load, so a theme whose homepage will not render does not retry on every Home visit.
-let hasTried = false
+const triedThemes = new Set()
 
 export async function captureStorePreview(theme) {
-  if (hasTried) return false
-  hasTried = true
+  if (triedThemes.has(theme)) return false
+  triedThemes.add(theme)
   try {
     // Lazy: this pulls in modern-screenshot and the layout editor's data module.
     const { saveThemeThumbnail } = await import('./themeLayout')
@@ -12,5 +11,12 @@ export async function captureStorePreview(theme) {
   } catch (error) {
     console.warn('[commera] could not capture the storefront preview', error)
     return false
+  }
+}
+
+export async function captureMissingThumbnails(themes, onCaptured) {
+  const missing = themes.filter((theme) => theme.theme_type === 'Sections' && (!theme.thumbnail || !theme.thumbnail_dark))
+  for (const theme of missing) {
+    if (await captureStorePreview(theme.name)) await onCaptured(theme)
   }
 }

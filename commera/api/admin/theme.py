@@ -33,6 +33,7 @@ def build_themes(active_theme):
 			"theme_settings",
 			"theme_type",
 			"thumbnail",
+			"thumbnail_dark",
 			"module.app_name as app",
 		],
 		order_by="theme_name asc",

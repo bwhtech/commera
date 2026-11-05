@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { Badge, Button } from 'frappe-ui'
+import { Badge, Button, useColorScheme } from 'frappe-ui'
 import Thumb from '../Thumb.vue'
 
 const props = defineProps({
@@ -12,11 +12,16 @@ const props = defineProps({
 
 defineEmits(['activate'])
 
+const { resolvedColorScheme } = useColorScheme()
+
 const isClassic = computed(() => props.theme.theme_type !== 'Sections')
 const muted = computed(() => isClassic.value && !props.theme.live)
 const meta = computed(() => (isClassic.value ? props.theme.source : `Built with sections · ${props.theme.source}`))
 const editorRoute = computed(() =>
   isClassic.value ? null : { name: 'StorefrontThemeEditor', params: { theme: props.theme.name } },
+)
+const thumbnail = computed(() =>
+  resolvedColorScheme.value === 'dark' && props.theme.thumbnail_dark ? props.theme.thumbnail_dark : props.theme.thumbnail,
 )
 const imageSize = computed(() => (props.featured ? 'aspect-[16/10] w-full sm:w-60' : 'aspect-[16/10] w-28 sm:w-40'))
 </script>
@@ -30,8 +35,8 @@ const imageSize = computed(() => (props.featured ? 'aspect-[16/10] w-full sm:w-6
     ]"
   >
     <Thumb
-      v-if="theme.thumbnail"
-      :image="theme.thumbnail"
+      v-if="thumbnail"
+      :image="thumbnail"
       :size="imageSize"
       class="border border-outline-gray-2 object-top"
       :class="{ 'opacity-50': muted }"

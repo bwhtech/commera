@@ -14,6 +14,7 @@ from commera.shop_themes.sections import get_inherited_layout, get_section_schem
 
 EDITOR_ROLES = ("System Manager", "Website Manager")
 MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
+THUMBNAIL_FIELDS = {"light": "thumbnail", "dark": "thumbnail_dark"}
 
 
 def get_editable_theme_context(theme):
@@ -166,8 +167,11 @@ def detect_image_extension(content):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_thumbnail(theme: str, image: str):
+def save_thumbnail(theme: str, image: str, scheme: str = "light"):
 	get_editable_theme_context(theme)
+	if scheme not in THUMBNAIL_FIELDS:
+		frappe.throw(_("A thumbnail is either for light or for dark mode."))
+	fieldname = THUMBNAIL_FIELDS[scheme]
 
 	content = decode_file_content(image)
 	extension = detect_image_extension(content)
@@ -181,22 +185,22 @@ def save_thumbnail(theme: str, image: str):
 		filters={
 			"attached_to_doctype": "Shop Theme",
 			"attached_to_name": theme,
-			"attached_to_field": "thumbnail",
+			"attached_to_field": fieldname,
 		},
 		pluck="name",
 	)
 
 	thumbnail = frappe.get_doc(
 		doctype="File",
-		file_name=f"{frappe.scrub(theme)}-thumbnail-{frappe.generate_hash(length=8)}.{extension}",
+		file_name=f"{frappe.scrub(theme)}-{fieldname}-{frappe.generate_hash(length=8)}.{extension}",
 		content=content,
 		is_private=0,
 		attached_to_doctype="Shop Theme",
 		attached_to_name=theme,
-		attached_to_field="thumbnail",
+		attached_to_field=fieldname,
 	).insert()
 
-	frappe.db.set_value("Shop Theme", theme, "thumbnail", thumbnail.file_url, update_modified=False)
+	frappe.db.set_value("Shop Theme", theme, fieldname, thumbnail.file_url, update_modified=False)
 
 	for file_name in previous_files:
 		frappe.delete_doc("File", file_name, ignore_permissions=True)

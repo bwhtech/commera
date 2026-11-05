@@ -142,17 +142,20 @@ class TestThemeThumbnail(IntegrationTestCase):
 		self.delete_thumbnail_files()
 
 	def delete_thumbnail_files(self):
-		frappe.db.set_value("Shop Theme", SUMMER_THEME, "thumbnail", None, update_modified=False)
-		for file_name in self.thumbnail_files():
-			frappe.delete_doc("File", file_name, ignore_permissions=True)
+		frappe.db.set_value(
+			"Shop Theme", SUMMER_THEME, {"thumbnail": None, "thumbnail_dark": None}, update_modified=False
+		)
+		for fieldname in ("thumbnail", "thumbnail_dark"):
+			for file_name in self.thumbnail_files(fieldname):
+				frappe.delete_doc("File", file_name, ignore_permissions=True)
 
-	def thumbnail_files(self):
+	def thumbnail_files(self, fieldname="thumbnail"):
 		return frappe.get_all(
 			"File",
 			filters={
 				"attached_to_doctype": "Shop Theme",
 				"attached_to_name": SUMMER_THEME,
-				"attached_to_field": "thumbnail",
+				"attached_to_field": fieldname,
 			},
 			pluck="name",
 		)
@@ -179,6 +182,26 @@ class TestThemeThumbnail(IntegrationTestCase):
 		self.assertFalse(frappe.db.exists("File", first_file.name))
 		self.assertNotEqual(second_url, first_url)
 		self.assertEqual(frappe.db.get_value("Shop Theme", SUMMER_THEME, "thumbnail"), second_url)
+
+	def test_save_thumbnail_keeps_the_light_and_the_dark_image_apart(self):
+		light_url = save_thumbnail(SUMMER_THEME, image_data_url("WEBP", "white"))
+		first_dark_url = save_thumbnail(SUMMER_THEME, image_data_url("WEBP", "black"), scheme="dark")
+		dark_url = save_thumbnail(SUMMER_THEME, image_data_url("PNG", "black"), scheme="dark")
+
+		thumbnails = frappe.db.get_value("Shop Theme", SUMMER_THEME, ["thumbnail", "thumbnail_dark"])
+		self.assertEqual(thumbnails, (light_url, dark_url))
+		self.assertEqual(self.thumbnail_files(), [frappe.db.get_value("File", {"file_url": light_url})])
+		self.assertEqual(
+			self.thumbnail_files("thumbnail_dark"), [frappe.db.get_value("File", {"file_url": dark_url})]
+		)
+		self.assertFalse(frappe.db.exists("File", {"file_url": first_dark_url}))
+
+	def test_save_thumbnail_refuses_an_unknown_scheme(self):
+		self.assertRaises(
+			frappe.ValidationError, save_thumbnail, SUMMER_THEME, image_data_url("WEBP"), scheme="sepia"
+		)
+		self.assertEqual(frappe.db.get_value("Shop Theme", SUMMER_THEME, "thumbnail"), None)
+		self.assertEqual(self.thumbnail_files(), [])
 
 	def test_save_thumbnail_refuses_anything_but_an_image(self):
 		not_an_image = f"data:image/webp;base64,{base64.b64encode(b'<svg onload=alert(1)>').decode()}"
