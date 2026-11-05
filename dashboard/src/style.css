@@ -3,6 +3,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/* text-size-adjust stops iOS inflating text in landscape. */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+button,
+[role='button'],
+[role='tab'],
+[role='menuitem'] {
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  button,
+  [role='button'],
+  [role='tab'],
+  [role='menuitem'] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
+
+a {
+  touch-action: manipulation;
+}
+
+/* iOS Safari zooms into any field under 16px and never zooms back out; frappe-ui's fields are 14px. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  textarea,
+  select,
+  [contenteditable='true'] {
+    font-size: 16px !important;
+  }
+}
+
 /* Registered so the fade depth can transition; an unregistered custom property only snaps. */
 @property --scroll-fade-top {
   syntax: '<length>';

@@ -126,6 +126,7 @@ class CommeraSettings(Document):
 		store_setup_error: DF.SmallText | None
 		store_setup_status: DF.Literal["", "running", "done", "failed"]
 		storefront_apps: DF.Table[CommeraStorefrontApp]
+		storefront_published: DF.Check
 		strikethrough_color: DF.Color | None
 		tiktok_url: DF.Data | None
 		twitter_handle: DF.Data | None

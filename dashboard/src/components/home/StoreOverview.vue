@@ -3,19 +3,16 @@ import { computed } from 'vue'
 import { Avatar, Button, Skeleton } from 'frappe-ui'
 import { LineChart } from 'frappe-ui/charts'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
-import AppPageHeader from '../components/AppPageHeader.vue'
-import PageBody from '../components/PageBody.vue'
-import ReportStats from '../components/ReportStats.vue'
-import StatusBadge from '../components/StatusBadge.vue'
-import Thumb from '../components/Thumb.vue'
-import ListSkeleton from '../components/ListSkeleton.vue'
-import EmptyState from '../components/EmptyState.vue'
-import FirstRunWelcome from '../components/firstrun/FirstRunWelcome.vue'
-import { useAdminRead } from '../data/api'
-import { hasValues } from '../data/analytics'
-import { compactMoney, money, shortDate } from '../data/format'
-import { ia } from '../ia/store'
-import { orderRoute, productRoute } from '../ia/routes'
+import ReportStats from '../ReportStats.vue'
+import StatusBadge from '../StatusBadge.vue'
+import Thumb from '../Thumb.vue'
+import ListSkeleton from '../ListSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
+import { useAdminRead } from '../../data/api'
+import { hasValues } from '../../data/analytics'
+import { compactMoney, money, shortDate } from '../../data/format'
+import { ia } from '../../ia/store'
+import { orderRoute, productRoute } from '../../ia/routes'
 
 // The whole screen in three calls: orders.get_overview already backs the Home screen's stats,
 // recent orders and low-stock/needs-attention panels; catalog.get_top_products and
@@ -89,16 +86,14 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
 </script>
 
 <template>
-  <AppPageHeader title="Overview" />
-
-  <PageBody width="narrow">
-    <FirstRunWelcome />
-
+  <div>
     <ReportStats
       :stats="kpiTiles"
       compare
       :loading="overviewRequest.loading && !overview"
     />
+
+    <slot name="after-stats" />
 
     <!-- Reserving one row rather than three: the section drops any counter sitting at zero, so a
          settled store shows one to three rows and a spotless one shows none. Reserving the floor
@@ -285,6 +280,6 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
         </div>
       </div>
     </section>
-  </PageBody>
+  </div>
 </template>
 

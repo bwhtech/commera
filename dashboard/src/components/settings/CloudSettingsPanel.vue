@@ -2,7 +2,12 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { ErrorMessage } from 'frappe-ui'
 import { closeCloudSettings, openCloudSettings } from '@frappe/cloud-sdk'
-import { cloudContext, refreshBilling } from '../../data/cloudBilling'
+import { cloudContext } from '../../data/cloudBilling'
+
+const props = defineProps({
+  panel: { type: String, required: true },
+  onClose: { type: Function, default: undefined },
+})
 
 // True while one of the Cloud panel's own menus or dialogs is open; AppSettingsDialog's
 // setOpen explains why Settings must not close then.
@@ -25,14 +30,13 @@ onMounted(async () => {
     await openCloudSettings({
       context: cloudContext,
       target: target.value,
-      panels: ['billing'],
+      panels: [props.panel],
       theme: 'auto',
-      // Choosing a plan ends the trial, so the sidebar card reads the billing again.
-      onClose: refreshBilling,
+      onClose: props.onClose,
     })
     watchOverlays()
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : 'Could not open Frappe Cloud billing.'
+    error.value = reason instanceof Error ? reason.message : 'Could not open Frappe Cloud settings.'
   }
 })
 

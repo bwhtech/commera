@@ -178,16 +178,16 @@ describe('onboarding', () => {
       await page.waitForFunction((title) => !document.body.innerText.includes(title), { timeout: 10000 }, 'Import products')
       await clickByText(page, '[data-onboarding] button', 'Skip', { pause: 300 })
       await stepShown(page, 'done')
-      assert.ok((await text(page)).includes(`${STORE_NAME} is live`))
+      assert.ok((await text(page)).includes(`${STORE_NAME} is ready`))
 
-      await clickByText(page, '[data-onboarding] button', 'Go to dashboard', { pause: 300 })
-      // A store whose currency changed reloads into the dashboard instead of switching in place.
+      await clickByText(page, '[data-onboarding] button', 'Go to Home', { pause: 300 })
+      // A store whose currency changed reloads into Home instead of switching in place.
       await page.waitForFunction(
         () => !document.querySelector('[data-onboarding]') && document.body.innerText.includes('Orders'),
         { timeout: 30000 },
       )
       await wait(1500)
-      assert.ok(!(await text(page)).includes(`${STORE_NAME} is live`), 'the dashboard replaced onboarding')
+      assert.ok(!(await text(page)).includes(`${STORE_NAME} is ready`), 'Home replaced onboarding')
 
       const settings = await readSettings(page)
       assert.equal(settings.store_name, STORE_NAME)

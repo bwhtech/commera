@@ -91,7 +91,8 @@
 		<dl class="ms-auto mt-4 flex max-w-sm flex-col gap-2 text-base">
 			{{ summary_row(_("Subtotal"), order.total) }}
 			{% for discount in order.discounts | rejectattr("discount_class", "equalto", "Product") %}
-			{{ summary_row(discount.title, discount.amount, "text-ink-green-6", "−") }}
+			{%- set discount_name = discount.code or discount.title %}
+			{{ summary_row(_("Discount") ~ (" (" ~ discount_name ~ ")" if discount_name else ""), discount.amount, "text-ink-green-6", "−") }}
 			{% endfor %}
 			{% if order.shipping %}{{ summary_row(_("Shipping"), order.shipping) }}{% endif %}
 			{% if order.cod_charge %}{{ summary_row(_("Cash on delivery fee"), order.cod_charge) }}{% endif %}

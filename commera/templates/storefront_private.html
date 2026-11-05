@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="robots" content="noindex">
+	<title>{{ store_name or _("Coming soon") }}</title>
+	{% if favicon %}<link rel="icon" href="{{ favicon }}">{% endif %}
+	<style>
+		:root { color-scheme: light dark; }
+		body {
+			margin: 0;
+			min-height: 100vh;
+			display: grid;
+			place-items: center;
+			font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+			background: #fafafa;
+			color: #171717;
+		}
+		main { padding: 2rem; text-align: center; max-width: 28rem; }
+		img { max-height: 3rem; max-width: 12rem; margin-bottom: 1.5rem; }
+		h1 { margin: 0; font-size: 1.5rem; font-weight: 600; letter-spacing: -0.01em; }
+		p { margin: 0.75rem 0 0; color: #525252; line-height: 1.5; }
+		a { color: inherit; }
+		.staff { margin-top: 2.5rem; font-size: 0.875rem; color: #737373; }
+		@media (prefers-color-scheme: dark) {
+			body { background: #171717; color: #fafafa; }
+			p { color: #a3a3a3; }
+			.staff { color: #8a8a8a; }
+		}
+	</style>
+</head>
+<body>
+	<main>
+		{% if logo %}<img src="{{ logo }}" alt="{{ store_name }}">{% endif %}
+		<h1>{{ store_name or _("Coming soon") }}</h1>
+		<p>{{ _("We're getting the store ready. Check back soon.") }}</p>
+		<p class="staff"><a href="/login?redirect-to=/commera">{{ _("Store staff? Log in") }}</a></p>
+	</main>
+</body>
+</html>

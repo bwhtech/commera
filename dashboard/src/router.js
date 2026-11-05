@@ -5,7 +5,7 @@ import { SETTINGS_TABS } from './ia/settings'
 import { attachSettingsRouter, DEFAULT_SETTINGS_TAB, SETTINGS_ROUTE_NAME } from './ia/settingsRoute'
 
 const routes = [
-  { path: '/', name: 'Dashboard', component: () => import('./pages/Dashboard.vue') },
+  { path: '/', name: 'Home', component: () => import('./pages/Home.vue') },
   { path: '/orders', name: 'Orders', component: () => import('./pages/Orders.vue') },
   { path: '/orders/:id', name: 'OrderDetail', component: () => import('./pages/OrderDetail.vue'), meta: { split: true } },
   { path: '/products', name: 'Products', component: () => import('./pages/Products.vue') },

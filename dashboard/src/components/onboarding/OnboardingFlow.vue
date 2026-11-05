@@ -22,7 +22,7 @@ import {
 import { useTheme } from '../../data/theme'
 import { addProduct } from '../../data/addProduct'
 import { imp as productImport } from '../../data/importFlow'
-import { markWelcomeSeen } from '../../ia/firstRun'
+import { homeArrival } from '../../ia/homeTasks'
 import {
   adoptRecord,
   closeOnboarding,
@@ -66,7 +66,8 @@ const SLIDES = {
 }
 
 const router = useRouter()
-const { themes, activeTheme, load: loadThemes, mutate: mutateTheme } = useTheme()
+const { themes, load: loadThemes, activate: activateTheme } = useTheme()
+const activeTheme = computed(() => themes.value.find((theme) => theme.live)?.name ?? '')
 
 const saving = ref(false)
 const finishing = ref(false)
@@ -90,7 +91,7 @@ const stepProps = computed(() => {
 
 const title = computed(() => {
   if (step.value.key === 'you') return draft.fullName ? `Welcome, ${draft.fullName.trim().split(' ')[0]}` : step.value.title
-  if (step.value.key === 'done') return `${draft.storeName.trim() || 'Your store'} is live`
+  if (step.value.key === 'done') return `${draft.storeName.trim() || 'Your store'} is ready`
   return step.value.title
 })
 
@@ -121,7 +122,7 @@ function storeSetupValues() {
 
 async function activatePickedTheme() {
   if (!draft.theme || draft.theme === activeTheme.value) return true
-  return Boolean(await mutateTheme('activate_theme', { theme: draft.theme }))
+  return activateTheme(draft.theme)
 }
 
 // What Continue writes before moving on. A step missing here has nothing of its own to save.
@@ -158,8 +159,7 @@ async function finish() {
     finishing.value = false
     return
   }
-  // The dashboard's checklist is what comes next; its full-screen greeting would only repeat this one.
-  markWelcomeSeen()
+  homeArrival.playEntrance = true
   // format.js reads the boot's currency once at load. Setup may have changed it, and then every
   // money figure would wear the old symbol until a reload.
   if (bootValue('currency', '') !== draft.currency) {

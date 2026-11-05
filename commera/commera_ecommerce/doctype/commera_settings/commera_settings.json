@@ -9,6 +9,7 @@
   "store_name",
   "store_category",
   "onboarding_completed",
+  "storefront_published",
   "store_setup_status",
   "store_setup_error",
   "company",
@@ -178,6 +179,13 @@
    "hidden": 1,
    "label": "Onboarding Completed",
    "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Visitors see a coming-soon page until this is on. Staff who can open the dashboard always see the store.",
+   "fieldname": "storefront_published",
+   "fieldtype": "Check",
+   "label": "Storefront Published"
   },
   {
    "fieldname": "store_setup_status",
@@ -986,7 +994,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-02 10:00:00.000000",
+ "modified": "2026-11-04 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Settings",
