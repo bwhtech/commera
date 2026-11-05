@@ -15,7 +15,7 @@
 {% from "components/macros/icons.html" import spinner %}
 
 {% macro submit_button(label, busy="busy") %}
-<button type="submit" :disabled="{{ busy }}" :aria-busy="{{ busy }}" class="relative inline-flex h-10 items-center justify-center rounded-lg bg-brand px-4 text-lg font-medium text-on-brand hover:bg-brand-hover disabled:opacity-60 aria-busy:text-transparent">{{ label }}{{ spinner(busy, "size-5 text-on-brand") }}</button>
+<button type="submit" :disabled="{{ busy }}" :aria-busy="{{ busy }}" class="relative inline-flex h-10 items-center justify-center rounded-lg bg-brand px-4 text-lg font-medium text-on-brand hover:bg-brand-hover disabled:opacity-60">{{ label }}{{ spinner(busy, "size-5 text-on-brand") }}</button>
 {%- endmacro %}
 
 {% macro form_message() %}

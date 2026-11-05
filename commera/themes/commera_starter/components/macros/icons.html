@@ -21,6 +21,6 @@
 <svg class="{{ class }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ icon_paths[name] | safe }}</svg>
 {%- endmacro %}
 
-{% macro spinner(busy, class="size-5") %}
-<svg x-cloak x-show="{{ busy }}" class="absolute inset-0 m-auto motion-safe:animate-spin motion-reduce:animate-pulse {{ class }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" class="opacity-25"/><path d="M21 12a9 9 0 0 0-9-9"/></svg>
+{% macro spinner(busy, class="size-5", overlay=false) %}
+<svg x-cloak x-show="{{ busy }}" class="{{ 'absolute inset-0 m-auto' if overlay else 'ms-2 shrink-0' }} motion-safe:animate-spin motion-reduce:animate-pulse {{ class }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" class="opacity-25"/><path d="M21 12a9 9 0 0 0-9-9"/></svg>
 {%- endmacro %}
