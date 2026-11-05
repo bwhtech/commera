@@ -17,7 +17,13 @@ from pypika import Order
 from commera.core import get_address_docs, get_party
 from commera.guest import is_guest, is_guest_checkout_enabled
 from commera.order_access import get_key_access, is_shoppers_order
-from commera.plugin_events import SHIPPING_ADDRESS_FIELDS, STORE_ORDER_TYPE, fire_event, get_order_snapshot
+from commera.plugin_events import (
+	SHIPPING_ADDRESS_FIELDS,
+	STORE_ORDER_TYPE,
+	fire_event,
+	get_handlers,
+	get_order_snapshot,
+)
 
 # Ceiling for any IN (...) list this app sends to MariaDB/Postgres.
 IN_CLAUSE_CHUNK_SIZE = 1000
@@ -841,20 +847,31 @@ def update_sales_order_ecommerce_status(sales_order_name):
 		new_status = get_fulfilment_status(sales_order_name)
 
 	frappe.db.set_value("Sales Order", sales_order_name, "custom_ecommerce_status", new_status)
-	events = FULFILMENT_EVENTS.get(new_status, ())
-	if order.order_type == STORE_ORDER_TYPE and new_status != order.custom_ecommerce_status and events:
-		order_snapshot = get_order_snapshot(sales_order_name)
-		for event in events:
-			fire_event(
-				event,
-				"Sales Order",
-				sales_order_name,
-				order_snapshot=order_snapshot,
-				**get_status_event_args(event, new_status),
-			)
+	if order.order_type == STORE_ORDER_TYPE and new_status != order.custom_ecommerce_status:
+		fire_status_events(sales_order_name, new_status)
+
+
+def fire_status_events(sales_order_name, status: str):
+	events = list(FULFILMENT_EVENTS.get(status, ()))
+	if get_handlers("commera_events", "order_updated"):
+		events.append("order_updated")
+	if not events:
+		return
+
+	order_snapshot = get_order_snapshot(sales_order_name)
+	for event in events:
+		fire_event(
+			event,
+			"Sales Order",
+			sales_order_name,
+			order_snapshot=order_snapshot,
+			**get_status_event_args(event, status),
+		)
 
 
 def get_status_event_args(event: str, status: str) -> dict:
+	if event == "order_updated":
+		return {"data": {"status": status}, "key": f"status-{frappe.scrub(status)}"}
 	if event != "order_returned":
 		return {}
 	# Keyed on the status, so a partial return and the full return that follows each fire once.
