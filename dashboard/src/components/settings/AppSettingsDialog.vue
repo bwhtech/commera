@@ -25,9 +25,11 @@ import IntegrationTabPanel from './IntegrationTabPanel.vue'
 import LocationsSettings from './LocationsSettings.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import ShippingSections from './ShippingSections.vue'
+import WebhooksSettings from './webhooks/WebhooksSettings.vue'
 import { isCloudBillingAvailable } from '../../data/cloudBilling'
 import { paymentIntegrations, shippingIntegrations } from '../../data/integrations'
 import { pickupLocations } from '../../data/pickupLocations'
+import { webhookStore } from '../../data/webhooks'
 import { pluginSettingsTabs } from '../../ia/plugins'
 import { settings } from '../../ia/settings'
 import { useIsMobile } from '../../utils/useIsMobile'
@@ -64,8 +66,8 @@ function goBack() {
   else settings.open = false
 }
 
-// Both load when the dialog opens, not when their tab is shown: an unread registry counts
-// zero, which reads as "nothing is connected".
+// These load when the dialog opens, not when their tab is shown: an unread registry counts
+// zero, which reads as "nothing is connected", and an unread webhook list hides a failing one.
 watch(
   () => settings.open,
   (isOpen) => {
@@ -73,6 +75,7 @@ watch(
     paymentIntegrations.loadOnce()
     shippingIntegrations.loadOnce()
     pickupLocations.loadOnce()
+    webhookStore.loadOnce()
   },
   { immediate: true },
 )
@@ -154,6 +157,13 @@ watch(
         <SettingsNavItem value="plugins">
           <template #prefix><span class="lucide-blocks size-4" aria-hidden="true" /></template>
           Plugins
+        </SettingsNavItem>
+        <SettingsNavItem value="webhooks">
+          <template #prefix><span class="lucide-webhook size-4" aria-hidden="true" /></template>
+          Webhooks
+          <template v-if="webhookStore.hasFailingWebhook.value" #suffix>
+            <span class="size-2 rounded-full bg-surface-red-7" role="img" aria-label="A webhook is failing" />
+          </template>
         </SettingsNavItem>
         <SettingsNavItem value="advanced">
           <template #prefix><span class="lucide-sliders-horizontal size-4" aria-hidden="true" /></template>
@@ -245,6 +255,10 @@ watch(
 
       <SettingsPanel v-for="tab in pluginTabs" :key="tab.value" :value="tab.value" class="min-w-0">
         <PluginSettingsPanel :entry="tab.entry" :active="settings.open && settings.tab === tab.value" />
+      </SettingsPanel>
+
+      <SettingsPanel value="webhooks" class="min-w-0">
+        <WebhooksSettings :active="settings.open && settings.tab === 'webhooks'" />
       </SettingsPanel>
 
       <SettingsPanel value="advanced" class="min-w-0">

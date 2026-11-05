@@ -60,7 +60,13 @@ export const SETTINGS_TABS = [
     value: 'plugins',
     label: 'Plugins',
     icon: 'lucide-blocks',
-    keywords: ['plugins', 'apps', 'installed', 'deliveries', 'webhooks', 'failed', 'retry'],
+    keywords: ['plugins', 'apps', 'installed', 'deliveries', 'failed', 'retry'],
+  },
+  {
+    value: 'webhooks',
+    label: 'Webhooks',
+    icon: 'lucide-webhook',
+    keywords: ['webhooks', 'headless', 'storefront', 'events', 'endpoint', 'signing secret', 'hmac', 'integration'],
   },
   {
     value: 'advanced',

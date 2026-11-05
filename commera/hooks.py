@@ -139,6 +139,26 @@ setup_wizard_complete = [
 	"commera.plugin_events.add_plugin_user",
 ]
 
+# Commera Webhooks: the handler counts only while an enabled webhook subscribes to the event.
+commera_events = {
+	event: ["commera.webhooks.deliver"]
+	for event in (
+		"order_placed",
+		"order_paid",
+		"order_cancelled",
+		"order_refunded",
+		"order_fulfilled",
+		"order_delivered",
+		"order_returned",
+		"order_updated",
+		"product_updated",
+		"inventory_changed",
+		"collection_updated",
+		"page_updated",
+		"menu_updated",
+	)
+}
+
 
 doc_events = {
 	"User": {
@@ -146,7 +166,15 @@ doc_events = {
 	},
 	"Item Group": {
 		"before_validate": "commera.utils.set_item_group_displayname",
+		"on_update": "commera.plugin_events.on_item_group_change",
+		"on_trash": "commera.plugin_events.on_item_group_change",
 	},
+	"Shop Web Page": {
+		"on_update": "commera.plugin_events.on_shop_web_page_change",
+		"on_trash": "commera.plugin_events.on_shop_web_page_change",
+	},
+	"Footer Section Config": {"on_update": "commera.plugin_events.on_menu_change"},
+	"Commera Settings": {"on_update": "commera.plugin_events.on_menu_change"},
 	"Price List": {
 		"validate": "commera.doc_events.price_list.validate",
 	},
@@ -176,6 +204,7 @@ doc_events = {
 			"commera.plugin_events.on_sales_order_cancel",
 			"commera.plugin_events.on_sales_order_stock_reservation",
 		],
+		"on_update_after_submit": "commera.plugin_events.on_sales_order_update_after_submit",
 		"on_trash": "commera.doc_events.sales_order.on_trash",
 	},
 	"Stock Ledger Entry": {
@@ -195,12 +224,15 @@ doc_events = {
 			"commera.plugin_events.on_style_attribute_variant_update",
 		],
 		"after_rename": "commera.search.sync.after_rename",
-		"on_trash": "commera.search.sync.on_trash",
+		"on_trash": [
+			"commera.search.sync.on_trash",
+			"commera.plugin_events.on_style_attribute_variant_trash",
+		],
 	},
 	"Ecommerce Category": {
-		"on_update": "commera.search.sync.on_update",
+		"on_update": ["commera.search.sync.on_update", "commera.plugin_events.on_menu_change"],
 		"after_rename": "commera.search.sync.after_rename",
-		"on_trash": "commera.search.sync.on_trash",
+		"on_trash": ["commera.search.sync.on_trash", "commera.plugin_events.on_menu_change"],
 	},
 	"Sales Invoice": {
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
@@ -272,6 +304,7 @@ ignore_links_on_delete = [
 	"Bulk Style Attribute Configurator Creation Log",
 	"Commera Event",
 	"Commera Event Delivery",
+	"Commera Webhook Log",
 	# A use is never given back, so its row outlives a deleted order.
 	"Commera Discount Use",
 ]
@@ -503,7 +536,7 @@ override_whitelisted_methods = {
 # Automatically update python controller files with type annotations for this app.
 export_python_type_annotations = True
 
-default_log_clearing_doctypes = {"Commera Event": 14}
+default_log_clearing_doctypes = {"Commera Event": 14, "Commera Webhook Log": 30}
 
 fixtures = [
 	{

@@ -15,6 +15,8 @@ from rq.job import JobStatus
 from commera.discounts.allocations import get_allocations
 from commera.sdk import API_VERSION, STORE_ORDER_TYPE, as_plugin_user
 from commera.sdk.events import HANDLER_HOOKS, CommeraEvent
+from commera.webhooks import HANDLER as WEBHOOK_HANDLER
+from commera.webhooks import is_subscribed
 
 PLUGINS_USER = "commera-plugins@commera.local"
 RETRY_DELAYS_IN_MINUTES = (1, 5, 30, 120, 360)
@@ -35,6 +37,7 @@ COD_SWEEP_LOOKBACK_DAYS = 30
 EXTENDED_DOCTYPES = ("Sales Order", "Quotation", "Sales Invoice", "Item", "Customer", "Address")
 CHANGED_PRODUCTS_FLAG = "commera_changed_products"
 CHANGED_ITEMS_FLAG = "commera_changed_items"
+CHANGED_STOREFRONT_FLAG = "commera_changed_storefront"
 
 
 def fire_event(
@@ -161,7 +164,7 @@ def get_handlers(hook: str, key: str) -> list[str]:
 	return [
 		handler
 		for handler in frappe.get_hooks(hook, {}).get(key, [])
-		if is_supported_app(get_handler_app(handler))
+		if is_supported_app(get_handler_app(handler)) and (handler != WEBHOOK_HANDLER or is_subscribed(key))
 	]
 
 
@@ -385,18 +388,21 @@ def retry_delivery(delivery: str):
 		frappe.throw(_("Delivery {0} not found").format(delivery), frappe.DoesNotExistError)
 	if failed_delivery.status != "Failed":
 		frappe.throw(_("Only a failed delivery can be retried."))
+	queue_delivery_now(delivery)
 
+
+def queue_delivery_now(delivery: str):
+	"""Run the delivery on its lane's next job, whatever retry it waits for or however it ended."""
+	parent, app = frappe.db.get_value("Commera Event Delivery", delivery, ["parent", "app"])
 	frappe.db.set_value(
 		"Commera Event Delivery",
 		delivery,
 		{"status": "Queued", "next_retry_at": now_datetime(), "finished_at": None},
 	)
 	event, reference_doctype, reference_name = frappe.db.get_value(
-		"Commera Event", failed_delivery.parent, ["event", "reference_doctype", "reference_name"]
+		"Commera Event", parent, ["event", "reference_doctype", "reference_name"]
 	)
-	enqueue_app_deliveries(
-		failed_delivery.app, reference_doctype, reference_name, get_lane_event(reference_doctype, event)
-	)
+	enqueue_app_deliveries(app, reference_doctype, reference_name, get_lane_event(reference_doctype, event))
 
 
 def add_plugin_user(setup_args=None):
@@ -594,6 +600,44 @@ def on_style_attribute_variant_update(doc, method=None):
 		)
 
 
+def on_style_attribute_variant_trash(doc, method=None):
+	add_changed_products([doc.item_style], "published")
+
+
+def on_item_group_change(doc, method=None):
+	add_storefront_change("collection_updated", doc.doctype, doc.name)
+
+
+def on_shop_web_page_change(doc, method=None):
+	add_storefront_change("page_updated", doc.doctype, doc.name, {"route": doc.route})
+
+
+def on_menu_change(doc, method=None):
+	# The menu, footer and branding are one record to a storefront, so every change is one event.
+	add_storefront_change("menu_updated", "Commera Settings", "Commera Settings")
+
+
+def add_storefront_change(event: str, reference_doctype: str, reference_name: str, data: dict | None = None):
+	if not get_handlers("commera_events", event):
+		return
+	changes = get_transaction_batch(CHANGED_STOREFRONT_FLAG, dict, enqueue_storefront_changes)
+	changes[(event, reference_doctype, reference_name)] = data or {}
+
+
+def enqueue_storefront_changes():
+	for (event, reference_doctype, reference_name), data in (
+		frappe.local.flags.pop(CHANGED_STOREFRONT_FLAG, None) or {}
+	).items():
+		frappe.enqueue(
+			fire_event,
+			event=event,
+			reference_doctype=reference_doctype,
+			reference_name=reference_name,
+			data=data,
+			repeatable=True,
+		)
+
+
 def on_item_price_change(doc, method=None):
 	if doc.selling and get_handlers("commera_events", "product_updated"):
 		item_template = frappe.db.get_value("Item", doc.item_code, "variant_of") or doc.item_code
@@ -759,6 +803,18 @@ def sweep_missed_cod_payments():
 def on_sales_order_cancel(doc, method=None):
 	if doc.get("order_type") == STORE_ORDER_TYPE:
 		fire_event("order_cancelled", "Sales Order", doc.name)
+
+
+def on_sales_order_update_after_submit(doc, method=None):
+	if doc.get("order_type") == STORE_ORDER_TYPE and get_handlers("commera_events", "order_updated"):
+		# Keyed on the save, so each save fires once and a retried hook never fires it twice.
+		fire_event(
+			"order_updated",
+			"Sales Order",
+			doc.name,
+			data={"status": doc.get("custom_ecommerce_status")},
+			key=cstr(doc.modified),
+		)
 
 
 def validate_plugins():
