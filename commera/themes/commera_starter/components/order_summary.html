@@ -1,4 +1,4 @@
-{% from "components/macros/icons.html" import icon %}
+{% from "components/macros/icons.html" import icon, spinner %}
 
 {% macro order_summary(total="cart?.total") -%}
 <div x-data="order_summary" class="flex flex-col gap-3 text-base">
@@ -23,7 +23,7 @@
 	<form @submit.prevent="apply_code()" class="mt-2 flex gap-2">
 		<label for="discount-code" class="sr-only">{{ _("Discount code") }}</label>
 		<input id="discount-code" x-model="code" autocomplete="off" placeholder="{{ _('Discount code') }}" class="h-10 min-w-0 flex-1 rounded-lg border border-outline-gray-2 bg-surface-base px-3 text-lg text-ink-gray-8 outline-none placeholder:text-ink-gray-4 focus:border-outline-gray-4 focus:shadow-sm">
-		<button type="submit" :disabled="busy || !code.trim()" class="h-10 shrink-0 rounded-lg border border-outline-gray-2 bg-surface-base px-3 text-lg font-medium text-ink-gray-8 hover:border-outline-gray-3 disabled:text-ink-gray-4">{{ _("Apply") }}</button>
+		<button type="submit" :disabled="busy || !code.trim()" :aria-busy="busy === 'apply'" class="relative h-10 shrink-0 rounded-lg border border-outline-gray-2 bg-surface-base px-3 text-lg font-medium text-ink-gray-8 hover:border-outline-gray-3 disabled:text-ink-gray-4 aria-busy:text-transparent">{{ _("Apply") }}{{ spinner("busy === 'apply'", "size-5 text-ink-gray-8") }}</button>
 	</form>
 	<p x-show="error" x-text="error" role="alert" class="text-sm text-ink-red-6"></p>
 	<ul x-show="discount_codes.length" class="flex flex-col gap-2">

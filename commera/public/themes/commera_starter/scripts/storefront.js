@@ -4,8 +4,8 @@ function product_url(product) {
 	)}`;
 }
 
-async function save_change(state, change) {
-	state.busy = true;
+async function save_change(state, change, action = true) {
+	state.busy = action;
 	state.error = '';
 	try {
 		await change();
@@ -47,9 +47,9 @@ function form_state() {
 		error: '',
 		saved: false,
 
-		async submit(change) {
+		async submit(change, action) {
 			this.saved = false;
-			await save_change(this, change);
+			await save_change(this, change, action);
 		},
 	};
 }
@@ -113,8 +113,8 @@ function product_form(product) {
 			this.image = (this.image + step + count) % count;
 		},
 
-		save(change) {
-			return save_change(this, change);
+		save(change, action) {
+			return save_change(this, change, action);
 		},
 
 		async add_to_cart() {
@@ -127,7 +127,7 @@ function product_form(product) {
 					{ item_code: this.variant.id, qty: this.qty },
 				]);
 				Alpine.store('cart').open = true;
-			});
+			}, 'add_to_cart');
 		},
 
 		async toggle_wishlist() {
@@ -142,7 +142,7 @@ function product_form(product) {
 					? commera.wishlist.remove(product.id)
 					: commera.wishlist.add(product.id));
 				this.saved = !this.saved;
-			});
+			}, 'wishlist');
 		},
 	};
 }
@@ -219,10 +219,14 @@ function order_summary() {
 
 		async apply_code() {
 			const code = this.code.trim();
-			await save_change(this, async () => {
-				await commera.cart.apply_discount(code);
-				this.code = '';
-			});
+			await save_change(
+				this,
+				async () => {
+					await commera.cart.apply_discount(code);
+					this.code = '';
+				},
+				'apply',
+			);
 		},
 
 		async remove_code(code) {
@@ -364,25 +368,29 @@ function checkout(config) {
 		async save_address() {
 			this.step = 'address';
 			const email = this.config.is_guest ? this.email.trim() : undefined;
-			await save_change(this, async () => {
-				this.state =
-					this.delivery_method === 'pickup'
-						? await commera.checkout.set_store_pickup({
-								warehouse: this.pickup_location,
-								email,
-						  })
-						: await commera.checkout.set_addresses({
-								billing_address: this.address_input(
-									this.billing_same ? 'shipping' : 'billing',
-								),
-								shipping_address: this.billing_same
-									? undefined
-									: this.address_input('shipping'),
-								email,
-						  });
-				await this.load_options();
-				this.editing_address = false;
-			});
+			await save_change(
+				this,
+				async () => {
+					this.state =
+						this.delivery_method === 'pickup'
+							? await commera.checkout.set_store_pickup({
+									warehouse: this.pickup_location,
+									email,
+							  })
+							: await commera.checkout.set_addresses({
+									billing_address: this.address_input(
+										this.billing_same ? 'shipping' : 'billing',
+									),
+									shipping_address: this.billing_same
+										? undefined
+										: this.address_input('shipping'),
+									email,
+							  });
+					await this.load_options();
+					this.editing_address = false;
+				},
+				'address',
+			);
 		},
 
 		async choose_shipping_option(option_id) {
@@ -395,7 +403,7 @@ function checkout(config) {
 
 		async pay() {
 			this.step = 'payment';
-			this.busy = true;
+			this.busy = 'pay';
 			this.error = '';
 			try {
 				const session = await commera.checkout.start_payment({
@@ -543,8 +551,8 @@ document.addEventListener('alpine:init', () => {
 			this.cart = await commera.cart.get();
 		},
 
-		save(change) {
-			return save_change(this, change);
+		save(change, action) {
+			return save_change(this, change, action);
 		},
 
 		async set_quantity(line, qty) {
@@ -558,7 +566,7 @@ document.addEventListener('alpine:init', () => {
 		},
 
 		async checkout() {
-			await this.save(() => commera.cart.go_to_checkout());
+			await this.save(() => commera.cart.go_to_checkout(), 'checkout');
 		},
 
 		money(amount) {
@@ -688,7 +696,7 @@ document.addEventListener('alpine:init', () => {
 			await this.submit(async () => {
 				await this.request_code();
 				this.resent = true;
-			});
+			}, 'resend');
 		},
 
 		async verify() {
@@ -714,9 +722,14 @@ document.addEventListener('alpine:init', () => {
 	}));
 
 	Alpine.data('log_out_button', () => ({
+		busy: false,
+		error: '',
+
 		async log_out() {
-			await commera.auth.log_out();
-			location.assign(`/${document.documentElement.lang}`);
+			await save_change(this, async () => {
+				await commera.auth.log_out();
+				location.assign(`/${document.documentElement.lang}`);
+			});
 		},
 	}));
 

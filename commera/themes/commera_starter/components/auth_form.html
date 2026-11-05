@@ -1,4 +1,5 @@
 {% from "components/macros/form.html" import field, submit_button %}
+{% from "components/macros/icons.html" import spinner %}
 
 {% macro auth_form(mode, redirect="", heading="h2") %}
 <div x-data='auth_form({{ {"mode": mode, "redirect": redirect} | tojson }})' @open-auth.window="redirect = $event.detail?.redirect ?? ''" class="flex flex-col gap-6">
@@ -28,12 +29,13 @@
 		{{ field("code", _("Code"), "code", required=True, autocomplete="one-time-code", inputmode="numeric") }}
 		<p x-cloak x-show="error" x-text="error" class="text-sm text-ink-red-6" role="alert"></p>
 		<p x-cloak x-show="resent" class="text-sm text-ink-green-6" role="status">{{ _("We have sent a new code.") }}</p>
-		<button type="submit" :disabled="busy" class="inline-flex h-10 items-center justify-center rounded-lg bg-brand px-4 text-lg font-medium text-on-brand hover:bg-brand-hover disabled:opacity-60">
+		<button type="submit" :disabled="busy" :aria-busy="busy === true" class="relative inline-flex h-10 items-center justify-center rounded-lg bg-brand px-4 text-lg font-medium text-on-brand hover:bg-brand-hover disabled:opacity-60 aria-busy:text-transparent">
 			<span x-show="mode === 'login'">{{ _("Log in") }}</span>
 			<span x-show="mode === 'signup'">{{ _("Create account") }}</span>
+			{{ spinner("busy === true", "size-5 text-on-brand") }}
 		</button>
 		<div class="flex gap-4">
-			<button type="button" @click="resend_code()" :disabled="busy" class="text-sm text-ink-gray-8 underline hover:text-ink-gray-9">{{ _("Resend code") }}</button>
+			<button type="button" @click="resend_code()" :disabled="busy" :aria-busy="busy === 'resend'" class="relative text-sm text-ink-gray-8 underline hover:text-ink-gray-9 aria-busy:text-transparent">{{ _("Resend code") }}{{ spinner("busy === 'resend'", "size-4 text-ink-gray-8") }}</button>
 			<button type="button" @click="step = 'details'; error = ''" class="text-sm text-ink-gray-8 underline hover:text-ink-gray-9">{{ _("Change email") }}</button>
 		</div>
 	</form>
