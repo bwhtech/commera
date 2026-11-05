@@ -335,7 +335,6 @@
 	[x-cloak] {
 		display: none !important;
 	}
-	/* Tailwind v4 preflight leaves buttons on the default cursor. */
 	button:not(:disabled),
 	[role="button"]:not(:disabled),
 	select:not(:disabled),
