@@ -1,5 +1,5 @@
 {% from "components/macros/breadcrumbs.html" import breadcrumbs %}
-{% from "components/macros/icons.html" import icon %}
+{% from "components/macros/icons.html" import icon, spinner %}
 {% from "components/macros/image.html" import image with context %}
 {% if product is defined and product %}
 {% set colour_option = product.options | selectattr("values") | selectattr("values.0.handle") | first %}
@@ -72,12 +72,13 @@
 					<button type="button" @click="qty++" class="grid size-10 place-items-center text-ink-gray-8" aria-label="{{ _('More') }}">{{ icon("plus", "size-4") }}</button>
 				</div>
 				{% endif %}
-				<button type="button" x-ref="add_button" @click="add_to_cart()" :disabled="busy || (variant && !variant.available)" class="inline-flex h-10 flex-1 items-center justify-center rounded-lg bg-brand px-3 text-lg font-medium text-on-brand hover:bg-brand-hover disabled:opacity-60">
+				<button type="button" x-ref="add_button" @click="add_to_cart()" :disabled="busy || (variant && !variant.available)" :aria-busy="busy === 'add_to_cart'" class="relative inline-flex h-10 flex-1 items-center justify-center rounded-lg bg-brand px-3 text-lg font-medium text-on-brand hover:bg-brand-hover disabled:opacity-60">
 					<span x-show="!variant || variant.available">{{ _("Add to cart") }}</span>
 					<span x-cloak x-show="variant && !variant.available">{{ _("Sold out") }}</span>
+					{{ spinner("busy === 'add_to_cart'", "size-5 text-on-brand") }}
 				</button>
 				{% if section.settings.show_wishlist %}
-				<button type="button" @click="toggle_wishlist()" :disabled="busy" :aria-pressed="saved" :class="saved && '[&_svg]:fill-current'" class="grid size-10 place-items-center rounded-lg border border-outline-gray-2 bg-surface-base text-ink-gray-8 hover:border-outline-gray-3" aria-label="{{ _('Add to wishlist') }}">{{ icon("heart") }}</button>
+				<button type="button" @click="toggle_wishlist()" :disabled="busy" :aria-pressed="saved" :aria-busy="busy === 'wishlist'" :class="saved && '[&_svg]:fill-current'" class="relative grid size-10 place-items-center rounded-lg border border-outline-gray-2 bg-surface-base text-ink-gray-8 hover:border-outline-gray-3 aria-busy:text-transparent" aria-label="{{ _('Add to wishlist') }}">{{ icon("heart") }}{{ spinner("busy === 'wishlist'", "size-5 text-ink-gray-8 *:fill-none", overlay=true) }}</button>
 				{% endif %}
 			</div>
 			<p x-cloak x-show="missing_size" class="mt-2 text-sm text-ink-red-4">{{ _("Choose a size first.") }}</p>
@@ -103,7 +104,7 @@
 
 	<div x-cloak x-show="!add_button_visible" class="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-outline-gray-2 bg-surface-base px-5 py-3 md:hidden">
 		<p class="flex-1 text-lg" x-text="money(price)">{{ commera.format.money(variant.price if variant else product.price, product.currency) }}</p>
-		<button type="button" @click="add_to_cart()" :disabled="busy || (variant && !variant.available)" class="inline-flex h-10 items-center justify-center rounded-lg bg-brand px-4 text-lg font-medium text-on-brand disabled:opacity-60">{{ _("Add to cart") }}</button>
+		<button type="button" @click="add_to_cart()" :disabled="busy || (variant && !variant.available)" :aria-busy="busy === 'add_to_cart'" class="relative inline-flex h-10 items-center justify-center rounded-lg bg-brand px-4 text-lg font-medium text-on-brand disabled:opacity-60">{{ _("Add to cart") }}{{ spinner("busy === 'add_to_cart'", "size-5 text-on-brand") }}</button>
 	</div>
 </section>
 {% endif %}

@@ -1,4 +1,4 @@
-{% from "components/macros/icons.html" import icon %}
+{% from "components/macros/icons.html" import icon, spinner %}
 {% set language = frappe.lang or "en" %}
 
 <div x-show="!$store.cart.count" class="flex flex-1 flex-col items-center justify-center gap-4 px-5 text-center">
@@ -19,12 +19,15 @@
 				</div>
 				<p class="mt-1 text-sm text-ink-gray-6" x-show="line.product?.variant_title" x-text="line.product?.variant_title"></p>
 				<div class="mt-auto flex items-center justify-between pt-3">
+					<div class="flex items-center">
 					<div class="flex h-8 items-center rounded-lg bg-surface-gray-2">
 						<button type="button" @click="$store.cart.set_quantity(line, line.qty - 1)" :disabled="$store.cart.busy" class="grid size-8 place-items-center text-ink-gray-8 disabled:text-ink-gray-4" aria-label="{{ _('Less') }}">{{ icon("minus", "size-4") }}</button>
 						<span class="w-6 text-center text-base" x-text="line.qty"></span>
 						<button type="button" @click="$store.cart.set_quantity(line, line.qty + 1)" :disabled="$store.cart.busy" class="grid size-8 place-items-center text-ink-gray-8 disabled:text-ink-gray-4" aria-label="{{ _('More') }}">{{ icon("plus", "size-4") }}</button>
 					</div>
-					<button type="button" @click="$store.cart.remove(line)" :disabled="$store.cart.busy" class="text-sm text-ink-gray-6 underline hover:text-ink-gray-9">{{ _("Remove") }}</button>
+					{{ spinner("$store.cart.busy === 'quantity:' + line.line_id", "size-4 text-ink-gray-6") }}
+					</div>
+					<button type="button" @click="$store.cart.remove(line)" :disabled="$store.cart.busy" :aria-busy="$store.cart.busy === 'remove:' + line.line_id" class="inline-flex items-center text-sm text-ink-gray-6 underline hover:text-ink-gray-9">{{ _("Remove") }}{{ spinner("$store.cart.busy === 'remove:' + line.line_id", "size-4 text-ink-gray-6") }}</button>
 				</div>
 			</div>
 		</li>

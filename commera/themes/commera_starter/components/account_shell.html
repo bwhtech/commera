@@ -1,3 +1,4 @@
+{% from "components/macros/icons.html" import spinner %}
 {% set language = frappe.lang or "en" %}
 {% set account_links = [
 	("orders", _("Orders"), "/" ~ language ~ "/account/orders"),
@@ -15,7 +16,7 @@
 			{% for key, label, url in account_links %}
 			<a href="{{ url }}" {% if key == active %}aria-current="page"{% endif %} class="{{ 'bg-surface-gray-3 text-ink-gray-9' if key == active else 'text-ink-gray-7 hover:bg-surface-gray-2' }} inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-base">{{ label }}</a>
 			{% endfor %}
-			<button type="button" x-data="log_out_button" @click="log_out()" class="inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-base text-ink-gray-7 hover:bg-surface-gray-2">{{ _("Log out") }}</button>
+			<button type="button" x-data="log_out_button" @click="log_out()" :disabled="busy" :aria-busy="busy" class="relative inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-base text-ink-gray-7 hover:bg-surface-gray-2">{{ _("Log out") }}{{ spinner("busy", "size-4 text-ink-gray-7") }}</button>
 		</nav>
 		{% endif %}
 		<div class="min-w-0 flex-1">{{ caller() }}</div>

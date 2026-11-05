@@ -1,7 +1,7 @@
-{% from "components/macros/icons.html" import icon %}
+{% from "components/macros/icons.html" import icon, spinner %}
 
 <div x-data x-cloak x-show="$store.cart.open" @open-cart.window="$store.cart.open = true" @keydown.escape.window="$store.cart.open = false" class="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="{{ _('Cart') }}">
-	<div @click="$store.cart.open = false" class="absolute inset-0 bg-surface-alpha-gray-6"></div>
+	<div @click="$store.cart.open = false" class="absolute inset-0 cursor-pointer bg-surface-alpha-gray-6"></div>
 	<div class="absolute inset-y-0 end-0 flex w-full max-w-md flex-col bg-surface-base shadow-2xl">
 		<div class="flex items-center justify-between border-b border-outline-gray-2 px-5 py-4">
 			<p class="text-3xl">{{ _("Cart") }} <span class="text-ink-gray-6" x-show="$store.cart.count" x-text="'(' + $store.cart.count + ')'"></span></p>
@@ -16,7 +16,7 @@
 				<span x-text="$store.cart.money($store.cart.cart?.total)"></span>
 			</div>
 			<p class="mt-1 text-sm text-ink-gray-6">{{ _("Shipping and taxes are worked out at checkout.") }}</p>
-			<button type="button" @click="$store.cart.checkout()" :disabled="$store.cart.busy" class="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg bg-brand px-3 text-lg font-medium text-on-brand hover:bg-brand-hover">{{ _("Check out") }}</button>
+			<button type="button" @click="$store.cart.checkout()" :disabled="$store.cart.busy" :aria-busy="$store.cart.busy === 'checkout'" class="relative mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg bg-brand px-3 text-lg font-medium text-on-brand hover:bg-brand-hover disabled:opacity-60">{{ _("Check out") }}{{ spinner("$store.cart.busy === 'checkout'", "size-5 text-on-brand") }}</button>
 		</div>
 	</div>
 </div>
