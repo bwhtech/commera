@@ -6,11 +6,15 @@ import PageBody from '../../components/PageBody.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import ThemeRow from '../../components/storefront/ThemeRow.vue'
 import { useTheme } from '../../data/theme'
+import { captureMissingThumbnails } from '../../data/storePreview'
 import { errorMessage } from '../../data/errors'
 
 const { themes, loadError, loading, load, activate } = useTheme()
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  captureMissingThumbnails(themes.value, load)
+})
 
 const activatingName = ref(null)
 
