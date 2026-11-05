@@ -11,8 +11,6 @@ HANDLER_HOOKS = {
 		"order_delivered",
 		"order_returned",
 		"order_updated",
-		"customer_created",
-		"customer_updated",
 		"product_updated",
 		"inventory_changed",
 		"collection_updated",

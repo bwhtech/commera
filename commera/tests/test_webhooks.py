@@ -14,7 +14,6 @@ from commera.api.admin import webhooks as webhooks_api
 from commera.roles import COMMERA_ADMIN, COMMERA_USER, add_commera_roles
 from commera.sdk import STORE_ORDER_TYPE
 from commera.sdk.events import HANDLER_HOOKS, CommeraEvent
-from commera.tests.test_admin_customers import make_customer
 from commera.tests.test_admin_orders import make_test_sales_order
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.utils import update_sales_order_ecommerce_status
@@ -439,18 +438,13 @@ class TestWebhooks(ProductDetailPriceTestCase):
 			make_webhook(["page_updated", "page_updated"])
 
 
-class TestWebhookOrderAndCustomerEvents(IntegrationTestCase):
+class TestWebhookOrderEvents(IntegrationTestCase):
 	def setUp(self):
 		reset_webhooks(self)
 		frappe.db.after_commit.reset()
-		frappe.local.flags.pop(plugin_events.CHANGED_CUSTOMERS_FLAG, None)
-		self.addCleanup(frappe.local.flags.pop, plugin_events.CHANGED_CUSTOMERS_FLAG, None)
 
 	def get_events(self, reference_name: str) -> list[str]:
 		return frappe.get_all("Commera Event", filters={"reference_name": reference_name}, pluck="event")
-
-	def get_customer_changes(self) -> dict | None:
-		return frappe.local.flags.get(plugin_events.CHANGED_CUSTOMERS_FLAG)
 
 	def test_a_store_order_save_fires_order_updated_only_when_subscribed(self):
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
@@ -482,45 +476,3 @@ class TestWebhookOrderAndCustomerEvents(IntegrationTestCase):
 		self.assertEqual(
 			data["status"], frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status")
 		)
-
-	def test_a_customer_and_its_address_saved_together_fire_one_created_event(self):
-		make_customer()
-		self.assertIsNone(self.get_customer_changes())
-
-		make_webhook(["customer_created", "customer_updated"])
-		customer = make_customer()
-		self.make_address(customer)
-
-		self.assertEqual(self.get_customer_changes(), {customer: "customer_created"})
-		plugin_events.fire_customer_event("customer_created", customer)
-		data = frappe.parse_json(frappe.db.get_value("Commera Event", {"reference_name": customer}, "data"))
-		self.assertEqual(set(data), {"customer", "customer_name", "email_id", "mobile_no"})
-		self.assertEqual(data["customer"], customer)
-
-	def test_a_customer_or_address_change_fires_customer_updated(self):
-		customer = make_customer()
-		make_webhook(["customer_updated"])
-		frappe.local.flags.pop(plugin_events.CHANGED_CUSTOMERS_FLAG, None)
-
-		frappe.get_doc("Customer", customer).save(ignore_permissions=True)
-		self.assertEqual(self.get_customer_changes(), {customer: "customer_updated"})
-
-		frappe.local.flags.pop(plugin_events.CHANGED_CUSTOMERS_FLAG, None)
-		address = self.make_address(customer)
-		self.assertEqual(self.get_customer_changes(), {customer: "customer_updated"})
-
-		frappe.local.flags.pop(plugin_events.CHANGED_CUSTOMERS_FLAG, None)
-		address.delete(ignore_permissions=True)
-		self.assertEqual(self.get_customer_changes(), {customer: "customer_updated"})
-
-	def make_address(self, customer: str):
-		return frappe.get_doc(
-			{
-				"doctype": "Address",
-				"address_title": customer,
-				"address_line1": "1 ZZ Street",
-				"city": "Mumbai",
-				"country": "India",
-				"links": [{"link_doctype": "Customer", "link_name": customer}],
-			}
-		).insert(ignore_permissions=True)

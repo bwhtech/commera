@@ -38,7 +38,6 @@ EXTENDED_DOCTYPES = ("Sales Order", "Quotation", "Sales Invoice", "Item", "Custo
 CHANGED_PRODUCTS_FLAG = "commera_changed_products"
 CHANGED_ITEMS_FLAG = "commera_changed_items"
 CHANGED_STOREFRONT_FLAG = "commera_changed_storefront"
-CHANGED_CUSTOMERS_FLAG = "commera_changed_customers"
 
 
 def fire_event(
@@ -816,43 +815,6 @@ def on_sales_order_update_after_submit(doc, method=None):
 			data={"status": doc.get("custom_ecommerce_status")},
 			key=cstr(doc.modified),
 		)
-
-
-def on_customer_insert(doc, method=None):
-	add_customer_change(doc.name, "customer_created")
-
-
-def on_customer_update(doc, method=None):
-	if not doc.flags.in_insert:
-		add_customer_change(doc.name, "customer_updated")
-
-
-def on_address_change(doc, method=None):
-	for link in doc.links:
-		if link.link_doctype == "Customer" and link.link_name:
-			add_customer_change(link.link_name, "customer_updated")
-
-
-def add_customer_change(customer: str, event: str):
-	"""One event per customer per transaction: a customer created with its address is only created."""
-	if not get_handlers("commera_events", event):
-		return
-	changes = get_transaction_batch(CHANGED_CUSTOMERS_FLAG, dict, enqueue_customer_changes)
-	if changes.get(customer) != "customer_created":
-		changes[customer] = event
-
-
-def enqueue_customer_changes():
-	for customer, event in (frappe.local.flags.pop(CHANGED_CUSTOMERS_FLAG, None) or {}).items():
-		frappe.enqueue(fire_customer_event, event=event, customer=customer)
-
-
-def fire_customer_event(event: str, customer: str):
-	data = frappe.db.get_value(
-		"Customer", customer, ["name as customer", "customer_name", "email_id", "mobile_no"], as_dict=True
-	)
-	if data:
-		fire_event(event, "Customer", customer, data=data, repeatable=event == "customer_updated")
 
 
 def validate_plugins():

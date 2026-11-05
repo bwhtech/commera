@@ -12,7 +12,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Event",
-   "options": "order_placed\norder_paid\norder_fulfilled\norder_delivered\norder_cancelled\norder_refunded\norder_returned\norder_updated\ncustomer_created\ncustomer_updated\nproduct_updated\ninventory_changed\ncollection_updated\npage_updated\nmenu_updated",
+   "options": "order_placed\norder_paid\norder_fulfilled\norder_delivered\norder_cancelled\norder_refunded\norder_returned\norder_updated\nproduct_updated\ninventory_changed\ncollection_updated\npage_updated\nmenu_updated",
    "reqd": 1
   }
  ],

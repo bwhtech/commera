@@ -81,8 +81,6 @@ Fix the receiver, then turn the webhook on. This clears the failure count and **
 | `order_refunded` | All or part of the order is refunded | The order snapshot, `payment_entry`, `amount` |
 | `order_returned` | All or part of the order comes back | The order snapshot, `status`, `partial` |
 | `order_updated` | A submitted store order is saved, or its status changes | The order snapshot, `status` |
-| `customer_created` | A Customer is added | `customer`, `customer_name`, `email_id`, `mobile_no` |
-| `customer_updated` | A Customer is saved, or an Address linked to it is saved or deleted | `customer`, `customer_name`, `email_id`, `mobile_no` |
 | `product_updated` | An Item, a product option, a selling Item Price or a product's publishing changes, or an option is deleted | `item_code`, `changed` (`details`, `options`, `published`, `price`), `handles` |
 | `inventory_changed` | Stock moves in the store warehouse, or an order reserves or releases it | `warehouse`, `actual_qty`, `available_qty`, `handles`; the item code is `reference_name` |
 | `collection_updated` | An Item Group is saved or deleted | `handle` |
@@ -91,6 +89,6 @@ Fix the receiver, then turn the webhook on. This clears the failure count and **
 
 The order snapshot is `customer`, `currency`, `grand_total`, `payment_mode`, `docstatus`, `shipping_address` and `discounts`. `handles` are the routes of the products the change touches, published or not.
 
-One transaction sends one `customer_*` event per customer. A customer that is added together with its address sends only `customer_created`. `order_updated` fires one time for each save and one time for each new status.
+`order_updated` fires one time for each save and one time for each new status.
 
 `cart_created` and `discount_used` go to plugins only, not to webhooks.

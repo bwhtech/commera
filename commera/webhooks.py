@@ -38,13 +38,6 @@ EVENT_GROUPS = (
 		),
 	),
 	(
-		"Customers",
-		(
-			("customer_created", "Customer created", "A customer is added"),
-			("customer_updated", "Customer updated", "A customer or one of their addresses changes"),
-		),
-	),
-	(
 		"Catalogue",
 		(
 			(

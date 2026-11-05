@@ -151,8 +151,6 @@ commera_events = {
 		"order_delivered",
 		"order_returned",
 		"order_updated",
-		"customer_created",
-		"customer_updated",
 		"product_updated",
 		"inventory_changed",
 		"collection_updated",
@@ -208,14 +206,6 @@ doc_events = {
 		],
 		"on_update_after_submit": "commera.plugin_events.on_sales_order_update_after_submit",
 		"on_trash": "commera.doc_events.sales_order.on_trash",
-	},
-	"Customer": {
-		"after_insert": "commera.plugin_events.on_customer_insert",
-		"on_update": "commera.plugin_events.on_customer_update",
-	},
-	"Address": {
-		"on_update": "commera.plugin_events.on_address_change",
-		"on_trash": "commera.plugin_events.on_address_change",
 	},
 	"Stock Ledger Entry": {
 		"after_insert": [
