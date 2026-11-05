@@ -1,4 +1,3 @@
-// One try per theme per page load, so a theme whose homepage will not render does not retry on every visit.
 const triedThemes = new Set()
 
 export async function captureStorePreview(theme) {
@@ -15,8 +14,6 @@ export async function captureStorePreview(theme) {
   }
 }
 
-// Serial on purpose: each capture renders a full storefront homepage in a hidden iframe.
-// Classic themes are skipped because save_thumbnail refuses them.
 export async function captureMissingThumbnails(themes, onCaptured) {
   const missing = themes.filter((theme) => theme.theme_type === 'Sections' && !theme.thumbnail)
   for (const theme of missing) {
