@@ -6,7 +6,7 @@ Source of truth: `commera/webhooks.py` (delivery, signing, event list, auto turn
 
 ## Set up a webhook
 
-In the dashboard, open **Settings > Webhooks** and add a webhook. Enter the receiving URL, for example `https://shop.example.com/api/webhooks/commera`, and select the events to send. The **Headless storefront** preset selects the five storefront events.
+In the dashboard, open **Settings > Webhooks** and add a webhook. Enter the receiving URL, for example `https://shop.example.com/api/webhooks/commera`, and select the events to send. A headless storefront needs the Catalogue and Storefront content events: use **Select all** on those two groups.
 
 Commera makes the signing secret (`whsec_` and 32 hex characters) and shows it one time. Copy it into the receiving app. You can show the secret again or rotate it from the webhook page. After a rotation, update the receiving app, because Commera signs the next request with the new secret.
 

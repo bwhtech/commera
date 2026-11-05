@@ -11,14 +11,6 @@ import { useAdminRead } from './api'
  * `useAdminRead` (GET, as the backend whitelists them); writes go through `webhookActions`.
  */
 
-export const STOREFRONT_EVENTS = [
-  'product_updated',
-  'inventory_changed',
-  'collection_updated',
-  'page_updated',
-  'menu_updated',
-]
-
 export const TEST_EVENT = 'webhook_test'
 
 // The scope is detached: these reads outlive whichever component first opened the panel.
