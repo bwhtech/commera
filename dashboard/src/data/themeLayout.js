@@ -57,6 +57,11 @@ export function isTranslatable(setting) {
   return TRANSLATABLE_TYPES.includes(setting.type)
 }
 
+function typedValue(setting, value) {
+  if (setting.type !== 'number') return value
+  return value === '' || value === null || value === undefined ? null : Number(value)
+}
+
 export function maxBlocks(schema) {
   return Number(schema?.max_blocks) || DEFAULT_MAX_BLOCKS
 }
@@ -382,7 +387,7 @@ export function createLayoutEditor(theme) {
     owner.settings ??= {}
     owner.settings[setting.id] = isTranslatable(setting)
       ? translatedValue(owner.settings[setting.id] ?? setting.default, value)
-      : value
+      : typedValue(setting, value)
   }
 
   async function saveThemeSettings(changes) {

@@ -280,7 +280,9 @@ def validate_layout(theme_context, layout, page=None):
 			frappe.throw(_("Section type {0} cannot be used in {1}.").format(section["type"], page or group))
 		if not isinstance(section.get("hidden", False), bool):
 			frappe.throw(_("Section {0}: hidden must be true or false.").format(section["id"]))
-		validate_settings(schema.get("settings"), section.get("settings"), section["id"], references)
+		validate_settings(
+			schema.get("settings"), section.get("settings"), section_label(schema, section), references
+		)
 		validate_blocks(schema, section, references)
 
 	validate_references(theme_context, references)
@@ -316,9 +318,15 @@ def validate_blocks(schema, section, references):
 			frappe.throw(
 				_("Section {0} does not allow blocks of type {1}.").format(section["id"], block["type"])
 			)
-		validate_settings(
-			block_schemas[block["type"]].get("settings"), block.get("settings"), block["id"], references
+		block_schema = block_schemas[block["type"]]
+		owner = _("{0} block in {1}").format(
+			block_schema.get("name") or block["type"], section_label(schema, section)
 		)
+		validate_settings(block_schema.get("settings"), block.get("settings"), owner, references)
+
+
+def section_label(schema, section):
+	return _("{0} section").format(schema.get("name") or section["type"])
 
 
 def validate_entry(entry, seen_ids, label):
@@ -340,7 +348,9 @@ def validate_settings(schema_settings, saved_settings, owner_id, references):
 		if not setting:
 			frappe.throw(_("{0}: unknown setting {1}.").format(owner_id, setting_id))
 		if not is_valid_value(setting, value):
-			frappe.throw(_("{0}: setting {1} has the wrong type.").format(owner_id, setting_id))
+			frappe.throw(
+				_('{0}: "{1}" has the wrong type.').format(owner_id, setting.get("label") or setting_id)
+			)
 
 	add_references(settings_by_id, saved_settings, owner_id, references)
 

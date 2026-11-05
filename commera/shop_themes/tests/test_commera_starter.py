@@ -79,6 +79,20 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 		validate_layout(self.theme_context, newsletter, "index")
 		validate_layout(self.theme_context, newsletter, "footer_group")
 
+	def test_a_wrongly_typed_setting_names_its_section_and_field(self):
+		layout = {
+			"sections": [
+				{"id": "recommendations", "type": "product_recommendations", "settings": {"limit": "6"}}
+			]
+		}
+		with self.assertRaisesRegex(
+			frappe.ValidationError, 'Product recommendations section: "Products to show" has the wrong type.'
+		):
+			validate_layout(self.theme_context, layout)
+
+		layout["sections"][0]["settings"]["limit"] = 6
+		validate_layout(self.theme_context, layout)
+
 	def test_the_header_and_footer_come_from_their_group_layouts(self):
 		html = self.render_home([])
 
