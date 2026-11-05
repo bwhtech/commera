@@ -31,7 +31,7 @@
 			<li>
 				<span class="inline-flex h-8 items-center gap-1 rounded-lg bg-surface-gray-3 ps-3 text-sm font-medium text-ink-gray-8">
 					<span x-text="code_state.code"></span>
-					<button type="button" @click="remove_code(code_state.code)" :disabled="busy" class="grid size-8 place-items-center rounded-lg text-ink-gray-6 hover:text-ink-gray-9" aria-label="{{ _('Remove discount code') }}">{{ icon("close", "size-4") }}</button>
+					<button type="button" @click="remove_code(code_state.code)" :disabled="busy" :aria-busy="busy === 'remove:' + code_state.code" class="relative grid size-8 aria-busy:text-transparent place-items-center rounded-lg text-ink-gray-6 hover:text-ink-gray-9" aria-label="{{ _('Remove discount code') }}">{{ icon("close", "size-4") }}{{ spinner("busy === 'remove:' + code_state.code", "size-4 text-ink-gray-6", overlay=true) }}</button>
 				</span>
 				<p x-show="code_state.reason" x-text="code_state.reason" class="mt-1 text-sm text-ink-gray-6"></p>
 			</li>

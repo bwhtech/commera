@@ -340,7 +340,8 @@
 	select:not(:disabled),
 	summary,
 	input:is([type="checkbox"], [type="radio"]):not(:disabled),
-	label:has(input:is([type="checkbox"], [type="radio"]):not(:disabled)) {
+	label:has(input:is([type="checkbox"], [type="radio"]):not(:disabled)),
+	label:has(select:not(:disabled)) {
 		cursor: pointer;
 	}
 	:disabled {

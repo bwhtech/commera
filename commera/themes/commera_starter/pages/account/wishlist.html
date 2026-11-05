@@ -1,7 +1,7 @@
 {% extends "components/base.html" %}
 {% from "components/account_shell.html" import account_shell with context %}
 {% from "components/macros/product_card.html" import product_card with context %}
-{% from "components/macros/icons.html" import icon %}
+{% from "components/macros/icons.html" import icon, spinner %}
 {% set language = frappe.lang or "en" %}
 {% set wishlist = commera.wishlist.get_wishlist() %}
 
@@ -13,7 +13,7 @@
 		{% for product in wishlist.products %}
 		<div data-product="{{ product.id }}" x-show="!removed.includes($el.dataset.product)" class="relative">
 			{{ product_card(product) }}
-			<button type="button" @click="remove($el.parentElement.dataset.product)" :disabled="busy" class="absolute end-2 top-2 grid size-9 place-items-center rounded-lg bg-surface-base text-ink-gray-8 shadow-sm hover:bg-surface-gray-2" aria-label="{{ _('Remove from wishlist') }}">{{ icon("close", "size-4") }}</button>
+			<button type="button" @click="remove($el.parentElement.dataset.product)" :disabled="busy" :aria-busy="busy === 'remove:' + $el.parentElement.dataset.product" class="absolute end-2 top-2 grid size-9 place-items-center rounded-lg bg-surface-base text-ink-gray-8 shadow-sm hover:bg-surface-gray-2 aria-busy:text-transparent" aria-label="{{ _('Remove from wishlist') }}">{{ icon("close", "size-4") }}{{ spinner("busy === 'remove:' + $el.closest('[data-product]').dataset.product", "size-4 text-ink-gray-8", overlay=true) }}</button>
 		</div>
 		{% endfor %}
 	</div>

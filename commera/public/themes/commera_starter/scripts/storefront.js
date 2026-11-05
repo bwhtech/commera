@@ -16,6 +16,17 @@ async function save_change(state, change, action = true) {
 	}
 }
 
+async function save_change_and_leave(state, change, action = true) {
+	state.busy = action;
+	state.error = '';
+	try {
+		await change();
+	} catch (error) {
+		state.error = error.message;
+		state.busy = false;
+	}
+}
+
 function typeahead() {
 	return {
 		query: '',
@@ -230,7 +241,11 @@ function order_summary() {
 		},
 
 		async remove_code(code) {
-			await save_change(this, () => commera.cart.remove_discount(code));
+			await save_change(
+				this,
+				() => commera.cart.remove_discount(code),
+				`remove:${code}`,
+			);
 		},
 	};
 }
@@ -395,10 +410,14 @@ function checkout(config) {
 
 		async choose_shipping_option(option_id) {
 			this.step = 'shipping';
-			await save_change(this, async () => {
-				this.state = await commera.checkout.set_shipping_option(option_id);
-				this.payment_methods = await commera.checkout.list_payment_methods();
-			});
+			await save_change(
+				this,
+				async () => {
+					this.state = await commera.checkout.set_shipping_option(option_id);
+					this.payment_methods = await commera.checkout.list_payment_methods();
+				},
+				`shipping:${option_id}`,
+			);
 		},
 
 		async pay() {
@@ -556,17 +575,25 @@ document.addEventListener('alpine:init', () => {
 		},
 
 		async set_quantity(line, qty) {
-			await this.save(() =>
-				commera.cart.update_lines([{ line_id: line.line_id, qty }]),
+			await this.save(
+				() => commera.cart.update_lines([{ line_id: line.line_id, qty }]),
+				`quantity:${line.line_id}`,
 			);
 		},
 
 		async remove(line) {
-			await this.save(() => commera.cart.remove_lines([line.line_id]));
+			await this.save(
+				() => commera.cart.remove_lines([line.line_id]),
+				`remove:${line.line_id}`,
+			);
 		},
 
 		async checkout() {
-			await this.save(() => commera.cart.go_to_checkout(), 'checkout');
+			await save_change_and_leave(
+				this,
+				() => commera.cart.go_to_checkout(),
+				'checkout',
+			);
 		},
 
 		money(amount) {
@@ -604,7 +631,7 @@ document.addEventListener('alpine:init', () => {
 				const wishlist = await commera.wishlist.remove(product);
 				this.removed.push(product);
 				this.count = wishlist.count;
-			});
+			}, `remove:${product}`);
 		},
 	}));
 
@@ -649,7 +676,7 @@ document.addEventListener('alpine:init', () => {
 				this.addresses = this.addresses.filter(
 					(entry) => entry.name !== address.name,
 				);
-			});
+			}, `remove:${address.name}`);
 		},
 	}));
 
@@ -689,7 +716,7 @@ document.addEventListener('alpine:init', () => {
 				this.resent = false;
 				this.code = '';
 				this.step = 'code';
-			});
+			}, 'send');
 		},
 
 		async resend_code() {
@@ -701,23 +728,27 @@ document.addEventListener('alpine:init', () => {
 
 		async verify() {
 			this.resent = false;
-			await this.submit(async () => {
-				if (this.mode === 'login') {
-					await commera.auth.log_in({ email: this.email, code: this.code });
-				} else {
-					await commera.auth.sign_up({
-						email: this.email,
-						first_name: this.first_name,
-						last_name: this.last_name,
-						code: this.code,
-					});
-				}
-				if (this.redirect) {
-					location.assign(this.redirect);
-				} else {
-					location.reload();
-				}
-			});
+			await save_change_and_leave(
+				this,
+				async () => {
+					if (this.mode === 'login') {
+						await commera.auth.log_in({ email: this.email, code: this.code });
+					} else {
+						await commera.auth.sign_up({
+							email: this.email,
+							first_name: this.first_name,
+							last_name: this.last_name,
+							code: this.code,
+						});
+					}
+					if (this.redirect) {
+						location.assign(this.redirect);
+					} else {
+						location.reload();
+					}
+				},
+				'verify',
+			);
 		},
 	}));
 
@@ -726,7 +757,7 @@ document.addEventListener('alpine:init', () => {
 		error: '',
 
 		async log_out() {
-			await save_change(this, async () => {
+			await save_change_and_leave(this, async () => {
 				await commera.auth.log_out();
 				location.assign(`/${document.documentElement.lang}`);
 			});
