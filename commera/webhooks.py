@@ -1,7 +1,10 @@
 import base64
 import hashlib
 import hmac
+import ipaddress
+import socket
 import time
+from urllib.parse import urlsplit
 
 import frappe
 import requests
@@ -22,6 +25,7 @@ LOG_DOCTYPE = "Commera Webhook Log"
 TEST_EVENT = "webhook_test"
 FAILURE_LIMIT = 10
 FAILURE_WINDOW_HOURS = 24
+ALLOW_LOCAL_URLS_CONFIG = "commera_webhooks_allow_local_urls"
 REPLAYED_FIELDS = ("webhook", "event", "event_id", "reference_doctype", "reference_name", "is_test")
 EVENT_GROUPS = (
 	(
@@ -106,6 +110,32 @@ def clear_subscriptions():
 	frappe.cache.delete_value(SUBSCRIPTIONS_CACHE_KEY)
 
 
+def get_url_error(url: str) -> str | None:
+	"""Why Commera refuses to post to the URL, or None. Without the site config, only public https URLs pass,
+	so a webhook cannot reach the server itself or its private network."""
+	parts = urlsplit(url or "")
+	if frappe.conf.get(ALLOW_LOCAL_URLS_CONFIG):
+		return (
+			None
+			if parts.scheme in ("https", "http") and parts.hostname
+			else _("The URL must start with https:// or http://.")
+		)
+	if parts.scheme != "https" or not parts.hostname:
+		return _("The URL must start with https://.")
+	if is_private_host(parts.hostname):
+		return _("The URL must point to a public address, not to localhost or a private network.")
+	return None
+
+
+def is_private_host(hostname: str) -> bool:
+	try:
+		addresses = {info[4][0] for info in socket.getaddrinfo(hostname, None)}
+	except (socket.gaierror, UnicodeError):
+		# A name that does not resolve reaches nothing, and its post fails on its own.
+		return False
+	return any(not ipaddress.ip_address(address.split("%")[0]).is_global for address in addresses)
+
+
 def deliver(event: CommeraEvent):
 	"""Post the event to every webhook that wants it and has no Done log for it yet, so a retry only reaches
 	the webhooks that failed. A receiver can still see an event twice: dedupe on the X-Commera-Event-Id header."""
@@ -169,23 +199,11 @@ def send(webhook, log, body: str) -> bool:
 	"""Post the body signed with the webhook's current secret, and record the attempt on the unsaved log."""
 	signature = sign(webhook.get_password("secret"), body)
 	started_at = time.monotonic()
-	response_code = error = None
-	try:
-		response = requests.post(
-			webhook.url,
-			data=body,
-			headers={
-				"Content-Type": "application/json",
-				SIGNATURE_HEADER: signature,
-				EVENT_HEADER: log.event,
-				EVENT_ID_HEADER: log.event_id,
-			},
-			timeout=TIMEOUT_SECONDS,
-		)
-		response_code = response.status_code
-		response.raise_for_status()
-	except requests.RequestException as exception:
-		error = get_error_message(exception)
+	response_code = None
+	# Checked again on each post: a name that was public when saved can point inside later.
+	error = get_url_error(webhook.url)
+	if not error:
+		response_code, error = post(webhook.url, log, body, signature)
 
 	log.update(
 		{
@@ -202,13 +220,33 @@ def send(webhook, log, body: str) -> bool:
 	return not error
 
 
+def post(url: str, log, body: str, signature: str) -> tuple[int | None, str | None]:
+	"""Returns the response code and an error. A redirect is an error: following it could reach a private host."""
+	try:
+		response = requests.post(
+			url,
+			data=body,
+			headers={
+				"Content-Type": "application/json",
+				SIGNATURE_HEADER: signature,
+				EVENT_HEADER: log.event,
+				EVENT_ID_HEADER: log.event_id,
+			},
+			timeout=TIMEOUT_SECONDS,
+			allow_redirects=False,
+		)
+	except requests.RequestException as exception:
+		return None, get_error_message(exception)
+	if 200 <= response.status_code < 300:
+		return response.status_code, None
+	return response.status_code, f"{response.status_code} {response.reason or ''}".strip()
+
+
 def sign(secret: str, body: str) -> str:
 	return base64.b64encode(hmac.new(secret.encode(), body.encode(), hashlib.sha256).digest()).decode()
 
 
 def get_error_message(exception: requests.RequestException) -> str:
-	if exception.response is not None:
-		return f"{exception.response.status_code} {exception.response.reason or ''}".strip()
 	if isinstance(exception, requests.Timeout):
 		return f"Connection timed out after {TIMEOUT_SECONDS} s"
 	if isinstance(exception, requests.ConnectionError) and "refused" in str(exception).lower():

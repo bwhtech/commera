@@ -10,7 +10,9 @@ In the dashboard, open **Settings > Webhooks** and add a webhook. Enter the rece
 
 Commera makes the signing secret (`whsec_` and 32 hex characters) and shows it one time. Copy it into the receiving app. You can show the secret again or rotate it from the webhook page. After a rotation, update the receiving app, because Commera signs the next request with the new secret.
 
-System Managers and Commera Admins can manage webhooks. The URL must start with `https://` or `http://`, and a webhook must have at least one event.
+System Managers and Commera Admins can manage webhooks. A webhook must have at least one event.
+
+The URL must use `https://` and point to a public address. Commera refuses `localhost`, private networks and link-local addresses such as the cloud metadata service, both when you save the webhook and before each request, because a name can point somewhere else later. Commera does not follow redirects: a redirect counts as a failed attempt. For local development, set `commera_webhooks_allow_local_urls` to `1` in the site config. Then `http://` and private addresses are allowed, for example `http://127.0.0.1:3100/api/webhooks/commera`.
 
 Commera records an event only while a plugin or an enabled webhook wants it. A site without webhooks records nothing extra.
 

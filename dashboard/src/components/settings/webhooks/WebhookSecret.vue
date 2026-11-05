@@ -8,7 +8,6 @@ const props = defineProps({
   hint: { type: String, default: '' },
 })
 
-// The plain secret, once the server has handed it over; null while only its hint is known.
 const secret = defineModel('secret', { type: String, default: null })
 const isShown = defineModel('shown', { type: Boolean, default: false })
 

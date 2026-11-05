@@ -2,14 +2,8 @@ import { computed, effectScope } from 'vue'
 import { createAdminCaller } from './adminCaller'
 import { useAdminRead } from './api'
 
-/**
- * The store's outgoing webhooks, the events they can carry, and the shapers the settings panel
- * draws them with.
- *
- * The list is a module-level read rather than one inside the panel, because the settings sidebar
- * shows a dot for a failing webhook before the tab is ever opened. Reads go through
- * `useAdminRead` (GET, as the backend whitelists them); writes go through `webhookActions`.
- */
+// A module-level read, not one inside the panel: the settings sidebar shows a failing webhook's
+// dot before the tab is ever opened.
 
 export const TEST_EVENT = 'webhook_test'
 

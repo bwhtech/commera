@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-from commera.webhooks import LOG_DOCTYPE, clear_subscriptions, fail_retrying_logs
+from commera.webhooks import LOG_DOCTYPE, clear_subscriptions, fail_retrying_logs, get_url_error
 
 
 class CommeraWebhook(Document):
@@ -19,8 +19,8 @@ class CommeraWebhook(Document):
 			frappe.throw(_("Choose at least one event."))
 		if len(events) != len(set(events)):
 			frappe.throw(_("Each event can only be listed once."))
-		if not (self.url or "").startswith(("https://", "http://")):
-			frappe.throw(_("The URL must start with https:// or http://."))
+		if self.has_value_changed("url") and (error := get_url_error(self.url)):
+			frappe.throw(error)
 		if self.enabled and self.has_value_changed("enabled") and not self.is_new():
 			self.reset_failures()
 

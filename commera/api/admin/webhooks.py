@@ -7,6 +7,7 @@ from commera import webhooks
 from commera.commera_ecommerce.doctype.commera_webhook.commera_webhook import generate_secret
 
 DOCTYPE = "Commera Webhook"
+MAX_PAGE_LENGTH = 100
 LOG_FIELDS = (
 	"name",
 	"event",
@@ -125,7 +126,7 @@ def get_webhook_logs(webhook: str, start: int = 0, page_length: int = 20) -> dic
 		.select(*LOG_FIELDS)
 		.where(log.webhook == webhook)
 		.orderby(log.creation, order=Order.desc)
-		.limit(cint(page_length))
+		.limit(min(cint(page_length), MAX_PAGE_LENGTH))
 		.offset(cint(start))
 		.run(as_dict=True)
 	)

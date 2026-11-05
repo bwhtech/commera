@@ -18,6 +18,7 @@ from commera.tests.test_admin_orders import make_test_sales_order
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.utils import update_sales_order_ecommerce_status
 from commera.webhooks import (
+	ALLOW_LOCAL_URLS_CONFIG,
 	EVENT_HEADER,
 	EVENT_ID_HEADER,
 	EVENTS,
@@ -61,10 +62,7 @@ def make_webhook(
 
 
 def make_response(status_code: int = 200, reason: str = "OK"):
-	response = MagicMock(status_code=status_code, reason=reason)
-	if status_code >= 400:
-		response.raise_for_status.side_effect = requests.HTTPError(response=response)
-	return response
+	return MagicMock(status_code=status_code, reason=reason)
 
 
 def post_unless_down(url, **kwargs):
@@ -404,6 +402,44 @@ class TestWebhooks(ProductDetailPriceTestCase):
 			make_webhook([])
 		with self.assertRaisesRegex(frappe.ValidationError, "must start with"):
 			make_webhook(["menu_updated"], url="ftp://store.example.com")
+
+	def test_a_webhook_cannot_point_at_the_server_or_its_network(self):
+		for url in (
+			"http://store.example.com/hook",
+			"https://127.0.0.1/hook",
+			"https://169.254.169.254/latest",
+		):
+			with self.subTest(url=url), self.assertRaises(frappe.ValidationError):
+				make_webhook(["menu_updated"], url=url)
+		with patch("commera.webhooks.socket.getaddrinfo", return_value=[(2, 1, 6, "", ("10.0.0.5", 0))]):
+			with self.assertRaisesRegex(frappe.ValidationError, "public address"):
+				make_webhook(["menu_updated"], url="https://internal.example.com/hook")
+
+	def test_the_site_config_allows_local_urls_for_development(self):
+		with patch.dict(frappe.conf, {ALLOW_LOCAL_URLS_CONFIG: 1}):
+			webhook = make_webhook(["menu_updated"], url="http://127.0.0.1:3100/api/webhooks/commera")
+		self.assertEqual(webhook.url, "http://127.0.0.1:3100/api/webhooks/commera")
+
+	def test_a_name_that_now_points_inside_is_not_posted_to(self):
+		webhook = make_webhook(["menu_updated"])
+		with (
+			patch("commera.webhooks.socket.getaddrinfo", return_value=[(2, 1, 6, "", ("127.0.0.1", 0))]),
+			patch("commera.webhooks.requests.post") as post,
+		):
+			self.deliver_and_fail(self.make_event("menu_updated", {}), post=post)
+
+		post.assert_not_called()
+		[log] = get_logs(webhook.name)
+		self.assertIn("public address", log.error)
+
+	def test_a_redirect_is_a_failure_and_is_not_followed(self):
+		webhook = make_webhook(["menu_updated"])
+		self.deliver_and_fail(
+			self.make_event("menu_updated", {}), post=lambda url, **kwargs: make_response(302, "Found")
+		)
+
+		[log] = get_logs(webhook.name)
+		self.assertEqual((log.status, log.error), ("Retrying", "302 Found"))
 
 	def test_deleting_a_webhook_deletes_its_logs(self):
 		webhook = make_webhook(["menu_updated"])

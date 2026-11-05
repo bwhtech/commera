@@ -11,10 +11,7 @@ const url = ref('')
 const events = ref([])
 const saving = ref(false)
 
-const urlError = computed(() =>
-  url.value && !/^https?:\/\//.test(url.value) ? 'The URL must start with https:// or http://.' : '',
-)
-const canSave = computed(() => url.value && !urlError.value && events.value.length)
+const canSave = computed(() => url.value.trim() && events.value.length)
 
 watch(open, (isOpen) => {
   if (!isOpen) return
@@ -42,7 +39,6 @@ async function save() {
           label="Endpoint URL"
           description="Commera posts each event here as JSON."
           placeholder="https://shop.example.com/api/webhooks/commera"
-          :error="urlError"
           required
         />
         <div>
