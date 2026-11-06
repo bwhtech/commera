@@ -8,9 +8,8 @@ from bwh_payments.bwh_payments.doctype.gateway_payment_request.test_gateway_paym
 	configure_stripe_gateway,
 	remove_stripe_gateway,
 )
-from bwh_payments.bwh_payments.doctype.stripe_gateway_settings import stripe_gateway_settings
 from bwh_payments.currency import to_minor_units
-from bwh_payments.tests.fake_stripe import FakeStripeClient
+from bwh_payments.services.stripe.stub import StubStripeClient
 from frappe.deferred_insert import queue_prefix
 from frappe.tests import IntegrationTestCase
 
@@ -168,10 +167,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 
 	def setUp(self):
 		self.addCleanup(frappe.set_user, "Administrator")
-		FakeStripeClient.reset()
-		stripe_client_patch = patch.object(stripe_gateway_settings.stripe, "StripeClient", FakeStripeClient)
-		stripe_client_patch.start()
-		self.addCleanup(stripe_client_patch.stop)
+		StubStripeClient.reset()
 		frappe.cache.delete_value(f"{queue_prefix}Error Log")
 		self.addCleanup(frappe.cache.delete_value, f"{queue_prefix}Error Log")
 		frappe.flags.commera_hooks_hook_calls = []
@@ -218,7 +214,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 
 		frappe.set_user("Administrator")
 		self.assertEqual(self.gateway_requests(quotation.name), [])
-		self.assertEqual(FakeStripeClient.created_sessions, [])
+		self.assertEqual(StubStripeClient.created_sessions, [])
 		self.assertNotIn(REFUSAL, self.queued_error_logs(), "a refusal the shopper can fix is no error")
 
 	def test_an_app_refusal_stops_a_cod_order_at_checkout_and_at_confirmation(self):
@@ -290,7 +286,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 		frappe.set_user("Administrator")
 		(payment_request,) = self.gateway_requests(quotation.name)
 		self.assertEqual(payment_request.amount, summary["total"])
-		gateway_line = FakeStripeClient.created_sessions[-1]["line_items"][0]["price_data"]
+		gateway_line = StubStripeClient.created_sessions[-1]["line_items"][0]["price_data"]
 		self.assertEqual(gateway_line["unit_amount"], to_minor_units(summary["total"], quotation.currency))
 
 	def test_a_pickup_cart_keeps_its_plugin_fee(self):
@@ -542,7 +538,7 @@ class TestCheckoutHooks(IntegrationTestCase):
 
 		frappe.set_user("Administrator")
 		self.assertEqual(self.gateway_requests(quotation.name), [])
-		self.assertEqual(FakeStripeClient.created_sessions, [])
+		self.assertEqual(StubStripeClient.created_sessions, [])
 
 	def test_hidden_cash_on_delivery_is_refused_at_checkout_and_at_confirmation(self):
 		patch_app_hooks(self, {"commera_hooks": {"payment_methods": [f"{__name__}.hide_cod"]}})

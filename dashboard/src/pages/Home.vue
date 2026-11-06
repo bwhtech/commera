@@ -33,13 +33,19 @@ watch(home, (record, previousRecord, onCleanup) => {
 
 onMounted(loadDomains)
 
-const playEntrance = homeArrival.playEntrance
-homeArrival.playEntrance = false
-const STAGGER = ['delay-0', 'delay-75', 'delay-150']
+const arrival = homeArrival.entrance
+homeArrival.entrance = null
+// Each beat starts closer to the last and travels less, so the three land as one wave.
+const ENTRANCES = {
+  load: { duration: 'duration-300', delays: ['delay-0', 'delay-[40ms]', 'delay-[70ms]'] },
+  onboarding: { duration: 'duration-500', delays: ['delay-0', 'delay-[90ms]', 'delay-[150ms]'] },
+}
+const RISES = ['translate-y-2', 'translate-y-1.5', 'translate-y-0']
+const timing = ENTRANCES[arrival] ?? ENTRANCES.load
 const entrance = (step) => ({
-  appear: playEntrance,
-  enterActiveClass: ['transition-[opacity,transform] duration-500 ease-out-strong', STAGGER[step]].join(' '),
-  enterFromClass: 'translate-y-2 opacity-0 motion-reduce:translate-y-0',
+  appear: Boolean(arrival),
+  enterActiveClass: ['transition-[opacity,transform] ease-out-strong motion-reduce:delay-0', timing.duration, timing.delays[step]].join(' '),
+  enterFromClass: ['opacity-0 motion-reduce:translate-y-0', RISES[step]].join(' '),
 })
 
 const isLive = isStorefrontPublished

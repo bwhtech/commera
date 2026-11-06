@@ -159,7 +159,7 @@ async function finish() {
     finishing.value = false
     return
   }
-  homeArrival.playEntrance = true
+  homeArrival.entrance = 'onboarding'
   // format.js reads the boot's currency once at load. Setup may have changed it, and then every
   // money figure would wear the old symbol until a reload.
   if (bootValue('currency', '') !== draft.currency) {
@@ -265,14 +265,15 @@ watch(
         />
 
         <div
-          class="flex flex-1 flex-col transition-[opacity,transform] delay-300 duration-500 ease-out-strong"
+          class="relative flex flex-1 flex-col transition-[opacity,transform] delay-300 duration-500 ease-out-strong"
           :class="entered ? 'translate-y-0 opacity-100' : 'translate-y-2.5 opacity-0 motion-reduce:translate-y-0'"
         >
+          <!-- Crossfade, not out-in, so Continue skips the exit wait. inset-0 keeps the leaving step's
+               buttons pinned while it overlaps the new one. -->
           <Transition
-            mode="out-in"
             enter-active-class="transition-[opacity,transform] duration-300 ease-out-strong"
             :enter-from-class="slide.enter"
-            leave-active-class="transition-[opacity,transform] duration-150 ease-out-strong"
+            leave-active-class="pointer-events-none absolute inset-0 transition-[opacity,transform] duration-150 ease-out-strong"
             :leave-to-class="slide.leave"
           >
             <form :key="step.key" class="flex flex-1 flex-col" :data-onboarding-step="step.key" @submit.prevent="next">
