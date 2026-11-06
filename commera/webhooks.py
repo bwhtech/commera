@@ -33,7 +33,7 @@ EVENT_GROUPS = (
 		(
 			("order_placed", "Order placed", "A shopper completes checkout"),
 			("order_paid", "Order paid", "Payment is captured, including cash on delivery"),
-			("order_fulfilled", "Order shipped", "The carrier picks up the parcel"),
+			("order_fulfilled", "Order shipped", "Every item has shipped"),
 			("order_delivered", "Order delivered", "The carrier confirms delivery"),
 			("order_cancelled", "Order cancelled", "The order is cancelled"),
 			("order_refunded", "Order refunded", "All or part of the order is refunded"),
