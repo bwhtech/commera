@@ -12,7 +12,7 @@ from commera.api.admin.inventory import get_inventory
 from commera.api.admin.plugins import query_deliveries
 from commera.api.shipping import get_order_charge_lines
 from commera.discounts.allocations import get_allocations, get_discount_rows, get_order_discount_rows
-from commera.utils import get_address_lines, get_item_images, get_store_currency
+from commera.utils import get_address_lines, get_item_images, get_lines_the_store_ships, get_store_currency
 
 PAGE_LENGTH = 20
 
@@ -837,16 +837,6 @@ def can_fulfil_order(order, state) -> bool:
 		and state["key"] not in SETTLED_STAGES
 		and bool(get_lines_the_store_ships(order.lines))
 	)
-
-
-def get_lines_the_store_ships(lines) -> list:
-	"""Outstanding lines a Delivery Note can take. ERPNext's mapper leaves out drop-ship lines: the supplier
-	ships those against a Purchase Order."""
-	return [
-		line
-		for line in lines
-		if not cint(line.delivered_by_supplier) and flt(line.delivered_qty) < flt(line.qty)
-	]
 
 
 @frappe.whitelist(methods=["POST"])

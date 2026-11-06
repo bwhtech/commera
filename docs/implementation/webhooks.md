@@ -77,7 +77,7 @@ Fix the receiver, then turn the webhook on. This clears the failure count and **
 | --- | --- | --- |
 | `order_placed` | A shopper completes checkout | The order snapshot |
 | `order_paid` | Payment is captured, including cash on delivery | The order snapshot |
-| `order_fulfilled` | The carrier picks up the parcel | The order snapshot |
+| `order_fulfilled` | Every item has shipped | The order snapshot |
 | `order_delivered` | The carrier confirms delivery | The order snapshot |
 | `order_cancelled` | The order is cancelled | The order snapshot |
 | `order_refunded` | All or part of the order is refunded | The order snapshot, `payment_entry`, `amount` |
@@ -91,6 +91,6 @@ Fix the receiver, then turn the webhook on. This clears the failure count and **
 
 The order snapshot is `customer`, `currency`, `grand_total`, `payment_mode`, `docstatus`, `shipping_address` and `discounts`. `handles` are the routes of the products the change touches, published or not.
 
-`order_updated` fires one time for each save and one time for each new status.
+`order_updated` fires one time for each save and one time for each status change.
 
 `cart_created` and `discount_used` go to plugins only, not to webhooks.

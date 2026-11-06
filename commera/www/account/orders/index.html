@@ -7,6 +7,7 @@
     'Waiting for Approval': {'color_class': 'bg-yellow-50 text-yellow-600 border-yellow-600'},
     'Order Received': {'color_class': 'bg-green-50 text-green-600 border-green-600'},
     'Preparing for Shipment': {'color_class': 'bg-yellow-50 text-yellow-600 border-yellow-600'},
+    'Partially Shipped': {'color_class': 'bg-yellow-50 text-yellow-600 border-yellow-600'},
     'Shipped': { 'color_class': 'bg-gray-50 text-gray-600 border-gray-600'},
   'Delivered': {'color_class': 'bg-green-50 text-green-600 border-green-600'},
     'Partially Returned': {'color_class': 'bg-yellow-50 text-yellow-600 border-yellow-600'},
@@ -126,7 +127,7 @@
                 <a href="/api/method/frappe.utils.print_format.download_pdf?doctype=Sales Invoice&name={{sales_invoice[0].name}}&format={{print_format}}"
                     target="_blank" class="text-sm text-secondary-accent font-medium flex items-center justify-end mb-2 "
                     x-show="!partially_returned">
-                    {% if order.custom_ecommerce_status == "Delivered" %}
+                    {% if order.custom_ecommerce_status in ("Partially Shipped", "Delivered") %}
             
                     {{icon("invoice",classes = 'size-4 me-1')}}
                     {{_('Invoice')}}
