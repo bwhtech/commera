@@ -185,8 +185,12 @@ function discard() {
 
 const actions = computed(() => [
   ...(hasChanges.value ? [{ label: 'Discard', variant: 'subtle', onClick: discard }] : []),
-  { label: 'Save', variant: 'solid', onClick: save },
-  { label: 'Publish', variant: 'solid', onClick: publish },
+  { label: 'Save', variant: hasUnsavedChanges.value ? 'solid' : 'subtle', onClick: save },
+  {
+    label: 'Publish',
+    variant: !hasUnsavedChanges.value && hasUnpublishedChanges.value ? 'solid' : 'subtle',
+    onClick: publish,
+  },
 ])
 
 onBeforeRouteLeave(async () => (state.loadError ? true : await saveIfChanged()))
