@@ -4,6 +4,10 @@ export async function get() {
 	return get_request('checkout.get');
 }
 
+export async function refresh() {
+	return post('checkout.refresh');
+}
+
 export async function set_addresses({
 	billing_address,
 	shipping_address,
