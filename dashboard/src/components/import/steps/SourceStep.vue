@@ -1,11 +1,14 @@
 <script setup>
+import { useRouter } from 'vue-router'
 import { Badge } from 'frappe-ui'
-import { imp } from '../../../data/importFlow'
+import { closeImport, imp } from '../../../data/importFlow'
 import CoachTip from '../CoachTip.vue'
 
-// Only the spreadsheet path exists today. The rest are named anyway: a merchant
-// coming from Shopify should see that we know about it, and that it is not
-// their route in yet.
+const router = useRouter()
+
+// The spreadsheet runs in this dialog. Shopify brings the whole store over (collections,
+// customers, pages), not only products, so it has its own page. The rest are named anyway: a
+// merchant should see that we know about them, and that they are not their route in yet.
 const sources = [
   {
     value: 'csv',
@@ -14,12 +17,27 @@ const sources = [
     icon: 'lucide-file-spreadsheet',
     tag: 'Most common',
   },
-  { value: 'shopify', title: 'Shopify', body: 'Pull products, variants and photos over.', icon: 'lucide-shopping-bag', soon: true },
+  {
+    value: 'shopify',
+    title: 'Shopify',
+    body: 'Connect your store and bring products, collections, customers and pages over.',
+    icon: 'lucide-shopping-bag',
+    route: { name: 'ShopifyImport' },
+  },
   { value: 'woo', title: 'WooCommerce', body: 'Connect with your store URL and a key.', icon: 'lucide-plug-zap', soon: true },
   { value: 'sheets', title: 'Google Sheet', body: 'Paste a link and we keep it in sync.', icon: 'lucide-table', soon: true },
   { value: 'insta', title: 'Instagram catalogue', body: 'Bring across the products you tag in posts.', icon: 'lucide-camera', soon: true },
   { value: 'manual', title: 'Type them in', body: 'Fine for a handful of products.', icon: 'lucide-pencil-line', soon: true },
 ]
+
+function choose(source) {
+  if (!source.route) {
+    imp.source = source.value
+    return
+  }
+  closeImport()
+  router.push(source.route)
+}
 </script>
 
 <template>
@@ -42,7 +60,7 @@ const sources = [
           s.soon ? 'cursor-not-allowed opacity-60' : 'hover:bg-surface-gray-1',
         ]"
         :disabled="s.soon"
-        @click="imp.source = s.value"
+        @click="choose(s)"
       >
         <div class="flex items-start gap-3">
           <span :class="[s.icon, 'size-5 shrink-0 text-ink-gray-7']" aria-hidden="true" />
