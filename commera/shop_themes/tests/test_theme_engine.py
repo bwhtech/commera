@@ -38,6 +38,7 @@ from commera.shop_themes.theme_resolver import (
 	find_theme_file,
 	get_theme_bytecode_cache,
 	get_theme_environment,
+	get_theme_not_found_html,
 	is_dynamic_page,
 	match_route,
 	theme_bytecode_caches,
@@ -127,6 +128,14 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 		self.activate("Shop Default Theme")
 		url = shop_theme_asset_url("images/placeholder.svg")
 		self.assertIn("/themes/shop_base_theme/images/placeholder.svg", url)
+
+	def test_asset_url_carries_the_file_version_so_a_changed_asset_is_fetched_again(self):
+		self.activate("Shop Default Theme")
+		path = os.path.join(
+			frappe.get_app_path("commera"), "public", "themes", "shop_base_theme", "images", "placeholder.svg"
+		)
+		url = shop_theme_asset_url("images/placeholder.svg")
+		self.assertTrue(url.endswith(f"placeholder.svg?v={int(os.path.getmtime(path))}"))
 
 	def test_asset_url_is_empty_with_no_active_theme(self):
 		self.activate(None)
@@ -523,6 +532,28 @@ class IntegrationTestThemedNotFound(IntegrationTestCase):
 	def test_a_theme_without_404_html_leaves_the_miss_to_frappe(self):
 		with self.assertRaises(frappe.DoesNotExistError):
 			self.render_probe()
+
+	def test_unknown_routes_get_the_active_theme_404(self):
+		theme_context = {"theme_name": "Probe", "dirs": [self.theme_dir]}
+		with patch("commera.shop_themes.theme_resolver.get_render_theme_context", return_value=theme_context):
+			self.assertIsNone(get_theme_not_found_html("/en/nope"))
+			self.write_theme_file("pages/404.html", "theme not found")
+			self.assertEqual(get_theme_not_found_html("/en/nope"), "theme not found")
+
+	def test_a_guest_on_an_account_page_is_sent_to_the_theme_login(self):
+		os.makedirs(os.path.join(self.theme_dir, "pages", "account"))
+		renderer = ThemePageRenderer("en/account/orders")
+		renderer.theme_dirs = [self.theme_dir]
+		renderer.requires_auth = True
+		frappe.set_user("Guest")
+		self.addCleanup(frappe.set_user, "Administrator")
+
+		with self.assertRaises(frappe.PermissionError):
+			renderer.render()
+		self.write_theme_file("pages/account/login.html", "login")
+		with self.assertRaises(frappe.Redirect):
+			renderer.render()
+		self.assertEqual(frappe.flags.redirect_location, "/en/account/login?redirect-to=/en/account/orders")
 
 
 class IntegrationTestThemeSettingsContext(IntegrationTestCase):

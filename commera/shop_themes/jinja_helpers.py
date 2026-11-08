@@ -25,12 +25,18 @@ def shop_theme_asset_url(path):
 	relative_path = path.lstrip("/")
 	asset_url = find_theme_asset_url(theme_context, relative_path)
 	if asset_url:
-		return asset_url
+		return f"{asset_url}?v={get_asset_version(asset_url)}"
 
 	# Nothing in the chain ships it: fall back to the ACTIVE theme's URL so the 404 names this theme.
 	active_name = theme_context["names"][0]
 	active_app = theme_context["apps"][active_name]
 	return f"/assets/{active_app}/themes/{frappe.scrub(active_name)}/{relative_path}"
+
+
+def get_asset_version(asset_url):
+	"""The file's modified time, so browsers fetch a theme asset again after it changes."""
+	app, _, path = asset_url.removeprefix("/assets/").partition("/")
+	return int(os.path.getmtime(os.path.join(frappe.get_app_path(app), "public", path)))
 
 
 def find_theme_asset_url(theme_context, relative_path):
