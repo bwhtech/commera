@@ -313,4 +313,90 @@ describe('state flows', () => {
       await page.setRequestInterception(false)
     }
   })
+
+  uiTest(session, 'reviews: two quick publish toggles both land, with no aborted error', async () => {
+    const { page } = session
+    const review = (name) => ({
+      name,
+      shopper: `Shopper ${name}`,
+      product: 'Demo product',
+      rating: 0.8,
+      review_title: `Review ${name}`,
+      comment: 'Fine.',
+      creation: '2026-11-01 10:00:00',
+      is_published: 0,
+    })
+    const writes = []
+    const onRequest = (request) => {
+      if (request.isInterceptResolutionHandled()) return
+      const url = request.url()
+      if (url.includes('reviews.get_reviews')) {
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { reviews: [review('E2E-R1'), review('E2E-R2')], total: 2 } }),
+        })
+      }
+      if (!url.includes('reviews.set_published')) return request.continue()
+      writes.push(JSON.parse(request.postData()).name)
+      setTimeout(() => request.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {} }) }), 600)
+    }
+    await page.setRequestInterception(true)
+    page.on('request', onRequest)
+    try {
+      await goto(page, '/reviews')
+      const switches = await page.$$('button[role=switch]')
+      assert.equal(switches.length, 2, 'the two faked reviews did not render')
+      await switches[0].click()
+      await switches[1].click()
+      await wait(2000)
+      assert.deepEqual(writes, ['E2E-R1', 'E2E-R2'], 'both toggles should reach the server, in order')
+      const checked = await page.$$eval('button[role=switch]', (buttons) => buttons.map((button) => button.getAttribute('aria-checked')))
+      assert.deepEqual(checked, ['true', 'true'], 'a toggle was reverted')
+      const toasts = await page.evaluate(() => [...document.querySelectorAll('[data-sonner-toast]')].map((toast) => toast.innerText).join(' / '))
+      assert.ok(!/abort/i.test(toasts), `an abort was reported: ${toasts}`)
+    } finally {
+      page.off('request', onRequest)
+      await page.setRequestInterception(false)
+    }
+  })
+
+  uiTest(session, 'pages: after a failed move to another page, Save is gone and writes nothing', async () => {
+    const { page } = session
+    const pageA = { name: 'E2E Page A', route: 'e2e-page-a', published: 0, content: '<p>Page A</p>' }
+    const saves = []
+    const onRequest = (request) => {
+      if (request.isInterceptResolutionHandled()) return
+      const url = request.url()
+      if (url.includes('pages.save_page')) {
+        saves.push(request.postData())
+        return request.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: pageA }) })
+      }
+      if (!url.includes('pages.get_page')) return request.continue()
+      const asked = JSON.parse(request.postData() || '{}').name
+      if (asked === pageA.name) {
+        return request.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: pageA }) })
+      }
+      request.respond({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ errors: [{ type: 'DoesNotExistError', message: 'Web Page E2E Page B not found' }] }),
+      })
+    }
+    await page.setRequestInterception(true)
+    page.on('request', onRequest)
+    try {
+      await goto(page, `/storefront/pages/${encodeURIComponent(pageA.name)}`)
+      assert.ok(await findByText(page, 'button', 'Save'), 'page A did not offer Save')
+      await page.evaluate(() =>
+        document.querySelector('#app').__vue_app__.config.globalProperties.$router.push('/storefront/pages/E2E%20Page%20B'),
+      )
+      await waitFor(async () => (await text(page)).includes('Could not load this page'), { label: 'the load error' })
+      assert.equal(await findByText(page, 'button', 'Save'), null, 'Save is still offered after the failed load')
+      assert.deepEqual(saves, [], 'something was saved')
+    } finally {
+      page.off('request', onRequest)
+      await page.setRequestInterception(false)
+    }
+  })
 })
