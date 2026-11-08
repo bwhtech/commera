@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as auth from '../auth.js';
 import * as orders from '../orders.js';
+import * as shop from '../shop.js';
 import { StorefrontError } from '../request.js';
 import { add_fake_fetch } from './fake-fetch.js';
 
@@ -37,6 +38,11 @@ const post_calls = [
 				email: 'asha@example.com',
 			}),
 		{ order_number: 'SO-0001', email: 'asha@example.com' },
+	],
+	[
+		'shop.subscribe_to_newsletter',
+		() => shop.subscribe_to_newsletter('asha@example.com'),
+		{ email: 'asha@example.com' },
 	],
 ];
 

@@ -53,3 +53,8 @@ def get_storefront_url(item: MenuItem) -> str | None:
 	if item["type"] == "collection":
 		return f"/collections/{item['target']}"
 	return "/collections/all" if item["type"] == "all" else None
+
+
+@rate_limited_guest_api("POST", limit=10, seconds=60 * 60)
+def subscribe_to_newsletter(email: str) -> None:
+	shop.subscribe_to_newsletter(email)
