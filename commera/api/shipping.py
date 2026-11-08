@@ -38,11 +38,16 @@ DEFAULT_ITEM_WEIGHT_KG = 0.5
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=100, seconds=60 * 60)
 def get_shipping_options() -> dict:
-	"""Delivery options priced for the cart's current shipping address.
+	"""Delivery options priced for the cart's current shipping address, with the checkout summary.
 
-	Never raises: checkout has to render even when the carrier is down.
+	Never raises: checkout has to render even when the carrier is down. The summary comes along so a
+	checkout that re-quotes after a price change shows the new total, also when no option is offered.
 	"""
-	return get_cart_shipping_options(_get_cart_quotation())
+	quotation = _get_cart_quotation()
+	options = get_cart_shipping_options(quotation)
+	if quotation and quotation.items:
+		options["checkout_summary"] = get_checkout_summary(quotation)
+	return options
 
 
 def get_cart_shipping_options(quotation) -> dict:
