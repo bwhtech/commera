@@ -5,7 +5,7 @@ from frappe import _
 
 from commera.api.storefront import rate_limited_guest_api
 from commera.sdk import shop
-from commera.sdk.types import ContentPage, Country, MenuItem, Sitemap
+from commera.sdk.types import ContentPage, ContentPageLink, Country, MenuItem, Sitemap
 
 
 @rate_limited_guest_api("GET", limit=600, seconds=60)
@@ -20,6 +20,11 @@ def get_page(handle: str) -> ContentPage:
 	if page := shop.get_page(handle):
 		return page
 	frappe.throw(_("Page {0} not found").format(handle), frappe.DoesNotExistError)
+
+
+@rate_limited_guest_api("GET", limit=600, seconds=60)
+def list_pages() -> list[ContentPageLink]:
+	return shop.list_pages()
 
 
 @rate_limited_guest_api("GET", limit=60, seconds=60)

@@ -1,5 +1,6 @@
 import { StorefrontError } from '../request.js';
 import { checkout_tools } from './checkout_tools.js';
+import { page_tools } from './page_tools.js';
 import { storefront_tools } from './storefront_tools.js';
 
 export function is_checkout_page() {
@@ -7,7 +8,10 @@ export function is_checkout_page() {
 }
 
 export function get_tools() {
-	return is_checkout_page() ? checkout_tools : storefront_tools;
+	return [
+		...(is_checkout_page() ? checkout_tools : storefront_tools),
+		...page_tools,
+	];
 }
 
 export async function register_tools(

@@ -4,10 +4,19 @@ import frappe
 
 from commera.api.storefront.collections import get_collection, get_collections
 from commera.api.storefront.products import get_product, get_products
-from commera.api.storefront.shop import get_page, get_sitemap, get_storefront_url, list_countries
+from commera.api.storefront.shop import get_page, get_sitemap, get_storefront_url, list_countries, list_pages
 from commera.sdk import catalog, shop
 from commera.sdk.shop import get_menu_link
-from commera.sdk.types import Collection, Country, Product, ProductCard, ProductPage, ProductVariant, Shop
+from commera.sdk.types import (
+	Collection,
+	ContentPageLink,
+	Country,
+	Product,
+	ProductCard,
+	ProductPage,
+	ProductVariant,
+	Shop,
+)
 from commera.shop_themes.sections import get_section_products
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.www.sitemap_segment import get_urls_per_page
@@ -276,6 +285,46 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 
 		with self.assertRaises(frappe.DoesNotExistError):
 			get_page(page.route)
+
+	def test_list_pages_lists_only_published_pages_by_title(self):
+		for title, published in (("Returns", 1), ("Draft", 0), ("About", 1)):
+			frappe.get_doc(
+				{
+					"doctype": "Shop Web Page",
+					"route": f"{title.lower()}-{self.suffix.lower()}",
+					"meta_title": f"{title} {self.suffix}",
+					"content": title,
+					"published": published,
+				}
+			).insert(ignore_permissions=True, set_name=f"{title} page {self.suffix}")
+
+		pages = [page for page in list_pages() if page["handle"].endswith(self.suffix.lower())]
+		self.assertEqual(
+			[(page["handle"], page["title"]) for page in pages],
+			[
+				(f"about-{self.suffix.lower()}", f"About {self.suffix}"),
+				(f"returns-{self.suffix.lower()}", f"Returns {self.suffix}"),
+			],
+		)
+		self.assertEqual(set(pages[0]), ContentPageLink.__required_keys__)
+
+	def test_a_page_reads_in_the_request_language(self):
+		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
+		for content_ar, expected in (("<p>سياسة</p>", "<p>سياسة</p>"), ("", "<p>Policy</p>")):
+			page = frappe.get_doc(
+				{
+					"doctype": "Shop Web Page",
+					"route": f"policy-{len(content_ar)}-{self.suffix.lower()}",
+					"content": "<p>Policy</p>",
+					"content_ar": content_ar,
+					"published": 1,
+				}
+			).insert(ignore_permissions=True, set_name=f"Policy {len(content_ar)} {self.suffix}")
+			with self.subTest(content_ar=content_ar):
+				frappe.local.lang = "ar"
+				self.assertEqual(get_page(page.route)["body_html"], expected)
+				frappe.local.lang = "en"
+				self.assertEqual(get_page(page.route)["body_html"], "<p>Policy</p>")
 
 	def test_rate_limited_guest_api_whitelists_an_endpoint_for_guests_on_its_method_only(self):
 		from commera.api.storefront import auth, cart
