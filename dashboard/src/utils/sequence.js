@@ -13,3 +13,16 @@ export function createSequence() {
     },
   }
 }
+
+// Callers that arrive while `run` is in flight share its promise instead of starting another:
+// two panels asking for the same store on one open must not send two reads of one shared
+// request, where the second aborts the first and the first reports the abort as a failure.
+export function singleFlight(run) {
+  let inFlight = null
+  return () => {
+    inFlight ??= Promise.resolve(run()).finally(() => {
+      inFlight = null
+    })
+    return inFlight
+  }
+}
