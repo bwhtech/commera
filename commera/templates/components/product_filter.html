@@ -6,15 +6,16 @@
         const formatted = key.replace(/([A-Z])/g, ' $1').trim();
         return formatted.charAt(0).toUpperCase() + formatted.slice(1);
     },
+    // Ticks land here first. Wide screens apply each one at once; below 768px the panel applies them together
+    // with its Apply button, so the URL never shows filters the page has not loaded.
+    pending: { ...window.query_state },
     reset_filters() {
-        Object.keys(this.query_state).forEach((key) => {
-            delete this.query_state[key];
-        });
+        window.query_sync.update(Object.fromEntries(Object.keys(this.query_state).map((key) => [key, null])));
         window.location.reload()
     },
     // `value` is either one option or the list of item groups a facet filters on, so it ticks only when every one is selected.
     selected_values(query_key) {
-        return this.query_state[query_key] ? this.query_state[query_key].split(',') : [];
+        return this.pending[query_key] ? this.pending[query_key].split(',') : [];
     },
     toggle_filter(key, value, is_subcategory = false) {
         let query_key = is_subcategory ? 'subcategory' : key;
@@ -27,17 +28,16 @@
             current_selections = current_selections.concat(values.filter(item => !current_selections.includes(item)));
         }
 
-        this.query_state[query_key] = current_selections.length ? current_selections.join(',') : '';
+        this.pending[query_key] = current_selections.length ? current_selections.join(',') : '';
 
         if(window.innerWidth > 768){
-            window.location.reload();
+            this.apply_filters();
         }
     },
     toggle_price_filter(key,value){
-        // Update state (store as a comma-separated string)
-        this.query_state[key] = value;
+        this.pending[key] = String(value);
         if(window.innerWidth > 768){
-            window.location.reload();
+            this.apply_filters();
         }
     },
     is_checked(key, value, is_subcategory = false) {
@@ -46,7 +46,9 @@
         let current_selections = this.selected_values(query_key);
         return values.length > 0 && values.every(item => current_selections.includes(item));
     },
+    // One history entry, back on page 1: a narrower result set has fewer pages.
     apply_filters(){
+        window.query_sync.update({ ...this.pending, page: 1 });
         window.location.reload()
     }
     }" class="md:h-[70vh] md:overflow-y-auto no-scrollbar">
@@ -185,16 +187,15 @@
     max: window.query_state.max ? parseInt(window.query_state.max) : {{ price_range.max_price }},
                     error_min: '',
                     error_max: '',
+                    // An out-of-range value is pulled back into range and applied, so the box and the results agree.
                     validate_min() {
                         if (this.min < this.min_price) {
                             this.error_min = $store.i18n.t('Min price must be at least')
                             this.error_min += ` ${this.min_price}`;
                             this.min = this.min_price;
-                            return;
                         } else if (this.min > this.max) {
                             this.error_min = $store.i18n.t('Min price cannot exceed max price');
                             this.min = this.max;
-                            return;
                         } else {
                             this.error_min = '';
                         }
@@ -205,16 +206,12 @@
                         if (this.max > this.max_price) {
                             this.error_max = $store.i18n.t('Max price cannot exceed')
                             this.error_max += ` ${this.max_price}`;
-                           
                             this.max = this.max_price;
-                            return;
                         } else if (this.max < this.min) {
                             this.error_max = $store.i18n.t('Max price must exceed min price');
                             this.max = this.min;
-                            return;
                         } else {
                             this.error_max = '';
-
                         }
                         toggle_price_filter('max',this.max)
 

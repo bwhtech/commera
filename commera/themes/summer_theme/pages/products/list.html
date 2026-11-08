@@ -143,17 +143,15 @@
 					this.set_filter(key, next.join(','));
 				},
 
+				// One history entry per change, so Back steps back one filter rather than through each key it set.
 				set_filter(key, value) {
-					this.query_state[key] = value;
-// A narrower result set has fewer pages, so page 7 of the old one is a blank grid.
-					this.query_state.page = 1;
+					// A narrower result set has fewer pages, so page 7 of the old one is a blank grid.
+					window.query_sync.update({ [key]: value, page: 1 });
 					window.location.reload();
 				},
 
 				reset_filters() {
-					for (const key of Object.keys(this.query_state)) {
-						delete this.query_state[key];
-					}
+					window.query_sync.update(Object.fromEntries(Object.keys(this.query_state).map((key) => [key, null])));
 					window.location.reload();
 				},
 

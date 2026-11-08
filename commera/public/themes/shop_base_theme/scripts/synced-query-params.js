@@ -166,6 +166,22 @@ class QuerySync {
 	}
 
 	/**
+	 * Apply several changes as one history entry: setting keys one by one through the proxy pushes one per key.
+	 * A null or undefined value removes the key.
+	 * @param {Object} changes - Keys to set or remove
+	 */
+	update(changes) {
+		for (const [key, value] of Object.entries(changes)) {
+			if (value === null || value === undefined) {
+				delete this._state[key];
+			} else {
+				this._state[key] = String(value);
+			}
+		}
+		this.updateUrl(this._state);
+	}
+
+	/**
 	 * Reset state to default values or empty object
 	 */
 	reset() {
