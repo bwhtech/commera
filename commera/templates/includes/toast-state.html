@@ -1,4 +1,19 @@
-<script defer>
+<script>
+    // Defined before Alpine starts, so a toast raised while the page loads (a failed request, say) waits for the
+    // toaster instead of being dispatched to no listener. toast-teleport.html sets toast_ready and drains the queue.
+    window.toast_queue = window.toast_queue || [];
+    window.toast = function (message, options = {}) {
+        const detail = {
+            type: options.type ?? 'default',
+            message: message,
+            description: options.description ?? '',
+            position: options.position ?? 'top-right',
+            html: options.html ?? '',
+        };
+        if (window.toast_ready) window.dispatchEvent(new CustomEvent('toast-show', { detail }));
+        else window.toast_queue.push(detail);
+    };
+
     document.addEventListener('alpine:init', () => {
         Alpine.data('toaster', () => ({
             title: 'Default Toast Notification',
@@ -14,18 +29,5 @@
                 toast(this.title, { description: this.description, type: this.type, position: this.position, html: html })
             }
         }));
-
-        window.toast = function (message, options = {}) {
-            let description = '';
-            let type = 'default';
-            let position = 'top-right';
-            let html = '';
-            if (typeof options.description != 'undefined') description = options.description;
-            if (typeof options.type != 'undefined') type = options.type;
-            if (typeof options.position != 'undefined') position = options.position;
-            if (typeof options.html != 'undefined') html = options.html;
-
-            window.dispatchEvent(new CustomEvent('toast-show', { detail: { type: type, message: message, description: description, position: position, html: html } }));
-        }
     })
 </script>
