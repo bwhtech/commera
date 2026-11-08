@@ -500,7 +500,7 @@ function checkout(config) {
 								? await commera.checkout.set_store_pickup({
 										warehouse: this.pickup_location,
 										email,
-									})
+								  })
 								: await commera.checkout.set_addresses({
 										billing_address: this.address_input(
 											this.billing_same ? 'shipping' : 'billing',
@@ -509,7 +509,7 @@ function checkout(config) {
 											? undefined
 											: this.address_input('shipping'),
 										email,
-									});
+								  });
 						await this.load_options();
 						this.editing_address = false;
 					}),
