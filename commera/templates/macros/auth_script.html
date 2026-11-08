@@ -2,7 +2,14 @@
     // auth_step: email, sending, code, resending, verifying, done ('done' stays set while the page moves on).
     // Included once per modal, so this file declares functions only.
 
+    // Each send or verify takes an attempt number; a reply for an attempt reset or replaced since is dropped.
+    function next_auth_attempt(x_data) {
+        x_data.auth_attempt = (x_data.auth_attempt || 0) + 1;
+        return x_data.auth_attempt;
+    }
+
     function reset_auth_attempt(x_data) {
+        next_auth_attempt(x_data);
         x_data.auth_step = 'email';
         x_data.otp_for = null;
         x_data.otp = ['', '', '', '', '', ''];
@@ -21,7 +28,7 @@
             toast({{ _("Please enter a valid email") | tojson }}, { type: "warning" });
             return;
         }
-        await request_otp(signup_data, ref, '/api/v2/method/commera.api.signup.send_signup_otp', {
+        await request_otp(signup_data, ref, 'signup', '/api/v2/method/commera.api.signup.send_signup_otp', {
             'email': signup_data.email,
             'first_name': signup_data.first_name,
             'last_name': signup_data.last_name
@@ -105,14 +112,17 @@
             }
         }
         x_data.auth_step = 'verifying';
+        const attempt = next_auth_attempt(x_data);
         try {
             await frappe_call(url, args);
         } catch (error) {
+            if (x_data.auth_attempt !== attempt) return;
             x_data.auth_step = 'code';
             ref.verify_otp_btn?.focus();
             return;
         }
-        // Signed in: the code is spent, so Verify stays off while the page moves on.
+        // Signed in even if the dialog closed meanwhile, so the page still moves on.
+        // The code is spent, so Verify stays off.
         x_data.auth_step = 'done';
         // Set by a page that signs the shopper in for somewhere else, such as /storefront-login.
         if (x_data.redirect_to) {
@@ -162,16 +172,16 @@
     }
 
     async function login_user(x_data, ref) {
-        await request_otp(x_data, ref, '/api/v2/method/commera.api.signup.send_login_otp');
+        await request_otp(x_data, ref, 'login', '/api/v2/method/commera.api.signup.send_login_otp');
     }
 
     async function send_checkout_otp(x_data, ref) {
-        await request_otp(x_data, ref, '/api/v2/method/commera.api.signup.send_checkout_otp');
+        await request_otp(x_data, ref, 'checkout', '/api/v2/method/commera.api.signup.send_checkout_otp');
     }
 
     // Sends the first code from 'email', or a new one from 'code'. The cooldown starts only once a code is sent,
     // so a failed send can be tried again at once.
-    async function request_otp(x_data, ref, url, args = null) {
+    async function request_otp(x_data, ref, purpose, url, args = null) {
         const email = x_data.email;
         if (!email) {
             toast({{ _("Please enter a valid email") | tojson }}, { type: "warning" });
@@ -180,16 +190,21 @@
         const is_resend = x_data.auth_step === 'code';
         if (!is_resend && x_data.auth_step !== 'email') return;
         x_data.auth_step = is_resend ? 'resending' : 'sending';
+        // Taken before the request: the shopper can switch tabs while it runs.
+        const otp_for = is_resend && x_data.otp_for ? x_data.otp_for : purpose;
+        const attempt = next_auth_attempt(x_data);
         try {
             await frappe_call(url, args || { 'email': email });
         } catch (error) {
+            if (x_data.auth_attempt !== attempt) return;
             x_data.auth_step = is_resend ? 'code' : 'email';
             return;
         }
+        if (x_data.auth_attempt !== attempt) return;
         toast({{ _("OTP sent successfully, please check your email.") | tojson }}, { type: "success" });
         // A new code replaces the old one, so the boxes start empty.
         x_data.otp = ['', '', '', '', '', ''];
-        x_data.otp_for = x_data.otp_for && is_resend ? x_data.otp_for : x_data.selected_tab;
+        x_data.otp_for = otp_for;
         x_data.auth_step = 'code';
         start_resend_timer(x_data);
         focus_first_otp_box(ref);
