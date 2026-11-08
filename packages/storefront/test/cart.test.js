@@ -92,3 +92,40 @@ test('go_to_checkout opens the single-use checkout path', async () => {
 	assert.equal(calls[0].options.method, 'POST');
 	assert.deepEqual(browser.assigned, [path]);
 });
+
+test('a later write waits for the earlier one, so the newest cart is announced last', async () => {
+	const replies = [];
+	globalThis.fetch = (url) =>
+		new Promise((resolve) => {
+			const method = url.split('.').pop();
+			replies.push(() =>
+				resolve({
+					ok: true,
+					status: 200,
+					json: async () => ({ data: { name: method } }),
+				}),
+			);
+		});
+	const first = cart.add_lines([{ item_code: 'SHOE-42', qty: 1 }]);
+	const second = cart.remove_lines(['line-1']);
+	await new Promise((resolve) => setTimeout(resolve));
+	assert.equal(replies.length, 1, 'the second write was sent before the first answered');
+	replies[0]();
+	await first;
+	await new Promise((resolve) => setTimeout(resolve));
+	replies[1]();
+	await second;
+	assert.deepEqual(
+		browser.events.map((event) => event.name),
+		['add_lines', 'remove_lines'],
+	);
+});
+
+test('a failed write does not hold up the next one', async () => {
+	add_fake_fetch({
+		add_lines: { status: 417, body: { errors: [{ message: 'Out of stock' }] } },
+		remove_lines: { body: { data: priced_cart } },
+	});
+	await assert.rejects(cart.add_lines([{ item_code: 'SHOE-42', qty: 9 }]));
+	assert.deepEqual(await cart.remove_lines(['line-1']), priced_cart);
+});
