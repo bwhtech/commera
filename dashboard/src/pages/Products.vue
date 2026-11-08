@@ -80,7 +80,7 @@ let listView = 0
 
 // A selection only means the rows on screen: archiving products the merchant can no longer see
 // is a surprise.
-watch([query, status, collection, page], () => {
+watch([query, status, collection, page, pageSize], () => {
   listView += 1
   selection.value = []
 })

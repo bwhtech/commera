@@ -156,6 +156,20 @@ describe('state flows', () => {
     }
   })
 
+  uiTest(session, 'orders: a page size change drops a selection the new page cannot show', async () => {
+    const { page } = session
+    await goto(page, '/orders')
+    await clickByText(page, 'button', 'Select')
+    const rows = await page.$$('a[data-slot=list-row]')
+    assert.ok(rows.length >= 15, 'needs fifteen orders on the first page')
+    await rows[14].click()
+    await waitFor(async () => (await text(page)).includes('1 order selected'), { label: 'the selection' })
+    await (await page.$('[aria-label="Rows per page"]')).click()
+    await clickByText(page, '[role=option]', '10 per page')
+    await wait(800)
+    assert.ok(!(await text(page)).includes('1 order selected'), 'row 15 stayed selected after it left the page')
+  })
+
   uiTest(session, 'bulk fulfil: one run at a time, a refusal does not stop it, and the list reloads', async () => {
     const { page } = session
     await goto(page, '/orders')

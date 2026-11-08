@@ -60,7 +60,7 @@ let listView = 0
 
 // A selection only means the rows on screen: an action on orders the merchant can no longer see
 // is a surprise, and printing reads each order's delivery notes off the loaded page.
-watch([query, tab, page], () => {
+watch([query, tab, page, pageSize], () => {
   listView += 1
   selection.value = []
 })
