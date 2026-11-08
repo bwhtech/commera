@@ -20,9 +20,9 @@
 	</template>
 	{% if caller is defined %}{{ caller() }}{% endif %}
 
-	<form @submit.prevent="apply_code()" class="mt-2 flex gap-2">
+	<form @submit.prevent="apply_code()" class="mt-2 flex flex-wrap gap-2">
 		<label for="discount-code" class="sr-only">{{ _("Discount code") }}</label>
-		<input id="discount-code" x-model="code" autocomplete="off" placeholder="{{ _('Discount code') }}" class="field flex-1">
+		<input id="discount-code" x-model="code" autocomplete="off" placeholder="{{ _('Discount code') }}" class="field min-w-0 flex-[1_1_9rem]">
 		<button type="submit" :disabled="busy || !code.trim()" :aria-busy="busy === 'apply'" class="button-secondary relative shrink-0">{{ _("Apply") }}{{ spinner("busy === 'apply'", "size-5 text-ink-gray-8") }}</button>
 	</form>
 	<p x-show="error" x-text="error" role="alert" class="text-base text-ink-red-7"></p>

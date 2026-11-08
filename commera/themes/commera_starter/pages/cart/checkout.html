@@ -137,7 +137,7 @@
 
 		<aside class="order-first rounded-2xl bg-surface-gray-1 p-6 lg:sticky lg:top-[calc(var(--header-height)+1.5rem)] lg:order-none">
 			<button type="button" @click="summary_open = !summary_open" :aria-expanded="summary_open" class="flex min-h-12 w-full items-center justify-between gap-3 lg:hidden">
-				<span class="flex items-center gap-1 text-md">{{ _("Order summary") }}<span :class="summary_open && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></span>
+				<span class="flex min-w-0 items-center gap-1 text-start text-md">{{ _("Order summary") }}<span :class="summary_open && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></span>
 				<span class="tabular text-2xl font-medium" x-text="money(total)"></span>
 			</button>
 			<div :class="summary_open || 'max-lg:hidden'" class="max-lg:mt-5">
