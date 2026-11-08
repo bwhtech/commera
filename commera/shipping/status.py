@@ -1,10 +1,8 @@
 import frappe
 from frappe import _
 
-# Every move a shipment can make, written out. A carrier skips steps freely (a parcel can go from Ready
-# To Ship straight to Delivered), but never back down the road, except for a re-attempt after a failed
-# delivery. RTO, the parcel on its way back to the store, only ends in Lost. A Draft can jump ahead too:
-# a plugin or a fulfilment partner records a shipment it booked elsewhere.
+# Carriers skip steps but never go back, except a re-attempt after a failed delivery. RTO only ends
+# in Lost. A Draft can jump ahead: a plugin may record a shipment it booked elsewhere.
 IN_FLIGHT = ("In Transit", "Out For Delivery", "Undelivered", "RTO", "Delivered", "Lost")
 TRANSITIONS = {
 	"Draft": ("Ready To Ship", "Pickup Scheduled", *IN_FLIGHT, "Cancelled"),

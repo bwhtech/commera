@@ -26,9 +26,8 @@ def cancel_order(order_id: str):
 
 		order_doc.flags.ignore_permissions = True
 		cancelling = True
-		# validate_can_cancel checked that this is the shopper's order. Submitting a draft re-reads
-		# its items, and ERPNext's get_item_details checks Item permission directly, which a
-		# shopper does not have and ignore_permissions does not reach.
+		# Ownership is checked above. ERPNext's get_item_details checks Item permission directly on
+		# submit, which a shopper lacks and ignore_permissions does not reach.
 		with system_user_session():
 			if order_doc.docstatus == 1:
 				order_doc.cancel()
