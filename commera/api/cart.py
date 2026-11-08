@@ -99,6 +99,9 @@ def validate_cart_stock(items: list | str):
 # which are already public.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 def update_variant(product_name: str, size: str):
+	# Guests can call this: an unpublished variant's sizes and prices stay hidden, as on the product page.
+	if not frappe.db.exists("Style Attribute Variant", {"name": product_name, "is_published": 1}):
+		raise frappe.DoesNotExistError(_("Product not found."))
 	product_variant = frappe.get_cached_doc("Style Attribute Variant", product_name)
 	commera_settings = frappe.get_cached_doc("Commera Settings")
 	warehouse = commera_settings.ecommerce_warehouse

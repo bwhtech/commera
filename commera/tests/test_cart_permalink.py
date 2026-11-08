@@ -9,6 +9,7 @@ from frappe.website.serve import get_response_content
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
+from commera.api.cart import update_variant
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import DEFAULT_ROUTES
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.utils import get_country_list
@@ -93,6 +94,18 @@ class TestCartPermalinkPage(ProductDetailPriceTestCase):
 		context = frappe._dict()
 		permalink.get_context(context)
 		return context
+
+	def test_a_guest_can_switch_size_on_a_published_variant(self):
+		frappe.set_user("Guest")
+		result = update_variant(self.variant.name, "S")
+		self.assertEqual(result["variant"]["item_code"], self.small)
+
+	def test_a_guest_cannot_read_an_unpublished_variant(self):
+		frappe.db.set_value("Style Attribute Variant", self.variant.name, "is_published", 0)
+		frappe.clear_document_cache("Style Attribute Variant", self.variant.name)
+		frappe.set_user("Guest")
+		with self.assertRaises(frappe.DoesNotExistError):
+			update_variant(self.variant.name, "S")
 
 	def test_line_matches_the_shape_the_cart_store_adds(self):
 		context = self.render(f"{self.medium}:2")
