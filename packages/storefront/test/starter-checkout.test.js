@@ -9,7 +9,8 @@ const STARTER_SCRIPT = new URL(
 );
 
 function make_checkout_form() {
-	const context = { document: { addEventListener() {} } };
+	// The script resets its busy state on a back/forward restore, so the page needs `pageshow` too.
+	const context = { addEventListener() {}, document: { addEventListener() {} } };
 	vm.createContext(context);
 	vm.runInContext(readFileSync(STARTER_SCRIPT, 'utf8'), context);
 	return context.checkout({
