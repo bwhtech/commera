@@ -17,6 +17,11 @@
   "column_break_social",
   "pinterest_url",
   "youtube_url",
+  "cards_section",
+  "card_image_ratio",
+  "card_image_fit",
+  "column_break_cards",
+  "show_vendor",
   "style_tab",
   "brand_color",
   "brand_text_color",
@@ -90,6 +95,37 @@
    "options": "URL"
   },
   {
+   "fieldname": "cards_section",
+   "fieldtype": "Section Break",
+   "label": "Product cards"
+  },
+  {
+   "fieldname": "card_image_ratio",
+   "fieldtype": "Select",
+   "label": "Image shape",
+   "options": "Portrait\nSquare\nLandscape",
+   "default": "Portrait",
+   "description": "The shape of product photos in grids. Use Square for products shot on white."
+  },
+  {
+   "fieldname": "card_image_fit",
+   "fieldtype": "Select",
+   "label": "Image fit",
+   "options": "Crop\nFit",
+   "default": "Crop",
+   "description": "Fit shows the whole photo on a soft background instead of cropping it."
+  },
+  {
+   "fieldname": "column_break_cards",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "show_vendor",
+   "fieldtype": "Check",
+   "label": "Show brand on cards",
+   "default": "0"
+  },
+  {
    "fieldname": "style_tab",
    "fieldtype": "Tab Break",
    "label": "Style"
@@ -126,7 +162,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-27 11:24:07.533749",
+ "modified": "2026-11-08 16:30:00.000000",
  "modified_by": "Administrator",
  "module": "Shop Themes",
  "name": "Commera Starter Settings",

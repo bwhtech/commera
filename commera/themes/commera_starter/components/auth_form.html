@@ -3,10 +3,13 @@
 
 {% macro auth_form(mode, redirect="", heading="h2") %}
 <div x-data='auth_form({{ {"mode": mode, "redirect": redirect} | tojson }})' @open-auth.window="redirect = $event.detail?.redirect ?? ''" class="flex flex-col gap-6">
-	<{{ heading }} class="text-3xl">
-		<span x-show="mode === 'login'">{{ _("Log in") }}</span>
-		<span x-cloak x-show="mode === 'signup'">{{ _("Create an account") }}</span>
-	</{{ heading }}>
+	<div>
+		<{{ heading }} class="{{ 'page-title' if heading == 'h1' else 'text-4xl' }}">
+			<span x-show="mode === 'login'">{{ _("Log in") }}</span>
+			<span x-cloak x-show="mode === 'signup'">{{ _("Create an account") }}</span>
+		</{{ heading }}>
+		<p x-show="step === 'details'" class="mt-2 text-p-md text-ink-gray-6">{{ _("No password needed. We'll email you a one-time code.") }}</p>
+	</div>
 
 	<form x-show="step === 'details'" @submit.prevent="send_code()" class="flex flex-col gap-5">
 		<template x-if="mode === 'signup'">
@@ -16,37 +19,37 @@
 			</div>
 		</template>
 		{{ field("email", _("Email address"), "email", type="email", required=True, autocomplete="email") }}
-		<p x-cloak x-show="error" x-text="error" class="text-sm text-ink-red-6" role="alert"></p>
+		<p x-cloak x-show="error" x-text="error" class="text-base text-ink-red-7" role="alert"></p>
 		{{ submit_button(_("Send code"), "busy === 'send'") }}
 	</form>
 
 	<form x-cloak x-show="step === 'code'" @submit.prevent="verify()" class="flex flex-col gap-5">
-		<p class="text-p-base text-ink-gray-7">
+		<p class="text-p-md text-ink-gray-7">
 			<span x-show="mode === 'login'">{{ _("If an account exists for this email, we have sent it a code.") }}</span>
 			<span x-show="mode === 'signup'">{{ _("We have sent a code to this email.") }}</span>
 			<bdi class="text-ink-gray-9" x-text="email"></bdi>
 		</p>
 		{{ field("code", _("Code"), "code", required=True, autocomplete="one-time-code", inputmode="numeric") }}
-		<p x-cloak x-show="error" x-text="error" class="text-sm text-ink-red-6" role="alert"></p>
-		<p x-cloak x-show="resent" class="text-sm text-ink-green-6" role="status">{{ _("We have sent a new code.") }}</p>
-		<button type="submit" :disabled="busy" :aria-busy="busy === 'verify'" class="relative inline-flex h-10 items-center justify-center rounded-lg bg-brand px-4 text-lg font-medium text-on-brand hover:bg-brand-hover disabled:opacity-60">
+		<p x-cloak x-show="error" x-text="error" class="text-base text-ink-red-7" role="alert"></p>
+		<p x-cloak x-show="resent" class="text-base text-ink-green-6" role="status">{{ _("We have sent a new code.") }}</p>
+		<button type="submit" :disabled="busy" :aria-busy="busy === 'verify'" class="button-primary relative">
 			<span x-show="mode === 'login'">{{ _("Log in") }}</span>
 			<span x-show="mode === 'signup'">{{ _("Create account") }}</span>
 			{{ spinner("busy === 'verify'", "size-5 text-on-brand") }}
 		</button>
 		<div class="flex gap-4">
-			<button type="button" @click="resend_code()" :disabled="busy || resend_wait > 0" :aria-busy="busy === 'resend'" class="relative inline-flex items-center text-sm text-ink-gray-8 underline hover:text-ink-gray-9 disabled:text-ink-gray-5">
+			<button type="button" @click="resend_code()" :disabled="busy || resend_wait > 0" :aria-busy="busy === 'resend'" class="relative inline-flex items-center text-base text-ink-gray-8 underline hover:text-ink-gray-9 disabled:text-ink-gray-6">
     <span x-show="resend_wait <= 0">{{ _("Resend code") }}</span>
     <span x-cloak x-show="resend_wait > 0">{{ _("Resend code in") }} <span x-text="resend_wait"></span>s</span>
     {{ spinner("busy === 'resend'", "size-4 text-ink-gray-8") }}
 </button>
-			<button type="button" @click="step = 'details'; error = ''" :disabled="busy" class="text-sm text-ink-gray-8 underline hover:text-ink-gray-9">{{ _("Change email") }}</button>
+			<button type="button" @click="step = 'details'; error = ''" :disabled="busy" class="text-base text-ink-gray-8 underline hover:text-ink-gray-9">{{ _("Change email") }}</button>
 		</div>
 	</form>
 
-	<p class="text-base text-ink-gray-7">
-		<span x-show="mode === 'login'">{{ _("New here?") }} <button type="button" @click="switch_mode('signup')" :disabled="busy" class="text-ink-gray-9 underline">{{ _("Create an account") }}</button></span>
-		<span x-cloak x-show="mode === 'signup'">{{ _("Already have an account?") }} <button type="button" @click="switch_mode('login')" :disabled="busy" class="text-ink-gray-9 underline">{{ _("Log in") }}</button></span>
+	<p class="border-t border-outline-gray-2 pt-5 text-md text-ink-gray-6">
+		<span x-show="mode === 'login'">{{ _("New here?") }} <button type="button" @click="switch_mode('signup')" class="-my-2.5 inline-flex min-h-10 items-center px-1 text-ink-gray-9 underline underline-offset-4" :disabled="busy">{{ _("Create an account") }}</button></span>
+		<span x-cloak x-show="mode === 'signup'">{{ _("Already have an account?") }} <button type="button" @click="switch_mode('login')" class="-my-2.5 inline-flex min-h-10 items-center px-1 text-ink-gray-9 underline underline-offset-4" :disabled="busy">{{ _("Log in") }}</button></span>
 	</p>
 </div>
 {%- endmacro %}

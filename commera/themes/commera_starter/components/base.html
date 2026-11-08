@@ -44,18 +44,22 @@
 
 	{{ commera_header_content }}
 	<script defer src="{{ shop_theme_asset_url('scripts/storefront.js') }}"></script>
+	<script defer src="/assets/commera/js/vendor/alpinejs/plugins/focus.js"></script>
+	<script defer src="/assets/commera/js/vendor/alpinejs/plugins/collapse.js"></script>
 	<script defer src="/assets/commera/js/vendor/alpinejs/core.js"></script>
 	{% block head %}{% endblock %}
 	{{ format_plugin_includes("css") }}
 </head>
 
 <body class="flex min-h-dvh flex-col bg-surface-base text-ink-gray-9">
+	<a href="#main" class="sr-only z-60 rounded-lg bg-surface-base px-4 py-3 text-md font-medium shadow-lg focus:not-sr-only focus:fixed focus:start-3 focus:top-3">{{ _("Skip to content") }}</a>
 	{% block header %}{{ render_layout("header_group") }}{% endblock %}
 	{% include "components/search_modal.html" %}
 	{% include "components/cart_drawer.html" %}
+	<p x-data class="sr-only" role="status" aria-live="polite" data-message="{{ _('Added to your cart') }}" @open-cart.window="if ($event.detail?.added) { $el.textContent = ''; setTimeout(() => ($el.textContent = $el.dataset.message), 150) }"></p>
 	{% block auth_modal %}{% if frappe.session.user == "Guest" %}{% include "components/auth_modal.html" %}{% endif %}{% endblock %}
 
-	<main class="flex-1">
+	<main id="main" tabindex="-1" class="flex-1 outline-none">
 		{% block body %}{% endblock %}
 		{% block uncontained_body %}{% endblock %}
 	</main>

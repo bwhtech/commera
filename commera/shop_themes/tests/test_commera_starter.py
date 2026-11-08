@@ -97,7 +97,7 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 		html = self.render_home([])
 
 		self.assertIn('aria-label="Wishlist"', html)
-		self.assertIn("grid grid-cols-3 items-center", html)
+		self.assertIn("grid grid-cols-[1fr_auto_1fr] items-center", html)
 		self.assertNotIn("ZZ Starter announcement", html)
 
 		self.publish(
@@ -136,7 +136,7 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 
 		self.assertIn("ZZ Starter announcement", html)
 		self.assertNotIn('aria-label="Wishlist"', html)
-		self.assertNotIn("grid grid-cols-3 items-center", html)
+		self.assertNotIn("grid grid-cols-[1fr_auto_1fr] items-center", html)
 		self.assertIn("ZZ Starter copyright", html)
 		self.assertIn("ZZ Starter column", html)
 

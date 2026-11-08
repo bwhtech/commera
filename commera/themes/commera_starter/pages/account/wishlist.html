@@ -2,25 +2,25 @@
 {% from "components/account_shell.html" import account_shell with context %}
 {% from "components/macros/product_card.html" import product_card with context %}
 {% from "components/macros/icons.html" import icon, spinner %}
+{% from "components/macros/empty_state.html" import empty_state %}
 {% set language = frappe.lang or "en" %}
 {% set wishlist = commera.wishlist.get_wishlist() %}
 
 {% block body %}
 {% call account_shell("wishlist", _("Wishlist")) %}
 <div x-data="wishlist({{ wishlist.count }})">
-	<p x-cloak x-show="error" x-text="error" class="mb-4 text-sm text-ink-red-6" role="alert"></p>
-	<div x-show="count" class="grid grid-cols-2 gap-x-5 gap-y-12 lg:grid-cols-3 lg:gap-x-8">
+	<p x-cloak x-show="error" x-text="error" class="mb-4 text-base text-ink-red-7" role="alert"></p>
+	<div x-show="count" class="grid grid-cols-2 gap-x-3 gap-y-10 md:gap-x-6 md:gap-y-14 lg:grid-cols-3">
 		{% for product in wishlist.products %}
 		<div data-product="{{ product.id }}" x-show="!removed.includes($el.dataset.product)" class="relative">
 			{{ product_card(product) }}
-			<button type="button" @click="remove($el.parentElement.dataset.product)" :disabled="busy" :aria-busy="busy === 'remove:' + $el.parentElement.dataset.product" class="absolute end-2 top-2 grid size-9 place-items-center rounded-lg bg-surface-base text-ink-gray-8 shadow-sm hover:bg-surface-gray-2 aria-busy:text-transparent" aria-label="{{ _('Remove from wishlist') }}">{{ icon("close", "size-4") }}{{ spinner("busy === 'remove:' + $el.closest('[data-product]').dataset.product", "size-4 text-ink-gray-8", overlay=true) }}</button>
+			<button type="button" @click="remove($el.parentElement.dataset.product)" :disabled="busy" :aria-busy="busy === 'remove:' + $el.parentElement.dataset.product" class="absolute end-2 top-2 grid size-10 place-items-center rounded-full bg-surface-base text-ink-gray-8 shadow-sm hover:bg-surface-gray-2 aria-busy:text-transparent" aria-label="{{ _('Remove from wishlist') }}">{{ icon("close", "size-4") }}{{ spinner("busy === 'remove:' + $el.closest('[data-product]').dataset.product", "size-4 text-ink-gray-8", overlay=true) }}</button>
 		</div>
 		{% endfor %}
 	</div>
-	<div x-cloak x-show="!count" class="flex flex-col items-start gap-4">
-		<p class="text-p-base text-ink-gray-6">{{ _("Your wishlist is empty.") }}</p>
-		<a href="/{{ language }}/products" class="inline-flex h-10 items-center justify-center rounded-lg bg-brand px-3 text-lg font-medium text-on-brand hover:bg-brand-hover">{{ _("Continue shopping") }}</a>
-	</div>
+	{% call empty_state(_("Your wishlist is empty"), _("Tap the heart on a product to save it here for later."), "heart", show="!count") %}
+	<a href="/{{ language }}/products" class="button-primary">{{ _("Start shopping") }}</a>
+	{% endcall %}
 </div>
 {% endcall %}
 {% endblock %}

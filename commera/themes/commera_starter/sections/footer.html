@@ -1,4 +1,6 @@
+{% from "components/macros/icons.html" import icon %}
 {% from "components/macros/menu_link.html" import menu_link %}
+{% macro disclosure_heading(title) %}<button type="button" @click="open = !open" :aria-expanded="open" class="flex min-h-12 w-full items-center justify-between text-start text-xs font-medium uppercase tracking-wider text-ink-gray-9 md:pointer-events-none md:mb-3 md:min-h-0" tabindex="-1" x-init="matchMedia('(width < 48rem)').matches && $el.removeAttribute('tabindex')">{{ title }}<span :class="open && 'rotate-180'" class="transition-transform duration-200 md:hidden">{{ icon("down", "size-4") }}</span></button>{% endmacro %}
 {% set social_links = [
 	(_("Instagram"), theme.instagram_url),
 	(_("Facebook"), theme.facebook_url),
@@ -7,34 +9,46 @@
 	(_("YouTube"), theme.youtube_url),
 ] | selectattr(1) | list %}
 
-<footer class="grid grid-cols-2 gap-8 border-t border-outline-gray-2 px-5 py-14 text-sm md:grid-cols-4 md:px-12">
-	<div>
-		<p class="font-semibold uppercase tracking-widest">{{ app_name }}</p>
-		<p class="mt-3 text-ink-gray-6">{{ section.settings.copyright or "© {0} {1}".format(frappe.utils.getdate().year, app_name) }}</p>
+<footer class="section-x grid grid-cols-2 gap-x-6 gap-y-10 border-t max-md:gap-y-0 border-outline-gray-2 pb-10 pt-14 text-md md:grid-cols-4 md:gap-x-8 md:pb-14 md:pt-16 md:text-base">
+	<div class="col-span-2 pb-8 md:col-span-1 md:pb-0">
+		<p class="text-2xl font-semibold uppercase tracking-widest">{{ app_name }}</p>
 	</div>
 	{% for block in section.blocks %}
 	{% if block.type == "menu" %}
 	{% set menu = commera.shop.get_menu(block.settings.menu or "footer") %}
 	{% for column in (menu["items"] if menu else []) %}
-	<div class="space-y-2 text-ink-gray-6"{{ block.editor_attributes }}>
-		<p class="text-ink-gray-9">{{ column["title"] }}</p>
-		{% for link in column["items"] %}
-		{{ menu_link(link, "block hover:text-ink-gray-9") }}
-		{% endfor %}
+	<div x-data="{ open: false }" class="col-span-2 border-b border-outline-gray-2 text-ink-gray-6 md:col-span-1 md:border-0"{{ block.editor_attributes }}>
+		{{ disclosure_heading(column["title"]) }}
+		<div :class="open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'" :inert="!open && matchMedia('(width < 48rem)').matches" class="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-out md:!grid-rows-[1fr]">
+			<div class="overflow-hidden">
+				<div class="pb-3 md:pb-0">
+					{% for link in column["items"] %}
+					{{ menu_link(link, "block py-2.5 hover:text-ink-gray-9 md:py-1") }}
+					{% endfor %}
+				</div>
+			</div>
+		</div>
 	</div>
 	{% endfor %}
 	{% elif block.type == "text" %}
-	<div class="space-y-2 text-ink-gray-6"{{ block.editor_attributes }}>
-		{% if block.settings.heading %}<p class="text-ink-gray-9">{{ block.settings.heading }}</p>{% endif %}
-		<p class="text-p-sm">{{ block.settings.text }}</p>
+	<div class="col-span-2 py-4 text-ink-gray-6 md:col-span-1 md:py-0"{{ block.editor_attributes }}>
+		{% if block.settings.heading %}<p class="mb-3 text-xs font-medium uppercase tracking-wider text-ink-gray-9">{{ block.settings.heading }}</p>{% endif %}
+		<p class="text-p-sm max-w-[36ch]">{{ block.settings.text }}</p>
 	</div>
 	{% elif block.type == "social" and social_links %}
-	<div class="space-y-2 text-ink-gray-6"{{ block.editor_attributes }}>
-		<p class="text-ink-gray-9">{{ block.settings.heading }}</p>
-		{% for label, url in social_links %}
-		<a href="{{ url }}" target="_blank" rel="noopener" class="block hover:text-ink-gray-9">{{ label }}</a>
-		{% endfor %}
+	<div x-data="{ open: false }" class="col-span-2 border-b border-outline-gray-2 text-ink-gray-6 md:col-span-1 md:border-0"{{ block.editor_attributes }}>
+		{{ disclosure_heading(block.settings.heading) }}
+		<div :class="open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'" :inert="!open && matchMedia('(width < 48rem)').matches" class="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-out md:!grid-rows-[1fr]">
+			<div class="overflow-hidden">
+				<div class="pb-3 md:pb-0">
+					{% for label, url in social_links %}
+					<a href="{{ url }}" target="_blank" rel="noopener" class="block py-2.5 hover:text-ink-gray-9 md:py-1">{{ label }}</a>
+					{% endfor %}
+				</div>
+			</div>
+		</div>
 	</div>
 	{% endif %}
 	{% endfor %}
+	<p class="col-span-full mt-6 text-base text-ink-gray-6 md:mt-4 md:border-t md:border-outline-gray-2 md:pt-6">{{ section.settings.copyright or "© {0} {1}".format(frappe.utils.getdate().year, app_name) }}</p>
 </footer>

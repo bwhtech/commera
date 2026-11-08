@@ -1,17 +1,20 @@
+{% from "components/macros/icons.html" import icon %}
 {% from "components/macros/image.html" import image with context %}
 {% set language = frappe.lang or "en" %}
-<section class="mx-5 grid items-center gap-10 rounded-2xl bg-surface-gray-1 p-5 md:mx-12 md:grid-cols-2 md:p-8">
-	{{ image(section.settings.image, "", 960, "w-full rounded-xl") }}
-	<div class="md:ps-10">
-		{% if section.settings.badge %}
-		<span class="inline-flex h-6 items-center rounded-full bg-surface-gray-3 px-2 text-sm text-ink-gray-7">{{ section.settings.badge }}</span>
-		{% endif %}
-		<p class="mt-4 text-6xl">{{ section.settings.heading }}</p>
-		{% if section.settings.text %}
-		<p class="mt-5 text-p-base text-ink-gray-6">{{ section.settings.text }}</p>
-		{% endif %}
-		{% if section.settings.button_label %}
-		<a href="{{ section.settings.button_url or '/' ~ language ~ '/products' }}" class="mt-6 inline-flex h-8 items-center rounded-lg border border-outline-gray-2 bg-surface-base px-2.5 text-base font-medium text-ink-gray-8 hover:border-outline-gray-3">{{ section.settings.button_label }}</a>
-		{% endif %}
+<section class="section-x section-top">
+	<div class="grid items-center gap-8 overflow-hidden rounded-2xl bg-surface-gray-1 md:grid-cols-2 md:gap-0">
+		{{ image(section.settings.image, "", 1280, "aspect-[4/3] size-full object-cover md:aspect-auto md:min-h-[32rem]") }}
+		<div class="px-6 pb-10 md:px-16 md:py-16 lg:px-20">
+			{% if section.settings.badge %}
+			<p class="eyebrow">{{ section.settings.badge }}</p>
+			{% endif %}
+			<h2 class="mt-4 max-w-[20ch] text-6xl leading-tight tracking-tight md:text-7xl">{{ section.settings.heading }}</h2>
+			{% if section.settings.text %}
+			<p class="mt-5 max-w-[44ch] text-p-xl text-ink-gray-6">{{ section.settings.text }}</p>
+			{% endif %}
+			{% if section.settings.button_label %}
+			<a href="{{ section.settings.button_url or '/' ~ language ~ '/products' }}" class="group mt-8 button-secondary">{{ section.settings.button_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
+			{% endif %}
+		</div>
 	</div>
 </section>

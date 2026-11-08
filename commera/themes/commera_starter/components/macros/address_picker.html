@@ -1,7 +1,7 @@
 {% macro address_input(kind, field, label, autocomplete, required=True, type="text") -%}
-<label class="flex flex-col gap-1.5">
-	<span class="text-sm text-ink-gray-6">{{ label }}</span>
-	<input type="{{ type }}" x-model="forms.{{ kind }}.{{ field }}" autocomplete="{{ kind }} {{ autocomplete }}" {{ "required" if required }} class="h-10 w-full min-w-0 rounded-lg border border-outline-gray-2 bg-surface-base px-3 text-lg text-ink-gray-8 outline-none focus:border-outline-gray-4 focus:shadow-sm">
+<label class="flex flex-col gap-2">
+	<span class="field-label">{{ label }}</span>
+	<input type="{{ type }}" x-model="forms.{{ kind }}.{{ field }}" autocomplete="{{ kind }} {{ autocomplete }}" {{ "required" if required }} class="field">
 </label>
 {%- endmacro %}
 
@@ -10,15 +10,15 @@
 	{% if saved_addresses %}
 	<div role="radiogroup" class="flex flex-col gap-2">
 		{% for address in saved_addresses %}
-		<label class="flex cursor-pointer items-start gap-3 rounded-lg border border-outline-gray-2 p-4 has-[:checked]:border-outline-gray-5">
+		<label class="flex cursor-pointer items-start gap-3 rounded-lg border border-outline-gray-3 p-4 has-[:checked]:border-outline-gray-9 has-[:checked]:ring-1 has-[:checked]:ring-outline-gray-9">
 			<input type="radio" name="{{ kind }}_address" value="{{ address.name }}" x-model="choices.{{ kind }}" class="mt-1 size-4 accent-current">
-			<span class="flex flex-col gap-0.5 text-base">
+			<span class="flex flex-col gap-0.5 text-md">
 				<span class="font-medium">{{ address.address_title or address.address_line1 }}</span>
 				<span class="text-ink-gray-6"><bdi>{{ [address.address_line1, address.address_line2, address.city, address.state, address.pincode, address.country] | select | join(", ") }}</bdi></span>
 			</span>
 		</label>
 		{% endfor %}
-		<label class="flex cursor-pointer items-center gap-3 rounded-lg border border-outline-gray-2 p-4 text-base has-[:checked]:border-outline-gray-5">
+		<label class="flex cursor-pointer items-center gap-3 rounded-lg border border-outline-gray-3 p-4 text-md has-[:checked]:border-outline-gray-9 has-[:checked]:ring-1 has-[:checked]:ring-outline-gray-9">
 			<input type="radio" name="{{ kind }}_address" value="new" x-model="choices.{{ kind }}" class="size-4 accent-current">
 			{{ _("Use a new address") }}
 		</label>
@@ -34,9 +34,9 @@
 				{{ address_input(kind, "city", _("City"), "address-level2") }}
 				{{ address_input(kind, "state", _("State"), "address-level1", required=False) }}
 				{{ address_input(kind, "pincode", _("Postcode"), "postal-code") }}
-				<label class="flex flex-col gap-1.5">
-					<span class="text-sm text-ink-gray-6">{{ _("Country") }}</span>
-					<select x-model="forms.{{ kind }}.country" autocomplete="{{ kind }} country-name" required class="h-10 w-full min-w-0 rounded-lg border border-outline-gray-2 bg-surface-base px-2.5 text-lg text-ink-gray-8 outline-none focus:border-outline-gray-4">
+				<label class="flex flex-col gap-2">
+					<span class="field-label">{{ _("Country") }}</span>
+					<select x-model="forms.{{ kind }}.country" autocomplete="{{ kind }} country-name" required class="field">
 						{% for country in countries %}
 						<option value="{{ country.name }}">{{ country.title }}</option>
 						{% endfor %}

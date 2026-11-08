@@ -1,44 +1,48 @@
 {% from "components/macros/icons.html" import icon, spinner %}
+{% from "components/macros/empty_state.html" import empty_state %}
 {% set language = frappe.lang or "en" %}
 
 {# Loading, unreadable and empty used to look the same: a cart that is not read yet showed as empty. #}
 <div x-show="$store.cart.status === 'loading'" class="flex flex-1 items-center justify-center px-5" aria-busy="true">
 	{{ spinner("true", "size-6 text-ink-gray-6") }}
 </div>
-<div x-cloak x-show="$store.cart.status === 'failed'" class="flex flex-1 flex-col items-center justify-center gap-4 px-5 text-center">
-	<p class="text-p-base text-ink-gray-6" role="alert">{{ _("We could not load your cart.") }}</p>
-	<button type="button" @click="$store.cart.load()" class="inline-flex h-10 items-center justify-center rounded-lg bg-surface-gray-2 px-3 text-lg font-medium text-ink-gray-8 hover:bg-surface-gray-3">{{ _("Try again") }}</button>
-</div>
-<div x-show="$store.cart.status === 'ready' && !$store.cart.count" class="flex flex-1 flex-col items-center justify-center gap-4 px-5 text-center">
-	<p class="text-p-base text-ink-gray-6">{{ _("Your cart is empty.") }}</p>
-	<a href="/{{ language }}/products" class="inline-flex h-10 items-center justify-center rounded-lg bg-brand px-3 text-lg font-medium text-on-brand hover:bg-brand-hover">{{ _("Continue shopping") }}</a>
-</div>
+{% call empty_state(_("We could not load your cart"), _("Check your connection and try again."), "bag", show="$store.cart.status === 'failed'", role="alert") %}
+<button type="button" @click="$store.cart.load()" class="button-secondary">{{ _("Try again") }}</button>
+{% endcall %}
+{% call empty_state(_("Your cart is empty"), _("Browse the shop and add what you like. It will wait for you here."), "bag", show="$store.cart.status === 'ready' && !$store.cart.count") %}
+<a href="/{{ language }}/products" class="button-primary">{{ _("Start shopping") }}</a>
+{% endcall %}
 
 <ul x-show="$store.cart.count" class="flex-1 divide-y divide-outline-gray-2 overflow-y-auto px-5">
 	<template x-for="line in $store.cart.cart?.lines ?? []" :key="line.line_id">
-		<li class="flex gap-4 py-5">
-			<a :href="line.product && $store.cart.product_url(line.product)" class="w-20 shrink-0 overflow-hidden rounded-lg bg-surface-gray-2">
-				<img x-show="line.product?.image" :src="line.product?.image" alt="" class="aspect-[3/4] w-full object-cover object-top">
+		<li x-init="matchMedia('(prefers-reduced-motion: reduce)').matches || $el.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 300, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' })" class="flex gap-4 py-5">
+			<a x-data="{ broken: false }" :href="line.product && $store.cart.product_url(line.product)" class="media grid aspect-[3/4] w-20 shrink-0 place-items-center self-start overflow-hidden rounded-lg text-ink-gray-4">
+				<img x-show="line.product?.image && !broken" :src="line.product?.image" @error="broken = true" alt="" class="size-full object-cover object-top">
+				<span x-show="!line.product?.image || broken">{{ icon("image", "size-6") }}</span>
 			</a>
 			<div class="flex min-w-0 flex-1 flex-col">
-				<div class="flex justify-between gap-3">
-					<p class="text-base" x-text="line.product?.title ?? line.title"></p>
-					<p class="shrink-0 text-base" x-text="$store.cart.money(line.amount)"></p>
+				<div class="grid gap-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-3">
+					<a :href="line.product && $store.cart.product_url(line.product)" class="text-md font-medium text-ink-gray-9 [overflow-wrap:anywhere] hover:underline" x-text="line.product?.title ?? line.title"></a>
+					<p class="tabular whitespace-nowrap text-md font-medium max-sm:order-last" x-text="$store.cart.money(line.amount)"></p>
 				</div>
-				<p class="mt-1 text-sm text-ink-gray-6" x-show="line.product?.variant_title" x-text="line.product?.variant_title"></p>
+				<p class="mt-1 text-base text-ink-gray-6 [overflow-wrap:anywhere]" x-show="line.product?.variant_title" x-text="line.product?.variant_title"></p>
+				<p class="tabular mt-0.5 text-base text-ink-gray-6" x-show="line.qty > 1" x-text="$store.cart.money(line.rate) + ' ' + $el.dataset.each" data-each="{{ _('each') }}"></p>
 				<div class="mt-auto flex items-center justify-between pt-3">
 					<div class="flex items-center">
-					<div class="flex h-8 items-center rounded-lg bg-surface-gray-2">
-						<button type="button" @click="$store.cart.set_quantity(line, line.qty - 1)" :disabled="$store.cart.busy" class="grid size-8 place-items-center text-ink-gray-8 disabled:text-ink-gray-4" aria-label="{{ _('Less') }}">{{ icon("minus", "size-4") }}</button>
-						<span class="w-6 text-center text-base" x-text="line.qty"></span>
-						<button type="button" @click="$store.cart.set_quantity(line, line.qty + 1)" :disabled="$store.cart.busy" class="grid size-8 place-items-center text-ink-gray-8 disabled:text-ink-gray-4" aria-label="{{ _('More') }}">{{ icon("plus", "size-4") }}</button>
+					<div class="flex h-10 items-center rounded-lg border border-outline-gray-3">
+						<button type="button" @click="$store.cart.set_quantity(line, line.qty - 1)" :disabled="$store.cart.busy" class="grid size-10 place-items-center rounded-lg text-ink-gray-8 disabled:text-ink-gray-4" aria-label="{{ _('Less') }}">{{ icon("minus", "size-4") }}</button>
+						<span class="tabular w-6 text-center text-md" x-text="line.qty"></span>
+						<button type="button" @click="$store.cart.set_quantity(line, line.qty + 1)" :disabled="$store.cart.busy" class="grid size-10 place-items-center rounded-lg text-ink-gray-8 disabled:text-ink-gray-4" aria-label="{{ _('More') }}">{{ icon("plus", "size-4") }}</button>
 					</div>
 					{{ spinner("$store.cart.busy === 'quantity:' + line.line_id", "size-4 text-ink-gray-6") }}
 					</div>
-					<button type="button" @click="$store.cart.remove(line)" :disabled="$store.cart.busy" :aria-busy="$store.cart.busy === 'remove:' + line.line_id" class="inline-flex items-center text-sm text-ink-gray-6 underline hover:text-ink-gray-9">{{ _("Remove") }}{{ spinner("$store.cart.busy === 'remove:' + line.line_id", "size-4 text-ink-gray-6") }}</button>
+					<button type="button" @click="$store.cart.remove(line)" :disabled="$store.cart.busy" :aria-busy="$store.cart.busy === 'remove:' + line.line_id" class="inline-flex h-10 items-center rounded-lg px-2 text-base text-ink-gray-6 underline underline-offset-4 hover:text-ink-gray-9">{{ _("Remove") }}{{ spinner("$store.cart.busy === 'remove:' + line.line_id", "size-4 text-ink-gray-6") }}</button>
 				</div>
 			</div>
 		</li>
 	</template>
+	<li class="py-5">
+		<a href="/{{ language }}/products" @click="$store.cart.open = false" class="group inline-flex h-10 items-center gap-1.5 text-base font-medium text-ink-gray-8 underline decoration-outline-gray-4 underline-offset-4 hover:decoration-ink-gray-8">{{ _("Continue shopping") }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
+	</li>
 </ul>
 

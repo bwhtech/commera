@@ -1,7 +1,11 @@
-<label class="flex items-center gap-2 text-base text-ink-gray-6">{{ _("Sort") }}
-	<select name="sort_by" form="listing-filters" @change="$el.form.requestSubmit()" class="h-8 rounded-lg border border-transparent bg-surface-gray-2 px-2.5 text-base text-ink-gray-8 outline-none hover:bg-surface-gray-3">
-		{% for value, label in sort_options %}
-		<option value="{{ value }}" {{ "selected" if value == selected.sort_by }}>{{ label }}</option>
-		{% endfor %}
-	</select>
+{% from "components/macros/icons.html" import icon %}
+<label class="flex min-w-0 items-center gap-2 text-base text-ink-gray-6"><span class="max-sm:sr-only">{{ _("Sort") }}</span>
+	<span class="relative min-w-0">
+		<select name="sort_by" form="listing-filters" @change="$el.form.requestSubmit()" class="pill max-w-full appearance-none pe-9">
+			{% for value, label in sort_options %}
+			<option value="{{ value }}" {{ "selected" if value == selected.sort_by }}>{{ label }}</option>
+			{% endfor %}
+		</select>
+		<span class="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-ink-gray-8">{{ icon("down", "size-4") }}</span>
+	</span>
 </label>

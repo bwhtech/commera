@@ -4,7 +4,7 @@
 {% set language = frappe.lang or "en" %}
 
 {% block uncontained_body %}
-<section x-data="order_confirmation" class="mx-auto flex max-w-2xl flex-col px-5 pb-20 pt-10 md:px-12">
+<section x-data="order_confirmation" class="section-x pt-6 md:pt-10"><div class="mx-auto flex max-w-2xl flex-col">
 	<div x-show="status === 'checking'" class="flex flex-col gap-4" aria-busy="true">
 		<div class="h-12 w-2/3 animate-pulse rounded-lg bg-surface-gray-2"></div>
 		<div class="h-5 w-1/2 animate-pulse rounded-lg bg-surface-gray-2"></div>
@@ -14,19 +14,19 @@
 	<div x-cloak x-show="status === 'paid'" class="flex flex-col gap-8">
 		<div class="flex flex-col items-start gap-4">
 			<span class="grid size-12 place-items-center rounded-full bg-brand text-on-brand">{{ icon("check", "size-6") }}</span>
-			<h1 class="text-8xl">{{ _("Thank you for your order") }}</h1>
-			<p x-show="order" class="text-p-base text-ink-gray-6">{{ _("Order") }} <span class="text-ink-gray-9" x-text="order?.name"></span></p>
-			<p x-show="!order" class="text-p-base text-ink-gray-6">{{ _("Your payment is received. Your order number will be in your confirmation email.") }}</p>
+			<h1 class="page-title">{{ _("Thank you for your order") }}</h1>
+			<p x-show="order" class="text-p-md text-ink-gray-6">{{ _("Order") }} <span class="text-ink-gray-9" x-text="order?.name"></span></p>
+			<p x-show="!order" class="text-p-md text-ink-gray-6">{{ _("Your payment is received. Your order number will be in your confirmation email.") }}</p>
 		</div>
 
-		<div x-show="details" class="rounded-xl bg-surface-gray-1 p-5">
-			<h2 class="mb-4 text-3xl">{{ _("Order summary") }}</h2>
+		<div x-show="details" class="rounded-2xl bg-surface-gray-1 p-6">
+			<h2 class="mb-5 text-3xl">{{ _("Order summary") }}</h2>
 			<ul class="flex flex-col gap-4 border-b border-outline-gray-2 pb-5">
 				<template x-for="line in details?.items ?? []" :key="line.line_id">
 					{{ summary_line("line.image", "line.title", "line.size", "line.qty", "money(line.amount)") }}
 				</template>
 			</ul>
-			<div class="flex flex-col gap-3 pt-4 text-base">
+			<div class="flex flex-col gap-3 pt-4 text-md">
 				<div class="flex justify-between">
 					<span>{{ _("Subtotal") }}</span>
 					<span x-text="money(details?.total)"></span>
@@ -59,29 +59,29 @@
 					<span>{{ _("Payment") }}</span>
 					<span class="text-ink-gray-7" x-text="details?.payment_mode"></span>
 				</div>
-				<div class="mt-2 flex justify-between border-t border-outline-gray-2 pt-4 text-xl font-medium">
+				<div class="mt-2 flex justify-between border-t border-outline-gray-2 pt-4 text-2xl font-medium">
 					<span>{{ _("Order total") }}</span>
 					<span x-text="money(details?.rounded_total || details?.grand_total)"></span>
 				</div>
 			</div>
 		</div>
-		<div x-show="order && !details" class="flex justify-between rounded-xl bg-surface-gray-1 p-5 text-xl font-medium">
+		<div x-show="order && !details" class="flex justify-between rounded-2xl bg-surface-gray-1 p-6 text-2xl font-medium">
 			<span>{{ _("Order total") }}</span>
 			<span x-text="money(order?.grand_total)"></span>
 		</div>
 
 		<div class="flex flex-wrap gap-3">
-			<a x-show="order?.link" :href="order?.link" class="inline-flex h-11 items-center justify-center rounded-lg bg-brand px-6 text-lg font-medium text-on-brand hover:bg-brand-hover">{{ _("View order") }}</a>
-			<a href="/{{ language }}/products" class="inline-flex h-11 items-center justify-center rounded-lg border border-outline-gray-2 px-6 text-lg font-medium text-ink-gray-8 hover:border-outline-gray-3">{{ _("Continue shopping") }}</a>
+			<a x-show="order?.link" :href="order?.link" class="button-primary">{{ _("View order") }}</a>
+			<a href="/{{ language }}/products" class="button-secondary">{{ _("Continue shopping") }}</a>
 		</div>
 	</div>
 
 	<div x-cloak x-show="status === 'pending' || status === 'failed'" class="flex flex-col items-start gap-4">
-		<h1 class="text-8xl"><span x-show="status === 'pending'">{{ _("Payment pending") }}</span><span x-show="status === 'failed'">{{ _("Payment not completed") }}</span></h1>
-		<p x-show="is_still_polling" class="text-p-base text-ink-gray-6" role="status">{{ _("We are waiting for your payment to be confirmed. This page updates by itself.") }}</p>
-<p x-cloak x-show="status === 'pending' && !is_still_polling" class="text-p-base text-ink-gray-6">{{ _("This is taking longer than usual. Refresh this page in a minute, or check your orders.") }}</p>
-		<p x-show="status === 'failed'" class="text-p-base text-ink-gray-6">{{ _("We could not confirm a payment for this order. Your cart is still saved.") }}</p>
-		<a href="/{{ language }}/cart/checkout" class="inline-flex h-11 items-center justify-center rounded-lg bg-brand px-6 text-lg font-medium text-on-brand hover:bg-brand-hover">{{ _("Back to checkout") }}</a>
+		<h1 class="page-title"><span x-show="status === 'pending'">{{ _("Payment pending") }}</span><span x-show="status === 'failed'">{{ _("Payment not completed") }}</span></h1>
+		<p x-show="is_still_polling" class="text-p-md text-ink-gray-6" role="status">{{ _("We are waiting for your payment to be confirmed. This page updates by itself.") }}</p>
+<p x-cloak x-show="status === 'pending' && !is_still_polling" class="text-p-md text-ink-gray-6">{{ _("This is taking longer than usual. Refresh this page in a minute, or check your orders.") }}</p>
+		<p x-show="status === 'failed'" class="text-p-md text-ink-gray-6">{{ _("We could not confirm a payment for this order. Your cart is still saved.") }}</p>
+		<a href="/{{ language }}/cart/checkout" class="button-primary">{{ _("Back to checkout") }}</a>
 	</div>
-</section>
+</div></section>
 {% endblock %}

@@ -1,36 +1,45 @@
+{% from "components/macros/icons.html" import icon %}
 {% set language = frappe.lang or "en" %}
 {% set products_url = "/" ~ language ~ "/products" %}
 {% set slides = section.blocks | selectattr("settings.image") | list %}
-<section x-data="hero({{ slides | length }})" class="grid items-center gap-10 px-5 pb-20 pt-4 md:grid-cols-2 md:px-12">
-	<div class="order-2 md:order-1 md:pe-16">
+<section x-data="hero({{ slides | length }})" @mouseenter="hovered = true" @mouseleave="hovered = false" @focusin="focused = true" @focusout="focused = $el.contains($event.relatedTarget)" class="section-x grid items-center gap-6 pt-2 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-12 md:pt-4 lg:gap-20">
+	<div class="order-2 animate-rise md:order-1">
 		{% if section.settings.badge %}
-		<span class="inline-flex h-6 items-center rounded-full bg-surface-gray-2 px-2 text-sm text-ink-gray-7">{{ section.settings.badge }}</span>
+		<span class="inline-flex h-7 items-center rounded-full border border-outline-gray-2 px-3 text-xs font-medium uppercase tracking-wider text-ink-gray-6">{{ section.settings.badge }}</span>
 		{% endif %}
-		<h1 class="mt-5 text-8xl font-normal lg:text-10xl">{{ section.settings.heading }}</h1>
+		<h1 class="mt-4 max-w-[14ch] md:mt-6 text-9xl leading-none tracking-tight md:text-10xl xl:text-12xl [overflow-wrap:anywhere]">{{ section.settings.heading }}</h1>
 		{% if section.settings.text %}
-		<p class="mt-5 max-w-sm text-p-md text-ink-gray-6">{{ section.settings.text }}</p>
+		<p class="mt-4 max-w-[38ch] text-p-xl md:mt-6 text-ink-gray-6 md:text-p-2xl">{{ section.settings.text }}</p>
 		{% endif %}
-		<div class="mt-8 flex gap-2">
+		<div class="mt-6 flex flex-wrap gap-3 md:mt-9">
 			{% if section.settings.primary_label %}
-			<a href="{{ section.settings.primary_url or products_url }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand px-3 text-lg font-medium text-on-brand hover:bg-brand-hover">{{ section.settings.primary_label }}</a>
+			<a href="{{ section.settings.primary_url or products_url }}" class="group button-primary">{{ section.settings.primary_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
 			{% endif %}
 			{% if section.settings.secondary_label %}
-			<a href="{{ section.settings.secondary_url or products_url }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-outline-gray-2 bg-surface-base px-3 text-lg font-medium text-ink-gray-8 hover:border-outline-gray-3">{{ section.settings.secondary_label }}</a>
+			<a href="{{ section.settings.secondary_url or products_url }}" class="button-secondary">{{ section.settings.secondary_label }}</a>
 			{% endif %}
 		</div>
 		{% if slides | length > 1 %}
-		<div class="mt-12 flex items-center gap-3 text-xs text-ink-gray-6">
-			<span x-text="String(slide + 1).padStart(2, '0')">01</span>
+		<div class="tabular mt-8 flex max-w-md items-center gap-3 text-xs text-ink-gray-6" style="--slide-duration: 6000ms">
+			<span class="shrink-0" x-text="String(slide + 1).padStart(2, '0')">01</span>
 			{% for slide in slides %}
-			<button type="button" @click="slide = {{ loop.index0 }}" aria-label="{{ _('Slide {0}').format(loop.index) }}" :class="slide === {{ loop.index0 }} ? 'bg-surface-gray-10' : 'bg-surface-gray-4'" class="h-1 w-16 rounded-full"></button>
+			<button type="button" @click="slide = {{ loop.index0 }}" aria-label="{{ _('Slide {0}').format(loop.index) }}" :aria-current="slide === {{ loop.index0 }}" class="group flex h-11 min-w-0 flex-1 items-center">
+				<span class="relative block h-0.5 w-full overflow-hidden rounded-full bg-surface-gray-4">
+					<span :class="slide === {{ loop.index0 }} ? (autoplay ? 'animate-progress' : '') : (slide > {{ loop.index0 }} ? '' : 'scale-x-0')" :style="paused && { animationPlayState: 'paused' }" class="absolute inset-0 origin-left bg-brand rtl:origin-right"></span>
+				</span>
+			</button>
 			{% endfor %}
-			{{ "%02d" | format(slides | length) }}
+			<span class="shrink-0">{{ "%02d" | format(slides | length) }}</span>
+			<button type="button" x-show="autoplay" @click="stopped = !stopped" :aria-label="stopped ? $el.dataset.play : $el.dataset.pause" data-play="{{ _('Play slideshow') }}" data-pause="{{ _('Pause slideshow') }}" class="ms-auto grid size-11 shrink-0 place-items-center rounded-full text-ink-gray-7 hover:bg-surface-gray-3">
+				<svg x-show="!stopped" class="size-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+				<svg x-cloak x-show="stopped" class="size-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10-6.5a1 1 0 0 0 0-1.7l-10-6.5A1 1 0 0 0 8 5.5Z"/></svg>
+			</button>
 		</div>
 		{% endif %}
 	</div>
-	<div class="order-1 md:order-2">
+	<div class="order-1 grid overflow-hidden rounded-2xl md:order-2 [&>*]:col-start-1 [&>*]:row-start-1">
 		{% for slide in slides %}
-		<img src="{{ slide.settings.image }}" alt="{{ slide.settings.alt }}" {% if not loop.first %}x-cloak loading="lazy" {% endif %}x-show="slide === {{ loop.index0 }}" class="aspect-[3/4] w-full rounded-xl object-cover object-top"{{ slide.editor_attributes }}>
+		<img src="{{ slide.settings.image }}" alt="{{ slide.settings.alt }}" {% if loop.first %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async" :class="slide === {{ loop.index0 }} ? 'opacity-100' : 'opacity-0'" :aria-hidden="slide !== {{ loop.index0 }}" class="media aspect-[4/3] max-h-[calc(100dvh-var(--header-height)-2rem)] w-full object-cover object-top transition-opacity md:aspect-[4/5] duration-600 ease-out{{ ' opacity-0' if not loop.first }}"{{ slide.editor_attributes }}>
 		{% endfor %}
 	</div>
 </section>

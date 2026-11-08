@@ -1,15 +1,15 @@
 {% macro summary_line(image, title, subtitle, qty, amount) -%}
 <li class="flex items-center gap-3">
 	<div class="relative w-14 shrink-0">
-		<div class="overflow-hidden rounded-lg bg-surface-gray-2">
+		<div class="media overflow-hidden rounded-lg">
 			<img x-show="{{ image }}" :src="{{ image }}" alt="" class="aspect-[3/4] w-full object-cover object-top">
 		</div>
 		<span class="absolute -end-2 -top-2 grid size-5 place-items-center rounded-full bg-brand text-xs font-medium text-on-brand" x-text="{{ qty }}"></span>
 	</div>
 	<div class="flex min-w-0 flex-1 flex-col">
-		<p class="line-clamp-2 text-base"><bdi x-text="{{ title }}"></bdi></p>
-		<p class="text-sm text-ink-gray-6" x-show="{{ subtitle }}" x-text="{{ subtitle }}"></p>
+		<p class="text-md [overflow-wrap:anywhere]"><bdi x-text="{{ title }}"></bdi></p>
+		<p class="text-base text-ink-gray-6" x-show="{{ subtitle }}" x-text="{{ subtitle }}"></p>
 	</div>
-	<p class="shrink-0 text-base" x-text="{{ amount }}"></p>
+	<p class="tabular shrink-0 whitespace-nowrap text-md" x-text="{{ amount }}"></p>
 </li>
 {%- endmacro %}

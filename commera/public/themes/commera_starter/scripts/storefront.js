@@ -122,12 +122,20 @@ function product_form(product) {
 		error: '',
 		missing_size: false,
 		saved: product.in_wishlist,
-		add_button_visible: true,
+		add_button_passed: false,
+		added: false,
 
 		init() {
-			new IntersectionObserver(([entry]) => {
-				this.add_button_visible = entry.isIntersecting;
-			}).observe(this.$refs.add_button);
+			// The root starts under the sticky header and reaches far below the viewport,
+			// so the button stops intersecting only once it is hidden above.
+			const header_height = document.querySelector('header')?.offsetHeight ?? 0;
+			new IntersectionObserver(
+				([entry]) => {
+					this.add_button_passed = !entry.isIntersecting;
+					document.body.classList.toggle('has-buy-bar', this.add_button_passed);
+				},
+				{ rootMargin: `-${header_height}px 0px 100000px 0px` },
+			).observe(this.$refs.add_button);
 			const url = new URL(location.href);
 			if (url.searchParams.has('save_to_wishlist')) {
 				url.searchParams.delete('save_to_wishlist');
@@ -156,7 +164,8 @@ function product_form(product) {
 		},
 
 		get compare_at_price() {
-			return this.variant?.compare_at_price;
+			const compare_at_price = this.variant?.compare_at_price;
+			return compare_at_price > this.price ? compare_at_price : null;
 		},
 
 		get discount() {
@@ -171,11 +180,19 @@ function product_form(product) {
 			this.image = (this.image + step + count) % count;
 		},
 
+		sync_image_with_scroll() {
+			const gallery = this.$refs.gallery;
+			if (gallery.scrollWidth <= gallery.clientWidth) return;
+			this.image = Math.round(Math.abs(gallery.scrollLeft) / gallery.clientWidth);
+		},
+
 		save(change, action) {
 			return save_change(this, change, action);
 		},
 
 		async add_to_cart() {
+			// The button stays enabled while busy so it keeps focus, and the drawer can return focus to it.
+			if (this.busy) return;
 			this.missing_size = !this.variant;
 			if (this.missing_size) {
 				return;
@@ -184,7 +201,11 @@ function product_form(product) {
 				await commera.cart.add_lines([
 					{ item_code: this.variant.id, qty: this.qty },
 				]);
-				globalThis.dispatchEvent(new CustomEvent('open-cart'));
+				this.added = true;
+				setTimeout(() => (this.added = false), 1500);
+				globalThis.dispatchEvent(
+					new CustomEvent('open-cart', { detail: { added: true } }),
+				);
 			}, 'add_to_cart');
 		},
 
@@ -1008,9 +1029,33 @@ document.addEventListener('alpine:init', () => {
 		},
 	}));
 
+	Alpine.data('newsletter', () => ({
+		email: '',
+		busy: false,
+		error: '',
+		subscribed: false,
+
+		async subscribe() {
+			if (this.busy) return;
+			await save_change(this, async () => {
+				await commera.shop.subscribe_to_newsletter(this.email);
+				this.subscribed = true;
+			});
+		},
+	}));
+
 	Alpine.data('hero', (slide_count) => ({
 		slide: 0,
 		selected: false,
+		hovered: false,
+		focused: false,
+		offscreen: false,
+		stopped: false,
+		autoplay: false,
+
+		get paused() {
+			return this.hovered || this.focused || this.offscreen || this.stopped;
+		},
 
 		init() {
 			this.$el.addEventListener('commera:block:select', (event) => {
@@ -1029,9 +1074,14 @@ document.addEventListener('alpine:init', () => {
 			) {
 				return;
 			}
-			setInterval(() => {
-				if (!this.selected) this.slide = (this.slide + 1) % slide_count;
-			}, 5000);
+			this.autoplay = true;
+			new IntersectionObserver(([entry]) => {
+				this.offscreen = !entry.isIntersecting;
+			}).observe(this.$el);
+			this.$el.addEventListener('animationend', (event) => {
+				if (event.animationName !== 'progress' || this.selected) return;
+				this.slide = (this.slide + 1) % slide_count;
+			});
 		},
 	}));
 });

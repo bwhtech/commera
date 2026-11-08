@@ -1,8 +1,10 @@
+{% from "components/macros/icons.html" import icon %}
+
 {% macro image(path, alt="", width=640, class="aspect-[3/4] w-full rounded-xl object-cover object-top", loading="lazy") %}
 {%- set src = commera.format.image_url(path, width) if path else None -%}
 {% if src %}
-<img src="{{ src }}" alt="{{ alt or '' }}" loading="{{ loading }}" class="{{ class }}">
+<img src="{{ src }}" alt="{{ alt or '' }}" loading="{{ loading }}" decoding="async" data-fade onload="this.classList.add('is-loaded')" onerror="this.classList.add('is-loaded', 'is-broken')" class="media {{ class }}">
 {% else %}
-<div class="{{ class }} bg-surface-gray-2"></div>
+<div class="media grid place-items-center text-ink-gray-4 {{ class }}" role="img" aria-label="{{ alt or '' }}">{{ icon("image", "size-1/5 max-w-10 min-w-4") }}</div>
 {% endif %}
 {%- endmacro %}

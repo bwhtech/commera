@@ -24,6 +24,8 @@
 	--font-weight-semibold: 600;
 	--font-weight-bold: 700;
 	--font-weight-black: 800;
+	--color-white: oklch(1 0 0);
+	--color-black: oklch(0 0 0);
 	--color-brand: var(--theme-brand-color, var(--surface-gray-10));
 	--color-brand-hover: var(--theme-brand-color, var(--surface-gray-9));
 	--color-on-brand: var(--theme-brand-text-color, var(--ink-base));
@@ -306,11 +308,242 @@
 	--shadow-lg: inset 0px 0.25px 1.5px 0px #ffffff29, 0px 0px 1.5px 0px #0000002e, 0px 0px 6px 3px #00000008, 0px 18px 22px -6px #0000001a;
 	--shadow-xl: inset 0px 0.25px 1.5px 0px #ffffff29, 0px 0px 1px 0px #00000033, 0px 0px 10px 2px #0000000a, 0px 24px 30px -8px #0000001a;
 	--shadow-2xl: inset 0px 0.25px 2px 0px #ffffff29, 0px 0px 1.5px 0px #00000040, 0px 0px 10px 2px #00000008, 0px 44px 52px -10px #0000001a;
+	--default-transition-duration: 160ms;
+	--default-transition-timing-function: var(--ease-out);
+	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+	--ease-in: cubic-bezier(0.4, 0, 1, 1);
+	--ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+	--animate-pop: pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+	--animate-rise: rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+	--animate-progress: progress var(--slide-duration, 6000ms) linear both;
+
+	@keyframes pop {
+		50% {
+			transform: scale(1.3);
+		}
+	}
+	@keyframes rise {
+		from {
+			opacity: 0;
+			transform: translateY(12px);
+		}
+	}
+	@keyframes progress {
+		from {
+			transform: scaleX(0);
+		}
+	}
+}
+
+@utility section-x {
+	padding-inline: max(1.25rem, calc((100% - var(--page-width)) / 2));
+	@media (width >= 48rem) {
+		padding-inline: max(3rem, calc((100% - var(--page-width)) / 2));
+	}
+}
+
+@utility section-top {
+	padding-top: var(--section-gap);
+}
+
+@utility media {
+	background-color: var(--surface-gray-2);
+	outline: 1px solid var(--outline-alpha-gray-1);
+	outline-offset: -1px;
+}
+
+@utility rich-text {
+	overflow-wrap: anywhere;
+	& :where(p, ul, ol, blockquote, table, figure, img) + :where(*) {
+		margin-top: 1em;
+	}
+	& :where(h2, h3, h4) {
+		margin-top: 1.75em;
+		color: var(--ink-gray-9);
+		font-family: var(--font-heading);
+		font-weight: 500;
+	}
+	& :where(h2, h3, h4) + :where(*) {
+		margin-top: 0.5em;
+	}
+	& :where(h2) {
+		@apply text-4xl leading-tight tracking-tight;
+	}
+	& :where(h3) {
+		@apply text-3xl leading-tight tracking-tight;
+	}
+	& :where(h4) {
+		@apply text-2xl leading-tight;
+	}
+	& > :where(:first-child) {
+		margin-top: 0;
+	}
+	& :where(ul) {
+		list-style: disc;
+		padding-inline-start: 1.25em;
+	}
+	& :where(ol) {
+		list-style: decimal;
+		padding-inline-start: 1.25em;
+	}
+	& :where(li + li) {
+		margin-top: 0.35em;
+	}
+	& :where(a) {
+		color: var(--ink-gray-9);
+		text-decoration: underline;
+		text-underline-offset: 3px;
+	}
+	& :where(strong, b) {
+		color: var(--ink-gray-9);
+		font-weight: 600;
+	}
+	& :where(blockquote) {
+		border-inline-start: 2px solid var(--outline-gray-3);
+		padding-inline-start: 1em;
+	}
+	& :where(table) {
+		display: block;
+		max-width: 100%;
+		overflow-x: auto;
+		border-collapse: collapse;
+		@apply text-p-base;
+	}
+	& :where(th, td) {
+		min-width: 6rem;
+		overflow-wrap: normal;
+		border-bottom: 1px solid var(--outline-gray-2);
+		padding: 0.6em 1em 0.6em 0;
+		text-align: start;
+		vertical-align: top;
+	}
+	& :where(th) {
+		color: var(--ink-gray-9);
+		font-weight: 600;
+	}
+	& :where(img) {
+		max-width: 100%;
+		height: auto;
+		border-radius: var(--radius-xl);
+	}
+}
+
+@utility button {
+	display: inline-flex;
+	height: 3rem;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	border-radius: var(--radius-lg);
+	padding-inline: 1.25rem;
+	@apply text-md;
+	font-weight: 500;
+	white-space: nowrap;
+	&:disabled {
+		opacity: 0.6;
+	}
+}
+
+@utility button-primary {
+	@apply button bg-brand text-on-brand hover:bg-brand-hover;
+}
+
+@utility button-secondary {
+	@apply button border border-outline-gray-3 bg-surface-base text-ink-gray-8 hover:border-outline-gray-5;
+}
+
+@utility button-small {
+	height: 2.5rem;
+	padding-inline: 1rem;
+	@apply text-base;
+}
+
+@utility chip {
+	@apply inline-flex h-12 min-w-12 items-center justify-center gap-2 rounded-lg border border-outline-gray-3 bg-surface-base px-4 text-md text-ink-gray-8 hover:border-outline-gray-6;
+	&[aria-current="page"],
+	&[aria-pressed="true"] {
+		@apply border-outline-gray-9 font-medium text-ink-gray-9 ring-1 ring-outline-gray-9;
+	}
+	&:disabled,
+	&[aria-disabled="true"] {
+		@apply border-transparent bg-surface-gray-2 text-ink-gray-4 line-through;
+	}
+}
+
+/* chip = choosing a value (variants); pill = filtering or sorting a list. */
+@utility icon-button {
+	@apply grid size-11 shrink-0 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 lg:size-10;
+}
+
+@utility icon-button-floating {
+	@apply grid size-11 shrink-0 place-items-center rounded-full bg-surface-elevation-2 text-ink-gray-8 shadow-md;
+}
+
+@utility pill {
+	@apply inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-outline-gray-3 bg-surface-base pe-3 ps-4 text-base font-medium text-ink-gray-8 hover:border-outline-gray-5 aria-expanded:border-outline-gray-9 max-sm:text-lg;
+}
+
+@utility field {
+	height: 3rem;
+	width: 100%;
+	min-width: 0;
+	border-radius: var(--radius-lg);
+	border: 1px solid var(--outline-gray-3);
+	background-color: var(--surface-base);
+	padding-inline: 0.875rem;
+	@apply text-md;
+	color: var(--ink-gray-9);
+	outline: none;
+	&::placeholder {
+		color: var(--ink-gray-4);
+	}
+	&:hover {
+		border-color: var(--outline-gray-5);
+	}
+	&:focus {
+		border-color: var(--outline-gray-9);
+		box-shadow: 0 0 0 1px var(--outline-gray-9);
+	}
+}
+
+@utility field-label {
+	@apply text-base;
+	font-weight: 500;
+	color: var(--ink-gray-8);
+}
+
+@utility page-title {
+	@apply text-6xl [overflow-wrap:anywhere] md:text-8xl leading-tight tracking-tight;
+}
+
+@utility section-title {
+	@apply text-4xl md:text-6xl leading-tight tracking-tight;
+}
+
+@utility eyebrow {
+	@apply text-xs font-medium uppercase tracking-wider text-ink-gray-6;
+}
+
+@utility popover {
+	@apply rounded-xl bg-surface-elevation-2 shadow-2xl;
+}
+
+@utility tabular {
+	font-variant-numeric: tabular-nums;
 }
 
 @layer base {
 	:root {
 		--corner-scale: 1;
+		--section-gap: clamp(3.5rem, 7vw, 6.5rem);
+		--page-width: 96rem;
+		--header-height: 4.5rem;
+		-webkit-tap-highlight-color: transparent;
+		text-rendering: optimizeLegibility;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		scroll-padding-top: var(--header-height);
+		scrollbar-gutter: stable;
 	}
 	[data-corners="Square"] {
 		--corner-scale: 0;
@@ -331,6 +564,63 @@
 	h2,
 	h3 {
 		font-family: var(--font-heading);
+		font-weight: 500;
+		text-wrap: balance;
+	}
+	p {
+		text-wrap: pretty;
+	}
+	main > :is(section, article):last-child {
+		padding-bottom: var(--section-gap);
+	}
+	a,
+	button,
+	summary,
+	input,
+	select,
+	textarea {
+		transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+		transition-duration: var(--default-transition-duration);
+		transition-timing-function: var(--default-transition-timing-function);
+	}
+	:focus-visible {
+		outline: 2px solid var(--ink-gray-9);
+		outline-offset: 2px;
+	}
+	input:focus-visible,
+	select:focus-visible,
+	textarea:focus-visible {
+		outline-offset: 0;
+	}
+	:is(button, [role="button"], a[class*="button"]):not(:disabled, [aria-disabled="true"]):active {
+		transform: scale(0.98);
+	}
+	@media (width < 64rem) {
+		body.has-buy-bar {
+			padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+		}
+	}
+	img[data-fade] {
+		opacity: 0;
+		transition:
+			opacity 600ms var(--ease-out),
+			scale 600ms var(--ease-out);
+	}
+	img[data-fade].is-loaded {
+		opacity: 1;
+	}
+	img.is-broken {
+		color: transparent;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		::before,
+		::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-property: opacity, color, background-color, border-color !important;
+			scroll-behavior: auto !important;
+		}
 	}
 	[x-cloak] {
 		display: none !important;
@@ -349,5 +639,13 @@
 	}
 	button[aria-busy="true"] {
 		cursor: progress;
+	}
+}
+
+@media (width < 48rem) {
+	input:not([type="checkbox"], [type="radio"]),
+	select,
+	textarea {
+		font-size: max(16px, 1em) !important;
 	}
 }

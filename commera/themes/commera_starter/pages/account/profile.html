@@ -11,8 +11,8 @@
 		{{ field("last_name", _("Last name"), "profile.last_name", autocomplete="family-name") }}
 	</div>
 	<label class="block">
-		<span class="text-sm text-ink-gray-7">{{ _("Email") }}</span>
-		<input type="email" value="{{ profile.email }}" disabled class="mt-1.5 h-10 w-full rounded-lg bg-surface-gray-1 px-3 text-lg text-ink-gray-5">
+		<span class="field-label">{{ _("Email") }}</span>
+		<input type="email" value="{{ profile.email }}" disabled class="field mt-2 bg-surface-gray-1 text-ink-gray-6">
 	</label>
 	{{ field("phone", _("Phone"), "profile.phone", type="tel", autocomplete="tel") }}
 	{{ form_message() }}
