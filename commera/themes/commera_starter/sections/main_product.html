@@ -10,17 +10,17 @@
 {% set payload = {"id": product.id, "currency": product.currency, "price": product.price, "options": product.options, "variants": product.variants, "size": variant.title if size_option and variant else "", "in_wishlist": in_wishlist, "is_guest": frappe.session.user == "Guest"} %}
 <section x-data='product_form({{ payload | tojson }})' class="pt-2 md:pt-6">
 	<div class="section-x grid grid-cols-1 gap-6 md:gap-10 *:min-w-0 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10 xl:gap-20">
-		<div class="md:max-lg:mx-auto md:max-lg:w-full md:max-lg:max-w-96">
+		<div class="md:max-lg:w-full md:max-lg:max-w-96">
 			<div class="group/gallery relative">
 				<div x-ref="gallery" @scroll.debounce.60ms="sync_image_with_scroll()" class="flex snap-x snap-mandatory overflow-x-auto rounded-2xl [scrollbar-width:none] md:grid md:overflow-hidden md:[&>*]:col-start-1 md:[&>*]:row-start-1 [&::-webkit-scrollbar]:hidden">
 					{% for path in product.images or [None] %}
-					<div :class="image === {{ loop.index0 }} ? 'md:opacity-100' : 'md:pointer-events-none md:opacity-0'" :aria-hidden="image !== {{ loop.index0 }}" class="w-full shrink-0 snap-center md:transition-opacity md:duration-600 md:ease-out{{ ' md:opacity-0' if not loop.first }}">{{ image(path, product.title, 1200, "aspect-square max-md:max-h-[calc(100dvh-var(--header-height)-3rem)] w-full rounded-2xl md:aspect-[3/4] " ~ fit, loading="eager" if loop.first else "lazy") }}</div>
+					<div :class="image === {{ loop.index0 }} ? 'md:opacity-100' : 'md:pointer-events-none md:opacity-0'" :aria-hidden="image !== {{ loop.index0 }}" class="w-full shrink-0 snap-center md:transition-opacity md:duration-300 md:ease-out{{ ' md:opacity-0' if not loop.first }}">{{ image(path, product.title, 1200, "aspect-[3/4] max-md:max-h-[calc(100dvh-var(--header-height)-3rem)] w-full rounded-2xl md:aspect-[3/4] " ~ fit, loading="eager" if loop.first else "lazy") }}</div>
 					{% endfor %}
 				</div>
 				{% if product.images | length > 1 %}
 				<button type="button" @click="move_image(-1, {{ product.images | length }})" class="absolute start-3 top-1/2 icon-button-floating -translate-y-1/2 opacity-0 group-hover/gallery:opacity-100 focus-visible:opacity-100 max-md:hidden" aria-label="{{ _('Previous photo') }}">{{ icon("left", "size-5 rtl:-scale-x-100") }}</button>
 				<button type="button" @click="move_image(1, {{ product.images | length }})" class="absolute end-3 top-1/2 icon-button-floating -translate-y-1/2 opacity-0 group-hover/gallery:opacity-100 focus-visible:opacity-100 max-md:hidden" aria-label="{{ _('Next photo') }}">{{ icon("right", "size-5 rtl:-scale-x-100") }}</button>
-				<p class="tabular pointer-events-none absolute bottom-3 end-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur md:hidden"><span x-text="image + 1">1</span> / {{ product.images | length }}</p>
+				<p class="tabular pointer-events-none absolute bottom-3 end-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur"><span x-text="image + 1">1</span> / {{ product.images | length }}</p>
 				{% endif %}
 			</div>
 			{% if product.images | length > 1 %}

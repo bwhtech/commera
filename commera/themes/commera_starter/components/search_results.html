@@ -1,10 +1,11 @@
-<p x-cloak x-show="status === 'failed'" class="px-2 py-3 text-start text-md text-ink-gray-6" role="alert">{{ _("Search is not available right now. Try again.") }}</p>
-<p x-cloak x-show="has_no_results()" class="px-2 py-3 text-start text-md text-ink-gray-6">{{ _("No results.") }}</p>
+{% set inset = result_inset or "px-2" %}
+<p x-cloak x-show="status === 'failed'" class="{{ inset }} py-3 text-start text-md text-ink-gray-6" role="alert">{{ _("Search is not available right now. Try again.") }}</p>
+<p x-cloak x-show="has_no_results()" class="{{ inset }} py-3 text-start text-md text-ink-gray-6">{{ _("No results.") }}</p>
 <div x-cloak x-show="results && (results.products.length || results.categories.length)" class="divide-y divide-outline-gray-2 text-start">
 	<div x-show="results?.products.length" class="py-2">
-		<p class="eyebrow px-2 pb-1">{{ _("Products") }}</p>
+		<p class="eyebrow {{ inset }} pb-1">{{ _("Products") }}</p>
 		<template x-for="product in results?.products ?? []" :key="product.id">
-			<a :href="product_url(product)" class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-3 rounded-lg p-2 hover:bg-surface-gray-3 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto]">
+			<a :href="product_url(product)" class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-3 rounded-lg {{ inset }} py-2 hover:bg-surface-gray-3 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto]">
 				<span class="media aspect-[3/4] w-10 shrink-0 overflow-hidden rounded-lg"><img x-show="product.image" :src="product.image" alt="" class="size-full object-cover object-top"></span>
 				<span class="min-w-0">
 					<span class="block text-md text-ink-gray-8 [overflow-wrap:anywhere]" x-text="product.title"></span>
@@ -15,9 +16,9 @@
 		</template>
 	</div>
 	<div x-show="results?.categories.length" class="py-2">
-		<p class="eyebrow px-2 pb-1">{{ _("Collections") }}</p>
+		<p class="eyebrow {{ inset }} pb-1">{{ _("Collections") }}</p>
 		<template x-for="category in results?.categories ?? []" :key="category.url">
-			<a :href="category.url" class="flex min-h-10 items-center rounded-lg px-2 py-2 text-md [overflow-wrap:anywhere] text-ink-gray-8 hover:bg-surface-gray-3" x-text="category.title"></a>
+			<a :href="category.url" class="flex min-h-10 items-center rounded-lg {{ inset }} py-2 text-md [overflow-wrap:anywhere] text-ink-gray-8 hover:bg-surface-gray-3" x-text="category.title"></a>
 		</template>
 	</div>
 </div>

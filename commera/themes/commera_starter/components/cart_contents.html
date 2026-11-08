@@ -36,13 +36,13 @@
 					</div>
 					{{ spinner("$store.cart.busy === 'quantity:' + line.line_id", "size-4 text-ink-gray-6") }}
 					</div>
-					<button type="button" @click="$store.cart.remove(line)" :disabled="$store.cart.busy" :aria-busy="$store.cart.busy === 'remove:' + line.line_id" class="-me-2 inline-flex h-10 items-center rounded-lg px-2 text-base text-ink-gray-6 underline decoration-outline-gray-4 underline-offset-4 hover:text-ink-gray-9 hover:decoration-ink-gray-8">{{ _("Remove") }}{{ spinner("$store.cart.busy === 'remove:' + line.line_id", "size-4 text-ink-gray-6") }}</button>
+					<button type="button" @click="$store.cart.remove(line)" :disabled="$store.cart.busy" :aria-busy="$store.cart.busy === 'remove:' + line.line_id" class="-me-2 inline-flex h-10 items-center rounded-lg px-2 text-base text-ink-gray-6 link hover:text-ink-gray-9">{{ _("Remove") }}{{ spinner("$store.cart.busy === 'remove:' + line.line_id", "size-4 text-ink-gray-6") }}</button>
 				</div>
 			</div>
 		</li>
 	</template>
 	<li class="py-5">
-		<a href="/{{ language }}/products" @click="$store.cart.open = false" class="group inline-flex h-10 items-center gap-1.5 text-base font-medium text-ink-gray-8 underline decoration-outline-gray-4 underline-offset-4 hover:decoration-ink-gray-8">{{ _("Continue shopping") }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
+		<a href="/{{ language }}/products" @click="$store.cart.open = false" class="group inline-flex h-10 items-center gap-1.5 text-base font-medium text-ink-gray-8 link">{{ _("Continue shopping") }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
 	</li>
 </ul>
 

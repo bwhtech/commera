@@ -5,7 +5,7 @@
 	<div class="flex items-end justify-between gap-6">
 		<h2 class="section-title">{{ section.settings.title }}</h2>
 		{% if section.settings.link_label %}
-		<a href="{{ section.settings.link_url or '/' ~ language ~ '/products' }}" class="group inline-flex h-10 shrink-0 items-center gap-1.5 text-md font-medium text-ink-gray-8 underline decoration-outline-gray-4 underline-offset-4 hover:decoration-ink-gray-8">{{ section.settings.link_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
+		<a href="{{ section.settings.link_url or '/' ~ language ~ '/products' }}" class="group inline-flex h-10 shrink-0 items-center gap-1.5 text-md font-medium text-ink-gray-8 link">{{ section.settings.link_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
 		{% endif %}
 	</div>
 	{% if section.products %}

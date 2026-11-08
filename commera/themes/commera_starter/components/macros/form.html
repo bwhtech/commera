@@ -22,7 +22,7 @@
 {%- endmacro %}
 
 {% macro submit_button(label, busy="busy") %}
-<button type="submit" :disabled="{{ busy }}" :aria-busy="{{ busy }}" class="button-primary relative">{{ label }}{{ spinner(busy, "size-5 text-on-brand") }}</button>
+<button type="submit" :disabled="{{ busy }}" :aria-busy="{{ busy }}" class="button-primary relative max-sm:w-full">{{ label }}{{ spinner(busy, "size-5 text-on-brand") }}</button>
 {%- endmacro %}
 
 {% macro form_message() %}

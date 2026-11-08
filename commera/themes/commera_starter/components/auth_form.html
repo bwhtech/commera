@@ -38,18 +38,18 @@
 			{{ spinner("busy === 'verify'", "size-5 text-on-brand") }}
 		</button>
 		<div class="-mx-1 flex flex-wrap gap-x-4 gap-y-2">
-			<button type="button" @click="resend_code()" :disabled="busy || resend_wait > 0" :aria-busy="busy === 'resend'" class="relative inline-flex min-h-10 items-center px-1 text-base text-ink-gray-8 underline underline-offset-4 hover:text-ink-gray-9 disabled:text-ink-gray-6">
+			<button type="button" @click="resend_code()" :disabled="busy || resend_wait > 0" :aria-busy="busy === 'resend'" class="relative inline-flex min-h-10 items-center px-1 text-base text-ink-gray-8 link hover:text-ink-gray-9 disabled:text-ink-gray-6">
     <span x-show="resend_wait <= 0">{{ _("Resend code") }}</span>
     <span x-cloak x-show="resend_wait > 0">{{ _("Resend code in") }} <span x-text="resend_wait"></span>s</span>
     {{ spinner("busy === 'resend'", "size-4 text-ink-gray-8") }}
 </button>
-			<button type="button" @click="step = 'details'; error = ''" :disabled="busy" class="inline-flex min-h-10 items-center px-1 text-base text-ink-gray-8 underline underline-offset-4 hover:text-ink-gray-9">{{ _("Change email") }}</button>
+			<button type="button" @click="step = 'details'; error = ''" :disabled="busy" class="inline-flex min-h-10 items-center px-1 text-base text-ink-gray-8 link hover:text-ink-gray-9">{{ _("Change email") }}</button>
 		</div>
 	</form>
 
 	<p class="border-t border-outline-gray-2 pt-5 text-md text-ink-gray-6">
-		<span x-show="mode === 'login'">{{ _("New here?") }} <button type="button" @click="switch_mode('signup')" class="-my-2.5 inline-flex min-h-10 items-center px-1 text-ink-gray-9 underline underline-offset-4" :disabled="busy">{{ _("Create an account") }}</button></span>
-		<span x-cloak x-show="mode === 'signup'">{{ _("Already have an account?") }} <button type="button" @click="switch_mode('login')" class="-my-2.5 inline-flex min-h-10 items-center px-1 text-ink-gray-9 underline underline-offset-4" :disabled="busy">{{ _("Log in") }}</button></span>
+		<span x-show="mode === 'login'">{{ _("New here?") }} <button type="button" @click="switch_mode('signup')" class="-my-2.5 inline-flex min-h-10 items-center px-1 text-ink-gray-9 link" :disabled="busy">{{ _("Create an account") }}</button></span>
+		<span x-cloak x-show="mode === 'signup'">{{ _("Already have an account?") }} <button type="button" @click="switch_mode('login')" class="-my-2.5 inline-flex min-h-10 items-center px-1 text-ink-gray-9 link" :disabled="busy">{{ _("Log in") }}</button></span>
 	</p>
 </div>
 {%- endmacro %}

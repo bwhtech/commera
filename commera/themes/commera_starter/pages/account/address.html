@@ -19,7 +19,7 @@
 	</div>
 
 	<form x-cloak x-show="form" @submit.prevent="save" class="grid max-w-lg gap-5">
-		<button type="button" @click="close" class="inline-flex items-center gap-1 justify-self-start text-md text-ink-gray-7 hover:text-ink-gray-9">{{ icon("left", "size-4 rtl:rotate-180") }} {{ _("Back") }}</button>
+		<button type="button" @click="close" class="-ms-1 inline-flex min-h-10 items-center gap-1 justify-self-start px-1 text-md text-ink-gray-7 hover:text-ink-gray-9">{{ icon("left", "size-4 rtl:rotate-180") }} {{ _("Back") }}</button>
 		<h2 class="text-3xl"><span x-show="form?.name">{{ _("Edit address") }}</span><span x-show="!form?.name">{{ _("New address") }}</span></h2>
 		<template x-if="form">
 			<div class="grid gap-5">

@@ -38,7 +38,7 @@
 	<p x-cloak x-show="error" x-text="error" class="text-base text-ink-red-7" role="alert"></p>
 
 	{% if order.access == "limited" %}
-	<p class="rounded-lg bg-surface-gray-2 p-4 text-p-md text-ink-gray-7">{{ _("This order link is older, so the delivery address and payment details are hidden.") }} <a href="/{{ language }}/track-order" class="text-ink-gray-9 underline">{{ _("Get a new link by email") }}</a></p>
+	<p class="rounded-lg bg-surface-gray-2 p-4 text-p-md text-ink-gray-7">{{ _("This order link is older, so the delivery address and payment details are hidden.") }} <a href="/{{ language }}/track-order" class="text-ink-gray-9 link">{{ _("Get a new link by email") }}</a></p>
 	{% endif %}
 
 	{% if can_cancel %}
@@ -80,7 +80,7 @@
 		<ul class="mt-4 divide-y divide-outline-gray-1 border-y border-outline-gray-1">
 			{% for line in order["items"] %}
 			<li class="flex items-center gap-4 py-4">
-				{{ image(line.image, width=160, class="size-16 shrink-0 rounded-lg object-cover") }}
+				{{ image(line.image, width=160, class="aspect-[3/4] w-16 shrink-0 rounded-lg object-cover object-top") }}
 				<div class="min-w-0 flex-1">
 					<p class="text-md text-ink-gray-9">{{ line.title }}</p>
 					<p class="mt-1 text-base text-ink-gray-6">{% if line.size %}{{ _("Size") }} {{ line.size }} · {% endif %}<bdi>{{ line.qty | int }} × {{ commera.format.money(line.rate, order.currency) }}</bdi></p>
@@ -107,7 +107,7 @@
 
 	<section x-cloak x-show="tracking.has_tracking">
 		<h2 class="text-3xl">{{ _("Delivery") }}</h2>
-		<p class="mt-2 text-p-md text-ink-gray-7"><bdi x-text="[tracking.carrier, tracking.awb, tracking.status].filter(Boolean).join(' · ')"></bdi> <a x-show="tracking.tracking_url" :href="tracking.tracking_url" target="_blank" rel="noopener noreferrer" class="text-ink-gray-9 underline">{{ _("Track your parcel") }}</a></p>
+		<p class="mt-2 text-p-md text-ink-gray-7"><bdi x-text="[tracking.carrier, tracking.awb, tracking.status].filter(Boolean).join(' · ')"></bdi> <a x-show="tracking.tracking_url" :href="tracking.tracking_url" target="_blank" rel="noopener noreferrer" class="text-ink-gray-9 link">{{ _("Track your parcel") }}</a></p>
 		<ol class="mt-4 flex flex-col gap-4 border-s border-outline-gray-2 ps-5">
 			<template x-for="event in tracking.events || []" :key="event.timestamp + event.status">
 				<li>
@@ -142,7 +142,7 @@
 	{% endif %}
 
 	{% if is_owner %}
-	<a href="/{{ language }}/account/orders" class="inline-flex items-center gap-1 self-start text-md text-ink-gray-8 underline hover:text-ink-gray-9">{{ icon("left", "size-4 rtl:rotate-180") }}{{ _("Back to orders") }}</a>
+	<a href="/{{ language }}/account/orders" class="-ms-1 inline-flex min-h-10 items-center gap-1 self-start px-1 text-md text-ink-gray-8 link hover:text-ink-gray-9">{{ icon("left", "size-4 rtl:rotate-180") }}{{ _("Back to orders") }}</a>
 	{% endif %}
 </div>
 {% endcall %}

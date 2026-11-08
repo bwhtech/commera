@@ -11,10 +11,10 @@
 	<div aria-hidden="true" :class="scrolled ? 'border-outline-gray-2 bg-surface-base/95 backdrop-blur-md backdrop-saturate-150' : 'border-transparent bg-surface-base'" class="absolute inset-0 -z-10 border-b transition-[background-color,border-color,backdrop-filter] duration-300"></div>
 	<div class="{{ 'flex items-center gap-6' if logo_at_start else 'grid grid-cols-[1fr_auto_1fr] items-center' }} section-x h-[var(--header-height)] max-lg:!px-3">
 		<div class="flex items-center gap-1">
-			<button type="button" @click="$dispatch('open-menu')" class="icon-button lg:hidden" aria-label="{{ _('Menu') }}">{{ icon("menu") }}</button>
+			<button type="button" @click="$dispatch('open-menu')" class="icon-button xl:hidden" aria-label="{{ _('Menu') }}">{{ icon("menu") }}</button>
 			{% for item in menu_items %}
 			{% if item["items"] %}
-			<div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false" class="relative hidden lg:block">
+			<div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false" class="relative hidden xl:block">
 				<button type="button" @click="open = !open" :aria-expanded="open" :class="open && 'bg-surface-gray-4'" class="inline-flex h-10 items-center gap-1 whitespace-nowrap rounded-lg px-3 text-md text-ink-gray-8 hover:bg-surface-gray-3">{{ item["title"] }} <span :class="open && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
 				<div x-cloak x-show="open" {{ popover() }} class="absolute start-0 top-full z-50 mt-2 min-w-56 popover divide-y divide-outline-gray-2 text-start">
 					{% for group in item["items"] if group["items"] %}
@@ -31,7 +31,7 @@
 				</div>
 			</div>
 			{% else %}
-			{{ menu_link(item, "hidden h-10 items-center rounded-lg whitespace-nowrap px-3 text-md text-ink-gray-8 hover:bg-surface-gray-3 lg:inline-flex") }}
+			{{ menu_link(item, "hidden h-10 items-center rounded-lg whitespace-nowrap px-3 text-md text-ink-gray-8 hover:bg-surface-gray-3 xl:inline-flex") }}
 			{% endif %}
 			{% endfor %}
 		</div>

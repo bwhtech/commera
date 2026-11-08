@@ -19,7 +19,7 @@
 	<a href="/{{ language }}/products" class="button-primary">{{ _("Start shopping") }}</a>
 	{% endcall %}
 
-	<div x-cloak x-show="ready && !sign_in_required && $store.cart.count" class="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start lg:gap-12">
+	<div x-cloak x-show="ready && !sign_in_required && $store.cart.count" class="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,40rem)_24rem] lg:items-start lg:justify-between lg:gap-12">
 		<div class="flex flex-col">
 			<form @submit.prevent="save_address()" class="flex flex-col gap-5 pb-8">
 				<div class="flex items-center justify-between gap-3">
@@ -35,7 +35,7 @@
 
 				<div class="mt-3 flex items-center justify-between gap-3">
 					<h2 class="text-3xl">{{ _("Delivery") }}</h2>
-					<button type="button" x-show="!editing_address" @click="editing_address = true" class="inline-flex h-10 items-center rounded-lg px-2 text-base text-ink-gray-7 underline underline-offset-4 hover:text-ink-gray-9">{{ _("Change") }}</button>
+					<button type="button" x-show="!editing_address" @click="editing_address = true" class="inline-flex h-10 items-center rounded-lg px-2 text-base text-ink-gray-7 link hover:text-ink-gray-9">{{ _("Change") }}</button>
 				</div>
 
 				<div x-show="!editing_address" class="rounded-xl bg-surface-gray-1 p-4 text-md">
@@ -62,7 +62,7 @@
 							<span class="flex flex-1 flex-col gap-0.5 text-md">
 								<span class="font-medium">{{ location.title }}</span>
 								<span class="text-ink-gray-6"><bdi>{{ [location.address_line1, location.address_line2, location.city, location.state, location.pincode] | select | join(", ") }}</bdi></span>
-								{% if location.directions_url %}<a href="{{ location.directions_url }}" target="_blank" rel="noopener" class="mt-1 text-base text-ink-gray-6 underline hover:text-ink-gray-9">{{ _("Directions") }}</a>{% endif %}
+								{% if location.directions_url %}<a href="{{ location.directions_url }}" target="_blank" rel="noopener" class="mt-1 text-base text-ink-gray-6 link hover:text-ink-gray-9">{{ _("Directions") }}</a>{% endif %}
 							</span>
 						</label>
 						{% endfor %}

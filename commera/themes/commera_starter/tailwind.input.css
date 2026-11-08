@@ -470,6 +470,10 @@
 	}
 }
 
+@utility link {
+	@apply underline decoration-outline-gray-4 underline-offset-4 hover:decoration-current;
+}
+
 /* chip = choosing a value (variants); pill = filtering or sorting a list. */
 @utility choice-card {
 	@apply flex cursor-pointer gap-3 rounded-lg border border-outline-gray-3 p-4 has-[:checked]:border-outline-gray-9 has-[:checked]:ring-1 has-[:checked]:ring-outline-gray-9;
@@ -511,6 +515,9 @@
 	&:is(select) {
 		appearance: none;
 		padding-inline-end: 2.5rem;
+	}
+	&:is(select):has(option[value=""]:checked) {
+		color: var(--ink-gray-4);
 	}
 }
 

@@ -1,6 +1,6 @@
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/menu_link.html" import menu_link %}
-{% macro disclosure_heading(title) %}<button type="button" @click="open = !open" :aria-expanded="!mobile || open" class="flex min-h-12 w-full items-center justify-between text-start text-xs font-medium uppercase tracking-wider text-ink-gray-9 md:pointer-events-none md:mb-3 md:min-h-0" :tabindex="mobile ? 0 : -1">{{ title }}<span :class="open && 'rotate-180'" class="transition-transform duration-200 md:hidden">{{ icon("down", "size-4") }}</span></button>{% endmacro %}
+{% macro disclosure_heading(title) %}<button type="button" @click="open = !open" x-effect="mobile ? ($el.setAttribute('aria-expanded', open), $el.removeAttribute('role'), $el.removeAttribute('aria-level')) : ($el.removeAttribute('aria-expanded'), $el.setAttribute('role', 'heading'), $el.setAttribute('aria-level', '2'))" class="flex min-h-12 w-full items-center justify-between text-start text-xs font-medium uppercase tracking-wider text-ink-gray-9 md:pointer-events-none md:mb-3 md:min-h-0" :tabindex="mobile ? 0 : -1">{{ title }}<span :class="open && 'rotate-180'" class="transition-transform duration-200 md:hidden">{{ icon("down", "size-4") }}</span></button>{% endmacro %}
 {% set social_links = [
 	(_("Instagram"), theme.instagram_url),
 	(_("Facebook"), theme.facebook_url),
