@@ -1,5 +1,5 @@
 import re
-from functools import lru_cache
+from functools import lru_cache, partial
 from urllib.parse import quote, urlencode
 
 import frappe
@@ -806,8 +806,13 @@ def update_so_status_from_related_doc(doc, method):
 
 
 def enqueue_ecommerce_status_update(sales_order_name):
-	"""One waiting recompute per order is enough: it reads the order's documents when it runs. A started job
-	may have read them before this change, so a second one queues behind it rather than being dropped."""
+	# Decided after commit: a job already queued could otherwise run in between and miss this change.
+	frappe.db.after_commit.add(partial(queue_ecommerce_status_update, sales_order_name))
+
+
+def queue_ecommerce_status_update(sales_order_name):
+	"""One waiting recompute per order is enough. A started one may have read the documents already,
+	so a second job queues behind it instead of being dropped."""
 	job_id = f"commera-order-status::{sales_order_name}"
 	started = get_job_status(job_id) == JobStatus.STARTED
 	frappe.enqueue(
@@ -815,7 +820,6 @@ def enqueue_ecommerce_status_update(sales_order_name):
 		sales_order_name=sales_order_name,
 		job_id=None if started else job_id,
 		deduplicate=not started,
-		enqueue_after_commit=True,
 	)
 
 
