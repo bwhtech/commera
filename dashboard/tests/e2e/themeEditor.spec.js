@@ -600,4 +600,79 @@ describe('theme editor', () => {
       await wait(500)
     }
   })
+
+  uiTest(session, 'Switching page keeps unsaved theme settings, and leaving asks about them', async (t) => {
+    const { page } = session
+    const theme = await findLiveSectionsTheme(page)
+    if (!theme) return t.skip('the live theme is not a Sections theme')
+
+    // The page switch needs a second page. A theme with only a home page is given a stand-in
+    // "Product" page answered from the home page's own data, which is enough for the editor.
+    const home = await adminGet(page, 'theme_layout.get_editor', { theme: theme.name, page: 'index' })
+    const pages = home.pages.includes('product') ? home.pages : [...home.pages, 'product']
+    const onRequest = (request) => {
+      if (request.isInterceptResolutionHandled()) return
+      const url = new URL(request.url())
+      if (!url.pathname.endsWith('theme_layout.get_editor')) return request.continue()
+      // createAdminCaller POSTs, so the page rides in the body.
+      const asked = JSON.parse(request.postData() || '{}').page ?? url.searchParams.get('page')
+      if (asked !== 'index' && asked !== 'product') return request.continue()
+      const body = { data: { ...home, pages, page: asked } }
+      request.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+    }
+    await page.setRequestInterception(true)
+    page.on('request', onRequest)
+
+    try {
+      await openEditor(page, theme)
+      await openThemeSettings(page)
+
+      const field = await page.evaluate(() => {
+        const input = [...document.querySelectorAll('input[id^="theme-"]')].find(
+          (element) => element.type === 'text' && !element.readOnly && !element.disabled,
+        )
+        return input && { id: input.id, value: input.value }
+      })
+      if (!field) return t.skip('this theme has no editable text setting')
+      const typed = `${field.value} E2E unsaved`
+      await page.click(`#${field.id}`)
+      await page.$eval(`#${field.id}`, (input) => input.select())
+      await page.keyboard.type(typed)
+
+      const trigger = await page.evaluateHandle(() =>
+        [...document.querySelectorAll('[data-theme-layout-editor] header button')].find((button) =>
+          button.querySelector('.lucide-chevron-down'),
+        ),
+      )
+      await trigger.asElement().click()
+      await wait(500)
+      const option = await page.evaluateHandle(() =>
+        [...document.querySelectorAll('[role=menuitem]')].find((item) => item.textContent.trim().startsWith('Product')),
+      )
+      assert.ok(option.asElement(), 'the page picker offers no Product page')
+      await option.asElement().click()
+      await page.waitForFunction(
+        () =>
+          [...document.querySelectorAll('[data-theme-layout-editor] header button')].some((button) =>
+            button.textContent.trim().startsWith('Product'),
+          ),
+        { timeout: 15000 },
+      )
+      await wait(800)
+      assert.equal(await page.$eval(`#${field.id}`, (input) => input.value), typed, 'a page switch dropped the typed theme setting')
+
+      // Leaving through the app asks before the typed setting is dropped, and Cancel stays.
+      await page.click('[data-theme-layout-editor] header nav a, [data-theme-layout-editor] header a')
+      await page.waitForFunction(() => document.body.innerText.includes('Discard unsaved theme settings?'), { timeout: 5000 })
+      const cancel = await page.evaluateHandle(() =>
+        [...document.querySelectorAll('[role=dialog] button')].find((button) => button.innerText.trim() === 'Cancel'),
+      )
+      await cancel.asElement().click()
+      await wait(600)
+      assert.ok(page.url().includes('/editor'), 'Cancel did not keep the editor open')
+    } finally {
+      page.off('request', onRequest)
+      await page.setRequestInterception(false)
+    }
+  })
 })

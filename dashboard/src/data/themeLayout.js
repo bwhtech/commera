@@ -4,6 +4,7 @@ import { createAdminCaller } from './adminCaller'
 import { useAdminAction, useAdminRead } from './api'
 import { rememberPreviewEntry, rememberedPreviewEntry } from '../ia/previewEntry'
 import { capturePage } from '../utils/capturePage'
+import { createSequence } from '../utils/sequence'
 import { readableName } from '../utils/sectionSettingToField'
 
 const DEFAULT_MAX_BLOCKS = 50
@@ -208,20 +209,36 @@ export function createLayoutEditor(theme) {
     if (state.selection && !selected.value) state.selection = null
   }
 
+  // Two quick page picks each load; get_editor is one shared request, so the second aborts the
+  // first, and the first's loop over the header and footer would abort the second in turn. Only
+  // the newest load may write the editor's state.
+  const loads = createSequence()
+  let settingsAdopted = false
+
   async function load(page = state.page) {
+    const ticket = loads.next()
     const { data, error } = await layoutCaller.attempt('get_editor', { theme, page })
+    if (!loads.isLatest(ticket)) return false
     state.loadError = error
     if (data) {
+      const groups = SECTION_GROUPS.filter((group) => data.pages.includes(group) && group !== page)
+      const groupData = []
+      for (const group of groups) {
+        groupData.push(await layoutCaller.call('get_editor', { theme, page: group }))
+        if (!loads.isLatest(ticket)) return false
+      }
       state.page = data.page
       state.pages = data.pages
       state.hasPreviewEntries = data.has_preview_entries
       state.previewEntry = data.has_preview_entries ? rememberedPreviewEntry(theme, data.page) : null
       state.schemas = data.section_schemas
-      state.settings = data.settings
+      // Theme settings belong to the theme, not the page, and saveThemeSettings() keeps this copy
+      // current. Re-adopting them on a page switch would wipe what is typed in the open panel.
+      if (!settingsAdopted) {
+        state.settings = data.settings
+        settingsAdopted = true
+      }
       state.live = data.live
-      const groups = SECTION_GROUPS.filter((group) => data.pages.includes(group) && group !== page)
-      const groupData = []
-      for (const group of groups) groupData.push(await layoutCaller.call('get_editor', { theme, page: group }))
       state.parts = []
       for (const partData of [data, ...groupData.filter(Boolean)]) adoptPart(partData)
       state.parts.sort(
@@ -241,7 +258,11 @@ export function createLayoutEditor(theme) {
       const params = { theme, page: part.group }
       if (withLayout) params.layout = clone(part.layout)
       const data = await layoutCaller.call(method, params)
-      if (!data) return false
+      if (!data) {
+        // Parts before this one have landed; the preview and badges must show them.
+        commit()
+        return false
+      }
       const layout = part.layout
       adoptPart(data)
       if (method !== 'discard') findPart(part.group).layout = layout
