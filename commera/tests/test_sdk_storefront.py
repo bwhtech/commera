@@ -97,6 +97,12 @@ class TestSdkStorefront(ProductDetailPriceTestCase):
 		self.assertNotIn(same_style, handles)
 		self.assertEqual(catalog.get_recommendations("no-such-product"), [])
 
+	def test_recommendations_are_empty_when_the_item_group_has_no_other_style(self):
+		route = self.make_priced_variant("LONESTYLE", default_rate=40)
+		frappe.db.set_value("Style Attribute Variant", {"route": route}, "item_group", "Services")
+
+		self.assertEqual(catalog.get_recommendations(route), [])
+
 	def test_money_uses_the_storefront_currency_symbol(self):
 		symbol = frappe.db.get_value("Currency", "INR", "symbol")
 		self.assertEqual(format.money(1234.5, "INR"), f"{symbol}1,234.50")

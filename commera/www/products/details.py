@@ -103,7 +103,8 @@ def get_recommended_products(product_variant, limit=8):
 		pluck="name",
 		limit=limit,
 	)
-
+	if not style_attribute_variants:
+		return []
 	return get_product_list(product_list=style_attribute_variants)
 
 
