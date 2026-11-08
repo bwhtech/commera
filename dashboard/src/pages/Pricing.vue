@@ -13,6 +13,7 @@ import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { money } from '../data/format'
 import { compareAtPrice, pricePayload, shownPrice } from '../data/product'
 import { ia } from '../ia/store'
+import { useBulkAction } from '../utils/useBulkAction'
 
 const selecting = ref(false)
 const selection = ref([])
@@ -44,6 +45,22 @@ const rows = computed(() =>
 )
 
 const priceAction = useAdminAction('catalog.set_variant_price')
+// Its own request, quiet: a bulk run reports once at the end, and must not abort (or be aborted
+// by) a single row's inline edit on the shared one.
+const bulkPriceAction = useAdminAction('catalog.set_variant_price', { quiet: true })
+const { running: bulkRunning, run: runBulk } = useBulkAction()
+
+function repriceAll(label, selected, payloadFor, verb) {
+  return runBulk(label, selected, (row) => bulkPriceAction.submit({ style_attribute_variant: row.name, ...payloadFor(row) }), {
+    noun: 'item',
+    verb,
+    after: ({ failed }) => {
+      selection.value = failed.map(({ item }) => item.name)
+      if (!failed.length) endSelecting()
+      return pricingRequest.reload()
+    },
+  })
+}
 
 // The same variant-wide bulk write (catalog.set_variant_price) the product page's own variant
 // matrix uses, applying one rate to every size under the variant.
@@ -65,15 +82,12 @@ function bulkRaisePrice() {
     fields: [{ name: 'value', label: 'Raise by %', type: 'number', required: true }],
     onConfirm: async ({ values }) => {
       const pct = Number(values.value) || 0
-      for (const row of selected) {
-        const rate = Math.round(row.price * (1 + pct / 100) * 100) / 100
-        const saved = await trySubmit(priceAction, { style_attribute_variant: row.name, ...pricePayload(row, rate) })
-        // A failure already toasted inside useAdminAction — stop rather than reprice the rest silently.
-        if (!saved) return
-      }
-      endSelecting()
-      toast.success(`Price raised on ${selected.length} ${selected.length === 1 ? 'item' : 'items'}`)
-      pricingRequest.reload()
+      await repriceAll(
+        'Raise by %',
+        selected,
+        (row) => pricePayload(row, Math.round(row.price * (1 + pct / 100) * 100) / 100),
+        'repriced',
+      )
     },
   })
 }
@@ -89,13 +103,7 @@ function bulkSetCompareAt() {
     fields: [{ name: 'value', label: 'Compare at', type: 'number', required: true }],
     onConfirm: async ({ values }) => {
       const rate = Math.max(0, Number(values.value) || 0)
-      for (const row of selected) {
-        const saved = await trySubmit(priceAction, { style_attribute_variant: row.name, default_rate: rate })
-        if (!saved) return
-      }
-      endSelecting()
-      toast.success(`Compare-at set on ${selected.length} ${selected.length === 1 ? 'item' : 'items'}`)
-      pricingRequest.reload()
+      await repriceAll('Set compare-at', selected, () => ({ default_rate: rate }), 'given a compare-at price')
     },
   })
 }
@@ -124,9 +132,9 @@ function bulkSetCompareAt() {
       />
     </div>
 
-    <BulkBar v-if="selecting" :count="selection.length" noun="item" @done="endSelecting">
-      <Button label="Raise by %" @click="bulkRaisePrice" />
-      <Button label="Set compare-at" @click="bulkSetCompareAt" />
+    <BulkBar v-if="selecting" :count="selection.length" noun="item" :busy="Boolean(bulkRunning)" @done="endSelecting">
+      <Button label="Raise by %" :loading="bulkRunning === 'Raise by %'" @click="bulkRaisePrice" />
+      <Button label="Set compare-at" :loading="bulkRunning === 'Set compare-at'" @click="bulkSetCompareAt" />
     </BulkBar>
 
     <div class="mt-3 overflow-x-auto">

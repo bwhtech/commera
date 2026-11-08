@@ -4,6 +4,8 @@ import { Button } from 'frappe-ui'
 defineProps({
   count: { type: Number, required: true },
   noun: { type: String, default: 'item' },
+  // A bulk action is running: every action, and Done, waits for it rather than racing it.
+  busy: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['done'])
@@ -20,10 +22,10 @@ const emit = defineEmits(['done'])
     <div class="ml-auto flex flex-wrap gap-2">
       <!-- A fieldset so every action a screen slots in is inert with nothing selected, whatever it
            is: each handler already returns early on an empty selection, which read as a dead click. -->
-      <fieldset :disabled="!count" class="flex flex-wrap gap-2 disabled:opacity-50">
+      <fieldset :disabled="!count || busy" class="flex flex-wrap gap-2 disabled:opacity-50">
         <slot :count="count" />
       </fieldset>
-      <Button label="Done" icon-left="lucide-check" @click="emit('done')" />
+      <Button label="Done" icon-left="lucide-check" :disabled="busy" @click="emit('done')" />
     </div>
   </div>
 </template>

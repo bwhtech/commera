@@ -148,4 +148,54 @@ describe('state flows', () => {
       await page.evaluate(() => localStorage.removeItem('commera:onboarding-step'))
     }
   })
+
+  uiTest(session, 'bulk fulfil: one run at a time, a refusal does not stop it, and the list reloads', async () => {
+    const { page } = session
+    await goto(page, '/orders')
+    await clickByText(page, 'button', 'Select')
+    const rows = await page.$$('a[data-slot=list-row]')
+    assert.ok(rows.length >= 2, 'needs two orders on the first page')
+    await rows[0].click()
+    await rows[1].click()
+    await wait(300)
+
+    // Never reaches the server: the first order "fulfils", the second is refused.
+    const fulfils = []
+    let listReads = 0
+    const onRequest = (request) => {
+      if (request.isInterceptResolutionHandled()) return
+      if (request.url().includes('orders.get_orders')) listReads += 1
+      if (!request.url().includes('orders.fulfil_order')) return request.continue()
+      fulfils.push(request.postData())
+      const refused = fulfils.length === 2
+      setTimeout(() => {
+        request.respond(
+          refused
+            ? {
+                status: 417,
+                contentType: 'application/json',
+                body: JSON.stringify({ errors: [{ type: 'ValidationError', message: 'Order is on hold' }] }),
+              }
+            : { status: 200, contentType: 'application/json', body: JSON.stringify({ data: {} }) },
+        )
+      }, 400)
+    }
+    await page.setRequestInterception(true)
+    page.on('request', onRequest)
+    try {
+      const button = await findByText(page, 'button', 'Mark fulfilled')
+      await button.click()
+      await button.click({ delay: 0 }).catch(() => {})
+      await waitFor(async () => (await text(page)).includes('failed'), { label: 'the summary toast' })
+      await wait(800)
+      assert.equal(fulfils.length, 2, `a second click started another run: ${fulfils.length} fulfil calls`)
+      const body = await text(page)
+      assert.ok(body.includes('1 of 2 orders marked fulfilled. 1 failed: Order is on hold'), 'no partial-failure summary: ' + (await page.evaluate(() => [...document.querySelectorAll('[data-sonner-toast]')].map((t) => t.innerText).join(' / '))))
+      assert.ok(listReads >= 1, 'the list was not reloaded after the run')
+      assert.ok(body.includes('1 order selected'), 'the refused order should stay selected for a retry')
+    } finally {
+      page.off('request', onRequest)
+      await page.setRequestInterception(false)
+    }
+  })
 })
