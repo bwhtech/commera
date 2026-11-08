@@ -100,6 +100,7 @@
   "seo_crawlers_section",
   "sitemap_urls_per_page",
   "llms_txt",
+  "enable_webmcp",
   "footer_customization_tab",
   "newsletter_title",
   "column_break_newsletter",
@@ -917,6 +918,13 @@
    "label": "llms.txt Content"
   },
   {
+   "default": "1",
+   "description": "WebMCP tools let AI agents in the shopper's browser search products, change the cart and go to checkout on themed storefront pages.",
+   "fieldname": "enable_webmcp",
+   "fieldtype": "Check",
+   "label": "Enable WebMCP Tools for Browser AI Agents"
+  },
+  {
    "fieldname": "navbar_tab",
    "fieldtype": "Tab Break",
    "label": "Navbar"
@@ -994,7 +1002,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-04 10:00:00.000000",
+ "modified": "2026-11-08 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Settings",

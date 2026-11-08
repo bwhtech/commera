@@ -73,6 +73,7 @@ class CommeraSettings(Document):
 		default_share_image: DF.AttachImage | None
 		ecommerce_item_group_mapping: DF.Table[ItemGroupMap]
 		ecommerce_warehouse: DF.Link | None
+		enable_webmcp: DF.Check
 		facebook_url: DF.Data | None
 		favicon: DF.Attach | None
 		focus_ring_color: DF.Color | None

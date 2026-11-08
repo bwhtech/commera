@@ -37,6 +37,13 @@
                     sync_timer = setTimeout(() => this.sync(), 400);
                 });
                 loaded = this.load_server_cart();
+                // The storefront SDK (an agent's WebMCP tools) changed the server cart: it wins, as on a conflict.
+                window.addEventListener('commera:cart-updated', async () => {
+                    clearTimeout(sync_timer);
+                    sync_timer = null;
+                    if (sync_chain) await sync_chain;
+                    await this.restore_server_cart();
+                });
             },
             // Pages that change the cart on load wait for this, or it puts the old server cart back.
             wait_until_loaded() {

@@ -118,7 +118,9 @@ def get_checkout_url() -> dict:
 		handoff,
 		expires_in_sec=CHECKOUT_CODE_SECONDS + CHECKOUT_SIGN_IN_SECONDS,
 	)
-	return {"path": f"/api/v2/method/commera.api.storefront.cart.open_checkout?code={code}"}
+	# The browser opens this path itself, so it names the language the checkout pages use.
+	query = urlencode({"code": code, "_lang": frappe.local.lang})
+	return {"path": f"/api/v2/method/commera.api.storefront.cart.open_checkout?{query}"}
 
 
 def get_checkout_handoff() -> dict:

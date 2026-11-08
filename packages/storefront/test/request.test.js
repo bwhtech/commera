@@ -212,3 +212,15 @@ test('a server message still wins over the fallback', async () => {
 		message: 'Product gone not found',
 	});
 });
+
+test('every call carries the storefront language', async () => {
+	globalThis.commera_storefront_config = {
+		csrf_token: 'csrf-123',
+		language: 'ar',
+	};
+	const calls = add_fake_fetch();
+	await get('shop.list_countries', { page: 2 });
+	await post('cart.add_lines', { lines: [] });
+	assert.match(calls[0].url, /\?page=2&_lang=ar$/);
+	assert.deepEqual(calls[1].body, { lines: [], _lang: 'ar' });
+});

@@ -2,6 +2,7 @@ import importlib.util
 import os
 
 import frappe
+from frappe.utils.data import cint
 from frappe.utils.jinja import get_jenv
 from frappe.utils.jinja_globals import is_rtl
 from frappe.website.doctype.website_settings.website_settings import get_website_settings
@@ -288,6 +289,10 @@ def build_base_context(match):
 			"csrf_token": frappe.session.data.csrf_token,
 			"store_currency": get_store_currency(),
 			"currency_symbols": get_currency_symbols(),
+			"language": frappe.local.lang or "en",
+			"webmcp": bool(
+				cint(frappe.get_cached_value("Commera Settings", "Commera Settings", "enable_webmcp"))
+			),
 		},
 	)
 	context.commera = commera.sdk

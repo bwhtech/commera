@@ -12,7 +12,7 @@ export class StorefrontError extends Error {
 
 export async function get(method, params = {}) {
 	const query = new URLSearchParams();
-	for (const [key, value] of Object.entries(params)) {
+	for (const [key, value] of Object.entries(with_language(params))) {
 		if (value !== undefined && value !== null) {
 			query.set(key, typeof value === 'object' ? JSON.stringify(value) : value);
 		}
@@ -28,8 +28,14 @@ export async function post(method, params = {}) {
 			'Content-Type': 'application/json',
 			'X-Frappe-CSRF-Token': get_csrf_token(),
 		},
-		body: JSON.stringify(params),
+		body: JSON.stringify(with_language(params)),
 	});
+}
+
+// Frappe reads `_lang` before the shopper's account or browser language, so replies match the page.
+function with_language(params) {
+	const language = globalThis.commera_storefront_config?.language;
+	return language ? { ...params, _lang: language } : params;
 }
 
 function get_csrf_token() {
