@@ -530,8 +530,6 @@
                     window.prompt({{ _("Copy this cart link") | tojson }}, url);
                 }
             },
-            // Swaps the line to another size, keeping its quantity as far as stock allows. Resolves true once the
-            // server has the change and the page reloads to show it; false leaves the line as it was.
             // Only the lines the switch touched go back; edits made to other lines meanwhile stay.
             async undo_size_switch({ target, fields, removed, removed_index }) {
                 Object.assign(target, fields);
@@ -548,6 +546,8 @@
                     sync_timer = null;
                 }
             },
+            // Swaps the line to another size, keeping its quantity as far as stock allows. Resolves true once the
+            // server has the change and the page reloads to show it; false leaves the line as it was.
             async update_variant(cart_item, selected_size) {
                 if (this.updating_variant) return false;
                 this.updating_variant = cart_item.variant.item_code;
