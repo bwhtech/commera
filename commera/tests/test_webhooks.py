@@ -347,6 +347,60 @@ class TestWebhooks(ProductDetailPriceTestCase):
 		)
 		enqueue.assert_called_once_with("commera", "Commera Settings", "Commera Settings", "menu_updated")
 
+	def test_a_webhook_unsubscribed_since_its_last_attempt_fails_its_retrying_log(self):
+		down = make_webhook(["menu_updated"], url=DOWN_URL)
+		event = self.make_event("menu_updated", {})
+		self.deliver_and_fail(event)
+		down.reload()
+		down.events = []
+		down.append("events", {"event": "page_updated"})
+		down.save(ignore_permissions=True)
+		clear_subscriptions()
+
+		deliver(event)
+
+		[log] = get_logs(down.name)
+		self.assertEqual((log.status, log.next_retry_at), ("Failed", None))
+
+	def retrying_log_and_delivery(self, webhook):
+		plugin_events.fire_event("menu_updated", "Commera Settings", "Commera Settings", repeatable=True)
+		event_key = frappe.db.get_value(
+			"Commera Event", {"event": "menu_updated"}, "name", order_by="creation desc"
+		)
+		self.deliver_and_fail(self.make_event("menu_updated", {}, event_id=event_key))
+		self.assertEqual(get_logs(webhook.name)[0].status, "Retrying")
+		return event_key, frappe.db.get_value(
+			"Commera Event Delivery", {"parent": event_key, "handler": HANDLER}
+		)
+
+	def test_retry_failed_fails_a_log_whose_delivery_already_finished(self):
+		webhook = make_webhook(["menu_updated"], url=DOWN_URL)
+		_event_key, delivery = self.retrying_log_and_delivery(webhook)
+		frappe.db.set_value("Commera Event Delivery", delivery, "status", "Done")
+
+		with patch.object(plugin_events, "enqueue_app_deliveries") as enqueue:
+			self.assertEqual(webhooks_api.retry_failed(webhook.name), {"count": 0})
+
+		enqueue.assert_not_called()
+		self.assertEqual(frappe.db.get_value("Commera Event Delivery", delivery, "status"), "Done")
+		self.assertEqual(get_logs(webhook.name)[0].status, "Failed")
+
+	def test_a_delivery_that_runs_out_of_retries_fails_its_retrying_logs(self):
+		webhook = make_webhook(["menu_updated"], url=DOWN_URL)
+		event_key, delivery = self.retrying_log_and_delivery(webhook)
+		frappe.db.set_value("Commera Event Delivery", delivery, "status", "Running")
+		row = frappe._dict(
+			name=delivery,
+			attempts=len(plugin_events.RETRY_DELAYS_IN_MINUTES),
+			handler=HANDLER,
+			event_key=event_key,
+		)
+
+		self.assertTrue(plugin_events.save_failed_attempt(row, None))
+
+		self.assertEqual(frappe.db.get_value("Commera Event Delivery", delivery, "status"), "Failed")
+		self.assertEqual(get_logs(webhook.name)[0].status, "Failed")
+
 	def test_the_admin_api_lists_and_describes_webhooks(self):
 		created = webhooks_api.create_webhook(
 			"https://store.example.com/hook", ["menu_updated", "page_updated"]

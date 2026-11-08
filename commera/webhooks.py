@@ -141,7 +141,10 @@ def deliver(event: CommeraEvent):
 	the webhooks that failed. A receiver can still see an event twice: dedupe on the X-Commera-Event-Id header."""
 	body = frappe.as_json(get_payload(event), indent=None)
 	failures = []
-	for name in get_subscriptions().get(event.name, []):
+	subscribed = get_subscriptions().get(event.name, [])
+	# A webhook turned off or unsubscribed since its last attempt is never posted to again.
+	fail_event_logs(event.id, keep_webhooks=subscribed)
+	for name in subscribed:
 		log = get_delivery_log(name, event)
 		if log.status == "Done":
 			continue
@@ -282,6 +285,23 @@ def turn_off(webhook: str):
 	frappe.db.after_commit.add(clear_subscriptions)
 
 
+def fail_event_logs(event_id: str, keep_webhooks: list | None = None, webhook: str | None = None):
+	"""Retrying -> Failed for an event's logs that no job will post again: all of them, only one webhook's,
+	or all but the kept webhooks'."""
+	log = frappe.qb.DocType(LOG_DOCTYPE)
+	query = (
+		frappe.qb.update(log)
+		.set(log.status, "Failed")
+		.set(log.next_retry_at, None)
+		.where((log.event_id == event_id) & (log.status == "Retrying"))
+	)
+	if webhook:
+		query = query.where(log.webhook == webhook)
+	if keep_webhooks:
+		query = query.where(log.webhook.notin(keep_webhooks))
+	query.run()
+
+
 def fail_retrying_logs(webhook: str):
 	"""The event queue skips a webhook that is off, so its Retrying logs would never finish."""
 	log = frappe.qb.DocType(LOG_DOCTYPE)
@@ -334,7 +354,7 @@ def retry_failing_logs(webhook: str) -> int:
 		.on(commera_event.event_key == log.event_id)
 		.join(delivery)
 		.on(delivery.parent == commera_event.name)
-		.select(delivery.name)
+		.select(delivery.name, log.event_id)
 		.distinct()
 		.where(
 			(log.webhook == webhook)
@@ -342,14 +362,19 @@ def retry_failing_logs(webhook: str) -> int:
 			& (delivery.handler == HANDLER)
 			& (delivery.status != "Running")
 		)
-		.run(pluck=True)
+		.run(as_dict=True)
 	)
-	for delivery_name in deliveries:
-		queue_delivery_now(delivery_name)
+	queued = 0
+	for row in deliveries:
+		if queue_delivery_now(row.name):
+			queued += 1
+		else:
+			# The delivery already finished, so nothing will post this log again.
+			fail_event_logs(row.event_id, webhook=webhook)
 	frappe.db.set_value(
 		LOG_DOCTYPE, {"webhook": webhook, "status": "Retrying"}, "next_retry_at", now_datetime()
 	)
-	return len(deliveries)
+	return queued
 
 
 def get_payload(event: CommeraEvent) -> dict:

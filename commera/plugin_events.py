@@ -295,9 +295,9 @@ def run_delivery(delivery) -> bool:
 		frappe.db.commit()
 		return False
 
-	frappe.db.set_value(
-		"Commera Event Delivery",
+	set_delivery_state(
 		delivery.name,
+		"Running",
 		{
 			"status": "Done",
 			"attempts": delivery.attempts + 1,
@@ -322,7 +322,9 @@ def get_commera_event(delivery) -> CommeraEvent:
 	)
 
 
-def save_failed_attempt(delivery, error_log: str | None):
+def save_failed_attempt(delivery, error_log: str | None) -> bool:
+	"""Running -> Queued for the next retry, or -> Failed once the retries run out. False when the row
+	was no longer Running: another job (the stale-claim sweep, or the worker itself) already moved it."""
 	attempts = delivery.attempts + 1
 	values = {"attempts": attempts, "last_error": error_log}
 	if attempts > len(RETRY_DELAYS_IN_MINUTES):
@@ -332,7 +334,34 @@ def save_failed_attempt(delivery, error_log: str | None):
 			status="Queued",
 			next_retry_at=add_to_date(now_datetime(), minutes=RETRY_DELAYS_IN_MINUTES[attempts - 1]),
 		)
-	frappe.db.set_value("Commera Event Delivery", delivery.name, values)
+	moved = set_delivery_state(delivery.name, "Running", values)
+	if moved and values["status"] == "Failed" and delivery.get("handler") == WEBHOOK_HANDLER:
+		fail_retrying_webhook_logs(delivery)
+	return moved
+
+
+def set_delivery_state(delivery_name: str, expected_status: str | tuple, values: dict) -> bool:
+	"""Write a delivery's new state only while it is still in the expected one. Each job reads a row, works,
+	then writes: without the check, a write based on a stale read undoes another job's transition."""
+	expected = (expected_status,) if isinstance(expected_status, str) else expected_status
+	delivery = DocType("Commera Event Delivery")
+	query = frappe.qb.update(delivery).where(
+		(delivery.name == delivery_name) & delivery.status.isin(expected)
+	)
+	for field, value in values.items():
+		query = query.set(delivery[field], value)
+	query.run()
+	return frappe.db._cursor.rowcount == 1
+
+
+def fail_retrying_webhook_logs(delivery):
+	"""The webhook handler's delivery gave up, so no job will post its Retrying logs again."""
+	from commera.webhooks import fail_event_logs
+
+	event_key = delivery.get("event_key") or frappe.db.get_value(
+		"Commera Event Delivery", delivery.name, "parent"
+	)
+	fail_event_logs(event_key)
 
 
 def run_due_deliveries():
@@ -348,7 +377,7 @@ def release_stale_claims():
 			"status": "Running",
 			"claimed_at": ["<", add_to_date(now_datetime(), minutes=-STALE_CLAIM_MINUTES)],
 		},
-		fields=["name", "attempts", "last_error"],
+		fields=["name", "attempts", "last_error", "handler", "parent as event_key"],
 	)
 	for stale_delivery in stale_deliveries:
 		save_failed_attempt(stale_delivery, stale_delivery.last_error)
@@ -386,23 +415,23 @@ def retry_delivery(delivery: str):
 	)
 	if not failed_delivery:
 		frappe.throw(_("Delivery {0} not found").format(delivery), frappe.DoesNotExistError)
-	if failed_delivery.status != "Failed":
+	if failed_delivery.status != "Failed" or not queue_delivery_now(delivery, from_statuses=("Failed",)):
 		frappe.throw(_("Only a failed delivery can be retried."))
-	queue_delivery_now(delivery)
 
 
-def queue_delivery_now(delivery: str):
-	"""Run the delivery on its lane's next job, whatever retry it waits for or however it ended."""
+def queue_delivery_now(delivery: str, from_statuses: tuple = ("Queued", "Failed")) -> bool:
+	"""Run a waiting or failed delivery on its lane's next job. A Running delivery is left to its job, and a
+	Done one is never sent again. Returns whether the delivery was queued."""
 	parent, app = frappe.db.get_value("Commera Event Delivery", delivery, ["parent", "app"])
-	frappe.db.set_value(
-		"Commera Event Delivery",
-		delivery,
-		{"status": "Queued", "next_retry_at": now_datetime(), "finished_at": None},
-	)
+	if not set_delivery_state(
+		delivery, from_statuses, {"status": "Queued", "next_retry_at": now_datetime(), "finished_at": None}
+	):
+		return False
 	event, reference_doctype, reference_name = frappe.db.get_value(
 		"Commera Event", parent, ["event", "reference_doctype", "reference_name"]
 	)
 	enqueue_app_deliveries(app, reference_doctype, reference_name, get_lane_event(reference_doctype, event))
+	return True
 
 
 def add_plugin_user(setup_args=None):
