@@ -13,6 +13,7 @@ import { Badge, Button, Dialog, LoadingText, toast } from 'frappe-ui'
 import ListPagination from '../ListPagination.vue'
 import SearchInput from '../SearchInput.vue'
 import { useNavMenu } from '../../data/navMenu'
+import { createSequence } from '../../utils/sequence'
 
 const props = defineProps({
   // { name, label, publish, count } — the answer from navigation.get_publish_preview.
@@ -27,7 +28,9 @@ const search = ref('')
 const page = ref(1)
 const pageSize = ref(10)
 const cascade = ref(null)
-const loading = ref(false)
+// The list's own state: 'idle' | 'loading' | 'ready' | 'error'. Confirm waits for `ready`, because the
+// blocked-options note it depends on comes from this answer.
+const status = ref('idle')
 const submitting = ref(false)
 
 const publishing = computed(() => Boolean(props.target?.publish))
@@ -80,27 +83,42 @@ function rowState(option) {
   return { label: 'Going live', theme: 'green' }
 }
 
-async function loadOptions() {
-  if (!props.target) return
+// Opening resets the search and page, which their own watcher sees too, so one open used to send
+// two reads that aborted each other. A read for the same list as the one in flight is skipped, and
+// only the newest read may land: a reply for a closed dialog or an older search is dropped.
+const loads = createSequence()
+let inFlight = ''
 
-  loading.value = true
-  try {
-    cascade.value = await call('get_cascade_products', {
-      name: props.target.name,
-      start: (page.value - 1) * pageSize.value,
-      page_length: pageSize.value,
-      search: search.value || undefined,
-    })
-  } finally {
-    loading.value = false
+async function loadOptions() {
+  if (!props.target || !open.value) return
+  const params = {
+    name: props.target.name,
+    start: (page.value - 1) * pageSize.value,
+    page_length: pageSize.value,
+    search: search.value || undefined,
   }
+  const key = JSON.stringify(params)
+  if (status.value === 'loading' && key === inFlight) return
+  inFlight = key
+  const ticket = loads.next()
+  status.value = 'loading'
+  const answer = await call('get_cascade_products', params)
+  if (!loads.isLatest(ticket)) return
+  inFlight = ''
+  cascade.value = answer
+  status.value = answer ? 'ready' : 'error'
 }
 
 watch(open, (isOpen) => {
-  if (!isOpen) return
+  if (!isOpen) {
+    loads.cancel()
+    inFlight = ''
+    return
+  }
   search.value = ''
   page.value = 1
   cascade.value = null
+  status.value = 'idle'
   loadOptions()
 })
 
@@ -109,6 +127,7 @@ watch(search, () => (page.value = 1))
 watch([search, page, pageSize], loadOptions)
 
 async function confirmPublish() {
+  if (submitting.value || status.value !== 'ready') return
   submitting.value = true
   try {
     const data = await mutate('set_published', {
@@ -147,7 +166,12 @@ async function confirmPublish() {
           placeholder="Search these options"
         />
 
-        <LoadingText v-if="loading" />
+        <LoadingText v-if="status === 'loading' || status === 'idle'" />
+
+        <div v-else-if="status === 'error'" class="flex flex-col items-center gap-2 py-6 text-center">
+          <p class="text-base text-ink-gray-5">Could not list these options.</p>
+          <Button label="Try again" @click="loadOptions" />
+        </div>
 
         <template v-else>
           <p v-if="!options.length" class="py-6 text-center text-base text-ink-gray-5">
@@ -184,7 +208,7 @@ async function confirmPublish() {
         variant="solid"
         theme="gray"
         :label="confirmLabel"
-        :disabled="!count"
+        :disabled="!count || status !== 'ready'"
         :loading="submitting"
         @click="confirmPublish"
       />
