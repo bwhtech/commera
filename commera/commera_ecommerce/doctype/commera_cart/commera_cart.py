@@ -49,6 +49,9 @@ class CommeraCart(Document):
 			line.attributes = frappe.as_json(attributes, indent=None) if attributes else None
 		self.validate_stock()
 
+	def before_save(self):
+		self.revision = cint(self.revision) + 1
+
 	def validate_stock(self):
 		# Only what grew: a line stock fell under since it was added must not block every other cart edit.
 		previous = self.get_doc_before_save()
@@ -192,6 +195,7 @@ class CommeraCart(Document):
 		return {
 			"name": self.name,
 			"version": self.version,
+			"revision": cint(self.revision),
 			"attributes": parse_attributes(self.attributes),
 			"currency": quotation.currency,
 			"discount_codes": get_code_states(quotation),
@@ -361,7 +365,7 @@ def get_session_cart(create: bool = False) -> CommeraCart | None:
 
 
 def clear_ordered_cart(quotation, shopper: str | None):
-	# modified is left alone so the next browser sync is not a version conflict.
+	# modified is left alone so the next browser sync is not a version conflict; revision moves for set_lines.
 	cart = frappe.qb.DocType("Commera Cart")
 	if quotation.custom_guest_cart_key:
 		condition = cart.cart_key == quotation.custom_guest_cart_key
@@ -372,9 +376,9 @@ def clear_ordered_cart(quotation, shopper: str | None):
 	cart_name = frappe.qb.from_(cart).select(cart.name).where(condition).run(pluck=True)
 	if not cart_name:
 		return
-	frappe.qb.update(cart).set(cart.discount_codes, None).set(cart.attributes, None).where(
-		cart.name == cart_name[0]
-	).run()
+	frappe.qb.update(cart).set(cart.discount_codes, None).set(cart.attributes, None).set(
+		cart.revision, cart.revision + 1
+	).where(cart.name == cart_name[0]).run()
 	# The webhook can place the order while the shopper never comes back to sync the browser cart.
 	line = frappe.qb.DocType("Commera Cart Line")
 	frappe.qb.from_(line).delete().where(

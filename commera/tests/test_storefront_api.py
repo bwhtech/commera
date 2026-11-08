@@ -277,6 +277,23 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		with self.assertRaises(frappe.DoesNotExistError):
 			get_page(page.route)
 
+	def test_rate_limited_guest_api_whitelists_an_endpoint_for_guests_on_its_method_only(self):
+		from commera.api.storefront import auth, cart
+
+		for endpoint, method, other in ((cart.get_cart, "GET", "POST"), (cart.set_lines, "POST", "GET")):
+			with self.subTest(endpoint=endpoint.__name__):
+				allowed_methods = frappe.allowed_http_methods_for_whitelisted_func[endpoint]
+				self.assertIn(endpoint, frappe.guest_methods)
+				self.assertIn(method, allowed_methods)
+				self.assertNotIn(other, allowed_methods)
+		self.assertIn(auth.log_out, frappe.guest_methods)
+
+	def test_rate_limited_guest_api_needs_a_limit(self):
+		from commera.api.storefront import rate_limited_guest_api
+
+		with self.assertRaises(TypeError):
+			rate_limited_guest_api("POST")
+
 	def test_the_sdk_returns_none_where_the_api_answers_404(self):
 		route = self.make_priced_variant("SDKHIDDEN", default_rate=50)
 		frappe.db.set_value("Style Attribute Variant", {"route": route}, "is_published", 0)

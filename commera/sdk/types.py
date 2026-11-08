@@ -275,6 +275,8 @@ class PricedCart(TypedDict):
 
 	name: str
 	version: str
+	# Counts every change, lines cleared by a placed order included; set_lines takes it.
+	revision: int
 	attributes: dict[str, str]
 	currency: str
 	# {"code", "title", "discount_class", "applied", "reason"}; reason says why an unapplied code gives nothing.

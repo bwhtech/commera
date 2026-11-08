@@ -2,36 +2,32 @@ from urllib.parse import quote
 
 import frappe
 from frappe import _
-from frappe.rate_limiter import rate_limit
 
+from commera.api.storefront import rate_limited_guest_api
 from commera.sdk import shop
 from commera.sdk.types import ContentPage, Country, MenuItem, Sitemap
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=600, seconds=60)
+@rate_limited_guest_api("GET", limit=600, seconds=60)
 def get_shop() -> dict:
 	"""The shop, with each menu item's path on a headless storefront in `url`."""
 	details = shop.get_shop()
 	return {**details, "menu": [with_storefront_url(item) for item in details["menu"]]}
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=600, seconds=60)
+@rate_limited_guest_api("GET", limit=600, seconds=60)
 def get_page(handle: str) -> ContentPage:
 	if page := shop.get_page(handle):
 		return page
 	frappe.throw(_("Page {0} not found").format(handle), frappe.DoesNotExistError)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=60, seconds=60)
+@rate_limited_guest_api("GET", limit=60, seconds=60)
 def get_sitemap(kind: str | None = None, page: int = 1) -> Sitemap:
 	return shop.get_sitemap(kind=kind or None, page=page)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=600, seconds=60)
+@rate_limited_guest_api("GET", limit=600, seconds=60)
 def list_countries() -> list[Country]:
 	return shop.list_countries()
 

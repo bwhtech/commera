@@ -73,6 +73,7 @@ PUBLIC_NAMES = {
 		"remove_lines",
 		"set_cart_attributes",
 		"set_cart_fields",
+		"set_lines",
 		"update_lines",
 	],
 	"commera.sdk.discounts": [

@@ -22,6 +22,11 @@ const cart_writes = [
 		{ lines: [{ line_id: 'line-1', qty: 0 }] },
 	],
 	[
+		'set_lines',
+		() => cart.set_lines([{ line_id: 'line-1', qty: 2 }], 4),
+		{ lines: [{ line_id: 'line-1', qty: 2 }], revision: 4 },
+	],
+	[
 		'remove_lines',
 		() => cart.remove_lines(['line-1']),
 		{ line_ids: ['line-1'] },

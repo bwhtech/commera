@@ -94,7 +94,7 @@ export const storefront_tools = [
 	{
 		name: 'get_cart',
 		description:
-			"Get the shopper's cart: lines, quantities, discounts and totals. The cart is null when the shopper has no cart yet; a cart can also exist with no lines. Pass its version to update_cart.",
+			"Get the shopper's cart: lines, quantities, discounts and totals. The cart is null when the shopper has no cart yet; a cart can also exist with no lines. Pass its revision to update_cart.",
 		inputSchema: NO_INPUT,
 		annotations: READS_STORE_DATA,
 		async run() {
@@ -108,10 +108,10 @@ export const storefront_tools = [
 		inputSchema: {
 			type: 'object',
 			properties: {
-				version: {
-					type: ['string', 'null'],
+				revision: {
+					type: ['integer', 'null'],
 					description:
-						'The version of the cart from get_cart. Send null only when get_cart returned a null cart, not for a cart with no lines.',
+						'The revision of the cart from get_cart. Send null only when get_cart returned a null cart, not for a cart with no lines.',
 				},
 				lines: {
 					type: 'array',
@@ -120,13 +120,18 @@ export const storefront_tools = [
 						properties: {
 							line_id: { type: 'string' },
 							item_code: { type: 'string' },
-							qty: { type: 'integer', minimum: 1 },
+							qty: {
+								type: 'integer',
+								minimum: 0,
+								description:
+									'0 removes a kept line; a new line needs 1 or more.',
+							},
 						},
 						required: ['qty'],
 					},
 				},
 			},
-			required: ['version', 'lines'],
+			required: ['revision', 'lines'],
 		},
 		annotations: RETURNS_STORE_DATA,
 		run: set_cart_lines,
@@ -164,45 +169,15 @@ export const storefront_tools = [
 	},
 ];
 
-async function set_cart_lines({ version, lines }) {
-	const current = await cart.get();
-	if ((current?.version ?? null) !== version) {
-		return {
-			cart: current,
-			changed: false,
-			message: 'The cart changed since you read it. Read it again and retry.',
-		};
+async function set_cart_lines({ revision, lines }) {
+	try {
+		return { cart: await cart.set_lines(lines, revision), changed: true };
+	} catch (error) {
+		if (error.exc_type !== 'CartChangedError') {
+			throw error;
+		}
+		return { cart: await cart.get(), changed: false, message: error.message };
 	}
-	const wanted = new Map(
-		lines
-			.filter((line) => line.line_id)
-			.map((line) => [line.line_id, line.qty]),
-	);
-	const existing = current?.lines ?? [];
-	const unknown = [...wanted.keys()].filter(
-		(line_id) => !existing.some((line) => line.line_id === line_id),
-	);
-	if (unknown.length) {
-		throw new StorefrontError(`The cart has no line ${unknown.join(', ')}.`);
-	}
-	const changes = existing
-		.filter((line) => wanted.get(line.line_id) !== line.qty)
-		.map((line) => ({
-			line_id: line.line_id,
-			qty: wanted.get(line.line_id) ?? 0,
-		}));
-	const additions = lines
-		.filter((line) => !line.line_id)
-		.map(({ item_code, qty }) => ({ item_code, qty }));
-
-	let updated = current;
-	if (changes.length) {
-		updated = await cart.update_lines(changes);
-	}
-	if (additions.length) {
-		updated = await cart.add_lines(additions);
-	}
-	return { cart: updated, changed: updated !== current };
 }
 
 function get_product_url(handle) {
