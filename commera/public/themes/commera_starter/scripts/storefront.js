@@ -302,6 +302,9 @@ function checkout(config) {
 
 		async init() {
 			globalThis.addEventListener('commera:cart-updated', () => this.refresh());
+			globalThis.addEventListener('commera:checkout-updated', (event) =>
+				this.show_state(event.detail),
+			);
 			try {
 				this.state = await commera.checkout.get();
 			} catch (error) {
@@ -317,13 +320,22 @@ function checkout(config) {
 			this.ready = true;
 		},
 
+		async show_state(state) {
+			this.state = state;
+			this.restore_state();
+			if (!this.editing_address) {
+				await this.load_options();
+			}
+		},
+
 		restore_state() {
 			const { state } = this;
 			if (state.email && this.config.is_guest) {
 				this.email = state.email;
 			}
+			// Set both ways: an agent can move a checkout from pickup back to delivery.
+			this.delivery_method = state.is_store_pickup ? 'pickup' : 'ship';
 			if (state.is_store_pickup) {
-				this.delivery_method = 'pickup';
 				this.pickup_location = state.store;
 			} else if (state.shipping_address) {
 				this.restore_address('shipping', state.shipping_address);

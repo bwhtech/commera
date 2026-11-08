@@ -14,11 +14,22 @@ const NUMBER_FORMATS = {
 const PRECISION = 2;
 
 export function money(amount, currency) {
+	const { symbol, number_format } = get_currency(currency);
+	return `${symbol}${format_number(amount, number_format)}`;
+}
+
+// For plain text such as a confirm dialog: a symbol drawn with HTML becomes the currency code.
+export function money_text(amount, currency) {
+	const { code, symbol, number_format } = get_currency(currency);
+	const prefix = symbol.includes('<') ? `${code} ` : symbol;
+	return `${prefix}${format_number(amount, number_format)}`;
+}
+
+function get_currency(currency) {
 	const config = globalThis.commera_storefront_config ?? {};
-	const symbols = config.currency_symbols ?? {};
 	const code = currency || config.store_currency;
-	const symbol = symbols[code] ?? `${code} `;
-	return `${symbol}${format_number(amount, config.number_format)}`;
+	const symbol = config.currency_symbols?.[code] ?? `${code} `;
+	return { code, symbol, number_format: config.number_format };
 }
 
 function format_number(amount, number_format = '#,###.##') {

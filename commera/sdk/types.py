@@ -9,6 +9,7 @@ __all__ = [
 	"CatalogItem",
 	"Charge",
 	"ChargeSummary",
+	"CheckoutItem",
 	"CheckoutResult",
 	"CheckoutState",
 	"CheckoutSummary",
@@ -514,8 +515,19 @@ class Wishlist(TypedDict):
 	count: int
 
 
+class CheckoutItem(TypedDict):
+	item_code: str
+	title: str
+	qty: float
+
+
 class CheckoutState(TypedDict):
 	cart: str
+	# Changes with every checkout change; start_payment can require the version the buyer reviewed.
+	version: str
+	currency: str
+	# The lines this version covers, for a review the buyer approves.
+	items: list[CheckoutItem]
 	email: str | None
 	billing_address: Address | None
 	shipping_address: Address | None

@@ -36,8 +36,16 @@ export async function list_payment_methods() {
 	return get_request('checkout.list_payment_methods');
 }
 
-export async function start_payment({ payment_method, expected_total }) {
-	return post('checkout.start_payment', { payment_method, expected_total });
+export async function start_payment({
+	payment_method,
+	expected_total,
+	expected_version,
+}) {
+	return post('checkout.start_payment', {
+		payment_method,
+		expected_total,
+		expected_version,
+	});
 }
 
 export async function complete(reference_id) {

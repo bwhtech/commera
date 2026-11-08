@@ -10,5 +10,5 @@ export * as products from './products.js';
 export { StorefrontError } from './request.js';
 export * as search from './search.js';
 export * as shop from './shop.js';
-export * as webmcp from './webmcp.js';
+export * as webmcp from './webmcp/index.js';
 export * as wishlist from './wishlist.js';

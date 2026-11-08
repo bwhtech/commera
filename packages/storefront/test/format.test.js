@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { afterEach, test } from 'node:test';
-import { money } from '../format.js';
+import { money, money_text } from '../format.js';
 
 const cases = JSON.parse(
 	readFileSync(new URL('./fmt-money-cases.json', import.meta.url)),
@@ -48,4 +48,19 @@ test('money uses the store currency and the default format when not given', () =
 	assert.equal(money(1234.5), '$1,234.50');
 	assert.equal(money('12.3', 'USD'), '$12.30');
 	assert.equal(money(null, 'USD'), '$0.00');
+});
+
+test('money_text spells out a currency whose symbol is HTML', () => {
+	globalThis.commera_storefront_config = {
+		currency_symbols: {
+			SAR: '<span class="saudi-currency-symbol pe-0.5"></span>',
+			USD: '$',
+		},
+	};
+	assert.equal(money_text(1250, 'SAR'), 'SAR 1,250.00');
+	assert.equal(money_text(1250, 'USD'), '$1,250.00');
+	assert.equal(
+		money(1250, 'SAR'),
+		'<span class="saudi-currency-symbol pe-0.5"></span>1,250.00',
+	);
 });
