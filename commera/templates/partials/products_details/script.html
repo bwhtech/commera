@@ -104,15 +104,22 @@
     });
 </script>
 <script>
+    // The controller resolves price, stock and the cart variant per size, so a size is a new page load.
     function update_size(size) {
-        state.size = `${size}`;
-        window.location.reload();
+        const url = new URL(window.location.href);
+        url.searchParams.set("size", size);
+        window.location.assign(url.toString());
     }
-    async function notify_user_product(item) {
-
-            data = await frappe_call("/api/v2/method/commera.api.utils.notify_user_product", { item: item })
-
-            toast("{{_('You will be notified when item is available')}}", { type: "success" })
+    async function notify_user_product(item, state) {
+        if (state.notify_status !== "idle") return;
+        state.notify_status = "saving";
+        try {
+            await frappe_call("/api/v2/method/commera.api.utils.notify_user_product", { item: item });
+            state.notify_status = "subscribed";
+            toast({{ _('You will be notified when item is available') | tojson }}, { type: "success" });
+        } catch (error) {
+            state.notify_status = "idle";
+        }
     }
 </script>
 <script>
