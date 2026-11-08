@@ -95,7 +95,15 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 		self.assertEqual(get_cart()["total_quantity"], 0)
 
 	def get_checkout_code(self) -> str:
-		return get_checkout_url()["path"].split("code=")[1]
+		return parse_qs(urlsplit(get_checkout_url()["path"]).query)["code"][0]
+
+	def test_the_checkout_path_keeps_the_storefront_language(self):
+		add_lines([{"item_code": self.item_code, "qty": 1}])
+		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
+		frappe.local.lang = "ar"
+
+		query = parse_qs(urlsplit(get_checkout_url()["path"]).query)
+		self.assertEqual(query["_lang"], ["ar"])
 
 	def test_a_checkout_code_moves_the_cart_to_a_new_browser_token_once(self):
 		add_lines([{"item_code": self.item_code, "qty": 1}])
@@ -200,7 +208,7 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 		self.send_token(None, user=shopper)
 		add_lines([{"item_code": self.item_code, "qty": 1}])
 		path = get_checkout_url()["path"]
-		code = path.split("code=")[1]
+		code = parse_qs(urlsplit(path).query)["code"][0]
 
 		for browser_user in ("Guest", make_website_user()):
 			with self.subTest(browser_user):

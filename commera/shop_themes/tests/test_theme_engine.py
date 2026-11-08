@@ -370,6 +370,17 @@ class IntegrationTestThemeBaseContext(IntegrationTestCase):
 		self.assertIn("window.commera_storefront_config", header_content)
 		self.assertIn("commera-storefront.bundle", header_content)
 
+	def test_storefront_config_follows_the_webmcp_setting(self):
+		settings = frappe.get_single("Commera Settings")
+		self.addCleanup(settings.db_set, "enable_webmcp", settings.enable_webmcp)
+
+		settings.db_set("enable_webmcp", 1)
+		config = get_storefront_config(build_base_context(None).commera_header_content)
+		self.assertIs(config["webmcp"], True)
+		self.assertEqual(config["language"], frappe.local.lang or "en")
+		settings.db_set("enable_webmcp", 0)
+		self.assertIs(get_storefront_config(build_base_context(None).commera_header_content)["webmcp"], False)
+
 	def test_header_content_carries_each_session_its_own_csrf_token(self):
 		session_data = frappe.local.session.data
 		self.addCleanup(setattr, session_data, "csrf_token", session_data.get("csrf_token"))
