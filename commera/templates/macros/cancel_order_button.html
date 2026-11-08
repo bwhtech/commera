@@ -10,17 +10,23 @@ cursor-pointer ' + classes %}
 {% if show_cancel_button %}
 
 <script>
-    async function cancel_order(order_id) {
+    // state.cancel_status: 'idle', 'saving', then 'leaving' while the page reloads to show the cancelled order.
+    async function cancel_order(order_id, state) {
+        if (state.cancel_status !== 'idle') return;
+        state.cancel_status = 'saving';
         try {
-            const response = await frappe_call('/api/v2/method/commera.api.orders.cancel_order', {
+            await frappe_call('/api/v2/method/commera.api.orders.cancel_order', {
                 order_id
             });
-            toast('{{ _("Order cancelled successfully!") }}', {"type": "success"})
-            await new Promise(resolve => setTimeout(resolve, 600));
-            window.location.reload()
-        } catch (e) {
-            console.log(e);
+        } catch (error) {
+            // frappe_call has shown the error; the button is ready for another try.
+            state.cancel_status = 'idle';
+            return;
         }
+        state.cancel_status = 'leaving';
+        toast({{ _("Order cancelled successfully!") | tojson }}, {"type": "success"})
+        await new Promise(resolve => setTimeout(resolve, 600));
+        window.location.reload()
     }
 </script>
 
@@ -33,9 +39,12 @@ modal_classes='w-full md:max-w-1/2'
 <div class="p-5">
     {{ _("Are you sure you want to cancel this order?") }}
 
-    <div class="mt-3 w-full flex items-end justify-start">
-        <button type="button" @click="cancel_order('{{order_id}}', $data)"
+    <div class="mt-3 w-full flex items-end justify-start" x-data="{ cancel_status: 'idle' }">
+        <button type="button" @click="cancel_order('{{order_id}}', $data)" :disabled="cancel_status !== 'idle'"
             class="cursor-pointer bg-primary rounded-xl p-2 px-5 text-base tracking-wide text-white transition hover:opacity-75  active:outline-offset-0 flex items-center disabled:cursor-not-allowed disabled:opacity-75">{{_('Yes')}}
+            <div x-show="cancel_status !== 'idle'" x-cloak
+                class="animate-spin size-4 border-3 border-current border-t-transparent rounded-full ms-2"
+                role="status" aria-label="loading"></div>
         </button>
     </div>
 </div>

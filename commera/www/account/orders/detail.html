@@ -12,24 +12,15 @@
 {% block user_body %}
 {% set is_owner = order_access == "owner" %}
 {% set shows_private_details = order_access != "limited" %}
+{# The return state comes with the page, so Cancel and Return never show before it is known. #}
+{% set return_state = return_state or {"returned_items": [], "returned_items_in_draft": [], "is_fully_returned": False, "partially_returned": False} %}
 <div x-data="{ 
     selected_items: [],
-    returned_items: [],
-    returned_items_in_draft:[],
-    is_fully_returned:false,
-    partially_returned: false,
-    async fetch_returned_items(order_id) {
-    const response = await frappe_call('/api/v2/method/commera.api.return.get_returned_items', {
-        sales_order_id: order_id
-    });
-    this.returned_items = response.data.returned_items;
-    this.returned_items_in_draft = response.data.returned_items_in_draft;
-    this.is_fully_returned = response.data.is_fully_returned;
-    this.partially_returned = response.data.partially_returned;
-
-}
-}"
-x-init="{% if is_owner %}fetch_returned_items('{{ order.name }}'){% endif %}" class=" flex flex-col border border-gray-300 rounded-lg w-full p-4">
+    returned_items: {{ return_state.returned_items | tojson | forceescape }},
+    returned_items_in_draft: {{ return_state.returned_items_in_draft | tojson | forceescape }},
+    is_fully_returned: {{ return_state.is_fully_returned | tojson }},
+    partially_returned: {{ return_state.partially_returned | tojson }},
+}" class=" flex flex-col border border-gray-300 rounded-lg w-full p-4">
     <div class="flex md:justify-between md:items-center border-b border-gray-300 mb-5 pb-5 flex-col md:flex-row">
         <div class="flex flex-col md:flex-row md:w-2/3 md:justify-between md:items-center">
             <h1 class=" text-base mb-2 md:mb-0 md:text-lg font-normal">{{_('Order placed')}} {{
