@@ -26,12 +26,16 @@ def cancel_order(order_id: str):
 
 		order_doc.flags.ignore_permissions = True
 		cancelling = True
-		if order_doc.docstatus == 1:
-			order_doc.cancel()
-		elif order_doc.docstatus == 0:
-			order_doc.submit()
-			order_doc.reload()
-			order_doc.cancel()
+		# validate_can_cancel checked that this is the shopper's order. Submitting a draft re-reads
+		# its items, and ERPNext's get_item_details checks Item permission directly, which a
+		# shopper does not have and ignore_permissions does not reach.
+		with system_user_session():
+			if order_doc.docstatus == 1:
+				order_doc.cancel()
+			elif order_doc.docstatus == 0:
+				order_doc.submit()
+				order_doc.reload()
+				order_doc.cancel()
 		cancelling = False
 		# The on_cancel hook only enqueues this, so the page would reload onto the old status.
 		update_sales_order_ecommerce_status(order_id)
