@@ -12,8 +12,8 @@
 {% set address = order.shipping_address %}
 {% set detail_config = {"name": order.name, "key": order_key, "is_owner": is_owner, "is_cancelled": order.is_cancelled} %}
 
-{% macro summary_row(label, amount, class="text-ink-gray-7", sign="") %}
-<div class="{{ class }} flex justify-between gap-4"><dt>{{ label }}</dt><dd class="whitespace-nowrap"><bdi>{{ sign }}{{ commera.format.money(amount, order.currency) }}</bdi></dd></div>
+{% macro summary_row(label, amount, class="", sign="") %}
+<div class="{{ class }} flex justify-between gap-3"><dt class="min-w-0 [overflow-wrap:anywhere]">{{ label }}</dt><dd class="shrink-0 whitespace-nowrap"><bdi>{{ sign }}{{ commera.format.money(amount, order.currency) }}</bdi></dd></div>
 {%- endmacro %}
 
 {% block body %}
@@ -83,7 +83,7 @@
 				{{ image(line.image, width=160, class="aspect-[3/4] w-16 shrink-0 rounded-lg object-cover object-top") }}
 				<div class="min-w-0 flex-1">
 					<div class="grid gap-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-3">
-						<p class="text-md text-balance text-ink-gray-9">{{ line.title }}</p>
+						<p class="text-md text-balance text-ink-gray-9 [overflow-wrap:anywhere]">{{ line.title }}</p>
 						<p class="tabular whitespace-nowrap text-md text-ink-gray-9 max-sm:order-last"><bdi>{{ commera.format.money(line.amount, order.currency) }}</bdi></p>
 					</div>
 					{% if line.size %}<p class="mt-1 text-base text-ink-gray-6">{{ _("Size") }} {{ line.size }}</p>{% endif %}
@@ -96,7 +96,7 @@
 			{{ summary_row(_("Subtotal"), order.total) }}
 			{% for discount in order.discounts | rejectattr("discount_class", "equalto", "Product") %}
 			{%- set discount_name = discount.code or discount.title %}
-			{{ summary_row(_("Discount") ~ (" (" ~ discount_name ~ ")" if discount_name else ""), discount.amount, "text-ink-green-6", "−") }}
+			{{ summary_row(_("Discount") ~ (" (" ~ discount_name ~ ")" if discount_name else ""), discount.amount, "text-ink-gray-7", "−") }}
 			{% endfor %}
 			{% if order.shipping %}{{ summary_row(_("Shipping"), order.shipping) }}{% endif %}
 			{% if order.cod_charge %}{{ summary_row(_("Cash on delivery fee"), order.cod_charge) }}{% endif %}
@@ -104,7 +104,7 @@
 			{{ summary_row(charge.description, charge.amount) }}
 			{% endfor %}
 			{% if order.rounded_total and order.rounding_adjustment %}{{ summary_row(_("Rounding"), order.rounding_adjustment | abs, sign="−" if order.rounding_adjustment < 0 else "") }}{% endif %}
-			<div class="mt-2 flex justify-between gap-4 border-t border-outline-gray-2 pt-4 text-2xl font-medium text-ink-gray-9"><dt>{{ _("Order total") }}</dt><dd class="whitespace-nowrap"><bdi>{{ commera.format.money(order.rounded_total or order.grand_total, order.currency) }}</bdi></dd></div>
+			<div class="mt-2 flex justify-between gap-3 border-t border-outline-gray-2 pt-4 text-2xl font-medium text-ink-gray-9"><dt class="min-w-0 [overflow-wrap:anywhere]">{{ _("Order total") }}</dt><dd class="shrink-0 whitespace-nowrap"><bdi>{{ commera.format.money(order.rounded_total or order.grand_total, order.currency) }}</bdi></dd></div>
 		</dl>
 	</section>
 
@@ -122,7 +122,7 @@
 	</section>
 
 	{% if order.access != "limited" %}
-	<section class="grid gap-8 md:grid-cols-2">
+	<section class="grid gap-8 lg:grid-cols-2">
 		<div>
 			<h2 class="text-3xl">{{ _("Delivery address") }}</h2>
 			{% if address %}
