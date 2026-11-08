@@ -109,7 +109,11 @@ test('a later write waits for the earlier one, so the newest cart is announced l
 	const first = cart.add_lines([{ item_code: 'SHOE-42', qty: 1 }]);
 	const second = cart.remove_lines(['line-1']);
 	await new Promise((resolve) => setTimeout(resolve));
-	assert.equal(replies.length, 1, 'the second write was sent before the first answered');
+	assert.equal(
+		replies.length,
+		1,
+		'the second write was sent before the first answered',
+	);
 	replies[0]();
 	await first;
 	await new Promise((resolve) => setTimeout(resolve));

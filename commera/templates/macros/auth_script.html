@@ -1,8 +1,6 @@
 <script>
-    // One sign-in attempt is x_data.auth_step: 'email' (the form), 'sending' (asking for a code), 'code' (typing it),
-    // 'resending', 'verifying', then 'done' once signed in, which stays set while the page moves on.
-    // x_data.otp_sent is a getter over it in each component. This file is included once per modal, so it
-    // declares functions only.
+    // auth_step: email, sending, code, resending, verifying, done ('done' stays set while the page moves on).
+    // Included once per modal, so this file declares functions only.
 
     function reset_auth_attempt(x_data) {
         x_data.auth_step = 'email';

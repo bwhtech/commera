@@ -166,8 +166,7 @@ class QuerySync {
 	}
 
 	/**
-	 * Apply several changes as one history entry: setting keys one by one through the proxy pushes one per key.
-	 * A null or undefined value removes the key.
+	 * Apply several changes as one history entry; a null or undefined value removes the key.
 	 * @param {Object} changes - Keys to set or remove
 	 */
 	update(changes) {

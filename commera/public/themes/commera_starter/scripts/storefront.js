@@ -468,25 +468,26 @@ function checkout(config) {
 			const email = this.config.is_guest ? this.email.trim() : undefined;
 			await save_change(
 				this,
-				() => this.queue(async () => {
-					this.state =
-						this.delivery_method === 'pickup'
-							? await commera.checkout.set_store_pickup({
-									warehouse: this.pickup_location,
-									email,
-							  })
-							: await commera.checkout.set_addresses({
-									billing_address: this.address_input(
-										this.billing_same ? 'shipping' : 'billing',
-									),
-									shipping_address: this.billing_same
-										? undefined
-										: this.address_input('shipping'),
-									email,
-							  });
-					await this.load_options();
-					this.editing_address = false;
-				}),
+				() =>
+					this.queue(async () => {
+						this.state =
+							this.delivery_method === 'pickup'
+								? await commera.checkout.set_store_pickup({
+										warehouse: this.pickup_location,
+										email,
+								  })
+								: await commera.checkout.set_addresses({
+										billing_address: this.address_input(
+											this.billing_same ? 'shipping' : 'billing',
+										),
+										shipping_address: this.billing_same
+											? undefined
+											: this.address_input('shipping'),
+										email,
+								  });
+						await this.load_options();
+						this.editing_address = false;
+					}),
 				'address',
 			);
 			if (!this.error) this.step = null;
@@ -500,10 +501,12 @@ function checkout(config) {
 			this.chosen_shipping_option = option_id;
 			await save_change(
 				this,
-				() => this.queue(async () => {
-					this.state = await commera.checkout.set_shipping_option(option_id);
-					this.payment_methods = await commera.checkout.list_payment_methods();
-				}),
+				() =>
+					this.queue(async () => {
+						this.state = await commera.checkout.set_shipping_option(option_id);
+						this.payment_methods =
+							await commera.checkout.list_payment_methods();
+					}),
 				`shipping:${option_id}`,
 			);
 			// Saved or refused, the radio now shows the option the server holds.
@@ -519,18 +522,19 @@ function checkout(config) {
 			let price_changed = false;
 			await save_change_and_leave(
 				this,
-				() => this.queue(async () => {
-					try {
-						const session = await commera.checkout.start_payment({
-							payment_method: this.payment_method,
-							expected_total: this.total,
-						});
-						globalThis.location.assign(session.redirect_url);
-					} catch (error) {
-						price_changed = error.exc_type === 'CheckoutPriceChangedError';
-						throw error;
-					}
-				}),
+				() =>
+					this.queue(async () => {
+						try {
+							const session = await commera.checkout.start_payment({
+								payment_method: this.payment_method,
+								expected_total: this.total,
+							});
+							globalThis.location.assign(session.redirect_url);
+						} catch (error) {
+							price_changed = error.exc_type === 'CheckoutPriceChangedError';
+							throw error;
+						}
+					}),
 				'pay',
 			);
 			if (price_changed) {
@@ -863,9 +867,9 @@ document.addEventListener('alpine:init', () => {
 				this.step = 'code';
 				this.start_resend_wait();
 			}, 'send');
-			},
+		},
 
-			async resend_code() {
+		async resend_code() {
 			if (this.resend_wait > 0) {
 				return;
 			}
@@ -875,7 +879,7 @@ document.addEventListener('alpine:init', () => {
 				this.code = '';
 				this.start_resend_wait();
 			}, 'resend');
-			},
+		},
 
 		async verify() {
 			this.resent = false;
