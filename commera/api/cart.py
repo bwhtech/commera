@@ -95,7 +95,9 @@ def validate_cart_stock(items: list | str):
 	return {"success": True}
 
 
-@frappe.whitelist()
+# Guests change size on the cart before signing in; this reads catalogue sizes, price and stock,
+# which are already public.
+@frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 def update_variant(product_name: str, size: str):
 	product_variant = frappe.get_cached_doc("Style Attribute Variant", product_name)
 	commera_settings = frappe.get_cached_doc("Commera Settings")

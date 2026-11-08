@@ -7,7 +7,13 @@ import frappe
 from frappe.model.document import Document
 from frappe.tests import IntegrationTestCase
 
-from commera.api.cart import get_detail_for_cart_items, get_stock_shortfalls, validate_stock_available
+from commera.api.cart import (
+	get_detail_for_cart_items,
+	get_stock_shortfalls,
+	update_variant,
+	validate_cart_stock,
+	validate_stock_available,
+)
 from commera.api.checkout import apply_shipping_rule
 from commera.api.payments import (
 	COD_PAYMENT_MODE,
@@ -859,3 +865,11 @@ class TestCartCheckout(IntegrationTestCase):
 
 		with self.assertRaises(frappe.ValidationError):
 			update_delivery_charges(_get_cart_quotation())
+
+
+class TestCartGuestAccess(IntegrationTestCase):
+	def test_a_guest_cart_can_price_check_and_resize_its_lines(self):
+		"""The legacy cart calls all three before sign-in; a size switch used to fail with a 403."""
+		for method in (get_detail_for_cart_items, validate_cart_stock, update_variant):
+			with self.subTest(method=method.__name__):
+				self.assertIn(method, frappe.guest_methods)
