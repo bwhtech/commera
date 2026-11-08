@@ -2,7 +2,15 @@
 import { ref } from 'vue'
 import { Button, Spinner, toast, useFileUpload } from 'frappe-ui'
 import { trySubmit } from '../../../data/api'
-import { applyValidation, imp, validateImportAction } from '../../../data/importFlow'
+import {
+  applyValidation,
+  beginPhase,
+  clearImportFile,
+  endPhase,
+  imp,
+  isCurrentImport,
+  validateImportAction,
+} from '../../../data/importFlow'
 import CoachTip from '../CoachTip.vue'
 
 const { upload } = useFileUpload()
@@ -10,17 +18,21 @@ const { upload } = useFileUpload()
 async function pick(event) {
   const file = event?.target?.files?.[0] ?? event?.dataTransfer?.files?.[0]
   if (!file) return
+  const ticket = beginPhase('parsing')
+  if (ticket === null) return
 
-  imp.parsing = true
   imp.parsed = false
   imp.file = { name: file.name, size: `${Math.round(file.size / 1024)} KB` }
 
   try {
     // Private: a merchant's spreadsheet is working data, not a storefront asset.
     const uploaded = await upload(file, { private: true })
+    // Closed and reopened while this was uploading: the fresh flow is not reading this file.
+    if (!isCurrentImport(ticket)) return
     imp.fileUrl = uploaded.file_url
 
     const checked = await trySubmit(validateImportAction, { file_url: imp.fileUrl })
+    if (!isCurrentImport(ticket)) return
     if (!checked) {
       imp.file = null
       imp.fileUrl = null
@@ -31,20 +43,13 @@ async function pick(event) {
     imp.parsed = true
     toast.success(`${imp.counts.total} rows read from ${file.name}`)
   } catch {
+    if (!isCurrentImport(ticket)) return
     toast.error(`Could not read ${file.name}`)
     imp.file = null
     imp.fileUrl = null
   } finally {
-    imp.parsing = false
+    endPhase(ticket)
   }
-}
-
-function clear() {
-  imp.file = null
-  imp.fileUrl = null
-  imp.parsed = false
-  imp.headers = []
-  imp.rows = []
 }
 </script>
 
@@ -95,11 +100,11 @@ function clear() {
             <template v-if="imp.parsed"> · {{ imp.counts.total }} rows · {{ imp.headers.length }} columns</template>
           </div>
         </div>
-        <Spinner v-if="imp.parsing" class="size-4" />
-        <Button v-else variant="ghost" icon="lucide-x" label="Remove file" @click="clear" />
+        <Spinner v-if="imp.phase === 'parsing'" class="size-4" />
+        <Button v-else variant="ghost" icon="lucide-x" label="Remove file" @click="clearImportFile" />
       </div>
 
-      <p v-if="imp.parsing" class="mt-3 text-sm text-ink-gray-5">Reading rows and checking your columns…</p>
+      <p v-if="imp.phase === 'parsing'" class="mt-3 text-sm text-ink-gray-5">Reading rows and checking your columns…</p>
 
       <div v-if="imp.parsed" class="mt-4 overflow-x-auto rounded-4 border border-outline-gray-1">
         <table class="w-full min-w-[42rem] border-collapse text-left">

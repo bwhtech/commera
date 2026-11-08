@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Badge, Button, Progress, Select, Spinner, TabButtons, toast, useFileUpload } from 'frappe-ui'
-import { imp } from '../../../data/importFlow'
+import { beginPhase, canChangeStep, endPhase, imp, isCurrentImport } from '../../../data/importFlow'
 import { useAdminAction, trySubmit } from '../../../data/api'
 import CoachTip from '../CoachTip.vue'
 
@@ -10,7 +10,7 @@ const emit = defineEmits(['next'])
 const { upload } = useFileUpload()
 const matchAction = useAdminAction('imports.match_import_images')
 
-const uploading = ref(false)
+const uploading = computed(() => imp.phase === 'uploading')
 const chosenCount = ref(0)
 const doneCount = ref(0)
 
@@ -41,30 +41,39 @@ function rebuildAssignments() {
     if (!assignments[key]) assignments[key] = []
     assignments[key].push(fileUrl)
   }
+  // A pick made under an earlier column mapping may name a group that no longer exists.
+  const groupKeys = new Set(groups.value.map((group) => group.key))
   for (const match of imp.imageMatch?.matched ?? []) {
-    if (match.file_url in imp.imageChoices) continue
+    if (imp.imageChoices[match.file_url] && groupKeys.has(imp.imageChoices[match.file_url])) continue
     add(match.key, match.file_url)
   }
   for (const [fileUrl, key] of Object.entries(imp.imageChoices)) {
-    if (key) add(key, fileUrl)
+    if (key && groupKeys.has(key)) add(key, fileUrl)
   }
   imp.imageAssignments = assignments
 }
 
-async function matchUploadedFiles() {
+// Called with the ticket of an upload already in flight, so the match after it does not need a
+// second phase; on its own (on mount) it takes one, which keeps Continue shut until the groups land.
+async function matchUploadedFiles(uploadTicket = null) {
+  const ticket = uploadTicket ?? beginPhase('matching')
+  if (ticket === null) return
   const matched = await trySubmit(matchAction, {
     file_url: imp.fileUrl,
     column_mapping: { ...imp.mapping },
     image_files: imp.imageFiles,
   })
-  if (!matched) return
-  imp.imageMatch = matchAction.data
-  rebuildAssignments()
+  if (matched && isCurrentImport(ticket)) {
+    imp.imageMatch = matchAction.data
+    rebuildAssignments()
+  }
+  if (!uploadTicket) endPhase(ticket)
 }
 
 async function addFiles(files, groupKey = '') {
-  if (!files.length || uploading.value) return
-  uploading.value = true
+  if (!files.length) return
+  const ticket = beginPhase('uploading')
+  if (ticket === null) return
   chosenCount.value = files.length
   doneCount.value = 0
 
@@ -73,18 +82,21 @@ async function addFiles(files, groupKey = '') {
     try {
       // Public: these are storefront product photos, not access-controlled files.
       const result = await upload(file, { private: false })
+      // The dialog was reset under this loop: the rest of the batch belongs to a flow that is gone.
+      if (!isCurrentImport(ticket)) return
       uploadedFiles.push({ file_name: result.file_name, file_url: result.file_url })
       if (groupKey) imp.imageChoices[result.file_url] = groupKey
       // Counted inside the try: a file that failed is not one of "8 of 8 uploaded".
       doneCount.value += 1
     } catch {
+      if (!isCurrentImport(ticket)) return
       toast.error(`Could not upload ${file.name}`)
     }
   }
 
   imp.imageFiles.push(...uploadedFiles)
-  if (uploadedFiles.length) await matchUploadedFiles()
-  uploading.value = false
+  if (uploadedFiles.length) await matchUploadedFiles(ticket)
+  endPhase(ticket)
 }
 
 function setAssignment(fileUrl, key) {
@@ -142,7 +154,7 @@ onMounted(() => {
       />
     </div>
 
-    <div v-if="matchAction.loading && !imp.imageMatch" class="flex items-center gap-3 text-base text-ink-gray-6">
+    <div v-if="imp.phase === 'matching'" class="flex items-center gap-3 text-base text-ink-gray-6">
       <Spinner class="size-4" />
       Reading your products…
     </div>
@@ -177,7 +189,14 @@ onMounted(() => {
           We match each file to a product by its name, so
           <span class="text-ink-gray-7">oversized-tee-black-1.jpg</span> lands on Oversized Tee in Black.
         </p>
-        <Button class="mt-3" variant="solid" theme="gray" label="Browse photos" @click="bulkInput.click()" />
+        <Button
+          class="mt-3"
+          variant="solid"
+          theme="gray"
+          label="Browse photos"
+          :disabled="!canChangeStep"
+          @click="bulkInput.click()"
+        />
       </div>
 
       <template v-else>
@@ -221,7 +240,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <Button icon-left="lucide-plus" label="Add more photos" @click="bulkInput.click()" />
+        <Button icon-left="lucide-plus" label="Add more photos" :disabled="!canChangeStep" @click="bulkInput.click()" />
       </template>
 
       <CoachTip
@@ -240,7 +259,13 @@ onMounted(() => {
           size="sm"
           class="max-w-56 flex-1"
         />
-        <Button class="ml-auto" variant="ghost" label="Skip the rest for now" @click="emit('next')" />
+        <Button
+          class="ml-auto"
+          variant="ghost"
+          label="Skip the rest for now"
+          :disabled="!canChangeStep"
+          @click="emit('next')"
+        />
       </div>
 
       <div v-if="groups.length" class="overflow-hidden rounded-5 border border-outline-gray-1">
@@ -278,7 +303,7 @@ onMounted(() => {
               class="shrink-0"
               :variant="assignedPhotos(group.key).length ? 'subtle' : 'solid'"
               theme="gray"
-              :disabled="uploading"
+              :disabled="!canChangeStep"
               icon-left="lucide-upload"
               :label="assignedPhotos(group.key).length ? 'Add more' : 'Upload'"
               @click="chooseGroupFiles(group.key)"
