@@ -448,6 +448,22 @@ class TestCheckoutHooks(IntegrationTestCase):
 			for option in get_shipping_options()["options"]
 		]
 
+	def test_the_options_listing_carries_the_summary_payment_will_charge(self):
+		quotation = self.open_delivery_cart(EXPRESS)
+
+		listing = get_shipping_options()
+
+		self.assertEqual(listing["checkout_summary"], get_checkout_summary(quotation))
+		self.assertTrue(listing["options"])
+
+	def test_the_options_listing_carries_the_summary_with_no_option_to_offer(self):
+		quotation = self.open_cart()
+
+		listing = get_shipping_options()
+
+		self.assertEqual(listing["options"], [])
+		self.assertEqual(listing["checkout_summary"], get_checkout_summary(quotation))
+
 	def test_a_hidden_delivery_option_is_not_listed_cannot_be_chosen_and_is_refused_at_payment(self):
 		quotation = self.open_delivery_cart(EXPRESS)
 		patch_app_hooks(self, {"commera_hooks": {"delivery_options": [f"{__name__}.hide_express"]}})

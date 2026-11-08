@@ -3,20 +3,26 @@
 <div x-data="{
     is_open: {{ 'true' if open else 'false' }},
     redirect_to: {{ redirect_to|tojson|forceescape }},
-    otp_sent: false,
+    auth_step: 'email',
+    otp_for: null,
+    get otp_sent() { return ['code', 'resending', 'verifying', 'done'].includes(this.auth_step); },
     first_name:'',
     last_name:'',
     otp: ['', '', '', '', '', ''],
     email:'',
     resend_timer: 0,
     resend_interval: null,
-    }" class="w-full">
+    close() {
+        this.is_open = false;
+        reset_auth_attempt(this);
+    },
+    }" x-init="reset_auth_on_restore($data)" class="w-full">
 
     <button x-on:click="is_open = true" class="cursor-pointer w-full">
         {{caller()}}
     </button>
     <div x-cloak x-show="is_open" x-transition.opacity.duration.200ms x-trap.inert.noscroll="is_open"
-        x-on:keydown.esc.window="is_open = false" x-on:click.self="is_open = false"
+        x-on:keydown.esc.window="is_open && close()" x-on:click.self="close()"
         class="fixed inset-0 z-30 flex items-center justify-center bg-black/20 p-4 pb-8 backdrop-blur-md sm:items-center lg:p-8"
         role="dialog" aria-modal="true" aria-labelledby="defaultModalTitle">
         <div x-show="is_open"
@@ -99,15 +105,19 @@
 
                             <button
                                 class="bg-gray-300 py-2 px-3 rounded-lg mt-2 w-full text-black cursor-pointer disabled:opacity-75 flex items-center justify-center"
-                                type="submit" x-ref="verify_otp_btn">{{_('Verify OTP')}}<div
-                                    class="hidden  animate-spin  size-4 border-3 border-current border-t-transparent  rounded-full ms-2"
+                                type="submit" x-ref="verify_otp_btn" :disabled="auth_step !== 'code'">{{_('Verify OTP')}}<div
+                                    x-show="auth_step === 'verifying' || auth_step === 'done'" x-cloak
+                                    class="animate-spin  size-4 border-3 border-current border-t-transparent  rounded-full ms-2"
                                     role="status" aria-label="loading">
                                 </div></button>
                             <div class=" mt-4 flex items-center justify-center">
                                 <p class="text-sm text-gray-500 me-1">{{_("Didn't receive code")}}?</p>
-                                <button type="button" :disabled="resend_timer > 0" @click="resend_otp($data, $refs)"
+                                <button type="button" :disabled="resend_timer > 0 || auth_step !== 'code'" @click="resend_otp($data, $refs)"
                                     class="text-gray-900 text-sm font-medium cursor-pointer disabled:opacity-50">
-                                    <template x-if="resend_timer === 0">
+                                    <template x-if="auth_step === 'resending'">
+                                        <span>{{ _('Sending...') }}</span>
+                                    </template>
+                                    <template x-if="resend_timer === 0 && auth_step !== 'resending'">
                                         <span>{{ _('Resend') }}</span>
                                     </template>
                                     <template x-if="resend_timer > 0">
@@ -115,7 +125,7 @@
                                     </template>
                                 </button>
                             </div>
-                            <button type="button" @click="otp_sent = false"
+                            <button type="button" @click="reset_auth_attempt($data)" :disabled="auth_step === 'verifying' || auth_step === 'done'"
                                 class="text-gray-500 text-sm w-full text-center mt-4">{{_('Go back')}}</button>
                         </form>
                     </div>
@@ -150,8 +160,9 @@
                             </div>
                             <button
                                 class="bg-gray-300 py-2 px-3 rounded-lg mt-6 w-full text-black cursor-pointer disabled:opacity-75 flex items-center justify-center"
-                                type="submit" x-ref="sign_in_btn">{{_('Sign Up')}}<div
-                                    class="hidden  animate-spin  size-4 border-3 border-current border-t-transparent  rounded-full ms-2"
+                                type="submit" x-ref="sign_in_btn" :disabled="auth_step !== 'email'">{{_('Sign Up')}}<div
+                                    x-show="auth_step === 'sending'" x-cloak
+                                    class="animate-spin  size-4 border-3 border-current border-t-transparent  rounded-full ms-2"
                                     role="status" aria-label="loading">
                                 </div> </button>
                         </form>
@@ -168,8 +179,9 @@
                                 placeholder="{{ _('Enter your email') }}" required x-model="email">
                             <button
                                 class="bg-gray-300 py-2 px-3 rounded-lg mt-6 flex items-center justify-center w-full text-black disabled:opacity-75 cursor-pointer"
-                                type="submit" x-ref="checkout_otp_btn">{{ _('Continue') }} <div
-                                    class="hidden animate-spin size-4 border-3 border-current border-t-transparent rounded-full ms-2"
+                                type="submit" x-ref="checkout_otp_btn" :disabled="auth_step !== 'email'">{{ _('Continue') }} <div
+                                    x-show="auth_step === 'sending'" x-cloak
+                                    class="animate-spin size-4 border-3 border-current border-t-transparent rounded-full ms-2"
                                     role="status" aria-label="loading">
                                 </div>
                             </button>
@@ -188,8 +200,9 @@
                                     placeholder="Enter your email" required x-model="email">
                                 <button
                                     class="bg-gray-300 py-2 px-3 rounded-lg mt-6 flex items-center justify-center w-full text-black disabled:opacity-75 cursor-pointer"
-                                    type="submit" x-ref="login_otp_btn">{{_('Sign In')}} <div
-                                        class="hidden  animate-spin  size-4 border-3 border-current border-t-transparent  rounded-full ms-2"
+                                    type="submit" x-ref="login_otp_btn" :disabled="auth_step !== 'email'">{{_('Sign In')}} <div
+                                        x-show="auth_step === 'sending'" x-cloak
+                                        class="animate-spin  size-4 border-3 border-current border-t-transparent  rounded-full ms-2"
                                         role="status" aria-label="loading">
                                     </div>
                                 </button>

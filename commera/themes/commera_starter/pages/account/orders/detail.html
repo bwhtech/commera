@@ -26,9 +26,9 @@
 		{% if is_owner %}
 		<div class="flex flex-wrap gap-2">
 			<a x-cloak x-show="invoice_url" :href="invoice_url" target="_blank" rel="noopener" class="inline-flex h-9 items-center rounded-lg bg-surface-gray-2 px-3 text-base text-ink-gray-8 hover:bg-surface-gray-3">{{ _("Download invoice") }}</a>
-			<button type="button" x-cloak x-show="returns.can_return && returnable_codes.length" @click="show_return = !show_return" class="inline-flex h-9 items-center rounded-lg bg-surface-gray-2 px-3 text-base text-ink-gray-8 hover:bg-surface-gray-3">{{ _("Return items") }}</button>
+			<button type="button" x-cloak x-show="returns.can_return && returnable_codes.length" @click="show_return = !show_return; confirm_cancel = false" class="inline-flex h-9 items-center rounded-lg bg-surface-gray-2 px-3 text-base text-ink-gray-8 hover:bg-surface-gray-3">{{ _("Return items") }}</button>
 			{% if can_cancel %}
-			<button type="button" @click="confirm_cancel = true" class="inline-flex h-9 items-center rounded-lg bg-surface-gray-2 px-3 text-base text-ink-red-6 hover:bg-surface-gray-3">{{ _("Cancel order") }}</button>
+			<button type="button" @click="confirm_cancel = true; show_return = false" class="inline-flex h-9 items-center rounded-lg bg-surface-gray-2 px-3 text-base text-ink-red-6 hover:bg-surface-gray-3">{{ _("Cancel order") }}</button>
 			{% endif %}
 		</div>
 		{% endif %}

@@ -139,11 +139,17 @@
                 </div>
                 {% if not product_in_stock and frappe.session.user != "Guest" %}
 
-                <p class="mt-6 flex items-center text-xs font-medium md:mt-7 w-fit cursor-pointer"
-                    @click.debounce.300ms="notify_user_product('{{selected_item.name}}')">
-                    Out of stock?
-                    {{ icon('notification',classes='h-4 w-4 ms-1') }}
-                </p>
+                <div x-data="{ notify_status: 'idle' }">
+                    <button type="button" class="mt-6 flex items-center text-xs font-medium md:mt-7 w-fit cursor-pointer disabled:opacity-75"
+                        x-show="notify_status !== 'subscribed'" :disabled="notify_status !== 'idle'"
+                        @click="notify_user_product('{{selected_item.name}}', $data)">
+                        {{ _("Out of stock?") }}
+                        {{ icon('notification',classes='h-4 w-4 ms-1') }}
+                    </button>
+                    <p class="mt-6 text-xs font-medium md:mt-7" role="status" x-show="notify_status === 'subscribed'" x-cloak>
+                        {{ _("We'll email you when it's back in stock.") }}
+                    </p>
+                </div>
                 {% endif %}
                 {% if product_in_stock and size_selected %}
                 <div class="flex justify-between items-center">
@@ -168,8 +174,7 @@
                         class="mt-7 flex w-full items-center justify-between rounded-md bg-button px-6 py-3 font-normal text-white opacity-90 hover:opacity-100 focus:ring-2 focus:ring-focus focus:outline-none cursor-pointer disabled:opacity-75 disabled:pointer-events-none"
                         @click="
                                     if (selected_variant) {
-                                        $store.cart.add(product, selected_variant, price,default_price, brand,sizes,qty);
-                                        is_open = true;
+                                        if ($store.cart.add(product, selected_variant, price,default_price, brand,sizes,qty)) is_open = true;
                                     } else {
                                         toast('Please select a size first!', {type: 'warning'});
                                     }
@@ -392,7 +397,7 @@
                     <button type="submit" :disabled="submitting"
                         x-text="editing ? '{{ _('Save changes') }}' : '{{ _('Submit Review') }}'"
                         class="cursor-pointer rounded-md bg-button px-6 py-2 text-sm font-normal text-white opacity-90 hover:opacity-100 disabled:opacity-75"></button>
-                    <button type="button" x-show="editing" x-cloak @click="editing = false"
+                    <button type="button" x-show="editing" x-cloak @click="cancel_edit()"
                         class="cursor-pointer text-sm font-medium text-gray-500 hover:text-gray-700">
                         {{ _("Cancel") }}
                     </button>

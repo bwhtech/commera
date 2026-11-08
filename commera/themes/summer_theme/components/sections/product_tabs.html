@@ -190,7 +190,7 @@
 										<button type="submit" class="btn btn-secondary" :disabled="submitting"
 											x-text="editing ? '{{ _('Save changes') }}' : '{{ _('Submit Review') }}'"></button>
 										<button type="button" class="btn btn-link" x-show="editing" x-cloak
-											@click="editing = false">{{ _("Cancel") }}</button>
+											@click="cancel_edit()">{{ _("Cancel") }}</button>
 									</p>
 								</form>
 							</div>

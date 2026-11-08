@@ -1,35 +1,38 @@
 <script>
+    // auth_step: email, sending, code, resending, verifying, done ('done' stays set while the page moves on).
+    // Included once per modal, so this file declares functions only.
+
+    // Each send or verify takes an attempt number; a reply for an attempt reset or replaced since is dropped.
+    function next_auth_attempt(x_data) {
+        x_data.auth_attempt = (x_data.auth_attempt || 0) + 1;
+        return x_data.auth_attempt;
+    }
+
+    function reset_auth_attempt(x_data) {
+        next_auth_attempt(x_data);
+        x_data.auth_step = 'email';
+        x_data.otp_for = null;
+        x_data.otp = ['', '', '', '', '', ''];
+        stop_resend_timer(x_data);
+    }
+
+    // A page restored from the back/forward cache after signing in would still say 'done'.
+    function reset_auth_on_restore(x_data) {
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted && x_data.auth_step === 'done') reset_auth_attempt(x_data);
+        });
+    }
+
     async function sign_up_user(signup_data, ref) {
-        const email = signup_data.email;
-        if (!email) {
-            toast("Please enter a valid email", { type: "warning" });
+        if (!signup_data.email) {
+            toast({{ _("Please enter a valid email") | tojson }}, { type: "warning" });
             return;
         }
-        const args = {
-            'email': email,
+        await request_otp(signup_data, ref, 'signup', '/api/v2/method/commera.api.signup.send_signup_otp', {
+            'email': signup_data.email,
             'first_name': signup_data.first_name,
             'last_name': signup_data.last_name
-        };
-        const btn = ref.sign_in_btn
-        const spinner = btn.querySelector(".animate-spin");
-        btn.disabled = true;
-        spinner.classList.remove("hidden");
-        try {
-            const data = await frappe_call('/api/v2/method/commera.api.signup.send_signup_otp', args);
-
-            toast("OTP sent successfully, please check you email.", { type: "success" });
-            signup_data.otp_sent = true;
-            focus_first_otp_box(ref);
-
-
-        } catch (error) {
-
-        }
-        finally {
-            btn.disabled = false;
-            spinner.classList.add("hidden");
-            if (!signup_data.otp_sent) btn.focus();
-        }
+        });
     }
 
     // x-show reveals the OTP pane on the next animation frame, and a hidden input cannot take focus.
@@ -78,18 +81,21 @@
     async function verify_otp(x_data, ref) {
         const otpValue = x_data.otp.join('');
         if (otpValue.length !== 6) {
-            toast("Please enter a valid 6-digit OTP", { type: "warning" });
+            toast({{ _("Please enter a valid 6-digit OTP") | tojson }}, { type: "warning" });
             return;
         }
+        if (x_data.auth_step !== 'code') return;
+        // The code was sent for the tab it was asked from; a tab switched since must not pick the endpoint.
+        const purpose = x_data.otp_for || x_data.selected_tab;
         let url;
         let args;
-        if (x_data.selected_tab === 'checkout') {
+        if (purpose === 'checkout') {
             url = '/api/v2/method/commera.api.signup.verify_checkout_otp';
             args = {
                 'email': x_data.email,
                 'otp': otpValue,
             };
-        } else if (x_data.selected_tab === 'login') {
+        } else if (purpose === 'login') {
             url = '/api/v2/method/commera.api.signup.verify_login_otp';
             args = {
                 'email': x_data.email,
@@ -105,59 +111,59 @@
 
             }
         }
-        const btn = ref.verify_otp_btn
-        const spinner = btn.querySelector(".animate-spin");
-        btn.disabled = true;
-        spinner.classList.remove("hidden");
+        x_data.auth_step = 'verifying';
+        const attempt = next_auth_attempt(x_data);
         try {
-            const data = await frappe_call(url, args);
-            // Set by a page that signs the shopper in for somewhere else, such as /storefront-login.
-            if (x_data.redirect_to) {
-                window.location.href = x_data.redirect_to;
-                return;
-            }
-            // The page's CSRF token belongs to the guest session, so checkout resumes on a fresh load.
-            if (x_data.selected_tab === 'checkout') {
-                const resume_url = new URL(window.location.href);
-                resume_url.searchParams.set('checkout', '1');
-                window.location.href = resume_url.toString();
-                return;
-            }
-            let message = "Logged in successfully"
-            if (url === '/api/v2/method/commera.api.signup.verify_signup_otp') {
-                message = "Account created successfully"
-            }
-            toast(message, { type: "success" });
-            setTimeout(() => {
-                window.location.reload()
-            }, 1000);
+            await frappe_call(url, args);
         } catch (error) {
-
+            if (x_data.auth_attempt !== attempt) return;
+            x_data.auth_step = 'code';
+            ref.verify_otp_btn?.focus();
+            return;
         }
-        finally {
-            btn.disabled = false;
-            spinner.classList.add("hidden");
-            btn.focus();
+        // Signed in even if the dialog closed meanwhile, so the page still moves on.
+        // The code is spent, so Verify stays off.
+        x_data.auth_step = 'done';
+        // Set by a page that signs the shopper in for somewhere else, such as /storefront-login.
+        if (x_data.redirect_to) {
+            window.location.href = x_data.redirect_to;
+            return;
         }
-    }
-    function start_resend_timer(x_data) {
-        x_data.resend_timer = 15;
-        x_data.resend_interval = setInterval(() => {
-            if (x_data.resend_timer > 0) {
-                x_data.resend_timer--;
-            } else {
-                clearInterval(x_data.resend_interval);
-                x_data.resend_interval = null;
-            }
+        // The page's CSRF token belongs to the guest session, so checkout resumes on a fresh load.
+        if (purpose === 'checkout') {
+            const resume_url = new URL(window.location.href);
+            resume_url.searchParams.set('checkout', '1');
+            window.location.href = resume_url.toString();
+            return;
+        }
+        const is_signup = url === '/api/v2/method/commera.api.signup.verify_signup_otp';
+        toast(is_signup ? {{ _("Account created successfully") | tojson }} : {{ _("Logged in successfully") | tojson }}, { type: "success" });
+        setTimeout(() => {
+            window.location.reload()
         }, 1000);
     }
+    function start_resend_timer(x_data) {
+        stop_resend_timer(x_data);
+        x_data.resend_timer = 15;
+        x_data.resend_interval = setInterval(() => {
+            x_data.resend_timer--;
+            if (x_data.resend_timer <= 0) stop_resend_timer(x_data);
+        }, 1000);
+    }
+
+    function stop_resend_timer(x_data) {
+        clearInterval(x_data.resend_interval);
+        x_data.resend_interval = null;
+        x_data.resend_timer = 0;
+    }
+
     function resend_otp(x_data, ref) {
-        if (x_data.resend_timer > 0) return;
-        start_resend_timer(x_data);
-        if (x_data.selected_tab === 'checkout') {
+        if (x_data.resend_timer > 0 || x_data.auth_step !== 'code') return;
+        const purpose = x_data.otp_for || x_data.selected_tab;
+        if (purpose === 'checkout') {
             send_checkout_otp(x_data, ref);
         }
-        else if (x_data.selected_tab === 'login') {
+        else if (purpose === 'login') {
             login_user(x_data, ref);
         }
         else {
@@ -166,34 +172,41 @@
     }
 
     async function login_user(x_data, ref) {
-        await request_otp(x_data, ref.login_otp_btn, ref, '/api/v2/method/commera.api.signup.send_login_otp');
+        await request_otp(x_data, ref, 'login', '/api/v2/method/commera.api.signup.send_login_otp');
     }
 
     async function send_checkout_otp(x_data, ref) {
-        await request_otp(x_data, ref.checkout_otp_btn, ref, '/api/v2/method/commera.api.signup.send_checkout_otp');
+        await request_otp(x_data, ref, 'checkout', '/api/v2/method/commera.api.signup.send_checkout_otp');
     }
 
-    async function request_otp(x_data, btn, ref, url) {
+    // Sends the first code from 'email', or a new one from 'code'. The cooldown starts only once a code is sent,
+    // so a failed send can be tried again at once.
+    async function request_otp(x_data, ref, purpose, url, args = null) {
         const email = x_data.email;
         if (!email) {
-            toast("Please enter a valid email", { type: "warning" });
+            toast({{ _("Please enter a valid email") | tojson }}, { type: "warning" });
             return;
         }
-        const spinner = btn.querySelector(".animate-spin");
-        btn.disabled = true;
-        spinner.classList.remove("hidden");
+        const is_resend = x_data.auth_step === 'code';
+        if (!is_resend && x_data.auth_step !== 'email') return;
+        x_data.auth_step = is_resend ? 'resending' : 'sending';
+        // Taken before the request: the shopper can switch tabs while it runs.
+        const otp_for = is_resend && x_data.otp_for ? x_data.otp_for : purpose;
+        const attempt = next_auth_attempt(x_data);
         try {
-            await frappe_call(url, { 'email': email });
-
-            toast("OTP sent successfully, please check you email.", { type: "success" });
-            x_data.otp_sent = true;
-            focus_first_otp_box(ref);
+            await frappe_call(url, args || { 'email': email });
         } catch (error) {
+            if (x_data.auth_attempt !== attempt) return;
+            x_data.auth_step = is_resend ? 'code' : 'email';
+            return;
         }
-        finally {
-            btn.disabled = false;
-            spinner.classList.add("hidden");
-            if (!x_data.otp_sent) btn.focus();
-        }
+        if (x_data.auth_attempt !== attempt) return;
+        toast({{ _("OTP sent successfully, please check your email.") | tojson }}, { type: "success" });
+        // A new code replaces the old one, so the boxes start empty.
+        x_data.otp = ['', '', '', '', '', ''];
+        x_data.otp_for = otp_for;
+        x_data.auth_step = 'code';
+        start_resend_timer(x_data);
+        focus_first_otp_box(ref);
     }
 </script>

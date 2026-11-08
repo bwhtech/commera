@@ -49,6 +49,7 @@
     const querySync = new QuerySync({ defaultValues: { page: 1 } });
     const { state } = querySync;
     window.query_state = state;
+    window.query_sync = querySync;
 </script>
 <style>
     [x-cloak] { display: none !important; }

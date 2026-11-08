@@ -91,8 +91,12 @@ def return_items(sales_order_id: str, items: list | str):
 
 @frappe.whitelist()
 def get_returned_items(sales_order_id: str):
-	sales_order = validate_document_access("Sales Order", sales_order_id)
+	return get_return_state(validate_document_access("Sales Order", sales_order_id))
 
+
+def get_return_state(sales_order) -> dict:
+	"""Which of the order's items are returned or being returned. The caller has checked access."""
+	sales_order_id = sales_order.name
 	free_items_map = {}
 	for pr in sales_order.get("pricing_rules") or []:
 		pricing_rule = frappe.get_cached_doc("Pricing Rule", pr.pricing_rule)

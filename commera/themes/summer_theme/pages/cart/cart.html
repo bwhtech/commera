@@ -114,7 +114,7 @@
 						<div class="icon-bx-wraper style-4 m-b15">
 							<div class="icon-bx"><i class="flaticon flaticon-free-delivery"></i></div>
 							<div class="icon-content">
-								<span class="font-14" x-show="!delivery_amount">{{ _("FREE") }}</span>
+								<span class="font-14" x-show="$store.cart.delivery_status === 'free'">{{ _("FREE") }}</span>
 								<h6 class="dz-title">{{ _("Delivery") }}</h6>
 							</div>
 						</div>
@@ -141,13 +141,20 @@
 								<tr>
 									<td>{{ _("Delivery Charge") }}</td>
 									<td class="price">
-										<span x-show="!delivery_amount">{{ _("Free") }}</span>
-										<span x-show="delivery_amount">{{ currency_symbol }}<span x-text="format_amount(delivery_amount)"></span></span>
+										<span x-show="$store.cart.delivery_status === 'free'">{{ _("Free") }}</span>
+										<span x-show="$store.cart.delivery_status === 'charged'">{{ currency_symbol }}<span x-text="format_amount(delivery_amount)"></span></span>
+										<span x-show="$store.cart.delivery_status === 'pending'">&hellip;</span>
+										<span x-show="$store.cart.delivery_status === 'failed'">&mdash;</span>
 									</td>
 								</tr>
-								<tr class="total">
+								<tr class="total" :aria-busy="!$store.cart.is_priced_current">
 									<td><h6 class="mb-0">{{ _("Total") }}</h6></td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(total)"></span></td>
+									<td class="price">
+										<span x-show="$store.cart.is_priced_current">{{ currency_symbol }}<span x-text="format_amount(total)"></span></span>
+										<span x-show="!$store.cart.is_priced_current && $store.cart.pricing_status !== 'failed'">{{ _("Updating…") }}</span>
+										<a href="javascript:void(0);" x-show="!$store.cart.is_priced_current && $store.cart.pricing_status === 'failed'"
+											@click="$store.cart.load_priced()">{{ _("Retry") }}</a>
+									</td>
 								</tr>
 							</tbody>
 						</table>
@@ -157,11 +164,14 @@
 								{{ _("Checkout") }}
 							</button>
 						{% else %}
-							<button type="button" class="btn btn-secondary w-100" :disabled="checkout_loading || !$store.cart.selected_count"
+							<button type="button" class="btn btn-secondary w-100" :disabled="checkout_status !== 'idle' || !$store.cart.selected_count"
 								@click="save_quotation_for_checkout()">
 								{{ _("Place Order") }}
 							</button>
 						{% endif %}
+						<p class="text-center text-danger font-14 m-t10 mb-0" role="status" x-show="$store.cart.sync_status === 'offline'" x-cloak>
+							{{ _("Your latest changes are not saved yet. We'll keep trying.") }}
+						</p>
 						<p class="text-center text-body-secondary font-14 m-t10 mb-0" x-show="!$store.cart.selected_count" x-cloak>
 							{{ _("Tick an item to check out") }}
 						</p>
@@ -181,10 +191,15 @@
 		document.addEventListener("alpine:init", () => {
 			Alpine.data("summer_cart", (delivery_charge) => ({
 				delivery_charge: delivery_charge,
-				checkout_loading: false,
+				// 'idle', 'saving' while the cart is checked and saved, 'leaving' once checkout is loading.
+				checkout_status: "idle",
 				include_label: {{ _("Include {0} in checkout") | tojson }},
 
 				async init() {
+					// A page restored from the back/forward cache still says 'leaving'.
+					window.addEventListener("pageshow", (event) => {
+						if (event.persisted) this.checkout_status = "idle";
+					});
 					await this.$store.cart.fetch_detail_for_cart();
 					await this.$store.cart.load_priced();
 					await this.resume_checkout_after_sign_in();
@@ -209,7 +224,7 @@
 				},
 
 				get delivery_amount() {
-					return this.$store.cart.is_delivery_charged ? this.delivery_charge : 0;
+					return this.$store.cart.delivery_status === "charged" ? this.delivery_charge : 0;
 				},
 
 				get total() {
@@ -222,7 +237,8 @@
 				},
 
 				async save_quotation_for_checkout() {
-					this.checkout_loading = true;
+					if (this.checkout_status !== "idle") return;
+					this.checkout_status = "saving";
 					try {
 						const items = this.$store.cart.items.filter(item => item.selected);
 						if (!await this.$store.cart.validate_stock_before_checkout(items)) return;
@@ -231,9 +247,12 @@
 						await frappe_call("/api/v2/method/commera.api.payments.generate_quotation_for_cart", {
 							cart: { items: items },
 						});
+						this.checkout_status = "leaving";
 						window.location.href = "/{{ language }}/cart/checkout" + window.location.search;
+					} catch (error) {
+						// frappe_call has shown the error.
 					} finally {
-						this.checkout_loading = false;
+						if (this.checkout_status === "saving") this.checkout_status = "idle";
 					}
 				},
 			}));

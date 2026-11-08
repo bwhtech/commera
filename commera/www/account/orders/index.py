@@ -1,11 +1,16 @@
 no_cache = True
 
+import importlib
+
 import frappe
 from frappe.query_builder import DocType
 from pypika import CustomFunction, Order
 
 from commera.order_access import get_shopper_order_condition
 from commera.utils import get_current_page, get_rounded_or_grand_total
+
+# "return" is a keyword, so the module cannot be named in an import statement.
+get_return_state = importlib.import_module("commera.api.return").get_return_state
 
 
 def get_context(context):
@@ -20,6 +25,9 @@ def get_context(context):
 		page=page,
 		page_length=context.page_length,
 	)
+	# Rendered with the page: a request per order kept a loading overlay up until the first one answered.
+	for order in orders:
+		order.return_state = get_return_state(frappe.get_doc("Sales Order", order.name))
 	context.orders = orders
 	context.total_count = total_count
 	return_reasons = frappe.get_cached_value("Commera Settings", "Commera Settings", "reason_for_return")

@@ -19,33 +19,12 @@
 {% endblock %}
 
 {% block user_body %}
-<div x-data="{
-    loading_status: true,
-    init() {
-        {% if not orders %}
-        this.loading_status = false;
-        {% endif %}
-    }
-}" x-init="init()">
+<div>
 {% for order in orders %}
+{# The return state comes with the page: no request per order, nothing to wait for. #}
 <div x-data="{ 
     selected_items: [],
-    returned_items: [],
-    returned_items_in_draft:[],
-    is_fully_returned:false,
-    partially_returned: false,
-    free_items_map: {},
-    async fetch_returned_items(order_id) {
-    const response = await frappe_call('/api/v2/method/commera.api.return.get_returned_items', {
-        sales_order_id: order_id
-    });
-    this.returned_items = response.data.returned_items;
-    this.returned_items_in_draft = response.data.returned_items_in_draft;
-    this.is_fully_returned = response.data.is_fully_returned;
-    this.partially_returned = response.data.partially_returned;
-    this.loading_status = false;
-    this.free_items_map = response.data.free_items_map;
-    },
+    ...{{ order.return_state | tojson | forceescape }},
     watch_selected_items() {
         let updated_selected = [...this.selected_items];
 
@@ -68,7 +47,7 @@
 
         this.selected_items = updated_selected;
     },
-}" x-init="fetch_returned_items('{{ order.name }}')" x-effect="watch_selected_items()" class="flex flex-col border  border-gray-300 rounded-lg mb-4">
+}" x-effect="watch_selected_items()" class="flex flex-col border  border-gray-300 rounded-lg mb-4">
     <div class="flex items-start justify-between border-b border-gray-300 bg-gray-50 p-4 rounded-t-lg">
         <div>
             <h3 class="text-sm text-secondary-accent font-medium uppercase">{{order.name}}</h3>
@@ -146,7 +125,7 @@
 
             <span
                 class="text-xxs px-2 py-1   border rounded-md font-medium flex justify-center {{ order_status.color_class }}"
-                x-show="!is_fully_returned && !partially_returned && !loading_status" x-cloak>
+                x-show="!is_fully_returned && !partially_returned">
                 {{ _(order.custom_ecommerce_status) }}
             </span>
             {% endwith %}
@@ -193,15 +172,6 @@
 {% else %}
 <div class="text-center">{{_('No orders found')}}...</div>
 {% endfor %}
- <div x-show="loading_status" style="background: rgba(255,255,255,0.8)"
-        class="fixed top-0 left-0 w-full h-full z-50 flex items-center justify-center" >
-        <div class=" p-4 rounded-md  text-lg text-accent flex items-center gap-2">
-            <div class="  animate-spin  size-5 border-3 border-current border-t-transparent  rounded-full ms-2"
-                role="status" aria-label="loading">
-            </div>
-            <span>{{_("Loading your orders")}}...</span>
-        </div>
-    </div>
 </div>
 {% if orders|length > 0 %}
     <div class="flex items-center justify-center mt-20">

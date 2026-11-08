@@ -23,7 +23,9 @@
     {% else %}
     <h1 class="text-2xl font-medium text-gray-900">{{ _("Continue to Checkout") }}</h1>
     {# Link previewers and prefetchers run no script, so only a real browser spends the code. #}
-    <form method="post" action="/api/v2/method/commera.api.storefront.cart.claim_checkout_cart" class="mt-6" x-data x-init="$el.submit()">
+    {# Coming Back to this page must not spend the code a second time, so the history entry remembers the first submit. #}
+    <form method="post" action="/api/v2/method/commera.api.storefront.cart.claim_checkout_cart" class="mt-6" x-data
+        x-init="if (!history.state?.checkout_cart_claimed) { history.replaceState({ ...history.state, checkout_cart_claimed: true }, ''); $el.submit(); }">
         {{ forwarded_inputs() }}
         <button type="submit" class="inline-block bg-primary text-white rounded-lg px-8 py-2">{{ _("Continue to checkout") }}</button>
     </form>

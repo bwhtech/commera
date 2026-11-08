@@ -16,32 +16,77 @@ async function save_change(state, change, action = true) {
 	}
 }
 
+// A change that ends in a navigation keeps busy set, so its button stays off while the next page loads.
+// A page restored from the back/forward cache comes back with it still set, so the restore clears it.
+const leaving_states = new Set();
+
+globalThis.addEventListener('pageshow', (event) => {
+	if (!event.persisted) return;
+	for (const state of leaving_states) state.busy = false;
+	leaving_states.clear();
+});
+
 async function save_change_and_leave(state, change, action = true) {
 	state.busy = action;
 	state.error = '';
+	leaving_states.add(state);
 	try {
 		await change();
 	} catch (error) {
 		state.error = error.message;
 		state.busy = false;
+		leaving_states.delete(state);
 	}
+}
+
+// Runs requests one after another, so the last reply to arrive is the server's latest state.
+function request_queue() {
+	let last = Promise.resolve();
+	return (request) => {
+		const reply = last.then(request, request);
+		last = reply.catch(() => {});
+		return reply;
+	};
 }
 
 function typeahead() {
 	return {
 		query: '',
 		results: null,
+		// 'idle', 'loading', 'ready' (results answer the query, maybe with nothing) or 'failed'.
+		status: 'idle',
 
 		async search() {
 			const query = this.query.trim();
 			if (!query) {
 				this.results = null;
+				this.status = 'idle';
 				return;
 			}
-			const results = await commera.search.get_typeahead(query);
+			this.status = 'loading';
+			let results;
+			try {
+				results = await commera.search.get_typeahead(query);
+			} catch {
+				if (query === this.query.trim()) {
+					this.results = null;
+					this.status = 'failed';
+				}
+				return;
+			}
 			if (query === this.query.trim()) {
 				this.results = results;
+				this.status = 'ready';
 			}
+		},
+
+		// A method, not a getter: search_modal spreads typeahead(), which would freeze a getter's value.
+		has_no_results() {
+			return (
+				this.status === 'ready' &&
+				!this.results?.products.length &&
+				!this.results?.categories.length
+			);
 		},
 
 		product_url,
@@ -71,7 +116,9 @@ function product_form(product) {
 		size: product.size,
 		qty: 1,
 		image: 0,
+		// Add to cart and the wishlist button are separate requests, so each has its own busy.
 		busy: false,
+		wishlist_busy: false,
 		error: '',
 		missing_size: false,
 		saved: product.in_wishlist,
@@ -137,7 +184,7 @@ function product_form(product) {
 				await commera.cart.add_lines([
 					{ item_code: this.variant.id, qty: this.qty },
 				]);
-				Alpine.store('cart').open = true;
+				globalThis.dispatchEvent(new CustomEvent('open-cart'));
 			}, 'add_to_cart');
 		},
 
@@ -148,12 +195,21 @@ function product_form(product) {
 				this.$dispatch('open-auth', { redirect: url.pathname + url.search });
 				return;
 			}
-			await this.save(async () => {
+			if (this.wishlist_busy) {
+				return;
+			}
+			this.wishlist_busy = true;
+			this.error = '';
+			try {
 				await (this.saved
 					? commera.wishlist.remove(product.id)
 					: commera.wishlist.add(product.id));
 				this.saved = !this.saved;
-			}, 'wishlist');
+			} catch (error) {
+				this.error = error.message;
+			} finally {
+				this.wishlist_busy = false;
+			}
 		},
 	};
 }
@@ -296,9 +352,14 @@ function checkout(config) {
 		payment_methods: [],
 		payment_method: '',
 		summary_open: false,
-		step: 'address',
+		// The section the error belongs to; null once an action succeeds.
+		step: null,
 		busy: false,
 		error: '',
+		// The option the shopper just picked, while it saves; the radio shows it, then the server's.
+		chosen_shipping_option: null,
+		// Address, option, refresh and payment requests all rewrite state, so they run one at a time.
+		queue: request_queue(),
 
 		async init() {
 			globalThis.addEventListener('commera:cart-updated', () => this.refresh());
@@ -357,16 +418,26 @@ function checkout(config) {
 			this.forms[kind] = address_form(address, this.config.country);
 		},
 
+		// A background reload after the cart changed: it leaves busy to the shopper's own action.
 		async refresh() {
 			if (!this.state) {
 				return;
 			}
-			await save_change(this, async () => {
-				this.state = await commera.checkout.get();
-				if (!this.editing_address) {
-					await this.load_options();
-				}
-			});
+			try {
+				await this.queue(async () => {
+					this.state = await commera.checkout.get();
+					if (!this.editing_address) {
+						await this.load_options();
+					}
+				});
+			} catch (error) {
+				this.step = 'payment';
+				this.error = error.message;
+			}
+		},
+
+		get shown_shipping_option() {
+			return this.chosen_shipping_option ?? this.state?.shipping_option;
 		},
 
 		async load_options() {
@@ -397,57 +468,77 @@ function checkout(config) {
 			const email = this.config.is_guest ? this.email.trim() : undefined;
 			await save_change(
 				this,
-				async () => {
-					this.state =
-						this.delivery_method === 'pickup'
-							? await commera.checkout.set_store_pickup({
-									warehouse: this.pickup_location,
-									email,
-							  })
-							: await commera.checkout.set_addresses({
-									billing_address: this.address_input(
-										this.billing_same ? 'shipping' : 'billing',
-									),
-									shipping_address: this.billing_same
-										? undefined
-										: this.address_input('shipping'),
-									email,
-							  });
-					await this.load_options();
-					this.editing_address = false;
-				},
+				() =>
+					this.queue(async () => {
+						this.state =
+							this.delivery_method === 'pickup'
+								? await commera.checkout.set_store_pickup({
+										warehouse: this.pickup_location,
+										email,
+								  })
+								: await commera.checkout.set_addresses({
+										billing_address: this.address_input(
+											this.billing_same ? 'shipping' : 'billing',
+										),
+										shipping_address: this.billing_same
+											? undefined
+											: this.address_input('shipping'),
+										email,
+								  });
+						await this.load_options();
+						this.editing_address = false;
+					}),
 				'address',
 			);
+			if (!this.error) this.step = null;
 		},
 
 		async choose_shipping_option(option_id) {
+			if (this.busy) {
+				return;
+			}
 			this.step = 'shipping';
+			this.chosen_shipping_option = option_id;
 			await save_change(
 				this,
-				async () => {
-					this.state = await commera.checkout.set_shipping_option(option_id);
-					this.payment_methods = await commera.checkout.list_payment_methods();
-				},
+				() =>
+					this.queue(async () => {
+						this.state = await commera.checkout.set_shipping_option(option_id);
+						this.payment_methods =
+							await commera.checkout.list_payment_methods();
+					}),
 				`shipping:${option_id}`,
 			);
+			// Saved or refused, the radio now shows the option the server holds.
+			this.chosen_shipping_option = null;
+			if (!this.error) this.step = null;
 		},
 
 		async pay() {
+			if (this.busy) {
+				return;
+			}
 			this.step = 'payment';
-			this.busy = 'pay';
-			this.error = '';
-			try {
-				const session = await commera.checkout.start_payment({
-					payment_method: this.payment_method,
-					expected_total: this.total,
-				});
-				globalThis.location.assign(session.redirect_url);
-			} catch (error) {
-				this.error = error.message;
-				this.busy = false;
-				if (error.exc_type === 'CheckoutPriceChangedError') {
-					await this.refresh();
-				}
+			let price_changed = false;
+			await save_change_and_leave(
+				this,
+				() =>
+					this.queue(async () => {
+						try {
+							const session = await commera.checkout.start_payment({
+								payment_method: this.payment_method,
+								expected_total: this.total,
+							});
+							globalThis.location.assign(session.redirect_url);
+						} catch (error) {
+							price_changed = error.exc_type === 'CheckoutPriceChangedError';
+							throw error;
+						}
+					}),
+				'pay',
+			);
+			if (price_changed) {
+				await this.refresh();
 			}
 		},
 
@@ -514,9 +605,12 @@ function checkout(config) {
 
 function order_confirmation() {
 	return {
+		// 'checking', then 'paid', 'pending' (asked again every few seconds, a few times) or 'failed'.
 		status: 'checking',
 		order: null,
 		details: null,
+		polls: 0,
+		max_polls: 10,
 
 		async init() {
 			const params = new URLSearchParams(globalThis.location.search);
@@ -528,11 +622,28 @@ function order_confirmation() {
 				this.status = 'failed';
 				return;
 			}
+			await this.check(reference_id);
+		},
+
+		get is_still_polling() {
+			return this.status === 'pending' && this.polls < this.max_polls;
+		},
+
+		async check(reference_id) {
 			let result;
 			try {
 				result = await commera.checkout.complete(reference_id);
 			} catch {
 				this.status = 'failed';
+				return;
+			}
+			if (result.status === 'Pending') {
+				this.order = result.order;
+				this.status = 'pending';
+				this.polls += 1;
+				if (this.polls < this.max_polls) {
+					setTimeout(() => this.check(reference_id), 3000);
+				}
 				return;
 			}
 			const [cart, details] = await Promise.all([
@@ -567,6 +678,8 @@ function order_confirmation() {
 document.addEventListener('alpine:init', () => {
 	Alpine.store('cart', {
 		cart: null,
+		// 'loading' until the cart is read, then 'ready', or 'failed' with a retry.
+		status: 'loading',
 		open: false,
 		busy: false,
 		error: '',
@@ -578,8 +691,20 @@ document.addEventListener('alpine:init', () => {
 		async init() {
 			globalThis.addEventListener('commera:cart-updated', (event) => {
 				this.cart = event.detail;
+				this.status = 'ready';
 			});
-			this.cart = await commera.cart.get();
+			await this.load();
+		},
+
+		async load() {
+			this.status = 'loading';
+			try {
+				this.cart = await commera.cart.get();
+				this.status = 'ready';
+			} catch (error) {
+				this.error = error.message;
+				this.status = 'failed';
+			}
 		},
 
 		save(change, action) {
@@ -702,6 +827,18 @@ document.addEventListener('alpine:init', () => {
 		email: '',
 		code: '',
 		resent: false,
+		// Seconds until another code may be asked for; it starts when a code is sent.
+		resend_wait: 0,
+		resend_timer: null,
+
+		start_resend_wait() {
+			clearInterval(this.resend_timer);
+			this.resend_wait = 15;
+			this.resend_timer = setInterval(() => {
+				this.resend_wait -= 1;
+				if (this.resend_wait <= 0) clearInterval(this.resend_timer);
+			}, 1000);
+		},
 
 		switch_mode(next_mode) {
 			this.mode = next_mode;
@@ -728,13 +865,19 @@ document.addEventListener('alpine:init', () => {
 				this.resent = false;
 				this.code = '';
 				this.step = 'code';
+				this.start_resend_wait();
 			}, 'send');
 		},
 
 		async resend_code() {
+			if (this.resend_wait > 0) {
+				return;
+			}
 			await this.submit(async () => {
 				await this.request_code();
 				this.resent = true;
+				this.code = '';
+				this.start_resend_wait();
 			}, 'resend');
 		},
 
@@ -787,16 +930,35 @@ document.addEventListener('alpine:init', () => {
 		reasons: {},
 		item_codes: [],
 
+		// 'loading' until the return options are read, then 'ready' or 'failed'; the return form waits for them.
+		returns_status: is_owner && !is_cancelled ? 'loading' : 'ready',
+
 		async init() {
 			this.item_codes = [...this.$el.querySelectorAll('[data-item]')].map(
 				(element) => element.dataset.item,
 			);
-			this.tracking = await commera.orders.get_tracking(name, key);
+			commera.orders
+				.get_tracking(name, key)
+				.then((tracking) => {
+					this.tracking = tracking;
+				})
+				.catch(() => {});
 			if (is_owner && !is_cancelled) {
+				await this.load_returns();
+			}
+		},
+
+		async load_returns() {
+			this.returns_status = 'loading';
+			try {
 				[this.returns, this.invoice_url] = await Promise.all([
 					commera.orders.get_return_options(name),
 					commera.orders.get_invoice_url(name),
 				]);
+				this.returns_status = 'ready';
+			} catch (error) {
+				this.error = error.message;
+				this.returns_status = 'failed';
 			}
 		},
 
@@ -809,7 +971,7 @@ document.addEventListener('alpine:init', () => {
 		},
 
 		async cancel() {
-			await this.submit(async () => {
+			await save_change_and_leave(this, async () => {
 				await commera.orders.cancel(name);
 				location.reload();
 			});

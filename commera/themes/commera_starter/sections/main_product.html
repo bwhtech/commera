@@ -78,7 +78,7 @@
 					{{ spinner("busy === 'add_to_cart'", "size-5 text-on-brand") }}
 				</button>
 				{% if section.settings.show_wishlist %}
-				<button type="button" @click="toggle_wishlist()" :disabled="busy" :aria-pressed="saved" :aria-busy="busy === 'wishlist'" :class="saved && '[&_svg]:fill-current'" class="relative grid size-10 place-items-center rounded-lg border border-outline-gray-2 bg-surface-base text-ink-gray-8 hover:border-outline-gray-3 aria-busy:text-transparent" aria-label="{{ _('Add to wishlist') }}">{{ icon("heart") }}{{ spinner("busy === 'wishlist'", "size-5 text-ink-gray-8 *:fill-none", overlay=true) }}</button>
+				<button type="button" @click="toggle_wishlist()" :disabled="wishlist_busy" :aria-pressed="saved" :aria-busy="wishlist_busy" :class="saved && '[&_svg]:fill-current'" class="relative grid size-10 place-items-center rounded-lg border border-outline-gray-2 bg-surface-base text-ink-gray-8 hover:border-outline-gray-3 aria-busy:text-transparent" aria-label="{{ _('Add to wishlist') }}">{{ icon("heart") }}{{ spinner("wishlist_busy", "size-5 text-ink-gray-8 *:fill-none", overlay=true) }}</button>
 				{% endif %}
 			</div>
 			<p x-cloak x-show="missing_size" class="mt-2 text-sm text-ink-red-4">{{ _("Choose a size first.") }}</p>

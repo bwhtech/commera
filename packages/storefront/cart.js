@@ -33,8 +33,14 @@ export async function go_to_checkout() {
 	globalThis.location.assign(path);
 }
 
+// Every write answers with the whole cart, and the page shows the last one announced. Writes run one after
+// another, so a slower, older reply can never announce itself over a newer cart.
+let last_write = Promise.resolve();
+
 async function save_cart(method, params) {
-	const cart = await post(method, params);
+	const write = last_write.then(() => post(method, params));
+	last_write = write.catch(() => {});
+	const cart = await write;
 	globalThis.dispatchEvent(
 		new CustomEvent('commera:cart-updated', { detail: cart }),
 	);

@@ -1,8 +1,9 @@
-{# `hidden` and `animate-spin` are toggled by templates/macros/auth_script.html, so renaming them here would fork the script. #}
+{# The sign-in functions come from templates/macros/auth_script.html and drive auth_step; the buttons and spinners read it. #}
 
 {% set allow_guest_checkout = is_guest_checkout_enabled() %}
 
 <div class="summer-auth" x-data="summer_auth()" @open-auth.window="open_dialog($event.detail)"
+	@summer-overlay-open.window="close_dialog()"
 	@keydown.escape.window="close_dialog()">
 
 	<div class="summer-auth-backdrop" x-show="is_open" x-cloak x-transition.opacity
@@ -50,9 +51,9 @@
 								<input type="email" class="form-control" required x-model="email"
 									autocomplete="email" placeholder="{{ _('Enter your email') }}">
 							</div>
-							<button type="submit" class="btn btn-secondary w-100" x-ref="checkout_otp_btn">
+							<button type="submit" class="btn btn-secondary w-100" x-ref="checkout_otp_btn" :disabled="auth_step !== 'email'">
 								{{ _("Send Code") }}
-								<span class="hidden animate-spin" role="status" aria-label="{{ _('loading') }}"></span>
+								<span class="animate-spin" x-show="auth_step === 'sending'" x-cloak role="status" aria-label="{{ _('loading') }}"></span>
 							</button>
 						</form>
 						{% if allow_guest_checkout %}
@@ -75,9 +76,9 @@
 								<input type="email" class="form-control" required x-model="email"
 									placeholder="{{ _('Enter your email') }}">
 							</div>
-							<button type="submit" class="btn btn-secondary w-100" x-ref="login_otp_btn">
+							<button type="submit" class="btn btn-secondary w-100" x-ref="login_otp_btn" :disabled="auth_step !== 'email'">
 								{{ _("Sign In") }}
-								<span class="hidden animate-spin" role="status" aria-label="{{ _('loading') }}"></span>
+								<span class="animate-spin" x-show="auth_step === 'sending'" x-cloak role="status" aria-label="{{ _('loading') }}"></span>
 							</button>
 						</form>
 					</div>
@@ -100,9 +101,9 @@
 								<input type="text" class="form-control" required x-model="last_name"
 									placeholder="{{ _('Enter your last name') }}">
 							</div>
-							<button type="submit" class="btn btn-secondary w-100" x-ref="sign_in_btn">
+							<button type="submit" class="btn btn-secondary w-100" x-ref="sign_in_btn" :disabled="auth_step !== 'email'">
 								{{ _("Sign Up") }}
-								<span class="hidden animate-spin" role="status" aria-label="{{ _('loading') }}"></span>
+								<span class="animate-spin" x-show="auth_step === 'sending'" x-cloak role="status" aria-label="{{ _('loading') }}"></span>
 							</button>
 						</form>
 					</div>
@@ -120,16 +121,18 @@
 										aria-label="{{ _('Digit {0}').format(index + 1) }}">
 								{% endfor %}
 							</div>
-							<button type="submit" class="btn btn-secondary w-100" x-ref="verify_otp_btn">
+							<button type="submit" class="btn btn-secondary w-100" x-ref="verify_otp_btn" :disabled="auth_step !== 'code'">
 								{{ _("Verify") }}
-								<span class="hidden animate-spin" role="status" aria-label="{{ _('loading') }}"></span>
+								<span class="animate-spin" x-show="auth_step === 'verifying' || auth_step === 'done'" x-cloak
+									role="status" aria-label="{{ _('loading') }}"></span>
 							</button>
-							<button type="button" class="btn btn-link w-100 mt-2" :disabled="resend_timer > 0"
+							<button type="button" class="btn btn-link w-100 mt-2" :disabled="resend_timer > 0 || auth_step !== 'code'"
 								@click="resend_otp($data, $refs)">
-								<span x-show="resend_timer > 0">
+								<span x-show="auth_step === 'resending'">{{ _("Sending...") }}</span>
+								<span x-show="auth_step !== 'resending' && resend_timer > 0">
 									{{ _("Resend in") }} <span x-text="resend_timer"></span>s
 								</span>
-								<span x-show="resend_timer === 0">{{ _("Resend code") }}</span>
+								<span x-show="auth_step !== 'resending' && resend_timer === 0">{{ _("Resend code") }}</span>
 							</button>
 						</form>
 					</div>
@@ -146,7 +149,8 @@
 	document.addEventListener("alpine:init", () => {
 		Alpine.data("summer_auth", () => ({
 			is_open: false,
-			otp_sent: false,
+			auth_step: "email",
+			otp_for: null,
 			selected_tab: "login",
 			first_name: "",
 			last_name: "",
@@ -155,20 +159,27 @@
 			resend_timer: 0,
 			resend_interval: null,
 
+			init() {
+				reset_auth_on_restore(this);
+			},
+
+			get otp_sent() {
+				return ["code", "resending", "verifying", "done"].includes(this.auth_step);
+			},
+
 			open_dialog(detail) {
-				this.selected_tab = detail?.mode === "checkout" ? "checkout" : "login";
+				const tab = detail?.mode === "checkout" ? "checkout" : "login";
+				// A code asked for from another tab belongs to another endpoint, so switching drops the attempt.
+				if (tab !== this.selected_tab && this.auth_step !== "done") reset_auth_attempt(this);
+				this.selected_tab = tab;
 				this.is_open = true;
 			},
 
 			close_dialog() {
 				if (!this.is_open) return;
 				this.is_open = false;
-// A dialog reopened after a half-finished attempt would otherwise show the OTP panel for an abandoned code.
-				this.otp_sent = false;
-				this.otp = ["", "", "", "", "", ""];
-				clearInterval(this.resend_interval);
-				this.resend_interval = null;
-				this.resend_timer = 0;
+				// A dialog reopened after a half-finished attempt would otherwise show the OTP panel for an abandoned code.
+				if (this.auth_step !== "done") reset_auth_attempt(this);
 			},
 		}));
 	});

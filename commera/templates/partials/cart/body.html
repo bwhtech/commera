@@ -2,15 +2,19 @@
 
 <script defer>
 	async function proceed_to_checkout(state) {
-		state.checkout_loading = true;
+		if (state.checkout_status !== "idle") return;
+		state.checkout_status = "saving";
 		try {
 			const selected_items = Alpine.store("cart").items.filter(item => item.selected);
 			if (!await Alpine.store("cart").validate_stock_before_checkout(selected_items)) return;
 			if (!await Alpine.store("cart").flush_sync()) return;
 			await frappe_call("/api/v2/method/commera.api.payments.generate_quotation_for_cart", { cart: { items: selected_items } });
+			state.checkout_status = "leaving";
 			window.location.href = "/{{frappe.lang}}/cart/checkout" + window.location.search;
+		} catch (error) {
+			// frappe_call has shown the error.
 		} finally {
-			state.checkout_loading = false;
+			if (state.checkout_status === "saving") state.checkout_status = "idle";
 		}
 	}
 
@@ -26,16 +30,17 @@
 </script>
 
 <div class=" space-y-10" x-data="{
-		checkout_loading: false,
+		checkout_status: 'idle',
 		cart_loading: true,
 		delivery_charge: {{ delivery_charge | float }},
 		get show_delivery_charges() {
-			return this.delivery_charge > 0 && $store.cart.is_delivery_charged;
+			return this.delivery_charge > 0 && $store.cart.delivery_status === 'charged';
 		},
 		get cart_total() {
 			return $store.cart.total - $store.cart.saved + (this.show_delivery_charges ? this.delivery_charge : 0);
 		},
 	}" x-init="
+		window.addEventListener('pageshow', (event) => { if (event.persisted) checkout_status = 'idle'; });
 		await $store.cart.fetch_detail_for_cart();
 		cart_loading = false;
 		await $store.cart.load_priced();
@@ -59,8 +64,9 @@
 	<div class="mb-6 md:mb-10">
 		<h1 class="mb-4 text-3xl font-semibold">{{ _('Your bag') }}</h1>
 		<h3 class="text-lg font-medium flex">
-			{{ _('Total') }} (<span x-text="$store.cart.selected_count"></span><span class=""> &nbsp; {{ _('items') }}) </span>{{get_currency_symbol()}} <span
-				x-text="$store.cart.total.toFixed(2)" class="ps-0.5"></span>
+			{{ _('Total') }} (<span x-text="$store.cart.selected_count"></span><span class=""> &nbsp; {{ _('items') }}) </span>
+			<span x-show="$store.cart.is_priced_current">{{get_currency_symbol()}} <span x-text="cart_total.toFixed(2)" class="ps-0.5"></span></span>
+			<span x-show="!$store.cart.is_priced_current" class="ps-0.5">{{ _("Updating…") }}</span>
 		</h3>
 	</div>
 	{{ plugin_slot("cart_banner") }}
@@ -219,16 +225,21 @@
 						<p class="text-base font-medium flex">{{get_currency_symbol()}}<span x-text="delivery_charge.toFixed(2)" ></span>
 							</p>
 					</div>
-					<div x-show="!show_delivery_charges">
-						<p class="text-base font-medium flex">Free</p>
+					<div x-show="delivery_charge <= 0 || $store.cart.delivery_status === 'free'">
+						<p class="text-base font-medium flex">{{ _("Free") }}</p>
+					</div>
+					<div x-show="delivery_charge > 0 && ($store.cart.delivery_status === 'pending' || $store.cart.delivery_status === 'failed')">
+						<p class="text-base font-medium flex">&hellip;</p>
 					</div>
 				</div>
 				<div class="mb-3 flex items-center justify-between">
 					<p class="text-base font-normal text-gray-400"> {{
 						_('Total') }}</p>
-					<p class="text-base font-medium flex">	{{get_currency_symbol()}}<span x-text="cart_total.toFixed(2)"></span>
-					
+					<p class="text-base font-medium flex" x-show="$store.cart.is_priced_current">	{{get_currency_symbol()}}<span x-text="cart_total.toFixed(2)"></span>
 					</p>
+					<p class="text-base font-medium flex" x-show="!$store.cart.is_priced_current && $store.cart.pricing_status !== 'failed'">{{ _("Updating…") }}</p>
+					<button type="button" class="text-base font-medium underline cursor-pointer" x-show="!$store.cart.is_priced_current && $store.cart.pricing_status === 'failed'"
+						@click="$store.cart.load_priced()">{{ _("Retry") }}</button>
 				</div>
 
 				<div class="mt-6 md:mt-9">
@@ -245,16 +256,19 @@
 					{% else %}
 					<button x-on:click="proceed_to_checkout($data)"
 						class="w-full h-12  py-3 bg-accent hover:bg-secondary-accent rounded-lg flex justify-center items-center gap-2.5 cursor-pointer disabled:opacity-75"
-						:disabled="checkout_loading?true:false">
+						:disabled="checkout_status !== 'idle'">
 						<span class="flex items-center text-white text-base font-semibold uppercase">
 					
 							<span>{{ _("proceed to checkout") }}</span>
 							<div class="animate-spin inline-block size-5 border-3 border-current border-t-transparent rounded-full ms-2"
-								role="status" aria-label="loading" x-show="checkout_loading" x-cloak>
+								role="status" aria-label="loading" x-show="checkout_status !== 'idle'" x-cloak>
 							</div>
 						</span>
 					</button>
 					{% endif %}
+					<p class="mt-3 text-sm text-center text-red-700" role="status" x-show="$store.cart.sync_status === 'offline'" x-cloak>
+						{{ _("Your latest changes are not saved yet. We'll keep trying.") }}
+					</p>
 					<button type="button" x-on:click="$store.cart.copy_link()"
 						class="mt-3 w-full h-12 py-3 border border-accent rounded-lg text-accent text-base font-semibold uppercase cursor-pointer">
 						{{ _("Copy cart link") }}

@@ -3,6 +3,8 @@
 		Alpine.data("cart_permalink", (config) => ({
 			async init() {
 				if (!config.lines.length) return;
+				// Back to this page with notices on it would add the lines a second time, doubling them in merge mode.
+				if (history.state?.cart_link_applied) return;
 				await this.$store.cart.wait_until_loaded();
 				if (!config.is_merge) this.$store.cart.clear();
 				for (const line of config.lines) {
@@ -11,6 +13,7 @@
 				// $persist writes on Alpine's next flush; navigating first can leave the old cart in storage.
 				await this.$nextTick();
 				await this.$store.cart.sync();
+				history.replaceState({ ...history.state, cart_link_applied: true }, "");
 				if (!config.notices.length) window.location.replace(config.next_url);
 			},
 		}));

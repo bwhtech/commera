@@ -9,8 +9,13 @@ document.addEventListener('alpine:init', () => {
 		open_branches: [],
 		cart_detail_loaded: false,
 		bottom_bar_active: false,
+		// The drawer's Checkout: 'idle', 'saving' while the cart's last edit lands, 'leaving' once checkout loads.
+		checkout_status: 'idle',
 
 		init() {
+			window.addEventListener('pageshow', (event) => {
+				if (event.persisted) this.checkout_status = 'idle';
+			});
 			/* Below 768px style.css parks .extra-nav off the bottom edge and slides it up on .active,
 			   which upstream stamps from a jQuery scroll handler. A sentinel reads the same moment. */
 			const observer = new IntersectionObserver((entries) => {
@@ -29,10 +34,16 @@ document.addEventListener('alpine:init', () => {
 				: [...this.open_branches, branch_key];
 		},
 
+		/* The auth dialog is its own component; it closes on this event, and the header closes on open-auth. */
+		announce_overlay() {
+			window.dispatchEvent(new CustomEvent('summer-overlay-open'));
+		},
+
 		async open_cart() {
 			this.search_open = false;
 			this.menu_open = false;
 			this.cart_open = true;
+			this.announce_overlay();
 			/* Stock and price are only stamped onto the persisted cart by an API read, and increment()
 			   refuses to go past stock_qty, so the stepper is dead on a page that never loaded it. */
 			if (!this.cart_detail_loaded && Alpine.store('cart').items.length) {
@@ -45,18 +56,32 @@ document.addEventListener('alpine:init', () => {
 			this.cart_open = false;
 			this.menu_open = false;
 			this.search_open = true;
+			this.announce_overlay();
 		},
 
 		open_mobile_menu() {
 			this.search_open = false;
 			this.cart_open = false;
 			this.menu_open = true;
+			this.announce_overlay();
 		},
 
 		close_overlays() {
 			this.menu_open = false;
 			this.search_open = false;
 			this.cart_open = false;
+		},
+
+		/* Checkout builds from the server cart, so an edit still waiting on the debounce must land first. */
+		async go_to_checkout(url) {
+			if (this.checkout_status !== 'idle') return;
+			this.checkout_status = 'saving';
+			if (!(await Alpine.store('cart').flush_sync())) {
+				this.checkout_status = 'idle';
+				return;
+			}
+			this.checkout_status = 'leaving';
+			window.location.href = url;
 		},
 	}));
 });

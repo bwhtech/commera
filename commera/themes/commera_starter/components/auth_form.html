@@ -35,7 +35,11 @@
 			{{ spinner("busy === 'verify'", "size-5 text-on-brand") }}
 		</button>
 		<div class="flex gap-4">
-			<button type="button" @click="resend_code()" :disabled="busy" :aria-busy="busy === 'resend'" class="relative inline-flex items-center text-sm text-ink-gray-8 underline hover:text-ink-gray-9">{{ _("Resend code") }}{{ spinner("busy === 'resend'", "size-4 text-ink-gray-8") }}</button>
+			<button type="button" @click="resend_code()" :disabled="busy || resend_wait > 0" :aria-busy="busy === 'resend'" class="relative inline-flex items-center text-sm text-ink-gray-8 underline hover:text-ink-gray-9 disabled:text-ink-gray-5">
+    <span x-show="resend_wait <= 0">{{ _("Resend code") }}</span>
+    <span x-cloak x-show="resend_wait > 0">{{ _("Resend code in") }} <span x-text="resend_wait"></span>s</span>
+    {{ spinner("busy === 'resend'", "size-4 text-ink-gray-8") }}
+</button>
 			<button type="button" @click="step = 'details'; error = ''" :disabled="busy" class="text-sm text-ink-gray-8 underline hover:text-ink-gray-9">{{ _("Change email") }}</button>
 		</div>
 	</form>

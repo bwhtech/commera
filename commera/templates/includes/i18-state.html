@@ -3,18 +3,24 @@
         Alpine.store('i18n', {
             i18n: Alpine.$persist([]).as("i18n_data"),
             lastFetched: Alpine.$persist(null).as("i18n_last_fetched"),
+            // The cache belongs to one language: the strings fetched on an Arabic page are no use on an English one.
+            lang: Alpine.$persist(null).as("i18n_lang"),
             ttl: 60 * 60 * 24 * 1000,
 
             async init() {
                 const now = Date.now();
+                const lang = {{ (frappe.lang or "en") | tojson }};
+                if (this.lang !== lang) this.i18n = {};
 
-                if (
-                    !this.i18n || Object.keys(this.i18n).length === 0 ||
-                    !this.lastFetched || (now - this.lastFetched) > this.ttl
-                ) {
-                    const res = await frappe_call('/api/v2/method/commera.api.utils.get_translations');
-                    this.i18n = res.data || {};
-                    this.lastFetched = now;
+                if (this.lang !== lang || !this.lastFetched || (now - this.lastFetched) > this.ttl) {
+                    try {
+                        const res = await frappe_call('/api/v2/method/commera.api.utils.get_translations', { lang });
+                        this.i18n = res.data || {};
+                        this.lang = lang;
+                        this.lastFetched = now;
+                    } catch (error) {
+                        // frappe_call has shown the error; t() falls back to the source strings.
+                    }
                 }
             },
 

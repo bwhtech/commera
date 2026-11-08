@@ -380,10 +380,41 @@ def clear_ordered_cart(quotation, shopper: str | None):
 		cart.revision, cart.revision + 1
 	).where(cart.name == cart_name[0]).run()
 	# The webhook can place the order while the shopper never comes back to sync the browser cart.
-	line = frappe.qb.DocType("Commera Cart Line")
-	frappe.qb.from_(line).delete().where(
-		(line.parent == cart_name[0]) & (line.parenttype == "Commera Cart") & (line.selected == 1)
-	).run()
+	remove_ordered_quantities(cart_name[0], quotation.get("items") or [])
+
+
+def remove_ordered_quantities(cart_name: str, ordered_items):
+	"""Take each ordered quantity off the ticked lines of its item, matching attributes first.
+	Unticked lines were not ordered, and quantity added while the shopper paid stays."""
+	lines = frappe.get_all(
+		"Commera Cart Line",
+		filters={"parent": cart_name, "parenttype": "Commera Cart", "selected": 1},
+		fields=["name", "item_code", "qty", "attributes"],
+		order_by="idx",
+	)
+	if not ordered_items:
+		ordered_items = [frappe._dict(item_code=row.item_code, qty=row.qty) for row in lines]
+	remaining = {row.name: cint(row.qty) for row in lines}
+	for item in ordered_items:
+		qty = cint(item.get("qty"))
+		attributes = parse_attributes(item.get("custom_line_attributes"))
+		candidates = sorted(
+			(row for row in lines if row.item_code == item.get("item_code")),
+			key=lambda row: parse_attributes(row.attributes) != attributes,
+		)
+		for row in candidates:
+			taken = min(qty, remaining[row.name])
+			remaining[row.name] -= taken
+			qty -= taken
+			if not qty:
+				break
+	for row in lines:
+		if remaining[row.name] <= 0:
+			frappe.db.delete("Commera Cart Line", {"name": row.name})
+		elif remaining[row.name] != cint(row.qty):
+			frappe.db.set_value(
+				"Commera Cart Line", row.name, "qty", remaining[row.name], update_modified=False
+			)
 
 
 def delete_abandoned_guest_carts():

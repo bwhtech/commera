@@ -30,7 +30,8 @@
 				toast($store.i18n.t("Please select a size first!"), { type: "warning" });
 				return;
 			}
-			$store.cart.add(this.product, this.selected_variant, this.price, this.default_price, this.brand, this.sizes, this.qty);
+			// The store warns and adds less when the cart already holds the rest of the stock.
+			if (!$store.cart.add(this.product, this.selected_variant, this.price, this.default_price, this.brand, this.sizes, this.qty)) return;
 			toast($store.i18n.t("Item added to your bag"), { type: "success" });
 		},
 		get in_wishlist() {
@@ -39,9 +40,18 @@
 		toggle_wishlist() {
 			this.in_wishlist ? $store.wishlist.remove(this.product) : $store.wishlist.add(this.product);
 		},
+		// "idle", "saving", then "subscribed"; a failed request goes back to "idle" so it can be tried again.
+		notify_status: "idle",
 		async notify_when_available() {
-			await frappe_call("/api/v2/method/commera.api.utils.notify_user_product", { item: {{ selected_item.item_code | tojson }} });
-			toast($store.i18n.t("You will be notified when item is available"), { type: "success" });
+			if (this.notify_status !== "idle") return;
+			this.notify_status = "saving";
+			try {
+				await frappe_call("/api/v2/method/commera.api.utils.notify_user_product", { item: {{ selected_item.item_code | tojson }} });
+				this.notify_status = "subscribed";
+				toast($store.i18n.t("You will be notified when item is available"), { type: "success" });
+			} catch (error) {
+				this.notify_status = "idle";
+			}
 		}
 	}'>
 	<div class="row">
@@ -188,10 +198,13 @@
 					{{ _("Add To Cart") }}
 				</button>
 				{% if not product_in_stock and frappe.session.user != "Guest" %}
-				<button type="button" class="btn btn-link w-100 mt-2"
-					@click.debounce.300ms="notify_when_available()">
+				<button type="button" class="btn btn-link w-100 mt-2" x-show="notify_status !== 'subscribed'"
+					:disabled="notify_status !== 'idle'" @click="notify_when_available()">
 					{{ _("Notify me when available") }}
 				</button>
+				<p class="text-center mt-2 mb-0" role="status" x-show="notify_status === 'subscribed'" x-cloak>
+					{{ _("We'll email you when it's back in stock.") }}
+				</p>
 				{% endif %}
 			</div>
 		</div>

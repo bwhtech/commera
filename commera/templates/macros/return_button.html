@@ -10,9 +10,12 @@ cursor-pointer ' + classes %}
 {% if delivery_status != "Not Delivered" %}
 
 <script>
-    async function return_items(order_id, selected_items, btn, refs) {
+    // A plain function, not an Alpine expression, so it reaches the stores through Alpine.store, not $store.
+    // state.return_status: 'idle', 'saving', then 'leaving' while the page reloads to show the return.
+    async function return_items(order_id, selected_items, state, refs) {
+        if (state.return_status !== 'idle') return;
         if (!selected_items.length) {
-            const message = $store.i18n.t('Please select at least one item to return.')
+            const message = Alpine.store('i18n').t('Please select at least one item to return.')
             toast(message, { "type": "warning" });
             return;
         }
@@ -36,33 +39,28 @@ cursor-pointer ' + classes %}
             });
         });
         if (!valid) return;
-        const spinner = btn.querySelector(".animate-spin");
-        btn.disabled = true;
-        spinner.classList.remove("hidden");
+        state.return_status = 'saving';
+        let response;
         try {
-            const response = await frappe_call('/api/v2/method/commera.api.return.return_items', {
+            response = await frappe_call('/api/v2/method/commera.api.return.return_items', {
                 sales_order_id: order_id,
                 items: items_to_return
             });
-            if (!response.data.success) {
-                const message = $store.i18n.t('Something went wrong');
-                toast(message, { "type": "danger" })
-                return
-            }
-            const message = $store.i18n.t('Return raised successfully!');
-            toast(message, { "type": "success" })
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            window.location.reload()
         } catch (error) {
-
+            // frappe_call has shown the error; the button is ready for another try.
+            state.return_status = 'idle';
+            return;
         }
-        finally {
-            btn.disabled = false
-            spinner.classList.add("hidden");
-
+        if (!response.data.success) {
+            toast(Alpine.store('i18n').t('Something went wrong'), { "type": "danger" })
+            state.return_status = 'idle';
+            return
         }
-
-
+        // The return is raised: the button stays off, so it cannot be raised twice while the page reloads.
+        state.return_status = 'leaving';
+        toast(Alpine.store('i18n').t('Return raised successfully!'), { "type": "success" })
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        window.location.reload()
     }
 </script>
 
@@ -129,12 +127,13 @@ modal_classes='w-full md:max-w-1/2'
     </div>
     {% endfor %}
 
-    <div
+    <div x-data="{ return_status: 'idle' }"
         class="flex flex-col-reverse justify-between gap-2 border-t border-gray-300 bg-white/60 mt-4 pt-4 sm:flex-row sm:items-center md:justify-end">
-        <button type="button" x-on:click="return_items('{{ order_id }}', selected_items,$event.target,$refs)"
+        <button type="button" x-on:click="return_items('{{ order_id }}', selected_items, $data, $refs)"
+            :disabled="return_status !== 'idle'"
             class="whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-center text-sm font-medium tracking-wide text-white transition hover:opacity-75 active:opacity-100 disabled:opacity-75 flex items-center justify-center">
-            {{ _('Return') }} <div
-                class="hidden  animate-spin  size-4 border-3 border-current border-t-transparent  rounded-full ms-2"
+            {{ _('Return') }} <div x-show="return_status !== 'idle'" x-cloak
+                class="animate-spin  size-4 border-3 border-current border-t-transparent  rounded-full ms-2"
                 role="status" aria-label="loading">
             </div>
         </button>

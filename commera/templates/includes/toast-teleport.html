@@ -16,8 +16,8 @@
             }
         },
         burnToast(id){
-            burnToast = this.getToastWithId(id);
-            burnToastElement = document.getElementById(burnToast.id);
+            const burnToast = this.getToastWithId(id);
+            const burnToastElement = document.getElementById(burnToast.id);
             if(burnToastElement){
                 if(this.toasts.length == 1){
                     if(this.layout=='default'){
@@ -76,7 +76,7 @@
             middleToast.style.zIndex = 90;
 
             if(this.expanded){
-                middleToastPosition = topToast.getBoundingClientRect().height +
+                const middleToastPosition = topToast.getBoundingClientRect().height +
                                         this.paddingBetweenToasts + 'px';
 
                 if(this.position.includes('bottom')){
@@ -104,7 +104,7 @@
             let bottomToast = document.getElementById( this.toasts[2].id );
             bottomToast.style.zIndex = 80;
             if(this.expanded){
-                bottomToastPosition = topToast.getBoundingClientRect().height + 
+                const bottomToastPosition = topToast.getBoundingClientRect().height + 
                                         this.paddingBetweenToasts + 
                                         middleToast.getBoundingClientRect().height +
                                         this.paddingBetweenToasts + 'px';
@@ -134,7 +134,7 @@
             let burnToast = document.getElementById( this.toasts[3].id );
             burnToast.style.zIndex = 70;
             if(this.expanded){
-                burnToastPosition = topToast.getBoundingClientRect().height + 
+                const burnToastPosition = topToast.getBoundingClientRect().height + 
                                         this.paddingBetweenToasts + 
                                         middleToast.getBoundingClientRect().height + 
                                         this.paddingBetweenToasts + 
@@ -259,6 +259,11 @@
             expanded = true;
         }
         stackToasts();
+        // Toasts raised before this listener existed wait in a queue (see toast-state.html); @toast-show binds after x-init.
+        $nextTick(() => {
+            window.toast_ready = true;
+            for (const detail of window.toast_queue.splice(0)) window.dispatchEvent(new CustomEvent('toast-show', { detail }));
+        });
         $watch('toastsHovered', function(value){
 
             if(layout == 'default'){

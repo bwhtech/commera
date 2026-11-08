@@ -150,7 +150,7 @@
 					<div class="d-flex align-items-center justify-content-between m-b15">
 						<h4 class="title mb-0">{{ _("Billing details") }}</h4>
 						<a href="javascript:void(0);" class="checkout-edit" x-show="address_saved" x-cloak
-							@click="address_saved = false">{{ _("Edit") }}</a>
+							@click="address_step = 'editing'">{{ _("Edit") }}</a>
 					</div>
 
 					<div class="checkout-saved-note m-b30" x-show="address_saved" x-cloak>
@@ -281,9 +281,9 @@
 						</div>
 
 						<div class="col-md-12">
-							<button type="submit" class="btn btn-secondary" :disabled="address_loading">
-								<span x-show="!address_loading">{{ _("Continue") }}</span>
-								<span x-show="address_loading" x-cloak>{{ _("Saving...") }}</span>
+							<button type="submit" class="btn btn-secondary" :disabled="address_step === 'saving'">
+								<span x-show="address_step !== 'saving'">{{ _("Continue") }}</span>
+								<span x-show="address_step === 'saving'" x-cloak>{{ _("Saving...") }}</span>
 							</button>
 						</div>
 					</form>
@@ -405,22 +405,23 @@
 						<template x-if="delivery_option === 'home_delivery' && address_saved">
 							<div class="checkout-delivery-options">
 								<h5 class="title m-b15">{{ _("Delivery Method") }}</h5>
-								<p class="checkout-locked-note" x-show="shipping_options_loading">
+								<p class="checkout-locked-note" x-show="shipping_options_status === 'loading'">
 									{{ _("Checking delivery options for your address...") }}
 								</p>
 								<p class="checkout-locked-note" x-cloak
-									x-show="!shipping_options_loading && shipping_options_message"
+									x-show="shipping_options_status !== 'loading' && shipping_options_message"
 									x-text="shipping_options_message"></p>
 								<div class="accordion dz-accordion accordion-sm" x-show="shipping_options.length" x-cloak>
 									<template x-for="(option, index) in shipping_options" :key="option.title">
 										<div class="accordion-item">
 											<div class="accordion-header">
 												<div class="accordion-button custom-control custom-checkbox border-0"
-													:class="selected_shipping_option !== option.title && 'collapsed'"
+													:class="shown_shipping_option !== option.title && 'collapsed'"
 													@click="select_shipping_option(option.title)">
+													{# Checked from state, not x-model: a refused choice has to put the radio back. #}
 													<input class="form-check-input radio" type="radio" name="shipping_option"
 														:id="'shipping_option_' + index" :value="option.title"
-														x-model="selected_shipping_option">
+														:checked="shown_shipping_option === option.title">
 													<label class="form-check-label" :for="'shipping_option_' + index">
 														<span x-text="option.label || option.title"></span>
 														<span x-show="option.is_free"> &mdash; {{ _("Free") }}</span>
@@ -431,7 +432,7 @@
 												</div>
 											</div>
 											<div class="accordion-collapse collapse"
-												:class="selected_shipping_option === option.title && 'show'">
+												:class="shown_shipping_option === option.title && 'show'">
 												<div class="accordion-body">
 													<p class="m-b0" x-text="option.description"></p>
 												</div>
@@ -502,9 +503,9 @@
 								</div>
 							</div>
 							<button type="button" class="btn btn-secondary w-100"
-								:disabled="!terms_accepted || !payment_mode || order_loading || !delivery_ready" @click="save_order()">
-								<span x-show="!order_loading">{{ _("Place Order") }}</span>
-								<span x-show="order_loading" x-cloak>{{ _("Placing...") }}</span>
+								:disabled="!terms_accepted || !payment_mode || order_status !== 'idle' || !delivery_ready" @click="save_order()">
+								<span x-show="order_status === 'idle'">{{ _("Place Order") }}</span>
+								<span x-show="order_status !== 'idle'" x-cloak>{{ _("Placing...") }}</span>
 							</button>
 						</div>
 						<button type="button" class="btn btn-outline-secondary w-100 m-t10"
@@ -567,26 +568,34 @@
 				store_pickup_warehouse: "",
 				billing: get_blank_address(),
 				shipping: get_blank_address(),
-				address_saved: false,
-				address_loading: false,
-				order_loading: false,
+				// 'editing', 'saving', then 'saved' once the quotation has the address.
+				address_step: "editing",
+				// 'idle', 'placing', then 'leaving' while the payment or order page loads.
+				order_status: "idle",
 				terms_accepted: false,
 				errors: [],
 				email_error: "",
 				payment_mode: Alpine.$persist(null).as("payment_mode"),
 				summary: config.summary,
 				shipping_options: [],
-				shipping_options_loading: false,
+				// 'idle', 'loading', 'ready' or 'failed'; replies to an older load are dropped.
+				shipping_options_status: "idle",
+				shipping_options_request: 0,
 				shipping_options_message: "",
-				shipping_options_failed: false,
+				// The option the server holds, and the shopper's latest pick while it saves (null when nothing saves).
 				selected_shipping_option: null,
-				shipping_option_saving: false,
-				pending_shipping_option: null,
+				wanted_shipping_option: null,
+				// Requests that change the quotation run one at a time, so the last summary to arrive is the server's latest.
+				summary_writes: Promise.resolve(),
 				pending_discount: null,
 				discount_code: "",
 				discount_codes: config.discount_codes,
 
 				async init() {
+					// A page restored from the back/forward cache still says 'leaving'.
+					window.addEventListener("pageshow", (event) => {
+						if (event.persisted) this.order_status = "idle";
+					});
 					if (this.config.cart_needs_refresh && await this.refresh_checkout_cart()) return;
 					this.set_available_payment_mode();
 					const url = new URL(window.location.href);
@@ -608,8 +617,10 @@
 						return;
 					}
 					this.summary = this.get_browser_cart_summary();
-					this.load_discount_codes();
-				},
+					await this.load_discount_codes();
+					// The code goes on the guest's server cart now, so the total on screen includes it before the address step.
+					await this.apply_pending_discount();
+					},
 
 				// Returns true when it leaves the page.
 				async refresh_checkout_cart() {
@@ -631,19 +642,32 @@
 					this.summary = this.get_browser_cart_summary();
 				},
 
+				// Before the address step a guest has no quotation, so the summary comes from the priced cart.
 				get_browser_cart_summary() {
 					const subtotal = this.$store.cart.total;
 					const shipping = this.$store.cart.is_delivery_charged ? this.config.delivery_charge : 0;
+					const discounts = this.$store.cart.discounts;
 					const summary = {
 						subtotal: subtotal,
 						shipping: shipping,
 						cod_charge: 0,
 						taxes: [],
-						discount_amount: 0,
+						discounts: discounts,
+						discount_amount: this.$store.cart.saved,
 						rounding_adjustment: 0,
-						total: subtotal + shipping,
+						total: subtotal - this.$store.cart.saved + shipping,
 					};
 					return { ...summary, cash_on_delivery: summary };
+				},
+
+				queue_summary_write(request) {
+					const reply = this.summary_writes.then(request, request);
+					this.summary_writes = reply.catch(() => {});
+					return reply;
+				},
+
+				show_summary(summary) {
+					if (summary) this.summary = summary;
 				},
 
 				async apply_pending_discount() {
@@ -658,7 +682,7 @@
 				},
 
 				async add_discount_code(code) {
-					const priced_cart = await this.$store.cart.add_discount_code(code);
+					const priced_cart = await this.queue_summary_write(() => this.$store.cart.add_discount_code(code));
 					if (!priced_cart) return false;
 					this.set_discount_codes(priced_cart);
 					const reason = this.active_discount_codes.find((state) => state.code === code.toUpperCase())?.reason;
@@ -667,14 +691,15 @@
 				},
 
 				async remove_discount_code(code) {
-					const priced_cart = await this.$store.cart.remove_discount_code(code);
+					const priced_cart = await this.queue_summary_write(() => this.$store.cart.remove_discount_code(code));
 					if (priced_cart) this.set_discount_codes(priced_cart);
 				},
 
-				// A guest has no checkout before the address step, so only the codes change on screen until then.
+				// A guest has no checkout before the address step, so the summary is rebuilt from the priced cart until then.
 				set_discount_codes(priced_cart) {
 					this.discount_codes = priced_cart.discount_codes;
-					if (priced_cart.checkout_summary) this.summary = priced_cart.checkout_summary;
+					if (priced_cart.checkout_summary) this.show_summary(priced_cart.checkout_summary);
+					else if (this.config.is_guest && this.address_step !== "saved") this.summary = this.get_browser_cart_summary();
 				},
 
 				format_amount(amount) {
@@ -697,6 +722,14 @@
 					return this.active_summary.discount_codes ?? this.discount_codes;
 				},
 
+				get address_saved() {
+					return this.address_step === "saved";
+				},
+
+				get shown_shipping_option() {
+					return this.wanted_shipping_option ?? this.selected_shipping_option;
+				},
+
 				get active_summary() {
 					if (!this.address_saved || this.payment_mode !== COD_PAYMENT_MODE) return this.summary;
 					return this.summary.cash_on_delivery;
@@ -704,7 +737,7 @@
 
 				get delivery_ready() {
 					if (this.delivery_option !== "home_delivery") return true;
-					if (this.shipping_options_loading || this.shipping_option_saving || this.shipping_options_failed) return false;
+					if (["loading", "failed"].includes(this.shipping_options_status) || this.wanted_shipping_option !== null) return false;
 					return !this.shipping_options.length || Boolean(this.selected_shipping_option);
 				},
 
@@ -714,25 +747,33 @@
 				},
 
 				reset_address_step() {
-					this.address_saved = false;
+					this.address_step = "editing";
 					this.errors = [];
 // Switching between delivery and pickup invalidates any quote; the server clears its own copy when the address saves.
 					this.shipping_options = [];
 					this.shipping_options_message = "";
-					this.shipping_options_failed = false;
+					this.shipping_options_status = "idle";
+					this.shipping_options_request++;
 					this.selected_shipping_option = null;
-					this.pending_shipping_option = null;
-				},
+					this.wanted_shipping_option = null;
+					},
 
 				async load_shipping_options() {
 					if (this.delivery_option !== "home_delivery") return;
 
-					this.shipping_options_loading = true;
+					const request = ++this.shipping_options_request;
+					this.shipping_options_status = "loading";
 					this.shipping_options_message = "";
 					try {
-						const response = await frappe_call("/api/v2/method/commera.api.shipping.get_shipping_options");
+						const response = await this.queue_summary_write(
+							() => frappe_call("/api/v2/method/commera.api.shipping.get_shipping_options"),
+						);
+						if (request !== this.shipping_options_request) return;
 						const data = response.data || {};
+						// The quote comes with the summary, so a total the server changed is on screen even with no options.
+						this.show_summary(data.checkout_summary);
 						this.shipping_options = data.options || [];
+						this.shipping_options_status = "ready";
 						if (!this.shipping_options.length) {
 // No options is a legitimate configuration (a flat delivery rule), so this only explains itself when the store offers a menu.
 							this.shipping_options_message = data.connector_missing ? "" : NO_SHIPPING_OPTIONS_MESSAGE;
@@ -742,41 +783,41 @@
 						const still_offered = this.shipping_options.some((option) => option.title === data.selected);
 						await this.select_shipping_option(still_offered ? data.selected : this.get_cheapest_shipping_option());
 					} catch (error) {
+						if (request !== this.shipping_options_request) return;
 						this.shipping_options = [];
 						this.selected_shipping_option = null;
-						this.shipping_options_failed = true;
+						this.shipping_options_status = "failed";
 						this.shipping_options_message = SHIPPING_FAILED_MESSAGE;
-					} finally {
-						this.shipping_options_loading = false;
 					}
-				},
+					},
 
 				get_cheapest_shipping_option() {
 					return this.shipping_options.reduce((cheapest, option) =>
 						Number(option.amount) < Number(cheapest.amount) ? option : cheapest).title;
 				},
 
+				// Picks made while one saves are sent after it, newest only. A failure puts the radio back on the server's option.
 				async select_shipping_option(title) {
-					if (title === this.selected_shipping_option) return;
-					this.pending_shipping_option = title;
-					if (this.shipping_option_saving) return;
+					if (title === this.shown_shipping_option) return;
+					const is_saving = this.wanted_shipping_option !== null;
+					this.wanted_shipping_option = title;
+					if (is_saving) return;
 
-					this.shipping_option_saving = true;
 					try {
-						while (this.pending_shipping_option) {
-							const next_option = this.pending_shipping_option;
-							this.pending_shipping_option = null;
-							const response = await frappe_call(
+						let sent;
+						do {
+							sent = this.wanted_shipping_option;
+							const response = await this.queue_summary_write(() => frappe_call(
 								"/api/v2/method/commera.api.shipping.set_delivery_option",
-								{ delivery_option: next_option },
-							);
+								{ delivery_option: sent },
+							));
 							this.selected_shipping_option = response.data.delivery_option;
-							this.summary = response.data.checkout_summary;
-						}
+							this.show_summary(response.data.checkout_summary);
+						} while (this.wanted_shipping_option !== sent);
 					} catch (error) {
-						this.pending_shipping_option = null;
+						// frappe_call has shown the error.
 					} finally {
-						this.shipping_option_saving = false;
+						this.wanted_shipping_option = null;
 					}
 				},
 
@@ -844,37 +885,41 @@
 				},
 
 				async save_address() {
+					if (this.address_step === "saving") return;
 					this.errors = this.get_checkout_errors();
 					if (this.errors.length) return;
 
-					this.address_loading = true;
+					this.address_step = "saving";
 					this.email_error = "";
 					try {
-						const response = await frappe_call(
+						// The server books the guest's server cart, so its last edit must land first.
+						if (this.config.is_guest && !await this.$store.cart.flush_sync()) {
+							this.address_step = "editing";
+							return;
+						}
+						const response = await this.queue_summary_write(() => frappe_call(
 							"/api/v2/method/commera.api.payments.update_quotation_address",
 							{
 								address: this.get_address_payload(),
-								...(this.config.is_guest && { cart: { items: this.$store.cart.items } }),
+								// Only the ticked lines, as the summary counts: the server falls back to these without a server cart.
+								...(this.config.is_guest && { cart: { items: this.$store.cart.items.filter((item) => item.selected) } }),
 							},
-						);
+						));
 						toast(response.data.message, { type: "success" });
-// Saving an address clears the delivery option on the server, so the one shown here is gone too.
+						// Saving an address clears the delivery option on the server, so the one shown here is gone too.
 						this.reset_address_step();
-						this.summary = response.data.checkout_summary;
-						this.address_saved = true;
-						// A guest has no checkout to price the link's code until their first address save.
-						if (this.config.is_guest) await this.apply_pending_discount();
+						this.show_summary(response.data.checkout_summary);
+						this.address_step = "saved";
 						await this.load_shipping_options();
 					} catch (error) {
+						this.address_step = "editing";
 						if (error.type === "InvalidEmailAddressError") this.email_error = INVALID_EMAIL_MESSAGE;
-					} finally {
-						this.address_loading = false;
 					}
 				},
 
 				async save_order() {
-					if (this.order_loading) return;
-					this.order_loading = true;
+					if (this.order_status !== "idle") return;
+					this.order_status = "placing";
 					try {
 						const response = await frappe_call(
 							"/api/v2/method/commera.api.payments.initiate_checkout_with_mode",
@@ -884,9 +929,10 @@
 								expected_total: this.active_summary.total,
 							},
 						);
+						this.order_status = "leaving";
 						window.location.href = response.data.order_url;
-					} catch (error) {
-						this.order_loading = false;
+						} catch (error) {
+							this.order_status = "idle";
 						// Only a moved price or option is worth re-quoting; other refusals would toast twice.
 						if (error.type !== "CheckoutPriceChangedError") return;
 						this.selected_shipping_option = null;
