@@ -168,10 +168,13 @@ const submitHint = computed(() => {
 })
 
 async function submit() {
-  if (!canSubmit.value) return
+  if (!canSubmit.value || createAction.loading) return
+  // Read before the wait: the toast and the jump must name this product, not whatever the form
+  // holds by the time the server answers.
+  const productTitle = title.value.trim()
 
   const added = await trySubmit(createAction, {
-    title: title.value.trim(),
+    title: productTitle,
     collection: collection.value,
     option_attribute: colors.value.length ? optionAttribute.value : undefined,
     size_attribute: 'Size',
@@ -184,7 +187,10 @@ async function submit() {
   if (!added) return
 
   const created = createAction.data
-  toast.success(`"${title.value}" created`)
+  toast.success(`"${productTitle}" created`)
+  // The dialog cannot be dismissed while this runs, but it can be closed from elsewhere (a route
+  // change, the onboarding finishing); then the merchant has moved on and is not pulled back.
+  if (!addProduct.open) return
   closeAddProduct()
   router.push(productRoute(created.name))
 }
@@ -195,7 +201,7 @@ async function submit() {
     v-model:open="addProduct.open"
     size="xl"
     title="Add product"
-    :dismissible="!pickerOpen"
+    :dismissible="!pickerOpen && !createAction.loading"
     @update:open="(v) => (v ? null : closeAddProduct())"
   >
     <template #default>
