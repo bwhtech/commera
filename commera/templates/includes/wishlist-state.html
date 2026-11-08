@@ -6,6 +6,19 @@
 
             init() {
                 this.refresh_route_set();
+                // Another tab's add or remove lands in localStorage only; take it, or this tab's next change
+                // writes its older list over it.
+                window.addEventListener('storage', (event) => {
+                    if (event.storageArea !== localStorage || event.key !== 'wishlist_items') return;
+                    let items;
+                    try {
+                        items = JSON.parse(event.newValue);
+                    } catch (error) {
+                        return;
+                    }
+                    this.items = Array.isArray(items) ? items : [];
+                    this.refresh_route_set();
+                });
             },
 
             refresh_route_set() {
