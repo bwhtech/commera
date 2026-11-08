@@ -1,5 +1,7 @@
 import { computed, ref } from 'vue'
 import { createAdminCaller } from './adminCaller'
+import { wasAborted } from './api'
+import { singleFlight } from '../utils/sequence'
 
 /**
  * The delivery options a shopper picks between at checkout.
@@ -40,16 +42,20 @@ function apply(data) {
 
 async function load() {
   const { data, error } = await attempt('get_delivery_options')
+  // A newer read of the same endpoint aborted this one, and its answer settles the state.
+  if (wasAborted(error)) return
   loadError.value = error
   apply(data)
-  loaded.value = true
+  // Only an answer counts as loaded: after a refusal the next open reads again.
+  if (data) loaded.value = true
 }
 
-// Loads once per dialog open rather than on every tab switch. Every mutation re-reads
-// anyway, because the answer to one is the refreshed screen.
-async function loadOnce() {
+// Loads once per dialog open rather than on every tab switch, and callers that ask while it
+// reads share the one read. Every mutation re-reads anyway, because the answer to one is the
+// refreshed screen.
+const loadOnce = singleFlight(async () => {
   if (!loaded.value) await load()
-}
+})
 
 // Run a mutation and adopt the screen it returns, or null when the server refused it.
 async function mutate(method, params = {}) {

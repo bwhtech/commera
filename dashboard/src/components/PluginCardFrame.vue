@@ -1,5 +1,5 @@
 <script setup>
-import { computed, provide, ref } from 'vue'
+import { computed, onBeforeUnmount, provide, ref } from 'vue'
 import { CARD_CONTEXT } from '../plugin-api/context'
 import PluginHost from './PluginHost.vue'
 
@@ -23,6 +23,13 @@ provide(CARD_CONTEXT, {
 
 // The frame waits for the card's first render, so a card that hides itself on load never shows an empty frame.
 const visible = computed(() => failed.value || (ready.value && !hidden.value))
+
+// A card whose module never finishes loading (a hung request, a plugin that never mounts) fires
+// neither `ready` nor `failed`, and its frame stayed hidden for good. Past this it is shown as it is;
+// a card that asked to be hidden stays hidden.
+const READY_TIMEOUT_MS = 10000
+const readyTimer = setTimeout(() => (ready.value = true), READY_TIMEOUT_MS)
+onBeforeUnmount(() => clearTimeout(readyTimer))
 </script>
 
 <template>

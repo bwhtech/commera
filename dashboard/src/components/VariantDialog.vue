@@ -55,6 +55,7 @@ const skuList = computed(() => props.variant?.sizes?.map((size) => size.item_cod
 const priceAction = useAdminAction('catalog.set_variant_price')
 
 async function save() {
+  if (priceAction.loading) return
   const hasCompareAt = compareAt.value != null && compareAt.value !== ''
   // With no compare-at there is only one price to write, and it has to land on the list already
   // in force: a product created without one is priced on the sale list alone, so writing the
@@ -124,8 +125,8 @@ async function save() {
           :route="productRoute(product.id, variant.name)"
         />
         <div class="flex gap-2">
-          <Button label="Cancel" @click="open = false" />
-          <Button label="Save variant" variant="solid" theme="gray" @click="save" />
+          <Button label="Cancel" :disabled="priceAction.loading" @click="open = false" />
+          <Button label="Save variant" variant="solid" theme="gray" :loading="priceAction.loading" @click="save" />
         </div>
       </div>
     </template>

@@ -12,6 +12,7 @@ import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { stockTone } from '../data/format'
 import { pricePayload, shownPrice } from '../data/product'
 import { ia } from '../ia/store'
+import { useBulkAction } from '../utils/useBulkAction'
 
 const props = defineProps({ product: { type: Object, required: true } })
 const emit = defineEmits(['saved'])
@@ -62,6 +63,10 @@ async function setPrice(variant, rate) {
   emit('saved')
 }
 
+// Its own quiet request: see Pricing.vue's bulk repricing, which this mirrors.
+const bulkPriceAction = useAdminAction('catalog.set_variant_price', { quiet: true })
+const { running: bulkRunning, run: runBulk } = useBulkAction()
+
 async function bulkSetPrice() {
   const selected = props.product.variants.filter((variant) => selection.value.includes(variant.name))
   if (!selected.length) return
@@ -72,17 +77,20 @@ async function bulkSetPrice() {
     fields: [{ name: 'value', label: 'Price', type: 'number', required: true }],
     onConfirm: async ({ values }) => {
       const rate = Math.max(0, Number(values.value) || 0)
-      for (const variant of selected) {
-        const saved = await trySubmit(priceAction, {
-          style_attribute_variant: variant.name,
-          ...pricePayload(variant.sizes[0], rate),
-        })
-        // A failure already toasted inside useAdminAction — stop rather than reprice the rest silently.
-        if (!saved) return
-      }
-      selection.value = []
-      toast.success(`Price updated on ${selected.length} ${selected.length === 1 ? 'variant' : 'variants'}`)
-      emit('saved')
+      await runBulk(
+        'Set price',
+        selected,
+        (variant) =>
+          bulkPriceAction.submit({ style_attribute_variant: variant.name, ...pricePayload(variant.sizes[0], rate) }),
+        {
+          noun: 'variant',
+          verb: 'repriced',
+          after: ({ failed }) => {
+            selection.value = failed.map(({ item }) => item.name)
+            emit('saved')
+          },
+        },
+      )
     },
   })
 }
@@ -208,8 +216,8 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
         <div class="flex items-center gap-2">
           <template v-if="selection.length">
             <span class="text-sm text-ink-gray-5">{{ selection.length }} selected</span>
-            <Button label="Set price" @click="bulkSetPrice" />
-            <Button label="Clear" variant="ghost" @click="selection = []" />
+            <Button label="Set price" :loading="bulkRunning === 'Set price'" @click="bulkSetPrice" />
+            <Button label="Clear" variant="ghost" :disabled="Boolean(bulkRunning)" @click="selection = []" />
           </template>
         </div>
       </div>

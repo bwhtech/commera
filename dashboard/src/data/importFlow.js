@@ -1,8 +1,9 @@
 // The product import flow: shared state for one run of it. Every step reads and writes the real
 // commera.api.admin.imports endpoints — the spreadsheet is the only source that exists, and photos
 // are matched to a product colour by file name (imports.match_import_images).
-import { reactive } from 'vue'
+import { computed, reactive } from 'vue'
 import { useAdminAction } from './api'
+import { canMove, isBusy, nextPhase } from './importPhase'
 
 export const STEPS = [
   { key: 'source', label: 'Source', icon: 'lucide-plug', hint: 'Where the products live today' },
@@ -36,9 +37,10 @@ function blankImport() {
     step: 0,
     source: 'csv',
     imagesMode: 'bulk',
+    // See importPhase.js: the one value that says what the flow is waiting on.
+    phase: 'idle',
     file: null,
     fileUrl: null,
-    parsing: false,
     parsed: false,
     // Photos: every file the browser has uploaded, the merchant's manual pick per file, what the
     // server matched back, and the {group key: [file_url]} map handed to run_import.
@@ -46,11 +48,6 @@ function blankImport() {
     imageChoices: {},
     imageMatch: null,
     imageAssignments: {},
-    running: false,
-    // `finished` means the write landed; a refused run sets `failed` instead, so that a retry is
-    // not mistaken for a completed import (see RunStep).
-    finished: false,
-    failed: false,
     reviewFilter: 'all',
     mapping: {},
     confidence: {},
@@ -66,12 +63,51 @@ function blankImport() {
 
 export const imp = reactive({ open: false, ...blankImport() })
 
+// Bumped on every reset. A request started before a reset — a spreadsheet still uploading when the
+// dialog was closed and reopened, a photo upload loop — holds the old number and must not write its
+// answer into the fresh flow.
+let session = 0
+
+export const importBusy = computed(() => isBusy(imp.phase))
+export const canChangeStep = computed(() => canMove(imp.phase))
+
+// Every async step starts here and gets a ticket back, or null when something else is in flight
+// (or the import already landed), which makes a second click a no-op rather than a second request.
+export function beginPhase(phase) {
+  const next = nextPhase(imp.phase, phase)
+  if (!next) return null
+  imp.phase = next
+  return session
+}
+
+// True when the ticket still belongs to this flow, so its answer may be written.
+export const isCurrentImport = (ticket) => ticket === session
+
+// Ends the phase a ticket started; a ticket from before a reset changes nothing.
+export function endPhase(ticket, phase = 'idle') {
+  if (!isCurrentImport(ticket)) return false
+  imp.phase = phase
+  return true
+}
+
 export function resetImport() {
+  session += 1
   Object.assign(imp, blankImport())
 }
 
+// Removing the spreadsheet forgets everything read from it — the mapping, the counts and the photo
+// matches are all keyed to its rows, and run_import would otherwise get the old file's photo map.
+// The photos already uploaded are kept: they are the merchant's files, and the next match re-places them.
+export function clearImportFile() {
+  const { step, source, imagesMode, imageFiles } = imp
+  resetImport()
+  Object.assign(imp, { step, source, imagesMode, imageFiles })
+}
+
 export function openImport() {
-  if (imp.finished || imp.file) resetImport()
+  // A run still in flight is shown again rather than reset: its write is landing either way, and
+  // the merchant should see what it did.
+  if (imp.phase !== 'running' && (imp.phase === 'done' || imp.file)) resetImport()
   imp.open = true
 }
 
@@ -89,4 +125,8 @@ export function applyValidation(data) {
   imp.confidence = data.confidence
   imp.rows = data.rows
   imp.counts = data.counts
+  // Photo groups are product + colour, read through the mapping, so a new mapping means the old
+  // match may name groups that no longer exist. Images re-matches whenever this is empty.
+  imp.imageMatch = null
+  imp.imageAssignments = {}
 }

@@ -9,6 +9,7 @@ import RichTextField from '../../components/RichTextField.vue'
 import { usePages } from '../../data/pages'
 import { errorMessage } from '../../data/errors'
 import { longDate } from '../../data/format'
+import { createSequence } from '../../utils/sequence'
 
 const route = useRoute()
 const router = useRouter()
@@ -48,13 +49,16 @@ function openStorefront() {
 }
 
 const form = ref(blankPage())
-const loading = ref(false)
 const loadError = ref(null)
-const saving = ref(false)
+// 'loading' | 'ready' | 'error' | 'saving'. Save and Delete exist only in `ready`: a failed load
+// keeps nothing of the page it replaced, so there is nothing on screen that Save could write.
+const status = ref('ready')
 
 // The doc name IS the title, so an unsaved page has no name yet.
 const savedName = ref('')
 const isNew = computed(() => !savedName.value)
+// While a page loads, or after it failed to, there is no saved name yet but it is not a new page.
+const heading = computed(() => savedName.value || route.params.name || 'New page')
 
 // Shown while the route field is still blank: the server derives it from the title.
 const previewUrl = computed(() => {
@@ -74,24 +78,30 @@ function isBlankRichText(html) {
   return !html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
 }
 
+// Only the newest load may fill the form: a slow answer for a page already left behind must not.
+const loads = createSequence()
+
 async function load(name) {
+  const ticket = loads.next()
+  form.value = blankPage()
+  savedName.value = ''
+  loadError.value = null
   if (!name) {
-    form.value = blankPage()
-    savedName.value = ''
-    loadError.value = null
+    status.value = 'ready'
     return
   }
 
-  loading.value = true
-  try {
-    const { data, error } = await getPage(name)
-    loadError.value = error
-    if (!data) return
-    form.value = toForm(data)
-    savedName.value = data.name
-  } finally {
-    loading.value = false
+  status.value = 'loading'
+  const { data, error } = await getPage(name)
+  if (!loads.isLatest(ticket)) return
+  loadError.value = error
+  if (!data) {
+    status.value = 'error'
+    return
   }
+  form.value = toForm(data)
+  savedName.value = data.name
+  status.value = 'ready'
 }
 
 onMounted(() => load(route.params.name))
@@ -106,6 +116,7 @@ watch(
 )
 
 async function save() {
+  if (status.value !== 'ready') return
   const title = form.value.name.trim()
   if (!title) {
     toast.error('Give the page a title')
@@ -116,7 +127,8 @@ async function save() {
     return
   }
 
-  saving.value = true
+  const ticket = loads.current()
+  status.value = 'saving'
   try {
     const saved = await savePage({
       name: savedName.value || null,
@@ -130,7 +142,8 @@ async function save() {
       og_image: form.value.og_image,
       noindex: form.value.noindex ? 1 : 0,
     })
-    if (!saved) return
+    // Moved to another page meanwhile: this answer belongs to the one left behind.
+    if (!saved || !loads.isLatest(ticket)) return
 
     const wasNew = isNew.value
     form.value = toForm(saved)
@@ -140,7 +153,7 @@ async function save() {
     }
     toast.success(wasNew ? 'Page created' : 'Saved')
   } finally {
-    saving.value = false
+    if (loads.isLatest(ticket)) status.value = 'ready'
   }
 }
 
@@ -160,14 +173,14 @@ function remove() {
 
 <template>
   <AppPageHeader
-    :title="isNew ? 'New page' : savedName"
+    :title="heading"
     back-to="/storefront/pages"
     :breadcrumbs="[
       { label: 'Pages', route: '/storefront/pages' },
-      { label: isNew ? 'New page' : savedName },
+      { label: heading },
     ]"
   >
-    <template #actions>
+    <template v-if="status === 'ready' || status === 'saving'" #actions>
       <Dropdown
         v-if="!isNew"
         :options="[
@@ -177,15 +190,15 @@ function remove() {
       >
         <Button icon="lucide-ellipsis" label="More actions" />
       </Dropdown>
-      <Button label="Save" variant="solid" theme="gray" :loading="saving" @click="save" />
+      <Button label="Save" variant="solid" theme="gray" :loading="status === 'saving'" @click="save" />
     </template>
   </AppPageHeader>
 
   <PageBody width="narrow">
-    <LoadingText v-if="loading" />
+    <LoadingText v-if="status === 'loading'" />
 
     <EmptyState
-      v-else-if="loadError"
+      v-else-if="status === 'error'"
       icon="lucide-triangle-alert"
       title="Could not load this page"
       :description="errorMessage(loadError)"

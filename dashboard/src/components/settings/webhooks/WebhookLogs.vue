@@ -58,8 +58,12 @@ function replay(log) {
       isLogOpen.value = false
       await reload()
       emit('replayed')
-      if (replayed.status === 'Failed') toast.error(`Replay to ${props.host} failed: ${replayed.error ?? 'no answer'}`)
-      else toast.success(`Replayed to ${props.host}`)
+      // A refused delivery comes back `Retrying` while it has retries left, and only `Failed`
+      // once it has none, so only `Done` means the receiver took it.
+      const reason = replayed.error ?? 'no answer'
+      if (replayed.status === 'Done') toast.success(`Replayed to ${props.host}`)
+      else if (replayed.status === 'Retrying') toast.warning(`Replay to ${props.host} failed: ${reason}. It will retry.`)
+      else toast.error(`Replay to ${props.host} failed: ${reason}`)
     },
   })
 }

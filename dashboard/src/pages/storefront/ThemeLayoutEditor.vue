@@ -15,6 +15,7 @@ import ThemeSettingsPanel from '../../components/storefront/ThemeSettingsPanel.v
 import PreviewOptions from '../../components/storefront/PreviewOptions.vue'
 import { SECTION_GROUPS, createLayoutEditor, pageLabel, saveThemeThumbnail } from '../../data/themeLayout'
 import { errorMessage } from '../../data/errors'
+import { confirmLeave } from '../../utils/confirmLeave'
 
 const PANELS = [
   { label: 'Sections', value: 'tree' },
@@ -193,11 +194,29 @@ const actions = computed(() => [
   },
 ])
 
-onBeforeRouteLeave(async () => (state.loadError ? true : await saveIfChanged()))
+// Layout drafts save themselves on the way out; theme settings have their own Save, so they are
+// asked about. A failed save asks too: without the choice the only way out was Discard.
+onBeforeRouteLeave(async () => {
+  // Theme settings survive a failed page load, so they are asked about before the load-error exit.
+  if (
+    themeSettingsDirty.value &&
+    !(await confirmLeave('Discard unsaved theme settings?', 'The theme settings you have not saved are lost.'))
+  ) {
+    return false
+  }
+  if (state.loadError) return true
+  if (await saveIfChanged()) return true
+  return confirmLeave('Leave without saving?', 'Your layout changes could not be saved. Leaving now loses them.')
+})
 
 useEventListener(window, 'beforeunload', (event) => {
-  if (hasUnsavedChanges.value) event.preventDefault()
+  if (hasUnsavedChanges.value || themeSettingsDirty.value) event.preventDefault()
 })
+
+async function retryLoad() {
+  if (busy.value) return
+  await editor.load()
+}
 </script>
 
 <template>
@@ -216,8 +235,14 @@ useEventListener(window, 'beforeunload', (event) => {
       </div>
 
       <div class="order-last flex w-full flex-wrap items-center gap-2 lg:order-none lg:mx-auto lg:w-auto">
-        <Dropdown :options="pageOptions">
-          <Button icon-left="lucide-file" icon-right="lucide-chevron-down" :label="pageLabel(state.page)" />
+        <!-- Shut while a load or save runs: a second pick would race the first one's save. -->
+        <Dropdown :options="pageOptions" :disabled="busy">
+          <Button
+            icon-left="lucide-file"
+            icon-right="lucide-chevron-down"
+            :label="pageLabel(state.page)"
+            :disabled="busy"
+          />
         </Dropdown>
         <PreviewEntryPicker v-if="state.loaded && state.hasPreviewEntries" :editor="editor" />
       </div>
@@ -241,7 +266,9 @@ useEventListener(window, 'beforeunload', (event) => {
       icon="lucide-triangle-alert"
       title="Could not open this theme"
       :description="errorMessage(state.loadError)"
-    />
+    >
+      <Button label="Try again" :loading="busy" @click="retryLoad" />
+    </EmptyState>
 
     <template v-else>
       <div v-if="!isWide" class="flex shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3 py-2">

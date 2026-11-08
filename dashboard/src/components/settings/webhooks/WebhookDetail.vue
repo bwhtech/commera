@@ -91,6 +91,7 @@ function setEvents(events) {
 }
 
 function saveEvents() {
+  eventsTimer = null
   if (!values.value.events.length) {
     toast.error('Choose at least one event.')
     values.value.events = stored.value.events
@@ -102,7 +103,14 @@ function saveEvents() {
   })
 }
 
-onBeforeUnmount(() => clearTimeout(eventsTimer))
+// Flushed, not dropped: Back within the debounce would otherwise lose the last tick without a word.
+// The commit outlives this component, so its answer still lands in the shared webhook store.
+onBeforeUnmount(() => {
+  if (!eventsTimer) return
+  clearTimeout(eventsTimer)
+  eventsTimer = null
+  saveEvents()
+})
 
 async function retryFailed() {
   const answer = await webhookActions.call('retry_failed', { webhook: props.name })
@@ -115,6 +123,7 @@ async function retryFailed() {
 const sendingTest = ref(false)
 
 async function sendTest() {
+  if (sendingTest.value) return
   sendingTest.value = true
   const log = await webhookActions.call('send_test', { name: props.name })
   sendingTest.value = false
@@ -124,8 +133,10 @@ async function sendTest() {
   logsPanel.value?.reload()
   webhookRequest.reload()
   webhookStore.reload()
+  const reason = log.error ?? log.response_code ?? 'no answer'
   if (log.status === 'Done') toast.success(`Test event sent: ${log.response_code}`)
-  else toast.error(`Test event failed: ${log.error ?? log.response_code ?? 'no answer'}`)
+  else if (log.status === 'Retrying') toast.warning(`Test event failed: ${reason}. It will retry.`)
+  else toast.error(`Test event failed: ${reason}`)
 }
 
 function rotateSecret() {

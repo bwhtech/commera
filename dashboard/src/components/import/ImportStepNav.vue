@@ -1,13 +1,14 @@
 <script setup>
 import { computed } from 'vue'
 import { Tooltip } from 'frappe-ui'
-import { STEPS, imp } from '../../data/importFlow'
+import { STEPS, canChangeStep, imp } from '../../data/importFlow'
 
 const pct = computed(() => Math.round(((imp.step + 1) / STEPS.length) * 100))
 
-// Only steps you have already reached are clickable.
+// Only steps you have already reached are clickable, and none while a step is waiting on the
+// server or after the import landed (see importPhase.js).
 const go = (i) => {
-  if (i <= imp.step) imp.step = i
+  if (canChangeStep.value && i <= imp.step) imp.step = i
 }
 const state = (i) => (i < imp.step ? 'done' : i === imp.step ? 'current' : 'todo')
 </script>
@@ -30,6 +31,7 @@ const state = (i) => (i < imp.step ? 'done' : i === imp.step ? 'current' : 'todo
           class="h-1 flex-1 rounded-full transition-colors"
           :class="state(i) === 'todo' ? 'bg-surface-gray-3' : 'bg-surface-gray-7'"
           :aria-label="s.label"
+          :disabled="!canChangeStep || i > imp.step"
           @click="go(i)"
         />
       </Tooltip>

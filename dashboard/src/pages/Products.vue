@@ -13,13 +13,14 @@ import EmptyState from '../components/EmptyState.vue'
 import ListSkeleton from '../components/ListSkeleton.vue'
 import BulkBar from '../components/BulkBar.vue'
 import SearchInput from '../components/SearchInput.vue'
-import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
+import { useAdminRead, useAdminAction } from '../data/api'
 import { pickCollectionFor, useCollections } from '../data/collections'
 import { priceRange, shortDate, stockTone } from '../data/format'
 import { ia } from '../ia/store'
 import { productRoute } from '../ia/routes'
 import { openImport } from '../data/importFlow'
 import { openAddProduct } from '../data/addProduct'
+import { useBulkAction } from '../utils/useBulkAction'
 
 const STATUS_TABS = [
   { label: 'All', value: 'all' },
@@ -74,6 +75,16 @@ const productsRequest = useAdminRead('catalog.get_products', {
 // A filter changes what page one is, so it sends you back to it.
 watch([query, status, collection], () => (page.value = 1))
 
+// Bumped when the list changes under a bulk run, so the run does not restore a selection from the old list.
+let listView = 0
+
+// A selection only means the rows on screen: archiving products the merchant can no longer see
+// is a surprise.
+watch([query, status, collection, page, pageSize], () => {
+  listView += 1
+  selection.value = []
+})
+
 const total = computed(() => (status.value === 'draft' ? 0 : productsRequest.data?.total ?? 0))
 
 // The endpoint always orders by last-modified — the toggle re-sorts the
@@ -96,6 +107,17 @@ const rows = computed(() => {
   })
 })
 
+// A reload can move a selected row off this page (an archive, a new order): keep only the rows shown.
+watch(
+  () => productsRequest.data,
+  (data) => {
+    if (!data) return
+    const shown = new Set(rows.value.map((row) => row.name))
+    const kept = selection.value.filter((name) => shown.has(name))
+    if (kept.length !== selection.value.length) selection.value = kept
+  },
+)
+
 // "Change the filters" is a lie on a store with an empty catalogue, which is the
 // state this list is most often first seen in.
 const isFiltered = computed(
@@ -111,21 +133,22 @@ function toggleSort(key) {
 
 const directionFor = (key) => (sort.value.key === key ? sort.value.direction : null)
 
-const archiveAction = useAdminAction('catalog.update_product')
+const archiveAction = useAdminAction('catalog.update_product', { quiet: true })
+const { running: bulkRunning, run: runBulk } = useBulkAction()
 
 async function archiveSelected() {
-  const ids = [...selection.value]
-  if (!ids.length) return
-
-  for (const id of ids) {
-    const archived = await trySubmit(archiveAction, { item_template: id, disabled: 1 })
-    // A failure already toasted inside useAdminAction — stop rather than archive the rest silently.
-    if (!archived) return
-  }
-
-  toast.success(`${ids.length} product${ids.length > 1 ? 's' : ''} archived`)
-  endSelecting()
-  productsRequest.reload()
+  const view = listView
+  await runBulk('Archive', [...selection.value], (id) => archiveAction.submit({ item_template: id, disabled: 1 }), {
+    noun: 'product',
+    verb: 'archived',
+    after: ({ failed }) => {
+      if (view === listView) {
+        selection.value = failed.map(({ item }) => item)
+        if (!failed.length) endSelecting()
+      }
+      return productsRequest.reload()
+    },
+  })
 }
 
 function moveToCollection() {
@@ -166,7 +189,13 @@ function moveToCollection() {
       />
     </div>
 
-    <BulkBar v-if="selecting" :count="selection.length" noun="product" @done="endSelecting">
+    <BulkBar
+      v-if="selecting"
+      :count="selection.length"
+      noun="product"
+      :busy="Boolean(bulkRunning) || movingToCollection"
+      @done="endSelecting"
+    >
       <Button
         label="Move to collection"
         :loading="movingToCollection"
@@ -176,7 +205,7 @@ function moveToCollection() {
         label="Archive"
         theme="red"
         variant="subtle"
-        :loading="archiveAction.loading"
+        :loading="bulkRunning === 'Archive'"
         @click="archiveSelected"
       />
     </BulkBar>

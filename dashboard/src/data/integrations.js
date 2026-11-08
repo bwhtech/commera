@@ -1,6 +1,8 @@
 import { computed, ref } from 'vue'
 import { createAdminCaller } from './adminCaller'
 import { getIntegrationLogo, letterPlate } from '../components/integrations/logos'
+import { wasAborted } from './api'
+import { singleFlight } from '../utils/sequence'
 
 // The vendor's own colour, and the one place in the app where non-semantic colour is
 // correct: it is the thing being recognised. Presentation only — everything else about
@@ -44,16 +46,20 @@ export function createIntegrationsStore({ module, listMethod, saveMethod }) {
 
   async function load() {
     const { data, error } = await attempt(listMethod)
+    // A newer read of the same endpoint aborted this one, and its answer settles the state.
+    if (wasAborted(error)) return
     loadError.value = error
     if (data) cards.value = data
-    loaded.value = true
+    // Only an answer counts as loaded: after a refusal the next open reads again.
+    if (data) loaded.value = true
   }
 
   // Loads once per dialog open rather than on every tab switch, but always re-reads after
-  // a save, because the server owns `enabled`, `configured` and `missing`.
-  async function loadOnce() {
+  // a save, because the server owns `enabled`, `configured` and `missing`. The dialog and the
+  // panel both ask on open, so they share one read.
+  const loadOnce = singleFlight(async () => {
     if (!loaded.value) await load()
-  }
+  })
 
   // The server returns the refreshed card, so the list can never drift from what was
   // actually stored — including a refusal to enable a provider whose keys are missing.

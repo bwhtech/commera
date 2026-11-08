@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { STEP_INDEX, abbreviate, canFinish, clampStep, missingField, resumeStep, toOptions } from '../../src/ia/onboardingSteps.js'
+import {
+  STEP_INDEX,
+  abbreviate,
+  canFinish,
+  clampStep,
+  missingField,
+  resumeStep,
+  setupPollDelay,
+  toOptions,
+} from '../../src/ia/onboardingSteps.js'
 
 const filled = { fullName: 'Aisha Khan', password: '', storeName: 'Indigo Loom', storeCategory: 'Fashion' }
 
@@ -38,4 +47,12 @@ test('toOptions turns plain strings into label/value pairs and keeps objects', (
   assert.deepEqual(toOptions(['INR']), [{ label: 'INR', value: 'INR' }])
   assert.deepEqual(toOptions([{ label: 'A', value: 1 }]), [{ label: 'A', value: 1 }])
   assert.deepEqual(toOptions(undefined), [])
+})
+
+test('setupPollDelay slows after a minute and stops after ten', () => {
+  assert.equal(setupPollDelay(0), 2000)
+  assert.equal(setupPollDelay(59000), 2000)
+  assert.equal(setupPollDelay(61000), 10000)
+  assert.equal(setupPollDelay(10 * 60000), 10000)
+  assert.equal(setupPollDelay(10 * 60000 + 1), null)
 })

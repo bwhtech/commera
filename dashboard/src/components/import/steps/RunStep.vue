@@ -1,42 +1,53 @@
 <script setup>
+import { onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Alert, Badge, Button, Spinner } from 'frappe-ui'
-import { STEPS, closeImport, imp } from '../../../data/importFlow'
+import { STEPS, beginPhase, closeImport, endPhase, imp, isCurrentImport } from '../../../data/importFlow'
 import { useAdminAction, trySubmit } from '../../../data/api'
 import { openSettings } from '../../../ia/settings'
 import ProductThumb from '../ProductThumb.vue'
 
 const runImportAction = useAdminAction('imports.run_import')
 
+// run_import is one synchronous request that writes every product, so it has no progress to show
+// and no way to cancel. Past this the merchant is told it is slow, not stuck, and that closing is safe.
+const SLOW_RUN_MS = 45000
+const slow = ref(false)
+let slowTimer = null
+
 async function run() {
-  // `failed` is deliberately not in this guard: going back to Review and running again mounts a
-  // fresh RunStep, and the retry has to be allowed through. `finished` still blocks, because a
-  // landed import must never be written twice.
-  if (imp.running || imp.finished) return
-  imp.failed = false
-  imp.running = true
+  // beginPhase refuses while a run is in flight and once one has landed: a landed import must
+  // never be written twice. A refused run (`failed`) is let through, for a retry from Review.
+  const ticket = beginPhase('running')
+  if (ticket === null) return
+  slow.value = false
+  slowTimer = setTimeout(() => (slow.value = true), SLOW_RUN_MS)
 
   const imported = await trySubmit(runImportAction, {
     file_url: imp.fileUrl,
     column_mapping: { ...imp.mapping },
     image_assignments: { ...imp.imageAssignments },
   })
-  imp.running = false
+  clearTimeout(slowTimer)
+  slow.value = false
+  if (!isCurrentImport(ticket)) return
   if (!imported) {
-    imp.failed = true
+    endPhase(ticket, 'failed')
     return
   }
-  imp.finished = true
   const result = runImportAction.data
   imp.created = result.created
   imp.runRowErrors = result.row_errors
   imp.imagesAttached = result.images_attached
   imp.runImageErrors = result.image_errors
+  endPhase(ticket, 'done')
 }
 
-// Started in setup rather than onMounted so the `imp.failed = false` above lands before the first
-// render: a retry mounts this component with the previous run's `failed` still set, and on mount
-// the error branch would paint an empty card for a frame before the spinner replaced it.
+onBeforeUnmount(() => clearTimeout(slowTimer))
+
+// Started in setup rather than onMounted so the phase leaves `failed` before the first render: a
+// retry mounts this component with the previous run's `failed` still set, and on mount the error
+// branch would paint an empty card for a frame before the spinner replaced it.
 run()
 
 const router = useRouter()
@@ -62,7 +73,7 @@ const NEXT = [
 <template>
   <div class="space-y-6">
     <!-- Running -->
-    <template v-if="!imp.finished && !imp.failed">
+    <template v-if="imp.phase === 'running'">
       <div>
         <h2 class="text-xl text-ink-gray-9">Importing your catalogue</h2>
         <p class="mt-1 text-p-base text-ink-gray-6">This only takes a moment.</p>
@@ -75,11 +86,16 @@ const NEXT = [
         </div>
       </div>
 
-      <Alert description="Products appear in your catalogue as they land, so you can start editing right away." />
+      <Alert
+        v-if="slow"
+        theme="amber"
+        description="This is taking longer than usual. It is still running: you can close this window, and the products appear in your catalogue when it finishes."
+      />
+      <Alert v-else description="Products appear in your catalogue as they land, so you can start editing right away." />
     </template>
 
     <!-- Failed outright (e.g. this store has no Color/Size attribute) -->
-    <template v-else-if="imp.failed">
+    <template v-else-if="imp.phase === 'failed'">
       <div class="rounded-6 border border-outline-gray-1 px-6 py-8 text-center">
         <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-red-2 text-ink-red-6">
           <span class="lucide-triangle-alert size-6" aria-hidden="true" />

@@ -4,6 +4,7 @@ import { StorageSerializers, useStorage } from '@vueuse/core'
 import { getDomains } from '@frappe/cloud-sdk/api'
 import { cloudContext } from './cloudBilling'
 import { describeDomains } from './home'
+import { singleFlight } from '../utils/sequence'
 
 export const isCloudDomainsAvailable = cloudContext.enabled === true
 
@@ -15,14 +16,16 @@ export const customDomain = computed(() =>
   isCloudDomainsAvailable ? describeDomains(cached.value?.domains) : null,
 )
 
-export async function refreshDomains() {
+// A failed read is not cached: storing it as "no domains" for ten minutes hid Home's domain task
+// on a blip. The last good answer stays, and the next visit asks again. Callers that arrive while
+// a read is out share it.
+export const refreshDomains = singleFlight(async () => {
   try {
     cached.value = { domains: await getDomains(), fetchedAt: Date.now() }
   } catch (error) {
     console.warn('[commera] could not read the Frappe Cloud domains', error)
-    cached.value = { domains: null, fetchedAt: Date.now() }
   }
-}
+})
 
 export function loadDomains() {
   if (!isCloudDomainsAvailable) return

@@ -17,6 +17,9 @@ const FRAME_NAMES = [`commera-theme-editor-preview-${frameId}-0`, `commera-theme
 const MAX_SCROLL_WAIT_FRAMES = 10
 const RENDERING_DELAY_MS = 150
 const READY_GRACE_MS = 500
+// A render whose frame never loads (a hung request, a dropped connection) fires neither `load`
+// nor `preview-ready`, so nothing else would ever lift the overlay off the old preview.
+const RENDER_TIMEOUT_MS = 30000
 
 const frames = []
 const form = ref(null)
@@ -25,8 +28,12 @@ const visibleIndex = ref(null)
 const rendering = ref(false)
 let latestRender = 0
 let readyRender = 0
+// The render actually on screen. A frame can post ready and then hang on its load event.
+let shownRender = 0
+let stopLoadWait = null
 let lastPosted = null
 let renderingTimer = null
+let renderTimeout = null
 let unmounted = false
 
 const action = computed(() => {
@@ -81,6 +88,22 @@ function render() {
   form.value.submit()
   clearTimeout(renderingTimer)
   renderingTimer = setTimeout(() => (rendering.value = true), RENDERING_DELAY_MS)
+  const renderNumber = latestRender
+  clearTimeout(renderTimeout)
+  renderTimeout = setTimeout(() => {
+    if (unmounted || renderNumber !== latestRender || shownRender === renderNumber) return
+    renderFailed()
+  }, RENDER_TIMEOUT_MS)
+}
+
+// The old preview stays; forgetting what was posted lets the next edit render again.
+function renderFailed() {
+  stopLoadWait?.()
+  clearTimeout(renderingTimer)
+  clearTimeout(renderTimeout)
+  rendering.value = false
+  lastPosted = null
+  toast.error('The preview could not be updated. Your changes are kept.', { id: 'theme-preview-failed' })
 }
 
 const renderNumberOf = (index) => Number(new URLSearchParams(frames[index].contentWindow.location.search).get('render'))
@@ -88,10 +111,7 @@ const renderNumberOf = (index) => Number(new URLSearchParams(frames[index].conte
 async function onFrameLoad(index) {
   await new Promise((resolve) => setTimeout(resolve, READY_GRACE_MS))
   if (unmounted || index === visibleIndex.value || renderNumberOf(index) !== latestRender || readyRender === latestRender) return
-  clearTimeout(renderingTimer)
-  rendering.value = false
-  lastPosted = null
-  toast.error('The preview could not be updated. Your changes are kept.', { id: 'theme-preview-failed' })
+  renderFailed()
 }
 
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve))
@@ -99,7 +119,17 @@ const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve))
 async function swapIn(index, renderNumber) {
   const target = frames[index].contentWindow
   if (target.document.readyState !== 'complete') {
-    await new Promise((resolve) => target.addEventListener('load', resolve, { once: true }))
+    const loaded = await new Promise((resolve) => {
+      const finish = (value) => {
+        target.removeEventListener('load', onLoad)
+        stopLoadWait = null
+        resolve(value)
+      }
+      const onLoad = () => finish(true)
+      stopLoadWait = () => finish(false)
+      target.addEventListener('load', onLoad)
+    })
+    if (!loaded) return
   }
   if (renderNumber !== latestRender) return
   const scrollY = visibleWindow()?.scrollY ?? 0
@@ -110,7 +140,9 @@ async function swapIn(index, renderNumber) {
   }
   if (renderNumber !== latestRender) return
   visibleIndex.value = index
+  shownRender = renderNumber
   clearTimeout(renderingTimer)
+  clearTimeout(renderTimeout)
   rendering.value = false
 }
 
@@ -133,7 +165,12 @@ const { resolvedColorScheme } = useColorScheme()
 defineExpose({ scrollToSection: (position) => post('commera:scroll-to-section', position) })
 
 onMounted(render)
-onBeforeUnmount(() => (unmounted = true))
+onBeforeUnmount(() => {
+  unmounted = true
+  stopLoadWait?.()
+  clearTimeout(renderingTimer)
+  clearTimeout(renderTimeout)
+})
 watch(() => [state.previewToken, state.language], render)
 watch(
   () => state.scrollRequest,

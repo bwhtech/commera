@@ -139,6 +139,7 @@ const draftConflicts = computed(() => {
 
 // An existing rule stores each band change at once; a new rule keeps them until Add creates it.
 async function commitRows(nextRows, successMessage) {
+  if (savingBand.value) return
   if (isEdit.value) {
     savingBand.value = true
     serverError.value = ''
@@ -209,6 +210,7 @@ function buildPayload(rowsToSave) {
 }
 
 async function save() {
+  if (saving.value) return
   saving.value = true
   serverError.value = ''
   try {
@@ -356,7 +358,9 @@ async function save() {
                 </p>
 
                 <div class="flex items-center justify-end gap-2 pt-2">
-                  <Button label="Cancel" @click="cancelDraft" />
+                  <!-- Shut while the band saves: the write is already on its way, and closing the
+                       draft under it would hide a refusal or show a band the merchant thought undone. -->
+                  <Button label="Cancel" :disabled="savingBand" @click="cancelDraft" />
                   <Button
                     label="Save"
                     variant="solid"

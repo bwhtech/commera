@@ -1,6 +1,8 @@
 import { computed, ref } from 'vue'
 import { createAdminCaller } from './adminCaller'
 import { exactMoney } from './format'
+import { wasAborted } from './api'
+import { singleFlight } from '../utils/sequence'
 
 /**
  * The store company's selling Shipping Rules and the one checkout uses. Bands are on order
@@ -31,14 +33,18 @@ function apply(data) {
 
 async function load() {
   const { data, error } = await attempt('get_shipping_rules')
+  // A newer read of the same endpoint aborted this one, and its answer settles the state.
+  if (wasAborted(error)) return
   loadError.value = error
   apply(data)
-  loaded.value = true
+  // Only an answer counts as loaded: after a refusal the next open reads again.
+  if (data) loaded.value = true
 }
 
-async function loadOnce() {
+// Two panels of the Shipping tab ask on open, so they share one read.
+const loadOnce = singleFlight(async () => {
   if (!loaded.value) await load()
-}
+})
 
 // The refusal is handed back as well as the screen: the rule editor shows ERPNext's own
 // overlap message beside the bands, where the toast alone would vanish before it is read.

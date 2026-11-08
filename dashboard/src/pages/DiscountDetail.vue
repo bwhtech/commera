@@ -1,6 +1,7 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, nextTick, ref, watch } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
+import { useEventListener } from '@vueuse/core'
 import { Button, Dropdown, LoadingText, Switch, TabList, TabPanel, TabTrigger, Tabs, dialog, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
@@ -25,6 +26,8 @@ import {
   saveDiscount,
 } from '../data/discounts'
 import { errorMessage } from '../data/errors'
+import { confirmLeave } from '../utils/confirmLeave'
+import { createSequence } from '../utils/sequence'
 
 const route = useRoute()
 const router = useRouter()
@@ -39,25 +42,53 @@ const TABS = [
 const discount = ref(null)
 const options = ref({ customer_groups: [], campaigns: [], discount_accounts: [], delivery_options: [] })
 const loadError = ref(null)
-const saving = ref(false)
+// 'loading' | 'ready' | 'error' | 'saving' | 'toggling'. Save and the Active switch both write
+// through save_discount, one shared request, so either one running shuts the other.
+const status = ref('loading')
+const busy = computed(() => status.value === 'saving' || status.value === 'toggling')
 const triedSaving = ref(false)
 const tab = ref('setup')
 
 const isNew = computed(() => !discount.value?.name)
 const heading = computed(() => (!discount.value || isNew.value ? 'New discount' : discountHeading(discount.value)))
 
+// What the server last said, to tell an edit from a discount merely opened. Taken a tick after the
+// sections mount, because some of them fill a default into the record as they do.
+const savedSnapshot = ref('')
+// Not tied to `status`: edits stay unsaved while the Active switch or a failing Save is in flight.
+const isDirty = computed(
+  () => Boolean(discount.value) && !['loading', 'error'].includes(status.value) && JSON.stringify(discount.value) !== savedSnapshot.value,
+)
+async function markSaved() {
+  await nextTick()
+  savedSnapshot.value = JSON.stringify(discount.value)
+}
+
+// Moving from one discount to the next starts a load per move; only the newest may land, so a slow
+// answer for the one left behind cannot fill the form of the one now open.
+const loads = createSequence()
+
 async function load() {
+  const ticket = loads.next()
+  status.value = 'loading'
+  discount.value = null
   loadError.value = null
   triedSaving.value = false
-  options.value = (await getEditorOptions()) ?? options.value
+  tab.value = 'setup'
+  const editorOptions = await getEditorOptions()
+  if (!loads.isLatest(ticket)) return
+  options.value = editorOptions ?? options.value
   if (route.name === 'DiscountNew') {
     const type = discountTypeBySlug[route.params.type] ?? discountTypeBySlug.products
     discount.value = blankDiscount(type.value, options.value.currency)
-    return
+  } else {
+    const { data, error } = await getDiscount(route.params.id)
+    if (!loads.isLatest(ticket)) return
+    loadError.value = error
+    discount.value = data
   }
-  const { data, error } = await getDiscount(route.params.id)
-  loadError.value = error
-  discount.value = data
+  status.value = discount.value ? 'ready' : 'error'
+  await markSaved()
 }
 
 watch(
@@ -70,27 +101,52 @@ watch(
   { immediate: true },
 )
 
+const leaveUnsaved = () => confirmLeave('Discard unsaved changes?', 'The changes to this discount have not been saved.', 'Discard')
+
+onBeforeRouteLeave(() => (isDirty.value ? leaveUnsaved() : true))
+// Another discount opens in this same component, so the leave guard alone never sees it.
+onBeforeRouteUpdate((to) => {
+  if (!isDirty.value || (to.params.id && to.params.id === discount.value?.name)) return true
+  return leaveUnsaved()
+})
+useEventListener(window, 'beforeunload', (event) => {
+  if (isDirty.value) event.preventDefault()
+})
+
 async function save() {
-  saving.value = true
+  if (status.value !== 'ready') return
+  const ticket = loads.current()
+  status.value = 'saving'
   triedSaving.value = true
   try {
     const wasNew = isNew.value
     const saved = await saveDiscount(discount.value)
-    if (!saved) return
+    if (!saved || !loads.isLatest(ticket)) return
     discount.value = saved
+    await markSaved()
     toast.success(wasNew ? 'Discount created' : 'Saved')
     if (wasNew) router.replace({ name: 'DiscountDetail', params: { id: saved.name } })
   } finally {
-    saving.value = false
+    if (loads.isLatest(ticket)) status.value = 'ready'
   }
 }
 
 // Saves the switch alone, so flipping it never publishes edits still waiting for Save.
 async function toggleEnabled(enabled) {
-  const saved = await saveDiscount({ name: discount.value.name, enabled: enabled ? 1 : 0 })
-  if (!saved) return
-  Object.assign(discount.value, { enabled: saved.enabled, status: saved.status })
-  toast.success(saved.enabled ? 'Discount switched on' : 'Discount switched off')
+  if (status.value !== 'ready') return
+  const ticket = loads.current()
+  status.value = 'toggling'
+  try {
+    const saved = await saveDiscount({ name: discount.value.name, enabled: enabled ? 1 : 0 })
+    if (!saved || !loads.isLatest(ticket)) return
+    const changes = { enabled: saved.enabled, status: saved.status }
+    Object.assign(discount.value, changes)
+    // The switch landed on its own; edits still waiting for Save stay unsaved.
+    savedSnapshot.value = JSON.stringify({ ...JSON.parse(savedSnapshot.value), ...changes })
+    toast.success(saved.enabled ? 'Discount switched on' : 'Discount switched off')
+  } finally {
+    if (loads.isLatest(ticket)) status.value = 'ready'
+  }
 }
 
 function remove() {
@@ -100,6 +156,8 @@ function remove() {
     confirmLabel: 'Delete discount',
     onConfirm: async () => {
       if (!(await deleteDiscount(discount.value.name))) return
+      // Deleted: edits made before it are gone with it, so leaving must not ask about them.
+      savedSnapshot.value = JSON.stringify(discount.value)
       toast.success('Discount deleted')
       router.replace('/discounts')
     },
@@ -115,24 +173,32 @@ const hasValue = computed(() => ['Amount Off Products', 'Amount Off Order'].incl
     back-to="/discounts"
     :breadcrumbs="[{ label: 'Discounts', route: '/discounts' }, { label: heading }]"
   >
-    <template v-if="discount" #actions>
+    <template v-if="discount && status !== 'loading'" #actions>
       <Switch
         v-if="!isNew"
         :model-value="Boolean(discount.enabled)"
         class="max-sm:hidden"
         label="Active"
+        :disabled="busy"
         @update:model-value="toggleEnabled"
       />
       <Dropdown
         v-if="!isNew"
         :options="[
-          { label: discount.enabled ? 'Switch off' : 'Switch on', icon: 'lucide-power', onClick: () => toggleEnabled(!discount.enabled) },
+          { label: discount.enabled ? 'Switch off' : 'Switch on', icon: 'lucide-power', disabled: busy, onClick: () => toggleEnabled(!discount.enabled) },
           { label: 'Delete discount', icon: 'lucide-trash-2', theme: 'red', onClick: remove },
         ]"
       >
         <Button icon="lucide-ellipsis" label="More actions" />
       </Dropdown>
-      <Button label="Save" variant="solid" theme="gray" :loading="saving" @click="save" />
+      <Button
+        label="Save"
+        variant="solid"
+        theme="gray"
+        :loading="status === 'saving'"
+        :disabled="status === 'toggling'"
+        @click="save"
+      />
     </template>
   </AppPageHeader>
 

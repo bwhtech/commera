@@ -122,7 +122,8 @@ const moreActions = computed(() => [...asDropdownOptions(actions.value.groups), 
 // fields via v-model (see their templates), so one Save just pushes whatever
 // is currently on it — there is no separate draft to track.
 async function save() {
-  if (!product.value) return
+  // One shared request: a second click would abort the first and send it again.
+  if (!product.value || updateAction.loading) return
   const saved = await trySubmit(updateAction, {
     item_template: product.value.id,
     title: product.value.title,
@@ -169,7 +170,7 @@ const loadFailure = computed(() =>
         <Dropdown :options="moreActions">
           <Button icon="lucide-ellipsis" label="More actions" />
         </Dropdown>
-        <Button label="Save" variant="solid" theme="gray" @click="save" />
+        <Button label="Save" variant="solid" theme="gray" :loading="updateAction.loading" @click="save" />
       </template>
     </AppPageHeader>
 

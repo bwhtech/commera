@@ -1,5 +1,7 @@
 import { computed, ref } from 'vue'
 import { createAdminCaller } from './adminCaller'
+import { wasAborted } from './api'
+import { singleFlight } from '../utils/sequence'
 
 /**
  * The store's warehouses and which of them shoppers can collect from.
@@ -31,14 +33,18 @@ const activeCount = computed(() =>
 
 async function load() {
   const { data, error } = await attempt('get_locations')
+  // A newer read of the same endpoint aborted this one, and its answer settles the state.
+  if (wasAborted(error)) return
   loadError.value = error
   if (data) screen.value = data
-  loaded.value = true
+  // Only an answer counts as loaded: after a refusal the next open reads again.
+  if (data) loaded.value = true
 }
 
-async function loadOnce() {
+// The dialog and the panel both ask on open, so they share one read.
+const loadOnce = singleFlight(async () => {
   if (!loaded.value) await load()
-}
+})
 
 // Run a write and adopt the screen it returns, or null when the server refused it.
 async function mutate(method, params = {}) {

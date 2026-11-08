@@ -3,6 +3,7 @@
 import { reactive, ref } from 'vue'
 import { createAdminCaller } from './adminCaller'
 import { useAdminRead } from './api'
+import { setupPollDelay } from '../ia/onboardingSteps'
 
 const { attempt } = createAdminCaller('onboarding.')
 
@@ -27,29 +28,56 @@ export const onboarding = ref(null)
 export const onboardingLoadError = ref(null)
 
 // One owner for the setup state: the header badge, the products step and the finish button all
-// read this, and only adoptSetup() writes it.
-export const storeSetup = reactive({ status: 'idle', error: '' })
+// read this, and only adoptSetup() writes it. `status` is the server's (idle, running, done,
+// failed); `poll` is ours: whether this tab is still asking (`polling`), gave up asking
+// (`stalled`), or has nothing to ask about (`off`).
+export const storeSetup = reactive({ status: 'idle', error: '', poll: 'off' })
 
 // No socket is open in the dashboard, so the job's realtime event cannot reach it; polling is
-// the one channel. Two seconds keeps "Ready" prompt without hammering a site that is busy setting up.
-const POLL_MS = 2000
+// the one channel, on the schedule setupPollDelay() sets. Once it says stop, the tab says so
+// rather than polling a job that died with its worker for as long as the tab stays open.
 let pollTimer = null
+let pollStartedAt = 0
 
 function adoptSetup(answer) {
   if (!answer) return
   storeSetup.status = answer.status
   storeSetup.error = answer.error || ''
   if (answer.status === 'running') schedulePoll()
+  else stopSetupPolling()
 }
 
 function schedulePoll() {
   if (pollTimer) return
+  if (storeSetup.poll !== 'polling') {
+    storeSetup.poll = 'polling'
+    pollStartedAt = Date.now()
+  }
+  const delay = setupPollDelay(Date.now() - pollStartedAt)
+  if (delay === null) {
+    storeSetup.poll = 'stalled'
+    return
+  }
   pollTimer = setTimeout(async () => {
     pollTimer = null
     const answer = await statusRequest.fetch()
+    // Stopped while this was in flight: the flow closed, or a newer answer already settled it.
+    if (storeSetup.poll !== 'polling') return
     if (answer) adoptSetup(answer)
     else if (storeSetup.status === 'running') schedulePoll()
-  }, POLL_MS)
+  }, delay)
+}
+
+export function stopSetupPolling() {
+  clearTimeout(pollTimer)
+  pollTimer = null
+  storeSetup.poll = 'off'
+}
+
+// "Check again" after a stall: a fresh window of polling, starting now.
+export function resumeSetupPolling() {
+  stopSetupPolling()
+  if (storeSetup.status === 'running') schedulePoll()
 }
 
 export async function loadOnboarding() {

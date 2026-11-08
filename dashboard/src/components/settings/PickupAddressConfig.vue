@@ -5,6 +5,7 @@ import SettingsConfigHeader from './SettingsConfigHeader.vue'
 import LocationMap from '../LocationMap.vue'
 import SettingsLinkControl from './SettingsLinkControl.vue'
 import { useAdminAction, trySubmit } from '../../data/api'
+import { createSequence } from '../../utils/sequence'
 
 const props = defineProps({
   warehouse: { type: Object, required: true },
@@ -59,9 +60,15 @@ const searchText = computed(() =>
 
 const otherMatches = computed(() => matches.value.filter((match) => match !== chosenMatch.value))
 
+// findLocation is one request: a lookup started while another is out aborts it, and that one
+// must not then read as "not found". Only the newest lookup answers; null means it failed or
+// was replaced, which is different from an empty answer.
+const lookups = createSequence()
+
 async function lookUp(query) {
+  const ticket = lookups.next()
   const searched = await trySubmit(findLocation, { query })
-  if (!searched) return []
+  if (!lookups.isLatest(ticket) || !searched) return null
   return findLocation.data ?? []
 }
 
@@ -69,7 +76,7 @@ async function lookUp(query) {
 onMounted(async () => {
   if (hasPin.value || !values.country) return
 
-  const [country] = await lookUp(values.country)
+  const [country] = (await lookUp(values.country)) ?? []
   if (country?.bounds && !hasPin.value) map.value.fitBounds(country.bounds)
 })
 
@@ -83,8 +90,14 @@ async function placeFromAddress() {
   if (!pinFollowsAddress.value || (!values.city && !values.pincode)) return
   if (searchText.value === lastSearched) return
 
-  lastSearched = searchText.value
-  const found = await lookUp(searchText.value)
+  const searched = searchText.value
+  lastSearched = searched
+  const found = await lookUp(searched)
+  // Failed or replaced by a newer lookup: a failed one may be tried again on the next blur.
+  if (found === null) {
+    if (lastSearched === searched) lastSearched = ''
+    return
+  }
   // The owner may have placed the pin by hand while the lookup was out.
   if (!pinFollowsAddress.value) return
 

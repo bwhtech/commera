@@ -95,11 +95,21 @@ const moreActions = computed(() => [{ group: 'Order', options: orderActions }, a
 
 const fulfilAction = useAdminAction('orders.fulfil_order')
 
+// Held through the reload, not only the write: until the order is re-read it still says it can be
+// fulfilled, and a second click would make a second delivery note.
+const fulfilling = ref(false)
+
 async function fulfil() {
-  const fulfilled = await trySubmit(fulfilAction, { sales_order: order.value.name })
-  if (!fulfilled) return
-  toast.success('Fulfilment created')
-  orderRequest.reload()
+  if (fulfilling.value) return
+  fulfilling.value = true
+  try {
+    const fulfilled = await trySubmit(fulfilAction, { sales_order: order.value.name })
+    if (!fulfilled) return
+    toast.success('Fulfilment created')
+    await orderRequest.reload()
+  } finally {
+    fulfilling.value = false
+  }
 }
 
 // A refund moves money and leaves a Payment Entry behind: both the order's
@@ -149,6 +159,7 @@ const loadFailure = computed(() =>
           variant="solid"
           theme="gray"
           :disabled="!order.can_fulfil"
+          :loading="fulfilling"
           @click="fulfil"
         />
       </template>

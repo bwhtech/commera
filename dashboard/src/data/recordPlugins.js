@@ -1,7 +1,8 @@
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { dialog, toast } from 'frappe-ui'
 import { useAdminAction, useAdminRead, trySubmit } from './api'
 import { pluginIcon, placeEntries } from '../ia/plugins'
+import { createSequence } from '../utils/sequence'
 
 export function usePluginRun(path, paramsOf, { onDone } = {}) {
   const runAction = useAdminAction(path)
@@ -26,20 +27,41 @@ export function useRecordPlugins(place, doctype, nameGetter, { onReload } = {}) 
   const actionEntries = placeEntries(`${place}/actions`)
   const hasConditions = [...cardEntries, ...actionEntries].some((entry) => entry.has_condition)
 
-  const conditionsRequest = useAdminRead('plugins.get_record_plugins', { immediate: false })
+  // Quiet: it is a background check the merchant did not ask for, and it retries on its own.
+  const conditionsRequest = useAdminRead('plugins.get_record_plugins', { immediate: false, quiet: true })
   const resolved = shallowRef({ name: null, keys: new Set() })
 
-  // Moving to the next order mid-request answers for the old one, so an answer only counts for its own record.
-  async function resolveConditions() {
+  // A failed check used to leave the record's conditional entries hidden until something reloaded
+  // it. It is retried a couple of times, slower each time, for as long as the record stays open.
+  const RETRY_DELAYS_MS = [2000, 8000]
+  const checks = createSequence()
+  let retryTimer = null
+
+  // Moving to the next order mid-request answers for the old one, so an answer only counts for its
+  // own record, and only the newest check may answer at all.
+  async function resolveConditions(attempt = 0) {
+    clearTimeout(retryTimer)
     const name = nameGetter()
     if (!hasConditions || !name) return
+    const ticket = checks.next()
     const answered = await trySubmit(conditionsRequest, { doctype, name })
-    if (!answered || nameGetter() !== name) return
+    if (!checks.isLatest(ticket) || nameGetter() !== name) return
+    if (!answered) {
+      if (attempt < RETRY_DELAYS_MS.length) {
+        retryTimer = setTimeout(() => resolveConditions(attempt + 1), RETRY_DELAYS_MS[attempt])
+      }
+      return
+    }
     const result = conditionsRequest.data
     resolved.value = { name, keys: new Set(result?.keys ?? []) }
   }
 
-  watch(nameGetter, resolveConditions, { immediate: true })
+  onScopeDispose(() => {
+    clearTimeout(retryTimer)
+    checks.cancel()
+  })
+
+  watch(nameGetter, () => resolveConditions(), { immediate: true })
 
   function isVisible(entry) {
     if (!entry.has_condition) return true

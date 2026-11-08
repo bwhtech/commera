@@ -2,7 +2,16 @@
 import { computed } from 'vue'
 import { Alert, Badge, Button, Select } from 'frappe-ui'
 import { trySubmit } from '../../../data/api'
-import { REQUIRED_FIELDS, TARGET_FIELDS, applyValidation, imp, validateImportAction } from '../../../data/importFlow'
+import {
+  REQUIRED_FIELDS,
+  TARGET_FIELDS,
+  applyValidation,
+  beginPhase,
+  endPhase,
+  imp,
+  isCurrentImport,
+  validateImportAction,
+} from '../../../data/importFlow'
 import CoachTip from '../CoachTip.vue'
 
 const mapped = computed(() => Object.values(imp.mapping).filter(Boolean).length)
@@ -15,20 +24,19 @@ const labelFor = (v) => TARGET_FIELDS.find((f) => f.value === v)?.label ?? ''
 const confidenceTheme = { high: 'green', medium: 'amber', low: 'gray', none: 'gray' }
 const confidenceLabel = { high: 'Sure', medium: 'Likely', low: 'Guess', none: 'No match' }
 
-async function recheck() {
-  const checked = await trySubmit(validateImportAction, {
-    file_url: imp.fileUrl,
-    column_mapping: { ...imp.mapping },
-  })
-  if (!checked) return
-  applyValidation(validateImportAction.data)
+// Re-validating rewrites the counts Review shows and Import commits, so the step stays put until
+// the answer is in.
+async function validate(columnMapping) {
+  const ticket = beginPhase('checking')
+  if (ticket === null) return
+  const params = columnMapping ? { file_url: imp.fileUrl, column_mapping: columnMapping } : { file_url: imp.fileUrl }
+  const checked = await trySubmit(validateImportAction, params)
+  if (checked && isCurrentImport(ticket)) applyValidation(validateImportAction.data)
+  endPhase(ticket)
 }
 
-async function resetToSuggested() {
-  const checked = await trySubmit(validateImportAction, { file_url: imp.fileUrl })
-  if (!checked) return
-  applyValidation(validateImportAction.data)
-}
+const recheck = () => validate({ ...imp.mapping })
+const resetToSuggested = () => validate(null)
 </script>
 
 <template>
@@ -46,7 +54,7 @@ async function resetToSuggested() {
         variant="subtle"
         icon-left="lucide-wand-sparkles"
         label="Use suggestions"
-        :loading="validateImportAction.loading"
+        :loading="imp.phase === 'checking'"
         @click="resetToSuggested"
       />
     </div>
@@ -100,7 +108,7 @@ async function resetToSuggested() {
           size="sm"
           label="Re-check"
           :disabled="!!missing.length"
-          :loading="validateImportAction.loading"
+          :loading="imp.phase === 'checking'"
           @click="recheck"
         />
       </div>

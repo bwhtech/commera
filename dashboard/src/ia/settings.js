@@ -1,3 +1,5 @@
+import { watch } from 'vue'
+import { settings as settingsState } from './settingsRoute'
 import { isCloudBillingAvailable } from '../data/cloudBilling'
 import { isCloudDomainsAvailable } from '../data/cloudDomains'
 import { pluginSettingsTabs } from './plugins'
@@ -5,6 +7,19 @@ import { pluginSettingsTabs } from './plugins'
 // Derived from the URL in ia/settingsRoute; re-exported because this is still the door the
 // rest of the app knocks on.
 export { openSettings, settings } from './settingsRoute'
+
+// The dialog keeps its panels mounted while hidden (`unmount-on-hide=false`), so a panel's
+// drill-in state — an open webhook, a warehouse's address form, a provider being configured —
+// would greet the next open where the last one left off. A panel hands its reset here, and it runs
+// each time the dialog closes. Called from a component's setup, so the watch ends with it.
+export function onSettingsClose(reset) {
+  watch(
+    () => settingsState.open,
+    (isOpen) => {
+      if (!isOpen) reset()
+    },
+  )
+}
 
 // `value` must stay identical to AppSettingsDialog's SettingsNavItem values. The palette
 // matches a plain substring per keyword — no tokenising — so list the words people type.

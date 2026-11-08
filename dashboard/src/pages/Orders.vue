@@ -12,10 +12,11 @@ import EmptyState from '../components/EmptyState.vue'
 import ListSkeleton from '../components/ListSkeleton.vue'
 import BulkBar from '../components/BulkBar.vue'
 import SearchInput from '../components/SearchInput.vue'
-import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
+import { useAdminRead, useAdminAction } from '../data/api'
 import { printUrl } from '../data/erpnext'
 import { money, shortDate } from '../data/format'
 import { useIsMobile } from '../utils/useIsMobile'
+import { useBulkAction } from '../utils/useBulkAction'
 import { ia } from '../ia/store'
 import { orderRoute } from '../ia/routes'
 
@@ -54,6 +55,16 @@ const ordersRequest = useAdminRead('orders.get_orders', {
 // A filter changes what page one is, so it sends you back to it.
 watch([query, tab], () => (page.value = 1))
 
+// Bumped when the list changes under a bulk run, so the run does not restore a selection from the old list.
+let listView = 0
+
+// A selection only means the rows on screen: an action on orders the merchant can no longer see
+// is a surprise, and printing reads each order's delivery notes off the loaded page.
+watch([query, tab, page, pageSize], () => {
+  listView += 1
+  selection.value = []
+})
+
 const total = computed(() => ordersRequest.data?.total ?? 0)
 
 // The endpoint orders by newest first — the header toggle re-sorts the loaded
@@ -73,6 +84,17 @@ const rows = computed(() => {
     return av > bv ? dir : av < bv ? -dir : 0
   })
 })
+
+// A reload can move a selected row off this page (an archive, a new order): keep only the rows shown.
+watch(
+  () => ordersRequest.data,
+  (data) => {
+    if (!data) return
+    const shown = new Set(rows.value.map((row) => row.name))
+    const kept = selection.value.filter((name) => shown.has(name))
+    if (kept.length !== selection.value.length) selection.value = kept
+  },
+)
 
 // "Try a different filter" is a lie on a store that has never taken an order, which
 // is the state this list is most often first seen in.
@@ -94,23 +116,24 @@ const isMobile = useIsMobile()
 // height. Recheck this if the max-sm column override or any `max-sm:hidden` cell changes.
 const skeletonColumns = computed(() => (isMobile.value ? 2 : 6))
 
-const fulfilAction = useAdminAction('orders.fulfil_order')
+const fulfilAction = useAdminAction('orders.fulfil_order', { quiet: true })
+const { running: bulkRunning, run: runBulk } = useBulkAction()
 
-// There is no bulk-fulfil endpoint (fulfil_order ships one order at a time) — same
-// sequential-loop shape Products.vue's bulk archive already uses for the same reason.
+// There is no bulk-fulfil endpoint (fulfil_order ships one order at a time), so it is one call
+// per order, and a refusal is reported with the rest rather than stopping half way.
 async function markFulfilled() {
-  const names = [...selection.value]
-  if (!names.length) return
-
-  for (const name of names) {
-    const fulfilled = await trySubmit(fulfilAction, { sales_order: name })
-    // A failure already toasted inside useAdminAction — stop rather than fulfil the rest silently.
-    if (!fulfilled) return
-  }
-
-  toast.success(`${names.length} order(s) marked fulfilled`)
-  endSelecting()
-  ordersRequest.reload()
+  const view = listView
+  await runBulk('Mark fulfilled', [...selection.value], (name) => fulfilAction.submit({ sales_order: name }), {
+    noun: 'order',
+    verb: 'marked fulfilled',
+    after: ({ failed }) => {
+      if (view === listView) {
+        selection.value = failed.map(({ item }) => item)
+        if (!failed.length) endSelecting()
+      }
+      return ordersRequest.reload()
+    },
+  })
 }
 
 // A packing slip is the Delivery Note, not the invoice: a prepaid order is
@@ -160,8 +183,8 @@ function printDeliveryNotes() {
       />
     </div>
 
-    <BulkBar v-if="selecting" :count="selection.length" noun="order" @done="endSelecting">
-      <Button label="Mark fulfilled" @click="markFulfilled" />
+    <BulkBar v-if="selecting" :count="selection.length" noun="order" :busy="Boolean(bulkRunning)" @done="endSelecting">
+      <Button label="Mark fulfilled" :loading="bulkRunning === 'Mark fulfilled'" @click="markFulfilled" />
       <Button label="Print delivery notes" @click="printDeliveryNotes" />
     </BulkBar>
 

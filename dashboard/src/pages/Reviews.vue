@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { Avatar, Rating, Switch, toast } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import AppPageHeader from '../components/AppPageHeader.vue'
@@ -59,14 +59,26 @@ const publishAction = useAdminAction('reviews.set_published', { quiet: true })
 // Optimistic so the switch never snaps back to its old state mid-drag; a
 // refusal restores it and toasts why. `@click.stop` on the Switch (in the
 // template) is what stops this from also navigating into the review's own row.
+// Writes are chained, not fired together: publishAction is one request, and a second toggle
+// would abort the first, which then reverted its row and toasted "aborted" although the server
+// may well have applied it. A row's own switch waits while its write is pending.
+const pending = reactive(new Set())
+let queue = Promise.resolve()
+
 async function togglePublished(row) {
+  if (pending.has(row.name)) return
   const nextValue = !row.is_published
   row.is_published = nextValue
+  pending.add(row.name)
+  const write = queue.then(() => publishAction.submit({ name: row.name, published: nextValue }))
+  queue = write.catch(() => {})
   try {
-    await publishAction.submit({ name: row.name, published: nextValue })
+    await write
   } catch (error) {
     row.is_published = !nextValue
     toast.error(errorMessage(error))
+  } finally {
+    pending.delete(row.name)
   }
 }
 </script>
@@ -136,7 +148,11 @@ async function togglePublished(row) {
               <span class="text-sm text-ink-gray-5">{{ shortDate(item.creation) }}</span>
             </ListCell>
             <ListCell class="relative">
-              <Switch :model-value="item.is_published" @update:model-value="togglePublished(item)" />
+              <Switch
+                :model-value="item.is_published"
+                :disabled="pending.has(item.name)"
+                @update:model-value="togglePublished(item)"
+              />
             </ListCell>
           </ListRow>
         </ListRows>

@@ -22,6 +22,7 @@ import {
   toast,
 } from 'frappe-ui'
 import EmptyState from '../EmptyState.vue'
+import { createSequence } from '../../utils/sequence'
 
 const props = defineProps({
   // { provider, label } of the carrier being imported from; null while closed.
@@ -48,9 +49,14 @@ const serviceCount = computed(() =>
   accounts.value.reduce((total, account) => total + account.services.length, 0),
 )
 
+// A reply for an earlier open (closed and reopened, or another carrier) must not fill this one.
+const fetches = createSequence()
+
 watch(open, async (isOpen) => {
+  if (!isOpen) fetches.cancel()
   if (!isOpen || !props.provider) return
 
+  const ticket = fetches.next()
   accounts.value = []
   selectedCodes.value = []
   backupCharge.value = '0'
@@ -58,6 +64,7 @@ watch(open, async (isOpen) => {
   loading.value = true
   try {
     const data = await props.fetchChoices(props.provider.provider)
+    if (!fetches.isLatest(ticket)) return
     failed.value = !data
     accounts.value = (data?.accounts ?? [])
       .map((account) => ({
@@ -66,7 +73,7 @@ watch(open, async (isOpen) => {
       }))
       .filter((account) => account.services.length)
   } finally {
-    loading.value = false
+    if (fetches.isLatest(ticket)) loading.value = false
   }
 })
 
@@ -77,6 +84,7 @@ function toggle(code, checked) {
 }
 
 async function importSelected() {
+  if (importing.value) return
   // The carrier's own rows go back with only the account's carrier name added — the server
   // stores all three. Re-deriving a code from a label here is how one gets corrupted.
   const selections = accounts.value.flatMap((account) =>
