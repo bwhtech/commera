@@ -117,6 +117,8 @@ def record_shipment(
 	if not cstr(awb).strip():
 		frappe.throw(_("A shipment needs its AWB."), frappe.ValidationError)
 	frappe.has_permission("Sales Order", doc=sales_order, ptype="read", throw=True)
+	# The order lock cancel_order takes first: a cancel and a new shipment then run one after the other.
+	frappe.db.get_value("Sales Order", sales_order, "name", for_update=True)
 
 	shipments = get_order_shipments(sales_order, awb_number=awb, docstatus=1)
 	if not shipments:
@@ -138,6 +140,8 @@ def create_order_shipment(sales_order, provider, awb, carrier, status, events, t
 		frappe.throw(_("Shipping provider {0} does not exist.").format(provider), frappe.ValidationError)
 
 	order = frappe.get_doc("Sales Order", sales_order)
+	if order.docstatus != 1:
+		frappe.throw(_("Only a submitted order can be shipped."), frappe.ValidationError)
 	shipment = new_shipment(
 		order,
 		origin=(provider and get_provider_pickup_address(provider)) or order.company_address,

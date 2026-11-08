@@ -527,6 +527,12 @@ class TestSdk(IntegrationTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			orders.record_shipment(sales_order.name, provider=provider, awb="ZZ-SDK-AWB", status="Teleported")
 
+	def test_a_cancelled_order_gets_no_new_shipment(self):
+		sales_order = make_test_sales_order()
+		sales_order.cancel()
+		with self.assertRaises(frappe.ValidationError):
+			orders.record_shipment(sales_order.name, awb="ZZ-SDK-CANCELLED")
+
 	def test_a_carrier_named_after_the_first_record_is_saved(self):
 		from commera.shipping.tests.test_carrier_import import create_test_address
 
