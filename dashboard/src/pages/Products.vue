@@ -74,9 +74,16 @@ const productsRequest = useAdminRead('catalog.get_products', {
 
 // A filter changes what page one is, so it sends you back to it.
 watch([query, status, collection], () => (page.value = 1))
+
+// Bumped when the list changes under a bulk run, so the run does not restore a selection from the old list.
+let listView = 0
+
 // A selection only means the rows on screen: archiving products the merchant can no longer see
 // is a surprise.
-watch([query, status, collection, page], () => (selection.value = []))
+watch([query, status, collection, page], () => {
+  listView += 1
+  selection.value = []
+})
 
 const total = computed(() => (status.value === 'draft' ? 0 : productsRequest.data?.total ?? 0))
 
@@ -119,12 +126,15 @@ const archiveAction = useAdminAction('catalog.update_product', { quiet: true })
 const { running: bulkRunning, run: runBulk } = useBulkAction()
 
 async function archiveSelected() {
+  const view = listView
   await runBulk('Archive', [...selection.value], (id) => archiveAction.submit({ item_template: id, disabled: 1 }), {
     noun: 'product',
     verb: 'archived',
     after: ({ failed }) => {
-      selection.value = failed.map(({ item }) => item)
-      if (!failed.length) endSelecting()
+      if (view === listView) {
+        selection.value = failed.map(({ item }) => item)
+        if (!failed.length) endSelecting()
+      }
       return productsRequest.reload()
     },
   })

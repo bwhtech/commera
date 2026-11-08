@@ -54,9 +54,16 @@ const ordersRequest = useAdminRead('orders.get_orders', {
 
 // A filter changes what page one is, so it sends you back to it.
 watch([query, tab], () => (page.value = 1))
+
+// Bumped when the list changes under a bulk run, so the run does not restore a selection from the old list.
+let listView = 0
+
 // A selection only means the rows on screen: an action on orders the merchant can no longer see
 // is a surprise, and printing reads each order's delivery notes off the loaded page.
-watch([query, tab, page], () => (selection.value = []))
+watch([query, tab, page], () => {
+  listView += 1
+  selection.value = []
+})
 
 const total = computed(() => ordersRequest.data?.total ?? 0)
 
@@ -104,12 +111,15 @@ const { running: bulkRunning, run: runBulk } = useBulkAction()
 // There is no bulk-fulfil endpoint (fulfil_order ships one order at a time), so it is one call
 // per order, and a refusal is reported with the rest rather than stopping half way.
 async function markFulfilled() {
+  const view = listView
   await runBulk('Mark fulfilled', [...selection.value], (name) => fulfilAction.submit({ sales_order: name }), {
     noun: 'order',
     verb: 'marked fulfilled',
     after: ({ failed }) => {
-      selection.value = failed.map(({ item }) => item)
-      if (!failed.length) endSelecting()
+      if (view === listView) {
+        selection.value = failed.map(({ item }) => item)
+        if (!failed.length) endSelecting()
+      }
       return ordersRequest.reload()
     },
   })

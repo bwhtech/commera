@@ -127,6 +127,7 @@ async function save() {
     return
   }
 
+  const ticket = loads.current()
   status.value = 'saving'
   try {
     const saved = await savePage({
@@ -141,7 +142,8 @@ async function save() {
       og_image: form.value.og_image,
       noindex: form.value.noindex ? 1 : 0,
     })
-    if (!saved) return
+    // Moved to another page meanwhile: this answer belongs to the one left behind.
+    if (!saved || !loads.isLatest(ticket)) return
 
     const wasNew = isNew.value
     form.value = toForm(saved)
@@ -151,7 +153,7 @@ async function save() {
     }
     toast.success(wasNew ? 'Page created' : 'Saved')
   } finally {
-    status.value = 'ready'
+    if (loads.isLatest(ticket)) status.value = 'ready'
   }
 }
 
