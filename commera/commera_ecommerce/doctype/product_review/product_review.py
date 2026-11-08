@@ -2,11 +2,14 @@
 # For license information, please see license.txt
 
 import hashlib
+from functools import partial
 
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils.background_jobs import get_job_status
 from frappe.utils.data import cint
+from rq.job import JobStatus
 
 from commera.api.reviews import get_rating_summary
 
@@ -62,12 +65,36 @@ class ProductReview(Document):
 def recompute_variant_rating(variant: str) -> None:
 	"""Published-only aggregate for the variant's storefront summary. Called from this controller on
 	publish/unpublish/delete instead of a scheduled sweep, so the numbers are never stale."""
-	# Locked first, then counted with a locking read: two reviews published at once each see the other.
-	frappe.db.get_value("Style Attribute Variant", variant, "name", for_update=True)
-	summary = get_rating_summary(variant, current=True)
+	write_variant_rating(variant)
+	# Two reviews saved at once each count without the other; a fresh read after both commit fixes it.
+	frappe.db.after_commit.add(partial(queue_variant_rating, variant))
+
+
+def write_variant_rating(variant: str) -> None:
+	summary = get_rating_summary(variant)
 	frappe.db.set_value(
 		"Style Attribute Variant",
 		variant,
 		{"average_rating": summary["average_rating"], "review_count": summary["review_count"]},
 		update_modified=False,
 	)
+
+
+def queue_variant_rating(variant: str) -> None:
+	job_id = f"commera-variant-rating::{variant}"
+	try:
+		# A started job may have counted already, so a second one queues behind it.
+		started = get_job_status(job_id) == JobStatus.STARTED
+		frappe.enqueue(
+			"commera.commera_ecommerce.doctype.product_review.product_review.write_variant_rating",
+			variant=variant,
+			job_id=None if started else job_id,
+			deduplicate=not started,
+		)
+	except Exception:
+		# Runs after commit: a full queue must not fail the saved review or skip the other callbacks.
+		frappe.log_error(
+			title="Variant rating recompute not queued",
+			reference_doctype="Style Attribute Variant",
+			reference_name=variant,
+		)

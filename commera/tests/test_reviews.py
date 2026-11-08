@@ -1,6 +1,8 @@
 # Copyright (c) 2026, ivend and Contributors
 # Tests for the storefront review endpoints (commera/api/reviews.py). Real-DB, auto-rolled-back.
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
@@ -194,3 +196,20 @@ class TestGetReviewsOwnReview(ReviewsTestCase):
 
 		self.assertIsNone(payload["my_review"])
 		self.assertFalse(payload["can_review"])
+
+
+class TestQueuedRecomputes(IntegrationTestCase):
+	"""Both run after commit, where an error would fail a saved change and skip the other callbacks."""
+
+	def test_a_full_queue_is_logged_not_raised(self):
+		from commera.commera_ecommerce.doctype.product_review.product_review import queue_variant_rating
+		from commera.utils import queue_ecommerce_status_update
+
+		with (
+			patch("frappe.enqueue", side_effect=Exception("queue full")),
+			patch("frappe.log_error") as log_error,
+		):
+			queue_variant_rating("ZZ-VARIANT")
+			queue_ecommerce_status_update("ZZ-ORDER")
+
+		self.assertEqual(log_error.call_count, 2)

@@ -814,13 +814,21 @@ def queue_ecommerce_status_update(sales_order_name):
 	"""One waiting recompute per order is enough. A started one may have read the documents already,
 	so a second job queues behind it instead of being dropped."""
 	job_id = f"commera-order-status::{sales_order_name}"
-	started = get_job_status(job_id) == JobStatus.STARTED
-	frappe.enqueue(
-		"commera.utils.update_sales_order_ecommerce_status",
-		sales_order_name=sales_order_name,
-		job_id=None if started else job_id,
-		deduplicate=not started,
-	)
+	try:
+		started = get_job_status(job_id) == JobStatus.STARTED
+		frappe.enqueue(
+			"commera.utils.update_sales_order_ecommerce_status",
+			sales_order_name=sales_order_name,
+			job_id=None if started else job_id,
+			deduplicate=not started,
+		)
+	except Exception:
+		# Runs after commit: a full queue must not fail a saved change or skip the other callbacks.
+		frappe.log_error(
+			title="Order status recompute not queued",
+			reference_doctype="Sales Order",
+			reference_name=sales_order_name,
+		)
 
 
 SHIPMENT_STATUS_LADDER = {
