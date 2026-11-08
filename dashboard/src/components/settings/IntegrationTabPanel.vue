@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import IntegrationsPanel from './IntegrationsPanel.vue'
+import { onSettingsClose } from '../../ia/settings'
 
 defineProps({
   store: { type: Object, required: true },
@@ -12,6 +13,10 @@ defineProps({
 
 const configuring = ref(null)
 const sectionTakeover = ref(false)
+onSettingsClose(() => {
+  configuring.value = null
+  sectionTakeover.value = false
+})
 </script>
 
 <template>

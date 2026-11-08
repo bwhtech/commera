@@ -13,6 +13,7 @@ import EmptyState from '../EmptyState.vue'
 import PickupAddressConfig from './PickupAddressConfig.vue'
 import SettingsSkeleton from './SettingsSkeleton.vue'
 import { pickupLocations } from '../../data/pickupLocations'
+import { onSettingsClose } from '../../ia/settings'
 
 const props = defineProps({
   active: { type: Boolean, default: false },
@@ -28,6 +29,7 @@ const current = computed(
 )
 
 watch(() => props.active, (isActive) => isActive && pickupLocations.loadOnce(), { immediate: true })
+onSettingsClose(() => (editing.value = null))
 
 async function toggleStorePickup(enabled) {
   if (!(await mutate('save_store_pickup', { enabled: enabled ? 1 : 0 }))) return

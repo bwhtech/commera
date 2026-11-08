@@ -4,6 +4,7 @@ import AddWebhookDialog from './AddWebhookDialog.vue'
 import WebhookDetail from './WebhookDetail.vue'
 import WebhookList from './WebhookList.vue'
 import { webhookStore } from '../../../data/webhooks'
+import { onSettingsClose } from '../../../ia/settings'
 
 const props = defineProps({
   active: { type: Boolean, default: false },
@@ -13,6 +14,11 @@ const props = defineProps({
 const openName = ref(null)
 const createdSecret = ref(null)
 const isAddOpen = ref(false)
+onSettingsClose(() => {
+  openName.value = null
+  createdSecret.value = null
+  isAddOpen.value = false
+})
 
 watch(
   () => props.active,
