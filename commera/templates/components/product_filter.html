@@ -93,6 +93,9 @@
                 {% block storefront_filter_categories %}
                 <div x-show="current_tab === key && Array.isArray(values) && values.length > 0 && values[0].display_name" x-transition
                     class="pt-6 pb-6">
+                    {# x-show only hides this block, so without the x-if the loop also runs for brand, size and colour strings, which have no item_groups. #}
+                    <template x-if="Array.isArray(values) && values.length > 0 && values[0].display_name">
+                    <div>
                     <template x-for="(node, node_index) in values" :key="node_index">
                         <div class="mb-3">
                             <div x-data="{ open: false }">
@@ -157,6 +160,8 @@
                                 </div>
                             </div>
                         </div>
+                    </template>
+                    </div>
                     </template>
                 </div>
                 {% endblock %}
