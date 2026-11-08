@@ -1,3 +1,5 @@
+from commera.shipping.status import SHIPMENT_STATUSES
+
 CUSTOM_FIELDS = {
 	"Shipment": [
 		{
@@ -40,16 +42,7 @@ CUSTOM_FIELDS = {
 			"fieldtype": "Select",
 			"label": "Shipment Status",
 			"insert_after": "custom_service_code",
-			"options": "Draft\n"
-			"Ready To Ship\n"
-			"Pickup Scheduled\n"
-			"In Transit\n"
-			"Out For Delivery\n"
-			"Undelivered\n"
-			"RTO\n"
-			"Delivered\n"
-			"Cancelled\n"
-			"Lost",
+			"options": "\n".join(SHIPMENT_STATUSES),
 			"allow_on_submit": 1,
 			"bold": 1,
 			"default": "Draft",

@@ -23,6 +23,7 @@ class InMemoryShippingProvider(ShippingProviderBase):
 		self.shipments: dict[str, dict] = {}
 		self.cancelled: list[str] = []
 		self.tracking: dict[str, dict] = {}
+		self.pickups: list[str] = []
 
 	def get(self, key: str, default=None):
 		return getattr(self, key, default)
@@ -58,6 +59,10 @@ class InMemoryShippingProvider(ShippingProviderBase):
 
 	def handle_webhook(self, payload: bytes, headers: dict) -> dict:
 		return {}
+
+	def schedule_pickup(self, shipment_ref: str, pickup_date: str | None = None) -> dict:
+		self.pickups.append(shipment_ref)
+		return {"pickup_ref": f"PICKUP-{shipment_ref}", "scheduled_date": pickup_date}
 
 
 def insert_shipment_record(sales_order: str, status: str, delivery_note: str | None = None) -> str:

@@ -5,11 +5,11 @@ from frappe.utils.data import cstr, flt, get_datetime, today
 
 from commera.shipping.exceptions import PartialBookingError
 from commera.shipping.providers import get_provider
-from commera.shipping.status import can_advance, is_terminal, validate_status
+from commera.shipping.status import AWAITING_PICKUP_STATUSES, can_advance, is_terminal, validate_status
 from commera.shipping.units import normalise_parcels
 from commera.shipping.utils import get_address_payload
 
-CANCELLABLE_STATUSES = ("Draft", "Ready To Ship", "Pickup Scheduled")
+CANCELLABLE_STATUSES = ("Draft", *AWAITING_PICKUP_STATUSES)
 
 TRACKING_STATUSES = {
 	"Pickup Scheduled": "In Progress",
@@ -133,6 +133,14 @@ def book(shipment: str) -> dict:
 			_("This shipment is already booked with AWB {0}").format(frappe.bold(shipment_doc.awb_number)),
 			title=_("Already Booked"),
 		)
+	# Only a Draft is booked: a cancelled partial booking must not be finished at the carrier.
+	if shipment_doc.docstatus == 2 or shipment_doc.custom_shipment_status != "Draft":
+		frappe.throw(
+			_("A shipment in status {0} cannot be booked").format(
+				frappe.bold(_(shipment_doc.custom_shipment_status))
+			),
+			title=_("Booking Not Allowed"),
+		)
 	if not shipment_doc.custom_service_code:
 		frappe.throw(_("Select a shipping service before booking"))
 
@@ -214,7 +222,9 @@ def apply_booking_result(shipment, result: dict):
 	shipment.custom_cost_currency = result.get("cost_currency")
 	shipment.custom_tracking_ref = result.get("tracking_ref")
 	shipment.custom_provider_status = result.get("status")
-	shipment.custom_shipment_status = "Ready To Ship"
+	# book() only runs on a Draft, which a carrier webhook can move on while the call is in flight.
+	if can_advance(shipment.custom_shipment_status, "Ready To Ship"):
+		shipment.custom_shipment_status = "Ready To Ship"
 	shipment.save(ignore_permissions=True)
 
 
@@ -293,6 +303,9 @@ def schedule_pickup(shipment: str, pickup_date: str | None = None) -> dict:
 		)
 	if not shipment_doc.shipment_id:
 		frappe.throw(_("Book this shipment before scheduling a pickup"))
+	validate_awaiting_pickup(
+		shipment_doc, _("A pickup can no longer be scheduled for a shipment in status {0}")
+	)
 
 	result = controller.schedule_pickup(shipment_doc.shipment_id, pickup_date=pickup_date or today())
 	shipment_doc.custom_pickup_ref = (result or {}).get("pickup_ref")
@@ -307,6 +320,7 @@ def schedule_pickup(shipment: str, pickup_date: str | None = None) -> dict:
 def generate_manifest(shipment: str) -> dict:
 	shipment_doc = frappe.get_doc("Shipment", shipment)
 	shipment_doc.check_permission("write")
+	lock_booking(shipment_doc)
 	controller = get_controller(shipment_doc)
 	if not controller.supports("manifest"):
 		frappe.throw(
@@ -314,10 +328,18 @@ def generate_manifest(shipment: str) -> dict:
 		)
 	if not shipment_doc.shipment_id:
 		frappe.throw(_("Book this shipment before generating a manifest"))
+	validate_awaiting_pickup(
+		shipment_doc, _("A manifest can no longer be generated for a shipment in status {0}")
+	)
 
 	result = controller.generate_manifest([shipment_doc.shipment_id])
 	shipment_doc.db_set("custom_manifest_url", (result or {}).get("manifest_url"))
 	return result or {}
+
+
+def validate_awaiting_pickup(shipment, message: str):
+	if shipment.docstatus == 2 or shipment.custom_shipment_status not in AWAITING_PICKUP_STATUSES:
+		frappe.throw(message.format(frappe.bold(_(shipment.custom_shipment_status))))
 
 
 def apply_webhook_status(
