@@ -165,6 +165,8 @@
                 try {
                     do {
                         is_sync_queued = false;
+                        // The tab holds lines just ordered; only the server cart may land now.
+                        if (this.after_order) break;
                         await this.send_sync();
                     } while (is_sync_queued);
                 } finally {
@@ -213,11 +215,13 @@
             // After an order the server has dropped the ordered lines from its cart, so that cart is the one to show.
             // Ticked lines are not the ordered ones: they may have changed in another tab since checkout.
             async take_cart_after_order() {
-                // Not past a few seconds: the page moves on after this, and the cart read below is the current one anyway.
-                await Promise.race([this.wait_until_loaded(), new Promise(resolve => setTimeout(resolve, 5000))]);
+                // Set before any wait: the first load must take the server cart, not send the ordered lines back.
                 this.after_order = true;
                 clearTimeout(sync_timer);
                 sync_timer = null;
+                // Not past a few seconds: the page moves on after this, and the cart read below is the current one anyway.
+                await Promise.race([this.wait_until_loaded(), new Promise(resolve => setTimeout(resolve, 5000))]);
+                if (sync_chain) await sync_chain;
                 let server_cart;
                 try {
                     server_cart = (await frappe_call("/api/v2/method/commera.api.server_cart.get_server_cart", {})).data;
@@ -528,8 +532,14 @@
             },
             // Swaps the line to another size, keeping its quantity as far as stock allows. Resolves true once the
             // server has the change and the page reloads to show it; false leaves the line as it was.
-            async restore_lines(lines) {
-                this.items = lines;
+            // Only the lines the switch touched go back; edits made to other lines meanwhile stay.
+            async undo_size_switch({ target, fields, removed, removed_index }) {
+                Object.assign(target, fields);
+                if (removed && !this.items.includes(removed)) {
+                    const items = [...this.items];
+                    items.splice(Math.min(removed_index, items.length), 0, removed);
+                    this.items = items;
+                }
                 await Alpine.nextTick();
                 // Back to what the server holds: nothing is left to retry.
                 if (get_snapshot(this.items) === synced_snapshot) {
@@ -543,7 +553,7 @@
                 this.updating_variant = cart_item.variant.item_code;
                 let is_leaving = false;
                 // Put back if the switch cannot be saved, so the dropdown and the cart never disagree.
-                let lines_before = null;
+                let undo = null;
                 try {
                     const data = (await frappe_call("/api/v2/method/commera.api.cart.update_variant", { product_name: cart_item.item.name, size: selected_size })).data;
                     const new_variant = {
@@ -561,8 +571,15 @@
                         return false;
                     }
                     if (qty < wanted) toast(stock_warning(stock), { type: "warning" });
-                    lines_before = JSON.parse(JSON.stringify(this.items));
                     const target = existing_item || cart_item;
+                    undo = {
+                        target,
+                        fields: JSON.parse(JSON.stringify(
+                            (({ variant, qty, stock_qty, price, default_price }) => ({ variant, qty, stock_qty, price, default_price }))(target)
+                        )),
+                        removed: existing_item ? cart_item : null,
+                        removed_index: this.items.indexOf(cart_item),
+                    };
                     target.variant = new_variant;
                     target.qty = qty;
                     target.stock_qty = stock;
@@ -572,14 +589,14 @@
                     // The effect marks the cart dirty on Alpine's next flush; the reload must wait for the sync.
                     await Alpine.nextTick();
                     if (!await this.flush_sync()) {
-                        await this.restore_lines(lines_before);
+                        await this.undo_size_switch(undo);
                         return false;
                     }
                     is_leaving = true;
                     window.location.reload();
                     return true;
                 } catch (error) {
-                    if (lines_before) await this.restore_lines(lines_before);
+                    if (undo) await this.undo_size_switch(undo);
                     return false;
                 } finally {
                     if (!is_leaving) this.updating_variant = null;
