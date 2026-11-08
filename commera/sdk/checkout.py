@@ -3,11 +3,13 @@ from frappe import _
 from frappe.utils.data import cstr, flt
 
 from commera.api.payments import (
+	REVIEWED_CHECKOUT_FIELD,
 	CheckoutPriceChangedError,
 	cart_write_lock,
 	generate_quotation_for_cart,
 	get_checkout_cart,
 	get_checkout_payment_methods,
+	get_checkout_version,
 	get_cod_total_key,
 	get_open_gateway_payment_request,
 	get_quotation_for_cart,
@@ -188,7 +190,10 @@ def list_payment_methods() -> list[PaymentMethod]:
 	]
 
 
-def start_payment(payment_method: str, expected_total: float | None = None) -> PaymentSession:
+def start_payment(
+	payment_method: str, expected_total: float | None = None, expected_version: str | None = None
+) -> PaymentSession:
+	"""`expected_version` is the checkout version the buyer reviewed; any change since is refused."""
 	quotation = get_checkout_quotation()
 	with cart_write_lock(quotation):
 		if cart_needs_refresh(quotation):
@@ -197,8 +202,18 @@ def start_payment(payment_method: str, expected_total: float | None = None) -> P
 				title=_("Cart Changed"),
 				exc=CheckoutPriceChangedError,
 			)
+		if expected_version is not None and expected_version != get_checkout_version(quotation):
+			frappe.throw(
+				_("Your checkout has changed. Please review it before placing your order."),
+				title=_("Checkout Changed"),
+				exc=CheckoutPriceChangedError,
+			)
 		session = open_checkout(
-			quotation, cstr(payment_method), quotation.custom_delivery_option, expected_total
+			quotation,
+			cstr(payment_method),
+			quotation.custom_delivery_option,
+			expected_total,
+			is_reviewed=expected_version is not None,
 		)
 	return {"redirect_url": session["order_url"], "reference_id": quotation.name}
 
@@ -218,9 +233,14 @@ def complete(reference_id: str | None = None) -> CheckoutResult:
 
 
 def get_payment_mode(reference_id: str) -> str | None:
-	if frappe.cache.get_value(get_cod_total_key(reference_id)) is None:
+	if get_open_gateway_payment_request(reference_id):
 		return None
-	return None if get_open_gateway_payment_request(reference_id) else COD_PAYMENT_MODE
+	if frappe.cache.get_value(get_cod_total_key(reference_id)) is not None:
+		return COD_PAYMENT_MODE
+	# A reviewed start keeps its marker on the quotation, so a lost cache key still finds cash on delivery.
+	if frappe.db.get_value("Quotation", reference_id, REVIEWED_CHECKOUT_FIELD):
+		return COD_PAYMENT_MODE
+	return None
 
 
 def get_open_checkout():
@@ -248,6 +268,12 @@ def get_checkout_state(quotation) -> CheckoutState:
 		}
 	return {
 		"cart": quotation.name,
+		"version": get_checkout_version(quotation),
+		"currency": quotation.currency,
+		"items": [
+			{"item_code": row.item_code, "title": row.item_name, "qty": flt(row.qty)}
+			for row in quotation.items
+		],
 		"email": quotation.contact_email,
 		"billing_address": addresses.get(quotation.customer_address),
 		"shipping_address": addresses.get(quotation.shipping_address_name),

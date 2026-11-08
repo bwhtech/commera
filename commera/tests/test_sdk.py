@@ -150,6 +150,7 @@ PUBLIC_NAMES = {
 		"Typeahead",
 		"TypeaheadLink",
 		"CheckoutResult",
+		"CheckoutItem",
 		"CheckoutState",
 		"PaymentMethod",
 		"PaymentSession",

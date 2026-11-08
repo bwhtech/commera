@@ -74,9 +74,13 @@ def list_payment_methods() -> list[PaymentMethod]:
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
 @rate_limit(limit=100, seconds=60 * 60)
-def start_payment(payment_method: str, expected_total: float | None = None) -> PaymentSession:
+def start_payment(
+	payment_method: str, expected_total: float | None = None, expected_version: str | None = None
+) -> PaymentSession:
 	return checkout.start_payment(
-		cstr(payment_method), None if expected_total in (None, "") else flt(expected_total)
+		cstr(payment_method),
+		None if expected_total in (None, "") else flt(expected_total),
+		cstr(expected_version) or None,
 	)
 
 

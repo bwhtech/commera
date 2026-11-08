@@ -161,6 +161,32 @@ CUSTOM_FIELDS = {
 			"report_hide": 1,
 			"search_index": 1,
 		},
+		{
+			"fieldname": "custom_reviewed_checkout",
+			"fieldtype": "Data",
+			"label": "Reviewed Checkout",
+			"insert_after": "custom_guest_cart_key",
+			"description": "Fingerprint of the checkout a buyer approved for a cash on delivery order "
+			"an agent started; empty when the shopper paid from the page.",
+			"hidden": 1,
+			"no_copy": 1,
+			"print_hide": 1,
+			"read_only": 1,
+			"report_hide": 1,
+		},
+		{
+			"fieldname": "custom_reviewed_total",
+			"fieldtype": "Currency",
+			"label": "Reviewed Total",
+			"insert_after": "custom_reviewed_checkout",
+			"options": "currency",
+			"description": "The cash on delivery total the buyer approved with the reviewed checkout.",
+			"hidden": 1,
+			"no_copy": 1,
+			"print_hide": 1,
+			"read_only": 1,
+			"report_hide": 1,
+		},
 	],
 	("Quotation", "Sales Order"): [
 		{

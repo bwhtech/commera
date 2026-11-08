@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, test } from 'node:test';
 import { StorefrontError } from '../request.js';
-import * as webmcp from '../webmcp.js';
+import * as webmcp from '../webmcp/index.js';
 import { add_fake_fetch, add_fake_window } from './fake-fetch.js';
 
 const two_line_cart = {
@@ -65,7 +65,12 @@ test('storefront pages get catalog and cart tools, checkout gets its own', async
 	await webmcp.register_tools(checkout);
 	assert.deepEqual(
 		[...checkout.tools.keys()],
-		['get_checkout', 'navigate_to_storefront'],
+		[
+			'get_checkout',
+			'update_checkout',
+			'complete_checkout',
+			'navigate_to_storefront',
+		],
 	);
 });
 

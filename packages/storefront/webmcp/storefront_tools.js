@@ -1,14 +1,16 @@
-import * as cart from './cart.js';
-import * as checkout from './checkout.js';
-import * as collections from './collections.js';
-import * as products from './products.js';
-import { StorefrontError } from './request.js';
-import * as search from './search.js';
+import * as cart from '../cart.js';
+import * as collections from '../collections.js';
+import * as products from '../products.js';
+import { StorefrontError } from '../request.js';
+import * as search from '../search.js';
+import {
+	NO_INPUT,
+	READS_STORE_DATA,
+	RETURNS_STORE_DATA,
+	get_language_root,
+	navigate,
+} from './shared.js';
 
-const READS_STORE_DATA = { readOnlyHint: true, untrustedContentHint: true };
-// A write that returns store or shopper text still marks it untrusted.
-const RETURNS_STORE_DATA = { untrustedContentHint: true };
-const NO_INPUT = { type: 'object', properties: {} };
 const HANDLE_INPUT = {
 	type: 'object',
 	properties: {
@@ -17,7 +19,7 @@ const HANDLE_INPUT = {
 	required: ['handle'],
 };
 
-const storefront_tools = [
+export const storefront_tools = [
 	{
 		name: 'search_catalog',
 		description:
@@ -162,69 +164,6 @@ const storefront_tools = [
 	},
 ];
 
-const checkout_tools = [
-	{
-		name: 'get_checkout',
-		description:
-			'Get the checkout: email, addresses, store pickup, shipping option and the charge summary with taxes and total. The checkout is null until the shopper saves contact and delivery details.',
-		inputSchema: NO_INPUT,
-		annotations: READS_STORE_DATA,
-		async run() {
-			return { checkout: await checkout.get() };
-		},
-	},
-	{
-		name: 'navigate_to_storefront',
-		description: 'Leave checkout and return to the cart page.',
-		inputSchema: NO_INPUT,
-		annotations: {},
-		async run() {
-			return navigate(`${get_language_root()}/cart`);
-		},
-	},
-];
-
-export function is_checkout_page() {
-	return /\/cart\/checkout\/?$/.test(globalThis.location.pathname);
-}
-
-export function get_tools() {
-	return is_checkout_page() ? checkout_tools : storefront_tools;
-}
-
-export async function register_tools(
-	model_context = globalThis.document?.modelContext,
-) {
-	if (!model_context) {
-		return [];
-	}
-	const tools = get_tools();
-	await Promise.all(
-		tools.map(({ run, ...tool }) =>
-			model_context.registerTool({
-				...tool,
-				execute: (input) => run_tool(run, input ?? {}),
-			}),
-		),
-	);
-	return tools.map((tool) => tool.name);
-}
-
-async function run_tool(run, input) {
-	try {
-		const data = await run(input);
-		return {
-			content: [{ type: 'text', text: JSON.stringify(data) }],
-			structuredContent: data,
-		};
-	} catch (error) {
-		if (!(error instanceof StorefrontError)) {
-			throw error;
-		}
-		return { isError: true, content: [{ type: 'text', text: error.message }] };
-	}
-}
-
 async function set_cart_lines({ version, lines }) {
 	const current = await cart.get();
 	if ((current?.version ?? null) !== version) {
@@ -264,15 +203,6 @@ async function set_cart_lines({ version, lines }) {
 		updated = await cart.add_lines(additions);
 	}
 	return { cart: updated, changed: updated !== current };
-}
-
-function navigate(path) {
-	globalThis.location.assign(path);
-	return { navigating_to: path };
-}
-
-function get_language_root() {
-	return `/${globalThis.commera_storefront_config?.language ?? 'en'}`;
 }
 
 function get_product_url(handle) {
