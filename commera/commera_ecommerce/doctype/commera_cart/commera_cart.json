@@ -10,7 +10,8 @@
 		"attributes",
 		"plugin_fields",
 		"discount_codes",
-		"lines"
+		"lines",
+		"revision"
 	],
 	"fields": [
 		{
@@ -55,10 +56,19 @@
 			"fieldtype": "Table",
 			"label": "Lines",
 			"options": "Commera Cart Line"
+		},
+		{
+			"default": "0",
+			"description": "Counts every change to the cart, lines cleared by a placed order included.",
+			"fieldname": "revision",
+			"fieldtype": "Int",
+			"hidden": 1,
+			"label": "Revision",
+			"read_only": 1
 		}
 	],
 	"links": [],
-	"modified": "2026-10-21 18:00:00.000000",
+	"modified": "2026-11-08 10:00:00.000000",
 	"modified_by": "Administrator",
 	"module": "Commera Ecommerce",
 	"name": "Commera Cart",

@@ -617,6 +617,24 @@ class TestServerCart(DiscountCodeTestCase):
 
 		self.assertEqual([(row.item_code, row.qty) for row in _get_cart_quotation().items], [(self.shirt, 1)])
 
+	def test_set_lines_waits_for_a_payment_under_way(self):
+		sync_server_cart([{"item_code": self.shirt, "qty": 1}])
+		quotation = generate_quotation_for_cart({"items": [self.browser_line(self.shirt, 1)]})
+		self.create_pending_payment_request(quotation.name)
+		revision = cart_sdk.get_priced_cart()["revision"]
+
+		with (
+			patch(
+				"bwh_payments.bwh_payments.doctype.gateway_payment_request.gateway_payment_request"
+				".GatewayPaymentRequest.release_if_unpaid",
+				return_value=False,
+			),
+			self.assertRaisesRegex(frappe.ValidationError, "already in progress"),
+		):
+			cart_sdk.set_lines([], revision)
+
+		self.assertEqual([row.item_code for row in get_session_cart().lines], [self.shirt])
+
 	def create_pending_payment_request(self, quotation_name: str):
 		payment_request = frappe.new_doc("Gateway Payment Request")
 		payment_request.update(
