@@ -197,13 +197,14 @@ const actions = computed(() => [
 // Layout drafts save themselves on the way out; theme settings have their own Save, so they are
 // asked about. A failed save asks too: without the choice the only way out was Discard.
 onBeforeRouteLeave(async () => {
-  if (state.loadError) return true
+  // Theme settings survive a failed page load, so they are asked about before the load-error exit.
   if (
     themeSettingsDirty.value &&
     !(await confirmLeave('Discard unsaved theme settings?', 'The theme settings you have not saved are lost.'))
   ) {
     return false
   }
+  if (state.loadError) return true
   if (await saveIfChanged()) return true
   return confirmLeave('Leave without saving?', 'Your layout changes could not be saved. Leaving now loses them.')
 })
