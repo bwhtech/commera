@@ -128,34 +128,40 @@
 		{% endif %}
 		{% if is_returnable and returnable_items %}
 		<button type="button" class="btn btn-outline-secondary m-b15 me-xl-3 me-2 btnhover20"
-			x-show="!is_fully_returned" x-cloak
-			@click="show_return_form = !show_return_form">{{ _("Return Items") }}</button>
+			x-show="!is_fully_returned" x-cloak :disabled="action_status !== 'idle'"
+			@click="panel = panel === 'return' ? 'none' : 'return'">{{ _("Return Items") }}</button>
 		{% endif %}
 		{% if is_cancellable %}
-		<button type="button" class="btn btn-outline-danger m-b15 btnhover20"
-			@click="show_cancel_confirm = true">{{ _("Cancel Order") }}</button>
+		<button type="button" class="btn btn-outline-danger m-b15 btnhover20" :disabled="action_status !== 'idle'"
+			@click="panel = 'cancel'">{{ _("Cancel Order") }}</button>
 		{% endif %}
 	</div>
 	{% endif %}
 
 	{% if is_cancellable %}
-	<div class="alert alert-danger" x-show="show_cancel_confirm" x-cloak>
+	<div class="alert alert-danger" x-show="panel === 'cancel'" x-cloak>
 		<p class="mb-3">{{ _("Are you sure you want to cancel this order?") }}</p>
-		<button type="button" class="btn btn-danger btn-sm me-2" :disabled="is_saving"
+		<button type="button" class="btn btn-danger btn-sm me-2" :disabled="action_status !== 'idle'"
 			@click="cancel_order()">{{ _("Yes, cancel it") }}</button>
-		<button type="button" class="btn btn-outline-secondary btn-sm"
-			@click="show_cancel_confirm = false">{{ _("Keep Order") }}</button>
+		<button type="button" class="btn btn-outline-secondary btn-sm" :disabled="action_status !== 'idle'"
+			@click="panel = 'none'">{{ _("Keep Order") }}</button>
 	</div>
 	{% endif %}
 
 	{% if is_returnable and returnable_items %}
-	<div class="border-top pt-4 m-b30" x-show="show_return_form" x-cloak>
+	<div class="border-top pt-4 m-b30" x-show="panel === 'return'" x-cloak>
 		<h6>{{ _("Select items to return") }}</h6>
+		{# Which items are already returned decides what can be ticked, so the form waits for it. #}
+		<p class="text-muted" x-show="returns_status === 'loading'">{{ _("Checking returned items...") }}</p>
+		<p class="text-danger" x-show="returns_status === 'failed'" x-cloak>
+			{{ _("Could not check which items are already returned.") }}
+			<a href="javascript:void(0);" @click="get_returned_items()">{{ _("Try again") }}</a>
+		</p>
 		{% for item in returnable_items %}
 		<div class="row align-items-center g-3 py-3 border-bottom">
 			<div class="col-md-6 d-flex align-items-center">
 				<input type="checkbox" class="form-check-input m-0 me-3" value="{{ item.item_code }}"
-					x-model="selected_item_codes" :disabled='is_item_locked({{ item.item_code | tojson }})'>
+					x-model="selected_item_codes" :disabled='returns_status !== "ready" || is_item_locked({{ item.item_code | tojson }})'>
 				<div class="tracking-product-content">
 					<h6 class="title">{% if frappe.lang == "ar" %}{{ item.item_name_ar or item.item_name }}{% else %}{{ item.item_name }}{% endif %}</h6>
 					{% if item.size %}<small class="d-block"><strong>{{ _("Size") }}</strong> : {{ item.size }}</small>{% endif %}
@@ -180,7 +186,7 @@
 			</div>
 		</div>
 		{% endfor %}
-		<button type="button" class="btn btn-secondary m-t20 btnhover20" :disabled="is_saving"
+		<button type="button" class="btn btn-secondary m-t20 btnhover20" :disabled="action_status !== 'idle' || returns_status !== 'ready'"
 			@click="save_return_request()">{{ _("Submit Return") }}</button>
 	</div>
 	{% endif %}
@@ -291,9 +297,12 @@
 		Alpine.data('order_detail', ({ order_id, key, is_owner }) => ({
 			active_tab: 'items',
 			tracking: {},
-			show_cancel_confirm: false,
-			show_return_form: false,
-			is_saving: false,
+			// One of 'none', 'cancel' or 'return': the confirm and the return form never show together.
+			panel: 'none',
+			// 'idle', 'saving', then 'leaving' while the page reloads to show the result.
+			action_status: 'idle',
+			// The returned items gate the return form: 'loading', 'ready' or 'failed'.
+			returns_status: is_owner ? 'loading' : 'ready',
 			selected_item_codes: [],
 			return_reasons_by_item: {},
 			return_comments_by_item: {},
@@ -309,8 +318,12 @@
 			async get_order_tracking() {
 				const args = { sales_order: order_id };
 				if (key) args.key = key;
-				const response = await frappe_call('/api/v2/method/commera.api.shipping.get_order_tracking', args);
-				this.tracking = response.data;
+				try {
+					const response = await frappe_call('/api/v2/method/commera.api.shipping.get_order_tracking', args);
+					this.tracking = response.data;
+				} catch (error) {
+					// frappe_call has shown the error; the tracking panel stays empty.
+				}
 			},
 
 			is_item_locked(item_code) {
@@ -323,23 +336,32 @@
 			},
 
 			async get_returned_items() {
-				const response = await frappe_call('/api/v2/method/commera.api.return.get_returned_items', {
-					sales_order_id: order_id
-				});
-				this.returned_item_codes = response.data.returned_items;
-				this.draft_return_item_codes = response.data.returned_items_in_draft;
-				this.is_fully_returned = response.data.is_fully_returned;
+				this.returns_status = 'loading';
+				try {
+					const response = await frappe_call('/api/v2/method/commera.api.return.get_returned_items', {
+						sales_order_id: order_id
+					});
+					this.returned_item_codes = response.data.returned_items;
+					this.draft_return_item_codes = response.data.returned_items_in_draft;
+					this.is_fully_returned = response.data.is_fully_returned;
+					this.returns_status = 'ready';
+				} catch (error) {
+					this.returns_status = 'failed';
+				}
 			},
 
 			async cancel_order() {
-				this.is_saving = true;
+				if (this.action_status !== 'idle') return;
+				this.action_status = 'saving';
 				try {
 					await frappe_call('/api/v2/method/commera.api.orders.cancel_order', { order_id });
-					toast(this.$store.i18n.t('Order cancelled successfully!'), { type: 'success' });
-					window.location.reload();
-				} finally {
-					this.is_saving = false;
+				} catch (error) {
+					this.action_status = 'idle';
+					return;
 				}
+				this.action_status = 'leaving';
+				toast(this.$store.i18n.t('Order cancelled successfully!'), { type: 'success' });
+				window.location.reload();
 			},
 
 			async save_return_request() {
@@ -352,7 +374,8 @@
 					toast(this.$store.i18n.t('Reason is required.'), { type: 'warning' });
 					return;
 				}
-				this.is_saving = true;
+				if (this.action_status !== 'idle' || this.returns_status !== 'ready') return;
+				this.action_status = 'saving';
 				try {
 					await frappe_call('/api/v2/method/commera.api.return.return_items', {
 						sales_order_id: order_id,
@@ -362,11 +385,13 @@
 							comment: this.return_comments_by_item[item_code] || ''
 						}))
 					});
-					toast(this.$store.i18n.t('Return raised successfully!'), { type: 'success' });
-					window.location.reload();
-				} finally {
-					this.is_saving = false;
+				} catch (error) {
+					this.action_status = 'idle';
+					return;
 				}
+				this.action_status = 'leaving';
+				toast(this.$store.i18n.t('Return raised successfully!'), { type: 'success' });
+				window.location.reload();
 			}
 		}));
 	});
