@@ -46,19 +46,19 @@
 				<div x-show="editing_address" class="flex flex-col gap-5">
 					{% if pickup_locations %}
 					<div role="radiogroup" class="grid grid-cols-2 gap-2">
-						<label class="flex cursor-pointer items-center gap-3 rounded-lg border border-outline-gray-3 p-4 text-md has-[:checked]:border-outline-gray-9 has-[:checked]:ring-1 has-[:checked]:ring-outline-gray-9">
-							<input type="radio" name="delivery_method" value="ship" x-model="delivery_method" class="size-4 accent-current">
+						<label class="choice-card items-center text-md">
+							<input type="radio" name="delivery_method" value="ship" x-model="delivery_method" class="size-4">
 							{{ icon("truck", "size-5") }}{{ _("Ship") }}
 						</label>
-						<label class="flex cursor-pointer items-center gap-3 rounded-lg border border-outline-gray-3 p-4 text-md has-[:checked]:border-outline-gray-9 has-[:checked]:ring-1 has-[:checked]:ring-outline-gray-9">
-							<input type="radio" name="delivery_method" value="pickup" x-model="delivery_method" class="size-4 accent-current">
+						<label class="choice-card items-center text-md">
+							<input type="radio" name="delivery_method" value="pickup" x-model="delivery_method" class="size-4">
 							{{ icon("store", "size-5") }}{{ _("Pick up") }}
 						</label>
 					</div>
 					<div x-show="delivery_method === 'pickup'" role="radiogroup" class="flex flex-col gap-2">
 						{% for location in pickup_locations %}
-						<label class="flex cursor-pointer items-start gap-3 rounded-lg border border-outline-gray-3 p-4 has-[:checked]:border-outline-gray-9 has-[:checked]:ring-1 has-[:checked]:ring-outline-gray-9">
-							<input type="radio" name="pickup_location" value="{{ location.id }}" x-model="pickup_location" :required="delivery_method === 'pickup'" class="mt-1 size-4 accent-current">
+						<label class="choice-card items-start">
+							<input type="radio" name="pickup_location" value="{{ location.id }}" x-model="pickup_location" :required="delivery_method === 'pickup'" class="mt-1 size-4">
 							<span class="flex flex-1 flex-col gap-0.5 text-md">
 								<span class="font-medium">{{ location.title }}</span>
 								<span class="text-ink-gray-6"><bdi>{{ [location.address_line1, location.address_line2, location.city, location.state, location.pincode] | select | join(", ") }}</bdi></span>
@@ -74,7 +74,7 @@
 							<div class="flex flex-col gap-5">
 								{{ address_picker("shipping", countries, saved_addresses) }}
 								<label class="flex items-center gap-2 text-md text-ink-gray-8">
-									<input type="checkbox" x-model="billing_same" class="size-4 accent-current">
+									<input type="checkbox" x-model="billing_same" class="size-4">
 									{{ _("Billing address is the same") }}
 								</label>
 								<template x-if="!billing_same">
@@ -87,7 +87,7 @@
 						</template>
 					</div>
 
-					<button type="submit" :disabled="busy" :aria-busy="busy === 'address'" class="button-primary relative w-full sm:w-auto sm:self-start sm:px-6">{{ _("Continue") }}{{ spinner("busy === 'address'", "size-5 text-on-brand") }}</button>
+					<button type="submit" :disabled="busy" :aria-busy="busy === 'address'" class="button-primary relative w-full">{{ _("Continue") }}{{ spinner("busy === 'address'", "size-5 text-on-brand") }}</button>
 				</div>
 				<p x-show="error && step === 'address'" x-text="error" role="alert" class="text-base text-ink-red-7"></p>
 			</form>
@@ -98,8 +98,8 @@
 				<p x-show="!shipping_options.length && shipping_reason !== 'unavailable'" class="text-md text-ink-gray-6">{{ _("Standard delivery. The charge is shown in your order summary.") }}</p>
 				<div role="radiogroup" class="flex flex-col gap-2">
 					<template x-for="option in shipping_options" :key="option.id">
-						<label class="flex items-start gap-3 rounded-lg border border-outline-gray-3 p-4 has-[:checked]:border-outline-gray-9 has-[:checked]:ring-1 has-[:checked]:ring-outline-gray-9">
-							<input type="radio" name="shipping_option" :value="option.id" :checked="shown_shipping_option === option.id" @change="choose_shipping_option(option.id)" :disabled="busy" class="mt-1 size-4 accent-current">
+						<label class="choice-card items-start">
+							<input type="radio" name="shipping_option" :value="option.id" :checked="shown_shipping_option === option.id" @change="choose_shipping_option(option.id)" :disabled="busy" class="mt-1 size-4">
 							<span class="flex flex-1 flex-col gap-0.5 text-md">
 								<span class="font-medium" x-text="option.title"></span>
 								<span x-show="option.description" class="text-ink-gray-6"><bdi x-text="option.description"></bdi></span>
@@ -120,8 +120,8 @@
 				<p x-show="needs_shipping_option" class="text-md text-ink-gray-6">{{ _("Choose a delivery option first.") }}</p>
 				<div x-show="!needs_shipping_option" role="radiogroup" class="flex flex-col gap-2">
 					<template x-for="method in payment_methods" :key="method.id">
-						<label class="flex cursor-pointer items-center gap-3 rounded-lg border border-outline-gray-3 p-4 text-md has-[:checked]:border-outline-gray-9 has-[:checked]:ring-1 has-[:checked]:ring-outline-gray-9">
-							<input type="radio" name="payment_method" :value="method.id" x-model="payment_method" class="size-4 accent-current">
+						<label class="choice-card items-center text-md">
+							<input type="radio" name="payment_method" :value="method.id" x-model="payment_method" class="size-4">
 							<span x-text="method.title"></span>
 						</label>
 					</template>
@@ -136,9 +136,9 @@
 		</div>
 
 		<aside class="order-first rounded-2xl bg-surface-gray-1 p-6 lg:sticky lg:top-[calc(var(--header-height)+1.5rem)] lg:order-none">
-			<button type="button" @click="summary_open = !summary_open" :aria-expanded="summary_open" class="flex w-full items-center justify-between gap-3 lg:hidden">
+			<button type="button" @click="summary_open = !summary_open" :aria-expanded="summary_open" class="flex min-h-12 w-full items-center justify-between gap-3 lg:hidden">
 				<span class="flex items-center gap-1 text-md">{{ _("Order summary") }}<span :class="summary_open && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></span>
-				<span class="text-2xl font-medium" x-text="money(total)"></span>
+				<span class="tabular text-2xl font-medium" x-text="money(total)"></span>
 			</button>
 			<div :class="summary_open || 'max-lg:hidden'" class="max-lg:mt-5">
 				<h2 class="mb-5 text-3xl max-lg:hidden">{{ _("Order summary") }}</h2>

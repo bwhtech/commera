@@ -1,6 +1,6 @@
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/menu_link.html" import menu_link %}
-{% macro disclosure_heading(title) %}<button type="button" @click="open = !open" :aria-expanded="open" class="flex min-h-12 w-full items-center justify-between text-start text-xs font-medium uppercase tracking-wider text-ink-gray-9 md:pointer-events-none md:mb-3 md:min-h-0" tabindex="-1" x-init="matchMedia('(width < 48rem)').matches && $el.removeAttribute('tabindex')">{{ title }}<span :class="open && 'rotate-180'" class="transition-transform duration-200 md:hidden">{{ icon("down", "size-4") }}</span></button>{% endmacro %}
+{% macro disclosure_heading(title) %}<button type="button" @click="open = !open" :aria-expanded="!mobile || open" class="flex min-h-12 w-full items-center justify-between text-start text-xs font-medium uppercase tracking-wider text-ink-gray-9 md:pointer-events-none md:mb-3 md:min-h-0" :tabindex="mobile ? 0 : -1">{{ title }}<span :class="open && 'rotate-180'" class="transition-transform duration-200 md:hidden">{{ icon("down", "size-4") }}</span></button>{% endmacro %}
 {% set social_links = [
 	(_("Instagram"), theme.instagram_url),
 	(_("Facebook"), theme.facebook_url),
@@ -9,7 +9,7 @@
 	(_("YouTube"), theme.youtube_url),
 ] | selectattr(1) | list %}
 
-<footer class="section-x grid grid-cols-2 gap-x-6 gap-y-10 border-t max-md:gap-y-0 border-outline-gray-2 pb-10 pt-14 text-md md:grid-cols-4 md:gap-x-8 md:pb-14 md:pt-16 md:text-base">
+<footer x-data="{ mobile: false }" x-init="const query = matchMedia('(width < 48rem)'); mobile = query.matches; query.addEventListener('change', (event) => mobile = event.matches)" class="section-x grid grid-cols-2 gap-x-6 gap-y-10 border-t max-md:gap-y-0 border-outline-gray-2 pb-10 pt-14 text-md md:grid-cols-4 md:gap-x-8 md:pb-14 md:pt-16 md:text-base">
 	<div class="col-span-2 pb-8 md:col-span-1 md:pb-0">
 		<p class="text-2xl font-semibold uppercase tracking-widest">{{ app_name }}</p>
 	</div>
@@ -19,7 +19,7 @@
 	{% for column in (menu["items"] if menu else []) %}
 	<div x-data="{ open: false }" class="col-span-2 border-b border-outline-gray-2 text-ink-gray-6 md:col-span-1 md:border-0"{{ block.editor_attributes }}>
 		{{ disclosure_heading(column["title"]) }}
-		<div :class="open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'" :inert="!open && matchMedia('(width < 48rem)').matches" class="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-out md:!grid-rows-[1fr]">
+		<div :class="open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'" :inert="mobile && !open" class="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-out md:!grid-rows-[1fr]">
 			<div class="overflow-hidden">
 				<div class="pb-3 md:pb-0">
 					{% for link in column["items"] %}
@@ -38,7 +38,7 @@
 	{% elif block.type == "social" and social_links %}
 	<div x-data="{ open: false }" class="col-span-2 border-b border-outline-gray-2 text-ink-gray-6 md:col-span-1 md:border-0"{{ block.editor_attributes }}>
 		{{ disclosure_heading(block.settings.heading) }}
-		<div :class="open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'" :inert="!open && matchMedia('(width < 48rem)').matches" class="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-out md:!grid-rows-[1fr]">
+		<div :class="open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'" :inert="mobile && !open" class="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-out md:!grid-rows-[1fr]">
 			<div class="overflow-hidden">
 				<div class="pb-3 md:pb-0">
 					{% for label, url in social_links %}

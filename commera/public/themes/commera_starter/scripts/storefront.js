@@ -265,6 +265,12 @@ function listing_filters() {
 			this.open = this.open === name ? '' : name;
 		},
 
+		close() {
+			if (!this.open) return;
+			this.$el.querySelector(`[data-filter="${this.open}"]`).focus();
+			this.open = '';
+		},
+
 		apply() {
 			const values = {};
 			for (const [key, value] of new FormData(this.$el)) {

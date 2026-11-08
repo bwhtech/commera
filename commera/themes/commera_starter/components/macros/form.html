@@ -1,18 +1,25 @@
 {% macro field(name, label, model, type="text", required=False, autocomplete="", inputmode="") %}
 <label class="block">
-	<span class="text-base font-medium text-ink-gray-8">{{ label }}</span>
+	<span class="field-label">{{ label }}</span>
 	<input type="{{ type }}" name="{{ name }}" x-model="{{ model }}" {% if required %}required{% endif %} {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %} {% if inputmode %}inputmode="{{ inputmode }}"{% endif %} class="field mt-2">
 </label>
 {%- endmacro %}
 
 {% macro checkbox(label, model) %}
 <label class="flex items-center gap-2 text-md text-ink-gray-8">
-	<input type="checkbox" x-model="{{ model }}" class="size-4 rounded accent-brand">
+	<input type="checkbox" x-model="{{ model }}" class="size-4 rounded">
 	{{ label }}
 </label>
 {%- endmacro %}
 
-{% from "components/macros/icons.html" import spinner %}
+{% from "components/macros/icons.html" import icon, spinner %}
+
+{% macro select(attributes, class="") %}
+<span class="relative block {{ class }}">
+	<select {{ attributes }} class="field">{{ caller() }}</select>
+	<span class="pointer-events-none absolute end-3.5 top-1/2 -translate-y-1/2 text-ink-gray-8">{{ icon("down", "size-4") }}</span>
+</span>
+{%- endmacro %}
 
 {% macro submit_button(label, busy="busy") %}
 <button type="submit" :disabled="{{ busy }}" :aria-busy="{{ busy }}" class="button-primary relative">{{ label }}{{ spinner(busy, "size-5 text-on-brand") }}</button>

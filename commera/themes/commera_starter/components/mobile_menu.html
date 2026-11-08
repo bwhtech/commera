@@ -25,7 +25,7 @@
 			{% if item["items"] %}
 			<div x-data="{ expanded: false }">
 				<button type="button" @click="expanded = !expanded" :aria-expanded="expanded" class="flex h-12 w-full items-center justify-between rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ item["title"] }} <span :class="expanded && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
-				<div x-show="expanded" x-collapse.duration.250ms><div class="pb-2 ps-3">
+				<div x-show="expanded" x-collapse.duration.300ms><div class="pb-2 ps-3">
 					{% for child in item["items"] %}
 					{{ menu_link(child, "flex h-11 items-center rounded-lg px-2 text-md text-ink-gray-8 hover:bg-surface-gray-3") }}
 					{% for link in child["items"] %}{{ menu_link(link, "flex h-11 items-center rounded-lg ps-5 pe-2 text-md text-ink-gray-7 hover:bg-surface-gray-3") }}{% endfor %}
@@ -40,10 +40,10 @@
 			{% if section.settings.show_account or section.settings.show_wishlist %}
 			<div class="mx-2 mt-4 border-t border-outline-gray-2 pt-4">
 				{% if section.settings.show_account %}
-				<a href="/{{ language }}/account/{{ 'login' if is_guest else 'orders' }}" {% if is_guest %}@click.prevent="open = false; $dispatch('open-auth')"{% endif %} class="flex h-12 items-center gap-2 rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ icon("user") }} {{ _("Account") }}</a>
+				<a href="/{{ language }}/account/{{ 'login' if is_guest else 'orders' }}" {% if is_guest %}@click.prevent="open = false; $dispatch('open-auth')"{% endif %} class="-mx-2 flex h-12 items-center gap-2 rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ icon("user") }} {{ _("Account") }}</a>
 				{% endif %}
 				{% if section.settings.show_wishlist %}
-				<a href="/{{ language }}/account/wishlist" {% if is_guest %}@click.prevent="open = false; $dispatch('open-auth', { redirect: $el.pathname })"{% endif %} class="flex h-12 items-center gap-2 rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ icon("heart") }} {{ _("Wishlist") }}</a>
+				<a href="/{{ language }}/account/wishlist" {% if is_guest %}@click.prevent="open = false; $dispatch('open-auth', { redirect: $el.pathname })"{% endif %} class="-mx-2 flex h-12 items-center gap-2 rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ icon("heart") }} {{ _("Wishlist") }}</a>
 				{% endif %}
 			</div>
 			{% endif %}

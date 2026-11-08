@@ -1,3 +1,4 @@
+{% from "components/macros/form.html" import select %}
 {% macro address_input(kind, field, label, autocomplete, required=True, type="text") -%}
 <label class="flex flex-col gap-2">
 	<span class="field-label">{{ label }}</span>
@@ -10,16 +11,16 @@
 	{% if saved_addresses %}
 	<div role="radiogroup" class="flex flex-col gap-2">
 		{% for address in saved_addresses %}
-		<label class="flex cursor-pointer items-start gap-3 rounded-lg border border-outline-gray-3 p-4 has-[:checked]:border-outline-gray-9 has-[:checked]:ring-1 has-[:checked]:ring-outline-gray-9">
-			<input type="radio" name="{{ kind }}_address" value="{{ address.name }}" x-model="choices.{{ kind }}" class="mt-1 size-4 accent-current">
+		<label class="choice-card items-start">
+			<input type="radio" name="{{ kind }}_address" value="{{ address.name }}" x-model="choices.{{ kind }}" class="mt-1 size-4">
 			<span class="flex flex-col gap-0.5 text-md">
 				<span class="font-medium">{{ address.address_title or address.address_line1 }}</span>
 				<span class="text-ink-gray-6"><bdi>{{ [address.address_line1, address.address_line2, address.city, address.state, address.pincode, address.country] | select | join(", ") }}</bdi></span>
 			</span>
 		</label>
 		{% endfor %}
-		<label class="flex cursor-pointer items-center gap-3 rounded-lg border border-outline-gray-3 p-4 text-md has-[:checked]:border-outline-gray-9 has-[:checked]:ring-1 has-[:checked]:ring-outline-gray-9">
-			<input type="radio" name="{{ kind }}_address" value="new" x-model="choices.{{ kind }}" class="size-4 accent-current">
+		<label class="choice-card items-center text-md">
+			<input type="radio" name="{{ kind }}_address" value="new" x-model="choices.{{ kind }}" class="size-4">
 			{{ _("Use a new address") }}
 		</label>
 	</div>
@@ -36,11 +37,11 @@
 				{{ address_input(kind, "pincode", _("Postcode"), "postal-code") }}
 				<label class="flex flex-col gap-2">
 					<span class="field-label">{{ _("Country") }}</span>
-					<select x-model="forms.{{ kind }}.country" autocomplete="{{ kind }} country-name" required class="field">
+					{% call select('x-model="forms.' ~ kind ~ '.country" autocomplete="' ~ kind ~ ' country-name" required') %}
 						{% for country in countries %}
 						<option value="{{ country.name }}">{{ country.title }}</option>
 						{% endfor %}
-					</select>
+					{% endcall %}
 				</label>
 				<div class="sm:col-span-2">{{ address_input(kind, "phone", _("Phone"), "tel", type="tel") }}</div>
 			</div>

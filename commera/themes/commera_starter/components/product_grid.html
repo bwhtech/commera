@@ -9,15 +9,15 @@
 	{% if query %}<input type="hidden" name="search" value="{{ query }}">{% endif %}
 	{% if collection %}<input type="hidden" name="category" value="{{ collection.handle }}">{% endif %}
 	{% if section.settings.show_filters %}
-	<div class="relative mt-6 border-b border-outline-gray-2 pb-6" @click.outside="open = ''" @keydown.escape="open = ''">
+	<div class="relative mt-6 border-b border-outline-gray-2 pb-6" @click.outside="open = ''" @keydown.escape="close()">
 	<div class="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
 		{% for key, label, values in facet_filters if values %}
 		<div class="sm:relative">
-			<button type="button" @click="toggle('{{ key }}')" :aria-expanded="open === '{{ key }}'" class="pill">{{ label }}<span :class="open === '{{ key }}' && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
+			<button type="button" @click="toggle('{{ key }}')" data-filter="{{ key }}" :aria-expanded="open === '{{ key }}'" class="pill">{{ label }}<span :class="open === '{{ key }}' && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
 			<div x-cloak x-show="open === '{{ key }}'" {{ popover() }} class="absolute inset-x-0 top-full z-20 -mt-4 max-h-80 sm:inset-x-auto sm:start-0 sm:mt-2 sm:w-64 overflow-y-auto popover p-1.5">
 				{% for facet in values %}
 				<label class="flex min-h-10 items-center gap-2.5 rounded-lg px-2.5 py-2 text-md text-ink-gray-8 hover:bg-surface-gray-3">
-					<input type="checkbox" name="{{ key }}" value="{{ facet.value }}" {{ "checked" if facet.value in selected[key] }} class="size-4 shrink-0 accent-current">
+					<input type="checkbox" name="{{ key }}" value="{{ facet.value }}" {{ "checked" if facet.value in selected[key] }} class="size-4 shrink-0">
 					<span class="min-w-0 flex-1 [overflow-wrap:anywhere]">{{ facet.value }}</span>
 					<span class="tabular shrink-0 text-base text-ink-gray-6">{{ facet.count }}</span>
 				</label>
@@ -26,7 +26,7 @@
 		</div>
 		{% endfor %}
 		<div class="sm:relative">
-			<button type="button" @click="toggle('price')" :aria-expanded="open === 'price'" class="pill">{{ _("Price") }}<span :class="open === 'price' && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
+			<button type="button" @click="toggle('price')" data-filter="price" :aria-expanded="open === 'price'" class="pill">{{ _("Price") }}<span :class="open === 'price' && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
 			<div x-cloak x-show="open === 'price'" {{ popover() }} @change.stop class="absolute inset-x-0 top-full z-20 -mt-4 sm:inset-x-auto sm:start-0 sm:mt-2 sm:w-64 popover p-3">
 				<div class="grid grid-cols-2 gap-2">
 					<label class="text-xs font-medium text-ink-gray-7">{{ _("From") }}
@@ -36,7 +36,7 @@
 						<input type="number" name="max" min="0" step="any" inputmode="decimal" value="{{ selected.max if selected.max is not none }}" placeholder="{{ commera.format.money(facets.price.max) }}" class="field mt-1 h-10 font-normal">
 					</label>
 				</div>
-				<label class="mt-2 flex min-h-10 items-center gap-2 text-md text-ink-gray-8"><input type="checkbox" name="has_discount" value="1" {{ "checked" if selected.has_discount }} class="size-4 accent-current">{{ _("On sale only") }}</label>
+				<label class="mt-2 flex min-h-10 items-center gap-2 text-md text-ink-gray-8"><input type="checkbox" name="has_discount" value="1" {{ "checked" if selected.has_discount }} class="size-4">{{ _("On sale only") }}</label>
 				<button type="submit" class="button-primary button-small mt-3 w-full">{{ _("Apply") }}</button>
 			</div>
 		</div>

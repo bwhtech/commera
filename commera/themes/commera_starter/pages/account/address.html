@@ -1,6 +1,6 @@
 {% extends "components/base.html" %}
 {% from "components/account_shell.html" import account_shell with context %}
-{% from "components/macros/form.html" import field, checkbox, submit_button, form_message %}
+{% from "components/macros/form.html" import field, checkbox, select, submit_button, form_message %}
 {% from "components/macros/icons.html" import icon %}
 {% set addresses = commera.account.list_addresses() %}
 {% set countries = commera.shop.list_countries() %}
@@ -33,10 +33,10 @@
 					{{ field("pincode", _("Postal code"), "form.pincode", autocomplete="postal-code") }}
 					<label class="block">
 						<span class="field-label">{{ _("Country") }}</span>
-						<select name="country" x-model="form.country" required autocomplete="country-name" class="field mt-2">
+						{% call select('name="country" x-model="form.country" required autocomplete="country-name"', "mt-2") %}
 							<option value="">{{ _("Select a country") }}</option>
 							{% for country in countries %}<option value="{{ country.name }}">{{ country.title }}</option>{% endfor %}
-						</select>
+						{% endcall %}
 					</label>
 				</div>
 				{{ field("phone", _("Phone"), "form.phone", type="tel", autocomplete="tel") }}

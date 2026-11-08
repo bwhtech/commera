@@ -1,7 +1,7 @@
 {% from "components/macros/icons.html" import icon, spinner %}
 
 {% macro order_summary(total="cart?.total") -%}
-<div x-data="order_summary" class="flex flex-col gap-3 text-md">
+<div x-data="order_summary" class="tabular flex flex-col gap-3 text-md">
 	<div class="flex justify-between gap-3">
 		<span class="min-w-0 [overflow-wrap:anywhere]" title="{{ _("Subtotal") }}">{{ _("Subtotal") }}</span>
 		<span class="shrink-0 whitespace-nowrap" x-text="money(subtotal)"></span>

@@ -36,7 +36,7 @@
 			{% endfor %}
 		</div>
 
-		<a href="/{{ language }}" class="{{ 'lg:order-first' if logo_at_start else 'justify-self-center text-center' }} px-2 text-2xl font-semibold uppercase tracking-widest">
+		<a href="/{{ language }}" class="{{ 'lg:order-first' if logo_at_start else 'justify-self-center text-center' }} inline-flex min-h-11 items-center px-2 text-2xl font-semibold uppercase tracking-widest">
 			{% if theme.logo %}<img src="{{ theme.logo }}" alt="{{ app_name }}" class="h-8 w-auto">{% else %}{{ app_name }}{% endif %}
 		</a>
 
@@ -52,7 +52,7 @@
 			{% endif %}
 			<a href="/{{ language }}/cart" @click.prevent="$dispatch('open-cart')" class="icon-button relative" aria-label="{{ _('Cart') }}">
 				{{ icon("bag") }}
-				<span x-cloak x-show="$store.cart.count" x-text="$store.cart.count" x-data="{ seen: null }" x-effect="const count = $store.cart.count; if (seen !== null && count > seen) { $el.classList.remove('animate-pop'); void $el.offsetWidth; $el.classList.add('animate-pop') } seen = count" class="tabular absolute end-1 top-1 grid h-[18px] min-w-[18px] place-content-center rounded-full bg-brand px-1 text-2xs font-semibold text-on-brand"></span>
+				<span x-cloak x-show="$store.cart.count" x-text="$store.cart.count" x-data="{ seen: null }" x-effect="const count = $store.cart.count; if (seen !== null && count > seen) { $el.classList.remove('animate-pop'); void $el.offsetWidth; $el.classList.add('animate-pop') } seen = count" class="tabular absolute end-1 top-1 grid h-4.5 min-w-4.5 place-content-center rounded-full bg-brand px-1 text-2xs font-semibold text-on-brand"></span>
 			</a>
 		</div>
 	</div>

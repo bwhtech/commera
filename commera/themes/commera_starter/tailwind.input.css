@@ -313,7 +313,7 @@
 	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 	--ease-in: cubic-bezier(0.4, 0, 1, 1);
 	--ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-	--animate-pop: pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+	--animate-pop: pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
 	--animate-rise: rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
 	--animate-progress: progress var(--slide-duration, 6000ms) linear both;
 
@@ -471,6 +471,10 @@
 }
 
 /* chip = choosing a value (variants); pill = filtering or sorting a list. */
+@utility choice-card {
+	@apply flex cursor-pointer gap-3 rounded-lg border border-outline-gray-3 p-4 has-[:checked]:border-outline-gray-9 has-[:checked]:ring-1 has-[:checked]:ring-outline-gray-9;
+}
+
 @utility icon-button {
 	@apply grid size-11 shrink-0 place-items-center rounded-lg text-ink-gray-8 hover:bg-surface-gray-3 lg:size-10;
 }
@@ -503,6 +507,10 @@
 	&:focus {
 		border-color: var(--outline-gray-9);
 		box-shadow: 0 0 0 1px var(--outline-gray-9);
+	}
+	&:is(select) {
+		appearance: none;
+		padding-inline-end: 2.5rem;
 	}
 }
 
@@ -592,8 +600,13 @@
 	textarea:focus-visible {
 		outline-offset: 0;
 	}
-	:is(button, [role="button"], a[class*="button"]):not(:disabled, [aria-disabled="true"]):active {
-		transform: scale(0.98);
+	@media (prefers-reduced-motion: no-preference) {
+		:is(button, [role="button"], a[class*="button"]):not(:disabled, [aria-disabled="true"]):active {
+			transform: scale(0.98);
+		}
+	}
+	input:is([type="checkbox"], [type="radio"]) {
+		accent-color: var(--ink-gray-9);
 	}
 	@media (width < 64rem) {
 		body.has-buy-bar {

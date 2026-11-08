@@ -15,7 +15,7 @@
 
 <ul x-show="$store.cart.count" class="flex-1 divide-y divide-outline-gray-2 overflow-y-auto px-5">
 	<template x-for="line in $store.cart.cart?.lines ?? []" :key="line.line_id">
-		<li x-init="matchMedia('(prefers-reduced-motion: reduce)').matches || $el.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 300, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' })" class="flex gap-4 py-5">
+		<li x-init="matchMedia('(prefers-reduced-motion: reduce)').matches || $el.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 300, easing: getComputedStyle($el).getPropertyValue('--ease-out').trim() })" class="flex gap-4 py-5">
 			<a x-data="{ broken: false }" :href="line.product && $store.cart.product_url(line.product)" class="media grid aspect-[3/4] w-20 shrink-0 place-items-center self-start overflow-hidden rounded-lg text-ink-gray-4">
 				<img x-show="line.product?.image && !broken" :src="line.product?.image" @error="broken = true" alt="" class="size-full object-cover object-top">
 				<span x-show="!line.product?.image || broken">{{ icon("image", "size-6") }}</span>
@@ -36,7 +36,7 @@
 					</div>
 					{{ spinner("$store.cart.busy === 'quantity:' + line.line_id", "size-4 text-ink-gray-6") }}
 					</div>
-					<button type="button" @click="$store.cart.remove(line)" :disabled="$store.cart.busy" :aria-busy="$store.cart.busy === 'remove:' + line.line_id" class="inline-flex h-10 items-center rounded-lg px-2 text-base text-ink-gray-6 underline underline-offset-4 hover:text-ink-gray-9">{{ _("Remove") }}{{ spinner("$store.cart.busy === 'remove:' + line.line_id", "size-4 text-ink-gray-6") }}</button>
+					<button type="button" @click="$store.cart.remove(line)" :disabled="$store.cart.busy" :aria-busy="$store.cart.busy === 'remove:' + line.line_id" class="-me-2 inline-flex h-10 items-center rounded-lg px-2 text-base text-ink-gray-6 underline decoration-outline-gray-4 underline-offset-4 hover:text-ink-gray-9 hover:decoration-ink-gray-8">{{ _("Remove") }}{{ spinner("$store.cart.busy === 'remove:' + line.line_id", "size-4 text-ink-gray-6") }}</button>
 				</div>
 			</div>
 		</li>
