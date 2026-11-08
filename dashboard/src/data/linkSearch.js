@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import { useAdminRead } from './api'
 
 const SEARCH_DEBOUNCE_MS = 300
@@ -20,6 +20,8 @@ export function useLinkSearch(path, extraParams = () => ({}), committedValue = (
       searchText.value = value
     }, SEARCH_DEBOUNCE_MS)
   })
+  // A keystroke just before the picker unmounts would otherwise fire into a dead component's read.
+  onScopeDispose(() => clearTimeout(debounceTimer))
 
   const results = useAdminRead(path, {
     params: () => ({ ...extraParams(), search_text: searchText.value }),
