@@ -12,6 +12,7 @@
         let code_queue = null;
         let priced_request = 0;
         let retry_timer = null;
+        let after_order_retried = false;
         let retry_count = 0;
         const MAX_RETRIES = 5;
         const get_snapshot = items => JSON.stringify(items.map(item => [item.variant?.item_code, item.qty, item.selected]));
@@ -30,6 +31,8 @@
             version: Alpine.$persist(null).as('commera_cart_version'),
             // Set while the screen holds edits the server has not taken, so the next page sends them.
             is_dirty: Alpine.$persist(false).as('commera_cart_dirty'),
+            // An order was placed but its cleaned cart not read yet: the server cart wins before any sync.
+            after_order: Alpine.$persist(false).as('commera_cart_after_order'),
             // Fetched only by pages that show totals.
             priced: null,
             wants_pricing: false,
@@ -71,6 +74,8 @@
             // Another tab has synced the cart. Taking its cart keeps this tab's next sync from being a conflict.
             take_other_tab_cart(event) {
                 if (event.storageArea !== localStorage || event.key !== 'commera_cart_version') return;
+                // A queued event for an older version would write it back and echo between the tabs forever.
+                if (event.newValue !== localStorage.getItem('commera_cart_version')) return;
                 if (!is_loaded || this.is_dirty || sync_chain) return;
                 let items;
                 let version;
@@ -127,6 +132,10 @@
                 resolve_loaded();
             },
             async take_server_cart(server_cart) {
+                if (this.after_order) {
+                    this.take_ordered_server_cart(server_cart);
+                    return;
+                }
                 if (!server_cart) {
                     if (this.items.length) await this.sync();
                     return;
@@ -143,6 +152,8 @@
             sync() {
                 clearTimeout(sync_timer);
                 sync_timer = null;
+                // This tab still holds the ordered lines: sending them would put them back in the cart.
+                if (this.after_order) return this.take_cart_after_order();
                 if (sync_chain) {
                     is_sync_queued = true;
                     return sync_chain;
@@ -204,13 +215,24 @@
             async take_cart_after_order() {
                 // Not past a few seconds: the page moves on after this, and the cart read below is the current one anyway.
                 await Promise.race([this.wait_until_loaded(), new Promise(resolve => setTimeout(resolve, 5000))]);
+                this.after_order = true;
+                clearTimeout(sync_timer);
+                sync_timer = null;
                 let server_cart;
                 try {
                     server_cart = (await frappe_call("/api/v2/method/commera.api.server_cart.get_server_cart", {})).data;
                 } catch (error) {
-                    this.remove_selected();
+                    // Never guess the ordered lines from what is ticked now; the next load or sync reads again.
+                    if (!after_order_retried) {
+                        after_order_retried = true;
+                        setTimeout(() => this.after_order && this.take_cart_after_order(), 3000);
+                    }
                     return;
                 }
+                this.take_ordered_server_cart(server_cart);
+            },
+            take_ordered_server_cart(server_cart) {
+                this.after_order = false;
                 if (server_cart) {
                     this.apply_server_cart(server_cart);
                     return;
@@ -506,10 +528,22 @@
             },
             // Swaps the line to another size, keeping its quantity as far as stock allows. Resolves true once the
             // server has the change and the page reloads to show it; false leaves the line as it was.
+            async restore_lines(lines) {
+                this.items = lines;
+                await Alpine.nextTick();
+                // Back to what the server holds: nothing is left to retry.
+                if (get_snapshot(this.items) === synced_snapshot) {
+                    this.is_dirty = false;
+                    clearTimeout(sync_timer);
+                    sync_timer = null;
+                }
+            },
             async update_variant(cart_item, selected_size) {
                 if (this.updating_variant) return false;
                 this.updating_variant = cart_item.variant.item_code;
                 let is_leaving = false;
+                // Put back if the switch cannot be saved, so the dropdown and the cart never disagree.
+                let lines_before = null;
                 try {
                     const data = (await frappe_call("/api/v2/method/commera.api.cart.update_variant", { product_name: cart_item.item.name, size: selected_size })).data;
                     const new_variant = {
@@ -527,6 +561,7 @@
                         return false;
                     }
                     if (qty < wanted) toast(stock_warning(stock), { type: "warning" });
+                    lines_before = JSON.parse(JSON.stringify(this.items));
                     const target = existing_item || cart_item;
                     target.variant = new_variant;
                     target.qty = qty;
@@ -536,11 +571,15 @@
                     if (existing_item) this.items = this.items.filter(item => item !== cart_item);
                     // The effect marks the cart dirty on Alpine's next flush; the reload must wait for the sync.
                     await Alpine.nextTick();
-                    if (!await this.flush_sync()) return false;
+                    if (!await this.flush_sync()) {
+                        await this.restore_lines(lines_before);
+                        return false;
+                    }
                     is_leaving = true;
                     window.location.reload();
                     return true;
                 } catch (error) {
+                    if (lines_before) await this.restore_lines(lines_before);
                     return false;
                 } finally {
                     if (!is_leaving) this.updating_variant = null;
