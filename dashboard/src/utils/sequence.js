@@ -7,6 +7,8 @@ export function createSequence() {
   let latest = 0
   return {
     next: () => ++latest,
+    // A write started on the current thing takes this, so its answer is dropped once the screen moves on.
+    current: () => latest,
     isLatest: (ticket) => ticket === latest,
     cancel: () => {
       latest += 1

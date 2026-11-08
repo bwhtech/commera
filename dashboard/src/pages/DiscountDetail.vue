@@ -54,11 +54,14 @@ const heading = computed(() => (!discount.value || isNew.value ? 'New discount' 
 
 // What the server last said, to tell an edit from a discount merely opened. Taken a tick after the
 // sections mount, because some of them fill a default into the record as they do.
-let savedSnapshot = ''
-const isDirty = computed(() => Boolean(discount.value) && status.value === 'ready' && JSON.stringify(discount.value) !== savedSnapshot)
+const savedSnapshot = ref('')
+// Not tied to `status`: edits stay unsaved while the Active switch or a failing Save is in flight.
+const isDirty = computed(
+  () => Boolean(discount.value) && !['loading', 'error'].includes(status.value) && JSON.stringify(discount.value) !== savedSnapshot.value,
+)
 async function markSaved() {
   await nextTick()
-  savedSnapshot = JSON.stringify(discount.value)
+  savedSnapshot.value = JSON.stringify(discount.value)
 }
 
 // Moving from one discount to the next starts a load per move; only the newest may land, so a slow
@@ -112,35 +115,37 @@ useEventListener(window, 'beforeunload', (event) => {
 
 async function save() {
   if (status.value !== 'ready') return
+  const ticket = loads.current()
   status.value = 'saving'
   triedSaving.value = true
   try {
     const wasNew = isNew.value
     const saved = await saveDiscount(discount.value)
-    if (!saved) return
+    if (!saved || !loads.isLatest(ticket)) return
     discount.value = saved
     await markSaved()
     toast.success(wasNew ? 'Discount created' : 'Saved')
     if (wasNew) router.replace({ name: 'DiscountDetail', params: { id: saved.name } })
   } finally {
-    status.value = 'ready'
+    if (loads.isLatest(ticket)) status.value = 'ready'
   }
 }
 
 // Saves the switch alone, so flipping it never publishes edits still waiting for Save.
 async function toggleEnabled(enabled) {
   if (status.value !== 'ready') return
+  const ticket = loads.current()
   status.value = 'toggling'
   try {
     const saved = await saveDiscount({ name: discount.value.name, enabled: enabled ? 1 : 0 })
-    if (!saved) return
+    if (!saved || !loads.isLatest(ticket)) return
     const changes = { enabled: saved.enabled, status: saved.status }
     Object.assign(discount.value, changes)
     // The switch landed on its own; edits still waiting for Save stay unsaved.
-    savedSnapshot = JSON.stringify({ ...JSON.parse(savedSnapshot), ...changes })
+    savedSnapshot.value = JSON.stringify({ ...JSON.parse(savedSnapshot.value), ...changes })
     toast.success(saved.enabled ? 'Discount switched on' : 'Discount switched off')
   } finally {
-    status.value = 'ready'
+    if (loads.isLatest(ticket)) status.value = 'ready'
   }
 }
 
@@ -151,6 +156,8 @@ function remove() {
     confirmLabel: 'Delete discount',
     onConfirm: async () => {
       if (!(await deleteDiscount(discount.value.name))) return
+      // Deleted: edits made before it are gone with it, so leaving must not ask about them.
+      savedSnapshot.value = JSON.stringify(discount.value)
       toast.success('Discount deleted')
       router.replace('/discounts')
     },

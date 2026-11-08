@@ -208,7 +208,8 @@ const { attempt, call } = createAdminCaller('discounts.')
 export const getDiscount = (name) => attempt('get_discount', { name })
 export const saveDiscount = (discount) =>
   call('save_discount', { discount: discount.targets ? { ...discount, targets: scopedTargets(discount) } : discount })
-export const deleteDiscount = (name) => call('delete_discount', { name })
+// delete_discount answers nothing, so success is the absence of an error, not a truthy answer.
+export const deleteDiscount = async (name) => !(await attempt('delete_discount', { name })).error
 export const createCodes = (name, count, prefix) => call('create_codes', { name, count, prefix })
 export const getEditorOptions = () => call('get_editor_options')
 
