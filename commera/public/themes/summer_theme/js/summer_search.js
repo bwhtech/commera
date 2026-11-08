@@ -7,7 +7,8 @@ document.addEventListener('alpine:init', () => {
 		products: [],
 		categories: [],
 		corrected_query: null,
-		loading: false,
+		/* 'idle', 'loading', 'ready' (products holds the answer for matched_term) or 'failed'. */
+		status: 'idle',
 		debounce_timer: null,
 		/* Each keystroke fires its own request and the server answers out of order often enough
 		   to matter; only the newest id may paint. */
@@ -23,7 +24,7 @@ document.addEventListener('alpine:init', () => {
 				this.reset();
 				return;
 			}
-			this.loading = true;
+			this.status = 'loading';
 			this.debounce_timer = setTimeout(() => this.get_products(), 275);
 		},
 
@@ -34,30 +35,37 @@ document.addEventListener('alpine:init', () => {
 			this.categories = [];
 			this.corrected_query = null;
 			this.matched_term = '';
-			this.loading = false;
+			this.status = 'idle';
 		},
 
 		async get_products() {
 			const term = this.search_term.trim();
 			this.latest_request += 1;
 			const request_id = this.latest_request;
+			let response;
 			try {
-				const response = await frappe_call(
+				response = await frappe_call(
 					'/api/v2/method/commera.api.search.typeahead',
 					{ q: term },
 				);
-				if (request_id !== this.latest_request) {
-					return;
-				}
-				this.products = response.data.products;
-				this.categories = response.data.categories;
-				this.corrected_query = response.data.corrected_query;
+			} catch (error) {
+				/* The results on screen belong to an older term, so they go rather than pass for this one's. */
+				if (request_id !== this.latest_request) return;
+				this.products = [];
+				this.categories = [];
+				this.corrected_query = null;
 				this.matched_term = term;
-			} finally {
-				if (request_id === this.latest_request) {
-					this.loading = false;
-				}
+				this.status = 'failed';
+				return;
 			}
+			if (request_id !== this.latest_request) {
+				return;
+			}
+			this.products = response.data.products;
+			this.categories = response.data.categories;
+			this.corrected_query = response.data.corrected_query;
+			this.matched_term = term;
+			this.status = 'ready';
 		},
 
 		get_product_url(product) {

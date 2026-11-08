@@ -10,11 +10,12 @@
     categories: [],
     corrected_query: null,
     latest_request: 0,
-    query_state: window.query_state,
+    // 'idle', 'loading', 'ready' (the results answer search_term) or 'failed'.
+    status: 'idle',
     search_term: window.query_state?.search ? window.query_state.search : '',
+    // A plain navigation: the products page reads the term from its own URL.
     update_search(){
-        this.query_state['search'] = this.search_term;
-        window.location.href = `/{{frappe.lang}}/products?search=${this.search_term}`
+        window.location.href = `/{{frappe.lang}}/products?search=${encodeURIComponent(this.search_term.trim())}`
     },
     async get_search_results() {
         const term = this.search_term.trim();
@@ -24,23 +25,38 @@
             this.products = [];
             this.categories = [];
             this.corrected_query = null;
+            this.status = 'idle';
             return;
         }
-        const data = await frappe_call('/api/v2/method/commera.api.search.typeahead', {q: term});
+        this.status = 'loading';
+        let data;
+        try {
+            data = await frappe_call('/api/v2/method/commera.api.search.typeahead', {q: term});
+        } catch (error) {
+            if (request_id !== this.latest_request) return;
+            this.products = [];
+            this.categories = [];
+            this.corrected_query = null;
+            this.status = 'failed';
+            return;
+        }
         if (request_id !== this.latest_request) {
             return;
         }
         this.products = data.data.products;
         this.categories = data.data.categories;
         this.corrected_query = data.data.corrected_query;
+        this.status = 'ready';
     },
-    init(){
-        this.get_search_results();
+    // The header renders this twice (wide and narrow), so results load when one opens, not on every page load.
+    open_search(){
+        this.is_open = true;
+        if (this.status === 'idle' && this.search_term.trim()) this.get_search_results();
     },
     }" 
     class="w-full"
     >
-    <div x-on:click="is_open = true ; $nextTick(() => $refs.modalSearch.querySelector('input')?.focus())"
+    <div x-on:click="open_search() ; $nextTick(() => $refs.modalSearch.querySelector('input')?.focus())"
         class="w-full">
         {% include 'templates/components/core/search_bar.html' %}
     </div>
@@ -62,6 +78,14 @@
                 </button>
             </div>
             <div class="max-w-4xl w-full mx-auto mt-10 px-6 md:px-10">
+                <p class="text-sm my-2" x-cloak x-show="status === 'loading'">{{ _("Searching") }}...</p>
+                <p class="text-sm my-2" x-cloak x-show="status === 'failed'">
+                    {{ _("Search is not available right now.") }}
+                    <button type="button" class="underline cursor-pointer" @click="get_search_results()">{{ _("Try again") }}</button>
+                </p>
+                <p class="text-sm my-2" x-cloak x-show="status === 'ready' && !products.length && !categories.length">
+                    {{ _("No products found for") }} &ldquo;<span x-text="search_term.trim()"></span>&rdquo;
+                </p>
                 <p class="text-sm my-2" x-cloak x-show="corrected_query">
                     {{ _("Showing results for") }} <span class="font-medium" x-text="corrected_query"></span>
                 </p>
