@@ -166,10 +166,37 @@ class TestServerCart(DiscountCodeTestCase):
 		)
 
 		clear_ordered_cart(
-			frappe._dict(custom_guest_cart_key=None, items=[frappe._dict(item_code=self.shirt)]), self.shopper
+			frappe._dict(custom_guest_cart_key=None, items=[frappe._dict(item_code=self.shirt, qty=1)]),
+			self.shopper,
 		)
 
 		self.assertEqual([row.item_code for row in get_session_cart().lines], [self.cap])
+
+	def ordered(self, *items):
+		return frappe._dict(custom_guest_cart_key=None, items=[frappe._dict(item) for item in items])
+
+	def test_a_placed_order_keeps_an_unticked_line_of_the_same_item(self):
+		cart_sdk.add_lines(
+			[
+				{"item_code": self.shirt, "qty": 1, "attributes": {"engraving": "A"}},
+				{"item_code": self.shirt, "qty": 1, "attributes": {"engraving": "B"}, "selected": 0},
+			]
+		)
+
+		clear_ordered_cart(
+			self.ordered({"item_code": self.shirt, "qty": 1, "custom_line_attributes": '{"engraving": "A"}'}),
+			self.shopper,
+		)
+
+		[line] = get_session_cart().lines
+		self.assertEqual((line.item_code, line.qty, line.selected), (self.shirt, 1, 0))
+
+	def test_a_placed_order_keeps_quantity_added_while_the_shopper_paid(self):
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 3}])
+
+		clear_ordered_cart(self.ordered({"item_code": self.shirt, "qty": 2}), self.shopper)
+
+		self.assertEqual([(row.item_code, row.qty) for row in get_session_cart().lines], [(self.shirt, 1)])
 
 	def test_abandoned_guest_carts_are_deleted(self):
 		self.use_guest_cart()
