@@ -532,6 +532,8 @@
             },
             // Only the lines the switch touched go back; edits made to other lines meanwhile stay.
             async undo_size_switch({ target, fields, removed, removed_index }) {
+                // A target the shopper removed meanwhile stays removed, and so does the line merged into it.
+                if (!this.items.includes(target)) return;
                 Object.assign(target, fields);
                 if (removed && !this.items.includes(removed)) {
                     const items = [...this.items];
@@ -562,6 +564,8 @@
                         stock_detail: data.variant.stock_detail || {},
                     };
                     if (new_variant.item_code === cart_item.variant.item_code) return true;
+                    // Removed while the sizes were read: there is nothing left to switch.
+                    if (!this.items.includes(cart_item)) return false;
                     const stock = stock_of(new_variant);
                     const existing_item = this.items.find(item => item !== cart_item && item.variant.item_code === new_variant.item_code);
                     const wanted = cart_item.qty + (existing_item ? existing_item.qty : 0);
