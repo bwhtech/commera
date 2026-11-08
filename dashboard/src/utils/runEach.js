@@ -18,9 +18,11 @@ export async function runEach(items, write) {
 }
 
 // "3 orders marked fulfilled" or "2 of 3 orders marked fulfilled. 1 failed: <reason>".
+// `noun` is a word that takes an s, or a [singular, plural] pair for one that does not.
 export function bulkSummary({ done, failed }, noun, verb, reasonFor = (error) => error?.message) {
   const total = done.length + failed.length
-  const plural = (count) => `${count} ${noun}${count === 1 ? '' : 's'}`
+  const [one, many] = Array.isArray(noun) ? noun : [noun, `${noun}s`]
+  const plural = (count) => `${count} ${count === 1 ? one : many}`
   if (!failed.length) return `${plural(total)} ${verb}`
   const reason = failed.map(({ error }) => error && reasonFor(error)).find(Boolean)
   const head = `${done.length} of ${plural(total)} ${verb}. ${failed.length} failed`

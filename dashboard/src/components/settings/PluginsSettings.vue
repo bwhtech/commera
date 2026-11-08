@@ -8,9 +8,10 @@ import ListPagination from '../ListPagination.vue'
 import ResponsiveButton from '../ResponsiveButton.vue'
 import StatusBadge from '../StatusBadge.vue'
 import { useAdminAction, useAdminRead, trySubmit } from '../../data/api'
+import { errorMessage } from '../../data/errors'
 import { eventLabel, statusKey, timeLabel, useDeliveryRetry } from '../../data/pluginEvents'
 import { appIcon, pluginSettingsTabs, placeLabel, settingsTabValue } from '../../ia/plugins'
-import { settings } from '../../ia/settings'
+import { onSettingsClose, settings } from '../../ia/settings'
 import { orderRoute } from '../../ia/routes'
 
 const props = defineProps({
@@ -32,6 +33,7 @@ watch(
 )
 
 const configuring = ref(null)
+onSettingsClose(() => (configuring.value = null))
 const current = computed(() => plugins.value.find((app) => app.app === configuring.value) ?? null)
 const settingsTab = computed(() =>
   pluginSettingsTabs().find((tab) => tab.value === settingsTabValue(configuring.value)),
@@ -94,14 +96,24 @@ async function setStorefront(enabled) {
     <SettingsPanelHeader title="Plugins" description="Plugins installed alongside Commera, and what they add to it." />
 
     <SettingsBody v-scroll-fade>
-      <!-- The refusal itself is already toasted by useAdminRead. This says why the panel is empty. -->
+      <!-- The refusal itself is already toasted by useAdminRead. This says why the panel is empty:
+           only a permission refusal is about the role, anything else is worth another try. -->
       <EmptyState
-        v-if="pluginsRequest.error"
+        v-if="pluginsRequest.error?.type === 'PermissionError'"
         compact
         icon="lucide-lock"
         title="Hidden from your role"
         description="Installed plugins are only listed for a System Manager."
       />
+      <EmptyState
+        v-else-if="pluginsRequest.error"
+        compact
+        icon="lucide-triangle-alert"
+        title="Plugins could not be loaded"
+        :description="errorMessage(pluginsRequest.error)"
+      >
+        <Button label="Try again" :loading="pluginsRequest.loading" @click="pluginsRequest.reload()" />
+      </EmptyState>
 
       <div v-else-if="!pluginsRequest.data" class="divide-y divide-outline-gray-1" aria-hidden="true">
         <div v-for="row in 3" :key="row" class="flex items-center gap-3 py-3">

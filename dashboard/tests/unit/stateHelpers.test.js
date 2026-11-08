@@ -54,4 +54,5 @@ test('bulkSummary names the partial failure and its first reason', () => {
     '1 of 3 orders marked fulfilled. 2 failed: Closed',
   )
   assert.equal(bulkSummary({ done: [], failed: [{ item: 'b', error: null }] }, 'product', 'archived'), '0 of 1 product archived. 1 failed')
+  assert.equal(bulkSummary({ done: ['a', 'b'], failed: [] }, ['delivery', 'deliveries'], 'queued'), '2 deliveries queued')
 })
