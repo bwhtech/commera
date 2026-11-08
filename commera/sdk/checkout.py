@@ -31,7 +31,7 @@ from commera.sdk.types import (
 	ShippingOptions,
 )
 from commera.utils import get_directions_url, get_pickup_addresses, get_pickup_warehouses
-from commera.www.cart.checkout import cart_needs_refresh
+from commera.www.cart.checkout import cart_needs_refresh, rebuild_checkout_cart
 
 __all__ = [
 	"complete",
@@ -39,6 +39,7 @@ __all__ = [
 	"list_payment_methods",
 	"list_pickup_locations",
 	"list_shipping_options",
+	"refresh",
 	"set_addresses",
 	"set_shipping_option",
 	"set_store_pickup",
@@ -72,6 +73,18 @@ NO_OPTIONS_REASONS = ("store_pickup", "connector_missing", "address_missing", "u
 def get() -> CheckoutState | None:
 	quotation = get_open_checkout()
 	return get_checkout_state(quotation) if quotation else None
+
+
+def refresh() -> CheckoutState | None:
+	quotation = get_open_checkout()
+	if not quotation:
+		return None
+	if cart_needs_refresh(quotation):
+		rebuilt, nothing_selected = rebuild_checkout_cart(quotation)
+		if nothing_selected:
+			return None
+		quotation = rebuilt or quotation
+	return get_checkout_state(quotation)
 
 
 def set_addresses(

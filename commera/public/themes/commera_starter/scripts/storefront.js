@@ -218,9 +218,12 @@ function order_summary() {
 		},
 
 		get subtotal() {
-			return (this.cart?.discounts ?? []).reduce(
-				(subtotal, discount) => subtotal + discount.amount,
-				this.cart?.total ?? 0,
+			return (
+				this.summary?.items_total ??
+				(this.cart?.discounts ?? []).reduce(
+					(subtotal, discount) => subtotal + discount.amount,
+					this.cart?.total ?? 0,
+				)
 			);
 		},
 
@@ -303,7 +306,7 @@ function checkout(config) {
 		async init() {
 			globalThis.addEventListener('commera:cart-updated', () => this.refresh());
 			try {
-				this.state = await commera.checkout.get();
+				this.state = await commera.checkout.refresh();
 			} catch (error) {
 				this.sign_in_required = error.status === 403;
 				this.error = error.message;
@@ -350,7 +353,7 @@ function checkout(config) {
 				return;
 			}
 			await save_change(this, async () => {
-				this.state = await commera.checkout.get();
+				this.state = await commera.checkout.refresh();
 				if (!this.editing_address) {
 					await this.load_options();
 				}
