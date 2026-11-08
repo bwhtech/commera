@@ -23,6 +23,9 @@ const missing = computed(() => (flow.showErrors ? missingField('store', draft) :
 
 // Once setup has made the company, its country, currency and books are fixed.
 const isLocked = computed(() => storeSetup.status === 'running' || storeSetup.status === 'done')
+// start_store_setup leaves a running job alone and writes nothing, so a name or category changed
+// while it runs would be dropped without a word. Once it is done they save again.
+const isRunning = computed(() => storeSetup.status === 'running')
 
 const options = computed(() => props.record.options ?? {})
 const chartOptions = computed(() =>
@@ -57,6 +60,8 @@ watch(
       v-model="draft.storeName"
       label="Store name"
       autocomplete="organization"
+      :disabled="isRunning"
+      :description="isRunning ? 'You can change the name once setup finishes.' : ''"
       :error="missing === 'storeName' ? 'Required' : ''"
     />
 
@@ -67,13 +72,14 @@ watch(
           v-for="option in CATEGORIES"
           :key="option.value"
           type="button"
-          class="flex flex-col items-center gap-2 rounded-4 border px-2 py-3 text-sm transition-[background-color,border-color,color,transform] duration-150 ease-out-strong active:scale-[0.97]"
+          class="flex flex-col items-center gap-2 rounded-4 border px-2 py-3 text-sm transition-[background-color,border-color,color,transform] duration-150 ease-out-strong enabled:active:scale-[0.97] disabled:cursor-not-allowed"
           :class="
             draft.storeCategory === option.value
               ? 'border-outline-gray-5 bg-surface-gray-2 text-ink-gray-9'
               : 'border-outline-gray-2 text-ink-gray-6 hover:bg-surface-gray-1'
           "
           :aria-pressed="draft.storeCategory === option.value"
+          :disabled="isRunning"
           @click="draft.storeCategory = option.value"
         >
           <span :class="option.icon" class="size-5" aria-hidden="true" />

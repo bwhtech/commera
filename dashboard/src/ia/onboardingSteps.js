@@ -56,3 +56,13 @@ export function abbreviate(name, maxLength = 5) {
 export function toOptions(values) {
   return (values ?? []).map((value) => (typeof value === 'string' ? { label: value, value } : value))
 }
+
+// How long the setup poll waits before its next beat, or null once it should stop asking. The job
+// usually takes about a minute, so two seconds keeps "Ready" prompt; past that the beat slows, and
+// past ten minutes the tab stops polling a job that may have died with its worker.
+export const SETUP_POLL = { fastMs: 2000, slowMs: 10000, slowAfterMs: 60000, stallAfterMs: 10 * 60000 }
+
+export function setupPollDelay(elapsedMs) {
+  if (elapsedMs > SETUP_POLL.stallAfterMs) return null
+  return elapsedMs > SETUP_POLL.slowAfterMs ? SETUP_POLL.slowMs : SETUP_POLL.fastMs
+}

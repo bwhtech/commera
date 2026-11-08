@@ -3,7 +3,7 @@
  * First-run onboarding, covering the whole app until it is finished: one step at a time on the
  * right, the store building itself on the left. App.vue renders this instead of the shell.
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Alert, Button, Spinner } from 'frappe-ui'
 import { bootValue } from '../../data/boot'
@@ -13,10 +13,12 @@ import {
   loadStoreProducts,
   onboarding,
   onboardingLoadError,
+  resumeSetupPolling,
   saveBrand,
   saveProfile,
   saveSelling,
   startStoreSetup,
+  stopSetupPolling,
   storeSetup,
 } from '../../data/onboarding'
 import { useTheme } from '../../data/theme'
@@ -72,6 +74,8 @@ const activeTheme = computed(() => themes.value.find((theme) => theme.live)?.nam
 const saving = ref(false)
 const finishing = ref(false)
 const retrying = ref(false)
+// The record's load, which "Try again" repeats: 'idle' | 'loading' | 'error' | 'ready'.
+const loadStatus = ref('idle')
 
 const record = computed(() => onboarding.value)
 // The column mounts empty while the record loads, so its entrance waits for the record.
@@ -85,18 +89,23 @@ const isReady = computed(() => canFinish(storeSetup.status))
 const stepProps = computed(() => {
   if (step.value.key === 'you') return { needsPassword: needsPassword.value }
   if (step.value.key === 'store') return { record: record.value }
-  if (step.value.key === 'done') return { finishing: finishing.value, isReady: isReady.value }
+  if (step.value.key === 'done') return { finishing: finishing.value, setupStatus: storeSetup.status }
   return {}
 })
 
 const title = computed(() => {
   if (step.value.key === 'you') return draft.fullName ? `Welcome, ${draft.fullName.trim().split(' ')[0]}` : step.value.title
+  if (step.value.key === 'done' && storeSetup.status === 'failed') return 'Almost there'
   if (step.value.key === 'done') return `${draft.storeName.trim() || 'Your store'} is ready`
   return step.value.title
 })
 
 async function load() {
+  // The read is one shared request: a second click would abort the first and send it again.
+  if (loadStatus.value === 'loading') return
+  loadStatus.value = 'loading'
   const data = await loadOnboarding()
+  loadStatus.value = data ? 'ready' : 'error'
   if (!data) return
   adoptRecord(data)
   goToStep(resumeStep(readSavedStep(), storeSetup.status))
@@ -106,6 +115,10 @@ onMounted(async () => {
   await Promise.all([load(), loadThemes()])
   draft.theme = draft.theme || activeTheme.value || ''
 })
+
+// The poll is module state and outlives this component: finishing (or a reload into the shell)
+// must not leave it asking every few seconds behind Home.
+onBeforeUnmount(stopSetupPolling)
 
 function storeSetupValues() {
   return {
@@ -139,6 +152,8 @@ async function next() {
     flow.showErrors = true
     return
   }
+  // Enter in a field submits the form even while the Continue button shows its spinner.
+  if (saving.value) return
   saving.value = true
   const saved = await (SAVES[step.value.key]?.() ?? true)
   saving.value = false
@@ -146,6 +161,7 @@ async function next() {
 }
 
 async function retrySetup() {
+  if (retrying.value) return
   retrying.value = true
   await startStoreSetup(storeSetupValues())
   retrying.value = false
@@ -240,7 +256,7 @@ watch(
       <div v-if="!record" class="flex flex-1 items-center justify-center">
         <div v-if="onboardingLoadError" class="space-y-3 text-center">
           <p class="text-base text-ink-gray-6">Could not load your setup</p>
-          <Button label="Try again" @click="load" />
+          <Button label="Try again" :loading="loadStatus === 'loading'" @click="load" />
         </div>
         <Spinner v-else class="size-5 text-ink-gray-5" />
       </div>
@@ -262,6 +278,14 @@ watch(
           theme="red"
           :title="storeSetup.error || 'Store setup failed'"
           :primary-action="{ label: 'Retry', loading: retrying, onClick: retrySetup }"
+        />
+        <Alert
+          v-else-if="storeSetup.status === 'running' && storeSetup.poll === 'stalled'"
+          class="mb-6"
+          theme="amber"
+          title="Setup is taking longer than usual"
+          description="It may still finish. Check again in a minute, or reload the page."
+          :primary-action="{ label: 'Check again', onClick: resumeSetupPolling }"
         />
 
         <div

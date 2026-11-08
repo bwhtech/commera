@@ -3,7 +3,9 @@ import { Button, Skeleton } from 'frappe-ui'
 
 defineProps({
   finishing: { type: Boolean, default: false },
-  isReady: { type: Boolean, default: false },
+  // The store setup's status: only `done` can finish, and a `failed` one is retried from the
+  // alert above, so it must not read as a skeleton that will resolve on its own.
+  setupStatus: { type: String, default: 'idle' },
 })
 defineEmits(['finish'])
 </script>
@@ -15,7 +17,7 @@ defineEmits(['finish'])
       Only you can see it for now. Publish it from Home when you are ready.
     </p>
     <Button
-      v-if="isReady"
+      v-if="setupStatus === 'done'"
       variant="solid"
       size="md"
       class="w-full"
@@ -23,6 +25,9 @@ defineEmits(['finish'])
       :loading="finishing"
       @click="$emit('finish')"
     />
+    <p v-else-if="setupStatus === 'failed'" class="text-p-base text-ink-red-6">
+      Your store could not be set up. Retry it above, then come back here.
+    </p>
     <Skeleton v-else role="status" class="h-8 w-full rounded-4" aria-label="Finishing setup" />
   </div>
 </template>
