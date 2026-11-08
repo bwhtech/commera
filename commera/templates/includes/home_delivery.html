@@ -4,8 +4,7 @@
     </h2>
     <h3 class="text-sm text-secondary-accent hover:text-accent font-semibold ms-2 cursor-pointer" x-show="!show_billing_state"
         x-cloak @click="show_billing_state = true;
-        billing_address_filled = false;
-        payment_mode_confirmed = false " x-collapse.duration.300ms x-transition:enter="ease-out duration-200"
+        billing_address_filled = false" x-collapse.duration.300ms x-transition:enter="ease-out duration-200"
         x-transition:leave="ease-in duration-100">
         {{icon(name="edit",classes="h-5 w-5")}}
     </h3>
