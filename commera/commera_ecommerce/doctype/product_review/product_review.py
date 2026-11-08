@@ -8,7 +8,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils.background_jobs import get_job_status
-from frappe.utils.data import cint
+from frappe.utils.data import cint, flt
 from rq.job import JobStatus
 
 from commera.api.reviews import get_rating_summary
@@ -81,10 +81,18 @@ def write_variant_rating(variant: str) -> None:
 
 
 def recount_variant_rating(variant: str) -> None:
-	# Two jobs can overlap, so they take turns on the variant lock. The new transaction then counts after it.
+	# Raw SQL only after the rollback: a metadata read before the lock would fix an older snapshot.
+	# The lock is a locking read, so the count below is the first plain read and sees every commit.
 	frappe.db.rollback()
-	frappe.db.get_value("Style Attribute Variant", variant, "name", for_update=True)
-	write_variant_rating(variant)
+	frappe.db.sql("SELECT name FROM `tabStyle Attribute Variant` WHERE name = %s FOR UPDATE", variant)
+	count, average = frappe.db.sql(
+		"SELECT COUNT(name), AVG(rating) FROM `tabProduct Review` WHERE variant = %s AND is_published = 1",
+		variant,
+	)[0]
+	frappe.db.sql(
+		"UPDATE `tabStyle Attribute Variant` SET average_rating = %s, review_count = %s WHERE name = %s",
+		(flt(average), cint(count), variant),
+	)
 
 
 def queue_variant_rating(variant: str) -> None:
