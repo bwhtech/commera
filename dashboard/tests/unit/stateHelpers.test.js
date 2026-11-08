@@ -13,6 +13,15 @@ test('createSequence lets only the newest ticket write', () => {
   assert.equal(sequence.isLatest(second), false)
 })
 
+test('a write started on the current ticket is dropped once a new load starts', () => {
+  const sequence = createSequence()
+  sequence.next()
+  const save = sequence.current()
+  assert.equal(sequence.isLatest(save), true)
+  sequence.next()
+  assert.equal(sequence.isLatest(save), false)
+})
+
 test('runEach keeps going past a refusal and reports which items failed', async () => {
   const order = []
   const refusal = new Error('ValidationError: Order is closed')

@@ -161,12 +161,13 @@ describe('state flows', () => {
     await goto(page, '/orders')
     await clickByText(page, 'button', 'Select')
     const rows = await page.$$('a[data-slot=list-row]')
-    assert.ok(rows.length >= 2, 'needs two orders on the first page')
+    assert.ok(rows.length >= 3, 'needs three orders on the first page')
     await rows[0].click()
     await rows[1].click()
+    await rows[2].click()
     await wait(300)
 
-    // Never reaches the server: the first order "fulfils", the second is refused.
+    // Never reaches the server: the middle order is refused, the other two "fulfil".
     const fulfils = []
     let listReads = 0
     const onRequest = (request) => {
@@ -174,7 +175,7 @@ describe('state flows', () => {
       if (request.url().includes('orders.get_orders')) listReads += 1
       if (!request.url().includes('orders.fulfil_order')) return request.continue()
       fulfils.push(request.postData())
-      const refused = fulfils.length === 2
+      const refused = fulfils.length === 2 // the middle one: the run must go on past it
       setTimeout(() => {
         request.respond(
           refused
@@ -195,9 +196,9 @@ describe('state flows', () => {
       await button.click({ delay: 0 }).catch(() => {})
       await waitFor(async () => (await text(page)).includes('failed'), { label: 'the summary toast' })
       await wait(800)
-      assert.equal(fulfils.length, 2, `a second click started another run: ${fulfils.length} fulfil calls`)
+      assert.equal(fulfils.length, 3, `expected one call per order, no second run: ${fulfils.length} fulfil calls`)
       const body = await text(page)
-      assert.ok(body.includes('1 of 2 orders marked fulfilled. 1 failed: Order is on hold'), 'no partial-failure summary: ' + (await page.evaluate(() => [...document.querySelectorAll('[data-sonner-toast]')].map((t) => t.innerText).join(' / '))))
+      assert.ok(body.includes('2 of 3 orders marked fulfilled. 1 failed: Order is on hold'), 'no partial-failure summary: ' + (await page.evaluate(() => [...document.querySelectorAll('[data-sonner-toast]')].map((t) => t.innerText).join(' / '))))
       assert.ok(listReads >= 1, 'the list was not reloaded after the run')
       assert.ok(body.includes('1 order selected'), 'the refused order should stay selected for a retry')
     } finally {
@@ -262,7 +263,10 @@ describe('state flows', () => {
         value: 5,
       },
     })
-    onCleanup(session, ({ page: cleanupPage }) => adminPost(cleanupPage, 'discounts.delete_discount', { name: discount.name }))
+    // The test deletes it through the editor at the end; this only catches a run that stopped early.
+    onCleanup(session, ({ page: cleanupPage }) =>
+      adminPost(cleanupPage, 'discounts.delete_discount', { name: discount.name }).catch(() => {}),
+    )
     page.removeAllListeners('dialog')
     page.on('dialog', (dialog) => dialog.accept())
 
@@ -312,6 +316,44 @@ describe('state flows', () => {
       page.off('request', onRequest)
       await page.setRequestInterception(false)
     }
+
+    // An edit stays unsaved while the Active switch is in flight, so leaving still asks.
+    const savedBox = (
+      await page.evaluateHandle(() => [...document.querySelectorAll('input')].find((input) => input.value === '50'))
+    ).asElement()
+    assert.ok(savedBox, 'no value box after the save')
+    await savedBox.click()
+    await savedBox.press('Backspace')
+    let release
+    const held = new Promise((resolve) => (release = resolve))
+    const holdToggle = (request) => {
+      if (request.isInterceptResolutionHandled()) return
+      if (!request.url().includes('discounts.save_discount')) return request.continue()
+      held.then(() => request.continue())
+    }
+    await page.setRequestInterception(true)
+    page.on('request', holdToggle)
+    try {
+      await (await page.$('button[role=switch]')).click()
+      await wait(300)
+      push('/discounts').catch(() => {})
+      await waitFor(async () => (await text(page)).includes('Discard unsaved changes?'), {
+        label: 'the unsaved prompt while the switch saves',
+      })
+      await clickByText(page, '[role=dialog] button', 'Cancel')
+    } finally {
+      release()
+      await wait(1200)
+      page.off('request', holdToggle)
+      await page.setRequestInterception(false)
+    }
+
+    // Deleted with that edit still unsaved: leaving afterwards does not ask about it.
+    await (await page.$('button[aria-label="More actions"]')).click()
+    await clickByText(page, '[role=menuitem]', 'Delete discount')
+    await clickByText(page, '[role=dialog] button', 'Delete discount')
+    await waitFor(async () => page.url().endsWith('/discounts'), { label: 'the list after the delete' })
+    assert.ok(!(await text(page)).includes('Discard unsaved changes?'), 'a deleted discount asked about unsaved changes')
   })
 
   uiTest(session, 'reviews: two quick publish toggles both land, with no aborted error', async () => {
