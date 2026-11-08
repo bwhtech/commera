@@ -67,6 +67,13 @@ async function writeSettings(page, values) {
   assert.equal(status, 200, 'could not write Commera Settings')
 }
 
+async function typeIntoFirst(page, placeholder, value) {
+  const input = await page.$(`input[placeholder="${placeholder}"]`)
+  if (!input) throw new Error('no input with placeholder ' + placeholder)
+  await input.click()
+  await input.type(value)
+}
+
 async function waitFor(check, { timeout = 10000, label = 'condition' } = {}) {
   const started = Date.now()
   while (Date.now() - started < timeout) {
@@ -193,6 +200,49 @@ describe('state flows', () => {
       assert.ok(body.includes('1 of 2 orders marked fulfilled. 1 failed: Order is on hold'), 'no partial-failure summary: ' + (await page.evaluate(() => [...document.querySelectorAll('[data-sonner-toast]')].map((t) => t.innerText).join(' / '))))
       assert.ok(listReads >= 1, 'the list was not reloaded after the run')
       assert.ok(body.includes('1 order selected'), 'the refused order should stay selected for a retry')
+    } finally {
+      page.off('request', onRequest)
+      await page.setRequestInterception(false)
+    }
+  })
+
+  uiTest(session, 'variant save: a double click receives stock once', async () => {
+    const { page } = session
+    const { products } = await adminGet(page, 'catalog.get_products', { page_length: 20 })
+    let target = null
+    for (const listed of products) {
+      const product = await adminGet(page, 'catalog.get_product', { item_template: listed.name })
+      const variant = product.variants.find((candidate) => candidate.sizes.length)
+      if (variant) {
+        target = { product: product.name ?? listed.name, variant: variant.name }
+        break
+      }
+    }
+    assert.ok(target, 'needs a product with a sized variant')
+    await goto(page, `/products/${encodeURIComponent(target.product)}/variants/${encodeURIComponent(target.variant)}`)
+
+    // Never reaches the server: both writes answer after a beat, as a slow site would.
+    const writes = { prices: 0, receipts: 0 }
+    const onRequest = (request) => {
+      if (request.isInterceptResolutionHandled()) return
+      const url = request.url()
+      const kind = url.includes('catalog.save_product_prices') ? 'prices' : url.includes('catalog.receive_product_stock') ? 'receipts' : null
+      if (!kind) return request.continue()
+      writes[kind] += 1
+      setTimeout(() => request.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {} }) }), 500)
+    }
+    await page.setRequestInterception(true)
+    page.on('request', onRequest)
+    try {
+      await typeIntoFirst(page, 'Receive qty', '2')
+      const save = await findByText(page, 'button', 'Save')
+      await save.click()
+      await save.click().catch(() => {})
+      await save.click().catch(() => {})
+      await waitFor(async () => (await text(page)).includes('Variant saved'), { label: 'the save toast' })
+      await wait(800)
+      assert.equal(writes.prices, 1, `prices were written ${writes.prices} times`)
+      assert.equal(writes.receipts, 1, `stock was received ${writes.receipts} times`)
     } finally {
       page.off('request', onRequest)
       await page.setRequestInterception(false)

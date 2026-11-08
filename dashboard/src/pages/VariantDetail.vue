@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Button, FormControl, Skeleton, Switch, TextInput, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
@@ -50,7 +50,21 @@ const priceAction = useAdminAction('catalog.save_product_prices')
 const stockAction = useAdminAction('catalog.receive_product_stock')
 const publishAction = useAdminAction('catalog.set_variant_published')
 
+// 'idle' | 'saving' | 'toggling'. Save is prices then an additive stock receipt: a second click
+// while it runs would receive the same stock twice, so it is held until the product is re-read.
+const status = ref('idle')
+
 async function save() {
+  if (status.value !== 'idle') return
+  status.value = 'saving'
+  try {
+    await saveVariant()
+  } finally {
+    status.value = 'idle'
+  }
+}
+
+async function saveVariant() {
   const size_prices = variant.value.sizes.map((size) => {
     const draft = sizeDrafts[size.item_code]
     const hasCompareAt = draft.compareAt != null && draft.compareAt !== ''
@@ -77,19 +91,26 @@ async function save() {
       received_quantities,
     })
     if (!received) return
+    // The receipt landed: a retry after a failed reload must not receive it again.
+    for (const draft of Object.values(sizeDrafts)) draft.receiveQty = ''
   }
 
   toast.success('Variant saved')
-  productRequest.reload()
+  await productRequest.reload()
 }
 
 async function togglePublish() {
-  const toggled = await trySubmit(publishAction, {
-    style_attribute_variant: variant.value.name,
-    publish: !variant.value.is_published,
-  })
-  if (!toggled) return
-  productRequest.reload()
+  if (status.value !== 'idle') return
+  status.value = 'toggling'
+  try {
+    const toggled = await trySubmit(publishAction, {
+      style_attribute_variant: variant.value.name,
+      publish: !variant.value.is_published,
+    })
+    if (toggled) await productRequest.reload()
+  } finally {
+    status.value = 'idle'
+  }
 }
 
 // Two identifiers, so three ways to end up with nothing: the product read was
@@ -139,7 +160,14 @@ const loadFailure = computed(() => {
       ]"
     >
       <template #actions>
-        <Button label="Save" variant="solid" theme="gray" @click="save" />
+        <Button
+          label="Save"
+          variant="solid"
+          theme="gray"
+          :loading="status === 'saving'"
+          :disabled="status === 'toggling'"
+          @click="save"
+        />
       </template>
     </AppPageHeader>
 
@@ -169,7 +197,7 @@ const loadFailure = computed(() => {
                  enforces is Style Attribute Variant.unpublish_if_incomplete_data. -->
             <Switch
               :model-value="variant.is_published"
-              :disabled="!variant.is_published && variant.blockers.length > 0"
+              :disabled="status !== 'idle' || (!variant.is_published && variant.blockers.length > 0)"
               @update:model-value="togglePublish"
             />
           </div>
