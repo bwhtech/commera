@@ -101,7 +101,7 @@ PUBLIC_NAMES = {
 	],
 	"commera.sdk.format": ["IMAGE_WIDTHS", "image_url", "money", "product_url"],
 	"commera.sdk.orders": ["get_order", "get_orders", "record_shipment"],
-	"commera.sdk.shop": ["get_menu", "get_page", "get_shop", "get_sitemap", "list_countries"],
+	"commera.sdk.shop": ["get_menu", "get_page", "get_shop", "get_sitemap", "list_countries", "list_pages"],
 	"commera.sdk.types": [
 		"Address",
 		"Cart",
@@ -113,6 +113,7 @@ PUBLIC_NAMES = {
 		"CheckoutSummary",
 		"Collection",
 		"ContentPage",
+		"ContentPageLink",
 		"Country",
 		"CustomerAddress",
 		"CustomerProfile",

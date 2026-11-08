@@ -51,6 +51,8 @@ test('storefront pages get catalog and cart tools, checkout gets its own', async
 			'update_cart',
 			'clear_cart',
 			'proceed_to_checkout',
+			'list_store_pages',
+			'get_store_page',
 		],
 	);
 	assert.equal(storefront.tools.get('get_cart').annotations.readOnlyHint, true);
@@ -70,6 +72,8 @@ test('storefront pages get catalog and cart tools, checkout gets its own', async
 			'update_checkout',
 			'complete_checkout',
 			'navigate_to_storefront',
+			'list_store_pages',
+			'get_store_page',
 		],
 	);
 });
@@ -207,6 +211,22 @@ test('proceed_to_checkout opens checkout for a cart with lines', async () => {
 	});
 	await call_tool('proceed_to_checkout', {});
 	assert.deepEqual(browser.assigned, ['/en/cart/checkout']);
+});
+
+test('list_store_pages and get_store_page link each page', async () => {
+	const calls = add_fake_fetch({
+		list_pages: { body: { data: [{ handle: 'returns', title: 'Returns' }] } },
+		get_page: {
+			body: { data: { handle: 'returns', body_html: '<p>30 days</p>' } },
+		},
+	});
+	const list = await call_tool('list_store_pages', {});
+	assert.deepEqual(list.structuredContent.pages, [
+		{ handle: 'returns', title: 'Returns', url: '/ar/page/returns' },
+	]);
+	const page = await call_tool('get_store_page', { handle: 'returns' });
+	assert.match(calls[1].url, /shop\.get_page\?handle=returns&_lang=ar$/);
+	assert.equal(page.structuredContent.url, '/ar/page/returns');
 });
 
 test('a store error becomes a tool error and a bug still throws', async () => {

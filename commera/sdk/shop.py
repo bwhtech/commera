@@ -3,13 +3,23 @@ from frappe import _
 from frappe.utils.data import cint, cstr
 
 from commera.branding import get_brand_assets
-from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import get_page_by_route
-from commera.sdk.types import ContentPage, Country, FooterSection, Menu, MenuItem, Shop, Sitemap, SitemapEntry
+from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import get_page_by_route, get_page_content
+from commera.sdk.types import (
+	ContentPage,
+	ContentPageLink,
+	Country,
+	FooterSection,
+	Menu,
+	MenuItem,
+	Shop,
+	Sitemap,
+	SitemapEntry,
+)
 from commera.shop_data import get_storefront_menu
 from commera.utils import get_country_list, get_store_company, get_store_currency
 from commera.www.sitemap_segment import SEGMENT_CONFIG, get_segment_filters, get_urls_per_page
 
-__all__ = ["get_menu", "get_page", "get_shop", "get_sitemap", "list_countries"]
+__all__ = ["get_menu", "get_page", "get_shop", "get_sitemap", "list_countries", "list_pages"]
 
 SITEMAP_KINDS = tuple(SEGMENT_CONFIG)
 
@@ -76,14 +86,14 @@ def get_footer_menu_item(section: FooterSection) -> MenuItem:
 
 
 def get_page(handle: str) -> ContentPage | None:
-	"""A published Shop Web Page by its route, or None."""
+	"""A published Shop Web Page by its route, or None. The body is in the request language."""
 	page = get_page_by_route(cstr(handle))
 	if not page or not page.published:
 		return None
 	return {
 		"handle": page.route,
 		"title": page.meta_title or page.name,
-		"body_html": page.content or "",
+		"body_html": get_page_content(page) or "",
 		"seo": {
 			"title": page.meta_title,
 			"description": page.meta_description,
@@ -91,6 +101,18 @@ def get_page(handle: str) -> ContentPage | None:
 		},
 		"updated_at": str(page.modified),
 	}
+
+
+def list_pages() -> list[ContentPageLink]:
+	"""Every published Shop Web Page, by title."""
+	pages = frappe.get_all(
+		"Shop Web Page", filters={"published": 1}, fields=["name", "route", "meta_title", "modified"]
+	)
+	links = [
+		{"handle": page.route, "title": page.meta_title or page.name, "updated_at": str(page.modified)}
+		for page in pages
+	]
+	return sorted(links, key=lambda link: link["title"])
 
 
 def get_sitemap(kind: str | None = None, page: int = 1) -> Sitemap:

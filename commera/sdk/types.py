@@ -15,6 +15,7 @@ __all__ = [
 	"CheckoutSummary",
 	"Collection",
 	"ContentPage",
+	"ContentPageLink",
 	"Country",
 	"CustomerAddress",
 	"CustomerProfile",
@@ -489,6 +490,12 @@ class ContentPage(TypedDict):
 	title: str
 	body_html: str
 	seo: dict
+	updated_at: str
+
+
+class ContentPageLink(TypedDict):
+	handle: str
+	title: str
 	updated_at: str
 
 
