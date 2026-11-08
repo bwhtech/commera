@@ -171,11 +171,15 @@ def validate_can_cancel(order_doc):
 	if order_doc.status == "Completed":
 		frappe.throw(_("Order already delivered!"))
 
-	if frappe.db.exists("Delivery Note Item", {"against_sales_order": order_doc.name, "docstatus": ["<", 2]}):
+	# Locking reads: under REPEATABLE READ a plain read can miss one committed while the order lock waited.
+	live = {"against_sales_order": order_doc.name, "docstatus": ["<", 2]}
+	if frappe.db.get_value("Delivery Note Item", live, "name", for_update=True):
 		frappe.throw(_("This order is already being prepared for shipment."))
 
 	# A carrier booking made straight from the order, with no Delivery Note, would stay live.
-	if frappe.db.exists("Shipment", {"custom_sales_order": order_doc.name, "docstatus": ["<", 2]}):
+	if frappe.db.get_value(
+		"Shipment", {"custom_sales_order": order_doc.name, "docstatus": ["<", 2]}, "name", for_update=True
+	):
 		frappe.throw(_("This order is already being prepared for shipment."))
 
 	if not is_shoppers_order(order_doc):
