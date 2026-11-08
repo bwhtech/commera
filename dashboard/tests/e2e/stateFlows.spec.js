@@ -170,6 +170,45 @@ describe('state flows', () => {
     assert.ok(!(await text(page)).includes('1 order selected'), 'row 15 stayed selected after it left the page')
   })
 
+  uiTest(session, 'orders: a reload that moves a selected order off the page drops it from the selection', async () => {
+    const { page } = session
+    await goto(page, '/orders')
+    await clickByText(page, 'button', 'Select')
+    const rows = await page.$$('a[data-slot=list-row]')
+    await rows[0].click()
+    await waitFor(async () => (await text(page)).includes('1 order selected'), { label: 'the selection' })
+
+    // The order is refused, so the run restores it; the reload then no longer has it on this page.
+    const reply = await page.evaluate(async () => {
+      const response = await fetch('/api/v2/method/commera.api.admin.orders.get_orders?' + new URLSearchParams({ start: 0, page_length: 20 }), { headers: { Accept: 'application/json' } })
+      return response.json()
+    })
+    reply.data.orders = reply.data.orders.slice(1)
+    let shifted = false
+    const onRequest = (request) => {
+      if (request.isInterceptResolutionHandled()) return
+      if (request.url().includes('orders.fulfil_order')) {
+        shifted = true
+        return request.respond({ status: 417, contentType: 'application/json', body: JSON.stringify({ errors: [{ type: 'ValidationError', message: 'Order is on hold' }] }) })
+      }
+      if (shifted && request.url().includes('orders.get_orders')) {
+        return request.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(reply) })
+      }
+      request.continue()
+    }
+    await page.setRequestInterception(true)
+    page.on('request', onRequest)
+    try {
+      await (await findByText(page, 'button', 'Mark fulfilled')).click()
+      await waitFor(async () => (await text(page)).includes('failed'), { label: 'the summary toast' })
+      await wait(1000)
+      assert.ok(!(await text(page)).includes('1 order selected'), 'an order no longer on the page stayed selected')
+    } finally {
+      page.off('request', onRequest)
+      await page.setRequestInterception(false)
+    }
+  })
+
   uiTest(session, 'bulk fulfil: one run at a time, a refusal does not stop it, and the list reloads', async () => {
     const { page } = session
     await goto(page, '/orders')

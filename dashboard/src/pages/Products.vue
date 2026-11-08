@@ -107,6 +107,17 @@ const rows = computed(() => {
   })
 })
 
+// A reload can move a selected row off this page (an archive, a new order): keep only the rows shown.
+watch(
+  () => productsRequest.data,
+  (data) => {
+    if (!data) return
+    const shown = new Set(rows.value.map((row) => row.name))
+    const kept = selection.value.filter((name) => shown.has(name))
+    if (kept.length !== selection.value.length) selection.value = kept
+  },
+)
+
 // "Change the filters" is a lie on a store with an empty catalogue, which is the
 // state this list is most often first seen in.
 const isFiltered = computed(
