@@ -7,15 +7,16 @@
     md:text-base capitalize',
     modal_header='Apply a promo code', header_alignment='center',modal_classes='w-fit') %}
         <div class="p-10 w-full">
-            <div class="relative w-full" x-data="{ coupon_code: '' }">
+            <div class="relative w-full" x-data="{ coupon_code: '', status: 'idle' }">
                 <input type="text"
                     class="w-full border-outline bg-white border border-gray-300 rounded-xl px-2 py-2 pl-5 pr-30 text-sm text-gray-400  focus:outline-none disabled:cursor-not-allowed disabled:opacity-75  cursor-pointer"
                     name="prompt" placeholder="Apply Code" x-model="coupon_code" />
                 <button type="button"
                     class="absolute right-0 top-1/2 -translate-y-1/2 cursor-pointer bg-red-800 rounded-xl p-2 px-5 text-base tracking-wide text-white transition hover:opacity-75  active:outline-offset-0 flex items-center disabled:cursor-not-allowed disabled:opacity-75"
-                    @click="apply_coupon(coupon_code,$refs)" x-ref="apply_coupon_ref">Apply 
-                    <span
-                        class="hidden animate-spin size-5 border-3 border-current border-t-transparent rounded-full ms-2"
+                    :disabled="status !== 'idle' || $store.cart.saving_code"
+                    @click="apply_coupon(coupon_code, $data)">{{ _("Apply") }}
+                    <span x-show="status !== 'idle'" x-cloak
+                        class="animate-spin size-5 border-3 border-current border-t-transparent rounded-full ms-2"
                         role="status" aria-label="loading">
                     </span>
                 </button>
@@ -25,28 +26,25 @@
 
 
 <script defer>
-    async function apply_coupon(coupon_code, ref) {
+    // state.status: "idle", "saving", then "leaving" while the page reloads to show the code's totals.
+    async function apply_coupon(coupon_code, state) {
+        if (state.status !== "idle") return;
         if (!coupon_code) {
             toast({{ _("Please enter a coupon code") | tojson }}, { type: "warning" })
             return;
         }
-        const btn = ref.apply_coupon_ref
-        const spinner = btn.querySelector(".animate-spin");
-        btn.disabled = true;
-        spinner.classList.remove("hidden");
-        try {
-            if (!await Alpine.store("cart").add_discount_code(coupon_code)) return;
-            confetti({
-                particleCount: 100,
-                spread: 70,
-                origin: { y: 0.6 }
-            });
-            window.location.reload()
+        state.status = "saving";
+        if (!await Alpine.store("cart").add_discount_code(coupon_code)) {
+            state.status = "idle";
+            return;
         }
-        finally {
-            btn.disabled = false;
-            spinner.classList.add("hidden");
-        }
+        state.status = "leaving";
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+        });
+        window.location.reload()
     }
     // The checkout totals are drawn by the server, so the page reloads to show them without the code.
     async function remove_discount_code(code) {

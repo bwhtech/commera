@@ -6,10 +6,24 @@
         let is_sync_queued = false;
         let synced_snapshot = null;
         let loaded = null;
+        let resolve_loaded = null;
         let is_loaded = false;
         let code_save = null;
+        let code_queue = null;
         let priced_request = 0;
+        let retry_timer = null;
+        let retry_count = 0;
+        const MAX_RETRIES = 5;
         const get_snapshot = items => JSON.stringify(items.map(item => [item.variant?.item_code, item.qty, item.selected]));
+        // null when the stock is unknown or unlimited: the server is the judge then.
+        const stock_of = variant => {
+            const detail = variant?.stock_detail;
+            if (!detail || detail.unlimited) return null;
+            return Math.max(Math.floor(Number(detail.stock_qty) || 0), 0);
+        };
+        const stock_warning = stock => stock
+            ? {{ _("Only {0} left in stock.") | tojson }}.replace("{0}", stock)
+            : {{ _("This item is out of stock.") | tojson }};
         Alpine.store('cart', {
             items: Alpine.$persist([]),
             // The server cart's version this browser last saw; the server cart wins when they differ.
@@ -20,6 +34,12 @@
             priced: null,
             wants_pricing: false,
             saving_code: null,
+            // 'loading' until the server cart has been read; 'retrying' after a failed read.
+            load_status: 'loading',
+            // 'offline' holds edits the server could not be reached for; they are retried.
+            sync_status: 'idle',
+            pricing_status: 'idle',
+            updating_variant: null,
             init() {
                 this.items.forEach(item => { item.selected ??= true; });
                 let is_first_run = true;
@@ -36,7 +56,10 @@
                     clearTimeout(sync_timer);
                     sync_timer = setTimeout(() => this.sync(), 400);
                 });
-                loaded = this.load_server_cart();
+                loaded = new Promise(resolve => { resolve_loaded = resolve; });
+                this.load_server_cart();
+                window.addEventListener('online', () => this.retry_now());
+                window.addEventListener('storage', event => this.take_other_tab_cart(event));
                 // The storefront SDK (an agent's WebMCP tools) changed the server cart: it wins, as on a conflict.
                 window.addEventListener('commera:cart-updated', async () => {
                     clearTimeout(sync_timer);
@@ -45,19 +68,65 @@
                     await this.restore_server_cart();
                 });
             },
+            // Another tab has synced the cart. Taking its cart keeps this tab's next sync from being a conflict.
+            take_other_tab_cart(event) {
+                if (event.storageArea !== localStorage || event.key !== 'commera_cart_version') return;
+                if (!is_loaded || this.is_dirty || sync_chain) return;
+                let items;
+                let version;
+                try {
+                    items = JSON.parse(localStorage.getItem('_x_items'));
+                    version = JSON.parse(event.newValue);
+                } catch (error) {
+                    return;
+                }
+                if (!Array.isArray(items) || version === this.version) return;
+                synced_snapshot = get_snapshot(items);
+                this.items = items;
+                this.version = version;
+                this.is_dirty = false;
+                if (this.wants_pricing) this.load_priced();
+            },
+            // A failed read or an unsent edit tries again a few times with a growing delay, and at once when the
+            // browser is back online. An offline browser only waits for that, so it does not stack up error toasts.
+            schedule_retry() {
+                clearTimeout(retry_timer);
+                if (retry_count >= MAX_RETRIES) return;
+                retry_timer = setTimeout(() => {
+                    if (navigator.onLine === false) return;
+                    retry_count++;
+                    this.retry_now();
+                }, Math.min(2000 * 2 ** retry_count, 30000));
+            },
+            retry_now() {
+                clearTimeout(retry_timer);
+                retry_timer = null;
+                if (this.load_status === 'retrying') this.load_server_cart();
+                else if (this.sync_status === 'offline') this.sync();
+            },
             // Pages that change the cart on load wait for this, or it puts the old server cart back.
             wait_until_loaded() {
                 return loaded;
             },
+            // Until the server cart is read, edits wait: one sent before would carry no version and drop the server's cart.
             async load_server_cart() {
+                if (this.load_status === 'ready') return;
+                this.load_status = 'loading';
                 let server_cart;
                 try {
                     server_cart = (await frappe_call("/api/v2/method/commera.api.server_cart.get_server_cart", {})).data;
                 } catch (error) {
+                    this.load_status = 'retrying';
+                    this.schedule_retry();
                     return;
-                } finally {
-                    is_loaded = true;
                 }
+                is_loaded = true;
+                retry_count = 0;
+                this.load_status = 'ready';
+                await this.take_server_cart(server_cart);
+                resolve_loaded();
+            },
+            async take_server_cart(server_cart) {
                 if (!server_cart) {
                     if (this.items.length) await this.sync();
                     return;
@@ -96,9 +165,16 @@
                 if (code_save) await code_save;
                 const snapshot = get_snapshot(this.items);
                 const items = this.items.map(item => ({ item_code: item.variant.item_code, qty: item.qty, selected: item.selected }));
+                this.sync_status = 'saving';
                 try {
                     const response = (await frappe_call("/api/v2/method/commera.api.server_cart.sync_server_cart", { items, version: this.version })).data;
+                    this.sync_status = 'idle';
+                    retry_count = 0;
                     if (response.conflict) {
+                        // Another tab or device changed the cart first; its cart wins, so say so.
+                        if (get_snapshot(response.lines.map(line => ({ variant: line.variant, qty: line.qty, selected: line.selected ?? true }))) !== snapshot) {
+                            toast({{ _("Your cart was changed in another tab, so it now shows the latest cart.") | tojson }}, { type: "warning" });
+                        }
                         this.apply_server_cart(response);
                         return;
                     }
@@ -107,8 +183,14 @@
                     this.is_dirty = get_snapshot(this.items) !== snapshot;
                 } catch (error) {
                     // frappe_call has shown the error. A refused cart goes back to the server's; an unsent one
-                    // stays dirty, so the next page load sends it again.
-                    if (error.type) await this.restore_server_cart();
+                    // stays dirty and is sent again.
+                    if (error.type) {
+                        this.sync_status = 'idle';
+                        await this.restore_server_cart();
+                    } else {
+                        this.sync_status = 'offline';
+                        this.schedule_retry();
+                    }
                 }
             },
             async restore_server_cart() {
@@ -126,12 +208,27 @@
             async load_priced() {
                 this.wants_pricing = true;
                 const request = ++priced_request;
+                this.pricing_status = 'loading';
                 try {
                     const priced = (await frappe_call("/api/v2/method/commera.api.server_cart.get_priced_server_cart", {})).data;
-                    if (request === priced_request) this.priced = priced;
-                } catch (error) {}
+                    if (request !== priced_request) return;
+                    this.priced = priced;
+                    this.pricing_status = 'ready';
+                } catch (error) {
+                    if (request === priced_request) this.pricing_status = 'failed';
+                }
             },
-            // Only while the priced cart is the cart on screen, so the rows never belong to an older cart.
+            // The priced cart is the cart on screen: no edit is waiting and the server priced this version.
+            // Totals, discounts and delivery are only shown as final then, so they never mix two carts.
+            get is_priced_current() {
+                if (!this.items.length) return true;
+                return Boolean(this.priced) && this.priced.version === this.version && !this.is_dirty;
+            },
+            // 'pending' while prices are on their way, 'failed' when they could not be read, then 'free' or 'charged'.
+            get delivery_status() {
+                if (!this.is_priced_current) return this.pricing_status === 'failed' ? 'failed' : 'pending';
+                return this.is_delivery_charged ? 'charged' : 'free';
+            },
             get discounts() {
                 if (!this.priced || this.priced.version !== this.version) return [];
                 return this.priced.discounts || [];
@@ -147,8 +244,11 @@
                 return this.save_discount_code("remove_discount_code", code);
             },
             // Only the codes change, so the priced cart that comes back is the cart on screen at its new version.
+            // One code at a time: a second one waits for the first instead of being dropped.
             async save_discount_code(method, code) {
-                if (this.saving_code) return null;
+                while (code_queue) await code_queue;
+                let release_queue;
+                code_queue = new Promise(resolve => { release_queue = resolve; });
                 this.saving_code = code;
                 let resolve_code_save;
                 try {
@@ -165,6 +265,8 @@
                     code_save = null;
                     resolve_code_save?.();
                     this.saving_code = null;
+                    code_queue = null;
+                    release_queue();
                 }
             },
             // The server judges it after discounts; null while unpriced or when the store has no free-delivery band.
@@ -195,7 +297,7 @@
                     price: line.price,
                     default_price: line.default_price,
                     brand: line.brand,
-                    stock_qty: line.variant.stock_detail?.stock_qty ?? 0,
+                    stock_qty: stock_of(line.variant),
                     selected: line.selected ?? true,
                     sizes: line.sizes,
                 }));
@@ -204,13 +306,25 @@
                 this.is_dirty = false;
                 if (this.wants_pricing) this.load_priced();
             },
+            // Returns how many it added: fewer than asked when the stock runs out, after a warning.
             add(item, variant, price = 0,default_price=0, brand = '',sizes=[],qty=1) {
                 let already_added = false;
                 variant = JSON.parse(variant)
+                const stock = stock_of(variant);
+                const in_cart = this.items
+                    .filter(cart_item => cart_item.variant?.item_code === variant?.item_code)
+                    .reduce((sum, cart_item) => sum + cart_item.qty, 0);
+                if (stock !== null && in_cart + qty > stock) {
+                    toast(stock_warning(stock), { type: "warning" });
+                    qty = Math.max(stock - in_cart, 0);
+                    if (!qty) return 0;
+                }
                 for (let cart_item of this.items) {
-                    if (cart_item.item.name === item.name &&
-                        JSON.stringify(cart_item.variant) === JSON.stringify(variant)) {
+                    // By item code: the stock stamped on a variant changes, the line it belongs to does not.
+                    if (cart_item.variant?.item_code === variant?.item_code) {
+                        cart_item.variant = variant;
                         cart_item.qty += qty;
+                        cart_item.stock_qty = stock;
                         cart_item.price = price;
                         cart_item.default_price = default_price;
                         cart_item.brand = brand
@@ -227,7 +341,7 @@
                         price: price,
                         default_price: default_price,
                         brand: brand,
-                        stock_qty: 0,
+                        stock_qty: stock,
                         selected: true,
                         sizes: sizes,
                     });
@@ -255,6 +369,7 @@
                     value: line_value,
                     currency: window.ls_currency
                 });
+                return qty;
             },
             async fetch_detail_for_cart() {
                 try {
@@ -296,12 +411,13 @@
                     cart_item.item.name === name &&
                     JSON.stringify(cart_item.variant) === JSON.stringify(variant)
                 );
-                if (!found_item) return;
-                if (found_item.stock_qty !== null && (found_item.qty + 1) > found_item.stock_qty) {
-                    toast(`Only ${found_item.stock_qty} left in stock.`, { type: "warning" });
-                    return;
+                if (!found_item) return false;
+                if (found_item.stock_qty != null && (found_item.qty + 1) > found_item.stock_qty) {
+                    toast(stock_warning(found_item.stock_qty), { type: "warning" });
+                    return false;
                 }
                 found_item.qty += 1;
+                return true;
             },
 
             decrement(name, variant) {
@@ -367,35 +483,47 @@
                     window.prompt({{ _("Copy this cart link") | tojson }}, url);
                 }
             },
+            // Swaps the line to another size, keeping its quantity as far as stock allows. Resolves true once the
+            // server has the change and the page reloads to show it; false leaves the line as it was.
             async update_variant(cart_item, selected_size) {
-                const item_name = cart_item.item.name;
-                const reponse = await frappe_call("/api/v2/method/commera.api.cart.update_variant", { product_name: item_name, size: selected_size });
-                const data = reponse.data;
-                const new_variant = {
-                    item_code: data.variant.item_code,
-                    size: data.variant.size,
-                    stock_detail: data.variant.stock_detail || {},
-                };
-                const existing_item = this.items.find(item =>
-                    item.item.name === item_name &&
-                    JSON.stringify(item.variant) === JSON.stringify(new_variant) &&
-                    item !== cart_item
-                );
-                if (existing_item) {
-                    this.increment(existing_item.item.name, new_variant)
-                    existing_item.price = data.price || 0;
-                    existing_item.default_price = data.default_price || 0;
-
-                    this.items = this.items.filter(item => item !== cart_item);
+                if (this.updating_variant) return false;
+                this.updating_variant = cart_item.variant.item_code;
+                let is_leaving = false;
+                try {
+                    const data = (await frappe_call("/api/v2/method/commera.api.cart.update_variant", { product_name: cart_item.item.name, size: selected_size })).data;
+                    const new_variant = {
+                        item_code: data.variant.item_code,
+                        size: data.variant.size,
+                        stock_detail: data.variant.stock_detail || {},
+                    };
+                    if (new_variant.item_code === cart_item.variant.item_code) return true;
+                    const stock = stock_of(new_variant);
+                    const existing_item = this.items.find(item => item !== cart_item && item.variant.item_code === new_variant.item_code);
+                    const wanted = cart_item.qty + (existing_item ? existing_item.qty : 0);
+                    const qty = stock === null ? wanted : Math.min(wanted, stock);
+                    if (qty < 1) {
+                        toast(stock_warning(0), { type: "warning" });
+                        return false;
+                    }
+                    if (qty < wanted) toast(stock_warning(stock), { type: "warning" });
+                    const target = existing_item || cart_item;
+                    target.variant = new_variant;
+                    target.qty = qty;
+                    target.stock_qty = stock;
+                    target.price = data.price || 0;
+                    target.default_price = data.default_price || 0;
+                    if (existing_item) this.items = this.items.filter(item => item !== cart_item);
+                    // The effect marks the cart dirty on Alpine's next flush; the reload must wait for the sync.
+                    await Alpine.nextTick();
+                    if (!await this.flush_sync()) return false;
+                    is_leaving = true;
+                    window.location.reload();
+                    return true;
+                } catch (error) {
+                    return false;
+                } finally {
+                    if (!is_leaving) this.updating_variant = null;
                 }
-
-                else {
-                    cart_item.variant = new_variant;
-                    cart_item.qty = 1;
-                    cart_item.price = data.price || 0;
-                    cart_item.default_price = data.default_price || 0;
-                }
-                window.location.reload();
             }
 
         });

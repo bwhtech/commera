@@ -3,12 +3,17 @@
     opened_with_keyboard: false,
     selected_option: { value: cart_item.variant.size, label: cart_item.variant.size },
     options: cart_item.sizes.filter(s => s.stock_detail.in_stock === 1).map(s => ({ value: s.size, label: s.size })),
-    set_selected_option(option) {
+    async set_selected_option(option) {
+        const previous = this.selected_option;
         this.selected_option = option;
         this.is_open = false;
         this.opened_with_keyboard = false;
         this.$refs.hidden_text_field.value = option.value;
-        $store.cart.update_variant(cart_item, option.value); // Trigger size update
+        // A refused or failed swap leaves the line on its old size.
+        if (!await $store.cart.update_variant(cart_item, option.value)) {
+            this.selected_option = previous;
+            this.$refs.hidden_text_field.value = previous?.value || '';
+        }
     },
     highlight_first_matching_option(pressed_key) {
         const option = this.options.find(item =>
@@ -25,7 +30,7 @@
     x-on:keydown.esc.window="is_open = false, opened_with_keyboard = false">
 
     <div class="relative">
-        <button type="button" role="combobox"
+        <button type="button" role="combobox" :disabled="$store.cart.updating_variant"
             class="inline-flex w-full items-center justify-between gap-2  cursor-pointer py-1 text-xs md:text-sm text-gray-900 bg-white"
             x-on:click="is_open = !is_open" x-on:keydown.down.prevent="opened_with_keyboard = true"
             x-on:keydown.enter.prevent="opened_with_keyboard = true"

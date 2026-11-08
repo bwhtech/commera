@@ -9,8 +9,13 @@ document.addEventListener('alpine:init', () => {
 		open_branches: [],
 		cart_detail_loaded: false,
 		bottom_bar_active: false,
+		// The drawer's Checkout: 'idle', 'saving' while the cart's last edit lands, 'leaving' once checkout loads.
+		checkout_status: 'idle',
 
 		init() {
+			window.addEventListener('pageshow', (event) => {
+				if (event.persisted) this.checkout_status = 'idle';
+			});
 			/* Below 768px style.css parks .extra-nav off the bottom edge and slides it up on .active,
 			   which upstream stamps from a jQuery scroll handler. A sentinel reads the same moment. */
 			const observer = new IntersectionObserver((entries) => {
@@ -57,6 +62,18 @@ document.addEventListener('alpine:init', () => {
 			this.menu_open = false;
 			this.search_open = false;
 			this.cart_open = false;
+		},
+
+		/* Checkout builds from the server cart, so an edit still waiting on the debounce must land first. */
+		async go_to_checkout(url) {
+			if (this.checkout_status !== 'idle') return;
+			this.checkout_status = 'saving';
+			if (!(await Alpine.store('cart').flush_sync())) {
+				this.checkout_status = 'idle';
+				return;
+			}
+			this.checkout_status = 'leaving';
+			window.location.href = url;
 		},
 	}));
 });

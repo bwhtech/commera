@@ -76,7 +76,9 @@
 								<h5 class="mb-0">{{ get_currency_symbol() }}<span x-text="$store.cart.total.toFixed(2)"></span></h5>
 							</div>
 							<div class="mt-auto">
-								<a href="/{{ language }}/cart/checkout" class="btn btn-outline-secondary btn-block m-b20">{{ _("Checkout") }}</a>
+								<a href="/{{ language }}/cart/checkout" class="btn btn-outline-secondary btn-block m-b20"
+									:class="checkout_status !== 'idle' && 'disabled'" :aria-disabled="checkout_status !== 'idle'"
+									@click.prevent="go_to_checkout($el.href)">{{ _("Checkout") }}</a>
 								<a href="/{{ language }}/cart" class="btn btn-secondary btn-block">{{ _("View Cart") }}</a>
 							</div>
 						</div>
