@@ -78,7 +78,8 @@
 
 	<div x-cloak x-show="status === 'pending' || status === 'failed'" class="flex flex-col items-start gap-4">
 		<h1 class="text-8xl"><span x-show="status === 'pending'">{{ _("Payment pending") }}</span><span x-show="status === 'failed'">{{ _("Payment not completed") }}</span></h1>
-		<p x-show="status === 'pending'" class="text-p-base text-ink-gray-6">{{ _("We are waiting for your payment to be confirmed. Refresh this page in a minute.") }}</p>
+		<p x-show="is_still_polling" class="text-p-base text-ink-gray-6" role="status">{{ _("We are waiting for your payment to be confirmed. This page updates by itself.") }}</p>
+<p x-cloak x-show="status === 'pending' && !is_still_polling" class="text-p-base text-ink-gray-6">{{ _("This is taking longer than usual. Refresh this page in a minute, or check your orders.") }}</p>
 		<p x-show="status === 'failed'" class="text-p-base text-ink-gray-6">{{ _("We could not confirm a payment for this order. Your cart is still saved.") }}</p>
 		<a href="/{{ language }}/cart/checkout" class="inline-flex h-11 items-center justify-center rounded-lg bg-brand px-6 text-lg font-medium text-on-brand hover:bg-brand-hover">{{ _("Back to checkout") }}</a>
 	</div>
