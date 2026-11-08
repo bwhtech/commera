@@ -183,7 +183,9 @@ function product_form(product) {
 		sync_image_with_scroll() {
 			const gallery = this.$refs.gallery;
 			if (gallery.scrollWidth <= gallery.clientWidth) return;
-			this.image = Math.round(Math.abs(gallery.scrollLeft) / gallery.clientWidth);
+			this.image = Math.round(
+				Math.abs(gallery.scrollLeft) / gallery.clientWidth,
+			);
 		},
 
 		save(change, action) {
@@ -202,7 +204,9 @@ function product_form(product) {
 					{ item_code: this.variant.id, qty: this.qty },
 				]);
 				this.added = true;
-				setTimeout(() => (this.added = false), 1500);
+				setTimeout(() => {
+					this.added = false;
+				}, 1500);
 				globalThis.dispatchEvent(
 					new CustomEvent('open-cart', { detail: { added: true } }),
 				);
@@ -496,7 +500,7 @@ function checkout(config) {
 								? await commera.checkout.set_store_pickup({
 										warehouse: this.pickup_location,
 										email,
-								  })
+									})
 								: await commera.checkout.set_addresses({
 										billing_address: this.address_input(
 											this.billing_same ? 'shipping' : 'billing',
@@ -505,7 +509,7 @@ function checkout(config) {
 											? undefined
 											: this.address_input('shipping'),
 										email,
-								  });
+									});
 						await this.load_options();
 						this.editing_address = false;
 					}),
