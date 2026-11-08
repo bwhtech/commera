@@ -4,7 +4,7 @@
 {% set language = frappe.lang or "en" %}
 {% set is_guest = frappe.session.user == "Guest" %}
 
-<div x-data="{ open: false }" x-init="matchMedia('(width >= 80rem)').addEventListener('change', (event) => event.matches && (open = false))" x-cloak x-show="open" {{ overlay() }} @open-menu.window="open = true" @keydown.escape.window="open = false"
+<div x-data="{ open: false }" x-init="matchMedia('(width >= 80rem)').addEventListener('change', (event) => { if (event.matches && open) { open = false; $nextTick(() => [...document.querySelectorAll('header a, header button')].find((element) => element.offsetParent)?.focus()) } })" x-cloak x-show="open" {{ overlay() }} @open-menu.window="open = true" @keydown.escape.window="open = false"
     @open-cart.window="open = false" @open-search.window="open = false" @open-auth.window="open = false" class="fixed inset-0 z-50 xl:hidden" role="dialog" aria-modal="true" aria-label="{{ _('Menu') }}">
 	<div x-show="open" {{ scrim() }} @click="open = false" class="absolute inset-0 cursor-pointer bg-surface-alpha-gray-6"></div>
 	<nav x-show="open" x-trap.noscroll="open" {{ drawer("start") }} class="absolute inset-y-0 start-0 flex w-80 max-w-[85vw] flex-col overflow-y-auto bg-surface-elevation-1 shadow-xl" aria-label="{{ _('Menu') }}">

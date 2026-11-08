@@ -9,7 +9,7 @@
 
 <header x-data="{ scrolled: false }" @scroll.window.passive="scrolled = scrollY > 8" class="sticky top-0 z-40">
 	<div aria-hidden="true" :class="scrolled ? 'border-outline-gray-2 bg-surface-base/95 backdrop-blur-md backdrop-saturate-150' : 'border-transparent bg-surface-base'" class="absolute inset-0 -z-10 border-b transition-[background-color,border-color,backdrop-filter] duration-300"></div>
-	<div class="{{ 'flex items-center gap-6' if logo_at_start else 'grid grid-cols-[1fr_auto_1fr] items-center' }} section-x h-[var(--header-height)] max-md:!px-3 md:max-lg:!px-9">
+	<div class="{{ 'flex items-center gap-6' if logo_at_start else 'grid grid-cols-[1fr_auto_1fr] items-center' }} section-x h-[var(--header-height)] max-md:!px-2 md:max-lg:!px-9">
 		<div class="flex items-center gap-1 lg:-ms-2.5 xl:-ms-3">
 			<button type="button" @click="$dispatch('open-menu')" class="icon-button xl:hidden" aria-label="{{ _('Menu') }}">{{ icon("menu") }}</button>
 			{% for item in menu_items %}
