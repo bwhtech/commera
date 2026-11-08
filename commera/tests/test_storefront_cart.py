@@ -16,11 +16,13 @@ from commera.api.storefront.cart import (
 	get_checkout_url,
 	open_checkout,
 	remove_lines,
+	set_lines,
 	update_lines,
 )
-from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
+from commera.commera_ecommerce.doctype.commera_cart.commera_cart import clear_ordered_cart, get_session_cart
 from commera.guest import CART_TOKEN_HEADER, GUEST_CART_COOKIE
 from commera.sdk import cart as cart_sdk
+from commera.sdk.cart import CartChangedError
 from commera.sdk.types import CartLineProduct, PricedCart, PricedCartLine
 from commera.tests.test_order_access import make_website_user
 from commera.tests.test_product_details import ProductDetailPriceTestCase
@@ -104,6 +106,89 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 
 		query = parse_qs(urlsplit(get_checkout_url()["path"]).query)
 		self.assertEqual(query["_lang"], ["ar"])
+
+	def test_set_lines_starts_a_cart_from_no_revision(self):
+		cart = set_lines([{"item_code": self.item_code, "qty": 2}], None)
+
+		self.assertEqual([(line["item_code"], line["qty"]) for line in cart["lines"]], [(self.item_code, 2)])
+
+	def test_set_lines_keeps_listed_lines_adds_new_ones_and_drops_the_rest(self):
+		other_item = self.make_other_item()
+		cart = add_lines([{"item_code": self.item_code, "qty": 1}, {"item_code": other_item, "qty": 1}])
+		kept = cart["lines"][0]["line_id"]
+
+		cart = set_lines([{"line_id": kept, "qty": 3}], cart["revision"])
+		self.assertEqual([(line["line_id"], line["qty"]) for line in cart["lines"]], [(kept, 3)])
+
+		cart = set_lines([{"item_code": other_item, "qty": 2}], cart["revision"])
+		self.assertEqual([(line["item_code"], line["qty"]) for line in cart["lines"]], [(other_item, 2)])
+
+	def test_set_lines_with_a_stale_revision_changes_nothing(self):
+		cart = add_lines([{"item_code": self.item_code, "qty": 1}])
+
+		for revision in (cart["revision"] - 1, None):
+			with self.subTest(revision=revision), self.assertRaises(CartChangedError):
+				set_lines([], revision)
+		self.assertEqual(get_cart()["lines"][0]["qty"], 1)
+		self.assertEqual(get_cart()["revision"], cart["revision"])
+
+	def test_a_placed_order_makes_an_earlier_replacement_stale(self):
+		cart = add_lines([{"item_code": self.item_code, "qty": 1}])
+		quotation = frappe._dict(custom_guest_cart_key=get_session_cart().cart_key)
+
+		clear_ordered_cart(quotation, None)
+
+		self.assertEqual(get_cart()["version"], cart["version"])
+		with self.assertRaises(CartChangedError):
+			set_lines([{"item_code": self.item_code, "qty": 1}], cart["revision"])
+		self.assertEqual(get_cart()["lines"], [])
+
+	def test_set_lines_refuses_an_unknown_line_and_an_item_not_for_sale(self):
+		frappe.set_user("Administrator")
+		unlisted = self.make_item("UNLISTED-SET")
+		self.send_token(self.token)
+		cart = add_lines([{"item_code": self.item_code, "qty": 1}])
+
+		with self.assertRaises(frappe.DoesNotExistError):
+			set_lines([{"line_id": "no-such-line", "qty": 1}], cart["revision"])
+		with self.assertRaisesRegex(frappe.ValidationError, "is not for sale"):
+			set_lines([{"item_code": unlisted, "qty": 1}], cart["revision"])
+
+	def test_set_lines_drops_a_kept_line_at_zero_and_refuses_a_new_one(self):
+		cart = add_lines([{"item_code": self.item_code, "qty": 2}])
+		line_id = cart["lines"][0]["line_id"]
+
+		with self.assertRaisesRegex(frappe.ValidationError, "new line 1 or more"):
+			set_lines([{"item_code": self.item_code, "qty": 0}], cart["revision"])
+		with self.assertRaisesRegex(frappe.ValidationError, "qty for every line"):
+			set_lines([{"line_id": line_id}], cart["revision"])
+
+		self.assertEqual(set_lines([{"line_id": line_id, "qty": 0}], cart["revision"])["lines"], [])
+
+	def test_a_stale_first_write_sets_no_cart_cookie(self):
+		self.send_token(None)
+
+		with self.assertRaises(CartChangedError):
+			set_lines([{"item_code": self.item_code, "qty": 1}], 5)
+		self.assertNotIn(GUEST_CART_COOKIE, frappe.local.cookie_manager.cookies)
+
+	def test_set_lines_to_nothing_without_a_cart_makes_none(self):
+		self.assertIsNone(set_lines([], None))
+		self.assertIsNone(get_session_cart())
+
+	def make_other_item(self) -> str:
+		frappe.set_user("Administrator")
+		route = self.make_priced_variant("CARTB", default_rate=20, sale_rate=None)
+		item_code = frappe.db.get_value(
+			"Color Size Item",
+			{"parent": frappe.db.get_value("Style Attribute Variant", {"route": route})},
+			"item_code",
+		)
+		frappe.get_doc(
+			{"doctype": "Bin", "item_code": item_code, "warehouse": self.warehouse, "actual_qty": 10}
+		).insert(ignore_permissions=True)
+		self.send_token(self.token)
+		return item_code
 
 	def test_a_checkout_code_moves_the_cart_to_a_new_browser_token_once(self):
 		add_lines([{"item_code": self.item_code, "qty": 1}])

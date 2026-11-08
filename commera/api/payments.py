@@ -7,7 +7,7 @@ from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_ent
 from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import getdate, validate_email_address
-from frappe.utils.data import cstr, flt, fmt_money
+from frappe.utils.data import cint, cstr, flt, fmt_money, sha256_hash
 
 from commera.analytics.events import log_purchase, set_attribution_fields
 from commera.api.cart import validate_stock_available
@@ -160,8 +160,13 @@ def initiate_checkout_with_mode(
 
 
 def open_checkout(
-	quotation, payment_mode: str, delivery_option: str | None = None, expected_total: float | None = None
+	quotation,
+	payment_mode: str,
+	delivery_option: str | None = None,
+	expected_total: float | None = None,
+	is_reviewed: bool = False,
 ):
+	"""`is_reviewed`: the buyer approved this checkout in a review, so cash on delivery must place it as is."""
 	validate_delivery_option(quotation, delivery_option)
 	validate_cart_is_not_in_checkout(quotation.name)
 	quotation.flags.strict_plugin_fees = True
@@ -174,11 +179,11 @@ def open_checkout(
 	if is_cod(payment_mode):
 		if COD_PAYMENT_MODE not in payment_methods:
 			refuse_payment(_("Cash on delivery is not available."), quotation.name)
+		payable_total = get_payable_total(quotation, payment_mode)
 		frappe.cache.set_value(
-			get_cod_total_key(quotation.name),
-			get_payable_total(quotation, payment_mode),
-			expires_in_sec=COD_TOTAL_TTL_SECONDS,
+			get_cod_total_key(quotation.name), payable_total, expires_in_sec=COD_TOTAL_TTL_SECONDS
 		)
+		save_cod_review(quotation.name, payable_total if is_reviewed else None)
 		return {"order_url": get_confirmation_url(quotation.name, payment_mode=COD_PAYMENT_MODE)}
 
 	gateway = resolve_payment_mode(payment_mode)
@@ -319,9 +324,61 @@ def get_cod_total_key(quotation_name: str) -> str:
 	return f"commera:cod_total:{quotation_name}"
 
 
+REVIEWED_CHECKOUT_FIELD = "custom_reviewed_checkout"
+REVIEWED_TOTAL_FIELD = "custom_reviewed_total"
+VERSIONED_ADDRESS_FIELDS = ("address_line1", "address_line2", "city", "state", "pincode", "country", "phone")
+
+
+def get_checkout_version(quotation) -> str:
+	"""A digest of what the buyer approves: lines, contact, addresses, pickup or delivery, and total."""
+	address_names = [name for name in (quotation.customer_address, quotation.shipping_address_name) if name]
+	addresses = {}
+	if address_names:
+		addresses = {
+			address.name: address
+			for address in frappe.get_all(
+				"Address", filters={"name": ("in", address_names)}, fields=["name", *VERSIONED_ADDRESS_FIELDS]
+			)
+		}
+	content = {
+		"lines": [(row.item_code, flt(row.qty), flt(row.rate)) for row in quotation.items],
+		"email": quotation.contact_email,
+		"billing_address": addresses.get(quotation.customer_address),
+		"shipping_address": addresses.get(quotation.shipping_address_name),
+		"pickup": (cint(quotation.custom_is_store_pickup), quotation.custom_store),
+		"delivery_option": quotation.custom_delivery_option,
+		"total": flt(quotation.grand_total),
+	}
+	return sha256_hash(frappe.as_json(content))
+
+
+def save_cod_review(quotation_name: str, reviewed_total: float | None):
+	"""Every cash on delivery start writes it, so an ordinary start (None) clears an earlier agent's review."""
+	reviewed_version = None
+	if reviewed_total is not None:
+		reviewed_version = get_checkout_version(frappe.get_doc("Quotation", quotation_name))
+	frappe.db.set_value(
+		"Quotation",
+		quotation_name,
+		{REVIEWED_CHECKOUT_FIELD: reviewed_version, REVIEWED_TOTAL_FIELD: flt(reviewed_total)},
+		update_modified=False,
+	)
+
+
+def validate_reviewed_checkout(quotation):
+	"""Cash on delivery an agent started from a reviewed checkout must still be that checkout."""
+	reviewed_version = quotation.get(REVIEWED_CHECKOUT_FIELD)
+	if reviewed_version and reviewed_version != get_checkout_version(quotation):
+		frappe.throw(
+			_("Your checkout has changed. Please review it before placing your order."),
+			title=_("Checkout Changed"),
+			exc=CheckoutPriceChangedError,
+		)
+
+
 def validate_cod_total(quotation):
 	# Placement re-prices for cash on delivery; a discount that ran out since checkout must not raise it quietly.
-	confirmed_total = frappe.cache.get_value(get_cod_total_key(quotation.name))
+	confirmed_total = get_confirmed_cod_total(quotation)
 	if confirmed_total is None:
 		return
 	total = get_charge_amount(quotation)
@@ -335,6 +392,13 @@ def validate_cod_total(quotation):
 		title=_("Order Total Changed"),
 		exc=CheckoutPriceChangedError,
 	)
+
+
+def get_confirmed_cod_total(quotation) -> float | None:
+	"""A reviewed checkout keeps its total on the quotation, so a lost cache key cannot skip the check."""
+	if quotation.get(REVIEWED_CHECKOUT_FIELD):
+		return flt(quotation.get(REVIEWED_TOTAL_FIELD))
+	return frappe.cache.get_value(get_cod_total_key(quotation.name))
 
 
 def get_payable_total(quotation, payment_mode: str) -> float:
@@ -833,6 +897,7 @@ def quotation_purchase_summary(quotation_name: str):
 
 def place_cod_order(quotation_name: str):
 	quotation = frappe.get_doc("Quotation", quotation_name)
+	validate_reviewed_checkout(quotation)
 	shopper = get_order_shopper(quotation)
 	quotation.flags.strict_plugin_fees = True
 	# Repriced here too: the fee a cart edit left out after a hook failed must not slip into the order.

@@ -3,6 +3,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cstr
 
+from commera.api.storefront import rate_limited_guest_api
 from commera.sdk import account
 from commera.sdk.types import OrderTracking, ReturnOptions, ShopperOrderDetail
 
@@ -34,13 +35,11 @@ def get_invoice_url(name: str) -> str | None:
 	return account.get_invoice_url(cstr(name))
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=120, seconds=60 * 60)
+@rate_limited_guest_api("GET", limit=120, seconds=60 * 60)
 def get_order_tracking(name: str, key: str | None = None) -> OrderTracking:
 	return account.get_order_tracking(cstr(name), key)
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=10, seconds=60 * 60)
+@rate_limited_guest_api("POST", limit=10, seconds=60 * 60)
 def send_order_link(order_number: str, email: str) -> str:
 	return account.send_order_link(order_number, email)

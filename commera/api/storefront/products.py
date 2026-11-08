@@ -1,14 +1,13 @@
 import frappe
 from frappe import _
-from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cint, cstr, flt
 
+from commera.api.storefront import rate_limited_guest_api
 from commera.sdk import catalog
 from commera.sdk.types import Product, ProductPage
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=600, seconds=60)
+@rate_limited_guest_api("GET", limit=600, seconds=60)
 def get_products(
 	collection: str | None = None,
 	query: str | None = None,
@@ -38,8 +37,7 @@ def get_products(
 	)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=600, seconds=60)
+@rate_limited_guest_api("GET", limit=600, seconds=60)
 def get_product(handle: str) -> Product:
 	if product := catalog.get_product(handle):
 		return product

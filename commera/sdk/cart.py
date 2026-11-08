@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils.data import cstr, flt
+from frappe.utils.data import cint, cstr, flt
 
 from commera.api.payments import cart_write_lock, save_cart_quotation, validate_cart_is_not_in_checkout
 from commera.api.shipping import get_checkout_summary, reprice_shipping_discount
@@ -22,6 +22,7 @@ __all__ = [
 	"remove_lines",
 	"set_cart_attributes",
 	"set_cart_fields",
+	"set_lines",
 	"update_lines",
 ]
 
@@ -98,15 +99,60 @@ def get_priced_cart() -> PricedCart | None:
 	return price_cart(cart) if cart else None
 
 
+class CartChangedError(frappe.ValidationError):
+	pass
+
+
 def add_lines(lines: list[NewCartLine]) -> PricedCart:
 	"""Only items a published product sells. The storefront shows new lines on the shopper's next page
 	load."""
-	item_codes = {cstr(line["item_code"]) for line in lines}
-	if unlisted := item_codes - get_listed_items(list(item_codes), sellable_only=True):
-		frappe.throw(_("{0} is not for sale.").format(", ".join(sorted(unlisted))))
+	validate_items_for_sale(lines)
 	cart = get_session_cart(create=True)
 	cart.add_lines(lines)
 	return save_server_cart(cart)
+
+
+def set_lines(lines: list[dict], revision: int | None) -> PricedCart | None:
+	"""Make the cart hold exactly `lines`: `{line_id, qty}` keeps a line (0 drops it), `{item_code, qty}` adds
+	one, the rest go. `revision` is the one the caller read, None for no cart; refused while paying."""
+	validate_quantities(lines)
+	quotation = get_open_cart_quotation()
+	if not quotation:
+		return replace_lines(lines, revision)
+	# The quotation lock comes before the server cart's, in the order checkout takes them.
+	with cart_write_lock(quotation):
+		validate_cart_is_not_in_checkout(quotation.name)
+		return replace_lines(lines, revision)
+
+
+def validate_quantities(lines: list[dict]):
+	for line in lines:
+		least = 0 if line.get("line_id") else 1
+		if cint(line["qty"]) < least:
+			frappe.throw(_("A kept line needs a quantity of 0 or more, and a new line 1 or more."))
+
+
+def replace_lines(lines: list[dict], revision: int | None) -> PricedCart | None:
+	cart = get_session_cart()
+	if (cint(cart.revision) if cart else None) != revision:
+		frappe.throw(_("The cart changed. Read it again and retry."), CartChangedError)
+	cart = cart or get_session_cart(create=True)
+	kept = {line["line_id"]: cint(line["qty"]) for line in lines if line.get("line_id")}
+	for line_id in kept:
+		cart.get_line(line_id)
+	cart.update_lines([{"line_id": row.name, "qty": kept.get(row.name, 0)} for row in cart.lines])
+	if new_lines := [line for line in lines if not line.get("line_id")]:
+		validate_items_for_sale(new_lines)
+		cart.add_lines(new_lines)
+	if cart.is_new() and not cart.lines:
+		return None
+	return save_server_cart(cart)
+
+
+def validate_items_for_sale(lines: list[dict]):
+	item_codes = {cstr(line["item_code"]) for line in lines}
+	if unlisted := item_codes - get_listed_items(list(item_codes), sellable_only=True):
+		frappe.throw(_("{0} is not for sale.").format(", ".join(sorted(unlisted))))
 
 
 def update_lines(lines: list[dict]) -> PricedCart:

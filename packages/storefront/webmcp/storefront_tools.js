@@ -1,14 +1,16 @@
-import * as cart from './cart.js';
-import * as checkout from './checkout.js';
-import * as collections from './collections.js';
-import * as products from './products.js';
-import { StorefrontError } from './request.js';
-import * as search from './search.js';
+import * as cart from '../cart.js';
+import * as collections from '../collections.js';
+import * as products from '../products.js';
+import { StorefrontError } from '../request.js';
+import * as search from '../search.js';
+import {
+	NO_INPUT,
+	READS_STORE_DATA,
+	RETURNS_STORE_DATA,
+	get_language_root,
+	navigate,
+} from './shared.js';
 
-const READS_STORE_DATA = { readOnlyHint: true, untrustedContentHint: true };
-// A write that returns store or shopper text still marks it untrusted.
-const RETURNS_STORE_DATA = { untrustedContentHint: true };
-const NO_INPUT = { type: 'object', properties: {} };
 const HANDLE_INPUT = {
 	type: 'object',
 	properties: {
@@ -17,7 +19,7 @@ const HANDLE_INPUT = {
 	required: ['handle'],
 };
 
-const storefront_tools = [
+export const storefront_tools = [
 	{
 		name: 'search_catalog',
 		description:
@@ -92,7 +94,7 @@ const storefront_tools = [
 	{
 		name: 'get_cart',
 		description:
-			"Get the shopper's cart: lines, quantities, discounts and totals. The cart is null when the shopper has no cart yet; a cart can also exist with no lines. Pass its version to update_cart.",
+			"Get the shopper's cart: lines, quantities, discounts and totals. The cart is null when the shopper has no cart yet; a cart can also exist with no lines. Pass its revision to update_cart.",
 		inputSchema: NO_INPUT,
 		annotations: READS_STORE_DATA,
 		async run() {
@@ -106,10 +108,10 @@ const storefront_tools = [
 		inputSchema: {
 			type: 'object',
 			properties: {
-				version: {
-					type: ['string', 'null'],
+				revision: {
+					type: ['integer', 'null'],
 					description:
-						'The version of the cart from get_cart. Send null only when get_cart returned a null cart, not for a cart with no lines.',
+						'The revision of the cart from get_cart. Send null only when get_cart returned a null cart, not for a cart with no lines.',
 				},
 				lines: {
 					type: 'array',
@@ -118,13 +120,18 @@ const storefront_tools = [
 						properties: {
 							line_id: { type: 'string' },
 							item_code: { type: 'string' },
-							qty: { type: 'integer', minimum: 1 },
+							qty: {
+								type: 'integer',
+								minimum: 0,
+								description:
+									'0 removes a kept line; a new line needs 1 or more.',
+							},
 						},
 						required: ['qty'],
 					},
 				},
 			},
-			required: ['version', 'lines'],
+			required: ['revision', 'lines'],
 		},
 		annotations: RETURNS_STORE_DATA,
 		run: set_cart_lines,
@@ -162,117 +169,15 @@ const storefront_tools = [
 	},
 ];
 
-const checkout_tools = [
-	{
-		name: 'get_checkout',
-		description:
-			'Get the checkout: email, addresses, store pickup, shipping option and the charge summary with taxes and total. The checkout is null until the shopper saves contact and delivery details.',
-		inputSchema: NO_INPUT,
-		annotations: READS_STORE_DATA,
-		async run() {
-			return { checkout: await checkout.get() };
-		},
-	},
-	{
-		name: 'navigate_to_storefront',
-		description: 'Leave checkout and return to the cart page.',
-		inputSchema: NO_INPUT,
-		annotations: {},
-		async run() {
-			return navigate(`${get_language_root()}/cart`);
-		},
-	},
-];
-
-export function is_checkout_page() {
-	return /\/cart\/checkout\/?$/.test(globalThis.location.pathname);
-}
-
-export function get_tools() {
-	return is_checkout_page() ? checkout_tools : storefront_tools;
-}
-
-export async function register_tools(
-	model_context = globalThis.document?.modelContext,
-) {
-	if (!model_context) {
-		return [];
-	}
-	const tools = get_tools();
-	await Promise.all(
-		tools.map(({ run, ...tool }) =>
-			model_context.registerTool({
-				...tool,
-				execute: (input) => run_tool(run, input ?? {}),
-			}),
-		),
-	);
-	return tools.map((tool) => tool.name);
-}
-
-async function run_tool(run, input) {
+async function set_cart_lines({ revision, lines }) {
 	try {
-		const data = await run(input);
-		return {
-			content: [{ type: 'text', text: JSON.stringify(data) }],
-			structuredContent: data,
-		};
+		return { cart: await cart.set_lines(lines, revision), changed: true };
 	} catch (error) {
-		if (!(error instanceof StorefrontError)) {
+		if (error.exc_type !== 'CartChangedError') {
 			throw error;
 		}
-		return { isError: true, content: [{ type: 'text', text: error.message }] };
+		return { cart: await cart.get(), changed: false, message: error.message };
 	}
-}
-
-async function set_cart_lines({ version, lines }) {
-	const current = await cart.get();
-	if ((current?.version ?? null) !== version) {
-		return {
-			cart: current,
-			changed: false,
-			message: 'The cart changed since you read it. Read it again and retry.',
-		};
-	}
-	const wanted = new Map(
-		lines
-			.filter((line) => line.line_id)
-			.map((line) => [line.line_id, line.qty]),
-	);
-	const existing = current?.lines ?? [];
-	const unknown = [...wanted.keys()].filter(
-		(line_id) => !existing.some((line) => line.line_id === line_id),
-	);
-	if (unknown.length) {
-		throw new StorefrontError(`The cart has no line ${unknown.join(', ')}.`);
-	}
-	const changes = existing
-		.filter((line) => wanted.get(line.line_id) !== line.qty)
-		.map((line) => ({
-			line_id: line.line_id,
-			qty: wanted.get(line.line_id) ?? 0,
-		}));
-	const additions = lines
-		.filter((line) => !line.line_id)
-		.map(({ item_code, qty }) => ({ item_code, qty }));
-
-	let updated = current;
-	if (changes.length) {
-		updated = await cart.update_lines(changes);
-	}
-	if (additions.length) {
-		updated = await cart.add_lines(additions);
-	}
-	return { cart: updated, changed: updated !== current };
-}
-
-function navigate(path) {
-	globalThis.location.assign(path);
-	return { navigating_to: path };
-}
-
-function get_language_root() {
-	return `/${globalThis.commera_storefront_config?.language ?? 'en'}`;
 }
 
 function get_product_url(handle) {

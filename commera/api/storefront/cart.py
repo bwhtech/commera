@@ -6,6 +6,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cint, cstr, sha256_hash
 
+from commera.api.storefront import rate_limited_guest_api
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	adopt_guest_cart,
 	get_session_cart,
@@ -28,14 +29,12 @@ CHECKOUT_SIGN_IN_SECONDS = 10 * 60
 
 
 # Each call acts on the cart of the X-Commera-Cart-Token header the storefront server sends.
-@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=1200, seconds=60 * 60)
+@rate_limited_guest_api("GET", limit=1200, seconds=60 * 60)
 def get_cart() -> PricedCart | None:
 	return cart_sdk.get_priced_cart()
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=600, seconds=60 * 60)
+@rate_limited_guest_api("POST", limit=600, seconds=60 * 60)
 def add_lines(lines: list | str | None = None) -> PricedCart:
 	"""Add `[{item_code, qty, attributes}]`; only items a published product sells."""
 	lines = [
@@ -49,8 +48,7 @@ def add_lines(lines: list | str | None = None) -> PricedCart:
 	return cart_sdk.add_lines(lines)
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=600, seconds=60 * 60)
+@rate_limited_guest_api("POST", limit=600, seconds=60 * 60)
 def update_lines(lines: list | str | None = None) -> PricedCart:
 	"""Set `[{line_id, qty}]`; a quantity of 0 removes the line."""
 	lines = [
@@ -60,8 +58,26 @@ def update_lines(lines: list | str | None = None) -> PricedCart:
 	return cart_sdk.update_lines(lines)
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=600, seconds=60 * 60)
+@rate_limited_guest_api("POST", limit=600, seconds=60 * 60)
+def set_lines(lines: list | str | None = None, revision: int | None = None) -> PricedCart | None:
+	"""Make the cart hold exactly `[{line_id, qty}]` kept and `[{item_code, qty, attributes}]` new lines;
+	a kept line at qty 0 goes. A `revision` other than the cart's raises CartChangedError."""
+	lines = get_list_of(lines, dict, _("Send the lines as a list of objects."))
+	if any("qty" not in line for line in lines):
+		frappe.throw(_("Send a qty for every line."))
+	lines = [
+		{
+			"line_id": cstr(line.get("line_id")) or None,
+			"item_code": cstr(line.get("item_code")),
+			"qty": cint(line["qty"]),
+			"attributes": line.get("attributes"),
+		}
+		for line in lines
+	]
+	return cart_sdk.set_lines(lines, None if revision in (None, "") else cint(revision))
+
+
+@rate_limited_guest_api("POST", limit=600, seconds=60 * 60)
 def remove_lines(line_ids: list | str | None = None) -> PricedCart:
 	return cart_sdk.remove_lines(get_list_of(line_ids, str, _("Send the line ids as a list of strings.")))
 
@@ -76,14 +92,12 @@ def get_list_of(value: list | str | None, item_type: type, message: str) -> list
 	return value
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=30, seconds=60 * 60)
+@rate_limited_guest_api("POST", limit=30, seconds=60 * 60)
 def add_discount_code(code: str) -> PricedCart:
 	return cart_sdk.add_discount_code(cstr(code).strip())
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=100, seconds=60 * 60)
+@rate_limited_guest_api("POST", limit=100, seconds=60 * 60)
 def remove_discount_code(code: str) -> PricedCart:
 	return cart_sdk.remove_discount_code(cstr(code).strip())
 
@@ -100,8 +114,7 @@ def adopt_cart() -> PricedCart | None:
 	return cart_sdk.get_priced_cart()
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=120, seconds=60 * 60)
+@rate_limited_guest_api("POST", limit=120, seconds=60 * 60)
 def get_checkout_url() -> dict:
 	"""A single-use path that opens this cart in the Commera checkout, valid for five minutes."""
 	handoff = get_checkout_handoff()
@@ -132,8 +145,7 @@ def get_checkout_handoff() -> dict:
 	frappe.throw(_("Send the cart token to start a storefront checkout."))
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=60, seconds=60)
+@rate_limited_guest_api("GET", limit=60, seconds=60)
 def open_checkout(code: str):
 	"""Send the browser on with a checkout code. It writes nothing, so a link preview cannot use the code up."""
 	handoff = get_checkout_code(f"{CHECKOUT_CODE_PREFIX}{cstr(code)}")
@@ -144,8 +156,7 @@ def open_checkout(code: str):
 	redirect(get_handoff_page_url(code))
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: guest-whitelisted-method
-@rate_limit(limit=60, seconds=60)
+@rate_limited_guest_api("POST", limit=60, seconds=60)
 def claim_checkout_cart(code: str):
 	"""Move a guest checkout code's cart to this guest browser, then go on to checkout."""
 	if not is_guest():

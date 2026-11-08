@@ -12,6 +12,10 @@ export async function update_lines(lines) {
 	return save_cart('cart.update_lines', { lines });
 }
 
+export async function set_lines(lines, revision) {
+	return save_cart('cart.set_lines', { lines, revision });
+}
+
 export async function remove_lines(line_ids) {
 	return save_cart('cart.remove_lines', { line_ids });
 }

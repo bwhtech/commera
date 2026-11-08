@@ -6,7 +6,12 @@ from frappe.tests import IntegrationTestCase
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
-from commera.api.payments import COD_PAYMENT_MODE, CheckoutPriceChangedError
+from commera.api.payments import (
+	COD_PAYMENT_MODE,
+	CheckoutPriceChangedError,
+	get_cod_total_key,
+	resolve_checkout_payment,
+)
 from commera.api.storefront import checkout as checkout_api
 from commera.core import _get_cart_quotation
 from commera.guest import CART_TOKEN_HEADER
@@ -284,6 +289,112 @@ class TestSdkCheckout(IntegrationTestCase):
 
 		with self.assertRaises(CheckoutPriceChangedError):
 			checkout.start_payment(COD_PAYMENT_MODE, expected_total=1)
+
+	def test_payment_needs_the_checkout_the_buyer_reviewed(self):
+		self.set_commera_settings({"cod_enabled": 1, "cod_charge": 0})
+		self.fill_cart()
+		checkout.set_addresses(BILLING_ADDRESS)
+		reviewed = checkout.get()
+		self.assertEqual(checkout.get()["version"], reviewed["version"])
+
+		checkout.set_addresses({**BILLING_ADDRESS, "address_line1": "9 Other Street"})
+		changed = checkout.get()
+		self.assertEqual(changed["summary"]["total"], reviewed["summary"]["total"])
+		with self.assertRaisesRegex(CheckoutPriceChangedError, "checkout has changed"):
+			checkout.start_payment(COD_PAYMENT_MODE, expected_version=reviewed["version"])
+
+		session = checkout.start_payment(COD_PAYMENT_MODE, expected_version=changed["version"])
+		self.assertEqual(session["reference_id"], changed["cart"])
+
+	def test_an_edit_to_a_saved_address_changes_the_checkout_version(self):
+		self.set_commera_settings({"cod_enabled": 1, "cod_charge": 0})
+		self.fill_cart()
+		reviewed = checkout.set_addresses(BILLING_ADDRESS)
+
+		address = frappe.get_doc("Address", reviewed["billing_address"]["name"])
+		address.address_line1 = "9 Other Street"
+		address.save(ignore_permissions=True)
+
+		self.assertNotEqual(checkout.get()["version"], reviewed["version"])
+		with self.assertRaisesRegex(CheckoutPriceChangedError, "checkout has changed"):
+			checkout.start_payment(COD_PAYMENT_MODE, expected_version=reviewed["version"])
+
+	def test_cash_on_delivery_places_only_the_checkout_the_buyer_reviewed(self):
+		self.set_commera_settings({"cod_enabled": 1, "cod_charge": 0})
+		self.fill_cart()
+		reviewed = checkout.set_addresses(BILLING_ADDRESS)
+		session = checkout.start_payment(COD_PAYMENT_MODE, expected_version=reviewed["version"])
+
+		checkout.set_addresses(SHIPPING_ADDRESS)
+		with self.assertRaisesRegex(CheckoutPriceChangedError, "checkout has changed"):
+			checkout.complete(session["reference_id"])
+		self.assertFalse(frappe.db.exists("Sales Order Item", {"prevdoc_docname": session["reference_id"]}))
+
+	def test_the_checkout_version_follows_content_not_timestamps(self):
+		self.set_commera_settings({"cod_enabled": 1, "cod_charge": 0})
+		self.fill_cart()
+		reviewed = checkout.set_addresses(BILLING_ADDRESS)
+		address_name = reviewed["billing_address"]["name"]
+
+		frappe.db.set_value("Address", address_name, "address_line1", "9 Other Street", update_modified=False)
+		self.assertNotEqual(checkout.get()["version"], reviewed["version"])
+		frappe.db.set_value(
+			"Address", address_name, "address_line1", "1 Billing Street", update_modified=False
+		)
+		self.assertEqual(checkout.get()["version"], reviewed["version"])
+
+	def test_an_ordinary_cash_on_delivery_start_clears_an_agents_review(self):
+		self.set_commera_settings({"cod_enabled": 1, "cod_charge": 0})
+		self.fill_cart()
+		reviewed = checkout.set_addresses(BILLING_ADDRESS)
+		checkout.start_payment(COD_PAYMENT_MODE, expected_version=reviewed["version"])
+
+		checkout.set_addresses(SHIPPING_ADDRESS)
+		session = checkout.start_payment(COD_PAYMENT_MODE)
+
+		self.assertEqual(checkout.complete(session["reference_id"])["status"], "Paid")
+
+	def test_a_reviewed_cash_on_delivery_total_survives_a_lost_cache_key(self):
+		self.set_commera_settings({"cod_enabled": 1, "cod_charge": 0})
+		self.fill_cart()
+		reviewed = checkout.set_addresses(BILLING_ADDRESS)
+		session = checkout.start_payment(COD_PAYMENT_MODE, expected_version=reviewed["version"])
+
+		frappe.cache.delete_value(get_cod_total_key(session["reference_id"]))
+		self.set_commera_settings({"cod_charge": 25, "cod_charge_applicable_below": 10_000_000})
+		# The confirmation page names the payment mode itself, so placement does not need the cache key.
+		with self.assertRaisesRegex(CheckoutPriceChangedError, "total has changed"):
+			resolve_checkout_payment(session["reference_id"], COD_PAYMENT_MODE)
+		self.assertFalse(frappe.db.exists("Sales Order Item", {"prevdoc_docname": session["reference_id"]}))
+
+	def test_a_reviewed_cash_on_delivery_order_completes_without_its_cache_key(self):
+		self.set_commera_settings({"cod_enabled": 1, "cod_charge": 0})
+		self.fill_cart()
+		reviewed = checkout.set_addresses(BILLING_ADDRESS)
+		session = checkout.start_payment(COD_PAYMENT_MODE, expected_version=reviewed["version"])
+
+		frappe.cache.delete_value(get_cod_total_key(session["reference_id"]))
+
+		self.assertEqual(checkout.complete(session["reference_id"])["status"], "Paid")
+
+	def test_the_checkout_lists_the_lines_its_version_covers(self):
+		self.fill_cart()
+		state = checkout.set_addresses(BILLING_ADDRESS)
+		quotation = frappe.get_doc("Quotation", state["cart"])
+
+		self.assertEqual(
+			[(item["item_code"], item["qty"]) for item in state["items"]],
+			[(row.item_code, row.qty) for row in quotation.items],
+		)
+		self.assertEqual(state["currency"], quotation.currency)
+
+	def test_cash_on_delivery_from_a_reviewed_checkout_is_placed(self):
+		self.set_commera_settings({"cod_enabled": 1, "cod_charge": 0})
+		self.fill_cart()
+		reviewed = checkout.set_addresses(BILLING_ADDRESS)
+		session = checkout.start_payment(COD_PAYMENT_MODE, expected_version=reviewed["version"])
+
+		self.assertEqual(checkout.complete(session["reference_id"])["status"], "Paid")
 
 	def test_payment_is_refused_for_a_cart_changed_since_checkout_began(self):
 		self.set_commera_settings({"cod_enabled": 1, "cod_charge": 0})

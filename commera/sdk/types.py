@@ -9,11 +9,13 @@ __all__ = [
 	"CatalogItem",
 	"Charge",
 	"ChargeSummary",
+	"CheckoutItem",
 	"CheckoutResult",
 	"CheckoutState",
 	"CheckoutSummary",
 	"Collection",
 	"ContentPage",
+	"ContentPageLink",
 	"Country",
 	"CustomerAddress",
 	"CustomerProfile",
@@ -274,6 +276,8 @@ class PricedCart(TypedDict):
 
 	name: str
 	version: str
+	# Counts every change, lines cleared by a placed order included; set_lines takes it.
+	revision: int
 	attributes: dict[str, str]
 	currency: str
 	# {"code", "title", "discount_class", "applied", "reason"}; reason says why an unapplied code gives nothing.
@@ -489,6 +493,12 @@ class ContentPage(TypedDict):
 	updated_at: str
 
 
+class ContentPageLink(TypedDict):
+	handle: str
+	title: str
+	updated_at: str
+
+
 class SitemapEntry(TypedDict):
 	handle: str
 	updated_at: str
@@ -514,8 +524,19 @@ class Wishlist(TypedDict):
 	count: int
 
 
+class CheckoutItem(TypedDict):
+	item_code: str
+	title: str
+	qty: float
+
+
 class CheckoutState(TypedDict):
 	cart: str
+	# Changes with every checkout change; start_payment can require the version the buyer reviewed.
+	version: str
+	currency: str
+	# The lines this version covers, for a review the buyer approves.
+	items: list[CheckoutItem]
 	email: str | None
 	billing_address: Address | None
 	shipping_address: Address | None

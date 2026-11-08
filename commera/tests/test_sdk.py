@@ -73,6 +73,7 @@ PUBLIC_NAMES = {
 		"remove_lines",
 		"set_cart_attributes",
 		"set_cart_fields",
+		"set_lines",
 		"update_lines",
 	],
 	"commera.sdk.discounts": [
@@ -100,7 +101,7 @@ PUBLIC_NAMES = {
 	],
 	"commera.sdk.format": ["IMAGE_WIDTHS", "image_url", "money", "product_url"],
 	"commera.sdk.orders": ["get_order", "get_orders", "record_shipment"],
-	"commera.sdk.shop": ["get_menu", "get_page", "get_shop", "get_sitemap", "list_countries"],
+	"commera.sdk.shop": ["get_menu", "get_page", "get_shop", "get_sitemap", "list_countries", "list_pages"],
 	"commera.sdk.types": [
 		"Address",
 		"Cart",
@@ -112,6 +113,7 @@ PUBLIC_NAMES = {
 		"CheckoutSummary",
 		"Collection",
 		"ContentPage",
+		"ContentPageLink",
 		"Country",
 		"CustomerAddress",
 		"CustomerProfile",
@@ -150,6 +152,7 @@ PUBLIC_NAMES = {
 		"Typeahead",
 		"TypeaheadLink",
 		"CheckoutResult",
+		"CheckoutItem",
 		"CheckoutState",
 		"PaymentMethod",
 		"PaymentSession",
