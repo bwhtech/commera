@@ -17,7 +17,7 @@
 {%- endmacro %}
 
 {% block body %}
-{% call account_shell("orders", _("Order") ~ " " ~ order.name, show_nav=is_owner) %}
+{% call account_shell("orders", _("Order") ~ ' <bdi class="whitespace-nowrap">' ~ (order.name | e) ~ "</bdi>", show_nav=is_owner) %}
 <div x-data='order_detail({{ detail_config | tojson }})' class="flex flex-col gap-10">
 	<div class="flex flex-wrap items-center justify-between gap-4">
 		<div class="flex flex-wrap items-center gap-3">

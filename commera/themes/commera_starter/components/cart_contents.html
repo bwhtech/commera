@@ -22,7 +22,7 @@
 			</a>
 			<div class="flex min-w-0 flex-1 flex-col">
 				<div class="grid gap-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-3">
-					<a :href="line.product && $store.cart.product_url(line.product)" class="text-md font-medium text-ink-gray-9 [overflow-wrap:anywhere] hover:underline" x-text="line.product?.title ?? line.title"></a>
+					<a :href="line.product && $store.cart.product_url(line.product)" class="text-md font-medium text-ink-gray-9 [overflow-wrap:anywhere] decoration-1 underline-offset-4 hover:underline" x-text="line.product?.title ?? line.title"></a>
 					<p class="tabular whitespace-nowrap text-md font-medium max-sm:order-last" x-text="$store.cart.money(line.amount)"></p>
 				</div>
 				<p class="mt-1 text-base text-ink-gray-6 [overflow-wrap:anywhere]" x-show="line.product?.variant_title" x-text="line.product?.variant_title"></p>

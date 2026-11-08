@@ -136,6 +136,9 @@ function product_form(product) {
 				},
 				{ rootMargin: `-${header_height}px 0px 100000px 0px` },
 			).observe(this.$refs.add_button);
+			matchMedia('(width < 48rem)').addEventListener('change', (event) => {
+				if (event.matches) this.$nextTick(() => this.scroll_rail_to_image());
+			});
 			const url = new URL(location.href);
 			if (url.searchParams.has('save_to_wishlist')) {
 				url.searchParams.delete('save_to_wishlist');
@@ -178,6 +181,15 @@ function product_form(product) {
 
 		move_image(step, count) {
 			this.image = (this.image + step + count) % count;
+		},
+
+		scroll_rail_to_image() {
+			const gallery = this.$refs.gallery;
+			const direction = getComputedStyle(gallery).direction === 'rtl' ? -1 : 1;
+			gallery.scrollTo({
+				left: direction * this.image * gallery.clientWidth,
+				behavior: 'instant',
+			});
 		},
 
 		sync_image_with_scroll() {

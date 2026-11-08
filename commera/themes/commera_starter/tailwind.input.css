@@ -518,6 +518,9 @@
 	}
 	&:is(select):has(option[value=""]:checked) {
 		color: var(--ink-gray-4);
+		& option {
+			color: var(--ink-gray-9);
+		}
 	}
 }
 
@@ -594,7 +597,7 @@
 	input,
 	select,
 	textarea {
-		transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+		transition-property: color, background-color, border-color, text-decoration-color, box-shadow, opacity, transform;
 		transition-duration: var(--default-transition-duration);
 		transition-timing-function: var(--default-transition-timing-function);
 	}
