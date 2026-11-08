@@ -3,6 +3,7 @@
 {% set allow_guest_checkout = is_guest_checkout_enabled() %}
 
 <div class="summer-auth" x-data="summer_auth()" @open-auth.window="open_dialog($event.detail)"
+	@summer-overlay-open.window="close_dialog()"
 	@keydown.escape.window="close_dialog()">
 
 	<div class="summer-auth-backdrop" x-show="is_open" x-cloak x-transition.opacity

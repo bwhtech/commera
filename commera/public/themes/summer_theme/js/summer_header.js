@@ -34,10 +34,16 @@ document.addEventListener('alpine:init', () => {
 				: [...this.open_branches, branch_key];
 		},
 
+		/* The auth dialog is its own component; it closes on this event, and the header closes on open-auth. */
+		announce_overlay() {
+			window.dispatchEvent(new CustomEvent('summer-overlay-open'));
+		},
+
 		async open_cart() {
 			this.search_open = false;
 			this.menu_open = false;
 			this.cart_open = true;
+			this.announce_overlay();
 			/* Stock and price are only stamped onto the persisted cart by an API read, and increment()
 			   refuses to go past stock_qty, so the stepper is dead on a page that never loaded it. */
 			if (!this.cart_detail_loaded && Alpine.store('cart').items.length) {
@@ -50,12 +56,14 @@ document.addEventListener('alpine:init', () => {
 			this.cart_open = false;
 			this.menu_open = false;
 			this.search_open = true;
+			this.announce_overlay();
 		},
 
 		open_mobile_menu() {
 			this.search_open = false;
 			this.cart_open = false;
 			this.menu_open = true;
+			this.announce_overlay();
 		},
 
 		close_overlays() {

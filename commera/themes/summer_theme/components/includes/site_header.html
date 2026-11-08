@@ -29,7 +29,8 @@
 <header class="site-header mo-left header {{ header_class | default('') }}" x-data="summer_header"
 	@open-search.window="open_search()"
 	@open-cart.window="open_cart()"
-	@open-mobile-menu.window="open_mobile_menu()">
+	@open-mobile-menu.window="open_mobile_menu()"
+	@open-auth.window="close_overlays()">
 	<div class="sticky-header main-bar-wraper navbar-expand-lg">
 		<div class="main-bar clearfix">
 			<div class="container-fluid clearfix d-lg-flex d-block">
