@@ -6,7 +6,7 @@ from frappe.tests import IntegrationTestCase
 from commera.sdk import STORE_ORDER_TYPE
 from commera.shipping.fulfilment import create_shipment
 from commera.shipping.providers import use_providers
-from commera.shipping.shipment import book, cancel_booking, sync_status
+from commera.shipping.shipment import book, cancel_booking, schedule_pickup, sync_status
 from commera.shipping.testing import InMemoryShippingProvider
 from commera.shipping.tests.test_carrier_import import create_test_address, create_test_provider_profile
 from commera.tests.test_admin_orders import make_test_sales_order
@@ -110,3 +110,48 @@ class TestShipmentBooking(IntegrationTestCase):
 			(shipment.status, shipment.tracking_status, len(shipment.custom_tracking_events)),
 			("Completed", "Delivered", 1),
 		)
+
+	def sync_to(self, shipment, status: str) -> str:
+		self.carrier.tracking[shipment.awb_number] = {"status": status, "events": []}
+		return sync_status(shipment.name)
+
+	def test_a_carrier_reattempt_after_a_failed_delivery_moves_the_shipment_on(self):
+		shipment = self.book()
+
+		self.assertEqual(
+			[
+				self.sync_to(shipment, status)
+				for status in ("Out For Delivery", "Undelivered", "Out For Delivery")
+			],
+			["Out For Delivery", "Undelivered", "Out For Delivery"],
+		)
+		self.assertEqual(self.sync_to(shipment, "Delivered"), "Delivered")
+
+	def test_a_parcel_on_its_way_back_to_the_store_never_becomes_delivered(self):
+		shipment = self.book()
+		self.sync_to(shipment, "RTO")
+
+		self.assertEqual(self.sync_to(shipment, "Delivered"), "RTO")
+		self.assertEqual(self.sync_to(shipment, "Lost"), "Lost")
+
+	def test_a_cancelled_partial_booking_is_not_finished_at_the_carrier(self):
+		shipment = frappe.get_doc("Shipment", create_shipment(self.delivery_note))
+		shipment.submit()
+		shipment.db_set("custom_order_ref", "MEM-PARTIAL")
+		cancel_booking(shipment.name)
+
+		self.assertRaisesRegex(frappe.ValidationError, "cannot be booked", book, shipment.name)
+		self.assertEqual(self.carrier.shipments, {})
+
+	def test_a_pickup_is_only_scheduled_before_the_carrier_collects(self):
+		shipment = self.book()
+		schedule_pickup(shipment.name)
+		shipment.reload()
+		self.assertEqual(shipment.custom_shipment_status, "Pickup Scheduled")
+
+		self.sync_to(shipment, "Delivered")
+
+		self.assertRaisesRegex(
+			frappe.ValidationError, "no longer be scheduled", schedule_pickup, shipment.name
+		)
+		self.assertEqual(self.carrier.pickups, ["MEM-1"])

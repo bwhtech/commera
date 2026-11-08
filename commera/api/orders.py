@@ -26,12 +26,15 @@ def cancel_order(order_id: str):
 
 		order_doc.flags.ignore_permissions = True
 		cancelling = True
-		if order_doc.docstatus == 1:
-			order_doc.cancel()
-		elif order_doc.docstatus == 0:
-			order_doc.submit()
-			order_doc.reload()
-			order_doc.cancel()
+		# Ownership is checked above. ERPNext's get_item_details checks Item permission directly on
+		# submit, which a shopper lacks and ignore_permissions does not reach.
+		with system_user_session():
+			if order_doc.docstatus == 1:
+				order_doc.cancel()
+			elif order_doc.docstatus == 0:
+				order_doc.submit()
+				order_doc.reload()
+				order_doc.cancel()
 		cancelling = False
 		# The on_cancel hook only enqueues this, so the page would reload onto the old status.
 		update_sales_order_ecommerce_status(order_id)
@@ -168,7 +171,15 @@ def validate_can_cancel(order_doc):
 	if order_doc.status == "Completed":
 		frappe.throw(_("Order already delivered!"))
 
-	if frappe.db.exists("Delivery Note Item", {"against_sales_order": order_doc.name, "docstatus": ["<", 2]}):
+	# Locking reads: under REPEATABLE READ a plain read can miss one committed while the order lock waited.
+	live = {"against_sales_order": order_doc.name, "docstatus": ["<", 2]}
+	if frappe.db.get_value("Delivery Note Item", live, "name", for_update=True):
+		frappe.throw(_("This order is already being prepared for shipment."))
+
+	# A carrier booking made straight from the order, with no Delivery Note, would stay live.
+	if frappe.db.get_value(
+		"Shipment", {"custom_sales_order": order_doc.name, "docstatus": ["<", 2]}, "name", for_update=True
+	):
 		frappe.throw(_("This order is already being prepared for shipment."))
 
 	if not is_shoppers_order(order_doc):

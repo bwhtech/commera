@@ -41,7 +41,7 @@ def is_link_pending() -> bool:
 	return (
 		not settings.site_key_value
 		or settings.server_url != get_server_url()
-		or settings.site != get_site_name()
+		or (settings.linked_hostname or settings.site) != get_site_name()
 	)
 
 
@@ -86,7 +86,7 @@ def link_site() -> None:
 	server_url = get_server_url()
 	site_name = get_site_name()
 	try:
-		save_link(server_url, exchange_identity_token(server_url, site_name))
+		save_link(server_url, exchange_identity_token(server_url, site_name), site_name)
 	finally:
 		frappe.cache.set_value(
 			f"{ATTEMPTED_CACHE_KEY}:{site_name}", 1, expires_in_sec=ATTEMPT_INTERVAL_SECONDS
@@ -126,12 +126,15 @@ def get_registration_site_name(token: str, site_name: str) -> str:
 	return (preferred_hosts or hosts)[0]
 
 
-def save_link(server_url: str, link: dict) -> None:
+def save_link(server_url: str, link: dict, linked_hostname: str | None = None) -> None:
+	"""`site` is the name Commera Cloud registered, which can be a host from the token. The check for a
+	renamed site compares `linked_hostname`, the name this site answered to, so it does not re-link hourly."""
 	settings = frappe.get_single("Commera Cloud Settings")
 	settings.update(
 		{
 			"server_url": server_url,
 			"site": link["site"],
+			"linked_hostname": linked_hostname or link["site"],
 			"team": link["team"],
 			"site_key": link["site_key"],
 			"linked_on": now_datetime(),

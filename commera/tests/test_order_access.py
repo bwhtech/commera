@@ -7,6 +7,7 @@ import frappe
 from frappe.tests import IntegrationTestCase, UnitTestCase
 
 from commera.api.orders import (
+	cancel_order,
 	create_refund_payment_entry,
 	get_sales_order_refund_status,
 	make_refund_payment_entry,
@@ -88,6 +89,33 @@ class TestOrderAccess(IntegrationTestCase):
 		frappe.set_user(self.outsider)
 		with self.assertRaises(frappe.PermissionError):
 			create_refund_payment_entry(self.sales_order.name)
+
+
+class TestShopperCancel(IntegrationTestCase):
+	"""A shopper has no permission on Item, and submitting a draft order re-reads its items."""
+
+	def setUp(self):
+		self.shopper = make_website_user()
+		self.addCleanup(frappe.set_user, "Administrator")
+
+	def cancel_as_shopper(self, sales_order):
+		frappe.db.set_value("Sales Order", sales_order.name, "owner", self.shopper)
+		frappe.set_user(self.shopper)
+		cancel_order(sales_order.name)
+		frappe.set_user("Administrator")
+		return frappe.db.get_value("Sales Order", sales_order.name, "docstatus")
+
+	def test_a_shopper_can_cancel_their_draft_order(self):
+		self.assertEqual(self.cancel_as_shopper(make_test_sales_order(submit=False)), 2)
+
+	def test_a_shopper_can_cancel_their_submitted_order(self):
+		self.assertEqual(self.cancel_as_shopper(make_test_sales_order()), 2)
+
+	def test_a_shopper_cannot_cancel_someone_elses_order(self):
+		sales_order = make_test_sales_order(submit=False)
+		frappe.set_user(self.shopper)
+		with self.assertRaises(frappe.ValidationError):
+			cancel_order(sales_order.name)
 
 
 class TestRefundAmountClamp(UnitTestCase):

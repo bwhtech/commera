@@ -14,6 +14,8 @@ SETTINGS_DOCTYPE = "Commera Settings"
 DEFAULT_PRICE_LIST = "Standard Selling"
 DEFAULT_CHART_OF_ACCOUNTS = "Standard"
 SETUP_REALTIME_EVENT = "commera_store_setup"
+SETUP_QUEUEING_CACHE_KEY = "commera_store_setup_queueing"
+SETUP_QUEUEING_SECONDS = 30
 SETUP_JOB_ID = "commera_store_setup"
 SETUP_JOB_TIMEOUT = 1500
 MAX_ABBR_LENGTH = 5
@@ -174,7 +176,7 @@ def get_company_warehouse(company: str) -> str | None:
 def get_setup_status() -> dict:
 	"""The job's own record on Commera Settings; a site set up some other way also counts as done."""
 	status, error = frappe.db.get_single_value(SETTINGS_DOCTYPE, "store_setup_status"), None
-	if status == "running" and not is_job_enqueued(SETUP_JOB_ID):
+	if status == "running" and not is_job_enqueued(SETUP_JOB_ID) and not is_setup_being_queued():
 		# The worker died or the job was dropped: report it so the owner can retry.
 		status, error = "failed", _("Store setup stopped before it finished. Please try again.")
 	elif status != "running" and frappe.is_setup_complete():
@@ -184,6 +186,10 @@ def get_setup_status() -> dict:
 	return {"status": status or "idle", "error": error}
 
 
+def is_setup_being_queued() -> bool:
+	return bool(frappe.cache.get_value(SETUP_QUEUEING_CACHE_KEY))
+
+
 def set_setup_status(status: str, error: str | None = None):
 	frappe.db.set_single_value(SETTINGS_DOCTYPE, {"store_setup_status": status, "store_setup_error": error})
 
@@ -191,6 +197,9 @@ def set_setup_status(status: str, error: str | None = None):
 def queue_store_setup(setup_args: dict) -> dict:
 	"""Mark setup running and enqueue its job; deduplicate keeps a second click from queueing another."""
 	set_setup_status("running")
+	# The job reaches the queue only after this request commits: until then, running without a job is not
+	# a dead job.
+	frappe.cache.set_value(SETUP_QUEUEING_CACHE_KEY, 1, expires_in_sec=SETUP_QUEUEING_SECONDS)
 	frappe.enqueue(
 		run_store_setup,
 		queue="long",

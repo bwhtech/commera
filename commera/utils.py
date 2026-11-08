@@ -1,5 +1,5 @@
 import re
-from functools import lru_cache
+from functools import lru_cache, partial
 from urllib.parse import quote, urlencode
 
 import frappe
@@ -10,9 +10,11 @@ from frappe.geo.country_info import get_all
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Count, Min, Sum
 from frappe.utils import add_days, cint, create_batch, cstr, flt, get_datetime, now_datetime
+from frappe.utils.background_jobs import get_job_status
 from frappe.utils.caching import request_cache
 from frappe.utils.data import strip_html
 from pypika import Order
+from rq.job import JobStatus
 
 from commera.core import get_address_docs, get_party
 from commera.guest import is_guest, is_guest_checkout_enabled
@@ -780,11 +782,7 @@ def update_so_status_from_related_doc(doc, method):
 	sales_orders = set()
 
 	if doc.doctype == "Sales Order":
-		frappe.enqueue(
-			"commera.utils.update_sales_order_ecommerce_status",
-			sales_order_name=doc.name,
-			enqueue_after_commit=True,
-		)
+		sales_orders.add(doc.name)
 
 	elif doc.doctype == "Sales Invoice":
 		sales_orders.update([d.sales_order for d in doc.items if d.sales_order])
@@ -804,10 +802,32 @@ def update_so_status_from_related_doc(doc, method):
 				)
 			)
 	for so in sales_orders:
+		enqueue_ecommerce_status_update(so)
+
+
+def enqueue_ecommerce_status_update(sales_order_name):
+	# Decided after commit: a job already queued could otherwise run in between and miss this change.
+	frappe.db.after_commit.add(partial(queue_ecommerce_status_update, sales_order_name))
+
+
+def queue_ecommerce_status_update(sales_order_name):
+	"""One waiting recompute per order is enough. A started one may have read the documents already,
+	so a second job queues behind it instead of being dropped."""
+	job_id = f"commera-order-status::{sales_order_name}"
+	try:
+		started = get_job_status(job_id) == JobStatus.STARTED
 		frappe.enqueue(
 			"commera.utils.update_sales_order_ecommerce_status",
-			sales_order_name=so,
-			enqueue_after_commit=True,
+			sales_order_name=sales_order_name,
+			job_id=None if started else job_id,
+			deduplicate=not started,
+		)
+	except Exception:
+		# Runs after commit: a full queue must not fail a saved change or skip the other callbacks.
+		frappe.log_error(
+			title="Order status recompute not queued",
+			reference_doctype="Sales Order",
+			reference_name=sales_order_name,
 		)
 
 
@@ -832,12 +852,17 @@ FULFILMENT_EVENTS = {
 
 
 def update_sales_order_ecommerce_status(sales_order_name):
+	# Locked first, before any other read: two recomputes then run one after the other, and the second
+	# sees what the first committed instead of writing back a status derived from older documents.
 	order = frappe.db.get_value(
 		"Sales Order",
 		sales_order_name,
 		["docstatus", "custom_ecommerce_status", "order_type"],
 		as_dict=True,
+		for_update=True,
 	)
+	if not order:
+		return
 
 	if order.docstatus == 2:
 		new_status = "Cancelled"

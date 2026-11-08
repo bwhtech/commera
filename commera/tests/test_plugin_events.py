@@ -33,10 +33,12 @@ from commera.plugin_events import (
 	fire_event,
 	fire_inventory_changed,
 	on_payment_entry_submit,
+	queue_delivery_now,
 	reset_changed_products,
 	run_app_deliveries,
 	run_due_deliveries,
 	run_lane,
+	save_failed_attempt,
 	validate_plugins,
 )
 from commera.sdk import API_VERSION
@@ -835,6 +837,31 @@ class TestPluginEventDeliveryClaims(IntegrationTestCase):
 
 		self.assertEqual(self.delivery(abandoned), {"status": "Queued", "attempts": 1})
 		self.assertEqual(self.delivery(running), {"status": "Running", "attempts": 0})
+
+	def test_a_sweep_that_read_a_claim_before_its_worker_finished_leaves_it_done(self):
+		event_key = self.add_running_delivery(claimed_minutes_ago=STALE_CLAIM_MINUTES + 1)
+		stale_read = frappe.get_all(
+			"Commera Event Delivery",
+			filters={"parent": event_key},
+			fields=["name", "attempts", "last_error", "handler", "parent as event_key"],
+		)[0]
+		frappe.db.set_value("Commera Event Delivery", stale_read.name, "status", "Done")
+
+		self.assertFalse(save_failed_attempt(stale_read, None))
+		self.assertEqual(self.delivery(event_key), {"status": "Done", "attempts": 0})
+
+	def test_queueing_a_delivery_now_never_reopens_a_finished_or_running_one(self):
+		event_key = self.add_running_delivery(claimed_minutes_ago=1)
+		name = frappe.db.get_value("Commera Event Delivery", {"parent": event_key})
+
+		self.assertFalse(queue_delivery_now(name))
+		frappe.db.set_value("Commera Event Delivery", name, "status", "Done")
+		self.assertFalse(queue_delivery_now(name))
+		self.assertEqual(self.delivery(event_key), {"status": "Done", "attempts": 0})
+
+		frappe.db.set_value("Commera Event Delivery", name, "status", "Failed")
+		self.assertTrue(queue_delivery_now(name))
+		self.assertEqual(self.delivery(event_key), {"status": "Queued", "attempts": 0})
 
 	def test_the_sweep_queues_each_due_lane_once_and_skips_one_waiting_on_a_retry(self):
 		sales_order = make_test_sales_order(submit=False).name

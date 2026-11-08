@@ -4,6 +4,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, fmt_money, random_string
 
+from commera.commera_ecommerce.doctype.bulk_publish_variants.bulk_publish_variants import save_publish_state
 from commera.utils import get_store_currency
 
 STANDARD_DELIVERY_OPTION = "Standard Delivery"
@@ -666,16 +667,14 @@ def publish_style_variants():
 	"""Ensure all Style Attribute Variants are published"""
 	print("  - Publishing Style Attribute Variants...")
 
-	savs = frappe.get_all("Style Attribute Variant", fields=["name", "display_name"])
-
-	published = 0
-	for sav in savs:
-		# Check if it has Color Size Items
-		has_sizes = frappe.db.exists("Color Size Item", {"parent": sav.name})
-
-		if has_sizes:
-			frappe.db.set_value("Style Attribute Variant", sav.name, "is_published", 1)
-			published += 1
+	to_publish = [
+		sav.name
+		for sav in frappe.get_all("Style Attribute Variant", filters={"is_published": 0}, fields=["name"])
+		if frappe.db.exists("Color Size Item", {"parent": sav.name})
+	]
+	# Through the bulk publisher, which also updates the search index and announces product_updated.
+	save_publish_state(1, to_publish)
+	published = len(to_publish)
 
 	print(f"    ✓ Published {published} Style Attribute Variants")
 

@@ -117,6 +117,9 @@ def record_shipment(
 	if not cstr(awb).strip():
 		frappe.throw(_("A shipment needs its AWB."), frappe.ValidationError)
 	frappe.has_permission("Sales Order", doc=sales_order, ptype="read", throw=True)
+	# The lock cancel_order takes first. A locking read sees a cancel committed while this waited.
+	if frappe.db.get_value("Sales Order", sales_order, "docstatus", for_update=True) != 1:
+		frappe.throw(_("Only a submitted order can be shipped."), frappe.ValidationError)
 
 	shipments = get_order_shipments(sales_order, awb_number=awb, docstatus=1)
 	if not shipments:

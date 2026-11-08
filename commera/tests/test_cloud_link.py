@@ -30,7 +30,16 @@ class CloudLinkTestCase(IntegrationTestCase):
 		self.addCleanup(clear_attempts)
 		clear_attempts()
 		settings = frappe.get_single("Commera Cloud Settings")
-		settings.update({"server_url": None, "site": None, "team": None, "site_key": None, "linked_on": None})
+		settings.update(
+			{
+				"server_url": None,
+				"site": None,
+				"team": None,
+				"site_key": None,
+				"linked_on": None,
+				"linked_hostname": None,
+			}
+		)
 		settings.save()
 
 		self.enterContext(
@@ -66,6 +75,14 @@ class TestLinkSite(CloudLinkTestCase):
 		link.link_site()
 		clear_attempts()
 
+		self.assertFalse(link.is_link_pending())
+
+	def test_a_site_registered_under_a_host_from_its_token_stays_linked(self):
+		self.exchange.side_effect = lambda server_url, site: {**LINK, "site": "acme.frappe.cloud"}
+		link.link_site()
+		clear_attempts()
+
+		self.assertEqual(frappe.get_single("Commera Cloud Settings").site, "acme.frappe.cloud")
 		self.assertFalse(link.is_link_pending())
 
 	def test_a_renamed_site_links_again_at_once(self):
