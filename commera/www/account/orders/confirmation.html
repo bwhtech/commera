@@ -1,19 +1,45 @@
 {% extends "templates/layout.html" %}
 
 {% block body %}
-<div class=" shadow p-5 m-4">
-    <h1 class="text-xl font-semibold text-gray-800">{{ _('Checking payment status') }}</h1>
-    <p>{{ _('Please do not refresh') }}...</p>
+<div class=" shadow p-5 m-4" x-data="order_confirmation">
+    <div x-show="state === 'checking'">
+        <h1 class="text-xl font-semibold text-gray-800">{{ _('Checking payment status') }}</h1>
+        <p>{{ _('Please do not refresh') }}...</p>
+    </div>
+    <div x-show="state === 'pending'" x-cloak role="status">
+        <h1 class="text-xl font-semibold text-gray-800">{{ _('Your payment is still processing') }}</h1>
+        <p x-show="poll_count < max_polls">{{ _('This page updates by itself as soon as the payment goes through.') }}</p>
+        <p x-show="poll_count >= max_polls" x-cloak>{{ _('This is taking longer than usual. We will email you once the payment goes through, and your orders page shows its status.') }}</p>
+        <div class="mt-4 flex gap-4" x-show="poll_count >= max_polls" x-cloak>
+            <button type="button" class="underline cursor-pointer" @click="check_again()">{{ _('Check again') }}</button>
+            <a class="underline" href="/{{ frappe.lang }}/account/orders">{{ _('My orders') }}</a>
+        </div>
+    </div>
+    <div x-show="state === 'failed'" x-cloak>
+        <h1 class="text-xl font-semibold text-gray-800">{{ _('Your payment did not go through') }}</h1>
+        <p>{{ _('You have not been charged. Your bag still holds the items, so you can try again.') }}</p>
+        <a class="underline" href="/{{ frappe.lang }}/cart">{{ _('Back to your bag') }}</a>
+    </div>
+    <div x-show="state === 'error'" x-cloak>
+        <h1 class="text-xl font-semibold text-gray-800">{{ _('We could not check your payment') }}</h1>
+        <p>{{ _('Check your connection and try again.') }}</p>
+        <button type="button" class="underline cursor-pointer" @click="check_again()">{{ _('Try again') }}</button>
+    </div>
+    <div x-show="state === 'unconfirmed'" x-cloak>
+        <h1 class="text-xl font-semibold text-gray-800">{{ _('We could not confirm this order') }}</h1>
+        <p>{{ _('Your orders page shows the current status of every order you have placed.') }}</p>
+        <a class="underline" href="/{{ frappe.lang }}/account/orders">{{ _('My orders') }}</a>
+    </div>
+    <div x-show="state === 'confirmed'" x-cloak>
+        <h1 class="text-xl font-semibold text-gray-800">{{ _('Your order is confirmed') }}</h1>
+        <p>{{ _('Taking you to your order') }}...</p>
+    </div>
     {% if login_url %}
-    <a class="underline" href="{{ login_url }}">{{ _('Checked out with an account? Sign in to confirm your order') }}</a>
+    <a class="underline" href="{{ login_url }}" x-show="state !== 'confirmed'">{{ _('Checked out with an account? Sign in to confirm your order') }}</a>
     {% endif %}
 </div>
 
-<script defer>
-    const url_params = new URLSearchParams(window.location.search);
-    const payment_mode = url_params.get('payment_mode');
-// Legacy gateway redirects return `payment_id` and Stripe substitutes `session_id`; all three resolve through Gateway Payment Request.order_ref.
-    const reference_id = url_params.get('reference_id') || url_params.get('payment_id') || url_params.get('session_id');
+<script>
     function track_purchase(data, order_name) {
 // The first-party `purchase` event is logged server-side at order creation; the capture endpoint rejects it from the client.
         const dedup_key = 'fb_purchase_' + order_name;
@@ -34,24 +60,68 @@
         });
     }
 
-    async function confirm_payment() {
-// TODO: handle errors, unpaid, etc.
-        const args = { reference_id };
-        if (payment_mode) args.payment_mode = payment_mode;
+    // Registered on alpine:init, so the cart store exists by the time the payment resolves.
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('order_confirmation', () => ({
+            // 'checking', then 'confirmed', 'pending' (polled a few times), 'failed' (not paid), 'error' (no answer)
+            // or 'unconfirmed' (no record this shopper can see).
+            state: 'checking',
+            poll_count: 0,
+            max_polls: 10,
+            poll_timer: null,
 
-        const { data } = await frappe_call(
-            "/api/v2/method/commera.api.payments.confirm_payment",
-            args
-        );
-        if (data.status !== "Paid") return;
+            init() {
+                this.confirm_payment();
+            },
 
-        const order_name = data.order_name || data.ref_docname || reference_id;
-        if (order_name) track_purchase(data, order_name);
+            check_again() {
+                this.poll_count = 0;
+                this.state = 'checking';
+                this.confirm_payment();
+            },
 
-        Alpine.store("cart").remove_selected();
-        window.location.href = data.order_link || `/{{frappe.lang}}/account/orders`;
-    }
+            async confirm_payment() {
+                const url_params = new URLSearchParams(window.location.search);
+                const payment_mode = url_params.get('payment_mode');
+// Legacy gateway redirects return `payment_id` and Stripe substitutes `session_id`; all three resolve through Gateway Payment Request.order_ref.
+                const reference_id = url_params.get('reference_id') || url_params.get('payment_id') || url_params.get('session_id');
+                if (!reference_id) {
+                    this.state = 'unconfirmed';
+                    return;
+                }
+                const args = { reference_id };
+                if (payment_mode) args.payment_mode = payment_mode;
 
-    confirm_payment();
+                let data;
+                try {
+                    data = (await frappe_call("/api/v2/method/commera.api.payments.confirm_payment", args)).data;
+                } catch (error) {
+                    // A refusal names no order this shopper can see; no answer at all is worth another try.
+                    this.state = error.type ? 'unconfirmed' : 'error';
+                    return;
+                }
+                if (data.status === 'Pending') {
+                    this.state = 'pending';
+                    clearTimeout(this.poll_timer);
+                    if (++this.poll_count < this.max_polls) this.poll_timer = setTimeout(() => this.confirm_payment(), 3000);
+                    return;
+                }
+                if (['Not Paid', 'Cancelled', 'Expired'].includes(data.status)) {
+                    this.state = 'failed';
+                    return;
+                }
+                if (data.status !== 'Paid') {
+                    this.state = 'unconfirmed';
+                    return;
+                }
+
+                this.state = 'confirmed';
+                const order_name = data.order_name || data.ref_docname || reference_id;
+                if (order_name) track_purchase(data, order_name);
+                await Alpine.store("cart").take_cart_after_order();
+                window.location.href = data.order_link || `/{{frappe.lang}}/account/orders`;
+            },
+        }));
+    });
 </script>
 {% endblock %}

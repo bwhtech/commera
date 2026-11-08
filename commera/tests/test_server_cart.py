@@ -160,6 +160,17 @@ class TestServerCart(DiscountCodeTestCase):
 		self.assertEqual([row.item_code for row in cart.lines], [self.cap])
 		self.assertEqual(cart.version, version)
 
+	def test_a_placed_order_clears_only_the_ordered_items_when_more_were_ticked_since(self):
+		cart_sdk.add_lines(
+			[{"item_code": self.shirt, "qty": 1}, {"item_code": self.cap, "qty": 1, "selected": 1}]
+		)
+
+		clear_ordered_cart(
+			frappe._dict(custom_guest_cart_key=None, items=[frappe._dict(item_code=self.shirt)]), self.shopper
+		)
+
+		self.assertEqual([row.item_code for row in get_session_cart().lines], [self.cap])
+
 	def test_abandoned_guest_carts_are_deleted(self):
 		self.use_guest_cart()
 		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 1}])

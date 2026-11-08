@@ -45,6 +45,33 @@
 	</div>
 
 	{% if not order %}
+	<div x-show="state === 'pending'" x-cloak role="status">
+		<h4 class="mb-3">{{ _("Your payment is still processing") }}</h4>
+		<p class="mb-0" x-show="poll_count < max_polls">{{ _("This page updates by itself as soon as the payment goes through.") }}</p>
+		<p class="mb-0" x-show="poll_count >= max_polls" x-cloak>{{ _("This is taking longer than usual. We will email you once the payment goes through, and your orders page shows its status.") }}</p>
+		<div class="mt-4 d-sm-flex gap-3 justify-content-center" x-show="poll_count >= max_polls" x-cloak>
+			<button type="button" class="btn my-1 btn-secondary" @click="check_again()">{{ _("Check Again") }}</button>
+			<a class="btn btn-outline-secondary my-1 btnhover20" href="{{ orders_url }}">{{ _("My Orders") }}</a>
+		</div>
+	</div>
+
+	<div x-show="state === 'failed'" x-cloak>
+		<div class="cancel-btn mx-auto m-b30"><i class="fa-solid fa-xmark" aria-hidden="true"></i></div>
+		<h4 class="mb-3">{{ _("Your payment did not go through") }}</h4>
+		<p class="mb-0">{{ _("You have not been charged. Your bag still holds the items, so you can try again.") }}</p>
+		<div class="mt-4 d-sm-flex gap-3 justify-content-center">
+			<a class="btn my-1 btn-secondary" href="/{{ language }}/cart">{{ _("Back to Bag") }}</a>
+		</div>
+	</div>
+
+	<div x-show="state === 'error'" x-cloak>
+		<h4 class="mb-3">{{ _("We could not check your payment") }}</h4>
+		<p class="mb-0">{{ _("Check your connection and try again.") }}</p>
+		<div class="mt-4 d-sm-flex gap-3 justify-content-center">
+			<button type="button" class="btn my-1 btn-secondary" @click="check_again()">{{ _("Try Again") }}</button>
+		</div>
+	</div>
+
 	<div x-show="state === 'unconfirmed'" x-cloak>
 		<h4 class="mb-3">{{ _("We could not confirm this order") }}</h4>
 		{% if login_url %}
@@ -94,10 +121,21 @@
 				order_id: config.order_id,
 				order_link: null,
 				orders_url: config.orders_url,
+				// 'checking', then 'confirmed', 'pending' (polled a few times), 'failed' (not paid), 'error' (no answer)
+				// or 'unconfirmed' (no record this shopper can see).
 				state: config.order_id ? "confirmed" : "checking",
+				poll_count: 0,
+				max_polls: 10,
+				poll_timer: null,
 
 				init() {
 					if (this.state !== "checking") return;
+					this.confirm_payment();
+				},
+
+				check_again() {
+					this.poll_count = 0;
+					this.state = "checking";
 					this.confirm_payment();
 				},
 
@@ -119,24 +157,37 @@
 					const payment_mode = url_params.get("payment_mode");
 					if (payment_mode) args.payment_mode = payment_mode;
 
+					let data;
 					try {
-						const { data } = await frappe_call(
+						data = (await frappe_call(
 							"/api/v2/method/commera.api.payments.confirm_payment",
 							args,
-						);
-						if (data.status !== "Paid") {
-							this.state = "unconfirmed";
-							return;
-						}
-						this.order_id = data.order_name || data.ref_docname || reference_id;
-						this.order_link = data.order_link || null;
-						track_purchase(data, this.order_id);
-						Alpine.store("cart").remove_selected();
-						this.state = "confirmed";
+						)).data;
 					} catch (error) {
-						this.state = "unconfirmed";
+						// A refusal names no order this shopper can see; no answer at all is worth another try.
+						this.state = error.type ? "unconfirmed" : "error";
+						return;
 					}
-				},
+					if (data.status === "Pending") {
+						this.state = "pending";
+						clearTimeout(this.poll_timer);
+						if (++this.poll_count < this.max_polls) this.poll_timer = setTimeout(() => this.confirm_payment(), 3000);
+						return;
+					}
+					if (["Not Paid", "Cancelled", "Expired"].includes(data.status)) {
+						this.state = "failed";
+						return;
+					}
+					if (data.status !== "Paid") {
+						this.state = "unconfirmed";
+						return;
+					}
+					this.order_id = data.order_name || data.ref_docname || reference_id;
+					this.order_link = data.order_link || null;
+					track_purchase(data, this.order_id);
+					this.state = "confirmed";
+					Alpine.store("cart").take_cart_after_order();
+					},
 			}));
 		});
 	</script>

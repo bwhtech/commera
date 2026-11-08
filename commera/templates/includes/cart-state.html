@@ -199,6 +199,27 @@
                     if (server_cart) this.apply_server_cart(server_cart);
                 } catch (error) {}
             },
+            // After an order the server has dropped the ordered lines from its cart, so that cart is the one to show.
+            // Ticked lines are not the ordered ones: they may have changed in another tab since checkout.
+            async take_cart_after_order() {
+                // Not past a few seconds: the page moves on after this, and the cart read below is the current one anyway.
+                await Promise.race([this.wait_until_loaded(), new Promise(resolve => setTimeout(resolve, 5000))]);
+                let server_cart;
+                try {
+                    server_cart = (await frappe_call("/api/v2/method/commera.api.server_cart.get_server_cart", {})).data;
+                } catch (error) {
+                    this.remove_selected();
+                    return;
+                }
+                if (server_cart) {
+                    this.apply_server_cart(server_cart);
+                    return;
+                }
+                synced_snapshot = get_snapshot([]);
+                this.items = [];
+                this.version = null;
+                this.is_dirty = false;
+            },
             // Checkout builds from the server cart, so a change still waiting on the debounce must land first.
             async flush_sync() {
                 if (sync_timer || this.is_dirty) await this.sync();

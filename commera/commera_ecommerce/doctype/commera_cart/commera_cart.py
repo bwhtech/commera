@@ -380,9 +380,12 @@ def clear_ordered_cart(quotation, shopper: str | None):
 		cart.revision, cart.revision + 1
 	).where(cart.name == cart_name[0]).run()
 	# The webhook can place the order while the shopper never comes back to sync the browser cart.
+	# The ordered items go, not the ticked lines: another tab can tick more between checkout and payment.
 	line = frappe.qb.DocType("Commera Cart Line")
+	ordered_item_codes = list({row.item_code for row in quotation.get("items") or []})
+	ordered = line.item_code.isin(ordered_item_codes) if ordered_item_codes else line.selected == 1
 	frappe.qb.from_(line).delete().where(
-		(line.parent == cart_name[0]) & (line.parenttype == "Commera Cart") & (line.selected == 1)
+		(line.parent == cart_name[0]) & (line.parenttype == "Commera Cart") & ordered
 	).run()
 
 
