@@ -80,13 +80,20 @@ def write_variant_rating(variant: str) -> None:
 	)
 
 
+def recount_variant_rating(variant: str) -> None:
+	# Two jobs can overlap, so they take turns on the variant lock. The new transaction then counts after it.
+	frappe.db.rollback()
+	frappe.db.get_value("Style Attribute Variant", variant, "name", for_update=True)
+	write_variant_rating(variant)
+
+
 def queue_variant_rating(variant: str) -> None:
 	job_id = f"commera-variant-rating::{variant}"
 	try:
 		# A started job may have counted already, so a second one queues behind it.
 		started = get_job_status(job_id) == JobStatus.STARTED
 		frappe.enqueue(
-			"commera.commera_ecommerce.doctype.product_review.product_review.write_variant_rating",
+			"commera.commera_ecommerce.doctype.product_review.product_review.recount_variant_rating",
 			variant=variant,
 			job_id=None if started else job_id,
 			deduplicate=not started,
