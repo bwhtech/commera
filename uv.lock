@@ -1,0 +1,7 @@
+version = 1
+revision = 5
+requires-python = ">=3.11"
+
+[[package]]
+name = "commera"
+source = { editable = "." }

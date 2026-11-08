@@ -27,41 +27,41 @@
 				</template>
 			</ul>
 			<div class="tabular flex flex-col gap-3 pt-4 text-md">
-				<div class="flex justify-between">
-					<span>{{ _("Subtotal") }}</span>
-					<span x-text="money(details?.total)"></span>
+				<div class="flex justify-between gap-3">
+					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Subtotal") }}</span>
+					<span class="shrink-0 whitespace-nowrap" x-text="money(details?.total)"></span>
 				</div>
 				<template x-for="(discount, index) in (details?.discounts ?? []).filter((discount) => discount.discount_class === 'Order')" :key="index">
 					<div class="flex justify-between gap-3 text-ink-gray-7">
-						<span>{{ _("Discount") }}<span x-show="discount.code || discount.title" x-text="' (' + (discount.code || discount.title) + ')'"></span></span>
-						<span dir="ltr" x-text="'−' + money(discount.amount)"></span>
+						<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Discount") }}<span x-show="discount.code || discount.title" x-text="' (' + (discount.code || discount.title) + ')'"></span></span>
+						<span dir="ltr" class="shrink-0 whitespace-nowrap" x-text="'−' + money(discount.amount)"></span>
 					</div>
 				</template>
-				<div class="flex justify-between">
-					<span>{{ _("Shipping") }}</span>
-					<span x-text="money(details?.shipping ?? 0)"></span>
+				<div class="flex justify-between gap-3">
+					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Shipping") }}</span>
+					<span class="shrink-0 whitespace-nowrap" x-text="money(details?.shipping ?? 0)"></span>
 				</div>
 				<template x-for="(fee, index) in [...(details?.plugin_fees ?? []), ...(details?.taxes ?? [])]" :key="index">
 					<div class="flex justify-between gap-3">
-						<span x-text="fee.description"></span>
-						<span x-text="money(fee.amount)"></span>
+						<span class="min-w-0 [overflow-wrap:anywhere]" x-text="fee.description"></span>
+						<span class="shrink-0 whitespace-nowrap" x-text="money(fee.amount)"></span>
 					</div>
 				</template>
-				<div x-show="details?.cod_charge" class="flex justify-between">
-					<span>{{ _("Cash on delivery fee") }}</span>
-					<span x-text="money(details?.cod_charge)"></span>
+				<div x-show="details?.cod_charge" class="flex justify-between gap-3">
+					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Cash on delivery fee") }}</span>
+					<span class="shrink-0 whitespace-nowrap" x-text="money(details?.cod_charge)"></span>
 				</div>
-				<div x-show="details?.rounding_adjustment" class="flex justify-between">
-					<span>{{ _("Rounding") }}</span>
-					<span dir="ltr" x-text="(details?.rounding_adjustment < 0 ? '−' : '') + money(Math.abs(details?.rounding_adjustment ?? 0))"></span>
+				<div x-show="details?.rounding_adjustment" class="flex justify-between gap-3">
+					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Rounding") }}</span>
+					<span dir="ltr" class="shrink-0 whitespace-nowrap" x-text="(details?.rounding_adjustment < 0 ? '−' : '') + money(Math.abs(details?.rounding_adjustment ?? 0))"></span>
 				</div>
-				<div x-show="details?.payment_mode" class="flex justify-between border-t border-outline-gray-2 pt-3">
-					<span>{{ _("Payment") }}</span>
+				<div x-show="details?.payment_mode" class="flex justify-between gap-3 border-t border-outline-gray-2 pt-3">
+					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Payment") }}</span>
 					<span class="text-ink-gray-7" x-text="details?.payment_mode"></span>
 				</div>
-				<div class="mt-2 flex justify-between border-t border-outline-gray-2 pt-4 text-2xl font-medium">
-					<span>{{ _("Order total") }}</span>
-					<span x-text="money(details?.rounded_total || details?.grand_total)"></span>
+				<div class="mt-2 flex justify-between gap-3 border-t border-outline-gray-2 pt-4 text-2xl font-medium">
+					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Order total") }}</span>
+					<span class="shrink-0 whitespace-nowrap" x-text="money(details?.rounded_total || details?.grand_total)"></span>
 				</div>
 			</div>
 		</div>
