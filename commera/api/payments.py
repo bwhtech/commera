@@ -822,7 +822,9 @@ def resolve_checkout_payment(reference_id: str, payment_mode: str | None = None)
 		return {"status": payment_request.status, **purchase_summary(payment_request)}
 
 	validate_reference_owner("Quotation", reference_id)
-	if frappe.db.get_value("Quotation", reference_id, "docstatus") == 1:
+	# Locked, as the gateway path is: a second confirm (double click, retried request) waits here, then finds
+	# the order the first one placed instead of submitting the cart again.
+	if frappe.db.get_value("Quotation", reference_id, "docstatus", for_update=True) == 1:
 		return {"status": "Paid", **quotation_purchase_summary(reference_id)}
 
 	if not is_cod(payment_mode):

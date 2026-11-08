@@ -171,6 +171,10 @@ def validate_can_cancel(order_doc):
 	if frappe.db.exists("Delivery Note Item", {"against_sales_order": order_doc.name, "docstatus": ["<", 2]}):
 		frappe.throw(_("This order is already being prepared for shipment."))
 
+	# A carrier booking made straight from the order, with no Delivery Note, would stay live.
+	if frappe.db.exists("Shipment", {"custom_sales_order": order_doc.name, "docstatus": ["<", 2]}):
+		frappe.throw(_("This order is already being prepared for shipment."))
+
 	if not is_shoppers_order(order_doc):
 		frappe.throw(_("Action not allowed"))
 

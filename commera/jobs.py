@@ -187,20 +187,40 @@ def notify_users_if_item_in_stock(item_code):
 		pluck="user",
 	)
 	for user in user_subscriptions:
+		# Claimed before sending: two stock updates for the same item run this at once, and only the job
+		# that flips the flag sends the email.
+		if not claim_oos_subscription(item_code, user):
+			continue
 		try:
 			frappe.sendmail(recipients=[user], subject=subject, message=message, now=True)
-			frappe.db.set_value(
-				"OOS Notify Subscription",
-				{"item": item_code, "user": user},
-				{"notified": True},
-			)
 		except Exception as e:
+			set_oos_notified(item_code, user, notified=False)
 			frappe.log_error(
 				title="Error sending Item in stock email",
 				message=e,
 				reference_doctype="OOS Notify Subscription",
 				reference_name=user,
 			)
+
+
+def claim_oos_subscription(item_code: str, user: str) -> bool:
+	return set_oos_notified(item_code, user, notified=True)
+
+
+def set_oos_notified(item_code: str, user: str, notified: bool) -> bool:
+	subscription = frappe.qb.DocType("OOS Notify Subscription")
+	(
+		frappe.qb.update(subscription)
+		.set(subscription.notified, int(notified))
+		.where(
+			(subscription.item == item_code)
+			& (subscription.user == user)
+			& (subscription.notified == int(not notified))
+		)
+	).run()
+	# The update row-locks the subscription until this job commits, so a second job waits, then matches
+	# nothing.
+	return frappe.db._cursor.rowcount > 0
 
 
 def delete_notified_oos():
@@ -219,7 +239,20 @@ def delete_old_draft_quotations():
 		},
 		pluck="name",
 	)
+	# A cart with a payment still open is where sync_pending_gateway_payments places the order: keep it
+	# until that payment settles, however old the cart itself is.
+	paying = set(
+		frappe.get_all(
+			"Gateway Payment Request",
+			filters={"ref_doctype": "Quotation", "ref_docname": ("in", old_drafts), "status": "Pending"},
+			pluck="ref_docname",
+		)
+		if old_drafts
+		else ()
+	)
 	for quotation in old_drafts:
+		if quotation in paying:
+			continue
 		try:
 			frappe.delete_doc("Quotation", quotation)
 		except Exception as e:
@@ -228,9 +261,8 @@ def delete_old_draft_quotations():
 
 def sync_pending_gateway_payments():
 	"""Settle checkouts the shopper's browser never confirmed, so captured money always reaches an order."""
-	# ponytail: a request older than the lookback is left to manual reconciliation - delete_old_draft_
-	# quotations already removes the draft cart it points at after 6 hours, so the order can no longer
-	# be placed from it. Widen both windows together, never this one alone.
+	# ponytail: a request older than the lookback is left to manual reconciliation. delete_old_draft_
+	# quotations keeps the draft cart of a Pending request, so the order can still be placed from it.
 	now = now_datetime()
 	pending_requests = frappe.get_all(
 		"Gateway Payment Request",

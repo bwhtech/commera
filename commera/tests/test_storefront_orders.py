@@ -7,6 +7,7 @@ from commera.api.admin.orders import fulfil_order
 from commera.api.storefront import orders
 from commera.order_access import set_order_access_key
 from commera.sdk.types import ReturnOptions, ShopperOrderDetail
+from commera.shipping.testing import insert_shipment_record
 from commera.tests.test_admin_orders import make_test_sales_order
 from commera.tests.test_order_access import make_website_user
 
@@ -35,6 +36,14 @@ class TestStorefrontOrders(IntegrationTestCase):
 			set(order), ShopperOrderDetail.__required_keys__ | ShopperOrderDetail.__optional_keys__
 		)
 		self.assertTrue(order["is_cancelled"])
+
+	def test_an_order_booked_with_a_carrier_cannot_be_cancelled_by_the_shopper(self):
+		insert_shipment_record(self.sales_order.name, "Ready To Ship")
+		frappe.set_user(self.shopper)
+
+		self.assertRaisesRegex(
+			frappe.ValidationError, "prepared for shipment", orders.cancel_order, self.sales_order.name
+		)
 
 	def test_only_the_shopper_acts_on_their_order(self):
 		frappe.set_user(self.other)

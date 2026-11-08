@@ -6,6 +6,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from commera import jobs
 from commera.tests import test_payment_hooks as payment_hooks
 
 STORE_WAREHOUSE = "Stores - LSD"
@@ -74,3 +75,23 @@ class TestBackInStockEmail(IntegrationTestCase):
 		self.assertEqual(self.notified_items, [], "a worker cannot read the stock entry before commit")
 		frappe.db.after_commit.run()
 		self.assertEqual(self.notified_items, [item_code])
+
+
+class TestBackInStockClaim(IntegrationTestCase):
+	def test_only_one_job_claims_a_subscription_and_a_failed_send_releases_it(self):
+		item_code = f"ZZ-CLAIM-{frappe.generate_hash(length=8)}"
+		user = "Administrator"
+		frappe.get_doc(
+			{
+				"doctype": "OOS Notify Subscription",
+				"name": frappe.generate_hash(length=10),
+				"item": item_code,
+				"user": user,
+				"notified": 0,
+			}
+		).db_insert()
+
+		self.assertTrue(jobs.claim_oos_subscription(item_code, user))
+		self.assertFalse(jobs.claim_oos_subscription(item_code, user), "the second job must not send again")
+		self.assertTrue(jobs.set_oos_notified(item_code, user, notified=False))
+		self.assertTrue(jobs.claim_oos_subscription(item_code, user))

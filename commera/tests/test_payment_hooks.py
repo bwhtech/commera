@@ -24,7 +24,7 @@ from commera.api.payments import (
 	place_cod_order,
 	validate_cart_is_not_in_checkout,
 )
-from commera.jobs import sync_pending_gateway_payments
+from commera.jobs import delete_old_draft_quotations, sync_pending_gateway_payments
 from commera.plugin_events import (
 	PLUGINS_USER,
 	RETRY_DELAYS_IN_MINUTES,
@@ -591,6 +591,24 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 			add_to_date(now_datetime(), minutes=-minutes),
 			update_modified=False,
 		)
+
+	def test_the_old_cart_cleanup_keeps_a_cart_whose_payment_is_still_open(self):
+		paying = self.create_cart_quotation()
+		self.create_pending_payment_request(paying)
+		abandoned = self.create_cart_quotation()
+		for quotation in (paying, abandoned):
+			frappe.db.set_value(
+				"Quotation",
+				quotation.name,
+				"creation",
+				add_to_date(now_datetime(), hours=-7),
+				update_modified=False,
+			)
+
+		delete_old_draft_quotations()
+
+		self.assertTrue(frappe.db.exists("Quotation", paying.name))
+		self.assertFalse(frappe.db.exists("Quotation", abandoned.name))
 
 	def test_the_sweep_places_an_order_the_shopper_never_came_back_to_confirm(self):
 		quotation = self.create_cart_quotation()
