@@ -10,6 +10,7 @@
   "column_break_link",
   "server_url",
   "linked_on",
+  "linked_hostname",
   "site_key"
  ],
  "fields": [
@@ -43,6 +44,14 @@
    "fieldtype": "Datetime",
    "label": "Linked On",
    "read_only": 1
+  },
+  {
+   "fieldname": "linked_hostname",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Linked Hostname",
+   "read_only": 1,
+   "description": "This site's own hostname when it linked. Commera Cloud may register the site under another one."
   },
   {
    "fieldname": "site_key",

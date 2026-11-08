@@ -124,6 +124,16 @@ class StartStoreSetupTestCase(IntegrationTestCase):
 		self.assertEqual(status["status"], "failed")
 		self.assertTrue(status["error"])
 
+	def test_running_while_the_job_waits_for_the_request_to_commit_is_still_running(self):
+		with patch("frappe.enqueue"):
+			onboarding.queue_store_setup({"company_name": STORE["store_name"]})
+		self.addCleanup(frappe.cache.delete_value, onboarding.SETUP_QUEUEING_CACHE_KEY)
+
+		with patch("commera.onboarding.is_job_enqueued", return_value=False):
+			self.assertEqual(onboarding.get_setup_status(), {"status": "running", "error": None})
+			frappe.cache.delete_value(onboarding.SETUP_QUEUEING_CACHE_KEY)
+			self.assertEqual(onboarding.get_setup_status()["status"], "failed")
+
 	def test_rejects_invalid_store_details(self):
 		for override in (
 			{"store_name": "  "},

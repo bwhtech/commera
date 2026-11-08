@@ -2,6 +2,8 @@
 
 import frappe
 
+from commera.commera_ecommerce.doctype.bulk_publish_variants.bulk_publish_variants import save_publish_state
+
 
 def publish_all_demo_items():
 	"""Publish all demo product items to website"""
@@ -64,13 +66,14 @@ def publish_all_demo_items():
 				sav_fixed += 1
 
 	# Publish all SAVs that have sizes
-	sav_published = 0
-	all_savs = frappe.get_all("Style Attribute Variant", fields=["name"])
-	for sav in all_savs:
-		has_sizes = frappe.db.exists("Color Size Item", {"parent": sav.name})
-		if has_sizes:
-			frappe.db.set_value("Style Attribute Variant", sav.name, "is_published", 1)
-			sav_published += 1
+	to_publish = [
+		sav.name
+		for sav in frappe.get_all("Style Attribute Variant", filters={"is_published": 0}, fields=["name"])
+		if frappe.db.exists("Color Size Item", {"parent": sav.name})
+	]
+	# Through the bulk publisher, which also updates the search index and announces product_updated.
+	save_publish_state(1, to_publish)
+	sav_published = len(to_publish)
 
 	# Fix Website Item routes (should be simple slug without prefix)
 	website_items = frappe.get_all("Website Item", fields=["name", "item_code", "route"])

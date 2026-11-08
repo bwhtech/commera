@@ -62,6 +62,9 @@ class ProductReview(Document):
 def recompute_variant_rating(variant: str) -> None:
 	"""Published-only aggregate for the variant's storefront summary. Called from this controller on
 	publish/unpublish/delete instead of a scheduled sweep, so the numbers are never stale."""
+	# Locked first: two reviews published at once would each count without the other and the later write
+	# would keep a stale total.
+	frappe.db.get_value("Style Attribute Variant", variant, "name", for_update=True)
 	summary = get_rating_summary(variant)
 	frappe.db.set_value(
 		"Style Attribute Variant",
