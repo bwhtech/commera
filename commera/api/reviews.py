@@ -39,17 +39,21 @@ def find_qualifying_purchase(variant: str) -> dict | None:
 	return rows[0] if rows else None
 
 
-def get_rating_summary(variant: str) -> dict:
+def get_rating_summary(variant: str, current: bool = False) -> dict:
 	"""Published-only average + count for one variant, in a single query."""
 	product_review = frappe.qb.DocType("Product Review")
-	rows = (
+	query = (
 		frappe.qb.from_(product_review)
 		.select(
 			Count(product_review.name).as_("review_count"), Avg(product_review.rating).as_("average_rating")
 		)
 		.where(product_review.variant == variant)
 		.where(product_review.is_published == 1)
-	).run(as_dict=True)
+	)
+	# REPEATABLE READ keeps the transaction's old snapshot; a locking read sees other commits.
+	if current and frappe.db.db_type == "mariadb":
+		query = query.for_update()
+	rows = query.run(as_dict=True)
 
 	row = rows[0] if rows else None
 	return {
