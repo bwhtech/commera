@@ -15,6 +15,7 @@ import ThemeSettingsPanel from '../../components/storefront/ThemeSettingsPanel.v
 import PreviewOptions from '../../components/storefront/PreviewOptions.vue'
 import { SECTION_GROUPS, createLayoutEditor, pageLabel, saveThemeThumbnail } from '../../data/themeLayout'
 import { errorMessage } from '../../data/errors'
+import { confirmLeave } from '../../utils/confirmLeave'
 
 const PANELS = [
   { label: 'Sections', value: 'tree' },
@@ -192,20 +193,6 @@ const actions = computed(() => [
     onClick: publish,
   },
 ])
-
-// Resolves true when the merchant chose to go on, false when they chose to stay.
-function confirmLeave(title, message) {
-  return new Promise((resolve) => {
-    dialog.confirm({
-      title,
-      message,
-      theme: 'red',
-      confirmLabel: 'Leave',
-      onConfirm: () => resolve(true),
-      onCancel: () => resolve(false),
-    })
-  })
-}
 
 // Layout drafts save themselves on the way out; theme settings have their own Save, so they are
 // asked about. A failed save asks too: without the choice the only way out was Discard.

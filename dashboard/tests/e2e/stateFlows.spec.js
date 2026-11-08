@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe } from 'node:test'
-import { adminGet, clickByText, findByText, goto, text, uiTest, useSession, wait } from './harness.js'
+import { PREFIX, RUN_ID, adminGet, adminPost, clickByText, findByText, goto, onCleanup, text, uiTest, useSession, wait } from './harness.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
@@ -243,6 +243,71 @@ describe('state flows', () => {
       await wait(800)
       assert.equal(writes.prices, 1, `prices were written ${writes.prices} times`)
       assert.equal(writes.receipts, 1, `stock was received ${writes.receipts} times`)
+    } finally {
+      page.off('request', onRequest)
+      await page.setRequestInterception(false)
+    }
+  })
+
+  uiTest(session, 'discount editor: no false unsaved prompt, edits are guarded, and Save and Active never overlap', async () => {
+    const { page } = session
+    const discount = await adminPost(page, 'discounts.save_discount', {
+      discount: {
+        title: `${PREFIX} Discount`,
+        code: `E2E${RUN_ID}`,
+        method: 'Code',
+        discount_type: 'Amount Off Order',
+        enabled: 1,
+        value_type: 'Percentage',
+        value: 5,
+      },
+    })
+    onCleanup(session, ({ page: cleanupPage }) => adminPost(cleanupPage, 'discounts.delete_discount', { name: discount.name }))
+    page.removeAllListeners('dialog')
+    page.on('dialog', (dialog) => dialog.accept())
+
+    // Opened and left untouched: leaving must not ask.
+    await goto(page, `/discounts/${encodeURIComponent(discount.name)}`)
+    await waitFor(async () => (await text(page)).includes('Setup'), { label: 'the editor' })
+    const push = (path) =>
+      page.evaluate((target) => document.querySelector('#app').__vue_app__.config.globalProperties.$router.push(target), path)
+    await push('/discounts')
+    await wait(800)
+    assert.ok(!(await text(page)).includes('Discard unsaved changes?'), 'an untouched discount asked about unsaved changes')
+    assert.ok(page.url().endsWith('/discounts'), 'leaving an untouched discount was blocked')
+
+    // Edited: leaving asks, and Cancel stays.
+    await goto(page, `/discounts/${encodeURIComponent(discount.name)}`)
+    await waitFor(async () => (await text(page)).includes('Setup'), { label: 'the editor' })
+    // The value box: the discount was made at 5%.
+    const valueBox = (
+      await page.evaluateHandle(() => [...document.querySelectorAll('input')].find((input) => input.value === '5'))
+    ).asElement()
+    assert.ok(valueBox, 'no value box')
+    await valueBox.click()
+    await valueBox.type('0')
+    push('/discounts').catch(() => {})
+    await waitFor(async () => (await text(page)).includes('Discard unsaved changes?'), { label: 'the unsaved prompt' })
+    await clickByText(page, '[role=dialog] button', 'Cancel')
+    assert.ok(page.url().includes(`/discounts/${encodeURIComponent(discount.name)}`), 'Cancel left the editor')
+
+    // Save and the Active switch write through one request: while one runs the other is shut.
+    const writes = []
+    const onRequest = (request) => {
+      if (request.isInterceptResolutionHandled()) return
+      if (!request.url().includes('discounts.save_discount')) return request.continue()
+      writes.push(request.postData())
+      setTimeout(() => request.continue(), 800)
+    }
+    await page.setRequestInterception(true)
+    page.on('request', onRequest)
+    try {
+      await clickByText(page, 'button', 'Save', { pause: 50 })
+      const toggle = await page.$('button[role=switch]')
+      await toggle.click().catch(() => {})
+      await waitFor(async () => (await text(page)).includes('Saved'), { label: 'the save toast' })
+      await wait(1200)
+      assert.equal(writes.length, 1, `Save and Active overlapped: ${writes.length} writes`)
     } finally {
       page.off('request', onRequest)
       await page.setRequestInterception(false)
