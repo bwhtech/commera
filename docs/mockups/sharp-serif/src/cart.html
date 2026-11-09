@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@head-->
+<title>Cart · Émail</title>
+</head>
+<body data-page="cart">
+<!--@header-->
+<main tabindex="-1" id="main">
+	<div class="container cart">
+		<header class="cart-head">
+			<h1 class="h1">Your cart <span class="muted num" data-cart-title-count>(4)</span></h1>
+			<a href="collection.html" class="arrow-link">Continue shopping {icon:arrow icon-sm}</a>
+		</header>
+
+		<div class="cart-layout">
+			<section aria-label="Items">
+				<div class="ship-progress">
+					<p class="small">{icon:truck icon-sm} Your order ships free.</p>
+					
+				</div>
+				<div class="line-head small muted" aria-hidden="true"><span>Product</span><span>Quantity</span><span>Total</span></div>
+				<ul class="lines">
+					<li class="line" data-line="casserole-mint">
+						<a href="product.html?item=casserole-mint" class="line-media"><img src="img/casserole-mint.jpg" alt="Lidded casserole in Mint"></a>
+						<div class="line-info">
+							<a href="product.html?item=casserole-mint" class="line-title">Lidded casserole</a>
+							<p class="small muted">Mint · 3.5 L</p>
+							<p class="small num price"><s>$98</s><span class="sale">$84</span></p>
+						</div>
+						<div class="stepper stepper-sm" aria-label="Quantity"><button aria-label="Decrease">{icon:minus icon-sm}</button><output>1</output><button aria-label="Increase">{icon:plus icon-sm}</button></div>
+						<p class="line-total num">$84.00</p>
+						<button class="line-remove link small muted">Remove</button>
+					</li>
+					<li class="line" data-line="jug-delft">
+						<a href="product.html?item=jug-delft" class="line-media"><img src="img/jug-delft.jpg" alt="Water jug in Delft"></a>
+						<div class="line-info">
+							<a href="product.html?item=jug-delft" class="line-title">Water jug</a>
+							<p class="small muted">Delft · 1.8 L</p>
+							<p class="small num price">$72</p>
+						</div>
+						<div class="stepper stepper-sm" aria-label="Quantity"><button aria-label="Decrease">{icon:minus icon-sm}</button><output>1</output><button aria-label="Increase">{icon:plus icon-sm}</button></div>
+						<p class="line-total num">$72.00</p>
+						<button class="line-remove link small muted">Remove</button>
+					</li>
+					<li class="line" data-line="cup-jade">
+						<a href="product.html?item=cup-jade" class="line-media"><img src="img/cup-jade.jpg" alt="Camp cup in Jade"></a>
+						<div class="line-info">
+							<a href="product.html?item=cup-jade" class="line-title">Camp cup</a>
+							<p class="small muted">Jade · 300 ml</p>
+							<p class="small num price">$18</p>
+						</div>
+						<div class="stepper stepper-sm" aria-label="Quantity"><button aria-label="Decrease">{icon:minus icon-sm}</button><output>2</output><button aria-label="Increase">{icon:plus icon-sm}</button></div>
+						<p class="line-total num">$36.00</p>
+						<button class="line-remove link small muted">Remove</button>
+					</li>
+				</ul>
+				<label class="gift check"><input type="checkbox" data-gift> This is a gift. Add a note and leave prices off the packing slip.</label>
+				<label class="gift-note small" hidden>Gift note<textarea maxlength="300" placeholder="A few words for the recipient"></textarea></label>
+			</section>
+
+			<aside class="summary" aria-label="Order summary">
+				<h2 class="h3">Order summary</h2>
+				<dl class="totals num">
+					<div><dt>Subtotal</dt><dd data-subtotal>$192.00</dd></div>
+					<div><dt>Shipping</dt><dd data-shipping>Free</dd></div>
+					<div><dt>Tax</dt><dd class="muted">At checkout</dd></div>
+				</dl>
+				<details class="promo"><summary>Have a discount code?</summary><form class="input-group" data-promo><label class="field"><span class="sr-only">Discount code</span><input placeholder="Discount code" required></label><button class="btn btn-secondary">Apply</button></form><p class="small muted" role="status" data-promo-feedback></p></details>
+				<dl class="totals totals-grand num"><div><dt>Total</dt><dd><span class="muted small">USD</span><span data-total>$192.00</span></dd></div></dl>
+				<p class="small savings" data-savings>You are saving $14.00 on this order.</p>
+				<button class="btn btn-primary btn-block" data-info="Checkout">{icon:lock icon-sm} Check out</button>
+				<div class="pay pay-light" role="group" aria-label="Payment methods"><span>VISA</span><span>MC</span><span>AMEX</span><span>PAYPAL</span></div>
+				<p class="small muted summary-note">Free returns within 30 days. Questions? <button class="link small" data-info="Contact">Contact the workshop</button>.</p>
+			</aside>
+		</div>
+	</div>
+
+	<section class="section rule">
+		<div class="container">
+			<div class="section-head">
+				<div><p class="eyebrow">Before you go</p><h2 class="h2">Add a little something</h2></div>
+			</div>
+			<div class="grid grid-4">
+				<!--@cards:funnel-mint,cup-sky,candle-holder-mint,coffee-pot-sand-->
+			</div>
+		</div>
+	</section>
+</main>
+<!--@footer-->
+<script src="cart.js"></script>
+</body>
+</html>
