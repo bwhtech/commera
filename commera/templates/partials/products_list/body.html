@@ -10,6 +10,9 @@
     </h1>
     {% include "templates/components/filter_offcanvas.html" %}
 </div>
+{% if collection_header and collection_header.description %}
+<div class="mb-6 max-w-3xl text-base text-gray-600">{{ collection_header.description }}</div>
+{% endif %}
 <div class="flex flex-col gap-12 md:flex-row">
     <div class="hidden md:block md:w-1/4">
         <div class="sticky top-6">

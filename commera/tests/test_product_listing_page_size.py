@@ -179,7 +179,10 @@ class ProductListingPageSizeTestCase(IntegrationTestCase):
 	def test_unknown_category_is_dropped_and_the_other_filters_still_apply(self):
 		context = self.get_listing(category=f"stale-tab-{self.suffix.lower()}")
 
-		self.assertEqual(context.category, "")
+		# The listing shows one collection, so the collection heads it, never the typed category.
+		self.assertEqual(
+			context.category, frappe.db.get_value("Item Group", self.item_group, "custom_displayname")
+		)
 		self.assertEqual(context.selected_filters["category"], "")
 		self.assertEqual(context.total_count, FIXTURE_COUNT)
 

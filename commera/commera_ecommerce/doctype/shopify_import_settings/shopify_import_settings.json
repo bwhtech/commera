@@ -1,0 +1,210 @@
+{
+ "actions": [],
+ "creation": "2026-11-02 12:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "connection_section",
+  "shop_domain",
+  "auth_method",
+  "client_id",
+  "client_secret",
+  "access_token",
+  "api_version",
+  "column_break_connection",
+  "shop_name",
+  "shop_currency",
+  "primary_domain",
+  "granted_scopes",
+  "connected_on",
+  "mapping_section",
+  "page_option_names",
+  "option_attribute",
+  "default_collection",
+  "column_break_mapping",
+  "publish_active_products",
+  "import_inventory",
+  "add_collections_to_menu",
+  "sync_section",
+  "last_import_started_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "connection_section",
+   "fieldtype": "Section Break",
+   "label": "Connection"
+  },
+  {
+   "description": "The store's myshopify.com domain, for example <code>my-store.myshopify.com</code>.",
+   "fieldname": "shop_domain",
+   "fieldtype": "Data",
+   "label": "Shop Domain"
+  },
+  {
+   "default": "Client Credentials",
+   "description": "Client Credentials: the Client ID and Secret of a Dev Dashboard app installed on this store. Access Token: an Admin API access token.",
+   "fieldname": "auth_method",
+   "fieldtype": "Select",
+   "label": "Authentication",
+   "options": "Client Credentials\nAccess Token"
+  },
+  {
+   "depends_on": "eval:doc.auth_method=='Client Credentials'",
+   "fieldname": "client_id",
+   "fieldtype": "Data",
+   "label": "Client ID"
+  },
+  {
+   "depends_on": "eval:doc.auth_method=='Client Credentials'",
+   "fieldname": "client_secret",
+   "fieldtype": "Password",
+   "label": "Client Secret"
+  },
+  {
+   "depends_on": "eval:doc.auth_method=='Access Token'",
+   "fieldname": "access_token",
+   "fieldtype": "Password",
+   "label": "Access Token"
+  },
+  {
+   "default": "2026-10",
+   "description": "Shopify Admin API version, for example <code>2026-10</code>. Use 2026-01 or later: older versions cannot read the status of bulk exports.",
+   "fieldname": "api_version",
+   "fieldtype": "Data",
+   "label": "API Version"
+  },
+  {
+   "fieldname": "column_break_connection",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "shop_name",
+   "fieldtype": "Data",
+   "label": "Shop Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "shop_currency",
+   "fieldtype": "Data",
+   "label": "Shop Currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "primary_domain",
+   "fieldtype": "Data",
+   "label": "Primary Domain",
+   "read_only": 1
+  },
+  {
+   "fieldname": "granted_scopes",
+   "fieldtype": "Small Text",
+   "label": "Granted Scopes",
+   "read_only": 1
+  },
+  {
+   "fieldname": "connected_on",
+   "fieldtype": "Datetime",
+   "label": "Connected On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mapping_section",
+   "fieldtype": "Section Break",
+   "label": "Product Mapping"
+  },
+  {
+   "default": "Color\nColour",
+   "description": "One Shopify option name per line. Each value of the first matching option becomes its own product page. Every other option goes to the size picker.",
+   "fieldname": "page_option_names",
+   "fieldtype": "Small Text",
+   "label": "Options That Make Product Pages"
+  },
+  {
+   "default": "Color",
+   "description": "The Item Attribute that holds the values of the option above. It is created when it does not exist.",
+   "fieldname": "option_attribute",
+   "fieldtype": "Data",
+   "label": "Page Attribute"
+  },
+  {
+   "description": "For products that are in no Shopify collection. Empty: a collection called Shopify is created.",
+   "fieldname": "default_collection",
+   "fieldtype": "Link",
+   "label": "Default Collection",
+   "options": "Item Group"
+  },
+  {
+   "fieldname": "column_break_mapping",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "publish_active_products",
+   "fieldtype": "Check",
+   "label": "Publish Active Products"
+  },
+  {
+   "default": "1",
+   "description": "Sets the stock of each size in the Ecommerce Warehouse to the Shopify quantity.",
+   "fieldname": "import_inventory",
+   "fieldtype": "Check",
+   "label": "Import Stock"
+  },
+  {
+   "default": "0",
+   "fieldname": "add_collections_to_menu",
+   "fieldtype": "Check",
+   "label": "Add Collections to the Store Menu"
+  },
+  {
+   "fieldname": "sync_section",
+   "fieldtype": "Section Break",
+   "label": "Sync"
+  },
+  {
+   "description": "A run with Only Changed reads the records that Shopify changed after this time.",
+   "fieldname": "last_import_started_on",
+   "fieldtype": "Datetime",
+   "label": "Last Import Started On",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-02 12:00:00",
+ "modified_by": "Administrator",
+ "module": "Commera Ecommerce",
+ "name": "Shopify Import Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Commera Admin",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -14,6 +14,9 @@
 	<div class="container">
 		<div class="dz-bnr-inr-entry">
 			<h1>{{ (category or _("Products")) | e }}</h1>
+			{% if collection_header and collection_header.description %}
+			<div class="mb-3">{{ collection_header.description }}</div>
+			{% endif %}
 			<nav aria-label="{{ _('breadcrumb') }}" class="breadcrumb-row">
 				<ul class="breadcrumb">
 					<li class="breadcrumb-item"><a href="/{{ frappe.lang or 'en' }}/">{{ _("Home") }}</a></li>

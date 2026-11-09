@@ -64,10 +64,40 @@ def apply_category_scope(selected_filters):
 	return category_root
 
 
+def get_collection_header(subcategories):
+	"""The collection whose text heads the page, when the listing shows exactly one."""
+	if len(subcategories) != 1:
+		return None
+	collection = frappe.db.get_value(
+		"Item Group",
+		subcategories[0],
+		[
+			"name",
+			"custom_displayname",
+			"image",
+			"custom_description",
+			"custom_meta_title",
+			"custom_meta_description",
+		],
+		as_dict=True,
+	)
+	if not collection:
+		return None
+	return frappe._dict(
+		label=collection.custom_displayname or collection.name,
+		description=collection.custom_description,
+		meta_title=collection.custom_meta_title,
+		meta_description=collection.custom_meta_description,
+		og_image=collection.image,
+	)
+
+
 def get_context(context):
 	page = get_current_page()
 	selected_filters = get_selected_filters()
 	category_root = apply_category_scope(selected_filters)
+	# A menu tab keeps its own label and SEO. A bare collection link uses the collection's.
+	collection_header = None if category_root else get_collection_header(selected_filters["subcategory"])
 	filters, price_range = get_product_filters(selected_filters)
 	context.page_length = get_page_size()
 	context.page_size_options = PAGE_SIZE_OPTIONS
@@ -91,13 +121,17 @@ def get_context(context):
 			"href": "#",
 		}
 	]
-	context.category = category_root["label"] if category_root else ""
+	context.collection_header = collection_header
+	if collection_header:
+		context.category = collection_header.label
+	else:
+		context.category = category_root["label"] if category_root else ""
 
 	context.seo = seo.build_collection_seo(
 		context.category,
 		context.breadcrumbs,
 		total_count=context.total_count,
-		category_doc=category_root,
+		category_doc=collection_header or category_root,
 	)
 	context.json_ld = [
 		seo.build_collection_json_ld(context.category, context.breadcrumbs, context.total_count),
