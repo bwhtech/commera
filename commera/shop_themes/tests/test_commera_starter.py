@@ -62,6 +62,16 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			validate_layout(self.theme_context, layout, page)
 
+	def test_the_account_dashboard_lands_on_the_starter_orders_page(self):
+		renderer = ThemePageRenderer("en/account/dashboard")
+		renderer.theme_dirs = [STARTER_DIR]
+		renderer.template_path = "pages/account/dashboard.html"
+		renderer.requires_auth = True
+
+		with self.assertRaises(frappe.Redirect):
+			renderer.render()
+		self.assertEqual(frappe.flags.redirect_location, "/en/account/orders")
+
 	def test_every_starter_layout_passes_the_layout_checks(self):
 		for page in ("index", "header_group", "footer_group"):
 			with self.subTest(page):
