@@ -78,3 +78,4 @@ reference_themes/
 
 # Commera e2e artifacts — failure screenshots and the cached login session.
 dashboard/tests/e2e/.artifacts/
+/uv.lock

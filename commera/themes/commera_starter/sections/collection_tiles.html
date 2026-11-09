@@ -1,17 +1,26 @@
+{% from "components/macros/icons.html" import icon %}
 {% from "components/macros/image.html" import image with context %}
 {% set language = frappe.lang or "en" %}
 {% if section.blocks %}
-<section class="grid gap-8 px-5 py-20 md:grid-cols-3 md:px-12">
-	{% for tile in section.blocks %}
-	{% set collection = commera.catalog.get_collection(tile.settings.collection) if tile.settings.collection else None %}
-	{% set title = tile.settings.title or (collection.title if collection else "") %}
-	<a href="/{{ language }}/products{{ '?category=' ~ collection.handle | urlencode if collection else '' }}"{{ tile.editor_attributes }}>
-		{{ image(tile.settings.image or (collection.image if collection else None), title, 960) }}
-		<p class="mt-4 text-lg">{{ title }}</p>
-		{% if collection %}
-		<p class="text-sm text-ink-gray-6">{{ _("{0} pieces").format(commera.catalog.list_products(collection=collection.handle, page_size=1).total) }}</p>
-		{% endif %}
-	</a>
-	{% endfor %}
+<section class="section-top">
+	<div class="section-x -my-2 flex snap-x snap-mandatory gap-3 overflow-x-auto py-2 [scrollbar-width:none] md:grid {{ {1: 'md:grid-cols-1', 2: 'md:grid-cols-2'}.get(section.blocks | length, 'md:grid-cols-3') }} md:gap-6 md:overflow-visible [&::-webkit-scrollbar]:hidden">
+		{% for tile in section.blocks %}
+		{% set collection = commera.catalog.get_collection(tile.settings.collection) if tile.settings.collection else None %}
+		{% set title = tile.settings.title or (collection.title if collection else "") %}
+		<a href="/{{ language }}/products{{ '?category=' ~ collection.handle | urlencode if collection else '' }}" class="group relative block w-[78%] shrink-0 snap-start scroll-ms-5 overflow-hidden rounded-2xl md:w-auto"{{ tile.editor_attributes }}>
+			{{ image(tile.settings.image or (collection.image if collection else None), title, 960, "aspect-[4/5] w-full rounded-2xl object-cover object-top group-hover:scale-[1.03]") }}
+			<div class="pointer-events-none absolute inset-0 rounded-2xl bg-linear-to-t from-black/55 via-black/10 via-45% to-transparent"></div>
+			<div class="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5 text-white md:p-6">
+				<div class="min-w-0">
+					<p class="text-3xl font-medium md:text-4xl">{{ title }}</p>
+					{% if collection %}
+					<p class="tabular mt-0.5 text-base opacity-80">{{ _("{0} products").format(commera.catalog.list_products(collection=collection.handle, page_size=1).total) }}</p>
+					{% endif %}
+				</div>
+				<span class="grid size-10 shrink-0 place-items-center rounded-full bg-white text-black transition-transform duration-300 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span>
+			</div>
+		</a>
+		{% endfor %}
+	</div>
 </section>
 {% endif %}

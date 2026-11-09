@@ -2,7 +2,7 @@
 
 {% macro search_form(query="") %}
 <form action="/{{ frappe.lang or 'en' }}/products" class="flex w-full max-w-md gap-2" role="search">
-	<input type="search" enterkeyhint="search" name="search" value="{{ query }}" placeholder="{{ _('Search products') }}" aria-label="{{ _('Search products') }}" class="h-10 w-full min-w-0 rounded-lg border border-transparent bg-surface-gray-2 px-3 text-lg text-ink-gray-8 outline-none placeholder:text-ink-gray-4 hover:bg-surface-gray-3 focus:border-outline-gray-4 focus:bg-surface-base focus:shadow-sm">
-	<button type="submit" class="grid size-10 shrink-0 place-items-center rounded-lg bg-brand text-on-brand hover:bg-brand-hover" aria-label="{{ _('Search') }}">{{ icon("search") }}</button>
+	<input type="search" enterkeyhint="search" name="search" value="{{ query }}" placeholder="{{ _('Search products') }}" aria-label="{{ _('Search products') }}" class="field">
+	<button type="submit" class="button-primary w-12 shrink-0 px-0" aria-label="{{ _('Search') }}">{{ icon("search") }}</button>
 </form>
 {%- endmacro %}

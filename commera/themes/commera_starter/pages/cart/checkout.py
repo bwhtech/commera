@@ -19,7 +19,7 @@ def get_context(context):
 		"country": shop.get_shop()["country"],
 		"saved_addresses": [address["name"] for address in context.saved_addresses],
 		"pickup_titles": {location["id"]: location["title"] for location in context.pickup_locations},
-		"sign_in_url": f"/login?redirect-to=/{language}/cart/checkout",
+		"sign_in_url": f"/{language}/account/login?redirect-to=/{language}/cart/checkout",
 	}
 	context.seo = seo.build_page_seo({"noindex": 1}, display_name=_("Checkout"))
 	return context

@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from frappe.utils import validate_email_address
 from frappe.utils.data import cint, cstr
 
 from commera.branding import get_brand_assets
@@ -19,7 +20,17 @@ from commera.shop_data import get_storefront_menu
 from commera.utils import get_country_list, get_store_company, get_store_currency
 from commera.www.sitemap_segment import SEGMENT_CONFIG, get_segment_filters, get_urls_per_page
 
-__all__ = ["get_menu", "get_page", "get_shop", "get_sitemap", "list_countries", "list_pages"]
+__all__ = [
+	"get_menu",
+	"get_page",
+	"get_shop",
+	"get_sitemap",
+	"list_countries",
+	"list_pages",
+	"subscribe_to_newsletter",
+]
+
+NEWSLETTER_EMAIL_GROUP = "Newsletter"
 
 SITEMAP_KINDS = tuple(SEGMENT_CONFIG)
 
@@ -83,6 +94,24 @@ def get_footer_menu_item(section: FooterSection) -> MenuItem:
 			for link in section["links"]
 		],
 	}
+
+
+def subscribe_to_newsletter(email: str) -> None:
+	"""Add `email` to the Newsletter Email Group. Subscribing again clears an earlier unsubscribe."""
+	email = validate_email_address(cstr(email).strip(), throw=True)
+	if not frappe.db.exists("Email Group", NEWSLETTER_EMAIL_GROUP):
+		frappe.get_doc({"doctype": "Email Group", "title": NEWSLETTER_EMAIL_GROUP}).insert(
+			ignore_permissions=True
+		)
+	member = frappe.db.get_value(
+		"Email Group Member", {"email_group": NEWSLETTER_EMAIL_GROUP, "email": email}
+	)
+	if member:
+		frappe.db.set_value("Email Group Member", member, "unsubscribed", 0)
+		return
+	frappe.get_doc(
+		{"doctype": "Email Group Member", "email_group": NEWSLETTER_EMAIL_GROUP, "email": email}
+	).insert(ignore_permissions=True)
 
 
 def get_page(handle: str) -> ContentPage | None:

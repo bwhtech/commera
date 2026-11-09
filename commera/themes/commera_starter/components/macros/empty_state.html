@@ -1,0 +1,10 @@
+{% from "components/macros/icons.html" import icon %}
+
+{% macro empty_state(title, text="", icon_name="bag", show="", role="") %}
+<div {% if show %}x-cloak x-show="{{ show }}" {% endif %}{% if role %}role="{{ role }}" {% endif %}class="flex flex-1 flex-col items-center justify-center px-5 py-16 text-center">
+	<span class="grid size-16 place-items-center rounded-full bg-surface-gray-2 text-ink-gray-6">{{ icon(icon_name, "size-7") }}</span>
+	<p class="mt-5 text-3xl font-medium text-ink-gray-9">{{ title }}</p>
+	{% if text %}<p class="mt-2 max-w-[36ch] text-p-md text-ink-gray-6">{{ text }}</p>{% endif %}
+	{% if caller is defined %}<div class="mt-7 flex flex-wrap justify-center gap-2">{{ caller() }}</div>{% endif %}
+</div>
+{%- endmacro %}

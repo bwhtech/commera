@@ -1,5 +1,6 @@
 import importlib.util
 import os
+from urllib.parse import quote
 
 import frappe
 from frappe.utils.data import cint
@@ -51,6 +52,7 @@ THEME_OVERRIDABLE_PREFIX = "components/"
 DEFAULT_APP_NAME = "Commera"
 
 NOT_FOUND_TEMPLATE = "pages/404.html"
+LOGIN_TEMPLATE = "pages/account/login.html"
 
 
 def find_theme_file(theme_dirs, relative_path):
@@ -153,7 +155,7 @@ class ThemePageRenderer:
 
 	def render(self):
 		if self.requires_auth and frappe.session.user == "Guest":
-			raise frappe.PermissionError
+			self.redirect_guest_to_login()
 
 		context = build_base_context(self.match)
 		try:
@@ -165,13 +167,26 @@ class ThemePageRenderer:
 		html = self.render_with_theme_loader(context)
 		return build_response(self.path, html, self.http_status_code or 200)
 
+	def redirect_guest_to_login(self):
+		"""Send a guest to the theme's own login page, which returns them here after signing in."""
+		if not find_theme_file(self.theme_dirs, LOGIN_TEMPLATE):
+			raise frappe.PermissionError
+		return_path = quote("/" + self.get_request_path(), safe="/")
+		frappe.flags.redirect_location = (
+			f"/{frappe.local.lang or 'en'}/account/login?redirect-to={return_path}"
+		)
+		raise frappe.Redirect(302)
+
 	def render_not_found(self):
+		html = self.get_not_found_html()
+		return build_response(self.path, html, 404, {"Cache-Control": "no-store"})
+
+	def get_not_found_html(self):
 		frappe.clear_last_message()
 		self.template_path = NOT_FOUND_TEMPLATE
 		context = build_base_context(None)
 		run_page_controller(self.theme_dirs, self.template_path, context)
-		html = self.render_with_theme_loader(context)
-		return build_response(self.path, html, 404, {"Cache-Control": "no-store"})
+		return self.render_with_theme_loader(context)
 
 	def render_with_theme_loader(self, context):
 		theme_env = get_theme_environment(get_jenv(), self.theme_dirs)
@@ -334,3 +349,13 @@ def apply_website_context_hooks(context):
 		values = frappe.get_attr(hook_method)(context)
 		if values:
 			context.update(values)
+
+
+def get_theme_not_found_html(path):
+	"""The active theme's 404 page for `path`, or None when no theme is active or it has no 404 page."""
+	theme_context = get_render_theme_context()
+	if not theme_context["theme_name"] or not find_theme_file(theme_context["dirs"], NOT_FOUND_TEMPLATE):
+		return None
+	renderer = ThemePageRenderer(path)
+	renderer.theme_dirs = theme_context["dirs"]
+	return renderer.get_not_found_html()

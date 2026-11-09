@@ -1,45 +1,45 @@
 {% from "components/macros/icons.html" import icon, spinner %}
 
 {% macro order_summary(total="cart?.total") -%}
-<div x-data="order_summary" class="flex flex-col gap-3 text-base">
+<div x-data="order_summary" class="tabular flex flex-col gap-3 text-md">
 	<div class="flex justify-between gap-3">
-		<span class="min-w-0 truncate" title="{{ _("Subtotal") }}">{{ _("Subtotal") }}</span>
+		<span class="min-w-0 [overflow-wrap:anywhere]" title="{{ _("Subtotal") }}">{{ _("Subtotal") }}</span>
 		<span class="shrink-0 whitespace-nowrap" x-text="money(subtotal)"></span>
 	</div>
 	<template x-for="(discount, index) in discounts" :key="index">
 		<div class="flex justify-between gap-3 text-ink-gray-7">
-			<span class="min-w-0 truncate" :title='{{ _("Discount") | tojson }} + (discount.label ? " (" + discount.label + ")" : "")'>{{ _("Discount") }}<span x-show="discount.label" x-text="' (' + discount.label + ')'"></span></span>
+			<span class="min-w-0 [overflow-wrap:anywhere]" :title='{{ _("Discount") | tojson }} + (discount.label ? " (" + discount.label + ")" : "")'>{{ _("Discount") }}<span x-show="discount.label" x-text="' (' + discount.label + ')'"></span></span>
 			<span dir="ltr" class="shrink-0 whitespace-nowrap" x-text="'−' + money(discount.amount)"></span>
 		</div>
 	</template>
 	<template x-for="(fee, index) in cart?.plugin_fees ?? []" :key="index">
 		<div class="flex justify-between gap-3">
-			<span class="min-w-0 truncate" :title="fee.description" x-text="fee.description"></span>
+			<span class="min-w-0 [overflow-wrap:anywhere]" :title="fee.description" x-text="fee.description"></span>
 			<span class="shrink-0 whitespace-nowrap" x-text="money(fee.amount)"></span>
 		</div>
 	</template>
 	{% if caller is defined %}{{ caller() }}{% endif %}
 
-	<form @submit.prevent="apply_code()" class="mt-2 flex gap-2">
+	<form @submit.prevent="apply_code()" class="mt-2 flex flex-wrap gap-2">
 		<label for="discount-code" class="sr-only">{{ _("Discount code") }}</label>
-		<input id="discount-code" x-model="code" autocomplete="off" placeholder="{{ _('Discount code') }}" class="h-10 min-w-0 flex-1 rounded-lg border border-outline-gray-2 bg-surface-base px-3 text-lg text-ink-gray-8 outline-none placeholder:text-ink-gray-4 focus:border-outline-gray-4 focus:shadow-sm">
-		<button type="submit" :disabled="busy || !code.trim()" :aria-busy="busy === 'apply'" class="relative inline-flex h-10 shrink-0 items-center rounded-lg border border-outline-gray-2 bg-surface-base px-3 text-lg font-medium text-ink-gray-8 hover:border-outline-gray-3 disabled:text-ink-gray-4">{{ _("Apply") }}{{ spinner("busy === 'apply'", "size-5 text-ink-gray-8") }}</button>
+		<input id="discount-code" x-model="code" autocomplete="off" placeholder="{{ _('Discount code') }}" class="field min-w-0 flex-[1_1_9rem]">
+		<button type="submit" :disabled="busy || !code.trim()" :aria-busy="busy === 'apply'" class="button-secondary relative shrink-0">{{ _("Apply") }}{{ spinner("busy === 'apply'", "size-5 text-ink-gray-8") }}</button>
 	</form>
-	<p x-show="error" x-text="error" role="alert" class="text-sm text-ink-red-6"></p>
+	<p x-show="error" x-text="error" role="alert" class="text-base text-ink-red-7"></p>
 	<ul x-show="discount_codes.length" class="flex flex-col gap-2">
 		<template x-for="code_state in discount_codes" :key="code_state.code">
 			<li>
-				<span class="inline-flex h-8 items-center gap-1 rounded-lg bg-surface-gray-3 ps-3 text-sm font-medium text-ink-gray-8">
-					<span x-text="code_state.code"></span>
-					<button type="button" @click="remove_code(code_state.code)" :disabled="busy" :aria-busy="busy === 'remove:' + code_state.code" class="relative grid size-8 aria-busy:text-transparent place-items-center rounded-lg text-ink-gray-6 hover:text-ink-gray-9" aria-label="{{ _('Remove discount code') }}">{{ icon("close", "size-4") }}{{ spinner("busy === 'remove:' + code_state.code", "size-4 text-ink-gray-6", overlay=true) }}</button>
+				<span class="inline-flex min-h-10 max-w-full items-center gap-1 rounded-lg bg-surface-gray-3 ps-3 text-base font-medium text-ink-gray-8">
+					<span class="min-w-0 [overflow-wrap:anywhere]" x-text="code_state.code"></span>
+					<button type="button" @click="remove_code(code_state.code)" :disabled="busy" :aria-busy="busy === 'remove:' + code_state.code" class="relative grid size-10 shrink-0 aria-busy:text-transparent place-items-center rounded-lg text-ink-gray-6 hover:text-ink-gray-9" aria-label="{{ _('Remove discount code') }}">{{ icon("close", "size-4") }}{{ spinner("busy === 'remove:' + code_state.code", "size-4 text-ink-gray-6", overlay=true) }}</button>
 				</span>
-				<p x-show="code_state.reason" x-text="code_state.reason" class="mt-1 text-sm text-ink-gray-6"></p>
+				<p x-show="code_state.reason" x-text="code_state.reason" class="mt-1 text-base text-ink-gray-6"></p>
 			</li>
 		</template>
 	</ul>
 
-	<div class="mt-2 flex justify-between gap-3 border-t border-outline-gray-2 pt-4 text-xl font-medium">
-		<span class="min-w-0 truncate" title="{{ _("Order total") }}">{{ _("Order total") }}</span>
+	<div class="mt-2 flex justify-between gap-3 border-t border-outline-gray-2 pt-4 text-2xl font-medium">
+		<span class="min-w-0 [overflow-wrap:anywhere]" title="{{ _("Order total") }}">{{ _("Order total") }}</span>
 		<span class="shrink-0 whitespace-nowrap" x-text="money({{ total }})"></span>
 	</div>
 </div>

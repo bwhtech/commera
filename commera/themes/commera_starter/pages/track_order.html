@@ -3,13 +3,12 @@
 {% from "components/macros/form.html" import field, submit_button %}
 
 {% block body %}
-{% call account_shell("", _("Track order"), show_nav=False) %}
+{% call account_shell("", _("Track order"), show_nav=False, lede=_("Enter your order number and the email you checked out with. We will email you a link to the order.")) %}
 <form x-data="track_order" @submit.prevent="send()" class="flex max-w-lg flex-col gap-5">
-	<p class="text-p-base text-ink-gray-7">{{ _("Enter your order number and the email you checked out with. We will email you a link to the order.") }}</p>
 	{{ field("order_number", _("Order number"), "order_number", required=True, autocomplete="off") }}
 	{{ field("email", _("Email address"), "email", type="email", required=True, autocomplete="email") }}
-	<p x-cloak x-show="error" x-text="error" class="text-sm text-ink-red-6" role="alert"></p>
-	<p x-cloak x-show="message" x-text="message" class="text-sm text-ink-green-6" role="status"></p>
+	<p x-cloak x-show="error" x-text="error" class="text-base text-ink-red-7" role="alert"></p>
+	<p x-cloak x-show="message" x-text="message" class="text-base text-ink-green-6" role="status"></p>
 	<div>{{ submit_button(_("Email me the link")) }}</div>
 </form>
 {% endcall %}

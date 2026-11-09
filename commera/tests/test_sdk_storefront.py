@@ -97,6 +97,24 @@ class TestSdkStorefront(ProductDetailPriceTestCase):
 		self.assertNotIn(same_style, handles)
 		self.assertEqual(catalog.get_recommendations("no-such-product"), [])
 
+	def test_recommendations_are_empty_when_the_item_group_has_no_other_style(self):
+		route = self.make_priced_variant("LONESTYLE", default_rate=40)
+		frappe.db.set_value("Style Attribute Variant", {"route": route}, "item_group", "Services")
+
+		self.assertEqual(catalog.get_recommendations(route), [])
+
+	def test_newsletter_subscribe_adds_the_email_once_and_clears_an_unsubscribe(self):
+		email = f"news-{self.suffix}@example.com"
+		member = {"email_group": shop.NEWSLETTER_EMAIL_GROUP, "email": email}
+
+		shop.subscribe_to_newsletter(f" {email} ")
+		frappe.db.set_value("Email Group Member", member, "unsubscribed", 1)
+		shop.subscribe_to_newsletter(email)
+
+		self.assertEqual(frappe.db.count("Email Group Member", member), 1)
+		self.assertEqual(frappe.db.get_value("Email Group Member", member, "unsubscribed"), 0)
+		self.assertRaises(frappe.InvalidEmailAddressError, shop.subscribe_to_newsletter, "not-an-email")
+
 	def test_money_uses_the_storefront_currency_symbol(self):
 		symbol = frappe.db.get_value("Currency", "INR", "symbol")
 		self.assertEqual(format.money(1234.5, "INR"), f"{symbol}1,234.50")

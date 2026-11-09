@@ -125,7 +125,7 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		status, html = self.render("pages/products/list.html", "/en/products", sizes="ZZ-NO-SIZE")
 
 		self.assertEqual(status, 200)
-		self.assertIn("No products match these filters.", html)
+		self.assertIn("No products match these filters", html)
 		self.assertIn('aria-label="Remove ZZ-NO-SIZE"', html)
 		self.assertIn('href="/en/products"', html)
 
@@ -190,7 +190,7 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		status, html = self.render("pages/cart/cart.html", "/en/cart")
 
 		self.assertEqual(status, 200)
-		self.assertEqual(html.count("Your cart is empty."), 2)
+		self.assertEqual(html.count("Your cart is empty<"), 2)
 		self.assertEqual(html.count("$store.cart.checkout()"), 2)
 		self.assertIn('x-data="order_summary"', html)
 		self.assertIn('id="discount-code"', html)

@@ -1,3 +1,4 @@
+{% from "components/macros/transitions.html" import popover %}
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/pagination.html" import pagination %}
 {% from "components/macros/product_card.html" import product_card with context %}
@@ -8,45 +9,51 @@
 	{% if query %}<input type="hidden" name="search" value="{{ query }}">{% endif %}
 	{% if collection %}<input type="hidden" name="category" value="{{ collection.handle }}">{% endif %}
 	{% if section.settings.show_filters %}
-	<div class="mt-8 flex flex-wrap gap-2" @click.outside="open = ''" @keydown.escape="open = ''">
+	<div class="relative mt-6 border-b border-outline-gray-2 pb-6" @click.outside="open = ''" @keydown.escape="close()">
+	<div class="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
 		{% for key, label, values in facet_filters if values %}
-		<div class="relative">
-			<button type="button" @click="toggle('{{ key }}')" :aria-expanded="open === '{{ key }}'" class="inline-flex h-8 items-center gap-1 rounded-lg border border-outline-gray-2 bg-surface-base px-2.5 text-base font-medium text-ink-gray-8 hover:border-outline-gray-3">{{ label }}{{ icon("down", "size-4") }}</button>
-			<div x-cloak x-show="open === '{{ key }}'" class="absolute start-0 top-full z-20 mt-1 max-h-72 w-56 overflow-y-auto rounded-xl border border-outline-gray-2 bg-surface-base p-1.5 shadow-lg">
+		<div class="sm:relative">
+			<button type="button" @click="toggle('{{ key }}')" data-filter="{{ key }}" :aria-expanded="open === '{{ key }}'" class="pill">{{ label }}<span :class="open === '{{ key }}' && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
+			<div x-cloak x-show="open === '{{ key }}'" {{ popover() }} class="absolute inset-x-0 top-full z-20 -mt-4 max-h-80 sm:inset-x-auto sm:start-0 sm:mt-2 sm:w-64 overflow-y-auto popover p-1.5">
 				{% for facet in values %}
-				<label class="flex h-8 items-center gap-2 rounded-lg px-2 text-base text-ink-gray-8 hover:bg-surface-gray-3">
-					<input type="checkbox" name="{{ key }}" value="{{ facet.value }}" {{ "checked" if facet.value in selected[key] }} class="size-4 accent-current">
-					<span class="flex-1">{{ facet.value }}</span>
-					<span class="text-sm text-ink-gray-5">{{ facet.count }}</span>
+				<label class="flex min-h-10 items-center gap-2.5 rounded-lg px-2.5 py-2 text-md text-ink-gray-8 hover:bg-surface-gray-3">
+					<input type="checkbox" name="{{ key }}" value="{{ facet.value }}" {{ "checked" if facet.value in selected[key] }} class="size-4 shrink-0">
+					<span class="min-w-0 flex-1 [overflow-wrap:anywhere]">{{ facet.value }}</span>
+					<span class="tabular shrink-0 text-base text-ink-gray-6">{{ facet.count }}</span>
 				</label>
 				{% endfor %}
 			</div>
 		</div>
 		{% endfor %}
-		<div class="relative">
-			<button type="button" @click="toggle('price')" :aria-expanded="open === 'price'" class="inline-flex h-8 items-center gap-1 rounded-lg border border-outline-gray-2 bg-surface-base px-2.5 text-base font-medium text-ink-gray-8 hover:border-outline-gray-3">{{ _("Price") }}{{ icon("down", "size-4") }}</button>
-			<div x-cloak x-show="open === 'price'" @change.stop class="absolute start-0 top-full z-20 mt-1 w-64 rounded-xl border border-outline-gray-2 bg-surface-base p-3 shadow-lg">
-				<div class="flex gap-2">
-					<input type="number" name="min" min="0" value="{{ selected.min if selected.min is not none }}" placeholder="{{ facets.price.min | int }}" aria-label="{{ _('Lowest price') }}" class="h-8 w-full min-w-0 rounded-lg bg-surface-gray-2 px-2 text-base text-ink-gray-8 outline-none">
-					<input type="number" name="max" min="0" value="{{ selected.max if selected.max is not none }}" placeholder="{{ facets.price.max | int }}" aria-label="{{ _('Highest price') }}" class="h-8 w-full min-w-0 rounded-lg bg-surface-gray-2 px-2 text-base text-ink-gray-8 outline-none">
+		<div class="sm:relative">
+			<button type="button" @click="toggle('price')" data-filter="price" :aria-expanded="open === 'price'" class="pill">{{ _("Price") }}<span :class="open === 'price' && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
+			<div x-cloak x-show="open === 'price'" {{ popover() }} @change.stop class="absolute inset-x-0 top-full z-20 -mt-4 sm:inset-x-auto sm:start-0 sm:mt-2 sm:w-64 popover p-3">
+				<div class="grid grid-cols-2 gap-2">
+					<label class="text-xs font-medium text-ink-gray-7">{{ _("From") }}
+						<input type="number" name="min" min="0" step="any" inputmode="decimal" value="{{ selected.min if selected.min is not none }}" placeholder="{{ commera.format.money(facets.price.min) }}" class="field mt-1 h-10 font-normal">
+					</label>
+					<label class="text-xs font-medium text-ink-gray-7">{{ _("To") }}
+						<input type="number" name="max" min="0" step="any" inputmode="decimal" value="{{ selected.max if selected.max is not none }}" placeholder="{{ commera.format.money(facets.price.max) }}" class="field mt-1 h-10 font-normal">
+					</label>
 				</div>
-				<label class="mt-3 flex items-center gap-2 text-base text-ink-gray-8"><input type="checkbox" name="has_discount" value="1" {{ "checked" if selected.has_discount }} class="size-4 accent-current">{{ _("On sale only") }}</label>
-				<button type="submit" class="mt-3 inline-flex h-8 w-full items-center justify-center rounded-lg bg-brand px-2.5 text-base font-medium text-on-brand hover:bg-brand-hover">{{ _("Apply") }}</button>
+				<label class="mt-2 flex min-h-10 items-center gap-2 text-md text-ink-gray-8"><input type="checkbox" name="has_discount" value="1" {{ "checked" if selected.has_discount }} class="size-4">{{ _("On sale only") }}</label>
+				<button type="submit" class="button-primary button-small mt-3 w-full">{{ _("Apply") }}</button>
 			</div>
 		</div>
+	</div>
 	</div>
 	{% if chips %}
 	<div class="mt-3 flex flex-wrap items-center gap-2">
 		{% for chip in chips %}
-		<a href="{{ chip.url }}" class="inline-flex h-6 items-center gap-1 rounded-full bg-surface-gray-2 px-2 text-sm text-ink-gray-7 hover:bg-surface-gray-3" aria-label="{{ _('Remove {0}').format(chip.label) }}">{{ chip.label }}{{ icon("close", "size-3") }}</a>
+		<a href="{{ chip.url }}" class="inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-full bg-surface-gray-2 py-1 pe-2 ps-3 text-base text-ink-gray-7 hover:bg-surface-gray-3" aria-label="{{ _('Remove {0}').format(chip.label) }}"><span class="min-w-0 [overflow-wrap:anywhere]">{{ chip.label }}</span>{{ icon("close", "size-3 shrink-0") }}</a>
 		{% endfor %}
-		<a href="{{ reset_url }}" class="inline-flex h-6 items-center rounded-lg px-1.5 text-sm text-ink-gray-7 underline hover:bg-surface-gray-3">{{ _("Reset") }}</a>
+		<a href="{{ reset_url }}" class="inline-flex h-10 items-center rounded-lg px-2 text-base text-ink-gray-7 link hover:text-ink-gray-9">{{ _("Reset") }}</a>
 	</div>
 	{% endif %}
 	{% endif %}
 </form>
 
-<div class="mt-10 grid grid-cols-2 gap-x-5 gap-y-12 md:gap-x-8 {{ 'md:grid-cols-4' if section.settings.columns == '4' else 'md:grid-cols-3' }}">
+<div class="mt-8 grid grid-cols-2 gap-x-3 gap-y-10 md:gap-x-6 md:gap-y-14 {{ 'md:grid-cols-3 xl:grid-cols-4' if section.settings.columns == '4' else 'md:grid-cols-3' }}">
 	{% for product in listing.products %}
 	{{ product_card(product) }}
 	{% endfor %}
