@@ -87,6 +87,15 @@ def delete_translations(doc, method=None):
 	frappe.db.delete(DOCTYPE, {"reference_doctype": doc.doctype, "reference_name": doc.name})
 
 
+def read_source(doctype: str, name: str, field: str):
+	"""The text a translation of the field translates. A controller's `get_translation_source`
+	can read it from elsewhere, such as a product's Item."""
+	if frappe.get_meta(doctype).has_field(field):
+		return frappe.db.get_value(doctype, name, field)
+	doc = frappe.get_doc(doctype, name)
+	return getattr(doc, "get_translation_source", doc.get)(field)
+
+
 def get_source_hash(source) -> str:
 	return sha256_hash(cstr(source))
 

@@ -58,6 +58,7 @@ MAX_PAGE_SIZE = 48
 FACETS_CACHE_PREFIX = "commera:storefront_facets:"
 FACETS_CACHE_SECONDS = 5 * 60
 PRODUCT_DOCTYPE = "Style Attribute Variant"
+PRODUCT_CONTENT_FIELDS = ("display_name", "description", "meta_title", "meta_description")
 # Only a top-level menu entry owns a route_slug, so these are the menu tabs.
 COLLECTION_FILTERS = {"enabled": 1, "route_slug": ("is", "set")}
 COLLECTION_FIELDS = [
@@ -270,14 +271,15 @@ def get_product(handle: str) -> Product | None:
 
 	product_variant, item = detail["product_variant"], detail["product"]
 	variants = get_variants(detail["available_sizes"])
-	title = get_titles([product_variant], [item.get("custom_item_name_ar")])[0] or item.item_name
+	content = get_product_content(product_variant, item)
+	title = content["display_name"] or item.item_name
 	return {
 		"id": product_variant.name,
 		"handle": product_variant.route,
 		"title": title,
 		"vendor": item.brand,
-		"color": product_variant.attribute_value,
-		"description_html": item.description or "",
+		"color": translate_term(product_variant.attribute_value),
+		"description_html": content["description"],
 		"images": detail["images"],
 		"collection": get_product_collection(product_variant.item_group),
 		"currency": get_store_currency(),
@@ -290,9 +292,7 @@ def get_product(handle: str) -> Product | None:
 			"average": flt(product_variant.average_rating),
 			"count": cint(product_variant.review_count),
 		},
-		"seo": get_seo(
-			product_variant.meta_title, title, product_variant.meta_description, product_variant.noindex
-		),
+		"seo": get_seo(content["meta_title"], title, content["meta_description"], product_variant.noindex),
 		"updated_at": str(product_variant.modified),
 	}
 
@@ -360,8 +360,11 @@ def get_product_cards(cards: list[dict]) -> list[ProductCard]:
 	item_codes = [size["item_code"] for card in cards for size in card["sizes"]]
 	stock = get_available_stocks(item_codes, get_ecommerce_warehouse())
 	currency = get_store_currency()
-	titles = get_titles(cards, [card.get("custom_item_name_ar") for card in cards])
-	return [get_product_card(card, title, stock, currency) for card, title in zip(cards, titles, strict=True)]
+	contents = translate_products(cards, [card.get("custom_item_name_ar") for card in cards])
+	return [
+		get_product_card(card, content["display_name"], stock, currency)
+		for card, content in zip(cards, contents, strict=True)
+	]
 
 
 def get_product_card(card: dict, title: str, stock: dict, currency: str) -> ProductCard:
@@ -371,7 +374,7 @@ def get_product_card(card: dict, title: str, stock: dict, currency: str) -> Prod
 		"title": title or card["item_name"],
 		"vendor": card["brand"],
 		"product_type": card["item_group"],
-		"color": card["attribute_value"],
+		"color": translate_term(card["attribute_value"]),
 		"image": card["image"],
 		"hover_image": card["hover_image"],
 		"currency": currency,
@@ -383,13 +386,22 @@ def get_product_card(card: dict, title: str, stock: dict, currency: str) -> Prod
 	}
 
 
-def get_titles(product_variants: list, legacy_titles: list) -> list[str]:
-	"""Product titles in the request language. Cards and the product page share them, so they always match."""
+def get_product_content(product_variant, item) -> dict[str, str]:
+	# The product page shows its Item's description, translated as the product's own field.
+	source = {**product_variant.as_dict(), "description": item.description}
+	return translate_products([source], [item.get("custom_item_name_ar")], PRODUCT_CONTENT_FIELDS)[0]
+
+
+def translate_products(
+	product_variants: list, legacy_titles: list, fields: tuple[str, ...] = ("display_name",)
+) -> list[dict[str, str]]:
+	"""Product `fields` in the request language. Cards and the product page share it, so titles always match."""
 	localization = get_localization()
-	translated = translate(product_variants, ["display_name"], localization, doctype=PRODUCT_DOCTYPE)
+	translated = translate(product_variants, list(fields), localization, doctype=PRODUCT_DOCTYPE)
 	return [
-		pick_title(fields["display_name"], legacy_title, localization.language.code)
-		for fields, legacy_title in zip(translated, legacy_titles, strict=True)
+		{field: value.value for field, value in values.items()}
+		| {"display_name": pick_title(values["display_name"], legacy_title, localization.language.code)}
+		for values, legacy_title in zip(translated, legacy_titles, strict=True)
 	]
 
 
@@ -416,7 +428,7 @@ def get_variant(size: dict, default_price: float | None, sale_price: float | Non
 	stock = size["stock_detail"]
 	return {
 		"id": size["item_code"],
-		"title": size["size"],
+		"title": translate_term(size["size"]),
 		"price": price,
 		"compare_at_price": flt(default_price) if default_price and price < flt(default_price) else None,
 		"available": bool(stock.get("in_stock")),
@@ -431,9 +443,10 @@ def get_options(product_variant, sizes: list[dict]) -> list[ProductOption]:
 		"Style Attribute Configurator", product_variant.configurator, "item_attribute"
 	)
 	if attribute and attribute != DEFAULT_OPTION_ATTRIBUTE:
-		options.append({"name": attribute, "values": get_sibling_values(product_variant)})
+		options.append({"name": translate_term(attribute), "values": get_sibling_values(product_variant)})
 	if len(sizes) > 1 or (sizes and sizes[0]["size"] != DEFAULT_SIZE_VALUE):
-		options.append({"name": _("Size"), "values": [{"name": size["size"]} for size in sizes]})
+		values = [{"name": translate_term(size["size"])} for size in sizes]
+		options.append({"name": _("Size", lang=get_localization().language.code), "values": values})
 	return options
 
 
@@ -450,7 +463,7 @@ def get_sibling_values(product_variant) -> list[dict]:
 	swatches = get_swatch_map()
 	return [
 		{
-			"name": sibling.attribute_value,
+			"name": translate_term(sibling.attribute_value),
 			"handle": sibling.route,
 			"selected": sibling.name == product_variant.name,
 			"available": any(
@@ -461,6 +474,11 @@ def get_sibling_values(product_variant) -> list[dict]:
 		}
 		for sibling in siblings
 	]
+
+
+def translate_term(term: str | None) -> str | None:
+	# Option names and values are shared terms: one Frappe Translation covers every product.
+	return _(term, lang=get_localization().language.code) if term else term
 
 
 def get_product_collection(item_group: str | None) -> dict | None:
