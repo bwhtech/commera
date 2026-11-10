@@ -36,6 +36,7 @@ __all__ = [
 	"PaymentSession",
 	"PickupLocation",
 	"PlacedOrder",
+	"PriceFacet",
 	"PricedCart",
 	"PricedCartLine",
 	"Product",
@@ -363,11 +364,18 @@ class FacetValue(TypedDict):
 	count: int
 
 
+class PriceFacet(TypedDict):
+	min: float
+	max: float
+	# The request market's currency, which `min` and `max` are in.
+	currency: str
+
+
 class ProductFacets(TypedDict):
 	brands: list[FacetValue]
 	colors: list[FacetValue]
 	sizes: list[FacetValue]
-	price: dict[str, float]
+	price: PriceFacet
 
 
 class ProductPage(TypedDict):

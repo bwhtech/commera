@@ -2,6 +2,7 @@ import frappe
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Count, Max, Min
 
+from commera.base_prices import is_base_price
 from commera.localization.market_prices import MarketPrices
 from commera.product_detail import size_sort_key
 from commera.search import query as search_query
@@ -89,6 +90,7 @@ def get_price_range(sale_price_list: str | None) -> dict:
 			Max(item_price.price_list_rate).as_("max_price"),
 		)
 		.where(item_price.price_list == sale_price_list)
+		.where(is_base_price(item_price))
 	).run(as_dict=True)
 	return price_range[0] if price_range else {"min_price": 0, "max_price": 0}
 

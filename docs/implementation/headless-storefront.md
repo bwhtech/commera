@@ -53,7 +53,7 @@ The catalogue and cart methods allow guests. The [account methods](#account-meth
 
 | Method | Returns |
 | --- | --- |
-| `products.get_products` | One page of product cards with the facets of the whole result. Each brand, colour and size facet value has its product count, as `{"value": "K&N", "count": 3}`. The other selected filters narrow each count, but the facet's own filter does not. `price` is the `min` and `max` sale price. Filters: `collection`, `query`, `brands`, `colors`, `sizes`, `min_price`, `max_price`, `on_sale`. `sort` is `default`, `price_low`, `price_high`, `name`, `new_arrival` or `discount`. |
+| `products.get_products` | One page of product cards with the facets of the whole result. Each brand, colour and size facet value has its product count, as `{"value": "K&N", "count": 3}`. The other selected filters narrow each count, but the facet's own filter does not. `price` is the `min` and `max` sale price and the `currency` they are in. Filters: `collection`, `query`, `brands`, `colors`, `sizes`, `min_price`, `max_price`, `on_sale`. `sort` is `default`, `price_low`, `price_high`, `name`, `new_arrival` or `discount`. |
 | `products.get_product` | One product: images, the colour option with sibling handles and stock, the size option, and one variant for each size with its price, list price and stock. |
 | `collections.get_collections`, `collections.get_collection` | Enabled menu tabs (top-level Ecommerce Categories), by route slug. The `title`, the `description`, and the `seo` title and description are in the request language. `seo.custom_title` is true when the merchant set the meta title, as on a product. |
 | `shop.get_shop` | Store name and description, currency, logo, the menu from Ecommerce Category, the footer, and the resolved `localization`. The store name and description, menu labels, and footer section titles and link labels are in the request language. Link targets and URLs stay as the merchant entered them. |
@@ -209,8 +209,17 @@ On a secondary market page, or an API request with that market's `_country`, pro
 
 - `price` is the rate in the sale price list. Commera does not convert currency.
 - `compare_at_price` is the rate in the compare-at price list when it is higher than `price`.
-- An item with no rate in the sale price list has `price: null` and `available: false` in that market. `cart.add_lines` refuses it.
+- An item with no rate in the sale price list has `price: null` and `available: false` in that market. `cart.add_lines` and `cart.set_lines` refuse it. `cart.update_lines` and `cart.set_lines` refuse a higher quantity of it, but a lower quantity or a removal is always allowed.
+- A product card is available only when one size has both a market price and stock.
+- The price facet (`facets.price`) has the `min`, `max` and `currency` of the market.
 - The primary market does not change: an item with no sale price uses its compare-at price.
+- A market with no sale price list keeps the store prices. This occurs before the schema sync, or when the backfill patch could not fill the market.
+
+Only base Item Price rows set a public price: a row with a customer or a batch is not shown, not used in a filter or a facet, and does not make an item available (`commera/base_prices.py`). Item Price validity dates do not apply.
+
+The product OG card (`/og-image/<handle>.png`) shows the store price. A secondary market page links the card without a price: `/og-image/<handle>.png?price=none`, which has its own cache file.
+
+The patch `set_market_price_lists` gives each market without a sale price list the Commera Settings lists: the sale price list (or the default price list when there is no sale list) as the sale price list, the default price list as the compare-at list, and their currency. It logs a market it cannot fill. Items with only a default price, and no rate in the sale price list, are unavailable in that market until you give the market a complete sale price list.
 
 The cart keeps the store price list and currency. Search sorting, price filters on the search index and taxes do not use market prices yet.
 

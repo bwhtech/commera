@@ -14,6 +14,7 @@ from commera.sdk.types import (
 	CatalogItem,
 	Collection,
 	FacetValue,
+	PriceFacet,
 	Product,
 	ProductCard,
 	ProductOption,
@@ -168,7 +169,7 @@ def list_products(
 		"total": get_total_product_count(filters=filters),
 		"page": page,
 		"page_size": page_size,
-		"facets": {**get_facets(filters), "price": get_price_facet(MarketPrices.current().sale_price_list)},
+		"facets": {**get_facets(filters), "price": get_market_price_facet()},
 	}
 
 
@@ -186,7 +187,7 @@ def search(query: str, page: int = 1, page_size: int = 24, sort: str = "default"
 				"brands": [],
 				"colors": [],
 				"sizes": [],
-				"price": get_price_facet(MarketPrices.current().sale_price_list),
+				"price": get_market_price_facet(),
 			},
 		}
 	return {
@@ -261,6 +262,11 @@ def get_facets(filters: dict) -> dict[str, list[FacetValue]]:
 	return facets
 
 
+def get_market_price_facet() -> PriceFacet:
+	prices = MarketPrices.current()
+	return {**get_price_facet(prices.sale_price_list), "currency": prices.currency}
+
+
 @redis_cache(ttl=FACETS_CACHE_SECONDS)
 def get_price_facet(sale_price_list: str | None) -> dict:
 	price_range = get_price_range(sale_price_list)
@@ -294,7 +300,7 @@ def get_product(handle: str) -> Product | None:
 		"collection": get_product_collection(product_variant.item_group),
 		"currency": prices.currency,
 		# A secondary market has no price for a product it does not sell.
-		"price": min(prices_paid, default=0 if prices.is_primary else None),
+		"price": min(prices_paid, default=0 if prices.uses_store_prices else None),
 		"available": any(variant["available"] for variant in variants),
 		"options": get_options(product_variant, detail["available_sizes"]),
 		"variants": variants,
@@ -370,13 +376,16 @@ def get_seo(meta_title: str | None, title: str, meta_description: str | None, no
 def get_product_cards(cards: list[dict]) -> list[ProductCard]:
 	item_codes = [size["item_code"] for card in cards for size in card["sizes"]]
 	stock = get_available_stocks(item_codes, get_ecommerce_warehouse())
-	currency = MarketPrices.current().currency
+	prices = MarketPrices.current()
+	# A size is for sale with both a market price and stock.
+	unpriced = prices.get_unpriced(item_codes)
+	sellable = {code for code in item_codes if code not in unpriced and stock.get(code, {}).get("in_stock")}
 	# utils.shape_product_cards titles every grid's cards; only a hand-built card lacks one.
 	set_product_titles([card for card in cards if "title" not in card])
-	return [get_product_card(card, stock, currency) for card in cards]
+	return [get_product_card(card, sellable, prices.currency) for card in cards]
 
 
-def get_product_card(card: dict, stock: dict, currency: str) -> ProductCard:
+def get_product_card(card: dict, sellable: set[str], currency: str) -> ProductCard:
 	# shape_product_cards leaves no price on a product the market does not sell.
 	priced = card["effective_price"] is not None
 	return {
@@ -391,8 +400,7 @@ def get_product_card(card: dict, stock: dict, currency: str) -> ProductCard:
 		"currency": currency,
 		"price": flt(card["effective_price"]) if priced else None,
 		"compare_at_price": flt(card["default_price"]) if priced and cint(card["has_discount"]) else None,
-		"available": priced
-		and any(stock.get(size["item_code"], {}).get("in_stock") for size in card["sizes"]),
+		"available": priced and any(size["item_code"] in sellable for size in card["sizes"]),
 		"rating": {"average": flt(card["average_rating"]), "count": cint(card["review_count"])},
 		"updated_at": card["modified"],
 	}

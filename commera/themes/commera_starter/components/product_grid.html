@@ -30,10 +30,10 @@
 			<div x-cloak x-show="open === 'price'" {{ popover() }} @change.stop class="absolute inset-x-0 top-full z-20 -mt-4 sm:inset-x-auto sm:start-0 sm:mt-2 sm:w-64 popover p-3">
 				<div class="grid grid-cols-2 gap-2">
 					<label class="text-xs font-medium text-ink-gray-7">{{ _("From") }}
-						<input type="number" name="min" min="0" step="any" inputmode="decimal" value="{{ selected.min if selected.min is not none }}" placeholder="{{ commera.format.money(facets.price.min) }}" class="field mt-1 h-10 font-normal">
+						<input type="number" name="min" min="0" step="any" inputmode="decimal" value="{{ selected.min if selected.min is not none }}" placeholder="{{ commera.format.money(facets.price.min, facets.price.currency) }}" class="field mt-1 h-10 font-normal">
 					</label>
 					<label class="text-xs font-medium text-ink-gray-7">{{ _("To") }}
-						<input type="number" name="max" min="0" step="any" inputmode="decimal" value="{{ selected.max if selected.max is not none }}" placeholder="{{ commera.format.money(facets.price.max) }}" class="field mt-1 h-10 font-normal">
+						<input type="number" name="max" min="0" step="any" inputmode="decimal" value="{{ selected.max if selected.max is not none }}" placeholder="{{ commera.format.money(facets.price.max, facets.price.currency) }}" class="field mt-1 h-10 font-normal">
 					</label>
 				</div>
 				<label class="mt-2 flex min-h-10 items-center gap-2 text-md text-ink-gray-8"><input type="checkbox" name="has_discount" value="1" {{ "checked" if selected.has_discount }} class="size-4">{{ _("On sale only") }}</label>

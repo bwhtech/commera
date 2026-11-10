@@ -250,6 +250,7 @@ def get_product_count_qb(filters=None, product_list=None):
 
 
 def get_product_base_query(filters=None, product_list=None):
+	from commera.base_prices import is_base_price
 	from commera.localization.market_prices import MarketPrices
 
 	prices = MarketPrices.current()
@@ -275,11 +276,13 @@ def get_product_base_query(filters=None, product_list=None):
 		.on(
 			(item_price_default.item_code == color_size_item.item_code)
 			& (item_price_default.price_list == default_price_list)
+			& is_base_price(item_price_default)
 		)
 		.left_join(item_price_sale)
 		.on(
 			(item_price_sale.item_code == color_size_item.item_code)
 			& (item_price_sale.price_list == sale_price_list)
+			& is_base_price(item_price_sale)
 		)
 		.left_join(item)
 		.on(item.name == style_attribute_variant.item_style)

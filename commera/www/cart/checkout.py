@@ -12,6 +12,7 @@ from commera.api.payments import (
 	validate_cart_is_not_in_checkout,
 )
 from commera.api.shipping import get_charge_amount, get_checkout_summary
+from commera.base_prices import base_price_filters
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	get_code_states,
 	get_quantities_by_item_code,
@@ -130,9 +131,9 @@ def set_cart_context(context, commera_settings):
 	items = get_checkout_items(cart_quotation)
 	if default_price_list:
 		for item in items:
-			item["default_price"] = frappe.get_cached_value(
+			item["default_price"] = frappe.db.get_value(
 				"Item Price",
-				{"item_code": item.item_code, "price_list": default_price_list},
+				base_price_filters({"item_code": item.item_code, "price_list": default_price_list}),
 				"price_list_rate",
 			)
 	context.items = items

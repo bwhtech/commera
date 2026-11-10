@@ -222,7 +222,7 @@ class TestMarketProductListing(MarketPriceTestCase):
 		self.assertEqual((cards[priced]["price"], cards[priced]["currency"]), (300, self.currency))
 		self.assertTrue(cards[priced]["available"])
 		self.assertEqual((cards[unpriced]["price"], cards[unpriced]["available"]), (None, False))
-		self.assertEqual(page["facets"]["price"], {"min": 300, "max": 300})
+		self.assertEqual(page["facets"]["price"], {"min": 300, "max": 300, "currency": self.currency})
 
 	def test_the_price_facet_is_cached_per_market(self):
 		self.make_market_variant("FACET", market_sale=300)

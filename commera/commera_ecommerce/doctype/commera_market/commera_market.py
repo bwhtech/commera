@@ -210,6 +210,9 @@ def validate_market_price_list(doc, method=None):
 	"""A market's currency is its price lists' currency, cached with the markets."""
 	if doc.is_new() or not doc.has_value_changed("currency"):
 		return
+	# Before the schema sync no market has a price list.
+	if not frappe.db.has_column("Commera Market", "sale_price_list"):
+		return
 	markets = frappe.get_all(
 		"Commera Market",
 		or_filters={"sale_price_list": doc.name, "compare_at_price_list": doc.name},

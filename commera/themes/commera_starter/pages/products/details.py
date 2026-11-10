@@ -4,6 +4,7 @@ import frappe
 from frappe import _
 
 from commera import seo
+from commera.localization import get_localization
 from commera.sdk import catalog, wishlist
 from commera.sdk.format import product_url, url
 
@@ -52,7 +53,7 @@ def add_seo(context, product):
 	context.seo = seo.build_product_seo(
 		variant_fields,
 		product_fields,
-		image_url=seo.get_product_og_image(product["handle"]),
+		image_url=get_og_image_url(product["handle"]),
 		price=product["price"],
 		availability=availability,
 		currency=product["currency"],
@@ -75,3 +76,10 @@ def add_seo(context, product):
 			]
 		),
 	]
+
+
+def get_og_image_url(handle):
+	"""The card shows the store price, so a secondary market shares the card without one."""
+	url = seo.get_product_og_image(handle)
+	market = get_localization().market
+	return url if not market or market.is_primary else f"{url}?price=none"

@@ -1,6 +1,7 @@
 import frappe
 from frappe.utils import cint, create_batch, cstr
 
+from commera.base_prices import base_price_filters
 from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import root_filter
 from commera.search.translations import get_market_titles, get_translated_titles
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
@@ -321,10 +322,9 @@ def rates_by_item_code(item_codes, default_price_list, sale_price_list):
 	for chunk in create_batch(item_codes, IN_CLAUSE_CHUNK_SIZE):
 		for row in frappe.get_all(
 			"Item Price",
-			filters={
-				"item_code": ("in", chunk),
-				"price_list": ("in", [default_price_list, sale_price_list]),
-			},
+			filters=base_price_filters(
+				{"item_code": ("in", chunk), "price_list": ("in", [default_price_list, sale_price_list])}
+			),
 			fields=["item_code", "price_list", "price_list_rate", "valid_upto"],
 		):
 			if row.price_list == default_price_list and row.price_list_rate is not None:

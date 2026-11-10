@@ -137,9 +137,9 @@ class StorefrontMarkets:
 			default_language=languages[0],
 			languages=tuple(languages),
 			countries=tuple(row["countries"]),
-			sale_price_list=row["sale_price_list"],
-			compare_at_price_list=row["compare_at_price_list"],
-			currency=row["currency"] or get_default_currency(),
+			sale_price_list=row.get("sale_price_list"),
+			compare_at_price_list=row.get("compare_at_price_list"),
+			currency=row.get("currency") or get_default_currency(),
 		)
 
 	def find_language(self, code: str | None) -> Language | None:
@@ -194,7 +194,9 @@ def delete_cached_rows():
 def fetch_market_rows() -> list[dict]:
 	if not frappe.db.table_exists(MARKET_DOCTYPE):
 		return []
-	fields = ["name", "market_name", "enabled", "default_language", *PRICE_FIELDS]
+	# Before the schema sync adds the price columns, markets keep the store prices.
+	price_fields = [field for field in PRICE_FIELDS if frappe.db.has_column(MARKET_DOCTYPE, field)]
+	fields = ["name", "market_name", "enabled", "default_language", *price_fields]
 	rows = frappe.get_all(MARKET_DOCTYPE, fields=fields, order_by="creation")
 	countries = get_child_values("Commera Market Country", "country")
 	languages = get_child_values("Commera Market Language", "language")
