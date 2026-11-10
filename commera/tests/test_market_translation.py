@@ -1,12 +1,18 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from commera.localization import CURRENT, MISSING, OUTDATED, register, resolve, translate
+from commera import seo
+from commera.localization import CURRENT, MISSING, OUTDATED, pin_localization, register, resolve, translate
+from commera.og import generator
 from commera.sdk import catalog
 from commera.tests.test_content_translation import PRODUCT, use_storefront_language
 from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_markets import UAE, make_market, use_markets
 from commera.tests.test_product_details import ProductDetailPriceTestCase
+from commera.www import og_image_render
+from commera.www.products import details
 
 NOTE_RESOURCE = {"type": "note", "doctype": "Note", "fields": ["title"], "label": "Notes"}
 
@@ -158,6 +164,55 @@ class TestMarketProductTitles(ProductDetailPriceTestCase):
 	def setUp(self):
 		super().setUp()
 		set_up_market_translations(self)
+
+	def make_gulf_product(self):
+		"""A product with an Arabic title, and its own title and meta description in the Gulf."""
+		route = self.make_priced_variant("MARKET", default_rate=30)
+		product = frappe.get_doc(PRODUCT, {"route": route})
+		register(PRODUCT, product.name, "display_name", "ar", "قميص الكتان")
+		register(PRODUCT, product.name, "display_name", "ar", "قميص الخليج", market="gulf")
+		register(PRODUCT, product.name, "meta_description", "ar", "وصف الخليج", market="gulf")
+		return product
+
+	def serve_card(self, route, path):
+		"""The cached file /<path>/og-image/<route>.png redirects to. Nothing renders or is written."""
+		with (
+			pin_localization(resolve(path)[0]),
+			patch.object(og_image_render, "render_card_for_doc", return_value=b"png"),
+			patch.object(og_image_render, "write_cache"),
+			self.assertRaises(frappe.Redirect),
+		):
+			og_image_render.serve_og_image(route)
+		return frappe.local.flags.redirect_location
+
+	def test_a_product_card_has_the_market_title_and_its_own_url_and_cache_file(self):
+		product = self.make_gulf_product()
+		self.addCleanup(setattr, frappe.local.flags, "redirect_location", None)
+
+		with pin_localization(resolve("/ar-ae")[0]):
+			self.assertEqual(generator.build_variant_card_context(product)["display_name"], "قميص الخليج")
+			self.assertEqual(seo.get_product_og_image(product.route), f"/ar-ae/og-image/{product.route}.png")
+		with pin_localization(resolve("/ar")[0]):
+			self.assertEqual(generator.build_variant_card_context(product)["display_name"], "قميص الكتان")
+			self.assertEqual(seo.get_product_og_image(product.route), f"/ar/og-image/{product.route}.png")
+		cards = {self.serve_card(product.route, path) for path in ("/ar-ae", "/ar", "/en-ae", "/")}
+		self.assertEqual(len(cards), 4)
+
+	def test_the_legacy_product_page_seo_reads_the_market_content(self):
+		product = self.make_gulf_product()
+		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
+		frappe.local.form_dict = frappe._dict(route=product.route, _lang="ar", _country="AE")
+		frappe.local.request_cache.clear()
+		context = frappe._dict()
+
+		details.get_context(context)
+
+		self.assertEqual(context.seo["title"], f"قميص الخليج | {seo.get_store_name()}")
+		self.assertEqual(context.seo["description"], "وصف الخليج")
+		self.assertIn(f"/ar-ae/og-image/{product.route}.png", context.seo["image"])
+		self.assertEqual(
+			(context.json_ld[0]["name"], context.json_ld[0]["description"]), ("قميص الخليج", "وصف الخليج")
+		)
 
 	def test_the_sdk_reads_the_market_title_of_a_market_request(self):
 		route = self.make_priced_variant("MARKET", default_rate=30)

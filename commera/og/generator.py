@@ -12,6 +12,7 @@ from frappe.utils import flt, get_files_path, get_url
 
 from commera import seo
 from commera.branding import get_brand_assets
+from commera.localization import get_localization
 from commera.shop_themes.render import render_themed_template
 
 # resvg-js is pathologically slow on large embedded images (~58s for 1220x1760, <1s downscaled).
@@ -80,13 +81,30 @@ def build_variant_card_context(variant_doc):
 
 	return {
 		"store_name": seo.get_store_name(),
-		"display_name": variant_doc.display_name or variant_doc.name,
+		"display_name": get_card_title(variant_doc),
 		"brand": brand,
 		"price": price,
 		"photo_data_uri": photo_data_uri,
 		# DocType templates address the source document as `doc`.
 		"doc": variant_doc,
 	}
+
+
+def get_card_title(variant_doc) -> str:
+	"""The product's title in the request language and market, as its page shows it."""
+	from commera.sdk.catalog import translate_products
+
+	return (
+		translate_products([variant_doc])[0]["display_name"] or variant_doc.display_name or variant_doc.name
+	)
+
+
+def get_variant_card_version(variant_doc) -> str:
+	"""What a product card's cache key must change with: the record, and its translated text."""
+	localization = get_localization()
+	market = localization.market.handle if localization.market else ""
+	text = [localization.language.code, market, seo.get_store_name(), get_card_title(variant_doc)]
+	return frappe.as_json([str(variant_doc.modified), *text])
 
 
 OG_CONTEXT_BUILDERS = {
