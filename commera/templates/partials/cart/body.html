@@ -91,7 +91,7 @@
 							"image": cart_item.item.images[0]?.image
 						}
 					}'>
-							<a :href="`{{ url('/products') | e }}/${cart_item.item.route}`">
+							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + cart_item.item.route">
 						<img :src="cart_item.item.images.length > 0 ? cart_item.item.images[0].image : '/assets/commera/images/1.jpg'"
 								alt="Product Image" class="w-35 h-50 md:w-45 md:h-60 object-cover rounded-lg" />
 							</a>

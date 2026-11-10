@@ -42,7 +42,7 @@
 											</div>
 											<div class="cart-content">
 												<h6 class="title">
-													<a :href="`{{ url('/products') | e }}/${cart_item.item.route}`" x-text="{% if in_source_language %}cart_item.variant.item_name{% else %}cart_item.variant.title || cart_item.variant.item_name{% endif %}"></a>
+													<a :href="{{ url('/products') | tojson | forceescape }} + '/' + cart_item.item.route" x-text="{% if in_source_language %}cart_item.variant.item_name{% else %}cart_item.variant.title || cart_item.variant.item_name{% endif %}"></a>
 												</h6>
 												<div class="d-flex align-items-center">
 													<div class="btn-quantity light quantity-sm me-3">
@@ -95,7 +95,7 @@
 											</div>
 											<div class="cart-content">
 												<h6 class="title">
-													<a :href="`{{ url('/products') | e }}/${wishlist_item.route}`" x-text="{% if in_source_language %}wishlist_item.item_name{% else %}wishlist_item.title || wishlist_item.item_name{% endif %}"></a>
+													<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route" x-text="wishlist_item.title || wishlist_item.item_name"></a>
 												</h6>
 												<div class="d-flex align-items-center">
 													<h6 class="dz-price mb-0">{{ get_currency_symbol() }}<span x-text="Number(wishlist_item.sale_price || 0).toFixed(2)"></span></h6>

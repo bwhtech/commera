@@ -1,5 +1,4 @@
 {% macro search_bar() %}
-{% set in_source_language = get_localization().language == get_localization().default_language %}
 {% from "templates/macros/icon.html" import icon %}
 {% set brand_logo = get_brand_assets().logo %}
 {% set store_name = get_shop_details().name or "Commera" %}
@@ -15,7 +14,7 @@
     search_term: window.query_state?.search ? window.query_state.search : '',
     // A plain navigation: the products page reads the term from its own URL.
     update_search(){
-        window.location.href = `{{ url('/products') | e }}?search=${encodeURIComponent(this.search_term.trim())}`
+        window.location.href = {{ url('/products') | tojson | forceescape }} + '?search=' + encodeURIComponent(this.search_term.trim())
     },
     async get_search_results() {
         const term = this.search_term.trim();
@@ -98,23 +97,16 @@
                 <h3 class="text-sm my-4" x-show="products.length > 0">{{_("Search Results")}}</h3>
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-6">
                     <template x-for="(product, index) in products" :key="index">
-                        <a :href="`{{ url('/products') | e }}/${product.route}`">
+                        <a :href="{{ url('/products') | tojson | forceescape }} + '/' + product.route">
                             <div class="flex-col">
                                 <div class="flex gap-1 mb-1">
                                     <img :src="product.image||'/assets/commera/images/1.jpg'" alt=""
                                         class="h-10 w-10 object-cover rounded-md bg-gray-400">
                                     <div></div>
                                     <h3 class="text-base">
-                                        {% if in_source_language %}
-                                        <span x-text="product.item_name"></span>
-                                        {% if "color" in card_fields %}
-                                        <span x-text="product.attribute_value"></span>
-                                        {% endif %}
-                                        {% else %}
                                         <span x-text="product.title || product.item_name"></span>
                                         {% if "color" in card_fields %}
                                         <span x-text="commera.t(product.attribute_value)"></span>
-                                        {% endif %}
                                         {% endif %}
                                     </h3>
                                 </div>

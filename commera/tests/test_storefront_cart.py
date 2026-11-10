@@ -24,6 +24,8 @@ from commera.guest import CART_TOKEN_HEADER, GUEST_CART_COOKIE
 from commera.sdk import cart as cart_sdk
 from commera.sdk.cart import CartChangedError
 from commera.sdk.types import CartLineProduct, PricedCart, PricedCartLine
+from commera.tests.test_content_translation import use_storefront_language
+from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_order_access import make_website_user
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 
@@ -32,6 +34,7 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 	def setUp(self):
 		super().setUp()
 		self.addCleanup(frappe.set_user, "Administrator")
+		use_storefront_languages(self, "en", published=("en", "ar"))
 		self.route = self.make_priced_variant("CART", default_rate=40, sale_rate=30)
 		self.item_code = frappe.db.get_value(
 			"Color Size Item",
@@ -204,12 +207,12 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 
 		browser_token = frappe.local.cookie_manager.cookies[GUEST_CART_COOKIE]["value"]
 		self.assertNotIn(browser_token, (self.token, "unused-browser-token-0000000000000000"))
-		self.assertEqual(frappe.local.response["location"], "/en/cart/checkout")
+		self.assertEqual(frappe.local.response["location"], "/cart/checkout")
 		self.assertTrue(
 			frappe.db.exists("Commera Cart", {"cart_key": frappe.utils.sha256_hash(browser_token)})
 		)
 		claim_checkout_cart(code)
-		self.assertEqual(frappe.local.response["location"], "/en/cart")
+		self.assertEqual(frappe.local.response["location"], "/cart")
 
 		self.send_token(self.token)
 		self.assertIsNone(get_cart())
@@ -240,8 +243,11 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 
 		open_checkout(code)
 
-		self.assertEqual(frappe.local.response["location"], "/en/cart")
+		self.assertEqual(frappe.local.response["location"], "/cart")
 		self.assertNotIn(GUEST_CART_COOKIE, frappe.local.cookie_manager.cookies)
+		use_storefront_language(self, "ar")
+		open_checkout(code)
+		self.assertEqual(frappe.local.response["location"], "/ar/cart")
 
 	def test_a_signed_in_checkout_code_leaves_time_to_sign_in_but_never_extends(self):
 		self.send_token(None, user=make_website_user())
@@ -305,4 +311,4 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 
 		self.send_token(None, user=shopper, path=path)
 		open_checkout(code)
-		self.assertEqual(frappe.local.response["location"], "/en/cart?checkout=1")
+		self.assertEqual(frappe.local.response["location"], "/cart?checkout=1")

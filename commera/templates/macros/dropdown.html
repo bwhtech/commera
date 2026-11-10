@@ -17,7 +17,7 @@
             open: false,
             toggle() {
                 if(window.innerWidth < 768) {
-                    window.location.href = '{{ url('/' ~ link) | e }}'
+                    window.location.href = {{ url('/' ~ link) | tojson | forceescape }}
                     return
                 }
                 if (this.open) {

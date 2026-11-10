@@ -19,6 +19,8 @@ UTILITY_PAGE_NAMES = {"cart": "Cart", "account": "My Account", "login": "Login"}
 
 def update_website_context(context):
 	context.localization = get_localization()
+	# Website Settings' `url` is the site address; it would hide the url() Jinja global.
+	context.pop("url", None)
 	keep_prefix_in_login_action()
 
 	match = match_utility_path(get_request_path())

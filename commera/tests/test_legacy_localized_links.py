@@ -10,19 +10,40 @@ from frappe.website.serve import get_response_content
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
+from commera import utils
 from commera.api.admin.theme import activate_theme
+from commera.api.payments import get_confirmation_url
 from commera.localization.routing import localize_request
+from commera.tests.test_content_translation import use_storefront_language
 from commera.tests.test_localization import use_storefront_languages
+from commera.tests.test_order_access import make_website_user
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.tests.test_store_frame_translation import SECTION, SETTINGS
 
 APP = Path(frappe.get_app_path("commera"))
-SURFACES = ("templates", "www", "themes/summer_theme", "public/themes/summer_theme/js")
+SURFACES = (
+	"templates",
+	"www",
+	"themes/summer_theme",
+	"public/themes/summer_theme/js",
+	"api/payments.py",
+	"api/storefront",
+)
 # Merchant-editable fallback text for /llms.txt, not a link the page builds.
 SKIPPED = {"www/llms.py"}
 # The shared macros, which the theme engine imports; the pages here use only the language one.
 SWITCHER_MACROS = "templates/macros/language_switcher.html"
 THEMES = ("Shop Default Theme", "Summer Theme")
+ARABIC_TITLE = "قميص كتان"
+# Product cards bind the producer's title in every language; a bare item_name drops it.
+CARD_TITLES = {
+	("Shop Default Theme", "/"): 'x-text="product.title || product.item_name"',
+	("Shop Default Theme", "/account/wishlist"): 'x-text="item.title||item.item_name"',
+	("Shop Default Theme", "/account/dashboard"): 'x-text="item.title || item.item_name"',
+	("Summer Theme", "/account/wishlist"): 'x-text="wishlist_item.title || wishlist_item.item_name"',
+}
+BARE_ITEM_NAME = re.compile(r'x-text="(?:product|item|wishlist_item)\.item_name"')
+ACCOUNT_PAGES = ("dashboard", "orders", "wishlist", "profile", "address")
 HAND_BUILT_PREFIX = re.compile(
 	r"frappe\.(?:local\.)?lang\s*(?:~|\}\}\s*/|==)"
 	r"|/\{\{\s*(?:frappe\.lang|language)\b"
@@ -32,7 +53,9 @@ HAND_BUILT_PREFIX = re.compile(
 	r"|\{frappe\.local\.lang\}"
 	r"""|['"`(]/(?:en|ar)(?:/|['"`)])"""
 )
-UNPREFIXED_LINK = re.compile(r'(?:href|action)="/(?!/|assets/|files/|api/|login\b)')
+UNPREFIXED_LINK = re.compile(r"""(?:href|action)=["']/(?!/|assets/|files/|api/|login\b)""")
+# A url() inside a JS string: |e leaves quotes and ${} live, so JS takes it through |tojson.
+URL_IN_JS_STRING = re.compile(r"['`]\{\{\s*(?:switch_)?url\(")
 JINJA_COMMENT = re.compile(r"\{#.*?#\}", re.S)
 NOT_PAGES = ("/assets/", "/files/", "/api/", "/login")
 
@@ -43,6 +66,7 @@ class TestLegacyLinkSources(IntegrationTestCase):
 			with self.subTest(path):
 				self.assertNotRegex(text, HAND_BUILT_PREFIX)
 				self.assertNotRegex(text, UNPREFIXED_LINK)
+				self.assertNotRegex(text, URL_IN_JS_STRING)
 
 	def test_no_surface_offers_a_market_or_country_switcher(self):
 		for path, text in read_surfaces():
@@ -70,6 +94,16 @@ class TestLegacyLocalizedLinks(ProductDetailPriceTestCase):
 					for href in links:
 						self.assertRegex(href, r"^/ar(?:[/?#]|$)")
 
+	def test_legacy_account_pages_render_and_link_in_the_page_language(self):
+		activate_theme("Shop Default Theme")
+		user = make_website_user()
+		for page in ACCOUNT_PAGES:
+			with self.subTest(page):
+				links = page_links(self.render_page(f"/ar/account/{page}", user))
+				self.assertIn("/ar/account/orders", links)
+				for href in links:
+					self.assertRegex(href, r"^/ar(?:[/?#]|$)")
+
 	def test_the_switcher_lists_published_languages_and_keeps_the_query(self):
 		for theme in THEMES:
 			activate_theme(theme)
@@ -90,6 +124,21 @@ class TestLegacyLocalizedLinks(ProductDetailPriceTestCase):
 			activate_theme(theme)
 			with self.subTest(theme=theme):
 				self.assertEqual(switcher_links(self.render_page("/products")), {})
+
+	def test_product_cards_show_the_title_on_a_non_english_default_store(self):
+		use_storefront_languages(self, "ar", published=("ar", "en"))
+		product = frappe.db.get_value("Style Attribute Variant", {"route": self.route})
+		frappe.db.set_value("Style Attribute Variant", product, "display_name", ARABIC_TITLE)
+		[card] = utils.get_product_list(product_list=[product], page_length=1)
+		self.assertEqual(card["title"], ARABIC_TITLE)
+
+		user = make_website_user()
+		for (theme, path), binding in CARD_TITLES.items():
+			activate_theme(theme)
+			with self.subTest(theme=theme, path=path):
+				html = self.render_page(path, user)
+				self.assertIn(binding, html)
+				self.assertNotRegex(html, BARE_ITEM_NAME)
 
 	def set_footer_link(self, link_url):
 		"""One footer section with one link, written straight to the database."""
@@ -119,8 +168,8 @@ class TestLegacyLocalizedLinks(ProductDetailPriceTestCase):
 		frappe.clear_document_cache(SETTINGS, SETTINGS)
 		self.addCleanup(frappe.clear_document_cache, SETTINGS, SETTINGS)
 
-	def render_page(self, path):
-		"""The HTML a guest gets for `path`, routed and localized as a real request."""
+	def render_page(self, path, user="Guest"):
+		"""The HTML `user` gets for `path`, routed and localized as a real request."""
 		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
 		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
 		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
@@ -128,16 +177,32 @@ class TestLegacyLocalizedLinks(ProductDetailPriceTestCase):
 		frappe.local.request = Request(EnvironBuilder(path=path).get_environ())
 		frappe.local.form_dict = frappe._dict(frappe.local.request.args)
 		frappe.local.request_cache.clear()
-		# Memoised per request: a real request starts without it.
+		# Memoised per request: a real request starts without it, and the next test too.
 		frappe.local.commera_storefront_menu = None
+		self.addCleanup(setattr, frappe.local, "commera_storefront_menu", None)
 		# nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
-		frappe.set_user("Guest")
+		frappe.set_user(user)
 		try:
 			localize_request()
 			return get_response_content(frappe.local.request.path)
 		finally:
 			# nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
 			frappe.set_user("Administrator")
+
+
+class TestServerBuiltLinks(IntegrationTestCase):
+	def setUp(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+
+	def test_the_payment_confirmation_url_has_no_default_language_prefix(self):
+		self.assertEqual(
+			get_confirmation_url("SAL-QTN-1&x", payment_mode="Cash On Delivery"),
+			"/account/orders/confirmation?reference_id=SAL-QTN-1%26x&payment_mode=Cash+On+Delivery",
+		)
+		use_storefront_language(self, "ar")
+		self.assertEqual(
+			get_confirmation_url("SAL-QTN-1"), "/ar/account/orders/confirmation?reference_id=SAL-QTN-1"
+		)
 
 
 class AnchorParser(HTMLParser):
@@ -175,7 +240,8 @@ def switcher_links(html):
 
 def read_surfaces():
 	for surface in SURFACES:
-		for path in sorted((APP / surface).rglob("*")):
+		root = APP / surface
+		for path in [root] if root.is_file() else sorted(root.rglob("*")):
 			name = str(path.relative_to(APP))
 			if path.suffix in (".html", ".py", ".js") and not path.name.endswith(".min.js"):
 				if name not in SKIPPED:

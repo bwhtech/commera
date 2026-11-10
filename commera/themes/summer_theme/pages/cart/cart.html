@@ -59,14 +59,14 @@
 											<div class="d-flex align-items-center gap-3 position-relative">
 												<input type="checkbox" class="form-check-input m-0 flex-shrink-0" x-model="cart_item.selected"
 													:aria-label="include_label.replace('{0}', cart_item.variant.item_name)">
-												<a :href="`{{ url('/products') | e }}/${cart_item.item.route}`">
+												<a :href="{{ url('/products') | tojson | forceescape }} + '/' + cart_item.item.route">
 													<img :src="cart_item.item.images.length > 0 ? cart_item.item.images[0].image : '/assets/commera/images/1.jpg'"
 														:alt="cart_item.variant.item_name">
 												</a>
 											</div>
 										</td>
 										<td class="product-item-name">
-											<a :href="`{{ url('/products') | e }}/${cart_item.item.route}`"
+											<a :href="{{ url('/products') | tojson | forceescape }} + '/' + cart_item.item.route"
 												x-text="{% if in_source_language %}cart_item.variant.item_name{% else %}cart_item.variant.title || cart_item.variant.item_name{% endif %}"></a>
 										</td>
 										<td class="product-item-price">

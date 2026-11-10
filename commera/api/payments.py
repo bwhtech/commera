@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from urllib.parse import urlencode
 
 import frappe
 from bwh_payments.bwh_payments.utils import get_available_payment_modes, resolve_payment_mode
@@ -50,6 +51,7 @@ from commera.guest import (
 	set_guest_cart_cookie,
 	validate_guest_checkout_enabled,
 )
+from commera.localization import url
 from commera.order_access import get_order_link, set_order_access_key
 from commera.plugin_events import fire_event, get_plugin_fieldnames
 from commera.utils import (
@@ -130,10 +132,10 @@ def refuse_paid_cart():
 
 
 def get_confirmation_url(reference_id: str, payment_mode: str | None = None) -> str:
-	url = f"/{frappe.local.lang}/account/orders/confirmation?reference_id={reference_id}"
+	query = {"reference_id": reference_id}
 	if payment_mode:
-		url = f"{url}&payment_mode={payment_mode}"
-	return url
+		query["payment_mode"] = payment_mode
+	return f"{url('/account/orders/confirmation')}?{urlencode(query)}"
 
 
 def refuse_payment(message: str, quotation: str | None = None, **context):

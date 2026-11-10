@@ -14,7 +14,7 @@
 		:class="account_open ? 'show' : ''" x-cloak>
 		<a class="dropdown-item" href="{{ url('/account/dashboard') | e }}">{{ _("My Account") }}</a>
 		<a class="dropdown-item" href="{{ url('/account/orders') | e }}">{{ _("My Orders") }}</a>
-		<button type="button" class="dropdown-item" @click="account_open = false; logout('{{ url("/") | e }}')">{{ _("Logout") }}</button>
+		<button type="button" class="dropdown-item" @click="account_open = false; logout({{ url("/") | tojson | forceescape }})">{{ _("Logout") }}</button>
 	</div>
 </li>
 {% endmacro %}
