@@ -147,7 +147,7 @@ export class Formatter {
 		})
 			.formatToParts(Number(amount) || 0)
 			.map((part) =>
-				part.type === 'minusSign' ? '-' : (separators[part.type] ?? part.value),
+				part.type === 'minusSign' ? '-' : separators[part.type] ?? part.value,
 			)
 			.join('')
 			.replace(BIDI_MARKS, '');

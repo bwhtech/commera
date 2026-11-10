@@ -38,7 +38,8 @@ def main():
 
 def get_babel_locales():
 	path = os.path.join(os.path.dirname(frappe.__file__), "geo", "languages.csv")
-	with open(path, newline="") as languages:
+	# A fixed path inside the Frappe package, never user input.
+	with open(path, newline="") as languages:  # nosemgrep: frappe-security-file-traversal
 		for row in csv.DictReader(languages):
 			try:
 				yield row["language_code"], Locale.parse(row["language_code"], sep="-")
