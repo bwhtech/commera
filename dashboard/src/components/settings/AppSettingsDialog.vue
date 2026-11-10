@@ -25,6 +25,7 @@ import IntegrationTabPanel from './IntegrationTabPanel.vue'
 import LocationsSettings from './LocationsSettings.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import ShippingSections from './ShippingSections.vue'
+import TranslationsSettings from './TranslationsSettings.vue'
 import WebhooksSettings from './webhooks/WebhooksSettings.vue'
 import { isCloudBillingAvailable, refreshBilling } from '../../data/cloudBilling'
 import { isCloudDomainsAvailable, refreshDomains } from '../../data/cloudDomains'
@@ -120,6 +121,10 @@ watch(
           <template #prefix><span class="lucide-mail size-4" aria-hidden="true" /></template>
           {{ __('Emails') }}
         </SettingsNavItem>
+        <SettingsNavItem value="translations">
+          <template #prefix><span class="lucide-languages size-4" aria-hidden="true" /></template>
+          {{ __('Translations') }}
+        </SettingsNavItem>
       </SettingsNavGroup>
 
       <SettingsNavGroup :label="__('Checkout')">
@@ -201,6 +206,10 @@ watch(
 
       <SettingsPanel value="emails" class="min-w-0">
         <EmailSettings :active="settings.open && settings.tab === 'emails'" />
+      </SettingsPanel>
+
+      <SettingsPanel value="translations" class="min-w-0">
+        <TranslationsSettings />
       </SettingsPanel>
 
       <SettingsPanel value="locations" class="min-w-0">

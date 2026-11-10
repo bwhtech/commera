@@ -44,6 +44,12 @@ export const SETTINGS_TABS = [
     keywords: ['email', 'template', 'order confirmation', 'cancellation', 'back in stock', 'notification'],
   },
   {
+    value: 'translations',
+    label: __('Translations'),
+    icon: 'lucide-languages',
+    keywords: ['translation', 'translate', 'language', 'locale', 'csv', 'export', 'import', 'arabic'],
+  },
+  {
     value: 'payments',
     label: __('Payments'),
     icon: 'lucide-credit-card',
