@@ -14,7 +14,6 @@ from commera.localization import MISSING, TranslatedValue, get_localization, tra
 from commera.plugin_events import get_ecommerce_warehouse, get_listed_items
 from commera.product_detail import get_product_detail
 from commera.sdk.types import (
-	CartLineProduct,
 	CatalogItem,
 	Collection,
 	FacetValue,
@@ -26,7 +25,7 @@ from commera.sdk.types import (
 	Typeahead,
 )
 from commera.search.facets import get_listing_facet_counts, get_price_range
-from commera.search.record_builder import images_for_variants, rates_by_item_code, sizes_for_variants
+from commera.search.record_builder import rates_by_item_code, sizes_for_variants
 from commera.search.typeahead import get_typeahead as get_search_typeahead
 from commera.shop_data import get_storefront_menu, translate_categories
 from commera.swatches import get_swatch_map
@@ -498,31 +497,3 @@ def links_item_group(node: dict, item_group: str) -> bool:
 	return item_group in node["item_groups"] or any(
 		links_item_group(child, item_group) for child in node["children"]
 	)
-
-
-def get_line_products(item_codes: list[str]) -> dict[str, CartLineProduct]:
-	"""The published product, size and image that sell each item."""
-	rows = frappe.get_all(
-		"Color Size Item",
-		filters={"item_code": ("in", item_codes or [""]), "parenttype": "Style Attribute Variant"},
-		fields=["item_code", "size", "parent"],
-	)
-	variants = {
-		row.name: row
-		for row in frappe.get_all(
-			"Style Attribute Variant",
-			filters={"name": ("in", [row.parent for row in rows] or [""]), "is_published": 1},
-			fields=["name", "route", "display_name"],
-		)
-	}
-	images = images_for_variants(list(variants))
-	return {
-		row.item_code: {
-			"handle": variants[row.parent].route,
-			"title": variants[row.parent].display_name,
-			"variant_title": row.size,
-			"image": images.get(row.parent, {}).get("image"),
-		}
-		for row in rows
-		if row.parent in variants
-	}
