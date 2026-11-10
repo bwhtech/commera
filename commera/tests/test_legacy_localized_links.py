@@ -3,9 +3,11 @@
 import re
 from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import quote
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.utils import get_request_site_address
 from frappe.website.serve import get_response_content
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
@@ -19,6 +21,7 @@ from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_order_access import make_website_user
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.tests.test_store_frame_translation import SECTION, SETTINGS
+from commera.website_context import update_website_context
 
 APP = Path(frappe.get_app_path("commera"))
 SURFACES = (
@@ -203,6 +206,23 @@ class TestServerBuiltLinks(IntegrationTestCase):
 		self.assertEqual(
 			get_confirmation_url("SAL-QTN-1"), "/ar/account/orders/confirmation?reference_id=SAL-QTN-1"
 		)
+
+
+class TestSiteAddressUrl(IntegrationTestCase):
+	def setUp(self):
+		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+		frappe.local.request = Request(EnvironBuilder(path="/checkout").get_environ())
+
+	def test_the_site_address_url_is_dropped_so_the_helper_shows(self):
+		context = frappe._dict(url=quote(str(get_request_site_address(full_address=True)), safe="/:"))
+		update_website_context(context)
+		self.assertNotIn("url", context)
+
+	def test_a_page_controllers_own_url_stays(self):
+		# A payment page posts its form to the gateway it puts in `url`.
+		context = frappe._dict(url="https://gateway.example/pay")
+		update_website_context(context)
+		self.assertEqual(context.url, "https://gateway.example/pay")
 
 
 class AnchorParser(HTMLParser):

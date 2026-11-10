@@ -1,7 +1,8 @@
 import re
-from urllib.parse import quote_plus
+from urllib.parse import quote, quote_plus
 
 import frappe
+from frappe.utils import get_request_site_address
 
 from commera import seo
 from commera.localization import (
@@ -19,8 +20,7 @@ UTILITY_PAGE_NAMES = {"cart": "Cart", "account": "My Account", "login": "Login"}
 
 def update_website_context(context):
 	context.localization = get_localization()
-	# Website Settings' `url` is the site address; it would hide the url() Jinja global.
-	context.pop("url", None)
+	drop_site_address_url(context)
 	keep_prefix_in_login_action()
 
 	match = match_utility_path(get_request_path())
@@ -30,6 +30,15 @@ def update_website_context(context):
 	context.no_cache = 1
 	context.seo = seo.build_page_seo({"noindex": 1}, display_name=UTILITY_PAGE_NAMES[match.group(1)])
 	context.json_ld = []
+
+
+def drop_site_address_url(context):
+	"""Website Settings' `url` is the site address and hides the url() Jinja global.
+	A page controller's own `url`, such as a payment gateway's form action, stays."""
+	if frappe.request and context.get("url") == quote(
+		str(get_request_site_address(full_address=True)), safe="/:"
+	):
+		context.pop("url")
 
 
 def keep_prefix_in_login_action():
