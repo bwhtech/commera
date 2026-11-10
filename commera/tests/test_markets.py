@@ -28,7 +28,17 @@ from commera.tests.test_seo import render_seo_head, sitemap_locs
 UAE = "United Arab Emirates"
 
 
-def make_market(name, countries, default_language, languages=(), enabled=1, handle=None):
+def make_market(
+	name,
+	countries,
+	default_language,
+	languages=(),
+	enabled=1,
+	handle=None,
+	sale_price_list=None,
+	compare_at_price_list=None,
+):
+	"""Without price lists, the market sells at the store's sale prices."""
 	return frappe.get_doc(
 		{
 			"doctype": "Commera Market",
@@ -38,8 +48,14 @@ def make_market(name, countries, default_language, languages=(), enabled=1, hand
 			"countries": [{"country": country} for country in countries],
 			"default_language": default_language,
 			"languages": [{"language": language} for language in languages],
+			"sale_price_list": sale_price_list or get_store_sale_price_list(),
+			"compare_at_price_list": compare_at_price_list,
 		}
 	).insert(ignore_permissions=True)
+
+
+def get_store_sale_price_list():
+	return frappe.db.get_single_value("Commera Settings", "sale_price_list") or "Standard Selling"
 
 
 def use_markets(test):
@@ -444,6 +460,7 @@ class TestMarketResolution(IntegrationTestCase):
 				"default_language": "ar",
 				"languages": ["ar", "en"],
 				"countries": ["AE", "SA"],
+				"currency": frappe.db.get_value("Price List", get_store_sale_price_list(), "currency"),
 			},
 		)
 		self.assertEqual(as_dict["country"], "AE")

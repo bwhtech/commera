@@ -201,4 +201,17 @@ Rules:
 - A market language must be a base language (`pt`, `ar`) or a base language with a script (`zh-Hans`). It cannot name a region (`pt-BR`, `zh-TW`, `en-US`), because the market countries set the region.
 - The hreflang of a market URL is `<language>-<COUNTRY>`, or `<language>-<Script>-<COUNTRY>` for a script code. Example: `zh-Hans` in the UAE is `zh-Hans-AE` at `/zh-hans-ae/`.
 
+### Market prices
+
+A market has a **Sale Price List** and an optional **Compare-at Price List**. Both must be selling price lists in one currency. The market currency is the currency of the sale price list. The primary market uses the two price lists of **Commera Settings** and the store currency.
+
+On a secondary market page, or an API request with that market's `_country`, products, product cards, variants and `catalog.get_items` show the prices and the currency of the market:
+
+- `price` is the rate in the sale price list. Commera does not convert currency.
+- `compare_at_price` is the rate in the compare-at price list when it is higher than `price`.
+- An item with no rate in the sale price list has `price: null` and `available: false` in that market. `cart.add_lines` refuses it.
+- The primary market does not change: an item with no sale price uses its compare-at price.
+
+The cart keeps the store price list and currency. Search sorting, price filters on the search index and taxes do not use market prices yet.
+
 **Limitation (v1).** A regional language, such as `pt-BR`, shows in the primary market only, at its own URL (`/pt-br/`). To serve Portuguese in a market, publish the base language `pt` and add it to the market. A market saved before this rule can keep its regional rows. Commera serves no URL for them. You can still remove those rows or disable the market.

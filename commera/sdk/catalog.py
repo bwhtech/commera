@@ -4,13 +4,10 @@ from frappe.utils import create_batch
 from frappe.utils.caching import redis_cache
 from frappe.utils.data import cint, cstr, flt, sha256_hash
 
-from commera.api.admin.catalog import (
-	DEFAULT_OPTION_ATTRIBUTE,
-	DEFAULT_SIZE_VALUE,
-	get_default_rates,
-	get_selling_rates,
-)
+from commera.api.admin.catalog import DEFAULT_OPTION_ATTRIBUTE, DEFAULT_SIZE_VALUE
+from commera.api.variant_pricing import get_base_price_rows_by_key
 from commera.localization import get_localization, translate
+from commera.localization.market_prices import MarketPrices
 from commera.plugin_events import get_ecommerce_warehouse, get_listed_items
 from commera.product_detail import get_product_detail
 from commera.sdk.types import (
@@ -33,7 +30,6 @@ from commera.utils import (
 	IN_CLAUSE_CHUNK_SIZE,
 	get_available_stocks,
 	get_product_list,
-	get_store_currency,
 	get_total_product_count,
 )
 from commera.www.products.details import get_recommended_products
@@ -75,8 +71,8 @@ COLLECTION_FIELDS = [
 
 
 def get_items(item_codes: list[str]) -> dict[str, CatalogItem]:
-	"""`price` is what a shopper pays, `list_price` the struck-through figure; both None until the store's
-	price lists are set. A code that is not an Item is left out."""
+	"""`price` is what a shopper pays in the request's market, `list_price` the compare-at figure.
+	`price` is None for an item the market does not sell. A code that is not an Item is left out."""
 	frappe.has_permission("Item", ptype="read", throw=True)
 	items = {}
 	for item_code_chunk in create_batch(
@@ -95,11 +91,11 @@ def read_items(item_codes: list[str]) -> dict[str, CatalogItem]:
 		return {}
 
 	listed_items = get_listed_items(found_codes)
-	prices, list_prices = get_store_prices(found_codes)
+	prices = MarketPrices.current()
+	sale_rates, compare_at_rates = get_base_rates(prices, found_codes)
 	warehouse = get_ecommerce_warehouse()
 	# get_available_stocks reads a missing warehouse as one literally named "website_warehouse".
 	stocks = get_available_stocks(found_codes, warehouse) if warehouse else {}
-	currency = get_store_currency()
 
 	return {
 		row.name: {
@@ -107,9 +103,9 @@ def read_items(item_codes: list[str]) -> dict[str, CatalogItem]:
 			"title": row.item_name,
 			"product": row.variant_of or row.name,
 			"is_listed": row.name in listed_items,
-			"price": prices.get(row.name),
-			"list_price": list_prices.get(row.name),
-			"currency": currency,
+			"price": get_item_price(prices, sale_rates.get(row.name), compare_at_rates.get(row.name)),
+			"list_price": compare_at_rates.get(row.name),
+			"currency": prices.currency,
 			"available_qty": flt(stocks.get(row.name, {}).get("stock_qty")),
 			"unlimited": bool(stocks.get(row.name, {}).get("unlimited")),
 		}
@@ -117,13 +113,19 @@ def read_items(item_codes: list[str]) -> dict[str, CatalogItem]:
 	}
 
 
-def get_store_prices(item_codes: list[str]) -> tuple[dict, dict]:
-	price_lists = frappe.get_cached_value(
-		"Commera Settings", "Commera Settings", ["default_price_list", "sale_price_list"]
-	)
-	if not all(price_lists):
-		return {}, {}
-	return get_selling_rates(item_codes), get_default_rates(item_codes)
+def get_base_rates(prices: MarketPrices, item_codes: list[str]) -> tuple[dict, dict]:
+	"""(sale, compare-at) base rates by item code. Customer rows are negotiated contracts."""
+	price_lists = [prices.sale_price_list, prices.compare_at_price_list]
+	rows = get_base_price_rows_by_key(item_codes, [name for name in price_lists if name])
+	rates = {name: {} for name in price_lists}
+	for (item_code, price_list), row in rows.items():
+		rates[price_list][item_code] = flt(row.price_list_rate)
+	return rates[prices.sale_price_list], rates[prices.compare_at_price_list]
+
+
+def get_item_price(prices: MarketPrices, sale: float | None, compare_at: float | None) -> float | None:
+	# An item on neither list has no price, in the primary market too.
+	return None if sale is None and compare_at is None else prices.price(sale, compare_at)
 
 
 # Shopper reads: published products only, the same for every caller, so they need no permission.
@@ -166,7 +168,7 @@ def list_products(
 		"total": get_total_product_count(filters=filters),
 		"page": page,
 		"page_size": page_size,
-		"facets": {**get_facets(filters), "price": get_price_facet()},
+		"facets": {**get_facets(filters), "price": get_price_facet(MarketPrices.current().sale_price_list)},
 	}
 
 
@@ -180,7 +182,12 @@ def search(query: str, page: int = 1, page_size: int = 24, sort: str = "default"
 			"total": 0,
 			"page": page,
 			"page_size": page_size,
-			"facets": {"brands": [], "colors": [], "sizes": [], "price": get_price_facet()},
+			"facets": {
+				"brands": [],
+				"colors": [],
+				"sizes": [],
+				"price": get_price_facet(MarketPrices.current().sale_price_list),
+			},
 		}
 	return {
 		"query": query,
@@ -244,7 +251,9 @@ def list_brands() -> list[dict]:
 
 
 def get_facets(filters: dict) -> dict[str, list[FacetValue]]:
-	cache_key = f"{FACETS_CACHE_PREFIX}{sha256_hash(frappe.as_json(filters))}"
+	# The price filters read the market's sale price list.
+	key = frappe.as_json({"filters": filters, "prices": MarketPrices.current().cache_key})
+	cache_key = f"{FACETS_CACHE_PREFIX}{sha256_hash(key)}"
 	facets = frappe.cache.get_value(cache_key)
 	if facets is None:
 		facets = {key: get_facet_values(counts) for key, counts in get_listing_facet_counts(filters).items()}
@@ -253,8 +262,8 @@ def get_facets(filters: dict) -> dict[str, list[FacetValue]]:
 
 
 @redis_cache(ttl=FACETS_CACHE_SECONDS)
-def get_price_facet() -> dict:
-	price_range = get_price_range()
+def get_price_facet(sale_price_list: str | None) -> dict:
+	price_range = get_price_range(sale_price_list)
 	return {"min": flt(price_range.get("min_price")), "max": flt(price_range.get("max_price"))}
 
 
@@ -269,7 +278,9 @@ def get_product(handle: str) -> Product | None:
 		return None
 
 	product_variant, item = detail["product_variant"], detail["product"]
-	variants = get_variants(detail["available_sizes"])
+	prices = MarketPrices.current()
+	variants = get_variants(prices, detail["available_sizes"])
+	prices_paid = [variant["price"] for variant in variants if variant["price"] is not None]
 	content = get_product_content(product_variant, item)
 	title = content["display_name"] or item.item_name
 	return {
@@ -281,8 +292,9 @@ def get_product(handle: str) -> Product | None:
 		"description_html": content["description"],
 		"images": detail["images"],
 		"collection": get_product_collection(product_variant.item_group),
-		"currency": get_store_currency(),
-		"price": min((variant["price"] for variant in variants), default=0),
+		"currency": prices.currency,
+		# A secondary market has no price for a product it does not sell.
+		"price": min(prices_paid, default=0 if prices.is_primary else None),
 		"available": any(variant["available"] for variant in variants),
 		"options": get_options(product_variant, detail["available_sizes"]),
 		"variants": variants,
@@ -358,13 +370,15 @@ def get_seo(meta_title: str | None, title: str, meta_description: str | None, no
 def get_product_cards(cards: list[dict]) -> list[ProductCard]:
 	item_codes = [size["item_code"] for card in cards for size in card["sizes"]]
 	stock = get_available_stocks(item_codes, get_ecommerce_warehouse())
-	currency = get_store_currency()
+	currency = MarketPrices.current().currency
 	# utils.shape_product_cards titles every grid's cards; only a hand-built card lacks one.
 	set_product_titles([card for card in cards if "title" not in card])
 	return [get_product_card(card, stock, currency) for card in cards]
 
 
 def get_product_card(card: dict, stock: dict, currency: str) -> ProductCard:
+	# shape_product_cards leaves no price on a product the market does not sell.
+	priced = card["effective_price"] is not None
 	return {
 		"id": card["name"],
 		"handle": card["route"],
@@ -375,9 +389,10 @@ def get_product_card(card: dict, stock: dict, currency: str) -> ProductCard:
 		"image": card["image"],
 		"hover_image": card["hover_image"],
 		"currency": currency,
-		"price": flt(card["effective_price"]),
-		"compare_at_price": flt(card["default_price"]) if cint(card["has_discount"]) else None,
-		"available": any(stock.get(size["item_code"], {}).get("in_stock") for size in card["sizes"]),
+		"price": flt(card["effective_price"]) if priced else None,
+		"compare_at_price": flt(card["default_price"]) if priced and cint(card["has_discount"]) else None,
+		"available": priced
+		and any(stock.get(size["item_code"], {}).get("in_stock") for size in card["sizes"]),
 		"rating": {"average": flt(card["average_rating"]), "count": cint(card["review_count"])},
 		"updated_at": card["modified"],
 	}
@@ -405,27 +420,26 @@ def set_product_titles(rows: list[dict]) -> list[dict]:
 	return rows
 
 
-def get_variants(sizes: list[dict]) -> list[dict]:
-	settings = frappe.get_cached_doc("Commera Settings")
-	default_rate, sale_rate, _sale_ends = rates_by_item_code(
-		[size["item_code"] for size in sizes], settings.default_price_list, settings.sale_price_list
+def get_variants(prices: MarketPrices, sizes: list[dict]) -> list[dict]:
+	compare_at_rates, sale_rates, _sale_ends = rates_by_item_code(
+		[size["item_code"] for size in sizes], prices.compare_at_price_list, prices.sale_price_list
 	)
 	return [
-		get_variant(size, default_rate.get(size["item_code"]), sale_rate.get(size["item_code"]))
+		get_variant(prices, size, sale_rates.get(size["item_code"]), compare_at_rates.get(size["item_code"]))
 		for size in sizes
 	]
 
 
-def get_variant(size: dict, default_price: float | None, sale_price: float | None) -> dict:
-	price = flt(sale_price if sale_price is not None else default_price)
+def get_variant(prices: MarketPrices, size: dict, sale: float | None, compare_at: float | None) -> dict:
+	price = prices.price(sale, compare_at)
 	stock = size["stock_detail"]
 	return {
 		"id": size["item_code"],
 		"title": translate_term(size["size"]),
 		"size": size["size"],
 		"price": price,
-		"compare_at_price": flt(default_price) if default_price and price < flt(default_price) else None,
-		"available": bool(stock.get("in_stock")),
+		"compare_at_price": prices.compare_at(price, compare_at),
+		"available": price is not None and bool(stock.get("in_stock")),
 		"quantity_available": None if stock.get("unlimited") else flt(stock.get("stock_qty")),
 	}
 

@@ -14,7 +14,7 @@
 		{% endif %}
 		<div class="absolute start-2.5 top-2.5 flex flex-col items-start gap-1">
 			{% if not product.available %}
-			<span class="inline-flex h-6 items-center rounded-full bg-surface-base/90 px-2 text-xs font-medium text-ink-gray-8 shadow-sm backdrop-blur">{{ _("Sold out") }}</span>
+			<span class="inline-flex h-6 items-center rounded-full bg-surface-base/90 px-2 text-xs font-medium text-ink-gray-8 shadow-sm backdrop-blur">{{ _("Unavailable") if product.price is none else _("Sold out") }}</span>
 			{% elif discount %}
 			<span dir="ltr" class="tabular inline-flex h-6 items-center rounded-full bg-surface-base/90 px-2 text-xs font-semibold text-ink-red-7 shadow-sm backdrop-blur">−{{ discount }}%</span>
 			{% endif %}

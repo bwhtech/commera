@@ -175,12 +175,14 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 def shape_product_cards(cards):
 	"""Give every product card the one storefront card shape, whichever grid built it.
 	`title` is the product's title in the request language."""
+	from commera.localization.market_prices import MarketPrices
 	from commera.sdk.catalog import set_product_titles
 	from commera.search.engine import CARD_COLUMNS
 	from commera.search.record_builder import sizes_for_variants
 
 	if not cards:
 		return cards
+	prices = MarketPrices.current()
 
 	unsized = [card["name"] for card in cards if card.get("sizes") is None]
 	sizes_by_variant = sizes_for_variants(unsized) if unsized else {}
@@ -192,11 +194,8 @@ def shape_product_cards(cards):
 			card.setdefault(column, None)
 		card.setdefault("average_rating", None)
 		card.setdefault("review_count", None)
-		# Mirrors record_builder.aggregate_prices so both grids agree on the price they filter and sort by.
-		if card["effective_price"] is None:
-			card["effective_price"] = (
-				card["sale_price"] if card["sale_price"] is not None else (card["default_price"] or 0)
-			)
+		# The primary market mirrors record_builder.aggregate_prices; another sells only priced products.
+		card["effective_price"] = prices.price(card["sale_price"], card["default_price"])
 		if card["has_discount"] is None:
 			card["has_discount"] = 1 if flt(card["discount_percent"]) else 0
 		# frappe.qb returns a datetime where the index holds a string, and the card is json.dumps'd into HTML.
@@ -207,17 +206,18 @@ def shape_product_cards(cards):
 def attach_live_prices(cards):
 	"""Overlay the live Item Price onto index-hydrated cards."""
 	# Item Price edits fire no Style Attribute Variant event, so the indexed price lags until the rebuild.
+	from commera.localization.market_prices import MarketPrices
 	from commera.search.record_builder import aggregate_prices, rates_by_item_code
 
 	if not cards:
 		return cards
 
-	settings = frappe.get_cached_doc("Commera Settings")
+	prices = MarketPrices.current()
 	item_codes = list(
 		{size["item_code"] for card in cards for size in (card.get("sizes") or []) if size.get("item_code")}
 	)
 	default_rate, sale_rate, sale_upto = rates_by_item_code(
-		item_codes, settings.default_price_list, settings.sale_price_list
+		item_codes, prices.compare_at_price_list, prices.sale_price_list
 	)
 
 	for card in cards:
@@ -250,9 +250,11 @@ def get_product_count_qb(filters=None, product_list=None):
 
 
 def get_product_base_query(filters=None, product_list=None):
-	commera_settings = frappe.get_cached_doc("Commera Settings")
-	default_price_list = commera_settings.default_price_list
-	sale_price_list = commera_settings.sale_price_list
+	from commera.localization.market_prices import MarketPrices
+
+	prices = MarketPrices.current()
+	default_price_list = prices.compare_at_price_list
+	sale_price_list = prices.sale_price_list
 	style_attribute_variant = DocType("Style Attribute Variant")
 	website_slideshow_item = DocType("Website Slideshow Item")
 	color_size_item = DocType("Color Size Item")

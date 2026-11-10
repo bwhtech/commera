@@ -9,6 +9,7 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import CommeraC
 from commera.core import _get_cart_quotation
 from commera.discounts.allocations import get_allocations
 from commera.guest import get_guest_cart_name, is_guest
+from commera.localization.market_prices import MarketPrices
 from commera.plugin_events import get_listed_items, get_plugin_fieldnames, validate_plugin_fieldnames
 from commera.sdk.lines import LineProducts
 from commera.sdk.types import Cart, CheckoutSummary, NewCartLine, PricedCart
@@ -154,6 +155,11 @@ def validate_items_for_sale(lines: list[dict]):
 	item_codes = {cstr(line["item_code"]) for line in lines}
 	if unlisted := item_codes - get_listed_items(list(item_codes), sellable_only=True):
 		frappe.throw(_("{0} is not for sale.").format(", ".join(sorted(unlisted))))
+	if unpriced := MarketPrices.current().get_unpriced(sorted(item_codes)):
+		frappe.throw(
+			_("{0} is not available in this market.").format(", ".join(sorted(unpriced))),
+			title=_("Not Available"),
+		)
 
 
 def update_lines(lines: list[dict]) -> PricedCart:

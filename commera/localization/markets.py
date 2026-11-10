@@ -12,6 +12,7 @@ from commera.localization.languages import Language, StorefrontLanguages
 MARKET_DOCTYPE = "Commera Market"
 PRIMARY_MARKET = "primary"
 CACHE_KEY = "commera_markets"
+PRICE_FIELDS = ("sale_price_list", "compare_at_price_list", "currency")
 COUNTRY_CODE = re.compile(r"[A-Za-z]{2}")
 # A base language, with an optional four-letter script: `pt`, `zh-Hans`. Never a region.
 MARKET_LANGUAGE = re.compile(r"[a-z]{2,3}(?:-[a-z]{4})?", re.IGNORECASE)
@@ -27,6 +28,10 @@ class Market:
 	languages: tuple[Language, ...]
 	# Lowercase ISO codes. The primary market lists none: it takes every unclaimed country.
 	countries: tuple[str, ...]
+	# None in the primary market: it reads the store's, which may change mid-request.
+	sale_price_list: str | None = None
+	compare_at_price_list: str | None = None
+	currency: str | None = None
 
 	@property
 	def is_primary(self) -> bool:
@@ -44,6 +49,7 @@ class Market:
 			"default_language": self.default_language.code,
 			"languages": [language.code for language in self.languages],
 			"countries": [country.upper() for country in self.countries],
+			"currency": self.currency or get_default_currency(),
 		}
 
 
@@ -131,6 +137,9 @@ class StorefrontMarkets:
 			default_language=languages[0],
 			languages=tuple(languages),
 			countries=tuple(row["countries"]),
+			sale_price_list=row["sale_price_list"],
+			compare_at_price_list=row["compare_at_price_list"],
+			currency=row["currency"] or get_default_currency(),
 		)
 
 	def find_language(self, code: str | None) -> Language | None:
@@ -185,9 +194,8 @@ def delete_cached_rows():
 def fetch_market_rows() -> list[dict]:
 	if not frappe.db.table_exists(MARKET_DOCTYPE):
 		return []
-	rows = frappe.get_all(
-		MARKET_DOCTYPE, fields=["name", "market_name", "enabled", "default_language"], order_by="creation"
-	)
+	fields = ["name", "market_name", "enabled", "default_language", *PRICE_FIELDS]
+	rows = frappe.get_all(MARKET_DOCTYPE, fields=fields, order_by="creation")
 	countries = get_child_values("Commera Market Country", "country")
 	languages = get_child_values("Commera Market Language", "language")
 	for row in rows:
@@ -208,6 +216,12 @@ def get_child_values(doctype: str, fieldname: str) -> dict[str, list[str]]:
 	for parent, value in query.run():
 		values.setdefault(parent, []).append((value or "").lower())
 	return values
+
+
+def get_default_currency() -> str:
+	from commera.utils import get_store_currency
+
+	return get_store_currency()
 
 
 def get_primary_market_title() -> str:

@@ -2,6 +2,7 @@ import frappe
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Count, Max, Min
 
+from commera.localization.market_prices import MarketPrices
 from commera.product_detail import size_sort_key
 from commera.search import query as search_query
 from commera.shop_data import get_category_facets
@@ -79,9 +80,8 @@ def get_listing_facet_counts(selected_filters: dict) -> dict[str, dict[str, int]
 	return {key: get_facet_counts_qb(selected_filters, key) for key in FACET_FIELDS}
 
 
-def get_price_range() -> dict:
+def get_price_range(sale_price_list: str | None) -> dict:
 	item_price = DocType("Item Price")
-	sale_price_list = frappe.get_cached_value("Commera Settings", "Commera Settings", "sale_price_list")
 	price_range = (
 		frappe.qb.from_(item_price)
 		.select(
@@ -107,4 +107,4 @@ def get_product_filters(selected_filters):
 		filters["sizes"] = get_filter_sizes(selected_filters)
 		filters["colors"] = get_filter_colors(selected_filters)
 
-	return filters, get_price_range()
+	return filters, get_price_range(MarketPrices.current().sale_price_list)

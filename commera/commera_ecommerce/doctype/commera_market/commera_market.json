@@ -14,7 +14,12 @@
   "countries",
   "languages_section",
   "default_language",
-  "languages"
+  "languages",
+  "prices_section",
+  "sale_price_list",
+  "compare_at_price_list",
+  "column_break_prc1",
+  "currency"
  ],
  "fields": [
   {
@@ -76,10 +81,46 @@
    "fieldtype": "Table",
    "label": "Languages",
    "options": "Commera Market Language"
+  },
+  {
+   "fieldname": "prices_section",
+   "fieldtype": "Section Break",
+   "label": "Prices",
+   "description": "Prices are not converted. An item without a price in the sale price list is unavailable in this market."
+  },
+  {
+   "description": "The price a shopper pays.",
+   "fieldname": "sale_price_list",
+   "fieldtype": "Link",
+   "label": "Sale Price List",
+   "link_filters": "[[\"Price List\",\"selling\",\"=\",1],[\"Price List\",\"enabled\",\"=\",1]]",
+   "options": "Price List",
+   "reqd": 1
+  },
+  {
+   "description": "The struck-through price, shown when it is higher than the sale price.",
+   "fieldname": "compare_at_price_list",
+   "fieldtype": "Link",
+   "label": "Compare-at Price List",
+   "link_filters": "[[\"Price List\",\"selling\",\"=\",1],[\"Price List\",\"enabled\",\"=\",1]]",
+   "options": "Price List"
+  },
+  {
+   "fieldname": "column_break_prc1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The currency of the sale price list.",
+   "fetch_from": "sale_price_list.currency",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "read_only": 1
   }
  ],
  "links": [],
- "modified": "2026-11-10 00:00:00.000000",
+ "modified": "2026-11-10 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Market",

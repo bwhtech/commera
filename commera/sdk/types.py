@@ -348,8 +348,9 @@ class ProductCard(TypedDict):
 	color: str | None
 	image: str | None
 	hover_image: str | None
+	# The request market's currency. `price` is None where the market has no price: not for sale.
 	currency: str
-	price: float
+	price: float | None
 	compare_at_price: float | None
 	available: bool
 	rating: Rating
@@ -417,7 +418,8 @@ class ProductVariant(TypedDict):
 	# Select a variant by `size`: two sizes can share a translated label.
 	title: str
 	size: str
-	price: float
+	# None where the request market has no price: the variant is unavailable there.
+	price: float | None
 	compare_at_price: float | None
 	available: bool
 	# None when the item is sold without stock tracking.
@@ -436,7 +438,8 @@ class Product(TypedDict):
 	images: list[str]
 	collection: dict | None
 	currency: str
-	price: float
+	# The lowest variant price; None where the request market prices no variant.
+	price: float | None
 	available: bool
 	options: list[ProductOption]
 	variants: list[ProductVariant]
