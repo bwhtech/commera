@@ -66,6 +66,7 @@ COLLECTION_FIELDS = [
 	"display_name",
 	"category_name",
 	"image",
+	"description",
 	"meta_title",
 	"meta_description",
 	"noindex",
@@ -289,11 +290,9 @@ def get_product(handle: str) -> Product | None:
 			"average": flt(product_variant.average_rating),
 			"count": cint(product_variant.review_count),
 		},
-		"seo": {
-			"title": product_variant.meta_title or title,
-			"description": product_variant.meta_description or "",
-			"noindex": bool(product_variant.noindex),
-		},
+		"seo": get_seo(
+			product_variant.meta_title, title, product_variant.meta_description, product_variant.noindex
+		),
 		"updated_at": str(product_variant.modified),
 	}
 
@@ -338,13 +337,22 @@ def get_collection_shape(row, translated: dict) -> Collection:
 	return {
 		"handle": row.route_slug,
 		"title": translated["label"],
+		"description": translated["description"] or "",
 		"image": row.image,
-		"seo": {
-			"title": translated["meta_title"] or translated["label"],
-			"description": translated["meta_description"],
-			"noindex": bool(row.noindex),
-		},
+		"seo": get_seo(
+			translated["meta_title"], translated["label"], translated["meta_description"], row.noindex
+		),
 		"updated_at": str(row.modified),
+	}
+
+
+def get_seo(meta_title: str | None, title: str, meta_description: str | None, noindex) -> dict:
+	# `custom_title` lets a theme keep a set meta title that happens to equal the title.
+	return {
+		"title": meta_title or title,
+		"custom_title": bool(meta_title),
+		"description": meta_description or "",
+		"noindex": bool(noindex),
 	}
 
 

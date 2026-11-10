@@ -148,7 +148,7 @@ commera_hooks = {
 		{
 			"type": "collection",
 			"doctype": "Ecommerce Category",
-			"fields": ["display_name", "meta_title", "meta_description"],
+			"fields": ["display_name", "description", "meta_title", "meta_description"],
 			"label": "Collections",
 		},
 	],

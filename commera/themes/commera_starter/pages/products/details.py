@@ -40,7 +40,7 @@ def add_seo(context, product):
 	variant_fields = {
 		"name": product["id"],
 		"display_name": product["title"],
-		"meta_title": product["seo"]["title"] if product["seo"]["title"] != product["title"] else None,
+		"meta_title": product["seo"]["title"] if product["seo"]["custom_title"] else None,
 		"meta_description": product["seo"]["description"],
 		"noindex": product["seo"]["noindex"],
 	}

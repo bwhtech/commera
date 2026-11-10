@@ -36,6 +36,7 @@ class EcommerceCategory(NestedSet):
 		)
 
 		category_name: DF.Data
+		description: DF.SmallText | None
 		display_name: DF.Data
 		display_order: DF.Int
 		enabled: DF.Check
@@ -226,6 +227,7 @@ def get_menu_tree(enabled_only=False):
 			"link_url",
 			"icon",
 			"image",
+			"description",
 			"meta_title",
 			"meta_description",
 			"og_image",
@@ -253,6 +255,7 @@ def get_menu_tree(enabled_only=False):
 			"url": entry.link_url or "",
 			"icon": entry.icon or "",
 			"image": entry.image or "",
+			"description": entry.description or "",
 			"meta_title": entry.meta_title or "",
 			"meta_description": entry.meta_description or "",
 			"og_image": entry.og_image or "",

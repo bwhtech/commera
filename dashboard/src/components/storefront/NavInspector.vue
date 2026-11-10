@@ -24,6 +24,7 @@ const form = reactive({
   brand: '',
   url: '',
   icon: '',
+  description: '',
   meta_title: '',
   meta_description: '',
   noindex: false,
@@ -45,6 +46,7 @@ watch(
     form.brand = node.brand
     form.url = node.url
     form.icon = node.icon
+    form.description = node.description
     form.meta_title = node.meta_title
     form.meta_description = node.meta_description
     form.noindex = Boolean(node.noindex)
@@ -97,6 +99,7 @@ async function save() {
       // left out of the payload.
       route_slug: form.route_slug || undefined,
       icon: form.icon,
+      description: form.description,
       meta_title: form.meta_title,
       meta_description: form.meta_description,
       noindex: form.noindex ? 1 : 0,
@@ -186,6 +189,14 @@ async function save() {
         />
 
         <FormControl v-model="form.icon" :label="__('Icon')" :description="__('Optional icon name or CSS class.')" />
+
+        <FormControl
+          v-if="isRoot"
+          v-model="form.description"
+          type="textarea"
+          :label="__('Description')"
+          :description="__('Shown under the title on the collection page.')"
+        />
       </div>
 
       <div class="mt-8 space-y-4">

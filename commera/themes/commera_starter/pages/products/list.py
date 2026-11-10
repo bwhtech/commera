@@ -144,10 +144,9 @@ def add_seo(context):
 def get_seo_overrides(collection):
 	if not collection:
 		return None
-	# The SDK's SEO title falls back to the collection title; only a set meta title replaces the template.
-	meta_title = collection["seo"]["title"]
+	# Only a set meta title replaces the "Title | Store" template.
 	return {
-		"meta_title": meta_title if meta_title != collection["title"] else None,
+		"meta_title": collection["seo"]["title"] if collection["seo"]["custom_title"] else None,
 		"meta_description": collection["seo"]["description"],
 		"noindex": collection["seo"]["noindex"],
 	}
