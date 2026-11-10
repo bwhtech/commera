@@ -36,6 +36,7 @@ class RoutingTestCase(IntegrationTestCase):
 		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
 		self.addCleanup(frappe.set_user, frappe.session.user)
 		self.addCleanup(frappe.local.flags.pop, "home_page", None)
+		self.addCleanup(forget_website_settings)
 		frappe.set_user("Guest")
 
 	def open(self, url, lang="en", headers=None):
@@ -52,6 +53,7 @@ class RoutingTestCase(IntegrationTestCase):
 		frappe.local.request_cache.clear()
 		# frappe.init starts every request with an empty frappe.local.cache.
 		frappe.local.cache.pop(frappe.cache.make_key("website_redirects"), None)
+		forget_website_settings()
 		frappe.local.lang = lang
 		frappe.flags.redirect_location = None
 		# Frappe's init_request runs the before_request hooks after it has set the language.
@@ -541,3 +543,9 @@ class TestExcludedPathsUnderAPrefix(ThemeTestCase):
 		self.write_theme_files("pages/ar/private/catalogue.html")
 
 		self.assertEqual(self.respond("/ar/private/catalogue").status_code, 503)
+
+
+def forget_website_settings():
+	"""frappe.init starts every request without them; localize_request may have replaced them."""
+	if hasattr(frappe.local, "website_settings"):
+		del frappe.local.website_settings

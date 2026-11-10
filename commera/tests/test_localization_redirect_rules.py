@@ -75,51 +75,67 @@ class TestLegacyDefaultPrefixRules(RedirectRulesTestCase):
 		self.assertEqual(self.follow("/en/products/shoe"), [])
 
 
+QUERY_AWARE_HOOK = {"source": "/elsewhere", "target": "/there", "match_with_query_string": True}
+
+
 class TestRedirectRuleTargets(RedirectRulesTestCase):
-	def test_saving_rules_drops_the_default_prefix_and_rules_that_point_at_themselves(self):
+	def save_rules(self, *rules):
 		frappe.set_user("Administrator")
 		settings = frappe.get_single("Website Settings")
 		settings.set("route_redirects", [])
-		settings.append("route_redirects", LEGACY_RULE)
-		settings.append("route_redirects", {"source": "/sale", "target": "https://example.com/en/sale"})
-		settings.save(ignore_permissions=True)
-
-		targets = [row.target for row in frappe.get_single("Website Settings").route_redirects]
-		# The legacy rule would point at its own source now, so it is dropped.
-		self.assertEqual(targets, ["https://example.com/en/sale"])
-
-	def test_a_query_aware_hook_elsewhere_cannot_loop_a_saved_rule(self):
-		# Any such hook makes Frappe skip its redirect cache whenever the URL has a query string.
-		frappe.set_user("Administrator")
-		settings = frappe.get_single("Website Settings")
-		settings.set("route_redirects", [])
-		settings.append("route_redirects", LEGACY_RULE)
+		for rule in rules:
+			settings.append("route_redirects", rule)
 		settings.save(ignore_permissions=True)
 		clear_redirect_caches()
 		frappe.set_user("Guest")
-		query_aware = {"source": "/elsewhere", "target": "/there", "match_with_query_string": True}
+		return [row.target for row in frappe.get_single("Website Settings").route_redirects]
+
+	def with_query_aware_hook(self):
+		"""Any such hook makes Frappe skip its redirect cache whenever the URL has a query string."""
 		get_hooks = frappe.get_hooks
 
-		def with_query_aware_hook(hook=None, *args, **kwargs):
+		def hooks_with_query_aware_rule(hook=None, *args, **kwargs):
 			hooks = get_hooks(hook, *args, **kwargs)
-			return [*hooks, query_aware] if hook == "website_redirects" else hooks
+			return [*hooks, QUERY_AWARE_HOOK] if hook == "website_redirects" else hooks
 
-		with patch.object(frappe, "get_hooks", with_query_aware_hook):
-			self.assertEqual(self.follow("/products/shoe?colour=red"), [])
+		return patch.object(frappe, "get_hooks", hooks_with_query_aware_rule)
+
+	def test_saving_rules_moves_targets_off_the_default_prefix_and_keeps_every_rule(self):
+		targets = self.save_rules(
+			LEGACY_RULE,
+			{"source": "/products/[ab]", "target": "/en/products/[ab]"},
+			{"source": "/sale", "target": "https://example.com/en/sale"},
+		)
+
+		self.assertEqual(targets, [r"/products/\1", "/products/[ab]", "https://example.com/en/sale"])
+
+	def test_a_query_aware_hook_elsewhere_cannot_loop_a_rule_to_its_own_page(self):
+		self.save_rules(
+			LEGACY_RULE,
+			{"source": r"/shoes/(.*)\.html", "target": r"/en/shoes/\1.html"},
+			{"source": "/boots/(?P<slug>.*)", "target": r"/en/boots/\g<slug>"},
+		)
+
+		with self.with_query_aware_hook():
+			for url in ("/products/shoe?colour=red", "/shoes/a.html?x=1", "/boots/b?x=1"):
+				with self.subTest(url):
+					self.assertEqual(self.follow(url), [])
 			self.assertEqual(self.follow("/en/products/shoe?colour=red"), ["/products/shoe?colour=red"])
 
-	def test_a_rule_that_only_adds_a_query_string_still_redirects(self):
+	def test_a_rule_that_only_adds_a_query_string_redirects_once(self):
 		self.store_rules({"source": "/products", "target": "/products?category=sale"})
 
 		self.assertEqual(self.follow("/products"), ["/products?category=sale"])
 		self.assertEqual(self.follow("/products?category=sale"), [])
+		with self.with_query_aware_hook():
+			self.assertEqual(self.follow("/products?category=sale"), [])
 
 
 class TestRedirectTargetPatch(RedirectRulesTestCase):
 	def targets(self):
 		return [row.target for row in frappe.get_single("Website Settings").route_redirects]
 
-	def test_targets_under_the_default_prefix_move_to_the_root_or_are_dropped(self):
+	def test_targets_under_the_default_prefix_move_to_the_root(self):
 		self.store_rules(
 			LEGACY_RULE,
 			{"source": "/home", "target": "/en"},
@@ -132,7 +148,7 @@ class TestRedirectTargetPatch(RedirectRulesTestCase):
 
 		self.assertEqual(
 			self.targets(),
-			["/", "/page/offers?from=home", "/ar/products", "https://example.com/en/x"],
+			[r"/products/\1", "/", "/page/offers?from=home", "/ar/products", "https://example.com/en/x"],
 		)
 
 	def test_english_targets_stay_when_english_is_not_the_default(self):

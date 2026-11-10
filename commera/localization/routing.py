@@ -45,6 +45,7 @@ def localize_request():
 
 	localized = localize_path(request.path)
 	if not localized:
+		stop_self_redirect(request.path)
 		return
 
 	request.commera_localized = localized
@@ -148,6 +149,13 @@ def is_self_redirect(location: str, requested_path: str) -> bool:
 	return target.path == get_canonical_path(requested_path) and same_query
 
 
+def stop_self_redirect(path: str):
+	"""A rule from a page to itself would redirect forever, as /x → /en/x now does."""
+	redirect = match_website_redirect(path)
+	if redirect and is_self_redirect(canonicalize_location(redirect[0]), path):
+		skip_frappe_redirects(path)
+
+
 def match_website_redirect(path: str) -> tuple[str, int] | None:
 	try:
 		resolve_redirect(path.strip("/ "), frappe.local.request.query_string)
@@ -219,9 +227,22 @@ def clean_path(path: str) -> str:
 
 def skip_frappe_redirects(path: str):
 	"""The rules ran in localize_request. Frappe's PathResolver would match them again on the
-	stripped path and send /x back to /en/x. frappe.local.cache lives for this request only."""
+	stripped path, and skips its cache when any hook is query-aware. Both last this request only."""
 	key = frappe.cache.make_key("website_redirects")
 	frappe.local.cache.setdefault(key, {})[path.strip("/ ") or "/"] = False
+	settings = frappe.get_website_settings("route_redirects") and frappe.local.website_settings
+	if settings:
+		frappe.local.website_settings = WithoutRouteRedirects(settings)
+
+
+class WithoutRouteRedirects:
+	"""Website Settings for the rest of one request, with no redirect rules left to apply."""
+
+	def __init__(self, settings):
+		self.settings = settings
+
+	def get(self, key, default=None):
+		return [] if key == "route_redirects" else self.settings.get(key, default)
 
 
 def set_request_path(request, path: str):
