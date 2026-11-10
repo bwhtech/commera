@@ -10,6 +10,7 @@ import click
 import frappe
 from frappe.modules.import_file import import_file_by_path
 from frappe.tests import IntegrationTestCase, UnitTestCase
+from frappe.utils import get_url
 from frappe.utils.boilerplate import _create_app_boilerplate
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
@@ -28,7 +29,9 @@ from commera.scaffold.shipping_provider import ShippingProviderScaffold
 from commera.scaffold.theme import ThemeScaffold
 from commera.sdk import API_VERSION
 from commera.shipping.base_class import ShippingProviderBase
+from commera.shop_themes.doctype.shop_theme.shop_theme import render_theme_context
 from commera.shop_themes.sections import get_theme_json, validate_layout
+from commera.shop_themes.theme_resolver import ThemePageRenderer
 from commera.tests.test_localization import use_storefront_languages
 
 APP = "commera_test_plugin"
@@ -39,6 +42,7 @@ STARTER_DIRS = {
 	"public/themes": Path(frappe.get_app_path("commera"), "public", "themes", "commera_starter"),
 }
 JINJA_COMMENT = re.compile(r"{#.*?#}", re.DOTALL)
+LINK_HREF = re.compile(r'<a\b[^>]*\bhref="([^"]*)"')
 # A language prefix glued on by hand instead of through url() or switch_url().
 HAND_BUILT_PREFIX = re.compile(r'root_prefix|language\.code\s*~|~\s*localization|href="/(?!assets/|files/)')
 PHYSICAL_CSS = re.compile(
@@ -425,7 +429,7 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 				ThemeScaffold(APP, self.apps_path).add_theme(f"Scaffold {theme_type}", theme_type, None)
 				theme_dir = self.theme_dir.parent / f"scaffold_{theme_type.lower()}"
 				self.assert_localized(theme_dir)
-				for href in re.findall(r'href="([^"]*)"', read_templates(theme_dir)):
+				for href in LINK_HREF.findall(read_templates(theme_dir)):
 					self.assertRegex(href, r"^\{\{ url\(")
 
 	def test_minimal_theme_links_carry_the_page_language(self):
@@ -449,6 +453,42 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 		self.assertIn('href="/ar/products"', section)
 		self.assertIn("&lt;b&gt;Hi&lt;/b&gt;", section)
 		self.assertIn("&lt;img&gt;</a>", section)
+
+	def test_a_minimal_theme_renders_a_full_page_in_each_language(self):
+		frappe.db.set_value("Shop Theme", STARTER, "use_as_starter", 0)
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+
+		for theme_type in ("Classic", "Sections"):
+			ThemeScaffold(APP, self.apps_path).add_theme(f"Scaffold {theme_type}", theme_type, None)
+			for lang, direction, prefix in (("en", "ltr", ""), ("ar", "rtl", "/ar")):
+				with self.subTest(theme_type, lang=lang):
+					html = self.render_page(f"Scaffold {theme_type}", theme_type, f"{prefix}/")
+					self.assertIn(f'<html lang="{lang}" dir="{direction}">', html)
+					self.assertIn(f'<link rel="canonical" href="{get_url(f"{prefix}/")}">', html)
+					self.assertIn(f'hreflang="en" href="{get_url("/")}"', html)
+					self.assertIn(f'hreflang="ar" href="{get_url("/ar")}"', html)
+					self.assertIn("window.commera_storefront_config", html)
+					self.assertIn(f'href="{prefix}/products"', html)
+
+	def render_page(self, theme_name: str, theme_type: str, path: str) -> str:
+		frappe.local.request = Request(EnvironBuilder(path=path).get_environ())
+		frappe.local.request_cache.clear()
+		theme_context = {
+			"theme_name": theme_name,
+			"theme_type": theme_type,
+			"names": [theme_name],
+			"dirs": [str(self.theme_dir.parent / frappe.scrub(theme_name))],
+			"apps": {theme_name: APP},
+			"settings_doctype": None,
+		}
+		with render_theme_context(theme_context):
+			renderer = ThemePageRenderer(path.strip("/"))
+			renderer.theme_dirs = theme_context["dirs"]
+			renderer.template_path = "pages/index.html"
+			response = renderer.render()
+		self.assertEqual(response.status_code, 200)
+		return response.get_data(as_text=True)
 
 	def render(self, path: Path, **context) -> str:
 		# nosemgrep: frappe-ssti
@@ -527,8 +567,10 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 
 	def test_a_sections_theme_with_a_parent_stays_minimal(self):
 		ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Sections", "Shop Base Theme")
+		ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Classic", "Classic", "Shop Base Theme")
 
 		self.assertFalse((self.theme_dir / "components").exists())
+		self.assertFalse((self.theme_dir.parent / "scaffold_classic" / "components" / "base.html").exists())
 		self.assertFalse((self.export_path.parents[2] / "doctype" / "scaffold_check_settings").exists())
 		self.assertNotIn("theme_settings", json.loads(self.export_path.read_text()))
 
@@ -545,7 +587,7 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 		ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Sections", None)
 
 		self.assertTrue((self.theme_dir / "layouts" / "index.json").is_file())
-		self.assertFalse((self.theme_dir / "components").exists())
+		self.assertEqual(list_files(self.theme_dir / "components"), {"base.html"})
 		self.assertFalse((self.export_path.parents[2] / "doctype" / "scaffold_check_settings").exists())
 		self.assertNotIn("theme_settings", json.loads(self.export_path.read_text()))
 

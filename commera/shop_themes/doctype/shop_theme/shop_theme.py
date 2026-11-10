@@ -351,8 +351,18 @@ def scaffold_theme(theme_name, module=None, theme_type="Classic", app=None, pare
 	for folder in ("scripts", "images"):
 		(theme_public_dir / folder).mkdir(parents=True, exist_ok=True)
 
+	starter_dirs = [THEME_STARTER_DIR / theme_type.lower()]
+	# A child theme renders with its parent's components/base.html.
+	if not parent_theme:
+		starter_dirs.append(THEME_STARTER_DIR / "standalone")
 	changes = []
-	starter_dir = THEME_STARTER_DIR / theme_type.lower()
+	for starter_dir in starter_dirs:
+		changes.extend(write_minimal_starter(starter_dir, theme_dir, theme_name, app_path))
+	return changes
+
+
+def write_minimal_starter(starter_dir, theme_dir, theme_name, app_path):
+	changes = []
 	for starter in sorted(path for path in starter_dir.rglob("*") if path.is_file()):
 		path = theme_dir / starter.relative_to(starter_dir)
 		path.parent.mkdir(parents=True, exist_ok=True)
