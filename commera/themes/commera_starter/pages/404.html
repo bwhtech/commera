@@ -8,7 +8,7 @@
 	<h1 class="page-title mt-3">{{ _("Page not found") }}</h1>
 	<p class="mt-4 max-w-[40ch] text-p-xl text-ink-gray-6">{{ _("This page has moved or is no longer here. Try a search, or start from the home page.") }}</p>
 	<div class="mt-8 flex w-full justify-center">{{ search_form() }}</div>
-	<a href="/{{ frappe.lang or 'en' }}" class="button-secondary mt-4">{{ _("Back to home") }}</a>
+	<a href="{{ url('/') }}" class="button-secondary mt-4">{{ _("Back to home") }}</a>
 </section>
 {% if new_arrivals %}
 <section class="section-x section-top">

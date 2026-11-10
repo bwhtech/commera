@@ -1,6 +1,5 @@
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/image.html" import image with context %}
-{% set language = frappe.lang or "en" %}
 <section class="section-x section-top">
 	<div class="grid items-center gap-8 overflow-hidden rounded-2xl bg-surface-gray-1 md:grid-cols-2 md:gap-0">
 		{{ image(section.settings.image, "", 1280, "aspect-[4/3] size-full object-cover md:aspect-auto md:min-h-[32rem]") }}
@@ -13,7 +12,7 @@
 			<p class="mt-5 max-w-[44ch] text-p-xl text-ink-gray-6">{{ section.settings.text }}</p>
 			{% endif %}
 			{% if section.settings.button_label %}
-			<a href="{{ section.settings.button_url or '/' ~ language ~ '/products' }}" class="group mt-8 button-secondary">{{ section.settings.button_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
+			<a href="{{ url(section.settings.button_url or '/products') }}" class="group mt-8 button-secondary">{{ section.settings.button_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
 			{% endif %}
 		</div>
 	</div>

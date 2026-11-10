@@ -1,10 +1,9 @@
 {% from "components/macros/icons.html" import spinner %}
-{% set language = frappe.lang or "en" %}
 {% set account_links = [
-	("orders", _("Orders"), "/" ~ language ~ "/account/orders"),
-	("profile", _("Profile"), "/" ~ language ~ "/account/profile"),
-	("address", _("Addresses"), "/" ~ language ~ "/account/address"),
-	("wishlist", _("Wishlist"), "/" ~ language ~ "/account/wishlist"),
+	("orders", _("Orders"), url("/account/orders")),
+	("profile", _("Profile"), url("/account/profile")),
+	("address", _("Addresses"), url("/account/address")),
+	("wishlist", _("Wishlist"), url("/account/wishlist")),
 ] %}
 
 {% macro account_shell(active, title, show_nav=True, lede="") %}
@@ -14,8 +13,8 @@
 	<div class="mt-8 flex flex-col gap-8 md:mt-12 md:flex-row md:gap-16">
 		{% if show_nav %}
 		<nav class="-mx-5 flex shrink-0 gap-1 overflow-x-auto px-5 [scrollbar-width:none] md:mx-0 md:w-52 md:flex-col md:px-0 [&::-webkit-scrollbar]:hidden" aria-label="{{ _('Account') }}">
-			{% for key, label, url in account_links %}
-			<a href="{{ url }}" {% if key == active %}aria-current="page"{% endif %} class="{{ 'bg-surface-gray-3 text-ink-gray-9' if key == active else 'text-ink-gray-7 hover:bg-surface-gray-2' }} inline-flex h-11 shrink-0 items-center rounded-lg px-3.5 text-md md:h-10">{{ label }}</a>
+			{% for key, label, href in account_links %}
+			<a href="{{ href }}" {% if key == active %}aria-current="page"{% endif %} class="{{ 'bg-surface-gray-3 text-ink-gray-9' if key == active else 'text-ink-gray-7 hover:bg-surface-gray-2' }} inline-flex h-11 shrink-0 items-center rounded-lg px-3.5 text-md md:h-10">{{ label }}</a>
 			{% endfor %}
 			<button type="button" x-data="log_out_button" @click="log_out()" :disabled="busy" :aria-busy="busy" class="relative inline-flex h-11 shrink-0 items-center rounded-lg px-3.5 text-md text-ink-gray-7 hover:bg-surface-gray-2 md:h-10">{{ _("Log out") }}{{ spinner("busy", "size-4 text-ink-gray-7") }}</button>
 		</nav>

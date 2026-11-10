@@ -1,6 +1,4 @@
 {% from "components/macros/icons.html" import icon %}
-{% set language = frappe.lang or "en" %}
-{% set products_url = "/" ~ language ~ "/products" %}
 {% set slides = section.blocks | selectattr("settings.image") | list %}
 <section x-data="hero({{ slides | length }})" @mouseenter="hovered = true" @mouseleave="hovered = false" @focusin="focused = true" @focusout="focused = $el.contains($event.relatedTarget)" class="section-x grid items-center gap-6 pt-2 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-12 md:pt-4 lg:gap-20">
 	<div class="order-2 animate-rise md:order-1">
@@ -13,10 +11,10 @@
 		{% endif %}
 		<div class="mt-6 flex flex-wrap gap-3 md:mt-9">
 			{% if section.settings.primary_label %}
-			<a href="{{ section.settings.primary_url or products_url }}" class="group button-primary">{{ section.settings.primary_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
+			<a href="{{ url(section.settings.primary_url or '/products') }}" class="group button-primary">{{ section.settings.primary_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
 			{% endif %}
 			{% if section.settings.secondary_label %}
-			<a href="{{ section.settings.secondary_url or products_url }}" class="button-secondary">{{ section.settings.secondary_label }}</a>
+			<a href="{{ url(section.settings.secondary_url or '/products') }}" class="button-secondary">{{ section.settings.secondary_label }}</a>
 			{% endif %}
 		</div>
 		{% if slides | length > 1 %}

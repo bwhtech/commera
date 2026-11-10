@@ -1,7 +1,7 @@
 {% from "components/macros/icons.html" import icon %}
 
 {% macro search_form(query="") %}
-<form action="/{{ frappe.lang or 'en' }}/products" class="flex w-full max-w-md gap-2" role="search">
+<form action="{{ url('/products') }}" class="flex w-full max-w-md gap-2" role="search">
 	<input type="search" enterkeyhint="search" name="search" value="{{ query }}" placeholder="{{ _('Search products') }}" aria-label="{{ _('Search products') }}" class="field">
 	<button type="submit" class="button-primary w-12 shrink-0 px-0" aria-label="{{ _('Search') }}">{{ icon("search") }}</button>
 </form>

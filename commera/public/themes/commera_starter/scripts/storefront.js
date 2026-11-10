@@ -1,7 +1,12 @@
+// The page's language prefix, as url() adds it in templates. The default language has none.
+function localized_url(path) {
+	const prefix =
+		globalThis.commera_storefront_config?.localization?.root_prefix ?? '';
+	return path === '/' ? prefix || '/' : `${prefix}${path}`;
+}
+
 function product_url(product) {
-	return `/${document.documentElement.lang}/products/${encodeURIComponent(
-		product.handle,
-	)}`;
+	return localized_url(`/products/${encodeURIComponent(product.handle)}`);
 }
 
 async function save_change(state, change, action = true) {
@@ -966,7 +971,7 @@ document.addEventListener('alpine:init', () => {
 		async log_out() {
 			await save_change_and_leave(this, async () => {
 				await commera.auth.log_out();
-				location.assign(`/${document.documentElement.lang}`);
+				location.assign(localized_url('/'));
 			});
 		},
 	}));

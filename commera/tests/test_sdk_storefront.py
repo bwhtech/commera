@@ -3,11 +3,14 @@ from urllib.parse import quote
 
 import frappe
 from PIL import Image
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request
 
 from commera.api.storefront import images
 from commera.api.storefront import search as search_api
 from commera.sdk import catalog, format, shop
 from commera.sdk.types import Menu, MenuItem, ProductCard, SearchResults, Typeahead
+from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.tests.test_storefront_api import get_shopper_messages
 
@@ -32,6 +35,8 @@ class TestSdkStorefront(ProductDetailPriceTestCase):
 		return category.display_name
 
 	def test_main_menu_items_carry_their_storefront_url(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		self.use_request("/ar/products")
 		title = self.make_tab()
 		hidden_title = self.make_tab(enabled=0)
 		menu = shop.get_menu("main-menu")
@@ -41,7 +46,7 @@ class TestSdkStorefront(ProductDetailPriceTestCase):
 		self.assert_shape(tab, MenuItem)
 		self.assertEqual(tab["type"], "collection")
 		self.assertEqual(
-			tab["url"], f"/en/products?category={tab['target']}&subcategory={quote(self.item_group)}"
+			tab["url"], f"/ar/products?category={tab['target']}&subcategory={quote(self.item_group)}"
 		)
 		self.assertNotIn(hidden_title, [item["title"] for item in menu["items"]])
 		self.assertEqual(shop.get_shop()["menu"], menu["items"])
@@ -121,11 +126,18 @@ class TestSdkStorefront(ProductDetailPriceTestCase):
 		self.assertEqual(format.money(10, "SAR"), '<span class="saudi-currency-symbol pe-0.5"></span>10.00')
 
 	def test_product_url_links_the_handle_in_the_current_language(self):
-		self.assertEqual(format.product_url("blue shirt"), "/en/products/blue%20shirt")
-		frappe.local.lang = "ar"
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		self.use_request("/products")
+		self.assertEqual(format.product_url("blue shirt"), "/products/blue%20shirt")
+		self.use_request("/ar/products")
 		self.assertEqual(format.product_url("shirt"), "/ar/products/shirt")
 		self.assertRaises(frappe.ValidationError, format.product_url, "")
 		self.assertEqual(frappe.render_template("{{ product_url('shirt') }}", {}), "/ar/products/shirt")
+
+	def use_request(self, path):
+		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+		frappe.local.request = Request(EnvironBuilder(path=path).get_environ())
+		frappe.local.request_cache.clear()
 
 
 class TestImageUrl(ProductDetailPriceTestCase):

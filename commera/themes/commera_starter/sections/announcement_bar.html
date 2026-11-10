@@ -1,6 +1,6 @@
 {% if section.settings.text %}
 {% if section.settings.url %}
-<a href="{{ section.settings.url }}" class="block focus-visible:outline-current focus-visible:-outline-offset-4 bg-brand px-5 py-2.5 text-center text-xs font-medium tracking-wide text-on-brand hover:bg-brand-hover">{{ section.settings.text }}</a>
+<a href="{{ url(section.settings.url) }}" class="block focus-visible:outline-current focus-visible:-outline-offset-4 bg-brand px-5 py-2.5 text-center text-xs font-medium tracking-wide text-on-brand hover:bg-brand-hover">{{ section.settings.text }}</a>
 {% else %}
 <p class="bg-brand px-5 py-2.5 text-center text-xs font-medium tracking-wide text-on-brand">{{ section.settings.text }}</p>
 {% endif %}

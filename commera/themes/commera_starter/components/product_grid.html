@@ -5,7 +5,7 @@
 {% set facets = listing.facets %}
 {% set facet_filters = [("sizes", _("Size"), facets.sizes), ("colors", _("Colour"), facets.colors), ("brands", _("Brand"), facets.brands)] %}
 
-<form id="listing-filters" action="/{{ frappe.lang or 'en' }}/products" x-data="listing_filters" @submit.prevent="apply()" @change="apply()">
+<form id="listing-filters" action="{{ url('/products') }}" x-data="listing_filters" @submit.prevent="apply()" @change="apply()">
 	{% if query %}<input type="hidden" name="search" value="{{ query }}">{% endif %}
 	{% if collection %}<input type="hidden" name="category" value="{{ collection.handle }}">{% endif %}
 	{% if section.settings.show_filters %}

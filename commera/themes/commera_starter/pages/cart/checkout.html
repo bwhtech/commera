@@ -4,7 +4,6 @@
 {% from "components/macros/icons.html" import icon, spinner %}
 {% from "components/macros/empty_state.html" import empty_state %}
 {% from "components/macros/skeleton.html" import skeleton %}
-{% set language = frappe.lang or "en" %}
 
 {% block uncontained_body %}
 <section x-data='checkout({{ checkout_config | tojson }})' class="section-x pt-6 md:pt-10">
@@ -17,7 +16,7 @@
 	<button type="button" @click="$store.cart.load()" class="button-secondary">{{ _("Try again") }}</button>
 	{% endcall %}
 	{% call empty_state(_("Your cart is empty"), _("Browse the shop and add what you like. It will wait for you here."), "bag", show="!sign_in_required && $store.cart.status === 'ready' && !$store.cart.count") %}
-	<a href="/{{ language }}/products" class="button-primary">{{ _("Start shopping") }}</a>
+	<a href="{{ url('/products') }}" class="button-primary">{{ _("Start shopping") }}</a>
 	{% endcall %}
 
 	<div x-show="is_loading" aria-busy="true" class="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,40rem)_24rem] lg:items-start lg:justify-between lg:gap-12">

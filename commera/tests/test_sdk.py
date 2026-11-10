@@ -99,7 +99,16 @@ PUBLIC_NAMES = {
 		"list_products",
 		"search",
 	],
-	"commera.sdk.format": ["IMAGE_WIDTHS", "date", "image_url", "money", "number", "product_url"],
+	"commera.sdk.format": [
+		"IMAGE_WIDTHS",
+		"date",
+		"image_url",
+		"money",
+		"number",
+		"product_url",
+		"switch_url",
+		"url",
+	],
 	"commera.sdk.orders": ["get_order", "get_orders", "record_shipment"],
 	"commera.sdk.shop": [
 		"get_localization",

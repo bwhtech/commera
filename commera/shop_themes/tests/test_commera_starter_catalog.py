@@ -9,6 +9,7 @@ import commera.sdk
 from commera.shop_themes.doctype.shop_theme.shop_theme import render_theme_context
 from commera.shop_themes.sections import LAYOUT_CACHE_PREFIX, get_theme_json, validate_layout
 from commera.shop_themes.theme_resolver import ThemePageRenderer
+from commera.tests.test_localization import use_storefront_languages
 
 STARTER = "Commera Starter"
 STARTER_DIR = os.path.join(frappe.get_app_path("commera"), "themes", "commera_starter")
@@ -138,13 +139,14 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 
 	def test_a_selected_filter_shows_as_a_chip_that_removes_it(self):
 		self.get_any_product()
+		use_storefront_languages(self, "en", published=("en", "ar"))
 
-		status, html = self.render("pages/products/list.html", "/en/products", sizes="ZZ-NO-SIZE")
+		status, html = self.render("pages/products/list.html", "/ar/products", sizes="ZZ-NO-SIZE")
 
 		self.assertEqual(status, 200)
 		self.assertIn("No products match these filters", html)
 		self.assertIn('aria-label="Remove ZZ-NO-SIZE"', html)
-		self.assertIn('href="/en/products"', html)
+		self.assertIn('href="/ar/products"', html)
 
 	def test_a_search_shows_its_results_and_is_kept_out_of_search_engines(self):
 		product = self.get_any_product()

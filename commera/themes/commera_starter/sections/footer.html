@@ -41,8 +41,8 @@
 		<div :class="open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'" :inert="mobile && !open" class="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-out md:!grid-rows-[1fr]">
 			<div class="overflow-hidden">
 				<div class="pb-3 md:pb-0">
-					{% for label, url in social_links %}
-					<a href="{{ url }}" target="_blank" rel="noopener" class="block py-2.5 hover:text-ink-gray-9 md:py-1">{{ label }}</a>
+					{% for label, href in social_links %}
+					<a href="{{ href }}" target="_blank" rel="noopener" class="block py-2.5 hover:text-ink-gray-9 md:py-1">{{ label }}</a>
 					{% endfor %}
 				</div>
 			</div>

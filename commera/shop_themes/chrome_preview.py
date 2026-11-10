@@ -122,6 +122,8 @@ def get_preview_context(preview_settings, lang):
 	"""The context every chrome preview needs, whichever end of the page it is rendering."""
 	# Theme templates read the page language off frappe.lang, so the ?lang switch must move it here.
 	frappe.local.lang = lang
+	# url() and the language switcher read get_localization(), which reads `_lang` off the form.
+	frappe.form_dict._lang = lang
 	localization = resolve("/", lang, include_unpublished=True)[0]
 
 	return frappe._dict(

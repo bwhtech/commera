@@ -1,0 +1,13 @@
+{# The published languages, each linking to this page in that language. Nothing for a single-language store.
+   A pick also sets Frappe's preferred_language cookie. The URL alone still decides the page language. #}
+{% macro language_switcher(class="", link_class="", current_class="") -%}
+{%- set localization = get_localization() -%}
+{%- if localization.available_languages | length > 1 -%}
+<ul aria-label="{{ _('Language') }}" class="{{ class }}">
+	{%- for language in localization.available_languages %}
+	{%- set is_current = language.code == localization.language.code %}
+	<li><a href="{{ switch_url(language=language.code) }}" hreflang="{{ language.code }}" lang="{{ language.code }}" dir="{{ language.direction }}" data-language="{{ language.code }}" onclick="document.cookie = 'preferred_language=' + this.dataset.language + '; path=/; max-age=31536000; samesite=lax'"{% if is_current %} aria-current="true"{% endif %} class="{{ link_class }}{{ ' ' ~ current_class if is_current and current_class }}">{{ language.endonym[:1] | upper }}{{ language.endonym[1:] }}</a></li>
+	{%- endfor %}
+</ul>
+{%- endif %}
+{%- endmacro %}

@@ -5,8 +5,7 @@
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/empty_state.html" import empty_state %}
 {% from "components/macros/pagination.html" import pagination %}
-{% set language = frappe.lang or "en" %}
-{% set orders_url = "/" ~ language ~ "/account/orders" %}
+{% set orders_url = url("/account/orders") %}
 {% set page = [frappe.form_dict.page | int, 1] | max %}
 {% set order_page = commera.account.list_orders(page, 10) %}
 {% set page_count = ((order_page.total + order_page.page_size - 1) // order_page.page_size) or 1 %}
@@ -38,7 +37,7 @@
 {{ pagination(page, page_count, page_url) }}
 {% else %}
 {% call empty_state(_("No orders yet"), _("When you place an order, it shows here with its delivery status."), "truck") %}
-<a href="/{{ language }}/products" class="button-primary">{{ _("Start shopping") }}</a>
+<a href="{{ url('/products') }}" class="button-primary">{{ _("Start shopping") }}</a>
 {% endcall %}
 {% endif %}
 {% endcall %}
