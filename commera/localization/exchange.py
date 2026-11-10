@@ -1,28 +1,23 @@
 """Translation exchange: one language's translations as a CSV in Shopify's column shape, and an
-import that writes such a file back through `register()`, one row at a time."""
+import that writes such a file back one row at a time. Both go through the resource interface only."""
 
 import csv
 import io
 from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass, field
+from itertools import batched
 
 import frappe
 from frappe import _
-from frappe.utils import create_batch, cstr
+from frappe.utils import cstr
 
-from commera.localization.content import (
-	BATCH_SIZE,
-	CURRENT,
-	DOCTYPE,
-	MISSING,
-	OUTDATED,
-	SHOP_WIDE,
-	get_source_hash,
-	get_sources,
-	register,
-)
+from commera.localization.content import BATCH_SIZE, SHOP_WIDE
 from commera.localization.languages import StorefrontLanguages
-from commera.localization.resources import TranslatableResource, get_translatable_resources
+from commera.localization.resources import (
+	TranslatableResource,
+	TranslationEntry,
+	get_translatable_resources,
+)
 
 COLUMNS = (
 	"Type",
@@ -45,7 +40,7 @@ MARKET_DOCTYPE = "Commera Market"
 
 @dataclass(frozen=True)
 class Entry:
-	"""One translatable field of one record, in one language."""
+	"""One translatable field of one record, in one language, as a CSV row names it."""
 
 	type: str
 	identification: str
@@ -54,6 +49,18 @@ class Entry:
 	status: str
 	default: str
 	translated: str
+
+	@classmethod
+	def from_translation(cls, entry: TranslationEntry) -> "Entry":
+		return cls(
+			type=entry.resource,
+			identification=entry.name,
+			field=entry.field,
+			market=entry.market,
+			status=entry.status,
+			default=entry.source,
+			translated=entry.value,
+		)
 
 	@property
 	def key(self) -> tuple[str, str, str, str]:
@@ -98,8 +105,8 @@ def get_exchange_language(code: str) -> str:
 
 
 def export_csv(language: str) -> str:
-	"""Every field with a source or a translation, shop-wide and per market. Cells are quoted against
-	formulas (OWASP) by `encode_cell`, which the import reverses."""
+	"""Every field with a source or a stored translation, shop-wide and per market, of every resource.
+	Cells are quoted against formulas (OWASP) by `encode_cell`, which the import reverses."""
 	language = get_exchange_language(language)
 	buffer = io.StringIO()
 	writer = csv.writer(buffer)
@@ -115,8 +122,8 @@ def import_csv(content: bytes | str, language: str) -> ImportReport:
 
 
 class TranslationImport:
-	"""Matches each row on type, identification, field, locale and market, and writes the changed ones.
-	A bad row, or a repeat of a key, becomes an error in the report and the next row is read."""
+	"""Matches each row on type, identification, field, locale and market, and writes the changed ones
+	through its resource. A bad row, or a repeat of a key, becomes an error in the report."""
 
 	def __init__(self, rows: list[tuple[int, dict]], language: str):
 		self.rows = rows
@@ -140,14 +147,15 @@ class TranslationImport:
 		if row["Market"]:
 			row["Market"] = canonical_market(row["Market"])
 		self.check_duplicate(number, row)
-		resource, entry, market = self.match(row)
-		value = row["Translated content"]
+		resource = self.match(row)
+		entry, name = self.find_record(resource, row)
+		value, market = row["Translated content"], row["Market"]
 		if not value:
 			self.report.skipped += 1
-		elif value == self.stored_value(entry, market):
+		elif entry and value == self.stored_value(entry, market):
 			self.report.unchanged += 1
 		else:
-			self.write(resource, entry, value, market)
+			self.write(resource, name, row["Field"], value, market)
 			self.report.updated += 1
 
 	def check_duplicate(self, number: int, row: dict):
@@ -158,7 +166,7 @@ class TranslationImport:
 			)
 		self.seen[key] = number
 
-	def match(self, row: dict) -> tuple[TranslatableResource, Entry, str]:
+	def match(self, row: dict) -> TranslatableResource:
 		if row["Locale"].casefold() != self.language.casefold():
 			raise RowError(
 				_("Locale {0} is not {1}, the language you import.").format(row["Locale"], self.language)
@@ -166,36 +174,50 @@ class TranslationImport:
 		resource = self.resources.get(row["Type"])
 		if not resource:
 			raise RowError(_("{0} is not a type you can translate.").format(row["Type"]))
-		if row["Field"] not in resource.fields:
-			raise RowError(_("{0} is not a translatable field of {1}.").format(row["Field"], row["Type"]))
-		entry = self.find_entry(row)
-		if not entry:
-			raise RowError(_("No {0} with identification {1}.").format(row["Type"], row["Identification"]))
-		return resource, entry, row["Market"]
+		return resource
+
+	def find_record(self, resource: TranslatableResource, row: dict) -> tuple[Entry | None, str]:
+		"""The row's exported entry, if any, and its record name. An unknown record or field is an
+		error even with nothing to import, as the export never names one."""
+		if entry := self.find_entry(row):
+			return entry, entry.identification
+		for name in candidate_names(row["Identification"]):
+			# A field the export had no row for, e.g. one without source text or translation.
+			if resource.exists(name, row["Field"]):
+				return None, name
+		raise RowError(
+			_("No {0} with identification {1} has a translatable field {2}.").format(
+				row["Type"], row["Identification"], row["Field"]
+			)
+		)
 
 	def find_entry(self, row: dict) -> Entry | None:
-		key = (row["Type"], row["Identification"], row["Field"], SHOP_WIDE)
-		if entry := self.entries.get(key):
-			return entry
-		# decode_cell removed an apostrophe the record's own name starts with.
-		if row["Identification"].startswith(FORMULA_TRIGGERS):
-			return self.entries.get((row["Type"], "'" + row["Identification"], row["Field"], SHOP_WIDE))
+		for name in candidate_names(row["Identification"]):
+			if entry := self.entries.get((row["Type"], name, row["Field"], SHOP_WIDE)):
+				return entry
 		return None
 
 	def stored_value(self, entry: Entry, market: str) -> str:
 		stored = self.entries.get((entry.type, entry.identification, entry.field, market))
 		return stored.translated if stored else ""
 
-	def write(self, resource: TranslatableResource, entry: Entry, value: str, market: str):
+	def write(self, resource: TranslatableResource, name: str, fieldname: str, value: str, market: str):
 		# A refused save must not leave a half-written row or a toast behind for this row.
 		messages = len(frappe.local.message_log)
 		frappe.db.savepoint("import_translation_row")
 		try:
-			write_entry(resource, entry.identification, entry.field, self.language, value, market)
-		except frappe.ValidationError as error:
+			resource.write(name, fieldname, self.language, value, market)
+		except (frappe.ValidationError, frappe.PermissionError) as error:
 			frappe.db.rollback(save_point="import_translation_row")
 			del frappe.local.message_log[messages:]
 			raise RowError(cstr(error) or _("The translation could not be saved.")) from error
+
+
+def candidate_names(identification: str) -> list[str]:
+	"""decode_cell removes an apostrophe a record's own name may start with."""
+	if identification.startswith(FORMULA_TRIGGERS):
+		return [identification, "'" + identification]
+	return [identification]
 
 
 def canonical_market(market: str) -> str:
@@ -258,73 +280,14 @@ def decode(content: bytes | str) -> str:
 		frappe.throw(_("Save the file as CSV in UTF-8 and upload it again."))
 
 
-# Doctype resources: the only code here that knows a resource is a doctype.
-# Swap these two for the generic resource interface (list entries per language, write) when it lands.
-
-
 def iter_entries(language: str, types: Iterable[str] | None = None) -> Iterator[Entry]:
+	"""Each resource's entries, sourceless ones too, each shop-wide one followed by its market ones."""
 	for resource in get_translatable_resources():
-		if types is None or resource.type in types:
-			yield from iter_doctype_entries(resource, language)
-
-
-def write_entry(
-	resource: TranslatableResource, name: str, fieldname: str, language: str, value: str, market: str
-):
-	register(resource.doctype, name, fieldname, language, value, market)
-
-
-def read_records(doctype: str, meta, columns: list[str]) -> list:
-	# A Single has no rows to list: its one record is named after the doctype.
-	if meta.issingle:
-		doc = frappe.get_cached_doc(doctype)
-		return [frappe._dict(name=doctype, **{column: doc.get(column) for column in columns})]
-	return frappe.get_all(doctype, fields=["name", *columns], order_by="name asc")
-
-
-def iter_doctype_entries(resource: TranslatableResource, language: str) -> Iterator[Entry]:
-	meta = frappe.get_meta(resource.doctype)
-	columns = [fieldname for fieldname in resource.fields if meta.has_field(fieldname)]
-	for batch in create_batch(read_records(resource.doctype, meta, columns), BATCH_SIZE):
-		sources = get_sources(resource.doctype, batch, list(resource.fields))
-		names = [cstr(record.name) for record in batch]
-		translations = fetch_all_translations(resource.doctype, names, list(resource.fields), language)
-		for name, source in zip(names, sources, strict=True):
-			for fieldname in resource.fields:
-				markets = translations.get((name, fieldname), {})
-				for market in [SHOP_WIDE, *sorted(set(markets) - {SHOP_WIDE})]:
-					translated, source_hash = markets.get(market) or ("", None)
-					yield Entry(
-						type=resource.type,
-						identification=name,
-						field=fieldname,
-						market=market,
-						status=get_status(source[fieldname], translated, source_hash),
-						default=source[fieldname],
-						translated=translated,
-					)
-
-
-def fetch_all_translations(doctype: str, names: list[str], fields: list[str], language: str) -> dict:
-	"""{(name, field): {market: (translated value, source hash)}}, shop-wide and every market."""
-	rows = frappe.get_all(
-		DOCTYPE,
-		filters={
-			"reference_doctype": doctype,
-			"reference_name": ("in", names),
-			"reference_field": ("in", fields),
-			"language": language,
-		},
-		fields=["reference_name", "reference_field", "market", "translated_value", "source_hash"],
-	)
-	translations = {}
-	for row in rows:
-		markets = translations.setdefault((row.reference_name, row.reference_field), {})
-		markets[cstr(row.market)] = (cstr(row.translated_value), row.source_hash)
-	return translations
-
-
-def get_status(source: str, translated: str, source_hash: str | None) -> str:
-	if not translated:
-		return MISSING
-	return CURRENT if source_hash == get_source_hash(source) else OUTDATED
+		if types is not None and resource.type not in types:
+			continue
+		for batch in batched(resource.iter_entries(language, include_sourceless=True), BATCH_SIZE):
+			markets = resource.get_market_entries(list(batch), language)
+			for entry in batch:
+				yield Entry.from_translation(entry)
+				for market_entry in markets.get((entry.name, entry.field), []):
+					yield Entry.from_translation(market_entry)

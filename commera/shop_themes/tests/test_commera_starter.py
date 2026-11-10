@@ -8,7 +8,7 @@ from werkzeug.wrappers import Request
 
 import commera.sdk
 from commera.shop_themes.doctype.shop_theme.shop_theme import render_theme_context
-from commera.shop_themes.sections import LAYOUT_CACHE_PREFIX, get_theme_json, validate_layout
+from commera.shop_themes.sections import get_theme_json, validate_layout
 from commera.shop_themes.theme_resolver import ThemePageRenderer, build_base_context
 from commera.tests.test_localization import use_storefront_languages
 
@@ -42,9 +42,6 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 			"apps": {STARTER: "commera"},
 			"settings_doctype": None,
 		}
-		for page in ("index", "header_group", "footer_group"):
-			frappe.cache.delete_value(f"{LAYOUT_CACHE_PREFIX}{STARTER}:{page}")
-			self.addCleanup(frappe.cache.delete_value, f"{LAYOUT_CACHE_PREFIX}{STARTER}:{page}")
 		frappe.db.delete("Theme Layout", {"theme": STARTER})
 
 	def render_home(self, products):
@@ -58,7 +55,14 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 			return renderer.render_with_theme_loader(build_base_context(None))
 
 	def publish(self, page, layout):
-		frappe.cache.set_value(f"{LAYOUT_CACHE_PREFIX}{STARTER}:{page}", {"layout": layout})
+		frappe.get_doc(
+			doctype="Theme Layout",
+			name=f"{STARTER}-{page}",
+			theme=STARTER,
+			page=page,
+			published_layout=frappe.as_json(layout),
+			modified=frappe.utils.now_datetime(),
+		).db_insert()
 
 	def assert_layout_rejected(self, page, section_type):
 		layout = {"sections": [{"id": "probe", "type": section_type}]}

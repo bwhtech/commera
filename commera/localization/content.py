@@ -6,12 +6,14 @@ from dataclasses import dataclass
 import frappe
 from frappe import _
 from frappe.model.base_document import get_controller
+from frappe.query_builder import Case, CustomFunction, DocType
+from frappe.query_builder.functions import Count, IfNull
 from frappe.utils import create_batch, cstr
 from frappe.utils.data import sha256_hash
 
 from commera.localization.resolver import Localization, get_localization
-from commera.localization.resources import get_translatable_fields
 
+Sha2 = CustomFunction("SHA2", ["value", "length"])
 DOCTYPE = "Content Translation"
 MISSING, OUTDATED, CURRENT = "missing", "outdated", "current"
 SHOP_WIDE = ""
@@ -87,7 +89,7 @@ def delete_translations(doc, method=None):
 	for row in doc.get_all_children():
 		rows.setdefault(row.doctype, []).append(row.name)
 	for doctype, names in rows.items():
-		if get_translatable_fields(doctype):
+		if has_translatable_fields(doctype):
 			frappe.db.delete(DOCTYPE, {"reference_doctype": doctype, "reference_name": ("in", names)})
 
 
@@ -97,7 +99,7 @@ def delete_removed_row_translations(doc, method=None):
 	if not before:
 		return
 	for table in doc.meta.get_table_fields():
-		if not get_translatable_fields(table.options):
+		if not has_translatable_fields(table.options):
 			continue
 		kept = {row.name for row in doc.get(table.fieldname)}
 		removed = [row.name for row in before.get(table.fieldname) if row.name not in kept]
@@ -180,5 +182,46 @@ def fetch_translations(doctype: str, names: list, fields: list[str], language: s
 def resolve_value(source: str, translation: tuple | None, language: str) -> TranslatedValue:
 	if translation and translation[0]:
 		value, source_hash = translation
-		return TranslatedValue(value, CURRENT if source_hash == get_source_hash(source) else OUTDATED)
+		return TranslatedValue(value, get_status(source, value, source_hash))
 	return TranslatedValue(_(source, lang=language) if source else source, MISSING)
+
+
+def get_status(source, value: str | None, source_hash: str | None) -> str:
+	"""Missing without a translation; outdated when the source changed after it was written, or is gone."""
+	if not value:
+		return MISSING
+	return CURRENT if source and source_hash == get_source_hash(source) else OUTDATED
+
+
+def count_column_statuses(doctype: str, field: str, language: str) -> dict[str, int]:
+	"""{status: count} of a column field's shop-wide translations, aggregated in SQL. MariaDB's
+	SHA2 matches get_source_hash for text, so status is decided without reading a source."""
+	record, translation = DocType(doctype), DocType(DOCTYPE)
+	status = (
+		Case()
+		.when(IfNull(translation.translated_value, "") == "", MISSING)
+		.when(translation.source_hash == Sha2(record[field], 256), CURRENT)
+		.else_(OUTDATED)
+	)
+	query = (
+		frappe.qb.from_(record)
+		.left_join(translation)
+		.on(
+			(translation.reference_doctype == doctype)
+			& (translation.reference_name == record.name)
+			& (translation.reference_field == field)
+			& (translation.language == language)
+			& (IfNull(translation.market, "") == "")
+		)
+		.where(IfNull(record[field], "") != "")
+		.select(status, Count("*"))
+		.groupby(status)
+	)
+	return dict(query.run())
+
+
+def has_translatable_fields(doctype: str) -> bool:
+	# Imported here: resources imports this module.
+	from commera.localization.resources import get_translatable_fields
+
+	return bool(get_translatable_fields(doctype))

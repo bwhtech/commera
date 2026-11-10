@@ -27,8 +27,10 @@ ADMIN_PERMISSIONS = {
 	"Shop Theme Settings": ("read", "write"),
 	"Commera Settings": ("read",),
 	"Commera Webhook": ("read", "write", "create", "delete"),
-	# No delete: the CSV import and the Translations page (#437) only save translations.
-	"Content Translation": ("read", "write", "create"),
+	# Translation writes check these rights. Create: an inherited page's first translation adds its row.
+	# Existing sites get them from patches.grant_commera_admin_translation_rights.
+	"Theme Layout": ("read", "write", "create"),
+	"Content Translation": ("read", "write", "create", "delete"),
 }
 
 

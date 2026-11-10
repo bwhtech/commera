@@ -3,6 +3,7 @@ import { refDebounced } from '@vueuse/core'
 import { createAdminCaller } from './adminCaller'
 import { storefrontLanguages } from './boot'
 import { useAdminAction, useAdminRead } from './api'
+import { isStaleWrite } from './errors'
 import { __ } from './translation'
 import { rememberPreviewEntry, rememberedPreviewEntry } from '../ia/previewEntry'
 import { capturePage } from '../utils/capturePage'
@@ -113,6 +114,8 @@ function createPart(group, data) {
     layout,
     savedLayout: stableJson(data.draft_layout),
     liveLayout: stableJson(data.published_layout ?? data.default_layout),
+    // Sent back with each save, so the server refuses one over a change this editor never loaded.
+    revision: data.revision,
   }
 }
 
@@ -260,11 +263,13 @@ export function createLayoutEditor(theme) {
   async function runOnParts(method, parts, withLayout = true) {
     for (const part of parts) {
       const params = { theme, page: part.group }
-      if (withLayout) params.layout = clone(part.layout)
-      const data = await layoutCaller.call(method, params)
+      if (withLayout) Object.assign(params, { layout: clone(part.layout), revision: part.revision })
+      const { data, error } = await layoutCaller.attempt(method, params)
       if (!data) {
-        // Parts before this one have landed; the preview and badges must show them.
-        commit()
+        // The wrapper already toasted why. A stale page reloads, since saving it again would fail
+        // the same way; otherwise parts before this one have landed and the preview must show them.
+        if (isStaleWrite(error)) await load(state.page)
+        else commit()
         return false
       }
       const layout = part.layout

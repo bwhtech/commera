@@ -8,16 +8,19 @@ from jinja2 import pass_context
 from markupsafe import Markup, escape
 
 import commera.sdk
+from commera.localization.resolver import get_localization
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context, is_within_directory
 from commera.shop_themes.jinja_helpers import find_theme_asset_url
+from commera.shop_themes.layout_cache import get_published_layouts
 from commera.shop_themes.theme_resolver import find_theme_file
 
-LAYOUT_CACHE_PREFIX = "commera:theme_layout:"
 TEXT_TYPES = frozenset({"text", "textarea", "url", "image"})
 DEFAULT_MAX_BLOCKS = 50
 DEFAULT_MAX_PRODUCTS = 8
 PASS_THROUGH_IMAGE_PREFIXES = ("http://", "https://", "/assets/")
 SORT_BY_SOURCE = {"newest": "new_arrival", "on_sale": "discount", "collection": "default"}
+# Section text saved before the store's default language became the source key.
+LEGACY_SOURCE_LANGUAGE = "en"
 SECTION_GROUPS = frozenset({"header_group", "footer_group"})
 DEFAULT_SECTION_GROUPS = ("pages",)
 
@@ -43,38 +46,49 @@ def get_theme_json(theme_dirs, relative_path):
 	return data
 
 
+def list_theme_files(theme_dirs, folder):
+	names = set()
+	for theme_dir in theme_dirs:
+		folder_path = os.path.join(theme_dir, folder)
+		if os.path.isdir(folder_path):
+			names.update(
+				file_name[: -len(".json")]
+				for file_name in os.listdir(folder_path)
+				if file_name.endswith(".json")
+			)
+	return sorted(names)
+
+
+def get_pages(theme_dirs):
+	return list_theme_files(theme_dirs, "layouts")
+
+
 def get_section_schema(theme_dirs, section_type):
 	if not isinstance(section_type, str) or not section_type.replace("_", "").isalnum():
 		return None
 	return get_theme_json(theme_dirs, f"sections/{section_type}.json")
 
 
-def get_published_layouts(theme_names, page):
-	cache_keys = {name: f"{LAYOUT_CACHE_PREFIX}{name}:{page}" for name in theme_names}
-	cached = {name: frappe.cache.get_value(cache_key) for name, cache_key in cache_keys.items()}
-	if any(entry is None for entry in cached.values()):
-		published_layouts = dict(
-			frappe.get_all(
-				"Theme Layout",
-				filters={"theme": ("in", theme_names), "page": page},
-				fields=["theme", "published_layout"],
-				as_list=True,
-			)
-		)
-		for name, cache_key in cache_keys.items():
-			published_layout = published_layouts.get(name)
-			cached[name] = {"layout": frappe.parse_json(published_layout) if published_layout else None}
-			frappe.cache.set_value(cache_key, cached[name])
-
-	return {name: entry["layout"] for name, entry in cached.items()}
-
-
 def get_inherited_layout(theme_names, theme_dirs, page):
-	published_layouts = get_published_layouts(theme_names, page)
-	return next(
-		(published_layouts[name] for name in theme_names if published_layouts[name]),
-		None,
-	) or get_theme_json(theme_dirs, f"layouts/{page}.json")
+	"""The first theme's own layout, else the theme file, under the translation overlays of the themes
+	before it. Do not mutate the result: without overlays it is the cached layout."""
+	published_layouts = get_published_layouts(theme_names, page) if theme_names else {}
+	return resolve_inherited_layout(theme_names, theme_dirs, page, published_layouts)
+
+
+def resolve_inherited_layout(theme_names, theme_dirs, page, published_layouts):
+	"""get_inherited_layout over given {theme: parsed live layout}, e.g. one database snapshot."""
+	# section_text imports this module.
+	from commera.shop_themes.section_text import apply_overlays, is_overlay
+
+	overlays = []
+	for name in theme_names:
+		layout = published_layouts[name]
+		if layout and not is_overlay(layout):
+			return apply_overlays(theme_dirs, layout, overlays[::-1])
+		if layout:
+			overlays.append(layout)
+	return apply_overlays(theme_dirs, get_theme_json(theme_dirs, f"layouts/{page}.json"), overlays[::-1])
 
 
 def get_page_layout(theme_context, page):
@@ -85,14 +99,23 @@ def get_editor_preview():
 	return getattr(frappe.local, "theme_editor_preview", None)
 
 
-def clear_layout_cache(theme_name, page):
-	frappe.cache.delete_value(f"{LAYOUT_CACHE_PREFIX}{theme_name}:{page}")
-
-
 def get_text(value):
+	"""`value` in the page language. Previews move frappe.lang, so it wins over the request's language."""
 	if not isinstance(value, dict):
 		return value
-	return value.get(frappe.local.lang) or value.get("en") or next(iter(value.values()), "")
+	default = get_localization().default_language.code
+	return value.get(frappe.local.lang) or get_source(value, default) or next(iter(value.values()), "")
+
+
+def get_source(value, default):
+	"""The text other languages translate: the default language's, or the legacy English one."""
+	if not isinstance(value, dict):
+		return value or ""
+	return value.get(get_source_key(value, default)) or ""
+
+
+def get_source_key(value, default):
+	return next((key for key in (default, LEGACY_SOURCE_LANGUAGE) if value.get(key)), None)
 
 
 def get_image_url(theme_context, path):

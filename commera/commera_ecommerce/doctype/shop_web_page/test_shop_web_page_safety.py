@@ -17,7 +17,6 @@ from commera.commera_ecommerce.doctype.shop_web_page.test_shop_web_page import (
 from commera.localization import CURRENT, MISSING, register
 from commera.sdk import shop
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context, render_theme_context
-from commera.shop_themes.sections import LAYOUT_CACHE_PREFIX
 from commera.shop_themes.theme_resolver import ThemePageRenderer
 from commera.tests.test_content_translation import use_storefront_language
 
@@ -114,7 +113,7 @@ class TestShopWebPageEscaping(ShopWebPageTestCase):
 		self.assertEqual(page["seo"]["description"], ATTRIBUTE_INJECTION)
 
 	def render_theme(self, theme):
-		self.clear_layout_cache(theme)
+		self.delete_layouts(theme)
 		path = f"/ar/page/{self.page.route}"
 		frappe.local.lang = "ar"
 		frappe.local.request = Request(EnvironBuilder(path=path).get_environ())
@@ -126,11 +125,8 @@ class TestShopWebPageEscaping(ShopWebPageTestCase):
 			renderer.template_path = "pages/shop_web_page.html"
 			return renderer.render().get_data(as_text=True)
 
-	def clear_layout_cache(self, theme):
+	def delete_layouts(self, theme):
 		frappe.db.delete("Theme Layout", {"theme": theme})
-		for layout in ("page", "header_group", "footer_group"):
-			frappe.cache.delete_value(f"{LAYOUT_CACHE_PREFIX}{theme}:{layout}")
-			self.addCleanup(frappe.cache.delete_value, f"{LAYOUT_CACHE_PREFIX}{theme}:{layout}")
 
 	def assert_escaped(self, html):
 		self.assertNotIn("<script>alert(1)", html)
