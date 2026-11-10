@@ -1,12 +1,14 @@
 no_cache = True
 
 import importlib
+import json
 
 import frappe
 from frappe.query_builder import DocType
 from pypika import CustomFunction, Order
 
 from commera.order_access import get_shopper_order_condition
+from commera.sdk.lines import LineProducts
 from commera.utils import get_current_page, get_rounded_or_grand_total
 
 # "return" is a keyword, so the module cannot be named in an import statement.
@@ -84,10 +86,6 @@ def get_orders_list(order_id_list=None, page=1, page_length=6, owned_only=True):
 		"size",
 		color_size_item.size,
 	]
-	has_custom_name_ar = frappe.db.has_column("Item", "custom_item_name_ar")
-	if has_custom_name_ar:
-		json_object_args.append("item_name_ar")
-		json_object_args.append(item.custom_item_name_ar)
 	num_keys = len(json_object_args) // 2
 	arg_names = []
 	for i in range(1, num_keys + 1):
@@ -164,5 +162,17 @@ def get_orders_list(order_id_list=None, page=1, page_length=6, owned_only=True):
 	orders = paginated_query.run(as_dict=True)
 	for order in orders:
 		order.payable_total = get_rounded_or_grand_total(order)
-
+	add_line_titles(orders)
 	return total_count, orders
+
+
+def add_line_titles(orders):
+	"""Give each order line a `title` in the request language. Lines stay a JSON string, as the pages parse it."""
+	lines_by_order = {order.name: frappe.parse_json(order["items"]) or [] for order in orders}
+	products = LineProducts([line["item_code"] for lines in lines_by_order.values() for line in lines])
+	for order in orders:
+		lines = lines_by_order[order.name]
+		for line in lines:
+			product = products.products.get(line["item_code"])
+			line["title"] = (product and product.title) or line.get("item_name")
+		order["items"] = json.dumps(lines)

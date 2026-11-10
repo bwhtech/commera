@@ -32,10 +32,10 @@
 				<div class="tab-pane fade" id="description-tab-pane" role="tabpanel" aria-labelledby="description-tab"
 					:class="active_tab === 'description' ? 'show active' : ''">
 					<div class="detail-bx text-center">
-						<h5 class="title">{{ product_variant.display_name }}</h5>
-						{% if selected_item.description and selected_item.description != selected_item.item_code %}
+						<h5 class="title">{{ product_title|e }}</h5>
+						{% if show_product_description %}
 						<p class="para-text">
-							{% if frappe.lang == "ar" %}{{ selected_item.description_ar or selected_item.description }}{% else %}{{ selected_item.description }}{% endif %}
+							{{ product_description }}
 						</p>
 						{% endif %}
 						<ul class="feature-detail">

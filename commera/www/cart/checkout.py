@@ -20,6 +20,7 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 from commera.core import _get_cart_quotation
 from commera.discounts.selection import get_discount_codes
 from commera.guest import is_guest
+from commera.sdk.catalog import set_product_titles
 from commera.utils import (
 	format_addresses,
 	get_addresses,
@@ -184,7 +185,6 @@ def get_checkout_items(cart_quotation):
 	website_slideshow_item = DocType("Website Slideshow Item")
 	item = DocType("Item")
 	item_variant_attribute = DocType("Item Variant Attribute")
-	has_custom_name_ar = frappe.db.has_column("Item", "custom_item_name_ar")
 	query = (
 		frappe.qb.from_(color_size_item)
 		.left_join(quotation_item)
@@ -216,9 +216,7 @@ def get_checkout_items(cart_quotation):
 		)
 		.groupby(quotation_item.name)
 	)
-	if has_custom_name_ar:
-		query = query.select(item.custom_item_name_ar.as_("custom_item_name_ar"))
-	return query.run(as_dict=True)
+	return set_product_titles(query.run(as_dict=True))
 
 
 def get_store_pickup_addresses():

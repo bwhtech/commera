@@ -208,15 +208,6 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		self.engine.sql("DROP TABLE search_language", commit=True)
 		self.assertFalse(SqliteProductSearch().index_exists())
 
-	def test_the_legacy_arabic_name_fills_a_missing_translation(self):
-		if not self.has_legacy_field():
-			self.skipTest("Item has no custom_item_name_ar field on this site")
-		frappe.db.set_value("Item", STYLE_ITEM, "custom_item_name_ar", "قديم تجريبي")
-		self.addCleanup(frappe.db.set_value, "Item", STYLE_ITEM, "custom_item_name_ar", None)
-		records = record_builder.build_product_search_records([self.red, self.blue])
-		titles = {record["name"]: record["titles"]["ar"] for record in records}
-		self.assertEqual(titles, {self.red: ARABIC_TITLE, self.blue: "قديم تجريبي"})
-
 	def test_a_rebuild_reads_translations_once_per_language(self):
 		with patch.object(
 			localization_content, "fetch_translations", wraps=localization_content.fetch_translations
@@ -432,9 +423,6 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 	def delete_translation(self, name, record):
 		frappe.db.delete("Content Translation", name)
 		sync.upsert_doc(PRODUCT, record)
-
-	def has_legacy_field(self):
-		return frappe.db.has_column("Item", "custom_item_name_ar")
 
 
 def upserts(enqueue):

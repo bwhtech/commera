@@ -35,3 +35,4 @@ commera.patches.enable_webmcp
 commera.patches.seed_storefront_languages
 commera.patches.drop_language_from_theme_routes
 commera.patches.drop_default_language_from_redirect_targets
+commera.patches.move_item_arabic_fields_to_content_translation

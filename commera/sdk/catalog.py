@@ -10,7 +10,7 @@ from commera.api.admin.catalog import (
 	get_default_rates,
 	get_selling_rates,
 )
-from commera.localization import MISSING, TranslatedValue, get_localization, translate
+from commera.localization import get_localization, translate
 from commera.plugin_events import get_ecommerce_warehouse, get_listed_items
 from commera.product_detail import get_product_detail
 from commera.sdk.types import (
@@ -359,18 +359,16 @@ def get_product_cards(cards: list[dict]) -> list[ProductCard]:
 	item_codes = [size["item_code"] for card in cards for size in card["sizes"]]
 	stock = get_available_stocks(item_codes, get_ecommerce_warehouse())
 	currency = get_store_currency()
-	contents = translate_products(cards, [card.get("custom_item_name_ar") for card in cards])
-	return [
-		get_product_card(card, content["display_name"], stock, currency)
-		for card, content in zip(cards, contents, strict=True)
-	]
+	# utils.shape_product_cards titles every grid's cards; only a hand-built card lacks one.
+	set_product_titles([card for card in cards if "title" not in card])
+	return [get_product_card(card, stock, currency) for card in cards]
 
 
-def get_product_card(card: dict, title: str, stock: dict, currency: str) -> ProductCard:
+def get_product_card(card: dict, stock: dict, currency: str) -> ProductCard:
 	return {
 		"id": card["name"],
 		"handle": card["route"],
-		"title": title or card["item_name"],
+		"title": card["title"],
 		"vendor": card["brand"],
 		"product_type": card["item_group"],
 		"color": translate_term(card["attribute_value"]),
@@ -388,27 +386,23 @@ def get_product_card(card: dict, title: str, stock: dict, currency: str) -> Prod
 def get_product_content(product_variant, item) -> dict[str, str]:
 	# The product page shows its Item's description, translated as the product's own field.
 	source = {**product_variant.as_dict(), "description": item.description}
-	return translate_products([source], [item.get("custom_item_name_ar")], PRODUCT_CONTENT_FIELDS)[0]
+	return translate_products([source], PRODUCT_CONTENT_FIELDS)[0]
 
 
 def translate_products(
-	product_variants: list, legacy_titles: list, fields: tuple[str, ...] = ("display_name",)
+	product_variants: list, fields: tuple[str, ...] = ("display_name",)
 ) -> list[dict[str, str]]:
 	"""Product `fields` in the request language. Cards and the product page share it, so titles always match."""
-	localization = get_localization()
-	translated = translate(product_variants, list(fields), localization, doctype=PRODUCT_DOCTYPE)
-	return [
-		{field: value.value for field, value in values.items()}
-		| {"display_name": pick_title(values["display_name"], legacy_title, localization.language.code)}
-		for values, legacy_title in zip(translated, legacy_titles, strict=True)
-	]
+	translated = translate(product_variants, list(fields), get_localization(), doctype=PRODUCT_DOCTYPE)
+	return [{field: value.value for field, value in values.items()} for values in translated]
 
 
-def pick_title(title: TranslatedValue, legacy_title: str | None, language: str) -> str:
-	# The Item's Arabic name field stays a fallback until #441 moves it into Content Translation.
-	if title.status == MISSING and legacy_title and language == "ar":
-		return legacy_title
-	return title.value
+def set_product_titles(rows: list[dict]) -> list[dict]:
+	"""Set each product row's `title`: its `display_name` in the request language, else its `item_name`.
+	The legacy pages and the summer theme read titles here, so they match the SDK's cards."""
+	for row, content in zip(rows, translate_products(rows), strict=True):
+		row["title"] = content["display_name"] or row.get("item_name") or ""
+	return rows
 
 
 def get_variants(sizes: list[dict]) -> list[dict]:

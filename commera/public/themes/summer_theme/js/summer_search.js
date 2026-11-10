@@ -72,11 +72,9 @@ document.addEventListener('alpine:init', () => {
 			return `/${settings.language}/products/${product.route}`;
 		},
 
+		/* The server titles each card in the page's language: frappe_call sends it. */
 		get_product_name(product) {
-			if (settings.language === 'ar') {
-				return product.custom_item_name_ar || product.item_name;
-			}
-			return product.item_name;
+			return product.title || product.item_name;
 		},
 
 		format_amount(amount) {

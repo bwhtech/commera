@@ -163,7 +163,7 @@
 				<input type="checkbox" class="form-check-input m-0 me-3" value="{{ item.item_code }}"
 					x-model="selected_item_codes" :disabled='returns_status !== "ready" || is_item_locked({{ item.item_code | tojson }})'>
 				<div class="tracking-product-content">
-					<h6 class="title">{% if frappe.lang == "ar" %}{{ item.item_name_ar or item.item_name }}{% else %}{{ item.item_name }}{% endif %}</h6>
+					<h6 class="title">{{ (item.title or item.item_name)|e }}</h6>
 					{% if item.size %}<small class="d-block"><strong>{{ _("Size") }}</strong> : {{ item.size }}</small>{% endif %}
 					<template x-if='is_item_locked({{ item.item_code | tojson }})'>
 						<small class="d-block text-muted" x-text='item_state_label({{ item.item_code | tojson }})'></small>
@@ -213,7 +213,7 @@
 					</div>
 					{% endif %}
 					<div class="tracking-product-content">
-						<h6 class="title">{% if frappe.lang == "ar" %}{{ item.item_name_ar or item.item_name }}{% else %}{{ item.item_name }}{% endif %}</h6>
+						<h6 class="title">{{ (item.title or item.item_name)|e }}</h6>
 						{% if item.brand %}<small class="d-block"><strong>{{ _("Brand") }}</strong> : {{ item.brand }}</small>{% endif %}
 						<small class="d-block"><strong>{{ _("Price") }}</strong> : {{ get_currency_symbol() }}{{ "%.2f" | format(item.price or 0) }}</small>
 						{% if item.size %}<small class="d-block"><strong>{{ _("Size") }}</strong> : {{ item.size }}</small>{% endif %}

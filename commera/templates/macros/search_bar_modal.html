@@ -110,7 +110,7 @@
                                         <span x-text="product.attribute_value"></span>
                                         {% endif %}
                                         {% else %}
-                                        <span x-text="product.custom_item_name_ar || product.item_name"></span>
+                                        <span x-text="product.title || product.item_name"></span>
                                         {% if "color" in card_fields %}
                                         <span x-text="$store.i18n.t(product.attribute_value)"></span>
                                         {% endif %}

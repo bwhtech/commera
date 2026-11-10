@@ -163,7 +163,7 @@
             {% set items = json.loads(order['items'])%}
             {% for item in items %}
                 <div class="border-b border-gray-300 mb-4 pb-4">
-                {% set display_name = item.item_name if frappe.lang == "en" else item.item_name_ar or item.item_name %}
+                {% set display_name = item.title or item.item_name %}
                     {{ dashboard_product(item['image'],
                     item['brand'],
                     display_name,

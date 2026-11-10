@@ -18,7 +18,7 @@
 
 {% for item in items %}
     <div class="embla__slide flex-shrink-0  {{embla_slide_classes}} px-1 md:px-3 ">
-      {% set product_name = item.item_name if frappe.lang == "en" else item.custom_item_name_ar or item.item_name %}
+      {% set product_name = item.title or item.item_name %}
         <a href="products/{{item.route}}" >
             {{ item_card(
             image=item.image or "/assets/commera/images/1.jpg",

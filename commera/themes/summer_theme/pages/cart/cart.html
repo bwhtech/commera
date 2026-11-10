@@ -67,7 +67,7 @@
 										</td>
 										<td class="product-item-name">
 											<a :href="`/{{ language }}/products/${cart_item.item.route}`"
-												x-text="{% if language == 'en' %}cart_item.variant.item_name{% else %}cart_item.variant.item_name_ar || cart_item.variant.item_name{% endif %}"></a>
+												x-text="{% if language == 'en' %}cart_item.variant.item_name{% else %}cart_item.variant.title || cart_item.variant.item_name{% endif %}"></a>
 										</td>
 										<td class="product-item-price">
 											<template x-if="cart_item.default_price && parseFloat(cart_item.default_price) !== $store.cart.price_of(cart_item)">

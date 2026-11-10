@@ -114,7 +114,7 @@
     "image": product.image,
     "brand": product.vendor,
     "item_name": product.title,
-    "custom_item_name_ar": product.title if frappe.lang == "ar" else None,
+    "title": product.title,
     "attribute_value": product.color,
     "sale_price": product.price,
     "default_price": product.compare_at_price or product.price,

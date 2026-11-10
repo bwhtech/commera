@@ -116,7 +116,6 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 	item_price_default = DocType("Item Price").as_("ip_default")
 	item_price_sale = DocType("Item Price").as_("ip_sale")
 	item = DocType("Item")
-	has_custom_name_ar = frappe.db.has_column("Item", "custom_item_name_ar")
 
 	discount_expr = (
 		Case()
@@ -158,8 +157,6 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 		.limit(page_length)
 		.offset((page - 1) * page_length)
 	)
-	if has_custom_name_ar:
-		query = query.select(item.custom_item_name_ar)
 	if sort_by == "price_low":
 		query = query.orderby(Min(item_price_sale.price_list_rate), order=Order.asc)
 	elif sort_by == "price_high":
@@ -176,7 +173,9 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 
 
 def shape_product_cards(cards):
-	"""Give every product card the one storefront card shape, whichever grid built it."""
+	"""Give every product card the one storefront card shape, whichever grid built it.
+	`title` is the product's title in the request language."""
+	from commera.sdk.catalog import set_product_titles
 	from commera.search.engine import CARD_COLUMNS
 	from commera.search.record_builder import sizes_for_variants
 
@@ -202,7 +201,7 @@ def shape_product_cards(cards):
 			card["has_discount"] = 1 if flt(card["discount_percent"]) else 0
 		# frappe.qb returns a datetime where the index holds a string, and the card is json.dumps'd into HTML.
 		card["modified"] = cstr(card["modified"]) if card["modified"] else None
-	return cards
+	return set_product_titles(cards)
 
 
 def attach_live_prices(cards):
@@ -320,8 +319,6 @@ def get_product_base_query(filters=None, product_list=None):
 			# Short terms and indexes without the term's language land here, so translated titles match too.
 			if (translated := translated_title_matches(search)) is not None:
 				search_condition |= style_attribute_variant.name.isin(translated)
-			if frappe.db.has_column("Item", "custom_item_name_ar"):
-				search_condition |= item.custom_item_name_ar.like(f"%{search}%")
 			if child_categories:
 				search_condition |= style_attribute_variant.item_group.isin(child_categories)
 

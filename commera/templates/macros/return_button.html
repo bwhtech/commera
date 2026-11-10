@@ -84,7 +84,7 @@ modal_classes='w-full md:max-w-1/2'
                 :disabled="returned_items.includes('{{ item.item_code }}') || returned_items_in_draft.includes('{{ item.item_code }}')">
             <div
                 :class="(returned_items.includes('{{ item.item_code }}') || returned_items_in_draft.includes('{{ item.item_code }}')) ? 'opacity-75' : ''">
-                {% set display_name = item.item_name if frappe.lang == "en" else item.item_name_ar or "" %}
+                {% set display_name = item.title or item.item_name %}
                 {{ dashboard_product(item['image'],
                 item['brand'],
                 display_name,
