@@ -55,6 +55,8 @@ class CommeraMarket(Document):
 		refresh_market_surfaces()
 
 	def on_trash(self):
+		# An export would list them under a market an import refuses.
+		frappe.db.delete("Content Translation", {"market": self.name})
 		refresh_market_surfaces()
 
 	def validate_handle(self):

@@ -1,0 +1,156 @@
+import frappe
+from frappe.tests import IntegrationTestCase
+
+from commera.localization import CURRENT, MISSING, OUTDATED, register, resolve, translate
+from commera.sdk import catalog
+from commera.tests.test_content_translation import PRODUCT, use_storefront_language
+from commera.tests.test_localization import use_storefront_languages
+from commera.tests.test_markets import UAE, make_market, use_markets
+from commera.tests.test_product_details import ProductDetailPriceTestCase
+
+NOTE_RESOURCE = {"type": "note", "doctype": "Note", "fields": ["title"], "label": "Notes"}
+
+
+def set_up_market_translations(test):
+	"""Gulf sells in Arabic to the UAE. Levant, disabled, sells in Arabic to Jordan."""
+	use_storefront_languages(test, "en", published=("en", "ar"))
+	use_markets(test)
+	make_market("Gulf", [UAE], "ar", ["en"], handle="gulf")
+	make_market("Levant", ["Jordan"], "ar", enabled=0, handle="levant")
+
+
+def as_pair(value) -> tuple[str, str]:
+	return (value.value, value.status)
+
+
+class TestMarketTranslationLookup(IntegrationTestCase):
+	def setUp(self):
+		set_up_market_translations(self)
+		hooks = {**frappe.get_hooks("commera_hooks", {}), "translatable_resources": [NOTE_RESOURCE]}
+		self.enterContext(self.patch_hooks({"commera_hooks": hooks}))
+		self.gulf = resolve("/ar-ae")[0]
+		self.primary = resolve("/ar")[0]
+		self.note = self.make_note("Packing note")
+
+	def make_note(self, title):
+		title = f"{title} {frappe.generate_hash(length=6)}"
+		return frappe.get_doc({"doctype": "Note", "title": title}).insert()
+
+	def title(self, note, localization):
+		return as_pair(translate([note], ["title"], localization)[0]["title"])
+
+	def add_frappe_translation(self, source, translated):
+		translation = {"doctype": "Translation", "language": "ar", "source_text": source}
+		translation = frappe.get_doc({**translation, "translated_text": translated}).insert()
+		self.addCleanup(frappe.delete_doc, "Translation", translation.name, force=True)
+
+	def test_the_market_translation_wins_in_its_market_only(self):
+		register("Note", self.note.name, "title", "ar", "ملاحظة")
+		register("Note", self.note.name, "title", "ar", "ملاحظة الخليج", market="gulf")
+
+		self.assertEqual(self.title(self.note, self.gulf), ("ملاحظة الخليج", CURRENT))
+		self.assertEqual(self.title(self.note, self.primary), ("ملاحظة", CURRENT))
+
+	def test_without_a_market_translation_the_lookup_falls_back_in_order(self):
+		shop_wide, frappe_translated, untranslated = (self.make_note(label) for label in "ABC")
+		register("Note", shop_wide.name, "title", "ar", "ملاحظة")
+		self.add_frappe_translation(frappe_translated.title, "ملاحظة فرابيه")
+
+		titles = translate([shop_wide, frappe_translated, untranslated], ["title"], self.gulf)
+
+		self.assertEqual(
+			[as_pair(fields["title"]) for fields in titles],
+			[("ملاحظة", CURRENT), ("ملاحظة فرابيه", MISSING), (untranslated.title, MISSING)],
+		)
+
+	def test_an_empty_market_translation_falls_back_to_the_shop_wide_one(self):
+		register("Note", self.note.name, "title", "ar", "ملاحظة")
+		register("Note", self.note.name, "title", "ar", "", market="gulf")
+
+		self.assertEqual(self.title(self.note, self.gulf), ("ملاحظة", CURRENT))
+
+	def test_another_markets_translation_is_never_used(self):
+		register("Note", self.note.name, "title", "ar", "ملاحظة الشام", market="levant")
+
+		self.assertEqual(self.title(self.note, self.gulf), (self.note.title, MISSING))
+		self.assertEqual(self.title(self.note, self.primary), (self.note.title, MISSING))
+
+	def test_each_market_translation_has_its_own_status(self):
+		register("Note", self.note.name, "title", "ar", "ملاحظة الخليج", market="gulf")
+		frappe.db.set_value("Note", self.note.name, "title", "Packing note v2")
+		self.note.reload()
+		register("Note", self.note.name, "title", "ar", "ملاحظة")
+
+		self.assertEqual(self.title(self.note, self.gulf), ("ملاحظة الخليج", OUTDATED))
+		self.assertEqual(self.title(self.note, self.primary), ("ملاحظة", CURRENT))
+
+	def test_primary_names_the_shop_wide_translation(self):
+		first = register("Note", self.note.name, "title", "ar", "أولى", market="primary")
+		second = register("Note", self.note.name, "title", "ar", "ثانية", market="PRIMARY")
+
+		self.assertEqual(first, second)
+		self.assertEqual(frappe.db.get_value("Content Translation", first, "market"), "")
+		self.assertEqual(self.title(self.note, self.gulf), ("ثانية", CURRENT))
+
+	def test_a_translation_for_a_market_that_does_not_exist_is_refused(self):
+		with self.assertRaisesRegex(frappe.DoesNotExistError, "Market .*nowhere.* does not exist"):
+			register("Note", self.note.name, "title", "ar", "ملاحظة", market="nowhere")
+		with self.assertRaises(frappe.DoesNotExistError):
+			frappe.get_doc(
+				{
+					"doctype": "Content Translation",
+					"reference_doctype": "Note",
+					"reference_name": self.note.name,
+					"reference_field": "title",
+					"language": "ar",
+					"market": "nowhere",
+					"translated_value": "ملاحظة",
+				}
+			).insert()
+
+	def test_market_spellings_are_one_key(self):
+		first = register("Note", self.note.name, "title", "ar", "أولى", market="Gulf")
+		second = register("Note", self.note.name, "title", "ar", "ثانية", market="gulf")
+
+		self.assertEqual(first, second)
+		self.assertEqual(frappe.db.get_value("Content Translation", first, "market"), "gulf")
+
+	def test_a_disabled_market_translation_shows_in_an_admin_preview_only(self):
+		register("Note", self.note.name, "title", "ar", "ملاحظة")
+		register("Note", self.note.name, "title", "ar", "ملاحظة الشام", market="levant")
+		shopper = resolve("/", "ar", country="JO")[0]
+		preview = resolve("/ar-jo", include_unpublished=True)[0]
+
+		self.assertTrue(shopper.market.is_primary)
+		self.assertEqual(self.title(self.note, shopper), ("ملاحظة", CURRENT))
+		self.assertEqual(preview.market.handle, "levant")
+		self.assertEqual(self.title(self.note, preview), ("ملاحظة الشام", CURRENT))
+
+	def test_deleting_a_market_deletes_its_translations(self):
+		register("Note", self.note.name, "title", "ar", "ملاحظة")
+		register("Note", self.note.name, "title", "ar", "ملاحظة الخليج", market="gulf")
+
+		frappe.delete_doc("Commera Market", "gulf", ignore_permissions=True)
+
+		markets = frappe.get_all("Content Translation", {"reference_name": self.note.name}, pluck="market")
+		self.assertEqual(markets, [""])
+
+
+class TestMarketProductTitles(ProductDetailPriceTestCase):
+	def setUp(self):
+		super().setUp()
+		set_up_market_translations(self)
+
+	def test_the_sdk_reads_the_market_title_of_a_market_request(self):
+		route = self.make_priced_variant("MARKET", default_rate=30)
+		product = frappe.get_doc(PRODUCT, {"route": route})
+		register(PRODUCT, product.name, "display_name", "ar", "قميص الكتان")
+		register(PRODUCT, product.name, "display_name", "ar", "قميص الخليج", market="gulf")
+		use_storefront_language(self, "ar")
+
+		self.assertEqual(catalog.get_product(route)["title"], "قميص الكتان")
+		self.addCleanup(frappe.form_dict.pop, "_country", None)
+		frappe.form_dict["_country"] = "AE"
+		frappe.local.request_cache.clear()
+		self.assertEqual(catalog.get_product_cards_for([product.name])[0]["title"], "قميص الخليج")
+		self.assertEqual(catalog.get_product(route)["title"], "قميص الخليج")

@@ -11,7 +11,7 @@ import frappe
 from frappe import _
 from frappe.utils import cstr
 
-from commera.localization.content import BATCH_SIZE, SHOP_WIDE
+from commera.localization.content import BATCH_SIZE, SHOP_WIDE, find_market_key
 from commera.localization.languages import StorefrontLanguages
 from commera.localization.resources import (
 	TranslatableResource,
@@ -34,8 +34,6 @@ MAX_IMPORT_ROWS = 10_000
 MAX_FILE_SIZE = 10 * 1024 * 1024
 # A spreadsheet runs a cell that starts with one of these. The apostrophe is here so the quote reverses.
 FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r", "'")
-# Markets arrive with #450. Until that doctype exists, a row for a market is an error.
-MARKET_DOCTYPE = "Commera Market"
 
 
 @dataclass(frozen=True)
@@ -144,8 +142,7 @@ class TranslationImport:
 		return self.report
 
 	def import_row(self, number: int, row: dict):
-		if row["Market"]:
-			row["Market"] = canonical_market(row["Market"])
+		row["Market"] = canonical_market(row["Market"])
 		self.check_duplicate(number, row)
 		resource = self.match(row)
 		entry, name = self.find_record(resource, row)
@@ -221,10 +218,10 @@ def candidate_names(identification: str) -> list[str]:
 
 
 def canonical_market(market: str) -> str:
-	"""The market's stored name, so `inr` and `INR` are one key for duplicates and lookups."""
-	if not frappe.db.exists("DocType", MARKET_DOCTYPE):
-		raise RowError(_("Markets are not available yet. Leave the Market column empty."))
-	if not (name := frappe.db.get_value(MARKET_DOCTYPE, market, "name")):
+	"""The market's stored name, so `gulf` and `Gulf` are one key for duplicates and lookups.
+	`primary` is the shop-wide row, as the primary market is the store itself."""
+	name = find_market_key(market)
+	if name is None:
 		raise RowError(_("Market {0} does not exist.").format(market))
 	return name
 
