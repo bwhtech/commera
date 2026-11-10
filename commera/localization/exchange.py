@@ -137,6 +137,8 @@ class TranslationImport:
 		return self.report
 
 	def import_row(self, number: int, row: dict):
+		if row["Market"]:
+			row["Market"] = canonical_market(row["Market"])
 		self.check_duplicate(number, row)
 		resource, entry, market = self.match(row)
 		value = row["Translated content"]
@@ -166,12 +168,19 @@ class TranslationImport:
 			raise RowError(_("{0} is not a type you can translate.").format(row["Type"]))
 		if row["Field"] not in resource.fields:
 			raise RowError(_("{0} is not a translatable field of {1}.").format(row["Field"], row["Type"]))
-		entry = self.entries.get((row["Type"], row["Identification"], row["Field"], SHOP_WIDE))
+		entry = self.find_entry(row)
 		if not entry:
 			raise RowError(_("No {0} with identification {1}.").format(row["Type"], row["Identification"]))
-		if row["Market"]:
-			check_market(row["Market"])
 		return resource, entry, row["Market"]
+
+	def find_entry(self, row: dict) -> Entry | None:
+		key = (row["Type"], row["Identification"], row["Field"], SHOP_WIDE)
+		if entry := self.entries.get(key):
+			return entry
+		# decode_cell removed an apostrophe the record's own name starts with.
+		if row["Identification"].startswith(FORMULA_TRIGGERS):
+			return self.entries.get((row["Type"], "'" + row["Identification"], row["Field"], SHOP_WIDE))
+		return None
 
 	def stored_value(self, entry: Entry, market: str) -> str:
 		stored = self.entries.get((entry.type, entry.identification, entry.field, market))
@@ -189,11 +198,13 @@ class TranslationImport:
 			raise RowError(cstr(error) or _("The translation could not be saved.")) from error
 
 
-def check_market(market: str):
+def canonical_market(market: str) -> str:
+	"""The market's stored name, so `inr` and `INR` are one key for duplicates and lookups."""
 	if not frappe.db.exists("DocType", MARKET_DOCTYPE):
 		raise RowError(_("Markets are not available yet. Leave the Market column empty."))
-	if not frappe.db.exists(MARKET_DOCTYPE, market):
+	if not (name := frappe.db.get_value(MARKET_DOCTYPE, market, "name")):
 		raise RowError(_("Market {0} does not exist.").format(market))
+	return name
 
 
 # Python's default of 128 KB refuses long pages. Set once: a scoped change races other threads.

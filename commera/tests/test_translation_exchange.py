@@ -165,6 +165,16 @@ class TestTranslationExchange(IntegrationTestCase):
 		stored = [(row.market, row.translated_value) for row in translations_of(self.note.name)]
 		self.assertEqual(stored, [("INR", "ملاحظة الخليج")])
 
+	def test_market_spellings_are_one_key(self):
+		rows = [self.row("title", "أولى", Market="INR"), self.row("title", "ثانية", Market="inr")]
+
+		with patch.object(exchange, "MARKET_DOCTYPE", "Currency"):
+			report = exchange.import_csv(to_csv(rows), "ar")
+
+		self.assertEqual([error["row"] for error in report.errors], [3])
+		stored = [(row.market, row.translated_value) for row in translations_of(self.note.name)]
+		self.assertEqual(stored, [("INR", "أولى")])
+
 	def test_export_neutralises_formulas_and_import_reads_them_back(self):
 		note = self.make_note("=1+1")
 		register("Note", note.name, "title", "ar", '=HYPERLINK("https://example.com","x")')
