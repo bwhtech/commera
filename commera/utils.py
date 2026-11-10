@@ -7,8 +7,8 @@ from erpnext.selling.doctype.customer.customer import (
 	get_nested_links as _get_nested_links,
 )
 from frappe.geo.country_info import get_all
-from frappe.query_builder import Case, Criterion, DocType
-from frappe.query_builder.functions import Coalesce, Count, Min, Sum
+from frappe.query_builder import Criterion, DocType
+from frappe.query_builder.functions import Count, Sum
 from frappe.utils import add_days, cint, create_batch, cstr, flt, get_datetime, now_datetime
 from frappe.utils.background_jobs import get_job_status
 from frappe.utils.caching import request_cache

@@ -4,6 +4,7 @@ from unittest.mock import patch
 import frappe
 from frappe.utils import get_files_path
 
+from commera import seo
 from commera.commera_ecommerce.doctype.commera_market.commera_market import validate_market_price_list
 from commera.localization import formatter as formatter_module
 from commera.localization import markets as markets_module
@@ -153,8 +154,10 @@ class TestMarketOgCard(MarketPriceTestCase):
 	def test_a_secondary_market_links_the_card_without_a_price(self):
 		with self.in_market():
 			market_url = starter_details.get_og_image_url("shirt")
+			localized = seo.get_product_og_image("shirt")
 
-		self.assertEqual(market_url, "/og-image/shirt.png?price=none")
+		# The locale prefix keeps the card's text in the market; the flag drops its store price.
+		self.assertEqual(market_url, f"{localized}?price=none")
 		self.assertEqual(starter_details.get_og_image_url("shirt"), "/og-image/shirt.png")
 
 	def test_the_card_without_a_price_shows_none(self):
@@ -171,9 +174,11 @@ class TestMarketOgCard(MarketPriceTestCase):
 	def test_the_card_without_a_price_has_its_own_cache_file(self):
 		route = self.make_market_variant("OGCACHE", market_sale=300)
 		cache_dir = os.path.join(get_files_path(is_private=False), og_image_render.CACHE_SUBDIR)
-		modified = frappe.db.get_value("Style Attribute Variant", {"route": route}, "modified")
-		priced_path = og_image_render.cache_file_path(route, modified)
-		unpriced_path = og_image_render.cache_file_path(f"{route}?price=none", modified)
+		version = generator.get_variant_card_version(
+			frappe.get_doc("Style Attribute Variant", {"route": route})
+		)
+		priced_path = og_image_render.cache_file_path(route, version)
+		unpriced_path = og_image_render.cache_file_path(f"{route}?price=none", version)
 		for path in (priced_path, unpriced_path):
 			self.addCleanup(lambda path=path: os.path.exists(path) and os.remove(path))
 
