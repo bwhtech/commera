@@ -21,6 +21,7 @@ from commera.shop_themes.doctype.shop_theme.shop_theme import (
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import get_compiled_routes
 from commera.shop_themes.jinja_helpers import get_shop_theme_settings
 from commera.shop_themes.route_patterns import has_language_group
+from commera.store_frame import get_shop_details
 from commera.utils import get_currency_symbols, get_store_currency
 
 # page_renderer runs before every built-in renderer: a segment missing here is a route hijack, not a 404.
@@ -298,6 +299,7 @@ def build_base_context(match):
 		apply_route_groups(match, context)
 
 	apply_website_settings(context)
+	context.shop_name = get_shop_details(localization).name or context.app_name
 	context.theme = get_shop_theme_settings()
 	context.commera_header_content = frappe.render_template(  # nosemgrep: frappe-ssti
 		"templates/includes/commera-header-content.html",

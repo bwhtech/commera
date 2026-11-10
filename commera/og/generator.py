@@ -119,10 +119,9 @@ def render_card_for_doc(for_doctype, doc):
 
 
 def build_store_card_html():
-	settings = seo.get_seo_settings()
 	context = {
 		"store_name": seo.get_store_name(),
-		"tagline": settings.get("default_meta_description") or seo.default_store_description(),
+		"tagline": seo.get_store_description() or seo.default_store_description(),
 		"site_host": urlsplit(get_url()).hostname or "",
 		"logo_data_uri": logo_data_uri(get_brand_assets().logo),
 	}

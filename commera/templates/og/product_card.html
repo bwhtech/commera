@@ -2,17 +2,17 @@
   <div style="display:flex;flex-direction:column;justify-content:space-between;flex-grow:1;padding:60px;">
     <div style="display:flex;flex-direction:column;">
       {% if store_name %}
-      <div style="color:#d4af37;font-size:30px;font-weight:700;text-transform:uppercase;">{{ store_name }}</div>
+      <div style="color:#d4af37;font-size:30px;font-weight:700;text-transform:uppercase;">{{ store_name | e }}</div>
       {% endif %}
       {% if display_name %}
-      <div style="color:#fff;font-size:64px;font-weight:700;margin-top:20px;line-height:1.1;">{{ display_name }}</div>
+      <div style="color:#fff;font-size:64px;font-weight:700;margin-top:20px;line-height:1.1;">{{ display_name | e }}</div>
       {% endif %}
       {% if brand %}
-      <div style="color:#b4b4b4;font-size:36px;font-weight:400;margin-top:16px;">{{ brand }}</div>
+      <div style="color:#b4b4b4;font-size:36px;font-weight:400;margin-top:16px;">{{ brand | e }}</div>
       {% endif %}
     </div>
     {% if price %}
-    <div style="color:#fff;font-size:48px;font-weight:700;">{{ price }}</div>
+    <div style="color:#fff;font-size:48px;font-weight:700;">{{ price | e }}</div>
     {% endif %}
   </div>
   {% if photo_data_uri %}

@@ -9,7 +9,7 @@
 	<div x-show="open" {{ scrim() }} @click="open = false" class="absolute inset-0 cursor-pointer bg-surface-alpha-gray-6"></div>
 	<nav x-show="open" x-trap.noscroll="open" {{ drawer("start") }} class="absolute inset-y-0 start-0 flex w-80 max-w-[85vw] flex-col overflow-y-auto bg-surface-elevation-1 shadow-xl" aria-label="{{ _('Menu') }}">
 		<div class="flex items-center justify-between px-5 py-4">
-			<span class="text-lg font-semibold uppercase tracking-widest">{{ app_name }}</span>
+			<span class="text-lg font-semibold uppercase tracking-widest">{{ shop_name | e }}</span>
 			<button type="button" @click="open = false" class="icon-button" aria-label="{{ _('Close') }}">{{ icon("close") }}</button>
 		</div>
 		{% if section.settings.show_search %}
@@ -24,7 +24,7 @@
 			{% for item in menu_items %}
 			{% if item["items"] %}
 			<div x-data="{ expanded: false }">
-				<button type="button" @click="expanded = !expanded" :aria-expanded="expanded" class="flex h-12 w-full items-center justify-between rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ item["title"] }} <span :class="expanded && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
+				<button type="button" @click="expanded = !expanded" :aria-expanded="expanded" class="flex h-12 w-full items-center justify-between rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ item["title"] | e }} <span :class="expanded && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
 				<div x-show="expanded" x-collapse.duration.300ms><div class="pb-2 ps-3">
 					{% for child in item["items"] %}
 					{{ menu_link(child, "flex h-11 items-center rounded-lg px-2 text-md text-ink-gray-8 hover:bg-surface-gray-3") }}

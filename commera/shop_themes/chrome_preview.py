@@ -3,17 +3,21 @@
 
 import os
 import re
+from contextlib import contextmanager
 
 import frappe
 
-from commera.localization import StorefrontLanguages, resolve
+from commera.localization import Localization, StorefrontLanguages, pin_localization, resolve
+from commera.shop_data import get_header_data
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	get_theme_context,
 	render_theme_context,
 	resolve_active_theme,
 )
+from commera.shop_themes.jinja_helpers import get_shop_theme_settings
 from commera.shop_themes.render import render_themed_template
 from commera.shop_themes.theme_resolver import build_base_context, find_theme_file, run_page_controller
+from commera.store_frame import get_preview_shop_details
 
 PREVIEW_LAYOUTS = ("components/theme_layout.html", "components/base.html")
 
@@ -58,9 +62,12 @@ def render_chrome_preview(context, blanked_blocks):
 	if not layout:
 		return None
 
-	return render_themed_template(
-		get_preview_template(layout, blanked_blocks), context, theme_name=theme_name
-	)
+	with render_theme_context(theme_context):
+		# The starter's layout reads its settings off `theme`, as a page render sets it.
+		context.setdefault("theme", get_shop_theme_settings())
+		return render_themed_template(
+			get_preview_template(layout, blanked_blocks), context, theme_name=theme_name
+		)
 
 
 def render_page_preview(page_template, blanked_blocks, theme_name=None, head_html=""):
@@ -118,18 +125,40 @@ def get_preview_language(requested) -> str:
 	return (languages.find(requested, include_unpublished=True) or languages.default).code
 
 
+@contextmanager
+def preview_language(requested):
+	"""Render a preview in the ?lang an editor asked for: every SDK and template read uses it."""
+	lang = get_preview_language(requested)
+	previous = frappe.local.lang
+	# Theme templates read the page language off frappe.lang, so the ?lang switch must move it here.
+	frappe.local.lang = lang
+	try:
+		with pin_localization(get_preview_localization(lang)):
+			yield lang
+	finally:
+		frappe.local.lang = previous
+
+
+def get_preview_localization(lang) -> Localization:
+	return resolve("/", lang, include_unpublished=True)[0]
+
+
 def get_preview_context(preview_settings, lang):
 	"""The context every chrome preview needs, whichever end of the page it is rendering."""
-	# Theme templates read the page language off frappe.lang, so the ?lang switch must move it here.
 	frappe.local.lang = lang
 	# url() and the language switcher read get_localization(), which reads `_lang` off the form.
 	frappe.form_dict._lang = lang
-	localization = resolve("/", lang, include_unpublished=True)[0]
+	localization = get_preview_localization(lang)
+	shop_details = get_preview_shop_details(preview_settings, localization)
 
 	return frappe._dict(
 		preview_settings=preview_settings,
 		lang=lang,
 		localization=localization,
+		# The resolver reads the request path, not frappe.lang, so the preview language goes in here.
+		header_data=get_header_data(localization),
+		shop_details=shop_details,
+		shop_name=shop_details.name or frappe.get_website_settings("app_name") or "Commera",
 		is_rtl=localization.language.direction == "rtl",
 		# format_theme_css() in the layout reads the SAVED doc, so this live copy is appended after to win.
 		preview_theme_css=preview_settings.generate_theme_css(),

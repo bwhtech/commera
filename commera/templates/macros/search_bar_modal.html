@@ -1,8 +1,7 @@
 {% macro search_bar() %}
 {% from "templates/macros/icon.html" import icon %}
-{% set settings = frappe.get_cached_doc("Commera Settings", "Commera Settings") %}
 {% set brand_logo = get_brand_assets().logo %}
-{% set store_name = settings.store_name or "Commera" %}
+{% set store_name = get_shop_details().name or "Commera" %}
 {% set card_fields = get_search_result_fields() %}
 <div x-data="{
     is_open: false,
@@ -67,7 +66,7 @@
             class="flex w-full h-1/2 flex-col gap-4 overflow-hidden border border-gray-300 bg-white text-gray-600 ">
             <div class="max-w-7xl mx-auto px-6 md:px-10 py-5 flex items-center justify-between w-full">
                 <a class="rtl:space-x-reverse" href="/">
-                    <img src="{{ brand_logo }}" alt="{{ store_name }} Logo" class="w-20 h-10 object-fit" />
+                    <img src="{{ brand_logo | e }}" alt="{{ store_name | e }} Logo" class="w-20 h-10 object-fit" />
                 </a>
                 <div class="max-w-3xl w-full mx-10" x-ref="modalSearch">
                     {% include 'templates/components/core/search_bar.html' %}

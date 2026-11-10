@@ -112,6 +112,21 @@ commera_hooks = {
 			"fields": ["title", "content", "meta_title", "meta_description"],
 			"label": "Pages",
 		},
+		{
+			"type": "footer_section",
+			"doctype": "Footer Section Config",
+			"fields": ["section_title"],
+			"label": "Footer sections",
+		},
+		# Keyed by the row name, so a translation follows its link through edits and reorders.
+		{"type": "footer_link", "doctype": "Footer Link", "fields": ["link_label"], "label": "Footer links"},
+		# A Single: its translations name the doctype as the record.
+		{
+			"type": "shop",
+			"doctype": "Commera Settings",
+			"fields": ["store_name", "default_meta_description"],
+			"label": "Shop",
+		},
 	],
 }
 setup_wizard_complete = [
@@ -160,7 +175,13 @@ doc_events = {
 			"commera.localization.content.delete_translations",
 		],
 	},
-	"Footer Section Config": {"on_update": "commera.plugin_events.on_menu_change"},
+	"Footer Section Config": {
+		"on_update": [
+			"commera.plugin_events.on_menu_change",
+			"commera.localization.content.delete_removed_row_translations",
+		],
+		"on_trash": "commera.localization.content.delete_translations",
+	},
 	"Commera Settings": {"on_update": "commera.plugin_events.on_menu_change"},
 	"Price List": {
 		"validate": "commera.doc_events.price_list.validate",
@@ -271,6 +292,8 @@ jinja = {
 		"commera.seo_jinja",
 		"commera.shop_data.get_header_data",
 		"commera.shop_data.get_storefront_menu",
+		"commera.store_frame.get_shop_details",
+		"commera.store_frame.get_storefront_footer",
 		"commera.shop_themes.jinja_helpers.shop_theme_asset_url",
 		"commera.shop_themes.jinja_helpers.shop_theme_config",
 		"commera.shop_themes.jinja_helpers.format_shop_theme_css",

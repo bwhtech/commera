@@ -15,7 +15,7 @@
 				<select class="default-select" name="category" aria-label="{{ _('Category') }}">
 					<option value="">{{ _("All Categories") }}</option>
 					{% for node in header_data.navigation_menu %}
-					<option value="{{ node.route_slug or node.name }}">{{ node.label }}</option>
+					<option value="{{ (node.route_slug or node.name) | e }}">{{ node.label | e }}</option>
 					{% endfor %}
 				</select>
 				<input type="search" class="form-control" name="search" placeholder="{{ _('Search Product') }}"
@@ -30,7 +30,7 @@
 			<ul class="recent-tag">
 				<li class="pe-0"><span>{{ _("Quick Search") }} :</span></li>
 				{% for node in header_data.navigation_menu[:4] %}
-				<li><a href="{{ node.href or '/' ~ language ~ '/products' }}">{{ node.label }}</a></li>
+				<li><a href="{{ (node.href or '/' ~ language ~ '/products') | e }}">{{ node.label | e }}</a></li>
 				{% endfor %}
 			</ul>
 			{% endif %}

@@ -11,9 +11,9 @@
 		{% if node.is_leaf %}
 		<a href="javascript:void(0);"
 			:class='{ "selected": is_selected("subcategory", {{ node.item_groups | tojson }}) }'
-			@click='toggle_filter("subcategory", {{ node.item_groups | tojson }})'>{{ _(node.display_name) }}</a>
+			@click='toggle_filter("subcategory", {{ node.item_groups | tojson }})'>{{ node.display_name | e }}</a>
 		{% else %}
-		<span class="cat-parent text-start">{{ _(node.display_name) }}</span>
+		<span class="cat-parent text-start">{{ node.display_name | e }}</span>
 		{% endif %}
 		{% if node.children %}{{ category_facet_list(node.children) }}{% endif %}
 	</li>

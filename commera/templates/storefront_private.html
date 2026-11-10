@@ -4,7 +4,7 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="robots" content="noindex">
-	<title>{{ store_name or _("Coming soon") }}</title>
+	<title>{{ (store_name or _("Coming soon")) | e }}</title>
 	{% if favicon %}<link rel="icon" href="{{ favicon }}">{% endif %}
 	<style>
 		:root { color-scheme: light dark; }
@@ -32,8 +32,8 @@
 </head>
 <body>
 	<main>
-		{% if logo %}<img src="{{ logo }}" alt="{{ store_name }}">{% endif %}
-		<h1>{{ store_name or _("Coming soon") }}</h1>
+		{% if logo %}<img src="{{ logo | e }}" alt="{{ store_name | e }}">{% endif %}
+		<h1>{{ (store_name or _("Coming soon")) | e }}</h1>
 		<p>{{ _("We're getting the store ready. Check back soon.") }}</p>
 		<p class="staff"><a href="/login?redirect-to=/commera">{{ _("Store staff? Log in") }}</a></p>
 	</main>

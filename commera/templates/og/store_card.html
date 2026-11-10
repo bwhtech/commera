@@ -3,12 +3,12 @@
     {% if logo_data_uri %}
     <img src="{{ logo_data_uri }}" style="height:140px;max-width:600px;object-fit:contain;object-position:left;" />
     {% endif %}
-    <div style="font-size:72px;font-weight:700;line-height:1.1;margin-top:40px;">{{ store_name }}</div>
+    <div style="font-size:72px;font-weight:700;line-height:1.1;margin-top:40px;">{{ store_name | e }}</div>
     {% if tagline %}
-    <div style="font-size:34px;font-weight:400;color:#57534e;line-height:1.35;margin-top:20px;max-width:1000px;">{{ tagline }}</div>
+    <div style="font-size:34px;font-weight:400;color:#57534e;line-height:1.35;margin-top:20px;max-width:1000px;">{{ tagline | e }}</div>
     {% endif %}
   </div>
   {% if site_host %}
-  <div style="font-size:28px;font-weight:700;color:#78716c;">{{ site_host }}</div>
+  <div style="font-size:28px;font-weight:700;color:#78716c;">{{ site_host | e }}</div>
   {% endif %}
 </div>

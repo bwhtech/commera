@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 import frappe
@@ -67,10 +69,28 @@ class LocalizedRequest:
 
 
 def get_localization() -> Localization:
-	"""The localization of the current request."""
+	"""The localization of the current request, or the one pinned by pin_localization()."""
+	if pinned := get_pinned_localization():
+		return pinned
 	if localized := get_localized_request():
 		return localized.localization
 	return resolve_current_request()[0]
+
+
+@contextmanager
+def pin_localization(localization: Localization) -> Iterator[Localization]:
+	"""Make get_localization() return `localization` inside the block.
+	An editor preview renders its language this way, whatever the request path or `_lang` says."""
+	previous = get_pinned_localization()
+	frappe.local.commera_pinned_localization = localization
+	try:
+		yield localization
+	finally:
+		frappe.local.commera_pinned_localization = previous
+
+
+def get_pinned_localization() -> Localization | None:
+	return getattr(frappe.local, "commera_pinned_localization", None)
 
 
 def get_route_path() -> str:

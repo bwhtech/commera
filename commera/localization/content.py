@@ -10,6 +10,7 @@ from frappe.utils import create_batch, cstr
 from frappe.utils.data import sha256_hash
 
 from commera.localization.resolver import Localization, get_localization
+from commera.localization.resources import get_translatable_fields
 
 DOCTYPE = "Content Translation"
 MISSING, OUTDATED, CURRENT = "missing", "outdated", "current"
@@ -80,8 +81,35 @@ def save_translation(translation, value: str) -> str:
 
 
 def delete_translations(doc, method=None):
-	"""doc_events on_trash: drop the translations of a deleted record."""
+	"""doc_events on_trash: drop the translations of a deleted record and of its child rows."""
 	frappe.db.delete(DOCTYPE, {"reference_doctype": doc.doctype, "reference_name": doc.name})
+	rows = {}
+	for row in doc.get_all_children():
+		rows.setdefault(row.doctype, []).append(row.name)
+	for doctype, names in rows.items():
+		if get_translatable_fields(doctype):
+			frappe.db.delete(DOCTYPE, {"reference_doctype": doctype, "reference_name": ("in", names)})
+
+
+def delete_removed_row_translations(doc, method=None):
+	"""doc_events on_update: drop the translations of translatable child rows the save removed."""
+	before = doc.get_doc_before_save()
+	if not before:
+		return
+	for table in doc.meta.get_table_fields():
+		if not get_translatable_fields(table.options):
+			continue
+		kept = {row.name for row in doc.get(table.fieldname)}
+		removed = [row.name for row in before.get(table.fieldname) if row.name not in kept]
+		if removed:
+			frappe.db.delete(DOCTYPE, {"reference_doctype": table.options, "reference_name": ("in", removed)})
+
+
+def move_translations(doctype: str, old_name: str, new_name: str):
+	"""Point a record's translations at its copy, as when a child row moves to another parent."""
+	frappe.db.set_value(
+		DOCTYPE, {"reference_doctype": doctype, "reference_name": old_name}, "reference_name", new_name
+	)
 
 
 def read_source(doctype: str, name: str, field: str):

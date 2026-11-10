@@ -13,7 +13,7 @@ from commera.shop_themes.chrome_preview import (
 	COMMON_BLANKED_BLOCKS,
 	HEADER_BLOCKS,
 	get_preview_context,
-	get_preview_language,
+	preview_language,
 	render_chrome_preview,
 )
 
@@ -45,6 +45,9 @@ PREVIEW_OVERRIDE_FIELDS = (
 # only an exact hex match keeps `#fff};x:expression(1)` out of the stylesheet.
 COLOR_FIELDS = ("footer_bg_color", "footer_text_color")
 COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{3}([0-9a-fA-F]{3}([0-9a-fA-F]{2})?)?$")
+
+# The footers escape these themselves; escaping here too would show `&amp;` for `&`.
+ESCAPED_IN_TEMPLATE = ("store_name", "copyright_text")
 
 # These land in an href/src attribute, so escaping is not enough either — javascript: and data:
 # survive escaping intact.
@@ -79,12 +82,16 @@ def get_context(context):
 		else:
 			if fieldname in URL_FIELDS and not validate_url(value, valid_schemes=SAFE_URL_SCHEMES):
 				continue
-			value = escape_html(value)
+			if fieldname not in ESCAPED_IN_TEMPLATE:
+				value = escape_html(value)
 
 		setattr(settings, fieldname, value)
 
-	lang = get_preview_language(frappe.form_dict.get("lang"))
+	with preview_language(frappe.form_dict.get("lang")) as lang:
+		render_preview(context, settings, lang)
 
+
+def render_preview(context, settings, lang):
 	footer_context = get_preview_context(settings, lang)
 
 	rendered = render_chrome_preview(footer_context, COMMON_BLANKED_BLOCKS + HEADER_BLOCKS)

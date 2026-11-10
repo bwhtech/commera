@@ -6,6 +6,7 @@ from frappe.utils import cstr, flt, get_url, strip_html_tags
 
 from commera.branding import get_configured_brand_assets
 from commera.localization import StorefrontLanguages, get_request_path, strip_language_prefix
+from commera.store_frame import get_shop_details
 from commera.utils import get_store_currency
 
 META_DESCRIPTION_MAX_LENGTH = 160
@@ -43,7 +44,13 @@ def current_request_url():
 
 
 def get_store_name():
-	return get_seo_settings().get("store_name") or "Store"
+	"""The store name in the request language."""
+	return get_shop_details().name or "Store"
+
+
+def get_store_description():
+	"""The store description in the request language, or blank."""
+	return get_shop_details().description
 
 
 def default_store_description():
@@ -269,7 +276,7 @@ def build_page_seo(source, display_name=None, page_type="website"):
 	description = (
 		truncate_description(meta_description)
 		if meta_description
-		else (settings.get("default_meta_description") or default_store_description())
+		else (get_store_description() or default_store_description())
 	)
 
 	image = source.get("og_image") or settings.get("default_share_image") or DEFAULT_OG_IMAGE
@@ -358,7 +365,7 @@ def default_seo():
 
 	return {
 		"title": apply_title_template(),
-		"description": settings.get("default_meta_description") or default_store_description(),
+		"description": get_store_description() or default_store_description(),
 		"image": absolute_url(image),
 		"url": current_request_url(),
 		"type": "website",
