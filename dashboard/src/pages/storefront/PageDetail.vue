@@ -22,10 +22,6 @@ function blankPage() {
     route: '',
     published: true,
     content: '',
-    // Not edited here any more, but still round-tripped through load and save so a page
-    // that already carries Arabic content keeps it instead of being blanked on the next
-    // save. The storefront still serves it (shop_web_page.py get_content).
-    content_ar: '',
     meta_title: '',
     meta_description: '',
     og_image: '',
@@ -137,7 +133,6 @@ async function save() {
       route: form.value.route.trim(),
       published: form.value.published ? 1 : 0,
       content: form.value.content,
-      content_ar: form.value.content_ar,
       meta_title: form.value.meta_title,
       meta_description: form.value.meta_description,
       og_image: form.value.og_image,

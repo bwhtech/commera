@@ -32,7 +32,7 @@ class TestShopWebPageBodySanitizing(ShopWebPageTestCase):
 
 	def setUp(self):
 		super().setUp()
-		self.page = self.make_page(content_ar="<p>قديم</p>")
+		self.page = self.make_page()
 		# The headless endpoint is rate limited by IP.
 		self.addCleanup(setattr, frappe.local, "request_ip", getattr(frappe.local, "request_ip", None))
 		frappe.local.request_ip = "127.0.0.1"
@@ -67,13 +67,7 @@ class TestShopWebPageBodySanitizing(ShopWebPageTestCase):
 		self.write_page(content=UNSAFE_BODY)
 		self.assert_sanitized("en")
 
-	def test_legacy_arabic_content_written_to_the_database_is_sanitized(self):
-		self.write_page(content_ar=UNSAFE_BODY)
-		self.assert_sanitized("ar")
-		self.assertEqual(get_translated_page(self.page)["content"].status, MISSING)
-
 	def test_a_frappe_dictionary_translation_of_the_body_is_sanitized(self):
-		self.write_page(content_ar="")
 		translation = frappe.get_doc(
 			{
 				"doctype": "Translation",
@@ -84,6 +78,7 @@ class TestShopWebPageBodySanitizing(ShopWebPageTestCase):
 		).insert()
 		self.addCleanup(frappe.delete_doc, "Translation", translation.name, force=True)
 		self.assert_sanitized("ar")
+		self.assertEqual(get_translated_page(self.page)["content"].status, MISSING)
 
 
 class TestShopWebPageEscaping(ShopWebPageTestCase):

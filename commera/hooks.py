@@ -127,6 +127,19 @@ commera_hooks = {
 			"fields": ["store_name", "default_meta_description"],
 			"label": "Shop",
 		},
+		# The un-themed homepage. An image or link translation swaps the file or target per language.
+		# Hero banners are not translated: each language can have its own rows, tagged with it.
+		{
+			"type": "landing_page",
+			"doctype": "Landing Page Settings",
+			"fields": [
+				*(f"gif_{number}" for number in range(1, 5)),
+				*(f"gif_url_{number}" for number in range(1, 5)),
+				"banner_1",
+				"banner_url_1",
+			],
+			"label": "Landing page",
+		},
 	],
 }
 setup_wizard_complete = [
