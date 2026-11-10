@@ -9,13 +9,14 @@ const cases = JSON.parse(
 );
 
 function open_page(page) {
-	const { language, root_prefix } = cases.pages[page];
+	const { language, root_prefix, prefix_codes } = cases.pages[page];
 	globalThis.commera_storefront_config = {
 		localization: {
 			language: { code: language },
 			default_language: { code: cases.languages.default },
 			available_languages: cases.languages.published.map((code) => ({ code })),
 			root_prefix,
+			prefix_codes,
 		},
 	};
 }

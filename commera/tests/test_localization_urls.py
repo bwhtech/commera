@@ -122,7 +122,9 @@ class TestUrlCases(IntegrationTestCase):
 	def setUp(self):
 		self.cases = json.loads(URL_CASES.read_text())
 		languages = self.cases["languages"]
-		use_storefront_languages(self, languages["default"], published=languages["published"])
+		use_storefront_languages(
+			self, languages["default"], published=languages["published"], unpublished=languages["unpublished"]
+		)
 		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
 		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
 		self.addCleanup(frappe.set_user, frappe.session.user)
@@ -135,6 +137,7 @@ class TestUrlCases(IntegrationTestCase):
 				localization = get_localization()
 				self.assertEqual(localization.language.code, expected["language"])
 				self.assertEqual(localization.root_prefix, expected["root_prefix"])
+				self.assertEqual(list(localization.prefix_codes), expected["prefix_codes"])
 
 	def test_url_gives_the_shared_answer_for_each_case(self):
 		for case in self.cases["cases"]:

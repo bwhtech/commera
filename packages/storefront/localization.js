@@ -25,6 +25,7 @@ const NO_LOCALIZATION = {
 	default_language: null,
 	available_languages: [],
 	root_prefix: '',
+	prefix_codes: [],
 };
 
 // The page's localization, read on each access: the page sets it after this module loads.
@@ -104,16 +105,15 @@ function get_localization() {
 	return globalThis.commera_storefront_config?.localization ?? NO_LOCALIZATION;
 }
 
-// The client knows only published languages and its own prefix, never unpublished ones.
+// Like Python, strips any configured language, published or not, and the legacy /en/.
 function get_prefix_segments(current, prefix) {
-	const languages = [
-		current.language,
-		current.default_language,
-		...(current.available_languages ?? []),
+	const codes = [
+		current.language?.code,
+		current.default_language?.code,
+		...(current.available_languages ?? []).map((language) => language.code),
+		...(current.prefix_codes ?? []),
 	];
-	const segments = languages
-		.filter(Boolean)
-		.map((language) => language.code.toLowerCase());
+	const segments = codes.filter(Boolean).map((code) => code.toLowerCase());
 	return new Set([...segments, prefix.slice(1).toLowerCase(), LEGACY_PREFIX]);
 }
 

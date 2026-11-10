@@ -1,20 +1,24 @@
 {
 	"languages": {
 		"default": "en",
-		"published": ["en", "ar", "fr", "pt-BR"]
+		"published": ["en", "ar", "fr", "pt-BR"],
+		"unpublished": ["de"]
 	},
 	"pages": {
 		"/": {
 			"language": "en",
-			"root_prefix": ""
+			"root_prefix": "",
+			"prefix_codes": ["ar", "de", "en", "fr", "pt-BR"]
 		},
 		"/ar/products": {
 			"language": "ar",
-			"root_prefix": "/ar"
+			"root_prefix": "/ar",
+			"prefix_codes": ["ar", "de", "en", "fr", "pt-BR"]
 		},
 		"/pt-br/cart": {
 			"language": "pt-BR",
-			"root_prefix": "/pt-br"
+			"root_prefix": "/pt-br",
+			"prefix_codes": ["ar", "de", "en", "fr", "pt-BR"]
 		}
 	},
 	"cases": [
@@ -292,6 +296,41 @@
 			"page": "/pt-br/cart",
 			"path": "/ar/cart?x=1",
 			"expected": "/pt-br/cart?x=1"
+		},
+		{
+			"page": "/",
+			"path": "/de/products",
+			"expected": "/products"
+		},
+		{
+			"page": "/",
+			"path": "/deutsch/x",
+			"expected": "/deutsch/x"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/de/cart",
+			"expected": "/ar/cart"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/DE",
+			"expected": "/ar"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/de/cart?x=1#top",
+			"expected": "/ar/cart?x=1#top"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/fr/de/cart",
+			"expected": "/ar/de/cart"
+		},
+		{
+			"page": "/pt-br/cart",
+			"path": "/de/checkout",
+			"expected": "/pt-br/checkout"
 		}
 	]
 }

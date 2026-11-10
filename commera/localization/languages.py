@@ -56,6 +56,11 @@ class StorefrontLanguages:
 		"""Published and unpublished languages, default first."""
 		return self.published + self.unpublished
 
+	@property
+	def prefix_codes(self) -> tuple[str, ...]:
+		"""The codes of all configured languages, published or not, in code order."""
+		return tuple(sorted(language.code for language in self.configured))
+
 	def prefix(self, language: Language) -> str:
 		"""The URL prefix of `language`. The default language has none."""
 		return "" if language == self.default else f"/{language.code.lower()}"
