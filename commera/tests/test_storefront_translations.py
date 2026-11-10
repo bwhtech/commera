@@ -46,6 +46,15 @@ class TestStorefrontTranslations(ProductDetailPriceTestCase):
 		self.as_guest()
 		self.assertEqual(get_translations("ar")[UI_STRING], "باقي {0} قطع")
 
+	def test_the_dictionary_is_built_in_its_own_language_not_the_request_language(self):
+		frappe.translate.clear_cache()
+		self.addCleanup(frappe.translate.clear_cache)
+		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
+		frappe.local.lang = "fr"
+
+		self.as_guest()
+		self.assertEqual(get_translations("ar")["Germany"], "ألمانيا")
+
 	def test_record_content_stays_out_of_the_dictionary(self):
 		route = self.make_priced_variant("Dictionary Linen Shirt", default_rate=30)
 		product = frappe.get_doc(PRODUCT, {"route": route})

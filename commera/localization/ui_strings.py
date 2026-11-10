@@ -3,7 +3,12 @@ Record content stays out: it lives in Content Translation and comes translated f
 
 import frappe
 from frappe import _
-from frappe.translate import get_all_translations, get_translation_version, get_user_translations
+from frappe.translate import (
+	get_all_translations,
+	get_translation_version,
+	get_user_translations,
+	print_language,
+)
 
 from commera.localization.languages import StorefrontLanguages
 from commera.roles import is_commera_admin
@@ -17,7 +22,9 @@ def get_ui_strings(lang: str) -> dict[str, str]:
 	language = StorefrontLanguages.load().find(lang, include_unpublished=is_commera_admin())
 	if not language:
 		frappe.throw(_("Language {0} is not available").format(lang), frappe.DoesNotExistError)
-	return get_all_translations(language.code)
+	# Country names are merged in frappe.local.lang, which `_lang` may have set to another language.
+	with print_language(language.code):
+		return get_all_translations(language.code)
 
 
 def get_ui_strings_version(language: str) -> str | None:
