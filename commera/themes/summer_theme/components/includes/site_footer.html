@@ -1,7 +1,7 @@
 
 {# preview_settings carries the footer editor's unsaved values; binding to the saved doc makes the preview ignore what is being typed. #}
 {% set settings = preview_settings if preview_settings is defined and preview_settings else frappe.get_cached_doc("Commera Settings", "Commera Settings") %}
-{% set store_name = settings.store_name or "Commera" %}
+{% set store_name = (settings.store_name if preview_settings is defined and preview_settings else get_shop_details(localization if localization is defined else none).name) or "Commera" %}
 {% set footer_logo = preview_settings.footer_logo if preview_settings is defined and preview_settings and preview_settings.footer_logo else get_brand_assets().footer_logo %}
 {% set contact_email = settings.contact_email or "Contact@lifestyle.sa" %}
 {% set contact_phone = settings.contact_phone or "920000576" %}
@@ -50,16 +50,14 @@
 					</div>
 				</div>
 
-				{% for mapping in settings.footer_sections | selectattr("enabled") | sort(attribute="section_order") %}
-				{% set section = frappe.get_cached_doc("Footer Section Config", mapping.footer_section) %}
-				{% set links = section.footer_links | selectattr("enabled") | sort(attribute="link_order") | list %}
-				{% if section.enabled and links %}
+				{% for section in get_storefront_footer(localization if localization is defined else none) %}
+				{% if section.enabled and section.links %}
 				<div class="col-xl-3 col-md-4 col-sm-4 col-6 wow fadeInUp" data-wow-delay="0.{{ loop.index + 1 }}s">
 					<div class="widget widget_services">
-						<h5 class="footer-title">{{ _(section.section_title) }}</h5>
+						<h5 class="footer-title">{{ section.title | e }}</h5>
 						<ul>
-							{% for link in links %}
-							<li><a href="{{ link.link_url or 'javascript:void(0);' }}">{{ _(link.link_label) }}</a></li>
+							{% for link in section.links %}
+							<li><a href="{{ (link.url or 'javascript:void(0);') | e }}">{{ link.title | e }}</a></li>
 							{% endfor %}
 						</ul>
 					</div>

@@ -6,6 +6,7 @@ import frappe
 from commera.branding import get_brand_assets
 from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import get_menu_tree
 from commera.localization import translate
+from commera.store_frame import get_shop_details
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
 ITEM_GROUP_RANGE_CHUNK_SIZE = 100
@@ -179,7 +180,7 @@ def get_header_data():
 
 	return frappe._dict(
 		settings=settings,
-		store_name=settings.store_name or "Commera",
+		store_name=get_shop_details().name or "Commera",
 		brand_logo=get_brand_assets().logo,
 		navigation_menu=menu,
 		navigation_categories=build_legacy_navigation(menu),

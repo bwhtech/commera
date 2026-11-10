@@ -24,6 +24,7 @@ from commera.sdk.types import (
 	SitemapEntry,
 )
 from commera.shop_data import get_storefront_menu
+from commera.store_frame import get_shop_details, get_storefront_footer
 from commera.utils import get_country_list, get_store_company, get_store_currency
 from commera.www.sitemap_segment import SEGMENT_CONFIG, get_segment_filters, get_urls_per_page
 
@@ -49,18 +50,18 @@ def get_localization() -> Localization:
 
 
 def get_shop() -> Shop:
-	"""Store identity, the storefront menu and the footer."""
-	settings = frappe.get_cached_doc("Commera Settings")
+	"""Store identity, the storefront menu and the footer, in the request language."""
+	details = get_shop_details()
 	brand = get_brand_assets()
 	return {
-		"name": settings.store_name or frappe.get_website_settings("app_name") or "Commera",
-		"description": settings.default_meta_description or "",
+		"name": details.name or frappe.get_website_settings("app_name") or "Commera",
+		"description": details.description,
 		"currency": get_store_currency(),
 		"country": get_store_country(),
 		"logo": brand.logo,
 		"favicon": brand.favicon,
 		"menu": get_main_menu_items(),
-		"footer": [get_footer_section(row.footer_section) for row in get_footer_rows(settings)],
+		"footer": get_footer_sections(),
 	}
 
 
@@ -68,14 +69,10 @@ def get_menu(handle: str) -> Menu | None:
 	if handle == "main-menu":
 		return {"handle": handle, "title": _("Main menu"), "items": get_main_menu_items()}
 	if handle == "footer":
-		sections = [
-			get_footer_section(row.footer_section)
-			for row in get_footer_rows(frappe.get_cached_doc("Commera Settings"))
-		]
 		return {
 			"handle": handle,
 			"title": _("Footer"),
-			"items": [get_footer_menu_item(section) for section in sections],
+			"items": [get_footer_menu_item(section) for section in get_footer_sections()],
 		}
 	return None
 
@@ -208,16 +205,11 @@ def get_menu_link(node: dict, root_slug: str) -> tuple[str | None, str | None]:
 	return None, None
 
 
-def get_footer_rows(settings) -> list:
-	return sorted(
-		(row for row in settings.footer_sections or [] if row.enabled), key=lambda row: row.section_order
-	)
-
-
-def get_footer_section(name: str) -> FooterSection:
-	section = frappe.get_cached_doc("Footer Section Config", name)
-	links = sorted((link for link in section.footer_links if link.enabled), key=lambda link: link.link_order)
-	return {
-		"title": section.section_title,
-		"links": [{"title": link.link_label, "url": localization.url(link.link_url)} for link in links],
-	}
+def get_footer_sections() -> list[FooterSection]:
+	return [
+		{
+			"title": section.title,
+			"links": [{"title": link.title, "url": localization.url(link.url)} for link in section.links],
+		}
+		for section in get_storefront_footer()
+	]

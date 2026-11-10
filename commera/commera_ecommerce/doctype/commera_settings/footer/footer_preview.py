@@ -9,6 +9,7 @@ from commera.commera_ecommerce.doctype.commera_settings.editor_input import (
 	require_safe_url,
 	require_value,
 )
+from commera.localization.content import move_translations
 
 # Storefront pages come from hooks.website_route_rules, not Web Page docs, so the picker cannot see them.
 # Routes needing a query param or a cart (checkout, confirmation, order detail) are deliberately absent.
@@ -248,5 +249,7 @@ def move_footer_link(from_section: str, to_section: str, link_row_name: str, tar
 		target_row.link_order = index
 		target_row.idx = index
 	target.save()
+	# The moved link is a new row, so its translations follow it there.
+	move_translations("Footer Link", link_row_name, new_row.name)
 
 	return get_footer_editor_data()

@@ -10,6 +10,7 @@ from frappe.utils import create_batch, cstr
 from frappe.utils.data import sha256_hash
 
 from commera.localization.resolver import Localization, get_localization
+from commera.localization.resources import get_translatable_fields
 
 DOCTYPE = "Content Translation"
 MISSING, OUTDATED, CURRENT = "missing", "outdated", "current"
@@ -80,8 +81,21 @@ def save_translation(translation, value: str) -> str:
 
 
 def delete_translations(doc, method=None):
-	"""doc_events on_trash: drop the translations of a deleted record."""
+	"""doc_events on_trash: drop the translations of a deleted record and of its child rows."""
 	frappe.db.delete(DOCTYPE, {"reference_doctype": doc.doctype, "reference_name": doc.name})
+	rows = {}
+	for row in doc.get_all_children():
+		rows.setdefault(row.doctype, []).append(row.name)
+	for doctype, names in rows.items():
+		if get_translatable_fields(doctype):
+			frappe.db.delete(DOCTYPE, {"reference_doctype": doctype, "reference_name": ("in", names)})
+
+
+def move_translations(doctype: str, old_name: str, new_name: str):
+	"""Point a record's translations at its copy, as when a child row moves to another parent."""
+	frappe.db.set_value(
+		DOCTYPE, {"reference_doctype": doctype, "reference_name": old_name}, "reference_name", new_name
+	)
 
 
 def read_source(doctype: str, name: str, field: str):
