@@ -126,6 +126,24 @@ class TestMarketTranslationLookup(IntegrationTestCase):
 		self.assertEqual(preview.market.handle, "levant")
 		self.assertEqual(self.title(self.note, preview), ("ملاحظة الشام", CURRENT))
 
+	def test_a_market_overrides_the_default_language(self):
+		register("Note", self.note.name, "title", "en", "Gulf packing note", market="gulf")
+		other = self.make_note("Other note")
+		gulf_english = resolve("/en-ae")[0]
+
+		titles = translate([self.note, other], ["title"], gulf_english)
+
+		self.assertEqual(
+			[as_pair(fields["title"]) for fields in titles],
+			[("Gulf packing note", CURRENT), (other.title, CURRENT)],
+		)
+		self.assertEqual(self.title(self.note, resolve("/")[0]), (self.note.title, CURRENT))
+
+	def test_the_default_language_has_no_shop_wide_translation(self):
+		register("Note", self.note.name, "title", "en", "Shop-wide note")
+
+		self.assertEqual(self.title(self.note, resolve("/en-ae")[0]), (self.note.title, CURRENT))
+
 	def test_deleting_a_market_deletes_its_translations(self):
 		register("Note", self.note.name, "title", "ar", "ملاحظة")
 		register("Note", self.note.name, "title", "ar", "ملاحظة الخليج", market="gulf")

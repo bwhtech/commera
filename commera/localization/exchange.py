@@ -93,13 +93,25 @@ class RowError(Exception):
 	pass
 
 
-def get_exchange_language(code: str) -> str:
-	"""A configured storefront language other than the default, which has nothing to translate."""
+@dataclass(frozen=True)
+class ExchangeLanguage:
+	code: str
+	# The source language: only markets override it, so it has no shop-wide rows.
+	is_default: bool
+
+	def has_entry(self, entry: Entry) -> bool:
+		if self.is_default:
+			return bool(entry.market and entry.translated)
+		return bool(entry.default or entry.translated)
+
+
+def get_exchange_language(code: str) -> ExchangeLanguage:
+	"""A configured storefront language. The default one holds market overrides only."""
 	languages = StorefrontLanguages.load()
 	language = languages.find(code, include_unpublished=True)
-	if not language or language == languages.default:
+	if not language:
 		frappe.throw(_("{0} is not a storefront language you translate into.").format(cstr(code)))
-	return language.code
+	return ExchangeLanguage(language.code, language == languages.default)
 
 
 def export_csv(language: str) -> str:
@@ -109,9 +121,9 @@ def export_csv(language: str) -> str:
 	buffer = io.StringIO()
 	writer = csv.writer(buffer)
 	writer.writerow(COLUMNS)
-	for entry in iter_entries(language):
-		if entry.default or entry.translated:
-			writer.writerow([encode_cell(cell) for cell in entry.as_row(language)])
+	for entry in iter_entries(language.code):
+		if language.has_entry(entry):
+			writer.writerow([encode_cell(cell) for cell in entry.as_row(language.code)])
 	return buffer.getvalue()
 
 
@@ -123,15 +135,16 @@ class TranslationImport:
 	"""Matches each row on type, identification, field, locale and market, and writes the changed ones
 	through its resource. A bad row, or a repeat of a key, becomes an error in the report."""
 
-	def __init__(self, rows: list[tuple[int, dict]], language: str):
+	def __init__(self, rows: list[tuple[int, dict]], language: ExchangeLanguage):
 		self.rows = rows
-		self.language = language
+		self.language = language.code
+		self.is_default_language = language.is_default
 		self.report = ImportReport()
 		self.seen = {}
 		self.resources = {resource.type: resource for resource in get_translatable_resources()}
 		types = {row["Type"] for _number, row in rows} & set(self.resources)
 		# A snapshot is safe to compare against because each key is imported at most once.
-		self.entries = {entry.key: entry for entry in iter_entries(language, types)}
+		self.entries = {entry.key: entry for entry in iter_entries(self.language, types)}
 
 	def run(self) -> ImportReport:
 		for number, row in self.rows:
@@ -143,6 +156,8 @@ class TranslationImport:
 
 	def import_row(self, number: int, row: dict):
 		row["Market"] = canonical_market(row["Market"])
+		if self.is_default_language and row["Market"] == SHOP_WIDE:
+			raise RowError(_("The default language is the source content. Name a market to override it."))
 		self.check_duplicate(number, row)
 		resource = self.match(row)
 		entry, name = self.find_record(resource, row)

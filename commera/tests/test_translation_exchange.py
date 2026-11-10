@@ -372,12 +372,31 @@ class TestTranslationExchange(IntegrationTestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "Locale"):
 			exchange.import_csv("Type,Identification,Field,Market,Translated content\n", "ar")
 
-	def test_only_a_translated_storefront_language_is_exchanged(self):
-		for language in ("en", "fr"):
-			with self.assertRaises(frappe.ValidationError):
-				exchange.export_csv(language)
-			with self.assertRaises(frappe.ValidationError):
-				exchange.import_csv(to_csv([self.row("title", "x", Locale=language)]), language)
+	def test_only_a_storefront_language_is_exchanged(self):
+		with self.assertRaises(frappe.ValidationError):
+			exchange.export_csv("fr")
+		with self.assertRaises(frappe.ValidationError):
+			exchange.import_csv(to_csv([self.row("title", "x", Locale="fr")]), "fr")
+
+	def test_the_default_language_exchanges_market_rows_only(self):
+		register("Note", self.note.name, "title", "en", "Gulf packing note", market="gulf")
+		rows = [
+			self.row("title", "Shop-wide note", Locale="en"),
+			self.row("title", "Gulf note", Locale="en", Market="gulf"),
+		]
+
+		exported = self.rows_of(exchange.export_csv("en"))
+		report = exchange.import_csv(to_csv(rows), "en")
+
+		self.assertEqual(
+			[(row["Field"], row["Market"], row["Translated content"]) for row in exported],
+			[("title", "gulf", "Gulf packing note")],
+		)
+		self.assertEqual(report.updated, 1)
+		self.assertEqual([error["row"] for error in report.errors], [2])
+		filters = {"reference_name": self.note.name, "language": "en"}
+		stored = frappe.get_all("Content Translation", filters, ["market", "translated_value"])
+		self.assertEqual([(row.market, row.translated_value) for row in stored], [("gulf", "Gulf note")])
 
 	def upload(self, rows):
 		return frappe.get_doc(
