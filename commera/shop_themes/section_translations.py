@@ -9,6 +9,7 @@ from frappe import _
 from commera.localization.content import get_source_hash, get_status
 from commera.localization.resources import BATCH_SIZE, TranslatableResource, TranslationEntry
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
+from commera.shop_themes.layout_cache import get_published_layouts
 from commera.shop_themes.section_text import (
 	OVERLAY,
 	find_text_setting,
@@ -16,13 +17,20 @@ from commera.shop_themes.section_text import (
 	get_nested,
 	get_stored_hash,
 	get_translations,
+	index_text_settings,
 	is_overlay,
+	iter_overlay,
 	iter_text_settings,
 	set_overlay_text,
 	set_stored_hash,
 	with_translation,
 )
-from commera.shop_themes.sections import get_inherited_layout, get_pages, get_source
+from commera.shop_themes.sections import (
+	get_inherited_layout,
+	get_pages,
+	get_source,
+	resolve_inherited_layout,
+)
 
 THEME_LAYOUT = "Theme Layout"
 
@@ -52,6 +60,55 @@ class ThemeSectionResource(TranslatableResource):
 			for text in iter_text_settings(theme_context["dirs"], layout):
 				if source := get_source(text.value, default):
 					yield self.make_entry(page, text, layout, source, language, default)
+
+	def scan_sourceless(self, language, batch_size=BATCH_SIZE):
+		"""Translations this theme stores for text without a source: in its own full layout, or
+		dormant in its overlay, where the inherited text lost its source or is gone."""
+		theme_context = self.get_theme_context()
+		if not theme_context:
+			return
+		names, theme_dirs = theme_context["names"], theme_context["dirs"]
+		default = get_default_language()
+		for page in get_pages(theme_dirs):
+			published = get_published_layouts(names, page)
+			own = published[names[0]]
+			if is_overlay(own):
+				layout = resolve_inherited_layout(names, theme_dirs, page, published)
+				yield from self.iter_dormant_entries(theme_dirs, page, own, layout, language, default)
+				continue
+			for text in iter_text_settings(theme_dirs, own):
+				if not get_source(text.value, default) and get_translations(text.value, default).get(
+					language
+				):
+					yield self.make_entry(page, text, own, "", language, default)
+
+	def iter_dormant_entries(self, theme_dirs, page, overlay, layout, language, default):
+		texts = index_text_settings(theme_dirs, layout)
+		for path, setting_id, text_language, value in iter_overlay(overlay):
+			text = texts.get((path, setting_id))
+			if text_language != language or not value or (text and get_source(text.value, default)):
+				continue
+			yield TranslationEntry(
+				resource=self.type,
+				name=f"{page}/{path}",
+				field=setting_id,
+				label=text.label if text else setting_id,
+				source="",
+				value=value,
+				status=get_status("", value, None),
+			)
+
+	def exists(self, name, field):
+		theme_context = self.get_theme_context()
+		page, _slash, path = name.partition("/")
+		if not theme_context or page not in get_pages(theme_context["dirs"]):
+			return False
+		names, theme_dirs = theme_context["names"], theme_context["dirs"]
+		published = get_published_layouts(names, page)
+		layout = resolve_inherited_layout(names, theme_dirs, page, published)
+		own = published[names[0]]
+		in_overlay = is_overlay(own) and get_nested(own, OVERLAY, path, field) is not None
+		return in_overlay or bool(find_text_setting(theme_dirs, layout, path, field))
 
 	def make_entry(self, page, text, layout, source, language, default):
 		value = get_translations(text.value, default).get(language, "")

@@ -105,8 +105,8 @@ def get_exchange_language(code: str) -> str:
 
 
 def export_csv(language: str) -> str:
-	"""Every field with a source, shop-wide and per market, of every resource. Cells are quoted against
-	formulas (OWASP) by `encode_cell`, which the import reverses."""
+	"""Every field with a source or a stored translation, shop-wide and per market, of every resource.
+	Cells are quoted against formulas (OWASP) by `encode_cell`, which the import reverses."""
 	language = get_exchange_language(language)
 	buffer = io.StringIO()
 	writer = csv.writer(buffer)
@@ -148,15 +148,13 @@ class TranslationImport:
 			row["Market"] = canonical_market(row["Market"])
 		self.check_duplicate(number, row)
 		resource = self.match(row)
-		entry = self.find_entry(row)
+		entry, name = self.find_record(resource, row)
 		value, market = row["Translated content"], row["Market"]
 		if not value:
 			self.report.skipped += 1
 		elif entry and value == self.stored_value(entry, market):
 			self.report.unchanged += 1
 		else:
-			# A field the export had no row for, e.g. one without source text: the resource checks it.
-			name = entry.identification if entry else row["Identification"]
 			self.write(resource, name, row["Field"], value, market)
 			self.report.updated += 1
 
@@ -178,13 +176,25 @@ class TranslationImport:
 			raise RowError(_("{0} is not a type you can translate.").format(row["Type"]))
 		return resource
 
+	def find_record(self, resource: TranslatableResource, row: dict) -> tuple[Entry | None, str]:
+		"""The row's exported entry, if any, and its record name. An unknown record or field is an
+		error even with nothing to import, as the export never names one."""
+		if entry := self.find_entry(row):
+			return entry, entry.identification
+		for name in candidate_names(row["Identification"]):
+			# A field the export had no row for, e.g. one without source text or translation.
+			if resource.exists(name, row["Field"]):
+				return None, name
+		raise RowError(
+			_("No {0} with identification {1} has a translatable field {2}.").format(
+				row["Type"], row["Identification"], row["Field"]
+			)
+		)
+
 	def find_entry(self, row: dict) -> Entry | None:
-		key = (row["Type"], row["Identification"], row["Field"], SHOP_WIDE)
-		if entry := self.entries.get(key):
-			return entry
-		# decode_cell removed an apostrophe the record's own name starts with.
-		if row["Identification"].startswith(FORMULA_TRIGGERS):
-			return self.entries.get((row["Type"], "'" + row["Identification"], row["Field"], SHOP_WIDE))
+		for name in candidate_names(row["Identification"]):
+			if entry := self.entries.get((row["Type"], name, row["Field"], SHOP_WIDE)):
+				return entry
 		return None
 
 	def stored_value(self, entry: Entry, market: str) -> str:
@@ -201,6 +211,13 @@ class TranslationImport:
 			frappe.db.rollback(save_point="import_translation_row")
 			del frappe.local.message_log[messages:]
 			raise RowError(cstr(error) or _("The translation could not be saved.")) from error
+
+
+def candidate_names(identification: str) -> list[str]:
+	"""decode_cell removes an apostrophe a record's own name may start with."""
+	if identification.startswith(FORMULA_TRIGGERS):
+		return [identification, "'" + identification]
+	return [identification]
 
 
 def canonical_market(market: str) -> str:
@@ -264,11 +281,11 @@ def decode(content: bytes | str) -> str:
 
 
 def iter_entries(language: str, types: Iterable[str] | None = None) -> Iterator[Entry]:
-	"""Each resource's entries, each shop-wide one followed by its per-market ones."""
+	"""Each resource's entries, sourceless ones too, each shop-wide one followed by its market ones."""
 	for resource in get_translatable_resources():
 		if types is not None and resource.type not in types:
 			continue
-		for batch in batched(resource.iter_entries(language), BATCH_SIZE):
+		for batch in batched(resource.iter_entries(language, include_sourceless=True), BATCH_SIZE):
 			markets = resource.get_market_entries(list(batch), language)
 			for entry in batch:
 				yield Entry.from_translation(entry)

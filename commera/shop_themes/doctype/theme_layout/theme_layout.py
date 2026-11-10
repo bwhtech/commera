@@ -3,9 +3,10 @@ from frappe import _
 from frappe.model.document import Document
 
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context
+from commera.shop_themes.layout_cache import cache_layout_on_commit
 from commera.shop_themes.section_text import is_overlay
 from commera.shop_themes.section_text_checks import prepare_theme_layout
-from commera.shop_themes.sections import clear_layout_cache_on_commit, validate_layout
+from commera.shop_themes.sections import validate_layout
 
 
 class ThemeLayout(Document):
@@ -22,10 +23,10 @@ class ThemeLayout(Document):
 		prepare_theme_layout(self, theme_context)
 
 	def on_update(self):
-		clear_layout_cache_on_commit(self.theme, self.page)
+		cache_layout_on_commit(self.theme, self.page, self.published_layout)
 
 	def on_trash(self):
-		clear_layout_cache_on_commit(self.theme, self.page)
+		cache_layout_on_commit(self.theme, self.page, None)
 
 	@frappe.whitelist()
 	def publish(self):

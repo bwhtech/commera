@@ -1,3 +1,4 @@
+import copy
 import csv
 import io
 from unittest.mock import patch
@@ -7,9 +8,11 @@ from frappe.tests import IntegrationTestCase
 
 from commera.api.admin import translations as translations_api
 from commera.api.admin.theme import activate_theme
+from commera.api.admin.theme_layout import get_editor
 from commera.localization import CURRENT, MISSING, OUTDATED, exchange, get_translatable_resource, register
 from commera.roles import COMMERA_ADMIN, COMMERA_USER, add_commera_roles
-from commera.shop_themes.sections import clear_layout_cache
+from commera.shop_themes.layout_cache import clear_layout_cache
+from commera.tests.test_admin_theme_layout import publish
 from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.tests.test_theme_section_translation import ARABIC_HEADING, ENTRY, HEADING, SUMMER_THEME
@@ -156,6 +159,51 @@ class TestTranslationExchange(IntegrationTestCase):
 		self.assertEqual(len(report.errors), 1)
 		self.assertIn("Market nowhere does not exist", report.errors[0]["message"])
 		self.assertEqual(translations_of(self.note.name), [])
+
+	def test_rows_for_an_unknown_record_or_field_are_errors_even_when_empty(self):
+		rows = [
+			self.row("title", "", Identification="no-such-note"),
+			self.row("route", ""),
+			self.row("content", "", Identification=self.make_note("Gift note").name),
+		]
+
+		report = exchange.import_csv(to_csv(rows), "ar")
+
+		self.assertEqual([error["row"] for error in report.errors], [2, 3])
+		self.assertIn("no-such-note", report.errors[0]["message"])
+		self.assertIn("route", report.errors[1]["message"])
+		self.assertEqual((report.updated, report.skipped), (0, 1))
+
+	def test_a_translation_whose_source_was_cleared_is_still_exchanged(self):
+		register("Note", self.note.name, "content", "ar", "<p>لفها جيدا</p>")
+		register("Note", self.note.name, "content", "ar", "<p>لفها للخليج</p>", market="INR")
+		market_only = self.make_note("Gift note", "<p>A gift</p>")
+		register("Note", market_only.name, "content", "ar", "<p>هدية</p>", market="INR")
+		for name in (self.note.name, market_only.name):
+			frappe.db.set_value("Note", name, "content", "")
+		before = translations_of(self.note.name), translations_of(market_only.name)
+
+		content = exchange.export_csv("ar")
+		with patch.object(exchange, "MARKET_DOCTYPE", "Currency"):
+			report = exchange.import_csv(content, "ar")
+
+		cells = ("Market", "Status", "Default content", "Translated content")
+		self.assertEqual(
+			[tuple(row[cell] for cell in cells) for row in self.rows_of(content, field="content")],
+			[
+				("", OUTDATED, "", self.stored(self.note.name, "content")),
+				("INR", OUTDATED, "", self.stored(self.note.name, "content", "INR")),
+			],
+		)
+		self.assertEqual(
+			[tuple(row[cell] for cell in cells) for row in self.rows_of(content, market_only.name)],
+			[
+				("", MISSING, market_only.title, ""),
+				("INR", OUTDATED, "", self.stored(market_only.name, "content", "INR")),
+			],
+		)
+		self.assertEqual((report.updated, report.errors), (0, []))
+		self.assertEqual((translations_of(self.note.name), translations_of(market_only.name)), before)
 
 	def test_a_market_row_is_an_error_while_markets_do_not_exist(self):
 		with patch.object(exchange, "MARKET_DOCTYPE", "No Such Market DocType"):
@@ -444,3 +492,31 @@ class TestThemeSectionTranslationExchange(IntegrationTestCase):
 
 		self.assertEqual(len(report.errors), 1)
 		self.assertIn("per market", report.errors[0]["message"])
+
+	def test_a_translation_whose_source_was_cleared_is_still_exchanged(self):
+		self.resource.write(ENTRY, "heading", "ar", ARABIC_HEADING)
+		layout = copy.deepcopy(get_editor(SUMMER_THEME)["draft_layout"])
+		layout["sections"][0]["blocks"][0]["settings"]["heading"] = {"en": "", "ar": ARABIC_HEADING}
+		publish(SUMMER_THEME, "index", layout)
+		before = frappe.db.get_value("Theme Layout", {"theme": SUMMER_THEME, "page": "index"}, "modified")
+
+		content = exchange.export_csv("ar")
+		row = self.heading_row(content)
+		report = exchange.import_csv(content, "ar")
+
+		self.assertEqual(
+			(row["Status"], row["Default content"], row["Translated content"]), (OUTDATED, "", ARABIC_HEADING)
+		)
+		self.assertEqual((report.updated, report.errors), (0, []))
+		after = frappe.db.get_value("Theme Layout", {"theme": SUMMER_THEME, "page": "index"}, "modified")
+		self.assertEqual(after, before)
+
+	def test_a_theme_section_row_for_an_unknown_setting_is_an_error_even_when_empty(self):
+		row = self.heading_row(exchange.export_csv("ar"))
+
+		report = exchange.import_csv(
+			to_csv([{**row, "Field": "no_such_setting", "Translated content": ""}]), "ar"
+		)
+
+		self.assertEqual([error["row"] for error in report.errors], [2])
+		self.assertEqual(report.skipped, 0)

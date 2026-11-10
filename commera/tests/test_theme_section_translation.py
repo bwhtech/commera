@@ -11,9 +11,10 @@ from commera.api.admin.theme_layout import discard, get_editor
 from commera.localization import CURRENT, MISSING, OUTDATED, get_translatable_resource
 from commera.roles import COMMERA_ADMIN, add_commera_roles
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context, get_theme_context
+from commera.shop_themes.layout_cache import clear_layout_cache
 from commera.shop_themes.section_text import OVERLAY, SOURCE_HASHES
 from commera.shop_themes.section_translations import ThemeSectionResource
-from commera.shop_themes.sections import clear_layout_cache, get_page_layout, get_text
+from commera.shop_themes.sections import get_page_layout, get_text
 from commera.shop_themes.theme_resolver import get_theme_environment
 from commera.tests.test_admin_theme_layout import publish, save_draft
 from commera.tests.test_localization import use_storefront_languages

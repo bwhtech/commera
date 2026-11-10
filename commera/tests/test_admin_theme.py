@@ -15,8 +15,8 @@ from commera.api.admin.theme import (
 )
 from commera.api.admin.theme_layout import get_editor, get_preview_entries
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context
+from commera.shop_themes.layout_cache import clear_layout_cache
 from commera.shop_themes.sections import (
-	clear_layout_cache,
 	get_section,
 	get_section_schema,
 	get_theme_json,

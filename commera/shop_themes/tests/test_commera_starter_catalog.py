@@ -7,7 +7,8 @@ from werkzeug.wrappers import Request
 
 import commera.sdk
 from commera.shop_themes.doctype.shop_theme.shop_theme import render_theme_context
-from commera.shop_themes.sections import LAYOUT_CACHE_PREFIX, get_theme_json, validate_layout
+from commera.shop_themes.layout_cache import clear_layout_cache, get_cache_keys, set_entry
+from commera.shop_themes.sections import get_theme_json, validate_layout
 from commera.shop_themes.theme_resolver import ThemePageRenderer
 from commera.tests.test_localization import use_storefront_languages
 
@@ -32,8 +33,8 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 			"settings_doctype": None,
 		}
 		for page in (*CATALOG_LAYOUTS, "header_group", "footer_group"):
-			frappe.cache.delete_value(f"{LAYOUT_CACHE_PREFIX}{STARTER}:{page}")
-			self.addCleanup(frappe.cache.delete_value, f"{LAYOUT_CACHE_PREFIX}{STARTER}:{page}")
+			clear_layout_cache(STARTER, page)
+			self.addCleanup(clear_layout_cache, STARTER, page)
 		frappe.db.delete("Theme Layout", {"theme": STARTER})
 
 		self.saved_request = getattr(frappe.local, "request", None)

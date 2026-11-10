@@ -188,10 +188,10 @@ def resolve_value(source: str, translation: tuple | None, language: str) -> Tran
 
 
 def get_status(source, value: str | None, source_hash: str | None) -> str:
-	"""Missing without a translation; outdated when the source changed after it was written."""
+	"""Missing without a translation; outdated when the source changed after it was written, or is gone."""
 	if not value:
 		return MISSING
-	return CURRENT if source_hash == get_source_hash(source) else OUTDATED
+	return CURRENT if source and source_hash == get_source_hash(source) else OUTDATED
 
 
 def count_column_statuses(doctype: str, field: str, language: str) -> dict[str, int]:

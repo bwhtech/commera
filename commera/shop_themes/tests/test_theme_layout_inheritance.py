@@ -2,6 +2,8 @@
 # See license.txt
 
 import copy
+import csv
+import io
 from unittest.mock import ANY, Mock, call, patch
 
 import frappe
@@ -9,16 +11,21 @@ from frappe.tests import IntegrationTestCase
 
 from commera.api.admin import theme_layout as theme_layout_api
 from commera.api.admin.theme_layout import discard, get_editor
-from commera.localization import CURRENT
+from commera.localization import CURRENT, OUTDATED, exchange
+from commera.shop_themes import layout_cache
 from commera.shop_themes.doctype.shop_theme.shop_theme import clear_theme_cache, get_theme_context
+from commera.shop_themes.layout_cache import (
+	clear_layout_cache,
+	forget_uncommitted_layouts,
+	get_cache_keys,
+	has_uncommitted_layouts,
+	publish_entry,
+	read_published_layouts,
+	set_entry,
+)
 from commera.shop_themes.section_text import OVERLAY, SOURCE_HASHES
 from commera.shop_themes.section_translations import ThemeSectionResource
-from commera.shop_themes.sections import (
-	LAYOUT_CACHE_PREFIX,
-	clear_layout_cache,
-	get_page_layout,
-	get_theme_json,
-)
+from commera.shop_themes.sections import get_inherited_layout, get_page_layout, get_theme_json
 from commera.tests.test_admin_theme_layout import publish, save_draft
 from commera.tests.test_localization import use_storefront_languages
 
@@ -176,9 +183,20 @@ class TestThemeLayoutInheritance(IntegrationTestCase):
 	def title_entries(self, resource):
 		return resource.list_entries("ar", filters={"name": TILE, "field": "title"}).entries
 
+	def commit_layouts(self, queued=0):
+		"""Run the layout callbacks a commit would run; the test transaction stays open."""
+		for callback in list(frappe.db.after_commit._functions)[queued:]:
+			if getattr(callback, "func", None) is publish_entry or callback is forget_uncommitted_layouts:
+				callback()
+
+	def cached_entry(self, theme_name):
+		return frappe.cache.get_value(get_cache_keys([theme_name], PAGE)[0], use_local_cache=False)
+
 	def test_the_editor_reads_the_parent_layout_past_a_stale_cache(self):
+		queued = len(frappe.db.after_commit)
 		publish(PARENT, PAGE, self.reordered_layout(1))
-		frappe.cache.set_value(f"{LAYOUT_CACHE_PREFIX}{PARENT}:{PAGE}", {"layout": self.reordered_layout(2)})
+		self.commit_layouts(queued)
+		set_entry(get_cache_keys([PARENT], PAGE)[0], {"layout": self.reordered_layout(2)})
 
 		editor = get_editor(CHILD, PAGE)
 
@@ -186,19 +204,69 @@ class TestThemeLayoutInheritance(IntegrationTestCase):
 		self.assertEqual(editor["draft_layout"], self.reordered_layout(1))
 		theme_layout_api.save_draft(CHILD, PAGE, editor["draft_layout"], editor["revision"])
 
-	def test_a_saved_layout_clears_its_cache_again_after_commit(self):
+	def test_a_commit_caches_the_committed_layout(self):
 		queued = len(frappe.db.after_commit)
 		publish(PARENT, PAGE, self.reordered_layout(1))
-		cache_key = f"{LAYOUT_CACHE_PREFIX}{PARENT}:{PAGE}"
-		# A request that read the old row before the commit caches it meanwhile.
-		frappe.cache.set_value(cache_key, {"layout": self.file_layout})
+		self.assertTrue(has_uncommitted_layouts())
 
-		for callback in list(frappe.db.after_commit._functions)[queued:]:
-			if getattr(callback, "func", None) is clear_layout_cache:
-				callback()
+		self.commit_layouts(queued)
 
-		self.assertIsNone(frappe.cache.get_value(cache_key))
+		self.assertFalse(has_uncommitted_layouts())
+		self.assertEqual(self.cached_entry(PARENT), {"layout": self.reordered_layout(1)})
 		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
+
+	def test_a_reader_that_read_the_old_row_before_a_commit_cannot_cache_it(self):
+		queued = len(frappe.db.after_commit)
+		publish(PARENT, PAGE, self.reordered_layout(1))
+		self.commit_layouts(queued)
+		clear_layout_cache(PARENT, PAGE)
+		reads = []
+
+		def read_then_let_a_writer_commit(theme_names, page):
+			stored = read_published_layouts(theme_names, page)
+			if not reads:
+				reads.append(page)
+				queued = len(frappe.db.after_commit)
+				publish(PARENT, PAGE, self.reordered_layout(2))
+				self.commit_layouts(queued)
+			return stored
+
+		with patch.object(layout_cache, "read_published_layouts", read_then_let_a_writer_commit):
+			# The stale reader still sees the old row it read, and caches it under the old generation.
+			self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
+
+		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(2))
+
+	def test_a_reader_on_an_older_snapshot_cannot_replace_the_committed_layout(self):
+		queued = len(frappe.db.after_commit)
+		publish(PARENT, PAGE, self.reordered_layout(1))
+		self.commit_layouts(queued)
+		old_rows = read_published_layouts([CHILD, PARENT], PAGE)
+		queued = len(frappe.db.after_commit)
+		publish(PARENT, PAGE, self.reordered_layout(2))
+		self.commit_layouts(queued)
+
+		# It reads the new generation, but its snapshot predates the commit.
+		with patch.object(layout_cache, "read_published_layouts", return_value=old_rows):
+			self.rendered_layout(CHILD)
+
+		self.assertEqual(self.cached_entry(PARENT), {"layout": self.reordered_layout(2)})
+		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(2))
+
+	def test_a_rolled_back_layout_leaves_nothing_cached(self):
+		publish(PARENT, PAGE, self.reordered_layout(1))
+		self.assertEqual(self.rendered_layout(PARENT), self.reordered_layout(1))
+		self.assertIsNone(self.cached_entry(PARENT))
+
+		frappe.db.rollback()
+
+		self.assertFalse(has_uncommitted_layouts())
+		self.assertIsNone(self.cached_entry(PARENT))
+		committed = get_inherited_layout([PARENT], get_theme_context(PARENT)["dirs"], PAGE, cached=False)
+		self.assertEqual(self.rendered_layout(PARENT), committed)
+		self.assertEqual(
+			self.cached_entry(PARENT), {"layout": read_published_layouts([PARENT], PAGE)[PARENT]}
+		)
 
 	def test_a_save_locks_the_page_and_its_parents_in_one_ordered_read(self):
 		theme_context = get_theme_context(GRANDCHILD)
@@ -224,6 +292,29 @@ class TestThemeLayoutInheritance(IntegrationTestCase):
 		self.assertIsNone(self.child_overlay())
 		with self.assertRaises(frappe.DoesNotExistError):
 			child.write(TILE, "title", "ar", "نساء")
+
+	def test_a_dormant_overlay_translation_is_still_exchanged(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		child = translatable(CHILD)
+		child.write(TILE, "title", "ar", "نساء")
+		child.write(OTHER_TILE, "title", "ar", "رجال")
+		publish(PARENT, PAGE, self.edited_tiles(lambda tiles: tiles[0]["settings"].update(title="")))
+		before = self.child_overlay()
+
+		with patch.object(exchange, "get_translatable_resources", return_value=[child]):
+			content = exchange.export_csv("ar")
+			report = exchange.import_csv(content, "ar")
+
+		rows = {(row["Identification"], row["Field"]): row for row in csv.DictReader(io.StringIO(content))}
+		dormant = rows[(TILE, "title")]
+		self.assertEqual(
+			(dormant["Status"], dormant["Default content"], dormant["Translated content"]),
+			(OUTDATED, "", "نساء"),
+		)
+		self.assertEqual(rows[(OTHER_TILE, "title")]["Status"], CURRENT)
+		self.assertEqual(self.title_entries(child), [])
+		self.assertEqual((report.updated, report.errors), (0, []))
+		self.assertEqual(self.child_overlay(), before)
 
 	def test_an_unchanged_stored_translation_never_blocks_a_save(self):
 		use_storefront_languages(self, "en", published=("en", "ar"), unpublished=("fr",))

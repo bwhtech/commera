@@ -10,7 +10,7 @@ from typing import ClassVar
 
 import frappe
 from frappe import _
-from frappe.utils import cint
+from frappe.utils import cint, create_batch, cstr
 
 from commera.localization.content import (
 	CURRENT,
@@ -92,11 +92,16 @@ class TranslatableResource:
 		next_cursor = json.dumps(page[limit - 1][1]) if len(page) > limit else None
 		return EntryPage([entry for entry, _key in page[:limit]], next_cursor)
 
-	def iter_entries(self, language: str, batch_size: int = BATCH_SIZE) -> Iterator[TranslationEntry]:
-		"""Every entry, read `batch_size` records at a time, for an export."""
+	def iter_entries(
+		self, language: str, batch_size: int = BATCH_SIZE, *, include_sourceless: bool = False
+	) -> Iterator[TranslationEntry]:
+		"""Every entry with source text, read `batch_size` records at a time, for an export. With
+		`include_sourceless`, then each one whose source is now empty but holds a translation."""
 		check_target_language(language)
 		for entry, _key in self.scan(language, {}, None, batch_size):
 			yield entry
+		if include_sourceless:
+			yield from self.scan_sourceless(language, batch_size)
 
 	def count_statuses(self, language: str) -> dict[str, int]:
 		check_target_language(language)
@@ -116,9 +121,18 @@ class TranslatableResource:
 		self.check_write_permission(bool(value))
 		self.save_translation(name, field, language, value or "", market)
 
+	def exists(self, name: str, field: str) -> bool:
+		"""Whether `name` has the translatable `field`, with source text or not."""
+		raise NotImplementedError
+
 	def scan(self, language, filters, after: list | None, batch_size=BATCH_SIZE) -> Iterator[tuple]:
 		"""(entry, its key as a list) in ascending key order, only keys strictly after `after`."""
 		raise NotImplementedError
+
+	def scan_sourceless(self, language, batch_size=BATCH_SIZE) -> Iterator[TranslationEntry]:
+		"""Shop-wide entries without source text that hold a translation, shop-wide or for a market.
+		The shop-wide value is empty when only markets hold one."""
+		return iter(())
 
 	def aggregate_statuses(self, language) -> Counter:
 		return Counter(entry.status for entry, _key in self.scan(language, {}, None))
@@ -154,6 +168,46 @@ class DoctypeResource(TranslatableResource):
 					if source[field]:
 						entry = self.make_entry(meta, record.name, field, source[field], translations)
 						yield entry, [record.name, field]
+
+	def scan_sourceless(self, language, batch_size=BATCH_SIZE):
+		meta = frappe.get_meta(self.doctype)
+		columns = [field for field in self.fields if meta.has_field(field)]
+		translated = self.get_translated_fields(language)
+		for names in create_batch(sorted(translated), batch_size):
+			records = frappe.get_all(
+				self.doctype,
+				filters={"name": ("in", names)},
+				fields=["name", *columns],
+				order_by="name asc",
+			)
+			sources = get_sources(self.doctype, records, list(self.fields))
+			translations = fetch_translations(self.doctype, names, list(self.fields), language)
+			for record, source in zip(records, sources, strict=True):
+				for field in self.fields:
+					if field in translated[cstr(record.name)] and not source[field]:
+						yield self.make_entry(meta, record.name, field, "", translations)
+
+	def get_translated_fields(self, language) -> dict[str, set[str]]:
+		"""{record name: its fields with a translation in `language`, shop-wide or for a market}."""
+		rows = frappe.get_all(
+			DOCTYPE,
+			filters={
+				"reference_doctype": self.doctype,
+				"reference_field": ("in", self.fields),
+				"language": language,
+				"translated_value": ("is", "set"),
+			},
+			fields=["reference_name", "reference_field"],
+			distinct=True,
+			as_list=True,
+		)
+		translated = {}
+		for name, field in rows:
+			translated.setdefault(name, set()).add(field)
+		return translated
+
+	def exists(self, name, field):
+		return field in self.fields and bool(frappe.db.exists(self.doctype, name))
 
 	def is_field_after(self, field, after_field) -> bool:
 		"""A cursor field no longer declared resumes at the record's first field: nothing is skipped."""
@@ -241,7 +295,7 @@ class DoctypeResource(TranslatableResource):
 		frappe.has_permission(DOCTYPE, "write" if saving else "delete", throw=True)
 
 	def save_translation(self, name, field, language, value, market):
-		if field not in self.fields or not frappe.db.exists(self.doctype, name):
+		if not self.exists(name, field):
 			frappe.throw(
 				_("{0} {1} has no translatable field {2}.").format(_(self.doctype), name, field),
 				frappe.DoesNotExistError,

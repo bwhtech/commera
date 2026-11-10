@@ -1,6 +1,5 @@
 import json
 import os
-from functools import partial
 
 import frappe
 from frappe import _
@@ -12,9 +11,9 @@ import commera.sdk
 from commera.localization.resolver import get_localization
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context, is_within_directory
 from commera.shop_themes.jinja_helpers import find_theme_asset_url
+from commera.shop_themes.layout_cache import get_published_layouts, read_published_layouts
 from commera.shop_themes.theme_resolver import find_theme_file
 
-LAYOUT_CACHE_PREFIX = "commera:theme_layout:"
 TEXT_TYPES = frozenset({"text", "textarea", "url", "image"})
 DEFAULT_MAX_BLOCKS = 50
 DEFAULT_MAX_PRODUCTS = 8
@@ -70,39 +69,6 @@ def get_section_schema(theme_dirs, section_type):
 	return get_theme_json(theme_dirs, f"sections/{section_type}.json")
 
 
-def get_published_layouts(theme_names, page):
-	cache_keys = {name: f"{LAYOUT_CACHE_PREFIX}{name}:{page}" for name in theme_names}
-	cached = {name: frappe.cache.get_value(cache_key) for name, cache_key in cache_keys.items()}
-	if any(entry is None for entry in cached.values()):
-		published_layouts = dict(
-			frappe.get_all(
-				"Theme Layout",
-				filters={"theme": ("in", theme_names), "page": page},
-				fields=["theme", "published_layout"],
-				as_list=True,
-			)
-		)
-		for name, cache_key in cache_keys.items():
-			published_layout = published_layouts.get(name)
-			cached[name] = {"layout": frappe.parse_json(published_layout) if published_layout else None}
-			frappe.cache.set_value(cache_key, cached[name])
-
-	return {name: entry["layout"] for name, entry in cached.items()}
-
-
-def read_published_layouts(theme_names, page):
-	"""The stored live layouts, read past the cache, for a save that must not trust it."""
-	stored = dict(
-		frappe.get_all(
-			"Theme Layout",
-			filters={"theme": ("in", theme_names), "page": page},
-			fields=["theme", "published_layout"],
-			as_list=True,
-		)
-	)
-	return {name: frappe.parse_json(stored[name]) if stored.get(name) else None for name in theme_names}
-
-
 def get_inherited_layout(theme_names, theme_dirs, page, cached=True):
 	"""The first theme's own layout, else the theme file, under the translation overlays of the themes
 	before it. Do not mutate the result: without overlays it is the cached layout."""
@@ -132,17 +98,6 @@ def get_page_layout(theme_context, page):
 
 def get_editor_preview():
 	return getattr(frappe.local, "theme_editor_preview", None)
-
-
-def clear_layout_cache(theme_name, page):
-	frappe.cache.delete_value(f"{LAYOUT_CACHE_PREFIX}{theme_name}:{page}")
-
-
-def clear_layout_cache_on_commit(theme_name, page):
-	"""Clear now for this request, and again after commit: a request that read the old row before
-	the commit may have cached it meanwhile."""
-	clear_layout_cache(theme_name, page)
-	frappe.db.after_commit.add(partial(clear_layout_cache, theme_name, page))
 
 
 def get_text(value):
