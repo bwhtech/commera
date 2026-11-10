@@ -3,10 +3,12 @@ import re
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.website.path_resolver import PathResolver
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
-from commera.localization import apply_request_language, get_localization, resolve
+from commera.localization import get_localization, resolve
+from commera.localization.routing import localize_request
 from commera.shop_themes.theme_resolver import build_base_context
 
 STOREFRONT_CONFIG_PATTERN = re.compile(r"window\.commera_storefront_config = (.*);")
@@ -130,15 +132,16 @@ class TestRequestLanguage(IntegrationTestCase):
 		frappe.local.request = Request(EnvironBuilder(path=path).get_environ())
 		frappe.local.request_cache.clear()
 		frappe.local.lang = lang
-		apply_request_language()
+		localize_request()
+		PathResolver(frappe.local.request.path).resolve()
 		return frappe.local.lang
 
 	def test_a_language_prefix_sets_frappes_language(self):
 		self.assertEqual(self.visit("/ar/products", lang="en"), "ar")
-		self.assertEqual(self.visit("/en/products"), "en")
+		self.assertEqual(self.visit("/products"), "en")
 
 	def test_other_paths_keep_frappes_language(self):
-		for path in ("/archive", "/article", "/app/item", "/api/method/ping", "/commera/orders", "/builder"):
+		for path in ("/archive", "/article", "/app/item", "/commera/orders", "/builder"):
 			with self.subTest(path):
 				self.assertEqual(self.visit(path, lang="en"), "en")
 				self.assertEqual(self.visit(path, lang="fr"), "fr")

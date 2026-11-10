@@ -1,4 +1,4 @@
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 
 import frappe
 from frappe import _
@@ -15,7 +15,6 @@ MAX_CART_LINES = 25
 
 
 def get_context(context):
-	redirect_to_language_route()
 	requested_quantities, notices = parse_cart_codes(frappe.form_dict.get("codes"))
 	context.lines = get_cart_lines(requested_quantities, notices)
 	context.notices = notices
@@ -23,19 +22,6 @@ def get_context(context):
 	context.next_url = (
 		get_next_url(frappe.form_dict.get("return_to")) if context.lines else f"/{frappe.local.lang}/cart"
 	)
-
-
-def redirect_to_language_route():
-	request = getattr(frappe.local, "request", None)
-	if not request or request.path.startswith(("/en/", "/ar/")):
-		return
-
-	# Not a website_redirects rule: that rebuilds the target from the decoded path, so a "?" in an item code
-	# would start the query string.
-	target = f"/en/cart/{quote(cstr(frappe.form_dict.get('codes')), safe=':,')}"
-	if query_string := frappe.safe_decode(request.query_string):
-		target = f"{target}?{query_string}"
-	frappe.redirect(target)
 
 
 def parse_cart_codes(codes: str | None) -> tuple[dict[str, int], list[str]]:

@@ -18,7 +18,9 @@ def get_docs_per_page():
 
 
 def get_language_prefixes():
-	return [language.code.lower() for language in StorefrontLanguages.load().published]
+	"""URL prefixes of the published languages. The default language has none."""
+	languages = StorefrontLanguages.load()
+	return [languages.prefix(language) for language in languages.published]
 
 
 SEGMENT_CONFIG = {
@@ -57,10 +59,10 @@ def format_lastmod(value):
 
 
 def add_localized(urls, path, lastmod, changefreq, priority):
-	for lang in get_language_prefixes():
+	for prefix in get_language_prefixes():
 		urls.append(
 			{
-				"loc": get_url(f"/{lang}{path}"),
+				"loc": get_url(f"{prefix}{path}" or "/"),
 				"lastmod": lastmod,
 				"changefreq": changefreq,
 				"priority": priority,

@@ -11,6 +11,8 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase, UnitTestCase
 from frappe.utils.jinja import get_jenv
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request
 
 import commera.sdk
 from commera.api.admin.theme import get_theme_settings_doctype
@@ -24,7 +26,6 @@ from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	validate_theme_name,
 )
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import (
-	LANG,
 	build_compiled_routes,
 	seed_default_routes,
 )
@@ -159,27 +160,29 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 		# after_install seeds these, but the site may have been installed before they shipped.
 		seed_default_routes()
 		compiled = build_compiled_routes()
-		matched_route, match = match_route(compiled["routes"], "en/products/some-slug")
+		matched_route, match = match_route(compiled["routes"], "products/some-slug")
 		self.assertIsNotNone(matched_route)
 		self.assertEqual(matched_route["template_path"], "pages/products/details.html")
 		self.assertEqual(match.group("route"), "some-slug")
 
-	def test_route_table_compiles_the_language_group_from_the_settings(self):
+	def test_route_patterns_match_the_path_without_its_language_prefix(self):
+		# A test site may still hold the routes from before the language patch.
+		settings = frappe.get_single("Shop Theme Settings")
+		settings.set("routes", [])
+		settings.save(ignore_permissions=True)
 		seed_default_routes()
-		use_storefront_languages(self, "en", published=("en", "fr"), unpublished=("he",))
 
 		routes = build_compiled_routes()["routes"]
 
-		for path in ("en/products/shoe", "fr/products/shoe", "he/products/shoe"):
-			self.assertEqual(match_route(routes, path)[1].group("lang"), path.split("/")[0])
-		self.assertIsNone(match_route(routes, "ar/products/shoe")[0])
-		# The stored patterns are not rewritten.
-		self.assertIn(rf"^{LANG}/products$", self.seeded_route_patterns())
+		self.assertEqual(match_route(routes, "")[0]["template_path"], "pages/index.html")
+		self.assertEqual(match_route(routes, "products")[0]["template_path"], "pages/products/list.html")
+		self.assertIsNone(match_route(routes, "en/products/shoe")[0])
+		self.assertIn(r"^products$", self.seeded_route_patterns())
 
 	def test_route_table_no_match_for_unknown_path(self):
 		seed_default_routes()
 		compiled = build_compiled_routes()
-		matched_route, _match = match_route(compiled["routes"], "en/not-a-real-route")
+		matched_route, _match = match_route(compiled["routes"], "not-a-real-route")
 		self.assertIsNone(matched_route)
 
 	def test_the_login_and_signup_routes_render_from_a_theme_that_ships_them(self):
@@ -229,34 +232,22 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 		settings = {"dynamic_pages_enabled": True}
 		self.assertFalse(is_dynamic_page(settings, "api/method/x"))
 
-	def test_is_dynamic_page_requires_a_known_language_prefix(self):
+	def test_is_dynamic_page_serves_any_unreserved_path(self):
 		settings = {"dynamic_pages_enabled": True}
-		self.assertFalse(is_dynamic_page(settings, "not-a-lang/foo"))
-		self.assertTrue(is_dynamic_page(settings, "en/foo"))
-
-	def test_is_dynamic_page_follows_the_published_languages(self):
-		settings = {"dynamic_pages_enabled": True}
-		use_storefront_languages(self, "en", published=("en", "fr"), unpublished=("de",))
-		self.addCleanup(frappe.set_user, frappe.session.user)
-
-		self.assertTrue(is_dynamic_page(settings, "fr/about"))
-		self.assertFalse(is_dynamic_page(settings, "ar/about"))
-		frappe.set_user("Guest")
-		self.assertFalse(is_dynamic_page(settings, "de/about"))
-		frappe.set_user("Administrator")
-		self.assertTrue(is_dynamic_page(settings, "de/about"))
+		self.assertTrue(is_dynamic_page(settings, "about"))
+		self.assertTrue(is_dynamic_page(settings, "lookbook/summer"))
+		self.assertFalse(is_dynamic_page(settings, ""))
 
 	def test_is_dynamic_page_rejects_traversal_segments(self):
 		# werkzeug percent-decodes before the renderer, so %2e%2e%2f arrives as ".." verbatim.
 		settings = {"routes": [], "dynamic_pages_enabled": True}
-		self.assertFalse(is_dynamic_page(settings, "en/../../../etc/passwd"))
-		self.assertFalse(is_dynamic_page(settings, "en/.."))
-		self.assertFalse(is_dynamic_page(settings, "../en/about"))
-		self.assertTrue(is_dynamic_page(settings, "en/about"))
+		self.assertFalse(is_dynamic_page(settings, "../../../etc/passwd"))
+		self.assertFalse(is_dynamic_page(settings, "about/.."))
+		self.assertTrue(is_dynamic_page(settings, "about"))
 
 	def test_is_dynamic_page_off_when_disabled(self):
 		settings = {"dynamic_pages_enabled": False}
-		self.assertFalse(is_dynamic_page(settings, "en/foo"))
+		self.assertFalse(is_dynamic_page(settings, "foo"))
 
 
 class IntegrationTestThemeShadowAudit(IntegrationTestCase):
@@ -569,7 +560,10 @@ class IntegrationTestThemedNotFound(IntegrationTestCase):
 
 	def test_a_guest_on_an_account_page_is_sent_to_the_theme_login(self):
 		os.makedirs(os.path.join(self.theme_dir, "pages", "account"))
-		renderer = ThemePageRenderer("en/account/orders")
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+		frappe.local.request = Request(EnvironBuilder(path="/ar/account/orders").get_environ())
+		renderer = ThemePageRenderer("account/orders")
 		renderer.theme_dirs = [self.theme_dir]
 		renderer.requires_auth = True
 		frappe.set_user("Guest")
@@ -580,7 +574,7 @@ class IntegrationTestThemedNotFound(IntegrationTestCase):
 		self.write_theme_file("pages/account/login.html", "login")
 		with self.assertRaises(frappe.Redirect):
 			renderer.render()
-		self.assertEqual(frappe.flags.redirect_location, "/en/account/login?redirect-to=/en/account/orders")
+		self.assertEqual(frappe.flags.redirect_location, "/ar/account/login?redirect-to=/ar/account/orders")
 
 
 class IntegrationTestThemeSettingsContext(IntegrationTestCase):

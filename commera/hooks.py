@@ -9,81 +9,35 @@ app_license = "agpl-3.0"
 required_apps = ["frappe/erpnext", "bwhtech/bwh_payments"]
 
 
+# Only language-independent rules: commera.localization.routing redirects /<default>/* and /account.
 website_redirects = [
-	{"source": "/products", "target": "/en/products"},
-	{"source": "/products/(.*)", "target": r"/en/products/\1"},
-	{"source": "/", "target": "/en"},
-	{"source": "/cart", "target": "/en/cart"},
-	{"source": "/cart/checkout", "target": "/en/cart/checkout"},
-	{"source": "/account", "target": "en/account/dashboard"},
-	{"source": "/account/(.*)", "target": r"/en/account/\1"},
-	{"source": "/en/account", "target": "/account/dashboard"},
-	{"source": "/ar/account", "target": "/account/dashboard"},
 	{"source": "/en-US/(.*)", "target": r"/en/\1"},
 	{"source": "/en-GB/(.*)", "target": r"/en/\1"},
 ]
 
-# website_path_resolver = "commera.utils.resolve_bilingual_path"
+# localize_request strips the language prefix off request.path before any app's path resolver runs,
+# so the route rules below match the path without it. resolve_website_path sends the canonical redirects.
+before_request = ["commera.localization.routing.localize_request"]
+website_path_resolver = "commera.localization.routing.resolve_website_path"
 
 website_route_rules = [
 	# SPA client-side routing: every /commera deep link resolves to the same shell so a reload does not 404.
 	{"from_route": "/commera/<path:app_path>", "to_route": "/commera"},
+	# -> Products
+	{"from_route": "/products", "to_route": "/products/list.html"},
+	{"from_route": "/products/<path:route>", "to_route": "/products/details.html"},
+	# -> Cart / Checkout
+	{"from_route": "/cart", "to_route": "/cart/cart.html"},
+	{"from_route": "/cart/checkout", "to_route": "/cart/checkout.html"},
 	{"from_route": "/cart/<path:codes>", "to_route": "/cart/permalink.html"},
-	# ------------
-	# English Routes
-	# ------------
-	#
-	# -> Landing
-	{"from_route": "/en", "to_route": "/index.html"},
-	# -> Products
-	{"from_route": "/en/products", "to_route": "/products/list.html"},
-	{"from_route": "/en/products/<path:route>", "to_route": "/products/details.html"},
-	# -> Cart / Checkout
-	{"from_route": "/en/cart", "to_route": "/cart/cart.html"},
-	{"from_route": "/en/cart/checkout", "to_route": "/cart/checkout.html"},
-	{"from_route": "/en/cart/<path:codes>", "to_route": "/cart/permalink.html"},
 	# -> Account
-	{"from_route": "/en/account/dashboard", "to_route": "/account/dashboard.html"},
-	{"from_route": "/en/account/profile", "to_route": "/account/profile.html"},
-	{"from_route": "/en/account/orders", "to_route": "/account/orders/index.html"},
-	{
-		"from_route": "/en/account/orders/confirmation",
-		"to_route": "/account/orders/confirmation.html",
-	},
-	{
-		"from_route": "/en/account/orders/detail",
-		"to_route": "/account/orders/detail.html",
-	},
-	{"from_route": "/en/account/wishlist", "to_route": "/account/wishlist.html"},
-	{"from_route": "/en/account/address", "to_route": "/account/address.html"},
-	#
-	# ------------
-	# Arabic Routes
-	# ------------
-	#
-	# -> Landing
-	{"from_route": "/ar", "to_route": "/index.html"},
-	# -> Products
-	{"from_route": "/ar/products", "to_route": "/products/list.html"},
-	{"from_route": "/ar/products/<path:route>", "to_route": "/products/details.html"},
-	# -> Cart / Checkout
-	{"from_route": "/ar/cart", "to_route": "/cart/cart.html"},
-	{"from_route": "/ar/cart/checkout", "to_route": "/cart/checkout.html"},
-	{"from_route": "/ar/cart/<path:codes>", "to_route": "/cart/permalink.html"},
-	# -> Account
-	{"from_route": "/ar/account/dashboard", "to_route": "/account/dashboard.html"},
-	{"from_route": "/ar/account/profile", "to_route": "/account/profile.html"},
-	{"from_route": "/ar/account/orders", "to_route": "/account/orders/index.html"},
-	{
-		"from_route": "/ar/account/orders/confirmation",
-		"to_route": "/account/orders/confirmation.html",
-	},
-	{
-		"from_route": "/ar/account/orders/detail",
-		"to_route": "/account/orders/detail.html",
-	},
-	{"from_route": "/ar/account/wishlist", "to_route": "/account/wishlist.html"},
-	{"from_route": "/ar/account/address", "to_route": "/account/address.html"},
+	{"from_route": "/account/dashboard", "to_route": "/account/dashboard.html"},
+	{"from_route": "/account/profile", "to_route": "/account/profile.html"},
+	{"from_route": "/account/orders", "to_route": "/account/orders/index.html"},
+	{"from_route": "/account/orders/confirmation", "to_route": "/account/orders/confirmation.html"},
+	{"from_route": "/account/orders/detail", "to_route": "/account/orders/detail.html"},
+	{"from_route": "/account/wishlist", "to_route": "/account/wishlist.html"},
+	{"from_route": "/account/address", "to_route": "/account/address.html"},
 	# ------------
 	# Crawl infrastructure (language-agnostic)
 	# ------------
@@ -91,7 +45,6 @@ website_route_rules = [
 	{"from_route": "/og-image/<path:route>", "to_route": "/og_image_render"},
 ]
 
-before_request = ["commera.utils.before_request"]
 on_session_creation = "commera.commera_ecommerce.doctype.commera_cart.commera_cart.keep_guest_cart"
 on_login = "commera.roles.save_commera_default_app"
 
@@ -181,6 +134,9 @@ commera_events = {
 
 
 doc_events = {
+	"Website Settings": {
+		"validate": "commera.localization.redirect_rules.canonicalize_redirect_targets",
+	},
 	"User": {
 		"before_insert": "commera.utils.prevent_welcome_email",
 	},

@@ -6,6 +6,7 @@ import unittest
 
 import frappe
 from frappe.tests import IntegrationTestCase, UnitTestCase
+from frappe.utils import get_url
 
 from commera import seo, website_context
 from commera.tests import get_test_configurator, get_test_item
@@ -90,25 +91,6 @@ class TestTruncateDescription(UnitTestCase):
 		self.assertNotIn("wor…", result)
 
 
-class TestLangSwap(UnitTestCase):
-	codes = ("en", "ar", "fr")
-
-	def test_swaps_a_language_prefix(self):
-		self.assertEqual(seo.swap_lang_in_path("/en/products/shoe", "ar", self.codes), "/ar/products/shoe")
-		self.assertEqual(seo.swap_lang_in_path("/ar/products/shoe", "fr", self.codes), "/fr/products/shoe")
-
-	def test_no_prefix_path_gets_lang_prepended(self):
-		self.assertEqual(seo.swap_lang_in_path("/foo", "en", self.codes), "/en/foo")
-		self.assertEqual(seo.swap_lang_in_path("/de/bar", "ar", self.codes), "/ar/de/bar")
-
-	def test_empty_path_fallback(self):
-		self.assertEqual(seo.swap_lang_in_path("", "en", self.codes), "/en/")
-		self.assertEqual(seo.swap_lang_in_path(None, "ar", self.codes), "/ar/")
-
-	def test_codes_become_lowercase_prefixes(self):
-		self.assertEqual(seo.swap_lang_in_path("/PT-BR/cart", "zh-TW", ("pt-BR",)), "/zh-tw/cart")
-
-
 class TestBuildAlternates(IntegrationTestCase):
 	def test_one_alternate_per_published_language_default_first(self):
 		use_storefront_languages(self, "en", published=("en", "ar", "fr"), unpublished=("de",))
@@ -117,7 +99,7 @@ class TestBuildAlternates(IntegrationTestCase):
 
 		self.assertEqual([alt["lang"] for alt in alternates], ["en", "ar", "fr"])
 		by_lang = {alt["lang"]: alt["href"] for alt in alternates}
-		self.assertTrue(by_lang["en"].endswith("/en/products/shoe"))
+		self.assertEqual(by_lang["en"], get_url("/products/shoe"))
 		self.assertTrue(by_lang["ar"].endswith("/ar/products/shoe"))
 		self.assertTrue(by_lang["fr"].endswith("/fr/products/shoe"))
 
@@ -127,6 +109,14 @@ class TestBuildAlternates(IntegrationTestCase):
 		alternates = seo.build_alternates("/en/products/shoe")
 
 		self.assertEqual([alt["lang"] for alt in alternates if alt["x_default"]], ["fr"])
+		self.assertEqual({alt["lang"]: alt["href"] for alt in alternates}["fr"], get_url("/products/shoe"))
+
+	def test_the_home_page_alternates_are_the_root_and_each_prefix(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+
+		hrefs = [alt["href"] for alt in seo.build_alternates("/")]
+
+		self.assertEqual(hrefs, [get_url("/"), get_url("/ar/")])
 
 	def test_the_hreflang_tags_carry_every_published_language(self):
 		use_storefront_languages(self, "en", published=("en", "ar", "fr"))
@@ -305,9 +295,10 @@ class TestUtilityPageNoindexInjection(IntegrationTestCase):
 		self.assertNotIn("seo", context)
 		self.assertNotIn("json_ld", context)
 
-	def test_unprefixed_utility_path_is_not_matched(self):
-		# The pattern is language-anchored; a bare /cart is not a storefront route.
-		self.assertNotIn("seo", self.run_context("/cart"))
+	def test_a_utility_path_of_the_default_language_has_no_prefix(self):
+		self.assertIs(self.run_context("/cart").seo["noindex"], True)
+		self.assertIs(self.run_context("/account/dashboard").seo["noindex"], True)
+		self.assertNotIn("seo", self.run_context("/products"))
 
 
 class SitemapFixtureMixin:
@@ -420,7 +411,7 @@ class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
 	def test_published_variant_present_in_both_languages(self):
 		# Freshly inserted rows sort newest-first, so the fixtures land on page 1.
 		locs = self.locs("products", 1)
-		self.assertIn(self.url(f"/en/products/{self.published_route}"), locs)
+		self.assertIn(self.url(f"/products/{self.published_route}"), locs)
 		self.assertIn(self.url(f"/ar/products/{self.published_route}"), locs)
 
 	def test_every_published_language_gets_a_url(self):
@@ -428,30 +419,30 @@ class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
 
 		locs = self.locs("products", 1)
 
-		for lang in ("en", "ar", "fr"):
-			self.assertIn(self.url(f"/{lang}/products/{self.published_route}"), locs)
+		for prefix in ("", "/ar", "/fr"):
+			self.assertIn(self.url(f"{prefix}/products/{self.published_route}"), locs)
 		self.assertNotIn(self.url(f"/de/products/{self.published_route}"), locs)
 		self.assertIn(self.url("/fr"), self.locs("pages", 1))
 
 	def test_noindex_variant_excluded(self):
 		locs = self.locs("products", 1)
-		self.assertNotIn(self.url(f"/en/products/{self.noindex_route}"), locs)
+		self.assertNotIn(self.url(f"/products/{self.noindex_route}"), locs)
 		self.assertNotIn(self.url(f"/ar/products/{self.noindex_route}"), locs)
 
 	def test_unpublished_variant_excluded(self):
 		locs = self.locs("products", 1)
-		self.assertNotIn(self.url(f"/en/products/{self.unpublished_route}"), locs)
+		self.assertNotIn(self.url(f"/products/{self.unpublished_route}"), locs)
 		self.assertNotIn(self.url(f"/ar/products/{self.unpublished_route}"), locs)
 
 	def test_enabled_category_present_noindex_excluded(self):
 		locs = self.locs("collections", 1)
-		self.assertIn(self.url(f"/en/products?category={self.category_slug}"), locs)
+		self.assertIn(self.url(f"/products?category={self.category_slug}"), locs)
 		self.assertIn(self.url(f"/ar/products?category={self.category_slug}"), locs)
-		self.assertNotIn(self.url(f"/en/products?category={self.noindex_category_slug}"), locs)
+		self.assertNotIn(self.url(f"/products?category={self.noindex_category_slug}"), locs)
 
 	def test_homepage_rides_first_pages_child(self):
 		locs = self.locs("pages", 1)
-		self.assertIn(self.url("/en"), locs)
+		self.assertIn(self.url("/"), locs)
 		self.assertIn(self.url("/ar"), locs)
 
 	def test_pages_segment_lists_published_indexable_shop_web_pages(self):
@@ -463,10 +454,10 @@ class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
 
 		locs = self.locs("pages", 1)
 
-		self.assertIn(self.url(f"/en/page/{shown.route}"), locs)
+		self.assertIn(self.url(f"/page/{shown.route}"), locs)
 		self.assertIn(self.url(f"/ar/page/{shown.route}"), locs)
 		for page in hidden:
-			self.assertNotIn(self.url(f"/en/page/{page.route}"), locs)
+			self.assertNotIn(self.url(f"/page/{page.route}"), locs)
 
 	def make_page(self, label, published, noindex):
 		suffix = frappe.generate_hash(length=6)

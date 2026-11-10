@@ -76,12 +76,6 @@ def get_complete_nested_links(parent_group):
 	return list(all_links)
 
 
-def before_request():
-	from commera.localization import apply_request_language
-
-	apply_request_language()
-
-
 def get_nested_links(link_doctype, link_name):
 	"`get_nested_links` from erpnext, but with permissions ignored!"
 	return _get_nested_links(link_doctype, link_name, ignore_permissions=True)

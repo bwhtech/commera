@@ -3,14 +3,15 @@ from urllib.parse import parse_qsl, urlsplit
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.website.page_renderers.redirect_page import RedirectPage
 from frappe.website.path_resolver import PathResolver
 from frappe.website.serve import get_response_content
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
 from commera.api.cart import update_variant
+from commera.localization.routing import localize_request
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import DEFAULT_ROUTES
+from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.utils import get_country_list
 from commera.www.cart import permalink
@@ -147,7 +148,7 @@ class TestCartPermalinkPage(ProductDetailPriceTestCase):
 		self.assertEqual(context.next_url, "/en/cart")
 
 	def test_link_with_nothing_to_add_says_so_instead_of_waiting(self):
-		html = get_response_content("en/cart/,,,")
+		html = get_response_content("cart/,,,")
 
 		self.assertIn("This cart link has nothing to add", html)
 		self.assertNotIn("Adding the products to your bag", html)
@@ -207,24 +208,6 @@ class TestCartPermalinkPage(ProductDetailPriceTestCase):
 			self.assertEqual(dict(parse_qsl(urlsplit(context.next_url).query)), {"discount": "SUMMER10"})
 
 
-class TestBareCartLink(IntegrationTestCase):
-	def test_bare_link_redirects_to_english_keeping_item_codes_and_query_encoded(self):
-		frappe.local.request = Request(
-			EnvironBuilder(
-				path="/cart/Will%20You%20Commit%3F-OS:2", query_string="discount=A&utm_source=x"
-			).get_environ()
-		)
-		self.addCleanup(delattr, frappe.local, "request")
-		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
-		frappe.local.form_dict = frappe._dict(codes="Will You Commit?-OS:2")
-
-		with self.assertRaises(frappe.Redirect):
-			permalink.get_context(frappe._dict())
-		self.assertEqual(
-			frappe.flags.redirect_location, "/en/cart/Will%20You%20Commit%3F-OS:2?discount=A&utm_source=x"
-		)
-
-
 class TestGuestCheckoutRedirect(IntegrationTestCase):
 	def test_guest_sent_back_to_the_cart_keeps_the_query_string(self):
 		frappe.local.request = Request(
@@ -246,24 +229,27 @@ class TestCartRoutes(IntegrationTestCase):
 		self.addCleanup(delattr, frappe.local, "request")
 		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
 		frappe.local.form_dict = frappe._dict()
-		return PathResolver(path).resolve()
+		localize_request()
+		return PathResolver(frappe.local.request.path).resolve()
 
 	def test_checkout_is_not_taken_for_a_cart_link(self):
-		endpoint, _ = self.resolve("en/cart/checkout")
+		endpoint, _ = self.resolve("cart/checkout")
 
 		self.assertEqual(endpoint, "/cart/checkout.html")
 
 	def test_a_cart_link_resolves_to_the_permalink_page_with_its_codes(self):
-		endpoint, _ = self.resolve("en/cart/X:1,Y:2")
+		endpoint, _ = self.resolve("cart/X:1,Y:2")
 
 		self.assertEqual(endpoint, "/cart/permalink.html")
 		self.assertEqual(frappe.form_dict.codes, "X:1,Y:2")
 
-	def test_bare_checkout_still_redirects_to_english(self):
-		_, renderer = self.resolve("cart/checkout")
+	def test_an_arabic_cart_link_keeps_its_codes(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
 
-		self.assertIsInstance(renderer, RedirectPage)
-		self.assertEqual(frappe.flags.redirect_location, "/en/cart/checkout")
+		endpoint, _ = self.resolve("ar/cart/X:1")
+
+		self.assertEqual(endpoint, "/cart/permalink.html")
+		self.assertEqual(frappe.form_dict.codes, "X:1")
 
 	def test_theme_permalink_route_leaves_checkout_alone(self):
 		[pattern] = [
@@ -272,8 +258,8 @@ class TestCartRoutes(IntegrationTestCase):
 			if route["template_path"] == "pages/cart/permalink.html"
 		]
 
-		self.assertIsNone(pattern.match("en/cart/checkout"))
-		self.assertEqual(pattern.match("en/cart/X:1")["codes"], "X:1")
+		self.assertIsNone(pattern.match("cart/checkout"))
+		self.assertEqual(pattern.match("cart/X:1")["codes"], "X:1")
 
 
 class TestCheckoutPrefill(IntegrationTestCase):

@@ -7,7 +7,6 @@ from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
 from commera.patches.seed_shop_web_page_route import execute as seed_shop_web_page_route
-from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import LANG
 from commera.www.shop_web_page import index as www_shop_web_page
 
 ENGLISH_CONTENT = "<p>Free returns within 30 days.</p>"
@@ -105,4 +104,4 @@ class TestShopWebPageThemedRoute(IntegrationTestCase):
 		seed_shop_web_page_route()
 
 		patterns = {row.url_pattern for row in frappe.get_single("Shop Theme Settings").routes}
-		self.assertIn(rf"^{LANG}/page/(?P<route>.+)$", patterns)
+		self.assertIn(r"^page/(?P<route>.+)$", patterns)

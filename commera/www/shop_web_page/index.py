@@ -5,6 +5,7 @@ from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import (
 	get_page_by_route,
 	get_page_content,
 )
+from commera.localization import get_request_path
 
 # An unpublished page renders for its editors only, so this response is user-specific.
 no_cache = True
@@ -32,7 +33,7 @@ def build_page_context(context):
 
 	context.page = page
 	context.content = get_page_content(page)
-	context.breadcrumbs = [{"label": page.name, "href": frappe.request.path}]
+	context.breadcrumbs = [{"label": page.name, "href": get_request_path()}]
 	context.seo = seo.build_page_seo(page, display_name=page.name)
 	context.json_ld = [seo.build_breadcrumb_json_ld(context.breadcrumbs)]
 	return True

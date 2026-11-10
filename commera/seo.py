@@ -4,7 +4,7 @@ import frappe
 from frappe.utils import cstr, flt, get_url, strip_html_tags
 
 from commera.branding import get_configured_brand_assets
-from commera.localization import StorefrontLanguages
+from commera.localization import StorefrontLanguages, get_request_path, strip_language_prefix
 from commera.utils import get_store_currency
 
 META_DESCRIPTION_MAX_LENGTH = 160
@@ -37,10 +37,7 @@ def truncate_description(text):
 
 
 def current_request_url():
-	path = getattr(frappe.local, "request", None)
-	if path and getattr(path, "path", None):
-		return get_url(frappe.local.request.path)
-	return get_url()
+	return get_url(get_request_path() or None)
 
 
 def get_store_name():
@@ -77,26 +74,14 @@ def get_site_currency():
 	return get_store_currency()
 
 
-def swap_lang_in_path(path, target_lang, language_codes):
-	"""`path` under the `target_lang` prefix. A first segment in `language_codes` is replaced."""
-	target_lang = target_lang.lower()
-	if not path:
-		return f"/{target_lang}/"
-	parts = path.split("/")
-	if len(parts) > 1 and parts[1].lower() in {code.lower() for code in language_codes}:
-		parts[1] = target_lang
-		return "/".join(parts)
-	return f"/{target_lang}{path}"
-
-
 def build_alternates(path):
 	"""One hreflang entry per published language, default first. The default is the x-default target."""
 	languages = StorefrontLanguages.load()
-	configured = [language.code for language in languages.configured]
+	_language, path = strip_language_prefix(path or "/", include_unpublished=True)
 	return [
 		{
 			"lang": language.code,
-			"href": get_url(swap_lang_in_path(path, language.code, configured)),
+			"href": get_url(languages.prefix(language) + path),
 			"x_default": language == languages.default,
 		}
 		for language in languages.published
@@ -131,7 +116,7 @@ def build_product_seo(
 	og_override = product_variant.get("og_image")
 	resolved_image = absolute_url(og_override or image_url or DEFAULT_OG_IMAGE)
 
-	request_path = frappe.local.request.path if getattr(frappe.local, "request", None) else ""
+	request_path = get_request_path()
 	canonical = get_url(request_path) if request_path else current_request_url()
 
 	return {
@@ -178,7 +163,7 @@ def build_product_json_ld(
 	)
 	image_list = [absolute_url(image) for image in (images or []) if image]
 
-	request_path = frappe.local.request.path if getattr(frappe.local, "request", None) else ""
+	request_path = get_request_path()
 	product_url = get_url(request_path) if request_path else current_request_url()
 
 	sku = product.get("item_code") or product_variant.get("item_style")
@@ -287,7 +272,7 @@ def build_page_seo(source, display_name=None, page_type="website"):
 
 	image = source.get("og_image") or settings.get("default_share_image") or DEFAULT_OG_IMAGE
 
-	request_path = frappe.local.request.path if getattr(frappe.local, "request", None) else ""
+	request_path = get_request_path()
 	canonical = get_url(request_path) if request_path else current_request_url()
 
 	return {
@@ -331,7 +316,7 @@ def build_collection_seo(category, breadcrumbs, total_count=0, lang="en", image_
 		None if category else settings.get("product_list_og_image")
 	)
 
-	request_path = frappe.local.request.path if getattr(frappe.local, "request", None) else ""
+	request_path = get_request_path()
 	canonical = get_url(request_path) if request_path else current_request_url()
 
 	return {
@@ -352,7 +337,7 @@ def build_collection_json_ld(category, breadcrumbs, total_count=0):
 	store_name = get_store_name()
 	name = f"{category} | {store_name}" if category else f"Products | {store_name}"
 
-	request_path = frappe.local.request.path if getattr(frappe.local, "request", None) else ""
+	request_path = get_request_path()
 	page_url = get_url(request_path) if request_path else current_request_url()
 
 	return {

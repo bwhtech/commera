@@ -2,17 +2,21 @@ import frappe
 from frappe.website.utils import build_response
 
 from commera.api.permission import has_app_permission
-from commera.localization import StorefrontLanguages
+from commera.localization import StorefrontLanguages, get_request_path, strip_language_prefix
+from commera.localization.routing import is_page_path
 
 SETTINGS_DOCTYPE = "Commera Settings"
 
-# Unprefixed www pages render without the language prefix; sitemap* and llms.txt list the catalogue.
+# First segments of the storefront pages after the language prefix; sitemap* and llms.txt list the catalogue.
 STOREFRONT_SEGMENTS = frozenset(
 	{
 		"",
 		"index",
+		"products",
 		"cart",
 		"account",
+		"page",
+		"track-order",
 		"storefront-cart",
 		"storefront-login",
 		"og-image",
@@ -34,12 +38,21 @@ def is_storefront_published() -> bool:
 
 
 def is_storefront_path(path: str) -> bool:
+	"""A language-prefixed page path, a storefront page or a page of the active theme.
+	The theme test takes the path as is: the renderer keeps the prefix of /ar/private/x too."""
+	path = "/" + path.strip("/")
+	language, rest = strip_language_prefix(path, include_unpublished=True)
+	if language and is_page_path(rest):
+		return True
 	segment = path.strip("/").split("/", 1)[0]
-	return (
-		segment in STOREFRONT_SEGMENTS
-		or segment.startswith("sitemap")
-		or bool(StorefrontLanguages.load().find(segment, include_unpublished=True))
-	)
+	return segment in STOREFRONT_SEGMENTS or segment.startswith("sitemap") or has_theme_page(path)
+
+
+def has_theme_page(path: str) -> bool:
+	"""A page of the active theme at `path` in the default language, which has no prefix."""
+	from commera.shop_themes.theme_resolver import find_theme_page
+
+	return find_theme_page(path.strip("/"), StorefrontLanguages.load().default.code) is not None
 
 
 class PrivateStorefrontPage:
@@ -47,9 +60,8 @@ class PrivateStorefrontPage:
 		self.path = path
 
 	def can_render(self):
-		request = getattr(frappe.local, "request", None)
-		path = request.path if request else self.path
-		if not is_storefront_path(path) or is_storefront_published():
+		path = get_request_path() or self.path
+		if is_storefront_published() or not is_storefront_path(path):
 			return False
 		return frappe.session.user == "Guest" or not has_app_permission()
 
