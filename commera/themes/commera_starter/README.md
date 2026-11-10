@@ -48,3 +48,9 @@ Fields in other tabs are not variables; read them in templates as `theme.<field>
 	--color-primary: var(--theme-primary-color, #111827);
 }
 ```
+
+## Languages
+
+Write interface text in `_()` and links with `url()`.
+Use logical CSS properties, such as `margin-inline-start`, so that the layout flips in a right-to-left language.
+See [Localized themes](https://github.com/bwhtech/commera/blob/develop/docs/themes/localization.md).
