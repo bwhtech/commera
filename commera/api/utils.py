@@ -4,7 +4,6 @@ import frappe
 from erpnext.controllers.website_list_for_contact import get_transaction_list
 from frappe import _
 from frappe.rate_limiter import rate_limit
-from frappe.translate import get_all_translations
 
 from commera.commera_ecommerce.doctype.landing_page_settings.landing_page_settings import (
 	get_translated_landing_page,
@@ -139,12 +138,6 @@ def notify_user_product(item: str):
 			).insert()
 	except Exception:
 		frappe.throw(_("Cannot subscribe for notification"))
-
-
-# UI strings, the same data frappe's own get_boot_translations serves guests.
-@frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
-def get_translations(lang: str = "ar"):
-	return get_all_translations(lang=lang)
 
 
 @frappe.whitelist()

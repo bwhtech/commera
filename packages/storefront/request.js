@@ -1,4 +1,5 @@
 import { get_request_params } from './localization.js';
+import { t } from './translate.js';
 
 const API_ROOT = '/api/v2/method/commera.api.storefront';
 const STATUS_MESSAGES = { 403: 'Not permitted.', 404: 'Not found.' };
@@ -55,7 +56,7 @@ async function request(url, { headers = {}, ...options }) {
 	});
 	const body = await read_json(response);
 	if (body === null && response.ok) {
-		throw new StorefrontError('The store sent an unexpected response.', {
+		throw new StorefrontError(t('The store sent an unexpected response.'), {
 			status: response.status,
 		});
 	}
@@ -73,7 +74,7 @@ async function send(url, options) {
 	try {
 		return await fetch(url, options);
 	} catch (error) {
-		throw new StorefrontError('Could not reach the store.', {
+		throw new StorefrontError(t('Could not reach the store.'), {
 			status: 0,
 			cause: error,
 		});
@@ -94,9 +95,9 @@ function get_error_message(body, response) {
 		error.message ||
 			body.messages?.[0]?.message ||
 			error.exception?.trim().split('\n').pop() ||
-			STATUS_MESSAGES[response.status] ||
+			t(STATUS_MESSAGES[response.status] ?? '') ||
 			response.statusText ||
-			'Request failed',
+			t('Request failed'),
 	);
 }
 

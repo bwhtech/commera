@@ -331,8 +331,8 @@
 			},
 
 			item_state_label(item_code) {
-				if (this.returned_item_codes.includes(item_code)) return this.$store.i18n.t('Returned');
-				return this.$store.i18n.t('Processing');
+				if (this.returned_item_codes.includes(item_code)) return commera.t('Returned');
+				return commera.t('Processing');
 			},
 
 			async get_returned_items() {
@@ -360,18 +360,18 @@
 					return;
 				}
 				this.action_status = 'leaving';
-				toast(this.$store.i18n.t('Order cancelled successfully!'), { type: 'success' });
+				toast(commera.t('Order cancelled successfully!'), { type: 'success' });
 				window.location.reload();
 			},
 
 			async save_return_request() {
 				if (!this.selected_item_codes.length) {
-					toast(this.$store.i18n.t('Please select at least one item to return.'), { type: 'warning' });
+					toast(commera.t('Please select at least one item to return.'), { type: 'warning' });
 					return;
 				}
 				const missing_reason = this.selected_item_codes.some((item_code) => !this.return_reasons_by_item[item_code]);
 				if (missing_reason) {
-					toast(this.$store.i18n.t('Reason is required.'), { type: 'warning' });
+					toast(commera.t('Reason is required.'), { type: 'warning' });
 					return;
 				}
 				if (this.action_status !== 'idle' || this.returns_status !== 'ready') return;
@@ -390,7 +390,7 @@
 					return;
 				}
 				this.action_status = 'leaving';
-				toast(this.$store.i18n.t('Return raised successfully!'), { type: 'success' });
+				toast(commera.t('Return raised successfully!'), { type: 'success' });
 				window.location.reload();
 			}
 		}));

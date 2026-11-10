@@ -64,7 +64,7 @@
 					value = Math.floor(value / size);
 					unit = name;
 				}
-				if (unit === 'second' && value < 10) return Alpine.store('i18n').t('Just now');
+				if (unit === 'second' && value < 10) return commera.t('Just now');
 				const rtf = new Intl.RelativeTimeFormat(document.documentElement.lang || 'en', { numeric: 'auto' });
 				return rtf.format(-value, unit);
 			},
@@ -86,7 +86,7 @@
 
 			async submit_review() {
 				if (!this.form_rating) {
-					toast(Alpine.store('i18n').t('Please select a rating'), { type: 'warning' });
+					toast(commera.t('Please select a rating'), { type: 'warning' });
 					return;
 				}
 				if (this.review_step !== 'compose') return;
@@ -108,7 +108,7 @@
 						comment: this.form_comment,
 						is_published: false,
 					};
-					toast(Alpine.store('i18n').t('Thanks! Your review is waiting for approval.'), { type: 'success' });
+					toast(commera.t('Thanks! Your review is waiting for approval.'), { type: 'success' });
 				} catch (error) {
 					this.review_step = 'compose';
 				}
@@ -127,7 +127,7 @@
 
 			async save_review() {
 				if (!this.form_rating) {
-					toast(Alpine.store('i18n').t('Please select a rating'), { type: 'warning' });
+					toast(commera.t('Please select a rating'), { type: 'warning' });
 					return;
 				}
 				if (this.review_step !== 'editing') return;
@@ -148,7 +148,7 @@
 					this.histogram = response.data.histogram;
 					this.my_review = response.data.my_review;
 					this.review_step = 'submitted';
-					toast(Alpine.store('i18n').t('Thanks! Your review is waiting for approval.'), { type: 'success' });
+					toast(commera.t('Thanks! Your review is waiting for approval.'), { type: 'success' });
 				} catch (error) {
 					this.review_step = 'editing';
 				}

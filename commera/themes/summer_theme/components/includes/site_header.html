@@ -89,13 +89,8 @@
 									language_open: false,
 									current_language: '{{ localization.language.code.lower() }}',
 									root_prefix: '{{ localization.root_prefix }}',
-									async change_language(language) {
+									change_language(language) {
 										if (language === this.current_language) return;
-										/* The cached bundle is per language, so it has to be dropped before the
-										   next page reads it back out of localStorage. */
-										Alpine.store('i18n').i18n = {};
-										Alpine.store('i18n').lastFetched = null;
-										await Alpine.store('i18n').init();
 										window.location.href = `/${language}${window.location.pathname.slice(this.root_prefix.length)}`;
 									},
 								}">

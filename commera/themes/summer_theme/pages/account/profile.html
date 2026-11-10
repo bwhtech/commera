@@ -33,7 +33,7 @@
 						last_name: this.profile.last_name,
 						mobile_no: this.profile.mobile_no,
 					}, "PUT");
-					toast(this.$store.i18n.t("Profile updated successfully"), { type: "success" });
+					toast(commera.t("Profile updated successfully"), { type: "success" });
 // The header and the sidebar render the name server-side, so they only pick it up on a reload.
 					window.location.reload();
 				} catch (error) {
@@ -96,7 +96,7 @@
 			<div class="alert alert-danger">
 				<ul class="mb-0">
 					<template x-for="error in errors" :key="error">
-						<li x-text="$store.i18n.t(error)"></li>
+						<li x-text="commera.t(error)"></li>
 					</template>
 				</ul>
 			</div>
@@ -104,7 +104,7 @@
 
 		<div class="col-12">
 			<button class="btn btn-primary" type="submit" :disabled="saving">
-				<span x-text="saving ? $store.i18n.t('Saving...') : $store.i18n.t('Update profile')">{{ _("Update profile") }}</span>
+				<span x-text="saving ? commera.t('Saving...') : commera.t('Update profile')">{{ _("Update profile") }}</span>
 			</button>
 		</div>
 	</form>

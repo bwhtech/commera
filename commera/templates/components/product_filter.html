@@ -65,7 +65,7 @@
             <div class="border-b border-gray-300">
                 <button @click="current_tab = (current_tab === key) ? null : key"
                     class="flex w-full items-center justify-between py-4 text-lg font-medium cursor-pointer">
-                    <span x-text="$store.i18n.t(format_key(key))"></span>
+                    <span x-text="commera.t(format_key(key))"></span>
                     <svg class="w-5 h-5 transition-transform duration-200"
                         :class="{ 'rotate-180': current_tab === key }" xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 20 20" fill="currentColor">
@@ -84,7 +84,7 @@
                                     :checked="is_checked(key, option, false)"
                                     class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                 <label :for="`${key}-${option}-${index}`" class="ms-2 text-sm text-gray-700 capitalize"
-                                    x-text="$store.i18n.t(option)"></label>
+                                    x-text="commera.t(option)"></label>
                             </div>
                         </template>
                     </div>
@@ -101,7 +101,7 @@
                             <div x-data="{ open: false }">
                                 <div x-show="!node.is_leaf" class="flex items-center">
                                     <span class="flex items-center text-gray-800 font-semibold"
-                                        x-text="$store.i18n.t(node.display_name)"></span>
+                                        x-text="commera.t(node.display_name)"></span>
 
                                 </div>
 
@@ -111,7 +111,7 @@
                                         :checked="is_checked(key, node.item_groups, true)"
                                         class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                     <label :for="`${key}-${node_index}`" class="ms-2 text-sm text-gray-700 capitalize"
-                                        x-text="$store.i18n.t(node.display_name)"></label>
+                                        x-text="commera.t(node.display_name)"></label>
                                 </div>
 
                                 <div class="pl-3 mt-2 space-y-2">
@@ -122,7 +122,7 @@
                                                 <button @click="childOpen = !childOpen"
                                                     class="flex items-center text-gray-800 font-medium">
                                                  
-                                                    <span x-text="$store.i18n.t(child.display_name)"></span>
+                                                    <span x-text="commera.t(child.display_name)"></span>
                                                 </button>
                                             </div>
 
@@ -135,7 +135,7 @@
                                                     class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                                 <label :for="`${key}-${node_index}-${child_index}`"
                                                     class="ms-2 text-sm text-gray-700 capitalize"
-                                                    x-text="$store.i18n.t(child.display_name)"></label>
+                                                    x-text="commera.t(child.display_name)"></label>
                                             </div>
 
                                             <div class="pl-3 mt-2 space-y-2">
@@ -151,7 +151,7 @@
                                                         <label
                                                             :for="`${key}-${node_index}-${child_index}-${grandchild_index}`"
                                                             class="ms-2 text-sm text-gray-700 capitalize"
-                                                            x-text="$store.i18n.t(grandchild.display_name)"></label>
+                                                            x-text="commera.t(grandchild.display_name)"></label>
                                                     </div>
                                                 </template>
                                             </div>
@@ -195,11 +195,11 @@
                     // An out-of-range value is pulled back into range and applied, so the box and the results agree.
                     validate_min() {
                         if (this.min < this.min_price) {
-                            this.error_min = $store.i18n.t('Min price must be at least')
+                            this.error_min = commera.t('Min price must be at least')
                             this.error_min += ` ${this.min_price}`;
                             this.min = this.min_price;
                         } else if (this.min > this.max) {
-                            this.error_min = $store.i18n.t('Min price cannot exceed max price');
+                            this.error_min = commera.t('Min price cannot exceed max price');
                             this.min = this.max;
                         } else {
                             this.error_min = '';
@@ -209,11 +209,11 @@
                     },
                     validate_max() {
                         if (this.max > this.max_price) {
-                            this.error_max = $store.i18n.t('Max price cannot exceed')
+                            this.error_max = commera.t('Max price cannot exceed')
                             this.error_max += ` ${this.max_price}`;
                             this.max = this.max_price;
                         } else if (this.max < this.min) {
-                            this.error_max = $store.i18n.t('Max price must exceed min price');
+                            this.error_max = commera.t('Max price must exceed min price');
                             this.max = this.min;
                         } else {
                             this.error_max = '';

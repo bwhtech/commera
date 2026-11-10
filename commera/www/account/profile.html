@@ -48,7 +48,7 @@ x-data=
         x-transition.origin.top>
         <ul>
             <template x-for="error in errors" :key="error">
-                <li class="text-sm"> <span x-text="$store.i18n.t(error)"></span></li>
+                <li class="text-sm"> <span x-text="commera.t(error)"></span></li>
             </template>
         </ul>
     </div>
@@ -91,7 +91,7 @@ x-data=
             spinner.classList.remove("hidden");
             try {
                 const response = await frappe_call(api_url, payload, "PUT");
-                const message= $store.i18n.t("Profile updated successfully")
+                const message= commera.t("Profile updated successfully")
                 toast(message, { type: "success" })
                 await new Promise(resolve => setTimeout(resolve, 400));
                 window.location.reload()

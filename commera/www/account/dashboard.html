@@ -54,7 +54,7 @@
                     <div class="md:mt-5">
                     
                         <div class="text-sm gap-2 flex flex-col">
-                            <p class="text-secondary-accent font-medium text-base" :title="item.brand" x-text="$store.i18n.t(item.brand)"></p>
+                            <p class="text-secondary-accent font-medium text-base" :title="item.brand" x-text="commera.t(item.brand)"></p>
                             <p>
                                 {% if frappe.lang == "en" %}
                                 <span x-text="item.item_name"></span>
@@ -62,7 +62,7 @@
                             
                                 {% else %}
                                 <span x-text="item.title || item.item_name"></span>
-                                <span x-text="$store.i18n.t(item.attribute_value)"></span>
+                                <span x-text="commera.t(item.attribute_value)"></span>
                                 {% endif %}
                             </p>
 

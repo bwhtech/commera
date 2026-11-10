@@ -85,7 +85,7 @@
 <div class="account-card" x-data='summer_account_addresses({{ {"doctype": party_doctype, "name": party_name} | tojson }})'>
 
 	<form x-show="form" x-cloak @submit.prevent="save()">
-		<h6 class="m-b25" x-text="form &amp;&amp; form.name ? $store.i18n.t('Edit Address') : $store.i18n.t('Add New Address')">{{ _("Add New Address") }}</h6>
+		<h6 class="m-b25" x-text="form &amp;&amp; form.name ? commera.t('Edit Address') : commera.t('Add New Address')">{{ _("Add New Address") }}</h6>
 		<template x-if="form">
 			<div class="row">
 				<div class="col-lg-6">
@@ -154,7 +154,7 @@
 			</div>
 		</template>
 		<button class="btn btn-primary me-3" type="submit" :disabled="saving">
-			<span x-text="saving ? $store.i18n.t('Saving...') : $store.i18n.t('Save Address')">{{ _("Save Address") }}</span>
+			<span x-text="saving ? commera.t('Saving...') : commera.t('Save Address')">{{ _("Save Address") }}</span>
 		</button>
 		<button class="btn btn-outline-secondary" type="button" :disabled="saving" @click="reset()">{{ _("Cancel") }}</button>
 	</form>

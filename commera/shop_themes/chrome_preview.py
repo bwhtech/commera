@@ -16,6 +16,7 @@ from commera.shop_themes.doctype.shop_theme.shop_theme import (
 )
 from commera.shop_themes.jinja_helpers import get_shop_theme_settings
 from commera.shop_themes.render import render_themed_template
+from commera.shop_themes.storefront_header import render_storefront_header
 from commera.shop_themes.theme_resolver import build_base_context, find_theme_file, run_page_controller
 from commera.store_frame import get_preview_shop_details
 
@@ -164,5 +165,6 @@ def get_preview_context(preview_settings, lang):
 		preview_theme_css=preview_settings.generate_theme_css(),
 		# The default theme's base renders a breadcrumb outside any block, guarded only by this.
 		show_breadcrumb=False,
-		commera_header_content="",
+		# Theme chrome calls commera.t(); the editor frame registers no WebMCP tools.
+		commera_header_content=render_storefront_header(localization, webmcp=False),
 	)

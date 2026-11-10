@@ -37,7 +37,7 @@
         this.qty +=1; 
     }
     else { 
-        const message = $store.i18n.t("Only") + " " + this.max_qty + " " + $store.i18n.t("left in stock");
+        const message = commera.t("Only {0} left", this.max_qty);
         toast(message, { type: "warning" }); 
         } 
     },

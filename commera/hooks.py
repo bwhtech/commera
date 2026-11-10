@@ -311,6 +311,7 @@ jinja = {
 		"commera.shop_themes.jinja_helpers.shop_theme_config",
 		"commera.shop_themes.jinja_helpers.format_shop_theme_css",
 		"commera.shop_themes.sections.render_layout",
+		"commera.shop_themes.storefront_header.render_storefront_header",
 		"commera.storefront_plugins.format_plugin_includes",
 		"commera.storefront_plugins.plugin_slot",
 	],
