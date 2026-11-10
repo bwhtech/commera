@@ -86,7 +86,10 @@ def strip_fmt_money_symbol(formatted: str, currency: str) -> str:
 	if frappe.defaults.get_global_default("hide_currency_symbol") in ("1", "Yes"):
 		return formatted
 	symbol = _(frappe.db.get_value("Currency", currency, "symbol", cache=True) or currency)
-	return formatted.removeprefix(f"{symbol} ").removesuffix(f" {symbol}")
+	# Only the side fmt_money used: a symbol made of digits could match the amount's other end.
+	if frappe.db.get_value("Currency", currency, "symbol_on_right", cache=True):
+		return formatted.removesuffix(f" {symbol}")
+	return formatted.removeprefix(f"{symbol} ")
 
 
 def split_sign(formatted: str) -> tuple[str, str]:

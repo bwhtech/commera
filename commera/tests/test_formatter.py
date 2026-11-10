@@ -142,6 +142,18 @@ class TestFormatterSources(IntegrationTestCase):
 			self.assertEqual(self.formatter.money(1.2, "KWD"), f"{get_currency_symbol('KWD')}1.200")
 			self.assertEqual(self.formatter.money(1.2, "USD"), f"{get_currency_symbol('USD')}1.20")
 
+	def test_only_the_symbol_fmt_money_added_is_removed(self):
+		# A symbol made of digits must not eat the amount's other end.
+		for on_right, formatted, expected in ((0, "123 1 123", "1 123"), (1, "123 1 123", "123 1")):
+			values = {"symbol": "123", "symbol_on_right": on_right}
+			with (
+				self.subTest(on_right=on_right),
+				patch.object(
+					frappe.db, "get_value", side_effect=lambda _dt, _dn, field, **_kw: values[field]
+				),
+			):
+				self.assertEqual(formatter_module.strip_fmt_money_symbol(formatted, "XTS"), expected)
+
 	def test_currency_precision_wins_over_the_number_format(self):
 		with self.change_money_settings(use_number_format_from_currency=1, currency_precision="0"):
 			self.assertEqual(self.formatter.money(1234567.4, "INR"), f"{self.symbol}1,234,567")

@@ -128,3 +128,13 @@ test('an unknown number format falls back to the default', () => {
 		'1,234,567',
 	);
 });
+
+test('decimal.js avoids syntax the ES2015 dashboard build cannot keep for BigInt', () => {
+	// esbuild turns ** into Math.pow, which throws on a BigInt, and cannot lower 52n at all.
+	const code = readFileSync(new URL('../decimal.js', import.meta.url), 'utf8')
+		.split('\n')
+		.filter((line) => !line.trim().startsWith('//'))
+		.join('\n');
+	assert.doesNotMatch(code, /\*\*/);
+	assert.doesNotMatch(code, /\b\d+n\b/);
+});
