@@ -1,16 +1,21 @@
+import os
+import shutil
+import tempfile
 from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.website.page_renderers.not_found_page import NotFoundPage
+from frappe.website.page_renderers.not_permitted_page import NotPermittedPage
 from frappe.website.page_renderers.redirect_page import RedirectPage
 from frappe.website.path_resolver import PathResolver, resolve_path
 from frappe.website.serve import get_response
+from werkzeug.exceptions import HTTPException
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
 from commera import seo
-from commera.localization import get_localization, get_request_path
+from commera.localization import get_localization, get_localized_request, get_request_path
 from commera.localization.routing import localize_request
 from commera.patches.drop_language_from_theme_routes import execute as drop_language_from_theme_routes
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import (
@@ -18,7 +23,7 @@ from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import 
 	build_compiled_routes,
 	clear_settings_cache,
 )
-from commera.shop_themes.theme_resolver import match_route
+from commera.shop_themes.theme_resolver import ThemePageRenderer, match_route
 from commera.tests.test_localization import use_storefront_languages
 
 
@@ -55,11 +60,28 @@ class RoutingTestCase(IntegrationTestCase):
 		self.assertEqual(served, endpoint)
 		self.assertEqual(frappe.local.lang, lang)
 
+	def respond(self, url):
+		"""The response frappe.app sends: it returns an HTTPException raised in before_request as is."""
+		try:
+			self.set_request(url)
+		except HTTPException as error:
+			return error.get_response()
+		return get_response(frappe.local.request.path)
+
 	def assertRedirects(self, url, location):
-		self.set_request(url)
-		response = get_response(frappe.local.request.path)
+		response = self.respond(url)
 		self.assertEqual(response.status_code, 301)
 		self.assertEqual(response.headers["Location"], location)
+
+	def patch_hooks(self, **hooks):
+		real_get_hooks = frappe.get_hooks
+
+		def get_hooks(hook=None, *args, **kwargs):
+			return hooks[hook] if hook in hooks else real_get_hooks(hook, *args, **kwargs)
+
+		patcher = patch("frappe.get_hooks", side_effect=get_hooks)
+		patcher.start()
+		self.addCleanup(patcher.stop)
 
 
 class TestRootAndPrefixedRoutes(RoutingTestCase):
@@ -155,6 +177,53 @@ class TestRedirectsStayOnSite(RoutingTestCase):
 		self.assertNotIsInstance(renderer, RedirectPage)
 
 
+# Like a site's own website_redirects or Website Settings redirects.
+WEBSITE_REDIRECTS = [
+	{"source": "/ar/old", "target": "/ar/new"},
+	{"source": "/moved", "target": "/products"},
+	{"source": "/to-arabic", "target": "/ar/offers"},
+	{"source": "/elsewhere", "target": "https://example.com/"},
+]
+
+
+class TestWebsiteRedirects(RoutingTestCase):
+	def setUp(self):
+		super().setUp()
+		self.patch_hooks(website_redirects=WEBSITE_REDIRECTS)
+		frappe.cache.delete_value("website_redirects")
+		self.addCleanup(frappe.cache.delete_value, "website_redirects")
+
+	def test_a_rule_written_with_a_prefix_matches_the_prefixed_url(self):
+		self.assertRedirects("/ar/old", "/ar/new")
+
+	def test_an_unprefixed_rule_keeps_the_language_of_the_url(self):
+		self.assertRedirects("/moved", "/products")
+		self.assertRedirects("/ar/moved", "/ar/products")
+		self.assertRedirects("/en/moved", "/products")
+
+	def test_a_target_with_its_own_language_or_host_is_kept(self):
+		self.assertRedirects("/ar/to-arabic", "/ar/offers")
+		self.assertRedirects("/ar/elsewhere", "https://example.com/")
+
+
+class TestNotPermittedLogin(RoutingTestCase):
+	def setUp(self):
+		super().setUp()
+		self.addCleanup(setattr, frappe.local, "response", frappe.local.response)
+		frappe.local.response = frappe._dict()
+
+	def login_action(self, url):
+		self.set_request(url)
+		NotPermittedPage(frappe.local.request.path.strip("/")).render()
+		return frappe.local.response.context["primary_action"]
+
+	def test_a_guest_returns_to_the_prefixed_page_after_login(self):
+		self.assertEqual(
+			self.login_action("/ar/account/orders"), "/login?redirect-to=%2Far%2Faccount%2Forders"
+		)
+		self.assertEqual(self.login_action("/account/orders"), "/login?redirect-to=%2Faccount%2Forders")
+
+
 PATHS_SEEN_BY_ANOTHER_APP = []
 
 
@@ -167,24 +236,12 @@ def resolve_like_another_app(path):
 class TestEveryAppRoutesWithoutThePrefix(RoutingTestCase):
 	"""Frappe calls every website_path_resolver with the same path and keeps the last endpoint."""
 
-	def setUp(self):
-		super().setUp()
-		self.real_get_hooks = frappe.get_hooks
-		patcher = patch("frappe.get_hooks", side_effect=self.get_hooks)
-		patcher.start()
-		self.addCleanup(patcher.stop)
-
-	def get_hooks(self, hook=None, *args, **kwargs):
-		if hook == "website_path_resolver":
-			return self.resolvers
-		return self.real_get_hooks(hook, *args, **kwargs)
-
 	def in_each_app_order(self):
 		commera = "commera.localization.routing.resolve_website_path"
 		other = f"{__name__}.resolve_like_another_app"
 		for resolvers in ([commera, other], [other, commera]):
 			with self.subTest(resolvers=resolvers):
-				self.resolvers = resolvers
+				self.patch_hooks(website_path_resolver=resolvers)
 				yield
 
 	def test_a_prefixed_page_is_routed_without_the_prefix(self):
@@ -195,6 +252,12 @@ class TestEveryAppRoutesWithoutThePrefix(RoutingTestCase):
 	def test_the_canonical_redirect_wins(self):
 		for _order in self.in_each_app_order():
 			self.assertRedirects("/en/cart?x=1", "/cart?x=1")
+
+	def test_a_doubled_slash_redirects_before_another_apps_router_sees_it(self):
+		for _order in self.in_each_app_order():
+			self.assertRedirects("/en/account//orders", "/account/orders")
+			self.assertRedirects("/account//orders?x=1", "/account/orders?x=1")
+			self.assertRedirects("/ar/account//orders", "/ar/account/orders")
 
 	def test_the_home_page_is_the_storefront_for_staff(self):
 		frappe.set_user("Administrator")
@@ -219,6 +282,26 @@ class TestTheRequestKeepsItsPrefix(RoutingTestCase):
 			with self.subTest(url):
 				self.set_request(url)
 				self.assertEqual(frappe.local.request.path, url)
+
+	def test_desk_and_other_frappe_namespaces_under_a_prefix_are_not_localized(self):
+		urls = (
+			"/ar/app",
+			"/ar/app/item",
+			"/ar/desk",
+			"/ar/desk/item",
+			"/ar/private/files/x.pdf",
+			"/ar/socket.io/x",
+			"/ar/assets/x.js",
+			"/ar/backups/x",
+		)
+		with patch("commera.storefront_access.is_storefront_published", return_value=False):
+			for url in urls:
+				with self.subTest(url):
+					_endpoint, renderer = self.open(url, lang="fr")
+					self.assertEqual(frappe.local.request.path, url)
+					self.assertIsNone(get_localized_request())
+					self.assertEqual(frappe.local.lang, "fr")
+					self.assertIsInstance(renderer, NotFoundPage)
 
 
 class TestLangParameter(RoutingTestCase):
@@ -261,17 +344,21 @@ LEGACY_ROUTES = [
 ]
 
 
+def store_legacy_routes(test_case):
+	settings = frappe.get_single("Shop Theme Settings")
+	settings.set("routes", [])
+	for pattern, template_path, requires_auth in LEGACY_ROUTES:
+		settings.append(
+			"routes",
+			{"url_pattern": pattern, "template_path": template_path, "requires_auth": requires_auth},
+		)
+	settings.save(ignore_permissions=True)
+	test_case.addCleanup(clear_settings_cache)
+
+
 class TestThemeRoutePatternPatch(IntegrationTestCase):
 	def setUp(self):
-		settings = frappe.get_single("Shop Theme Settings")
-		settings.set("routes", [])
-		for pattern, template_path, requires_auth in LEGACY_ROUTES:
-			settings.append(
-				"routes",
-				{"url_pattern": pattern, "template_path": template_path, "requires_auth": requires_auth},
-			)
-		settings.save(ignore_permissions=True)
-		self.addCleanup(clear_settings_cache)
+		store_legacy_routes(self)
 
 	def routes(self):
 		return [
@@ -330,3 +417,55 @@ class TestDefaultThemeRoutes(IntegrationTestCase):
 		for route in DEFAULT_ROUTES:
 			with self.subTest(route["url_pattern"]):
 				self.assertNotIn("lang", route["url_pattern"])
+
+
+class TestKeptLegacyThemeRoutes(RoutingTestCase):
+	"""A route the patch kept with its language group still serves its old URLs, in its old place."""
+
+	def setUp(self):
+		super().setUp()
+		store_legacy_routes(self)
+		drop_language_from_theme_routes()
+		self.theme_dir = tempfile.mkdtemp(prefix="shop_theme_legacy_routes_")
+		self.addCleanup(shutil.rmtree, self.theme_dir)
+		for _pattern, template_path, _requires_auth in LEGACY_ROUTES:
+			self.write_theme_file(template_path, template_path)
+		self.patch_theme_context()
+
+	def write_theme_file(self, relative_path, source):
+		path = os.path.join(self.theme_dir, relative_path)
+		os.makedirs(os.path.dirname(path), exist_ok=True)
+		with open(path, "w") as theme_file:
+			theme_file.write(source)
+
+	def patch_theme_context(self):
+		theme_context = {"theme_name": "Legacy Routes", "dirs": [self.theme_dir]}
+		for patcher in (
+			patch("commera.shop_themes.theme_resolver.get_render_theme_context", return_value=theme_context),
+			patch("commera.storefront_access.is_storefront_published", return_value=True),
+		):
+			patcher.start()
+			self.addCleanup(patcher.stop)
+
+	def assertThemePage(self, url, template_path):
+		_endpoint, renderer = self.open(url)
+		self.assertIsInstance(renderer, ThemePageRenderer)
+		self.assertEqual(renderer.template_path, template_path)
+		return renderer
+
+	def test_a_kept_route_serves_its_language_urls_before_a_later_custom_route(self):
+		renderer = self.assertThemePage("/ar/account/orders", "pages/orders.html")
+		self.assertTrue(renderer.requires_auth)
+		# Served at /en/account/orders before English moved to the root.
+		self.assertThemePage("/account/orders", "pages/orders.html")
+
+	def test_an_earlier_rewritten_route_still_wins_over_a_kept_one(self):
+		self.assertThemePage("/ar/lookbook", "pages/lookbook.html")
+		self.assertThemePage("/lookbook", "pages/lookbook.html")
+
+	def test_a_kept_route_renders_end_to_end(self):
+		frappe.set_user("Administrator")
+		response = self.respond("/ar/account/orders")
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.get_data(as_text=True), "pages/orders.html")

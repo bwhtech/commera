@@ -116,7 +116,7 @@ class ThemePageRenderer:
 		self.requires_auth = False
 
 	def can_render(self):
-		page = find_theme_page(self.get_request_path())
+		page = find_theme_page(self.get_request_path(), get_localization().language.code)
 		if not page:
 			return False
 
@@ -170,14 +170,15 @@ class ThemePageRenderer:
 		return template.render(context)
 
 
-def find_theme_page(request_path):
+def find_theme_page(request_path, language_code=None):
 	"""(theme dirs, template path, requires_auth, match) of the active theme's page, or None."""
 	theme_context = get_render_theme_context()
 	if not theme_context["theme_name"] or not theme_context["dirs"]:
 		return None
 
 	settings = get_compiled_routes()
-	matched_route, match = match_route(settings["routes"], request_path)
+	legacy_path = f"{language_code.lower()}/{request_path}".rstrip("/") if language_code else None
+	matched_route, match = match_route(settings["routes"], request_path, legacy_path)
 	if matched_route:
 		template_path, requires_auth = matched_route["template_path"], matched_route["requires_auth"]
 	elif is_dynamic_page(settings, request_path):
@@ -191,9 +192,12 @@ def find_theme_page(request_path):
 	return theme_context["dirs"], template_path, requires_auth, match
 
 
-def match_route(routes, request_path):
+def match_route(routes, request_path, legacy_path=None):
+	"""`legacy_path` is the path as it was under /<lang>/. A route that the language patch kept
+	with its (?P<lang>…) group matches it, so it still wins in its old place."""
 	for route in routes:
-		match = route["pattern"].match(request_path)
+		has_language_group = legacy_path is not None and "lang" in route["pattern"].groupindex
+		match = route["pattern"].match(legacy_path if has_language_group else request_path)
 		if match:
 			return route, match
 	return None, None

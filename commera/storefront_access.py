@@ -2,7 +2,8 @@ import frappe
 from frappe.website.utils import build_response
 
 from commera.api.permission import has_app_permission
-from commera.localization import get_request_path, strip_language_prefix
+from commera.localization import StorefrontLanguages, get_request_path, strip_language_prefix
+from commera.localization.routing import is_page_path
 
 SETTINGS_DOCTYPE = "Commera Settings"
 
@@ -37,21 +38,19 @@ def is_storefront_published() -> bool:
 
 
 def is_storefront_path(path: str) -> bool:
-	"""A language-prefixed path, a storefront page or a page of the active theme."""
+	"""A language-prefixed page path, a storefront page or a page of the active theme."""
 	language, rest = strip_language_prefix("/" + path.strip("/"), include_unpublished=True)
 	segment = rest.strip("/").split("/", 1)[0]
-	return (
-		bool(language)
-		or segment in STOREFRONT_SEGMENTS
-		or segment.startswith("sitemap")
-		or has_theme_page(rest)
-	)
+	if language:
+		return is_page_path(rest)
+	return segment in STOREFRONT_SEGMENTS or segment.startswith("sitemap") or has_theme_page(rest)
 
 
 def has_theme_page(path: str) -> bool:
+	"""A page of the active theme at `path` in the default language, which has no prefix."""
 	from commera.shop_themes.theme_resolver import find_theme_page
 
-	return find_theme_page(path.strip("/")) is not None
+	return find_theme_page(path.strip("/"), StorefrontLanguages.load().default.code) is not None
 
 
 class PrivateStorefrontPage:

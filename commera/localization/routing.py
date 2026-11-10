@@ -1,10 +1,17 @@
+import re
 from urllib.parse import quote, urlsplit
 
 import frappe
-from frappe.website.path_resolver import resolve_path
+from frappe.website.path_resolver import resolve_path, resolve_redirect
 from werkzeug.routing.exceptions import RequestRedirect
 
-from commera.localization.resolver import Localization, LocalizedRequest, get_localized_request, resolve
+from commera.localization.resolver import (
+	Localization,
+	LocalizedRequest,
+	get_localized_request,
+	resolve,
+	strip_language_prefix,
+)
 from commera.roles import is_commera_admin
 
 ACCOUNT_PATH = "/account"
@@ -13,8 +20,18 @@ ACCOUNT_HOME_PATH = "/account/dashboard"
 # Every store served English under /en/ before the default language moved to the root.
 LEGACY_PREFIX = "en"
 
-# Requests that frappe.app.application never sends to the website router.
-NON_PAGE_PATH_PREFIXES = ("/api/", "/assets/", "/backups", "/files/", "/private/files/", "/.well-known/")
+# Requests that frappe.app.application never sends to the website router, and Desk.
+NON_PAGE_PATH_PREFIXES = (
+	"/api/",
+	"/app/",
+	"/assets/",
+	"/backups",
+	"/desk/",
+	"/files/",
+	"/private/",
+	"/socket.io/",
+	"/.well-known/",
+)
 PAGE_METHODS = ("GET", "HEAD", "POST")
 
 
@@ -31,20 +48,30 @@ def localize_request():
 
 	request.commera_localized = localized
 	frappe.local.lang = localized.localization.language.code
+	# Redirect before any app's path resolver runs: another app's resolver may raise first.
+	if redirect := get_website_redirect(localized):
+		raise StorefrontRedirect(*redirect)
+	if localized.redirect_to:
+		raise StorefrontRedirect(encode_target(localized.redirect_to))
+
 	if localized.route_path == "/":
 		# Frappe's get_home_page() would send staff to the desk.
 		frappe.local.flags.home_page = "index"
 	set_request_path(request, localized.route_path)
 
 
+class StorefrontRedirect(RequestRedirect):
+	"""Raised in before_request: frappe.app sends the response of an HTTPException as it is."""
+
+	def __init__(self, location: str, code: int = 301):
+		super().__init__(location)
+		self.code = code
+
+
 def resolve_website_path(path: str) -> str:
-	"""website_path_resolver hook: sends the redirect to the canonical URL, then routes.
-	A redirect raised here wins over every other app's resolver, whatever the app order."""
+	"""website_path_resolver hook: routes the path that localize_request stripped of its prefix."""
 	path = clean_path(path)
 	localized = get_localized_request()
-	if localized and path == localized.route_path and localized.redirect_to:
-		raise_redirect(localized.redirect_to)
-
 	# Frappe's resolve_path sends "/" to the role home page, which is the desk for staff.
 	if path == "/":
 		frappe.local.path = "index"
@@ -87,8 +114,38 @@ def get_redirect_target(path: str, prefix: str, rest: str) -> str | None:
 	if rest.rstrip("/") == ACCOUNT_PATH:
 		rest = ACCOUNT_HOME_PATH
 
-	target = clean_path(prefix + rest)
+	# Frappe's router would answer a doubled slash with its own redirect, which drops the prefix.
+	target = clean_path(re.sub(r"/{2,}", "/", prefix + rest))
 	return target if target != path else None
+
+
+def get_website_redirect(localized: LocalizedRequest) -> tuple[str, int] | None:
+	"""A website_redirects or Website Settings rule for the requested path, else for the path
+	without its prefix. A same-site target of such an unprefixed rule keeps the language."""
+	if redirect := match_website_redirect(localized.path):
+		return redirect
+	if localized.route_path == clean_path(localized.path):
+		return None
+	if redirect := match_website_redirect(localized.route_path):
+		location, code = redirect
+		return keep_language_prefix(location, localized.canonical_prefix), code
+	return None
+
+
+def match_website_redirect(path: str) -> tuple[str, int] | None:
+	try:
+		resolve_redirect(path.strip("/ "), frappe.local.request.query_string)
+	except frappe.Redirect as redirect:
+		return frappe.flags.redirect_location, redirect.http_status_code
+	return None
+
+
+def keep_language_prefix(location: str, prefix: str) -> str:
+	if not prefix or not location.startswith("/") or location.startswith(("//", "/\\")):
+		return location
+	if strip_language_prefix(urlsplit(location).path, include_unpublished=True)[0]:
+		return location
+	return prefix + location
 
 
 def strip_legacy_prefix(path: str) -> str:
@@ -105,14 +162,17 @@ def route(path: str, prefix: str) -> str:
 
 
 def raise_redirect(target: str, status_code: int = 301):
-	# The path arrives percent-decoded: re-encode it, or a "?" in an item code starts the query string.
+	frappe.flags.redirect_location = encode_target(target)
+	raise frappe.Redirect(status_code)
+
+
+def encode_target(target: str) -> str:
+	"""`target` with the query string of the request.
+	The path arrives percent-decoded: re-encode it, or a "?" in an item code starts the query string."""
 	target = quote(clean_path(target), safe="/:,;=@!$&'()*+~")
 	request = getattr(frappe.local, "request", None)
 	query_string = frappe.safe_decode(request.query_string) if request else ""
-	if query_string:
-		target = f"{target}?{query_string}"
-	frappe.flags.redirect_location = target
-	raise frappe.Redirect(status_code)
+	return f"{target}?{query_string}" if query_string else target
 
 
 def clean_path(path: str) -> str:
