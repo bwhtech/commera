@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-from commera.localization.content import get_source_hash
+from commera.localization.content import get_source_hash, read_source
 from commera.localization.resources import get_translatable_fields
 
 KEY_FIELDS = ["reference_doctype", "reference_name", "reference_field", "language", "market"]
@@ -39,7 +39,7 @@ class ContentTranslation(Document):
 			)
 		if self.flags.refresh_source_hash or self.source_changed():
 			self.source_hash = get_source_hash(
-				frappe.db.get_value(self.reference_doctype, self.reference_name, self.reference_field)
+				read_source(self.reference_doctype, self.reference_name, self.reference_field)
 			)
 
 	def source_changed(self) -> bool:

@@ -95,7 +95,7 @@ commera_hooks = {
 		{
 			"type": "product",
 			"doctype": "Style Attribute Variant",
-			"fields": ["display_name"],
+			"fields": ["display_name", "description", "meta_title", "meta_description"],
 			"label": "Products",
 		},
 		{

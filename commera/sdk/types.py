@@ -393,7 +393,9 @@ class Typeahead(TypedDict):
 
 
 class ProductOptionValue(TypedDict, total=False):
+	# `name` is the label in the request language; `value` is the source, the same in every language.
 	name: str
+	value: str
 	# Colour values only: the sibling product's handle, whether it is this one, and its stock and swatch.
 	handle: str
 	selected: bool
@@ -410,7 +412,10 @@ class ProductVariant(TypedDict):
 	"""One size of a product."""
 
 	id: str
+	# `title` is the size's label in the request language; `size` is its source value.
+	# Select a variant by `size`: two sizes can share a translated label.
 	title: str
+	size: str
 	price: float
 	compare_at_price: float | None
 	available: bool

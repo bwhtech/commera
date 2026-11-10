@@ -178,6 +178,15 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		self.assertIn("Shipping &amp; returns", html)
 		self.assertIn('"@type": "Product"', html)
 
+	def test_the_size_picker_selects_by_source_value_not_translated_title(self):
+		# Two sizes can share a translated title, so the title must not pick the item code.
+		with open(os.path.join(STARTER_DIR, "sections", "main_product.html")) as template:
+			source = template.read()
+
+		self.assertIn('@click="size = variants[{{ loop.index0 }}].size"', source)
+		self.assertIn('"size": variant.size if size_option', source)
+		self.assertNotIn("].title", source)
+
 	def test_an_unknown_product_renders_the_theme_404(self):
 		status, html = self.render(
 			"pages/products/details.html", "/en/products/zz-no-such-product", route="zz-no-such-product"
