@@ -3,8 +3,6 @@ Both were Custom Fields made on each site, so a new site has neither and the pat
 
 import csv
 import io
-import operator
-from functools import reduce
 
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import delete_custom_fields
@@ -84,7 +82,10 @@ class ItemArabicMigration:
 		"""Items with an Arabic value, in pages ordered by name."""
 		item = frappe.qb.DocType("Item")
 		# Byte length, not `!= ""`: the collation treats some characters as equal to "".
-		has_value = reduce(operator.or_, (Length(item[column]) > 0 for column in self.columns))
+		conditions = [Length(item[column]) > 0 for column in self.columns]
+		has_value = conditions[0]
+		for condition in conditions[1:]:
+			has_value |= condition
 		query = (
 			frappe.qb.from_(item)
 			.select(item.name, item.item_name, *(item[column] for column in self.columns))
