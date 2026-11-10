@@ -404,6 +404,22 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 			self.assertEqual(self.product_names(f"{GULF_TERM} color"), [])
 		self.assertIn(self.blue, self.product_names(f"{SEARCH_TOKEN} zzshade"))
 
+	def test_a_db_set_on_the_item_reindexes_its_own_and_market_rows(self):
+		self.use_gulf_market()
+		self.add_titles("ar", {self.blue: GULF_TITLE}, market="gulf")
+		self.make_source_record("Brand", {"brand": OTHER_BRAND})
+
+		batches = self.save_sources(("Item", STYLE_ITEM, {"brand": OTHER_BRAND}, "db_set"))
+
+		self.assertEqual(batches, [sorted([self.red, self.blue, self.green])])
+		with self.market_request("AE"):
+			self.assertEqual(self.product_names(f"{GULF_TERM} zzother"), [self.blue])
+		self.assertIn(self.blue, self.product_names(f"{SEARCH_TOKEN} zzother"))
+
+	def test_a_db_set_of_an_unrelated_item_field_reindexes_nothing(self):
+		batches = self.save_sources(("Item", STYLE_ITEM, {"description": "Zz unrelated"}, "db_set"))
+		self.assertEqual(batches, [])
+
 	def test_saving_a_source_twice_reindexes_its_variants_once(self):
 		self.make_source_record("Brand", {"brand": OTHER_BRAND})
 		batches = self.save_sources(
@@ -574,8 +590,8 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 			patch.object(frappe.db, "after_commit", callbacks),
 			patch("commera.search.sync.frappe.enqueue") as enqueue,
 		):
-			for doctype, name, changes in saves:
-				self.save_source(doctype, name, changes)
+			for save in saves:
+				self.save_source(*save)
 			callbacks.run()
 		batches = [
 			call.kwargs["names"]
@@ -586,11 +602,14 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 			sync.upsert_docs(PRODUCT, names)
 		return batches
 
-	def save_source(self, doctype, name, changes):
+	def save_source(self, doctype, name, changes, method="save"):
 		doc = frappe.get_doc(doctype, name)
 		# Fixtures are committed, so the old values go back by hand.
 		self.addCleanup(frappe.db.set_value, doctype, name, {field: doc.get(field) for field in changes})
-		doc.update(changes).save(ignore_permissions=True)
+		if method == "db_set":
+			doc.db_set(changes)
+		else:
+			doc.update(changes).save(ignore_permissions=True)
 
 	def build_with_after_commit(self):
 		"""Rebuild the index. Returns the after-commit callbacks the build left, without running them."""

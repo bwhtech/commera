@@ -17,8 +17,12 @@ SOURCE_LINK_FIELDS = {"Item": "item_style", "Style Attribute Configurator": "con
 PENDING_VARIANTS_FLAG = "commera_search_source_variants"
 
 
-def on_source_update(doc, method=None):
-	if doc.get_doc_before_save() and search_fields_changed(doc):
+def on_source_change(doc, method=None):
+	"""on_change runs after save and after db_set; a new source has no variants yet."""
+	if doc.flags.in_insert:
+		return
+	# Without a snapshot nothing tells what changed, so reindex.
+	if not doc.get_doc_before_save() or search_fields_changed(doc):
 		queue_variants_of(doc)
 
 
