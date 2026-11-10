@@ -4,6 +4,8 @@
 
 import re
 import unittest
+from unittest.mock import patch
+from urllib.parse import quote
 
 import frappe
 from frappe.tests import IntegrationTestCase, UnitTestCase
@@ -11,6 +13,8 @@ from frappe.utils import get_url
 
 from commera import seo, website_context
 from commera.localization import Language, alternates
+from commera.localization.markets import StorefrontMarkets
+from commera.localization.urls import SiteLocales
 from commera.migrate import get_private_path_rules
 from commera.tests import get_test_configurator, get_test_item
 from commera.tests.test_localization import use_storefront_languages
@@ -160,6 +164,25 @@ class TestHeadAlternates(LocaleUrlTestCase):
 		alternate_locales = re.findall(r'og:locale:alternate" content="([^"]+)"', html)
 		self.assertEqual(alternate_locales, ["en_US", "fr_FR"])
 
+	def test_og_locale_and_its_alternates_take_the_store_country_where_it_uses_the_language(self):
+		self.store_in("ae")
+		self.open("/fr/products/shoe")
+
+		html = render_seo_head(seo.build_page_seo({}))
+
+		self.assertIn('<meta property="og:locale" content="fr_FR">', html)
+		alternate_locales = re.findall(r'og:locale:alternate" content="([^"]+)"', html)
+		self.assertEqual(alternate_locales, ["en_AE", "ar_AE"])
+		self.assertEqual([alt["locale"] for alt in alternates()], ["en_AE", "ar_AE", "fr_FR"])
+
+	def test_the_request_og_locale_agrees_with_its_root(self):
+		self.store_in("in")
+		for path, expected in (("/products", "en_IN"), ("/ar/products", "ar_EG")):
+			with self.subTest(path):
+				self.open(path)
+				self.assertEqual(seo.get_og_locales()["locale"], expected)
+				self.assertIn(expected, [alt["locale"] for alt in alternates()])
+
 
 class TestSingleLanguageSeo(LocaleUrlTestCase):
 	def setUp(self):
@@ -188,6 +211,42 @@ class TestSingleLanguageSeo(LocaleUrlTestCase):
 
 
 class TestOgLocale(IntegrationTestCase):
+	def test_the_region_is_the_code_then_the_market_then_the_store_then_the_likely_one(self):
+		cases = {
+			("pt-BR", "ae", "ae"): "pt_BR",
+			("ar", "ae", "in"): "ar_AE",
+			("ar", None, "ae"): "ar_AE",
+			("en", None, "in"): "en_IN",
+			("fr", None, "in"): "fr_FR",
+			("en", None, None): "en_US",
+			("xx", None, "ae"): "xx",
+		}
+		for (code, market_country, store_country), expected in cases.items():
+			with self.subTest(code=code, market=market_country, store=store_country):
+				language = Language(code=code, name=code, endonym=code, direction="ltr")
+				self.assertEqual(language.og_locale(market_country, store_country), expected)
+
+	def test_a_script_has_its_own_likely_region(self):
+		cases = {"zh-Hant": "zh_TW", "zh-Hans": "zh_CN", "zh": "zh_CN", "sr-Latn": "sr_RS"}
+		for code, expected in cases.items():
+			with self.subTest(code):
+				language = Language(code=code, name=code, endonym=code, direction="ltr")
+				self.assertEqual(language.og_locale(), expected)
+
+	def test_the_store_country_must_use_the_script(self):
+		# CLDR lists zh_Hant in the US, and plain zh (Hans) in China.
+		cases = {
+			("zh-Hant", "us"): "zh_US",
+			("zh-Hans", "us"): "zh_CN",
+			("zh-Hans", "cn"): "zh_CN",
+			("zh-Hant", "cn"): "zh_TW",
+			("zh-Hans", "sg"): "zh_SG",
+		}
+		for (code, store_country), expected in cases.items():
+			with self.subTest(code=code, store=store_country):
+				language = Language(code=code, name=code, endonym=code, direction="ltr")
+				self.assertEqual(language.og_locale(store_country=store_country), expected)
+
 	def test_a_language_takes_its_own_or_its_likely_region(self):
 		cases = {
 			("en", None): "en_US",
@@ -596,6 +655,49 @@ class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
 
 	def test_unknown_segment_renders_empty(self):
 		self.assertEqual(self.run_segment("widgets", 1).urls, [])
+
+	def test_a_sitemap_page_loads_markets_a_fixed_number_of_times(self):
+		def count_loads():
+			with patch.object(StorefrontMarkets, "load", wraps=StorefrontMarkets.load) as load:
+				urls = self.run_segment("pages", 1).urls
+			return load.call_count, len(urls)
+
+		loads, url_count = count_loads()
+		for label in ("one", "two", "three"):
+			self.make_page(label, published=1, noindex=0)
+
+		self.assertEqual(count_loads(), (loads, url_count + 6))
+
+	def test_sitemap_urls_are_percent_encoded(self):
+		urls = []
+		path = "/page/قمصان a%20b?category=new in"
+
+		sitemap_segment.add_localized(urls, path, None, "daily", "1.0", SiteLocales.load())
+
+		encoded = "/page/" + quote("قمصان") + "%20a%20b?category=new%20in"
+		self.assertEqual([url["loc"] for url in urls], [self.url(encoded), self.url("/ar" + encoded)])
+
+	def test_the_homepage_counts_toward_the_page_cap(self):
+		for label in ("one", "two", "three"):
+			self.make_page(label, published=1, noindex=0)
+		total = frappe.db.count(
+			"Shop Web Page", sitemap_segment.get_segment_filters(sitemap_segment.SEGMENT_CONFIG["pages"])
+		)
+		original = frappe.db.get_single_value("Commera Settings", "sitemap_urls_per_page")
+		self.addCleanup(frappe.db.set_single_value, "Commera Settings", "sitemap_urls_per_page", original)
+		# Two languages: two routes per page.
+		frappe.db.set_single_value("Commera Settings", "sitemap_urls_per_page", 4)
+
+		page_count = sitemap_segment.segment_page_count("pages")
+		pages = [sitemap_locs("pages", page) for page in range(1, page_count + 2)]
+
+		self.assertEqual(page_count, -(-(total + 1) // 2))
+		self.assertTrue(all(len(locs) <= 4 for locs in pages))
+		self.assertEqual(pages[0][:2], [self.url("/"), self.url("/ar")])
+		self.assertEqual(pages[-1], [])
+		every_loc = [loc for locs in pages for loc in locs]
+		self.assertEqual(len(every_loc), (total + 1) * 2)
+		self.assertEqual(len(set(every_loc)), len(every_loc))
 
 	def test_docs_per_page_honours_settings(self):
 		# The per-page budget is set in Commera Settings and split across the storefront languages.

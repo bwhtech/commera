@@ -215,3 +215,12 @@ def get_primary_market_title() -> str:
 
 	company = get_store_company()
 	return (company and frappe.get_cached_value("Company", company, "country")) or frappe._("Primary market")
+
+
+def get_store_country() -> str | None:
+	"""The lowercase ISO code of the store company's country."""
+	from commera.utils import get_store_company
+
+	company = get_store_company()
+	country = frappe.get_cached_value("Company", company, "country") if company else None
+	return frappe.get_cached_value("Country", country, "code") if country else None

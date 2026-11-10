@@ -5,8 +5,8 @@ import frappe
 from frappe.utils import cstr, flt, get_url, strip_html_tags
 
 from commera.branding import get_configured_brand_assets
-from commera.localization import Localization, alternates, get_localization, get_request_path
-from commera.localization.urls import get_locale_roots
+from commera.localization import alternates, get_localization, get_request_path
+from commera.localization.urls import get_locale_roots, get_og_locale
 from commera.store_frame import get_shop_details
 from commera.utils import get_store_currency
 
@@ -92,14 +92,6 @@ def get_og_locales() -> dict:
 		if root.og_locale not in (locale, *others):
 			others.append(root.og_locale)
 	return {"locale": locale, "alternates": others}
-
-
-def get_og_locale(localization: Localization) -> str:
-	"""The Open Graph locale of `localization`: a secondary market adds its country."""
-	market = localization.market
-	if not market or market.is_primary:
-		return localization.language.og_locale()
-	return localization.language.og_locale(localization.country or market.countries[0])
 
 
 def schema_availability(availability):

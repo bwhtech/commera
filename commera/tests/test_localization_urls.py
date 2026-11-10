@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -27,7 +28,14 @@ class LocaleUrlTestCase(IntegrationTestCase):
 		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
 		self.addCleanup(frappe.set_user, frappe.session.user)
 		frappe.set_user("Guest")
+		self.store_in(None)
 		self.open("/")
+
+	def store_in(self, country):
+		"""Pin the store company's country: og:locale follows it, and the test site's is any."""
+		patcher = patch("commera.localization.urls.get_store_country", return_value=country)
+		patcher.start()
+		self.addCleanup(patcher.stop)
 
 	def open(self, path, query_string=""):
 		frappe.local.request = Request(EnvironBuilder(path=path, query_string=query_string).get_environ())

@@ -713,6 +713,19 @@ class TestMarketUrls(LocaleUrlTestCase):
 			alternates("/cart"),
 		)
 
+	def test_traditional_and_simplified_chinese_get_their_own_og_locale(self):
+		for code in ("zh-Hant", "zh-Hans"):
+			use_language(self, code)
+		use_storefront_languages(self, "en", published=("en", "zh-Hant", "zh-Hans"))
+		self.open("/zh-hant/products/shoe")
+
+		html = render_seo_head(seo.build_page_seo({}))
+
+		self.assertIn('<meta property="og:locale" content="zh_TW">', html)
+		self.assertIn('<meta property="og:locale:alternate" content="zh_CN">', html)
+		locales = {alt["lang"]: alt["locale"] for alt in alternates()}
+		self.assertEqual((locales["zh-Hant"], locales["zh-Hans"]), ("zh_TW", "zh_CN"))
+
 	def test_a_saved_regional_market_language_gets_no_url(self):
 		use_storefront_languages(self, "en", published=("en", "ar", "en-GB"))
 		add_saved_language(frappe.get_doc("Commera Market", "gulf"), "en-GB")
