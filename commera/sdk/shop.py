@@ -10,6 +10,7 @@ from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import (
 	get_translated_page,
 	translate_pages,
 )
+from commera.sdk.catalog import get_seo
 from commera.sdk.types import (
 	ContentPage,
 	ContentPageLink,
@@ -127,43 +128,31 @@ def subscribe_to_newsletter(email: str) -> None:
 
 
 def get_page(handle: str) -> ContentPage | None:
-	"""A published Shop Web Page by its route, or None. Text is in the request language; the handle is not."""
+	"""A published Shop Web Page by its route, or None. Text is in the request language; the handle is not.
+	`title` is the page title; `seo` is shaped as on a collection, with `custom_title`."""
 	page = get_page_by_route(cstr(handle))
 	if not page or not page.published:
 		return None
 	values = get_translated_page(page)
+	title = values["title"].value
 	return {
 		"handle": page.route,
-		"title": get_page_title(values),
+		"title": title,
 		"body_html": values["content"].value,
-		"seo": {
-			"title": values["meta_title"].value or None,
-			"description": values["meta_description"].value or None,
-			"noindex": bool(page.noindex),
-		},
+		"seo": get_seo(values["meta_title"].value, title, values["meta_description"].value, page.noindex),
 		"updated_at": str(page.modified),
 	}
 
 
 def list_pages() -> list[ContentPageLink]:
 	"""Every published Shop Web Page, by title in the request language."""
-	pages = frappe.get_all(
-		"Shop Web Page", filters={"published": 1}, fields=["name", "route", "meta_title", "modified"]
-	)
-	translated = translate_pages(pages, ("title", "meta_title"))
+	pages = frappe.get_all("Shop Web Page", filters={"published": 1}, fields=["name", "route", "modified"])
+	translated = translate_pages(pages, ("title",))
 	links = [
-		{"handle": page.route, "title": get_page_title(values), "updated_at": str(page.modified)}
+		{"handle": page.route, "title": values["title"].value, "updated_at": str(page.modified)}
 		for page, values in zip(pages, translated, strict=True)
 	]
-	return sorted(links, key=lambda link: link["title"])
-
-
-def get_page_title(values: dict[str, localization.TranslatedValue]) -> str:
-	"""The meta title, or else the page title. An untranslated meta title yields to a translated title."""
-	meta_title, title = values["meta_title"], values["title"]
-	if meta_title.status == localization.MISSING and title.status != localization.MISSING:
-		return title.value
-	return meta_title.value or title.value
+	return sorted(links, key=lambda link: (link["title"], link["handle"]))
 
 
 def get_sitemap(kind: str | None = None, page: int = 1) -> Sitemap:

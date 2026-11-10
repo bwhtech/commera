@@ -4,12 +4,14 @@
 import frappe
 from frappe.model.document import Document
 from frappe.utils import cstr
+from frappe.utils.html_utils import sanitize_html
 from frappe.website.utils import cleanup_page_name
 
 from commera.localization import MISSING, TranslatedValue, get_localization, translate
 
 DOCTYPE = "Shop Web Page"
 TRANSLATABLE_FIELDS = ("title", "content", "meta_title", "meta_description")
+LEGACY_LANGUAGE = "ar"
 
 
 class ShopWebPage(Document):
@@ -63,11 +65,14 @@ def get_page_by_route(route):
 
 
 def get_translated_page(page) -> dict[str, TranslatedValue]:
-	"""The page's title, content and SEO fields in the request language."""
+	"""The page's title, content and SEO fields in the request language. The body is always sanitized:
+	a translation written straight to the database never went through the save-time sanitizer."""
 	localization = get_localization()
 	values = translate_pages([page], TRANSLATABLE_FIELDS, localization)[0]
-	if uses_legacy_content(page, values["content"], localization):
-		values["content"] = TranslatedValue(page.content_ar, MISSING)
+	content = values["content"]
+	if uses_legacy_content(page, content, localization):
+		content = TranslatedValue(page.content_ar, MISSING)
+	values["content"] = TranslatedValue(sanitize_body(content.value), content.status)
 	return values
 
 
@@ -83,8 +88,16 @@ def translate_pages(
 
 
 def uses_legacy_content(page, content: TranslatedValue, localization) -> bool:
-	# `content_ar` fills in for a missing Arabic translation until #442 moves it into Content Translation.
-	translated = (
-		content.status != MISSING and localization.language.code != localization.default_language.code
+	"""`content_ar` fills in for a missing Arabic translation until #442 moves it into Content Translation.
+	It wins over Frappe's `_()` dictionary, which only matches a body by its exact source HTML."""
+	return (
+		localization.language.code == LEGACY_LANGUAGE
+		and localization.default_language.code != LEGACY_LANGUAGE
+		and content.status == MISSING
+		and bool(page.content_ar)
 	)
-	return frappe.local.lang == "ar" and bool(page.content_ar) and not translated
+
+
+def sanitize_body(html: str | None) -> str:
+	# The Text Editor policy that Frappe applies to `content` on save.
+	return sanitize_html(cstr(html), linkify=True, always_sanitize=True)

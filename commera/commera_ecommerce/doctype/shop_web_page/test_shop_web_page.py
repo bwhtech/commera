@@ -26,6 +26,7 @@ class ShopWebPageTestCase(IntegrationTestCase):
 		self.saved_lang = frappe.local.lang
 		self.addCleanup(self.restore_locals)
 		self.addCleanup(frappe.set_user, frappe.session.user)
+		use_storefront_languages(self, "en", published=("en", "ar"))
 
 	def restore_locals(self):
 		frappe.local.request = self.saved_request
@@ -38,8 +39,9 @@ class ShopWebPageTestCase(IntegrationTestCase):
 		page.update(fields)
 		return page.insert()
 
-	def run_context(self, route, lang="en"):
-		frappe.local.lang = lang
+	def run_context(self, route, lang="en", frappe_lang=None):
+		"""The www page context on /<lang>/page/<route>. `frappe_lang` sets frappe.local.lang apart."""
+		frappe.local.lang = frappe_lang or lang
 		frappe.local.request = Request(EnvironBuilder(path=f"/{lang}/page/{route}").get_environ())
 		frappe.form_dict.route = route
 		self.addCleanup(frappe.form_dict.pop, "route", None)
@@ -107,7 +109,6 @@ class TestShopWebPage(ShopWebPageTestCase):
 class TestShopWebPageTranslation(ShopWebPageTestCase):
 	def setUp(self):
 		super().setUp()
-		use_storefront_languages(self, "en", published=("en", "ar"))
 		self.page = self.make_page(meta_title="Returns", meta_description="Our returns policy")
 		self.translate_page(self.page, "سياسة الإرجاع", ARABIC_CONTENT)
 		register(PAGE, self.page.name, "meta_title", "ar", "الإرجاع")
@@ -138,19 +139,27 @@ class TestShopWebPageTranslation(ShopWebPageTestCase):
 		page = shop.get_page(self.page.route)
 
 		self.assertEqual(page["handle"], self.page.route)
-		self.assertEqual((page["title"], page["body_html"]), ("الإرجاع", ARABIC_CONTENT))
+		self.assertEqual((page["title"], page["body_html"]), ("سياسة الإرجاع", ARABIC_CONTENT))
 		self.assertEqual(
-			page["seo"], {"title": "الإرجاع", "description": "سياسة الإرجاع لدينا", "noindex": False}
+			page["seo"],
+			{
+				"title": "الإرجاع",
+				"custom_title": True,
+				"description": "سياسة الإرجاع لدينا",
+				"noindex": False,
+			},
 		)
 		listed = next(link for link in shop.list_pages() if link["handle"] == self.page.route)
-		self.assertEqual(listed["title"], "الإرجاع")
+		self.assertEqual(listed["title"], "سياسة الإرجاع")
 
 	def test_the_default_language_shows_the_source(self):
 		use_storefront_language(self, "en")
 		page = shop.get_page(self.page.route)
 
-		self.assertEqual((page["title"], page["body_html"]), ("Returns", ENGLISH_CONTENT))
-		self.assertEqual(page["seo"]["description"], "Our returns policy")
+		self.assertEqual((page["title"], page["body_html"]), (self.page.name, ENGLISH_CONTENT))
+		self.assertEqual(
+			(page["seo"]["title"], page["seo"]["description"]), ("Returns", "Our returns policy")
+		)
 		self.assertEqual(self.run_context(self.page.route).page_title, self.page.name)
 
 	def test_an_untranslated_page_falls_back_to_frappe_translation_then_the_source(self):
@@ -170,16 +179,38 @@ class TestShopWebPageTranslation(ShopWebPageTestCase):
 		plain_page = shop.get_page(plain.route)
 
 		self.assertEqual((plain_page["title"], plain_page["body_html"]), (plain.name, ENGLISH_CONTENT))
-		self.assertEqual(plain_page["seo"], {"title": None, "description": None, "noindex": False})
-		self.assertEqual(shop.get_page(frappe_translated.route)["title"], "دليل المقاسات")
+		self.assertEqual(
+			plain_page["seo"],
+			{"title": plain.name, "custom_title": False, "description": "", "noindex": False},
+		)
+		dictionary_page = shop.get_page(frappe_translated.route)
+		self.assertEqual(dictionary_page["title"], "دليل المقاسات")
+		self.assertEqual(
+			(dictionary_page["seo"]["title"], dictionary_page["seo"]["custom_title"]),
+			("دليل المقاسات", False),
+		)
 		self.assertEqual(self.run_context(plain.route, lang="ar").breadcrumbs[0]["label"], plain.name)
 
-	def test_a_translated_title_wins_over_an_untranslated_meta_title(self):
+	def test_the_sdk_and_the_www_heading_show_the_page_title_and_seo_keeps_the_meta_title(self):
 		page = self.make_page(title=f"Care {self.tag}", meta_title="Care guide")
 		register(PAGE, page.name, "title", "ar", "العناية")
 
 		use_storefront_language(self, "ar")
-		self.assertEqual(shop.get_page(page.route)["title"], "العناية")
+		sdk_page = shop.get_page(page.route)
+		self.assertEqual(sdk_page["title"], "العناية")
+		self.assertEqual((sdk_page["seo"]["title"], sdk_page["seo"]["custom_title"]), ("Care guide", True))
+		context = self.run_context(page.route, lang="ar")
+		self.assertEqual((context.page_title, context.seo["title"]), ("العناية", "Care guide"))
+
+	def test_pages_with_the_same_title_list_by_handle(self):
+		later = self.make_page(title=f"Later {self.tag}", route=f"b-same-{self.tag.lower()}")
+		earlier = self.make_page(title=f"Earlier {self.tag}", route=f"a-same-{self.tag.lower()}")
+		for page in (later, earlier):
+			register(PAGE, page.name, "title", "ar", f"نفس {self.tag}")
+
+		use_storefront_language(self, "ar")
+		handles = [link["handle"] for link in shop.list_pages() if link["title"] == f"نفس {self.tag}"]
+		self.assertEqual(handles, [earlier.route, later.route])
 
 	def test_a_translation_wins_over_the_legacy_arabic_content(self):
 		page = self.make_page(title=f"Legacy {self.tag}", content_ar="<p>قديم</p>")
@@ -187,6 +218,35 @@ class TestShopWebPageTranslation(ShopWebPageTestCase):
 
 		register(PAGE, page.name, "content", "ar", ARABIC_CONTENT)
 		self.assertEqual(self.run_context(page.route, lang="ar").content, ARABIC_CONTENT)
+
+	def test_legacy_content_follows_the_request_language_not_frappe_lang(self):
+		page = self.make_page(title=f"Legacy {self.tag}", content_ar="<p>قديم</p>")
+
+		self.assertEqual(self.run_context(page.route, lang="ar", frappe_lang="en").content, "<p>قديم</p>")
+		self.assertEqual(self.run_context(page.route, lang="en", frappe_lang="ar").content, ENGLISH_CONTENT)
+
+	def test_legacy_content_is_unused_when_arabic_is_the_default_language(self):
+		use_storefront_languages(self, "ar", published=("ar", "en"))
+		page = self.make_page(title=f"Legacy {self.tag}", content_ar="<p>قديم</p>")
+
+		self.assertEqual(self.run_context(page.route, lang="ar").content, ENGLISH_CONTENT)
+
+	def test_legacy_content_wins_over_a_frappe_dictionary_translation(self):
+		page = self.make_page(title=f"Legacy {self.tag}", content_ar="<p>قديم</p>")
+		translation = frappe.get_doc(
+			{
+				"doctype": "Translation",
+				"language": "ar",
+				"source_text": ENGLISH_CONTENT,
+				"translated_text": "<p>قاموس</p>",
+			}
+		).insert()
+		self.addCleanup(frappe.delete_doc, "Translation", translation.name, force=True)
+
+		self.assertEqual(self.run_context(page.route, lang="ar").content, "<p>قديم</p>")
+		frappe.db.set_value(PAGE, page.name, "content_ar", "")
+		frappe.clear_document_cache(PAGE, page.name)
+		self.assertEqual(self.run_context(page.route, lang="ar").content, "<p>قاموس</p>")
 
 	def test_translated_content_is_sanitized_like_the_source(self):
 		unsafe = '<p onclick="steal()">مرحبا</p><script>steal()</script>'

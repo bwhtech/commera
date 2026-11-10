@@ -19,7 +19,7 @@ from commera.sdk.types import (
 )
 from commera.shop_themes.sections import get_section_products
 from commera.tests.test_content_translation import use_storefront_language
-from commera.tests.test_localization import set_storefront_languages
+from commera.tests.test_localization import set_storefront_languages, use_storefront_languages
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.www.sitemap_segment import get_urls_per_page
 
@@ -305,14 +305,14 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		self.assertEqual(
 			[(page["handle"], page["title"]) for page in pages],
 			[
-				(f"about-{self.suffix.lower()}", f"About {self.suffix}"),
-				(f"returns-{self.suffix.lower()}", f"Returns {self.suffix}"),
+				(f"about-{self.suffix.lower()}", f"About page {self.suffix}"),
+				(f"returns-{self.suffix.lower()}", f"Returns page {self.suffix}"),
 			],
 		)
 		self.assertEqual(set(pages[0]), ContentPageLink.__required_keys__)
 
 	def test_a_page_reads_in_the_request_language(self):
-		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
+		use_storefront_languages(self, "en", published=("en", "ar"))
 		for content_ar, expected in (("<p>سياسة</p>", "<p>سياسة</p>"), ("", "<p>Policy</p>")):
 			page = frappe.get_doc(
 				{
@@ -324,9 +324,9 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 				}
 			).insert(ignore_permissions=True, set_name=f"Policy {len(content_ar)} {self.suffix}")
 			with self.subTest(content_ar=content_ar):
-				frappe.local.lang = "ar"
+				use_storefront_language(self, "ar")
 				self.assertEqual(get_page(page.route)["body_html"], expected)
-				frappe.local.lang = "en"
+				use_storefront_language(self, "en")
 				self.assertEqual(get_page(page.route)["body_html"], "<p>Policy</p>")
 
 	def test_rate_limited_guest_api_whitelists_an_endpoint_for_guests_on_its_method_only(self):

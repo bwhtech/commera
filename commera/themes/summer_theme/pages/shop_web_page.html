@@ -7,12 +7,12 @@
 	<div class="dz-bnr-inr bg-secondary">
 		<div class="container">
 			<div class="dz-bnr-inr-entry">
-				<h1>{{ page_title }}</h1>
+				<h1>{{ page_title|e }}</h1>
 				<nav aria-label="{{ _('breadcrumb') }}" class="breadcrumb-row">
 					<ul class="breadcrumb">
 						<li class="breadcrumb-item"><a href="/{{ language }}">{{ _("Home") }}</a></li>
 						{% for breadcrumb in breadcrumbs %}
-						<li class="breadcrumb-item">{{ breadcrumb.label }}</li>
+						<li class="breadcrumb-item">{{ breadcrumb.label|e }}</li>
 						{% endfor %}
 					</ul>
 				</nav>

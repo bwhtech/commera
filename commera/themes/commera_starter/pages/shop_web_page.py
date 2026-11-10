@@ -12,7 +12,8 @@ def get_context(context):
 	context.page = page
 	context.seo = seo.build_page_seo(
 		{
-			"meta_title": page["seo"]["title"],
+			# Only a set meta title replaces the "Title | Store" template.
+			"meta_title": page["seo"]["title"] if page["seo"]["custom_title"] else None,
 			"meta_description": page["seo"]["description"],
 			"noindex": page["seo"]["noindex"],
 		},
