@@ -5,6 +5,7 @@ import io
 from unittest.mock import patch
 
 import frappe
+from frappe.core.doctype.file.file import File
 from frappe.custom.doctype.custom_field.custom_field import create_custom_field, delete_custom_fields
 from frappe.tests import IntegrationTestCase
 from frappe.utils import now
@@ -25,6 +26,7 @@ NAME_FIELD, DESCRIPTION_FIELD = "custom_item_name_ar", "custom_description_ar"
 DESCRIPTION = "<p>A linen shirt for warm days.</p>"
 ARABIC_NAME = "قميص كتان"
 ARABIC_DESCRIPTION = "<p>قميص كتان للأيام الدافئة.</p>"
+UNSAFE_DESCRIPTION = '<p onclick="steal()">قميص كتان</p>'
 REBUILD = "commera.search.build.enqueue_full_rebuild"
 
 
@@ -118,12 +120,10 @@ class TestMoveItemArabicFields(IntegrationTestCase):
 		return frappe.get_all("Error Log", filters=filters, pluck="name")
 
 	def archived(self):
-		"""{item_code: archive row} of this test's Items, from the archive the patch saved."""
+		"""{item_code: archive row} of this test's Items, from every archive part the patch saved."""
 		rows = {}
 		for name in self.archive_files():
-			content = frappe.get_doc("File", name).get_content()
-			content = content.decode() if isinstance(content, bytes) else content
-			rows |= {row["item_code"]: row for row in csv.DictReader(io.StringIO(content))}
+			rows |= {row["item_code"]: row for row in read_archive(name)}
 		return {code: row for code, row in rows.items() if code.endswith(self.suffix)}
 
 	def run_patch(self):
@@ -200,6 +200,57 @@ class TestMoveItemArabicFields(IntegrationTestCase):
 		self.assertIn("Content Translation: 1.", log.error)
 		self.assertIn(archive.file_name, log.error)
 
+	def test_a_value_that_sanitising_changes_is_archived_raw(self):
+		unsafe = self.make_item("UNSAFE", **{DESCRIPTION_FIELD: UNSAFE_DESCRIPTION})
+		dirty = self.make_product(unsafe, "Rust")
+		saved = self.make_product(self.make_item("SAVED", **{DESCRIPTION_FIELD: UNSAFE_DESCRIPTION}), "Plum")
+		# A translation saved earlier holds the same sanitised value the patch would write.
+		register(PRODUCT, saved.name, "description", "ar", UNSAFE_DESCRIPTION)
+		clean = self.make_product(self.make_item("CLEAN", **{DESCRIPTION_FIELD: ARABIC_DESCRIPTION}), "Teal")
+
+		self.run_patch()
+
+		self.assertEqual(self.translations(dirty.name)["description"].translated_value, "<p>قميص كتان</p>")
+		self.assertEqual(self.translations(clean.name)["description"].translated_value, ARABIC_DESCRIPTION)
+		archived = self.archived()
+		self.assertEqual(sorted(archived), [f"ARABIC-SAVED-{self.suffix}", f"ARABIC-UNSAFE-{self.suffix}"])
+		for row in archived.values():
+			self.assertEqual(row[DESCRIPTION_FIELD], UNSAFE_DESCRIPTION)
+			self.assertEqual(row["reason"], f"{DESCRIPTION_FIELD}: sanitised on copy")
+
+	def test_the_archive_is_saved_in_parts(self):
+		loose = [self.make_plain_item(f"PART{index}", **{NAME_FIELD: ARABIC_NAME}) for index in range(3)]
+
+		# Every row fills a part.
+		with patch.object(migration, "ARCHIVE_PART_SIZE", 1):
+			self.run_patch()
+
+		files = sorted(
+			frappe.get_all("File", filters={"name": ("in", self.archive_files())}, pluck="file_name")
+		)
+		self.assertEqual(len(files), 3)
+		self.assertEqual([name.rsplit("-", 1)[1] for name in files], ["1.csv", "2.csv", "3.csv"])
+		parts = [[row["item_code"] for row in read_archive(name)] for name in self.archive_files()]
+		self.assertEqual(sorted(parts), [[item] for item in loose])
+		[log] = [frappe.get_doc("Error Log", name) for name in self.archive_logs()]
+		self.assertIn("Content Translation: 3.", log.error)
+		for name in files:
+			self.assertIn(name, log.error)
+
+	def test_a_failed_archive_save_keeps_the_fields(self):
+		self.make_plain_item("FAIL", **{NAME_FIELD: ARABIC_NAME})
+
+		with (
+			patch.object(File, "insert", side_effect=frappe.ValidationError("disk full")),
+			self.assertRaises(frappe.ValidationError),
+		):
+			self.run_patch()
+
+		for field in (NAME_FIELD, DESCRIPTION_FIELD):
+			self.assertTrue(frappe.db.has_column("Item", field))
+			self.assertTrue(frappe.db.exists("Custom Field", {"dt": "Item", "fieldname": field}))
+		self.assertEqual(self.archive_files(), [])
+
 	def test_a_size_item_is_archived_only_when_it_differs_from_its_template(self):
 		item = self.make_item("TPL", **{NAME_FIELD: ARABIC_NAME, DESCRIPTION_FIELD: ARABIC_DESCRIPTION})
 		same = self.make_plain_item(
@@ -264,6 +315,12 @@ class TestMoveItemArabicFields(IntegrationTestCase):
 		self.assertFalse(migration.has_arabic_translations())
 		self.assertEqual(self.archive_files(), [])
 		rebuild.assert_not_called()
+
+
+def read_archive(name):
+	content = frappe.get_doc("File", name).get_content()
+	content = content.decode() if isinstance(content, bytes) else content
+	return list(csv.DictReader(io.StringIO(content)))
 
 
 def keep_language_settings(test):

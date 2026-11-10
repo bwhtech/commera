@@ -2,7 +2,7 @@
 Both were Custom Fields made on each site, so a new site has neither and the patch does nothing."""
 
 import csv
-import tempfile
+import io
 
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import delete_custom_fields
@@ -20,6 +20,8 @@ FIELDS = {"custom_item_name_ar": "display_name", "custom_description_ar": "descr
 COLUMNS = {field: column for column, field in FIELDS.items()}
 BATCH_SIZE = 500
 ARCHIVE_PREFIX = "legacy-item-arabic-unmigrated"
+# Characters per archive part. Arabic text takes two bytes a character in UTF-8.
+ARCHIVE_PART_SIZE = 5_000_000
 ARCHIVE_TITLE = "Item Arabic values archived before the fields were dropped"
 ARCHIVE_HEADER = ("item_code", "item_name", *FIELDS, "reason")
 ROW_FIELDS = (
@@ -119,10 +121,13 @@ class ItemArabicMigration:
 		rows = []
 		for product, source in zip(products, sources, strict=True):
 			for field, value in arabic_values(items[product.item_style], self.columns).items():
-				kept = existing.get((product.name, field))
+				clean, kept = sanitize(value), existing.get((product.name, field))
+				# The products get the sanitised value, so the archive keeps the raw one.
+				if clean != value:
+					reasons[product.item_style].append(f"{COLUMNS[field]}: sanitised on copy")
 				if kept is None:
-					rows.append(make_row(product.name, field, value, source[field], timestamp))
-				elif kept != sanitize(value):
+					rows.append(make_row(product.name, field, clean, source[field], timestamp))
+				elif kept != clean:
 					reasons[product.item_style].append(
 						f"{COLUMNS[field]}: a product kept another translation"
 					)
@@ -167,42 +172,56 @@ class ItemArabicMigration:
 
 
 class Archive:
-	"""A private CSV on Commera Settings of the values the patch did not copy. Rows stream to disk."""
+	"""Private CSVs on Commera Settings of the values the patch did not copy.
+	A part is saved when it reaches ARCHIVE_PART_SIZE, so memory stays bounded."""
 
 	def __init__(self):
 		self.count = 0
-		self.buffer = tempfile.TemporaryFile("w+", encoding="utf-8", newline="")
-		self.writer = csv.writer(self.buffer)
-		self.writer.writerow(ARCHIVE_HEADER)
+		self.files = []
+		self.start_part()
 
 	def add(self, row, reasons: list[str]):
 		values = (cstr(row.get(column)) for column in FIELDS)
 		self.writer.writerow((row.name, row.item_name, *values, "; ".join(dict.fromkeys(reasons))))
 		self.count += 1
+		self.rows += 1
+		if self.buffer.tell() >= ARCHIVE_PART_SIZE:
+			self.save_part()
+			self.start_part()
 
 	def save(self):
-		with self.buffer:
-			if not self.count:
-				return
-			self.buffer.seek(0)
-			file = frappe.get_doc(
-				{
-					"doctype": "File",
-					"file_name": f"{ARCHIVE_PREFIX}-{today()}.csv",
-					"attached_to_doctype": SETTINGS,
-					"attached_to_name": SETTINGS,
-					"is_private": 1,
-					"content": self.buffer.read(),
-				}
-			)
-			file.flags.skip_file_size_check = True
-			file.insert(ignore_permissions=True)
+		"""Save the last part, then log the name of every part."""
+		if self.rows:
+			self.save_part()
+		if not self.files:
+			return
 		message = (
 			f"Items with Arabic values not copied into Content Translation: {self.count}. "
-			f"The values are in the private file {file.file_name} attached to {SETTINGS}."
+			f"The values are in the private files {', '.join(self.files)} attached to {SETTINGS}."
 		)
 		frappe.log_error(ARCHIVE_TITLE, message, SETTINGS, SETTINGS)
 		print(message)
+
+	def start_part(self):
+		self.rows = 0
+		self.buffer = io.StringIO()
+		self.writer = csv.writer(self.buffer)
+		self.writer.writerow(ARCHIVE_HEADER)
+
+	def save_part(self):
+		file = frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": f"{ARCHIVE_PREFIX}-{today()}-{len(self.files) + 1}.csv",
+				"attached_to_doctype": SETTINGS,
+				"attached_to_name": SETTINGS,
+				"is_private": 1,
+				"content": self.buffer.getvalue(),
+			}
+		)
+		file.flags.skip_file_size_check = True
+		file.insert(ignore_permissions=True)
+		self.files.append(file.file_name)
 
 
 def arabic_values(row, columns: list[str]) -> dict[str, str]:
@@ -227,7 +246,7 @@ def read_existing(names: list[str], fields: list[str]) -> dict[tuple[str, str], 
 
 
 def make_row(product: str, field: str, value: str, source: str, timestamp: str) -> tuple:
-	"""A Content Translation row as a save writes it: sanitised, current against the source now."""
+	"""A Content Translation row of a sanitised value, current against the source now."""
 	user = frappe.session.user
 	return (
 		frappe.generate_hash(length=10),
@@ -240,7 +259,7 @@ def make_row(product: str, field: str, value: str, source: str, timestamp: str) 
 		PRODUCT,
 		product,
 		field,
-		sanitize(value),
+		value,
 		get_source_hash(source),
 	)
 
