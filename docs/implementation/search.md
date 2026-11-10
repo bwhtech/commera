@@ -31,9 +31,10 @@ To add an engine, subclass `RemoteSearchEngine` in `commera/search/remote_engine
 The index holds the title of each product and the name of each category in every published storefront language. The titles come from Content Translation rows. Until #441, an Item's Arabic name fills in for a missing Arabic translation.
 
 - A query in any published language finds the record. The translated titles are part of the record's `content`. Search-server engines also get the Arabic title in `title_ar`.
-- Saving or deleting a title translation reindexes its record.
-- A change to the default or the published languages in Commera Settings rebuilds the index.
-- The `LIKE` query also looks in the title translations, so short terms find translated titles.
+- SQLite normalises Arabic words in the same way in the index and in the query (`commera/search/arabic.py`). It removes the article (`ال`, and `وال`, `بال`, `كال`, `فال`, `لل`), harakat and tatweel. It changes `أ إ آ ٱ` to `ا`, `ة` to `ه` and `ى` to `ي`. Thus `قميص` finds `القميص`. The index keeps the written words too, and the storefront shows them unchanged.
+- Saving or deleting a title translation reindexes its record. When an edit moves a translation to a different record or language, the old record is also reindexed.
+- A change to the default or the published languages in Commera Settings rebuilds the index. A build compares the languages at its start and end. If they changed while it ran, it enqueues one more build, unless a build is already queued.
+- The `LIKE` query also looks in the shop-wide title translations of the published languages, so short terms find translated titles.
 
 ## Search as you type
 

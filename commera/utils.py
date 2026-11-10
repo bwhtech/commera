@@ -318,7 +318,8 @@ def get_product_base_query(filters=None, product_list=None):
 				| (item.name.like(f"%{search}%"))
 			)
 			# Short terms and indexes without the term's language land here, so translated titles match too.
-			search_condition |= style_attribute_variant.name.isin(translated_title_matches(search))
+			if (translated := translated_title_matches(search)) is not None:
+				search_condition |= style_attribute_variant.name.isin(translated)
 			if frappe.db.has_column("Item", "custom_item_name_ar"):
 				search_condition |= item.custom_item_name_ar.like(f"%{search}%")
 			if child_categories:
@@ -335,15 +336,23 @@ def get_product_base_query(filters=None, product_list=None):
 
 
 def translated_title_matches(search):
-	"""Products with a shop-wide title translation that contains `search`, as a subquery."""
+	"""Products with a shop-wide title in a search language that contains `search`, as a subquery.
+	None when the store publishes no language besides the default."""
+	from commera.localization.content import SHOP_WIDE
+	from commera.search.translations import TITLE_FIELD, get_search_languages
+
+	codes = [language.code for language in get_search_languages()]
+	if not codes:
+		return None
 	translation = DocType("Content Translation")
 	return (
 		frappe.qb.from_(translation)
 		.select(translation.reference_name)
 		.where(
 			(translation.reference_doctype == "Style Attribute Variant")
-			& (translation.reference_field == "display_name")
-			& (translation.market == "")
+			& (translation.reference_field == TITLE_FIELD)
+			& (translation.market == SHOP_WIDE)
+			& translation.language.isin(codes)
 			& translation.translated_value.like(f"%{search}%")
 		)
 	)

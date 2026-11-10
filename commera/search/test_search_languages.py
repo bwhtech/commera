@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.utils import CallbackManager
+from rq.job import JobStatus
 
 from commera import utils
 from commera.localization import content as localization_content
@@ -16,6 +18,7 @@ from commera.search.catalogue_fixtures import SEARCH_TOKEN, STYLE_ITEM, SearchCa
 from commera.search.engine_cache import clear_search_engine
 from commera.search.sqlite_product_search import SqliteProductSearch
 from commera.search.translations import search_languages_changed
+from commera.tests.test_localization import set_storefront_languages
 from commera.utils import translated_title_matches
 
 TEST_INDEX_NAME = "test_commera_search_languages.db"
@@ -26,16 +29,17 @@ SETTINGS_MODULE = "commera.commera_ecommerce.doctype.commera_settings.commera_se
 FRENCH_TITLE, FRENCH_TERM = "Zzbidule Rouge Premium", "zzbidule"
 ARABIC_TITLE, ARABIC_TERM = "ودجت أحمر فاخر", "ودجت"
 FRENCH_CATEGORY, FRENCH_CATEGORY_TERM = "Zzrayon Bidules", "zzrayon"
-ARABIC_CATEGORY, ARABIC_CATEGORY_TERM = "منوعات تجريبية", "منوعات"
+ARABIC_CATEGORY, ARABIC_CATEGORY_TERM = "منوعات الأحذية الرياضية", "منوعات"
 
 
 class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		cls.original_index_name = SqliteProductSearch.INDEX_NAME
-		cls.original_indexable = SqliteProductSearch.INDEXABLE_DOCTYPES
-		SqliteProductSearch.INDEX_NAME = TEST_INDEX_NAME
+		# Each cleanup is registered before its change, so a failing setUpClass still undoes it.
+		cls.swap_engine_attribute("INDEX_NAME", TEST_INDEX_NAME)
+		cls.addClassCleanup(cls.drop_test_index)
+		cls.addClassCleanup(cls.drop_fixtures)
 
 		settings = frappe.get_cached_doc("Commera Settings")
 		cls.default_price_list = settings.default_price_list
@@ -57,14 +61,19 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		frappe.db.commit()  # nosemgrep: frappe-manual-commit
 
 	@classmethod
-	def tearDownClass(cls):
+	def swap_engine_attribute(cls, name, value):
+		cls.addClassCleanup(setattr, SqliteProductSearch, name, getattr(SqliteProductSearch, name))
+		setattr(SqliteProductSearch, name, value)
+
+	@classmethod
+	def drop_fixtures(cls):
 		# Deleting the records also deletes their translations.
 		cls.drop_catalogue()
 		frappe.db.commit()  # nosemgrep: frappe-manual-commit
+
+	@classmethod
+	def drop_test_index(cls):
 		SqliteProductSearch().drop_index()
-		SqliteProductSearch.INDEX_NAME = cls.original_index_name
-		SqliteProductSearch.INDEXABLE_DOCTYPES = cls.original_indexable
-		super().tearDownClass()
 
 	def setUp(self):
 		self.publish("en", "fr", "ar")
@@ -74,7 +83,7 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		scoped = copy.deepcopy(SqliteProductSearch.INDEXABLE_DOCTYPES)
 		scoped[PRODUCT]["filters"] = {"is_published": 1, "name": ("in", [cls.red, cls.blue, cls.green])}
 		scoped[CATEGORY]["filters"] = {"enabled": 1, "name": ("in", [cls.category])}
-		SqliteProductSearch.INDEXABLE_DOCTYPES = scoped
+		cls.swap_engine_attribute("INDEXABLE_DOCTYPES", scoped)
 
 	def publish(self, *codes):
 		"""Publish `codes`, then rebuild the index as a publish does."""
@@ -111,6 +120,39 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 	def test_english_queries_still_match(self):
 		self.assertEqual(set(self.product_names(SEARCH_TOKEN)), {self.red, self.blue, self.green})
 
+	def test_arabic_queries_match_with_or_without_the_article(self):
+		self.add_titles("ar", {self.blue: "القميص الأزرق", self.green: "قميص أخضر للمدرسة"})
+		for term in ("قميص", "القميص", "قَمِيص"):
+			with self.subTest(term=term):
+				self.assertEqual(set(self.product_names(term)), {self.blue, self.green})
+				self.assertEqual(set(self.engine.search_products({"search": term})), {self.blue, self.green})
+		self.assertEqual(self.product_names("ازرق"), [self.blue])
+
+	def test_arabic_queries_fold_alef_and_ta_marbuta(self):
+		self.add_titles("ar", {self.green: "قميص أخضر للمدرسة"})
+		for term in ("مدرسه", "المدرسة", "مدرسة"):
+			with self.subTest(term=term):
+				self.assertEqual(self.product_names(term), [self.green])
+		# The red title has "أحمر": a query with a bare alef or with the article still finds it.
+		for term in ("احمر", "الأحمر", "إحمر"):
+			with self.subTest(term=term):
+				self.assertEqual(self.product_names(term), [self.red])
+
+	def test_arabic_category_names_match_normalised_forms(self):
+		for term in ("أحذية", "احذيه", "الاحذية", "رياضيه"):
+			with self.subTest(term=term):
+				self.assertEqual(self.engine.typeahead(term)["category_names"], [self.category])
+
+	def test_arabic_titles_keep_their_written_form(self):
+		self.add_titles("ar", {self.blue: "القميص الأزرق"})
+		[record] = record_builder.build_product_search_records([self.blue])
+		self.assertEqual(record["titles"]["ar"], "القميص الأزرق")
+		[row] = self.engine.sql(
+			"SELECT content FROM search_fts WHERE doc_id = ?", (f"{PRODUCT}:{self.blue}",), read_only=True
+		)
+		self.assertIn("القميص الأزرق", row["content"])
+		self.assertIn("قميص ازرق", row["content"])
+
 	# -- what the index holds ----------------------------------------------------------------------
 
 	def test_only_published_languages_are_indexed(self):
@@ -141,6 +183,21 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		) as fetch:
 			record_builder.build_product_search_records([self.red, self.blue, self.green])
 		self.assertEqual(fetch.call_count, 2)
+
+	def test_the_like_fallback_skips_unpublished_languages(self):
+		with patch("commera.search.sync.frappe.enqueue"):
+			name = register(PRODUCT, self.blue, "display_name", "de", "Zzding Blau")
+		self.addCleanup(frappe.db.delete, "Content Translation", name)
+		frappe.set_user("Guest")
+		self.addCleanup(frappe.set_user, "Administrator")
+		self.assertTrue(search_query.use_qb_fallback({"search": "Zzd"}))
+		self.assertNotIn(self.blue, [card["name"] for card in utils.get_product_list({"search": "Zzd"})])
+		self.assertEqual(translated_title_matches("Zzding").run(pluck=True), [])
+
+	def test_the_like_fallback_needs_a_search_language(self):
+		self.publish("en")
+		self.assertIsNone(translated_title_matches("Zzbid"))
+		self.assertNotIn(self.red, [card["name"] for card in utils.get_product_list({"search": "Zzb"})])
 
 	def test_short_terms_match_translated_titles_on_frappe_qb(self):
 		# Too short for SQLite, so frappe.qb serves it and must look in the translations too.
@@ -175,6 +232,19 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 			self.addCleanup(frappe.db.delete, "Content Translation", name)
 		self.assertEqual(upserts(enqueue), [])
 
+	def test_moving_a_translation_to_an_unpublished_language_drops_its_title(self):
+		name = self.add_titles("fr", {self.blue: "Zzmachin Bleu"})[0]
+		self.assertEqual(self.product_names("zzmachin"), [self.blue])
+		upserted = self.edit_translation(name, language="de")
+		self.assertEqual(upserted, [(PRODUCT, self.blue)])
+		self.assertEqual(self.product_names("zzmachin"), [])
+
+	def test_moving_a_translation_to_another_product_reindexes_both(self):
+		name = self.add_titles("fr", {self.blue: "Zzmachin Bleu"})[0]
+		upserted = self.edit_translation(name, reference_name=self.green)
+		self.assertEqual(set(upserted), {(PRODUCT, self.blue), (PRODUCT, self.green)})
+		self.assertEqual(self.product_names("zzmachin"), [self.green])
+
 	def test_publishing_a_language_rebuilds_the_index(self):
 		before = frappe.get_single("Commera Settings")
 		settings = frappe.get_single("Commera Settings")
@@ -188,6 +258,37 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 			settings.on_update()
 		rebuild.assert_called_once_with(deduplicate=True)
 
+	def test_a_language_change_during_a_build_rebuilds_again(self):
+		def change_languages(*args, **kwargs):
+			if not changed:
+				changed.append(True)
+				set_storefront_languages("en", published=("en", "fr"))
+			return paginate(*args, **kwargs)
+
+		changed, paginate = [], SqliteProductSearch.get_documents_paginated
+		with patch.object(SqliteProductSearch, "get_documents_paginated", autospec=True) as patched:
+			patched.side_effect = change_languages
+			callbacks = self.build_with_after_commit()
+		# Started builds suppress a deduplicated enqueue, so the build must enqueue its own successor.
+		with patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild:
+			callbacks.run()
+		rebuild.assert_called_once_with()
+
+	def test_a_build_with_unchanged_languages_or_a_queued_build_enqueues_nothing(self):
+		callbacks = self.build_with_after_commit()
+		with patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild:
+			callbacks.run()
+		rebuild.assert_not_called()
+
+		callbacks = self.build_with_after_commit()
+		set_storefront_languages("en", published=("en",))
+		with (
+			patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild,
+			patch("commera.search.translations.get_job_status", return_value=JobStatus.QUEUED),
+		):
+			callbacks.run()
+		rebuild.assert_not_called()
+
 	def test_only_index_languages_count_as_a_change(self):
 		before = frappe.get_single("Commera Settings")
 		unpublished = frappe.get_single("Commera Settings")
@@ -200,6 +301,35 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		self.assertTrue(search_languages_changed(before, published))
 
 	# -- helpers -----------------------------------------------------------------------------------
+
+	def add_titles(self, language, titles):
+		"""Register `titles` {product: title} in `language` and index them, removed after the test."""
+		with patch("commera.search.sync.frappe.enqueue"):
+			names = [
+				register(PRODUCT, product, "display_name", language, title)
+				for product, title in titles.items()
+			]
+		# setUp rebuilds the index for the next test, so only the rows need removing.
+		self.addCleanup(frappe.db.delete, "Content Translation", {"name": ("in", names)})
+		SqliteProductSearch().index_docs(PRODUCT, list(titles))
+		return names
+
+	def edit_translation(self, name, **changes):
+		"""Save `changes` to a translation, then run the upserts it enqueued. Returns them."""
+		translation = frappe.get_doc("Content Translation", name)
+		with patch("commera.search.sync.frappe.enqueue") as enqueue:
+			translation.update(changes).save(ignore_permissions=True)
+		for doctype, record in upserts(enqueue):
+			sync.upsert_doc(doctype, record)
+		return upserts(enqueue)
+
+	def build_with_after_commit(self):
+		"""Rebuild the index. Returns the after-commit callbacks the build left, without running them."""
+		callbacks = CallbackManager()
+		with patch.object(frappe.db, "after_commit", callbacks):
+			SqliteProductSearch().drop_index()
+			SqliteProductSearch().build_index()
+		return callbacks
 
 	def delete_translation(self, name, record):
 		frappe.db.delete("Content Translation", name)

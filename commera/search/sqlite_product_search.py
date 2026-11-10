@@ -1,6 +1,5 @@
 import difflib
 import os
-import re
 import sqlite3
 from typing import ClassVar
 
@@ -9,6 +8,7 @@ from frappe.search.sqlite_search import MAX_EDIT_DISTANCE, MIN_WORD_LENGTH, SQLi
 from frappe.utils import create_batch, flt
 
 from commera.localization.languages import StorefrontLanguages
+from commera.search.arabic import arabic_search_forms, is_arabic_query, normalize_arabic_word
 from commera.search.engine import (
 	CARD_COLUMNS,
 	MIN_QUERY_LENGTH,
@@ -21,6 +21,7 @@ from commera.search.record_builder import (
 	build_category_search_records,
 	build_product_search_records,
 )
+from commera.search.translations import language_generation, rebuild_if_languages_change
 
 FACET_COLUMN_TO_KEY = {"brand": "brand", "color": "color", "item_group": "category"}
 
@@ -34,7 +35,6 @@ SEARCH_CLASS_PATH = "commera.search.sqlite_product_search.SqliteProductSearch"
 CORE_BUILD_INDEX = "frappe.search.sqlite_search.build_index"
 BUILD_TIMEOUT = 2 * 60 * 60 + 10 * 60
 
-ARABIC_PATTERN = re.compile("[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]")
 ARABIC_SCRIPT_LANGUAGES = {"ar", "fa", "ur"}
 
 
@@ -162,6 +162,11 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 	# -- builds ---------------------------------------------------------------------------------
 
+	def build_index(self, batch_size=1000, is_continuation=False):
+		generation = language_generation()
+		super().build_index(batch_size=batch_size, is_continuation=is_continuation)
+		rebuild_if_languages_change(self, generation, SEARCH_CLASS_PATH)
+
 	def enqueue_full_rebuild(self, deduplicate=False):
 		"""Enqueue a full rebuild on the long queue. Returns the enqueue payload."""
 		# Core builds into a temp DB and renames it over the live one, so the index keeps serving.
@@ -239,7 +244,10 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	def prepare_document(self, doc):
 		document = super().prepare_document(doc)
 		if document:
-			document["content"] = getattr(doc, "search_content", document.get("content", ""))
+			content = getattr(doc, "search_content", document.get("content", ""))
+			# The tokenizer has no Arabic rules: also index each Arabic word as a query normalises it.
+			forms = arabic_search_forms(f"{document.get('title') or ''} {content}")
+			document["content"] = f"{content} {forms}".strip()
 			document["_sizes"] = getattr(doc, "sizes", None) or []
 			document["_detail"] = getattr(doc, "product_detail", None)
 		return document
@@ -559,7 +567,8 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		expanded_terms = []
 		corrections = {}
 
-		for word in query.strip().split():
+		for typed in query.strip().split():
+			word = normalize_arabic_word(typed)
 			if self.word_in_vocabulary(word):
 				expanded_terms.append(word)
 				continue
@@ -567,13 +576,13 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			similar_words = self._find_similar_words(word)
 			if similar_words and similar_words[0] != word:
 				expanded_terms.append(similar_words[0])
-				corrections[word] = similar_words[0]
+				corrections[typed] = similar_words[0]
 				continue
 
 			edit_distance_word = self.find_edit_distance_correction(word)
 			if edit_distance_word and edit_distance_word != word.lower():
 				expanded_terms.append(edit_distance_word)
-				corrections[word] = edit_distance_word
+				corrections[typed] = edit_distance_word
 			else:
 				expanded_terms.append(word)
 
@@ -664,8 +673,3 @@ def levenshtein_distance(source, target):
 		previous_row = current_row
 
 	return previous_row[-1]
-
-
-def is_arabic_query(text):
-	"""True if the text carries any Arabic-script character."""
-	return bool(ARABIC_PATTERN.search(text or ""))
