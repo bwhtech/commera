@@ -209,12 +209,18 @@ doc_events = {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},
 	"Quotation": {
-		"before_validate": "commera.discounts.pricing.remove_code_discounts",
+		"before_validate": [
+			"commera.discounts.pricing.remove_code_discounts",
+			"commera.cart_prices.keep_regular_rates",
+		],
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 	},
 	"Sales Order": {
 		"before_insert": "commera.discounts.pricing.drop_copied_discounts",
-		"before_validate": "commera.discounts.pricing.remove_code_discounts",
+		"before_validate": [
+			"commera.discounts.pricing.remove_code_discounts",
+			"commera.cart_prices.keep_regular_rates",
+		],
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 		"after_insert": [
 			"commera.discounts.usage.record_discount_uses",
@@ -286,7 +292,10 @@ doc_events = {
 		],
 	},
 	"Sales Invoice": {
-		"before_validate": "commera.discounts.pricing.remove_code_discounts",
+		"before_validate": [
+			"commera.discounts.pricing.remove_code_discounts",
+			"commera.cart_prices.keep_regular_rates",
+		],
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 		"on_submit": "commera.utils.update_so_status_from_related_doc",
 	},

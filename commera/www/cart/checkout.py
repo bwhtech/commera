@@ -13,6 +13,7 @@ from commera.api.payments import (
 )
 from commera.api.shipping import get_charge_amount, get_checkout_summary
 from commera.base_prices import base_price_filters
+from commera.cart_prices import is_priced_in
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	get_code_states,
 	get_quantities_by_item_code,
@@ -22,6 +23,7 @@ from commera.core import _get_cart_quotation
 from commera.discounts.selection import get_discount_codes
 from commera.guest import is_guest
 from commera.localization import url
+from commera.localization.market_prices import MarketPrices
 from commera.sdk.catalog import set_product_titles
 from commera.utils import (
 	format_addresses,
@@ -121,7 +123,7 @@ def set_cart_context(context, commera_settings):
 	cart_quotation = _get_cart_quotation()
 	if not cart_quotation or not cart_quotation.items:
 		frappe.redirect(url("/cart"))
-	default_price_list = commera_settings.get("default_price_list")
+	default_price_list = MarketPrices.current().compare_at_price_list
 	context.cart_quotation = cart_quotation
 	context.cart_needs_refresh = cart_needs_refresh(cart_quotation)
 	context.cart_payable_total = get_charge_amount(cart_quotation)
@@ -146,6 +148,8 @@ def cart_needs_refresh(quotation) -> bool:
 	server_cart = get_session_cart()
 	if quotation.is_new() or not server_cart:
 		return False
+	if not is_priced_in(quotation, MarketPrices.current()):
+		return True
 	quotation_lines = [row for row in quotation.items if not row.is_free_item]
 	return get_quantities_by_item_code(server_cart.get_selected_lines()) != get_quantities_by_item_code(
 		quotation_lines

@@ -20,6 +20,7 @@ from commera.discounts.selection import (
 	validate_new_discount_code,
 )
 from commera.guest import clear_guest_cart_cookie, get_guest_cart_key, is_guest, set_guest_cart_cookie
+from commera.localization.market_prices import MarketPrices
 from commera.plugin_events import fire_event, get_handlers
 from commera.utils import get_available_stocks, get_free_delivery
 
@@ -163,6 +164,27 @@ class CommeraCart(Document):
 	def get_selected_lines(self) -> list:
 		return [row for row in self.lines if cint(row.selected)]
 
+	def get_payable_lines(self, unavailable: set[str] | None = None) -> list:
+		"""The ticked lines the current market has a price for."""
+		if unavailable is None:
+			unavailable = self.get_unavailable_items()
+		return [row for row in self.get_selected_lines() if row.item_code not in unavailable]
+
+	def get_unavailable_items(self) -> set[str]:
+		return MarketPrices.current().get_unavailable([row.item_code for row in self.lines])
+
+	def move_to_market(self, market: str):
+		"""Reprice in `market`. After a switch, a code that takes nothing off there is dropped; the
+		priced cart lists it once more, with its reason."""
+		previous, self.market = self.market, market
+		if not previous or previous == market or not self.discount_codes:
+			return
+		states = get_code_states(self.get_quotation_preview())
+		dropped = [{**state, "removed": True} for state in states if not state["applied"]]
+		for state in dropped:
+			self.remove_discount_code(state["code"])
+		self.flags.dropped_codes = dropped
+
 	def add_discount_code(self, code: str):
 		codes = [applied_code for applied_code in get_discount_codes(self) if get_code_discount(applied_code)]
 		preview = self.get_quotation_preview()
@@ -183,11 +205,12 @@ class CommeraCart(Document):
 		return lines_by_item_code
 
 	def get_priced_cart(self) -> dict:
-		# Unticked lines are priced on their own, without discounts.
-		quotation = self.get_quotation_preview()
-		selected_lines = self.get_selected_lines()
-		items_by_row = dict(zip([row.name for row in selected_lines], quotation.items, strict=True))
-		if other_lines := [row for row in self.lines if not cint(row.selected)]:
+		# Unticked and unavailable lines are priced on their own, without discounts.
+		unavailable = self.get_unavailable_items()
+		payable_lines = self.get_payable_lines(unavailable)
+		quotation = self.get_quotation_preview(payable_lines)
+		items_by_row = dict(zip([row.name for row in payable_lines], quotation.items, strict=True))
+		if other_lines := [row for row in self.lines if row.name not in items_by_row]:
 			plain_quotation = get_preview_quotation(
 				get_preview_lines(other_lines), user=self.user, flags={"commera_discounts": []}
 			)
@@ -197,22 +220,25 @@ class CommeraCart(Document):
 			"version": self.version,
 			"revision": cint(self.revision),
 			"attributes": parse_attributes(self.attributes),
+			"market": self.market,
 			"currency": quotation.currency,
-			"discount_codes": get_code_states(quotation),
+			"discount_codes": [*get_code_states(quotation), *(self.flags.dropped_codes or [])],
 			"automatic_discounts": get_automatic_discounts(quotation),
 			"discounts": get_price_discount_rows(quotation),
-			"lines": [get_priced_line(row, items_by_row[row.name]) for row in self.lines],
+			"lines": [
+				get_priced_line(row, items_by_row[row.name], row.item_code not in unavailable)
+				for row in self.lines
+			],
 			"subtotal": flt(quotation.total),
 			"order_discount": flt(quotation.custom_code_order_discount),
 			"total": flt(quotation.net_total),
 			**get_free_delivery(quotation),
 		}
 
-	def get_quotation_preview(self):
+	def get_quotation_preview(self, lines: list | None = None):
+		lines = self.get_payable_lines() if lines is None else lines
 		fields = {**frappe.parse_json(self.plugin_fields or "{}"), "custom_cart_attributes": self.attributes}
-		return get_preview_quotation(
-			get_preview_lines(self.get_selected_lines()), self.discount_codes, self.user, fields=fields
-		)
+		return get_preview_quotation(get_preview_lines(lines), self.discount_codes, self.user, fields=fields)
 
 	def update_quotation(self, quotation):
 		# Split by attributes only while the qty still matches the ticked lines.
@@ -286,6 +312,7 @@ def get_code_states(quotation) -> list[dict]:
 				"discount_class": discount.discount_class if discount else None,
 				"applied": is_applied,
 				"reason": None if is_applied else get_code_reason(cart, code, selections),
+				"removed": False,
 			}
 		)
 	return states
@@ -323,7 +350,7 @@ def get_automatic_discounts(quotation) -> list[dict]:
 	]
 
 
-def get_priced_line(row, item) -> dict:
+def get_priced_line(row, item, available: bool) -> dict:
 	return {
 		"line_id": row.name,
 		"item_code": row.item_code,
@@ -336,6 +363,7 @@ def get_priced_line(row, item) -> dict:
 		"code_discount": flt(item.custom_code_discount),
 		"discount": item.custom_discount,
 		"amount": flt(item.amount),
+		"available": available,
 	}
 
 

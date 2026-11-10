@@ -224,6 +224,17 @@ The product OG card (`/og-image/<handle>.png`) shows the store price. A secondar
 
 The patch `set_market_price_lists` gives each market without a sale price list the Commera Settings lists: the sale price list (or the default price list when there is no sale list) as the sale price list, the default price list as the compare-at list, and their currency. The market then prices every item like the primary market. It logs a market it cannot fill.
 
+### Market cart
+
+The cart uses the price rule above, in every market (`commera/cart_prices.py`):
+
+- The cart quotation uses the sale price list and the currency of the current market. ERPNext prices each line from the sale price list. A line that only the compare-at price list prices gets the compare-at rate. Commera does not convert currency.
+- A line with a rate in neither list has `available: false` and a price of 0, in the primary market too. It is not in the subtotal or in the discounts. `cart.add_lines` refuses such an item, and checkout refuses a cart that has one. The message gives the product title and size.
+- The server cart keeps the handle of its market (`market`). A request in another market prices the same cart in the new market and currency. A read does not save the change; the next change to the cart saves it.
+- After a switch, each discount code that takes nothing off in the new market is removed. The priced cart lists the code one more time with `removed: true` and the reason.
+- A checkout quotation priced in another market is rebuilt (`cart_needs_refresh`). Payment refuses it until it is rebuilt.
+- With the Stock Settings option "Auto insert Item Price if missing", ERPNext adds a sale-list price from the rate of a line that has none. For cart quotations, orders and invoices, Commera clears the rate of such a line before validation, so ERPNext calculates it again from the compare-at rate and adds no price.
+
 The cart keeps the store price list and currency. Search sorting and price filters on the search index, and taxes, do not use market prices yet.
 
 **Limitation (v1).** A regional language, such as `pt-BR`, shows in the primary market only, at its own URL (`/pt-br/`). To serve Portuguese in a market, publish the base language `pt` and add it to the market. A market saved before this rule can keep its regional rows. Commera serves no URL for them. You can still remove those rows or disable the market.

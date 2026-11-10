@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import frappe
 from frappe.utils.data import flt
 
-from commera.base_prices import base_price_filters
+from commera.api.variant_pricing import get_base_price_rows_by_key
 from commera.localization.markets import Market
 from commera.localization.resolver import get_localization
 from commera.utils import get_store_currency
@@ -61,11 +61,19 @@ class MarketPrices:
 		"""The items this market cannot sell: those with no price in either of its price lists."""
 		if self.uses_store_prices or not item_codes:
 			return set()
-		priced = frappe.get_all(
-			"Item Price",
-			filters=base_price_filters(
-				{"item_code": ("in", item_codes), "price_list": ("in", self.price_lists)}
-			),
-			pluck="item_code",
-		)
-		return set(item_codes) - set(priced)
+		return self.get_unavailable(item_codes)
+
+	def get_unavailable(self, item_codes: list[str]) -> set[str]:
+		"""Items neither list prices. A cart cannot sell them in any market, the primary one included."""
+		sale, compare_at = self.get_base_rates(item_codes)
+		return set(item_codes) - set(sale) - set(compare_at)
+
+	def get_base_rates(self, item_codes: list[str]) -> tuple[dict[str, float], dict[str, float]]:
+		"""(sale, compare-at) public rates by item code. Customer rows are negotiated contracts."""
+		sale, compare_at = {}, {}
+		for (item_code, price_list), row in get_base_price_rows_by_key(item_codes, self.price_lists).items():
+			if price_list == self.sale_price_list:
+				sale[item_code] = flt(row.price_list_rate)
+			if price_list == self.compare_at_price_list:
+				compare_at[item_code] = flt(row.price_list_rate)
+		return sale, compare_at

@@ -4,11 +4,13 @@ from frappe.utils.data import cint, cstr, flt
 
 from commera.api.payments import cart_write_lock, save_cart_quotation, validate_cart_is_not_in_checkout
 from commera.api.shipping import get_checkout_summary, reprice_shipping_discount
+from commera.cart_prices import describe_items, validate_available
 from commera.checkout_hooks import apply_plugin_fees
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import CommeraCart, get_session_cart
 from commera.core import _get_cart_quotation
 from commera.discounts.allocations import get_allocations
 from commera.guest import get_guest_cart_name, is_guest
+from commera.localization import get_localization
 from commera.localization.market_prices import MarketPrices
 from commera.plugin_events import get_listed_items, get_plugin_fieldnames, validate_plugin_fieldnames
 from commera.sdk.lines import LineProducts
@@ -155,7 +157,7 @@ def replace_lines(lines: list[dict], revision: int | None) -> PricedCart | None:
 def validate_items_for_sale(lines: list[dict]):
 	item_codes = {cstr(line["item_code"]) for line in lines}
 	if unlisted := item_codes - get_listed_items(list(item_codes), sellable_only=True):
-		frappe.throw(_("{0} is not for sale.").format(", ".join(sorted(unlisted))))
+		frappe.throw(_("{0} is not for sale.").format(describe_items(unlisted)))
 	validate_market_prices(item_codes)
 
 
@@ -170,11 +172,7 @@ def validate_increases(cart: CommeraCart, lines: list[dict]):
 
 
 def validate_market_prices(item_codes: set[str]):
-	if unpriced := MarketPrices.current().get_unpriced(sorted(item_codes)):
-		frappe.throw(
-			_("{0} is not available in this market.").format(", ".join(sorted(unpriced))),
-			title=_("Not Available"),
-		)
+	validate_available(MarketPrices.current(), list(item_codes))
 
 
 def update_lines(lines: list[dict]) -> PricedCart:
@@ -222,11 +220,14 @@ def get_existing_cart() -> CommeraCart:
 
 
 def save_server_cart(cart: CommeraCart) -> PricedCart:
+	cart.move_to_market(get_localization().market.handle)
 	cart.save(ignore_permissions=True)
 	return price_cart(cart)
 
 
 def price_cart(cart: CommeraCart) -> PricedCart:
+	"""Priced in the request's market. A read saves no switch: the next change to the cart does."""
+	cart.move_to_market(get_localization().market.handle)
 	priced = cart.get_priced_cart()
 	line_products = LineProducts([line["item_code"] for line in priced["lines"]])
 	products = line_products.get_cart_products()

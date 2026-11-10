@@ -24,6 +24,7 @@ from commera.api.shipping import (
 	reprice_shipping_discount,
 )
 from commera.api.signup import get_placeholder_first_name, validate_single_email, validate_user_names
+from commera.cart_prices import apply_market, is_priced_in, price_regular_lines, validate_available
 from commera.checkout_hooks import (
 	apply_plugin_fees,
 	filter_payment_methods,
@@ -52,6 +53,7 @@ from commera.guest import (
 	validate_guest_checkout_enabled,
 )
 from commera.localization import url
+from commera.localization.market_prices import MarketPrices
 from commera.order_access import get_order_link, set_order_access_key
 from commera.plugin_events import fire_event, get_plugin_fieldnames
 from commera.utils import (
@@ -171,6 +173,7 @@ def open_checkout(
 	"""`is_reviewed`: the buyer approved this checkout in a review, so cash on delivery must place it as is."""
 	validate_delivery_option(quotation, delivery_option)
 	validate_cart_is_not_in_checkout(quotation.name)
+	validate_cart_market(quotation)
 	quotation.flags.strict_plugin_fees = True
 	drop_refused_codes(quotation)
 	update_delivery_charges(quotation)
@@ -261,6 +264,21 @@ def validate_cart(quotation):
 	if refusal := get_cart_refusal(quotation):
 		# Not refuse_payment: the shopper can fix this, so it is no error to log.
 		frappe.throw(refusal)
+
+
+def validate_cart_market(quotation):
+	prices = MarketPrices.current()
+	if not is_priced_in(quotation, prices):
+		frappe.throw(
+			_("Your cart was priced in another market. Please review it before placing your order."),
+			title=_("Market Changed"),
+			exc=CheckoutPriceChangedError,
+		)
+	validate_available(
+		prices,
+		[item.item_code for item in quotation.items if not item.is_free_item],
+		_("{0} is not available in this market. Remove it from your cart to check out."),
+	)
 
 
 def drop_refused_codes(quotation):
@@ -500,6 +518,7 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 def create_sales_invoice(sales_order, payment_mode: str, paid_amount: float, reference_no: str | None):
 	sales_invoice = make_sales_invoice(sales_order.name, ignore_permissions=True)
 	sales_invoice.flags.ignore_permissions = True
+	sales_invoice.flags.commera_cart_order = True
 	sales_invoice.insert()
 	sales_invoice.submit()
 	create_payment_entry(sales_invoice, payment_mode, paid_amount, reference_no)
@@ -618,11 +637,11 @@ def get_guest_party(email: str) -> tuple[str, str]:
 
 
 def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
-	sale_price_list = frappe.get_cached_value("Commera Settings", "Commera Settings", "sale_price_list")
+	prices = MarketPrices.current()
 	ecommerce_warehouse = frappe.get_cached_value(
 		"Commera Settings", "Commera Settings", "ecommerce_warehouse"
 	)
-	unsaved_quotation_doc.selling_price_list = sale_price_list
+	apply_market(unsaved_quotation_doc, prices)
 	set_attribution_fields(unsaved_quotation_doc)
 	unsaved_quotation_doc.items = []
 	for item in cart["items"]:
@@ -636,6 +655,7 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 		)
 	if server_cart := get_session_cart():
 		server_cart.update_quotation(unsaved_quotation_doc)
+	price_regular_lines(unsaved_quotation_doc, prices)
 	save_cart_quotation(unsaved_quotation_doc)
 	# The stored option was priced for the old cart, and payment would re-quote it for the new one.
 	clear_delivery_option(unsaved_quotation_doc)
