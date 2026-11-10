@@ -19,7 +19,7 @@
   },
   {
    "default": "0",
-   "description": "When enabled, /en/foo/bar also looks for pages/en/foo/bar.html in the active theme if no route matches. Off by default: the route table is the supported surface.",
+   "description": "When enabled, /foo/bar (and /ar/foo/bar) also looks for pages/foo/bar.html in the active theme if no route matches. Off by default: the route table is the supported surface.",
    "fieldname": "dynamic_pages_enabled",
    "fieldtype": "Check",
    "label": "Enable Dynamic Pages"
@@ -39,7 +39,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-16 12:00:00",
+ "modified": "2026-11-10 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Shop Themes",
  "name": "Shop Theme Settings",

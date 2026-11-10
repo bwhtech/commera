@@ -10,10 +10,11 @@ from commera.localization.content import (
 from commera.localization.languages import MAX_STOREFRONT_LANGUAGES, Language, StorefrontLanguages
 from commera.localization.resolver import (
 	Localization,
-	apply_request_language,
 	find_request_language,
 	get_localization,
+	get_route_path,
 	resolve,
+	strip_language_prefix,
 )
 from commera.localization.resources import (
 	TranslatableResource,
@@ -31,13 +32,14 @@ __all__ = [
 	"StorefrontLanguages",
 	"TranslatableResource",
 	"TranslatedValue",
-	"apply_request_language",
 	"delete_translations",
 	"find_request_language",
 	"get_localization",
+	"get_route_path",
 	"get_translatable_fields",
 	"get_translatable_resources",
 	"register",
 	"resolve",
+	"strip_language_prefix",
 	"translate",
 ]

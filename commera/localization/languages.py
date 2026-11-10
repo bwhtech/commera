@@ -56,6 +56,10 @@ class StorefrontLanguages:
 		"""Published and unpublished languages, default first."""
 		return self.published + self.unpublished
 
+	def prefix(self, language: Language) -> str:
+		"""The URL prefix of `language`. The default language has none."""
+		return "" if language == self.default else f"/{language.code.lower()}"
+
 	def find(self, code: str | None, include_unpublished: bool = False) -> Language | None:
 		if not code:
 			return None

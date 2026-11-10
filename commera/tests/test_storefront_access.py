@@ -43,6 +43,9 @@ class TestStorefrontAccess(IntegrationTestCase):
 			"/fr/products",
 			"/en",
 			"/en/products",
+			"/products/shirt",
+			"/page/about",
+			"/track-order",
 			"/ar/cart",
 			"/cart/ITEM-1",
 			"/index",
@@ -62,11 +65,11 @@ class TestStorefrontAccess(IntegrationTestCase):
 		set_published(0)
 		for user in ("Guest", SHOPPER):
 			with self.subTest(user=user):
-				self.assertEqual(self.get_status(user, "/en"), 503)
+				self.assertEqual(self.get_status(user, "/"), 503)
 
 	def test_staff_see_a_private_store(self):
 		set_published(0)
-		self.assertNotEqual(self.get_status(STORE_ADMIN, "/en"), 503)
+		self.assertNotEqual(self.get_status(STORE_ADMIN, "/"), 503)
 
 	def test_login_stays_open_on_a_private_store(self):
 		set_published(0)
@@ -74,7 +77,7 @@ class TestStorefrontAccess(IntegrationTestCase):
 
 	def test_a_published_store_is_open_to_visitors(self):
 		set_published(1)
-		self.assertNotEqual(self.get_status("Guest", "/en"), 503)
+		self.assertNotEqual(self.get_status("Guest", "/"), 503)
 
 	def test_a_system_manager_publishes_and_unpublishes_the_store(self):
 		set_published(0)

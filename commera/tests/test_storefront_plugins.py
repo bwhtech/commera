@@ -146,7 +146,7 @@ class TestStorefrontPlugins(IntegrationTestCase):
 		self.declare_hooks({"commera_storefront_blocks": {"cart_banner": [BROKEN, BANNER]}})
 		self.set_enabled(1)
 
-		html = get_html_for_route("en/cart")
+		html = get_html_for_route("cart")
 
 		self.assertIn("test-plugin-banner", html)
 		self.assertNotIn("test-plugin-broken", html)

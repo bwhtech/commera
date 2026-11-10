@@ -3,94 +3,90 @@ import re
 import frappe
 from frappe.model.document import Document
 
-from commera.localization import StorefrontLanguages
 from commera.shop_themes.doctype.shop_theme.shop_theme import clear_render_theme_context
 
-# Stored patterns keep this literal group; compile time swaps in the configured languages.
-LANG = r"(?P<lang>en|ar)"
-
-# The routes the bundled themes ship pages for.
-# Seeded from after_install and after_migrate too: a fresh install marks patches applied without running them.
+# Bundled theme routes, matched on the path without its language prefix. Also seeded on install and
+# migrate: a fresh install marks patches applied without running them.
 DEFAULT_ROUTES = [
-	{"url_pattern": rf"^{LANG}$", "template_path": "pages/index.html", "requires_auth": 0},
+	{"url_pattern": r"^$", "template_path": "pages/index.html", "requires_auth": 0},
 	{
-		"url_pattern": rf"^{LANG}/products$",
+		"url_pattern": r"^products$",
 		"template_path": "pages/products/list.html",
 		"requires_auth": 0,
 	},
 	{
-		"url_pattern": rf"^{LANG}/products/(?P<route>.+)$",
+		"url_pattern": r"^products/(?P<route>.+)$",
 		"template_path": "pages/products/details.html",
 		"requires_auth": 0,
 	},
-	{"url_pattern": rf"^{LANG}/cart$", "template_path": "pages/cart/cart.html", "requires_auth": 0},
+	{"url_pattern": r"^cart$", "template_path": "pages/cart/cart.html", "requires_auth": 0},
 	# requires_auth 0 on purpose: the resolver's gate 403s before the controller can send a guest to the cart.
 	{
-		"url_pattern": rf"^{LANG}/cart/checkout$",
+		"url_pattern": r"^cart/checkout$",
 		"template_path": "pages/cart/checkout.html",
 		"requires_auth": 0,
 	},
 	{
-		"url_pattern": rf"^{LANG}/cart/(?!checkout$)(?P<codes>.+)$",
+		"url_pattern": r"^cart/(?!checkout$)(?P<codes>.+)$",
 		"template_path": "pages/cart/permalink.html",
 		"requires_auth": 0,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/dashboard$",
+		"url_pattern": r"^account/dashboard$",
 		"template_path": "pages/account/dashboard.html",
 		"requires_auth": 1,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/profile$",
+		"url_pattern": r"^account/profile$",
 		"template_path": "pages/account/profile.html",
 		"requires_auth": 1,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/orders$",
+		"url_pattern": r"^account/orders$",
 		"template_path": "pages/account/orders/index.html",
 		"requires_auth": 1,
 	},
 	# requires_auth 0 on purpose: a guest opens the private order link; the controller checks its key.
 	{
-		"url_pattern": rf"^{LANG}/account/orders/detail$",
+		"url_pattern": r"^account/orders/detail$",
 		"template_path": "pages/account/orders/detail.html",
 		"requires_auth": 0,
 	},
 	{
-		"url_pattern": rf"^{LANG}/track-order$",
+		"url_pattern": r"^track-order$",
 		"template_path": "pages/track_order.html",
 		"requires_auth": 0,
 	},
 	# requires_auth 0 on purpose: this is the gateway return URL, so the page asks for the login itself.
 	{
-		"url_pattern": rf"^{LANG}/account/orders/confirmation$",
+		"url_pattern": r"^account/orders/confirmation$",
 		"template_path": "pages/account/orders/confirmation.html",
 		"requires_auth": 0,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/wishlist$",
+		"url_pattern": r"^account/wishlist$",
 		"template_path": "pages/account/wishlist.html",
 		"requires_auth": 1,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/address$",
+		"url_pattern": r"^account/address$",
 		"template_path": "pages/account/address.html",
 		"requires_auth": 1,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/login$",
+		"url_pattern": r"^account/login$",
 		"template_path": "pages/account/login.html",
 		"requires_auth": 0,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/signup$",
+		"url_pattern": r"^account/signup$",
 		"template_path": "pages/account/signup.html",
 		"requires_auth": 0,
 	},
 	# requires_auth 0 on purpose: a published content page is public, and the controller is what lets
 	# an editor preview an unpublished one.
 	{
-		"url_pattern": rf"^{LANG}/page/(?P<route>.+)$",
+		"url_pattern": r"^page/(?P<route>.+)$",
 		"template_path": "pages/shop_web_page.html",
 		"requires_auth": 0,
 	},
@@ -133,13 +129,12 @@ def clear_settings_cache():
 	clear_render_theme_context()
 
 
-def build_compiled_routes(language_codes=None):
+def build_compiled_routes():
 	settings = frappe.get_cached_doc("Shop Theme Settings")
-	language_group = get_language_group(language_codes or get_language_codes())
 	compiled = []
 	for row in settings.get("routes") or []:
 		try:
-			pattern = re.compile(row.url_pattern.replace(LANG, language_group))
+			pattern = re.compile(row.url_pattern)
 		except re.error:
 			continue
 		compiled.append(
@@ -156,20 +151,6 @@ def get_compiled_routes():
 	# Memoised on frappe.local over redis too: regex compilation showed up hot per request.
 	routes = getattr(frappe.local, "shop_theme_compiled_routes", None)
 	if routes is None:
-		# Keyed by the languages, so a language change compiles fresh patterns without a hook.
-		codes = get_language_codes()
-		routes = frappe.cache.get_value(
-			f"{COMPILED_ROUTES_CACHE_KEY}:{'|'.join(codes)}",
-			generator=lambda: build_compiled_routes(codes),
-		)
+		routes = frappe.cache.get_value(COMPILED_ROUTES_CACHE_KEY, generator=build_compiled_routes)
 		frappe.local.shop_theme_compiled_routes = routes
 	return routes
-
-
-def get_language_codes() -> tuple[str, ...]:
-	"""Lowercase URL prefixes of every configured language. Unpublished ones stay for admin previews."""
-	return tuple(language.code.lower() for language in StorefrontLanguages.load().configured)
-
-
-def get_language_group(codes) -> str:
-	return rf"(?P<lang>{'|'.join(re.escape(code) for code in codes)})"

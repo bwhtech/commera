@@ -3,9 +3,9 @@ import re
 import frappe
 
 from commera import seo
-from commera.localization import get_localization, resolve
+from commera.localization import get_localization, strip_language_prefix
 
-# Cart/account/login render per-user content and must never be indexed. Matched below a language prefix.
+# Cart/account/login render per-user content and must never be indexed. Matched without the language prefix.
 UTILITY_PATH_PATTERN = re.compile(r"^/(cart|account|login)(?:/|$)")
 
 UTILITY_PAGE_NAMES = {"cart": "Cart", "account": "My Account", "login": "Login"}
@@ -27,5 +27,5 @@ def update_website_context(context):
 
 
 def match_utility_path(path):
-	_localization, rest = resolve(path, include_unpublished=True)
-	return UTILITY_PATH_PATTERN.match(rest) if rest != path else None
+	_language, rest = strip_language_prefix(path, include_unpublished=True)
+	return UTILITY_PATH_PATTERN.match(rest)

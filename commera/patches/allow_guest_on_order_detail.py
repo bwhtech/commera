@@ -1,10 +1,12 @@
 import frappe
 
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import (
-	LANG,
 	clear_settings_cache,
 	seed_default_routes,
 )
+
+# Patterns from before the language prefix left the route table; drop_language_from_theme_routes rewrites them.
+LANG = r"(?P<lang>en|ar)"
 
 
 def execute():

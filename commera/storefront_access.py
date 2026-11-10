@@ -2,17 +2,20 @@ import frappe
 from frappe.website.utils import build_response
 
 from commera.api.permission import has_app_permission
-from commera.localization import StorefrontLanguages
+from commera.localization import strip_language_prefix
 
 SETTINGS_DOCTYPE = "Commera Settings"
 
-# Unprefixed www pages render without the language prefix; sitemap* and llms.txt list the catalogue.
+# First segments of the storefront pages after the language prefix; sitemap* and llms.txt list the catalogue.
 STOREFRONT_SEGMENTS = frozenset(
 	{
 		"",
 		"index",
+		"products",
 		"cart",
 		"account",
+		"page",
+		"track-order",
 		"storefront-cart",
 		"storefront-login",
 		"og-image",
@@ -34,12 +37,21 @@ def is_storefront_published() -> bool:
 
 
 def is_storefront_path(path: str) -> bool:
-	segment = path.strip("/").split("/", 1)[0]
+	"""A language-prefixed path, a storefront page or a page of the active theme."""
+	language, rest = strip_language_prefix("/" + path.strip("/"), include_unpublished=True)
+	segment = rest.strip("/").split("/", 1)[0]
 	return (
-		segment in STOREFRONT_SEGMENTS
+		bool(language)
+		or segment in STOREFRONT_SEGMENTS
 		or segment.startswith("sitemap")
-		or bool(StorefrontLanguages.load().find(segment, include_unpublished=True))
+		or has_theme_page(rest)
 	)
+
+
+def has_theme_page(path: str) -> bool:
+	from commera.shop_themes.theme_resolver import find_theme_page
+
+	return find_theme_page(path.strip("/")) is not None
 
 
 class PrivateStorefrontPage:
@@ -49,7 +61,7 @@ class PrivateStorefrontPage:
 	def can_render(self):
 		request = getattr(frappe.local, "request", None)
 		path = request.path if request else self.path
-		if not is_storefront_path(path) or is_storefront_published():
+		if is_storefront_published() or not is_storefront_path(path):
 			return False
 		return frappe.session.user == "Guest" or not has_app_permission()
 

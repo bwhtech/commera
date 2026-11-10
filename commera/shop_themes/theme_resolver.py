@@ -11,7 +11,7 @@ from jinja2 import BaseLoader, BytecodeCache, TemplateNotFound
 from jinja2.utils import LRUCache
 
 import commera.sdk
-from commera.localization import find_request_language, get_localization
+from commera.localization import get_localization, get_route_path, strip_language_prefix
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	get_render_theme_context,
 	is_within_directory,
@@ -116,39 +116,19 @@ class ThemePageRenderer:
 		self.requires_auth = False
 
 	def can_render(self):
-		theme_context = get_render_theme_context()
-		if not theme_context["theme_name"] or not theme_context["dirs"]:
+		page = find_theme_page(self.get_request_path())
+		if not page:
 			return False
 
-		request_path = self.get_request_path()
-		settings = get_compiled_routes()
-
-		matched_route, match = match_route(settings["routes"], request_path)
-		if matched_route:
-			template_path = matched_route["template_path"]
-			requires_auth = matched_route["requires_auth"]
-		elif is_dynamic_page(settings, request_path):
-			template_path = f"pages/{request_path}.html"
-			requires_auth = False
-		else:
-			return False
-
-		# No fallback template: a theme that lacks this page declines and stock frappe routing serves it.
-		if not find_theme_file(theme_context["dirs"], template_path):
-			return False
-
-		self.theme_dirs = theme_context["dirs"]
-		self.template_path = template_path
-		self.match = match
-		self.requires_auth = requires_auth
+		self.theme_dirs, self.template_path, self.requires_auth, self.match = page
 		return True
 
 	def get_request_path(self):
-		# The RAW request path, not what website_route_rules rewrote it to, so a themed route bypasses them.
-		request = getattr(frappe.local, "request", None)
-		if request:
-			return request.path.strip("/")
-		return self.path.strip("/")
+		# The request path without its language prefix, not what website_route_rules rewrote it to,
+		# so a themed route bypasses them.
+		if getattr(frappe.local, "request", None):
+			return get_route_path().strip("/")
+		return strip_language_prefix("/" + self.path.strip("/"))[1].strip("/")
 
 	def render(self):
 		if self.requires_auth and frappe.session.user == "Guest":
@@ -168,10 +148,10 @@ class ThemePageRenderer:
 		"""Send a guest to the theme's own login page, which returns them here after signing in."""
 		if not find_theme_file(self.theme_dirs, LOGIN_TEMPLATE):
 			raise frappe.PermissionError
-		return_path = quote("/" + self.get_request_path(), safe="/")
-		frappe.flags.redirect_location = (
-			f"/{frappe.local.lang or 'en'}/account/login?redirect-to={return_path}"
-		)
+		request = getattr(frappe.local, "request", None)
+		return_path = quote(request.path if request else "/" + self.path.strip("/"), safe="/")
+		login_path = f"{get_localization().root_prefix}/account/login"
+		frappe.flags.redirect_location = f"{login_path}?redirect-to={return_path}"
 		raise frappe.Redirect(302)
 
 	def render_not_found(self):
@@ -189,6 +169,27 @@ class ThemePageRenderer:
 		theme_env = get_theme_environment(get_jenv(), self.theme_dirs)
 		template = theme_env.get_template(f"theme://{self.template_path}")
 		return template.render(context)
+
+
+def find_theme_page(request_path):
+	"""(theme dirs, template path, requires_auth, match) of the active theme's page, or None."""
+	theme_context = get_render_theme_context()
+	if not theme_context["theme_name"] or not theme_context["dirs"]:
+		return None
+
+	settings = get_compiled_routes()
+	matched_route, match = match_route(settings["routes"], request_path)
+	if matched_route:
+		template_path, requires_auth = matched_route["template_path"], matched_route["requires_auth"]
+	elif is_dynamic_page(settings, request_path):
+		template_path, requires_auth = f"pages/{request_path}.html", False
+	else:
+		return None
+
+	# No fallback template: a theme that lacks this page declines and stock frappe routing serves it.
+	if not find_theme_file(theme_context["dirs"], template_path):
+		return None
+	return theme_context["dirs"], template_path, requires_auth, match
 
 
 def match_route(routes, request_path):
@@ -209,12 +210,7 @@ def is_dynamic_page(settings, request_path):
 	if ".." in segments:
 		return False
 
-	first_segment = segments[0]
-	if first_segment in RESERVED_PATH_SEGMENTS:
-		return False
-
-	# Every storefront route carries a language prefix, so a dynamic page can only live below one.
-	return find_request_language(first_segment) is not None
+	return segments[0] not in RESERVED_PATH_SEGMENTS
 
 
 class ThemeFallbackLoader(BaseLoader):

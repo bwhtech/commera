@@ -11,7 +11,7 @@
  ],
  "fields": [
   {
-   "description": "Regex matched against the request path with the leading slash stripped. Named groups like (?P&lt;route&gt;[^/]+) are merged into the render context and form_dict.",
+   "description": "Regex matched against the request path without the leading slash and the language prefix. Named groups like (?P&lt;route&gt;[^/]+) are merged into the render context and form_dict.",
    "fieldname": "url_pattern",
    "fieldtype": "Small Text",
    "ignore_xss_filter": 1,
@@ -39,7 +39,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-16 12:00:00",
+ "modified": "2026-11-10 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Shop Themes",
  "name": "Shop Themed Route",

@@ -249,7 +249,7 @@ class TestThemeEditorPreview(IntegrationTestCase):
 
 		frappe.set_user("Guest")
 		frappe.local.form_dict = frappe._dict()
-		return get_response_content("/en")
+		return get_response_content("/")
 
 	def test_blocks_get_escaped_editor_attributes_only_in_editor_mode(self):
 		theme_context = build_theme_context(SUMMER_THEME)
@@ -379,7 +379,7 @@ class TestThemeEditorGroupPreview(IntegrationTestCase):
 
 		frappe.set_user("Guest")
 		frappe.local.form_dict = frappe._dict()
-		return get_response_content("/en")
+		return get_response_content("/")
 
 
 class TestThemeEditorLayoutPagePreview(ProductDetailPriceTestCase):
