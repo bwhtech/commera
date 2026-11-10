@@ -24,6 +24,8 @@ __all__ = [
 	"DiscountInput",
 	"FacetValue",
 	"FooterSection",
+	"Language",
+	"Localization",
 	"Menu",
 	"MenuItem",
 	"NewCartLine",
@@ -478,6 +480,20 @@ class Shop(TypedDict):
 	favicon: str
 	menu: list[MenuItem]
 	footer: list[FooterSection]
+
+
+class Language(TypedDict):
+	code: str
+	name: str
+	endonym: str
+	direction: str
+
+
+class Localization(TypedDict):
+	language: Language
+	default_language: Language
+	available_languages: list[Language]
+	root_prefix: str
 
 
 class Country(TypedDict):

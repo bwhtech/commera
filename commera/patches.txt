@@ -32,3 +32,4 @@ commera.patches.add_commera_admin_to_item_writers
 commera.patches.mark_existing_sites_onboarded
 commera.patches.publish_existing_storefronts
 commera.patches.enable_webmcp
+commera.patches.seed_storefront_languages

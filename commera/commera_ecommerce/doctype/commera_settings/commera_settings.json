@@ -149,6 +149,10 @@
   "logo_url",
   "email_section",
   "cc_email",
+  "languages_tab",
+  "storefront_languages_section",
+  "default_storefront_language",
+  "storefront_languages",
   "storefront_apps_tab",
   "storefront_apps",
   "headless_storefront_section",
@@ -965,6 +969,30 @@
    "non_negative": 1
   },
   {
+   "fieldname": "languages_tab",
+   "fieldtype": "Tab Break",
+   "label": "Languages"
+  },
+  {
+   "fieldname": "storefront_languages_section",
+   "fieldtype": "Section Break",
+   "label": "Storefront Languages"
+  },
+  {
+   "description": "The language shoppers see when the URL has no language prefix. Leave empty to use the System Settings language, else English.",
+   "fieldname": "default_storefront_language",
+   "fieldtype": "Link",
+   "label": "Default Language",
+   "options": "Language"
+  },
+  {
+   "description": "Other languages the storefront serves, at most 20 with the default language.",
+   "fieldname": "storefront_languages",
+   "fieldtype": "Table",
+   "label": "Languages",
+   "options": "Commera Storefront Language"
+  },
+  {
    "fieldname": "storefront_apps_tab",
    "fieldtype": "Tab Break",
    "label": "Storefront Apps"
@@ -1002,7 +1030,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-08 10:00:00.000000",
+ "modified": "2026-11-10 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Settings",

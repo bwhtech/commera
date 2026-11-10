@@ -102,6 +102,7 @@ PUBLIC_NAMES = {
 	"commera.sdk.format": ["IMAGE_WIDTHS", "image_url", "money", "product_url"],
 	"commera.sdk.orders": ["get_order", "get_orders", "record_shipment"],
 	"commera.sdk.shop": [
+		"get_localization",
 		"get_menu",
 		"get_page",
 		"get_shop",
@@ -130,6 +131,8 @@ PUBLIC_NAMES = {
 		"DiscountInput",
 		"FacetValue",
 		"FooterSection",
+		"Language",
+		"Localization",
 		"Menu",
 		"MenuItem",
 		"NewCartLine",
