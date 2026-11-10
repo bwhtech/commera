@@ -6,9 +6,11 @@ from frappe import _
 from frappe.utils import escape_html
 from markupsafe import Markup
 
+from commera.localization.languages import is_rtl_language
 from commera.shop_themes.chrome_preview import (
 	TRACKING_BLANKED_BLOCKS,
 	find_layout_template,
+	get_preview_language,
 	render_page_preview,
 )
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
@@ -19,7 +21,6 @@ from commera.shop_themes.theme_resolver import find_theme_file
 no_cache = True
 
 HOME_PAGE_TEMPLATE = "pages/index.html"
-PREVIEW_LANGUAGES = ("en", "ar")
 EDITOR_ROLES = ("System Manager", "Website Manager")
 
 EDITOR_HEAD_HTML = Markup(
@@ -36,15 +37,16 @@ def get_context(context):
 	page = requested_page(theme_dirs)
 	layouts = requested_layouts(page)
 
-	lang = frappe.form_dict.get("lang")
-	if lang not in PREVIEW_LANGUAGES:
-		lang = frappe.local.lang or "en"
+	lang = get_preview_language(frappe.form_dict.get("lang"))
 
 	# The themed page reads its language off frappe.lang, so the ?lang switch must move it here.
 	frappe.local.lang = lang
 
 	page_template = find_page_template(theme_dirs, page)
 	sample_form = get_sample_form(page) if page_template else None
+	if sample_form is not None:
+		# get_localization() reads `_lang` off the form the page renders with.
+		sample_form._lang = lang
 	rendered = sample_form is not None and render_layout_page(page_template, sample_form, theme, layouts)
 	if rendered:
 		context.rendered_html = rendered
@@ -53,7 +55,7 @@ def get_context(context):
 	message = no_preview_message(theme, page, page_template)
 	editor_hint = f'<p class="mt-2 text-base">{escape_html(_("You can still edit this layout."))}</p>'
 	context.rendered_html = f"""<!DOCTYPE html>
-<html lang="{escape_html(lang)}">
+<html lang="{escape_html(lang)}" dir="{"rtl" if is_rtl_language(lang) else "ltr"}">
 <head>
 <meta charset="UTF-8">
 <link rel="stylesheet" href="/assets/commera/css/tailwind.css">

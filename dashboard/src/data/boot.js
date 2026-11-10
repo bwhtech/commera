@@ -1,25 +1,32 @@
 import './devBoot'
 
-// commera/www/commera.py injects each boot key straight onto `window` (see
-// commera.html's `window["{{ key }}"] = ...` loop) — csrf_token, date_format,
-// time_format, lang, is_rtl, currency, currency_symbol. This is the one place
+// commera/www/commera.py puts each boot key on `window`. This is the one place
 // that reads them back; no screen should reach into `window` itself.
 export function bootValue(key, fallback) {
   const value = window[key]
   return typeof value === typeof fallback ? value : fallback
 }
 
-// The language cannot change without a round trip to the server, so these are
-// read once rather than kept reactive — switching language reloads the shell,
-// the way Frappe's own desk does.
+// Read once, not reactive: switching language reloads the shell, as Frappe's desk does.
 export const language = bootValue('lang', 'en')
 export const isRtl = bootValue('is_rtl', false)
 export const direction = isRtl ? 'rtl' : 'ltr'
 export const isAdmin = bootValue('is_admin', false)
 
-// frappe-ui ships Tailwind `rtl:` variants that only fire under a `dir` on an
-// ancestor, so the mirroring for the whole shell hangs off this one attribute
-// rather than a per-component flag.
+// Every configured storefront language, default first: { code, name, endonym, direction }.
+export const storefrontLanguages = bootValue('storefront_languages', [])
+export const storefrontLanguageOptions = storefrontLanguages.map(({ code }) => ({
+  label: code.toUpperCase(),
+  value: code,
+}))
+
+// Direction comes from Frappe's right-to-left set on the server, never from the code itself.
+export function languageDirection(code) {
+  return storefrontLanguages.find((language) => language.code === code)?.direction ?? 'ltr'
+}
+
+// frappe-ui's Tailwind `rtl:` variants fire only under a `dir` on an ancestor,
+// so the whole shell mirrors off this one attribute.
 export function applyDocumentDirection() {
   document.documentElement.dir = direction
   document.documentElement.lang = language

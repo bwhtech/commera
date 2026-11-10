@@ -3,8 +3,6 @@
 {% set language = frappe.lang or "en" %}
 {% set settings = header_data.settings %}
 
-{% set languages = [("en", "English"), ("ar", "العربية")] %}
-
 {% macro account_menu(item_class, menu_align, language) %}
 <li class="nav-item {{ item_class }} dropdown" @click.outside="account_open = false"
 	@keydown.escape="account_open = false"
@@ -89,7 +87,8 @@
 								@keydown.escape="language_open = false"
 								x-data="{
 									language_open: false,
-									current_language: '{{ language }}',
+									current_language: '{{ localization.language.code.lower() }}',
+									root_prefix: '{{ localization.root_prefix }}',
 									async change_language(language) {
 										if (language === this.current_language) return;
 										/* The cached bundle is per language, so it has to be dropped before the
@@ -97,7 +96,7 @@
 										Alpine.store('i18n').i18n = {};
 										Alpine.store('i18n').lastFetched = null;
 										await Alpine.store('i18n').init();
-										window.location.href = window.location.pathname.replace(/^\/(en|ar)/, `/${language}`);
+										window.location.href = `/${language}${window.location.pathname.slice(this.root_prefix.length)}`;
 									},
 								}">
 								<a class="nav-link" href="javascript:void(0);" @click="language_open = !language_open"
@@ -107,9 +106,10 @@
 								</a>
 								<div class="dropdown-menu dropdown-menu-end" data-bs-popper="static"
 									:class="language_open ? 'show' : ''" x-cloak>
-									{% for code, label in languages %}
-									<button type="button" class="dropdown-item{% if code == language %} active{% endif %}"
-										@click="language_open = false; change_language('{{ code }}')">{{ label }}</button>
+									{% for option in localization.available_languages %}
+									<button type="button" class="dropdown-item{% if option == localization.language %} active{% endif %}"
+										lang="{{ option.code }}" dir="{{ option.direction }}"
+										@click="language_open = false; change_language('{{ option.code.lower() }}')">{{ option.endonym }}</button>
 									{% endfor %}
 								</div>
 							</li>

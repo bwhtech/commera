@@ -7,6 +7,7 @@ from frappe.utils.jinja_globals import is_rtl
 
 from commera.api.admin.orders import get_reporting_currency_symbol
 from commera.api.permission import has_app_permission
+from commera.localization import StorefrontLanguages
 from commera.onboarding import is_onboarding_pending
 from commera.plugins.registry import get_visible_plugins
 from commera.roles import is_commera_admin
@@ -59,6 +60,10 @@ def get_boot():
 			"onboarding_pending": is_onboarding_pending(),
 			"cloud_settings": get_cloud_settings(),
 			"storefront_published": is_storefront_published(),
+			# The theme editors preview every configured language, unpublished ones included.
+			"storefront_languages": [
+				language.as_dict() for language in StorefrontLanguages.load().configured
+			],
 		}
 	)
 	frappe.db.commit()  # nosemgrep

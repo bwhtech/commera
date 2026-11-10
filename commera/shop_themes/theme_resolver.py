@@ -5,14 +5,13 @@ from urllib.parse import quote
 import frappe
 from frappe.utils.data import cint
 from frappe.utils.jinja import get_jenv
-from frappe.utils.jinja_globals import is_rtl
 from frappe.website.doctype.website_settings.website_settings import get_website_settings
 from frappe.website.utils import build_response
 from jinja2 import BaseLoader, BytecodeCache, TemplateNotFound
 from jinja2.utils import LRUCache
 
 import commera.sdk
-from commera.localization import get_localization
+from commera.localization import find_request_language, get_localization
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	get_render_theme_context,
 	is_within_directory,
@@ -42,9 +41,6 @@ RESERVED_PATH_SEGMENTS = frozenset(
 		"website_script.js",
 	}
 )
-
-# Every storefront route carries a language prefix, so a dynamic page can only live below one.
-DYNAMIC_PAGE_LANG_PREFIXES = frozenset({"en", "ar"})
 
 # Bare template names resolve from a theme only under this prefix: otherwise a theme could shadow
 # templates/includes/header.html and silently disconnect the menu manager and footer editor.
@@ -217,7 +213,8 @@ def is_dynamic_page(settings, request_path):
 	if first_segment in RESERVED_PATH_SEGMENTS:
 		return False
 
-	return first_segment in DYNAMIC_PAGE_LANG_PREFIXES
+	# Every storefront route carries a language prefix, so a dynamic page can only live below one.
+	return find_request_language(first_segment) is not None
 
 
 class ThemeFallbackLoader(BaseLoader):
@@ -293,7 +290,7 @@ def get_theme_environment(jenv, theme_dirs):
 
 def build_base_context(match):
 	localization = get_localization()
-	context = frappe._dict(is_rtl=is_rtl(), localization=localization)
+	context = frappe._dict(is_rtl=localization.language.direction == "rtl", localization=localization)
 
 	if match:
 		apply_route_groups(match, context)

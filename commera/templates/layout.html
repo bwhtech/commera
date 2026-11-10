@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
+{# A context built outside the website renderer can lack localization. #}
+{% set localization = localization if localization is defined else get_localization() -%}
+<html lang="{{ localization.language.code }}" dir="{{ localization.language.direction }}">
 {% from "templates/macros/seo.html" import seo_meta, json_ld_block %}
 {% set settings = frappe.get_cached_doc("Commera Settings", "Commera Settings") %}
 {% set store_name = settings.store_name or "Commera" %}
@@ -66,7 +68,7 @@
 
 {% set header_data = header_data if header_data is defined and header_data else get_header_data() %}
 
-<body x-data dir="auto">
+<body x-data>
     {% block header %}{% include "templates/includes/header.html" %}{% endblock %}
 
     <main class="relative" x-data="toaster">

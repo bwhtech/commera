@@ -4,15 +4,13 @@ import frappe
 from frappe.utils import cstr, flt, get_url, strip_html_tags
 
 from commera.branding import get_configured_brand_assets
+from commera.localization import StorefrontLanguages
 from commera.utils import get_store_currency
 
 META_DESCRIPTION_MAX_LENGTH = 160
 
 # Satori card of the store's logo and name, served by www/og_image_render.
 DEFAULT_OG_IMAGE = "/og-image/store.png"
-
-# Storefront languages, in hreflang emission order; the first is the x-default target.
-LANGUAGES = ("en", "ar")
 
 
 def encode_url_path(url):
@@ -79,18 +77,30 @@ def get_site_currency():
 	return get_store_currency()
 
 
-def swap_lang_in_path(path, target_lang):
+def swap_lang_in_path(path, target_lang, language_codes):
+	"""`path` under the `target_lang` prefix. A first segment in `language_codes` is replaced."""
+	target_lang = target_lang.lower()
 	if not path:
 		return f"/{target_lang}/"
 	parts = path.split("/")
-	if len(parts) > 1 and parts[1] in LANGUAGES:
+	if len(parts) > 1 and parts[1].lower() in {code.lower() for code in language_codes}:
 		parts[1] = target_lang
 		return "/".join(parts)
 	return f"/{target_lang}{path}"
 
 
 def build_alternates(path):
-	return [{"lang": lang, "href": get_url(swap_lang_in_path(path, lang))} for lang in LANGUAGES]
+	"""One hreflang entry per published language, default first. The default is the x-default target."""
+	languages = StorefrontLanguages.load()
+	configured = [language.code for language in languages.configured]
+	return [
+		{
+			"lang": language.code,
+			"href": get_url(swap_lang_in_path(path, language.code, configured)),
+			"x_default": language == languages.default,
+		}
+		for language in languages.published
+	]
 
 
 def schema_availability(availability):

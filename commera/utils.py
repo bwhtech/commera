@@ -582,16 +582,6 @@ def add_roles(doc, method):
 		doc.append("roles", {"role": role})
 
 
-def get_local_lang_url(path: str) -> str:
-	if "/ar/" in path and frappe.local.lang == "en":
-		return path.replace("/ar/", "/en/")
-
-	if "/en/" in path and frappe.local.lang == "ar":
-		return path.replace("/en/", "/ar/")
-
-	return path
-
-
 def get_same_site_path(path: str | None) -> str | None:
 	"""`path` when it stays on this site, else None."""
 	path = cstr(path).strip()

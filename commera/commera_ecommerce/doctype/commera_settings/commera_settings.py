@@ -8,7 +8,11 @@ from frappe.utils import get_url_to_form
 from frappe.website.utils import clear_cache as clear_website_cache
 
 from commera.commera_ecommerce.doctype.commera_settings.headless_storefront import sync_headless_oauth_client
-from commera.localization.languages import MAX_STOREFRONT_LANGUAGES, get_default_language_code
+from commera.localization.languages import (
+	MAX_STOREFRONT_LANGUAGES,
+	StorefrontLanguages,
+	get_default_language_code,
+)
 from commera.search.build import enqueue_full_rebuild
 from commera.search.engine_cache import clear_search_engine, get_engine_class
 from commera.search.http_client import SearchServerError
@@ -257,6 +261,10 @@ class CommeraSettings(Document):
 		elif storefront_languages_changed(before, self):
 			# Cached guest pages carry the old language list.
 			clear_website_cache()
+		if storefront_languages_changed(before, self):
+			from commera.migrate import setup_robots_txt
+
+			setup_robots_txt(StorefrontLanguages.from_settings(self))
 		if frappe.flags.in_install or frappe.flags.in_migrate:
 			return
 		if before is None:

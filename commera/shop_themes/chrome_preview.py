@@ -6,6 +6,7 @@ import re
 
 import frappe
 
+from commera.localization import StorefrontLanguages, resolve
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	get_theme_context,
 	render_theme_context,
@@ -111,15 +112,23 @@ def renders_layout(template_path, quoted_page):
 	return any(quoted_page.search(arguments) for arguments in RENDER_LAYOUT_CALL.findall(source))
 
 
+def get_preview_language(requested) -> str:
+	"""The ?lang an editor asked for when it is a configured storefront language, else the default."""
+	languages = StorefrontLanguages.load()
+	return (languages.find(requested, include_unpublished=True) or languages.default).code
+
+
 def get_preview_context(preview_settings, lang):
 	"""The context every chrome preview needs, whichever end of the page it is rendering."""
-	# base.html reads the page language off frappe.lang, so the ?lang switch must move it here.
+	# Theme templates read the page language off frappe.lang, so the ?lang switch must move it here.
 	frappe.local.lang = lang
+	localization = resolve("/", lang, include_unpublished=True)[0]
 
 	return frappe._dict(
 		preview_settings=preview_settings,
 		lang=lang,
-		is_rtl=lang == "ar",
+		localization=localization,
+		is_rtl=localization.language.direction == "rtl",
 		# format_theme_css() in the layout reads the SAVED doc, so this live copy is appended after to win.
 		preview_theme_css=preview_settings.generate_theme_css(),
 		# The default theme's base renders a breadcrumb outside any block, guarded only by this.

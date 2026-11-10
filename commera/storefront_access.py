@@ -2,7 +2,7 @@ import frappe
 from frappe.website.utils import build_response
 
 from commera.api.permission import has_app_permission
-from commera.seo import LANGUAGES
+from commera.localization import StorefrontLanguages
 
 SETTINGS_DOCTYPE = "Commera Settings"
 
@@ -10,7 +10,6 @@ SETTINGS_DOCTYPE = "Commera Settings"
 STOREFRONT_SEGMENTS = frozenset(
 	{
 		"",
-		*LANGUAGES,
 		"index",
 		"cart",
 		"account",
@@ -36,7 +35,11 @@ def is_storefront_published() -> bool:
 
 def is_storefront_path(path: str) -> bool:
 	segment = path.strip("/").split("/", 1)[0]
-	return segment in STOREFRONT_SEGMENTS or segment.startswith("sitemap")
+	return (
+		segment in STOREFRONT_SEGMENTS
+		or segment.startswith("sitemap")
+		or bool(StorefrontLanguages.load().find(segment, include_unpublished=True))
+	)
 
 
 class PrivateStorefrontPage:

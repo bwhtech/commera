@@ -1,5 +1,6 @@
 <script setup>
 import { Button, Popover, TabButtons } from 'frappe-ui'
+import { storefrontLanguageOptions } from '../../data/boot'
 
 defineProps({
   state: { type: Object, required: true },
@@ -10,11 +11,6 @@ const DEVICES = [
   { label: 'Desktop', value: 'desktop', icon: 'lucide-monitor' },
   { label: 'Mobile', value: 'mobile', icon: 'lucide-smartphone' },
   { label: 'Desktop and mobile', value: 'both', icon: 'lucide-columns-2' },
-]
-
-const DIRECTIONS = [
-  { label: 'LTR', value: 'en' },
-  { label: 'RTL', value: 'ar' },
 ]
 </script>
 
@@ -31,7 +27,13 @@ const DIRECTIONS = [
     <template #default>
       <div class="flex w-36 flex-col gap-1.5 p-1" data-preview-options>
         <TabButtons v-if="devices" v-model="state.device" :options="DEVICES" fluid aria-label="Device" />
-        <TabButtons v-model="state.language" :options="DIRECTIONS" fluid aria-label="Text direction" />
+        <TabButtons
+          v-if="storefrontLanguageOptions.length > 1"
+          v-model="state.language"
+          :options="storefrontLanguageOptions"
+          fluid
+          aria-label="Preview language"
+        />
       </div>
     </template>
   </Popover>

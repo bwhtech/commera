@@ -2,10 +2,9 @@ import frappe
 from frappe.utils import get_datetime, get_url
 from frappe.utils.data import cint
 
-DEFAULT_URLS_PER_SITEMAP = 50000
+from commera.localization import StorefrontLanguages
 
-# Every route is emitted once per language, so the document budget is the URL cap divided by these.
-LANGUAGES = ("en", "ar")
+DEFAULT_URLS_PER_SITEMAP = 50000
 
 
 def get_urls_per_page():
@@ -14,7 +13,12 @@ def get_urls_per_page():
 
 
 def get_docs_per_page():
-	return get_urls_per_page() // len(LANGUAGES)
+	# Every route is emitted once per published language.
+	return max(get_urls_per_page() // len(get_language_prefixes()), 1)
+
+
+def get_language_prefixes():
+	return [language.code.lower() for language in StorefrontLanguages.load().published]
 
 
 SEGMENT_CONFIG = {
@@ -53,7 +57,7 @@ def format_lastmod(value):
 
 
 def add_localized(urls, path, lastmod, changefreq, priority):
-	for lang in LANGUAGES:
+	for lang in get_language_prefixes():
 		urls.append(
 			{
 				"loc": get_url(f"/{lang}{path}"),

@@ -9,6 +9,7 @@ from frappe.tests import IntegrationTestCase, UnitTestCase
 
 from commera import seo, website_context
 from commera.tests import get_test_configurator, get_test_item
+from commera.tests.test_localization import use_storefront_languages
 from commera.www import sitemap, sitemap_segment
 
 SEO_SETTING_FIELDS = (
@@ -90,28 +91,55 @@ class TestTruncateDescription(UnitTestCase):
 
 
 class TestLangSwap(UnitTestCase):
-	def test_swaps_en_to_ar(self):
-		self.assertEqual(seo.swap_lang_in_path("/en/products/shoe", "ar"), "/ar/products/shoe")
+	codes = ("en", "ar", "fr")
 
-	def test_swaps_ar_to_en(self):
-		self.assertEqual(seo.swap_lang_in_path("/ar/products/shoe", "en"), "/en/products/shoe")
+	def test_swaps_a_language_prefix(self):
+		self.assertEqual(seo.swap_lang_in_path("/en/products/shoe", "ar", self.codes), "/ar/products/shoe")
+		self.assertEqual(seo.swap_lang_in_path("/ar/products/shoe", "fr", self.codes), "/fr/products/shoe")
 
 	def test_no_prefix_path_gets_lang_prepended(self):
-		self.assertEqual(seo.swap_lang_in_path("/foo", "en"), "/en/foo")
-		self.assertEqual(seo.swap_lang_in_path("/foo/bar", "ar"), "/ar/foo/bar")
+		self.assertEqual(seo.swap_lang_in_path("/foo", "en", self.codes), "/en/foo")
+		self.assertEqual(seo.swap_lang_in_path("/de/bar", "ar", self.codes), "/ar/de/bar")
 
 	def test_empty_path_fallback(self):
-		self.assertEqual(seo.swap_lang_in_path("", "en"), "/en/")
-		self.assertEqual(seo.swap_lang_in_path(None, "ar"), "/ar/")
+		self.assertEqual(seo.swap_lang_in_path("", "en", self.codes), "/en/")
+		self.assertEqual(seo.swap_lang_in_path(None, "ar", self.codes), "/ar/")
+
+	def test_codes_become_lowercase_prefixes(self):
+		self.assertEqual(seo.swap_lang_in_path("/PT-BR/cart", "zh-TW", ("pt-BR",)), "/zh-tw/cart")
 
 
 class TestBuildAlternates(IntegrationTestCase):
-	def test_build_alternates_has_both_languages(self):
-		alternates = seo.build_alternates("/en/products/shoe")
-		self.assertEqual({alt["lang"] for alt in alternates}, {"en", "ar"})
+	def test_one_alternate_per_published_language_default_first(self):
+		use_storefront_languages(self, "en", published=("en", "ar", "fr"), unpublished=("de",))
+
+		alternates = seo.build_alternates("/fr/products/shoe")
+
+		self.assertEqual([alt["lang"] for alt in alternates], ["en", "ar", "fr"])
 		by_lang = {alt["lang"]: alt["href"] for alt in alternates}
-		self.assertIn("/en/products/shoe", by_lang["en"])
-		self.assertIn("/ar/products/shoe", by_lang["ar"])
+		self.assertTrue(by_lang["en"].endswith("/en/products/shoe"))
+		self.assertTrue(by_lang["ar"].endswith("/ar/products/shoe"))
+		self.assertTrue(by_lang["fr"].endswith("/fr/products/shoe"))
+
+	def test_x_default_is_the_default_language(self):
+		use_storefront_languages(self, "fr", published=("en", "fr"))
+
+		alternates = seo.build_alternates("/en/products/shoe")
+
+		self.assertEqual([alt["lang"] for alt in alternates if alt["x_default"]], ["fr"])
+
+	def test_the_hreflang_tags_carry_every_published_language(self):
+		use_storefront_languages(self, "en", published=("en", "ar", "fr"))
+		seo_data = {"alternates": seo.build_alternates("/en/products/shoe")}
+
+		html = frappe.render_template(
+			'{% from "templates/macros/seo.html" import seo_meta %}{{ seo_meta(seo) }}', {"seo": seo_data}
+		)
+
+		for lang in ("en", "ar", "fr"):
+			self.assertIn(f'hreflang="{lang}"', html)
+		self.assertEqual(html.count('hreflang="x-default"'), 1)
+		self.assertIn(f'hreflang="x-default" href="{seo_data["alternates"][0]["href"]}"', html)
 
 
 class TestBuildPageSeo(IntegrationTestCase):
@@ -243,6 +271,7 @@ class TestUtilityPageNoindexInjection(IntegrationTestCase):
 
 	def setUp(self):
 		set_seo_settings(store_name="MyStore", seo_title_template="{title} | {store}")
+		use_storefront_languages(self, "en", published=("en", "ar", "fr"))
 		self.saved_request = getattr(frappe.local, "request", None)
 
 	def tearDown(self):
@@ -255,7 +284,7 @@ class TestUtilityPageNoindexInjection(IntegrationTestCase):
 		return context
 
 	def test_utility_paths_stay_noindex_without_json_ld(self):
-		for path in ("/en/cart", "/ar/account/dashboard", "/en/login"):
+		for path in ("/en/cart", "/ar/account/dashboard", "/en/login", "/fr/cart/checkout"):
 			context = self.run_context(path)
 			self.assertIs(context.seo["noindex"], True)
 			# noindex pages carry no structured data
@@ -376,6 +405,9 @@ class TestSitemapIndex(SitemapFixtureMixin, IntegrationTestCase):
 
 
 class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
+	def setUp(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+
 	def run_segment(self, seg_type, page):
 		context = frappe._dict()
 		frappe.local.form_dict = frappe._dict(seg_type=seg_type, page=str(page))
@@ -390,6 +422,16 @@ class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
 		locs = self.locs("products", 1)
 		self.assertIn(self.url(f"/en/products/{self.published_route}"), locs)
 		self.assertIn(self.url(f"/ar/products/{self.published_route}"), locs)
+
+	def test_every_published_language_gets_a_url(self):
+		use_storefront_languages(self, "en", published=("en", "ar", "fr"), unpublished=("de",))
+
+		locs = self.locs("products", 1)
+
+		for lang in ("en", "ar", "fr"):
+			self.assertIn(self.url(f"/{lang}/products/{self.published_route}"), locs)
+		self.assertNotIn(self.url(f"/de/products/{self.published_route}"), locs)
+		self.assertIn(self.url("/fr"), self.locs("pages", 1))
 
 	def test_noindex_variant_excluded(self):
 		locs = self.locs("products", 1)
@@ -483,10 +525,9 @@ class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
 		original = frappe.db.get_single_value("Commera Settings", "sitemap_urls_per_page")
 		try:
 			frappe.db.set_single_value("Commera Settings", "sitemap_urls_per_page", 10)
-			self.assertEqual(
-				sitemap_segment.get_docs_per_page(),
-				10 // len(sitemap_segment.LANGUAGES),
-			)
+			self.assertEqual(sitemap_segment.get_docs_per_page(), 5)
+			use_storefront_languages(self, "en", published=("en", "ar", "fr"))
+			self.assertEqual(sitemap_segment.get_docs_per_page(), 3)
 		finally:
 			frappe.db.set_single_value("Commera Settings", "sitemap_urls_per_page", original)
 

@@ -9,6 +9,7 @@ from commera.commera_ecommerce.doctype.commera_settings.navbar.navbar_manager im
 	seed_menu_when_empty,
 )
 from commera.customizations import create_customizations
+from commera.localization import StorefrontLanguages
 from commera.plugin_events import add_plugin_user, validate_plugins
 from commera.plugins.registry import get_registry
 from commera.roles import add_commera_roles
@@ -43,10 +44,10 @@ def after_install():
 
 	populate_search_settings()
 	ensure_storefront_search_index()
+	seed_default_storefront_language()
 	setup_robots_txt()
 	seed_llms_txt()
 	seed_default_routes()
-	seed_default_storefront_language()
 	activate_summer_theme()
 	seed_menu_when_empty()
 	add_plugin_user()
@@ -243,7 +244,8 @@ def seed_llms_txt():
 		frappe.db.set_single_value("Commera Settings", "llms_txt", DEFAULT_LLMS_TXT)
 
 
-def setup_robots_txt():
+def setup_robots_txt(languages=None):
+	"""`languages` is a StorefrontLanguages; Commera Settings passes its own before the cache clears."""
 	# Core's frappe/www/robots.py serves this value, so we only write it.
 	current = frappe.db.get_single_value("Website Settings", "robots_txt") or ""
 	if current.strip() and ROBOTS_MARKER not in current:
@@ -262,15 +264,19 @@ def setup_robots_txt():
 		"Disallow: /*?sort=\n"
 		"Disallow: /*?page=\n"
 		"Disallow: /*?filter=\n"
-		# Disallow is a prefix match: the explicit checkout line is redundant but kept deliberately.
-		"Disallow: /en/cart\n"
-		"Disallow: /ar/cart\n"
-		"Disallow: /en/cart/checkout\n"
-		"Disallow: /en/account\n"
-		"Disallow: /ar/account\n\n"
+		f"{get_private_path_rules(languages)}\n"
 		f"Sitemap: {site_url}/sitemap.xml\n"
 	)
 	frappe.db.set_single_value("Website Settings", "robots_txt", robots_txt)
+
+
+def get_private_path_rules(languages=None) -> str:
+	languages = languages or StorefrontLanguages.load()
+	# Disallow is a prefix match: the explicit checkout line is redundant but kept deliberately.
+	return "".join(
+		f"Disallow: /{prefix}/cart\nDisallow: /{prefix}/cart/checkout\nDisallow: /{prefix}/account\n"
+		for prefix in (language.code.lower() for language in languages.published)
+	)
 
 
 def seed_default_storefront_language():

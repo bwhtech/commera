@@ -5,6 +5,7 @@ import { Button } from 'frappe-ui'
 import SettingsFieldControl from '../settings/SettingsFieldControl.vue'
 import { sectionSettingToField } from '../../utils/sectionSettingToField'
 import { isTranslatable, maxProducts } from '../../data/themeLayout'
+import { languageDirection } from '../../data/boot'
 
 const props = defineProps({
   editor: { type: Object, required: true },
@@ -105,7 +106,7 @@ function settle(setting, value) {
             :model-value="settingValue(selected.owner, setting)"
             :class="field.fieldtype === 'Check' ? undefined : '!w-full'"
             :field="field"
-            :dir="isTranslatable(setting) && state.language === 'ar' ? 'rtl' : undefined"
+            :dir="isTranslatable(setting) ? languageDirection(state.language) : undefined"
             @update:model-value="update(setting, $event)"
             @change="settle(setting, $event)"
           />

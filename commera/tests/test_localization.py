@@ -33,6 +33,13 @@ def set_storefront_languages(default=None, published=(), unpublished=()):
 	frappe.local.request_cache.clear()
 
 
+def use_storefront_languages(test, default=None, published=(), unpublished=()):
+	"""set_storefront_languages for one test. The cached settings would outlive the rollback."""
+	set_storefront_languages(default, published, unpublished)
+	test.addCleanup(frappe.local.request_cache.clear)
+	test.addCleanup(frappe.clear_document_cache, "Commera Settings", "Commera Settings")
+
+
 def codes(languages):
 	return [language.code for language in languages]
 

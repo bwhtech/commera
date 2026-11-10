@@ -9,6 +9,7 @@ from commera.shop_themes.chrome_preview import (
 	COMMON_BLANKED_BLOCKS,
 	FOOTER_BLOCKS,
 	get_preview_context,
+	get_preview_language,
 	render_chrome_preview,
 )
 
@@ -16,15 +17,11 @@ BASE_HEADER = "templates/includes/header.html"
 
 no_cache = True
 
-PREVIEW_LANGUAGES = ("en", "ar")
-
 
 def get_context(context):
 	frappe.has_permission("Commera Settings", "write", throw=True)
 
-	lang = frappe.form_dict.get("lang")
-	if lang not in PREVIEW_LANGUAGES:
-		lang = frappe.local.lang or "en"
+	lang = get_preview_language(frappe.form_dict.get("lang"))
 
 	settings = frappe.get_cached_doc("Commera Settings")
 	header_context = get_preview_context(settings, lang)
