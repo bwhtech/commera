@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.translate import get_all_translations
+from frappe.translate import get_translation_version
 
 from commera.api.admin import language as dashboard_language
 from commera.www import commera as dashboard
@@ -35,7 +35,7 @@ class TestDashboardLanguage(IntegrationTestCase):
 		with patch.object(frappe, "get_system_settings", return_value=None):
 			self.assertEqual(dashboard_language.get_dashboard_language("Administrator"), "en")
 
-	def test_boot_carries_the_admins_language_and_its_translations(self):
+	def test_boot_carries_the_admins_language_and_the_translations_version(self):
 		self.set_admin_language("ar")
 		frappe.local.lang = "en"
 
@@ -43,7 +43,8 @@ class TestDashboardLanguage(IntegrationTestCase):
 
 		self.assertEqual(boot.lang, "ar")
 		self.assertTrue(boot.is_rtl)
-		self.assertEqual(boot.translations, get_all_translations("ar"))
+		self.assertEqual(boot.translations_version, get_translation_version())
+		self.assertNotIn("translations", boot)
 
 	def test_a_left_to_right_language_does_not_mirror(self):
 		self.set_admin_language("de")

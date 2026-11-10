@@ -84,7 +84,7 @@ watch(
           @click="draft.storeCategory = option.value"
         >
           <span :class="option.icon" class="size-5" aria-hidden="true" />
-          <span class="truncate">{{ __(option.value) }}</span>
+          <span class="truncate">{{ option.label }}</span>
         </button>
       </div>
     </div>

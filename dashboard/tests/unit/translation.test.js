@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { __ as bootTranslator, createTranslator } from '../../src/data/translation.js'
+import { __ as bootTranslator, createTranslator, loadTranslations } from '../../src/data/translation.js'
 
 const __ = createTranslator({
   Orders: 'الطلبات',
@@ -41,4 +41,27 @@ test('an empty or non-string message passes through untouched', () => {
 test('with no boot translations the shell reads in English', () => {
   assert.equal(bootTranslator('Orders'), 'Orders')
   assert.equal(bootTranslator('{0} orders', [3]), '3 orders')
+})
+
+test('numeric-keyed objects fill placeholders, as plugins already pass them', () => {
+  assert.equal(__('{0} of {1} selected', { 0: 2, 1: 5 }), 'تم تحديد 2 من 5')
+})
+
+test('the shell translator reads the dictionary from the versioned endpoint', async () => {
+  Object.assign(globalThis, { lang: 'ar', translations_version: 'abc_1' })
+  const requested = []
+  await loadTranslations(async (url) => {
+    requested.push(url)
+    return { json: async () => ({ message: { Customers: 'العملاء' } }) }
+  })
+
+  assert.deepEqual(requested, ['/api/method/frappe.translate.get_boot_translations?v=abc_1&lang=ar'])
+  assert.equal(bootTranslator('Customers'), 'العملاء')
+})
+
+test('an unreachable dictionary leaves the shell in English', async () => {
+  await loadTranslations(async () => {
+    throw new Error('offline')
+  })
+  assert.equal(bootTranslator('Settings'), 'Settings')
 })

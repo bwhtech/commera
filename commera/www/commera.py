@@ -3,7 +3,7 @@
 
 import frappe
 from frappe import _
-from frappe.translate import get_all_translations
+from frappe.translate import get_translation_version
 
 from commera.api.admin.language import get_dashboard_language
 from commera.api.admin.orders import get_reporting_currency_symbol
@@ -55,8 +55,8 @@ def get_boot():
 			# resolved by the framework here rather than guessed from a hardcoded default client-side.
 			"lang": frappe.local.lang,
 			"is_rtl": is_rtl_language(frappe.local.lang),
-			# Every app's strings, so plugin pages translate through the same `__()` as the shell.
-			"translations": get_all_translations(frappe.local.lang),
+			# The shell fetches every app's strings from Frappe's browser-cached endpoint, keyed by this.
+			"translations_version": get_translation_version(),
 			# The reporting currency is a site setting, not a per-request one, so it rides the shell
 			# instead of every money surface having to carry the symbol down from its own endpoint.
 			"currency": currency,

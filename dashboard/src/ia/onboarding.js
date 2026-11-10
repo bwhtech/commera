@@ -93,12 +93,12 @@ export function adoptRecord(record) {
 }
 
 export const CATEGORIES = [
-  { value: 'Fashion', icon: 'lucide-shirt', hero: __('Wear it well.') },
-  { value: 'Beauty', icon: 'lucide-sparkles', hero: __('Glow, every day.') },
-  { value: 'Home', icon: 'lucide-sofa', hero: __('Make it home.') },
-  { value: 'Food', icon: 'lucide-coffee', hero: __('Small batch.') },
-  { value: 'Electronics', icon: 'lucide-headphones', hero: __('Sound, simplified.') },
-  { value: 'Other', icon: 'lucide-package', hero: __('Made with care.') },
+  { value: 'Fashion', label: __('Fashion'), icon: 'lucide-shirt', hero: __('Wear it well.') },
+  { value: 'Beauty', label: __('Beauty'), icon: 'lucide-sparkles', hero: __('Glow, every day.') },
+  { value: 'Home', label: __('Home'), icon: 'lucide-sofa', hero: __('Make it home.') },
+  { value: 'Food', label: __('Food'), icon: 'lucide-coffee', hero: __('Small batch.') },
+  { value: 'Electronics', label: __('Electronics'), icon: 'lucide-headphones', hero: __('Sound, simplified.') },
+  { value: 'Other', label: __('Other'), icon: 'lucide-package', hero: __('Made with care.') },
 ]
 
 // Stand-ins the preview shows faded until the owner has products of their own.
