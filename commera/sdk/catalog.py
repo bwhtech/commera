@@ -28,7 +28,7 @@ from commera.sdk.types import (
 from commera.search.facets import get_listing_facet_counts, get_price_range
 from commera.search.record_builder import images_for_variants, rates_by_item_code, sizes_for_variants
 from commera.search.typeahead import get_typeahead as get_search_typeahead
-from commera.shop_data import get_storefront_menu
+from commera.shop_data import get_storefront_menu, translate_categories
 from commera.swatches import get_swatch_map
 from commera.utils import (
 	IN_CLAUSE_CHUNK_SIZE,
@@ -60,7 +60,17 @@ FACETS_CACHE_SECONDS = 5 * 60
 PRODUCT_DOCTYPE = "Style Attribute Variant"
 # Only a top-level menu entry owns a route_slug, so these are the menu tabs.
 COLLECTION_FILTERS = {"enabled": 1, "route_slug": ("is", "set")}
-COLLECTION_FIELDS = ["route_slug", "display_name", "category_name", "image", "modified"]
+COLLECTION_FIELDS = [
+	"name",
+	"route_slug",
+	"display_name",
+	"category_name",
+	"image",
+	"meta_title",
+	"meta_description",
+	"noindex",
+	"modified",
+]
 
 
 def get_items(item_codes: list[str]) -> dict[str, CatalogItem]:
@@ -296,7 +306,7 @@ def list_collections() -> list[Collection]:
 		fields=COLLECTION_FIELDS,
 		order_by="display_order asc, category_name asc",
 	)
-	return [get_collection_shape(row) for row in rows]
+	return get_collection_shapes(rows)
 
 
 def get_collection(handle: str) -> Collection | None:
@@ -306,7 +316,7 @@ def get_collection(handle: str) -> Collection | None:
 		fields=COLLECTION_FIELDS,
 		limit=1,
 	)
-	return get_collection_shape(rows[0]) if rows else None
+	return get_collection_shapes(rows)[0] if rows else None
 
 
 def get_collection_filters(handle: str) -> dict:
@@ -317,11 +327,23 @@ def get_collection_filters(handle: str) -> dict:
 	return {"category": root["route_slug"], "subcategory": root["item_groups"]}
 
 
-def get_collection_shape(row) -> Collection:
+def get_collection_shapes(rows: list) -> list[Collection]:
+	for row in rows:
+		row.label = row.display_name or row.category_name
+	translated = translate_categories(rows)
+	return [get_collection_shape(row, fields) for row, fields in zip(rows, translated, strict=True)]
+
+
+def get_collection_shape(row, translated: dict) -> Collection:
 	return {
 		"handle": row.route_slug,
-		"title": row.display_name or row.category_name,
+		"title": translated["label"],
 		"image": row.image,
+		"seo": {
+			"title": translated["meta_title"] or translated["label"],
+			"description": translated["meta_description"],
+			"noindex": bool(row.noindex),
+		},
 		"updated_at": str(row.modified),
 	}
 

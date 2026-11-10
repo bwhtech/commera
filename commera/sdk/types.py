@@ -446,6 +446,7 @@ class Collection(TypedDict):
 	handle: str
 	title: str
 	image: str | None
+	seo: dict
 	updated_at: str
 
 

@@ -55,7 +55,7 @@ The catalogue and cart methods allow guests. The [account methods](#account-meth
 | --- | --- |
 | `products.get_products` | One page of product cards with the facets of the whole result. Each brand, colour and size facet value has its product count, as `{"value": "K&N", "count": 3}`. The other selected filters narrow each count, but the facet's own filter does not. `price` is the `min` and `max` sale price. Filters: `collection`, `query`, `brands`, `colors`, `sizes`, `min_price`, `max_price`, `on_sale`. `sort` is `default`, `price_low`, `price_high`, `name`, `new_arrival` or `discount`. |
 | `products.get_product` | One product: images, the colour option with sibling handles and stock, the size option, and one variant for each size with its price, list price and stock. |
-| `collections.get_collections`, `collections.get_collection` | Enabled menu tabs (top-level Ecommerce Categories), by route slug. |
+| `collections.get_collections`, `collections.get_collection` | Enabled menu tabs (top-level Ecommerce Categories), by route slug. The `title` and the `seo` title and description are in the request language. |
 | `shop.get_shop` | Store name, currency, logo, the menu from Ecommerce Category, and the footer. |
 | `shop.get_page` | A published Shop Web Page. |
 | `shop.get_sitemap` | Handles and change dates of indexable products, collections and pages. A page holds as many handles of each kind as the "Sitemap URLs Per Page" setting in Commera Settings. Without arguments, it returns page 1 of each kind. Set `kind` to `products`, `collections` or `pages`, and `page` to get one kind and one page. `total` gives the number of handles of each returned kind, and `page_size` gives the page size. |

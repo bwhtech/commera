@@ -145,6 +145,12 @@ commera_hooks = {
 			"fields": ["display_name"],
 			"label": "Products",
 		},
+		{
+			"type": "collection",
+			"doctype": "Ecommerce Category",
+			"fields": ["display_name", "meta_title", "meta_description"],
+			"label": "Collections",
+		},
 	],
 }
 setup_wizard_complete = [
@@ -247,7 +253,11 @@ doc_events = {
 	"Ecommerce Category": {
 		"on_update": ["commera.search.sync.on_update", "commera.plugin_events.on_menu_change"],
 		"after_rename": "commera.search.sync.after_rename",
-		"on_trash": ["commera.search.sync.on_trash", "commera.plugin_events.on_menu_change"],
+		"on_trash": [
+			"commera.search.sync.on_trash",
+			"commera.plugin_events.on_menu_change",
+			"commera.localization.content.delete_translations",
+		],
 	},
 	"Sales Invoice": {
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
