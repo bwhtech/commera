@@ -12,7 +12,6 @@ from frappe.utils import create_batch, cstr
 from frappe.utils.data import sha256_hash
 
 from commera.localization.resolver import Localization, get_localization
-from commera.localization.resources import get_translatable_fields
 
 Sha2 = CustomFunction("SHA2", ["value", "length"])
 DOCTYPE = "Content Translation"
@@ -90,7 +89,7 @@ def delete_translations(doc, method=None):
 	for row in doc.get_all_children():
 		rows.setdefault(row.doctype, []).append(row.name)
 	for doctype, names in rows.items():
-		if get_translatable_fields(doctype):
+		if has_translatable_fields(doctype):
 			frappe.db.delete(DOCTYPE, {"reference_doctype": doctype, "reference_name": ("in", names)})
 
 
@@ -100,7 +99,7 @@ def delete_removed_row_translations(doc, method=None):
 	if not before:
 		return
 	for table in doc.meta.get_table_fields():
-		if not get_translatable_fields(table.options):
+		if not has_translatable_fields(table.options):
 			continue
 		kept = {row.name for row in doc.get(table.fieldname)}
 		removed = [row.name for row in before.get(table.fieldname) if row.name not in kept]
@@ -219,3 +218,10 @@ def count_column_statuses(doctype: str, field: str, language: str) -> dict[str, 
 		.groupby(status)
 	)
 	return dict(query.run())
+
+
+def has_translatable_fields(doctype: str) -> bool:
+	# Imported here: resources imports this module.
+	from commera.localization.resources import get_translatable_fields
+
+	return bool(get_translatable_fields(doctype))
