@@ -23,6 +23,7 @@ from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import 
 	build_compiled_routes,
 	clear_settings_cache,
 )
+from commera.shop_themes.route_patterns import has_language_group
 from commera.shop_themes.theme_resolver import ThemePageRenderer, match_route
 from commera.tests.test_localization import use_storefront_languages
 
@@ -49,6 +50,8 @@ class RoutingTestCase(IntegrationTestCase):
 		)
 		frappe.local.form_dict = frappe._dict(frappe.local.request.args)
 		frappe.local.request_cache.clear()
+		# frappe.init starts every request with an empty frappe.local.cache.
+		frappe.local.cache.pop(frappe.cache.make_key("website_redirects"), None)
 		frappe.local.lang = lang
 		frappe.flags.redirect_location = None
 		# Frappe's init_request runs the before_request hooks after it has set the language.
@@ -345,15 +348,21 @@ LEGACY_ROUTES = [
 
 
 def store_legacy_routes(test_case):
+	store_routes(test_case, LEGACY_ROUTES)
+
+
+def store_routes(test_case, routes, dynamic_pages=False):
 	settings = frappe.get_single("Shop Theme Settings")
 	settings.set("routes", [])
-	for pattern, template_path, requires_auth in LEGACY_ROUTES:
+	settings.dynamic_pages_enabled = int(dynamic_pages)
+	for pattern, template_path, requires_auth in routes:
 		settings.append(
 			"routes",
 			{"url_pattern": pattern, "template_path": template_path, "requires_auth": requires_auth},
 		)
 	settings.save(ignore_permissions=True)
 	test_case.addCleanup(clear_settings_cache)
+	test_case.addCleanup(frappe.clear_document_cache, "Shop Theme Settings", "Shop Theme Settings")
 
 
 class TestThemeRoutePatternPatch(IntegrationTestCase):
@@ -419,30 +428,30 @@ class TestDefaultThemeRoutes(IntegrationTestCase):
 				self.assertNotIn("lang", route["url_pattern"])
 
 
-class TestKeptLegacyThemeRoutes(RoutingTestCase):
-	"""A route the patch kept with its language group still serves its old URLs, in its old place."""
+class ThemeTestCase(RoutingTestCase):
+	"""An active theme in a temporary folder, whose every template renders its own path."""
+
+	storefront_published = True
 
 	def setUp(self):
 		super().setUp()
-		store_legacy_routes(self)
-		drop_language_from_theme_routes()
-		self.theme_dir = tempfile.mkdtemp(prefix="shop_theme_legacy_routes_")
+		self.theme_dir = tempfile.mkdtemp(prefix="shop_theme_routing_")
 		self.addCleanup(shutil.rmtree, self.theme_dir)
-		for _pattern, template_path, _requires_auth in LEGACY_ROUTES:
-			self.write_theme_file(template_path, template_path)
 		self.patch_theme_context()
 
-	def write_theme_file(self, relative_path, source):
-		path = os.path.join(self.theme_dir, relative_path)
-		os.makedirs(os.path.dirname(path), exist_ok=True)
-		with open(path, "w") as theme_file:
-			theme_file.write(source)
+	def write_theme_files(self, *relative_paths):
+		for relative_path in relative_paths:
+			path = os.path.join(self.theme_dir, relative_path)
+			os.makedirs(os.path.dirname(path), exist_ok=True)
+			with open(path, "w") as theme_file:
+				theme_file.write(relative_path)
 
 	def patch_theme_context(self):
-		theme_context = {"theme_name": "Legacy Routes", "dirs": [self.theme_dir]}
+		theme_context = {"theme_name": "Routing", "dirs": [self.theme_dir]}
+		published = self.storefront_published
 		for patcher in (
 			patch("commera.shop_themes.theme_resolver.get_render_theme_context", return_value=theme_context),
-			patch("commera.storefront_access.is_storefront_published", return_value=True),
+			patch("commera.storefront_access.is_storefront_published", return_value=published),
 		):
 			patcher.start()
 			self.addCleanup(patcher.stop)
@@ -452,6 +461,16 @@ class TestKeptLegacyThemeRoutes(RoutingTestCase):
 		self.assertIsInstance(renderer, ThemePageRenderer)
 		self.assertEqual(renderer.template_path, template_path)
 		return renderer
+
+
+class TestKeptLegacyThemeRoutes(ThemeTestCase):
+	"""A route the patch kept with its language group still serves its old URLs, in its old place."""
+
+	def setUp(self):
+		super().setUp()
+		store_legacy_routes(self)
+		drop_language_from_theme_routes()
+		self.write_theme_files(*(template_path for _pattern, template_path, _auth in LEGACY_ROUTES))
 
 	def test_a_kept_route_serves_its_language_urls_before_a_later_custom_route(self):
 		renderer = self.assertThemePage("/ar/account/orders", "pages/orders.html")
@@ -469,3 +488,56 @@ class TestKeptLegacyThemeRoutes(RoutingTestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.get_data(as_text=True), "pages/orders.html")
+
+
+class TestALanguageGroupInsideAPattern(ThemeTestCase):
+	"""Only a leading (?P<lang>…) group is the old language prefix, for the patch and the matcher."""
+
+	PATTERN = r"^collections/(?P<lang>sale|outlet)$"
+
+	def setUp(self):
+		super().setUp()
+		store_routes(self, [(self.PATTERN, "pages/collection.html", 0)])
+		self.write_theme_files("pages/collection.html")
+
+	def test_the_patch_keeps_the_pattern(self):
+		drop_language_from_theme_routes()
+
+		self.assertEqual(frappe.get_single("Shop Theme Settings").routes[0].url_pattern, self.PATTERN)
+		self.assertFalse(has_language_group(self.PATTERN))
+		self.assertTrue(has_language_group(r"^(?P<lang>en|ar)/products$"))
+
+	def test_the_pattern_matches_the_path_as_it_is(self):
+		renderer = self.assertThemePage("/collections/sale", "pages/collection.html")
+		self.assertEqual(renderer.match["lang"], "sale")
+		self.assertEqual(
+			self.assertThemePage("/ar/collections/outlet", "pages/collection.html").match["lang"], "outlet"
+		)
+
+
+class TestExcludedPathsUnderAPrefix(ThemeTestCase):
+	"""A Frappe namespace under a language prefix is never localized, so no theme page renders there."""
+
+	storefront_published = False
+
+	def setUp(self):
+		super().setUp()
+		store_routes(self, [(r"^private/catalogue$", "pages/catalogue.html", 0)])
+		self.write_theme_files("pages/catalogue.html")
+
+	def test_the_private_store_gate_covers_the_theme_route(self):
+		self.assertEqual(self.respond("/private/catalogue").status_code, 503)
+
+	def test_the_theme_does_not_render_the_route_under_a_prefix(self):
+		_endpoint, renderer = self.open("/ar/private/catalogue")
+		self.assertNotIsInstance(renderer, ThemePageRenderer)
+
+		response = self.respond("/ar/private/catalogue")
+		self.assertNotEqual(response.get_data(as_text=True), "pages/catalogue.html")
+		self.assertNotEqual(response.status_code, 200)
+
+	def test_the_gate_covers_a_theme_page_at_the_prefixed_path(self):
+		store_routes(self, [], dynamic_pages=True)
+		self.write_theme_files("pages/ar/private/catalogue.html")
+
+		self.assertEqual(self.respond("/ar/private/catalogue").status_code, 503)

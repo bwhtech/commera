@@ -11,13 +11,15 @@ from jinja2 import BaseLoader, BytecodeCache, TemplateNotFound
 from jinja2.utils import LRUCache
 
 import commera.sdk
-from commera.localization import get_localization, get_request_path, get_route_path, strip_language_prefix
+from commera.localization import get_localization, get_request_path, get_route_path
+from commera.localization.routing import localize_path
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	get_render_theme_context,
 	is_within_directory,
 )
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import get_compiled_routes
 from commera.shop_themes.jinja_helpers import get_shop_theme_settings
+from commera.shop_themes.route_patterns import has_language_group
 from commera.utils import get_currency_symbols, get_store_currency
 
 # page_renderer runs before every built-in renderer: a segment missing here is a route hijack, not a 404.
@@ -124,11 +126,12 @@ class ThemePageRenderer:
 		return True
 
 	def get_request_path(self):
-		# The request path without its language prefix, not what website_route_rules rewrote it to,
-		# so a themed route bypasses them.
+		# The path without its language prefix, not what website_route_rules rewrote it to.
+		# Only a localized request loses its prefix: /ar/private/x stays outside the storefront.
 		if getattr(frappe.local, "request", None):
 			return get_route_path().strip("/")
-		return strip_language_prefix("/" + self.path.strip("/"))[1].strip("/")
+		localized = localize_path(self.path)
+		return (localized.route_path if localized else self.path).strip("/")
 
 	def render(self):
 		if self.requires_auth and frappe.session.user == "Guest":
@@ -196,8 +199,8 @@ def match_route(routes, request_path, legacy_path=None):
 	"""`legacy_path` is the path as it was under /<lang>/. A route that the language patch kept
 	with its (?P<lang>…) group matches it, so it still wins in its old place."""
 	for route in routes:
-		has_language_group = legacy_path is not None and "lang" in route["pattern"].groupindex
-		match = route["pattern"].match(legacy_path if has_language_group else request_path)
+		is_legacy = legacy_path is not None and has_language_group(route["pattern"].pattern)
+		match = route["pattern"].match(legacy_path if is_legacy else request_path)
 		if match:
 			return route, match
 	return None, None

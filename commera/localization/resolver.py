@@ -70,10 +70,12 @@ def get_localization() -> Localization:
 
 
 def get_route_path() -> str:
-	"""The current request path without its language prefix."""
+	"""The current request path without its language prefix.
+	A request that localize_request left alone keeps its path, prefix and all."""
 	if localized := get_localized_request():
 		return localized.route_path
-	return resolve_current_request()[1]
+	request = getattr(frappe.local, "request", None)
+	return request.path if request else "/"
 
 
 def get_request_path() -> str:

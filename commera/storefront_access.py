@@ -38,12 +38,14 @@ def is_storefront_published() -> bool:
 
 
 def is_storefront_path(path: str) -> bool:
-	"""A language-prefixed page path, a storefront page or a page of the active theme."""
-	language, rest = strip_language_prefix("/" + path.strip("/"), include_unpublished=True)
-	segment = rest.strip("/").split("/", 1)[0]
-	if language:
-		return is_page_path(rest)
-	return segment in STOREFRONT_SEGMENTS or segment.startswith("sitemap") or has_theme_page(rest)
+	"""A language-prefixed page path, a storefront page or a page of the active theme.
+	The theme test takes the path as is: the renderer keeps the prefix of /ar/private/x too."""
+	path = "/" + path.strip("/")
+	language, rest = strip_language_prefix(path, include_unpublished=True)
+	if language and is_page_path(rest):
+		return True
+	segment = path.strip("/").split("/", 1)[0]
+	return segment in STOREFRONT_SEGMENTS or segment.startswith("sitemap") or has_theme_page(path)
 
 
 def has_theme_page(path: str) -> bool:

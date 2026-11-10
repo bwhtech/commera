@@ -5,6 +5,7 @@ import frappe
 from frappe.website.path_resolver import resolve_path, resolve_redirect
 from werkzeug.routing.exceptions import RequestRedirect
 
+from commera.localization.languages import StorefrontLanguages
 from commera.localization.resolver import (
 	Localization,
 	LocalizedRequest,
@@ -57,6 +58,7 @@ def localize_request():
 	if localized.route_path == "/":
 		# Frappe's get_home_page() would send staff to the desk.
 		frappe.local.flags.home_page = "index"
+	skip_frappe_redirects(localized.route_path)
 	set_request_path(request, localized.route_path)
 
 
@@ -122,13 +124,19 @@ def get_redirect_target(path: str, prefix: str, rest: str) -> str | None:
 def get_website_redirect(localized: LocalizedRequest) -> tuple[str, int] | None:
 	"""A website_redirects or Website Settings rule for the requested path, else for the path
 	without its prefix. A same-site target of such an unprefixed rule keeps the language."""
-	if redirect := match_website_redirect(localized.path):
-		return redirect
-	if localized.route_path == clean_path(localized.path):
-		return None
-	if redirect := match_website_redirect(localized.route_path):
-		location, code = redirect
-		return keep_language_prefix(location, localized.canonical_prefix), code
+	candidates = [(localized.path, "")]
+	if localized.route_path != clean_path(localized.path):
+		candidates.append((localized.route_path, localized.canonical_prefix))
+
+	current = get_canonical_path(localized.path)
+	for path, prefix in candidates:
+		if not (redirect := match_website_redirect(path)):
+			continue
+		# /en/... named the default language's page before it moved to the root.
+		location = keep_language_prefix(canonicalize_location(redirect[0]), prefix)
+		# A rule written for /en/... would send the page back to itself, then to /en/... again.
+		if not is_same_site(location) or urlsplit(location).path != current:
+			return location, redirect[1]
 	return None
 
 
@@ -141,11 +149,32 @@ def match_website_redirect(path: str) -> tuple[str, int] | None:
 
 
 def keep_language_prefix(location: str, prefix: str) -> str:
-	if not prefix or not location.startswith("/") or location.startswith(("//", "/\\")):
+	if not prefix or not is_same_site(location):
 		return location
 	if strip_language_prefix(urlsplit(location).path, include_unpublished=True)[0]:
 		return location
 	return prefix + location
+
+
+def canonicalize_location(location: str) -> str:
+	"""A same-site `location` without the default language's prefix, which only redirects."""
+	if not is_same_site(location):
+		return location
+	parts = urlsplit(location)
+	return parts._replace(path=get_canonical_path(parts.path)).geturl()
+
+
+def get_canonical_path(path: str) -> str:
+	"""`path` as a link for guests: no prefix for the default language, and no closed /en/."""
+	path = clean_path(path)
+	language, rest = strip_language_prefix(path)
+	if not language:
+		return strip_legacy_prefix(path)
+	return rest if language == StorefrontLanguages.load().default else path
+
+
+def is_same_site(location: str) -> bool:
+	return location.startswith("/") and not location.startswith(("//", "/\\"))
 
 
 def strip_legacy_prefix(path: str) -> str:
@@ -178,6 +207,13 @@ def encode_target(target: str) -> str:
 def clean_path(path: str) -> str:
 	"""`path` with exactly one leading slash. "//host" or "/\\host" would send a redirect off-site."""
 	return "/" + (path or "").strip(" ").strip("/\\")
+
+
+def skip_frappe_redirects(path: str):
+	"""The rules ran in localize_request. Frappe's PathResolver would match them again on the
+	stripped path and send /x back to /en/x. frappe.local.cache lives for this request only."""
+	key = frappe.cache.make_key("website_redirects")
+	frappe.local.cache.setdefault(key, {})[path.strip("/ ") or "/"] = False
 
 
 def set_request_path(request, path: str):

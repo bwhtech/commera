@@ -166,6 +166,10 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 		self.assertEqual(match.group("route"), "some-slug")
 
 	def test_route_patterns_match_the_path_without_its_language_prefix(self):
+		# A test site may still hold the routes from before the language patch.
+		settings = frappe.get_single("Shop Theme Settings")
+		settings.set("routes", [])
+		settings.save(ignore_permissions=True)
 		seed_default_routes()
 
 		routes = build_compiled_routes()["routes"]
