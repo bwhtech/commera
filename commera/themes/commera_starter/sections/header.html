@@ -1,7 +1,7 @@
 {% from "components/macros/transitions.html" import popover %}
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/menu_link.html" import menu_link %}
-{% from "templates/macros/language_switcher.html" import language_switcher %}
+{% from "templates/macros/language_switcher.html" import country_switcher, language_switcher %}
 {% set is_guest = frappe.session.user == "Guest" %}
 {% set main_menu = commera.shop.get_menu(section.settings.menu or "main-menu") %}
 {% set menu_items = main_menu["items"] if main_menu else [] %}
@@ -41,11 +41,24 @@
 		</a>
 
 		<div class="{{ 'ms-auto' if logo_at_start }} flex items-center justify-end gap-1 lg:-me-2.5">
-			{% if get_localization().available_languages | length > 1 %}
-			<div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false" class="relative max-lg:hidden">
-				<button type="button" @click="open = !open" :aria-expanded="open" class="icon-button" aria-label="{{ _('Language') }}">{{ icon("globe") }}</button>
-				<div x-cloak x-show="open" {{ popover() }} class="absolute end-0 top-full z-50 mt-2 min-w-56 popover p-1.5">
-					{{ language_switcher(link_class="flex h-10 items-center rounded-lg px-2.5 text-md text-ink-gray-8 hover:bg-surface-gray-3", current_class="font-medium text-ink-gray-9") }}
+			{% set localization = get_localization() %}
+			{% set has_countries = localization.available_markets | length > 1 %}
+			{% set has_languages = localization.available_languages | length > 1 %}
+			{% if has_countries or has_languages %}
+			{% set locale_label = _("Country and language") if has_countries and has_languages else (_("Country") if has_countries else _("Language")) %}
+			<div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="if (open) { open = false; $refs.toggle.focus() }" class="relative max-lg:hidden">
+				<button x-ref="toggle" type="button" @click="open = !open" aria-expanded="false" :aria-expanded="open" aria-controls="locale-picker" class="icon-button" aria-label="{{ locale_label | e }}">{{ icon("globe") }}</button>
+				<div id="locale-picker" x-cloak x-show="open" {{ popover() }} class="absolute end-0 top-full z-50 mt-2 max-h-[min(32rem,calc(100vh-var(--header-height)-1rem))] min-w-56 overflow-y-auto overscroll-contain popover divide-y divide-outline-gray-2 text-start">
+					{% if has_countries %}
+					<div class="p-1.5">
+						{{ country_switcher(link_class="flex h-10 items-center rounded-lg px-2.5 text-md text-ink-gray-8 hover:bg-surface-gray-3", current_class="font-medium text-ink-gray-9", heading_class="flex h-7 items-center px-2.5 pt-1.5 text-base font-medium text-ink-gray-6") }}
+					</div>
+					{% endif %}
+					{% if has_languages %}
+					<div class="p-1.5">
+						{{ language_switcher(link_class="flex h-10 items-center rounded-lg px-2.5 text-md text-ink-gray-8 hover:bg-surface-gray-3", current_class="font-medium text-ink-gray-9") }}
+					</div>
+					{% endif %}
 				</div>
 			</div>
 			{% endif %}

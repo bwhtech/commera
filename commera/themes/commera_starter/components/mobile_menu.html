@@ -1,7 +1,7 @@
 {% from "components/macros/transitions.html" import overlay, scrim, drawer, sheet, dialog %}
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/menu_link.html" import menu_link %}
-{% from "templates/macros/language_switcher.html" import language_switcher %}
+{% from "templates/macros/language_switcher.html" import country_switcher, language_switcher %}
 {% set is_guest = frappe.session.user == "Guest" %}
 
 <div x-data="{ open: false }" x-init="matchMedia('(width >= 80rem)').addEventListener('change', (event) => { if (event.matches && open) { open = false; $nextTick(() => [...document.querySelectorAll('header a, header button')].find((element) => element.offsetParent)?.focus()) } })" x-cloak x-show="open" {{ overlay() }} @open-menu.window="open = true" @keydown.escape.window="open = false"
@@ -47,6 +47,7 @@
 				{% endif %}
 			</div>
 			{% endif %}
+			{{ country_switcher(class="mx-2 mt-4 border-t border-outline-gray-2 pt-4", link_class="-mx-2 flex h-12 items-center rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3", current_class="font-medium text-ink-gray-9", heading_class="flex h-8 items-center pt-2 text-base font-medium text-ink-gray-6") }}
 			{{ language_switcher(class="mx-2 mt-4 border-t border-outline-gray-2 pt-4", link_class="-mx-2 flex h-12 items-center rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3", current_class="font-medium text-ink-gray-9") }}
 		</div>
 	</nav>
