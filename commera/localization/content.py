@@ -6,12 +6,15 @@ from dataclasses import dataclass
 import frappe
 from frappe import _
 from frappe.model.base_document import get_controller
+from frappe.query_builder import Case, CustomFunction, DocType
+from frappe.query_builder.functions import Count, IfNull
 from frappe.utils import create_batch, cstr
 from frappe.utils.data import sha256_hash
 
 from commera.localization.resolver import Localization, get_localization
 from commera.localization.resources import get_translatable_fields
 
+Sha2 = CustomFunction("SHA2", ["value", "length"])
 DOCTYPE = "Content Translation"
 MISSING, OUTDATED, CURRENT = "missing", "outdated", "current"
 SHOP_WIDE = ""
@@ -194,31 +197,25 @@ def get_status(source, value: str | None, source_hash: str | None) -> str:
 def count_column_statuses(doctype: str, field: str, language: str) -> dict[str, int]:
 	"""{status: count} of a column field's shop-wide translations, aggregated in SQL. MariaDB's
 	SHA2 matches get_source_hash for text, so status is decided without reading a source."""
-	rows = frappe.db.sql(
-		f"""
-		select
-			case
-				when ifnull(translation.translated_value, '') = '' then %(missing)s
-				when translation.source_hash = sha2(record.`{field}`, 256) then %(current)s
-				else %(outdated)s
-			end as status,
-			count(*)
-		from `tab{doctype}` record
-		left join `tab{DOCTYPE}` translation
-			on translation.reference_doctype = %(doctype)s
-			and translation.reference_name = record.name
-			and translation.reference_field = %(field)s
-			and translation.language = %(language)s
-			and ifnull(translation.market, '') = ''
-		where ifnull(record.`{field}`, '') != ''
-		group by status""",
-		{
-			"doctype": doctype,
-			"field": field,
-			"language": language,
-			"missing": MISSING,
-			"outdated": OUTDATED,
-			"current": CURRENT,
-		},
+	record, translation = DocType(doctype), DocType(DOCTYPE)
+	status = (
+		Case()
+		.when(IfNull(translation.translated_value, "") == "", MISSING)
+		.when(translation.source_hash == Sha2(record[field], 256), CURRENT)
+		.else_(OUTDATED)
 	)
-	return dict(rows)
+	query = (
+		frappe.qb.from_(record)
+		.left_join(translation)
+		.on(
+			(translation.reference_doctype == doctype)
+			& (translation.reference_name == record.name)
+			& (translation.reference_field == field)
+			& (translation.language == language)
+			& (IfNull(translation.market, "") == "")
+		)
+		.where(IfNull(record[field], "") != "")
+		.select(status, Count("*"))
+		.groupby(status)
+	)
+	return dict(query.run())
