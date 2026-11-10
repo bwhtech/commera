@@ -439,12 +439,16 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 		header = self.render(self.theme_dir / "components" / "includes" / "header.html")
 		section = self.render(
 			self.theme_dir.parent / "scaffold_sections" / "sections" / "rich_text.html",
-			section={"settings": {"button_label": "Shop", "button_url": "/products"}},
+			section={
+				"settings": {"heading": "<b>Hi</b>", "button_label": "<img>", "button_url": "/products"}
+			},
 		)
 
 		self.assertIn('href="/ar/products"', header)
 		self.assertIn('hreflang="en"', header)
 		self.assertIn('href="/ar/products"', section)
+		self.assertIn("&lt;b&gt;Hi&lt;/b&gt;", section)
+		self.assertIn("&lt;img&gt;</a>", section)
 
 	def render(self, path: Path, **context) -> str:
 		# nosemgrep: frappe-ssti

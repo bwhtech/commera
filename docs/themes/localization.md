@@ -48,7 +48,7 @@ Write every link to a storefront page through `url()`:
 
 ```jinja
 <a href="{{ url('/products') | e }}">{{ _("Shop all") }}</a>
-<a href="{{ url(section.settings.button_url or '/products') | e }}">{{ section.settings.button_label }}</a>
+<a href="{{ url(section.settings.button_url or '/products') | e }}">{{ section.settings.button_label | e }}</a>
 ```
 
 `url(path)` gives `path` in the language of the page. On an Arabic page, `url('/products')` gives `/ar/products`. On a default-language page, it gives `/products`. A path that already names a language moves to the language of the page.
@@ -153,8 +153,11 @@ In Tailwind, use the logical classes: `ms-4`, `me-4`, `ps-4`, `pe-4`, `start-0`,
 Flip an icon that points in a direction, such as an arrow, with the `rtl:` variant:
 
 ```jinja
+{% from "components/macros/icons.html" import icon %}
 <span class="rtl:-scale-x-100">{{ icon("right", "size-4") }}</span>
 ```
+
+`icon` is a macro of the Commera Starter theme, not a Jinja global. Your theme must have `components/macros/icons.html`, or inherit it from a parent theme.
 
 Do not flip icons that have no direction, such as a cart or a search icon. A theme page also gets `is_rtl`, which is true on a right-to-left page.
 
