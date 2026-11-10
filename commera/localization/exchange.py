@@ -9,7 +9,6 @@ from dataclasses import asdict, dataclass, field
 import frappe
 from frappe import _
 from frappe.utils import create_batch, cstr
-from frappe.utils.csvutils import escape_formula_injection, unescape_formula_injection
 
 from commera.localization.content import (
 	BATCH_SIZE,
@@ -18,7 +17,6 @@ from commera.localization.content import (
 	MISSING,
 	OUTDATED,
 	SHOP_WIDE,
-	fetch_translations,
 	get_source_hash,
 	get_sources,
 	register,
@@ -38,6 +36,9 @@ COLUMNS = (
 )
 IMPORT_COLUMNS = ("Type", "Identification", "Field", "Locale", "Market", "Translated content")
 MAX_IMPORT_ROWS = 10_000
+MAX_FILE_SIZE = 10 * 1024 * 1024
+# A spreadsheet runs a cell that starts with one of these. The apostrophe is here so the quote reverses.
+FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r", "'")
 # Markets arrive with #450. Until that doctype exists, a row for a market is an error.
 MARKET_DOCTYPE = "Commera Market"
 
@@ -49,9 +50,14 @@ class Entry:
 	type: str
 	identification: str
 	field: str
+	market: str
 	status: str
 	default: str
 	translated: str
+
+	@property
+	def key(self) -> tuple[str, str, str, str]:
+		return (self.type, self.identification, self.field, self.market)
 
 	def as_row(self, language: str) -> list[str]:
 		return [
@@ -59,7 +65,7 @@ class Entry:
 			self.identification,
 			self.field,
 			language,
-			SHOP_WIDE,
+			self.market,
 			self.status,
 			self.default,
 			self.translated,
@@ -92,14 +98,15 @@ def get_exchange_language(code: str) -> str:
 
 
 def export_csv(language: str) -> str:
-	"""Every field with a source or a translation. Formula-like cells get a leading quote (OWASP)."""
+	"""Every field with a source or a translation, shop-wide and per market. Cells are quoted against
+	formulas (OWASP) by `encode_cell`, which the import reverses."""
 	language = get_exchange_language(language)
 	buffer = io.StringIO()
 	writer = csv.writer(buffer)
 	writer.writerow(COLUMNS)
 	for entry in iter_entries(language):
 		if entry.default or entry.translated:
-			writer.writerow([escape_formula_injection(cell) for cell in entry.as_row(language)])
+			writer.writerow([encode_cell(cell) for cell in entry.as_row(language)])
 	return buffer.getvalue()
 
 
@@ -109,29 +116,30 @@ def import_csv(content: bytes | str, language: str) -> ImportReport:
 
 class TranslationImport:
 	"""Matches each row on type, identification, field, locale and market, and writes the changed ones.
-	A bad row becomes an error in the report and the next row is read."""
+	A bad row, or a repeat of a key, becomes an error in the report and the next row is read."""
 
 	def __init__(self, rows: list[tuple[int, dict]], language: str):
 		self.rows = rows
 		self.language = language
 		self.report = ImportReport()
+		self.seen = {}
 		self.resources = {resource.type: resource for resource in get_translatable_resources()}
 		types = {row["Type"] for _number, row in rows} & set(self.resources)
-		self.entries = {
-			(entry.type, entry.identification, entry.field): entry for entry in iter_entries(language, types)
-		}
+		# A snapshot is safe to compare against because each key is imported at most once.
+		self.entries = {entry.key: entry for entry in iter_entries(language, types)}
 
 	def run(self) -> ImportReport:
 		for number, row in self.rows:
 			try:
-				self.import_row(row)
+				self.import_row(number, row)
 			except RowError as error:
 				self.report.errors.append({"row": number, "message": str(error)})
 		return self.report
 
-	def import_row(self, row: dict):
+	def import_row(self, number: int, row: dict):
+		self.check_duplicate(number, row)
 		resource, entry, market = self.match(row)
-		value = unescape_formula_injection(row["Translated content"])
+		value = row["Translated content"]
 		if not value:
 			self.report.skipped += 1
 		elif value == self.stored_value(entry, market):
@@ -139,6 +147,14 @@ class TranslationImport:
 		else:
 			self.write(resource, entry, value, market)
 			self.report.updated += 1
+
+	def check_duplicate(self, number: int, row: dict):
+		key = (row["Type"], row["Identification"], row["Field"], row["Locale"].casefold(), row["Market"])
+		if first := self.seen.get(key):
+			raise RowError(
+				_("Row {0} already has this type, identification, field and market.").format(first)
+			)
+		self.seen[key] = number
 
 	def match(self, row: dict) -> tuple[TranslatableResource, Entry, str]:
 		if row["Locale"].casefold() != self.language.casefold():
@@ -150,7 +166,7 @@ class TranslationImport:
 			raise RowError(_("{0} is not a type you can translate.").format(row["Type"]))
 		if row["Field"] not in resource.fields:
 			raise RowError(_("{0} is not a translatable field of {1}.").format(row["Field"], row["Type"]))
-		entry = self.entries.get((row["Type"], row["Identification"], row["Field"]))
+		entry = self.entries.get((row["Type"], row["Identification"], row["Field"], SHOP_WIDE))
 		if not entry:
 			raise RowError(_("No {0} with identification {1}.").format(row["Type"], row["Identification"]))
 		if row["Market"]:
@@ -158,16 +174,8 @@ class TranslationImport:
 		return resource, entry, row["Market"]
 
 	def stored_value(self, entry: Entry, market: str) -> str:
-		if market == SHOP_WIDE:
-			return entry.translated
-		filters = {
-			"reference_doctype": self.resources[entry.type].doctype,
-			"reference_name": entry.identification,
-			"reference_field": entry.field,
-			"language": self.language,
-			"market": market,
-		}
-		return cstr(frappe.db.get_value(DOCTYPE, filters, "translated_value"))
+		stored = self.entries.get((entry.type, entry.identification, entry.field, market))
+		return stored.translated if stored else ""
 
 	def write(self, resource: TranslatableResource, entry: Entry, value: str, market: str):
 		# A refused save must not leave a half-written row or a toast behind for this row.
@@ -186,6 +194,10 @@ def check_market(market: str):
 		raise RowError(_("Markets are not available yet. Leave the Market column empty."))
 	if not frappe.db.exists(MARKET_DOCTYPE, market):
 		raise RowError(_("Market {0} does not exist.").format(market))
+
+
+# Python's default of 128 KB refuses long pages. Set once: a scoped change races other threads.
+csv.field_size_limit(max(csv.field_size_limit(), MAX_FILE_SIZE))
 
 
 def read_rows(content: bytes | str) -> list[tuple[int, dict]]:
@@ -208,12 +220,22 @@ def read_rows(content: bytes | str) -> list[tuple[int, dict]]:
 
 
 def read_cells(header: list[str], cells: list[str]) -> dict:
-	"""Key columns are trimmed; translated content is kept exactly as written."""
+	"""Key columns are trimmed; translated content is kept exactly as written. Both are decoded."""
 	row = dict(zip(header, cells, strict=False))
+	values = {column: row.get(column, "") for column in IMPORT_COLUMNS}
 	return {
-		column: row.get(column, "") if column == "Translated content" else row.get(column, "").strip()
-		for column in IMPORT_COLUMNS
+		column: decode_cell(value if column == "Translated content" else value.strip())
+		for column, value in values.items()
 	}
+
+
+def encode_cell(value: str) -> str:
+	return "'" + value if value.startswith(FORMULA_TRIGGERS) else value
+
+
+def decode_cell(value: str) -> str:
+	"""Reverses `encode_cell`. Any other leading apostrophe was typed and stays."""
+	return value[1:] if value.startswith("'") and value[1:].startswith(FORMULA_TRIGGERS) else value
 
 
 def decode(content: bytes | str) -> str:
@@ -247,19 +269,41 @@ def iter_doctype_entries(resource: TranslatableResource, language: str) -> Itera
 	records = frappe.get_all(resource.doctype, fields=["name", *columns], order_by="name asc")
 	for batch in create_batch(records, BATCH_SIZE):
 		sources = get_sources(resource.doctype, batch, list(resource.fields))
-		names = [record.name for record in batch]
-		translations = fetch_translations(resource.doctype, names, list(resource.fields), language)
-		for record, source in zip(batch, sources, strict=True):
+		names = [cstr(record.name) for record in batch]
+		translations = fetch_all_translations(resource.doctype, names, list(resource.fields), language)
+		for name, source in zip(names, sources, strict=True):
 			for fieldname in resource.fields:
-				translated, source_hash = translations.get((record.name, fieldname)) or ("", None)
-				yield Entry(
-					type=resource.type,
-					identification=cstr(record.name),
-					field=fieldname,
-					status=get_status(source[fieldname], cstr(translated), source_hash),
-					default=source[fieldname],
-					translated=cstr(translated),
-				)
+				markets = translations.get((name, fieldname), {})
+				for market in [SHOP_WIDE, *sorted(set(markets) - {SHOP_WIDE})]:
+					translated, source_hash = markets.get(market) or ("", None)
+					yield Entry(
+						type=resource.type,
+						identification=name,
+						field=fieldname,
+						market=market,
+						status=get_status(source[fieldname], translated, source_hash),
+						default=source[fieldname],
+						translated=translated,
+					)
+
+
+def fetch_all_translations(doctype: str, names: list[str], fields: list[str], language: str) -> dict:
+	"""{(name, field): {market: (translated value, source hash)}}, shop-wide and every market."""
+	rows = frappe.get_all(
+		DOCTYPE,
+		filters={
+			"reference_doctype": doctype,
+			"reference_name": ("in", names),
+			"reference_field": ("in", fields),
+			"language": language,
+		},
+		fields=["reference_name", "reference_field", "market", "translated_value", "source_hash"],
+	)
+	translations = {}
+	for row in rows:
+		markets = translations.setdefault((row.reference_name, row.reference_field), {})
+		markets[cstr(row.market)] = (cstr(row.translated_value), row.source_hash)
+	return translations
 
 
 def get_status(source: str, translated: str, source_hash: str | None) -> str:

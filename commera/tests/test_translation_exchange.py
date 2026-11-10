@@ -7,6 +7,7 @@ from frappe.tests import IntegrationTestCase
 
 from commera.api.admin import translations as translations_api
 from commera.localization import CURRENT, MISSING, OUTDATED, exchange, register
+from commera.roles import COMMERA_ADMIN, COMMERA_USER, add_commera_roles
 from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 
@@ -25,6 +26,22 @@ def to_csv(rows: list[dict]) -> str:
 	return buffer.getvalue()
 
 
+def make_user(role: str) -> str:
+	return (
+		frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": f"translator-{frappe.generate_hash(length=6)}@example.com",
+				"first_name": "Translator",
+				"send_welcome_email": 0,
+				"roles": [{"role": role}],
+			}
+		)
+		.insert()
+		.name
+	)
+
+
 def translations_of(name: str) -> list[dict]:
 	return frappe.get_all(
 		"Content Translation",
@@ -38,17 +55,25 @@ class TestTranslationExchange(IntegrationTestCase):
 	"""Notes stand in for a store's resources, so an export holds only what a test made."""
 
 	def setUp(self):
+		# Each test exports every note: keep one test's notes and markets out of the next.
+		frappe.db.savepoint("translation_exchange_test")
+		self.addCleanup(frappe.db.rollback, save_point="translation_exchange_test")
 		use_storefront_languages(self, "en", published=("en", "ar"))
 		hooks = {**frappe.get_hooks("commera_hooks", {}), "translatable_resources": [NOTE_RESOURCE]}
 		self.enterContext(self.patch_hooks({"commera_hooks": hooks}))
 		self.note = self.make_note("Packing note", "<p>Wrap it well</p>")
 
-	def make_note(self, title, content=""):
+	def make_note(self, title, content="", name=None):
 		title = f"{title} {frappe.generate_hash(length=6)}"
-		return frappe.get_doc({"doctype": "Note", "title": title, "content": content}).insert()
+		return frappe.get_doc({"doctype": "Note", "title": title, "content": content}).insert(set_name=name)
 
-	def rows_of(self, content, name=None):
-		return [row for row in parse(content) if row["Identification"] == (name or self.note.name)]
+	def stored(self, name, field="title", market=""):
+		filters = {"reference_name": name, "reference_field": field, "language": "ar", "market": market}
+		return frappe.db.get_value("Content Translation", filters, "translated_value")
+
+	def rows_of(self, content, name=None, field=None):
+		rows = [row for row in parse(content) if row["Identification"] == (name or self.note.name)]
+		return [row for row in rows if field in (None, row["Field"])]
 
 	def row(self, field, translated, **overrides):
 		return {
@@ -107,7 +132,7 @@ class TestTranslationExchange(IntegrationTestCase):
 			self.row("route", "x"),
 			self.row("title", "x", Identification="no-such-note"),
 			self.row("title", "x", Locale="fr"),
-			self.row("content", ""),
+			self.row("content", "", Identification=self.make_note("Gift note").name),
 			self.row("content", "<p>لفها</p>"),
 		]
 		messages = len(frappe.local.message_log)
@@ -154,6 +179,107 @@ class TestTranslationExchange(IntegrationTestCase):
 		self.assertEqual((report.updated, report.errors), (0, []))
 		self.assertEqual(translations_of(note.name), before)
 
+	def test_identifications_starting_with_a_formula_character_still_match(self):
+		notes = [self.make_note("Card", name=f"{char}S-{frappe.generate_hash(length=6)}") for char in "=+-@'"]
+		for note in notes:
+			register("Note", note.name, "title", "ar", "بطاقة")
+
+		content = exchange.export_csv("ar")
+		rows = [row for note in notes for row in self.rows_of(content, "'" + note.name, "title")]
+		unchanged = exchange.import_csv(content, "ar")
+		for row in rows:
+			row["Translated content"] = "بطاقة هدية"
+		report = exchange.import_csv(to_csv(rows), "ar")
+
+		self.assertEqual(len(rows), len(notes))
+		self.assertEqual((unchanged.updated, unchanged.errors), (0, []))
+		self.assertEqual((report.updated, report.errors), (len(notes), []))
+		self.assertEqual({self.stored(note.name) for note in notes}, {"بطاقة هدية"})
+
+	def test_cells_starting_with_a_formula_character_or_a_quote_round_trip_exactly(self):
+		values = [f"{char}S-001" for char in ("=", "+", "-", "@", "\t", "\r", "'", "''", "'=")]
+		notes = [self.make_note("Card") for _value in values]
+		content = exchange.export_csv("ar")
+		rows = [row for note in notes for row in self.rows_of(content, note.name, "title")]
+		for row, value in zip(rows, values, strict=True):
+			row["Translated content"] = "'" + value
+
+		report = exchange.import_csv(to_csv(rows), "ar")
+		exported = exchange.export_csv("ar")
+		again = exchange.import_csv(exported, "ar")
+
+		self.assertEqual((report.updated, report.errors), (len(values), []))
+		self.assertEqual([self.stored(note.name) for note in notes], values)
+		self.assertEqual((again.updated, again.errors), (0, []))
+		self.assertEqual(exchange.export_csv("ar"), exported)
+		cells = [
+			row["Translated content"] for note in notes for row in self.rows_of(exported, note.name, "title")
+		]
+		self.assertEqual(cells, ["'" + value for value in values])
+
+	def test_a_typed_leading_quote_is_kept(self):
+		report = exchange.import_csv(to_csv([self.row("title", "'S-001"), self.row("content", "'")]), "ar")
+
+		self.assertEqual((report.updated, report.errors), (2, []))
+		self.assertEqual(
+			(self.stored(self.note.name), self.stored(self.note.name, "content")), ("'S-001", "'")
+		)
+
+	def test_a_repeated_key_is_an_error_and_the_first_row_is_kept(self):
+		rows = [
+			self.row("title", "B"),
+			self.row("title", "A"),
+			self.row("title", "C", Locale="AR"),
+			self.row("content", "<p>B</p>"),
+		]
+
+		report = exchange.import_csv(to_csv(rows), "ar")
+
+		self.assertEqual([error["row"] for error in report.errors], [3, 4])
+		self.assertIn("Row 2", report.errors[0]["message"])
+		self.assertEqual((report.updated, self.stored(self.note.name)), (2, "B"))
+
+	def test_a_long_page_body_round_trips(self):
+		body = "<p>" + "لفها جيدا " * 20_000 + "</p>"
+		note = self.make_note("Long page", content="<p>" + "Wrap it " * 25_000 + "</p>")
+		(row,) = [
+			row for row in self.rows_of(exchange.export_csv("ar"), note.name) if row["Field"] == "content"
+		]
+		row["Translated content"] = body
+
+		report = exchange.import_csv(to_csv([row]), "ar")
+		again = exchange.import_csv(exchange.export_csv("ar"), "ar")
+
+		self.assertGreater(len(body), 200_000)
+		self.assertEqual((report.updated, report.errors), (1, []))
+		self.assertEqual(self.stored(note.name, "content"), body)
+		self.assertEqual((again.updated, again.errors), (0, []))
+
+	def test_market_translations_are_exported_with_their_market_and_import_back(self):
+		register("Note", self.note.name, "title", "ar", "ملاحظة الخليج", market="INR")
+		frappe.db.set_value("Note", self.note.name, "title", "Packing note v2")
+		register("Note", self.note.name, "title", "ar", "ملاحظة")
+
+		content = exchange.export_csv("ar")
+		rows = self.rows_of(content, self.note.name)
+		with patch.object(exchange, "MARKET_DOCTYPE", "Currency"):
+			unchanged = exchange.import_csv(content, "ar")
+			rows[1]["Translated content"] = "ملاحظة الخليج الجديدة"
+			report = exchange.import_csv(to_csv(rows), "ar")
+
+		self.assertEqual(
+			[(row["Field"], row["Market"], row["Status"], row["Translated content"]) for row in rows],
+			[
+				("title", "", CURRENT, "ملاحظة"),
+				("title", "INR", OUTDATED, "ملاحظة الخليج الجديدة"),
+				("content", "", MISSING, ""),
+			],
+		)
+		self.assertEqual((unchanged.updated, unchanged.errors), (0, []))
+		self.assertEqual((report.updated, report.errors), (1, []))
+		self.assertEqual(self.stored(self.note.name, market="INR"), "ملاحظة الخليج الجديدة")
+		self.assertEqual(self.stored(self.note.name), "ملاحظة")
+
 	def test_imported_html_is_sanitised(self):
 		content = "<p>لفها</p><script>alert(1)</script>"
 
@@ -182,36 +308,45 @@ class TestTranslationExchange(IntegrationTestCase):
 			with self.assertRaises(frappe.ValidationError):
 				exchange.import_csv(to_csv([self.row("title", "x", Locale=language)]), language)
 
+	def upload(self, rows):
+		return frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": "translations-ar.csv",
+				"is_private": 1,
+				"content": to_csv(rows).encode(),
+			}
+		).insert()
+
 	def test_the_admin_api_downloads_a_csv_and_imports_an_uploaded_one(self):
 		translations_api.export_translations("ar")
 		self.assertEqual(frappe.response["type"], "download")
 		self.assertEqual(frappe.response["filename"], "translations-ar.csv")
 		self.assertTrue(frappe.response["filecontent"].startswith("﻿"))
 
-		file = frappe.get_doc(
-			{
-				"doctype": "File",
-				"file_name": "translations-ar.csv",
-				"is_private": 1,
-				"content": to_csv([self.row("title", "ملاحظة")]).encode(),
-			}
-		).insert()
-		report = translations_api.import_translations(file.file_url, "ar")
+		report = translations_api.import_translations(
+			self.upload([self.row("title", "ملاحظة")]).file_url, "ar"
+		)
 
 		self.assertEqual((report["updated"], report["errors"]), (1, []))
 
-	def test_the_admin_api_refuses_a_user_without_access_to_translations(self):
-		user = frappe.get_doc(
-			{
-				"doctype": "User",
-				"email": f"translator-{frappe.generate_hash(length=6)}@example.com",
-				"first_name": "Translator",
-				"send_welcome_email": 0,
-				"roles": [{"role": "Commera User"}],
-			}
-		).insert()
+	def test_a_commera_admin_exports_and_imports_translations(self):
+		add_commera_roles()
 		self.addCleanup(frappe.set_user, "Administrator")
-		frappe.set_user(user.name)
+		frappe.set_user(make_user(COMMERA_ADMIN))
+
+		translations_api.export_translations("ar")
+		report = translations_api.import_translations(
+			self.upload([self.row("title", "ملاحظة")]).file_url, "ar"
+		)
+
+		self.assertEqual(frappe.response["filename"], "translations-ar.csv")
+		self.assertEqual((report["updated"], report["errors"]), (1, []))
+		self.assertEqual(self.stored(self.note.name), "ملاحظة")
+
+	def test_the_admin_api_refuses_a_user_without_access_to_translations(self):
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(make_user(COMMERA_USER))
 
 		with self.assertRaises(frappe.PermissionError):
 			translations_api.export_translations("ar")

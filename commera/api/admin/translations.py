@@ -10,8 +10,6 @@ from frappe.utils import cint, cstr
 from commera.localization import exchange
 from commera.localization.content import DOCTYPE
 
-MAX_FILE_SIZE = 10 * 1024 * 1024
-
 
 @frappe.whitelist(methods=["GET"])
 def export_translations(language: str):
@@ -38,6 +36,6 @@ def import_translations(file_url: str, language: str) -> dict:
 	file.check_permission("read")
 	if not cstr(file.file_name).lower().endswith(".csv"):
 		frappe.throw(_("Upload a CSV file."))
-	if cint(file.file_size) > MAX_FILE_SIZE:
-		frappe.throw(_("The file is larger than {0} MB.").format(MAX_FILE_SIZE // (1024 * 1024)))
+	if cint(file.file_size) > exchange.MAX_FILE_SIZE:
+		frappe.throw(_("The file is larger than {0} MB.").format(exchange.MAX_FILE_SIZE // (1024 * 1024)))
 	return exchange.import_csv(file.get_content(), language).as_dict()
