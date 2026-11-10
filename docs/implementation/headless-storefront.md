@@ -15,7 +15,7 @@ The API is a thin layer over `commera.sdk`. It reads the request, calls the SDK,
 | `catalog.get_items` | None | Yes | None |
 | `account.get_profile`, `update_profile`, addresses, `list_orders`, `get_order` | `account.*` | Yes | Not yet: the account pages read `commera.utils` and `commera.www.account` |
 
-The shapes are typed in `commera.sdk.types`: `ProductPage`, `ProductCard`, `Product`, `ProductVariant`, `Collection`, `Shop`, `MenuItem`, `ContentPage`, `Sitemap`, `PricedCart`, `CustomerProfile`, `CustomerAddress`, `ShopperOrder` and `ShopperOrderPage`. Each priced cart line has its `product` (handle, title, size and image). A menu item gives a link `type` and `target`, and the storefront API adds the headless path in `url`.
+The shapes are typed in `commera.sdk.types`: `ProductPage`, `ProductCard`, `Product`, `ProductVariant`, `Collection`, `Shop`, `MenuItem`, `ContentPage`, `Sitemap`, `PricedCart`, `CustomerProfile`, `CustomerAddress`, `ShopperOrder` and `ShopperOrderPage`. Each priced cart line has its `product` (handle, title, size and image). A menu item gives a link `type` and `target`, and the storefront API adds the headless path in `url`, with the language prefix.
 
 Plugin hooks run for headless carts too. `validate_discount_code` runs when a code is applied. `validate_cart`, `cart_fees`, `delivery_options` and `payment_methods` run on the Commera checkout, which a headless cart reaches through the hand-off.
 
@@ -56,7 +56,8 @@ The catalogue and cart methods allow guests. The [account methods](#account-meth
 | `products.get_products` | One page of product cards with the facets of the whole result. Each brand, colour and size facet value has its product count, as `{"value": "K&N", "count": 3}`. The other selected filters narrow each count, but the facet's own filter does not. `price` is the `min` and `max` sale price. Filters: `collection`, `query`, `brands`, `colors`, `sizes`, `min_price`, `max_price`, `on_sale`. `sort` is `default`, `price_low`, `price_high`, `name`, `new_arrival` or `discount`. |
 | `products.get_product` | One product: images, the colour option with sibling handles and stock, the size option, and one variant for each size with its price, list price and stock. |
 | `collections.get_collections`, `collections.get_collection` | Enabled menu tabs (top-level Ecommerce Categories), by route slug. The `title`, the `description`, and the `seo` title and description are in the request language. `seo.custom_title` is true when the merchant set the meta title, as on a product. |
-| `shop.get_shop` | Store name, currency, logo, the menu from Ecommerce Category, and the footer. |
+| `shop.get_shop` | Store name, currency, logo, the menu from Ecommerce Category, the footer, and the resolved `localization`. |
+| `shop.get_localization` | The resolved `localization`: `language`, `default_language`, `available_languages` (the published languages, default first) and `root_prefix`. Each language has `code`, `name`, `endonym` and `direction`. |
 | `shop.get_page`, `shop.list_pages` | One published Shop Web Page by its route, or a link to each published page, sorted by title and then handle. The `title` is the page title. The `title`, `body_html`, and the `seo` title and description are in the request language. `seo.title` is the meta title, or else the page title. `seo.custom_title` is true when the merchant set the meta title, as on a collection. `body_html` is sanitized HTML. The `title` and `seo` values are plain text, so escape them where you render them. The handle stays the same in every language. |
 | `shop.get_sitemap` | Handles and change dates of indexable products, collections and pages. A page holds as many handles of each kind as the "Sitemap URLs Per Page" setting in Commera Settings. Without arguments, it returns page 1 of each kind. Set `kind` to `products`, `collections` or `pages`, and `page` to get one kind and one page. `total` gives the number of handles of each returned kind, and `page_size` gives the page size. |
 | `cart.get_cart`, `cart.add_lines`, `cart.update_lines`, `cart.remove_lines` | The priced server cart. Each line has the product handle, size and image. |
@@ -67,6 +68,12 @@ The catalogue and cart methods allow guests. The [account methods](#account-meth
 A missing or unpublished record returns HTTP 404. A product is one Style Attribute Variant: its `route` is the handle, sibling colours of the same configurator are the colour option, and its sizes are the variants. Options that only hold the fallback axis ("Title" or "One Size") are left out.
 
 Product text comes back in the request language. Use `name` and `title` only as display labels. To pick a variant, match an option value's `value` against a variant's `size`. Both stay the same in every language. Send the variant `id` as the cart line's item code.
+
+## Language
+
+Send `_lang` with a language code to get text, menu and footer links in that language. Send it only for a language other than the default. Without `_lang`, or with a language that is not published, the API uses the default language. It does not use the shopper's cookie, browser or account language. The response of `shop.get_shop` and `shop.get_localization` gives the language that the API used in `localization`.
+
+Menu and footer `url` values carry the language prefix: none for the default language, `/<code>` for the others, such as `/ar/collections/brakes`. Links to other sites stay as they are. Use the same prefixes for the storefront's own pages.
 
 ## The cart token
 

@@ -16,7 +16,14 @@ let browser;
 beforeEach(() => {
 	browser = add_fake_window();
 	globalThis.location.pathname = '/ar/products';
-	globalThis.commera_storefront_config = { language: 'ar' };
+	globalThis.commera_storefront_config = {
+		localization: {
+			language: { code: 'ar' },
+			default_language: { code: 'en' },
+			available_languages: [{ code: 'en' }, { code: 'ar' }],
+			root_prefix: '/ar',
+		},
+	};
 });
 
 function add_fake_model_context() {

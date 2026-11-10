@@ -27,6 +27,11 @@ from commera.shop_themes.route_patterns import has_language_group
 from commera.shop_themes.theme_resolver import ThemePageRenderer, match_route
 from commera.tests.test_localization import use_storefront_languages
 
+STOREFRONT_API_PATHS = (
+	"/api/v2/method/commera.api.storefront.cart.get_cart",
+	"/api/method/commera.api.storefront.shop.get_shop",
+)
+
 
 class RoutingTestCase(IntegrationTestCase):
 	def setUp(self):
@@ -320,6 +325,24 @@ class TestLangParameter(RoutingTestCase):
 		self.set_request("/api/method/commera.api.ping?_lang=ar")
 
 		self.assertEqual(get_localization().language.code, "ar")
+
+	def test_a_storefront_api_call_without_lang_replies_in_the_default_language(self):
+		for path in STOREFRONT_API_PATHS:
+			with self.subTest(path):
+				# Frappe set Arabic from the cookie, the browser or the user.
+				self.set_request(path, lang="ar")
+				self.assertEqual(frappe.local.lang, "en")
+
+	def test_a_storefront_api_call_replies_in_its_lang(self):
+		self.set_request(f"{STOREFRONT_API_PATHS[0]}?_lang=ar")
+		self.assertEqual(frappe.local.lang, "ar")
+		self.set_request(f"{STOREFRONT_API_PATHS[0]}?_lang=fr", lang="ar")
+		self.assertEqual(frappe.local.lang, "en")
+
+	def test_other_api_calls_keep_frappes_language(self):
+		self.set_request("/api/method/commera.api.ping", lang="ar")
+
+		self.assertEqual(frappe.local.lang, "ar")
 
 
 class TestCachedNotFound(RoutingTestCase):

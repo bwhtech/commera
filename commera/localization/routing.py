@@ -9,6 +9,7 @@ from commera.localization.languages import StorefrontLanguages
 from commera.localization.resolver import (
 	Localization,
 	LocalizedRequest,
+	get_localization,
 	get_localized_request,
 	resolve,
 	strip_language_prefix,
@@ -34,12 +35,15 @@ NON_PAGE_PATH_PREFIXES = (
 	"/.well-known/",
 )
 PAGE_METHODS = ("GET", "HEAD", "POST")
+STOREFRONT_API_PATH = re.compile(r"^/api/(?:v\d+/)?method/commera\.api\.storefront\.")
 
 
 def localize_request():
 	"""before_request hook: a storefront page takes its language from the URL alone.
 	Strips the prefix off request.path, so every app's website_path_resolver routes without it."""
 	request = getattr(frappe.local, "request", None)
+	if request and STOREFRONT_API_PATH.match(request.path):
+		localize_api_request()
 	if not request or not is_page_request(request):
 		return
 
@@ -61,6 +65,12 @@ def localize_request():
 		frappe.local.flags.home_page = "index"
 	skip_frappe_redirects(localized.route_path)
 	set_request_path(request, localized.route_path)
+
+
+def localize_api_request():
+	"""A storefront API reply takes its language from `_lang` alone, as the page that sent it did.
+	Frappe would fall back to the cookie, the browser or the user language when the page omits it."""
+	frappe.local.lang = get_localization().language.code
 
 
 class StorefrontRedirect(RequestRedirect):

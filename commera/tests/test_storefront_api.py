@@ -4,13 +4,22 @@ import frappe
 
 from commera.api.storefront.collections import get_collection, get_collections
 from commera.api.storefront.products import get_product, get_products
-from commera.api.storefront.shop import get_page, get_sitemap, get_storefront_url, list_countries, list_pages
+from commera.api.storefront.shop import (
+	get_localization,
+	get_page,
+	get_shop,
+	get_sitemap,
+	get_storefront_url,
+	list_countries,
+	list_pages,
+)
 from commera.sdk import catalog, shop
 from commera.sdk.shop import get_menu_link
 from commera.sdk.types import (
 	Collection,
 	ContentPageLink,
 	Country,
+	Localization,
 	Product,
 	ProductCard,
 	ProductPage,
@@ -372,3 +381,37 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		)
 		self.assertEqual(get_storefront_url({"type": "brand", "target": "K&N"}), "/search?q=K%26N")
 		self.assertEqual(get_storefront_url({"type": "all", "target": None}), "/collections/all")
+
+	def test_menu_urls_carry_the_language_prefix_of_the_request(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		use_storefront_language(self, "ar")
+
+		self.assertEqual(
+			get_storefront_url({"type": "collection", "target": self.collection}),
+			f"/ar/collections/{self.collection}",
+		)
+		self.assertEqual(get_storefront_url({"type": "brand", "target": "K&N"}), "/ar/search?q=K%26N")
+		self.assertEqual(get_storefront_url({"type": "url", "target": "/en/page/about"}), "/ar/page/about")
+		self.assertEqual(
+			get_storefront_url({"type": "url", "target": "https://example.com/x"}), "https://example.com/x"
+		)
+		self.assertEqual(get_storefront_url({"type": "url", "target": "javascript:alert(1)"}), "#")
+		self.assertIsNone(get_storefront_url({"type": None, "target": None}))
+
+	def test_the_shop_carries_the_resolved_localization_and_prefixed_menu(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		for code, prefix in (("ar", "/ar"), ("en", "")):
+			with self.subTest(code):
+				use_storefront_language(self, code)
+				details = get_shop()
+
+				self.assert_shape(details["localization"], Localization)
+				self.assertEqual(details["localization"], get_localization())
+				self.assertEqual(details["localization"]["language"]["code"], code)
+				self.assertEqual(details["localization"]["root_prefix"], prefix)
+				self.assertEqual(
+					[language["code"] for language in details["localization"]["available_languages"]],
+					["en", "ar"],
+				)
+				tab = next(item for item in details["menu"] if item["target"] == self.collection)
+				self.assertEqual(tab["url"], f"{prefix}/collections/{self.collection}")

@@ -1,0 +1,297 @@
+{
+	"languages": {
+		"default": "en",
+		"published": ["en", "ar", "fr", "pt-BR"]
+	},
+	"pages": {
+		"/": {
+			"language": "en",
+			"root_prefix": ""
+		},
+		"/ar/products": {
+			"language": "ar",
+			"root_prefix": "/ar"
+		},
+		"/pt-br/cart": {
+			"language": "pt-BR",
+			"root_prefix": "/pt-br"
+		}
+	},
+	"cases": [
+		{
+			"page": "/",
+			"path": "/products",
+			"expected": "/products"
+		},
+		{
+			"page": "/",
+			"path": "/",
+			"expected": "/"
+		},
+		{
+			"page": "/",
+			"path": "/en/page/about",
+			"expected": "/page/about"
+		},
+		{
+			"page": "/",
+			"path": "/ar/page/about",
+			"expected": "/page/about"
+		},
+		{
+			"page": "/",
+			"path": "/AR/cart",
+			"expected": "/cart"
+		},
+		{
+			"page": "/",
+			"path": "/ar",
+			"expected": "/"
+		},
+		{
+			"page": "/",
+			"path": "/archive",
+			"expected": "/archive"
+		},
+		{
+			"page": "/",
+			"path": "/english/x",
+			"expected": "/english/x"
+		},
+		{
+			"page": "/",
+			"path": "/products/",
+			"expected": "/products"
+		},
+		{
+			"page": "/",
+			"path": "/products?category=shirts&sizes=M#grid",
+			"expected": "/products?category=shirts&sizes=M#grid"
+		},
+		{
+			"page": "/",
+			"path": "/?q=1",
+			"expected": "/?q=1"
+		},
+		{
+			"page": "/",
+			"path": "/#top",
+			"expected": "/#top"
+		},
+		{
+			"page": "/",
+			"path": "/ar/\\evil.com/x",
+			"expected": "/evil.com/x"
+		},
+		{
+			"page": "/",
+			"path": "/fr//evil.com/x",
+			"expected": "/evil.com/x"
+		},
+		{
+			"page": "/",
+			"path": "/%2F%2Fx",
+			"expected": "/%2F%2Fx"
+		},
+		{
+			"page": "/",
+			"path": "/cart/ ",
+			"expected": "/cart"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/products/blue-shirt",
+			"expected": "/ar/products/blue-shirt"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/",
+			"expected": "/ar"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/en/page/about",
+			"expected": "/ar/page/about"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/fr/page/about",
+			"expected": "/ar/page/about"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/pt-BR/cart",
+			"expected": "/ar/cart"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/en/\\/evil.com/x",
+			"expected": "/ar/evil.com/x"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/%2F%2Fx",
+			"expected": "/ar/%2F%2Fx"
+		},
+		{
+			"page": "/ar/products",
+			"path": "\t/products",
+			"expected": "/ar/products"
+		},
+		{
+			"page": "/ar/products",
+			"path": " /products",
+			"expected": "/ar/products"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/products?x=1#a?b",
+			"expected": "/ar/products?x=1#a?b"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/products?",
+			"expected": "/ar/products"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/en",
+			"expected": "/ar"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/ar/",
+			"expected": "/ar"
+		},
+		{
+			"page": "/ar/products",
+			"path": "https://example.com/products",
+			"expected": "https://example.com/products"
+		},
+		{
+			"page": "/ar/products",
+			"path": "//example.com/products",
+			"expected": "//example.com/products"
+		},
+		{
+			"page": "/ar/products",
+			"path": "mailto:shop@example.com",
+			"expected": "mailto:shop@example.com"
+		},
+		{
+			"page": "/ar/products",
+			"path": "#reviews",
+			"expected": "#reviews"
+		},
+		{
+			"page": "/ar/products",
+			"path": "products",
+			"expected": "products"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/files/size-guide.pdf",
+			"expected": "/files/size-guide.pdf"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/api/method/ping",
+			"expected": "/api/method/ping"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/api",
+			"expected": "/api"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/assets/commera/logo.svg",
+			"expected": "/assets/commera/logo.svg"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/backups/x",
+			"expected": "/backups/x"
+		},
+		{
+			"page": "/ar/products",
+			"path": "",
+			"expected": ""
+		},
+		{
+			"page": "/ar/products",
+			"path": null,
+			"expected": null
+		},
+		{
+			"page": "/ar/products",
+			"path": "/\\x",
+			"expected": "/\\x"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/\\evil.com/x",
+			"expected": "/\\evil.com/x"
+		},
+		{
+			"page": "/ar/products",
+			"path": "/\t/evil.com",
+			"expected": "/\t/evil.com"
+		},
+		{
+			"page": "/ar/products",
+			"path": " //evil.com",
+			"expected": " //evil.com"
+		},
+		{
+			"page": "/ar/products",
+			"path": "///evil.com",
+			"expected": "///evil.com"
+		},
+		{
+			"page": "/ar/products",
+			"path": "javascript:alert(1)",
+			"expected": "#"
+		},
+		{
+			"page": "/ar/products",
+			"path": " JavaScript:alert(1)",
+			"expected": "#"
+		},
+		{
+			"page": "/ar/products",
+			"path": "java\nscript:alert(1)",
+			"expected": "#"
+		},
+		{
+			"page": "/ar/products",
+			"path": "data:text/html,x",
+			"expected": "#"
+		},
+		{
+			"page": "/ar/products",
+			"path": "VBScript:x",
+			"expected": "#"
+		},
+		{
+			"page": "/pt-br/cart",
+			"path": "/products",
+			"expected": "/pt-br/products"
+		},
+		{
+			"page": "/pt-br/cart",
+			"path": "/PT-BR/x",
+			"expected": "/pt-br/x"
+		},
+		{
+			"page": "/pt-br/cart",
+			"path": "/",
+			"expected": "/pt-br"
+		},
+		{
+			"page": "/pt-br/cart",
+			"path": "/ar/cart?x=1",
+			"expected": "/pt-br/cart?x=1"
+		}
+	]
+}
