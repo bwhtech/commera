@@ -9,6 +9,7 @@ from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
 from commera.api.cart import update_variant
+from commera.localization.routing import localize_request
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import DEFAULT_ROUTES
 from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_product_details import ProductDetailPriceTestCase
@@ -228,7 +229,8 @@ class TestCartRoutes(IntegrationTestCase):
 		self.addCleanup(delattr, frappe.local, "request")
 		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
 		frappe.local.form_dict = frappe._dict()
-		return PathResolver(path).resolve()
+		localize_request()
+		return PathResolver(frappe.local.request.path).resolve()
 
 	def test_checkout_is_not_taken_for_a_cart_link(self):
 		endpoint, _ = self.resolve("cart/checkout")

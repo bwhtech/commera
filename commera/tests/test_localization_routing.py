@@ -1,11 +1,17 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.website.page_renderers.not_found_page import NotFoundPage
 from frappe.website.page_renderers.redirect_page import RedirectPage
-from frappe.website.path_resolver import PathResolver
+from frappe.website.path_resolver import PathResolver, resolve_path
 from frappe.website.serve import get_response
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
+from commera import seo
+from commera.localization import get_localization, get_request_path
+from commera.localization.routing import localize_request
 from commera.patches.drop_language_from_theme_routes import execute as drop_language_from_theme_routes
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import (
 	DEFAULT_ROUTES,
@@ -23,6 +29,7 @@ class RoutingTestCase(IntegrationTestCase):
 		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
 		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
 		self.addCleanup(frappe.set_user, frappe.session.user)
+		self.addCleanup(frappe.local.flags.pop, "home_page", None)
 		frappe.set_user("Guest")
 
 	def open(self, url, lang="en", headers=None):
@@ -39,6 +46,8 @@ class RoutingTestCase(IntegrationTestCase):
 		frappe.local.request_cache.clear()
 		frappe.local.lang = lang
 		frappe.flags.redirect_location = None
+		# Frappe's init_request runs the before_request hooks after it has set the language.
+		localize_request()
 
 	def assertServes(self, url, endpoint, lang):
 		served, renderer = self.open(url)
@@ -135,12 +144,120 @@ class TestTheUrlDecidesTheLanguage(RoutingTestCase):
 		self.assertEqual(frappe.local.lang, "ar")
 
 
-LEGACY_PATTERNS = [
-	r"^(?P<lang>en|ar)$",
-	r"^(?P<lang>en|ar)/products/(?P<route>.+)$",
-	r"^(?P<lang>en|ar)/account/orders$",
-	r"^(?P<lang>en|ar|fr)/lookbook$",
-	r"^account/orders$",
+class TestRedirectsStayOnSite(RoutingTestCase):
+	def test_a_path_after_the_prefix_cannot_name_another_host(self):
+		for url in ("/en//evil.com", "/en/%2F%2Fevil.com", "/en/\\evil.com", "/en/%5C%5Cevil.com"):
+			with self.subTest(url):
+				self.assertRedirects(url, "/evil.com")
+
+	def test_an_unprefixed_path_naming_another_host_is_not_redirected(self):
+		_endpoint, renderer = self.open("/\\evil.com")
+		self.assertNotIsInstance(renderer, RedirectPage)
+
+
+PATHS_SEEN_BY_ANOTHER_APP = []
+
+
+def resolve_like_another_app(path):
+	"""A website_path_resolver like Frappe Builder's, which falls back to Frappe's resolve_path."""
+	PATHS_SEEN_BY_ANOTHER_APP.append(path)
+	return resolve_path(path)
+
+
+class TestEveryAppRoutesWithoutThePrefix(RoutingTestCase):
+	"""Frappe calls every website_path_resolver with the same path and keeps the last endpoint."""
+
+	def setUp(self):
+		super().setUp()
+		self.real_get_hooks = frappe.get_hooks
+		patcher = patch("frappe.get_hooks", side_effect=self.get_hooks)
+		patcher.start()
+		self.addCleanup(patcher.stop)
+
+	def get_hooks(self, hook=None, *args, **kwargs):
+		if hook == "website_path_resolver":
+			return self.resolvers
+		return self.real_get_hooks(hook, *args, **kwargs)
+
+	def in_each_app_order(self):
+		commera = "commera.localization.routing.resolve_website_path"
+		other = f"{__name__}.resolve_like_another_app"
+		for resolvers in ([commera, other], [other, commera]):
+			with self.subTest(resolvers=resolvers):
+				self.resolvers = resolvers
+				yield
+
+	def test_a_prefixed_page_is_routed_without_the_prefix(self):
+		for _order in self.in_each_app_order():
+			self.assertServes("/ar/products/blue-shirt", "/products/details.html", "ar")
+			self.assertEqual(PATHS_SEEN_BY_ANOTHER_APP[-1], "products/blue-shirt")
+
+	def test_the_canonical_redirect_wins(self):
+		for _order in self.in_each_app_order():
+			self.assertRedirects("/en/cart?x=1", "/cart?x=1")
+
+	def test_the_home_page_is_the_storefront_for_staff(self):
+		frappe.set_user("Administrator")
+		# get_home_page() reads the before_request override only outside tests.
+		with patch.object(frappe, "in_test", False):
+			for _order in self.in_each_app_order():
+				self.assertServes("/", "index", "en")
+				self.assertServes("/ar", "index", "ar")
+
+
+class TestTheRequestKeepsItsPrefix(RoutingTestCase):
+	def test_the_router_sees_the_path_without_the_prefix_and_links_keep_it(self):
+		self.set_request("/ar/products/blue-shirt")
+
+		self.assertEqual(frappe.local.request.path, "/products/blue-shirt")
+		self.assertEqual(get_request_path(), "/ar/products/blue-shirt")
+		self.assertTrue(frappe.local.request.url.endswith("/ar/products/blue-shirt"))
+		self.assertTrue(seo.current_request_url().endswith("/ar/products/blue-shirt"))
+
+	def test_other_requests_keep_their_path(self):
+		for url in ("/api/method/ping", "/ar/api/method/ping", "/ar/files/x.png", "/commera/orders"):
+			with self.subTest(url):
+				self.set_request(url)
+				self.assertEqual(frappe.local.request.path, url)
+
+
+class TestLangParameter(RoutingTestCase):
+	def test_lang_does_not_override_the_url_on_a_storefront_page(self):
+		self.open("/products/blue-shirt?_lang=ar", lang="ar")
+
+		self.assertEqual(frappe.local.lang, "en")
+		self.assertEqual(get_localization().language.code, "en")
+
+	def test_lang_still_picks_the_language_of_an_api_request(self):
+		self.set_request("/api/method/commera.api.ping?_lang=ar")
+
+		self.assertEqual(get_localization().language.code, "ar")
+
+
+class TestCachedNotFound(RoutingTestCase):
+	def test_a_cached_404_renders_in_the_language_of_the_url(self):
+		self.set_request("/ar/no-such-page-anywhere", lang="fr")
+		url = frappe.local.request.url
+		frappe.cache.hset("website_404", url, True)
+		self.addCleanup(frappe.cache.hdel, "website_404", url)
+
+		with patch("frappe.website.path_resolver.can_cache", return_value=True):
+			_endpoint, renderer = PathResolver(frappe.local.request.path).resolve()
+
+		self.assertIsInstance(renderer, NotFoundPage)
+		self.assertEqual(frappe.local.lang, "ar")
+		self.assertIn("/ar/", url)
+
+
+# (url_pattern, template_path, requires_auth) as stored before the language moved to the root.
+LEGACY_ROUTES = [
+	(r"^(?P<lang>en|ar)$", "pages/home.html", 0),
+	(r"^(?P<lang>en|ar)/products/(?P<route>.+)$", "pages/product.html", 0),
+	(r"^(?P<lang>en|ar)/account/orders$", "pages/orders.html", 1),
+	(r"^(?P<lang>en|ar|fr)/lookbook$", "pages/lookbook.html", 0),
+	(r"^account/orders$", "pages/custom-orders.html", 0),
+	(r"^(?P<lang>en|ar|fr)/products/(?P<route>.+)$", "pages/product.html", 0),
+	(r"^(?P<lang>en|ar)/lookbook$", "pages/members-lookbook.html", 1),
 ]
 
 
@@ -148,10 +265,10 @@ class TestThemeRoutePatternPatch(IntegrationTestCase):
 	def setUp(self):
 		settings = frappe.get_single("Shop Theme Settings")
 		settings.set("routes", [])
-		for idx, pattern in enumerate(LEGACY_PATTERNS):
+		for pattern, template_path, requires_auth in LEGACY_ROUTES:
 			settings.append(
 				"routes",
-				{"url_pattern": pattern, "template_path": f"pages/p{idx}.html", "requires_auth": idx == 2},
+				{"url_pattern": pattern, "template_path": template_path, "requires_auth": requires_auth},
 			)
 		settings.save(ignore_permissions=True)
 		self.addCleanup(clear_settings_cache)
@@ -162,18 +279,31 @@ class TestThemeRoutePatternPatch(IntegrationTestCase):
 			for row in frappe.get_single("Shop Theme Settings").routes
 		]
 
-	def test_patterns_are_rewritten_in_place_without_duplicates(self):
+	def test_patterns_are_rewritten_in_place_and_exact_duplicates_dropped(self):
 		drop_language_from_theme_routes()
 
 		self.assertEqual(
 			self.routes(),
 			[
-				(r"^$", "pages/p0.html", 0),
-				(r"^products/(?P<route>.+)$", "pages/p1.html", 0),
-				(r"^account/orders$", "pages/p2.html", 1),
-				(r"^lookbook$", "pages/p3.html", 0),
+				(r"^$", "pages/home.html", 0),
+				(r"^products/(?P<route>.+)$", "pages/product.html", 0),
+				(r"^(?P<lang>en|ar)/account/orders$", "pages/orders.html", 1),
+				(r"^lookbook$", "pages/lookbook.html", 0),
+				(r"^account/orders$", "pages/custom-orders.html", 0),
+				(r"^(?P<lang>en|ar)/lookbook$", "pages/members-lookbook.html", 1),
 			],
 		)
+
+	def test_a_conflicting_route_is_kept_and_logged(self):
+		drop_language_from_theme_routes()
+
+		logged = frappe.get_all(
+			"Error Log",
+			filters={"method": "Theme route kept with its language group"},
+			pluck="error",
+		)
+		self.assertTrue(any("pages/orders.html" in error for error in logged))
+		self.assertTrue(any("pages/members-lookbook.html" in error for error in logged))
 
 	def test_the_patch_runs_twice_without_changes(self):
 		drop_language_from_theme_routes()
@@ -187,9 +317,12 @@ class TestThemeRoutePatternPatch(IntegrationTestCase):
 		routes = build_compiled_routes()["routes"]
 
 		matched, match = match_route(routes, "products/blue-shirt")
-		self.assertEqual(matched["template_path"], "pages/p1.html")
+		self.assertEqual(matched["template_path"], "pages/product.html")
 		self.assertEqual(match["route"], "blue-shirt")
-		self.assertEqual(match_route(routes, "")[0]["template_path"], "pages/p0.html")
+		self.assertEqual(match_route(routes, "")[0]["template_path"], "pages/home.html")
+		self.assertEqual(
+			match_route(routes, "account/orders")[0]["template_path"], "pages/custom-orders.html"
+		)
 
 
 class TestDefaultThemeRoutes(IntegrationTestCase):

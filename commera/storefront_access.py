@@ -2,7 +2,7 @@ import frappe
 from frappe.website.utils import build_response
 
 from commera.api.permission import has_app_permission
-from commera.localization import strip_language_prefix
+from commera.localization import get_request_path, strip_language_prefix
 
 SETTINGS_DOCTYPE = "Commera Settings"
 
@@ -59,8 +59,7 @@ class PrivateStorefrontPage:
 		self.path = path
 
 	def can_render(self):
-		request = getattr(frappe.local, "request", None)
-		path = request.path if request else self.path
+		path = get_request_path() or self.path
 		if is_storefront_published() or not is_storefront_path(path):
 			return False
 		return frappe.session.user == "Guest" or not has_app_permission()

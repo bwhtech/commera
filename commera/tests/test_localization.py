@@ -8,6 +8,7 @@ from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
 from commera.localization import get_localization, resolve
+from commera.localization.routing import localize_request
 from commera.shop_themes.theme_resolver import build_base_context
 
 STOREFRONT_CONFIG_PATTERN = re.compile(r"window\.commera_storefront_config = (.*);")
@@ -131,7 +132,8 @@ class TestRequestLanguage(IntegrationTestCase):
 		frappe.local.request = Request(EnvironBuilder(path=path).get_environ())
 		frappe.local.request_cache.clear()
 		frappe.local.lang = lang
-		PathResolver(path).resolve()
+		localize_request()
+		PathResolver(frappe.local.request.path).resolve()
 		return frappe.local.lang
 
 	def test_a_language_prefix_sets_frappes_language(self):

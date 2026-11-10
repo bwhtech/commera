@@ -15,7 +15,9 @@ website_redirects = [
 	{"source": "/en-GB/(.*)", "target": r"/en/\1"},
 ]
 
-# Strips the language prefix, so the route rules below match the path without it.
+# localize_request strips the language prefix off request.path before any app's path resolver runs,
+# so the route rules below match the path without it. resolve_website_path sends the canonical redirects.
+before_request = ["commera.localization.routing.localize_request"]
 website_path_resolver = "commera.localization.routing.resolve_website_path"
 
 website_route_rules = [

@@ -51,14 +51,42 @@ def strip_language_prefix(path: str, include_unpublished: bool = False) -> tuple
 	return split_language_prefix(StorefrontLanguages.load(), path, include_unpublished)
 
 
+@dataclass(frozen=True)
+class LocalizedRequest:
+	"""A storefront page request. Its URL alone decides the language, never `_lang`."""
+
+	path: str
+	route_path: str
+	localization: Localization
+	canonical_prefix: str
+	redirect_to: str | None
+
+
 def get_localization() -> Localization:
 	"""The localization of the current request."""
+	if localized := get_localized_request():
+		return localized.localization
 	return resolve_current_request()[0]
 
 
 def get_route_path() -> str:
 	"""The current request path without its language prefix."""
+	if localized := get_localized_request():
+		return localized.route_path
 	return resolve_current_request()[1]
+
+
+def get_request_path() -> str:
+	"""The path the browser asked for, with its language prefix."""
+	if localized := get_localized_request():
+		return localized.path
+	request = getattr(frappe.local, "request", None)
+	return request.path if request else ""
+
+
+def get_localized_request() -> LocalizedRequest | None:
+	"""Set by the before_request hook on storefront pages, which also strips the prefix off request.path."""
+	return getattr(getattr(frappe.local, "request", None), "commera_localized", None)
 
 
 def find_request_language(code: str | None) -> Language | None:

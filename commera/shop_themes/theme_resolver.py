@@ -11,7 +11,7 @@ from jinja2 import BaseLoader, BytecodeCache, TemplateNotFound
 from jinja2.utils import LRUCache
 
 import commera.sdk
-from commera.localization import get_localization, get_route_path, strip_language_prefix
+from commera.localization import get_localization, get_request_path, get_route_path, strip_language_prefix
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	get_render_theme_context,
 	is_within_directory,
@@ -148,8 +148,7 @@ class ThemePageRenderer:
 		"""Send a guest to the theme's own login page, which returns them here after signing in."""
 		if not find_theme_file(self.theme_dirs, LOGIN_TEMPLATE):
 			raise frappe.PermissionError
-		request = getattr(frappe.local, "request", None)
-		return_path = quote(request.path if request else "/" + self.path.strip("/"), safe="/")
+		return_path = quote(get_request_path() or "/" + self.path.strip("/"), safe="/")
 		login_path = f"{get_localization().root_prefix}/account/login"
 		frappe.flags.redirect_location = f"{login_path}?redirect-to={return_path}"
 		raise frappe.Redirect(302)
