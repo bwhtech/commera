@@ -104,6 +104,12 @@ commera_hooks = {
 			"fields": ["display_name", "description", "meta_title", "meta_description"],
 			"label": "Collections",
 		},
+		{
+			"type": "page",
+			"doctype": "Shop Web Page",
+			"fields": ["title", "content", "meta_title", "meta_description"],
+			"label": "Pages",
+		},
 	],
 }
 setup_wizard_complete = [
@@ -147,7 +153,10 @@ doc_events = {
 	},
 	"Shop Web Page": {
 		"on_update": "commera.plugin_events.on_shop_web_page_change",
-		"on_trash": "commera.plugin_events.on_shop_web_page_change",
+		"on_trash": [
+			"commera.plugin_events.on_shop_web_page_change",
+			"commera.localization.content.delete_translations",
+		],
 	},
 	"Footer Section Config": {"on_update": "commera.plugin_events.on_menu_change"},
 	"Commera Settings": {"on_update": "commera.plugin_events.on_menu_change"},

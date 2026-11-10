@@ -5,7 +5,12 @@ from frappe.utils.data import cint, cstr
 
 from commera import localization
 from commera.branding import get_brand_assets
-from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import get_page_by_route, get_page_content
+from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import (
+	get_page_by_route,
+	get_translated_page,
+	translate_pages,
+)
+from commera.sdk.catalog import get_seo
 from commera.sdk.types import (
 	ContentPage,
 	ContentPageLink,
@@ -123,33 +128,31 @@ def subscribe_to_newsletter(email: str) -> None:
 
 
 def get_page(handle: str) -> ContentPage | None:
-	"""A published Shop Web Page by its route, or None. The body is in the request language."""
+	"""A published Shop Web Page by its route, or None. Text is in the request language; the handle is not.
+	`title` is the page title; `seo` is shaped as on a collection, with `custom_title`."""
 	page = get_page_by_route(cstr(handle))
 	if not page or not page.published:
 		return None
+	values = get_translated_page(page)
+	title = values["title"].value
 	return {
 		"handle": page.route,
-		"title": page.meta_title or page.name,
-		"body_html": get_page_content(page) or "",
-		"seo": {
-			"title": page.meta_title,
-			"description": page.meta_description,
-			"noindex": bool(page.noindex),
-		},
+		"title": title,
+		"body_html": values["content"].value,
+		"seo": get_seo(values["meta_title"].value, title, values["meta_description"].value, page.noindex),
 		"updated_at": str(page.modified),
 	}
 
 
 def list_pages() -> list[ContentPageLink]:
-	"""Every published Shop Web Page, by title."""
-	pages = frappe.get_all(
-		"Shop Web Page", filters={"published": 1}, fields=["name", "route", "meta_title", "modified"]
-	)
+	"""Every published Shop Web Page, by title in the request language."""
+	pages = frappe.get_all("Shop Web Page", filters={"published": 1}, fields=["name", "route", "modified"])
+	translated = translate_pages(pages, ("title",))
 	links = [
-		{"handle": page.route, "title": page.meta_title or page.name, "updated_at": str(page.modified)}
-		for page in pages
+		{"handle": page.route, "title": values["title"].value, "updated_at": str(page.modified)}
+		for page, values in zip(pages, translated, strict=True)
 	]
-	return sorted(links, key=lambda link: link["title"])
+	return sorted(links, key=lambda link: (link["title"], link["handle"]))
 
 
 def get_sitemap(kind: str | None = None, page: int = 1) -> Sitemap:

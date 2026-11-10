@@ -1,3 +1,4 @@
+from html import unescape
 from urllib.parse import quote, urlsplit, urlunsplit
 
 import frappe
@@ -28,7 +29,8 @@ def absolute_url(path_or_url):
 
 
 def truncate_description(text):
-	clean = strip_html_tags(frappe.utils.cstr(text or "")).strip()
+	# Plain text: the seo macro escapes it, so an entity left here would show as "&amp;amp;".
+	clean = unescape(strip_html_tags(frappe.utils.cstr(text or ""))).strip()
 	clean = " ".join(clean.split())
 	if len(clean) <= META_DESCRIPTION_MAX_LENGTH:
 		return clean

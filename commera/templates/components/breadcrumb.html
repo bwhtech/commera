@@ -8,7 +8,7 @@
         </li>
         {% for breadcrumb in breadcrumbs %}
         <li class="flex items-center gap-1">
-            <a href="{{breadcrumb.href}}" class="hover:text-accent ">{{_(breadcrumb.label)}}</a>
+            <a href="{{ breadcrumb.href|e }}" class="hover:text-accent ">{{ _(breadcrumb.label)|e }}</a>
             {% if not loop.last %}
             {{icon(name="arrow-right",classes="h-4 w-4")}}
             {% endif %}

@@ -511,6 +511,9 @@ class Country(TypedDict):
 
 
 class ContentPage(TypedDict):
+	"""A published Shop Web Page. `title` is the page title and `body_html` is sanitized HTML.
+	`seo` has `title`, `custom_title` (the merchant set it), `description` and `noindex`, as on Product."""
+
 	handle: str
 	title: str
 	body_html: str

@@ -631,3 +631,49 @@ class TestGenerateProductJsonLd(SitemapFixtureMixin, IntegrationTestCase):
 		)
 		with self.assertRaises(frappe.ValidationError):
 			seo.generate_product_json_ld(variant_name)
+
+
+class TestSeoMacroEscaping(IntegrationTestCase):
+	"""The shared macro renders text from every page type, so it escapes each value it interpolates."""
+
+	TEMPLATE = (
+		'{% from "templates/macros/seo.html" import seo_meta, json_ld_block %}'
+		"{{ seo_meta(seo) }}{{ json_ld_block(json_ld) }}"
+	)
+
+	def render(self, seo_values, json_ld=()):
+		return frappe.render_template(self.TEMPLATE, {"seo": seo_values, "json_ld": list(json_ld)})
+
+	def test_quotes_and_tags_cannot_break_out_of_the_head_tags(self):
+		html = self.render(
+			{
+				"title": "</title><script>alert(1)</script>",
+				"description": '" onmouseover="alert(1)',
+				"url": 'https://shop.example/a?x=1&y="2"',
+				"image": '/files/a.png" onerror="alert(1)',
+				"alternates": [{"lang": 'en" x="1', "href": "/en?a=1&b=2", "x_default": True}],
+			}
+		)
+
+		self.assertNotIn("<script>alert(1)", html)
+		self.assertNotIn('" onmouseover="', html)
+		self.assertNotIn('" onerror="', html)
+		self.assertIn("<title>&lt;/title&gt;&lt;script&gt;alert(1)&lt;/script&gt;</title>", html)
+		self.assertIn('content="&#34; onmouseover=&#34;alert(1)"', html)
+		self.assertIn('href="https://shop.example/a?x=1&amp;y=&#34;2&#34;"', html)
+		self.assertIn('hreflang="en&#34; x=&#34;1"', html)
+
+	def test_rich_text_entities_are_escaped_once(self):
+		description = seo.truncate_description("<p>Soft &amp; light &lt;3</p>")
+		self.assertEqual(description, "Soft & light <3")
+
+		html = self.render({"title": "Shirt", "description": description})
+
+		self.assertIn('content="Soft &amp; light &lt;3"', html)
+		self.assertNotIn("&amp;amp;", html)
+
+	def test_json_ld_cannot_close_its_script_tag(self):
+		html = self.render({}, json_ld=[{"name": "</script><script>alert(1)</script>"}])
+
+		self.assertEqual(html.count("</script>"), 1)
+		self.assertIn("\\u003c/script\\u003e", html)
