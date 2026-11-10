@@ -46,7 +46,8 @@ def get_card_price(size_rates: list[tuple[float | None, float | None]]) -> dict:
 def get_discount(price: float | None, default_price: float | None) -> dict:
 	if not default_price:
 		return {"discount_percent": 0.0, "has_discount": 0}
-	return {"discount_percent": (default_price - price) / default_price * 100, "has_discount": 1}
+	# Rounded like the SQL decimal: 42.50 from 100 is 57.5% off, not 57.49999.
+	return {"discount_percent": round((default_price - price) / default_price * 100, 6), "has_discount": 1}
 
 
 def card_prices_query(

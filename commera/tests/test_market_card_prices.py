@@ -1,10 +1,10 @@
-import json
 from contextlib import nullcontext
 from unittest.mock import patch
 
 import frappe
 from frappe.tests import UnitTestCase
 
+from commera import card_prices
 from commera.card_prices import get_card_price
 from commera.sdk import catalog
 from commera.search.facets import get_price_range
@@ -32,6 +32,10 @@ class TestCardPriceRule(UnitTestCase):
 			(card["effective_price"], card["default_price"], card["has_discount"]), (300, 400, 1)
 		)
 		self.assertEqual(card["discount_percent"], 25)
+
+	def test_a_half_percent_discount_is_not_lost_to_float_rounding(self):
+		card = get_card_price([(42.5, 100)])
+		self.assertEqual(card["discount_percent"], 57.5)
 
 	def test_a_compare_at_rate_below_the_sale_rate_is_not_crossed_out(self):
 		card = get_card_price([(300, 250)])
@@ -162,73 +166,52 @@ class TestMarketCardPrices(CardPriceTestCase):
 
 
 class TestCardPriceQueryScope(CardPriceTestCase):
-	"""The card prices aggregate the sizes of the grid's candidate products, never the whole shop."""
+	"""The card prices are built for the grid's candidate products, never the whole shop."""
 
-	def test_a_one_product_list_aggregates_only_its_sizes(self):
+	def test_a_one_product_list_prices_only_that_product(self):
 		mixed, _item_codes = self.make_product("ONE", MIXED_SIZES)
 		self.make_product("ONEOTHER", {"M": (260, None)})
 
 		for sort_by in ("default", "price_low"):
 			with self.subTest(sort_by=sort_by):
-				cards, sizes = aggregated_sizes(
+				cards, candidates = card_price_candidates(
 					lambda sort_by=sort_by: get_product_list_qb(product_list=[mixed], sort_by=sort_by)
 				)
-				self.assertEqual(sizes, [len(MIXED_SIZES)])
+				self.assertEqual(candidates, [[mixed]])
 				self.assertEqual(cards[0]["effective_price"], 250)
 
 	def test_a_page_is_priced_after_it_is_picked(self):
 		names = [self.make_product(label, MIXED_SIZES)[0] for label in ("PAGEA", "PAGEB")]
 
-		cards, sizes = aggregated_sizes(lambda: get_product_list_qb(product_list=names, page_length=1))
-		self.assertEqual(len(cards), 1)
-		self.assertEqual(sizes, [len(MIXED_SIZES)])
+		cards, candidates = card_price_candidates(
+			lambda: get_product_list_qb(product_list=names, page_length=1)
+		)
+		self.assertEqual(candidates, [[cards[0]["name"]]])
 
-	def test_a_price_filter_aggregates_only_the_filtered_products(self):
+	def test_a_price_filter_prices_only_the_filtered_products(self):
 		mixed, _item_codes = self.make_product("FILTERED", MIXED_SIZES)
 		self.make_product("FILTEREDOTHER", {"M": (260, None)})
 		in_group = {"subcategory": [self.item_group]}
 		priced = {**in_group, "max_price": 251}
 
-		cards, sizes = aggregated_sizes(lambda: get_product_list_qb(priced))
-		self.assertEqual(([card["name"] for card in cards], sizes), ([mixed], [3]))
-		self.assertEqual(aggregated_sizes(lambda: get_product_count_qb(priced)), (1, [3]))
-		self.assertEqual(aggregated_sizes(lambda: get_product_count_qb(in_group)), (2, []))
+		cards, (candidates,) = card_price_candidates(lambda: get_product_list_qb(priced))
+		self.assertEqual([card["name"] for card in cards], [mixed])
+		self.assertIn(self.item_group, str(candidates))
+		count, (candidates,) = card_price_candidates(lambda: get_product_count_qb(priced))
+		self.assertEqual(count, 1)
+		self.assertIn(self.item_group, str(candidates))
+		self.assertEqual(card_price_candidates(lambda: get_product_count_qb(in_group)), (2, []))
 
 
-def aggregated_sizes(run):
-	"""`run`'s result, and the size rows each card-price query it sends aggregates, per MariaDB's ANALYZE.
-	Each query must aggregate the sizes once."""
-	with patch.object(frappe.db, "sql", wraps=frappe.db.sql) as sql:
+def card_price_candidates(run):
+	"""`run`'s result, and the candidate products each card-price query was built for."""
+	calls = []
+	build = card_prices.card_prices_query
+
+	def record(sale_price_list, compare_at_price_list, products):
+		calls.append(products)
+		return build(sale_price_list, compare_at_price_list, products)
+
+	with patch.object(card_prices, "card_prices_query", record):
 		result = run()
-	sizes = []
-	for call in sql.call_args_list:
-		if "`priced_size`" not in call.args[0]:
-			continue
-		plan = json.loads(frappe.db.sql("ANALYZE FORMAT=JSON " + call.args[0], call.args[1])[0][0])
-		(rows,) = size_aggregations(plan)
-		sizes.append(rows)
-	return result, sizes
-
-
-def size_aggregations(node):
-	"""Rows of each derived table in an ANALYZE plan that groups the `priced_size` rows."""
-	if isinstance(node, list):
-		return [rows for child in node for rows in size_aggregations(child)]
-	if not isinstance(node, dict):
-		return []
-	table = node.get("table")
-	if isinstance(table, dict) and reads_priced_size(table.get("materialized")):
-		return [round(table["r_loops"] * table["r_rows"])]
-	return [rows for child in node.values() for rows in size_aggregations(child)]
-
-
-def reads_priced_size(node) -> bool:
-	"""Whether a plan block reads `priced_size` itself, not through a nested derived table."""
-	if isinstance(node, list):
-		return any(reads_priced_size(child) for child in node)
-	if not isinstance(node, dict):
-		return False
-	table = node.get("table")
-	if isinstance(table, dict) and table.get("table_name") == "priced_size":
-		return True
-	return any(reads_priced_size(child) for key, child in node.items() if key != "materialized")
+	return result, calls
