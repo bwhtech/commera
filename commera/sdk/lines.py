@@ -77,6 +77,10 @@ def read_variants(names: list[str]) -> dict[str, frappe._dict]:
 
 
 def read_legacy_titles(item_styles: list[str]) -> dict[str, str]:
+	# pick_title reads them only for a non-default Arabic request, so other carts skip the query.
+	localization = get_localization()
+	if localization.language.code != "ar" or localization.language == localization.default_language:
+		return {}
 	if not item_styles or not frappe.db.has_column("Item", LEGACY_TITLE_FIELD):
 		return {}
 	rows = frappe.get_all(

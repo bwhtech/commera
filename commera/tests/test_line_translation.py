@@ -56,6 +56,17 @@ class TestLineTranslation(ProductDetailPriceTestCase):
 			frappe.delete_doc, "Translation", translation.name, force=True, ignore_permissions=True
 		)
 
+	def test_only_a_non_default_arabic_request_reads_legacy_item_titles(self):
+		has_column = frappe.db.has_column
+
+		def no_item_reads(doctype, column):
+			self.assertNotEqual(doctype, "Item", "the default language read legacy Item titles")
+			return has_column(doctype, column)
+
+		use_storefront_language(self, "en")
+		with patch.object(frappe.db, "has_column", no_item_reads):
+			self.assertEqual(lines.read_legacy_titles(["ANY-STYLE"]), {})
+
 	def test_cart_lines_show_the_translated_product_title_and_size(self):
 		frappe.set_user(self.shopper)
 		use_storefront_language(self, "ar")
