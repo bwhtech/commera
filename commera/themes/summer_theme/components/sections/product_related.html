@@ -6,7 +6,7 @@
 			<div class="left-content">
 				<h2 class="title mb-0">{{ _("Related products") }}</h2>
 			</div>
-			<a href="/{{ frappe.lang or 'en' }}/products" class="text-secondary font-14 d-flex align-items-center gap-1">
+			<a href="{{ url('/products') | e }}" class="text-secondary font-14 d-flex align-items-center gap-1">
 				{{ _("See all products") }}
 				<i class="icon feather icon-chevron-right font-18"></i>
 			</a>

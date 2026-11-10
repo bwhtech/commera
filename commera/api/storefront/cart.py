@@ -19,6 +19,7 @@ from commera.guest import (
 	set_guest_cart_cookie,
 	validate_cart_token,
 )
+from commera.localization import url
 from commera.sdk import cart as cart_sdk
 from commera.sdk.types import PricedCart
 from commera.utils import get_next_url
@@ -150,7 +151,7 @@ def open_checkout(code: str):
 	"""Send the browser on with a checkout code. It writes nothing, so a link preview cannot use the code up."""
 	handoff = get_checkout_code(f"{CHECKOUT_CODE_PREFIX}{cstr(code)}")
 	if not handoff:
-		return redirect(f"/{frappe.local.lang}/cart")
+		return redirect(url("/cart"))
 	if "user" in handoff:
 		return open_account_checkout(handoff)
 	redirect(get_handoff_page_url(code))
@@ -164,7 +165,7 @@ def claim_checkout_cart(code: str):
 	key = f"{CHECKOUT_CODE_PREFIX}{cstr(code)}"
 	handoff = get_checkout_code(key)
 	if not handoff or "token" not in handoff:
-		return redirect(f"/{frappe.local.lang}/cart")
+		return redirect(url("/cart"))
 
 	frappe.cache.delete_value(key)
 	# A new token, so the storefront's copy of the old one no longer reaches the cart.
@@ -179,7 +180,7 @@ def adopt_checkout_cart(code: str):
 	key = f"{CHECKOUT_CODE_PREFIX}{cstr(code)}"
 	handoff = get_checkout_code(key)
 	if not handoff or "token" not in handoff:
-		return redirect(f"/{frappe.local.lang}/cart")
+		return redirect(url("/cart"))
 
 	frappe.cache.delete_value(key)
 	adopt_guest_cart(sha256_hash(handoff["token"]))

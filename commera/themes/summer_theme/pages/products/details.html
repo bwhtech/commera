@@ -10,10 +10,10 @@
 	<div class="d-sm-flex justify-content-between container-fluid py-3">
 		<nav aria-label="{{ _('Breadcrumb') }}" class="breadcrumb-row">
 			<ul class="breadcrumb mb-0">
-				<li class="breadcrumb-item"><a href="/{{ frappe.lang or 'en' }}">{{ _("Home") }}</a></li>
+				<li class="breadcrumb-item"><a href="{{ url('/') | e }}">{{ _("Home") }}</a></li>
 				{% for crumb in breadcrumbs %}
 				<li class="breadcrumb-item">
-					{% if crumb.href %}<a href="{{ crumb.href }}">{{ _(crumb.label) }}</a>{% else %}{{ _(crumb.label) }}{% endif %}
+					{% if crumb.href %}<a href="{{ crumb.href | e }}">{{ _(crumb.label) }}</a>{% else %}{{ _(crumb.label) }}{% endif %}
 				</li>
 				{% endfor %}
 			</ul>

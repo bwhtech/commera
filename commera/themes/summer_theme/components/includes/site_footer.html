@@ -20,13 +20,13 @@
 				<div class="col-xl-3 col-md-4 col-sm-6 wow fadeInUp" data-wow-delay="0.1s">
 					<div class="widget widget_about me-2">
 						<div class="footer-logo">
-							<a href="/{{ frappe.lang or 'en' }}"><img src="{{ footer_logo }}" alt="{{ store_name | e }}"></a>
+							<a href="{{ url('/') | e }}"><img src="{{ footer_logo }}" alt="{{ store_name | e }}"></a>
 						</div>
 						<ul class="widget-address">
 							<li><p><span>{{ _("E-mail") }}</span> : <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p></li>
 							<li><p><span>{{ _("Phone") }}</span> : <a href="tel:{{ contact_phone }}">{{ contact_phone }}</a></p></li>
 							<li><p><span>{{ _("Hours") }}</span> : {{ working_hours }}</p></li>
-							<li><p><a href="/{{ frappe.lang or 'en' }}/track-order">{{ _("Track Your Order") }}</a></p></li>
+							<li><p><a href="{{ url('/track-order') | e }}">{{ _("Track Your Order") }}</a></p></li>
 						</ul>
 						<div class="subscribe_widget">
 							<h6 class="title fw-medium text-capitalize">{{ newsletter_title }}</h6>
@@ -58,7 +58,7 @@
 						<h5 class="footer-title">{{ section.title | e }}</h5>
 						<ul>
 							{% for link in section.links %}
-							<li><a href="{{ (link.url or 'javascript:void(0);') | e }}">{{ link.title | e }}</a></li>
+							<li><a href="{{ (url(link.url) if link.url else 'javascript:void(0);') | e }}">{{ link.title | e }}</a></li>
 							{% endfor %}
 						</ul>
 					</div>

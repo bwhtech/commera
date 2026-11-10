@@ -14,7 +14,7 @@
 
 {% set footer_sections = get_storefront_footer(localization if localization is defined else none) %}
 <div class="flex justify-center md:hidden my-9">
-  <a href="/">
+  <a href="{{ url('/') | e }}">
     <img src="{{ footer_logo }}" alt="{{ store_name | e }} Logo" class="h-12 w-32 object-contain" />
   </a>
 </div>
@@ -22,7 +22,7 @@
 <footer class="bg-footer text-footer">
   <div class="max-w-7xl mx-auto px-6 md:px-10 mt-14 py-12">
     <div class="hidden items-start justify-start md:flex mb-12">
-      <a href="/">
+      <a href="{{ url('/') | e }}">
         <img src="{{ footer_logo }}" alt="{{ store_name | e }} Logo" class="h-16 w-40 object-contain" />
       </a>
     </div>
@@ -35,7 +35,7 @@
             <ul class="list-disc ps-4 text-sm">
               {% for link in section.links %}
                 <li class="mb-2">
-                  <a href="{{ link.url | e }}" class="text-xs text-gray-300 hover:text-white">{{ link.title | e }}</a>
+                  <a href="{{ url(link.url or '#') | e }}" class="text-xs text-gray-300 hover:text-white">{{ link.title | e }}</a>
                 </li>
               {% endfor %}
             </ul>
@@ -44,9 +44,9 @@
       {% else %}
         {% call macros.collapsible_section(_("My Account"), "order-2 mb-4 md:order-1 md:mb-0 md:w-1/") %}
           <ul class="list-disc ps-4 text-sm">
-            <li class="mb-2"><a href="/{{frappe.lang}}/account/dashboard" class="text-xs text-gray-300 hover:text-white">{{_('My account')}}</a></li>
-            <li class="mb-2"><a href="/{{frappe.lang}}/account/orders" class="text-xs text-gray-300 hover:text-white">{{_('Orders history')}}</a></li>
-            <li class="mb-2"><a href="/{{frappe.lang}}/account/wishlist" class="text-xs text-gray-300 hover:text-white">{{_('Wishlist')}}</a></li>
+            <li class="mb-2"><a href="{{ url('/account/dashboard') | e }}" class="text-xs text-gray-300 hover:text-white">{{_('My account')}}</a></li>
+            <li class="mb-2"><a href="{{ url('/account/orders') | e }}" class="text-xs text-gray-300 hover:text-white">{{_('Orders history')}}</a></li>
+            <li class="mb-2"><a href="{{ url('/account/wishlist') | e }}" class="text-xs text-gray-300 hover:text-white">{{_('Wishlist')}}</a></li>
           </ul>
         {% endcall %}
         

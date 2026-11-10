@@ -9,7 +9,7 @@
 				<h2 class="title">{{ section.settings.title }}</h2>
 			</div>
 			{% if section.settings.link_label %}
-			<a href="{{ section.settings.link_url or '/' ~ (frappe.lang or 'en') ~ '/products' }}" class="text-secondary font-14 d-flex align-items-center gap-1">{{ section.settings.link_label }}
+			<a href="{{ url(section.settings.link_url or '/products') | e }}" class="text-secondary font-14 d-flex align-items-center gap-1">{{ section.settings.link_label }}
 				<i class="icon feather icon-chevron-right font-18"></i>
 			</a>
 			{% endif %}

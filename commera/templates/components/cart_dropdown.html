@@ -1,3 +1,4 @@
+{% set in_source_language = get_localization().language == get_localization().default_language %}
 {% import "templates/macros/dropdown.html" as dropdown %}
 
 {%
@@ -23,7 +24,7 @@ link='cart',
         <div>
             <p class="text-xs text-brand" x-text="cart_item.brand"></p>
             <div class="flex">
-                {% if frappe.lang == "en" %}
+                {% if in_source_language %}
                 <p class="text-xs mt-1 text-gray-500" x-text="cart_item.variant.item_name"></p>
                 {% else %}
                   <p class="text-xs mt-1 text-gray-500" x-text="cart_item.variant.title || cart_item.variant.item_name"></p>
@@ -35,7 +36,7 @@ link='cart',
     </div>
 </template>
 
-<a href="/{{frappe.lang}}/cart">
+<a href="{{ url('/cart') | e }}">
     <div x-show="$store.cart.items.length > 0" class="text-center text-xs text-gray-500  hover:text-gray-700 capitalize">
         {{_('checkout')}}
     </div>

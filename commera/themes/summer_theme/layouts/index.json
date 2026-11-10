@@ -18,7 +18,7 @@
 						"heading": "Beautiful Woman Purple Sweater.",
 						"subheading": "₹3,999",
 						"cta_label": "More Collection Explore",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				},
 				{
@@ -30,7 +30,7 @@
 						"heading": "Shot Slad Curly Woman.",
 						"subheading": "₹1,499",
 						"cta_label": "More Collection Explore",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				},
 				{
@@ -42,7 +42,7 @@
 						"heading": "Athletic Mesh Sports Leggings.",
 						"subheading": "₹3,799",
 						"cta_label": "More Collection Explore",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				},
 				{
@@ -54,7 +54,7 @@
 						"heading": "Curly Girl Beautiful Dress.",
 						"subheading": "₹2,499",
 						"cta_label": "More Collection Explore",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				}
 			]
@@ -74,7 +74,7 @@
 					"settings": {
 						"image": "images/shop/product/clothes/1.png",
 						"heading": "Shirts",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				},
 				{
@@ -83,7 +83,7 @@
 					"settings": {
 						"image": "images/shop/product/clothes/2.png",
 						"heading": "Shorts",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				},
 				{
@@ -92,7 +92,7 @@
 					"settings": {
 						"image": "images/shop/product/clothes/3.png",
 						"heading": "t-Shirt",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				},
 				{
@@ -101,7 +101,7 @@
 					"settings": {
 						"image": "images/shop/product/clothes/4.png",
 						"heading": "t-Jeans",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				},
 				{
@@ -110,7 +110,7 @@
 					"settings": {
 						"image": "images/shop/product/clothes/5.png",
 						"heading": "Dresses",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				}
 			]
@@ -146,7 +146,7 @@
 						"badge_label": "Sale Up to 50% Off",
 						"heading": "Summer Edit",
 						"cta_label": "Shop Now",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				},
 				{
@@ -157,7 +157,7 @@
 						"badge_label": "Sale Up to 50% Off",
 						"heading": "New Summer Collection",
 						"cta_label": "Shop Now",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				}
 			]
@@ -207,7 +207,7 @@
 						"badge_label": "20% Off",
 						"heading": "Luxury Bras",
 						"cta_label": "Collect Now",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				},
 				{
@@ -218,7 +218,7 @@
 						"badge_label": "Sale Up to 50% Off",
 						"heading": "Summer",
 						"cta_label": "Collect Now",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				},
 				{
@@ -229,7 +229,7 @@
 						"badge_label": "20% Off",
 						"heading": "Swimwear",
 						"cta_label": "Collect Now",
-						"url": "/en/products"
+						"url": "/products"
 					}
 				}
 			]

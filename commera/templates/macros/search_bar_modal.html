@@ -14,7 +14,7 @@
     search_term: window.query_state?.search ? window.query_state.search : '',
     // A plain navigation: the products page reads the term from its own URL.
     update_search(){
-        window.location.href = `/{{frappe.lang}}/products?search=${encodeURIComponent(this.search_term.trim())}`
+        window.location.href = {{ url('/products') | tojson | forceescape }} + '?search=' + encodeURIComponent(this.search_term.trim())
     },
     async get_search_results() {
         const term = this.search_term.trim();
@@ -65,7 +65,7 @@
         <div x-show="is_open"
             class="flex w-full h-1/2 flex-col gap-4 overflow-hidden border border-gray-300 bg-white text-gray-600 ">
             <div class="max-w-7xl mx-auto px-6 md:px-10 py-5 flex items-center justify-between w-full">
-                <a class="rtl:space-x-reverse" href="/">
+                <a class="rtl:space-x-reverse" href="{{ url('/') | e }}">
                     <img src="{{ brand_logo | e }}" alt="{{ store_name | e }} Logo" class="w-20 h-10 object-fit" />
                 </a>
                 <div class="max-w-3xl w-full mx-10" x-ref="modalSearch">
@@ -97,23 +97,16 @@
                 <h3 class="text-sm my-4" x-show="products.length > 0">{{_("Search Results")}}</h3>
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-6">
                     <template x-for="(product, index) in products" :key="index">
-                        <a :href="`/{{frappe.lang}}/products/${product.route}`">
+                        <a :href="{{ url('/products') | tojson | forceescape }} + '/' + product.route">
                             <div class="flex-col">
                                 <div class="flex gap-1 mb-1">
                                     <img :src="product.image||'/assets/commera/images/1.jpg'" alt=""
                                         class="h-10 w-10 object-cover rounded-md bg-gray-400">
                                     <div></div>
                                     <h3 class="text-base">
-                                        {% if frappe.lang == 'en' %}
-                                        <span x-text="product.item_name"></span>
-                                        {% if "color" in card_fields %}
-                                        <span x-text="product.attribute_value"></span>
-                                        {% endif %}
-                                        {% else %}
                                         <span x-text="product.title || product.item_name"></span>
                                         {% if "color" in card_fields %}
                                         <span x-text="commera.t(product.attribute_value)"></span>
-                                        {% endif %}
                                         {% endif %}
                                     </h3>
                                 </div>

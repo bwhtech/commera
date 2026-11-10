@@ -26,7 +26,7 @@
             {% for product in products %}
           {% set product_name = product.title or product.item_name %}
 
-                <a href="/{{frappe.lang}}/products/{{product.route}}" class="flex justify-end">
+                <a href="{{ url('/products/' ~ product.route) | e }}" class="flex justify-end">
                     {{ item_card(
                     image=product.image or "/assets/commera/images/1.jpg",
                     brand=product.brand,

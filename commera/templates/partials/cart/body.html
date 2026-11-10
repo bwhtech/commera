@@ -1,3 +1,4 @@
+{% set in_source_language = get_localization().language == get_localization().default_language %}
 {% from "templates/macros/discount_code_chips.html" import discount_code_chips %}
 
 <script defer>
@@ -10,7 +11,7 @@
 			if (!await Alpine.store("cart").flush_sync()) return;
 			await frappe_call("/api/v2/method/commera.api.payments.generate_quotation_for_cart", { cart: { items: selected_items } });
 			state.checkout_status = "leaving";
-			window.location.href = "/{{frappe.lang}}/cart/checkout" + window.location.search;
+			window.location.href = {{ url('/cart/checkout') | tojson }} + window.location.search;
 		} catch (error) {
 			// frappe_call has shown the error.
 		} finally {
@@ -90,7 +91,7 @@
 							"image": cart_item.item.images[0]?.image
 						}
 					}'>
-							<a :href="`/{{frappe.lang}}/products/${cart_item.item.route}`">
+							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + cart_item.item.route">
 						<img :src="cart_item.item.images.length > 0 ? cart_item.item.images[0].image : '/assets/commera/images/1.jpg'"
 								alt="Product Image" class="w-35 h-50 md:w-45 md:h-60 object-cover rounded-lg" />
 							</a>
@@ -100,7 +101,7 @@
 										x-text="cart_item.brand">
 									</h3>
 									<h4 class="mb-2 text-sm font-medium md:text-base">
-									{% if frappe.lang == "en" %}
+									{% if in_source_language %}
 									<span x-text="cart_item.variant.item_name"></span>
 									{% else %}
 									<span x-text="cart_item.variant.title || cart_item.variant.item_name"></span>

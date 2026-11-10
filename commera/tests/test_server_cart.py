@@ -629,7 +629,7 @@ class TestServerCart(DiscountCodeTestCase):
 			{(self.shirt, 1), (self.cap, 2)},
 		)
 		sync_server_cart([])
-		self.assertEqual(refresh_checkout_cart()["redirect"], f"/{frappe.local.lang}/cart")
+		self.assertEqual(refresh_checkout_cart()["redirect"], "/cart")
 
 	def test_an_emptied_server_cart_checks_out_nothing(self):
 		sync_server_cart([{"item_code": self.shirt, "qty": 1}])
@@ -638,7 +638,7 @@ class TestServerCart(DiscountCodeTestCase):
 
 		with self.assertRaises(frappe.ValidationError):
 			generate_quotation_for_cart({"items": [self.browser_line(self.shirt, 1)]})
-		self.assertEqual(refresh_checkout_cart()["redirect"], f"/{frappe.local.lang}/cart")
+		self.assertEqual(refresh_checkout_cart()["redirect"], "/cart")
 
 	def test_opening_checkout_leaves_a_cart_in_payment_alone(self):
 		sync_server_cart([{"item_code": self.shirt, "qty": 1}])

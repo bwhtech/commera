@@ -1,7 +1,7 @@
 
 {% macro brand_logo(header_data, extra_classes="") %}
 <div class="logo-header logo-dark {{ extra_classes }}">
-	<a href="/{{ frappe.lang or 'en' }}"><img src="{{ header_data.brand_logo | e }}" alt="{{ header_data.store_name | e }}"></a>
+	<a href="{{ url('/') | e }}"><img src="{{ header_data.brand_logo | e }}" alt="{{ header_data.store_name | e }}"></a>
 </div>
 {% endmacro %}
 

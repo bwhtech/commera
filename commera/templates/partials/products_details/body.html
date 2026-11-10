@@ -55,7 +55,7 @@
         <div class="flex flex-2 flex-col pt-6">
             <div class="ipad:max-w-md">
 
-                <a href="/{{frappe.lang}}/products?brands={{product.brand | urlencode}}"
+                <a href="{{ url('/products?brands=' ~ (product.brand | urlencode)) | e }}"
                     class="mb-2 text-xl font-bold md:mb-0 md:text-3xl ">
                     {{ _(product.brand|title) }}
                 </a>
@@ -195,7 +195,7 @@
                                 class="px-4 py-2 bg-gray-200  hover:bg-gray-300 rounded-md cursor-pointer">
                                 {{ _("Continue Shopping") }}
                             </button>
-                            <a href="/{{frappe.lang}}/cart"
+                            <a href="{{ url('/cart') | e }}"
                                 class="px-4 py-2 bg-accent text-white  opacity-90 hover:opacity-100  rounded-md">
                                 {{ _("Go to Cart") }}
                             </a>
@@ -211,7 +211,7 @@
                             {% for color in other_variants %}
 
                             <div class="flex flex-col items-start">
-                                <a href="/{{frappe.lang}}/products/{{color.route}}">
+                                <a href="{{ url('/products/' ~ color.route) | e }}">
                                     <img src="{{color.image or " /assets/commera/images/1.jpg"}}" alt=""
                                         class="w-18 h-25 object-cover rounded-lg">
                                 </a>
@@ -403,7 +403,7 @@
             {% for item in recommended_items %}
             <div class="mb-11 md:mb-4">
                 {% set product_name = item.title or item.item_name %}
-                <a href="/{{frappe.lang}}/products/{{item.route}}">
+                <a href="{{ url('/products/' ~ item.route) | e }}">
                     {{ item_card(
                     image=item.image or "/assets/commera/images/1.jpg",
                     brand=item.brand,

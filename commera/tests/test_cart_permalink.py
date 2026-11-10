@@ -145,7 +145,7 @@ class TestCartPermalinkPage(ProductDetailPriceTestCase):
 		context = self.render(f"{self.medium}:1")
 
 		self.assertEqual(context.lines, [])
-		self.assertEqual(context.next_url, "/en/cart")
+		self.assertEqual(context.next_url, "/cart")
 
 	def test_link_with_nothing_to_add_says_so_instead_of_waiting(self):
 		html = get_response_content("cart/,,,")
@@ -163,7 +163,7 @@ class TestCartPermalinkPage(ProductDetailPriceTestCase):
 		)
 
 		next_url = urlsplit(context.next_url)
-		self.assertEqual(next_url.path, "/en/cart")
+		self.assertEqual(next_url.path, "/cart")
 		self.assertEqual(
 			dict(parse_qsl(next_url.query)),
 			{
@@ -178,7 +178,7 @@ class TestCartPermalinkPage(ProductDetailPriceTestCase):
 		to_cart = self.render(f"{self.medium}:1", return_to="cart", utm_source="ig")
 		to_page = self.render(f"{self.medium}:1", return_to="/en/products/shirt?colour=red", utm_source="ig")
 
-		self.assertEqual(to_cart.next_url, "/en/cart?utm_source=ig")
+		self.assertEqual(to_cart.next_url, "/cart?utm_source=ig")
 		self.assertEqual(to_page.next_url, "/en/products/shirt?colour=red&utm_source=ig")
 
 	def test_return_to_never_leaves_the_site(self):
@@ -199,7 +199,7 @@ class TestCartPermalinkPage(ProductDetailPriceTestCase):
 
 	def test_guest_goes_to_checkout_only_when_guest_checkout_is_on(self):
 		frappe.set_user("Guest")
-		for allow_guest_checkout, expected_path in ((1, "/en/cart/checkout"), (0, "/en/cart")):
+		for allow_guest_checkout, expected_path in ((1, "/cart/checkout"), (0, "/cart")):
 			frappe.db.set_single_value("Commera Settings", "allow_guest_checkout", allow_guest_checkout)
 			frappe.clear_document_cache("Commera Settings", "Commera Settings")
 			context = self.render(f"{self.medium}:1", discount="SUMMER10")
@@ -209,18 +209,27 @@ class TestCartPermalinkPage(ProductDetailPriceTestCase):
 
 
 class TestGuestCheckoutRedirect(IntegrationTestCase):
+	def setUp(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+
 	def test_guest_sent_back_to_the_cart_keeps_the_query_string(self):
+		self.assertEqual(self.redirect("/cart/checkout"), "/cart?discount=A&utm_source=x")
+
+	def test_guest_sent_back_to_the_cart_keeps_the_page_language(self):
+		self.assertEqual(self.redirect("/ar/cart/checkout"), "/ar/cart?discount=A&utm_source=x")
+
+	def redirect(self, path):
 		frappe.local.request = Request(
-			EnvironBuilder(path="/en/cart/checkout", query_string="discount=A&utm_source=x").get_environ()
+			EnvironBuilder(path=path, query_string="discount=A&utm_source=x").get_environ()
 		)
 		self.addCleanup(delattr, frappe.local, "request")
-		frappe.local.lang = "en"
+		frappe.local.request_cache.clear()
 		frappe.set_user("Guest")
 		self.addCleanup(frappe.set_user, "Administrator")
 
 		with self.assertRaises(frappe.Redirect):
 			get_checkout_context(frappe._dict())
-		self.assertEqual(frappe.flags.redirect_location, "/en/cart?discount=A&utm_source=x")
+		return frappe.flags.redirect_location
 
 
 class TestCartRoutes(IntegrationTestCase):

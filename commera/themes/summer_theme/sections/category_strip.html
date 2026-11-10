@@ -1,5 +1,4 @@
-{% set language = frappe.lang or "en" %}
-{% set products_url = "/" ~ language ~ "/products" %}
+{% set products_url = url("/products") %}
 {% if section.blocks %}
 <section class="shop-section overflow-hidden">
 	<div class="container-fluid p-0">
@@ -13,13 +12,13 @@
 								<div class="dz-media">
 									{% if category.settings.image %}<img src="{{ category.settings.image }}" alt="{{ category.settings.heading }}">{% endif %}
 								</div>
-								<h6 class="product-name"><a href="{{ category.settings.url or products_url }}">{{ category.settings.heading }}</a></h6>
+								<h6 class="product-name"><a href="{{ url(category.settings.url or products_url) | e }}">{{ category.settings.heading }}</a></h6>
 							</div>
 						</div>
 						{% endfor %}
 					</div>
 				</div>
-				<a class="icon-button" href="{{ products_url }}">
+				<a class="icon-button" href="{{ products_url | e }}">
 					<div class="text-row word-rotate-box c-black border-secondary">
 						<span class="word-rotate">{{ _("More Collection Explore") }}</span>
 						<svg class="badge__emoji" xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 35 35" fill="none">
@@ -45,7 +44,7 @@
 						</div>
 					</div>
 				</div>
-				<a class="icon-button" href="{{ products_url }}">
+				<a class="icon-button" href="{{ products_url | e }}">
 					<div class="text-row word-rotate-box c-black border-white">
 						<span class="word-rotate">{{ _("More Collection Explore") }}</span>
 						<svg class="badge__emoji" xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 35 35" fill="none">

@@ -69,7 +69,7 @@ document.addEventListener('alpine:init', () => {
 		},
 
 		get_product_url(product) {
-			return `/${settings.language}/products/${product.route}`;
+			return `${settings.products_url}/${product.route}`;
 		},
 
 		/* The server titles each card in the page's language: frappe_call sends it. */

@@ -515,8 +515,8 @@
                 const pairs = this.items
                     .filter(item => item.selected)
                     .map(item => `${encodeURIComponent(item.variant.item_code)}:${item.qty}`);
-                const language = {{ localization.language.code.lower() | tojson }};
-                const url = new URL(`/${language}/cart/${pairs.join(",")}`, window.location.origin);
+                const cart_path = {{ url("/cart") | tojson }};
+                const url = new URL(`${cart_path}/${pairs.join(",")}`, window.location.origin);
                 if (discount_code) url.searchParams.set("discount", discount_code);
                 return url.href;
             },

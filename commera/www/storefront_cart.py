@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils.data import cstr
 
 from commera.guest import is_guest
+from commera.localization import url
 
 no_cache = True
 
@@ -17,6 +18,6 @@ def get_context(context):
 		if key not in ("code", "cmd", "csrf_token")
 	}
 	context.signed_in_user = None if is_guest() else frappe.session.user
-	context.cart_url = f"/{frappe.local.lang}/cart"
+	context.cart_url = url("/cart")
 	context.title = _("Continue to Checkout") if is_guest() else _("Add to Your Cart")
 	context.show_breadcrumb = False

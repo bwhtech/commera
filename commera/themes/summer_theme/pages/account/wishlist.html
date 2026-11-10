@@ -2,7 +2,6 @@
 {% extends "components/theme_layout.html" %}
 {% from "components/core/account_shell.html" import account_shell %}
 
-{% set language = frappe.lang or "en" %}
 
 {% block head %}
 	{{ super() }}
@@ -27,12 +26,12 @@
 				<template x-for="wishlist_item in $store.wishlist.items" :key="wishlist_item.route">
 					<tr>
 						<td class="product-item-img">
-							<a :href="`/{{ language }}/products/${wishlist_item.route}`">
+							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route">
 								<img :src="wishlist_item.image || '/assets/commera/images/1.jpg'" :alt="wishlist_item.item_name">
 							</a>
 						</td>
 						<td class="product-item-name">
-							<a :href="`/{{ language }}/products/${wishlist_item.route}`" x-text="{% if language == 'en' %}wishlist_item.item_name{% else %}wishlist_item.title || wishlist_item.item_name{% endif %}"></a>
+							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route" x-text="wishlist_item.title || wishlist_item.item_name"></a>
 						</td>
 						<td class="product-item-price text-nowrap">
 							{# .product-item-price strikes through every span it holds, so the amounts sit in bdi. #}
@@ -40,7 +39,7 @@
 							<strong>{{ get_currency_symbol() }}<bdi x-text="Number(wishlist_item.sale_price || 0).toFixed(2)"></bdi></strong>
 						</td>
 						<td>
-							<a :href="`/{{ language }}/products/${wishlist_item.route}`" class="btn btn-secondary btnhover text-nowrap">{{ _("Add To Cart") }}</a>
+							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route" class="btn btn-secondary btnhover text-nowrap">{{ _("Add To Cart") }}</a>
 						</td>
 						<td class="product-item-close">
 							<a href="javascript:void(0);" @click="$store.wishlist.remove(wishlist_item)" aria-label="{{ _('Remove') }}">
@@ -56,7 +55,7 @@
 	<div class="account-empty" x-show="!$store.wishlist.items.length" x-cloak>
 		<i class="icon feather icon-heart"></i>
 		<p>{{ _("Your wishlist is empty.") }}</p>
-		<a href="/{{ language }}/products" class="btn btn-secondary">{{ _("Start Shopping") }}</a>
+		<a href="{{ url('/products') | e }}" class="btn btn-secondary">{{ _("Start Shopping") }}</a>
 	</div>
 </div>
 {% endcall %}
