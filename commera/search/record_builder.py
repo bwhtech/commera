@@ -1,9 +1,9 @@
 import frappe
-from frappe.utils import cint, create_batch, cstr, flt
+from frappe.utils import cint, create_batch, cstr
 
-from commera.base_prices import base_price_filters
-from commera.card_prices import get_card_price
 from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import root_filter
+from commera.localization.content import SHOP_WIDE
+from commera.search.price_markets import prices_for_variants
 from commera.search.translations import get_market_titles, get_translated_titles
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
@@ -109,7 +109,7 @@ def build_product_search_records(variant_names=None):
 	names = [variant.name for variant in variants]
 	sizes_by_variant = sizes_for_variants(names)
 	images_by_variant = images_for_variants(names)
-	prices_by_variant = prices_for_variants(sizes_by_variant)
+	prices_by_variant = prices_for_variants(names, sizes_by_variant)
 	titles_by_variant = get_translated_titles("Style Attribute Variant", variants)
 	market_titles = get_market_titles("Style Attribute Variant", names)
 
@@ -118,6 +118,7 @@ def build_product_search_records(variant_names=None):
 		item = item_by_style.get(variant.item_style) or {}
 		configurator = configurator_by_name.get(variant.configurator) or {}
 		titles = titles_by_variant[variant.name]
+		market_prices = prices_by_variant[variant.name]
 		records.append(
 			{
 				"name": variant.name,
@@ -134,8 +135,9 @@ def build_product_search_records(variant_names=None):
 					item,
 					sizes_by_variant.get(variant.name, []),
 					images_by_variant.get(variant.name, {}),
-					prices_by_variant.get(variant.name, {}),
+					market_prices[SHOP_WIDE],
 				),
+				"market_prices": market_prices,
 			}
 		)
 	return records
@@ -296,63 +298,3 @@ def images_for_variants(variant_names):
 			slot = "image" if row.idx == 1 else "hover_image"
 			images_by_variant.setdefault(row.parent, {}).setdefault(slot, row.image)
 	return images_by_variant
-
-
-def prices_for_variants(sizes_by_variant):
-	"""Map variant -> price snapshot, aggregating Item Price over the variant's item_codes."""
-	settings = frappe.get_cached_doc("Commera Settings")
-	default_price_list = settings.default_price_list
-	sale_price_list = settings.sale_price_list
-
-	codes_by_variant = {
-		variant: [size["item_code"] for size in sizes if size.get("item_code")]
-		for variant, sizes in sizes_by_variant.items()
-	}
-	all_codes = list({code for codes in codes_by_variant.values() for code in codes})
-	default_rate, sale_rate, sale_upto = rates_by_item_code(all_codes, default_price_list, sale_price_list)
-
-	snapshots = {
-		variant: aggregate_prices(codes, default_rate, sale_rate, sale_upto)
-		for variant, codes in codes_by_variant.items()
-	}
-	# The index keeps 0 for an unpriced product, as before.
-	for snapshot in snapshots.values():
-		snapshot["effective_price"] = flt(snapshot["effective_price"])
-	return snapshots
-
-
-def rates_by_item_code(item_codes, default_price_list, sale_price_list):
-	"""Per item_code: min default rate, min sale rate, max sale valid_upto across Item Price rows."""
-	default_rate, sale_rate, sale_upto = {}, {}, {}
-	for chunk in create_batch(item_codes, IN_CLAUSE_CHUNK_SIZE):
-		for row in frappe.get_all(
-			"Item Price",
-			filters=base_price_filters(
-				{"item_code": ("in", chunk), "price_list": ("in", [default_price_list, sale_price_list])}
-			),
-			fields=["item_code", "price_list", "price_list_rate", "valid_upto"],
-		):
-			if row.price_list == default_price_list and row.price_list_rate is not None:
-				default_rate[row.item_code] = min_or(default_rate.get(row.item_code), row.price_list_rate)
-			if row.price_list == sale_price_list and row.price_list_rate is not None:
-				sale_rate[row.item_code] = min_or(sale_rate.get(row.item_code), row.price_list_rate)
-				if row.valid_upto:
-					sale_upto[row.item_code] = max_or(sale_upto.get(row.item_code), row.valid_upto)
-	return default_rate, sale_rate, sale_upto
-
-
-def aggregate_prices(item_codes, default_rate, sale_rate, sale_upto):
-	"""A product's card prices over its sizes (card_prices.get_card_price), with its last sale end."""
-	upto_values = [sale_upto[code] for code in item_codes if code in sale_upto]
-	return {
-		**get_card_price([(sale_rate.get(code), default_rate.get(code)) for code in item_codes]),
-		"sale_end_date": max(upto_values) if upto_values else None,
-	}
-
-
-def min_or(current, value):
-	return value if current is None else min(current, value)
-
-
-def max_or(current, value):
-	return value if current is None else max(current, value)

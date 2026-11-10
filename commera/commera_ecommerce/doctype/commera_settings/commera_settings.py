@@ -279,8 +279,18 @@ class CommeraSettings(Document):
 			# Build the newly chosen index. Until it exists, the frappe.qb grid serves every search.
 			clear_search_engine()
 			get_engine_class(self.get("search_engine"))().enqueue_full_rebuild(deduplicate=True)
-		elif old_pairs != new_pairs or search_languages_changed(before, self):
+		elif (
+			old_pairs != new_pairs
+			or search_languages_changed(before, self)
+			or self.store_prices_changed(before)
+		):
 			enqueue_full_rebuild(deduplicate=True)
+
+	def store_prices_changed(self, before):
+		"""The index holds the card prices of the store's lists."""
+		return any(
+			before.get(field) != self.get(field) for field in ("sale_price_list", "default_price_list")
+		)
 
 	def search_engine_changed(self, before):
 		fields = ("search_engine", "search_server_url", "search_index_prefix")

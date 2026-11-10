@@ -249,8 +249,14 @@ doc_events = {
 		"after_rename": "commera.search.source_sync.on_source_rename",
 	},
 	"Item Price": {
-		"on_update": "commera.plugin_events.on_item_price_change",
-		"on_trash": "commera.plugin_events.on_item_price_change",
+		"on_update": [
+			"commera.plugin_events.on_item_price_change",
+			"commera.search.price_sync.on_item_price_change",
+		],
+		"on_trash": [
+			"commera.plugin_events.on_item_price_change",
+			"commera.search.price_sync.on_item_price_change",
+		],
 	},
 	"Style Attribute Variant": {
 		"on_update": [

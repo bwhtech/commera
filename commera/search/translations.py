@@ -12,6 +12,7 @@ from rq.job import JobStatus
 from commera.localization.content import BATCH_SIZE, DOCTYPE, SHOP_WIDE, get_lookup_market, translate
 from commera.localization.languages import Language, StorefrontLanguages
 from commera.localization.resolver import Localization, get_localization
+from commera.search.price_markets import price_generation
 
 # The field the index takes its title from, on both indexed doctypes.
 TITLE_FIELD = "display_name"
@@ -124,19 +125,19 @@ def index_languages(settings) -> tuple[str, list[str]]:
 	return languages.default.code, [language.code for language in get_search_languages(languages)]
 
 
-def language_generation(settings=None) -> str:
-	"""A hash of the languages a full build indexes. A build compares it at its start and end."""
+def index_generation(settings=None) -> str:
+	"""A hash of the languages and prices a full build indexes. A build compares it at its start and end."""
 	settings = settings or frappe.get_cached_doc("Commera Settings")
-	return sha256_hash(json.dumps(index_languages(settings)))
+	return sha256_hash(json.dumps([index_languages(settings), price_generation(settings)]))
 
 
-def rebuild_if_languages_change(engine, generation: str, job_id: str):
-	"""After a build commits, rebuild again if the languages changed while it ran."""
+def rebuild_if_generation_changes(engine, generation: str, job_id: str):
+	"""After a build commits, rebuild again if the languages or prices changed while it ran."""
 	# A settings save during the build saw its job as started, and dedupe dropped that save's rebuild.
 
 	def check():
 		# After the commit, so the build's read snapshot cannot hide a newer save.
-		if language_generation(frappe.get_doc("Commera Settings")) == generation:
+		if index_generation(frappe.get_doc("Commera Settings")) == generation:
 			return
 		# Only a queued build reads the new settings. This build's own job still counts as started.
 		if get_job_status(job_id) != JobStatus.QUEUED:

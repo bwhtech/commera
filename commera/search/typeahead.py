@@ -20,7 +20,7 @@ class CategoryLink(TypedDict):
 
 class Typeahead(TypedDict):
 	query: str
-	# Storefront product cards with live prices, best match first.
+	# Storefront product cards priced in the request's market, best match first.
 	products: list[dict]
 	# Menu entries whose names match, linked to their listing.
 	categories: list[CategoryLink]

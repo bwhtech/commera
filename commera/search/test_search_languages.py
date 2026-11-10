@@ -538,23 +538,31 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		frappe.db.set_value(PRODUCT, product, "meta_description", text)
 
 	def add_index_rows(self, doctype, names, markets):
-		"""A row per name and market that matches SEARCH_TOKEN, written straight to the index."""
+		"""A row per name and market that matches SEARCH_TOKEN, and its price, written straight to the index."""
 		rows = [
 			(f"{doctype}:{name}", SEARCH_TOKEN, SEARCH_TOKEN, doctype, name, market)
 			for name in names
 			for market in markets
 		]
-		self.engine._with_connection(
-			lambda cursor: cursor.executemany(
+
+		def write(cursor):
+			cursor.executemany(
 				"INSERT INTO search_fts (doc_id, title, content, doctype, name, market) "
 				"VALUES (?, ?, ?, ?, ?, ?)",
 				rows,
 			)
-		)
+			prices = [(doc_id, market, 1) for doc_id, *_rest, market in rows]
+			cursor.executemany(
+				"INSERT INTO search_price (doc_id, market, effective_price) VALUES (?, ?, ?)", prices
+			)
+
+		self.engine._with_connection(write)
 
 	def use_gulf_market(self, language="ar"):
+		"""A Gulf market on the store's lists, so it prices every fixture, in a rebuilt index."""
 		use_markets(self)
-		make_market("Gulf", [UAE], language, handle="gulf")
+		make_market("Gulf", [UAE], language, handle="gulf", compare_at_price_list=self.default_price_list)
+		self.rebuild_index()
 
 	@contextmanager
 	def market_request(self, country):

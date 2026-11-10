@@ -11,6 +11,7 @@ from frappe.website.utils import clear_cache as clear_website_cache
 
 from commera.localization.languages import StorefrontLanguages
 from commera.localization.markets import PRIMARY_MARKET, clear_market_cache, is_market_language
+from commera.search.price_sync import rebuild_if_market_prices_change
 from commera.search.translations import reindex_market_records
 
 HANDLE_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -58,8 +59,10 @@ class CommeraMarket(Document):
 
 	def on_update(self):
 		refresh_market_surfaces()
+		rebuild_if_market_prices_change(self.get_doc_before_save(), self)
 
 	def on_trash(self):
+		rebuild_if_market_prices_change(self, None)
 		reindex_market_records(self.name)
 		# An export would list them under a market an import refuses.
 		frappe.db.delete("Content Translation", {"market": self.name})

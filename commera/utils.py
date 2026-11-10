@@ -235,29 +235,6 @@ def shape_product_cards(cards):
 	return set_product_titles(cards)
 
 
-def attach_live_prices(cards):
-	"""Overlay the live Item Price onto index-hydrated cards."""
-	# Item Price edits fire no Style Attribute Variant event, so the indexed price lags until the rebuild.
-	from commera.localization.market_prices import MarketPrices
-	from commera.search.record_builder import aggregate_prices, rates_by_item_code
-
-	if not cards:
-		return cards
-
-	prices = MarketPrices.current()
-	item_codes = list(
-		{size["item_code"] for card in cards for size in (card.get("sizes") or []) if size.get("item_code")}
-	)
-	default_rate, sale_rate, sale_upto = rates_by_item_code(
-		item_codes, prices.compare_at_price_list, prices.sale_price_list
-	)
-
-	for card in cards:
-		codes = [size["item_code"] for size in (card.get("sizes") or []) if size.get("item_code")]
-		card.update(aggregate_prices(codes, default_rate, sale_rate, sale_upto))
-	return cards
-
-
 def get_total_product_count(filters=None, product_list=None):
 	"""Total products for the grid's pagination controls — from SQLite unless frappe.qb owns the grid."""
 	from commera.search import query as search_query

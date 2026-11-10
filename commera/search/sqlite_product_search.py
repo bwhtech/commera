@@ -25,14 +25,15 @@ from commera.search.engine import (
 	empty_typeahead,
 	is_query_too_short,
 )
+from commera.search.price_markets import PRICE_COLUMNS, get_price_market, get_price_markets
 from commera.search.record_builder import (
 	build_category_search_records,
 	build_product_search_records,
 )
 from commera.search.translations import (
 	get_search_markets,
-	language_generation,
-	rebuild_if_languages_change,
+	index_generation,
+	rebuild_if_generation_changes,
 )
 
 CATEGORY_DOCTYPE = "Ecommerce Category"
@@ -59,15 +60,8 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	INDEX_SCHEMA: ClassVar = {
 		"text_fields": ["title", "content"],
 		# `market` is "" on a record's own row. A market row swaps its title for that market's titles.
-		"metadata_fields": [
-			"item_group",
-			"brand",
-			"color",
-			"route_slug",
-			"effective_price",
-			"has_discount",
-			"market",
-		],
+		# Prices live in search_price, one row per product and market.
+		"metadata_fields": ["item_group", "brand", "color", "route_slug", "market"],
 		"tokenizer": "unicode61 remove_diacritics 2",
 	}
 
@@ -107,7 +101,17 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		term = (term or "").strip()
 		if len(term) < MIN_QUERY_LENGTH or not self.index_exists():
 			return False
+		if not self.prices_market(get_price_market()):
+			return False
 		return not is_arabic_query(term) or self.indexes_arabic()
+
+	def prices_market(self, key):
+		"""Whether the build priced the market `key`. A newer market waits for the rebuild it enqueued."""
+		cached = getattr(self, "price_markets_cache", None)
+		if cached is None:
+			rows = self.sql("SELECT market FROM search_price_market", read_only=True)
+			cached = self.price_markets_cache = {row["market"] for row in rows}
+		return key in cached
 
 	def indexes_arabic(self):
 		"""Whether the index holds a language in Arabic script, memoized like index_exists()."""
@@ -129,7 +133,9 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 				super().index_exists()
 				and self._table_exists("product_detail")
 				and self._table_exists("search_language")
-				and self.fts_has_columns(("effective_price", "has_discount", "market"))
+				and self._table_exists("search_price")
+				and self._table_exists("search_price_market")
+				and self.fts_has_columns(("market",))
 			)
 			self.index_exists_cache = cached
 		return cached
@@ -155,24 +161,37 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		cursor.execute("DELETE FROM search_language")
 		codes = [(language.code,) for language in StorefrontLanguages.load().published]
 		cursor.executemany("INSERT INTO search_language (code) VALUES (?)", codes)
-		# The languages the build started with. A resumed build restarts when they changed.
+		# The languages and prices the build started with. A resumed build restarts when they changed.
 		cursor.execute("CREATE TABLE IF NOT EXISTS search_generation (generation TEXT)")
 		cursor.execute("DELETE FROM search_generation")
-		generation = getattr(self, "build_generation", None) or language_generation()
+		generation = getattr(self, "build_generation", None) or index_generation()
 		cursor.execute("INSERT INTO search_generation (generation) VALUES (?)", (generation,))
+
+		self.create_price_tables(cursor)
 
 		columns = ",\n".join(self.product_detail_column_defs())
 		cursor.execute(f"CREATE TABLE IF NOT EXISTS product_detail ({columns})")
 		for column in (
-			"effective_price",
 			"modified",
-			"discount_percent",
 			"display_name",
 			"item_group",
 			"brand",
 			"color",
 		):
 			cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_pd_{column} ON product_detail({column})")
+
+	def create_price_tables(self, cursor):
+		cursor.execute(
+			"CREATE TABLE IF NOT EXISTS search_price (doc_id TEXT, market TEXT, effective_price REAL, "
+			"sale_price REAL, default_price REAL, discount_percent REAL, has_discount INTEGER, "
+			"sale_end_date TEXT, PRIMARY KEY (market, doc_id))"
+		)
+		cursor.execute("CREATE INDEX IF NOT EXISTS idx_search_price_doc ON search_price(doc_id)")
+		# The markets this build prices. A search in any other market is served by frappe.qb.
+		cursor.execute("CREATE TABLE IF NOT EXISTS search_price_market (market TEXT PRIMARY KEY)")
+		cursor.execute("DELETE FROM search_price_market")
+		markets = [(key,) for key in get_price_markets()]
+		cursor.executemany("INSERT INTO search_price_market (market) VALUES (?)", markets)
 
 	def product_detail_column_defs(self):
 		integer_columns = {"is_stock_item", "has_discount"}
@@ -192,16 +211,16 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	# -- builds ---------------------------------------------------------------------------------
 
 	def build_index(self, batch_size=1000, is_continuation=False):
-		self.build_generation = generation = language_generation()
+		self.build_generation = generation = index_generation()
 		if is_continuation and self.stored_generation() != generation:
-			# The finished batches hold the old languages' titles.
+			# The finished batches hold the old languages' titles or the old prices.
 			self.discard_partial_build()
 			is_continuation = False
 		super().build_index(batch_size=batch_size, is_continuation=is_continuation)
-		rebuild_if_languages_change(self, generation, SEARCH_CLASS_PATH)
+		rebuild_if_generation_changes(self, generation, SEARCH_CLASS_PATH)
 
 	def stored_generation(self):
-		"""The language generation the build being resumed started with, or None."""
+		"""The index generation the build being resumed started with, or None."""
 		temp_path = self._get_db_path(is_temp=True)
 		path = temp_path if os.path.exists(temp_path) else self.db_path
 		if not os.path.exists(path):
@@ -274,9 +293,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			doc.route_slug = record.get("route_slug") or ""
 			doc.sizes = record.get("sizes") or []
 			doc.product_detail = record.get("detail")
-			detail = record.get("detail") or {}
-			doc.effective_price = detail.get("effective_price")
-			doc.has_discount = detail.get("has_discount")
+			doc.market_prices = record.get("market_prices") or {}
 
 	def get_documents_paginated(
 		self, doctype, limit=1000, last_indexed_modified=None, last_indexed_name=None
@@ -303,6 +320,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			document["_market_titles"] = getattr(doc, "market_titles", None) or {}
 			document["_sizes"] = getattr(doc, "sizes", None) or []
 			document["_detail"] = getattr(doc, "product_detail", None)
+			document["_market_prices"] = getattr(doc, "market_prices", None) or {}
 		return document
 
 	# -- incremental writes ---------------------------------------------------------------------
@@ -355,6 +373,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 					continue
 				self.write_search_size(cursor, doc_id, document.get("_sizes") or [])
 				self.write_product_detail(cursor, doc_id, document.get("_detail"))
+				self.write_search_prices(cursor, doc_id, document.get("_market_prices") or {})
 			self.write_market_rows(cursor, documents)
 
 		self._with_connection(index_siblings)
@@ -377,6 +396,19 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		if rows:
 			cursor.executemany("INSERT INTO search_size (doc_id, size, item_code) VALUES (?, ?, ?)", rows)
 
+	def write_search_prices(self, cursor, doc_id, market_prices):
+		cursor.execute("DELETE FROM search_price WHERE doc_id = ?", (doc_id,))
+		columns = ("doc_id", "market", *PRICE_COLUMNS)
+		rows = [
+			(doc_id, market, *(prices.get(column) for column in PRICE_COLUMNS))
+			for market, prices in market_prices.items()
+		]
+		if rows:
+			placeholders = ", ".join("?" for _ in columns)
+			cursor.executemany(
+				f"INSERT INTO search_price ({', '.join(columns)}) VALUES ({placeholders})", rows
+			)
+
 	def write_product_detail(self, cursor, doc_id, detail):
 		cursor.execute("DELETE FROM product_detail WHERE doc_id = ?", (doc_id,))
 		if not detail:
@@ -395,14 +427,15 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		doc_id = f"{doctype}:{docname}"
 		self.sql("DELETE FROM search_size WHERE doc_id = ?", (doc_id,), commit=True)
 		self.sql("DELETE FROM product_detail WHERE doc_id = ?", (doc_id,), commit=True)
+		self.sql("DELETE FROM search_price WHERE doc_id = ?", (doc_id,), commit=True)
 
 	def remove_docs(self, doctype, names):
-		"""Drop many docs from the FTS table and both sibling tables."""
+		"""Drop many docs from the FTS table and its sibling tables."""
 		self.raise_if_not_indexed()
 		for chunk in create_batch(list(names), SQLITE_PARAM_CHUNK_SIZE):
 			doc_ids = tuple(f"{doctype}:{name}" for name in chunk)
 			placeholders = ", ".join("?" for _ in doc_ids)
-			for table in ("search_fts", "search_size", "product_detail"):
+			for table in ("search_fts", "search_size", "product_detail", "search_price"):
 				self.sql(f"DELETE FROM {table} WHERE doc_id IN ({placeholders})", doc_ids, commit=True)
 
 	# -- card hydration -------------------------------------------------------------------------
@@ -414,6 +447,8 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 		card_by_name = {}
 		sizes_by_name = {}
+		prices_by_name = {}
+		market = get_price_market()
 		# Chunked: SQLite caps bound parameters per statement, and nothing bounds the caller's name list.
 		for chunk in create_batch(list(names), SQLITE_PARAM_CHUNK_SIZE):
 			doc_ids = tuple(f"Style Attribute Variant:{name}" for name in chunk)
@@ -436,12 +471,22 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 					{"size": row["size"], "item_code": row["item_code"]}
 				)
 
+			for row in self.sql(
+				f"SELECT * FROM search_price WHERE market = ? AND doc_id IN ({placeholders})",
+				(market, *doc_ids),
+				read_only=True,
+			):
+				name = row["doc_id"].split(":", 1)[1]
+				prices_by_name[name] = {column: row[column] for column in PRICE_COLUMNS}
+
 		cards = []
 		for name in names:
 			card = card_by_name.get(name)
 			if not card:
 				continue
 			card["sizes"] = sizes_by_name.get(name, [])
+			# product_detail holds the store prices; a product its market cannot price has none.
+			card.update(prices_by_name.get(name) or dict.fromkeys(PRICE_COLUMNS))
 			cards.append(card)
 		return cards
 
@@ -510,41 +555,41 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 				f" AND {prefix}doc_id IN (SELECT doc_id FROM search_size WHERE size IN ({placeholders}))"
 			)
 			params.extend(selected["sizes"])
-		price_sql, price_params = self.price_discount_clause(selected, prefix)
+		price_sql, price_params = self.price_clause(selected, prefix)
 		clauses.append(price_sql)
 		params.extend(price_params)
 		return "".join(clauses), params
 
-	def price_discount_clause(self, filters, prefix=""):
-		"""SQL fragment + params for the min_price/max_price/has_discount filters against the snapshot."""
-		# flt() the bounds: FTS5 content columns have no type affinity, and SQLite sorts every REAL below TEXT.
-		clauses = []
-		params = []
-		min_price = flt(filters.get("min_price"))
-		max_price = flt(filters.get("max_price"))
-		if min_price:
-			clauses.append(f" AND {prefix}effective_price >= ?")
+	def price_clause(self, filters, prefix=""):
+		"""Products priced in the request's market, within the min_price/max_price/has_discount filters.
+		Menu entries have no price, so they always pass."""
+		conditions = ["market = ?"]
+		params = [get_price_market()]
+		# flt() the bounds: a query string may send "" or text.
+		if min_price := flt(filters.get("min_price")):
+			conditions.append("effective_price >= ?")
 			params.append(min_price)
-		if max_price:
-			clauses.append(f" AND {prefix}effective_price <= ?")
+		if max_price := flt(filters.get("max_price")):
+			conditions.append("effective_price <= ?")
 			params.append(max_price)
 		if filters.get("has_discount"):
-			clauses.append(f" AND {prefix}has_discount = 1")
-		return "".join(clauses), params
+			conditions.append("has_discount = 1")
+		priced = f"SELECT doc_id FROM search_price WHERE {' AND '.join(conditions)}"
+		return f" AND ({prefix}doctype = ? OR {prefix}doc_id IN ({priced}))", [CATEGORY_DOCTYPE, *params]
 
 	# -- search grid ----------------------------------------------------------------------------
 
-	def detail_order(self, sort_by, prefix=""):
-		"""ORDER BY fragment over product_detail columns; `name` breaks ties so pages never overlap."""
+	def detail_order(self, sort_by):
+		"""ORDER BY fragment over the product and its market prices; `name` breaks ties so pages never overlap."""
 		columns = {
-			"price_low": f"{prefix}effective_price ASC",
-			"price_high": f"{prefix}effective_price DESC",
-			"name": f"{prefix}display_name ASC",
-			"new_arrival": f"{prefix}modified DESC",
-			"discount": f"{prefix}discount_percent DESC",
+			"price_low": "search_price.effective_price ASC",
+			"price_high": "search_price.effective_price DESC",
+			"name": "product_detail.display_name ASC",
+			"new_arrival": "product_detail.modified DESC",
+			"discount": "search_price.discount_percent DESC",
 		}
 		primary = columns.get(sort_by)
-		return f"{primary}, {prefix}name ASC" if primary else f"{prefix}name ASC"
+		return f"{primary}, product_detail.name ASC" if primary else "product_detail.name ASC"
 
 	def _prepare_fts_query(self, query):
 		"""Core's FTS5 query, where an Arabic word matches any of its forms."""
@@ -576,14 +621,15 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		# unlike bm25() it may be aggregated.
 		order = "MIN(search_fts.rank), product_detail.name ASC"
 		if sort_by != "default":
-			order = self.detail_order(sort_by, "product_detail.")
+			order = self.detail_order(sort_by)
 		offset = (page - 1) * page_length
 		rows = self.sql(
 			"SELECT product_detail.name AS name FROM search_fts "
 			"JOIN product_detail ON product_detail.doc_id = search_fts.doc_id "
+			"JOIN search_price ON search_price.doc_id = search_fts.doc_id AND search_price.market = ? "
 			f"WHERE search_fts MATCH ?{where} GROUP BY product_detail.name "
 			f"ORDER BY {order} LIMIT ? OFFSET ?",
-			(fts_query, *params, page_length, offset),
+			(get_price_market(), fts_query, *params, page_length, offset),
 			read_only=True,
 		)
 		return [row["name"] for row in rows]

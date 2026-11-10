@@ -1,4 +1,5 @@
-"""What every engine on a search server shares. A subclass speaks one server's API; this class does the rest."""
+"""What every engine on a search server shares. A subclass speaks one server's API; this class does the rest.
+Documents hold each market's prices in price_field() fields; a new market has none until its rebuild."""
 
 import hashlib
 import json
@@ -8,11 +9,13 @@ from abc import abstractmethod
 import frappe
 from frappe.utils import create_batch, flt
 
+from commera.localization.content import SHOP_WIDE
 from commera.product_detail import size_sort_key
 from commera.search.engine import CARD_COLUMNS, SearchEngineBase, empty_facets, empty_typeahead
 from commera.search.http_client import SearchServerError
+from commera.search.price_markets import get_price_market
 from commera.search.record_builder import build_category_search_records, build_product_search_records
-from commera.search.translations import language_generation, rebuild_if_languages_change
+from commera.search.translations import index_generation, rebuild_if_generation_changes
 
 PRODUCT_DOCTYPE = "Style Attribute Variant"
 CATEGORY_DOCTYPE = "Ecommerce Category"
@@ -31,7 +34,10 @@ FACETS = {
 	"size": ("sizes", "sizes"),
 }
 LIST_FILTERS = {"subcategory": "item_group", "brands": "brand", "colors": "color", "sizes": "sizes"}
-# sort_by -> (field, direction). Every engine breaks ties on `name`, so pages never overlap.
+# The price fields each market filters and sorts on.
+MARKET_PRICE_FIELDS = ("effective_price", "discount_percent", "has_discount")
+# sort_by -> (field, direction), with the store's price fields. Every engine breaks ties on `name`,
+# so pages never overlap. get_sort swaps in the market's price fields.
 SORTS = {
 	"price_low": ("effective_price", "asc"),
 	"price_high": ("effective_price", "desc"),
@@ -87,7 +93,7 @@ class RemoteSearchEngine(SearchEngineBase):
 
 	@abstractmethod
 	def fetch_documents(self, names) -> list[dict]:
-		"""The stored `card` and `size_items` of each named product, in any order."""
+		"""The stored `card`, `size_items` and `market_prices` of each named product, in any order."""
 
 	@abstractmethod
 	def upsert(self, uid, documents): ...
@@ -164,7 +170,7 @@ class RemoteSearchEngine(SearchEngineBase):
 		term, clauses = grid_terms(filters)
 		if not self.can_rank(term):
 			return []
-		names, total = self.find_page(term, clauses, page, page_length, SORTS.get(sort_by))
+		names, total = self.find_page(term, clauses, page, page_length, get_sort(sort_by))
 		# The listing asks for the count next; the grid answer already holds it.
 		self.total_hits = (query_key(term, clauses), total)
 		return names
@@ -180,10 +186,16 @@ class RemoteSearchEngine(SearchEngineBase):
 
 	def hydrate_cards(self, names):
 		card_by_name = {}
+		market = get_price_market()
 		for chunk in create_batch(list(names), BATCH_SIZE):
 			for document in self.fetch_documents(chunk):
 				# A server may drop a null field when it updates a document, so restore the missing keys.
 				card = {**dict.fromkeys(CARD_COLUMNS), **document["card"], "sizes": document["size_items"]}
+				if market != SHOP_WIDE:
+					# find_names takes no filters, so typeahead drops the products the market cannot price here.
+					if not (prices := (document.get("market_prices") or {}).get(market)):
+						continue
+					card.update(prices)
 				card_by_name[card["name"]] = card
 		return [card_by_name[name] for name in names if name in card_by_name]
 
@@ -237,7 +249,7 @@ class RemoteSearchEngine(SearchEngineBase):
 	def rebuild(self):
 		"""Build both indexes beside the live ones, then swap them in, so search keeps serving meanwhile."""
 		started = frappe.utils.now()
-		generation = language_generation()
+		generation = index_generation()
 		for doctype, filters in ((PRODUCT_DOCTYPE, {"is_published": 1}), (CATEGORY_DOCTYPE, {"enabled": 1})):
 			names = frappe.get_all(doctype, filters=filters, pluck="name")
 			self.rebuild_one(self.uid_for(doctype), doctype, names)
@@ -247,7 +259,7 @@ class RemoteSearchEngine(SearchEngineBase):
 		for doctype in (PRODUCT_DOCTYPE, CATEGORY_DOCTYPE):
 			if changed := frappe.get_all(doctype, filters={"modified": (">=", started)}, pluck="name"):
 				self.index_docs(doctype, changed)
-		rebuild_if_languages_change(self, generation, self.REBUILD_JOB)
+		rebuild_if_generation_changes(self, generation, self.REBUILD_JOB)
 
 	def drop_index(self):
 		self.drop_indexes()
@@ -270,11 +282,10 @@ def query_key(term, clauses):
 
 
 def filter_clauses(filters, drop_key):
-	"""SearchFilters as (operator, field, value) clauses, leaving out `drop_key` for disjunctive facets.
-
-	The operators are "in" (any of a list), ">=", "<=" and "=". Each engine writes them in its own syntax.
-	"""
-	clauses = []
+	"""SearchFilters as (operator, field, value) clauses on the request market, leaving out `drop_key`.
+	The operators are "in" (any of a list), ">=", "<=" and "=". Each engine writes them in its own syntax."""
+	market = get_price_market()
+	clauses = [] if market == SHOP_WIDE else [("in", "price_markets", [market])]
 	for key, field in LIST_FILTERS.items():
 		if key != drop_key and filters.get(key):
 			clauses.append(("in", field, [str(value) for value in filters[key]]))
@@ -282,12 +293,37 @@ def filter_clauses(filters, drop_key):
 	if filters.get("category_item_groups"):
 		clauses.append(("in", "item_group", [str(value) for value in filters["category_item_groups"]]))
 	if min_price := flt(filters.get("min_price")):
-		clauses.append((">=", "effective_price", min_price))
+		clauses.append((">=", price_field("effective_price", market), min_price))
 	if max_price := flt(filters.get("max_price")):
-		clauses.append(("<=", "effective_price", max_price))
+		clauses.append(("<=", price_field("effective_price", market), max_price))
 	if filters.get("has_discount"):
-		clauses.append(("=", "has_discount", 1))
+		clauses.append(("=", price_field("has_discount", market), 1))
 	return clauses
+
+
+def get_sort(sort_by):
+	"""The SORTS value of `sort_by` on the request market's price fields, or None."""
+	sort = SORTS.get(sort_by)
+	if not sort or sort[0] not in MARKET_PRICE_FIELDS:
+		return sort
+	return price_field(sort[0], get_price_market()), sort[1]
+
+
+def price_field(field, market):
+	"""`field` of the store prices, or of a secondary market. Handles hold no `_`, so names stay unique."""
+	return field if market == SHOP_WIDE else f"{field}_{market.replace('-', '_')}"
+
+
+def market_price_fields(market_prices):
+	"""The filterable price fields of each secondary market that prices the product."""
+	fields = {"price_markets": [market for market in market_prices if market != SHOP_WIDE]}
+	for market, prices in market_prices.items():
+		if market == SHOP_WIDE:
+			continue
+		fields[price_field("effective_price", market)] = flt(prices.get("effective_price"))
+		fields[price_field("discount_percent", market)] = flt(prices.get("discount_percent"))
+		fields[price_field("has_discount", market)] = 1 if prices.get("has_discount") else 0
+	return fields
 
 
 def product_document(record):
@@ -311,6 +347,8 @@ def product_document(record):
 		"discount_percent": flt(card.get("discount_percent")),
 		"has_discount": 1 if card.get("has_discount") else 0,
 		"card": card,
+		"market_prices": record["market_prices"],
+		**market_price_fields(record["market_prices"]),
 	}
 
 
