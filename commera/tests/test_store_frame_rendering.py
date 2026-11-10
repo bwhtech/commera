@@ -196,3 +196,25 @@ def unsafe_node(*children):
 		visible=1,
 		children=list(children),
 	)
+
+
+class TestPreviewAndCardSafety(StoreFrameTestCase):
+	def test_og_cards_escape_translated_text(self):
+		for template, context in (
+			("templates/og/store_card.html", {"store_name": "<img src=x>", "tagline": "<b>t</b>"}),
+			("templates/og/product_card.html", {"store_name": "<img src=x>", "display_name": "<i>p</i>"}),
+		):
+			with self.subTest(template):
+				html = frappe.render_template(template, context)
+				self.assertNotIn("<img src=x>", html)
+				self.assertIn("&lt;img src=x&gt;", html)
+
+	def test_a_preview_restores_frappes_language(self):
+		from commera.shop_themes.chrome_preview import preview_language
+
+		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
+		frappe.local.lang = "en"
+		with self.assertRaises(RuntimeError), preview_language("ar"):
+			self.assertEqual(frappe.local.lang, "ar")
+			raise RuntimeError
+		self.assertEqual(frappe.local.lang, "en")

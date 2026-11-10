@@ -6,8 +6,9 @@ Link URLs stay as the merchant entered them."""
 
 import frappe
 from frappe.utils import cstr
+from frappe.utils.caching import request_cache
 
-from commera.localization import Localization, translate
+from commera.localization import Localization, get_localization, translate
 
 SETTINGS = "Commera Settings"
 SECTION_DOCTYPE = "Footer Section Config"
@@ -19,10 +20,18 @@ SHOP_FIELDS = list(SHOP_KEYS.values())
 def get_shop_details(localization: Localization | None = None) -> frappe._dict:
 	"""The store `name` and `description`, translated. Either is blank when the merchant left it blank."""
 	settings = frappe.get_cached_doc(SETTINGS)
+	sources = tuple(cstr(settings.get(field)) for field in SHOP_FIELDS)
+	# A copy: callers such as the editor preview overwrite fields of the result.
+	return frappe._dict(read_shop_details(localization or get_localization(), sources))
+
+
+@request_cache
+def read_shop_details(localization: Localization, sources: tuple[str, ...]) -> dict:
+	"""Keyed by the source text too, so a settings change within one request is not missed."""
 	# A Single's translations name the doctype itself as the record.
-	record = {"name": SETTINGS, **{field: settings.get(field) for field in SHOP_FIELDS}}
+	record = {"name": SETTINGS, **dict(zip(SHOP_FIELDS, sources, strict=True))}
 	fields = translate([record], SHOP_FIELDS, localization, doctype=SETTINGS)[0]
-	return frappe._dict({key: fields[field].value for key, field in SHOP_KEYS.items()})
+	return {key: fields[field].value for key, field in SHOP_KEYS.items()}
 
 
 def get_preview_shop_details(preview_settings, localization: Localization) -> frappe._dict:

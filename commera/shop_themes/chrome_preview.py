@@ -129,10 +129,14 @@ def get_preview_language(requested) -> str:
 def preview_language(requested):
 	"""Render a preview in the ?lang an editor asked for: every SDK and template read uses it."""
 	lang = get_preview_language(requested)
+	previous = frappe.local.lang
 	# Theme templates read the page language off frappe.lang, so the ?lang switch must move it here.
 	frappe.local.lang = lang
-	with pin_localization(get_preview_localization(lang)):
-		yield lang
+	try:
+		with pin_localization(get_preview_localization(lang)):
+			yield lang
+	finally:
+		frappe.local.lang = previous
 
 
 def get_preview_localization(lang) -> Localization:
