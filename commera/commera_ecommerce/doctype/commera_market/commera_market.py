@@ -10,7 +10,7 @@ from frappe.query_builder import DocType
 from frappe.website.utils import clear_cache as clear_website_cache
 
 from commera.localization.languages import StorefrontLanguages
-from commera.localization.markets import PRIMARY_MARKET, clear_market_cache
+from commera.localization.markets import MARKET_DOCTYPE, PRIMARY_MARKET, clear_market_cache
 
 HANDLE_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
@@ -81,13 +81,16 @@ class CommeraMarket(Document):
 			)
 
 	def get_countries_in_other_markets(self, countries: list[str]) -> list[tuple[str, str]]:
+		lock_market_countries()
 		row = DocType("Commera Market Country")
+		# A locking read sees rows committed after this transaction began; a plain read would not.
 		return (
 			frappe.qb.from_(row)
 			.select(row.country, row.parent)
 			.where(row.parenttype == self.doctype)
 			.where(row.country.isin(countries))
 			.where(row.parent != (self.name or ""))
+			.for_update()
 			.run()
 		)
 
@@ -102,12 +105,23 @@ class CommeraMarket(Document):
 					_("Language {0} is not a published storefront language.").format(frappe.bold(code)),
 					title=_("Unpublished Language"),
 				)
+			self.validate_no_region(code)
 			if codes.count(code) > 1:
 				frappe.throw(_("Language {0} is listed more than once.").format(frappe.bold(code)))
 		self.validate_prefixes(languages, codes)
 
+	def validate_no_region(self, code: str):
+		"""The hreflang of a market URL is `<language>-<COUNTRY>`. pt-BR in Portugal has no valid tag."""
+		if "-" in code:
+			frappe.throw(
+				_(
+					"Language {0} names a region. A market sets the region with its countries: use {1}."
+				).format(frappe.bold(code), frappe.bold(code.partition("-")[0])),
+				title=_("Regional Language"),
+			)
+
 	def validate_prefixes(self, languages: StorefrontLanguages, codes: list[str]):
-		"""`/pt-br/` would name both Portuguese in Brazil and the language pt-BR."""
+		"""`/pt-br/` would name both Portuguese in Brazil and the language pt-BR, and share its hreflang."""
 		for code in codes:
 			for row in self.countries:
 				prefix = f"{code}-{get_country_code(row.country)}"
@@ -118,6 +132,12 @@ class CommeraMarket(Document):
 						),
 						title=_("URL Taken"),
 					)
+
+
+def lock_market_countries():
+	"""Every market save locks the same row, so two saves cannot claim one country at once.
+	The lock lasts until the transaction ends."""
+	frappe.db.get_value("DocType", MARKET_DOCTYPE, "name", for_update=True)
 
 
 def refresh_market_surfaces():

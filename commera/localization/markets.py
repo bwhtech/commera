@@ -1,6 +1,7 @@
 """Markets: groups of countries with their own languages.
 The primary market is the store itself: it takes every country that no other market claims."""
 
+import re
 from dataclasses import dataclass
 
 import frappe
@@ -11,6 +12,7 @@ from commera.localization.languages import Language, StorefrontLanguages
 MARKET_DOCTYPE = "Commera Market"
 PRIMARY_MARKET = "primary"
 CACHE_KEY = "commera_markets"
+COUNTRY_CODE = re.compile(r"[A-Za-z]{2}")
 
 
 @dataclass(frozen=True)
@@ -25,7 +27,7 @@ class Market:
 	countries: tuple[str, ...]
 
 	@property
-	def primary(self) -> bool:
+	def is_primary(self) -> bool:
 		return self.handle == PRIMARY_MARKET
 
 	def find_language(self, code: str | None) -> Language | None:
@@ -36,7 +38,7 @@ class Market:
 		return {
 			"handle": self.handle,
 			"title": self.title,
-			"primary": self.primary,
+			"is_primary": self.is_primary,
 			"default_language": self.default_language.code,
 			"languages": [language.code for language in self.languages],
 			"countries": [country.upper() for country in self.countries],
@@ -79,20 +81,20 @@ class StorefrontMarkets:
 
 	def for_country(self, code: str | None) -> Market:
 		"""The market that claims the country `code`, else the primary market."""
-		code = (code or "").lower()
+		code = normalize_country(code) or ""
 		return next((market for market in self.secondary if code in market.countries), self.primary)
 
 	def match_prefix(self, segment: str) -> tuple[Market, Language, str] | None:
 		"""The market, language and country of a `<language>-<country>` path segment."""
 		language_code, _hyphen, country = (segment or "").lower().rpartition("-")
 		market = self.for_country(country) if len(country) == 2 else None
-		if market and not market.primary and (language := market.find_language(language_code)):
+		if market and not market.is_primary and (language := market.find_language(language_code)):
 			return market, language, country
 		return None
 
 	def prefix(self, market: Market, language: Language, country: str | None = None) -> str:
 		"""The URL prefix of `language` in `market`. A secondary market prefix names one of its countries."""
-		if market.primary:
+		if market.is_primary:
 			return self.languages.prefix(language)
 		country = (country or "").lower()
 		country = country if country in market.countries else market.countries[0]
@@ -123,6 +125,22 @@ class StorefrontMarkets:
 			languages=tuple(languages),
 			countries=tuple(row["countries"]),
 		)
+
+
+def normalize_country(value) -> str | None:
+	"""`value` as a lowercase ISO code, or None. `_country` comes from the request: any type."""
+	return value.lower() if isinstance(value, str) and COUNTRY_CODE.fullmatch(value) else None
+
+
+def find_market_by_prefix(code: str) -> str | None:
+	"""The name of the market, enabled or not, with a URL `/<language>-<country>/` equal to `code`."""
+	code = (code or "").lower()
+	for row in get_market_rows():
+		if any(
+			f"{language}-{country}" == code for language in row["languages"] for country in row["countries"]
+		):
+			return row["market_name"]
+	return None
 
 
 def get_market_rows() -> list[dict]:

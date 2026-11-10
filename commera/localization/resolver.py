@@ -6,7 +6,7 @@ import frappe
 from frappe.utils.caching import request_cache
 
 from commera.localization.languages import Language, StorefrontLanguages
-from commera.localization.markets import Market, StorefrontMarkets
+from commera.localization.markets import Market, StorefrontMarkets, normalize_country
 from commera.roles import is_commera_admin
 
 
@@ -58,8 +58,9 @@ def resolve(
 		market, language, country = prefix.market, prefix.language, prefix.country
 		root_prefix = get_prefix_path(prefix)
 	else:
+		country = normalize_country(country)
 		market = markets.for_country(country)
-		country = (country or "").lower() if country and not market.primary else None
+		country = None if market.is_primary else country
 		language = find_market_language(markets, market, lang)
 		root_prefix = markets.prefix(market, language, country)
 
@@ -156,7 +157,10 @@ def resolve_current_request() -> tuple[Localization, str]:
 	request = getattr(frappe.local, "request", None)
 	form = frappe.form_dict
 	path = request.path if request else "/"
-	return resolve_cached(path, form.get("_lang"), is_commera_admin(), form.get("_country"))
+	# A request may send any JSON type. request_cache also needs hashable arguments.
+	lang = form.get("_lang")
+	lang = lang if isinstance(lang, str) else None
+	return resolve_cached(path, lang, is_commera_admin(), normalize_country(form.get("_country")))
 
 
 @request_cache
@@ -168,7 +172,7 @@ def resolve_cached(
 
 def find_market_language(markets: StorefrontMarkets, market: Market, code: str | None) -> Language:
 	"""`code` when the market has it, else the market's default language."""
-	if market.primary:
+	if market.is_primary:
 		return markets.languages.find(code, markets.include_hidden) or market.default_language
 	return market.find_language(code) or market.default_language
 

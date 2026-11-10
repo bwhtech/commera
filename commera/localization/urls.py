@@ -69,7 +69,7 @@ def alternates(path: str | None = None) -> list[dict]:
 
 def get_locale_prefixes() -> list[tuple[str, str, bool]]:
 	"""(hreflang, prefix, x_default) of every URL root a shopper can open, the default first.
-	x-default is the primary market's default language, at the root."""
+	x-default is the store default at the root. Market languages have no region: tags stay unique."""
 	markets = StorefrontMarkets.load()
 	languages = markets.languages
 	prefixes = [
@@ -77,12 +77,12 @@ def get_locale_prefixes() -> list[tuple[str, str, bool]]:
 		for language in languages.published
 	]
 	for _market, language, country, prefix in markets.market_prefixes():
-		prefixes.append((f"{language.code.split('-')[0]}-{country.upper()}", prefix, False))
+		prefixes.append((f"{language.code}-{country.upper()}", prefix, False))
 	return prefixes
 
 
 def get_current_prefix(localization: Localization) -> str:
-	if localization.market and not localization.market.primary:
+	if localization.market and not localization.market.is_primary:
 		return localization.root_prefix
 	return StorefrontLanguages.load().prefix(localization.language)
 

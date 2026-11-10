@@ -1,6 +1,10 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import get_url
+from frappe.website.doctype.web_page.web_page import WebPage
+from frappe.website.utils import delete_page_cache
 
 from commera import seo
 from commera.localization import alternates, get_localization, resolve, switch_url, url
@@ -94,6 +98,45 @@ class TestMarketValidation(IntegrationTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			make_market("Brazil", ["Brazil"], "pt")
 
+	def test_a_language_cannot_take_a_market_url(self):
+		make_market("Gulf", [UAE], "ar", ["en"])
+		settings = frappe.get_doc("Commera Settings")
+
+		settings.append("storefront_languages", {"language": "en-AE", "published": 0})
+		with self.assertRaisesRegex(frappe.ValidationError, "/en-ae/.*Gulf"):
+			settings.validate_storefront_languages()
+
+		settings.storefront_languages.pop()
+		settings.default_storefront_language = "ar-AE"
+		with self.assertRaisesRegex(frappe.ValidationError, "/ar-ae/.*Gulf"):
+			settings.validate_storefront_languages()
+
+	def test_a_market_language_names_no_region(self):
+		use_storefront_languages(self, "en", published=("en", "pt", "pt-BR"))
+
+		with self.assertRaisesRegex(frappe.ValidationError, "pt-BR.*names a region"):
+			make_market("Portugal", ["Portugal"], "pt", ["pt-BR"])
+		with self.assertRaisesRegex(frappe.ValidationError, "pt-BR.*names a region"):
+			make_market("Portugal", ["Portugal"], "pt-BR")
+
+	def test_every_market_save_takes_the_same_lock_before_it_reads_countries(self):
+		queries = []
+		run_sql = frappe.db.sql
+
+		def record(query, *args, **kwargs):
+			queries.append(f"{query} {args} {kwargs}")
+			return run_sql(query, *args, **kwargs)
+
+		with patch.object(frappe.db, "sql", side_effect=record):
+			make_market("Gulf", [UAE], "ar")
+		locks = [query for query in queries if "for update" in query.lower()]
+
+		self.assertIn("`tabDocType`", locks[0])
+		self.assertIn("Commera Market", locks[0])
+		self.assertIn("`tabCommera Market Country`", locks[1])
+		with self.assertRaisesRegex(frappe.ValidationError, "already in market"):
+			make_market("Emirates", [UAE], "ar")
+
 
 class TestMarketResolution(IntegrationTestCase):
 	def setUp(self):
@@ -121,11 +164,11 @@ class TestMarketResolution(IntegrationTestCase):
 		for path in ("/fr-ae/cart", "/ar-us/cart", "/ar-aeroplane", "/ar-ae-x/cart", "/-ae/cart"):
 			with self.subTest(path):
 				localization, rest = resolve(path)
-				self.assertTrue(localization.market.primary)
+				self.assertTrue(localization.market.is_primary)
 				self.assertEqual(rest, path)
 
 	def test_a_disabled_market_resolves_only_for_admins(self):
-		self.assertTrue(resolve("/fr-be/products")[0].market.primary)
+		self.assertTrue(resolve("/fr-be/products")[0].market.is_primary)
 
 		as_admin, path = resolve("/de-be/products", include_unpublished=True)
 		self.assertEqual(as_admin.market.handle, "benelux")
@@ -141,16 +184,24 @@ class TestMarketResolution(IntegrationTestCase):
 		self.assertEqual(resolve("/api/method/x", "en", country="sa")[0].root_prefix, "/en-sa")
 		self.assertEqual(resolve("/api/method/x", "fr", country="AE")[0].language.code, "ar")
 
+	def test_country_is_a_two_letter_code_or_nothing(self):
+		self.assertEqual(resolve("/api/method/x", country="ae")[0].market.handle, "gulf")
+		for country in (["AE"], {"code": "AE"}, 971, "ARE", "A1", " ae", "ä"):
+			with self.subTest(country):
+				localization = resolve("/api/method/x", "fr", country=country)[0]
+				self.assertTrue(localization.market.is_primary)
+				self.assertIsNone(localization.country)
+
 	def test_a_country_in_no_enabled_market_gets_the_primary_market(self):
 		for country in ("US", "BE", "", None, "xx"):
 			with self.subTest(country):
 				localization = resolve("/api/method/x", "fr", country=country)[0]
-				self.assertTrue(localization.market.primary)
+				self.assertTrue(localization.market.is_primary)
 				self.assertEqual(localization.language.code, "fr")
 				self.assertIsNone(localization.country)
 
 	def test_the_url_prefix_wins_over_country(self):
-		self.assertTrue(resolve("/ar/cart", country="AE")[0].market.primary)
+		self.assertTrue(resolve("/ar/cart", country="AE")[0].market.is_primary)
 		self.assertEqual(resolve("/en-sa/cart", country="US")[0].market.handle, "gulf")
 
 	def test_localization_lists_the_market_and_available_markets(self):
@@ -164,7 +215,7 @@ class TestMarketResolution(IntegrationTestCase):
 			{
 				"handle": "gulf",
 				"title": "Gulf",
-				"primary": False,
+				"is_primary": False,
 				"default_language": "ar",
 				"languages": ["ar", "en"],
 				"countries": ["AE", "SA"],
@@ -176,7 +227,7 @@ class TestMarketResolution(IntegrationTestCase):
 	def test_the_primary_market_is_the_store_itself(self):
 		localization = resolve("/fr/products")[0]
 
-		self.assertTrue(localization.market.primary)
+		self.assertTrue(localization.market.is_primary)
 		self.assertEqual(localization.market.default_language.code, "en")
 		self.assertEqual(codes(localization.available_languages), ["en", "ar", "fr"])
 		self.assertEqual(localization.root_prefix, "/fr")
@@ -190,7 +241,7 @@ class TestSingleMarketStore(IntegrationTestCase):
 	def test_the_primary_market_is_the_only_market(self):
 		localization = resolve("/ar/cart", country="AE")[0]
 
-		self.assertTrue(localization.market.primary)
+		self.assertTrue(localization.market.is_primary)
 		self.assertEqual([market.handle for market in localization.available_markets], ["primary"])
 		self.assertEqual(localization.root_prefix, "/ar")
 		self.assertIsNone(localization.country)
@@ -218,11 +269,32 @@ class TestMarketRequests(RoutingTestCase):
 
 	def test_a_disabled_market_is_previewed_by_admins_only(self):
 		self.open("/fr-be/products")
-		self.assertTrue(get_localization().market.primary)
+		self.assertTrue(get_localization().market.is_primary)
 
 		frappe.set_user("Administrator")
 		self.assertServes("/fr-be/cart", "/cart/cart.html", "fr")
 		self.assertEqual(get_localization().market.handle, "benelux")
+
+	def test_an_untrusted_country_or_lang_falls_back_to_the_primary_market(self):
+		for value in (["AE"], {"code": "AE"}, 971, "UAE"):
+			with self.subTest(value):
+				self.set_request("/api/method/commera.api.ping")
+				frappe.local.form_dict = frappe._dict(_country=value, _lang=["ar"])
+				localization = get_localization()
+				self.assertTrue(localization.market.is_primary)
+				self.assertEqual(localization.language.code, "en")
+
+	def test_an_omitted_lang_is_the_market_default_language(self):
+		"""The request contract: a page sends `_lang` only when it is not its market's default."""
+		self.set_request("/api/method/commera.api.ping?_lang=en&_country=AE")
+		self.assertEqual((get_localization().language.code, get_localization().root_prefix), ("en", "/en-ae"))
+
+		self.set_request("/api/method/commera.api.ping?_country=AE")
+		self.assertEqual((get_localization().language.code, get_localization().root_prefix), ("ar", "/ar-ae"))
+
+		self.set_request("/api/method/commera.api.ping")
+		self.assertTrue(get_localization().market.is_primary)
+		self.assertEqual(get_localization().language.code, "en")
 
 	def test_country_picks_the_market_of_an_api_request_only(self):
 		self.set_request("/api/method/commera.api.ping?_country=AE&_lang=en")
@@ -230,7 +302,64 @@ class TestMarketRequests(RoutingTestCase):
 		self.assertEqual(get_localization().root_prefix, "/en-ae")
 
 		self.open("/products?_country=AE")
-		self.assertTrue(get_localization().market.primary)
+		self.assertTrue(get_localization().market.is_primary)
+
+
+class TestMarketPageCache(RoutingTestCase):
+	"""Frappe caches a page by its unprefixed path and language. Two countries share English."""
+
+	ROUTE = "market-cache-check"
+
+	def setUp(self):
+		super().setUp()
+		set_up_markets(self)
+		# The class rollback runs after the last test only.
+		frappe.db.delete("Web Page", {"route": self.ROUTE})
+		frappe.get_doc(
+			{
+				"doctype": "Web Page",
+				"title": "Market Cache Check",
+				"route": self.ROUTE,
+				"published": 1,
+				"content_type": "HTML",
+				"main_section_html": "<!-- static --><p>Shop {{ root_prefix }}/cart</p>",
+				"dynamic_template": 1,
+			}
+		).insert(ignore_permissions=True)
+		render_dynamic = patch.object(WebPage, "render_dynamic", render_with_root_prefix)
+		render_dynamic.start()
+		self.addCleanup(render_dynamic.stop)
+		conf = patch.dict(frappe.conf, {"developer_mode": 0, "disable_website_cache": 0})
+		conf.start()
+		self.addCleanup(conf.stop)
+		delete_page_cache(self.ROUTE)
+		self.addCleanup(delete_page_cache, self.ROUTE)
+
+	def render(self, path):
+		frappe.local.response = frappe._dict(docs=[])
+		response = self.respond(path)
+		self.assertEqual(response.status_code, 200)
+		return response
+
+	def test_each_market_url_renders_its_own_page(self):
+		for prefix in ("/en-sa", "/en-ae", "/en-sa"):
+			with self.subTest(prefix):
+				response = self.render(f"{prefix}/{self.ROUTE}")
+				self.assertIn(f"Shop {prefix}/cart", response.get_data(as_text=True))
+				self.assertEqual(response.headers["X-From-Cache"], "False")
+
+	def test_the_primary_market_is_still_cached(self):
+		self.render(f"/{self.ROUTE}")
+		response = self.render(f"/{self.ROUTE}")
+
+		self.assertIn("Shop /cart", response.get_data(as_text=True))
+		self.assertEqual(response.headers["X-From-Cache"], "True")
+
+
+def render_with_root_prefix(page, context, render=WebPage.render_dynamic):
+	"""A page that shows its market. Restricted Web Page templates cannot call url()."""
+	context.root_prefix = get_localization().root_prefix
+	return render(page, context)
 
 
 class TestMarketUrls(LocaleUrlTestCase):

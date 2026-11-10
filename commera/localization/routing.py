@@ -54,6 +54,9 @@ def localize_request():
 
 	request.commera_localized = localized
 	frappe.local.lang = localized.localization.language.code
+	if localized.localization.market and not localized.localization.market.is_primary:
+		# Frappe caches a page by its unprefixed path and language: /en-ae/x would serve /en-sa/x.
+		frappe.local.no_cache = 1
 	# Redirect before any app's path resolver runs: another app's resolver may raise first.
 	if redirect := get_website_redirect(localized):
 		raise StorefrontRedirect(*redirect)
@@ -130,7 +133,7 @@ def localize_path(requested_path: str) -> LocalizedRequest | None:
 def get_canonical_prefix(localization: Localization, prefixed: bool) -> str:
 	"""The prefix a link to this page should carry: the default language has none.
 	A secondary market always has one."""
-	primary = not localization.market or localization.market.primary
+	primary = not localization.market or localization.market.is_primary
 	if not prefixed or (primary and localization.language == localization.default_language):
 		return ""
 	return localization.root_prefix
@@ -209,7 +212,7 @@ def get_canonical_path(path: str) -> str:
 	prefix, rest = strip_locale_prefix(path)
 	if not prefix:
 		return strip_legacy_prefix(path)
-	is_default = prefix.market.primary and prefix.language == StorefrontLanguages.load().default
+	is_default = prefix.market.is_primary and prefix.language == StorefrontLanguages.load().default
 	return rest if is_default else path
 
 
