@@ -27,6 +27,7 @@ from commera.localization.resolver import (
 )
 from commera.localization.resources import (
 	DoctypeResource,
+	EntryPage,
 	TranslatableResource,
 	TranslationEntry,
 	get_translatable_fields,
@@ -43,6 +44,7 @@ __all__ = [
 	"PRIMARY_MARKET",
 	"CountryChoice",
 	"DoctypeResource",
+	"EntryPage",
 	"Language",
 	"LocalePrefix",
 	"Localization",

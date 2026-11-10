@@ -189,3 +189,36 @@ def get_status(source, value: str | None, source_hash: str | None) -> str:
 	if not value:
 		return MISSING
 	return CURRENT if source_hash == get_source_hash(source) else OUTDATED
+
+
+def count_column_statuses(doctype: str, field: str, language: str) -> dict[str, int]:
+	"""{status: count} of a column field's shop-wide translations, aggregated in SQL. MariaDB's
+	SHA2 matches get_source_hash for text, so status is decided without reading a source."""
+	rows = frappe.db.sql(
+		f"""
+		select
+			case
+				when ifnull(translation.translated_value, '') = '' then %(missing)s
+				when translation.source_hash = sha2(record.`{field}`, 256) then %(current)s
+				else %(outdated)s
+			end as status,
+			count(*)
+		from `tab{doctype}` record
+		left join `tab{DOCTYPE}` translation
+			on translation.reference_doctype = %(doctype)s
+			and translation.reference_name = record.name
+			and translation.reference_field = %(field)s
+			and translation.language = %(language)s
+			and ifnull(translation.market, '') = ''
+		where ifnull(record.`{field}`, '') != ''
+		group by status""",
+		{
+			"doctype": doctype,
+			"field": field,
+			"language": language,
+			"missing": MISSING,
+			"outdated": OUTDATED,
+			"current": CURRENT,
+		},
+	)
+	return dict(rows)

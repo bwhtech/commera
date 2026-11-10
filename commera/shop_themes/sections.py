@@ -90,11 +90,20 @@ def get_published_layouts(theme_names, page):
 
 
 def get_inherited_layout(theme_names, theme_dirs, page):
+	"""The first theme's own layout, else the theme file, under the translation overlays of the themes
+	before it. Do not mutate the result: without overlays it is the cached layout."""
+	# section_text imports this module.
+	from commera.shop_themes.section_text import apply_overlays, is_overlay
+
 	published_layouts = get_published_layouts(theme_names, page)
-	return next(
-		(published_layouts[name] for name in theme_names if published_layouts[name]),
-		None,
-	) or get_theme_json(theme_dirs, f"layouts/{page}.json")
+	overlays = []
+	for name in theme_names:
+		layout = published_layouts[name]
+		if layout and not is_overlay(layout):
+			return apply_overlays(theme_dirs, layout, overlays[::-1])
+		if layout:
+			overlays.append(layout)
+	return apply_overlays(theme_dirs, get_theme_json(theme_dirs, f"layouts/{page}.json"), overlays[::-1])
 
 
 def get_page_layout(theme_context, page):

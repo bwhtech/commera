@@ -4,9 +4,12 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from commera.api.admin.theme_layout import discard, get_editor, publish, save_draft
+from commera.api.admin.theme_layout import discard, get_editor
 from commera.shop_themes.doctype.shop_theme.shop_theme import clear_theme_cache, get_theme_context
+from commera.shop_themes.section_translations import ThemeSectionResource
 from commera.shop_themes.sections import clear_layout_cache, get_page_layout, get_theme_json
+from commera.tests.test_admin_theme_layout import publish, save_draft
+from commera.tests.test_localization import use_storefront_languages
 
 PARENT = "Commera Starter"
 CHILD = "ZZ Inherit Child"
@@ -89,3 +92,19 @@ class TestThemeLayoutInheritance(IntegrationTestCase):
 
 		self.assertEqual(discarded["draft_layout"], self.reordered_layout(1))
 		self.assertFalse(discarded["has_unpublished_changes"])
+
+	def test_a_translated_inherited_page_still_follows_its_parent(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		child = ThemeSectionResource(type="theme_section", label="Theme", theme=CHILD)
+		child.write(f"{PAGE}/collections/tile-1", "title", "ar", "نساء")
+
+		publish(PARENT, PAGE, self.reordered_layout(1))
+
+		layout = self.rendered_layout(CHILD)
+		self.assertEqual([section["id"] for section in layout["sections"]], self.section_ids(1))
+		tiles = next(section for section in layout["sections"] if section["id"] == "collections")
+		self.assertEqual(tiles["blocks"][0]["settings"]["title"], {"en": "Women", "ar": "نساء"})
+		self.assertEqual(self.rendered_layout(PARENT), self.reordered_layout(1))
+
+	def section_ids(self, shift):
+		return [section["id"] for section in self.reordered_layout(shift)["sections"]]

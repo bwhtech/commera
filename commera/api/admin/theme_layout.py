@@ -4,11 +4,12 @@
 import frappe
 from frappe import _
 from frappe.core.doctype.file.utils import decode_file_content
+from frappe.utils.data import sha256_hash
 
 from commera.api.admin.theme import build_theme_settings
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
 from commera.shop_themes.preview_entries import PREVIEW_ENTRY_PAGES, list_entries, resolve_entry
-from commera.shop_themes.section_text import without_source_hashes
+from commera.shop_themes.section_text import is_overlay, without_source_hashes
 from commera.shop_themes.sections import (
 	get_inherited_layout,
 	get_pages,
@@ -60,7 +61,6 @@ def get_default_layout(theme_context, page):
 
 
 def build_layout_state(theme_context, page):
-	default_layout = get_default_layout(theme_context, page)
 	saved = (
 		frappe.db.get_value(
 			"Theme Layout",
@@ -70,10 +70,17 @@ def build_layout_state(theme_context, page):
 		)
 		or frappe._dict()
 	)
+	published_layout = parse_layout(saved.published_layout)
+	if is_overlay(published_layout):
+		# Live translations of an inherited page: the editor sees them laid over it, as the shop does.
+		published_layout = None
+		default_layout = get_inherited_layout(theme_context["names"], theme_context["dirs"], page)
+	else:
+		default_layout = get_default_layout(theme_context, page)
 
 	# Source hashes stay server-side: the editor sends layouts without them, and save restores them.
 	default_layout = without_source_hashes(default_layout)
-	published_layout = without_source_hashes(parse_layout(saved.published_layout))
+	published_layout = without_source_hashes(published_layout)
 	live_layout = published_layout or default_layout
 	draft_layout = without_source_hashes(parse_layout(saved.draft_layout)) or live_layout
 	return {
@@ -82,7 +89,22 @@ def build_layout_state(theme_context, page):
 		"published_layout": published_layout,
 		"default_layout": default_layout,
 		"has_unpublished_changes": draft_layout != live_layout,
+		"revision": get_revision(saved),
 	}
+
+
+def get_revision(theme_layout) -> str:
+	"""Changes with every stored change to the page, so a save can tell the editor saw the latest."""
+	return sha256_hash(f"{theme_layout.draft_layout or ''}\0{theme_layout.published_layout or ''}")[:20]
+
+
+def check_revision(theme_layout, revision):
+	if revision != get_revision(theme_layout):
+		frappe.throw(
+			_("This page changed elsewhere. Reload to continue."),
+			frappe.TimestampMismatchError,
+			title=_("Page changed"),
+		)
 
 
 @frappe.whitelist()
@@ -111,37 +133,39 @@ def get_preview_entries(
 	return {**list_entries(page, search, start), "current": resolve_entry(page, selected)}
 
 
-def save_draft_layout(theme_context, page, layout):
+def save_draft_layout(theme_context, page, layout, revision):
 	layout = frappe.parse_json(layout)
 	if layout is None:
 		frappe.throw(_("A layout is required."))
 
 	name = get_theme_layout_name(theme_context["theme_name"], page)
 	theme_layout = (
-		frappe.get_doc("Theme Layout", name)
+		frappe.get_doc("Theme Layout", name, for_update=True)
 		if name
 		else frappe.new_doc("Theme Layout", theme=theme_context["theme_name"], page=page)
 	)
+	# The editor sends its whole layout, so a save over a change it never saw would undo that change.
+	check_revision(theme_layout, revision)
 	theme_layout.draft_layout = frappe.as_json(layout)
 	theme_layout.save()
 	return theme_layout
 
 
 @frappe.whitelist(methods=["POST"])
-def save_draft(theme: str, page: str, layout: str | dict):
+def save_draft(theme: str, page: str, layout: str | dict, revision: str):
 	theme_context = get_editable_theme_context(theme)
 	validate_page(theme_context, page)
 
-	save_draft_layout(theme_context, page, layout)
+	save_draft_layout(theme_context, page, layout, revision)
 	return build_layout_state(theme_context, page)
 
 
 @frappe.whitelist(methods=["POST"])
-def publish(theme: str, page: str, layout: str | dict):
+def publish(theme: str, page: str, layout: str | dict, revision: str):
 	theme_context = get_editable_theme_context(theme)
 	validate_page(theme_context, page)
 
-	save_draft_layout(theme_context, page, layout).publish()
+	save_draft_layout(theme_context, page, layout, revision).publish()
 	return build_layout_state(theme_context, page)
 
 
@@ -205,9 +229,14 @@ def discard(theme: str, page: str):
 	name = get_theme_layout_name(theme, page)
 	if name:
 		theme_layout = frappe.get_doc("Theme Layout", name)
-		theme_layout.draft_layout = theme_layout.published_layout or frappe.as_json(
-			get_default_layout(theme_context, page)
-		)
+		published_layout = parse_layout(theme_layout.published_layout)
+		if is_overlay(published_layout):
+			# No draft: the editor then shows the live page, translations laid over it.
+			theme_layout.draft_layout = None
+		else:
+			theme_layout.draft_layout = theme_layout.published_layout or frappe.as_json(
+				get_default_layout(theme_context, page)
+			)
 		theme_layout.save()
 
 	return build_layout_state(theme_context, page)

@@ -1,3 +1,4 @@
+from collections import Counter
 from unittest.mock import patch
 
 import frappe
@@ -200,9 +201,56 @@ class TestContentTranslation(ProductDetailPriceTestCase):
 		resource.write(product.name, "display_name", "ar", "")
 		self.assertEqual(self.resource_entry(resource, product.name).status, MISSING)
 
-	def resource_entry(self, resource, name):
-		entries = {(entry.name, entry.field): entry for entry in resource.list_entries("ar")}
-		return entries[(name, "display_name")]
+	def resource_entry(self, resource, name, field="display_name"):
+		return resource.list_entries("ar", filters={"name": name, "field": field}).entries[0]
+
+	def test_a_doctype_resource_pages_through_one_record_at_a_time(self):
+		product = self.make_product("PAGES")
+		frappe.db.set_value(PRODUCT, product.name, "meta_title", "ZZ Meta title")
+		resource = get_translatable_resource("product")
+		resource.write(product.name, "meta_title", "ar", "عنوان")
+
+		first = resource.list_entries("ar", filters={"name": product.name}, limit=1)
+		second = resource.list_entries("ar", filters={"name": product.name}, cursor=first.next_cursor)
+
+		fields = [entry.field for entry in first.entries + second.entries]
+		self.assertEqual(fields[0], "display_name")
+		self.assertEqual(len(fields), len(set(fields)))
+		self.assertIn("meta_title", fields)
+		self.assertIsNone(second.next_cursor)
+		current = resource.list_entries("ar", filters={"name": product.name}, status=CURRENT).entries
+		self.assertEqual([entry.field for entry in current], ["meta_title"])
+
+	def test_sql_status_counts_match_the_entries(self):
+		product = self.make_product("COUNTS")
+		resource = get_translatable_resource("product")
+		resource.write(product.name, "display_name", "ar", "قميص الكتان")
+		resource.write(product.name, "description", "ar", "وصف")
+		resource.write(product.name, "meta_title", "ar", "عنوان")
+		frappe.db.set_value(PRODUCT, product.name, "meta_title", "ZZ Edited title")
+
+		counts = resource.count_statuses("ar")
+
+		expected = Counter(entry.status for entry in resource.iter_entries("ar", batch_size=7))
+		self.assertEqual(counts, {status: expected[status] for status in (MISSING, OUTDATED, CURRENT)})
+		self.assertGreaterEqual(counts[OUTDATED], 1)
+
+	def test_a_doctype_resource_refuses_writes_it_cannot_check(self):
+		product = self.make_product("REFUSED")
+		resource = get_translatable_resource("product")
+		resource.write(product.name, "display_name", "ar", "قميص الكتان")
+
+		for name, field in ((product.name, "route"), ("ZZ No Such Product", "display_name")):
+			with self.subTest(field=field), self.assertRaises(frappe.DoesNotExistError):
+				resource.write(name, field, "ar", "")
+
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user("Guest")
+		for value in ("قميص", ""):
+			with self.subTest(value=value), self.assertRaises(frappe.PermissionError):
+				resource.write(product.name, "display_name", "ar", value)
+		frappe.set_user("Administrator")
+		self.assertEqual(self.resource_entry(resource, product.name).value, "قميص الكتان")
 
 	def test_deleting_a_record_deletes_its_translations(self):
 		product = self.make_product("DELETE")

@@ -1,25 +1,18 @@
 """Section text as {language: text}, the default language being the source. Each translation's source
-hash sits under the layout's SOURCE_HASHES; the editor never sees them and each save carries them over."""
+hash sits under the layout's SOURCE_HASHES; the editor never sees them."""
 
+import copy
 from dataclasses import dataclass
 
-import frappe
-from frappe import _
-
-from commera.localization.content import get_source_hash
 from commera.localization.languages import StorefrontLanguages
-from commera.shop_themes.sections import (
-	LEGACY_SOURCE_LANGUAGE,
-	get_inherited_layout,
-	get_section_schema,
-	get_source,
-	get_source_key,
-)
+from commera.shop_themes.sections import get_section_schema, get_source, get_source_key
 
 TRANSLATABLE_TYPES = frozenset({"text", "textarea"})
 # {entry path: {setting id: {language: source hash}}}, beside "sections".
 SOURCE_HASHES = "source_hashes"
-LAYOUT_FIELDS = ("draft_layout", "published_layout")
+# A published layout without "sections" holds only {entry path: {setting id: {language: text}}} here:
+# translations of an inherited page, laid over it at read time. "" hides an inherited translation.
+OVERLAY = "translations"
 
 
 @dataclass(frozen=True)
@@ -35,6 +28,10 @@ class TextSetting:
 	@property
 	def id(self) -> str:
 		return self.setting["id"]
+
+	@property
+	def key(self) -> tuple[str, str]:
+		return (self.path, self.id)
 
 	@property
 	def saved(self) -> bool:
@@ -55,18 +52,6 @@ class TextSetting:
 		self.owner["settings"][self.id] = value
 
 
-def prepare_theme_layout(theme_layout, theme_context):
-	"""Theme Layout validate: refuse unknown language keys, then stamp each translation's source hash.
-	A translation keeps the hash a stored layout has for the same text; new text hashes today's source."""
-	known = get_known_layouts(theme_layout, theme_context)
-	default = StorefrontLanguages.load().default.code
-	for fieldname in LAYOUT_FIELDS:
-		if layout := parse_layout(theme_layout.get(fieldname)):
-			check_language_keys(theme_context["dirs"], layout, known)
-			stamp_source_hashes(theme_context["dirs"], layout, known, default)
-			theme_layout.set(fieldname, frappe.as_json(layout))
-
-
 def iter_text_settings(theme_dirs, layout):
 	for section in (layout or {}).get("sections") or []:
 		schema = isinstance(section, dict) and get_section_schema(theme_dirs, section.get("type"))
@@ -83,15 +68,12 @@ def iter_text_settings(theme_dirs, layout):
 				yield from owner_text_settings(block, block_schema, path, labels)
 
 
+def index_text_settings(theme_dirs, layout) -> dict[tuple[str, str], TextSetting]:
+	return {text.key: text for text in iter_text_settings(theme_dirs, layout)}
+
+
 def find_text_setting(theme_dirs, layout, path, setting_id) -> TextSetting | None:
-	return next(
-		(
-			text
-			for text in iter_text_settings(theme_dirs, layout)
-			if text.path == path and text.id == setting_id
-		),
-		None,
-	)
+	return index_text_settings(theme_dirs, layout).get((path, setting_id))
 
 
 def get_translations(value, default) -> dict[str, str]:
@@ -114,11 +96,17 @@ def with_translation(value, language, text, default) -> dict:
 	return texts
 
 
+def get_default_language() -> str:
+	return StorefrontLanguages.load().default.code
+
+
 def get_stored_hash(layout, text: TextSetting, language) -> str | None:
-	hashes = (layout or {}).get(SOURCE_HASHES)
-	if not isinstance(hashes, dict):
-		return None
-	return ((hashes.get(text.path) or {}).get(text.id) or {}).get(language)
+	return get_nested(layout, SOURCE_HASHES, text.path, text.id, language)
+
+
+def set_stored_hash(layout, path, setting_id, language, source_hash: str | None):
+	"""Set or, with None, drop one translation's source hash."""
+	set_nested(layout, (SOURCE_HASHES, path, setting_id, language), source_hash)
 
 
 def without_source_hashes(layout):
@@ -127,70 +115,40 @@ def without_source_hashes(layout):
 	return {key: value for key, value in layout.items() if key != SOURCE_HASHES}
 
 
-def stamp_source_hashes(theme_dirs, layout, known_layouts, default):
-	known = [index_translations(theme_dirs, known_layout, default) for known_layout in known_layouts]
-	hashes = {}
-	for text in iter_text_settings(theme_dirs, layout):
-		if not text.saved:
-			continue
-		source = get_source(text.value, default)
-		for language, translation in get_translations(text.value, default).items():
-			stored = find_stored_hash(known, (text.path, text.id, language), translation)
-			hashes.setdefault(text.path, {}).setdefault(text.id, {})[language] = stored or get_source_hash(
-				source
-			)
-
-	layout.pop(SOURCE_HASHES, None)
-	if hashes:
-		layout[SOURCE_HASHES] = hashes
+def is_overlay(layout) -> bool:
+	return isinstance(layout, dict) and "sections" not in layout
 
 
-def index_translations(theme_dirs, layout, default) -> dict:
-	"""{(path, setting id, language): (translation, stored source hash)} of a stored layout."""
-	index = {}
-	for text in iter_text_settings(theme_dirs, layout):
-		for language, translation in get_translations(text.value, default).items():
-			if stored := get_stored_hash(layout, text, language):
-				index[(text.path, text.id, language)] = (translation, stored)
-	return index
+def iter_overlay(overlay):
+	"""(path, setting id, language, text) of each translation an overlay holds."""
+	for path, settings in ((overlay or {}).get(OVERLAY) or {}).items():
+		for setting_id, texts in (settings if isinstance(settings, dict) else {}).items():
+			for language, text in (texts if isinstance(texts, dict) else {}).items():
+				yield path, setting_id, language, text
 
 
-def find_stored_hash(known, key, translation) -> str | None:
-	return next((index[key][1] for index in known if key in index and index[key][0] == translation), None)
+def set_overlay_text(overlay, path, setting_id, language, text: str | None, source_hash: str | None):
+	"""Set or, with None, drop one overlay translation and its source hash."""
+	set_nested(overlay, (OVERLAY, path, setting_id, language), text)
+	set_stored_hash(overlay, path, setting_id, language, source_hash)
 
 
-def check_language_keys(theme_dirs, layout, known_layouts):
-	"""Every text key is a configured storefront language, the legacy English source key, or a key the
-	theme or a stored layout already holds, so removing a language never blocks a save."""
-	allowed = {language.code for language in StorefrontLanguages.load().configured}
-	allowed |= {LEGACY_SOURCE_LANGUAGE, *get_language_keys(theme_dirs, known_layouts)}
-	for text in iter_text_settings(theme_dirs, layout):
-		default = text.setting.get("default")
-		if unknown := set(get_keys(text.value)) - allowed - set(get_keys(default)):
-			frappe.throw(
-				_("{0}: {1} is not a storefront language.").format(text.label, ", ".join(sorted(unknown)))
-			)
-
-
-def get_language_keys(theme_dirs, layouts) -> set[str]:
-	return {
-		key
-		for layout in layouts
-		for text in iter_text_settings(theme_dirs, layout)
-		for key in get_keys(text.value)
-	}
-
-
-def get_keys(value):
-	return value.keys() if isinstance(value, dict) else ()
-
-
-def get_known_layouts(theme_layout, theme_context) -> list[dict]:
-	"""The stored draft and live layouts before this save, then the layout the theme inherits."""
-	previous = theme_layout.get_doc_before_save()
-	layouts = [parse_layout(previous.get(field)) for field in LAYOUT_FIELDS] if previous else []
-	layouts.append(get_inherited_layout(theme_context["names"][1:], theme_context["dirs"], theme_layout.page))
-	return [layout for layout in layouts if isinstance(layout, dict)]
+def apply_overlays(theme_dirs, base, overlays):
+	"""`base` with each overlay's translations and hashes laid over it, the last overlay winning.
+	`base` may be a cached layout, so it is copied first."""
+	if not overlays or not isinstance(base, dict):
+		return base
+	layout = copy.deepcopy(base)
+	texts = index_text_settings(theme_dirs, layout)
+	default = get_default_language()
+	for overlay in overlays:
+		for path, setting_id, language, text in iter_overlay(overlay):
+			setting = texts.get((path, setting_id))
+			if setting and isinstance(text, str) and get_source(setting.value, default):
+				setting.set(with_translation(setting.value, language, text, default))
+				source_hash = get_nested(overlay, SOURCE_HASHES, path, setting_id, language)
+				set_stored_hash(layout, path, setting_id, language, source_hash if text else None)
+	return layout
 
 
 def owner_text_settings(owner, schema, path, labels):
@@ -200,5 +158,30 @@ def owner_text_settings(owner, schema, path, labels):
 			yield TextSetting(path=path, owner=owner, setting=setting, label=label)
 
 
-def parse_layout(value):
-	return frappe.parse_json(value) if value else None
+def get_nested(data, *keys):
+	for key in keys:
+		if not isinstance(data, dict):
+			return None
+		data = data.get(key)
+	return data
+
+
+def set_nested(data: dict, keys: tuple, value):
+	"""Set data[k1][k2]...= value, or with None pop it and prune the dicts it leaves empty."""
+	*parents, last = keys
+	chain = [data]
+	for key in parents:
+		child = chain[-1].get(key)
+		if not isinstance(child, dict):
+			if value is None:
+				return
+			child = chain[-1][key] = {}
+		chain.append(child)
+	if value is not None:
+		chain[-1][last] = value
+		return
+	chain[-1].pop(last, None)
+	for parent, key in zip(reversed(chain[:-1]), reversed(parents), strict=True):
+		if parent[key]:
+			break
+		parent.pop(key)
