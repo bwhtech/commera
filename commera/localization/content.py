@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import frappe
 from frappe import _
+from frappe.model.base_document import get_controller
 from frappe.utils import create_batch, cstr
 from frappe.utils.data import sha256_hash
 
@@ -32,22 +33,18 @@ def translate(
 	language = localization.language.code
 	if not records:
 		return []
-	if language == localization.default_language.code:
-		return [
-			{field: TranslatedValue(get_source(record, field), CURRENT) for field in fields}
-			for record in records
-		]
-
 	doctype = doctype or records[0].get("doctype")
+	sources = get_sources(doctype, records, fields)
+	if language == localization.default_language.code:
+		return [{field: TranslatedValue(source[field], CURRENT) for field in fields} for source in sources]
+
 	translations = fetch_translations(doctype, [record.get("name") for record in records], fields, language)
 	return [
 		{
-			field: resolve_value(
-				get_source(record, field), translations.get((record.get("name"), field)), language
-			)
+			field: resolve_value(source[field], translations.get((record.get("name"), field)), language)
 			for field in fields
 		}
-		for record in records
+		for record, source in zip(records, sources, strict=True)
 	]
 
 
@@ -88,12 +85,44 @@ def delete_translations(doc, method=None):
 
 
 def read_source(doctype: str, name: str, field: str):
-	"""The text a translation of the field translates. A controller's `get_translation_source`
-	can read it from elsewhere, such as a product's Item."""
+	"""The text a translation of the field translates, read as `translate()` reads it."""
 	if frappe.get_meta(doctype).has_field(field):
 		return frappe.db.get_value(doctype, name, field)
-	doc = frappe.get_doc(doctype, name)
-	return getattr(doc, "get_translation_source", doc.get)(field)
+	return read_derived_sources(doctype, field, [name]).get(name)
+
+
+def get_sources(doctype: str | None, records: list, fields: list[str]) -> list[dict[str, str]]:
+	"""Each record's source of `fields`. A field without a column that the record lacks is read
+	for all records at once, through the controller's `get_translation_sources`."""
+	sources = [{field: record.get(field) for field in fields} for record in records]
+	for field in get_derived_fields(doctype, fields):
+		missing = [
+			(record.get("name"), source)
+			for record, source in zip(records, sources, strict=True)
+			if source[field] is None
+		]
+		derived = read_derived_sources(doctype, field, [name for name, _source in missing])
+		for name, source in missing:
+			source[field] = derived.get(name)
+	return [{field: cstr(value) for field, value in source.items()} for source in sources]
+
+
+def get_derived_fields(doctype: str | None, fields: list[str]) -> list[str]:
+	if not doctype:
+		return []
+	meta = frappe.get_meta(doctype)
+	return [field for field in fields if not meta.has_field(field)]
+
+
+def read_derived_sources(doctype: str, field: str, names: list) -> dict:
+	"""{name: source} from the controller's `get_translation_sources(field, names)`, one query per batch."""
+	get_translation_sources = getattr(get_controller(doctype), "get_translation_sources", None)
+	sources = {}
+	if not get_translation_sources:
+		return sources
+	for batch in create_batch([name for name in names if name], BATCH_SIZE):
+		sources.update(get_translation_sources(field, batch))
+	return sources
 
 
 def get_source_hash(source) -> str:
@@ -125,7 +154,3 @@ def resolve_value(source: str, translation: tuple | None, language: str) -> Tran
 		value, source_hash = translation
 		return TranslatedValue(value, CURRENT if source_hash == get_source_hash(source) else OUTDATED)
 	return TranslatedValue(_(source, lang=language) if source else source, MISSING)
-
-
-def get_source(record, field: str) -> str:
-	return cstr(record.get(field))

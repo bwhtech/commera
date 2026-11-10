@@ -429,6 +429,7 @@ def get_variant(size: dict, default_price: float | None, sale_price: float | Non
 	return {
 		"id": size["item_code"],
 		"title": translate_term(size["size"]),
+		"size": size["size"],
 		"price": price,
 		"compare_at_price": flt(default_price) if default_price and price < flt(default_price) else None,
 		"available": bool(stock.get("in_stock")),
@@ -445,7 +446,7 @@ def get_options(product_variant, sizes: list[dict]) -> list[ProductOption]:
 	if attribute and attribute != DEFAULT_OPTION_ATTRIBUTE:
 		options.append({"name": translate_term(attribute), "values": get_sibling_values(product_variant)})
 	if len(sizes) > 1 or (sizes and sizes[0]["size"] != DEFAULT_SIZE_VALUE):
-		values = [{"name": translate_term(size["size"])} for size in sizes]
+		values = [{"name": translate_term(size["size"]), "value": size["size"]} for size in sizes]
 		options.append({"name": _("Size", lang=get_localization().language.code), "values": values})
 	return options
 
@@ -464,6 +465,7 @@ def get_sibling_values(product_variant) -> list[dict]:
 	return [
 		{
 			"name": translate_term(sibling.attribute_value),
+			"value": sibling.attribute_value,
 			"handle": sibling.route,
 			"selected": sibling.name == product_variant.name,
 			"available": any(

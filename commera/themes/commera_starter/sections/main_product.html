@@ -7,7 +7,7 @@
 {% set size_option = product.options | reject("equalto", colour_option) | first %}
 {% set variant = product.variants | selectattr("id", "equalto", product.selected_variant_id) | first or product.variants | first %}
 {% set fit = "object-contain p-[6%]" if theme.card_image_fit == "Fit" else "object-cover object-top" %}
-{% set payload = {"id": product.id, "currency": product.currency, "price": product.price, "options": product.options, "variants": product.variants, "size": variant.title if size_option and variant else "", "in_wishlist": in_wishlist, "is_guest": frappe.session.user == "Guest"} %}
+{% set payload = {"id": product.id, "currency": product.currency, "price": product.price, "options": product.options, "variants": product.variants, "size": variant.size if size_option and variant else "", "in_wishlist": in_wishlist, "is_guest": frappe.session.user == "Guest"} %}
 <section x-data='product_form({{ payload | tojson }})' class="pt-2 md:pt-6">
 	<div class="section-x grid grid-cols-1 gap-6 md:gap-10 *:min-w-0 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10 xl:gap-20">
 		<div class="md:max-lg:w-full md:max-lg:max-w-96">
@@ -64,10 +64,10 @@
 
 			{% if size_option %}
 			<div class="mt-6">
-				<p class="text-base font-medium text-ink-gray-9">{{ size_option.name }}: <span class="font-normal text-ink-gray-6" x-text="size"></span></p>
+				<p class="text-base font-medium text-ink-gray-9">{{ size_option.name }}: <span class="font-normal text-ink-gray-6" x-text="variant?.title ?? ''"></span></p>
 				<div class="mt-3 flex flex-wrap gap-2">
 					{% for size_variant in product.variants %}
-					<button type="button" @click="size = variants[{{ loop.index0 }}].title" {{ "disabled" if not size_variant.available }} :aria-pressed="size === variants[{{ loop.index0 }}].title" class="chip">{{ size_variant.title }}</button>
+					<button type="button" @click="size = variants[{{ loop.index0 }}].size" {{ "disabled" if not size_variant.available }} :aria-pressed="size === variants[{{ loop.index0 }}].size" class="chip">{{ size_variant.title }}</button>
 					{% endfor %}
 				</div>
 			</div>

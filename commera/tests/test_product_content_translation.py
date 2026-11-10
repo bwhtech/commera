@@ -1,6 +1,14 @@
 import frappe
 
-from commera.localization import CURRENT, OUTDATED, get_translatable_fields, register, resolve, translate
+from commera.localization import (
+	CURRENT,
+	MISSING,
+	OUTDATED,
+	get_translatable_fields,
+	register,
+	resolve,
+	translate,
+)
 from commera.sdk import catalog
 from commera.tests.test_content_translation import use_storefront_language
 from commera.tests.test_localization import set_storefront_languages
@@ -54,16 +62,31 @@ class TestProductContentTranslation(ProductDetailPriceTestCase):
 		arabic = resolve("/ar")[0]
 
 		def status():
-			source = {
-				"name": product.name,
-				"description": frappe.db.get_value("Item", product.item_style, "description"),
-			}
-			return translate([source], ["description"], arabic, doctype=PRODUCT)[0]["description"].status
+			return translate([frappe.get_doc(PRODUCT, product.name)], ["description"], arabic)[0][
+				"description"
+			].status
 
 		self.assertEqual(status(), CURRENT)
 		frappe.db.set_value("Item", product.item_style, "description", "<p>A linen shirt, now longer.</p>")
 		self.assertEqual(status(), OUTDATED)
 		self.assertEqual(self.get_product(product, "ar")["description_html"], "<p>قميص كتان.</p>")
+
+	def test_a_product_document_translates_its_items_description(self):
+		products = [self.make_product(label) for label in ("DOC-A", "DOC-B", "DOC-C")]
+		register(PRODUCT, products[0].name, "description", "ar", "<p>قميص كتان.</p>")
+		docs = [frappe.get_doc(PRODUCT, product.name) for product in products]
+		arabic, english = resolve("/ar")[0], resolve("/en")[0]
+		translate(docs, ["description"], arabic)
+
+		# One query reads every Item description, one reads every translation.
+		with self.assertQueryCount(2):
+			translated = translate(docs, ["description"], arabic)
+
+		self.assertEqual(
+			[(value["description"].value, value["description"].status) for value in translated],
+			[("<p>قميص كتان.</p>", CURRENT), (DESCRIPTION, MISSING), (DESCRIPTION, MISSING)],
+		)
+		self.assertEqual(translate(docs[1:2], ["description"], english)[0]["description"].value, DESCRIPTION)
 
 	def test_the_product_seo_title_and_description_are_translated(self):
 		product = self.make_product("SEO", meta_title="Linen shirt | Shop", meta_description="Cool linen.")
@@ -111,8 +134,33 @@ class TestProductContentTranslation(ProductDetailPriceTestCase):
 
 		colour_values = {value["handle"]: value["name"] for value in colour["values"]}
 		self.assertEqual(colour_values[products[0].route], "أحمر")
+		colour_sources = {value["handle"]: value["value"] for value in colour["values"]}
+		self.assertEqual(colour_sources[products[0].route], products[0].attribute_value)
 		self.assertEqual(self.get_product(products[0], "ar")["color"], "أحمر")
 		self.assertEqual(catalog.get_product_cards_for([products[0].name])[0]["color"], "أحمر")
+
+	def test_sizes_that_share_a_translated_label_keep_their_own_source_value(self):
+		product = self.make_product("SAME-LABEL")
+		medium = self.make_item("SAME-LABEL-MEDIUM")
+		self.make_item_price(medium, self.default_price_list, 30)
+		doc = frappe.get_doc(PRODUCT, product.name)
+		doc.append("sizes", {"size": "Medium", "item_code": medium})
+		doc.save(ignore_permissions=True)
+		self.add_frappe_translation("M", "وسط")
+		self.add_frappe_translation("Medium", "وسط")
+
+		page = self.get_product(product, "ar")
+
+		size = next(
+			option for option in page["options"] if option["values"] and "handle" not in option["values"][0]
+		)
+		self.assertEqual(
+			[(value["name"], value["value"]) for value in size["values"]], [("وسط", "M"), ("وسط", "Medium")]
+		)
+		self.assertEqual(
+			[(variant["title"], variant["size"], variant["id"]) for variant in page["variants"]],
+			[("وسط", "M", product.sizes[0].item_code), ("وسط", "Medium", medium)],
+		)
 
 	def test_untranslated_option_terms_keep_their_source(self):
 		product = self.make_product("OPTIONS-SOURCE")
