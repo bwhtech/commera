@@ -1,0 +1,204 @@
+import copy
+
+import frappe
+from frappe.tests import IntegrationTestCase
+from frappe.utils.jinja import get_jenv
+
+from commera.api.admin.theme import activate_theme
+from commera.api.admin.theme_layout import get_editor, publish, save_draft
+from commera.localization import CURRENT, MISSING, OUTDATED, get_translatable_resource
+from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context
+from commera.shop_themes.section_text import SOURCE_HASHES
+from commera.shop_themes.section_translations import ThemeSectionResource
+from commera.shop_themes.sections import clear_layout_cache, get_text
+from commera.shop_themes.theme_resolver import get_theme_environment
+from commera.tests.test_localization import use_storefront_languages
+
+SUMMER_THEME = "Summer Theme"
+HEADING = "Beautiful Woman Purple Sweater."
+ARABIC_HEADING = "سترة أرجوانية جميلة"
+ENTRY = "index/hero/slide-1"
+
+
+class TestThemeSectionTranslation(IntegrationTestCase):
+	def setUp(self):
+		frappe.set_user("Administrator")
+		self.addCleanup(clear_layout_cache, SUMMER_THEME, "index")
+		self.addCleanup(frappe.clear_cache)
+		self.addCleanup(frappe.db.rollback)
+
+		frappe.db.delete("Theme Layout", {"theme": SUMMER_THEME, "page": "index"})
+		clear_layout_cache(SUMMER_THEME, "index")
+		use_storefront_languages(self, "en", published=("en", "ar"), unpublished=("fr",))
+		activate_theme(SUMMER_THEME)
+		self.resource = get_translatable_resource("theme_section")
+		self.file_layout = get_editor(SUMMER_THEME)["default_layout"]
+
+	def editor_layout(self, heading):
+		layout = copy.deepcopy(get_editor(SUMMER_THEME)["draft_layout"])
+		layout["sections"][0]["blocks"][0]["settings"]["heading"] = heading
+		return layout
+
+	def entry(self, language, name=ENTRY, field="heading"):
+		entries = {(entry.name, entry.field): entry for entry in self.resource.list_entries(language)}
+		return entries[(name, field)]
+
+	def stored_layouts(self):
+		row = frappe.db.get_value(
+			"Theme Layout",
+			{"theme": SUMMER_THEME, "page": "index"},
+			["draft_layout", "published_layout"],
+			as_dict=True,
+		)
+		return frappe.parse_json(row.draft_layout), frappe.parse_json(row.published_layout)
+
+	def render_home(self, language):
+		frappe.local.lang = language
+		self.addCleanup(setattr, frappe.local, "lang", "en")
+		environment = get_theme_environment(get_jenv(), get_render_theme_context()["dirs"])
+		return environment.from_string("{{ render_layout('index') }}").render()
+
+	def test_the_adapter_registers_through_the_hook_for_the_live_theme(self):
+		self.assertIsInstance(self.resource, ThemeSectionResource)
+		self.assertIsNone(self.resource.theme)
+		self.assertEqual(self.resource.label, "Theme")
+
+	def test_entries_list_each_text_setting_with_its_source_translation_and_status(self):
+		publish(SUMMER_THEME, "index", self.editor_layout({"en": HEADING, "ar": ARABIC_HEADING}))
+
+		heading = self.entry("ar")
+		caption = self.entry("ar", name="index/hero", field="caption")
+
+		self.assertEqual(
+			(heading.resource, heading.source, heading.value, heading.status),
+			("theme_section", HEADING, ARABIC_HEADING, CURRENT),
+		)
+		self.assertEqual(heading.label, "Hero slider · Slide · Heading")
+		self.assertEqual((caption.source, caption.value, caption.status), (self.file_caption(), "", MISSING))
+		self.assertEqual(self.entry("fr").status, MISSING)
+		self.assertNotIn("url", {entry.field for entry in self.resource.list_entries("ar")})
+
+	def file_caption(self):
+		return self.file_layout["sections"][0]["settings"]["caption"]
+
+	def test_writing_puts_the_translation_into_the_layout_json(self):
+		self.resource.write(ENTRY, "heading", "ar", ARABIC_HEADING)
+
+		draft, published = self.stored_layouts()
+		for layout in (draft, published):
+			self.assertEqual(
+				layout["sections"][0]["blocks"][0]["settings"]["heading"],
+				{"en": HEADING, "ar": ARABIC_HEADING},
+			)
+		self.assertIn(ARABIC_HEADING, self.render_home("ar"))
+		self.assertIn(HEADING, self.render_home("en"))
+
+	def test_the_theme_editor_never_sees_the_source_hashes(self):
+		self.resource.write(ENTRY, "heading", "ar", ARABIC_HEADING)
+
+		self.assertIn(SOURCE_HASHES, self.stored_layouts()[1])
+		editor = get_editor(SUMMER_THEME)
+		self.assertNotIn(SOURCE_HASHES, editor["draft_layout"])
+		self.assertNotIn(SOURCE_HASHES, editor["published_layout"])
+		self.assertFalse(editor["has_unpublished_changes"])
+
+	def test_writing_keeps_the_unpublished_draft_changes(self):
+		layout = self.editor_layout(HEADING)
+		layout["sections"][0]["settings"]["caption"] = "ZZ Draft caption"
+		save_draft(SUMMER_THEME, "index", layout)
+
+		self.resource.write(ENTRY, "heading", "ar", ARABIC_HEADING)
+
+		draft, published = self.stored_layouts()
+		self.assertEqual(draft["sections"][0]["settings"]["caption"], "ZZ Draft caption")
+		self.assertEqual(published["sections"][0]["settings"]["caption"], self.file_caption())
+		self.assertEqual(draft["sections"][0]["blocks"][0]["settings"]["heading"]["ar"], ARABIC_HEADING)
+
+	def test_a_source_edit_makes_the_translation_outdated_until_it_is_rewritten(self):
+		self.resource.write(ENTRY, "heading", "ar", ARABIC_HEADING)
+
+		save_draft(SUMMER_THEME, "index", self.editor_layout({"en": "New heading", "ar": ARABIC_HEADING}))
+		self.assertEqual(self.entry("ar").status, CURRENT)
+		publish(SUMMER_THEME, "index", get_editor(SUMMER_THEME)["draft_layout"])
+
+		outdated = self.entry("ar")
+		self.assertEqual(
+			(outdated.source, outdated.value, outdated.status), ("New heading", ARABIC_HEADING, OUTDATED)
+		)
+		self.assertIn(ARABIC_HEADING, self.render_home("ar"))
+
+		self.resource.write(ENTRY, "heading", "ar", "عنوان جديد")
+		self.assertEqual(self.entry("ar").status, CURRENT)
+
+	def test_a_translation_edited_in_the_theme_editor_is_current(self):
+		self.resource.write(ENTRY, "heading", "ar", ARABIC_HEADING)
+		publish(SUMMER_THEME, "index", self.editor_layout({"en": "New heading", "ar": ARABIC_HEADING}))
+
+		publish(SUMMER_THEME, "index", self.editor_layout({"en": "New heading", "ar": "عنوان جديد"}))
+
+		self.assertEqual(self.entry("ar").status, CURRENT)
+
+	def test_writing_an_empty_value_removes_the_translation(self):
+		self.resource.write(ENTRY, "heading", "ar", ARABIC_HEADING)
+
+		self.resource.write(ENTRY, "heading", "ar", "")
+
+		self.assertEqual((self.entry("ar").value, self.entry("ar").status), ("", MISSING))
+		self.assertNotIn("ar", self.stored_layouts()[1]["sections"][0]["blocks"][0]["settings"]["heading"])
+
+	def test_status_counts_cover_every_section_text(self):
+		self.resource.write(ENTRY, "heading", "ar", ARABIC_HEADING)
+
+		counts = self.resource.count_statuses("ar")
+
+		self.assertEqual(counts[CURRENT], 1)
+		self.assertEqual(sum(counts.values()), len(self.resource.list_entries("ar")))
+
+	def test_only_configured_languages_other_than_the_default_take_translations(self):
+		for language in ("en", "de"):
+			with self.subTest(language), self.assertRaises(frappe.ValidationError):
+				self.resource.write(ENTRY, "heading", language, "Text")
+
+		self.resource.write(ENTRY, "heading", "fr", "Beau pull violet.")
+		self.assertEqual(self.entry("fr").status, CURRENT)
+
+	def test_an_unknown_entry_is_refused(self):
+		for name, field in (
+			(ENTRY, "url"),
+			("index/hero/no-such-slide", "heading"),
+			("nowhere/hero", "caption"),
+		):
+			with self.subTest(name), self.assertRaises(frappe.DoesNotExistError):
+				self.resource.write(name, field, "ar", "Text")
+
+	def test_a_layout_takes_only_storefront_language_keys(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "is not a storefront language"):
+			save_draft(SUMMER_THEME, "index", self.editor_layout({"en": HEADING, "xx": "Text"}))
+
+	def test_a_removed_language_never_blocks_a_save(self):
+		self.resource.write(ENTRY, "heading", "fr", "Beau pull violet.")
+		use_storefront_languages(self, "en", published=("en", "ar"))
+
+		save_draft(SUMMER_THEME, "index", self.editor_layout({"en": HEADING, "fr": "Beau pull violet."}))
+
+
+class TestSectionTextSourceKey(IntegrationTestCase):
+	def setUp(self):
+		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
+		use_storefront_languages(self, "ar", published=("ar", "en"))
+
+	def test_the_default_language_is_the_source_of_other_languages(self):
+		frappe.local.lang = "de"
+
+		self.assertEqual(get_text({"en": "Sale", "ar": "تخفيضات"}), "تخفيضات")
+
+	def test_legacy_english_text_is_the_source_when_the_default_has_none(self):
+		frappe.local.lang = "ar"
+
+		self.assertEqual(get_text({"en": "Sale"}), "Sale")
+		self.assertEqual(get_text({"fr": "Soldes"}), "Soldes")
+
+	def test_the_page_language_wins(self):
+		frappe.local.lang = "en"
+
+		self.assertEqual(get_text({"en": "Sale", "ar": "تخفيضات"}), "Sale")

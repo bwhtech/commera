@@ -180,5 +180,12 @@ def fetch_translations(doctype: str, names: list, fields: list[str], language: s
 def resolve_value(source: str, translation: tuple | None, language: str) -> TranslatedValue:
 	if translation and translation[0]:
 		value, source_hash = translation
-		return TranslatedValue(value, CURRENT if source_hash == get_source_hash(source) else OUTDATED)
+		return TranslatedValue(value, get_status(source, value, source_hash))
 	return TranslatedValue(_(source, lang=language) if source else source, MISSING)
+
+
+def get_status(source, value: str | None, source_hash: str | None) -> str:
+	"""Missing without a translation; outdated when the source changed after it was written."""
+	if not value:
+		return MISSING
+	return CURRENT if source_hash == get_source_hash(source) else OUTDATED

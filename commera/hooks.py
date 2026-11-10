@@ -140,6 +140,11 @@ commera_hooks = {
 			],
 			"label": "Landing page",
 		},
+		{
+			"type": "theme_section",
+			"adapter": "commera.shop_themes.section_translations.ThemeSectionResource",
+			"label": "Theme",
+		},
 	],
 }
 setup_wizard_complete = [

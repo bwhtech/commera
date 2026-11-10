@@ -8,6 +8,7 @@ from commera.localization import (
 	MISSING,
 	OUTDATED,
 	get_translatable_fields,
+	get_translatable_resource,
 	get_translatable_resources,
 	register,
 	resolve,
@@ -181,6 +182,27 @@ class TestContentTranslation(ProductDetailPriceTestCase):
 		self.assertEqual((title.value, title.status), ("ملاحظة التغليف", CURRENT))
 		self.assertEqual(resources["note"].fields, ("title",))
 		self.assertEqual(resources["product"].doctype, PRODUCT)
+
+	def test_a_doctype_resource_lists_writes_and_counts_its_entries(self):
+		product = self.make_product("RESOURCE")
+		resource = get_translatable_resource("product")
+
+		resource.write(product.name, "display_name", "ar", "قميص الكتان")
+		entry = self.resource_entry(resource, product.name)
+		self.assertEqual(
+			(entry.source, entry.value, entry.status), (product.display_name, "قميص الكتان", CURRENT)
+		)
+		self.assertGreaterEqual(resource.count_statuses("ar")[CURRENT], 1)
+
+		frappe.db.set_value(PRODUCT, product.name, "display_name", f"Edited {product.display_name}")
+		self.assertEqual(self.resource_entry(resource, product.name).status, OUTDATED)
+
+		resource.write(product.name, "display_name", "ar", "")
+		self.assertEqual(self.resource_entry(resource, product.name).status, MISSING)
+
+	def resource_entry(self, resource, name):
+		entries = {(entry.name, entry.field): entry for entry in resource.list_entries("ar")}
+		return entries[(name, "display_name")]
 
 	def test_deleting_a_record_deletes_its_translations(self):
 		product = self.make_product("DELETE")

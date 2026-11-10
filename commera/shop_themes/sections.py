@@ -8,6 +8,7 @@ from jinja2 import pass_context
 from markupsafe import Markup, escape
 
 import commera.sdk
+from commera.localization.resolver import get_localization
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context, is_within_directory
 from commera.shop_themes.jinja_helpers import find_theme_asset_url
 from commera.shop_themes.theme_resolver import find_theme_file
@@ -18,6 +19,8 @@ DEFAULT_MAX_BLOCKS = 50
 DEFAULT_MAX_PRODUCTS = 8
 PASS_THROUGH_IMAGE_PREFIXES = ("http://", "https://", "/assets/")
 SORT_BY_SOURCE = {"newest": "new_arrival", "on_sale": "discount", "collection": "default"}
+# Section text saved before the store's default language became the source key.
+LEGACY_SOURCE_LANGUAGE = "en"
 SECTION_GROUPS = frozenset({"header_group", "footer_group"})
 DEFAULT_SECTION_GROUPS = ("pages",)
 
@@ -41,6 +44,23 @@ def get_theme_json(theme_dirs, relative_path):
 		data = json.load(json_file)
 	theme_json_files[path] = (modified_time, data)
 	return data
+
+
+def list_theme_files(theme_dirs, folder):
+	names = set()
+	for theme_dir in theme_dirs:
+		folder_path = os.path.join(theme_dir, folder)
+		if os.path.isdir(folder_path):
+			names.update(
+				file_name[: -len(".json")]
+				for file_name in os.listdir(folder_path)
+				if file_name.endswith(".json")
+			)
+	return sorted(names)
+
+
+def get_pages(theme_dirs):
+	return list_theme_files(theme_dirs, "layouts")
 
 
 def get_section_schema(theme_dirs, section_type):
@@ -90,9 +110,22 @@ def clear_layout_cache(theme_name, page):
 
 
 def get_text(value):
+	"""`value` in the page language. Previews move frappe.lang, so it wins over the request's language."""
 	if not isinstance(value, dict):
 		return value
-	return value.get(frappe.local.lang) or value.get("en") or next(iter(value.values()), "")
+	default = get_localization().default_language.code
+	return value.get(frappe.local.lang) or get_source(value, default) or next(iter(value.values()), "")
+
+
+def get_source(value, default):
+	"""The text other languages translate: the default language's, or the legacy English one."""
+	if not isinstance(value, dict):
+		return value or ""
+	return value.get(get_source_key(value, default)) or ""
+
+
+def get_source_key(value, default):
+	return next((key for key in (default, LEGACY_SOURCE_LANGUAGE) if value.get(key)), None)
 
 
 def get_image_url(theme_context, path):

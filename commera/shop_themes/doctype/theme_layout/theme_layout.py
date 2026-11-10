@@ -3,6 +3,7 @@ from frappe import _
 from frappe.model.document import Document
 
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context
+from commera.shop_themes.section_text import LAYOUT_FIELDS, prepare_theme_layout
 from commera.shop_themes.sections import clear_layout_cache, validate_layout
 
 
@@ -12,9 +13,10 @@ class ThemeLayout(Document):
 			frappe.throw(_("Page must hold only letters, digits, - and _."))
 
 		theme_context = build_theme_context(self.theme)
-		for fieldname in ("draft_layout", "published_layout"):
+		for fieldname in LAYOUT_FIELDS:
 			if self.get(fieldname):
 				validate_layout(theme_context, frappe.parse_json(self.get(fieldname)), self.page)
+		prepare_theme_layout(self, theme_context)
 
 	def on_update(self):
 		clear_layout_cache(self.theme, self.page)

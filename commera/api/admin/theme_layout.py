@@ -1,8 +1,6 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
-import os
-
 import frappe
 from frappe import _
 from frappe.core.doctype.file.utils import decode_file_content
@@ -10,7 +8,13 @@ from frappe.core.doctype.file.utils import decode_file_content
 from commera.api.admin.theme import build_theme_settings
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
 from commera.shop_themes.preview_entries import PREVIEW_ENTRY_PAGES, list_entries, resolve_entry
-from commera.shop_themes.sections import get_inherited_layout, get_section_schema
+from commera.shop_themes.section_text import without_source_hashes
+from commera.shop_themes.sections import (
+	get_inherited_layout,
+	get_pages,
+	get_section_schema,
+	list_theme_files,
+)
 
 EDITOR_ROLES = ("System Manager", "Website Manager")
 MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
@@ -27,23 +31,6 @@ def get_editable_theme_context(theme):
 	if theme_context["theme_type"] != "Sections":
 		frappe.throw(_("{0} is a Classic theme, so it has no layouts to edit.").format(theme))
 	return theme_context
-
-
-def list_theme_files(theme_dirs, folder):
-	names = set()
-	for theme_dir in theme_dirs:
-		folder_path = os.path.join(theme_dir, folder)
-		if os.path.isdir(folder_path):
-			names.update(
-				file_name[: -len(".json")]
-				for file_name in os.listdir(folder_path)
-				if file_name.endswith(".json")
-			)
-	return sorted(names)
-
-
-def get_pages(theme_dirs):
-	return list_theme_files(theme_dirs, "layouts")
 
 
 def validate_page(theme_context, page):
@@ -84,9 +71,11 @@ def build_layout_state(theme_context, page):
 		or frappe._dict()
 	)
 
-	published_layout = parse_layout(saved.published_layout)
+	# Source hashes stay server-side: the editor sends layouts without them, and save restores them.
+	default_layout = without_source_hashes(default_layout)
+	published_layout = without_source_hashes(parse_layout(saved.published_layout))
 	live_layout = published_layout or default_layout
-	draft_layout = parse_layout(saved.draft_layout) or live_layout
+	draft_layout = without_source_hashes(parse_layout(saved.draft_layout)) or live_layout
 	return {
 		"page": page,
 		"draft_layout": draft_layout,

@@ -26,8 +26,11 @@ from commera.localization.resolver import (
 	strip_locale_prefix,
 )
 from commera.localization.resources import (
+	DoctypeResource,
 	TranslatableResource,
+	TranslationEntry,
 	get_translatable_fields,
+	get_translatable_resource,
 	get_translatable_resources,
 )
 from commera.localization.urls import alternates, switch_url, url
@@ -39,6 +42,7 @@ __all__ = [
 	"OUTDATED",
 	"PRIMARY_MARKET",
 	"CountryChoice",
+	"DoctypeResource",
 	"Language",
 	"LocalePrefix",
 	"Localization",
@@ -49,6 +53,7 @@ __all__ = [
 	"StorefrontMarkets",
 	"TranslatableResource",
 	"TranslatedValue",
+	"TranslationEntry",
 	"alternates",
 	"delete_translations",
 	"find_request_language",
@@ -59,6 +64,7 @@ __all__ = [
 	"get_request_path",
 	"get_route_path",
 	"get_translatable_fields",
+	"get_translatable_resource",
 	"get_translatable_resources",
 	"pin_localization",
 	"register",
