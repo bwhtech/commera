@@ -57,7 +57,7 @@ def serve_og_image(route):
 		raise frappe.DoesNotExistError()
 
 	variant_doc = frappe.get_cached_doc("Style Attribute Variant", variant.name)
-	# /ar-ae/og-image/<route>.png renders in Arabic for the Gulf market.
+	# /en-ae/og-image/<route>.png renders the Gulf market text; RTL pages keep the source language.
 	cache_path = cache_file_path(route, get_variant_card_version(variant_doc))
 	if not os.path.exists(cache_path):
 		png_bytes = render_card_for_doc("Style Attribute Variant", variant_doc)

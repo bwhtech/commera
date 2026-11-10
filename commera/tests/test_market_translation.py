@@ -187,16 +187,35 @@ class TestMarketProductTitles(ProductDetailPriceTestCase):
 
 	def test_a_product_card_has_the_market_title_and_its_own_url_and_cache_file(self):
 		product = self.make_gulf_product()
+		register(PRODUCT, product.name, "display_name", "en", "Gulf Linen Shirt", market="gulf")
 		self.addCleanup(setattr, frappe.local.flags, "redirect_location", None)
 
+		with pin_localization(resolve("/en-ae")[0]):
+			self.assertEqual(
+				generator.build_variant_card_context(product)["display_name"], "Gulf Linen Shirt"
+			)
+			self.assertEqual(seo.get_product_og_image(product.route), f"/en-ae/og-image/{product.route}.png")
 		with pin_localization(resolve("/ar-ae")[0]):
-			self.assertEqual(generator.build_variant_card_context(product)["display_name"], "قميص الخليج")
 			self.assertEqual(seo.get_product_og_image(product.route), f"/ar-ae/og-image/{product.route}.png")
+		cards = {self.serve_card(product.route, path) for path in ("/en-ae", "/")}
+		self.assertEqual(len(cards), 2)
+
+	def test_a_right_to_left_card_keeps_the_source_language_of_its_market(self):
+		product = self.make_gulf_product()
+		register(PRODUCT, product.name, "display_name", "en", "Gulf Linen Shirt", market="gulf")
+		self.addCleanup(setattr, frappe.local.flags, "redirect_location", None)
+
+		# Satori cannot draw Arabic, so the card text stays in the store's default language.
+		with pin_localization(resolve("/ar-ae")[0]):
+			self.assertEqual(
+				generator.build_variant_card_context(product)["display_name"], "Gulf Linen Shirt"
+			)
 		with pin_localization(resolve("/ar")[0]):
-			self.assertEqual(generator.build_variant_card_context(product)["display_name"], "قميص الكتان")
-			self.assertEqual(seo.get_product_og_image(product.route), f"/ar/og-image/{product.route}.png")
-		cards = {self.serve_card(product.route, path) for path in ("/ar-ae", "/ar", "/en-ae", "/")}
-		self.assertEqual(len(cards), 4)
+			self.assertEqual(
+				generator.build_variant_card_context(product)["display_name"], product.display_name
+			)
+		self.assertEqual(self.serve_card(product.route, "/ar-ae"), self.serve_card(product.route, "/en-ae"))
+		self.assertEqual(self.serve_card(product.route, "/ar"), self.serve_card(product.route, "/"))
 
 	def test_the_legacy_product_page_seo_reads_the_market_content(self):
 		product = self.make_gulf_product()
