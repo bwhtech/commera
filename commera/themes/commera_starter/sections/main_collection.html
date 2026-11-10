@@ -13,8 +13,8 @@
 	{% include "components/product_grid.html" %}
 	{% if not listing.products %}
 	{% call empty_state(_("No products match these filters"), _("Try removing a filter or searching for something else."), "search") %}
-		{% if chips %}<a href="{{ reset_url }}" class="button-primary">{{ _("Clear filters") }}</a>{% endif %}
-		<a href="{{ url('/products') }}" class="button-secondary">{{ _("Browse all products") }}</a>
+		{% if chips %}<a href="{{ reset_url | e }}" class="button-primary">{{ _("Clear filters") }}</a>{% endif %}
+		<a href="{{ url('/products') | e }}" class="button-secondary">{{ _("Browse all products") }}</a>
 		{% endcall %}
 	{% endif %}
 </section>

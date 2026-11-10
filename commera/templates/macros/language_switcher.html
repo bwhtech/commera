@@ -3,10 +3,10 @@
 {% macro language_switcher(class="", link_class="", current_class="") -%}
 {%- set localization = get_localization() -%}
 {%- if localization.available_languages | length > 1 -%}
-<ul aria-label="{{ _('Language') }}" class="{{ class }}">
+<ul aria-label="{{ _('Language') | e }}" class="{{ class | e }}">
 	{%- for language in localization.available_languages %}
 	{%- set is_current = language.code == localization.language.code %}
-	<li><a href="{{ switch_url(language=language.code) }}" hreflang="{{ language.code }}" lang="{{ language.code }}" dir="{{ language.direction }}" data-language="{{ language.code }}" onclick="document.cookie = 'preferred_language=' + this.dataset.language + '; path=/; max-age=31536000; samesite=lax'"{% if is_current %} aria-current="true"{% endif %} class="{{ link_class }}{{ ' ' ~ current_class if is_current and current_class }}">{{ language.endonym[:1] | upper }}{{ language.endonym[1:] }}</a></li>
+	<li><a href="{{ switch_url(language=language.code) | e }}" hreflang="{{ language.code | e }}" lang="{{ language.code | e }}" dir="{{ language.direction | e }}" data-language="{{ language.code | e }}" onclick="document.cookie = 'preferred_language=' + encodeURIComponent(this.dataset.language) + '; path=/; max-age=31536000; samesite=lax'"{% if is_current %} aria-current="true"{% endif %} class="{{ (link_class ~ (' ' ~ current_class if is_current and current_class else '')) | e }}">{{ ((language.endonym[:1] | upper) ~ language.endonym[1:]) | e }}</a></li>
 	{%- endfor %}
 </ul>
 {%- endif %}

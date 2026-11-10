@@ -18,7 +18,7 @@
 <ul class="divide-y divide-outline-gray-1 border-y border-outline-gray-1">
 	{% for order in order_page.orders %}
 	<li>
-		<a href="{{ orders_url }}/detail?order_id={{ order.name | urlencode }}" class="flex items-center gap-4 py-4 hover:bg-surface-gray-1">
+		<a href="{{ orders_url | e }}/detail?order_id={{ order.name | urlencode }}" class="flex items-center gap-4 py-4 hover:bg-surface-gray-1">
 			{{ image(order["items"][0].image if order["items"] else None, width=160, class="aspect-[3/4] w-16 shrink-0 rounded-lg object-cover object-top") }}
 			<div class="min-w-0 flex-1">
 				<div class="flex flex-wrap items-center gap-2">
@@ -37,7 +37,7 @@
 {{ pagination(page, page_count, page_url) }}
 {% else %}
 {% call empty_state(_("No orders yet"), _("When you place an order, it shows here with its delivery status."), "truck") %}
-<a href="{{ url('/products') }}" class="button-primary">{{ _("Start shopping") }}</a>
+<a href="{{ url('/products') | e }}" class="button-primary">{{ _("Start shopping") }}</a>
 {% endcall %}
 {% endif %}
 {% endcall %}

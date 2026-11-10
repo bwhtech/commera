@@ -11,10 +11,10 @@
 		{% endif %}
 		<div class="mt-6 flex flex-wrap gap-3 md:mt-9">
 			{% if section.settings.primary_label %}
-			<a href="{{ url(section.settings.primary_url or '/products') }}" class="group button-primary">{{ section.settings.primary_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
+			<a href="{{ url(section.settings.primary_url or '/products') | e }}" class="group button-primary">{{ section.settings.primary_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
 			{% endif %}
 			{% if section.settings.secondary_label %}
-			<a href="{{ url(section.settings.secondary_url or '/products') }}" class="button-secondary">{{ section.settings.secondary_label }}</a>
+			<a href="{{ url(section.settings.secondary_url or '/products') | e }}" class="button-secondary">{{ section.settings.secondary_label }}</a>
 			{% endif %}
 		</div>
 		{% if slides | length > 1 %}

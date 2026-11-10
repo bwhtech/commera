@@ -6,7 +6,7 @@
 		{% for tile in section.blocks %}
 		{% set collection = commera.catalog.get_collection(tile.settings.collection) if tile.settings.collection else None %}
 		{% set title = tile.settings.title or (collection.title if collection else "") %}
-		<a href="{{ url('/products' ~ ('?category=' ~ collection.handle | urlencode if collection else '')) }}" class="group relative block w-[78%] shrink-0 snap-start scroll-ms-5 overflow-hidden rounded-2xl md:w-auto"{{ tile.editor_attributes }}>
+		<a href="{{ url('/products' ~ ('?category=' ~ collection.handle | urlencode if collection else '')) | e }}" class="group relative block w-[78%] shrink-0 snap-start scroll-ms-5 overflow-hidden rounded-2xl md:w-auto"{{ tile.editor_attributes }}>
 			{{ image(tile.settings.image or (collection.image if collection else None), title, 960, "aspect-[4/5] w-full rounded-2xl object-cover object-top group-hover:scale-[1.03]") }}
 			<div class="pointer-events-none absolute inset-0 rounded-2xl bg-linear-to-t from-black/55 via-black/10 via-45% to-transparent"></div>
 			<div class="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5 text-white md:p-6">

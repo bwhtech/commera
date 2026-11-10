@@ -11,6 +11,8 @@ SWITCHER = (
 	'{% from "templates/macros/language_switcher.html" import language_switcher %}{{ language_switcher() }}'
 )
 
+MALICIOUS_QUERY = 'x="><img src=x onerror=alert(1)>'
+
 
 class LocaleUrlTestCase(IntegrationTestCase):
 	def setUp(self):
@@ -71,6 +73,32 @@ class TestUrl(LocaleUrlTestCase):
 			with self.subTest(link):
 				self.assertEqual(url(link), link)
 
+	def test_a_page_path_never_becomes_an_off_site_link(self):
+		self.assertEqual(url("/ar/\\evil.com/x"), "/evil.com/x")
+		self.assertEqual(url("/fr//evil.com/x"), "/evil.com/x")
+		self.assertEqual(url("/%2F%2Fx"), "/%2F%2Fx")
+		self.open("/ar/products")
+		self.assertEqual(url("/en/\\/evil.com/x"), "/ar/evil.com/x")
+		self.assertEqual(url("/%2F%2Fx"), "/ar/%2F%2Fx")
+
+	def test_links_a_browser_reads_as_off_site_get_no_prefix(self):
+		self.open("/ar/products")
+
+		for link in ("/\\x", "/\\evil.com/x", "/\t/evil.com", " //evil.com", "///evil.com"):
+			with self.subTest(link):
+				self.assertEqual(url(link), link)
+
+	def test_a_script_link_goes_nowhere(self):
+		for link in (
+			"javascript:alert(1)",
+			" JavaScript:alert(1)",
+			"java\nscript:alert(1)",
+			"data:text/html,x",
+		):
+			with self.subTest(link):
+				self.assertEqual(url(link), "#")
+				self.assertEqual(switch_url(link, language="ar"), "#")
+
 	def test_an_api_request_follows_its_lang_parameter(self):
 		self.open("/api/method/commera.api.ping", "_lang=ar")
 
@@ -115,6 +143,38 @@ class TestSwitchUrl(LocaleUrlTestCase):
 		self.assertEqual(switch_url(language="de"), "/products")
 		self.assertEqual(switch_url(language="xx"), "/products")
 
+	def test_an_off_site_link_stays_off_site(self):
+		self.assertEqual(switch_url("//evil.com/x", language="ar"), "//evil.com/x")
+		self.assertEqual(switch_url("/\\x", language="ar"), "/\\x")
+		self.assertEqual(switch_url("/ar/\\evil.com/x", language="en"), "/evil.com/x")
+		self.assertEqual(switch_url("/%2F%2Fx", language="ar"), "/ar/%2F%2Fx")
+
+	def test_the_query_merges_into_the_path_query_before_the_fragment(self):
+		self.assertEqual(switch_url("/products#grid", {"page": 2}, "ar"), "/ar/products?page=2#grid")
+		self.assertEqual(
+			switch_url("/products?page=1&sort=price#grid", {"page": 2}, "ar"),
+			"/ar/products?sort=price&page=2#grid",
+		)
+		self.assertEqual(
+			switch_url("/products?page=1&sort=price", "page=3", "fr"), "/fr/products?sort=price&page=3"
+		)
+		self.assertEqual(
+			switch_url("/products?page=1&sort=price", {"page": None}, "fr"), "/fr/products?sort=price"
+		)
+
+	def test_the_query_merges_into_the_current_query(self):
+		self.open("/products", "page=1&sizes=M")
+
+		self.assertEqual(switch_url(query={"page": 2}, language="ar"), "/ar/products?sizes=M&page=2")
+
+	def test_the_current_query_is_re_encoded(self):
+		self.open("/products", MALICIOUS_QUERY)
+
+		link = switch_url(language="ar")
+
+		self.assertTrue(link.startswith("/ar/products?x="), link)
+		self.assertFalse(set(link) & set("\"'<> "), link)
+
 	def test_the_current_path_is_percent_encoded(self):
 		self.open("/ar/products/blue shirt")
 
@@ -138,6 +198,10 @@ class TestAlternates(LocaleUrlTestCase):
 		self.assertEqual(
 			[alt["href"] for alt in alternates()], [get_url("/"), get_url("/ar"), get_url("/fr")]
 		)
+
+	def test_an_off_site_link_has_none(self):
+		self.assertEqual(alternates("//evil.com/x"), [])
+		self.assertEqual(alternates("/\\evil.com/x"), [])
 
 	def test_a_single_language_store_has_none(self):
 		use_storefront_languages(self, "en", published=("en",), unpublished=("ar",))
@@ -177,4 +241,24 @@ class TestLanguageSwitcher(LocaleUrlTestCase):
 		html = frappe.render_template(SWITCHER, {})
 
 		self.assertIn('data-language="fr"', html)
-		self.assertIn("document.cookie = 'preferred_language=' + this.dataset.language", html)
+		self.assertIn(
+			"document.cookie = 'preferred_language=' + encodeURIComponent(this.dataset.language)", html
+		)
+
+	def test_a_query_cannot_break_out_of_the_link(self):
+		self.open("/ar/products", MALICIOUS_QUERY)
+
+		html = frappe.render_template(SWITCHER, {})
+
+		self.assertNotIn("<img", html)
+		self.assertNotIn('"><', html)
+		self.assertEqual(html.count("<a "), 3)
+
+	def test_every_value_in_the_markup_is_escaped(self):
+		macro = '{% from "templates/macros/language_switcher.html" import language_switcher %}'
+		html = frappe.render_template(
+			macro + "{{ language_switcher(link_class=link_class) }}", {"link_class": '"><b>'}
+		)
+
+		self.assertNotIn("<b>", html)
+		self.assertIn('class="&#34;&gt;&lt;b&gt;', html)

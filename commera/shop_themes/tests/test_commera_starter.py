@@ -170,6 +170,18 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 		self.assertIn('href="/ar/account/', html)
 		self.assertNotIn('href="/en', html)
 
+	def test_a_query_cannot_break_out_of_a_header_link(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+		query = 'x="><img src=x onerror=alert(1)>'
+		frappe.local.request = Request(EnvironBuilder(path="/ar/", query_string=query).get_environ())
+
+		html = self.render_home([])
+
+		self.assertNotIn("<img src=x", html)
+		self.assertNotIn("onerror=alert", html)
+		self.assertIn('href="/?x=%22%3E%3Cimg', html)
+
 	def test_a_single_language_store_has_no_switcher_and_no_prefixes(self):
 		use_storefront_languages(self, "en", published=("en",))
 		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))

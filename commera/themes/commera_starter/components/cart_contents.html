@@ -9,7 +9,7 @@
 <button type="button" @click="$store.cart.load()" class="button-secondary">{{ _("Try again") }}</button>
 {% endcall %}
 {% call empty_state(_("Your cart is empty"), _("Browse the shop and add what you like. It will wait for you here."), "bag", show="$store.cart.status === 'ready' && !$store.cart.count") %}
-<a href="{{ url('/products') }}" class="button-primary">{{ _("Start shopping") }}</a>
+<a href="{{ url('/products') | e }}" class="button-primary">{{ _("Start shopping") }}</a>
 {% endcall %}
 
 <ul x-show="$store.cart.count" class="flex-1 divide-y divide-outline-gray-2 overflow-y-auto px-5">
@@ -41,7 +41,7 @@
 		</li>
 	</template>
 	<li class="py-5">
-		<a href="{{ url('/products') }}" @click="$store.cart.open = false" class="group inline-flex h-10 items-center gap-1.5 text-base font-medium text-ink-gray-8 link">{{ _("Continue shopping") }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
+		<a href="{{ url('/products') | e }}" @click="$store.cart.open = false" class="group inline-flex h-10 items-center gap-1.5 text-base font-medium text-ink-gray-8 link">{{ _("Continue shopping") }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
 	</li>
 </ul>
 

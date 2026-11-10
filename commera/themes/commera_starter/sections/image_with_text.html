@@ -12,7 +12,7 @@
 			<p class="mt-5 max-w-[44ch] text-p-xl text-ink-gray-6">{{ section.settings.text }}</p>
 			{% endif %}
 			{% if section.settings.button_label %}
-			<a href="{{ url(section.settings.button_url or '/products') }}" class="group mt-8 button-secondary">{{ section.settings.button_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
+			<a href="{{ url(section.settings.button_url or '/products') | e }}" class="group mt-8 button-secondary">{{ section.settings.button_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
 			{% endif %}
 		</div>
 	</div>
