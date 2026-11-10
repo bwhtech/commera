@@ -124,6 +124,15 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 	def test_english_queries_still_match(self):
 		self.assertEqual(set(self.product_names(SEARCH_TOKEN)), {self.red, self.blue, self.green})
 
+	def test_non_arabic_queries_keep_cores_match_expression(self):
+		from frappe.search.sqlite_search import SQLiteSearch
+
+		engine = SqliteProductSearch()
+		for query in ("red shoes", 'say "hi" OR not', "a\x00b"):
+			with self.subTest(query=query):
+				expected = SQLiteSearch._prepare_fts_query(engine, query.replace("\x00", ""))
+				self.assertEqual(engine._prepare_fts_query(query), expected)
+
 	def test_arabic_queries_match_with_or_without_the_article(self):
 		self.add_titles("ar", {self.blue: "القميص الأزرق", self.green: "قميص أخضر للمدرسة"})
 		for term in ("قميص", "القميص", "قَمِيص"):

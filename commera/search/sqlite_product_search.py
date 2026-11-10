@@ -511,6 +511,10 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 	def _prepare_fts_query(self, query):
 		"""Core's FTS5 query, where an Arabic word matches any of its forms."""
+		# A NUL inside a quoted term makes SQLite report an unterminated string.
+		query = query.replace("\x00", "")
+		if not is_arabic_query(query):
+			return super()._prepare_fts_query(query)
 		# FTS5 rejects an implicit AND next to a bracketed group, so AND is explicit.
 		return " AND ".join(self.fts_term(word) for word in query.split())
 
