@@ -5,24 +5,64 @@ import frappe
 
 from commera.branding import get_brand_assets
 from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import get_menu_tree
+from commera.localization import translate
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
 ITEM_GROUP_RANGE_CHUNK_SIZE = 100
+CATEGORY_DOCTYPE = "Ecommerce Category"
+CATEGORY_FIELDS = ["display_name", "description", "meta_title", "meta_description"]
 
 
 def get_storefront_menu():
-	"""Request-scoped enabled menu tree, memoised on `frappe.local`."""
+	"""Request-scoped enabled menu tree in the request language, memoised on `frappe.local`."""
 	menu = getattr(frappe.local, "commera_storefront_menu", None)
 	if menu is None:
-		menu = get_menu_tree(enabled_only=True)
+		menu = translate_menu(get_menu_tree(enabled_only=True))
 		frappe.local.commera_storefront_menu = menu
 	return menu
 
 
+def translate_menu(menu):
+	"""Translate every node's label, description and SEO fields in place.
+	The menu editor reads the untranslated tree."""
+	nodes = list(walk_menu(menu))
+	for node, fields in zip(nodes, translate_categories(nodes), strict=True):
+		# Old `?category=` links carry the source label, so it must still match.
+		node["source_label"] = node["label"]
+		node.update(fields)
+	return menu
+
+
+def translate_categories(categories):
+	"""The `label`, `description`, `meta_title` and `meta_description` of each category, translated.
+	`label` is the display name, or the category name when that is blank."""
+	# The label stands in for the display name, so a blank one falls back to `_()` of the category name.
+	records = [
+		{
+			"name": category["name"],
+			"display_name": category["label"],
+			"description": category.get("description"),
+			"meta_title": category.get("meta_title"),
+			"meta_description": category.get("meta_description"),
+		}
+		for category in categories
+	]
+	return [
+		{
+			"label": fields["display_name"].value,
+			"description": fields["description"].value,
+			"meta_title": fields["meta_title"].value,
+			"meta_description": fields["meta_description"].value,
+		}
+		for fields in translate(records, CATEGORY_FIELDS, doctype=CATEGORY_DOCTYPE)
+	]
+
+
 def find_menu_root(menu, category):
-	"""Locate the tab a `?category=` value names — it carries the route slug, the entry name or the label."""
+	"""Locate the tab a `?category=` value names: its route slug, entry name or source label.
+	The shown label changes with the language, so links must not depend on it."""
 	for node in menu:
-		if category in (node["route_slug"], node["name"], node["label"]):
+		if category in (node["route_slug"], node["name"], node.get("source_label", node["label"])):
 			return node
 	return None
 
@@ -191,3 +231,11 @@ def get_item_groups_with_descendants(item_groups):
 		)
 
 	return list(dict.fromkeys(expanded))
+
+
+def walk_menu(menu):
+	pending = list(reversed(menu))
+	while pending:
+		node = pending.pop()
+		yield node
+		pending.extend(reversed(node["children"]))

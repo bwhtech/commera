@@ -441,11 +441,14 @@ class Product(TypedDict):
 
 
 class Collection(TypedDict):
-	"""An enabled menu tab (top-level Ecommerce Category); `handle` is its route slug."""
+	"""An enabled menu tab (top-level Ecommerce Category); `handle` is its route slug.
+	`seo` has `title`, `custom_title` (the merchant set it), `description` and `noindex`, as on Product."""
 
 	handle: str
 	title: str
+	description: str
 	image: str | None
+	seo: dict
 	updated_at: str
 
 

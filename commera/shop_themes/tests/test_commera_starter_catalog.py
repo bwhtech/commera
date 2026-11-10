@@ -119,6 +119,23 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		self.assertIn(f">{collection['title']}</h1>", html)
 		self.assertIn(f'name="category" value="{collection["handle"]}"', html)
 
+	def test_a_collection_page_shows_its_description(self):
+		category = frappe.get_doc(
+			{
+				"doctype": "Ecommerce Category",
+				"category_name": f"Described {frappe.generate_hash(length=8)}",
+				"description": "Linen <b>for</b> summer",
+				"enabled": 1,
+			}
+		).insert(ignore_permissions=True)
+		# The menu is memoised per request; an earlier test may have built it without this tab.
+		frappe.local.commera_storefront_menu = None
+
+		status, html = self.render("pages/products/list.html", "/en/products", category=category.route_slug)
+
+		self.assertEqual(status, 200)
+		self.assertIn("Linen &lt;b&gt;for&lt;/b&gt; summer</p>", html)
+
 	def test_a_selected_filter_shows_as_a_chip_that_removes_it(self):
 		self.get_any_product()
 

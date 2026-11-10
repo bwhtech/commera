@@ -129,8 +129,24 @@ def add_seo(context):
 
 	title = context.collection["title"] if context.collection else ""
 	breadcrumbs = [{"label": title or _("Products"), "href": ""}]
-	context.seo = seo.build_collection_seo(title, breadcrumbs, total_count=context.listing["total"])
+	context.seo = seo.build_collection_seo(
+		title,
+		breadcrumbs,
+		total_count=context.listing["total"],
+		category_doc=get_seo_overrides(context.collection),
+	)
 	context.json_ld = [
 		seo.build_collection_json_ld(title, breadcrumbs, context.listing["total"]),
 		seo.build_breadcrumb_json_ld(breadcrumbs),
 	]
+
+
+def get_seo_overrides(collection):
+	if not collection:
+		return None
+	# Only a set meta title replaces the "Title | Store" template.
+	return {
+		"meta_title": collection["seo"]["title"] if collection["seo"]["custom_title"] else None,
+		"meta_description": collection["seo"]["description"],
+		"noindex": collection["seo"]["noindex"],
+	}

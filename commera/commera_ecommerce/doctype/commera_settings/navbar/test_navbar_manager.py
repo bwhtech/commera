@@ -390,6 +390,15 @@ class TestNavbarManager(IntegrationTestCase):
 		self.assertEqual(find_node(menu, self.men)["noindex"], 0)
 		self.assertEqual(find_node(menu, self.men)["meta_title"], "Test MM Menswear")
 
+	def test_update_node_writes_the_description_and_the_editor_reads_it_back(self):
+		menu = navbar_manager.update_node(self.men, description="Test MM shirts for every day")["menu"]
+
+		self.assertEqual(find_node(menu, self.men)["description"], "Test MM shirts for every day")
+		navbar_manager.update_node(self.men, meta_title="Test MM Menswear")
+		self.assertEqual(
+			frappe.db.get_value("Ecommerce Category", self.men, "description"), "Test MM shirts for every day"
+		)
+
 	def test_update_node_keeps_the_other_fields_when_only_seo_changes(self):
 		bags = self.add_node(None, "Test MM Bags", "Item Group", ["Test MM Bags"])
 
