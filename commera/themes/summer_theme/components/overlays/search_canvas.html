@@ -1,5 +1,4 @@
 
-{% set language = frappe.lang or "en" %}
 <script src="{{ shop_theme_asset_url('js/summer_search.js') }}"></script>
 <div class="dz-search-area dz-offcanvas offcanvas offcanvas-top" tabindex="-1" role="dialog"
 	aria-label="{{ _('Search') }}"
@@ -9,8 +8,8 @@
 	<button type="button" class="btn-close" @click="search_open = false" aria-label="{{ _('Close') }}">
 		&times;
 	</button>
-	<div class="container" x-data='summer_search({{ {"language": language} | tojson }})'>
-		<form class="header-item-search" action="/{{ language }}/products" method="get">
+	<div class="container" x-data='summer_search({{ {"products_url": url("/products")} | tojson }})'>
+		<form class="header-item-search" action="{{ url('/products') | e }}" method="get">
 			<div class="input-group search-input">
 				<select class="default-select" name="category" aria-label="{{ _('Category') }}">
 					<option value="">{{ _("All Categories") }}</option>
@@ -30,7 +29,7 @@
 			<ul class="recent-tag">
 				<li class="pe-0"><span>{{ _("Quick Search") }} :</span></li>
 				{% for node in header_data.navigation_menu[:4] %}
-				<li><a href="{{ (node.href or '/' ~ language ~ '/products') | e }}">{{ node.label | e }}</a></li>
+				<li><a href="{{ (node.href or url('/products')) | e }}">{{ node.label | e }}</a></li>
 				{% endfor %}
 			</ul>
 			{% endif %}

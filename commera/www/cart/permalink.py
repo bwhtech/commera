@@ -6,6 +6,7 @@ from frappe.utils.data import cint, cstr
 
 from commera.api.cart import get_cart_price
 from commera.guest import is_guest, is_guest_checkout_enabled
+from commera.localization import url
 from commera.product_detail import size_sort_key
 from commera.sdk.lines import LineProducts
 from commera.utils import get_available_stocks, get_next_url
@@ -20,9 +21,7 @@ def get_context(context):
 	context.lines = get_cart_lines(requested_quantities, notices)
 	context.notices = notices
 	context.is_merge = frappe.form_dict.get("mode") == "add"
-	context.next_url = (
-		get_next_url(frappe.form_dict.get("return_to")) if context.lines else f"/{frappe.local.lang}/cart"
-	)
+	context.next_url = get_next_url(frappe.form_dict.get("return_to")) if context.lines else url("/cart")
 
 
 def parse_cart_codes(codes: str | None) -> tuple[dict[str, int], list[str]]:

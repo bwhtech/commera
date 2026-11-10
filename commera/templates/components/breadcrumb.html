@@ -3,7 +3,7 @@
 <nav  class="text-sm font-medium text-gray-700 hidden md:flex mt-3 mb-8" aria-label="breadcrumb">
     <ol class="flex flex-wrap items-center gap-1">
         <li class="flex items-center gap-1">
-            <a href="/" class="hover:text-accent ">{{_("Home")}}</a>
+            <a href="{{ url('/') | e }}" class="hover:text-accent ">{{_("Home")}}</a>
             {{icon(name="arrow-right",classes="h-4 w-4")}}
         </li>
         {% for breadcrumb in breadcrumbs %}

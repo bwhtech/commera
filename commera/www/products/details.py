@@ -5,6 +5,7 @@ from commera import seo
 from commera.api.admin.catalog import DEFAULT_OPTION_ATTRIBUTE, DEFAULT_SIZE_VALUE
 from commera.api.reviews import PAGE_LENGTH as REVIEWS_PAGE_LENGTH
 from commera.api.reviews import get_reviews
+from commera.localization import url
 from commera.product_detail import get_product_detail
 from commera.utils import get_available_stock, get_product_list
 
@@ -50,7 +51,7 @@ def get_context(context):
 	context.item_qty = get_available_stock(product.item_code, detail["warehouse"])
 	context.reviews = get_reviews_for_context(product_variant.name)
 	context.breadcrumbs = [
-		{"label": "Products", "href": f"/{frappe.local.lang}/products/"},
+		{"label": "Products", "href": url("/products/")},
 		{"label": product_variant.display_name, "href": ""},
 	]
 

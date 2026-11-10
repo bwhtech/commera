@@ -7,7 +7,7 @@
         {% if frappe.session.user !="Guest" %}
         {% for page in pages %}
             {% set is_active = frappe.request.path.endswith('/account/' + page|lower) %}
-            <a href="/{{frappe.lang}}/account/{{page|lower}}">
+            <a href="{{ url('/account/' ~ (page | lower)) | e }}">
                 <div class="ipad:border-b ipad:border-gray-300 flex items-center text-sm">
                     {{icon('arrow-left',classes='rotate-180 size-4 me-1')}}
                     <button class="flex w-full items-center justify-between font-medium cursor-pointer my-3 
@@ -18,7 +18,7 @@
             </a>
         {% endfor %}
         {% else %}
-        <a href="/{{frappe.lang}}/account/wishlist">
+        <a href="{{ url('/account/wishlist') | e }}">
             <div class="ipad:border-b ipad:border-gray-300 flex items-center text-sm">
                 {{icon('arrow-left',classes='rotate-180 size-4 me-1')}}
                 <button class="flex w-full items-center justify-between font-medium cursor-pointer my-3 

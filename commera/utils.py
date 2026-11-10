@@ -19,6 +19,7 @@ from rq.job import JobStatus
 
 from commera.core import get_address_docs, get_party
 from commera.guest import is_guest, is_guest_checkout_enabled
+from commera.localization import url
 from commera.order_access import get_key_access, is_shoppers_order
 from commera.plugin_events import (
 	SHIPPING_ADDRESS_FIELDS,
@@ -674,7 +675,7 @@ def get_next_url(return_to: str | None = None) -> str:
 		for key, value in frappe.form_dict.items()
 		if key == "discount" or key.startswith(FORWARDED_PARAM_PREFIXES)
 	]
-	cart_url = f"/{frappe.local.lang}/cart"
+	cart_url = url("/cart")
 	destination = get_return_to_url(return_to, cart_url)
 	if destination:
 		query_string = urlencode(forwarded_params, doseq=True)

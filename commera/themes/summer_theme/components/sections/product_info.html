@@ -68,7 +68,7 @@
 							</h1>
 							{% if product.brand %}
 							<div class="review-num">
-								<a href="/{{ frappe.lang or 'en' }}/products?brands={{ product.brand | urlencode }}">{{ product.brand }}</a>
+								<a href="{{ url('/products?brands=' ~ (product.brand | urlencode)) | e }}">{{ product.brand }}</a>
 							</div>
 							{% endif %}
 						</div>
@@ -119,14 +119,14 @@
 						<label class="form-label">{{ _("Colour") }}</label>
 						<ul class="product-colour-list">
 							<li>
-								<a href="/{{ frappe.lang or 'en' }}/products/{{ product_variant.route }}" class="is-active" aria-current="page">
+								<a href="{{ url('/products/' ~ product_variant.route) | e }}" class="is-active" aria-current="page">
 									<img src="{{ images[0] }}" alt="{{ product_variant.attribute_value }}">
 									<span>{{ product_variant.attribute_value }}</span>
 								</a>
 							</li>
 							{% for variant in other_variants %}
 							<li>
-								<a href="/{{ frappe.lang or 'en' }}/products/{{ variant.route }}">
+								<a href="{{ url('/products/' ~ variant.route) | e }}">
 									<img src="{{ variant.image or '/assets/commera/images/1.jpg' }}" alt="{{ variant.attribute_value }}">
 									<span>{{ variant.attribute_value }}</span>
 								</a>
@@ -143,7 +143,7 @@
 						</ul>
 						<ul>
 							<li><strong>{{ _("Category") }}:</strong></li>
-							<li><a href="/{{ frappe.lang or 'en' }}/products?item_groups={{ product_variant.item_group | urlencode }}">{{ product_variant.item_group }}</a></li>
+							<li><a href="{{ url('/products?item_groups=' ~ (product_variant.item_group | urlencode)) | e }}">{{ product_variant.item_group }}</a></li>
 						</ul>
 						{% if selected_item.material %}
 						<ul>

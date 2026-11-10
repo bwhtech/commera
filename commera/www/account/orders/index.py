@@ -7,6 +7,7 @@ import frappe
 from frappe.query_builder import DocType
 from pypika import CustomFunction, Order
 
+from commera.localization import url
 from commera.order_access import get_shopper_order_condition
 from commera.sdk.lines import LineProducts
 from commera.utils import get_current_page, get_rounded_or_grand_total
@@ -40,7 +41,7 @@ def get_context(context):
 	context.breadcrumbs = [
 		{
 			"label": "My Account",
-			"href": f"/{frappe.local.lang}/account/",
+			"href": url("/account/"),
 		},
 		{
 			"label": "Orders",

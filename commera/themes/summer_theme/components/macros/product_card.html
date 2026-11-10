@@ -47,15 +47,15 @@
     average_rating=0,
     review_count=0
 ) %}
-{% set product_url = "/" ~ (frappe.lang or "en") ~ "/products/" ~ route %}
+{% set product_url = url("/products/" ~ route) %}
 <div class="shop-card {{ style }} wow fadeInUp" data-wow-delay="{{ wow_delay }}">
 	<div class="dz-media">
-		<a href="{{ product_url }}" tabindex="-1" aria-hidden="true">
+		<a href="{{ product_url | e }}" tabindex="-1" aria-hidden="true">
 			<img src="{{ image or '/assets/commera/images/1.jpg' }}" alt="{{ product_name }}">
 		</a>
 		{% if not style %}
 		<div class="shop-meta">
-			<a href="{{ product_url }}" class="btn btn-secondary btn-md btn-rounded">
+			<a href="{{ product_url | e }}" class="btn btn-secondary btn-md btn-rounded">
 				<i class="fa-solid fa-eye d-md-none d-block"></i>
 				<span class="d-md-block d-none">{{ _("Quick View") }}</span>
 			</a>
@@ -72,7 +72,7 @@
 				<i class="icon feather icon-heart dz-heart" x-show="!in_wishlist"></i>
 				<i class="icon feather icon-heart-on dz-heart-fill" x-show="in_wishlist" x-cloak></i>
 			</div>
-			<a href="{{ product_url }}" class="btn btn-primary meta-icon dz-carticon">
+			<a href="{{ product_url | e }}" class="btn btn-primary meta-icon dz-carticon">
 				<i class="flaticon flaticon-basket"></i>
 			</a>
 		</div>
@@ -81,12 +81,12 @@
 	<div class="dz-content">
 		{% if style == "style-2" %}
 		{% if discount %}<span class="sale-title">{{ _("up to {0}% off").format(discount | round | int) }}</span>{% endif %}
-		<h5 class="title shop-card-title"><a href="{{ product_url }}">{{ product_name }}</a></h5>
+		<h5 class="title shop-card-title"><a href="{{ product_url | e }}">{{ product_name }}</a></h5>
 		{{ card_rating(average_rating, review_count) }}
 		<h6 class="price shop-card-price">{{ card_price(formatted_price, original_price, discount) }}</h6>
 		{% elif style == "style-4" %}
 		<div>
-			<h6 class="title"><a href="{{ product_url }}">{{ product_name }}</a></h6>
+			<h6 class="title"><a href="{{ product_url | e }}">{{ product_name }}</a></h6>
 			{{ card_rating(average_rating, review_count) }}
 			{% if discount %}<span class="sale-title">{{ _("Up to {0}% Off").format(discount | round | int) }}</span>{% endif %}
 		</div>
@@ -94,7 +94,7 @@
 			<h6 class="price">{{ card_price(formatted_price, original_price, discount) }}</h6>
 		</div>
 		{% else %}
-		<h5 class="title shop-card-title"><a href="{{ product_url }}">{{ product_name }}</a></h5>
+		<h5 class="title shop-card-title"><a href="{{ product_url | e }}">{{ product_name }}</a></h5>
 		{{ card_rating(average_rating, review_count) }}
 		<h5 class="price shop-card-price">{{ card_price(formatted_price, original_price, discount) }}</h5>
 		{% endif %}

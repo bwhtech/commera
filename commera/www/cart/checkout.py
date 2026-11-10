@@ -21,6 +21,7 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 from commera.core import _get_cart_quotation
 from commera.discounts.selection import get_discount_codes
 from commera.guest import is_guest
+from commera.localization import url
 from commera.sdk.catalog import set_product_titles
 from commera.utils import (
 	format_addresses,
@@ -56,7 +57,7 @@ def get_context(context, allow_guest: bool = False):
 	commera_settings = frappe.get_cached_doc("Commera Settings")
 	if is_guest():
 		if not allow_guest:
-			cart_url = f"/{frappe.local.lang}/cart"
+			cart_url = url("/cart")
 			if frappe.request and (query_string := frappe.safe_decode(frappe.request.query_string)):
 				cart_url = f"{cart_url}?{query_string}"
 			frappe.redirect(cart_url)
@@ -77,7 +78,7 @@ def get_context(context, allow_guest: bool = False):
 	context.breadcrumbs = [
 		{
 			"label": "Cart",
-			"href": f"/{frappe.local.lang}/cart/",
+			"href": url("/cart/"),
 		},
 		{
 			"label": "Checkout",
@@ -119,7 +120,7 @@ def set_guest_cart_context(context):
 def set_cart_context(context, commera_settings):
 	cart_quotation = _get_cart_quotation()
 	if not cart_quotation or not cart_quotation.items:
-		frappe.redirect(f"/{frappe.local.lang}/cart")
+		frappe.redirect(url("/cart"))
 	default_price_list = commera_settings.get("default_price_list")
 	context.cart_quotation = cart_quotation
 	context.cart_needs_refresh = cart_needs_refresh(cart_quotation)
@@ -160,7 +161,7 @@ def rebuild_checkout_cart(quotation) -> tuple:
 			frappe.clear_last_message()
 			return None, None
 		if not get_session_cart().get_selected_lines():
-			return None, f"/{frappe.local.lang}/cart"
+			return None, url("/cart")
 		return get_quotation_for_cart(get_checkout_cart({}), quotation), None
 
 

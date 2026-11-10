@@ -5,7 +5,7 @@
 
 <nav class="border-gray-200 bg-white shadow-sm">
   <div class="max-w-7xl mx-auto px-6 md:px-10 py-5 flex items-center justify-between">
-    <a class="rtl:space-x-reverse" href="/">
+    <a class="rtl:space-x-reverse" href="{{ url('/') | e }}">
       {# Frappe's Jinja environment has no autoescape, so owner-authored settings are escaped here. #}
       <img src="{{ header_data.brand_logo | e }}" alt="{{ header_data.store_name | e }} Logo" class="w-12 h-12 object-contain" />
     </a>

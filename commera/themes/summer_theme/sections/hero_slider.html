@@ -1,5 +1,4 @@
 {# The .slick-slide / .slick-current class names are kept because style.css scales the off-centre banners off them. #}
-{% set language = frappe.lang or "en" %}
 {% if section.blocks %}
 <div class="main-slider-wrapper">
 	<div class="slider-inner">
@@ -20,7 +19,7 @@
 								{% endif %}
 								{% if slide.settings.cta_label %}
 								<div class="content-btn m-b30">
-									<a href="{{ slide.settings.url or '/' ~ language ~ '/products' }}" class="btn btn-secondary me-xl-3 me-2 btnhover20">{{ slide.settings.cta_label }}</a>
+									<a href="{{ url(slide.settings.url or '/products') | e }}" class="btn btn-secondary me-xl-3 me-2 btnhover20">{{ slide.settings.cta_label }}</a>
 								</div>
 								{% endif %}
 							</div>

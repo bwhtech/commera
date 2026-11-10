@@ -1,21 +1,20 @@
 
-{% set language = frappe.lang or "en" %}
 {# The sandboxed jinja namespace wraps get_cached_doc in a SafeDoc that cannot serialise a cached User's child tables. #}
 {% set account_user = frappe.db.get_value("User", frappe.session.user, ["full_name", "email", "user_image"], as_dict=True) %}
 {% set account_sections = [
 	{
 		"title": _("Dashboard"),
 		"links": [
-			{"label": _("Dashboard"), "href": "/" ~ language ~ "/account/dashboard"},
-			{"label": _("Orders"), "href": "/" ~ language ~ "/account/orders"},
-			{"label": _("Wishlist"), "href": "/" ~ language ~ "/account/wishlist"},
+			{"label": _("Dashboard"), "href": url("/account/dashboard")},
+			{"label": _("Orders"), "href": url("/account/orders")},
+			{"label": _("Wishlist"), "href": url("/account/wishlist")},
 		],
 	},
 	{
 		"title": _("Account Settings"),
 		"links": [
-			{"label": _("Profile"), "href": "/" ~ language ~ "/account/profile"},
-			{"label": _("Address"), "href": "/" ~ language ~ "/account/address"},
+			{"label": _("Profile"), "href": url("/account/profile")},
+			{"label": _("Address"), "href": url("/account/address")},
 		],
 	},
 ] %}
@@ -60,7 +59,7 @@
 				<ul>
 					{% for link in section.links %}
 					<li>
-						<a href="{{ link.href }}" :class='{ "active": is_active({{ link.href | tojson }}) }'>{{ link.label }}</a>
+						<a href="{{ link.href | e }}" :class='{ "active": is_active({{ link.href | tojson }}) }'>{{ link.label }}</a>
 					</li>
 					{% endfor %}
 					{% if loop.last %}

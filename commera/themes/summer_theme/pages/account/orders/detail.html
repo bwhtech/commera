@@ -3,8 +3,7 @@
 {% extends "components/theme_layout.html" %}
 {% from "components/core/account_shell.html" import account_shell %}
 
-{% set language = frappe.lang or "en" %}
-{% set orders_url = "/" ~ language ~ "/account/orders" %}
+{% set orders_url = url("/account/orders") %}
 {% set status_badges = {
 	"Waiting for Approval": "bg-warning",
 	"Order Received": "bg-info",
@@ -59,7 +58,7 @@
 	{% if not shows_private_details %}
 	<div class="alert alert-info m-b30">
 		{{ _("This order link is older, so the delivery address and payment details are hidden.") }}
-		<a href="/{{ language }}/track-order" class="text-underline">{{ _("Get a new link by email") }}</a>
+		<a href="{{ url('/track-order') | e }}" class="text-underline">{{ _("Get a new link by email") }}</a>
 	</div>
 	{% endif %}
 
@@ -285,7 +284,7 @@
 					{% endif %}
 				</ul>
 				{% if is_owner %}
-				<a href="{{ orders_url }}" class="btn-link text-underline p-0">{{ _("Back to Orders") }}</a>
+				<a href="{{ orders_url | e }}" class="btn-link text-underline p-0">{{ _("Back to Orders") }}</a>
 				{% endif %}
 			</div>
 		</div>

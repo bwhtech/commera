@@ -2,8 +2,7 @@
 {% extends "components/theme_layout.html" %}
 {% from "components/core/account_shell.html" import account_shell %}
 
-{% set language = frappe.lang or "en" %}
-{% set orders_url = "/" ~ language ~ "/account/orders" %}
+{% set orders_url = url("/account/orders") %}
 {% set status_badges = {
 	"Waiting for Approval": "bg-warning",
 	"Order Received": "bg-info",
@@ -54,7 +53,7 @@
 			</div>
 		</div>
 		<div class="col-md-4">
-			<a class="total-contain d-flex d-md-block" href="/{{ language }}/account/wishlist">
+			<a class="total-contain d-flex d-md-block" href="{{ url('/account/wishlist') | e }}">
 				<div class="total-icon">
 					<svg width="34" height="34" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
 				</div>
@@ -68,7 +67,7 @@
 
 	<div class="d-flex align-items-center justify-content-between m-b20">
 		<h6 class="mb-0">{{ _("Recent Orders") }}</h6>
-		{% if recent_orders %}<a href="{{ orders_url }}" class="btn-link text-underline p-0">{{ _("View All") }}</a>{% endif %}
+		{% if recent_orders %}<a href="{{ orders_url | e }}" class="btn-link text-underline p-0">{{ _("View All") }}</a>{% endif %}
 	</div>
 
 	{% if recent_orders %}
@@ -87,7 +86,7 @@
 				{% for order in recent_orders %}
 				{% set order_url = orders_url ~ "/detail?order_id=" ~ (order.name | urlencode) %}
 				<tr>
-					<td><a href="{{ order_url }}" class="fw-medium">{{ order.name | e }}</a></td>
+					<td><a href="{{ order_url | e }}" class="fw-medium">{{ order.name | e }}</a></td>
 					<td>{{ frappe.utils.formatdate(order.creation, "medium") }}</td>
 					<td>
 						<span class="badge m-0 {{ status_badges.get(order.custom_ecommerce_status, 'bg-secondary') }}">
@@ -95,7 +94,7 @@
 						</span>
 					</td>
 					<td class="text-nowrap">{{ get_currency_symbol() }}{{ "%.2f" | format(order.payable_total) }}</td>
-					<td><a href="{{ order_url }}" class="btn-link text-underline p-0">{{ _("View") }}</a></td>
+					<td><a href="{{ order_url | e }}" class="btn-link text-underline p-0">{{ _("View") }}</a></td>
 				</tr>
 				{% endfor %}
 			</tbody>
@@ -105,7 +104,7 @@
 	<div class="account-empty">
 		<i class="flaticon flaticon-cart"></i>
 		<p>{{ _("You have not placed an order yet.") }}</p>
-		<a href="/{{ language }}/products" class="btn btn-secondary">{{ _("Start Shopping") }}</a>
+		<a href="{{ url('/products') | e }}" class="btn btn-secondary">{{ _("Start Shopping") }}</a>
 	</div>
 	{% endif %}
 
@@ -121,7 +120,7 @@
 					</ul>
 				</div>
 				<div class="account-address-bottom">
-					<a href="/{{ language }}/account/profile" class="d-block me-3">
+					<a href="{{ url('/account/profile') | e }}" class="d-block me-3">
 						<i class="fa-solid fa-pen me-2"></i>{{ _("Edit") }}
 					</a>
 				</div>
@@ -140,7 +139,7 @@
 					</ul>
 				</div>
 				<div class="account-address-bottom">
-					<a href="/{{ language }}/account/address" class="d-block me-3">
+					<a href="{{ url('/account/address') | e }}" class="d-block me-3">
 						<i class="fa-solid fa-pen me-2"></i>{{ _("Manage") }}
 					</a>
 				</div>

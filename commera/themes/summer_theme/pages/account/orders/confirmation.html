@@ -3,10 +3,9 @@
 {% extends "components/theme_layout.html" %}
 {% from "components/core/account_shell.html" import account_shell %}
 
-{% set language = frappe.lang or "en" %}
-{% set orders_url = "/" ~ language ~ "/account/orders" %}
+{% set orders_url = url("/account/orders") %}
 {% set confirmation_config = {"order_id": order.name if order else None, "orders_url": orders_url} %}
-{% set track_order_url = "/" ~ language ~ "/track-order" %}
+{% set track_order_url = url("/track-order") %}
 
 {% block head %}
 	{{ super() }}
@@ -40,7 +39,7 @@
 		{% endif %}
 		<div class="mt-4 d-sm-flex gap-3 justify-content-center">
 			<a class="btn my-1 btn-secondary" :href="order_detail_url">{{ _("View Order") }}</a>
-			<a class="btn btn-outline-secondary my-1 btnhover20" href="/{{ language }}/products">{{ _("Continue Shopping") }}</a>
+			<a class="btn btn-outline-secondary my-1 btnhover20" href="{{ url('/products') | e }}">{{ _("Continue Shopping") }}</a>
 		</div>
 	</div>
 
@@ -51,7 +50,7 @@
 		<p class="mb-0" x-show="poll_count >= max_polls" x-cloak>{{ _("This is taking longer than usual. We will email you once the payment goes through, and your orders page shows its status.") }}</p>
 		<div class="mt-4 d-sm-flex gap-3 justify-content-center" x-show="poll_count >= max_polls" x-cloak>
 			<button type="button" class="btn my-1 btn-secondary" @click="check_again()">{{ _("Check Again") }}</button>
-			<a class="btn btn-outline-secondary my-1 btnhover20" href="{{ orders_url }}">{{ _("My Orders") }}</a>
+			<a class="btn btn-outline-secondary my-1 btnhover20" href="{{ orders_url | e }}">{{ _("My Orders") }}</a>
 		</div>
 	</div>
 
@@ -60,7 +59,7 @@
 		<h4 class="mb-3">{{ _("Your payment did not go through") }}</h4>
 		<p class="mb-0">{{ _("You have not been charged. Your bag still holds the items, so you can try again.") }}</p>
 		<div class="mt-4 d-sm-flex gap-3 justify-content-center">
-			<a class="btn my-1 btn-secondary" href="/{{ language }}/cart">{{ _("Back to Bag") }}</a>
+			<a class="btn my-1 btn-secondary" href="{{ url('/cart') | e }}">{{ _("Back to Bag") }}</a>
 		</div>
 	</div>
 
@@ -77,14 +76,14 @@
 		{% if login_url %}
 		<p class="mb-0">{{ _("If you checked out with an account, sign in to confirm it. Otherwise you can look the order up with its number and your email.") }}</p>
 		<div class="mt-4 d-sm-flex gap-3 justify-content-center">
-			<a class="btn my-1 btn-secondary" href="{{ login_url }}">{{ _("Sign In") }}</a>
-			<a class="btn btn-outline-secondary my-1 btnhover20" href="{{ track_order_url }}">{{ _("Track Your Order") }}</a>
+			<a class="btn my-1 btn-secondary" href="{{ login_url | e }}">{{ _("Sign In") }}</a>
+			<a class="btn btn-outline-secondary my-1 btnhover20" href="{{ track_order_url | e }}">{{ _("Track Your Order") }}</a>
 		</div>
 		{% else %}
 		<p class="mb-0">{{ _("This confirmation link has expired. Your orders page shows the current status of every order you have placed.") }}</p>
 		<div class="mt-4 d-sm-flex gap-3 justify-content-center">
-			<a class="btn my-1 btn-secondary" href="{{ orders_url }}">{{ _("My Orders") }}</a>
-			<a class="btn btn-outline-secondary my-1 btnhover20" href="/{{ language }}/products">{{ _("Continue Shopping") }}</a>
+			<a class="btn my-1 btn-secondary" href="{{ orders_url | e }}">{{ _("My Orders") }}</a>
+			<a class="btn btn-outline-secondary my-1 btnhover20" href="{{ url('/products') | e }}">{{ _("Continue Shopping") }}</a>
 		</div>
 		{% endif %}
 	</div>

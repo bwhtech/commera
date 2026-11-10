@@ -62,7 +62,7 @@
 								<span>{{ _("or") }}</span>
 								<hr class="flex-grow-1 m-0">
 							</div>
-							<a href="/{{ frappe.lang or 'en' }}/cart/checkout" class="btn btn-outline-secondary w-100">
+							<a href="{{ url('/cart/checkout') | e }}" class="btn btn-outline-secondary w-100">
 								{{ _("Continue as Guest") }}
 							</a>
 						{% endif %}

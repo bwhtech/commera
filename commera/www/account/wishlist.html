@@ -2,12 +2,13 @@
 {% from "templates/macros/item_card.html" import item_card %}
 
 {% block user_body %}
+{% set in_source_language = get_localization().language == get_localization().default_language %}
 
 <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-6">
 	<template x-for="item in $store.wishlist.items">
 		<div class="flex flex-col w-fit mb-4">
 			<div class="relative w-fit">
-				<a :href="'/{{ frappe.lang }}/products/' + item.route">
+				<a :href="'{{ url('/products') | e }}/' + item.route">
 					<img :src="item.image || '/assets/commera/images/1.jpg'" alt=""
 						class="w-45 h-60 md:w-55 md:h-70 lg:w-3xs lg:h-85 object-cover rounded-lg" />
 				</a>
@@ -25,7 +26,7 @@
 
 			<h3 class="mt-6 font-medium text-accent text-base md:text-xl" :title="item.brand" x-text="commera.t(item.brand)"></h3>
 			</h3>
-			{% if frappe.lang == 'en' %}
+			{% if in_source_language %}
 			<h4 class="text-base md:text-xl ">
 				<span x-text="item.item_name" class="me-1"></span> <span x-text="item.attribute_value"></span>
 			</h4>

@@ -2,7 +2,7 @@
 {% extends "components/theme_layout.html" %}
 {% from "components/macros/discount_codes.html" import discount_code_chips %}
 
-{% set language = frappe.lang or "en" %}
+{% set in_source_language = get_localization().language == get_localization().default_language %}
 {% set currency_symbol = get_currency_symbol() %}
 
 {% block head %}
@@ -17,7 +17,7 @@
 				<h1>{{ _("Shop Cart") }}</h1>
 				<nav aria-label="{{ _('breadcrumb') }}" class="breadcrumb-row">
 					<ul class="breadcrumb">
-						<li class="breadcrumb-item"><a href="/{{ language }}">{{ _("Home") }}</a></li>
+						<li class="breadcrumb-item"><a href="{{ url('/') | e }}">{{ _("Home") }}</a></li>
 						{% for breadcrumb in breadcrumbs %}
 							<li class="breadcrumb-item">{{ _(breadcrumb.label) }}</li>
 						{% endfor %}
@@ -35,7 +35,7 @@
 				<i class="flaticon flaticon-cart"></i>
 				<h4 class="title">{{ _("Your cart is empty") }}</h4>
 				<p>{{ _("Browse the shop and add something you love.") }}</p>
-				<a href="/{{ language }}/products" class="btn btn-secondary">{{ _("Continue Shopping") }}</a>
+				<a href="{{ url('/products') | e }}" class="btn btn-secondary">{{ _("Continue Shopping") }}</a>
 			</div>
 
 			<div class="row" x-show="$store.cart.items.length" x-cloak>
@@ -59,15 +59,15 @@
 											<div class="d-flex align-items-center gap-3 position-relative">
 												<input type="checkbox" class="form-check-input m-0 flex-shrink-0" x-model="cart_item.selected"
 													:aria-label="include_label.replace('{0}', cart_item.variant.item_name)">
-												<a :href="`/{{ language }}/products/${cart_item.item.route}`">
+												<a :href="`{{ url('/products') | e }}/${cart_item.item.route}`">
 													<img :src="cart_item.item.images.length > 0 ? cart_item.item.images[0].image : '/assets/commera/images/1.jpg'"
 														:alt="cart_item.variant.item_name">
 												</a>
 											</div>
 										</td>
 										<td class="product-item-name">
-											<a :href="`/{{ language }}/products/${cart_item.item.route}`"
-												x-text="{% if language == 'en' %}cart_item.variant.item_name{% else %}cart_item.variant.title || cart_item.variant.item_name{% endif %}"></a>
+											<a :href="`{{ url('/products') | e }}/${cart_item.item.route}`"
+												x-text="{% if in_source_language %}cart_item.variant.item_name{% else %}cart_item.variant.title || cart_item.variant.item_name{% endif %}"></a>
 										</td>
 										<td class="product-item-price">
 											<template x-if="cart_item.default_price && parseFloat(cart_item.default_price) !== $store.cart.price_of(cart_item)">
@@ -248,7 +248,7 @@
 							cart: { items: items },
 						});
 						this.checkout_status = "leaving";
-						window.location.href = "/{{ language }}/cart/checkout" + window.location.search;
+						window.location.href = {{ url('/cart/checkout') | tojson }} + window.location.search;
 					} catch (error) {
 						// frappe_call has shown the error.
 					} finally {
