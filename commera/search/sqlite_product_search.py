@@ -17,6 +17,7 @@ from frappe.utils import create_batch, flt
 from commera.localization.content import SHOP_WIDE
 from commera.localization.languages import StorefrontLanguages
 from commera.search.arabic import arabic_search_forms, arabic_word_forms, is_arabic_query
+from commera.search.build_writes import reconcile_build_writes, track_build_writes
 from commera.search.engine import (
 	CARD_COLUMNS,
 	MIN_QUERY_LENGTH,
@@ -211,12 +212,14 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	# -- builds ---------------------------------------------------------------------------------
 
 	def build_index(self, batch_size=1000, is_continuation=False):
+		track_build_writes()
 		self.build_generation = generation = index_generation()
 		if is_continuation and self.stored_generation() != generation:
 			# The finished batches hold the old languages' titles or the old prices.
 			self.discard_partial_build()
 			is_continuation = False
 		super().build_index(batch_size=batch_size, is_continuation=is_continuation)
+		frappe.db.after_commit.add(reconcile_build_writes)
 		rebuild_if_generation_changes(self, generation, SEARCH_CLASS_PATH)
 
 	def stored_generation(self):
@@ -240,6 +243,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	def enqueue_full_rebuild(self, deduplicate=False):
 		"""Enqueue a full rebuild on the long queue. Returns the enqueue payload."""
 		# Core builds into a temp DB and renames it over the live one, so the index keeps serving.
+		track_build_writes()
 		return frappe.enqueue(
 			CORE_BUILD_INDEX,
 			queue="long",

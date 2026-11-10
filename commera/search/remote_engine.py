@@ -11,6 +11,7 @@ from frappe.utils import create_batch, flt
 
 from commera.localization.content import SHOP_WIDE
 from commera.product_detail import size_sort_key
+from commera.search.build_writes import reconcile_build_writes, track_build_writes
 from commera.search.engine import CARD_COLUMNS, SearchEngineBase, empty_facets, empty_typeahead
 from commera.search.http_client import SearchServerError
 from commera.search.price_markets import get_price_market
@@ -230,6 +231,7 @@ class RemoteSearchEngine(SearchEngineBase):
 		]
 
 	def enqueue_full_rebuild(self, deduplicate=False):
+		track_build_writes()
 		return frappe.enqueue(
 			self.REBUILD_JOB,
 			queue="long",
@@ -248,6 +250,7 @@ class RemoteSearchEngine(SearchEngineBase):
 
 	def rebuild(self):
 		"""Build both indexes beside the live ones, then swap them in, so search keeps serving meanwhile."""
+		track_build_writes()
 		started = frappe.utils.now()
 		generation = index_generation()
 		for doctype, filters in ((PRODUCT_DOCTYPE, {"is_published": 1}), (CATEGORY_DOCTYPE, {"enabled": 1})):
@@ -259,6 +262,7 @@ class RemoteSearchEngine(SearchEngineBase):
 		for doctype in (PRODUCT_DOCTYPE, CATEGORY_DOCTYPE):
 			if changed := frappe.get_all(doctype, filters={"modified": (">=", started)}, pluck="name"):
 				self.index_docs(doctype, changed)
+		frappe.db.after_commit.add(reconcile_build_writes)
 		rebuild_if_generation_changes(self, generation, self.REBUILD_JOB)
 
 	def drop_index(self):

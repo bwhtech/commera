@@ -11,6 +11,7 @@ from rq.job import JobStatus
 
 from commera.localization.content import BATCH_SIZE, DOCTYPE, SHOP_WIDE, get_lookup_market, translate
 from commera.localization.languages import Language, StorefrontLanguages
+from commera.localization.markets import StorefrontMarkets, fetch_market_rows
 from commera.localization.resolver import Localization, get_localization
 from commera.search.price_markets import price_generation
 
@@ -125,10 +126,17 @@ def index_languages(settings) -> tuple[str, list[str]]:
 	return languages.default.code, [language.code for language in get_search_languages(languages)]
 
 
-def index_generation(settings=None) -> str:
+def index_generation(settings=None, markets: StorefrontMarkets | None = None) -> str:
 	"""A hash of the languages and prices a full build indexes. A build compares it at its start and end."""
 	settings = settings or frappe.get_cached_doc("Commera Settings")
-	return sha256_hash(json.dumps([index_languages(settings), price_generation(settings)]))
+	return sha256_hash(json.dumps([index_languages(settings), price_generation(settings, markets)]))
+
+
+def fresh_index_generation() -> str:
+	"""index_generation from the database. The worker's own caches can predate another worker's save."""
+	settings = frappe.get_doc("Commera Settings")
+	markets = StorefrontMarkets(StorefrontLanguages.from_settings(settings), fetch_market_rows())
+	return index_generation(settings, markets)
 
 
 def rebuild_if_generation_changes(engine, generation: str, job_id: str):
@@ -137,7 +145,7 @@ def rebuild_if_generation_changes(engine, generation: str, job_id: str):
 
 	def check():
 		# After the commit, so the build's read snapshot cannot hide a newer save.
-		if index_generation(frappe.get_doc("Commera Settings")) == generation:
+		if fresh_index_generation() == generation:
 			return
 		# Only a queued build reads the new settings. This build's own job still counts as started.
 		if get_job_status(job_id) != JobStatus.QUEUED:

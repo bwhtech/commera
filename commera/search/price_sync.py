@@ -4,6 +4,7 @@ import frappe
 from frappe.query_builder import DocType
 
 from commera.search.build import enqueue_full_rebuild
+from commera.search.build_writes import note_build_writes
 from commera.search.price_markets import get_price_markets
 from commera.search.source_sync import PRODUCT_DOCTYPE, queue_variants
 from commera.search.sync import skip_batch_sync
@@ -22,7 +23,9 @@ def on_item_price_change(doc, method=None):
 		if version and version.price_list in price_lists and is_base_price(version)
 	}
 	if item_codes:
-		queue_variants(get_published_variants(sorted(item_codes)))
+		variants = get_published_variants(sorted(item_codes))
+		note_build_writes(PRODUCT_DOCTYPE, variants)
+		queue_variants(variants)
 
 
 def is_base_price(item_price) -> bool:

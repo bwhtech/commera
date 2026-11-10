@@ -23,9 +23,9 @@ PRICE_COLUMNS = (
 )
 
 
-def get_price_markets() -> dict[str, MarketPrices]:
+def get_price_markets(markets: StorefrontMarkets | None = None) -> dict[str, MarketPrices]:
 	"""{key: prices} of each market the index prices: the store, and each enabled market with lists."""
-	markets = StorefrontMarkets.load()
+	markets = markets or StorefrontMarkets.load()
 	priced = {SHOP_WIDE: MarketPrices.of(markets.primary)}
 	for market in markets.secondary:
 		prices = MarketPrices.of(market)
@@ -40,14 +40,14 @@ def get_price_market(market: Market | None = None) -> str:
 	return SHOP_WIDE if MarketPrices.of(market).uses_store_prices else market.handle
 
 
-def price_generation(settings) -> list:
+def price_generation(settings, markets: StorefrontMarkets | None = None) -> list:
 	"""What decides the indexed prices: the store lists in `settings`, and each market's lists."""
-	markets = [
+	lists = [
 		[key, prices.sale_price_list, prices.compare_at_price_list]
-		for key, prices in get_price_markets().items()
+		for key, prices in get_price_markets(markets).items()
 		if key != SHOP_WIDE
 	]
-	return [settings.sale_price_list, settings.default_price_list, markets]
+	return [settings.sale_price_list, settings.default_price_list, lists]
 
 
 def prices_for_variants(names, sizes_by_variant) -> dict[str, dict[str, dict]]:

@@ -8,10 +8,14 @@ from frappe.utils import CallbackManager
 from commera import utils
 from commera.localization import pin_localization, resolve
 from commera.localization.markets import CACHE_KEY as MARKETS_CACHE_KEY
+from commera.localization.markets import StorefrontMarkets
 from commera.search import query as search_query
 from commera.search import sqlite_product_search, sync
+from commera.search.build_writes import BUILD_KEY, BUILD_WRITES_KEY
 from commera.search.engine_cache import clear_search_engine
+from commera.search.facets import get_listing_facet_counts
 from commera.search.sqlite_product_search import SqliteProductSearch
+from commera.search.typeahead import get_typeahead
 from commera.tests.test_market_prices import MarketPriceTestCase, make_price_list
 from commera.tests.test_markets import make_market
 
@@ -44,6 +48,8 @@ class SearchPriceTestCase(MarketPriceTestCase):
 		self.swap_engine_attribute("INDEX_NAME", TEST_INDEX_NAME)
 		self.addCleanup(lambda: SqliteProductSearch().drop_index())
 		self.addCleanup(clear_search_engine)
+		# The builds below never run their after-commit reconcile.
+		self.addCleanup(frappe.cache.delete_value, [BUILD_KEY, BUILD_WRITES_KEY])
 		self.products, self.item_codes = {}, {}
 		for label in STORE_RATES:
 			self.products[label], self.item_codes[label] = self.make_product(label)
@@ -300,11 +306,21 @@ class TestSearchPriceSync(SearchPriceTestCase):
 		with patch.object(frappe.db, "after_commit", callbacks):
 			SqliteProductSearch().drop_index()
 			SqliteProductSearch().build_index()
+		# Another worker's save: it clears the Redis rows, not this worker's local copy.
 		frappe.db.set_value("Commera Market", "gulf", "enabled", 0)
-		frappe.cache.delete_value(MARKETS_CACHE_KEY)
+		frappe.cache.delete(frappe.cache.make_key(MARKETS_CACHE_KEY))
+		self.assertTrue(StorefrontMarkets.load().find("gulf"))
 		with patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild:
 			callbacks.run()
 		rebuild.assert_called_once_with()
+
+	def test_an_unchanged_build_does_not_rebuild_again(self):
+		callbacks = CallbackManager()
+		with patch.object(frappe.db, "after_commit", callbacks):
+			SqliteProductSearch().build_index()
+		with patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild:
+			callbacks.run()
+		rebuild.assert_not_called()
 
 	def test_an_index_without_market_prices_counts_as_missing(self):
 		self.engine.sql("DROP TABLE search_price", commit=True)
@@ -312,3 +328,93 @@ class TestSearchPriceSync(SearchPriceTestCase):
 		with patch.object(sqlite_product_search.frappe, "enqueue") as enqueue:
 			self.engine.ensure_index_built()
 		enqueue.assert_called_once()
+
+
+class TestPriceSyncDuringABuild(SearchPriceTestCase):
+	"""A build reads a batch, a price sync writes newer rows, then the build writes its batch."""
+
+	def build_with_a_price_sync_midway(self, change):
+		"""Rebuild in place, running `change` and its sync before the build's first write."""
+		callbacks, synced = CallbackManager(), []
+		write = SqliteProductSearch._index_documents
+
+		def sync_then_write(engine, documents):
+			if not synced:
+				synced.append(True)
+				synced.extend(self.run_price_sync(change))
+			write(engine, documents)
+
+		with (
+			patch.object(frappe.db, "after_commit", callbacks),
+			patch.object(SqliteProductSearch, "_index_documents", sync_then_write),
+		):
+			SqliteProductSearch().build_index()
+		self.assertEqual(synced, [True, [self.other]])
+		return callbacks
+
+	def gulf_card_price(self):
+		clear_search_engine()
+		with self.in_market():
+			return self.cards([self.other]).get(self.other, {}).get("effective_price")
+
+	def test_a_price_saved_during_a_build_survives_it(self):
+		callbacks = self.build_with_a_price_sync_midway(
+			lambda: self.save_item_price(self.item_codes["OTHER"]["M"], self.market_sale, price_list_rate=210)
+		)
+		# The build wrote the price it read first over the synced one.
+		self.assertEqual(self.gulf_card_price(), 260)
+		callbacks.run()
+		self.assertEqual(self.gulf_card_price(), 210)
+		with self.in_market():
+			self.assertEqual(self.grid("price_low"), [self.discounted, self.other, self.mixed])
+		self.assertFalse(frappe.cache.exists(BUILD_KEY))
+		self.assertEqual(frappe.cache.smembers(BUILD_WRITES_KEY), set())
+
+	def test_a_price_deleted_during_a_build_stays_deleted(self):
+		name = frappe.db.get_value(
+			"Item Price", {"item_code": self.item_codes["OTHER"]["M"], "price_list": self.market_sale}
+		)
+		callbacks = self.build_with_a_price_sync_midway(
+			lambda: frappe.delete_doc("Item Price", name, ignore_permissions=True)
+		)
+		with self.in_market():
+			self.assertIn(self.other, self.grid())
+		callbacks.run()
+		with self.in_market():
+			self.assertNotIn(self.other, self.grid())
+			self.assertEqual(self.count(), 2)
+
+
+class TestUnpricedSearchFallback(SearchPriceTestCase):
+	"""frappe.qb serves a market the index has not priced yet. A search there still needs a price."""
+
+	def setUp(self):
+		super().setUp()
+		patcher = patch.object(SqliteProductSearch, "prices_market", return_value=False)
+		patcher.start()
+		self.addCleanup(patcher.stop)
+
+	def listed(self):
+		return [card["name"] for card in utils.get_product_list({"search": TOKEN}, page_length=100)]
+
+	def test_a_search_in_a_secondary_market_leaves_out_unpriced_products(self):
+		with self.in_market():
+			self.assertTrue(search_query.use_qb_fallback({"search": TOKEN}))
+			self.assertEqual(set(self.listed()), {self.mixed, self.other, self.discounted})
+			self.assertEqual(utils.get_total_product_count({"search": TOKEN}), 3)
+			self.assertEqual(get_listing_facet_counts({"search": TOKEN})["sizes"], {"M": 3, "L": 1})
+			typeahead = [card["name"] for card in get_typeahead(TOKEN, limit=10)["products"]]
+			self.assertEqual(set(typeahead), {self.mixed, self.other, self.discounted})
+			# Browsing still lists it, unavailable.
+			unpriced = self.cards_qb([self.unpriced])[0]
+			self.assertIsNone(unpriced["effective_price"])
+
+	def test_a_search_in_the_primary_market_keeps_unpriced_products(self):
+		self.assertTrue(search_query.use_qb_fallback({"search": TOKEN}))
+		# The class's earlier tests leave their products: the store prices them all.
+		listed = self.listed()
+		self.assertIn(self.unpriced, listed)
+		self.assertEqual(utils.get_total_product_count({"search": TOKEN}), len(listed))
+
+	def cards_qb(self, names):
+		return utils.get_product_list_qb(product_list=names)
