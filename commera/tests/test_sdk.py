@@ -148,6 +148,7 @@ PUBLIC_NAMES = {
 		"Order",
 		"OrderLine",
 		"OrderTracking",
+		"PriceFacet",
 		"PricedCart",
 		"PricedCartLine",
 		"Product",

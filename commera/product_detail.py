@@ -1,6 +1,7 @@
 import frappe
 from frappe.utils import cstr, flt
 
+from commera.base_prices import base_price_filters
 from commera.utils import get_available_stock, get_discount_percent
 
 DEFAULT_PRODUCT_IMAGE = "/assets/commera/images/1.jpg"
@@ -87,9 +88,9 @@ def get_price(selected_item, price_list):
 	# None and 0.0 must stay distinguishable: "not on this list" falls back, "free" does not.
 	if not selected_item:
 		return None
-	price = frappe.get_cached_value(
+	price = frappe.db.get_value(
 		"Item Price",
-		{"item_code": selected_item["item_code"], "price_list": price_list},
+		base_price_filters({"item_code": selected_item["item_code"], "price_list": price_list}),
 		"price_list_rate",
 	)
 	return flt(price) if price is not None else None

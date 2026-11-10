@@ -1,7 +1,10 @@
 import frappe
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Count, Max, Min
+from pypika.terms import Field
 
+from commera.card_prices import card_prices_query
+from commera.localization.market_prices import MarketPrices
 from commera.product_detail import size_sort_key
 from commera.search import query as search_query
 from commera.shop_data import get_category_facets
@@ -79,18 +82,17 @@ def get_listing_facet_counts(selected_filters: dict) -> dict[str, dict[str, int]
 	return {key: get_facet_counts_qb(selected_filters, key) for key in FACET_FIELDS}
 
 
-def get_price_range() -> dict:
-	item_price = DocType("Item Price")
-	sale_price_list = frappe.get_cached_value("Commera Settings", "Commera Settings", "sale_price_list")
-	price_range = (
-		frappe.qb.from_(item_price)
-		.select(
-			Min(item_price.price_list_rate).as_("min_price"),
-			Max(item_price.price_list_rate).as_("max_price"),
+def get_price_range(sale_price_list: str | None, compare_at_price_list: str | None = None) -> dict:
+	"""The range of the card prices of the published products, the price the grid filters on."""
+	product = DocType("Style Attribute Variant")
+	published = frappe.qb.from_(product).select(product.name).where(product.is_published == 1)
+	card_prices = card_prices_query(sale_price_list, compare_at_price_list, published).as_("card_prices")
+	return (
+		frappe.qb.from_(card_prices).select(
+			Min(Field("effective_price", table=card_prices)).as_("min_price"),
+			Max(Field("effective_price", table=card_prices)).as_("max_price"),
 		)
-		.where(item_price.price_list == sale_price_list)
-	).run(as_dict=True)
-	return price_range[0] if price_range else {"min_price": 0, "max_price": 0}
+	).run(as_dict=True)[0]
 
 
 def get_product_filters(selected_filters):
@@ -107,4 +109,5 @@ def get_product_filters(selected_filters):
 		filters["sizes"] = get_filter_sizes(selected_filters)
 		filters["colors"] = get_filter_colors(selected_filters)
 
-	return filters, get_price_range()
+	prices = MarketPrices.current()
+	return filters, get_price_range(prices.sale_price_list, prices.compare_at_price_list)

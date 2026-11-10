@@ -107,19 +107,22 @@ def get_chips(context):
 	]
 	if context.selected.min is not None or context.selected.max is not None:
 		chips.append(
-			{"label": get_price_label(context.selected), "url": get_listing_url(context, min=None, max=None)}
+			{
+				"label": get_price_label(context.selected, context.listing["facets"]["price"]["currency"]),
+				"url": get_listing_url(context, min=None, max=None),
+			}
 		)
 	if context.selected.has_discount:
 		chips.append({"label": _("On sale"), "url": get_listing_url(context, has_discount=None)})
 	return chips
 
 
-def get_price_label(selected):
+def get_price_label(selected, currency):
 	if selected.max is None:
-		return _("From {0}").format(money(selected.min))
+		return _("From {0}").format(money(selected.min, currency))
 	if selected.min is None:
-		return _("Up to {0}").format(money(selected.max))
-	return _("{0} to {1}").format(money(selected.min), money(selected.max))
+		return _("Up to {0}").format(money(selected.max, currency))
+	return _("{0} to {1}").format(money(selected.min, currency), money(selected.max, currency))
 
 
 def add_seo(context):

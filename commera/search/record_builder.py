@@ -1,6 +1,8 @@
 import frappe
-from frappe.utils import cint, create_batch, cstr
+from frappe.utils import cint, create_batch, cstr, flt
 
+from commera.base_prices import base_price_filters
+from commera.card_prices import get_card_price
 from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import root_filter
 from commera.search.translations import get_market_titles, get_translated_titles
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
@@ -309,10 +311,14 @@ def prices_for_variants(sizes_by_variant):
 	all_codes = list({code for codes in codes_by_variant.values() for code in codes})
 	default_rate, sale_rate, sale_upto = rates_by_item_code(all_codes, default_price_list, sale_price_list)
 
-	return {
+	snapshots = {
 		variant: aggregate_prices(codes, default_rate, sale_rate, sale_upto)
 		for variant, codes in codes_by_variant.items()
 	}
+	# The index keeps 0 for an unpriced product, as before.
+	for snapshot in snapshots.values():
+		snapshot["effective_price"] = flt(snapshot["effective_price"])
+	return snapshots
 
 
 def rates_by_item_code(item_codes, default_price_list, sale_price_list):
@@ -321,10 +327,9 @@ def rates_by_item_code(item_codes, default_price_list, sale_price_list):
 	for chunk in create_batch(item_codes, IN_CLAUSE_CHUNK_SIZE):
 		for row in frappe.get_all(
 			"Item Price",
-			filters={
-				"item_code": ("in", chunk),
-				"price_list": ("in", [default_price_list, sale_price_list]),
-			},
+			filters=base_price_filters(
+				{"item_code": ("in", chunk), "price_list": ("in", [default_price_list, sale_price_list])}
+			),
 			fields=["item_code", "price_list", "price_list_rate", "valid_upto"],
 		):
 			if row.price_list == default_price_list and row.price_list_rate is not None:
@@ -337,24 +342,10 @@ def rates_by_item_code(item_codes, default_price_list, sale_price_list):
 
 
 def aggregate_prices(item_codes, default_rate, sale_rate, sale_upto):
-	"""Min/min/max snapshot over a variant's item_codes, mirroring the QB discount_expr semantics."""
-	default_values = [default_rate[code] for code in item_codes if code in default_rate]
-	sale_values = [sale_rate[code] for code in item_codes if code in sale_rate]
+	"""A product's card prices over its sizes (card_prices.get_card_price), with its last sale end."""
 	upto_values = [sale_upto[code] for code in item_codes if code in sale_upto]
-
-	default_price = min(default_values) if default_values else None
-	sale_price = min(sale_values) if sale_values else None
-
-	discount_percent = 0.0
-	if default_price and default_price > 0 and sale_price is not None:
-		discount_percent = (default_price - sale_price) / default_price * 100
-
 	return {
-		"default_price": default_price,
-		"sale_price": sale_price,
-		"effective_price": sale_price if sale_price is not None else (default_price or 0),
-		"discount_percent": discount_percent,
-		"has_discount": 1 if discount_percent else 0,
+		**get_card_price([(sale_rate.get(code), default_rate.get(code)) for code in item_codes]),
 		"sale_end_date": max(upto_values) if upto_values else None,
 	}
 

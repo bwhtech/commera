@@ -90,7 +90,10 @@ function typeahead() {
 		product_url,
 
 		money(product) {
-			return commera.format.money(product.price, product.currency);
+			// A product the market does not sell has no price.
+			return product.price === null
+				? ''
+				: commera.format.money(product.price, product.currency);
 		},
 	};
 }
@@ -161,7 +164,8 @@ function product_form(product) {
 		},
 
 		get price() {
-			return this.variant?.price ?? product.price;
+			// A variant the market does not sell has a null price, never another variant's.
+			return this.variant ? this.variant.price : product.price;
 		},
 
 		get compare_at_price() {
@@ -174,7 +178,9 @@ function product_form(product) {
 		},
 
 		money(amount) {
-			return commera.format.money(amount, product.currency);
+			return amount === null
+				? ''
+				: commera.format.money(amount, product.currency);
 		},
 
 		move_image(step, count) {

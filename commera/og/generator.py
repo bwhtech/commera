@@ -76,12 +76,13 @@ def card_text_localization():
 		yield
 
 
-def build_variant_card_context(variant_doc):
+def build_variant_card_context(variant_doc, with_price=True):
+	"""`with_price` False drops the price: a secondary market's card would show the store price."""
 	with card_text_localization():
-		return read_variant_card_context(variant_doc)
+		return read_variant_card_context(variant_doc, with_price)
 
 
-def read_variant_card_context(variant_doc):
+def read_variant_card_context(variant_doc, with_price):
 	from commera.product_detail import get_product_detail
 
 	detail = get_product_detail(variant_doc.route)
@@ -91,7 +92,7 @@ def read_variant_card_context(variant_doc):
 	if detail:
 		brand = detail["product"].brand or ""
 		amount = detail["sale_price"] or detail["default_price"]
-		if amount:
+		if amount and with_price:
 			price = f"{seo.get_site_currency()} {flt(amount):.2f}"
 		images = detail["images"]
 		if images:
@@ -148,8 +149,8 @@ def resolve_template(for_doctype):
 	return template_html or BUNDLED_CARD_TEMPLATE
 
 
-def render_card_for_doc(for_doctype, doc):
-	context = context_builder_for(for_doctype)(doc)
+def render_card_for_doc(for_doctype, doc, with_price=True):
+	context = context_builder_for(for_doctype)(doc, with_price=with_price)
 	# nosemgrep: frappe-ssti  # template is admin-authored OG Image Template, not end-user input
 	html_str = render_themed_template(resolve_template(for_doctype), context)
 	return render_og_png(html_str, DEFAULT_OG_WIDTH, DEFAULT_OG_HEIGHT)

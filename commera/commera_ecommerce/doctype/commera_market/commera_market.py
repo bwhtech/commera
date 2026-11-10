@@ -32,12 +32,15 @@ class CommeraMarket(Document):
 			CommeraMarketLanguage,
 		)
 
+		compare_at_price_list: DF.Link | None
 		countries: DF.Table[CommeraMarketCountry]
+		currency: DF.Link | None
 		default_language: DF.Link
 		enabled: DF.Check
 		handle: DF.Data | None
 		languages: DF.Table[CommeraMarketLanguage]
 		market_name: DF.Data
+		sale_price_list: DF.Link
 	# end: auto-generated types
 
 	def autoname(self):
@@ -48,6 +51,7 @@ class CommeraMarket(Document):
 		self.validate_handle()
 		self.validate_countries()
 		self.validate_languages()
+		self.validate_price_lists()
 
 	def before_save(self):
 		self.reinsert_changed_countries()
@@ -145,6 +149,28 @@ class CommeraMarket(Document):
 				title=_("Regional Language"),
 			)
 
+	def validate_price_lists(self):
+		"""The market sells in the sale price list's currency; Commera converts no prices."""
+		for fieldname in ("sale_price_list", "compare_at_price_list"):
+			if (price_list := self.get(fieldname)) and not frappe.get_cached_value(
+				"Price List", price_list, "selling"
+			):
+				frappe.throw(
+					_("{0} {1} is not a selling price list.").format(
+						_(self.meta.get_label(fieldname)), frappe.bold(price_list)
+					),
+					title=_("Invalid Price List"),
+				)
+		self.currency = get_price_list_currency(self.sale_price_list)
+		compare_at_currency = get_price_list_currency(self.compare_at_price_list)
+		if self.compare_at_price_list and compare_at_currency != self.currency:
+			frappe.throw(
+				_(
+					"Compare-at Price List {0} is in {1}, but the Sale Price List is in {2}. Use one currency."
+				).format(frappe.bold(self.compare_at_price_list), compare_at_currency, self.currency),
+				title=_("Currency Mismatch"),
+			)
+
 	def reinsert_changed_countries(self):
 		"""Frappe updates kept rows one by one, so a swap of two countries breaks the unique index midway.
 		As new rows, Frappe deletes them with the removed rows first, then inserts them under their names."""
@@ -178,6 +204,32 @@ def throw_country_taken(country: str, market: str | None, exc=frappe.ValidationE
 		title=_("Country In Another Market"),
 		exc=exc,
 	)
+
+
+def validate_market_price_list(doc, method=None):
+	"""A market's currency is its price lists' currency, cached with the markets."""
+	if doc.is_new() or not doc.has_value_changed("currency"):
+		return
+	# Before the schema sync no market has a price list.
+	if not frappe.db.has_column("Commera Market", "sale_price_list"):
+		return
+	markets = frappe.get_all(
+		"Commera Market",
+		or_filters={"sale_price_list": doc.name, "compare_at_price_list": doc.name},
+		pluck="market_name",
+		limit=1,
+	)
+	if markets:
+		frappe.throw(
+			_("Price List {0} sets the prices of market {1}, so its currency cannot change.").format(
+				frappe.bold(doc.name), frappe.bold(markets[0])
+			),
+			title=_("Price List In Use"),
+		)
+
+
+def get_price_list_currency(price_list: str | None) -> str | None:
+	return frappe.get_cached_value("Price List", price_list, "currency") if price_list else None
 
 
 def refresh_market_surfaces():

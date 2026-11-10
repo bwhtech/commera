@@ -53,7 +53,7 @@ The catalogue and cart methods allow guests. The [account methods](#account-meth
 
 | Method | Returns |
 | --- | --- |
-| `products.get_products` | One page of product cards with the facets of the whole result. Each brand, colour and size facet value has its product count, as `{"value": "K&N", "count": 3}`. The other selected filters narrow each count, but the facet's own filter does not. `price` is the `min` and `max` sale price. Filters: `collection`, `query`, `brands`, `colors`, `sizes`, `min_price`, `max_price`, `on_sale`. `sort` is `default`, `price_low`, `price_high`, `name`, `new_arrival` or `discount`. |
+| `products.get_products` | One page of product cards with the facets of the whole result. Each brand, colour and size facet value has its product count, as `{"value": "K&N", "count": 3}`. The other selected filters narrow each count, but the facet's own filter does not. `price` is the `min` and `max` sale price and the `currency` they are in. Filters: `collection`, `query`, `brands`, `colors`, `sizes`, `min_price`, `max_price`, `on_sale`. `sort` is `default`, `price_low`, `price_high`, `name`, `new_arrival` or `discount`. |
 | `products.get_product` | One product: images, the colour option with sibling handles and stock, the size option, and one variant for each size with its price, list price and stock. |
 | `collections.get_collections`, `collections.get_collection` | Enabled menu tabs (top-level Ecommerce Categories), by route slug. The `title`, the `description`, and the `seo` title and description are in the request language. `seo.custom_title` is true when the merchant set the meta title, as on a product. |
 | `shop.get_shop` | Store name and description, currency, logo, the menu from Ecommerce Category, the footer, and the resolved `localization`. The store name and description, menu labels, and footer section titles and link labels are in the request language. Link targets and URLs stay as the merchant entered them. |
@@ -200,5 +200,30 @@ Rules:
 - A country belongs to one market only. A unique index on the country column of **Commera Market Country** enforces this, also when two saves run at the same time.
 - A market language must be a base language (`pt`, `ar`) or a base language with a script (`zh-Hans`). It cannot name a region (`pt-BR`, `zh-TW`, `en-US`), because the market countries set the region.
 - The hreflang of a market URL is `<language>-<COUNTRY>`, or `<language>-<Script>-<COUNTRY>` for a script code. Example: `zh-Hans` in the UAE is `zh-Hans-AE` at `/zh-hans-ae/`.
+
+### Market prices
+
+A market has a **Sale Price List** and an optional **Compare-at Price List**. Both must be selling price lists in one currency. The market currency is the currency of the sale price list. The primary market uses the two price lists of **Commera Settings** and the store currency.
+
+On a secondary market page, or an API request with that market's `_country`, products, product cards, variants and `catalog.get_items` show the prices and the currency of the market. Every market, the primary market too, uses one price rule:
+
+- `price` is the rate in the sale price list. When the item has no sale rate, `price` is the rate in the compare-at price list, and the item shows no compare-at price. Commera does not convert currency.
+- `compare_at_price` is the rate in the compare-at price list, only when the item has a sale rate and the compare-at rate is higher. `catalog.get_items` gives it as `list_price`, which is `null` otherwise.
+- A product card shows its lowest size price. The card `compare_at_price` is the compare-at rate of that size, only when that size has a sale rate and the compare-at rate is higher. Example: size M at 300 (sale) from 400, and size L at 250 (compare-at rate only). The card price is 250, with no crossed-out price.
+- The grid price filters, the price sort, the "On sale" filter, the discount sort and the price facet use the card price, calculated over all sizes of the product (`commera/card_prices.py`). A size filter does not change the card price.
+- The card price query calculates only the candidate products: a pinned product list, the page of a grid without a price sort or price filter, or the products that the other grid filters keep. It reads each size once.
+- In a secondary market, an item with a rate in neither list has `price: null` and `available: false`. `cart.add_lines` and `cart.set_lines` refuse it. `cart.update_lines` and `cart.set_lines` refuse a higher quantity of it, but a lower quantity or a removal is always allowed.
+- A product card is available only when one size has both a market price and stock.
+- The price facet (`facets.price`) has the `min`, `max` and `currency` of the market.
+- The primary market keeps its prices and currency. An item with a rate in neither list has a price of 0 there, as before.
+- A market with no sale price list keeps the store prices. This occurs before the schema sync, or when the backfill patch could not fill the market.
+
+Only base Item Price rows set a public price: a row with a customer or a batch is not shown, not used in a filter or a facet, and does not make an item available (`commera/base_prices.py`). Item Price validity dates do not apply.
+
+The product OG card (`/og-image/<handle>.png`) shows the store price. A secondary market page links the card without a price: `/og-image/<handle>.png?price=none`, which has its own cache file.
+
+The patch `set_market_price_lists` gives each market without a sale price list the Commera Settings lists: the sale price list (or the default price list when there is no sale list) as the sale price list, the default price list as the compare-at list, and their currency. The market then prices every item like the primary market. It logs a market it cannot fill.
+
+The cart keeps the store price list and currency. Search sorting and price filters on the search index, and taxes, do not use market prices yet.
 
 **Limitation (v1).** A regional language, such as `pt-BR`, shows in the primary market only, at its own URL (`/pt-br/`). To serve Portuguese in a market, publish the base language `pt` and add it to the market. A market saved before this rule can keep its regional rows. Commera serves no URL for them. You can still remove those rows or disable the market.
