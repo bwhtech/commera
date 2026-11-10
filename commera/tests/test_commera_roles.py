@@ -99,6 +99,27 @@ class TestCommeraRoles(IntegrationTestCase):
 		)
 		self.assertCountEqual([row.parent for row in permissions], ADMIN_PERMISSIONS)
 
+	def test_a_right_added_later_reaches_a_site_that_has_the_row(self):
+		self.addCleanup(frappe.db.rollback)
+		add_commera_roles()
+		key = {"parent": "Content Translation", "role": COMMERA_ADMIN, "permlevel": 0}
+		frappe.db.set_value("Custom DocPerm", key, "delete", 0)
+
+		add_commera_roles()
+
+		self.assertEqual(frappe.db.get_value("Custom DocPerm", key, ["read", "delete"]), (1, 1))
+
+	def test_a_commera_admin_manages_translations_and_theme_text(self):
+		add_commera_roles()
+		create_user(GRANTED_ADMIN, COMMERA_ADMIN)
+		for doctype, rights in (
+			("Content Translation", ("read", "write", "create", "delete")),
+			("Theme Layout", ("read", "write", "create")),
+		):
+			for right in rights:
+				with self.subTest(doctype=doctype, right=right):
+					self.assertTrue(frappe.has_permission(doctype, right, user=GRANTED_ADMIN))
+
 	def test_a_commera_admin_can_write_items(self):
 		add_commera_roles()
 		create_user(GRANTED_ADMIN, COMMERA_ADMIN)

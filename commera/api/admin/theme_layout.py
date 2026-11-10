@@ -14,6 +14,7 @@ from commera.shop_themes.sections import (
 	get_inherited_layout,
 	get_pages,
 	get_section_schema,
+	get_theme_json,
 	list_theme_files,
 )
 
@@ -89,17 +90,39 @@ def build_layout_state(theme_context, page):
 		"published_layout": published_layout,
 		"default_layout": default_layout,
 		"has_unpublished_changes": draft_layout != live_layout,
-		"revision": get_revision(saved),
+		"revision": get_revision(theme_context, page, saved),
 	}
 
 
-def get_revision(theme_layout) -> str:
-	"""Changes with every stored change to the page, so a save can tell the editor saw the latest."""
-	return sha256_hash(f"{theme_layout.draft_layout or ''}\0{theme_layout.published_layout or ''}")[:20]
+def get_revision(theme_context, page, theme_layout, lock=False) -> str:
+	"""Changes with every stored change to the page or to a layout it inherits, so a save can tell the
+	editor saw the latest. `lock` holds the parent rows until the save commits."""
+	parts = [
+		theme_layout.draft_layout or "",
+		theme_layout.published_layout or "",
+		*get_parent_layouts(theme_context, page, lock),
+		frappe.as_json(get_theme_json(theme_context["dirs"], f"layouts/{page}.json")),
+	]
+	return sha256_hash("\0".join(parts))[:20]
 
 
-def check_revision(theme_layout, revision):
-	if revision != get_revision(theme_layout):
+def get_parent_layouts(theme_context, page, lock) -> list[str]:
+	"""The stored live layouts of the parent themes, in chain order. Read past the layout cache."""
+	parents = theme_context["names"][1:]
+	if not parents:
+		return []
+	table = frappe.qb.DocType("Theme Layout")
+	query = (
+		frappe.qb.from_(table)
+		.select(table.theme, table.published_layout)
+		.where(table.theme.isin(parents) & (table.page == page))
+	)
+	stored = dict((query.for_update() if lock else query).run())
+	return [stored.get(name) or "" for name in parents]
+
+
+def check_revision(theme_context, page, theme_layout, revision):
+	if revision != get_revision(theme_context, page, theme_layout, lock=True):
 		frappe.throw(
 			_("This page changed elsewhere. Reload to continue."),
 			frappe.TimestampMismatchError,
@@ -145,7 +168,7 @@ def save_draft_layout(theme_context, page, layout, revision):
 		else frappe.new_doc("Theme Layout", theme=theme_context["theme_name"], page=page)
 	)
 	# The editor sends its whole layout, so a save over a change it never saw would undo that change.
-	check_revision(theme_layout, revision)
+	check_revision(theme_context, page, theme_layout, revision)
 	theme_layout.draft_layout = frappe.as_json(layout)
 	theme_layout.save()
 	return theme_layout

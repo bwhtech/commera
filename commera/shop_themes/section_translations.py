@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 import frappe
 from frappe import _
-from frappe.utils import cint
 
 from commera.localization.content import get_source_hash, get_status
 from commera.localization.resources import BATCH_SIZE, TranslatableResource, TranslationEntry
@@ -14,6 +13,7 @@ from commera.shop_themes.section_text import (
 	OVERLAY,
 	find_text_setting,
 	get_default_language,
+	get_nested,
 	get_stored_hash,
 	get_translations,
 	is_overlay,
@@ -34,13 +34,13 @@ class ThemeSectionResource(TranslatableResource):
 
 	theme: str | None = None
 
-	def scan(self, language, filters, cursor, batch_size=BATCH_SIZE):
-		"""A theme has few entries, so the cursor is a plain position in the full list."""
-		start = cint(cursor)
-		for position, entry in enumerate(self.iter_all_entries(language)):
-			if position >= start and filters.get("name") in (None, entry.name):
-				if filters.get("field") in (None, entry.field):
-					yield entry, str(position)
+	def scan(self, language, filters, after, batch_size=BATCH_SIZE):
+		"""A theme has few entries, so they are sorted in memory by their key, [name, setting id]."""
+		entries = sorted(self.iter_all_entries(language), key=lambda entry: (entry.name, entry.field))
+		for entry in entries:
+			key = [entry.name, entry.field]
+			if (not after or key > after) and matches_filters(entry, filters):
+				yield entry, key
 
 	def iter_all_entries(self, language):
 		theme_context = self.get_theme_context()
@@ -122,14 +122,21 @@ def set_inherited_translation(theme_context, page, overlay, path, setting_id, la
 	default = get_default_language()
 	source = get_source(text.value, default) if text else ""
 	if not source:
-		throw_not_found(f"{page}/{path}", setting_id)
-	if value:
+		# A translation of a setting the parent dropped can still be cleared.
+		if value or get_nested(overlay, OVERLAY, path, setting_id, language) is None:
+			throw_not_found(f"{page}/{path}", setting_id)
+		set_overlay_text(overlay, path, setting_id, language, None, None)
+	elif value:
 		set_overlay_text(overlay, path, setting_id, language, value, get_source_hash(source))
 	else:
 		# Removing a translation the parent ships needs an empty one to hide it.
 		hidden = "" if language in get_translations(text.value, default) else None
 		set_overlay_text(overlay, path, setting_id, language, hidden, None)
 	return overlay if overlay.get(OVERLAY) else None
+
+
+def matches_filters(entry, filters) -> bool:
+	return filters.get("name") in (None, entry.name) and filters.get("field") in (None, entry.field)
 
 
 def get_theme_layout(theme, page):

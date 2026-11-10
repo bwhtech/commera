@@ -7,15 +7,18 @@ from frappe import _
 from commera.localization.content import get_source_hash
 from commera.localization.languages import StorefrontLanguages
 from commera.shop_themes.section_text import (
+	OVERLAY,
 	SOURCE_HASHES,
 	apply_overlays,
 	get_default_language,
+	get_nested,
 	get_stored_hash,
 	get_translations,
 	index_text_settings,
 	is_overlay,
 	iter_overlay,
 	iter_text_settings,
+	set_overlay_text,
 	set_stored_hash,
 )
 from commera.shop_themes.sections import LEGACY_SOURCE_LANGUAGE, get_inherited_layout, get_source
@@ -26,7 +29,7 @@ def prepare_theme_layout(theme_layout, theme_context):
 	then hashes today's source. The draft may borrow live hashes; the live layout never borrows draft ones."""
 	dirs = theme_context["dirs"]
 	inherited = get_inherited_layout(theme_context["names"][1:], dirs, theme_layout.page)
-	previous_draft, previous_live = get_previous_layouts(theme_layout, dirs, inherited)
+	previous_draft, previous_live, previous_overlay = get_previous_layouts(theme_layout, dirs, inherited)
 	default = get_default_language()
 	known = {
 		"draft_layout": [previous_draft, previous_live, inherited],
@@ -38,22 +41,25 @@ def prepare_theme_layout(theme_layout, theme_context):
 			continue
 		known_layouts = [known for known in known_layouts if isinstance(known, dict)]
 		if fieldname == "published_layout" and is_overlay(layout):
-			check_overlay(dirs, layout, inherited, known_layouts)
+			prune_overlay(dirs, layout, inherited)
+			check_overlay(dirs, layout, previous_overlay, inherited, known_layouts)
+			layout = layout if layout.get(OVERLAY) else None
 		else:
 			check_language_keys(dirs, layout, known_layouts)
 			stamp_source_hashes(dirs, layout, known_layouts, default)
-		theme_layout.set(fieldname, frappe.as_json(layout))
+		theme_layout.set(fieldname, frappe.as_json(layout) if layout else None)
 
 
 def get_previous_layouts(theme_layout, theme_dirs, inherited):
-	"""The stored draft and live layout before this save; a live overlay comes laid over `inherited`."""
+	"""The stored draft and live layout before this save, a live overlay laid over `inherited`,
+	and that overlay as stored."""
 	previous = theme_layout.get_doc_before_save()
 	if not previous:
-		return None, None
+		return None, None, None
 	live = parse_layout(previous.published_layout)
 	if is_overlay(live):
-		live = apply_overlays(theme_dirs, inherited, [live])
-	return parse_layout(previous.draft_layout), live
+		return parse_layout(previous.draft_layout), apply_overlays(theme_dirs, inherited, [live]), live
+	return parse_layout(previous.draft_layout), live, None
 
 
 def stamp_source_hashes(theme_dirs, layout, known_layouts, default):
@@ -100,12 +106,25 @@ def check_language_keys(theme_dirs, layout, known_layouts):
 			throw_unknown_keys(text.label, unknown)
 
 
-def check_overlay(theme_dirs, overlay, inherited, known_layouts):
-	"""An overlay holds text only, under configured languages or keys its setting already holds."""
+def prune_overlay(theme_dirs, overlay, inherited):
+	"""Drop the translations of settings the inherited layout no longer has, e.g. of a removed block."""
+	texts = index_text_settings(theme_dirs, inherited)
+	for path, setting_id, language, _text in list(iter_overlay(overlay)):
+		if (path, setting_id) not in texts:
+			set_overlay_text(overlay, path, setting_id, language, None, None)
+
+
+def check_overlay(theme_dirs, overlay, previous_overlay, inherited, known_layouts):
+	"""A new or changed overlay text is text, under a configured language or a key its setting already
+	holds. Unchanged ones pass, so a stored key never blocks an unrelated save."""
 	allowed = get_allowed_keys()
 	held = get_held_keys(theme_dirs, known_layouts)
 	texts = index_text_settings(theme_dirs, inherited)
 	for path, setting_id, language, text in iter_overlay(overlay):
+		if isinstance(text, str) and text == get_nested(
+			previous_overlay, OVERLAY, path, setting_id, language
+		):
+			continue
 		setting = texts.get((path, setting_id))
 		label = setting.label if setting else f"{path} {setting_id}"
 		if not isinstance(text, str):

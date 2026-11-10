@@ -12,7 +12,7 @@ from PIL import Image
 
 from commera.api.admin import theme_layout as theme_layout_api
 from commera.api.admin.theme import activate_theme
-from commera.api.admin.theme_layout import discard, get_editor, get_revision, save_thumbnail
+from commera.api.admin.theme_layout import discard, get_editor, save_thumbnail
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context
 from commera.shop_themes.sections import clear_layout_cache
 from commera.shop_themes.theme_resolver import get_theme_environment
@@ -22,9 +22,7 @@ CLASSIC_THEME = "Shop Default Theme"
 
 
 def current_revision(theme, page):
-	fields = ["draft_layout", "published_layout"]
-	row = frappe.db.get_value("Theme Layout", {"theme": theme, "page": page}, fields, as_dict=True)
-	return get_revision(row or frappe._dict())
+	return get_editor(theme, page)["revision"]
 
 
 def save_draft(theme, page, layout):

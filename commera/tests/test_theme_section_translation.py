@@ -1,6 +1,7 @@
 import copy
 
 import frappe
+from frappe.core.doctype.user_permission.test_user_permission import create_user
 from frappe.tests import IntegrationTestCase
 from frappe.utils.jinja import get_jenv
 
@@ -8,6 +9,7 @@ from commera.api.admin import theme_layout as theme_layout_api
 from commera.api.admin.theme import activate_theme
 from commera.api.admin.theme_layout import discard, get_editor
 from commera.localization import CURRENT, MISSING, OUTDATED, get_translatable_resource
+from commera.roles import COMMERA_ADMIN, add_commera_roles
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context, get_theme_context
 from commera.shop_themes.section_text import OVERLAY, SOURCE_HASHES
 from commera.shop_themes.section_translations import ThemeSectionResource
@@ -20,6 +22,8 @@ SUMMER_THEME = "Summer Theme"
 HEADING = "Beautiful Woman Purple Sweater."
 ARABIC_HEADING = "سترة أرجوانية جميلة"
 ENTRY = "index/hero/slide-1"
+ENTRY_KEY = (ENTRY, "heading")
+THEME_TRANSLATOR = "theme-translator@example.com"
 
 
 class TestThemeSectionTranslation(IntegrationTestCase):
@@ -272,6 +276,58 @@ class TestThemeSectionTranslation(IntegrationTestCase):
 		)
 		found = self.resource.list_entries("ar", search="purple sweater").entries
 		self.assertIn((ENTRY, "heading"), [(entry.name, entry.field) for entry in found])
+
+	def test_a_page_after_an_entry_before_the_cursor_was_removed_skips_nothing(self):
+		publish(SUMMER_THEME, "index", self.editor_layout(HEADING))
+		first = self.first_page_past(ENTRY_KEY)
+
+		publish(SUMMER_THEME, "index", self.editor_layout(""))
+
+		self.assertNotIn(ENTRY_KEY, self.keys(self.resource.iter_entries("ar")))
+		self.assert_rest_follows(first)
+
+	def test_a_page_after_an_entry_was_added_before_the_cursor_repeats_nothing(self):
+		publish(SUMMER_THEME, "index", self.editor_layout(""))
+		first = self.first_page_past(ENTRY_KEY)
+
+		publish(SUMMER_THEME, "index", self.editor_layout(HEADING))
+
+		self.assertIn(ENTRY_KEY, self.keys(self.resource.iter_entries("ar")))
+		self.assert_rest_follows(first)
+
+	def first_page_past(self, key):
+		before = [entry for entry in self.keys(self.resource.iter_entries("ar")) if entry <= key]
+		first = self.resource.list_entries("ar", limit=len(before) + 1)
+		self.assertGreater(self.keys(first.entries)[-1], key)
+		self.assertTrue(first.next_cursor)
+		return first
+
+	def assert_rest_follows(self, first):
+		"""The pages after `first` hold exactly the entries after its last key now, once each."""
+		rest, cursor = [], first.next_cursor
+		while cursor:
+			page = self.resource.list_entries("ar", cursor=cursor, limit=4)
+			rest += self.keys(page.entries)
+			cursor = page.next_cursor
+		last = self.keys(first.entries)[-1]
+		self.assertEqual(rest, [key for key in self.keys(self.resource.iter_entries("ar")) if key > last])
+
+	def keys(self, entries):
+		return [(entry.name, entry.field) for entry in entries]
+
+	def test_a_commera_admin_translates_and_clears_theme_text(self):
+		add_commera_roles()
+		create_user(THEME_TRANSLATOR, COMMERA_ADMIN)
+		frappe.set_user(THEME_TRANSLATOR)
+
+		self.resource.write(ENTRY, "heading", "ar", ARABIC_HEADING)
+		self.resource.write(ENTRY, "heading", "fr", "Beau pull violet.")
+		self.assertEqual(self.entry("ar").value, ARABIC_HEADING)
+
+		self.resource.write(ENTRY, "heading", "ar", "")
+		self.resource.write(ENTRY, "heading", "fr", "")
+		self.assertEqual((self.entry("ar").status, self.entry("fr").status), (MISSING, MISSING))
+		self.assertIsNone(self.stored_layouts()[1])
 
 	def test_only_configured_languages_other_than_the_default_take_translations(self):
 		for language in ("en", "de"):

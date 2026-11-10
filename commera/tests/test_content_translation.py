@@ -2,6 +2,8 @@ from collections import Counter
 from unittest.mock import patch
 
 import frappe
+from frappe.core.doctype.user_permission.test_user_permission import create_user
+from frappe.tests import IntegrationTestCase
 from frappe.translate import get_all_translations
 
 from commera.localization import (
@@ -15,11 +17,14 @@ from commera.localization import (
 	resolve,
 	translate,
 )
+from commera.roles import COMMERA_ADMIN, add_commera_roles
 from commera.sdk import catalog
 from commera.tests.test_localization import set_storefront_languages
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 
 PRODUCT = "Style Attribute Variant"
+TRANSLATOR = "content-translator@example.com"
+NOTE_RESOURCE = {"type": "note", "doctype": "Note", "fields": ["title"], "label": "Notes"}
 
 
 def use_storefront_language(test_case, code):
@@ -252,6 +257,21 @@ class TestContentTranslation(ProductDetailPriceTestCase):
 		frappe.set_user("Administrator")
 		self.assertEqual(self.resource_entry(resource, product.name).value, "قميص الكتان")
 
+	def test_a_commera_admin_writes_and_clears_product_translations(self):
+		add_commera_roles()
+		create_user(TRANSLATOR, COMMERA_ADMIN)
+		product = self.make_product("ADMIN")
+		resource = get_translatable_resource("product")
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(TRANSLATOR)
+
+		resource.write(product.name, "display_name", "ar", "قميص الكتان")
+		resource.write(product.name, "display_name", "ar", "قميص")
+		self.assertEqual(self.resource_entry(resource, product.name).value, "قميص")
+
+		resource.write(product.name, "display_name", "ar", "")
+		self.assertEqual(self.resource_entry(resource, product.name).status, MISSING)
+
 	def test_deleting_a_record_deletes_its_translations(self):
 		product = self.make_product("DELETE")
 		register(PRODUCT, product.name, "display_name", "ar", "قميص الكتان")
@@ -259,6 +279,61 @@ class TestContentTranslation(ProductDetailPriceTestCase):
 		frappe.delete_doc(PRODUCT, product.name)
 
 		self.assertFalse(frappe.db.exists("Content Translation", {"reference_name": product.name}))
+
+
+class TestDoctypeResourcePages(IntegrationTestCase):
+	"""Pages over a Note resource, every Note but the test's removed, so the order is known."""
+
+	def setUp(self):
+		self.addCleanup(frappe.db.rollback)
+		set_storefront_languages("en", published=("en", "ar"))
+		frappe.db.delete("Note")
+		commera_hooks = frappe.get_hooks("commera_hooks", {})
+		resources = [*commera_hooks["translatable_resources"], NOTE_RESOURCE]
+		patcher = self.patch_hooks({"commera_hooks": {**commera_hooks, "translatable_resources": resources}})
+		patcher.__enter__()
+		self.addCleanup(patcher.__exit__, None, None, None)
+		for name in ("note-a", "note-c", "note-e"):
+			self.add_note(name)
+		self.resource = get_translatable_resource("note")
+
+	def add_note(self, name):
+		frappe.get_doc({"doctype": "Note", "title": f"Title of {name}"}).insert(set_name=name)
+
+	def names(self, cursor=None, limit=50):
+		page = self.resource.list_entries("ar", cursor=cursor, limit=limit)
+		return [entry.name for entry in page.entries], page.next_cursor
+
+	def test_a_page_after_a_record_before_the_cursor_was_deleted_skips_nothing(self):
+		first, cursor = self.names(limit=2)
+		self.assertEqual(first, ["note-a", "note-c"])
+
+		frappe.delete_doc("Note", "note-c")
+
+		self.assertEqual(self.names(cursor), (["note-e"], None))
+
+	def test_a_page_after_a_record_was_added_before_the_cursor_repeats_nothing(self):
+		first, cursor = self.names(limit=2)
+
+		self.add_note("note-b")
+		self.add_note("note-d")
+
+		self.assertEqual(self.names(cursor), (["note-d", "note-e"], None))
+
+	def test_a_filtered_page_resumes_after_its_last_entry_not_at_the_next_match(self):
+		self.resource.write("note-c", "title", "ar", "ملاحظة")
+		first = self.resource.list_entries("ar", status=MISSING, limit=1)
+		self.assertEqual([entry.name for entry in first.entries], ["note-a"])
+
+		self.resource.write("note-c", "title", "ar", "")
+
+		rest = self.resource.list_entries("ar", status=MISSING, cursor=first.next_cursor)
+		self.assertEqual([entry.name for entry in rest.entries], ["note-c", "note-e"])
+
+	def test_a_cursor_that_is_not_a_key_is_refused(self):
+		for cursor in ("3", "not json", '["note-a"]'):
+			with self.subTest(cursor), self.assertRaises(frappe.ValidationError):
+				self.names(cursor)
 
 
 class TestTranslatedProductTitles(ProductDetailPriceTestCase):

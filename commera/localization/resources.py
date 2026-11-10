@@ -50,7 +50,7 @@ class TranslationEntry:
 @dataclass(frozen=True)
 class EntryPage:
 	entries: list[TranslationEntry]
-	# Pass it back as `cursor` for the next page; None on the last page.
+	# The key of the last entry: pass it back as `cursor` for the next page. None on the last page.
 	next_cursor: str | None
 
 
@@ -72,24 +72,26 @@ class TranslatableResource:
 		cursor: str | None = None,
 		limit: int = PAGE_SIZE,
 	) -> EntryPage:
-		"""One page of entries with source text. `filters` takes "name" and "field"; `search` matches the
-		source or the translation, any case."""
+		"""One page of entries with source text, in key order. `filters` takes "name" and "field"; `search`
+		matches the source or the translation, any case."""
 		check_target_language(language)
 		check_entry_filters(filters, status)
 		limit = min(max(cint(limit), 1), BATCH_SIZE)
 		matches = (
-			(entry, entry_cursor)
-			for entry, entry_cursor in self.scan(language, filters or {}, cursor)
+			(entry, key)
+			for entry, key in self.scan(language, filters or {}, parse_cursor(cursor))
 			if matches_entry(entry, search, status)
 		)
 		page = list(islice(matches, limit + 1))
-		next_cursor = page.pop()[1] if len(page) > limit else None
-		return EntryPage([entry for entry, _cursor in page], next_cursor)
+		# The next page starts after the last key returned. An entry added or removed meanwhile may show
+		# or not, but no entry not yet returned is skipped, and none repeats.
+		next_cursor = json.dumps(page[limit - 1][1]) if len(page) > limit else None
+		return EntryPage([entry for entry, _key in page[:limit]], next_cursor)
 
 	def iter_entries(self, language: str, batch_size: int = BATCH_SIZE) -> Iterator[TranslationEntry]:
 		"""Every entry, read `batch_size` records at a time, for an export."""
 		check_target_language(language)
-		for entry, _cursor in self.scan(language, {}, None, batch_size):
+		for entry, _key in self.scan(language, {}, None, batch_size):
 			yield entry
 
 	def count_statuses(self, language: str) -> dict[str, int]:
@@ -104,12 +106,12 @@ class TranslatableResource:
 		self.check_write_permission(bool(value))
 		self.save_translation(name, field, language, value or "")
 
-	def scan(self, language, filters, cursor, batch_size=BATCH_SIZE) -> Iterator[tuple]:
-		"""(entry, cursor that resumes at it) in a stable order, from `cursor` on."""
+	def scan(self, language, filters, after: list | None, batch_size=BATCH_SIZE) -> Iterator[tuple]:
+		"""(entry, its key as a list) in ascending key order, only keys strictly after `after`."""
 		raise NotImplementedError
 
 	def aggregate_statuses(self, language) -> Counter:
-		return Counter(entry.status for entry, _cursor in self.scan(language, {}, None))
+		return Counter(entry.status for entry, _key in self.scan(language, {}, None))
 
 	def check_write_permission(self, saving: bool):
 		raise NotImplementedError
@@ -120,32 +122,38 @@ class TranslatableResource:
 
 @dataclass(frozen=True)
 class DoctypeResource(TranslatableResource):
-	"""Fields of a doctype, translated in Content Translation rows. Records are read in name order,
-	one batch at a time, so a page or an export never loads the whole catalog."""
+	"""Fields of a doctype, translated in Content Translation rows, read one batch of records at a time.
+	An entry's key is [record name, field]: by name, then by the field's place in the hook entry."""
 
 	doctype: str
 	fields: tuple[str, ...]
 
-	def scan(self, language, filters, cursor, batch_size=BATCH_SIZE):
+	def scan(self, language, filters, after, batch_size=BATCH_SIZE):
 		meta = frappe.get_meta(self.doctype)
 		fields = [field for field in self.fields if filters.get("field") in (None, field)]
-		start_name, start_field = json.loads(cursor) if cursor else (None, None)
-		for records in self.iter_record_batches(meta, filters.get("name"), start_name, batch_size):
+		after_name, after_field = after or (None, None)
+		for records in self.iter_record_batches(meta, filters.get("name"), after_name, batch_size):
 			sources = get_sources(self.doctype, records, fields)
 			names = [record.name for record in records]
 			translations = fetch_translations(self.doctype, names, fields, language)
 			for record, source in zip(records, sources, strict=True):
 				for field in fields:
-					if record.name == start_name and fields.index(field) < index_of(fields, start_field):
+					if record.name == after_name and not self.is_field_after(field, after_field):
 						continue
 					if source[field]:
 						entry = self.make_entry(meta, record.name, field, source[field], translations)
-						yield entry, json.dumps([record.name, field])
+						yield entry, [record.name, field]
 
-	def iter_record_batches(self, meta, name, start_name, batch_size):
+	def is_field_after(self, field, after_field) -> bool:
+		"""A cursor field no longer declared resumes at the record's first field: nothing is skipped."""
+		position = self.fields.index(after_field) if after_field in self.fields else -1
+		return self.fields.index(field) > position
+
+	def iter_record_batches(self, meta, name, after_name, batch_size):
 		columns = [field for field in self.fields if meta.has_field(field)]
 		conditions = [["name", "=", name]] if name else []
-		after = ["name", ">=", start_name] if start_name else None
+		# The cursor record may still have fields after the cursor field.
+		after = ["name", ">=", after_name] if after_name else None
 		while True:
 			records = frappe.get_all(
 				self.doctype,
@@ -267,5 +275,13 @@ def matches_entry(entry: TranslationEntry, search: str | None, status: str | Non
 	return not needle or needle in entry.source.casefold() or needle in entry.value.casefold()
 
 
-def index_of(fields: list[str], field: str | None) -> int:
-	return fields.index(field) if field in fields else 0
+def parse_cursor(cursor: str | None) -> list | None:
+	if not cursor:
+		return None
+	try:
+		key = json.loads(cursor)
+	except ValueError:
+		key = None
+	if not (isinstance(key, list) and len(key) == 2 and all(isinstance(part, str) for part in key)):
+		frappe.throw(_("The page cursor is not valid. Load the first page again."))
+	return key
