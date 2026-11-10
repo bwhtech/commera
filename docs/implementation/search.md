@@ -6,7 +6,7 @@ Commera Settings > Search > Search Engine selects the engine that ranks storefro
 
 | Engine | Where the index is | What it adds |
 |---|---|---|
-| SQLite (default) | A file on the site, `commera_product_search.db` | Nothing to set up. Terms shorter than 4 characters and Arabic terms use a `LIKE` query instead. |
+| SQLite (default) | A file on the site, `commera_product_search.db` | Nothing to set up. Terms shorter than 4 characters use a `LIKE` query instead. Arabic terms also use it until Arabic is a published language. |
 
 ### Engines on a search server
 
@@ -25,6 +25,15 @@ The storefront uses the `LIKE` query in these cases:
 A rebuild fills new indexes and then swaps them in, so search keeps working during the build.
 
 To add an engine, subclass `RemoteSearchEngine` in `commera/search/remote_engine.py` and add it to `ENGINES` in `commera/search/engine_cache.py`. Its tests subclass `RemoteEngineTests` in `commera/search/remote_engine_tests.py`.
+
+## Languages
+
+The index holds the title of each product and the name of each category in every published storefront language. The titles come from Content Translation rows. Until #441, an Item's Arabic name fills in for a missing Arabic translation.
+
+- A query in any published language finds the record. The translated titles are part of the record's `content`. Search-server engines also get the Arabic title in `title_ar`.
+- Saving or deleting a title translation reindexes its record.
+- A change to the default or the published languages in Commera Settings rebuilds the index.
+- The `LIKE` query also looks in the title translations, so short terms find translated titles.
 
 ## Search as you type
 

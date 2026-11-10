@@ -8,6 +8,7 @@ import frappe
 from frappe.search.sqlite_search import MAX_EDIT_DISTANCE, MIN_WORD_LENGTH, SQLiteSearch
 from frappe.utils import create_batch, flt
 
+from commera.localization.languages import StorefrontLanguages
 from commera.search.engine import (
 	CARD_COLUMNS,
 	MIN_QUERY_LENGTH,
@@ -34,6 +35,7 @@ CORE_BUILD_INDEX = "frappe.search.sqlite_search.build_index"
 BUILD_TIMEOUT = 2 * 60 * 60 + 10 * 60
 
 ARABIC_PATTERN = re.compile("[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]")
+ARABIC_SCRIPT_LANGUAGES = {"ar", "fa", "ur"}
 
 
 class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
@@ -76,12 +78,21 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		return {}
 
 	def can_rank(self, term):
-		"""True for a term of at least MIN_QUERY_LENGTH that is not Arabic, once the index exists."""
-		# The FTS tokenizer has no Arabic stemming, so an Arabic term goes back to frappe.qb.
+		"""True for a term of at least MIN_QUERY_LENGTH, once the index exists.
+		An Arabic term also needs an Arabic language in the index, else frappe.qb serves it."""
 		term = (term or "").strip()
-		if len(term) < MIN_QUERY_LENGTH or is_arabic_query(term):
+		if len(term) < MIN_QUERY_LENGTH or not self.index_exists():
 			return False
-		return self.index_exists()
+		return not is_arabic_query(term) or self.indexes_arabic()
+
+	def indexes_arabic(self):
+		"""Whether the index holds a language in Arabic script, memoized like index_exists()."""
+		cached = getattr(self, "indexes_arabic_cache", None)
+		if cached is None:
+			rows = self.sql("SELECT code FROM search_language", read_only=True)
+			cached = any(row["code"].split("-")[0].lower() in ARABIC_SCRIPT_LANGUAGES for row in rows)
+			self.indexes_arabic_cache = cached
+		return cached
 
 	# -- index shape ----------------------------------------------------------------------------
 
@@ -93,6 +104,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			cached = (
 				super().index_exists()
 				and self._table_exists("product_detail")
+				and self._table_exists("search_language")
 				and self.fts_has_columns(("effective_price", "has_discount"))
 			)
 			self.index_exists_cache = cached
@@ -113,6 +125,12 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	def create_sibling_tables(self, cursor):
 		cursor.execute("CREATE TABLE IF NOT EXISTS search_size (doc_id TEXT, size TEXT, item_code TEXT)")
 		cursor.execute("CREATE INDEX IF NOT EXISTS idx_search_size_doc ON search_size(doc_id)")
+
+		# The published languages whose titles this build indexed.
+		cursor.execute("CREATE TABLE IF NOT EXISTS search_language (code TEXT PRIMARY KEY)")
+		cursor.execute("DELETE FROM search_language")
+		codes = [(language.code,) for language in StorefrontLanguages.load().published]
+		cursor.executemany("INSERT INTO search_language (code) VALUES (?)", codes)
 
 		columns = ",\n".join(self.product_detail_column_defs())
 		cursor.execute(f"CREATE TABLE IF NOT EXISTS product_detail ({columns})")

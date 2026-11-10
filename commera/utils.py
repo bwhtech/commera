@@ -317,7 +317,8 @@ def get_product_base_query(filters=None, product_list=None):
 				| (style_attribute_variant.item_group.like(f"%{search}%"))
 				| (item.name.like(f"%{search}%"))
 			)
-			# SQLite sends every Arabic term here, so the Arabic item name must be searchable too.
+			# Short terms and indexes without the term's language land here, so translated titles match too.
+			search_condition |= style_attribute_variant.name.isin(translated_title_matches(search))
 			if frappe.db.has_column("Item", "custom_item_name_ar"):
 				search_condition |= item.custom_item_name_ar.like(f"%{search}%")
 			if child_categories:
@@ -331,6 +332,21 @@ def get_product_base_query(filters=None, product_list=None):
 
 			query = query.where(search_condition)
 	return query
+
+
+def translated_title_matches(search):
+	"""Products with a shop-wide title translation that contains `search`, as a subquery."""
+	translation = DocType("Content Translation")
+	return (
+		frappe.qb.from_(translation)
+		.select(translation.reference_name)
+		.where(
+			(translation.reference_doctype == "Style Attribute Variant")
+			& (translation.reference_field == "display_name")
+			& (translation.market == "")
+			& translation.translated_value.like(f"%{search}%")
+		)
+	)
 
 
 def get_delivery_configuration():
