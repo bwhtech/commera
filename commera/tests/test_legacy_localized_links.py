@@ -59,6 +59,8 @@ HAND_BUILT_PREFIX = re.compile(
 UNPREFIXED_LINK = re.compile(r"""(?:href|action)=["']/(?!/|assets/|files/|api/|login\b)""")
 # A url() inside a JS string: |e leaves quotes and ${} live, so JS takes it through |tojson.
 URL_IN_JS_STRING = re.compile(r"['`]\{\{\s*(?:switch_)?url\(")
+# A relative path such as "products/x" resolves against /ar and /ar/ differently and drops the language.
+RELATIVE_LINK = re.compile(r"""(?<![:\w-])(?:href|action)=["'](?![a-z][a-z0-9+.-]*:)[a-z]""")
 JINJA_COMMENT = re.compile(r"\{#.*?#\}", re.S)
 NOT_PAGES = ("/assets/", "/files/", "/api/", "/login")
 
@@ -70,6 +72,7 @@ class TestLegacyLinkSources(IntegrationTestCase):
 				self.assertNotRegex(text, HAND_BUILT_PREFIX)
 				self.assertNotRegex(text, UNPREFIXED_LINK)
 				self.assertNotRegex(text, URL_IN_JS_STRING)
+				self.assertNotRegex(text, RELATIVE_LINK)
 
 	def test_no_surface_offers_a_market_or_country_switcher(self):
 		for path, text in read_surfaces():
