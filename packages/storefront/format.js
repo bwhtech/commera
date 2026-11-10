@@ -30,6 +30,7 @@ function get_formatter() {
 		number_format: config.number_format,
 		store_currency: config.store_currency,
 		currency_symbols: config.currency_symbols,
-		currency_number_formats: config.currency_number_formats,
+		money_formats: config.money_formats,
+		date_formats: config.date_formats,
 	});
 }

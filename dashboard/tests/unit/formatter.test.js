@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
+
+const cases = JSON.parse(
+  readFileSync(new URL('../../../packages/storefront/test/formatter-cases.json', import.meta.url)),
+)
 
 // boot.js reads `globalThis` once at import, so the boot keys are set before the module loads.
 Object.assign(globalThis, {
@@ -8,13 +13,14 @@ Object.assign(globalThis, {
   currency: 'INR',
   number_format: '#,###.##',
   currency_symbols: { INR: '₹', USD: '$' },
-  currency_number_formats: { INR: '#,##,###.##' },
+  money_formats: { INR: { number_format: '#,##,###.##', precision: 2 } },
+  date_formats: cases.date_formats.ar,
 })
 const { compactMoney, count, exactMoney, formatDate, money, moneyIn, monthName, symbolFor } = await import(
   '../../src/data/formatter.js'
 )
 
-test('money reads the currency number format and puts the symbol after the amount in RTL', () => {
+test('money reads the resolved currency format and puts the symbol after the amount in RTL', () => {
   assert.equal(money(1234567.6), '12,34,568\u00a0₹')
   assert.equal(exactMoney(499.99), '499.99\u00a0₹')
   assert.equal(exactMoney(500), '500\u00a0₹')

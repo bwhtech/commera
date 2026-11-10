@@ -9,13 +9,13 @@ from commera.api.admin.language import get_dashboard_language
 from commera.api.admin.orders import get_reporting_currency_symbol
 from commera.api.permission import has_app_permission
 from commera.localization import StorefrontLanguages
-from commera.localization.formatter import get_language_number_format
-from commera.localization.languages import is_rtl_language
+from commera.localization.formatter import Formatter
+from commera.localization.languages import Language, is_rtl_language
 from commera.onboarding import is_onboarding_pending
 from commera.plugins.registry import get_visible_plugins
 from commera.roles import is_commera_admin
 from commera.storefront_access import is_storefront_published
-from commera.utils import get_currency_number_formats, get_selling_currencies, get_store_currency
+from commera.utils import get_selling_currencies, get_store_currency
 
 no_cache = 1
 
@@ -63,9 +63,8 @@ def get_boot():
 			"currency": currency,
 			"currency_symbol": get_reporting_currency_symbol(currency),
 			# The dashboard formats money with the storefront's formatter, never the browser's locale.
-			"number_format": get_language_number_format(frappe.local.lang),
+			**Formatter(Language.from_code(frappe.local.lang)).as_config(),
 			"currency_symbols": get_text_currency_symbols(),
-			"currency_number_formats": get_currency_number_formats(),
 			"plugins": get_visible_plugins(frappe.session.user),
 			"is_admin": is_commera_admin(),
 			"onboarding_pending": is_onboarding_pending(),

@@ -12,6 +12,7 @@ from jinja2.utils import LRUCache
 
 import commera.sdk
 from commera.localization import get_localization, get_request_path, get_route_path
+from commera.localization.formatter import Formatter
 from commera.localization.routing import localize_path
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	get_render_theme_context,
@@ -20,7 +21,7 @@ from commera.shop_themes.doctype.shop_theme.shop_theme import (
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import get_compiled_routes
 from commera.shop_themes.jinja_helpers import get_shop_theme_settings
 from commera.shop_themes.route_patterns import has_language_group
-from commera.utils import get_currency_number_formats, get_currency_symbols, get_store_currency
+from commera.utils import get_currency_symbols, get_store_currency
 
 # page_renderer runs before every built-in renderer: a segment missing here is a route hijack, not a 404.
 RESERVED_PATH_SEGMENTS = frozenset(
@@ -305,7 +306,7 @@ def build_base_context(match):
 			"csrf_token": frappe.session.data.csrf_token,
 			"store_currency": get_store_currency(),
 			"currency_symbols": get_currency_symbols(),
-			"currency_number_formats": get_currency_number_formats(),
+			**Formatter(localization.language).as_config(),
 			"language": localization.language.code,
 			"localization": localization.as_dict(),
 			"webmcp": bool(

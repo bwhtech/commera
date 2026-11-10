@@ -8,12 +8,14 @@ const cases = JSON.parse(
 	readFileSync(new URL('./formatter-cases.json', import.meta.url)),
 );
 
-function formatter_for(language) {
+function formatter_for(language, options = {}) {
 	return new Formatter({
 		language,
 		...cases.languages[language],
 		currency_symbols: cases.currency_symbols,
-		currency_number_formats: cases.currency_number_formats,
+		money_formats: cases.money_formats,
+		date_formats: cases.date_formats[language],
+		...options,
 	});
 }
 
@@ -34,16 +36,23 @@ test('money matches the Python formatter for each language and currency', () => 
 });
 
 test('number matches the Python formatter for each language', () => {
-	for (const { language, value, precision, expected } of cases.number) {
+	for (const {
+		language,
+		number_format,
+		value,
+		precision,
+		expected,
+	} of cases.number) {
+		const options = number_format ? { number_format } : {};
 		assert.equal(
-			formatter_for(language).number(value, precision),
+			formatter_for(language, options).number(value, precision),
 			expected,
-			`${language} ${value}`,
+			`${language} ${number_format} ${value} ${precision}`,
 		);
 	}
 });
 
-test('date matches the Python formatter for each language and style', () => {
+test("date renders Babel's pattern for each Frappe language and style", () => {
 	for (const { language, value, style, expected } of cases.date) {
 		assert.equal(
 			formatter_for(language).date(value, style),
@@ -90,6 +99,17 @@ test('a Date keeps its local calendar day', () => {
 		'Mar 5, 2026',
 	);
 	assert.equal(formatter_for('en').date(null), '');
+});
+
+test('without the server patterns a date falls back to Intl, Gregorian and Latin digits', () => {
+	const persian = new Formatter({ language: 'fa' });
+	assert.equal(persian.date('2026-03-05', 'short'), '2026/3/5');
+	assert.throws(() => persian.date('2026-03-05', 'tiny'), RangeError);
+});
+
+test('a currency the server did not resolve takes the language format', () => {
+	const german = formatter_for('de', { money_formats: {} });
+	assert.equal(german.money(1234.5, 'JPY'), '¥1.234,50');
 });
 
 test('an unknown number format falls back to the default', () => {

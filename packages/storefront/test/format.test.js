@@ -66,15 +66,22 @@ test('money_text spells out a currency whose symbol is HTML', () => {
 	);
 });
 
-test('money reads the currency number format and the page direction', () => {
+test('money and dates read the resolved rules and the page direction', () => {
 	globalThis.commera_storefront_config = {
 		number_format: '#,###.##',
 		currency_symbols: { INR: '₹', JPY: '¥' },
-		currency_number_formats: { INR: '#,##,###.##', JPY: '#,###' },
+		money_formats: {
+			INR: { number_format: '#,##,###.##', precision: 2 },
+			JPY: { number_format: '#,###', precision: 0 },
+		},
+		date_formats: {
+			parts: { medium: [{ field: 'd' }, { text: ' ' }, { field: 'MMM' }] },
+			names: { MMM: ['jan', 'feb', 'mar'] },
+		},
 		localization: { language: { code: 'ar', direction: 'rtl' } },
 	};
 	assert.equal(money(1234567.5, 'INR'), '12,34,567.50\u00a0₹');
 	assert.equal(money(1234.5, 'JPY'), '1,234\u00a0¥');
 	assert.equal(number(1234567), '1,234,567');
-	assert.equal(date('2026-03-05'), '05\u200f/03\u200f/2026');
+	assert.equal(date('2026-03-05'), '5 mar');
 });

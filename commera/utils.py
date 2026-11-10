@@ -435,16 +435,6 @@ def get_currency_symbols() -> dict[str, str]:
 	return {currency: get_currency_symbol(currency) for currency in get_selling_currencies()}
 
 
-@request_cache
-def get_currency_number_formats() -> dict[str, str]:
-	"""Frappe's number format of each selling currency that sets one."""
-	formats = {
-		currency: frappe.get_cached_value("Currency", currency, "number_format")
-		for currency in get_selling_currencies()
-	}
-	return {currency: number_format for currency, number_format in formats.items() if number_format}
-
-
 def get_selling_currencies() -> set[str]:
 	currencies = frappe.get_all(
 		"Price List", filters={"enabled": 1, "selling": 1}, pluck="currency", distinct=True

@@ -1,4 +1,6 @@
 // The rules of commera/localization/formatter.py; test/formatter-cases.json holds the cases both pass.
+import { render_date } from './date_format.js';
+
 const NUMBER_FORMATS = {
 	'#,###.##': ['.', ',', 2],
 	'#.###,##': [',', '.', 2],
@@ -20,21 +22,24 @@ const NO_BREAK_SPACE = '\u00a0';
 const BIDI_MARKS = /[\u061c\u200e\u200f]/g;
 
 export class Formatter {
-	// `currency_symbols` and `currency_number_formats` are keyed by currency code.
+	// The server resolves `money_formats` and `date_formats` (Formatter.as_config in Python).
+	// `currency_symbols` and `money_formats` are keyed by currency code.
 	constructor({
 		language = 'en',
 		direction = 'ltr',
 		number_format,
 		store_currency,
 		currency_symbols = {},
-		currency_number_formats = {},
+		money_formats = {},
+		date_formats,
 	} = {}) {
 		this.language = language;
 		this.direction = direction;
 		this.number_format = known_format(number_format) ?? DEFAULT_NUMBER_FORMAT;
 		this.store_currency = store_currency;
 		this.currency_symbols = currency_symbols;
-		this.currency_number_formats = currency_number_formats;
+		this.money_formats = money_formats;
+		this.date_formats = date_formats;
 	}
 
 	money(amount, currency, precision) {
@@ -58,7 +63,7 @@ export class Formatter {
 
 	// Report figures: 4.8L or 482.3K, in the language's words, with the number format's separators.
 	compact_money(amount, currency) {
-		const number_format = this.currency_number_format(currency);
+		const { number_format } = this.money_format(currency);
 		const [sign, digits] = split_sign(this.compact(amount, number_format));
 		return this.join(sign, digits, this.symbol(currency));
 	}
@@ -77,7 +82,10 @@ export class Formatter {
 				`Date style must be one of ${DATE_STYLES.join(', ')}.`,
 			);
 		}
-		// Gregorian and Latin digits, as Babel prints them on the server.
+		if (this.date_formats?.parts) {
+			return render_date(date, this.date_formats, style);
+		}
+		// Without the server's patterns: Gregorian and Latin digits, close to Babel.
 		return new Intl.DateTimeFormat([this.language, 'en'], {
 			dateStyle: style,
 			timeZone: 'UTC',
@@ -87,10 +95,13 @@ export class Formatter {
 	}
 
 	place_symbol(amount, currency, precision, symbol) {
-		const number_format = this.currency_number_format(currency);
-		const digits = precision ?? NUMBER_FORMATS[number_format][2];
+		const money_format = this.money_format(currency);
 		const [sign, number] = split_sign(
-			format_number(amount, number_format, digits),
+			format_number(
+				amount,
+				money_format.number_format,
+				precision ?? money_format.precision,
+			),
 		);
 		return this.join(sign, number, symbol);
 	}
@@ -107,11 +118,14 @@ export class Formatter {
 		return this.currency_symbols[code] ?? `${code}${NO_BREAK_SPACE}`;
 	}
 
-	currency_number_format(currency) {
-		const code = currency || this.store_currency;
-		return (
-			known_format(this.currency_number_formats[code]) ?? this.number_format
-		);
+	// A currency the server did not resolve takes the language's format, as Python resolves it.
+	money_format(currency) {
+		const resolved = this.money_formats[currency || this.store_currency];
+		if (known_format(resolved?.number_format)) {
+			return resolved;
+		}
+		const precision = NUMBER_FORMATS[this.number_format][2];
+		return { number_format: this.number_format, precision };
 	}
 
 	compact(amount, number_format) {
@@ -140,14 +154,22 @@ export class Formatter {
 	}
 }
 
+// Frappe's fmt_money, precision rule included.
 export function format_number(
 	value,
 	number_format = DEFAULT_NUMBER_FORMAT,
-	precision = 2,
+	requested_precision = 2,
 ) {
-	const [decimal_separator, thousands_separator] =
+	const format_info =
 		NUMBER_FORMATS[number_format] ?? NUMBER_FORMATS[DEFAULT_NUMBER_FORMAT];
-	const units = round_half_even(Number(value) || 0, precision);
+	const [decimal_separator, thousands_separator] = format_info;
+	const amount = Number(value) || 0;
+	const precision = effective_precision(
+		amount,
+		requested_precision,
+		format_info,
+	);
+	const units = round_half_even(amount, precision);
 	const factor = 10 ** precision;
 	const whole = String(Math.floor(Math.abs(units) / factor));
 	const decimals = String(Math.abs(units) % factor).padStart(precision, '0');
@@ -157,6 +179,36 @@ export function format_number(
 		group_digits(whole, group_size).join(thousands_separator) +
 		(precision && decimal_separator ? decimal_separator + decimals : '');
 	return units < 0 && formatted !== '0' ? `-${formatted}` : formatted;
+}
+
+// fmt_money: above 2 decimals, a shorter fraction drops to its own length or the format's precision.
+function effective_precision(
+	amount,
+	precision,
+	[decimal_separator, , format_precision],
+) {
+	if (!decimal_separator || precision <= 2) {
+		return precision;
+	}
+	// Python's `amount % 1` is never negative.
+	const fraction = amount % 1 < 0 ? (amount % 1) + 1 : amount % 1;
+	const decimals = python_decimals(
+		round_half_even(fraction, precision) / 10 ** precision,
+	);
+	if (decimals.length < 3) {
+		return format_precision;
+	}
+	return Math.min(decimals.length, precision);
+}
+
+// What fmt_money reads after the point of str(x) for 0 <= x <= 1; Python writes 1.2e-05 below 1e-4.
+function python_decimals(x) {
+	const text =
+		x > 0 && x < 1e-4
+			? x.toExponential().replace(/e-(\d)$/, 'e-0$1')
+			: String(x);
+	const parts = text.split('.');
+	return parts.length > 1 ? parts[1] : parts[0];
 }
 
 function known_format(number_format) {

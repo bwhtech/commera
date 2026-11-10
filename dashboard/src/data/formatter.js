@@ -11,7 +11,8 @@ export const formatter = new Formatter({
   number_format: bootValue('number_format', '#,###.##'),
   store_currency: storeCurrency,
   currency_symbols: bootValue('currency_symbols', {}),
-  currency_number_formats: bootValue('currency_number_formats', {}),
+  money_formats: bootValue('money_formats', {}),
+  date_formats: bootValue('date_formats', {}),
 })
 
 // Dashboard figures are whole units: cents add noise to a list of orders or a stat card.
@@ -36,9 +37,12 @@ export const symbolFor = (currency = storeCurrency) => formatter.symbol(currency
 
 export const formatDate = (value, style = 'medium') => formatter.date(value, style)
 
-// January is 1, as in Frappe's month selects.
+// January is 1, as in Frappe's month selects. Gregorian and Latin digits, as formatDate.
 export function monthName(month) {
-  return new Intl.DateTimeFormat([language, 'en'], { month: 'long', timeZone: 'UTC' }).format(
-    new Date(Date.UTC(2000, month - 1, 1)),
-  )
+  return new Intl.DateTimeFormat([language, 'en'], {
+    month: 'long',
+    timeZone: 'UTC',
+    calendar: 'gregory',
+    numberingSystem: 'latn',
+  }).format(new Date(Date.UTC(2000, month - 1, 1)))
 }
