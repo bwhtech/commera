@@ -10,7 +10,7 @@ import ListSkeleton from '../ListSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
 import { useAdminRead } from '../../data/api'
 import { hasValues } from '../../data/analytics'
-import { compactMoney, money, shortDate } from '../../data/format'
+import { compactMoney, count, money, shortDate } from '../../data/format'
 import { __ } from '../../data/translation'
 import { ia } from '../../ia/store'
 import { orderRoute, productRoute } from '../../ia/routes'
@@ -37,7 +37,7 @@ const kpiTiles = computed(() => {
   return stats.map((stat) => ({
     key: stat.key,
     label: stat.label,
-    value: stat.format === 'currency' ? money(stat.value) : Number(stat.value).toLocaleString('en-IN'),
+    value: stat.format === 'currency' ? money(stat.value) : count(stat.value),
     delta: stat.delta == null ? null : `${stat.delta >= 0 ? '+' : ''}${stat.delta}%`,
     up: stat.delta >= 0,
     note: stat.note,

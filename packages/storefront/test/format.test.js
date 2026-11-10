@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { afterEach, test } from 'node:test';
-import { money, money_text } from '../format.js';
+import { date, money, money_text, number } from '../format.js';
+import { format_number } from '../formatter.js';
 
 const cases = JSON.parse(
 	readFileSync(new URL('./fmt-money-cases.json', import.meta.url)),
@@ -12,13 +13,13 @@ afterEach(() => {
 });
 
 for (const [number_format, amounts] of Object.entries(cases)) {
-	test(`money matches the server's fmt_money for ${number_format}`, () => {
-		globalThis.commera_storefront_config = {
-			number_format,
-			currency_symbols: { INR: '₹' },
-		};
+	test(`format_number matches the server's fmt_money for ${number_format}`, () => {
 		for (const [amount, expected] of amounts) {
-			assert.equal(money(amount, 'INR'), `₹${expected}`, `amount ${amount}`);
+			assert.equal(
+				format_number(amount, number_format, 2),
+				expected,
+				`amount ${amount}`,
+			);
 		}
 	});
 }
@@ -63,4 +64,24 @@ test('money_text spells out a currency whose symbol is HTML', () => {
 		money(1250, 'SAR'),
 		'<span class="saudi-currency-symbol pe-0.5"></span>1,250.00',
 	);
+});
+
+test('money and dates read the resolved rules and the page direction', () => {
+	globalThis.commera_storefront_config = {
+		number_format: '#,###.##',
+		currency_symbols: { INR: '₹', JPY: '¥' },
+		money_formats: {
+			INR: { precision: 2, fraction_precision: 2 },
+			JPY: { precision: 0, fraction_precision: 2 },
+		},
+		date_formats: {
+			parts: { medium: [{ field: 'd' }, { text: ' ' }, { field: 'MMM' }] },
+			names: { MMM: ['jan', 'feb', 'mar'] },
+		},
+		localization: { language: { code: 'ar', direction: 'rtl' } },
+	};
+	assert.equal(money(1234567.5, 'INR'), '1,234,567.50\u00a0₹');
+	assert.equal(money(1234.5, 'JPY'), '1,234\u00a0¥');
+	assert.equal(number(1234567), '1,234,567');
+	assert.equal(date('2026-03-05'), '5 mar');
 });

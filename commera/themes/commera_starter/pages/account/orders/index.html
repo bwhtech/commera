@@ -27,7 +27,7 @@
 					{{ order_status(order.stage) }}
 				</div>
 				{% set item_count = order["items"] | sum(attribute="qty") | int %}
-				<p class="mt-1 text-p-md text-ink-gray-6">{{ frappe.utils.format_date(order.placed_on, "medium") }} · {{ _("1 item") if item_count == 1 else _("{0} items").format(item_count) }}<span class="tabular block font-medium text-ink-gray-9 lg:hidden"><bdi>{{ commera.format.money(order.rounded_total or order.grand_total, order.currency) }}</bdi></span></p>
+				<p class="mt-1 text-p-md text-ink-gray-6">{{ commera.format.date(order.placed_on) }} · {{ _("1 item") if item_count == 1 else _("{0} items").format(item_count) }}<span class="tabular block font-medium text-ink-gray-9 lg:hidden"><bdi>{{ commera.format.money(order.rounded_total or order.grand_total, order.currency) }}</bdi></span></p>
 			</div>
 			<p class="tabular hidden shrink-0 text-md font-medium text-ink-gray-9 lg:block"><bdi>{{ commera.format.money(order.rounded_total or order.grand_total, order.currency) }}</bdi></p>
 			{{ icon("right", "size-4 shrink-0 text-ink-gray-6 rtl:rotate-180") }}

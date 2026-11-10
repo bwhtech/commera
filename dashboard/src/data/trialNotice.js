@@ -1,5 +1,6 @@
 // The pure half of data/cloudBilling.js, kept apart so `node --test` can import it: the other
 // half imports the Cloud SDK.
+import { formatDate } from './formatter.js'
 import { __ } from './translation.js'
 
 const URGENT_DAYS = 3
@@ -12,9 +13,7 @@ function endsInTitle(daysLeft) {
 
 function deletionNotice(deletesOn) {
   if (!deletesOn) return __('Choose a plan to keep using your store.')
-  // A date-only string parses as UTC midnight, so it is formatted in UTC to keep the same day.
-  const date = new Date(deletesOn).toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' })
-  return __('Your store will be deleted on {0}. Choose a plan to keep it.', [date])
+  return __('Your store will be deleted on {0}. Choose a plan to keep it.', [formatDate(deletesOn)])
 }
 
 // `trial` is Frappe Cloud's BillingTrial (from getBilling). An ended trial cannot be dismissed:

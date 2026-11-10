@@ -12,6 +12,7 @@ from jinja2.utils import LRUCache
 
 import commera.sdk
 from commera.localization import get_localization, get_request_path, get_route_path
+from commera.localization.formatter import Formatter
 from commera.localization.routing import localize_path
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	get_render_theme_context,
@@ -305,6 +306,7 @@ def build_base_context(match):
 			"csrf_token": frappe.session.data.csrf_token,
 			"store_currency": get_store_currency(),
 			"currency_symbols": get_currency_symbols(),
+			**Formatter(localization.language).as_config(),
 			"language": localization.language.code,
 			"localization": localization.as_dict(),
 			"webmcp": bool(

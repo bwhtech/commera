@@ -10,7 +10,7 @@ import EmptyState from '../../components/EmptyState.vue'
 import ListSkeleton from '../../components/ListSkeleton.vue'
 import { useAdminRead } from '../../data/api'
 import { hasValues, monthsForRange } from '../../data/analytics'
-import { compactMoney, money } from '../../data/format'
+import { compactMoney, count, money } from '../../data/format'
 import { __ } from '../../data/translation'
 import { ia } from '../../ia/store'
 
@@ -34,7 +34,7 @@ const stats = computed(() => {
   const stat = report.value?.stats ?? {}
   return [
     { label: __('Stock value'), value: compactMoney(stat.stock_value?.value ?? 0), delta: null, up: true },
-    { label: __('Units on hand'), value: (stat.units_on_hand?.value ?? 0).toLocaleString('en-IN'), delta: null, up: true },
+    { label: __('Units on hand'), value: count(stat.units_on_hand?.value), delta: null, up: true },
     {
       label: __('Days of cover'),
       value: stat.days_of_cover?.value != null ? String(stat.days_of_cover.value) : '—',
