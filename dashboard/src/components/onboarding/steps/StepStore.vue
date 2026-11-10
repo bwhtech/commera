@@ -4,6 +4,7 @@ import { Combobox, FormControl, Select, TextInput } from 'frappe-ui'
 import { getCountryDefaults, storeSetup } from '../../../data/onboarding'
 import { CATEGORIES, draft, flow } from '../../../ia/onboarding'
 import { abbreviate, missingField, toOptions } from '../../../ia/onboardingSteps'
+import { monthName } from '../../../data/format'
 import { __ } from '../../../data/translation'
 
 const props = defineProps({
@@ -11,7 +12,7 @@ const props = defineProps({
 })
 
 const MONTHS = Array.from({ length: 12 }, (_, index) => ({
-  label: new Date(2000, index, 1).toLocaleString(undefined, { month: 'long' }),
+  label: monthName(index + 1),
   value: index + 1,
 }))
 

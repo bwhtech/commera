@@ -1,0 +1,422 @@
+{
+	"languages": {
+		"en": {
+			"direction": "ltr",
+			"number_format": "#,###.##"
+		},
+		"de": {
+			"direction": "ltr",
+			"number_format": "#.###,##"
+		},
+		"fr": {
+			"direction": "ltr",
+			"number_format": "# ###,##"
+		},
+		"ar": {
+			"direction": "rtl",
+			"number_format": "#,###.##"
+		},
+		"he": {
+			"direction": "rtl",
+			"number_format": "#,###.##"
+		},
+		"hi": {
+			"direction": "ltr",
+			"number_format": "#,##,###.##"
+		}
+	},
+	"currency_symbols": {
+		"USD": "$",
+		"EUR": "€",
+		"INR": "₹",
+		"SAR": "<span class=\"saudi-currency-symbol pe-0.5\"></span>",
+		"AED": "د.إ",
+		"JPY": "¥",
+		"KWD": "د.ك",
+		"XTS": "XTS "
+	},
+	"currency_number_formats": {
+		"INR": "#,##,###.##",
+		"JPY": "#,###",
+		"KWD": "#,###.###"
+	},
+	"money": [
+		{
+			"language": "en",
+			"currency": "USD",
+			"amount": 0,
+			"precision": null,
+			"expected": "$0.00"
+		},
+		{
+			"language": "en",
+			"currency": "USD",
+			"amount": 1234.5,
+			"precision": null,
+			"expected": "$1,234.50"
+		},
+		{
+			"language": "en",
+			"currency": "USD",
+			"amount": -1234.567,
+			"precision": null,
+			"expected": "-$1,234.57"
+		},
+		{
+			"language": "en",
+			"currency": "USD",
+			"amount": 2.675,
+			"precision": null,
+			"expected": "$2.67"
+		},
+		{
+			"language": "en",
+			"currency": "USD",
+			"amount": 12345678.9,
+			"precision": null,
+			"expected": "$12,345,678.90"
+		},
+		{
+			"language": "en",
+			"currency": "INR",
+			"amount": 1234567.891,
+			"precision": null,
+			"expected": "₹12,34,567.89"
+		},
+		{
+			"language": "en",
+			"currency": "INR",
+			"amount": -0.001,
+			"precision": null,
+			"expected": "₹0.00"
+		},
+		{
+			"language": "en",
+			"currency": "SAR",
+			"amount": 1250,
+			"precision": null,
+			"expected": "<span class=\"saudi-currency-symbol pe-0.5\"></span>1,250.00"
+		},
+		{
+			"language": "en",
+			"currency": "XTS",
+			"amount": 10,
+			"precision": null,
+			"expected": "XTS 10.00"
+		},
+		{
+			"language": "en",
+			"currency": "JPY",
+			"amount": 1234.5,
+			"precision": null,
+			"expected": "¥1,234"
+		},
+		{
+			"language": "en",
+			"currency": "JPY",
+			"amount": 1235.5,
+			"precision": null,
+			"expected": "¥1,236"
+		},
+		{
+			"language": "en",
+			"currency": "KWD",
+			"amount": 1.2345,
+			"precision": null,
+			"expected": "د.ك1.234"
+		},
+		{
+			"language": "en",
+			"currency": "KWD",
+			"amount": 1.5,
+			"precision": null,
+			"expected": "د.ك1.500"
+		},
+		{
+			"language": "en",
+			"currency": "USD",
+			"amount": 1234.5,
+			"precision": 0,
+			"expected": "$1,234"
+		},
+		{
+			"language": "en",
+			"currency": "USD",
+			"amount": 499.99,
+			"precision": 0,
+			"expected": "$500"
+		},
+		{
+			"language": "de",
+			"currency": "EUR",
+			"amount": 1234.5,
+			"precision": null,
+			"expected": "€1.234,50"
+		},
+		{
+			"language": "de",
+			"currency": "EUR",
+			"amount": -0.125,
+			"precision": null,
+			"expected": "-€0,12"
+		},
+		{
+			"language": "fr",
+			"currency": "EUR",
+			"amount": 1234567.5,
+			"precision": null,
+			"expected": "€1 234 567,50"
+		},
+		{
+			"language": "ar",
+			"currency": "SAR",
+			"amount": 1250,
+			"precision": null,
+			"expected": "1,250.00 <span class=\"saudi-currency-symbol pe-0.5\"></span>"
+		},
+		{
+			"language": "ar",
+			"currency": "SAR",
+			"amount": -1234.567,
+			"precision": null,
+			"expected": "-1,234.57 <span class=\"saudi-currency-symbol pe-0.5\"></span>"
+		},
+		{
+			"language": "ar",
+			"currency": "AED",
+			"amount": 1234.5,
+			"precision": null,
+			"expected": "1,234.50 د.إ"
+		},
+		{
+			"language": "ar",
+			"currency": "USD",
+			"amount": 0.375,
+			"precision": null,
+			"expected": "0.38 $"
+		},
+		{
+			"language": "ar",
+			"currency": "XTS",
+			"amount": 10,
+			"precision": null,
+			"expected": "10.00 XTS"
+		},
+		{
+			"language": "he",
+			"currency": "USD",
+			"amount": 99.995,
+			"precision": null,
+			"expected": "100.00 $"
+		},
+		{
+			"language": "ar",
+			"currency": "USD",
+			"amount": 1234.5,
+			"precision": 0,
+			"expected": "1,234 $"
+		}
+	],
+	"number": [
+		{
+			"language": "en",
+			"value": 1234567,
+			"precision": 0,
+			"expected": "1,234,567"
+		},
+		{
+			"language": "en",
+			"value": -1234.5,
+			"precision": 0,
+			"expected": "-1,234"
+		},
+		{
+			"language": "en",
+			"value": 2.5,
+			"precision": 0,
+			"expected": "2"
+		},
+		{
+			"language": "en",
+			"value": 3.5,
+			"precision": 0,
+			"expected": "4"
+		},
+		{
+			"language": "de",
+			"value": 1234567.891,
+			"precision": 2,
+			"expected": "1.234.567,89"
+		},
+		{
+			"language": "fr",
+			"value": 1234567,
+			"precision": 0,
+			"expected": "1 234 567"
+		},
+		{
+			"language": "ar",
+			"value": 1234567.5,
+			"precision": 1,
+			"expected": "1,234,567.5"
+		},
+		{
+			"language": "hi",
+			"value": 12345678,
+			"precision": 0,
+			"expected": "1,23,45,678"
+		},
+		{
+			"language": "he",
+			"value": 0.125,
+			"precision": 2,
+			"expected": "0.12"
+		}
+	],
+	"date": [
+		{
+			"language": "en",
+			"value": "2026-03-05",
+			"style": "short",
+			"expected": "3/5/26"
+		},
+		{
+			"language": "en",
+			"value": "2026-03-05",
+			"style": "medium",
+			"expected": "Mar 5, 2026"
+		},
+		{
+			"language": "en",
+			"value": "2026-12-01 18:30:00",
+			"style": "long",
+			"expected": "December 1, 2026"
+		},
+		{
+			"language": "en",
+			"value": "2026-03-05",
+			"style": "full",
+			"expected": "Thursday, March 5, 2026"
+		},
+		{
+			"language": "de",
+			"value": "2026-03-05",
+			"style": "short",
+			"expected": "05.03.26"
+		},
+		{
+			"language": "de",
+			"value": "2026-03-05",
+			"style": "medium",
+			"expected": "05.03.2026"
+		},
+		{
+			"language": "de",
+			"value": "2026-12-01 18:30:00",
+			"style": "long",
+			"expected": "1. Dezember 2026"
+		},
+		{
+			"language": "de",
+			"value": "2026-03-05",
+			"style": "full",
+			"expected": "Donnerstag, 5. März 2026"
+		},
+		{
+			"language": "fr",
+			"value": "2026-03-05",
+			"style": "short",
+			"expected": "05/03/2026"
+		},
+		{
+			"language": "fr",
+			"value": "2026-03-05",
+			"style": "medium",
+			"expected": "5 mars 2026"
+		},
+		{
+			"language": "fr",
+			"value": "2026-12-01 18:30:00",
+			"style": "long",
+			"expected": "1 décembre 2026"
+		},
+		{
+			"language": "fr",
+			"value": "2026-03-05",
+			"style": "full",
+			"expected": "jeudi 5 mars 2026"
+		},
+		{
+			"language": "ar",
+			"value": "2026-03-05",
+			"style": "short",
+			"expected": "5‏/3‏/2026"
+		},
+		{
+			"language": "ar",
+			"value": "2026-03-05",
+			"style": "medium",
+			"expected": "05‏/03‏/2026"
+		},
+		{
+			"language": "ar",
+			"value": "2026-12-01 18:30:00",
+			"style": "long",
+			"expected": "1 ديسمبر 2026"
+		},
+		{
+			"language": "ar",
+			"value": "2026-03-05",
+			"style": "full",
+			"expected": "الخميس، 5 مارس 2026"
+		},
+		{
+			"language": "he",
+			"value": "2026-03-05",
+			"style": "short",
+			"expected": "5.3.2026"
+		},
+		{
+			"language": "he",
+			"value": "2026-03-05",
+			"style": "medium",
+			"expected": "5 במרץ 2026"
+		},
+		{
+			"language": "he",
+			"value": "2026-12-01 18:30:00",
+			"style": "long",
+			"expected": "1 בדצמבר 2026"
+		},
+		{
+			"language": "he",
+			"value": "2026-03-05",
+			"style": "full",
+			"expected": "יום חמישי, 5 במרץ 2026"
+		},
+		{
+			"language": "hi",
+			"value": "2026-03-05",
+			"style": "short",
+			"expected": "5/3/26"
+		},
+		{
+			"language": "hi",
+			"value": "2026-03-05",
+			"style": "medium",
+			"expected": "5 मार्च 2026"
+		},
+		{
+			"language": "hi",
+			"value": "2026-12-01 18:30:00",
+			"style": "long",
+			"expected": "1 दिसंबर 2026"
+		},
+		{
+			"language": "hi",
+			"value": "2026-03-05",
+			"style": "full",
+			"expected": "गुरुवार, 5 मार्च 2026"
+		}
+	]
+}

@@ -10,6 +10,7 @@ import EmptyState from '../../components/EmptyState.vue'
 import ListSkeleton from '../../components/ListSkeleton.vue'
 import { useAdminRead } from '../../data/api'
 import { hasValues, monthsForRange } from '../../data/analytics'
+import { count } from '../../data/format'
 import { ia } from '../../ia/store'
 import { __ } from '../../data/translation'
 
@@ -70,7 +71,7 @@ const stats = computed(() => {
   return [
     {
       label: __('Sessions'),
-      value: (stat.sessions?.value ?? 0).toLocaleString('en-IN'),
+      value: count(stat.sessions?.value),
       delta: countDeltaLabel(stat.sessions),
       up: (stat.sessions?.value ?? 0) >= (stat.sessions?.previous ?? 0),
     },
@@ -193,7 +194,7 @@ const stats = computed(() => {
           <ListRows v-else :items="topPages" row-key="page" v-slot="{ item }">
             <ListRow :value="item.page">
               <ListCell><span class="truncate text-base text-ink-gray-8">{{ item.page }}</span></ListCell>
-              <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ item.views.toLocaleString('en-IN') }}</span></ListCell>
+              <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ count(item.views) }}</span></ListCell>
               <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ item.conversion }}%</span></ListCell>
             </ListRow>
           </ListRows>

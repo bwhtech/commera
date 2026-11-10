@@ -10,7 +10,7 @@ import EmptyState from '../../components/EmptyState.vue'
 import ListSkeleton from '../../components/ListSkeleton.vue'
 import { useAdminRead } from '../../data/api'
 import { hasValues, monthsForRange } from '../../data/analytics'
-import { compactMoney, money } from '../../data/format'
+import { compactMoney, count, money } from '../../data/format'
 import { ia } from '../../ia/store'
 import { __ } from '../../data/translation'
 
@@ -46,7 +46,7 @@ const stats = computed(() => {
   const refunds = totals.value.refunds
   return [
     { label: __('Gross revenue'), value: compactMoney(revenue?.value ?? 0), delta: deltaLabel(revenue), up: (delta(revenue) ?? 0) >= 0 },
-    { label: __('Orders'), value: (orders?.value ?? 0).toLocaleString('en-IN'), delta: deltaLabel(orders), up: (delta(orders) ?? 0) >= 0 },
+    { label: __('Orders'), value: count(orders?.value), delta: deltaLabel(orders), up: (delta(orders) ?? 0) >= 0 },
     { label: __('Avg. order value'), value: money(aov?.value ?? 0), delta: deltaLabel(aov), up: (delta(aov) ?? 0) >= 0 },
     { label: __('Refunded'), value: compactMoney(refunds?.value ?? 0), delta: deltaLabel(refunds), up: (delta(refunds) ?? 0) <= 0 },
   ]
