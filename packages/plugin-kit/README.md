@@ -175,9 +175,68 @@ Fetch data with `useMethodRead` and `useMethodAction` from `@commera/admin`, poi
 method in your app's `api.py`. Inside an action dialog, `useMethodAction` does not toast its own error.
 Throw `request.error` from `onSubmit` and the dialog shows it once.
 
-Translate a string with `__('{0} jobs', [count])`, from `usePlugin()` or as an import from `@commera/admin`. It is the
-dashboard's own `__()`, so it reads the admin's language and your app's Frappe translation files. Write each string as one
-literal inside `__()`, so Frappe's string extraction finds it.
+## Translations
+
+### Dashboard text
+
+Translate a string with `__('{0} jobs', [count])`, from `usePlugin()` or as an import from `@commera/admin`:
+
+```vue
+<script setup>
+import { __ } from '@commera/admin';
+</script>
+
+<template>
+	<p>{{ __('{0} jobs', [jobs.length]) }}</p>
+</template>
+```
+
+It is the dashboard's own `__()`, so it reads the admin's language and your app's Frappe translation files, such as
+`my_app/translations/ar.csv`. Write each string as one literal inside `__()`, so Frappe's string extraction finds it.
+It does not find ``__(`Hello ${name}`)`` or `__(label)`.
+
+### Translatable records
+
+A merchant can translate the text fields of your app's records, as they translate products. Declare each doctype in
+`commera_hooks["translatable_resources"]` in `hooks.py`:
+
+```python
+commera_hooks = {
+	"translatable_resources": [
+		{
+			"type": "lookbook",
+			"doctype": "Lookbook",
+			"fields": ["title", "description"],
+			"label": "Lookbooks",
+		},
+	],
+}
+```
+
+| Key | Value |
+| --- | --- |
+| `type` | A short name, unique across apps. The translation CSV names the resource by it. |
+| `doctype` | The doctype that holds the records. |
+| `fields` | The fields a merchant can translate. Only these fields take a Content Translation. |
+| `label` | The name the merchant sees. Defaults to the doctype. |
+
+Each translation is a Content Translation record. Read the fields in the shopper's language with `translate()`:
+
+```python
+from commera.localization import translate
+
+lookbooks = frappe.get_all("Lookbook", fields=["name", "title", "description"])
+for lookbook, values in zip(lookbooks, translate(lookbooks, ["title", "description"], doctype="Lookbook")):
+	lookbook.title = values["title"].value
+```
+
+A field without a translation gives `_()` of the source text, then the source text. `values[field].status` is
+`current`, `outdated` (the source changed after the translation) or `missing`.
+
+### Storefront blocks
+
+A block in a storefront slot gets `localization`, the language of the page. Write its text in `_()` and its links
+through `url()`, as a theme does. See [Localized themes](../../docs/themes/localization.md).
 
 ## What the build does
 

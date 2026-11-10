@@ -8,6 +8,7 @@ from frappe import _
 from markupsafe import Markup
 
 from commera.guest import is_guest
+from commera.localization import get_localization
 
 SETTINGS = "Commera Settings"
 CACHE_KEY = "commera_storefront_plugins"
@@ -45,6 +46,7 @@ def get_slot_context() -> dict:
 		"currency": frappe.get_cached_value("Global Defaults", "Global Defaults", "default_currency"),
 		"language": frappe.local.lang,
 		"is_guest": is_guest(),
+		"localization": get_localization(),
 	}
 
 
