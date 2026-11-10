@@ -174,22 +174,22 @@ class TestThemeLayoutInheritance(IntegrationTestCase):
 
 	def snapshot(self):
 		"""The parent's rows as a reader on this snapshot sees them."""
-		return layout_cache.read_rows(
-			[CHILD, PARENT], PAGE, ["name", "modified", "theme", "published_layout"]
-		)
+		return layout_cache.read_rows([CHILD, PARENT], PAGE)
 
 	@contextmanager
 	def reading(self, snapshot):
 		"""Serve the cache's reads from an older snapshot, as a concurrent reader would."""
 
-		def read_rows(theme_names, page, fields):
-			return [frappe._dict({field: row[field] for field in fields}) for row in snapshot]
-
-		with patch.object(layout_cache, "read_rows", read_rows):
+		with (
+			patch.object(layout_cache, "read_rows", lambda theme_names, page: snapshot),
+			patch.object(
+				layout_cache, "read_versions", lambda theme_names, page: layout_cache.get_versions(snapshot)
+			),
+		):
 			yield
 
 	def cached_layouts(self, snapshot):
-		key = layout_cache.get_cache_key([CHILD, PARENT], PAGE, snapshot)
+		key = layout_cache.get_cache_key([CHILD, PARENT], PAGE, layout_cache.get_versions(snapshot))
 		return frappe.cache.get_value(key, use_local_cache=False)
 
 	def test_a_read_after_each_save_sees_the_saved_layout(self):
@@ -227,7 +227,7 @@ class TestThemeLayoutInheritance(IntegrationTestCase):
 	def test_an_evicted_entry_is_read_again(self):
 		publish(PARENT, PAGE, self.reordered_layout(1))
 		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
-		key = layout_cache.get_cache_key([CHILD, PARENT], PAGE, self.snapshot())
+		key = layout_cache.get_cache_key([CHILD, PARENT], PAGE, layout_cache.get_versions(self.snapshot()))
 		frappe.cache.delete_value(key)
 
 		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
@@ -244,6 +244,24 @@ class TestThemeLayoutInheritance(IntegrationTestCase):
 		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
 		publish(PARENT, PAGE, self.reordered_layout(3))
 		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(3))
+
+	def test_the_database_hash_names_the_key_a_read_cached_under(self):
+		publish(PARENT, PAGE, self.reordered_layout(1))
+		self.rendered_layout(CHILD)
+
+		versions = layout_cache.read_versions([CHILD, PARENT], PAGE)
+		self.assertEqual(versions, layout_cache.get_versions(self.snapshot()))
+		self.assertIsNotNone(self.cached_layouts(self.snapshot()))
+
+	def test_a_content_write_that_keeps_modified_is_served(self):
+		publish(PARENT, PAGE, self.reordered_layout(1))
+		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
+		name = f"{PARENT}-{PAGE}"
+
+		layout = frappe.as_json(self.reordered_layout(2))
+		frappe.db.set_value("Theme Layout", name, "published_layout", layout, update_modified=False)
+
+		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(2))
 
 	def test_a_deleted_layout_falls_back_to_the_theme_file(self):
 		publish(PARENT, PAGE, self.reordered_layout(1))
