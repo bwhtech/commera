@@ -6,7 +6,9 @@
 			"hidden": false,
 			"settings": {
 				"heading": "Welcome to $theme_name",
-				"text": "Edit layouts/index.json, or add sections in sections/."
+				"text": "Edit layouts/index.json, or add sections in sections/.",
+				"button_label": "Shop all products",
+				"button_url": "/products"
 			},
 			"blocks": []
 		}

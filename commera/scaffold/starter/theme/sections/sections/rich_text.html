@@ -1,4 +1,7 @@
-<section>
+<section class="rich-text">
 	<h2>{{ section.settings.heading }}</h2>
 	<p>{{ section.settings.text }}</p>
+	{% if section.settings.button_label %}
+	<a href="{{ url(section.settings.button_url or '/products') | e }}">{{ section.settings.button_label }}</a>
+	{% endif %}
 </section>

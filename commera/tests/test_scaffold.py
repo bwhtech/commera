@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -10,8 +11,11 @@ import frappe
 from frappe.modules.import_file import import_file_by_path
 from frappe.tests import IntegrationTestCase, UnitTestCase
 from frappe.utils.boilerplate import _create_app_boilerplate
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request
 
 from commera.commands import get_current_app_scaffold
+from commera.localization import get_localization
 from commera.plugins.places import ICONS, PLACES
 from commera.scaffold import (
 	LOGO_COLOURS,
@@ -25,6 +29,7 @@ from commera.scaffold.theme import ThemeScaffold
 from commera.sdk import API_VERSION
 from commera.shipping.base_class import ShippingProviderBase
 from commera.shop_themes.sections import get_theme_json, validate_layout
+from commera.tests.test_localization import use_storefront_languages
 
 APP = "commera_test_plugin"
 STARTER = "Commera Starter"
@@ -33,6 +38,12 @@ STARTER_DIRS = {
 	"themes": Path(frappe.get_app_path("commera"), "themes", "commera_starter"),
 	"public/themes": Path(frappe.get_app_path("commera"), "public", "themes", "commera_starter"),
 }
+JINJA_COMMENT = re.compile(r"{#.*?#}", re.DOTALL)
+# A language prefix glued on by hand instead of through url() or switch_url().
+HAND_BUILT_PREFIX = re.compile(r'root_prefix|language\.code\s*~|~\s*localization|href="/(?!assets/|files/)')
+PHYSICAL_CSS = re.compile(
+	r"\b(margin|padding)-(left|right)\b|text-align:\s*(left|right)|[\s{;](left|right)\s*:"
+)
 
 
 def make_app(apps_path: Path, app: str = APP) -> Path:
@@ -62,6 +73,11 @@ def list_files(root: Path) -> set[str]:
 		for path in root.rglob("*")
 		if path.is_file() and "__pycache__" not in path.parts and "node_modules" not in path.parts
 	}
+
+
+def read_templates(theme_dir: Path) -> str:
+	text = "".join(path.read_text() for path in sorted(theme_dir.rglob("*.html")))
+	return JINJA_COMMENT.sub("", text)
 
 
 def get_fieldnames(doctype: dict) -> list[str]:
@@ -392,6 +408,47 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 					self.assertNotIn("commera_starter", text, path)
 					self.assertNotIn("Commera Starter", text, path)
 		self.assertTrue((self.theme_dir / "README.md").read_text().startswith("# Scaffold Check\n"))
+		self.assert_localized(self.theme_dir)
+
+	def assert_localized(self, theme_dir):
+		templates = read_templates(theme_dir)
+		for call in ("url(", "_(", "localization", "language_switcher("):
+			self.assertIn(call, templates)
+		self.assertNotRegex(templates, HAND_BUILT_PREFIX)
+		self.assertNotRegex(templates, PHYSICAL_CSS)
+
+	def test_a_minimal_theme_links_through_url_and_localization(self):
+		frappe.db.set_value("Shop Theme", STARTER, "use_as_starter", 0)
+
+		for theme_type in ("Classic", "Sections"):
+			with self.subTest(theme_type):
+				ThemeScaffold(APP, self.apps_path).add_theme(f"Scaffold {theme_type}", theme_type, None)
+				theme_dir = self.theme_dir.parent / f"scaffold_{theme_type.lower()}"
+				self.assert_localized(theme_dir)
+				for href in re.findall(r'href="([^"]*)"', read_templates(theme_dir)):
+					self.assertRegex(href, r"^\{\{ url\(")
+
+	def test_minimal_theme_links_carry_the_page_language(self):
+		frappe.db.set_value("Shop Theme", STARTER, "use_as_starter", 0)
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+		frappe.local.request = Request(EnvironBuilder(path="/ar/").get_environ())
+		ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Classic", None)
+		ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Sections", "Sections", None)
+
+		header = self.render(self.theme_dir / "components" / "includes" / "header.html")
+		section = self.render(
+			self.theme_dir.parent / "scaffold_sections" / "sections" / "rich_text.html",
+			section={"settings": {"button_label": "Shop", "button_url": "/products"}},
+		)
+
+		self.assertIn('href="/ar/products"', header)
+		self.assertIn('hreflang="en"', header)
+		self.assertIn('href="/ar/products"', section)
+
+	def render(self, path: Path, **context) -> str:
+		# nosemgrep: frappe-ssti
+		return frappe.render_template(path.read_text(), {"localization": get_localization(), **context})
 
 	def test_a_sections_theme_without_a_parent_is_a_copy_of_the_starter(self):
 		changes = ThemeScaffold(APP, self.apps_path).add_theme("Scaffold Check", "Sections", None)

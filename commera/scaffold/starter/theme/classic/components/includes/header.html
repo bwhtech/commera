@@ -1,0 +1,15 @@
+{# url() adds the current language prefix: never build one by hand. #}
+{% from "templates/macros/language_switcher.html" import language_switcher %}
+<header class="site-header">
+	<a href="{{ url('/') | e }}" class="site-name">$theme_name</a>
+	<nav aria-label="{{ _('Main') | e }}">
+		<a href="{{ url('/products') | e }}">{{ _("Products") }}</a>
+		<a href="{{ url('/cart') | e }}">{{ _("Cart") }}</a>
+	</nav>
+	{% if localization.available_languages | length > 1 %}
+	<div class="languages">
+		<span>{{ _("Language") }}</span>
+		{{ language_switcher(class="language-switcher", current_class="is-current") }}
+	</div>
+	{% endif %}
+</header>

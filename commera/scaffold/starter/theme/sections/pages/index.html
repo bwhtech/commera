@@ -1,5 +1,27 @@
 {% extends "components/base.html" %}
+{% from "templates/macros/language_switcher.html" import language_switcher %}
+
+{% block head %}
+{# Logical properties (inline, block, start, end) flip on their own in a right-to-left language. #}
+<style>
+	.site-header { display: flex; align-items: center; gap: 1.5rem; padding-block: 1rem; padding-inline: 1.5rem; }
+	.languages { display: flex; align-items: center; gap: 0.5rem; margin-inline-start: auto; }
+	.language-switcher { display: flex; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+	.language-switcher .is-current { font-weight: 600; }
+	.rich-text { max-inline-size: 40rem; padding-inline: 1.5rem; text-align: start; }
+</style>
+{% endblock %}
 
 {% block uncontained_body %}
+	{# url() adds the current language prefix: never build one by hand. #}
+	<header class="site-header">
+		<a href="{{ url('/') | e }}">$theme_name</a>
+		{% if localization.available_languages | length > 1 %}
+		<div class="languages">
+			<span>{{ _("Language") }}</span>
+			{{ language_switcher(class="language-switcher", current_class="is-current") }}
+		</div>
+		{% endif %}
+	</header>
 	{{ render_layout("index") }}
 {% endblock %}
