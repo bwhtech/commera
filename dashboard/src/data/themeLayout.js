@@ -1,12 +1,15 @@
 import { computed, effectScope, reactive, ref, watch } from 'vue'
 import { refDebounced } from '@vueuse/core'
 import { createAdminCaller } from './adminCaller'
+import { storefrontLanguages } from './boot'
 import { useAdminAction, useAdminRead } from './api'
 import { rememberPreviewEntry, rememberedPreviewEntry } from '../ia/previewEntry'
 import { capturePage } from '../utils/capturePage'
 import { createSequence } from '../utils/sequence'
 import { readableName } from '../utils/sectionSettingToField'
 
+// Section text in the default language is the source the other languages translate.
+const SOURCE_LANGUAGE = storefrontLanguages[0]?.code ?? 'en'
 const DEFAULT_MAX_BLOCKS = 50
 const DEFAULT_MAX_PRODUCTS = 8
 const SEARCH_DEBOUNCE_MS = 300
@@ -20,7 +23,7 @@ const thumbnailAction = effectScope(true).run(() => useAdminAction('theme_layout
 const THUMBNAIL_SIZE = { width: 1280, height: 800, scale: 2, outputWidth: 480, quality: 0.85 }
 
 async function captureThumbnail(theme, scheme) {
-  const params = new URLSearchParams({ theme, page: 'index', lang: 'en' })
+  const params = new URLSearchParams({ theme, page: 'index', lang: SOURCE_LANGUAGE })
   let followsSystem = false
   const image = await capturePage(`/theme_editor_preview?${params}`, {
     ...THUMBNAIL_SIZE,
@@ -126,7 +129,7 @@ export function createLayoutEditor(theme) {
     settings: { doctype: null, groups: [] },
     live: false,
     parts: [],
-    language: 'en',
+    language: SOURCE_LANGUAGE,
     device: 'desktop',
     selection: null,
     previewToken: 0,
@@ -392,22 +395,24 @@ export function createLayoutEditor(theme) {
   function settingValue(owner, setting) {
     const value = owner.settings?.[setting.id] ?? setting.default
     if (!isTranslatable(setting)) return value
-    if (value && typeof value === 'object') return value[state.language] ?? ''
-    return state.language === 'en' ? (value ?? '') : ''
+    if (value && typeof value === 'object') {
+      return value[state.language] ?? (state.language === SOURCE_LANGUAGE ? value.en : null) ?? ''
+    }
+    return state.language === SOURCE_LANGUAGE ? (value ?? '') : ''
   }
 
   function settingPlaceholder(owner, setting) {
-    if (!isTranslatable(setting) || state.language === 'en') return ''
+    if (!isTranslatable(setting) || state.language === SOURCE_LANGUAGE) return ''
     const value = owner.settings?.[setting.id] ?? setting.default
-    return (value && typeof value === 'object' ? value.en : value) ?? ''
+    return (value && typeof value === 'object' ? (value[SOURCE_LANGUAGE] ?? value.en) : value) ?? ''
   }
 
   function translatedValue(current, value) {
-    if (state.language === 'en') {
-      return current && typeof current === 'object' ? { ...current, en: value } : value
+    if (state.language === SOURCE_LANGUAGE) {
+      return current && typeof current === 'object' ? { ...current, [SOURCE_LANGUAGE]: value } : value
     }
 
-    const translations = current && typeof current === 'object' ? { ...current } : current ? { en: current } : {}
+    const translations = current && typeof current === 'object' ? { ...current } : current ? { [SOURCE_LANGUAGE]: current } : {}
     if (value === '' || value === null) delete translations[state.language]
     else translations[state.language] = value
     return translations
