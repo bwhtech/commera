@@ -128,16 +128,24 @@ def get_website_redirect(localized: LocalizedRequest) -> tuple[str, int] | None:
 	if localized.route_path != clean_path(localized.path):
 		candidates.append((localized.route_path, localized.canonical_prefix))
 
-	current = get_canonical_path(localized.path)
 	for path, prefix in candidates:
 		if not (redirect := match_website_redirect(path)):
 			continue
 		# /en/... named the default language's page before it moved to the root.
 		location = keep_language_prefix(canonicalize_location(redirect[0]), prefix)
-		# A rule written for /en/... would send the page back to itself, then to /en/... again.
-		if not is_same_site(location) or urlsplit(location).path != current:
+		if not is_self_redirect(location, localized.path):
 			return location, redirect[1]
 	return None
+
+
+def is_self_redirect(location: str, requested_path: str) -> bool:
+	"""A rule written for /en/... would send the page back to itself. A new query string is a move."""
+	if not is_same_site(location):
+		return False
+	target = urlsplit(location)
+	query_string = frappe.safe_decode(frappe.local.request.query_string or b"")
+	same_query = target.query in ("", query_string)
+	return target.path == get_canonical_path(requested_path) and same_query
 
 
 def match_website_redirect(path: str) -> tuple[str, int] | None:

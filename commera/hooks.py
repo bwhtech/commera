@@ -128,6 +128,9 @@ commera_events = {
 
 
 doc_events = {
+	"Website Settings": {
+		"validate": "commera.localization.redirect_rules.canonicalize_redirect_targets",
+	},
 	"User": {
 		"before_insert": "commera.utils.prevent_welcome_email",
 	},
