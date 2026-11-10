@@ -2,7 +2,7 @@
 {% macro seo_meta(seo) %}
     {# macros don't inherit the caller's {% set settings %}, so fetch it here (frappe is a jinja global) #}
     {% set settings = frappe.get_cached_doc("Commera Settings", "Commera Settings") %}
-    {% set site_name = settings.store_name or "Store" %}
+    {% set site_name = get_shop_details().name or "Store" %}
     {% if seo.title %}<title>{{ seo.title|e }}</title>{% endif %}
     {% if seo.description %}<meta name="description" content="{{ seo.description|e }}">{% endif %}
     {% if seo.url %}<link rel="canonical" href="{{ seo.url|e }}">{% endif %}

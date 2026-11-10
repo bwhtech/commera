@@ -24,7 +24,7 @@
 			{% for item in menu_items %}
 			{% if item["items"] %}
 			<div x-data="{ expanded: false }">
-				<button type="button" @click="expanded = !expanded" :aria-expanded="expanded" class="flex h-12 w-full items-center justify-between rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ item["title"] }} <span :class="expanded && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
+				<button type="button" @click="expanded = !expanded" :aria-expanded="expanded" class="flex h-12 w-full items-center justify-between rounded-lg px-2 text-lg text-ink-gray-8 hover:bg-surface-gray-3">{{ item["title"] | e }} <span :class="expanded && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
 				<div x-show="expanded" x-collapse.duration.300ms><div class="pb-2 ps-3">
 					{% for child in item["items"] %}
 					{{ menu_link(child, "flex h-11 items-center rounded-lg px-2 text-md text-ink-gray-8 hover:bg-surface-gray-3") }}

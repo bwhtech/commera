@@ -13,7 +13,7 @@ from commera.shop_themes.chrome_preview import (
 	COMMON_BLANKED_BLOCKS,
 	HEADER_BLOCKS,
 	get_preview_context,
-	get_preview_language,
+	preview_language,
 	render_chrome_preview,
 )
 
@@ -87,8 +87,11 @@ def get_context(context):
 
 		setattr(settings, fieldname, value)
 
-	lang = get_preview_language(frappe.form_dict.get("lang"))
+	with preview_language(frappe.form_dict.get("lang")) as lang:
+		render_preview(context, settings, lang)
 
+
+def render_preview(context, settings, lang):
 	footer_context = get_preview_context(settings, lang)
 
 	rendered = render_chrome_preview(footer_context, COMMON_BLANKED_BLOCKS + HEADER_BLOCKS)

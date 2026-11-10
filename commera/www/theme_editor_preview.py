@@ -10,7 +10,7 @@ from commera.localization.languages import is_rtl_language
 from commera.shop_themes.chrome_preview import (
 	TRACKING_BLANKED_BLOCKS,
 	find_layout_template,
-	get_preview_language,
+	preview_language,
 	render_page_preview,
 )
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
@@ -37,16 +37,13 @@ def get_context(context):
 	page = requested_page(theme_dirs)
 	layouts = requested_layouts(page)
 
-	lang = get_preview_language(frappe.form_dict.get("lang"))
+	with preview_language(frappe.form_dict.get("lang")) as lang:
+		render_preview(context, theme, theme_dirs, page, layouts, lang)
 
-	# The themed page reads its language off frappe.lang, so the ?lang switch must move it here.
-	frappe.local.lang = lang
 
+def render_preview(context, theme, theme_dirs, page, layouts, lang):
 	page_template = find_page_template(theme_dirs, page)
 	sample_form = get_sample_form(page) if page_template else None
-	if sample_form is not None:
-		# get_localization() reads `_lang` off the form the page renders with.
-		sample_form._lang = lang
 	rendered = sample_form is not None and render_layout_page(page_template, sample_form, theme, layouts)
 	if rendered:
 		context.rendered_html = rendered

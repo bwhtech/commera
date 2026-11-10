@@ -18,8 +18,8 @@
 	{% for category in categories %}
 		{% set slot = collage_slots[categories | length][loop.index0] %}
 		{% set category_image = category_images[loop.index0].settings.image if category_images | length > loop.index0 and category_images[loop.index0].settings.image else shop_theme_asset_url("images/collection/" ~ slot ~ ".png") %}
-		<a class="collection{{ slot }} collection-tile" href="{{ category.href or products_url }}">
-			<img src="{{ category_image }}" alt="{{ category.label }}" width="190" height="220" loading="lazy">
+		<a class="collection{{ slot }} collection-tile" href="{{ (category.href or products_url) | e }}">
+			<img src="{{ category_image | e }}" alt="{{ category.label | e }}" width="190" height="220" loading="lazy">
 		</a>
 	{% endfor %}
 </section>

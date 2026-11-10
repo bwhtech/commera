@@ -1,8 +1,15 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from commera import seo
 from commera.commera_ecommerce.doctype.commera_settings.footer import footer_preview
-from commera.localization import get_translatable_fields, register, resolve
+from commera.localization import (
+	get_localization,
+	get_translatable_fields,
+	pin_localization,
+	register,
+	resolve,
+)
 from commera.localization.content import CURRENT, translate
 from commera.sdk import shop
 from commera.shop_data import get_header_data
@@ -139,6 +146,15 @@ class TestStoreFrameTranslation(StoreFrameTestCase):
 
 		self.assertEqual(get_header_data().store_name, "بيت الكتان")
 
+	def test_a_pinned_localization_wins_over_the_request_until_the_block_ends(self):
+		self.serve("en")
+		with pin_localization(resolve("/ar")[0]):
+			self.assertEqual(shop.get_shop()["name"], "بيت الكتان")
+			self.assertEqual(shop.get_menu("footer")["items"][0]["title"], "مساعدة")
+
+		self.assertEqual(get_localization().language.code, "en")
+		self.assertEqual(shop.get_shop()["name"], "Linen House")
+
 	def test_the_footer_template_renders_translations_escaped(self):
 		register(LINK, self.returns.name, "link_label", "ar", "<b>الإرجاع</b>")
 		html = frappe.render_template(FOOTER_TEMPLATE, {"localization": resolve("/ar")[0]})
@@ -208,3 +224,32 @@ class TestRemovedFooterLinkTranslations(StoreFrameTestCase):
 		self.assertFalse(self.has_translations(LINK, moved))
 		self.assertFalse(self.has_translations(LINK, self.shipping.name))
 		self.assertTrue(self.has_translations(LINK, self.returns.name))
+
+
+class TestStoreFrameSeo(StoreFrameTestCase):
+	def setUp(self):
+		super().setUp()
+		frappe.db.set_single_value(SETTINGS, "seo_title_template", "{title} | {store}")
+		frappe.clear_document_cache(SETTINGS, SETTINGS)
+
+	def test_titles_and_json_ld_carry_the_translated_store_name(self):
+		self.serve("ar")
+
+		self.assertEqual(seo.apply_title_template("قمصان"), "قمصان | بيت الكتان")
+		self.assertEqual(seo.default_seo()["title"], "بيت الكتان")
+		self.assertEqual(seo.default_seo()["description"], "قمصان للصيف")
+		self.assertEqual([entry["name"] for entry in seo.org_website_json_ld()], ["بيت الكتان"] * 2)
+
+	def test_og_site_name_is_the_translated_store_name(self):
+		self.serve("ar")
+		html = frappe.render_template(
+			'{% from "templates/macros/seo.html" import seo_meta %}{{ seo_meta(seo) }}', {"seo": {}}
+		)
+
+		self.assertIn('<meta property="og:site_name" content="بيت الكتان">', html)
+
+	def test_the_default_language_keeps_the_source_store_name(self):
+		self.serve("en")
+
+		self.assertEqual(seo.apply_title_template("Shirts"), "Shirts | Linen House")
+		self.assertEqual(seo.default_seo()["description"], "Shirts for summer")

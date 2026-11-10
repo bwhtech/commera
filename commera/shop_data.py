@@ -5,7 +5,7 @@ import frappe
 
 from commera.branding import get_brand_assets
 from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import get_menu_tree
-from commera.localization import Localization, translate
+from commera.localization import Localization, get_pinned_localization, translate
 from commera.store_frame import get_shop_details
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
@@ -16,7 +16,8 @@ CATEGORY_FIELDS = ["display_name", "description", "meta_title", "meta_descriptio
 
 def get_storefront_menu(localization: Localization | None = None):
 	"""Request-scoped enabled menu tree in the request language, memoised on `frappe.local`.
-	An explicit `localization` (an editor preview) gets a fresh tree in that language."""
+	An explicit or pinned `localization` (an editor preview) gets a fresh tree in that language."""
+	localization = localization or get_pinned_localization()
 	if localization:
 		return translate_menu(get_menu_tree(enabled_only=True), localization)
 	menu = getattr(frappe.local, "commera_storefront_menu", None)
