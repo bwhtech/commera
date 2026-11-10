@@ -51,6 +51,11 @@ def get_localization() -> Localization:
 	return resolve_current_request()[0]
 
 
+def find_request_language(code: str | None) -> Language | None:
+	"""`code` when the current user may open it: a published language, or any configured one for admins."""
+	return StorefrontLanguages.load().find(code, is_commera_admin())
+
+
 def apply_request_language():
 	"""Set frappe.local.lang when the path starts with a storefront language prefix."""
 	localization, path = resolve_current_request()

@@ -17,7 +17,7 @@
     <link rel="alternate" hreflang="{{ alt.lang }}" href="{{ alt.href }}">
     {% endfor %}
     {% for alt in seo.alternates or [] %}
-        {% if alt.lang == "en" %}<link rel="alternate" hreflang="x-default" href="{{ alt.href }}">{% endif %}
+        {% if alt.x_default %}<link rel="alternate" hreflang="x-default" href="{{ alt.href }}">{% endif %}
     {% endfor %}
 
     {# OG/FB want full locales (en_US, ar_AR), not the bare lang code Frappe uses #}

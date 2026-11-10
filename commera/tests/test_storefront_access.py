@@ -8,6 +8,7 @@ from commera.api.admin.home import get_home, set_storefront_published
 from commera.patches import publish_existing_storefronts
 from commera.roles import COMMERA_ADMIN
 from commera.storefront_access import is_storefront_path, is_storefront_published
+from commera.tests.test_localization import use_storefront_languages
 
 STORE_ADMIN = "storefront-access-admin@example.com"
 SYSTEM_MANAGER = "storefront-access-manager@example.com"
@@ -36,8 +37,10 @@ class TestStorefrontAccess(IntegrationTestCase):
 		return get_response().status_code
 
 	def test_only_storefront_paths_are_gated(self):
+		use_storefront_languages(self, "en", published=("en", "ar"), unpublished=("fr",))
 		for path in (
 			"/",
+			"/fr/products",
 			"/en",
 			"/en/products",
 			"/ar/cart",
@@ -51,7 +54,7 @@ class TestStorefrontAccess(IntegrationTestCase):
 		):
 			with self.subTest(path=path):
 				self.assertTrue(is_storefront_path(path))
-		for path in ("/commera", "/login", "/app/item", "/api/method/ping", "/files/a.png"):
+		for path in ("/commera", "/login", "/app/item", "/api/method/ping", "/files/a.png", "/de/products"):
 			with self.subTest(path=path):
 				self.assertFalse(is_storefront_path(path))
 

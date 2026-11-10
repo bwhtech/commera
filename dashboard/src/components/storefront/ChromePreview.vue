@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useEventListener, useWindowSize } from '@vueuse/core'
 import { Button, TabButtons } from 'frappe-ui'
+import { storefrontLanguageOptions } from '../../data/boot'
 
 const props = defineProps({
   // Bumped by every mutation; it is what makes the iframe refetch the rendered chrome.
@@ -23,12 +24,7 @@ const RESIZE_STEP = 40
 // clips it out of existence.
 const DROPDOWN_HEADROOM = 460
 
-const LANGUAGES = [
-  { label: 'LTR', value: 'en' },
-  { label: 'RTL', value: 'ar' },
-]
-
-const language = ref('en')
+const language = ref(storefrontLanguageOptions[0]?.value ?? 'en')
 const reloadToken = ref(0)
 const contentHeight = ref(0)
 
@@ -186,7 +182,12 @@ const source = computed(() => {
           :label="collapsed ? `Show ${title.toLowerCase()}` : title"
           @click="collapsed = !collapsed"
         />
-        <TabButtons v-if="!collapsed" v-model="language" size="sm" :options="LANGUAGES" />
+        <TabButtons
+          v-if="!collapsed && storefrontLanguageOptions.length > 1"
+          v-model="language"
+          size="sm"
+          :options="storefrontLanguageOptions"
+        />
       </div>
 
       <Button v-if="!collapsed" icon-left="lucide-rotate-cw" label="Refresh" @click="reloadToken += 1" />

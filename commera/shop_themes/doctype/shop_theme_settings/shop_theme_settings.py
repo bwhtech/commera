@@ -3,8 +3,10 @@ import re
 import frappe
 from frappe.model.document import Document
 
+from commera.localization import StorefrontLanguages
 from commera.shop_themes.doctype.shop_theme.shop_theme import clear_render_theme_context
 
+# Stored patterns keep this literal group; compile time swaps in the configured languages.
 LANG = r"(?P<lang>en|ar)"
 
 # The routes the bundled themes ship pages for.
@@ -125,18 +127,19 @@ def seed_default_routes():
 
 
 def clear_settings_cache():
-	frappe.cache.delete_value(COMPILED_ROUTES_CACHE_KEY)
+	frappe.cache.delete_keys(COMPILED_ROUTES_CACHE_KEY)
 	frappe.local.shop_theme_compiled_routes = None
 	# The active theme lives on this Single, so the memoised render context is stale too.
 	clear_render_theme_context()
 
 
-def build_compiled_routes():
+def build_compiled_routes(language_codes=None):
 	settings = frappe.get_cached_doc("Shop Theme Settings")
+	language_group = get_language_group(language_codes or get_language_codes())
 	compiled = []
 	for row in settings.get("routes") or []:
 		try:
-			pattern = re.compile(row.url_pattern)
+			pattern = re.compile(row.url_pattern.replace(LANG, language_group))
 		except re.error:
 			continue
 		compiled.append(
@@ -153,6 +156,20 @@ def get_compiled_routes():
 	# Memoised on frappe.local over redis too: regex compilation showed up hot per request.
 	routes = getattr(frappe.local, "shop_theme_compiled_routes", None)
 	if routes is None:
-		routes = frappe.cache.get_value(COMPILED_ROUTES_CACHE_KEY, generator=build_compiled_routes)
+		# Keyed by the languages, so a language change compiles fresh patterns without a hook.
+		codes = get_language_codes()
+		routes = frappe.cache.get_value(
+			f"{COMPILED_ROUTES_CACHE_KEY}:{'|'.join(codes)}",
+			generator=lambda: build_compiled_routes(codes),
+		)
 		frappe.local.shop_theme_compiled_routes = routes
 	return routes
+
+
+def get_language_codes() -> tuple[str, ...]:
+	"""Lowercase URL prefixes of every configured language. Unpublished ones stay for admin previews."""
+	return tuple(language.code.lower() for language in StorefrontLanguages.load().configured)
+
+
+def get_language_group(codes) -> str:
+	return rf"(?P<lang>{'|'.join(re.escape(code) for code in codes)})"

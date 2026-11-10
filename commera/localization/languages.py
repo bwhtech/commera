@@ -44,14 +44,22 @@ class StorefrontLanguages:
 
 	@classmethod
 	def load(cls) -> "StorefrontLanguages":
-		settings = frappe.get_cached_doc("Commera Settings")
+		return cls.from_settings(frappe.get_cached_doc("Commera Settings"))
+
+	@classmethod
+	def from_settings(cls, settings) -> "StorefrontLanguages":
 		rows = [(row.language, bool(row.published)) for row in settings.get("storefront_languages") or []]
 		return cls(get_default_language_code(settings), rows)
+
+	@property
+	def configured(self) -> list[Language]:
+		"""Published and unpublished languages, default first."""
+		return self.published + self.unpublished
 
 	def find(self, code: str | None, include_unpublished: bool = False) -> Language | None:
 		if not code:
 			return None
-		languages = self.published + self.unpublished if include_unpublished else self.published
+		languages = self.configured if include_unpublished else self.published
 		code = code.lower()
 		return next((language for language in languages if language.code.lower() == code), None)
 

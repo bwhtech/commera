@@ -267,6 +267,7 @@ jinja = {
 	"methods": [
 		"commera.branding.get_brand_assets",
 		"commera.guest.is_guest_checkout_enabled",
+		"commera.localization.get_localization",
 		"commera.utils.format_theme_css",
 		"commera.utils.get_currency_symbol",
 		"commera.search.result_card.get_search_result_fields",

@@ -515,7 +515,7 @@
                 const pairs = this.items
                     .filter(item => item.selected)
                     .map(item => `${encodeURIComponent(item.variant.item_code)}:${item.qty}`);
-                const language = window.location.pathname.split("/")[1] === "ar" ? "ar" : "en";
+                const language = {{ localization.language.code.lower() | tojson }};
                 const url = new URL(`/${language}/cart/${pairs.join(",")}`, window.location.origin);
                 if (discount_code) url.searchParams.set("discount", discount_code);
                 return url.href;

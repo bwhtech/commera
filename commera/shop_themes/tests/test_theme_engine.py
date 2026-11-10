@@ -24,6 +24,7 @@ from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	validate_theme_name,
 )
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import (
+	LANG,
 	build_compiled_routes,
 	seed_default_routes,
 )
@@ -43,6 +44,7 @@ from commera.shop_themes.theme_resolver import (
 	match_route,
 	theme_bytecode_caches,
 )
+from commera.tests.test_localization import use_storefront_languages
 from commera.utils import get_currency_symbol, get_store_currency
 
 APP_PATH = frappe.get_app_path("commera")
@@ -162,6 +164,18 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 		self.assertEqual(matched_route["template_path"], "pages/products/details.html")
 		self.assertEqual(match.group("route"), "some-slug")
 
+	def test_route_table_compiles_the_language_group_from_the_settings(self):
+		seed_default_routes()
+		use_storefront_languages(self, "en", published=("en", "fr"), unpublished=("he",))
+
+		routes = build_compiled_routes()["routes"]
+
+		for path in ("en/products/shoe", "fr/products/shoe", "he/products/shoe"):
+			self.assertEqual(match_route(routes, path)[1].group("lang"), path.split("/")[0])
+		self.assertIsNone(match_route(routes, "ar/products/shoe")[0])
+		# The stored patterns are not rewritten.
+		self.assertIn(rf"^{LANG}/products$", self.seeded_route_patterns())
+
 	def test_route_table_no_match_for_unknown_path(self):
 		seed_default_routes()
 		compiled = build_compiled_routes()
@@ -177,6 +191,7 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 			with open(os.path.join(theme_dir, "pages", "account", f"{page}.html"), "w") as page_file:
 				page_file.write(page)
 
+		use_storefront_languages(self, "en", published=("en", "ar"))
 		theme_context = {"theme_name": "Account Probe", "dirs": [theme_dir]}
 		with patch("commera.shop_themes.theme_resolver.get_render_theme_context", return_value=theme_context):
 			for path in ("en/account/login", "ar/account/signup"):
@@ -218,6 +233,18 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 		settings = {"dynamic_pages_enabled": True}
 		self.assertFalse(is_dynamic_page(settings, "not-a-lang/foo"))
 		self.assertTrue(is_dynamic_page(settings, "en/foo"))
+
+	def test_is_dynamic_page_follows_the_published_languages(self):
+		settings = {"dynamic_pages_enabled": True}
+		use_storefront_languages(self, "en", published=("en", "fr"), unpublished=("de",))
+		self.addCleanup(frappe.set_user, frappe.session.user)
+
+		self.assertTrue(is_dynamic_page(settings, "fr/about"))
+		self.assertFalse(is_dynamic_page(settings, "ar/about"))
+		frappe.set_user("Guest")
+		self.assertFalse(is_dynamic_page(settings, "de/about"))
+		frappe.set_user("Administrator")
+		self.assertTrue(is_dynamic_page(settings, "de/about"))
 
 	def test_is_dynamic_page_rejects_traversal_segments(self):
 		# werkzeug percent-decodes before the renderer, so %2e%2e%2f arrives as ".." verbatim.
