@@ -31,9 +31,15 @@ To add an engine, subclass `RemoteSearchEngine` in `commera/search/remote_engine
 The index holds the title of each product and the name of each category in every published storefront language. The titles come from Content Translation rows. Until #441, an Item's Arabic name fills in for a missing Arabic translation.
 
 - A query in any published language finds the record. The translated titles are part of the record's `content`. Search-server engines also get the Arabic title in `title_ar`.
-- SQLite normalises Arabic words in the same way in the index and in the query (`commera/search/arabic.py`). It removes the article (`ال`, and `وال`, `بال`, `كال`, `فال`, `لل`), harakat and tatweel. It changes `أ إ آ ٱ` to `ا`, `ة` to `ه` and `ى` to `ي`. Thus `قميص` finds `القميص`. The index keeps the written words too, and the storefront shows them unchanged.
+- SQLite gives each Arabic word a set of search forms (`commera/search/arabic.py`). The index and the query use the same forms.
+  - The folded form removes harakat and tatweel. It changes `أ إ آ ٱ` to `ا`, `ة` to `ه` and `ى` to `ي`.
+  - When the folded word starts with an article (`ال`, `وال`, `بال`, `كال`, `فال`, `لل`) and 3 letters stay after it, the word also has a form without the article.
+  - The index holds the written words and all their forms. The storefront shows the written words unchanged.
+  - A query word matches any of its forms, for example `("العاب"* OR "عاب")`. Thus `العاب` finds `ألعاب`, `قميص` finds `القميص`, and `فالنتين` still finds `فالنتين`.
+  - Forms of 4 or more letters match as a prefix, as other words do. Thus `الورد` finds `الوردة`. A partial Arabic word that starts a known word is not spell-corrected.
 - Saving or deleting a title translation reindexes its record. When an edit moves a translation to a different record or language, the old record is also reindexed.
 - A change to the default or the published languages in Commera Settings rebuilds the index. A build compares the languages at its start and end. If they changed while it ran, it enqueues one more build, unless a build is already queued.
+- A build saves the languages it started with in the index. When an interrupted build resumes with other languages, it starts again from the beginning.
 - The `LIKE` query also looks in the shop-wide title translations of the published languages, so short terms find translated titles.
 
 ## Search as you type

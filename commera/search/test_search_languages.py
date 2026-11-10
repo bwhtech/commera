@@ -2,6 +2,7 @@
 # See license.txt
 
 import copy
+import os
 from unittest.mock import patch
 
 import frappe
@@ -88,6 +89,9 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 	def publish(self, *codes):
 		"""Publish `codes`, then rebuild the index as a publish does."""
 		self.publish_languages(*codes)
+		self.rebuild_index()
+
+	def rebuild_index(self):
 		clear_search_engine()
 		SqliteProductSearch().drop_index()
 		SqliteProductSearch().build_index()
@@ -138,6 +142,32 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 			with self.subTest(term=term):
 				self.assertEqual(self.product_names(term), [self.red])
 
+	def test_arabic_spellings_find_each_other(self):
+		# Folding and article stripping must agree: "العاب" once lost "ألعاب" to its stem "عاب".
+		self.add_titles("ar", {self.blue: "ألعاب مكتبة مستشفى", self.green: "العاب مكتبه مستشفي"})
+		self.rebuild_index()
+		for term in ("ألعاب", "العاب", "مكتبة", "مكتبه", "مستشفى", "مستشفي"):
+			with self.subTest(term=term):
+				self.assertEqual(set(self.product_names(term)), {self.blue, self.green})
+				self.assertEqual(set(self.engine.search_products({"search": term})), {self.blue, self.green})
+		for term in ("أحمر", "احمر"):
+			with self.subTest(term=term):
+				self.assertEqual(self.product_names(term), [self.red])
+
+	def test_a_word_that_only_looks_like_it_has_an_article_matches_in_full(self):
+		self.add_titles("ar", {self.blue: "هدية فالنتين"})
+		self.rebuild_index()
+		self.assertEqual(self.product_names("فالنتين"), [self.blue])
+		self.assertEqual(self.engine.search_products({"search": "فالنتين"}), [self.blue])
+
+	def test_a_partial_arabic_word_matches_as_a_prefix(self):
+		self.add_titles("ar", {self.blue: "الوردة الحمراء"})
+		self.rebuild_index()
+		self.assertEqual(self.engine.search_products({"search": "الورد"}), [self.blue])
+		typeahead = self.engine.typeahead("الورد")
+		self.assertEqual(typeahead["product_names"], [self.blue])
+		self.assertEqual(typeahead["corrected_words"], {})
+
 	def test_arabic_category_names_match_normalised_forms(self):
 		for term in ("أحذية", "احذيه", "الاحذية", "رياضيه"):
 			with self.subTest(term=term):
@@ -151,7 +181,8 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 			"SELECT content FROM search_fts WHERE doc_id = ?", (f"{PRODUCT}:{self.blue}",), read_only=True
 		)
 		self.assertIn("القميص الأزرق", row["content"])
-		self.assertIn("قميص ازرق", row["content"])
+		# Each word is held folded, and without its article when one is present.
+		self.assertLessEqual({"قميص", "الازرق", "ازرق"}, set(row["content"].split()))
 
 	# -- what the index holds ----------------------------------------------------------------------
 
@@ -289,6 +320,31 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 			callbacks.run()
 		rebuild.assert_not_called()
 
+	def test_resuming_a_build_after_a_language_change_starts_again(self):
+		self.interrupt_build()
+		set_storefront_languages("en", published=("en", "fr"))
+		self.resume_build()
+		content = self.indexed_content(self.red)
+		self.assertIn(FRENCH_TITLE, content)
+		self.assertNotIn(ARABIC_TITLE, content)
+		codes = {row["code"] for row in self.engine.sql("SELECT code FROM search_language", read_only=True)}
+		self.assertEqual(codes, {"en", "fr"})
+
+	def test_resuming_a_build_with_the_same_languages_continues_it(self):
+		self.interrupt_build()
+		fetched, paginate = [], SqliteProductSearch.get_documents_paginated
+
+		def record_doctype(*args, **kwargs):
+			fetched.append(args[1])
+			return paginate(*args, **kwargs)
+
+		with patch.object(SqliteProductSearch, "get_documents_paginated", autospec=True) as patched:
+			patched.side_effect = record_doctype
+			self.resume_build()
+		self.assertNotIn(PRODUCT, fetched)
+		self.assertIn(ARABIC_TITLE, self.indexed_content(self.red))
+		self.assertEqual(self.engine.typeahead(FRENCH_CATEGORY_TERM)["category_names"], [self.category])
+
 	def test_only_index_languages_count_as_a_change(self):
 		before = frappe.get_single("Commera Settings")
 		unpublished = frappe.get_single("Commera Settings")
@@ -330,6 +386,39 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 			SqliteProductSearch().drop_index()
 			SqliteProductSearch().build_index()
 		return callbacks
+
+	def interrupt_build(self):
+		"""Start a fresh build that dies after the products. Its temporary database stays."""
+		temp_path = SqliteProductSearch()._get_db_path(is_temp=True)
+		self.addCleanup(lambda: os.path.exists(temp_path) and os.unlink(temp_path))
+		paginate = SqliteProductSearch.get_documents_paginated
+
+		def fail_on_categories(*args, **kwargs):
+			if args[1] == CATEGORY:
+				raise RuntimeError("interrupted")
+			return paginate(*args, **kwargs)
+
+		SqliteProductSearch().drop_index()
+		with (
+			patch.object(SqliteProductSearch, "get_documents_paginated", autospec=True) as patched,
+			patch.object(frappe.db, "after_commit", CallbackManager()),
+			patch("frappe.search.sqlite_search.frappe.log_error"),
+			self.assertRaises(RuntimeError),
+		):
+			patched.side_effect = fail_on_categories
+			SqliteProductSearch().build_index()
+		self.assertTrue(os.path.exists(temp_path))
+
+	def resume_build(self):
+		with patch.object(frappe.db, "after_commit", CallbackManager()):
+			SqliteProductSearch().build_index(is_continuation=True)
+		self.engine = SqliteProductSearch()
+
+	def indexed_content(self, product):
+		[row] = self.engine.sql(
+			"SELECT content FROM search_fts WHERE doc_id = ?", (f"{PRODUCT}:{product}",), read_only=True
+		)
+		return row["content"]
 
 	def delete_translation(self, name, record):
 		frappe.db.delete("Content Translation", name)

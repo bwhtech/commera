@@ -1,6 +1,7 @@
 import difflib
 import os
 import sqlite3
+from contextlib import closing
 from typing import ClassVar
 
 import frappe
@@ -8,7 +9,7 @@ from frappe.search.sqlite_search import MAX_EDIT_DISTANCE, MIN_WORD_LENGTH, SQLi
 from frappe.utils import create_batch, flt
 
 from commera.localization.languages import StorefrontLanguages
-from commera.search.arabic import arabic_search_forms, is_arabic_query, normalize_arabic_word
+from commera.search.arabic import arabic_search_forms, arabic_word_forms, is_arabic_query
 from commera.search.engine import (
 	CARD_COLUMNS,
 	MIN_QUERY_LENGTH,
@@ -36,6 +37,8 @@ CORE_BUILD_INDEX = "frappe.search.sqlite_search.build_index"
 BUILD_TIMEOUT = 2 * 60 * 60 + 10 * 60
 
 ARABIC_SCRIPT_LANGUAGES = {"ar", "fa", "ur"}
+# Sorts after every character, so `word < prefix + LAST_CHARACTER` bounds a prefix range.
+LAST_CHARACTER = "\U0010ffff"
 
 
 class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
@@ -131,6 +134,11 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		cursor.execute("DELETE FROM search_language")
 		codes = [(language.code,) for language in StorefrontLanguages.load().published]
 		cursor.executemany("INSERT INTO search_language (code) VALUES (?)", codes)
+		# The languages the build started with. A resumed build restarts when they changed.
+		cursor.execute("CREATE TABLE IF NOT EXISTS search_generation (generation TEXT)")
+		cursor.execute("DELETE FROM search_generation")
+		generation = getattr(self, "build_generation", None) or language_generation()
+		cursor.execute("INSERT INTO search_generation (generation) VALUES (?)", (generation,))
 
 		columns = ",\n".join(self.product_detail_column_defs())
 		cursor.execute(f"CREATE TABLE IF NOT EXISTS product_detail ({columns})")
@@ -163,9 +171,31 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	# -- builds ---------------------------------------------------------------------------------
 
 	def build_index(self, batch_size=1000, is_continuation=False):
-		generation = language_generation()
+		self.build_generation = generation = language_generation()
+		if is_continuation and self.stored_generation() != generation:
+			# The finished batches hold the old languages' titles.
+			self.discard_partial_build()
+			is_continuation = False
 		super().build_index(batch_size=batch_size, is_continuation=is_continuation)
 		rebuild_if_languages_change(self, generation, SEARCH_CLASS_PATH)
+
+	def stored_generation(self):
+		"""The language generation the build being resumed started with, or None."""
+		temp_path = self._get_db_path(is_temp=True)
+		path = temp_path if os.path.exists(temp_path) else self.db_path
+		if not os.path.exists(path):
+			return None
+		try:
+			with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as connection:
+				row = connection.execute("SELECT generation FROM search_generation").fetchone()
+		except sqlite3.Error:
+			return None
+		return row[0] if row else None
+
+	def discard_partial_build(self):
+		temp_path = self._get_db_path(is_temp=True)
+		if os.path.exists(temp_path):
+			os.unlink(temp_path)
 
 	def enqueue_full_rebuild(self, deduplicate=False):
 		"""Enqueue a full rebuild on the long queue. Returns the enqueue payload."""
@@ -479,6 +509,15 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		primary = columns.get(sort_by)
 		return f"{primary}, {prefix}name ASC" if primary else f"{prefix}name ASC"
 
+	def _prepare_fts_query(self, query):
+		"""Core's FTS5 query, where an Arabic word matches any of its forms."""
+		# FTS5 rejects an implicit AND next to a bracketed group, so AND is explicit.
+		return " AND ".join(self.fts_term(word) for word in query.split())
+
+	def fts_term(self, word):
+		phrases = [fts_phrase(form) for form in arabic_word_forms(word)]
+		return phrases[0] if len(phrases) == 1 else f"({' OR '.join(phrases)})"
+
 	def fts_query_for(self, term):
 		"""Expanded + escaped FTS5 MATCH string for a term, or "" when too short / index missing."""
 		if is_query_too_short(term) or not self.index_exists():
@@ -568,8 +607,8 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		corrections = {}
 
 		for typed in query.strip().split():
-			word = normalize_arabic_word(typed)
-			if self.word_in_vocabulary(word):
+			word = arabic_word_forms(typed)[0]
+			if self.is_known_word(word):
 				expanded_terms.append(word)
 				continue
 
@@ -588,12 +627,21 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 		return " ".join(expanded_terms), corrections if corrections else None
 
-	def word_in_vocabulary(self, word):
+	def is_known_word(self, word):
+		"""In the vocabulary. An Arabic word also counts when one of its forms starts a vocabulary word."""
+		if not is_arabic_query(word):
+			return self.word_in_vocabulary(word)
+		# Typeahead sends partial words: "الورد" must stay, not become a correction of "الوردة".
+		return any(self.word_in_vocabulary(form, prefix=True) for form in arabic_word_forms(word))
+
+	def word_in_vocabulary(self, word, prefix=False):
+		word = word.lower()
+		condition, params = "word = ?", (word,)
+		if prefix:
+			condition, params = "word >= ? AND word < ?", (word, word + LAST_CHARACTER)
 		try:
 			result = self.sql(
-				"SELECT 1 FROM search_vocabulary WHERE word = ? LIMIT 1",
-				(word.lower(),),
-				read_only=True,
+				f"SELECT 1 FROM search_vocabulary WHERE {condition} LIMIT 1", params, read_only=True
 			)
 			return bool(result)
 		except sqlite3.Error:
@@ -651,6 +699,12 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 		ranked.sort()
 		return ranked[0][3]
+
+
+def fts_phrase(word):
+	"""A quoted FTS5 phrase. Long words match as a prefix, as in core."""
+	escaped = word.replace('"', '""')
+	return f'"{escaped}"*' if len(escaped) > MIN_WORD_LENGTH - 1 else f'"{escaped}"'
 
 
 def levenshtein_distance(source, target):
