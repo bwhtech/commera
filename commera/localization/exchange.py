@@ -293,11 +293,14 @@ def decode(content: bytes | str) -> str:
 
 
 def iter_entries(language: str, types: Iterable[str] | None = None) -> Iterator[Entry]:
-	"""Each resource's entries, sourceless ones too, each shop-wide one followed by its market ones."""
+	"""Each resource's entries, sourceless ones too, each shop-wide one followed by its market ones.
+	The default language holds only market overrides, so a resource without markets has none."""
+	is_default = language == StorefrontLanguages.load().default.code
 	for resource in get_translatable_resources():
-		if types is not None and resource.type not in types:
+		if (types is not None and resource.type not in types) or (is_default and not resource.has_markets):
 			continue
-		for batch in batched(resource.iter_entries(language, include_sourceless=True), BATCH_SIZE):
+		entries = resource.iter_entries(language, include_sourceless=True, market_overrides=is_default)
+		for batch in batched(entries, BATCH_SIZE):
 			markets = resource.get_market_entries(list(batch), language)
 			for entry in batch:
 				yield Entry.from_translation(entry)
