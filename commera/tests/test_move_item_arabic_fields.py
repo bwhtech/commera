@@ -92,7 +92,9 @@ class TestMoveItemArabicFields(IntegrationTestCase):
 			frappe.delete_doc("Item", name, force=True, ignore_permissions=True)
 		for name in self.archive_files():
 			frappe.delete_doc("File", name, force=True, ignore_permissions=True)
-		frappe.db.delete("Error Log", {"name": ("in", self.archive_logs() or [""])})
+		# Error Log is a virtual doctype stored in the log database, so it is deleted through its controller.
+		for name in self.archive_logs():
+			frappe.delete_doc("Error Log", name, force=True, ignore_permissions=True)
 		frappe.db.delete(
 			"Comment",
 			{"reference_doctype": SETTINGS, "reference_name": SETTINGS, "creation": (">=", self.started)},
