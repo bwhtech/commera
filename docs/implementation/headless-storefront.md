@@ -66,6 +66,8 @@ The catalogue and cart methods allow guests. The [account methods](#account-meth
 
 A missing or unpublished record returns HTTP 404. A product is one Style Attribute Variant: its `route` is the handle, sibling colours of the same configurator are the colour option, and its sizes are the variants. Options that only hold the fallback axis ("Title" or "One Size") are left out.
 
+Product text comes back in the request language. Use `name` and `title` only as display labels. To pick a variant, match an option value's `value` against a variant's `size`. Both stay the same in every language. Send the variant `id` as the cart line's item code.
+
 ## The cart token
 
 The storefront server keeps a random token of 32 to 128 letters, digits, `-` or `_`, and sends it with each call:
