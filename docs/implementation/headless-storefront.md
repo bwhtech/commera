@@ -57,7 +57,7 @@ The catalogue and cart methods allow guests. The [account methods](#account-meth
 | `products.get_product` | One product: images, the colour option with sibling handles and stock, the size option, and one variant for each size with its price, list price and stock. |
 | `collections.get_collections`, `collections.get_collection` | Enabled menu tabs (top-level Ecommerce Categories), by route slug. The `title`, the `description`, and the `seo` title and description are in the request language. `seo.custom_title` is true when the merchant set the meta title, as on a product. |
 | `shop.get_shop` | Store name and description, currency, logo, the menu from Ecommerce Category, the footer, and the resolved `localization`. The store name and description, menu labels, and footer section titles and link labels are in the request language. Link targets and URLs stay as the merchant entered them. |
-| `shop.get_localization` | The resolved `localization`: `language`, `default_language`, `available_languages` (the published languages, default first), `root_prefix` and `prefix_codes` (the code of every configured language, published or not, which `url()` strips as a prefix). Each language has `code`, `name`, `endonym` and `direction`. |
+| `shop.get_localization` | The resolved `localization`: `language`, `default_language`, `available_languages` (the published languages, default first), `root_prefix` and `prefix_codes` (the code of every configured language, published or not, and every market prefix such as `ar-ae`, which `url()` strips as a prefix). Each language has `code`, `name`, `endonym` and `direction`. |
 | `shop.get_page`, `shop.list_pages` | One published Shop Web Page by its route, or a link to each published page, sorted by title and then handle. The `title` is the page title. The `title`, `body_html`, and the `seo` title and description are in the request language. `seo.title` is the meta title, or else the page title. `seo.custom_title` is true when the merchant set the meta title, as on a collection. `body_html` is sanitized HTML. The `title` and `seo` values are plain text, so escape them where you render them. The handle stays the same in every language. |
 | `shop.get_sitemap` | Handles and change dates of indexable products, collections and pages. A page holds as many handles of each kind as the "Sitemap URLs Per Page" setting in Commera Settings. Without arguments, it returns page 1 of each kind. Set `kind` to `products`, `collections` or `pages`, and `page` to get one kind and one page. `total` gives the number of handles of each returned kind, and `page_size` gives the page size. |
 | `cart.get_cart`, `cart.add_lines`, `cart.update_lines`, `cart.remove_lines` | The priced server cart. Each line has the product handle, size and image. |
@@ -187,3 +187,15 @@ An order that a signed-in account placed with the shopper's email is not the sho
 ## Cache refresh
 
 The storefront caches catalogue reads. Frappe **Webhook** records with **Enable Security** sign each request with `X-Frappe-Webhook-Signature`, so the storefront can expire the cache of the changed record. The storefront README lists the doctypes and request bodies.
+
+## Markets
+
+A market (doctype **Commera Market**) is a group of countries with its own languages. A secondary market serves each language and country at `/<language>-<country>/`, for example `/ar-ae/`. Send `_country` to the API to pick the market of a country. Other countries get the primary market, which is the store itself.
+
+Rules:
+
+- A country belongs to one market only. A unique index on the country column of **Commera Market Country** enforces this, also when two saves run at the same time.
+- A market language must be a base language (`pt`, `ar`) or a base language with a script (`zh-Hans`). It cannot name a region (`pt-BR`, `zh-TW`, `en-US`), because the market countries set the region.
+- The hreflang of a market URL is `<language>-<COUNTRY>`, or `<language>-<Script>-<COUNTRY>` for a script code. Example: `zh-Hans` in the UAE is `zh-Hans-AE` at `/zh-hans-ae/`.
+
+**Limitation (v1).** A regional language, such as `pt-BR`, shows in the primary market only, at its own URL (`/pt-br/`). To serve Portuguese in a market, publish the base language `pt` and add it to the market. A market saved before this rule can keep its regional rows. Commera serves no URL for them. You can still remove those rows or disable the market.

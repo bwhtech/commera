@@ -52,6 +52,20 @@ test('url strips the current market prefix from a path', () => {
 	assert.equal(url('/'), '/ar-ae');
 });
 
+test('url swaps another market locale for the current one', () => {
+	globalThis.commera_storefront_config = {
+		localization: {
+			language: { code: 'ar' },
+			default_language: { code: 'en' },
+			available_languages: [{ code: 'en' }, { code: 'ar' }],
+			root_prefix: '/ar-ae',
+			prefix_codes: ['ar', 'ar-ae', 'ar-sa', 'en', 'en-ae', 'en-sa'],
+		},
+	};
+	assert.equal(url('/en-ae/cart'), '/ar-ae/cart');
+	assert.equal(url('/ar-sa/products'), '/ar-ae/products');
+});
+
 test('localization reads the page configuration', () => {
 	assert.equal(localization.language, null);
 	assert.equal(localization.root_prefix, '');

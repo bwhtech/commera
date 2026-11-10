@@ -13,6 +13,7 @@ from commera.localization.languages import (
 	StorefrontLanguages,
 	get_default_language_code,
 )
+from commera.localization.markets import find_market_by_prefix
 from commera.search.build import enqueue_full_rebuild
 from commera.search.engine_cache import clear_search_engine, get_engine_class
 from commera.search.http_client import SearchServerError
@@ -196,6 +197,8 @@ class CommeraSettings(Document):
 		for row in self.storefront_languages or []:
 			if row.language == default:
 				row.published = 1
+		if storefront_languages_changed(self.get_doc_before_save(), self):
+			validate_no_market_url(default, codes)
 
 	def validate_search_engine(self):
 		engine = get_engine_class(self.get("search_engine"))
@@ -451,6 +454,18 @@ def create_configurator_log():
 			"doctype": "Bulk Style Attribute Configurator Creation Log",
 		}
 	).insert(ignore_permissions=True)
+
+
+def validate_no_market_url(default: str, codes: list[str]):
+	"""A language en-AE would take /en-ae/, the URL of English in a market for the UAE."""
+	for code in dict.fromkeys([default, *codes]):
+		if market := find_market_by_prefix(code):
+			frappe.throw(
+				frappe._("Language {0} would take /{1}/, the URL of market {2}.").format(
+					frappe.bold(code), code.lower(), frappe.bold(market)
+				),
+				title=frappe._("URL Taken"),
+			)
 
 
 def storefront_languages_changed(before, after) -> bool:

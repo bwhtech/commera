@@ -1,0 +1,107 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-11-10 00:00:00.000000",
+ "description": "A group of countries with its own languages and URLs. Countries in no market use the store's own settings.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "market_name",
+  "handle",
+  "column_break_mkt1",
+  "enabled",
+  "countries_section",
+  "countries",
+  "languages_section",
+  "default_language",
+  "languages"
+ ],
+ "fields": [
+  {
+   "fieldname": "market_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Name",
+   "reqd": 1
+  },
+  {
+   "description": "Identifies the market in the API and in translation files. Made from the name when empty.",
+   "fieldname": "handle",
+   "fieldtype": "Data",
+   "label": "Handle",
+   "set_only_once": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "column_break_mkt1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Shoppers see only enabled markets. Admins can preview disabled ones.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "countries_section",
+   "fieldtype": "Section Break",
+   "label": "Countries"
+  },
+  {
+   "description": "A country belongs to one market only. Countries in no market use the primary market.",
+   "fieldname": "countries",
+   "fieldtype": "Table",
+   "label": "Countries",
+   "options": "Commera Market Country",
+   "reqd": 1
+  },
+  {
+   "fieldname": "languages_section",
+   "fieldtype": "Section Break",
+   "label": "Languages"
+  },
+  {
+   "description": "Must be a published storefront language.",
+   "fieldname": "default_language",
+   "fieldtype": "Link",
+   "label": "Default Language",
+   "options": "Language",
+   "reqd": 1
+  },
+  {
+   "description": "Published storefront languages. Each language gets a /<language>-<country>/ URL.",
+   "fieldname": "languages",
+   "fieldtype": "Table",
+   "label": "Languages",
+   "options": "Commera Market Language"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-10 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Commera Ecommerce",
+ "name": "Commera Market",
+ "naming_rule": "By script",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "market_name",
+ "show_title_field_in_link": 1
+}

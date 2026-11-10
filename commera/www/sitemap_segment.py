@@ -2,7 +2,7 @@ import frappe
 from frappe.utils import get_datetime, get_url
 from frappe.utils.data import cint
 
-from commera.localization import StorefrontLanguages
+from commera.localization.urls import get_locale_prefixes
 
 DEFAULT_URLS_PER_SITEMAP = 50000
 
@@ -13,14 +13,13 @@ def get_urls_per_page():
 
 
 def get_docs_per_page():
-	# Every route is emitted once per published language.
+	# Every route is emitted once per published language and market URL.
 	return max(get_urls_per_page() // len(get_language_prefixes()), 1)
 
 
 def get_language_prefixes():
-	"""URL prefixes of the published languages. The default language has none."""
-	languages = StorefrontLanguages.load()
-	return [languages.prefix(language) for language in languages.published]
+	"""URL prefixes of the published languages and enabled market URLs. The default language has none."""
+	return [prefix for _hreflang, prefix, _x_default in get_locale_prefixes()]
 
 
 SEGMENT_CONFIG = {

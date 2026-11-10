@@ -147,12 +147,19 @@ class TestTranslationExchange(IntegrationTestCase):
 		self.assertEqual(stored, {"title": "ملاحظة", "content": "<p>لفها</p>"})
 		self.assertEqual(len(frappe.local.message_log), messages)
 
+	def test_a_row_for_a_market_that_does_not_exist_is_an_error(self):
+		report = exchange.import_csv(to_csv([self.row("title", "ملاحظة", Market="nowhere")]), "ar")
+
+		self.assertEqual(len(report.errors), 1)
+		self.assertIn("Market nowhere does not exist", report.errors[0]["message"])
+		self.assertEqual(translations_of(self.note.name), [])
+
 	def test_a_market_row_is_an_error_while_markets_do_not_exist(self):
-		report = exchange.import_csv(to_csv([self.row("title", "ملاحظة", Market="gulf")]), "ar")
+		with patch.object(exchange, "MARKET_DOCTYPE", "No Such Market DocType"):
+			report = exchange.import_csv(to_csv([self.row("title", "ملاحظة", Market="gulf")]), "ar")
 
 		self.assertEqual(len(report.errors), 1)
 		self.assertIn("Market column empty", report.errors[0]["message"])
-		self.assertEqual(translations_of(self.note.name), [])
 
 	def test_a_market_row_is_stored_against_its_market_once_markets_exist(self):
 		rows = [self.row("title", "ملاحظة الخليج", Market="INR"), self.row("title", "x", Market="XYZ")]

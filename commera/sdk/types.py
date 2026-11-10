@@ -498,12 +498,26 @@ class Language(TypedDict):
 	direction: str
 
 
+class Market(TypedDict):
+	"""`default_language` and `languages` are language codes; `countries` are uppercase ISO codes."""
+
+	handle: str
+	title: str
+	is_primary: bool
+	default_language: str
+	languages: list[str]
+	countries: list[str]
+
+
 class Localization(TypedDict):
 	language: Language
 	default_language: Language
 	available_languages: list[Language]
 	root_prefix: str
 	prefix_codes: list[str]
+	market: Market | None
+	available_markets: list[Market]
+	country: str | None
 
 
 class Country(TypedDict):
