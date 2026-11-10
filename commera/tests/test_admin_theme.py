@@ -15,7 +15,6 @@ from commera.api.admin.theme import (
 )
 from commera.api.admin.theme_layout import get_editor, get_preview_entries
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context
-from commera.shop_themes.layout_cache import clear_layout_cache
 from commera.shop_themes.sections import (
 	get_section,
 	get_section_schema,
@@ -200,7 +199,6 @@ class TestThemeEditorPreview(IntegrationTestCase):
 		self.assertIn("no home page to preview", html)
 
 	def publish_layout(self, layout):
-		self.addCleanup(clear_layout_cache, SUMMER_THEME, "index")
 		name = frappe.db.exists("Theme Layout", {"theme": SUMMER_THEME, "page": "index"})
 		theme_layout = (
 			frappe.get_doc("Theme Layout", name)
@@ -304,9 +302,6 @@ class TestThemeEditorGroupPreview(IntegrationTestCase):
 				module="Shop Themes",
 			).db_insert()
 		frappe.db.delete("Theme Layout", {"theme": STARTER_THEME})
-		for page in ("index", "header_group", "footer_group"):
-			clear_layout_cache(STARTER_THEME, page)
-			self.addCleanup(clear_layout_cache, STARTER_THEME, page)
 		activate_theme(STARTER_THEME)
 
 	def render(self, **form):
@@ -323,7 +318,6 @@ class TestThemeEditorGroupPreview(IntegrationTestCase):
 			draft_layout=frappe.as_json(layout),
 			published_layout=frappe.as_json(layout),
 		).insert()
-		clear_layout_cache(STARTER_THEME, page)
 
 	def test_a_header_group_draft_renders_in_the_header_and_not_on_the_live_page(self):
 		self.publish_layout("header_group", announcement_layout("Published announcement"))
@@ -389,9 +383,6 @@ class TestThemeEditorLayoutPagePreview(ProductDetailPriceTestCase):
 		self.addCleanup(frappe.db.rollback)
 		frappe.set_user("Administrator")
 		frappe.db.delete("Theme Layout", {"theme": STARTER_THEME})
-		for page in STARTER_LAYOUT_PAGES:
-			clear_layout_cache(STARTER_THEME, page)
-			self.addCleanup(clear_layout_cache, STARTER_THEME, page)
 		activate_theme(STARTER_THEME)
 
 	def render(self, page, layout=None, entry=None):

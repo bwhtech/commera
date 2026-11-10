@@ -11,7 +11,6 @@ from commera.api.admin.theme import activate_theme
 from commera.api.admin.theme_layout import get_editor
 from commera.localization import CURRENT, MISSING, OUTDATED, exchange, get_translatable_resource, register
 from commera.roles import COMMERA_ADMIN, COMMERA_USER, add_commera_roles
-from commera.shop_themes.layout_cache import clear_layout_cache
 from commera.tests.test_admin_theme_layout import publish
 from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_product_details import ProductDetailPriceTestCase
@@ -450,10 +449,8 @@ class TestProductTranslationExchange(ProductDetailPriceTestCase):
 
 class TestThemeSectionTranslationExchange(IntegrationTestCase):
 	def setUp(self):
-		self.addCleanup(clear_layout_cache, SUMMER_THEME, "index")
 		self.addCleanup(frappe.db.rollback)
 		frappe.db.delete("Theme Layout", {"theme": SUMMER_THEME, "page": "index"})
-		clear_layout_cache(SUMMER_THEME, "index")
 		use_storefront_languages(self, "en", published=("en", "ar"))
 		activate_theme(SUMMER_THEME)
 		hooks = frappe.get_hooks("commera_hooks", {})

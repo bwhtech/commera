@@ -11,7 +11,7 @@ import commera.sdk
 from commera.localization.resolver import get_localization
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context, is_within_directory
 from commera.shop_themes.jinja_helpers import find_theme_asset_url
-from commera.shop_themes.layout_cache import get_published_layouts, read_published_layouts
+from commera.shop_themes.layout_cache import get_published_layouts
 from commera.shop_themes.theme_resolver import find_theme_file
 
 TEXT_TYPES = frozenset({"text", "textarea", "url", "image"})
@@ -69,11 +69,10 @@ def get_section_schema(theme_dirs, section_type):
 	return get_theme_json(theme_dirs, f"sections/{section_type}.json")
 
 
-def get_inherited_layout(theme_names, theme_dirs, page, cached=True):
+def get_inherited_layout(theme_names, theme_dirs, page):
 	"""The first theme's own layout, else the theme file, under the translation overlays of the themes
 	before it. Do not mutate the result: without overlays it is the cached layout."""
-	read = get_published_layouts if cached else read_published_layouts
-	published_layouts = read(theme_names, page) if theme_names else {}
+	published_layouts = get_published_layouts(theme_names, page) if theme_names else {}
 	return resolve_inherited_layout(theme_names, theme_dirs, page, published_layouts)
 
 

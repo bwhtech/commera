@@ -11,7 +11,6 @@ from commera.api.admin.theme_layout import discard, get_editor
 from commera.localization import CURRENT, MISSING, OUTDATED, get_translatable_resource
 from commera.roles import COMMERA_ADMIN, add_commera_roles
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context, get_theme_context
-from commera.shop_themes.layout_cache import clear_layout_cache
 from commera.shop_themes.section_text import OVERLAY, SOURCE_HASHES
 from commera.shop_themes.section_translations import ThemeSectionResource
 from commera.shop_themes.sections import get_page_layout, get_text
@@ -31,12 +30,10 @@ class TestThemeSectionTranslation(IntegrationTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
 		self.addCleanup(frappe.set_user, "Administrator")
-		self.addCleanup(clear_layout_cache, SUMMER_THEME, "index")
 		self.addCleanup(frappe.clear_cache)
 		self.addCleanup(frappe.db.rollback)
 
 		frappe.db.delete("Theme Layout", {"theme": SUMMER_THEME, "page": "index"})
-		clear_layout_cache(SUMMER_THEME, "index")
 		use_storefront_languages(self, "en", published=("en", "ar"), unpublished=("fr",))
 		activate_theme(SUMMER_THEME)
 		self.resource = get_translatable_resource("theme_section")

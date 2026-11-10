@@ -3,7 +3,6 @@ from frappe import _
 from frappe.model.document import Document
 
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context
-from commera.shop_themes.layout_cache import cache_layout_on_commit
 from commera.shop_themes.section_text import is_overlay
 from commera.shop_themes.section_text_checks import prepare_theme_layout
 from commera.shop_themes.sections import validate_layout
@@ -21,12 +20,6 @@ class ThemeLayout(Document):
 			if layout is not None and not (fieldname == "published_layout" and is_overlay(layout)):
 				validate_layout(theme_context, layout, self.page)
 		prepare_theme_layout(self, theme_context)
-
-	def on_update(self):
-		cache_layout_on_commit(self.theme, self.page, self.published_layout)
-
-	def on_trash(self):
-		cache_layout_on_commit(self.theme, self.page, None)
 
 	@frappe.whitelist()
 	def publish(self):

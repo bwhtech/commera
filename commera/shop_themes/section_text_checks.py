@@ -27,7 +27,7 @@ def prepare_theme_layout(theme_layout, theme_context):
 	"""Each layout trusts the hashes it carries, then a stored layout's hash for the same text,
 	then hashes today's source. The draft may borrow live hashes; the live layout never borrows draft ones."""
 	dirs = theme_context["dirs"]
-	inherited = get_inherited_layout(theme_context["names"][1:], dirs, theme_layout.page, cached=False)
+	inherited = get_inherited_layout(theme_context["names"][1:], dirs, theme_layout.page)
 	previous_draft, previous_live, previous_overlay = get_previous_layouts(theme_layout, dirs, inherited)
 	default = get_default_language()
 	known = {

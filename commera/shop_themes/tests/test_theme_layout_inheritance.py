@@ -4,6 +4,7 @@
 import copy
 import csv
 import io
+from contextlib import contextmanager
 from unittest.mock import ANY, Mock, call, patch
 
 import frappe
@@ -14,18 +15,9 @@ from commera.api.admin.theme_layout import discard, get_editor
 from commera.localization import CURRENT, OUTDATED, exchange
 from commera.shop_themes import layout_cache
 from commera.shop_themes.doctype.shop_theme.shop_theme import clear_theme_cache, get_theme_context
-from commera.shop_themes.layout_cache import (
-	clear_layout_cache,
-	forget_uncommitted_layouts,
-	get_cache_keys,
-	has_uncommitted_layouts,
-	publish_entry,
-	read_published_layouts,
-	set_entry,
-)
 from commera.shop_themes.section_text import OVERLAY, SOURCE_HASHES
 from commera.shop_themes.section_translations import ThemeSectionResource
-from commera.shop_themes.sections import get_inherited_layout, get_page_layout, get_theme_json
+from commera.shop_themes.sections import get_page_layout, get_theme_json
 from commera.tests.test_admin_theme_layout import publish, save_draft
 from commera.tests.test_localization import use_storefront_languages
 
@@ -55,9 +47,6 @@ class TestThemeLayoutInheritance(IntegrationTestCase):
 		clear_theme_cache()
 
 		frappe.db.delete("Theme Layout", {"theme": PARENT, "page": PAGE})
-		for theme_name in (PARENT, CHILD, GRANDCHILD):
-			clear_layout_cache(theme_name, PAGE)
-			self.addCleanup(clear_layout_cache, theme_name, PAGE)
 
 		self.file_layout = get_theme_json(get_theme_context(PARENT)["dirs"], f"layouts/{PAGE}.json")
 
@@ -183,90 +172,86 @@ class TestThemeLayoutInheritance(IntegrationTestCase):
 	def title_entries(self, resource):
 		return resource.list_entries("ar", filters={"name": TILE, "field": "title"}).entries
 
-	def commit_layouts(self, queued=0):
-		"""Run the layout callbacks a commit would run; the test transaction stays open."""
-		for callback in list(frappe.db.after_commit._functions)[queued:]:
-			if getattr(callback, "func", None) is publish_entry or callback is forget_uncommitted_layouts:
-				callback()
+	def snapshot(self):
+		"""The parent's rows as a reader on this snapshot sees them."""
+		return layout_cache.read_rows(
+			[CHILD, PARENT], PAGE, ["name", "modified", "theme", "published_layout"]
+		)
 
-	def cached_entry(self, theme_name):
-		return frappe.cache.get_value(get_cache_keys([theme_name], PAGE)[0], use_local_cache=False)
+	@contextmanager
+	def reading(self, snapshot):
+		"""Serve the cache's reads from an older snapshot, as a concurrent reader would."""
 
-	def test_the_editor_reads_the_parent_layout_past_a_stale_cache(self):
-		queued = len(frappe.db.after_commit)
+		def read_rows(theme_names, page, fields):
+			return [frappe._dict({field: row[field] for field in fields}) for row in snapshot]
+
+		with patch.object(layout_cache, "read_rows", read_rows):
+			yield
+
+	def cached_layouts(self, snapshot):
+		key = layout_cache.get_cache_key([CHILD, PARENT], PAGE, snapshot)
+		return frappe.cache.get_value(key, use_local_cache=False)
+
+	def test_a_read_after_each_save_sees_the_saved_layout(self):
+		for shift in (1, 2, 3, 1):
+			publish(PARENT, PAGE, self.reordered_layout(shift))
+			self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(shift))
+			self.assertEqual(self.rendered_layout(PARENT), self.reordered_layout(shift))
+
+	def test_a_reader_on_an_older_snapshot_caches_only_under_its_own_version(self):
 		publish(PARENT, PAGE, self.reordered_layout(1))
-		self.commit_layouts(queued)
-		set_entry(get_cache_keys([PARENT], PAGE)[0], {"layout": self.reordered_layout(2)})
+		old = self.snapshot()
+		publish(PARENT, PAGE, self.reordered_layout(2))
+		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(2))
 
-		editor = get_editor(CHILD, PAGE)
-
-		self.assertEqual(editor["default_layout"], self.reordered_layout(1))
-		self.assertEqual(editor["draft_layout"], self.reordered_layout(1))
-		theme_layout_api.save_draft(CHILD, PAGE, editor["draft_layout"], editor["revision"])
-
-	def test_a_commit_caches_the_committed_layout(self):
-		queued = len(frappe.db.after_commit)
-		publish(PARENT, PAGE, self.reordered_layout(1))
-		self.assertTrue(has_uncommitted_layouts())
-
-		self.commit_layouts(queued)
-
-		self.assertFalse(has_uncommitted_layouts())
-		self.assertEqual(self.cached_entry(PARENT), {"layout": self.reordered_layout(1)})
-		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
-
-	def test_a_reader_that_read_the_old_row_before_a_commit_cannot_cache_it(self):
-		queued = len(frappe.db.after_commit)
-		publish(PARENT, PAGE, self.reordered_layout(1))
-		self.commit_layouts(queued)
-		clear_layout_cache(PARENT, PAGE)
-		reads = []
-
-		def read_then_let_a_writer_commit(theme_names, page):
-			stored = read_published_layouts(theme_names, page)
-			if not reads:
-				reads.append(page)
-				queued = len(frappe.db.after_commit)
-				publish(PARENT, PAGE, self.reordered_layout(2))
-				self.commit_layouts(queued)
-			return stored
-
-		with patch.object(layout_cache, "read_published_layouts", read_then_let_a_writer_commit):
-			# The stale reader still sees the old row it read, and caches it under the old generation.
+		with self.reading(old):
 			self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
 
+		self.assertEqual(self.cached_layouts(old)[PARENT], self.reordered_layout(1))
+		self.assertEqual(self.cached_layouts(self.snapshot())[PARENT], self.reordered_layout(2))
 		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(2))
 
-	def test_a_reader_on_an_older_snapshot_cannot_replace_the_committed_layout(self):
-		queued = len(frappe.db.after_commit)
+	def test_writers_caching_out_of_commit_order_cannot_serve_the_older_layout(self):
 		publish(PARENT, PAGE, self.reordered_layout(1))
-		self.commit_layouts(queued)
-		old_rows = read_published_layouts([CHILD, PARENT], PAGE)
-		queued = len(frappe.db.after_commit)
+		first = self.snapshot()
 		publish(PARENT, PAGE, self.reordered_layout(2))
-		self.commit_layouts(queued)
+		second = self.snapshot()
 
-		# It reads the new generation, but its snapshot predates the commit.
-		with patch.object(layout_cache, "read_published_layouts", return_value=old_rows):
+		with self.reading(second):
+			self.rendered_layout(CHILD)
+		with self.reading(first):
 			self.rendered_layout(CHILD)
 
-		self.assertEqual(self.cached_entry(PARENT), {"layout": self.reordered_layout(2)})
 		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(2))
 
-	def test_a_rolled_back_layout_leaves_nothing_cached(self):
+	def test_an_evicted_entry_is_read_again(self):
 		publish(PARENT, PAGE, self.reordered_layout(1))
-		self.assertEqual(self.rendered_layout(PARENT), self.reordered_layout(1))
-		self.assertIsNone(self.cached_entry(PARENT))
+		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
+		key = layout_cache.get_cache_key([CHILD, PARENT], PAGE, self.snapshot())
+		frappe.cache.delete_value(key)
 
-		frappe.db.rollback()
+		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
+		self.assertEqual(self.cached_layouts(self.snapshot())[PARENT], self.reordered_layout(1))
 
-		self.assertFalse(has_uncommitted_layouts())
-		self.assertIsNone(self.cached_entry(PARENT))
-		committed = get_inherited_layout([PARENT], get_theme_context(PARENT)["dirs"], PAGE, cached=False)
-		self.assertEqual(self.rendered_layout(PARENT), committed)
-		self.assertEqual(
-			self.cached_entry(PARENT), {"layout": read_published_layouts([PARENT], PAGE)[PARENT]}
-		)
+	def test_a_layout_rolled_back_to_a_savepoint_is_not_served(self):
+		publish(PARENT, PAGE, self.reordered_layout(1))
+		frappe.db.savepoint("layout_cache_test")
+		publish(PARENT, PAGE, self.reordered_layout(2))
+		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(2))
+
+		frappe.db.rollback(save_point="layout_cache_test")
+
+		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
+		publish(PARENT, PAGE, self.reordered_layout(3))
+		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(3))
+
+	def test_a_deleted_layout_falls_back_to_the_theme_file(self):
+		publish(PARENT, PAGE, self.reordered_layout(1))
+		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
+
+		frappe.delete_doc("Theme Layout", f"{PARENT}-{PAGE}")
+
+		self.assertEqual(self.rendered_layout(CHILD), self.file_layout)
 
 	def test_a_save_locks_the_page_and_its_parents_in_one_ordered_read(self):
 		theme_context = get_theme_context(GRANDCHILD)
