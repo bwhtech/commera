@@ -9,16 +9,23 @@ from commera.builder_themes.cards import get_cards
 from commera.sdk import catalog
 
 PAGE_SIZE = 24
-# Facet key, query parameter and label, in the order a filter sidebar lists them.
-FILTER_GROUPS = (("colors", _("Colour")), ("sizes", _("Size")), ("brands", _("Brand")))
-SORT_OPTIONS = (
-	("new_arrival", _("Newest")),
-	("price_low", _("Price, low to high")),
-	("price_high", _("Price, high to low")),
-	("discount", _("Biggest discount")),
-	("name", _("Name")),
-)
-SEARCH_SORT = ("default", _("Relevance"))
+# Facet key and query parameter, in the order a filter sidebar lists them.
+FILTER_KEYS = ("colors", "sizes", "brands")
+
+
+def get_filter_labels() -> dict[str, str]:
+	return {"colors": _("Colour"), "sizes": _("Size"), "brands": _("Brand")}
+
+
+def get_sort_options(is_search: bool) -> tuple:
+	options = (
+		("new_arrival", _("Newest")),
+		("price_low", _("Price, low to high")),
+		("price_high", _("Price, high to low")),
+		("discount", _("Biggest discount")),
+		("name", _("Name")),
+	)
+	return (("default", _("Relevance")), *options) if is_search else options
 
 
 class Listing:
@@ -29,10 +36,10 @@ class Listing:
 		self.query = cstr(form.get("search")).strip()
 		self.collection = catalog.get_collection(form.get("category")) if form.get("category") else None
 		self.selected = {
-			key: [value for value in cstr(form.get(key)).split(",") if value] for key, _label in FILTER_GROUPS
+			key: [value for value in cstr(form.get(key)).split(",") if value] for key in FILTER_KEYS
 		}
 		self.on_sale = form.get("has_discount") == "1"
-		self.sort_options = (SEARCH_SORT, *SORT_OPTIONS) if self.query else SORT_OPTIONS
+		self.sort_options = get_sort_options(bool(self.query))
 		sort = form.get("sort_by")
 		self.sort = sort if sort in dict(self.sort_options) else self.sort_options[0][0]
 		self.page = max(cint(form.get("page")), 1)
@@ -94,9 +101,13 @@ class Listing:
 		return links
 
 	def get_filters(self, facets: dict) -> list[dict]:
+		labels = get_filter_labels()
 		return [
-			{"name": label, "values": [self.get_filter_value(key, facet) for facet in facets.get(key, [])]}
-			for key, label in FILTER_GROUPS
+			{
+				"name": labels[key],
+				"values": [self.get_filter_value(key, facet) for facet in facets.get(key, [])],
+			}
+			for key in FILTER_KEYS
 			if facets.get(key)
 		]
 
@@ -123,7 +134,7 @@ class Listing:
 					**{key: ",".join(other for other in self.selected[key] if other != value)}
 				),
 			}
-			for key, _label in FILTER_GROUPS
+			for key in FILTER_KEYS
 			for value in self.selected[key]
 		]
 		if self.on_sale:
@@ -149,7 +160,7 @@ class Listing:
 		values = {
 			"search": self.query,
 			"category": self.collection_handle,
-			**{key: ",".join(self.selected[key]) for key, _label in FILTER_GROUPS},
+			**{key: ",".join(self.selected[key]) for key in FILTER_KEYS},
 			"has_discount": "1" if self.on_sale else None,
 			"sort_by": self.sort if self.sort != self.sort_options[0][0] else None,
 			"page": None,

@@ -8,7 +8,6 @@ from commera.sdk import catalog
 from commera.sdk.format import image_url
 from commera.shop_themes.doctype.shop_theme.shop_theme import resolve_active_theme
 
-PAGE_LABELS = {HOME: _("Home"), PRODUCT_LISTING: _("Listing"), PRODUCT_DETAIL: _("Product")}
 PREVIEW_PRODUCT_COUNT = 12
 PREVIEW_IMAGE_WIDTH = 160
 
@@ -28,11 +27,15 @@ def get_theme_bar(page_id: str) -> dict | None:
 	}
 
 
+def get_page_labels() -> dict[str, str]:
+	return {HOME: _("Home"), PRODUCT_LISTING: _("Listing"), PRODUCT_DETAIL: _("Product")}
+
+
 def get_page_tab(page_type: str, page_name: str) -> dict:
 	page = frappe.db.get_value("Builder Page", page_name, ["published", "draft_blocks"], as_dict=True)
 	return {
 		"page_type": page_type,
-		"label": PAGE_LABELS[page_type],
+		"label": get_page_labels()[page_type],
 		"page": page_name,
 		"is_published": bool(page.published),
 		"has_unpublished_changes": bool(page.draft_blocks) and bool(page.published),
@@ -78,13 +81,14 @@ def get_storefront_path(page_type: str) -> str:
 def publish_theme(theme: str) -> dict:
 	"""Publish every page that has been designed. An empty page stays unpublished, so its route keeps
 	rendering from the parent theme instead of going blank."""
+	labels = get_page_labels()
 	published, skipped = [], []
 	for page_type, page_name in get_theme_pages(theme).items():
 		page = frappe.get_doc("Builder Page", page_name)
 		page.check_permission("write")
 		if page.block_count() <= 1:
-			skipped.append(PAGE_LABELS[page_type])
+			skipped.append(labels[page_type])
 			continue
 		page.publish()
-		published.append(PAGE_LABELS[page_type])
+		published.append(labels[page_type])
 	return {"published": published, "skipped": skipped}
