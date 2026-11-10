@@ -315,7 +315,11 @@ def product_document(record):
 
 
 def category_document(record):
-	return {"id": document_id(record["name"]), **record}
+	# A remote engine has no market rows yet: market titles stay out of its documents.
+	return {
+		"id": document_id(record["name"]),
+		**{key: value for key, value in record.items() if key != "market_titles"},
+	}
 
 
 def document_id(name):

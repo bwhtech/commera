@@ -11,7 +11,7 @@ import frappe
 from frappe import _
 from frappe.utils import cstr
 
-from commera.localization.content import BATCH_SIZE, SHOP_WIDE
+from commera.localization.content import BATCH_SIZE, SHOP_WIDE, find_market_key
 from commera.localization.languages import StorefrontLanguages
 from commera.localization.resources import (
 	TranslatableResource,
@@ -34,8 +34,6 @@ MAX_IMPORT_ROWS = 10_000
 MAX_FILE_SIZE = 10 * 1024 * 1024
 # A spreadsheet runs a cell that starts with one of these. The apostrophe is here so the quote reverses.
 FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r", "'")
-# Markets arrive with #450. Until that doctype exists, a row for a market is an error.
-MARKET_DOCTYPE = "Commera Market"
 
 
 @dataclass(frozen=True)
@@ -95,13 +93,25 @@ class RowError(Exception):
 	pass
 
 
-def get_exchange_language(code: str) -> str:
-	"""A configured storefront language other than the default, which has nothing to translate."""
+@dataclass(frozen=True)
+class ExchangeLanguage:
+	code: str
+	# The source language: only markets override it, so it has no shop-wide rows.
+	is_default: bool
+
+	def has_entry(self, entry: Entry) -> bool:
+		if self.is_default:
+			return bool(entry.market and entry.translated)
+		return bool(entry.default or entry.translated)
+
+
+def get_exchange_language(code: str) -> ExchangeLanguage:
+	"""A configured storefront language. The default one holds market overrides only."""
 	languages = StorefrontLanguages.load()
 	language = languages.find(code, include_unpublished=True)
-	if not language or language == languages.default:
+	if not language:
 		frappe.throw(_("{0} is not a storefront language you translate into.").format(cstr(code)))
-	return language.code
+	return ExchangeLanguage(language.code, language == languages.default)
 
 
 def export_csv(language: str) -> str:
@@ -111,9 +121,9 @@ def export_csv(language: str) -> str:
 	buffer = io.StringIO()
 	writer = csv.writer(buffer)
 	writer.writerow(COLUMNS)
-	for entry in iter_entries(language):
-		if entry.default or entry.translated:
-			writer.writerow([encode_cell(cell) for cell in entry.as_row(language)])
+	for entry in iter_entries(language.code):
+		if language.has_entry(entry):
+			writer.writerow([encode_cell(cell) for cell in entry.as_row(language.code)])
 	return buffer.getvalue()
 
 
@@ -125,15 +135,16 @@ class TranslationImport:
 	"""Matches each row on type, identification, field, locale and market, and writes the changed ones
 	through its resource. A bad row, or a repeat of a key, becomes an error in the report."""
 
-	def __init__(self, rows: list[tuple[int, dict]], language: str):
+	def __init__(self, rows: list[tuple[int, dict]], language: ExchangeLanguage):
 		self.rows = rows
-		self.language = language
+		self.language = language.code
+		self.is_default_language = language.is_default
 		self.report = ImportReport()
 		self.seen = {}
 		self.resources = {resource.type: resource for resource in get_translatable_resources()}
 		types = {row["Type"] for _number, row in rows} & set(self.resources)
 		# A snapshot is safe to compare against because each key is imported at most once.
-		self.entries = {entry.key: entry for entry in iter_entries(language, types)}
+		self.entries = {entry.key: entry for entry in iter_entries(self.language, types)}
 
 	def run(self) -> ImportReport:
 		for number, row in self.rows:
@@ -144,8 +155,9 @@ class TranslationImport:
 		return self.report
 
 	def import_row(self, number: int, row: dict):
-		if row["Market"]:
-			row["Market"] = canonical_market(row["Market"])
+		row["Market"] = canonical_market(row["Market"])
+		if self.is_default_language and row["Market"] == SHOP_WIDE:
+			raise RowError(_("The default language is the source content. Name a market to override it."))
 		self.check_duplicate(number, row)
 		resource = self.match(row)
 		entry, name = self.find_record(resource, row)
@@ -221,10 +233,10 @@ def candidate_names(identification: str) -> list[str]:
 
 
 def canonical_market(market: str) -> str:
-	"""The market's stored name, so `inr` and `INR` are one key for duplicates and lookups."""
-	if not frappe.db.exists("DocType", MARKET_DOCTYPE):
-		raise RowError(_("Markets are not available yet. Leave the Market column empty."))
-	if not (name := frappe.db.get_value(MARKET_DOCTYPE, market, "name")):
+	"""The market's stored name, so `gulf` and `Gulf` are one key for duplicates and lookups.
+	`primary` is the shop-wide row, as the primary market is the store itself."""
+	name = find_market_key(market)
+	if name is None:
 		raise RowError(_("Market {0} does not exist.").format(market))
 	return name
 
@@ -281,11 +293,14 @@ def decode(content: bytes | str) -> str:
 
 
 def iter_entries(language: str, types: Iterable[str] | None = None) -> Iterator[Entry]:
-	"""Each resource's entries, sourceless ones too, each shop-wide one followed by its market ones."""
+	"""Each resource's entries, sourceless ones too, each shop-wide one followed by its market ones.
+	The default language holds only market overrides, so a resource without markets has none."""
+	is_default = language == StorefrontLanguages.load().default.code
 	for resource in get_translatable_resources():
-		if types is not None and resource.type not in types:
+		if (types is not None and resource.type not in types) or (is_default and not resource.has_markets):
 			continue
-		for batch in batched(resource.iter_entries(language, include_sourceless=True), BATCH_SIZE):
+		entries = resource.iter_entries(language, include_sourceless=True, market_overrides=is_default)
+		for batch in batched(entries, BATCH_SIZE):
 			markets = resource.get_market_entries(list(batch), language)
 			for entry in batch:
 				yield Entry.from_translation(entry)

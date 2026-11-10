@@ -11,6 +11,7 @@ from commera.og.generator import (
 	DEFAULT_OG_HEIGHT,
 	DEFAULT_OG_WIDTH,
 	build_store_card_html,
+	get_variant_card_version,
 	render_card_for_doc,
 	render_og_png,
 	variant_primary_image_url,
@@ -55,9 +56,10 @@ def serve_og_image(route):
 	if not variant or not variant.is_published:
 		raise frappe.DoesNotExistError()
 
-	cache_path = cache_file_path(route, variant.modified)
+	variant_doc = frappe.get_cached_doc("Style Attribute Variant", variant.name)
+	# /en-ae/og-image/<route>.png renders the Gulf market text; RTL pages keep the source language.
+	cache_path = cache_file_path(route, get_variant_card_version(variant_doc))
 	if not os.path.exists(cache_path):
-		variant_doc = frappe.get_cached_doc("Style Attribute Variant", variant.name)
 		png_bytes = render_card_for_doc("Style Attribute Variant", variant_doc)
 		write_cache(cache_path, png_bytes)
 

@@ -11,6 +11,7 @@ from frappe.query_builder.functions import Count, IfNull
 from frappe.utils import create_batch, cstr
 from frappe.utils.data import sha256_hash
 
+from commera.localization.markets import MARKET_DOCTYPE, PRIMARY_MARKET, Market
 from commera.localization.resolver import Localization, get_localization
 
 Sha2 = CustomFunction("SHA2", ["value", "length"])
@@ -30,21 +31,26 @@ class TranslatedValue:
 def translate(
 	records: list, fields: list[str], localization: Localization | None = None, doctype: str | None = None
 ) -> list[dict[str, TranslatedValue]]:
-	"""Each record's `fields` in the localization's language, in the order of `records`.
-	Without a translation: Frappe `_()` of the source, then the source. `doctype` names rows that lack one."""
+	"""Each record's `fields` in the localization's language, in record order. `doctype` names rows that
+	lack one. Lookup: the market's translation, the shop-wide one (not in the default language), `_()`."""
 	localization = localization or get_localization()
 	language = localization.language.code
 	if not records:
 		return []
 	doctype = doctype or records[0].get("doctype")
 	sources = get_sources(doctype, records, fields)
-	if language == localization.default_language.code:
+	market = get_lookup_market(localization.market)
+	# The default language is the source: only a market may override it.
+	is_default = language == localization.default_language.code
+	if is_default and market == SHOP_WIDE:
 		return [{field: TranslatedValue(source[field], CURRENT) for field in fields} for source in sources]
 
-	translations = fetch_translations(doctype, [record.get("name") for record in records], fields, language)
+	names = [record.get("name") for record in records]
+	translations = fetch_translations(doctype, names, fields, language, market, shop_wide=not is_default)
+	resolve = resolve_source if is_default else resolve_value
 	return [
 		{
-			field: resolve_value(source[field], translations.get((record.get("name"), field)), language)
+			field: resolve(source[field], translations.get((record.get("name"), field)), language)
 			for field in fields
 		}
 		for record, source in zip(records, sources, strict=True)
@@ -54,14 +60,14 @@ def translate(
 def register(
 	doctype: str, name: str, field: str, language: str, value: str, market: str | None = None
 ) -> str:
-	"""Write a translation of a record's field, marked current against the field's source now.
-	Returns the Content Translation name."""
+	"""Write a translation of a record's field, shop-wide or for `market`, marked current against the
+	field's source now. Returns the Content Translation name."""
 	key = {
 		"reference_doctype": doctype,
 		"reference_name": name,
 		"reference_field": field,
 		"language": language,
-		"market": market or SHOP_WIDE,
+		"market": get_market_key(market),
 	}
 	if existing := frappe.db.get_value(DOCTYPE, key):
 		return save_translation(frappe.get_doc(DOCTYPE, existing), value)
@@ -73,6 +79,29 @@ def register(
 		# Another request inserted the same key first: update its row instead.
 		frappe.db.rollback(save_point="register_content_translation")
 		return save_translation(frappe.get_doc(DOCTYPE, frappe.db.get_value(DOCTYPE, key)), value)
+
+
+def get_market_key(market: str | None) -> str:
+	"""The stored market of a translation: shop-wide for none or the primary market. Throws for a
+	market that does not exist; a disabled one is fine, as it is prepared before launch."""
+	key = find_market_key(market)
+	if key is None:
+		frappe.throw(_("Market {0} does not exist.").format(frappe.bold(market)), frappe.DoesNotExistError)
+	return key
+
+
+def find_market_key(market: str | None) -> str | None:
+	"""Like `get_market_key`, but None for a market that does not exist. Any case matches."""
+	market = cstr(market).strip()
+	if not market or market.lower() == PRIMARY_MARKET:
+		return SHOP_WIDE
+	if not frappe.db.table_exists(MARKET_DOCTYPE):
+		return None
+	return frappe.db.get_value(MARKET_DOCTYPE, market, "name")
+
+
+def get_lookup_market(market: Market | None) -> str:
+	return SHOP_WIDE if market is None or market.is_primary else market.handle
 
 
 def save_translation(translation, value: str) -> str:
@@ -159,8 +188,17 @@ def get_source_hash(source) -> str:
 	return sha256_hash(cstr(source))
 
 
-def fetch_translations(doctype: str, names: list, fields: list[str], language: str) -> dict:
-	"""{(name, field): (translated value, source hash)} of shop-wide translations, in one query per batch."""
+def fetch_translations(
+	doctype: str,
+	names: list,
+	fields: list[str],
+	language: str,
+	market: str = SHOP_WIDE,
+	shop_wide: bool = True,
+) -> dict:
+	"""{(name, field): (translated value, source hash)}, in one query per batch. A non-empty translation
+	for `market` wins over the shop-wide one, and its hash decides the status."""
+	markets = list({SHOP_WIDE, market} if shop_wide else {market})
 	translations = {}
 	for batch in create_batch(list({cstr(name) for name in names if name}), BATCH_SIZE):
 		rows = frappe.get_all(
@@ -170,20 +208,34 @@ def fetch_translations(doctype: str, names: list, fields: list[str], language: s
 				"reference_name": ("in", batch),
 				"reference_field": ("in", fields),
 				"language": language,
-				"market": SHOP_WIDE,
+				"market": ("in", markets),
+				"translated_value": ("is", "set"),
 			},
-			fields=["reference_name", "reference_field", "translated_value", "source_hash"],
+			fields=["reference_name", "reference_field", "market", "translated_value", "source_hash"],
 		)
 		for row in rows:
-			translations[(row.reference_name, row.reference_field)] = (row.translated_value, row.source_hash)
+			key = (row.reference_name, row.reference_field)
+			if row.market == market or key not in translations:
+				translations[key] = (row.translated_value, row.source_hash)
 	return translations
 
 
 def resolve_value(source: str, translation: tuple | None, language: str) -> TranslatedValue:
 	if translation and translation[0]:
-		value, source_hash = translation
-		return TranslatedValue(value, get_status(source, value, source_hash))
+		return resolve_translation(source, translation)
 	return TranslatedValue(_(source, lang=language) if source else source, MISSING)
+
+
+def resolve_source(source: str, translation: tuple | None, language: str) -> TranslatedValue:
+	"""A market's override of the source, in the default language, else the source itself."""
+	if translation and translation[0]:
+		return resolve_translation(source, translation)
+	return TranslatedValue(source, CURRENT)
+
+
+def resolve_translation(source: str, translation: tuple) -> TranslatedValue:
+	value, source_hash = translation
+	return TranslatedValue(value, get_status(source, value, source_hash))
 
 
 def get_status(source, value: str | None, source_hash: str | None) -> str:

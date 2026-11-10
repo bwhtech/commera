@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-from commera.localization.content import get_source_hash, read_source
+from commera.localization.content import get_market_key, get_source_hash, read_source
 from commera.localization.resources import get_translatable_fields
 
 KEY_FIELDS = ["reference_doctype", "reference_name", "reference_field", "language", "market"]
@@ -30,7 +30,7 @@ class ContentTranslation(Document):
 	# end: auto-generated types
 
 	def validate(self):
-		self.market = self.market or ""
+		self.market = get_market_key(self.market)
 		if self.reference_field not in get_translatable_fields(self.reference_doctype):
 			frappe.throw(
 				_("{0} of {1} is not a translatable field.").format(

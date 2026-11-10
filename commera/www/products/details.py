@@ -27,7 +27,7 @@ def get_context(context):
 	context.product_in_stock = detail["in_stock"]
 
 	add_selected_item_fields(selected_item)
-	add_product_content(context, product_variant, product)
+	content = add_product_content(context, product_variant, product)
 
 	resolved_size = selected_item["size"] if selected_item else None
 	context.available_sizes = detail["available_sizes"]
@@ -54,7 +54,7 @@ def get_context(context):
 		{"label": product_variant.display_name, "href": ""},
 	]
 
-	add_seo(context, detail)
+	add_seo(context, detail, content)
 
 
 def add_selected_item_fields(selected_item):
@@ -86,24 +86,32 @@ def add_product_content(context, product_variant, item):
 		item.name,
 		item.item_name,
 	)
+	return content
 
 
-def add_seo(context, detail):
-	product_variant = detail["product_variant"]
+def add_seo(context, detail, content):
+	"""Meta tags and JSON-LD from the translated content the page shows, on copies of the records."""
+	product_variant = {
+		**detail["product_variant"].as_dict(),
+		"display_name": context.product_title,
+		"meta_title": content["meta_title"],
+		"meta_description": content["meta_description"],
+	}
+	product = {**detail["product"].as_dict(), "description": content["description"]}
 	price = detail["selected_price"]
 	availability = "InStock" if detail["in_stock"] else "OutOfStock"
 
 	context.seo = seo.build_product_seo(
 		product_variant,
-		detail["product"],
-		image_url=f"/og-image/{product_variant.route}.png",
+		product,
+		image_url=seo.get_product_og_image(product_variant["route"]),
 		price=price,
 		availability=availability,
 	)
 	context.json_ld = [
 		seo.build_product_json_ld(
 			product_variant,
-			detail["product"],
+			product,
 			images=detail["images"],
 			price=price,
 			availability=availability,

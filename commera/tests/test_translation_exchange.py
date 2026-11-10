@@ -13,6 +13,7 @@ from commera.localization import CURRENT, MISSING, OUTDATED, exchange, get_trans
 from commera.roles import COMMERA_ADMIN, COMMERA_USER, add_commera_roles
 from commera.tests.test_admin_theme_layout import publish
 from commera.tests.test_localization import use_storefront_languages
+from commera.tests.test_market_translation import set_up_market_translations
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.tests.test_theme_section_translation import ARABIC_HEADING, ENTRY, HEADING, SUMMER_THEME
 
@@ -63,7 +64,7 @@ class TestTranslationExchange(IntegrationTestCase):
 		# Each test exports every note: keep one test's notes and markets out of the next.
 		frappe.db.savepoint("translation_exchange_test")
 		self.addCleanup(frappe.db.rollback, save_point="translation_exchange_test")
-		use_storefront_languages(self, "en", published=("en", "ar"))
+		set_up_market_translations(self)
 		hooks = {**frappe.get_hooks("commera_hooks", {}), "translatable_resources": [NOTE_RESOURCE]}
 		self.enterContext(self.patch_hooks({"commera_hooks": hooks}))
 		self.note = self.make_note("Packing note", "<p>Wrap it well</p>")
@@ -175,62 +176,66 @@ class TestTranslationExchange(IntegrationTestCase):
 
 	def test_a_translation_whose_source_was_cleared_is_still_exchanged(self):
 		register("Note", self.note.name, "content", "ar", "<p>لفها جيدا</p>")
-		register("Note", self.note.name, "content", "ar", "<p>لفها للخليج</p>", market="INR")
+		register("Note", self.note.name, "content", "ar", "<p>لفها للخليج</p>", market="gulf")
 		market_only = self.make_note("Gift note", "<p>A gift</p>")
-		register("Note", market_only.name, "content", "ar", "<p>هدية</p>", market="INR")
+		register("Note", market_only.name, "content", "ar", "<p>هدية</p>", market="gulf")
 		for name in (self.note.name, market_only.name):
 			frappe.db.set_value("Note", name, "content", "")
 		before = translations_of(self.note.name), translations_of(market_only.name)
 
 		content = exchange.export_csv("ar")
-		with patch.object(exchange, "MARKET_DOCTYPE", "Currency"):
-			report = exchange.import_csv(content, "ar")
+		report = exchange.import_csv(content, "ar")
 
 		cells = ("Market", "Status", "Default content", "Translated content")
 		self.assertEqual(
 			[tuple(row[cell] for cell in cells) for row in self.rows_of(content, field="content")],
 			[
 				("", OUTDATED, "", self.stored(self.note.name, "content")),
-				("INR", OUTDATED, "", self.stored(self.note.name, "content", "INR")),
+				("gulf", OUTDATED, "", self.stored(self.note.name, "content", "gulf")),
 			],
 		)
 		self.assertEqual(
 			[tuple(row[cell] for cell in cells) for row in self.rows_of(content, market_only.name)],
 			[
 				("", MISSING, market_only.title, ""),
-				("INR", OUTDATED, "", self.stored(market_only.name, "content", "INR")),
+				("gulf", OUTDATED, "", self.stored(market_only.name, "content", "gulf")),
 			],
 		)
 		self.assertEqual((report.updated, report.errors), (0, []))
 		self.assertEqual((translations_of(self.note.name), translations_of(market_only.name)), before)
 
-	def test_a_market_row_is_an_error_while_markets_do_not_exist(self):
-		with patch.object(exchange, "MARKET_DOCTYPE", "No Such Market DocType"):
-			report = exchange.import_csv(to_csv([self.row("title", "ملاحظة", Market="gulf")]), "ar")
+	def test_a_market_row_is_stored_against_its_market(self):
+		rows = [self.row("title", "ملاحظة الخليج", Market="Gulf"), self.row("title", "x", Market="XYZ")]
 
-		self.assertEqual(len(report.errors), 1)
-		self.assertIn("Market column empty", report.errors[0]["message"])
-
-	def test_a_market_row_is_stored_against_its_market_once_markets_exist(self):
-		rows = [self.row("title", "ملاحظة الخليج", Market="INR"), self.row("title", "x", Market="XYZ")]
-
-		# Currency stands in for the market doctype, which ships with markets (#450).
-		with patch.object(exchange, "MARKET_DOCTYPE", "Currency"):
-			report = exchange.import_csv(to_csv(rows), "ar")
+		report = exchange.import_csv(to_csv(rows), "ar")
 
 		self.assertEqual([error["row"] for error in report.errors], [3])
 		stored = [(row.market, row.translated_value) for row in translations_of(self.note.name)]
-		self.assertEqual(stored, [("INR", "ملاحظة الخليج")])
+		self.assertEqual(stored, [("gulf", "ملاحظة الخليج")])
 
 	def test_market_spellings_are_one_key(self):
-		rows = [self.row("title", "أولى", Market="INR"), self.row("title", "ثانية", Market="inr")]
+		rows = [self.row("title", "أولى", Market="GULF"), self.row("title", "ثانية", Market="gulf")]
 
-		with patch.object(exchange, "MARKET_DOCTYPE", "Currency"):
-			report = exchange.import_csv(to_csv(rows), "ar")
+		report = exchange.import_csv(to_csv(rows), "ar")
 
 		self.assertEqual([error["row"] for error in report.errors], [3])
 		stored = [(row.market, row.translated_value) for row in translations_of(self.note.name)]
-		self.assertEqual(stored, [("INR", "أولى")])
+		self.assertEqual(stored, [("gulf", "أولى")])
+
+	def test_a_primary_market_row_is_the_shop_wide_row(self):
+		rows = [self.row("title", "أولى", Market="primary"), self.row("title", "ثانية")]
+
+		report = exchange.import_csv(to_csv(rows), "ar")
+
+		self.assertEqual([error["row"] for error in report.errors], [3])
+		stored = [(row.market, row.translated_value) for row in translations_of(self.note.name)]
+		self.assertEqual(stored, [("", "أولى")])
+
+	def test_a_disabled_market_row_is_imported(self):
+		report = exchange.import_csv(to_csv([self.row("title", "ملاحظة", Market="levant")]), "ar")
+
+		self.assertEqual((report.updated, report.errors), (1, []))
+		self.assertEqual(self.stored(self.note.name, market="levant"), "ملاحظة")
 
 	def test_export_neutralises_formulas_and_import_reads_them_back(self):
 		note = self.make_note("=1+1")
@@ -323,28 +328,27 @@ class TestTranslationExchange(IntegrationTestCase):
 		self.assertEqual((again.updated, again.errors), (0, []))
 
 	def test_market_translations_are_exported_with_their_market_and_import_back(self):
-		register("Note", self.note.name, "title", "ar", "ملاحظة الخليج", market="INR")
+		register("Note", self.note.name, "title", "ar", "ملاحظة الخليج", market="gulf")
 		frappe.db.set_value("Note", self.note.name, "title", "Packing note v2")
 		register("Note", self.note.name, "title", "ar", "ملاحظة")
 
 		content = exchange.export_csv("ar")
 		rows = self.rows_of(content, self.note.name)
-		with patch.object(exchange, "MARKET_DOCTYPE", "Currency"):
-			unchanged = exchange.import_csv(content, "ar")
-			rows[1]["Translated content"] = "ملاحظة الخليج الجديدة"
-			report = exchange.import_csv(to_csv(rows), "ar")
+		unchanged = exchange.import_csv(content, "ar")
+		rows[1]["Translated content"] = "ملاحظة الخليج الجديدة"
+		report = exchange.import_csv(to_csv(rows), "ar")
 
 		self.assertEqual(
 			[(row["Field"], row["Market"], row["Status"], row["Translated content"]) for row in rows],
 			[
 				("title", "", CURRENT, "ملاحظة"),
-				("title", "INR", OUTDATED, "ملاحظة الخليج الجديدة"),
+				("title", "gulf", OUTDATED, "ملاحظة الخليج الجديدة"),
 				("content", "", MISSING, ""),
 			],
 		)
 		self.assertEqual((unchanged.updated, unchanged.errors), (0, []))
 		self.assertEqual((report.updated, report.errors), (1, []))
-		self.assertEqual(self.stored(self.note.name, market="INR"), "ملاحظة الخليج الجديدة")
+		self.assertEqual(self.stored(self.note.name, market="gulf"), "ملاحظة الخليج الجديدة")
 		self.assertEqual(self.stored(self.note.name), "ملاحظة")
 
 	def test_imported_html_is_sanitised(self):
@@ -368,12 +372,31 @@ class TestTranslationExchange(IntegrationTestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "Locale"):
 			exchange.import_csv("Type,Identification,Field,Market,Translated content\n", "ar")
 
-	def test_only_a_translated_storefront_language_is_exchanged(self):
-		for language in ("en", "fr"):
-			with self.assertRaises(frappe.ValidationError):
-				exchange.export_csv(language)
-			with self.assertRaises(frappe.ValidationError):
-				exchange.import_csv(to_csv([self.row("title", "x", Locale=language)]), language)
+	def test_only_a_storefront_language_is_exchanged(self):
+		with self.assertRaises(frappe.ValidationError):
+			exchange.export_csv("fr")
+		with self.assertRaises(frappe.ValidationError):
+			exchange.import_csv(to_csv([self.row("title", "x", Locale="fr")]), "fr")
+
+	def test_the_default_language_exchanges_market_rows_only(self):
+		register("Note", self.note.name, "title", "en", "Gulf packing note", market="gulf")
+		rows = [
+			self.row("title", "Shop-wide note", Locale="en"),
+			self.row("title", "Gulf note", Locale="en", Market="gulf"),
+		]
+
+		exported = self.rows_of(exchange.export_csv("en"))
+		report = exchange.import_csv(to_csv(rows), "en")
+
+		self.assertEqual(
+			[(row["Field"], row["Market"], row["Translated content"]) for row in exported],
+			[("title", "gulf", "Gulf packing note")],
+		)
+		self.assertEqual(report.updated, 1)
+		self.assertEqual([error["row"] for error in report.errors], [2])
+		filters = {"reference_name": self.note.name, "language": "en"}
+		stored = frappe.get_all("Content Translation", filters, ["market", "translated_value"])
+		self.assertEqual([(row.market, row.translated_value) for row in stored], [("gulf", "Gulf note")])
 
 	def upload(self, rows):
 		return frappe.get_doc(
@@ -482,10 +505,10 @@ class TestThemeSectionTranslationExchange(IntegrationTestCase):
 		self.assertEqual((entry.value, entry.status), ("سترة جديدة", CURRENT))
 
 	def test_a_theme_section_row_for_a_market_is_an_error(self):
+		set_up_market_translations(self)
 		row = self.heading_row(exchange.export_csv("ar"))
 
-		with patch.object(exchange, "MARKET_DOCTYPE", "Currency"):
-			report = exchange.import_csv(to_csv([{**row, "Market": "INR", "Translated content": "x"}]), "ar")
+		report = exchange.import_csv(to_csv([{**row, "Market": "gulf", "Translated content": "x"}]), "ar")
 
 		self.assertEqual(len(report.errors), 1)
 		self.assertIn("per market", report.errors[0]["message"])

@@ -4,6 +4,7 @@ import base64
 import os
 import subprocess
 import time
+from contextlib import contextmanager
 from io import BytesIO
 from urllib.parse import urlsplit
 
@@ -12,6 +13,7 @@ from frappe.utils import flt, get_files_path, get_url
 
 from commera import seo
 from commera.branding import get_brand_assets
+from commera.localization import get_localization, pin_localization, resolve
 from commera.shop_themes.render import render_themed_template
 
 # resvg-js is pathologically slow on large embedded images (~58s for 1220x1760, <1s downscaled).
@@ -62,7 +64,24 @@ def render_og_png(html_str, width, height):
 	return result.stdout
 
 
+@contextmanager
+def card_text_localization():
+	"""Satori draws no right-to-left script, so an RTL page's card keeps the source language."""
+	localization = get_localization()
+	if localization.language.direction != "rtl":
+		yield
+		return
+	source = resolve("/", localization.default_language.code, country=localization.country)[0]
+	with pin_localization(source):
+		yield
+
+
 def build_variant_card_context(variant_doc):
+	with card_text_localization():
+		return read_variant_card_context(variant_doc)
+
+
+def read_variant_card_context(variant_doc):
 	from commera.product_detail import get_product_detail
 
 	detail = get_product_detail(variant_doc.route)
@@ -80,13 +99,31 @@ def build_variant_card_context(variant_doc):
 
 	return {
 		"store_name": seo.get_store_name(),
-		"display_name": variant_doc.display_name or variant_doc.name,
+		"display_name": get_card_title(variant_doc),
 		"brand": brand,
 		"price": price,
 		"photo_data_uri": photo_data_uri,
 		# DocType templates address the source document as `doc`.
 		"doc": variant_doc,
 	}
+
+
+def get_card_title(variant_doc) -> str:
+	"""The product's title in the request language and market, as its page shows it."""
+	from commera.sdk.catalog import translate_products
+
+	return (
+		translate_products([variant_doc])[0]["display_name"] or variant_doc.display_name or variant_doc.name
+	)
+
+
+def get_variant_card_version(variant_doc) -> str:
+	"""What a product card's cache key must change with: the record, and its translated text."""
+	with card_text_localization():
+		localization = get_localization()
+		market = localization.market.handle if localization.market else ""
+		text = [localization.language.code, market, seo.get_store_name(), get_card_title(variant_doc)]
+	return frappe.as_json([str(variant_doc.modified), *text])
 
 
 OG_CONTEXT_BUILDERS = {
@@ -119,12 +156,13 @@ def render_card_for_doc(for_doctype, doc):
 
 
 def build_store_card_html():
-	context = {
-		"store_name": seo.get_store_name(),
-		"tagline": seo.get_store_description() or seo.default_store_description(),
-		"site_host": urlsplit(get_url()).hostname or "",
-		"logo_data_uri": logo_data_uri(get_brand_assets().logo),
-	}
+	with card_text_localization():
+		context = {
+			"store_name": seo.get_store_name(),
+			"tagline": seo.get_store_description() or seo.default_store_description(),
+			"site_host": urlsplit(get_url()).hostname or "",
+			"logo_data_uri": logo_data_uri(get_brand_assets().logo),
+		}
 	return render_themed_template(STORE_CARD_TEMPLATE, context)
 
 

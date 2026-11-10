@@ -52,7 +52,7 @@ def add_seo(context, product):
 	context.seo = seo.build_product_seo(
 		variant_fields,
 		product_fields,
-		image_url=f"/og-image/{product['handle']}.png",
+		image_url=seo.get_product_og_image(product["handle"]),
 		price=product["price"],
 		availability=availability,
 		currency=product["currency"],

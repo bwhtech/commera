@@ -93,11 +93,16 @@ class TranslatableResource:
 		return EntryPage([entry for entry, _key in page[:limit]], next_cursor)
 
 	def iter_entries(
-		self, language: str, batch_size: int = BATCH_SIZE, *, include_sourceless: bool = False
+		self,
+		language: str,
+		batch_size: int = BATCH_SIZE,
+		*,
+		include_sourceless: bool = False,
+		market_overrides: bool = False,
 	) -> Iterator[TranslationEntry]:
 		"""Every entry with source text, read `batch_size` records at a time, for an export. With
 		`include_sourceless`, then each one whose source is now empty but holds a translation."""
-		check_target_language(language)
+		check_target_language(language, market_override=market_overrides and self.has_markets)
 		for entry, _key in self.scan(language, {}, None, batch_size):
 			yield entry
 		if include_sourceless:
@@ -115,7 +120,7 @@ class TranslatableResource:
 	def write(self, name: str, field: str, language: str, value: str, market: str = SHOP_WIDE):
 		"""Save the translation of a field, shop-wide or for `market`, current against its source now.
 		Empty removes it. The caller needs write permission on the storage."""
-		check_target_language(language)
+		check_target_language(language, market_override=bool(market))
 		if market and not self.has_markets:
 			frappe.throw(_("{0} cannot be translated per market.").format(self.label))
 		self.check_write_permission(bool(value))
@@ -349,11 +354,11 @@ def load_resource(entry: dict) -> TranslatableResource:
 	)
 
 
-def check_target_language(language: str):
-	"""Translations go to a configured language other than the default, which holds the source.
-	Unpublished languages count, so a merchant can translate before publishing one."""
+def check_target_language(language: str, *, market_override: bool = False):
+	"""Translations go to a configured language other than the default, which holds the source;
+	only a market may override the default. Unpublished languages count, to translate before publishing."""
 	languages = StorefrontLanguages.load()
-	if language == languages.default.code:
+	if language == languages.default.code and not market_override:
 		frappe.throw(_("{0} is the default language, so it holds the source text.").format(language))
 	if not any(configured.code == language for configured in languages.configured):
 		frappe.throw(_("{0} is not a storefront language.").format(language))

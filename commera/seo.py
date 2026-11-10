@@ -7,6 +7,7 @@ from frappe.utils import cstr, flt, get_url, strip_html_tags
 from commera.branding import get_configured_brand_assets
 from commera.localization import alternates, get_localization, get_request_path
 from commera.localization.urls import get_locale_roots, get_og_locale
+from commera.localization.urls import url as localized_url
 from commera.store_frame import get_shop_details
 from commera.utils import get_store_currency
 
@@ -14,6 +15,16 @@ META_DESCRIPTION_MAX_LENGTH = 160
 
 # Satori card of the store's logo and name, served by www/og_image_render.
 DEFAULT_OG_IMAGE = "/og-image/store.png"
+
+
+def get_default_og_image() -> str:
+	"""The store card in the request's language and market: its name and tagline are translated."""
+	return localized_url(DEFAULT_OG_IMAGE)
+
+
+def get_product_og_image(route: str) -> str:
+	"""A product's card under the request's locale prefix, so each language and market has its own."""
+	return localized_url(f"/og-image/{route}.png")
 
 
 def encode_url_path(url):
@@ -120,7 +131,7 @@ def build_product_seo(
 	meta_description = truncate_description(product_variant.get("meta_description") or fallback_description)
 
 	og_override = product_variant.get("og_image")
-	resolved_image = absolute_url(og_override or image_url or DEFAULT_OG_IMAGE)
+	resolved_image = absolute_url(og_override or image_url or get_default_og_image())
 
 	request_path = get_request_path()
 	canonical = get_url(request_path) if request_path else current_request_url()
@@ -276,7 +287,7 @@ def build_page_seo(source, display_name=None, page_type="website"):
 		else (get_store_description() or default_store_description())
 	)
 
-	image = source.get("og_image") or settings.get("default_share_image") or DEFAULT_OG_IMAGE
+	image = source.get("og_image") or settings.get("default_share_image") or get_default_og_image()
 
 	request_path = get_request_path()
 	canonical = get_url(request_path) if request_path else current_request_url()
@@ -328,7 +339,7 @@ def build_collection_seo(category, breadcrumbs, total_count=0, lang="en", image_
 	return {
 		"title": title,
 		"description": description,
-		"image": absolute_url(resolved_image or image_url or DEFAULT_OG_IMAGE),
+		"image": absolute_url(resolved_image or image_url or get_default_og_image()),
 		"url": canonical,
 		"type": "website",
 		"alternates": alternates(request_path or None),
@@ -358,7 +369,7 @@ def build_collection_json_ld(category, breadcrumbs, total_count=0):
 def default_seo():
 	settings = get_seo_settings()
 
-	image = settings.get("default_share_image") or DEFAULT_OG_IMAGE
+	image = settings.get("default_share_image") or get_default_og_image()
 
 	return {
 		"title": apply_title_template(),

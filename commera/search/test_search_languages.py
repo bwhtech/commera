@@ -3,6 +3,7 @@
 
 import copy
 import os
+from contextlib import contextmanager
 from unittest.mock import patch
 
 import frappe
@@ -14,12 +15,13 @@ from commera import utils
 from commera.localization import content as localization_content
 from commera.localization import register
 from commera.search import query as search_query
-from commera.search import record_builder, sync
+from commera.search import record_builder, source_sync, sync
 from commera.search.catalogue_fixtures import SEARCH_TOKEN, STYLE_ITEM, SearchCatalogue
 from commera.search.engine_cache import clear_search_engine
 from commera.search.sqlite_product_search import SqliteProductSearch
 from commera.search.translations import search_languages_changed
 from commera.tests.test_localization import set_storefront_languages
+from commera.tests.test_markets import UAE, make_market, use_markets
 from commera.utils import translated_title_matches
 
 TEST_INDEX_NAME = "test_commera_search_languages.db"
@@ -31,6 +33,15 @@ FRENCH_TITLE, FRENCH_TERM = "Zzbidule Rouge Premium", "zzbidule"
 ARABIC_TITLE, ARABIC_TERM = "ودجت أحمر فاخر", "ودجت"
 FRENCH_CATEGORY, FRENCH_CATEGORY_TERM = "Zzrayon Bidules", "zzrayon"
 ARABIC_CATEGORY, ARABIC_CATEGORY_TERM = "منوعات الأحذية الرياضية", "منوعات"
+GULF_TITLE, GULF_TERM = f"Zzkhaleej {SEARCH_TOKEN}", "zzkhaleej"
+CONFIGURATOR = "Style Attribute Configurator"
+OTHER_BRAND = "ZZ Zzother Brand"
+OTHER_ATTRIBUTE = "Zzshade Attribute"
+OTHER_ATTRIBUTE_DOC = {
+	"attribute_name": OTHER_ATTRIBUTE,
+	"item_attribute_values": [{"attribute_value": "Zzshade", "abbr": "ZZS"}],
+}
+SOURCE_NAME_FIELDS = {"Brand": "brand", "Item Attribute": "attribute_name"}
 
 
 class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
@@ -236,6 +247,90 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		self.assertEqual([card["name"] for card in utils.get_product_list({"search": "ودج"})], [self.red])
 		self.assertEqual(translated_title_matches("Zzbid").run(pluck=True), [self.red])
 
+	# -- markets -----------------------------------------------------------------------------------
+
+	def test_a_market_title_is_found_in_its_market_only(self):
+		self.use_gulf_market()
+		self.add_titles("ar", {self.blue: GULF_TITLE}, market="gulf")
+
+		with self.market_request("AE"):
+			self.assertEqual(self.product_names(GULF_TERM), [self.blue])
+			self.assertEqual(self.engine.search_products({"search": GULF_TERM}), [self.blue])
+			self.assertEqual(self.engine.search_count({"search": GULF_TERM}), 1)
+			self.assertEqual(sum(self.engine.facet_counts({"search": GULF_TERM})["color"].values()), 1)
+		self.assertEqual(self.product_names(GULF_TERM), [])
+		self.assertEqual(self.engine.search_products({"search": GULF_TERM}), [])
+		self.assertEqual(self.engine.search_count({"search": GULF_TERM}), 0)
+
+	def test_a_product_found_through_its_market_row_too_counts_once(self):
+		self.use_gulf_market()
+		self.add_titles("ar", {self.blue: GULF_TITLE}, market="gulf")
+
+		with self.market_request("AE"):
+			self.assertEqual(
+				sorted(self.product_names(SEARCH_TOKEN)), sorted([self.red, self.blue, self.green])
+			)
+			names = self.engine.search_products({"search": SEARCH_TOKEN})
+			self.assertEqual(sorted(names), sorted([self.red, self.blue, self.green]))
+			self.assertEqual(self.engine.search_count({"search": SEARCH_TOKEN}), 3)
+			self.assertEqual(sum(self.engine.facet_counts({"search": SEARCH_TOKEN})["color"].values()), 3)
+
+	def test_a_market_title_combines_with_the_other_searchable_fields(self):
+		self.use_gulf_market()
+		self.set_meta_description(self.blue, "Zzsuede lining")
+		content_fields = [*record_builder.DEFAULT_CONTENT_FIELDS, (PRODUCT, "meta_description")]
+		with patch.object(record_builder, "get_configured_content_fields", return_value=content_fields):
+			self.add_titles("ar", {self.blue: GULF_TITLE}, market="gulf")
+
+		# The brand, the colour and a configured description field.
+		for query in (f"{GULF_TERM} testsearch", f"{GULF_TERM} zzblue", f"{GULF_TERM} zzsuede"):
+			with self.subTest(query=query):
+				with self.market_request("AE"):
+					self.assertEqual(self.product_names(query), [self.blue])
+					self.assertEqual(self.engine.search_products({"search": query}), [self.blue])
+				self.assertEqual(self.product_names(query), [])
+				self.assertEqual(self.engine.search_products({"search": query}), [])
+
+	def test_typeahead_counts_each_record_once_before_its_limits(self):
+		# Core keeps 100 hits: 50 products with two matching rows each would push the category out.
+		self.use_gulf_market()
+		self.add_index_rows(PRODUCT, [f"zz-many-{index}" for index in range(50)], ("", "gulf"))
+
+		with self.market_request("AE"):
+			suggestions = self.engine.typeahead(SEARCH_TOKEN)
+		self.assertEqual(suggestions["category_names"], [self.category])
+		self.assertEqual(len(suggestions["product_names"]), 6)
+		self.assertEqual(len(set(suggestions["product_names"])), 6)
+
+	def test_the_like_fallback_matches_the_market_title_in_its_market_only(self):
+		self.publish("en")
+		self.use_gulf_market("en")
+		self.add_titles("en", {self.blue: GULF_TITLE}, market="gulf")
+
+		with self.market_request("AE"):
+			self.assertTrue(search_query.use_qb_fallback({"search": "Zzk"}))
+			self.assertEqual(
+				[card["name"] for card in utils.get_product_list({"search": "Zzk"})], [self.blue]
+			)
+		self.assertIsNone(translated_title_matches("Zzk"))
+		self.assertEqual(utils.get_product_list({"search": "Zzk"}), [])
+
+	def test_saving_a_market_title_reindexes_its_record(self):
+		self.use_gulf_market()
+		with patch("commera.search.sync.frappe.enqueue") as enqueue:
+			name = register(PRODUCT, self.blue, "display_name", "en", GULF_TITLE, market="gulf")
+		self.addCleanup(frappe.db.delete, "Content Translation", name)
+		self.assertEqual(upserts(enqueue), [(PRODUCT, self.blue)])
+
+		with patch("commera.search.sync.frappe.enqueue") as enqueue:
+			frappe.delete_doc("Commera Market", "gulf", ignore_permissions=True)
+		batches = [
+			call.kwargs
+			for call in enqueue.call_args_list
+			if call.args == ("commera.search.sync.upsert_docs",)
+		]
+		self.assertEqual([(batch["doctype"], batch["names"]) for batch in batches], [(PRODUCT, [self.blue])])
+
 	# -- keeping the index fresh ---------------------------------------------------------------------
 
 	def test_saving_a_translation_reindexes_its_record(self):
@@ -275,6 +370,73 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		upserted = self.edit_translation(name, reference_name=self.green)
 		self.assertEqual(set(upserted), {(PRODUCT, self.blue), (PRODUCT, self.green)})
 		self.assertEqual(self.product_names("zzmachin"), [self.green])
+
+	def test_changing_the_item_brand_reindexes_its_own_and_market_rows(self):
+		self.use_gulf_market()
+		self.add_titles("ar", {self.blue: GULF_TITLE}, market="gulf")
+		self.make_source_record("Brand", {"brand": OTHER_BRAND})
+
+		batches = self.save_sources(("Item", STYLE_ITEM, {"brand": OTHER_BRAND}))
+		self.assertEqual(batches, [sorted([self.red, self.blue, self.green])])
+		with self.market_request("AE"):
+			self.assertEqual(self.product_names(f"{GULF_TERM} zzother"), [self.blue])
+			self.assertEqual(self.product_names(f"{GULF_TERM} testsearch"), [])
+		self.assertIn(self.blue, self.product_names(f"{SEARCH_TOKEN} zzother"))
+		self.assertEqual(self.product_names(f"{SEARCH_TOKEN} testsearch"), [])
+
+	def test_changing_a_configured_configurator_field_reindexes_its_rows(self):
+		self.use_gulf_market()
+		self.make_source_record("Item Attribute", OTHER_ATTRIBUTE_DOC)
+		configurator = frappe.db.get_value(PRODUCT, self.blue, "configurator")
+		content_fields = [*record_builder.DEFAULT_CONTENT_FIELDS, (CONFIGURATOR, "item_attribute")]
+		with (
+			patch.object(record_builder, "get_configured_content_fields", return_value=content_fields),
+			patch.object(source_sync, "get_configured_content_fields", return_value=content_fields),
+		):
+			self.add_titles("ar", {self.blue: GULF_TITLE}, market="gulf")
+			with self.market_request("AE"):
+				self.assertEqual(self.product_names(f"{GULF_TERM} color"), [self.blue])
+			batches = self.save_sources((CONFIGURATOR, configurator, {"item_attribute": OTHER_ATTRIBUTE}))
+
+		self.assertEqual(batches, [sorted([self.red, self.blue, self.green])])
+		with self.market_request("AE"):
+			self.assertEqual(self.product_names(f"{GULF_TERM} zzshade"), [self.blue])
+			self.assertEqual(self.product_names(f"{GULF_TERM} color"), [])
+		self.assertIn(self.blue, self.product_names(f"{SEARCH_TOKEN} zzshade"))
+
+	def test_a_db_set_on_the_item_reindexes_its_own_and_market_rows(self):
+		self.use_gulf_market()
+		self.add_titles("ar", {self.blue: GULF_TITLE}, market="gulf")
+		self.make_source_record("Brand", {"brand": OTHER_BRAND})
+
+		batches = self.save_sources(("Item", STYLE_ITEM, {"brand": OTHER_BRAND}, "db_set"))
+
+		self.assertEqual(batches, [sorted([self.red, self.blue, self.green])])
+		with self.market_request("AE"):
+			self.assertEqual(self.product_names(f"{GULF_TERM} zzother"), [self.blue])
+		self.assertIn(self.blue, self.product_names(f"{SEARCH_TOKEN} zzother"))
+
+	def test_a_db_set_of_an_unrelated_item_field_reindexes_nothing(self):
+		batches = self.save_sources(("Item", STYLE_ITEM, {"description": "Zz unrelated"}, "db_set"))
+		self.assertEqual(batches, [])
+
+	def test_saving_a_source_twice_reindexes_its_variants_once(self):
+		self.make_source_record("Brand", {"brand": OTHER_BRAND})
+		batches = self.save_sources(
+			("Item", STYLE_ITEM, {"brand": OTHER_BRAND}),
+			("Item", STYLE_ITEM, {"item_name": "Zzwidget Renamed Template"}),
+		)
+		self.assertEqual(batches, [sorted([self.red, self.blue, self.green])])
+
+	def test_unrelated_source_saves_reindex_nothing(self):
+		self.make_source_record("Item Attribute", OTHER_ATTRIBUTE_DOC)
+		configurator = frappe.db.get_value(PRODUCT, self.blue, "configurator")
+		# Default content fields read nothing from the Configurator.
+		batches = self.save_sources(
+			("Item", STYLE_ITEM, {"description": "Zz unrelated description"}),
+			(CONFIGURATOR, configurator, {"item_attribute": OTHER_ATTRIBUTE}),
+		)
+		self.assertEqual(batches, [])
 
 	def test_publishing_a_language_rebuilds_the_index(self):
 		before = frappe.get_single("Commera Settings")
@@ -358,17 +520,52 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 
 	# -- helpers -----------------------------------------------------------------------------------
 
-	def add_titles(self, language, titles):
+	def add_titles(self, language, titles, market=None):
 		"""Register `titles` {product: title} in `language` and index them, removed after the test."""
 		with patch("commera.search.sync.frappe.enqueue"):
 			names = [
-				register(PRODUCT, product, "display_name", language, title)
+				register(PRODUCT, product, "display_name", language, title, market)
 				for product, title in titles.items()
 			]
 		# setUp rebuilds the index for the next test, so only the rows need removing.
 		self.addCleanup(frappe.db.delete, "Content Translation", {"name": ("in", names)})
 		SqliteProductSearch().index_docs(PRODUCT, list(titles))
 		return names
+
+	def set_meta_description(self, product, text):
+		original = frappe.db.get_value(PRODUCT, product, "meta_description")
+		self.addCleanup(frappe.db.set_value, PRODUCT, product, "meta_description", original)
+		frappe.db.set_value(PRODUCT, product, "meta_description", text)
+
+	def add_index_rows(self, doctype, names, markets):
+		"""A row per name and market that matches SEARCH_TOKEN, written straight to the index."""
+		rows = [
+			(f"{doctype}:{name}", SEARCH_TOKEN, SEARCH_TOKEN, doctype, name, market)
+			for name in names
+			for market in markets
+		]
+		self.engine._with_connection(
+			lambda cursor: cursor.executemany(
+				"INSERT INTO search_fts (doc_id, title, content, doctype, name, market) "
+				"VALUES (?, ?, ?, ?, ?, ?)",
+				rows,
+			)
+		)
+
+	def use_gulf_market(self, language="ar"):
+		use_markets(self)
+		make_market("Gulf", [UAE], language, handle="gulf")
+
+	@contextmanager
+	def market_request(self, country):
+		"""Search as a shopper from `country`, which `_country` names."""
+		frappe.form_dict["_country"] = country
+		frappe.local.request_cache.clear()
+		try:
+			yield
+		finally:
+			frappe.form_dict.pop("_country", None)
+			frappe.local.request_cache.clear()
 
 	def edit_translation(self, name, **changes):
 		"""Save `changes` to a translation, then run the upserts it enqueued. Returns them."""
@@ -378,6 +575,41 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		for doctype, record in upserts(enqueue):
 			sync.upsert_doc(doctype, record)
 		return upserts(enqueue)
+
+	def make_source_record(self, doctype, values):
+		"""A record the source fields can link to, removed after the test."""
+		name = values[SOURCE_NAME_FIELDS[doctype]]
+		if not frappe.db.exists(doctype, name):
+			frappe.get_doc({"doctype": doctype, **values}).insert(ignore_permissions=True)
+		self.addCleanup(frappe.delete_doc, doctype, name, force=True, ignore_permissions=True)
+
+	def save_sources(self, *saves):
+		"""Save each (doctype, name, changes) and commit. Runs and returns the batches that enqueues."""
+		callbacks = CallbackManager()
+		with (
+			patch.object(frappe.db, "after_commit", callbacks),
+			patch("commera.search.sync.frappe.enqueue") as enqueue,
+		):
+			for save in saves:
+				self.save_source(*save)
+			callbacks.run()
+		batches = [
+			call.kwargs["names"]
+			for call in enqueue.call_args_list
+			if call.args == ("commera.search.sync.upsert_docs",)
+		]
+		for names in batches:
+			sync.upsert_docs(PRODUCT, names)
+		return batches
+
+	def save_source(self, doctype, name, changes, method="save"):
+		doc = frappe.get_doc(doctype, name)
+		# Fixtures are committed, so the old values go back by hand.
+		self.addCleanup(frappe.db.set_value, doctype, name, {field: doc.get(field) for field in changes})
+		if method == "db_set":
+			doc.db_set(changes)
+		else:
+			doc.update(changes).save(ignore_permissions=True)
 
 	def build_with_after_commit(self):
 		"""Rebuild the index. Returns the after-commit callbacks the build left, without running them."""

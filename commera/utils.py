@@ -7,7 +7,7 @@ from erpnext.selling.doctype.customer.customer import (
 	get_nested_links as _get_nested_links,
 )
 from frappe.geo.country_info import get_all
-from frappe.query_builder import Case, DocType
+from frappe.query_builder import Case, Criterion, DocType
 from frappe.query_builder.functions import Count, Min, Sum
 from frappe.utils import add_days, cint, create_batch, cstr, flt, get_datetime, now_datetime
 from frappe.utils.background_jobs import get_job_status
@@ -333,23 +333,31 @@ def get_product_base_query(filters=None, product_list=None):
 
 
 def translated_title_matches(search):
-	"""Products with a shop-wide title in a search language that contains `search`, as a subquery.
-	None when the store publishes no language besides the default."""
+	"""Products whose title contains `search` in a search language, shop-wide or in the request's
+	market (which also overrides the default language), as a subquery. None when no title can match."""
 	from commera.localization.content import SHOP_WIDE
-	from commera.search.translations import TITLE_FIELD, get_search_languages
+	from commera.localization.languages import StorefrontLanguages
+	from commera.search.translations import TITLE_FIELD, get_search_languages, get_search_markets
 
-	codes = [language.code for language in get_search_languages()]
-	if not codes:
-		return None
+	languages = StorefrontLanguages.load()
 	translation = DocType("Content Translation")
+	conditions = [
+		(translation.market == market)
+		& translation.language.isin([language.code for language in languages.published])
+		for market in get_search_markets()
+		if market != SHOP_WIDE
+	]
+	if codes := [language.code for language in get_search_languages(languages)]:
+		conditions.append((translation.market == SHOP_WIDE) & translation.language.isin(codes))
+	if not conditions:
+		return None
 	return (
 		frappe.qb.from_(translation)
 		.select(translation.reference_name)
 		.where(
 			(translation.reference_doctype == "Style Attribute Variant")
 			& (translation.reference_field == TITLE_FIELD)
-			& (translation.market == SHOP_WIDE)
-			& translation.language.isin(codes)
+			& Criterion.any(conditions)
 			& translation.translated_value.like(f"%{search}%")
 		)
 	)

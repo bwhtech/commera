@@ -2,7 +2,7 @@ import frappe
 from frappe.utils import cint, create_batch, cstr
 
 from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import root_filter
-from commera.search.translations import get_translated_titles
+from commera.search.translations import get_market_titles, get_translated_titles
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
 # The only doctypes reachable from a variant (itself, its Item, its Style Attribute Configurator).
@@ -18,6 +18,9 @@ DEFAULT_CONTENT_FIELDS = (
 	("Style Attribute Variant", "item_group"),
 	("Item", "brand"),
 )
+
+# Item fields every product record copies, configured or not.
+ITEM_FIELDS = ("brand", "is_stock_item", "item_name")
 
 
 def get_configured_content_fields():
@@ -106,6 +109,7 @@ def build_product_search_records(variant_names=None):
 	images_by_variant = images_for_variants(names)
 	prices_by_variant = prices_for_variants(sizes_by_variant)
 	titles_by_variant = get_translated_titles("Style Attribute Variant", variants)
+	market_titles = get_market_titles("Style Attribute Variant", names)
 
 	records = []
 	for variant in variants:
@@ -118,6 +122,7 @@ def build_product_search_records(variant_names=None):
 				"title": variant.display_name or "",
 				"content": join_text(build_content(configured_fields, variant, item, configurator), titles),
 				"titles": titles,
+				"market_titles": market_titles.get(variant.name, {}),
 				"item_group": variant.item_group or "",
 				"brand": item.get("brand") or "",
 				"color": variant.attribute_value or "",
@@ -200,6 +205,7 @@ def build_category_search_records(names=None):
 
 	roots = get_root_route_slugs()
 	titles_by_category = get_translated_titles("Ecommerce Category", categories)
+	market_titles = get_market_titles("Ecommerce Category", [category.name for category in categories])
 
 	records = []
 	for category in categories:
@@ -224,6 +230,7 @@ def build_category_search_records(names=None):
 					titles_by_category[category.name],
 				),
 				"route_slug": route_slug,
+				"market_titles": market_titles.get(category.name, {}),
 			}
 		)
 	return records
@@ -231,7 +238,7 @@ def build_category_search_records(names=None):
 
 def items_for_item_styles(item_styles, content_fields=None):
 	"""Map item_style (Item name) -> {brand, is_stock_item, item_name, ...content}."""
-	fields = union_fields(["name", "brand", "is_stock_item", "item_name"], content_fields or [])
+	fields = union_fields(["name", *ITEM_FIELDS], content_fields or [])
 
 	item_by_style = {}
 	for chunk in create_batch(item_styles, IN_CLAUSE_CHUNK_SIZE):
