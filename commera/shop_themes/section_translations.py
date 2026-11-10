@@ -161,11 +161,14 @@ class ThemeSectionResource(TranslatableResource):
 
 
 def set_translation(theme_dirs, layout, path, setting_id, language, value) -> bool:
-	"""Set one translation in a full layout, with a fresh source hash. False when it has no source there."""
+	"""Set one translation in a full layout, with a fresh source hash. False when it has no source there,
+	except that a translation left without a source can still be cleared."""
 	text = find_text_setting(theme_dirs, layout, path, setting_id)
+	if not text:
+		return False
 	default = get_default_language()
-	source = get_source(text.value, default) if text else ""
-	if not source:
+	source = get_source(text.value, default)
+	if not source and (value or language not in get_translations(text.value, default)):
 		return False
 	text.set(with_translation(text.value, language, value, default))
 	set_stored_hash(layout, path, setting_id, language, get_source_hash(source) if value else None)

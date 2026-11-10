@@ -221,6 +221,15 @@ class TestThemeSectionTranslation(IntegrationTestCase):
 		self.resource.write(ENTRY, "heading", "ar", "عنوان جديد")
 		self.assertEqual(self.entry("ar").status, CURRENT)
 
+	def test_a_translation_whose_source_was_cleared_can_be_cleared(self):
+		publish(SUMMER_THEME, "index", self.editor_layout({"en": "", "ar": ARABIC_HEADING}))
+
+		self.resource.write(ENTRY, "heading", "ar", "")
+
+		heading = self.stored_layouts()[1]["sections"][0]["blocks"][0]["settings"]["heading"]
+		self.assertNotIn("ar", heading)
+		self.assertRaises(frappe.DoesNotExistError, self.resource.write, ENTRY, "heading", "ar", "نص")
+
 	def test_rewriting_an_unchanged_translation_marks_it_current(self):
 		self.resource.write(ENTRY, "heading", "ar", ARABIC_HEADING)
 		publish(SUMMER_THEME, "index", self.editor_layout({"en": "New heading", "ar": ARABIC_HEADING}))
