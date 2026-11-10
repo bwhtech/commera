@@ -19,6 +19,8 @@ website_redirects = [
 # so the route rules below match the path without it. resolve_website_path sends the canonical redirects.
 before_request = ["commera.localization.routing.localize_request"]
 website_path_resolver = "commera.localization.routing.resolve_website_path"
+# Frappe runs auth_hooks after its API key and OAuth checks, so a storefront API call knows its user.
+auth_hooks = ["commera.localization.routing.localize_api_request"]
 
 website_route_rules = [
 	# SPA client-side routing: every /commera deep link resolves to the same shell so a reload does not 404.
@@ -523,13 +525,6 @@ override_whitelisted_methods = {
 # 	{
 # 		"doctype": "{doctype_4}"
 # 	}
-# ]
-
-# Authentication and authorization
-# --------------------------------
-
-# auth_hooks = [
-# 	"commera.auth.validate"
 # ]
 
 # Automatically update python controller files with type annotations for this app.

@@ -35,15 +35,14 @@ NON_PAGE_PATH_PREFIXES = (
 	"/.well-known/",
 )
 PAGE_METHODS = ("GET", "HEAD", "POST")
-STOREFRONT_API_PATH = re.compile(r"^/api/(?:v\d+/)?method/commera\.api\.storefront\.")
+API_METHOD_PATH = re.compile(r"^/api/(?:v1/|v2/)?method/([^/]+)/?$")
+STOREFRONT_API_NAMESPACE = "commera.api.storefront."
 
 
 def localize_request():
 	"""before_request hook: a storefront page takes its language from the URL alone.
 	Strips the prefix off request.path, so every app's website_path_resolver routes without it."""
 	request = getattr(frappe.local, "request", None)
-	if request and STOREFRONT_API_PATH.match(request.path):
-		localize_api_request()
 	if not request or not is_page_request(request):
 		return
 
@@ -68,9 +67,20 @@ def localize_request():
 
 
 def localize_api_request():
-	"""A storefront API reply takes its language from `_lang` alone, as the page that sent it did.
-	Frappe would fall back to the cookie, the browser or the user language when the page omits it."""
-	frappe.local.lang = get_localization().language.code
+	"""auth_hooks hook: a storefront API reply takes its language from `_lang` alone, as its page did.
+	Runs after the API key check: only then may an admin's `_lang` name an unpublished language."""
+	if get_api_method().startswith(STOREFRONT_API_NAMESPACE):
+		# Frappe fell back to the cookie, the browser or the user language.
+		frappe.local.lang = get_localization().language.code
+
+
+def get_api_method() -> str:
+	"""The method frappe.app calls: a `cmd` parameter wins over the /api/method/ path."""
+	if cmd := frappe.form_dict.cmd:
+		return cmd if isinstance(cmd, str) else ""
+	request = getattr(frappe.local, "request", None)
+	match = request and API_METHOD_PATH.match(request.path)
+	return match.group(1) if match else ""
 
 
 class StorefrontRedirect(RequestRedirect):

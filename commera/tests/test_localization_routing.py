@@ -4,6 +4,9 @@ import tempfile
 from unittest.mock import patch
 
 import frappe
+from frappe.app import make_form_dict
+from frappe.auth import validate_auth
+from frappe.core.doctype.user.user import generate_keys
 from frappe.tests import IntegrationTestCase
 from frappe.website.page_renderers.not_found_page import NotFoundPage
 from frappe.website.page_renderers.not_permitted_page import NotPermittedPage
@@ -49,12 +52,18 @@ class RoutingTestCase(IntegrationTestCase):
 		self.set_request(url, lang, headers)
 		return PathResolver(frappe.local.request.path).resolve()
 
-	def set_request(self, url, lang="en", headers=None):
+	def set_request(self, url, lang="en", headers=None, data=None):
+		"""A request to `url`, a POST when it has a `data` body, through Frappe's request hooks."""
 		path, _sep, query_string = url.partition("?")
-		frappe.local.request = Request(
-			EnvironBuilder(path=path, query_string=query_string, headers=headers).get_environ()
-		)
-		frappe.local.form_dict = frappe._dict(frappe.local.request.args)
+		environ = EnvironBuilder(
+			path=path,
+			query_string=query_string,
+			headers=headers,
+			method="POST" if data else "GET",
+			data=data,
+		).get_environ()
+		frappe.local.request = Request(environ)
+		make_form_dict(frappe.local.request)
 		frappe.local.request_cache.clear()
 		# frappe.init starts every request with an empty frappe.local.cache.
 		frappe.local.cache.pop(frappe.cache.make_key("website_redirects"), None)
@@ -63,6 +72,8 @@ class RoutingTestCase(IntegrationTestCase):
 		frappe.flags.redirect_location = None
 		# Frappe's init_request runs the before_request hooks after it has set the language.
 		localize_request()
+		# Then frappe.app authenticates the request and runs the auth_hooks.
+		validate_auth()
 
 	def assertServes(self, url, endpoint, lang):
 		served, renderer = self.open(url)
@@ -343,6 +354,51 @@ class TestLangParameter(RoutingTestCase):
 		self.set_request("/api/method/commera.api.ping", lang="ar")
 
 		self.assertEqual(frappe.local.lang, "ar")
+
+	def test_a_cmd_parameter_names_the_storefront_method(self):
+		self.set_request("/?cmd=commera.api.storefront.shop.get_shop", lang="ar")
+		self.assertEqual(frappe.local.lang, "en")
+		self.set_request("/", lang="ar", data={"cmd": "commera.api.storefront.shop.get_shop", "_lang": "ar"})
+		self.assertEqual(frappe.local.lang, "ar")
+		self.set_request("/api/method/frappe.client.get_value?cmd=commera.api.storefront.shop.get_shop", "ar")
+		self.assertEqual(frappe.local.lang, "en")
+
+	def test_a_cmd_parameter_wins_over_a_storefront_api_path(self):
+		for path in STOREFRONT_API_PATHS:
+			with self.subTest(path):
+				self.set_request(f"{path}?cmd=frappe.client.get_value", lang="ar")
+				self.assertEqual(frappe.local.lang, "ar")
+				body = '{"cmd": "frappe.client.get_value"}'
+				self.set_request(path, "ar", headers={"Content-Type": "application/json"}, data=body)
+				self.assertEqual(frappe.local.lang, "ar")
+
+
+class TestStorefrontApiAuthentication(RoutingTestCase):
+	def setUp(self):
+		super().setUp()
+		use_storefront_languages(self, "en", published=("en", "ar"), unpublished=("fr",))
+		self.addCleanup(setattr, frappe.local, "login_manager", getattr(frappe.local, "login_manager", None))
+		frappe.local.login_manager = frappe._dict(user="Guest")
+
+	def test_an_admin_with_an_api_key_may_ask_for_an_unpublished_language(self):
+		frappe.set_user("Administrator")
+		secret = generate_keys("Administrator")["api_secret"]
+		key = frappe.db.get_value("User", "Administrator", "api_key")
+		frappe.set_user("Guest")
+
+		self.set_request(
+			f"{STOREFRONT_API_PATHS[1]}?_lang=fr", headers={"Authorization": f"token {key}:{secret}"}
+		)
+
+		self.assertEqual(frappe.session.user, "Administrator")
+		self.assertEqual(frappe.local.lang, "fr")
+		self.assertEqual(get_localization().language.code, "fr")
+
+	def test_a_guest_asking_for_an_unpublished_language_gets_the_default(self):
+		self.set_request(f"{STOREFRONT_API_PATHS[1]}?_lang=fr", lang="fr")
+
+		self.assertEqual(frappe.local.lang, "en")
+		self.assertEqual(get_localization().language.code, "en")
 
 
 class TestCachedNotFound(RoutingTestCase):
