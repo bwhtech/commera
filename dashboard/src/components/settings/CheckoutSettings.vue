@@ -18,8 +18,8 @@ const enabled = computed(() => Boolean(values.value.allow_guest_checkout))
 
 <template>
   <SettingsPanelHeader
-    title="General"
-    description="How shoppers check out."
+    :title="__('General')"
+    :description="__('How shoppers check out.')"
   />
 
   <SettingsBody v-scroll-fade>
@@ -28,31 +28,31 @@ const enabled = computed(() => Boolean(values.value.allow_guest_checkout))
       v-if="settings.error"
       compact
       icon="lucide-triangle-alert"
-      title="This could not be loaded"
-      description="Guest checkout may still be on. This panel just cannot say."
+      :title="__('This could not be loaded')"
+      :description="__('Guest checkout may still be on. This panel just cannot say.')"
     >
-      <Button label="Try again" variant="subtle" theme="gray" @click="settings.reload()" />
+      <Button :label="__('Try again')" variant="subtle" theme="gray" @click="settings.reload()" />
     </EmptyState>
 
     <SettingsSkeleton v-else-if="settings.loading && !settings.data" :rows="2" />
 
     <div v-else class="divide-y divide-outline-gray-1">
       <SettingsRow
-        title="Allow guest checkout"
-        description="Off, and shoppers sign in with an emailed code before they pay. Past guest orders stay viewable."
+        :title="__('Allow guest checkout')"
+        :description="__('Off, and shoppers sign in with an emailed code before they pay. Past guest orders stay viewable.')"
       >
         <Switch
           size="sm"
           :model-value="enabled"
           :disabled="save.loading"
-          @update:model-value="commit('allow_guest_checkout', $event ? 1 : 0, 'Guest checkout')"
+          @update:model-value="commit('allow_guest_checkout', $event ? 1 : 0, __('Guest checkout'))"
         />
       </SettingsRow>
 
       <SettingsRow
         v-if="enabled"
-        title="Order link shows full details for (days)"
-        description="The emailed order link shows the address and payment for this long, then only status and tracking. 0 means always."
+        :title="__('Order link shows full details for (days)')"
+        :description="__('The emailed order link shows the address and payment for this long, then only status and tracking. 0 means always.')"
       >
         <TextInput
           :model-value="values.guest_order_link_days"
@@ -60,7 +60,7 @@ const enabled = computed(() => Boolean(values.value.allow_guest_checkout))
           type="number"
           min="0"
           :disabled="save.loading"
-          @change="commit('guest_order_link_days', $event.target.value, 'Order link days')"
+          @change="commit('guest_order_link_days', $event.target.value, __('Order link days'))"
         />
       </SettingsRow>
     </div>

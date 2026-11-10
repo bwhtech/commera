@@ -12,12 +12,13 @@ import SearchInput from '../components/SearchInput.vue'
 import { useAdminAction, useAdminRead } from '../data/api'
 import { errorMessage } from '../data/errors'
 import { shortDate } from '../data/format'
+import { __ } from '../data/translation'
 import { useIsMobile } from '../utils/useIsMobile'
 import { ia } from '../ia/store'
 
 const TABS = [
-  { label: 'Unpublished', value: 'unpublished' },
-  { label: 'Published', value: 'published' },
+  { label: __('Unpublished'), value: 'unpublished' },
+  { label: __('Published'), value: 'published' },
 ]
 
 // Approve-first: a new review lands unpublished, so that is the merchant's
@@ -84,15 +85,15 @@ async function togglePublished(row) {
 </script>
 
 <template>
-  <AppPageHeader title="Reviews" />
+  <AppPageHeader :title="__('Reviews')" />
 
   <PageBody>
     <div class="flex flex-wrap items-center gap-2">
       <ListTabs v-model="tab" :options="TABS" />
       <SearchInput
         v-model="query"
-        class="min-w-0 flex-1 basis-40 sm:ml-auto sm:w-56 sm:flex-none sm:basis-auto"
-        placeholder="Search reviews"
+        class="min-w-0 flex-1 basis-40 sm:ms-auto sm:w-56 sm:flex-none sm:basis-auto"
+        :placeholder="__('Search reviews')"
       />
     </div>
 
@@ -107,11 +108,11 @@ async function togglePublished(row) {
         :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['1fr', '9rem', '9rem', '7rem', '5rem'] }"
       >
         <ListHeader>
-          <ListHeaderCell>Review</ListHeaderCell>
-          <ListHeaderCell class="max-sm:hidden">Product</ListHeaderCell>
-          <ListHeaderCell class="max-sm:hidden">Shopper</ListHeaderCell>
-          <ListHeaderCell class="max-sm:hidden">Submitted</ListHeaderCell>
-          <ListHeaderCell>Published</ListHeaderCell>
+          <ListHeaderCell>{{ __('Review') }}</ListHeaderCell>
+          <ListHeaderCell class="max-sm:hidden">{{ __('Product') }}</ListHeaderCell>
+          <ListHeaderCell class="max-sm:hidden">{{ __('Shopper') }}</ListHeaderCell>
+          <ListHeaderCell class="max-sm:hidden">{{ __('Submitted') }}</ListHeaderCell>
+          <ListHeaderCell>{{ __('Published') }}</ListHeaderCell>
         </ListHeader>
 
         <!-- `loading` flips on every param change and the request keeps the previous
@@ -123,14 +124,14 @@ async function togglePublished(row) {
           <ListRow :value="item.name" class="cursor-pointer active:bg-surface-gray-2 sm:rounded-5 sm:hover:bg-surface-gray-1">
             <RouterLink
               :to="`/reviews/${item.name}`"
-              :aria-label="item.review_title || 'Untitled review'"
+              :aria-label="item.review_title || __('Untitled review')"
               class="absolute inset-0 sm:rounded-5"
             />
             <ListCell>
               <div class="flex min-w-0 items-center gap-2.5">
                 <Rating :model-value="item.rating" disabled size="sm" />
                 <div class="min-w-0">
-                  <p class="truncate text-base text-ink-gray-8">{{ item.review_title || 'Untitled review' }}</p>
+                  <p class="truncate text-base text-ink-gray-8">{{ item.review_title || __('Untitled review') }}</p>
                   <p class="truncate text-sm text-ink-gray-5">{{ item.comment }}</p>
                 </div>
               </div>
@@ -164,15 +165,15 @@ async function togglePublished(row) {
     <EmptyState
       v-if="!reviewsRequest.loading && !rows.length"
       icon="lucide-star"
-      :title="tab === 'unpublished' ? 'No reviews waiting on you' : 'No published reviews yet'"
+      :title="tab === 'unpublished' ? __('No reviews waiting on you') : __('No published reviews yet')"
       :description="
         tab === 'unpublished'
-          ? 'New reviews land here for you to approve before they reach the storefront.'
-          : 'Publish a review from the Unpublished tab to see it here.'
+          ? __('New reviews land here for you to approve before they reach the storefront.')
+          : __('Publish a review from the Unpublished tab to see it here.')
       "
       :filtered="isFiltered"
-      filtered-title="No reviews match that search"
-      filtered-description="Try a different search term."
+      :filtered-title="__('No reviews match that search')"
+      :filtered-description="__('Try a different search term.')"
     />
   </PageBody>
 </template>

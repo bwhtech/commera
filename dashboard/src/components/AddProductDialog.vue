@@ -12,6 +12,7 @@ import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { addProduct, closeAddProduct } from '../data/addProduct'
 import { buildOptionSizes } from '../data/optionSizes'
 import { productRoute } from '../ia/routes'
+import { __ } from '../data/translation'
 import AttributeMultiSelect from './AttributeMultiSelect.vue'
 import OptionSizeGrid from './OptionSizeGrid.vue'
 
@@ -59,21 +60,21 @@ watch(
 
 const collectionsRequest = useAdminRead('catalog.get_collections')
 const collectionOptions = computed(() => [
-  { label: 'Select a collection', value: '' },
+  { label: __('Select a collection'), value: '' },
   ...(collectionsRequest.data ?? []).map((name) => ({ label: name, value: name })),
 ])
 
 const createCollectionAction = useAdminAction('catalog.create_collection')
 function addCollection() {
   dialog.prompt({
-    title: 'New collection',
-    fields: [{ name: 'title', label: 'Name', required: true }],
+    title: __('New collection'),
+    fields: [{ name: 'title', label: __('Name'), required: true }],
     onConfirm: async ({ values }) => {
       const created = await trySubmit(createCollectionAction, { title: values.title })
       if (!created) return
       await collectionsRequest.reload()
       collection.value = values.title
-      toast.success(`"${values.title}" created`)
+      toast.success(__('"{0}" created', [values.title]))
     },
   })
 }
@@ -91,10 +92,10 @@ const optionAttributeOptions = computed(() =>
 const createAttributeAction = useAdminAction('catalog.create_attribute')
 function addAttribute() {
   dialog.prompt({
-    title: 'New option',
+    title: __('New option'),
     fields: [
-      { name: 'title', label: 'Name', required: true, placeholder: 'Format' },
-      { name: 'values', label: 'Values', placeholder: 'Paperback, Hardcover' },
+      { name: 'title', label: __('Name'), required: true, placeholder: __('Format') },
+      { name: 'values', label: __('Values'), placeholder: __('Paperback, Hardcover') },
     ],
     onConfirm: async ({ values }) => {
       const created = await trySubmit(createAttributeAction, {
@@ -104,7 +105,7 @@ function addAttribute() {
       if (!created) return
       await attributesRequest.reload()
       optionAttribute.value = values.title
-      toast.success(`"${values.title}" created`)
+      toast.success(__('"{0}" created', [values.title]))
     },
   })
 }
@@ -131,7 +132,7 @@ const mixedOption = computed(() =>
     ? sizelessOptions.value[0].option
     : '',
 )
-const gridError = computed(() => (mixedOption.value ? `Pick at least one size for ${mixedOption.value}` : ''))
+const gridError = computed(() => (mixedOption.value ? __('Pick at least one size for {0}', [mixedOption.value]) : ''))
 
 // A price is required, not optional. create_product only writes Item Prices for a rate
 // above zero, so a product created without one carries no Item Price row at all and reads
@@ -147,13 +148,14 @@ const canSubmit = computed(
 // What the owner is about to get, in their words rather than ERPNext's.
 const summary = computed(() => {
   const optionCount = colors.value.length
-  const optionWord = optionCount === 1 ? 'option' : 'options'
+  const options = optionCount === 1 ? __('1 option') : __('{0} options', [optionCount])
   if (variantCount.value) {
-    const variantWord = variantCount.value === 1 ? 'variant' : 'variants'
-    return `${optionCount} ${optionWord} · ${variantCount.value} ${variantWord} will be created`
+    const variants =
+      variantCount.value === 1 ? __('1 variant will be created') : __('{0} variants will be created', [variantCount.value])
+    return `${options} · ${variants}`
   }
-  if (optionCount) return `${optionCount} ${optionWord} · no sizes, so each one sells as a single item`
-  return 'No options — this sells as a single item, the way a book does'
+  if (optionCount) return `${options} · ${__('no sizes, so each one sells as a single item')}`
+  return __('No options — this sells as a single item, the way a book does')
 })
 
 const createAction = useAdminAction('catalog.create_product')
@@ -161,9 +163,9 @@ const createAction = useAdminAction('catalog.create_product')
 // A disabled button with no reason reads as a broken screen, so the first thing still missing is named.
 const submitHint = computed(() => {
   if (canSubmit.value || createAction.loading) return ''
-  if (!title.value.trim()) return 'Add a title to continue.'
-  if (!collection.value) return 'Pick a collection to continue.'
-  if (!(Number(price.value) > 0)) return 'Set a price above zero to continue.'
+  if (!title.value.trim()) return __('Add a title to continue.')
+  if (!collection.value) return __('Pick a collection to continue.')
+  if (!(Number(price.value) > 0)) return __('Set a price above zero to continue.')
   return ''
 })
 
@@ -187,7 +189,7 @@ async function submit() {
   if (!added) return
 
   const created = createAction.data
-  toast.success(`"${productTitle}" created`)
+  toast.success(__('"{0}" created', [productTitle]))
   // The dialog cannot be dismissed while this runs, but it can be closed from elsewhere (a route
   // change, the onboarding finishing); then the merchant has moved on and is not pulled back.
   if (!addProduct.open) return
@@ -200,34 +202,34 @@ async function submit() {
   <Dialog
     v-model:open="addProduct.open"
     size="xl"
-    title="Add product"
+    :title="__('Add product')"
     :dismissible="!pickerOpen && !createAction.loading"
     @update:open="(v) => (v ? null : closeAddProduct())"
   >
     <template #default>
       <div class="space-y-5">
-        <FormControl v-model="title" label="Title" placeholder="Cotton oversized tee" required />
+        <FormControl v-model="title" :label="__('Title')" :placeholder="__('Cotton oversized tee')" required />
 
         <div>
           <span class="mb-1.5 block text-base text-ink-gray-6">
-            Collection
+            {{ __('Collection') }}
             <span class="text-ink-red-5 select-none" aria-hidden="true">*</span>
-            <span class="sr-only">(required)</span>
+            <span class="sr-only">{{ __('(required)') }}</span>
           </span>
           <div class="flex gap-2">
             <Select v-model="collection" class="min-w-0 flex-1" :options="collectionOptions" />
-            <Button label="New" icon-left="lucide-plus" @click="addCollection" />
+            <Button :label="__('New')" icon-left="lucide-plus" @click="addCollection" />
           </div>
         </div>
 
         <div>
-          <span class="mb-1.5 block text-base text-ink-gray-6">Option</span>
+          <span class="mb-1.5 block text-base text-ink-gray-6">{{ __('Option') }}</span>
           <div class="flex gap-2">
             <Select v-model="optionAttribute" class="min-w-0 flex-1" :options="optionAttributeOptions" />
-            <Button label="New" icon-left="lucide-plus" @click="addAttribute" />
+            <Button :label="__('New')" icon-left="lucide-plus" @click="addAttribute" />
           </div>
           <p class="mt-1.5 text-p-sm text-ink-gray-5">
-            What this product varies by. Sizes are added below and apply to every option.
+            {{ __('What this product varies by. Sizes are added below and apply to every option.') }}
           </p>
         </div>
 
@@ -237,8 +239,8 @@ async function submit() {
           v-model:open="colorsOpen"
           :attribute="optionAttribute"
           :label="optionAttribute"
-          :placeholder="`Pick or type a ${optionAttribute.toLowerCase()}`"
-          :description="`Type a new ${optionAttribute.toLowerCase()} to add it — leave empty if this product has none`"
+          :placeholder="__('Pick or type a {0}', [optionAttribute.toLowerCase()])"
+          :description="__('Type a new {0} to add it — leave empty if this product has none', [optionAttribute.toLowerCase()])"
           @values="setOptionSwatches"
         />
 
@@ -246,9 +248,9 @@ async function submit() {
           v-model="sizes"
           v-model:open="sizesOpen"
           attribute="Size"
-          label="Sizes"
-          placeholder="Pick or type a size"
-          description="Leave empty for a product that has no sizes, like a book"
+          :label="__('Sizes')"
+          :placeholder="__('Pick or type a size')"
+          :description="__('Leave empty for a product that has no sizes, like a book')"
         />
 
         <OptionSizeGrid
@@ -256,7 +258,7 @@ async function submit() {
           v-model="excludedPairs"
           :options="colors"
           :sizes="sizes"
-          :option-label="optionAttribute || 'Option'"
+          :option-label="optionAttribute || __('Option')"
           :swatches="optionSwatches"
         />
 
@@ -264,13 +266,13 @@ async function submit() {
         <ErrorMessage :message="gridError" />
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormControl v-model.number="price" type="number" label="Price *" placeholder="0" />
-          <FormControl v-model.number="compareAt" type="number" label="Compare at" placeholder="0" />
+          <FormControl v-model.number="price" type="number" :label="`${__('Price')} *`" placeholder="0" />
+          <FormControl v-model.number="compareAt" type="number" :label="__('Compare at')" placeholder="0" />
         </div>
 
         <Alert
-          title="Photos come next"
-          description="This product is created without a photo, so it stays hidden from shoppers until you add one — from the product page, right after this."
+          :title="__('Photos come next')"
+          :description="__('This product is created without a photo, so it stays hidden from shoppers until you add one — from the product page, right after this.')"
         />
       </div>
     </template>
@@ -281,7 +283,7 @@ async function submit() {
           class="w-full"
           variant="solid"
           theme="gray"
-          label="Add product"
+          :label="__('Add product')"
           :disabled="!canSubmit"
           :loading="createAction.loading"
           @click="submit"

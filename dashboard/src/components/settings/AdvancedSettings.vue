@@ -44,8 +44,8 @@ async function commitField(fieldname, value, label) {
 
 <template>
   <SettingsPanelHeader
-    title="Advanced"
-    description="Every remaining store setting, grouped as it appears in your books."
+    :title="__('Advanced')"
+    :description="__('Every remaining store setting, grouped as it appears in your books.')"
   />
 
   <SettingsBody v-scroll-fade>
@@ -55,8 +55,8 @@ async function commitField(fieldname, value, label) {
       <Alert
         class="mt-4"
         theme="amber"
-        title="These are setup values, not everyday settings"
-        description="Changing one can break your storefront — edit only what you recognise."
+        :title="__('These are setup values, not everyday settings')"
+        :description="__('Changing one can break your storefront — edit only what you recognise.')"
       />
 
       <div class="mt-2 divide-y divide-outline-gray-1">
@@ -72,10 +72,9 @@ async function commitField(fieldname, value, label) {
       <!-- Lists of rows rather than single values, so this says where they live instead of
            pretending it can edit them. -->
       <div v-if="advanced.data.child_tables.length" class="mt-8 border-t border-outline-gray-1 pt-6">
-        <h3 class="text-base font-medium text-ink-gray-8">Managed in Desk</h3>
+        <h3 class="text-base font-medium text-ink-gray-8">{{ __('Managed in Desk') }}</h3>
         <p class="mt-1 text-p-sm text-ink-gray-5">
-          These are lists rather than single values, so they are still edited on the Commera
-          Settings form.
+          {{ __('These are lists rather than single values, so they are still edited on the Commera Settings form.') }}
         </p>
         <ul class="mt-3 divide-y divide-outline-gray-1 border-y border-outline-gray-1">
           <li
@@ -92,16 +91,15 @@ async function commitField(fieldname, value, label) {
       <!-- Hidden once the store has traded for itself: seeding overwrites the setup those
            orders were placed against, so the safe answer is not to offer it at all. -->
       <div v-if="advanced.data.can_install_demo_data" class="mt-8 border-t border-outline-gray-1 pt-6">
-        <h3 class="text-base font-medium text-ink-gray-8">Demo data</h3>
+        <h3 class="text-base font-medium text-ink-gray-8">{{ __('Demo data') }}</h3>
         <p class="mt-1 text-p-sm text-ink-gray-5">
-          Fills an empty store with a demo catalogue, menu, footer and banners so you can see how
-          the storefront looks before you add your own products.
+          {{ __('Fills an empty store with a demo catalogue, menu, footer and banners so you can see how the storefront looks before you add your own products.') }}
         </p>
         <Button
           class="mt-3"
           variant="subtle"
           theme="red"
-          label="Install demo data"
+          :label="__('Install demo data')"
           :loading="installDemoDataAction.loading"
           @click="confirmInstallDemoData"
         />

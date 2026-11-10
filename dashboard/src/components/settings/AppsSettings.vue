@@ -7,6 +7,7 @@ import SettingsFieldRows from './SettingsFieldRows.vue'
 import SettingsSkeleton from './SettingsSkeleton.vue'
 import { useAdminAction, useAdminRead } from '../../data/api'
 import { useSettingsAutosave } from '../../data/useSettingsAutosave'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   active: { type: Boolean, default: false },
@@ -55,36 +56,36 @@ watch(
 
 const groups = computed(() => [
   {
-    label: 'This store',
+    label: __('This store'),
     fields: [
       {
         fieldname: 'enable_first_party',
-        label: 'Track visits in Commera',
+        label: __('Track visits in Commera'),
         fieldtype: 'Check',
-        description: 'Powers the Storefront report. Nothing leaves this site.',
+        description: __('Powers the Storefront report. Nothing leaves this site.'),
       },
     ],
   },
   {
     label: 'Google Analytics 4',
     logo: 'ga4',
-    toggle: { fieldname: 'enable_ga4', label: 'Send events to GA4', fieldtype: 'Check' },
+    toggle: { fieldname: 'enable_ga4', label: __('Send events to GA4'), fieldtype: 'Check' },
     fields: [
       {
         fieldname: 'ga4_measurement_id',
-        label: 'Measurement ID',
+        label: __('Measurement ID'),
         fieldtype: 'Data',
-        description: 'Starts with G-. In GA4 it is under Admin, Data streams.',
+        description: __('Starts with G-. In GA4 it is under Admin, Data streams.'),
       },
       {
         fieldname: 'ga4_property_id',
-        label: 'Property ID',
+        label: __('Property ID'),
         fieldtype: 'Data',
-        description: 'The numeric property, used to read reports back out of GA4.',
+        description: __('The numeric property, used to read reports back out of GA4.'),
       },
       {
         fieldname: 'ga4_service_account_json',
-        label: 'Service account JSON',
+        label: __('Service account JSON'),
         fieldtype: 'Data',
         is_secret: true,
         is_set: Boolean(analytics.data?.ga4_service_account_json_is_set),
@@ -94,12 +95,12 @@ const groups = computed(() => [
   {
     label: 'Meta',
     logo: 'meta',
-    toggle: { fieldname: 'enable_facebook', label: 'Send events to Meta', fieldtype: 'Check' },
+    toggle: { fieldname: 'enable_facebook', label: __('Send events to Meta'), fieldtype: 'Check' },
     fields: [
-      { fieldname: 'fb_pixel_id', label: 'Pixel ID', fieldtype: 'Data' },
+      { fieldname: 'fb_pixel_id', label: __('Pixel ID'), fieldtype: 'Data' },
       {
         fieldname: 'fb_access_token',
-        label: 'Access token',
+        label: __('Access token'),
         fieldtype: 'Data',
         is_secret: true,
         is_set: Boolean(analytics.data?.fb_access_token_is_set),
@@ -120,8 +121,8 @@ async function commitField(fieldname, value, label) {
 
 <template>
   <SettingsPanelHeader
-    title="Analytics"
-    description="The analytics and marketing services this store reports to."
+    :title="__('Analytics')"
+    :description="__('The analytics and marketing services this store reports to.')"
   />
 
   <SettingsBody v-scroll-fade>
@@ -131,8 +132,8 @@ async function commitField(fieldname, value, label) {
       v-if="analytics.error"
       compact
       icon="lucide-lock"
-      title="Hidden from your role"
-      description="These credentials are only visible to a System Manager."
+      :title="__('Hidden from your role')"
+      :description="__('These credentials are only visible to a System Manager.')"
     />
 
     <SettingsSkeleton v-else-if="!analytics.data" :rows="6" />

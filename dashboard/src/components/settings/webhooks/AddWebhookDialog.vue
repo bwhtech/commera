@@ -30,20 +30,20 @@ async function save() {
 </script>
 
 <template>
-  <Dialog v-model:open="open" title="Add webhook" size="2xl">
+  <Dialog v-model:open="open" :title="__('Add webhook')" size="2xl">
     <template #default>
       <div class="space-y-4">
         <FormControl
           v-model="url"
           type="url"
-          label="Endpoint URL"
-          description="Commera posts each event here as JSON."
+          :label="__('Endpoint URL')"
+          :description="__('Commera posts each event here as JSON.')"
           placeholder="https://shop.example.com/api/webhooks/commera"
           required
         />
         <div>
-          <span class="text-sm text-ink-gray-6">Events</span>
-          <div class="mt-2 max-h-80 overflow-y-auto pr-1">
+          <span class="text-sm text-ink-gray-6">{{ __('Events') }}</span>
+          <div class="mt-2 max-h-80 overflow-y-auto pe-1">
             <WebhookEventPicker v-model="events" />
           </div>
         </div>
@@ -51,11 +51,11 @@ async function save() {
     </template>
     <template #actions>
       <div class="flex justify-end gap-2">
-        <Button label="Cancel" @click="open = false" />
+        <Button :label="__('Cancel')" @click="open = false" />
         <Button
           variant="solid"
           theme="gray"
-          label="Add webhook"
+          :label="__('Add webhook')"
           :disabled="!canSave"
           :loading="saving"
           @click="save"

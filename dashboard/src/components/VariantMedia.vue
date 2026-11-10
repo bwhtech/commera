@@ -6,6 +6,7 @@
 import { ref } from 'vue'
 import { Badge, Button, toast, useFileUpload } from 'frappe-ui'
 import { useAdminAction, trySubmit } from '../data/api'
+import { __ } from '../data/translation'
 
 const props = defineProps({
   variant: { type: Object, required: true },
@@ -26,14 +27,18 @@ async function addFiles(files) {
       const result = await upload(file, { private: false })
       uploaded.push(result.file_url)
     } catch {
-      toast.error(`Could not upload ${file.name}`)
+      toast.error(__('Could not upload {0}', [file.name]))
     }
   }
   if (!uploaded.length) return
 
   const added = await trySubmit(addAction, { style_attribute_variant: props.variant.name, file_urls: uploaded })
   if (!added) return
-  toast.success(`${uploaded.length} photo${uploaded.length > 1 ? 's' : ''} added to ${props.variant.option}`)
+  toast.success(
+    uploaded.length === 1
+      ? __('1 photo added to {0}', [props.variant.option])
+      : __('{0} photos added to {1}', [uploaded.length, props.variant.option]),
+  )
   emit('saved')
 }
 
@@ -67,32 +72,32 @@ async function remove(fileUrl) {
         class="group relative size-20 overflow-hidden rounded-4 border border-outline-gray-1 bg-surface-gray-2"
       >
         <img :src="image" class="size-full object-cover" alt="" />
-        <Badge v-if="index === 0" class="absolute bottom-1 start-1" label="Cover" theme="gray" variant="solid" size="sm" />
+        <Badge v-if="index === 0" class="absolute bottom-1 start-1" :label="__('Cover')" theme="gray" variant="solid" size="sm" />
         <!-- Touch has no hover, so the only way to delete a photo has to be
              visible from the start on a phone; hover-reveal is a desktop luxury. -->
         <Button
-          class="absolute right-1 top-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+          class="absolute end-1 top-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
           icon="lucide-x"
-          label="Remove photo"
+          :label="__('Remove photo')"
           @click="remove(image)"
         />
       </div>
 
       <button
         class="grid size-20 place-content-center rounded-4 border border-dashed border-outline-gray-2 text-ink-gray-5 hover:bg-surface-gray-1"
-        aria-label="Add photo"
+        :aria-label="__('Add photo')"
         :disabled="isUploading"
         @click="fileInput.click()"
       >
         <span class="flex flex-col items-center gap-1">
           <span :class="isUploading ? 'lucide-loader-2 animate-spin' : 'lucide-plus'" class="size-5" aria-hidden="true" />
-          <span class="text-sm">{{ isUploading ? 'Uploading…' : 'Add' }}</span>
+          <span class="text-sm">{{ isUploading ? __('Uploading…') : __('Add') }}</span>
         </span>
       </button>
     </div>
 
     <p v-if="!variant.images.length" class="mt-2 text-p-sm text-ink-gray-5">
-      No photo yet. This variant falls back to the product's own image on the storefront.
+      {{ __("No photo yet. This variant falls back to the product's own image on the storefront.") }}
     </p>
   </div>
 </template>

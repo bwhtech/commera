@@ -1,19 +1,20 @@
 // The pure half of data/cloudBilling.js, kept apart so `node --test` can import it: the other
-// half reads boot.js, whose devBoot import needs Vite's `import.meta.env`.
+// half imports the Cloud SDK.
+import { __ } from './translation.js'
 
 const URGENT_DAYS = 3
 
 function endsInTitle(daysLeft) {
-  if (daysLeft <= 0) return 'Your trial ends today'
-  if (daysLeft === 1) return 'Your trial ends tomorrow'
-  return `Your trial ends in ${daysLeft} days`
+  if (daysLeft <= 0) return __('Your trial ends today')
+  if (daysLeft === 1) return __('Your trial ends tomorrow')
+  return __('Your trial ends in {0} days', [daysLeft])
 }
 
 function deletionNotice(deletesOn) {
-  if (!deletesOn) return 'Choose a plan to keep using your store.'
+  if (!deletesOn) return __('Choose a plan to keep using your store.')
   // A date-only string parses as UTC midnight, so it is formatted in UTC to keep the same day.
   const date = new Date(deletesOn).toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' })
-  return `Your store will be deleted on ${date}. Choose a plan to keep it.`
+  return __('Your store will be deleted on {0}. Choose a plan to keep it.', [date])
 }
 
 // `trial` is Frappe Cloud's BillingTrial (from getBilling). An ended trial cannot be dismissed:
@@ -23,26 +24,26 @@ export function getTrialNotice(trial) {
   if (trial.state === 'Ended') {
     return {
       theme: 'red',
-      title: 'Your trial has ended',
+      title: __('Your trial has ended'),
       description: deletionNotice(trial.deletes_on),
-      actionLabel: 'Choose a plan',
+      actionLabel: __('Choose a plan'),
       dismissible: false,
     }
   }
   if (trial.held) {
     return {
       theme: 'amber',
-      title: 'Your plan is over your spending limit',
-      description: 'Raise the limit or choose a smaller plan to end your trial.',
-      actionLabel: 'Manage billing',
+      title: __('Your plan is over your spending limit'),
+      description: __('Raise the limit or choose a smaller plan to end your trial.'),
+      actionLabel: __('Manage billing'),
       dismissible: true,
     }
   }
   return {
     theme: trial.days_left <= URGENT_DAYS ? 'amber' : 'gray',
     title: endsInTitle(trial.days_left),
-    description: 'Choose a plan to keep your store after the trial.',
-    actionLabel: 'Choose a plan',
+    description: __('Choose a plan to keep your store after the trial.'),
+    actionLabel: __('Choose a plan'),
     dismissible: true,
   }
 }

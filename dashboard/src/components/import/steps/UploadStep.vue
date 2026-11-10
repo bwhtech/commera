@@ -11,6 +11,7 @@ import {
   isCurrentImport,
   validateImportAction,
 } from '../../../data/importFlow'
+import { __ } from '../../../data/translation'
 import CoachTip from '../CoachTip.vue'
 
 const { upload } = useFileUpload()
@@ -41,10 +42,10 @@ async function pick(event) {
 
     applyValidation(validateImportAction.data)
     imp.parsed = true
-    toast.success(`${imp.counts.total} rows read from ${file.name}`)
+    toast.success(__('{0} rows read from {1}', [imp.counts.total, file.name]))
   } catch {
     if (!isCurrentImport(ticket)) return
-    toast.error(`Could not read ${file.name}`)
+    toast.error(__('Could not read {0}', [file.name]))
     imp.file = null
     imp.fileUrl = null
   } finally {
@@ -56,16 +57,15 @@ async function pick(event) {
 <template>
   <div class="space-y-6">
     <div>
-      <h2 class="text-xl text-ink-gray-9">Upload your product file</h2>
+      <h2 class="text-xl text-ink-gray-9">{{ __('Upload your product file') }}</h2>
       <p class="mt-1.5 text-p-base text-ink-gray-6">
-        CSV or Excel, built from
+        {{ __('CSV or Excel. Column names can be anything, we work them out next.') }}
         <a
           class="text-ink-blue-4 underline"
           href="/api/method/commera.api.admin.imports.download_product_template"
         >
-          our template
+          {{ __('Download our template') }}
         </a>
-        — column names can be anything, we work them out next.
       </p>
     </div>
 
@@ -78,10 +78,10 @@ async function pick(event) {
       <div class="flex size-11 items-center justify-center rounded-full bg-surface-base text-ink-gray-6 shadow-sm">
         <span class="lucide-upload size-5" aria-hidden="true" />
       </div>
-      <p class="mt-3 text-base text-ink-gray-7">Drop your spreadsheet here</p>
-      <p class="mt-1 text-sm text-ink-gray-5">or</p>
+      <p class="mt-3 text-base text-ink-gray-7">{{ __('Drop your spreadsheet here') }}</p>
+      <p class="mt-1 text-sm text-ink-gray-5">{{ __('or') }}</p>
       <input type="file" accept=".csv,.xlsx" class="hidden" ref="fileInput" @change="pick" />
-      <Button class="mt-2" variant="solid" theme="gray" label="Browse files" @click="$refs.fileInput.click()" />
+      <Button class="mt-2" variant="solid" theme="gray" :label="__('Browse files')" @click="$refs.fileInput.click()" />
       <div class="mt-5 flex items-center gap-4 text-sm text-ink-gray-5">
         <span>.csv</span>
         <span>.xlsx</span>
@@ -97,17 +97,17 @@ async function pick(event) {
           <div class="truncate text-base-semibold text-ink-gray-8">{{ imp.file.name }}</div>
           <div class="mt-0.5 text-sm text-ink-gray-5">
             {{ imp.file.size }}
-            <template v-if="imp.parsed"> · {{ imp.counts.total }} rows · {{ imp.headers.length }} columns</template>
+            <template v-if="imp.parsed"> · {{ __('{0} rows', [imp.counts.total]) }} · {{ __('{0} columns', [imp.headers.length]) }}</template>
           </div>
         </div>
         <Spinner v-if="imp.phase === 'parsing'" class="size-4" />
-        <Button v-else variant="ghost" icon="lucide-x" label="Remove file" @click="clearImportFile" />
+        <Button v-else variant="ghost" icon="lucide-x" :label="__('Remove file')" @click="clearImportFile" />
       </div>
 
-      <p v-if="imp.phase === 'parsing'" class="mt-3 text-sm text-ink-gray-5">Reading rows and checking your columns…</p>
+      <p v-if="imp.phase === 'parsing'" class="mt-3 text-sm text-ink-gray-5">{{ __('Reading rows and checking your columns…') }}</p>
 
       <div v-if="imp.parsed" class="mt-4 overflow-x-auto rounded-4 border border-outline-gray-1">
-        <table class="w-full min-w-[42rem] border-collapse text-left">
+        <table class="w-full min-w-[42rem] border-collapse text-start">
           <thead class="bg-surface-gray-1">
             <tr>
               <th v-for="h in imp.headers" :key="h" class="whitespace-nowrap px-3 py-2 text-sm font-normal text-ink-gray-5">
@@ -125,22 +125,22 @@ async function pick(event) {
         </table>
       </div>
       <p v-if="imp.parsed" class="mt-2 text-sm text-ink-gray-5">
-        Showing the first 3 of {{ imp.counts.total }} rows.
+        {{ __('Showing the first 3 of {0} rows.', [imp.counts.total]) }}
       </p>
     </div>
 
     <CoachTip
       v-if="!imp.file"
       icon="lucide-download"
-      title="Starting from scratch?"
-      text="Download our template spreadsheet, fill it in, and drop it back here."
+      :title="__('Starting from scratch?')"
+      :text="__('Download our template spreadsheet, fill it in, and drop it back here.')"
     />
     <CoachTip
       v-else-if="imp.parsed && imp.counts.errors"
       theme="amber"
       icon="lucide-triangle-alert"
-      title="A few rows look odd"
-      text="That is fine. We show you exactly which ones before anything is saved."
+      :title="__('A few rows look odd')"
+      :text="__('That is fine. We show you exactly which ones before anything is saved.')"
     />
   </div>
 </template>

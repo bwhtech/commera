@@ -20,7 +20,7 @@ const choices = computed(() =>
       v-for="choice in choices"
       :key="choice.name"
       type="button"
-      class="text-left transition-transform duration-150 ease-out-strong active:scale-[0.98]"
+      class="text-start transition-transform duration-150 ease-out-strong active:scale-[0.98]"
       :aria-pressed="draft.theme === choice.name"
       :data-onboarding-theme="choice.name"
       @click="draft.theme = choice.name"

@@ -15,17 +15,17 @@ const missing = computed(() => (flow.showErrors ? missingField('you', draft, pro
   <div class="space-y-4">
     <FormControl
       v-model="draft.fullName"
-      label="Your name"
+      :label="__('Your name')"
       autocomplete="name"
-      :error="missing === 'fullName' ? 'Required' : ''"
+      :error="missing === 'fullName' ? __('Required') : ''"
     />
     <FormControl
       v-if="needsPassword"
       v-model="draft.password"
       type="password"
-      label="Password"
+      :label="__('Password')"
       autocomplete="new-password"
-      :error="missing === 'password' ? 'Required' : ''"
+      :error="missing === 'password' ? __('Required') : ''"
     />
   </div>
 </template>

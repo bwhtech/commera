@@ -5,6 +5,7 @@ import EmptyState from '../EmptyState.vue'
 import SettingsLinkControl from './SettingsLinkControl.vue'
 import SettingsSkeleton from './SettingsSkeleton.vue'
 import { useSettingsTab } from '../../data/useSettingsTab'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   // Opening the Emails tab should fetch; switching away and back should not.
@@ -16,18 +17,18 @@ const TEMPLATE_FIELD = { options: 'Email Template' }
 const TEMPLATE_ROWS = [
   {
     fieldname: 'order_confirmation_email_template',
-    title: 'Order confirmation',
-    description: 'Sent when a customer places an order.',
+    title: __('Order confirmation'),
+    description: __('Sent when a customer places an order.'),
   },
   {
     fieldname: 'order_cancellation_email_template',
-    title: 'Order cancellation',
-    description: 'Sent when an order is cancelled.',
+    title: __('Order cancellation'),
+    description: __('Sent when an order is cancelled.'),
   },
   {
     fieldname: 'item_in_stock_email_template',
-    title: 'Back in stock',
-    description: 'Sent to customers waiting on a product when it is restocked.',
+    title: __('Back in stock'),
+    description: __('Sent to customers waiting on a product when it is restocked.'),
   },
 ]
 
@@ -36,8 +37,8 @@ const { settings, values, commit } = useSettingsTab('emails', () => props.active
 
 <template>
   <SettingsPanelHeader
-    title="Templates"
-    description="The template each store email is sent with."
+    :title="__('Templates')"
+    :description="__('The template each store email is sent with.')"
   />
 
   <SettingsBody v-scroll-fade>
@@ -45,10 +46,10 @@ const { settings, values, commit } = useSettingsTab('emails', () => props.active
       v-if="settings.error"
       compact
       icon="lucide-triangle-alert"
-      title="This could not be loaded"
-      description="Your emails still go out. This panel just cannot say which templates they use."
+      :title="__('This could not be loaded')"
+      :description="__('Your emails still go out. This panel just cannot say which templates they use.')"
     >
-      <Button label="Try again" variant="subtle" theme="gray" @click="settings.reload()" />
+      <Button :label="__('Try again')" variant="subtle" theme="gray" @click="settings.reload()" />
     </EmptyState>
 
     <SettingsSkeleton v-else-if="settings.loading && !settings.data" :rows="3" />

@@ -11,6 +11,7 @@ import EmptyState from '../EmptyState.vue'
 import { useAdminRead } from '../../data/api'
 import { hasValues } from '../../data/analytics'
 import { compactMoney, money, shortDate } from '../../data/format'
+import { __ } from '../../data/translation'
 import { ia } from '../../ia/store'
 import { orderRoute, productRoute } from '../../ia/routes'
 
@@ -55,29 +56,36 @@ const attention = computed(() => {
   // totals the endpoint sends rather than the length of the preview.
   const lowStockCount = overview.value.running_low_total
   const needsAttentionCount = overview.value.needs_attention_total
+  const toFulfilCount = toFulfil?.value ?? 0
   return [
     {
+      count: toFulfilCount,
       icon: 'lucide-package-open',
-      title: `${toFulfil?.value ?? 0} ${toFulfil?.value === 1 ? 'order' : 'orders'} to fulfil`,
+      title: toFulfilCount === 1 ? __('1 order to fulfil') : __('{0} orders to fulfil', [toFulfilCount]),
       note: toFulfil?.note,
-      action: 'Fulfil orders',
+      action: __('Fulfil orders'),
       to: '/orders',
     },
     {
+      count: lowStockCount,
       icon: 'lucide-triangle-alert',
-      title: `${lowStockCount} ${lowStockCount === 1 ? 'variant' : 'variants'} low on stock`,
-      note: 'At or below five units',
-      action: 'Restock',
+      title: lowStockCount === 1 ? __('1 variant low on stock') : __('{0} variants low on stock', [lowStockCount]),
+      note: __('At or below five units'),
+      action: __('Restock'),
       to: '/inventory',
     },
     {
+      count: needsAttentionCount,
       icon: 'lucide-file-pen-line',
-      title: `${needsAttentionCount} ${needsAttentionCount === 1 ? 'product needs' : 'products need'} attention`,
-      note: 'Missing a photo or a size before it can publish',
-      action: 'Open catalogue',
+      title:
+        needsAttentionCount === 1
+          ? __('1 product needs attention')
+          : __('{0} products need attention', [needsAttentionCount]),
+      note: __('Missing a photo or a size before it can publish'),
+      action: __('Open catalogue'),
       to: '/products',
     },
-  ].filter((row) => !row.title.startsWith('0 '))
+  ].filter((row) => Number(row.count) !== 0)
 })
 
 const recentOrders = computed(() => overview.value?.recent_orders ?? [])
@@ -114,7 +122,7 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
     </section>
 
     <section v-else-if="attention.length" class="mt-6">
-      <h2 class="text-lg-semibold text-ink-gray-8">Needs attention</h2>
+      <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Needs attention') }}</h2>
       <div class="mt-2 divide-y divide-outline-gray-1 rounded-5 border border-outline-gray-1">
         <div v-for="row in attention" :key="row.title" class="flex items-center gap-3 px-4 py-3">
           <span class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-gray-2 text-ink-gray-6">
@@ -138,13 +146,13 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
 
     <section v-else class="mt-6 rounded-5 border border-outline-gray-1 p-4">
       <div class="flex items-center justify-between">
-        <h2 class="text-lg-semibold text-ink-gray-8">Revenue</h2>
+        <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Revenue') }}</h2>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-ink-gray-5">Last 12 months</span>
+          <span class="text-sm text-ink-gray-5">{{ __('Last 12 months') }}</span>
           <Button
             variant="ghost"
-            label="Revenue report"
-            icon-right="lucide-arrow-right"
+            :label="__('Revenue report')"
+            icon-right="lucide-arrow-right rtl:-scale-x-100"
             route="/analytics/revenue"
           />
         </div>
@@ -152,8 +160,8 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
       <EmptyState
         v-if="!hasValues(revenueByMonth, 'revenue')"
         icon="lucide-chart-line"
-        title="No revenue yet"
-        description="The trend appears once orders start coming in."
+        :title="__('No revenue yet')"
+        :description="__('The trend appears once orders start coming in.')"
         compact
       />
       <div v-else class="h-72">
@@ -163,8 +171,8 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
 
     <section class="mt-6 rounded-5 border border-outline-gray-1">
       <div class="flex items-center justify-between px-4 py-3">
-        <h2 class="text-lg-semibold text-ink-gray-8">Recent orders</h2>
-        <Button variant="ghost" label="View all" icon-right="lucide-arrow-right" route="/orders" />
+        <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Recent orders') }}</h2>
+        <Button variant="ghost" :label="__('View all')" icon-right="lucide-arrow-right rtl:-scale-x-100" route="/orders" />
       </div>
       <div class="overflow-x-auto px-2 pb-2">
         <!-- Payment and fulfilment get a track each, the way Orders.vue lays them
@@ -181,12 +189,12 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
           :row-height="Math.max(ia.density, 48)"
         >
           <ListHeader>
-            <ListHeaderCell>Order</ListHeaderCell>
-            <ListHeaderCell>Customer</ListHeaderCell>
-            <ListHeaderCell>Payment</ListHeaderCell>
-            <ListHeaderCell>Fulfilment</ListHeaderCell>
-            <ListHeaderCell>Total</ListHeaderCell>
-            <ListHeaderCell>Placed</ListHeaderCell>
+            <ListHeaderCell>{{ __('Order') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Customer') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Payment') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Fulfilment') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Total') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Placed') }}</ListHeaderCell>
           </ListHeader>
           <!-- Four placeholder rows against a five-row panel: the skeleton is also the space the
                empty state below reserves, and five rows of blank is a lot of nothing to hold for a
@@ -223,8 +231,8 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
       <div v-if="!overviewRequest.loading && !recentOrders.length" class="grid min-h-48 place-items-center">
         <EmptyState
           icon="lucide-shopping-bag"
-          title="No orders yet"
-          description="Your first order will appear here."
+          :title="__('No orders yet')"
+          :description="__('Your first order will appear here.')"
           compact
         />
       </div>
@@ -232,8 +240,8 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
 
     <section class="mt-6 rounded-5 border border-outline-gray-1">
       <div class="flex items-center justify-between px-4 py-3">
-        <h2 class="text-lg-semibold text-ink-gray-8">Top products</h2>
-        <Button variant="ghost" label="All products" icon-right="lucide-arrow-right" route="/products" />
+        <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Top products') }}</h2>
+        <Button variant="ghost" :label="__('All products')" icon-right="lucide-arrow-right rtl:-scale-x-100" route="/products" />
       </div>
       <div class="divide-y divide-outline-gray-1 border-t border-outline-gray-1">
         <template v-if="topProductsRequest.loading && !topProducts.length">
@@ -258,10 +266,10 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
             <Thumb :image="product.image" size="size-8" />
             <div class="min-w-0 flex-1">
               <p class="truncate text-base text-ink-gray-8">{{ product.title }}</p>
-              <p class="mt-1 text-sm text-ink-gray-5">{{ product.stock }} in stock</p>
+              <p class="mt-1 text-sm text-ink-gray-5">{{ __('{0} in stock', [product.stock]) }}</p>
             </div>
-            <span class="w-20 text-right text-sm text-ink-gray-5 tabular-nums">{{ product.units }} sold</span>
-            <span class="w-24 text-right text-base text-ink-gray-7 tabular-nums">
+            <span class="w-20 text-end text-sm text-ink-gray-5 tabular-nums">{{ __('{0} sold', [product.units]) }}</span>
+            <span class="w-24 text-end text-base text-ink-gray-7 tabular-nums">
               {{ compactMoney(product.revenue) }}
             </span>
           </RouterLink>
@@ -273,8 +281,8 @@ const revenueByMonth = computed(() => revenueRequest.data?.months ?? [])
         <div v-else class="grid min-h-52 place-items-center">
           <EmptyState
             icon="lucide-package"
-            title="No sales yet"
-            description="Bestsellers rank once orders come in."
+            :title="__('No sales yet')"
+            :description="__('Bestsellers rank once orders come in.')"
             compact
           />
         </div>

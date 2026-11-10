@@ -14,7 +14,7 @@ defineProps({
 <template>
   <div class="divide-y divide-outline-gray-1">
     <section class="px-4 py-4">
-      <p class="text-sm text-ink-gray-5">Customer</p>
+      <p class="text-sm text-ink-gray-5">{{ __('Customer') }}</p>
       <router-link :to="customerRoute(order.customer_id)" class="mt-2 flex items-center gap-2.5">
         <Avatar :label="order.customer" size="md" />
         <div class="min-w-0">
@@ -26,25 +26,25 @@ defineProps({
     </section>
 
     <section class="px-4 py-4">
-      <p class="text-sm text-ink-gray-5">Shipping address</p>
+      <p class="text-sm text-ink-gray-5">{{ __('Shipping address') }}</p>
       <p class="mt-1.5 whitespace-pre-line text-p-base text-ink-gray-7">
-        {{ order.shipping_address || 'No shipping address on file.' }}
+        {{ order.shipping_address || __('No shipping address on file.') }}
       </p>
     </section>
 
     <section class="px-4 py-4">
-      <p class="text-sm text-ink-gray-5">Tags</p>
+      <p class="text-sm text-ink-gray-5">{{ __('Tags') }}</p>
       <div class="mt-1.5 flex flex-wrap gap-1.5">
         <Badge v-for="tag in order.tags" :key="tag" :label="tag" variant="subtle" />
-        <span v-if="!order.tags.length" class="text-sm text-ink-gray-5">None</span>
+        <span v-if="!order.tags.length" class="text-sm text-ink-gray-5">{{ __('None') }}</span>
       </div>
     </section>
 
     <section class="px-4 py-4">
-      <p class="text-sm text-ink-gray-5">Note</p>
+      <p class="text-sm text-ink-gray-5">{{ __('Note') }}</p>
       <!-- Sales Order carries no note/remarks field in this data model — always the empty
            state rather than a control that can never do anything. -->
-      <p class="mt-1.5 text-p-base text-ink-gray-4">No note on this order.</p>
+      <p class="mt-1.5 text-p-base text-ink-gray-4">{{ __('No note on this order.') }}</p>
     </section>
   </div>
 </template>

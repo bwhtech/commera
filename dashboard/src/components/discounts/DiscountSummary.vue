@@ -18,17 +18,17 @@ const performance = computed(() => props.discount.performance)
       <StatusBadge :status="statusKey(status)" />
     </div>
     <p class="mt-0.5 text-sm text-ink-gray-5">
-      {{ discount.method === 'Code' ? 'Code' : 'Automatic' }} · {{ discountTypeLabel(discount) }}
+      {{ discount.method === 'Code' ? __('Code') : __('Automatic') }} · {{ discountTypeLabel(discount) }}
     </p>
-    <ul class="mt-3 list-disc space-y-1 pl-4 text-p-sm text-ink-gray-7">
+    <ul class="mt-3 list-disc space-y-1 ps-4 text-p-sm text-ink-gray-7">
       <li v-for="line in summaryLines(discount)" :key="line">{{ line }}</li>
     </ul>
   </section>
 
   <div v-if="performance" class="grid grid-cols-2 gap-3">
-    <NumberCard title="Orders" :value="performance.orders" />
-    <NumberCard title="Discount given" :value="money(performance.discount_given)" />
-    <NumberCard title="Sales" :value="money(performance.sales)" />
-    <NumberCard title="Budget left" :value="performance.budget_left == null ? '—' : moneyIn(performance.budget_left, discount.currency)" />
+    <NumberCard :title="__('Orders')" :value="performance.orders" />
+    <NumberCard :title="__('Discount given')" :value="money(performance.discount_given)" />
+    <NumberCard :title="__('Sales')" :value="money(performance.sales)" />
+    <NumberCard :title="__('Budget left')" :value="performance.budget_left == null ? '—' : moneyIn(performance.budget_left, discount.currency)" />
   </div>
 </template>

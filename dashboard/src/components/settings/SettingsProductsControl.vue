@@ -59,12 +59,12 @@ function update(codes) {
       :loading="results.loading"
       :filterable="false"
       :disabled="disabled"
-      placeholder="Pick products"
+      :placeholder="__('Pick products')"
       @update:model-value="update"
     >
       <template #footer="{ clear }">
         <div v-if="modelValue.length" class="border-t border-outline-gray-1 px-2 py-1.5">
-          <Button variant="ghost" size="sm" @click="clear">Clear All</Button>
+          <Button variant="ghost" size="sm" @click="clear">{{ __('Clear All') }}</Button>
         </div>
       </template>
     </MultiSelect>

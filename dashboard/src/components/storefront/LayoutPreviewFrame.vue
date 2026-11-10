@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { useEventListener } from '@vueuse/core'
 import { toast, useColorScheme } from 'frappe-ui'
 import { SECTION_GROUPS } from '../../data/themeLayout'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   editor: { type: Object, required: true },
@@ -103,7 +104,7 @@ function renderFailed() {
   clearTimeout(renderTimeout)
   rendering.value = false
   lastPosted = null
-  toast.error('The preview could not be updated. Your changes are kept.', { id: 'theme-preview-failed' })
+  toast.error(__('The preview could not be updated. Your changes are kept.'), { id: 'theme-preview-failed' })
 }
 
 const renderNumberOf = (index) => Number(new URLSearchParams(frames[index].contentWindow.location.search).get('render'))
@@ -191,7 +192,7 @@ watch(resolvedColorScheme, () => highlight(false))
       :key="name"
       :ref="(element) => (frames[index] = element)"
       :name="name"
-      title="Storefront preview"
+      :title="__('Storefront preview')"
       class="absolute inset-0 size-full"
       :class="{ 'pointer-events-none invisible': index !== visibleIndex }"
       :data-preview-frame="index === visibleIndex ? 'visible' : 'hidden'"
@@ -202,7 +203,7 @@ watch(resolvedColorScheme, () => highlight(false))
       data-preview-rendering
       class="absolute inset-0 bg-black-overlay-100 backdrop-blur-[1px]"
       role="progressbar"
-      aria-label="Updating preview"
+      :aria-label="__('Updating preview')"
     >
       <div class="h-0.5 overflow-hidden bg-surface-gray-3">
         <div class="preview-progress h-full w-1/3 bg-surface-gray-7" />

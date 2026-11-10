@@ -3,35 +3,36 @@ import { refDebounced } from '@vueuse/core'
 import { createAdminCaller } from './adminCaller'
 import { methodUrl, useAdminRead } from './api'
 import { moneyIn } from './format'
+import { __ } from './translation'
 
 export const DISCOUNT_TYPES = [
   {
     slug: 'products',
     value: 'Amount Off Products',
-    label: 'Amount off products',
+    label: __('Amount off products'),
     icon: 'lucide-tag',
-    description: 'A percentage or amount off chosen products, collections or brands.',
+    description: __('A percentage or amount off chosen products, collections or brands.'),
   },
   {
     slug: 'order',
     value: 'Amount Off Order',
-    label: 'Amount off order',
+    label: __('Amount off order'),
     icon: 'lucide-shopping-cart',
-    description: 'Off the order subtotal, with optional spend tiers and a cap.',
+    description: __('Off the order subtotal, with optional spend tiers and a cap.'),
   },
   {
     slug: 'buy-x-get-y',
     value: 'Buy X Get Y',
-    label: 'Buy X get Y',
+    label: __('Buy X get Y'),
     icon: 'lucide-gift',
-    description: 'Buy a quantity or amount of some products, get others free or cheaper.',
+    description: __('Buy a quantity or amount of some products, get others free or cheaper.'),
   },
   {
     slug: 'shipping',
     value: 'Free Shipping',
-    label: 'Free shipping',
+    label: __('Free shipping'),
     icon: 'lucide-truck',
-    description: 'Free or cheaper delivery above a spend, on chosen delivery options.',
+    description: __('Free or cheaper delivery above a spend, on chosen delivery options.'),
   },
 ]
 
@@ -44,15 +45,15 @@ export const discountTypeLabel = (discount) =>
 export const statusKey = (status) => status.toLowerCase().replaceAll(' ', '_')
 
 export function discountHeading(discount) {
-  if (discount.method === 'Automatic') return discount.title || 'Untitled discount'
+  if (discount.method === 'Automatic') return discount.title || __('Untitled discount')
   if (discount.code) return discount.code
-  return discount.generated_codes ? `${discount.generated_codes} unique codes` : discount.title || 'No code yet'
+  return discount.generated_codes ? __('{0} unique codes', [discount.generated_codes]) : discount.title || __('No code yet')
 }
 
 export const SCOPE_TARGETS = {
-  'Specific Products': { targetType: 'Item', label: 'Products', placeholder: 'Search products' },
-  'Specific Collections': { targetType: 'Item Group', label: 'Collections', placeholder: 'Search collections' },
-  'Specific Brands': { targetType: 'Brand', label: 'Brands', placeholder: 'Search brands' },
+  'Specific Products': { targetType: 'Item', label: __('Products'), placeholder: __('Search products') },
+  'Specific Collections': { targetType: 'Item Group', label: __('Collections'), placeholder: __('Search collections') },
+  'Specific Brands': { targetType: 'Brand', label: __('Brands'), placeholder: __('Search brands') },
 }
 
 export function scopedTargets(discount) {
@@ -114,52 +115,60 @@ export function blankDiscount(discountType, currency) {
 function valueLine(discount) {
   const money = (value) => moneyIn(value, discount.currency)
   const off = (value) => (discount.value_type === 'Percentage' ? `${value}%` : money(value))
-  if (discount.discount_type === 'Buy X Get Y') {
-    const reward = { Free: 'free', Percentage: `${discount.get_value}% off` }[discount.get_value_type] ?? `${money(discount.get_value)} off each`
-    const buy = discount.buy_requirement === 'Quantity' ? discount.buy_value : money(discount.buy_value)
-    return `Buy ${buy}, get ${discount.get_quantity} ${reward}`
-  }
+  if (discount.discount_type === 'Buy X Get Y') return buyXGetYLine(discount, money)
   if (discount.discount_type === 'Free Shipping') {
-    return discount.shipping_percentage >= 100 ? 'Free delivery' : `${discount.shipping_percentage}% off delivery`
+    return discount.shipping_percentage >= 100 ? __('Free delivery') : __('{0}% off delivery', [discount.shipping_percentage])
   }
   if (discount.tiered && discount.tiers?.length) {
-    return discount.tiers.map((tier) => `${money(tier.minimum_subtotal)}+ gets ${off(tier.value)}`).join(' · ')
+    return discount.tiers.map((tier) => __('{0}+ gets {1}', [money(tier.minimum_subtotal), off(tier.value)])).join(' · ')
   }
-  const where = discount.discount_type === 'Amount Off Order' ? 'the order' : 'products'
-  const cap = discount.value_type === 'Percentage' && Number(discount.maximum_discount) ? `, up to ${money(discount.maximum_discount)}` : ''
-  return `${off(discount.value)} off ${where}${cap}`
+  const onOrder = discount.discount_type === 'Amount Off Order'
+  const value = off(discount.value)
+  if (discount.value_type === 'Percentage' && Number(discount.maximum_discount)) {
+    const cap = money(discount.maximum_discount)
+    return onOrder ? __('{0} off the order, up to {1}', [value, cap]) : __('{0} off products, up to {1}', [value, cap])
+  }
+  return onOrder ? __('{0} off the order', [value]) : __('{0} off products', [value])
+}
+
+function buyXGetYLine(discount, money) {
+  const buy = discount.buy_requirement === 'Quantity' ? discount.buy_value : money(discount.buy_value)
+  const get = discount.get_quantity
+  if (discount.get_value_type === 'Free') return __('Buy {0}, get {1} free', [buy, get])
+  if (discount.get_value_type === 'Percentage') return __('Buy {0}, get {1} {2}% off', [buy, get, discount.get_value])
+  return __('Buy {0}, get {1} {2} off each', [buy, get, money(discount.get_value)])
 }
 
 export function minimumLine(discount) {
-  if (discount.minimum_requirement === 'Subtotal') return `Minimum subtotal ${moneyIn(discount.minimum_subtotal, discount.currency)}`
-  if (discount.minimum_requirement === 'Quantity') return `Minimum ${discount.minimum_quantity} items`
+  if (discount.minimum_requirement === 'Subtotal') return __('Minimum subtotal {0}', [moneyIn(discount.minimum_subtotal, discount.currency)])
+  if (discount.minimum_requirement === 'Quantity') return __('Minimum {0} items', [discount.minimum_quantity])
   return null
 }
 
 export function audienceLine(discount) {
-  return { 'First Order': 'First order only', 'Customer Groups': 'Chosen customer groups', 'Specific Customers': 'Chosen customers' }[
+  return { 'First Order': __('First order only'), 'Customer Groups': __('Chosen customer groups'), 'Specific Customers': __('Chosen customers') }[
     discount.eligibility
   ]
 }
 
 export function paymentLine(discount) {
-  return { Prepaid: 'Prepaid orders only', 'Cash On Delivery': 'Cash on delivery only' }[discount.payment_condition]
+  return { Prepaid: __('Prepaid orders only'), 'Cash On Delivery': __('Cash on delivery only') }[discount.payment_condition]
 }
 
 export function combinationLine(discount) {
   const kinds = [
-    discount.combines_with_product && 'product',
-    discount.combines_with_order && 'order',
-    discount.combines_with_shipping && 'shipping',
+    discount.combines_with_product && __('product'),
+    discount.combines_with_order && __('order'),
+    discount.combines_with_shipping && __('shipping'),
   ].filter(Boolean)
-  return kinds.length ? `Combines with ${kinds.join(', ')} discounts` : 'Does not combine with other discounts'
+  return kinds.length ? __('Combines with {0} discounts', [kinds.join(', ')]) : __('Does not combine with other discounts')
 }
 
 export function limitLines(discount) {
   return [
-    Number(discount.usage_limit) && `${discount.usage_limit} uses in total`,
-    discount.once_per_customer && 'Once per customer',
-    Number(discount.budget) && `Stops after ${moneyIn(discount.budget, discount.currency)} of discounts`,
+    Number(discount.usage_limit) && __('{0} uses in total', [discount.usage_limit]),
+    discount.once_per_customer && __('Once per customer'),
+    Number(discount.budget) && __('Stops after {0} of discounts', [moneyIn(discount.budget, discount.currency)]),
   ].filter(Boolean)
 }
 
@@ -167,7 +176,7 @@ export function summaryLines(discount) {
   return [
     valueLine(discount),
     minimumLine(discount),
-    discount.exclude_sale_items && 'Not on items already on sale',
+    discount.exclude_sale_items && __('Not on items already on sale'),
     audienceLine(discount),
     paymentLine(discount),
     ...limitLines(discount),

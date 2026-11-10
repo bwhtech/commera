@@ -2,12 +2,13 @@
 import { computed } from 'vue'
 import { MultiSelect } from 'frappe-ui'
 import { useTargetSearch } from '../../data/discounts'
+import { __ } from '../../data/translation'
 
 const selected = defineModel({ type: Array, required: true })
 const props = defineProps({
   targetType: { type: String, required: true },
   label: { type: String, required: true },
-  placeholder: { type: String, default: 'Search' },
+  placeholder: { type: String, default: () => __('Search') },
   error: { type: String, default: null },
   knownLabels: { type: Object, default: () => ({}) },
 })

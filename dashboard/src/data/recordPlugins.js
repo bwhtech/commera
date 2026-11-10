@@ -3,6 +3,7 @@ import { dialog, toast } from 'frappe-ui'
 import { useAdminAction, useAdminRead, trySubmit } from './api'
 import { pluginIcon, placeEntries } from '../ia/plugins'
 import { createSequence } from '../utils/sequence'
+import { __ } from './translation'
 
 export function usePluginRun(path, paramsOf, { onDone } = {}) {
   const runAction = useAdminAction(path)
@@ -11,7 +12,7 @@ export function usePluginRun(path, paramsOf, { onDone } = {}) {
     const ran = await trySubmit(runAction, paramsOf(entry))
     if (!ran) return
     const result = runAction.data
-    toast.success(result?.message || `${entry.label} done`)
+    toast.success(result?.message || __('{0} done', [entry.label]))
     onDone?.()
   }
 
@@ -98,7 +99,7 @@ export function useRecordPlugins(place, doctype, nameGetter, { onReload } = {}) 
   const actionGroup = computed(() =>
     actions.value.length
       ? {
-          group: 'Plugins',
+          group: __('Plugins'),
           options: actions.value.map((entry) => ({
             label: entry.label,
             icon: pluginIcon(entry),

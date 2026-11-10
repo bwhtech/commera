@@ -26,6 +26,7 @@ import {
   saveDiscount,
 } from '../data/discounts'
 import { errorMessage } from '../data/errors'
+import { __ } from '../data/translation'
 import { confirmLeave } from '../utils/confirmLeave'
 import { createSequence } from '../utils/sequence'
 
@@ -33,10 +34,10 @@ const route = useRoute()
 const router = useRouter()
 
 const TABS = [
-  { value: 'setup', label: 'Setup', icon: 'lucide-sliders-horizontal' },
-  { value: 'conditions', label: 'Conditions', icon: 'lucide-list-checks' },
-  { value: 'limits', label: 'Limits and dates', icon: 'lucide-calendar-clock' },
-  { value: 'reporting', label: 'Reporting', icon: 'lucide-chart-column' },
+  { value: 'setup', label: __('Setup'), icon: 'lucide-sliders-horizontal' },
+  { value: 'conditions', label: __('Conditions'), icon: 'lucide-list-checks' },
+  { value: 'limits', label: __('Limits and dates'), icon: 'lucide-calendar-clock' },
+  { value: 'reporting', label: __('Reporting'), icon: 'lucide-chart-column' },
 ]
 
 const discount = ref(null)
@@ -50,7 +51,7 @@ const triedSaving = ref(false)
 const tab = ref('setup')
 
 const isNew = computed(() => !discount.value?.name)
-const heading = computed(() => (!discount.value || isNew.value ? 'New discount' : discountHeading(discount.value)))
+const heading = computed(() => (!discount.value || isNew.value ? __('New discount') : discountHeading(discount.value)))
 
 // What the server last said, to tell an edit from a discount merely opened. Taken a tick after the
 // sections mount, because some of them fill a default into the record as they do.
@@ -101,7 +102,11 @@ watch(
   { immediate: true },
 )
 
-const leaveUnsaved = () => confirmLeave('Discard unsaved changes?', 'The changes to this discount have not been saved.', 'Discard')
+const leaveUnsaved = () => confirmLeave(
+    __('Discard unsaved changes?'),
+    __('The changes to this discount have not been saved.'),
+    __('Discard'),
+  )
 
 onBeforeRouteLeave(() => (isDirty.value ? leaveUnsaved() : true))
 // Another discount opens in this same component, so the leave guard alone never sees it.
@@ -124,7 +129,7 @@ async function save() {
     if (!saved || !loads.isLatest(ticket)) return
     discount.value = saved
     await markSaved()
-    toast.success(wasNew ? 'Discount created' : 'Saved')
+    toast.success(wasNew ? __('Discount created') : __('Saved'))
     if (wasNew) router.replace({ name: 'DiscountDetail', params: { id: saved.name } })
   } finally {
     if (loads.isLatest(ticket)) status.value = 'ready'
@@ -143,7 +148,7 @@ async function toggleEnabled(enabled) {
     Object.assign(discount.value, changes)
     // The switch landed on its own; edits still waiting for Save stay unsaved.
     savedSnapshot.value = JSON.stringify({ ...JSON.parse(savedSnapshot.value), ...changes })
-    toast.success(saved.enabled ? 'Discount switched on' : 'Discount switched off')
+    toast.success(saved.enabled ? __('Discount switched on') : __('Discount switched off'))
   } finally {
     if (loads.isLatest(ticket)) status.value = 'ready'
   }
@@ -151,14 +156,14 @@ async function toggleEnabled(enabled) {
 
 function remove() {
   dialog.danger({
-    title: `Delete ${heading.value}?`,
-    message: "Shoppers can no longer use it. Discounts already used on orders can't be deleted; switch it off instead.",
-    confirmLabel: 'Delete discount',
+    title: __('Delete {0}?', [heading.value]),
+    message: __("Shoppers can no longer use it. Discounts already used on orders can't be deleted; switch it off instead."),
+    confirmLabel: __('Delete discount'),
     onConfirm: async () => {
       if (!(await deleteDiscount(discount.value.name))) return
       // Deleted: edits made before it are gone with it, so leaving must not ask about them.
       savedSnapshot.value = JSON.stringify(discount.value)
-      toast.success('Discount deleted')
+      toast.success(__('Discount deleted'))
       router.replace('/discounts')
     },
   })
@@ -171,28 +176,28 @@ const hasValue = computed(() => ['Amount Off Products', 'Amount Off Order'].incl
   <AppPageHeader
     :title="heading"
     back-to="/discounts"
-    :breadcrumbs="[{ label: 'Discounts', route: '/discounts' }, { label: heading }]"
+    :breadcrumbs="[{ label: __('Discounts'), route: '/discounts' }, { label: heading }]"
   >
     <template v-if="discount && status !== 'loading'" #actions>
       <Switch
         v-if="!isNew"
         :model-value="Boolean(discount.enabled)"
         class="max-sm:hidden"
-        label="Active"
+        :label="__('Active')"
         :disabled="busy"
         @update:model-value="toggleEnabled"
       />
       <Dropdown
         v-if="!isNew"
         :options="[
-          { label: discount.enabled ? 'Switch off' : 'Switch on', icon: 'lucide-power', disabled: busy, onClick: () => toggleEnabled(!discount.enabled) },
-          { label: 'Delete discount', icon: 'lucide-trash-2', theme: 'red', onClick: remove },
+          { label: discount.enabled ? __('Switch off') : __('Switch on'), icon: 'lucide-power', disabled: busy, onClick: () => toggleEnabled(!discount.enabled) },
+          { label: __('Delete discount'), icon: 'lucide-trash-2', theme: 'red', onClick: remove },
         ]"
       >
-        <Button icon="lucide-ellipsis" label="More actions" />
+        <Button icon="lucide-ellipsis" :label="__('More actions')" />
       </Dropdown>
       <Button
-        label="Save"
+        :label="__('Save')"
         variant="solid"
         theme="gray"
         :loading="status === 'saving'"
@@ -206,7 +211,7 @@ const hasValue = computed(() => ['Amount Off Products', 'Amount Off Order'].incl
     <EmptyState
       v-if="loadError"
       icon="lucide-triangle-alert"
-      title="Could not load this discount"
+      :title="__('Could not load this discount')"
       :description="errorMessage(loadError)"
     />
     <LoadingText v-else-if="!discount" />

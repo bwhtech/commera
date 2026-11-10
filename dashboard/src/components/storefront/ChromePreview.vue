@@ -162,7 +162,7 @@ const source = computed(() => {
       role="separator"
       aria-orientation="horizontal"
       tabindex="0"
-      :aria-label="`Resize ${title.toLowerCase()}`"
+      :aria-label="__('Resize {0}', [title.toLowerCase()])"
       class="group absolute inset-x-0 top-0 z-10 flex h-2 -translate-y-1/2 cursor-ns-resize touch-none items-center justify-center focus:outline-none"
       @pointerdown="startResize"
       @keydown.up.prevent="resizeTo(stageHeight + RESIZE_STEP)"
@@ -179,7 +179,7 @@ const source = computed(() => {
         <Button
           variant="ghost"
           :icon-left="collapsed ? 'lucide-chevron-up' : 'lucide-chevron-down'"
-          :label="collapsed ? `Show ${title.toLowerCase()}` : title"
+          :label="collapsed ? __('Show {0}', [title.toLowerCase()]) : title"
           @click="collapsed = !collapsed"
         />
         <TabButtons
@@ -190,7 +190,7 @@ const source = computed(() => {
         />
       </div>
 
-      <Button v-if="!collapsed" icon-left="lucide-rotate-cw" label="Refresh" @click="reloadToken += 1" />
+      <Button v-if="!collapsed" icon-left="lucide-rotate-cw" :label="__('Refresh')" @click="reloadToken += 1" />
     </div>
 
     <div v-if="!collapsed" class="px-3 pb-3">
@@ -203,7 +203,7 @@ const source = computed(() => {
           :key="language"
           :src="source"
           :title="title"
-          class="origin-top-left border-0"
+          class="origin-top-left border-0 rtl:origin-top-right"
           :class="resizing && 'pointer-events-none'"
           :style="{
             width: `${FRAME_WIDTH}px`,

@@ -1,5 +1,6 @@
 import { dayjs } from 'frappe-ui'
 import { bootValue } from './boot'
+import { __ } from './translation'
 
 // The shell (commera/www/commera.py) drops the site's reporting currency and
 // its symbol on `window`, so money reads correctly without any screen
@@ -84,28 +85,28 @@ export const shortDate = (iso) => (iso ? dayjs(iso).format(shortDateFormat) : '�
 export const longDate = (iso) => (iso ? dayjs(iso).format(dateFormat) : '—')
 
 const LABELS = {
-  paid: 'Paid',
-  pending: 'Payment pending',
-  refunded: 'Refunded',
-  partially_refunded: 'Partly refunded',
-  unfulfilled: 'Unfulfilled',
-  fulfilled: 'Fulfilled',
-  partial: 'Partly fulfilled',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
-  active: 'Active',
-  draft: 'Draft',
-  archived: 'Archived',
-  published: 'Published',
-  sent: 'Sent',
-  queued: 'Queued',
-  sending: 'Sending',
-  retrying: 'Retrying',
-  failed: 'Failed',
-  scheduled: 'Scheduled',
-  expired: 'Expired',
-  used_up: 'Used up',
-  disabled: 'Disabled',
+  paid: __('Paid'),
+  pending: __('Payment pending'),
+  refunded: __('Refunded'),
+  partially_refunded: __('Partly refunded'),
+  unfulfilled: __('Unfulfilled'),
+  fulfilled: __('Fulfilled'),
+  partial: __('Partly fulfilled'),
+  delivered: __('Delivered'),
+  cancelled: __('Cancelled'),
+  active: __('Active'),
+  draft: __('Draft'),
+  archived: __('Archived'),
+  published: __('Published'),
+  sent: __('Sent'),
+  queued: __('Queued'),
+  sending: __('Sending'),
+  retrying: __('Retrying'),
+  failed: __('Failed'),
+  scheduled: __('Scheduled'),
+  expired: __('Expired'),
+  used_up: __('Used up'),
+  disabled: __('Disabled'),
 }
 
 export const label = (key) => LABELS[key] ?? key
@@ -146,7 +147,7 @@ export const statusTheme = (key) => THEMES[key] ?? 'gray'
 // that decides how a low/high pair reads, so every screen with a price range
 // agrees on it.
 export function priceRange(low, high) {
-  if (low == null && high == null) return 'No price'
+  if (low == null && high == null) return __('No price')
   if (low === high) return money(low)
   return `${money(low)} – ${money(high)}`
 }

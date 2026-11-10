@@ -11,7 +11,7 @@ defineProps({
 </script>
 
 <template>
-  <div class="grid grid-cols-2 rounded-5 border border-outline-gray-1 sm:grid-cols-4 sm:divide-x sm:divide-outline-gray-2">
+  <div class="grid grid-cols-2 rounded-5 border border-outline-gray-1 sm:grid-cols-4 sm:divide-x sm:divide-outline-gray-2 sm:rtl:divide-x-reverse">
     <div v-for="stat in stats" :key="stat.key ?? stat.label" class="px-4 py-3.5">
       <!-- h-20 is what the label, the reading and the line under it occupy together, so the strip
            keeps its height and nothing below it moves when the numbers land. -->
@@ -26,7 +26,7 @@ defineProps({
           class="mt-1 text-sm"
           :class="stat.up ? 'text-ink-green-6' : 'text-ink-red-6'"
         >
-          {{ stat.delta }} vs. previous period
+          {{ __('{0} vs. previous period', [stat.delta]) }}
         </p>
         <p v-else-if="stat.note" class="mt-1 truncate text-sm text-ink-gray-5">{{ stat.note }}</p>
         <p v-else class="mt-1 text-sm text-ink-gray-4">&nbsp;</p>

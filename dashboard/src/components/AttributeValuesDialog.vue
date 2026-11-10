@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { Button, Dialog, ErrorMessage, TextInput, toast, useFileUpload } from 'frappe-ui'
 import SwatchDot from './SwatchDot.vue'
 import { useAdminAction, trySubmit } from '../data/api'
+import { __ } from '../data/translation'
 
 const props = defineProps({
   attribute: { type: Object, default: null },
@@ -109,7 +110,7 @@ async function uploadImage(row, event) {
     const uploaded = await upload(file, { private: false })
     await save(row, { image: uploaded.file_url })
   } catch {
-    toast.error(`Could not upload ${file.name}`)
+    toast.error(__('Could not upload {0}', [file.name]))
   }
 }
 
@@ -125,15 +126,14 @@ async function addValue() {
 </script>
 
 <template>
-  <Dialog v-model:open="open" size="2xl" :title="attribute ? attribute.name : 'Attribute'">
+  <Dialog v-model:open="open" size="2xl" :title="attribute ? attribute.name : __('Attribute')">
     <div v-if="attribute" class="space-y-4">
       <p class="text-p-sm text-ink-gray-5">
         <template v-if="isColour">
-          A shopper sees these instead of the words. Upload an image for a pattern a flat colour
-          cannot show — denim, floral, marble.
+          {{ __('A shopper sees these instead of the words. Upload an image for a pattern a flat colour cannot show — denim, floral, marble.') }}
         </template>
         <template v-else>
-          The choices a shopper picks from. Click a name to rename one.
+          {{ __('The choices a shopper picks from. Click a name to rename one.') }}
         </template>
       </p>
 
@@ -146,7 +146,7 @@ async function addValue() {
             :ref="(element) => (nameInputs[row.value] = element)"
             :value="row.value"
             class="min-w-0 flex-1 rounded-4 border border-transparent bg-surface-gray-2 px-2 py-1 text-base text-ink-gray-8 hover:bg-surface-gray-3 focus:border-outline-gray-4 focus:bg-surface-base focus:shadow-sm focus:ring-0 focus-visible:outline-none"
-            :aria-label="`Rename ${row.value}`"
+            :aria-label="__('Rename {0}', [row.value])"
             @keyup.enter="$event.target.blur()"
             @keyup.escape="cancelRename"
             @blur="commitRename(row, $event.target.value)"
@@ -162,8 +162,10 @@ async function addValue() {
             "
             :title="
               row.used_by
-                ? `Used by ${row.used_by} ${row.used_by === 1 ? 'product' : 'products'} — renaming would leave their SKUs and links saying ${row.value}.`
-                : `Rename ${row.value}`
+                ? row.used_by === 1
+                  ? __('Used by 1 product — renaming would leave its SKUs and links saying {0}.', [row.value])
+                  : __('Used by {0} products — renaming would leave their SKUs and links saying {1}.', [row.used_by, row.value])
+                : __('Rename {0}', [row.value])
             "
             @click="startRename(row)"
           >
@@ -190,7 +192,7 @@ async function addValue() {
                 :value="row.color || '#000000'"
                 type="color"
                 class="absolute inset-0 size-full cursor-pointer opacity-0"
-                :aria-label="`${row.value} colour`"
+                :aria-label="__('{0} colour', [row.value])"
                 @change="save(row, { color: $event.target.value })"
               />
             </label>
@@ -202,7 +204,7 @@ async function addValue() {
               :model-value="row.color ?? ''"
               class="w-28 shrink-0"
               placeholder="#000000"
-              :aria-label="`${row.value} hex`"
+              :aria-label="__('{0} hex', [row.value])"
               @update:model-value="save(row, { color: $event })"
             />
 
@@ -217,7 +219,7 @@ async function addValue() {
               class="w-28 shrink-0"
               :loading="isUploading && savingValue === row.value"
               icon-left="lucide-image"
-              :label="row.image ? 'Replace' : 'Image'"
+              :label="row.image ? __('Replace') : __('Image')"
               variant="subtle"
               @click="fileInputs[row.value]?.click()"
             />
@@ -225,7 +227,7 @@ async function addValue() {
             <Button
               :disabled="!row.color && !row.image"
               icon="lucide-x"
-              :aria-label="`Clear ${row.value} swatch`"
+              :aria-label="__('Clear {0} swatch', [row.value])"
               variant="ghost"
               @click="clear(row)"
             />
@@ -237,11 +239,11 @@ async function addValue() {
         <TextInput
           v-model="newValue"
           class="min-w-0 flex-1"
-          :label="`Add a value to ${attribute.name}`"
-          placeholder="Type a new one"
+          :label="__('Add a value to {0}', [attribute.name])"
+          :placeholder="__('Type a new one')"
           @keydown.enter="addValue"
         />
-        <Button label="Add" :loading="addAction.loading" @click="addValue" />
+        <Button :label="__('Add')" :loading="addAction.loading" @click="addValue" />
       </div>
       <ErrorMessage :message="addAction.error?.message" />
     </div>

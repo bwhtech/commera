@@ -17,7 +17,7 @@ const open = ref(!props.collapsible || props.defaultOpen)
     <component
       :is="collapsible ? 'button' : 'div'"
       :type="collapsible ? 'button' : undefined"
-      class="flex w-full items-start gap-3 p-4 text-left"
+      class="flex w-full items-start gap-3 p-4 text-start"
       :class="{ 'hover:bg-surface-gray-1 rounded-5': collapsible }"
       :aria-expanded="collapsible ? open : undefined"
       @click="collapsible && (open = !open)"

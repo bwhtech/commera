@@ -9,6 +9,7 @@ import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { erpnextLink } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { productRoute } from '../ia/routes'
+import { __ } from '../data/translation'
 
 const route = useRoute()
 
@@ -26,13 +27,13 @@ const loadFailure = computed(() =>
   reviewRequest.error
     ? {
         icon: 'lucide-triangle-alert',
-        title: 'Could not load this review',
+        title: __('Could not load this review'),
         description: errorMessage(reviewRequest.error),
       }
     : {
         icon: 'lucide-search-x',
-        title: 'Review not found',
-        description: `No review matches ${route.params.id}. It may have been deleted.`,
+        title: __('Review not found'),
+        description: __('No review matches {0}. It may have been deleted.', [route.params.id]),
       },
 )
 
@@ -69,7 +70,7 @@ const replyAction = useAdminAction('reviews.save_reply')
 async function saveReply() {
   const posted = await trySubmit(replyAction, { name: review.value.name, reply: replyDraft.value })
   if (!posted) return
-  toast.success('Reply posted')
+  toast.success(__('Reply posted'))
   reviewRequest.reload()
 }
 </script>
@@ -77,12 +78,12 @@ async function saveReply() {
 <template>
   <template v-if="review">
     <AppPageHeader
-      :title="review.review_title || 'Review'"
+      :title="review.review_title || __('Review')"
       back-to="/reviews"
-      :breadcrumbs="[{ label: 'Reviews', route: '/reviews' }, { label: review.review_title || review.name }]"
+      :breadcrumbs="[{ label: __('Reviews'), route: '/reviews' }, { label: review.review_title || review.name }]"
     >
       <template #actions>
-        <Switch :model-value="review.is_published" label="Published" @click.stop @update:model-value="togglePublished" />
+        <Switch :model-value="review.is_published" :label="__('Published')" @click.stop @update:model-value="togglePublished" />
       </template>
     </AppPageHeader>
 
@@ -96,7 +97,7 @@ async function saveReply() {
               <p class="text-sm text-ink-gray-5">{{ review.shopper.email }}</p>
             </div>
           </div>
-          <Badge v-if="review.verified_purchase" label="Verified purchase" theme="green" variant="subtle" />
+          <Badge v-if="review.verified_purchase" :label="__('Verified purchase')" theme="green" variant="subtle" />
         </div>
 
         <div class="mt-4 flex items-center gap-2">
@@ -115,7 +116,7 @@ async function saveReply() {
             class="inline-flex items-center gap-1 text-sm-medium text-ink-gray-8 hover:underline"
           >
             {{ review.product.name }}
-            <span class="lucide-chevron-right size-3.5 text-ink-gray-5" aria-hidden="true" />
+            <span class="lucide-chevron-right size-3.5 text-ink-gray-5 rtl:-scale-x-100" aria-hidden="true" />
           </router-link>
           <a
             v-if="review.sales_order"
@@ -131,19 +132,19 @@ async function saveReply() {
       </section>
 
       <section class="mt-6">
-        <h2 class="text-lg-semibold text-ink-gray-8">Seller reply</h2>
+        <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Seller reply') }}</h2>
         <p v-if="review.replied_on" class="mt-1 text-sm text-ink-gray-5">
-          Last replied {{ dayjs(review.replied_on).fromNow() }} by {{ review.replied_by }}
+          {{ __('Last replied {0} by {1}', [dayjs(review.replied_on).fromNow(), review.replied_by]) }}
         </p>
         <Textarea
           v-model="replyDraft"
           class="mt-2"
-          placeholder="Write a reply the shopper and other buyers will see under this review…"
+          :placeholder="__('Write a reply the shopper and other buyers will see under this review…')"
           :rows="4"
         />
         <Button
           class="mt-2"
-          :label="review.seller_reply ? 'Update reply' : 'Post reply'"
+          :label="review.seller_reply ? __('Update reply') : __('Post reply')"
           :loading="replyAction.loading"
           :disabled="!replyDraft.trim()"
           @click="saveReply"
@@ -153,7 +154,7 @@ async function saveReply() {
   </template>
 
   <template v-else-if="reviewRequest.loading">
-    <AppPageHeader :title="route.params.id" back-to="/reviews" :breadcrumbs="[{ label: 'Reviews', route: '/reviews' }, { label: route.params.id }]" />
+    <AppPageHeader :title="route.params.id" back-to="/reviews" :breadcrumbs="[{ label: __('Reviews'), route: '/reviews' }, { label: route.params.id }]" />
     <PageBody width="narrow">
       <div class="rounded-5 border border-outline-gray-1 p-4">
         <div class="flex items-center gap-2.5">
@@ -173,10 +174,10 @@ async function saveReply() {
   <!-- The request has settled with nothing to show. Without this branch a bad id
        or a refusal falls through every branch above and paints an empty screen. -->
   <template v-else>
-    <AppPageHeader :title="route.params.id" back-to="/reviews" :breadcrumbs="[{ label: 'Reviews', route: '/reviews' }, { label: route.params.id }]" />
+    <AppPageHeader :title="route.params.id" back-to="/reviews" :breadcrumbs="[{ label: __('Reviews'), route: '/reviews' }, { label: route.params.id }]" />
     <PageBody width="narrow">
       <EmptyState :icon="loadFailure.icon" :title="loadFailure.title" :description="loadFailure.description">
-        <Button label="Back to reviews" variant="subtle" theme="gray" route="/reviews" />
+        <Button :label="__('Back to reviews')" variant="subtle" theme="gray" route="/reviews" />
       </EmptyState>
     </PageBody>
   </template>

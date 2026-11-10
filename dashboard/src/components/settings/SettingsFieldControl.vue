@@ -9,6 +9,7 @@ import { Button, Select, Switch, Textarea, TextInput, toast, useFileUpload } fro
 import SettingsCollectionControl from './SettingsCollectionControl.vue'
 import SettingsLinkControl from './SettingsLinkControl.vue'
 import SettingsProductsControl from './SettingsProductsControl.vue'
+import { __ } from '../../data/translation'
 
 const NUMERIC_FIELDTYPES = ['Int', 'Float', 'Currency', 'Percent']
 const MULTILINE_FIELDTYPES = ['Small Text', 'Text', 'Long Text', 'Text Editor', 'Code']
@@ -73,7 +74,7 @@ async function uploadFile(event) {
     const uploaded = await upload(file, { private: false })
     commit(uploaded.file_url)
   } catch {
-    toast.error(`Could not upload ${file.name}`)
+    toast.error(__('Could not upload {0}', [file.name]))
   }
 }
 </script>
@@ -107,7 +108,7 @@ async function uploadFile(event) {
       v-model="text"
       class="min-w-0 flex-1"
       :disabled="disabled"
-      :aria-label="`${field.label} hex`"
+      :aria-label="__('{0} hex', [field.label])"
       placeholder="#000000"
       @change="commit($event.target.value)"
     />
@@ -155,14 +156,14 @@ async function uploadFile(event) {
       @change="uploadFile"
     />
     <p v-if="text" class="min-w-0 flex-1 truncate text-base text-ink-gray-7">{{ text }}</p>
-    <p v-else class="min-w-0 flex-1 text-base text-ink-gray-5">Nothing uploaded</p>
-    <Button :loading="isUploading" :disabled="disabled" label="Upload" @click="fileInput.click()" />
+    <p v-else class="min-w-0 flex-1 text-base text-ink-gray-5">{{ __('Nothing uploaded') }}</p>
+    <Button :loading="isUploading" :disabled="disabled" :label="__('Upload')" @click="fileInput.click()" />
     <Button
       v-if="text"
       icon="lucide-x"
       variant="ghost"
       :disabled="disabled"
-      :aria-label="`Remove ${field.label}`"
+      :aria-label="__('Remove {0}', [field.label])"
       @click="commit('')"
     />
   </div>

@@ -7,6 +7,7 @@
 import { computed } from 'vue'
 import { Badge, Button, Dropdown, Switch } from 'frappe-ui'
 import { money } from '../../data/format'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   option: { type: Object, required: true },
@@ -23,23 +24,23 @@ defineEmits(['edit', 'delete', 'toggle'])
 const priceParts = computed(() => {
   const parts = []
 
-  if (props.pricedByRates) parts.push('Priced by shipping rule')
-  if (props.option.service_code) parts.push('Carrier rate')
+  if (props.pricedByRates) parts.push(__('Priced by shipping rule'))
+  if (props.option.service_code) parts.push(__('Carrier rate'))
 
   if (props.option.markup_percent) parts.push(`+${props.option.markup_percent}%`)
-  if (props.option.handling_fee) parts.push(`+${money(props.option.handling_fee)} handling`)
+  if (props.option.handling_fee) parts.push(__('+{0} handling', [money(props.option.handling_fee)]))
   // What the shopper is charged when the carrier will not quote — the difference between
   // a checkout that completes and one that dead-ends, so it is never hidden behind Edit.
   // With no carrier there is no live rate to fall back from, so the backup charge is the price.
   if (props.option.backup_charge) {
-    const kind = props.option.provider || props.pricedByRates ? 'fallback' : 'flat'
-    parts.push(`${money(props.option.backup_charge)} ${kind}`)
+    const charge = money(props.option.backup_charge)
+    parts.push(props.option.provider || props.pricedByRates ? __('{0} fallback', [charge]) : __('{0} flat', [charge]))
   }
 
   return parts
 })
 
-const source = computed(() => props.option.carrier || props.option.provider || 'Own delivery')
+const source = computed(() => props.option.carrier || props.option.provider || __('Own delivery'))
 
 // Frappe answers 1/0. Handed straight to a Switch, reka never reads a non-boolean as its
 // starting state: the thumb renders on from `data-state` while its internal value stays
@@ -54,7 +55,7 @@ const isOn = computed(() => Boolean(props.option.enabled))
       <div class="flex items-center gap-2">
         <p class="truncate text-base text-ink-gray-8">{{ option.title }}</p>
         <Badge :label="source" theme="gray" variant="subtle" />
-        <Badge v-if="hidden" label="Hidden at checkout" theme="gray" variant="subtle" />
+        <Badge v-if="hidden" :label="__('Hidden at checkout')" theme="gray" variant="subtle" />
       </div>
       <p v-if="option.description" class="mt-1 truncate text-sm text-ink-gray-5">
         {{ option.description }}
@@ -64,19 +65,19 @@ const isOn = computed(() => Boolean(props.option.enabled))
       </p>
     </div>
 
-    <div class="ml-auto flex shrink-0 items-center gap-2">
-      <Button label="Edit" @click="$emit('edit', option)" />
+    <div class="ms-auto flex shrink-0 items-center gap-2">
+      <Button :label="__('Edit')" @click="$emit('edit', option)" />
       <Dropdown
         :options="[
           {
-            label: 'Delete',
+            label: __('Delete'),
             icon: 'lucide-trash-2',
             theme: 'red',
             onClick: () => $emit('delete', option),
           },
         ]"
       >
-        <Button icon="lucide-ellipsis" :aria-label="`More actions for ${option.title}`" />
+        <Button icon="lucide-ellipsis" :aria-label="__('More actions for {0}', [option.title])" />
       </Dropdown>
       <Switch
         :model-value="isOn"

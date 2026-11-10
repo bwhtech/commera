@@ -21,6 +21,7 @@ import { errorMessage } from '../data/errors'
 import { longDate } from '../data/format'
 import { useProductStats } from '../data/product'
 import { useRecordPlugins } from '../data/recordPlugins'
+import { __ } from '../data/translation'
 import { asDropdownOptions, buildProductActions } from '../ia/productActions'
 
 const route = useRoute()
@@ -73,9 +74,9 @@ async function togglePublish() {
   const result = publishAction.data
   productRequest.reload()
   if (result.skipped.length) {
-    toast.warning(`Published ${result.updated.length}, skipped ${result.skipped.join(', ')} (missing a photo or size)`)
+    toast.warning(__('Published {0}, skipped {1} (missing a photo or size)', [result.updated.length, result.skipped.join(', ')]))
   } else {
-    toast.success(publish ? 'Published' : 'Hidden from the storefront')
+    toast.success(publish ? __('Published') : __('Hidden from the storefront'))
   }
 }
 
@@ -83,7 +84,7 @@ async function toggleArchive() {
   const disabled = product.value.status !== 'archived'
   const saved = await trySubmit(updateAction, { item_template: product.value.id, disabled: disabled ? 1 : 0 })
   if (!saved) return
-  toast.success(disabled ? 'Archived' : 'Restored')
+  toast.success(disabled ? __('Archived') : __('Restored'))
   productRequest.reload()
 }
 
@@ -131,7 +132,7 @@ async function save() {
     description: product.value.description,
   })
   if (!saved) return
-  toast.success('Saved')
+  toast.success(__('Saved'))
   productRequest.reload()
 }
 
@@ -148,13 +149,13 @@ const loadFailure = computed(() =>
   productRequest.error
     ? {
         icon: 'lucide-triangle-alert',
-        title: 'Could not load this product',
+        title: __('Could not load this product'),
         description: errorMessage(productRequest.error),
       }
     : {
         icon: 'lucide-search-x',
-        title: 'Product not found',
-        description: `No product matches ${route.params.id}. It may have been deleted or renamed.`,
+        title: __('Product not found'),
+        description: __('No product matches {0}. It may have been deleted or renamed.', [route.params.id]),
       },
 )
 </script>
@@ -164,13 +165,13 @@ const loadFailure = computed(() =>
     <AppPageHeader
       :title="product.title"
       back-to="/products"
-      :breadcrumbs="[{ label: 'Products', route: '/products' }, { label: product.title }]"
+      :breadcrumbs="[{ label: __('Products'), route: '/products' }, { label: product.title }]"
     >
       <template #actions>
         <Dropdown :options="moreActions">
-          <Button icon="lucide-ellipsis" label="More actions" />
+          <Button icon="lucide-ellipsis" :label="__('More actions')" />
         </Dropdown>
-        <Button label="Save" variant="solid" theme="gray" :loading="updateAction.loading" @click="save" />
+        <Button :label="__('Save')" variant="solid" theme="gray" :loading="updateAction.loading" @click="save" />
       </template>
     </AppPageHeader>
 
@@ -182,7 +183,7 @@ const loadFailure = computed(() =>
           <div class="flex flex-wrap items-center gap-2">
             <StatusBadge :status="product.status" />
             <span class="text-sm text-ink-gray-5">
-              {{ product.sku }} · updated {{ longDate(product.updated) }}
+              {{ product.sku }} · {{ __('updated {0}', [longDate(product.updated)]) }}
             </span>
           </div>
 
@@ -202,7 +203,7 @@ const loadFailure = computed(() =>
         </PageBody>
       </ScrollArea>
 
-      <aside class="hidden w-[19rem] shrink-0 flex-col border-l border-outline-gray-1 lg:flex">
+      <aside class="hidden w-[19rem] shrink-0 flex-col border-s border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
           <ProductSummaryPanel :product="product" :stats="stats" />
           <PluginSlot v-if="hasRail" :entries="cards" :record="record" frame="rail" @reload="reloadPlugins" />
@@ -221,7 +222,7 @@ const loadFailure = computed(() =>
     <AppPageHeader
       :title="route.params.id"
       back-to="/products"
-      :breadcrumbs="[{ label: 'Products', route: '/products' }, { label: route.params.id }]"
+      :breadcrumbs="[{ label: __('Products'), route: '/products' }, { label: route.params.id }]"
     />
 
     <div class="flex min-h-0 flex-1 overflow-hidden">
@@ -245,7 +246,7 @@ const loadFailure = computed(() =>
         </PageBody>
       </ScrollArea>
 
-      <aside class="hidden w-[19rem] shrink-0 flex-col gap-4 border-l border-outline-gray-1 p-4 lg:flex">
+      <aside class="hidden w-[19rem] shrink-0 flex-col gap-4 border-s border-outline-gray-1 p-4 lg:flex">
         <Skeleton class="h-4 w-24 rounded-4" />
         <Skeleton class="h-32 w-full rounded-4" />
         <Skeleton class="h-24 w-full rounded-4" />
@@ -259,7 +260,7 @@ const loadFailure = computed(() =>
     <AppPageHeader
       :title="route.params.id"
       back-to="/products"
-      :breadcrumbs="[{ label: 'Products', route: '/products' }, { label: route.params.id }]"
+      :breadcrumbs="[{ label: __('Products'), route: '/products' }, { label: route.params.id }]"
     />
 
     <PageBody width="narrow">
@@ -268,7 +269,7 @@ const loadFailure = computed(() =>
         :title="loadFailure.title"
         :description="loadFailure.description"
       >
-        <Button label="Back to products" variant="subtle" theme="gray" route="/products" />
+        <Button :label="__('Back to products')" variant="subtle" theme="gray" route="/products" />
       </EmptyState>
     </PageBody>
   </template>

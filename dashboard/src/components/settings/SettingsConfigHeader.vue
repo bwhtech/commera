@@ -13,7 +13,7 @@ const emit = defineEmits(['back'])
 <template>
   <SettingsPanelHeader :title="title" :description="description">
     <template #actions>
-      <Button label="Back" icon-left="lucide-arrow-left" @click="emit('back')" />
+      <Button :label="__('Back')" icon-left="lucide-arrow-left rtl:-scale-x-100" @click="emit('back')" />
       <!-- Saving differs per screen: one emits, one submits a form. -->
       <slot name="actions" />
     </template>

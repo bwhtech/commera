@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Button } from 'frappe-ui'
 import { acceptsSection } from '../../data/themeLayout'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   schemas: { type: Array, required: true },
@@ -14,7 +15,7 @@ const categories = computed(() => {
   const grouped = new Map()
   for (const schema of props.schemas) {
     if (!acceptsSection(schema, props.group)) continue
-    const category = schema.category || 'Other'
+    const category = schema.category || __('Other')
     if (!grouped.has(category)) grouped.set(category, [])
     grouped.get(category).push(schema)
   }
@@ -25,8 +26,8 @@ const categories = computed(() => {
 <template>
   <div class="flex flex-col gap-3" data-section-picker>
     <div class="flex items-center gap-1">
-      <Button variant="ghost" icon="lucide-arrow-left" aria-label="Back to sections" @click="emit('back')" />
-      <h2 class="text-base font-medium text-ink-gray-9">Add section</h2>
+      <Button variant="ghost" icon="lucide-arrow-left rtl:-scale-x-100" :aria-label="__('Back to sections')" @click="emit('back')" />
+      <h2 class="text-base font-medium text-ink-gray-9">{{ __('Add section') }}</h2>
     </div>
 
     <div v-for="category in categories" :key="category.label">

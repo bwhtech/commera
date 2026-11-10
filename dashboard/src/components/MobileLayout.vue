@@ -5,6 +5,7 @@ import { BottomSheet, Icon, MobileNav, MobileNavItem, MobileShell } from 'frappe
 import { useAccountMenu } from '../data/account'
 import { isAdmin } from '../data/boot'
 import { activeNavTarget, sections } from '../ia/nav'
+import { __ } from '../data/translation'
 import TrialCard from './TrialCard.vue'
 
 // The four destinations that earn a permanent tab. Everything else is reached
@@ -32,7 +33,7 @@ const moreSections = [
     }))
     .filter((section) => section.items.length),
   // A phone never renders the sidebar, so its store menu has no other way in.
-  { id: 'account', label: 'Account', items: useAccountMenu() },
+  { id: 'account', label: __('Account'), items: useAccountMenu() },
 ]
 
 const rowClass =
@@ -68,12 +69,12 @@ function closeMore(item) {
           :route="tab.to"
           :active="tab.to === activeTarget"
         />
-        <MobileNavItem label="More" icon="lucide-ellipsis" :active="moreIsActive" @click="moreOpen = true" />
+        <MobileNavItem :label="__('More')" icon="lucide-ellipsis" :active="moreIsActive" @click="moreOpen = true" />
       </MobileNav>
     </template>
   </MobileShell>
 
-  <BottomSheet v-model:open="moreOpen" title="More">
+  <BottomSheet v-model:open="moreOpen" :title="__('More')">
     <div class="px-2 pb-8">
       <!-- A phone has no sidebar, so the trial card heads the sheet that stands in for it. -->
       <TrialCard class="mx-1 mb-2" @open="moreOpen = false" />

@@ -8,6 +8,7 @@ import ListPagination from '../components/ListPagination.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ListSkeleton from '../components/ListSkeleton.vue'
 import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
+import { __ } from '../data/translation'
 import { ia } from '../ia/store'
 
 const page = ref(1)
@@ -28,14 +29,14 @@ const createAction = useAdminAction('catalog.create_collection')
 
 function addCollection() {
   dialog.prompt({
-    title: 'New collection',
-    message: 'A collection groups products the storefront can filter and browse by.',
-    fields: [{ name: 'title', label: 'Title', required: true }],
+    title: __('New collection'),
+    message: __('A collection groups products the storefront can filter and browse by.'),
+    fields: [{ name: 'title', label: __('Title'), required: true }],
     onConfirm: async ({ values }) => {
       const created = await trySubmit(createAction, { title: values.title })
       // A failure already toasted inside useAdminAction.
       if (!created) return
-      toast.success(`"${values.title}" created`)
+      toast.success(__('"{0}" created', [values.title]))
       collectionsRequest.reload()
     },
   })
@@ -43,9 +44,9 @@ function addCollection() {
 </script>
 
 <template>
-  <AppPageHeader title="Collections">
+  <AppPageHeader :title="__('Collections')">
     <template #actions>
-      <Button label="Create collection" icon-left="lucide-plus" variant="solid" theme="gray" @click="addCollection" />
+      <Button :label="__('Create collection')" icon-left="lucide-plus" variant="solid" theme="gray" @click="addCollection" />
     </template>
   </AppPageHeader>
 
@@ -60,8 +61,8 @@ function addCollection() {
         :columns="['minmax(9rem,1fr)', '6rem']"
       >
         <ListHeader>
-          <ListHeaderCell>Collection</ListHeaderCell>
-          <ListHeaderCell>Products</ListHeaderCell>
+          <ListHeaderCell>{{ __('Collection') }}</ListHeaderCell>
+          <ListHeaderCell>{{ __('Products') }}</ListHeaderCell>
         </ListHeader>
         <!-- `loading` flips on every param change and the request keeps the previous
              `data`, so guarding on it alone would blank a loaded table on each page
@@ -81,8 +82,8 @@ function addCollection() {
     <EmptyState
       v-if="!collectionsRequest.loading && !rows.length"
       icon="lucide-layers"
-      title="No collections yet"
-      description="Create one to start filing products under it."
+      :title="__('No collections yet')"
+      :description="__('Create one to start filing products under it.')"
     />
   </PageBody>
 </template>

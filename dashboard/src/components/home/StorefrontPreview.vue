@@ -27,7 +27,7 @@ watch(
       target="_blank"
       rel="noopener"
       class="group relative block overflow-hidden rounded-6 border border-outline-gray-2 bg-surface-base shadow-lg transition-transform duration-200 ease-out-strong active:scale-[0.99] motion-reduce:transition-none hover:-translate-y-0.5"
-      :aria-label="live ? 'View your storefront' : 'Preview your storefront'"
+      :aria-label="live ? __('View your storefront') : __('Preview your storefront')"
     >
       <div class="flex items-center gap-1.5 border-b border-outline-gray-1 bg-surface-gray-1 px-3 py-2">
         <span v-for="dot in 3" :key="dot" class="size-2 rounded-full bg-surface-gray-4" />
@@ -66,7 +66,7 @@ watch(
         class="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-focus-visible:opacity-100 group-hover:opacity-100"
       >
         <span class="flex items-center gap-1.5 rounded-full bg-surface-base px-3 py-1.5 text-sm text-ink-gray-8 shadow-md">
-          {{ live ? 'View store' : 'Preview store' }}
+          {{ live ? __('View store') : __('Preview store') }}
           <span class="lucide-arrow-up-right size-3.5" aria-hidden="true" />
         </span>
       </div>
@@ -86,7 +86,7 @@ watch(
         <span :key="live ? 'live' : 'private'" class="flex items-center gap-1.5">
           <span v-if="live" class="size-2 rounded-full bg-surface-green-7" />
           <span v-else class="lucide-lock size-3" aria-hidden="true" />
-          {{ live ? 'Live' : 'Private' }}
+          {{ live ? __('Live') : __('Private') }}
         </span>
       </Transition>
     </div>

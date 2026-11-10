@@ -22,6 +22,7 @@ import { openImport } from '../data/importFlow'
 import { openAddProduct } from '../data/addProduct'
 import { confirmInstallDemoData } from '../data/demoData'
 import { usePluginRun } from '../data/recordPlugins'
+import { __ } from '../data/translation'
 
 const LIMIT = 5
 
@@ -30,7 +31,7 @@ const query = ref('')
 
 useKeyboardShortcut({
   combo: 'Mod+K',
-  description: 'Search',
+  description: __('Search'),
   handler: () => (search.open = !search.open),
   allowInInput: true,
 })
@@ -92,34 +93,34 @@ const noRecordHits = computed(
 const noMatchState = computed(() => ({
   compact: true,
   icon: 'lucide-search',
-  title: `Nothing matches “${needle.value}”`,
-  description: 'Try a product name, an order number, or a customer.',
+  title: __('Nothing matches “{0}”', [needle.value]),
+  description: __('Try a product name, an order number, or a customer.'),
 }))
 
 // Includes the screens the sidebar does not list but that are still real destinations.
 const GO_TO = [
-  { id: 'go-home', label: 'Overview', icon: 'lucide-layout-dashboard', keywords: ['home', 'dashboard'], run: () => router.push('/') },
-  { id: 'go-orders', label: 'Orders', icon: 'lucide-shopping-bag', keywords: ['sales'], run: () => router.push('/orders') },
-  { id: 'go-customers', label: 'Customers', icon: 'lucide-users', keywords: ['people', 'buyers'], run: () => router.push('/customers') },
-  { id: 'go-products', label: 'Products', icon: 'lucide-package', keywords: ['catalogue', 'catalog'], run: () => router.push('/products') },
-  { id: 'go-inventory', label: 'Inventory', icon: 'lucide-boxes', keywords: ['stock', 'warehouse'], run: () => router.push('/inventory') },
-  { id: 'go-pricing', label: 'Bulk edit prices', icon: 'lucide-indian-rupee', keywords: ['price', 'margin', 'reprice'], run: () => router.push('/pricing') },
-  { id: 'go-revenue', label: 'Revenue report', icon: 'lucide-banknote', keywords: ['analytics', 'sales', 'refunds'], run: () => router.push('/analytics/revenue') },
-  { id: 'go-stock-report', label: 'Inventory report', icon: 'lucide-chart-line', keywords: ['analytics', 'dead stock', 'cover'], run: () => router.push('/analytics/inventory') },
-  { id: 'go-storefront-report', label: 'Storefront report', icon: 'lucide-globe', keywords: ['analytics', 'sessions', 'funnel'], run: () => router.push('/analytics/storefront') },
-  { id: 'go-theme', label: 'Storefront theme', icon: 'lucide-palette', keywords: ['design', 'brand'], run: () => router.push('/storefront/theme') },
+  { id: 'go-home', label: __('Overview'), icon: 'lucide-layout-dashboard', keywords: ['home', 'dashboard'], run: () => router.push('/') },
+  { id: 'go-orders', label: __('Orders'), icon: 'lucide-shopping-bag', keywords: ['sales'], run: () => router.push('/orders') },
+  { id: 'go-customers', label: __('Customers'), icon: 'lucide-users', keywords: ['people', 'buyers'], run: () => router.push('/customers') },
+  { id: 'go-products', label: __('Products'), icon: 'lucide-package', keywords: ['catalogue', 'catalog'], run: () => router.push('/products') },
+  { id: 'go-inventory', label: __('Inventory'), icon: 'lucide-boxes', keywords: ['stock', 'warehouse'], run: () => router.push('/inventory') },
+  { id: 'go-pricing', label: __('Bulk edit prices'), icon: 'lucide-indian-rupee', keywords: ['price', 'margin', 'reprice'], run: () => router.push('/pricing') },
+  { id: 'go-revenue', label: __('Revenue report'), icon: 'lucide-banknote', keywords: ['analytics', 'sales', 'refunds'], run: () => router.push('/analytics/revenue') },
+  { id: 'go-stock-report', label: __('Inventory report'), icon: 'lucide-chart-line', keywords: ['analytics', 'dead stock', 'cover'], run: () => router.push('/analytics/inventory') },
+  { id: 'go-storefront-report', label: __('Storefront report'), icon: 'lucide-globe', keywords: ['analytics', 'sessions', 'funnel'], run: () => router.push('/analytics/storefront') },
+  { id: 'go-theme', label: __('Storefront theme'), icon: 'lucide-palette', keywords: ['design', 'brand'], run: () => router.push('/storefront/theme') },
   ...pluginPageCommands().map((page) => ({ ...page, run: () => router.push(page.to) })),
 ]
 
 const CREATE = [
-  { id: 'new-product', label: 'New product', icon: 'lucide-plus', keywords: ['add', 'create'], run: openAddProduct },
-  { id: 'import', label: 'Import products from CSV', icon: 'lucide-upload', keywords: ['csv', 'bulk', 'shopify', 'migrate'], run: openImport },
-  { id: 'receive', label: 'Receive stock', icon: 'lucide-package-plus', keywords: ['inward', 'grn'], run: () => router.push('/inventory') },
-  { id: 'demo-data', label: 'Install demo data', icon: 'lucide-database', keywords: ['demo', 'sample', 'seed', 'example'], run: confirmInstallDemoData },
+  { id: 'new-product', label: __('New product'), icon: 'lucide-plus', keywords: ['add', 'create'], run: openAddProduct },
+  { id: 'import', label: __('Import products from CSV'), icon: 'lucide-upload', keywords: ['csv', 'bulk', 'shopify', 'migrate'], run: openImport },
+  { id: 'receive', label: __('Receive stock'), icon: 'lucide-package-plus', keywords: ['inward', 'grn'], run: () => router.push('/inventory') },
+  { id: 'demo-data', label: __('Install demo data'), icon: 'lucide-database', keywords: ['demo', 'sample', 'seed', 'example'], run: confirmInstallDemoData },
 ]
 
 const SETTINGS = [
-  { id: 'settings', label: 'Open settings', icon: 'lucide-settings', keywords: ['preferences', 'config'], run: () => openSettings() },
+  { id: 'settings', label: __('Open settings'), icon: 'lucide-settings', keywords: ['preferences', 'config'], run: () => openSettings() },
   ...SETTINGS_TABS.map((tab) => ({
     id: `settings-${tab.value}`,
     label: tab.label,
@@ -141,10 +142,10 @@ async function startPlugin(entry) {
 const PLUGINS = pluginCommands().map((command) => ({ ...command, suffix: command.appTitle, run: () => startPlugin(command.entry) }))
 
 const ALL = [
-  { label: 'Go to', commands: GO_TO },
-  { label: 'Create', commands: CREATE },
-  { label: 'Settings', commands: SETTINGS },
-  { label: 'Plugins', commands: PLUGINS },
+  { label: __('Go to'), commands: GO_TO },
+  { label: __('Create'), commands: CREATE },
+  { label: __('Settings'), commands: SETTINGS },
+  { label: __('Plugins'), commands: PLUGINS },
 ]
 
 // Before you type, the palette is a short menu — the five destinations worth a
@@ -152,9 +153,9 @@ const ALL = [
 const SUGGESTED_SETTING_IDS = ['settings', 'settings-appearance', 'settings-payments']
 
 const SUGGESTED = [
-  { label: 'Jump to', commands: GO_TO.slice(0, 5) },
-  { label: 'Create', commands: CREATE.slice(0, 2) },
-  { label: 'Settings', commands: SETTINGS.filter((command) => SUGGESTED_SETTING_IDS.includes(command.id)) },
+  { label: __('Jump to'), commands: GO_TO.slice(0, 5) },
+  { label: __('Create'), commands: CREATE.slice(0, 2) },
+  { label: __('Settings'), commands: SETTINGS.filter((command) => SUGGESTED_SETTING_IDS.includes(command.id)) },
 ]
 
 // The palette's own filter is off so the record rows can be ranked by hand;
@@ -189,21 +190,21 @@ function onSelect(value) {
     v-model:query="query"
     class="palette"
     :filterable="false"
-    title="Search Commera"
+    :title="__('Search Commera')"
     @select="onSelect"
   >
-    <CommandPaletteInput placeholder="Search products, orders and customers, or type a command…" />
+    <CommandPaletteInput :placeholder="__('Search products, orders and customers, or type a command…')" />
 
     <!-- One scroll region, capped: the list never grows past the fold. -->
     <CommandPaletteList class="max-h-[21rem] py-1.5">
-      <CommandPaletteGroup v-if="productHits.length" label="Products">
+      <CommandPaletteGroup v-if="productHits.length" :label="__('Products')">
         <CommandPaletteItem
           v-for="product in productHits"
           :key="product.name"
           :value="{ kind: 'product', id: product.name }"
         >
           <template #prefix>
-            <span class="lucide-package mr-2.5 size-4 shrink-0 text-ink-gray-5" aria-hidden="true" />
+            <span class="lucide-package me-2.5 size-4 shrink-0 text-ink-gray-5" aria-hidden="true" />
           </template>
           {{ product.title }}
           <template #suffix>
@@ -212,14 +213,14 @@ function onSelect(value) {
         </CommandPaletteItem>
       </CommandPaletteGroup>
 
-      <CommandPaletteGroup v-if="orderHits.length" label="Orders">
+      <CommandPaletteGroup v-if="orderHits.length" :label="__('Orders')">
         <CommandPaletteItem
           v-for="order in orderHits"
           :key="order.name"
           :value="{ kind: 'order', id: order.name }"
         >
           <template #prefix>
-            <span class="lucide-shopping-bag mr-2.5 size-4 shrink-0 text-ink-gray-5" aria-hidden="true" />
+            <span class="lucide-shopping-bag me-2.5 size-4 shrink-0 text-ink-gray-5" aria-hidden="true" />
           </template>
           {{ order.name }} · {{ order.customer }}
           <template #suffix>
@@ -228,14 +229,14 @@ function onSelect(value) {
         </CommandPaletteItem>
       </CommandPaletteGroup>
 
-      <CommandPaletteGroup v-if="customerHits.length" label="Customers">
+      <CommandPaletteGroup v-if="customerHits.length" :label="__('Customers')">
         <CommandPaletteItem
           v-for="customer in customerHits"
           :key="customer.id"
           :value="{ kind: 'customer', id: customer.id }"
         >
           <template #prefix>
-            <span class="lucide-user mr-2.5 size-4 shrink-0 text-ink-gray-5" aria-hidden="true" />
+            <span class="lucide-user me-2.5 size-4 shrink-0 text-ink-gray-5" aria-hidden="true" />
           </template>
           {{ customer.name }}
           <template #suffix>
@@ -244,18 +245,18 @@ function onSelect(value) {
         </CommandPaletteItem>
       </CommandPaletteGroup>
 
-      <CommandPaletteGroup v-if="collectionHits.length" label="Collections">
+      <CommandPaletteGroup v-if="collectionHits.length" :label="__('Collections')">
         <CommandPaletteItem
           v-for="collection in collectionHits"
           :key="collection.name"
           :value="{ kind: 'collection', id: collection.name }"
         >
           <template #prefix>
-            <span class="lucide-layers mr-2.5 size-4 shrink-0 text-ink-gray-5" aria-hidden="true" />
+            <span class="lucide-layers me-2.5 size-4 shrink-0 text-ink-gray-5" aria-hidden="true" />
           </template>
           {{ collection.name }}
           <template #suffix>
-            <span class="text-sm text-ink-gray-5">{{ collection.count }} products</span>
+            <span class="text-sm text-ink-gray-5">{{ __('{0} products', [collection.count]) }}</span>
           </template>
         </CommandPaletteItem>
       </CommandPaletteGroup>
@@ -271,7 +272,7 @@ function onSelect(value) {
           :value="{ kind: 'command', id: command.id }"
         >
           <template #prefix>
-            <Icon :name="command.icon" class="mr-2.5 size-4 shrink-0 text-ink-gray-5" />
+            <Icon :name="command.icon" class="me-2.5 size-4 shrink-0 text-ink-gray-5" />
           </template>
           {{ command.label }}
           <template v-if="command.suffix" #suffix>
@@ -287,13 +288,13 @@ function onSelect(value) {
 
     <CommandPaletteFooter>
       <span class="flex items-center gap-1.5 text-sm text-ink-gray-5">
-        <KeyboardShortcut combo="ArrowUp" /><KeyboardShortcut combo="ArrowDown" /> Navigate
+        <KeyboardShortcut combo="ArrowUp" /><KeyboardShortcut combo="ArrowDown" /> {{ __('Navigate') }}
       </span>
       <span class="flex items-center gap-1.5 text-sm text-ink-gray-5">
-        <KeyboardShortcut combo="Enter" /> Open
+        <KeyboardShortcut combo="Enter" /> {{ __('Open') }}
       </span>
-      <span class="ml-auto flex items-center gap-1.5 text-sm text-ink-gray-5">
-        <KeyboardShortcut combo="Esc" /> Close
+      <span class="ms-auto flex items-center gap-1.5 text-sm text-ink-gray-5">
+        <KeyboardShortcut combo="Esc" /> {{ __('Close') }}
       </span>
     </CommandPaletteFooter>
   </CommandPalette>

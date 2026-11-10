@@ -55,8 +55,8 @@ function pinBeforeLeave(element) {
   <div v-else class="rounded-6 border border-dashed border-outline-gray-2 py-6">
     <EmptyState
       icon="lucide-party-popper"
-      title="You are all caught up"
-      description="New suggestions show up here as your store grows."
+      :title="__('You are all caught up')"
+      :description="__('New suggestions show up here as your store grows.')"
       compact
     />
   </div>

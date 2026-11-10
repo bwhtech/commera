@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Alert } from 'frappe-ui'
 import { useDeliveryRetry } from '../data/pluginEvents'
+import { __ } from '../data/translation'
 
 const props = defineProps({
   failures: { type: Array, default: () => [] },
@@ -27,7 +28,7 @@ function retry(failure) {
 function retryAlertAction(failure) {
   if (!failure.rows.some((row) => row.can_retry)) return undefined
   return {
-    label: 'Retry',
+    label: __('Retry'),
     iconLeft: 'lucide-rotate-cw',
     loading: retryingApp.value === failure.app,
     disabled: Boolean(retryingApp.value),
@@ -37,7 +38,7 @@ function retryAlertAction(failure) {
 
 function description(failure) {
   const count = failure.rows.length
-  return count === 1 ? 'One update did not reach it.' : `${count} updates did not reach it.`
+  return count === 1 ? __('One update did not reach it.') : __('{0} updates did not reach it.', [count])
 }
 </script>
 
@@ -47,7 +48,7 @@ function description(failure) {
       v-for="failure in failuresByApp"
       :key="failure.app"
       theme="red"
-      :title="`${failure.app} couldn't process this order`"
+      :title="__('{0} could not process this order', [failure.app])"
       :description="description(failure)"
       :primary-action="retryAlertAction(failure)"
     />

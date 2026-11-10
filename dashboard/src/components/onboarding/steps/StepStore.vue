@@ -4,6 +4,7 @@ import { Combobox, FormControl, Select, TextInput } from 'frappe-ui'
 import { getCountryDefaults, storeSetup } from '../../../data/onboarding'
 import { CATEGORIES, draft, flow } from '../../../ia/onboarding'
 import { abbreviate, missingField, toOptions } from '../../../ia/onboardingSteps'
+import { __ } from '../../../data/translation'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -32,7 +33,7 @@ const chartOptions = computed(() =>
   toOptions(countryCharts.value ?? options.value.charts_of_accounts ?? STANDARD_CHARTS),
 )
 const accountingSummary = computed(() =>
-  [draft.currency, draft.timeZone, draft.chartOfAccounts === 'Standard' ? 'Standard accounts' : draft.chartOfAccounts]
+  [draft.currency, draft.timeZone, draft.chartOfAccounts === 'Standard' ? __('Standard accounts') : draft.chartOfAccounts]
     .filter(Boolean)
     .join(' · '),
 )
@@ -58,15 +59,15 @@ watch(
   <div class="space-y-5">
     <FormControl
       v-model="draft.storeName"
-      label="Store name"
+      :label="__('Store name')"
       autocomplete="organization"
       :disabled="isRunning"
-      :description="isRunning ? 'You can change the name once setup finishes.' : ''"
-      :error="missing === 'storeName' ? 'Required' : ''"
+      :description="isRunning ? __('You can change the name once setup finishes.') : ''"
+      :error="missing === 'storeName' ? __('Required') : ''"
     />
 
     <div>
-      <p class="mb-2 text-xs" :class="missing === 'storeCategory' ? 'text-ink-red-6' : 'text-ink-gray-6'">You sell</p>
+      <p class="mb-2 text-xs" :class="missing === 'storeCategory' ? 'text-ink-red-6' : 'text-ink-gray-6'">{{ __('You sell') }}</p>
       <div class="grid grid-cols-3 gap-2">
         <button
           v-for="option in CATEGORIES"
@@ -83,7 +84,7 @@ watch(
           @click="draft.storeCategory = option.value"
         >
           <span :class="option.icon" class="size-5" aria-hidden="true" />
-          <span class="truncate">{{ option.value }}</span>
+          <span class="truncate">{{ __(option.value) }}</span>
         </button>
       </div>
     </div>
@@ -91,8 +92,8 @@ watch(
     <Combobox
       v-model="draft.country"
       trigger="button"
-      label="Country"
-      placeholder="Search countries"
+      :label="__('Country')"
+      :placeholder="__('Search countries')"
       :options="toOptions(options.countries)"
       :disabled="isLocked"
     />
@@ -124,28 +125,28 @@ watch(
             <Combobox
               v-model="draft.currency"
               trigger="button"
-              label="Currency"
+              :label="__('Currency')"
               :options="toOptions(options.currencies)"
               :disabled="isLocked"
             />
             <Combobox
               v-model="draft.timeZone"
               trigger="button"
-              label="Time zone"
+              :label="__('Time zone')"
               :options="toOptions(options.time_zones)"
               :disabled="isLocked"
             />
-            <Select v-model="draft.chartOfAccounts" label="Chart of accounts" :options="chartOptions" :disabled="isLocked" />
+            <Select v-model="draft.chartOfAccounts" :label="__('Chart of accounts')" :options="chartOptions" :disabled="isLocked" />
             <Select
               v-model="draft.fiscalYearStartMonth"
-              label="Year starts"
-              placeholder="Country default"
+              :label="__('Year starts')"
+              :placeholder="__('Country default')"
               :options="MONTHS"
               :disabled="isLocked"
             />
             <TextInput
               v-model="draft.companyAbbr"
-              label="Short code"
+              :label="__('Short code')"
               :placeholder="abbreviate(draft.storeName)"
               :disabled="isLocked"
             />

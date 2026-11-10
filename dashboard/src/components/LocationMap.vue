@@ -9,6 +9,7 @@ import 'leaflet/dist/leaflet.css'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
+import { __ } from '../data/translation'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -96,7 +97,7 @@ onMounted(() => {
   map = L.map(container.value).setView(point ?? [20, 0], point ? STREET_ZOOM : WORLD_ZOOM)
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors',
+    attribution: `&copy; ${__('OpenStreetMap contributors')}`,
   }).addTo(map)
 
   if (point) placeMarker(point)

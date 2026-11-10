@@ -12,6 +12,7 @@ import { customDomain, loadDomains } from '../data/cloudDomains'
 import { buildHomeTasks, describeStoreStatus, listBlockers, needsPreviewCapture, storeSlug } from '../data/home'
 import { captureStorePreview } from '../data/storePreview'
 import { isStorefrontPublished } from '../data/storefront'
+import { __ } from '../data/translation'
 import { dismissTask, dismissedTasks, homeArrival, restoreTasks } from '../ia/homeTasks'
 import { lookFor } from '../ia/onboarding'
 import { whenIdle } from '../utils/whenIdle'
@@ -75,34 +76,34 @@ const status = computed(() => describeStoreStatus(isLive.value, blockers.value.l
 
 const publishOpen = ref(false)
 const unpublishOpen = ref(false)
-const storeName = computed(() => home.value?.store_name || 'your store')
+const storeName = computed(() => home.value?.store_name || __('your store'))
 
 async function setPublished(published, close) {
   if (!(await trySubmit(publishAction, { published: published ? 1 : 0 }))) return
   isStorefrontPublished.value = published
   close()
   homeRequest.reload()
-  toast.success(published ? `${storeName.value} is live` : 'Your store is private again')
+  toast.success(published ? __('{0} is live', [storeName.value]) : __('Your store is private again'))
 }
 
 const publishActions = computed(() => {
-  const publish = { label: blockers.value.length ? 'Publish anyway' : 'Publish store', onClick: ({ close }) => setPublished(true, close) }
+  const publish = { label: blockers.value.length ? __('Publish anyway') : __('Publish store'), onClick: ({ close }) => setPublished(true, close) }
   if (!blockers.value.length) return [{ ...publish, variant: 'solid' }]
-  return [{ label: 'Finish setup first', variant: 'solid', onClick: ({ close }) => close() }, publish]
+  return [{ label: __('Finish setup first'), variant: 'solid', onClick: ({ close }) => close() }, publish]
 })
 
 async function copyLink() {
   try {
     await navigator.clipboard.writeText(storeUrl.value)
-    toast.success('Link copied')
+    toast.success(__('Link copied'))
   } catch {
-    toast.error('Could not copy the link')
+    toast.error(__('Could not copy the link'))
   }
 }
 </script>
 
 <template>
-  <AppPageHeader title="Home" />
+  <AppPageHeader :title="__('Home')" />
 
   <PageBody width="wide">
     <section class="flex flex-col gap-10 pt-4 sm:flex-row sm:items-center sm:gap-12">
@@ -130,13 +131,13 @@ async function copyLink() {
               <p class="mt-2 text-p-lg text-ink-gray-6">{{ status.subline }}</p>
               <div class="mt-6 flex flex-wrap items-center gap-2">
                 <template v-if="isLive">
-                  <Button variant="solid" size="md" label="View store" icon-right="lucide-arrow-up-right" :href="storeUrl" />
-                  <Button size="md" label="Copy link" icon-left="lucide-copy" @click="copyLink" />
+                  <Button variant="solid" size="md" :label="__('View store')" icon-right="lucide-arrow-up-right" :href="storeUrl" />
+                  <Button size="md" :label="__('Copy link')" icon-left="lucide-copy" @click="copyLink" />
                   <Button
                     v-if="home.can_publish"
                     variant="ghost"
                     size="md"
-                    label="Make private"
+                    :label="__('Make private')"
                     icon-left="lucide-lock"
                     @click="unpublishOpen = true"
                   />
@@ -146,16 +147,16 @@ async function copyLink() {
                     v-if="home.can_publish"
                     variant="solid"
                     size="md"
-                    label="Publish store"
+                    :label="__('Publish store')"
                     icon-left="lucide-rocket"
                     @click="publishOpen = true"
                   />
-                  <Button size="md" label="Preview" icon-right="lucide-arrow-up-right" :href="storeUrl" />
+                  <Button size="md" :label="__('Preview')" icon-right="lucide-arrow-up-right" :href="storeUrl" />
                 </template>
               </div>
               <p v-if="!isLive" class="mt-3 flex items-center gap-1.5 text-sm text-ink-gray-5">
                 <span class="lucide-lock size-3.5 shrink-0" aria-hidden="true" />
-                Visitors see a coming-soon page.
+                {{ __('Visitors see a coming-soon page.') }}
               </p>
             </div>
 
@@ -176,7 +177,7 @@ async function copyLink() {
           <template #after-stats>
             <section v-if="openTasks.length" class="mt-10">
               <TaskHeading
-                title="Grow your store"
+                :title="__('Grow your store')"
                 :done="doneCount"
                 :total="tasks.length"
                 :dismissed-count="dismissedCount"
@@ -189,7 +190,7 @@ async function copyLink() {
 
         <section v-else-if="home">
           <TaskHeading
-            title="Get ready to sell"
+            :title="__('Get ready to sell')"
             :done="doneCount"
             :total="tasks.length"
             :dismissed-count="dismissedCount"
@@ -207,23 +208,23 @@ async function copyLink() {
 
   <Dialog
     v-model:open="publishOpen"
-    :title="blockers.length ? 'Publish before you can sell?' : `Publish ${storeName}?`"
+    :title="blockers.length ? __('Publish before you can sell?') : __('Publish {0}?', [storeName])"
     icon="lucide-rocket"
     :theme="blockers.length ? 'amber' : 'green'"
     :message="
       blockers.length
-        ? `You have not set up ${listBlockers(blockers)} yet. Visitors can browse, but checkout will not work.`
-        : `Anyone with the link to ${host} can browse and buy. You can make it private again any time.`
+        ? __('You have not set up {0} yet. Visitors can browse, but checkout will not work.', [listBlockers(blockers)])
+        : __('Anyone with the link to {0} can browse and buy. You can make it private again any time.', [host])
     "
     :actions="publishActions"
   />
 
   <Dialog
     v-model:open="unpublishOpen"
-    title="Make your store private?"
+    :title="__('Make your store private?')"
     icon="lucide-lock"
     theme="amber"
-    message="Visitors will see a coming-soon page and cannot place orders until you publish again."
-    :actions="[{ label: 'Make private', variant: 'solid', onClick: ({ close }) => setPublished(false, close) }]"
+    :message="__('Visitors will see a coming-soon page and cannot place orders until you publish again.')"
+    :actions="[{ label: __('Make private'), variant: 'solid', onClick: ({ close }) => setPublished(false, close) }]"
   />
 </template>

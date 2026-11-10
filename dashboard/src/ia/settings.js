@@ -2,6 +2,7 @@ import { watch } from 'vue'
 import { settings as settingsState } from './settingsRoute'
 import { isCloudBillingAvailable } from '../data/cloudBilling'
 import { isCloudDomainsAvailable } from '../data/cloudDomains'
+import { __ } from '../data/translation'
 import { pluginSettingsTabs } from './plugins'
 
 // Derived from the URL in ia/settingsRoute; re-exported because this is still the door the
@@ -26,67 +27,67 @@ export function onSettingsClose(reset) {
 export const SETTINGS_TABS = [
   {
     value: 'general',
-    label: 'General',
+    label: __('General'),
     icon: 'lucide-store',
     keywords: ['store', 'shop', 'name', 'address', 'currency', 'timezone', 'contact', 'company'],
   },
   {
     value: 'appearance',
-    label: 'Appearance',
+    label: __('Appearance'),
     icon: 'lucide-sun-moon',
     keywords: ['theme', 'dark', 'light', 'colour', 'color', 'logo', 'brand'],
   },
   {
     value: 'emails',
-    label: 'Emails',
+    label: __('Emails'),
     icon: 'lucide-mail',
     keywords: ['email', 'template', 'order confirmation', 'cancellation', 'back in stock', 'notification'],
   },
   {
     value: 'payments',
-    label: 'Payments',
+    label: __('Payments'),
     icon: 'lucide-credit-card',
     keywords: ['stripe', 'razorpay', 'upi', 'card', 'keys', 'gateway', 'checkout', 'cash on delivery', 'cod', 'refund'],
   },
   {
     value: 'shipping',
-    label: 'Shipping',
+    label: __('Shipping'),
     icon: 'lucide-truck',
     keywords: ['carrier', 'shiprocket', 'aftership', 'rates', 'courier', 'delivery', 'tracking', 'free shipping'],
   },
   {
     value: 'locations',
-    label: 'Pickup locations',
+    label: __('Pickup locations'),
     icon: 'lucide-map-pin',
     keywords: ['pickup', 'warehouse', 'collect', 'store pickup', 'branch', 'address'],
   },
   {
     value: 'checkout',
-    label: 'Checkout',
+    label: __('Checkout'),
     icon: 'lucide-shopping-cart',
     keywords: ['checkout', 'guest', 'guest checkout', 'order link', 'track order', 'without account'],
   },
   {
     value: 'apps',
-    label: 'Analytics',
+    label: __('Analytics'),
     icon: 'lucide-chart-line',
     keywords: ['ga4', 'google analytics', 'pixel', 'tracking', 'meta', 'apps', 'integrations'],
   },
   {
     value: 'plugins',
-    label: 'Plugins',
+    label: __('Plugins'),
     icon: 'lucide-blocks',
     keywords: ['plugins', 'apps', 'installed', 'deliveries', 'failed', 'retry'],
   },
   {
     value: 'webhooks',
-    label: 'Webhooks',
+    label: __('Webhooks'),
     icon: 'lucide-webhook',
     keywords: ['webhooks', 'headless', 'storefront', 'events', 'endpoint', 'signing secret', 'hmac', 'integration'],
   },
   {
     value: 'advanced',
-    label: 'Advanced',
+    label: __('Advanced'),
     icon: 'lucide-sliders-horizontal',
     keywords: ['developer', 'api', 'reset', 'danger', 'cache', 'debug'],
   },
@@ -96,7 +97,7 @@ export const SETTINGS_TABS = [
     ? [
         {
           value: 'billing',
-          label: 'Billing',
+          label: __('Billing'),
           icon: 'lucide-receipt',
           keywords: ['billing', 'plan', 'subscription', 'invoice', 'payment method', 'trial', 'frappe cloud'],
         },
@@ -106,7 +107,7 @@ export const SETTINGS_TABS = [
     ? [
         {
           value: 'domains',
-          label: 'Domains',
+          label: __('Domains'),
           icon: 'lucide-globe',
           keywords: ['domain', 'custom domain', 'dns', 'ssl', 'certificate', 'url', 'address', 'frappe cloud'],
         },

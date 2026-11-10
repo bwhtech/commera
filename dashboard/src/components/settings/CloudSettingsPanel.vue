@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { ErrorMessage } from 'frappe-ui'
 import { closeCloudSettings, openCloudSettings } from '@frappe/cloud-sdk'
 import { cloudContext } from '../../data/cloudBilling'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   panel: { type: String, required: true },
@@ -36,7 +37,7 @@ onMounted(async () => {
     })
     watchOverlays()
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : 'Could not open Frappe Cloud settings.'
+    error.value = reason instanceof Error ? reason.message : __('Could not open Frappe Cloud settings.')
   }
 })
 

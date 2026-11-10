@@ -19,6 +19,7 @@ import { erpnextLink, printUrl } from '../data/erpnext'
 import { errorMessage } from '../data/errors'
 import { discountMoney, longDate, money } from '../data/format'
 import { useRecordPlugins } from '../data/recordPlugins'
+import { __ } from '../data/translation'
 
 const route = useRoute()
 
@@ -69,14 +70,14 @@ const erpLink = computed(() => (order.value ? erpnextLink('Sales Order', order.v
 // the labelled button is a desktop convenience on top of it.
 const orderActions = [
   {
-    label: 'View in ERP',
+    label: __('View in ERP'),
     icon: 'lucide-external-link',
     onClick: () => window.open(erpLink.value, '_blank', 'noopener'),
   },
   // An unpaid or uninvoiced order has no Sales Invoice to print, so the row is
   // not offered at all rather than offered and then apologised for.
   {
-    label: 'Print invoice',
+    label: __('Print invoice'),
     icon: 'lucide-printer',
     condition: () => Boolean(order.value?.invoices?.length),
     onClick: () => window.open(printUrl('Sales Invoice', order.value.invoices), '_blank', 'noopener'),
@@ -84,14 +85,14 @@ const orderActions = [
   // Nothing is refundable on a COD, unpaid or already fully refunded order, so
   // the row is not offered at all rather than offered and then apologised for.
   {
-    label: 'Refund',
+    label: __('Refund'),
     icon: 'lucide-rotate-ccw',
     condition: () => Boolean(refundStatus.value.can_refund),
     onClick: () => (refundOpen.value = true),
   },
 ]
 
-const moreActions = computed(() => [{ group: 'Order', options: orderActions }, actionGroup.value].filter(Boolean))
+const moreActions = computed(() => [{ group: __('Order'), options: orderActions }, actionGroup.value].filter(Boolean))
 
 const fulfilAction = useAdminAction('orders.fulfil_order')
 
@@ -105,7 +106,7 @@ async function fulfil() {
   try {
     const fulfilled = await trySubmit(fulfilAction, { sales_order: order.value.name })
     if (!fulfilled) return
-    toast.success('Fulfilment created')
+    toast.success(__('Fulfilment created'))
     await orderRequest.reload()
   } finally {
     fulfilling.value = false
@@ -127,13 +128,13 @@ const loadFailure = computed(() =>
   orderRequest.error
     ? {
         icon: 'lucide-triangle-alert',
-        title: 'Could not load this order',
+        title: __('Could not load this order'),
         description: errorMessage(orderRequest.error),
       }
     : {
         icon: 'lucide-search-x',
-        title: 'Order not found',
-        description: `No order matches ${route.params.id}. It may have been deleted.`,
+        title: __('Order not found'),
+        description: __('No order matches {0}. It may have been deleted.', [route.params.id]),
       },
 )
 </script>
@@ -143,18 +144,18 @@ const loadFailure = computed(() =>
     <AppPageHeader
       :title="order.name"
       back-to="/orders"
-      :breadcrumbs="[{ label: 'Orders', route: '/orders' }, { label: order.name }]"
+      :breadcrumbs="[{ label: __('Orders'), route: '/orders' }, { label: order.name }]"
     >
       <template #actions>
         <!-- Three full label+icon buttons do not fit a phone header, so this one
              drops out below `sm` and the More menu's own entry carries it. -->
-        <Button class="hidden sm:inline-flex" label="View in ERP" icon-right="lucide-external-link" :href="erpLink" />
+        <Button class="hidden sm:inline-flex" :label="__('View in ERP')" icon-right="lucide-external-link" :href="erpLink" />
         <Dropdown :options="moreActions">
-          <Button icon="lucide-ellipsis" label="More actions" />
+          <Button icon="lucide-ellipsis" :label="__('More actions')" />
         </Dropdown>
         <Button
           v-if="order.items.some((item) => !item.delivered_by_supplier)"
-          label="Fulfil items"
+          :label="__('Fulfil items')"
           icon-left="lucide-truck"
           variant="solid"
           theme="gray"
@@ -182,7 +183,7 @@ const loadFailure = computed(() =>
 
       <OrderPluginFailures class="mt-4" :failures="order.plugin_failures" @retried="orderRequest.reload()" />
 
-      <!-- Where the order has reached, read left to right. -->
+      <!-- Where the order has reached, read in the reading direction. -->
       <OrderProgress class="mt-6" :progress="order.progress" />
 
       <!-- The lines and what they add up to are one thing, so they are one
@@ -190,10 +191,10 @@ const loadFailure = computed(() =>
       <div class="mt-5 space-y-6">
         <section class="rounded-5 border border-outline-gray-1">
             <div class="flex items-center justify-between px-4 py-3">
-              <h2 class="text-lg-semibold text-ink-gray-8">Items</h2>
+              <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Items') }}</h2>
               <div class="flex items-center gap-2">
                 <span class="text-sm text-ink-gray-5">
-                  {{ order.items.length }} {{ order.items.length === 1 ? 'line' : 'lines' }}
+                  {{ order.items.length === 1 ? __('1 line') : __('{0} lines', [order.items.length]) }}
                 </span>
                 <StatusBadge :status="order.state.key" :label="order.state.label" />
               </div>
@@ -216,20 +217,20 @@ const loadFailure = computed(() =>
                     {{ discount.label }} · {{ discountMoney(discount.amount) }}
                   </p>
                 </div>
-                <span class="w-28 text-right text-base text-ink-gray-5 tabular-nums">
+                <span class="w-28 text-end text-base text-ink-gray-5 tabular-nums">
                   {{ money(item.rate) }} × {{ item.qty }}
                 </span>
-                <span class="w-24 text-right text-base text-ink-gray-8 tabular-nums">
+                <span class="w-24 text-end text-base text-ink-gray-8 tabular-nums">
                   {{ money(item.amount) }}
                 </span>
               </div>
             </div>
 
-            <EmptyState v-if="!order.items.length" compact icon="lucide-package" title="No items on this order" />
+            <EmptyState v-if="!order.items.length" compact icon="lucide-package" :title="__('No items on this order')" />
 
             <div class="space-y-1.5 border-t border-outline-gray-1 px-4 py-3">
               <div class="flex justify-between text-base text-ink-gray-6">
-                <span>Subtotal</span><span class="tabular-nums">{{ money(order.total) }}</span>
+                <span>{{ __('Subtotal') }}</span><span class="tabular-nums">{{ money(order.total) }}</span>
               </div>
               <div
                 v-for="(discount, index) in order.order_discounts"
@@ -237,7 +238,7 @@ const loadFailure = computed(() =>
                 class="flex justify-between gap-3 text-base text-ink-gray-6"
               >
                 <span class="min-w-0 truncate">
-                  Discount<span v-if="discount.label" class="text-ink-gray-5"> · {{ discount.label }}</span>
+                  {{ __('Discount') }}<span v-if="discount.label" class="text-ink-gray-5"> · {{ discount.label }}</span>
                 </span>
                 <span class="shrink-0 tabular-nums">{{ discountMoney(discount.amount) }}</span>
               </div>
@@ -245,11 +246,11 @@ const loadFailure = computed(() =>
                 <!-- The service the shopper chose and paid for: an amount alone does not tell
                      whoever packs this which delivery option to book. -->
                 <span class="min-w-0 truncate">
-                  Shipping<span v-if="order.delivery_option" class="text-ink-gray-5">
+                  {{ __('Shipping') }}<span v-if="order.delivery_option" class="text-ink-gray-5">
                     · {{ order.delivery_option }}</span
                   >
                 </span>
-                <span class="shrink-0 tabular-nums">{{ shippingBeforeDiscount ? money(shippingBeforeDiscount) : 'Free' }}</span>
+                <span class="shrink-0 tabular-nums">{{ shippingBeforeDiscount ? money(shippingBeforeDiscount) : __('Free') }}</span>
               </div>
               <div
                 v-for="(discount, index) in order.shipping_discounts"
@@ -257,15 +258,15 @@ const loadFailure = computed(() =>
                 class="flex justify-between gap-3 text-base text-ink-gray-6"
               >
                 <span class="min-w-0 truncate">
-                  Shipping discount<span class="text-ink-gray-5"> · {{ discount.label }}</span>
+                  {{ __('Shipping discount') }}<span class="text-ink-gray-5"> · {{ discount.label }}</span>
                 </span>
                 <span class="shrink-0 tabular-nums">{{ discountMoney(discount.amount) }}</span>
               </div>
               <div v-if="order.cod_charge" class="flex justify-between text-base text-ink-gray-6">
-                <span>Cash on delivery charge</span><span class="tabular-nums">{{ money(order.cod_charge) }}</span>
+                <span>{{ __('Cash on delivery charge') }}</span><span class="tabular-nums">{{ money(order.cod_charge) }}</span>
               </div>
               <div class="flex justify-between text-base text-ink-gray-6">
-                <span>Tax</span><span class="tabular-nums">{{ money(order.tax) }}</span>
+                <span>{{ __('Tax') }}</span><span class="tabular-nums">{{ money(order.tax) }}</span>
               </div>
               <div
                 v-for="fee in order.plugin_fees"
@@ -275,7 +276,7 @@ const loadFailure = computed(() =>
                 <span>{{ fee.description }}</span><span class="tabular-nums">{{ money(fee.amount) }}</span>
               </div>
               <div class="flex justify-between pt-1 text-base-semibold text-ink-gray-9">
-                <span>Total</span><span class="tabular-nums">{{ money(order.grand_total) }}</span>
+                <span>{{ __('Total') }}</span><span class="tabular-nums">{{ money(order.grand_total) }}</span>
               </div>
             </div>
         </section>
@@ -293,7 +294,7 @@ const loadFailure = computed(() =>
         </PageBody>
       </ScrollArea>
 
-      <aside class="hidden w-[19rem] shrink-0 flex-col border-l border-outline-gray-1 lg:flex">
+      <aside class="hidden w-[19rem] shrink-0 flex-col border-s border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
           <OrderCustomerPanel :order="order" />
           <PluginSlot v-if="hasRail" :entries="cards" :record="record" frame="rail" @reload="reloadPlugins" />
@@ -317,7 +318,7 @@ const loadFailure = computed(() =>
     <AppPageHeader
       :title="route.params.id"
       back-to="/orders"
-      :breadcrumbs="[{ label: 'Orders', route: '/orders' }, { label: route.params.id }]"
+      :breadcrumbs="[{ label: __('Orders'), route: '/orders' }, { label: route.params.id }]"
     />
 
     <div class="flex min-h-0 flex-1 overflow-hidden">
@@ -360,7 +361,7 @@ const loadFailure = computed(() =>
         </PageBody>
       </ScrollArea>
 
-      <aside class="hidden w-[19rem] shrink-0 flex-col gap-4 border-l border-outline-gray-1 p-4 lg:flex">
+      <aside class="hidden w-[19rem] shrink-0 flex-col gap-4 border-s border-outline-gray-1 p-4 lg:flex">
         <Skeleton class="h-4 w-24 rounded-4" />
         <Skeleton class="h-4 w-40 rounded-4" />
         <Skeleton class="h-24 w-full rounded-4" />
@@ -375,7 +376,7 @@ const loadFailure = computed(() =>
     <AppPageHeader
       :title="route.params.id"
       back-to="/orders"
-      :breadcrumbs="[{ label: 'Orders', route: '/orders' }, { label: route.params.id }]"
+      :breadcrumbs="[{ label: __('Orders'), route: '/orders' }, { label: route.params.id }]"
     />
 
     <PageBody width="narrow">
@@ -384,7 +385,7 @@ const loadFailure = computed(() =>
         :title="loadFailure.title"
         :description="loadFailure.description"
       >
-        <Button label="Back to orders" variant="subtle" theme="gray" route="/orders" />
+        <Button :label="__('Back to orders')" variant="subtle" theme="gray" route="/orders" />
       </EmptyState>
     </PageBody>
   </template>

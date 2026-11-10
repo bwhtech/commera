@@ -2,6 +2,7 @@
 // and what the owner has typed so far. The server's truth lives in data/onboarding.js.
 import { computed, reactive, ref } from 'vue'
 import { bootValue, isAdmin } from '../data/boot'
+import { __ } from '../data/translation'
 import { STEPS, clampStep } from './onboardingSteps'
 
 const STEP_KEY = 'commera:onboarding-step'
@@ -92,12 +93,12 @@ export function adoptRecord(record) {
 }
 
 export const CATEGORIES = [
-  { value: 'Fashion', icon: 'lucide-shirt', hero: 'Wear it well.' },
-  { value: 'Beauty', icon: 'lucide-sparkles', hero: 'Glow, every day.' },
-  { value: 'Home', icon: 'lucide-sofa', hero: 'Make it home.' },
-  { value: 'Food', icon: 'lucide-coffee', hero: 'Small batch.' },
-  { value: 'Electronics', icon: 'lucide-headphones', hero: 'Sound, simplified.' },
-  { value: 'Other', icon: 'lucide-package', hero: 'Made with care.' },
+  { value: 'Fashion', icon: 'lucide-shirt', hero: __('Wear it well.') },
+  { value: 'Beauty', icon: 'lucide-sparkles', hero: __('Glow, every day.') },
+  { value: 'Home', icon: 'lucide-sofa', hero: __('Make it home.') },
+  { value: 'Food', icon: 'lucide-coffee', hero: __('Small batch.') },
+  { value: 'Electronics', icon: 'lucide-headphones', hero: __('Sound, simplified.') },
+  { value: 'Other', icon: 'lucide-package', hero: __('Made with care.') },
 ]
 
 // Stand-ins the preview shows faded until the owner has products of their own.

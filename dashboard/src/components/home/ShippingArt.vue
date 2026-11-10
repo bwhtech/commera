@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { __ } from '../../data/translation'
 
 const props = defineProps({ country: { type: String, default: '' } })
 
@@ -15,7 +16,7 @@ const CITIES = {
   'United States': 'Brooklyn',
   Germany: 'Berlin',
 }
-const city = computed(() => CITIES[props.country] ?? 'Your customer')
+const city = computed(() => CITIES[props.country] ?? __('Your customer'))
 </script>
 
 <template>
@@ -56,7 +57,7 @@ const city = computed(() => CITIES[props.country] ?? 'Your customer')
 
     <span class="absolute left-1/2 top-[6.5rem] flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-surface-base px-2 py-0.5 text-2xs text-ink-gray-7 shadow-sm ring-1 ring-outline-gray-1">
       <span class="lucide-clock size-3 text-ink-gray-5" aria-hidden="true" />
-      {{ city }} · Thursday
+      {{ __('{0} · Thursday', [city]) }}
     </span>
   </div>
 </template>

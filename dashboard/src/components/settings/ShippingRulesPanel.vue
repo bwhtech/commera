@@ -8,6 +8,7 @@ import ShippingRuleConfig from './ShippingRuleConfig.vue'
 import ShippingRuleRow from './ShippingRuleRow.vue'
 import { useDeliveryOptions } from '../../data/deliveryOptions'
 import { useShippingRates } from '../../data/shippingRates'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   active: { type: Boolean, default: false },
@@ -50,18 +51,18 @@ async function saveRule(values) {
 
 async function useAtCheckout(rule) {
   const { data } = await store.mutate('set_store_rule', { name: rule.name })
-  if (data) toast.success(`Checkout now uses ${rule.label}`)
+  if (data) toast.success(__('Checkout now uses {0}', [rule.label]))
 }
 
 function confirmDelete(rule) {
   dialog.confirm({
-    title: `Delete ${rule.label}?`,
-    message: 'Its bands go with it. Orders already placed keep the shipping they were charged.',
+    title: __('Delete {0}?', [rule.label]),
+    message: __('Its bands go with it. Orders already placed keep the shipping they were charged.'),
     theme: 'red',
-    confirmLabel: 'Delete',
+    confirmLabel: __('Delete'),
     onConfirm: async () => {
       const { data } = await store.mutate('delete_shipping_rule', { name: rule.name })
-      if (data) toast.success(`${rule.label} deleted`)
+      if (data) toast.success(__('{0} deleted', [rule.label]))
     },
   })
 }
@@ -81,13 +82,13 @@ function confirmDelete(rule) {
 
   <template v-else>
     <SettingsPanelHeader
-      title="Shipping rules"
-      description="The order-value bands checkout charges. Options with no matching band use their carrier rate or Backup Charge."
+      :title="__('Shipping rules')"
+      :description="__('The order-value bands checkout charges. Options with no matching band use their carrier rate or Backup Charge.')"
     >
       <template #actions>
         <Button
           v-if="store.loaded.value"
-          label="Add rule"
+          :label="__('Add rule')"
           icon-left="lucide-plus"
           variant="solid"
           theme="gray"
@@ -101,10 +102,10 @@ function confirmDelete(rule) {
         v-if="store.loadError.value"
         compact
         icon="lucide-triangle-alert"
-        title="Shipping rules could not be loaded"
-        description="Checkout still charges whatever is stored — this panel just cannot say what."
+        :title="__('Shipping rules could not be loaded')"
+        :description="__('Checkout still charges whatever is stored — this panel just cannot say what.')"
       >
-        <Button label="Try again" variant="subtle" theme="gray" @click="store.load()" />
+        <Button :label="__('Try again')" variant="subtle" theme="gray" @click="store.load()" />
       </EmptyState>
 
       <SettingsSkeleton
@@ -117,10 +118,10 @@ function confirmDelete(rule) {
         v-else-if="!store.rules.value.length"
         compact
         icon="lucide-receipt"
-        title="No shipping rules yet"
-        description="Add one to charge shipping by order value, per delivery option or for any of them."
+        :title="__('No shipping rules yet')"
+        :description="__('Add one to charge shipping by order value, per delivery option or for any of them.')"
       >
-        <Button label="Add rule" icon-left="lucide-plus" variant="subtle" theme="gray" @click="create" />
+        <Button :label="__('Add rule')" icon-left="lucide-plus" variant="subtle" theme="gray" @click="create" />
       </EmptyState>
 
       <div v-else class="divide-y divide-outline-gray-1">

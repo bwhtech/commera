@@ -9,15 +9,15 @@ const route = useRoute()
 </script>
 
 <template>
-  <AppPageHeader title="Page not found" />
+  <AppPageHeader :title="__('Page not found')" />
 
   <PageBody>
     <EmptyState
       icon="lucide-compass"
-      title="There is nothing at this address"
-      :description="`${route.fullPath} is not a screen in Commera.`"
+      :title="__('There is nothing at this address')"
+      :description="__('{0} is not a screen in Commera.', [route.fullPath])"
     >
-      <Button label="Go to Overview" variant="solid" theme="gray" route="/" />
+      <Button :label="__('Go to Overview')" variant="solid" theme="gray" route="/" />
     </EmptyState>
   </PageBody>
 </template>

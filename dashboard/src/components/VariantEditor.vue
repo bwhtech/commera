@@ -11,6 +11,7 @@ import SwatchDot from './SwatchDot.vue'
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { stockTone } from '../data/format'
 import { pricePayload, shownPrice } from '../data/product'
+import { __ } from '../data/translation'
 import { ia } from '../ia/store'
 import { useBulkAction } from '../utils/useBulkAction'
 
@@ -34,6 +35,7 @@ function openVariant(variant) {
 
 const showEditOptions = ref(false)
 
+const optionNoun = computed(() => (props.product.option_attribute ?? __('option')).toLowerCase())
 const optionValues = computed(() => [...new Set(props.product.variants.map((v) => v.option))])
 
 const optionValuesRequest = useAdminRead('catalog.get_attribute_values', {
@@ -59,7 +61,7 @@ async function setPrice(variant, rate) {
     ...pricePayload(variant.sizes[0], rate),
   })
   if (!saved) return
-  toast.success(`Price updated for ${variant.option} (${variant.sizes.length} sizes)`)
+  toast.success(__('Price updated for {0} ({1} sizes)', [variant.option, variant.sizes.length]))
   emit('saved')
 }
 
@@ -72,9 +74,9 @@ async function bulkSetPrice() {
   if (!selected.length) return
 
   dialog.prompt({
-    title: `Set price on ${selected.length} ${selected.length === 1 ? 'variant' : 'variants'}`,
-    message: 'Sets the price for every size under each selected variant.',
-    fields: [{ name: 'value', label: 'Price', type: 'number', required: true }],
+    title: selected.length === 1 ? __('Set price on 1 variant') : __('Set price on {0} variants', [selected.length]),
+    message: __('Sets the price for every size under each selected variant.'),
+    fields: [{ name: 'value', label: __('Price'), type: 'number', required: true }],
     onConfirm: async ({ values }) => {
       const rate = Math.max(0, Number(values.value) || 0)
       await runBulk(
@@ -83,8 +85,10 @@ async function bulkSetPrice() {
         (variant) =>
           bulkPriceAction.submit({ style_attribute_variant: variant.name, ...pricePayload(variant.sizes[0], rate) }),
         {
-          noun: 'variant',
-          verb: 'repriced',
+          sentences: {
+            all: (count) => (count === 1 ? __('1 variant repriced') : __('{0} variants repriced', [count])),
+            some: (done, total, failed) => __('{0} of {1} variants repriced. {2} failed', [done, total, failed]),
+          },
           after: ({ failed }) => {
             selection.value = failed.map(({ item }) => item.name)
             emit('saved')
@@ -105,10 +109,12 @@ function publishBlockers(variant) {
 }
 
 function blockerLabel(variant) {
-  const missing = [!variant.images.length && 'photo', !variant.sizes.length && 'size'].filter(Boolean)
-  if (missing.length === 1) return `Needs a ${missing[0]}`
-  if (missing.length) return `Needs ${missing.join(', ')}`
-  return 'Not ready'
+  const needsPhoto = !variant.images.length
+  const needsSize = !variant.sizes.length
+  if (needsPhoto && needsSize) return __('Needs a photo and a size')
+  if (needsPhoto) return __('Needs a photo')
+  if (needsSize) return __('Needs a size')
+  return __('Not ready')
 }
 
 async function togglePublish(variant) {
@@ -118,7 +124,11 @@ async function togglePublish(variant) {
   })
   // A refusal names the missing photo or size and has already been toasted.
   if (!toggled) return
-  toast.success(variant.is_published ? `${variant.option} hidden from the storefront` : `${variant.option} published`)
+  toast.success(
+    variant.is_published
+      ? __('{0} hidden from the storefront', [variant.option])
+      : __('{0} published', [variant.option]),
+  )
   emit('saved')
 }
 
@@ -127,14 +137,17 @@ async function togglePublish(variant) {
 function receiveStock(variant) {
   const itemCodes = variant.sizes.map((size) => size.item_code).filter(Boolean)
   if (!itemCodes.length) {
-    toast.info(`${variant.option} has no sizes to receive stock against yet.`)
+    toast.info(__('{0} has no sizes to receive stock against yet.', [variant.option]))
     return
   }
 
   dialog.prompt({
-    title: `Receive stock on ${variant.option}`,
-    message: `Adds this quantity to each of the ${itemCodes.length} sizes under this option. There is no way to set stock to an exact number here.`,
-    fields: [{ name: 'value', label: 'Quantity received', type: 'number', required: true }],
+    title: __('Receive stock on {0}', [variant.option]),
+    message: __(
+      'Adds this quantity to each of the {0} sizes under this option. There is no way to set stock to an exact number here.',
+      [itemCodes.length],
+    ),
+    fields: [{ name: 'value', label: __('Quantity received'), type: 'number', required: true }],
     onConfirm: async ({ values }) => {
       const quantity = Math.max(0, Math.trunc(Number(values.value) || 0))
       if (!quantity) return
@@ -143,7 +156,7 @@ function receiveStock(variant) {
         received_quantities: Object.fromEntries(itemCodes.map((code) => [code, quantity])),
       })
       if (!received) return
-      toast.success(`Received ${quantity} on ${itemCodes.length} sizes`)
+      toast.success(__('Received {0} on {1} sizes', [quantity, itemCodes.length]))
       emit('saved')
     },
   })
@@ -152,12 +165,12 @@ function receiveStock(variant) {
 function rowActions(variant) {
   return [
     {
-      label: variant.is_published ? 'Hide from storefront' : 'Publish to storefront',
+      label: variant.is_published ? __('Hide from storefront') : __('Publish to storefront'),
       icon: variant.is_published ? 'lucide-eye-off' : 'lucide-globe',
       onClick: () => togglePublish(variant),
     },
-    { label: 'Receive stock', icon: 'lucide-package-plus', onClick: () => receiveStock(variant) },
-    { label: 'Open full page', icon: 'lucide-external-link', onClick: () => openVariant(variant) },
+    { label: __('Receive stock'), icon: 'lucide-package-plus', onClick: () => receiveStock(variant) },
+    { label: __('Open full page'), icon: 'lucide-external-link', onClick: () => openVariant(variant) },
   ]
 }
 
@@ -172,12 +185,12 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
     <div id="product-options" class="rounded-5 border border-outline-gray-1">
       <div class="flex items-start justify-between gap-3 px-4 py-3">
         <div>
-          <h2 class="text-lg-semibold text-ink-gray-8">Options</h2>
+          <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Options') }}</h2>
           <p class="mt-1 text-p-sm text-ink-gray-5">
-            Add a {{ (product.option_attribute ?? 'option').toLowerCase() }} or size, or take one off sale.
+            {{ __('Add a {0} or size, or take one off sale.', [optionNoun]) }}
           </p>
         </div>
-        <Button label="Edit" icon-left="lucide-pencil" @click="showEditOptions = true" />
+        <Button :label="__('Edit')" icon-left="lucide-pencil" @click="showEditOptions = true" />
       </div>
 
       <div v-if="optionValues.length" class="border-t border-outline-gray-1 px-4 py-3">
@@ -200,8 +213,8 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
       </div>
 
       <div v-else class="border-t border-outline-gray-1 px-4 py-6 text-center">
-        <p class="text-base text-ink-gray-7">This product has no options</p>
-        <p class="mt-1 text-p-sm text-ink-gray-5">It sells as a single item.</p>
+        <p class="text-base text-ink-gray-7">{{ __('This product has no options') }}</p>
+        <p class="mt-1 text-p-sm text-ink-gray-5">{{ __('It sells as a single item.') }}</p>
       </div>
     </div>
 
@@ -212,12 +225,12 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
          list in the app answers "no rows" (see ProductStock right below). -->
     <div id="product-variants" class="rounded-5 border border-outline-gray-1">
       <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-        <h2 class="text-lg-semibold text-ink-gray-8">Variants</h2>
+        <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Variants') }}</h2>
         <div class="flex items-center gap-2">
           <template v-if="selection.length">
-            <span class="text-sm text-ink-gray-5">{{ selection.length }} selected</span>
-            <Button label="Set price" :loading="bulkRunning === 'Set price'" @click="bulkSetPrice" />
-            <Button label="Clear" variant="ghost" :disabled="Boolean(bulkRunning)" @click="selection = []" />
+            <span class="text-sm text-ink-gray-5">{{ __('{0} selected', [selection.length]) }}</span>
+            <Button :label="__('Set price')" :loading="bulkRunning === 'Set price'" @click="bulkSetPrice" />
+            <Button :label="__('Clear')" variant="ghost" :disabled="Boolean(bulkRunning)" @click="selection = []" />
           </template>
         </div>
       </div>
@@ -231,12 +244,12 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
           :columns="columns"
         >
           <ListHeader>
-            <ListHeaderCell>Variant</ListHeaderCell>
-            <ListHeaderCell>Sizes</ListHeaderCell>
-            <ListHeaderCell>Price</ListHeaderCell>
-            <ListHeaderCell>Stock</ListHeaderCell>
-            <ListHeaderCell>Photos</ListHeaderCell>
-            <ListHeaderCell>Storefront</ListHeaderCell>
+            <ListHeaderCell>{{ __('Variant') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Sizes') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Price') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Stock') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Photos') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Storefront') }}</ListHeaderCell>
             <ListHeaderCell></ListHeaderCell>
           </ListHeader>
           <ListRows :items="product.variants" row-key="name" v-slot="{ item }">
@@ -261,7 +274,7 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
                      shownPrice in data/product.js — not the compare-at above it. -->
                 <EditableValue
                   :model-value="shownPrice(item.sizes[0])"
-                  label="Price"
+                  :label="__('Price')"
                   format="money"
                   @update:model-value="(rate) => setPrice(item, rate)"
                 />
@@ -271,7 +284,7 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
                      setting on-hand to an arbitrary number — see VariantDetail. -->
                 <EditableValue
                   :model-value="item.sizes.reduce((sum, s) => sum + (s.stock ?? 0), 0)"
-                  label="On hand"
+                  :label="__('On hand')"
                   readonly
                   :class="stockTone(item.sizes.reduce((sum, s) => sum + (s.stock ?? 0), 0))"
                 />
@@ -288,7 +301,7 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
                     aria-hidden="true"
                   />
                   <span class="text-base tabular-nums" :class="item.images.length ? 'text-ink-gray-7' : 'text-ink-gray-4'">
-                    {{ item.images.length || 'Add' }}
+                    {{ item.images.length || __('Add') }}
                   </span>
                 </button>
               </ListCell>
@@ -297,18 +310,18 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
                      option names what it is missing instead of just reading "Hidden". -->
                 <Badge
                   v-if="item.is_published"
-                  label="Live"
+                  :label="__('Live')"
                   theme="green"
                   variant="subtle"
                 />
                 <Tooltip v-else-if="publishBlockers(item).length" :text="publishBlockers(item).join(', ')">
                   <Badge :label="blockerLabel(item)" theme="amber" variant="subtle" />
                 </Tooltip>
-                <Badge v-else label="Hidden" theme="gray" variant="subtle" />
+                <Badge v-else :label="__('Hidden')" theme="gray" variant="subtle" />
               </ListCell>
               <ListCell>
                 <Dropdown :options="rowActions(item)" @click.stop>
-                  <Button icon="lucide-ellipsis" label="Options for this variant" variant="ghost" />
+                  <Button icon="lucide-ellipsis" :label="__('Options for this variant')" variant="ghost" />
                 </Dropdown>
               </ListCell>
             </ListRow>
@@ -320,8 +333,8 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
         v-if="!product.variants.length"
         compact
         icon="lucide-layers"
-        title="No variants yet"
-        description="Variants are the buyable combinations, like a colour in a size."
+        :title="__('No variants yet')"
+        :description="__('Variants are the buyable combinations, like a colour in a size.')"
       />
     </div>
   </section>

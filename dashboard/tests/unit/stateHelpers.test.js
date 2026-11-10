@@ -51,17 +51,20 @@ test('runEach runs one write at a time', async () => {
   assert.equal(peak, 1)
 })
 
+const orderSentences = {
+  all: (count) => (count === 1 ? '1 order marked fulfilled' : `${count} orders marked fulfilled`),
+  some: (done, total, failed) => `${done} of ${total} orders marked fulfilled. ${failed} failed`,
+}
+
+test('bulkSummary picks the whole sentence for a clean run', () => {
+  assert.equal(bulkSummary({ done: ['a', 'b'], failed: [] }, orderSentences), '2 orders marked fulfilled')
+  assert.equal(bulkSummary({ done: ['a'], failed: [] }, orderSentences), '1 order marked fulfilled')
+})
+
 test('bulkSummary names the partial failure and its first reason', () => {
-  assert.equal(bulkSummary({ done: ['a', 'b'], failed: [] }, 'order', 'marked fulfilled'), '2 orders marked fulfilled')
-  assert.equal(bulkSummary({ done: ['a'], failed: [] }, 'order', 'marked fulfilled'), '1 order marked fulfilled')
   assert.equal(
-    bulkSummary(
-      { done: ['a'], failed: [{ item: 'b', error: null }, { item: 'c', error: new Error('Closed') }] },
-      'order',
-      'marked fulfilled',
-    ),
+    bulkSummary({ done: ['a'], failed: [{ item: 'b', error: null }, { item: 'c', error: new Error('Closed') }] }, orderSentences),
     '1 of 3 orders marked fulfilled. 2 failed: Closed',
   )
-  assert.equal(bulkSummary({ done: [], failed: [{ item: 'b', error: null }] }, 'product', 'archived'), '0 of 1 product archived. 1 failed')
-  assert.equal(bulkSummary({ done: ['a', 'b'], failed: [] }, ['delivery', 'deliveries'], 'queued'), '2 deliveries queued')
+  assert.equal(bulkSummary({ done: [], failed: [{ item: 'b', error: null }] }, orderSentences), '0 of 1 orders marked fulfilled. 1 failed')
 })

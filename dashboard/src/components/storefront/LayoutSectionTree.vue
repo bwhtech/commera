@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { Button, Dropdown, Tree } from 'frappe-ui'
 import { canAddBlocks, maxBlocks, pageLabel } from '../../data/themeLayout'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   editor: { type: Object, required: true },
@@ -146,13 +147,13 @@ function rowActions(node) {
   if (node.kind === 'block') {
     return [
       {
-        label: 'Duplicate',
+        label: __('Duplicate'),
         icon: 'lucide-copy',
         disabled: node.full,
         onClick: () => duplicateBlock(node.group, node.sectionId, node.blockId),
       },
       {
-        label: 'Remove',
+        label: __('Remove'),
         icon: 'lucide-trash-2',
         theme: 'red',
         onClick: () => removeBlock(node.group, node.sectionId, node.blockId),
@@ -160,8 +161,8 @@ function rowActions(node) {
     ]
   }
   return [
-    { label: 'Duplicate', icon: 'lucide-copy', onClick: () => duplicateSection(node.group, node.sectionId) },
-    { label: 'Remove', icon: 'lucide-trash-2', theme: 'red', onClick: () => removeSection(node.group, node.sectionId) },
+    { label: __('Duplicate'), icon: 'lucide-copy', onClick: () => duplicateSection(node.group, node.sectionId) },
+    { label: __('Remove'), icon: 'lucide-trash-2', theme: 'red', onClick: () => removeSection(node.group, node.sectionId) },
   ]
 }
 </script>
@@ -169,11 +170,11 @@ function rowActions(node) {
 <template>
   <div class="flex flex-col gap-1" data-section-tree>
     <div v-if="!grouped" class="flex items-center justify-between px-2">
-      <p class="text-sm text-ink-gray-5">Sections</p>
+      <p class="text-sm text-ink-gray-5">{{ __('Sections') }}</p>
       <Button
         variant="ghost"
         icon-left="lucide-plus"
-        label="Add section"
+        :label="__('Add section')"
         @click="emit('add-section', editor.pagePart.value?.group)"
       />
     </div>
@@ -211,7 +212,7 @@ function rowActions(node) {
           <Button
             variant="ghost"
             class="!size-6"
-            :aria-label="`Add section to ${node.label}`"
+            :aria-label="__('Add section to {0}', [node.label])"
             @click="emit('add-section', node.group)"
           >
             <template #icon>
@@ -233,7 +234,7 @@ function rowActions(node) {
           @click.stop
         >
           <Dropdown v-if="node.canAddBlock" :options="addBlockOptions(node)">
-            <Button variant="ghost" class="!size-6" :aria-label="`Add block to ${node.label}`">
+            <Button variant="ghost" class="!size-6" :aria-label="__('Add block to {0}', [node.label])">
               <template #icon>
                 <span class="lucide-plus size-4 text-ink-gray-5" aria-hidden="true" />
               </template>
@@ -243,7 +244,7 @@ function rowActions(node) {
             v-if="node.kind === 'section'"
             variant="ghost"
             class="!size-6"
-            :aria-label="node.hidden ? `Show ${node.label}` : `Hide ${node.label}`"
+            :aria-label="node.hidden ? __('Show {0}', [node.label]) : __('Hide {0}', [node.label])"
             @click="toggleHidden(node.group, node.sectionId)"
           >
             <template #icon>
@@ -255,7 +256,7 @@ function rowActions(node) {
             </template>
           </Button>
           <Dropdown :options="rowActions(node)">
-            <Button variant="ghost" class="!size-6" :aria-label="`${node.label} actions`">
+            <Button variant="ghost" class="!size-6" :aria-label="__('{0} actions', [node.label])">
               <template #icon>
                 <span class="lucide-ellipsis size-4 text-ink-gray-5" aria-hidden="true" />
               </template>

@@ -28,30 +28,30 @@ function setSize(size) {
 
 <template>
   <div class="mt-3 flex flex-wrap items-center gap-3 border-t border-outline-gray-1 pt-3">
-    <p class="text-sm text-ink-gray-5 tabular-nums">{{ first }}–{{ last }} of {{ total }}</p>
+    <p class="text-sm text-ink-gray-5 tabular-nums">{{ __('{0}–{1} of {2}', [first, last, total]) }}</p>
 
-    <div class="ml-auto flex items-center gap-2">
+    <div class="ms-auto flex items-center gap-2">
       <Select
         :model-value="String(pageSize)"
-        aria-label="Rows per page"
+        :aria-label="__('Rows per page')"
         size="sm"
         class="w-32"
         :options="[
-          { label: '10 per page', value: '10' },
-          { label: '20 per page', value: '20' },
-          { label: '50 per page', value: '50' },
+          { label: __('{0} per page', [10]), value: '10' },
+          { label: __('{0} per page', [20]), value: '20' },
+          { label: __('{0} per page', [50]), value: '50' },
         ]"
         @update:model-value="setSize"
       />
       <ResponsiveButton
-        label="Previous"
-        icon="lucide-chevron-left"
+        :label="__('Previous')"
+        icon="lucide-chevron-left rtl:-scale-x-100"
         :disabled="page <= 1"
         @click="emit('update:page', page - 1)"
       />
       <ResponsiveButton
-        label="Next"
-        icon="lucide-chevron-right"
+        :label="__('Next')"
+        icon="lucide-chevron-right rtl:-scale-x-100"
         icon-position="right"
         :disabled="page >= pageCount"
         @click="emit('update:page', page + 1)"

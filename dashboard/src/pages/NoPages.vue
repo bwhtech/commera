@@ -10,8 +10,8 @@ import EmptyState from '../components/EmptyState.vue'
   <PageBody>
     <EmptyState
       icon="lucide-lock"
-      title="No pages are available to you yet"
-      description="Ask your store admin to give you access to an app."
+      :title="__('No pages are available to you yet')"
+      :description="__('Ask your store admin to give you access to an app.')"
     />
   </PageBody>
 </template>
