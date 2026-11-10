@@ -35,8 +35,8 @@
             role="combobox" aria-controls="combosList" aria-haspopup="listbox" x-on:click="isOpen = ! isOpen"
             x-on:keydown.down.prevent="openedWithKeyboard = true" x-on:keydown.enter.prevent="openedWithKeyboard = true"
             x-on:keydown.space.prevent="openedWithKeyboard = true" x-bind:aria-expanded="isOpen || openedWithKeyboard"
-            x-bind:aria-label="selectedOption ? selectedOption.value : $store.i18n.t('Please Select')">
-            <span class="text-sm font-normal text-left" x-text="selectedOption ? selectedOption.display : $store.i18n.t('Please Select')"></span>
+            x-bind:aria-label="selectedOption ? selectedOption.value : commera.t('Please Select')">
+            <span class="text-sm font-normal text-left" x-text="selectedOption ? selectedOption.display : commera.t('Please Select')"></span>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"
                 aria-hidden="true">
                 <path fill-rule="evenodd"

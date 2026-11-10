@@ -23,7 +23,7 @@
 				</div>
 			</div>
 
-			<h3 class="mt-6 font-medium text-accent text-base md:text-xl" :title="item.brand" x-text="$store.i18n.t(item.brand)"></h3>
+			<h3 class="mt-6 font-medium text-accent text-base md:text-xl" :title="item.brand" x-text="commera.t(item.brand)"></h3>
 			</h3>
 			{% if frappe.lang == 'en' %}
 			<h4 class="text-base md:text-xl ">
@@ -33,7 +33,7 @@
 			{% else %}
 			<h4 class="text-base md:text-xl" :title="item.title||item.item_name">
 				<span x-text="item.title||item.item_name" class="me-1"></span> <span
-					x-text="$store.i18n.t(item.attribute_value)"></span>
+					x-text="commera.t(item.attribute_value)"></span>
 			</h4>
 			{% endif %}
 			<div class="mt-2 text-sm md:text-base flex font-semibold">

@@ -13,4 +13,9 @@ export { StorefrontError } from './request.js';
 export * as search from './search.js';
 export * as shop from './shop.js';
 export * as webmcp from './webmcp/index.js';
+export {
+	load_translations,
+	make_translations_reactive,
+	t,
+} from './translate.js';
 export * as wishlist from './wishlist.js';

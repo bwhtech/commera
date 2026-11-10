@@ -3,13 +3,9 @@
   current_lang: '{{ current_language.code.lower() }}',
   root_prefix: '{{ localization.root_prefix }}',
   dropdown_open: false,
-  async change_language(lang) {
+  change_language(lang) {
       if (lang === this.current_lang) return; // Do nothing if already selected
-      let newUrl = `/${lang}${window.location.pathname.slice(this.root_prefix.length)}`;
-      Alpine.store('i18n').i18n = {};
-      Alpine.store('i18n').lastFetched = null;
-      await Alpine.store('i18n').init();
-      window.location.href = newUrl;
+      window.location.href = `/${lang}${window.location.pathname.slice(this.root_prefix.length)}`;
   }
 }">
 

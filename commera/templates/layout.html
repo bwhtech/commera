@@ -29,7 +29,7 @@
     
     {{ format_theme_css()|safe }}
 
-    
+    {{ render_storefront_header(localization) }}
     <script src="/assets/commera/js/vendor/alpinejs/plugins/persist.js"></script>
     <script src="/assets/commera/js/vendor/alpinejs/plugins/collapse.js"></script>
     
@@ -41,7 +41,6 @@
 </head>
 
 {% include "templates/includes/cart-state.html" %}
-{% include "templates/includes/i18-state.html" %}
 {% include "templates/includes/wishlist-state.html" %}
 {% include "templates/includes/toast-state.html" %}
 

@@ -29,6 +29,8 @@
     {# A theme's own tokens must not redefine the --ls-* variables the merchant's colour pickers drive. #}
     {{ format_theme_css()|safe }}{{ format_shop_theme_css() }}
 
+    {{ commera_header_content }}
+
     <script src="{{ shop_theme_asset_url('scripts/vendor/alpinejs/plugins/persist.js') }}"></script>
     <script src="{{ shop_theme_asset_url('scripts/vendor/alpinejs/plugins/collapse.js') }}"></script>
 
@@ -41,7 +43,6 @@
 
 {# Alpine stores every other component reads: a themed page missing one renders a cart that never fills. #}
 {% include "templates/includes/cart-state.html" %}
-{% include "templates/includes/i18-state.html" %}
 {% include "templates/includes/wishlist-state.html" %}
 {% include "templates/includes/toast-state.html" %}
 {% include "templates/includes/frappe-call-script.html" %}
