@@ -77,12 +77,9 @@ def get_complete_nested_links(parent_group):
 
 
 def before_request():
-	request_path = frappe.request.path
+	from commera.localization import apply_request_language
 
-	if request_path.startswith("/en"):
-		frappe.local.lang = "en"
-	elif request_path.startswith("/ar"):
-		frappe.local.lang = "ar"
+	apply_request_language()
 
 
 def get_nested_links(link_doctype, link_name):

@@ -8,6 +8,7 @@ from frappe.utils import get_url_to_form
 from frappe.website.utils import clear_cache as clear_website_cache
 
 from commera.commera_ecommerce.doctype.commera_settings.headless_storefront import sync_headless_oauth_client
+from commera.localization.languages import MAX_STOREFRONT_LANGUAGES, get_default_language_code
 from commera.search.build import enqueue_full_rebuild
 from commera.search.engine_cache import clear_search_engine, get_engine_class
 from commera.search.http_client import SearchServerError
@@ -36,6 +37,9 @@ class CommeraSettings(Document):
 
 		from commera.commera_ecommerce.doctype.commera_storefront_app.commera_storefront_app import (
 			CommeraStorefrontApp,
+		)
+		from commera.commera_ecommerce.doctype.commera_storefront_language.commera_storefront_language import (
+			CommeraStorefrontLanguage,
 		)
 		from commera.commera_ecommerce.doctype.footer_section_mapping.footer_section_mapping import (
 			FooterSectionMapping,
@@ -70,6 +74,7 @@ class CommeraSettings(Document):
 		create_variants_automatically_on_configurator_creation: DF.Check
 		default_meta_description: DF.SmallText | None
 		default_price_list: DF.Link | None
+		default_storefront_language: DF.Link | None
 		default_share_image: DF.AttachImage | None
 		ecommerce_item_group_mapping: DF.Table[ItemGroupMap]
 		ecommerce_warehouse: DF.Link | None
@@ -127,6 +132,7 @@ class CommeraSettings(Document):
 		store_setup_error: DF.SmallText | None
 		store_setup_status: DF.Literal["", "running", "done", "failed"]
 		storefront_apps: DF.Table[CommeraStorefrontApp]
+		storefront_languages: DF.Table[CommeraStorefrontLanguage]
 		storefront_published: DF.Check
 		strikethrough_color: DF.Color | None
 		tiktok_url: DF.Data | None
@@ -144,6 +150,7 @@ class CommeraSettings(Document):
 		self.validate_search_content_fields()
 		self.validate_search_result_fields()
 		self.validate_search_engine()
+		self.validate_storefront_languages()
 		sync_headless_oauth_client(self)
 
 	def validate_price_list_currencies(self):
@@ -168,6 +175,22 @@ class CommeraSettings(Document):
 		pairs = [(row.search_doctype, row.field) for row in rows]
 		if len(pairs) != len(set(pairs)):
 			frappe.throw(frappe._("Duplicate search content fields are not allowed."))
+
+	def validate_storefront_languages(self):
+		codes = [row.language for row in self.storefront_languages or []]
+		if len(codes) != len(set(codes)):
+			frappe.throw(frappe._("Each storefront language can be listed only once."))
+
+		default = get_default_language_code(self)
+		if len({default, *codes}) > MAX_STOREFRONT_LANGUAGES:
+			frappe.throw(
+				frappe._("A storefront can have at most {0} languages.").format(MAX_STOREFRONT_LANGUAGES)
+			)
+
+		# Shoppers always see the default language, so its row cannot stay unpublished.
+		for row in self.storefront_languages or []:
+			if row.language == default:
+				row.published = 1
 
 	def validate_search_engine(self):
 		engine = get_engine_class(self.get("search_engine"))
@@ -230,6 +253,9 @@ class CommeraSettings(Document):
 		before = self.get_doc_before_save()
 		if get_enabled_storefront_apps(before) != get_enabled_storefront_apps(self):
 			clear_storefront_plugin_cache()
+			clear_website_cache()
+		elif storefront_languages_changed(before, self):
+			# Cached guest pages carry the old language list.
 			clear_website_cache()
 		if frappe.flags.in_install or frappe.flags.in_migrate:
 			return
@@ -416,6 +442,16 @@ def create_configurator_log():
 			"doctype": "Bulk Style Attribute Configurator Creation Log",
 		}
 	).insert(ignore_permissions=True)
+
+
+def storefront_languages_changed(before, after) -> bool:
+	def languages(doc):
+		if doc is None:
+			return None
+		rows = [(row.language, row.published) for row in doc.get("storefront_languages") or []]
+		return doc.get("default_storefront_language"), rows
+
+	return languages(before) != languages(after)
 
 
 def validate_price_list_currency(price_list: str, currency: str, label: str):

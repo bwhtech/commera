@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils import validate_email_address
 from frappe.utils.data import cint, cstr
 
+from commera import localization
 from commera.branding import get_brand_assets
 from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import get_page_by_route, get_page_content
 from commera.sdk.types import (
@@ -10,6 +11,7 @@ from commera.sdk.types import (
 	ContentPageLink,
 	Country,
 	FooterSection,
+	Localization,
 	Menu,
 	MenuItem,
 	Shop,
@@ -21,6 +23,7 @@ from commera.utils import get_country_list, get_store_company, get_store_currenc
 from commera.www.sitemap_segment import SEGMENT_CONFIG, get_segment_filters, get_urls_per_page
 
 __all__ = [
+	"get_localization",
 	"get_menu",
 	"get_page",
 	"get_shop",
@@ -33,6 +36,11 @@ __all__ = [
 NEWSLETTER_EMAIL_GROUP = "Newsletter"
 
 SITEMAP_KINDS = tuple(SEGMENT_CONFIG)
+
+
+def get_localization() -> Localization:
+	"""The language of the current request, the default language and the languages shoppers can pick."""
+	return localization.get_localization().as_dict()
 
 
 def get_shop() -> Shop:

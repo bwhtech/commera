@@ -12,6 +12,7 @@ from jinja2 import BaseLoader, BytecodeCache, TemplateNotFound
 from jinja2.utils import LRUCache
 
 import commera.sdk
+from commera.localization import get_localization
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	get_render_theme_context,
 	is_within_directory,
@@ -291,7 +292,8 @@ def get_theme_environment(jenv, theme_dirs):
 
 
 def build_base_context(match):
-	context = frappe._dict(is_rtl=is_rtl())
+	localization = get_localization()
+	context = frappe._dict(is_rtl=is_rtl(), localization=localization)
 
 	if match:
 		apply_route_groups(match, context)
@@ -304,7 +306,8 @@ def build_base_context(match):
 			"csrf_token": frappe.session.data.csrf_token,
 			"store_currency": get_store_currency(),
 			"currency_symbols": get_currency_symbols(),
-			"language": frappe.local.lang or "en",
+			"language": localization.language.code,
+			"localization": localization.as_dict(),
 			"webmcp": bool(
 				cint(frappe.get_cached_value("Commera Settings", "Commera Settings", "enable_webmcp"))
 			),
