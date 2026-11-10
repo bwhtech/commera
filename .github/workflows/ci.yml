@@ -14,6 +14,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  storefront-js:
+    runs-on: ubuntu-latest
+    name: Storefront JS
+    timeout-minutes: 5
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # The package has no dependencies, so there is nothing to install.
+      - name: Run Tests
+        working-directory: packages/storefront
+        run: node --test test/*.test.js
+
   tests:
     runs-on: ubuntu-latest
     strategy:
