@@ -18,6 +18,8 @@ from commera.sdk.types import (
 	Shop,
 )
 from commera.shop_themes.sections import get_section_products
+from commera.tests.test_content_translation import use_storefront_language
+from commera.tests.test_localization import set_storefront_languages
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.www.sitemap_segment import get_urls_per_page
 
@@ -188,19 +190,20 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		self.assertEqual([card["handle"] for card in cards], [routes[1], routes[0]])
 		self.assertEqual(cards[0]["product_type"], self.item_group)
 
-	def test_a_product_card_is_titled_in_the_shoppers_language(self):
+	def test_the_legacy_arabic_item_name_titles_the_card_and_the_product_page(self):
 		if not frappe.db.has_column("Item", "custom_item_name_ar"):
 			self.skipTest("Item has no custom_item_name_ar field on this site")
+		set_storefront_languages("en", published=("en", "ar"))
 		route = self.make_priced_variant("ARABIC", default_rate=30)
 		name, item_style = frappe.db.get_value(
 			"Style Attribute Variant", {"route": route}, ["name", "item_style"]
 		)
 		frappe.db.set_value("Item", item_style, "custom_item_name_ar", "قميص تجريبي")
-		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
 
-		frappe.local.lang = "ar"
+		use_storefront_language(self, "ar")
 		self.assertEqual(catalog.get_product_cards_for([name])[0]["title"], "قميص تجريبي")
-		frappe.local.lang = "en"
+		self.assertEqual(catalog.get_product(route)["title"], "قميص تجريبي")
+		use_storefront_language(self, "en")
 		self.assertNotEqual(catalog.get_product_cards_for([name])[0]["title"], "قميص تجريبي")
 
 	def test_an_unknown_sort_is_refused(self):

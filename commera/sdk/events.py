@@ -26,6 +26,7 @@ HANDLER_HOOKS = {
 		"delivery_options",
 		"payment_methods",
 		"shipping_providers",
+		"translatable_resources",
 	),
 }
 
