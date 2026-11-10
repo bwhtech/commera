@@ -2,6 +2,7 @@ import frappe
 from frappe.utils import cint, create_batch, cstr
 
 from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import root_filter
+from commera.search.translations import get_translated_titles
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
 # The only doctypes reachable from a variant (itself, its Item, its Style Attribute Configurator).
@@ -104,16 +105,26 @@ def build_product_search_records(variant_names=None):
 	sizes_by_variant = sizes_for_variants(names)
 	images_by_variant = images_for_variants(names)
 	prices_by_variant = prices_for_variants(sizes_by_variant)
+	titles_by_variant = get_translated_titles(
+		"Style Attribute Variant",
+		variants,
+		{
+			variant.name: item_by_style.get(variant.item_style, {}).get("custom_item_name_ar")
+			for variant in variants
+		},
+	)
 
 	records = []
 	for variant in variants:
 		item = item_by_style.get(variant.item_style) or {}
 		configurator = configurator_by_name.get(variant.configurator) or {}
+		titles = titles_by_variant[variant.name]
 		records.append(
 			{
 				"name": variant.name,
 				"title": variant.display_name or "",
-				"content": build_content(configured_fields, variant, item, configurator),
+				"content": join_text(build_content(configured_fields, variant, item, configurator), titles),
+				"titles": titles,
 				"item_group": variant.item_group or "",
 				"brand": item.get("brand") or "",
 				"color": variant.attribute_value or "",
@@ -143,6 +154,11 @@ def build_content(configured_fields, variant, item, configurator):
 		if value:
 			parts.append(value)
 	return " ".join(parts).strip()
+
+
+def join_text(content, titles):
+	"""`content` followed by the translated titles, so a query in any published language finds the record."""
+	return " ".join([content, *titles.values()]).strip()
 
 
 def build_product_detail(variant, item, sizes, images, prices):
@@ -191,6 +207,7 @@ def build_category_search_records(names=None):
 		return []
 
 	roots = get_root_route_slugs()
+	titles_by_category = get_translated_titles("Ecommerce Category", categories)
 
 	records = []
 	for category in categories:
@@ -210,7 +227,10 @@ def build_category_search_records(names=None):
 			{
 				"name": category.name,
 				"title": display_name or category_name,
-				"content": " ".join(part for part in (category_name, display_name) if part).strip(),
+				"content": join_text(
+					" ".join(part for part in (category_name, display_name) if part),
+					titles_by_category[category.name],
+				),
 				"route_slug": route_slug,
 			}
 		)

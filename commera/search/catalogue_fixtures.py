@@ -36,6 +36,13 @@ class SearchCatalogue:
 			for name in frappe.get_all(doctype, filters=filters, pluck="name"):
 				frappe.delete_doc(doctype, name, force=True, ignore_permissions=True)
 
+	def publish_languages(self, *codes):
+		"""Publish `codes` with English as the default for one test. Fixtures get committed, so restore."""
+		from commera.tests.test_localization import set_storefront_languages
+
+		self.addCleanup(set_storefront_languages, *read_language_settings())
+		set_storefront_languages("en", published=codes)
+
 	def unpublish(self, variant_name):
 		"""Unpublish a variant for the duration of one test, restoring it afterwards."""
 		frappe.db.set_value("Style Attribute Variant", variant_name, "is_published", 0)
@@ -189,3 +196,18 @@ class SearchCatalogue:
 					"send_welcome_email": 0,
 				}
 			).insert(ignore_permissions=True)
+
+
+def read_language_settings():
+	"""The site's language settings, as set_storefront_languages takes them."""
+	rows = frappe.get_all(
+		"Commera Storefront Language",
+		filters={"parent": "Commera Settings"},
+		fields=["language", "published"],
+		order_by="idx",
+	)
+	return (
+		frappe.db.get_single_value("Commera Settings", "default_storefront_language"),
+		tuple(row.language for row in rows if row.published),
+		tuple(row.language for row in rows if not row.published),
+	)

@@ -215,6 +215,10 @@ doc_events = {
 			"commera.localization.content.delete_translations",
 		],
 	},
+	"Content Translation": {
+		"on_update": "commera.search.translations.on_translation_change",
+		"on_trash": "commera.search.translations.on_translation_change",
+	},
 	"Ecommerce Category": {
 		"on_update": ["commera.search.sync.on_update", "commera.plugin_events.on_menu_change"],
 		"after_rename": "commera.search.sync.after_rename",

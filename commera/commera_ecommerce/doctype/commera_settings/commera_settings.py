@@ -24,6 +24,7 @@ from commera.search.result_card import (
 	MIN_RESULT_FIELDS,
 	RESULT_CARD_CATALOG,
 )
+from commera.search.translations import search_languages_changed
 from commera.storefront_plugins import clear_storefront_plugin_cache, get_enabled_storefront_apps
 from commera.utils import get_store_currency
 
@@ -275,7 +276,7 @@ class CommeraSettings(Document):
 			# Build the newly chosen index. Until it exists, the frappe.qb grid serves every search.
 			clear_search_engine()
 			get_engine_class(self.get("search_engine"))().enqueue_full_rebuild(deduplicate=True)
-		elif old_pairs != new_pairs:
+		elif old_pairs != new_pairs or search_languages_changed(before, self):
 			enqueue_full_rebuild(deduplicate=True)
 
 	def search_engine_changed(self, before):

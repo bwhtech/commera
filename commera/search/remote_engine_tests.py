@@ -6,6 +6,7 @@ import frappe
 
 from commera import utils
 from commera.api.utils import get_search_results
+from commera.localization import register
 from commera.search import query as search_query
 from commera.search.catalogue_fixtures import (
 	ITEM_GROUP,
@@ -202,6 +203,25 @@ class RemoteEngineTests(SearchCatalogue):
 
 		self.addCleanup(restore)
 		self.assertEqual(set(self.engine.typeahead("ودجت")["product_names"]), set(variants))
+
+	def test_translated_titles_are_searchable(self):
+		self.publish_languages("en", "fr", "ar")
+		with patch("commera.search.sync.frappe.enqueue"):
+			names = [
+				register("Style Attribute Variant", self.red, "display_name", language, title)
+				for language, title in (("fr", "Zzbidule Rouge"), ("ar", "ودجت أحمر"))
+			]
+		self.engine.index_docs("Style Attribute Variant", [self.red])
+		self.wait_for_writes()
+
+		def restore():
+			frappe.db.delete("Content Translation", {"name": ("in", names)})
+			self.engine.index_docs("Style Attribute Variant", [self.red])
+			self.wait_for_writes()
+
+		self.addCleanup(restore)
+		self.assertEqual(self.engine.search_products({"search": "zzbidule"}), [self.red])
+		self.assertEqual(self.engine.typeahead("ودجت")["product_names"], [self.red])
 
 	# -- requests per page -----------------------------------------------------------------------
 

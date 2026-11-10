@@ -12,6 +12,7 @@ from commera.product_detail import size_sort_key
 from commera.search.engine import CARD_COLUMNS, SearchEngineBase, empty_facets, empty_typeahead
 from commera.search.http_client import SearchServerError
 from commera.search.record_builder import build_category_search_records, build_product_search_records
+from commera.search.translations import language_generation, rebuild_if_languages_change
 
 PRODUCT_DOCTYPE = "Style Attribute Variant"
 CATEGORY_DOCTYPE = "Ecommerce Category"
@@ -236,6 +237,7 @@ class RemoteSearchEngine(SearchEngineBase):
 	def rebuild(self):
 		"""Build both indexes beside the live ones, then swap them in, so search keeps serving meanwhile."""
 		started = frappe.utils.now()
+		generation = language_generation()
 		for doctype, filters in ((PRODUCT_DOCTYPE, {"is_published": 1}), (CATEGORY_DOCTYPE, {"enabled": 1})):
 			names = frappe.get_all(doctype, filters=filters, pluck="name")
 			self.rebuild_one(self.uid_for(doctype), doctype, names)
@@ -245,6 +247,7 @@ class RemoteSearchEngine(SearchEngineBase):
 		for doctype in (PRODUCT_DOCTYPE, CATEGORY_DOCTYPE):
 			if changed := frappe.get_all(doctype, filters={"modified": (">=", started)}, pluck="name"):
 				self.index_docs(doctype, changed)
+		rebuild_if_languages_change(self, generation, self.REBUILD_JOB)
 
 	def drop_index(self):
 		self.drop_indexes()
@@ -294,7 +297,8 @@ def product_document(record):
 		"id": document_id(record["name"]),
 		"name": record["name"],
 		"title": record["title"],
-		"title_ar": card.get("custom_item_name_ar") or "",
+		# Arabic keeps its own field: engines tokenize it with Arabic rules. Other languages ride in `content`.
+		"title_ar": record["titles"].get("ar") or card.get("custom_item_name_ar") or "",
 		"content": record["content"],
 		"item_group": record["item_group"],
 		"brand": record["brand"],
