@@ -5,7 +5,7 @@ from frappe import _
 
 from commera import seo
 from commera.sdk import catalog, wishlist
-from commera.sdk.format import product_url
+from commera.sdk.format import product_url, url
 
 
 def get_context(context):
@@ -13,18 +13,17 @@ def get_context(context):
 	if not product:
 		raise frappe.PageDoesNotExistError
 
-	language = frappe.local.lang or "en"
 	context.product = product
 	context.in_wishlist = frappe.session.user != "Guest" and product["id"] in {
 		card["id"] for card in wishlist.get_wishlist()["products"]
 	}
 	context.breadcrumb_links = [
-		{"label": _("Home"), "url": f"/{language}"},
+		{"label": _("Home"), "url": url("/")},
 		*(
 			[
 				{
 					"label": product["collection"]["title"],
-					"url": f"/{language}/products?{urlencode({'category': product['collection']['handle']})}",
+					"url": url(f"/products?{urlencode({'category': product['collection']['handle']})}"),
 				}
 			]
 			if product["collection"]

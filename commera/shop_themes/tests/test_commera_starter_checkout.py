@@ -3,6 +3,7 @@ from frappe.tests import IntegrationTestCase
 
 from commera.shop_themes.tests import test_commera_starter_catalog
 from commera.tests import test_cart_checkout
+from commera.tests.test_localization import use_storefront_languages
 
 
 class IntegrationTestCommeraStarterCheckout(IntegrationTestCase):
@@ -26,13 +27,14 @@ class IntegrationTestCommeraStarterCheckout(IntegrationTestCase):
 		self.assertIn("noindex", html)
 
 	def test_a_signed_in_shopper_back_from_the_checkout_handoff_goes_on_to_checkout(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
 		frappe.set_user(self.create_shopper())
 		self.addCleanup(frappe.set_user, "Administrator")
 
 		with self.assertRaises(frappe.Redirect):
-			self.render("pages/cart/cart.html", "/en/cart", checkout="1", discount="ZZSAVE")
+			self.render("pages/cart/cart.html", "/ar/cart", checkout="1", discount="ZZSAVE")
 
-		self.assertEqual(frappe.flags.redirect_location, "/en/cart/checkout?discount=ZZSAVE")
+		self.assertEqual(frappe.flags.redirect_location, "/ar/cart/checkout?discount=ZZSAVE")
 
 	def test_a_guest_on_the_cart_page_stays_on_it(self):
 		frappe.set_user("Guest")

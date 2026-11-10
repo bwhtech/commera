@@ -7,10 +7,11 @@ from frappe.core.doctype.file.utils import get_local_image
 from frappe.utils.data import cint, cstr, sha256_hash
 from PIL import Image, ImageOps
 
+from commera.localization import switch_url, url
 from commera.localization.formatter import Formatter
 from commera.shop_themes.doctype.shop_theme.shop_theme import is_within_directory
 
-__all__ = ["IMAGE_WIDTHS", "date", "image_url", "money", "number", "product_url"]
+__all__ = ["IMAGE_WIDTHS", "date", "image_url", "money", "number", "product_url", "switch_url", "url"]
 
 IMAGE_WIDTHS = (160, 320, 480, 640, 960, 1280, 1920)
 RESIZED_IMAGES_URL = "/files/commera-images"
@@ -35,7 +36,7 @@ def date(value, style: str = "medium") -> str:
 def product_url(handle: str) -> str:
 	if not handle:
 		frappe.throw(_("A product URL needs the product's handle."))
-	return f"/{frappe.local.lang or 'en'}/products/{quote(cstr(handle))}"
+	return url(f"/products/{quote(cstr(handle))}")
 
 
 def image_url(path: str | None, width: int | None = None) -> str | None:

@@ -1,12 +1,11 @@
 {% from "components/macros/transitions.html" import overlay, scrim, drawer, sheet, dialog %}
 {% from "components/macros/icons.html" import icon %}
-{% set language = frappe.lang or "en" %}
 
 <div x-data="search_modal" x-cloak x-show="open" {{ overlay() }} @open-search.window="show()" @keydown.escape.window="open = false"
     @open-cart.window="open = false" @open-auth.window="open = false" @open-menu.window="open = false" class="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="{{ _('Search') }}">
 	<div x-show="open" {{ scrim() }} @click="open = false" class="absolute inset-0 cursor-pointer bg-surface-alpha-gray-6"></div>
 	<div x-show="open" x-trap.noscroll="open" {{ sheet() }} class="absolute inset-x-0 top-0 flex max-h-[85dvh] flex-col rounded-b-2xl bg-surface-elevation-1 px-5 pb-6 pt-4 shadow-xl md:px-12 md:pb-8 md:pt-6">
-		<form action="/{{ language }}/products" class="mx-auto flex w-full max-w-2xl items-center gap-2" role="search">
+		<form action="{{ url('/products') | e }}" class="mx-auto flex w-full max-w-2xl items-center gap-2" role="search">
 			<input x-ref="search_input" type="text" enterkeyhint="search" name="search" x-model="query" @input.debounce.200ms="search()" autocomplete="off" placeholder="{{ _('Search products') }}" aria-label="{{ _('Search products') }}" class="field">
 			<button type="button" @click="open = false" class="icon-button" aria-label="{{ _('Close') }}">{{ icon("close") }}</button>
 		</form>

@@ -219,5 +219,5 @@ def get_footer_section(name: str) -> FooterSection:
 	links = sorted((link for link in section.footer_links if link.enabled), key=lambda link: link.link_order)
 	return {
 		"title": section.section_title,
-		"links": [{"title": link.link_label, "url": link.link_url} for link in links],
+		"links": [{"title": link.link_label, "url": localization.url(link.link_url)} for link in links],
 	}

@@ -7,7 +7,7 @@ from frappe.utils.data import cint, cstr, flt
 
 from commera import seo
 from commera.sdk import catalog
-from commera.sdk.format import money
+from commera.sdk.format import money, url
 
 PAGE_SIZE = 24
 LIST_FILTERS = ("sizes", "colors", "brands")
@@ -90,7 +90,7 @@ def get_listing_url(context, **overrides):
 	if values.get("page") == 1:
 		values["page"] = None
 	query_string = urlencode({key: value for key, value in values.items() if value not in (None, "")})
-	path = f"/{frappe.local.lang or 'en'}/products"
+	path = url("/products")
 	return f"{path}?{query_string}" if query_string else path
 
 

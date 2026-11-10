@@ -11,7 +11,7 @@ from jinja2 import BaseLoader, BytecodeCache, TemplateNotFound
 from jinja2.utils import LRUCache
 
 import commera.sdk
-from commera.localization import get_localization, get_request_path, get_route_path
+from commera.localization import get_localization, get_request_path, get_route_path, url
 from commera.localization.formatter import Formatter
 from commera.localization.routing import localize_path
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
@@ -153,8 +153,7 @@ class ThemePageRenderer:
 		if not find_theme_file(self.theme_dirs, LOGIN_TEMPLATE):
 			raise frappe.PermissionError
 		return_path = quote(get_request_path() or "/" + self.path.strip("/"), safe="/")
-		login_path = f"{get_localization().root_prefix}/account/login"
-		frappe.flags.redirect_location = f"{login_path}?redirect-to={return_path}"
+		frappe.flags.redirect_location = f"{url('/account/login')}?redirect-to={return_path}"
 		raise frappe.Redirect(302)
 
 	def render_not_found(self):
@@ -328,6 +327,8 @@ def apply_website_settings(context):
 	try:
 		# Also fills context.boot; never call get_boot_data() on top of this.
 		context.update(get_website_settings())
+		# Its `url` is the site address, which would hide the url() Jinja global.
+		context.pop("url", None)
 
 		# get_website_settings() leaves out the branding fields a theme renders the brand from.
 		settings = frappe.client_cache.get_doc("Website Settings")
