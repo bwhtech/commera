@@ -6,10 +6,13 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from commera.api.admin import translations as translations_api
-from commera.localization import CURRENT, MISSING, OUTDATED, exchange, register
+from commera.api.admin.theme import activate_theme
+from commera.localization import CURRENT, MISSING, OUTDATED, exchange, get_translatable_resource, register
 from commera.roles import COMMERA_ADMIN, COMMERA_USER, add_commera_roles
+from commera.shop_themes.sections import clear_layout_cache
 from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_product_details import ProductDetailPriceTestCase
+from commera.tests.test_theme_section_translation import ARABIC_HEADING, ENTRY, HEADING, SUMMER_THEME
 
 NOTE_RESOURCE = {"type": "note", "doctype": "Note", "fields": ["title", "content"], "label": "Notes"}
 
@@ -395,3 +398,49 @@ class TestProductTranslationExchange(ProductDetailPriceTestCase):
 			"translated_value",
 		)
 		self.assertEqual(stored, "قميص الكتان الجديد")
+
+
+class TestThemeSectionTranslationExchange(IntegrationTestCase):
+	def setUp(self):
+		self.addCleanup(clear_layout_cache, SUMMER_THEME, "index")
+		self.addCleanup(frappe.db.rollback)
+		frappe.db.delete("Theme Layout", {"theme": SUMMER_THEME, "page": "index"})
+		clear_layout_cache(SUMMER_THEME, "index")
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		activate_theme(SUMMER_THEME)
+		hooks = frappe.get_hooks("commera_hooks", {})
+		themes = [entry for entry in hooks["translatable_resources"] if entry["type"] == "theme_section"]
+		self.enterContext(self.patch_hooks({"commera_hooks": {**hooks, "translatable_resources": themes}}))
+		self.resource = get_translatable_resource("theme_section")
+
+	def heading_row(self, content):
+		(row,) = [
+			row for row in parse(content) if (row["Identification"], row["Field"]) == (ENTRY, "heading")
+		]
+		return row
+
+	def test_a_theme_section_translation_exports_and_imports_back(self):
+		self.resource.write(ENTRY, "heading", "ar", ARABIC_HEADING)
+
+		content = exchange.export_csv("ar")
+		row = self.heading_row(content)
+		unchanged = exchange.import_csv(content, "ar")
+		report = exchange.import_csv(to_csv([{**row, "Translated content": "سترة جديدة"}]), "ar")
+
+		self.assertEqual(
+			(row["Type"], row["Status"], row["Default content"], row["Translated content"]),
+			("theme_section", CURRENT, HEADING, ARABIC_HEADING),
+		)
+		self.assertEqual((unchanged.updated, unchanged.errors), (0, []))
+		self.assertEqual((report.updated, report.errors), (1, []))
+		(entry,) = self.resource.list_entries("ar", filters={"name": ENTRY, "field": "heading"}).entries
+		self.assertEqual((entry.value, entry.status), ("سترة جديدة", CURRENT))
+
+	def test_a_theme_section_row_for_a_market_is_an_error(self):
+		row = self.heading_row(exchange.export_csv("ar"))
+
+		with patch.object(exchange, "MARKET_DOCTYPE", "Currency"):
+			report = exchange.import_csv(to_csv([{**row, "Market": "INR", "Translated content": "x"}]), "ar")
+
+		self.assertEqual(len(report.errors), 1)
+		self.assertIn("per market", report.errors[0]["message"])

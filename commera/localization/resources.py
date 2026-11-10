@@ -4,8 +4,9 @@
 import json
 from collections import Counter
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import islice
+from typing import ClassVar
 
 import frappe
 from frappe import _
@@ -45,6 +46,7 @@ class TranslationEntry:
 	# Empty when missing. An outdated value is still the one shown.
 	value: str
 	status: str
+	market: str = SHOP_WIDE
 
 
 @dataclass(frozen=True)
@@ -61,6 +63,8 @@ class TranslatableResource:
 
 	type: str
 	label: str
+	# Whether translations can also be scoped to one market.
+	has_markets: ClassVar[bool] = False
 
 	def list_entries(
 		self,
@@ -99,12 +103,18 @@ class TranslatableResource:
 		counts = self.aggregate_statuses(language)
 		return {status: counts[status] for status in STATUSES}
 
-	def write(self, name: str, field: str, language: str, value: str):
-		"""Save the shop-wide translation of a field, current against its source now. Empty removes it.
-		The caller needs write permission on the storage, and the field must belong to this resource."""
+	def get_market_entries(self, entries: list[TranslationEntry], language: str) -> dict:
+		"""{(name, field): [its entry per market, by market]} for a batch of shop-wide entries."""
+		return {}
+
+	def write(self, name: str, field: str, language: str, value: str, market: str = SHOP_WIDE):
+		"""Save the translation of a field, shop-wide or for `market`, current against its source now.
+		Empty removes it. The caller needs write permission on the storage."""
 		check_target_language(language)
+		if market and not self.has_markets:
+			frappe.throw(_("{0} cannot be translated per market.").format(self.label))
 		self.check_write_permission(bool(value))
-		self.save_translation(name, field, language, value or "")
+		self.save_translation(name, field, language, value or "", market)
 
 	def scan(self, language, filters, after: list | None, batch_size=BATCH_SIZE) -> Iterator[tuple]:
 		"""(entry, its key as a list) in ascending key order, only keys strictly after `after`."""
@@ -116,7 +126,7 @@ class TranslatableResource:
 	def check_write_permission(self, saving: bool):
 		raise NotImplementedError
 
-	def save_translation(self, name: str, field: str, language: str, value: str):
+	def save_translation(self, name: str, field: str, language: str, value: str, market: str):
 		raise NotImplementedError
 
 
@@ -127,6 +137,7 @@ class DoctypeResource(TranslatableResource):
 
 	doctype: str
 	fields: tuple[str, ...]
+	has_markets: ClassVar[bool] = True
 
 	def scan(self, language, filters, after, batch_size=BATCH_SIZE):
 		meta = frappe.get_meta(self.doctype)
@@ -203,19 +214,42 @@ class DoctypeResource(TranslatableResource):
 					counts[get_status(source[field], value, source_hash)] += 1
 		return counts
 
+	def get_market_entries(self, entries, language):
+		by_key = {(entry.name, entry.field): entry for entry in entries}
+		rows = frappe.get_all(
+			DOCTYPE,
+			filters={
+				"reference_doctype": self.doctype,
+				"reference_name": ("in", list({entry.name for entry in entries})),
+				"reference_field": ("in", self.fields),
+				"language": language,
+				"market": ("is", "set"),
+			},
+			fields=["reference_name", "reference_field", "market", "translated_value", "source_hash"],
+			order_by="market asc",
+		)
+		markets = {}
+		for row in rows:
+			if entry := by_key.get((row.reference_name, row.reference_field)):
+				value = row.translated_value or ""
+				status = get_status(entry.source, value, row.source_hash)
+				market_entry = replace(entry, market=row.market, value=value, status=status)
+				markets.setdefault((entry.name, entry.field), []).append(market_entry)
+		return markets
+
 	def check_write_permission(self, saving):
 		frappe.has_permission(DOCTYPE, "write" if saving else "delete", throw=True)
 
-	def save_translation(self, name, field, language, value):
+	def save_translation(self, name, field, language, value, market):
 		if field not in self.fields or not frappe.db.exists(self.doctype, name):
 			frappe.throw(
 				_("{0} {1} has no translatable field {2}.").format(_(self.doctype), name, field),
 				frappe.DoesNotExistError,
 			)
 		if value:
-			register(self.doctype, name, field, language, value)
+			register(self.doctype, name, field, language, value, market)
 			return
-		key = {"reference_name": name, "reference_field": field, "language": language, "market": SHOP_WIDE}
+		key = {"reference_name": name, "reference_field": field, "language": language, "market": market}
 		if existing := frappe.db.get_value(DOCTYPE, {"reference_doctype": self.doctype, **key}):
 			frappe.delete_doc(DOCTYPE, existing)
 

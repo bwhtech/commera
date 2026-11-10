@@ -70,7 +70,7 @@ class ThemeSectionResource(TranslatableResource):
 	def check_write_permission(self, saving):
 		frappe.has_permission(THEME_LAYOUT, "write", throw=True)
 
-	def save_translation(self, name, field, language, value):
+	def save_translation(self, name, field, language, value, market):
 		"""Write into the live layout, or its overlay on an inherited page, and into the draft when the
 		draft has that entry. Each written field is stamped current, even when its text is unchanged."""
 		theme_context = self.get_theme_context()
