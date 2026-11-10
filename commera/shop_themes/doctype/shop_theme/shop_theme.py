@@ -15,6 +15,7 @@ THEME_NAME_PATTERN = re.compile(r"^[A-Za-z0-9 _-]+$")
 DEFAULT_THEME_APP = "commera"
 DEFAULT_THEME_MODULE = "Shop Themes"
 BASE_THEME = "Shop Base Theme"
+BUILDER_THEME_TYPE = "Builder"
 THEME_FOLDERS = {
 	"Classic": ("pages", "components/includes", "components/macros", "styles"),
 	"Sections": ("pages", "sections", "layouts"),
@@ -29,9 +30,16 @@ PREVIEW_THEME_PARAM = "preview_theme"
 
 
 class ShopTheme(Document):
+	@property
+	def is_builder_theme(self):
+		return self.theme_type == BUILDER_THEME_TYPE
+
 	def validate(self):
 		validate_theme_name(self.theme_name)
 		self.validate_unique_slug()
+		if self.is_builder_theme:
+			self.validate_builder_theme()
+			return
 		if self.is_new():
 			self.validate_theme_folder_can_exist()
 			if self.can_scaffold() and not os.path.isdir(self.get_folder()):
@@ -43,6 +51,16 @@ class ShopTheme(Document):
 		if self.parent_theme:
 			self.validate_no_circular_inheritance()
 			self.validate_parent_theme_type()
+
+	def validate_builder_theme(self):
+		"""Builder themes keep their pages in Frappe Builder: no folder, and a file theme to inherit the rest from."""
+		if not self.parent_theme:
+			frappe.throw(
+				frappe._("A Builder theme needs a parent theme for its cart, checkout and account pages")
+			)
+		if self.use_as_starter:
+			frappe.throw(frappe._("A Builder theme cannot be used as a starter"))
+		self.validate_no_circular_inheritance()
 
 	def validate_unique_slug(self):
 		# "Foo Bar" and "Foo-Bar" scrub to the same slug, and on_trash rmtrees by slug: one delete takes both.
@@ -99,7 +117,7 @@ class ShopTheme(Document):
 
 	def after_insert(self):
 		# A read-only apps volume would otherwise break the insert itself.
-		if not self.can_scaffold():
+		if self.is_builder_theme or not self.can_scaffold():
 			return
 
 		starter = None if os.path.isdir(self.get_folder()) else self.get_starter()

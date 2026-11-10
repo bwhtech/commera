@@ -1,15 +1,16 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Skeleton, dialog, toast } from 'frappe-ui'
+import { Button, Skeleton, dialog, toast } from 'frappe-ui'
 import AppPageHeader from '../../components/AppPageHeader.vue'
 import PageBody from '../../components/PageBody.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import ThemeRow from '../../components/storefront/ThemeRow.vue'
+import NewBuilderThemeDialog from '../../components/storefront/NewBuilderThemeDialog.vue'
 import { useTheme } from '../../data/theme'
 import { captureMissingThumbnails } from '../../data/storePreview'
 import { errorMessage } from '../../data/errors'
 
-const { themes, loadError, loading, load, activate } = useTheme()
+const { themes, loadError, loading, builderInstalled, load, activate } = useTheme()
 
 onMounted(async () => {
   await load()
@@ -17,6 +18,7 @@ onMounted(async () => {
 })
 
 const activatingName = ref(null)
+const creatingTheme = ref(false)
 
 const liveTheme = computed(() => themes.value.find((theme) => theme.live) ?? null)
 const libraryThemes = computed(() => themes.value.filter((theme) => !theme.live))
@@ -42,7 +44,11 @@ function confirmActivate(theme) {
 </script>
 
 <template>
-  <AppPageHeader title="Themes" />
+  <AppPageHeader title="Themes">
+    <template v-if="builderInstalled" #actions>
+      <Button label="New theme" icon-left="lucide-plus" variant="solid" theme="gray" @click="creatingTheme = true" />
+    </template>
+  </AppPageHeader>
 
   <PageBody width="wide">
     <div v-if="loading && !themes.length" aria-hidden="true">
@@ -95,4 +101,6 @@ function confirmActivate(theme) {
       </section>
     </template>
   </PageBody>
+
+  <NewBuilderThemeDialog v-model:open="creatingTheme" />
 </template>

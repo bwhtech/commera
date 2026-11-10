@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Badge, Button, useColorScheme } from 'frappe-ui'
 import Thumb from '../Thumb.vue'
+import ResponsiveButton from '../ResponsiveButton.vue'
 
 const props = defineProps({
   theme: { type: Object, required: true },
@@ -14,11 +15,16 @@ defineEmits(['activate'])
 
 const { resolvedColorScheme } = useColorScheme()
 
-const isClassic = computed(() => props.theme.theme_type !== 'Sections')
+const isBuilder = computed(() => props.theme.theme_type === 'Builder')
+const isClassic = computed(() => props.theme.theme_type !== 'Sections' && !isBuilder.value)
 const muted = computed(() => isClassic.value && !props.theme.live)
-const meta = computed(() => (isClassic.value ? props.theme.source : `Built with sections · ${props.theme.source}`))
+const META_PREFIXES = { Sections: 'Built with sections', Builder: 'Built with Frappe Builder' }
+const meta = computed(() => {
+  const prefix = META_PREFIXES[props.theme.theme_type]
+  return prefix ? `${prefix} · ${props.theme.source}` : props.theme.source
+})
 const editorRoute = computed(() =>
-  isClassic.value ? null : { name: 'StorefrontThemeEditor', params: { theme: props.theme.name } },
+  props.theme.theme_type === 'Sections' ? { name: 'StorefrontThemeEditor', params: { theme: props.theme.name } } : null,
 )
 const thumbnail = computed(() =>
   resolvedColorScheme.value === 'dark' && props.theme.thumbnail_dark ? props.theme.thumbnail_dark : props.theme.thumbnail,
@@ -82,6 +88,13 @@ const imageSize = computed(() => (props.featured ? 'aspect-[16/10] w-full sm:w-6
       <span class="sm:hidden">Switch</span>
       <span class="hidden sm:inline">Switch Theme</span>
     </Button>
+    <ResponsiveButton
+      v-if="isBuilder && theme.builder_editor_url"
+      label="Edit in Builder"
+      icon="lucide-external-link"
+      icon-position="right"
+      :href="theme.builder_editor_url"
+    />
     <span
       class="lucide-chevron-right size-4 shrink-0 text-ink-gray-5"
       :class="{ invisible: !editorRoute, 'hidden sm:block': featured }"

@@ -7,12 +7,16 @@ const themes = ref([])
 // unless the failure is kept.
 const loadError = ref(null)
 
+const builderInstalled = ref(false)
+
 const { attempt, call, loading } = createAdminCaller('theme.')
 
 async function load() {
   const { data, error } = await attempt('get_editor_data')
   loadError.value = error
-  if (data) themes.value = data.themes ?? []
+  if (!data) return
+  themes.value = data.themes ?? []
+  builderInstalled.value = Boolean(data.builder_installed)
 }
 
 async function activate(theme) {
@@ -22,6 +26,11 @@ async function activate(theme) {
   return true
 }
 
+// Both halves, so the dialog can show the refusal under its field.
+function createBuilderTheme(themeName) {
+  return attempt('create_builder_theme', { theme_name: themeName })
+}
+
 export function useTheme() {
-  return { themes, loadError, loading, load, activate }
+  return { themes, loadError, loading, builderInstalled, load, activate, createBuilderTheme }
 }

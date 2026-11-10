@@ -298,7 +298,16 @@ def build_base_context(match):
 
 	apply_website_settings(context)
 	context.theme = get_shop_theme_settings()
-	context.commera_header_content = frappe.render_template(  # nosemgrep: frappe-ssti
+	context.commera_header_content = get_commera_header_content()
+	context.commera = commera.sdk
+	apply_website_context_hooks(context)
+
+	return context
+
+
+def get_commera_header_content():
+	"""The storefront SDK bundle and its config, for the page head."""
+	return frappe.render_template(  # nosemgrep: frappe-ssti
 		"templates/includes/commera-header-content.html",
 		{
 			"csrf_token": frappe.session.data.csrf_token,
@@ -310,10 +319,6 @@ def build_base_context(match):
 			),
 		},
 	)
-	context.commera = commera.sdk
-	apply_website_context_hooks(context)
-
-	return context
 
 
 def apply_website_settings(context):

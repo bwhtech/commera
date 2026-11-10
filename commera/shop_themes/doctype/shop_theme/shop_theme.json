@@ -17,7 +17,10 @@
   "thumbnail_dark",
   "parent_theme",
   "section_break_config",
-  "config"
+  "config",
+  "section_break_builder",
+  "builder_folder",
+  "builder_pages"
  ],
  "fields": [
   {
@@ -30,12 +33,12 @@
   },
   {
    "default": "Classic",
-   "description": "Classic themes hardcode their pages. Sections themes build pages from sections/ and layouts/ that shops can rearrange.",
+   "description": "Classic themes hardcode their pages. Sections themes build pages from sections/ and layouts/ that shops can rearrange. Builder themes render their home, listing and product pages from Frappe Builder pages and inherit every other page from their parent theme.",
    "fieldname": "theme_type",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Theme Type",
-   "options": "Classic\nSections",
+   "options": "Classic\nSections\nBuilder",
    "reqd": 1
   },
   {
@@ -105,12 +108,32 @@
    "fieldname": "config",
    "fieldtype": "JSON",
    "label": "Config"
+  },
+  {
+   "collapsible": 0,
+   "depends_on": "eval:doc.theme_type == 'Builder'",
+   "fieldname": "section_break_builder",
+   "fieldtype": "Section Break",
+   "label": "Frappe Builder"
+  },
+  {
+   "description": "The Builder project folder that holds this theme's pages.",
+   "fieldname": "builder_folder",
+   "fieldtype": "Data",
+   "label": "Builder Folder",
+   "read_only": 1
+  },
+  {
+   "fieldname": "builder_pages",
+   "fieldtype": "Table",
+   "label": "Builder Pages",
+   "options": "Shop Theme Builder Page"
   }
  ],
  "image_field": "thumbnail",
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-05 12:00:00.000000",
+ "modified": "2026-11-10 08:00:00.000000",
  "modified_by": "Administrator",
  "module": "Shop Themes",
  "name": "Shop Theme",
