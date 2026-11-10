@@ -13,7 +13,8 @@ from frappe.utils import add_days, cint, create_batch, cstr, flt, get_datetime, 
 from frappe.utils.background_jobs import get_job_status
 from frappe.utils.caching import request_cache
 from frappe.utils.data import strip_html
-from pypika import Order
+from pypika import Order, Table
+from pypika.terms import Field
 from rq.job import JobStatus
 
 from commera.core import get_address_docs, get_party
@@ -108,27 +109,17 @@ def get_product_list(filters=None, product_list=None, page=1, page_length=30, so
 def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30, sort_by="default"):
 	"""Retained frappe.qb product grid — browse, pinned lists, and the Arabic/short-term search fallback."""
 
+	from commera.card_prices import card_discount_percent
+
 	query = get_product_base_query(filters, product_list)
 	style_attribute_variant = DocType("Style Attribute Variant")
 	website_slideshow_item = DocType("Website Slideshow Item")
 	hover_slideshow_item = DocType("Website Slideshow Item").as_("hover_slideshow_item")
 	color_size_item = DocType("Color Size Item")
-	item_price_default = DocType("Item Price").as_("ip_default")
-	item_price_sale = DocType("Item Price").as_("ip_sale")
+	card = Table("card_prices")
 	item = DocType("Item")
 
-	discount_expr = (
-		Case()
-		.when(
-			Min(item_price_default.price_list_rate) > 0,
-			(
-				(Min(item_price_default.price_list_rate) - Min(item_price_sale.price_list_rate))
-				/ Min(item_price_default.price_list_rate)
-			)
-			* 100,
-		)
-		.else_(0)
-	)
+	discount_expr = card_discount_percent(card)
 	query = (
 		query.left_join(hover_slideshow_item)
 		.on((hover_slideshow_item.parent == style_attribute_variant.name) & (hover_slideshow_item.idx == 2))
@@ -147,22 +138,21 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 			item.item_name,
 			item.is_stock_item,
 			color_size_item.item_code.as_("variant_item_code"),
-			Min(item_price_default.price_list_rate).as_("default_price"),
-			Min(item_price_sale.price_list_rate).as_("sale_price"),
+			card.effective_price,
+			card.default_price,
+			card.sale_price,
 			website_slideshow_item.image.as_("image"),
 			hover_slideshow_item.image.as_("hover_image"),
-			discount_expr.as_("discount_percent").as_("discount_percent"),
+			discount_expr.as_("discount_percent"),
 		)
 		.groupby(style_attribute_variant.name)
 		.limit(page_length)
 		.offset((page - 1) * page_length)
 	)
-	# The card's price: shape_product_cards gives the sale rate, else the compare-at rate.
-	card_price = Coalesce(Min(item_price_sale.price_list_rate), Min(item_price_default.price_list_rate))
 	if sort_by == "price_low":
-		query = query.orderby(card_price, order=Order.asc)
+		query = query.orderby(card.effective_price, order=Order.asc)
 	elif sort_by == "price_high":
-		query = query.orderby(card_price, order=Order.desc)
+		query = query.orderby(card.effective_price, order=Order.desc)
 	elif sort_by == "name":
 		query = query.orderby("display_name", order=Order.asc)
 	elif sort_by == "new_arrival":
@@ -196,10 +186,11 @@ def shape_product_cards(cards):
 			card.setdefault(column, None)
 		card.setdefault("average_rating", None)
 		card.setdefault("review_count", None)
-		# Mirrors record_builder.aggregate_prices; a secondary market gives no price to an unpriced product.
-		card["effective_price"] = prices.price(card["sale_price"], card["default_price"])
+		# No size priced: 0 in the primary market, as before; no price in a secondary market.
+		if card["effective_price"] is None:
+			card["effective_price"] = prices.price(None, None)
 		if card["has_discount"] is None:
-			card["has_discount"] = 1 if flt(card["discount_percent"]) else 0
+			card["has_discount"] = 1 if card["default_price"] else 0
 		# frappe.qb returns a datetime where the index holds a string, and the card is json.dumps'd into HTML.
 		card["modified"] = cstr(card["modified"]) if card["modified"] else None
 	return set_product_titles(cards)
@@ -252,17 +243,15 @@ def get_product_count_qb(filters=None, product_list=None):
 
 
 def get_product_base_query(filters=None, product_list=None):
-	from commera.base_prices import is_base_price
+	from commera.card_prices import card_prices_query
 	from commera.localization.market_prices import MarketPrices
 
 	prices = MarketPrices.current()
-	default_price_list = prices.compare_at_price_list
-	sale_price_list = prices.sale_price_list
+	card_prices = card_prices_query(prices.sale_price_list, prices.compare_at_price_list).as_("card_prices")
+	card = Table("card_prices")
 	style_attribute_variant = DocType("Style Attribute Variant")
 	website_slideshow_item = DocType("Website Slideshow Item")
 	color_size_item = DocType("Color Size Item")
-	item_price_default = DocType("Item Price").as_("ip_default")
-	item_price_sale = DocType("Item Price").as_("ip_sale")
 	item = DocType("Item")
 
 	query = (
@@ -274,18 +263,9 @@ def get_product_base_query(filters=None, product_list=None):
 		)
 		.left_join(color_size_item)
 		.on(color_size_item.parent == style_attribute_variant.name)
-		.left_join(item_price_default)
-		.on(
-			(item_price_default.item_code == color_size_item.item_code)
-			& (item_price_default.price_list == default_price_list)
-			& is_base_price(item_price_default)
-		)
-		.left_join(item_price_sale)
-		.on(
-			(item_price_sale.item_code == color_size_item.item_code)
-			& (item_price_sale.price_list == sale_price_list)
-			& is_base_price(item_price_sale)
-		)
+		# One row per product, over all its sizes: a size filter must not change the card price.
+		.left_join(card_prices)
+		.on(Field("parent", table=card_prices) == style_attribute_variant.name)
 		.left_join(item)
 		.on(item.name == style_attribute_variant.item_style)
 	)
@@ -296,7 +276,7 @@ def get_product_base_query(filters=None, product_list=None):
 
 	if filters:
 		if filters.get("has_discount"):
-			query = query.where(item_price_default.price_list_rate > item_price_sale.price_list_rate)
+			query = query.where(card.default_price.notnull())
 		if filters.get("category_item_groups"):
 			query = query.where(style_attribute_variant.item_group.isin(filters["category_item_groups"]))
 		if filters.get("subcategory"):
@@ -307,12 +287,10 @@ def get_product_base_query(filters=None, product_list=None):
 			query = query.where(color_size_item.size.isin(filters["sizes"]))
 		if filters.get("brands"):
 			query = query.where(item.brand.isin(filters["brands"]))
-		# A size priced only in the compare-at list sells at that rate.
-		price = Coalesce(item_price_sale.price_list_rate, item_price_default.price_list_rate)
 		if filters.get("min_price"):
-			query = query.where(price >= filters["min_price"])
+			query = query.where(card.effective_price >= filters["min_price"])
 		if filters.get("max_price"):
-			query = query.where(price <= filters["max_price"])
+			query = query.where(card.effective_price <= filters["max_price"])
 		if filters.get("search"):
 			search = filters.get("search")
 			child_categories = get_complete_nested_links(search)

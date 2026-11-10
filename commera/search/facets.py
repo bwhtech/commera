@@ -1,8 +1,9 @@
 import frappe
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Count, Max, Min
+from pypika.terms import Field
 
-from commera.base_prices import is_base_price
+from commera.card_prices import card_prices_query
 from commera.localization.market_prices import MarketPrices
 from commera.product_detail import size_sort_key
 from commera.search import query as search_query
@@ -82,38 +83,19 @@ def get_listing_facet_counts(selected_filters: dict) -> dict[str, dict[str, int]
 
 
 def get_price_range(sale_price_list: str | None, compare_at_price_list: str | None = None) -> dict:
-	"""The range of the prices paid: sale rates, and compare-at rates of items without one."""
-	sale = get_rate_range(sale_price_list)
-	full = get_rate_range(compare_at_price_list, without_rate_in=sale_price_list)
-	mins = [rate for rate in (sale["min_price"], full["min_price"]) if rate is not None]
-	maxes = [rate for rate in (sale["max_price"], full["max_price"]) if rate is not None]
-	return {"min_price": min(mins, default=None), "max_price": max(maxes, default=None)}
-
-
-def get_rate_range(price_list: str | None, without_rate_in: str | None = None) -> dict:
-	if not price_list:
-		return {"min_price": None, "max_price": None}
-	item_price = DocType("Item Price")
-	query = (
-		frappe.qb.from_(item_price)
+	"""The range of the card prices of the published products, the price the grid filters on."""
+	product = DocType("Style Attribute Variant")
+	card_prices = card_prices_query(sale_price_list, compare_at_price_list).as_("card_prices")
+	return (
+		frappe.qb.from_(product)
+		.join(card_prices)
+		.on(Field("parent", table=card_prices) == product.name)
+		.where(product.is_published == 1)
 		.select(
-			Min(item_price.price_list_rate).as_("min_price"),
-			Max(item_price.price_list_rate).as_("max_price"),
+			Min(Field("effective_price", table=card_prices)).as_("min_price"),
+			Max(Field("effective_price", table=card_prices)).as_("max_price"),
 		)
-		.where(item_price.price_list == price_list)
-		.where(is_base_price(item_price))
-	)
-	if without_rate_in:
-		priced = DocType("Item Price").as_("priced")
-		query = query.where(
-			item_price.item_code.notin(
-				frappe.qb.from_(priced)
-				.select(priced.item_code)
-				.where(priced.price_list == without_rate_in)
-				.where(is_base_price(priced))
-			)
-		)
-	return query.run(as_dict=True)[0]
+	).run(as_dict=True)[0]
 
 
 def get_product_filters(selected_filters):

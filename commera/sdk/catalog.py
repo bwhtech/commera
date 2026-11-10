@@ -72,8 +72,8 @@ COLLECTION_FIELDS = [
 
 
 def get_items(item_codes: list[str]) -> dict[str, CatalogItem]:
-	"""`price` is what a shopper pays in the request's market, `list_price` the compare-at figure.
-	`price` is None for an item the market does not sell. A code that is not an Item is left out."""
+	"""`price` is what a shopper pays in the request's market, None for an item it does not sell.
+	`list_price` is the crossed-out price: None unless above `price`. A non-Item code is left out."""
 	frappe.has_permission("Item", ptype="read", throw=True)
 	items = {}
 	for item_code_chunk in create_batch(
@@ -104,8 +104,7 @@ def read_items(item_codes: list[str]) -> dict[str, CatalogItem]:
 			"title": row.item_name,
 			"product": row.variant_of or row.name,
 			"is_listed": row.name in listed_items,
-			"price": get_item_price(prices, sale_rates.get(row.name), compare_at_rates.get(row.name)),
-			"list_price": compare_at_rates.get(row.name),
+			**get_item_prices(prices, sale_rates.get(row.name), compare_at_rates.get(row.name)),
 			"currency": prices.currency,
 			"available_qty": flt(stocks.get(row.name, {}).get("stock_qty")),
 			"unlimited": bool(stocks.get(row.name, {}).get("unlimited")),
@@ -124,9 +123,10 @@ def get_base_rates(prices: MarketPrices, item_codes: list[str]) -> tuple[dict, d
 	return rates[prices.sale_price_list], rates[prices.compare_at_price_list]
 
 
-def get_item_price(prices: MarketPrices, sale: float | None, compare_at: float | None) -> float | None:
+def get_item_prices(prices: MarketPrices, sale: float | None, compare_at: float | None) -> dict:
 	# An item on neither list has no price, in the primary market too.
-	return None if sale is None and compare_at is None else prices.price(sale, compare_at)
+	price = None if sale is None and compare_at is None else prices.price(sale, compare_at)
+	return {"price": price, "list_price": prices.compare_at(price, compare_at)}
 
 
 # Shopper reads: published products only, the same for every caller, so they need no permission.
@@ -383,12 +383,14 @@ def get_product_cards(cards: list[dict]) -> list[ProductCard]:
 	sellable = {code for code in item_codes if code not in unpriced and stock.get(code, {}).get("in_stock")}
 	# utils.shape_product_cards titles every grid's cards; only a hand-built card lacks one.
 	set_product_titles([card for card in cards if "title" not in card])
-	return [get_product_card(card, sellable, prices.currency) for card in cards]
+	return [get_product_card(card, sellable, prices) for card in cards]
 
 
-def get_product_card(card: dict, sellable: set[str], currency: str) -> ProductCard:
+def get_product_card(card: dict, sellable: set[str], prices: MarketPrices) -> ProductCard:
 	# shape_product_cards leaves no price on a product the market does not sell.
-	priced = card["effective_price"] is not None
+	price = flt(card["effective_price"]) if card["effective_price"] is not None else None
+	# default_price is the compare-at rate of the size with the card price: crossed out only above it.
+	compare_at = card["default_price"] if cint(card["has_discount"]) else None
 	return {
 		"id": card["name"],
 		"handle": card["route"],
@@ -398,10 +400,10 @@ def get_product_card(card: dict, sellable: set[str], currency: str) -> ProductCa
 		"color": translate_term(card["attribute_value"]),
 		"image": card["image"],
 		"hover_image": card["hover_image"],
-		"currency": currency,
-		"price": flt(card["effective_price"]) if priced else None,
-		"compare_at_price": flt(card["default_price"]) if priced and cint(card["has_discount"]) else None,
-		"available": priced and any(size["item_code"] in sellable for size in card["sizes"]),
+		"currency": prices.currency,
+		"price": price,
+		"compare_at_price": prices.compare_at(price, compare_at),
+		"available": price is not None and any(size["item_code"] in sellable for size in card["sizes"]),
 		"rating": {"average": flt(card["average_rating"]), "count": cint(card["review_count"])},
 		"updated_at": card["modified"],
 	}
