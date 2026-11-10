@@ -6,25 +6,6 @@ from frappe.utils.caching import request_cache
 from commera.localization.languages import Language, StorefrontLanguages
 from commera.roles import is_commera_admin
 
-# Desk, API, assets and Frappe's own pages keep Frappe's language: the user's, not the storefront's.
-SYSTEM_SEGMENTS = frozenset(
-	{
-		"api",
-		"app",
-		"desk",
-		"assets",
-		"files",
-		"private",
-		"commera",
-		"socket.io",
-		"print",
-		"printview",
-		"login",
-		"logout",
-		"update-password",
-	}
-)
-
 
 @dataclass(frozen=True)
 class Localization:
@@ -51,7 +32,7 @@ def resolve(
 	segment, rest = split_first_segment(path)
 
 	if language := languages.find(segment, include_unpublished):
-		root_prefix, path = f"/{segment}", rest
+		root_prefix, path = f"/{language.code.lower()}", rest
 	else:
 		language = languages.find(lang, include_unpublished) or languages.default
 		root_prefix = "" if language == languages.default else f"/{language.code.lower()}"
@@ -65,21 +46,26 @@ def resolve(
 	return localization, path
 
 
-@request_cache
 def get_localization() -> Localization:
 	"""The localization of the current request."""
-	request = getattr(frappe.local, "request", None)
-	path = request.path if request else "/"
-	localization, _path = resolve(path, frappe.form_dict.get("_lang"), is_commera_admin())
-	return localization
+	return resolve_current_request()[0]
 
 
 def apply_request_language():
-	"""Set frappe.local.lang from the storefront URL, except on desk, API and system paths."""
-	segment, _rest = split_first_segment(frappe.request.path)
-	if segment in SYSTEM_SEGMENTS:
-		return
-	frappe.local.lang = get_localization().language.code
+	"""Set frappe.local.lang when the path starts with a storefront language prefix."""
+	localization, path = resolve_current_request()
+	if path != frappe.request.path:
+		frappe.local.lang = localization.language.code
+
+
+def resolve_current_request() -> tuple[Localization, str]:
+	request = getattr(frappe.local, "request", None)
+	return resolve_cached(request.path if request else "/", frappe.form_dict.get("_lang"), is_commera_admin())
+
+
+@request_cache
+def resolve_cached(path: str, lang: str | None, include_unpublished: bool) -> tuple[Localization, str]:
+	return resolve(path, lang, include_unpublished)
 
 
 def split_first_segment(path: str) -> tuple[str, str]:

@@ -64,6 +64,29 @@ def get_default_language_code(settings) -> str:
 	)
 
 
+def seed_storefront_languages(default: str, codes: tuple[str, ...]):
+	"""Publish `codes` on a store with no language settings yet.
+	Writes rows directly: a Commera Settings save also checks unrelated required fields."""
+	if frappe.db.exists("Commera Storefront Language", {"parent": "Commera Settings"}):
+		return
+
+	frappe.db.set_single_value("Commera Settings", "default_storefront_language", default)
+	codes = [code for code in codes if frappe.db.exists("Language", code)]
+	for idx, code in enumerate(codes, start=1):
+		frappe.get_doc(
+			{
+				"doctype": "Commera Storefront Language",
+				"parent": "Commera Settings",
+				"parenttype": "Commera Settings",
+				"parentfield": "storefront_languages",
+				"idx": idx,
+				"language": code,
+				"published": 1,
+			}
+		).db_insert()
+	frappe.clear_document_cache("Commera Settings", "Commera Settings")
+
+
 def is_rtl_language(code: str) -> bool:
 	# Frappe keeps its right-to-left set inside is_rtl(), which reads frappe.local.lang.
 	previous = getattr(frappe.local, "lang", None)

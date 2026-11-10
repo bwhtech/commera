@@ -254,6 +254,9 @@ class CommeraSettings(Document):
 		if get_enabled_storefront_apps(before) != get_enabled_storefront_apps(self):
 			clear_storefront_plugin_cache()
 			clear_website_cache()
+		elif storefront_languages_changed(before, self):
+			# Cached guest pages carry the old language list.
+			clear_website_cache()
 		if frappe.flags.in_install or frappe.flags.in_migrate:
 			return
 		if before is None:
@@ -439,6 +442,16 @@ def create_configurator_log():
 			"doctype": "Bulk Style Attribute Configurator Creation Log",
 		}
 	).insert(ignore_permissions=True)
+
+
+def storefront_languages_changed(before, after) -> bool:
+	def languages(doc):
+		if doc is None:
+			return None
+		rows = [(row.language, row.published) for row in doc.get("storefront_languages") or []]
+		return doc.get("default_storefront_language"), rows
+
+	return languages(before) != languages(after)
 
 
 def validate_price_list_currency(price_list: str, currency: str, label: str):

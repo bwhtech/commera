@@ -1,9 +1,10 @@
 import json
 import re
-from types import SimpleNamespace
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request
 
 from commera.localization import apply_request_language, get_localization, resolve
 from commera.shop_themes.theme_resolver import build_base_context
@@ -46,6 +47,7 @@ class TestLocalizationResolver(IntegrationTestCase):
 		self.assertEqual(localization.language.code, "ar")
 		self.assertEqual(localization.root_prefix, "/ar")
 		self.assertEqual(path, "/products/linen-shirt")
+		self.assertEqual(resolve("/AR/cart")[0].root_prefix, "/ar")
 		self.assertEqual(resolve("/ar")[1], "/")
 		self.assertEqual(resolve("/en/cart")[0].language.code, "en")
 
@@ -115,24 +117,24 @@ class TestRequestLanguage(IntegrationTestCase):
 		set_storefront_languages("en", published=("en", "ar"))
 		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
 		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+		self.addCleanup(frappe.local.request_cache.clear)
 
 	def visit(self, path, lang="ar"):
-		frappe.local.request = SimpleNamespace(path=path)
+		frappe.local.request = Request(EnvironBuilder(path=path).get_environ())
 		frappe.local.request_cache.clear()
 		frappe.local.lang = lang
 		apply_request_language()
 		return frappe.local.lang
 
-	def test_storefront_paths_take_the_language_from_the_url(self):
+	def test_a_language_prefix_sets_frappes_language(self):
 		self.assertEqual(self.visit("/ar/products", lang="en"), "ar")
 		self.assertEqual(self.visit("/en/products"), "en")
-		self.assertEqual(self.visit("/archive"), "en")
-		self.assertEqual(self.visit("/article"), "en")
 
-	def test_desk_and_api_paths_keep_frappes_language(self):
-		for path in ("/app/item", "/api/method/ping", "/commera/orders", "/assets/x.js"):
+	def test_other_paths_keep_frappes_language(self):
+		for path in ("/archive", "/article", "/app/item", "/api/method/ping", "/commera/orders", "/builder"):
 			with self.subTest(path):
-				self.assertEqual(self.visit(path), "ar")
+				self.assertEqual(self.visit(path, lang="en"), "en")
+				self.assertEqual(self.visit(path, lang="fr"), "fr")
 
 	def test_storefront_config_and_theme_context_carry_the_localization(self):
 		self.visit("/ar/products")
@@ -200,3 +202,17 @@ class TestSeedStorefrontLanguagesPatch(IntegrationTestCase):
 		frappe.local.request_cache.clear()
 
 		self.assertEqual(codes(resolve("/")[0].available_languages), ["en", "fr"])
+
+	def test_a_new_store_starts_with_only_its_default_language(self):
+		from commera.migrate import seed_default_storefront_language
+
+		set_storefront_languages()
+
+		seed_default_storefront_language()
+		frappe.local.request_cache.clear()
+
+		system_language = frappe.get_system_settings("language") or "en"
+		self.assertEqual(codes(resolve("/")[0].available_languages), [system_language])
+		self.assertEqual(
+			frappe.db.get_single_value("Commera Settings", "default_storefront_language"), system_language
+		)

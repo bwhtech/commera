@@ -46,6 +46,7 @@ def after_install():
 	setup_robots_txt()
 	seed_llms_txt()
 	seed_default_routes()
+	seed_default_storefront_language()
 	activate_summer_theme()
 	seed_menu_when_empty()
 	add_plugin_user()
@@ -270,3 +271,10 @@ def setup_robots_txt():
 		f"Sitemap: {site_url}/sitemap.xml\n"
 	)
 	frappe.db.set_single_value("Website Settings", "robots_txt", robots_txt)
+
+
+def seed_default_storefront_language():
+	from commera.localization.languages import FALLBACK_LANGUAGE, seed_storefront_languages
+
+	default = frappe.get_system_settings("language") or FALLBACK_LANGUAGE
+	seed_storefront_languages(default, (default,))
