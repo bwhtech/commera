@@ -10,7 +10,7 @@ from frappe.query_builder import DocType
 from frappe.website.utils import clear_cache as clear_website_cache
 
 from commera.localization.languages import StorefrontLanguages
-from commera.localization.markets import MARKET_DOCTYPE, PRIMARY_MARKET, clear_market_cache
+from commera.localization.markets import PRIMARY_MARKET, clear_market_cache, is_market_language
 
 HANDLE_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
@@ -73,24 +73,17 @@ class CommeraMarket(Document):
 			if len(get_country_code(country)) != 2:
 				frappe.throw(_("Country {0} has no two-letter code.").format(frappe.bold(country)))
 		for country, market in self.get_countries_in_other_markets(countries):
-			frappe.throw(
-				_("{0} is already in market {1}. A country belongs to one market only.").format(
-					frappe.bold(country), frappe.bold(market)
-				),
-				title=_("Country In Another Market"),
-			)
+			throw_country_taken(country, market)
 
 	def get_countries_in_other_markets(self, countries: list[str]) -> list[tuple[str, str]]:
-		lock_market_countries()
+		"""For the error message only. The unique index on the country column refuses races."""
 		row = DocType("Commera Market Country")
-		# A locking read sees rows committed after this transaction began; a plain read would not.
 		return (
 			frappe.qb.from_(row)
 			.select(row.country, row.parent)
 			.where(row.parenttype == self.doctype)
 			.where(row.country.isin(countries))
 			.where(row.parent != (self.name or ""))
-			.for_update()
 			.run()
 		)
 
@@ -99,23 +92,32 @@ class CommeraMarket(Document):
 		if not any(row.language == self.default_language for row in self.languages):
 			self.append("languages", {"language": self.default_language})
 		codes = [row.language for row in self.languages]
+		saved = self.get_saved_languages()
 		for code in codes:
 			if not languages.find(code):
 				frappe.throw(
 					_("Language {0} is not a published storefront language.").format(frappe.bold(code)),
 					title=_("Unpublished Language"),
 				)
-			self.validate_no_region(code)
+			# Saved rows stay valid, so an older market can still drop them or be disabled.
+			if code not in saved:
+				self.validate_no_region(code)
 			if codes.count(code) > 1:
 				frappe.throw(_("Language {0} is listed more than once.").format(frappe.bold(code)))
 		self.validate_prefixes(languages, codes)
 
+	def get_saved_languages(self) -> set[str]:
+		before = self.get_doc_before_save()
+		return {row.language for row in before.languages} if before else set()
+
 	def validate_no_region(self, code: str):
 		"""The hreflang of a market URL is `<language>-<COUNTRY>`. pt-BR in Portugal has no valid tag."""
-		if "-" in code:
+		if not is_market_language(code):
 			frappe.throw(
 				_(
-					"Language {0} names a region. A market sets the region with its countries: use {1}."
+					"Language {0} names a region. A market takes its region from its countries, so its"
+					" languages must be base languages such as {1}, or a base language with a script"
+					" such as zh-Hans. Publish {1} and add it here. The primary market serves {0}."
 				).format(frappe.bold(code), frappe.bold(code.partition("-")[0])),
 				title=_("Regional Language"),
 			)
@@ -134,10 +136,16 @@ class CommeraMarket(Document):
 					)
 
 
-def lock_market_countries():
-	"""Every market save locks the same row, so two saves cannot claim one country at once.
-	The lock lasts until the transaction ends."""
-	frappe.db.get_value("DocType", MARKET_DOCTYPE, "name", for_update=True)
+def throw_country_taken(country: str, market: str | None, exc=frappe.ValidationError):
+	if market:
+		message = _("{0} is already in market {1}. A country belongs to one market only.")
+	else:
+		message = _("{0} is already in another market. A country belongs to one market only.")
+	frappe.throw(
+		message.format(frappe.bold(country), frappe.bold(market)),
+		title=_("Country In Another Market"),
+		exc=exc,
+	)
 
 
 def refresh_market_surfaces():

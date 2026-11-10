@@ -7,8 +7,17 @@ from frappe.website.doctype.web_page.web_page import WebPage
 from frappe.website.utils import delete_page_cache
 
 from commera import seo
+from commera.commera_ecommerce.doctype.commera_market.commera_market import CommeraMarket
+from commera.commera_ecommerce.doctype.commera_market_country.commera_market_country import (
+	UNIQUE_COUNTRY,
+)
 from commera.localization import alternates, get_localization, resolve, switch_url, url
-from commera.localization.markets import delete_cached_rows
+from commera.localization.markets import (
+	StorefrontMarkets,
+	delete_cached_rows,
+	find_market_by_prefix,
+	is_market_language,
+)
 from commera.migrate import get_private_path_rules
 from commera.tests.test_localization import codes, use_storefront_languages
 from commera.tests.test_localization_routing import RoutingTestCase
@@ -39,6 +48,29 @@ def use_markets(test):
 	test.addCleanup(delete_markets)
 
 
+def use_language(test, code):
+	"""A Language record for `code`. Frappe ships no script codes such as zh-Hans."""
+	if not frappe.db.exists("Language", code):
+		language = {"doctype": "Language", "language_code": code, "language_name": code}
+		frappe.get_doc(language).insert(ignore_permissions=True)
+		test.addCleanup(frappe.db.delete, "Language", code)
+
+
+def add_saved_language(market, code):
+	"""A language row saved before regional languages were refused."""
+	frappe.get_doc(
+		{
+			"doctype": "Commera Market Language",
+			"parent": market.name,
+			"parenttype": "Commera Market",
+			"parentfield": "languages",
+			"idx": len(market.languages) + 1,
+			"language": code,
+		}
+	).db_insert()
+	delete_cached_rows()
+
+
 def delete_markets():
 	for doctype in ("Commera Market", "Commera Market Country", "Commera Market Language"):
 		frappe.db.delete(doctype)
@@ -62,7 +94,7 @@ class TestMarketValidation(IntegrationTestCase):
 	def test_a_country_belongs_to_one_market_only(self):
 		make_market("Gulf", [UAE], "ar")
 
-		with self.assertRaises(frappe.ValidationError):
+		with self.assertRaisesRegex(frappe.ValidationError, "already in market .*gulf"):
 			make_market("Middle East", ["Saudi Arabia", UAE], "ar")
 		with self.assertRaises(frappe.ValidationError):
 			make_market("Saudi Arabia", ["Saudi Arabia", "Saudi Arabia"], "ar")
@@ -112,30 +144,97 @@ class TestMarketValidation(IntegrationTestCase):
 			settings.validate_storefront_languages()
 
 	def test_a_market_language_names_no_region(self):
+		use_storefront_languages(self, "en", published=("en", "pt", "pt-BR", "en-US", "zh-TW"))
+
+		for default, languages in (("pt", ["pt-BR"]), ("pt-BR", []), ("en-US", []), ("zh-TW", [])):
+			with self.subTest(default=default, languages=languages):
+				with self.assertRaisesRegex(frappe.ValidationError, "names a region.*primary market"):
+					make_market("Portugal", ["Portugal"], default, languages)
+
+	def test_only_base_and_script_codes_are_market_languages(self):
+		for code in ("pt", "fil", "zh-Hans", "sr-latn"):
+			self.assertTrue(is_market_language(code), code)
+		for code in ("pt-BR", "es-419", "zh-Hans-TW", "en-us", "", None):
+			self.assertFalse(is_market_language(code), code)
+
+	def test_a_market_language_may_name_a_script(self):
+		use_language(self, "zh-Hans")
+		use_storefront_languages(self, "en", published=("en", "zh-Hans"))
+
+		market = make_market("Gulf", [UAE], "zh-Hans")
+
+		self.assertEqual([row.language for row in market.languages], ["zh-Hans"])
+
+	def test_a_script_market_url_cannot_be_a_language_url(self):
+		use_language(self, "zh-Hans")
+		use_storefront_languages(self, "en", published=("en", "zh-Hans"), unpublished=("zh-Hans-AE",))
+
+		with self.assertRaisesRegex(frappe.ValidationError, "/zh-hans-ae/"):
+			make_market("Gulf", [UAE], "zh-Hans")
+
+	def test_a_language_cannot_take_a_script_market_url(self):
+		use_language(self, "zh-Hans")
+		use_storefront_languages(self, "en", published=("en", "zh-Hans"))
+		make_market("Gulf", [UAE], "zh-Hans")
+		settings = frappe.get_doc("Commera Settings")
+
+		settings.append("storefront_languages", {"language": "zh-Hans-AE", "published": 0})
+		with self.assertRaisesRegex(frappe.ValidationError, "/zh-hans-ae/.*Gulf"):
+			settings.validate_storefront_languages()
+
+	def test_a_market_with_a_saved_regional_language_can_drop_it_or_be_disabled(self):
 		use_storefront_languages(self, "en", published=("en", "pt", "pt-BR"))
+		market = make_market("Portugal", ["Portugal"], "pt")
+		add_saved_language(market, "pt-BR")
+		market.reload()
 
-		with self.assertRaisesRegex(frappe.ValidationError, "pt-BR.*names a region"):
-			make_market("Portugal", ["Portugal"], "pt", ["pt-BR"])
-		with self.assertRaisesRegex(frappe.ValidationError, "pt-BR.*names a region"):
-			make_market("Portugal", ["Portugal"], "pt-BR")
+		market.enabled = 0
+		market.save()
+		market.languages = [row for row in market.languages if row.language != "pt-BR"]
+		market.save()
+		market.append("languages", {"language": "pt-BR"})
+		with self.assertRaisesRegex(frappe.ValidationError, "names a region"):
+			market.save()
 
-	def test_every_market_save_takes_the_same_lock_before_it_reads_countries(self):
+	def test_a_market_save_takes_no_locking_read(self):
+		"""Frappe locks the saved market first. A lock shared by every market save made a cycle."""
+		market = make_market("Gulf", [UAE], "ar")
 		queries = []
 		run_sql = frappe.db.sql
 
 		def record(query, *args, **kwargs):
-			queries.append(f"{query} {args} {kwargs}")
+			queries.append(str(query))
 			return run_sql(query, *args, **kwargs)
 
 		with patch.object(frappe.db, "sql", side_effect=record):
-			make_market("Gulf", [UAE], "ar")
+			make_market("Saudi Arabia", ["Saudi Arabia"], "ar")
+			market.append("countries", {"country": "Oman"})
+			market.save()
 		locks = [query for query in queries if "for update" in query.lower()]
 
-		self.assertIn("`tabDocType`", locks[0])
-		self.assertIn("Commera Market", locks[0])
-		self.assertIn("`tabCommera Market Country`", locks[1])
-		with self.assertRaisesRegex(frappe.ValidationError, "already in market"):
+		# Frappe's own lock reads the saved market's rows by parent, never by country.
+		self.assertFalse([query for query in locks if "`tabDocType`" in query or "`country`" in query])
+
+	def test_a_country_claimed_during_a_save_gets_the_same_message(self):
+		"""The validation read misses a claim made after it. The unique index refuses it."""
+		make_market("Gulf", [UAE], "ar", handle="gulf")
+
+		with (
+			patch.object(CommeraMarket, "get_countries_in_other_markets", return_value=[]),
+			self.assertRaisesRegex(frappe.UniqueValidationError, "already in market .*gulf"),
+		):
 			make_market("Emirates", [UAE], "ar")
+
+
+class TestMarketCountryIndex(IntegrationTestCase):
+	def test_reload_adds_the_unique_country_index(self):
+		table = "tabCommera Market Country"
+		if frappe.db.has_index(table, UNIQUE_COUNTRY):
+			frappe.db.sql_ddl("alter table `tabCommera Market Country` drop index unique_market_country")
+
+		frappe.reload_doc("commera_ecommerce", "doctype", "commera_market_country", force=True)
+
+		self.assertTrue(frappe.db.has_index(table, UNIQUE_COUNTRY))
 
 
 class TestMarketResolution(IntegrationTestCase):
@@ -429,6 +528,30 @@ class TestMarketUrls(LocaleUrlTestCase):
 		rules = get_private_path_rules()
 		self.assertIn("Disallow: /en-ae/cart\n", rules)
 		self.assertNotIn("/de-be/", rules)
+
+	def test_a_script_language_has_a_market_url_and_hreflang(self):
+		use_language(self, "zh-Hans")
+		use_storefront_languages(self, "en", published=("en", "ar", "zh-Hans"))
+		make_market("Singapore", ["Singapore"], "zh-Hans", handle="sg")
+
+		localization, path = resolve("/zh-hans-sg/products")
+		self.assertEqual((localization.market.handle, localization.language.code), ("sg", "zh-Hans"))
+		self.assertEqual(path, "/products")
+		self.open("/zh-hans-sg/products")
+		self.assertEqual(url("/cart"), "/zh-hans-sg/cart")
+		self.assertIn(
+			{"lang": "zh-Hans-SG", "href": get_url("/zh-hans-sg/cart"), "x_default": False},
+			alternates("/cart"),
+		)
+
+	def test_a_saved_regional_market_language_gets_no_url(self):
+		use_storefront_languages(self, "en", published=("en", "ar", "en-GB"))
+		add_saved_language(frappe.get_doc("Commera Market", "gulf"), "en-GB")
+
+		self.assertEqual(codes(StorefrontMarkets.load().find("gulf").languages), ["ar", "en"])
+		self.assertFalse([alt for alt in alternates("/cart") if "-gb-" in alt["href"].lower()])
+		self.assertNotIn("en-GB-AE", [alt["lang"] for alt in alternates("/cart")])
+		self.assertIsNone(find_market_by_prefix("en-gb-ae"))
 
 	def test_a_single_language_store_with_a_market_has_alternates(self):
 		use_storefront_languages(self, "en", published=("en",))

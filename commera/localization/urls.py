@@ -6,7 +6,7 @@ import frappe
 from frappe.utils import get_url
 
 from commera.localization.languages import StorefrontLanguages
-from commera.localization.markets import Market, StorefrontMarkets
+from commera.localization.markets import Market, StorefrontMarkets, market_hreflang
 from commera.localization.resolver import (
 	Localization,
 	find_market_language,
@@ -77,7 +77,7 @@ def get_locale_prefixes() -> list[tuple[str, str, bool]]:
 		for language in languages.published
 	]
 	for _market, language, country, prefix in markets.market_prefixes():
-		prefixes.append((f"{language.code}-{country.upper()}", prefix, False))
+		prefixes.append((market_hreflang(language, country), prefix, False))
 	return prefixes
 
 

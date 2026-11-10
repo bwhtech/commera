@@ -187,3 +187,15 @@ An order that a signed-in account placed with the shopper's email is not the sho
 ## Cache refresh
 
 The storefront caches catalogue reads. Frappe **Webhook** records with **Enable Security** sign each request with `X-Frappe-Webhook-Signature`, so the storefront can expire the cache of the changed record. The storefront README lists the doctypes and request bodies.
+
+## Markets
+
+A market (doctype **Commera Market**) is a group of countries with its own languages. A secondary market serves each language and country at `/<language>-<country>/`, for example `/ar-ae/`. Send `_country` to the API to pick the market of a country. Other countries get the primary market, which is the store itself.
+
+Rules:
+
+- A country belongs to one market only. A unique index on the country column of **Commera Market Country** enforces this, also when two saves run at the same time.
+- A market language must be a base language (`pt`, `ar`) or a base language with a script (`zh-Hans`). It cannot name a region (`pt-BR`, `zh-TW`, `en-US`), because the market countries set the region.
+- The hreflang of a market URL is `<language>-<COUNTRY>`, or `<language>-<Script>-<COUNTRY>` for a script code. Example: `zh-Hans` in the UAE is `zh-Hans-AE` at `/zh-hans-ae/`.
+
+**Limitation (v1).** A regional language, such as `pt-BR`, shows in the primary market only, at its own URL (`/pt-br/`). To serve Portuguese in a market, publish the base language `pt` and add it to the market. A market saved before this rule can keep its regional rows. Commera serves no URL for them. You can still remove those rows or disable the market.

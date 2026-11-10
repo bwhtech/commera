@@ -13,6 +13,8 @@ MARKET_DOCTYPE = "Commera Market"
 PRIMARY_MARKET = "primary"
 CACHE_KEY = "commera_markets"
 COUNTRY_CODE = re.compile(r"[A-Za-z]{2}")
+# A base language, with an optional four-letter script: `pt`, `zh-Hans`. Never a region.
+MARKET_LANGUAGE = re.compile(r"[a-z]{2,3}(?:-[a-z]{4})?", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -110,9 +112,8 @@ class StorefrontMarkets:
 		]
 
 	def build_market(self, row: dict) -> Market | None:
-		find = self.languages.find
-		languages = [lang for code in row["languages"] if (lang := find(code, self.include_hidden))]
-		default = find(row["default_language"], self.include_hidden)
+		languages = [lang for code in row["languages"] if (lang := self.find_language(code))]
+		default = self.find_language(row["default_language"])
 		if default:
 			languages = [default, *(language for language in languages if language != default)]
 		if not languages or not row["countries"]:
@@ -126,6 +127,20 @@ class StorefrontMarkets:
 			countries=tuple(row["countries"]),
 		)
 
+	def find_language(self, code: str | None) -> Language | None:
+		# Regional rows saved before they were refused have no valid hreflang.
+		return self.languages.find(code, self.include_hidden) if is_market_language(code) else None
+
+
+def is_market_language(code: str | None) -> bool:
+	return bool(code and MARKET_LANGUAGE.fullmatch(code))
+
+
+def market_hreflang(language: Language, country: str) -> str:
+	"""`<language>-<COUNTRY>`, with a script in title case: `zh-Hans-AE`."""
+	base, _hyphen, script = language.code.partition("-")
+	return "-".join(filter(None, (base.lower(), script.title(), country.upper())))
+
 
 def normalize_country(value) -> str | None:
 	"""`value` as a lowercase ISO code, or None. `_country` comes from the request: any type."""
@@ -137,7 +152,10 @@ def find_market_by_prefix(code: str) -> str | None:
 	code = (code or "").lower()
 	for row in get_market_rows():
 		if any(
-			f"{language}-{country}" == code for language in row["languages"] for country in row["countries"]
+			f"{language}-{country}" == code
+			for language in row["languages"]
+			if is_market_language(language)
+			for country in row["countries"]
 		):
 			return row["market_name"]
 	return None
