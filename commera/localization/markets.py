@@ -139,7 +139,7 @@ def is_market_language(code: str | None) -> bool:
 def market_hreflang(language: Language, country: str) -> str:
 	"""`<language>-<COUNTRY>`, with a script in title case: `zh-Hans-AE`."""
 	base, _hyphen, script = language.code.partition("-")
-	return "-".join(filter(None, (base.lower(), script.title(), country.upper())))
+	return "-".join(part for part in (base.lower(), script.title(), country.upper()) if part)
 
 
 def normalize_country(value) -> str | None:
