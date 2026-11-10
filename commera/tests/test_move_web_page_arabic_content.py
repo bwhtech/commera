@@ -132,12 +132,10 @@ class TestMoveWebPageArabicContent(ArabicArchiveTestCase):
 		register(PAGE, kept.name, "content", "ar", "<p>محفوظ</p>")
 		same = self.make_page("Same", ARABIC)
 		register(PAGE, same.name, "content", "ar", ARABIC)
-		blank = self.make_page("Blank", "  ")
 
 		migration.execute()
 
 		self.assertEqual(self.translations(PAGE, kept.name)["content"].translated_value, "<p>محفوظ</p>")
-		self.assertEqual(self.translations(PAGE, blank.name), {})
 		archived = self.archived()
 		self.assertEqual(list(archived), [kept.name])
 		self.assertEqual(
@@ -159,6 +157,20 @@ class TestMoveWebPageArabicContent(ArabicArchiveTestCase):
 		row = self.archived()[page.name]
 		self.assertEqual(list(row), list(migration.ARCHIVE_HEADER))
 		self.assertEqual((row[COLUMN], row["reason"]), (UNSAFE, "sanitised on copy"))
+
+	def test_padding_is_copied_byte_for_byte_and_whitespace_alone_is_archived(self):
+		padded = self.make_page("Padded", "  مرحبا  ")
+		blank = self.make_page("Whitespace", " \t\n")
+
+		migration.execute()
+
+		self.assertEqual(self.translations(PAGE, padded.name)["content"].translated_value, "  مرحبا  ")
+		self.assertEqual(self.translations(PAGE, blank.name), {})
+		archived = self.archived()
+		self.assertEqual(list(archived), [blank.name])
+		self.assertEqual(
+			(archived[blank.name][COLUMN], archived[blank.name]["reason"]), (" \t\n", "whitespace only")
+		)
 
 	def test_a_value_the_collation_treats_as_empty_is_still_copied(self):
 		# utf8mb4_unicode_ci ignores U+200B, so `!= ""` would skip this page and drop its value.

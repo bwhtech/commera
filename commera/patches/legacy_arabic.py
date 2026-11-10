@@ -40,18 +40,20 @@ class TranslationCopy:
 		self.timestamp = now()
 
 	def add(self, name: str, field: str, raw, source, existing: dict) -> list[str]:
-		"""Queue the trimmed, sanitised value. Returns why it was not copied verbatim, if it was not.
-		Whitespace alone translates nothing, so it is neither copied nor archived."""
-		value = cstr(raw).strip()
+		"""Queue the value byte for byte, or sanitised if it must be. Returns why it was not copied verbatim.
+		Every stored value comes back copied or with a reason, so the caller archives it: nothing is dropped."""
+		value = cstr(raw)
 		if not value:
 			return []
-		clean, kept = sanitize(value), existing.get((name, field))
-		reasons = ["sanitised on copy"] if clean != value else []
-		if kept is None:
-			self.rows.append(self.make_row(name, field, clean, source))
-		elif kept != clean:
-			reasons.append("a translation was already saved")
-		return reasons
+		kept = existing.get((name, field))
+		if kept is not None:
+			return [] if kept == value else ["a translation was already saved"]
+		# A blank translation would hide the source, so whitespace is archived rather than copied.
+		if not value.strip():
+			return ["whitespace only"]
+		clean = sanitize(value)
+		self.rows.append(self.make_row(name, field, clean, source))
+		return ["sanitised on copy"] if clean != value else []
 
 	def insert(self):
 		if self.rows:

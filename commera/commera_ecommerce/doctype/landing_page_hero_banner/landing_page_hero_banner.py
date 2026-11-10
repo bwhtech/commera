@@ -15,6 +15,7 @@ class LandingPageHeroBanner(Document):
 		from frappe.types import DF
 
 		banner_image: DF.AttachImage | None
+		language: DF.Link | None
 		parent: DF.Data
 		parentfield: DF.Data
 		parenttype: DF.Data

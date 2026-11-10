@@ -3,11 +3,14 @@
 
 import frappe
 from frappe.model.document import Document
+from frappe.utils import cstr
 
+from commera.commera_ecommerce.doctype.commera_settings.editor_input import SAFE_URL_SCHEMES
 from commera.localization import get_localization, get_translatable_fields, translate
+from commera.localization.urls import INERT_LINK, Link
 
 DOCTYPE = "Landing Page Settings"
-BANNER = "Landing Page Hero Banner"
+LINK_FIELDS = (*(f"gif_url_{number}" for number in range(1, 5)), "banner_url_1")
 
 
 class LandingPageSettings(Document):
@@ -44,15 +47,35 @@ class LandingPageSettings(Document):
 
 
 def get_translated_landing_page(settings=None) -> frappe._dict:
-	"""The homepage GIFs, banner and hero banners with their links, in the request language."""
+	"""The homepage GIFs, banner and hero banners with their links, in the request language.
+	Links are safe for an `href`: the homepage templates do not autoescape."""
 	settings = settings or frappe.get_cached_doc(DOCTYPE)
 	localization = get_localization()
-	fields, banner_fields = sorted(get_translatable_fields(DOCTYPE)), sorted(get_translatable_fields(BANNER))
+	fields = sorted(get_translatable_fields(DOCTYPE))
 	[values] = translate([settings], fields, localization, doctype=DOCTYPE)
-	banners = translate(list(settings.hero_banner), banner_fields, localization, doctype=BANNER)
-	return frappe._dict(
-		{field: value.value for field, value in values.items()},
-		hero_banner=[
-			frappe._dict({field: value.value for field, value in banner.items()}) for banner in banners
-		],
-	)
+	page = frappe._dict({field: value.value for field, value in values.items()})
+	for field in LINK_FIELDS:
+		if field in page:
+			page[field] = get_safe_link(page[field])
+	page.hero_banner = [
+		frappe._dict(row.as_dict(), url=get_safe_link(row.url))
+		for row in get_hero_banners(settings.hero_banner, localization.language.code)
+	]
+	return page
+
+
+def get_hero_banners(banners: list, language: str) -> list:
+	"""The banners tagged with `language`, in order. A language with none shows the untagged banners."""
+	tagged = [row for row in banners if row.language == language]
+	return tagged or [row for row in banners if not row.language]
+
+
+def get_safe_link(value) -> str:
+	"""`value` if it is a relative or http(s) link, else a link that goes nowhere."""
+	value = cstr(value) or "/"
+	try:
+		scheme = Link(value).parts.scheme
+	except ValueError:
+		# urlsplit rejects some malformed hosts, such as an unclosed IPv6 bracket.
+		return INERT_LINK
+	return value if scheme in SAFE_URL_SCHEMES else INERT_LINK

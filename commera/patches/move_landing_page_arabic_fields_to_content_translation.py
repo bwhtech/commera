@@ -1,11 +1,18 @@
-"""Copy the Landing Page Settings Arabic GIFs, banner, hero banners and their links into Arabic Content
-Translation rows, then delete them. Arabic hero banner N translates English hero banner N."""
+"""Copy the Landing Page Settings Arabic GIFs, banner and their links into Arabic Content Translation rows,
+move the Arabic hero banners into the hero banner table as Arabic rows, then delete the Arabic fields."""
 
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import delete_custom_fields
 from frappe.utils import cstr
 
-from commera.patches.legacy_arabic import Archive, TranslationCopy, commit, has_value, read_existing
+from commera.patches.legacy_arabic import (
+	LANGUAGE,
+	Archive,
+	TranslationCopy,
+	commit,
+	has_value,
+	read_existing,
+)
 
 LANDING_PAGE = "Landing Page Settings"
 BANNER = "Landing Page Hero Banner"
@@ -18,20 +25,21 @@ TRANSLATED = (
 # Each Arabic field and the field it translates.
 FIELDS = {f"{field}_ar": field for field in TRANSLATED}
 TABLE, SOURCE_TABLE = "hero_banner_ar", "hero_banner"
-BANNER_FIELDS = ("banner_image", "url")
+# The link fields' default. An Arabic link left at it, like its English link, translates nothing.
+DEFAULT_LINK = "/"
 ARCHIVE_PREFIX = "legacy-landing-page-arabic-unmigrated"
 ARCHIVE_TITLE = "Landing Page Settings Arabic values archived before the fields were dropped"
-ARCHIVE_HEADER = ("field", "hero_banner_position", "value", "reason")
+ARCHIVE_HEADER = ("field", "value", "reason")
 
 
 def execute():
 	migration = LandingPageArabicMigration()
-	if migration.values or migration.banners:
+	if migration.values:
 		migration.run()
+	move_arabic_banners()
 	delete_custom_fields({LANDING_PAGE: [*FIELDS, TABLE]})
 	frappe.db.delete("Property Setter", {"doc_type": LANDING_PAGE, "field_name": ("in", [*FIELDS, TABLE])})
 	frappe.db.delete("Singles", {"doctype": LANDING_PAGE, "field": ("in", list(FIELDS))})
-	frappe.db.delete(BANNER, {"parenttype": LANDING_PAGE, "parentfield": TABLE})
 	frappe.clear_document_cache(LANDING_PAGE, LANDING_PAGE)
 
 
@@ -40,14 +48,12 @@ class LandingPageArabicMigration:
 
 	def __init__(self):
 		self.values = read_singles(list(FIELDS))
-		self.banners = read_banners(TABLE)
 		self.archive = Archive(
 			ARCHIVE_PREFIX, ARCHIVE_TITLE, ARCHIVE_HEADER, "Landing Page Settings Arabic values"
 		)
 
 	def run(self):
 		self.copy_fields()
-		self.copy_banners()
 		self.archive.save()
 		commit()
 
@@ -57,26 +63,28 @@ class LandingPageArabicMigration:
 		existing = read_existing(LANDING_PAGE, [LANDING_PAGE], list(FIELDS.values()))
 		for column, raw in self.values.items():
 			field = FIELDS[column]
-			reasons = copy.add(LANDING_PAGE, field, raw, sources.get(field), existing)
-			if reasons:
-				self.archive.add(column, "", raw, "; ".join(reasons))
+			if raw == DEFAULT_LINK and sources.get(field) == DEFAULT_LINK:
+				continue
+			if reasons := copy.add(LANDING_PAGE, field, raw, sources.get(field), existing):
+				self.archive.add(column, raw, "; ".join(reasons))
 		copy.insert()
 
-	def copy_banners(self):
-		copy = TranslationCopy(BANNER)
-		targets = read_banners(SOURCE_TABLE)
-		existing = read_existing(BANNER, [row.name for row in targets], list(BANNER_FIELDS))
-		for position, row in enumerate(self.banners, start=1):
-			target = targets[position - 1] if position <= len(targets) else None
-			for field in BANNER_FIELDS:
-				raw = cstr(row.get(field))
-				if target:
-					reasons = copy.add(target.name, field, raw, target.get(field), existing)
-				else:
-					reasons = ["no English hero banner at this position"] if raw else []
-				if reasons:
-					self.archive.add(f"{TABLE}.{field}", position, raw, "; ".join(reasons))
-		copy.insert()
+
+def move_arabic_banners():
+	"""Re-parent the Arabic hero banners into the English table, tagged Arabic, after the English rows.
+	The rows themselves are kept, so every value, blank or not, stays byte for byte."""
+	english = read_banners(SOURCE_TABLE)
+	start = english[-1].idx if english else 0
+	banner = frappe.qb.DocType(BANNER)
+	for idx, row in enumerate(read_banners(TABLE), start=start + 1):
+		(
+			frappe.qb.update(banner)
+			.set(banner.parentfield, SOURCE_TABLE)
+			.set(banner.language, LANGUAGE)
+			.set(banner.idx, idx)
+			.where(banner.name == row.name)
+			.run()
+		)
 
 
 def read_singles(fields: list[str]) -> dict[str, str]:
@@ -96,7 +104,7 @@ def read_banners(table: str) -> list:
 	banner = frappe.qb.DocType(BANNER)
 	return (
 		frappe.qb.from_(banner)
-		.select(banner.name, *(banner[field] for field in BANNER_FIELDS))
+		.select(banner.name, banner.idx, banner.banner_image, banner.url, banner.language)
 		.where(
 			(banner.parent == LANDING_PAGE)
 			& (banner.parenttype == LANDING_PAGE)

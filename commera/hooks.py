@@ -128,6 +128,7 @@ commera_hooks = {
 			"label": "Shop",
 		},
 		# The un-themed homepage. An image or link translation swaps the file or target per language.
+		# Hero banners are not translated: each language can have its own rows, tagged with it.
 		{
 			"type": "landing_page",
 			"doctype": "Landing Page Settings",
@@ -138,12 +139,6 @@ commera_hooks = {
 				"banner_url_1",
 			],
 			"label": "Landing page",
-		},
-		{
-			"type": "landing_page_banner",
-			"doctype": "Landing Page Hero Banner",
-			"fields": ["banner_image", "url"],
-			"label": "Landing page hero banners",
 		},
 	],
 }
@@ -201,7 +196,6 @@ doc_events = {
 		"on_trash": "commera.localization.content.delete_translations",
 	},
 	"Commera Settings": {"on_update": "commera.plugin_events.on_menu_change"},
-	"Landing Page Settings": {"on_update": "commera.localization.content.delete_removed_row_translations"},
 	"Price List": {
 		"validate": "commera.doc_events.price_list.validate",
 	},

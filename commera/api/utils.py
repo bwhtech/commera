@@ -72,10 +72,7 @@ def get_whitelist_transaction_list(
 def get_homepage_details():
 	settings = frappe.get_cached_doc("Landing Page Settings")
 	landing_page = settings.as_dict()
-	translated = get_translated_landing_page(settings)
-	for row, banner in zip(landing_page.get("hero_banner") or [], translated.pop("hero_banner"), strict=True):
-		row.update(banner)
-	landing_page.update(translated)
+	landing_page.update(get_translated_landing_page(settings))
 	landing_page["new_arrivals"] = get_item_details(landing_page.get("new_arrivals"))
 	landing_page["best_picks"] = get_item_details(landing_page.get("best_picks"))
 	landing_page["carousel_1"] = get_item_details(landing_page.get("carousel_1"))
