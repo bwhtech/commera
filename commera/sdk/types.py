@@ -90,6 +90,7 @@ class Address(TypedDict):
 class OrderLine(TypedDict):
 	line_id: str
 	item_code: str
+	# In the request language; `size` stays the source value.
 	title: str
 	size: str | None
 	qty: float
@@ -244,7 +245,7 @@ class CartLineProduct(TypedDict):
 
 	handle: str
 	title: str
-	# The size.
+	# The size in the request language.
 	variant_title: str
 	image: str | None
 

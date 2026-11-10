@@ -10,7 +10,7 @@ from commera.core import _get_cart_quotation
 from commera.discounts.allocations import get_allocations
 from commera.guest import get_guest_cart_name, is_guest
 from commera.plugin_events import get_listed_items, get_plugin_fieldnames, validate_plugin_fieldnames
-from commera.sdk.catalog import get_line_products
+from commera.sdk.lines import LineProducts
 from commera.sdk.types import Cart, CheckoutSummary, NewCartLine, PricedCart
 
 __all__ = [
@@ -33,6 +33,7 @@ def get_cart() -> Cart | None:
 	if quotation.is_new():
 		return None
 
+	products = LineProducts([row.item_code for row in quotation.items])
 	return {
 		"name": quotation.name,
 		"customer": quotation.party_name if quotation.quotation_to == "Customer" else None,
@@ -40,7 +41,7 @@ def get_cart() -> Cart | None:
 		"items": [
 			{
 				"item_code": row.item_code,
-				"title": row.item_name,
+				"title": products.get_title(row.item_code, row.item_name),
 				"qty": flt(row.qty),
 				"rate": flt(row.rate),
 				"amount": flt(row.amount),
@@ -205,8 +206,10 @@ def save_server_cart(cart: CommeraCart) -> PricedCart:
 
 def price_cart(cart: CommeraCart) -> PricedCart:
 	priced = cart.get_priced_cart()
-	products = get_line_products([line["item_code"] for line in priced["lines"]])
+	line_products = LineProducts([line["item_code"] for line in priced["lines"]])
+	products = line_products.get_cart_products()
 	for line in priced["lines"]:
+		line["title"] = line_products.get_title(line["item_code"], line["title"])
 		line["product"] = products.get(line["item_code"])
 	priced["total_quantity"] = sum(line["qty"] for line in priced["lines"])
 	return priced

@@ -30,12 +30,15 @@ def system_user_session(user: str = "Administrator"):
 	# frappe.set_user() mutates frappe.local.session in place, stamping "sid" with the username and wiping
 	# local.session.data, so restore the snapshot verbatim rather than calling it again for the shopper.
 	live_session_snapshot = frappe.local.session.copy()
+	# set_user() also empties form_dict, which holds the request's `_lang`.
+	form_dict = frappe.local.form_dict
 	try:
 		# Audited: the docstring above and the snapshot restore below are why this is safe.
 		frappe.set_user(user)  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
 		yield
 	finally:
 		frappe.local.session.update(live_session_snapshot)
+		frappe.local.form_dict = form_dict
 		frappe.local.cache = {}
 		frappe.local.role_permissions = {}
 		frappe.local.user_perms = None

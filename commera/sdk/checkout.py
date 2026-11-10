@@ -23,6 +23,7 @@ from commera.api.shipping import get_cart_shipping_options, get_checkout_summary
 from commera.core import COD_PAYMENT_MODE, is_cod, is_shoppers_address
 from commera.guest import is_guest, validate_guest_checkout_enabled
 from commera.sdk.cart import get_open_cart_quotation
+from commera.sdk.lines import LineProducts
 from commera.sdk.types import (
 	CheckoutResult,
 	CheckoutState,
@@ -270,10 +271,7 @@ def get_checkout_state(quotation) -> CheckoutState:
 		"cart": quotation.name,
 		"version": get_checkout_version(quotation),
 		"currency": quotation.currency,
-		"items": [
-			{"item_code": row.item_code, "title": row.item_name, "qty": flt(row.qty)}
-			for row in quotation.items
-		],
+		"items": get_checkout_lines(quotation.items),
 		"email": quotation.contact_email,
 		"billing_address": addresses.get(quotation.customer_address),
 		"shipping_address": addresses.get(quotation.shipping_address_name),
@@ -282,3 +280,15 @@ def get_checkout_state(quotation) -> CheckoutState:
 		"shipping_option": quotation.custom_delivery_option or None,
 		"summary": get_checkout_summary(quotation),
 	}
+
+
+def get_checkout_lines(items) -> list[dict]:
+	products = LineProducts([row.item_code for row in items])
+	return [
+		{
+			"item_code": row.item_code,
+			"title": products.get_title(row.item_code, row.item_name),
+			"qty": flt(row.qty),
+		}
+		for row in items
+	]
