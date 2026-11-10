@@ -3,6 +3,7 @@ from functools import lru_cache
 
 import frappe
 from babel import Locale, UnknownLocaleError
+from babel.core import get_global
 from frappe.utils.jinja_globals import is_rtl
 
 FALLBACK_LANGUAGE = "en"
@@ -28,6 +29,18 @@ class Language:
 
 	def as_dict(self) -> dict:
 		return asdict(self)
+
+	def og_locale(self, market_country: str | None = None, store_country: str | None = None) -> str:
+		"""Open Graph `ll_CC`. The region is the code's own (`pt-BR`), else the market country, else the
+		store country when people there use the language, else the CLDR likely one."""
+		region = (
+			get_code_region(self.code)
+			or market_country
+			or (store_country if is_used_in(self.code, store_country) else None)
+			or get_likely_region(self.code)
+		)
+		base = self.code.partition("-")[0].lower()
+		return f"{base}_{region.upper()}" if region else base
 
 
 class StorefrontLanguages:
@@ -117,9 +130,58 @@ def is_rtl_language(code: str) -> bool:
 @lru_cache(maxsize=64)
 def get_display_names(code: str) -> tuple[str, str]:
 	"""English name and native name (endonym) of a Frappe language code."""
-	try:
-		locale = Locale.parse(code, sep="-")
-	except (UnknownLocaleError, ValueError):
+	locale = parse_locale(code)
+	if not locale:
 		name = frappe.db.get_value("Language", code, "language_name") or code
 		return name, name
 	return locale.get_display_name("en"), locale.get_display_name(locale)
+
+
+@lru_cache(maxsize=64)
+def get_code_region(code: str) -> str | None:
+	"""The region `code` names itself: `BR` in `pt-BR`."""
+	locale = parse_locale(code)
+	return locale.territory if locale and is_region(locale.territory) else None
+
+
+@lru_cache(maxsize=256)
+def is_used_in(code: str, country: str | None) -> bool:
+	"""Whether CLDR lists `code` as a language of `country`. `zh-Hant` must match its script."""
+	locale = parse_locale(code)
+	if not locale or not is_region(country):
+		return False
+	used = get_global("territory_languages").get(country.upper(), {})
+	if locale.script and f"{locale.language}_{locale.script}" in used:
+		return True
+	return locale.language in used and (
+		not locale.script or locale.script == get_likely_script(locale.language)
+	)
+
+
+@lru_cache(maxsize=64)
+def get_likely_region(code: str) -> str | None:
+	"""The region CLDR finds most likely: `en` is in US, `zh-Hant` in TW."""
+	locale = parse_locale(code)
+	if not locale:
+		return None
+	likely = get_global("likely_subtags")
+	key = f"{locale.language}_{locale.script}" if locale.script else locale.language
+	region = (likely.get(key) or likely.get(locale.language, "")).rpartition("_")[2]
+	return region if is_region(region) else None
+
+
+def get_likely_script(language: str) -> str | None:
+	# `zh` alone is written in Hans: zh_Hans_CN.
+	parts = get_global("likely_subtags").get(language, "").split("_")
+	return parts[1] if len(parts) == 3 else None
+
+
+def parse_locale(code: str) -> Locale | None:
+	try:
+		return Locale.parse(code, sep="-")
+	except (UnknownLocaleError, ValueError):
+		return None
+
+
+def is_region(value: str | None) -> bool:
+	return bool(value and len(value) == 2 and value.isalpha())

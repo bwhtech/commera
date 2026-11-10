@@ -83,9 +83,11 @@ class TestLanguageLinks(IntegrationTestCase):
 	def test_robots_rules_cover_every_published_language(self):
 		rules = get_private_path_rules(StorefrontLanguages.load())
 
-		for prefix in ("en", "fr"):
-			self.assertIn(f"Disallow: /{prefix}/cart\n", rules)
-			self.assertIn(f"Disallow: /{prefix}/account\n", rules)
+		# The default language lives at the root.
+		for prefix in ("", "/fr"):
+			self.assertIn(f"Disallow: {prefix}/cart\n", rules)
+			self.assertIn(f"Disallow: {prefix}/account\n", rules)
+		self.assertNotIn("/en/", rules)
 		self.assertNotIn("/de/", rules)
 
 

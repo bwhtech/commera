@@ -1,18 +1,19 @@
 import re
 from collections.abc import Mapping
+from typing import NamedTuple
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 import frappe
 from frappe.utils import get_url
 
 from commera.localization.languages import StorefrontLanguages
-from commera.localization.markets import Market, StorefrontMarkets, market_hreflang
+from commera.localization.markets import Market, StorefrontMarkets, get_store_country, market_hreflang
 from commera.localization.resolver import (
 	Localization,
 	find_market_language,
 	get_localization,
 	get_request_path,
-	strip_language_prefix,
+	split_locale_prefix,
 )
 from commera.localization.routing import clean_path, is_page_path, is_same_site, strip_legacy_prefix
 from commera.roles import is_commera_admin
@@ -54,31 +55,73 @@ def switch_url(
 	return link.localize(prefix, query or "")
 
 
-def alternates(path: str | None = None) -> list[dict]:
+def alternates(path: str | None = None, locales: "SiteLocales | None" = None) -> list[dict]:
 	"""One absolute URL per published language and per enabled market's language and country,
 	for hreflang and the sitemap. Empty for a store with one language and one market."""
-	prefixes = get_locale_prefixes()
+	locales = locales or SiteLocales.load()
 	link = Link(get_current_path() if path is None else path)
-	if len(prefixes) < 2 or not link.is_page:
+	if len(locales.roots) < 2 or not link.is_page:
 		return []
+	route = link.route(locales.prefix_markets)
 	return [
-		{"lang": hreflang, "href": get_url(link.localize(prefix)), "x_default": x_default}
-		for hreflang, prefix, x_default in prefixes
+		{
+			"lang": root.hreflang,
+			"href": get_url(link.place(root.prefix, route)),
+			"x_default": root.x_default,
+			"locale": root.og_locale,
+		}
+		for root in locales.roots
 	]
 
 
-def get_locale_prefixes() -> list[tuple[str, str, bool]]:
-	"""(hreflang, prefix, x_default) of every URL root a shopper can open, the default first.
-	x-default is the store default at the root. Market languages have no region: tags stay unique."""
-	markets = StorefrontMarkets.load()
+class SiteLocales(NamedTuple):
+	"""The locale roots, and the markets whose prefixes a path may carry, unpublished ones too.
+	Load once to localize many paths: the sitemap."""
+
+	roots: list["LocaleRoot"]
+	prefix_markets: StorefrontMarkets
+
+	@classmethod
+	def load(cls) -> "SiteLocales":
+		return cls(get_locale_roots(), StorefrontMarkets.load(include_hidden=True))
+
+
+class LocaleRoot(NamedTuple):
+	hreflang: str
+	prefix: str
+	x_default: bool
+	# Open Graph form: `ar_AE`.
+	og_locale: str
+
+
+def get_locale_roots(markets: StorefrontMarkets | None = None) -> list[LocaleRoot]:
+	"""Every URL root a shopper can open, the default first. x-default is the store default at the root.
+	Market languages have no region: tags stay unique."""
+	markets = markets or StorefrontMarkets.load()
 	languages = markets.languages
-	prefixes = [
-		(language.code, languages.prefix(language), language == languages.default)
+	store_country = get_store_country()
+	roots = [
+		LocaleRoot(
+			language.code,
+			languages.prefix(language),
+			language == languages.default,
+			language.og_locale(store_country=store_country),
+		)
 		for language in languages.published
 	]
 	for _market, language, country, prefix in markets.market_prefixes():
-		prefixes.append((market_hreflang(language, country), prefix, False))
-	return prefixes
+		roots.append(
+			LocaleRoot(market_hreflang(language, country), prefix, False, language.og_locale(country))
+		)
+	return roots
+
+
+def get_og_locale(localization: Localization) -> str:
+	"""The Open Graph locale of `localization`, by the rule of its locale root."""
+	market = localization.market
+	if market and not market.is_primary:
+		return localization.language.og_locale(localization.country or market.countries[0])
+	return localization.language.og_locale(store_country=get_store_country())
 
 
 def get_current_prefix(localization: Localization) -> str:
@@ -117,15 +160,22 @@ class Link:
 
 	def localize(self, prefix: str, query: str | Mapping | None = None) -> str:
 		"""This page under `prefix`. A `query` is merged in and the result re-encoded."""
-		route = clean_path(strip_prefix(self.parts.path))
+		return self.place(prefix, self.route(), query)
+
+	def route(self, markets: StorefrontMarkets | None = None) -> str:
+		"""The page path without its locale prefix. Pass `markets` to skip loading them."""
+		return clean_path(strip_prefix(self.parts.path, markets))
+
+	def place(self, prefix: str, route: str, query: str | Mapping | None = None) -> str:
 		path = prefix + route if route != "/" else prefix or "/"
 		query = self.parts.query if query is None else merge_query(self.parts.query, query)
 		return urlunsplit(("", "", path, query, self.parts.fragment))
 
 
-def strip_prefix(path: str) -> str:
-	language, rest = strip_language_prefix(path, include_unpublished=True)
-	return rest if language else strip_legacy_prefix(path)
+def strip_prefix(path: str, markets: StorefrontMarkets | None = None) -> str:
+	markets = markets or StorefrontMarkets.load(include_hidden=True)
+	prefix, rest = split_locale_prefix(markets, path)
+	return rest if prefix else strip_legacy_prefix(path)
 
 
 def merge_query(current: str, query: str | Mapping) -> str:

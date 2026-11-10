@@ -271,16 +271,16 @@ def setup_robots_txt(languages=None):
 
 
 def get_private_path_rules(languages=None) -> str:
+	"""Cart and account rules under every locale root that alternates() lists, the root included."""
 	from commera.localization.markets import StorefrontMarkets, get_market_rows
+	from commera.localization.urls import get_locale_roots
 
 	languages = languages or StorefrontLanguages.load()
-	markets = StorefrontMarkets(languages, get_market_rows())
-	prefixes = [f"/{language.code.lower()}" for language in languages.published]
-	prefixes += [prefix for *_locale, prefix in markets.market_prefixes()]
+	roots = get_locale_roots(StorefrontMarkets(languages, get_market_rows()))
 	# Disallow is a prefix match: the explicit checkout line is redundant but kept deliberately.
 	return "".join(
-		f"Disallow: {prefix}/cart\nDisallow: {prefix}/cart/checkout\nDisallow: {prefix}/account\n"
-		for prefix in prefixes
+		f"Disallow: {root.prefix}/cart\nDisallow: {root.prefix}/cart/checkout\nDisallow: {root.prefix}/account\n"
+		for root in roots
 	)
 
 

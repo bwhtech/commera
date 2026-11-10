@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -27,7 +28,14 @@ class LocaleUrlTestCase(IntegrationTestCase):
 		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
 		self.addCleanup(frappe.set_user, frappe.session.user)
 		frappe.set_user("Guest")
+		self.store_in(None)
 		self.open("/")
+
+	def store_in(self, country):
+		"""Pin the store company's country: og:locale follows it, and the test site's is any."""
+		patcher = patch("commera.localization.urls.get_store_country", return_value=country)
+		patcher.start()
+		self.addCleanup(patcher.stop)
 
 	def open(self, path, query_string=""):
 		frappe.local.request = Request(EnvironBuilder(path=path, query_string=query_string).get_environ())
@@ -226,9 +234,9 @@ class TestAlternates(LocaleUrlTestCase):
 		self.assertEqual(
 			alternates("/ar/products/shoe"),
 			[
-				{"lang": "en", "href": get_url("/products/shoe"), "x_default": True},
-				{"lang": "ar", "href": get_url("/ar/products/shoe"), "x_default": False},
-				{"lang": "fr", "href": get_url("/fr/products/shoe"), "x_default": False},
+				{"lang": "en", "href": get_url("/products/shoe"), "x_default": True, "locale": "en_US"},
+				{"lang": "ar", "href": get_url("/ar/products/shoe"), "x_default": False, "locale": "ar_EG"},
+				{"lang": "fr", "href": get_url("/fr/products/shoe"), "x_default": False, "locale": "fr_FR"},
 			],
 		)
 
