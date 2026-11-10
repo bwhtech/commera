@@ -10,6 +10,7 @@ from commera.api.admin.catalog import (
 	get_default_rates,
 	get_selling_rates,
 )
+from commera.localization import MISSING, TranslatedValue, get_localization, translate
 from commera.plugin_events import get_ecommerce_warehouse, get_listed_items
 from commera.product_detail import get_product_detail
 from commera.sdk.types import (
@@ -56,6 +57,7 @@ SORT_KEYS = ("default", "price_low", "price_high", "name", "new_arrival", "disco
 MAX_PAGE_SIZE = 48
 FACETS_CACHE_PREFIX = "commera:storefront_facets:"
 FACETS_CACHE_SECONDS = 5 * 60
+PRODUCT_DOCTYPE = "Style Attribute Variant"
 # Only a top-level menu entry owns a route_slug, so these are the menu tabs.
 COLLECTION_FILTERS = {"enabled": 1, "route_slug": ("is", "set")}
 COLLECTION_FIELDS = ["route_slug", "display_name", "category_name", "image", "modified"]
@@ -257,10 +259,11 @@ def get_product(handle: str) -> Product | None:
 
 	product_variant, item = detail["product_variant"], detail["product"]
 	variants = get_variants(detail["available_sizes"])
+	title = get_titles([product_variant], [item.get("custom_item_name_ar")])[0] or item.item_name
 	return {
 		"id": product_variant.name,
 		"handle": product_variant.route,
-		"title": product_variant.display_name or item.item_name,
+		"title": title,
 		"vendor": item.brand,
 		"color": product_variant.attribute_value,
 		"description_html": item.description or "",
@@ -277,7 +280,7 @@ def get_product(handle: str) -> Product | None:
 			"count": cint(product_variant.review_count),
 		},
 		"seo": {
-			"title": product_variant.meta_title or product_variant.display_name,
+			"title": product_variant.meta_title or title,
 			"description": product_variant.meta_description or "",
 			"noindex": bool(product_variant.noindex),
 		},
@@ -327,14 +330,15 @@ def get_product_cards(cards: list[dict]) -> list[ProductCard]:
 	item_codes = [size["item_code"] for card in cards for size in card["sizes"]]
 	stock = get_available_stocks(item_codes, get_ecommerce_warehouse())
 	currency = get_store_currency()
-	return [get_product_card(card, stock, currency) for card in cards]
+	titles = get_titles(cards, [card.get("custom_item_name_ar") for card in cards])
+	return [get_product_card(card, title, stock, currency) for card, title in zip(cards, titles, strict=True)]
 
 
-def get_product_card(card: dict, stock: dict, currency: str) -> ProductCard:
+def get_product_card(card: dict, title: str, stock: dict, currency: str) -> ProductCard:
 	return {
 		"id": card["name"],
 		"handle": card["route"],
-		"title": get_card_title(card),
+		"title": title or card["item_name"],
 		"vendor": card["brand"],
 		"product_type": card["item_group"],
 		"color": card["attribute_value"],
@@ -349,10 +353,21 @@ def get_product_card(card: dict, stock: dict, currency: str) -> ProductCard:
 	}
 
 
-def get_card_title(card: dict) -> str:
-	if frappe.local.lang == "ar" and card["custom_item_name_ar"]:
-		return card["custom_item_name_ar"]
-	return card["display_name"] or card["item_name"]
+def get_titles(product_variants: list, legacy_titles: list) -> list[str]:
+	"""Product titles in the request language. Cards and the product page share them, so they always match."""
+	localization = get_localization()
+	translated = translate(product_variants, ["display_name"], localization, doctype=PRODUCT_DOCTYPE)
+	return [
+		pick_title(fields["display_name"], legacy_title, localization.language.code)
+		for fields, legacy_title in zip(translated, legacy_titles, strict=True)
+	]
+
+
+def pick_title(title: TranslatedValue, legacy_title: str | None, language: str) -> str:
+	# The Item's Arabic name field stays a fallback until #441 moves it into Content Translation.
+	if title.status == MISSING and legacy_title and language == "ar":
+		return legacy_title
+	return title.value
 
 
 def get_variants(sizes: list[dict]) -> list[dict]:

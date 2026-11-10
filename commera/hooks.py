@@ -135,7 +135,18 @@ after_app_install = [
 ]
 before_app_uninstall = "commera.shipping.providers.disable_app_profiles"
 
-commera_hooks = {"shipping_providers": ["Shiprocket Shipping Settings", "AfterShip Shipping Settings"]}
+commera_hooks = {
+	"shipping_providers": ["Shiprocket Shipping Settings", "AfterShip Shipping Settings"],
+	# Record fields merchants translate into Content Translation. Other apps add their own here.
+	"translatable_resources": [
+		{
+			"type": "product",
+			"doctype": "Style Attribute Variant",
+			"fields": ["display_name"],
+			"label": "Products",
+		},
+	],
+}
 setup_wizard_complete = [
 	"commera.swatches.drop_unused_colour_attribute",
 	"commera.cloud.link.queue_initial_link",
@@ -230,6 +241,7 @@ doc_events = {
 		"on_trash": [
 			"commera.search.sync.on_trash",
 			"commera.plugin_events.on_style_attribute_variant_trash",
+			"commera.localization.content.delete_translations",
 		],
 	},
 	"Ecommerce Category": {
@@ -311,6 +323,8 @@ ignore_links_on_delete = [
 	"Commera Webhook Log",
 	# A use is never given back, so its row outlives a deleted order.
 	"Commera Discount Use",
+	# Lets a record go even when its app does not hook delete_translations on on_trash.
+	"Content Translation",
 ]
 
 # Apps
