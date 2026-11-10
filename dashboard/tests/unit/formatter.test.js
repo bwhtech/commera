@@ -13,15 +13,15 @@ Object.assign(globalThis, {
   currency: 'INR',
   number_format: '#,###.##',
   currency_symbols: { INR: '₹', USD: '$' },
-  money_formats: { INR: { number_format: '#,##,###.##', precision: 2 } },
+  money_formats: { INR: { precision: 2, fraction_precision: 2 } },
   date_formats: cases.date_formats.ar,
 })
 const { compactMoney, count, exactMoney, formatDate, money, moneyIn, monthName, symbolFor } = await import(
   '../../src/data/formatter.js'
 )
 
-test('money reads the resolved currency format and puts the symbol after the amount in RTL', () => {
-  assert.equal(money(1234567.6), '12,34,568\u00a0₹')
+test('money takes the language separators and puts the symbol after the amount in RTL', () => {
+  assert.equal(money(1234567.6), '1,234,568\u00a0₹')
   assert.equal(exactMoney(499.99), '499.99\u00a0₹')
   assert.equal(exactMoney(500), '500\u00a0₹')
   assert.equal(moneyIn(1250.5, 'USD'), '1,250.50\u00a0$')

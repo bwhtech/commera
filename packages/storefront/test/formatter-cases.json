@@ -37,26 +37,125 @@
 		"BHD": "BD"
 	},
 	"money_formats": {
-		"INR": {
-			"number_format": "#,##,###.##",
-			"precision": 2
+		"currency_format_on": {
+			"USD": {
+				"precision": 2,
+				"fraction_precision": 2
+			},
+			"EUR": {
+				"precision": 2,
+				"fraction_precision": 2
+			},
+			"INR": {
+				"precision": 2,
+				"fraction_precision": 2
+			},
+			"SAR": {
+				"precision": 2,
+				"fraction_precision": 2
+			},
+			"AED": {
+				"precision": 2,
+				"fraction_precision": 2
+			},
+			"JPY": {
+				"precision": 0,
+				"fraction_precision": 2
+			},
+			"KWD": {
+				"precision": 3,
+				"fraction_precision": 3
+			},
+			"BHD": {
+				"precision": 3,
+				"fraction_precision": 3
+			},
+			"XTS": {
+				"precision": 2,
+				"fraction_precision": 2
+			}
 		},
-		"JPY": {
-			"number_format": "#,###",
-			"precision": 0
+		"currency_format_off": {
+			"USD": {
+				"precision": 2,
+				"fraction_precision": 2
+			},
+			"EUR": {
+				"precision": 2,
+				"fraction_precision": 2
+			},
+			"INR": {
+				"precision": 2,
+				"fraction_precision": 2
+			},
+			"SAR": {
+				"precision": 2,
+				"fraction_precision": 2
+			},
+			"AED": {
+				"precision": 2,
+				"fraction_precision": 2
+			},
+			"JPY": {
+				"precision": 2,
+				"fraction_precision": 2
+			},
+			"KWD": {
+				"precision": 2,
+				"fraction_precision": 3
+			},
+			"BHD": {
+				"precision": 2,
+				"fraction_precision": 3
+			},
+			"XTS": {
+				"precision": 2,
+				"fraction_precision": 2
+			}
 		},
-		"KWD": {
-			"number_format": "#,###.###",
-			"precision": 3
-		},
-		"BHD": {
-			"number_format": "#,###.##",
-			"precision": 4
+		"currency_precision_4": {
+			"USD": {
+				"precision": 4,
+				"fraction_precision": 2
+			},
+			"EUR": {
+				"precision": 4,
+				"fraction_precision": 2
+			},
+			"INR": {
+				"precision": 4,
+				"fraction_precision": 2
+			},
+			"SAR": {
+				"precision": 4,
+				"fraction_precision": 2
+			},
+			"AED": {
+				"precision": 4,
+				"fraction_precision": 2
+			},
+			"JPY": {
+				"precision": 4,
+				"fraction_precision": 2
+			},
+			"KWD": {
+				"precision": 4,
+				"fraction_precision": 3
+			},
+			"BHD": {
+				"precision": 4,
+				"fraction_precision": 3
+			},
+			"XTS": {
+				"precision": 4,
+				"fraction_precision": 2
+			}
 		}
 	},
 	"money": [
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "USD",
 			"amount": 0,
 			"precision": null,
@@ -64,6 +163,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "USD",
 			"amount": 1234.5,
 			"precision": null,
@@ -71,6 +171,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "USD",
 			"amount": -1234.567,
 			"precision": null,
@@ -78,6 +179,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "USD",
 			"amount": 2.675,
 			"precision": null,
@@ -85,6 +187,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "USD",
 			"amount": 12345678.9,
 			"precision": null,
@@ -92,13 +195,15 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "INR",
 			"amount": 1234567.891,
 			"precision": null,
-			"expected": "₹12,34,567.89"
+			"expected": "₹1,234,567.89"
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "INR",
 			"amount": -0.001,
 			"precision": null,
@@ -106,6 +211,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "SAR",
 			"amount": 1250,
 			"precision": null,
@@ -113,6 +219,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "XTS",
 			"amount": 10,
 			"precision": null,
@@ -120,6 +227,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "JPY",
 			"amount": 1234.5,
 			"precision": null,
@@ -127,6 +235,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "JPY",
 			"amount": 1235.5,
 			"precision": null,
@@ -134,6 +243,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "KWD",
 			"amount": 1.2345,
 			"precision": null,
@@ -141,6 +251,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "KWD",
 			"amount": 1.5,
 			"precision": null,
@@ -148,6 +259,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "USD",
 			"amount": 1234.5,
 			"precision": 0,
@@ -155,6 +267,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_format_on",
 			"currency": "USD",
 			"amount": 499.99,
 			"precision": 0,
@@ -162,6 +275,7 @@
 		},
 		{
 			"language": "de",
+			"rules": "currency_format_on",
 			"currency": "EUR",
 			"amount": 1234.5,
 			"precision": null,
@@ -169,6 +283,7 @@
 		},
 		{
 			"language": "de",
+			"rules": "currency_format_on",
 			"currency": "EUR",
 			"amount": -0.125,
 			"precision": null,
@@ -176,6 +291,7 @@
 		},
 		{
 			"language": "fr",
+			"rules": "currency_format_on",
 			"currency": "EUR",
 			"amount": 1234567.5,
 			"precision": null,
@@ -183,6 +299,7 @@
 		},
 		{
 			"language": "ar",
+			"rules": "currency_format_on",
 			"currency": "SAR",
 			"amount": 1250,
 			"precision": null,
@@ -190,6 +307,7 @@
 		},
 		{
 			"language": "ar",
+			"rules": "currency_format_on",
 			"currency": "SAR",
 			"amount": -1234.567,
 			"precision": null,
@@ -197,6 +315,7 @@
 		},
 		{
 			"language": "ar",
+			"rules": "currency_format_on",
 			"currency": "AED",
 			"amount": 1234.5,
 			"precision": null,
@@ -204,6 +323,7 @@
 		},
 		{
 			"language": "ar",
+			"rules": "currency_format_on",
 			"currency": "USD",
 			"amount": 0.375,
 			"precision": null,
@@ -211,6 +331,7 @@
 		},
 		{
 			"language": "ar",
+			"rules": "currency_format_on",
 			"currency": "XTS",
 			"amount": 10,
 			"precision": null,
@@ -218,6 +339,7 @@
 		},
 		{
 			"language": "he",
+			"rules": "currency_format_on",
 			"currency": "USD",
 			"amount": 99.995,
 			"precision": null,
@@ -225,6 +347,7 @@
 		},
 		{
 			"language": "ar",
+			"rules": "currency_format_on",
 			"currency": "USD",
 			"amount": 1234.5,
 			"precision": 0,
@@ -232,13 +355,15 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_precision_4",
 			"currency": "BHD",
 			"amount": 1.5,
 			"precision": null,
-			"expected": "BD1.50"
+			"expected": "BD1.500"
 		},
 		{
 			"language": "en",
+			"rules": "currency_precision_4",
 			"currency": "BHD",
 			"amount": 1.2345,
 			"precision": null,
@@ -246,6 +371,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_precision_4",
 			"currency": "BHD",
 			"amount": 1.234,
 			"precision": null,
@@ -253,6 +379,7 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_precision_4",
 			"currency": "BHD",
 			"amount": 1.23456,
 			"precision": null,
@@ -260,10 +387,91 @@
 		},
 		{
 			"language": "en",
+			"rules": "currency_precision_4",
 			"currency": "BHD",
 			"amount": -2,
 			"precision": null,
-			"expected": "-BD2.00"
+			"expected": "-BD2.000"
+		},
+		{
+			"language": "hi",
+			"rules": "currency_format_on",
+			"currency": "INR",
+			"amount": 1234567.891,
+			"precision": null,
+			"expected": "₹12,34,567.89"
+		},
+		{
+			"language": "hi",
+			"rules": "currency_format_off",
+			"currency": "INR",
+			"amount": 1234567.891,
+			"precision": null,
+			"expected": "₹12,34,567.89"
+		},
+		{
+			"language": "en",
+			"rules": "currency_format_off",
+			"currency": "INR",
+			"amount": 1234567.891,
+			"precision": null,
+			"expected": "₹1,234,567.89"
+		},
+		{
+			"language": "en",
+			"rules": "currency_format_off",
+			"currency": "JPY",
+			"amount": 1234.5,
+			"precision": null,
+			"expected": "¥1,234.50"
+		},
+		{
+			"language": "de",
+			"rules": "currency_format_on",
+			"currency": "JPY",
+			"amount": 1234567.5,
+			"precision": null,
+			"expected": "¥1.234.568"
+		},
+		{
+			"language": "en",
+			"rules": "currency_format_on",
+			"currency": "KWD",
+			"amount": 1.2,
+			"precision": null,
+			"expected": "د.ك1.200"
+		},
+		{
+			"language": "en",
+			"rules": "currency_format_off",
+			"currency": "KWD",
+			"amount": 1.2,
+			"precision": null,
+			"expected": "د.ك1.20"
+		},
+		{
+			"language": "de",
+			"rules": "currency_format_on",
+			"currency": "KWD",
+			"amount": 1234.2,
+			"precision": null,
+			"expected": "د.ك1.234,200"
+		},
+		{
+			"language": "en",
+			"rules": "currency_precision_4",
+			"currency": "USD",
+			"amount": 1.5,
+			"precision": null,
+			"expected": "$1.50"
+		},
+		{
+			"language": "en",
+			"rules": "currency_precision_4",
+			"currency": "KWD",
+			"amount": 1.2,
+			"precision": null,
+			"expected": "د.ك1.200"
 		}
 	],
 	"number": [
@@ -369,6 +577,48 @@
 			"value": 1234.56789,
 			"precision": 5,
 			"expected": "1.234,56789"
+		},
+		{
+			"language": "en",
+			"number_format": "#,###.##",
+			"value": 999999999.1234567,
+			"precision": 8,
+			"expected": "999,999,999.12345672"
+		},
+		{
+			"language": "en",
+			"number_format": "#,###.##",
+			"value": 9007199254740991,
+			"precision": 2,
+			"expected": "9,007,199,254,740,991.00"
+		},
+		{
+			"language": "en",
+			"number_format": "#,###.##",
+			"value": 9007199254740994,
+			"precision": 0,
+			"expected": "9,007,199,254,740,994"
+		},
+		{
+			"language": "en",
+			"number_format": "#,###.##",
+			"value": -4503599627370495.5,
+			"precision": 0,
+			"expected": "-4,503,599,627,370,496"
+		},
+		{
+			"language": "en",
+			"number_format": "#,###.##",
+			"value": 9007199254740.99,
+			"precision": 8,
+			"expected": "9,007,199,254,740.99023438"
+		},
+		{
+			"language": "en",
+			"number_format": "#,###.##",
+			"value": 12345678901234.566,
+			"precision": 3,
+			"expected": "12,345,678,901,234.566"
 		}
 	],
 	"date": [

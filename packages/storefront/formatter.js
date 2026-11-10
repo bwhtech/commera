@@ -1,5 +1,6 @@
 // The rules of commera/localization/formatter.py; test/formatter-cases.json holds the cases both pass.
 import { render_date } from './date_format.js';
+import { python_fixed, python_round } from './decimal.js';
 
 const NUMBER_FORMATS = {
 	'#,###.##': ['.', ',', 2],
@@ -23,7 +24,7 @@ const BIDI_MARKS = /[\u061c\u200e\u200f]/g;
 
 export class Formatter {
 	// The server resolves `money_formats` and `date_formats` (Formatter.as_config in Python).
-	// `currency_symbols` and `money_formats` are keyed by currency code.
+	// `money_formats` holds each currency's precision and fraction_precision, by currency code.
 	constructor({
 		language = 'en',
 		direction = 'ltr',
@@ -63,8 +64,7 @@ export class Formatter {
 
 	// Report figures: 4.8L or 482.3K, in the language's words, with the number format's separators.
 	compact_money(amount, currency) {
-		const { number_format } = this.money_format(currency);
-		const [sign, digits] = split_sign(this.compact(amount, number_format));
+		const [sign, digits] = split_sign(this.compact(amount, this.number_format));
 		return this.join(sign, digits, this.symbol(currency));
 	}
 
@@ -95,12 +95,14 @@ export class Formatter {
 	}
 
 	place_symbol(amount, currency, precision, symbol) {
-		const money_format = this.money_format(currency);
+		const { precision: money_precision, fraction_precision } =
+			this.money_format(currency);
 		const [sign, number] = split_sign(
 			format_number(
 				amount,
-				money_format.number_format,
-				precision ?? money_format.precision,
+				this.number_format,
+				precision ?? money_precision,
+				fraction_precision,
 			),
 		);
 		return this.join(sign, number, symbol);
@@ -118,14 +120,14 @@ export class Formatter {
 		return this.currency_symbols[code] ?? `${code}${NO_BREAK_SPACE}`;
 	}
 
-	// A currency the server did not resolve takes the language's format, as Python resolves it.
+	// A currency the server did not resolve takes the format's precision and fmt_money's 100 units.
 	money_format(currency) {
 		const resolved = this.money_formats[currency || this.store_currency];
-		if (known_format(resolved?.number_format)) {
+		if (Number.isInteger(resolved?.precision)) {
 			return resolved;
 		}
 		const precision = NUMBER_FORMATS[this.number_format][2];
-		return { number_format: this.number_format, precision };
+		return { precision, fraction_precision: 2 };
 	}
 
 	compact(amount, number_format) {
@@ -154,49 +156,49 @@ export class Formatter {
 	}
 }
 
-// Frappe's fmt_money, precision rule included.
+// Frappe's fmt_money, precision rules included.
 export function format_number(
 	value,
 	number_format = DEFAULT_NUMBER_FORMAT,
 	requested_precision = 2,
+	fraction_precision = undefined,
 ) {
 	const format_info =
 		NUMBER_FORMATS[number_format] ?? NUMBER_FORMATS[DEFAULT_NUMBER_FORMAT];
 	const [decimal_separator, thousands_separator] = format_info;
-	const amount = Number(value) || 0;
+	const amount = Number.isFinite(Number(value)) ? Number(value) : 0;
 	const precision = effective_precision(
 		amount,
 		requested_precision,
 		format_info,
+		fraction_precision,
 	);
-	const units = round_half_even(amount, precision);
-	const factor = 10 ** precision;
-	const whole = String(Math.floor(Math.abs(units) / factor));
-	const decimals = String(Math.abs(units) % factor).padStart(precision, '0');
+	const [whole, decimals = ''] = python_fixed(amount, precision).split('.');
 	const group_size = number_format === INDIAN_NUMBER_FORMAT ? 2 : 3;
 	// Like fmt_money, a format without a decimal separator drops the rounded decimals.
 	const formatted =
 		group_digits(whole, group_size).join(thousands_separator) +
 		(precision && decimal_separator ? decimal_separator + decimals : '');
-	return units < 0 && formatted !== '0' ? `-${formatted}` : formatted;
+	const negative = amount < 0 && /[1-9]/.test(whole + decimals);
+	return negative && formatted !== '0' ? `-${formatted}` : formatted;
 }
 
-// fmt_money: above 2 decimals, a shorter fraction drops to its own length or the format's precision.
+// fmt_money: above 2 decimals, a shorter fraction drops to its own length, or to the currency's
+// fraction units (the format's precision when there is no currency).
 function effective_precision(
 	amount,
 	precision,
 	[decimal_separator, , format_precision],
+	fraction_precision,
 ) {
 	if (!decimal_separator || precision <= 2) {
 		return precision;
 	}
 	// Python's `amount % 1` is never negative.
 	const fraction = amount % 1 < 0 ? (amount % 1) + 1 : amount % 1;
-	const decimals = python_decimals(
-		round_half_even(fraction, precision) / 10 ** precision,
-	);
+	const decimals = python_decimals(python_round(fraction, precision));
 	if (decimals.length < 3) {
-		return format_precision;
+		return fraction_precision ?? format_precision;
 	}
 	return Math.min(decimals.length, precision);
 }
@@ -233,18 +235,6 @@ function to_utc_date(value) {
 	}
 	const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value));
 	return match ? new Date(Date.UTC(match[1], match[2] - 1, match[3])) : null;
-}
-
-// Python's round(): a tie that binary floats hold exactly goes to the even digit.
-function round_half_even(amount, precision) {
-	const factor = 10 ** precision;
-	const absolute = Math.abs(amount);
-	const scaled = absolute * factor;
-	const units =
-		Number.isInteger(absolute * 2 ** (precision + 1)) && scaled % 1 === 0.5
-			? Math.floor(scaled) + (Math.floor(scaled) % 2)
-			: Number(absolute.toFixed(precision).replace('.', ''));
-	return amount < 0 ? -units : units;
 }
 
 function group_digits(whole, group_size) {

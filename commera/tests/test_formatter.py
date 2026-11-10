@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.utils.formatters import format_value
 from frappe.utils.number_format import NumberFormat
 
 import commera.sdk
@@ -12,6 +13,7 @@ from commera.localization import formatter as formatter_module
 from commera.localization.date_formats import DateFormats
 from commera.localization.formatter import DEFAULT_NUMBER_FORMAT, Formatter
 from commera.localization.languages import Language
+from commera.utils import get_currency_symbol
 
 # packages/storefront/test/formatter.test.js passes the same cases with the JavaScript formatter.
 CASES_DIR = Path(__file__).resolve().parents[2] / "packages" / "storefront" / "test"
@@ -28,19 +30,10 @@ class TestFormatterCases(IntegrationTestCase):
 		cls.cases = load_cases("formatter-cases.json")
 
 	def setUp(self):
-		symbols, money_formats = self.cases["currency_symbols"], self.cases["money_formats"]
-
-		def get_money_format(currency, language_format):
-			precision = NumberFormat.from_string(language_format).precision
-			return money_formats.get(currency) or {"number_format": language_format, "precision": precision}
-
-		for name, value in (
-			("get_currency_symbol", lambda currency: symbols[currency]),
-			("get_money_format", get_money_format),
-		):
-			patcher = patch.object(formatter_module, name, value)
-			patcher.start()
-			self.addCleanup(patcher.stop)
+		symbols = self.cases["currency_symbols"]
+		patcher = patch.object(formatter_module, "get_currency_symbol", lambda currency: symbols[currency])
+		patcher.start()
+		self.addCleanup(patcher.stop)
 
 	def formatter_for(self, code: str, number_format: str | None = None) -> Formatter:
 		language = self.cases["languages"][code]
@@ -49,8 +42,13 @@ class TestFormatterCases(IntegrationTestCase):
 		)
 
 	def test_money_per_language_and_currency(self):
+		# fmt_money reads the fraction units from the Currency records, as in the cases.
 		for case in self.cases["money"]:
-			with self.subTest(**{key: case[key] for key in ("language", "currency", "amount")}):
+			rules = self.cases["money_formats"][case["rules"]]
+			with (
+				self.subTest(**{key: case[key] for key in ("language", "rules", "currency", "amount")}),
+				patch.object(formatter_module, "get_money_precision", lambda c, r=rules: r[c]["precision"]),
+			):
 				formatter = self.formatter_for(case["language"])
 				self.assertEqual(
 					formatter.money(case["amount"], case["currency"], case["precision"]), case["expected"]
@@ -89,45 +87,76 @@ class TestFormatterCases(IntegrationTestCase):
 		self.assertEqual(self.formatter_for("he").money(-5, "EUR"), "-5.00\u00a0€")
 
 
+# The System Settings behind each set of rules in formatter-cases.json.
+SETTINGS_FOR_RULES = {
+	"currency_format_on": {"use_number_format_from_currency": 1, "currency_precision": ""},
+	"currency_format_off": {"use_number_format_from_currency": 0, "currency_precision": ""},
+	"currency_precision_4": {"use_number_format_from_currency": 1, "currency_precision": "4"},
+}
+
+
 class TestFormatterSources(IntegrationTestCase):
 	def setUp(self):
 		frappe.db.set_value("Currency", "INR", "number_format", "#,##,###.##")
 		frappe.clear_document_cache("Currency", "INR")
 		self.addCleanup(frappe.clear_document_cache, "Currency", "INR")
-		self.symbol = frappe.db.get_value("Currency", "INR", "symbol")
+		self.symbol = get_currency_symbol("INR")
 		self.formatter = Formatter(Language.from_code("en"), "#,###.##")
 
-	def test_currency_number_format_needs_the_system_setting(self):
-		with self.change_settings(
-			"System Settings", use_number_format_from_currency=0, currency_precision=""
-		):
+	def change_money_settings(self, **settings):
+		return self.change_settings("System Settings", number_format="#,###.##", **settings)
+
+	def test_money_matches_erpnext_print_formats(self):
+		amounts = (1234567.891, 1234.5, 1.2, 1.2345, -0.5, 999999999.1234567)
+		for rules, settings in SETTINGS_FOR_RULES.items():
+			with self.subTest(rules=rules), self.change_money_settings(**settings):
+				formatter = Formatter(Language.from_code(frappe.local.lang))
+				for currency in ("INR", "JPY", "KWD", "USD"):
+					for amount in amounts:
+						self.assertEqual(
+							formatter.money(amount, currency),
+							print_format_money(amount, currency),
+							f"{currency} {amount}",
+						)
+
+	def test_cases_rules_are_what_the_settings_resolve(self):
+		cases = load_cases("formatter-cases.json")["money_formats"]
+		for rules, settings in SETTINGS_FOR_RULES.items():
+			with self.subTest(rules=rules), self.change_money_settings(**settings):
+				resolved = {
+					currency: formatter_module.get_money_format(currency) for currency in cases[rules]
+				}
+				self.assertEqual(resolved, cases[rules])
+
+	def test_separators_follow_the_language_not_the_currency(self):
+		with self.change_money_settings(use_number_format_from_currency=1, currency_precision=""):
 			self.assertEqual(self.formatter.money(1234567, "INR"), f"{self.symbol}1,234,567.00")
-		with self.change_settings(
-			"System Settings", use_number_format_from_currency=1, currency_precision=""
-		):
-			self.assertEqual(self.formatter.money(1234567, "INR"), f"{self.symbol}12,34,567.00")
-			self.assertEqual(self.formatter.number(1234567), "1,234,567")
+			self.assertEqual(self.formatter.money(1234.5, "JPY"), f"{get_currency_symbol('JPY')}1,234")
+			hindi = Formatter(Language.from_code("hi"), "#,##,###.##")
+			self.assertEqual(hindi.money(1234567, "INR"), f"{self.symbol}12,34,567.00")
+		with self.change_money_settings(use_number_format_from_currency=0, currency_precision=""):
+			self.assertEqual(self.formatter.money(1234.5, "JPY"), f"{get_currency_symbol('JPY')}1,234.50")
+
+	def test_a_short_fraction_takes_the_currency_fraction_units(self):
+		with self.change_money_settings(use_number_format_from_currency=0, currency_precision="3"):
+			self.assertEqual(self.formatter.money(1.2, "KWD"), f"{get_currency_symbol('KWD')}1.200")
+			self.assertEqual(self.formatter.money(1.2, "USD"), f"{get_currency_symbol('USD')}1.20")
 
 	def test_currency_precision_wins_over_the_number_format(self):
-		with self.change_settings(
-			"System Settings", use_number_format_from_currency=1, currency_precision="0"
-		):
-			self.assertEqual(self.formatter.money(1234567.4, "INR"), f"{self.symbol}12,34,567")
+		with self.change_money_settings(use_number_format_from_currency=1, currency_precision="0"):
+			self.assertEqual(self.formatter.money(1234567.4, "INR"), f"{self.symbol}1,234,567")
 			self.assertEqual(
-				formatter_module.get_money_format("INR", "#,###.##"),
-				{"number_format": "#,##,###.##", "precision": 0},
+				formatter_module.get_money_format("INR"), {"precision": 0, "fraction_precision": 2}
 			)
 
 	def test_config_sends_the_resolved_rules(self):
 		with (
-			self.change_settings(
-				"System Settings", use_number_format_from_currency=1, currency_precision="3"
-			),
+			self.change_money_settings(use_number_format_from_currency=1, currency_precision="3"),
 			patch.object(formatter_module, "get_selling_currencies", return_value={"INR"}),
 		):
 			config = Formatter(Language.from_code("de"), "#.###,##").as_config()
 		self.assertEqual(config["number_format"], "#.###,##")
-		self.assertEqual(config["money_formats"], {"INR": {"number_format": "#,##,###.##", "precision": 3}})
+		self.assertEqual(config["money_formats"], {"INR": {"precision": 3, "fraction_precision": 2}})
 		self.assertEqual(config["date_formats"], DateFormats.for_language("de").as_dict())
 
 	def test_language_number_format_comes_from_frappe(self):
@@ -155,3 +184,13 @@ class TestFormatterSources(IntegrationTestCase):
 	def test_unknown_date_style_is_refused(self):
 		with self.assertRaises(frappe.ValidationError):
 			Formatter(Language.from_code("en")).date("2026-03-05", "tiny")
+
+
+def print_format_money(amount: float, currency: str) -> str:
+	"""A Sales Invoice total as print formats show it, with Commera's symbol in place of the record's."""
+	field = frappe.get_meta("Sales Invoice").get_field("grand_total")
+	invoice = frappe._dict(doctype="Sales Invoice", name=f"print-{currency}", currency=currency)
+	printed = format_value(amount, field, invoice)
+	digits = printed.removeprefix(f"{frappe.db.get_value('Currency', currency, 'symbol')} ")
+	sign, digits = ("-", digits[1:]) if digits.startswith("-") else ("", digits)
+	return f"{sign}{get_currency_symbol(currency)}{digits}"

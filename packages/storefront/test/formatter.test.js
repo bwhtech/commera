@@ -13,24 +13,31 @@ function formatter_for(language, options = {}) {
 		language,
 		...cases.languages[language],
 		currency_symbols: cases.currency_symbols,
-		money_formats: cases.money_formats,
+		money_formats: cases.money_formats.currency_format_on,
 		date_formats: cases.date_formats[language],
 		...options,
 	});
 }
 
+// `rules` names the money formats the server resolves under one set of System Settings.
 test('money matches the Python formatter for each language and currency', () => {
 	for (const {
 		language,
+		rules,
 		currency,
 		amount,
 		precision,
 		expected,
 	} of cases.money) {
+		const money_formats = cases.money_formats[rules];
 		assert.equal(
-			formatter_for(language).money(amount, currency, precision ?? undefined),
+			formatter_for(language, { money_formats }).money(
+				amount,
+				currency,
+				precision ?? undefined,
+			),
 			expected,
-			`${language} ${currency} ${amount}`,
+			`${language} ${rules} ${currency} ${amount}`,
 		);
 	}
 });
@@ -81,7 +88,9 @@ test('money_text spells out an HTML symbol on the correct side', () => {
 });
 
 test('compact_money follows the number format and the direction', () => {
-	assert.equal(formatter_for('en').compact_money(482300, 'INR'), '₹4.8L');
+	const indian = formatter_for('en', { number_format: '#,##,###.##' });
+	assert.equal(indian.compact_money(482300, 'INR'), '₹4.8L');
+	assert.equal(formatter_for('en').compact_money(482300, 'INR'), '₹482.3K');
 	assert.equal(formatter_for('en').compact_money(482300, 'USD'), '$482.3K');
 	assert.equal(
 		formatter_for('de').compact_money(1500000, 'EUR'),
@@ -110,6 +119,7 @@ test('without the server patterns a date falls back to Intl, Gregorian and Latin
 test('a currency the server did not resolve takes the language format', () => {
 	const german = formatter_for('de', { money_formats: {} });
 	assert.equal(german.money(1234.5, 'JPY'), '¥1.234,50');
+	assert.equal(german.money(1.2, 'KWD', 3), 'د.ك1,20');
 });
 
 test('an unknown number format falls back to the default', () => {

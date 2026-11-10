@@ -71,8 +71,8 @@ test('money and dates read the resolved rules and the page direction', () => {
 		number_format: '#,###.##',
 		currency_symbols: { INR: '₹', JPY: '¥' },
 		money_formats: {
-			INR: { number_format: '#,##,###.##', precision: 2 },
-			JPY: { number_format: '#,###', precision: 0 },
+			INR: { precision: 2, fraction_precision: 2 },
+			JPY: { precision: 0, fraction_precision: 2 },
 		},
 		date_formats: {
 			parts: { medium: [{ field: 'd' }, { text: ' ' }, { field: 'MMM' }] },
@@ -80,7 +80,7 @@ test('money and dates read the resolved rules and the page direction', () => {
 		},
 		localization: { language: { code: 'ar', direction: 'rtl' } },
 	};
-	assert.equal(money(1234567.5, 'INR'), '12,34,567.50\u00a0₹');
+	assert.equal(money(1234567.5, 'INR'), '1,234,567.50\u00a0₹');
 	assert.equal(money(1234.5, 'JPY'), '1,234\u00a0¥');
 	assert.equal(number(1234567), '1,234,567');
 	assert.equal(date('2026-03-05'), '5 mar');
