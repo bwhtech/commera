@@ -6,7 +6,6 @@ import commera.sdk
 from commera.localization import register, resolve
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context, render_theme_context
 from commera.shop_themes.render import render_themed_template
-from commera.shop_themes.sections import LAYOUT_CACHE_PREFIX
 from commera.shop_themes.theme_resolver import ThemePageRenderer, build_base_context
 from commera.tests.test_store_frame_translation import FOOTER_TEMPLATE, SETTINGS, StoreFrameTestCase
 from commera.www import footer_editor_preview, navbar_editor_preview, theme_editor_preview
@@ -152,13 +151,8 @@ class TestStoreFrameRendering(StoreFrameTestCase):
 		return category
 
 	def render_starter_preview(self, preview):
-		self.clear_starter_layouts()
 		with patch("commera.shop_themes.chrome_preview.resolve_active_theme", return_value=STARTER):
 			return self.render_preview(preview, lang="ar")
-
-	def clear_starter_layouts(self):
-		for page in ("index", "header_group", "footer_group"):
-			frappe.cache.delete_value(f"{LAYOUT_CACHE_PREFIX}{STARTER}:{page}")
 
 	def render_preview(self, preview, **form):
 		frappe.local.form_dict = frappe._dict(form)
@@ -169,7 +163,6 @@ class TestStoreFrameRendering(StoreFrameTestCase):
 	def render_starter_home(self, language):
 		self.serve(language)
 		frappe.local.lang = language
-		self.clear_starter_layouts()
 		theme_context = build_theme_context(STARTER)
 		with (
 			patch.object(commera.sdk.catalog, "list_products", return_value={"products": []}),
