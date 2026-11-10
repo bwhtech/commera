@@ -31,8 +31,8 @@
 			</h4>
 			
 			{% else %}
-			<h4 class="text-base md:text-xl" :title="item.custom_item_name_ar||item.item_name">
-				<span x-text="item.custom_item_name_ar||item.item_name" class="me-1"></span> <span
+			<h4 class="text-base md:text-xl" :title="item.title||item.item_name">
+				<span x-text="item.title||item.item_name" class="me-1"></span> <span
 					x-text="$store.i18n.t(item.attribute_value)"></span>
 			</h4>
 			{% endif %}

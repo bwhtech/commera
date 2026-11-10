@@ -17,7 +17,6 @@ CARD_COLUMNS = (
 	"brand",
 	"is_stock_item",
 	"item_name",
-	"custom_item_name_ar",
 	"variant_item_code",
 	"image",
 	"hover_image",

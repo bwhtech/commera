@@ -7,6 +7,7 @@ from frappe.utils.data import cint, cstr
 from commera.api.cart import get_cart_price
 from commera.guest import is_guest, is_guest_checkout_enabled
 from commera.product_detail import size_sort_key
+from commera.sdk.lines import LineProducts
 from commera.utils import get_available_stocks, get_next_url
 
 no_cache = True
@@ -68,6 +69,7 @@ def get_cart_lines(requested_quantities: dict[str, int], notices: list[str]) -> 
 		size["item_code"]: size["stock_detail"] for sizes in sizes_by_variant.values() for size in sizes
 	}
 	variant_by_name = get_variants(variant_names)
+	products = LineProducts(list(size_row_by_item_code))
 	commera_settings = frappe.get_cached_doc("Commera Settings")
 	price_lists = (commera_settings.get_default_price_list(), commera_settings.get_sale_price_list())
 
@@ -100,7 +102,7 @@ def get_cart_lines(requested_quantities: dict[str, int], notices: list[str]) -> 
 					"size": size_row.size,
 					"stock_detail": stock_detail,
 					"item_name": size_row.item_name,
-					"item_name_ar": size_row.get("item_name_ar") or size_row.item_name,
+					"title": products.get_title(item_code, size_row.item_name),
 				},
 				"qty": min(requested_qty, in_stock_qty),
 				"price": price,
@@ -129,8 +131,6 @@ def get_sellable_size_rows(item_codes: list[str]) -> list[dict]:
 		.where(style_attribute_variant.is_published == 1)
 		.where(item.disabled == 0)
 	)
-	if frappe.db.has_column("Item", "custom_item_name_ar"):
-		query = query.select(item.custom_item_name_ar.as_("item_name_ar"))
 	return query.run(as_dict=True)
 
 

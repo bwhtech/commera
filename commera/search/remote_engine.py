@@ -298,7 +298,7 @@ def product_document(record):
 		"name": record["name"],
 		"title": record["title"],
 		# Arabic keeps its own field: engines tokenize it with Arabic rules. Other languages ride in `content`.
-		"title_ar": record["titles"].get("ar") or card.get("custom_item_name_ar") or "",
+		"title_ar": record["titles"].get("ar") or "",
 		"content": record["content"],
 		"item_group": record["item_group"],
 		"brand": record["brand"],

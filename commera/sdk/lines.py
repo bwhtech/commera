@@ -11,8 +11,6 @@ from commera.sdk.catalog import translate_products, translate_term
 from commera.sdk.types import CartLineProduct
 from commera.search.record_builder import images_for_variants
 
-LEGACY_TITLE_FIELD = "custom_item_name_ar"
-
 
 class LineProducts:
 	"""The products that sell a set of items, read once with one translate() call for all lines.
@@ -68,22 +66,8 @@ def read_variants(names: list[str]) -> dict[str, frappe._dict]:
 		filters={"name": ("in", list(set(names)) or [""])},
 		fields=["name", "route", "display_name", "item_style", "is_published"],
 	)
-	legacy_titles = read_legacy_titles([variant.item_style for variant in variants])
-	titles = translate_products(variants, [legacy_titles.get(variant.item_style) for variant in variants])
+	titles = translate_products(variants)
 	return {
 		variant.name: frappe._dict(variant, title=title["display_name"])
 		for variant, title in zip(variants, titles, strict=True)
 	}
-
-
-def read_legacy_titles(item_styles: list[str]) -> dict[str, str]:
-	# pick_title reads them only for a non-default Arabic request, so other carts skip the query.
-	localization = get_localization()
-	if localization.language.code != "ar" or localization.language == localization.default_language:
-		return {}
-	if not item_styles or not frappe.db.has_column("Item", LEGACY_TITLE_FIELD):
-		return {}
-	rows = frappe.get_all(
-		"Item", filters={"name": ("in", list(set(item_styles)))}, fields=["name", LEGACY_TITLE_FIELD]
-	)
-	return {row.name: row.get(LEGACY_TITLE_FIELD) for row in rows}

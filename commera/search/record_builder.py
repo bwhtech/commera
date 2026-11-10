@@ -105,14 +105,7 @@ def build_product_search_records(variant_names=None):
 	sizes_by_variant = sizes_for_variants(names)
 	images_by_variant = images_for_variants(names)
 	prices_by_variant = prices_for_variants(sizes_by_variant)
-	titles_by_variant = get_translated_titles(
-		"Style Attribute Variant",
-		variants,
-		{
-			variant.name: item_by_style.get(variant.item_style, {}).get("custom_item_name_ar")
-			for variant in variants
-		},
-	)
+	titles_by_variant = get_translated_titles("Style Attribute Variant", variants)
 
 	records = []
 	for variant in variants:
@@ -172,7 +165,6 @@ def build_product_detail(variant, item, sizes, images, prices):
 		"brand": item.get("brand") or "",
 		"is_stock_item": cint(item.get("is_stock_item")),
 		"item_name": item.get("item_name") or "",
-		"custom_item_name_ar": item.get("custom_item_name_ar") or "",
 		"variant_item_code": sizes[0]["item_code"] if sizes else "",
 		"image": images.get("image") or "",
 		"hover_image": images.get("hover_image") or "",
@@ -238,11 +230,8 @@ def build_category_search_records(names=None):
 
 
 def items_for_item_styles(item_styles, content_fields=None):
-	"""Map item_style (Item name) -> {brand, is_stock_item, item_name, custom_item_name_ar, ...content}."""
-	fields = ["name", "brand", "is_stock_item", "item_name"]
-	if frappe.db.has_column("Item", "custom_item_name_ar"):
-		fields.append("custom_item_name_ar")
-	fields = union_fields(fields, content_fields or [])
+	"""Map item_style (Item name) -> {brand, is_stock_item, item_name, ...content}."""
+	fields = union_fields(["name", "brand", "is_stock_item", "item_name"], content_fields or [])
 
 	item_by_style = {}
 	for chunk in create_batch(item_styles, IN_CLAUSE_CHUNK_SIZE):

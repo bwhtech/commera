@@ -188,22 +188,6 @@ class RemoteEngineTests(SearchCatalogue):
 		self.assertEqual({card["name"] for card in result["products"]}, {self.red, self.blue, self.green})
 		self.assertEqual([category["name"] for category in result["categories"]], [self.category])
 
-	def test_arabic_item_names_are_searchable(self):
-		if not frappe.db.has_column("Item", "custom_item_name_ar"):
-			self.skipTest("Item has no custom_item_name_ar field on this site")
-		variants = [self.red, self.blue, self.green]
-		frappe.db.set_value("Item", STYLE_ITEM, "custom_item_name_ar", "ودجت تجريبي")
-		self.engine.index_docs("Style Attribute Variant", variants)
-		self.wait_for_writes()
-
-		def restore():
-			frappe.db.set_value("Item", STYLE_ITEM, "custom_item_name_ar", None)
-			self.engine.index_docs("Style Attribute Variant", variants)
-			self.wait_for_writes()
-
-		self.addCleanup(restore)
-		self.assertEqual(set(self.engine.typeahead("ودجت")["product_names"]), set(variants))
-
 	def test_translated_titles_are_searchable(self):
 		self.publish_languages("en", "fr", "ar")
 		with patch("commera.search.sync.frappe.enqueue"):

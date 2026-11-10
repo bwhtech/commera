@@ -83,11 +83,11 @@
     <h3 class="mt-6 font-medium text-link {{  current_variant.brand_size  }}" title="{{_(brand|title)}}">
         {{_(brand|title)}}
     </h3>
-    <h4 class="{{ current_variant.product_name_size }}" title="{{_(product_name|title)}}">
+    <h4 class="{{ current_variant.product_name_size }}" title="{{ _(product_name|title)|e }}">
         {% if product_name|length > 25 %}
-        {{ _(product_name[:25]|title) }}...
+        {{ _(product_name[:25]|title)|e }}...
         {% else %}
-        {{ _(product_name|title) }}
+        {{ _(product_name|title)|e }}
         {% endif %}
         {{_(attribute_value|title)}}
     </h4>

@@ -7,8 +7,7 @@
                 class="w-28 h-36 object-cover rounded-sm" alt="product image" />
             <div class="flex flex-col gap-2">
                 <span class="text-secondary-accent text-base font-medium"> {{_(cart_item.brand)}} </span>
-                    {% set product_name = cart_item.item_name if frappe.lang == "en" else cart_item.custom_item_name_ar or cart_item.item_name %}
-                    <span class="text-sm font-medium"> {{_(product_name)}} </span>
+                    <span class="text-sm font-medium"> {{ (cart_item.title or cart_item.item_name)|e }} </span>
                 <div class="text-xs text-gray-700 flex gap-4">
                     <span>{{ _('Size') }}: <span>{{_(cart_item.size)}}</span></span>
                     <span>{{ _('Quantity') }}: {{_(cart_item.qty)}}</span>

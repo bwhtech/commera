@@ -26,17 +26,8 @@ def get_context(context):
 	context.images = detail["images"]
 	context.product_in_stock = detail["in_stock"]
 
-	selected_item_doc = frappe.get_cached_doc("Item", selected_item["item_code"])
-	selected_item.update(
-		{
-			"item_name": selected_item_doc.item_name,
-			"item_name_ar": selected_item_doc.get("custom_item_name_ar") or selected_item_doc.item_name,
-			"style_code": selected_item_doc.get("custom_style_code", ""),
-			"material": selected_item_doc.get("custom_material", ""),
-			"description": selected_item_doc.get("description", ""),
-			"description_ar": selected_item_doc.get("custom_description_ar", selected_item_doc.description),
-		}
-	)
+	add_selected_item_fields(selected_item)
+	add_product_content(context, product_variant, product)
 
 	resolved_size = selected_item["size"] if selected_item else None
 	context.available_sizes = detail["available_sizes"]
@@ -64,6 +55,37 @@ def get_context(context):
 	]
 
 	add_seo(context, detail)
+
+
+def add_selected_item_fields(selected_item):
+	"""The size's own fields, and its cart line title in the request language."""
+	# sdk.catalog imports this module, so the SDK is imported where it is used.
+	from commera.sdk.lines import LineProducts
+
+	item = frappe.get_cached_doc("Item", selected_item["item_code"])
+	selected_item.update(
+		{
+			"item_name": item.item_name,
+			"title": LineProducts([item.name]).get_title(item.name, item.item_name),
+			"style_code": item.get("custom_style_code", ""),
+			"material": item.get("custom_material", ""),
+			"description": item.get("description", ""),
+		}
+	)
+
+
+def add_product_content(context, product_variant, item):
+	"""The title and description in the request language, as the SDK's product page has them."""
+	from commera.sdk.catalog import get_product_content
+
+	content = get_product_content(product_variant, item)
+	context.product_title = content["display_name"] or item.item_name
+	context.product_description = content["description"]
+	# Item saves default a blank description to the Item's code or name.
+	context.show_product_description = bool(content["description"]) and content["description"] not in (
+		item.name,
+		item.item_name,
+	)
 
 
 def add_seo(context, detail):

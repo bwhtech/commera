@@ -9,7 +9,7 @@
         {% endif %}
         <div class="text-sm gap-2 flex flex-col">
             <p class="text-gray-800 capitalize">{{_(brand)}}</p>
-            <p class="capitalize">{{_(name)}}</p>
+            <p class="capitalize">{{ _(name)|e }}</p>
             <p class="font-medium"><span class="capitalize">{{_("size")}}:</span> {{_(size)}}</p>
 
             <p class="flex">{{get_currency_symbol()}} {{"%.2f"|format(price)}} </p>

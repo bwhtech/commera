@@ -32,7 +32,7 @@
 							</a>
 						</td>
 						<td class="product-item-name">
-							<a :href="`/{{ language }}/products/${wishlist_item.route}`" x-text="{% if language == 'en' %}wishlist_item.item_name{% else %}wishlist_item.custom_item_name_ar || wishlist_item.item_name{% endif %}"></a>
+							<a :href="`/{{ language }}/products/${wishlist_item.route}`" x-text="{% if language == 'en' %}wishlist_item.item_name{% else %}wishlist_item.title || wishlist_item.item_name{% endif %}"></a>
 						</td>
 						<td class="product-item-price text-nowrap">
 							{# .product-item-price strikes through every span it holds, so the amounts sit in bdi. #}

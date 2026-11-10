@@ -60,11 +60,7 @@
                     {{ _(product.brand|title) }}
                 </a>
                 <h2 class="mb-3.5 text-base md:mb-6 md:text-xl ">
-                    {% if frappe.lang == "en" %}
-                    {{ _(product.item_name|title) }}
-                    {% else %}
-                    {{ _(product.custom_item_name_ar or product.item_name|title) }}
-                    {% endif %}
+                    {{ product_title|title|e }}
                 </h2>
                 {% if reviews.review_count %}
                 <a href="#product-reviews" class="mb-3.5 flex items-center gap-1.5 md:mb-6 w-fit">
@@ -191,11 +187,7 @@
                                 class="w-34 h-45 object-cover rounded-lg">
                         </div>
                         <p class="text-accent">
-                            {% if frappe.lang == "en" %}
-                            {{ _(product.item_name) }}
-                            {% else %}
-                            {{ _(product.custom_item_name_ar or '') }}
-                            {% endif %}
+                            {{ product_title|e }}
                         </p>
 
                         <div class="flex justify-center gap-4 mt-6">
@@ -277,12 +269,8 @@
                                         </li>
 
                                     </ul>
-                                    {% if selected_item.description != selected_item.item_code %}
-                                    {% if frappe.lang == "en" %}
-                                    {{selected_item.description}}
-                                    {% else %}
-                                    {{selected_item.description_ar or selected_item.description}}
-                                    {% endif %}
+                                    {% if show_product_description %}
+                                    {{ product_description }}
                                     {% endif %}
                                 </div>
                             </div>
@@ -414,7 +402,7 @@
         <div class="mt-9 mb-18 grid grid-cols-1 sm:grid-cols-2 md:mt-11 md:grid-cols-3 md:gap-8 lg:grid-cols-4">
             {% for item in recommended_items %}
             <div class="mb-11 md:mb-4">
-                {% set product_name = item.item_name if frappe.lang == "en" else item.custom_item_name_ar or "" %}
+                {% set product_name = item.title or item.item_name %}
                 <a href="/{{frappe.lang}}/products/{{item.route}}">
                     {{ item_card(
                     image=item.image or "/assets/commera/images/1.jpg",

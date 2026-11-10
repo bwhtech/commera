@@ -61,7 +61,7 @@
                                 <span x-text="item.attribute_value"></span>
                             
                                 {% else %}
-                                <span x-text="item.custom_item_name_ar || item.item_name"></span>
+                                <span x-text="item.title || item.item_name"></span>
                                 <span x-text="$store.i18n.t(item.attribute_value)"></span>
                                 {% endif %}
                             </p>
