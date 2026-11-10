@@ -13,6 +13,7 @@ from commera.localization.resolver import (
 	get_localized_request,
 	resolve,
 	strip_language_prefix,
+	strip_locale_prefix,
 )
 from commera.roles import is_commera_admin
 
@@ -127,8 +128,10 @@ def localize_path(requested_path: str) -> LocalizedRequest | None:
 
 
 def get_canonical_prefix(localization: Localization, prefixed: bool) -> str:
-	"""The prefix a link to this page should carry: the default language has none."""
-	if not prefixed or localization.language == localization.default_language:
+	"""The prefix a link to this page should carry: the default language has none.
+	A secondary market always has one."""
+	primary = not localization.market or localization.market.primary
+	if not prefixed or (primary and localization.language == localization.default_language):
 		return ""
 	return localization.root_prefix
 
@@ -203,10 +206,11 @@ def canonicalize_location(location: str) -> str:
 def get_canonical_path(path: str) -> str:
 	"""`path` as a link for guests: no prefix for the default language, and no closed /en/."""
 	path = clean_path(path)
-	language, rest = strip_language_prefix(path)
-	if not language:
+	prefix, rest = strip_locale_prefix(path)
+	if not prefix:
 		return strip_legacy_prefix(path)
-	return rest if language == StorefrontLanguages.load().default else path
+	is_default = prefix.market.primary and prefix.language == StorefrontLanguages.load().default
+	return rest if is_default else path
 
 
 def is_same_site(location: str) -> bool:

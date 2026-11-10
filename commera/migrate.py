@@ -271,11 +271,16 @@ def setup_robots_txt(languages=None):
 
 
 def get_private_path_rules(languages=None) -> str:
+	from commera.localization.markets import StorefrontMarkets, get_market_rows
+
 	languages = languages or StorefrontLanguages.load()
+	markets = StorefrontMarkets(languages, get_market_rows())
+	prefixes = [f"/{language.code.lower()}" for language in languages.published]
+	prefixes += [prefix for *_locale, prefix in markets.market_prefixes()]
 	# Disallow is a prefix match: the explicit checkout line is redundant but kept deliberately.
 	return "".join(
-		f"Disallow: /{prefix}/cart\nDisallow: /{prefix}/cart/checkout\nDisallow: /{prefix}/account\n"
-		for prefix in (language.code.lower() for language in languages.published)
+		f"Disallow: {prefix}/cart\nDisallow: {prefix}/cart/checkout\nDisallow: {prefix}/account\n"
+		for prefix in prefixes
 	)
 
 

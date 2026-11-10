@@ -5,7 +5,8 @@ import frappe
 from frappe.utils import cstr, flt, get_url, strip_html_tags
 
 from commera.branding import get_configured_brand_assets
-from commera.localization import StorefrontLanguages, get_request_path, strip_language_prefix
+from commera.localization import get_request_path, strip_language_prefix
+from commera.localization.urls import get_locale_prefixes
 from commera.store_frame import get_shop_details
 from commera.utils import get_store_currency
 
@@ -84,16 +85,12 @@ def get_site_currency():
 
 
 def build_alternates(path):
-	"""One hreflang entry per published language, default first. The default is the x-default target."""
-	languages = StorefrontLanguages.load()
+	"""One hreflang entry per published language and enabled market URL, default first.
+	The default language is the x-default target."""
 	_language, path = strip_language_prefix(path or "/", include_unpublished=True)
 	return [
-		{
-			"lang": language.code,
-			"href": get_url(languages.prefix(language) + path),
-			"x_default": language == languages.default,
-		}
-		for language in languages.published
+		{"lang": hreflang, "href": get_url(prefix + path), "x_default": x_default}
+		for hreflang, prefix, x_default in get_locale_prefixes()
 	]
 
 

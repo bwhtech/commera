@@ -6,7 +6,14 @@ import frappe
 from frappe.utils import get_url
 
 from commera.localization.languages import StorefrontLanguages
-from commera.localization.resolver import get_localization, get_request_path, strip_language_prefix
+from commera.localization.markets import Market, StorefrontMarkets
+from commera.localization.resolver import (
+	Localization,
+	find_market_language,
+	get_localization,
+	get_request_path,
+	strip_language_prefix,
+)
 from commera.localization.routing import clean_path, is_page_path, is_same_site, strip_legacy_prefix
 from commera.roles import is_commera_admin
 
@@ -19,49 +26,80 @@ INERT_LINK = "#"
 
 
 def url(path: str | None) -> str | None:
-	"""`path` in the current language: the default language has no prefix.
+	"""`path` in the current language and market: the default language has no prefix.
 	A path that names a language moves to the current one. Use switch_url() to link another."""
 	link = Link(path)
 	if not link.is_page:
 		return link.unchanged
-	return link.localize(StorefrontLanguages.load().prefix(get_localization().language))
+	return link.localize(get_current_prefix(get_localization()))
 
 
 def switch_url(
-	path: str | None = None, query: str | Mapping | None = None, language: str | None = None
+	path: str | None = None,
+	query: str | Mapping | None = None,
+	language: str | None = None,
+	market: str | None = None,
+	country: str | None = None,
 ) -> str:
-	"""`path` in `language`, with `query` merged into its query. Defaults to the current page,
-	its query and its language. A language the shopper may not open gives the default language."""
+	"""`path` in `language` and `market` (a handle; a `country` picks its market), with `query` merged in.
+	Defaults to the current ones. What the shopper may not open falls back to the defaults."""
 	link = Link(get_current_url() if path is None else path)
 	if not link.is_page:
 		return link.unchanged
-	languages = StorefrontLanguages.load()
-	if language:
-		target = languages.find(language, is_commera_admin()) or languages.default
-	else:
-		target = get_localization().language
-	return link.localize(languages.prefix(target), query or "")
+	localization = get_localization()
+	markets = StorefrontMarkets.load(is_commera_admin())
+	target = pick_market(markets, localization, market, country)
+	target_language = find_market_language(markets, target, language or localization.language.code)
+	prefix = markets.prefix(target, target_language, country or localization.country)
+	return link.localize(prefix, query or "")
 
 
 def alternates(path: str | None = None) -> list[dict]:
-	"""One absolute URL per published language, default first, for hreflang and the sitemap.
-	Empty for a single-language store: it has no other version to point search engines to."""
-	languages = StorefrontLanguages.load()
+	"""One absolute URL per published language and per enabled market's language and country,
+	for hreflang and the sitemap. Empty for a store with one language and one market."""
+	prefixes = get_locale_prefixes()
 	link = Link(get_current_path() if path is None else path)
-	if len(languages.published) < 2 or not link.is_page:
+	if len(prefixes) < 2 or not link.is_page:
 		return []
 	return [
-		{
-			"lang": language.code,
-			"href": get_url(link.localize(languages.prefix(language))),
-			"x_default": language == languages.default,
-		}
-		for language in languages.published
+		{"lang": hreflang, "href": get_url(link.localize(prefix)), "x_default": x_default}
+		for hreflang, prefix, x_default in prefixes
 	]
 
 
+def get_locale_prefixes() -> list[tuple[str, str, bool]]:
+	"""(hreflang, prefix, x_default) of every URL root a shopper can open, the default first.
+	x-default is the primary market's default language, at the root."""
+	markets = StorefrontMarkets.load()
+	languages = markets.languages
+	prefixes = [
+		(language.code, languages.prefix(language), language == languages.default)
+		for language in languages.published
+	]
+	for _market, language, country, prefix in markets.market_prefixes():
+		prefixes.append((f"{language.code.split('-')[0]}-{country.upper()}", prefix, False))
+	return prefixes
+
+
+def get_current_prefix(localization: Localization) -> str:
+	if localization.market and not localization.market.primary:
+		return localization.root_prefix
+	return StorefrontLanguages.load().prefix(localization.language)
+
+
+def pick_market(
+	markets: StorefrontMarkets, localization: Localization, handle: str | None, country: str | None
+) -> Market:
+	if country:
+		return markets.for_country(country)
+	if handle:
+		return markets.find(handle) or markets.primary
+	current = localization.market
+	return (current and markets.find(current.handle)) or markets.primary
+
+
 class Link:
-	"""A link as a browser reads it. Only a same-site page path gets a language prefix.
+	"""A link as a browser reads it. Only a same-site page path gets a locale prefix.
 	Links off-site, relative links and /files/, /api/ and the like stay as they are."""
 
 	def __init__(self, href: str | None):
