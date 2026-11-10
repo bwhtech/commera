@@ -4,6 +4,8 @@ A size sells at its sale rate, else its compare-at rate; the card shows its lowe
 import frappe
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Coalesce, Max, Min
+from pypika.analytics import Min as WindowMin
+from pypika.queries import QueryBuilder
 from pypika.terms import Field
 
 from commera.base_prices import is_base_price
@@ -47,20 +49,12 @@ def get_discount(price: float | None, default_price: float | None) -> dict:
 	return {"discount_percent": (default_price - price) / default_price * 100, "has_discount": 1}
 
 
-def card_prices_query(sale_price_list: str | None, compare_at_price_list: str | None):
+def card_prices_query(
+	sale_price_list: str | None, compare_at_price_list: str | None, products: list | QueryBuilder
+):
 	"""One row per product (`parent`) with get_card_price's effective, sale and default prices.
-	A product with no priced size has no row."""
-	sizes = size_prices_query(sale_price_list, compare_at_price_list).as_("sizes")
-	lowest_sizes = size_prices_query(sale_price_list, compare_at_price_list).as_("lowest_sizes")
-	lowest = (
-		frappe.qb.from_(lowest_sizes)
-		.groupby(Field("parent", table=lowest_sizes))
-		.select(
-			Field("parent", table=lowest_sizes),
-			Min(Field("size_price", table=lowest_sizes)).as_("price"),
-		)
-	).as_("lowest")
-
+	Only `products` (names or a name subquery) are aggregated. A product with no priced size has no row."""
+	sizes = size_prices_query(sale_price_list, compare_at_price_list, products).as_("sizes")
 	sale, compare_at, size_price = (
 		Field("sale", table=sizes),
 		Field("compare_at", table=sizes),
@@ -69,11 +63,7 @@ def card_prices_query(sale_price_list: str | None, compare_at_price_list: str | 
 	crossed_out = Case().when(sale.notnull() & (compare_at > size_price), compare_at)
 	return (
 		frappe.qb.from_(sizes)
-		.join(lowest)
-		.on(
-			(Field("parent", table=sizes) == Field("parent", table=lowest))
-			& (size_price == Field("price", table=lowest))
-		)
+		.where(size_price == Field("lowest_price", table=sizes))
 		.groupby(Field("parent", table=sizes))
 		.select(
 			Field("parent", table=sizes),
@@ -84,32 +74,34 @@ def card_prices_query(sale_price_list: str | None, compare_at_price_list: str | 
 	)
 
 
-def size_prices_query(sale_price_list: str | None, compare_at_price_list: str | None):
-	color_size_item = DocType("Color Size Item")
+def size_prices_query(
+	sale_price_list: str | None, compare_at_price_list: str | None, products: list | QueryBuilder
+):
+	"""Each size of `products` with its rates, and the lowest size price of its product."""
+	size = DocType("Color Size Item").as_("priced_size")
 	sale = DocType("Item Price").as_("size_sale")
 	compare_at = DocType("Item Price").as_("size_compare_at")
 	sale_rate, compare_at_rate = Min(sale.price_list_rate), Min(compare_at.price_list_rate)
+	size_price = Coalesce(sale_rate, compare_at_rate)
 	return (
-		frappe.qb.from_(color_size_item)
+		frappe.qb.from_(size)
 		.left_join(sale)
-		.on(
-			(sale.item_code == color_size_item.item_code)
-			& (sale.price_list == sale_price_list)
-			& is_base_price(sale)
-		)
+		.on((sale.item_code == size.item_code) & (sale.price_list == sale_price_list) & is_base_price(sale))
 		.left_join(compare_at)
 		.on(
-			(compare_at.item_code == color_size_item.item_code)
+			(compare_at.item_code == size.item_code)
 			& (compare_at.price_list == compare_at_price_list)
 			& is_base_price(compare_at)
 		)
-		.where(color_size_item.parenttype == "Style Attribute Variant")
-		.groupby(color_size_item.parent, color_size_item.item_code)
+		.where((size.parenttype == "Style Attribute Variant") & size.parent.isin(products))
+		.groupby(size.parent, size.item_code)
 		.select(
-			color_size_item.parent,
+			size.parent,
 			sale_rate.as_("sale"),
 			compare_at_rate.as_("compare_at"),
-			Coalesce(sale_rate, compare_at_rate).as_("size_price"),
+			size_price.as_("size_price"),
+			# One read of the sizes: the product's lowest price is a window over the grouped sizes.
+			WindowMin(size_price).over(size.parent).as_("lowest_price"),
 		)
 	)
 

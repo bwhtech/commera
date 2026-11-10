@@ -30,6 +30,9 @@ from commera.plugin_events import (
 
 # Ceiling for any IN (...) list this app sends to MariaDB/Postgres.
 IN_CLAUSE_CHUNK_SIZE = 1000
+# Grid sorts and filters on the card price: these need the price inside the grid query.
+PRICE_SORTS = ("price_low", "price_high", "discount")
+PRICE_FILTERS = ("has_discount", "min_price", "max_price")
 
 
 def get_address_lines(address_display):
@@ -111,7 +114,9 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 
 	from commera.card_prices import card_discount_percent
 
-	query = get_product_base_query(filters, product_list)
+	# Without a price sort or filter, pick the page first and price only its products.
+	priced_in_sql = sort_by in PRICE_SORTS or has_price_filter(filters)
+	query = get_product_base_query(filters, product_list, with_card_prices=priced_in_sql)
 	style_attribute_variant = DocType("Style Attribute Variant")
 	website_slideshow_item = DocType("Website Slideshow Item")
 	hover_slideshow_item = DocType("Website Slideshow Item").as_("hover_slideshow_item")
@@ -119,9 +124,13 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 	card = Table("card_prices")
 	item = DocType("Item")
 
-	discount_expr = card_discount_percent(card)
 	query = (
-		query.left_join(hover_slideshow_item)
+		query.left_join(website_slideshow_item)
+		.on(
+			(website_slideshow_item.parent == style_attribute_variant.name)
+			& (website_slideshow_item.idx == 1)
+		)
+		.left_join(hover_slideshow_item)
 		.on((hover_slideshow_item.parent == style_attribute_variant.name) & (hover_slideshow_item.idx == 2))
 		.select(
 			style_attribute_variant.name,
@@ -138,17 +147,21 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 			item.item_name,
 			item.is_stock_item,
 			color_size_item.item_code.as_("variant_item_code"),
-			card.effective_price,
-			card.default_price,
-			card.sale_price,
 			website_slideshow_item.image.as_("image"),
 			hover_slideshow_item.image.as_("hover_image"),
-			discount_expr.as_("discount_percent"),
 		)
 		.groupby(style_attribute_variant.name)
 		.limit(page_length)
 		.offset((page - 1) * page_length)
 	)
+	if priced_in_sql:
+		discount_expr = card_discount_percent(card)
+		query = query.select(
+			card.effective_price,
+			card.default_price,
+			card.sale_price,
+			discount_expr.as_("discount_percent"),
+		)
 	if sort_by == "price_low":
 		query = query.orderby(card.effective_price, order=Order.asc)
 	elif sort_by == "price_high":
@@ -161,7 +174,32 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 		query = query.orderby(discount_expr, order=Order.desc)
 	else:
 		query = query.orderby("name", order=Order.asc)
-	return shape_product_cards(query.run(as_dict=True))
+	cards = query.run(as_dict=True)
+	return shape_product_cards(cards if priced_in_sql else set_card_prices(cards))
+
+
+def set_card_prices(cards):
+	"""card_prices_query's columns on `cards`, aggregated over these products only."""
+	from commera.card_prices import card_prices_query, get_discount
+	from commera.localization.market_prices import MarketPrices
+
+	if not cards:
+		return cards
+	prices = MarketPrices.current()
+	rows = card_prices_query(
+		prices.sale_price_list, prices.compare_at_price_list, [card["name"] for card in cards]
+	).run(as_dict=True)
+	rows_by_product = {row.parent: row for row in rows}
+	for card in cards:
+		row = rows_by_product.get(card["name"], {})
+		price, default_price = row.get("effective_price"), row.get("default_price")
+		card.update(
+			effective_price=price,
+			sale_price=row.get("sale_price"),
+			default_price=default_price,
+			**get_discount(price, default_price),
+		)
+	return cards
 
 
 def shape_product_cards(cards):
@@ -242,30 +280,50 @@ def get_product_count_qb(filters=None, product_list=None):
 	return result[0]["total_count"] if result else 0
 
 
-def get_product_base_query(filters=None, product_list=None):
+def has_price_filter(filters) -> bool:
+	return bool(filters) and any(filters.get(key) for key in PRICE_FILTERS)
+
+
+def get_product_base_query(filters=None, product_list=None, with_card_prices=False):
+	"""Products matching `filters`, joined to `card_prices` when asked or when a price filter needs it.
+	The card prices aggregate only the products the other filters let through."""
 	from commera.card_prices import card_prices_query
 	from commera.localization.market_prices import MarketPrices
 
-	prices = MarketPrices.current()
-	card_prices = card_prices_query(prices.sale_price_list, prices.compare_at_price_list).as_("card_prices")
-	card = Table("card_prices")
+	query = filtered_products_query(filters, product_list)
+	if not (with_card_prices or has_price_filter(filters)):
+		return query
+
 	style_attribute_variant = DocType("Style Attribute Variant")
-	website_slideshow_item = DocType("Website Slideshow Item")
+	candidates = product_list or filtered_products_query(filters).select(style_attribute_variant.name)
+	prices = MarketPrices.current()
+	card_prices = card_prices_query(prices.sale_price_list, prices.compare_at_price_list, candidates).as_(
+		"card_prices"
+	)
+	card, filters = Table("card_prices"), filters or {}
+	# One row per product, over all its sizes: a size filter must not change the card price.
+	query = query.left_join(card_prices).on(
+		Field("parent", table=card_prices) == style_attribute_variant.name
+	)
+	if filters.get("has_discount"):
+		query = query.where(card.default_price.notnull())
+	if filters.get("min_price"):
+		query = query.where(card.effective_price >= filters["min_price"])
+	if filters.get("max_price"):
+		query = query.where(card.effective_price <= filters["max_price"])
+	return query
+
+
+def filtered_products_query(filters=None, product_list=None):
+	"""Products matching every filter but the price filters, with their sizes and their Item."""
+	style_attribute_variant = DocType("Style Attribute Variant")
 	color_size_item = DocType("Color Size Item")
 	item = DocType("Item")
 
 	query = (
 		frappe.qb.from_(style_attribute_variant)
-		.left_join(website_slideshow_item)
-		.on(
-			(website_slideshow_item.parent == style_attribute_variant.name)
-			& (website_slideshow_item.idx == 1)
-		)
 		.left_join(color_size_item)
 		.on(color_size_item.parent == style_attribute_variant.name)
-		# One row per product, over all its sizes: a size filter must not change the card price.
-		.left_join(card_prices)
-		.on(Field("parent", table=card_prices) == style_attribute_variant.name)
 		.left_join(item)
 		.on(item.name == style_attribute_variant.item_style)
 	)
@@ -275,8 +333,6 @@ def get_product_base_query(filters=None, product_list=None):
 		query = query.where(style_attribute_variant.is_published == 1)
 
 	if filters:
-		if filters.get("has_discount"):
-			query = query.where(card.default_price.notnull())
 		if filters.get("category_item_groups"):
 			query = query.where(style_attribute_variant.item_group.isin(filters["category_item_groups"]))
 		if filters.get("subcategory"):
@@ -287,36 +343,36 @@ def get_product_base_query(filters=None, product_list=None):
 			query = query.where(color_size_item.size.isin(filters["sizes"]))
 		if filters.get("brands"):
 			query = query.where(item.brand.isin(filters["brands"]))
-		if filters.get("min_price"):
-			query = query.where(card.effective_price >= filters["min_price"])
-		if filters.get("max_price"):
-			query = query.where(card.effective_price <= filters["max_price"])
 		if filters.get("search"):
-			search = filters.get("search")
-			child_categories = get_complete_nested_links(search)
-			search_condition = (
-				(style_attribute_variant.display_name.like(f"%{search}%"))
-				| (style_attribute_variant.attribute_value.like(f"%{search}%"))
-				| (style_attribute_variant.name.like(f"%{search}%"))
-				| (item.brand.like(f"%{search}%"))
-				| (style_attribute_variant.display_name.like(f"%{search}%"))
-				| (style_attribute_variant.item_group.like(f"%{search}%"))
-				| (item.name.like(f"%{search}%"))
-			)
-			# Short terms and indexes without the term's language land here, so translated titles match too.
-			if (translated := translated_title_matches(search)) is not None:
-				search_condition |= style_attribute_variant.name.isin(translated)
-			if child_categories:
-				search_condition |= style_attribute_variant.item_group.isin(child_categories)
-
-			if search.lower().startswith("men"):
-				exclusion_condition = (~style_attribute_variant.display_name.like("%women%")) & (
-					~style_attribute_variant.item_group.like("%women%")
-				)
-				search_condition = search_condition & exclusion_condition
-
-			query = query.where(search_condition)
+			query = query.where(search_condition(filters["search"]))
 	return query
+
+
+def search_condition(search):
+	style_attribute_variant = DocType("Style Attribute Variant")
+	item = DocType("Item")
+	child_categories = get_complete_nested_links(search)
+	condition = (
+		(style_attribute_variant.display_name.like(f"%{search}%"))
+		| (style_attribute_variant.attribute_value.like(f"%{search}%"))
+		| (style_attribute_variant.name.like(f"%{search}%"))
+		| (item.brand.like(f"%{search}%"))
+		| (style_attribute_variant.display_name.like(f"%{search}%"))
+		| (style_attribute_variant.item_group.like(f"%{search}%"))
+		| (item.name.like(f"%{search}%"))
+	)
+	# Short terms and indexes without the term's language land here, so translated titles match too.
+	if (translated := translated_title_matches(search)) is not None:
+		condition |= style_attribute_variant.name.isin(translated)
+	if child_categories:
+		condition |= style_attribute_variant.item_group.isin(child_categories)
+
+	if search.lower().startswith("men"):
+		exclusion_condition = (~style_attribute_variant.display_name.like("%women%")) & (
+			~style_attribute_variant.item_group.like("%women%")
+		)
+		condition = condition & exclusion_condition
+	return condition
 
 
 def translated_title_matches(search):

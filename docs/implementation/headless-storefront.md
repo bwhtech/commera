@@ -211,6 +211,7 @@ On a secondary market page, or an API request with that market's `_country`, pro
 - `compare_at_price` is the rate in the compare-at price list, only when the item has a sale rate and the compare-at rate is higher. `catalog.get_items` gives it as `list_price`, which is `null` otherwise.
 - A product card shows its lowest size price. The card `compare_at_price` is the compare-at rate of that size, only when that size has a sale rate and the compare-at rate is higher. Example: size M at 300 (sale) from 400, and size L at 250 (compare-at rate only). The card price is 250, with no crossed-out price.
 - The grid price filters, the price sort, the "On sale" filter, the discount sort and the price facet use the card price, calculated over all sizes of the product (`commera/card_prices.py`). A size filter does not change the card price.
+- The card price query calculates only the candidate products: a pinned product list, the page of a grid without a price sort or price filter, or the products that the other grid filters keep. It reads each size once.
 - In a secondary market, an item with a rate in neither list has `price: null` and `available: false`. `cart.add_lines` and `cart.set_lines` refuse it. `cart.update_lines` and `cart.set_lines` refuse a higher quantity of it, but a lower quantity or a removal is always allowed.
 - A product card is available only when one size has both a market price and stock.
 - The price facet (`facets.price`) has the `min`, `max` and `currency` of the market.

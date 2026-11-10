@@ -85,13 +85,10 @@ def get_listing_facet_counts(selected_filters: dict) -> dict[str, dict[str, int]
 def get_price_range(sale_price_list: str | None, compare_at_price_list: str | None = None) -> dict:
 	"""The range of the card prices of the published products, the price the grid filters on."""
 	product = DocType("Style Attribute Variant")
-	card_prices = card_prices_query(sale_price_list, compare_at_price_list).as_("card_prices")
+	published = frappe.qb.from_(product).select(product.name).where(product.is_published == 1)
+	card_prices = card_prices_query(sale_price_list, compare_at_price_list, published).as_("card_prices")
 	return (
-		frappe.qb.from_(product)
-		.join(card_prices)
-		.on(Field("parent", table=card_prices) == product.name)
-		.where(product.is_published == 1)
-		.select(
+		frappe.qb.from_(card_prices).select(
 			Min(Field("effective_price", table=card_prices)).as_("min_price"),
 			Max(Field("effective_price", table=card_prices)).as_("max_price"),
 		)
