@@ -1,5 +1,5 @@
 """The prices of the request's market, from its own price lists. Commera converts no currency, so a
-secondary market sells only items with a price in its sale price list."""
+secondary market sells only items with a price in its sale or compare-at price list."""
 
 from dataclasses import dataclass
 
@@ -39,11 +39,13 @@ class MarketPrices:
 		return f"{self.sale_price_list}|{self.compare_at_price_list}"
 
 	def price(self, sale: float | None, compare_at: float | None) -> float | None:
-		"""What a shopper pays, or None when the item is not for sale in this market.
-		Store prices fall back to the compare-at price, as the store always did."""
+		"""The sale rate, else the compare-at rate as the full price. None when neither list prices the
+		item: not for sale in a secondary market. The store prices that as 0, as it always did."""
 		if sale is not None:
 			return flt(sale)
-		return flt(compare_at) if self.uses_store_prices else None
+		if compare_at is not None or self.uses_store_prices:
+			return flt(compare_at)
+		return None
 
 	def compare_at(self, price: float | None, compare_at: float | None) -> float | None:
 		"""The struck-through price: only above the price paid."""
@@ -51,14 +53,18 @@ class MarketPrices:
 			return None
 		return flt(compare_at)
 
+	@property
+	def price_lists(self) -> list[str]:
+		return [name for name in (self.sale_price_list, self.compare_at_price_list) if name]
+
 	def get_unpriced(self, item_codes: list[str]) -> set[str]:
-		"""The items this market cannot sell: those with no price in its sale price list."""
+		"""The items this market cannot sell: those with no price in either of its price lists."""
 		if self.uses_store_prices or not item_codes:
 			return set()
 		priced = frappe.get_all(
 			"Item Price",
 			filters=base_price_filters(
-				{"item_code": ("in", item_codes), "price_list": self.sale_price_list or ""}
+				{"item_code": ("in", item_codes), "price_list": ("in", self.price_lists)}
 			),
 			pluck="item_code",
 		)

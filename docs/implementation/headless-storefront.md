@@ -205,22 +205,23 @@ Rules:
 
 A market has a **Sale Price List** and an optional **Compare-at Price List**. Both must be selling price lists in one currency. The market currency is the currency of the sale price list. The primary market uses the two price lists of **Commera Settings** and the store currency.
 
-On a secondary market page, or an API request with that market's `_country`, products, product cards, variants and `catalog.get_items` show the prices and the currency of the market:
+On a secondary market page, or an API request with that market's `_country`, products, product cards, variants and `catalog.get_items` show the prices and the currency of the market. Every market, the primary market too, uses one price rule:
 
-- `price` is the rate in the sale price list. Commera does not convert currency.
-- `compare_at_price` is the rate in the compare-at price list when it is higher than `price`.
-- An item with no rate in the sale price list has `price: null` and `available: false` in that market. `cart.add_lines` and `cart.set_lines` refuse it. `cart.update_lines` and `cart.set_lines` refuse a higher quantity of it, but a lower quantity or a removal is always allowed.
+- `price` is the rate in the sale price list. When the item has no sale rate, `price` is the rate in the compare-at price list, and the item shows no compare-at price. Commera does not convert currency.
+- `compare_at_price` is the rate in the compare-at price list, only when the item has a sale rate and the compare-at rate is higher.
+- Price filters, price sorting and the price facet use the same price.
+- In a secondary market, an item with a rate in neither list has `price: null` and `available: false`. `cart.add_lines` and `cart.set_lines` refuse it. `cart.update_lines` and `cart.set_lines` refuse a higher quantity of it, but a lower quantity or a removal is always allowed.
 - A product card is available only when one size has both a market price and stock.
 - The price facet (`facets.price`) has the `min`, `max` and `currency` of the market.
-- The primary market does not change: an item with no sale price uses its compare-at price.
+- The primary market keeps its prices and currency. An item with a rate in neither list has a price of 0 there, as before.
 - A market with no sale price list keeps the store prices. This occurs before the schema sync, or when the backfill patch could not fill the market.
 
 Only base Item Price rows set a public price: a row with a customer or a batch is not shown, not used in a filter or a facet, and does not make an item available (`commera/base_prices.py`). Item Price validity dates do not apply.
 
 The product OG card (`/og-image/<handle>.png`) shows the store price. A secondary market page links the card without a price: `/og-image/<handle>.png?price=none`, which has its own cache file.
 
-The patch `set_market_price_lists` gives each market without a sale price list the Commera Settings lists: the sale price list (or the default price list when there is no sale list) as the sale price list, the default price list as the compare-at list, and their currency. It logs a market it cannot fill. Items with only a default price, and no rate in the sale price list, are unavailable in that market until you give the market a complete sale price list.
+The patch `set_market_price_lists` gives each market without a sale price list the Commera Settings lists: the sale price list (or the default price list when there is no sale list) as the sale price list, the default price list as the compare-at list, and their currency. The market then prices every item like the primary market. It logs a market it cannot fill.
 
-The cart keeps the store price list and currency. Search sorting, price filters on the search index and taxes do not use market prices yet.
+The cart keeps the store price list and currency. Search sorting and price filters on the search index, and taxes, do not use market prices yet.
 
 **Limitation (v1).** A regional language, such as `pt-BR`, shows in the primary market only, at its own URL (`/pt-br/`). To serve Portuguese in a market, publish the base language `pt` and add it to the market. A market saved before this rule can keep its regional rows. Commera serves no URL for them. You can still remove those rows or disable the market.

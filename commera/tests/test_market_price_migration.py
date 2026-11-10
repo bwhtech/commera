@@ -7,12 +7,14 @@ from frappe.utils import get_files_path
 from commera.commera_ecommerce.doctype.commera_market.commera_market import validate_market_price_list
 from commera.localization import formatter as formatter_module
 from commera.localization import markets as markets_module
-from commera.localization import resolve
+from commera.localization import pin_localization, resolve
 from commera.localization.formatter import Formatter
 from commera.localization.languages import Language
 from commera.localization.market_prices import MarketPrices
 from commera.og import generator
 from commera.patches import set_market_price_lists
+from commera.sdk import cart as cart_sdk
+from commera.sdk import catalog
 from commera.tests.test_market_prices import MarketPriceTestCase, make_price_list
 from commera.tests.test_markets import make_market
 from commera.themes.commera_starter.pages.products import details as starter_details
@@ -71,6 +73,28 @@ class TestMarketPriceBackfill(MarketPriceTestCase):
 		self.assertEqual(titles, [f"Commera Market {market} has no sale price list"])
 		markets_module.clear_market_cache()
 		self.assertTrue(MarketPrices.of(resolve("/ar-qa/")[0].market).uses_store_prices)
+
+	def test_a_sparse_store_sale_list_keeps_prices_and_availability(self):
+		# The store's sale list holds only discounted items: this one sells at its default rate.
+		route = self.make_priced_variant("SPARSE", default_rate=100)
+		frappe.db.set_value("Item", self.get_item_code(route), "is_stock_item", 0)
+		self.make_unpriced_market("Sparse", "Qatar")
+		markets_module.clear_market_cache()
+		before = self.read_in_qatar(route)
+
+		set_market_price_lists.execute()
+
+		self.assertEqual(before, (100, True, 100, True))
+		self.assertEqual(self.read_in_qatar(route), before)
+		with pin_localization(resolve("/ar-qa/")[0]):
+			item_code = self.get_item_code(route)
+			cart_sdk.validate_items_for_sale([{"item_code": item_code, "qty": 1}])
+
+	def read_in_qatar(self, route):
+		with pin_localization(resolve("/ar-qa/")[0]):
+			product = catalog.get_product(route)
+			card = self.get_card(route)
+		return (product["price"], product["available"], card["price"], card["available"])
 
 
 def without_price_columns(doctype, column, *args, **kwargs):

@@ -1,5 +1,5 @@
-"""Markets made before market prices sold at the store's prices. Give each the store's price lists,
-so the migration does not leave it without a catalog."""
+"""Markets made before market prices sold at the store's prices. Give each the store's price lists:
+a market prices like the primary market, so every item keeps its price and availability."""
 
 import frappe
 

@@ -8,7 +8,7 @@ from erpnext.selling.doctype.customer.customer import (
 )
 from frappe.geo.country_info import get_all
 from frappe.query_builder import Case, Criterion, DocType
-from frappe.query_builder.functions import Count, Min, Sum
+from frappe.query_builder.functions import Coalesce, Count, Min, Sum
 from frappe.utils import add_days, cint, create_batch, cstr, flt, get_datetime, now_datetime
 from frappe.utils.background_jobs import get_job_status
 from frappe.utils.caching import request_cache
@@ -157,10 +157,12 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 		.limit(page_length)
 		.offset((page - 1) * page_length)
 	)
+	# The card's price: shape_product_cards gives the sale rate, else the compare-at rate.
+	card_price = Coalesce(Min(item_price_sale.price_list_rate), Min(item_price_default.price_list_rate))
 	if sort_by == "price_low":
-		query = query.orderby(Min(item_price_sale.price_list_rate), order=Order.asc)
+		query = query.orderby(card_price, order=Order.asc)
 	elif sort_by == "price_high":
-		query = query.orderby(Min(item_price_sale.price_list_rate), order=Order.desc)
+		query = query.orderby(card_price, order=Order.desc)
 	elif sort_by == "name":
 		query = query.orderby("display_name", order=Order.asc)
 	elif sort_by == "new_arrival":
@@ -194,7 +196,7 @@ def shape_product_cards(cards):
 			card.setdefault(column, None)
 		card.setdefault("average_rating", None)
 		card.setdefault("review_count", None)
-		# The primary market mirrors record_builder.aggregate_prices; another sells only priced products.
+		# Mirrors record_builder.aggregate_prices; a secondary market gives no price to an unpriced product.
 		card["effective_price"] = prices.price(card["sale_price"], card["default_price"])
 		if card["has_discount"] is None:
 			card["has_discount"] = 1 if flt(card["discount_percent"]) else 0
@@ -305,10 +307,12 @@ def get_product_base_query(filters=None, product_list=None):
 			query = query.where(color_size_item.size.isin(filters["sizes"]))
 		if filters.get("brands"):
 			query = query.where(item.brand.isin(filters["brands"]))
+		# A size priced only in the compare-at list sells at that rate.
+		price = Coalesce(item_price_sale.price_list_rate, item_price_default.price_list_rate)
 		if filters.get("min_price"):
-			query = query.where(item_price_sale.price_list_rate >= filters["min_price"])
+			query = query.where(price >= filters["min_price"])
 		if filters.get("max_price"):
-			query = query.where(item_price_sale.price_list_rate <= filters["max_price"])
+			query = query.where(price <= filters["max_price"])
 		if filters.get("search"):
 			search = filters.get("search")
 			child_categories = get_complete_nested_links(search)

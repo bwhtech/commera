@@ -169,9 +169,27 @@ class TestMarketProductPrices(MarketPriceTestCase):
 		self.assertIsNone(variant["compare_at_price"])
 		self.assertIsNone(card["compare_at_price"])
 
-	def test_an_item_without_a_market_sale_price_is_unavailable(self):
-		# The compare-at price alone is no price: the primary market's fallback stays there.
-		route = self.make_market_variant("UNPRICED", market_compare_at=400)
+	def test_an_item_priced_only_in_the_compare_at_list_sells_at_that_rate(self):
+		# Like the primary market: the compare-at rate is then the full price, not crossed out.
+		route = self.make_market_variant("FULLPRICE", market_compare_at=400)
+		item_code = self.get_item_code(route)
+
+		with self.in_market():
+			product = catalog.get_product(route)
+			card = self.get_card(route)
+			item = catalog.get_items([item_code])[item_code]
+			cart_sdk.validate_items_for_sale([{"item_code": item_code, "qty": 1}])
+
+		variant = product["variants"][0]
+		self.assertEqual(
+			(variant["price"], variant["compare_at_price"], variant["available"]), (400, None, True)
+		)
+		self.assertEqual((product["price"], product["available"]), (400, True))
+		self.assertEqual((card["price"], card["compare_at_price"], card["available"]), (400, None, True))
+		self.assertEqual(item["price"], 400)
+
+	def test_an_item_in_neither_market_list_is_unavailable(self):
+		route = self.make_market_variant("UNPRICED")
 
 		with self.in_market():
 			product = catalog.get_product(route)
@@ -224,6 +242,27 @@ class TestMarketProductListing(MarketPriceTestCase):
 		self.assertEqual((cards[unpriced]["price"], cards[unpriced]["available"]), (None, False))
 		self.assertEqual(page["facets"]["price"], {"min": 300, "max": 300, "currency": self.currency})
 
+	def test_filters_sorting_and_the_facet_use_the_compare_at_rate_without_a_sale_rate(self):
+		on_sale = self.make_market_variant("ONSALE", market_sale=300, market_compare_at=400)
+		full_price = self.make_market_variant("FULL", market_compare_at=250)
+		unpriced = self.make_market_variant("NONE")
+		names = [
+			frappe.db.get_value("Style Attribute Variant", {"route": route})
+			for route in (on_sale, full_price)
+		]
+		all_names = [*names, frappe.db.get_value("Style Attribute Variant", {"route": unpriced})]
+
+		with self.in_market():
+			cheapest_first = get_product_list_qb(product_list=names, page_length=2, sort_by="price_low")
+			above = get_product_list_qb({"min_price": 260}, product_list=all_names, page_length=3)
+			below = get_product_list_qb({"max_price": 260}, product_list=all_names, page_length=3)
+			facet = catalog.get_market_price_facet()
+
+		self.assertEqual([card["route"] for card in cheapest_first], [full_price, on_sale])
+		self.assertEqual([card["route"] for card in above], [on_sale])
+		self.assertEqual([card["route"] for card in below], [full_price])
+		self.assertEqual((facet["min"], facet["max"]), (250, 300))
+
 	def test_the_price_facet_is_cached_per_market(self):
 		self.make_market_variant("FACET", market_sale=300)
 
@@ -271,8 +310,8 @@ class TestMarketStorefrontApi(MarketPriceTestCase):
 
 
 class TestMarketCart(MarketPriceTestCase):
-	def test_an_item_without_a_market_sale_price_cannot_be_added_to_the_cart(self):
-		unpriced = self.get_item_code(self.make_market_variant("CARTUNPRICED", market_compare_at=400))
+	def test_an_item_in_neither_market_list_cannot_be_added_to_the_cart(self):
+		unpriced = self.get_item_code(self.make_market_variant("CARTUNPRICED"))
 
 		with self.in_market(), self.assertRaisesRegex(frappe.ValidationError, "not available in this market"):
 			cart_sdk.validate_items_for_sale([{"item_code": unpriced, "qty": 1}])

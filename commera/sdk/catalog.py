@@ -264,12 +264,13 @@ def get_facets(filters: dict) -> dict[str, list[FacetValue]]:
 
 def get_market_price_facet() -> PriceFacet:
 	prices = MarketPrices.current()
-	return {**get_price_facet(prices.sale_price_list), "currency": prices.currency}
+	facet = get_price_facet(prices.sale_price_list, prices.compare_at_price_list)
+	return {**facet, "currency": prices.currency}
 
 
 @redis_cache(ttl=FACETS_CACHE_SECONDS)
-def get_price_facet(sale_price_list: str | None) -> dict:
-	price_range = get_price_range(sale_price_list)
+def get_price_facet(sale_price_list: str | None, compare_at_price_list: str | None = None) -> dict:
+	price_range = get_price_range(sale_price_list, compare_at_price_list)
 	return {"min": flt(price_range.get("min_price")), "max": flt(price_range.get("max_price"))}
 
 
