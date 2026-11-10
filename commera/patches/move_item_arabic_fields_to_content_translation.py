@@ -91,8 +91,9 @@ class ItemArabicMigration:
 			.orderby(item.name)
 			.limit(BATCH_SIZE)
 		)
-		last = None
-		while page := (query if last is None else query.where(item.name > last)).run(as_dict=True):
+		# Every Item name sorts after "", so the first page needs no special case.
+		last = ""
+		while page := query.where(item.name > last).run(as_dict=True):
 			yield page
 			last = page[-1].name
 
