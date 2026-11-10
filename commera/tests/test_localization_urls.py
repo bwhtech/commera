@@ -1,10 +1,13 @@
+import json
+from pathlib import Path
+
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import get_url
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
-from commera.localization import alternates, switch_url, url
+from commera.localization import alternates, get_localization, switch_url, url
 from commera.tests.test_localization import use_storefront_languages
 
 SWITCHER = (
@@ -12,6 +15,9 @@ SWITCHER = (
 )
 
 MALICIOUS_QUERY = 'x="><img src=x onerror=alert(1)>'
+
+# packages/storefront/test/url.test.js passes the same cases, so url() has one answer in both.
+URL_CASES = Path(__file__).resolve().parents[2] / "packages" / "storefront" / "test" / "url-cases.json"
 
 
 class LocaleUrlTestCase(IntegrationTestCase):
@@ -110,6 +116,40 @@ class TestUrl(LocaleUrlTestCase):
 		html = frappe.render_template("{{ url('/cart') }} {{ switch_url(language='fr') }}", {})
 
 		self.assertEqual(html, "/ar/cart /fr/products?sort_by=price")
+
+
+class TestUrlCases(IntegrationTestCase):
+	def setUp(self):
+		self.cases = json.loads(URL_CASES.read_text())
+		languages = self.cases["languages"]
+		use_storefront_languages(
+			self, languages["default"], published=languages["published"], unpublished=languages["unpublished"]
+		)
+		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
+		self.addCleanup(frappe.set_user, frappe.session.user)
+		frappe.set_user("Guest")
+
+	def test_each_page_resolves_the_localization_the_javascript_cases_give(self):
+		for page, expected in self.cases["pages"].items():
+			with self.subTest(page):
+				open_page(page)
+				localization = get_localization()
+				self.assertEqual(localization.language.code, expected["language"])
+				self.assertEqual(localization.root_prefix, expected["root_prefix"])
+				self.assertEqual(list(localization.prefix_codes), expected["prefix_codes"])
+
+	def test_url_gives_the_shared_answer_for_each_case(self):
+		for case in self.cases["cases"]:
+			with self.subTest(page=case["page"], path=case["path"]):
+				open_page(case["page"])
+				self.assertEqual(url(case["path"]), case["expected"])
+
+
+def open_page(path):
+	frappe.local.request = Request(EnvironBuilder(path=path).get_environ())
+	frappe.local.form_dict = frappe._dict()
+	frappe.local.request_cache.clear()
 
 
 class TestSwitchUrl(LocaleUrlTestCase):

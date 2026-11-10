@@ -112,6 +112,8 @@ class TestLocalizationResolver(IntegrationTestCase):
 		self.assertEqual(localization["default_language"]["direction"], "ltr")
 		self.assertEqual([language["code"] for language in localization["available_languages"]], ["en", "ar"])
 		self.assertEqual(localization["root_prefix"], "/ar")
+		# Unpublished French too: a client's url() strips its prefix as the server's does.
+		self.assertEqual(localization["prefix_codes"], ["ar", "en", "fr"])
 
 	def test_direction_follows_frappes_right_to_left_set(self):
 		set_storefront_languages("en", published=("en", "he", "fa", "de"))

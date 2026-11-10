@@ -213,14 +213,87 @@ test('a server message still wins over the fallback', async () => {
 	});
 });
 
-test('every call carries the storefront language', async () => {
+function use_localization(localization) {
 	globalThis.commera_storefront_config = {
 		csrf_token: 'csrf-123',
-		language: 'ar',
+		localization: {
+			default_language: { code: 'en' },
+			available_languages: [{ code: 'en' }, { code: 'ar' }],
+			...localization,
+		},
 	};
+}
+
+test('a call in another language carries it in _lang', async () => {
+	use_localization({ language: { code: 'ar' }, root_prefix: '/ar' });
 	const calls = add_fake_fetch();
 	await get('shop.list_countries', { page: 2 });
 	await post('cart.add_lines', { lines: [] });
 	assert.match(calls[0].url, /\?page=2&_lang=ar$/);
 	assert.deepEqual(calls[1].body, { lines: [], _lang: 'ar' });
+});
+
+test('a call in the default language sends no _lang', async () => {
+	use_localization({ language: { code: 'en' }, root_prefix: '' });
+	const calls = add_fake_fetch();
+	await get('shop.list_countries', { page: 2 });
+	await post('cart.add_lines', { lines: [] });
+	assert.match(calls[0].url, /\?page=2$/);
+	assert.deepEqual(calls[1].body, { lines: [] });
+});
+
+test('a call from a secondary market carries its country in _country', async () => {
+	use_localization({
+		language: { code: 'ar' },
+		root_prefix: '/ar-ae',
+		market: { handle: 'gulf', is_primary: false },
+		country: 'AE',
+	});
+	const calls = add_fake_fetch();
+	await get('cart.get_cart');
+	await post('cart.add_lines', { lines: [] });
+	assert.match(calls[0].url, /\?_lang=ar&_country=AE$/);
+	assert.deepEqual(calls[1].body, { lines: [], _lang: 'ar', _country: 'AE' });
+});
+
+test('_lang is compared with the market default, not the store default', async () => {
+	const gulf = { handle: 'gulf', is_primary: false, default_language: 'ar' };
+	for (const [code, expected] of [
+		['en', /\?_lang=en&_country=AE$/],
+		['ar', /\?_country=AE$/],
+	]) {
+		use_localization({
+			language: { code },
+			default_language: { code: 'en' },
+			root_prefix: `/${code}-ae`,
+			market: gulf,
+			country: 'AE',
+		});
+		const calls = add_fake_fetch();
+		await get('cart.get_cart');
+		assert.match(calls[0].url, expected);
+	}
+});
+
+test('a call from the primary market sends no _country', async () => {
+	for (const market of [null, { handle: 'store', is_primary: true }]) {
+		use_localization({
+			language: { code: 'en' },
+			root_prefix: '',
+			market,
+			country: 'IN',
+		});
+		const calls = add_fake_fetch();
+		await get('cart.get_cart');
+		assert.equal(
+			calls[0].url,
+			'/api/v2/method/commera.api.storefront.cart.get_cart',
+		);
+	}
+});
+
+test('a page without localization sends neither parameter', async () => {
+	const calls = add_fake_fetch();
+	await post('cart.add_lines', { lines: [] });
+	assert.deepEqual(calls[0].body, { lines: [] });
 });

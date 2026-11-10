@@ -503,6 +503,7 @@ class Localization(TypedDict):
 	default_language: Language
 	available_languages: list[Language]
 	root_prefix: str
+	prefix_codes: list[str]
 
 
 class Country(TypedDict):

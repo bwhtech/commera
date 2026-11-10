@@ -4,15 +4,27 @@ import frappe
 from frappe import _
 
 from commera.api.storefront import rate_limited_guest_api
+from commera.localization import url
 from commera.sdk import shop
-from commera.sdk.types import ContentPage, ContentPageLink, Country, MenuItem, Sitemap
+from commera.sdk.types import ContentPage, ContentPageLink, Country, Localization, MenuItem, Sitemap
 
 
 @rate_limited_guest_api("GET", limit=600, seconds=60)
 def get_shop() -> dict:
-	"""The shop, with each menu item's path on a headless storefront in `url`."""
+	"""The shop and the resolved `localization`. Each menu item's `url` is its headless path,
+	with the language prefix."""
 	details = shop.get_shop()
-	return {**details, "menu": [with_storefront_url(item) for item in details["menu"]]}
+	return {
+		**details,
+		"menu": [with_storefront_url(item) for item in details["menu"]],
+		"localization": shop.get_localization(),
+	}
+
+
+@rate_limited_guest_api("GET", limit=600, seconds=60)
+def get_localization() -> Localization:
+	"""The language that `_lang` resolves to, the default language and the published languages."""
+	return shop.get_localization()
 
 
 @rate_limited_guest_api("GET", limit=600, seconds=60)
@@ -46,6 +58,10 @@ def with_storefront_url(item: MenuItem) -> dict:
 
 
 def get_storefront_url(item: MenuItem) -> str | None:
+	return url(get_storefront_path(item))
+
+
+def get_storefront_path(item: MenuItem) -> str | None:
 	if item["type"] == "url":
 		return item["target"]
 	if item["type"] == "brand":

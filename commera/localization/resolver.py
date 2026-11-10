@@ -13,6 +13,8 @@ class Localization:
 	default_language: Language
 	available_languages: tuple[Language, ...]
 	root_prefix: str
+	# Every configured code, published or not: a client's url() strips each one as a prefix.
+	prefix_codes: tuple[str, ...] = ()
 
 	def as_dict(self) -> dict:
 		return {
@@ -20,6 +22,7 @@ class Localization:
 			"default_language": self.default_language.as_dict(),
 			"available_languages": [language.as_dict() for language in self.available_languages],
 			"root_prefix": self.root_prefix,
+			"prefix_codes": list(self.prefix_codes),
 		}
 
 
@@ -42,6 +45,7 @@ def resolve(
 		default_language=languages.default,
 		available_languages=tuple(languages.published),
 		root_prefix=root_prefix,
+		prefix_codes=languages.prefix_codes,
 	)
 	return localization, path
 

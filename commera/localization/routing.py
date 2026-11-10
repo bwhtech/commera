@@ -9,6 +9,7 @@ from commera.localization.languages import StorefrontLanguages
 from commera.localization.resolver import (
 	Localization,
 	LocalizedRequest,
+	get_localization,
 	get_localized_request,
 	resolve,
 	strip_language_prefix,
@@ -34,6 +35,8 @@ NON_PAGE_PATH_PREFIXES = (
 	"/.well-known/",
 )
 PAGE_METHODS = ("GET", "HEAD", "POST")
+API_METHOD_PATH = re.compile(r"^/api/(?:v1/|v2/)?method/([^/]+)/?$")
+STOREFRONT_API_NAMESPACE = "commera.api.storefront."
 
 
 def localize_request():
@@ -61,6 +64,23 @@ def localize_request():
 		frappe.local.flags.home_page = "index"
 	skip_frappe_redirects(localized.route_path)
 	set_request_path(request, localized.route_path)
+
+
+def localize_api_request():
+	"""auth_hooks hook: a storefront API reply takes its language from `_lang` alone, as its page did.
+	Runs after the API key check: only then may an admin's `_lang` name an unpublished language."""
+	if get_api_method().startswith(STOREFRONT_API_NAMESPACE):
+		# Frappe fell back to the cookie, the browser or the user language.
+		frappe.local.lang = get_localization().language.code
+
+
+def get_api_method() -> str:
+	"""The method frappe.app calls: a `cmd` parameter wins over the /api/method/ path."""
+	if cmd := frappe.form_dict.cmd:
+		return cmd if isinstance(cmd, str) else ""
+	request = getattr(frappe.local, "request", None)
+	match = request and API_METHOD_PATH.match(request.path)
+	return match.group(1) if match else ""
 
 
 class StorefrontRedirect(RequestRedirect):
