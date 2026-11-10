@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.translate import get_all_translations
 
@@ -104,6 +106,47 @@ class TestContentTranslation(ProductDetailPriceTestCase):
 		duplicate.pop("name")
 		with self.assertRaises(frappe.UniqueValidationError):
 			frappe.get_doc(duplicate).insert()
+
+	def test_a_translation_saved_in_desk_is_current_against_the_source(self):
+		product = self.make_product("DESK")
+		translation = frappe.get_doc(
+			{
+				"doctype": "Content Translation",
+				"reference_doctype": PRODUCT,
+				"reference_name": product.name,
+				"reference_field": "display_name",
+				"language": "ar",
+				"translated_value": "قميص",
+			}
+		).insert()
+		self.assertEqual(self.titles([product], self.arabic)[0].status, CURRENT)
+
+		frappe.db.set_value(PRODUCT, product.name, "display_name", f"{product.display_name} v2")
+		product.reload()
+		self.assertEqual(self.titles([product], self.arabic)[0].status, OUTDATED)
+
+		translation.translated_value = "قميص جديد"
+		translation.save()
+		self.assertEqual(self.titles([product], self.arabic)[0].status, CURRENT)
+
+	def test_registering_a_field_another_request_just_translated_updates_that_row(self):
+		product = self.make_product("RACE")
+		first = register(PRODUCT, product.name, "display_name", "ar", "قميص")
+		original_get_value = frappe.db.get_value
+		lookups = []
+
+		def miss_the_first_lookup(doctype, *args, **kwargs):
+			# The other request inserted its row after this one looked.
+			if doctype == "Content Translation" and not lookups:
+				lookups.append(doctype)
+				return None
+			return original_get_value(doctype, *args, **kwargs)
+
+		with patch.object(frappe.db, "get_value", miss_the_first_lookup):
+			second = register(PRODUCT, product.name, "display_name", "ar", "قميص الكتان")
+
+		self.assertEqual(second, first)
+		self.assertEqual(frappe.db.get_value("Content Translation", first, "translated_value"), "قميص الكتان")
 
 	def test_content_translations_stay_out_of_frappes_translation_dictionary(self):
 		product = self.make_product("DICT")

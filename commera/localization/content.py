@@ -63,10 +63,21 @@ def register(
 		"language": language,
 		"market": market or SHOP_WIDE,
 	}
-	existing = frappe.db.get_value(DOCTYPE, key)
-	translation = frappe.get_doc(DOCTYPE, existing) if existing else frappe.new_doc(DOCTYPE).update(key)
+	if existing := frappe.db.get_value(DOCTYPE, key):
+		return save_translation(frappe.get_doc(DOCTYPE, existing), value)
+
+	frappe.db.savepoint("register_content_translation")
+	try:
+		return save_translation(frappe.new_doc(DOCTYPE).update(key), value)
+	except (frappe.UniqueValidationError, frappe.DuplicateEntryError):
+		# Another request inserted the same key first: update its row instead.
+		frappe.db.rollback(save_point="register_content_translation")
+		return save_translation(frappe.get_doc(DOCTYPE, frappe.db.get_value(DOCTYPE, key)), value)
+
+
+def save_translation(translation, value: str) -> str:
 	translation.translated_value = value
-	translation.source_hash = get_source_hash(frappe.db.get_value(doctype, name, field))
+	translation.flags.refresh_source_hash = True
 	translation.save()
 	return translation.name
 
