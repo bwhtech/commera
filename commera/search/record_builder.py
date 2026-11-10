@@ -19,6 +19,9 @@ DEFAULT_CONTENT_FIELDS = (
 	("Item", "brand"),
 )
 
+# Item fields every product record copies, configured or not.
+ITEM_FIELDS = ("brand", "is_stock_item", "item_name")
+
 
 def get_configured_content_fields():
 	"""Configured (doctype, field) pairs that feed `content` (allowed + text-typed only), else the defaults."""
@@ -235,7 +238,7 @@ def build_category_search_records(names=None):
 
 def items_for_item_styles(item_styles, content_fields=None):
 	"""Map item_style (Item name) -> {brand, is_stock_item, item_name, ...content}."""
-	fields = union_fields(["name", "brand", "is_stock_item", "item_name"], content_fields or [])
+	fields = union_fields(["name", *ITEM_FIELDS], content_fields or [])
 
 	item_by_style = {}
 	for chunk in create_batch(item_styles, IN_CLAUSE_CHUNK_SIZE):
