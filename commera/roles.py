@@ -27,6 +27,8 @@ ADMIN_PERMISSIONS = {
 	"Shop Theme Settings": ("read", "write"),
 	"Commera Settings": ("read",),
 	"Commera Webhook": ("read", "write", "create", "delete"),
+	# No delete: the CSV import and the Translations page (#437) only save translations.
+	"Content Translation": ("read", "write", "create"),
 }
 
 
