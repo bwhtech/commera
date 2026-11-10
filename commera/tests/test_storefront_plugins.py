@@ -7,9 +7,11 @@ from frappe.utils import get_html_for_route, now_datetime, set_request
 
 from commera import storefront_plugins
 from commera.api.admin.plugins import set_storefront_enabled
+from commera.tests.test_localization import use_storefront_languages
 
 BANNER = "commera/tests/storefront_plugin_templates/banner.html"
 BROKEN = "commera/tests/storefront_plugin_templates/broken.html"
+LOCALIZED = "commera/tests/storefront_plugin_templates/localized.html"
 SCRIPT = "/assets/commera/js/test-plugin.js"
 STYLE = "/assets/commera/css/test-plugin.css"
 
@@ -77,6 +79,17 @@ class TestStorefrontPlugins(IntegrationTestCase):
 		store_name = frappe.db.get_single_value("Commera Settings", "store_name")
 		currency = frappe.db.get_single_value("Global Defaults", "default_currency")
 		self.assertIn(f"{store_name}|{currency}|{frappe.local.lang}|False", banner)
+
+	def test_a_block_gets_the_localization_of_the_page(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		self.declare_hooks({"commera_storefront_blocks": {"cart_banner": [LOCALIZED]}})
+		self.set_enabled(1)
+
+		set_request(method="GET", path="/ar/cart")
+		frappe.local.request_cache.clear()
+
+		self.assertEqual(storefront_plugins.get_slot_context()["localization"].language.code, "ar")
+		self.assertIn("ar|rtl|/ar/products", storefront_plugins.plugin_slot("cart_banner"))
 
 	def test_the_switch_turns_a_plugin_on_and_off_the_storefront(self):
 		self.declare_full_plugin()
