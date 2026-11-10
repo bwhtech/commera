@@ -114,21 +114,21 @@ class TestStoreFrameTranslation(StoreFrameTestCase):
 			{
 				"title": "مساعدة",
 				"links": [
-					{"title": "الشحن", "url": "/pages/shipping"},
-					{"title": "Linen care", "url": "/returns"},
+					{"title": "الشحن", "url": "/ar/pages/shipping"},
+					{"title": "Linen care", "url": "/ar/returns"},
 				],
 			},
 		)
 		self.assertEqual(result["footer"][1]["title"], self.other.section_title)
 
-	def test_the_footer_menu_returns_translated_titles_and_source_links(self):
+	def test_the_footer_menu_returns_translated_titles_and_localized_links(self):
 		self.serve("ar")
 		section = shop.get_menu("footer")["items"][0]
 
 		self.assertEqual(section["title"], "مساعدة")
 		self.assertEqual(
 			[(link["title"], link["target"]) for link in section["items"]],
-			[("الشحن", "/pages/shipping"), ("Linen care", "/returns")],
+			[("الشحن", "/ar/pages/shipping"), ("Linen care", "/ar/returns")],
 		)
 
 	def test_the_default_language_returns_the_source(self):
