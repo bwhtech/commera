@@ -54,6 +54,13 @@ class TestRightToLeftLanguages(IntegrationTestCase):
 		self.assertTrue(context.is_rtl)
 		self.assertEqual(context.localization.language.code, "fa")
 
+	def test_a_chrome_preview_loads_the_storefront_package_in_the_previewed_language(self):
+		header = get_preview_context(frappe.get_cached_doc("Commera Settings"), "fa").commera_header_content
+
+		self.assertIn("commera-storefront.bundle", header)
+		self.assertIn('"language": "fa"', header)
+		self.assertIn('"webmcp": false', header)
+
 	def test_a_preview_falls_back_to_the_default_for_an_unknown_language(self):
 		self.assertEqual(get_preview_language("fa"), "fa")
 		self.assertEqual(get_preview_language("ar"), "en")
