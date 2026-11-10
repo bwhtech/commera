@@ -5,9 +5,10 @@ from contextlib import closing
 from typing import ClassVar
 
 import frappe
-from frappe.search.sqlite_search import MAX_EDIT_DISTANCE, MIN_WORD_LENGTH, SQLiteSearch
+from frappe.search.sqlite_search import MAX_EDIT_DISTANCE, MIN_WORD_LENGTH, SQLiteSearch, strip_surrogates
 from frappe.utils import create_batch, flt
 
+from commera.localization.content import SHOP_WIDE
 from commera.localization.languages import StorefrontLanguages
 from commera.search.arabic import arabic_search_forms, arabic_word_forms, is_arabic_query
 from commera.search.engine import (
@@ -22,7 +23,11 @@ from commera.search.record_builder import (
 	build_category_search_records,
 	build_product_search_records,
 )
-from commera.search.translations import language_generation, rebuild_if_languages_change
+from commera.search.translations import (
+	get_search_markets,
+	language_generation,
+	rebuild_if_languages_change,
+)
 
 FACET_COLUMN_TO_KEY = {"brand": "brand", "color": "color", "item_group": "category"}
 
@@ -46,7 +51,16 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 	INDEX_SCHEMA: ClassVar = {
 		"text_fields": ["title", "content"],
-		"metadata_fields": ["item_group", "brand", "color", "route_slug", "effective_price", "has_discount"],
+		# `market` is "" on a record's own row. A market row holds only that market's titles.
+		"metadata_fields": [
+			"item_group",
+			"brand",
+			"color",
+			"route_slug",
+			"effective_price",
+			"has_discount",
+			"market",
+		],
 		"tokenizer": "unicode61 remove_diacritics 2",
 	}
 
@@ -78,7 +92,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	}
 
 	def get_search_filters(self):
-		return {}
+		return {"market": get_search_markets()}
 
 	def can_rank(self, term):
 		"""True for a term of at least MIN_QUERY_LENGTH, once the index exists.
@@ -108,7 +122,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 				super().index_exists()
 				and self._table_exists("product_detail")
 				and self._table_exists("search_language")
-				and self.fts_has_columns(("effective_price", "has_discount"))
+				and self.fts_has_columns(("effective_price", "has_discount", "market"))
 			)
 			self.index_exists_cache = cached
 		return cached
@@ -246,6 +260,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 				doc.search_content = ""
 				continue
 			doc.search_content = record.get("content") or ""
+			doc.market_titles = record.get("market_titles") or {}
 			doc.brand = record.get("brand") or ""
 			doc.color = record.get("color") or ""
 			doc.item_group = record.get("item_group") or doc.get("item_group") or ""
@@ -278,6 +293,8 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			# The tokenizer has no Arabic rules: also index each Arabic word as a query normalises it.
 			forms = arabic_search_forms(f"{document.get('title') or ''} {content}")
 			document["content"] = f"{content} {forms}".strip()
+			document["market"] = SHOP_WIDE
+			document["_market_titles"] = getattr(doc, "market_titles", None) or {}
 			document["_sizes"] = getattr(doc, "sizes", None) or []
 			document["_detail"] = getattr(doc, "product_detail", None)
 		return document
@@ -332,8 +349,21 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 					continue
 				self.write_search_size(cursor, doc_id, document.get("_sizes") or [])
 				self.write_product_detail(cursor, doc_id, document.get("_detail"))
+			self.write_market_rows(cursor, documents)
 
 		self._with_connection(index_siblings)
+
+	def write_market_rows(self, cursor, documents):
+		"""A row per market title of each document. Core's write deleted the old ones with its doc_id."""
+		fields = ["doc_id", *self.schema["text_fields"], *self.schema["metadata_fields"]]
+		rows = [
+			tuple(strip_surrogates(row.get(field, "")) for field in fields)
+			for document in documents
+			for row in market_rows(document)
+		]
+		if rows:
+			placeholders = ", ".join("?" for _ in fields)
+			cursor.executemany(f"INSERT INTO search_fts ({', '.join(fields)}) VALUES ({placeholders})", rows)
 
 	def write_search_size(self, cursor, doc_id, sizes):
 		cursor.execute("DELETE FROM search_size WHERE doc_id = ?", (doc_id,))
@@ -427,7 +457,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		for column, key in FACET_COLUMN_TO_KEY.items():
 			narrow_sql, narrow_params = self.narrow_clause(selected, self.COLUMN_TO_NARROW_KEY[column])
 			rows = self.sql(
-				f"SELECT {column} AS value, COUNT(*) AS count FROM search_fts "
+				f"SELECT {column} AS value, COUNT(DISTINCT doc_id) AS count FROM search_fts "
 				f"WHERE search_fts MATCH ? AND {column} IS NOT NULL AND {column} != ''{narrow_sql} "
 				f"GROUP BY {column} ORDER BY count DESC",
 				(fts_query, *narrow_params),
@@ -451,8 +481,9 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		return {row["size"]: row["count"] for row in rows}
 
 	def narrow_clause(self, selected, drop_key, prefix=""):
-		clauses = []
-		params = []
+		markets = get_search_markets()
+		clauses = [f" AND {prefix}market IN ({', '.join('?' for _ in markets)})"]
+		params = list(markets)
 		for narrow_key, column in self.NARROW_KEY_TO_COLUMN.items():
 			if narrow_key == drop_key:
 				continue
@@ -535,14 +566,17 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		if not fts_query:
 			return []
 		where, params = self.narrow_clause(filters, None, prefix="search_fts.")
-		order = "bm25(search_fts), product_detail.name ASC"
+		# A product can match through its own row and its market's. The hidden `rank` is bm25, and
+		# unlike bm25() it may be aggregated.
+		order = "MIN(search_fts.rank), product_detail.name ASC"
 		if sort_by != "default":
 			order = self.detail_order(sort_by, "product_detail.")
 		offset = (page - 1) * page_length
 		rows = self.sql(
 			"SELECT product_detail.name AS name FROM search_fts "
 			"JOIN product_detail ON product_detail.doc_id = search_fts.doc_id "
-			f"WHERE search_fts MATCH ?{where} ORDER BY {order} LIMIT ? OFFSET ?",
+			f"WHERE search_fts MATCH ?{where} GROUP BY product_detail.name "
+			f"ORDER BY {order} LIMIT ? OFFSET ?",
 			(fts_query, *params, page_length, offset),
 			read_only=True,
 		)
@@ -555,7 +589,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			return 0
 		where, params = self.narrow_clause(filters, None, prefix="search_fts.")
 		rows = self.sql(
-			"SELECT COUNT(*) AS count FROM search_fts "
+			"SELECT COUNT(DISTINCT product_detail.name) AS count FROM search_fts "
 			"JOIN product_detail ON product_detail.doc_id = search_fts.doc_id "
 			f"WHERE search_fts MATCH ?{where}",
 			(fts_query, *params),
@@ -568,13 +602,13 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			return empty_typeahead()
 
 		raw = super().search(query)
-		product_names = []
-		category_names = []
+		# dicts, not lists: a record found through its own row and its market's row counts once.
+		product_names = {}
+		category_names = {}
 		for hit in raw["results"]:
-			if hit.get("doctype") == "Ecommerce Category":
-				category_names.append(hit["name"])
-			else:
-				product_names.append(hit["name"])
+			names = category_names if hit.get("doctype") == "Ecommerce Category" else product_names
+			names[hit["name"]] = None
+		product_names, category_names = list(product_names), list(category_names)
 
 		raw_corrections = raw["summary"].get("corrected_words") or {}
 		return {
@@ -703,6 +737,23 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 		ranked.sort()
 		return ranked[0][3]
+
+
+def market_rows(document: dict) -> list[dict]:
+	return [
+		{
+			**document,
+			"doc_id": document["id"],
+			"title": text,
+			"content": arabic_search_text(text),
+			"market": market,
+		}
+		for market, text in document.get("_market_titles", {}).items()
+	]
+
+
+def arabic_search_text(text: str) -> str:
+	return f"{text} {arabic_search_forms(text)}".strip()
 
 
 def fts_phrase(word):

@@ -3,6 +3,7 @@
 
 import copy
 import os
+from contextlib import contextmanager
 from unittest.mock import patch
 
 import frappe
@@ -20,6 +21,7 @@ from commera.search.engine_cache import clear_search_engine
 from commera.search.sqlite_product_search import SqliteProductSearch
 from commera.search.translations import search_languages_changed
 from commera.tests.test_localization import set_storefront_languages
+from commera.tests.test_markets import UAE, make_market, use_markets
 from commera.utils import translated_title_matches
 
 TEST_INDEX_NAME = "test_commera_search_languages.db"
@@ -31,6 +33,7 @@ FRENCH_TITLE, FRENCH_TERM = "Zzbidule Rouge Premium", "zzbidule"
 ARABIC_TITLE, ARABIC_TERM = "ودجت أحمر فاخر", "ودجت"
 FRENCH_CATEGORY, FRENCH_CATEGORY_TERM = "Zzrayon Bidules", "zzrayon"
 ARABIC_CATEGORY, ARABIC_CATEGORY_TERM = "منوعات الأحذية الرياضية", "منوعات"
+GULF_TITLE, GULF_TERM = f"Zzkhaleej {SEARCH_TOKEN}", "zzkhaleej"
 
 
 class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
@@ -236,6 +239,63 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		self.assertEqual([card["name"] for card in utils.get_product_list({"search": "ودج"})], [self.red])
 		self.assertEqual(translated_title_matches("Zzbid").run(pluck=True), [self.red])
 
+	# -- markets -----------------------------------------------------------------------------------
+
+	def test_a_market_title_is_found_in_its_market_only(self):
+		self.use_gulf_market()
+		self.add_titles("ar", {self.blue: GULF_TITLE}, market="gulf")
+
+		with self.market_request("AE"):
+			self.assertEqual(self.product_names(GULF_TERM), [self.blue])
+			self.assertEqual(self.engine.search_products({"search": GULF_TERM}), [self.blue])
+			self.assertEqual(self.engine.search_count({"search": GULF_TERM}), 1)
+			self.assertEqual(sum(self.engine.facet_counts({"search": GULF_TERM})["color"].values()), 1)
+		self.assertEqual(self.product_names(GULF_TERM), [])
+		self.assertEqual(self.engine.search_products({"search": GULF_TERM}), [])
+		self.assertEqual(self.engine.search_count({"search": GULF_TERM}), 0)
+
+	def test_a_product_found_through_its_market_row_too_counts_once(self):
+		self.use_gulf_market()
+		self.add_titles("ar", {self.blue: GULF_TITLE}, market="gulf")
+
+		with self.market_request("AE"):
+			self.assertEqual(
+				sorted(self.product_names(SEARCH_TOKEN)), sorted([self.red, self.blue, self.green])
+			)
+			names = self.engine.search_products({"search": SEARCH_TOKEN})
+			self.assertEqual(sorted(names), sorted([self.red, self.blue, self.green]))
+			self.assertEqual(self.engine.search_count({"search": SEARCH_TOKEN}), 3)
+			self.assertEqual(sum(self.engine.facet_counts({"search": SEARCH_TOKEN})["color"].values()), 3)
+
+	def test_the_like_fallback_matches_the_market_title_in_its_market_only(self):
+		self.publish("en")
+		self.use_gulf_market("en")
+		self.add_titles("en", {self.blue: GULF_TITLE}, market="gulf")
+
+		with self.market_request("AE"):
+			self.assertTrue(search_query.use_qb_fallback({"search": "Zzk"}))
+			self.assertEqual(
+				[card["name"] for card in utils.get_product_list({"search": "Zzk"})], [self.blue]
+			)
+		self.assertIsNone(translated_title_matches("Zzk"))
+		self.assertEqual(utils.get_product_list({"search": "Zzk"}), [])
+
+	def test_saving_a_market_title_reindexes_its_record(self):
+		self.use_gulf_market()
+		with patch("commera.search.sync.frappe.enqueue") as enqueue:
+			name = register(PRODUCT, self.blue, "display_name", "en", GULF_TITLE, market="gulf")
+		self.addCleanup(frappe.db.delete, "Content Translation", name)
+		self.assertEqual(upserts(enqueue), [(PRODUCT, self.blue)])
+
+		with patch("commera.search.sync.frappe.enqueue") as enqueue:
+			frappe.delete_doc("Commera Market", "gulf", ignore_permissions=True)
+		batches = [
+			call.kwargs
+			for call in enqueue.call_args_list
+			if call.args == ("commera.search.sync.upsert_docs",)
+		]
+		self.assertEqual([(batch["doctype"], batch["names"]) for batch in batches], [(PRODUCT, [self.blue])])
+
 	# -- keeping the index fresh ---------------------------------------------------------------------
 
 	def test_saving_a_translation_reindexes_its_record(self):
@@ -358,17 +418,32 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 
 	# -- helpers -----------------------------------------------------------------------------------
 
-	def add_titles(self, language, titles):
+	def add_titles(self, language, titles, market=None):
 		"""Register `titles` {product: title} in `language` and index them, removed after the test."""
 		with patch("commera.search.sync.frappe.enqueue"):
 			names = [
-				register(PRODUCT, product, "display_name", language, title)
+				register(PRODUCT, product, "display_name", language, title, market)
 				for product, title in titles.items()
 			]
 		# setUp rebuilds the index for the next test, so only the rows need removing.
 		self.addCleanup(frappe.db.delete, "Content Translation", {"name": ("in", names)})
 		SqliteProductSearch().index_docs(PRODUCT, list(titles))
 		return names
+
+	def use_gulf_market(self, language="ar"):
+		use_markets(self)
+		make_market("Gulf", [UAE], language, handle="gulf")
+
+	@contextmanager
+	def market_request(self, country):
+		"""Search as a shopper from `country`, which `_country` names."""
+		frappe.form_dict["_country"] = country
+		frappe.local.request_cache.clear()
+		try:
+			yield
+		finally:
+			frappe.form_dict.pop("_country", None)
+			frappe.local.request_cache.clear()
 
 	def edit_translation(self, name, **changes):
 		"""Save `changes` to a translation, then run the upserts it enqueued. Returns them."""

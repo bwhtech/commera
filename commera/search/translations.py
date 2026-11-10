@@ -4,13 +4,14 @@ Every engine searches them through each record's `content`."""
 import json
 
 import frappe
+from frappe.utils import create_batch
 from frappe.utils.background_jobs import get_job_status
 from frappe.utils.data import sha256_hash
 from rq.job import JobStatus
 
-from commera.localization.content import translate
+from commera.localization.content import BATCH_SIZE, DOCTYPE, SHOP_WIDE, get_lookup_market, translate
 from commera.localization.languages import Language, StorefrontLanguages
-from commera.localization.resolver import Localization
+from commera.localization.resolver import Localization, get_localization
 
 # The field the index takes its title from, on both indexed doctypes.
 TITLE_FIELD = "display_name"
@@ -37,6 +38,50 @@ def get_translated_titles(doctype: str, records: list) -> dict:
 	return titles
 
 
+def get_market_titles(doctype: str, names: list) -> dict:
+	"""{name: {market: text}}: the titles each market overrides, in every published language. Only
+	that market's searches match them, so they stay out of the record's own `content`."""
+	codes = [language.code for language in StorefrontLanguages.load().published]
+	texts = {}
+	for batch in create_batch([name for name in names if name], BATCH_SIZE):
+		rows = frappe.get_all(
+			DOCTYPE,
+			filters={
+				"reference_doctype": doctype,
+				"reference_name": ("in", batch),
+				"reference_field": TITLE_FIELD,
+				"language": ("in", codes),
+				"market": ("is", "set"),
+				"translated_value": ("is", "set"),
+			},
+			fields=["reference_name", "market", "translated_value"],
+			order_by="language asc",
+		)
+		for row in rows:
+			titles = texts.setdefault(row.reference_name, {}).setdefault(row.market, [])
+			if row.translated_value not in titles:
+				titles.append(row.translated_value)
+	return {
+		name: {market: " ".join(titles) for market, titles in markets.items()}
+		for name, markets in texts.items()
+	}
+
+
+def get_search_markets() -> list[str]:
+	"""The markets whose titles a search of this request matches: shop-wide, and its own market."""
+	return list(dict.fromkeys((SHOP_WIDE, get_lookup_market(get_localization().market))))
+
+
+def reindex_market_records(market: str):
+	"""Commera Market on_trash, before its translations go: reindex each record that held its titles."""
+	from commera.search.sync import enqueue_upsert_many
+
+	for doctype in INDEXED_DOCTYPES:
+		filters = {"reference_doctype": doctype, "reference_field": TITLE_FIELD, "market": market}
+		names = frappe.get_all(DOCTYPE, filters=filters, pluck="reference_name", distinct=True)
+		enqueue_upsert_many(doctype, names)
+
+
 def get_search_languages(languages: StorefrontLanguages | None = None) -> list[Language]:
 	"""The published languages the index holds titles for. The default one is the record's own."""
 	languages = languages or StorefrontLanguages.load()
@@ -47,12 +92,15 @@ def on_translation_change(doc, method=None):
 	"""Content Translation on_update and on_trash: reindex each record whose search title changed."""
 	from commera.search.sync import enqueue_upsert
 
-	codes = {language.code for language in get_search_languages()}
+	languages = StorefrontLanguages.load()
+	codes = {language.code for language in get_search_languages(languages)}
+	# A market overrides the default language too.
+	market_codes = {language.code for language in languages.published}
 	# An edit can move a translation to another record or language: the old record drops its title.
 	records = {
 		(version.reference_doctype, version.reference_name)
 		for version in (doc.get_doc_before_save(), doc)
-		if version and is_search_title(version, codes)
+		if version and is_search_title(version, market_codes if version.market else codes)
 	}
 	for doctype, name in sorted(records):
 		enqueue_upsert(doctype, name)
@@ -62,7 +110,6 @@ def is_search_title(translation, codes: set[str]) -> bool:
 	return (
 		translation.reference_doctype in INDEXED_DOCTYPES
 		and translation.reference_field == TITLE_FIELD
-		and not translation.market
 		and translation.language in codes
 	)
 
