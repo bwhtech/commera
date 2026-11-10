@@ -111,6 +111,12 @@ class StorefrontMarkets:
 			for country in market.countries
 		]
 
+	@property
+	def prefix_codes(self) -> tuple[str, ...]:
+		"""Every first path segment that names a language or a market locale, in code order."""
+		segments = {prefix[1:] for *_rest, prefix in self.market_prefixes()}
+		return tuple(sorted({*self.languages.prefix_codes, *segments}))
+
 	def build_market(self, row: dict) -> Market | None:
 		languages = [lang for code in row["languages"] if (lang := self.find_language(code))]
 		default = self.find_language(row["default_language"])

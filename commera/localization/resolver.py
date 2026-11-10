@@ -70,7 +70,7 @@ def resolve(
 		default_language=languages.default,
 		available_languages=tuple(lang for lang in market.languages if languages.find(lang.code)),
 		root_prefix=root_prefix,
-		prefix_codes=languages.prefix_codes,
+		prefix_codes=markets.prefix_codes,
 		market=market,
 		available_markets=tuple((StorefrontMarkets.load() if include_unpublished else markets).all),
 		country=country,

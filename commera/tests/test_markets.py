@@ -378,6 +378,12 @@ class TestMarketResolution(IntegrationTestCase):
 				self.assertEqual(path, "/cart")
 		self.assertEqual(resolve("/AR-AE/cart")[0].root_prefix, "/ar-ae")
 
+	def test_prefix_codes_name_every_market_prefix(self):
+		localization = resolve("/ar-ae/cart")[0]
+
+		self.assertTrue({"ar-ae", "ar-sa", "en-ae", "en-sa", "ar", "en"} <= set(localization.prefix_codes))
+		self.assertNotIn("fr-be", localization.prefix_codes)
+
 	def test_only_a_market_language_and_country_is_a_prefix(self):
 		for path in ("/fr-ae/cart", "/ar-us/cart", "/ar-aeroplane", "/ar-ae-x/cart", "/-ae/cart"):
 			with self.subTest(path):
