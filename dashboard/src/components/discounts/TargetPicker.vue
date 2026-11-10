@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { __ } from '../../data/translation'
 import SearchMultiSelect from './SearchMultiSelect.vue'
 
 // Owns rows of one role and type; leaves every other row alone.
@@ -8,7 +9,7 @@ const props = defineProps({
   role: { type: String, required: true },
   targetType: { type: String, required: true },
   label: { type: String, required: true },
-  placeholder: { type: String, default: 'Search' },
+  placeholder: { type: String, default: __('Search') },
 })
 
 const ownsRow = (row) => row.role === props.role && row.target_type === props.targetType

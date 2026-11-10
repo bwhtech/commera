@@ -175,6 +175,10 @@ Fetch data with `useMethodRead` and `useMethodAction` from `@commera/admin`, poi
 method in your app's `api.py`. Inside an action dialog, `useMethodAction` does not toast its own error.
 Throw `request.error` from `onSubmit` and the dialog shows it once.
 
+Translate a string with `__('{0} jobs', [count])`, from `usePlugin()` or as an import from `@commera/admin`. It is the
+dashboard's own `__()`, so it reads the admin's language and your app's Frappe translation files. Write each string as one
+literal inside `__()`, so Frappe's string extraction finds it.
+
 ## What the build does
 
 - Writes `my_app/public/commera/manifest.json`: `api_version`, `kit_version`, `app`, and one entry per

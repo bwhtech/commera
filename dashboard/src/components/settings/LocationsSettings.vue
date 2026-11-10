@@ -14,6 +14,7 @@ import PickupAddressConfig from './PickupAddressConfig.vue'
 import SettingsSkeleton from './SettingsSkeleton.vue'
 import { pickupLocations } from '../../data/pickupLocations'
 import { onSettingsClose } from '../../ia/settings'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   active: { type: Boolean, default: false },
@@ -33,7 +34,7 @@ onSettingsClose(() => (editing.value = null))
 
 async function toggleStorePickup(enabled) {
   if (!(await mutate('save_store_pickup', { enabled: enabled ? 1 : 0 }))) return
-  toast.success(enabled ? 'Store pickup is on' : 'Store pickup is off')
+  toast.success(enabled ? __('Store pickup is on') : __('Store pickup is off'))
 }
 
 async function toggleWarehouse(warehouse, allowPickup) {
@@ -42,7 +43,11 @@ async function toggleWarehouse(warehouse, allowPickup) {
     allow_pickup: allowPickup ? 1 : 0,
   })
   if (!saved) return
-  toast.success(`Pickup ${allowPickup ? 'allowed' : 'stopped'} at ${warehouse.warehouse_name}`)
+  toast.success(
+    allowPickup
+      ? __('Pickup allowed at {0}', [warehouse.warehouse_name])
+      : __('Pickup stopped at {0}', [warehouse.warehouse_name]),
+  )
 }
 
 async function saveAddress(values) {
@@ -50,7 +55,7 @@ async function saveAddress(values) {
   if (!(await mutate('save_pickup_address', { warehouse: current.value.name, values }))) return
 
   editing.value = null
-  toast.success(hadAddress ? 'Pickup address saved' : 'Pickup address added')
+  toast.success(hadAddress ? __('Pickup address saved') : __('Pickup address added'))
 }
 </script>
 
@@ -65,8 +70,8 @@ async function saveAddress(values) {
 
   <template v-else>
     <SettingsPanelHeader
-      title="Pickup locations"
-      description="Your warehouses, and where shoppers can collect their order."
+      :title="__('Pickup locations')"
+      :description="__('Your warehouses, and where shoppers can collect their order.')"
     />
 
     <SettingsBody v-scroll-fade>
@@ -74,18 +79,18 @@ async function saveAddress(values) {
         v-if="loadError && !screen"
         compact
         icon="lucide-triangle-alert"
-        title="These could not be loaded"
-        description="Checkout still offers whatever is stored — this panel just cannot say what."
+        :title="__('These could not be loaded')"
+        :description="__('Checkout still offers whatever is stored — this panel just cannot say what.')"
       >
-        <Button label="Try again" variant="subtle" theme="gray" @click="pickupLocations.load()" />
+        <Button :label="__('Try again')" variant="subtle" theme="gray" @click="pickupLocations.load()" />
       </EmptyState>
 
       <SettingsSkeleton v-else-if="!screen" :rows="3" />
 
       <template v-else>
         <SettingsRow
-          title="Store pickup"
-          description="Let shoppers collect their order from a warehouse instead of having it delivered."
+          :title="__('Store pickup')"
+          :description="__('Let shoppers collect their order from a warehouse instead of having it delivered.')"
         >
           <Switch
             size="sm"
@@ -101,8 +106,8 @@ async function saveAddress(values) {
           v-if="pickupEnabled && !warehouses.length"
           compact
           icon="lucide-warehouse"
-          title="No warehouses yet"
-          description="Add a warehouse in your books, and it shows up here."
+          :title="__('No warehouses yet')"
+          :description="__('Add a warehouse in your books, and it shows up here.')"
         />
 
         <div v-else-if="pickupEnabled" class="divide-y divide-outline-gray-1 border-t border-outline-gray-1">
@@ -116,7 +121,7 @@ async function saveAddress(values) {
                 <p class="truncate text-base text-ink-gray-8">{{ warehouse.warehouse_name }}</p>
                 <Badge
                   v-if="warehouse.is_ecommerce_warehouse"
-                  label="Online orders"
+                  :label="__('Online orders')"
                   theme="gray"
                   variant="subtle"
                 />
@@ -129,14 +134,14 @@ async function saveAddress(values) {
                   <span
                     v-if="!warehouse.address.custom_store_location"
                     class="text-ink-gray-5"
-                  > · No map pin</span>
+                  > · {{ __('No map pin') }}</span>
                 </p>
                 <!-- Checkout skips a pickup warehouse it has nowhere to send the shopper to, so this
                      is the only place the owner learns why it is missing. -->
                 <Badge
                   v-else
                   class="mt-1.5"
-                  label="Needs an address — hidden at checkout"
+                  :label="__('Needs an address — hidden at checkout')"
                   theme="amber"
                   variant="subtle"
                 />
@@ -146,7 +151,7 @@ async function saveAddress(values) {
             <div class="flex shrink-0 items-center gap-2">
               <Button
                 v-if="warehouse.allow_pickup"
-                :label="warehouse.address ? 'Edit address' : 'Add address'"
+                :label="warehouse.address ? __('Edit address') : __('Add address')"
                 @click="editing = warehouse.name"
               />
               <Switch

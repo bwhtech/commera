@@ -51,7 +51,7 @@ async function commitField(fieldname, value, label) {
 </script>
 
 <template>
-  <SettingsPanelHeader :title="entry.label" :description="`Added by ${appTitle(entry.app)}.`" />
+  <SettingsPanelHeader :title="entry.label" :description="__('Added by {0}.', [appTitle(entry.app)])" />
 
   <SettingsBody v-scroll-fade>
     <template v-if="entry.doctype">
@@ -59,10 +59,10 @@ async function commitField(fieldname, value, label) {
         v-if="pluginSettings.error"
         compact
         icon="lucide-triangle-alert"
-        title="These settings could not be loaded"
-        :description="`${appTitle(entry.app)} may still be set up. This tab just cannot say.`"
+        :title="__('These settings could not be loaded')"
+        :description="__('{0} may still be set up. This tab just cannot say.', [appTitle(entry.app)])"
       >
-        <Button label="Try again" variant="subtle" theme="gray" @click="pluginSettings.reload()" />
+        <Button :label="__('Try again')" variant="subtle" theme="gray" @click="pluginSettings.reload()" />
       </EmptyState>
       <SettingsSkeleton v-else-if="!pluginSettings.data" :rows="3" />
       <div v-else class="divide-y divide-outline-gray-1">

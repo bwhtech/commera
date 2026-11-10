@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { Button, Combobox } from 'frappe-ui'
 import Thumb from '../Thumb.vue'
 import { usePreviewEntries } from '../../data/themeLayout'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   editor: { type: Object, required: true },
@@ -12,28 +13,28 @@ const { state, setPreviewEntry } = props.editor
 
 const PAGE_COPY = {
   product: {
-    placeholder: 'Search products',
-    empty: 'No products yet',
-    hint: 'Publish a product to see this layout with real content.',
-    create: { label: 'Go to products', route: { name: 'Products' } },
+    placeholder: __('Search products'),
+    empty: __('No products yet'),
+    hint: __('Publish a product to see this layout with real content.'),
+    create: { label: __('Go to products'), route: { name: 'Products' } },
   },
   search: {
-    placeholder: 'Search, or type any term',
-    empty: 'No products yet',
-    hint: 'Publish a product to see search results here.',
-    create: { label: 'Go to products', route: { name: 'Products' } },
+    placeholder: __('Search, or type any term'),
+    empty: __('No products yet'),
+    hint: __('Publish a product to see search results here.'),
+    create: { label: __('Go to products'), route: { name: 'Products' } },
   },
   products: {
-    placeholder: 'Search collections',
-    empty: 'No collections yet',
-    hint: 'Every product is still listed under All products.',
-    create: { label: 'Go to collections', route: { name: 'Collections' } },
+    placeholder: __('Search collections'),
+    empty: __('No collections yet'),
+    hint: __('Every product is still listed under All products.'),
+    create: { label: __('Go to collections'), route: { name: 'Collections' } },
   },
   page: {
-    placeholder: 'Search pages',
-    empty: 'No pages yet',
-    hint: 'Publish a page to see this layout with real content.',
-    create: { label: 'Create a page', route: { name: 'StorefrontPageNew' } },
+    placeholder: __('Search pages'),
+    empty: __('No pages yet'),
+    hint: __('Publish a page to see this layout with real content.'),
+    create: { label: __('Create a page'), route: { name: 'StorefrontPageNew' } },
   },
 }
 
@@ -80,11 +81,11 @@ const model = computed({
         variant="ghost"
         icon-right="lucide-chevron-down"
         class="max-w-72"
-        :aria-label="`Preview with ${current?.title ?? copy.empty}`"
+        :aria-label="__('Preview with {0}', [current?.title ?? copy.empty])"
         data-preview-entry-picker
       >
         <span class="flex min-w-0 gap-1">
-          <span class="shrink-0 text-ink-gray-5">Preview with</span>
+          <span class="shrink-0 text-ink-gray-5">{{ __('Preview with') }}</span>
           <span class="truncate" :class="current ? 'text-ink-gray-8' : 'text-ink-gray-5'">
             {{ current?.title ?? copy.empty }}
           </span>
@@ -100,11 +101,11 @@ const model = computed({
         <p class="text-p-sm text-ink-gray-5">{{ copy.hint }}</p>
         <Button class="mt-2" :label="copy.create.label" icon-left="lucide-plus" :route="copy.create.route" />
       </div>
-      <p v-else class="px-3 py-4 text-center text-p-sm text-ink-gray-5">No matches</p>
+      <p v-else class="px-3 py-4 text-center text-p-sm text-ink-gray-5">{{ __('No matches') }}</p>
     </template>
     <template #footer>
       <div v-if="hasMore" class="border-t border-outline-gray-1 p-1">
-        <Button class="w-full" variant="ghost" label="Show more" :loading="results.loading" @click="showMore" />
+        <Button class="w-full" variant="ghost" :label="__('Show more')" :loading="results.loading" @click="showMore" />
       </div>
     </template>
   </Combobox>

@@ -10,6 +10,7 @@ import { SettingsRow } from 'frappe-ui'
 import SettingsFieldControl from './SettingsFieldControl.vue'
 import StackedSettingsRow from './StackedSettingsRow.vue'
 import IntegrationLogo from '../integrations/IntegrationLogo.vue'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   groups: { type: Array, required: true },
@@ -49,10 +50,10 @@ function isOn(field) {
 
 // A secret already stored is the one thing this screen cannot show, so it says so instead.
 function hint(field) {
-  if (field.is_secret && field.is_set) return 'Stored. Leave blank to keep it.'
-  if (field.is_secret) return 'Stored encrypted, never shown again.'
-  if (field.fieldtype === 'Link' && !field.description) return `Links to ${field.options}.`
-  return plainText(field.description)
+  if (field.is_secret && field.is_set) return __('Stored. Leave blank to keep it.')
+  if (field.is_secret) return __('Stored encrypted, never shown again.')
+  if (field.fieldtype === 'Link' && !field.description) return __('Links to {0}.', [__(field.options)])
+  return plainText(__(field.description))
 }
 
 function isStacked(field) {
@@ -75,25 +76,25 @@ function hasHeading(group) {
          and the parent's divide-y would draw a second line right under the one before it. -->
     <div v-if="group.logo || group.toggle" class="flex items-center gap-2 pt-5 !border-t-0">
       <IntegrationLogo v-if="group.logo" :slug="group.logo" :label="group.label" size="sm" />
-      <p class="text-sm text-ink-gray-5">{{ group.label }}</p>
+      <p class="text-sm text-ink-gray-5">{{ __(group.label) }}</p>
       <!-- The switch belongs beside the name it switches, not in a row of its own under it. -->
-      <div v-if="group.toggle" class="ml-auto flex items-center">
+      <div v-if="group.toggle" class="ms-auto flex items-center">
         <SettingsFieldControl
           :field="group.toggle"
           :model-value="values[group.toggle.fieldname]"
-          :aria-label="group.toggle.label"
+          :aria-label="__(group.toggle.label)"
           @update:model-value="emit('update', group.toggle.fieldname, $event)"
-          @change="emit('commit', group.toggle.fieldname, $event, group.toggle.label)"
+          @change="emit('commit', group.toggle.fieldname, $event, __(group.toggle.label))"
         />
       </div>
     </div>
-    <p v-else-if="group.label" class="pt-5 text-sm text-ink-gray-5 !border-t-0">{{ group.label }}</p>
+    <p v-else-if="group.label" class="pt-5 text-sm text-ink-gray-5 !border-t-0">{{ __(group.label) }}</p>
     <component
       :is="isStacked(field) ? StackedSettingsRow : SettingsRow"
       v-for="(field, index) in groupFields(group)"
       :key="field.fieldname"
       :class="index === 0 && hasHeading(group) ? '!border-t-0' : undefined"
-      :title="isStacked(field) || !field.required ? field.label : `${field.label} *`"
+      :title="isStacked(field) || !field.required ? __(field.label) : `${__(field.label)} *`"
       :description="hint(field)"
       :required="isStacked(field) ? Boolean(field.required) : undefined"
     >
@@ -103,7 +104,7 @@ function hasHeading(group) {
         :model-value="values[field.fieldname]"
         :link-options-path="linkOptionsPath"
         @update:model-value="emit('update', field.fieldname, $event)"
-        @change="emit('commit', field.fieldname, $event, field.label)"
+        @change="emit('commit', field.fieldname, $event, __(field.label))"
       />
     </component>
   </template>

@@ -7,11 +7,12 @@ import { computed } from 'vue'
 import { Checkbox } from 'frappe-ui'
 import SwatchDot from './SwatchDot.vue'
 import { buildOptionSizes, pairKey } from '../data/optionSizes'
+import { __ } from '../data/translation'
 
 const props = defineProps({
   options: { type: Array, required: true },
   sizes: { type: Array, required: true },
-  optionLabel: { type: String, default: 'Colour' },
+  optionLabel: { type: String, default: () => __('Colour') },
   swatches: { type: Object, default: () => ({}) },
   live: { type: Array, default: null },
 })
@@ -44,9 +45,9 @@ function cellTone(option, size) {
 
 function cellLabel(option, size) {
   const tone = cellTone(option, size)
-  if (tone === 'bg-surface-red-2') return `${option} in size ${size}, coming off sale`
-  if (tone === 'bg-surface-green-2') return `${option} in size ${size}, new`
-  return `${option} in size ${size}`
+  if (tone === 'bg-surface-red-2') return __('{0} in size {1}, coming off sale', [option, size])
+  if (tone === 'bg-surface-green-2') return __('{0} in size {1}, new', [option, size])
+  return __('{0} in size {1}', [option, size])
 }
 
 function toggle(option, size, selected) {
@@ -58,7 +59,7 @@ function toggle(option, size, selected) {
 <template>
   <div>
     <p class="mb-2 text-sm text-ink-gray-5">
-      Untick any size you do not carry in a {{ optionLabel.toLowerCase() }}.
+      {{ __('Untick any size you do not carry in a {0}.', [optionLabel.toLowerCase()]) }}
     </p>
     <div class="overflow-x-auto rounded-4 border border-outline-gray-1">
       <table class="w-full min-w-max border-collapse text-start">
@@ -111,11 +112,11 @@ function toggle(option, size, selected) {
     <p v-if="props.live" class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-5">
       <span class="flex items-center gap-1.5">
         <span class="size-3 rounded-1 bg-surface-green-2" aria-hidden="true" />
-        New
+        {{ __('New') }}
       </span>
       <span class="flex items-center gap-1.5">
         <span class="size-3 rounded-1 bg-surface-red-2" aria-hidden="true" />
-        Coming off sale
+        {{ __('Coming off sale') }}
       </span>
     </p>
   </div>

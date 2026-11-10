@@ -12,6 +12,7 @@ import BulkBar from '../components/BulkBar.vue'
 import SearchInput from '../components/SearchInput.vue'
 import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { stockTone } from '../data/format'
+import { __ } from '../data/translation'
 import { ia } from '../ia/store'
 
 const lowOnly = ref(false)
@@ -57,9 +58,9 @@ function adjust() {
   if (!item_codes.length) return
 
   dialog.prompt({
-    title: `Receive stock on ${item_codes.length} ${item_codes.length === 1 ? 'line' : 'lines'}`,
-    message: 'Adds this quantity to each selected line. There is no way to set stock to an exact number here.',
-    fields: [{ name: 'value', label: 'Quantity received', type: 'number', required: true }],
+    title: item_codes.length === 1 ? __('Receive stock on 1 line') : __('Receive stock on {0} lines', [item_codes.length]),
+    message: __('Adds this quantity to each selected line. There is no way to set stock to an exact number here.'),
+    fields: [{ name: 'value', label: __('Quantity received'), type: 'number', required: true }],
     onConfirm: async ({ values }) => {
       const qty = Math.max(0, Number(values.value) || 0)
       if (!qty) return
@@ -70,7 +71,7 @@ function adjust() {
       if (!received) return
 
       endSelecting()
-      toast.success(`Adjustment recorded for ${item_codes.length} lines`)
+      toast.success(__('Adjustment recorded for {0} lines', [item_codes.length]))
       inventoryRequest.reload()
     },
   })
@@ -78,12 +79,12 @@ function adjust() {
 </script>
 
 <template>
-  <AppPageHeader title="Stock">
+  <AppPageHeader :title="__('Stock')">
     <template #actions>
       <!-- A real destination, so it stays reachable on a phone rather than dropping out. -->
-      <ResponsiveButton label="Adjustments" icon="lucide-history" route="/inventory/adjustments" />
+      <ResponsiveButton :label="__('Adjustments')" icon="lucide-history" route="/inventory/adjustments" />
       <Button
-        label="Receive stock"
+        :label="__('Receive stock')"
         icon-left="lucide-plus"
         variant="solid"
         theme="gray"
@@ -94,10 +95,10 @@ function adjust() {
 
   <PageBody>
     <div class="flex flex-wrap items-center gap-3">
-      <Switch v-model="lowOnly" label="Low stock only" size="sm" />
-      <SearchInput v-model="query" class="min-w-0 flex-1 basis-40 sm:ml-auto sm:w-56 sm:flex-none sm:basis-auto" placeholder="Search SKU or product" />
+      <Switch v-model="lowOnly" :label="__('Low stock only')" size="sm" />
+      <SearchInput v-model="query" class="min-w-0 flex-1 basis-40 sm:ms-auto sm:w-56 sm:flex-none sm:basis-auto" :placeholder="__('Search SKU or product')" />
       <ResponsiveButton
-        :label="selecting ? 'Cancel selection' : 'Select'"
+        :label="selecting ? __('Cancel selection') : __('Select')"
         icon="lucide-list-checks"
         :variant="selecting ? 'solid' : 'subtle'"
         theme="gray"
@@ -105,8 +106,14 @@ function adjust() {
       />
     </div>
 
-    <BulkBar v-if="selecting" :count="selection.length" noun="line" @done="endSelecting">
-      <Button label="Adjust quantity" @click="adjust" />
+    <BulkBar
+      v-if="selecting"
+      :count="selection.length"
+      :selected-label="selection.length === 1 ? __('1 line selected') : __('{0} lines selected', [selection.length])"
+      :empty-label="__('Select lines to act on them')"
+      @done="endSelecting"
+    >
+      <Button :label="__('Adjust quantity')" @click="adjust" />
     </BulkBar>
 
     <div class="mt-3 overflow-x-auto">
@@ -118,11 +125,11 @@ function adjust() {
       :columns="['1fr', '11rem', '6rem', '6rem', '7rem']"
     >
       <ListHeader>
-        <ListHeaderCell>Product</ListHeaderCell>
-        <ListHeaderCell>SKU</ListHeaderCell>
-        <ListHeaderCell>Committed</ListHeaderCell>
-        <ListHeaderCell>Available</ListHeaderCell>
-        <ListHeaderCell>On hand</ListHeaderCell>
+        <ListHeaderCell>{{ __('Product') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('SKU') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('Committed') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('Available') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('On hand') }}</ListHeaderCell>
       </ListHeader>
       <!-- `loading` flips on every param change and the request keeps the previous
            `data`, so guarding on it alone would blank a loaded table on each keystroke
@@ -144,7 +151,7 @@ function adjust() {
                     class="shrink-0 tabular-nums sm:hidden"
                     :class="stockTone(availableStock(item))"
                   >
-                    &nbsp;· {{ availableStock(item) }} available
+                    &nbsp;· {{ __('{0} available', [availableStock(item)]) }}
                   </span>
                 </p>
               </div>
@@ -171,11 +178,11 @@ function adjust() {
     <EmptyState
       v-if="!inventoryRequest.loading && !rows.length"
       icon="lucide-boxes"
-      title="No stock yet"
-      description="Add a product, then receive stock against it to see it counted here."
+      :title="__('No stock yet')"
+      :description="__('Add a product, then receive stock against it to see it counted here.')"
       :filtered="isFiltered"
-      filtered-title="Nothing matches"
-      filtered-description="Clear the filters to see all stock."
+      :filtered-title="__('Nothing matches')"
+      :filtered-description="__('Clear the filters to see all stock.')"
     />
   </PageBody>
 </template>

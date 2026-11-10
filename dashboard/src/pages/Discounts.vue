@@ -14,15 +14,16 @@ import DiscountTypeDialog from '../components/discounts/DiscountTypeDialog.vue'
 import { discountHeading, discountTypeLabel, statusKey, summaryLines } from '../data/discounts'
 import { useAdminRead } from '../data/api'
 import { money } from '../data/format'
+import { __ } from '../data/translation'
 import { ia } from '../ia/store'
 import { useIsMobile } from '../utils/useIsMobile'
 
 const TABS = [
-  { label: 'All', value: 'all' },
-  { label: 'Active', value: 'active' },
-  { label: 'Scheduled', value: 'scheduled' },
-  { label: 'Used up', value: 'used_up' },
-  { label: 'Expired', value: 'expired' },
+  { label: __('All'), value: 'all' },
+  { label: __('Active'), value: 'active' },
+  { label: __('Scheduled'), value: 'scheduled' },
+  { label: __('Used up'), value: 'used_up' },
+  { label: __('Expired'), value: 'expired' },
 ]
 
 const tab = ref('all')
@@ -53,16 +54,16 @@ function usage(row) {
 </script>
 
 <template>
-  <AppPageHeader title="Discounts">
+  <AppPageHeader :title="__('Discounts')">
     <template #actions>
-      <Button label="Create discount" variant="solid" theme="gray" icon-left="lucide-plus" @click="creating = true" />
+      <Button :label="__('Create discount')" variant="solid" theme="gray" icon-left="lucide-plus" @click="creating = true" />
     </template>
   </AppPageHeader>
 
   <PageBody>
     <div class="flex flex-wrap items-center gap-2">
       <ListTabs v-model="tab" :options="TABS" />
-      <SearchInput v-model="query" class="min-w-0 flex-1 basis-40 sm:ml-auto sm:w-56 sm:flex-none sm:basis-auto" placeholder="Search titles and codes" :debounce="300" />
+      <SearchInput v-model="query" class="min-w-0 flex-1 basis-40 sm:ms-auto sm:w-56 sm:flex-none sm:basis-auto" :placeholder="__('Search titles and codes')" :debounce="300" />
     </div>
 
     <div class="mt-3 overflow-x-auto">
@@ -74,12 +75,12 @@ function usage(row) {
         :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['1fr', '9rem', '7rem', '6rem', '8rem', '6rem'] }"
       >
         <ListHeader>
-          <ListHeaderCell>Discount</ListHeaderCell>
-          <ListHeaderCell class="max-sm:hidden">Type</ListHeaderCell>
-          <ListHeaderCell class="max-sm:hidden">Method</ListHeaderCell>
-          <ListHeaderCell class="max-sm:hidden">Used</ListHeaderCell>
-          <ListHeaderCell class="max-sm:hidden">Discount given</ListHeaderCell>
-          <ListHeaderCell>Status</ListHeaderCell>
+          <ListHeaderCell>{{ __('Discount') }}</ListHeaderCell>
+          <ListHeaderCell class="max-sm:hidden">{{ __('Type') }}</ListHeaderCell>
+          <ListHeaderCell class="max-sm:hidden">{{ __('Method') }}</ListHeaderCell>
+          <ListHeaderCell class="max-sm:hidden">{{ __('Used') }}</ListHeaderCell>
+          <ListHeaderCell class="max-sm:hidden">{{ __('Discount given') }}</ListHeaderCell>
+          <ListHeaderCell>{{ __('Status') }}</ListHeaderCell>
         </ListHeader>
         <ListSkeleton v-if="discountsRequest.loading && !rows.length" :columns="isMobile ? 2 : 6" />
         <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
@@ -109,11 +110,11 @@ function usage(row) {
     <EmptyState
       v-if="!discountsRequest.loading && !rows.length"
       icon="lucide-badge-percent"
-      title="No discounts yet"
-      description="Create a code shoppers type at checkout, or a discount that applies on its own."
+      :title="__('No discounts yet')"
+      :description="__('Create a code shoppers type at checkout, or a discount that applies on its own.')"
       :filtered="Boolean(query) || tab !== 'all'"
-      filtered-title="No discounts match"
-      filtered-description="Try another tab or search."
+      :filtered-title="__('No discounts match')"
+      :filtered-description="__('Try another tab or search.')"
     />
   </PageBody>
 

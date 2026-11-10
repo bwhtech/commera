@@ -9,6 +9,7 @@ import MapStep from './steps/MapStep.vue'
 import ImagesStep from './steps/ImagesStep.vue'
 import ReviewStep from './steps/ReviewStep.vue'
 import RunStep from './steps/RunStep.vue'
+import { __ } from '../../data/translation'
 
 const stepComponents = [SourceStep, UploadStep, MapStep, ImagesStep, ReviewStep, RunStep]
 const current = computed(() => stepComponents[imp.step])
@@ -27,9 +28,9 @@ const assignedPhotos = computed(() =>
 )
 
 const nextLabel = computed(() => {
-  if (imp.step === 3) return assignedPhotos.value ? 'Continue' : 'Skip photos for now'
-  if (imp.step === 4) return `Import ${imp.counts.ready} product${imp.counts.ready === 1 ? '' : 's'}`
-  return 'Continue'
+  if (imp.step === 3) return assignedPhotos.value ? __('Continue') : __('Skip photos for now')
+  if (imp.step === 4) return imp.counts.ready === 1 ? __('Import 1 product') : __('Import {0} products', [imp.counts.ready])
+  return __('Continue')
 })
 
 const onLastStep = computed(() => imp.step === STEPS.length - 1)
@@ -44,7 +45,7 @@ function back() {
 
 // Closing never cancels a request: a run keeps writing, and reopening shows how it ended.
 function close() {
-  if (imp.phase === 'running') toast.info('The import keeps running. Reopen Import to see how it went.')
+  if (imp.phase === 'running') toast.info(__('The import keeps running. Reopen Import to see how it went.'))
   closeImport()
 }
 </script>
@@ -64,15 +65,15 @@ function close() {
          phone vh is the height with the address bar hidden, which would push the footer off. -->
     <div class="flex max-h-[calc(100dvh-8rem)] flex-col">
       <div class="flex items-center gap-3 border-b border-outline-gray-1 px-6 py-4">
-        <span class="text-lg-semibold text-ink-gray-9">Import products</span>
+        <span class="text-lg-semibold text-ink-gray-9">{{ __('Import products') }}</span>
         <Badge
-          :label="imp.phase === 'done' ? 'Done' : `Step ${imp.step + 1} of ${STEPS.length}`"
+          :label="imp.phase === 'done' ? __('Done') : __('Step {0} of {1}', [imp.step + 1, STEPS.length])"
           :theme="imp.phase === 'done' ? 'green' : 'gray'"
           variant="subtle"
         />
-        <div class="ml-auto flex items-center gap-2">
-          <span v-if="imp.phase === 'running'" class="text-sm text-ink-gray-5">Import running…</span>
-          <Button variant="ghost" icon="lucide-x" label="Close" @click="close" />
+        <div class="ms-auto flex items-center gap-2">
+          <span v-if="imp.phase === 'running'" class="text-sm text-ink-gray-5">{{ __('Import running…') }}</span>
+          <Button variant="ghost" icon="lucide-x" :label="__('Close')" @click="close" />
         </div>
       </div>
 
@@ -91,20 +92,20 @@ function close() {
       >
         <Button
           v-if="imp.step > 0"
-          icon-left="lucide-arrow-left"
-          label="Back"
+          icon-left="lucide-arrow-left rtl:-scale-x-100"
+          :label="__('Back')"
           :disabled="!canChangeStep"
           @click="back"
         />
-        <span class="hidden text-sm text-ink-gray-5 sm:block">Nothing is saved until the last step.</span>
-        <div class="ml-auto flex items-center gap-2">
-          <Button v-if="imp.step === 3" variant="ghost" label="Do this later" :disabled="!canChangeStep" @click="next" />
+        <span class="hidden text-sm text-ink-gray-5 sm:block">{{ __('Nothing is saved until the last step.') }}</span>
+        <div class="ms-auto flex items-center gap-2">
+          <Button v-if="imp.step === 3" variant="ghost" :label="__('Do this later')" :disabled="!canChangeStep" @click="next" />
           <Button
             variant="solid"
             theme="gray"
             :disabled="!canContinue"
             :label="nextLabel"
-            :icon-right="imp.step === 4 ? 'lucide-rocket' : 'lucide-arrow-right'"
+            :icon-right="imp.step === 4 ? 'lucide-rocket' : 'lucide-arrow-right rtl:-scale-x-100'"
             @click="next"
           />
         </div>

@@ -34,13 +34,13 @@ const isCollapsed = inject(sidebarCollapsedKey, computed(() => false))
           >
             <template #suffix>
               <span
-                class="lucide-chevron-down mr-1 size-3.5 text-ink-gray-5 transition-transform"
-                :class="isOpen(item) ? '' : '-rotate-90'"
+                class="lucide-chevron-down me-1 size-3.5 text-ink-gray-5 transition-transform"
+                :class="isOpen(item) ? '' : '-rotate-90 rtl:rotate-90'"
                 aria-hidden="true"
               />
             </template>
           </SidebarItem>
-          <div v-show="isOpen(item)" class="space-y-0.5" :class="isCollapsed ? '' : 'pl-5'">
+          <div v-show="isOpen(item)" class="space-y-0.5" :class="isCollapsed ? '' : 'ps-5'">
             <!-- A child without `to` is a plugin's sidebar action: it runs on click and never takes active state. -->
             <SidebarItem
               v-for="child in item.children"
@@ -66,7 +66,7 @@ const isCollapsed = inject(sidebarCollapsedKey, computed(() => false))
           @click="item.onClick?.()"
         >
           <template v-if="item.shortcut" #suffix>
-            <KeyboardShortcut class="mr-1" :combo="item.shortcut" />
+            <KeyboardShortcut class="me-1" :combo="item.shortcut" />
           </template>
         </SidebarItem>
       </template>

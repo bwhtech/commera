@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Button, Spinner, toast, useFileUpload } from 'frappe-ui'
+import { __ } from '../../../data/translation'
 import { BRAND_COLOURS, draft } from '../../../ia/onboarding'
 import SwatchDot from '../../SwatchDot.vue'
 
@@ -21,7 +22,7 @@ async function uploadLogo(event) {
     const uploaded = await upload(file, { private: false })
     draft.brandLogo = uploaded.file_url
   } catch {
-    toast.error(`Could not upload ${file.name}`)
+    toast.error(__('Could not upload {0}', [file.name]))
   }
 }
 </script>
@@ -36,16 +37,16 @@ async function uploadLogo(event) {
       @click="fileInput?.click()"
     >
       <Spinner v-if="isUploading" class="size-5" />
-      <img v-else-if="draft.brandLogo" :src="draft.brandLogo" alt="Your logo" class="max-h-16 max-w-[60%] object-contain" />
+      <img v-else-if="draft.brandLogo" :src="draft.brandLogo" :alt="__('Your logo')" class="max-h-16 max-w-[60%] object-contain" />
       <template v-else>
         <span class="lucide-image-plus size-6" aria-hidden="true" />
-        <span class="text-sm">Logo</span>
+        <span class="text-sm">{{ __('Logo') }}</span>
       </template>
     </button>
-    <Button v-if="draft.brandLogo" variant="ghost" size="sm" label="Remove logo" class="-mt-4" @click="draft.brandLogo = ''" />
+    <Button v-if="draft.brandLogo" variant="ghost" size="sm" :label="__('Remove logo')" class="-mt-4" @click="draft.brandLogo = ''" />
 
     <div>
-      <p class="mb-2 text-xs text-ink-gray-6">Colour</p>
+      <p class="mb-2 text-xs text-ink-gray-6">{{ __('Colour') }}</p>
       <div class="flex flex-wrap items-center gap-2.5">
         <!-- The padding is the gap inside the selection ring: ring-offset paints a fixed white,
              which shows as a halo on a dark dashboard. -->
@@ -55,7 +56,7 @@ async function uploadLogo(event) {
           type="button"
           class="rounded-full p-0.5 transition-[transform,box-shadow] duration-150 ease-out-strong active:scale-90"
           :class="{ 'ring-2 ring-outline-gray-5': draft.primaryColor === colour }"
-          :aria-label="`Use ${colour}`"
+          :aria-label="__('Use {0}', [colour])"
           :aria-pressed="draft.primaryColor === colour"
           data-onboarding-colour
           @click="draft.primaryColor = draft.primaryColor === colour ? '' : colour"

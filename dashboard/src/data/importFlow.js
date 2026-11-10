@@ -4,28 +4,29 @@
 import { computed, reactive } from 'vue'
 import { useAdminAction } from './api'
 import { canMove, isBusy, nextPhase } from './importPhase'
+import { __ } from './translation'
 
 export const STEPS = [
-  { key: 'source', label: 'Source', icon: 'lucide-plug', hint: 'Where the products live today' },
-  { key: 'upload', label: 'Upload', icon: 'lucide-file-up', hint: 'Your spreadsheet' },
-  { key: 'map', label: 'Match columns', icon: 'lucide-arrow-left-right', hint: 'Your headings to ours' },
-  { key: 'images', label: 'Images', icon: 'lucide-image', hint: 'Photos for each product' },
-  { key: 'review', label: 'Review', icon: 'lucide-list-checks', hint: 'Check before saving' },
-  { key: 'run', label: 'Import', icon: 'lucide-rocket', hint: 'Create everything' },
+  { key: 'source', label: __('Source'), icon: 'lucide-plug', hint: __('Where the products live today') },
+  { key: 'upload', label: __('Upload'), icon: 'lucide-file-up', hint: __('Your spreadsheet') },
+  { key: 'map', label: __('Match columns'), icon: 'lucide-arrow-left-right', hint: __('Your headings to ours') },
+  { key: 'images', label: __('Images'), icon: 'lucide-image', hint: __('Photos for each product') },
+  { key: 'review', label: __('Review'), icon: 'lucide-list-checks', hint: __('Check before saving') },
+  { key: 'run', label: __('Import'), icon: 'lucide-rocket', hint: __('Create everything') },
 ]
 
 // TARGET_FIELDS/REQUIRED mirror commera.api.admin.imports.FIELD_SYNONYMS/REQUIRED_FIELDS field
 // for field — a mismatch here means a column that maps cleanly on the server shows the wrong
 // label here, not a functional bug, but it would be a confusing one.
 export const TARGET_FIELDS = [
-  { label: "Don't import", value: '' },
-  { label: 'Product title', value: 'title' },
-  { label: 'Collection', value: 'collection' },
-  { label: 'Colour', value: 'color' },
-  { label: 'Size', value: 'size' },
-  { label: 'Compare-at price', value: 'compare_at_price' },
-  { label: 'Selling price', value: 'sale_price' },
-  { label: 'Stock', value: 'stock' },
+  { label: __("Don't import"), value: '' },
+  { label: __('Product title'), value: 'title' },
+  { label: __('Collection'), value: 'collection' },
+  { label: __('Colour'), value: 'color' },
+  { label: __('Size'), value: 'size' },
+  { label: __('Compare-at price'), value: 'compare_at_price' },
+  { label: __('Selling price'), value: 'sale_price' },
+  { label: __('Stock'), value: 'stock' },
 ]
 
 export const REQUIRED_FIELDS = ['title', 'collection', 'color', 'size']

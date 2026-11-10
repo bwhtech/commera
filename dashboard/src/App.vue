@@ -12,6 +12,7 @@ import AppSettingsDialog from './components/settings/AppSettingsDialog.vue'
 import SearchPalette from './components/SearchPalette.vue'
 import ImportDialog from './components/import/ImportDialog.vue'
 import AddProductDialog from './components/AddProductDialog.vue'
+import LanguageDialog from './components/LanguageDialog.vue'
 
 // frappe-ui ships MobileShell alongside DesktopShell rather than as a responsive variant,
 // so the layout is picked per viewport. The phone bundle is lazy.
@@ -54,6 +55,7 @@ provide(routeLocationKey, shallowReactive(shellRoute))
       <ImportDialog />
       <AddProductDialog v-if="canAddProducts" />
     </template>
+    <LanguageDialog />
   </FrappeUIProvider>
 </template>
 

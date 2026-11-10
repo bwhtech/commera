@@ -49,7 +49,7 @@ const options = computed(() => {
       :disabled="disabled"
       :filterable="false"
       :loading="search.results.loading"
-      :placeholder="`Search ${field.options}`"
+      :placeholder="__('Search {0}', [__(field.options)])"
       @update:model-value="emit('update:modelValue', $event)"
     />
   </div>

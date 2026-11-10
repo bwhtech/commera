@@ -3,6 +3,7 @@ import { refDebounced } from '@vueuse/core'
 import { createAdminCaller } from './adminCaller'
 import { storefrontLanguages } from './boot'
 import { useAdminAction, useAdminRead } from './api'
+import { __ } from './translation'
 import { rememberPreviewEntry, rememberedPreviewEntry } from '../ia/previewEntry'
 import { capturePage } from '../utils/capturePage'
 import { createSequence } from '../utils/sequence'
@@ -89,11 +90,11 @@ export function canAddBlocks(schema) {
 
 export const SECTION_GROUPS = ['header_group', 'footer_group']
 
-const GROUP_LABELS = { header_group: 'Header group', footer_group: 'Footer group' }
+const GROUP_LABELS = { header_group: __('Header group'), footer_group: __('Footer group') }
 
 export function pageLabel(page) {
   if (GROUP_LABELS[page]) return GROUP_LABELS[page]
-  if (page === 'index') return 'Home page'
+  if (page === 'index') return __('Home page')
   return readableName(page)
 }
 

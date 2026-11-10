@@ -153,3 +153,16 @@ the plugin kit in `packages/plugin-kit/` checks app builds against.
 The dashboard draws every frame a plugin sits in: `PluginPageFrame` (header + body), `PluginCardFrame`,
 `PluginActionDialog` and `PluginSettingsPanel`. Plugins reach that chrome only through `usePage()`, `useCard()`
 and `useAction()`, so never export `AppPageHeader`, `PageBody` or a card wrapper from `@commera/admin`.
+
+## 11 — Every string goes through `__()`
+
+Frappe's string extraction reads `.vue` and `.js` files, so a dashboard string reaches the app's translation files only
+when it is a literal inside `__()`. Templates call the global `__`; a script imports it from `data/translation.js`.
+
+- The first argument is one single-line string literal. No template literal, concatenation or variable: the extractor
+  cannot read them, so the string never reaches a translator.
+- Interpolate with numbered placeholders, one whole sentence per string: `__('{0} orders', [count])`.
+- Translate what the dashboard writes. Server data, option values, keys and routes stay as they are.
+- Layout classes are logical (`ms-*`, `pe-*`, `start-*`, `text-end`), so the shell mirrors under `dir="rtl"`.
+
+The admin's language rides the boot payload, so changing it reloads the shell; nothing translates reactively.

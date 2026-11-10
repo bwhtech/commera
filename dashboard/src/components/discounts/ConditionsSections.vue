@@ -4,6 +4,7 @@ import { Checkbox, FormControl, MultiSelect, Radio, RadioGroup } from 'frappe-ui
 import DiscountSection from './DiscountSection.vue'
 import SearchMultiSelect from './SearchMultiSelect.vue'
 import { audienceLine, combinationLine, minimumLine, paymentLine } from '../../data/discounts'
+import { __ } from '../../data/translation'
 
 const discount = defineModel('discount', { type: Object, required: true })
 const props = defineProps({
@@ -11,9 +12,9 @@ const props = defineProps({
   showErrors: { type: Boolean, default: false },
 })
 
-const minimumSummary = computed(() => minimumLine(discount.value) ?? 'No minimum')
+const minimumSummary = computed(() => minimumLine(discount.value) ?? __('No minimum'))
 const audienceSummary = computed(
-  () => `${audienceLine(discount.value) ?? 'Everyone'} · ${paymentLine(discount.value) ?? 'Any payment method'}`,
+  () => `${audienceLine(discount.value) ?? __('Everyone')} · ${paymentLine(discount.value) ?? __('Any payment method')}`,
 )
 
 const customerGroups = computed({
@@ -30,89 +31,89 @@ const customers = computed({
 })
 
 const groupError = computed(() =>
-  props.showErrors && !customerGroups.value.length ? 'Choose at least one group. Without one, nobody can use this discount.' : null,
+  props.showErrors && !customerGroups.value.length ? __('Choose at least one group. Without one, nobody can use this discount.') : null,
 )
 const customerError = computed(() =>
-  props.showErrors && !customers.value.length ? 'Choose at least one customer. Without one, nobody can use this discount.' : null,
+  props.showErrors && !customers.value.length ? __('Choose at least one customer. Without one, nobody can use this discount.') : null,
 )
 </script>
 
 <template>
   <DiscountSection
     v-if="discount.discount_type !== 'Buy X Get Y' && !discount.tiered"
-    title="Minimum purchase"
+    :title="__('Minimum purchase')"
     collapsible
     :summary="minimumSummary"
     :default-open="discount.minimum_requirement !== 'None'"
   >
-    <RadioGroup v-model="discount.minimum_requirement" aria-label="Minimum purchase">
-      <Radio value="None" label="None" />
-      <Radio value="Subtotal" label="Minimum subtotal" />
-      <Radio value="Quantity" label="Minimum number of items" />
+    <RadioGroup v-model="discount.minimum_requirement" :aria-label="__('Minimum purchase')">
+      <Radio value="None" :label="__('None')" />
+      <Radio value="Subtotal" :label="__('Minimum subtotal')" />
+      <Radio value="Quantity" :label="__('Minimum number of items')" />
     </RadioGroup>
     <FormControl
       v-if="discount.minimum_requirement === 'Subtotal'"
       v-model="discount.minimum_subtotal"
       type="number"
       class="sm:w-48"
-      label="Subtotal"
+      :label="__('Subtotal')"
     />
     <FormControl
       v-if="discount.minimum_requirement === 'Quantity'"
       v-model="discount.minimum_quantity"
       type="number"
       class="sm:w-48"
-      label="Items"
+      :label="__('Items')"
     />
   </DiscountSection>
 
-  <DiscountSection title="Who can use it" collapsible :summary="audienceSummary">
-    <RadioGroup v-model="discount.eligibility" label="Customers">
-      <Radio value="Everyone" label="Everyone, guests included" />
-      <Radio value="First Order" label="First order only" description="Checked by customer and email, so guests count too." />
-      <Radio value="Customer Groups" label="Customer groups" />
-      <Radio value="Specific Customers" label="Specific customers" description="Signed-in customers only, up to 100." />
+  <DiscountSection :title="__('Who can use it')" collapsible :summary="audienceSummary">
+    <RadioGroup v-model="discount.eligibility" :label="__('Customers')">
+      <Radio value="Everyone" :label="__('Everyone, guests included')" />
+      <Radio value="First Order" :label="__('First order only')" :description="__('Checked by customer and email, so guests count too.')" />
+      <Radio value="Customer Groups" :label="__('Customer groups')" />
+      <Radio value="Specific Customers" :label="__('Specific customers')" :description="__('Signed-in customers only, up to 100.')" />
     </RadioGroup>
     <MultiSelect
       v-if="discount.eligibility === 'Customer Groups'"
       v-model="customerGroups"
       :options="customerGroupOptions"
-      label="Customer groups"
-      placeholder="Choose customer groups"
+      :label="__('Customer groups')"
+      :placeholder="__('Choose customer groups')"
       :error="groupError"
     />
     <SearchMultiSelect
       v-if="discount.eligibility === 'Specific Customers'"
       v-model="customers"
       target-type="Customer"
-      label="Chosen customers"
-      placeholder="Search customers"
+      :label="__('Chosen customers')"
+      :placeholder="__('Search customers')"
       :known-labels="customerNames"
       :error="customerError"
     />
     <FormControl
       v-model="discount.payment_condition"
       type="select"
-      label="Payment"
+      :label="__('Payment')"
       class="sm:w-72"
       :options="[
-        { label: 'Any payment method', value: 'Any' },
-        { label: 'Prepaid only (not cash on delivery)', value: 'Prepaid' },
-        { label: 'Cash on delivery only', value: 'Cash On Delivery' },
+        { label: __('Any payment method'), value: 'Any' },
+        { label: __('Prepaid only (not cash on delivery)'), value: 'Prepaid' },
+        { label: __('Cash on delivery only'), value: 'Cash On Delivery' },
       ]"
     />
   </DiscountSection>
 
   <DiscountSection
-    title="Combinations"
+    :title="__('Combinations')"
     collapsible
     :summary="combinationLine(discount)"
-    description="Two discounts stack only when each allows the other."
+    :description="__('Two discounts stack only when each allows the other.')"
   >
     <div class="flex flex-col gap-3">
-      <Checkbox v-model="discount.combines_with_product" label="Product discounts" />
-      <Checkbox v-model="discount.combines_with_order" label="Order discounts" />
-      <Checkbox v-model="discount.combines_with_shipping" label="Shipping discounts" />
+      <Checkbox v-model="discount.combines_with_product" :label="__('Product discounts')" />
+      <Checkbox v-model="discount.combines_with_order" :label="__('Order discounts')" />
+      <Checkbox v-model="discount.combines_with_shipping" :label="__('Shipping discounts')" />
     </div>
   </DiscountSection>
 </template>

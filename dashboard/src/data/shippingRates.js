@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { createAdminCaller } from './adminCaller'
 import { exactMoney } from './format'
 import { wasAborted } from './api'
+import { __ } from './translation'
 import { singleFlight } from '../utils/sequence'
 
 /**
@@ -80,27 +81,27 @@ const byFromValue = (first, second) => Number(first.from_value) - Number(second.
 export function formatBandRange(band) {
   const from = Number(band.from_value) || 0
   const to = Number(band.to_value) || 0
-  if (!to) return `${exactMoney(from)} and above`
+  if (!to) return __('{0} and above', [exactMoney(from)])
   return `${exactMoney(from)}–${exactMoney(to)}`
 }
 
 function formatBand(band) {
-  const price = band.free_shipping ? 'Free' : exactMoney(band.shipping_amount)
+  const price = band.free_shipping ? __('Free') : exactMoney(band.shipping_amount)
   const from = Number(band.from_value) || 0
   const to = Number(band.to_value) || 0
 
-  if (!to && !from) return `${price} flat`
-  if (!to) return `${price} from ${exactMoney(from)} and above`
-  if (!from) return `${price} up to ${exactMoney(to)}`
-  return `${price} for ${formatBandRange(band)}`
+  if (!to && !from) return __('{0} flat', [price])
+  if (!to) return __('{0} from {1} and above', [price, exactMoney(from)])
+  if (!from) return __('{0} up to {1}', [price, exactMoney(to)])
+  return __('{0} for {1}', [price, formatBandRange(band)])
 }
 
 // What bwh_shipping charges when no band covers the cart: the carrier's live quote, then the
 // Backup Charge. Null when neither exists, so a cart outside every band is not offered it.
 function formatFallback(option) {
   const backupCharge = Number(option?.backup_charge) || 0
-  if (option?.service_code && backupCharge) return `carrier rate, ${exactMoney(backupCharge)} if unavailable`
-  if (option?.service_code) return 'carrier rate'
+  if (option?.service_code && backupCharge) return __('carrier rate, {0} if unavailable', [exactMoney(backupCharge)])
+  if (option?.service_code) return __('carrier rate')
   if (backupCharge) return exactMoney(backupCharge)
   return null
 }

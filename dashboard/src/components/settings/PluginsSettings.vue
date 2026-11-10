@@ -10,6 +10,7 @@ import StatusBadge from '../StatusBadge.vue'
 import { useAdminAction, useAdminRead, trySubmit } from '../../data/api'
 import { errorMessage } from '../../data/errors'
 import { eventLabel, statusKey, timeLabel, useDeliveryRetry } from '../../data/pluginEvents'
+import { __ } from '../../data/translation'
 import { appIcon, pluginSettingsTabs, placeLabel, settingsTabValue } from '../../ia/plugins'
 import { onSettingsClose, settings } from '../../ia/settings'
 import { orderRoute } from '../../ia/routes'
@@ -19,8 +20,8 @@ const props = defineProps({
 })
 
 const DELIVERY_TABS = [
-  { label: 'All', value: 'all' },
-  { label: 'Failed', value: 'Failed' },
+  { label: __('All'), value: 'all' },
+  { label: __('Failed'), value: 'Failed' },
 ]
 
 const pluginsRequest = useAdminRead('plugins.get_plugins', { immediate: false })
@@ -64,7 +65,7 @@ function openPlugin(app) {
 
 function pluginCount(app) {
   const count = app.entries.length
-  return count === 1 ? '1 addition to the dashboard' : `${count} additions to the dashboard`
+  return count === 1 ? __('1 addition to the dashboard') : __('{0} additions to the dashboard', [count])
 }
 
 const { retrying: retryingDelivery, retry: retryDeliveries } = useDeliveryRetry(() => {
@@ -87,13 +88,15 @@ async function setStorefront(enabled) {
     plugin.storefront = !enabled
     return
   }
-  toast.success(enabled ? `${plugin.title} now runs on your storefront` : `${plugin.title} is off your storefront`)
+  toast.success(
+    enabled ? __('{0} now runs on your storefront', [plugin.title]) : __('{0} is off your storefront', [plugin.title]),
+  )
 }
 </script>
 
 <template>
   <template v-if="!current">
-    <SettingsPanelHeader title="Plugins" description="Plugins installed alongside Commera, and what they add to it." />
+    <SettingsPanelHeader :title="__('Plugins')" :description="__('Plugins installed alongside Commera, and what they add to it.')" />
 
     <SettingsBody v-scroll-fade>
       <!-- The refusal itself is already toasted by useAdminRead. This says why the panel is empty:
@@ -102,17 +105,17 @@ async function setStorefront(enabled) {
         v-if="pluginsRequest.error?.type === 'PermissionError'"
         compact
         icon="lucide-lock"
-        title="Hidden from your role"
-        description="Installed plugins are only listed for a System Manager."
+        :title="__('Hidden from your role')"
+        :description="__('Installed plugins are only listed for a System Manager.')"
       />
       <EmptyState
         v-else-if="pluginsRequest.error"
         compact
         icon="lucide-triangle-alert"
-        title="Plugins could not be loaded"
+        :title="__('Plugins could not be loaded')"
         :description="errorMessage(pluginsRequest.error)"
       >
-        <Button label="Try again" :loading="pluginsRequest.loading" @click="pluginsRequest.reload()" />
+        <Button :label="__('Try again')" :loading="pluginsRequest.loading" @click="pluginsRequest.reload()" />
       </EmptyState>
 
       <div v-else-if="!pluginsRequest.data" class="divide-y divide-outline-gray-1" aria-hidden="true">
@@ -130,8 +133,8 @@ async function setStorefront(enabled) {
         v-else-if="!plugins.length"
         compact
         icon="lucide-blocks"
-        title="No plugins installed"
-        description="Plugins built for Commera show up here once they are installed on this site."
+        :title="__('No plugins installed')"
+        :description="__('Plugins built for Commera show up here once they are installed on this site.')"
       />
 
       <div v-else class="divide-y divide-outline-gray-1">
@@ -144,7 +147,7 @@ async function setStorefront(enabled) {
             </div>
             <p class="mt-1 text-sm text-ink-gray-5">
               {{ pluginCount(app) }}
-              <template v-if="app.problems.length"> · {{ app.problems.length }} not loaded</template>
+              <template v-if="app.problems.length"> · {{ __('{0} not loaded', [app.problems.length]) }}</template>
             </p>
           </div>
           <Badge
@@ -152,9 +155,9 @@ async function setStorefront(enabled) {
             class="shrink-0"
             theme="red"
             variant="subtle"
-            :label="`${app.failed_deliveries} failed`"
+            :label="__('{0} failed', [app.failed_deliveries])"
           />
-          <Button class="shrink-0" label="Open" @click="openPlugin(app)" />
+          <Button class="shrink-0" :label="__('Open')" @click="openPlugin(app)" />
         </div>
       </div>
     </SettingsBody>
@@ -163,11 +166,11 @@ async function setStorefront(enabled) {
   <template v-else>
     <SettingsConfigHeader
       :title="current.title"
-      :description="current.version ? `Version ${current.version}` : current.app"
+      :description="current.version ? __('Version {0}', [current.version]) : current.app"
       @back="configuring = null"
     >
       <template v-if="settingsTab" #actions>
-        <ResponsiveButton label="Open settings" icon="lucide-settings" @click="settings.tab = settingsTab.value" />
+        <ResponsiveButton :label="__('Open settings')" icon="lucide-settings" @click="settings.tab = settingsTab.value" />
       </template>
     </SettingsConfigHeader>
 
@@ -175,8 +178,12 @@ async function setStorefront(enabled) {
       <SettingsRow
         v-if="current.storefront !== null"
         class="mt-2 border-b border-outline-gray-1"
-        title="Run on the storefront"
-        description="This plugin adds scripts or blocks to your store pages, such as a popup or a banner. They load only while this is on."
+        :title="__('Run on the storefront')"
+        :description="
+          __(
+            'This plugin adds scripts or blocks to your store pages, such as a popup or a banner. They load only while this is on.',
+          )
+        "
       >
         <Switch
           size="sm"
@@ -187,7 +194,7 @@ async function setStorefront(enabled) {
       </SettingsRow>
 
       <section class="mt-2">
-        <h3 class="text-base font-medium text-ink-gray-8">What it adds</h3>
+        <h3 class="text-base font-medium text-ink-gray-8">{{ __('What it adds') }}</h3>
         <ul
           v-if="current.entries.length || current.problems.length"
           class="mt-2 divide-y divide-outline-gray-1 border-y border-outline-gray-1"
@@ -203,15 +210,15 @@ async function setStorefront(enabled) {
             {{ problem }}
           </li>
         </ul>
-        <p v-else class="mt-1 text-p-sm text-ink-gray-5">Nothing on the dashboard. It may still listen to orders.</p>
+        <p v-else class="mt-1 text-p-sm text-ink-gray-5">{{ __('Nothing on the dashboard. It may still listen to orders.') }}</p>
       </section>
 
       <section class="mt-8">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <h3 class="text-base font-medium text-ink-gray-8">Recent deliveries</h3>
+          <h3 class="text-base font-medium text-ink-gray-8">{{ __('Recent deliveries') }}</h3>
           <TabButtons v-model="deliveryStatus" size="sm" :options="DELIVERY_TABS" />
         </div>
-        <p class="mt-1 text-p-sm text-ink-gray-5">Each time an order changes, Commera tells the plugin. A failed send can be retried.</p>
+        <p class="mt-1 text-p-sm text-ink-gray-5">{{ __('Each time an order changes, Commera tells the plugin. A failed send can be retried.') }}</p>
 
         <div v-if="deliveriesRequest.loading && !deliveriesRequest.data" class="mt-3 space-y-3" aria-hidden="true">
           <Skeleton v-for="row in 3" :key="row" class="h-10 w-full rounded-4" />
@@ -221,8 +228,12 @@ async function setStorefront(enabled) {
           v-else-if="!deliveries.length"
           compact
           :icon="deliveryStatus === 'Failed' ? 'lucide-circle-check' : 'lucide-send'"
-          :title="deliveryStatus === 'Failed' ? 'Nothing failed' : 'No deliveries yet'"
-          :description="deliveryStatus === 'Failed' ? 'Every order update reached this plugin.' : 'This plugin has not been sent an order update.'"
+          :title="deliveryStatus === 'Failed' ? __('Nothing failed') : __('No deliveries yet')"
+          :description="
+            deliveryStatus === 'Failed'
+              ? __('Every order update reached this plugin.')
+              : __('This plugin has not been sent an order update.')
+          "
         />
 
         <template v-else>
@@ -247,7 +258,7 @@ async function setStorefront(enabled) {
                 v-if="row.status === 'Failed' && row.can_retry"
                 class="shrink-0"
                 size="sm"
-                label="Retry"
+                :label="__('Retry')"
                 icon-left="lucide-rotate-cw"
                 :loading="retryingDelivery === row.delivery"
                 :disabled="Boolean(retryingDelivery)"

@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { Button, Dialog, toast } from 'frappe-ui'
 import { useMethodAction, trySubmit } from '../data/api'
 import { money } from '../data/format'
+import { __ } from '../data/translation'
 
 const props = defineProps({
   orderId: { type: String, required: true },
@@ -34,8 +35,8 @@ async function refund() {
     if (!paymentEntry) return
 
     open.value = false
-    toast.success(`Refunded ${money(props.status.refundable_amount)}`, {
-      description: `Payment Entry ${paymentEntry} created.`,
+    toast.success(__('Refunded {0}', [money(props.status.refundable_amount)]), {
+      description: __('Payment Entry {0} created.', [paymentEntry]),
     })
     emit('refunded')
   } finally {
@@ -45,20 +46,21 @@ async function refund() {
 </script>
 
 <template>
-  <Dialog v-model:open="open" title="Refund this order" size="sm" :dismissible="!refunding">
+  <Dialog v-model:open="open" :title="__('Refund this order')" size="sm" :dismissible="!refunding">
     <template #default>
       <div class="space-y-3">
         <p class="text-p-base text-ink-gray-7">
-          {{ money(status.refundable_amount) }} goes back to the customer on {{ orderId }}, the same
-          way they paid. This cannot be undone from here.
+          {{
+            __('{0} goes back to the customer on {1}, the same way they paid. This cannot be undone from here.', [money(status.refundable_amount), orderId])
+          }}
         </p>
 
         <p v-if="status.amount_refunded" class="text-p-sm text-ink-gray-5">
-          {{ money(status.amount_refunded) }} has already been refunded on this order.
+          {{ __('{0} has already been refunded on this order.', [money(status.amount_refunded)]) }}
         </p>
 
         <p v-if="status.only_charges" class="text-p-sm text-ink-gray-5">
-          The goods are already fully refunded — only shipping and other charges are left.
+          {{ __('The goods are already fully refunded — only shipping and other charges are left.') }}
         </p>
       </div>
     </template>
@@ -67,12 +69,12 @@ async function refund() {
       <!-- Stacked on a phone, side by side from sm up; the money-moving button is
            never the one under a stray thumb at the top. -->
       <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button class="w-full sm:w-auto" label="Keep the payment" :disabled="refunding" @click="open = false" />
+        <Button class="w-full sm:w-auto" :label="__('Keep the payment')" :disabled="refunding" @click="open = false" />
         <Button
           class="w-full sm:w-auto"
           variant="solid"
           theme="red"
-          :label="`Refund ${money(status.refundable_amount)}`"
+          :label="__('Refund {0}', [money(status.refundable_amount)])"
           :loading="refunding"
           :disabled="refunding"
           @click="refund"

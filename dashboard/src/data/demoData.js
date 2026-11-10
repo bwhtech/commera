@@ -1,5 +1,6 @@
 import { dialog, toast } from 'frappe-ui'
 import { useAdminAction, trySubmit } from './api'
+import { __ } from './translation'
 
 export const installDemoDataAction = useAdminAction('settings.install_demo_data')
 
@@ -7,19 +8,20 @@ export const installDemoDataAction = useAdminAction('settings.install_demo_data'
 // so the confirmation names those rather than only the catalogue it also creates.
 export function confirmInstallDemoData() {
   dialog.confirm({
-    title: 'Replace this store with demo data?',
-    message:
+    title: __('Replace this store with demo data?'),
+    message: __(
       'It seeds a full demo catalogue, and overwrites your homepage, footer, store currency and payment accounts. Run it on a store you have not set up yet.',
+    ),
     theme: 'red',
-    confirmLabel: 'Install demo data',
+    confirmLabel: __('Install demo data'),
     onConfirm: async () => {
       // The palette can reopen this dialog while a run is still queuing; one seed job at a time.
       if (installDemoDataAction.loading) return
       const queued = await trySubmit(installDemoDataAction)
       // useAdminAction has already toasted a refusal; a second toast here would stack on it.
       if (!queued) return
-      toast.success('Demo data queued', {
-        description: 'It runs in the background and takes a few minutes.',
+      toast.success(__('Demo data queued'), {
+        description: __('It runs in the background and takes a few minutes.'),
       })
     },
   })

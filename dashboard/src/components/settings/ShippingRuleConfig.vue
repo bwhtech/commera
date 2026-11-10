@@ -15,6 +15,7 @@ import SettingsConfigHeader from './SettingsConfigHeader.vue'
 import { errorMessage } from '../../data/errors'
 import { exactMoney, symbolFor } from '../../data/format'
 import { findBandConflicts, formatBandRange } from '../../data/shippingRates'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   // Null while creating; the rule being edited otherwise.
@@ -35,11 +36,11 @@ const moneyUnit = symbolFor(props.currency || undefined)
 
 // '' is the "Any option" row: a band that names no delivery option.
 const optionChoices = computed(() => [
-  { label: 'Any option', value: '' },
+  { label: __('Any option'), value: '' },
   ...props.deliveryOptions.map((option) => ({
     label: option.title,
     value: option.name,
-    description: option.enabled ? undefined : 'Off at checkout',
+    description: option.enabled ? undefined : __('Off at checkout'),
   })),
 ])
 
@@ -121,9 +122,10 @@ function removeRow(key) {
 }
 
 function describeConflict({ kind, bands }) {
-  if (kind === 'order') return 'Each band has to start below where it ends.'
-  if (kind === 'open') return 'Only one band can be left open-ended.'
-  return `${bands.map((band) => formatBandRange(band)).join(' and ')} overlap.`
+  if (kind === 'order') return __('Each band has to start below where it ends.')
+  if (kind === 'open') return __('Only one band can be left open-ended.')
+  const [first, second] = bands.map((band) => formatBandRange(band))
+  return __('{0} and {1} overlap.', [first, second])
 }
 
 // ERPNext checks the whole rule, so the draft is checked against every other band.
@@ -164,14 +166,14 @@ async function saveDraft() {
   const nextRows = rows.value
     .map((row) => (row.key === updated.key ? updated : row))
     .sort((first, second) => first.from_value - second.from_value)
-  await commitRows(nextRows, 'Band saved')
+  await commitRows(nextRows, __('Band saved'))
 }
 
 async function removeDraftBand() {
   if (draftIsNew.value) return cancelDraft()
   await commitRows(
     rows.value.filter((row) => row.key !== draft.value.key),
-    'Band removed',
+    __('Band removed'),
   )
 }
 
@@ -181,18 +183,26 @@ function shown(row) {
 }
 
 function optionLabel(row) {
-  if (!row.shipping_service) return 'Any option'
+  if (!row.shipping_service) return __('Any option')
   return optionTitles.value[row.shipping_service] ?? row.shipping_service
 }
 
 function bandSentence(row) {
-  const price = row.free_shipping ? 'delivery is free' : `delivery costs ${exactMoney(row.shipping_amount)}`
+  const charge = exactMoney(row.shipping_amount)
   const from = exactMoney(row.from_value)
   const to = exactMoney(row.to_value)
 
-  if (!row.from_value && !row.to_value) return `For every order, ${price}`
-  if (!row.to_value) return `For orders ${from} and above, ${price}`
-  return `For orders ${from} to ${to}, ${price}`
+  if (!row.from_value && !row.to_value) {
+    return row.free_shipping ? __('For every order, delivery is free') : __('For every order, delivery costs {0}', [charge])
+  }
+  if (!row.to_value) {
+    return row.free_shipping
+      ? __('For orders {0} and above, delivery is free', [from])
+      : __('For orders {0} and above, delivery costs {1}', [from, charge])
+  }
+  return row.free_shipping
+    ? __('For orders {0} to {1}, delivery is free', [from, to])
+    : __('For orders {0} to {1}, delivery costs {2}', [from, to, charge])
 }
 
 function buildPayload(rowsToSave) {
@@ -223,7 +233,7 @@ async function save() {
       return
     }
 
-    toast.success(isEdit.value ? 'Shipping rule saved' : 'Shipping rule added')
+    toast.success(isEdit.value ? __('Shipping rule saved') : __('Shipping rule added'))
     emit('back')
   } finally {
     saving.value = false
@@ -233,8 +243,8 @@ async function save() {
 
 <template>
   <SettingsConfigHeader
-    :title="isEdit ? rule.label : 'Add a shipping rule'"
-    description="Checkout charges the band the order total falls in."
+    :title="isEdit ? rule.label : __('Add a shipping rule')"
+    :description="__('Checkout charges the band the order total falls in.')"
     @back="emit('back')"
   >
     <template #actions>
@@ -245,7 +255,7 @@ async function save() {
         theme="gray"
         :loading="saving"
         :disabled="Boolean(draft)"
-        :label="isEdit ? 'Save' : 'Add'"
+        :label="isEdit ? __('Save') : __('Add')"
       />
     </template>
   </SettingsConfigHeader>
@@ -257,34 +267,34 @@ async function save() {
           <FormControl
             v-if="!isEdit"
             v-model="label"
-            label="Name"
+            :label="__('Name')"
             required
-            placeholder="Standard shipping"
-            description="Only you see it. It cannot be changed later."
+            :placeholder="__('Standard shipping')"
+            :description="__('Only you see it. It cannot be changed later.')"
           />
           <template v-else>
-            <p class="text-sm text-ink-gray-5">Name</p>
+            <p class="text-sm text-ink-gray-5">{{ __('Name') }}</p>
             <p class="mt-1 text-base text-ink-gray-8">{{ rule.label }}</p>
           </template>
         </div>
 
         <SettingsRow
           v-if="inUse"
-          title="Used at checkout"
-          description="Checkout charges these bands. To stop, pick another rule for checkout."
+          :title="__('Used at checkout')"
+          :description="__('Checkout charges these bands. To stop, pick another rule for checkout.')"
         >
-          <Badge label="In use" theme="green" />
+          <Badge :label="__('In use')" theme="green" />
         </SettingsRow>
         <SettingsRow
           v-else
-          title="Use at checkout"
-          description="On, and checkout charges these bands instead of the rule it uses now."
+          :title="__('Use at checkout')"
+          :description="__('On, and checkout charges these bands instead of the rule it uses now.')"
         >
           <Switch v-model="useAtCheckout" size="sm" />
         </SettingsRow>
 
         <div class="flex flex-col gap-1 py-3">
-          <p class="text-base font-medium text-ink-gray-8">Bands</p>
+          <p class="text-base font-medium text-ink-gray-8">{{ __('Bands') }}</p>
 
           <div class="divide-y divide-outline-gray-1">
             <div v-for="row in rows" :key="row.key">
@@ -299,13 +309,13 @@ async function save() {
                   variant="ghost"
                   theme="red"
                   size="sm"
-                  aria-label="Remove band"
+                  :aria-label="__('Remove band')"
                   :loading="savingBand"
                   @click="removeDraftBand"
                 />
                 <Button
                   v-else
-                  label="Edit"
+                  :label="__('Edit')"
                   icon-left="lucide-pencil"
                   :disabled="Boolean(draft)"
                   @click="editRow(row)"
@@ -322,27 +332,27 @@ async function save() {
                     v-model="draft.from_value"
                     type="text"
                     inputmode="decimal"
-                    :label="`From (${moneyUnit})`"
+                    :label="__('From ({0})', [moneyUnit])"
                   />
                   <TextInput
                     v-model="draft.to_value"
                     type="text"
                     inputmode="decimal"
-                    :label="`To (${moneyUnit})`"
-                    placeholder="No limit"
+                    :label="__('To ({0})', [moneyUnit])"
+                    :placeholder="__('No limit')"
                   />
                   <TextInput
                     v-model="draft.shipping_amount"
                     type="text"
                     inputmode="decimal"
-                    :label="`Charge (${moneyUnit})`"
-                    placeholder="0 for free delivery"
+                    :label="__('Charge ({0})', [moneyUnit])"
+                    :placeholder="__('0 for free delivery')"
                   />
                   <Combobox
                     v-model="draft.shipping_service"
                     trigger="button"
-                    label="Delivery option"
-                    placeholder="Search delivery options"
+                    :label="__('Delivery option')"
+                    :placeholder="__('Search delivery options')"
                     :options="optionChoices"
                   />
                 </div>
@@ -360,9 +370,9 @@ async function save() {
                 <div class="flex items-center justify-end gap-2 pt-2">
                   <!-- Shut while the band saves: the write is already on its way, and closing the
                        draft under it would hide a refusal or show a band the merchant thought undone. -->
-                  <Button label="Cancel" :disabled="savingBand" @click="cancelDraft" />
+                  <Button :label="__('Cancel')" :disabled="savingBand" @click="cancelDraft" />
                   <Button
-                    label="Save"
+                    :label="__('Save')"
                     variant="solid"
                     theme="gray"
                     :loading="savingBand"
@@ -375,12 +385,12 @@ async function save() {
           </div>
 
           <p v-if="!rows.length" class="py-2 text-p-sm text-ink-gray-5">
-            No bands yet. Add one for each range of order totals you charge differently.
+            {{ __('No bands yet. Add one for each range of order totals you charge differently.') }}
           </p>
 
           <div class="pt-1">
             <Button
-              label="Add band"
+              :label="__('Add band')"
               icon-left="lucide-plus"
               variant="subtle"
               theme="gray"

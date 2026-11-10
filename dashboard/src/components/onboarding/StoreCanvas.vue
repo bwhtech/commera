@@ -26,7 +26,7 @@ const SIZES = {
     icons: 'gap-4',
     icon: 'size-4',
     hero: 'min-h-48 items-end justify-between p-8',
-    heroIcon: 'right-12 top-6 size-40',
+    heroIcon: 'end-12 top-6 size-40',
     heroLine: 'text-5xl',
     button: 'px-5 py-2 text-sm',
     grid: '-mx-3 grid-cols-4 gap-4 p-3',
@@ -42,7 +42,7 @@ const SIZES = {
     icons: 'gap-2.5',
     icon: 'size-3',
     hero: 'min-h-32 flex-col items-start justify-end gap-3 p-4',
-    heroIcon: 'right-3 top-3 size-20',
+    heroIcon: 'end-3 top-3 size-20',
     heroLine: 'text-2xl',
     button: 'px-3.5 py-1 text-2xs',
     grid: 'grid-cols-2 gap-2',
@@ -110,13 +110,13 @@ const accent = computed(() => (draft.primaryColor ? { backgroundColor: draft.pri
         {{ storeName
         }}<span
           v-if="isTyping"
-          class="ml-px inline-block w-0.5 bg-surface-gray-10 align-middle motion-safe:animate-pulse"
+          class="ms-px inline-block w-0.5 bg-surface-gray-10 align-middle motion-safe:animate-pulse"
           :class="size.caret"
         />
       </span>
       <span v-else class="h-2.5 rounded-full" :class="[look.tile, mobile ? 'w-14' : 'w-24']" />
 
-      <div class="ml-auto flex items-center" :class="size.icons">
+      <div class="ms-auto flex items-center" :class="size.icons">
         <Transition
           enter-active-class="transition-[opacity,transform] duration-500 ease-out-strong"
           enter-from-class="translate-x-1 opacity-0 motion-reduce:translate-x-0"
@@ -169,7 +169,7 @@ const accent = computed(() => (draft.primaryColor ? { backgroundColor: draft.pri
           >
             <!-- Brand colours run dark, so their label stays light: ink-base is white in light mode, and
                  under a dark look's data-theme the dark: variant swaps in the light end of the scale. -->
-            Shop
+            {{ __('Shop') }}
           </span>
         </Transition>
       </section>

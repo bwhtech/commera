@@ -15,12 +15,13 @@ import ThemeSettingsPanel from '../../components/storefront/ThemeSettingsPanel.v
 import PreviewOptions from '../../components/storefront/PreviewOptions.vue'
 import { SECTION_GROUPS, createLayoutEditor, pageLabel, saveThemeThumbnail } from '../../data/themeLayout'
 import { errorMessage } from '../../data/errors'
+import { __ } from '../../data/translation'
 import { confirmLeave } from '../../utils/confirmLeave'
 
 const PANELS = [
-  { label: 'Sections', value: 'tree' },
-  { label: 'Preview', value: 'preview' },
-  { label: 'Settings', value: 'settings' },
+  { label: __('Sections'), value: 'tree' },
+  { label: __('Preview'), value: 'preview' },
+  { label: __('Settings'), value: 'settings' },
 ]
 
 const route = useRoute()
@@ -73,10 +74,10 @@ function closeThemeSettings(then) {
 function leaveThemeSettings(then) {
   if (!themeSettingsDirty.value) return closeThemeSettings(then)
   dialog.confirm({
-    title: 'Discard unsaved theme settings?',
-    message: 'The changes you have not saved are lost.',
+    title: __('Discard unsaved theme settings?'),
+    message: __('The changes you have not saved are lost.'),
     theme: 'red',
-    confirmLabel: 'Discard',
+    confirmLabel: __('Discard'),
     onConfirm: () => {
       themeSettingsDirty.value = false
       closeThemeSettings(then)
@@ -97,7 +98,7 @@ async function toggleThemeSettings() {
 }
 
 const breadcrumbs = computed(() => [
-  { label: 'Themes', route: { name: 'StorefrontTheme' } },
+  { label: __('Themes'), route: { name: 'StorefrontTheme' } },
   { label: state.theme },
 ])
 
@@ -161,34 +162,39 @@ async function track(label, work) {
 const hasChanges = computed(() => hasUnsavedChanges.value || hasUnpublishedChanges.value)
 
 async function save() {
-  if (!hasUnsavedChanges.value) return toast.info('Nothing to save')
-  if (await track('Save', () => editor.save())) toast.success('Draft saved')
+  if (!hasUnsavedChanges.value) return toast.info(__('Nothing to save'))
+  if (await track('Save', () => editor.save())) toast.success(__('Draft saved'))
 }
 
 async function publish() {
-  if (!hasChanges.value) return toast.info('Already published')
+  if (!hasChanges.value) return toast.info(__('Already published'))
   if (!(await track('Publish', () => editor.publish()))) return
-  toast.success(state.live ? 'Published to your store' : `Published. Activate ${state.theme} to show it in your store.`)
+  toast.success(
+    state.live
+      ? __('Published to your store')
+      : __('Published. Activate {0} to show it in your store.', [state.theme]),
+  )
   saveThemeThumbnail(state.theme).catch((error) => console.error('Theme thumbnail was not saved', error))
 }
 
 function discard() {
   dialog.confirm({
-    title: 'Discard all unpublished changes?',
-    message: 'The layout goes back to what your store shows now.',
+    title: __('Discard all unpublished changes?'),
+    message: __('The layout goes back to what your store shows now.'),
     theme: 'red',
-    confirmLabel: 'Discard',
+    confirmLabel: __('Discard'),
     onConfirm: async () => {
-      if (await track('Discard', () => editor.discard())) toast.success('Changes discarded')
+      if (await track('Discard', () => editor.discard())) toast.success(__('Changes discarded'))
     },
   })
 }
 
 const actions = computed(() => [
-  ...(hasChanges.value ? [{ label: 'Discard', variant: 'subtle', onClick: discard }] : []),
-  { label: 'Save', variant: hasUnsavedChanges.value ? 'solid' : 'subtle', onClick: save },
+  ...(hasChanges.value ? [{ key: 'Discard', label: __('Discard'), variant: 'subtle', onClick: discard }] : []),
+  { key: 'Save', label: __('Save'), variant: hasUnsavedChanges.value ? 'solid' : 'subtle', onClick: save },
   {
-    label: 'Publish',
+    key: 'Publish',
+    label: __('Publish'),
     variant: !hasUnsavedChanges.value && hasUnpublishedChanges.value ? 'solid' : 'subtle',
     onClick: publish,
   },
@@ -200,13 +206,19 @@ onBeforeRouteLeave(async () => {
   // Theme settings survive a failed page load, so they are asked about before the load-error exit.
   if (
     themeSettingsDirty.value &&
-    !(await confirmLeave('Discard unsaved theme settings?', 'The theme settings you have not saved are lost.'))
+    !(await confirmLeave(
+      __('Discard unsaved theme settings?'),
+      __('The theme settings you have not saved are lost.'),
+    ))
   ) {
     return false
   }
   if (state.loadError) return true
   if (await saveIfChanged()) return true
-  return confirmLeave('Leave without saving?', 'Your layout changes could not be saved. Leaving now loses them.')
+  return confirmLeave(
+    __('Leave without saving?'),
+    __('Your layout changes could not be saved. Leaving now loses them.'),
+  )
 })
 
 useEventListener(window, 'beforeunload', (event) => {
@@ -228,9 +240,9 @@ async function retryLoad() {
       <div class="flex min-w-0 items-center gap-2">
         <Breadcrumbs class="min-w-0" :items="breadcrumbs" />
         <template v-if="state.loaded && !state.loadError">
-          <Badge v-if="hasUnpublishedChanges" label="Unpublished changes" theme="orange" variant="subtle" />
-          <Badge v-else label="Published" theme="green" variant="subtle" />
-          <Badge v-if="!state.live" label="Not live" theme="gray" variant="subtle" />
+          <Badge v-if="hasUnpublishedChanges" :label="__('Unpublished changes')" theme="orange" variant="subtle" />
+          <Badge v-else :label="__('Published')" theme="green" variant="subtle" />
+          <Badge v-if="!state.live" :label="__('Not live')" theme="gray" variant="subtle" />
         </template>
       </div>
 
@@ -250,11 +262,11 @@ async function retryLoad() {
       <div class="ms-auto flex items-center gap-2 lg:ms-0">
         <Button
           v-for="action in actions"
-          :key="action.label"
+          :key="action.key"
           :variant="action.variant"
           :label="action.label"
-          :disabled="busy && pendingAction !== action.label"
-          :loading="pendingAction === action.label"
+          :disabled="busy && pendingAction !== action.key"
+          :loading="pendingAction === action.key"
           @click="action.onClick"
         />
       </div>
@@ -264,15 +276,15 @@ async function retryLoad() {
       v-if="state.loadError"
       class="mt-16"
       icon="lucide-triangle-alert"
-      title="Could not open this theme"
+      :title="__('Could not open this theme')"
       :description="errorMessage(state.loadError)"
     >
-      <Button label="Try again" :loading="busy" @click="retryLoad" />
+      <Button :label="__('Try again')" :loading="busy" @click="retryLoad" />
     </EmptyState>
 
     <template v-else>
       <div v-if="!isWide" class="flex shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3 py-2">
-        <TabButtons v-model="panel" class="min-w-0 flex-1" :options="panels" aria-label="Panel" />
+        <TabButtons v-model="panel" class="min-w-0 flex-1" :options="panels" :aria-label="__('Panel')" />
         <PreviewOptions :state="state" :devices="false" />
       </div>
 
@@ -314,7 +326,7 @@ async function retryLoad() {
                 class="w-full !justify-start"
                 :variant="themeSettingsOpen ? 'subtle' : 'ghost'"
                 icon-left="lucide-settings"
-                label="Theme settings"
+                :label="__('Theme settings')"
                 :aria-pressed="themeSettingsOpen"
                 data-theme-settings-toggle
                 @click="toggleThemeSettings"
@@ -322,7 +334,7 @@ async function retryLoad() {
             </div>
           </SplitterPanel>
           <SplitterResizeHandle
-            class="relative z-10 w-0 border-l border-outline-gray-2 transition-colors after:absolute after:inset-y-0 after:-left-1 after:-right-1 after:content-[''] data-[state=drag]:border-outline-gray-4 data-[state=hover]:border-outline-gray-4"
+            class="relative z-10 w-0 border-s border-outline-gray-2 transition-colors after:absolute after:inset-y-0 after:-start-1 after:-end-1 after:content-[''] data-[state=drag]:border-outline-gray-4 data-[state=hover]:border-outline-gray-4"
             data-editor-handle="tree"
           />
           <SplitterPanel id="theme-editor-preview" :order="2" class="min-w-0">
@@ -349,7 +361,7 @@ async function retryLoad() {
               class="w-full !justify-start"
               variant="ghost"
               icon-left="lucide-settings"
-              label="Theme settings"
+              :label="__('Theme settings')"
               data-theme-settings-toggle
               @click="toggleThemeSettings"
             />

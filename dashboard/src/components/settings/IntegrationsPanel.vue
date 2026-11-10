@@ -5,6 +5,7 @@ import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import EmptyState from '../EmptyState.vue'
 import IntegrationCard from './IntegrationCard.vue'
 import IntegrationConfig from './IntegrationConfig.vue'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   store: { type: Object, required: true },
@@ -28,8 +29,8 @@ async function toggle(card, enabled) {
   const saved = await props.store.save(card.slug, enabled, {})
   if (!saved) return
 
-  if (saved.enabled) toast.success(`${saved.label} is on`)
-  else toast.success(`${saved.label} is off`)
+  if (saved.enabled) toast.success(__('{0} is on', [saved.label]))
+  else toast.success(__('{0} is off', [saved.label]))
 }
 
 async function saveCurrent({ enabled, values }) {
@@ -37,7 +38,7 @@ async function saveCurrent({ enabled, values }) {
   if (!saved) return
 
   configuring.value = null
-  toast.success(`${saved.label} saved`)
+  toast.success(__('{0} saved', [saved.label]))
 }
 </script>
 
@@ -47,7 +48,11 @@ async function saveCurrent({ enabled, values }) {
       <template #actions>
         <Badge
           v-if="store.incomplete.value.length"
-          :label="`${store.incomplete.value.length} ${store.incomplete.value.length === 1 ? 'needs' : 'need'} keys`"
+          :label="
+            store.incomplete.value.length === 1
+              ? __('1 needs keys')
+              : __('{0} need keys', [store.incomplete.value.length])
+          "
           theme="amber"
           variant="subtle"
         />
@@ -56,8 +61,8 @@ async function saveCurrent({ enabled, values }) {
     <SettingsBody v-scroll-fade>
       <!-- A refused read must not read as "this store has no providers". -->
       <div v-if="store.loadError.value" class="py-6 text-base text-ink-gray-5">
-        These could not be loaded.
-        <Button label="Try again" variant="ghost" @click="store.load()" />
+        {{ __('These could not be loaded.') }}
+        <Button :label="__('Try again')" variant="ghost" @click="store.load()" />
       </div>
       <!-- Shaped like IntegrationCard's row so the list does not shift. First load only: a
            save keeps `cards` populated and must not blank the list under the switch. -->
@@ -72,7 +77,7 @@ async function saveCurrent({ enabled, values }) {
             <Skeleton class="h-4 w-32 rounded-4" />
             <Skeleton class="mt-2 h-3.5 w-48 rounded-4" />
           </div>
-          <div class="ml-auto flex shrink-0 items-center gap-3">
+          <div class="ms-auto flex shrink-0 items-center gap-3">
             <Skeleton class="h-7 w-20 rounded-4" />
             <Skeleton class="h-4 w-8 rounded-full" />
           </div>
@@ -84,8 +89,8 @@ async function saveCurrent({ enabled, values }) {
         v-else-if="!store.cards.value.length"
         compact
         icon="lucide-plug"
-        title="No integrations available"
-        description="Install a payments or delivery app to see it here."
+        :title="__('No integrations available')"
+        :description="__('Install a payments or delivery app to see it here.')"
       />
       <div v-else class="divide-y divide-outline-gray-1">
         <IntegrationCard

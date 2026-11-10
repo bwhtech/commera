@@ -12,6 +12,7 @@ import { useAdminRead } from '../../data/api'
 import { hasValues, monthsForRange } from '../../data/analytics'
 import { compactMoney, money } from '../../data/format'
 import { ia } from '../../ia/store'
+import { __ } from '../../data/translation'
 
 const range = ref('Last 12 months')
 const compare = ref(true)
@@ -44,10 +45,10 @@ const stats = computed(() => {
   const aov = totals.value.aov
   const refunds = totals.value.refunds
   return [
-    { label: 'Gross revenue', value: compactMoney(revenue?.value ?? 0), delta: deltaLabel(revenue), up: (delta(revenue) ?? 0) >= 0 },
-    { label: 'Orders', value: (orders?.value ?? 0).toLocaleString('en-IN'), delta: deltaLabel(orders), up: (delta(orders) ?? 0) >= 0 },
-    { label: 'Avg. order value', value: money(aov?.value ?? 0), delta: deltaLabel(aov), up: (delta(aov) ?? 0) >= 0 },
-    { label: 'Refunded', value: compactMoney(refunds?.value ?? 0), delta: deltaLabel(refunds), up: (delta(refunds) ?? 0) <= 0 },
+    { label: __('Gross revenue'), value: compactMoney(revenue?.value ?? 0), delta: deltaLabel(revenue), up: (delta(revenue) ?? 0) >= 0 },
+    { label: __('Orders'), value: (orders?.value ?? 0).toLocaleString('en-IN'), delta: deltaLabel(orders), up: (delta(orders) ?? 0) >= 0 },
+    { label: __('Avg. order value'), value: money(aov?.value ?? 0), delta: deltaLabel(aov), up: (delta(aov) ?? 0) >= 0 },
+    { label: __('Refunded'), value: compactMoney(refunds?.value ?? 0), delta: deltaLabel(refunds), up: (delta(refunds) ?? 0) <= 0 },
   ]
 })
 
@@ -61,19 +62,19 @@ const hasMonthlyActivity = computed(() => hasValues(months.value, 'revenue', 'or
 // so they say it in one voice.
 const noRevenueState = {
   icon: 'lucide-chart-line',
-  title: 'No revenue in this period',
-  description: 'Try a wider date range.',
+  title: __('No revenue in this period'),
+  description: __('Try a wider date range.'),
 }
 </script>
 
 <template>
-  <ReportHeader title="Revenue" v-model:range="range" v-model:compare="compare" />
+  <ReportHeader :title="__('Revenue')" v-model:range="range" v-model:compare="compare" />
 
   <PageBody width="narrow">
     <div>
-      <h1 class="text-2xl text-ink-gray-9">Revenue</h1>
+      <h1 class="text-2xl text-ink-gray-9">{{ __('Revenue') }}</h1>
       <p class="mt-1 text-p-base text-ink-gray-6">
-        What the store earned, and what came back off the top. {{ range }}.
+        {{ __('What the store earned, and what came back off the top. {0}.', [__(range)]) }}
       </p>
     </div>
 
@@ -89,7 +90,7 @@ const noRevenueState = {
     <Skeleton v-if="reportRequest.loading && !months.length" class="mt-6 h-[21.75rem] w-full rounded-5" />
 
     <section v-else class="mt-6 rounded-5 border border-outline-gray-1 p-4">
-      <h2 class="text-lg-semibold text-ink-gray-8">Revenue over time</h2>
+      <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Revenue over time') }}</h2>
       <EmptyState v-if="!hasValues(months, 'revenue')" compact v-bind="noRevenueState" />
       <div v-else class="h-72">
         <AreaChart :data="months" x="label" :y="['revenue']" palette="categorical" />
@@ -101,9 +102,13 @@ const noRevenueState = {
 
       <section v-else class="rounded-5 border border-outline-gray-1 p-4">
         <div class="flex flex-wrap items-baseline justify-between gap-x-3">
-          <h2 class="text-lg-semibold text-ink-gray-8">Discounts given</h2>
+          <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Discounts given') }}</h2>
           <span v-if="discounts.orders" class="text-sm text-ink-gray-5 tabular-nums">
-            {{ money(discounts.given) }} on {{ discounts.orders }} {{ discounts.orders === 1 ? 'order' : 'orders' }}
+            {{
+              discounts.orders === 1
+                ? __('{0} on 1 order', [money(discounts.given)])
+                : __('{0} on {1} orders', [money(discounts.given), discounts.orders])
+            }}
           </span>
         </div>
         <EmptyState v-if="!hasValues(months, 'discounts')" compact v-bind="noRevenueState" />
@@ -114,7 +119,7 @@ const noRevenueState = {
       <Skeleton v-if="reportRequest.loading && !months.length" class="h-[17.75rem] w-full rounded-5" />
 
       <section v-else class="rounded-5 border border-outline-gray-1 p-4">
-        <h2 class="text-lg-semibold text-ink-gray-8">Average order value</h2>
+        <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Average order value') }}</h2>
         <EmptyState v-if="!hasValues(months, 'aov')" compact v-bind="noRevenueState" />
         <div v-else class="h-56">
           <BarChart :data="months" x="label" :y="['aov']" />
@@ -123,13 +128,13 @@ const noRevenueState = {
     </div>
 
     <section class="mt-6 rounded-5 border border-outline-gray-1">
-      <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">Top discounts</h2>
+      <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">{{ __('Top discounts') }}</h2>
       <div class="px-2 pb-2">
         <List :columns="['minmax(0,1fr)', '6rem', '8rem']" :row-height="Math.max(ia.density, 44)">
           <ListHeader>
-            <ListHeaderCell>Discount</ListHeaderCell>
-            <ListHeaderCell>Orders</ListHeaderCell>
-            <ListHeaderCell>Given</ListHeaderCell>
+            <ListHeaderCell>{{ __('Discount') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Orders') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Given') }}</ListHeaderCell>
           </ListHeader>
           <ListSkeleton v-if="reportRequest.loading && !reportRequest.data" :columns="3" />
           <ListRows v-else :items="discounts.top" row-key="label" v-slot="{ item }">
@@ -144,14 +149,14 @@ const noRevenueState = {
           v-if="!reportRequest.loading && !reportRequest.error && !discounts.top.length"
           compact
           icon="lucide-ticket-percent"
-          title="No discounts in this period"
-          description="Orders that use a code or an automatic discount show up here."
+          :title="__('No discounts in this period')"
+          :description="__('Orders that use a code or an automatic discount show up here.')"
         />
       </div>
     </section>
 
     <section class="mt-6 rounded-5 border border-outline-gray-1">
-      <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">By month</h2>
+      <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">{{ __('By month') }}</h2>
       <div class="overflow-x-auto px-2 pb-2">
         <List
           class="min-w-[46rem]"
@@ -159,12 +164,12 @@ const noRevenueState = {
           :row-height="Math.max(ia.density, 44)"
         >
           <ListHeader>
-            <ListHeaderCell>Month</ListHeaderCell>
-            <ListHeaderCell>Revenue</ListHeaderCell>
-            <ListHeaderCell>Orders</ListHeaderCell>
-            <ListHeaderCell>Discounts</ListHeaderCell>
-            <ListHeaderCell>Refunds</ListHeaderCell>
-            <ListHeaderCell>Net</ListHeaderCell>
+            <ListHeaderCell>{{ __('Month') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Revenue') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Orders') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Discounts') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Refunds') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Net') }}</ListHeaderCell>
           </ListHeader>
           <ListSkeleton v-if="reportRequest.loading && !rows.length" :columns="6" />
           <ListRows v-else-if="hasMonthlyActivity" :items="rows" row-key="month" v-slot="{ item }">

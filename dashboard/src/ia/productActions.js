@@ -1,6 +1,7 @@
 import { dialog, toast } from 'frappe-ui'
 import { useAdminAction, trySubmit } from '../data/api'
 import { pickCollectionFor } from '../data/collections'
+import { __ } from '../data/translation'
 
 // Every action a merchant can take from a product page, grouped by intent.
 // The `productActions` IA axis only changes where these are rendered — the set
@@ -37,7 +38,7 @@ export function buildProductActions(product, router, handlers = {}) {
 
   const publish = {
     key: 'publish',
-    label: isPublished ? 'Unpublish' : 'Publish to storefront',
+    label: isPublished ? __('Unpublish') : __('Publish to storefront'),
     icon: isPublished ? 'lucide-eye-off' : 'lucide-globe',
     onClick: handlers.onTogglePublish,
   }
@@ -45,7 +46,7 @@ export function buildProductActions(product, router, handlers = {}) {
   const groups = [
     {
       id: 'storefront',
-      label: 'Storefront',
+      label: __('Storefront'),
       items: [
         publish,
         // Both rows need a route to point at; a product whose options have
@@ -53,22 +54,22 @@ export function buildProductActions(product, router, handlers = {}) {
         // offered and then apologised for.
         liveUrl && {
           key: 'preview',
-          label: 'Preview on storefront',
+          label: __('Preview on storefront'),
           icon: 'lucide-external-link',
           onClick: () => window.open(liveUrl, '_blank', 'noopener'),
         },
         liveUrl && {
           key: 'link',
-          label: 'Copy product link',
+          label: __('Copy product link'),
           icon: 'lucide-link',
           // The clipboard is refused outright over plain http and in some embedded
           // browsers, so the link is put in front of the merchant to copy by hand.
           onClick: async () => {
             try {
               await navigator.clipboard.writeText(liveUrl)
-              toast.success('Link copied')
+              toast.success(__('Link copied'))
             } catch {
-              toast.error('Could not copy the link', { description: liveUrl })
+              toast.error(__('Could not copy the link'), { description: liveUrl })
             }
           },
         },
@@ -76,7 +77,7 @@ export function buildProductActions(product, router, handlers = {}) {
         // commera has no per-product SEO field to edit, here or in Desk.
         {
           key: 'seo',
-          label: 'See storefront addresses',
+          label: __('See storefront addresses'),
           icon: 'lucide-link',
           onClick: () => handlers.onScrollTo?.('product-storefront'),
         },
@@ -84,25 +85,25 @@ export function buildProductActions(product, router, handlers = {}) {
     },
     {
       id: 'catalogue',
-      label: 'Catalogue',
+      label: __('Catalogue'),
       items: [
         // The axis is fixed at creation and no endpoint adds another, so the section it
         // scrolls to only names the one this product has — the row says exactly that.
         {
           key: 'option',
-          label: 'See options',
+          label: __('See options'),
           icon: 'lucide-git-branch',
           onClick: () => handlers.onScrollTo?.('product-options'),
         },
         {
           key: 'bulk',
-          label: 'Bulk edit variants',
+          label: __('Bulk edit variants'),
           icon: 'lucide-table-2',
           onClick: () => handlers.onScrollTo?.('product-variants'),
         },
         {
           key: 'collection',
-          label: 'Add to collection',
+          label: __('Add to collection'),
           icon: 'lucide-layers',
           onClick: () =>
             pickCollectionFor([product.id], {
@@ -115,20 +116,23 @@ export function buildProductActions(product, router, handlers = {}) {
     },
     {
       id: 'inventory',
-      label: 'Inventory',
+      label: __('Inventory'),
       items: [
         // Same operation as the Stock screen's "Adjust quantity", so it is
         // worded the same: commera only exposes an additive receipt, there is
         // no reason-coded adjustment and no "set on-hand to X".
         itemCodes.length && {
           key: 'adjust',
-          label: 'Receive stock',
+          label: __('Receive stock'),
           icon: 'lucide-package-plus',
           onClick: () =>
             dialog.prompt({
-              title: `Receive stock on ${product.title}`,
-              message: `Adds this quantity to each of the ${itemCodes.length} sizes under this product. There is no way to set stock to an exact number here.`,
-              fields: [{ name: 'value', label: 'Quantity received', type: 'number', required: true }],
+              title: __('Receive stock on {0}', [product.title]),
+              message: __(
+                'Adds this quantity to each of the {0} sizes under this product. There is no way to set stock to an exact number here.',
+                [itemCodes.length],
+              ),
+              fields: [{ name: 'value', label: __('Quantity received'), type: 'number', required: true }],
               onConfirm: async ({ values }) => {
                 const quantity = Math.max(0, Number(values.value) || 0)
                 if (!quantity) return
@@ -138,24 +142,25 @@ export function buildProductActions(product, router, handlers = {}) {
                 })
                 if (!received) return
 
-                toast.success(`Received ${quantity} on ${itemCodes.length} sizes`)
+                toast.success(__('Received {0} on {1} sizes', [quantity, itemCodes.length]))
                 handlers.onReload?.()
               },
             }),
         },
         {
           key: 'restock',
-          label: 'Set the low-stock level',
+          label: __('Set the low-stock level'),
           icon: 'lucide-bell',
           onClick: () =>
             dialog.prompt({
-              title: 'Set the low-stock level',
-              message:
+              title: __('Set the low-stock level'),
+              message: __(
                 'Every size of this product reads as Low stock on the Stock screen at or below this number. Nobody is notified.',
+              ),
               fields: [
                 {
                   name: 'value',
-                  label: 'Low-stock level',
+                  label: __('Low-stock level'),
                   type: 'number',
                   required: true,
                   defaultValue: String(product.restock_level ?? ''),
@@ -168,7 +173,7 @@ export function buildProductActions(product, router, handlers = {}) {
                 const saved = await trySubmit(restockLevelAction, { item_template: product.id, level })
                 if (!saved) return
 
-                toast.success(`Low stock now reads at ${level} or below`)
+                toast.success(__('Low stock now reads at {0} or below', [level]))
                 handlers.onReload?.()
               },
             }),
@@ -177,27 +182,27 @@ export function buildProductActions(product, router, handlers = {}) {
     },
     {
       id: 'pricing',
-      label: 'Pricing',
+      label: __('Pricing'),
       items: [
-        { key: 'price', label: 'Bulk edit prices across products', icon: 'lucide-indian-rupee', onClick: () => router.push('/pricing') },
+        { key: 'price', label: __('Bulk edit prices across products'), icon: 'lucide-indian-rupee', onClick: () => router.push('/pricing') },
       ],
     },
     {
       id: 'insight',
-      label: 'Reporting',
+      label: __('Reporting'),
       items: [
         // orders.get_orders searches order name and customer name only — there is no
         // product filter to send, so the row promises no more than the trip it makes.
-        { key: 'orders', label: 'Open the orders list', icon: 'lucide-shopping-bag', onClick: () => router.push('/orders') },
+        { key: 'orders', label: __('Open the orders list'), icon: 'lucide-shopping-bag', onClick: () => router.push('/orders') },
       ],
     },
     {
       id: 'manage',
-      label: 'Manage',
+      label: __('Manage'),
       items: [
         {
           key: 'archive',
-          label: isArchived ? 'Restore from archive' : 'Archive',
+          label: isArchived ? __('Restore from archive') : __('Archive'),
           icon: isArchived ? 'lucide-archive-restore' : 'lucide-archive',
           // Restoring is undoable and goes straight through; archiving takes the product
           // off the storefront, so only that half asks first.
@@ -207,30 +212,31 @@ export function buildProductActions(product, router, handlers = {}) {
               return
             }
             dialog.confirm({
-              title: 'Archive this product?',
-              message: 'It leaves the storefront. Past orders keep their line items.',
+              title: __('Archive this product?'),
+              message: __('It leaves the storefront. Past orders keep their line items.'),
               theme: 'red',
-              confirmLabel: 'Archive',
+              confirmLabel: __('Archive'),
               onConfirm: handlers.onToggleArchive,
             })
           },
         },
         {
           key: 'delete',
-          label: 'Delete',
+          label: __('Delete'),
           icon: 'lucide-trash-2',
           theme: 'red',
           onClick: () =>
             dialog.confirm({
-              title: `Delete ${product.title}?`,
-              message:
+              title: __('Delete {0}?', [product.title]),
+              message: __(
                 'This removes the product, its options and every size under it, for good. A product that has ever been ordered cannot be deleted — archive it instead, and its past orders keep their line items.',
+              ),
               theme: 'red',
-              confirmLabel: 'Delete',
+              confirmLabel: __('Delete'),
               onConfirm: async () => {
                 const deleted = await trySubmit(deleteAction, { item_template: product.id })
                 if (!deleted) return
-                toast.success(`${product.title} deleted`)
+                toast.success(__('{0} deleted', [product.title]))
                 router.push('/products')
               },
             }),

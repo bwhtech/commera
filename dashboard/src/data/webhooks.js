@@ -1,6 +1,7 @@
 import { computed, effectScope } from 'vue'
 import { createAdminCaller } from './adminCaller'
 import { useAdminRead } from './api'
+import { __ } from './translation'
 
 // A module-level read, not one inside the panel: the settings sidebar shows a failing webhook's
 // dot before the tab is ever opened.
@@ -40,7 +41,7 @@ export const webhookStore = {
 export const webhookActions = createAdminCaller('webhooks.')
 
 export function eventLabel(event) {
-  if (event === TEST_EVENT) return 'Test event'
+  if (event === TEST_EVENT) return __('Test event')
   return eventLabels.value.get(event) ?? event
 }
 
@@ -62,10 +63,10 @@ export function pathOf(url) {
 }
 
 const HEALTH = {
-  off: { label: 'Off', theme: 'gray' },
-  failing: { label: 'Failing', theme: 'amber' },
-  new: { label: 'Nothing sent yet', theme: 'blue' },
-  active: { label: 'Active', theme: 'green' },
+  off: { label: __('Off'), theme: 'gray' },
+  failing: { label: __('Failing'), theme: 'amber' },
+  new: { label: __('Nothing sent yet'), theme: 'blue' },
+  active: { label: __('Active'), theme: 'green' },
 }
 
 export function healthOf(webhook) {
@@ -76,7 +77,3 @@ export function healthOf(webhook) {
 }
 
 export const LOG_STATUS_THEMES = { Done: 'green', Retrying: 'amber', Failed: 'red' }
-
-export function plural(count, word) {
-  return `${count} ${word}${count === 1 ? '' : 's'}`
-}

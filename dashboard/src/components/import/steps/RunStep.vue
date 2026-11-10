@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { Alert, Badge, Button, Spinner } from 'frappe-ui'
 import { STEPS, beginPhase, closeImport, endPhase, imp, isCurrentImport } from '../../../data/importFlow'
 import { useAdminAction, trySubmit } from '../../../data/api'
+import { __ } from '../../../data/translation'
 import { openSettings } from '../../../ia/settings'
 import ProductThumb from '../ProductThumb.vue'
 
@@ -64,9 +65,9 @@ function finish(path) {
 }
 
 const NEXT = [
-  { icon: 'lucide-credit-card', title: 'Turn on payments', body: 'Accept cards and UPI at checkout.', run: () => (closeImport(), openSettings('payments')) },
-  { icon: 'lucide-truck', title: 'Set shipping rates', body: 'Flat rate, or by weight and pin code.', run: () => (closeImport(), openSettings('shipping')) },
-  { icon: 'lucide-globe', title: 'Set up the storefront', body: 'Theme, navigation and pages.', run: () => finish('/storefront/theme') },
+  { icon: 'lucide-credit-card', title: __('Turn on payments'), body: __('Accept cards and UPI at checkout.'), run: () => (closeImport(), openSettings('payments')) },
+  { icon: 'lucide-truck', title: __('Set shipping rates'), body: __('Flat rate, or by weight and pin code.'), run: () => (closeImport(), openSettings('shipping')) },
+  { icon: 'lucide-globe', title: __('Set up the storefront'), body: __('Theme, navigation and pages.'), run: () => finish('/storefront/theme') },
 ]
 </script>
 
@@ -75,23 +76,27 @@ const NEXT = [
     <!-- Running -->
     <template v-if="imp.phase === 'running'">
       <div>
-        <h2 class="text-xl text-ink-gray-9">Importing your catalogue</h2>
-        <p class="mt-1 text-p-base text-ink-gray-6">This only takes a moment.</p>
+        <h2 class="text-xl text-ink-gray-9">{{ __('Importing your catalogue') }}</h2>
+        <p class="mt-1 text-p-base text-ink-gray-6">{{ __('This only takes a moment.') }}</p>
       </div>
 
       <div class="rounded-5 border border-outline-gray-1 p-5">
         <div class="flex items-center gap-3">
           <Spinner class="size-4" />
-          <span class="text-base text-ink-gray-8">Creating {{ imp.counts.products }} products…</span>
+          <span class="text-base text-ink-gray-8">{{ __('Creating {0} products…', [imp.counts.products]) }}</span>
         </div>
       </div>
 
       <Alert
         v-if="slow"
         theme="amber"
-        description="This is taking longer than usual. It is still running: you can close this window, and the products appear in your catalogue when it finishes."
+        :description="
+          __(
+            'This is taking longer than usual. It is still running: you can close this window, and the products appear in your catalogue when it finishes.',
+          )
+        "
       />
-      <Alert v-else description="Products appear in your catalogue as they land, so you can start editing right away." />
+      <Alert v-else :description="__('Products appear in your catalogue as they land, so you can start editing right away.')" />
     </template>
 
     <!-- Failed outright (e.g. this store has no Color/Size attribute) -->
@@ -100,13 +105,13 @@ const NEXT = [
         <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-red-2 text-ink-red-6">
           <span class="lucide-triangle-alert size-6" aria-hidden="true" />
         </div>
-        <h2 class="mt-4 text-xl text-ink-gray-9">The import could not run</h2>
+        <h2 class="mt-4 text-xl text-ink-gray-9">{{ __('The import could not run') }}</h2>
         <p class="mx-auto mt-1.5 max-w-[460px] text-p-base text-ink-gray-6">
           {{ runImportAction.error?.message }}
         </p>
         <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
-          <Button variant="solid" theme="gray" icon-left="lucide-arrow-left" label="Back to review" @click="backToReview" />
-          <Button label="Close" @click="closeImport" />
+          <Button variant="solid" theme="gray" icon-left="lucide-arrow-left rtl:-scale-x-100" :label="__('Back to review')" @click="backToReview" />
+          <Button :label="__('Close')" @click="closeImport" />
         </div>
       </div>
     </template>
@@ -117,12 +122,12 @@ const NEXT = [
         <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-green-2 text-ink-green-7">
           <span class="lucide-party-popper size-6" aria-hidden="true" />
         </div>
-        <h2 class="mt-4 text-2xl text-ink-gray-9">{{ imp.created.length }} products are live</h2>
+        <h2 class="mt-4 text-2xl text-ink-gray-9">{{ __('{0} products are live', [imp.created.length]) }}</h2>
         <p class="mx-auto mt-1.5 max-w-[460px] text-p-base text-ink-gray-6">
           {{
             imp.imagesAttached
-              ? `Your catalogue now has these products, with ${imp.imagesAttached} photos already on them.`
-              : 'Your catalogue now has these products. Add photos from each product page to publish them.'
+              ? __('Your catalogue now has these products, with {0} photos already on them.', [imp.imagesAttached])
+              : __('Your catalogue now has these products. Add photos from each product page to publish them.')
           }}
         </p>
 
@@ -131,45 +136,45 @@ const NEXT = [
         </div>
 
         <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
-          <Button variant="solid" theme="gray" label="View my products" @click="finish('/products')" />
-          <Button label="Back to overview" @click="finish('/')" />
+          <Button variant="solid" theme="gray" :label="__('View my products')" @click="finish('/products')" />
+          <Button :label="__('Back to overview')" @click="finish('/')" />
         </div>
       </div>
 
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="rounded-5 border border-outline-gray-1 p-4">
           <div class="text-2xl text-ink-gray-9 tabular-nums">{{ imp.created.length }}</div>
-          <div class="mt-0.5 text-sm text-ink-gray-5">products created</div>
+          <div class="mt-0.5 text-sm text-ink-gray-5">{{ __('products created') }}</div>
         </div>
         <div class="rounded-5 border border-outline-gray-1 p-4">
           <div class="flex items-baseline gap-2">
             <span class="text-2xl text-ink-red-6 tabular-nums">{{ imp.runRowErrors.length }}</span>
-            <Badge v-if="imp.runRowErrors.length" label="Fix and re-upload" theme="red" variant="subtle" />
+            <Badge v-if="imp.runRowErrors.length" :label="__('Fix and re-upload')" theme="red" variant="subtle" />
           </div>
-          <div class="mt-0.5 text-sm text-ink-gray-5">rows skipped</div>
+          <div class="mt-0.5 text-sm text-ink-gray-5">{{ __('rows skipped') }}</div>
         </div>
         <div class="rounded-5 border border-outline-gray-1 p-4">
           <div class="text-2xl tabular-nums text-ink-gray-9">{{ imp.imagesAttached }}</div>
-          <div class="mt-0.5 text-sm text-ink-gray-5">photos attached</div>
+          <div class="mt-0.5 text-sm text-ink-gray-5">{{ __('photos attached') }}</div>
         </div>
         <div class="rounded-5 border border-outline-gray-1 p-4">
           <div class="flex items-baseline gap-2">
             <span class="text-2xl tabular-nums text-ink-amber-7">{{ imp.runImageErrors.length }}</span>
-            <Badge v-if="imp.runImageErrors.length" label="Add from the product page" theme="amber" variant="subtle" />
+            <Badge v-if="imp.runImageErrors.length" :label="__('Add from the product page')" theme="amber" variant="subtle" />
           </div>
           <!-- The server reports one entry per spreadsheet row of a group whose photos
                failed, not one per photo, so this counts rows and says so. -->
-          <div class="mt-0.5 text-sm text-ink-gray-5">rows whose photos did not attach</div>
+          <div class="mt-0.5 text-sm text-ink-gray-5">{{ __('rows whose photos did not attach') }}</div>
         </div>
       </div>
 
       <div v-if="imp.runRowErrors.length" class="rounded-5 border border-outline-gray-1">
         <div class="border-b border-outline-gray-1 px-4 py-3 text-base-semibold text-ink-gray-8">
-          Rows that did not import
+          {{ __('Rows that did not import') }}
         </div>
         <div v-scroll-fade class="max-h-56 divide-y divide-outline-gray-1 overflow-y-auto">
           <div v-for="e in imp.runRowErrors" :key="e.row" class="flex items-start gap-3 px-4 py-2.5">
-            <span class="shrink-0 text-sm tabular-nums text-ink-gray-5">Row {{ e.row }}</span>
+            <span class="shrink-0 text-sm tabular-nums text-ink-gray-5">{{ __('Row {0}', [e.row]) }}</span>
             <span class="text-sm text-ink-gray-7">{{ e.message }}</span>
           </div>
         </div>
@@ -177,18 +182,18 @@ const NEXT = [
 
       <div v-if="imp.runImageErrors.length" class="rounded-5 border border-outline-gray-1">
         <div class="border-b border-outline-gray-1 px-4 py-3 text-base-semibold text-ink-gray-8">
-          Rows whose photos did not attach
+          {{ __('Rows whose photos did not attach') }}
         </div>
         <div v-scroll-fade class="max-h-56 divide-y divide-outline-gray-1 overflow-y-auto">
           <div v-for="e in imp.runImageErrors" :key="e.row + e.message" class="flex items-start gap-3 px-4 py-2.5">
-            <span v-if="e.row" class="shrink-0 text-sm tabular-nums text-ink-gray-5">Row {{ e.row }}</span>
+            <span v-if="e.row" class="shrink-0 text-sm tabular-nums text-ink-gray-5">{{ __('Row {0}', [e.row]) }}</span>
             <span class="text-sm text-ink-gray-7">{{ e.message }}</span>
           </div>
         </div>
       </div>
 
       <div class="rounded-5 border border-outline-gray-1 p-4">
-        <div class="text-base-semibold text-ink-gray-8">What usually comes next</div>
+        <div class="text-base-semibold text-ink-gray-8">{{ __('What usually comes next') }}</div>
         <div class="mt-3 divide-y divide-outline-gray-1">
           <div v-for="n in NEXT" :key="n.title" class="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
             <span :class="[n.icon, 'size-4 text-ink-gray-6']" aria-hidden="true" />
@@ -196,7 +201,7 @@ const NEXT = [
               <div class="text-base text-ink-gray-8">{{ n.title }}</div>
               <div class="text-sm text-ink-gray-5">{{ n.body }}</div>
             </div>
-            <Button variant="subtle" label="Start" @click="n.run" />
+            <Button variant="subtle" :label="__('Start')" @click="n.run" />
           </div>
         </div>
       </div>

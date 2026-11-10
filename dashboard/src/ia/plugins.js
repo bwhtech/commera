@@ -1,6 +1,7 @@
 import { h } from 'vue'
 import AppIcon from '../components/AppIcon.vue'
 import { bootValue } from '../data/boot'
+import { __ } from '../data/translation'
 import { runSidebarAction } from '../plugin-api/sidebar'
 import { openSettings } from './settingsRoute'
 
@@ -156,16 +157,16 @@ export function pluginCommands() {
 }
 
 const PLACE_LABELS = {
-  pages: 'Page',
-  sidebar: 'Sidebar action',
-  'order/cards': 'Order card',
-  'product/cards': 'Product card',
-  'customer/cards': 'Customer card',
-  'order/actions': 'Order action',
-  'product/actions': 'Product action',
-  'customer/actions': 'Customer action',
-  settings: 'Settings tab',
-  commands: 'Command',
+  pages: __('Page'),
+  sidebar: __('Sidebar action'),
+  'order/cards': __('Order card'),
+  'product/cards': __('Product card'),
+  'customer/cards': __('Customer card'),
+  'order/actions': __('Order action'),
+  'product/actions': __('Product action'),
+  'customer/actions': __('Customer action'),
+  settings: __('Settings tab'),
+  commands: __('Command'),
 }
 
 export function placeLabel(place) {

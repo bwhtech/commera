@@ -6,6 +6,7 @@ import ChromePreview from './ChromePreview.vue'
 import FooterLinkDialog from './FooterLinkDialog.vue'
 import { useFooter } from '../../data/footerEditor'
 import { errorMessage } from '../../data/errors'
+import { __ } from '../../data/translation'
 import { useIsMobile } from '../../utils/useIsMobile'
 
 const { sections, pages, loadError, previewToken, loading, load, mutate, reordered } = useFooter()
@@ -39,7 +40,7 @@ async function moveLinkToColumn(section, link, columnIndex, offset) {
     link_row_name: link.name,
     target_index: target.links.length,
   })
-  if (moved) toast.success(`Moved to ${target.title}`)
+  if (moved) toast.success(__('Moved to {0}', [target.title]))
 }
 
 async function moveSection(columnIndex, offset) {
@@ -54,26 +55,26 @@ async function moveSection(columnIndex, offset) {
 
 function addSection() {
   dialog.prompt({
-    title: 'Add a footer column',
-    fields: [{ name: 'title', label: 'Column title', placeholder: 'Help', required: true }],
-    confirmLabel: 'Add',
+    title: __('Add a footer column'),
+    fields: [{ name: 'title', label: __('Column title'), placeholder: __('Help'), required: true }],
+    confirmLabel: __('Add'),
     onConfirm: async ({ values }) => {
-      if (await mutate('add_section', { title: values.title.trim() })) toast.success('Column added')
+      if (await mutate('add_section', { title: values.title.trim() })) toast.success(__('Column added'))
     },
   })
 }
 
 function renameSection(section) {
   dialog.prompt({
-    title: 'Rename column',
-    fields: [{ name: 'title', label: 'Column title', defaultValue: section.title, required: true }],
-    confirmLabel: 'Rename',
+    title: __('Rename column'),
+    fields: [{ name: 'title', label: __('Column title'), defaultValue: section.title, required: true }],
+    confirmLabel: __('Rename'),
     onConfirm: async ({ values }) => {
       const renamed = await mutate('rename_section', {
         old_name: section.name,
         new_name: values.title,
       })
-      if (renamed) toast.success('Column renamed')
+      if (renamed) toast.success(__('Column renamed'))
     },
   })
 }
@@ -81,28 +82,30 @@ function renameSection(section) {
 function removeSection(section) {
   const count = section.links.length
   dialog.danger({
-    title: `Delete "${section.title}"?`,
+    title: __('Delete "{0}"?', [section.title]),
     message: count
-      ? `The ${count} ${count === 1 ? 'link' : 'links'} in this column go with it. Pages are not deleted.`
-      : 'Pages are not deleted — only this footer column.',
-    confirmLabel: 'Delete column',
+      ? count === 1
+        ? __('The 1 link in this column goes with it. Pages are not deleted.')
+        : __('The {0} links in this column go with it. Pages are not deleted.', [count])
+      : __('Pages are not deleted — only this footer column.'),
+    confirmLabel: __('Delete column'),
     onConfirm: async () => {
-      if (await mutate('delete_section', { name: section.name })) toast.success('Column deleted')
+      if (await mutate('delete_section', { name: section.name })) toast.success(__('Column deleted'))
     },
   })
 }
 
 function removeLink(section, link) {
   dialog.danger({
-    title: `Remove "${link.link_label}"?`,
-    message: 'The page it points at is not deleted — only this footer link.',
-    confirmLabel: 'Remove link',
+    title: __('Remove "{0}"?', [link.link_label]),
+    message: __('The page it points at is not deleted — only this footer link.'),
+    confirmLabel: __('Remove link'),
     onConfirm: async () => {
       const removed = await mutate('delete_link', {
         section_name: section.name,
         link_row_name: link.name,
       })
-      if (removed) toast.success('Link removed')
+      if (removed) toast.success(__('Link removed'))
     },
   })
 }
@@ -143,29 +146,29 @@ async function toggleLink(section, link) {
 
 function columnActions(section, columnIndex) {
   return [
-    { label: 'Add link', icon: 'lucide-plus', onClick: () => openLinkDialog(section) },
-    { label: 'Rename', icon: 'lucide-pencil', onClick: () => renameSection(section) },
+    { label: __('Add link'), icon: 'lucide-plus', onClick: () => openLinkDialog(section) },
+    { label: __('Rename'), icon: 'lucide-pencil', onClick: () => renameSection(section) },
     {
-      label: 'Move left',
+      label: __('Move left'),
       icon: 'lucide-arrow-left',
       disabled: columnIndex === 0,
       onClick: () => moveSection(columnIndex, -1),
     },
     {
-      label: 'Move right',
+      label: __('Move right'),
       icon: 'lucide-arrow-right',
       disabled: columnIndex === sections.value.length - 1,
       onClick: () => moveSection(columnIndex, 1),
     },
     {
-      label: section.enabled ? 'Hide from footer' : 'Show in footer',
+      label: section.enabled ? __('Hide from footer') : __('Show in footer'),
       icon: section.enabled ? 'lucide-eye-off' : 'lucide-eye',
       onClick: () => toggleSection(section),
     },
     {
-      group: 'Danger',
+      group: __('Danger'),
       options: [
-        { label: 'Delete column', icon: 'lucide-trash-2', theme: 'red', onClick: () => removeSection(section) },
+        { label: __('Delete column'), icon: 'lucide-trash-2', theme: 'red', onClick: () => removeSection(section) },
       ],
     },
   ]
@@ -173,40 +176,40 @@ function columnActions(section, columnIndex) {
 
 function linkActions(section, columnIndex, link, linkIndex) {
   return [
-    { label: 'Edit', icon: 'lucide-pencil', onClick: () => openLinkDialog(section, link) },
+    { label: __('Edit'), icon: 'lucide-pencil', onClick: () => openLinkDialog(section, link) },
     {
-      label: 'Move up',
+      label: __('Move up'),
       icon: 'lucide-arrow-up',
       disabled: linkIndex === 0,
       onClick: () => moveLinkWithinColumn(section, linkIndex, -1),
     },
     {
-      label: 'Move down',
+      label: __('Move down'),
       icon: 'lucide-arrow-down',
       disabled: linkIndex === section.links.length - 1,
       onClick: () => moveLinkWithinColumn(section, linkIndex, 1),
     },
     {
-      label: 'Move to previous column',
+      label: __('Move to previous column'),
       icon: 'lucide-arrow-left',
       disabled: columnIndex === 0,
       onClick: () => moveLinkToColumn(section, link, columnIndex, -1),
     },
     {
-      label: 'Move to next column',
+      label: __('Move to next column'),
       icon: 'lucide-arrow-right',
       disabled: columnIndex === sections.value.length - 1,
       onClick: () => moveLinkToColumn(section, link, columnIndex, 1),
     },
     {
-      label: link.enabled ? 'Hide from footer' : 'Show in footer',
+      label: link.enabled ? __('Hide from footer') : __('Show in footer'),
       icon: link.enabled ? 'lucide-eye-off' : 'lucide-eye',
       onClick: () => toggleLink(section, link),
     },
     {
-      group: 'Danger',
+      group: __('Danger'),
       options: [
-        { label: 'Remove link', icon: 'lucide-trash-2', theme: 'red', onClick: () => removeLink(section, link) },
+        { label: __('Remove link'), icon: 'lucide-trash-2', theme: 'red', onClick: () => removeLink(section, link) },
       ],
     },
   ]
@@ -216,7 +219,7 @@ function linkActions(section, columnIndex, link, linkIndex) {
 <template>
   <div>
     <div class="flex items-center justify-end">
-      <Button icon-left="lucide-plus" label="Add column" @click="addSection" />
+      <Button icon-left="lucide-plus" :label="__('Add column')" @click="addSection" />
     </div>
 
     <div
@@ -249,17 +252,17 @@ function linkActions(section, columnIndex, link, linkIndex) {
     <EmptyState
       v-else-if="loadError"
       icon="lucide-triangle-alert"
-      title="Could not load your footer"
+      :title="__('Could not load your footer')"
       :description="errorMessage(loadError)"
     />
 
     <EmptyState
       v-else-if="!sections.length"
       icon="lucide-columns-3"
-      title="No footer columns yet"
-      description="Add a column, then fill it with links to your pages."
+      :title="__('No footer columns yet')"
+      :description="__('Add a column, then fill it with links to your pages.')"
     >
-      <Button variant="subtle" theme="gray" label="Add column" @click="addSection" />
+      <Button variant="subtle" theme="gray" :label="__('Add column')" @click="addSection" />
     </EmptyState>
 
     <div v-else class="mt-3 flex items-start gap-3 overflow-x-auto pb-2">
@@ -276,14 +279,14 @@ function linkActions(section, columnIndex, link, linkIndex) {
             {{ section.title }}
           </span>
 
-          <Badge v-if="!section.enabled" variant="subtle" theme="amber" label="Hidden" />
+          <Badge v-if="!section.enabled" variant="subtle" :label="__('Hidden')" theme="amber" />
           <span class="shrink-0 text-sm text-ink-gray-5">{{ section.links.length }}</span>
 
-          <Tooltip text="Add a link">
+          <Tooltip :text="__('Add a link')">
             <Button
               variant="ghost"
               class="!size-5 shrink-0"
-              aria-label="Add a link to this column"
+              :aria-label="__('Add a link to this column')"
               @click="openLinkDialog(section)"
             >
               <template #icon>
@@ -293,7 +296,7 @@ function linkActions(section, columnIndex, link, linkIndex) {
           </Tooltip>
 
           <Dropdown :options="columnActions(section, columnIndex)">
-            <Button variant="ghost" class="!size-5 shrink-0" aria-label="Column actions">
+            <Button variant="ghost" class="!size-5 shrink-0" :aria-label="__('Column actions')">
               <template #icon>
                 <span class="lucide-ellipsis size-4 text-ink-gray-5" aria-hidden="true" />
               </template>
@@ -322,9 +325,9 @@ function linkActions(section, columnIndex, link, linkIndex) {
             </button>
 
             <div class="flex shrink-0 items-center gap-1">
-              <Badge v-if="!link.enabled" variant="subtle" theme="amber" label="Hidden" />
+              <Badge v-if="!link.enabled" variant="subtle" :label="__('Hidden')" theme="amber" />
               <Dropdown :options="linkActions(section, columnIndex, link, linkIndex)">
-                <Button variant="ghost" class="!size-5" aria-label="Link actions">
+                <Button variant="ghost" class="!size-5" :aria-label="__('Link actions')">
                   <template #icon>
                     <span class="lucide-ellipsis size-4 text-ink-gray-5" aria-hidden="true" />
                   </template>
@@ -340,7 +343,7 @@ function linkActions(section, columnIndex, link, linkIndex) {
             variant="ghost"
             theme="gray"
             icon-left="lucide-plus"
-            label="Add link"
+            :label="__('Add link')"
             @click="openLinkDialog(section)"
           />
         </div>
@@ -351,7 +354,7 @@ function linkActions(section, columnIndex, link, linkIndex) {
       v-model:collapsed="previewCollapsed"
       :token="previewToken"
       path="/footer_editor_preview"
-      title="Footer preview"
+      :title="__('Footer preview')"
       selector="footer"
     />
 

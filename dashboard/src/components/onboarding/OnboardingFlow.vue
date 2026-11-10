@@ -24,6 +24,7 @@ import {
 import { useTheme } from '../../data/theme'
 import { addProduct } from '../../data/addProduct'
 import { imp as productImport } from '../../data/importFlow'
+import { __ } from '../../data/translation'
 import { homeArrival } from '../../ia/homeTasks'
 import {
   adoptRecord,
@@ -94,9 +95,9 @@ const stepProps = computed(() => {
 })
 
 const title = computed(() => {
-  if (step.value.key === 'you') return draft.fullName ? `Welcome, ${draft.fullName.trim().split(' ')[0]}` : step.value.title
-  if (step.value.key === 'done' && storeSetup.status === 'failed') return 'Almost there'
-  if (step.value.key === 'done') return `${draft.storeName.trim() || 'Your store'} is ready`
+  if (step.value.key === 'you') return draft.fullName ? __('Welcome, {0}', [draft.fullName.trim().split(' ')[0]]) : step.value.title
+  if (step.value.key === 'done' && storeSetup.status === 'failed') return __('Almost there')
+  if (step.value.key === 'done') return draft.storeName.trim() ? __('{0} is ready', [draft.storeName.trim()]) : __('Your store is ready')
   return step.value.title
 })
 
@@ -211,12 +212,12 @@ watch(
           v-if="flow.index > 0 && step.key !== 'done'"
           variant="ghost"
           size="md"
-          icon-left="lucide-arrow-left"
-          label="Back"
+          icon-left="lucide-arrow-left rtl:-scale-x-100"
+          :label="__('Back')"
           :disabled="saving"
           @click="goToStep(flow.index - 1)"
         />
-        <div class="ml-auto" aria-live="polite">
+        <div class="ms-auto" aria-live="polite">
           <Transition
             mode="out-in"
             enter-active-class="transition-[opacity,transform] duration-300 ease-out-strong"
@@ -229,9 +230,9 @@ watch(
               key="running"
               class="flex items-center gap-1.5 text-sm text-ink-gray-5"
               data-onboarding-setup="running"
-              title="Creating your company, books and warehouse"
+              :title="__('Creating your company, books and warehouse')"
             >
-              <Spinner class="size-3.5" /> Setting up
+              <Spinner class="size-3.5" /> {{ __('Setting up') }}
             </span>
             <span
               v-else-if="storeSetup.status === 'done'"
@@ -239,7 +240,7 @@ watch(
               class="flex items-center gap-1.5 text-sm text-ink-green-6"
               data-onboarding-setup="done"
             >
-              <span class="lucide-circle-check size-3.5" aria-hidden="true" /> Ready
+              <span class="lucide-circle-check size-3.5" aria-hidden="true" /> {{ __('Ready') }}
             </span>
             <span
               v-else-if="storeSetup.status === 'failed'"
@@ -247,7 +248,7 @@ watch(
               class="flex items-center gap-1.5 text-sm text-ink-red-6"
               data-onboarding-setup="failed"
             >
-              <span class="lucide-circle-alert size-3.5" aria-hidden="true" /> Setup failed
+              <span class="lucide-circle-alert size-3.5" aria-hidden="true" /> {{ __('Setup failed') }}
             </span>
           </Transition>
         </div>
@@ -255,8 +256,8 @@ watch(
 
       <div v-if="!record" class="flex flex-1 items-center justify-center">
         <div v-if="onboardingLoadError" class="space-y-3 text-center">
-          <p class="text-base text-ink-gray-6">Could not load your setup</p>
-          <Button label="Try again" :loading="loadStatus === 'loading'" @click="load" />
+          <p class="text-base text-ink-gray-6">{{ __('Could not load your setup') }}</p>
+          <Button :label="__('Try again')" :loading="loadStatus === 'loading'" @click="load" />
         </div>
         <Spinner v-else class="size-5 text-ink-gray-5" />
       </div>
@@ -267,7 +268,7 @@ watch(
           :class="entered && step.key !== 'done' ? 'translate-y-0 opacity-100' : 'translate-y-2.5 opacity-0 motion-reduce:translate-y-0'"
         >
           <div
-            class="h-full origin-left rounded-full bg-surface-gray-10 transition-transform duration-500 ease-in-out-strong"
+            class="h-full origin-left rounded-full rtl:origin-right bg-surface-gray-10 transition-transform duration-500 ease-in-out-strong"
             :class="PROGRESS[flow.index]"
           />
         </div>
@@ -276,16 +277,16 @@ watch(
           v-if="storeSetup.status === 'failed'"
           class="mb-6"
           theme="red"
-          :title="storeSetup.error || 'Store setup failed'"
-          :primary-action="{ label: 'Retry', loading: retrying, onClick: retrySetup }"
+          :title="storeSetup.error || __('Store setup failed')"
+          :primary-action="{ label: __('Retry'), loading: retrying, onClick: retrySetup }"
         />
         <Alert
           v-else-if="storeSetup.status === 'running' && storeSetup.poll === 'stalled'"
           class="mb-6"
           theme="amber"
-          title="Setup is taking longer than usual"
-          description="It may still finish. Check again in a minute, or reload the page."
-          :primary-action="{ label: 'Check again', onClick: resumeSetupPolling }"
+          :title="__('Setup is taking longer than usual')"
+          :description="__('It may still finish. Check again in a minute, or reload the page.')"
+          :primary-action="{ label: __('Check again'), onClick: resumeSetupPolling }"
         />
 
         <div
@@ -312,8 +313,8 @@ watch(
               <component :is="STEP_COMPONENTS[step.key]" v-bind="stepProps" @finish="finish" />
 
               <div v-if="step.key !== 'done'" class="mt-auto space-y-1 pt-8">
-                <Button type="submit" variant="solid" size="md" label="Continue" class="w-full" :loading="saving" />
-                <Button v-if="step.optional" variant="ghost" size="md" label="Skip" class="w-full" :disabled="saving" @click="goToStep(flow.index + 1)" />
+                <Button type="submit" variant="solid" size="md" :label="__('Continue')" class="w-full" :loading="saving" />
+                <Button v-if="step.optional" variant="ghost" size="md" :label="__('Skip')" class="w-full" :disabled="saving" @click="goToStep(flow.index + 1)" />
               </div>
             </form>
           </Transition>

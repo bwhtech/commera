@@ -22,6 +22,7 @@ import {
   toast,
 } from 'frappe-ui'
 import EmptyState from '../EmptyState.vue'
+import { __ } from '../../data/translation'
 import { createSequence } from '../../utils/sequence'
 
 const props = defineProps({
@@ -101,8 +102,8 @@ async function importSelected() {
     open.value = false
     toast.success(
       selections.length === 1
-        ? '1 delivery option imported'
-        : `${selections.length} delivery options imported`,
+        ? __('1 delivery option imported')
+        : __('{0} delivery options imported', [selections.length]),
     )
   } finally {
     importing.value = false
@@ -111,7 +112,7 @@ async function importSelected() {
 </script>
 
 <template>
-  <Dialog v-model:open="open" :title="`Import from ${provider?.label ?? 'carrier'}`">
+  <Dialog v-model:open="open" :title="provider?.label ? __('Import from {0}', [provider.label]) : __('Import from carrier')">
     <template #default>
       <!-- Shaped like the checkbox rows below — a box and its label — so the dialog does
            not resize under the pointer when the carrier answers. -->
@@ -124,26 +125,25 @@ async function importSelected() {
 
       <ErrorMessage
         v-else-if="failed"
-        message="These services could not be read from the carrier."
+        :message="__('These services could not be read from the carrier.')"
       />
 
       <EmptyState
         v-else-if="!serviceCount"
         compact
         icon="lucide-truck"
-        title="No services to import"
-        description="This carrier is not offering any services on the account it is connected with."
+        :title="__('No services to import')"
+        :description="__('This carrier is not offering any services on the account it is connected with.')"
       />
 
       <template v-else>
         <p class="text-p-base text-ink-gray-7">
-          Pick what shoppers should be offered at checkout. Each becomes a delivery option you
-          can rename the price rules on afterwards.
+          {{ __('Pick what shoppers should be offered at checkout. Each becomes a delivery option you can rename the price rules on afterwards.') }}
         </p>
 
         <!-- A carrier lists dozens of services across its accounts, so the list scrolls and
              the price below it — and the Import button under that — stay in reach. -->
-        <ScrollArea v-scroll-fade class="mt-4 max-h-96 border-y border-outline-gray-1" viewport-class="pr-3">
+        <ScrollArea v-scroll-fade class="mt-4 max-h-96 border-y border-outline-gray-1" viewport-class="pe-3">
           <div v-for="account in accounts" :key="account.carrier" class="pt-3">
             <p class="text-sm text-ink-gray-5">{{ account.description || account.carrier }}</p>
             <div class="mt-1 divide-y divide-outline-gray-1">
@@ -169,8 +169,8 @@ async function importSelected() {
           <FormControl
             v-model="backupCharge"
             type="number"
-            label="Fallback price"
-            description="Charged when the carrier gives no quote. Leave at 0 only if you will set a shipping rule on each option."
+            :label="__('Fallback price')"
+            :description="__('Charged when the carrier gives no quote. Leave at 0 only if you will set a shipping rule on each option.')"
           />
         </div>
       </template>
@@ -183,7 +183,7 @@ async function importSelected() {
         theme="gray"
         :loading="importing"
         :disabled="!selectedCodes.length"
-        :label="selectedCodes.length ? `Import ${selectedCodes.length}` : 'Import'"
+        :label="selectedCodes.length ? __('Import {0}', [selectedCodes.length]) : __('Import')"
         @click="importSelected"
       />
     </template>

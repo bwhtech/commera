@@ -1,6 +1,7 @@
 <script setup>
 import { computed, reactive, ref, useId } from 'vue'
 import { Button, FormControl, SettingsBody, toast } from 'frappe-ui'
+import { __ } from '../../data/translation'
 import SettingsConfigHeader from './SettingsConfigHeader.vue'
 import SettingsFieldRows from './SettingsFieldRows.vue'
 import StackedSettingsRow from './StackedSettingsRow.vue'
@@ -64,7 +65,7 @@ async function save() {
     const saved = await props.submit(payload)
     if (!saved) return
 
-    toast.success(isEdit.value ? 'Delivery option saved' : 'Delivery option added')
+    toast.success(isEdit.value ? __('Delivery option saved') : __('Delivery option added'))
     emit('back')
   } finally {
     saving.value = false
@@ -74,8 +75,8 @@ async function save() {
 
 <template>
   <SettingsConfigHeader
-    :title="isEdit ? option.title : 'Add a delivery option'"
-    description="What shoppers pick at checkout, and what it costs them."
+    :title="isEdit ? option.title : __('Add a delivery option')"
+    :description="__('What shoppers pick at checkout, and what it costs them.')"
     @back="emit('back')"
   >
     <template #actions>
@@ -85,7 +86,7 @@ async function save() {
         variant="solid"
         theme="gray"
         :loading="saving"
-        :label="isEdit ? 'Save' : 'Add'"
+        :label="isEdit ? __('Save') : __('Add')"
       />
     </template>
   </SettingsConfigHeader>
@@ -95,8 +96,8 @@ async function save() {
       <div class="divide-y divide-outline-gray-1">
         <StackedSettingsRow
           v-if="isEdit"
-          title="Name at checkout"
-          description="Orders are stored against this name, so it cannot be changed."
+          :title="__('Name at checkout')"
+          :description="__('Orders are stored against this name, so it cannot be changed.')"
         >
           <p class="text-base text-ink-gray-7">{{ option.title }}</p>
         </StackedSettingsRow>
@@ -104,10 +105,10 @@ async function save() {
         <div v-else class="py-3.5">
           <FormControl
             v-model="title"
-            label="Name at checkout"
+            :label="__('Name at checkout')"
             required
-            placeholder="Standard delivery"
-            description="What shoppers read beside the price. It cannot be changed later."
+            :placeholder="__('Standard delivery')"
+            :description="__('What shoppers read beside the price. It cannot be changed later.')"
           />
         </div>
 

@@ -31,8 +31,8 @@ function commitNumber(fieldname, event, label) {
 
 <template>
   <SettingsPanelHeader
-    title="Cash on delivery"
-    description="Taking payment at the door, and what it costs to offer it."
+    :title="__('Cash on delivery')"
+    :description="__('Taking payment at the door, and what it costs to offer it.')"
   />
 
   <SettingsBody v-scroll-fade>
@@ -41,49 +41,49 @@ function commitNumber(fieldname, event, label) {
       v-if="settings.error"
       compact
       icon="lucide-triangle-alert"
-      title="This could not be loaded"
-      description="Cash on delivery may still be on — this panel just cannot say."
+      :title="__('This could not be loaded')"
+      :description="__('Cash on delivery may still be on — this panel just cannot say.')"
     >
-      <Button label="Try again" variant="subtle" theme="gray" @click="settings.reload()" />
+      <Button :label="__('Try again')" variant="subtle" theme="gray" @click="settings.reload()" />
     </EmptyState>
 
     <SettingsSkeleton v-else-if="settings.loading && !settings.data" :rows="4" />
 
     <div v-else class="divide-y divide-outline-gray-1">
       <SettingsRow
-        title="Offer cash on delivery"
-        description="When off, checkout stops offering it — placed orders are unaffected."
+        :title="__('Offer cash on delivery')"
+        :description="__('When off, checkout stops offering it — placed orders are unaffected.')"
       >
         <Switch
           size="sm"
           :model-value="enabled"
           :disabled="save.loading"
-          @update:model-value="commit('cod_enabled', $event ? 1 : 0, 'Cash on delivery')"
+          @update:model-value="commit('cod_enabled', $event ? 1 : 0, __('Cash on delivery'))"
         />
       </SettingsRow>
 
       <!-- What it costs to offer COD is only worth asking while it is offered. -->
       <template v-if="enabled">
-        <SettingsRow title="COD charge" description="Added to the order when the fee applies.">
+        <SettingsRow :title="__('COD charge')" :description="__('Added to the order when the fee applies.')">
           <TextInput
             :model-value="values.cod_charge"
             class="w-full sm:w-40"
             type="number"
             :disabled="save.loading"
-            @change="commitNumber('cod_charge', $event, 'COD charge')"
+            @change="commitNumber('cod_charge', $event, __('COD charge'))"
           />
         </SettingsRow>
 
         <SettingsRow
-          title="Charge below order value"
-          description="The fee applies under this total, so bigger baskets carry no COD charge. Leave both at zero to never charge for it."
+          :title="__('Charge below order value')"
+          :description="__('The fee applies under this total, so bigger baskets carry no COD charge. Leave both at zero to never charge for it.')"
         >
           <TextInput
             :model-value="values.cod_charge_applicable_below"
             class="w-full sm:w-40"
             type="number"
             :disabled="save.loading"
-            @change="commitNumber('cod_charge_applicable_below', $event, 'Order value')"
+            @change="commitNumber('cod_charge_applicable_below', $event, __('Order value'))"
           />
         </SettingsRow>
       </template>
@@ -91,15 +91,15 @@ function commitNumber(fieldname, event, label) {
       <!-- Not COD's own, so it outlives the switch: the delivery charge posts here too, and
            hiding it with the rest would make that unreachable whenever COD is off. -->
       <SettingsRow
-        title="Charge account"
-        description="Where the COD and delivery charges post in your books."
+        :title="__('Charge account')"
+        :description="__('Where the COD and delivery charges post in your books.')"
       >
         <SettingsLinkControl
           :field="ACCOUNT_FIELD"
           :model-value="values.charge_account_head ?? ''"
           options-path="settings.get_link_options"
           class="w-full sm:w-72"
-          @update:model-value="commit('charge_account_head', $event, 'Charge account')"
+          @update:model-value="commit('charge_account_head', $event, __('Charge account'))"
         />
       </SettingsRow>
     </div>
