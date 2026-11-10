@@ -20,7 +20,8 @@ def main(site: str):
 	frappe.init(site)
 	frappe.connect()
 	try:
-		frappe.set_user("Guest")
+		# A dev script: generates the cases as a guest sees them, never on a live request.
+		frappe.set_user("Guest")  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
 		cases = json.loads(CASES_FILE.read_text())
 		write_cases(cases)
 		CASES_FILE.write_text(json.dumps(cases, indent="\t", ensure_ascii=False) + "\n")
