@@ -20,10 +20,7 @@
         {% if alt.x_default %}<link rel="alternate" hreflang="x-default" href="{{ alt.href|e }}">{% endif %}
     {% endfor %}
 
-    {# OG/FB want full locales (en_US, ar_AR), not the bare lang code Frappe uses #}
-    {% set og_locales = {"en": "en_US", "ar": "ar_AR"} %}
-    {# Derived from the canonical url because frappe.local.lang may not be set at macro-render time. #}
-    {% set lang = "ar" if (seo.url and "/ar/" in seo.url) else (frappe.local.lang or "en") %}
+    {% set og_locales = seo_og_locales() %}
     <meta property="og:type" content="{{ (seo.type or 'website')|e }}">
     {% if seo.title %}<meta property="og:title" content="{{ seo.title|e }}">{% endif %}
     {% if seo.description %}<meta property="og:description" content="{{ seo.description|e }}">{% endif %}
@@ -33,9 +30,9 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="{{ (seo.title or site_name)|e }}">{% endif %}
     <meta property="og:site_name" content="{{ site_name|e }}">
-    <meta property="og:locale" content="{{ og_locales.get(lang, 'en_US')|e }}">
-    {% for code, locale in og_locales.items() %}
-        {% if code != lang %}<meta property="og:locale:alternate" content="{{ locale|e }}">{% endif %}
+    {% if og_locales.locale %}<meta property="og:locale" content="{{ og_locales.locale|e }}">{% endif %}
+    {% for locale in og_locales.alternates or [] %}
+    <meta property="og:locale:alternate" content="{{ locale|e }}">
     {% endfor %}
     {% if seo.type == "product" %}
         {% if seo.price %}<meta property="og:price:amount" content="{{ seo.price|e }}">{% endif %}

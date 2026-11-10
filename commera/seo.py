@@ -5,8 +5,8 @@ import frappe
 from frappe.utils import cstr, flt, get_url, strip_html_tags
 
 from commera.branding import get_configured_brand_assets
-from commera.localization import get_request_path, strip_language_prefix
-from commera.localization.urls import get_locale_prefixes
+from commera.localization import Localization, alternates, get_localization, get_request_path
+from commera.localization.urls import get_locale_roots
 from commera.store_frame import get_shop_details
 from commera.utils import get_store_currency
 
@@ -84,14 +84,22 @@ def get_site_currency():
 	return get_store_currency()
 
 
-def build_alternates(path):
-	"""One hreflang entry per published language and enabled market URL, default first.
-	The default language is the x-default target."""
-	_language, path = strip_language_prefix(path or "/", include_unpublished=True)
-	return [
-		{"lang": hreflang, "href": get_url(prefix + path), "x_default": x_default}
-		for hreflang, prefix, x_default in get_locale_prefixes()
-	]
+def get_og_locales() -> dict:
+	"""og:locale of the request and og:locale:alternate of every other locale root."""
+	locale = get_og_locale(get_localization())
+	others = []
+	for root in get_locale_roots():
+		if root.og_locale not in (locale, *others):
+			others.append(root.og_locale)
+	return {"locale": locale, "alternates": others}
+
+
+def get_og_locale(localization: Localization) -> str:
+	"""The Open Graph locale of `localization`: a secondary market adds its country."""
+	market = localization.market
+	if not market or market.is_primary:
+		return localization.language.og_locale()
+	return localization.language.og_locale(localization.country or market.countries[0])
 
 
 def schema_availability(availability):
@@ -131,7 +139,7 @@ def build_product_seo(
 		"image": resolved_image,
 		"url": canonical,
 		"type": "product",
-		"alternates": build_alternates(request_path),
+		"alternates": alternates(request_path or None),
 		"price": f"{flt(price):.2f}" if price else None,
 		"currency": (currency or get_site_currency()) if price else None,
 		"availability": availability,
@@ -287,7 +295,7 @@ def build_page_seo(source, display_name=None, page_type="website"):
 		"image": absolute_url(image),
 		"url": canonical,
 		"type": page_type,
-		"alternates": build_alternates(request_path),
+		"alternates": alternates(request_path or None),
 		"price": None,
 		"currency": None,
 		"availability": None,
@@ -331,7 +339,7 @@ def build_collection_seo(category, breadcrumbs, total_count=0, lang="en", image_
 		"image": absolute_url(resolved_image or image_url or DEFAULT_OG_IMAGE),
 		"url": canonical,
 		"type": "website",
-		"alternates": build_alternates(request_path),
+		"alternates": alternates(request_path or None),
 		"price": None,
 		"currency": None,
 		"availability": None,
@@ -406,7 +414,7 @@ def org_website_json_ld():
 			"@type": "SearchAction",
 			"target": {
 				"@type": "EntryPoint",
-				"urlTemplate": f"{site_url}/en/products?search={{search_term_string}}",
+				"urlTemplate": f"{site_url}/products?search={{search_term_string}}",
 			},
 			"query-input": "required name=search_term_string",
 		},

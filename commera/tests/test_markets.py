@@ -18,11 +18,12 @@ from commera.localization.markets import (
 	find_market_by_prefix,
 	is_market_language,
 )
+from commera.localization.urls import get_locale_roots
 from commera.migrate import get_private_path_rules
 from commera.tests.test_localization import codes, use_storefront_languages
 from commera.tests.test_localization_routing import RoutingTestCase
 from commera.tests.test_localization_urls import LocaleUrlTestCase
-from commera.www.sitemap_segment import get_language_prefixes
+from commera.tests.test_seo import render_seo_head, sitemap_locs
 
 UAE = "United Arab Emirates"
 
@@ -471,7 +472,7 @@ class TestSingleMarketStore(IntegrationTestCase):
 		self.assertIsNone(localization.country)
 
 	def test_urls_and_alternates_are_unchanged(self):
-		self.assertEqual(get_language_prefixes(), ["", "/ar"])
+		self.assertEqual([root.prefix for root in get_locale_roots()], ["", "/ar"])
 		self.assertEqual([alt["lang"] for alt in alternates("/cart")], ["en", "ar"])
 
 
@@ -635,22 +636,60 @@ class TestMarketUrls(LocaleUrlTestCase):
 		self.assertEqual(
 			alternates("/ar-ae/products/shoe"),
 			[
-				{"lang": "en", "href": get_url("/products/shoe"), "x_default": True},
-				{"lang": "ar", "href": get_url("/ar/products/shoe"), "x_default": False},
-				{"lang": "fr", "href": get_url("/fr/products/shoe"), "x_default": False},
-				{"lang": "ar-AE", "href": get_url("/ar-ae/products/shoe"), "x_default": False},
-				{"lang": "ar-SA", "href": get_url("/ar-sa/products/shoe"), "x_default": False},
-				{"lang": "en-AE", "href": get_url("/en-ae/products/shoe"), "x_default": False},
-				{"lang": "en-SA", "href": get_url("/en-sa/products/shoe"), "x_default": False},
+				{"lang": "en", "href": get_url("/products/shoe"), "x_default": True, "locale": "en_US"},
+				{"lang": "ar", "href": get_url("/ar/products/shoe"), "x_default": False, "locale": "ar_EG"},
+				{"lang": "fr", "href": get_url("/fr/products/shoe"), "x_default": False, "locale": "fr_FR"},
+				{
+					"lang": "ar-AE",
+					"href": get_url("/ar-ae/products/shoe"),
+					"x_default": False,
+					"locale": "ar_AE",
+				},
+				{
+					"lang": "ar-SA",
+					"href": get_url("/ar-sa/products/shoe"),
+					"x_default": False,
+					"locale": "ar_SA",
+				},
+				{
+					"lang": "en-AE",
+					"href": get_url("/en-ae/products/shoe"),
+					"x_default": False,
+					"locale": "en_AE",
+				},
+				{
+					"lang": "en-SA",
+					"href": get_url("/en-sa/products/shoe"),
+					"x_default": False,
+					"locale": "en_SA",
+				},
 			],
 		)
 
-	def test_seo_sitemap_and_robots_include_market_urls(self):
-		hreflangs = [alt["lang"] for alt in seo.build_alternates("/en-ae/")]
+	def test_a_market_page_head_lists_every_locale_url(self):
+		self.open("/ar-ae/products/shoe")
+		page_seo = seo.build_page_seo({})
+		hreflangs = [alt["lang"] for alt in page_seo["alternates"]]
 		self.assertEqual(hreflangs, ["en", "ar", "fr", "ar-AE", "ar-SA", "en-AE", "en-SA"])
-		self.assertIn("/ar-sa", get_language_prefixes())
-		self.assertNotIn("/fr-be", get_language_prefixes())
+
+		html = render_seo_head(page_seo)
+
+		self.assertIn(f'hreflang="ar-AE" href="{get_url("/ar-ae/products/shoe")}"', html)
+		self.assertIn(f'hreflang="x-default" href="{get_url("/products/shoe")}"', html)
+		self.assertIn('<meta property="og:locale" content="ar_AE">', html)
+		for locale in ("en_US", "ar_EG", "fr_FR", "ar_SA", "en_AE", "en_SA"):
+			self.assertIn(f'<meta property="og:locale:alternate" content="{locale}">', html)
+		self.assertNotIn('og:locale:alternate" content="ar_AE"', html)
+
+	def test_the_sitemap_and_robots_include_market_urls(self):
+		locs = sitemap_locs("pages", 1)
+		for prefix in ("/ar", "/fr", "/ar-ae", "/ar-sa", "/en-ae", "/en-sa"):
+			self.assertIn(get_url(prefix), locs)
+		self.assertIn(get_url("/"), locs)
+		self.assertNotIn(get_url("/fr-be"), locs)
+
 		rules = get_private_path_rules()
+		self.assertIn("Disallow: /cart\n", rules)
 		self.assertIn("Disallow: /en-ae/cart\n", rules)
 		self.assertNotIn("/de-be/", rules)
 
@@ -665,7 +704,12 @@ class TestMarketUrls(LocaleUrlTestCase):
 		self.open("/zh-hans-sg/products")
 		self.assertEqual(url("/cart"), "/zh-hans-sg/cart")
 		self.assertIn(
-			{"lang": "zh-Hans-SG", "href": get_url("/zh-hans-sg/cart"), "x_default": False},
+			{
+				"lang": "zh-Hans-SG",
+				"href": get_url("/zh-hans-sg/cart"),
+				"x_default": False,
+				"locale": "zh_SG",
+			},
 			alternates("/cart"),
 		)
 

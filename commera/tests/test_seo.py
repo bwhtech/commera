@@ -2,6 +2,7 @@
 # Tests for the pure SEO helpers (commera/seo.py) and the sitemap
 # controller (commera/www/sitemap.py). Real-DB, auto-rolled-back.
 
+import re
 import unittest
 
 import frappe
@@ -9,8 +10,11 @@ from frappe.tests import IntegrationTestCase, UnitTestCase
 from frappe.utils import get_url
 
 from commera import seo, website_context
+from commera.localization import Language, alternates
+from commera.migrate import get_private_path_rules
 from commera.tests import get_test_configurator, get_test_item
 from commera.tests.test_localization import use_storefront_languages
+from commera.tests.test_localization_urls import LocaleUrlTestCase
 from commera.www import sitemap, sitemap_segment
 
 SEO_SETTING_FIELDS = (
@@ -91,45 +95,113 @@ class TestTruncateDescription(UnitTestCase):
 		self.assertNotIn("wor…", result)
 
 
-class TestBuildAlternates(IntegrationTestCase):
-	def test_one_alternate_per_published_language_default_first(self):
-		use_storefront_languages(self, "en", published=("en", "ar", "fr"), unpublished=("de",))
+def render_seo_head(seo_values):
+	return frappe.render_template(
+		'{% from "templates/macros/seo.html" import seo_meta %}{{ seo_meta(seo) }}', {"seo": seo_values}
+	)
 
-		alternates = seo.build_alternates("/fr/products/shoe")
 
-		self.assertEqual([alt["lang"] for alt in alternates], ["en", "ar", "fr"])
-		by_lang = {alt["lang"]: alt["href"] for alt in alternates}
-		self.assertEqual(by_lang["en"], get_url("/products/shoe"))
-		self.assertTrue(by_lang["ar"].endswith("/ar/products/shoe"))
-		self.assertTrue(by_lang["fr"].endswith("/fr/products/shoe"))
+def sitemap_locs(seg_type, page):
+	context = frappe._dict()
+	frappe.local.form_dict = frappe._dict(seg_type=seg_type, page=str(page))
+	sitemap_segment.get_context(context)
+	return [entry["loc"] for entry in context.urls]
 
-	def test_x_default_is_the_default_language(self):
+
+def build_head_seo():
+	"""The SEO data of a product, a collection and a page head for the current request."""
+	return {
+		"product": seo.build_product_seo({"display_name": "Shoe"}, {}, None),
+		"collection": seo.build_collection_seo(category="Shoes", breadcrumbs=[]),
+		"page": seo.build_page_seo({}, display_name="About"),
+	}
+
+
+class TestHeadAlternates(LocaleUrlTestCase):
+	"""Published: en (default), ar, fr. Unpublished: de."""
+
+	def test_every_head_lists_each_published_language_from_alternates(self):
+		self.open("/fr/products/shoe")
+
+		for kind, head in build_head_seo().items():
+			with self.subTest(kind):
+				self.assertEqual(head["alternates"], alternates("/products/shoe"))
+				self.assertEqual([alt["lang"] for alt in head["alternates"]], ["en", "ar", "fr"])
+
+	def test_x_default_is_the_default_language_at_the_root(self):
 		use_storefront_languages(self, "fr", published=("en", "fr"))
+		self.open("/en/products/shoe")
 
-		alternates = seo.build_alternates("/en/products/shoe")
+		head = seo.build_page_seo({})
 
-		self.assertEqual([alt["lang"] for alt in alternates if alt["x_default"]], ["fr"])
-		self.assertEqual({alt["lang"]: alt["href"] for alt in alternates}["fr"], get_url("/products/shoe"))
-
-	def test_the_home_page_alternates_are_the_root_and_each_prefix(self):
-		use_storefront_languages(self, "en", published=("en", "ar"))
-
-		hrefs = [alt["href"] for alt in seo.build_alternates("/")]
-
-		self.assertEqual(hrefs, [get_url("/"), get_url("/ar/")])
-
-	def test_the_hreflang_tags_carry_every_published_language(self):
-		use_storefront_languages(self, "en", published=("en", "ar", "fr"))
-		seo_data = {"alternates": seo.build_alternates("/en/products/shoe")}
-
-		html = frappe.render_template(
-			'{% from "templates/macros/seo.html" import seo_meta %}{{ seo_meta(seo) }}', {"seo": seo_data}
+		x_default = [alt for alt in head["alternates"] if alt["x_default"]]
+		self.assertEqual(
+			[(alt["lang"], alt["href"]) for alt in x_default], [("fr", get_url("/products/shoe"))]
 		)
 
-		for lang in ("en", "ar", "fr"):
-			self.assertIn(f'hreflang="{lang}"', html)
+	def test_the_home_page_alternates_are_the_root_and_each_prefix(self):
+		self.open("/ar")
+
+		hrefs = [alt["href"] for alt in seo.build_page_seo({})["alternates"]]
+
+		self.assertEqual(hrefs, [get_url("/"), get_url("/ar"), get_url("/fr")])
+
+	def test_the_head_renders_hreflang_and_og_locale_for_every_language(self):
+		self.open("/ar/products/shoe")
+
+		html = render_seo_head(seo.build_page_seo({}))
+
+		for lang, prefix in (("en", ""), ("ar", "/ar"), ("fr", "/fr")):
+			self.assertIn(f'hreflang="{lang}" href="{get_url(prefix + "/products/shoe")}"', html)
 		self.assertEqual(html.count('hreflang="x-default"'), 1)
-		self.assertIn(f'hreflang="x-default" href="{seo_data["alternates"][0]["href"]}"', html)
+		self.assertIn(f'hreflang="x-default" href="{get_url("/products/shoe")}"', html)
+		self.assertNotIn('hreflang="de"', html)
+		self.assertIn('<meta property="og:locale" content="ar_EG">', html)
+		alternate_locales = re.findall(r'og:locale:alternate" content="([^"]+)"', html)
+		self.assertEqual(alternate_locales, ["en_US", "fr_FR"])
+
+
+class TestSingleLanguageSeo(LocaleUrlTestCase):
+	def setUp(self):
+		super().setUp()
+		use_storefront_languages(self, "en", published=("en",), unpublished=("ar",))
+
+	def test_heads_emit_no_hreflang(self):
+		self.open("/products/shoe")
+
+		for kind, head in build_head_seo().items():
+			with self.subTest(kind):
+				self.assertEqual(head["alternates"], [])
+				self.assertNotIn("hreflang", render_seo_head(head))
+
+	def test_og_locale_has_no_alternates(self):
+		html = render_seo_head(seo.build_page_seo({}))
+
+		self.assertIn('<meta property="og:locale" content="en_US">', html)
+		self.assertNotIn("og:locale:alternate", html)
+
+	def test_robots_rules_cover_the_root_only(self):
+		self.assertEqual(
+			get_private_path_rules(),
+			"Disallow: /cart\nDisallow: /cart/checkout\nDisallow: /account\n",
+		)
+
+
+class TestOgLocale(IntegrationTestCase):
+	def test_a_language_takes_its_own_or_its_likely_region(self):
+		cases = {
+			("en", None): "en_US",
+			("pt-BR", None): "pt_BR",
+			("ar", "ae"): "ar_AE",
+			("zh-Hans", "sg"): "zh_SG",
+		}
+		for (code, country), expected in cases.items():
+			with self.subTest(code):
+				language = Language(code=code, name=code, endonym=code, direction="ltr")
+				self.assertEqual(language.og_locale(country), expected)
+
+	def test_an_unknown_language_keeps_its_code(self):
+		self.assertEqual(Language(code="xx", name="", endonym="", direction="ltr").og_locale(), "xx")
 
 
 class TestBuildPageSeo(IntegrationTestCase):
@@ -423,6 +495,20 @@ class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
 			self.assertIn(self.url(f"{prefix}/products/{self.published_route}"), locs)
 		self.assertNotIn(self.url(f"/de/products/{self.published_route}"), locs)
 		self.assertIn(self.url("/fr"), self.locs("pages", 1))
+
+	def test_a_single_language_store_lists_each_page_once(self):
+		use_storefront_languages(self, "en", published=("en",), unpublished=("ar",))
+		total = frappe.db.count(
+			"Style Attribute Variant", {"is_published": 1, "noindex": 0, "route": ["is", "set"]}
+		)
+
+		products = sitemap_locs("products", 1)
+
+		self.assertEqual(products.count(self.url(f"/products/{self.published_route}")), 1)
+		self.assertEqual(len(products), min(total, sitemap_segment.get_docs_per_page()))
+		self.assertEqual(len(set(products)), len(products))
+		self.assertEqual(sitemap_locs("pages", 1).count(self.url("/")), 1)
+		self.assertNotIn(self.url("/ar"), sitemap_locs("pages", 1))
 
 	def test_noindex_variant_excluded(self):
 		locs = self.locs("products", 1)

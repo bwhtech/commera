@@ -21,3 +21,11 @@ def seo_org_jsonld():
 	except Exception:
 		frappe.log_error(title="SEO organization JSON-LD build failed")
 		return []
+
+
+def seo_og_locales():
+	try:
+		return seo.get_og_locales()
+	except Exception:
+		frappe.log_error(title="SEO og:locale build failed")
+		return {}

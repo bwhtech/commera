@@ -1,5 +1,6 @@
 import re
 from collections.abc import Mapping
+from typing import NamedTuple
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 import frappe
@@ -54,31 +55,48 @@ def switch_url(
 	return link.localize(prefix, query or "")
 
 
-def alternates(path: str | None = None) -> list[dict]:
+def alternates(path: str | None = None, roots: list["LocaleRoot"] | None = None) -> list[dict]:
 	"""One absolute URL per published language and per enabled market's language and country,
 	for hreflang and the sitemap. Empty for a store with one language and one market."""
-	prefixes = get_locale_prefixes()
+	roots = get_locale_roots() if roots is None else roots
 	link = Link(get_current_path() if path is None else path)
-	if len(prefixes) < 2 or not link.is_page:
+	if len(roots) < 2 or not link.is_page:
 		return []
 	return [
-		{"lang": hreflang, "href": get_url(link.localize(prefix)), "x_default": x_default}
-		for hreflang, prefix, x_default in prefixes
+		{
+			"lang": root.hreflang,
+			"href": get_url(link.localize(root.prefix)),
+			"x_default": root.x_default,
+			"locale": root.og_locale,
+		}
+		for root in roots
 	]
 
 
-def get_locale_prefixes() -> list[tuple[str, str, bool]]:
-	"""(hreflang, prefix, x_default) of every URL root a shopper can open, the default first.
-	x-default is the store default at the root. Market languages have no region: tags stay unique."""
-	markets = StorefrontMarkets.load()
+class LocaleRoot(NamedTuple):
+	hreflang: str
+	prefix: str
+	x_default: bool
+	# Open Graph form: `ar_AE`.
+	og_locale: str
+
+
+def get_locale_roots(markets: StorefrontMarkets | None = None) -> list[LocaleRoot]:
+	"""Every URL root a shopper can open, the default first. x-default is the store default at the root.
+	Market languages have no region: tags stay unique."""
+	markets = markets or StorefrontMarkets.load()
 	languages = markets.languages
-	prefixes = [
-		(language.code, languages.prefix(language), language == languages.default)
+	roots = [
+		LocaleRoot(
+			language.code, languages.prefix(language), language == languages.default, language.og_locale()
+		)
 		for language in languages.published
 	]
 	for _market, language, country, prefix in markets.market_prefixes():
-		prefixes.append((market_hreflang(language, country), prefix, False))
-	return prefixes
+		roots.append(
+			LocaleRoot(market_hreflang(language, country), prefix, False, language.og_locale(country))
+		)
+	return roots
 
 
 def get_current_prefix(localization: Localization) -> str:

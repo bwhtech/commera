@@ -3,6 +3,7 @@ from functools import lru_cache
 
 import frappe
 from babel import Locale, UnknownLocaleError
+from babel.core import get_global
 from frappe.utils.jinja_globals import is_rtl
 
 FALLBACK_LANGUAGE = "en"
@@ -28,6 +29,12 @@ class Language:
 
 	def as_dict(self) -> dict:
 		return asdict(self)
+
+	def og_locale(self, country: str | None = None) -> str:
+		"""Open Graph `ll_CC`. The region is `country`, the code's own (`pt-BR`) or the likely one."""
+		region = country or get_region(self.code)
+		base = self.code.partition("-")[0].lower()
+		return f"{base}_{region.upper()}" if region else base
 
 
 class StorefrontLanguages:
@@ -123,3 +130,20 @@ def get_display_names(code: str) -> tuple[str, str]:
 		name = frappe.db.get_value("Language", code, "language_name") or code
 		return name, name
 	return locale.get_display_name("en"), locale.get_display_name(locale)
+
+
+@lru_cache(maxsize=64)
+def get_region(code: str) -> str | None:
+	"""The two-letter region of `code`, else the one CLDR finds most likely: `en` is in US."""
+	try:
+		locale = Locale.parse(code, sep="-")
+	except (UnknownLocaleError, ValueError):
+		return None
+	if is_region(locale.territory):
+		return locale.territory
+	region = get_global("likely_subtags").get(locale.language, "").rpartition("_")[2]
+	return region if is_region(region) else None
+
+
+def is_region(value: str | None) -> bool:
+	return bool(value and len(value) == 2 and value.isalpha())

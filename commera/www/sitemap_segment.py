@@ -2,7 +2,7 @@ import frappe
 from frappe.utils import get_datetime, get_url
 from frappe.utils.data import cint
 
-from commera.localization.urls import get_locale_prefixes
+from commera.localization.urls import LocaleRoot, alternates, get_locale_roots
 
 DEFAULT_URLS_PER_SITEMAP = 50000
 
@@ -12,14 +12,9 @@ def get_urls_per_page():
 	return urls_per_sitemap if urls_per_sitemap > 0 else DEFAULT_URLS_PER_SITEMAP
 
 
-def get_docs_per_page():
+def get_docs_per_page(roots: list[LocaleRoot] | None = None):
 	# Every route is emitted once per published language and market URL.
-	return max(get_urls_per_page() // len(get_language_prefixes()), 1)
-
-
-def get_language_prefixes():
-	"""URL prefixes of the published languages and enabled market URLs. The default language has none."""
-	return [prefix for _hreflang, prefix, _x_default in get_locale_prefixes()]
+	return max(get_urls_per_page() // len(roots or get_locale_roots()), 1)
 
 
 SEGMENT_CONFIG = {
@@ -57,11 +52,13 @@ def format_lastmod(value):
 	return get_datetime(value).isoformat()
 
 
-def add_localized(urls, path, lastmod, changefreq, priority):
-	for prefix in get_language_prefixes():
+def add_localized(urls, path, lastmod, changefreq, priority, roots):
+	"""One entry per locale URL of `path`, from alternates(). A one-language store has one."""
+	locations = [alt["href"] for alt in alternates(path, roots)] or [get_url(path)]
+	for location in locations:
 		urls.append(
 			{
-				"loc": get_url(f"{prefix}{path}" or "/"),
+				"loc": location,
 				"lastmod": lastmod,
 				"changefreq": changefreq,
 				"priority": priority,
@@ -109,10 +106,11 @@ def get_context(context):
 	if not config or page < 1:
 		return
 
+	roots = get_locale_roots()
 	if page == 1 and config.get("include_homepage"):
-		add_localized(urls, "", None, config["changefreq"], config["priority"])
+		add_localized(urls, "/", None, config["changefreq"], config["priority"], roots)
 
-	docs_per_page = get_docs_per_page()
+	docs_per_page = get_docs_per_page(roots)
 	route_field = config["route_field"]
 	rows = frappe.get_all(
 		config["doctype"],
@@ -130,4 +128,5 @@ def get_context(context):
 			format_lastmod(row.modified),
 			config["changefreq"],
 			config["priority"],
+			roots,
 		)

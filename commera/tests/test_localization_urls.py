@@ -226,9 +226,9 @@ class TestAlternates(LocaleUrlTestCase):
 		self.assertEqual(
 			alternates("/ar/products/shoe"),
 			[
-				{"lang": "en", "href": get_url("/products/shoe"), "x_default": True},
-				{"lang": "ar", "href": get_url("/ar/products/shoe"), "x_default": False},
-				{"lang": "fr", "href": get_url("/fr/products/shoe"), "x_default": False},
+				{"lang": "en", "href": get_url("/products/shoe"), "x_default": True, "locale": "en_US"},
+				{"lang": "ar", "href": get_url("/ar/products/shoe"), "x_default": False, "locale": "ar_EG"},
+				{"lang": "fr", "href": get_url("/fr/products/shoe"), "x_default": False, "locale": "fr_FR"},
 			],
 		)
 
