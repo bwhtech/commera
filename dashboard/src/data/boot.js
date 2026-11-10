@@ -1,9 +1,10 @@
-import './devBoot'
+import './devBoot.js'
 
 // commera/www/commera.py puts each boot key on `window`. This is the one place
 // that reads them back; no screen should reach into `window` itself.
 export function bootValue(key, fallback) {
-  const value = window[key]
+  // `globalThis` is `window` in a browser, and lets node unit tests import a module that reads boot.
+  const value = globalThis[key]
   return typeof value === typeof fallback ? value : fallback
 }
 

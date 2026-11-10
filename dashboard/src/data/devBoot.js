@@ -1,5 +1,6 @@
 // The Vite dev server serves index.html, not the Jinja-rendered commera.html, so no boot keys reach `window`.
-if (import.meta.env.DEV) {
+// Node unit tests import this with no Vite `import.meta.env` at all.
+if (import.meta.env?.DEV) {
   const response = await fetch('/api/method/commera.www.commera.get_context_for_dev', {
     headers: { Accept: 'application/json' },
   })

@@ -6,9 +6,8 @@ export const PAGE_CONTEXT = Symbol('commera-plugin-page')
 export const ACTION_CONTEXT = Symbol('commera-plugin-action')
 export const CARD_CONTEXT = Symbol('commera-plugin-card')
 
-export function __(text, replacements = []) {
-  return String(text).replace(/\{(\d+)\}/g, (placeholder, index) => replacements[index] ?? placeholder)
-}
+// Plugin strings sit in the plugin app's own translation files, which the boot payload already merges in.
+export { __ } from '../data/translation'
 
 function injectOrThrow(key, message) {
   const context = inject(key, null)
