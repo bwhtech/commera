@@ -39,7 +39,12 @@ test('select_variant returns the only variant of a one-size product', () => {
 
 test('select_variant tells apart sizes whose translated labels match', () => {
 	const m = { id: 'RUNNER-BLUE-M', title: 'وسط', size: 'M', available: true };
-	const medium = { id: 'RUNNER-BLUE-MEDIUM', title: 'وسط', size: 'Medium', available: true };
+	const medium = {
+		id: 'RUNNER-BLUE-MEDIUM',
+		title: 'وسط',
+		size: 'Medium',
+		available: true,
+	};
 	const arabic = {
 		options: [
 			{
