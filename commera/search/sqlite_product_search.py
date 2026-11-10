@@ -5,7 +5,13 @@ from contextlib import closing
 from typing import ClassVar
 
 import frappe
-from frappe.search.sqlite_search import MAX_EDIT_DISTANCE, MIN_WORD_LENGTH, SQLiteSearch, strip_surrogates
+from frappe.search.sqlite_search import (
+	MAX_EDIT_DISTANCE,
+	MAX_RERANK_CANDIDATES,
+	MIN_WORD_LENGTH,
+	SQLiteSearch,
+	strip_surrogates,
+)
 from frappe.utils import create_batch, flt
 
 from commera.localization.content import SHOP_WIDE
@@ -29,6 +35,7 @@ from commera.search.translations import (
 	rebuild_if_languages_change,
 )
 
+CATEGORY_DOCTYPE = "Ecommerce Category"
 FACET_COLUMN_TO_KEY = {"brand": "brand", "color": "color", "item_group": "category"}
 
 # SQLite caps bound parameters per statement (999 on older builds), so bulk deletes go out in chunks.
@@ -51,7 +58,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 	INDEX_SCHEMA: ClassVar = {
 		"text_fields": ["title", "content"],
-		# `market` is "" on a record's own row. A market row holds only that market's titles.
+		# `market` is "" on a record's own row. A market row swaps its title for that market's titles.
 		"metadata_fields": [
 			"item_group",
 			"brand",
@@ -290,10 +297,9 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		document = super().prepare_document(doc)
 		if document:
 			content = getattr(doc, "search_content", document.get("content", ""))
-			# The tokenizer has no Arabic rules: also index each Arabic word as a query normalises it.
-			forms = arabic_search_forms(f"{document.get('title') or ''} {content}")
-			document["content"] = f"{content} {forms}".strip()
+			document["content"] = searchable_content(document.get("title"), content)
 			document["market"] = SHOP_WIDE
+			document["_own_content"] = content
 			document["_market_titles"] = getattr(doc, "market_titles", None) or {}
 			document["_sizes"] = getattr(doc, "sizes", None) or []
 			document["_detail"] = getattr(doc, "product_detail", None)
@@ -601,25 +607,40 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		if is_query_too_short(query) or not self.index_exists():
 			return empty_typeahead()
 
-		raw = super().search(query)
-		# dicts, not lists: a record found through its own row and its market's row counts once.
-		product_names = {}
-		category_names = {}
-		for hit in raw["results"]:
-			names = category_names if hit.get("doctype") == "Ecommerce Category" else product_names
-			names[hit["name"]] = None
-		product_names, category_names = list(product_names), list(category_names)
-
-		raw_corrections = raw["summary"].get("corrected_words") or {}
+		expanded_query, corrections = self._expand_query_with_corrections(query)
+		hits = self.best_hits(self._prepare_fts_query(expanded_query))
+		categories = [hit for hit in hits if hit["doctype"] == CATEGORY_DOCTYPE]
+		products = [hit for hit in hits if hit["doctype"] != CATEGORY_DOCTYPE]
 		return {
-			"product_names": product_names[:limit],
-			"category_names": category_names[:limit],
+			"product_names": self.ranked_names(products, query)[:limit],
+			"category_names": self.ranked_names(categories, query)[:limit],
 			"corrected_words": {
 				original: suggestion
-				for original, suggestion in raw_corrections.items()
+				for original, suggestion in (corrections or {}).items()
 				if original.lower() != suggestion.lower()
 			},
 		}
+
+	def best_hits(self, fts_query):
+		"""Each matching record once, as its best-ranked row, before any limit applies."""
+		where, params = self.narrow_clause({}, None)
+		columns = ", ".join(self.schema["metadata_fields"])
+		try:
+			# Bare columns come from the MIN(rank) row. The hidden `rank` is bm25.
+			return self.sql(
+				f"SELECT doc_id, title AS original_title, {columns}, MIN(rank) AS bm25_score "
+				f"FROM search_fts WHERE search_fts MATCH ?{where} GROUP BY doc_id "
+				"ORDER BY bm25_score LIMIT ?",
+				(fts_query, *params, MAX_RERANK_CANDIDATES),
+				read_only=True,
+			)
+		except sqlite3.Error as error:
+			frappe.log_error(f"Search query failed: {error}")
+			return []
+
+	def ranked_names(self, hits, query):
+		"""Names in core's rerank order. Typeahead ranks each doctype apart, so none crowds out another."""
+		return [hit["name"] for hit in self._process_search_results(hits, query)]
 
 	def facet_counts(self, filters):
 		fts_query = self.fts_query_for((filters.get("search") or "").strip())
@@ -740,20 +761,24 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 
 def market_rows(document: dict) -> list[dict]:
+	"""The record's own row once per market, titled with that market's titles."""
+	content = document.get("_own_content") or ""
 	return [
 		{
 			**document,
 			"doc_id": document["id"],
 			"title": text,
-			"content": arabic_search_text(text),
+			"content": searchable_content(text, content),
 			"market": market,
 		}
 		for market, text in document.get("_market_titles", {}).items()
 	]
 
 
-def arabic_search_text(text: str) -> str:
-	return f"{text} {arabic_search_forms(text)}".strip()
+def searchable_content(title: str | None, content: str) -> str:
+	# The tokenizer has no Arabic rules: also index each Arabic word as a query normalises it.
+	forms = arabic_search_forms(f"{title or ''} {content}")
+	return f"{content} {forms}".strip()
 
 
 def fts_phrase(word):

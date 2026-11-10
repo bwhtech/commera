@@ -267,6 +267,33 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 			self.assertEqual(self.engine.search_count({"search": SEARCH_TOKEN}), 3)
 			self.assertEqual(sum(self.engine.facet_counts({"search": SEARCH_TOKEN})["color"].values()), 3)
 
+	def test_a_market_title_combines_with_the_other_searchable_fields(self):
+		self.use_gulf_market()
+		self.set_meta_description(self.blue, "Zzsuede lining")
+		content_fields = [*record_builder.DEFAULT_CONTENT_FIELDS, (PRODUCT, "meta_description")]
+		with patch.object(record_builder, "get_configured_content_fields", return_value=content_fields):
+			self.add_titles("ar", {self.blue: GULF_TITLE}, market="gulf")
+
+		# The brand, the colour and a configured description field.
+		for query in (f"{GULF_TERM} testsearch", f"{GULF_TERM} zzblue", f"{GULF_TERM} zzsuede"):
+			with self.subTest(query=query):
+				with self.market_request("AE"):
+					self.assertEqual(self.product_names(query), [self.blue])
+					self.assertEqual(self.engine.search_products({"search": query}), [self.blue])
+				self.assertEqual(self.product_names(query), [])
+				self.assertEqual(self.engine.search_products({"search": query}), [])
+
+	def test_typeahead_counts_each_record_once_before_its_limits(self):
+		# Core keeps 100 hits: 50 products with two matching rows each would push the category out.
+		self.use_gulf_market()
+		self.add_index_rows(PRODUCT, [f"zz-many-{index}" for index in range(50)], ("", "gulf"))
+
+		with self.market_request("AE"):
+			suggestions = self.engine.typeahead(SEARCH_TOKEN)
+		self.assertEqual(suggestions["category_names"], [self.category])
+		self.assertEqual(len(suggestions["product_names"]), 6)
+		self.assertEqual(len(set(suggestions["product_names"])), 6)
+
 	def test_the_like_fallback_matches_the_market_title_in_its_market_only(self):
 		self.publish("en")
 		self.use_gulf_market("en")
@@ -429,6 +456,26 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		self.addCleanup(frappe.db.delete, "Content Translation", {"name": ("in", names)})
 		SqliteProductSearch().index_docs(PRODUCT, list(titles))
 		return names
+
+	def set_meta_description(self, product, text):
+		original = frappe.db.get_value(PRODUCT, product, "meta_description")
+		self.addCleanup(frappe.db.set_value, PRODUCT, product, "meta_description", original)
+		frappe.db.set_value(PRODUCT, product, "meta_description", text)
+
+	def add_index_rows(self, doctype, names, markets):
+		"""A row per name and market that matches SEARCH_TOKEN, written straight to the index."""
+		rows = [
+			(f"{doctype}:{name}", SEARCH_TOKEN, SEARCH_TOKEN, doctype, name, market)
+			for name in names
+			for market in markets
+		]
+		self.engine._with_connection(
+			lambda cursor: cursor.executemany(
+				"INSERT INTO search_fts (doc_id, title, content, doctype, name, market) "
+				"VALUES (?, ?, ?, ?, ?, ?)",
+				rows,
+			)
+		)
 
 	def use_gulf_market(self, language="ar"):
 		use_markets(self)
