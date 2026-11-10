@@ -61,7 +61,7 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 			self.assertEqual(page.head_html, "{{ commera_builder_head() }}")
 			self.assertFalse(page.published)
 		detail = frappe.get_doc("Builder Page", self.pages[PRODUCT_DETAIL])
-		self.assertEqual(detail.route, "commera-themes/test_builder_theme/products/:route")
+		self.assertEqual(detail.route, "ct/test_builder_theme/products/:route")
 
 	def test_refuses_a_taken_name(self):
 		with self.assertRaises(frappe.ValidationError):
@@ -154,6 +154,7 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		first_title = get_data_for(PRODUCT_LISTING, {})["products"][0]["title"]
 		self.assertIn(frappe.utils.escape_html(first_title), html)
 		self.assertIn("commera-builder.js", html)
+		self.assertNotIn("noindex", html)
 
 	def test_agent_context_names_the_role_and_the_data(self):
 		home = get_agent_context(self.pages[HOME])

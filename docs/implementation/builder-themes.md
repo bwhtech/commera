@@ -49,6 +49,6 @@ Three hooks and one editor fix, all in the `feat/app-hooks` branch of Builder:
 
 - Bob builds one page per session. The merchant opens each page and prompts it; the listing and product pages match the home page by instruction.
 - Design tokens are site-wide in Builder. Bob is told to prefix them with the theme slug; nothing enforces it.
-- Builder pages also answer at their own `commera-themes/<theme>/...` routes, unindexed.
+- Builder pages also answer at their own `ct/<theme>/...` routes, and those routes are indexable too.
 - One language: the `ar` routes render the same blocks.
 - The listing ignores the `subcategory` parameter that menu links carry.

@@ -8,7 +8,7 @@ from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	validate_theme_name,
 )
 
-ROUTE_PREFIX = "commera-themes"
+ROUTE_PREFIX = "ct"
 # Builder serves each page at its own route as well; Commera serves the live theme at the storefront routes.
 PAGE_ROUTES = {
 	HOME: "home",
@@ -81,7 +81,6 @@ def create_page(theme_name: str, folder: str, page_type: str) -> str:
 			"project_folder": folder,
 			"draft_blocks": [ROOT_BLOCK],
 			"head_html": HEAD_HTML,
-			"disable_indexing": 1,
 		}
 	)
 	return page.insert().name
