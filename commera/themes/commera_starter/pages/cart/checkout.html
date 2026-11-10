@@ -3,6 +3,7 @@
 {% from "components/macros/address_picker.html" import address_picker %}
 {% from "components/macros/icons.html" import icon, spinner %}
 {% from "components/macros/empty_state.html" import empty_state %}
+{% from "components/macros/skeleton.html" import skeleton %}
 {% set language = frappe.lang or "en" %}
 
 {% block uncontained_body %}
@@ -18,6 +19,49 @@
 	{% call empty_state(_("Your cart is empty"), _("Browse the shop and add what you like. It will wait for you here."), "bag", show="!sign_in_required && $store.cart.status === 'ready' && !$store.cart.count") %}
 	<a href="/{{ language }}/products" class="button-primary">{{ _("Start shopping") }}</a>
 	{% endcall %}
+
+	<div x-show="is_loading" aria-busy="true" class="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,40rem)_24rem] lg:items-start lg:justify-between lg:gap-12">
+		<span class="sr-only">{{ _("Loading checkout") }}</span>
+		<div class="flex flex-col gap-5">
+			{{ skeleton("h-7 w-28 rounded-lg") }}
+			{{ skeleton("h-5 w-56 rounded-sm") }}
+			{{ skeleton("mt-3 h-7 w-32 rounded-lg") }}
+			<div class="grid gap-3 sm:grid-cols-2">
+				{% for width in ["", "", "sm:col-span-2", "sm:col-span-2", "", ""] %}
+				<div class="flex flex-col gap-2 {{ width }}">
+					{{ skeleton("h-4 w-24 rounded-sm") }}
+					{{ skeleton("h-12 w-full rounded-lg") }}
+				</div>
+				{% endfor %}
+			</div>
+			{{ skeleton("h-12 w-full rounded-lg") }}
+		</div>
+		<div class="order-first rounded-2xl bg-surface-gray-1 p-6 lg:order-none">
+			<div class="flex min-h-12 items-center justify-between gap-3 lg:hidden">
+				{{ skeleton("h-5 w-32 rounded-sm") }}
+				{{ skeleton("h-7 w-24 rounded-sm") }}
+			</div>
+			<div class="flex flex-col gap-5 max-lg:hidden">
+				{{ skeleton("h-7 w-40 rounded-lg") }}
+				{% for _line in range(2) %}
+				<div class="flex items-center gap-3">
+					{{ skeleton("aspect-[3/4] w-14 shrink-0 rounded-lg") }}
+					<div class="flex flex-1 flex-col gap-2">
+						{{ skeleton("h-4 w-3/4 rounded-sm") }}
+						{{ skeleton("h-4 w-1/3 rounded-sm") }}
+					</div>
+				</div>
+				{% endfor %}
+				<div class="flex flex-col gap-3 border-t border-outline-gray-2 pt-5">
+					{% for _row in range(2) %}
+					<div class="flex justify-between gap-3">{{ skeleton("h-4 w-20 rounded-sm") }}{{ skeleton("h-4 w-16 rounded-sm") }}</div>
+					{% endfor %}
+					{{ skeleton("mt-2 h-12 w-full rounded-lg") }}
+					<div class="mt-2 flex justify-between gap-3">{{ skeleton("h-6 w-28 rounded-sm") }}{{ skeleton("h-6 w-20 rounded-sm") }}</div>
+				</div>
+			</div>
+		</div>
+	</div>
 
 	<div x-cloak x-show="ready && !sign_in_required && $store.cart.count" class="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,40rem)_24rem] lg:items-start lg:justify-between lg:gap-12">
 		<div class="flex flex-col">
