@@ -256,6 +256,25 @@ test('a call from a secondary market carries its country in _country', async () 
 	assert.deepEqual(calls[1].body, { lines: [], _lang: 'ar', _country: 'AE' });
 });
 
+test('_lang is compared with the market default, not the store default', async () => {
+	const gulf = { handle: 'gulf', is_primary: false, default_language: 'ar' };
+	for (const [code, expected] of [
+		['en', /\?_lang=en&_country=AE$/],
+		['ar', /\?_country=AE$/],
+	]) {
+		use_localization({
+			language: { code },
+			default_language: { code: 'en' },
+			root_prefix: `/${code}-ae`,
+			market: gulf,
+			country: 'AE',
+		});
+		const calls = add_fake_fetch();
+		await get('cart.get_cart');
+		assert.match(calls[0].url, expected);
+	}
+});
+
 test('a call from the primary market sends no _country', async () => {
 	for (const market of [null, { handle: 'store', is_primary: true }]) {
 		use_localization({

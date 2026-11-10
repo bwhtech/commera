@@ -57,15 +57,17 @@ export function url(path) {
 	return link.is_page ? link.localize(get_localization()) : link.unchanged;
 }
 
-// `_lang` and `_country` for an API call, each only when it is not the store default.
+// `_lang` and `_country` for an API call, each only when it is not the default the server assumes:
+// an omitted `_lang` means the current market's default language, the store default in the primary.
 export function get_request_params() {
 	const { language, default_language, market, country } = get_localization();
+	const in_market = Boolean(country && market && !market.is_primary);
+	const assumed = in_market ? market.default_language : default_language?.code;
 	const params = {};
-	if (language?.code && language.code !== default_language?.code) {
+	if (language?.code && language.code !== assumed) {
 		params._lang = language.code;
 	}
-	// The primary market is the store itself: no market, or one marked primary.
-	if (country && market && !market.is_primary) {
+	if (in_market) {
 		params._country = country;
 	}
 	return params;
