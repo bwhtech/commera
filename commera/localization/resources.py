@@ -276,10 +276,11 @@ def matches_entry(entry: TranslationEntry, search: str | None, status: str | Non
 
 
 def parse_cursor(cursor: str | None) -> list | None:
-	if not cursor:
+	"""None or "" is the first page. Anything but the JSON key a page returned is refused."""
+	if cursor is None or cursor == "":
 		return None
 	try:
-		key = json.loads(cursor)
+		key = json.loads(cursor) if isinstance(cursor, str) else None
 	except ValueError:
 		key = None
 	if not (isinstance(key, list) and len(key) == 2 and all(isinstance(part, str) for part in key)):

@@ -27,8 +27,8 @@ ADMIN_PERMISSIONS = {
 	"Shop Theme Settings": ("read", "write"),
 	"Commera Settings": ("read",),
 	"Commera Webhook": ("read", "write", "create", "delete"),
-	# Translation writes check these doctype rights; nothing bypasses them. Create: the first
-	# translation of an inherited page adds its Theme Layout row. The theme editor keeps its own gate.
+	# Translation writes check these rights. Create: an inherited page's first translation adds its row.
+	# Existing sites get them from patches.grant_commera_admin_translation_rights.
 	"Theme Layout": ("read", "write", "create"),
 	"Content Translation": ("read", "write", "create", "delete"),
 }
@@ -47,10 +47,7 @@ def add_commera_roles():
 
 def add_admin_permission(doctype: str, permission_types: tuple[str, ...]):
 	setup_custom_perms(doctype)
-	if name := frappe.db.get_value(
-		"Custom DocPerm", {"parent": doctype, "role": COMMERA_ADMIN, "permlevel": 0}
-	):
-		grant_missing_rights(doctype, name, permission_types)
+	if frappe.db.exists("Custom DocPerm", {"parent": doctype, "role": COMMERA_ADMIN, "permlevel": 0}):
 		return
 
 	frappe.get_doc(
@@ -65,15 +62,6 @@ def add_admin_permission(doctype: str, permission_types: tuple[str, ...]):
 		}
 	).insert(ignore_permissions=True)
 	validate_permissions_for_doctype(doctype)
-
-
-def grant_missing_rights(doctype: str, name: str, permission_types: tuple[str, ...]):
-	"""A right added to ADMIN_PERMISSIONS later reaches sites that have the row, with no patch.
-	A declared right taken away in Role Permissions Manager comes back on the next migrate."""
-	granted = frappe.db.get_value("Custom DocPerm", name, list(permission_types), as_dict=True)
-	if missing := {ptype: 1 for ptype in permission_types if not granted[ptype]}:
-		frappe.db.set_value("Custom DocPerm", name, missing)
-		validate_permissions_for_doctype(doctype)
 
 
 def is_commera_admin(user: str | None = None) -> bool:

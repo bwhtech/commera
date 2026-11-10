@@ -117,7 +117,7 @@ def set_translation(theme_dirs, layout, path, setting_id, language, value) -> bo
 
 def set_inherited_translation(theme_context, page, overlay, path, setting_id, language, value) -> dict:
 	"""`overlay` with one translation of the inherited page set; None once it holds nothing."""
-	parent = get_inherited_layout(theme_context["names"][1:], theme_context["dirs"], page)
+	parent = get_inherited_layout(theme_context["names"][1:], theme_context["dirs"], page, cached=False)
 	text = find_text_setting(theme_context["dirs"], parent, path, setting_id)
 	default = get_default_language()
 	source = get_source(text.value, default) if text else ""

@@ -331,9 +331,14 @@ class TestDoctypeResourcePages(IntegrationTestCase):
 		self.assertEqual([entry.name for entry in rest.entries], ["note-c", "note-e"])
 
 	def test_a_cursor_that_is_not_a_key_is_refused(self):
-		for cursor in ("3", "not json", '["note-a"]'):
-			with self.subTest(cursor), self.assertRaises(frappe.ValidationError):
+		for cursor in ("3", "not json", '["note-a"]', '["note-a", 3]', 0, [], ["note-a", "title"], {}):
+			with self.subTest(cursor=cursor), self.assertRaises(frappe.ValidationError):
 				self.names(cursor)
+
+	def test_only_no_cursor_or_an_empty_one_opens_the_first_page(self):
+		for cursor in (None, ""):
+			with self.subTest(cursor=cursor):
+				self.assertEqual(self.names(cursor), (["note-a", "note-c", "note-e"], None))
 
 
 class TestTranslatedProductTitles(ProductDetailPriceTestCase):

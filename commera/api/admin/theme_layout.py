@@ -11,11 +11,11 @@ from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context,
 from commera.shop_themes.preview_entries import PREVIEW_ENTRY_PAGES, list_entries, resolve_entry
 from commera.shop_themes.section_text import is_overlay, without_source_hashes
 from commera.shop_themes.sections import (
-	get_inherited_layout,
 	get_pages,
 	get_section_schema,
 	get_theme_json,
 	list_theme_files,
+	resolve_inherited_layout,
 )
 
 EDITOR_ROLES = ("System Manager", "Website Manager")
@@ -57,27 +57,23 @@ def parse_layout(layout):
 	return frappe.parse_json(layout) if layout else None
 
 
-def get_default_layout(theme_context, page):
-	return get_inherited_layout(theme_context["names"][1:], theme_context["dirs"], page)
+def get_parent_layout(theme_context, page):
+	rows = read_layout_rows(theme_context, page)
+	return get_snapshot_layout(theme_context, page, rows, theme_context["names"][1:])
 
 
 def build_layout_state(theme_context, page):
-	saved = (
-		frappe.db.get_value(
-			"Theme Layout",
-			{"theme": theme_context["theme_name"], "page": page},
-			["draft_layout", "published_layout"],
-			as_dict=True,
-		)
-		or frappe._dict()
-	)
+	"""The editor's layouts and revision, all from one read of the stored rows past the layout cache,
+	so the revision always describes the layouts the editor shows."""
+	rows = read_layout_rows(theme_context, page)
+	saved = rows.get(theme_context["theme_name"]) or frappe._dict()
 	published_layout = parse_layout(saved.published_layout)
 	if is_overlay(published_layout):
 		# Live translations of an inherited page: the editor sees them laid over it, as the shop does.
 		published_layout = None
-		default_layout = get_inherited_layout(theme_context["names"], theme_context["dirs"], page)
+		default_layout = get_snapshot_layout(theme_context, page, rows, theme_context["names"])
 	else:
-		default_layout = get_default_layout(theme_context, page)
+		default_layout = get_snapshot_layout(theme_context, page, rows, theme_context["names"][1:])
 
 	# Source hashes stay server-side: the editor sends layouts without them, and save restores them.
 	default_layout = without_source_hashes(default_layout)
@@ -90,39 +86,49 @@ def build_layout_state(theme_context, page):
 		"published_layout": published_layout,
 		"default_layout": default_layout,
 		"has_unpublished_changes": draft_layout != live_layout,
-		"revision": get_revision(theme_context, page, saved),
+		"revision": get_revision(theme_context, page, rows),
 	}
 
 
-def get_revision(theme_context, page, theme_layout, lock=False) -> str:
+def read_layout_rows(theme_context, page, lock=False) -> dict:
+	"""{theme: stored row} of the page across the theme chain, in one read. `lock` holds them all
+	until the save commits."""
+	return {row.theme: row for row in get_layout_rows_query(theme_context, page, lock).run(as_dict=True)}
+
+
+def get_layout_rows_query(theme_context, page, lock):
+	"""Every save locks its chain in name order, so two saves never wait on each other in a cycle."""
+	table = frappe.qb.DocType("Theme Layout")
+	query = (
+		frappe.qb.from_(table)
+		.select(table.name, table.theme, table.draft_layout, table.published_layout)
+		.where(table.theme.isin(theme_context["names"]) & (table.page == page))
+		.orderby(table.name)
+	)
+	return query.for_update() if lock else query
+
+
+def get_snapshot_layout(theme_context, page, rows, theme_names):
+	published = {name: parse_layout((rows.get(name) or {}).get("published_layout")) for name in theme_names}
+	return resolve_inherited_layout(theme_names, theme_context["dirs"], page, published)
+
+
+def get_revision(theme_context, page, rows) -> str:
 	"""Changes with every stored change to the page or to a layout it inherits, so a save can tell the
-	editor saw the latest. `lock` holds the parent rows until the save commits."""
+	editor saw the latest."""
+	saved = rows.get(theme_context["theme_name"]) or frappe._dict()
+	parents = [(rows.get(name) or frappe._dict()).published_layout for name in theme_context["names"][1:]]
 	parts = [
-		theme_layout.draft_layout or "",
-		theme_layout.published_layout or "",
-		*get_parent_layouts(theme_context, page, lock),
+		saved.draft_layout or "",
+		saved.published_layout or "",
+		*(layout or "" for layout in parents),
 		frappe.as_json(get_theme_json(theme_context["dirs"], f"layouts/{page}.json")),
 	]
 	return sha256_hash("\0".join(parts))[:20]
 
 
-def get_parent_layouts(theme_context, page, lock) -> list[str]:
-	"""The stored live layouts of the parent themes, in chain order. Read past the layout cache."""
-	parents = theme_context["names"][1:]
-	if not parents:
-		return []
-	table = frappe.qb.DocType("Theme Layout")
-	query = (
-		frappe.qb.from_(table)
-		.select(table.theme, table.published_layout)
-		.where(table.theme.isin(parents) & (table.page == page))
-	)
-	stored = dict((query.for_update() if lock else query).run())
-	return [stored.get(name) or "" for name in parents]
-
-
-def check_revision(theme_context, page, theme_layout, revision):
-	if revision != get_revision(theme_context, page, theme_layout, lock=True):
+def check_revision(theme_context, page, rows, revision):
+	if revision != get_revision(theme_context, page, rows):
 		frappe.throw(
 			_("This page changed elsewhere. Reload to continue."),
 			frappe.TimestampMismatchError,
@@ -161,14 +167,16 @@ def save_draft_layout(theme_context, page, layout, revision):
 	if layout is None:
 		frappe.throw(_("A layout is required."))
 
-	name = get_theme_layout_name(theme_context["theme_name"], page)
+	# Lock the page and every parent before reading any of them.
+	rows = read_layout_rows(theme_context, page, lock=True)
+	# The editor sends its whole layout, so a save over a change it never saw would undo that change.
+	check_revision(theme_context, page, rows, revision)
+	saved = rows.get(theme_context["theme_name"])
 	theme_layout = (
-		frappe.get_doc("Theme Layout", name, for_update=True)
-		if name
+		frappe.get_doc("Theme Layout", saved.name, for_update=True)
+		if saved
 		else frappe.new_doc("Theme Layout", theme=theme_context["theme_name"], page=page)
 	)
-	# The editor sends its whole layout, so a save over a change it never saw would undo that change.
-	check_revision(theme_context, page, theme_layout, revision)
 	theme_layout.draft_layout = frappe.as_json(layout)
 	theme_layout.save()
 	return theme_layout
@@ -258,7 +266,7 @@ def discard(theme: str, page: str):
 			theme_layout.draft_layout = None
 		else:
 			theme_layout.draft_layout = theme_layout.published_layout or frappe.as_json(
-				get_default_layout(theme_context, page)
+				get_parent_layout(theme_context, page)
 			)
 		theme_layout.save()
 

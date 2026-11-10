@@ -1,5 +1,6 @@
 import json
 import os
+from functools import partial
 
 import frappe
 from frappe import _
@@ -89,13 +90,32 @@ def get_published_layouts(theme_names, page):
 	return {name: entry["layout"] for name, entry in cached.items()}
 
 
-def get_inherited_layout(theme_names, theme_dirs, page):
+def read_published_layouts(theme_names, page):
+	"""The stored live layouts, read past the cache, for a save that must not trust it."""
+	stored = dict(
+		frappe.get_all(
+			"Theme Layout",
+			filters={"theme": ("in", theme_names), "page": page},
+			fields=["theme", "published_layout"],
+			as_list=True,
+		)
+	)
+	return {name: frappe.parse_json(stored[name]) if stored.get(name) else None for name in theme_names}
+
+
+def get_inherited_layout(theme_names, theme_dirs, page, cached=True):
 	"""The first theme's own layout, else the theme file, under the translation overlays of the themes
 	before it. Do not mutate the result: without overlays it is the cached layout."""
+	read = get_published_layouts if cached else read_published_layouts
+	published_layouts = read(theme_names, page) if theme_names else {}
+	return resolve_inherited_layout(theme_names, theme_dirs, page, published_layouts)
+
+
+def resolve_inherited_layout(theme_names, theme_dirs, page, published_layouts):
+	"""get_inherited_layout over given {theme: parsed live layout}, e.g. one database snapshot."""
 	# section_text imports this module.
 	from commera.shop_themes.section_text import apply_overlays, is_overlay
 
-	published_layouts = get_published_layouts(theme_names, page)
 	overlays = []
 	for name in theme_names:
 		layout = published_layouts[name]
@@ -116,6 +136,13 @@ def get_editor_preview():
 
 def clear_layout_cache(theme_name, page):
 	frappe.cache.delete_value(f"{LAYOUT_CACHE_PREFIX}{theme_name}:{page}")
+
+
+def clear_layout_cache_on_commit(theme_name, page):
+	"""Clear now for this request, and again after commit: a request that read the old row before
+	the commit may have cached it meanwhile."""
+	clear_layout_cache(theme_name, page)
+	frappe.db.after_commit.add(partial(clear_layout_cache, theme_name, page))
 
 
 def get_text(value):

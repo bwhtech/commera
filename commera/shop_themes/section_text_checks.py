@@ -18,7 +18,6 @@ from commera.shop_themes.section_text import (
 	is_overlay,
 	iter_overlay,
 	iter_text_settings,
-	set_overlay_text,
 	set_stored_hash,
 )
 from commera.shop_themes.sections import LEGACY_SOURCE_LANGUAGE, get_inherited_layout, get_source
@@ -28,7 +27,7 @@ def prepare_theme_layout(theme_layout, theme_context):
 	"""Each layout trusts the hashes it carries, then a stored layout's hash for the same text,
 	then hashes today's source. The draft may borrow live hashes; the live layout never borrows draft ones."""
 	dirs = theme_context["dirs"]
-	inherited = get_inherited_layout(theme_context["names"][1:], dirs, theme_layout.page)
+	inherited = get_inherited_layout(theme_context["names"][1:], dirs, theme_layout.page, cached=False)
 	previous_draft, previous_live, previous_overlay = get_previous_layouts(theme_layout, dirs, inherited)
 	default = get_default_language()
 	known = {
@@ -41,7 +40,6 @@ def prepare_theme_layout(theme_layout, theme_context):
 			continue
 		known_layouts = [known for known in known_layouts if isinstance(known, dict)]
 		if fieldname == "published_layout" and is_overlay(layout):
-			prune_overlay(dirs, layout, inherited)
 			check_overlay(dirs, layout, previous_overlay, inherited, known_layouts)
 			layout = layout if layout.get(OVERLAY) else None
 		else:
@@ -106,24 +104,15 @@ def check_language_keys(theme_dirs, layout, known_layouts):
 			throw_unknown_keys(text.label, unknown)
 
 
-def prune_overlay(theme_dirs, overlay, inherited):
-	"""Drop the translations of settings the inherited layout no longer has, e.g. of a removed block."""
-	texts = index_text_settings(theme_dirs, inherited)
-	for path, setting_id, language, _text in list(iter_overlay(overlay)):
-		if (path, setting_id) not in texts:
-			set_overlay_text(overlay, path, setting_id, language, None, None)
-
-
 def check_overlay(theme_dirs, overlay, previous_overlay, inherited, known_layouts):
-	"""A new or changed overlay text is text, under a configured language or a key its setting already
-	holds. Unchanged ones pass, so a stored key never blocks an unrelated save."""
+	"""A new or changed overlay text is text under a known key. Unchanged ones pass, so an unrelated save
+	keeps a translation of a setting the parent dropped: it comes back if the parent restores it."""
 	allowed = get_allowed_keys()
 	held = get_held_keys(theme_dirs, known_layouts)
 	texts = index_text_settings(theme_dirs, inherited)
 	for path, setting_id, language, text in iter_overlay(overlay):
-		if isinstance(text, str) and text == get_nested(
-			previous_overlay, OVERLAY, path, setting_id, language
-		):
+		previous = get_nested(previous_overlay, OVERLAY, path, setting_id, language)
+		if previous is not None and text == previous:
 			continue
 		setting = texts.get((path, setting_id))
 		label = setting.label if setting else f"{path} {setting_id}"

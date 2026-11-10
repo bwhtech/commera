@@ -2,16 +2,23 @@
 # See license.txt
 
 import copy
+from unittest.mock import ANY, Mock, call, patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
 
 from commera.api.admin import theme_layout as theme_layout_api
 from commera.api.admin.theme_layout import discard, get_editor
+from commera.localization import CURRENT
 from commera.shop_themes.doctype.shop_theme.shop_theme import clear_theme_cache, get_theme_context
 from commera.shop_themes.section_text import OVERLAY, SOURCE_HASHES
 from commera.shop_themes.section_translations import ThemeSectionResource
-from commera.shop_themes.sections import clear_layout_cache, get_page_layout, get_theme_json
+from commera.shop_themes.sections import (
+	LAYOUT_CACHE_PREFIX,
+	clear_layout_cache,
+	get_page_layout,
+	get_theme_json,
+)
 from commera.tests.test_admin_theme_layout import publish, save_draft
 from commera.tests.test_localization import use_storefront_languages
 
@@ -148,8 +155,63 @@ class TestThemeLayoutInheritance(IntegrationTestCase):
 		child.write(OTHER_TILE, "title", "ar", "رجال")
 
 		overlay = self.child_overlay()
-		self.assertEqual(overlay[OVERLAY], {"collections/tile-2": {"title": {"ar": "رجال"}}})
-		self.assertEqual(list(overlay[SOURCE_HASHES]), ["collections/tile-2"])
+		self.assertEqual(overlay[OVERLAY]["collections/tile-1"], {"title": {"fr": "Femmes"}})
+		self.assertEqual(overlay[OVERLAY]["collections/tile-2"], {"title": {"ar": "رجال"}})
+		self.assertCountEqual(overlay[SOURCE_HASHES], ["collections/tile-1", "collections/tile-2"])
+
+	def test_a_translation_comes_back_when_the_parent_restores_its_block(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		child = translatable(CHILD)
+		child.write(TILE, "title", "ar", "نساء")
+		publish(PARENT, PAGE, self.edited_tiles(lambda tiles: tiles.pop(0)))
+		child.write(OTHER_TILE, "title", "ar", "رجال")
+		self.assertEqual(self.title_entries(child), [])
+
+		publish(PARENT, PAGE, self.file_layout)
+
+		self.assertEqual(self.tile_title(CHILD), {"en": "Women", "ar": "نساء"})
+		[entry] = self.title_entries(child)
+		self.assertEqual((entry.value, entry.status), ("نساء", CURRENT))
+
+	def title_entries(self, resource):
+		return resource.list_entries("ar", filters={"name": TILE, "field": "title"}).entries
+
+	def test_the_editor_reads_the_parent_layout_past_a_stale_cache(self):
+		publish(PARENT, PAGE, self.reordered_layout(1))
+		frappe.cache.set_value(f"{LAYOUT_CACHE_PREFIX}{PARENT}:{PAGE}", {"layout": self.reordered_layout(2)})
+
+		editor = get_editor(CHILD, PAGE)
+
+		self.assertEqual(editor["default_layout"], self.reordered_layout(1))
+		self.assertEqual(editor["draft_layout"], self.reordered_layout(1))
+		theme_layout_api.save_draft(CHILD, PAGE, editor["draft_layout"], editor["revision"])
+
+	def test_a_saved_layout_clears_its_cache_again_after_commit(self):
+		queued = len(frappe.db.after_commit)
+		publish(PARENT, PAGE, self.reordered_layout(1))
+		cache_key = f"{LAYOUT_CACHE_PREFIX}{PARENT}:{PAGE}"
+		# A request that read the old row before the commit caches it meanwhile.
+		frappe.cache.set_value(cache_key, {"layout": self.file_layout})
+
+		for callback in list(frappe.db.after_commit._functions)[queued:]:
+			if getattr(callback, "func", None) is clear_layout_cache:
+				callback()
+
+		self.assertIsNone(frappe.cache.get_value(cache_key))
+		self.assertEqual(self.rendered_layout(CHILD), self.reordered_layout(1))
+
+	def test_a_save_locks_the_page_and_its_parents_in_one_ordered_read(self):
+		theme_context = get_theme_context(GRANDCHILD)
+		query = str(theme_layout_api.get_layout_rows_query(theme_context, PAGE, lock=True))
+
+		for theme_name in (GRANDCHILD, CHILD, PARENT):
+			self.assertIn(f"'{theme_name}'", query)
+		self.assertTrue(query.endswith("ORDER BY `name` FOR UPDATE"), query)
+
+		reads = Mock(wraps=theme_layout_api.read_layout_rows)
+		with patch.object(theme_layout_api, "read_layout_rows", reads):
+			save_draft(GRANDCHILD, PAGE, self.reordered_layout(1))
+		self.assertIn(call(ANY, PAGE, lock=True), reads.call_args_list)
 
 	def test_a_translation_of_a_block_the_parent_removed_can_be_cleared(self):
 		use_storefront_languages(self, "en", published=("en", "ar"))
