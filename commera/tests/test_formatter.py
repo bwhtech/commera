@@ -187,7 +187,11 @@ class TestFormatterSources(IntegrationTestCase):
 	def test_sdk_formats_in_the_current_language(self):
 		arabic = Language.from_code("ar")
 		localization = Localization(arabic, arabic, (arabic,), "")
-		with patch.object(formatter_module, "get_localization", return_value=localization):
+		# The site's number format decides the grouping: pin it, as a site set up in India has lakhs.
+		with (
+			self.change_settings("System Settings", number_format="#,###.##"),
+			patch.object(formatter_module, "get_localization", return_value=localization),
+		):
 			self.assertEqual(commera.sdk.format.money(1250, "USD"), "1,250.00\u00a0$")
 			self.assertEqual(commera.sdk.format.number(1234567), "1,234,567")
 			self.assertEqual(commera.sdk.format.date("2026-12-01"), "01\u200f/12\u200f/2026")
