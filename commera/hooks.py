@@ -281,6 +281,7 @@ jinja = {
 	"methods": [
 		"commera.branding.get_brand_assets",
 		"commera.guest.is_guest_checkout_enabled",
+		"commera.localization.get_country_choices",
 		"commera.localization.get_localization",
 		"commera.localization.switch_url",
 		"commera.localization.url",
