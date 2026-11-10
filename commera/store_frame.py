@@ -5,13 +5,15 @@
 Link URLs stay as the merchant entered them."""
 
 import frappe
+from frappe.utils import cstr
 
 from commera.localization import Localization, translate
 
 SETTINGS = "Commera Settings"
 SECTION_DOCTYPE = "Footer Section Config"
 LINK_DOCTYPE = "Footer Link"
-SHOP_FIELDS = ["store_name", "default_meta_description"]
+SHOP_KEYS = {"name": "store_name", "description": "default_meta_description"}
+SHOP_FIELDS = list(SHOP_KEYS.values())
 
 
 def get_shop_details(localization: Localization | None = None) -> frappe._dict:
@@ -20,7 +22,17 @@ def get_shop_details(localization: Localization | None = None) -> frappe._dict:
 	# A Single's translations name the doctype itself as the record.
 	record = {"name": SETTINGS, **{field: settings.get(field) for field in SHOP_FIELDS}}
 	fields = translate([record], SHOP_FIELDS, localization, doctype=SETTINGS)[0]
-	return frappe._dict(name=fields["store_name"].value, description=fields["default_meta_description"].value)
+	return frappe._dict({key: fields[field].value for key, field in SHOP_KEYS.items()})
+
+
+def get_preview_shop_details(preview_settings, localization: Localization) -> frappe._dict:
+	"""get_shop_details() for an editor preview: a field with an unsaved edit shows the edit as typed."""
+	details = get_shop_details(localization)
+	saved = frappe.get_cached_doc(SETTINGS)
+	for key, field in SHOP_KEYS.items():
+		if cstr(preview_settings.get(field)) != cstr(saved.get(field)):
+			details[key] = preview_settings.get(field)
+	return details
 
 
 def get_storefront_footer(localization: Localization | None = None) -> list[frappe._dict]:

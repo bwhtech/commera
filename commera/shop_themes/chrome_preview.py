@@ -7,6 +7,7 @@ import re
 import frappe
 
 from commera.localization import StorefrontLanguages, resolve
+from commera.shop_data import get_header_data
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	get_theme_context,
 	render_theme_context,
@@ -14,6 +15,7 @@ from commera.shop_themes.doctype.shop_theme.shop_theme import (
 )
 from commera.shop_themes.render import render_themed_template
 from commera.shop_themes.theme_resolver import build_base_context, find_theme_file, run_page_controller
+from commera.store_frame import get_preview_shop_details
 
 PREVIEW_LAYOUTS = ("components/theme_layout.html", "components/base.html")
 
@@ -125,11 +127,16 @@ def get_preview_context(preview_settings, lang):
 	# url() and the language switcher read get_localization(), which reads `_lang` off the form.
 	frappe.form_dict._lang = lang
 	localization = resolve("/", lang, include_unpublished=True)[0]
+	shop_details = get_preview_shop_details(preview_settings, localization)
 
 	return frappe._dict(
 		preview_settings=preview_settings,
 		lang=lang,
 		localization=localization,
+		# The resolver reads the request path, not frappe.lang, so the preview language goes in here.
+		header_data=get_header_data(localization),
+		shop_details=shop_details,
+		shop_name=shop_details.name or frappe.get_website_settings("app_name") or "Commera",
 		is_rtl=localization.language.direction == "rtl",
 		# format_theme_css() in the layout reads the SAVED doc, so this live copy is appended after to win.
 		preview_theme_css=preview_settings.generate_theme_css(),

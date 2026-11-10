@@ -1,7 +1,8 @@
 
 {# preview_settings carries the footer editor's unsaved values; binding to the saved doc makes the preview ignore what is being typed. #}
 {% set settings = preview_settings if preview_settings is defined and preview_settings else frappe.get_cached_doc("Commera Settings", "Commera Settings") %}
-{% set store_name = (settings.store_name if preview_settings is defined and preview_settings else get_shop_details(localization if localization is defined else none).name) or "Commera" %}
+{% set shop = shop_details if shop_details is defined and shop_details else get_shop_details(localization if localization is defined else none) %}
+{% set store_name = shop.name or "Commera" %}
 {% set footer_logo = preview_settings.footer_logo if preview_settings is defined and preview_settings and preview_settings.footer_logo else get_brand_assets().footer_logo %}
 {% set contact_email = settings.contact_email or "Contact@lifestyle.sa" %}
 {% set contact_phone = settings.contact_phone or "920000576" %}
@@ -19,7 +20,7 @@
 				<div class="col-xl-3 col-md-4 col-sm-6 wow fadeInUp" data-wow-delay="0.1s">
 					<div class="widget widget_about me-2">
 						<div class="footer-logo">
-							<a href="/{{ frappe.lang or 'en' }}"><img src="{{ footer_logo }}" alt="{{ store_name }}"></a>
+							<a href="/{{ frappe.lang or 'en' }}"><img src="{{ footer_logo }}" alt="{{ store_name | e }}"></a>
 						</div>
 						<ul class="widget-address">
 							<li><p><span>{{ _("E-mail") }}</span> : <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p></li>
@@ -74,7 +75,7 @@
 			{# No `wow` here: summer.js observes with a 10% bottom inset, and this last row can never intersect at a 900px viewport. #}
 			<div class="row fb-inner">
 				<div class="col-lg-6 col-md-12 text-start">
-					<p class="copyright-text">&copy; {{ frappe.utils.getdate().year }} {{ _(copyright_text) }}</p>
+					<p class="copyright-text">&copy; {{ frappe.utils.getdate().year }} {{ _(copyright_text) | e }}</p>
 				</div>
 				<div class="col-lg-6 col-md-12 text-end">
 					<div class="d-flex align-items-center justify-content-center justify-content-xl-end">

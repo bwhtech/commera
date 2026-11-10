@@ -46,6 +46,9 @@ PREVIEW_OVERRIDE_FIELDS = (
 COLOR_FIELDS = ("footer_bg_color", "footer_text_color")
 COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{3}([0-9a-fA-F]{3}([0-9a-fA-F]{2})?)?$")
 
+# The footers escape these themselves; escaping here too would show `&amp;` for `&`.
+ESCAPED_IN_TEMPLATE = ("store_name", "copyright_text")
+
 # These land in an href/src attribute, so escaping is not enough either — javascript: and data:
 # survive escaping intact.
 URL_FIELDS = (
@@ -79,7 +82,8 @@ def get_context(context):
 		else:
 			if fieldname in URL_FIELDS and not validate_url(value, valid_schemes=SAFE_URL_SCHEMES):
 				continue
-			value = escape_html(value)
+			if fieldname not in ESCAPED_IN_TEMPLATE:
+				value = escape_html(value)
 
 		setattr(settings, fieldname, value)
 

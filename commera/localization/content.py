@@ -91,6 +91,20 @@ def delete_translations(doc, method=None):
 			frappe.db.delete(DOCTYPE, {"reference_doctype": doctype, "reference_name": ("in", names)})
 
 
+def delete_removed_row_translations(doc, method=None):
+	"""doc_events on_update: drop the translations of translatable child rows the save removed."""
+	before = doc.get_doc_before_save()
+	if not before:
+		return
+	for table in doc.meta.get_table_fields():
+		if not get_translatable_fields(table.options):
+			continue
+		kept = {row.name for row in doc.get(table.fieldname)}
+		removed = [row.name for row in before.get(table.fieldname) if row.name not in kept]
+		if removed:
+			frappe.db.delete(DOCTYPE, {"reference_doctype": table.options, "reference_name": ("in", removed)})
+
+
 def move_translations(doctype: str, old_name: str, new_name: str):
 	"""Point a record's translations at its copy, as when a child row moves to another parent."""
 	frappe.db.set_value(

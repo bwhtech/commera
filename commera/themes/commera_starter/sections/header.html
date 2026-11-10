@@ -37,7 +37,7 @@
 		</div>
 
 		<a href="{{ url('/') | e }}" class="{{ 'lg:order-first' if logo_at_start else 'justify-self-center text-center' }} inline-flex min-h-11 items-center px-2 text-2xl font-semibold uppercase tracking-widest">
-			{% if theme.logo %}<img src="{{ theme.logo }}" alt="{{ app_name }}" class="h-8 w-auto">{% else %}{{ app_name }}{% endif %}
+			{% if theme.logo %}<img src="{{ theme.logo | e }}" alt="{{ shop_name | e }}" class="h-8 w-auto">{% else %}{{ shop_name | e }}{% endif %}
 		</a>
 
 		<div class="{{ 'ms-auto' if logo_at_start }} flex items-center justify-end gap-1 lg:-me-2.5">

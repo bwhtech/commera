@@ -9,7 +9,7 @@
 	<div x-show="open" {{ scrim() }} @click="open = false" class="absolute inset-0 cursor-pointer bg-surface-alpha-gray-6"></div>
 	<nav x-show="open" x-trap.noscroll="open" {{ drawer("start") }} class="absolute inset-y-0 start-0 flex w-80 max-w-[85vw] flex-col overflow-y-auto bg-surface-elevation-1 shadow-xl" aria-label="{{ _('Menu') }}">
 		<div class="flex items-center justify-between px-5 py-4">
-			<span class="text-lg font-semibold uppercase tracking-widest">{{ app_name }}</span>
+			<span class="text-lg font-semibold uppercase tracking-widest">{{ shop_name | e }}</span>
 			<button type="button" @click="open = false" class="icon-button" aria-label="{{ _('Close') }}">{{ icon("close") }}</button>
 		</div>
 		{% if section.settings.show_search %}

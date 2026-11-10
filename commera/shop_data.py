@@ -5,7 +5,7 @@ import frappe
 
 from commera.branding import get_brand_assets
 from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import get_menu_tree
-from commera.localization import translate
+from commera.localization import Localization, translate
 from commera.store_frame import get_shop_details
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
@@ -14,8 +14,11 @@ CATEGORY_DOCTYPE = "Ecommerce Category"
 CATEGORY_FIELDS = ["display_name", "description", "meta_title", "meta_description"]
 
 
-def get_storefront_menu():
-	"""Request-scoped enabled menu tree in the request language, memoised on `frappe.local`."""
+def get_storefront_menu(localization: Localization | None = None):
+	"""Request-scoped enabled menu tree in the request language, memoised on `frappe.local`.
+	An explicit `localization` (an editor preview) gets a fresh tree in that language."""
+	if localization:
+		return translate_menu(get_menu_tree(enabled_only=True), localization)
 	menu = getattr(frappe.local, "commera_storefront_menu", None)
 	if menu is None:
 		menu = translate_menu(get_menu_tree(enabled_only=True))
@@ -23,18 +26,18 @@ def get_storefront_menu():
 	return menu
 
 
-def translate_menu(menu):
+def translate_menu(menu, localization: Localization | None = None):
 	"""Translate every node's label, description and SEO fields in place.
 	The menu editor reads the untranslated tree."""
 	nodes = list(walk_menu(menu))
-	for node, fields in zip(nodes, translate_categories(nodes), strict=True):
+	for node, fields in zip(nodes, translate_categories(nodes, localization), strict=True):
 		# Old `?category=` links carry the source label, so it must still match.
 		node["source_label"] = node["label"]
 		node.update(fields)
 	return menu
 
 
-def translate_categories(categories):
+def translate_categories(categories, localization: Localization | None = None):
 	"""The `label`, `description`, `meta_title` and `meta_description` of each category, translated.
 	`label` is the display name, or the category name when that is blank."""
 	# The label stands in for the display name, so a blank one falls back to `_()` of the category name.
@@ -55,7 +58,7 @@ def translate_categories(categories):
 			"meta_title": fields["meta_title"].value,
 			"meta_description": fields["meta_description"].value,
 		}
-		for fields in translate(records, CATEGORY_FIELDS, doctype=CATEGORY_DOCTYPE)
+		for fields in translate(records, CATEGORY_FIELDS, localization, CATEGORY_DOCTYPE)
 	]
 
 
@@ -174,13 +177,14 @@ def get_featured_brands(menu):
 	return [frappe._dict(name=brand) for brand in brands]
 
 
-def get_header_data():
+def get_header_data(localization: Localization | None = None):
+	"""The header's settings, store name and menu, in the request language or in `localization`."""
 	settings = frappe.get_cached_doc("Commera Settings", "Commera Settings")
-	menu = get_storefront_menu()
+	menu = get_storefront_menu(localization)
 
 	return frappe._dict(
 		settings=settings,
-		store_name=get_shop_details().name or "Commera",
+		store_name=get_shop_details(localization).name or "Commera",
 		brand_logo=get_brand_assets().logo,
 		navigation_menu=menu,
 		navigation_categories=build_legacy_navigation(menu),

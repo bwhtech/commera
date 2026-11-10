@@ -4,7 +4,6 @@
 import frappe
 from frappe.utils import escape_html
 
-from commera.shop_data import get_header_data
 from commera.shop_themes.chrome_preview import (
 	COMMON_BLANKED_BLOCKS,
 	FOOTER_BLOCKS,
@@ -31,8 +30,6 @@ def get_context(context):
 		context.rendered_html = rendered
 		return
 
-	# No theme active: the base header expects the same header_data the storefront builds for it.
-	header_context.header_data = get_header_data()
 	# BASE_HEADER is a path constant in this repo, never caller input.
 	header_html = frappe.render_template(BASE_HEADER, header_context)  # nosemgrep: frappe-ssti
 

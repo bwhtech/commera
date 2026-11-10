@@ -15,7 +15,9 @@ LINK = "Footer Link"
 FOOTER_TEMPLATE = "templates/includes/footer.html"
 
 
-class TestStoreFrameTranslation(IntegrationTestCase):
+class StoreFrameTestCase(IntegrationTestCase):
+	"""A shop named in English and Arabic, with two footer sections."""
+
 	def setUp(self):
 		use_storefront_languages(self, "en", published=("en", "ar"))
 		frappe.db.set_single_value(
@@ -69,6 +71,13 @@ class TestStoreFrameTranslation(IntegrationTestCase):
 	def serve(self, language):
 		use_storefront_language(self, language)
 
+	def has_translations(self, doctype, name):
+		return bool(
+			frappe.db.exists("Content Translation", {"reference_doctype": doctype, "reference_name": name})
+		)
+
+
+class TestStoreFrameTranslation(StoreFrameTestCase):
 	def test_the_registry_declares_the_footer_and_the_shop_details(self):
 		self.assertEqual(get_translatable_fields(SECTION), {"section_title"})
 		self.assertEqual(get_translatable_fields(LINK), {"link_label"})
@@ -154,13 +163,48 @@ class TestStoreFrameTranslation(IntegrationTestCase):
 			"الشحن",
 		)
 
+	def test_a_link_moved_within_its_section_keeps_its_row_and_translation(self):
+		footer_preview.move_footer_link(self.section.name, self.section.name, self.shipping.name, 1)
+		links = frappe.get_doc(SECTION, self.section.name).footer_links
+
+		self.assertEqual([link.name for link in links], [self.returns.name, self.shipping.name])
+		self.assertTrue(self.has_translations(LINK, self.shipping.name))
+
 	def test_deleting_a_section_deletes_its_and_its_links_translations(self):
 		self.set_footer(self.other)
 		frappe.delete_doc(SECTION, self.section.name, ignore_permissions=True)
 
-		for doctype, name in ((SECTION, self.section.name), (LINK, self.shipping.name)):
-			self.assertFalse(
-				frappe.db.exists(
-					"Content Translation", {"reference_doctype": doctype, "reference_name": name}
-				)
-			)
+		self.assertFalse(self.has_translations(SECTION, self.section.name))
+		self.assertFalse(self.has_translations(LINK, self.shipping.name))
+
+
+class TestRemovedFooterLinkTranslations(StoreFrameTestCase):
+	def setUp(self):
+		super().setUp()
+		register(LINK, self.returns.name, "link_label", "ar", "العناية بالكتان")
+
+	def test_deleting_a_link_in_the_editor_deletes_only_its_translations(self):
+		footer_preview.delete_footer_link(self.section.name, self.shipping.name)
+
+		self.assertFalse(self.has_translations(LINK, self.shipping.name))
+		self.assertTrue(self.has_translations(LINK, self.returns.name))
+		self.assertTrue(self.has_translations(SECTION, self.section.name))
+
+	def test_removing_a_link_on_a_section_save_deletes_its_translations(self):
+		section = frappe.get_doc(SECTION, self.section.name)
+		section.footer_links = [row for row in section.footer_links if row.name != self.shipping.name]
+		section.save()
+
+		self.assertFalse(self.has_translations(LINK, self.shipping.name))
+		self.assertTrue(self.has_translations(LINK, self.returns.name))
+
+	def test_a_moved_then_deleted_link_leaves_no_translations(self):
+		footer_preview.move_footer_link(self.section.name, self.other.name, self.shipping.name, 0)
+		moved = frappe.get_doc(SECTION, self.other.name).footer_links[0].name
+		self.assertTrue(self.has_translations(LINK, moved))
+
+		footer_preview.delete_footer_link(self.other.name, moved)
+
+		self.assertFalse(self.has_translations(LINK, moved))
+		self.assertFalse(self.has_translations(LINK, self.shipping.name))
+		self.assertTrue(self.has_translations(LINK, self.returns.name))

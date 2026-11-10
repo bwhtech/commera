@@ -176,7 +176,10 @@ doc_events = {
 		],
 	},
 	"Footer Section Config": {
-		"on_update": "commera.plugin_events.on_menu_change",
+		"on_update": [
+			"commera.plugin_events.on_menu_change",
+			"commera.localization.content.delete_removed_row_translations",
+		],
 		"on_trash": "commera.localization.content.delete_translations",
 	},
 	"Commera Settings": {"on_update": "commera.plugin_events.on_menu_change"},
