@@ -200,6 +200,14 @@ class TestMoveItemArabicFields(IntegrationTestCase):
 		self.assertIn("Content Translation: 1.", log.error)
 		self.assertIn(archive.file_name, log.error)
 
+	def test_a_value_the_collation_treats_as_empty_is_still_archived(self):
+		# utf8mb4_unicode_ci ignores U+200B, so `!= ""` would skip this Item and drop its value.
+		invisible = self.make_plain_item("INVISIBLE", **{NAME_FIELD: "\u200b"})
+
+		self.run_patch()
+
+		self.assertEqual(self.archived()[invisible][NAME_FIELD], "\u200b")
+
 	def test_a_value_that_sanitising_changes_is_archived_raw(self):
 		unsafe = self.make_item("UNSAFE", **{DESCRIPTION_FIELD: UNSAFE_DESCRIPTION})
 		dirty = self.make_product(unsafe, "Rust")

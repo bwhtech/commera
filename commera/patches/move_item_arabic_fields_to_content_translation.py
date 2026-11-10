@@ -3,9 +3,12 @@ Both were Custom Fields made on each site, so a new site has neither and the pat
 
 import csv
 import io
+import operator
+from functools import reduce
 
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import delete_custom_fields
+from frappe.query_builder.functions import Length
 from frappe.utils import cstr, now, today
 from frappe.utils.html_utils import sanitize_html
 
@@ -80,10 +83,8 @@ class ItemArabicMigration:
 	def read_pages(self):
 		"""Items with an Arabic value, in pages ordered by name."""
 		item = frappe.qb.DocType("Item")
-		has_value = None
-		for column in self.columns:
-			condition = item[column].isnotnull() & (item[column] != "")
-			has_value = condition if has_value is None else has_value | condition
+		# Byte length, not `!= ""`: the collation treats some characters as equal to "".
+		has_value = reduce(operator.or_, (Length(item[column]) > 0 for column in self.columns))
 		query = (
 			frappe.qb.from_(item)
 			.select(item.name, item.item_name, *(item[column] for column in self.columns))
@@ -91,11 +92,11 @@ class ItemArabicMigration:
 			.orderby(item.name)
 			.limit(BATCH_SIZE)
 		)
-		# Every Item name sorts after "", so the first page needs no special case.
-		last = ""
-		while page := query.where(item.name > last).run(as_dict=True):
+		# The first page has no name bound: a name the collation sorts as "" must not be skipped.
+		page = query.run(as_dict=True)
+		while page:
 			yield page
-			last = page[-1].name
+			page = query.where(item.name > page[-1].name).run(as_dict=True)
 
 	def migrate(self, items: dict):
 		reasons = {name: [] for name in items}
@@ -174,7 +175,7 @@ class ItemArabicMigration:
 
 class Archive:
 	"""Private CSVs on Commera Settings of the values the patch did not copy.
-	A part is saved when it reaches ARCHIVE_PART_SIZE, so memory stays bounded."""
+	A part is saved once it passes ARCHIVE_PART_SIZE characters, an approximate bound: one huge row can exceed it."""
 
 	def __init__(self):
 		self.count = 0
