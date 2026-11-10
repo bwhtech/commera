@@ -171,15 +171,9 @@ class DoctypeResource(TranslatableResource):
 
 	def scan_sourceless(self, language, batch_size=BATCH_SIZE):
 		meta = frappe.get_meta(self.doctype)
-		columns = [field for field in self.fields if meta.has_field(field)]
 		translated = self.get_translated_fields(language)
 		for names in create_batch(sorted(translated), batch_size):
-			records = frappe.get_all(
-				self.doctype,
-				filters={"name": ("in", names)},
-				fields=["name", *columns],
-				order_by="name asc",
-			)
+			records = self.read_records(meta, [["name", "in", names]], batch_size)
 			sources = get_sources(self.doctype, records, list(self.fields))
 			translations = fetch_translations(self.doctype, names, list(self.fields), language)
 			for record, source in zip(records, sources, strict=True):
@@ -207,7 +201,11 @@ class DoctypeResource(TranslatableResource):
 		return translated
 
 	def exists(self, name, field):
-		return field in self.fields and bool(frappe.db.exists(self.doctype, name))
+		if field not in self.fields:
+			return False
+		if frappe.get_meta(self.doctype).issingle:
+			return name == self.doctype
+		return bool(frappe.db.exists(self.doctype, name))
 
 	def is_field_after(self, field, after_field) -> bool:
 		"""A cursor field no longer declared resumes at the record's first field: nothing is skipped."""
@@ -215,23 +213,32 @@ class DoctypeResource(TranslatableResource):
 		return self.fields.index(field) > position
 
 	def iter_record_batches(self, meta, name, after_name, batch_size):
-		columns = [field for field in self.fields if meta.has_field(field)]
 		conditions = [["name", "=", name]] if name else []
 		# The cursor record may still have fields after the cursor field.
 		after = ["name", ">=", after_name] if after_name else None
 		while True:
-			records = frappe.get_all(
-				self.doctype,
-				filters=conditions + ([after] if after else []),
-				fields=["name", *columns],
-				order_by="name asc",
-				limit=batch_size,
-			)
+			records = self.read_records(meta, conditions + ([after] if after else []), batch_size)
 			if records:
 				yield records
 			if len(records) < batch_size:
 				return
 			after = ["name", ">", records[-1].name]
+
+	def read_records(self, meta, filters, limit) -> list:
+		"""Up to `limit` records by name, with their column fields. `filters` are [["name", op, value]]."""
+		columns = [field for field in self.fields if meta.has_field(field)]
+		if meta.issingle:
+			return self.read_single(columns, filters)
+		return frappe.get_all(
+			self.doctype, filters=filters, fields=["name", *columns], order_by="name asc", limit=limit
+		)
+
+	def read_single(self, columns, filters) -> list:
+		"""A Single has no rows: its one record is named after the doctype."""
+		if not all(matches_name(self.doctype, operator, value) for _name, operator, value in filters):
+			return []
+		doc = frappe.get_single(self.doctype)
+		return [frappe._dict(name=self.doctype, **{column: doc.get(column) for column in columns})]
 
 	def make_entry(self, meta, name, field, source, translations):
 		value, source_hash = translations.get((name, field)) or ("", None)
@@ -247,6 +254,9 @@ class DoctypeResource(TranslatableResource):
 
 	def aggregate_statuses(self, language):
 		meta = frappe.get_meta(self.doctype)
+		if meta.issingle:
+			# A Single has no table to aggregate in SQL; it has one record to scan.
+			return super().aggregate_statuses(language)
 		counts = Counter()
 		for field in self.fields:
 			if meta.has_field(field):
@@ -361,6 +371,18 @@ def matches_entry(entry: TranslationEntry, search: str | None, status: str | Non
 		return False
 	needle = (search or "").strip().casefold()
 	return not needle or needle in entry.source.casefold() or needle in entry.value.casefold()
+
+
+def matches_name(name: str, operator: str, value) -> bool:
+	if operator == "=":
+		return name == value
+	if operator == "in":
+		return name in value
+	if operator == ">=":
+		return name >= value
+	if operator == ">":
+		return name > value
+	raise ValueError(f"Unsupported name filter {operator}")
 
 
 def parse_cursor(cursor: str | None) -> list | None:

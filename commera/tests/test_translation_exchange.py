@@ -517,3 +517,74 @@ class TestThemeSectionTranslationExchange(IntegrationTestCase):
 
 		self.assertEqual([error["row"] for error in report.errors], [2])
 		self.assertEqual(report.skipped, 0)
+
+
+SINGLE = "Website Settings"
+SINGLE_RESOURCE = {"type": "site", "doctype": SINGLE, "fields": ["app_name", "title_prefix"], "label": "Site"}
+
+
+class TestSingleTranslationExchange(IntegrationTestCase):
+	"""A Single has no rows: its one record is named after the doctype."""
+
+	def setUp(self):
+		frappe.db.savepoint("single_translation_test")
+		self.addCleanup(frappe.db.rollback, save_point="single_translation_test")
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		hooks = {**frappe.get_hooks("commera_hooks", {}), "translatable_resources": [SINGLE_RESOURCE]}
+		self.enterContext(self.patch_hooks({"commera_hooks": hooks}))
+		self.set_source("app_name", "ZZ Shop")
+		self.set_source("title_prefix", "ZZ Prefix")
+		self.resource = get_translatable_resource("site")
+
+	def set_source(self, field, value):
+		frappe.db.set_single_value(SINGLE, field, value)
+
+	def keys(self, entries):
+		return [(entry.name, entry.field) for entry in entries]
+
+	def test_its_fields_list_by_page_filter_and_search(self):
+		first = self.resource.list_entries("ar", limit=1)
+		second = self.resource.list_entries("ar", cursor=first.next_cursor, limit=1)
+
+		self.assertEqual(self.keys(first.entries), [(SINGLE, "app_name")])
+		self.assertEqual(self.keys(second.entries), [(SINGLE, "title_prefix")])
+		self.assertIsNone(second.next_cursor)
+		self.assertEqual(self.resource.list_entries("ar", filters={"name": "Other"}).entries, [])
+		found = self.resource.list_entries("ar", filters={"name": SINGLE}, search="zz prefix")
+		self.assertEqual(self.keys(found.entries), [(SINGLE, "title_prefix")])
+
+	def test_its_statuses_are_counted_from_the_document(self):
+		self.resource.write(SINGLE, "app_name", "ar", "متجر")
+		self.assertEqual(self.resource.count_statuses("ar"), {MISSING: 1, OUTDATED: 0, CURRENT: 1})
+
+		self.set_source("app_name", "ZZ Store")
+
+		self.assertEqual(self.resource.count_statuses("ar"), {MISSING: 1, OUTDATED: 1, CURRENT: 0})
+
+	def test_it_exports_and_imports_back(self):
+		self.resource.write(SINGLE, "app_name", "ar", "متجر")
+
+		content = exchange.export_csv("ar")
+		rows = {(row["Identification"], row["Field"]): row for row in parse(content)}
+		unchanged = exchange.import_csv(content, "ar")
+		edited = {**rows[(SINGLE, "title_prefix")], "Translated content": "بادئة"}
+		report = exchange.import_csv(to_csv([edited]), "ar")
+
+		self.assertEqual(list(rows), [(SINGLE, "app_name"), (SINGLE, "title_prefix")])
+		self.assertEqual(rows[(SINGLE, "app_name")]["Status"], CURRENT)
+		self.assertEqual((unchanged.updated, unchanged.errors), (0, []))
+		self.assertEqual((report.updated, report.errors), (1, []))
+		(entry,) = self.resource.list_entries("ar", filters={"field": "title_prefix"}).entries
+		self.assertEqual((entry.value, entry.status), ("بادئة", CURRENT))
+
+	def test_a_translation_whose_source_was_cleared_is_still_exchanged(self):
+		self.resource.write(SINGLE, "title_prefix", "ar", "بادئة")
+		self.set_source("title_prefix", "")
+
+		rows = {(row["Identification"], row["Field"]): row for row in parse(exchange.export_csv("ar"))}
+
+		cleared = rows[(SINGLE, "title_prefix")]
+		self.assertEqual(
+			(cleared["Status"], cleared["Default content"], cleared["Translated content"]),
+			(OUTDATED, "", "بادئة"),
+		)
