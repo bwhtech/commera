@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
 
 UNIQUE_COUNTRY = "unique_market_country"
@@ -23,12 +24,19 @@ class CommeraMarketCountry(Document):
 	# end: auto-generated types
 
 	def show_unique_validation_message(self, e):
-		"""Another market claimed this country after validate() read the countries."""
+		"""Another market claimed this country after validate() read the countries,
+		or a row of this market still held it: validate() refuses plain duplicates."""
 		from commera.commera_ecommerce.doctype.commera_market.commera_market import throw_country_taken
 
 		market = frappe.db.get_value(
-			self.doctype, {"country": self.country, "parent": ["!=", self.parent]}, "parent"
+			self.doctype, {"country": self.country, "name": ["!=", self.name]}, "parent"
 		)
+		if market == self.parent:
+			frappe.throw(
+				_("{0} is already on another row of this market.").format(frappe.bold(self.country)),
+				title=_("Duplicate Country"),
+				exc=frappe.UniqueValidationError,
+			)
 		throw_country_taken(self.country, market, frappe.UniqueValidationError)
 
 

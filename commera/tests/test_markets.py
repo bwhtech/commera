@@ -226,6 +226,125 @@ class TestMarketValidation(IntegrationTestCase):
 			make_market("Emirates", [UAE], "ar")
 
 
+class TestMarketWithUnpublishedLanguage(IntegrationTestCase):
+	"""Gulf took Arabic, its default, while Arabic was published. Arabic was unpublished later."""
+
+	def setUp(self):
+		use_storefront_languages(self, "en", published=("en", "ar", "fr"))
+		use_markets(self)
+		self.market = make_market("Gulf", [UAE], "ar", ["en"], handle="gulf")
+		use_storefront_languages(self, "en", published=("en", "fr"), unpublished=("ar",))
+
+	def test_the_market_can_still_be_renamed_moved_and_disabled(self):
+		self.market.market_name = "Gulf States"
+		self.market.save()
+		self.market.countries[0].country = "Saudi Arabia"
+		self.market.append("countries", {"country": "Oman"})
+		self.market.save()
+		self.assertEqual(StorefrontMarkets.load().find("gulf").default_language.code, "en")
+		self.market.enabled = 0
+		self.market.save()
+
+		self.assertEqual([row.language for row in self.market.languages], ["en", "ar"])
+		self.assertIsNone(StorefrontMarkets.load().find("gulf"))
+
+	def test_the_unpublished_default_can_be_dropped_for_a_published_one(self):
+		self.market.default_language = "en"
+		self.market.languages = [row for row in self.market.languages if row.language != "ar"]
+		self.market.save()
+
+		self.assertEqual([row.language for row in self.market.languages], ["en"])
+
+	def test_the_unpublished_default_is_not_added_back(self):
+		self.market.languages = [row for row in self.market.languages if row.language != "ar"]
+
+		with self.assertRaisesRegex(frappe.ValidationError, "Default language .*ar.* is not published"):
+			self.market.save()
+
+	def test_an_unpublished_language_cannot_be_chosen_again(self):
+		self.market.default_language = "en"
+		self.market.save()
+		self.market.default_language = "ar"
+		with self.assertRaisesRegex(frappe.ValidationError, "Default language .*ar.* is not published"):
+			self.market.save()
+
+		self.market.reload()
+		self.market.languages = [row for row in self.market.languages if row.language != "ar"]
+		self.market.save()
+		self.market.append("languages", {"language": "ar"})
+		with self.assertRaisesRegex(frappe.ValidationError, "not a published storefront language"):
+			self.market.save()
+
+
+class TestMarketCountryChanges(IntegrationTestCase):
+	"""Frappe updates kept rows one by one. A country moving between rows must not trip the unique index."""
+
+	def setUp(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		use_markets(self)
+		self.market = make_market("Gulf", [UAE, "Saudi Arabia", "Oman"], "ar", handle="gulf")
+		self.names = [row.name for row in self.market.countries]
+
+	def test_two_rows_can_swap_countries(self):
+		first, second, _third = self.market.countries
+		first.country, second.country = second.country, first.country
+		self.market.save()
+
+		self.assert_saved_countries(["Saudi Arabia", UAE, "Oman"])
+
+	def test_countries_can_move_round_a_chain(self):
+		first, second, third = self.market.countries
+		first.country, second.country, third.country = "Saudi Arabia", "Oman", UAE
+		self.market.save()
+
+		self.assert_saved_countries(["Saudi Arabia", "Oman", UAE])
+
+	def test_rows_can_be_reordered(self):
+		self.market.countries.reverse()
+		for idx, row in enumerate(self.market.countries, 1):
+			row.idx = idx
+		self.names.reverse()
+		self.market.save()
+
+		self.assert_saved_countries(["Oman", "Saudi Arabia", UAE])
+
+	def test_a_country_of_another_market_is_still_refused(self):
+		make_market("Kuwait", ["Kuwait"], "ar", handle="kuwait")
+		first, second, _third = self.market.countries
+		first.country, second.country = second.country, "Kuwait"
+
+		with self.assertRaisesRegex(frappe.ValidationError, "Kuwait.* is already in market .*kuwait"):
+			self.market.save()
+
+	def test_a_country_claimed_during_a_swap_names_the_other_market(self):
+		make_market("Kuwait", ["Kuwait"], "ar", handle="kuwait")
+		first, second, _third = self.market.countries
+		first.country, second.country = "Kuwait", first.country
+
+		with (
+			patch.object(CommeraMarket, "get_countries_in_other_markets", return_value=[]),
+			self.assertRaisesRegex(frappe.UniqueValidationError, "already in market .*kuwait"),
+		):
+			self.market.save()
+
+	def test_a_clash_inside_the_market_is_named_as_such(self):
+		first, second, _third = self.market.countries
+		first.country, second.country = second.country, first.country
+
+		with (
+			patch.object(CommeraMarket, "reinsert_changed_countries"),
+			self.assertRaisesRegex(frappe.UniqueValidationError, "already on another row of this market"),
+		):
+			self.market.save()
+
+	def assert_saved_countries(self, countries):
+		rows = frappe.get_all(
+			"Commera Market Country", {"parent": "gulf"}, ["name", "country"], order_by="idx"
+		)
+		self.assertEqual([row.country for row in rows], countries)
+		self.assertEqual([row.name for row in rows], self.names)
+
+
 class TestMarketCountryIndex(IntegrationTestCase):
 	def test_reload_adds_the_unique_country_index(self):
 		table = "tabCommera Market Country"

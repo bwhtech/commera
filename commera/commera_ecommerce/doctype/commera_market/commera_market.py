@@ -48,6 +48,9 @@ class CommeraMarket(Document):
 		self.validate_countries()
 		self.validate_languages()
 
+	def before_save(self):
+		self.reinsert_changed_countries()
+
 	def on_update(self):
 		refresh_market_surfaces()
 
@@ -89,22 +92,38 @@ class CommeraMarket(Document):
 
 	def validate_languages(self):
 		languages = StorefrontLanguages.load()
-		if not any(row.language == self.default_language for row in self.languages):
-			self.append("languages", {"language": self.default_language})
+		self.validate_default_language(languages)
 		codes = [row.language for row in self.languages]
 		saved = self.get_saved_languages()
 		for code in codes:
-			if not languages.find(code):
-				frappe.throw(
-					_("Language {0} is not a published storefront language.").format(frappe.bold(code)),
-					title=_("Unpublished Language"),
-				)
 			# Saved rows stay valid, so an older market can still drop them or be disabled.
 			if code not in saved:
+				self.validate_published(languages, code)
 				self.validate_no_region(code)
 			if codes.count(code) > 1:
 				frappe.throw(_("Language {0} is listed more than once.").format(frappe.bold(code)))
 		self.validate_prefixes(languages, codes)
+
+	def validate_default_language(self, languages: StorefrontLanguages):
+		"""The default is one of the languages. An unpublished default may stay, not be chosen or re-added."""
+		listed = any(row.language == self.default_language for row in self.languages)
+		chosen = not listed or self.has_value_changed("default_language")
+		if chosen and not languages.find(self.default_language):
+			frappe.throw(
+				_("Default language {0} is not published. Choose a published default language.").format(
+					frappe.bold(self.default_language)
+				),
+				title=_("Unpublished Language"),
+			)
+		if not listed:
+			self.append("languages", {"language": self.default_language})
+
+	def validate_published(self, languages: StorefrontLanguages, code: str):
+		if not languages.find(code):
+			frappe.throw(
+				_("Language {0} is not a published storefront language.").format(frappe.bold(code)),
+				title=_("Unpublished Language"),
+			)
 
 	def get_saved_languages(self) -> set[str]:
 		before = self.get_doc_before_save()
@@ -121,6 +140,15 @@ class CommeraMarket(Document):
 				).format(frappe.bold(code), frappe.bold(code.partition("-")[0])),
 				title=_("Regional Language"),
 			)
+
+	def reinsert_changed_countries(self):
+		"""Frappe updates kept rows one by one, so a swap of two countries breaks the unique index midway.
+		As new rows, Frappe deletes them with the removed rows first, then inserts them under their names."""
+		before = self.get_doc_before_save()
+		saved = {row.name: row.country for row in before.countries} if before else {}
+		for row in self.countries:
+			if row.name in saved and saved[row.name] != row.country:
+				row.set("__islocal", 1)
 
 	def validate_prefixes(self, languages: StorefrontLanguages, codes: list[str]):
 		"""`/pt-br/` would name both Portuguese in Brazil and the language pt-BR, and share its hreflang."""
