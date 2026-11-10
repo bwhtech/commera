@@ -319,17 +319,18 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 
 	def test_a_page_reads_in_the_request_language(self):
 		use_storefront_languages(self, "en", published=("en", "ar"))
-		for content_ar, expected in (("<p>سياسة</p>", "<p>سياسة</p>"), ("", "<p>Policy</p>")):
+		for arabic, expected in (("<p>سياسة</p>", "<p>سياسة</p>"), ("", "<p>Policy</p>")):
 			page = frappe.get_doc(
 				{
 					"doctype": "Shop Web Page",
-					"route": f"policy-{len(content_ar)}-{self.suffix.lower()}",
+					"route": f"policy-{len(arabic)}-{self.suffix.lower()}",
 					"content": "<p>Policy</p>",
-					"content_ar": content_ar,
 					"published": 1,
 				}
-			).insert(ignore_permissions=True, set_name=f"Policy {len(content_ar)} {self.suffix}")
-			with self.subTest(content_ar=content_ar):
+			).insert(ignore_permissions=True, set_name=f"Policy {len(arabic)} {self.suffix}")
+			if arabic:
+				register("Shop Web Page", page.name, "content", "ar", arabic)
+			with self.subTest(arabic=arabic):
 				use_storefront_language(self, "ar")
 				self.assertEqual(get_page(page.route)["body_html"], expected)
 				use_storefront_language(self, "en")

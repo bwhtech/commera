@@ -5,6 +5,9 @@ from frappe.query_builder import DocType
 from frappe.query_builder.functions import Min
 
 from commera import seo
+from commera.commera_ecommerce.doctype.landing_page_settings.landing_page_settings import (
+	get_translated_landing_page,
+)
 from commera.utils import get_product_list
 
 
@@ -37,38 +40,9 @@ def set_home_seo(context):
 
 
 def get_homepage_details():
-	homepage_settings = frappe.get_cached_doc("Landing Page Settings")
-	homepage_details = {}
-	if frappe.local.lang == "ar":
-		homepage_details = {
-			"hero_banner": homepage_settings.hero_banner_ar or homepage_settings.hero_banner,
-			"new_arrivals": homepage_settings.new_arrivals,
-			"best_picks": homepage_settings.best_picks,
-			"gif_1": homepage_settings.gif_1_ar or homepage_settings.gif_1,
-			"gif_url_1": homepage_settings.gif_url_1_ar or homepage_settings.gif_url_1,
-			"gif_2": homepage_settings.gif_2_ar or homepage_settings.gif_2,
-			"gif_url_2": homepage_settings.gif_url_2_ar or homepage_settings.gif_url_2,
-			"gif_3": homepage_settings.gif_3_ar or homepage_settings.gif_3,
-			"gif_url_3": homepage_settings.gif_url_3_ar or homepage_settings.gif_url_3,
-			"gif_4": homepage_settings.gif_4_ar or homepage_settings.gif_4,
-			"gif_url_4": homepage_settings.gif_url_4_ar or homepage_settings.gif_url_4,
-			"banner_1": homepage_settings.banner_1_ar or homepage_settings.banner_1,
-			"banner_url_1": homepage_settings.banner_url_1_ar or homepage_settings.banner_url_1,
-		}
-	else:
-		homepage_details = {
-			"hero_banner": homepage_settings.hero_banner,
-			"new_arrivals": homepage_settings.new_arrivals,
-			"best_picks": homepage_settings.best_picks,
-			"gif_1": homepage_settings.gif_1,
-			"gif_url_1": homepage_settings.gif_url_1,
-			"gif_2": homepage_settings.gif_2,
-			"gif_url_2": homepage_settings.gif_url_2,
-			"gif_3": homepage_settings.gif_3,
-			"gif_url_3": homepage_settings.gif_url_3,
-			"gif_4": homepage_settings.gif_4,
-			"gif_url_4": homepage_settings.gif_url_4,
-			"banner_1": homepage_settings.banner_1,
-			"banner_url_1": homepage_settings.banner_url_1,
-		}
-	return homepage_details
+	"""The homepage settings, with the banners, GIFs and their links in the request language."""
+	settings = frappe.get_cached_doc("Landing Page Settings")
+	details = get_translated_landing_page(settings)
+	details.new_arrivals = settings.new_arrivals
+	details.best_picks = settings.best_picks
+	return details

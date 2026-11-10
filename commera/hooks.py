@@ -127,6 +127,24 @@ commera_hooks = {
 			"fields": ["store_name", "default_meta_description"],
 			"label": "Shop",
 		},
+		# The un-themed homepage. An image or link translation swaps the file or target per language.
+		{
+			"type": "landing_page",
+			"doctype": "Landing Page Settings",
+			"fields": [
+				*(f"gif_{number}" for number in range(1, 5)),
+				*(f"gif_url_{number}" for number in range(1, 5)),
+				"banner_1",
+				"banner_url_1",
+			],
+			"label": "Landing page",
+		},
+		{
+			"type": "landing_page_banner",
+			"doctype": "Landing Page Hero Banner",
+			"fields": ["banner_image", "url"],
+			"label": "Landing page hero banners",
+		},
 	],
 }
 setup_wizard_complete = [
@@ -183,6 +201,7 @@ doc_events = {
 		"on_trash": "commera.localization.content.delete_translations",
 	},
 	"Commera Settings": {"on_update": "commera.plugin_events.on_menu_change"},
+	"Landing Page Settings": {"on_update": "commera.localization.content.delete_removed_row_translations"},
 	"Price List": {
 		"validate": "commera.doc_events.price_list.validate",
 	},

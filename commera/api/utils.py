@@ -6,6 +6,9 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.translate import get_all_translations
 
+from commera.commera_ecommerce.doctype.landing_page_settings.landing_page_settings import (
+	get_translated_landing_page,
+)
 from commera.search.typeahead import get_typeahead
 from commera.utils import get_available_stocks, validate_document_access
 
@@ -67,8 +70,12 @@ def get_whitelist_transaction_list(
 # The storefront landing page is public, and so is everything Landing Page Settings holds.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 def get_homepage_details():
-	landing_page = frappe.get_cached_doc("Landing Page Settings")
-	landing_page = landing_page.as_dict()
+	settings = frappe.get_cached_doc("Landing Page Settings")
+	landing_page = settings.as_dict()
+	translated = get_translated_landing_page(settings)
+	for row, banner in zip(landing_page.get("hero_banner") or [], translated.pop("hero_banner"), strict=True):
+		row.update(banner)
+	landing_page.update(translated)
 	landing_page["new_arrivals"] = get_item_details(landing_page.get("new_arrivals"))
 	landing_page["best_picks"] = get_item_details(landing_page.get("best_picks"))
 	landing_page["carousel_1"] = get_item_details(landing_page.get("carousel_1"))
