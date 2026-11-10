@@ -274,11 +274,18 @@ def write_entry(
 	register(resource.doctype, name, fieldname, language, value, market)
 
 
+def read_records(doctype: str, meta, columns: list[str]) -> list:
+	# A Single has no rows to list: its one record is named after the doctype.
+	if meta.issingle:
+		doc = frappe.get_cached_doc(doctype)
+		return [frappe._dict(name=doctype, **{column: doc.get(column) for column in columns})]
+	return frappe.get_all(doctype, fields=["name", *columns], order_by="name asc")
+
+
 def iter_doctype_entries(resource: TranslatableResource, language: str) -> Iterator[Entry]:
 	meta = frappe.get_meta(resource.doctype)
 	columns = [fieldname for fieldname in resource.fields if meta.has_field(fieldname)]
-	records = frappe.get_all(resource.doctype, fields=["name", *columns], order_by="name asc")
-	for batch in create_batch(records, BATCH_SIZE):
+	for batch in create_batch(read_records(resource.doctype, meta, columns), BATCH_SIZE):
 		sources = get_sources(resource.doctype, batch, list(resource.fields))
 		names = [cstr(record.name) for record in batch]
 		translations = fetch_all_translations(resource.doctype, names, list(resource.fields), language)

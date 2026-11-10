@@ -253,3 +253,21 @@ class TestStoreFrameSeo(StoreFrameTestCase):
 
 		self.assertEqual(seo.apply_title_template("Shirts"), "Shirts | Linen House")
 		self.assertEqual(seo.default_seo()["description"], "Shirts for summer")
+
+
+class TestStoreFrameTranslationExchange(StoreFrameTestCase):
+	def test_the_csv_carries_the_shop_and_footer_and_round_trips(self):
+		import csv
+		import io
+
+		from commera.localization import exchange
+
+		content = exchange.export_csv("ar")
+		rows = list(csv.DictReader(io.StringIO(content)))
+		translated = {(row["Identification"], row["Field"]): row["Translated content"] for row in rows}
+
+		self.assertEqual(translated[(SETTINGS, "store_name")], "بيت الكتان")
+		self.assertEqual(translated[(self.section.name, "section_title")], "مساعدة")
+		self.assertEqual(translated[(self.shipping.name, "link_label")], "الشحن")
+		report = exchange.import_csv(content, "ar")
+		self.assertEqual((report.updated, report.errors), (0, []))
