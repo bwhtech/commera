@@ -479,6 +479,15 @@ function checkout(config) {
 			}
 		},
 
+		// Until the checkout and the cart are both read; a failed or empty cart shows its own state.
+		get is_loading() {
+			const cart = this.$store.cart;
+			if (this.sign_in_required || cart.status === 'failed') {
+				return false;
+			}
+			return cart.status === 'loading' || (!this.ready && cart.count > 0);
+		},
+
 		get shown_shipping_option() {
 			return this.chosen_shipping_option ?? this.state?.shipping_option;
 		},

@@ -1,14 +1,15 @@
 {% extends "components/base.html" %}
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/summary_line.html" import summary_line %}
+{% from "components/macros/skeleton.html" import skeleton %}
 {% set language = frappe.lang or "en" %}
 
 {% block uncontained_body %}
 <section x-data="order_confirmation" class="section-x pt-6 md:pt-10"><div class="mx-auto flex max-w-2xl flex-col">
 	<div x-show="status === 'checking'" class="flex flex-col gap-4" aria-busy="true">
-		<div class="h-12 w-2/3 animate-pulse rounded-lg bg-surface-gray-2"></div>
-		<div class="h-5 w-1/2 animate-pulse rounded-lg bg-surface-gray-2"></div>
-		<div class="mt-6 h-40 animate-pulse rounded-xl bg-surface-gray-2"></div>
+		{{ skeleton("h-12 w-2/3 rounded-lg") }}
+		{{ skeleton("h-5 w-1/2 rounded-lg") }}
+		{{ skeleton("mt-6 h-40 rounded-xl") }}
 	</div>
 
 	<div x-cloak x-show="status === 'paid'" class="flex flex-col gap-8">

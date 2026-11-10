@@ -49,3 +49,31 @@ test('the Starter checkout follows a change between pickup and delivery', () => 
 	assert.equal(form.forms.shipping.address_line1, '1 MG Road');
 	assert.equal(form.editing_address, false);
 });
+
+test('the Starter checkout shows its skeleton only while a cart with lines loads', () => {
+	const form = make_checkout_form();
+	const cart = { status: 'loading', count: 0 };
+	form.$store = { cart };
+	assert.equal(form.is_loading, true);
+
+	Object.assign(cart, { status: 'ready', count: 2 });
+	assert.equal(form.is_loading, true);
+
+	form.ready = true;
+	assert.equal(form.is_loading, false);
+
+	form.ready = false;
+	cart.count = 0;
+	assert.equal(form.is_loading, false, 'an empty cart shows its empty state');
+
+	Object.assign(cart, { status: 'failed', count: 2 });
+	assert.equal(form.is_loading, false, 'a failed cart shows its retry state');
+
+	cart.status = 'loading';
+	form.sign_in_required = true;
+	assert.equal(
+		form.is_loading,
+		false,
+		'a guest without access is asked to sign in',
+	);
+});
