@@ -49,11 +49,12 @@ function remove(country) {
           :key="country"
           size="sm"
           variant="subtle"
-          :label="country"
           icon-right="lucide-x"
           :aria-label="__('Remove {0}', [country])"
           @click="remove(country)"
-        />
+        >
+          {{ country }}
+        </Button>
       </div>
       <p v-else class="text-p-sm text-ink-gray-5">{{ __('Add at least one country.') }}</p>
       <FormControl

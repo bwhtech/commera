@@ -232,8 +232,10 @@ def throw_country_taken(country: str, market: str | None, exc=frappe.ValidationE
 		message = _("{0} is already in market {1}. A country belongs to one market only.")
 	else:
 		message = _("{0} is already in another market. A country belongs to one market only.")
+	# Name the market as admins see it; its record name is only the handle.
+	title = market and (frappe.db.get_value("Commera Market", market, "market_name") or market)
 	frappe.throw(
-		message.format(frappe.bold(country), frappe.bold(market)),
+		message.format(frappe.bold(country), frappe.bold(title)),
 		title=_("Country In Another Market"),
 		exc=exc,
 	)

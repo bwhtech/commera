@@ -19,6 +19,10 @@ const emit = defineEmits(['back', 'created'])
 
 const form = useMarketForm(props.handle)
 const { isNew, values, errors, hasError } = form
+// Same rule as make_handle() on the server, shown while the handle is empty.
+const handleFromName = computed(() =>
+  (values.value.market_name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+)
 
 // The saved record, for the header: the boxes may hold a value still on its way to the server.
 const market = computed(() => (isNew ? null : marketStore.find(props.handle)))
@@ -134,6 +138,7 @@ const menu = [{ label: __('Delete market'), icon: 'lucide-trash-2', theme: 'red'
               v-if="!isPrimary"
               :label="__('Handle')"
               :model-value="values.handle"
+              :placeholder="isNew ? handleFromName : ''"
               :description="__('Made from the name when empty.')"
               :error="errors.handle"
               :disabled="!isNew"

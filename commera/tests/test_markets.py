@@ -111,7 +111,7 @@ class TestMarketValidation(IntegrationTestCase):
 	def test_a_country_belongs_to_one_market_only(self):
 		make_market("Gulf", [UAE], "ar")
 
-		with self.assertRaisesRegex(frappe.ValidationError, "already in market .*gulf"):
+		with self.assertRaisesRegex(frappe.ValidationError, "already in market .*Gulf"):
 			make_market("Middle East", ["Saudi Arabia", UAE], "ar")
 		with self.assertRaises(frappe.ValidationError):
 			make_market("Saudi Arabia", ["Saudi Arabia", "Saudi Arabia"], "ar")
@@ -238,7 +238,7 @@ class TestMarketValidation(IntegrationTestCase):
 
 		with (
 			patch.object(CommeraMarket, "get_countries_in_other_markets", return_value=[]),
-			self.assertRaisesRegex(frappe.UniqueValidationError, "already in market .*gulf"),
+			self.assertRaisesRegex(frappe.UniqueValidationError, "already in market .*Gulf"),
 		):
 			make_market("Emirates", [UAE], "ar")
 
@@ -330,7 +330,7 @@ class TestMarketCountryChanges(IntegrationTestCase):
 		first, second, _third = self.market.countries
 		first.country, second.country = second.country, "Kuwait"
 
-		with self.assertRaisesRegex(frappe.ValidationError, "Kuwait.* is already in market .*kuwait"):
+		with self.assertRaisesRegex(frappe.ValidationError, "Kuwait.* is already in market .*Kuwait"):
 			self.market.save()
 
 	def test_a_country_claimed_during_a_swap_names_the_other_market(self):
@@ -340,7 +340,7 @@ class TestMarketCountryChanges(IntegrationTestCase):
 
 		with (
 			patch.object(CommeraMarket, "get_countries_in_other_markets", return_value=[]),
-			self.assertRaisesRegex(frappe.UniqueValidationError, "already in market .*kuwait"),
+			self.assertRaisesRegex(frappe.UniqueValidationError, "already in market .*Kuwait"),
 		):
 			self.market.save()
 
