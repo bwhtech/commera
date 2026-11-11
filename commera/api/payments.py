@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from urllib.parse import urlencode
 
 import frappe
+from bwh_payments.api import get_gateway_options
 from bwh_payments.bwh_payments.utils import get_available_payment_modes, resolve_payment_mode
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
@@ -210,7 +211,10 @@ def open_checkout(
 		)
 	if gateway not in payment_methods:
 		refuse_payment(
-			_("This payment method is not available for your order."), quotation.name, gateway=gateway
+			_("This payment method is not available for your order."),
+			quotation.name,
+			gateway=gateway,
+			currency=quotation.currency,
 		)
 
 	payment_request = frappe.get_doc(
@@ -232,7 +236,9 @@ def open_checkout(
 
 
 def get_checkout_payment_methods(quotation, strict: bool = False) -> list[str]:
-	payment_methods = list(get_available_payment_modes())
+	"""Gateways that can charge the cart's currency, and cash on delivery, which has no currency limit."""
+	currency = quotation.currency if quotation else None
+	payment_methods = [option.name for option in get_gateway_options(currency)]
 	if frappe.get_cached_value("Commera Settings", "Commera Settings", "cod_enabled"):
 		payment_methods.append(COD_PAYMENT_MODE)
 	if not quotation:
