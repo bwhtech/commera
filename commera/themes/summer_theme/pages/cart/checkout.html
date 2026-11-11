@@ -7,6 +7,7 @@
 {% set currency_symbol = get_currency_symbol() %}
 {% set checkout_config = {
 	"payment_gateways": payment_gateways,
+	"payment_gateway_labels": payment_gateway_labels,
 	"show_cod": show_cod | int,
 	"summary": checkout_summary,
 	"has_billing_addresses": billing_addresses | length > 0,
@@ -16,6 +17,7 @@
 	"delivery_charge": delivery_charge,
 	"cart_needs_refresh": cart_needs_refresh or False,
 	"prefill": checkout_prefill,
+	"default_country": default_country,
 	"coupon_code": coupon_code,
 	"discount_codes": discount_code_states,
 } %}
@@ -115,9 +117,9 @@
 						{% for breadcrumb in breadcrumbs %}
 							<li class="breadcrumb-item">
 								{% if breadcrumb.href and breadcrumb.href != "#" %}
-									<a href="{{ breadcrumb.href | e }}">{{ _(breadcrumb.label) }}</a>
+									<a href="{{ breadcrumb.href | e }}">{{ breadcrumb.label|e }}</a>
 								{% else %}
-									{{ _(breadcrumb.label) }}
+									{{ breadcrumb.label|e }}
 								{% endif %}
 							</li>
 						{% endfor %}
@@ -446,27 +448,27 @@
 
 						<div x-show="address_saved" x-cloak>
 							<div class="accordion dz-accordion accordion-sm">
-								{% for gateway_name in payment_gateways %}
+								<template x-for="(gateway_name, index) in config.payment_gateways" :key="gateway_name">
 									<div class="accordion-item">
 										<div class="accordion-header">
 											<div class="accordion-button custom-control custom-checkbox border-0"
-												:class='payment_mode !== {{ gateway_name | tojson }} && "collapsed"'
-												@click='payment_mode = {{ gateway_name | tojson }}'>
+												:class='payment_mode !== gateway_name && "collapsed"'
+												@click='payment_mode = gateway_name'>
 												<input class="form-check-input radio" type="radio" name="payment_mode"
-													id="payment_mode_{{ loop.index }}" value="{{ gateway_name }}" x-model="payment_mode">
-												<label class="form-check-label" for="payment_mode_{{ loop.index }}">{{ _(gateway_name) }}</label>
+													:id="'payment_mode_' + index" :value="gateway_name" x-model="payment_mode">
+												<label class="form-check-label" :for="'payment_mode_' + index" x-text="config.payment_gateway_labels[gateway_name] || gateway_name"></label>
 											</div>
 										</div>
 										<div class="accordion-collapse collapse"
-											:class='payment_mode === {{ gateway_name | tojson }} && "show"'>
+											:class='payment_mode === gateway_name && "show"'>
 											<div class="accordion-body">
 												<p class="m-b0">{{ _("You will be redirected to the secure payment page to complete your order.") }}</p>
 											</div>
 										</div>
 									</div>
-								{% endfor %}
+								</template>
 
-								{% if show_cod %}
+								<template x-if="config.show_cod">
 									<div class="accordion-item">
 										<div class="accordion-header">
 											<div class="accordion-button custom-control custom-checkbox border-0"
@@ -486,7 +488,7 @@
 											</div>
 										</div>
 									</div>
-								{% endif %}
+								</template>
 							</div>
 
 							<p class="text">
@@ -537,7 +539,7 @@
 			return trimmed.length <= PHONE_NUMBER_MAX_LENGTH && PHONE_NUMBER_DIGITS.test(digits);
 		}
 
-		function get_blank_address() {
+		function get_blank_address(country = "") {
 			return {
 				first_name: "",
 				last_name: "",
@@ -545,7 +547,7 @@
 				phone_number: "",
 				full_address: "",
 				landmark: "",
-				country: "",
+				country: country ?? "",
 				state: "",
 				city: "",
 				po_box: "",
@@ -563,7 +565,7 @@
 				shipping_address_id: "",
 				store_pickup_warehouse: "",
 				billing: get_blank_address(),
-				shipping: get_blank_address(),
+				shipping: get_blank_address(config.default_country),
 				// 'editing', 'saving', then 'saved' once the quotation has the address.
 				address_step: "editing",
 				// 'idle', 'placing', then 'leaving' while the payment or order page loads.
@@ -604,6 +606,7 @@
 					for (const [field, value] of Object.entries(this.config.prefill)) {
 						if (!this.billing[field]) this.billing[field] = value;
 					}
+					if (!this.billing.country) this.billing.country = this.config.default_country ?? "";
 					if (!this.config.is_guest) {
 						this.apply_pending_discount();
 						return;
@@ -700,6 +703,12 @@
 
 				format_amount(amount) {
 					return (Number(amount) || 0).toFixed(2);
+				},
+
+				set_payment_methods(methods) {
+					this.config.payment_gateways = methods.filter((method) => method !== COD_PAYMENT_MODE);
+					this.config.show_cod = methods.includes(COD_PAYMENT_MODE);
+					if (!methods.includes(this.payment_mode)) this.payment_mode = null;
 				},
 
 				get available_payment_modes() {
@@ -905,6 +914,7 @@
 						// Saving an address clears the delivery option on the server, so the one shown here is gone too.
 						this.reset_address_step();
 						this.show_summary(response.data.checkout_summary);
+						this.set_payment_methods(response.data.payment_methods);
 						this.address_step = "saved";
 						await this.load_shipping_options();
 					} catch (error) {

@@ -4,6 +4,7 @@ import importlib
 import json
 
 import frappe
+from frappe import _
 from frappe.query_builder import DocType
 from pypika import CustomFunction, Order
 
@@ -40,11 +41,11 @@ def get_context(context):
 	]
 	context.breadcrumbs = [
 		{
-			"label": "My Account",
+			"label": _("My Account"),
 			"href": url("/account/"),
 		},
 		{
-			"label": "Orders",
+			"label": _("Orders"),
 			"href": "#",
 		},
 	]

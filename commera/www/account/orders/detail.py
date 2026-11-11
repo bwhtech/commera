@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 from commera.api.shipping import get_charge_summary
 from commera.localization import url
@@ -40,11 +41,11 @@ def get_context(context):
 def get_breadcrumbs(order_id):
 	return [
 		{
-			"label": "My Account",
+			"label": _("My Account"),
 			"href": url("/account/"),
 		},
 		{
-			"label": "Orders",
+			"label": _("Orders"),
 			"href": url("/account/orders"),
 		},
 		{

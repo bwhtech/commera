@@ -5,7 +5,6 @@ from frappe.utils.caching import redis_cache
 from frappe.utils.data import cint, cstr, flt, sha256_hash
 
 from commera.api.admin.catalog import DEFAULT_OPTION_ATTRIBUTE, DEFAULT_SIZE_VALUE
-from commera.api.variant_pricing import get_base_price_rows_by_key
 from commera.localization import get_localization, translate
 from commera.localization.market_prices import MarketPrices
 from commera.plugin_events import get_ecommerce_warehouse, get_listed_items
@@ -94,7 +93,7 @@ def read_items(item_codes: list[str]) -> dict[str, CatalogItem]:
 
 	listed_items = get_listed_items(found_codes)
 	prices = MarketPrices.current()
-	sale_rates, compare_at_rates = get_base_rates(prices, found_codes)
+	sale_rates, compare_at_rates = prices.get_base_rates(found_codes)
 	warehouse = get_ecommerce_warehouse()
 	# get_available_stocks reads a missing warehouse as one literally named "website_warehouse".
 	stocks = get_available_stocks(found_codes, warehouse) if warehouse else {}
@@ -112,16 +111,6 @@ def read_items(item_codes: list[str]) -> dict[str, CatalogItem]:
 		}
 		for row in rows
 	}
-
-
-def get_base_rates(prices: MarketPrices, item_codes: list[str]) -> tuple[dict, dict]:
-	"""(sale, compare-at) base rates by item code. Customer rows are negotiated contracts."""
-	price_lists = [prices.sale_price_list, prices.compare_at_price_list]
-	rows = get_base_price_rows_by_key(item_codes, [name for name in price_lists if name])
-	rates = {name: {} for name in price_lists}
-	for (item_code, price_list), row in rows.items():
-		rates[price_list][item_code] = flt(row.price_list_rate)
-	return rates[prices.sale_price_list], rates[prices.compare_at_price_list]
 
 
 def get_item_prices(prices: MarketPrices, sale: float | None, compare_at: float | None) -> dict:

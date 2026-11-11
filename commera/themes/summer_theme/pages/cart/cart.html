@@ -19,7 +19,7 @@
 					<ul class="breadcrumb">
 						<li class="breadcrumb-item"><a href="{{ url('/') | e }}">{{ _("Home") }}</a></li>
 						{% for breadcrumb in breadcrumbs %}
-							<li class="breadcrumb-item">{{ _(breadcrumb.label) }}</li>
+							<li class="breadcrumb-item">{{ breadcrumb.label|e }}</li>
 						{% endfor %}
 					</ul>
 				</nav>

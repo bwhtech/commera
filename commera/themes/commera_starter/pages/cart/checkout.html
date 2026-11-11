@@ -1,9 +1,10 @@
 {% extends "components/base.html" %}
 {% from "components/order_summary.html" import order_summary %}
-{% from "components/macros/address_picker.html" import address_picker %}
+{% from "components/macros/address_picker.html" import address_picker, market_offer %}
 {% from "components/macros/icons.html" import icon, spinner %}
 {% from "components/macros/empty_state.html" import empty_state %}
 {% from "components/macros/skeleton.html" import skeleton %}
+{% from "components/macros/availability.html" import checkout_blocked_notice %}
 
 {% block uncontained_body %}
 <section x-data='checkout({{ checkout_config | tojson }})' class="section-x pt-6 md:pt-10">
@@ -115,7 +116,7 @@
 					<div x-show="delivery_method === 'ship'" class="flex flex-col gap-5">
 						<template x-if="delivery_method === 'ship'">
 							<div class="flex flex-col gap-5">
-								{{ address_picker("shipping", countries, saved_addresses) }}
+								{{ address_picker("shipping", countries, saved_addresses, other_markets) }}
 								<label class="flex items-center gap-2 text-md text-ink-gray-8">
 									<input type="checkbox" x-model="billing_same" class="size-4">
 									{{ _("Billing address is the same") }}
@@ -123,13 +124,14 @@
 								<template x-if="!billing_same">
 									<div class="flex flex-col gap-3">
 										<h3 class="text-2xl font-medium">{{ _("Billing address") }}</h3>
-										{{ address_picker("billing", countries, saved_addresses) }}
+										{{ address_picker("billing", countries, saved_addresses, other_markets) }}
 									</div>
 								</template>
 							</div>
 						</template>
 					</div>
 
+					{{ market_offer("accept_market_switch()") }}
 					<button type="submit" :disabled="busy" :aria-busy="busy === 'address'" class="button-primary relative w-full">{{ _("Continue") }}{{ spinner("busy === 'address'", "size-5 text-on-brand") }}</button>
 				</div>
 				<p x-show="error && step === 'address'" x-text="error" role="alert" class="text-base text-ink-red-7"></p>
@@ -171,7 +173,8 @@
 					<p x-show="!payment_methods.length" class="text-md text-ink-gray-6">{{ _("No payment methods are available. Please contact the store.") }}</p>
 				</div>
 				<p x-show="error && step === 'payment'" x-text="error" role="alert" class="text-base text-ink-red-7"></p>
-				<button type="submit" :disabled="busy || needs_shipping_option || !payment_method" :aria-busy="busy === 'pay'" class="button-primary relative w-full">
+				{{ checkout_blocked_notice() }}
+				<button type="submit" :disabled="busy || needs_shipping_option || !payment_method || $store.cart.has_unavailable" :aria-busy="busy === 'pay'" class="button-primary relative w-full">
 					{{ _("Pay") }}&nbsp;<span x-text="money(total)"></span>
 					{{ spinner("busy === 'pay'", "size-5 text-on-brand") }}
 				</button>

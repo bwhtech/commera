@@ -22,7 +22,9 @@ import EmailSettings from './EmailSettings.vue'
 import GeneralSettings from './GeneralSettings.vue'
 import PluginsSettings from './PluginsSettings.vue'
 import IntegrationTabPanel from './IntegrationTabPanel.vue'
+import LanguagesSettings from './LanguagesSettings.vue'
 import LocationsSettings from './LocationsSettings.vue'
+import MarketsSettings from './markets/MarketsSettings.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import ShippingSections from './ShippingSections.vue'
 import TranslationsSettings from './TranslationsSettings.vue'
@@ -30,6 +32,7 @@ import WebhooksSettings from './webhooks/WebhooksSettings.vue'
 import { isCloudBillingAvailable, refreshBilling } from '../../data/cloudBilling'
 import { isCloudDomainsAvailable, refreshDomains } from '../../data/cloudDomains'
 import { paymentIntegrations, shippingIntegrations } from '../../data/integrations'
+import { marketStore } from '../../data/markets'
 import { pickupLocations } from '../../data/pickupLocations'
 import { webhookStore } from '../../data/webhooks'
 import { pluginSettingsTabs } from '../../ia/plugins'
@@ -78,6 +81,7 @@ watch(
     shippingIntegrations.loadOnce()
     pickupLocations.loadOnce()
     webhookStore.loadOnce()
+    marketStore.loadOnce()
   },
   { immediate: true },
 )
@@ -120,6 +124,17 @@ watch(
         <SettingsNavItem value="emails">
           <template #prefix><span class="lucide-mail size-4" aria-hidden="true" /></template>
           {{ __('Emails') }}
+        </SettingsNavItem>
+        <SettingsNavItem value="languages">
+          <template #prefix><span class="lucide-languages size-4" aria-hidden="true" /></template>
+          {{ __('Languages') }}
+        </SettingsNavItem>
+        <SettingsNavItem value="markets">
+          <template #prefix><span class="lucide-globe size-4" aria-hidden="true" /></template>
+          {{ __('Markets') }}
+          <template v-if="marketStore.markets.value" #suffix>
+            <span class="text-sm text-ink-gray-5 tabular-nums">{{ marketStore.enabledCount.value }}</span>
+          </template>
         </SettingsNavItem>
         <SettingsNavItem value="translations">
           <template #prefix><span class="lucide-languages size-4" aria-hidden="true" /></template>
@@ -206,6 +221,14 @@ watch(
 
       <SettingsPanel value="emails" class="min-w-0">
         <EmailSettings :active="settings.open && settings.tab === 'emails'" />
+      </SettingsPanel>
+
+      <SettingsPanel value="languages" class="min-w-0">
+        <LanguagesSettings :active="settings.open && settings.tab === 'languages'" />
+      </SettingsPanel>
+
+      <SettingsPanel value="markets" class="min-w-0">
+        <MarketsSettings :active="settings.open && settings.tab === 'markets'" />
       </SettingsPanel>
 
       <SettingsPanel value="translations" class="min-w-0">

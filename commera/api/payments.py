@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from urllib.parse import urlencode
 
 import frappe
+from bwh_payments.api import get_gateway_options
 from bwh_payments.bwh_payments.utils import get_available_payment_modes, resolve_payment_mode
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
@@ -24,6 +25,15 @@ from commera.api.shipping import (
 	reprice_shipping_discount,
 )
 from commera.api.signup import get_placeholder_first_name, validate_single_email, validate_user_names
+from commera.cart_prices import (
+	apply_market,
+	describe_items,
+	get_document_market,
+	get_market_handle,
+	is_priced_in,
+	price_regular_lines,
+	validate_available,
+)
 from commera.checkout_hooks import (
 	apply_plugin_fees,
 	filter_payment_methods,
@@ -51,7 +61,10 @@ from commera.guest import (
 	set_guest_cart_cookie,
 	validate_guest_checkout_enabled,
 )
+from commera.item_price_guard import skip_auto_item_price
 from commera.localization import url
+from commera.localization.address_countries import AddressCountries
+from commera.localization.market_prices import MarketPrices
 from commera.order_access import get_order_link, set_order_access_key
 from commera.plugin_events import fire_event, get_plugin_fieldnames
 from commera.utils import (
@@ -67,6 +80,7 @@ class CheckoutPriceChangedError(frappe.ValidationError):
 
 COD_TOTAL_TTL_SECONDS = 24 * 60 * 60
 ADDRESS_TYPES = ("Billing", "Shipping")
+ADDRESS_KINDS = ("billing_address", "shipping_address")
 
 
 # ERPNext moved its transaction mappers to a sibling `mapper` module; both layouts are in the wild.
@@ -169,8 +183,10 @@ def open_checkout(
 	is_reviewed: bool = False,
 ):
 	"""`is_reviewed`: the buyer approved this checkout in a review, so cash on delivery must place it as is."""
+	validate_persisted_address_countries(quotation)
 	validate_delivery_option(quotation, delivery_option)
 	validate_cart_is_not_in_checkout(quotation.name)
+	validate_cart_market(quotation)
 	quotation.flags.strict_plugin_fees = True
 	drop_refused_codes(quotation)
 	update_delivery_charges(quotation)
@@ -198,7 +214,10 @@ def open_checkout(
 		)
 	if gateway not in payment_methods:
 		refuse_payment(
-			_("This payment method is not available for your order."), quotation.name, gateway=gateway
+			_("This payment method is not available for your order."),
+			quotation.name,
+			gateway=gateway,
+			currency=quotation.currency,
 		)
 
 	payment_request = frappe.get_doc(
@@ -220,7 +239,9 @@ def open_checkout(
 
 
 def get_checkout_payment_methods(quotation, strict: bool = False) -> list[str]:
-	payment_methods = list(get_available_payment_modes())
+	"""Gateways that can charge the cart's currency, and cash on delivery, which has no currency limit."""
+	currency = quotation.currency if quotation else MarketPrices.current().currency
+	payment_methods = [option.name for option in get_gateway_options(currency)]
 	if frappe.get_cached_value("Commera Settings", "Commera Settings", "cod_enabled"):
 		payment_methods.append(COD_PAYMENT_MODE)
 	if not quotation:
@@ -261,6 +282,39 @@ def validate_cart(quotation):
 	if refusal := get_cart_refusal(quotation):
 		# Not refuse_payment: the shopper can fix this, so it is no error to log.
 		frappe.throw(refusal)
+
+
+def validate_cart_market(quotation):
+	prices = MarketPrices.current()
+	if not is_priced_in(quotation, prices):
+		frappe.throw(
+			_("Your cart was priced in another market. Please review it before placing your order."),
+			title=_("Market Changed"),
+			exc=CheckoutPriceChangedError,
+		)
+	validate_available(
+		prices,
+		get_sold_item_codes(quotation),
+		_("{0} is not available in this market. Remove it from your cart to check out."),
+	)
+
+
+def note_withdrawn_lines(sales_order, quotation):
+	"""A paid order is placed at its paid rates, whatever its market sells now. Staff learn what changed."""
+	market = get_document_market(quotation)
+	if not market:
+		note = _("Placed at paid rates; market {0} no longer exists.").format(get_market_handle(quotation))
+	elif unsold := MarketPrices.of(market).get_unavailable(get_sold_item_codes(quotation)):
+		note = _("Placed at paid rates; {0} no longer prices {1}.").format(
+			market.title, describe_items(unsold)
+		)
+	else:
+		return
+	sales_order.add_comment("Comment", note)
+
+
+def get_sold_item_codes(quotation) -> list[str]:
+	return [item.item_code for item in quotation.items if not item.is_free_item]
 
 
 def drop_refused_codes(quotation):
@@ -441,7 +495,7 @@ def cart_write_lock(quotation):
 def save_cart_quotation(quotation):
 	"""Persist the shopper's own cart, elevated. Saving resolves the receivable account, and ERPNext's
 	account_perm_check calls frappe.has_permission("Account") directly - no ignore_permissions reaches it."""
-	with system_user_session():
+	with system_user_session(), skip_auto_item_price():
 		quotation.flags.ignore_permissions = True
 		return quotation.save()
 
@@ -465,8 +519,9 @@ def get_order_shopper(quotation) -> str | None:
 
 def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
 	"""Submit the cart and bill it. Called once per payment; the Quotation docstatus enforces that."""
+	validate_persisted_address_countries(quotation)
 	shopper = get_order_shopper(quotation)
-	with system_user_session():
+	with system_user_session(), skip_auto_item_price():
 		fix_payment_schedule_dates(quotation)
 		quotation.flags.ignore_permissions = True
 		quotation.submit()
@@ -481,6 +536,7 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 		sales_order.insert()
 		set_order_access_key(sales_order)
 		sales_order.submit()
+		note_withdrawn_lines(sales_order, quotation)
 
 		# A cart discounted to nothing is settled at placement, so it is billed and paid like a charged one.
 		paid = flt(gateway_amount) > 0 or flt(sales_order.grand_total) <= 0
@@ -618,11 +674,11 @@ def get_guest_party(email: str) -> tuple[str, str]:
 
 
 def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
-	sale_price_list = frappe.get_cached_value("Commera Settings", "Commera Settings", "sale_price_list")
+	prices = MarketPrices.current()
 	ecommerce_warehouse = frappe.get_cached_value(
 		"Commera Settings", "Commera Settings", "ecommerce_warehouse"
 	)
-	unsaved_quotation_doc.selling_price_list = sale_price_list
+	apply_market(unsaved_quotation_doc, prices)
 	set_attribution_fields(unsaved_quotation_doc)
 	unsaved_quotation_doc.items = []
 	for item in cart["items"]:
@@ -636,6 +692,7 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 		)
 	if server_cart := get_session_cart():
 		server_cart.update_quotation(unsaved_quotation_doc)
+	price_regular_lines(unsaved_quotation_doc, prices)
 	save_cart_quotation(unsaved_quotation_doc)
 	# The stored option was priced for the old cart, and payment would re-quote it for the new one.
 	clear_delivery_option(unsaved_quotation_doc)
@@ -688,6 +745,7 @@ def save_quotation_address(quotation, address: dict):
 	quotation.custom_is_store_pickup = False
 	quotation.custom_store = ""
 	validate_guest_address_is_new(quotation, address)
+	validate_address_countries(quotation, address)
 
 	if address.get("billing_address", {}).get("is_saved"):
 		billing_address_name = address.get("billing_address", {}).get("address_id")
@@ -744,6 +802,41 @@ def validate_guest_address_is_new(quotation, address: dict):
 		raise frappe.PermissionError
 
 
+def validate_persisted_address_countries(quotation):
+	countries = AddressCountries.of(get_document_market(quotation))
+	fields = ["customer_address"]
+	if not quotation.custom_is_store_pickup:
+		fields.append("shipping_address_name")
+	for field in fields:
+		if address := quotation.get(field):
+			countries.validate(frappe.db.get_value("Address", address, "country"))
+
+
+def validate_address_countries(quotation, address: dict):
+	"""Both addresses must be in the cart's market: the shopper switches markets to use another."""
+	countries = AddressCountries.of(get_document_market(quotation))
+	kinds = ["billing_address"] if address.get("shipping_same_as_billing") else ADDRESS_KINDS
+	for kind in kinds:
+		values = address.get(kind) or {}
+		if not values.get("is_saved"):
+			countries.validate(values.get("country"))
+		elif country := get_party_address_country(quotation.party_name, values.get("address_id")):
+			countries.validate(country)
+
+
+def get_party_address_country(party_name: str, address_name: str | None) -> str | None:
+	# Only the party's own address: the refusal names its country.
+	link = {
+		"parenttype": "Address",
+		"parent": address_name,
+		"link_doctype": "Customer",
+		"link_name": party_name,
+	}
+	if address_name and frappe.db.exists("Dynamic Link", link):
+		return frappe.db.get_value("Address", address_name, "country")
+	return None
+
+
 def replace_placeholder_names(quotation, contact, billing_address: dict):
 	"""Checkout names a new shopper after their email; the billing name is the first real one."""
 	shopper_email = quotation.contact_email
@@ -776,6 +869,7 @@ def replace_placeholder_names(quotation, contact, billing_address: dict):
 def get_address_saved_response(quotation) -> dict:
 	return {
 		"message": _("Addresses updated successfully"),
+		"payment_methods": get_checkout_payment_methods(quotation),
 		"checkout_summary": get_checkout_summary(quotation),
 	}
 
@@ -901,6 +995,9 @@ def quotation_purchase_summary(quotation_name: str):
 
 def place_cod_order(quotation_name: str):
 	quotation = frappe.get_doc("Quotation", quotation_name)
+	validate_persisted_address_countries(quotation)
+	# A COD confirmation can be posted without opening checkout, after a market switch.
+	validate_cart_market(quotation)
 	validate_reviewed_checkout(quotation)
 	shopper = get_order_shopper(quotation)
 	quotation.flags.strict_plugin_fees = True
@@ -912,7 +1009,7 @@ def place_cod_order(quotation_name: str):
 		refuse_payment(_("Cash on delivery is not available."), quotation.name)
 	quotation.flags.commera_payment_kind = "cod"
 	reprice_shipping_discount(quotation)
-	with system_user_session():
+	with system_user_session(), skip_auto_item_price():
 		set_cod_charges(quotation)
 		validate_cod_total(quotation)
 		quotation.flags.ignore_permissions = True

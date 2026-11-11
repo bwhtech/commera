@@ -27,8 +27,14 @@ class LineProducts:
 		product = self.products.get(item_code)
 		if not product or not product.title:
 			return _(item_name, lang=self.localization.language.code) if item_name else item_name
-		shown_size = [translate_term(product.size)] if product.size != DEFAULT_SIZE_VALUE else []
-		return " - ".join([product.title, *shown_size])
+		return get_product_label(product)
+
+	def get_label(self, item_code: str) -> str:
+		"""The product and size for a message to the shopper, in any language; never the item code."""
+		product = self.products.get(item_code)
+		if product and product.title:
+			return get_product_label(product)
+		return frappe.get_cached_value("Item", item_code, "item_name") or item_code
 
 	def get_cart_products(self) -> dict[str, CartLineProduct]:
 		"""The published product, size and image that sell each item."""
@@ -71,3 +77,8 @@ def read_variants(names: list[str]) -> dict[str, frappe._dict]:
 		variant.name: frappe._dict(variant, title=title["display_name"])
 		for variant, title in zip(variants, titles, strict=True)
 	}
+
+
+def get_product_label(product: frappe._dict) -> str:
+	shown_size = [translate_term(product.size)] if product.size != DEFAULT_SIZE_VALUE else []
+	return " - ".join([product.title, *shown_size])

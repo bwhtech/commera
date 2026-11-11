@@ -2,6 +2,7 @@ from html import unescape
 from urllib.parse import quote, urlsplit, urlunsplit
 
 import frappe
+from frappe import _
 from frappe.utils import cstr, flt, get_url, strip_html_tags
 
 from commera.branding import get_configured_brand_assets
@@ -315,7 +316,7 @@ def build_collection_seo(category, breadcrumbs, total_count=0, lang="en", image_
 	meta_title = overrides.get("meta_title") or (
 		None if category else settings.get("product_list_meta_title")
 	)
-	title = meta_title or (f"{category} | {store_name}" if category else f"Products | {store_name}")
+	title = meta_title or f"{category or _('Products')} | {store_name}"
 
 	meta_description = overrides.get("meta_description") or (
 		None if category else settings.get("product_list_meta_description")
@@ -352,7 +353,7 @@ def build_collection_seo(category, breadcrumbs, total_count=0, lang="en", image_
 
 def build_collection_json_ld(category, breadcrumbs, total_count=0):
 	store_name = get_store_name()
-	name = f"{category} | {store_name}" if category else f"Products | {store_name}"
+	name = f"{category or _('Products')} | {store_name}"
 
 	request_path = get_request_path()
 	page_url = get_url(request_path) if request_path else current_request_url()

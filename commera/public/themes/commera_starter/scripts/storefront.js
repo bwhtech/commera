@@ -313,6 +313,14 @@ function order_summary() {
 		},
 
 		get discount_codes() {
+			return this.all_codes.filter((code_state) => !code_state.removed);
+		},
+
+		get removed_codes() {
+			return this.all_codes.filter((code_state) => code_state.removed);
+		},
+
+		get all_codes() {
 			return this.summary?.discount_codes ?? this.cart?.discount_codes ?? [];
 		},
 
@@ -375,8 +383,100 @@ function address_form(address, country) {
 	return form;
 }
 
+// A form the shopper filled before switching markets, for the same page in the new market.
+const MARKET_SWITCH_DRAFT = 'commera:market-switch-draft';
+
+globalThis.addEventListener('commera:auth-changed', () => {
+	try {
+		globalThis.sessionStorage?.removeItem(MARKET_SWITCH_DRAFT);
+	} catch {
+		// Storage may be disabled by the browser.
+	}
+});
+
+function save_market_draft(page, draft, destination, scope) {
+	try {
+		globalThis.sessionStorage.setItem(
+			MARKET_SWITCH_DRAFT,
+			JSON.stringify({
+				page,
+				draft,
+				destination,
+				scope,
+				expires: Date.now() + 300000,
+			}),
+		);
+	} catch {
+		// Without storage the new market's page starts with a blank form.
+	}
+}
+
+function take_market_draft(page, scope) {
+	try {
+		const saved = JSON.parse(
+			globalThis.sessionStorage.getItem(MARKET_SWITCH_DRAFT),
+		);
+		globalThis.sessionStorage.removeItem(MARKET_SWITCH_DRAFT);
+		return saved?.page === page &&
+			saved.scope === scope &&
+			saved.expires > Date.now() &&
+			saved.destination ===
+				`${globalThis.location.pathname}${globalThis.location.search ?? ''}`
+			? saved.draft
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+// Picking a country that another market sells to offers a switch to that market.
+// `switches`: the market of each country name, and each market's URL and prompt.
+function market_switch(switches) {
+	return {
+		switches: switches ?? { countries: {}, markets: {} },
+		market_offer: null,
+
+		// True when `country` is in another market: the shopper is asked first.
+		offer_market(country, title, on_decline) {
+			this.market_offer = null;
+			const market = this.switches.markets[this.switches.countries[country]];
+			if (!market) {
+				return false;
+			}
+			this.market_offer = {
+				prompt: market.prompt.replace('{0}', title || country),
+				url: market.url,
+				on_decline,
+			};
+			return true;
+		},
+
+		decline_market() {
+			this.market_offer?.on_decline?.();
+			this.market_offer = null;
+		},
+
+		switch_market(page, draft) {
+			this.busy = 'market';
+			leaving_states.add(this);
+			save_market_draft(
+				page,
+				draft,
+				this.market_offer.url,
+				this.switches.draft_scope,
+			);
+			globalThis.location.assign(this.market_offer.url);
+		},
+	};
+}
+
+function selected_title(event) {
+	return event?.target?.selectedOptions?.[0]?.text?.trim();
+}
+
 function checkout(config) {
 	return {
+		...market_switch(config.market_switches),
 		config,
 		state: null,
 		ready: false,
@@ -409,6 +509,8 @@ function checkout(config) {
 		queue: request_queue(),
 
 		async init() {
+			this.$watch('billing_same', () => this.offer_address_market());
+			this.$watch('delivery_method', () => this.offer_address_market());
 			globalThis.addEventListener('commera:cart-updated', () => this.refresh());
 			globalThis.addEventListener('commera:checkout-updated', (event) =>
 				this.show_state(event.detail),
@@ -422,10 +524,67 @@ function checkout(config) {
 			if (this.state) {
 				this.restore_state();
 			}
+			this.restore_market_draft();
 			if (!this.editing_address) {
 				await this.load_options();
 			}
 			this.ready = true;
+		},
+
+		// The form as the shopper left it in the market they switched from.
+		restore_market_draft() {
+			const draft = take_market_draft('checkout', this.switches.draft_scope);
+			if (!draft) {
+				return;
+			}
+			Object.assign(this, {
+				forms: { ...this.forms, ...draft.forms },
+				choices: { ...this.choices, ...draft.choices },
+				billing_same: draft.billing_same ?? this.billing_same,
+				delivery_method: 'ship',
+				editing_address: true,
+			});
+			if (this.config.is_guest && draft.email) {
+				this.email = draft.email;
+			}
+		},
+
+		choose_country(kind, event) {
+			this.offer_market(event.target.value, selected_title(event), () => {
+				this.forms[kind].country = this.config.country ?? '';
+			});
+		},
+
+		// A saved address may be in another market too.
+		offer_address_market() {
+			this.market_offer = null;
+			if (this.delivery_method !== 'ship') {
+				return false;
+			}
+			const kinds = this.billing_same ? ['shipping'] : ['shipping', 'billing'];
+			return kinds.some((kind) => {
+				const choice = this.choices[kind];
+				const country =
+					choice === 'new'
+						? this.forms[kind].country
+						: this.config.saved_countries?.[choice];
+				return this.offer_market(country, null, () => {
+					this.choices[kind] = 'new';
+					this.forms[kind].country = this.config.country ?? '';
+				});
+			});
+		},
+
+		accept_market_switch() {
+			if (!this.offer_address_market()) {
+				return;
+			}
+			this.switch_market('checkout', {
+				forms: this.forms,
+				choices: this.choices,
+				billing_same: this.billing_same,
+				email: this.email,
+			});
 		},
 
 		async show_state(state) {
@@ -509,7 +668,7 @@ function checkout(config) {
 			if (
 				!payment_methods.some((method) => method.id === this.payment_method)
 			) {
-				this.payment_method = payment_methods[0]?.id ?? '';
+				this.payment_method = '';
 			}
 		},
 
@@ -521,6 +680,10 @@ function checkout(config) {
 
 		async save_address() {
 			this.step = 'address';
+			this.market_offer = null;
+			if (this.offer_address_market()) {
+				return;
+			}
 			const email = this.config.is_guest ? this.email.trim() : undefined;
 			await save_change(
 				this,
@@ -744,6 +907,11 @@ document.addEventListener('alpine:init', () => {
 			return this.cart?.total_quantity ?? 0;
 		},
 
+		// A line the market has no price for: checkout refuses the cart until it is removed.
+		get has_unavailable() {
+			return (this.cart?.lines ?? []).some((line) => line.available === false);
+		},
+
 		async init() {
 			globalThis.addEventListener('commera:cart-updated', (event) => {
 				this.cart = event.detail;
@@ -840,19 +1008,38 @@ document.addEventListener('alpine:init', () => {
 		},
 	}));
 
-	Alpine.data('address_book', (addresses) => ({
+	// `default_country`: a secondary market's country for a new address.
+	Alpine.data('address_book', (addresses, switches, default_country) => ({
 		...form_state(),
+		...market_switch(switches),
 		addresses,
+		default_country: default_country ?? '',
 		form: null,
+
+		init() {
+			this.form = take_market_draft('address_book', this.switches.draft_scope);
+		},
 
 		edit(address = {}) {
 			this.error = '';
-			this.form = { ...address };
+			this.market_offer = null;
+			this.form = { country: this.default_country, ...address };
 		},
 
 		close() {
 			this.error = '';
+			this.market_offer = null;
 			this.form = null;
+		},
+
+		choose_country(event) {
+			this.offer_market(event.target.value, selected_title(event), () => {
+				this.form.country = this.default_country;
+			});
+		},
+
+		accept_market_switch() {
+			this.switch_market('address_book', this.form);
 		},
 
 		async save() {

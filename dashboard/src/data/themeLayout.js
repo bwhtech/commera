@@ -11,7 +11,7 @@ import { createSequence } from '../utils/sequence'
 import { readableName } from '../utils/sectionSettingToField'
 
 // Section text in the default language is the source the other languages translate.
-const SOURCE_LANGUAGE = storefrontLanguages[0]?.code ?? 'en'
+const sourceLanguage = () => storefrontLanguages[0]?.code ?? 'en'
 const DEFAULT_MAX_BLOCKS = 50
 const DEFAULT_MAX_PRODUCTS = 8
 const SEARCH_DEBOUNCE_MS = 300
@@ -25,7 +25,7 @@ const thumbnailAction = effectScope(true).run(() => useAdminAction('theme_layout
 const THUMBNAIL_SIZE = { width: 1280, height: 800, scale: 2, outputWidth: 480, quality: 0.85 }
 
 async function captureThumbnail(theme, scheme) {
-  const params = new URLSearchParams({ theme, page: 'index', lang: SOURCE_LANGUAGE })
+  const params = new URLSearchParams({ theme, page: 'index', lang: sourceLanguage() })
   let followsSystem = false
   const image = await capturePage(`/theme_editor_preview?${params}`, {
     ...THUMBNAIL_SIZE,
@@ -133,7 +133,7 @@ export function createLayoutEditor(theme) {
     settings: { doctype: null, groups: [] },
     live: false,
     parts: [],
-    language: SOURCE_LANGUAGE,
+    language: sourceLanguage(),
     device: 'desktop',
     selection: null,
     previewToken: 0,
@@ -402,23 +402,23 @@ export function createLayoutEditor(theme) {
     const value = owner.settings?.[setting.id] ?? setting.default
     if (!isTranslatable(setting)) return value
     if (value && typeof value === 'object') {
-      return value[state.language] ?? (state.language === SOURCE_LANGUAGE ? value.en : null) ?? ''
+      return value[state.language] ?? (state.language === sourceLanguage() ? value.en : null) ?? ''
     }
-    return state.language === SOURCE_LANGUAGE ? (value ?? '') : ''
+    return state.language === sourceLanguage() ? (value ?? '') : ''
   }
 
   function settingPlaceholder(owner, setting) {
-    if (!isTranslatable(setting) || state.language === SOURCE_LANGUAGE) return ''
+    if (!isTranslatable(setting) || state.language === sourceLanguage()) return ''
     const value = owner.settings?.[setting.id] ?? setting.default
-    return (value && typeof value === 'object' ? (value[SOURCE_LANGUAGE] ?? value.en) : value) ?? ''
+    return (value && typeof value === 'object' ? (value[sourceLanguage()] ?? value.en) : value) ?? ''
   }
 
   function translatedValue(current, value) {
-    if (state.language === SOURCE_LANGUAGE) {
-      return current && typeof current === 'object' ? { ...current, [SOURCE_LANGUAGE]: value } : value
+    if (state.language === sourceLanguage()) {
+      return current && typeof current === 'object' ? { ...current, [sourceLanguage()]: value } : value
     }
 
-    const translations = current && typeof current === 'object' ? { ...current } : current ? { [SOURCE_LANGUAGE]: current } : {}
+    const translations = current && typeof current === 'object' ? { ...current } : current ? { [sourceLanguage()]: current } : {}
     if (value === '' || value === null) delete translations[state.language]
     else translations[state.language] = value
     return translations

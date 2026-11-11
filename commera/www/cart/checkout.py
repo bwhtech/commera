@@ -1,4 +1,6 @@
 import frappe
+from bwh_payments.api import get_gateway_options
+from frappe import _
 from frappe.query_builder import DocType
 from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cstr
@@ -13,6 +15,7 @@ from commera.api.payments import (
 )
 from commera.api.shipping import get_charge_amount, get_checkout_summary
 from commera.base_prices import base_price_filters
+from commera.cart_prices import is_priced_in
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	get_code_states,
 	get_quantities_by_item_code,
@@ -22,6 +25,9 @@ from commera.core import _get_cart_quotation
 from commera.discounts.selection import get_discount_codes
 from commera.guest import is_guest
 from commera.localization import url
+from commera.localization.address_countries import AddressCountries
+from commera.localization.market_prices import MarketPrices
+from commera.localization.resolver import get_localization
 from commera.sdk.catalog import set_product_titles
 from commera.utils import (
 	format_addresses,
@@ -33,12 +39,15 @@ from commera.utils import (
 	get_free_delivery,
 	get_pickup_addresses,
 	get_pickup_warehouses,
+	get_store_company,
 )
 
 # from commera.api.utils import auth_required
 
 no_cache = True
 
+# The default theme's country picker has always started here.
+LEGACY_DEFAULT_COUNTRY = {"name": "Saudi Arabia", "code": "sa"}
 CHECKOUT_PREFILL_PARAMS = {
 	"checkout[email]": "email",
 	"checkout[shipping_address][first_name]": "first_name",
@@ -68,8 +77,17 @@ def get_context(context, allow_guest: bool = False):
 	payment_methods = get_checkout_payment_methods(context.cart_quotation)
 	context.payment_gateways = [method for method in payment_methods if method != COD_PAYMENT_MODE]
 	context.show_cod = int(COD_PAYMENT_MODE in payment_methods)
-	context.country_list = get_country_list()
+	# The list refreshes in the browser after the address step, so label every enabled gateway.
+	context.payment_gateway_labels = {option.name: _(option.name) for option in get_gateway_options()}
+	countries = AddressCountries.current()
+	context.phone_country_list = get_country_list()
+	context.country_list = countries.within(context.phone_country_list)
+	context.default_country = countries.market_default_country()
+	context.default_country_row = get_default_country_row(context.country_list, context.default_country)
 	context.checkout_prefill = get_checkout_prefill(context.country_list)
+	context.billing_country_row = get_default_country_row(
+		context.country_list, context.checkout_prefill.get("country") or context.default_country_row["name"]
+	)
 	context.store_pickup_addresses = (
 		get_store_pickup_addresses() if commera_settings.store_pickup_enabled else []
 	)
@@ -77,14 +95,29 @@ def get_context(context, allow_guest: bool = False):
 	context.cod_charge_applicable_below, context.cod_charge = get_cod_configuration()
 	context.breadcrumbs = [
 		{
-			"label": "Cart",
+			"label": _("Cart"),
 			"href": url("/cart/"),
 		},
 		{
-			"label": "Checkout",
+			"label": _("Checkout"),
 			"href": "#",
 		},
 	]
+
+
+def get_default_country_row(country_list: list[dict], default_country: str | None) -> dict:
+	"""Keep the legacy default only while this market allows it."""
+	for name in (default_country, LEGACY_DEFAULT_COUNTRY["name"]):
+		if row := next((row for row in country_list if row["name"] == name), None):
+			return row
+	shopper_country = get_localization().country
+	if row := next((row for row in country_list if row["code"] == shopper_country), None):
+		return row
+	store_company = get_store_company()
+	store_country = store_company and frappe.get_cached_value("Company", store_company, "country")
+	if row := next((row for row in country_list if row["name"] == store_country), None):
+		return row
+	return country_list[0] if country_list else {"name": "", "code": ""}
 
 
 def get_checkout_prefill(country_list: list[dict]) -> dict:
@@ -121,7 +154,7 @@ def set_cart_context(context, commera_settings):
 	cart_quotation = _get_cart_quotation()
 	if not cart_quotation or not cart_quotation.items:
 		frappe.redirect(url("/cart"))
-	default_price_list = commera_settings.get("default_price_list")
+	default_price_list = MarketPrices.current().compare_at_price_list
 	context.cart_quotation = cart_quotation
 	context.cart_needs_refresh = cart_needs_refresh(cart_quotation)
 	context.cart_payable_total = get_charge_amount(cart_quotation)
@@ -146,6 +179,8 @@ def cart_needs_refresh(quotation) -> bool:
 	server_cart = get_session_cart()
 	if quotation.is_new() or not server_cart:
 		return False
+	if not is_priced_in(quotation, MarketPrices.current()):
+		return True
 	quotation_lines = [row for row in quotation.items if not row.is_free_item]
 	return get_quantities_by_item_code(server_cart.get_selected_lines()) != get_quantities_by_item_code(
 		quotation_lines

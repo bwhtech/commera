@@ -20,7 +20,7 @@
 					<img :src="images[active_image]"
 						:class="zooming ? 'is-zoomed' : ''"
 						:style="'transform-origin: ' + zoom_origin"
-						alt="{{ product_variant.display_name }}">
+						alt="{{ product_title | e }}">
 				</div>
 			</div>
 			{% if images | length > 1 %}
@@ -30,7 +30,7 @@
 					<div class="swiper-slide"
 						:class="active_image === {{ loop.index0 }} ? 'swiper-slide-thumb-active' : ''"
 						@click="active_image = {{ loop.index0 }}">
-						<img src="{{ image }}" alt="{{ product_variant.display_name }}">
+						<img src="{{ image }}" alt="{{ product_title | e }}">
 					</div>
 					{% endfor %}
 				</div>

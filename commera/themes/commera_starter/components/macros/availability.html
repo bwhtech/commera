@@ -1,0 +1,8 @@
+{# A line the market has no price for: checkout refuses it until the shopper removes it. #}
+{% macro unavailable_label() -%}
+{{ _("Not available in {0}").format(get_market_place()) | e }}
+{%- endmacro %}
+
+{% macro checkout_blocked_notice(classes="") -%}
+<p x-cloak x-show="$store.cart.has_unavailable" role="status" class="text-base text-ink-red-7 {{ classes }}">{{ _("Remove the items not available in {0} to check out.").format(get_market_place()) | e }}</p>
+{%- endmacro %}

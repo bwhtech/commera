@@ -13,7 +13,7 @@
 				<li class="breadcrumb-item"><a href="{{ url('/') | e }}">{{ _("Home") }}</a></li>
 				{% for crumb in breadcrumbs %}
 				<li class="breadcrumb-item">
-					{% if crumb.href %}<a href="{{ crumb.href | e }}">{{ _(crumb.label) }}</a>{% else %}{{ _(crumb.label) }}{% endif %}
+					{% if crumb.href %}<a href="{{ crumb.href | e }}">{{ crumb.label | e }}</a>{% else %}{{ crumb.label | e }}{% endif %}
 				</li>
 				{% endfor %}
 			</ul>

@@ -3,7 +3,7 @@
     options: [],
     is_open: false,
     opened_with_keyboard: false,
-    selected_option: {name:'Saudi Arabia', code:'sa'},
+    selected_option: {{ {"name": default_country.name, "code": default_country.code}|tojson|forceescape }},
     setselected_option(option) {
         this.selected_option = option
         this.is_open = false
@@ -64,7 +64,7 @@
         </button>
 
         <input id="{{id}}_country" name="{{id}}_country" autocomplete="off" x-ref="hidden_text_filed" hidden=""
-            value="Saudi Arabia" />
+            value="{{ default_country.name|e }}" />
         <div x-show="is_open || opened_with_keyboard" id="{{id}}_countriesList"
             class="absolute left-0 top-11 z-10 w-full overflow-hidden rounded-md border border-gray-300 bg-white  "
             role="listbox" aria-label="countries list"

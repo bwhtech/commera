@@ -1,6 +1,8 @@
 import frappe
+from frappe import _
 
 from commera.localization import url
+from commera.localization.address_countries import AddressCountries
 from commera.utils import get_addresses, get_country_list
 
 no_cache = True
@@ -11,14 +13,16 @@ def get_context(context):
 		raise frappe.PermissionError
 	context.billing_addresses = get_addresses()
 	context.shipping_addresses = get_addresses(address_type="Shipping")
-	context.country_list = get_country_list()
+	countries = AddressCountries.current()
+	context.country_list = countries.within(get_country_list())
+	context.default_country = countries.market_default_country()
 	context.breadcrumbs = [
 		{
-			"label": "My Account",
+			"label": _("My Account"),
 			"href": url("/account/"),
 		},
 		{
-			"label": "Address",
+			"label": _("Address"),
 			"href": "#",
 		},
 	]
