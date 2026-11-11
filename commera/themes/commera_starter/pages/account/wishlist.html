@@ -3,7 +3,6 @@
 {% from "components/macros/product_card.html" import product_card with context %}
 {% from "components/macros/icons.html" import icon, spinner %}
 {% from "components/macros/empty_state.html" import empty_state %}
-{% set language = frappe.lang or "en" %}
 {% set wishlist = commera.wishlist.get_wishlist() %}
 
 {% block body %}
@@ -19,7 +18,7 @@
 		{% endfor %}
 	</div>
 	{% call empty_state(_("Your wishlist is empty"), _("Tap the heart on a product to save it here for later."), "heart", show="!count") %}
-	<a href="/{{ language }}/products" class="button-primary">{{ _("Start shopping") }}</a>
+	<a href="{{ url('/products') | e }}" class="button-primary">{{ _("Start shopping") }}</a>
 	{% endcall %}
 </div>
 {% endcall %}

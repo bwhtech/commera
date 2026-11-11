@@ -10,6 +10,7 @@ import VariantMedia from './VariantMedia.vue'
 import { useAdminAction, trySubmit } from '../data/api'
 import { pricePayload, shownPrice } from '../data/product'
 import { productRoute } from '../ia/routes'
+import { __ } from '../data/translation'
 
 const props = defineProps({
   variant: { type: Object, default: null },
@@ -68,49 +69,48 @@ async function save() {
   })
   if (!saved) return
   open.value = false
-  toast.success(`${props.variant.option} saved`)
+  toast.success(__('{0} saved', [props.variant.option]))
   emit('saved')
 }
 </script>
 
 <template>
-  <Dialog v-model:open="open" size="2xl" :title="variant ? variant.option : 'Variant'">
+  <Dialog v-model:open="open" size="2xl" :title="variant ? variant.option : __('Variant')">
     <div v-if="variant" class="space-y-6">
       <div class="flex flex-wrap items-center gap-1.5">
         <Badge :label="optionLabel" variant="subtle" />
-        <span class="text-sm text-ink-gray-5">of {{ product.title }}</span>
+        <span class="text-sm text-ink-gray-5">{{ __('of {0}', [product.title]) }}</span>
       </div>
 
       <section>
-        <h3 class="text-base-semibold text-ink-gray-8">Photos</h3>
+        <h3 class="text-base-semibold text-ink-gray-8">{{ __('Photos') }}</h3>
         <p class="mt-1 text-p-sm text-ink-gray-5">
-          Shown when a shopper picks this combination. The first one is the cover.
+          {{ __('Shown when a shopper picks this combination. The first one is the cover.') }}
         </p>
         <VariantMedia class="mt-3" :variant="variant" @saved="emit('saved')" />
       </section>
 
       <section>
-        <h3 class="text-base-semibold text-ink-gray-8">Pricing and stock</h3>
+        <h3 class="text-base-semibold text-ink-gray-8">{{ __('Pricing and stock') }}</h3>
         <p class="mt-1 text-p-sm text-ink-gray-5">
-          Applies to every size under this option ({{ variant.sizes.length }}). Edit one size at a
-          time from the variant's own page.
+          {{ __("Applies to every size under this option ({0}). Edit one size at a time from the variant's own page.", [variant.sizes.length]) }}
         </p>
         <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormControl v-model.number="price" type="number" label="Price" />
-          <FormControl v-model.number="compareAt" type="number" label="Compare at" />
+          <FormControl v-model.number="price" type="number" :label="__('Price')" />
+          <FormControl v-model.number="compareAt" type="number" :label="__('Compare at')" />
           <!-- Read-only: commera only exposes receiving stock (additive), not setting
                on-hand to an arbitrary number. -->
-          <FormControl :model-value="String(onHand)" type="number" label="On hand" disabled />
-          <FormControl :model-value="String(committed)" type="number" label="Committed" disabled />
+          <FormControl :model-value="String(onHand)" type="number" :label="__('On hand')" disabled />
+          <FormControl :model-value="String(committed)" type="number" :label="__('Committed')" disabled />
         </div>
       </section>
 
       <section>
-        <h3 class="text-base-semibold text-ink-gray-8">Identifiers</h3>
+        <h3 class="text-base-semibold text-ink-gray-8">{{ __('Identifiers') }}</h3>
         <div class="mt-3">
           <!-- One SKU per size, not per option — ERPNext assigns these at
                creation and no admin endpoint renames them. -->
-          <FormControl :model-value="skuList" label="SKU" disabled />
+          <FormControl :model-value="skuList" :label="__('SKU')" disabled />
         </div>
       </section>
     </div>
@@ -120,13 +120,13 @@ async function save() {
     <template v-if="variant" #actions>
       <div class="flex w-full items-center justify-between gap-2">
         <Button
-          label="Open full page"
+          :label="__('Open full page')"
           icon-left="lucide-external-link"
           :route="productRoute(product.id, variant.name)"
         />
         <div class="flex gap-2">
-          <Button label="Cancel" :disabled="priceAction.loading" @click="open = false" />
-          <Button label="Save variant" variant="solid" theme="gray" :loading="priceAction.loading" @click="save" />
+          <Button :label="__('Cancel')" :disabled="priceAction.loading" @click="open = false" />
+          <Button :label="__('Save variant')" variant="solid" theme="gray" :loading="priceAction.loading" @click="save" />
         </div>
       </div>
     </template>

@@ -3,7 +3,9 @@
 	"category": "Text",
 	"settings": [
 		{ "id": "heading", "type": "text", "label": "Heading", "default": "Your headline here" },
-		{ "id": "text", "type": "textarea", "label": "Text", "default": "A few sentences about your store." }
+		{ "id": "text", "type": "textarea", "label": "Text", "default": "A few sentences about your store." },
+		{ "id": "button_label", "type": "text", "label": "Button label", "default": "Shop all products" },
+		{ "id": "button_url", "type": "url", "label": "Button link", "default": "/products" }
 	],
 	"blocks": {},
 	"max_blocks": 0

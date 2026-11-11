@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { toast } from 'frappe-ui'
+import { __ } from './translation'
 
 // Frappe stores checks as 1/0 and numbers as numbers, while an input hands back a string or a
 // boolean, so two values are the same when they would be stored the same.
@@ -74,7 +75,7 @@ export function useSettingsAutosave(save, { params = {} } = {}) {
       if (afterSave) await afterSave(saved)
       else adopt(saved)
 
-      toast.success(`${label} saved`)
+      toast.success(__('{0} saved', [label]))
     })
   }
 

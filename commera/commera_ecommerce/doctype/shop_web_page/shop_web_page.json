@@ -10,7 +10,6 @@
   "route",
   "column_break_page",
   "content",
-  "content_ar",
   "seo_section",
   "seo_preview",
   "meta_title",
@@ -44,12 +43,6 @@
    "fieldtype": "Text Editor",
    "label": "Content",
    "reqd": 1
-  },
-  {
-   "description": "Shown to Arabic shoppers. Falls back to the English content when blank.",
-   "fieldname": "content_ar",
-   "fieldtype": "Text Editor",
-   "label": "Content (Arabic)"
   },
   {
    "collapsible": 1,
@@ -89,7 +82,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-04 10:00:00.000000",
+ "modified": "2026-11-10 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Shop Web Page",

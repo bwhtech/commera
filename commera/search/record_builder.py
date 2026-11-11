@@ -2,6 +2,9 @@ import frappe
 from frappe.utils import cint, create_batch, cstr
 
 from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import root_filter
+from commera.localization.content import SHOP_WIDE
+from commera.search.price_markets import prices_for_variants
+from commera.search.translations import get_market_titles, get_translated_titles
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
 # The only doctypes reachable from a variant (itself, its Item, its Style Attribute Configurator).
@@ -17,6 +20,9 @@ DEFAULT_CONTENT_FIELDS = (
 	("Style Attribute Variant", "item_group"),
 	("Item", "brand"),
 )
+
+# Item fields every product record copies, configured or not.
+ITEM_FIELDS = ("brand", "is_stock_item", "item_name")
 
 
 def get_configured_content_fields():
@@ -68,7 +74,8 @@ def get_indexable_docs(doctype, filters, names, fields):
 	return rows
 
 
-def build_product_search_records(variant_names=None):
+def build_product_search_records(variant_names=None, price_markets=None):
+	"""`price_markets`: the price lists a writer read fresh. A build's batches use the cached ones."""
 	configured_fields = get_configured_content_fields()
 	variant_content_fields = fields_by_doctype(configured_fields, "Style Attribute Variant")
 	item_content_fields = fields_by_doctype(configured_fields, "Item")
@@ -103,17 +110,23 @@ def build_product_search_records(variant_names=None):
 	names = [variant.name for variant in variants]
 	sizes_by_variant = sizes_for_variants(names)
 	images_by_variant = images_for_variants(names)
-	prices_by_variant = prices_for_variants(sizes_by_variant)
+	prices_by_variant = prices_for_variants(names, sizes_by_variant, price_markets)
+	titles_by_variant = get_translated_titles("Style Attribute Variant", variants)
+	market_titles = get_market_titles("Style Attribute Variant", names)
 
 	records = []
 	for variant in variants:
 		item = item_by_style.get(variant.item_style) or {}
 		configurator = configurator_by_name.get(variant.configurator) or {}
+		titles = titles_by_variant[variant.name]
+		market_prices = prices_by_variant[variant.name]
 		records.append(
 			{
 				"name": variant.name,
 				"title": variant.display_name or "",
-				"content": build_content(configured_fields, variant, item, configurator),
+				"content": join_text(build_content(configured_fields, variant, item, configurator), titles),
+				"titles": titles,
+				"market_titles": market_titles.get(variant.name, {}),
 				"item_group": variant.item_group or "",
 				"brand": item.get("brand") or "",
 				"color": variant.attribute_value or "",
@@ -123,8 +136,9 @@ def build_product_search_records(variant_names=None):
 					item,
 					sizes_by_variant.get(variant.name, []),
 					images_by_variant.get(variant.name, {}),
-					prices_by_variant.get(variant.name, {}),
+					market_prices[SHOP_WIDE],
 				),
+				"market_prices": market_prices,
 			}
 		)
 	return records
@@ -145,6 +159,11 @@ def build_content(configured_fields, variant, item, configurator):
 	return " ".join(parts).strip()
 
 
+def join_text(content, titles):
+	"""`content` followed by the translated titles, so a query in any published language finds the record."""
+	return " ".join([content, *titles.values()]).strip()
+
+
 def build_product_detail(variant, item, sizes, images, prices):
 	"""The full product-card snapshot stored in the index's product_detail table."""
 	detail = {
@@ -156,7 +175,6 @@ def build_product_detail(variant, item, sizes, images, prices):
 		"brand": item.get("brand") or "",
 		"is_stock_item": cint(item.get("is_stock_item")),
 		"item_name": item.get("item_name") or "",
-		"custom_item_name_ar": item.get("custom_item_name_ar") or "",
 		"variant_item_code": sizes[0]["item_code"] if sizes else "",
 		"image": images.get("image") or "",
 		"hover_image": images.get("hover_image") or "",
@@ -191,6 +209,8 @@ def build_category_search_records(names=None):
 		return []
 
 	roots = get_root_route_slugs()
+	titles_by_category = get_translated_titles("Ecommerce Category", categories)
+	market_titles = get_market_titles("Ecommerce Category", [category.name for category in categories])
 
 	records = []
 	for category in categories:
@@ -210,19 +230,20 @@ def build_category_search_records(names=None):
 			{
 				"name": category.name,
 				"title": display_name or category_name,
-				"content": " ".join(part for part in (category_name, display_name) if part).strip(),
+				"content": join_text(
+					" ".join(part for part in (category_name, display_name) if part),
+					titles_by_category[category.name],
+				),
 				"route_slug": route_slug,
+				"market_titles": market_titles.get(category.name, {}),
 			}
 		)
 	return records
 
 
 def items_for_item_styles(item_styles, content_fields=None):
-	"""Map item_style (Item name) -> {brand, is_stock_item, item_name, custom_item_name_ar, ...content}."""
-	fields = ["name", "brand", "is_stock_item", "item_name"]
-	if frappe.db.has_column("Item", "custom_item_name_ar"):
-		fields.append("custom_item_name_ar")
-	fields = union_fields(fields, content_fields or [])
+	"""Map item_style (Item name) -> {brand, is_stock_item, item_name, ...content}."""
+	fields = union_fields(["name", *ITEM_FIELDS], content_fields or [])
 
 	item_by_style = {}
 	for chunk in create_batch(item_styles, IN_CLAUSE_CHUNK_SIZE):
@@ -278,74 +299,3 @@ def images_for_variants(variant_names):
 			slot = "image" if row.idx == 1 else "hover_image"
 			images_by_variant.setdefault(row.parent, {}).setdefault(slot, row.image)
 	return images_by_variant
-
-
-def prices_for_variants(sizes_by_variant):
-	"""Map variant -> price snapshot, aggregating Item Price over the variant's item_codes."""
-	settings = frappe.get_cached_doc("Commera Settings")
-	default_price_list = settings.default_price_list
-	sale_price_list = settings.sale_price_list
-
-	codes_by_variant = {
-		variant: [size["item_code"] for size in sizes if size.get("item_code")]
-		for variant, sizes in sizes_by_variant.items()
-	}
-	all_codes = list({code for codes in codes_by_variant.values() for code in codes})
-	default_rate, sale_rate, sale_upto = rates_by_item_code(all_codes, default_price_list, sale_price_list)
-
-	return {
-		variant: aggregate_prices(codes, default_rate, sale_rate, sale_upto)
-		for variant, codes in codes_by_variant.items()
-	}
-
-
-def rates_by_item_code(item_codes, default_price_list, sale_price_list):
-	"""Per item_code: min default rate, min sale rate, max sale valid_upto across Item Price rows."""
-	default_rate, sale_rate, sale_upto = {}, {}, {}
-	for chunk in create_batch(item_codes, IN_CLAUSE_CHUNK_SIZE):
-		for row in frappe.get_all(
-			"Item Price",
-			filters={
-				"item_code": ("in", chunk),
-				"price_list": ("in", [default_price_list, sale_price_list]),
-			},
-			fields=["item_code", "price_list", "price_list_rate", "valid_upto"],
-		):
-			if row.price_list == default_price_list and row.price_list_rate is not None:
-				default_rate[row.item_code] = min_or(default_rate.get(row.item_code), row.price_list_rate)
-			if row.price_list == sale_price_list and row.price_list_rate is not None:
-				sale_rate[row.item_code] = min_or(sale_rate.get(row.item_code), row.price_list_rate)
-				if row.valid_upto:
-					sale_upto[row.item_code] = max_or(sale_upto.get(row.item_code), row.valid_upto)
-	return default_rate, sale_rate, sale_upto
-
-
-def aggregate_prices(item_codes, default_rate, sale_rate, sale_upto):
-	"""Min/min/max snapshot over a variant's item_codes, mirroring the QB discount_expr semantics."""
-	default_values = [default_rate[code] for code in item_codes if code in default_rate]
-	sale_values = [sale_rate[code] for code in item_codes if code in sale_rate]
-	upto_values = [sale_upto[code] for code in item_codes if code in sale_upto]
-
-	default_price = min(default_values) if default_values else None
-	sale_price = min(sale_values) if sale_values else None
-
-	discount_percent = 0.0
-	if default_price and default_price > 0 and sale_price is not None:
-		discount_percent = (default_price - sale_price) / default_price * 100
-
-	return {
-		"default_price": default_price,
-		"sale_price": sale_price,
-		"effective_price": sale_price if sale_price is not None else (default_price or 0),
-		"discount_percent": discount_percent,
-		"has_discount": 1 if discount_percent else 0,
-		"sale_end_date": max(upto_values) if upto_values else None,
-	}
-
-
-def min_or(current, value):
-	return value if current is None else min(current, value)
-
-
-def max_or(current, value):
-	return value if current is None else max(current, value)

@@ -30,19 +30,19 @@ const rows = computed(() =>
   <section>
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-lg-semibold text-ink-gray-8">Stock</h2>
-        <p class="mt-1 text-p-sm text-ink-gray-5">On hand per variant.</p>
+        <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Stock') }}</h2>
+        <p class="mt-1 text-p-sm text-ink-gray-5">{{ __('On hand per variant.') }}</p>
       </div>
       <div class="flex items-center gap-2">
         <!-- Receiving is the only stock write commera has, so it is the one offered
              here; the on-hand column stays read-only. -->
         <Button
-          label="Receive stock"
+          :label="__('Receive stock')"
           icon-left="lucide-package-plus"
           :disabled="!rows.length"
           @click="receiveOpen = true"
         />
-        <Button label="Open in Inventory" variant="ghost" route="/inventory" />
+        <Button :label="__('Open in Inventory')" variant="ghost" route="/inventory" />
       </div>
     </div>
 
@@ -53,10 +53,10 @@ const rows = computed(() =>
       :columns="['minmax(7rem,1fr)', 'minmax(8rem,1fr)', '6rem', '6rem']"
     >
       <ListHeader>
-        <ListHeaderCell>Variant</ListHeaderCell>
-        <ListHeaderCell>SKU</ListHeaderCell>
-        <ListHeaderCell>Committed</ListHeaderCell>
-        <ListHeaderCell>On hand</ListHeaderCell>
+        <ListHeaderCell>{{ __('Variant') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('SKU') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('Committed') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('On hand') }}</ListHeaderCell>
       </ListHeader>
       <ListRows :items="rows" row-key="id" v-slot="{ item }">
         <ListRow :value="item.id">
@@ -78,8 +78,8 @@ const rows = computed(() =>
       v-if="!rows.length"
       compact
       icon="lucide-boxes"
-      title="No stock to track yet"
-      description="Stock appears once this product has variants."
+      :title="__('No stock to track yet')"
+      :description="__('Stock appears once this product has variants.')"
     />
 
     <ReceiveStockDialog v-model:open="receiveOpen" :rows="rows" @received="emit('received')" />

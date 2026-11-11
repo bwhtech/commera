@@ -2,11 +2,12 @@
 import { computed } from 'vue'
 import { Combobox } from 'frappe-ui'
 import { useTargetSearch } from '../../data/discounts'
+import { __ } from '../../data/translation'
 
 const model = defineModel({ type: String, default: null })
 const props = defineProps({
   targetType: { type: String, required: true },
-  placeholder: { type: String, default: 'Search' },
+  placeholder: { type: String, default: () => __('Search') },
 })
 
 const { query, results, optionsWith } = useTargetSearch(() => props.targetType, { sellable: true })

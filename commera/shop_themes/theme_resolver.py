@@ -3,22 +3,24 @@ import os
 from urllib.parse import quote
 
 import frappe
-from frappe.utils.data import cint
 from frappe.utils.jinja import get_jenv
-from frappe.utils.jinja_globals import is_rtl
 from frappe.website.doctype.website_settings.website_settings import get_website_settings
 from frappe.website.utils import build_response
 from jinja2 import BaseLoader, BytecodeCache, TemplateNotFound
 from jinja2.utils import LRUCache
 
 import commera.sdk
+from commera.localization import get_localization, get_request_path, get_route_path, url
+from commera.localization.routing import localize_path
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	get_render_theme_context,
 	is_within_directory,
 )
 from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import get_compiled_routes
 from commera.shop_themes.jinja_helpers import get_shop_theme_settings
-from commera.utils import get_currency_symbols, get_store_currency
+from commera.shop_themes.route_patterns import has_language_group
+from commera.shop_themes.storefront_header import render_storefront_header
+from commera.store_frame import get_shop_details
 
 # page_renderer runs before every built-in renderer: a segment missing here is a route hijack, not a 404.
 RESERVED_PATH_SEGMENTS = frozenset(
@@ -41,9 +43,6 @@ RESERVED_PATH_SEGMENTS = frozenset(
 		"website_script.js",
 	}
 )
-
-# Every storefront route carries a language prefix, so a dynamic page can only live below one.
-DYNAMIC_PAGE_LANG_PREFIXES = frozenset({"en", "ar"})
 
 # Bare template names resolve from a theme only under this prefix: otherwise a theme could shadow
 # templates/includes/header.html and silently disconnect the menu manager and footer editor.
@@ -119,39 +118,20 @@ class ThemePageRenderer:
 		self.requires_auth = False
 
 	def can_render(self):
-		theme_context = get_render_theme_context()
-		if not theme_context["theme_name"] or not theme_context["dirs"]:
+		page = find_theme_page(self.get_request_path(), get_localization().language.code)
+		if not page:
 			return False
 
-		request_path = self.get_request_path()
-		settings = get_compiled_routes()
-
-		matched_route, match = match_route(settings["routes"], request_path)
-		if matched_route:
-			template_path = matched_route["template_path"]
-			requires_auth = matched_route["requires_auth"]
-		elif is_dynamic_page(settings, request_path):
-			template_path = f"pages/{request_path}.html"
-			requires_auth = False
-		else:
-			return False
-
-		# No fallback template: a theme that lacks this page declines and stock frappe routing serves it.
-		if not find_theme_file(theme_context["dirs"], template_path):
-			return False
-
-		self.theme_dirs = theme_context["dirs"]
-		self.template_path = template_path
-		self.match = match
-		self.requires_auth = requires_auth
+		self.theme_dirs, self.template_path, self.requires_auth, self.match = page
 		return True
 
 	def get_request_path(self):
-		# The RAW request path, not what website_route_rules rewrote it to, so a themed route bypasses them.
-		request = getattr(frappe.local, "request", None)
-		if request:
-			return request.path.strip("/")
-		return self.path.strip("/")
+		# The path without its language prefix, not what website_route_rules rewrote it to.
+		# Only a localized request loses its prefix: /ar/private/x stays outside the storefront.
+		if getattr(frappe.local, "request", None):
+			return get_route_path().strip("/")
+		localized = localize_path(self.path)
+		return (localized.route_path if localized else self.path).strip("/")
 
 	def render(self):
 		if self.requires_auth and frappe.session.user == "Guest":
@@ -171,10 +151,8 @@ class ThemePageRenderer:
 		"""Send a guest to the theme's own login page, which returns them here after signing in."""
 		if not find_theme_file(self.theme_dirs, LOGIN_TEMPLATE):
 			raise frappe.PermissionError
-		return_path = quote("/" + self.get_request_path(), safe="/")
-		frappe.flags.redirect_location = (
-			f"/{frappe.local.lang or 'en'}/account/login?redirect-to={return_path}"
-		)
+		return_path = quote(get_request_path() or "/" + self.path.strip("/"), safe="/")
+		frappe.flags.redirect_location = f"{url('/account/login')}?redirect-to={return_path}"
 		raise frappe.Redirect(302)
 
 	def render_not_found(self):
@@ -194,9 +172,34 @@ class ThemePageRenderer:
 		return template.render(context)
 
 
-def match_route(routes, request_path):
+def find_theme_page(request_path, language_code=None):
+	"""(theme dirs, template path, requires_auth, match) of the active theme's page, or None."""
+	theme_context = get_render_theme_context()
+	if not theme_context["theme_name"] or not theme_context["dirs"]:
+		return None
+
+	settings = get_compiled_routes()
+	legacy_path = f"{language_code.lower()}/{request_path}".rstrip("/") if language_code else None
+	matched_route, match = match_route(settings["routes"], request_path, legacy_path)
+	if matched_route:
+		template_path, requires_auth = matched_route["template_path"], matched_route["requires_auth"]
+	elif is_dynamic_page(settings, request_path):
+		template_path, requires_auth = f"pages/{request_path}.html", False
+	else:
+		return None
+
+	# No fallback template: a theme that lacks this page declines and stock frappe routing serves it.
+	if not find_theme_file(theme_context["dirs"], template_path):
+		return None
+	return theme_context["dirs"], template_path, requires_auth, match
+
+
+def match_route(routes, request_path, legacy_path=None):
+	"""`legacy_path` is the path as it was under /<lang>/. A route that the language patch kept
+	with its (?P<lang>…) group matches it, so it still wins in its old place."""
 	for route in routes:
-		match = route["pattern"].match(request_path)
+		is_legacy = legacy_path is not None and has_language_group(route["pattern"].pattern)
+		match = route["pattern"].match(legacy_path if is_legacy else request_path)
 		if match:
 			return route, match
 	return None, None
@@ -212,11 +215,7 @@ def is_dynamic_page(settings, request_path):
 	if ".." in segments:
 		return False
 
-	first_segment = segments[0]
-	if first_segment in RESERVED_PATH_SEGMENTS:
-		return False
-
-	return first_segment in DYNAMIC_PAGE_LANG_PREFIXES
+	return segments[0] not in RESERVED_PATH_SEGMENTS
 
 
 class ThemeFallbackLoader(BaseLoader):
@@ -291,34 +290,20 @@ def get_theme_environment(jenv, theme_dirs):
 
 
 def build_base_context(match):
-	context = frappe._dict(is_rtl=is_rtl())
+	localization = get_localization()
+	context = frappe._dict(is_rtl=localization.language.direction == "rtl", localization=localization)
 
 	if match:
 		apply_route_groups(match, context)
 
 	apply_website_settings(context)
+	context.shop_name = get_shop_details(localization).name or context.app_name
 	context.theme = get_shop_theme_settings()
-	context.commera_header_content = get_commera_header_content()
+	context.commera_header_content = render_storefront_header(localization)
 	context.commera = commera.sdk
 	apply_website_context_hooks(context)
 
 	return context
-
-
-def get_commera_header_content():
-	"""The storefront SDK bundle and its config, for the page head."""
-	return frappe.render_template(  # nosemgrep: frappe-ssti
-		"templates/includes/commera-header-content.html",
-		{
-			"csrf_token": frappe.session.data.csrf_token,
-			"store_currency": get_store_currency(),
-			"currency_symbols": get_currency_symbols(),
-			"language": frappe.local.lang or "en",
-			"webmcp": bool(
-				cint(frappe.get_cached_value("Commera Settings", "Commera Settings", "enable_webmcp"))
-			),
-		},
-	)
 
 
 def apply_website_settings(context):
@@ -329,6 +314,8 @@ def apply_website_settings(context):
 	try:
 		# Also fills context.boot; never call get_boot_data() on top of this.
 		context.update(get_website_settings())
+		# Its `url` is the site address, which would hide the url() Jinja global.
+		context.pop("url", None)
 
 		# get_website_settings() leaves out the branding fields a theme renders the brand from.
 		settings = frappe.client_cache.get_doc("Website Settings")

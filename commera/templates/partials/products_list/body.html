@@ -24,9 +24,9 @@
         {% endif %}
         <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-6">
             {% for product in products %}
-          {% set product_name = product.item_name if frappe.lang == "en" else product.custom_item_name_ar or product.item_name %}
+          {% set product_name = product.title or product.item_name %}
 
-                <a href="/{{frappe.lang}}/products/{{product.route}}" class="flex justify-end">
+                <a href="{{ url('/products/' ~ product.route) | e }}" class="flex justify-end">
                     {{ item_card(
                     image=product.image or "/assets/commera/images/1.jpg",
                     brand=product.brand,

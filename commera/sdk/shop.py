@@ -3,13 +3,20 @@ from frappe import _
 from frappe.utils import validate_email_address
 from frappe.utils.data import cint, cstr
 
+from commera import localization
 from commera.branding import get_brand_assets
-from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import get_page_by_route, get_page_content
+from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import (
+	get_page_by_route,
+	get_translated_page,
+	translate_pages,
+)
+from commera.sdk.catalog import get_seo
 from commera.sdk.types import (
 	ContentPage,
 	ContentPageLink,
 	Country,
 	FooterSection,
+	Localization,
 	Menu,
 	MenuItem,
 	Shop,
@@ -17,10 +24,12 @@ from commera.sdk.types import (
 	SitemapEntry,
 )
 from commera.shop_data import get_storefront_menu
+from commera.store_frame import get_shop_details, get_storefront_footer
 from commera.utils import get_country_list, get_store_company, get_store_currency
 from commera.www.sitemap_segment import SEGMENT_CONFIG, get_segment_filters, get_urls_per_page
 
 __all__ = [
+	"get_localization",
 	"get_menu",
 	"get_page",
 	"get_shop",
@@ -35,19 +44,24 @@ NEWSLETTER_EMAIL_GROUP = "Newsletter"
 SITEMAP_KINDS = tuple(SEGMENT_CONFIG)
 
 
+def get_localization() -> Localization:
+	"""The language of the current request, the default language and the languages shoppers can pick."""
+	return localization.get_localization().as_dict()
+
+
 def get_shop() -> Shop:
-	"""Store identity, the storefront menu and the footer."""
-	settings = frappe.get_cached_doc("Commera Settings")
+	"""Store identity, the storefront menu and the footer, in the request language."""
+	details = get_shop_details()
 	brand = get_brand_assets()
 	return {
-		"name": settings.store_name or frappe.get_website_settings("app_name") or "Commera",
-		"description": settings.default_meta_description or "",
+		"name": details.name or frappe.get_website_settings("app_name") or "Commera",
+		"description": details.description,
 		"currency": get_store_currency(),
 		"country": get_store_country(),
 		"logo": brand.logo,
 		"favicon": brand.favicon,
 		"menu": get_main_menu_items(),
-		"footer": [get_footer_section(row.footer_section) for row in get_footer_rows(settings)],
+		"footer": get_footer_sections(),
 	}
 
 
@@ -55,14 +69,10 @@ def get_menu(handle: str) -> Menu | None:
 	if handle == "main-menu":
 		return {"handle": handle, "title": _("Main menu"), "items": get_main_menu_items()}
 	if handle == "footer":
-		sections = [
-			get_footer_section(row.footer_section)
-			for row in get_footer_rows(frappe.get_cached_doc("Commera Settings"))
-		]
 		return {
 			"handle": handle,
 			"title": _("Footer"),
-			"items": [get_footer_menu_item(section) for section in sections],
+			"items": [get_footer_menu_item(section) for section in get_footer_sections()],
 		}
 	return None
 
@@ -115,33 +125,31 @@ def subscribe_to_newsletter(email: str) -> None:
 
 
 def get_page(handle: str) -> ContentPage | None:
-	"""A published Shop Web Page by its route, or None. The body is in the request language."""
+	"""A published Shop Web Page by its route, or None. Text is in the request language; the handle is not.
+	`title` is the page title; `seo` is shaped as on a collection, with `custom_title`."""
 	page = get_page_by_route(cstr(handle))
 	if not page or not page.published:
 		return None
+	values = get_translated_page(page)
+	title = values["title"].value
 	return {
 		"handle": page.route,
-		"title": page.meta_title or page.name,
-		"body_html": get_page_content(page) or "",
-		"seo": {
-			"title": page.meta_title,
-			"description": page.meta_description,
-			"noindex": bool(page.noindex),
-		},
+		"title": title,
+		"body_html": values["content"].value,
+		"seo": get_seo(values["meta_title"].value, title, values["meta_description"].value, page.noindex),
 		"updated_at": str(page.modified),
 	}
 
 
 def list_pages() -> list[ContentPageLink]:
-	"""Every published Shop Web Page, by title."""
-	pages = frappe.get_all(
-		"Shop Web Page", filters={"published": 1}, fields=["name", "route", "meta_title", "modified"]
-	)
+	"""Every published Shop Web Page, by title in the request language."""
+	pages = frappe.get_all("Shop Web Page", filters={"published": 1}, fields=["name", "route", "modified"])
+	translated = translate_pages(pages, ("title",))
 	links = [
-		{"handle": page.route, "title": page.meta_title or page.name, "updated_at": str(page.modified)}
-		for page in pages
+		{"handle": page.route, "title": values["title"].value, "updated_at": str(page.modified)}
+		for page, values in zip(pages, translated, strict=True)
 	]
-	return sorted(links, key=lambda link: link["title"])
+	return sorted(links, key=lambda link: (link["title"], link["handle"]))
 
 
 def get_sitemap(kind: str | None = None, page: int = 1) -> Sitemap:
@@ -197,16 +205,11 @@ def get_menu_link(node: dict, root_slug: str) -> tuple[str | None, str | None]:
 	return None, None
 
 
-def get_footer_rows(settings) -> list:
-	return sorted(
-		(row for row in settings.footer_sections or [] if row.enabled), key=lambda row: row.section_order
-	)
-
-
-def get_footer_section(name: str) -> FooterSection:
-	section = frappe.get_cached_doc("Footer Section Config", name)
-	links = sorted((link for link in section.footer_links if link.enabled), key=lambda link: link.link_order)
-	return {
-		"title": section.section_title,
-		"links": [{"title": link.link_label, "url": link.link_url} for link in links],
-	}
+def get_footer_sections() -> list[FooterSection]:
+	return [
+		{
+			"title": section.title,
+			"links": [{"title": link.title, "url": localization.url(link.url)} for link in section.links],
+		}
+		for section in get_storefront_footer()
+	]

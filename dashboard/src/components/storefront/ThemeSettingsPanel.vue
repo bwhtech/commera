@@ -56,17 +56,17 @@ function plainText(html) {
   <div class="flex h-full flex-col" data-theme-settings-panel>
     <div class="shrink-0 border-b border-outline-gray-2 px-4 py-2">
       <div class="flex items-center gap-1">
-        <h2 class="min-w-0 flex-1 truncate text-lg-semibold text-ink-gray-9">Theme settings</h2>
-        <Button variant="ghost" icon="lucide-x" aria-label="Close theme settings" @click="emit('close')" />
+        <h2 class="min-w-0 flex-1 truncate text-lg-semibold text-ink-gray-9">{{ __('Theme settings') }}</h2>
+        <Button variant="ghost" icon="lucide-x" :aria-label="__('Close theme settings')" @click="emit('close')" />
       </div>
     </div>
 
     <ScrollArea class="min-h-0 flex-1" viewport-class="p-4">
       <p v-if="!state.live" class="mb-6 text-p-sm text-ink-gray-5">
-        Activate {{ state.theme }} to change its settings.
+        {{ __('Activate {0} to change its settings.', [state.theme]) }}
       </p>
       <p v-if="!state.settings.groups?.length" class="text-p-sm text-ink-gray-5">
-        This theme ships no settings of its own.
+        {{ __('This theme ships no settings of its own.') }}
       </p>
       <div class="flex flex-col gap-6">
         <section v-for="group in state.settings.groups" :key="group.label" class="flex flex-col gap-3">
@@ -89,7 +89,7 @@ function plainText(html) {
     </ScrollArea>
 
     <div class="shrink-0 border-t border-outline-gray-2 p-4">
-      <Button class="w-full" variant="solid" label="Save" :disabled="!isDirty || saving" :loading="saving" @click="save" />
+      <Button class="w-full" variant="solid" :label="__('Save')" :disabled="!isDirty || saving" :loading="saving" @click="save" />
     </div>
   </div>
 </template>

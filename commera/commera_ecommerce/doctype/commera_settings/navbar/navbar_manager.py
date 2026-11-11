@@ -149,6 +149,7 @@ def update_node(
 	route_slug: str | None = None,
 	icon: str | None = None,
 	image: str | None = None,
+	description: str | None = None,
 	meta_title: str | None = None,
 	meta_description: str | None = None,
 	og_image: str | None = None,
@@ -168,6 +169,7 @@ def update_node(
 		{
 			"icon": icon,
 			"image": image,
+			"description": description,
 			"meta_title": meta_title,
 			"meta_description": meta_description,
 			"og_image": og_image,

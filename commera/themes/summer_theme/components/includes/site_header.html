@@ -1,11 +1,8 @@
 
 {% from "components/macros/navigation.html" import brand_logo, menu_tab %}
-{% set language = frappe.lang or "en" %}
 {% set settings = header_data.settings %}
 
-{% set languages = [("en", "English"), ("ar", "العربية")] %}
-
-{% macro account_menu(item_class, menu_align, language) %}
+{% macro account_menu(item_class, menu_align) %}
 <li class="nav-item {{ item_class }} dropdown" @click.outside="account_open = false"
 	@keydown.escape="account_open = false"
 	x-data="{
@@ -15,9 +12,9 @@
 		aria-haspopup="true" :aria-expanded="account_open" aria-label="{{ _('My Account') }}">{{ caller() }}</a>
 	<div class="dropdown-menu {{ menu_align }}" data-bs-popper="static"
 		:class="account_open ? 'show' : ''" x-cloak>
-		<a class="dropdown-item" href="/{{ language }}/account/dashboard">{{ _("My Account") }}</a>
-		<a class="dropdown-item" href="/{{ language }}/account/orders">{{ _("My Orders") }}</a>
-		<button type="button" class="dropdown-item" @click="account_open = false; logout('/{{ language }}')">{{ _("Logout") }}</button>
+		<a class="dropdown-item" href="{{ url('/account/dashboard') | e }}">{{ _("My Account") }}</a>
+		<a class="dropdown-item" href="{{ url('/account/orders') | e }}">{{ _("My Orders") }}</a>
+		<button type="button" class="dropdown-item" @click="account_open = false; logout({{ url("/") | tojson | forceescape }})">{{ _("Logout") }}</button>
 	</div>
 </li>
 {% endmacro %}
@@ -82,37 +79,27 @@
 							</li>
 							{% else %}
 							{# Start-aligned: below 767px this item sits on the bottom bar's left edge, so an end-aligned panel runs off-screen. #}
-							{% call account_menu("login-link", "dropdown-menu-start", language) %}{{ _("My Account") }}{% endcall %}
+							{% call account_menu("login-link", "dropdown-menu-start") %}{{ _("My Account") }}{% endcall %}
 							{% endif %}
 							{# Bootstrap's dropdown CSS ships in style.css but its JS does not, so Alpine stamps .show and the [data-bs-popper] offsets are authored here. #}
+							{% if localization.available_languages | length > 1 %}
 							<li class="nav-item language-link dropdown" @click.outside="language_open = false"
-								@keydown.escape="language_open = false"
-								x-data="{
-									language_open: false,
-									current_language: '{{ language }}',
-									async change_language(language) {
-										if (language === this.current_language) return;
-										/* The cached bundle is per language, so it has to be dropped before the
-										   next page reads it back out of localStorage. */
-										Alpine.store('i18n').i18n = {};
-										Alpine.store('i18n').lastFetched = null;
-										await Alpine.store('i18n').init();
-										window.location.href = window.location.pathname.replace(/^\/(en|ar)/, `/${language}`);
-									},
-								}">
+								@keydown.escape="language_open = false" x-data="{ language_open: false }">
 								<a class="nav-link" href="javascript:void(0);" @click="language_open = !language_open"
-									aria-haspopup="true" :aria-expanded="language_open" aria-label="{{ _('Change language') }}">
-									<span>{{ language|upper }}</span>
+									aria-haspopup="true" :aria-expanded="language_open" aria-label="{{ _('Change language') | e }}">
+									<span>{{ localization.language.code | upper | e }}</span>
 									<i class="fas fa-chevron-down"></i>
 								</a>
 								<div class="dropdown-menu dropdown-menu-end" data-bs-popper="static"
 									:class="language_open ? 'show' : ''" x-cloak>
-									{% for code, label in languages %}
-									<button type="button" class="dropdown-item{% if code == language %} active{% endif %}"
-										@click="language_open = false; change_language('{{ code }}')">{{ label }}</button>
+									{% for option in localization.available_languages %}
+									<a class="dropdown-item{% if option == localization.language %} active{% endif %}" href="{{ switch_url(language=option.code) | e }}"
+										hreflang="{{ option.code | e }}" lang="{{ option.code | e }}" dir="{{ option.direction | e }}" data-language="{{ option.code | e }}"{% if option == localization.language %} aria-current="true"{% endif %}
+										onclick="document.cookie = 'preferred_language=' + encodeURIComponent(this.dataset.language) + '; path=/; max-age=31536000; samesite=lax'">{{ option.endonym | e }}</a>
 									{% endfor %}
 								</div>
 							</li>
+							{% endif %}
 							<li class="nav-item search-link">
 								<a class="nav-link" href="javascript:void(0);" @click="$dispatch('open-search')" aria-label="{{ _('Search') }}">
 									<i class="iconly-Light-Search"></i>
@@ -125,10 +112,10 @@
 								</a>
 							</li>
 							{% else %}
-							{% call account_menu("account-link d-none d-lg-flex", "dropdown-menu-end", language) %}<i class="iconly-Light-User"></i>{% endcall %}
+							{% call account_menu("account-link d-none d-lg-flex", "dropdown-menu-end") %}<i class="iconly-Light-User"></i>{% endcall %}
 							{% endif %}
 							<li class="nav-item wishlist-link">
-								<a class="nav-link" href="/{{ language }}/account/wishlist" aria-label="{{ _('Wishlist') }}">
+								<a class="nav-link" href="{{ url('/account/wishlist') | e }}" aria-label="{{ _('Wishlist') }}">
 									<i class="iconly-Light-Heart2"></i>
 									<span class="badge badge-circle" x-show="$store.wishlist.count" x-text="$store.wishlist.count" x-cloak></span>
 								</a>

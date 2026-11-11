@@ -10,7 +10,7 @@
 					<div class="sale-box">
 						{% if banner.settings.badge_label %}<div class="badge style-1 mb-1">{{ banner.settings.badge_label }}</div>{% endif %}
 						<h2 class="sale-name">{{ banner.settings.heading }}</h2>
-						{% if banner.settings.cta_label %}<a href="{{ banner.settings.url or '#' }}" class="btn btn-outline-secondary btn-lg text-uppercase">{{ banner.settings.cta_label }}</a>{% endif %}
+						{% if banner.settings.cta_label %}<a href="{{ url(banner.settings.url or '#') | e }}" class="btn btn-outline-secondary btn-lg text-uppercase">{{ banner.settings.cta_label }}</a>{% endif %}
 					</div>
 					{% else %}
 					<div class="product-content">
@@ -18,7 +18,7 @@
 							{% if banner.settings.badge_label %}<div class="badge style-1 mb-3">{{ banner.settings.badge_label }}</div>{% endif %}
 							<h2 class="product-name">{{ banner.settings.heading }}</h2>
 						</div>
-						{% if banner.settings.cta_label %}<a href="{{ banner.settings.url or '#' }}" class="btn btn-secondary btn-lg text-uppercase">{{ banner.settings.cta_label }}</a>{% endif %}
+						{% if banner.settings.cta_label %}<a href="{{ url(banner.settings.url or '#') | e }}" class="btn btn-secondary btn-lg text-uppercase">{{ banner.settings.cta_label }}</a>{% endif %}
 					</div>
 					{% endif %}
 				</div>

@@ -7,7 +7,6 @@
 	"field_order": [
 		"banner_section",
 		"hero_banner",
-		"hero_banner_ar",
 		"section_break_uazs",
 		"gif_1",
 		"gif_3",
@@ -20,18 +19,6 @@
 		"column_break_agii",
 		"gif_url_2",
 		"gif_url_4",
-		"gifs_ar_section",
-		"gif_1_ar",
-		"gif_3_ar",
-		"column_break_fscr",
-		"gif_url_1_ar",
-		"gif_url_3_ar",
-		"column_break_dcsh",
-		"gif_2_ar",
-		"gif_4_ar",
-		"column_break_qsaw",
-		"gif_url_2_ar",
-		"gif_url_4_ar",
 		"section_break_hdto",
 		"new_arrivals",
 		"section_break_dyhp",
@@ -39,11 +26,7 @@
 		"section_break_tgjx",
 		"banner_1",
 		"column_break_mscz",
-		"banner_url_1",
-		"banner_section_4_ar_section",
-		"banner_1_ar",
-		"column_break_irta",
-		"banner_url_1_ar"
+		"banner_url_1"
 	],
 	"fields": [
 		{
@@ -148,91 +131,10 @@
 			"fieldtype": "Column Break"
 		},
 		{
-			"fieldname": "hero_banner_ar",
-			"fieldtype": "Table",
-			"label": "Hero Banner AR",
-			"options": "Landing Page Hero Banner"
-		},
-		{
 			"description": "Banner images",
 			"fieldname": "banner_section",
 			"fieldtype": "Section Break",
 			"label": "Hero Banner"
-		},
-		{
-			"fieldname": "gif_1_ar",
-			"fieldtype": "Attach",
-			"label": "GIF 1 AR"
-		},
-		{
-			"fieldname": "gif_3_ar",
-			"fieldtype": "Attach",
-			"label": "GIF 3 AR"
-		},
-		{
-			"default": "/",
-			"fieldname": "gif_url_1_ar",
-			"fieldtype": "Data",
-			"label": "GIF URL 1 AR",
-			"options": "URL"
-		},
-		{
-			"default": "/",
-			"fieldname": "gif_url_3_ar",
-			"fieldtype": "Data",
-			"label": "GIF URL 3 AR",
-			"options": "URL"
-		},
-		{
-			"fieldname": "gif_2_ar",
-			"fieldtype": "Attach",
-			"label": "GIF 2 AR"
-		},
-		{
-			"fieldname": "gif_4_ar",
-			"fieldtype": "Attach",
-			"label": "GIF 4 AR"
-		},
-		{
-			"default": "/",
-			"fieldname": "gif_url_2_ar",
-			"fieldtype": "Data",
-			"label": "GIF URL 2 AR",
-			"options": "URL"
-		},
-		{
-			"default": "/",
-			"fieldname": "gif_url_4_ar",
-			"fieldtype": "Data",
-			"label": "GIF URL 4 AR",
-			"options": "URL"
-		},
-		{
-			"description": "Brands or Categories AR",
-			"fieldname": "gifs_ar_section",
-			"fieldtype": "Section Break",
-			"label": "GIFs AR"
-		},
-		{
-			"fieldname": "column_break_fscr",
-			"fieldtype": "Column Break"
-		},
-		{
-			"fieldname": "column_break_dcsh",
-			"fieldtype": "Column Break"
-		},
-		{
-			"fieldname": "column_break_qsaw",
-			"fieldtype": "Column Break"
-		},
-		{
-			"fieldname": "banner_section_4_ar_section",
-			"fieldtype": "Section Break",
-			"label": "Banner Section  AR"
-		},
-		{
-			"fieldname": "column_break_irta",
-			"fieldtype": "Column Break"
 		},
 		{
 			"fieldname": "banner_1",
@@ -245,25 +147,13 @@
 			"fieldtype": "Data",
 			"label": "Banner URL 1",
 			"options": "URL"
-		},
-		{
-			"fieldname": "banner_1_ar",
-			"fieldtype": "Attach Image",
-			"label": "Banner 1 AR"
-		},
-		{
-			"default": "/",
-			"fieldname": "banner_url_1_ar",
-			"fieldtype": "Data",
-			"label": "Banner URL 1 AR",
-			"options": "URL"
 		}
 	],
 	"grid_page_length": 50,
 	"index_web_pages_for_search": 1,
 	"issingle": 1,
 	"links": [],
-	"modified": "2025-10-08 21:42:00.724782",
+	"modified": "2026-11-10 12:00:00.000000",
 	"modified_by": "Administrator",
 	"module": "Commera Ecommerce",
 	"name": "Landing Page Settings",

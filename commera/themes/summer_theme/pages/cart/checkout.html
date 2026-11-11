@@ -3,7 +3,7 @@
 {% from "components/macros/combobox.html" import combobox, country_combobox %}
 {% from "components/macros/discount_codes.html" import discount_code_chips %}
 
-{% set language = frappe.lang or "en" %}
+{% set in_source_language = get_localization().language == get_localization().default_language %}
 {% set currency_symbol = get_currency_symbol() %}
 {% set checkout_config = {
 	"payment_gateways": payment_gateways,
@@ -111,11 +111,11 @@
 				<h1>{{ _("Shop Checkout") }}</h1>
 				<nav aria-label="{{ _('breadcrumb') }}" class="breadcrumb-row">
 					<ul class="breadcrumb">
-						<li class="breadcrumb-item"><a href="/{{ language }}">{{ _("Home") }}</a></li>
+						<li class="breadcrumb-item"><a href="{{ url('/') | e }}">{{ _("Home") }}</a></li>
 						{% for breadcrumb in breadcrumbs %}
 							<li class="breadcrumb-item">
 								{% if breadcrumb.href and breadcrumb.href != "#" %}
-									<a href="{{ breadcrumb.href }}">{{ _(breadcrumb.label) }}</a>
+									<a href="{{ breadcrumb.href | e }}">{{ _(breadcrumb.label) }}</a>
 								{% else %}
 									{{ _(breadcrumb.label) }}
 								{% endif %}
@@ -302,7 +302,7 @@
 									</div>
 									<div class="dz-content">
 										<h6 class="title mb-0">
-											<span x-text="{% if language == 'ar' %}cart_item.variant.item_name_ar || {% endif %}cart_item.variant.item_name"></span>
+											<span x-text="{% if not in_source_language %}cart_item.variant.title || {% endif %}cart_item.variant.item_name"></span>
 											<span class="checkout-item-meta">{{ _("Qty") }} <span x-text="cart_item.qty"></span></span>
 										</h6>
 										<span class="price">{{ currency_symbol }}<span x-text="format_amount(cart_item.price * cart_item.qty)"></span></span>
@@ -318,11 +318,7 @@
 								</div>
 								<div class="dz-content">
 									<h6 class="title mb-0">
-										{% if language == "ar" and item.custom_item_name_ar %}
-											{{ item.custom_item_name_ar }}
-										{% else %}
-											{{ item.display_name or item.item_name }}
-										{% endif %}
+										{{ item.title|e }}
 										<span class="checkout-item-meta">
 											{% if item.size %}{{ item.size }} &middot; {% endif %}{{ _("Qty") }} {{ item.qty | int }}
 										</span>
@@ -613,7 +609,7 @@
 						return;
 					}
 					if (!this.$store.cart.items.length) {
-						window.location.replace("/{{ language }}/cart");
+						window.location.replace({{ url('/cart') | tojson }});
 						return;
 					}
 					this.summary = this.get_browser_cart_summary();

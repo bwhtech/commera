@@ -7,6 +7,7 @@ from commera.api.admin.orders import MAX_PAGE_LENGTH, describe_state, read_order
 from commera.api.shipping import get_charge_lines, read_order_taxes
 from commera.discounts.allocations import get_allocations
 from commera.plugin_events import read_shipping_addresses, validate_plugin_fieldnames
+from commera.sdk.lines import LineProducts
 from commera.sdk.types import Order
 from commera.shipping.fulfilment import get_provider_pickup_address, new_shipment
 from commera.shipping.shipment import append_tracking_events, apply_status, get_order_shipments, lock_booking
@@ -44,15 +45,18 @@ def read_order_results(sales_orders: list, extra_fields) -> dict[str, Order]:
 	paid_orders = read_paid_orders([order.name for order in orders.values()])
 	taxes_by_order = read_order_taxes(list(orders))
 	addresses = read_shipping_addresses(list(orders))
+	products = LineProducts([line.item_code for order in orders.values() for line in order.lines])
 	return {
 		name: get_order_result(
-			order, paid_orders, taxes_by_order.get(name, []), addresses.get(name), extra_fields
+			order, paid_orders, taxes_by_order.get(name, []), addresses.get(name), extra_fields, products
 		)
 		for name, order in orders.items()
 	}
 
 
-def get_order_result(order, paid_orders: set, taxes: list, shipping_address, extra_fields) -> Order:
+def get_order_result(
+	order, paid_orders: set, taxes: list, shipping_address, extra_fields, products: LineProducts
+) -> Order:
 	charge_lines = get_charge_lines(taxes, order.shipping_rule)
 	return {
 		"name": order.name,
@@ -84,7 +88,7 @@ def get_order_result(order, paid_orders: set, taxes: list, shipping_address, ext
 			{
 				"line_id": line.name,
 				"item_code": line.item_code,
-				"title": line.item_name,
+				"title": products.get_title(line.item_code, line.item_name),
 				"size": line.size,
 				"qty": flt(line.qty),
 				"delivered_qty": flt(line.delivered_qty),

@@ -1,7 +1,7 @@
 {% from "components/macros/transitions.html" import popover %}
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/menu_link.html" import menu_link %}
-{% set language = frappe.lang or "en" %}
+{% from "templates/macros/language_switcher.html" import country_switcher, language_switcher %}
 {% set is_guest = frappe.session.user == "Guest" %}
 {% set main_menu = commera.shop.get_menu(section.settings.menu or "main-menu") %}
 {% set menu_items = main_menu["items"] if main_menu else [] %}
@@ -15,17 +15,17 @@
 			{% for item in menu_items %}
 			{% if item["items"] %}
 			<div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false" class="relative hidden xl:block">
-				<button type="button" @click="open = !open" :aria-expanded="open" :class="open && 'bg-surface-gray-4'" class="inline-flex h-10 items-center gap-1 whitespace-nowrap rounded-lg px-3 text-md text-ink-gray-8 hover:bg-surface-gray-3">{{ item["title"] }} <span :class="open && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
+				<button type="button" @click="open = !open" :aria-expanded="open" :class="open && 'bg-surface-gray-4'" class="inline-flex h-10 items-center gap-1 whitespace-nowrap rounded-lg px-3 text-md text-ink-gray-8 hover:bg-surface-gray-3">{{ item["title"] | e }} <span :class="open && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
 				<div x-cloak x-show="open" {{ popover() }} class="absolute start-0 top-full z-50 mt-2 min-w-56 popover divide-y divide-outline-gray-2 text-start">
 					{% for group in item["items"] if group["items"] %}
 					<div class="p-1.5">
-						<p class="flex h-7 items-center px-2 text-base font-medium text-ink-gray-6">{{ group["title"] }}</p>
+						<p class="flex h-7 items-center px-2 text-base font-medium text-ink-gray-6">{{ group["title"] | e }}</p>
 						{% for link in group["items"] %}{{ menu_link(link, "flex h-10 items-center rounded-lg px-2.5 text-md text-ink-gray-8 hover:bg-surface-gray-3") }}{% endfor %}
 					</div>
 					{% endfor %}
 					{% set leaf_links %}
 						{%- for link in item["items"] if not link["items"] %}{{ menu_link(link, "flex h-10 items-center rounded-lg px-2.5 text-md text-ink-gray-8 hover:bg-surface-gray-3") }}{% endfor -%}
-						{%- if item["url"] %}<a href="{{ item['url'] }}" class="flex h-10 items-center rounded-lg px-2.5 text-md text-ink-gray-8 hover:bg-surface-gray-3">{{ _("View all") }}</a>{% endif -%}
+						{%- if item["url"] %}<a href="{{ item['url'] | e }}" class="flex h-10 items-center rounded-lg px-2.5 text-md text-ink-gray-8 hover:bg-surface-gray-3">{{ _("View all") }}</a>{% endif -%}
 					{% endset %}
 					{% if leaf_links | trim %}<div class="p-1.5">{{ leaf_links }}</div>{% endif %}
 				</div>
@@ -36,21 +36,42 @@
 			{% endfor %}
 		</div>
 
-		<a href="/{{ language }}" class="{{ 'lg:order-first' if logo_at_start else 'justify-self-center text-center' }} inline-flex min-h-11 items-center px-2 text-2xl font-semibold uppercase tracking-widest">
-			{% if theme.logo %}<img src="{{ theme.logo }}" alt="{{ app_name }}" class="h-8 w-auto">{% else %}{{ app_name }}{% endif %}
+		<a href="{{ url('/') | e }}" class="{{ 'lg:order-first' if logo_at_start else 'justify-self-center text-center' }} inline-flex min-h-11 items-center px-2 text-2xl font-semibold uppercase tracking-widest">
+			{% if theme.logo %}<img src="{{ theme.logo | e }}" alt="{{ shop_name | e }}" class="h-8 w-auto">{% else %}{{ shop_name | e }}{% endif %}
 		</a>
 
 		<div class="{{ 'ms-auto' if logo_at_start }} flex items-center justify-end gap-1 lg:-me-2.5">
+			{% set localization = get_localization() %}
+			{% set has_countries = localization.available_markets | length > 1 %}
+			{% set has_languages = localization.available_languages | length > 1 %}
+			{% if has_countries or has_languages %}
+			{% set locale_label = _("Country and language") if has_countries and has_languages else (_("Country") if has_countries else _("Language")) %}
+			<div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="if (open) { open = false; $refs.toggle.focus() }" class="relative max-lg:hidden">
+				<button x-ref="toggle" type="button" @click="open = !open" aria-expanded="false" :aria-expanded="open" aria-controls="locale-picker" class="icon-button" aria-label="{{ locale_label | e }}">{{ icon("globe") }}</button>
+				<div id="locale-picker" x-cloak x-show="open" {{ popover() }} class="absolute end-0 top-full z-50 mt-2 max-h-[min(32rem,calc(100vh-var(--header-height)-1rem))] min-w-56 overflow-y-auto overscroll-contain popover divide-y divide-outline-gray-2 text-start">
+					{% if has_countries %}
+					<div class="p-1.5">
+						{{ country_switcher(link_class="flex h-10 items-center rounded-lg px-2.5 text-md text-ink-gray-8 hover:bg-surface-gray-3", current_class="font-medium text-ink-gray-9", heading_class="flex h-7 items-center px-2.5 pt-1.5 text-base font-medium text-ink-gray-6") }}
+					</div>
+					{% endif %}
+					{% if has_languages %}
+					<div class="p-1.5">
+						{{ language_switcher(link_class="flex h-10 items-center rounded-lg px-2.5 text-md text-ink-gray-8 hover:bg-surface-gray-3", current_class="font-medium text-ink-gray-9") }}
+					</div>
+					{% endif %}
+				</div>
+			</div>
+			{% endif %}
 			{% if section.settings.show_search %}
 			<button type="button" @click="$dispatch('open-search')" class="icon-button" aria-label="{{ _('Search') }}">{{ icon("search") }}</button>
 			{% endif %}
 			{% if section.settings.show_account %}
-			<a href="/{{ language }}/account/{{ 'login' if is_guest else 'orders' }}" {% if is_guest %}@click.prevent="$dispatch('open-auth')"{% endif %} class="icon-button max-lg:hidden" aria-label="{{ _('Account') }}">{{ icon("user") }}</a>
+			<a href="{{ url('/account/login' if is_guest else '/account/orders') | e }}" {% if is_guest %}@click.prevent="$dispatch('open-auth')"{% endif %} class="icon-button max-lg:hidden" aria-label="{{ _('Account') }}">{{ icon("user") }}</a>
 			{% endif %}
 			{% if section.settings.show_wishlist %}
-			<a href="/{{ language }}/account/wishlist" {% if is_guest %}@click.prevent="$dispatch('open-auth', { redirect: $el.pathname })"{% endif %} class="icon-button max-lg:hidden" aria-label="{{ _('Wishlist') }}">{{ icon("heart") }}</a>
+			<a href="{{ url('/account/wishlist') | e }}" {% if is_guest %}@click.prevent="$dispatch('open-auth', { redirect: $el.pathname })"{% endif %} class="icon-button max-lg:hidden" aria-label="{{ _('Wishlist') }}">{{ icon("heart") }}</a>
 			{% endif %}
-			<a href="/{{ language }}/cart" @click.prevent="$dispatch('open-cart')" class="icon-button relative" aria-label="{{ _('Cart') }}">
+			<a href="{{ url('/cart') | e }}" @click.prevent="$dispatch('open-cart')" class="icon-button relative" aria-label="{{ _('Cart') }}">
 				{{ icon("bag") }}
 				<span x-cloak x-show="$store.cart.count" x-text="$store.cart.count" x-data="{ seen: null }" x-effect="const count = $store.cart.count; if (seen !== null && count > seen) { $el.classList.remove('animate-pop'); void $el.offsetWidth; $el.classList.add('animate-pop') } seen = count" class="tabular absolute end-1 top-1 grid h-4.5 min-w-4.5 place-content-center rounded-full bg-brand px-1 text-2xs font-semibold text-on-brand"></span>
 			</a>

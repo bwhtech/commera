@@ -7,11 +7,11 @@ defineProps({ product: { type: Object, required: true } })
 
 <template>
   <section class="space-y-4">
-    <FormControl v-model="product.title" label="Title" />
+    <FormControl v-model="product.title" :label="__('Title')" />
     <RichTextField
       v-model="product.description"
-      label="Description"
-      description="Shown on the product page."
+      :label="__('Description')"
+      :description="__('Shown on the product page.')"
       min-height="min-h-32"
     />
   </section>

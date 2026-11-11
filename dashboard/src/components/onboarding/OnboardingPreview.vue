@@ -18,7 +18,7 @@ const entered = useEntrance()
 <template>
   <div class="relative size-full max-h-[700px] max-w-[960px]">
     <div
-      class="absolute inset-0 flex flex-col overflow-hidden rounded-6 border border-outline-gray-2 bg-surface-base shadow-xl transition-[opacity,transform] delay-75 duration-700 ease-out-strong xl:bottom-16 xl:right-48"
+      class="absolute inset-0 flex flex-col overflow-hidden rounded-6 border border-outline-gray-2 bg-surface-base shadow-xl transition-[opacity,transform] delay-75 duration-700 ease-out-strong xl:bottom-16 xl:end-48"
       :class="entered ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-3.5 scale-[0.985] opacity-0 motion-reduce:translate-y-0 motion-reduce:scale-100'"
     >
       <div class="flex h-9 shrink-0 items-center gap-1.5 border-b border-outline-gray-1 bg-surface-gray-1 px-3">
@@ -36,7 +36,7 @@ const entered = useEntrance()
     </div>
 
     <div
-      class="absolute bottom-0 right-0 hidden h-[470px] w-[230px] transition-[opacity,transform] delay-500 duration-1000 ease-out-strong xl:block"
+      class="absolute bottom-0 end-0 hidden h-[470px] w-[230px] transition-[opacity,transform] delay-500 duration-1000 ease-out-strong xl:block"
       :class="entered ? 'translate-x-0 scale-100 opacity-100' : '-translate-x-16 scale-95 opacity-0 motion-reduce:translate-x-0 motion-reduce:scale-100'"
     >
       <!-- The bezel is a device, not app chrome, so it stays dark in a light dashboard. It is a

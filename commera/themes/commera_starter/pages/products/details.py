@@ -4,8 +4,9 @@ import frappe
 from frappe import _
 
 from commera import seo
+from commera.localization import get_localization
 from commera.sdk import catalog, wishlist
-from commera.sdk.format import product_url
+from commera.sdk.format import product_url, url
 
 
 def get_context(context):
@@ -13,18 +14,17 @@ def get_context(context):
 	if not product:
 		raise frappe.PageDoesNotExistError
 
-	language = frappe.local.lang or "en"
 	context.product = product
 	context.in_wishlist = frappe.session.user != "Guest" and product["id"] in {
 		card["id"] for card in wishlist.get_wishlist()["products"]
 	}
 	context.breadcrumb_links = [
-		{"label": _("Home"), "url": f"/{language}"},
+		{"label": _("Home"), "url": url("/")},
 		*(
 			[
 				{
 					"label": product["collection"]["title"],
-					"url": f"/{language}/products?{urlencode({'category': product['collection']['handle']})}",
+					"url": url(f"/products?{urlencode({'category': product['collection']['handle']})}"),
 				}
 			]
 			if product["collection"]
@@ -40,7 +40,7 @@ def add_seo(context, product):
 	variant_fields = {
 		"name": product["id"],
 		"display_name": product["title"],
-		"meta_title": product["seo"]["title"] if product["seo"]["title"] != product["title"] else None,
+		"meta_title": product["seo"]["title"] if product["seo"]["custom_title"] else None,
 		"meta_description": product["seo"]["description"],
 		"noindex": product["seo"]["noindex"],
 	}
@@ -53,7 +53,7 @@ def add_seo(context, product):
 	context.seo = seo.build_product_seo(
 		variant_fields,
 		product_fields,
-		image_url=f"/og-image/{product['handle']}.png",
+		image_url=get_og_image_url(product["handle"]),
 		price=product["price"],
 		availability=availability,
 		currency=product["currency"],
@@ -76,3 +76,10 @@ def add_seo(context, product):
 			]
 		),
 	]
+
+
+def get_og_image_url(handle):
+	"""The card shows the store price, so a secondary market shares the card without one."""
+	url = seo.get_product_og_image(handle)
+	market = get_localization().market
+	return url if not market or market.is_primary else f"{url}?price=none"

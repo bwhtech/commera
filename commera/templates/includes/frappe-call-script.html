@@ -1,5 +1,21 @@
+{% set call_localization = localization if localization is defined else get_localization() -%}
 <script>
+    // Replies such as cart lines and search results come back in the page's language, as in the storefront package.
+    function with_page_language(url, args, method) {
+        const page_language = {{ (none if call_localization.language == call_localization.default_language else call_localization.language.code) | tojson }};
+        if (!page_language) return [url, args];
+        if (method === "POST" || method === "PUT") {
+            const body = args ?? {};
+            const is_object = typeof body === "object" && !Array.isArray(body);
+            return [url, is_object && !("_lang" in body) ? { ...body, _lang: page_language } : args];
+        }
+        const target = new URL(url, window.location.origin);
+        if (!target.searchParams.has("_lang")) target.searchParams.set("_lang", page_language);
+        return [target.pathname + target.search, args];
+    }
+
     async function frappe_call(url, args, method = "POST") {
+        [url, args] = with_page_language(url, args, method);
         let response;
         let headers = {
             'Content-Type': 'application/json; charset=utf-8',

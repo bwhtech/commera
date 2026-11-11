@@ -20,8 +20,8 @@ const state = (i) => (i < imp.step ? 'done' : i === imp.step ? 'current' : 'todo
     <div class="flex items-center gap-2">
       <span class="min-w-0 truncate text-base-semibold text-ink-gray-8">{{ STEPS[imp.step].label }}</span>
       <span class="hidden min-w-0 truncate text-sm text-ink-gray-5 sm:inline">{{ STEPS[imp.step].hint }}</span>
-      <span class="ml-auto shrink-0 text-sm text-ink-gray-5 tabular-nums">
-        Step {{ imp.step + 1 }} of {{ STEPS.length }}
+      <span class="ms-auto shrink-0 text-sm text-ink-gray-5 tabular-nums">
+        {{ __('Step {0} of {1}', [imp.step + 1, STEPS.length]) }}
       </span>
     </div>
     <div class="flex gap-1" role="progressbar" :aria-valuenow="pct">

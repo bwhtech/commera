@@ -58,14 +58,14 @@
         try {
             const url = `/api/v2/method/commera.api.users.delete_user_address`
             let response = await frappe_call(url, { address_id: doc_name });
-            const message = $store.i18n.t("Address deleted successfully")
+            const message = commera.t("Address deleted successfully")
             toast(message, { type: "success" })
             window.location.reload()
 
 
         }
         catch (err) {
-            const message = $store.i18n.t("Cannot delete address")
+            const message = commera.t("Cannot delete address")
             toast(message, { type: "danger" })
         }
         finally {

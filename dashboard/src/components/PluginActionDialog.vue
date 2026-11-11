@@ -90,7 +90,7 @@ async function submit() {
     <template #actions>
       <!-- Stacked on a phone and side by side from sm up, the same footer RefundDialog uses. -->
       <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button class="w-full sm:w-auto" label="Cancel" :disabled="submitting" @click="open = false" />
+        <Button class="w-full sm:w-auto" :label="__('Cancel')" :disabled="submitting" @click="open = false" />
         <Button
           class="w-full sm:w-auto"
           variant="solid"

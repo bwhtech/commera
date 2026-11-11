@@ -11,12 +11,12 @@ import { bulkSummary, runEach } from './runEach'
 export function useBulkAction() {
   const running = ref(null)
 
-  async function run(label, items, write, { noun, verb, after }) {
+  async function run(label, items, write, { sentences, after }) {
     if (running.value || !items.length) return null
     running.value = label
     try {
       const result = await runEach(items, write)
-      const message = bulkSummary(result, noun, verb, (error) => errorMessage(error))
+      const message = bulkSummary(result, sentences, (error) => errorMessage(error))
       if (result.failed.length) toast.error(message)
       else toast.success(message)
       // Reloaded whatever happened: the writes before a refusal landed.

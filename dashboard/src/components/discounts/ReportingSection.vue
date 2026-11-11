@@ -10,21 +10,24 @@ defineProps({
 </script>
 
 <template>
-  <DiscountSection title="Reporting and accounting" description="Optional. Kept on every order the discount touches.">
+  <DiscountSection
+    :title="__('Reporting and accounting')"
+    :description="__('Optional. Kept on every order the discount touches.')"
+  >
     <div class="grid gap-4 sm:grid-cols-2">
       <FormControl
         v-model="discount.campaign"
         type="select"
-        label="Campaign"
+        :label="__('Campaign')"
         :options="['', ...campaigns]"
-        description="The marketing campaign orders using this discount are tagged with."
+        :description="__('The marketing campaign orders using this discount are tagged with.')"
       />
       <FormControl
         v-model="discount.discount_account"
         type="select"
-        label="Discount account"
+        :label="__('Discount account')"
         :options="['', ...discountAccounts]"
-        description="Used when Discount Accounting is on."
+        :description="__('Used when Discount Accounting is on.')"
       />
     </div>
   </DiscountSection>

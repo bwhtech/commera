@@ -48,10 +48,10 @@ const skeletonColumns = computed(() => (isMobile.value ? 2 : 5))
 <template>
   <!-- No header actions: a customer record is created the moment a shopper checks out
        (commera/core.py's _create_party_for_user), and there is no export endpoint. -->
-  <AppPageHeader title="Customers" />
+  <AppPageHeader :title="__('Customers')" />
 
   <PageBody>
-    <SearchInput v-model="query" class="w-56" placeholder="Search customers" />
+    <SearchInput v-model="query" class="w-56" :placeholder="__('Search customers')" />
 
     <div class="mt-3 overflow-x-auto">
       <!-- 46rem is the width the five columns need; a phone gets two of them instead, because
@@ -65,11 +65,11 @@ const skeletonColumns = computed(() => (isMobile.value ? 2 : 5))
         :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['1fr', '9rem', '6rem', '8rem', '9rem'] }"
       >
         <ListHeader>
-          <ListHeaderCell>Customer</ListHeaderCell>
-          <ListHeaderCell class="max-sm:hidden">City</ListHeaderCell>
-          <ListHeaderCell class="max-sm:hidden">Orders</ListHeaderCell>
-          <ListHeaderCell>Spend</ListHeaderCell>
-          <ListHeaderCell class="max-sm:hidden">Customer since</ListHeaderCell>
+          <ListHeaderCell>{{ __('Customer') }}</ListHeaderCell>
+          <ListHeaderCell class="max-sm:hidden">{{ __('City') }}</ListHeaderCell>
+          <ListHeaderCell class="max-sm:hidden">{{ __('Orders') }}</ListHeaderCell>
+          <ListHeaderCell>{{ __('Spend') }}</ListHeaderCell>
+          <ListHeaderCell class="max-sm:hidden">{{ __('Customer since') }}</ListHeaderCell>
         </ListHeader>
         <!-- `loading` flips on every param change and the request keeps the previous
              `data`, so guarding on it alone would blank a loaded table on each keystroke
@@ -100,11 +100,11 @@ const skeletonColumns = computed(() => (isMobile.value ? 2 : 5))
     <EmptyState
       v-if="!customersRequest.loading && !rows.length"
       icon="lucide-users"
-      title="No customers yet"
-      description="A customer appears here the moment someone checks out."
+      :title="__('No customers yet')"
+      :description="__('A customer appears here the moment someone checks out.')"
       :filtered="isFiltered"
-      filtered-title="No customers match that search"
-      filtered-description="Try a different search term."
+      :filtered-title="__('No customers match that search')"
+      :filtered-description="__('Try a different search term.')"
     />
   </PageBody>
 </template>

@@ -21,12 +21,13 @@ import { productRoute } from '../ia/routes'
 import { openImport } from '../data/importFlow'
 import { openAddProduct } from '../data/addProduct'
 import { useBulkAction } from '../utils/useBulkAction'
+import { __ } from '../data/translation'
 
 const STATUS_TABS = [
-  { label: 'All', value: 'all' },
-  { label: 'Active', value: 'active' },
-  { label: 'Draft', value: 'draft' },
-  { label: 'Archived', value: 'archived' },
+  { label: __('All'), value: 'all' },
+  { label: __('Active'), value: 'active' },
+  { label: __('Draft'), value: 'draft' },
+  { label: __('Archived'), value: 'archived' },
 ]
 
 const status = ref('all')
@@ -49,7 +50,7 @@ const { collectionOptions: collectionPickerOptions, loading: movingToCollection,
 loadCollections()
 
 const collectionFilterOptions = computed(() => [
-  { label: 'All collections', value: 'all' },
+  { label: __('All collections'), value: 'all' },
   ...collectionPickerOptions.value,
 ])
 
@@ -139,8 +140,10 @@ const { running: bulkRunning, run: runBulk } = useBulkAction()
 async function archiveSelected() {
   const view = listView
   await runBulk('Archive', [...selection.value], (id) => archiveAction.submit({ item_template: id, disabled: 1 }), {
-    noun: 'product',
-    verb: 'archived',
+    sentences: {
+      all: (count) => (count === 1 ? __('1 product archived') : __('{0} products archived', [count])),
+      some: (done, total, failed) => __('{0} of {1} products archived. {2} failed', [done, total, failed]),
+    },
     after: ({ failed }) => {
       if (view === listView) {
         selection.value = failed.map(({ item }) => item)
@@ -154,7 +157,7 @@ async function archiveSelected() {
 function moveToCollection() {
   const itemTemplates = [...selection.value]
   pickCollectionFor(itemTemplates, {
-    label: `${itemTemplates.length} product${itemTemplates.length === 1 ? '' : 's'}`,
+    label: itemTemplates.length === 1 ? __('1 product') : __('{0} products', [itemTemplates.length]),
     onDone: () => {
       endSelecting()
       productsRequest.reload()
@@ -164,10 +167,10 @@ function moveToCollection() {
 </script>
 
 <template>
-  <AppPageHeader title="Products">
+  <AppPageHeader :title="__('Products')">
     <template #actions>
-      <ResponsiveButton label="Import" icon="lucide-upload" @click="openImport" />
-      <Button label="Add product" icon-left="lucide-plus" variant="solid" theme="gray" @click="openAddProduct" />
+      <ResponsiveButton :label="__('Import')" icon="lucide-upload" @click="openImport" />
+      <Button :label="__('Add product')" icon-left="lucide-plus" variant="solid" theme="gray" @click="openAddProduct" />
     </template>
   </AppPageHeader>
 
@@ -177,11 +180,11 @@ function moveToCollection() {
       <Select v-model="collection" :options="collectionFilterOptions" />
       <SearchInput
         v-model="query"
-        class="min-w-0 flex-1 basis-40 sm:ml-auto sm:w-56 sm:flex-none sm:basis-auto"
-        placeholder="Search products"
+        class="min-w-0 flex-1 basis-40 sm:ms-auto sm:w-56 sm:flex-none sm:basis-auto"
+        :placeholder="__('Search products')"
       />
       <ResponsiveButton
-        :label="selecting ? 'Cancel selection' : 'Select'"
+        :label="selecting ? __('Cancel selection') : __('Select')"
         icon="lucide-list-checks"
         :variant="selecting ? 'solid' : 'subtle'"
         theme="gray"
@@ -192,17 +195,18 @@ function moveToCollection() {
     <BulkBar
       v-if="selecting"
       :count="selection.length"
-      noun="product"
+      :selected-label="selection.length === 1 ? __('1 product selected') : __('{0} products selected', [selection.length])"
+      :empty-label="__('Select products to act on them')"
       :busy="Boolean(bulkRunning) || movingToCollection"
       @done="endSelecting"
     >
       <Button
-        label="Move to collection"
+        :label="__('Move to collection')"
         :loading="movingToCollection"
         @click="moveToCollection"
       />
       <Button
-        label="Archive"
+        :label="__('Archive')"
         theme="red"
         variant="subtle"
         :loading="bulkRunning === 'Archive'"
@@ -220,18 +224,18 @@ function moveToCollection() {
     >
       <ListHeader>
         <ListHeaderCellSort :direction="directionFor('title')" @click="toggleSort('title')">
-          Product
+          {{ __('Product') }}
         </ListHeaderCellSort>
-        <ListHeaderCell>Status</ListHeaderCell>
-        <ListHeaderCell>Collection</ListHeaderCell>
+        <ListHeaderCell>{{ __('Status') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('Collection') }}</ListHeaderCell>
         <ListHeaderCellSort align="end" :direction="directionFor('stock')" @click="toggleSort('stock')">
-          Inventory
+          {{ __('Inventory') }}
         </ListHeaderCellSort>
         <ListHeaderCellSort align="end" :direction="directionFor('price')" @click="toggleSort('price')">
-          Price
+          {{ __('Price') }}
         </ListHeaderCellSort>
         <ListHeaderCellSort align="end" :direction="directionFor('updated')" @click="toggleSort('updated')">
-          Updated
+          {{ __('Updated') }}
         </ListHeaderCellSort>
       </ListHeader>
 
@@ -248,7 +252,7 @@ function moveToCollection() {
               <div class="min-w-0">
                 <p class="truncate text-base text-ink-gray-8">{{ item.title }}</p>
                 <p class="truncate text-sm text-ink-gray-5">
-                  {{ item.name }}<span v-if="item.variant_count"> · {{ item.variant_count }} variants</span>
+                  {{ item.name }}<span v-if="item.variant_count"> · {{ __('{0} variants', [item.variant_count]) }}</span>
                 </p>
               </div>
             </div>
@@ -256,17 +260,17 @@ function moveToCollection() {
           <ListCell><StatusBadge :status="item.disabled ? 'archived' : 'active'" /></ListCell>
           <ListCell><span class="text-base text-ink-gray-7">{{ item.collection ?? '—' }}</span></ListCell>
           <ListCell>
-            <span class="w-full text-right text-base tabular-nums" :class="stockTone(item.stock)">
-              {{ item.stock }} in stock
+            <span class="w-full text-end text-base tabular-nums" :class="stockTone(item.stock)">
+              {{ __('{0} in stock', [item.stock]) }}
             </span>
           </ListCell>
           <ListCell>
-            <span class="w-full text-right text-base text-ink-gray-8 tabular-nums">
+            <span class="w-full text-end text-base text-ink-gray-8 tabular-nums">
               {{ priceRange(item.price_from, item.price_to) }}
             </span>
           </ListCell>
           <ListCell>
-            <span class="w-full text-right text-base text-ink-gray-5">{{ shortDate(item.updated) }}</span>
+            <span class="w-full text-end text-base text-ink-gray-5">{{ shortDate(item.updated) }}</span>
           </ListCell>
         </ListRow>
       </ListRows>
@@ -283,13 +287,13 @@ function moveToCollection() {
     <EmptyState
       v-if="!productsRequest.loading && !rows.length"
       icon="lucide-package"
-      title="No products yet"
-      description="Add your first product, or import a catalogue to get started."
+      :title="__('No products yet')"
+      :description="__('Add your first product, or import a catalogue to get started.')"
       :filtered="isFiltered"
-      filtered-title="No products match"
-      filtered-description="Change the filters, or import a catalogue to get started."
+      :filtered-title="__('No products match')"
+      :filtered-description="__('Change the filters, or import a catalogue to get started.')"
     >
-      <Button label="Import CSV" icon-left="lucide-upload" variant="solid" theme="gray" class="mt-2" @click="openImport" />
+      <Button :label="__('Import CSV')" icon-left="lucide-upload" variant="solid" theme="gray" class="mt-2" @click="openImport" />
     </EmptyState>
   </PageBody>
 </template>

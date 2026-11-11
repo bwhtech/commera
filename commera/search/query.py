@@ -31,12 +31,12 @@ def read_or_fall_back(read, fall_back):
 
 
 def build_product_cards(product_names):
-	"""Hydrate ranked variant names into product cards from the index, preserving rank order."""
-	from commera.utils import attach_live_prices, shape_product_cards
+	"""Product cards from the index, in rank order, priced in the request's market."""
+	from commera.utils import shape_product_cards
 
 	if not product_names:
 		return []
-	return shape_product_cards(attach_live_prices(get_search_engine().hydrate_cards(product_names)))
+	return shape_product_cards(get_search_engine().hydrate_cards(product_names))
 
 
 def listing_facets(selected_filters):

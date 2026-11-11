@@ -3,15 +3,19 @@
 
 import frappe
 from frappe import _
-from frappe.utils.jinja_globals import is_rtl
+from frappe.translate import get_translation_version
 
+from commera.api.admin.language import get_dashboard_language
 from commera.api.admin.orders import get_reporting_currency_symbol
 from commera.api.permission import has_app_permission
+from commera.localization import StorefrontLanguages
+from commera.localization.formatter import Formatter
+from commera.localization.languages import Language, is_rtl_language
 from commera.onboarding import is_onboarding_pending
 from commera.plugins.registry import get_visible_plugins
 from commera.roles import is_commera_admin
 from commera.storefront_access import is_storefront_published
-from commera.utils import get_store_currency
+from commera.utils import get_selling_currencies, get_store_currency
 
 no_cache = 1
 
@@ -37,6 +41,8 @@ def get_boot():
 		frappe.throw(_("You do not have access to the store dashboard."), frappe.PermissionError)
 
 	currency = get_store_currency()
+	# A website request takes its language from the browser; the dashboard follows the admin instead.
+	frappe.local.lang = get_dashboard_language()
 
 	# get_csrf_token issues the token into the session, so it must be committed to outlive this request.
 	boot = frappe._dict(
@@ -46,23 +52,38 @@ def get_boot():
 			# formats ride along on the shell instead of costing every screen an extra round trip.
 			"date_format": frappe.db.get_default("date_format") or "yyyy-mm-dd",
 			"time_format": frappe.db.get_default("time_format") or "HH:mm:ss",
-			# The session language decides which way the whole shell reads, so the direction is
+			# The language decides which way the whole shell reads, so the direction is
 			# resolved by the framework here rather than guessed from a hardcoded default client-side.
-			"lang": frappe.local.lang or "en",
-			"is_rtl": is_rtl(),
+			"lang": frappe.local.lang,
+			"is_rtl": is_rtl_language(frappe.local.lang),
+			# The shell fetches every app's strings from Frappe's browser-cached endpoint, keyed by this.
+			"translations_version": get_translation_version(),
 			# The reporting currency is a site setting, not a per-request one, so it rides the shell
 			# instead of every money surface having to carry the symbol down from its own endpoint.
 			"currency": currency,
 			"currency_symbol": get_reporting_currency_symbol(currency),
+			# The dashboard formats money with the storefront's formatter, never the browser's locale.
+			**Formatter(Language.from_code(frappe.local.lang)).as_config(),
+			"currency_symbols": get_text_currency_symbols(),
 			"plugins": get_visible_plugins(frappe.session.user),
 			"is_admin": is_commera_admin(),
 			"onboarding_pending": is_onboarding_pending(),
 			"cloud_settings": get_cloud_settings(),
 			"storefront_published": is_storefront_published(),
+			# The theme editors preview every configured language, unpublished ones included.
+			"storefront_languages": [
+				language.as_dict() for language in StorefrontLanguages.load().configured
+			],
 		}
 	)
 	frappe.db.commit()  # nosemgrep
 	return boot
+
+
+def get_text_currency_symbols() -> dict[str, str]:
+	"""Plain-text symbols: the dashboard draws no storefront icon fonts."""
+	symbols = {currency: get_reporting_currency_symbol(currency) for currency in get_selling_currencies()}
+	return {currency: symbol for currency, symbol in symbols.items() if symbol}
 
 
 def get_cloud_settings() -> dict:

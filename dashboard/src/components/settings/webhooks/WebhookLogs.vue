@@ -6,6 +6,7 @@ import ListPagination from '../../ListPagination.vue'
 import WebhookLogDialog from './WebhookLogDialog.vue'
 import { useAdminRead } from '../../../data/api'
 import { LOG_STATUS_THEMES, eventLabel, webhookActions } from '../../../data/webhooks'
+import { __ } from '../../../data/translation'
 
 const props = defineProps({
   name: { type: String, required: true },
@@ -49,9 +50,12 @@ async function reload() {
 
 function replay(log) {
   dialog.confirm({
-    title: `Replay ${eventLabel(log.event).toLowerCase()}?`,
-    message: `Commera sends this event to ${props.host} again, with the same body and event id. A receiver that skips event ids it has already handled will ignore it.`,
-    confirmLabel: 'Replay',
+    title: __('Replay {0}?', [eventLabel(log.event).toLowerCase()]),
+    message: __(
+      'Commera sends this event to {0} again, with the same body and event id. A receiver that skips event ids it has already handled will ignore it.',
+      [props.host],
+    ),
+    confirmLabel: __('Replay'),
     onConfirm: async () => {
       const replayed = await webhookActions.call('replay', { log: log.name })
       if (!replayed) return
@@ -60,10 +64,10 @@ function replay(log) {
       emit('replayed')
       // A refused delivery comes back `Retrying` while it has retries left, and only `Failed`
       // once it has none, so only `Done` means the receiver took it.
-      const reason = replayed.error ?? 'no answer'
-      if (replayed.status === 'Done') toast.success(`Replayed to ${props.host}`)
-      else if (replayed.status === 'Retrying') toast.warning(`Replay to ${props.host} failed: ${reason}. It will retry.`)
-      else toast.error(`Replay to ${props.host} failed: ${reason}`)
+      const reason = replayed.error ?? __('no answer')
+      if (replayed.status === 'Done') toast.success(__('Replayed to {0}', [props.host]))
+      else if (replayed.status === 'Retrying') toast.warning(__('Replay to {0} failed: {1}. It will retry.', [props.host, reason]))
+      else toast.error(__('Replay to {0} failed: {1}', [props.host, reason]))
     },
   })
 }
@@ -80,18 +84,18 @@ defineExpose({ reload })
     v-else-if="!logs.length"
     compact
     icon="lucide-send"
-    title="Nothing sent yet"
-    description="Logs show here when a subscribed event is sent. Send a test event to check the endpoint now."
+    :title="__('Nothing sent yet')"
+    :description="__('Logs show here when a subscribed event is sent. Send a test event to check the endpoint now.')"
   >
-    <Button class="mt-2" icon-left="lucide-send" label="Send test event" @click="emit('send-test')" />
+    <Button class="mt-2" icon-left="lucide-send" :label="__('Send test event')" @click="emit('send-test')" />
   </EmptyState>
 
   <template v-else>
     <ul class="divide-y divide-outline-gray-1 border-y border-outline-gray-1">
-      <li v-for="log in logs" :key="log.name" class="group flex items-center gap-1 rounded-4 pr-1 hover:bg-surface-gray-1">
+      <li v-for="log in logs" :key="log.name" class="group flex items-center gap-1 rounded-4 pe-1 hover:bg-surface-gray-1">
         <button
           type="button"
-          class="flex min-w-0 flex-1 items-center gap-3 rounded-4 px-2 py-2.5 text-left"
+          class="flex min-w-0 flex-1 items-center gap-3 rounded-4 px-2 py-2.5 text-start"
           @click="inspect(log)"
         >
           <span class="size-2 shrink-0 rounded-full" :class="STATUS_DOTS[log.status]" aria-hidden="true" />
@@ -101,14 +105,14 @@ defineExpose({ reload })
                 {{ eventLabel(log.event) }}
                 <span v-if="log.reference_name" class="text-ink-gray-5">· {{ log.reference_name }}</span>
               </span>
-              <Badge v-if="log.replay_of" class="shrink-0" variant="outline" theme="gray" size="sm" label="Replay" />
+              <Badge v-if="log.replay_of" class="shrink-0" variant="outline" theme="gray" size="sm" :label="__('Replay')" />
             </span>
             <span class="block truncate font-mono text-2xs text-ink-gray-4">{{ log.event_id }}</span>
           </span>
-          <span class="w-20 shrink-0 text-right">
-            <Badge variant="subtle" :theme="LOG_STATUS_THEMES[log.status] ?? 'gray'" :label="log.status" />
+          <span class="w-20 shrink-0 text-end">
+            <Badge variant="subtle" :theme="LOG_STATUS_THEMES[log.status] ?? 'gray'" :label="__(log.status)" />
           </span>
-          <span class="w-24 shrink-0 text-right text-sm text-ink-gray-5" :title="dayjs(log.creation).format('LLL')">
+          <span class="w-24 shrink-0 text-end text-sm text-ink-gray-5" :title="dayjs(log.creation).format('LLL')">
             {{ dayjs(log.creation).fromNow() }}
           </span>
         </button>
@@ -116,7 +120,7 @@ defineExpose({ reload })
           size="sm"
           variant="ghost"
           icon-left="lucide-rotate-ccw"
-          label="Replay"
+          :label="__('Replay')"
           class="shrink-0 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
           @click="replay(log)"
         />

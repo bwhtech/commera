@@ -11,19 +11,19 @@
 | Checkout tools | `packages/storefront/webmcp/checkout_tools.js` |
 | Store page tools | `packages/storefront/webmcp/page_tools.js` |
 | Registration call | `commera/public/js/commera-storefront.bundle.js` |
-| `webmcp` and `language` in `window.commera_storefront_config` | `build_base_context` in `commera/shop_themes/theme_resolver.py` |
+| `webmcp` and `localization` in `window.commera_storefront_config` | `build_base_context` in `commera/shop_themes/theme_resolver.py` |
 | Tests | `packages/storefront/test/webmcp.test.js`, `packages/storefront/test/webmcp-checkout.test.js`, `packages/storefront/test/starter-checkout.test.js` |
 
 Each tool is a thin wrapper around a function of the storefront SDK. The tools do not call the API themselves. Cart tools go through the SDK, which sends `commera:cart-updated`. The Commera Starter cart and the shared cart store in `commera/templates/includes/cart-state.html` (Summer Theme, Shop Base Theme) listen and show the new cart. The shared store first waits for its own sync, then takes the server cart, as it does on a version conflict.
 
-Every SDK call sends the page language as `_lang`, so replies and the checkout handoff use `/ar/` on the Arabic storefront even when the account or browser prefers English.
+Every SDK call on a page in another language than the default sends that language as `_lang`, so replies and the checkout handoff use `/ar/` on the Arabic storefront even when the account or browser prefers English. Without `_lang`, a storefront API call replies in the default language. Tools build page links with `url()` from `packages/storefront/localization.js`, which adds the page's language prefix as the Python `url()` does.
 
 ## Tools
 
 | Page | Tools |
 |---|---|
 | Every storefront page except checkout | `search_catalog`, `browse_store`, `get_product`, `show_product`, `get_cart`, `update_cart`, `clear_cart`, `proceed_to_checkout` |
-| `/<language>/cart/checkout` | `get_checkout`, `update_checkout`, `complete_checkout`, `navigate_to_storefront` |
+| `/cart/checkout`, or `/<language>/cart/checkout` in another language | `get_checkout`, `update_checkout`, `complete_checkout`, `navigate_to_storefront` |
 | Every storefront page, checkout too | `list_store_pages`, `get_store_page` |
 
 - A tool returns `structuredContent` and the same data as JSON text in `content`.
@@ -43,7 +43,7 @@ Clear Commera Settings > SEO > Crawlers & AI > Enable WebMCP Tools for Browser A
 Use a browser with WebMCP, for example Chrome with `chrome://flags/#enable-webmcp-testing` or `agent-browser`:
 
 ```sh
-agent-browser open https://<site>/en/products
+agent-browser open https://<site>/products
 agent-browser webmcp list
 agent-browser webmcp invoke search_catalog --params '{"query": "brake"}'
 ```

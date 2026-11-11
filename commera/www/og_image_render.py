@@ -11,6 +11,7 @@ from commera.og.generator import (
 	DEFAULT_OG_HEIGHT,
 	DEFAULT_OG_WIDTH,
 	build_store_card_html,
+	get_variant_card_version,
 	render_card_for_doc,
 	render_og_png,
 	variant_primary_image_url,
@@ -18,6 +19,8 @@ from commera.og.generator import (
 
 CACHE_SUBDIR = "og-cache"
 STORE_CARD_ROUTE = "store"
+# `?price=none` asks for a card without the store price, for pages of a secondary market.
+NO_PRICE = "none"
 
 
 def get_context(context):
@@ -28,7 +31,7 @@ def get_context(context):
 	try:
 		if route == STORE_CARD_ROUTE:
 			serve_store_card()
-		serve_og_image(route)
+		serve_og_image(route, with_price=frappe.form_dict.get("price") != NO_PRICE)
 	except frappe.Redirect:
 		raise
 	except frappe.DoesNotExistError:
@@ -45,7 +48,7 @@ def get_context(context):
 	return context
 
 
-def serve_og_image(route):
+def serve_og_image(route, with_price=True):
 	variant = frappe.db.get_value(
 		"Style Attribute Variant",
 		{"route": route},
@@ -55,10 +58,12 @@ def serve_og_image(route):
 	if not variant or not variant.is_published:
 		raise frappe.DoesNotExistError()
 
-	cache_path = cache_file_path(route, variant.modified)
+	variant_doc = frappe.get_cached_doc("Style Attribute Variant", variant.name)
+	# /en-ae/og-image/<route>.png renders the Gulf market text; RTL pages keep the source language.
+	card = route if with_price else f"{route}?price={NO_PRICE}"
+	cache_path = cache_file_path(card, get_variant_card_version(variant_doc))
 	if not os.path.exists(cache_path):
-		variant_doc = frappe.get_cached_doc("Style Attribute Variant", variant.name)
-		png_bytes = render_card_for_doc("Style Attribute Variant", variant_doc)
+		png_bytes = render_card_for_doc("Style Attribute Variant", variant_doc, with_price=with_price)
 		write_cache(cache_path, png_bytes)
 
 	redirect_to_cached_card(cache_path)

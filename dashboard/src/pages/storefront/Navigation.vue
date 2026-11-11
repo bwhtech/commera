@@ -1,21 +1,22 @@
 <script setup>
 import { ref } from 'vue'
 import { TabButtons } from 'frappe-ui'
+import { __ } from '../../data/translation'
 import AppPageHeader from '../../components/AppPageHeader.vue'
 import PageBody from '../../components/PageBody.vue'
 import NavigationEditor from '../../components/storefront/NavigationEditor.vue'
 import FooterEditor from '../../components/storefront/FooterEditor.vue'
 
 const MENUS = [
-  { label: 'Main navigation', value: 'main' },
-  { label: 'Footer', value: 'footer' },
+  { label: __('Main navigation'), value: 'main' },
+  { label: __('Footer'), value: 'footer' },
 ]
 
 const menuId = ref('main')
 </script>
 
 <template>
-  <AppPageHeader title="Navigation" />
+  <AppPageHeader :title="__('Navigation')" />
 
   <PageBody>
     <TabButtons v-model="menuId" size="sm" :options="MENUS" />

@@ -6,6 +6,8 @@ from frappe.query_builder import DocType
 from frappe.query_builder.functions import Lower
 from frappe.utils import add_days, cint, cstr, get_datetime, get_url, now_datetime
 
+from commera.localization import StorefrontLanguages
+
 OWNER_ACCESS = "owner"
 FULL_ACCESS = "full"
 LIMITED_ACCESS = "limited"
@@ -37,9 +39,10 @@ def get_order_link(sales_order) -> str | None:
 	key = sales_order.get("custom_order_access_key")
 	if not key:
 		return None
-	language = "ar" if frappe.local.lang == "ar" else "en"
+	languages = StorefrontLanguages.load()
+	language = languages.find(frappe.local.lang) or languages.default
 	query = urlencode({"order_id": sales_order.name, "key": key})
-	return get_url(f"/{language}/account/orders/detail?{query}")
+	return get_url(f"/{language.code.lower()}/account/orders/detail?{query}")
 
 
 def get_order_access(order_name: str | int, key: str | None = None) -> str | None:

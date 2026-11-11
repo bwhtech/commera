@@ -12,13 +12,14 @@
  * stop and the announced group for free, and all this screen adds is what the cards look like.
  */
 import { useColorScheme } from 'frappe-ui'
+import { __ } from '../../data/translation'
 
 // The previews must show a light card as light while the app is painted dark, so their colours
 // are deliberately literal instead of themed. Everything outside the preview frame is tokens.
 const OPTIONS = [
-  { value: 'light', label: 'Light', frames: ['light'] },
-  { value: 'dark', label: 'Dark', frames: ['dark'] },
-  { value: 'system', label: 'System', frames: ['light', 'dark'] },
+  { value: 'light', label: __('Light'), frames: ['light'] },
+  { value: 'dark', label: __('Dark'), frames: ['dark'] },
+  { value: 'system', label: __('System'), frames: ['light', 'dark'] },
 ]
 
 const { colorScheme, setColorScheme } = useColorScheme()
@@ -26,7 +27,7 @@ const { colorScheme, setColorScheme } = useColorScheme()
 
 <template>
   <fieldset class="flex flex-col gap-2">
-    <legend class="sr-only">Appearance</legend>
+    <legend class="sr-only">{{ __('Appearance') }}</legend>
 
     <div class="flex flex-col items-stretch gap-3 sm:flex-row">
       <label

@@ -5,6 +5,7 @@ from commera import seo
 from commera.api.admin.catalog import DEFAULT_OPTION_ATTRIBUTE, DEFAULT_SIZE_VALUE
 from commera.api.reviews import PAGE_LENGTH as REVIEWS_PAGE_LENGTH
 from commera.api.reviews import get_reviews
+from commera.localization import url
 from commera.product_detail import get_product_detail
 from commera.utils import get_available_stock, get_product_list
 
@@ -26,17 +27,8 @@ def get_context(context):
 	context.images = detail["images"]
 	context.product_in_stock = detail["in_stock"]
 
-	selected_item_doc = frappe.get_cached_doc("Item", selected_item["item_code"])
-	selected_item.update(
-		{
-			"item_name": selected_item_doc.item_name,
-			"item_name_ar": selected_item_doc.get("custom_item_name_ar") or selected_item_doc.item_name,
-			"style_code": selected_item_doc.get("custom_style_code", ""),
-			"material": selected_item_doc.get("custom_material", ""),
-			"description": selected_item_doc.get("description", ""),
-			"description_ar": selected_item_doc.get("custom_description_ar", selected_item_doc.description),
-		}
-	)
+	add_selected_item_fields(selected_item)
+	content = add_product_content(context, product_variant, product)
 
 	resolved_size = selected_item["size"] if selected_item else None
 	context.available_sizes = detail["available_sizes"]
@@ -59,29 +51,68 @@ def get_context(context):
 	context.item_qty = get_available_stock(product.item_code, detail["warehouse"])
 	context.reviews = get_reviews_for_context(product_variant.name)
 	context.breadcrumbs = [
-		{"label": "Products", "href": f"/{frappe.local.lang}/products/"},
+		{"label": "Products", "href": url("/products/")},
 		{"label": product_variant.display_name, "href": ""},
 	]
 
-	add_seo(context, detail)
+	add_seo(context, detail, content)
 
 
-def add_seo(context, detail):
-	product_variant = detail["product_variant"]
+def add_selected_item_fields(selected_item):
+	"""The size's own fields, and its cart line title in the request language."""
+	# sdk.catalog imports this module, so the SDK is imported where it is used.
+	from commera.sdk.lines import LineProducts
+
+	item = frappe.get_cached_doc("Item", selected_item["item_code"])
+	selected_item.update(
+		{
+			"item_name": item.item_name,
+			"title": LineProducts([item.name]).get_title(item.name, item.item_name),
+			"style_code": item.get("custom_style_code", ""),
+			"material": item.get("custom_material", ""),
+			"description": item.get("description", ""),
+		}
+	)
+
+
+def add_product_content(context, product_variant, item):
+	"""The title and description in the request language, as the SDK's product page has them."""
+	from commera.sdk.catalog import get_product_content
+
+	content = get_product_content(product_variant, item)
+	context.product_title = content["display_name"] or item.item_name
+	context.product_description = content["description"]
+	# Item saves default a blank description to the Item's code or name.
+	context.show_product_description = bool(content["description"]) and content["description"] not in (
+		item.name,
+		item.item_name,
+	)
+	return content
+
+
+def add_seo(context, detail, content):
+	"""Meta tags and JSON-LD from the translated content the page shows, on copies of the records."""
+	product_variant = {
+		**detail["product_variant"].as_dict(),
+		"display_name": context.product_title,
+		"meta_title": content["meta_title"],
+		"meta_description": content["meta_description"],
+	}
+	product = {**detail["product"].as_dict(), "description": content["description"]}
 	price = detail["selected_price"]
 	availability = "InStock" if detail["in_stock"] else "OutOfStock"
 
 	context.seo = seo.build_product_seo(
 		product_variant,
-		detail["product"],
-		image_url=f"/og-image/{product_variant.route}.png",
+		product,
+		image_url=seo.get_product_og_image(product_variant["route"]),
 		price=price,
 		availability=availability,
 	)
 	context.json_ld = [
 		seo.build_product_json_ld(
 			product_variant,
-			detail["product"],
+			product,
 			images=detail["images"],
 			price=price,
 			availability=availability,

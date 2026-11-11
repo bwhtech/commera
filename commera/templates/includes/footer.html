@@ -1,56 +1,52 @@
 {% import "templates/macros/collapsible_section.html" as macros %}
 {% set settings = preview_settings if preview_settings is defined and preview_settings else frappe.get_cached_doc("Commera Settings", "Commera Settings") %}
 {% set footer_logo = preview_settings.footer_logo if preview_settings is defined and preview_settings and preview_settings.footer_logo else get_brand_assets().footer_logo %}
-{% set store_name = settings.store_name or "Commera" %}
+{% set shop = shop_details if shop_details is defined and shop_details else get_shop_details(localization if localization is defined else none) %}
+{% set store_name = shop.name or "Commera" %}
 {% set contact_phone = settings.contact_phone or "920000576" %}
 {% set contact_email = settings.contact_email or "Contact@lifestyle.sa" %}
 {% set working_hours = settings.working_hours or "Sun - Thu / 10.00 AM - 6.00 PM" %}
 {% set newsletter_title = settings.newsletter_title or _('Newsletter sign up') %}
 {% set newsletter_desc = settings.newsletter_description or _('Get all the latest information on Events, Sales and Offers. Sign up for the newsletter today') %}
-{% set copyright_text = settings.copyright_text or store_name + '. All Rights Reserved' %}
+{% set copyright_text = settings.copyright_text or _("{0}. All Rights Reserved").format(store_name) %}
 {% set payment_image = settings.payment_methods_image or "/assets/commera/images/payment_method.png" %}
 {% set vat_image = settings.vat_certificate_image or "/assets/commera/images/vat.png" %}
 
-{% set footer_sections = settings.footer_sections if settings.footer_sections else [] %}
+{% set footer_sections = get_storefront_footer(localization if localization is defined else none) %}
 <div class="flex justify-center md:hidden my-9">
-  <a href="/">
-    <img src="{{ footer_logo }}" alt="{{ store_name }} Logo" class="h-12 w-32 object-contain" />
+  <a href="{{ url('/') | e }}">
+    <img src="{{ footer_logo }}" alt="{{ store_name | e }} Logo" class="h-12 w-32 object-contain" />
   </a>
 </div>
 {% block storefront_footer %}
 <footer class="bg-footer text-footer">
   <div class="max-w-7xl mx-auto px-6 md:px-10 mt-14 py-12">
     <div class="hidden items-start justify-start md:flex mb-12">
-      <a href="/">
-        <img src="{{ footer_logo }}" alt="{{ store_name }} Logo" class="h-16 w-40 object-contain" />
+      <a href="{{ url('/') | e }}">
+        <img src="{{ footer_logo }}" alt="{{ store_name | e }} Logo" class="h-16 w-40 object-contain" />
       </a>
     </div>
   
     <div class="flex flex-col justify-between md:flex-row">
       {% if footer_sections %}
-        {% for section_mapping in footer_sections|sort(attribute='section_order') %}
-          {% if section_mapping.enabled %}
-            {% set section = frappe.get_doc('Footer Section Config', section_mapping.footer_section) %}
-            {% set order_class = "order-" + ((loop.index + 1)|string) %}
-            {% call macros.collapsible_section(_(section.section_title), order_class + " mb-4 md:order-" + (loop.index|string) + " md:mb-0 md:w-1/") %}
-              <ul class="list-disc ps-4 text-sm">
-                {% for link in section.footer_links|sort(attribute='link_order') %}
-                  {% if link.enabled %}
-                    <li class="mb-2">
-                      <a href="{{ link.link_url }}" class="text-xs text-gray-300 hover:text-white">{{ _(link.link_label) }}</a>
-                    </li>
-                  {% endif %}
-                {% endfor %}
-              </ul>
-            {% endcall %}
-          {% endif %}
+        {% for section in footer_sections %}
+          {% set order_class = "order-" + ((loop.index + 1)|string) %}
+          {% call macros.collapsible_section(section.title, order_class + " mb-4 md:order-" + (loop.index|string) + " md:mb-0 md:w-1/") %}
+            <ul class="list-disc ps-4 text-sm">
+              {% for link in section.links %}
+                <li class="mb-2">
+                  <a href="{{ url(link.url or '#') | e }}" class="text-xs text-gray-300 hover:text-white">{{ link.title | e }}</a>
+                </li>
+              {% endfor %}
+            </ul>
+          {% endcall %}
         {% endfor %}
       {% else %}
         {% call macros.collapsible_section(_("My Account"), "order-2 mb-4 md:order-1 md:mb-0 md:w-1/") %}
           <ul class="list-disc ps-4 text-sm">
-            <li class="mb-2"><a href="/{{frappe.lang}}/account/dashboard" class="text-xs text-gray-300 hover:text-white">{{_('My account')}}</a></li>
-            <li class="mb-2"><a href="/{{frappe.lang}}/account/orders" class="text-xs text-gray-300 hover:text-white">{{_('Orders history')}}</a></li>
-            <li class="mb-2"><a href="/{{frappe.lang}}/account/wishlist" class="text-xs text-gray-300 hover:text-white">{{_('Wishlist')}}</a></li>
+            <li class="mb-2"><a href="{{ url('/account/dashboard') | e }}" class="text-xs text-gray-300 hover:text-white">{{_('My account')}}</a></li>
+            <li class="mb-2"><a href="{{ url('/account/orders') | e }}" class="text-xs text-gray-300 hover:text-white">{{_('Orders history')}}</a></li>
+            <li class="mb-2"><a href="{{ url('/account/wishlist') | e }}" class="text-xs text-gray-300 hover:text-white">{{_('Wishlist')}}</a></li>
           </ul>
         {% endcall %}
         
@@ -129,7 +125,7 @@
         <img src="{{ vat_image }}" alt="VAT Certificate" class="me-4 mb-4 h-9 w-auto object-contain md:mb-0" />
         {% endif %}
         <div class="flex flex-col items-start">
-          <p>&copy; {{ frappe.utils.getdate().year }} {{ _(copyright_text) }}</p>
+          <p>&copy; {{ frappe.utils.getdate().year }} {{ _(copyright_text) | e }}</p>
         </div>
       </div>
       {% include "templates/includes/social_links.html" %}

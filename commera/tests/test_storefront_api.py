@@ -4,13 +4,23 @@ import frappe
 
 from commera.api.storefront.collections import get_collection, get_collections
 from commera.api.storefront.products import get_product, get_products
-from commera.api.storefront.shop import get_page, get_sitemap, get_storefront_url, list_countries, list_pages
+from commera.api.storefront.shop import (
+	get_localization,
+	get_page,
+	get_shop,
+	get_sitemap,
+	get_storefront_url,
+	list_countries,
+	list_pages,
+)
+from commera.localization import register
 from commera.sdk import catalog, shop
 from commera.sdk.shop import get_menu_link
 from commera.sdk.types import (
 	Collection,
 	ContentPageLink,
 	Country,
+	Localization,
 	Product,
 	ProductCard,
 	ProductPage,
@@ -18,6 +28,8 @@ from commera.sdk.types import (
 	Shop,
 )
 from commera.shop_themes.sections import get_section_products
+from commera.tests.test_content_translation import use_storefront_language
+from commera.tests.test_localization import set_storefront_languages, use_storefront_languages
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.www.sitemap_segment import get_urls_per_page
 
@@ -188,19 +200,16 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		self.assertEqual([card["handle"] for card in cards], [routes[1], routes[0]])
 		self.assertEqual(cards[0]["product_type"], self.item_group)
 
-	def test_a_product_card_is_titled_in_the_shoppers_language(self):
-		if not frappe.db.has_column("Item", "custom_item_name_ar"):
-			self.skipTest("Item has no custom_item_name_ar field on this site")
+	def test_an_arabic_translation_titles_the_card_and_the_product_page(self):
+		set_storefront_languages("en", published=("en", "ar"))
 		route = self.make_priced_variant("ARABIC", default_rate=30)
-		name, item_style = frappe.db.get_value(
-			"Style Attribute Variant", {"route": route}, ["name", "item_style"]
-		)
-		frappe.db.set_value("Item", item_style, "custom_item_name_ar", "قميص تجريبي")
-		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
+		name = frappe.db.get_value("Style Attribute Variant", {"route": route})
+		register("Style Attribute Variant", name, "display_name", "ar", "قميص تجريبي")
 
-		frappe.local.lang = "ar"
+		use_storefront_language(self, "ar")
 		self.assertEqual(catalog.get_product_cards_for([name])[0]["title"], "قميص تجريبي")
-		frappe.local.lang = "en"
+		self.assertEqual(catalog.get_product(route)["title"], "قميص تجريبي")
+		use_storefront_language(self, "en")
 		self.assertNotEqual(catalog.get_product_cards_for([name])[0]["title"], "قميص تجريبي")
 
 	def test_an_unknown_sort_is_refused(self):
@@ -302,28 +311,29 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		self.assertEqual(
 			[(page["handle"], page["title"]) for page in pages],
 			[
-				(f"about-{self.suffix.lower()}", f"About {self.suffix}"),
-				(f"returns-{self.suffix.lower()}", f"Returns {self.suffix}"),
+				(f"about-{self.suffix.lower()}", f"About page {self.suffix}"),
+				(f"returns-{self.suffix.lower()}", f"Returns page {self.suffix}"),
 			],
 		)
 		self.assertEqual(set(pages[0]), ContentPageLink.__required_keys__)
 
 	def test_a_page_reads_in_the_request_language(self):
-		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
-		for content_ar, expected in (("<p>سياسة</p>", "<p>سياسة</p>"), ("", "<p>Policy</p>")):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		for arabic, expected in (("<p>سياسة</p>", "<p>سياسة</p>"), ("", "<p>Policy</p>")):
 			page = frappe.get_doc(
 				{
 					"doctype": "Shop Web Page",
-					"route": f"policy-{len(content_ar)}-{self.suffix.lower()}",
+					"route": f"policy-{len(arabic)}-{self.suffix.lower()}",
 					"content": "<p>Policy</p>",
-					"content_ar": content_ar,
 					"published": 1,
 				}
-			).insert(ignore_permissions=True, set_name=f"Policy {len(content_ar)} {self.suffix}")
-			with self.subTest(content_ar=content_ar):
-				frappe.local.lang = "ar"
+			).insert(ignore_permissions=True, set_name=f"Policy {len(arabic)} {self.suffix}")
+			if arabic:
+				register("Shop Web Page", page.name, "content", "ar", arabic)
+			with self.subTest(arabic=arabic):
+				use_storefront_language(self, "ar")
 				self.assertEqual(get_page(page.route)["body_html"], expected)
-				frappe.local.lang = "en"
+				use_storefront_language(self, "en")
 				self.assertEqual(get_page(page.route)["body_html"], "<p>Policy</p>")
 
 	def test_rate_limited_guest_api_whitelists_an_endpoint_for_guests_on_its_method_only(self):
@@ -369,3 +379,37 @@ class TestStorefrontApi(ProductDetailPriceTestCase):
 		)
 		self.assertEqual(get_storefront_url({"type": "brand", "target": "K&N"}), "/search?q=K%26N")
 		self.assertEqual(get_storefront_url({"type": "all", "target": None}), "/collections/all")
+
+	def test_menu_urls_carry_the_language_prefix_of_the_request(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		use_storefront_language(self, "ar")
+
+		self.assertEqual(
+			get_storefront_url({"type": "collection", "target": self.collection}),
+			f"/ar/collections/{self.collection}",
+		)
+		self.assertEqual(get_storefront_url({"type": "brand", "target": "K&N"}), "/ar/search?q=K%26N")
+		self.assertEqual(get_storefront_url({"type": "url", "target": "/en/page/about"}), "/ar/page/about")
+		self.assertEqual(
+			get_storefront_url({"type": "url", "target": "https://example.com/x"}), "https://example.com/x"
+		)
+		self.assertEqual(get_storefront_url({"type": "url", "target": "javascript:alert(1)"}), "#")
+		self.assertIsNone(get_storefront_url({"type": None, "target": None}))
+
+	def test_the_shop_carries_the_resolved_localization_and_prefixed_menu(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		for code, prefix in (("ar", "/ar"), ("en", "")):
+			with self.subTest(code):
+				use_storefront_language(self, code)
+				details = get_shop()
+
+				self.assert_shape(details["localization"], Localization)
+				self.assertEqual(details["localization"], get_localization())
+				self.assertEqual(details["localization"]["language"]["code"], code)
+				self.assertEqual(details["localization"]["root_prefix"], prefix)
+				self.assertEqual(
+					[language["code"] for language in details["localization"]["available_languages"]],
+					["en", "ar"],
+				)
+				tab = next(item for item in details["menu"] if item["target"] == self.collection)
+				self.assertEqual(tab["url"], f"{prefix}/collections/{self.collection}")

@@ -18,7 +18,7 @@
 							<div class="main-content">
 								{% if banner.settings.badge_label %}<span class="offer">{{ banner.settings.badge_label }}</span>{% endif %}
 								<h2 class="product-name">{{ banner.settings.heading }}</h2>
-								{% if banner.settings.cta_label %}<a href="{{ banner.settings.url or '#' }}" class="btn btn-outline-secondary btn-rounded btn-lg">{{ banner.settings.cta_label }}</a>{% endif %}
+								{% if banner.settings.cta_label %}<a href="{{ url(banner.settings.url or '#') | e }}" class="btn btn-outline-secondary btn-rounded btn-lg">{{ banner.settings.cta_label }}</a>{% endif %}
 							</div>
 						</div>
 					</div>

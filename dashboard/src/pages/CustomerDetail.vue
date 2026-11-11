@@ -17,6 +17,7 @@ import { errorMessage } from '../data/errors'
 import { discountMoney, longDate, money } from '../data/format'
 import { orderRoute, productRoute } from '../ia/routes'
 import { useRecordPlugins } from '../data/recordPlugins'
+import { __ } from '../data/translation'
 
 const LAPSED_AFTER_DAYS = 90
 
@@ -40,13 +41,13 @@ const loadFailure = computed(() =>
   customerRequest.error
     ? {
         icon: 'lucide-triangle-alert',
-        title: 'Could not load this customer',
+        title: __('Could not load this customer'),
         description: errorMessage(customerRequest.error),
       }
     : {
         icon: 'lucide-search-x',
-        title: 'Customer not found',
-        description: `No customer matches ${route.params.id}. They may have been deleted or merged.`,
+        title: __('Customer not found'),
+        description: __('No customer matches {0}. They may have been deleted or merged.', [route.params.id]),
       },
 )
 
@@ -55,21 +56,21 @@ const daysSinceLastOrder = computed(() =>
 )
 
 const lifecycle = computed(() => {
-  if (!customer.value?.orders) return { label: 'No orders yet', theme: 'gray' }
-  if (daysSinceLastOrder.value > LAPSED_AFTER_DAYS) return { label: 'Lapsed', theme: 'red' }
-  if (customer.value.orders > 1) return { label: 'Repeat', theme: 'green' }
-  return { label: 'New', theme: 'blue' }
+  if (!customer.value?.orders) return { label: __('No orders yet'), theme: 'gray' }
+  if (daysSinceLastOrder.value > LAPSED_AFTER_DAYS) return { label: __('Lapsed'), theme: 'red' }
+  if (customer.value.orders > 1) return { label: __('Repeat'), theme: 'green' }
+  return { label: __('New'), theme: 'blue' }
 })
 
 const stats = computed(() => [
-  { label: 'Orders', value: customer.value.orders },
-  { label: 'Lifetime spend', value: money(customer.value.spend) },
+  { label: __('Orders'), value: customer.value.orders },
+  { label: __('Lifetime spend'), value: money(customer.value.spend) },
   {
-    label: 'Avg spend per order',
+    label: __('Avg spend per order'),
     value: customer.value.orders ? money(customer.value.average_order) : '—',
   },
   {
-    label: 'Last order',
+    label: __('Last order'),
     value: customer.value.last_order ? dayjs(customer.value.last_order).fromNow() : '—',
   },
 ])
@@ -78,15 +79,15 @@ const atAGlance = computed(() => {
   const record = customer.value
   const facts = []
 
-  if (record.first_order) facts.push({ label: 'First order', value: longDate(record.first_order) })
+  if (record.first_order) facts.push({ label: __('First order'), value: longDate(record.first_order) })
   if (record.days_between_orders) {
-    facts.push({ label: 'Orders about every', value: `${record.days_between_orders} days` })
+    facts.push({ label: __('Orders about every'), value: __('{0} days', [record.days_between_orders]) })
   }
-  if (record.units) facts.push({ label: 'Units bought', value: record.units })
-  if (record.payment_mode) facts.push({ label: 'Usually pays by', value: record.payment_mode })
+  if (record.units) facts.push({ label: __('Units bought'), value: record.units })
+  if (record.payment_mode) facts.push({ label: __('Usually pays by'), value: record.payment_mode })
   if (record.acquisition?.source) {
     facts.push({
-      label: 'Came from',
+      label: __('Came from'),
       value: [record.acquisition.source, record.acquisition.campaign].filter(Boolean).join(' · '),
       capitalize: true,
     })
@@ -115,7 +116,7 @@ const noteChanged = computed(() => note.value !== (customer.value?.note ?? ''))
 async function saveNote() {
   const saved = await trySubmit(noteAction, { customer: route.params.id, note: note.value })
   if (!saved) return
-  toast.success('Note saved')
+  toast.success(__('Note saved'))
   customerRequest.reload()
 }
 
@@ -126,9 +127,9 @@ const { cards, actionGroup, openAction, record, reload: reloadPlugins } = useRec
   { onReload: () => customerRequest.reload() },
 )
 
-function plural(count, word) {
-  return `${count} ${word}${count === 1 ? '' : 's'}`
-}
+const orderCount = (count) => (count === 1 ? __('1 order') : __('{0} orders', [count]))
+const itemCount = (count) => (count === 1 ? __('1 item') : __('{0} items', [count]))
+const unitCount = (count) => (count === 1 ? __('1 unit') : __('{0} units', [count]))
 </script>
 
 <template>
@@ -136,14 +137,14 @@ function plural(count, word) {
     <AppPageHeader
       :title="customer.name"
       back-to="/customers"
-      :breadcrumbs="[{ label: 'Customers', route: '/customers' }, { label: customer.name }]"
+      :breadcrumbs="[{ label: __('Customers'), route: '/customers' }, { label: customer.name }]"
     >
       <template #actions>
         <!-- A customer has no actions of its own, so the menu only exists once an installed plugin adds one. -->
         <Dropdown v-if="actionGroup" :options="[actionGroup]">
-          <Button icon="lucide-ellipsis" label="More actions" />
+          <Button icon="lucide-ellipsis" :label="__('More actions')" />
         </Dropdown>
-        <Button label="View in ERP" icon-right="lucide-external-link" :href="erpnextLink('Customer', customer.id)" />
+        <Button :label="__('View in ERP')" icon-right="lucide-external-link" :href="erpnextLink('Customer', customer.id)" />
       </template>
     </AppPageHeader>
 
@@ -156,10 +157,10 @@ function plural(count, word) {
             <Badge :label="lifecycle.label" :theme="lifecycle.theme" variant="subtle" />
           </div>
           <p class="mt-1 text-sm text-ink-gray-5">
-            {{ contactLine || 'No contact details on file' }}
+            {{ contactLine || __('No contact details on file') }}
           </p>
           <p class="mt-1 text-sm text-ink-gray-5">
-            Customer for {{ customerFor }} · since {{ longDate(customer.since) }}
+            {{ __('Customer for {0} · since {1}', [customerFor, longDate(customer.since)]) }}
           </p>
         </div>
       </div>
@@ -182,9 +183,9 @@ function plural(count, word) {
 
       <section v-if="customer.orders" class="mt-8">
         <div class="flex items-baseline justify-between">
-          <h2 class="text-lg-semibold text-ink-gray-8">Spend by month</h2>
+          <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Spend by month') }}</h2>
           <span class="text-sm text-ink-gray-5">
-            {{ spendByMonth.length === 1 ? 'This month' : `Last ${spendByMonth.length} months` }}
+            {{ spendByMonth.length === 1 ? __('This month') : __('Last {0} months', [spendByMonth.length]) }}
           </span>
         </div>
         <div class="mt-2 rounded-5 border border-outline-gray-1 p-4">
@@ -196,8 +197,8 @@ function plural(count, word) {
 
       <section class="mt-8">
         <div class="flex items-baseline justify-between">
-          <h2 class="text-lg-semibold text-ink-gray-8">Recent orders</h2>
-          <span class="text-sm text-ink-gray-5">{{ plural(customer.orders, 'order') }} all time</span>
+          <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Recent orders') }}</h2>
+          <span class="text-sm text-ink-gray-5">{{ __('{0} all time', [orderCount(customer.orders)]) }}</span>
         </div>
         <ul
           v-if="theirOrders.length"
@@ -211,27 +212,27 @@ function plural(count, word) {
               <div class="min-w-0 flex-1">
                 <p class="truncate text-base text-ink-gray-8">{{ order.name }}</p>
                 <p class="mt-0.5 text-sm text-ink-gray-5">
-                  {{ longDate(order.placed_on) }} · {{ plural(order.item_count, 'item') }}
+                  {{ longDate(order.placed_on) }} · {{ itemCount(order.item_count) }}
                 </p>
               </div>
               <div class="flex shrink-0 items-center gap-2">
                 <StatusBadge :status="order.payment_state.key" :label="order.payment_state.label" />
                 <StatusBadge :status="order.state.key" :label="order.state.label" />
               </div>
-              <p class="w-28 shrink-0 text-right text-base text-ink-gray-8 tabular-nums">
+              <p class="w-28 shrink-0 text-end text-base text-ink-gray-8 tabular-nums">
                 {{ money(order.total) }}
               </p>
-              <span class="lucide-chevron-right size-4 shrink-0 text-ink-gray-4" aria-hidden="true" />
+              <span class="lucide-chevron-right size-4 shrink-0 text-ink-gray-4 rtl:-scale-x-100" aria-hidden="true" />
             </router-link>
           </li>
         </ul>
-        <EmptyState v-else icon="lucide-shopping-bag" title="No orders yet" compact />
+        <EmptyState v-else icon="lucide-shopping-bag" :title="__('No orders yet')" compact />
       </section>
 
       <section v-if="discountUses.length" class="mt-8">
         <div class="flex items-baseline justify-between">
-          <h2 class="text-lg-semibold text-ink-gray-8">Discounts used</h2>
-          <span class="text-sm text-ink-gray-5">{{ money(customer.discount_saved) }} saved all time</span>
+          <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Discounts used') }}</h2>
+          <span class="text-sm text-ink-gray-5">{{ __('{0} saved all time', [money(customer.discount_saved)]) }}</span>
         </div>
         <ul class="mt-2 divide-y divide-outline-gray-1 rounded-5 border border-outline-gray-1">
           <li v-for="use in discountUses" :key="`${use.sales_order}-${use.code}-${use.title}`">
@@ -240,15 +241,15 @@ function plural(count, word) {
               class="flex items-center gap-4 px-4 py-2.5 hover:bg-surface-gray-2"
             >
               <div class="min-w-0 flex-1">
-                <p class="truncate text-base text-ink-gray-8">{{ use.code || use.title || 'Discount' }}</p>
+                <p class="truncate text-base text-ink-gray-8">{{ use.code || use.title || __('Discount') }}</p>
                 <p class="mt-0.5 truncate text-sm text-ink-gray-5">
                   {{ use.sales_order }} · {{ longDate(use.used_on) }}
                 </p>
               </div>
-              <p class="w-28 shrink-0 text-right text-base text-ink-gray-8 tabular-nums">
+              <p class="w-28 shrink-0 text-end text-base text-ink-gray-8 tabular-nums">
                 {{ discountMoney(use.amount) }}
               </p>
-              <span class="lucide-chevron-right size-4 shrink-0 text-ink-gray-4" aria-hidden="true" />
+              <span class="lucide-chevron-right size-4 shrink-0 text-ink-gray-4 rtl:-scale-x-100" aria-hidden="true" />
             </router-link>
           </li>
         </ul>
@@ -257,8 +258,8 @@ function plural(count, word) {
       <div class="mt-8 grid items-start gap-8 lg:grid-cols-3">
         <section v-if="topProducts.length" class="lg:col-span-2">
           <div class="flex items-baseline justify-between">
-            <h2 class="text-lg-semibold text-ink-gray-8">Recently bought</h2>
-            <span class="text-sm text-ink-gray-5">{{ plural(customer.units, 'unit') }} all time</span>
+            <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Recently bought') }}</h2>
+            <span class="text-sm text-ink-gray-5">{{ __('{0} all time', [unitCount(customer.units)]) }}</span>
           </div>
           <ul class="mt-2 divide-y divide-outline-gray-1 rounded-5 border border-outline-gray-1">
             <li v-for="product in topProducts" :key="product.item_code">
@@ -271,11 +272,11 @@ function plural(count, word) {
                   <p class="truncate text-base text-ink-gray-8">{{ product.name }}</p>
                   <p class="mt-0.5 text-sm text-ink-gray-5">{{ product.item_code }}</p>
                 </div>
-                <div class="text-right">
-                  <p class="text-base text-ink-gray-8 tabular-nums">{{ plural(product.units, 'unit') }}</p>
+                <div class="text-end">
+                  <p class="text-base text-ink-gray-8 tabular-nums">{{ unitCount(product.units) }}</p>
                   <p class="mt-0.5 text-sm text-ink-gray-5 tabular-nums">{{ money(product.spend) }}</p>
                 </div>
-                <span class="lucide-chevron-right size-4 shrink-0 text-ink-gray-4" aria-hidden="true" />
+                <span class="lucide-chevron-right size-4 shrink-0 text-ink-gray-4 rtl:-scale-x-100" aria-hidden="true" />
               </router-link>
             </li>
           </ul>
@@ -283,27 +284,27 @@ function plural(count, word) {
 
         <div class="space-y-6">
           <section class="rounded-5 border border-outline-gray-1 px-4 py-3.5">
-            <h2 class="text-sm text-ink-gray-5">Default address</h2>
+            <h2 class="text-sm text-ink-gray-5">{{ __('Default address') }}</h2>
             <p v-if="customer.address" class="mt-1.5 whitespace-pre-line text-p-base text-ink-gray-7">
               {{ customer.address }}
             </p>
-            <p v-else class="mt-1.5 text-p-base text-ink-gray-4">No address on file.</p>
+            <p v-else class="mt-1.5 text-p-base text-ink-gray-4">{{ __('No address on file.') }}</p>
           </section>
 
           <section>
-            <label class="text-sm text-ink-gray-5" for="customer-note">Note</label>
+            <label class="text-sm text-ink-gray-5" for="customer-note">{{ __('Note') }}</label>
             <FormControl
               id="customer-note"
               class="mt-1.5"
               type="textarea"
               :rows="3"
               v-model="note"
-              placeholder="Anything worth remembering about this customer"
+              :placeholder="__('Anything worth remembering about this customer')"
             />
             <Button
               v-if="noteChanged"
               class="mt-2"
-              label="Save note"
+              :label="__('Save note')"
               :loading="noteAction.loading"
               @click="saveNote"
             />
@@ -324,7 +325,7 @@ function plural(count, word) {
     <AppPageHeader
       :title="route.params.id"
       back-to="/customers"
-      :breadcrumbs="[{ label: 'Customers', route: '/customers' }, { label: route.params.id }]"
+      :breadcrumbs="[{ label: __('Customers'), route: '/customers' }, { label: route.params.id }]"
     />
 
     <PageBody width="wide">
@@ -338,7 +339,7 @@ function plural(count, word) {
       </div>
 
       <section
-        class="mt-6 grid grid-cols-2 rounded-5 border border-outline-gray-1 sm:grid-cols-4 sm:divide-x sm:divide-outline-gray-2"
+        class="mt-6 grid grid-cols-2 rounded-5 border border-outline-gray-1 sm:grid-cols-4 sm:divide-x sm:divide-outline-gray-2 sm:rtl:divide-x-reverse"
       >
         <div v-for="placeholder in 4" :key="placeholder" class="px-4 py-3.5">
           <Skeleton class="h-3.5 w-20 rounded-4" />
@@ -371,7 +372,7 @@ function plural(count, word) {
     <AppPageHeader
       :title="route.params.id"
       back-to="/customers"
-      :breadcrumbs="[{ label: 'Customers', route: '/customers' }, { label: route.params.id }]"
+      :breadcrumbs="[{ label: __('Customers'), route: '/customers' }, { label: route.params.id }]"
     />
 
     <PageBody width="wide">
@@ -380,7 +381,7 @@ function plural(count, word) {
         :title="loadFailure.title"
         :description="loadFailure.description"
       >
-        <Button label="Back to customers" variant="subtle" theme="gray" route="/customers" />
+        <Button :label="__('Back to customers')" variant="subtle" theme="gray" route="/customers" />
       </EmptyState>
     </PageBody>
   </template>

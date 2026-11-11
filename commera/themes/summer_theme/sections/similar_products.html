@@ -2,19 +2,19 @@
 {% from "components/macros/product_card.html" import variant_display_name, card_price, card_discount %}
 
 {% macro similar_card(product, wow_delay) %}
-{% set product_url = "/" ~ (frappe.lang or "en") ~ "/products/" ~ product.handle %}
+{% set product_url = url("/products/" ~ product.handle) %}
 {% set product_name = variant_display_name(product) %}
 {% set discount = card_discount(product) | int %}
 <div class="shop-card style-5 wow fadeInUp" data-wow-delay="{{ wow_delay }}">
 	<div class="dz-media">
-		<a href="{{ product_url }}" tabindex="-1" aria-hidden="true">
+		<a href="{{ product_url | e }}" tabindex="-1" aria-hidden="true">
 			<img src="{{ product.image or '/assets/commera/images/1.jpg' }}" alt="{{ product_name }}" loading="lazy">
 		</a>
 	</div>
 	<div class="dz-content">
 		<div>
 			{% if discount %}<span class="sale-title">{{ _("up to {0}% off").format(discount) }}</span>{% endif %}
-			<h6 class="title"><a href="{{ product_url }}">{{ product_name }}</a></h6>
+			<h6 class="title"><a href="{{ product_url | e }}">{{ product_name }}</a></h6>
 		</div>
 		<h6 class="price">{{ card_price(product.price, product.compare_at_price, discount) }}</h6>
 	</div>
@@ -42,7 +42,7 @@
 						</div>
 					</div>
 					<div class="col-lg-4 col-md-4 col-sm-12 text-md-end wow fadeInUp" data-wow-delay="0.6s">
-						<a class="icon-button d-md-block d-none ms-md-auto m-b30" href="/{{ frappe.lang or 'en' }}/products" aria-label="{{ _("All Products") }}">
+						<a class="icon-button d-md-block d-none ms-md-auto m-b30" href="{{ url('/products') | e }}" aria-label="{{ _("All Products") }}">
 							<div class="text-row word-rotate-box" aria-hidden="true">
 								{%- for character in badge_text %}
 								<span class="text__char" style="--char-rotate: {{ "%.2f" | format(360.0 * loop.index0 / (badge_text | length)) }}deg">{{ character }}</span>

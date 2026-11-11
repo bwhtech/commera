@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+{# A context built outside the website renderer can lack localization. #}
+{% set localization = localization if localization is defined else get_localization() -%}
+<html lang="{{ localization.language.code | e }}" dir="{{ localization.language.direction | e }}">
+{% from "templates/macros/seo.html" import seo_meta, json_ld_block %}
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	{# Mandatory by theme contract: dropping these silently loses every meta, canonical, hreflang and robots tag. #}
+	{% block seo %}{{ seo_meta(seo if seo is defined and seo else seo_page_meta()) }}{% endblock %}
+	{% block json_ld %}{{ json_ld_block(json_ld if json_ld is defined and json_ld else seo_org_jsonld()) }}{% endblock %}
+
+	{% block analytics_head %}
+	{% include "templates/includes/ga4.html" %}
+	{% include "templates/includes/meta-pixel.html" %}
+	{% include "templates/includes/custom-tracking-scripts.html" %}
+	{% endblock %}
+
+	<link rel="icon" href="{{ get_brand_assets().favicon | e }}">
+	{# The Style tab of the theme settings, as CSS variables. #}
+	{{ format_shop_theme_css() }}
+	{# Mandatory: the storefront config and bundle that cart, currency and language helpers read. #}
+	{{ commera_header_content }}
+	<style>
+		body { margin: 0; font-family: var(--theme-font, system-ui), sans-serif; }
+	</style>
+	{% block head %}{% endblock %}
+	{{ format_plugin_includes("css") }}
+</head>
+
+<body>
+	<main id="main">
+		{% block body %}{% endblock %}
+		{% block uncontained_body %}{% endblock %}
+	</main>
+
+	{% block analytics_events %}{% include "templates/includes/analytics-events.html" %}{% endblock %}
+	{{ plugin_slot("page_overlay") }}
+	{{ format_plugin_includes("js") }}
+	{% block script %}{% endblock %}
+</body>
+</html>

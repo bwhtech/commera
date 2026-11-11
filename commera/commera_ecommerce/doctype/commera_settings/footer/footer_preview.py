@@ -9,6 +9,7 @@ from commera.commera_ecommerce.doctype.commera_settings.editor_input import (
 	require_safe_url,
 	require_value,
 )
+from commera.localization.content import move_translations
 
 # Storefront pages come from hooks.website_route_rules, not Web Page docs, so the picker cannot see them.
 # Routes needing a query param or a cart (checkout, confirmation, order detail) are deliberately absent.
@@ -229,24 +230,33 @@ def move_footer_link(from_section: str, to_section: str, link_row_name: str, tar
 	row = next((link_row for link_row in source_links if link_row.name == link_row_name), None)
 	if not row:
 		frappe.throw(frappe._("Link not found in {0}.").format(from_section))
-	label, url, enabled = row.link_label, row.link_url, row.enabled
 
 	remaining = [link_row for link_row in source_links if link_row.name != link_row_name]
-	for index, remaining_row in enumerate(remaining, start=1):
-		remaining_row.link_order = index
-		remaining_row.idx = index
-	source.footer_links = remaining
-	source.save()
+	if from_section == to_section:
+		# Within a section the row keeps its name, and so its translations.
+		remaining.insert(max(0, min(target_index, len(remaining))), row)
+		return reorder_footer_links(from_section, [link_row.name for link_row in remaining])
 
 	target = frappe.get_doc("Footer Section Config", to_section)
 	existing_target_links = sorted(target.footer_links, key=lambda row: row.link_order or 0)
-	new_row = target.append("footer_links", {"link_label": label, "link_url": url, "enabled": enabled})
+	new_row = target.append(
+		"footer_links", {"link_label": row.link_label, "link_url": row.link_url, "enabled": row.enabled}
+	)
 	target_index = max(0, min(target_index, len(existing_target_links)))
 	existing_target_links.insert(target_index, new_row)
-	target.footer_links = existing_target_links
-	for index, target_row in enumerate(target.footer_links, start=1):
-		target_row.link_order = index
-		target_row.idx = index
+	set_link_order(target, existing_target_links)
 	target.save()
 
+	# The moved link is a new row. Its translations move before the source save drops removed rows'.
+	move_translations("Footer Link", link_row_name, new_row.name)
+	set_link_order(source, remaining)
+	source.save()
+
 	return get_footer_editor_data()
+
+
+def set_link_order(section, links):
+	section.footer_links = links
+	for index, link_row in enumerate(links, start=1):
+		link_row.link_order = index
+		link_row.idx = index

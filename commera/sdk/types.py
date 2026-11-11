@@ -24,6 +24,8 @@ __all__ = [
 	"DiscountInput",
 	"FacetValue",
 	"FooterSection",
+	"Language",
+	"Localization",
 	"Menu",
 	"MenuItem",
 	"NewCartLine",
@@ -34,6 +36,7 @@ __all__ = [
 	"PaymentSession",
 	"PickupLocation",
 	"PlacedOrder",
+	"PriceFacet",
 	"PricedCart",
 	"PricedCartLine",
 	"Product",
@@ -88,6 +91,7 @@ class Address(TypedDict):
 class OrderLine(TypedDict):
 	line_id: str
 	item_code: str
+	# In the request language; `size` stays the source value.
 	title: str
 	size: str | None
 	qty: float
@@ -242,7 +246,7 @@ class CartLineProduct(TypedDict):
 
 	handle: str
 	title: str
-	# The size.
+	# The size in the request language.
 	variant_title: str
 	image: str | None
 
@@ -345,8 +349,9 @@ class ProductCard(TypedDict):
 	color: str | None
 	image: str | None
 	hover_image: str | None
+	# The request market's currency. `price` is None where the market has no price: not for sale.
 	currency: str
-	price: float
+	price: float | None
 	compare_at_price: float | None
 	available: bool
 	rating: Rating
@@ -359,11 +364,18 @@ class FacetValue(TypedDict):
 	count: int
 
 
+class PriceFacet(TypedDict):
+	min: float
+	max: float
+	# The request market's currency, which `min` and `max` are in.
+	currency: str
+
+
 class ProductFacets(TypedDict):
 	brands: list[FacetValue]
 	colors: list[FacetValue]
 	sizes: list[FacetValue]
-	price: dict[str, float]
+	price: PriceFacet
 
 
 class ProductPage(TypedDict):
@@ -391,7 +403,9 @@ class Typeahead(TypedDict):
 
 
 class ProductOptionValue(TypedDict, total=False):
+	# `name` is the label in the request language; `value` is the source, the same in every language.
 	name: str
+	value: str
 	# Colour values only: the sibling product's handle, whether it is this one, and its stock and swatch.
 	handle: str
 	selected: bool
@@ -408,8 +422,12 @@ class ProductVariant(TypedDict):
 	"""One size of a product."""
 
 	id: str
+	# `title` is the size's label in the request language; `size` is its source value.
+	# Select a variant by `size`: two sizes can share a translated label.
 	title: str
-	price: float
+	size: str
+	# None where the request market has no price: the variant is unavailable there.
+	price: float | None
 	compare_at_price: float | None
 	available: bool
 	# None when the item is sold without stock tracking.
@@ -428,7 +446,8 @@ class Product(TypedDict):
 	images: list[str]
 	collection: dict | None
 	currency: str
-	price: float
+	# The lowest variant price; None where the request market prices no variant.
+	price: float | None
 	available: bool
 	options: list[ProductOption]
 	variants: list[ProductVariant]
@@ -439,11 +458,14 @@ class Product(TypedDict):
 
 
 class Collection(TypedDict):
-	"""An enabled menu tab (top-level Ecommerce Category); `handle` is its route slug."""
+	"""An enabled menu tab (top-level Ecommerce Category); `handle` is its route slug.
+	`seo` has `title`, `custom_title` (the merchant set it), `description` and `noindex`, as on Product."""
 
 	handle: str
 	title: str
+	description: str
 	image: str | None
+	seo: dict
 	updated_at: str
 
 
@@ -480,12 +502,44 @@ class Shop(TypedDict):
 	footer: list[FooterSection]
 
 
+class Language(TypedDict):
+	code: str
+	name: str
+	endonym: str
+	direction: str
+
+
+class Market(TypedDict):
+	"""`default_language` and `languages` are language codes; `countries` are uppercase ISO codes."""
+
+	handle: str
+	title: str
+	is_primary: bool
+	default_language: str
+	languages: list[str]
+	countries: list[str]
+
+
+class Localization(TypedDict):
+	language: Language
+	default_language: Language
+	available_languages: list[Language]
+	root_prefix: str
+	prefix_codes: list[str]
+	market: Market | None
+	available_markets: list[Market]
+	country: str | None
+
+
 class Country(TypedDict):
 	name: str
 	title: str
 
 
 class ContentPage(TypedDict):
+	"""A published Shop Web Page. `title` is the page title and `body_html` is sanitized HTML.
+	`seo` has `title`, `custom_title` (the merchant set it), `description` and `noindex`, as on Product."""
+
 	handle: str
 	title: str
 	body_html: str

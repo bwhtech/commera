@@ -5,6 +5,7 @@ import SettingsConfigHeader from './SettingsConfigHeader.vue'
 import LocationMap from '../LocationMap.vue'
 import SettingsLinkControl from './SettingsLinkControl.vue'
 import { useAdminAction, trySubmit } from '../../data/api'
+import { __ } from '../../data/translation'
 import { createSequence } from '../../utils/sequence'
 
 const props = defineProps({
@@ -59,6 +60,9 @@ const searchText = computed(() =>
 )
 
 const otherMatches = computed(() => matches.value.filter((match) => match !== chosenMatch.value))
+
+// Split around the placeholder so the match keeps its emphasis inside one translatable sentence.
+const [pinnedNearBefore, pinnedNearAfter] = __('Pinned near {0}. Drag the pin if it is off.').split('{0}')
 
 // findLocation is one request: a lookup started while another is out aborts it, and that one
 // must not then read as "not found". Only the newest lookup answers; null means it failed or
@@ -141,8 +145,8 @@ async function useCurrentLocation() {
     // Code 1 is the owner (or the browser) refusing; anything else is the device not answering.
     toast.error(
       error?.code === 1
-        ? 'Location access is blocked. Allow it in your browser, or click the map.'
-        : 'Your location could not be found. Click the map to place the pin.',
+        ? __('Location access is blocked. Allow it in your browser, or click the map.')
+        : __('Your location could not be found. Click the map to place the pin.'),
     )
   } finally {
     locatingDevice.value = false
@@ -153,12 +157,12 @@ async function useCurrentLocation() {
 <template>
   <SettingsConfigHeader
     :title="warehouse.warehouse_name"
-    description="Pickup address"
+    :description="__('Pickup address')"
     @back="emit('back')"
   >
     <template #actions>
       <Button
-        label="Save"
+        :label="__('Save')"
         type="submit"
         :form="formId"
         variant="solid"
@@ -173,25 +177,25 @@ async function useCurrentLocation() {
     <form :id="formId" class="flex flex-col gap-4 pt-4" @submit.prevent="emit('save', { ...values })">
       <FormControl
         v-model="values.address_title"
-        label="Name at checkout"
+        :label="__('Name at checkout')"
         required
-        description="What shoppers read when they pick where to collect."
+        :description="__('What shoppers read when they pick where to collect.')"
       />
 
       <!-- focusout bubbles where blur does not, so one listener hears every address field settle. -->
       <div class="flex flex-col gap-4" @focusout="placeFromAddress">
-        <FormControl v-model="values.address_line1" label="Address line 1" required />
-        <FormControl v-model="values.address_line2" label="Address line 2" />
+        <FormControl v-model="values.address_line1" :label="__('Address line 1')" required />
+        <FormControl v-model="values.address_line2" :label="__('Address line 2')" />
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormControl v-model="values.city" label="City" required />
-          <FormControl v-model="values.state" label="State" />
-          <FormControl v-model="values.pincode" label="Postal code" />
+          <FormControl v-model="values.city" :label="__('City')" required />
+          <FormControl v-model="values.state" :label="__('State')" />
+          <FormControl v-model="values.pincode" :label="__('Postal code')" />
           <SettingsLinkControl
             v-model="values.country"
             :field="COUNTRY_FIELD"
             options-path="settings.get_link_options"
-            label="Country"
+            :label="__('Country')"
             required
             class="!w-full"
           />
@@ -199,15 +203,15 @@ async function useCurrentLocation() {
       </div>
 
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormControl v-model="values.phone" label="Phone" type="tel" />
+        <FormControl v-model="values.phone" :label="__('Phone')" type="tel" />
       </div>
 
       <div class="flex flex-col gap-2">
         <div class="flex items-center justify-between gap-2">
-          <FormLabel label="Location on the map" />
+          <FormLabel :label="__('Location on the map')" />
           <Button
             v-if="canUseDevice"
-            label="Use my current location"
+            :label="__('Use my current location')"
             icon-left="lucide-locate-fixed"
             :loading="locatingDevice"
             @click="useCurrentLocation"
@@ -217,33 +221,32 @@ async function useCurrentLocation() {
         <LocationMap
           ref="map"
           v-model="values.custom_store_location"
-          empty-hint="No pin yet — click the map to place one"
+          :empty-hint="__('No pin yet — click the map to place one')"
           @place-by-hand="placedByHand"
         />
 
         <div class="flex items-start justify-between gap-3">
           <p class="min-w-0 text-sm text-ink-gray-5">
-            <template v-if="findLocation.loading && !hasPin">Looking up the address…</template>
+            <template v-if="findLocation.loading && !hasPin">{{ __('Looking up the address…') }}</template>
             <template v-else-if="pinSource === 'match'">
-              Pinned near <span class="text-ink-gray-7">{{ chosenMatch.label }}</span>. Drag the pin if it
-              is off.
+              {{ pinnedNearBefore }}<span class="text-ink-gray-7">{{ chosenMatch.label }}</span>{{ pinnedNearAfter }}
             </template>
             <template v-else-if="pinSource === 'device'">
-              Pinned at your current location. Drag the pin if it is off.
+              {{ __('Pinned at your current location. Drag the pin if it is off.') }}
             </template>
             <template v-else-if="pinSource === 'not-found' && !hasPin">
-              That address is not on the map. Click the map to place the pin.
+              {{ __('That address is not on the map. Click the map to place the pin.') }}
             </template>
-            <template v-else-if="hasPin">Drag the pin to adjust it.</template>
-            <template v-else>Fill in the address and the pin is placed for you.</template>
+            <template v-else-if="hasPin">{{ __('Drag the pin to adjust it.') }}</template>
+            <template v-else>{{ __('Fill in the address and the pin is placed for you.') }}</template>
           </p>
-          <Button v-if="hasPin" label="Remove pin" variant="ghost" @click="removePin" />
+          <Button v-if="hasPin" :label="__('Remove pin')" variant="ghost" @click="removePin" />
         </div>
 
         <!-- The best match is only a guess when a street name repeats across a city, so the rest
              stay one click away rather than behind another search. -->
         <div v-if="pinSource === 'match' && otherMatches.length" class="flex flex-col gap-1">
-          <p class="text-sm text-ink-gray-5">Not the right place?</p>
+          <p class="text-sm text-ink-gray-5">{{ __('Not the right place?') }}</p>
           <Button
             v-for="match in otherMatches"
             :key="`${match.latitude},${match.longitude}`"

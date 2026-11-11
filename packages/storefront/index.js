@@ -4,6 +4,8 @@ export * as cart from './cart.js';
 export * as checkout from './checkout.js';
 export * as collections from './collections.js';
 export * as format from './format.js';
+export { money } from './format.js';
+export { localization, url } from './localization.js';
 export * as orders from './orders.js';
 export * as product from './product.js';
 export * as products from './products.js';
@@ -11,4 +13,9 @@ export { StorefrontError } from './request.js';
 export * as search from './search.js';
 export * as shop from './shop.js';
 export * as webmcp from './webmcp/index.js';
+export {
+	load_translations,
+	make_translations_reactive,
+	t,
+} from './translate.js';
 export * as wishlist from './wishlist.js';

@@ -10,6 +10,7 @@
 import { computed, reactive, watch } from 'vue'
 import { Button, Dialog, TextInput, toast } from 'frappe-ui'
 import { useAdminAction, trySubmit } from '../../data/api'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   // The rows ProductStock already builds: { id, title, sku, onHand }.
@@ -51,19 +52,18 @@ async function receive() {
 
   open.value = false
   const count = result.stock_entries?.length ?? 0
-  toast.success(`Received ${totalQty.value} across ${lines.value.length} sizes`, {
-    description: `${count} Material Receipt${count === 1 ? '' : 's'} submitted.`,
+  toast.success(__('Received {0} across {1} sizes', [totalQty.value, lines.value.length]), {
+    description: count === 1 ? __('1 Material Receipt submitted.') : __('{0} Material Receipts submitted.', [count]),
   })
   emit('received')
 }
 </script>
 
 <template>
-  <Dialog v-model:open="open" title="Receive stock" size="xl">
+  <Dialog v-model:open="open" :title="__('Receive stock')" size="xl">
     <template #default>
       <p class="text-p-sm text-ink-gray-5">
-        Quantities are added to what is on hand, as a Material Receipt into the shop's warehouse.
-        Leave the valuation rate blank to keep the item's own.
+        {{ __("Quantities are added to what is on hand, as a Material Receipt into the shop's warehouse. Leave the valuation rate blank to keep the item's own.") }}
       </p>
 
       <div class="mt-4 space-y-3">
@@ -74,21 +74,21 @@ async function receive() {
         >
           <div class="min-w-0 flex-1">
             <p class="truncate text-base text-ink-gray-8">{{ row.title }}</p>
-            <p class="truncate text-sm text-ink-gray-5">{{ row.sku }} · {{ row.onHand }} on hand</p>
+            <p class="truncate text-sm text-ink-gray-5">{{ row.sku }} · {{ __('{0} on hand', [row.onHand]) }}</p>
           </div>
           <TextInput
             v-model="drafts[row.id].qty"
             type="number"
             size="sm"
             class="w-full sm:w-28"
-            placeholder="Qty"
+            :placeholder="__('Qty')"
           />
           <TextInput
             v-model="drafts[row.id].rate"
             type="number"
             size="sm"
             class="w-full sm:w-36"
-            placeholder="Valuation rate"
+            :placeholder="__('Valuation rate')"
           />
         </div>
       </div>
@@ -98,7 +98,7 @@ async function receive() {
       <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button
           class="w-full sm:w-auto"
-          label="Cancel"
+          :label="__('Cancel')"
           :disabled="receiveAction.loading"
           @click="open = false"
         />
@@ -106,7 +106,7 @@ async function receive() {
           class="w-full sm:w-auto"
           variant="solid"
           theme="gray"
-          :label="totalQty ? `Receive ${totalQty}` : 'Receive stock'"
+          :label="totalQty ? __('Receive {0}', [totalQty]) : __('Receive stock')"
           :loading="receiveAction.loading"
           :disabled="!lines.length || receiveAction.loading"
           @click="receive"

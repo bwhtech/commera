@@ -6,8 +6,8 @@
     {% call carousel.carousel(pagination = 'True') %}
     {% for image in homepage_details.hero_banner %}
     <div class="embla__slide flex-shrink-0 w-full  cursor-pointer">
-      <a href="{{image.url or '/'}}" class="banner-effect">
-        <img src="{{image.banner_image}}" alt="" class="md:rounded-lg w-full object-cover" />
+      <a href="{{ url(image.url or '/') | e }}" class="banner-effect">
+        <img src="{{ (image.banner_image or '') | e }}" alt="" class="md:rounded-lg w-full object-cover" />
       </a>
     </div>
     {% endfor %}
@@ -17,26 +17,26 @@
   <div
     class="max-w-7xl mx-auto grid grid-cols-2 gap-6 px-8 py-15 md:grid-cols-4 md:gap-11 md:px-0 md:py-22">
     {% if homepage_details.gif_1 %}
-    <a href="{{homepage_details.gif_url_1 or '/'}}" class="banner-effect">
-      <img src="{{homepage_details.gif_1}}" alt="" class="w-full rounded-lg cursor-pointer" />
+    <a href="{{ url(homepage_details.gif_url_1 or '/') | e }}" class="banner-effect">
+      <img src="{{ homepage_details.gif_1 | e }}" alt="" class="w-full rounded-lg cursor-pointer" />
     </a>
     {% endif %}
 
     {% if homepage_details.gif_2 %}
-    <a href="{{homepage_details.gif_url_2 or '/'}}" class="banner-effect">
-      <img src="{{homepage_details.gif_2}}" alt="" class="w-full rounded-lg cursor-pointer" />
+    <a href="{{ url(homepage_details.gif_url_2 or '/') | e }}" class="banner-effect">
+      <img src="{{ homepage_details.gif_2 | e }}" alt="" class="w-full rounded-lg cursor-pointer" />
     </a>
     {% endif %}
 
     {% if homepage_details.gif_3 %}
-    <a href="{{homepage_details.gif_url_3 or '/'}}" class="banner-effect">
-      <img src="{{homepage_details.gif_3}}" alt="" class="w-full rounded-lg cursor-pointer" />
+    <a href="{{ url(homepage_details.gif_url_3 or '/') | e }}" class="banner-effect">
+      <img src="{{ homepage_details.gif_3 | e }}" alt="" class="w-full rounded-lg cursor-pointer" />
     </a>
     {% endif %}
 
     {% if homepage_details.gif_4 %}
-    <a href="{{homepage_details.gif_url_4 or '/'}}" class="banner-effect">
-      <img src="{{homepage_details.gif_4}}" alt="" class="w-full rounded-lg cursor-pointer" />
+    <a href="{{ url(homepage_details.gif_url_4 or '/') | e }}" class="banner-effect">
+      <img src="{{ homepage_details.gif_4 | e }}" alt="" class="w-full rounded-lg cursor-pointer" />
     </a>
     {% endif %}
   </div>
@@ -69,8 +69,8 @@
   </div>
 
   <div class="container mx-auto mt-3 md:my-22">
-    <a href="{{homepage_details.banner_url_1 or '/'}}" class="banner-effect block">
-      <img src="{{homepage_details.banner_1}}" alt="" class="md:rounded-lg w-full cursor-pointer" />
+    <a href="{{ url(homepage_details.banner_url_1 or '/') | e }}" class="banner-effect block">
+      <img src="{{ (homepage_details.banner_1 or '') | e }}" alt="" class="md:rounded-lg w-full cursor-pointer" />
     </a>
   </div>
 </div>

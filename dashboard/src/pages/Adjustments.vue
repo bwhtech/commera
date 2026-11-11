@@ -23,20 +23,20 @@ const rows = computed(() => movementsRequest.data?.rows ?? [])
 </script>
 
 <template>
-  <AppPageHeader title="Adjustments" back-to="/inventory" />
+  <AppPageHeader :title="__('Adjustments')" back-to="/inventory" />
 
   <PageBody>
-    <p class="text-p-sm text-ink-gray-5">Every stock movement, in order. Read-only.</p>
+    <p class="text-p-sm text-ink-gray-5">{{ __('Every stock movement, in order. Read-only.') }}</p>
 
     <div class="mt-3 overflow-x-auto">
       <List class="min-w-[52rem]" :row-height="ia.density" :columns="['7rem', '1fr', '11rem', '6rem', '9rem', '7rem']">
       <ListHeader>
-        <ListHeaderCell>Date</ListHeaderCell>
-        <ListHeaderCell>Product</ListHeaderCell>
-        <ListHeaderCell>SKU</ListHeaderCell>
-        <ListHeaderCell>Change</ListHeaderCell>
-        <ListHeaderCell>Reason</ListHeaderCell>
-        <ListHeaderCell>By</ListHeaderCell>
+        <ListHeaderCell>{{ __('Date') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('Product') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('SKU') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('Change') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('Reason') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('By') }}</ListHeaderCell>
       </ListHeader>
       <!-- `loading` flips on every reload and the request keeps the previous `data`,
            so guarding on it alone would blank a loaded table on a refetch. The
@@ -59,6 +59,6 @@ const rows = computed(() => movementsRequest.data?.rows ?? [])
     </List>
     </div>
 
-    <EmptyState v-if="!movementsRequest.loading && !rows.length" icon="lucide-history" title="No movements yet" description="Stock receipts and sales will show up here." />
+    <EmptyState v-if="!movementsRequest.loading && !rows.length" icon="lucide-history" :title="__('No movements yet')" :description="__('Stock receipts and sales will show up here.')" />
   </PageBody>
 </template>

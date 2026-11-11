@@ -4,19 +4,17 @@ from frappe.utils import create_batch
 from frappe.utils.caching import redis_cache
 from frappe.utils.data import cint, cstr, flt, sha256_hash
 
-from commera.api.admin.catalog import (
-	DEFAULT_OPTION_ATTRIBUTE,
-	DEFAULT_SIZE_VALUE,
-	get_default_rates,
-	get_selling_rates,
-)
+from commera.api.admin.catalog import DEFAULT_OPTION_ATTRIBUTE, DEFAULT_SIZE_VALUE
+from commera.api.variant_pricing import get_base_price_rows_by_key
+from commera.localization import get_localization, translate
+from commera.localization.market_prices import MarketPrices
 from commera.plugin_events import get_ecommerce_warehouse, get_listed_items
 from commera.product_detail import get_product_detail
 from commera.sdk.types import (
-	CartLineProduct,
 	CatalogItem,
 	Collection,
 	FacetValue,
+	PriceFacet,
 	Product,
 	ProductCard,
 	ProductOption,
@@ -25,15 +23,15 @@ from commera.sdk.types import (
 	Typeahead,
 )
 from commera.search.facets import get_listing_facet_counts, get_price_range
-from commera.search.record_builder import images_for_variants, rates_by_item_code, sizes_for_variants
+from commera.search.price_markets import rates_by_item_code
+from commera.search.record_builder import sizes_for_variants
 from commera.search.typeahead import get_typeahead as get_search_typeahead
-from commera.shop_data import get_storefront_menu
+from commera.shop_data import get_storefront_menu, translate_categories
 from commera.swatches import get_swatch_map
 from commera.utils import (
 	IN_CLAUSE_CHUNK_SIZE,
 	get_available_stocks,
 	get_product_list,
-	get_store_currency,
 	get_total_product_count,
 )
 from commera.www.products.details import get_recommended_products
@@ -56,14 +54,27 @@ SORT_KEYS = ("default", "price_low", "price_high", "name", "new_arrival", "disco
 MAX_PAGE_SIZE = 48
 FACETS_CACHE_PREFIX = "commera:storefront_facets:"
 FACETS_CACHE_SECONDS = 5 * 60
+PRODUCT_DOCTYPE = "Style Attribute Variant"
+PRODUCT_CONTENT_FIELDS = ("display_name", "description", "meta_title", "meta_description")
 # Only a top-level menu entry owns a route_slug, so these are the menu tabs.
 COLLECTION_FILTERS = {"enabled": 1, "route_slug": ("is", "set")}
-COLLECTION_FIELDS = ["route_slug", "display_name", "category_name", "image", "modified"]
+COLLECTION_FIELDS = [
+	"name",
+	"route_slug",
+	"display_name",
+	"category_name",
+	"image",
+	"description",
+	"meta_title",
+	"meta_description",
+	"noindex",
+	"modified",
+]
 
 
 def get_items(item_codes: list[str]) -> dict[str, CatalogItem]:
-	"""`price` is what a shopper pays, `list_price` the struck-through figure; both None until the store's
-	price lists are set. A code that is not an Item is left out."""
+	"""`price` is what a shopper pays in the request's market, None for an item it does not sell.
+	`list_price` is the crossed-out price: None unless above `price`. A non-Item code is left out."""
 	frappe.has_permission("Item", ptype="read", throw=True)
 	items = {}
 	for item_code_chunk in create_batch(
@@ -82,11 +93,11 @@ def read_items(item_codes: list[str]) -> dict[str, CatalogItem]:
 		return {}
 
 	listed_items = get_listed_items(found_codes)
-	prices, list_prices = get_store_prices(found_codes)
+	prices = MarketPrices.current()
+	sale_rates, compare_at_rates = get_base_rates(prices, found_codes)
 	warehouse = get_ecommerce_warehouse()
 	# get_available_stocks reads a missing warehouse as one literally named "website_warehouse".
 	stocks = get_available_stocks(found_codes, warehouse) if warehouse else {}
-	currency = get_store_currency()
 
 	return {
 		row.name: {
@@ -94,9 +105,8 @@ def read_items(item_codes: list[str]) -> dict[str, CatalogItem]:
 			"title": row.item_name,
 			"product": row.variant_of or row.name,
 			"is_listed": row.name in listed_items,
-			"price": prices.get(row.name),
-			"list_price": list_prices.get(row.name),
-			"currency": currency,
+			**get_item_prices(prices, sale_rates.get(row.name), compare_at_rates.get(row.name)),
+			"currency": prices.currency,
 			"available_qty": flt(stocks.get(row.name, {}).get("stock_qty")),
 			"unlimited": bool(stocks.get(row.name, {}).get("unlimited")),
 		}
@@ -104,13 +114,20 @@ def read_items(item_codes: list[str]) -> dict[str, CatalogItem]:
 	}
 
 
-def get_store_prices(item_codes: list[str]) -> tuple[dict, dict]:
-	price_lists = frappe.get_cached_value(
-		"Commera Settings", "Commera Settings", ["default_price_list", "sale_price_list"]
-	)
-	if not all(price_lists):
-		return {}, {}
-	return get_selling_rates(item_codes), get_default_rates(item_codes)
+def get_base_rates(prices: MarketPrices, item_codes: list[str]) -> tuple[dict, dict]:
+	"""(sale, compare-at) base rates by item code. Customer rows are negotiated contracts."""
+	price_lists = [prices.sale_price_list, prices.compare_at_price_list]
+	rows = get_base_price_rows_by_key(item_codes, [name for name in price_lists if name])
+	rates = {name: {} for name in price_lists}
+	for (item_code, price_list), row in rows.items():
+		rates[price_list][item_code] = flt(row.price_list_rate)
+	return rates[prices.sale_price_list], rates[prices.compare_at_price_list]
+
+
+def get_item_prices(prices: MarketPrices, sale: float | None, compare_at: float | None) -> dict:
+	# An item on neither list has no price, in the primary market too.
+	price = None if sale is None and compare_at is None else prices.price(sale, compare_at)
+	return {"price": price, "list_price": prices.compare_at(price, compare_at)}
 
 
 # Shopper reads: published products only, the same for every caller, so they need no permission.
@@ -153,7 +170,7 @@ def list_products(
 		"total": get_total_product_count(filters=filters),
 		"page": page,
 		"page_size": page_size,
-		"facets": {**get_facets(filters), "price": get_price_facet()},
+		"facets": {**get_facets(filters), "price": get_market_price_facet()},
 	}
 
 
@@ -167,7 +184,12 @@ def search(query: str, page: int = 1, page_size: int = 24, sort: str = "default"
 			"total": 0,
 			"page": page,
 			"page_size": page_size,
-			"facets": {"brands": [], "colors": [], "sizes": [], "price": get_price_facet()},
+			"facets": {
+				"brands": [],
+				"colors": [],
+				"sizes": [],
+				"price": get_market_price_facet(),
+			},
 		}
 	return {
 		"query": query,
@@ -231,7 +253,9 @@ def list_brands() -> list[dict]:
 
 
 def get_facets(filters: dict) -> dict[str, list[FacetValue]]:
-	cache_key = f"{FACETS_CACHE_PREFIX}{sha256_hash(frappe.as_json(filters))}"
+	# The price filters read the market's sale price list.
+	key = frappe.as_json({"filters": filters, "prices": MarketPrices.current().cache_key})
+	cache_key = f"{FACETS_CACHE_PREFIX}{sha256_hash(key)}"
 	facets = frappe.cache.get_value(cache_key)
 	if facets is None:
 		facets = {key: get_facet_values(counts) for key, counts in get_listing_facet_counts(filters).items()}
@@ -239,9 +263,15 @@ def get_facets(filters: dict) -> dict[str, list[FacetValue]]:
 	return facets
 
 
+def get_market_price_facet() -> PriceFacet:
+	prices = MarketPrices.current()
+	facet = get_price_facet(prices.sale_price_list, prices.compare_at_price_list)
+	return {**facet, "currency": prices.currency}
+
+
 @redis_cache(ttl=FACETS_CACHE_SECONDS)
-def get_price_facet() -> dict:
-	price_range = get_price_range()
+def get_price_facet(sale_price_list: str | None, compare_at_price_list: str | None = None) -> dict:
+	price_range = get_price_range(sale_price_list, compare_at_price_list)
 	return {"min": flt(price_range.get("min_price")), "max": flt(price_range.get("max_price"))}
 
 
@@ -256,18 +286,23 @@ def get_product(handle: str) -> Product | None:
 		return None
 
 	product_variant, item = detail["product_variant"], detail["product"]
-	variants = get_variants(detail["available_sizes"])
+	prices = MarketPrices.current()
+	variants = get_variants(prices, detail["available_sizes"])
+	prices_paid = [variant["price"] for variant in variants if variant["price"] is not None]
+	content = get_product_content(product_variant, item)
+	title = content["display_name"] or item.item_name
 	return {
 		"id": product_variant.name,
 		"handle": product_variant.route,
-		"title": product_variant.display_name or item.item_name,
+		"title": title,
 		"vendor": item.brand,
-		"color": product_variant.attribute_value,
-		"description_html": item.description or "",
+		"color": translate_term(product_variant.attribute_value),
+		"description_html": content["description"],
 		"images": detail["images"],
 		"collection": get_product_collection(product_variant.item_group),
-		"currency": get_store_currency(),
-		"price": min((variant["price"] for variant in variants), default=0),
+		"currency": prices.currency,
+		# A secondary market has no price for a product it does not sell.
+		"price": min(prices_paid, default=0 if prices.uses_store_prices else None),
 		"available": any(variant["available"] for variant in variants),
 		"options": get_options(product_variant, detail["available_sizes"]),
 		"variants": variants,
@@ -276,11 +311,7 @@ def get_product(handle: str) -> Product | None:
 			"average": flt(product_variant.average_rating),
 			"count": cint(product_variant.review_count),
 		},
-		"seo": {
-			"title": product_variant.meta_title or product_variant.display_name,
-			"description": product_variant.meta_description or "",
-			"noindex": bool(product_variant.noindex),
-		},
+		"seo": get_seo(content["meta_title"], title, content["meta_description"], product_variant.noindex),
 		"updated_at": str(product_variant.modified),
 	}
 
@@ -293,7 +324,7 @@ def list_collections() -> list[Collection]:
 		fields=COLLECTION_FIELDS,
 		order_by="display_order asc, category_name asc",
 	)
-	return [get_collection_shape(row) for row in rows]
+	return get_collection_shapes(rows)
 
 
 def get_collection(handle: str) -> Collection | None:
@@ -303,7 +334,7 @@ def get_collection(handle: str) -> Collection | None:
 		fields=COLLECTION_FIELDS,
 		limit=1,
 	)
-	return get_collection_shape(rows[0]) if rows else None
+	return get_collection_shapes(rows)[0] if rows else None
 
 
 def get_collection_filters(handle: str) -> dict:
@@ -314,67 +345,113 @@ def get_collection_filters(handle: str) -> dict:
 	return {"category": root["route_slug"], "subcategory": root["item_groups"]}
 
 
-def get_collection_shape(row) -> Collection:
+def get_collection_shapes(rows: list) -> list[Collection]:
+	for row in rows:
+		row.label = row.display_name or row.category_name
+	translated = translate_categories(rows)
+	return [get_collection_shape(row, fields) for row, fields in zip(rows, translated, strict=True)]
+
+
+def get_collection_shape(row, translated: dict) -> Collection:
 	return {
 		"handle": row.route_slug,
-		"title": row.display_name or row.category_name,
+		"title": translated["label"],
+		"description": translated["description"] or "",
 		"image": row.image,
+		"seo": get_seo(
+			translated["meta_title"], translated["label"], translated["meta_description"], row.noindex
+		),
 		"updated_at": str(row.modified),
+	}
+
+
+def get_seo(meta_title: str | None, title: str, meta_description: str | None, noindex) -> dict:
+	# `custom_title` lets a theme keep a set meta title that happens to equal the title.
+	return {
+		"title": meta_title or title,
+		"custom_title": bool(meta_title),
+		"description": meta_description or "",
+		"noindex": bool(noindex),
 	}
 
 
 def get_product_cards(cards: list[dict]) -> list[ProductCard]:
 	item_codes = [size["item_code"] for card in cards for size in card["sizes"]]
 	stock = get_available_stocks(item_codes, get_ecommerce_warehouse())
-	currency = get_store_currency()
-	return [get_product_card(card, stock, currency) for card in cards]
+	prices = MarketPrices.current()
+	# A size is for sale with both a market price and stock.
+	unpriced = prices.get_unpriced(item_codes)
+	sellable = {code for code in item_codes if code not in unpriced and stock.get(code, {}).get("in_stock")}
+	# utils.shape_product_cards titles every grid's cards; only a hand-built card lacks one.
+	set_product_titles([card for card in cards if "title" not in card])
+	return [get_product_card(card, sellable, prices) for card in cards]
 
 
-def get_product_card(card: dict, stock: dict, currency: str) -> ProductCard:
+def get_product_card(card: dict, sellable: set[str], prices: MarketPrices) -> ProductCard:
+	# shape_product_cards leaves no price on a product the market does not sell.
+	price = flt(card["effective_price"]) if card["effective_price"] is not None else None
+	# default_price is the compare-at rate of the size with the card price: crossed out only above it.
+	compare_at = card["default_price"] if cint(card["has_discount"]) else None
 	return {
 		"id": card["name"],
 		"handle": card["route"],
-		"title": get_card_title(card),
+		"title": card["title"],
 		"vendor": card["brand"],
 		"product_type": card["item_group"],
-		"color": card["attribute_value"],
+		"color": translate_term(card["attribute_value"]),
 		"image": card["image"],
 		"hover_image": card["hover_image"],
-		"currency": currency,
-		"price": flt(card["effective_price"]),
-		"compare_at_price": flt(card["default_price"]) if cint(card["has_discount"]) else None,
-		"available": any(stock.get(size["item_code"], {}).get("in_stock") for size in card["sizes"]),
+		"currency": prices.currency,
+		"price": price,
+		"compare_at_price": prices.compare_at(price, compare_at),
+		"available": price is not None and any(size["item_code"] in sellable for size in card["sizes"]),
 		"rating": {"average": flt(card["average_rating"]), "count": cint(card["review_count"])},
 		"updated_at": card["modified"],
 	}
 
 
-def get_card_title(card: dict) -> str:
-	if frappe.local.lang == "ar" and card["custom_item_name_ar"]:
-		return card["custom_item_name_ar"]
-	return card["display_name"] or card["item_name"]
+def get_product_content(product_variant, item) -> dict[str, str]:
+	# The product page shows its Item's description, translated as the product's own field.
+	source = {**product_variant.as_dict(), "description": item.description}
+	return translate_products([source], PRODUCT_CONTENT_FIELDS)[0]
 
 
-def get_variants(sizes: list[dict]) -> list[dict]:
-	settings = frappe.get_cached_doc("Commera Settings")
-	default_rate, sale_rate, _sale_ends = rates_by_item_code(
-		[size["item_code"] for size in sizes], settings.default_price_list, settings.sale_price_list
+def translate_products(
+	product_variants: list, fields: tuple[str, ...] = ("display_name",)
+) -> list[dict[str, str]]:
+	"""Product `fields` in the request language. Cards and the product page share it, so titles always match."""
+	translated = translate(product_variants, list(fields), get_localization(), doctype=PRODUCT_DOCTYPE)
+	return [{field: value.value for field, value in values.items()} for values in translated]
+
+
+def set_product_titles(rows: list[dict]) -> list[dict]:
+	"""Set each product row's `title`: its `display_name` in the request language, else its `item_name`.
+	The legacy pages and the summer theme read titles here, so they match the SDK's cards."""
+	for row, content in zip(rows, translate_products(rows), strict=True):
+		row["title"] = content["display_name"] or row.get("item_name") or ""
+	return rows
+
+
+def get_variants(prices: MarketPrices, sizes: list[dict]) -> list[dict]:
+	compare_at_rates, sale_rates, _sale_ends = rates_by_item_code(
+		[size["item_code"] for size in sizes], prices.compare_at_price_list, prices.sale_price_list
 	)
 	return [
-		get_variant(size, default_rate.get(size["item_code"]), sale_rate.get(size["item_code"]))
+		get_variant(prices, size, sale_rates.get(size["item_code"]), compare_at_rates.get(size["item_code"]))
 		for size in sizes
 	]
 
 
-def get_variant(size: dict, default_price: float | None, sale_price: float | None) -> dict:
-	price = flt(sale_price if sale_price is not None else default_price)
+def get_variant(prices: MarketPrices, size: dict, sale: float | None, compare_at: float | None) -> dict:
+	price = prices.price(sale, compare_at)
 	stock = size["stock_detail"]
 	return {
 		"id": size["item_code"],
-		"title": size["size"],
+		"title": translate_term(size["size"]),
+		"size": size["size"],
 		"price": price,
-		"compare_at_price": flt(default_price) if default_price and price < flt(default_price) else None,
-		"available": bool(stock.get("in_stock")),
+		"compare_at_price": prices.compare_at(price, compare_at),
+		"available": price is not None and bool(stock.get("in_stock")),
 		"quantity_available": None if stock.get("unlimited") else flt(stock.get("stock_qty")),
 	}
 
@@ -386,9 +463,10 @@ def get_options(product_variant, sizes: list[dict]) -> list[ProductOption]:
 		"Style Attribute Configurator", product_variant.configurator, "item_attribute"
 	)
 	if attribute and attribute != DEFAULT_OPTION_ATTRIBUTE:
-		options.append({"name": attribute, "values": get_sibling_values(product_variant)})
+		options.append({"name": translate_term(attribute), "values": get_sibling_values(product_variant)})
 	if len(sizes) > 1 or (sizes and sizes[0]["size"] != DEFAULT_SIZE_VALUE):
-		options.append({"name": _("Size"), "values": [{"name": size["size"]} for size in sizes]})
+		values = [{"name": translate_term(size["size"]), "value": size["size"]} for size in sizes]
+		options.append({"name": _("Size", lang=get_localization().language.code), "values": values})
 	return options
 
 
@@ -405,7 +483,8 @@ def get_sibling_values(product_variant) -> list[dict]:
 	swatches = get_swatch_map()
 	return [
 		{
-			"name": sibling.attribute_value,
+			"name": translate_term(sibling.attribute_value),
+			"value": sibling.attribute_value,
 			"handle": sibling.route,
 			"selected": sibling.name == product_variant.name,
 			"available": any(
@@ -416,6 +495,11 @@ def get_sibling_values(product_variant) -> list[dict]:
 		}
 		for sibling in siblings
 	]
+
+
+def translate_term(term: str | None) -> str | None:
+	# Option names and values are shared terms: one Frappe Translation covers every product.
+	return _(term, lang=get_localization().language.code) if term else term
 
 
 def get_product_collection(item_group: str | None) -> dict | None:
@@ -433,31 +517,3 @@ def links_item_group(node: dict, item_group: str) -> bool:
 	return item_group in node["item_groups"] or any(
 		links_item_group(child, item_group) for child in node["children"]
 	)
-
-
-def get_line_products(item_codes: list[str]) -> dict[str, CartLineProduct]:
-	"""The published product, size and image that sell each item."""
-	rows = frappe.get_all(
-		"Color Size Item",
-		filters={"item_code": ("in", item_codes or [""]), "parenttype": "Style Attribute Variant"},
-		fields=["item_code", "size", "parent"],
-	)
-	variants = {
-		row.name: row
-		for row in frappe.get_all(
-			"Style Attribute Variant",
-			filters={"name": ("in", [row.parent for row in rows] or [""]), "is_published": 1},
-			fields=["name", "route", "display_name"],
-		)
-	}
-	images = images_for_variants(list(variants))
-	return {
-		row.item_code: {
-			"handle": variants[row.parent].route,
-			"title": variants[row.parent].display_name,
-			"variant_title": row.size,
-			"image": images.get(row.parent, {}).get("image"),
-		}
-		for row in rows
-		if row.parent in variants
-	}

@@ -21,7 +21,7 @@
 						<div class="media-contant">
 							<h2 class="title">{{ _("Great saving on everyday essentials") }}</h2>
 							<h5 class="sub-title">{{ _("Up to 60% off + up to $107 Cashback") }}</h5>
-							<a href="/{{ frappe.lang or 'en' }}/products" class="btn btn-white btn-lg">{{ _("See All") }}</a>
+							<a href="{{ url('/products') | e }}" class="btn btn-white btn-lg">{{ _("See All") }}</a>
 						</div>
 						{# The stroke animation keys off the text length, so the watermark is its own short phrase. #}
 						<svg class="title animation-text" viewBox="0 0 1320 300">

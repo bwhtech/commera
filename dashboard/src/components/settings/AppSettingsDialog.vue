@@ -25,6 +25,7 @@ import IntegrationTabPanel from './IntegrationTabPanel.vue'
 import LocationsSettings from './LocationsSettings.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import ShippingSections from './ShippingSections.vue'
+import TranslationsSettings from './TranslationsSettings.vue'
 import WebhooksSettings from './webhooks/WebhooksSettings.vue'
 import { isCloudBillingAvailable, refreshBilling } from '../../data/cloudBilling'
 import { isCloudDomainsAvailable, refreshDomains } from '../../data/cloudDomains'
@@ -89,17 +90,18 @@ watch(
     :unmount-on-hide="false"
     @update:open="setOpen"
   >
-    <template #title>Commera settings</template>
+    <template #title>{{ __('Commera settings') }}</template>
 
     <header class="flex h-12 shrink-0 items-center gap-1 border-b border-outline-gray-1 px-2 sm:hidden">
       <Button
         variant="ghost"
         size="lg"
         icon="lucide-chevron-left"
-        :aria-label="settings.pickedTab ? 'Back' : 'Close'"
+        class="rtl:-scale-x-100"
+        :aria-label="settings.pickedTab ? __('Back') : __('Close')"
         @click="goBack"
       />
-      <h2 aria-hidden="true" class="text-lg-semibold text-ink-gray-8">Settings</h2>
+      <h2 aria-hidden="true" class="text-lg-semibold text-ink-gray-8">{{ __('Settings') }}</h2>
     </header>
 
     <SettingsSidebar
@@ -109,36 +111,40 @@ watch(
       <SettingsNavGroup>
         <SettingsNavItem value="general">
           <template #prefix><span class="lucide-store size-4" aria-hidden="true" /></template>
-          General
+          {{ __('General') }}
         </SettingsNavItem>
         <SettingsNavItem value="appearance">
           <template #prefix><span class="lucide-sun-moon size-4" aria-hidden="true" /></template>
-          Appearance
+          {{ __('Appearance') }}
         </SettingsNavItem>
         <SettingsNavItem value="emails">
           <template #prefix><span class="lucide-mail size-4" aria-hidden="true" /></template>
-          Emails
+          {{ __('Emails') }}
+        </SettingsNavItem>
+        <SettingsNavItem value="translations">
+          <template #prefix><span class="lucide-languages size-4" aria-hidden="true" /></template>
+          {{ __('Translations') }}
         </SettingsNavItem>
       </SettingsNavGroup>
 
-      <SettingsNavGroup label="Checkout">
+      <SettingsNavGroup :label="__('Checkout')">
         <SettingsNavItem value="payments">
           <template #prefix><span class="lucide-credit-card size-4" aria-hidden="true" /></template>
-          Payments
+          {{ __('Payments') }}
           <template #suffix>
             <span class="text-sm text-ink-gray-5 tabular-nums">{{ connectedCount }}</span>
           </template>
         </SettingsNavItem>
         <SettingsNavItem value="shipping">
           <template #prefix><span class="lucide-truck size-4" aria-hidden="true" /></template>
-          Shipping
+          {{ __('Shipping') }}
           <template #suffix>
             <span class="text-sm text-ink-gray-5 tabular-nums">{{ shippingConnected }}</span>
           </template>
         </SettingsNavItem>
         <SettingsNavItem value="locations">
           <template #prefix><span class="lucide-map-pin size-4" aria-hidden="true" /></template>
-          Pickup locations
+          {{ __('Pickup locations') }}
           <!-- Nothing while pickup is off: a count there would suggest shoppers can collect today. -->
           <template v-if="pickupLocations.pickupEnabled.value" #suffix>
             <span class="text-sm text-ink-gray-5 tabular-nums">{{ pickupLocations.activeCount.value }}</span>
@@ -146,44 +152,44 @@ watch(
         </SettingsNavItem>
         <SettingsNavItem value="checkout">
           <template #prefix><span class="lucide-shopping-cart size-4" aria-hidden="true" /></template>
-          General
+          {{ __('General') }}
         </SettingsNavItem>
       </SettingsNavGroup>
 
-      <SettingsNavGroup label="Connections">
+      <SettingsNavGroup :label="__('Connections')">
         <SettingsNavItem value="apps">
           <template #prefix><span class="lucide-chart-line size-4" aria-hidden="true" /></template>
-          Analytics
+          {{ __('Analytics') }}
         </SettingsNavItem>
         <SettingsNavItem value="plugins">
           <template #prefix><span class="lucide-blocks size-4" aria-hidden="true" /></template>
-          Plugins
+          {{ __('Plugins') }}
         </SettingsNavItem>
         <SettingsNavItem value="webhooks">
           <template #prefix><span class="lucide-webhook size-4" aria-hidden="true" /></template>
-          Webhooks
+          {{ __('Webhooks') }}
           <template v-if="webhookStore.hasFailingWebhook.value" #suffix>
-            <span class="size-2 rounded-full bg-surface-red-7" role="img" aria-label="A webhook is failing" />
+            <span class="size-2 rounded-full bg-surface-red-7" role="img" :aria-label="__('A webhook is failing')" />
           </template>
         </SettingsNavItem>
         <SettingsNavItem value="advanced">
           <template #prefix><span class="lucide-sliders-horizontal size-4" aria-hidden="true" /></template>
-          Advanced
+          {{ __('Advanced') }}
         </SettingsNavItem>
       </SettingsNavGroup>
 
-      <SettingsNavGroup v-if="isCloudBillingAvailable" label="Frappe Cloud">
+      <SettingsNavGroup v-if="isCloudBillingAvailable" :label="__('Frappe Cloud')">
         <SettingsNavItem value="billing">
           <template #prefix><span class="lucide-receipt size-4" aria-hidden="true" /></template>
-          Billing
+          {{ __('Billing') }}
         </SettingsNavItem>
         <SettingsNavItem v-if="isCloudDomainsAvailable" value="domains">
           <template #prefix><span class="lucide-globe size-4" aria-hidden="true" /></template>
-          Domains
+          {{ __('Domains') }}
         </SettingsNavItem>
       </SettingsNavGroup>
 
-      <SettingsNavGroup v-if="pluginTabs.length" label="Installed plugins">
+      <SettingsNavGroup v-if="pluginTabs.length" :label="__('Installed plugins')">
         <SettingsNavItem v-for="tab in pluginTabs" :key="tab.value" :value="tab.value">
           <template #prefix><Icon :name="tab.icon" class="size-4" /></template>
           {{ tab.label }}
@@ -202,6 +208,10 @@ watch(
         <EmailSettings :active="settings.open && settings.tab === 'emails'" />
       </SettingsPanel>
 
+      <SettingsPanel value="translations" class="min-w-0">
+        <TranslationsSettings />
+      </SettingsPanel>
+
       <SettingsPanel value="locations" class="min-w-0">
         <LocationsSettings :active="settings.open && settings.tab === 'locations'" />
       </SettingsPanel>
@@ -214,7 +224,7 @@ watch(
         <!-- The blank line keeps this tab's header level with the others. -->
         <SettingsPanelHeader>
           <div class="flex min-w-0 flex-col gap-1">
-            <h2 class="text-lg font-semibold text-ink-gray-8">Appearance</h2>
+            <h2 class="text-lg font-semibold text-ink-gray-8">{{ __('Appearance') }}</h2>
             <p class="text-base" aria-hidden="true">&nbsp;</p>
           </div>
         </SettingsPanelHeader>
@@ -227,8 +237,8 @@ watch(
         <IntegrationTabPanel
           :store="paymentIntegrations"
           :active="settings.tab === 'payments'"
-          title="Payments"
-          description="Turn on as many providers as you like. Each keeps its own keys."
+          :title="__('Payments')"
+          :description="__('Turn on as many providers as you like. Each keeps its own keys.')"
         >
           <CashOnDeliverySettings :active="settings.open && settings.tab === 'payments'" />
         </IntegrationTabPanel>
@@ -239,8 +249,8 @@ watch(
           v-slot="{ takeover, setTakeover }"
           :store="shippingIntegrations"
           :active="settings.tab === 'shipping'"
-          title="Shipping"
-          description="Carriers this store books with. Each quotes its own rates at checkout."
+          :title="__('Shipping')"
+          :description="__('Carriers this store books with. Each quotes its own rates at checkout.')"
         >
           <ShippingSections
             :configuring="takeover"

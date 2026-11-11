@@ -12,13 +12,13 @@
         <p x-show="poll_count >= max_polls" x-cloak>{{ _('This is taking longer than usual. We will email you once the payment goes through, and your orders page shows its status.') }}</p>
         <div class="mt-4 flex gap-4" x-show="poll_count >= max_polls" x-cloak>
             <button type="button" class="underline cursor-pointer" @click="check_again()">{{ _('Check again') }}</button>
-            <a class="underline" href="/{{ frappe.lang }}/account/orders">{{ _('My orders') }}</a>
+            <a class="underline" href="{{ url('/account/orders') | e }}">{{ _('My orders') }}</a>
         </div>
     </div>
     <div x-show="state === 'failed'" x-cloak>
         <h1 class="text-xl font-semibold text-gray-800">{{ _('Your payment did not go through') }}</h1>
         <p>{{ _('You have not been charged. Your bag still holds the items, so you can try again.') }}</p>
-        <a class="underline" href="/{{ frappe.lang }}/cart">{{ _('Back to your bag') }}</a>
+        <a class="underline" href="{{ url('/cart') | e }}">{{ _('Back to your bag') }}</a>
     </div>
     <div x-show="state === 'error'" x-cloak>
         <h1 class="text-xl font-semibold text-gray-800">{{ _('We could not check your payment') }}</h1>
@@ -28,7 +28,7 @@
     <div x-show="state === 'unconfirmed'" x-cloak>
         <h1 class="text-xl font-semibold text-gray-800">{{ _('We could not confirm this order') }}</h1>
         <p>{{ _('Your orders page shows the current status of every order you have placed.') }}</p>
-        <a class="underline" href="/{{ frappe.lang }}/account/orders">{{ _('My orders') }}</a>
+        <a class="underline" href="{{ url('/account/orders') | e }}">{{ _('My orders') }}</a>
     </div>
     <div x-show="state === 'confirmed'" x-cloak>
         <h1 class="text-xl font-semibold text-gray-800">{{ _('Your order is confirmed') }}</h1>
@@ -119,7 +119,7 @@
                 const order_name = data.order_name || data.ref_docname || reference_id;
                 if (order_name) track_purchase(data, order_name);
                 await Alpine.store("cart").take_cart_after_order();
-                window.location.href = data.order_link || `/{{frappe.lang}}/account/orders`;
+                window.location.href = data.order_link || {{ url('/account/orders') | tojson }};
             },
         }));
     });

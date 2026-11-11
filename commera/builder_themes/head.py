@@ -3,14 +3,14 @@ import os
 import frappe
 from markupsafe import Markup
 
-from commera.shop_themes.theme_resolver import get_commera_header_content
+from commera.shop_themes.storefront_header import render_storefront_header
 
 BEHAVIOURS_SCRIPT = "js/commera-builder.js"
 
 
 def commera_builder_head() -> Markup:
 	"""Jinja method for a Builder theme page's head: the storefront SDK and the data-commera-* behaviours."""
-	html = get_commera_header_content() + f'<script src="{get_behaviours_url()}" defer></script>'
+	html = render_storefront_header() + f'<script src="{get_behaviours_url()}" defer></script>'
 	return Markup(html)  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-markup
 
 

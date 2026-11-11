@@ -1,36 +1,37 @@
 import { isAdmin } from '../data/boot'
+import { __ } from '../data/translation'
 import { pluginNavItems } from './plugins'
 import { search } from './search'
 
 // The three reports. Home carries a live store's headline numbers, so none of
 // them repeats them: each answers a question Home deliberately does not.
 export const REPORTS = [
-  { label: 'Revenue', icon: 'lucide-banknote', to: '/analytics/revenue' },
-  { label: 'Inventory', icon: 'lucide-boxes', to: '/analytics/inventory' },
-  { label: 'Storefront', icon: 'lucide-globe', to: '/analytics/storefront' },
+  { label: __('Revenue'), icon: 'lucide-banknote', to: '/analytics/revenue' },
+  { label: __('Inventory'), icon: 'lucide-boxes', to: '/analytics/inventory' },
+  { label: __('Storefront'), icon: 'lucide-globe', to: '/analytics/storefront' },
 ]
 
 const ITEM = {
-  home: { label: 'Home', icon: 'lucide-house', to: '/' },
+  home: { label: __('Home'), icon: 'lucide-house', to: '/' },
   search: {
-    label: 'Search',
+    label: __('Search'),
     icon: 'lucide-search',
     shortcut: 'Mod+K',
     onClick: () => (search.open = true),
   },
-  orders: { label: 'Orders', icon: 'lucide-shopping-bag', to: '/orders' },
-  customers: { label: 'Customers', icon: 'lucide-users', to: '/customers' },
-  discounts: { label: 'Discounts', icon: 'lucide-badge-percent', to: '/discounts' },
+  orders: { label: __('Orders'), icon: 'lucide-shopping-bag', to: '/orders' },
+  customers: { label: __('Customers'), icon: 'lucide-users', to: '/customers' },
+  discounts: { label: __('Discounts'), icon: 'lucide-badge-percent', to: '/discounts' },
   // A parent with children is a disclosure, not a destination: /analytics
   // itself holds nothing, so opening it lands on the first report.
-  analytics: { label: 'Analytics', icon: 'lucide-chart-line', to: '/analytics', children: REPORTS },
-  products: { label: 'Products', icon: 'lucide-package', to: '/products' },
-  collections: { label: 'Collections', icon: 'lucide-layers', to: '/collections' },
-  attributes: { label: 'Attributes', icon: 'lucide-tags', to: '/attributes' },
-  theme: { label: 'Themes', icon: 'lucide-palette', to: '/storefront/theme' },
-  navigation: { label: 'Navigation', icon: 'lucide-list-tree', to: '/storefront/navigation' },
-  pages: { label: 'Pages', icon: 'lucide-file-text', to: '/storefront/pages' },
-  reviews: { label: 'Reviews', icon: 'lucide-star', to: '/reviews' },
+  analytics: { label: __('Analytics'), icon: 'lucide-chart-line', to: '/analytics', children: REPORTS },
+  products: { label: __('Products'), icon: 'lucide-package', to: '/products' },
+  collections: { label: __('Collections'), icon: 'lucide-layers', to: '/collections' },
+  attributes: { label: __('Attributes'), icon: 'lucide-tags', to: '/attributes' },
+  theme: { label: __('Themes'), icon: 'lucide-palette', to: '/storefront/theme' },
+  navigation: { label: __('Navigation'), icon: 'lucide-list-tree', to: '/storefront/navigation' },
+  pages: { label: __('Pages'), icon: 'lucide-file-text', to: '/storefront/pages' },
+  reviews: { label: __('Reviews'), icon: 'lucide-star', to: '/reviews' },
 }
 
 // The daily work sits ungrouped at the top; the two groups below it are the
@@ -41,14 +42,14 @@ const coreSections = [
     id: 'primary',
     items: [ITEM.home, ITEM.search, ITEM.orders, ITEM.customers, ITEM.discounts, ITEM.analytics],
   },
-  { id: 'catalog', label: 'Catalog', items: [ITEM.products, ITEM.collections, ITEM.attributes] },
-  { id: 'storefront', label: 'Storefront', items: [ITEM.theme, ITEM.navigation, ITEM.pages, ITEM.reviews] },
+  { id: 'catalog', label: __('Catalog'), items: [ITEM.products, ITEM.collections, ITEM.attributes] },
+  { id: 'storefront', label: __('Storefront'), items: [ITEM.theme, ITEM.navigation, ITEM.pages, ITEM.reviews] },
 ]
 
 const pluginItems = pluginNavItems()
 
 // Installed plugins sit in their own section after the core ones, which only shows when it has rows.
-const pluginSections = pluginItems.length ? [{ id: 'plugins', label: 'Plugins', items: pluginItems }] : []
+const pluginSections = pluginItems.length ? [{ id: 'plugins', label: __('Plugins'), items: pluginItems }] : []
 
 export const sections = isAdmin ? [...coreSections, ...pluginSections] : pluginSections
 

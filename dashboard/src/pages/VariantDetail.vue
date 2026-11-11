@@ -11,6 +11,7 @@ import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { errorMessage } from '../data/errors'
 import { pricePayload, shownPrice } from '../data/product'
 import { productRoute } from '../ia/routes'
+import { __ } from '../data/translation'
 
 const route = useRoute()
 
@@ -95,7 +96,7 @@ async function saveVariant() {
     for (const draft of Object.values(sizeDrafts)) draft.receiveQty = ''
   }
 
-  toast.success('Variant saved')
+  toast.success(__('Variant saved'))
   await productRequest.reload()
 }
 
@@ -123,26 +124,26 @@ const loadFailure = computed(() => {
   if (productRequest.error) {
     return {
       icon: 'lucide-triangle-alert',
-      title: 'Could not load this variant',
+      title: __('Could not load this variant'),
       description: errorMessage(productRequest.error),
-      backLabel: 'Back to products',
+      backLabel: __('Back to products'),
       backRoute: '/products',
     }
   }
   if (product.value) {
     return {
       icon: 'lucide-search-x',
-      title: 'Variant not found',
-      description: `${product.value.title} has no option ${route.params.variantId}. It may have been deleted.`,
-      backLabel: 'Back to product',
+      title: __('Variant not found'),
+      description: __('{0} has no option {1}. It may have been deleted.', [product.value.title, route.params.variantId]),
+      backLabel: __('Back to product'),
       backRoute: productRoute(product.value.name),
     }
   }
   return {
     icon: 'lucide-search-x',
-    title: 'Product not found',
-    description: `No product matches ${route.params.id}. It may have been deleted or renamed.`,
-    backLabel: 'Back to products',
+    title: __('Product not found'),
+    description: __('No product matches {0}. It may have been deleted or renamed.', [route.params.id]),
+    backLabel: __('Back to products'),
     backRoute: '/products',
   }
 })
@@ -154,14 +155,14 @@ const loadFailure = computed(() => {
       :title="variant.option"
       :back-to="productRoute(product.name)"
       :breadcrumbs="[
-        { label: 'Products', route: '/products' },
+        { label: __('Products'), route: '/products' },
         { label: product.title, route: productRoute(product.name) },
         { label: variant.option },
       ]"
     >
       <template #actions>
         <Button
-          label="Save"
+          :label="__('Save')"
           variant="solid"
           theme="gray"
           :loading="status === 'saving'"
@@ -184,9 +185,9 @@ const loadFailure = computed(() => {
         <section>
           <div class="flex items-start justify-between gap-4">
             <div>
-              <h2 class="text-lg-semibold text-ink-gray-8">Published</h2>
+              <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Published') }}</h2>
               <p class="mt-1 text-p-sm text-ink-gray-5">
-                Visible on the storefront to shoppers.
+                {{ __('Visible on the storefront to shoppers.') }}
                 <span v-if="variant.blockers.length" class="text-ink-amber-7">
                   {{ variant.blockers.join(' · ') }}
                 </span>
@@ -204,15 +205,15 @@ const loadFailure = computed(() => {
         </section>
 
         <section>
-          <h2 class="text-lg-semibold text-ink-gray-8">Photos</h2>
+          <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Photos') }}</h2>
           <p class="mt-1 text-p-sm text-ink-gray-5">
-            Shown when a shopper picks this combination. The first one is the cover.
+            {{ __('Shown when a shopper picks this combination. The first one is the cover.') }}
           </p>
           <VariantMedia class="mt-4" :variant="variant" @saved="productRequest.reload()" />
         </section>
 
         <section>
-          <h2 class="text-lg-semibold text-ink-gray-8">Options</h2>
+          <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Options') }}</h2>
           <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <!-- Read-only: this value is set at creation (ERPNext's variant
                  attributes) and renaming it here has no supported endpoint —
@@ -223,16 +224,16 @@ const loadFailure = computed(() => {
         </section>
 
         <section v-for="size in variant.sizes" :key="size.item_code">
-          <h2 class="text-lg-semibold text-ink-gray-8">Size {{ size.size }}</h2>
+          <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Size {0}', [size.size]) }}</h2>
           <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormControl v-model.number="sizeDrafts[size.item_code].price" type="number" label="Price" />
-            <FormControl v-model.number="sizeDrafts[size.item_code].compareAt" type="number" label="Compare at" />
-            <FormControl :model-value="size.item_code" label="SKU" disabled />
+            <FormControl v-model.number="sizeDrafts[size.item_code].price" type="number" :label="__('Price')" />
+            <FormControl v-model.number="sizeDrafts[size.item_code].compareAt" type="number" :label="__('Compare at')" />
+            <FormControl :model-value="size.item_code" :label="__('SKU')" disabled />
             <!-- No barcode field surfaced by the admin API. -->
-            <FormControl model-value="" label="Barcode" disabled />
+            <FormControl model-value="" :label="__('Barcode')" disabled />
           </div>
           <div class="mt-4 flex items-center justify-between rounded-4 border border-outline-gray-1 px-4 py-3">
-            <span class="text-base text-ink-gray-7">On hand: {{ size.stock }} · Committed: {{ size.committed }}</span>
+            <span class="text-base text-ink-gray-7">{{ __('On hand: {0} · Committed: {1}', [size.stock, size.committed]) }}</span>
             <!-- commera only exposes receiving stock in (Style Attribute
                  Variant.receive_stock, additive) — there is no "set to X"
                  adjustment, so this is a quantity to add on Save, not the new total. -->
@@ -241,7 +242,7 @@ const loadFailure = computed(() => {
               type="number"
               size="sm"
               class="w-28"
-              placeholder="Receive qty"
+              :placeholder="__('Receive qty')"
             />
           </div>
         </section>
@@ -250,8 +251,8 @@ const loadFailure = computed(() => {
           v-if="!variant.sizes.length"
           compact
           icon="lucide-ruler"
-          title="No sizes yet"
-          description="Add a size so this variant can be stocked and sold."
+          :title="__('No sizes yet')"
+          :description="__('Add a size so this variant can be stocked and sold.')"
         />
       </div>
     </PageBody>
@@ -264,7 +265,7 @@ const loadFailure = computed(() => {
       :title="route.params.variantId"
       :back-to="productRoute(route.params.id)"
       :breadcrumbs="[
-        { label: 'Products', route: '/products' },
+        { label: __('Products'), route: '/products' },
         { label: route.params.id, route: productRoute(route.params.id) },
         { label: route.params.variantId },
       ]"
@@ -298,7 +299,7 @@ const loadFailure = computed(() => {
       :title="route.params.variantId"
       :back-to="productRoute(route.params.id)"
       :breadcrumbs="[
-        { label: 'Products', route: '/products' },
+        { label: __('Products'), route: '/products' },
         { label: route.params.id, route: productRoute(route.params.id) },
         { label: route.params.variantId },
       ]"

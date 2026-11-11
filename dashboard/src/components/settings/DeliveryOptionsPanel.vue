@@ -16,6 +16,7 @@ import ImportCarrierServicesDialog from './ImportCarrierServicesDialog.vue'
 import SettingsSkeleton from './SettingsSkeleton.vue'
 import { useDeliveryOptions } from '../../data/deliveryOptions'
 import { isPriced, useShippingRates } from '../../data/shippingRates'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   // Opening the Shipping tab should fetch; switching away and back should not.
@@ -90,20 +91,21 @@ async function toggle(option, enabled) {
   })
   if (!saved) return
 
-  toast.success(enabled ? `${option.title} is on` : `${option.title} is off`)
+  toast.success(enabled ? __('{0} is on', [option.title]) : __('{0} is off', [option.title]))
 }
 
 function confirmDelete(option) {
   dialog.confirm({
-    title: `Delete ${option.title}?`,
-    message:
+    title: __('Delete {0}?', [option.title]),
+    message: __(
       'Shoppers stop being offered it at checkout. Orders already placed with it keep the name they were placed under.',
+    ),
     theme: 'red',
-    confirmLabel: 'Delete',
+    confirmLabel: __('Delete'),
     onConfirm: async () => {
       const saved = await store.mutate('delete_delivery_option', { name: option.name })
       if (!saved) return
-      toast.success(`${option.title} deleted`)
+      toast.success(__('{0} deleted', [option.title]))
     },
   })
 }
@@ -122,22 +124,22 @@ function confirmDelete(option) {
 
   <template v-else>
     <SettingsPanelHeader
-      title="Delivery options"
-      description="What shoppers pick at checkout."
+      :title="__('Delivery options')"
+      :description="__('What shoppers pick at checkout.')"
     >
       <template #actions>
         <Badge
           v-if="store.options.value.length"
-          :label="`${store.enabledCount.value} of ${store.options.value.length} on`"
+          :label="__('{0} of {1} on', [store.enabledCount.value, store.options.value.length])"
           theme="gray"
           variant="subtle"
         />
         <Dropdown v-if="store.loaded.value && importActions.length" :options="importActions">
-          <Button label="Import from carrier" icon-right="lucide-chevron-down" />
+          <Button :label="__('Import from carrier')" icon-right="lucide-chevron-down" />
         </Dropdown>
         <Button
           v-if="store.loaded.value"
-          label="Add option"
+          :label="__('Add option')"
           icon-left="lucide-plus"
           variant="solid"
           theme="gray"
@@ -152,10 +154,10 @@ function confirmDelete(option) {
         v-if="store.loadError.value"
         compact
         icon="lucide-triangle-alert"
-        title="These could not be loaded"
-        description="Shoppers are still offered whatever is stored — this panel just cannot say what."
+        :title="__('These could not be loaded')"
+        :description="__('Shoppers are still offered whatever is stored — this panel just cannot say what.')"
       >
-        <Button label="Try again" variant="subtle" theme="gray" @click="store.load()" />
+        <Button :label="__('Try again')" variant="subtle" theme="gray" @click="store.load()" />
       </EmptyState>
 
       <!-- Three lines, because an option row carries its name, its description and its price. -->
@@ -169,8 +171,8 @@ function confirmDelete(option) {
         v-else-if="!store.options.value.length"
         compact
         icon="lucide-truck"
-        title="Checkout offers nothing to pick"
-        description="There are no delivery options yet. Import the services a connected carrier sells, or add one of your own."
+        :title="__('Checkout offers nothing to pick')"
+        :description="__('There are no delivery options yet. Import the services a connected carrier sells, or add one of your own.')"
       />
 
       <div v-else class="divide-y divide-outline-gray-1">

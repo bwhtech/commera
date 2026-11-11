@@ -5,6 +5,8 @@ import { Button } from 'frappe-ui'
 import SettingsFieldControl from '../settings/SettingsFieldControl.vue'
 import { sectionSettingToField } from '../../utils/sectionSettingToField'
 import { isTranslatable, maxProducts } from '../../data/themeLayout'
+import { language, languageDirection } from '../../data/boot'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   editor: { type: Object, required: true },
@@ -21,17 +23,18 @@ const fields = computed(() => {
     const field = sectionSettingToField(setting)
     if (setting.type === 'products') {
       field.max_products = maxProducts(current.sectionSchema)
-      field.description = `Pick up to ${field.max_products}.`
+      field.description = __('Pick up to {0}.', [field.max_products])
     }
     field.placeholder = settingPlaceholder(current.owner, setting)
     return { setting, field }
   })
 })
 
+// The browser's own list grammar, so "a, b or c" reads right in the admin's language.
+const BLOCK_LIST = new Intl.ListFormat([language, 'en'], { type: 'disjunction' })
+
 const blockNames = computed(() =>
-  Object.entries(selected.value?.schema?.blocks ?? {})
-    .map(([type, blockSchema]) => blockSchema.name ?? type)
-    .join(' or '),
+  BLOCK_LIST.format(Object.entries(selected.value?.schema?.blocks ?? {}).map(([type, blockSchema]) => blockSchema.name ?? type)),
 )
 
 function back() {
@@ -66,8 +69,8 @@ function settle(setting, value) {
       <div class="flex items-center gap-1">
         <Button
           variant="ghost"
-          icon="lucide-arrow-left"
-          :aria-label="selected.kind === 'block' ? `Back to ${selected.sectionSchema.name}` : 'Back'"
+          icon="lucide-arrow-left rtl:-scale-x-100"
+          :aria-label="selected.kind === 'block' ? __('Back to {0}', [selected.sectionSchema.name]) : __('Back')"
           @click="back"
         />
         <h2 class="min-w-0 flex-1 truncate text-lg-semibold text-ink-gray-9">{{ selected.schema.name }}</h2>
@@ -75,25 +78,29 @@ function settle(setting, value) {
           v-if="selected.kind === 'section'"
           variant="ghost"
           :icon="selected.section.hidden ? 'lucide-eye-off' : 'lucide-eye'"
-          :aria-label="selected.section.hidden ? 'Show section' : 'Hide section'"
+          :aria-label="selected.section.hidden ? __('Show section') : __('Hide section')"
           @click="toggleHidden(selected.group, selected.section.id)"
         />
-        <Button variant="ghost" icon="lucide-trash-2" :aria-label="`Remove ${selected.kind}`" @click="remove" />
+        <Button variant="ghost" icon="lucide-trash-2" :aria-label="selected.kind === 'block' ? __('Remove block') : __('Remove section')" @click="remove" />
       </div>
       <p v-if="selected.kind === 'block'" class="mt-1 text-sm text-ink-gray-5">
-        In {{ selected.sectionSchema.name }}
+        {{ __('In {0}', [selected.sectionSchema.name]) }}
       </p>
       <p v-else-if="selected.section.hidden" class="mt-1 text-sm text-ink-gray-5">
-        Hidden. It stays in the layout but the store does not show it.
+        {{ __('Hidden. It stays in the layout but the store does not show it.') }}
       </p>
     </div>
 
     <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
       <p v-if="!fields.length && blockNames" class="text-p-sm text-ink-gray-5">
-        This section has no settings of its own. Add a {{ blockNames }} with the + on its row in the list.
+        {{ __('This section has no settings of its own. Add a {0} with the + on its row in the list.', [blockNames]) }}
       </p>
       <p v-else-if="!fields.length" class="text-p-sm text-ink-gray-5">
-        This {{ selected.kind }} has no settings. Drag it in the list to move it.
+        {{
+          selected.kind === 'block'
+            ? __('This block has no settings. Drag it in the list to move it.')
+            : __('This section has no settings. Drag it in the list to move it.')
+        }}
       </p>
       <div class="flex flex-col gap-4">
         <div v-for="{ setting, field } in fields" :key="`${state.language}:${field.fieldname}`">
@@ -105,7 +112,7 @@ function settle(setting, value) {
             :model-value="settingValue(selected.owner, setting)"
             :class="field.fieldtype === 'Check' ? undefined : '!w-full'"
             :field="field"
-            :dir="isTranslatable(setting) && state.language === 'ar' ? 'rtl' : undefined"
+            :dir="isTranslatable(setting) ? languageDirection(state.language) : undefined"
             @update:model-value="update(setting, $event)"
             @change="settle(setting, $event)"
           />
@@ -117,7 +124,7 @@ function settle(setting, value) {
 
   <div v-else class="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
     <span class="lucide-mouse-pointer-click size-6 text-ink-gray-4" aria-hidden="true" />
-    <p class="text-base text-ink-gray-7">Select a section</p>
-    <p class="text-p-sm text-ink-gray-5">Click it in the preview or in the list to change its settings.</p>
+    <p class="text-base text-ink-gray-7">{{ __('Select a section') }}</p>
+    <p class="text-p-sm text-ink-gray-5">{{ __('Click it in the preview or in the list to change its settings.') }}</p>
   </div>
 </template>

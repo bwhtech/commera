@@ -1,12 +1,17 @@
 import { computed, effectScope, reactive, ref, watch } from 'vue'
 import { refDebounced } from '@vueuse/core'
 import { createAdminCaller } from './adminCaller'
+import { storefrontLanguages } from './boot'
 import { useAdminAction, useAdminRead } from './api'
+import { isStaleWrite } from './errors'
+import { __ } from './translation'
 import { rememberPreviewEntry, rememberedPreviewEntry } from '../ia/previewEntry'
 import { capturePage } from '../utils/capturePage'
 import { createSequence } from '../utils/sequence'
 import { readableName } from '../utils/sectionSettingToField'
 
+// Section text in the default language is the source the other languages translate.
+const SOURCE_LANGUAGE = storefrontLanguages[0]?.code ?? 'en'
 const DEFAULT_MAX_BLOCKS = 50
 const DEFAULT_MAX_PRODUCTS = 8
 const SEARCH_DEBOUNCE_MS = 300
@@ -20,7 +25,7 @@ const thumbnailAction = effectScope(true).run(() => useAdminAction('theme_layout
 const THUMBNAIL_SIZE = { width: 1280, height: 800, scale: 2, outputWidth: 480, quality: 0.85 }
 
 async function captureThumbnail(theme, scheme) {
-  const params = new URLSearchParams({ theme, page: 'index', lang: 'en' })
+  const params = new URLSearchParams({ theme, page: 'index', lang: SOURCE_LANGUAGE })
   let followsSystem = false
   const image = await capturePage(`/theme_editor_preview?${params}`, {
     ...THUMBNAIL_SIZE,
@@ -86,11 +91,11 @@ export function canAddBlocks(schema) {
 
 export const SECTION_GROUPS = ['header_group', 'footer_group']
 
-const GROUP_LABELS = { header_group: 'Header group', footer_group: 'Footer group' }
+const GROUP_LABELS = { header_group: __('Header group'), footer_group: __('Footer group') }
 
 export function pageLabel(page) {
   if (GROUP_LABELS[page]) return GROUP_LABELS[page]
-  if (page === 'index') return 'Home page'
+  if (page === 'index') return __('Home page')
   return readableName(page)
 }
 
@@ -109,6 +114,8 @@ function createPart(group, data) {
     layout,
     savedLayout: stableJson(data.draft_layout),
     liveLayout: stableJson(data.published_layout ?? data.default_layout),
+    // Sent back with each save, so the server refuses one over a change this editor never loaded.
+    revision: data.revision,
   }
 }
 
@@ -126,7 +133,7 @@ export function createLayoutEditor(theme) {
     settings: { doctype: null, groups: [] },
     live: false,
     parts: [],
-    language: 'en',
+    language: SOURCE_LANGUAGE,
     device: 'desktop',
     selection: null,
     previewToken: 0,
@@ -256,11 +263,13 @@ export function createLayoutEditor(theme) {
   async function runOnParts(method, parts, withLayout = true) {
     for (const part of parts) {
       const params = { theme, page: part.group }
-      if (withLayout) params.layout = clone(part.layout)
-      const data = await layoutCaller.call(method, params)
+      if (withLayout) Object.assign(params, { layout: clone(part.layout), revision: part.revision })
+      const { data, error } = await layoutCaller.attempt(method, params)
       if (!data) {
-        // Parts before this one have landed; the preview and badges must show them.
-        commit()
+        // The wrapper already toasted why. A stale page reloads, since saving it again would fail
+        // the same way; otherwise parts before this one have landed and the preview must show them.
+        if (isStaleWrite(error)) await load(state.page)
+        else commit()
         return false
       }
       const layout = part.layout
@@ -392,22 +401,24 @@ export function createLayoutEditor(theme) {
   function settingValue(owner, setting) {
     const value = owner.settings?.[setting.id] ?? setting.default
     if (!isTranslatable(setting)) return value
-    if (value && typeof value === 'object') return value[state.language] ?? ''
-    return state.language === 'en' ? (value ?? '') : ''
+    if (value && typeof value === 'object') {
+      return value[state.language] ?? (state.language === SOURCE_LANGUAGE ? value.en : null) ?? ''
+    }
+    return state.language === SOURCE_LANGUAGE ? (value ?? '') : ''
   }
 
   function settingPlaceholder(owner, setting) {
-    if (!isTranslatable(setting) || state.language === 'en') return ''
+    if (!isTranslatable(setting) || state.language === SOURCE_LANGUAGE) return ''
     const value = owner.settings?.[setting.id] ?? setting.default
-    return (value && typeof value === 'object' ? value.en : value) ?? ''
+    return (value && typeof value === 'object' ? (value[SOURCE_LANGUAGE] ?? value.en) : value) ?? ''
   }
 
   function translatedValue(current, value) {
-    if (state.language === 'en') {
-      return current && typeof current === 'object' ? { ...current, en: value } : value
+    if (state.language === SOURCE_LANGUAGE) {
+      return current && typeof current === 'object' ? { ...current, [SOURCE_LANGUAGE]: value } : value
     }
 
-    const translations = current && typeof current === 'object' ? { ...current } : current ? { en: current } : {}
+    const translations = current && typeof current === 'object' ? { ...current } : current ? { [SOURCE_LANGUAGE]: current } : {}
     if (value === '' || value === null) delete translations[state.language]
     else translations[state.language] = value
     return translations

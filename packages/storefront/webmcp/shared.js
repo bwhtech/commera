@@ -10,7 +10,3 @@ export function navigate(path) {
 	globalThis.location.assign(path);
 	return { navigating_to: path };
 }
-
-export function get_language_root() {
-	return `/${globalThis.commera_storefront_config?.language ?? 'en'}`;
-}

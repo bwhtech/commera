@@ -5,7 +5,7 @@ import { draft } from '../../../ia/onboarding'
 
 <template>
   <div class="space-y-4">
-    <Switch v-model="draft.codEnabled" label="Cash on delivery" />
-    <Switch v-model="draft.allowGuestCheckout" label="Guest checkout" />
+    <Switch v-model="draft.codEnabled" :label="__('Cash on delivery')" />
+    <Switch v-model="draft.allowGuestCheckout" :label="__('Guest checkout')" />
   </div>
 </template>

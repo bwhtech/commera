@@ -1,7 +1,5 @@
 function product_url(product) {
-	return `/${document.documentElement.lang}/products/${encodeURIComponent(
-		product.handle,
-	)}`;
+	return commera.url(`/products/${encodeURIComponent(product.handle)}`);
 }
 
 async function save_change(state, change, action = true) {
@@ -92,7 +90,10 @@ function typeahead() {
 		product_url,
 
 		money(product) {
-			return commera.format.money(product.price, product.currency);
+			// A product the market does not sell has no price.
+			return product.price === null
+				? ''
+				: commera.format.money(product.price, product.currency);
 		},
 	};
 }
@@ -163,7 +164,8 @@ function product_form(product) {
 		},
 
 		get price() {
-			return this.variant?.price ?? product.price;
+			// A variant the market does not sell has a null price, never another variant's.
+			return this.variant ? this.variant.price : product.price;
 		},
 
 		get compare_at_price() {
@@ -176,7 +178,9 @@ function product_form(product) {
 		},
 
 		money(amount) {
-			return commera.format.money(amount, product.currency);
+			return amount === null
+				? ''
+				: commera.format.money(amount, product.currency);
 		},
 
 		move_image(step, count) {
@@ -477,6 +481,15 @@ function checkout(config) {
 				this.step = 'payment';
 				this.error = error.message;
 			}
+		},
+
+		// Until the checkout and the cart are both read; a failed or empty cart shows its own state.
+		get is_loading() {
+			const cart = this.$store.cart;
+			if (this.sign_in_required || cart.status === 'failed') {
+				return false;
+			}
+			return cart.status === 'loading' || (!this.ready && cart.count > 0);
 		},
 
 		get shown_shipping_option() {
@@ -957,7 +970,7 @@ document.addEventListener('alpine:init', () => {
 		async log_out() {
 			await save_change_and_leave(this, async () => {
 				await commera.auth.log_out();
-				location.assign(`/${document.documentElement.lang}`);
+				location.assign(commera.url('/'));
 			});
 		},
 	}));

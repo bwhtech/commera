@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, useId, watch } from 'vue'
 import { Button, Combobox, Dialog, FormControl, toast } from 'frappe-ui'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   section: { type: Object, default: null },
@@ -16,8 +17,8 @@ const open = defineModel('open', { type: Boolean, required: true })
 const formId = useId()
 
 const SOURCE_OPTIONS = [
-  { label: 'Custom URL', value: 'url' },
-  { label: 'Existing page', value: 'page' },
+  { label: __('Custom URL'), value: 'url' },
+  { label: __('Existing page'), value: 'page' },
 ]
 
 const source = ref('url')
@@ -56,7 +57,7 @@ async function save() {
     if (!saved) return
 
     open.value = false
-    toast.success(isEdit.value ? 'Link saved' : 'Link added')
+    toast.success(isEdit.value ? __('Link saved') : __('Link added'))
   } finally {
     saving.value = false
   }
@@ -64,36 +65,36 @@ async function save() {
 </script>
 
 <template>
-  <Dialog v-model:open="open" :title="isEdit ? 'Edit link' : 'Add a link'">
+  <Dialog v-model:open="open" :title="isEdit ? __('Edit link') : __('Add a link')">
     <template #default>
       <form :id="formId" class="space-y-4" @submit.prevent="save">
-        <p v-if="section" class="text-p-base text-ink-gray-7">In the {{ section.title }} column.</p>
+        <p v-if="section" class="text-p-base text-ink-gray-7">{{ __('In the {0} column.', [section.title]) }}</p>
 
         <FormControl
           v-if="!isEdit"
           v-model="source"
           type="select"
-          label="Link source"
+          :label="__('Link source')"
           :options="SOURCE_OPTIONS"
-          description="Pick a page to fill the label and address in for you."
+          :description="__('Pick a page to fill the label and address in for you.')"
         />
 
         <Combobox
           v-if="source === 'page'"
           v-model="page"
           :options="pageOptions"
-          label="Page"
-          placeholder="Search pages"
+          :label="__('Page')"
+          :placeholder="__('Search pages')"
         />
 
-        <FormControl v-model="label" label="Label" required placeholder="Shipping & returns" />
+        <FormControl v-model="label" :label="__('Label')" required :placeholder="__('Shipping & returns')" />
 
         <FormControl
           v-model="url"
-          label="URL"
+          :label="__('URL')"
           required
           placeholder="/en/products"
-          description="Where this link sends shoppers."
+          :description="__('Where this link sends shoppers.')"
         />
       </form>
     </template>
@@ -106,7 +107,7 @@ async function save() {
         variant="solid"
         theme="gray"
         :loading="saving"
-        :label="isEdit ? 'Save' : 'Add'"
+        :label="isEdit ? __('Save') : __('Add')"
       />
     </template>
   </Dialog>

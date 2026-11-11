@@ -78,8 +78,9 @@ async function openThemeSettings(page) {
 async function pickPreviewOption(page, label) {
   await page.click('[data-zoom-controls] button[aria-label="More preview options"]')
   await page.waitForSelector('[data-preview-options]', { visible: true })
-  const directions = { 'Left to right': 'en', 'Right to left': 'ar' }
-  if (directions[label]) await page.click(`[data-preview-options] [aria-label="Text direction"] [data-value="${directions[label]}"]`)
+  // Assumes the site publishes English and Arabic.
+  const languages = { 'Left to right': 'en', 'Right to left': 'ar' }
+  if (languages[label]) await page.click(`[data-preview-options] [aria-label="Preview language"] [data-value="${languages[label]}"]`)
   else await page.click(`[data-preview-options] [aria-label="${label}"]`)
   await page.keyboard.press('Escape')
   await wait(400)

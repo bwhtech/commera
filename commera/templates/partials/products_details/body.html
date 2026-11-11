@@ -37,7 +37,7 @@
         this.qty +=1; 
     }
     else { 
-        const message = $store.i18n.t("Only") + " " + this.max_qty + " " + $store.i18n.t("left in stock");
+        const message = commera.t("Only {0} left", this.max_qty);
         toast(message, { type: "warning" }); 
         } 
     },
@@ -55,16 +55,12 @@
         <div class="flex flex-2 flex-col pt-6">
             <div class="ipad:max-w-md">
 
-                <a href="/{{frappe.lang}}/products?brands={{product.brand | urlencode}}"
+                <a href="{{ url('/products?brands=' ~ (product.brand | urlencode)) | e }}"
                     class="mb-2 text-xl font-bold md:mb-0 md:text-3xl ">
                     {{ _(product.brand|title) }}
                 </a>
                 <h2 class="mb-3.5 text-base md:mb-6 md:text-xl ">
-                    {% if frappe.lang == "en" %}
-                    {{ _(product.item_name|title) }}
-                    {% else %}
-                    {{ _(product.custom_item_name_ar or product.item_name|title) }}
-                    {% endif %}
+                    {{ product_title|title|e }}
                 </h2>
                 {% if reviews.review_count %}
                 <a href="#product-reviews" class="mb-3.5 flex items-center gap-1.5 md:mb-6 w-fit">
@@ -191,11 +187,7 @@
                                 class="w-34 h-45 object-cover rounded-lg">
                         </div>
                         <p class="text-accent">
-                            {% if frappe.lang == "en" %}
-                            {{ _(product.item_name) }}
-                            {% else %}
-                            {{ _(product.custom_item_name_ar or '') }}
-                            {% endif %}
+                            {{ product_title|e }}
                         </p>
 
                         <div class="flex justify-center gap-4 mt-6">
@@ -203,7 +195,7 @@
                                 class="px-4 py-2 bg-gray-200  hover:bg-gray-300 rounded-md cursor-pointer">
                                 {{ _("Continue Shopping") }}
                             </button>
-                            <a href="/{{frappe.lang}}/cart"
+                            <a href="{{ url('/cart') | e }}"
                                 class="px-4 py-2 bg-accent text-white  opacity-90 hover:opacity-100  rounded-md">
                                 {{ _("Go to Cart") }}
                             </a>
@@ -219,7 +211,7 @@
                             {% for color in other_variants %}
 
                             <div class="flex flex-col items-start">
-                                <a href="/{{frappe.lang}}/products/{{color.route}}">
+                                <a href="{{ url('/products/' ~ color.route) | e }}">
                                     <img src="{{color.image or " /assets/commera/images/1.jpg"}}" alt=""
                                         class="w-18 h-25 object-cover rounded-lg">
                                 </a>
@@ -277,12 +269,8 @@
                                         </li>
 
                                     </ul>
-                                    {% if selected_item.description != selected_item.item_code %}
-                                    {% if frappe.lang == "en" %}
-                                    {{selected_item.description}}
-                                    {% else %}
-                                    {{selected_item.description_ar or selected_item.description}}
-                                    {% endif %}
+                                    {% if show_product_description %}
+                                    {{ product_description }}
                                     {% endif %}
                                 </div>
                             </div>
@@ -414,8 +402,8 @@
         <div class="mt-9 mb-18 grid grid-cols-1 sm:grid-cols-2 md:mt-11 md:grid-cols-3 md:gap-8 lg:grid-cols-4">
             {% for item in recommended_items %}
             <div class="mb-11 md:mb-4">
-                {% set product_name = item.item_name if frappe.lang == "en" else item.custom_item_name_ar or "" %}
-                <a href="/{{frappe.lang}}/products/{{item.route}}">
+                {% set product_name = item.title or item.item_name %}
+                <a href="{{ url('/products/' ~ item.route) | e }}">
                     {{ item_card(
                     image=item.image or "/assets/commera/images/1.jpg",
                     brand=item.brand,

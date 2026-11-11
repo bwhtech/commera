@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { __ } from '../../data/translation'
 import { SAMPLE_PRODUCTS } from '../../ia/onboarding'
 import SwatchDot from '../SwatchDot.vue'
 import ShippingArt from './ShippingArt.vue'
@@ -23,7 +24,7 @@ const METHOD_DELAYS = ['delay-0', 'delay-75', 'delay-150']
 const productIcons = computed(() => (SAMPLE_PRODUCTS[props.store.category] ?? SAMPLE_PRODUCTS.Other).slice(0, 3))
 const methods = computed(() => [
   { label: 'UPI', on: false },
-  { label: 'Card', on: false },
+  { label: __('Card'), on: false },
   { label: 'COD', on: props.store.codEnabled },
 ])
 const swatches = computed(() => [props.store.primaryColor, null, null])
@@ -46,7 +47,7 @@ const swatches = computed(() => [props.store.primaryColor, null, null])
         </div>
         <p class="text-2xs text-ink-gray-5 tabular-nums">•••• 4242</p>
       </div>
-      <div class="absolute bottom-3 right-4 flex gap-1">
+      <div class="absolute bottom-3 end-4 flex gap-1">
         <span
           v-for="(method, index) in methods"
           :key="method.label"
@@ -77,7 +78,7 @@ const swatches = computed(() => [props.store.primaryColor, null, null])
         </div>
       </div>
       <div
-        class="ml-5 flex h-[5.375rem] w-16 items-center justify-center rounded-4 border border-dashed border-outline-gray-3 text-ink-gray-5 transition-[border-color,color,transform] duration-300 ease-out-strong motion-reduce:transition-none group-hover:-translate-y-1 group-hover:border-outline-gray-5 group-hover:text-ink-gray-8"
+        class="ms-5 flex h-[5.375rem] w-16 items-center justify-center rounded-4 border border-dashed border-outline-gray-3 text-ink-gray-5 transition-[border-color,color,transform] duration-300 ease-out-strong motion-reduce:transition-none group-hover:-translate-y-1 group-hover:border-outline-gray-5 group-hover:text-ink-gray-8"
       >
         <span class="lucide-plus size-5" />
       </div>

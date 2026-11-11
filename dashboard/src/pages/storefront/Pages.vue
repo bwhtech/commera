@@ -40,10 +40,10 @@ function detailRoute(name) {
 </script>
 
 <template>
-  <AppPageHeader title="Pages">
+  <AppPageHeader :title="__('Pages')">
     <template #actions>
       <Button
-        label="Add page"
+        :label="__('Add page')"
         icon-left="lucide-plus"
         variant="solid"
         theme="gray"
@@ -54,23 +54,23 @@ function detailRoute(name) {
 
   <PageBody width="wide">
     <p class="text-p-sm text-ink-gray-5">
-      Standalone pages — About us, shipping, returns — that your footer and menus can link to.
+      {{ __('Standalone pages — About us, shipping, returns — that your footer and menus can link to.') }}
     </p>
 
     <EmptyState
       v-if="loadError"
       icon="lucide-triangle-alert"
-      title="Could not load your pages"
+      :title="__('Could not load your pages')"
       :description="errorMessage(loadError)"
     />
 
     <EmptyState
       v-else-if="!loading && !pages.length"
       icon="lucide-file-text"
-      title="No pages yet"
-      description="Add one to tell shoppers about your store, your shipping or your returns."
+      :title="__('No pages yet')"
+      :description="__('Add one to tell shoppers about your store, your shipping or your returns.')"
     >
-      <Button variant="subtle" theme="gray" label="Add page" route="/storefront/pages/new" />
+      <Button variant="subtle" theme="gray" :label="__('Add page')" route="/storefront/pages/new" />
     </EmptyState>
 
     <template v-else>
@@ -81,10 +81,10 @@ function detailRoute(name) {
           :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['minmax(9rem,1fr)', 'minmax(11rem,1fr)', '7rem', '6rem'] }"
         >
           <ListHeader class="max-sm:hidden">
-            <ListHeaderCell>Page</ListHeaderCell>
-            <ListHeaderCell>Path</ListHeaderCell>
-            <ListHeaderCell>Status</ListHeaderCell>
-            <ListHeaderCell>Updated</ListHeaderCell>
+            <ListHeaderCell>{{ __('Page') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Path') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Status') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Updated') }}</ListHeaderCell>
           </ListHeader>
           <ListSkeleton v-if="loading && !pages.length" :columns="skeletonColumns" />
           <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">

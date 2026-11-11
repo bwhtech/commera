@@ -16,12 +16,12 @@ watch(
 </script>
 
 <template>
-  <DiscountSection title="Applies to">
-    <RadioGroup v-model="discount.applies_to" aria-label="Applies to">
-      <Radio value="All Products" label="All products" />
-      <Radio value="Specific Products" label="Specific products" />
-      <Radio value="Specific Collections" label="Specific collections" description="Includes their sub-collections." />
-      <Radio value="Specific Brands" label="Specific brands" />
+  <DiscountSection :title="__('Applies to')">
+    <RadioGroup v-model="discount.applies_to" :aria-label="__('Applies to')">
+      <Radio value="All Products" :label="__('All products')" />
+      <Radio value="Specific Products" :label="__('Specific products')" />
+      <Radio value="Specific Collections" :label="__('Specific collections')" :description="__('Includes their sub-collections.')" />
+      <Radio value="Specific Brands" :label="__('Specific brands')" />
     </RadioGroup>
 
     <TargetPicker
@@ -37,15 +37,15 @@ watch(
     <div class="space-y-3 border-t border-outline-gray-1 pt-4">
       <Checkbox
         v-model="discount.exclude_sale_items"
-        label="Skip items already on sale"
-        description="Items priced below their regular price get no extra discount."
+        :label="__('Skip items already on sale')"
+        :description="__('Items priced below their regular price get no extra discount.')"
       />
       <TargetPicker
         v-model="discount.targets"
         role="Excluded"
         target-type="Item"
-        label="Excluded products"
-        placeholder="Exclude products"
+        :label="__('Excluded products')"
+        :placeholder="__('Exclude products')"
       />
     </div>
   </DiscountSection>

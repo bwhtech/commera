@@ -1,11 +1,14 @@
+from urllib.parse import quote
+
 import frappe
 from frappe.utils import get_datetime, get_url
 from frappe.utils.data import cint
 
-DEFAULT_URLS_PER_SITEMAP = 50000
+from commera.localization.urls import SiteLocales, alternates, get_locale_roots
 
-# Every route is emitted once per language, so the document budget is the URL cap divided by these.
-LANGUAGES = ("en", "ar")
+DEFAULT_URLS_PER_SITEMAP = 50000
+# RFC 3986 reserved characters and "%": an encoded path stays as it is.
+URL_SAFE_CHARACTERS = ":/?#[]@!$&'()*+,;=%~"
 
 
 def get_urls_per_page():
@@ -13,8 +16,10 @@ def get_urls_per_page():
 	return urls_per_sitemap if urls_per_sitemap > 0 else DEFAULT_URLS_PER_SITEMAP
 
 
-def get_docs_per_page():
-	return get_urls_per_page() // len(LANGUAGES)
+def get_docs_per_page(locales: SiteLocales | None = None):
+	# Every route is emitted once per published language and market URL.
+	roots = locales.roots if locales else get_locale_roots()
+	return max(get_urls_per_page() // len(roots), 1)
 
 
 SEGMENT_CONFIG = {
@@ -52,11 +57,13 @@ def format_lastmod(value):
 	return get_datetime(value).isoformat()
 
 
-def add_localized(urls, path, lastmod, changefreq, priority):
-	for lang in LANGUAGES:
+def add_localized(urls, path, lastmod, changefreq, priority, locales):
+	"""One entry per locale URL of `path`, from alternates(). A one-language store has one."""
+	locations = [alt["href"] for alt in alternates(path, locales)] or [get_url(path)]
+	for location in locations:
 		urls.append(
 			{
-				"loc": get_url(f"/{lang}{path}"),
+				"loc": quote(location, safe=URL_SAFE_CHARACTERS),
 				"lastmod": lastmod,
 				"changefreq": changefreq,
 				"priority": priority,
@@ -71,9 +78,13 @@ def get_segment_filters(config):
 
 def segment_page_count(seg_type):
 	config = SEGMENT_CONFIG[seg_type]
-	total = frappe.db.count(config["doctype"], get_segment_filters(config))
-	page_count = -(-total // get_docs_per_page())  # ceil without float math
-	return max(page_count, 1) if config.get("include_homepage") else page_count
+	total = frappe.db.count(config["doctype"], get_segment_filters(config)) + get_homepage_slots(config)
+	return -(-total // get_docs_per_page())  # ceil without float math
+
+
+def get_homepage_slots(config) -> int:
+	"""The homepage takes the first route slot of the segment that lists it."""
+	return 1 if config.get("include_homepage") else 0
 
 
 def latest_lastmod(seg_type):
@@ -104,18 +115,25 @@ def get_context(context):
 	if not config or page < 1:
 		return
 
-	if page == 1 and config.get("include_homepage"):
-		add_localized(urls, "", None, config["changefreq"], config["priority"])
+	locales = SiteLocales.load()
+	docs_per_page = get_docs_per_page(locales)
+	homepage = get_homepage_slots(config)
+	start = (page - 1) * docs_per_page
+	if start < homepage:
+		add_localized(urls, "/", None, config["changefreq"], config["priority"], locales)
 
-	docs_per_page = get_docs_per_page()
+	# A page length of 0 means no limit.
+	length = docs_per_page - max(homepage - start, 0)
+	if length < 1:
+		return
 	route_field = config["route_field"]
 	rows = frappe.get_all(
 		config["doctype"],
 		filters=get_segment_filters(config),
 		fields=[route_field, "modified"],
 		order_by="modified desc",
-		limit_start=(page - 1) * docs_per_page,
-		limit_page_length=docs_per_page,
+		limit_start=max(start - homepage, 0),
+		limit_page_length=length,
 	)
 	for row in rows:
 		route = row.get(route_field)
@@ -125,4 +143,5 @@ def get_context(context):
 			format_lastmod(row.modified),
 			config["changefreq"],
 			config["priority"],
+			locales,
 		)

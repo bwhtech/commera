@@ -15,7 +15,7 @@ cursor-pointer ' + classes %}
     async function return_items(order_id, selected_items, state, refs) {
         if (state.return_status !== 'idle') return;
         if (!selected_items.length) {
-            const message = Alpine.store('i18n').t('Please select at least one item to return.')
+            const message = commera.t('Please select at least one item to return.')
             toast(message, { "type": "warning" });
             return;
         }
@@ -52,13 +52,13 @@ cursor-pointer ' + classes %}
             return;
         }
         if (!response.data.success) {
-            toast(Alpine.store('i18n').t('Something went wrong'), { "type": "danger" })
+            toast(commera.t('Something went wrong'), { "type": "danger" })
             state.return_status = 'idle';
             return
         }
         // The return is raised: the button stays off, so it cannot be raised twice while the page reloads.
         state.return_status = 'leaving';
-        toast(Alpine.store('i18n').t('Return raised successfully!'), { "type": "success" })
+        toast(commera.t('Return raised successfully!'), { "type": "success" })
         await new Promise(resolve => setTimeout(resolve, 1000));
         window.location.reload()
     }
@@ -84,7 +84,7 @@ modal_classes='w-full md:max-w-1/2'
                 :disabled="returned_items.includes('{{ item.item_code }}') || returned_items_in_draft.includes('{{ item.item_code }}')">
             <div
                 :class="(returned_items.includes('{{ item.item_code }}') || returned_items_in_draft.includes('{{ item.item_code }}')) ? 'opacity-75' : ''">
-                {% set display_name = item.item_name if frappe.lang == "en" else item.item_name_ar or "" %}
+                {% set display_name = item.title or item.item_name %}
                 {{ dashboard_product(item['image'],
                 item['brand'],
                 display_name,

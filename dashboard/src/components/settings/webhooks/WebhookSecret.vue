@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Button, toast } from 'frappe-ui'
+import { __ } from '../../../data/translation'
 import { webhookActions } from '../../../data/webhooks'
 
 const props = defineProps({
@@ -35,24 +36,24 @@ async function copy() {
   const value = await fetchSecret()
   if (!value) return
   await navigator.clipboard.writeText(value)
-  toast.success('Secret copied')
+  toast.success(__('Secret copied'))
 }
 </script>
 
 <template>
   <div>
-    <span class="text-sm text-ink-gray-6">Signing secret</span>
+    <span class="text-sm text-ink-gray-6">{{ __('Signing secret') }}</span>
     <div class="mt-1.5 flex items-center gap-2">
       <code class="min-w-0 flex-1 truncate rounded-4 bg-surface-gray-2 px-2.5 py-1.5 font-mono text-sm text-ink-gray-8">
         {{ shownText }}
       </code>
       <Button
         :icon="isShown ? 'lucide-eye-off' : 'lucide-eye'"
-        :label="isShown ? 'Hide secret' : 'Show secret'"
+        :label="isShown ? __('Hide secret') : __('Show secret')"
         :disabled="revealing"
         @click="toggle"
       />
-      <Button icon="lucide-copy" label="Copy secret" @click="copy" />
+      <Button icon="lucide-copy" :label="__('Copy secret')" @click="copy" />
     </div>
   </div>
 </template>

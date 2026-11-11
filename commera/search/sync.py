@@ -1,14 +1,16 @@
+import sqlite3
+
 import frappe
 from frappe.utils import create_batch
-from redis.exceptions import LockError
 
 from commera.search.build import ensure_index_built
 from commera.search.engine_cache import new_search_engine
+from commera.search.price_seq import bump_price_seq_after_commit
 from commera.search.record_builder import IN_CLAUSE_CHUNK_SIZE
 
-LOCK_KEY = "commera_search_index_write"
-LOCK_TIMEOUT = 30
-LOCK_BLOCKING_TIMEOUT = 10
+PRODUCT_DOCTYPE = "Style Attribute Variant"
+# SQLITE_BUSY and SQLITE_LOCKED, the primary codes of their extended codes.
+SQLITE_BUSY_CODES = (5, 6)
 
 
 def on_update(doc, method=None):
@@ -37,6 +39,7 @@ def skip_batch_sync():
 def enqueue_upsert(doctype, name):
 	if skip_sync():
 		return
+	bump_if_priced(doctype)
 	frappe.enqueue(
 		"commera.search.sync.upsert_doc",
 		queue="default",
@@ -52,6 +55,7 @@ def enqueue_upsert_many(doctype, names):
 	names = list(names)
 	if skip_batch_sync() or not names:
 		return
+	bump_if_priced(doctype)
 	for chunk in create_batch(names, IN_CLAUSE_CHUNK_SIZE):
 		frappe.enqueue(
 			"commera.search.sync.upsert_docs",
@@ -65,6 +69,7 @@ def enqueue_upsert_many(doctype, names):
 def enqueue_remove(doctype, name):
 	if skip_sync():
 		return
+	bump_if_priced(doctype)
 	frappe.enqueue(
 		"commera.search.sync.remove_doc",
 		queue="default",
@@ -74,8 +79,14 @@ def enqueue_remove(doctype, name):
 	)
 
 
+def bump_if_priced(doctype):
+	"""A product's save or deletion can add or drop its price rows. Bump before queueing its job."""
+	if doctype == PRODUCT_DOCTYPE:
+		bump_price_seq_after_commit()
+
+
 def upsert_doc(doctype, name):
-	serialized_write(lambda engine: engine.index_doc(doctype, name))
+	write_if_indexed(lambda engine: engine.index_doc(doctype, name))
 
 
 def upsert_docs(doctype, names):
@@ -83,26 +94,34 @@ def upsert_docs(doctype, names):
 		# No index yet: patching is a no-op, so build it instead of waiting for the nightly job.
 		ensure_index_built()
 		return
-	serialized_write(lambda engine: engine.index_docs(doctype, names))
+	write_if_indexed(lambda engine: engine.index_docs(doctype, names))
 
 
 def remove_doc(doctype, name):
-	serialized_write(lambda engine: engine.remove_doc(doctype, name))
+	"""Reconcile, not delete: by now the doc can be back, recreated and reindexed under its name."""
+	write_if_indexed(lambda engine: engine.index_docs(doctype, [name]))
 
 
-def serialized_write(write):
-	"""Run an index write under the single-writer cache lock; no-op until the index has been built."""
-	engine = new_search_engine()
-	if not engine.index_exists():
-		return
+def write_if_indexed(write):
+	"""Run an index write once the index is built. Stamped price writes need no lock (price_seq); a
+	failure raises, so RQ records the job as failed."""
 	try:
-		with frappe.cache.lock(LOCK_KEY, timeout=LOCK_TIMEOUT, blocking_timeout=LOCK_BLOCKING_TIMEOUT):
+		engine = new_search_engine()
+		if engine.index_exists():
 			write(engine)
-	except LockError:
-		frappe.log_error(
-			title="Search index sync lock timeout",
-			message=(
-				f"Could not acquire '{LOCK_KEY}' within {LOCK_BLOCKING_TIMEOUT}s; skipping this "
-				"index write. The next nightly rebuild will reconcile it."
-			),
-		)
+	except Exception as error:
+		if not is_sqlite_busy(error):
+			raise
+		# execute_job reruns the whole job, fresh read included, up to 5 times with a growing pause.
+		raise frappe.RetryBackgroundJobError("The search index is busy") from error
+
+
+def is_sqlite_busy(error):
+	"""Whether `error`, or an error it wraps, is SQLITE_BUSY or SQLITE_LOCKED."""
+	while error is not None:
+		if isinstance(error, sqlite3.OperationalError) and (
+			(getattr(error, "sqlite_errorcode", 0) & 0xFF) in SQLITE_BUSY_CODES or "locked" in str(error)
+		):
+			return True
+		error = error.__cause__ or error.__context__
+	return False

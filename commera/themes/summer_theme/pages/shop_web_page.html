@@ -1,18 +1,17 @@
 {% extends "components/theme_layout.html" %}
 
-{% set language = frappe.lang or "en" %}
 
 {% block uncontained_body %}
 {% if page %}
 	<div class="dz-bnr-inr bg-secondary">
 		<div class="container">
 			<div class="dz-bnr-inr-entry">
-				<h1>{{ page.name }}</h1>
+				<h1>{{ page_title|e }}</h1>
 				<nav aria-label="{{ _('breadcrumb') }}" class="breadcrumb-row">
 					<ul class="breadcrumb">
-						<li class="breadcrumb-item"><a href="/{{ language }}">{{ _("Home") }}</a></li>
+						<li class="breadcrumb-item"><a href="{{ url('/') | e }}">{{ _("Home") }}</a></li>
 						{% for breadcrumb in breadcrumbs %}
-						<li class="breadcrumb-item">{{ breadcrumb.label }}</li>
+						<li class="breadcrumb-item">{{ breadcrumb.label|e }}</li>
 						{% endfor %}
 					</ul>
 				</nav>
@@ -42,7 +41,7 @@
 		<div class="container text-center">
 			<h4 class="title">{{ _("We could not find that page") }}</h4>
 			<p>{{ _("This page has been moved or is no longer published.") }}</p>
-			<a href="/{{ language }}" class="btn btn-secondary">{{ _("Back to Home") }}</a>
+			<a href="{{ url('/') | e }}" class="btn btn-secondary">{{ _("Back to Home") }}</a>
 		</div>
 	</section>
 {% endif %}

@@ -16,7 +16,7 @@
 			<h1>{{ (category or _("Products")) | e }}</h1>
 			<nav aria-label="{{ _('breadcrumb') }}" class="breadcrumb-row">
 				<ul class="breadcrumb">
-					<li class="breadcrumb-item"><a href="/{{ frappe.lang or 'en' }}/">{{ _("Home") }}</a></li>
+					<li class="breadcrumb-item"><a href="{{ url('/') | e }}">{{ _("Home") }}</a></li>
 					{% for crumb in breadcrumbs %}
 					<li class="breadcrumb-item">{{ _(crumb.label) }}</li>
 					{% endfor %}

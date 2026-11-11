@@ -4,6 +4,7 @@ import { onKeyStroke, useElementSize, useLocalStorage } from '@vueuse/core'
 import { Button, TabButtons } from 'frappe-ui'
 import LayoutPreviewFrame from './LayoutPreviewFrame.vue'
 import PreviewOptions from './PreviewOptions.vue'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   editor: { type: Object, required: true },
@@ -22,7 +23,7 @@ const LABEL_HEIGHT = 28
 const CONTROLS_HEIGHT = 64
 
 const ZOOMS = [
-  { label: 'Fit', value: 'fit' },
+  { label: __('Fit'), value: 'fit' },
   { label: '75%', value: '0.75' },
   { label: '100%', value: '1' },
 ]
@@ -53,8 +54,8 @@ const layout = computed(() => {
   const desktopWidth = state.device === 'desktop' ? Math.max(DESKTOP_WIDTH, availableWidth / scale) : DESKTOP_WIDTH
   const height = availableHeight / scale
   const frames = []
-  if (showDesktop) frames.push({ key: 'desktop', label: 'Desktop', width: Math.floor(desktopWidth), height })
-  if (showMobile) frames.push({ key: 'mobile', label: 'Mobile', width: MOBILE_WIDTH, height })
+  if (showDesktop) frames.push({ key: 'desktop', label: __('Desktop'), width: Math.floor(desktopWidth), height })
+  if (showMobile) frames.push({ key: 'mobile', label: __('Mobile'), width: MOBILE_WIDTH, height })
   return { scale, frames }
 })
 
@@ -81,7 +82,7 @@ onKeyStroke('Escape', (event) => {
             :style="{ width: `${frame.width * layout.scale}px`, height: `${frame.height * layout.scale}px` }"
           >
             <div
-              class="origin-top-left"
+              class="origin-top-left rtl:origin-top-right"
               :style="{ width: `${frame.width}px`, height: `${frame.height}px`, transform: `scale(${layout.scale})` }"
             >
               <LayoutPreviewFrame
@@ -99,12 +100,12 @@ onKeyStroke('Escape', (event) => {
       class="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-5 border border-outline-gray-2 bg-surface-base p-1 shadow-lg"
       data-zoom-controls
     >
-      <TabButtons v-model="zoom" :options="ZOOMS" aria-label="Preview zoom" />
-      <div class="mx-0.5 h-4 border-l border-outline-gray-2" />
+      <TabButtons v-model="zoom" :options="ZOOMS" :aria-label="__('Preview zoom')" />
+      <div class="mx-0.5 h-4 border-s border-outline-gray-2" />
       <Button
         variant="ghost"
         :icon="maximised ? 'lucide-minimize-2' : 'lucide-maximize-2'"
-        :aria-label="maximised ? 'Restore panels' : 'Maximise preview'"
+        :aria-label="maximised ? __('Restore panels') : __('Maximise preview')"
         :aria-pressed="maximised"
         @click="emit('toggle-maximise')"
       />

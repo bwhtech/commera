@@ -9,6 +9,7 @@ from frappe.utils import cint, now
 from frappe.utils.nestedset import NestedSet, update_move_node
 
 from commera.commera_ecommerce.doctype.commera_settings.editor_input import require_safe_url
+from commera.localization import url
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
 ITEM_GROUP_LINK_DOCTYPE = "Ecommerce Category Item Group"
@@ -36,6 +37,7 @@ class EcommerceCategory(NestedSet):
 		)
 
 		category_name: DF.Data
+		description: DF.SmallText | None
 		display_name: DF.Data
 		display_order: DF.Int
 		enabled: DF.Check
@@ -136,12 +138,12 @@ class EcommerceCategory(NestedSet):
 			self.display_name = self.category_name
 
 
-def build_listing_href(root_slug, item_groups, language):
+def build_listing_href(root_slug, item_groups):
 	"""Product listing URL for a menu entry's item groups, as the `?subcategory=` filter expects."""
 	subcategory = quote(",".join(item_groups))
 	if root_slug:
-		return f"/{language}/products?category={root_slug}&subcategory={subcategory}"
-	return f"/{language}/products?subcategory={subcategory}"
+		return url(f"/products?category={root_slug}&subcategory={subcategory}")
+	return url(f"/products?subcategory={subcategory}")
 
 
 def get_depth(name):
@@ -226,6 +228,7 @@ def get_menu_tree(enabled_only=False):
 			"link_url",
 			"icon",
 			"image",
+			"description",
 			"meta_title",
 			"meta_description",
 			"og_image",
@@ -237,7 +240,6 @@ def get_menu_tree(enabled_only=False):
 	if not entries:
 		return []
 
-	language = frappe.local.lang or "en"
 	item_groups_by_entry = get_item_groups_by_entry([entry.name for entry in entries])
 	nodes = {}
 	roots = []
@@ -253,6 +255,7 @@ def get_menu_tree(enabled_only=False):
 			"url": entry.link_url or "",
 			"icon": entry.icon or "",
 			"image": entry.image or "",
+			"description": entry.description or "",
 			"meta_title": entry.meta_title or "",
 			"meta_description": entry.meta_description or "",
 			"og_image": entry.og_image or "",
@@ -278,26 +281,26 @@ def get_menu_tree(enabled_only=False):
 	roots.sort(key=lambda node: (node["display_order"] or 0, node["label"]))
 
 	for root in roots:
-		set_hrefs(root, root["route_slug"] or root["name"], language)
+		set_hrefs(root, root["route_slug"] or root["name"])
 
 	return roots
 
 
-def set_hrefs(node, root_slug, language):
-	node["href"] = get_node_href(node, root_slug, language)
+def set_hrefs(node, root_slug):
+	node["href"] = get_node_href(node, root_slug)
 	for child in node["children"]:
-		set_hrefs(child, root_slug, language)
+		set_hrefs(child, root_slug)
 
 
-def get_node_href(node, root_slug, language):
+def get_node_href(node, root_slug):
 	if node["link_type"] == "URL":
-		return node["url"] or None
+		return url(node["url"]) or None
 	if node["link_type"] == "Brand":
-		return f"/{language}/products?brands={quote(node['brand'])}" if node["brand"] else None
+		return url(f"/products?brands={quote(node['brand'])}") if node["brand"] else None
 	if node["link_type"] == "Item Group" and node["item_groups"]:
-		return build_listing_href(root_slug, node["item_groups"], language)
+		return build_listing_href(root_slug, node["item_groups"])
 	if not node["parent"]:
-		return f"/{language}/products?category={root_slug}"
+		return url(f"/products?category={root_slug}")
 	return None
 
 

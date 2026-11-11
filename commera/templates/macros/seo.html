@@ -2,10 +2,10 @@
 {% macro seo_meta(seo) %}
     {# macros don't inherit the caller's {% set settings %}, so fetch it here (frappe is a jinja global) #}
     {% set settings = frappe.get_cached_doc("Commera Settings", "Commera Settings") %}
-    {% set site_name = settings.store_name or "Store" %}
-    {% if seo.title %}<title>{{ seo.title }}</title>{% endif %}
-    {% if seo.description %}<meta name="description" content="{{ seo.description }}">{% endif %}
-    {% if seo.url %}<link rel="canonical" href="{{ seo.url }}">{% endif %}
+    {% set site_name = get_shop_details().name or "Store" %}
+    {% if seo.title %}<title>{{ seo.title|e }}</title>{% endif %}
+    {% if seo.description %}<meta name="description" content="{{ seo.description|e }}">{% endif %}
+    {% if seo.url %}<link rel="canonical" href="{{ seo.url|e }}">{% endif %}
 
     {% if seo.noindex %}
     <meta name="robots" content="noindex, follow">
@@ -14,44 +14,41 @@
     {% endif %}
 
     {% for alt in seo.alternates or [] %}
-    <link rel="alternate" hreflang="{{ alt.lang }}" href="{{ alt.href }}">
+    <link rel="alternate" hreflang="{{ alt.lang|e }}" href="{{ alt.href|e }}">
     {% endfor %}
     {% for alt in seo.alternates or [] %}
-        {% if alt.lang == "en" %}<link rel="alternate" hreflang="x-default" href="{{ alt.href }}">{% endif %}
+        {% if alt.x_default %}<link rel="alternate" hreflang="x-default" href="{{ alt.href|e }}">{% endif %}
     {% endfor %}
 
-    {# OG/FB want full locales (en_US, ar_AR), not the bare lang code Frappe uses #}
-    {% set og_locales = {"en": "en_US", "ar": "ar_AR"} %}
-    {# Derived from the canonical url because frappe.local.lang may not be set at macro-render time. #}
-    {% set lang = "ar" if (seo.url and "/ar/" in seo.url) else (frappe.local.lang or "en") %}
-    <meta property="og:type" content="{{ seo.type or 'website' }}">
-    {% if seo.title %}<meta property="og:title" content="{{ seo.title }}">{% endif %}
-    {% if seo.description %}<meta property="og:description" content="{{ seo.description }}">{% endif %}
-    {% if seo.url %}<meta property="og:url" content="{{ seo.url }}">{% endif %}
-    {% if seo.image %}<meta property="og:image" content="{{ seo.image }}">
+    {% set og_locales = seo_og_locales() %}
+    <meta property="og:type" content="{{ (seo.type or 'website')|e }}">
+    {% if seo.title %}<meta property="og:title" content="{{ seo.title|e }}">{% endif %}
+    {% if seo.description %}<meta property="og:description" content="{{ seo.description|e }}">{% endif %}
+    {% if seo.url %}<meta property="og:url" content="{{ seo.url|e }}">{% endif %}
+    {% if seo.image %}<meta property="og:image" content="{{ seo.image|e }}">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="{{ seo.title or site_name }}">{% endif %}
-    <meta property="og:site_name" content="{{ site_name }}">
-    <meta property="og:locale" content="{{ og_locales.get(lang, 'en_US') }}">
-    {% for code, locale in og_locales.items() %}
-        {% if code != lang %}<meta property="og:locale:alternate" content="{{ locale }}">{% endif %}
+    <meta property="og:image:alt" content="{{ (seo.title or site_name)|e }}">{% endif %}
+    <meta property="og:site_name" content="{{ site_name|e }}">
+    {% if og_locales.locale %}<meta property="og:locale" content="{{ og_locales.locale|e }}">{% endif %}
+    {% for locale in og_locales.alternates or [] %}
+    <meta property="og:locale:alternate" content="{{ locale|e }}">
     {% endfor %}
     {% if seo.type == "product" %}
-        {% if seo.price %}<meta property="og:price:amount" content="{{ seo.price }}">{% endif %}
-        {% if seo.currency %}<meta property="og:price:currency" content="{{ seo.currency }}">{% endif %}
-        {% if seo.availability %}<meta property="product:availability" content="{{ seo.availability }}">{% endif %}
+        {% if seo.price %}<meta property="og:price:amount" content="{{ seo.price|e }}">{% endif %}
+        {% if seo.currency %}<meta property="og:price:currency" content="{{ seo.currency|e }}">{% endif %}
+        {% if seo.availability %}<meta property="product:availability" content="{{ seo.availability|e }}">{% endif %}
     {% endif %}
 
     <meta name="twitter:card" content="summary_large_image">
-    {% if seo.title %}<meta name="twitter:title" content="{{ seo.title }}">{% endif %}
-    {% if seo.description %}<meta name="twitter:description" content="{{ seo.description }}">{% endif %}
-    {% if seo.image %}<meta name="twitter:image" content="{{ seo.image }}">{% endif %}
+    {% if seo.title %}<meta name="twitter:title" content="{{ seo.title|e }}">{% endif %}
+    {% if seo.description %}<meta name="twitter:description" content="{{ seo.description|e }}">{% endif %}
+    {% if seo.image %}<meta name="twitter:image" content="{{ seo.image|e }}">{% endif %}
     {# twitter:site wants an @handle and Commera Settings stores only a twitter_url, so nothing is emitted until a handle field exists. #}
     {% set twitter_handle = settings.get("twitter_handle") %}
     {% if twitter_handle %}
-    <meta name="twitter:site" content="{{ twitter_handle }}">
-    <meta name="twitter:creator" content="{{ twitter_handle }}">
+    <meta name="twitter:site" content="{{ twitter_handle|e }}">
+    <meta name="twitter:creator" content="{{ twitter_handle|e }}">
     {% endif %}
 {% endmacro %}
 

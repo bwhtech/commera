@@ -1,6 +1,8 @@
 import { openSettings } from '../ia/settings'
 import { useMethodAction } from './api'
+import { openLanguagePicker } from '../ia/languagePicker'
 import { isAdmin } from './boot'
+import { __ } from './translation'
 
 // The storefront is served by this same site, so it is the origin's root — a
 // bare '/' redirects to the shopper's language.
@@ -24,13 +26,16 @@ export function useAccountMenu() {
     window.location.replace('/login')
   }
 
-  const logoutItem = { label: 'Log out', icon: 'lucide-log-out', onClick: logout }
-  if (!isAdmin) return [logoutItem]
+  // The language is the admin's own, so staff without Settings still get to pick it.
+  const languageItem = { label: __('Language'), icon: 'lucide-languages', onClick: openLanguagePicker }
+  const logoutItem = { label: __('Log out'), icon: 'lucide-log-out', onClick: logout }
+  if (!isAdmin) return [languageItem, logoutItem]
 
   return [
-    { label: 'Settings', icon: 'lucide-settings', onClick: () => openSettings() },
-    { label: 'Appearance', icon: 'lucide-sun-moon', onClick: () => openSettings('appearance') },
-    { label: 'View storefront', icon: 'lucide-external-link', onClick: openStorefront },
+    { label: __('Settings'), icon: 'lucide-settings', onClick: () => openSettings() },
+    { label: __('Appearance'), icon: 'lucide-sun-moon', onClick: () => openSettings('appearance') },
+    languageItem,
+    { label: __('View storefront'), icon: 'lucide-external-link', onClick: openStorefront },
     logoutItem,
   ]
 }

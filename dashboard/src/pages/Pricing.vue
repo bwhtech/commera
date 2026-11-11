@@ -12,6 +12,7 @@ import EditableValue from '../components/EditableValue.vue'
 import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { money } from '../data/format'
 import { compareAtPrice, pricePayload, shownPrice } from '../data/product'
+import { __ } from '../data/translation'
 import { ia } from '../ia/store'
 import { useBulkAction } from '../utils/useBulkAction'
 
@@ -29,7 +30,7 @@ function endSelecting() {
 // is repeated, so this stays a single always-selected option rather than silently becoming
 // something it isn't.
 const type = ref('all')
-const typeOptions = [{ label: 'All types', value: 'all' }]
+const typeOptions = [{ label: __('All types'), value: 'all' }]
 
 const pricingRequest = useAdminRead('catalog.get_pricing_rows', {
   params: () => ({ page_length: 500 }),
@@ -50,10 +51,9 @@ const priceAction = useAdminAction('catalog.set_variant_price')
 const bulkPriceAction = useAdminAction('catalog.set_variant_price', { quiet: true })
 const { running: bulkRunning, run: runBulk } = useBulkAction()
 
-function repriceAll(label, selected, payloadFor, verb) {
+function repriceAll(label, selected, payloadFor, sentences) {
   return runBulk(label, selected, (row) => bulkPriceAction.submit({ style_attribute_variant: row.name, ...payloadFor(row) }), {
-    noun: 'item',
-    verb,
+    sentences,
     after: ({ failed }) => {
       selection.value = failed.map(({ item }) => item.name)
       if (!failed.length) endSelecting()
@@ -67,7 +67,7 @@ function repriceAll(label, selected, payloadFor, verb) {
 async function setPrice(row, rate) {
   const saved = await trySubmit(priceAction, { style_attribute_variant: row.name, ...pricePayload(row, rate) })
   if (!saved) return
-  toast.success(`Price updated for ${row.title} (${row.size_count} sizes)`)
+  toast.success(__('Price updated for {0} ({1} sizes)', [row.title, row.size_count]))
   pricingRequest.reload()
 }
 
@@ -77,16 +77,19 @@ function bulkRaisePrice() {
   if (!selected.length) return
 
   dialog.prompt({
-    title: `Raise price on ${ids.length} ${ids.length === 1 ? 'item' : 'items'}`,
-    message: 'Raises the price a shopper actually pays by this percentage, rounded to the nearest paisa.',
-    fields: [{ name: 'value', label: 'Raise by %', type: 'number', required: true }],
+    title: ids.length === 1 ? __('Raise price on 1 item') : __('Raise price on {0} items', [ids.length]),
+    message: __('Raises the price a shopper actually pays by this percentage, rounded to the nearest paisa.'),
+    fields: [{ name: 'value', label: __('Raise by %'), type: 'number', required: true }],
     onConfirm: async ({ values }) => {
       const pct = Number(values.value) || 0
       await repriceAll(
         'Raise by %',
         selected,
         (row) => pricePayload(row, Math.round(row.price * (1 + pct / 100) * 100) / 100),
-        'repriced',
+        {
+          all: (count) => (count === 1 ? __('1 item repriced') : __('{0} items repriced', [count])),
+          some: (done, total, failed) => __('{0} of {1} items repriced. {2} failed', [done, total, failed]),
+        },
       )
     },
   })
@@ -98,12 +101,17 @@ function bulkSetCompareAt() {
   if (!selected.length) return
 
   dialog.prompt({
-    title: `Set compare-at on ${ids.length} ${ids.length === 1 ? 'item' : 'items'}`,
-    message: 'Sets the struck-through reference price shown above the real price.',
-    fields: [{ name: 'value', label: 'Compare at', type: 'number', required: true }],
+    title: ids.length === 1 ? __('Set compare-at on 1 item') : __('Set compare-at on {0} items', [ids.length]),
+    message: __('Sets the struck-through reference price shown above the real price.'),
+    fields: [{ name: 'value', label: __('Compare at'), type: 'number', required: true }],
     onConfirm: async ({ values }) => {
       const rate = Math.max(0, Number(values.value) || 0)
-      await repriceAll('Set compare-at', selected, () => ({ default_rate: rate }), 'given a compare-at price')
+      await repriceAll('Set compare-at', selected, () => ({ default_rate: rate }), {
+        all: (count) =>
+          count === 1 ? __('1 item given a compare-at price') : __('{0} items given a compare-at price', [count]),
+        some: (done, total, failed) =>
+          __('{0} of {1} items given a compare-at price. {2} failed', [done, total, failed]),
+      })
     },
   })
 }
@@ -111,20 +119,20 @@ function bulkSetCompareAt() {
 
 <template>
   <AppPageHeader
-    title="Edit prices"
+    :title="__('Edit prices')"
     back-to="/products"
-    :breadcrumbs="[{ label: 'Products', route: '/products' }, { label: 'Edit prices' }]"
+    :breadcrumbs="[{ label: __('Products'), route: '/products' }, { label: __('Edit prices') }]"
   />
 
   <PageBody>
     <div class="flex flex-wrap items-center gap-3">
       <Select v-model="type" :options="typeOptions" disabled />
       <p v-if="!pricingRequest.loading" class="text-sm text-ink-gray-5">
-        {{ rows.length }} sellable units · one row per variant, priced individually on its product
+        {{ __('{0} sellable units · one row per variant, priced individually on its product', [rows.length]) }}
       </p>
       <Button
-        class="ml-auto"
-        :label="selecting ? 'Cancel selection' : 'Select'"
+        class="ms-auto"
+        :label="selecting ? __('Cancel selection') : __('Select')"
         icon-left="lucide-list-checks"
         :variant="selecting ? 'solid' : 'subtle'"
         theme="gray"
@@ -132,9 +140,16 @@ function bulkSetCompareAt() {
       />
     </div>
 
-    <BulkBar v-if="selecting" :count="selection.length" noun="item" :busy="Boolean(bulkRunning)" @done="endSelecting">
-      <Button label="Raise by %" :loading="bulkRunning === 'Raise by %'" @click="bulkRaisePrice" />
-      <Button label="Set compare-at" :loading="bulkRunning === 'Set compare-at'" @click="bulkSetCompareAt" />
+    <BulkBar
+      v-if="selecting"
+      :count="selection.length"
+      :selected-label="selection.length === 1 ? __('1 item selected') : __('{0} items selected', [selection.length])"
+      :empty-label="__('Select items to act on them')"
+      :busy="Boolean(bulkRunning)"
+      @done="endSelecting"
+    >
+      <Button :label="__('Raise by %')" :loading="bulkRunning === 'Raise by %'" @click="bulkRaisePrice" />
+      <Button :label="__('Set compare-at')" :loading="bulkRunning === 'Set compare-at'" @click="bulkSetCompareAt" />
     </BulkBar>
 
     <div class="mt-3 overflow-x-auto">
@@ -146,10 +161,10 @@ function bulkSetCompareAt() {
       :columns="['1fr', '11rem', '7rem', '8rem']"
     >
       <ListHeader>
-        <ListHeaderCell>Item</ListHeaderCell>
-        <ListHeaderCell>SKU</ListHeaderCell>
-        <ListHeaderCell>Price</ListHeaderCell>
-        <ListHeaderCell>Compare at</ListHeaderCell>
+        <ListHeaderCell>{{ __('Item') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('SKU') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('Price') }}</ListHeaderCell>
+        <ListHeaderCell>{{ __('Compare at') }}</ListHeaderCell>
       </ListHeader>
       <!-- `loading` flips on every reload and the request keeps the previous `data`,
            so guarding on it alone would blank a loaded table after every price edit.
@@ -170,7 +185,7 @@ function bulkSetCompareAt() {
           <ListCell>
             <EditableValue
               :model-value="item.price"
-              label="Price"
+              :label="__('Price')"
               format="money"
               @update:model-value="(rate) => setPrice(item, rate)"
             />
@@ -185,7 +200,7 @@ function bulkSetCompareAt() {
     </List>
     </div>
 
-    <EmptyState v-if="!pricingRequest.loading && !rows.length" icon="lucide-tag" title="No sellable items yet" description="Add a product to start pricing it." />
+    <EmptyState v-if="!pricingRequest.loading && !rows.length" icon="lucide-tag" :title="__('No sellable items yet')" :description="__('Add a product to start pricing it.')" />
   </PageBody>
 </template>
 

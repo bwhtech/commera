@@ -10,6 +10,7 @@ import { usePages } from '../../data/pages'
 import { errorMessage } from '../../data/errors'
 import { longDate } from '../../data/format'
 import { createSequence } from '../../utils/sequence'
+import { __ } from '../../data/translation'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,10 +22,6 @@ function blankPage() {
     route: '',
     published: true,
     content: '',
-    // Not edited here any more, but still round-tripped through load and save so a page
-    // that already carries Arabic content keeps it instead of being blanked on the next
-    // save. The storefront still serves it (shop_web_page.py get_content).
-    content_ar: '',
     meta_title: '',
     meta_description: '',
     og_image: '',
@@ -58,7 +55,7 @@ const status = ref('ready')
 const savedName = ref('')
 const isNew = computed(() => !savedName.value)
 // While a page loads, or after it failed to, there is no saved name yet but it is not a new page.
-const heading = computed(() => savedName.value || route.params.name || 'New page')
+const heading = computed(() => savedName.value || route.params.name || __('New page'))
 
 // Shown while the route field is still blank: the server derives it from the title.
 const previewUrl = computed(() => {
@@ -119,11 +116,11 @@ async function save() {
   if (status.value !== 'ready') return
   const title = form.value.name.trim()
   if (!title) {
-    toast.error('Give the page a title')
+    toast.error(__('Give the page a title'))
     return
   }
   if (isBlankRichText(form.value.content)) {
-    toast.error('The page needs some content')
+    toast.error(__('The page needs some content'))
     return
   }
 
@@ -136,7 +133,6 @@ async function save() {
       route: form.value.route.trim(),
       published: form.value.published ? 1 : 0,
       content: form.value.content,
-      content_ar: form.value.content_ar,
       meta_title: form.value.meta_title,
       meta_description: form.value.meta_description,
       og_image: form.value.og_image,
@@ -151,7 +147,7 @@ async function save() {
     if (route.params.name !== saved.name) {
       router.replace(`/storefront/pages/${encodeURIComponent(saved.name)}`)
     }
-    toast.success(wasNew ? 'Page created' : 'Saved')
+    toast.success(wasNew ? __('Page created') : __('Saved'))
   } finally {
     if (loads.isLatest(ticket)) status.value = 'ready'
   }
@@ -159,12 +155,12 @@ async function save() {
 
 function remove() {
   dialog.danger({
-    title: `Delete "${savedName.value}"?`,
-    message: 'Shoppers following a link to this page will get a not-found instead.',
-    confirmLabel: 'Delete page',
+    title: __('Delete "{0}"?', [savedName.value]),
+    message: __('Shoppers following a link to this page will get a not-found instead.'),
+    confirmLabel: __('Delete page'),
     onConfirm: async () => {
       if (!(await removePage(savedName.value))) return
-      toast.success('Page deleted')
+      toast.success(__('Page deleted'))
       router.replace('/storefront/pages')
     },
   })
@@ -176,7 +172,7 @@ function remove() {
     :title="heading"
     back-to="/storefront/pages"
     :breadcrumbs="[
-      { label: 'Pages', route: '/storefront/pages' },
+      { label: __('Pages'), route: '/storefront/pages' },
       { label: heading },
     ]"
   >
@@ -184,13 +180,13 @@ function remove() {
       <Dropdown
         v-if="!isNew"
         :options="[
-          { label: 'View on storefront', icon: 'lucide-external-link', onClick: openStorefront },
-          { label: 'Delete page', icon: 'lucide-trash-2', theme: 'red', onClick: remove },
+          { label: __('View on storefront'), icon: 'lucide-external-link', onClick: openStorefront },
+          { label: __('Delete page'), icon: 'lucide-trash-2', theme: 'red', onClick: remove },
         ]"
       >
-        <Button icon="lucide-ellipsis" label="More actions" />
+        <Button icon="lucide-ellipsis" :label="__('More actions')" />
       </Dropdown>
-      <Button label="Save" variant="solid" theme="gray" :loading="status === 'saving'" @click="save" />
+      <Button :label="__('Save')" variant="solid" theme="gray" :loading="status === 'saving'" @click="save" />
     </template>
   </AppPageHeader>
 
@@ -200,7 +196,7 @@ function remove() {
     <EmptyState
       v-else-if="status === 'error'"
       icon="lucide-triangle-alert"
-      title="Could not load this page"
+      :title="__('Could not load this page')"
       :description="errorMessage(loadError)"
     />
 
@@ -208,76 +204,76 @@ function remove() {
       <section class="space-y-4">
         <FormControl
           v-model="form.name"
-          label="Title"
+          :label="__('Title')"
           required
-          placeholder="Shipping & returns"
-          description="Shoppers see this at the top of the page, and it names the page everywhere else."
+          :placeholder="__('Shipping & returns')"
+          :description="__('Shoppers see this at the top of the page, and it names the page everywhere else.')"
         />
 
         <TextInput
           v-model="form.route"
           class="w-full"
-          label="Address"
+          :label="__('Address')"
           placeholder="shipping-returns"
-          :description="previewUrl ? `Lives at ${previewUrl}` : 'Left blank, it is built from the title.'"
+          :description="previewUrl ? __('Lives at {0}', [previewUrl]) : __('Left blank, it is built from the title.')"
         />
 
         <Switch
           v-model="form.published"
           size="sm"
-          label="Published"
-          description="An unpublished page is hidden from shoppers until you switch this on."
+          :label="__('Published')"
+          :description="__('An unpublished page is hidden from shoppers until you switch this on.')"
         />
       </section>
 
       <section>
-        <h2 class="text-lg-semibold text-ink-gray-8">Content</h2>
+        <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Content') }}</h2>
 
         <div class="mt-4">
           <RichTextField
             v-model="form.content"
             min-height="min-h-64"
-            placeholder="Write the page…"
+            :placeholder="__('Write the page…')"
           />
         </div>
       </section>
 
       <section>
-        <h2 class="text-lg-semibold text-ink-gray-8">Search engine listing</h2>
-        <p class="mt-1 text-p-sm text-ink-gray-5">How this page appears on Google and when shared.</p>
+        <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Search engine listing') }}</h2>
+        <p class="mt-1 text-p-sm text-ink-gray-5">{{ __('How this page appears on Google and when shared.') }}</p>
 
         <div class="mt-4 space-y-4">
           <FormControl
             v-model="form.meta_title"
-            label="Meta title"
-            description="Overrides the page title in search results. Left blank, the title above is used."
+            :label="__('Meta title')"
+            :description="__('Overrides the page title in search results. Left blank, the title above is used.')"
           />
           <FormControl
             v-model="form.meta_description"
             type="textarea"
             :rows="3"
-            label="Meta description"
-            description="Roughly 160 characters shows in search results."
+            :label="__('Meta description')"
+            :description="__('Roughly 160 characters shows in search results.')"
           />
           <TextInput
             v-model="form.og_image"
             class="w-full"
-            label="Share image"
+            :label="__('Share image')"
             placeholder="/files/shipping.jpg"
-            description="The image shown when the page is shared. Paste the address of an uploaded file."
+            :description="__('The image shown when the page is shared. Paste the address of an uploaded file.')"
           />
 
           <Switch
             v-model="form.noindex"
             size="sm"
-            label="Hide from search engines"
-            description="The page stays reachable by link, but Google is told not to list it."
+            :label="__('Hide from search engines')"
+            :description="__('The page stays reachable by link, but Google is told not to list it.')"
           />
         </div>
       </section>
 
       <p v-if="form.modified" class="text-sm text-ink-gray-5">
-        Last saved {{ longDate(form.modified) }}
+        {{ __('Last saved {0}', [longDate(form.modified)]) }}
       </p>
     </div>
   </PageBody>

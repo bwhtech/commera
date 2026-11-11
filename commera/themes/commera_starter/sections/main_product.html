@@ -6,8 +6,10 @@
 {% set colour_option = product.options | selectattr("values") | selectattr("values.0.handle") | first %}
 {% set size_option = product.options | reject("equalto", colour_option) | first %}
 {% set variant = product.variants | selectattr("id", "equalto", product.selected_variant_id) | first or product.variants | first %}
+{# None where the market does not sell the product. #}
+{% set shown_price = variant.price if variant else product.price %}
 {% set fit = "object-contain p-[6%]" if theme.card_image_fit == "Fit" else "object-cover object-top" %}
-{% set payload = {"id": product.id, "currency": product.currency, "price": product.price, "options": product.options, "variants": product.variants, "size": variant.title if size_option and variant else "", "in_wishlist": in_wishlist, "is_guest": frappe.session.user == "Guest"} %}
+{% set payload = {"id": product.id, "currency": product.currency, "price": product.price, "options": product.options, "variants": product.variants, "size": variant.size if size_option and variant else "", "in_wishlist": in_wishlist, "is_guest": frappe.session.user == "Guest"} %}
 <section x-data='product_form({{ payload | tojson }})' class="pt-2 md:pt-6">
 	<div class="section-x grid grid-cols-1 gap-6 md:gap-10 *:min-w-0 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10 xl:gap-20">
 		<div class="md:max-lg:w-full md:max-lg:max-w-96">
@@ -39,7 +41,7 @@
 			{% endif %}
 			<h1 class="{{ 'mt-1.5' if theme.show_vendor and product.vendor else 'mt-4' }} text-6xl leading-tight tracking-tight [overflow-wrap:anywhere] md:text-7xl">{{ product.title }}</h1>
 			<p class="tabular mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
-				<span class="text-4xl font-semibold text-ink-gray-9"><span x-show="compare_at_price" class="sr-only">{{ _("Sale price") }}</span><span x-show="!compare_at_price" class="sr-only">{{ _("Price") }}</span><span x-text="money(price)">{{ commera.format.money(variant.price if variant else product.price, product.currency) }}</span></span>
+				<span class="text-4xl font-semibold text-ink-gray-9"><span x-show="compare_at_price" class="sr-only">{{ _("Sale price") }}</span><span x-show="!compare_at_price" class="sr-only">{{ _("Price") }}</span><span x-text="money(price)">{{ commera.format.money(shown_price, product.currency) if shown_price is not none }}</span></span>
 				<span x-show="compare_at_price" class="text-lg text-ink-gray-6 line-through"><span class="sr-only">{{ _("Regular price") }}</span><span x-text="money(compare_at_price)"></span></span>
 				<span x-show="compare_at_price" x-text="'−' + discount + '%'" dir="ltr" class="inline-flex h-6 items-center rounded-full bg-surface-red-2 px-2 text-xs font-semibold text-ink-red-7"></span>
 			</p>
@@ -64,10 +66,10 @@
 
 			{% if size_option %}
 			<div class="mt-6">
-				<p class="text-base font-medium text-ink-gray-9">{{ size_option.name }}: <span class="font-normal text-ink-gray-6" x-text="size"></span></p>
+				<p class="text-base font-medium text-ink-gray-9">{{ size_option.name }}: <span class="font-normal text-ink-gray-6" x-text="variant?.title ?? ''"></span></p>
 				<div class="mt-3 flex flex-wrap gap-2">
 					{% for size_variant in product.variants %}
-					<button type="button" @click="size = variants[{{ loop.index0 }}].title" {{ "disabled" if not size_variant.available }} :aria-pressed="size === variants[{{ loop.index0 }}].title" class="chip">{{ size_variant.title }}</button>
+					<button type="button" @click="size = variants[{{ loop.index0 }}].size" {{ "disabled" if not size_variant.available }} :aria-pressed="size === variants[{{ loop.index0 }}].size" class="chip">{{ size_variant.title }}</button>
 					{% endfor %}
 				</div>
 			</div>
@@ -85,7 +87,8 @@
 					<span class="grid [&>span]:col-start-1 [&>span]:row-start-1">
 						<span x-show="(!variant || variant.available) && !added">{{ _("Add to cart") }}</span>
 						<span x-cloak x-show="added" x-transition.opacity.duration.150ms class="inline-flex items-center gap-1.5">{{ icon("check", "size-4") }}{{ _("Added") }}</span>
-						<span x-cloak x-show="variant && !variant.available">{{ _("Sold out") }}</span>
+						<span x-cloak x-show="variant && !variant.available && variant.price !== null">{{ _("Sold out") }}</span>
+				<span x-cloak x-show="variant && variant.price === null">{{ _("Unavailable") }}</span>
 					</span>
 					{{ spinner("busy === 'add_to_cart'", "size-5 text-on-brand", overlay=true) }}
 				</button>
@@ -118,13 +121,14 @@
 		{{ image((product.images or [None])[0], "", 160, "size-12 shrink-0 rounded-lg " ~ fit) }}
 		<div class="min-w-0 flex-1">
 			<p class="truncate text-base text-ink-gray-7">{{ product.title }}</p>
-			<p class="tabular text-md font-semibold text-ink-gray-9" x-text="money(price)">{{ commera.format.money(variant.price if variant else product.price, product.currency) }}</p>
+			<p class="tabular text-md font-semibold text-ink-gray-9" x-text="money(price)">{{ commera.format.money(shown_price, product.currency) if shown_price is not none }}</p>
 		</div>
 		<button type="button" @click="add_to_cart()" :disabled="variant && !variant.available" :aria-busy="busy === 'add_to_cart'" class="button-primary relative shrink-0 aria-busy:text-transparent">
 			<span class="grid [&>span]:col-start-1 [&>span]:row-start-1">
 				<span x-show="(!variant || variant.available) && !added">{{ _("Add to cart") }}</span>
 				<span x-cloak x-show="added" x-transition.opacity.duration.150ms class="inline-flex items-center gap-1.5">{{ icon("check", "size-4") }}{{ _("Added") }}</span>
-				<span x-cloak x-show="variant && !variant.available">{{ _("Sold out") }}</span>
+				<span x-cloak x-show="variant && !variant.available && variant.price !== null">{{ _("Sold out") }}</span>
+				<span x-cloak x-show="variant && variant.price === null">{{ _("Unavailable") }}</span>
 			</span>
 			{{ spinner("busy === 'add_to_cart'", "size-5 text-on-brand", overlay=true) }}
 		</button>

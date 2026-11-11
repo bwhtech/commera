@@ -4,6 +4,7 @@ import frappe
 from frappe import _
 
 from commera import seo
+from commera.sdk.format import url
 
 
 def get_context(context):
@@ -12,6 +13,6 @@ def get_context(context):
 			key: value for key, value in frappe.form_dict.items() if key not in ("checkout", "lang", "cmd")
 		}
 		query = f"?{urlencode(forwarded)}" if forwarded else ""
-		frappe.redirect(f"/{frappe.local.lang or 'en'}/cart/checkout{query}")
+		frappe.redirect(url(f"/cart/checkout{query}"))
 	context.seo = seo.build_page_seo({"noindex": 1}, display_name=_("Cart"))
 	return context

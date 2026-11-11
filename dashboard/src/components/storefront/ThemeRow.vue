@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { Badge, Button, useColorScheme } from 'frappe-ui'
 import Thumb from '../Thumb.vue'
 import ResponsiveButton from '../ResponsiveButton.vue'
+import { __ } from '../../data/translation'
 
 const props = defineProps({
   theme: { type: Object, required: true },
@@ -18,10 +19,9 @@ const { resolvedColorScheme } = useColorScheme()
 const isBuilder = computed(() => props.theme.theme_type === 'Builder')
 const isClassic = computed(() => props.theme.theme_type !== 'Sections' && !isBuilder.value)
 const muted = computed(() => isClassic.value && !props.theme.live)
-const META_PREFIXES = { Sections: 'Built with sections', Builder: 'Built with Frappe Builder' }
 const meta = computed(() => {
-  const prefix = META_PREFIXES[props.theme.theme_type]
-  return prefix ? `${prefix} · ${props.theme.source}` : props.theme.source
+  if (isBuilder.value) return __('Built with Frappe Builder · {0}', [props.theme.source])
+  return isClassic.value ? props.theme.source : __('Built with sections · {0}', [props.theme.source])
 })
 const editorRoute = computed(() =>
   props.theme.theme_type === 'Sections' ? { name: 'StorefrontThemeEditor', params: { theme: props.theme.name } } : null,
@@ -59,7 +59,7 @@ const imageSize = computed(() => (props.featured ? 'aspect-[16/10] w-full sm:w-6
         <RouterLink
           v-if="editorRoute"
           :to="editorRoute"
-          :aria-label="`Customize ${theme.theme_name}`"
+          :aria-label="__('Customize {0}', [theme.theme_name])"
           class="truncate text-ink-gray-9 after:absolute after:inset-0 after:rounded-[inherit] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-outline-gray-3"
           :class="featured ? 'text-lg-semibold' : 'text-base font-medium'"
         >
@@ -72,31 +72,31 @@ const imageSize = computed(() => (props.featured ? 'aspect-[16/10] w-full sm:w-6
         >
           {{ theme.theme_name }}
         </span>
-        <Badge v-if="theme.live" label="Live" theme="green" variant="subtle" />
-        <Badge v-if="isClassic" label="Classic" theme="gray" variant="subtle" />
+        <Badge v-if="theme.live" :label="__('Live')" theme="green" variant="subtle" />
+        <Badge v-if="isClassic" :label="__('Classic')" theme="gray" variant="subtle" />
       </div>
       <p class="mt-1 text-sm sm:truncate" :class="muted ? 'text-ink-gray-4' : 'text-ink-gray-5'">{{ meta }}</p>
     </div>
     <Button
       v-if="!theme.live && !theme.is_base"
       class="relative z-10"
-      aria-label="Switch Theme"
+      :aria-label="__('Switch Theme')"
       :loading="activating"
       :disabled="disabled"
       @click="$emit('activate', theme)"
     >
-      <span class="sm:hidden">Switch</span>
-      <span class="hidden sm:inline">Switch Theme</span>
+      <span class="sm:hidden">{{ __('Switch') }}</span>
+      <span class="hidden sm:inline">{{ __('Switch Theme') }}</span>
     </Button>
     <ResponsiveButton
       v-if="isBuilder && theme.builder_editor_url"
-      label="Edit in Builder"
+      :label="__('Edit in Builder')"
       icon="lucide-external-link"
       icon-position="right"
       :href="theme.builder_editor_url"
     />
     <span
-      class="lucide-chevron-right size-4 shrink-0 text-ink-gray-5"
+      class="lucide-chevron-right size-4 shrink-0 text-ink-gray-5 rtl:-scale-x-100"
       :class="{ invisible: !editorRoute, 'hidden sm:block': featured }"
       aria-hidden="true"
     />

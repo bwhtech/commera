@@ -8,9 +8,16 @@ from frappe.utils import get_url_to_form
 from frappe.website.utils import clear_cache as clear_website_cache
 
 from commera.commera_ecommerce.doctype.commera_settings.headless_storefront import sync_headless_oauth_client
+from commera.localization.languages import (
+	MAX_STOREFRONT_LANGUAGES,
+	StorefrontLanguages,
+	get_default_language_code,
+)
+from commera.localization.markets import find_market_by_prefix
 from commera.search.build import enqueue_full_rebuild
 from commera.search.engine_cache import clear_search_engine, get_engine_class
 from commera.search.http_client import SearchServerError
+from commera.search.price_seq import bump_price_seq_after_commit
 from commera.search.record_builder import ALLOWED_CONTENT_DOCTYPES, is_indexable_content_field
 from commera.search.remote_engine import RemoteSearchEngine
 from commera.search.result_card import (
@@ -19,6 +26,7 @@ from commera.search.result_card import (
 	MIN_RESULT_FIELDS,
 	RESULT_CARD_CATALOG,
 )
+from commera.search.translations import search_languages_changed
 from commera.storefront_plugins import clear_storefront_plugin_cache, get_enabled_storefront_apps
 from commera.utils import get_store_currency
 
@@ -36,6 +44,9 @@ class CommeraSettings(Document):
 
 		from commera.commera_ecommerce.doctype.commera_storefront_app.commera_storefront_app import (
 			CommeraStorefrontApp,
+		)
+		from commera.commera_ecommerce.doctype.commera_storefront_language.commera_storefront_language import (
+			CommeraStorefrontLanguage,
 		)
 		from commera.commera_ecommerce.doctype.footer_section_mapping.footer_section_mapping import (
 			FooterSectionMapping,
@@ -70,6 +81,7 @@ class CommeraSettings(Document):
 		create_variants_automatically_on_configurator_creation: DF.Check
 		default_meta_description: DF.SmallText | None
 		default_price_list: DF.Link | None
+		default_storefront_language: DF.Link | None
 		default_share_image: DF.AttachImage | None
 		ecommerce_item_group_mapping: DF.Table[ItemGroupMap]
 		ecommerce_warehouse: DF.Link | None
@@ -127,6 +139,7 @@ class CommeraSettings(Document):
 		store_setup_error: DF.SmallText | None
 		store_setup_status: DF.Literal["", "running", "done", "failed"]
 		storefront_apps: DF.Table[CommeraStorefrontApp]
+		storefront_languages: DF.Table[CommeraStorefrontLanguage]
 		storefront_published: DF.Check
 		strikethrough_color: DF.Color | None
 		tiktok_url: DF.Data | None
@@ -144,6 +157,7 @@ class CommeraSettings(Document):
 		self.validate_search_content_fields()
 		self.validate_search_result_fields()
 		self.validate_search_engine()
+		self.validate_storefront_languages()
 		sync_headless_oauth_client(self)
 
 	def validate_price_list_currencies(self):
@@ -168,6 +182,24 @@ class CommeraSettings(Document):
 		pairs = [(row.search_doctype, row.field) for row in rows]
 		if len(pairs) != len(set(pairs)):
 			frappe.throw(frappe._("Duplicate search content fields are not allowed."))
+
+	def validate_storefront_languages(self):
+		codes = [row.language for row in self.storefront_languages or []]
+		if len(codes) != len(set(codes)):
+			frappe.throw(frappe._("Each storefront language can be listed only once."))
+
+		default = get_default_language_code(self)
+		if len({default, *codes}) > MAX_STOREFRONT_LANGUAGES:
+			frappe.throw(
+				frappe._("A storefront can have at most {0} languages.").format(MAX_STOREFRONT_LANGUAGES)
+			)
+
+		# Shoppers always see the default language, so its row cannot stay unpublished.
+		for row in self.storefront_languages or []:
+			if row.language == default:
+				row.published = 1
+		if storefront_languages_changed(self.get_doc_before_save(), self):
+			validate_no_market_url(default, codes)
 
 	def validate_search_engine(self):
 		engine = get_engine_class(self.get("search_engine"))
@@ -231,18 +263,37 @@ class CommeraSettings(Document):
 		if get_enabled_storefront_apps(before) != get_enabled_storefront_apps(self):
 			clear_storefront_plugin_cache()
 			clear_website_cache()
+		elif storefront_languages_changed(before, self):
+			# Cached guest pages carry the old language list.
+			clear_website_cache()
+		if storefront_languages_changed(before, self):
+			from commera.migrate import setup_robots_txt
+
+			setup_robots_txt(StorefrontLanguages.from_settings(self))
 		if frappe.flags.in_install or frappe.flags.in_migrate:
 			return
 		if before is None:
 			return
 		old_pairs = [(row.search_doctype, row.field) for row in (before.search_content_fields or [])]
 		new_pairs = [(row.search_doctype, row.field) for row in (self.search_content_fields or [])]
+		if self.store_prices_changed(before):
+			bump_price_seq_after_commit()
 		if self.search_engine_changed(before):
 			# Build the newly chosen index. Until it exists, the frappe.qb grid serves every search.
 			clear_search_engine()
 			get_engine_class(self.get("search_engine"))().enqueue_full_rebuild(deduplicate=True)
-		elif old_pairs != new_pairs:
+		elif (
+			old_pairs != new_pairs
+			or search_languages_changed(before, self)
+			or self.store_prices_changed(before)
+		):
 			enqueue_full_rebuild(deduplicate=True)
+
+	def store_prices_changed(self, before):
+		"""The index holds the card prices of the store's lists."""
+		return any(
+			before.get(field) != self.get(field) for field in ("sale_price_list", "default_price_list")
+		)
 
 	def search_engine_changed(self, before):
 		fields = ("search_engine", "search_server_url", "search_index_prefix")
@@ -416,6 +467,28 @@ def create_configurator_log():
 			"doctype": "Bulk Style Attribute Configurator Creation Log",
 		}
 	).insert(ignore_permissions=True)
+
+
+def validate_no_market_url(default: str, codes: list[str]):
+	"""A language en-AE would take /en-ae/, the URL of English in a market for the UAE."""
+	for code in dict.fromkeys([default, *codes]):
+		if market := find_market_by_prefix(code):
+			frappe.throw(
+				frappe._("Language {0} would take /{1}/, the URL of market {2}.").format(
+					frappe.bold(code), code.lower(), frappe.bold(market)
+				),
+				title=frappe._("URL Taken"),
+			)
+
+
+def storefront_languages_changed(before, after) -> bool:
+	def languages(doc):
+		if doc is None:
+			return None
+		rows = [(row.language, row.published) for row in doc.get("storefront_languages") or []]
+		return doc.get("default_storefront_language"), rows
+
+	return languages(before) != languages(after)
 
 
 def validate_price_list_currency(price_list: str, currency: str, label: str):

@@ -3,11 +3,14 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request
 
 import commera.sdk
 from commera.shop_themes.doctype.shop_theme.shop_theme import render_theme_context
-from commera.shop_themes.sections import LAYOUT_CACHE_PREFIX, get_theme_json, validate_layout
+from commera.shop_themes.sections import get_theme_json, validate_layout
 from commera.shop_themes.theme_resolver import ThemePageRenderer, build_base_context
+from commera.tests.test_localization import use_storefront_languages
 
 STARTER = "Commera Starter"
 STARTER_DIR = os.path.join(frappe.get_app_path("commera"), "themes", "commera_starter")
@@ -39,9 +42,6 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 			"apps": {STARTER: "commera"},
 			"settings_doctype": None,
 		}
-		for page in ("index", "header_group", "footer_group"):
-			frappe.cache.delete_value(f"{LAYOUT_CACHE_PREFIX}{STARTER}:{page}")
-			self.addCleanup(frappe.cache.delete_value, f"{LAYOUT_CACHE_PREFIX}{STARTER}:{page}")
 		frappe.db.delete("Theme Layout", {"theme": STARTER})
 
 	def render_home(self, products):
@@ -55,7 +55,14 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 			return renderer.render_with_theme_loader(build_base_context(None))
 
 	def publish(self, page, layout):
-		frappe.cache.set_value(f"{LAYOUT_CACHE_PREFIX}{STARTER}:{page}", {"layout": layout})
+		frappe.get_doc(
+			doctype="Theme Layout",
+			name=f"{STARTER}-{page}",
+			theme=STARTER,
+			page=page,
+			published_layout=frappe.as_json(layout),
+			modified=frappe.utils.now_datetime(),
+		).db_insert()
 
 	def assert_layout_rejected(self, page, section_type):
 		layout = {"sections": [{"id": "probe", "type": section_type}]}
@@ -63,14 +70,17 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 			validate_layout(self.theme_context, layout, page)
 
 	def test_the_account_dashboard_lands_on_the_starter_orders_page(self):
-		renderer = ThemePageRenderer("en/account/dashboard")
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+		frappe.local.request = Request(EnvironBuilder(path="/ar/account/dashboard").get_environ())
+		renderer = ThemePageRenderer("account/dashboard")
 		renderer.theme_dirs = [STARTER_DIR]
 		renderer.template_path = "pages/account/dashboard.html"
 		renderer.requires_auth = True
 
 		with self.assertRaises(frappe.Redirect):
 			renderer.render()
-		self.assertEqual(frappe.flags.redirect_location, "/en/account/orders")
+		self.assertEqual(frappe.flags.redirect_location, "/ar/account/orders")
 
 	def test_every_starter_layout_passes_the_layout_checks(self):
 		for page in ("index", "header_group", "footer_group"):
@@ -149,6 +159,44 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 		self.assertNotIn("grid grid-cols-[1fr_auto_1fr] items-center", html)
 		self.assertIn("ZZ Starter copyright", html)
 		self.assertIn("ZZ Starter column", html)
+
+	def test_the_header_switches_between_the_published_languages(self):
+		use_storefront_languages(self, "en", published=("en", "ar"), unpublished=("fr",))
+		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+		frappe.local.request = Request(EnvironBuilder(path="/ar/", query_string="ref=zz").get_environ())
+
+		html = self.render_home([])
+
+		self.assertIn('aria-label="Language"', html)
+		self.assertIn('href="/?ref=zz" hreflang="en"', html)
+		self.assertIn('href="/ar?ref=zz" hreflang="ar"', html)
+		self.assertNotIn('hreflang="fr"', html)
+		self.assertIn('href="/ar/account/', html)
+		self.assertNotIn('href="/en', html)
+
+	def test_a_query_cannot_break_out_of_a_header_link(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+		query = 'x="><img src=x onerror=alert(1)>'
+		frappe.local.request = Request(EnvironBuilder(path="/ar/", query_string=query).get_environ())
+
+		html = self.render_home([])
+
+		self.assertNotIn("<img src=x", html)
+		self.assertNotIn("onerror=alert", html)
+		self.assertIn('href="/?x=%22%3E%3Cimg', html)
+
+	def test_a_single_language_store_has_no_switcher_and_no_prefixes(self):
+		use_storefront_languages(self, "en", published=("en",))
+		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+		frappe.local.request = Request(EnvironBuilder(path="/").get_environ())
+
+		html = self.render_home([])
+
+		self.assertNotIn('aria-label="Language"', html)
+		self.assertNotIn('lang="en" dir="ltr" data-language', html)
+		self.assertIn('href="/account/', html)
+		self.assertNotIn('href="/en', html)
 
 	def test_the_home_page_renders_every_section_from_the_theme_defaults(self):
 		html = self.render_home([PRODUCT_CARD])

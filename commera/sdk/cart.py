@@ -9,8 +9,9 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import CommeraC
 from commera.core import _get_cart_quotation
 from commera.discounts.allocations import get_allocations
 from commera.guest import get_guest_cart_name, is_guest
+from commera.localization.market_prices import MarketPrices
 from commera.plugin_events import get_listed_items, get_plugin_fieldnames, validate_plugin_fieldnames
-from commera.sdk.catalog import get_line_products
+from commera.sdk.lines import LineProducts
 from commera.sdk.types import Cart, CheckoutSummary, NewCartLine, PricedCart
 
 __all__ = [
@@ -33,6 +34,7 @@ def get_cart() -> Cart | None:
 	if quotation.is_new():
 		return None
 
+	products = LineProducts([row.item_code for row in quotation.items])
 	return {
 		"name": quotation.name,
 		"customer": quotation.party_name if quotation.quotation_to == "Customer" else None,
@@ -40,7 +42,7 @@ def get_cart() -> Cart | None:
 		"items": [
 			{
 				"item_code": row.item_code,
-				"title": row.item_name,
+				"title": products.get_title(row.item_code, row.item_name),
 				"qty": flt(row.qty),
 				"rate": flt(row.rate),
 				"amount": flt(row.amount),
@@ -140,6 +142,7 @@ def replace_lines(lines: list[dict], revision: int | None) -> PricedCart | None:
 	kept = {line["line_id"]: cint(line["qty"]) for line in lines if line.get("line_id")}
 	for line_id in kept:
 		cart.get_line(line_id)
+	validate_increases(cart, [{"line_id": line_id, "qty": qty} for line_id, qty in kept.items()])
 	cart.update_lines([{"line_id": row.name, "qty": kept.get(row.name, 0)} for row in cart.lines])
 	if new_lines := [line for line in lines if not line.get("line_id")]:
 		validate_items_for_sale(new_lines)
@@ -153,10 +156,30 @@ def validate_items_for_sale(lines: list[dict]):
 	item_codes = {cstr(line["item_code"]) for line in lines}
 	if unlisted := item_codes - get_listed_items(list(item_codes), sellable_only=True):
 		frappe.throw(_("{0} is not for sale.").format(", ".join(sorted(unlisted))))
+	validate_market_prices(item_codes)
+
+
+def validate_increases(cart: CommeraCart, lines: list[dict]):
+	"""Lowering or dropping a line is always allowed; buying more needs a price in the market."""
+	raised = set()
+	for line in lines:
+		row = cart.get_line(line["line_id"])
+		if "qty" in line and cint(line["qty"]) > cint(row.qty):
+			raised.add(cstr(row.item_code))
+	validate_market_prices(raised)
+
+
+def validate_market_prices(item_codes: set[str]):
+	if unpriced := MarketPrices.current().get_unpriced(sorted(item_codes)):
+		frappe.throw(
+			_("{0} is not available in this market.").format(", ".join(sorted(unpriced))),
+			title=_("Not Available"),
+		)
 
 
 def update_lines(lines: list[dict]) -> PricedCart:
 	cart = get_existing_cart()
+	validate_increases(cart, lines)
 	cart.update_lines(lines)
 	return save_server_cart(cart)
 
@@ -205,8 +228,10 @@ def save_server_cart(cart: CommeraCart) -> PricedCart:
 
 def price_cart(cart: CommeraCart) -> PricedCart:
 	priced = cart.get_priced_cart()
-	products = get_line_products([line["item_code"] for line in priced["lines"]])
+	line_products = LineProducts([line["item_code"] for line in priced["lines"]])
+	products = line_products.get_cart_products()
 	for line in priced["lines"]:
+		line["title"] = line_products.get_title(line["item_code"], line["title"])
 		line["product"] = products.get(line["item_code"])
 	priced["total_quantity"] = sum(line["qty"] for line in priced["lines"])
 	return priced

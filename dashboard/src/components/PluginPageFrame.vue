@@ -81,7 +81,7 @@ onUnmounted(() => (document.title = titleBeforeMount))
   <AppPageHeader :title="title" :breadcrumbs="breadcrumbs" :back-to="backTo">
     <template #actions>
       <Dropdown v-if="overflowOptions.length" :options="overflowOptions">
-        <Button icon="lucide-ellipsis" label="More actions" />
+        <Button icon="lucide-ellipsis" :label="__('More actions')" />
       </Dropdown>
       <component
         :is="action.icon ? ResponsiveButton : Button"

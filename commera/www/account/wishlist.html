@@ -7,7 +7,7 @@
 	<template x-for="item in $store.wishlist.items">
 		<div class="flex flex-col w-fit mb-4">
 			<div class="relative w-fit">
-				<a :href="'/{{ frappe.lang }}/products/' + item.route">
+				<a :href="{{ url('/products') | tojson | forceescape }} + '/' + item.route">
 					<img :src="item.image || '/assets/commera/images/1.jpg'" alt=""
 						class="w-45 h-60 md:w-55 md:h-70 lg:w-3xs lg:h-85 object-cover rounded-lg" />
 				</a>
@@ -23,19 +23,12 @@
 				</div>
 			</div>
 
-			<h3 class="mt-6 font-medium text-accent text-base md:text-xl" :title="item.brand" x-text="$store.i18n.t(item.brand)"></h3>
+			<h3 class="mt-6 font-medium text-accent text-base md:text-xl" :title="item.brand" x-text="commera.t(item.brand)"></h3>
 			</h3>
-			{% if frappe.lang == 'en' %}
-			<h4 class="text-base md:text-xl ">
-				<span x-text="item.item_name" class="me-1"></span> <span x-text="item.attribute_value"></span>
+			<h4 class="text-base md:text-xl" :title="item.title||item.item_name">
+				<span x-text="item.title||item.item_name" class="me-1"></span> <span
+					x-text="commera.t(item.attribute_value)"></span>
 			</h4>
-			
-			{% else %}
-			<h4 class="text-base md:text-xl" :title="item.custom_item_name_ar||item.item_name">
-				<span x-text="item.custom_item_name_ar||item.item_name" class="me-1"></span> <span
-					x-text="$store.i18n.t(item.attribute_value)"></span>
-			</h4>
-			{% endif %}
 			<div class="mt-2 text-sm md:text-base flex font-semibold">
 				<p class="flex">{{get_currency_symbol()}} <span x-text="item.sale_price.toFixed(2)"></span>
 				</p>

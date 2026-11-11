@@ -7,8 +7,9 @@ from werkzeug.wrappers import Request
 
 import commera.sdk
 from commera.shop_themes.doctype.shop_theme.shop_theme import render_theme_context
-from commera.shop_themes.sections import LAYOUT_CACHE_PREFIX, get_theme_json, validate_layout
+from commera.shop_themes.sections import get_theme_json, validate_layout
 from commera.shop_themes.theme_resolver import ThemePageRenderer
+from commera.tests.test_localization import use_storefront_languages
 
 STARTER = "Commera Starter"
 STARTER_DIR = os.path.join(frappe.get_app_path("commera"), "themes", "commera_starter")
@@ -30,9 +31,6 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 			"apps": {STARTER: "commera"},
 			"settings_doctype": None,
 		}
-		for page in (*CATALOG_LAYOUTS, "header_group", "footer_group"):
-			frappe.cache.delete_value(f"{LAYOUT_CACHE_PREFIX}{STARTER}:{page}")
-			self.addCleanup(frappe.cache.delete_value, f"{LAYOUT_CACHE_PREFIX}{STARTER}:{page}")
 		frappe.db.delete("Theme Layout", {"theme": STARTER})
 
 		self.saved_request = getattr(frappe.local, "request", None)
@@ -119,15 +117,33 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		self.assertIn(f">{collection['title']}</h1>", html)
 		self.assertIn(f'name="category" value="{collection["handle"]}"', html)
 
+	def test_a_collection_page_shows_its_description(self):
+		category = frappe.get_doc(
+			{
+				"doctype": "Ecommerce Category",
+				"category_name": f"Described {frappe.generate_hash(length=8)}",
+				"description": "Linen <b>for</b> summer",
+				"enabled": 1,
+			}
+		).insert(ignore_permissions=True)
+		# The menu is memoised per request; an earlier test may have built it without this tab.
+		frappe.local.commera_storefront_menu = None
+
+		status, html = self.render("pages/products/list.html", "/en/products", category=category.route_slug)
+
+		self.assertEqual(status, 200)
+		self.assertIn("Linen &lt;b&gt;for&lt;/b&gt; summer</p>", html)
+
 	def test_a_selected_filter_shows_as_a_chip_that_removes_it(self):
 		self.get_any_product()
+		use_storefront_languages(self, "en", published=("en", "ar"))
 
-		status, html = self.render("pages/products/list.html", "/en/products", sizes="ZZ-NO-SIZE")
+		status, html = self.render("pages/products/list.html", "/ar/products", sizes="ZZ-NO-SIZE")
 
 		self.assertEqual(status, 200)
 		self.assertIn("No products match these filters", html)
 		self.assertIn('aria-label="Remove ZZ-NO-SIZE"', html)
-		self.assertIn('href="/en/products"', html)
+		self.assertIn('href="/ar/products"', html)
 
 	def test_a_search_shows_its_results_and_is_kept_out_of_search_engines(self):
 		product = self.get_any_product()
@@ -160,6 +176,15 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		self.assertIn("Add to cart", html)
 		self.assertIn("Shipping &amp; returns", html)
 		self.assertIn('"@type": "Product"', html)
+
+	def test_the_size_picker_selects_by_source_value_not_translated_title(self):
+		# Two sizes can share a translated title, so the title must not pick the item code.
+		with open(os.path.join(STARTER_DIR, "sections", "main_product.html")) as template:
+			source = template.read()
+
+		self.assertIn('@click="size = variants[{{ loop.index0 }}].size"', source)
+		self.assertIn('"size": variant.size if size_option', source)
+		self.assertNotIn("].title", source)
 
 	def test_an_unknown_product_renders_the_theme_404(self):
 		status, html = self.render(

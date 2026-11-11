@@ -1,5 +1,7 @@
 import frappe
 
+from commera.localization import url
+
 no_cache = True
 
 
@@ -11,7 +13,7 @@ def get_context(context):
 	context.breadcrumbs = [
 		{
 			"label": "My Account",
-			"href": f"/{frappe.local.lang}/account/",
+			"href": url("/account/"),
 		},
 		{
 			"label": "Profile",

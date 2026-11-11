@@ -1,3 +1,6 @@
+import { get_request_params } from './localization.js';
+import { t } from './translate.js';
+
 const API_ROOT = '/api/v2/method/commera.api.storefront';
 const STATUS_MESSAGES = { 403: 'Not permitted.', 404: 'Not found.' };
 
@@ -12,7 +15,7 @@ export class StorefrontError extends Error {
 
 export async function get(method, params = {}) {
 	const query = new URLSearchParams();
-	for (const [key, value] of Object.entries(with_language(params))) {
+	for (const [key, value] of Object.entries(with_localization(params))) {
 		if (value !== undefined && value !== null) {
 			query.set(key, typeof value === 'object' ? JSON.stringify(value) : value);
 		}
@@ -28,14 +31,13 @@ export async function post(method, params = {}) {
 			'Content-Type': 'application/json',
 			'X-Frappe-CSRF-Token': get_csrf_token(),
 		},
-		body: JSON.stringify(with_language(params)),
+		body: JSON.stringify(with_localization(params)),
 	});
 }
 
-// Frappe reads `_lang` before the shopper's account or browser language, so replies match the page.
-function with_language(params) {
-	const language = globalThis.commera_storefront_config?.language;
-	return language ? { ...params, _lang: language } : params;
+// The server resolves `_lang` and `_country` as the page URL did, so replies match the page.
+function with_localization(params) {
+	return { ...params, ...get_request_params() };
 }
 
 function get_csrf_token() {
@@ -54,7 +56,7 @@ async function request(url, { headers = {}, ...options }) {
 	});
 	const body = await read_json(response);
 	if (body === null && response.ok) {
-		throw new StorefrontError('The store sent an unexpected response.', {
+		throw new StorefrontError(t('The store sent an unexpected response.'), {
 			status: response.status,
 		});
 	}
@@ -72,7 +74,7 @@ async function send(url, options) {
 	try {
 		return await fetch(url, options);
 	} catch (error) {
-		throw new StorefrontError('Could not reach the store.', {
+		throw new StorefrontError(t('Could not reach the store.'), {
 			status: 0,
 			cause: error,
 		});
@@ -93,9 +95,9 @@ function get_error_message(body, response) {
 		error.message ||
 			body.messages?.[0]?.message ||
 			error.exception?.trim().split('\n').pop() ||
-			STATUS_MESSAGES[response.status] ||
+			t(STATUS_MESSAGES[response.status] ?? '') ||
 			response.statusText ||
-			'Request failed',
+			t('Request failed'),
 	);
 }
 

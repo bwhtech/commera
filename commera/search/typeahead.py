@@ -20,7 +20,7 @@ class CategoryLink(TypedDict):
 
 class Typeahead(TypedDict):
 	query: str
-	# Storefront product cards with live prices, best match first.
+	# Storefront product cards priced in the request's market, best match first.
 	products: list[dict]
 	# Menu entries whose names match, linked to their listing.
 	categories: list[CategoryLink]
@@ -40,7 +40,7 @@ def get_typeahead(query: str, limit: int = DEFAULT_LIMIT) -> Typeahead:
 		if ranked is not None:
 			return {"query": query, **ranked}
 
-	# SQLite ranks no short or Arabic term, and a failing search server ranks nothing: list frappe.qb matches.
+	# SQLite skips short terms and unindexed Arabic, and a failing server ranks nothing: list frappe.qb matches.
 	from commera.utils import get_product_list
 
 	result["products"] = get_product_list(filters={"search": query}, page_length=limit)

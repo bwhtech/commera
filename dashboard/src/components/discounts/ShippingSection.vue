@@ -14,20 +14,20 @@ const chosenOptions = computed({
 </script>
 
 <template>
-  <DiscountSection title="Delivery">
-    <MultiSelect v-model="chosenOptions" :options="deliveryOptions" label="Delivery options" placeholder="Every delivery option" />
+  <DiscountSection :title="__('Delivery')">
+    <MultiSelect v-model="chosenOptions" :options="deliveryOptions" :label="__('Delivery options')" :placeholder="__('Every delivery option')" />
     <div class="grid gap-4 sm:grid-cols-2">
       <FormControl
         v-model="discount.shipping_percentage"
         type="number"
-        label="Off the delivery charge (%)"
-        description="100 makes delivery free."
+        :label="__('Off the delivery charge (%)')"
+        :description="__('100 makes delivery free.')"
       />
       <FormControl
         v-model="discount.maximum_shipping_rate"
         type="number"
-        label="Skip rates above"
-        description="Keeps expensive options at full price. 0 means no limit."
+        :label="__('Skip rates above')"
+        :description="__('Keeps expensive options at full price. 0 means no limit.')"
       />
     </div>
   </DiscountSection>

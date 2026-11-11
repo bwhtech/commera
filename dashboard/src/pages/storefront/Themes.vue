@@ -9,6 +9,7 @@ import NewBuilderThemeDialog from '../../components/storefront/NewBuilderThemeDi
 import { useTheme } from '../../data/theme'
 import { captureMissingThumbnails } from '../../data/storePreview'
 import { errorMessage } from '../../data/errors'
+import { __ } from '../../data/translation'
 
 const { themes, loadError, loading, builderInstalled, load, activate } = useTheme()
 
@@ -26,15 +27,15 @@ const libraryThemes = computed(() => themes.value.filter((theme) => !theme.live)
 function confirmActivate(theme) {
   const previous = liveTheme.value?.theme_name
   dialog.confirm({
-    title: `Switch to ${theme.theme_name}?`,
+    title: __('Switch to {0}?', [theme.theme_name]),
     message: previous
-      ? `Shoppers see ${theme.theme_name} straight away. ${previous} moves to the theme library and keeps all its changes.`
-      : `Shoppers see ${theme.theme_name} straight away.`,
-    confirmLabel: 'Switch Theme',
+      ? __('Shoppers see {0} straight away. {1} moves to the theme library and keeps all its changes.', [theme.theme_name, previous])
+      : __('Shoppers see {0} straight away.', [theme.theme_name]),
+    confirmLabel: __('Switch Theme'),
     onConfirm: async () => {
       activatingName.value = theme.name
       try {
-        if (await activate(theme.name)) toast.success(`${theme.theme_name} is now the live theme`)
+        if (await activate(theme.name)) toast.success(__('{0} is now the live theme', [theme.theme_name]))
       } finally {
         activatingName.value = null
       }
@@ -44,9 +45,9 @@ function confirmActivate(theme) {
 </script>
 
 <template>
-  <AppPageHeader title="Themes">
+  <AppPageHeader :title="__('Themes')">
     <template v-if="builderInstalled" #actions>
-      <Button label="New theme" icon-left="lucide-plus" variant="solid" theme="gray" @click="creatingTheme = true" />
+      <Button :label="__('New theme')" icon-left="lucide-plus" variant="solid" theme="gray" @click="creatingTheme = true" />
     </template>
   </AppPageHeader>
 
@@ -65,28 +66,28 @@ function confirmActivate(theme) {
     <EmptyState
       v-else-if="loadError"
       icon="lucide-triangle-alert"
-      title="Could not load themes"
+      :title="__('Could not load themes')"
       :description="errorMessage(loadError)"
     />
 
     <EmptyState
       v-else-if="!themes.length"
       icon="lucide-palette"
-      title="No themes installed"
-      description="A theme ships with the app it belongs to. Install one to style the storefront."
+      :title="__('No themes installed')"
+      :description="__('A theme ships with the app it belongs to. Install one to style the storefront.')"
     />
 
     <template v-else>
       <section v-if="liveTheme" data-live-theme>
-        <h2 class="text-sm font-medium uppercase tracking-wide text-ink-gray-5">Live theme</h2>
+        <h2 class="text-sm font-medium uppercase tracking-wide text-ink-gray-5">{{ __('Live theme') }}</h2>
         <div class="mt-2 overflow-hidden rounded-5 border border-outline-gray-2">
           <ThemeRow :theme="liveTheme" featured />
         </div>
       </section>
 
       <section v-if="libraryThemes.length" class="mt-8">
-        <h2 class="text-sm font-medium uppercase tracking-wide text-ink-gray-5">Theme library</h2>
-        <p class="text-p-sm text-ink-gray-5">Shoppers only see the live theme.</p>
+        <h2 class="text-sm font-medium uppercase tracking-wide text-ink-gray-5">{{ __('Theme library') }}</h2>
+        <p class="text-p-sm text-ink-gray-5">{{ __('Shoppers only see the live theme.') }}</p>
         <div class="mt-2 divide-y divide-outline-gray-1 overflow-hidden rounded-5 border border-outline-gray-2">
           <ThemeRow
             v-for="theme in libraryThemes"

@@ -5,8 +5,7 @@
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/empty_state.html" import empty_state %}
 {% from "components/macros/pagination.html" import pagination %}
-{% set language = frappe.lang or "en" %}
-{% set orders_url = "/" ~ language ~ "/account/orders" %}
+{% set orders_url = url("/account/orders") %}
 {% set page = [frappe.form_dict.page | int, 1] | max %}
 {% set order_page = commera.account.list_orders(page, 10) %}
 {% set page_count = ((order_page.total + order_page.page_size - 1) // order_page.page_size) or 1 %}
@@ -19,7 +18,7 @@
 <ul class="divide-y divide-outline-gray-1 border-y border-outline-gray-1">
 	{% for order in order_page.orders %}
 	<li>
-		<a href="{{ orders_url }}/detail?order_id={{ order.name | urlencode }}" class="flex items-center gap-4 py-4 hover:bg-surface-gray-1">
+		<a href="{{ orders_url | e }}/detail?order_id={{ order.name | urlencode }}" class="flex items-center gap-4 py-4 hover:bg-surface-gray-1">
 			{{ image(order["items"][0].image if order["items"] else None, width=160, class="aspect-[3/4] w-16 shrink-0 rounded-lg object-cover object-top") }}
 			<div class="min-w-0 flex-1">
 				<div class="flex flex-wrap items-center gap-2">
@@ -27,7 +26,7 @@
 					{{ order_status(order.stage) }}
 				</div>
 				{% set item_count = order["items"] | sum(attribute="qty") | int %}
-				<p class="mt-1 text-p-md text-ink-gray-6">{{ frappe.utils.format_date(order.placed_on, "medium") }} · {{ _("1 item") if item_count == 1 else _("{0} items").format(item_count) }}<span class="tabular block font-medium text-ink-gray-9 lg:hidden"><bdi>{{ commera.format.money(order.rounded_total or order.grand_total, order.currency) }}</bdi></span></p>
+				<p class="mt-1 text-p-md text-ink-gray-6">{{ commera.format.date(order.placed_on) }} · {{ _("1 item") if item_count == 1 else _("{0} items").format(item_count) }}<span class="tabular block font-medium text-ink-gray-9 lg:hidden"><bdi>{{ commera.format.money(order.rounded_total or order.grand_total, order.currency) }}</bdi></span></p>
 			</div>
 			<p class="tabular hidden shrink-0 text-md font-medium text-ink-gray-9 lg:block"><bdi>{{ commera.format.money(order.rounded_total or order.grand_total, order.currency) }}</bdi></p>
 			{{ icon("right", "size-4 shrink-0 text-ink-gray-6 rtl:rotate-180") }}
@@ -38,7 +37,7 @@
 {{ pagination(page, page_count, page_url) }}
 {% else %}
 {% call empty_state(_("No orders yet"), _("When you place an order, it shows here with its delivery status."), "truck") %}
-<a href="/{{ language }}/products" class="button-primary">{{ _("Start shopping") }}</a>
+<a href="{{ url('/products') | e }}" class="button-primary">{{ _("Start shopping") }}</a>
 {% endcall %}
 {% endif %}
 {% endcall %}

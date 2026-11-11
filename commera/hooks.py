@@ -9,81 +9,37 @@ app_license = "agpl-3.0"
 required_apps = ["frappe/erpnext", "bwhtech/bwh_payments"]
 
 
+# Only language-independent rules: commera.localization.routing redirects /<default>/* and /account.
 website_redirects = [
-	{"source": "/products", "target": "/en/products"},
-	{"source": "/products/(.*)", "target": r"/en/products/\1"},
-	{"source": "/", "target": "/en"},
-	{"source": "/cart", "target": "/en/cart"},
-	{"source": "/cart/checkout", "target": "/en/cart/checkout"},
-	{"source": "/account", "target": "en/account/dashboard"},
-	{"source": "/account/(.*)", "target": r"/en/account/\1"},
-	{"source": "/en/account", "target": "/account/dashboard"},
-	{"source": "/ar/account", "target": "/account/dashboard"},
 	{"source": "/en-US/(.*)", "target": r"/en/\1"},
 	{"source": "/en-GB/(.*)", "target": r"/en/\1"},
 ]
 
-# website_path_resolver = "commera.utils.resolve_bilingual_path"
+# localize_request strips the language prefix off request.path before any app's path resolver runs,
+# so the route rules below match the path without it. resolve_website_path sends the canonical redirects.
+before_request = ["commera.localization.routing.localize_request"]
+website_path_resolver = "commera.localization.routing.resolve_website_path"
+# Frappe runs auth_hooks after its API key and OAuth checks, so a storefront API call knows its user.
+auth_hooks = ["commera.localization.routing.localize_api_request"]
 
 website_route_rules = [
 	# SPA client-side routing: every /commera deep link resolves to the same shell so a reload does not 404.
 	{"from_route": "/commera/<path:app_path>", "to_route": "/commera"},
+	# -> Products
+	{"from_route": "/products", "to_route": "/products/list.html"},
+	{"from_route": "/products/<path:route>", "to_route": "/products/details.html"},
+	# -> Cart / Checkout
+	{"from_route": "/cart", "to_route": "/cart/cart.html"},
+	{"from_route": "/cart/checkout", "to_route": "/cart/checkout.html"},
 	{"from_route": "/cart/<path:codes>", "to_route": "/cart/permalink.html"},
-	# ------------
-	# English Routes
-	# ------------
-	#
-	# -> Landing
-	{"from_route": "/en", "to_route": "/index.html"},
-	# -> Products
-	{"from_route": "/en/products", "to_route": "/products/list.html"},
-	{"from_route": "/en/products/<path:route>", "to_route": "/products/details.html"},
-	# -> Cart / Checkout
-	{"from_route": "/en/cart", "to_route": "/cart/cart.html"},
-	{"from_route": "/en/cart/checkout", "to_route": "/cart/checkout.html"},
-	{"from_route": "/en/cart/<path:codes>", "to_route": "/cart/permalink.html"},
 	# -> Account
-	{"from_route": "/en/account/dashboard", "to_route": "/account/dashboard.html"},
-	{"from_route": "/en/account/profile", "to_route": "/account/profile.html"},
-	{"from_route": "/en/account/orders", "to_route": "/account/orders/index.html"},
-	{
-		"from_route": "/en/account/orders/confirmation",
-		"to_route": "/account/orders/confirmation.html",
-	},
-	{
-		"from_route": "/en/account/orders/detail",
-		"to_route": "/account/orders/detail.html",
-	},
-	{"from_route": "/en/account/wishlist", "to_route": "/account/wishlist.html"},
-	{"from_route": "/en/account/address", "to_route": "/account/address.html"},
-	#
-	# ------------
-	# Arabic Routes
-	# ------------
-	#
-	# -> Landing
-	{"from_route": "/ar", "to_route": "/index.html"},
-	# -> Products
-	{"from_route": "/ar/products", "to_route": "/products/list.html"},
-	{"from_route": "/ar/products/<path:route>", "to_route": "/products/details.html"},
-	# -> Cart / Checkout
-	{"from_route": "/ar/cart", "to_route": "/cart/cart.html"},
-	{"from_route": "/ar/cart/checkout", "to_route": "/cart/checkout.html"},
-	{"from_route": "/ar/cart/<path:codes>", "to_route": "/cart/permalink.html"},
-	# -> Account
-	{"from_route": "/ar/account/dashboard", "to_route": "/account/dashboard.html"},
-	{"from_route": "/ar/account/profile", "to_route": "/account/profile.html"},
-	{"from_route": "/ar/account/orders", "to_route": "/account/orders/index.html"},
-	{
-		"from_route": "/ar/account/orders/confirmation",
-		"to_route": "/account/orders/confirmation.html",
-	},
-	{
-		"from_route": "/ar/account/orders/detail",
-		"to_route": "/account/orders/detail.html",
-	},
-	{"from_route": "/ar/account/wishlist", "to_route": "/account/wishlist.html"},
-	{"from_route": "/ar/account/address", "to_route": "/account/address.html"},
+	{"from_route": "/account/dashboard", "to_route": "/account/dashboard.html"},
+	{"from_route": "/account/profile", "to_route": "/account/profile.html"},
+	{"from_route": "/account/orders", "to_route": "/account/orders/index.html"},
+	{"from_route": "/account/orders/confirmation", "to_route": "/account/orders/confirmation.html"},
+	{"from_route": "/account/orders/detail", "to_route": "/account/orders/detail.html"},
+	{"from_route": "/account/wishlist", "to_route": "/account/wishlist.html"},
+	{"from_route": "/account/address", "to_route": "/account/address.html"},
 	# ------------
 	# Crawl infrastructure (language-agnostic)
 	# ------------
@@ -91,7 +47,6 @@ website_route_rules = [
 	{"from_route": "/og-image/<path:route>", "to_route": "/og_image_render"},
 ]
 
-before_request = ["commera.utils.before_request"]
 on_session_creation = "commera.commera_ecommerce.doctype.commera_cart.commera_cart.keep_guest_cart"
 on_login = "commera.roles.save_commera_default_app"
 
@@ -149,7 +104,63 @@ after_app_install = [
 ]
 before_app_uninstall = "commera.shipping.providers.disable_app_profiles"
 
-commera_hooks = {"shipping_providers": ["Shiprocket Shipping Settings", "AfterShip Shipping Settings"]}
+commera_hooks = {
+	"shipping_providers": ["Shiprocket Shipping Settings", "AfterShip Shipping Settings"],
+	# Record fields merchants translate into Content Translation. Other apps add their own here.
+	"translatable_resources": [
+		{
+			"type": "product",
+			"doctype": "Style Attribute Variant",
+			"fields": ["display_name", "description", "meta_title", "meta_description"],
+			"label": "Products",
+		},
+		{
+			"type": "collection",
+			"doctype": "Ecommerce Category",
+			"fields": ["display_name", "description", "meta_title", "meta_description"],
+			"label": "Collections",
+		},
+		{
+			"type": "page",
+			"doctype": "Shop Web Page",
+			"fields": ["title", "content", "meta_title", "meta_description"],
+			"label": "Pages",
+		},
+		{
+			"type": "footer_section",
+			"doctype": "Footer Section Config",
+			"fields": ["section_title"],
+			"label": "Footer sections",
+		},
+		# Keyed by the row name, so a translation follows its link through edits and reorders.
+		{"type": "footer_link", "doctype": "Footer Link", "fields": ["link_label"], "label": "Footer links"},
+		# A Single: its translations name the doctype as the record.
+		{
+			"type": "shop",
+			"doctype": "Commera Settings",
+			"fields": ["store_name", "default_meta_description"],
+			"label": "Shop",
+		},
+		# The un-themed homepage. An image or link translation swaps the file or target per language.
+		# Hero banners are not translated: each language can have its own rows, tagged with it.
+		{
+			"type": "landing_page",
+			"doctype": "Landing Page Settings",
+			"fields": [
+				*(f"gif_{number}" for number in range(1, 5)),
+				*(f"gif_url_{number}" for number in range(1, 5)),
+				"banner_1",
+				"banner_url_1",
+			],
+			"label": "Landing page",
+		},
+		{
+			"type": "theme_section",
+			"adapter": "commera.shop_themes.section_translations.ThemeSectionResource",
+			"label": "Theme",
+		},
+	],
+}
 setup_wizard_complete = [
 	"commera.swatches.drop_unused_colour_attribute",
 	"commera.cloud.link.queue_initial_link",
@@ -178,6 +189,9 @@ commera_events = {
 
 
 doc_events = {
+	"Website Settings": {
+		"validate": "commera.localization.redirect_rules.canonicalize_redirect_targets",
+	},
 	"User": {
 		"before_insert": "commera.utils.prevent_welcome_email",
 	},
@@ -188,12 +202,22 @@ doc_events = {
 	},
 	"Shop Web Page": {
 		"on_update": "commera.plugin_events.on_shop_web_page_change",
-		"on_trash": "commera.plugin_events.on_shop_web_page_change",
+		"on_trash": [
+			"commera.plugin_events.on_shop_web_page_change",
+			"commera.localization.content.delete_translations",
+		],
 	},
-	"Footer Section Config": {"on_update": "commera.plugin_events.on_menu_change"},
+	"Footer Section Config": {
+		"on_update": [
+			"commera.plugin_events.on_menu_change",
+			"commera.localization.content.delete_removed_row_translations",
+		],
+		"on_trash": "commera.localization.content.delete_translations",
+	},
 	"Commera Settings": {"on_update": "commera.plugin_events.on_menu_change"},
 	"Price List": {
 		"validate": "commera.doc_events.price_list.validate",
+		"after_rename": "commera.search.price_sync.on_price_list_rename",
 	},
 	"Gateway Payment Request": {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
@@ -230,10 +254,25 @@ doc_events = {
 			"commera.plugin_events.on_stock_ledger_entry_insert",
 		]
 	},
-	"Item": {"on_update": "commera.plugin_events.on_item_update"},
+	"Item": {
+		"on_update": "commera.plugin_events.on_item_update",
+		"on_change": "commera.search.source_sync.on_source_change",
+		"after_rename": "commera.search.source_sync.on_source_rename",
+	},
+	"Style Attribute Configurator": {
+		"on_change": "commera.search.source_sync.on_source_change",
+		"after_rename": "commera.search.source_sync.on_source_rename",
+	},
 	"Item Price": {
-		"on_update": "commera.plugin_events.on_item_price_change",
-		"on_trash": "commera.plugin_events.on_item_price_change",
+		"on_update": [
+			"commera.plugin_events.on_item_price_change",
+			"commera.search.price_sync.on_item_price_change",
+		],
+		"on_trash": [
+			"commera.plugin_events.on_item_price_change",
+			"commera.search.price_sync.on_item_price_change",
+		],
+		"after_rename": "commera.search.price_sync.on_item_price_rename",
 	},
 	"Style Attribute Variant": {
 		"on_update": [
@@ -244,12 +283,21 @@ doc_events = {
 		"on_trash": [
 			"commera.search.sync.on_trash",
 			"commera.plugin_events.on_style_attribute_variant_trash",
+			"commera.localization.content.delete_translations",
 		],
+	},
+	"Content Translation": {
+		"on_update": "commera.search.translations.on_translation_change",
+		"on_trash": "commera.search.translations.on_translation_change",
 	},
 	"Ecommerce Category": {
 		"on_update": ["commera.search.sync.on_update", "commera.plugin_events.on_menu_change"],
 		"after_rename": "commera.search.sync.after_rename",
-		"on_trash": ["commera.search.sync.on_trash", "commera.plugin_events.on_menu_change"],
+		"on_trash": [
+			"commera.search.sync.on_trash",
+			"commera.plugin_events.on_menu_change",
+			"commera.localization.content.delete_translations",
+		],
 	},
 	"Sales Invoice": {
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
@@ -282,6 +330,10 @@ jinja = {
 		"commera.branding.get_brand_assets",
 		"commera.builder_themes.head.commera_builder_head",
 		"commera.guest.is_guest_checkout_enabled",
+		"commera.localization.get_country_choices",
+		"commera.localization.get_localization",
+		"commera.localization.switch_url",
+		"commera.localization.url",
 		"commera.utils.format_theme_css",
 		"commera.utils.get_currency_symbol",
 		"commera.search.result_card.get_search_result_fields",
@@ -290,10 +342,13 @@ jinja = {
 		"commera.seo_jinja",
 		"commera.shop_data.get_header_data",
 		"commera.shop_data.get_storefront_menu",
+		"commera.store_frame.get_shop_details",
+		"commera.store_frame.get_storefront_footer",
 		"commera.shop_themes.jinja_helpers.shop_theme_asset_url",
 		"commera.shop_themes.jinja_helpers.shop_theme_config",
 		"commera.shop_themes.jinja_helpers.format_shop_theme_css",
 		"commera.shop_themes.sections.render_layout",
+		"commera.shop_themes.storefront_header.render_storefront_header",
 		"commera.storefront_plugins.format_plugin_includes",
 		"commera.storefront_plugins.plugin_slot",
 	],
@@ -325,6 +380,8 @@ ignore_links_on_delete = [
 	"Commera Webhook Log",
 	# A use is never given back, so its row outlives a deleted order.
 	"Commera Discount Use",
+	# Lets a record go even when its app does not hook delete_translations on on_trash.
+	"Content Translation",
 ]
 
 # Apps
@@ -542,13 +599,6 @@ override_whitelisted_methods = {
 # 	{
 # 		"doctype": "{doctype_4}"
 # 	}
-# ]
-
-# Authentication and authorization
-# --------------------------------
-
-# auth_hooks = [
-# 	"commera.auth.validate"
 # ]
 
 # Automatically update python controller files with type annotations for this app.

@@ -1,13 +1,14 @@
-// The onboarding flow's shape, with no imports so tests/unit can load it under plain node.
+// The onboarding flow's shape. Every import keeps its `.js` so tests/unit can load it under plain node.
+import { __ } from '../data/translation.js'
 
 // `focus` names the area of the store preview a step outlines; `optional` offers Skip.
 export const STEPS = [
-  { key: 'you', title: 'Welcome' },
-  { key: 'store', title: 'Your store' },
-  { key: 'brand', title: 'Your brand', focus: 'brand', optional: true },
-  { key: 'theme', title: 'Pick a look', focus: 'theme' },
-  { key: 'selling', title: 'Selling', focus: 'selling' },
-  { key: 'products', title: 'Products', focus: 'products', optional: true },
+  { key: 'you', title: __('Welcome') },
+  { key: 'store', title: __('Your store') },
+  { key: 'brand', title: __('Your brand'), focus: 'brand', optional: true },
+  { key: 'theme', title: __('Pick a look'), focus: 'theme' },
+  { key: 'selling', title: __('Selling'), focus: 'selling' },
+  { key: 'products', title: __('Products'), focus: 'products', optional: true },
   { key: 'done', title: '' },
 ]
 

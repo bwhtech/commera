@@ -1,6 +1,5 @@
 
 {% macro account_shell(page_title, parent_crumbs=None) %}
-{% set language = frappe.lang or "en" %}
 {# Order pages are reachable logged out: the gateway return URL and the private order link. #}
 {% set is_signed_in = frappe.session.user != "Guest" %}
 
@@ -10,9 +9,9 @@
 			<h1>{{ page_title }}</h1>
 			<nav aria-label="{{ _('breadcrumb') }}" class="breadcrumb-row">
 				<ul class="breadcrumb">
-					<li class="breadcrumb-item"><a href="/{{ language }}">{{ _("Home") }}</a></li>
+					<li class="breadcrumb-item"><a href="{{ url('/') | e }}">{{ _("Home") }}</a></li>
 					{% for crumb in parent_crumbs or [] %}
-					<li class="breadcrumb-item"><a href="{{ crumb.href }}">{{ crumb.label }}</a></li>
+					<li class="breadcrumb-item"><a href="{{ crumb.href | e }}">{{ crumb.label }}</a></li>
 					{% endfor %}
 					<li class="breadcrumb-item">{{ page_title }}</li>
 				</ul>

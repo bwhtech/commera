@@ -1,11 +1,11 @@
 import * as checkout from '../checkout.js';
 import { money_text } from '../format.js';
+import { url } from '../localization.js';
 import { StorefrontError } from '../request.js';
 import {
 	NO_INPUT,
 	READS_STORE_DATA,
 	RETURNS_STORE_DATA,
-	get_language_root,
 	navigate,
 } from './shared.js';
 
@@ -81,7 +81,7 @@ export const checkout_tools = [
 		inputSchema: NO_INPUT,
 		annotations: {},
 		async run() {
-			return navigate(`${get_language_root()}/cart`);
+			return navigate(url('/cart'));
 		},
 	},
 ];

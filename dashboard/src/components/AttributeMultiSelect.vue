@@ -90,7 +90,7 @@ function addTypedValue(query, setQuery) {
         v-if="canAdd(query)"
         variant="ghost"
         icon="lucide-plus"
-        :aria-label="`Add ${query.trim()}`"
+        :aria-label="__('Add {0}', [query.trim()])"
         @click="addTypedValue(query, setQuery)"
       />
     </template>

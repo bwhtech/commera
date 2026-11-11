@@ -6,6 +6,7 @@ from frappe import _
 from frappe.utils import create_batch
 from frappe.utils.data import cint, cstr, flt
 
+from commera.base_prices import base_price_filters
 from commera.plugin_events import add_changed_products
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
@@ -25,7 +26,7 @@ def get_selling_price_lists():
 
 
 def get_base_price_rows_by_key(item_codes, price_lists):
-	"""Base (no-customer) selling rows keyed (item_code, price_list) - customer rows are negotiated contracts."""
+	"""Base selling rows keyed (item_code, price_list): see commera.base_prices."""
 	if not item_codes:
 		return {}
 
@@ -34,12 +35,9 @@ def get_base_price_rows_by_key(item_codes, price_lists):
 		price_rows.extend(
 			frappe.get_all(
 				"Item Price",
-				filters={
-					"item_code": ["in", item_code_chunk],
-					"price_list": ["in", price_lists],
-					"selling": 1,
-					"customer": ["is", "not set"],
-				},
+				filters=base_price_filters(
+					{"item_code": ["in", item_code_chunk], "price_list": ["in", price_lists], "selling": 1}
+				),
 				fields=["name", "item_code", "price_list", "price_list_rate"],
 				order_by="creation asc",
 			)

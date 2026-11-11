@@ -7,6 +7,7 @@ import EmptyState from '../components/EmptyState.vue'
 import AttributeValuesDialog from '../components/AttributeValuesDialog.vue'
 import SwatchDot from '../components/SwatchDot.vue'
 import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
+import { __ } from '../data/translation'
 
 const attributesRequest = useAdminRead('catalog.get_attributes')
 const attributes = computed(() => attributesRequest.data ?? [])
@@ -15,11 +16,11 @@ const createAction = useAdminAction('catalog.create_attribute')
 
 function addAttribute() {
   dialog.prompt({
-    title: 'New attribute',
-    message: 'Attributes are shared across products. Any product can turn one into a variant option.',
+    title: __('New attribute'),
+    message: __('Attributes are shared across products. Any product can turn one into a variant option.'),
     fields: [
-      { name: 'name', label: 'Name', required: true },
-      { name: 'values', label: 'Values', description: 'Comma separated' },
+      { name: 'name', label: __('Name'), required: true },
+      { name: 'values', label: __('Values'), description: __('Comma separated') },
     ],
     onConfirm: async ({ values }) => {
       const created = await trySubmit(createAction, { name: values.name, values: values.values })
@@ -27,7 +28,7 @@ function addAttribute() {
       // guard would fire if it ever could here (see catalog.check_abbreviations_are_distinct);
       // it can't in practice, because create_attribute auto-generates every abbreviation fresh.
       if (!created) return
-      toast.success(`"${values.name}" created`)
+      toast.success(__('"{0}" created', [values.name]))
       attributesRequest.reload()
     },
   })
@@ -43,9 +44,9 @@ function editAttribute(attribute) {
 </script>
 
 <template>
-  <AppPageHeader title="Attributes">
+  <AppPageHeader :title="__('Attributes')">
     <template #actions>
-      <Button label="New attribute" icon-left="lucide-plus" variant="solid" theme="gray" @click="addAttribute" />
+      <Button :label="__('New attribute')" icon-left="lucide-plus" variant="solid" theme="gray" @click="addAttribute" />
     </template>
   </AppPageHeader>
 
@@ -80,13 +81,13 @@ function editAttribute(attribute) {
           class="flex cursor-pointer items-start gap-4 px-2 py-4 hover:bg-surface-gray-2"
           role="button"
           tabindex="0"
-          :aria-label="`Edit ${attribute.name}`"
+          :aria-label="__('Edit {0}', [attribute.name])"
           @click="editAttribute(attribute)"
           @keyup.enter="editAttribute(attribute)"
         >
           <div class="min-w-0 flex-1">
             <p class="text-base text-ink-gray-8">{{ attribute.name }}</p>
-            <p class="mt-1 text-sm text-ink-gray-5">Used by {{ attribute.used_by }} products</p>
+            <p class="mt-1 text-sm text-ink-gray-5">{{ __('Used by {0} products', [attribute.used_by]) }}</p>
             <div class="mt-2 flex flex-wrap gap-1.5">
               <span
                 v-for="value in attribute.values"
@@ -104,7 +105,7 @@ function editAttribute(attribute) {
               </span>
             </div>
           </div>
-          <Button label="Edit" variant="ghost" @click.stop="editAttribute(attribute)" />
+          <Button :label="__('Edit')" variant="ghost" @click.stop="editAttribute(attribute)" />
         </div>
       </div>
     </ScrollArea>
@@ -112,10 +113,10 @@ function editAttribute(attribute) {
     <EmptyState
       v-else
       icon="lucide-tags"
-      title="No attributes yet"
-      description="Attributes are the choices a shopper picks — size, colour, format."
+      :title="__('No attributes yet')"
+      :description="__('Attributes are the choices a shopper picks — size, colour, format.')"
     >
-      <Button label="New attribute" icon-left="lucide-plus" variant="solid" theme="gray" @click="addAttribute" />
+      <Button :label="__('New attribute')" icon-left="lucide-plus" variant="solid" theme="gray" @click="addAttribute" />
     </EmptyState>
   </PageBody>
 

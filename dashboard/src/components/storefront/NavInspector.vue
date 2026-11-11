@@ -3,16 +3,17 @@ import { computed, reactive, ref, watch } from 'vue'
 import { Button, Combobox, FormControl, MultiSelect, Switch, toast } from 'frappe-ui'
 import { useNavMenu } from '../../data/navMenu'
 import { useLinkSearch } from '../../data/linkSearch'
+import { __ } from '../../data/translation'
 
 const { selected, mutate } = useNavMenu()
 
 const emit = defineEmits(['remove'])
 
 const LINK_TYPES = [
-  { label: 'Nothing — heading only', value: '' },
-  { label: 'Item groups', value: 'Item Group' },
-  { label: 'Brand', value: 'Brand' },
-  { label: 'Custom URL', value: 'URL' },
+  { label: __('Nothing — heading only'), value: '' },
+  { label: __('Item groups'), value: 'Item Group' },
+  { label: __('Brand'), value: 'Brand' },
+  { label: __('Custom URL'), value: 'URL' },
 ]
 
 const form = reactive({
@@ -23,6 +24,7 @@ const form = reactive({
   brand: '',
   url: '',
   icon: '',
+  description: '',
   meta_title: '',
   meta_description: '',
   noindex: false,
@@ -44,6 +46,7 @@ watch(
     form.brand = node.brand
     form.url = node.url
     form.icon = node.icon
+    form.description = node.description
     form.meta_title = node.meta_title
     form.meta_description = node.meta_description
     form.noindex = Boolean(node.noindex)
@@ -96,11 +99,12 @@ async function save() {
       // left out of the payload.
       route_slug: form.route_slug || undefined,
       icon: form.icon,
+      description: form.description,
       meta_title: form.meta_title,
       meta_description: form.meta_description,
       noindex: form.noindex ? 1 : 0,
     })
-    if (saved) toast.success('Menu entry saved')
+    if (saved) toast.success(__('Menu entry saved'))
   } finally {
     saving.value = false
   }
@@ -110,9 +114,9 @@ async function save() {
 <template>
   <div v-if="!selected" class="grid h-full place-items-center px-5 py-10 text-center">
     <div>
-      <p class="text-base text-ink-gray-6">Pick an entry to edit it</p>
+      <p class="text-base text-ink-gray-6">{{ __('Pick an entry to edit it') }}</p>
       <p class="mt-1 text-p-sm text-ink-gray-5">
-        Drag entries to reorder them, or drop one onto another to nest it.
+        {{ __('Drag entries to reorder them, or drop one onto another to nest it.') }}
       </p>
     </div>
   </div>
@@ -124,32 +128,32 @@ async function save() {
         variant="ghost"
         theme="red"
         icon-left="lucide-trash-2"
-        label="Delete"
+        :label="__('Delete')"
         @click="emit('remove', selected)"
       />
     </div>
 
     <div v-scroll-fade class="min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-5">
       <div class="space-y-4">
-        <FormControl v-model="form.label" label="Menu label" required />
+        <FormControl v-model="form.label" :label="__('Menu label')" required />
 
         <FormControl
           v-model="form.route_slug"
-          label="URL slug"
+          :label="__('URL slug')"
           :required="isRoot"
           :description="
             isRoot
-              ? 'Used in the storefront address for this section.'
-              : 'Optional. Top-level sections need one; entries below them do not.'
+              ? __('Used in the storefront address for this section.')
+              : __('Optional. Top-level sections need one; entries below them do not.')
           "
         />
 
         <FormControl
           v-model="form.link_type"
           type="select"
-          label="Links to"
+          :label="__('Links to')"
           :options="LINK_TYPES"
-          description="Leave as a heading to show a label that is not clickable."
+          :description="__('Leave as a heading to show a label that is not clickable.')"
         />
 
         <MultiSelect
@@ -160,9 +164,9 @@ async function save() {
           :options="itemGroupOptions"
           :filterable="false"
           :loading="itemGroupSearch.results.loading"
-          label="Item groups"
-          description="Products from every group listed here appear together under this entry."
-          placeholder="Search item groups"
+          :label="__('Item groups')"
+          :description="__('Products from every group listed here appear together under this entry.')"
+          :placeholder="__('Search item groups')"
         />
 
         <Combobox
@@ -173,44 +177,52 @@ async function save() {
           :options="brandOptions"
           :filterable="false"
           :loading="brandSearch.results.loading"
-          label="Brand"
-          placeholder="Search brands"
+          :label="__('Brand')"
+          :placeholder="__('Search brands')"
         />
 
         <FormControl
           v-else-if="form.link_type === 'URL'"
           v-model="form.url"
-          label="URL"
-          description="Where this entry sends shoppers."
+          :label="__('URL')"
+          :description="__('Where this entry sends shoppers.')"
         />
 
-        <FormControl v-model="form.icon" label="Icon" description="Optional icon name or CSS class." />
+        <FormControl v-model="form.icon" :label="__('Icon')" :description="__('Optional icon name or CSS class.')" />
+
+        <FormControl
+          v-if="isRoot"
+          v-model="form.description"
+          type="textarea"
+          :label="__('Description')"
+          :description="__('Shown under the title on the collection page.')"
+        />
       </div>
 
       <div class="mt-8 space-y-4">
-        <h3 class="text-base font-medium text-ink-gray-8">Search engine listing</h3>
+        <h3 class="text-base font-medium text-ink-gray-8">{{ __('Search engine listing') }}</h3>
 
         <FormControl
           v-model="form.meta_title"
-          label="Page title"
-          description="Defaults to the menu label and your store name."
+          :label="__('Page title')"
+          :description="__('Defaults to the menu label and your store name.')"
         />
         <FormControl
           v-model="form.meta_description"
           type="textarea"
-          label="Description"
-          description="Shown under the title in search results."
+          :label="__('Description')"
+          :description="__('Shown under the title in search results.')"
         />
         <Switch
           v-model="form.noindex"
-          label="Hide from search engines"
-          description="Asks crawlers not to list this page."
+          :label="__('Hide from search engines')"
+          :description="__('Asks crawlers not to list this page.')"
         />
       </div>
     </div>
 
     <div class="flex justify-end border-t border-outline-gray-1 px-5 py-3">
-      <Button variant="solid" theme="gray" label="Save" :loading="saving" @click="save" />
+      <Button variant="solid" theme="gray" :label="__('Save')" :loading="saving" @click="save" />
     </div>
   </div>
 </template>

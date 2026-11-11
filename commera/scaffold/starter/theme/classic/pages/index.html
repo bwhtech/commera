@@ -1,8 +1,23 @@
 {% extends "components/base.html" %}
 
+{% block head %}
+{# Logical properties (inline, block, start, end) flip on their own in a right-to-left language. #}
+<style>
+	.site-header { display: flex; align-items: center; gap: 1.5rem; padding-block: 1rem; padding-inline: 1.5rem; }
+	.site-header nav { display: flex; gap: 1rem; margin-inline-start: auto; }
+	.languages { display: flex; align-items: center; gap: 0.5rem; }
+	.language-switcher { display: flex; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+	.language-switcher .is-current { font-weight: 600; }
+	.welcome { max-inline-size: 40rem; padding-inline: 1.5rem; text-align: start; }
+</style>
+{% endblock %}
+
 {% block body %}
-<section>
+{% include "components/includes/header.html" %}
+<section class="welcome">
 	<h1>$theme_name</h1>
 	<p>{{ _("Build this page in pages/index.html, with macros from components/.") }}</p>
+	<p>{{ _("This page is in {0}.").format(localization.language.endonym) | e }}</p>
+	<a href="{{ url('/products') | e }}">{{ _("Shop all products") }}</a>
 </section>
 {% endblock %}

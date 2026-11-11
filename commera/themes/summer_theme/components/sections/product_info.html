@@ -13,7 +13,7 @@
 				this.qty += 1;
 				return;
 			}
-			toast($store.i18n.t("Only") + " " + this.max_qty + " " + $store.i18n.t("left in stock"), { type: "warning" });
+			toast(commera.t("Only {0} left", this.max_qty), { type: "warning" });
 		},
 		decrement() {
 			if (this.qty > 1) {
@@ -27,12 +27,12 @@
 		},
 		add_to_cart() {
 			if (!this.selected_variant) {
-				toast($store.i18n.t("Please select a size first!"), { type: "warning" });
+				toast(commera.t("Please select a size first!"), { type: "warning" });
 				return;
 			}
 			// The store warns and adds less when the cart already holds the rest of the stock.
 			if (!$store.cart.add(this.product, this.selected_variant, this.price, this.default_price, this.brand, this.sizes, this.qty)) return;
-			toast($store.i18n.t("Item added to your bag"), { type: "success" });
+			toast(commera.t("Item added to your bag"), { type: "success" });
 		},
 		get in_wishlist() {
 			return $store.wishlist.is_in_wishlist(this.product);
@@ -48,7 +48,7 @@
 			try {
 				await frappe_call("/api/v2/method/commera.api.utils.notify_user_product", { item: {{ selected_item.item_code | tojson }} });
 				this.notify_status = "subscribed";
-				toast($store.i18n.t("You will be notified when item is available"), { type: "success" });
+				toast(commera.t("You will be notified when item is available"), { type: "success" });
 			} catch (error) {
 				this.notify_status = "idle";
 			}
@@ -64,19 +64,19 @@
 							<span class="badge bg-secondary mb-2">{{ _("Sale {0}% Off").format(discount_percent | round | int) }}</span>
 							{% endif %}
 							<h1 class="h4 title mb-1">
-								{% if frappe.lang == "ar" %}{{ product.custom_item_name_ar or product_variant.display_name }}{% else %}{{ product_variant.display_name }}{% endif %}
+								{{ product_title|e }}
 							</h1>
 							{% if product.brand %}
 							<div class="review-num">
-								<a href="/{{ frappe.lang or 'en' }}/products?brands={{ product.brand | urlencode }}">{{ product.brand }}</a>
+								<a href="{{ url('/products?brands=' ~ (product.brand | urlencode)) | e }}">{{ product.brand }}</a>
 							</div>
 							{% endif %}
 						</div>
 					</div>
 
-					{% if selected_item.description and selected_item.description != selected_item.item_code %}
+					{% if show_product_description %}
 					<p class="para-text">
-						{% if frappe.lang == "ar" %}{{ selected_item.description_ar or selected_item.description }}{% else %}{{ selected_item.description }}{% endif %}
+						{{ product_description }}
 					</p>
 					{% endif %}
 
@@ -119,14 +119,14 @@
 						<label class="form-label">{{ _("Colour") }}</label>
 						<ul class="product-colour-list">
 							<li>
-								<a href="/{{ frappe.lang or 'en' }}/products/{{ product_variant.route }}" class="is-active" aria-current="page">
+								<a href="{{ url('/products/' ~ product_variant.route) | e }}" class="is-active" aria-current="page">
 									<img src="{{ images[0] }}" alt="{{ product_variant.attribute_value }}">
 									<span>{{ product_variant.attribute_value }}</span>
 								</a>
 							</li>
 							{% for variant in other_variants %}
 							<li>
-								<a href="/{{ frappe.lang or 'en' }}/products/{{ variant.route }}">
+								<a href="{{ url('/products/' ~ variant.route) | e }}">
 									<img src="{{ variant.image or '/assets/commera/images/1.jpg' }}" alt="{{ variant.attribute_value }}">
 									<span>{{ variant.attribute_value }}</span>
 								</a>
@@ -143,7 +143,7 @@
 						</ul>
 						<ul>
 							<li><strong>{{ _("Category") }}:</strong></li>
-							<li><a href="/{{ frappe.lang or 'en' }}/products?item_groups={{ product_variant.item_group | urlencode }}">{{ product_variant.item_group }}</a></li>
+							<li><a href="{{ url('/products?item_groups=' ~ (product_variant.item_group | urlencode)) | e }}">{{ product_variant.item_group }}</a></li>
 						</ul>
 						{% if selected_item.material %}
 						<ul>

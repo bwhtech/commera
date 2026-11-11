@@ -10,7 +10,9 @@ import EmptyState from '../../components/EmptyState.vue'
 import ListSkeleton from '../../components/ListSkeleton.vue'
 import { useAdminRead } from '../../data/api'
 import { hasValues, monthsForRange } from '../../data/analytics'
+import { count } from '../../data/format'
 import { ia } from '../../ia/store'
+import { __ } from '../../data/translation'
 
 const range = ref('Last 12 months')
 const compare = ref(true)
@@ -31,11 +33,13 @@ const channels = computed(() => report.value?.channels ?? [])
 // clips each to about seven characters, so four of the five read as "Viewed…". Shortened here
 // rather than on the server, which the Desk screen shares.
 const FUNNEL_STAGE_LABELS = {
-  'Viewed Product': 'Viewed',
-  'Added to Cart': 'Added',
-  'Reached Checkout': 'Checkout',
-  Purchased: 'Bought',
+  'Viewed Product': __('Viewed'),
+  'Added to Cart': __('Added'),
+  'Reached Checkout': __('Checkout'),
+  Purchased: __('Bought'),
 }
+
+const searchNotTracked = __("The storefront doesn't record search terms.")
 
 const funnel = computed(() =>
   (report.value?.funnel ?? []).map((row) => ({
@@ -66,25 +70,25 @@ const stats = computed(() => {
   const stat = report.value?.stats ?? {}
   return [
     {
-      label: 'Sessions',
-      value: (stat.sessions?.value ?? 0).toLocaleString('en-IN'),
+      label: __('Sessions'),
+      value: count(stat.sessions?.value),
       delta: countDeltaLabel(stat.sessions),
       up: (stat.sessions?.value ?? 0) >= (stat.sessions?.previous ?? 0),
     },
     {
-      label: 'Conversion',
+      label: __('Conversion'),
       value: `${stat.conversion_rate?.value ?? 0}%`,
       delta: ratePointsLabel(stat.conversion_rate),
       up: (stat.conversion_rate?.value ?? 0) >= (stat.conversion_rate?.previous ?? 0),
     },
     {
-      label: 'Add to cart',
+      label: __('Add to cart'),
       value: `${stat.add_to_cart_rate?.value ?? 0}%`,
       delta: ratePointsLabel(stat.add_to_cart_rate),
       up: (stat.add_to_cart_rate?.value ?? 0) >= (stat.add_to_cart_rate?.previous ?? 0),
     },
     {
-      label: 'Checkout completion',
+      label: __('Checkout completion'),
       value: `${stat.checkout_completion_rate?.value ?? 0}%`,
       delta: ratePointsLabel(stat.checkout_completion_rate),
       up: (stat.checkout_completion_rate?.value ?? 0) >= (stat.checkout_completion_rate?.previous ?? 0),
@@ -94,13 +98,13 @@ const stats = computed(() => {
 </script>
 
 <template>
-  <ReportHeader title="Storefront" v-model:range="range" v-model:compare="compare" />
+  <ReportHeader :title="__('Storefront')" v-model:range="range" v-model:compare="compare" />
 
   <PageBody width="narrow">
     <div>
-      <h1 class="text-2xl text-ink-gray-9">Storefront</h1>
+      <h1 class="text-2xl text-ink-gray-9">{{ __('Storefront') }}</h1>
       <p class="mt-1 text-p-base text-ink-gray-6">
-        Who reaches the store, what they look at, where they drop out. {{ range }}.
+        {{ __('Who reaches the store, what they look at, where they drop out. {0}.', [__(range)]) }}
       </p>
     </div>
 
@@ -119,13 +123,13 @@ const stats = computed(() => {
     />
 
     <section v-else class="mt-6 rounded-5 border border-outline-gray-1 p-4">
-      <h2 class="text-lg-semibold text-ink-gray-8">Sessions over time</h2>
+      <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Sessions over time') }}</h2>
       <EmptyState
         v-if="!hasValues(sessionsByMonth, 'sessions')"
         compact
         icon="lucide-chart-line"
-        title="No sessions in this period"
-        description="Try a wider date range."
+        :title="__('No sessions in this period')"
+        :description="__('Try a wider date range.')"
       />
       <div v-else class="h-72">
         <AreaChart :data="sessionsByMonth" x="label" :y="['sessions']" palette="categorical" />
@@ -142,13 +146,13 @@ const stats = computed(() => {
       />
 
       <section v-else class="rounded-5 border border-outline-gray-1 p-4 lg:col-span-2">
-        <h2 class="text-lg-semibold text-ink-gray-8">Where they come from</h2>
+        <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Where they come from') }}</h2>
         <EmptyState
           v-if="!hasValues(channels, 'sessions')"
           compact
           icon="lucide-chart-pie"
-          title="No traffic sources yet"
-          description="Channels appear once shoppers reach the storefront."
+          :title="__('No traffic sources yet')"
+          :description="__('Channels appear once shoppers reach the storefront.')"
         />
         <div v-else class="h-64">
           <DonutChart :data="channels" category="channel" value="sessions" />
@@ -160,13 +164,13 @@ const stats = computed(() => {
       />
 
       <section v-else class="rounded-5 border border-outline-gray-1 p-4 lg:col-span-3">
-        <h2 class="text-lg-semibold text-ink-gray-8">Checkout funnel</h2>
+        <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Checkout funnel') }}</h2>
         <EmptyState
           v-if="!hasValues(funnel, 'count')"
           compact
           icon="lucide-filter"
-          title="No checkout activity yet"
-          description="The funnel fills in once shoppers start browsing."
+          :title="__('No checkout activity yet')"
+          :description="__('The funnel fills in once shoppers start browsing.')"
         />
         <div v-else class="h-64">
           <FunnelChart :data="funnel" category="stage" value="count" />
@@ -175,22 +179,22 @@ const stats = computed(() => {
     </div>
 
     <section class="mt-6 rounded-5 border border-outline-gray-1">
-      <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">Top pages</h2>
+      <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">{{ __('Top pages') }}</h2>
       <p class="px-4 text-sm text-ink-gray-5">
-        Landing sessions per page — the storefront doesn't record a separate page-view count.
+        {{ __("Landing sessions per page — the storefront doesn't record a separate page-view count.") }}
       </p>
       <div class="px-2 pb-2">
         <List :columns="['minmax(0,1fr)', '8rem', '8rem']" :row-height="Math.max(ia.density, 44)">
           <ListHeader>
-            <ListHeaderCell>Page</ListHeaderCell>
-            <ListHeaderCell>Views</ListHeaderCell>
-            <ListHeaderCell>Conversion</ListHeaderCell>
+            <ListHeaderCell>{{ __('Page') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Views') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Conversion') }}</ListHeaderCell>
           </ListHeader>
           <ListSkeleton v-if="reportRequest.loading && !topPages.length" :columns="3" />
           <ListRows v-else :items="topPages" row-key="page" v-slot="{ item }">
             <ListRow :value="item.page">
               <ListCell><span class="truncate text-base text-ink-gray-8">{{ item.page }}</span></ListCell>
-              <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ item.views.toLocaleString('en-IN') }}</span></ListCell>
+              <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ count(item.views) }}</span></ListCell>
               <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ item.conversion }}%</span></ListCell>
             </ListRow>
           </ListRows>
@@ -199,27 +203,27 @@ const stats = computed(() => {
           v-if="!reportRequest.loading && !topPages.length"
           compact
           icon="lucide-file-text"
-          title="No page views yet"
-          description="Views appear once shoppers browse the storefront."
+          :title="__('No page views yet')"
+          :description="__('Views appear once shoppers browse the storefront.')"
         />
       </div>
     </section>
 
     <section class="mt-6 rounded-5 border border-outline-gray-1">
-      <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">Search terms</h2>
+      <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">{{ __('Search terms') }}</h2>
       <div v-if="searchTerms.length" class="px-2 pb-2">
         <List :columns="['minmax(0,1fr)', '8rem', '8rem']" :row-height="Math.max(ia.density, 44)">
           <ListHeader>
-            <ListHeaderCell>Term</ListHeaderCell>
-            <ListHeaderCell>Searches</ListHeaderCell>
-            <ListHeaderCell>Results</ListHeaderCell>
+            <ListHeaderCell>{{ __('Term') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Searches') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Results') }}</ListHeaderCell>
           </ListHeader>
           <ListRows :items="searchTerms" row-key="term" v-slot="{ item }">
             <ListRow :value="item.term">
               <ListCell><span class="truncate text-base text-ink-gray-8">{{ item.term }}</span></ListCell>
               <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ item.searches }}</span></ListCell>
               <ListCell>
-                <Badge v-if="!item.results" label="No results" theme="red" variant="subtle" />
+                <Badge v-if="!item.results" :label="__('No results')" theme="red" variant="subtle" />
                 <span v-else class="text-base text-ink-gray-6 tabular-nums">{{ item.results }}</span>
               </ListCell>
             </ListRow>
@@ -233,8 +237,8 @@ const stats = computed(() => {
         v-else
         compact
         icon="lucide-search"
-        title="Not tracked yet"
-        description="The storefront doesn't record search terms."
+        :title="__('Not tracked yet')"
+        :description="searchNotTracked"
       />
     </section>
   </PageBody>

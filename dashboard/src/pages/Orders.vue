@@ -15,17 +15,18 @@ import SearchInput from '../components/SearchInput.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 import { printUrl } from '../data/erpnext'
 import { money, shortDate } from '../data/format'
+import { __ } from '../data/translation'
 import { useIsMobile } from '../utils/useIsMobile'
 import { useBulkAction } from '../utils/useBulkAction'
 import { ia } from '../ia/store'
 import { orderRoute } from '../ia/routes'
 
 const TABS = [
-  { label: 'All', value: 'all' },
-  { label: 'Unfulfilled', value: 'unfulfilled' },
-  { label: 'Unpaid', value: 'unpaid' },
-  { label: 'Open', value: 'open' },
-  { label: 'Closed', value: 'closed' },
+  { label: __('All'), value: 'all' },
+  { label: __('Unfulfilled'), value: 'unfulfilled' },
+  { label: __('Unpaid'), value: 'unpaid' },
+  { label: __('Open'), value: 'open' },
+  { label: __('Closed'), value: 'closed' },
 ]
 
 const tab = ref('all')
@@ -124,8 +125,10 @@ const { running: bulkRunning, run: runBulk } = useBulkAction()
 async function markFulfilled() {
   const view = listView
   await runBulk('Mark fulfilled', [...selection.value], (name) => fulfilAction.submit({ sales_order: name }), {
-    noun: 'order',
-    verb: 'marked fulfilled',
+    sentences: {
+      all: (count) => (count === 1 ? __('1 order marked fulfilled') : __('{0} orders marked fulfilled', [count])),
+      some: (done, total, failed) => __('{0} of {1} orders marked fulfilled. {2} failed', [done, total, failed]),
+    },
     after: ({ failed }) => {
       if (view === listView) {
         selection.value = failed.map(({ item }) => item)
@@ -153,7 +156,7 @@ function printDeliveryNotes() {
   // Named, not silently dropped — otherwise a mixed selection prints short and
   // the merchant packs one parcel fewer than they selected.
   if (nothingToPrint.length) {
-    toast.warning(`No delivery note yet for ${nothingToPrint.join(', ')} — nothing to print.`)
+    toast.warning(__('No delivery note yet for {0} — nothing to print.', [nothingToPrint.join(', ')]))
   }
   if (!deliveryNotes.length) return
 
@@ -164,18 +167,18 @@ function printDeliveryNotes() {
 <template>
   <!-- No header actions: a shopper places their own order (the ownership rule in
        commera/utils.py), and there is no export endpoint. -->
-  <AppPageHeader title="Orders" />
+  <AppPageHeader :title="__('Orders')" />
 
   <PageBody>
     <div class="flex flex-wrap items-center gap-2">
       <ListTabs v-model="tab" :options="TABS" />
       <SearchInput
         v-model="query"
-        class="min-w-0 flex-1 basis-40 sm:ml-auto sm:w-56 sm:flex-none sm:basis-auto"
-        placeholder="Search orders"
+        class="min-w-0 flex-1 basis-40 sm:ms-auto sm:w-56 sm:flex-none sm:basis-auto"
+        :placeholder="__('Search orders')"
       />
       <ResponsiveButton
-        :label="selecting ? 'Cancel selection' : 'Select'"
+        :label="selecting ? __('Cancel selection') : __('Select')"
         icon="lucide-list-checks"
         :variant="selecting ? 'solid' : 'subtle'"
         theme="gray"
@@ -183,9 +186,16 @@ function printDeliveryNotes() {
       />
     </div>
 
-    <BulkBar v-if="selecting" :count="selection.length" noun="order" :busy="Boolean(bulkRunning)" @done="endSelecting">
-      <Button label="Mark fulfilled" :loading="bulkRunning === 'Mark fulfilled'" @click="markFulfilled" />
-      <Button label="Print delivery notes" @click="printDeliveryNotes" />
+    <BulkBar
+      v-if="selecting"
+      :count="selection.length"
+      :selected-label="selection.length === 1 ? __('1 order selected') : __('{0} orders selected', [selection.length])"
+      :empty-label="__('Select orders to act on them')"
+      :busy="Boolean(bulkRunning)"
+      @done="endSelecting"
+    >
+      <Button :label="__('Mark fulfilled')" :loading="bulkRunning === 'Mark fulfilled'" @click="markFulfilled" />
+      <Button :label="__('Print delivery notes')" @click="printDeliveryNotes" />
     </BulkBar>
 
     <div class="mt-3 overflow-x-auto">
@@ -203,20 +213,20 @@ function printDeliveryNotes() {
     >
       <ListHeader>
         <ListHeaderCellSort :direction="directionFor('customer')" @click="toggleSort('customer')">
-          Order
+          {{ __('Order') }}
         </ListHeaderCellSort>
         <ListHeaderCellSort
           class="max-sm:hidden"
           :direction="directionFor('date')"
           @click="toggleSort('date')"
         >
-          Date
+          {{ __('Date') }}
         </ListHeaderCellSort>
-        <ListHeaderCell class="max-sm:hidden">Payment</ListHeaderCell>
-        <ListHeaderCell class="max-sm:hidden">Fulfilment</ListHeaderCell>
-        <ListHeaderCell class="max-sm:hidden">Items</ListHeaderCell>
+        <ListHeaderCell class="max-sm:hidden">{{ __('Payment') }}</ListHeaderCell>
+        <ListHeaderCell class="max-sm:hidden">{{ __('Fulfilment') }}</ListHeaderCell>
+        <ListHeaderCell class="max-sm:hidden">{{ __('Items') }}</ListHeaderCell>
         <ListHeaderCellSort align="end" :direction="directionFor('total')" @click="toggleSort('total')">
-          Total
+          {{ __('Total') }}
         </ListHeaderCellSort>
       </ListHeader>
 
@@ -246,7 +256,7 @@ function printDeliveryNotes() {
             <span class="text-base text-ink-gray-7 tabular-nums">{{ item.item_count }}</span>
           </ListCell>
           <ListCell>
-            <span class="w-full text-right text-base text-ink-gray-8 tabular-nums">
+            <span class="w-full text-end text-base text-ink-gray-8 tabular-nums">
               {{ money(item.total) }}
             </span>
           </ListCell>
@@ -265,11 +275,11 @@ function printDeliveryNotes() {
     <EmptyState
       v-if="!ordersRequest.loading && !rows.length"
       icon="lucide-shopping-bag"
-      title="No orders yet"
-      description="Your first order will appear here the moment a shopper checks out."
+      :title="__('No orders yet')"
+      :description="__('Your first order will appear here the moment a shopper checks out.')"
       :filtered="isFiltered"
-      filtered-title="No orders here"
-      filtered-description="Try a different filter or search term."
+      :filtered-title="__('No orders here')"
+      :filtered-description="__('Try a different filter or search term.')"
     />
   </PageBody>
 </template>

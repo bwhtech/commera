@@ -28,7 +28,7 @@ function toggleGroup(group) {
       <div class="flex items-center justify-between">
         <h4 class="text-sm text-ink-gray-5">{{ group.label }}</h4>
         <button type="button" class="rounded-1 text-sm text-ink-gray-6 hover:text-ink-gray-8" @click="toggleGroup(group)">
-          {{ isGroupSelected(group) ? 'Clear' : 'Select all' }}
+          {{ isGroupSelected(group) ? __('Clear') : __('Select all') }}
         </button>
       </div>
       <div class="mt-1.5 grid gap-x-6 sm:grid-cols-2">

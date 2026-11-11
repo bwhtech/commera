@@ -34,7 +34,7 @@ const options = computed(() => {
       :options="options"
       :loading="collections.loading"
       :disabled="disabled"
-      placeholder="Pick a collection"
+      :placeholder="__('Pick a collection')"
       @update:model-value="emit('update:modelValue', $event ?? '')"
     />
   </div>

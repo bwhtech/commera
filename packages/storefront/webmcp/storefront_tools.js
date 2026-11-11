@@ -1,5 +1,6 @@
 import * as cart from '../cart.js';
 import * as collections from '../collections.js';
+import { url } from '../localization.js';
 import * as products from '../products.js';
 import { StorefrontError } from '../request.js';
 import * as search from '../search.js';
@@ -7,7 +8,6 @@ import {
 	NO_INPUT,
 	READS_STORE_DATA,
 	RETURNS_STORE_DATA,
-	get_language_root,
 	navigate,
 } from './shared.js';
 
@@ -38,9 +38,7 @@ export const storefront_tools = [
 			return {
 				...results,
 				products: results.products.map(add_product_url),
-				search_url: `${get_language_root()}/products?${new URLSearchParams({
-					search: query,
-				})}`,
+				search_url: url(`/products?${new URLSearchParams({ search: query })}`),
 			};
 		},
 	},
@@ -181,7 +179,7 @@ async function set_cart_lines({ revision, lines }) {
 }
 
 function get_product_url(handle) {
-	return `${get_language_root()}/products/${encodeURIComponent(handle)}`;
+	return url(`/products/${encodeURIComponent(handle)}`);
 }
 
 function add_product_url(product) {
@@ -190,5 +188,5 @@ function add_product_url(product) {
 
 function add_collection_url(collection) {
 	const query = new URLSearchParams({ category: collection.handle });
-	return { ...collection, url: `${get_language_root()}/products?${query}` };
+	return { ...collection, url: url(`/products?${query}`) };
 }

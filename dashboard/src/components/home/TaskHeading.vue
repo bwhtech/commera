@@ -24,18 +24,18 @@ const fill = computed(() => FILLS[props.total]?.[props.done] ?? 'scale-x-0')
     <div class="flex items-center gap-2 text-sm text-ink-gray-5">
       <div class="h-1.5 w-20 overflow-hidden rounded-full bg-surface-gray-2">
         <div
-          class="h-full origin-left rounded-full bg-surface-gray-7 transition-transform duration-300 ease-in-out-strong motion-reduce:transition-none"
+          class="h-full origin-left rounded-full rtl:origin-right bg-surface-gray-7 transition-transform duration-300 ease-in-out-strong motion-reduce:transition-none"
           :class="fill"
         />
       </div>
-      <span class="tabular-nums">{{ done }} of {{ total }} done</span>
+      <span class="tabular-nums">{{ __('{0} of {1} done', [done, total]) }}</span>
     </div>
     <Button
       v-if="dismissedCount"
       variant="ghost"
       size="sm"
-      class="ml-auto"
-      :label="`Show ${dismissedCount} dismissed`"
+      class="ms-auto"
+      :label="__('Show {0} dismissed', [dismissedCount])"
       @click="$emit('restore')"
     />
   </div>

@@ -2,13 +2,23 @@
 # Tests for the pure SEO helpers (commera/seo.py) and the sitemap
 # controller (commera/www/sitemap.py). Real-DB, auto-rolled-back.
 
+import re
 import unittest
+from unittest.mock import patch
+from urllib.parse import quote
 
 import frappe
 from frappe.tests import IntegrationTestCase, UnitTestCase
+from frappe.utils import get_url
 
 from commera import seo, website_context
+from commera.localization import Language, alternates
+from commera.localization.markets import StorefrontMarkets
+from commera.localization.urls import SiteLocales
+from commera.migrate import get_private_path_rules
 from commera.tests import get_test_configurator, get_test_item
+from commera.tests.test_localization import use_storefront_languages
+from commera.tests.test_localization_urls import LocaleUrlTestCase
 from commera.www import sitemap, sitemap_segment
 
 SEO_SETTING_FIELDS = (
@@ -89,29 +99,168 @@ class TestTruncateDescription(UnitTestCase):
 		self.assertNotIn("wor…", result)
 
 
-class TestLangSwap(UnitTestCase):
-	def test_swaps_en_to_ar(self):
-		self.assertEqual(seo.swap_lang_in_path("/en/products/shoe", "ar"), "/ar/products/shoe")
-
-	def test_swaps_ar_to_en(self):
-		self.assertEqual(seo.swap_lang_in_path("/ar/products/shoe", "en"), "/en/products/shoe")
-
-	def test_no_prefix_path_gets_lang_prepended(self):
-		self.assertEqual(seo.swap_lang_in_path("/foo", "en"), "/en/foo")
-		self.assertEqual(seo.swap_lang_in_path("/foo/bar", "ar"), "/ar/foo/bar")
-
-	def test_empty_path_fallback(self):
-		self.assertEqual(seo.swap_lang_in_path("", "en"), "/en/")
-		self.assertEqual(seo.swap_lang_in_path(None, "ar"), "/ar/")
+def render_seo_head(seo_values):
+	return frappe.render_template(
+		'{% from "templates/macros/seo.html" import seo_meta %}{{ seo_meta(seo) }}', {"seo": seo_values}
+	)
 
 
-class TestBuildAlternates(IntegrationTestCase):
-	def test_build_alternates_has_both_languages(self):
-		alternates = seo.build_alternates("/en/products/shoe")
-		self.assertEqual({alt["lang"] for alt in alternates}, {"en", "ar"})
-		by_lang = {alt["lang"]: alt["href"] for alt in alternates}
-		self.assertIn("/en/products/shoe", by_lang["en"])
-		self.assertIn("/ar/products/shoe", by_lang["ar"])
+def sitemap_locs(seg_type, page):
+	context = frappe._dict()
+	frappe.local.form_dict = frappe._dict(seg_type=seg_type, page=str(page))
+	sitemap_segment.get_context(context)
+	return [entry["loc"] for entry in context.urls]
+
+
+def build_head_seo():
+	"""The SEO data of a product, a collection and a page head for the current request."""
+	return {
+		"product": seo.build_product_seo({"display_name": "Shoe"}, {}, None),
+		"collection": seo.build_collection_seo(category="Shoes", breadcrumbs=[]),
+		"page": seo.build_page_seo({}, display_name="About"),
+	}
+
+
+class TestHeadAlternates(LocaleUrlTestCase):
+	"""Published: en (default), ar, fr. Unpublished: de."""
+
+	def test_every_head_lists_each_published_language_from_alternates(self):
+		self.open("/fr/products/shoe")
+
+		for kind, head in build_head_seo().items():
+			with self.subTest(kind):
+				self.assertEqual(head["alternates"], alternates("/products/shoe"))
+				self.assertEqual([alt["lang"] for alt in head["alternates"]], ["en", "ar", "fr"])
+
+	def test_x_default_is_the_default_language_at_the_root(self):
+		use_storefront_languages(self, "fr", published=("en", "fr"))
+		self.open("/en/products/shoe")
+
+		head = seo.build_page_seo({})
+
+		x_default = [alt for alt in head["alternates"] if alt["x_default"]]
+		self.assertEqual(
+			[(alt["lang"], alt["href"]) for alt in x_default], [("fr", get_url("/products/shoe"))]
+		)
+
+	def test_the_home_page_alternates_are_the_root_and_each_prefix(self):
+		self.open("/ar")
+
+		hrefs = [alt["href"] for alt in seo.build_page_seo({})["alternates"]]
+
+		self.assertEqual(hrefs, [get_url("/"), get_url("/ar"), get_url("/fr")])
+
+	def test_the_head_renders_hreflang_and_og_locale_for_every_language(self):
+		self.open("/ar/products/shoe")
+
+		html = render_seo_head(seo.build_page_seo({}))
+
+		for lang, prefix in (("en", ""), ("ar", "/ar"), ("fr", "/fr")):
+			self.assertIn(f'hreflang="{lang}" href="{get_url(prefix + "/products/shoe")}"', html)
+		self.assertEqual(html.count('hreflang="x-default"'), 1)
+		self.assertIn(f'hreflang="x-default" href="{get_url("/products/shoe")}"', html)
+		self.assertNotIn('hreflang="de"', html)
+		self.assertIn('<meta property="og:locale" content="ar_EG">', html)
+		alternate_locales = re.findall(r'og:locale:alternate" content="([^"]+)"', html)
+		self.assertEqual(alternate_locales, ["en_US", "fr_FR"])
+
+	def test_og_locale_and_its_alternates_take_the_store_country_where_it_uses_the_language(self):
+		self.store_in("ae")
+		self.open("/fr/products/shoe")
+
+		html = render_seo_head(seo.build_page_seo({}))
+
+		self.assertIn('<meta property="og:locale" content="fr_FR">', html)
+		alternate_locales = re.findall(r'og:locale:alternate" content="([^"]+)"', html)
+		self.assertEqual(alternate_locales, ["en_AE", "ar_AE"])
+		self.assertEqual([alt["locale"] for alt in alternates()], ["en_AE", "ar_AE", "fr_FR"])
+
+	def test_the_request_og_locale_agrees_with_its_root(self):
+		self.store_in("in")
+		for path, expected in (("/products", "en_IN"), ("/ar/products", "ar_EG")):
+			with self.subTest(path):
+				self.open(path)
+				self.assertEqual(seo.get_og_locales()["locale"], expected)
+				self.assertIn(expected, [alt["locale"] for alt in alternates()])
+
+
+class TestSingleLanguageSeo(LocaleUrlTestCase):
+	def setUp(self):
+		super().setUp()
+		use_storefront_languages(self, "en", published=("en",), unpublished=("ar",))
+
+	def test_heads_emit_no_hreflang(self):
+		self.open("/products/shoe")
+
+		for kind, head in build_head_seo().items():
+			with self.subTest(kind):
+				self.assertEqual(head["alternates"], [])
+				self.assertNotIn("hreflang", render_seo_head(head))
+
+	def test_og_locale_has_no_alternates(self):
+		html = render_seo_head(seo.build_page_seo({}))
+
+		self.assertIn('<meta property="og:locale" content="en_US">', html)
+		self.assertNotIn("og:locale:alternate", html)
+
+	def test_robots_rules_cover_the_root_only(self):
+		self.assertEqual(
+			get_private_path_rules(),
+			"Disallow: /cart\nDisallow: /cart/checkout\nDisallow: /account\n",
+		)
+
+
+class TestOgLocale(IntegrationTestCase):
+	def test_the_region_is_the_code_then_the_market_then_the_store_then_the_likely_one(self):
+		cases = {
+			("pt-BR", "ae", "ae"): "pt_BR",
+			("ar", "ae", "in"): "ar_AE",
+			("ar", None, "ae"): "ar_AE",
+			("en", None, "in"): "en_IN",
+			("fr", None, "in"): "fr_FR",
+			("en", None, None): "en_US",
+			("xx", None, "ae"): "xx",
+		}
+		for (code, market_country, store_country), expected in cases.items():
+			with self.subTest(code=code, market=market_country, store=store_country):
+				language = Language(code=code, name=code, endonym=code, direction="ltr")
+				self.assertEqual(language.og_locale(market_country, store_country), expected)
+
+	def test_a_script_has_its_own_likely_region(self):
+		cases = {"zh-Hant": "zh_TW", "zh-Hans": "zh_CN", "zh": "zh_CN", "sr-Latn": "sr_RS"}
+		for code, expected in cases.items():
+			with self.subTest(code):
+				language = Language(code=code, name=code, endonym=code, direction="ltr")
+				self.assertEqual(language.og_locale(), expected)
+
+	def test_the_store_country_must_use_the_script(self):
+		# CLDR lists zh_Hant in the US, and plain zh (Hans) in China.
+		cases = {
+			("zh-Hant", "us"): "zh_US",
+			("zh-Hans", "us"): "zh_CN",
+			("zh-Hans", "cn"): "zh_CN",
+			("zh-Hant", "cn"): "zh_TW",
+			("zh-Hans", "sg"): "zh_SG",
+		}
+		for (code, store_country), expected in cases.items():
+			with self.subTest(code=code, store=store_country):
+				language = Language(code=code, name=code, endonym=code, direction="ltr")
+				self.assertEqual(language.og_locale(store_country=store_country), expected)
+
+	def test_a_language_takes_its_own_or_its_likely_region(self):
+		cases = {
+			("en", None): "en_US",
+			("pt-BR", None): "pt_BR",
+			("ar", "ae"): "ar_AE",
+			("zh-Hans", "sg"): "zh_SG",
+		}
+		for (code, country), expected in cases.items():
+			with self.subTest(code):
+				language = Language(code=code, name=code, endonym=code, direction="ltr")
+				self.assertEqual(language.og_locale(country), expected)
+
+	def test_an_unknown_language_keeps_its_code(self):
+		self.assertEqual(Language(code="xx", name="", endonym="", direction="ltr").og_locale(), "xx")
 
 
 class TestBuildPageSeo(IntegrationTestCase):
@@ -243,6 +392,7 @@ class TestUtilityPageNoindexInjection(IntegrationTestCase):
 
 	def setUp(self):
 		set_seo_settings(store_name="MyStore", seo_title_template="{title} | {store}")
+		use_storefront_languages(self, "en", published=("en", "ar", "fr"))
 		self.saved_request = getattr(frappe.local, "request", None)
 
 	def tearDown(self):
@@ -255,7 +405,7 @@ class TestUtilityPageNoindexInjection(IntegrationTestCase):
 		return context
 
 	def test_utility_paths_stay_noindex_without_json_ld(self):
-		for path in ("/en/cart", "/ar/account/dashboard", "/en/login"):
+		for path in ("/en/cart", "/ar/account/dashboard", "/en/login", "/fr/cart/checkout"):
 			context = self.run_context(path)
 			self.assertIs(context.seo["noindex"], True)
 			# noindex pages carry no structured data
@@ -276,9 +426,10 @@ class TestUtilityPageNoindexInjection(IntegrationTestCase):
 		self.assertNotIn("seo", context)
 		self.assertNotIn("json_ld", context)
 
-	def test_unprefixed_utility_path_is_not_matched(self):
-		# The pattern is language-anchored; a bare /cart is not a storefront route.
-		self.assertNotIn("seo", self.run_context("/cart"))
+	def test_a_utility_path_of_the_default_language_has_no_prefix(self):
+		self.assertIs(self.run_context("/cart").seo["noindex"], True)
+		self.assertIs(self.run_context("/account/dashboard").seo["noindex"], True)
+		self.assertNotIn("seo", self.run_context("/products"))
 
 
 class SitemapFixtureMixin:
@@ -376,6 +527,9 @@ class TestSitemapIndex(SitemapFixtureMixin, IntegrationTestCase):
 
 
 class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
+	def setUp(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+
 	def run_segment(self, seg_type, page):
 		context = frappe._dict()
 		frappe.local.form_dict = frappe._dict(seg_type=seg_type, page=str(page))
@@ -388,28 +542,52 @@ class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
 	def test_published_variant_present_in_both_languages(self):
 		# Freshly inserted rows sort newest-first, so the fixtures land on page 1.
 		locs = self.locs("products", 1)
-		self.assertIn(self.url(f"/en/products/{self.published_route}"), locs)
+		self.assertIn(self.url(f"/products/{self.published_route}"), locs)
 		self.assertIn(self.url(f"/ar/products/{self.published_route}"), locs)
+
+	def test_every_published_language_gets_a_url(self):
+		use_storefront_languages(self, "en", published=("en", "ar", "fr"), unpublished=("de",))
+
+		locs = self.locs("products", 1)
+
+		for prefix in ("", "/ar", "/fr"):
+			self.assertIn(self.url(f"{prefix}/products/{self.published_route}"), locs)
+		self.assertNotIn(self.url(f"/de/products/{self.published_route}"), locs)
+		self.assertIn(self.url("/fr"), self.locs("pages", 1))
+
+	def test_a_single_language_store_lists_each_page_once(self):
+		use_storefront_languages(self, "en", published=("en",), unpublished=("ar",))
+		total = frappe.db.count(
+			"Style Attribute Variant", {"is_published": 1, "noindex": 0, "route": ["is", "set"]}
+		)
+
+		products = sitemap_locs("products", 1)
+
+		self.assertEqual(products.count(self.url(f"/products/{self.published_route}")), 1)
+		self.assertEqual(len(products), min(total, sitemap_segment.get_docs_per_page()))
+		self.assertEqual(len(set(products)), len(products))
+		self.assertEqual(sitemap_locs("pages", 1).count(self.url("/")), 1)
+		self.assertNotIn(self.url("/ar"), sitemap_locs("pages", 1))
 
 	def test_noindex_variant_excluded(self):
 		locs = self.locs("products", 1)
-		self.assertNotIn(self.url(f"/en/products/{self.noindex_route}"), locs)
+		self.assertNotIn(self.url(f"/products/{self.noindex_route}"), locs)
 		self.assertNotIn(self.url(f"/ar/products/{self.noindex_route}"), locs)
 
 	def test_unpublished_variant_excluded(self):
 		locs = self.locs("products", 1)
-		self.assertNotIn(self.url(f"/en/products/{self.unpublished_route}"), locs)
+		self.assertNotIn(self.url(f"/products/{self.unpublished_route}"), locs)
 		self.assertNotIn(self.url(f"/ar/products/{self.unpublished_route}"), locs)
 
 	def test_enabled_category_present_noindex_excluded(self):
 		locs = self.locs("collections", 1)
-		self.assertIn(self.url(f"/en/products?category={self.category_slug}"), locs)
+		self.assertIn(self.url(f"/products?category={self.category_slug}"), locs)
 		self.assertIn(self.url(f"/ar/products?category={self.category_slug}"), locs)
-		self.assertNotIn(self.url(f"/en/products?category={self.noindex_category_slug}"), locs)
+		self.assertNotIn(self.url(f"/products?category={self.noindex_category_slug}"), locs)
 
 	def test_homepage_rides_first_pages_child(self):
 		locs = self.locs("pages", 1)
-		self.assertIn(self.url("/en"), locs)
+		self.assertIn(self.url("/"), locs)
 		self.assertIn(self.url("/ar"), locs)
 
 	def test_pages_segment_lists_published_indexable_shop_web_pages(self):
@@ -421,10 +599,10 @@ class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
 
 		locs = self.locs("pages", 1)
 
-		self.assertIn(self.url(f"/en/page/{shown.route}"), locs)
+		self.assertIn(self.url(f"/page/{shown.route}"), locs)
 		self.assertIn(self.url(f"/ar/page/{shown.route}"), locs)
 		for page in hidden:
-			self.assertNotIn(self.url(f"/en/page/{page.route}"), locs)
+			self.assertNotIn(self.url(f"/page/{page.route}"), locs)
 
 	def make_page(self, label, published, noindex):
 		suffix = frappe.generate_hash(length=6)
@@ -478,15 +656,57 @@ class TestSitemapSegment(SitemapFixtureMixin, IntegrationTestCase):
 	def test_unknown_segment_renders_empty(self):
 		self.assertEqual(self.run_segment("widgets", 1).urls, [])
 
+	def test_a_sitemap_page_loads_markets_a_fixed_number_of_times(self):
+		def count_loads():
+			with patch.object(StorefrontMarkets, "load", wraps=StorefrontMarkets.load) as load:
+				urls = self.run_segment("pages", 1).urls
+			return load.call_count, len(urls)
+
+		loads, url_count = count_loads()
+		for label in ("one", "two", "three"):
+			self.make_page(label, published=1, noindex=0)
+
+		self.assertEqual(count_loads(), (loads, url_count + 6))
+
+	def test_sitemap_urls_are_percent_encoded(self):
+		urls = []
+		path = "/page/قمصان a%20b?category=new in"
+
+		sitemap_segment.add_localized(urls, path, None, "daily", "1.0", SiteLocales.load())
+
+		encoded = "/page/" + quote("قمصان") + "%20a%20b?category=new%20in"
+		self.assertEqual([url["loc"] for url in urls], [self.url(encoded), self.url("/ar" + encoded)])
+
+	def test_the_homepage_counts_toward_the_page_cap(self):
+		for label in ("one", "two", "three"):
+			self.make_page(label, published=1, noindex=0)
+		total = frappe.db.count(
+			"Shop Web Page", sitemap_segment.get_segment_filters(sitemap_segment.SEGMENT_CONFIG["pages"])
+		)
+		original = frappe.db.get_single_value("Commera Settings", "sitemap_urls_per_page")
+		self.addCleanup(frappe.db.set_single_value, "Commera Settings", "sitemap_urls_per_page", original)
+		# Two languages: two routes per page.
+		frappe.db.set_single_value("Commera Settings", "sitemap_urls_per_page", 4)
+
+		page_count = sitemap_segment.segment_page_count("pages")
+		pages = [sitemap_locs("pages", page) for page in range(1, page_count + 2)]
+
+		self.assertEqual(page_count, -(-(total + 1) // 2))
+		self.assertTrue(all(len(locs) <= 4 for locs in pages))
+		self.assertEqual(pages[0][:2], [self.url("/"), self.url("/ar")])
+		self.assertEqual(pages[-1], [])
+		every_loc = [loc for locs in pages for loc in locs]
+		self.assertEqual(len(every_loc), (total + 1) * 2)
+		self.assertEqual(len(set(every_loc)), len(every_loc))
+
 	def test_docs_per_page_honours_settings(self):
 		# The per-page budget is set in Commera Settings and split across the storefront languages.
 		original = frappe.db.get_single_value("Commera Settings", "sitemap_urls_per_page")
 		try:
 			frappe.db.set_single_value("Commera Settings", "sitemap_urls_per_page", 10)
-			self.assertEqual(
-				sitemap_segment.get_docs_per_page(),
-				10 // len(sitemap_segment.LANGUAGES),
-			)
+			self.assertEqual(sitemap_segment.get_docs_per_page(), 5)
+			use_storefront_languages(self, "en", published=("en", "ar", "fr"))
+			self.assertEqual(sitemap_segment.get_docs_per_page(), 3)
 		finally:
 			frappe.db.set_single_value("Commera Settings", "sitemap_urls_per_page", original)
 
@@ -599,3 +819,49 @@ class TestGenerateProductJsonLd(SitemapFixtureMixin, IntegrationTestCase):
 		)
 		with self.assertRaises(frappe.ValidationError):
 			seo.generate_product_json_ld(variant_name)
+
+
+class TestSeoMacroEscaping(IntegrationTestCase):
+	"""The shared macro renders text from every page type, so it escapes each value it interpolates."""
+
+	TEMPLATE = (
+		'{% from "templates/macros/seo.html" import seo_meta, json_ld_block %}'
+		"{{ seo_meta(seo) }}{{ json_ld_block(json_ld) }}"
+	)
+
+	def render(self, seo_values, json_ld=()):
+		return frappe.render_template(self.TEMPLATE, {"seo": seo_values, "json_ld": list(json_ld)})
+
+	def test_quotes_and_tags_cannot_break_out_of_the_head_tags(self):
+		html = self.render(
+			{
+				"title": "</title><script>alert(1)</script>",
+				"description": '" onmouseover="alert(1)',
+				"url": 'https://shop.example/a?x=1&y="2"',
+				"image": '/files/a.png" onerror="alert(1)',
+				"alternates": [{"lang": 'en" x="1', "href": "/en?a=1&b=2", "x_default": True}],
+			}
+		)
+
+		self.assertNotIn("<script>alert(1)", html)
+		self.assertNotIn('" onmouseover="', html)
+		self.assertNotIn('" onerror="', html)
+		self.assertIn("<title>&lt;/title&gt;&lt;script&gt;alert(1)&lt;/script&gt;</title>", html)
+		self.assertIn('content="&#34; onmouseover=&#34;alert(1)"', html)
+		self.assertIn('href="https://shop.example/a?x=1&amp;y=&#34;2&#34;"', html)
+		self.assertIn('hreflang="en&#34; x=&#34;1"', html)
+
+	def test_rich_text_entities_are_escaped_once(self):
+		description = seo.truncate_description("<p>Soft &amp; light &lt;3</p>")
+		self.assertEqual(description, "Soft & light <3")
+
+		html = self.render({"title": "Shirt", "description": description})
+
+		self.assertIn('content="Soft &amp; light &lt;3"', html)
+		self.assertNotIn("&amp;amp;", html)
+
+	def test_json_ld_cannot_close_its_script_tag(self):
+		html = self.render({}, json_ld=[{"name": "</script><script>alert(1)</script>"}])
+
+		self.assertEqual(html.count("</script>"), 1)
+		self.assertIn("\\u003c/script\\u003e", html)

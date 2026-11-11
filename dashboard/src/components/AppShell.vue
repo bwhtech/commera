@@ -5,6 +5,7 @@ import { DesktopShell, ScrollArea, Sidebar, SidebarHeader } from 'frappe-ui'
 import { activeNavTarget, productName, sections } from '../ia/nav'
 import logoUrl from '../assets/commera.svg'
 import { useAccountMenu } from '../data/account'
+import { __ } from '../data/translation'
 import { useAdminRead, useMethodRead } from '../data/api'
 import { sidebarCollapsed, toggleSidebar } from '../ia/sidebar'
 import NavSection from './NavSection.vue'
@@ -46,7 +47,7 @@ const appsMenuItems = computed(() =>
 )
 
 const headerMenu = computed(() => [
-  { label: 'Apps', icon: 'lucide-layout-grid', submenu: appsMenuItems.value },
+  { label: __('Apps'), icon: 'lucide-layout-grid', submenu: appsMenuItems.value },
   ...accountMenu,
 ])
 </script>
@@ -68,7 +69,7 @@ const headerMenu = computed(() => [
               :subtitle="storeName"
               :menu-items="headerMenu"
               class="transition-[margin] duration-300 ease-in-out motion-reduce:transition-none"
-              :class="sidebarCollapsed ? '-ml-2' : ''"
+              :class="sidebarCollapsed ? '-ms-2' : ''"
             >
               <template #prefix>
                 <img :src="logoUrl" alt="" class="h-full w-full object-cover" />
@@ -81,7 +82,7 @@ const headerMenu = computed(() => [
             <TrialCard v-if="!sidebarCollapsed" />
           </div>
         </Sidebar>
-        <SidebarEdge controls="commera-sidebar" :collapsed="sidebarCollapsed" label="sidebar" @toggle="toggleSidebar" />
+        <SidebarEdge controls="commera-sidebar" :collapsed="sidebarCollapsed" :label="__('sidebar')" @toggle="toggleSidebar" />
       </template>
 
       <slot />

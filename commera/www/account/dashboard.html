@@ -6,7 +6,7 @@
     <div class="border border-gray-300  rounded-lg">
         <div class="flex items-center justify-between border-b border-gray-300 bg-gray-50 p-3">
             <h3 class="text-base text-accent font-medium uppercase">{{_('my profile')}}</h3>
-            <a href="/{{frappe.lang}}/account/profile">
+            <a href="{{ url('/account/profile') | e }}">
                 <p class="underline">{{_('Edit')}}</p>
             </a>
         </div>
@@ -26,7 +26,7 @@
     <div class="border border-gray-300  mt-4 md:mt-0 rounded-lg">
         <div class="flex items-center justify-between border-b border-gray-300 bg-gray-50 p-3">
             <h3 class="text-base text-accent font-medium uppercase">{{_('billing information')}}</h3>
-            <a href="/{{frappe.lang}}/account/address">
+            <a href="{{ url('/account/address') | e }}">
                 <p class="underline">{{_('View all')}}</p>
             </a>
         </div>
@@ -42,7 +42,7 @@
     <div class="border border-gray-300  rounded-lg mt-4 md:mt-10">
         <div class="flex items-center justify-between border-b border-gray-300 bg-gray-50 p-3">
             <h3 class="text-base text-accent font-medium uppercase">{{_('my wishlist')}}</h3>
-            <a href="/{{frappe.lang}}/account/wishlist">
+            <a href="{{ url('/account/wishlist') | e }}">
                 <p class="underline">{{_('Edit')}}</p>
             </a>
         </div>
@@ -54,16 +54,10 @@
                     <div class="md:mt-5">
                     
                         <div class="text-sm gap-2 flex flex-col">
-                            <p class="text-secondary-accent font-medium text-base" :title="item.brand" x-text="$store.i18n.t(item.brand)"></p>
+                            <p class="text-secondary-accent font-medium text-base" :title="item.brand" x-text="commera.t(item.brand)"></p>
                             <p>
-                                {% if frappe.lang == "en" %}
-                                <span x-text="item.item_name"></span>
-                                <span x-text="item.attribute_value"></span>
-                            
-                                {% else %}
-                                <span x-text="item.custom_item_name_ar || item.item_name"></span>
-                                <span x-text="$store.i18n.t(item.attribute_value)"></span>
-                                {% endif %}
+                                <span x-text="item.title || item.item_name"></span>
+                                <span x-text="commera.t(item.attribute_value)"></span>
                             </p>
 
                             <p class="flex">

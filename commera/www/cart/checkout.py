@@ -12,6 +12,7 @@ from commera.api.payments import (
 	validate_cart_is_not_in_checkout,
 )
 from commera.api.shipping import get_charge_amount, get_checkout_summary
+from commera.base_prices import base_price_filters
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	get_code_states,
 	get_quantities_by_item_code,
@@ -20,6 +21,8 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 from commera.core import _get_cart_quotation
 from commera.discounts.selection import get_discount_codes
 from commera.guest import is_guest
+from commera.localization import url
+from commera.sdk.catalog import set_product_titles
 from commera.utils import (
 	format_addresses,
 	get_addresses,
@@ -54,7 +57,7 @@ def get_context(context, allow_guest: bool = False):
 	commera_settings = frappe.get_cached_doc("Commera Settings")
 	if is_guest():
 		if not allow_guest:
-			cart_url = f"/{frappe.local.lang}/cart"
+			cart_url = url("/cart")
 			if frappe.request and (query_string := frappe.safe_decode(frappe.request.query_string)):
 				cart_url = f"{cart_url}?{query_string}"
 			frappe.redirect(cart_url)
@@ -75,7 +78,7 @@ def get_context(context, allow_guest: bool = False):
 	context.breadcrumbs = [
 		{
 			"label": "Cart",
-			"href": f"/{frappe.local.lang}/cart/",
+			"href": url("/cart/"),
 		},
 		{
 			"label": "Checkout",
@@ -117,7 +120,7 @@ def set_guest_cart_context(context):
 def set_cart_context(context, commera_settings):
 	cart_quotation = _get_cart_quotation()
 	if not cart_quotation or not cart_quotation.items:
-		frappe.redirect(f"/{frappe.local.lang}/cart")
+		frappe.redirect(url("/cart"))
 	default_price_list = commera_settings.get("default_price_list")
 	context.cart_quotation = cart_quotation
 	context.cart_needs_refresh = cart_needs_refresh(cart_quotation)
@@ -129,9 +132,9 @@ def set_cart_context(context, commera_settings):
 	items = get_checkout_items(cart_quotation)
 	if default_price_list:
 		for item in items:
-			item["default_price"] = frappe.get_cached_value(
+			item["default_price"] = frappe.db.get_value(
 				"Item Price",
-				{"item_code": item.item_code, "price_list": default_price_list},
+				base_price_filters({"item_code": item.item_code, "price_list": default_price_list}),
 				"price_list_rate",
 			)
 	context.items = items
@@ -158,7 +161,7 @@ def rebuild_checkout_cart(quotation) -> tuple:
 			frappe.clear_last_message()
 			return None, None
 		if not get_session_cart().get_selected_lines():
-			return None, f"/{frappe.local.lang}/cart"
+			return None, url("/cart")
 		return get_quotation_for_cart(get_checkout_cart({}), quotation), None
 
 
@@ -184,7 +187,6 @@ def get_checkout_items(cart_quotation):
 	website_slideshow_item = DocType("Website Slideshow Item")
 	item = DocType("Item")
 	item_variant_attribute = DocType("Item Variant Attribute")
-	has_custom_name_ar = frappe.db.has_column("Item", "custom_item_name_ar")
 	query = (
 		frappe.qb.from_(color_size_item)
 		.left_join(quotation_item)
@@ -216,9 +218,7 @@ def get_checkout_items(cart_quotation):
 		)
 		.groupby(quotation_item.name)
 	)
-	if has_custom_name_ar:
-		query = query.select(item.custom_item_name_ar.as_("custom_item_name_ar"))
-	return query.run(as_dict=True)
+	return set_product_titles(query.run(as_dict=True))
 
 
 def get_store_pickup_addresses():

@@ -54,6 +54,22 @@ class StyleAttributeVariant(Document):
 	def validate(self):
 		self.unpublish_if_incomplete_data()
 
+	@staticmethod
+	def get_translation_sources(field: str, names: list[str]) -> dict[str, str | None]:
+		"""Translation sources of fields without a column, by product name, in one query.
+		The product page shows its Item's description, so that is what a translation translates."""
+		if field != "description":
+			return {}
+		product, item = frappe.qb.DocType("Style Attribute Variant"), frappe.qb.DocType("Item")
+		return dict(
+			frappe.qb.from_(product)
+			.join(item)
+			.on(item.name == product.item_style)
+			.select(product.name, item.description)
+			.where(product.name.isin(names))
+			.run()
+		)
+
 	def before_save(self):
 		if not self.route:
 			self.route = self.scrub(self.name)

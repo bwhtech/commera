@@ -12,9 +12,9 @@ const listings = computed(() => props.product.variants.filter((variant) => varia
 
 <template>
   <section id="product-storefront">
-    <h2 class="text-lg-semibold text-ink-gray-8">Storefront listing</h2>
+    <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Storefront listing') }}</h2>
     <p class="mt-1 text-p-sm text-ink-gray-5">
-      Every option has its own page on the store. These are the live addresses.
+      {{ __('Every option has its own page on the store. These are the live addresses.') }}
     </p>
 
     <div
@@ -25,16 +25,16 @@ const listings = computed(() => props.product.variants.filter((variant) => varia
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
             <span class="text-base text-ink-gray-8">{{ variant.option }}</span>
-            <Badge v-if="!variant.is_published" label="Not published" theme="amber" variant="subtle" />
+            <Badge v-if="!variant.is_published" :label="__('Not published')" theme="amber" variant="subtle" />
           </div>
           <p class="mt-0.5 truncate text-sm text-ink-gray-5">{{ variant.storefront_url }}</p>
         </div>
-        <Button label="Open" icon-right="lucide-external-link" :href="variant.storefront_url" />
+        <Button :label="__('Open')" icon-right="lucide-external-link" :href="variant.storefront_url" />
       </div>
     </div>
 
     <p v-else class="mt-4 text-p-base text-ink-gray-5">
-      No option has a storefront address yet. One is generated when an option is first saved.
+      {{ __('No option has a storefront address yet. One is generated when an option is first saved.') }}
     </p>
   </section>
 </template>

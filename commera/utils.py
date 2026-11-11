@@ -7,17 +7,19 @@ from erpnext.selling.doctype.customer.customer import (
 	get_nested_links as _get_nested_links,
 )
 from frappe.geo.country_info import get_all
-from frappe.query_builder import Case, DocType
-from frappe.query_builder.functions import Count, Min, Sum
+from frappe.query_builder import Criterion, DocType
+from frappe.query_builder.functions import Count, Sum
 from frappe.utils import add_days, cint, create_batch, cstr, flt, get_datetime, now_datetime
 from frappe.utils.background_jobs import get_job_status
 from frappe.utils.caching import request_cache
 from frappe.utils.data import strip_html
-from pypika import Order
+from pypika import Order, Table
+from pypika.terms import Field
 from rq.job import JobStatus
 
 from commera.core import get_address_docs, get_party
 from commera.guest import is_guest, is_guest_checkout_enabled
+from commera.localization import url
 from commera.order_access import get_key_access, is_shoppers_order
 from commera.plugin_events import (
 	SHIPPING_ADDRESS_FIELDS,
@@ -29,6 +31,9 @@ from commera.plugin_events import (
 
 # Ceiling for any IN (...) list this app sends to MariaDB/Postgres.
 IN_CLAUSE_CHUNK_SIZE = 1000
+# Grid sorts and filters on the card price: these need the price inside the grid query.
+PRICE_SORTS = ("price_low", "price_high", "discount")
+PRICE_FILTERS = ("has_discount", "min_price", "max_price")
 
 
 def get_address_lines(address_display):
@@ -76,15 +81,6 @@ def get_complete_nested_links(parent_group):
 	return list(all_links)
 
 
-def before_request():
-	request_path = frappe.request.path
-
-	if request_path.startswith("/en"):
-		frappe.local.lang = "en"
-	elif request_path.startswith("/ar"):
-		frappe.local.lang = "ar"
-
-
 def get_nested_links(link_doctype, link_name):
 	"`get_nested_links` from erpnext, but with permissions ignored!"
 	return _get_nested_links(link_doctype, link_name, ignore_permissions=True)
@@ -117,30 +113,25 @@ def get_product_list(filters=None, product_list=None, page=1, page_length=30, so
 def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30, sort_by="default"):
 	"""Retained frappe.qb product grid — browse, pinned lists, and the Arabic/short-term search fallback."""
 
-	query = get_product_base_query(filters, product_list)
+	from commera.card_prices import card_discount_percent
+
+	# Without a price sort or filter, pick the page first and price only its products.
+	priced_in_sql = sort_by in PRICE_SORTS or has_price_filter(filters)
+	query = get_product_base_query(filters, product_list, with_card_prices=priced_in_sql)
 	style_attribute_variant = DocType("Style Attribute Variant")
 	website_slideshow_item = DocType("Website Slideshow Item")
 	hover_slideshow_item = DocType("Website Slideshow Item").as_("hover_slideshow_item")
 	color_size_item = DocType("Color Size Item")
-	item_price_default = DocType("Item Price").as_("ip_default")
-	item_price_sale = DocType("Item Price").as_("ip_sale")
+	card = Table("card_prices")
 	item = DocType("Item")
-	has_custom_name_ar = frappe.db.has_column("Item", "custom_item_name_ar")
 
-	discount_expr = (
-		Case()
-		.when(
-			Min(item_price_default.price_list_rate) > 0,
-			(
-				(Min(item_price_default.price_list_rate) - Min(item_price_sale.price_list_rate))
-				/ Min(item_price_default.price_list_rate)
-			)
-			* 100,
-		)
-		.else_(0)
-	)
 	query = (
-		query.left_join(hover_slideshow_item)
+		query.left_join(website_slideshow_item)
+		.on(
+			(website_slideshow_item.parent == style_attribute_variant.name)
+			& (website_slideshow_item.idx == 1)
+		)
+		.left_join(hover_slideshow_item)
 		.on((hover_slideshow_item.parent == style_attribute_variant.name) & (hover_slideshow_item.idx == 2))
 		.select(
 			style_attribute_variant.name,
@@ -157,22 +148,25 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 			item.item_name,
 			item.is_stock_item,
 			color_size_item.item_code.as_("variant_item_code"),
-			Min(item_price_default.price_list_rate).as_("default_price"),
-			Min(item_price_sale.price_list_rate).as_("sale_price"),
 			website_slideshow_item.image.as_("image"),
 			hover_slideshow_item.image.as_("hover_image"),
-			discount_expr.as_("discount_percent").as_("discount_percent"),
 		)
 		.groupby(style_attribute_variant.name)
 		.limit(page_length)
 		.offset((page - 1) * page_length)
 	)
-	if has_custom_name_ar:
-		query = query.select(item.custom_item_name_ar)
+	if priced_in_sql:
+		discount_expr = card_discount_percent(card)
+		query = query.select(
+			card.effective_price,
+			card.default_price,
+			card.sale_price,
+			discount_expr.as_("discount_percent"),
+		)
 	if sort_by == "price_low":
-		query = query.orderby(Min(item_price_sale.price_list_rate), order=Order.asc)
+		query = query.orderby(card.effective_price, order=Order.asc)
 	elif sort_by == "price_high":
-		query = query.orderby(Min(item_price_sale.price_list_rate), order=Order.desc)
+		query = query.orderby(card.effective_price, order=Order.desc)
 	elif sort_by == "name":
 		query = query.orderby("display_name", order=Order.asc)
 	elif sort_by == "new_arrival":
@@ -181,16 +175,45 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 		query = query.orderby(discount_expr, order=Order.desc)
 	else:
 		query = query.orderby("name", order=Order.asc)
-	return shape_product_cards(query.run(as_dict=True))
+	cards = query.run(as_dict=True)
+	return shape_product_cards(cards if priced_in_sql else set_card_prices(cards))
+
+
+def set_card_prices(cards):
+	"""card_prices_query's columns on `cards`, aggregated over these products only."""
+	from commera.card_prices import card_prices_query, get_discount
+	from commera.localization.market_prices import MarketPrices
+
+	if not cards:
+		return cards
+	prices = MarketPrices.current()
+	rows = card_prices_query(
+		prices.sale_price_list, prices.compare_at_price_list, [card["name"] for card in cards]
+	).run(as_dict=True)
+	rows_by_product = {row.parent: row for row in rows}
+	for card in cards:
+		row = rows_by_product.get(card["name"], {})
+		price, default_price = row.get("effective_price"), row.get("default_price")
+		card.update(
+			effective_price=price,
+			sale_price=row.get("sale_price"),
+			default_price=default_price,
+			**get_discount(price, default_price),
+		)
+	return cards
 
 
 def shape_product_cards(cards):
-	"""Give every product card the one storefront card shape, whichever grid built it."""
+	"""Give every product card the one storefront card shape, whichever grid built it.
+	`title` is the product's title in the request language."""
+	from commera.localization.market_prices import MarketPrices
+	from commera.sdk.catalog import set_product_titles
 	from commera.search.engine import CARD_COLUMNS
 	from commera.search.record_builder import sizes_for_variants
 
 	if not cards:
 		return cards
+	prices = MarketPrices.current()
 
 	unsized = [card["name"] for card in cards if card.get("sizes") is None]
 	sizes_by_variant = sizes_for_variants(unsized) if unsized else {}
@@ -202,38 +225,14 @@ def shape_product_cards(cards):
 			card.setdefault(column, None)
 		card.setdefault("average_rating", None)
 		card.setdefault("review_count", None)
-		# Mirrors record_builder.aggregate_prices so both grids agree on the price they filter and sort by.
+		# No size priced: 0 in the primary market, as before; no price in a secondary market.
 		if card["effective_price"] is None:
-			card["effective_price"] = (
-				card["sale_price"] if card["sale_price"] is not None else (card["default_price"] or 0)
-			)
+			card["effective_price"] = prices.price(None, None)
 		if card["has_discount"] is None:
-			card["has_discount"] = 1 if flt(card["discount_percent"]) else 0
+			card["has_discount"] = 1 if card["default_price"] else 0
 		# frappe.qb returns a datetime where the index holds a string, and the card is json.dumps'd into HTML.
 		card["modified"] = cstr(card["modified"]) if card["modified"] else None
-	return cards
-
-
-def attach_live_prices(cards):
-	"""Overlay the live Item Price onto index-hydrated cards."""
-	# Item Price edits fire no Style Attribute Variant event, so the indexed price lags until the rebuild.
-	from commera.search.record_builder import aggregate_prices, rates_by_item_code
-
-	if not cards:
-		return cards
-
-	settings = frappe.get_cached_doc("Commera Settings")
-	item_codes = list(
-		{size["item_code"] for card in cards for size in (card.get("sizes") or []) if size.get("item_code")}
-	)
-	default_rate, sale_rate, sale_upto = rates_by_item_code(
-		item_codes, settings.default_price_list, settings.sale_price_list
-	)
-
-	for card in cards:
-		codes = [size["item_code"] for size in (card.get("sizes") or []) if size.get("item_code")]
-		card.update(aggregate_prices(codes, default_rate, sale_rate, sale_upto))
-	return cards
+	return set_product_titles(cards)
 
 
 def get_total_product_count(filters=None, product_list=None):
@@ -259,36 +258,59 @@ def get_product_count_qb(filters=None, product_list=None):
 	return result[0]["total_count"] if result else 0
 
 
-def get_product_base_query(filters=None, product_list=None):
-	commera_settings = frappe.get_cached_doc("Commera Settings")
-	default_price_list = commera_settings.default_price_list
-	sale_price_list = commera_settings.sale_price_list
+def has_price_filter(filters) -> bool:
+	return bool(filters) and any(filters.get(key) for key in PRICE_FILTERS)
+
+
+def get_product_base_query(filters=None, product_list=None, with_card_prices=False):
+	"""Products matching `filters`, joined to `card_prices` when asked or when a price filter needs it.
+	The card prices aggregate only the products the other filters let through."""
+	from commera.card_prices import card_prices_query
+	from commera.localization.market_prices import MarketPrices
+
+	query = filtered_products_query(filters, product_list)
+	prices = MarketPrices.current()
+	priced_only = searches_a_secondary_market(filters, prices)
+	if not (with_card_prices or has_price_filter(filters) or priced_only):
+		return query
+
 	style_attribute_variant = DocType("Style Attribute Variant")
-	website_slideshow_item = DocType("Website Slideshow Item")
+	candidates = product_list or filtered_products_query(filters).select(style_attribute_variant.name)
+	card_prices = card_prices_query(prices.sale_price_list, prices.compare_at_price_list, candidates).as_(
+		"card_prices"
+	)
+	card, filters = Table("card_prices"), filters or {}
+	# One row per product, over all its sizes: a size filter must not change the card price.
+	query = query.left_join(card_prices).on(
+		Field("parent", table=card_prices) == style_attribute_variant.name
+	)
+	if priced_only:
+		query = query.where(card.effective_price.notnull())
+	if filters.get("has_discount"):
+		query = query.where(card.default_price.notnull())
+	if filters.get("min_price"):
+		query = query.where(card.effective_price >= filters["min_price"])
+	if filters.get("max_price"):
+		query = query.where(card.effective_price <= filters["max_price"])
+	return query
+
+
+def searches_a_secondary_market(filters, prices) -> bool:
+	"""A search in a secondary market leaves out what that market cannot price, like the index does.
+	Browsing keeps those products, shown unavailable."""
+	return bool(filters and filters.get("search")) and not prices.uses_store_prices
+
+
+def filtered_products_query(filters=None, product_list=None):
+	"""Products matching every filter but the price filters, with their sizes and their Item."""
+	style_attribute_variant = DocType("Style Attribute Variant")
 	color_size_item = DocType("Color Size Item")
-	item_price_default = DocType("Item Price").as_("ip_default")
-	item_price_sale = DocType("Item Price").as_("ip_sale")
 	item = DocType("Item")
 
 	query = (
 		frappe.qb.from_(style_attribute_variant)
-		.left_join(website_slideshow_item)
-		.on(
-			(website_slideshow_item.parent == style_attribute_variant.name)
-			& (website_slideshow_item.idx == 1)
-		)
 		.left_join(color_size_item)
 		.on(color_size_item.parent == style_attribute_variant.name)
-		.left_join(item_price_default)
-		.on(
-			(item_price_default.item_code == color_size_item.item_code)
-			& (item_price_default.price_list == default_price_list)
-		)
-		.left_join(item_price_sale)
-		.on(
-			(item_price_sale.item_code == color_size_item.item_code)
-			& (item_price_sale.price_list == sale_price_list)
-		)
 		.left_join(item)
 		.on(item.name == style_attribute_variant.item_style)
 	)
@@ -298,8 +320,6 @@ def get_product_base_query(filters=None, product_list=None):
 		query = query.where(style_attribute_variant.is_published == 1)
 
 	if filters:
-		if filters.get("has_discount"):
-			query = query.where(item_price_default.price_list_rate > item_price_sale.price_list_rate)
 		if filters.get("category_item_groups"):
 			query = query.where(style_attribute_variant.item_group.isin(filters["category_item_groups"]))
 		if filters.get("subcategory"):
@@ -310,36 +330,67 @@ def get_product_base_query(filters=None, product_list=None):
 			query = query.where(color_size_item.size.isin(filters["sizes"]))
 		if filters.get("brands"):
 			query = query.where(item.brand.isin(filters["brands"]))
-		if filters.get("min_price"):
-			query = query.where(item_price_sale.price_list_rate >= filters["min_price"])
-		if filters.get("max_price"):
-			query = query.where(item_price_sale.price_list_rate <= filters["max_price"])
 		if filters.get("search"):
-			search = filters.get("search")
-			child_categories = get_complete_nested_links(search)
-			search_condition = (
-				(style_attribute_variant.display_name.like(f"%{search}%"))
-				| (style_attribute_variant.attribute_value.like(f"%{search}%"))
-				| (style_attribute_variant.name.like(f"%{search}%"))
-				| (item.brand.like(f"%{search}%"))
-				| (style_attribute_variant.display_name.like(f"%{search}%"))
-				| (style_attribute_variant.item_group.like(f"%{search}%"))
-				| (item.name.like(f"%{search}%"))
-			)
-			# SQLite sends every Arabic term here, so the Arabic item name must be searchable too.
-			if frappe.db.has_column("Item", "custom_item_name_ar"):
-				search_condition |= item.custom_item_name_ar.like(f"%{search}%")
-			if child_categories:
-				search_condition |= style_attribute_variant.item_group.isin(child_categories)
-
-			if search.lower().startswith("men"):
-				exclusion_condition = (~style_attribute_variant.display_name.like("%women%")) & (
-					~style_attribute_variant.item_group.like("%women%")
-				)
-				search_condition = search_condition & exclusion_condition
-
-			query = query.where(search_condition)
+			query = query.where(search_condition(filters["search"]))
 	return query
+
+
+def search_condition(search):
+	style_attribute_variant = DocType("Style Attribute Variant")
+	item = DocType("Item")
+	child_categories = get_complete_nested_links(search)
+	condition = (
+		(style_attribute_variant.display_name.like(f"%{search}%"))
+		| (style_attribute_variant.attribute_value.like(f"%{search}%"))
+		| (style_attribute_variant.name.like(f"%{search}%"))
+		| (item.brand.like(f"%{search}%"))
+		| (style_attribute_variant.display_name.like(f"%{search}%"))
+		| (style_attribute_variant.item_group.like(f"%{search}%"))
+		| (item.name.like(f"%{search}%"))
+	)
+	# Short terms and indexes without the term's language land here, so translated titles match too.
+	if (translated := translated_title_matches(search)) is not None:
+		condition |= style_attribute_variant.name.isin(translated)
+	if child_categories:
+		condition |= style_attribute_variant.item_group.isin(child_categories)
+
+	if search.lower().startswith("men"):
+		exclusion_condition = (~style_attribute_variant.display_name.like("%women%")) & (
+			~style_attribute_variant.item_group.like("%women%")
+		)
+		condition = condition & exclusion_condition
+	return condition
+
+
+def translated_title_matches(search):
+	"""Products whose title contains `search` in a search language, shop-wide or in the request's
+	market (which also overrides the default language), as a subquery. None when no title can match."""
+	from commera.localization.content import SHOP_WIDE
+	from commera.localization.languages import StorefrontLanguages
+	from commera.search.translations import TITLE_FIELD, get_search_languages, get_search_markets
+
+	languages = StorefrontLanguages.load()
+	translation = DocType("Content Translation")
+	conditions = [
+		(translation.market == market)
+		& translation.language.isin([language.code for language in languages.published])
+		for market in get_search_markets()
+		if market != SHOP_WIDE
+	]
+	if codes := [language.code for language in get_search_languages(languages)]:
+		conditions.append((translation.market == SHOP_WIDE) & translation.language.isin(codes))
+	if not conditions:
+		return None
+	return (
+		frappe.qb.from_(translation)
+		.select(translation.reference_name)
+		.where(
+			(translation.reference_doctype == "Style Attribute Variant")
+			& (translation.reference_field == TITLE_FIELD)
+			& Criterion.any(conditions)
+			& translation.translated_value.like(f"%{search}%")
+		)
+	)
 
 
 def get_delivery_configuration():
@@ -441,10 +492,14 @@ def get_currency_symbol(currency: str | None = None):
 
 @request_cache
 def get_currency_symbols() -> dict[str, str]:
+	return {currency: get_currency_symbol(currency) for currency in get_selling_currencies()}
+
+
+def get_selling_currencies() -> set[str]:
 	currencies = frappe.get_all(
 		"Price List", filters={"enabled": 1, "selling": 1}, pluck="currency", distinct=True
 	)
-	return {currency: get_currency_symbol(currency) for currency in {*currencies, get_store_currency()}}
+	return {*currencies, get_store_currency()}
 
 
 def get_addresses(party=None, address_type="Billing"):
@@ -585,16 +640,6 @@ def add_roles(doc, method):
 		doc.append("roles", {"role": role})
 
 
-def get_local_lang_url(path: str) -> str:
-	if "/ar/" in path and frappe.local.lang == "en":
-		return path.replace("/ar/", "/en/")
-
-	if "/en/" in path and frappe.local.lang == "ar":
-		return path.replace("/en/", "/ar/")
-
-	return path
-
-
 def get_same_site_path(path: str | None) -> str | None:
 	"""`path` when it stays on this site, else None."""
 	path = cstr(path).strip()
@@ -616,7 +661,7 @@ def get_next_url(return_to: str | None = None) -> str:
 		for key, value in frappe.form_dict.items()
 		if key == "discount" or key.startswith(FORWARDED_PARAM_PREFIXES)
 	]
-	cart_url = f"/{frappe.local.lang}/cart"
+	cart_url = url("/cart")
 	destination = get_return_to_url(return_to, cart_url)
 	if destination:
 		query_string = urlencode(forwarded_params, doseq=True)

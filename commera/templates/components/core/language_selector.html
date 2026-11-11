@@ -1,15 +1,8 @@
-<div x-data="{
-  current_lang: window.location.pathname.startsWith('/ar') ? 'ar' : 'en',
-  dropdown_open: false,
-  async change_language(lang) {
-      if (lang === this.current_lang) return; // Do nothing if already selected
-      let newUrl = window.location.pathname.replace(/^\/(en|ar)/, `/${lang}`);
-      Alpine.store('i18n').i18n = {};
-      Alpine.store('i18n').lastFetched = null;
-      await Alpine.store('i18n').init();
-      window.location.href = newUrl;
-  }
-}">
+{# The published languages, each a link to this page in that language with its query kept. #}
+{% set localization = get_localization() %}
+{% set current_language = localization.language %}
+{% if localization.available_languages | length > 1 %}
+<div x-data="{ dropdown_open: false }">
 
   <div class="relative">
     <button class="flex items-center rounded-lg border border-gray-300 px-4 py-1 w-fit cursor-pointer"
@@ -20,7 +13,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
           d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
       </svg>
-      <span class="me-2" x-text="current_lang === 'en' ? 'English' : 'العربية'"></span>
+      <span class="me-2">{{ current_language.endonym | e }}</span>
 
       <svg xmlns="http://www.w3.org/2000/svg" :class="{ 'h-4 w-4 ': true, 'transition-transform duration-200 transform rotate-180': dropdown_open }"
         fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -31,13 +24,14 @@
     <div x-show="dropdown_open" @click.away="dropdown_open = false"
       class="absolute left-0 mt-2 w-full bg-white border border-gray-300 rounded-lg shadow-md z-50" x-cloak>
       <ul class="py-2">
-        <li class="px-4 py-2 hover:bg-gray-200 cursor-pointer" @click="change_language('en'); dropdown_open = false">
-          English
-        </li>
-        <li class="px-4 py-2 hover:bg-gray-200 cursor-pointer" @click="change_language('ar'); dropdown_open = false">
-          العربية
-        </li>
+        {% for option in localization.available_languages %}
+        <li><a href="{{ switch_url(language=option.code) | e }}" hreflang="{{ option.code | e }}" lang="{{ option.code | e }}"
+          dir="{{ option.direction | e }}" data-language="{{ option.code | e }}"{% if option == current_language %} aria-current="true"{% endif %}
+          onclick="document.cookie = 'preferred_language=' + encodeURIComponent(this.dataset.language) + '; path=/; max-age=31536000; samesite=lax'"
+          class="block px-4 py-2 hover:bg-gray-200">{{ option.endonym | e }}</a></li>
+        {% endfor %}
       </ul>
     </div>
   </div>
 </div>
+{% endif %}

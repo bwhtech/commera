@@ -1,4 +1,4 @@
-<a href="/{{frappe.lang}}/account/wishlist" class="relative">
+<a href="{{ url('/account/wishlist') | e }}" class="relative">
     {{icon(name="heart",classes="h-6 w-6 ")}}
     <span
         class="absolute -top-3 ltr:-right-4 rtl:-left-4 bg-accent text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"

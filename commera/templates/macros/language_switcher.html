@@ -1,0 +1,36 @@
+{# The published languages, each linking to this page in that language. Nothing for a single-language store.
+   A pick also sets Frappe's preferred_language cookie. The URL alone still decides the page language. #}
+{% macro language_switcher(class="", link_class="", current_class="") -%}
+{%- set localization = get_localization() -%}
+{%- if localization.available_languages | length > 1 -%}
+<ul aria-label="{{ _('Language') | e }}" class="{{ class | e }}">
+	{%- for language in localization.available_languages %}
+	{%- set is_current = language.code == localization.language.code %}
+	<li><a href="{{ switch_url(language=language.code) | e }}" hreflang="{{ language.code | e }}" lang="{{ language.code | e }}" dir="{{ language.direction | e }}" data-language="{{ language.code | e }}" onclick="document.cookie = 'preferred_language=' + encodeURIComponent(this.dataset.language) + '; path=/; max-age=31536000; samesite=lax'"{% if is_current %} aria-current="true"{% endif %} class="{{ (link_class ~ (' ' ~ current_class if is_current and current_class else '')) | e }}">{{ ((language.endonym[:1] | upper) ~ language.endonym[1:]) | e }}</a></li>
+	{%- endfor %}
+</ul>
+{%- endif %}
+{%- endmacro %}
+
+{# Countries grouped by market, each linking to this page in that market. Nothing for a single-market store.
+   A market link keeps the page language when the market has it, else uses the market's default. #}
+{% macro country_switcher(class="", link_class="", current_class="", heading_class="") -%}
+{%- set groups = get_country_choices() -%}
+{%- if groups -%}
+<ul aria-label="{{ _('Country') | e }}" class="{{ class | e }}">
+	{%- for group in groups %}
+	{%- if group.title %}
+	<li><span aria-hidden="true" class="{{ heading_class | e }}">{{ group.title | e }}</span><ul aria-label="{{ group.title | e }}">
+		{%- for country in group.countries %}{{ country_link(country, link_class, current_class) }}{% endfor %}
+	</ul></li>
+	{%- else %}
+	{%- for country in group.countries %}{{ country_link(country, link_class, current_class) }}{% endfor %}
+	{%- endif %}
+	{%- endfor %}
+</ul>
+{%- endif %}
+{%- endmacro %}
+
+{% macro country_link(country, link_class, current_class) -%}
+<li><a href="{{ country.url | e }}"{% if country.is_current %} aria-current="true"{% endif %} class="{{ (link_class ~ (' ' ~ current_class if country.is_current and current_class else '')) | e }}">{{ country.name | e }}</a></li>
+{%- endmacro %}

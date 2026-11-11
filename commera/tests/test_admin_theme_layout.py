@@ -10,14 +10,27 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils.jinja import get_jenv
 from PIL import Image
 
+from commera.api.admin import theme_layout as theme_layout_api
 from commera.api.admin.theme import activate_theme
-from commera.api.admin.theme_layout import discard, get_editor, publish, save_draft, save_thumbnail
+from commera.api.admin.theme_layout import discard, get_editor, save_thumbnail
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context
-from commera.shop_themes.sections import clear_layout_cache
 from commera.shop_themes.theme_resolver import get_theme_environment
 
 SUMMER_THEME = "Summer Theme"
 CLASSIC_THEME = "Shop Default Theme"
+
+
+def current_revision(theme, page):
+	return get_editor(theme, page)["revision"]
+
+
+def save_draft(theme, page, layout):
+	"""The editor's save, made over the page as it is stored now."""
+	return theme_layout_api.save_draft(theme, page, layout, current_revision(theme, page))
+
+
+def publish(theme, page, layout):
+	return theme_layout_api.publish(theme, page, layout, current_revision(theme, page))
 
 
 def image_data_url(image_format, color="red"):
@@ -29,13 +42,11 @@ def image_data_url(image_format, color="red"):
 class TestAdminThemeLayout(IntegrationTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
-		self.addCleanup(clear_layout_cache, SUMMER_THEME, "index")
 		self.addCleanup(frappe.clear_cache)
 		self.addCleanup(frappe.db.rollback)
 		self.addCleanup(frappe.set_user, "Administrator")
 
 		frappe.db.delete("Theme Layout", {"theme": SUMMER_THEME, "page": "index"})
-		clear_layout_cache(SUMMER_THEME, "index")
 		self.file_layout = get_editor(SUMMER_THEME)["default_layout"]
 
 	def edited_layout(self, heading):
@@ -131,6 +142,18 @@ class TestAdminThemeLayout(IntegrationTestCase):
 		self.assertRaises(frappe.PermissionError, publish, SUMMER_THEME, "index", self.file_layout)
 		self.assertRaises(frappe.PermissionError, discard, SUMMER_THEME, "index")
 		self.assertRaises(frappe.PermissionError, save_thumbnail, SUMMER_THEME, image_data_url("WEBP"))
+
+	def test_a_save_over_a_page_changed_elsewhere_is_refused(self):
+		stale = get_editor(SUMMER_THEME)["revision"]
+		save_draft(SUMMER_THEME, "index", self.edited_layout("ZZ Saved Elsewhere"))
+
+		for endpoint in (theme_layout_api.save_draft, theme_layout_api.publish):
+			with self.subTest(endpoint.__name__), self.assertRaises(frappe.TimestampMismatchError):
+				endpoint(SUMMER_THEME, "index", self.edited_layout("ZZ Stale Heading"), stale)
+
+		self.assertEqual(get_editor(SUMMER_THEME)["draft_layout"], self.edited_layout("ZZ Saved Elsewhere"))
+		fresh = get_editor(SUMMER_THEME)["revision"]
+		theme_layout_api.save_draft(SUMMER_THEME, "index", self.edited_layout("ZZ Fresh Heading"), fresh)
 
 
 class TestThemeThumbnail(IntegrationTestCase):

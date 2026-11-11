@@ -19,6 +19,7 @@ const emit = defineEmits(['reload', 'failed', 'ready'])
 
 const router = useRouter()
 const label = computed(() => props.entry.label || props.entry.app)
+const failedTitle = computed(() => __("{0} couldn't load", [label.value]))
 const failure = ref(null)
 
 function fail(error) {
@@ -27,7 +28,7 @@ function fail(error) {
   console.error(`[commera plugin ${props.entry.key}]`, error)
 }
 
-if (props.entry.error || !props.entry.module_url) fail(props.entry.error || 'This plugin has not been built yet.')
+if (props.entry.error || !props.entry.module_url) fail(props.entry.error || __('This plugin has not been built yet.'))
 
 function navigate(to) {
   return router.push(appLocation(props.entry.app, to))
@@ -71,7 +72,7 @@ onErrorCaptured((error) => {
     v-if="failure"
     :compact="compact"
     icon="lucide-triangle-alert"
-    :title="`${label} couldn't load`"
+    :title="failedTitle"
     :description="failure"
   />
   <component :is="Plugin" v-else-if="Plugin" @vue:mounted="emit('ready')" />

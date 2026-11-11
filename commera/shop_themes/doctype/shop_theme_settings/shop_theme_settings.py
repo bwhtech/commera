@@ -5,90 +5,88 @@ from frappe.model.document import Document
 
 from commera.shop_themes.doctype.shop_theme.shop_theme import clear_render_theme_context
 
-LANG = r"(?P<lang>en|ar)"
-
-# The routes the bundled themes ship pages for.
-# Seeded from after_install and after_migrate too: a fresh install marks patches applied without running them.
+# Bundled theme routes, matched on the path without its language prefix. Also seeded on install and
+# migrate: a fresh install marks patches applied without running them.
 DEFAULT_ROUTES = [
-	{"url_pattern": rf"^{LANG}$", "template_path": "pages/index.html", "requires_auth": 0},
+	{"url_pattern": r"^$", "template_path": "pages/index.html", "requires_auth": 0},
 	{
-		"url_pattern": rf"^{LANG}/products$",
+		"url_pattern": r"^products$",
 		"template_path": "pages/products/list.html",
 		"requires_auth": 0,
 	},
 	{
-		"url_pattern": rf"^{LANG}/products/(?P<route>.+)$",
+		"url_pattern": r"^products/(?P<route>.+)$",
 		"template_path": "pages/products/details.html",
 		"requires_auth": 0,
 	},
-	{"url_pattern": rf"^{LANG}/cart$", "template_path": "pages/cart/cart.html", "requires_auth": 0},
+	{"url_pattern": r"^cart$", "template_path": "pages/cart/cart.html", "requires_auth": 0},
 	# requires_auth 0 on purpose: the resolver's gate 403s before the controller can send a guest to the cart.
 	{
-		"url_pattern": rf"^{LANG}/cart/checkout$",
+		"url_pattern": r"^cart/checkout$",
 		"template_path": "pages/cart/checkout.html",
 		"requires_auth": 0,
 	},
 	{
-		"url_pattern": rf"^{LANG}/cart/(?!checkout$)(?P<codes>.+)$",
+		"url_pattern": r"^cart/(?!checkout$)(?P<codes>.+)$",
 		"template_path": "pages/cart/permalink.html",
 		"requires_auth": 0,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/dashboard$",
+		"url_pattern": r"^account/dashboard$",
 		"template_path": "pages/account/dashboard.html",
 		"requires_auth": 1,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/profile$",
+		"url_pattern": r"^account/profile$",
 		"template_path": "pages/account/profile.html",
 		"requires_auth": 1,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/orders$",
+		"url_pattern": r"^account/orders$",
 		"template_path": "pages/account/orders/index.html",
 		"requires_auth": 1,
 	},
 	# requires_auth 0 on purpose: a guest opens the private order link; the controller checks its key.
 	{
-		"url_pattern": rf"^{LANG}/account/orders/detail$",
+		"url_pattern": r"^account/orders/detail$",
 		"template_path": "pages/account/orders/detail.html",
 		"requires_auth": 0,
 	},
 	{
-		"url_pattern": rf"^{LANG}/track-order$",
+		"url_pattern": r"^track-order$",
 		"template_path": "pages/track_order.html",
 		"requires_auth": 0,
 	},
 	# requires_auth 0 on purpose: this is the gateway return URL, so the page asks for the login itself.
 	{
-		"url_pattern": rf"^{LANG}/account/orders/confirmation$",
+		"url_pattern": r"^account/orders/confirmation$",
 		"template_path": "pages/account/orders/confirmation.html",
 		"requires_auth": 0,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/wishlist$",
+		"url_pattern": r"^account/wishlist$",
 		"template_path": "pages/account/wishlist.html",
 		"requires_auth": 1,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/address$",
+		"url_pattern": r"^account/address$",
 		"template_path": "pages/account/address.html",
 		"requires_auth": 1,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/login$",
+		"url_pattern": r"^account/login$",
 		"template_path": "pages/account/login.html",
 		"requires_auth": 0,
 	},
 	{
-		"url_pattern": rf"^{LANG}/account/signup$",
+		"url_pattern": r"^account/signup$",
 		"template_path": "pages/account/signup.html",
 		"requires_auth": 0,
 	},
 	# requires_auth 0 on purpose: a published content page is public, and the controller is what lets
 	# an editor preview an unpublished one.
 	{
-		"url_pattern": rf"^{LANG}/page/(?P<route>.+)$",
+		"url_pattern": r"^page/(?P<route>.+)$",
 		"template_path": "pages/shop_web_page.html",
 		"requires_auth": 0,
 	},
@@ -125,7 +123,7 @@ def seed_default_routes():
 
 
 def clear_settings_cache():
-	frappe.cache.delete_value(COMPILED_ROUTES_CACHE_KEY)
+	frappe.cache.delete_keys(COMPILED_ROUTES_CACHE_KEY)
 	frappe.local.shop_theme_compiled_routes = None
 	# The active theme lives on this Single, so the memoised render context is stale too.
 	clear_render_theme_context()

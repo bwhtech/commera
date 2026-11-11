@@ -1,6 +1,6 @@
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/menu_link.html" import menu_link %}
-{% macro disclosure_heading(title) %}<button type="button" @click="open = !open" x-effect="mobile ? ($el.setAttribute('aria-expanded', open), $el.removeAttribute('role'), $el.removeAttribute('aria-level')) : ($el.removeAttribute('aria-expanded'), $el.setAttribute('role', 'heading'), $el.setAttribute('aria-level', '2'))" class="flex min-h-12 w-full items-center justify-between text-start text-xs font-medium uppercase tracking-wider text-ink-gray-9 md:pointer-events-none md:mb-3 md:min-h-0" :tabindex="mobile ? 0 : -1">{{ title }}<span :class="open && 'rotate-180'" class="transition-transform duration-200 md:hidden">{{ icon("down", "size-4") }}</span></button>{% endmacro %}
+{% macro disclosure_heading(title) %}<button type="button" @click="open = !open" x-effect="mobile ? ($el.setAttribute('aria-expanded', open), $el.removeAttribute('role'), $el.removeAttribute('aria-level')) : ($el.removeAttribute('aria-expanded'), $el.setAttribute('role', 'heading'), $el.setAttribute('aria-level', '2'))" class="flex min-h-12 w-full items-center justify-between text-start text-xs font-medium uppercase tracking-wider text-ink-gray-9 md:pointer-events-none md:mb-3 md:min-h-0" :tabindex="mobile ? 0 : -1">{{ title | e }}<span :class="open && 'rotate-180'" class="transition-transform duration-200 md:hidden">{{ icon("down", "size-4") }}</span></button>{% endmacro %}
 {% set social_links = [
 	(_("Instagram"), theme.instagram_url),
 	(_("Facebook"), theme.facebook_url),
@@ -11,7 +11,7 @@
 
 <footer x-data="{ mobile: false }" x-init="const query = matchMedia('(width < 48rem)'); mobile = query.matches; query.addEventListener('change', (event) => mobile = event.matches)" class="section-x grid grid-cols-2 gap-x-6 gap-y-10 border-t max-md:gap-y-0 border-outline-gray-2 pb-10 pt-14 text-md md:grid-cols-4 md:gap-x-8 md:pb-14 md:pt-16 md:text-base">
 	<div class="col-span-2 pb-8 md:col-span-1 md:pb-0">
-		<p class="text-2xl font-semibold uppercase tracking-widest">{{ app_name }}</p>
+		<p class="text-2xl font-semibold uppercase tracking-widest">{{ shop_name | e }}</p>
 	</div>
 	{% for block in section.blocks %}
 	{% if block.type == "menu" %}
@@ -41,8 +41,8 @@
 		<div :class="open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'" :inert="mobile && !open" class="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-out md:!grid-rows-[1fr]">
 			<div class="overflow-hidden">
 				<div class="pb-3 md:pb-0">
-					{% for label, url in social_links %}
-					<a href="{{ url }}" target="_blank" rel="noopener" class="block py-2.5 hover:text-ink-gray-9 md:py-1">{{ label }}</a>
+					{% for label, href in social_links %}
+					<a href="{{ href }}" target="_blank" rel="noopener" class="block py-2.5 hover:text-ink-gray-9 md:py-1">{{ label }}</a>
 					{% endfor %}
 				</div>
 			</div>
@@ -50,5 +50,5 @@
 	</div>
 	{% endif %}
 	{% endfor %}
-	<p class="col-span-full mt-6 text-base text-ink-gray-6 md:mt-4 md:border-t md:border-outline-gray-2 md:pt-6">{{ section.settings.copyright or "© {0} {1}".format(frappe.utils.getdate().year, app_name) }}</p>
+	<p class="col-span-full mt-6 text-base text-ink-gray-6 md:mt-4 md:border-t md:border-outline-gray-2 md:pt-6">{{ (section.settings.copyright or "© {0} {1}".format(frappe.utils.getdate().year, shop_name)) | e }}</p>
 </footer>

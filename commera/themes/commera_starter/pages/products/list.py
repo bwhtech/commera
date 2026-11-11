@@ -7,7 +7,7 @@ from frappe.utils.data import cint, cstr, flt
 
 from commera import seo
 from commera.sdk import catalog
-from commera.sdk.format import money
+from commera.sdk.format import money, url
 
 PAGE_SIZE = 24
 LIST_FILTERS = ("sizes", "colors", "brands")
@@ -90,7 +90,7 @@ def get_listing_url(context, **overrides):
 	if values.get("page") == 1:
 		values["page"] = None
 	query_string = urlencode({key: value for key, value in values.items() if value not in (None, "")})
-	path = f"/{frappe.local.lang or 'en'}/products"
+	path = url("/products")
 	return f"{path}?{query_string}" if query_string else path
 
 
@@ -107,19 +107,22 @@ def get_chips(context):
 	]
 	if context.selected.min is not None or context.selected.max is not None:
 		chips.append(
-			{"label": get_price_label(context.selected), "url": get_listing_url(context, min=None, max=None)}
+			{
+				"label": get_price_label(context.selected, context.listing["facets"]["price"]["currency"]),
+				"url": get_listing_url(context, min=None, max=None),
+			}
 		)
 	if context.selected.has_discount:
 		chips.append({"label": _("On sale"), "url": get_listing_url(context, has_discount=None)})
 	return chips
 
 
-def get_price_label(selected):
+def get_price_label(selected, currency):
 	if selected.max is None:
-		return _("From {0}").format(money(selected.min))
+		return _("From {0}").format(money(selected.min, currency))
 	if selected.min is None:
-		return _("Up to {0}").format(money(selected.max))
-	return _("{0} to {1}").format(money(selected.min), money(selected.max))
+		return _("Up to {0}").format(money(selected.max, currency))
+	return _("{0} to {1}").format(money(selected.min, currency), money(selected.max, currency))
 
 
 def add_seo(context):
@@ -129,8 +132,24 @@ def add_seo(context):
 
 	title = context.collection["title"] if context.collection else ""
 	breadcrumbs = [{"label": title or _("Products"), "href": ""}]
-	context.seo = seo.build_collection_seo(title, breadcrumbs, total_count=context.listing["total"])
+	context.seo = seo.build_collection_seo(
+		title,
+		breadcrumbs,
+		total_count=context.listing["total"],
+		category_doc=get_seo_overrides(context.collection),
+	)
 	context.json_ld = [
 		seo.build_collection_json_ld(title, breadcrumbs, context.listing["total"]),
 		seo.build_breadcrumb_json_ld(breadcrumbs),
 	]
+
+
+def get_seo_overrides(collection):
+	if not collection:
+		return None
+	# Only a set meta title replaces the "Title | Store" template.
+	return {
+		"meta_title": collection["seo"]["title"] if collection["seo"]["custom_title"] else None,
+		"meta_description": collection["seo"]["description"],
+		"noindex": collection["seo"]["noindex"],
+	}

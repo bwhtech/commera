@@ -1,65 +1,11 @@
 import { dayjs } from 'frappe-ui'
 import { bootValue } from './boot'
+import { money } from './formatter'
+import { __ } from './translation'
 
-// The shell (commera/www/commera.py) drops the site's reporting currency and
-// its symbol on `window`, so money reads correctly without any screen
-// threading a symbol down from its own endpoint — see boot.js.
-const currencyCode = bootValue('currency', 'INR')
-const currencySymbol = bootValue('currency_symbol', '')
-
-function moneyFormatter(compact, maximumFractionDigits = compact ? 1 : 0, currency = currencyCode) {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency,
-    currencyDisplay: 'narrowSymbol',
-    notation: compact ? 'compact' : 'standard',
-    maximumFractionDigits,
-  })
-}
-
-// Intl has no narrow symbol for some currencies (AED, SAR…) in a Latin locale
-// and prints the code instead, so the site's own symbol is swapped in.
-function formatWithSymbol(amount, formatter, symbol = currencySymbol) {
-  const value = amount ?? 0
-  if (!symbol) return formatter.format(value)
-  return formatter
-    .formatToParts(value)
-    .map((part) => (part.type === 'currency' ? symbol : part.value))
-    .join('')
-}
-
-// The site's own symbol for its currency; Intl's narrow symbol for any other, or when the
-// shell did not boot one (the Vite dev server serves a bare index.html).
-export function symbolFor(code = currencyCode) {
-  if (code === currencyCode && currencySymbol) return currencySymbol
-  const currencyPart = new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: code,
-    currencyDisplay: 'narrowSymbol',
-  })
-    .formatToParts(0)
-    .find((part) => part.type === 'currency')
-  return currencyPart?.value ?? code
-}
-
-export const money = (n) => formatWithSymbol(n, moneyFormatter(false))
-
-const exactDigits = (n) => (Number.isInteger(Number(n ?? 0)) ? 0 : 2)
-
-// A rate band edge such as 499.99 must not round up into the next band's ₹500.
-export const exactMoney = (n) => formatWithSymbol(n, moneyFormatter(false, exactDigits(n)))
-
-// For an amount kept in a currency of its own; blank means the site's currency.
-export function moneyIn(n, currency) {
-  const code = currency || currencyCode
-  return formatWithSymbol(n, moneyFormatter(false, exactDigits(n), code), symbolFor(code))
-}
+export { compactMoney, count, exactMoney, formatDate, money, moneyIn, monthName, symbolFor } from './formatter'
 
 export const discountMoney = (n, format = money) => `−${format(n)}`
-
-// Report figures are read side by side, so they are compacted: ₹4.8L reads at
-// a glance where ₹4,82,300 has to be counted.
-export const compactMoney = (n) => formatWithSymbol(n, moneyFormatter(true))
 
 /**
  * Frappe writes its formats in lowercase tokens (dd-mm-yyyy, HH:mm:ss); dayjs
@@ -84,28 +30,28 @@ export const shortDate = (iso) => (iso ? dayjs(iso).format(shortDateFormat) : '�
 export const longDate = (iso) => (iso ? dayjs(iso).format(dateFormat) : '—')
 
 const LABELS = {
-  paid: 'Paid',
-  pending: 'Payment pending',
-  refunded: 'Refunded',
-  partially_refunded: 'Partly refunded',
-  unfulfilled: 'Unfulfilled',
-  fulfilled: 'Fulfilled',
-  partial: 'Partly fulfilled',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
-  active: 'Active',
-  draft: 'Draft',
-  archived: 'Archived',
-  published: 'Published',
-  sent: 'Sent',
-  queued: 'Queued',
-  sending: 'Sending',
-  retrying: 'Retrying',
-  failed: 'Failed',
-  scheduled: 'Scheduled',
-  expired: 'Expired',
-  used_up: 'Used up',
-  disabled: 'Disabled',
+  paid: __('Paid'),
+  pending: __('Payment pending'),
+  refunded: __('Refunded'),
+  partially_refunded: __('Partly refunded'),
+  unfulfilled: __('Unfulfilled'),
+  fulfilled: __('Fulfilled'),
+  partial: __('Partly fulfilled'),
+  delivered: __('Delivered'),
+  cancelled: __('Cancelled'),
+  active: __('Active'),
+  draft: __('Draft'),
+  archived: __('Archived'),
+  published: __('Published'),
+  sent: __('Sent'),
+  queued: __('Queued'),
+  sending: __('Sending'),
+  retrying: __('Retrying'),
+  failed: __('Failed'),
+  scheduled: __('Scheduled'),
+  expired: __('Expired'),
+  used_up: __('Used up'),
+  disabled: __('Disabled'),
 }
 
 export const label = (key) => LABELS[key] ?? key
@@ -146,7 +92,7 @@ export const statusTheme = (key) => THEMES[key] ?? 'gray'
 // that decides how a low/high pair reads, so every screen with a price range
 // agrees on it.
 export function priceRange(low, high) {
-  if (low == null && high == null) return 'No price'
+  if (low == null && high == null) return __('No price')
   if (low === high) return money(low)
   return `${money(low)} – ${money(high)}`
 }

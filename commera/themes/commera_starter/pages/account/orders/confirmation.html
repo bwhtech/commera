@@ -1,14 +1,14 @@
 {% extends "components/base.html" %}
 {% from "components/macros/icons.html" import icon %}
 {% from "components/macros/summary_line.html" import summary_line %}
-{% set language = frappe.lang or "en" %}
+{% from "components/macros/skeleton.html" import skeleton %}
 
 {% block uncontained_body %}
 <section x-data="order_confirmation" class="section-x pt-6 md:pt-10"><div class="mx-auto flex max-w-2xl flex-col">
 	<div x-show="status === 'checking'" class="flex flex-col gap-4" aria-busy="true">
-		<div class="h-12 w-2/3 animate-pulse rounded-lg bg-surface-gray-2"></div>
-		<div class="h-5 w-1/2 animate-pulse rounded-lg bg-surface-gray-2"></div>
-		<div class="mt-6 h-40 animate-pulse rounded-xl bg-surface-gray-2"></div>
+		{{ skeleton("h-12 w-2/3 rounded-lg") }}
+		{{ skeleton("h-5 w-1/2 rounded-lg") }}
+		{{ skeleton("mt-6 h-40 rounded-xl") }}
 	</div>
 
 	<div x-cloak x-show="status === 'paid'" class="flex flex-col gap-8">
@@ -72,7 +72,7 @@
 
 		<div class="flex flex-wrap gap-3">
 			<a x-show="order?.link" :href="order?.link" class="button-primary">{{ _("View order") }}</a>
-			<a href="/{{ language }}/products" class="button-secondary">{{ _("Continue shopping") }}</a>
+			<a href="{{ url('/products') | e }}" class="button-secondary">{{ _("Continue shopping") }}</a>
 		</div>
 	</div>
 
@@ -81,7 +81,7 @@
 		<p x-show="is_still_polling" class="text-p-md text-ink-gray-6" role="status">{{ _("We are waiting for your payment to be confirmed. This page updates by itself.") }}</p>
 <p x-cloak x-show="status === 'pending' && !is_still_polling" class="text-p-md text-ink-gray-6">{{ _("This is taking longer than usual. Refresh this page in a minute, or check your orders.") }}</p>
 		<p x-show="status === 'failed'" class="text-p-md text-ink-gray-6">{{ _("We could not confirm a payment for this order. Your cart is still saved.") }}</p>
-		<a href="/{{ language }}/cart/checkout" class="button-primary">{{ _("Back to checkout") }}</a>
+		<a href="{{ url('/cart/checkout') | e }}" class="button-primary">{{ _("Back to checkout") }}</a>
 	</div>
 </div></section>
 {% endblock %}

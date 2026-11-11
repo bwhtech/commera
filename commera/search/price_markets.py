@@ -1,0 +1,208 @@
+"""Card prices per market for the search index. The store's prices are keyed SHOP_WIDE, like the
+index's own rows; a secondary market with its own price lists is keyed by its handle."""
+
+import frappe
+from frappe.query_builder import DocType
+from frappe.query_builder.functions import Max, Min
+from frappe.utils import create_batch, flt
+
+from commera.base_prices import base_price_filters, is_base_price
+from commera.card_prices import get_card_price
+from commera.localization.content import SHOP_WIDE
+from commera.localization.languages import StorefrontLanguages
+from commera.localization.market_prices import MarketPrices
+from commera.localization.markets import Market, StorefrontMarkets, fetch_market_rows
+from commera.localization.resolver import get_localization
+from commera.utils import IN_CLAUSE_CHUNK_SIZE, get_store_currency
+
+PRODUCT_DOCTYPE = "Style Attribute Variant"
+# The card price columns each market row holds.
+PRICE_COLUMNS = (
+	"effective_price",
+	"sale_price",
+	"default_price",
+	"discount_percent",
+	"has_discount",
+	"sale_end_date",
+)
+
+
+def get_price_markets(
+	markets: StorefrontMarkets | None = None, store: MarketPrices | None = None
+) -> dict[str, MarketPrices]:
+	"""{key: prices} of each market the index prices: the store, and each enabled market with lists."""
+	markets = markets or StorefrontMarkets.load()
+	priced = {SHOP_WIDE: store or MarketPrices.of(markets.primary)}
+	for market in markets.secondary:
+		if market.sale_price_list:
+			priced[market.handle] = MarketPrices.of(market)
+	return priced
+
+
+def fresh_price_markets() -> dict[str, MarketPrices]:
+	"""get_price_markets from the database, not the caches: they can predate another worker's save."""
+	settings = frappe.get_doc("Commera Settings")
+	store = MarketPrices(True, settings.sale_price_list, settings.default_price_list, get_store_currency())
+	return get_price_markets(fresh_markets(settings), store)
+
+
+def fresh_markets(settings=None) -> StorefrontMarkets:
+	"""StorefrontMarkets from the database, not the caches."""
+	settings = settings or frappe.get_doc("Commera Settings")
+	return StorefrontMarkets(StorefrontLanguages.from_settings(settings), fetch_market_rows())
+
+
+def get_price_market(market: Market | None = None) -> str:
+	"""The key of the prices a search in `market` (default: this request's) sorts and shows."""
+	market = market or get_localization().market
+	return SHOP_WIDE if MarketPrices.of(market).uses_store_prices else market.handle
+
+
+def price_generation(settings, markets: StorefrontMarkets | None = None) -> list:
+	"""What decides the indexed prices: the store lists in `settings`, and each market's lists."""
+	lists = [
+		[key, prices.sale_price_list, prices.compare_at_price_list]
+		for key, prices in get_price_markets(markets).items()
+		if key != SHOP_WIDE
+	]
+	return [settings.sale_price_list, settings.default_price_list, lists]
+
+
+def prices_for_variants(names, sizes_by_variant, price_markets=None) -> dict[str, dict[str, dict]]:
+	"""{variant: {market key: card prices}} of `names`, as card_prices_by_variant prices them."""
+	price_markets = price_markets or get_price_markets()
+	codes_by_variant = {
+		name: [size["item_code"] for size in sizes_by_variant.get(name, []) if size.get("item_code")]
+		for name in names
+	}
+	codes = list({code for item_codes in codes_by_variant.values() for code in item_codes})
+	rates = rates_by_price_list(codes, price_lists_of(price_markets))
+	return card_prices_by_variant(codes_by_variant, price_markets, rates)
+
+
+def all_card_prices(products, price_markets) -> dict[str, dict[str, dict]]:
+	"""prices_for_variants of every product in `products`, a name subquery. One read of the products,
+	one of their sizes and one grouped read of their rates: no read per product."""
+	codes_by_variant = {name: [] for name in products.run(pluck=True)}
+	size = DocType("Color Size Item")
+	sizes = (
+		frappe.qb.from_(size)
+		.select(size.parent, size.item_code)
+		.where((size.parenttype == PRODUCT_DOCTYPE) & size.parent.isin(products) & (size.item_code != ""))
+		.run(as_dict=True)
+	)
+	for row in sizes:
+		codes_by_variant[row.parent].append(row.item_code)
+	item_codes = (
+		frappe.qb.from_(size)
+		.select(size.item_code)
+		.where((size.parenttype == PRODUCT_DOCTYPE) & size.parent.isin(products))
+	)
+	rates = grouped_rates(price_lists_of(price_markets), item_codes)
+	return card_prices_by_variant(codes_by_variant, price_markets, rates)
+
+
+def card_prices_by_variant(codes_by_variant, price_markets, rates) -> dict[str, dict[str, dict]]:
+	"""Every variant has store prices, 0 when unpriced, as before. A secondary market leaves out
+	each variant it cannot price: it does not sell it."""
+	snapshots = {}
+	for name, item_codes in codes_by_variant.items():
+		by_market = snapshots[name] = {}
+		for key, prices in price_markets.items():
+			sale = rates.get(prices.sale_price_list, empty_rates())
+			compare_at = rates.get(prices.compare_at_price_list, empty_rates())
+			snapshot = aggregate_prices(item_codes, compare_at["rate"], sale["rate"], sale["upto"])
+			if key == SHOP_WIDE:
+				snapshot["effective_price"] = flt(snapshot["effective_price"])
+			if snapshot["effective_price"] is not None:
+				by_market[key] = snapshot
+	return snapshots
+
+
+def price_lists_of(price_markets) -> list[str]:
+	return sorted({name for prices in price_markets.values() for name in prices.price_lists})
+
+
+def grouped_rates(price_lists, item_codes) -> dict[str, dict]:
+	"""rates_by_price_list over the item codes of a subquery, aggregated in SQL."""
+	rates = {}
+	if not price_lists:
+		return rates
+	price = DocType("Item Price")
+	rows = (
+		frappe.qb.from_(price)
+		.select(
+			price.price_list,
+			price.item_code,
+			Min(price.price_list_rate).as_("rate"),
+			Max(price.valid_upto).as_("upto"),
+		)
+		.where(
+			price.price_list.isin(price_lists)
+			& is_base_price(price)
+			& price.price_list_rate.notnull()
+			& price.item_code.isin(item_codes)
+		)
+		.groupby(price.price_list, price.item_code)
+		.run(as_dict=True)
+	)
+	for row in rows:
+		price_list = rates.setdefault(row.price_list, empty_rates())
+		price_list["rate"][row.item_code] = row.rate
+		if row.upto:
+			price_list["upto"][row.item_code] = row.upto
+	return rates
+
+
+def rates_by_price_list(item_codes, price_lists) -> dict[str, dict]:
+	"""{price list: {rate: {item_code: min rate}, upto: {item_code: max valid_upto}}}."""
+	rates = {}
+	if not price_lists:
+		return rates
+	for chunk in create_batch(item_codes, IN_CLAUSE_CHUNK_SIZE):
+		for row in frappe.get_all(
+			"Item Price",
+			filters=base_price_filters({"item_code": ("in", chunk), "price_list": ("in", price_lists)}),
+			fields=["item_code", "price_list", "price_list_rate", "valid_upto"],
+		):
+			if row.price_list_rate is None:
+				continue
+			price_list = rates.setdefault(row.price_list, empty_rates())
+			price_list["rate"][row.item_code] = min_or(
+				price_list["rate"].get(row.item_code), row.price_list_rate
+			)
+			if row.valid_upto:
+				price_list["upto"][row.item_code] = max_or(
+					price_list["upto"].get(row.item_code), row.valid_upto
+				)
+	return rates
+
+
+def rates_by_item_code(item_codes, default_price_list, sale_price_list):
+	"""Per item_code: min default rate, min sale rate, max sale valid_upto across Item Price rows."""
+	price_lists = [name for name in (default_price_list, sale_price_list) if name]
+	rates = rates_by_price_list(item_codes, price_lists)
+	default = rates.get(default_price_list, empty_rates())
+	sale = rates.get(sale_price_list, empty_rates())
+	return default["rate"], sale["rate"], sale["upto"]
+
+
+def aggregate_prices(item_codes, default_rate, sale_rate, sale_upto):
+	"""A product's card prices over its sizes (card_prices.get_card_price), with its last sale end."""
+	upto_values = [sale_upto[code] for code in item_codes if code in sale_upto]
+	return {
+		**get_card_price([(sale_rate.get(code), default_rate.get(code)) for code in item_codes]),
+		"sale_end_date": max(upto_values) if upto_values else None,
+	}
+
+
+def empty_rates():
+	return {"rate": {}, "upto": {}}
+
+
+def min_or(current, value):
+	return value if current is None else min(current, value)
+
+
+def max_or(current, value):
+	return value if current is None else max(current, value)

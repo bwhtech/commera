@@ -1,5 +1,6 @@
+import { url } from '../localization.js';
 import * as shop from '../shop.js';
-import { NO_INPUT, READS_STORE_DATA, get_language_root } from './shared.js';
+import { NO_INPUT, READS_STORE_DATA } from './shared.js';
 
 export const page_tools = [
 	{
@@ -37,6 +38,6 @@ export const page_tools = [
 function add_page_url(page) {
 	return {
 		...page,
-		url: `${get_language_root()}/page/${encodeURIComponent(page.handle)}`,
+		url: url(`/page/${encodeURIComponent(page.handle)}`),
 	};
 }

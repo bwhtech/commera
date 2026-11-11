@@ -4,13 +4,14 @@ from urllib.parse import quote, urlencode
 import frappe
 from frappe import _
 from frappe.core.doctype.file.utils import get_local_image
-from frappe.utils.data import cint, cstr, flt, fmt_money, sha256_hash
+from frappe.utils.data import cint, cstr, sha256_hash
 from PIL import Image, ImageOps
 
+from commera.localization import switch_url, url
+from commera.localization.formatter import Formatter
 from commera.shop_themes.doctype.shop_theme.shop_theme import is_within_directory
-from commera.utils import get_currency_symbol
 
-__all__ = ["IMAGE_WIDTHS", "image_url", "money", "product_url"]
+__all__ = ["IMAGE_WIDTHS", "date", "image_url", "money", "number", "product_url", "switch_url", "url"]
 
 IMAGE_WIDTHS = (160, 320, 480, 640, 960, 1280, 1920)
 RESIZED_IMAGES_URL = "/files/commera-images"
@@ -20,13 +21,22 @@ WEBP_QUALITY = 80
 
 
 def money(amount: float | None, currency: str | None = None) -> str:
-	return f"{get_currency_symbol(currency)}{fmt_money(flt(amount), precision=2)}"
+	return Formatter.current().money(amount, currency)
+
+
+def number(value: float | None, precision: int = 0) -> str:
+	return Formatter.current().number(value, precision)
+
+
+def date(value, style: str = "medium") -> str:
+	"""`style` is short, medium, long or full, in the current language."""
+	return Formatter.current().date(value, style)
 
 
 def product_url(handle: str) -> str:
 	if not handle:
 		frappe.throw(_("A product URL needs the product's handle."))
-	return f"/{frappe.local.lang or 'en'}/products/{quote(cstr(handle))}"
+	return url(f"/products/{quote(cstr(handle))}")
 
 
 def image_url(path: str | None, width: int | None = None) -> str | None:

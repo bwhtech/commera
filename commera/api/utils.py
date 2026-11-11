@@ -4,8 +4,10 @@ import frappe
 from erpnext.controllers.website_list_for_contact import get_transaction_list
 from frappe import _
 from frappe.rate_limiter import rate_limit
-from frappe.translate import get_all_translations
 
+from commera.commera_ecommerce.doctype.landing_page_settings.landing_page_settings import (
+	get_translated_landing_page,
+)
 from commera.search.typeahead import get_typeahead
 from commera.utils import get_available_stocks, validate_document_access
 
@@ -67,8 +69,9 @@ def get_whitelist_transaction_list(
 # The storefront landing page is public, and so is everything Landing Page Settings holds.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 def get_homepage_details():
-	landing_page = frappe.get_cached_doc("Landing Page Settings")
-	landing_page = landing_page.as_dict()
+	settings = frappe.get_cached_doc("Landing Page Settings")
+	landing_page = settings.as_dict()
+	landing_page.update(get_translated_landing_page(settings))
 	landing_page["new_arrivals"] = get_item_details(landing_page.get("new_arrivals"))
 	landing_page["best_picks"] = get_item_details(landing_page.get("best_picks"))
 	landing_page["carousel_1"] = get_item_details(landing_page.get("carousel_1"))
@@ -135,12 +138,6 @@ def notify_user_product(item: str):
 			).insert()
 	except Exception:
 		frappe.throw(_("Cannot subscribe for notification"))
-
-
-# UI strings, the same data frappe's own get_boot_translations serves guests.
-@frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
-def get_translations(lang: str = "ar"):
-	return get_all_translations(lang=lang)
 
 
 @frappe.whitelist()

@@ -17,14 +17,12 @@ export async function runEach(items, write) {
   return { done, failed }
 }
 
-// "3 orders marked fulfilled" or "2 of 3 orders marked fulfilled. 1 failed: <reason>".
-// `noun` is a word that takes an s, or a [singular, plural] pair for one that does not.
-export function bulkSummary({ done, failed }, noun, verb, reasonFor = (error) => error?.message) {
+// "3 orders marked fulfilled" or "2 of 3 orders marked fulfilled. 1 failed: <reason>". The caller writes
+// both sentences whole, `all(total)` and `some(done, total, failed)`, so each translates as one string.
+export function bulkSummary({ done, failed }, sentences, reasonFor = (error) => error?.message) {
   const total = done.length + failed.length
-  const [one, many] = Array.isArray(noun) ? noun : [noun, `${noun}s`]
-  const plural = (count) => `${count} ${count === 1 ? one : many}`
-  if (!failed.length) return `${plural(total)} ${verb}`
+  if (!failed.length) return sentences.all(total)
   const reason = failed.map(({ error }) => error && reasonFor(error)).find(Boolean)
-  const head = `${done.length} of ${plural(total)} ${verb}. ${failed.length} failed`
+  const head = sentences.some(done.length, total, failed.length)
   return reason ? `${head}: ${reason}` : head
 }

@@ -30,11 +30,11 @@ const isLive = computed(() => props.card.enabled && !needsKeys.value)
     <div class="min-w-0 flex-1">
       <div class="flex items-center gap-2">
         <p class="truncate text-base text-ink-gray-8">{{ card.label }}</p>
-        <Badge v-if="isLive" label="Live" theme="green" variant="subtle" />
-        <Badge v-else-if="needsKeys" label="Keys missing" theme="amber" variant="subtle" />
+        <Badge v-if="isLive" :label="__('Live')" theme="green" variant="subtle" />
+        <Badge v-else-if="needsKeys" :label="__('Keys missing')" theme="amber" variant="subtle" />
         <!-- The app behind this provider is not installed on the site, so there is
              nothing to configure and the row says so rather than offering keys. -->
-        <Badge v-if="!card.available" label="Not installed" theme="gray" variant="subtle" />
+        <Badge v-if="!card.available" :label="__('Not installed')" theme="gray" variant="subtle" />
       </div>
       <!-- Wraps rather than truncates: a carrier blurb is a sentence, and clipping it at the
            column edge cut it mid-word — which reads as a rendering fault rather than as text
@@ -42,9 +42,9 @@ const isLive = computed(() => props.card.enabled && !needsKeys.value)
       <p v-if="card.blurb" class="mt-1 text-sm text-ink-gray-5">{{ card.blurb }}</p>
     </div>
 
-    <div class="ml-auto flex shrink-0 items-center gap-3">
+    <div class="ms-auto flex shrink-0 items-center gap-3">
       <Button
-        :label="card.configured ? 'Configure' : 'Add keys'"
+        :label="card.configured ? __('Configure') : __('Add keys')"
         :disabled="!card.available"
         @click="$emit('configure', card.slug)"
       />

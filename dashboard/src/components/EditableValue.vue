@@ -65,8 +65,8 @@ function cancel(close) {
           @keyup.enter="save(close)"
         />
         <div class="flex justify-end gap-2">
-          <Button label="Cancel" @click="cancel(close)" />
-          <Button label="Save" variant="solid" theme="gray" @click="save(close)" />
+          <Button :label="__('Cancel')" @click="cancel(close)" />
+          <Button :label="__('Save')" variant="solid" theme="gray" @click="save(close)" />
         </div>
       </div>
     </template>

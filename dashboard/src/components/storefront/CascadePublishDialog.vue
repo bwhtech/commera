@@ -13,6 +13,7 @@ import { Badge, Button, Dialog, LoadingText, toast } from 'frappe-ui'
 import ListPagination from '../ListPagination.vue'
 import SearchInput from '../SearchInput.vue'
 import { useNavMenu } from '../../data/navMenu'
+import { __ } from '../../data/translation'
 import { createSequence } from '../../utils/sequence'
 
 const props = defineProps({
@@ -39,48 +40,50 @@ const options = computed(() => cascade.value?.products ?? [])
 const matching = computed(() => cascade.value?.matching ?? 0)
 const incomplete = computed(() => cascade.value?.incomplete ?? 0)
 
-function optionWord(total) {
-  return `${total} option${total === 1 ? '' : 's'}`
-}
-
 const title = computed(() =>
   publishing.value
-    ? `Publish the options under "${props.target?.label}"?`
-    : `Take the options under "${props.target?.label}" off the storefront?`,
+    ? __('Publish the options under "{0}"?', [props.target?.label])
+    : __('Take the options under "{0}" off the storefront?', [props.target?.label]),
 )
 
 const summary = computed(() => {
   if (publishing.value) {
     return count.value
-      ? `${optionWord(count.value)} will go live on your storefront.`
-      : 'None of these options can go live yet.'
+      ? count.value === 1
+        ? __('1 option will go live on your storefront.')
+        : __('{0} options will go live on your storefront.', [count.value])
+      : __('None of these options can go live yet.')
   }
   return count.value
-    ? `${optionWord(count.value)} will come off your storefront. They stay in your catalogue.`
-    : 'None of these options are on your storefront right now.'
+    ? count.value === 1
+      ? __('1 option will come off your storefront. It stays in your catalogue.')
+      : __('{0} options will come off your storefront. They stay in your catalogue.', [count.value])
+    : __('None of these options are on your storefront right now.')
 })
 
 // Only publishing can be blocked, and only a merchant who is told before confirming can fix it.
-const blockedNote = computed(() =>
-  publishing.value && incomplete.value
-    ? `${optionWord(incomplete.value)} are missing images or sizes, so they cannot go live yet and are left as they are.`
-    : '',
-)
+const blockedNote = computed(() => {
+  if (!publishing.value || !incomplete.value) return ''
+  return incomplete.value === 1
+    ? __('1 option is missing images or sizes, so it cannot go live yet and is left as it is.')
+    : __('{0} options are missing images or sizes, so they cannot go live yet and are left as they are.', [incomplete.value])
+})
 
 const confirmLabel = computed(() => {
-  if (!count.value) return publishing.value ? 'Nothing to publish' : 'Nothing to take off'
-  return publishing.value ? `Publish ${optionWord(count.value)}` : `Take ${optionWord(count.value)} off`
+  if (!count.value) return publishing.value ? __('Nothing to publish') : __('Nothing to take off')
+  if (publishing.value) return count.value === 1 ? __('Publish 1 option') : __('Publish {0} options', [count.value])
+  return count.value === 1 ? __('Take 1 option off') : __('Take {0} options off', [count.value])
 })
 
 function rowState(option) {
   if (!publishing.value) {
     return option.is_published
-      ? { label: 'Coming off', theme: 'amber' }
-      : { label: 'Already off', theme: 'gray' }
+      ? { label: __('Coming off'), theme: 'amber' }
+      : { label: __('Already off'), theme: 'gray' }
   }
-  if (option.is_published) return { label: 'Already live', theme: 'gray' }
+  if (option.is_published) return { label: __('Already live'), theme: 'gray' }
   if (option.blocked_reason) return { label: option.blocked_reason, theme: 'amber' }
-  return { label: 'Going live', theme: 'green' }
+  return { label: __('Going live'), theme: 'green' }
 }
 
 // Opening resets the search and page, which their own watcher sees too, so one open used to send
@@ -139,8 +142,12 @@ async function confirmPublish() {
     open.value = false
     toast.success(
       publishing.value
-        ? `${optionWord(data.count)} live on your storefront`
-        : `${optionWord(data.count)} taken off your storefront`,
+        ? data.count === 1
+          ? __('1 option live on your storefront')
+          : __('{0} options live on your storefront', [data.count])
+        : data.count === 1
+          ? __('1 option taken off your storefront')
+          : __('{0} options taken off your storefront', [data.count]),
     )
   } finally {
     submitting.value = false
@@ -156,26 +163,29 @@ async function confirmPublish() {
           <p class="text-p-base text-ink-gray-7">{{ summary }}</p>
           <p v-if="blockedNote" class="text-p-base text-ink-amber-7">{{ blockedNote }}</p>
           <p class="text-p-base text-ink-gray-5">
-            An option is one colour of a product, with a page of its own. The menu entry itself is
-            not touched — this only changes what shoppers can buy.
+            {{
+              __(
+                'An option is one colour of a product, with a page of its own. The menu entry itself is not touched — this only changes what shoppers can buy.',
+              )
+            }}
           </p>
         </div>
 
         <SearchInput
           v-model="search"
-          placeholder="Search these options"
+          :placeholder="__('Search these options')"
         />
 
         <LoadingText v-if="status === 'loading' || status === 'idle'" />
 
         <div v-else-if="status === 'error'" class="flex flex-col items-center gap-2 py-6 text-center">
-          <p class="text-base text-ink-gray-5">Could not list these options.</p>
-          <Button label="Try again" @click="loadOptions" />
+          <p class="text-base text-ink-gray-5">{{ __('Could not list these options.') }}</p>
+          <Button :label="__('Try again')" @click="loadOptions" />
         </div>
 
         <template v-else>
           <p v-if="!options.length" class="py-6 text-center text-base text-ink-gray-5">
-            No options under this entry match.
+            {{ __('No options under this entry match.') }}
           </p>
 
           <ul v-else class="divide-y divide-outline-gray-1 rounded-4 border border-outline-gray-1">
