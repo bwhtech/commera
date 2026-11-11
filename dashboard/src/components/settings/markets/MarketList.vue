@@ -45,7 +45,7 @@ function summaryOf(market) {
 
   <SettingsBody v-scroll-fade>
     <EmptyState
-      v-if="loadError && !markets"
+      v-if="loadError"
       compact
       icon="lucide-triangle-alert"
       :title="__('These could not be loaded')"

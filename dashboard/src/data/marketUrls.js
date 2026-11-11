@@ -47,8 +47,7 @@ export function countryOwners(markets, handle) {
   return owners
 }
 
-// The field a refused save belongs to, read off the error's title. The server sends the titles in
-// the admin's own language, so they match what it throws.
-export function errorField(error, errorFields) {
-  return (error?.title && errorFields?.[error.title]) || null
+// Validation responses carry the field independently of their translated message.
+export function errorField(error) {
+  return error?.field || null
 }

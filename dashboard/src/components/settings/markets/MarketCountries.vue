@@ -6,7 +6,7 @@ import { __ } from '../../../data/translation'
 
 const props = defineProps({
   countries: { type: Array, required: true },
-  handle: { type: String, required: true },
+  handle: { type: String, default: null },
   isPrimary: { type: Boolean, default: false },
   error: { type: String, default: '' },
 })

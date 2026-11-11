@@ -26,10 +26,10 @@ watch(
 <template>
   <MarketEditor
     v-if="editing"
-    :key="editing"
-    :handle="editing"
+    :key="editing.handle === null ? 'create' : `market:${editing.handle}`"
+    :handle="editing.handle"
     @back="editing = null"
-    @created="(handle) => (editing = handle)"
+    @created="(handle) => (editing = { handle })"
   />
-  <MarketList v-else @open="(handle) => (editing = handle)" />
+  <MarketList v-else @open="(handle) => (editing = { handle })" />
 </template>

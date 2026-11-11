@@ -12,7 +12,7 @@ import { __ } from '../../../data/translation'
 import { useMarketForm } from '../../../data/useMarketForm'
 
 const props = defineProps({
-  handle: { type: String, required: true },
+  handle: { type: String, default: null },
 })
 
 const emit = defineEmits(['back', 'created'])
@@ -116,9 +116,9 @@ const menu = [{ label: __('Delete market'), icon: 'lucide-trash-2', theme: 'red'
           >
             <p class="text-base text-ink-gray-8">{{ __('Sell in this market') }}</p>
             <Switch
-              :model-value="Boolean(market.enabled)"
+              :model-value="Boolean(values.enabled)"
               :aria-label="__('Sell in this market')"
-              @update:model-value="(isOn) => marketStore.setEnabled(market, isOn)"
+              @update:model-value="(isOn) => form.change('enabled', isOn ? 1 : 0, __('Market'))"
             />
           </div>
           <div class="grid gap-4 sm:grid-cols-2">

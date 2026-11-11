@@ -47,12 +47,10 @@ class MarketSettingsTestCase(IntegrationTestCase):
 		use_markets(self)
 
 	def refusal(self, action, *args, **kwargs) -> tuple[str | None, str]:
-		"""The field a refused save names, by its title, and the message."""
+		"""Read the same structured validation response as the dashboard."""
 		frappe.clear_messages()
-		with self.assertRaises(frappe.ValidationError) as caught:
-			action(*args, **kwargs)
-		title = frappe.message_log[-1].get("title") if frappe.message_log else None
-		return api.get_error_fields().get(title), str(caught.exception)
+		response = action(*args, **kwargs)
+		return response["field"], response["message"]
 
 
 class TestAdminMarkets(MarketSettingsTestCase):
@@ -78,8 +76,8 @@ class TestAdminMarkets(MarketSettingsTestCase):
 			(api.delete_market, {"handle": PRIMARY_MARKET}),
 		):
 			with self.subTest(action=action.__name__):
-				_field, message = self.refusal(action, **arguments)
-				self.assertIn("primary market is your store", message)
+				with self.assertRaisesRegex(frappe.ValidationError, "primary market is your store"):
+					action(**arguments)
 
 	def test_creating_a_market_makes_its_handle_from_the_name(self):
 		market = create("Gulf States", handle="")
@@ -89,6 +87,11 @@ class TestAdminMarkets(MarketSettingsTestCase):
 		self.assertEqual(
 			market["currency"], frappe.db.get_value("Price List", market["sale_price_list"], "currency")
 		)
+
+	def test_new_is_a_valid_market_handle(self):
+		market = create("New")
+		self.assertEqual(market["handle"], "new")
+		self.assertEqual(api.update_market("new", market_name="New market")["handle"], "new")
 
 	def test_an_update_writes_only_the_fields_sent(self):
 		market = create(countries=(UAE,))
@@ -148,6 +151,12 @@ class TestMarketValidationMessages(MarketSettingsTestCase):
 			("unpublished", {"languages": ("fr",), "default": "fr"}, "languages", "not published"),
 			("regional", {"languages": ("ar", "pt-BR")}, "languages", "names a region"),
 			("price list", {"sale_price_list": buying}, "sale_price_list", "not a selling price list"),
+			(
+				"compare list",
+				{"compare_at_price_list": buying},
+				"compare_at_price_list",
+				"not a selling price list",
+			),
 			(
 				"currency",
 				{"compare_at_price_list": other_currency},

@@ -52,10 +52,9 @@ test('the countries of the other markets name their market', () => {
   assert.deepEqual([...countryOwners(markets, 'uae')], [['Oman', 'Gulf']])
 })
 
-test('a refusal names its field by its title', () => {
-  const fields = { 'Currency Mismatch': 'compare_at_price_list' }
-  assert.equal(errorField({ title: 'Currency Mismatch' }, fields), 'compare_at_price_list')
-  assert.equal(errorField({ title: 'Something else' }, fields), null)
-  assert.equal(errorField({}, fields), null)
-  assert.equal(errorField(null, undefined), null)
+test('a refusal carries its field independently of its title', () => {
+  assert.equal(errorField({ field: 'compare_at_price_list', title: 'Invalid Price List' }), 'compare_at_price_list')
+  assert.equal(errorField({ field: 'sale_price_list', title: 'Invalid Price List' }), 'sale_price_list')
+  assert.equal(errorField({ title: 'Invalid Price List' }), null)
+  assert.equal(errorField(null), null)
 })

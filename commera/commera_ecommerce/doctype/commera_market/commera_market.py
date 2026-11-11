@@ -2,6 +2,8 @@
 # For license information, please see license.txt
 
 import re
+from contextlib import contextmanager
+from functools import wraps
 
 import frappe
 from frappe import _
@@ -15,6 +17,28 @@ from commera.search.price_sync import rebuild_if_market_prices_change
 from commera.search.translations import reindex_market_records
 
 HANDLE_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+@contextmanager
+def market_field(fieldname):
+	try:
+		yield
+	except frappe.ValidationError as error:
+		if not getattr(error, "field", None):
+			error.field = fieldname
+		raise
+
+
+def validates_field(fieldname):
+	def decorate(validate):
+		@wraps(validate)
+		def wrapped(*args, **kwargs):
+			with market_field(fieldname):
+				return validate(*args, **kwargs)
+
+		return wrapped
+
+	return decorate
 
 
 class CommeraMarket(Document):
@@ -68,6 +92,7 @@ class CommeraMarket(Document):
 		frappe.db.delete("Content Translation", {"market": self.name})
 		refresh_market_surfaces()
 
+	@validates_field("handle")
 	def validate_handle(self):
 		if not HANDLE_PATTERN.match(self.handle or "") or self.handle == PRIMARY_MARKET:
 			frappe.throw(
@@ -77,6 +102,7 @@ class CommeraMarket(Document):
 				title=_("Invalid Handle"),
 			)
 
+	@validates_field("countries")
 	def validate_countries(self):
 		countries = [row.country for row in self.countries]
 		if not countries:
@@ -101,6 +127,7 @@ class CommeraMarket(Document):
 			.run()
 		)
 
+	@validates_field("languages")
 	def validate_languages(self):
 		languages = StorefrontLanguages.load()
 		self.validate_default_language(languages)
@@ -152,18 +179,20 @@ class CommeraMarket(Document):
 				title=_("Regional Language"),
 			)
 
+	@validates_field("compare_at_price_list")
 	def validate_price_lists(self):
 		"""The market sells in the sale price list's currency; Commera converts no prices."""
 		for fieldname in ("sale_price_list", "compare_at_price_list"):
-			if (price_list := self.get(fieldname)) and not frappe.get_cached_value(
-				"Price List", price_list, "selling"
-			):
-				frappe.throw(
-					_("{0} {1} is not a selling price list.").format(
-						_(self.meta.get_label(fieldname)), frappe.bold(price_list)
-					),
-					title=_("Invalid Price List"),
-				)
+			with market_field(fieldname):
+				if (price_list := self.get(fieldname)) and not frappe.get_cached_value(
+					"Price List", price_list, "selling"
+				):
+					frappe.throw(
+						_("{0} {1} is not a selling price list.").format(
+							_(self.meta.get_label(fieldname)), frappe.bold(price_list)
+						),
+						title=_("Invalid Price List"),
+					)
 		self.currency = get_price_list_currency(self.sale_price_list)
 		compare_at_currency = get_price_list_currency(self.compare_at_price_list)
 		if self.compare_at_price_list and compare_at_currency != self.currency:
@@ -183,6 +212,7 @@ class CommeraMarket(Document):
 			if row.name in saved and saved[row.name] != row.country:
 				row.set("__islocal", 1)
 
+	@validates_field("urls")
 	def validate_prefixes(self, languages: StorefrontLanguages, codes: list[str]):
 		"""`/pt-br/` would name both Portuguese in Brazil and the language pt-BR, and share its hreflang."""
 		for code in codes:

@@ -7,7 +7,7 @@ import { marketStore } from './markets'
 import { __ } from './translation'
 import { useSettingsAutosave } from './useSettingsAutosave'
 
-export const NEW_MARKET = 'new'
+export const NEW_MARKET = null
 
 const DRAFT_FIELDS = [
   'market_name',
@@ -29,7 +29,10 @@ export function useMarketForm(handle) {
   // Quiet: a refusal that names a field is shown on the field; the rest are toasted in report().
   const updateAction = useAdminAction('markets.update_market', { quiet: true })
   const createAction = useAdminAction('markets.create_market', { quiet: true })
-  const { values, adopt, set, commit } = useSettingsAutosave(reportingErrors(updateAction), { params: { handle } })
+  const { values, adopt, set, commit } = useSettingsAutosave(reportingErrors(updateAction), {
+    params: { handle },
+    preserveEdits: true,
+  })
   adopt(isNew ? blankMarket() : marketStore.find(handle))
 
   function reportingErrors(action) {
@@ -37,6 +40,7 @@ export function useMarketForm(handle) {
       async submit(params) {
         try {
           const saved = await action.submit(params)
+          if (saved.field) throw saved
           errors.value = {}
           return saved
         } catch (error) {
@@ -49,7 +53,7 @@ export function useMarketForm(handle) {
 
   function report(error) {
     if (wasAborted(error)) return
-    const field = errorField(error, marketStore.choices.value?.error_fields)
+    const field = errorField(error)
     if (field) errors.value = { [field]: errorMessage(error) }
     else toast.error(errorMessage(error))
   }
@@ -61,7 +65,6 @@ export function useMarketForm(handle) {
       return
     }
     return commit(fieldname, value, label, (saved) => {
-      adopt(saved)
       marketStore.upsert(saved)
     })
   }
@@ -86,6 +89,7 @@ export function useMarketForm(handle) {
     if (marketStore.choices.value?.tax_templates) params.tax_template = values.value.tax_template
     try {
       const saved = await createAction.submit(params)
+      if (saved.field) throw saved
       marketStore.upsert(saved)
       toast.success(__('{0} created', [saved.market_name]))
       return saved.handle

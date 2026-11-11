@@ -4,10 +4,13 @@
 """The dashboard's Markets settings. Every write saves through Commera Market, so its validations run,
 and answers with the saved market."""
 
+from functools import wraps
+
 import frappe
 from frappe import _
 from frappe.utils import cint
 
+from commera.commera_ecommerce.doctype.commera_market.commera_market import market_field
 from commera.localization.languages import StorefrontLanguages
 from commera.localization.markets import (
 	MARKET_DOCTYPE,
@@ -27,6 +30,20 @@ EDITABLE_FIELDS = (
 	"compare_at_price_list",
 	TAX_TEMPLATE_FIELD,
 )
+
+
+def market_validation_response(action):
+	@wraps(action)
+	def wrapped(*args, **kwargs):
+		try:
+			return action(*args, **kwargs)
+		except frappe.ValidationError as error:
+			if not getattr(error, "field", None):
+				raise
+			frappe.clear_messages()
+			return {"field": error.field, "message": str(error)}
+
+	return wrapped
 
 
 # Not GET-only: the dashboard reads it through createAdminCaller, which POSTs.
@@ -51,11 +68,11 @@ def get_market_choices() -> dict:
 		),
 		# None before the market has a tax template field: the editor then shows no tax select.
 		"tax_templates": get_tax_templates() if has_tax_template() else None,
-		"error_fields": get_error_fields(),
 	}
 
 
 @frappe.whitelist(methods=["POST"])
+@market_validation_response
 def create_market(
 	market_name: str,
 	countries: list | str,
@@ -87,6 +104,7 @@ def create_market(
 
 
 @frappe.whitelist(methods=["POST"])
+@market_validation_response
 def update_market(handle: str, **values) -> dict:
 	"""Writes only the fields sent: each control in the editor saves its own field."""
 	doc = get_market_for_update(handle)
@@ -125,7 +143,8 @@ class MarketChange:
 
 	def set_languages(self, codes: list[str]):
 		if not codes:
-			frappe.throw(_("Choose at least one language."), title=_("No Languages"))
+			with market_field("languages"):
+				frappe.throw(_("Choose at least one language."), title=_("No Languages"))
 		# The doctype adds a default missing from the list back, so a dropped default hands over.
 		if self.doc.default_language not in codes:
 			self.doc.default_language = codes[0]
@@ -207,23 +226,6 @@ def get_tax_templates() -> list[str]:
 		order_by="name",
 		pluck="name",
 	)
-
-
-def get_error_fields() -> dict[str, str]:
-	"""The field each Commera Market validation title belongs to, keyed by the title in the admin's
-	language, so the editor shows a refused save's message on that field."""
-	return {
-		_("Invalid Handle"): "handle",
-		_("No Countries"): "countries",
-		_("Country In Another Market"): "countries",
-		_("No Languages"): "languages",
-		_("Unpublished Language"): "languages",
-		_("Regional Language"): "languages",
-		_("Invalid Price List"): "sale_price_list",
-		_("Currency Mismatch"): "compare_at_price_list",
-		_("Invalid Tax Template"): TAX_TEMPLATE_FIELD,
-		_("URL Taken"): "urls",
-	}
 
 
 def parse_list(value) -> list[str]:
