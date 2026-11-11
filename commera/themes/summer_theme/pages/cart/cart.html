@@ -3,7 +3,8 @@
 {% from "components/macros/discount_codes.html" import discount_code_chips %}
 
 {% set in_source_language = get_localization().language == get_localization().default_language %}
-{% set currency_symbol = get_currency_symbol() %}
+{% set cart_currency = get_cart_currency() %}
+{% set currency_symbol = cart_currency.symbol %}
 
 {% block head %}
 	{{ super() }}
@@ -222,7 +223,7 @@
 				},
 
 				format_amount(amount) {
-					return (Number(amount) || 0).toFixed(2);
+					return (Number(amount) || 0).toFixed({{ cart_currency.precision }});
 				},
 
 				get subtotal() {

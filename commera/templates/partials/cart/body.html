@@ -1,3 +1,4 @@
+{% set cart_currency = get_cart_currency() %}
 {% set in_source_language = get_localization().language == get_localization().default_language %}
 {% from "templates/macros/discount_code_chips.html" import discount_code_chips %}
 
@@ -50,7 +51,7 @@
 	<div x-show="show_delivery_charges && $store.cart.free_delivery_shortfall > 0" x-transition>
 		{% call banner() %}
 		<div class="text-sm text-secondary-accent w-full text-center">
-			{{_('Add items worth')}} {{get_currency_symbol()}} <span x-text="($store.cart.free_delivery_shortfall || 0).toFixed(2)"></span>
+			{{_('Add items worth')}} {{ cart_currency.symbol }} <span x-text="($store.cart.free_delivery_shortfall || 0).toFixed({{ cart_currency.precision }})"></span>
 			{{_('more to get free delivery')}}
 		</div>
 		{% endcall %}
@@ -66,7 +67,7 @@
 		<h1 class="mb-4 text-3xl font-semibold">{{ _('Your bag') }}</h1>
 		<h3 class="text-lg font-medium flex">
 			{{ _('Total') }} (<span x-text="$store.cart.selected_count"></span><span class=""> &nbsp; {{ _('items') }}) </span>
-			<span x-show="$store.cart.is_priced_current">{{get_currency_symbol()}} <span x-text="cart_total.toFixed(2)" class="ps-0.5"></span></span>
+			<span x-show="$store.cart.is_priced_current">{{ cart_currency.symbol }} <span x-text="cart_total.toFixed({{ cart_currency.precision }})" class="ps-0.5"></span></span>
 			<span x-show="!$store.cart.is_priced_current" class="ps-0.5">{{ _("Updating…") }}</span>
 		</h3>
 	</div>
@@ -113,12 +114,12 @@
 									<div class="text-sm font-medium mt-2 md:mt-9 flex">
 										<template x-if="cart_item.default_price && parseFloat(cart_item.default_price) !== $store.cart.price_of(cart_item)">
 										<p class="text-sm font-medium line-through text-strikethrough me-2 flex">
-											{{get_currency_symbol()}}
-											<span x-text="parseFloat(cart_item.default_price).toFixed(2)"></span>
+											{{ cart_currency.symbol }}
+											<span x-text="parseFloat(cart_item.default_price).toFixed({{ cart_currency.precision }})"></span>
 										</p>
 									</template>
 									&nbsp;
-									<p class="flex">{{get_currency_symbol()}} <span x-text="$store.cart.price_of(cart_item).toFixed(2)"></span>
+									<p class="flex">{{ cart_currency.symbol }} <span x-text="$store.cart.price_of(cart_item).toFixed({{ cart_currency.precision }})"></span>
 											
 										</p>
 								</div>
@@ -208,13 +209,13 @@
 					<p class="text-base font-normal text-gray-400"><span x-text="$store.cart.selected_count"></span> {{
 						_('items') }}</p>
 
-					<p class="text-base font-medium flex">{{get_currency_symbol()}}<span x-text="($store.cart.priced?.items_total ?? $store.cart.total).toFixed(2)" class="me-2"></span>
+					<p class="text-base font-medium flex">{{ cart_currency.symbol }}<span x-text="($store.cart.priced?.items_total ?? $store.cart.total).toFixed({{ cart_currency.precision }})" class="me-2"></span>
 						</p>
 				</div>
 				<template x-for="(tax, index) in $store.cart.priced?.taxes ?? []" :key="index">
 					<div class="mb-3 flex items-center justify-between">
 						<span x-text="tax.description"></span>
-						<span>{{get_currency_symbol()}} <span x-text="tax.amount.toFixed(2)"></span></span>
+						<span>{{ cart_currency.symbol }} <span x-text="tax.amount.toFixed({{ cart_currency.precision }})"></span></span>
 					</div>
 				</template>
 				{{ discount_code_chips("$store.cart.discount_codes", "$store.cart.saving_code", "$store.cart.remove_discount_code", classes="mb-3") }}
@@ -223,13 +224,13 @@
 						<p class="text-base font-normal text-gray-400">
 							{{ _('Discount') }}<span x-show="discount.label" x-text="` (${discount.label})`"></span>
 						</p>
-						<p class="text-base font-medium flex text-green-700">&minus;{{get_currency_symbol()}}<span x-text="discount.amount.toFixed(2)"></span></p>
+						<p class="text-base font-medium flex text-green-700">&minus;{{ cart_currency.symbol }}<span x-text="discount.amount.toFixed({{ cart_currency.precision }})"></span></p>
 					</div>
 				</template>
 				<div class="mb-3 flex items-center justify-between">
 					<p class="text-base font-normal text-gray-400 capitalize">{{ _("non-refundable delivery charge") }}</p>
 					<div x-show="show_delivery_charges && $store.cart.selected_count >0">
-						<p class="text-base font-medium flex">{{get_currency_symbol()}}<span x-text="delivery_charge.toFixed(2)" ></span>
+						<p class="text-base font-medium flex">{{ cart_currency.symbol }}<span x-text="delivery_charge.toFixed({{ cart_currency.precision }})" ></span>
 							</p>
 					</div>
 					<div x-show="delivery_charge <= 0 || $store.cart.delivery_status === 'free'">
@@ -242,7 +243,7 @@
 				<div class="mb-3 flex items-center justify-between">
 					<p class="text-base font-normal text-gray-400"> {{
 						_('Total') }}</p>
-					<p class="text-base font-medium flex" x-show="$store.cart.is_priced_current">	{{get_currency_symbol()}}<span x-text="cart_total.toFixed(2)"></span>
+					<p class="text-base font-medium flex" x-show="$store.cart.is_priced_current">	{{ cart_currency.symbol }}<span x-text="cart_total.toFixed({{ cart_currency.precision }})"></span>
 					</p>
 					<p class="text-base font-medium flex" x-show="!$store.cart.is_priced_current && $store.cart.pricing_status !== 'failed'">{{ _("Updating…") }}</p>
 					<button type="button" class="text-base font-medium underline cursor-pointer" x-show="!$store.cart.is_priced_current && $store.cart.pricing_status === 'failed'"

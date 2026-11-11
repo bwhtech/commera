@@ -1,6 +1,7 @@
 {# The quantity stepper is hand-written with bootstrap-touchspin's own class names, so style.css still shapes it. #}
 
 {% set in_source_language = get_localization().language == get_localization().default_language %}
+{% set cart_currency = get_cart_currency() %}
 <div class="offcanvas dz-offcanvas offcanvas-end" tabindex="-1" role="dialog"
 	aria-label="{{ _('Cart') }}"
 	:class="cart_open ? 'show' : ''"
@@ -58,7 +59,7 @@
 															</span>
 														</div>
 													</div>
-													<h6 class="dz-price mb-0">{{ get_currency_symbol() }}<span x-text="($store.cart.price_of(cart_item) * cart_item.qty).toFixed(2)"></span></h6>
+													<h6 class="dz-price mb-0">{{ cart_currency.symbol }}<span x-text="($store.cart.price_of(cart_item) * cart_item.qty).toFixed({{ cart_currency.precision }})"></span></h6>
 												</div>
 											</div>
 											<a href="javascript:void(0);" class="dz-close"
@@ -73,7 +74,7 @@
 							<p class="text-center" x-show="!$store.cart.items.length">{{ _("Your cart is empty.") }}</p>
 							<div class="cart-total" x-show="$store.cart.items.length">
 								<h5 class="mb-0">{{ _("Subtotal") }}:</h5>
-								<h5 class="mb-0">{{ get_currency_symbol() }}<span x-text="$store.cart.total.toFixed(2)"></span></h5>
+								<h5 class="mb-0">{{ cart_currency.symbol }}<span x-text="$store.cart.total.toFixed({{ cart_currency.precision }})"></span></h5>
 							</div>
 							<div class="mt-auto">
 								<a href="{{ url('/cart/checkout') | e }}" class="btn btn-outline-secondary btn-block m-b20"
