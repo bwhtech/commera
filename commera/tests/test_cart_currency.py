@@ -1,9 +1,14 @@
 import frappe
+from frappe.auth import CookieManager
 from frappe.website.page_renderers.template_page import TemplatePage
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
+from commera.api.cart import get_detail_for_cart_items, update_variant
 from commera.api.payments import generate_quotation_for_cart
+from commera.api.server_cart import get_server_cart, sync_server_cart
+from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
+from commera.guest import GUEST_CART_COOKIE
 from commera.localization.cart_currency import CartCurrency
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context, render_theme_context
 from commera.shop_themes.theme_resolver import ThemePageRenderer
@@ -152,3 +157,62 @@ class TestLegacyCartCurrency(CartCurrencyTestCase):
 
 		self.assertIn(f'{self.store_symbol} <span x-text="commera.format.amount(checkout_total,', checkout)
 		self.assertIn(f'{self.store_symbol}<span x-text="commera.format.amount($store.cart.total,', cart)
+
+
+class TestGuestCartMarket(CartCurrencyTestCase):
+	def setUp(self):
+		super().setUp()
+		# nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
+		frappe.set_user("Administrator")
+		self.route = self.make_market_variant("GUESTDRAWER", market_sale=1234.50, market_compare_at=1500)
+		self.code = self.get_item_code(self.route)
+		self.unpriced = self.item("GUESTUNPRICED")
+		self.token = frappe.generate_hash(length=32)
+		frappe.cache.delete_keys("rl:*127.0.0.1*")
+		self.guest_request("AE")
+
+	def guest_request(self, country=None):
+		self.open_request("/api/v2/method/commera.api.server_cart.sync_server_cart")
+		frappe.local.request = Request(
+			EnvironBuilder(
+				path="/api/v2/method/commera.api.server_cart.sync_server_cart",
+				headers={"Cookie": f"{GUEST_CART_COOKIE}={self.token}"},
+			).get_environ()
+		)
+		frappe.local.cookie_manager = CookieManager()
+		frappe.local.request_ip = "127.0.0.1"
+		# nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
+		frappe.set_user("Guest")
+		frappe.local.form_dict = frappe._dict(_lang="en", _country=country)
+
+	def detail(self, code):
+		return get_detail_for_cart_items([{"variant": {"item_code": code}}])["stock_data"][code]
+
+	def test_guest_drawer_refresh_uses_the_request_market(self):
+		self.assertEqual(self.detail(self.code)["sale_price"], 1234.50)
+		self.assertEqual(self.detail(self.code)["default_price"], 1500)
+		self.assertIsNone(self.detail(self.unpriced)["sale_price"])
+		self.assertEqual(self.detail(self.unpriced)["stock"], 0)
+		self.guest_request()
+		self.assertEqual(self.detail(self.code)["sale_price"], 80)
+		self.assertEqual(self.detail(self.code)["default_price"], 100)
+
+	def test_guest_size_change_uses_market_prices_and_refuses_unpriced_sizes(self):
+		variant = frappe.db.get_value("Style Attribute Variant", {"route": self.route})
+		self.assertEqual(update_variant(variant, "M")["price"], 1234.50)
+		unpriced_variant = frappe.db.get_value("Color Size Item", {"item_code": self.unpriced}, "parent")
+		with self.assertRaisesRegex(frappe.ValidationError, "not available in this market"):
+			update_variant(unpriced_variant, "M")
+		self.guest_request()
+		self.assertEqual(update_variant(variant, "M")["price"], 80)
+
+	def test_guest_sync_saves_market_and_reload_keeps_market_prices(self):
+		sync_server_cart([{"item_code": self.code, "qty": 1}])
+		self.assertEqual(get_session_cart().market, "gulf")
+		self.guest_request("AE")
+		self.assertEqual(get_server_cart()["lines"][0]["price"], 1234.50)
+		self.assertEqual(self.detail(self.code)["sale_price"], 1234.50)
+		self.guest_request()
+		self.assertEqual(get_server_cart()["lines"][0]["price"], 80)
+		sync_server_cart([{"item_code": self.code, "qty": 2}], get_session_cart().version)
+		self.assertEqual(get_session_cart().market, "primary")

@@ -11,6 +11,7 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	get_session_cart,
 )
 from commera.discounts.selection import get_discount_codes
+from commera.localization import get_localization
 from commera.sdk import cart as cart_sdk
 from commera.www.cart.permalink import get_cart_lines
 
@@ -38,6 +39,7 @@ def sync_server_cart(items: list | str, version: str | None = None) -> dict:
 
 	changed = cart.set_quantities(quantities)
 	if cart.set_selection(selection) or changed or cart.is_new():
+		cart.move_to_market(get_localization().market.handle)
 		cart.save(ignore_permissions=True)
 	return {"version": cart.version}
 
