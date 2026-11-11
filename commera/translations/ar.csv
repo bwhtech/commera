@@ -1975,6 +1975,7 @@ Some items are out of stock:,بعض الأصناف غير متوفرة:
 Out Of Stock,غير متوفر
 Product not found.,المنتج غير موجود.
 Selected size not found.,المقاس المحدد غير موجود.
+Selected size is not available in this market.,المقاس المحدد غير متوفر في هذه السوق.
 "If that order number and email match an order, we have emailed you a link to it.",إذا كان رقم الطلب والبريد الإلكتروني يطابقان طلبًا، فقد أرسلنا إليك رابطًا إليه بالبريد الإلكتروني.
 Your order {0},طلبك {0}
 Open your order {0}: {1},افتح طلبك {0}: {1}
