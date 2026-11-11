@@ -829,6 +829,7 @@ def replace_placeholder_names(quotation, contact, billing_address: dict):
 def get_address_saved_response(quotation) -> dict:
 	return {
 		"message": _("Addresses updated successfully"),
+		"payment_methods": get_checkout_payment_methods(quotation),
 		"checkout_summary": get_checkout_summary(quotation),
 	}
 

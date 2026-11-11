@@ -8,9 +8,10 @@ const STARTER_SCRIPT = new URL(
 	import.meta.url,
 );
 
-function make_checkout_form() {
+function make_checkout_form(commera = {}) {
 	// The script resets its busy state on a back/forward restore, so the page needs `pageshow` too.
 	const context = {
+		commera,
 		addEventListener() {},
 		document: { addEventListener() {} },
 	};
@@ -76,4 +77,24 @@ test('the Starter checkout shows its skeleton only while a cart with lines loads
 		false,
 		'a guest without access is asked to sign in',
 	);
+});
+
+test('Starter refreshes methods and clears a stale selection after saving an address', async () => {
+	const form = make_checkout_form({
+		checkout: {
+			set_addresses: async () => ({ currency: 'AED' }),
+			list_shipping_options: async () => ({ options: [], reason: 'standard' }),
+			list_payment_methods: async () => [
+				{ id: 'Market gateway', title: 'Market gateway' },
+			],
+		},
+	});
+	form.payment_methods = [{ id: 'Store gateway' }];
+	form.payment_method = 'Store gateway';
+	await form.save_address();
+	assert.equal(form.error, '');
+	assert.equal(form.editing_address, false);
+	assert.equal(form.state.currency, 'AED');
+	assert.equal(form.payment_methods[0].id, 'Market gateway');
+	assert.equal(form.payment_method, '');
 });

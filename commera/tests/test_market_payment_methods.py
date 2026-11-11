@@ -1,14 +1,22 @@
 from unittest.mock import patch
 
 import frappe
+from frappe.auth import CookieManager
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request
 
 from commera.api.payments import (
 	COD_PAYMENT_MODE,
 	generate_quotation_for_cart,
 	get_checkout_payment_methods,
 	open_checkout,
+	update_quotation_address,
 )
+from commera.guest import get_guest_cart_name
+from commera.localization import resolve
 from commera.sdk import checkout as checkout_sdk
+from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context, render_theme_context
+from commera.shop_themes.theme_resolver import ThemePageRenderer
 from commera.tests.test_market_cart import MarketCartTestCase
 from commera.www.cart.checkout import get_context
 
@@ -36,6 +44,7 @@ class TestMarketPaymentMethods(MarketCartTestCase):
 		gateways.start()
 		self.addCleanup(gateways.stop)
 		item_code = self.item("PAYMENTS", market_sale=300)
+		self.item_code = item_code
 		self.sign_in_shopper()
 		self.add(item_code)
 
@@ -70,6 +79,75 @@ class TestMarketPaymentMethods(MarketCartTestCase):
 		self.assertEqual(context.payment_gateways, [ANY_CURRENCY_GATEWAY, MARKET_ONLY_GATEWAY])
 		self.assertEqual(context.show_cod, 1)
 		self.assertEqual(methods, [*context.payment_gateways, COD_PAYMENT_MODE])
+
+	def test_guest_theme_address_save_keeps_the_page_market(self):
+		context, script = self.render_guest_checkout("/en-ae/cart/checkout")
+
+		self.assertIn('_country: "ae"', script)
+		self.assertIn('_lang: "en"', script)
+		response, quotation = self.save_guest_address(_country="AE", _lang="en")
+
+		self.assertEqual(quotation.currency, self.currency)
+		self.assertEqual(response["payment_methods"], [*context.payment_gateways, COD_PAYMENT_MODE])
+
+	def test_address_save_returns_new_methods_when_the_market_changes_after_render(self):
+		context, _script = self.render_guest_checkout("/cart/checkout")
+		self.assertIn(LIMITED_GATEWAY, context.payment_gateways)
+
+		response, quotation = self.save_guest_address(_country="AE", _lang="en")
+
+		self.assertEqual(quotation.currency, self.currency)
+		self.assertEqual(
+			response["payment_methods"],
+			[ANY_CURRENCY_GATEWAY, MARKET_ONLY_GATEWAY, COD_PAYMENT_MODE],
+		)
+
+	def render_guest_checkout(self, path):
+		self.set_single("Commera Settings", "allow_guest_checkout", 1)
+		for name in ("request", "form_dict", "cookie_manager", "request_ip"):
+			self.addCleanup(setattr, frappe.local, name, getattr(frappe.local, name, None))
+		# nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
+		frappe.set_user("Guest")
+		frappe.local.request = Request(EnvironBuilder(path=path).get_environ())
+		frappe.local.form_dict = frappe._dict()
+		frappe.local.cookie_manager = CookieManager()
+		frappe.local.request_ip = "192.0.2.49"
+		frappe.local.request_cache.clear()
+		context = frappe._dict(localization=resolve(path)[0])
+		get_context(context, allow_guest=True)
+		theme = build_theme_context("Summer Theme")
+		with render_theme_context(theme):
+			renderer = ThemePageRenderer(path.strip("/"))
+			renderer.theme_dirs = theme["dirs"]
+			renderer.template_path = "pages/cart/checkout.html"
+			response = renderer.render()
+		self.assertEqual(response.status_code, 200)
+		return context, response.get_data(as_text=True)
+
+	def save_guest_address(self, **form):
+		frappe.local.request = Request(
+			EnvironBuilder(path="/api/v2/method/commera.api.payments.update_quotation_address").get_environ()
+		)
+		frappe.local.form_dict = frappe._dict(form)
+		frappe.local.request_cache.clear()
+		email = f"zz-market-guest-{frappe.generate_hash(length=8)}@example.com"
+		address = {
+			"billing_address": {
+				"first_name": "Market",
+				"last_name": "Guest",
+				"email": email,
+				"full_address": "1 Market Street",
+				"city": "Dubai",
+				"country": "United Arab Emirates",
+				"phone_number": "+971500000001",
+			},
+			"shipping_same_as_billing": True,
+		}
+		cart = {"items": [{"variant": {"item_code": self.item_code}, "qty": 1}]}
+		response = update_quotation_address(address, cart)
+		token = frappe.local.cookie_manager.cookies["commera_guest_cart"]["value"]
+		quotation = frappe.get_doc("Quotation", get_guest_cart_name(frappe.utils.sha256_hash(token)))
+		return response, quotation
 
 	def test_a_market_currency_the_gateway_cannot_charge_hides_it(self):
 		with self.in_market():

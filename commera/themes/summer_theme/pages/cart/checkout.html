@@ -446,27 +446,27 @@
 
 						<div x-show="address_saved" x-cloak>
 							<div class="accordion dz-accordion accordion-sm">
-								{% for gateway_name in payment_gateways %}
+								<template x-for="(gateway_name, index) in config.payment_gateways" :key="gateway_name">
 									<div class="accordion-item">
 										<div class="accordion-header">
 											<div class="accordion-button custom-control custom-checkbox border-0"
-												:class='payment_mode !== {{ gateway_name | tojson }} && "collapsed"'
-												@click='payment_mode = {{ gateway_name | tojson }}'>
+												:class='payment_mode !== gateway_name && "collapsed"'
+												@click='payment_mode = gateway_name'>
 												<input class="form-check-input radio" type="radio" name="payment_mode"
-													id="payment_mode_{{ loop.index }}" value="{{ gateway_name }}" x-model="payment_mode">
-												<label class="form-check-label" for="payment_mode_{{ loop.index }}">{{ _(gateway_name) }}</label>
+													:id="'payment_mode_' + index" :value="gateway_name" x-model="payment_mode">
+												<label class="form-check-label" :for="'payment_mode_' + index" x-text="gateway_name"></label>
 											</div>
 										</div>
 										<div class="accordion-collapse collapse"
-											:class='payment_mode === {{ gateway_name | tojson }} && "show"'>
+											:class='payment_mode === gateway_name && "show"'>
 											<div class="accordion-body">
 												<p class="m-b0">{{ _("You will be redirected to the secure payment page to complete your order.") }}</p>
 											</div>
 										</div>
 									</div>
-								{% endfor %}
+								</template>
 
-								{% if show_cod %}
+								<template x-if="config.show_cod">
 									<div class="accordion-item">
 										<div class="accordion-header">
 											<div class="accordion-button custom-control custom-checkbox border-0"
@@ -486,7 +486,7 @@
 											</div>
 										</div>
 									</div>
-								{% endif %}
+								</template>
 							</div>
 
 							<p class="text">
@@ -702,6 +702,12 @@
 					return (Number(amount) || 0).toFixed(2);
 				},
 
+				set_payment_methods(methods) {
+					this.config.payment_gateways = methods.filter((method) => method !== COD_PAYMENT_MODE);
+					this.config.show_cod = methods.includes(COD_PAYMENT_MODE);
+					if (!methods.includes(this.payment_mode)) this.payment_mode = null;
+				},
+
 				get available_payment_modes() {
 					const payment_modes = this.config.payment_gateways.slice();
 					if (this.config.show_cod) payment_modes.push(COD_PAYMENT_MODE);
@@ -905,6 +911,7 @@
 						// Saving an address clears the delivery option on the server, so the one shown here is gone too.
 						this.reset_address_step();
 						this.show_summary(response.data.checkout_summary);
+						this.set_payment_methods(response.data.payment_methods);
 						this.address_step = "saved";
 						await this.load_shipping_options();
 					} catch (error) {
