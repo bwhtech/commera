@@ -29,6 +29,12 @@ const OPPOSITE = {
 
 export function mirrorStyle(style, context) {
 	const column = isColumn(style);
+	if (typeof style.transform === 'string') {
+		style.transform = style.transform.replace(
+			/translateX\(\s*(-?[\d.]+)([^)]*)\)/g,
+			(_match, amount, unit) => `translateX(${-Number(amount)}${unit})`,
+		);
+	}
 	if (!column) {
 		style.flexDirection =
 			style.flexDirection === 'row-reverse' ? 'row' : 'row-reverse';

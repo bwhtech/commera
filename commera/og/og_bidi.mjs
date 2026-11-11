@@ -1,7 +1,7 @@
-// Satori shapes each run with HarfBuzz, but it places words left to right and ignores `direction`.
-// Before Satori runs, this puts right-to-left text into words in visual order and, on a
-// right-to-left card, mirrors the layout.
+// Satori shapes logical runs with HarfBuzz but ignores paragraph direction.
+// Resolve visual run order and mirror right-to-left layouts before rendering.
 
+import bidiFactory from 'bidi-js';
 import { isColumn, mirrorStyle } from './og_mirror.mjs';
 
 export const ARABIC_FONT = 'IBM Plex Sans Arabic';
@@ -9,22 +9,8 @@ export const HEBREW_FONT = 'IBM Plex Sans Hebrew';
 
 const RTL_CHAR = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
 const HEBREW_CHAR = /[\u0590-\u05FF\uFB1D-\uFB4F]/;
-const LETTER = /\p{L}/u;
-const DIGIT = /\p{Nd}/u;
-// Leading punctuation, the word, trailing punctuation: "(مقاس" is "(" and "مقاس".
-const WORD_PARTS = /^([^\p{L}\p{N}]*)(.*?)([^\p{L}\p{N}]*)$/su;
-// Open Sans and IBM Plex both draw a space about a quarter of an em wide.
 const WORD_GAP = '0.26em';
-const MIRRORED = {
-	'(': ')',
-	')': '(',
-	'[': ']',
-	']': '[',
-	'{': '}',
-	'}': '{',
-	'<': '>',
-	'>': '<',
-};
+const bidi = bidiFactory();
 
 export function hasRtlText(text) {
 	return RTL_CHAR.test(text);
@@ -60,10 +46,17 @@ class BidiTree {
 		}
 
 		const style = { ...(node.props.style || {}) };
-		if (this.rtl) {
+		const noMirror =
+			context.noMirror ||
+			node.props['data-og-no-mirror'] !== undefined ||
+			style.flexDirection === 'row-reverse' ||
+			style.textAlign === 'right' ||
+			style.direction === 'rtl';
+		if (this.rtl && !noMirror) {
 			mirrorStyle(style, context);
 		}
 		const childContext = {
+			noMirror,
 			textAlign: style.textAlign ?? context.textAlign,
 			fontFamily: style.fontFamily ?? context.fontFamily,
 			inColumn: isColumn(style),
@@ -84,159 +77,81 @@ class BidiTree {
 /** One text node as a wrapping row of words, each run in its own direction. */
 class Paragraph {
 	constructor(text, rtl, context) {
+		this.text = text;
 		this.rtl = rtl;
 		this.context = context;
-		this.tokens = tokenize(text);
-		resolveDirections(this.tokens, rtl);
 	}
 
 	render() {
-		const pieces = groupRuns(this.tokens).flatMap((run) => {
-			if (run.rtl === this.rtl) {
-				return run.tokens.map((token) => ({
-					node: this.tokenNode(token),
-					space: token.space,
-				}));
+		const pieces = visualRuns(this.text, this.rtl).map(({ text, level }) => {
+			const style = {};
+			if (hasRtlText(text)) {
+				const font = HEBREW_CHAR.test(text) ? HEBREW_FONT : ARABIC_FONT;
+				style.fontFamily = `'${font}', ${
+					this.context.fontFamily || 'OpenSans'
+				}`;
 			}
-			const node = run.rtl
-				? this.rightToLeftRun(run.tokens)
-				: this.leftToRightRun(run.tokens);
-			return [{ node, space: run.tokens.at(-1).space }];
+			if (/^\s+$/.test(text)) {
+				return {
+					type: 'div',
+					props: { style: { width: WORD_GAP }, children: '' },
+				};
+			}
+			// HarfBuzz reverses Arabic-script digits even in an even-level run.
+			const children =
+				/[\u0660-\u0669\u06f0-\u06f9]/.test(text) && !(level & 1)
+					? text
+							.match(
+								/[\u0660-\u0669\u06f0-\u06f9]|[^\u0660-\u0669\u06f0-\u06f9]+/g,
+							)
+							.map((char) => ({ type: 'div', props: { children: char } }))
+					: text;
+			if (Array.isArray(children)) Object.assign(style, { display: 'flex' });
+			return { type: 'div', props: { style, children } };
 		});
-		const words = joinWords(pieces).map(({ nodes, space }) =>
-			withGap(
-				nodes.length > 1 ? row(nodes, this.rtl, {}) : nodes[0],
-				space,
-				this.rtl,
-			),
-		);
-		const justifyContent = justifyFor(this.context.textAlign, this.rtl);
-		return row(words, this.rtl, { flexWrap: 'wrap', justifyContent });
-	}
-
-	leftToRightRun(tokens) {
-		// One text node, so Satori wraps a long Latin run by itself.
-		const last = tokens.length - 1;
-		const text = tokens
-			.map(
-				(token, index) => token.text + (token.space && index < last ? ' ' : ''),
-			)
-			.join('');
-		return { type: 'div', props: { style: {}, children: text } };
-	}
-
-	rightToLeftRun(tokens) {
-		const last = tokens.length - 1;
-		const items = tokens.map((token, index) =>
-			withGap(this.tokenNode(token), token.space && index < last, true),
-		);
-		return row(items, true, {});
-	}
-
-	tokenNode(token) {
-		const style = {};
-		if (hasRtlText(token.text)) {
-			const font = HEBREW_CHAR.test(token.text) ? HEBREW_FONT : ARABIC_FONT;
-			const inherited = this.context.fontFamily;
-			style.fontFamily = inherited ? `'${font}', ${inherited}` : `'${font}'`;
-		}
-		// HarfBuzz reads Arabic-Indic digits as right-to-left text, so each digit is placed on its own.
-		if (token.type === 'EN' && hasRtlText(token.text)) {
-			const digits = [...token.text].map((digit) => ({
-				type: 'div',
-				props: { style: {}, children: digit },
-			}));
-			return row(digits, false, style);
-		}
-		// HarfBuzz shapes a lone bracket left to right, so a right-to-left one is mirrored here.
-		const text =
-			token.rtl && token.type === 'N'
-				? [...token.text].map((c) => MIRRORED[c] ?? c).join('')
-				: token.text;
-		return { type: 'div', props: { style, children: text } };
+		return row(pieces, false, {
+			flexWrap: 'wrap',
+			justifyContent:
+				this.context.textAlign === 'center'
+					? 'center'
+					: this.rtl
+					  ? 'flex-end'
+					  : 'flex-start',
+		});
 	}
 }
 
-/** Pieces with no space between them, such as a word and its brackets, wrap as one. */
-function joinWords(pieces) {
-	const words = [];
-	let word = null;
-	for (const piece of pieces) {
-		if (!word) {
-			word = { nodes: [], space: false };
-			words.push(word);
-		}
-		word.nodes.push(piece.node);
-		word.space = piece.space;
-		if (piece.space) {
-			word = null;
-		}
-	}
-	return words;
-}
-
-function tokenize(text) {
-	const tokens = [];
-	for (const word of text.trim().split(/\s+/)) {
-		// Each punctuation mark takes its own place: ")." reads "(." in right-to-left order.
-		const [, leading, core, trailing] = WORD_PARTS.exec(word);
-		const parts = [...leading, core, ...trailing].filter(Boolean);
-		tokens.push(
-			...parts.map((part) => ({
-				text: part,
-				type: bidiType(part),
-				space: false,
-			})),
-		);
-		tokens.at(-1).space = true;
-	}
-	tokens.at(-1).space = false;
-	return tokens;
-}
-
-function bidiType(text) {
-	for (const char of text) {
-		if (LETTER.test(char)) {
-			return RTL_CHAR.test(char) ? 'R' : 'L';
-		}
-	}
-	return DIGIT.test(text) ? 'EN' : 'N';
-}
-
-/** Sets `token.rtl`: Unicode's bidi rules W7, N1 and N2, applied to whole words. */
-function resolveDirections(tokens, paragraphRtl) {
-	let previousStrong = null;
-	for (const token of tokens) {
-		if (token.type === 'R' || token.type === 'L') {
-			previousStrong = token.type;
-			token.rtl = token.type === 'R';
-		} else if (token.type === 'EN') {
-			// A number after left-to-right text joins it; otherwise it sits in the right-to-left order.
-			token.rtl = previousStrong ? previousStrong === 'R' : paragraphRtl;
-		}
-	}
-	for (const [index, token] of tokens.entries()) {
-		if (token.type !== 'N') {
-			continue;
-		}
-		const before =
-			tokens.slice(0, index).findLast((other) => other.type !== 'N')?.rtl ??
-			paragraphRtl;
-		const after =
-			tokens.slice(index + 1).find((other) => other.type !== 'N')?.rtl ??
-			paragraphRtl;
-		token.rtl = before === after ? before : paragraphRtl;
-	}
-}
-
-function groupRuns(tokens) {
+/** UAX #9 levels and L1/L2 reordering precede grouping for HarfBuzz shaping. */
+export function visualRuns(text, rtl) {
+	const embedding = bidi.getEmbeddingLevels(text, rtl ? 'rtl' : 'ltr');
+	const indices = bidi.getReorderedIndices(text, embedding);
+	const mirrors = bidi.getMirroredCharactersMap(text, embedding.levels);
 	const runs = [];
-	for (const token of tokens) {
+	for (const index of indices) {
+		const char = text[index];
+		if (/[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(char)) continue;
+		const level = embedding.levels[index];
 		const last = runs.at(-1);
-		if (last && last.rtl === token.rtl) {
-			last.tokens.push(token);
+		const step = level & 1 ? -1 : 1;
+		const space = /\s/.test(char);
+		const bracket = bidi.getMirroredCharacter(char);
+		if (
+			last &&
+			last.level === level &&
+			index === last.index + step &&
+			(!(level & 1) ||
+				(!bracket && !last.bracket && space === last.space && !space))
+		) {
+			last.text = level & 1 ? char + last.text : last.text + char;
+			last.index = index;
 		} else {
-			runs.push({ rtl: token.rtl, tokens: [token] });
+			runs.push({
+				text: mirrors.get(index) || char,
+				level,
+				index,
+				space,
+				bracket,
+			});
 		}
 	}
 	return runs;
@@ -248,20 +163,4 @@ function row(children, rtl, style) {
 		type: 'div',
 		props: { style: { display: 'flex', flexDirection, ...style }, children },
 	};
-}
-
-function withGap(item, space, rtlRow) {
-	// The gap goes after the word in reading order: on its left in a right-to-left row.
-	if (space) {
-		item.props.style[rtlRow ? 'marginLeft' : 'marginRight'] = WORD_GAP;
-	}
-	return item;
-}
-
-function justifyFor(textAlign, rtl) {
-	if (textAlign === 'center') {
-		return 'center';
-	}
-	const towardRight = textAlign === 'right' || textAlign === 'end';
-	return towardRight === rtl ? 'flex-start' : 'flex-end';
 }

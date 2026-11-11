@@ -122,9 +122,46 @@ class TestRightToLeftCards(IntegrationTestCase):
 			visual_order(rtl_title, "rtl"),
 			[".", "(", "42", "مقاس", ")", "درهم", "499", "بسعر", "Nike Air Max 270", "حذاء"],
 		)
-		self.assertEqual(visual_order(ltr_title, "ltr"), ["Linen", "shirt", "2024", "الكتان", "قميص"])
+		self.assertEqual(visual_order(ltr_title, "ltr"), ["Linen shirt ", "2024", "الكتان", "قميص"])
 		# Arabic-Indic digits read left to right too.
 		self.assertEqual(visual_order("<div>سعر \u0661\u0662</div>", "rtl"), ["\u0661", "\u0662", "سعر"])
+
+	def test_brackets_digits_and_brands(self):
+		cases = (
+			("حذاء Nike (Air Max) الرياضي", ["الرياضي", "Nike (Air Max)", "حذاء"]),
+			("حذاء Nike ١٢ الرياضي", ["الرياضي", "\u0661", "\u0662", "Nike", "حذاء"]),
+			("حذاء Nike ۱۲ الرياضي", ["الرياضي", "Nike ", "\u06f1", "\u06f2", "حذاء"]),
+			("حذاء Nike 12 الرياضي", ["الرياضي", "Nike 12", "حذاء"]),
+			("حذاء Nike (Air [Max]) الرياضي", ["الرياضي", "Nike (Air [Max])", "حذاء"]),
+			("حذاء Nike-Air, Inc. الرياضي", ["الرياضي", ".", "Nike-Air, Inc", "حذاء"]),
+			("Nike (Air Max) 12", ["Nike (Air Max) 12"]),
+		)
+		for text, expected in cases:
+			with self.subTest(text=text):
+				self.assertEqual(visual_order(f"<div>{text}</div>", "rtl"), expected)
+
+	def test_custom_centered_element_stays_centered(self):
+		html_str = """<div style="display:flex;width:1200px;height:630px;background:white">
+		<div style="display:flex;position:absolute;left:50%;top:100px;transform:translateX(-50%);
+		width:100px;height:100px;background:red"></div></div>"""
+		with pin_localization(resolve("/ar")[0]):
+			card = Image.open(BytesIO(generator.render_og_png(html_str, 1200, 630))).convert("RGB")
+		self.assertEqual(card.getpixel((550, 120)), (255, 0, 0))
+		self.assertEqual(card.getpixel((649, 120)), (255, 0, 0))
+		self.assertEqual(card.getpixel((650, 120)), (255, 255, 255))
+
+	def test_direction_aware_templates_keep_their_layout(self):
+		for marker, direction, red_x in (
+			('data-og-no-mirror="true"', "row", 50),
+			("", "row-reverse", 1150),
+		):
+			html_str = f"""<div {marker} style="display:flex;flex-direction:{direction};
+			width:1200px;height:630px;background:white">
+			<div style="display:flex;width:100px;height:100px;background:red"></div></div>"""
+			with pin_localization(resolve("/ar")[0]):
+				card = Image.open(BytesIO(generator.render_og_png(html_str, 1200, 630))).convert("RGB")
+			self.assertEqual(card.getpixel((red_x, 50)), (255, 0, 0))
+			self.assertEqual(card.getpixel((1200 - red_x, 50)), (255, 255, 255))
 
 	def test_a_right_to_left_store_card_has_its_own_cache_file(self):
 		self.addCleanup(setattr, frappe.local.flags, "redirect_location", None)

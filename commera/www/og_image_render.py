@@ -18,6 +18,9 @@ from commera.og.generator import (
 	variant_primary_image_url,
 )
 
+# Bump whenever fonts, layout or text rendering change.
+RENDERER_VERSION = 2
+
 CACHE_SUBDIR = "og-cache"
 STORE_CARD_ROUTE = "store"
 # `?price=none` asks for a card without the store price, for pages of a secondary market.
@@ -101,7 +104,9 @@ def cache_file_path(route, version):
 	cache_dir = os.path.join(get_files_path(is_private=False), CACHE_SUBDIR)
 	os.makedirs(cache_dir, exist_ok=True)
 	# NOT frappe.generate_hash: it ignores its input and returns a random token, which defeats the cache.
-	key = hashlib.md5(f"{route}-{version}".encode(), usedforsecurity=False).hexdigest()[:16]
+	key = hashlib.md5(f"{RENDERER_VERSION}-{route}-{version}".encode(), usedforsecurity=False).hexdigest()[
+		:16
+	]
 	return os.path.join(cache_dir, f"{key}.png")
 
 
