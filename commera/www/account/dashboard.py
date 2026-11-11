@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 from commera.utils import get_addresses
 
@@ -16,7 +17,7 @@ def get_context(context):
 	context.billing_address = billing_addresses
 	context.breadcrumbs = [
 		{
-			"label": "My Account",
+			"label": _("My Account"),
 			"href": "#",
 		}
 	]

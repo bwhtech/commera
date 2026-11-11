@@ -79,30 +79,31 @@ class TestLegacyTitleReaders(ProductDetailPriceTestCase):
 		for theme in ("Summer Theme", "Shop Default Theme"):
 			with self.subTest(theme):
 				activate_theme(theme)
-				html = self.render_page(f"/ar/products/{self.route}")
+				html = render_page(self, f"/ar/products/{self.route}")
 				self.assertIn("قميص &amp; كتان", html)
 				self.assertIn(ARABIC_DESCRIPTION, html)
 				# frappe_call asks the server for replies in the page's language.
 				self.assertIn('const page_language = "ar";', html)
-				english = self.render_page(f"/products/{self.route}")
+				english = render_page(self, f"/products/{self.route}")
 				self.assertIn(self.product.display_name, english)
 				self.assertIn("const page_language = null;", english)
 
 	def card(self):
 		return utils.get_product_list(product_list=[self.product.name], page_length=1)[0]
 
-	def render_page(self, path):
-		"""The HTML a guest gets for `path`, routed and localized as a real request."""
-		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
-		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
-		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
-		self.addCleanup(frappe.clear_cache)
-		frappe.local.request = Request(EnvironBuilder(path=path).get_environ())
-		frappe.local.form_dict = frappe._dict()
-		frappe.local.request_cache.clear()
-		frappe.set_user("Guest")
-		try:
-			localize_request()
-			return get_response_content(frappe.local.request.path)
-		finally:
-			frappe.set_user("Administrator")
+
+def render_page(test, path):
+	"""The HTML a guest gets for `path`, routed and localized as a real request."""
+	test.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
+	test.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+	test.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
+	test.addCleanup(frappe.clear_cache)
+	frappe.local.request = Request(EnvironBuilder(path=path).get_environ())
+	frappe.local.form_dict = frappe._dict()
+	frappe.local.request_cache.clear()
+	frappe.set_user("Guest")
+	try:
+		localize_request()
+		return get_response_content(frappe.local.request.path)
+	finally:
+		frappe.set_user("Administrator")

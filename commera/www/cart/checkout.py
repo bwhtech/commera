@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from frappe.query_builder import DocType
 from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cstr
@@ -79,11 +80,11 @@ def get_context(context, allow_guest: bool = False):
 	context.cod_charge_applicable_below, context.cod_charge = get_cod_configuration()
 	context.breadcrumbs = [
 		{
-			"label": "Cart",
+			"label": _("Cart"),
 			"href": url("/cart/"),
 		},
 		{
-			"label": "Checkout",
+			"label": _("Checkout"),
 			"href": "#",
 		},
 	]

@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from frappe.utils import flt
 from frappe.utils.caching import redis_cache
 
@@ -87,7 +88,7 @@ def get_context(context):
 	context.price_range = price_range
 	context.breadcrumbs = [
 		{
-			"label": "Products",
+			"label": _("Products"),
 			"href": "#",
 		}
 	]

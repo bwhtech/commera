@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from frappe.utils.data import get_datetime
 
 from commera import seo
@@ -50,9 +51,10 @@ def get_context(context):
 	context.size_chart = get_size_chart(product.brand, product_variant.item_group)
 	context.item_qty = get_available_stock(product.item_code, detail["warehouse"])
 	context.reviews = get_reviews_for_context(product_variant.name)
+	# Labels in the page language: the templates and the breadcrumb JSON-LD print them as they are.
 	context.breadcrumbs = [
-		{"label": "Products", "href": url("/products/")},
-		{"label": product_variant.display_name, "href": ""},
+		{"label": _("Products"), "href": url("/products/")},
+		{"label": context.product_title, "href": ""},
 	]
 
 	add_seo(context, detail, content)

@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 from commera.localization import url
 from commera.utils import get_addresses, get_country_list
@@ -14,11 +15,11 @@ def get_context(context):
 	context.country_list = get_country_list()
 	context.breadcrumbs = [
 		{
-			"label": "My Account",
+			"label": _("My Account"),
 			"href": url("/account/"),
 		},
 		{
-			"label": "Address",
+			"label": _("Address"),
 			"href": "#",
 		},
 	]
