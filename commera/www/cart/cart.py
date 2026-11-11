@@ -2,7 +2,6 @@ from frappe import _
 
 from commera.localization.cart_currency import get_cart_delivery_configuration
 
-
 no_cache = True
 
 

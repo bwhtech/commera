@@ -79,7 +79,7 @@ class TestCartCurrency(CartCurrencyTestCase):
 
 		self.open_request("/cart")
 		self.assertEqual(CartCurrency.of(quotation).code, self.currency)
-		self.assertEqual(CartCurrency.of(quotation).amount(3499), "3,499.00")
+		self.assertEqual(CartCurrency.of(quotation).amount(3499), "3499.00")
 
 
 class TestSummerCartCurrency(CartCurrencyTestCase):
@@ -88,7 +88,7 @@ class TestSummerCartCurrency(CartCurrencyTestCase):
 
 		html = self.render_summer("pages/cart/checkout.html", "/en-ae/cart/checkout")
 
-		self.assertIn(self.summary_subtotal(self.market_symbol, "3,499.00"), html)
+		self.assertIn(self.summary_subtotal(self.market_symbol, "3499.00"), html)
 		self.assertIn(self.drawer_total(self.market_symbol), html)
 		self.assertIn("commera.format.amount(", html)
 		self.assertNotIn(f'<td class="price">{self.store_symbol}', html)

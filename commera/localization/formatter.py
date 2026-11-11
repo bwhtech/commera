@@ -2,6 +2,7 @@
 and packages/storefront/test/formatter-cases.json holds the cases both must pass."""
 
 import datetime
+from html import escape
 
 import frappe
 from babel.dates import format_date
@@ -37,7 +38,7 @@ class Formatter:
 			precision = get_money_precision(currency)
 		formatted = fmt_money(flt(amount), precision=precision, currency=currency, format=self.number_format)
 		sign, digits = split_sign(strip_fmt_money_symbol(formatted, currency))
-		symbol = get_currency_symbol(currency)
+		symbol = get_html_currency_symbol(currency)
 		if self.language.direction == "rtl":
 			return f"{sign}{digits}{NO_BREAK_SPACE}{symbol.strip()}"
 		return f"{sign}{symbol}{digits}"
@@ -101,3 +102,8 @@ def get_language_number_format(code: str) -> str:
 		return get_number_format(code).string
 	except frappe.DoesNotExistError:
 		return frappe.db.get_default("number_format") or DEFAULT_NUMBER_FORMAT
+
+
+def get_html_currency_symbol(currency: str) -> str:
+	symbol = get_currency_symbol(currency)
+	return symbol if currency == "SAR" else escape(symbol)

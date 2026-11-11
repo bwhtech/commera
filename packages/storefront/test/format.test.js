@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { afterEach, test } from 'node:test';
-import { date, money, money_text, number } from '../format.js';
+import { amount, date, money, money_text, number } from '../format.js';
 import { format_number } from '../formatter.js';
 
 const cases = JSON.parse(
@@ -86,23 +86,47 @@ test('money and dates read the resolved rules and the page direction', () => {
 	assert.equal(date('2026-03-05'), '5 mar');
 });
 
-test('storefront amount uses document precision and Frappe separators', async () => {
-	const { amount } = await import('../format.js');
-	const rules = {
-		number_format: '#,##,###.##',
-		precision: 2,
-		fraction_precision: 2,
+test('storefront amounts keep fixed decimals regardless of number format', () => {
+	for (const number_format of ['#,##,###.##', '#.###,##']) {
+		assert.equal(
+			amount(123456.78, { number_format, precision: 2 }),
+			'123456.78',
+		);
+		assert.equal(amount(123, { number_format, precision: 3 }), '123.000');
+	}
+});
+
+test('cart executes its formatter and keeps develop primary output', () => {
+	const template = readFileSync(
+		new URL(
+			'../../../commera/themes/summer_theme/pages/cart/cart.html',
+			import.meta.url,
+		),
+		'utf8',
+	);
+	const method = template.match(
+		/format_amount\(amount\) \{([\s\S]*?)\n\s*\}/,
+	)[1];
+	const source = method.replace(
+		/\{\{ cart_currency.config \| tojson \}\}/g,
+		'{"precision":2}',
+	);
+	const format = new Function('amount', 'commera', source);
+	for (const value of [123456.78, 123456.789, 0]) {
+		assert.equal(
+			format(value, { format: { amount } }),
+			Number(value || 0).toFixed(2),
+		);
+	}
+});
+
+test('all HTML money paths escape ordinary symbols and trust only the SAR icon', () => {
+	const symbol = '<img src=x onerror=alert(1)> & "currency"';
+	globalThis.commera_storefront_config = {
+		currency_symbols: { USD: symbol, SAR: symbol },
 	};
-	assert.equal(amount(123456.78, rules), '1,23,456.78');
-	assert.equal(
-		amount(123456.78, { ...rules, number_format: '#.###,##' }),
-		'123.456,78',
-	);
-	assert.equal(amount(123.456, { ...rules, precision: 3 }), '123.456');
-	assert.equal(amount(123, { ...rules, precision: 3 }), '123.00');
-	assert.equal(
-		amount(123, { ...rules, precision: 3, fraction_precision: 3 }),
-		'123.000',
-	);
-	assert.equal(amount(123.456, rules), '123.46');
+	const expected =
+		'&lt;img src=x onerror=alert(1)&gt; &amp; &quot;currency&quot;';
+	assert.equal(money(10, 'USD'), `${expected}10.00`);
+	assert.equal(money(10, 'SAR'), `${expected}10.00`);
 });

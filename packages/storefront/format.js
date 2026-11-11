@@ -1,4 +1,4 @@
-import { Formatter, format_number } from './formatter.js';
+import { Formatter } from './formatter.js';
 
 export { Formatter };
 
@@ -13,12 +13,7 @@ export function money_text(amount, currency) {
 
 // Storefront templates supply the document's rules, including historical order currencies.
 export function amount(value, rules) {
-	return format_number(
-		value,
-		rules.number_format,
-		rules.precision,
-		rules.fraction_precision,
-	);
+	return (Number(value) || 0).toFixed(rules.precision);
 }
 
 export function number(value, precision = 0) {

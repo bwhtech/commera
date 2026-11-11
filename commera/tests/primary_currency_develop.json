@@ -5,11 +5,6 @@
     "before": "{% macro card_price(amount, original_amount=0, discount=0) -%}\n{{- get_currency_symbol() }}{{ frappe.utils.fmt_money(amount or 0, precision=2) -}}\n{%- if discount %}<del>{{ get_currency_symbol() }}{{ frappe.utils.fmt_money(original_amount or 0, precision=2) }}</del>{% endif -%}\n{%- endmacro %}"
   },
   {
-    "template": "themes/summer_theme/pages/cart/cart.html",
-    "marker": "x-text=\"format_amount(subtotal)\"",
-    "before": "<td class=\"price\">{{ currency_symbol }}<span x-text=\"format_amount(subtotal)\"></span></td>"
-  },
-  {
     "template": "themes/summer_theme/pages/cart/checkout.html",
     "marker": "x-text=\"format_amount(active_summary.items_total ?? active_summary.subtotal)\"",
     "before": "<td class=\"price\">{{ currency_symbol }}<span x-text=\"format_amount(active_summary.items_total ?? active_summary.subtotal)\">{{ \"%.2f\" | format(checkout_summary.items_total or checkout_summary.subtotal or 0) }}</span></td>"

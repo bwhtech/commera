@@ -48,7 +48,7 @@ export class Formatter {
 			amount,
 			currency,
 			precision,
-			this.symbol(currency),
+			this.html_symbol(currency),
 		);
 	}
 
@@ -65,7 +65,7 @@ export class Formatter {
 	// Report figures: 4.8L or 482.3K, in the language's words, with the number format's separators.
 	compact_money(amount, currency) {
 		const [sign, digits] = split_sign(this.compact(amount, this.number_format));
-		return this.join(sign, digits, this.symbol(currency));
+		return this.join(sign, digits, this.html_symbol(currency));
 	}
 
 	number(value, precision = 0) {
@@ -113,6 +113,14 @@ export class Formatter {
 			return `${sign}${digits}${NO_BREAK_SPACE}${symbol.trim()}`;
 		}
 		return `${sign}${symbol}${digits}`;
+	}
+
+	html_symbol(currency) {
+		const symbol = this.symbol(currency);
+		if ((currency || this.store_currency) === 'SAR' && symbol === SAR_ICON) {
+			return SAR_ICON;
+		}
+		return symbol.replace(/[&<>"']/g, (character) => HTML_ENTITIES[character]);
 	}
 
 	symbol(currency) {
@@ -250,3 +258,12 @@ function group_digits(whole, group_size) {
 	groups.unshift(rest);
 	return groups;
 }
+
+const SAR_ICON = '<span class="saudi-currency-symbol pe-0.5"></span>';
+const HTML_ENTITIES = {
+	'&': '&amp;',
+	'<': '&lt;',
+	'>': '&gt;',
+	'"': '&quot;',
+	"'": '&#x27;',
+};
