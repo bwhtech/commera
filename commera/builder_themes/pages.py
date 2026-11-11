@@ -14,9 +14,9 @@ PAGE_TYPE_BY_TEMPLATE = {
 }
 
 STOREFRONT_PATHS = {
-	HOME: "/en",
-	PRODUCT_LISTING: "/en/products",
-	PRODUCT_DETAIL: "/en/products/<product handle>",
+	HOME: "/",
+	PRODUCT_LISTING: "/products",
+	PRODUCT_DETAIL: "/products/<product handle>",
 }
 
 

@@ -21,6 +21,7 @@ from commera.builder_themes.pages import (
 )
 from commera.builder_themes.renderer import BuilderThemePageRenderer
 from commera.builder_themes.theme import create_builder_theme
+from commera.localization.urls import url
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 
 THEME = "Test Builder Theme"
@@ -75,11 +76,11 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 	def test_builder_page_data_carries_shop_and_page_data(self):
 		page = frappe.get_doc("Builder Page", self.pages[HOME])
 		data = page.get_page_data()["commera"]
-		self.assertEqual(data["shop"]["cart_url"], "/en/cart")
+		self.assertEqual(data["shop"]["cart_url"], url("/cart"))
 		self.assertTrue(data["featured_products"])
 		card = data["featured_products"][0]
 		self.assertIsInstance(card["price"], str)
-		self.assertTrue(card["url"].startswith("/en/products/"))
+		self.assertTrue(card["url"].startswith(url("/products") + "/"))
 
 	def test_page_outside_every_theme_gets_no_data(self):
 		page = frappe.get_doc({"doctype": "Builder Page", "page_title": "Plain"}).insert()
@@ -91,7 +92,7 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		self.assertTrue(sample["title"])
 
 		product = get_data_for(PRODUCT_DETAIL, {"route": self.handle})["product"]
-		self.assertEqual(product["url"], f"/en/products/{self.handle}")
+		self.assertEqual(product["url"], url(f"/products/{self.handle}"))
 		self.assertIsInstance(product["price"], str)
 		# One size: the add-to-cart button adds it without a size picker.
 		self.assertFalse(product["has_sizes"])
@@ -107,12 +108,12 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 
 		value = listing["filters"][0]["values"][0]
 		self.assertFalse(value["is_active"])
-		self.assertIn("/en/products?", value["url"])
+		self.assertIn(url("/products") + "?", value["url"])
 
 		query = dict(parse_qsl(value["url"].split("?", 1)[1]))
 		filtered = get_data_for(PRODUCT_LISTING, query)
 		self.assertTrue(filtered["has_active_filters"])
-		self.assertEqual(filtered["active_filters"][0]["url"], "/en/products")
+		self.assertEqual(filtered["active_filters"][0]["url"], url("/products"))
 
 	def test_renderer_serves_only_published_pages_of_the_live_builder_theme(self):
 		self.activate(THEME)

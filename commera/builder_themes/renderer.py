@@ -1,9 +1,9 @@
 import frappe
 
 from commera.builder_themes.pages import PAGE_TYPE_BY_TEMPLATE, get_theme_pages
+from commera.localization import get_localization
 from commera.shop_themes.doctype.shop_theme.shop_theme import BUILDER_THEME_TYPE, get_render_theme_context
-from commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings import get_compiled_routes
-from commera.shop_themes.theme_resolver import ThemePageRenderer, apply_route_groups, match_route
+from commera.shop_themes.theme_resolver import ThemePageRenderer, apply_route_groups, find_theme_page
 
 
 class BuilderThemePageRenderer:
@@ -22,10 +22,11 @@ class BuilderThemePageRenderer:
 			return False
 
 		request_path = ThemePageRenderer(self.path).get_request_path()
-		route, self.match = match_route(get_compiled_routes()["routes"], request_path)
-		page_type = route and PAGE_TYPE_BY_TEMPLATE.get(route["template_path"])
+		found = find_theme_page(request_path, get_localization().language.code)
+		page_type = found and PAGE_TYPE_BY_TEMPLATE.get(found[1])
 		if not page_type:
 			return False
+		self.match = found[3]
 
 		page = get_theme_pages(theme_context["theme_name"]).get(page_type)
 		if not page or not frappe.db.get_value("Builder Page", page, "published"):

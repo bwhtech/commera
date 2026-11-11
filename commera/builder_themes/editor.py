@@ -4,6 +4,7 @@ import frappe
 from frappe import _
 
 from commera.builder_themes.pages import HOME, PRODUCT_DETAIL, PRODUCT_LISTING, get_page_role, get_theme_pages
+from commera.localization.urls import url
 from commera.sdk import catalog
 from commera.sdk.format import image_url
 from commera.shop_themes.doctype.shop_theme.shop_theme import resolve_active_theme
@@ -72,10 +73,7 @@ def search_products(query: str | None = None) -> list[dict]:
 
 
 def get_storefront_path(page_type: str) -> str:
-	language = frappe.local.lang or "en"
-	return {HOME: f"/{language}", PRODUCT_LISTING: f"/{language}/products"}.get(
-		page_type, f"/{language}/products/"
-	)
+	return {HOME: url("/"), PRODUCT_LISTING: url("/products")}.get(page_type, url("/products") + "/")
 
 
 def publish_theme(theme: str) -> dict:

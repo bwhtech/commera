@@ -8,6 +8,7 @@ import frappe
 from commera.builder_themes.cards import CARD_IMAGE_WIDTH, get_cards
 from commera.builder_themes.listing import Listing
 from commera.builder_themes.pages import HOME, PRODUCT_DETAIL, PRODUCT_LISTING, get_page_role
+from commera.localization.urls import url
 from commera.sdk import catalog, shop
 from commera.sdk.format import image_url, money, product_url
 
@@ -30,24 +31,19 @@ def get_data_for(page_type: str, form: dict) -> dict:
 	return {**get_shop_data(), **builders[page_type](form)}
 
 
-def get_language() -> str:
-	return frappe.local.lang or "en"
-
-
 def get_shop_data() -> dict:
 	store = shop.get_shop()
-	language = get_language()
 	return {
 		"shop": {
 			"name": store["name"],
 			"description": store["description"],
 			"logo": store["logo"],
-			"home_url": f"/{language}",
-			"products_url": f"/{language}/products",
-			"sale_url": f"/{language}/products?has_discount=1",
-			"search_url": f"/{language}/products",
-			"cart_url": f"/{language}/cart",
-			"account_url": f"/{language}/account/dashboard",
+			"home_url": url("/"),
+			"products_url": url("/products"),
+			"sale_url": url("/products?has_discount=1"),
+			"search_url": url("/products"),
+			"cart_url": url("/cart"),
+			"account_url": url("/account/dashboard"),
 		},
 		"menu": [get_menu_link(item) for item in store["menu"]],
 		"footer": store["footer"],
@@ -96,7 +92,7 @@ def get_sample_handle() -> str | None:
 def get_collection_link(collection: dict) -> dict:
 	return {
 		"title": collection["title"],
-		"url": f"/{get_language()}/products?{urlencode({'category': collection['handle']})}",
+		"url": url(f"/products?{urlencode({'category': collection['handle']})}"),
 		"image": image_url(collection["image"], CARD_IMAGE_WIDTH) or "",
 	}
 
@@ -158,5 +154,5 @@ def get_product_collection_link(collection: dict | None) -> dict | None:
 		return None
 	return {
 		"title": collection["title"],
-		"url": f"/{get_language()}/products?{urlencode({'category': collection['handle']})}",
+		"url": url(f"/products?{urlencode({'category': collection['handle']})}"),
 	}

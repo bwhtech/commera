@@ -74,7 +74,7 @@ lives in the browser, so render it from a page JavaScript script, not from bindi
 - Cart: lines[{line_id, qty, rate, amount, product{handle, title, variant_title, image} or null}],
   total_quantity, subtotal, total, currency, free_delivery_above (null when none), free_delivery_shortfall.
 - Money: window.commera.format.money_text(amount, cart.currency). A line's product page is
-  "/" + window.commera_storefront_config.language + "/products/" + product.handle.
+  window.commera.url("/products/" + product.handle).
 - Write text with textContent, never innerHTML. The drawer is a dialog: Escape and the backdrop close it,
   focus moves into it and back to the opener. Keep the bag link's href bound to commera.shop.cart_url as the fallback.
 - Build it once, on the Home page, as one shared script (and the drawer's markup in the header component); on

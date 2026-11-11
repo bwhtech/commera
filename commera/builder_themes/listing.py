@@ -6,6 +6,7 @@ from frappe import _
 from frappe.utils.data import cint, cstr
 
 from commera.builder_themes.cards import get_cards
+from commera.localization.urls import url
 from commera.sdk import catalog
 
 PAGE_SIZE = 24
@@ -169,5 +170,5 @@ class Listing:
 		if values["page"] == 1:
 			values["page"] = None
 		query_string = urlencode({key: value for key, value in values.items() if value not in (None, "")})
-		path = f"/{frappe.local.lang or 'en'}/products"
+		path = url("/products")
 		return f"{path}?{query_string}" if query_string else path
