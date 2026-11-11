@@ -11,6 +11,7 @@ import frappe
 from frappe.utils import set_request
 
 from commera.api.admin.builder_theme import make_theme_live
+from commera.api.admin.theme import BUILDER_PLACEHOLDER_PREVIEW, build_themes
 from commera.builder_themes.agent_context import get_agent_context
 from commera.builder_themes.editor import get_theme_bar, publish_theme
 from commera.builder_themes.page_data import get_data_for, get_page_data
@@ -214,6 +215,15 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		bar = get_theme_bar(self.pages[HOME])
 		self.assertEqual([page["page_type"] for page in bar["pages"]], [HOME, PRODUCT_DETAIL])
 		self.assertEqual(publish_theme(THEME), {"published": [], "skipped": ["Home", "Product"]})
+
+	def test_theme_preview_is_the_home_page_screenshot(self):
+		def get_thumbnail():
+			return next(theme for theme in build_themes(STARTER_THEME) if theme.name == THEME).thumbnail
+
+		frappe.db.set_value("Builder Page", self.pages[HOME], "preview", BUILDER_PLACEHOLDER_PREVIEW)
+		self.assertIsNone(get_thumbnail())
+		frappe.db.set_value("Builder Page", self.pages[HOME], "preview", "/files/home-preview.webp?v=1")
+		self.assertEqual(get_thumbnail(), "/files/home-preview.webp?v=1")
 
 	def test_make_theme_live_activates_it(self):
 		make_theme_live(THEME)

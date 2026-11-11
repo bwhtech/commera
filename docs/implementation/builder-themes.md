@@ -8,6 +8,7 @@ A Builder theme is a Shop Theme whose home, product listing and product detail p
 2. `commera.builder_themes.theme.create_builder_theme` creates a Builder Project Folder named after the theme and three empty Builder Pages in it, then a Shop Theme of type `Builder` whose `builder_pages` table maps each page type to its page.
 3. The dashboard opens the home page in the Builder editor. The merchant prompts Bob there, page by page, and publishes in Builder.
 4. Switch Theme makes it live. Unpublished pages fall back to the parent theme.
+5. The theme's preview on the Themes screen is Builder's screenshot of its Home page. Builder retakes it each time the page is previewed (by the merchant or by Bob) or published.
 
 ## Source of truth
 
