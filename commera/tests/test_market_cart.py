@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.utils.data import today
 
@@ -9,12 +11,13 @@ from commera.api.payments import (
 	save_cart_quotation,
 	validate_cart_market,
 )
-from commera.cart_prices import get_document_prices
+from commera.cart_prices import MARKET_FIELD, get_document_prices, is_priced_in
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.core import _get_cart_quotation
 from commera.discounts.cart_context import get_cart_context
 from commera.discounts.codes import add_code
 from commera.localization import pin_localization, resolve
+from commera.localization.market_prices import MarketPrices
 from commera.sdk import cart as cart_sdk
 from commera.tests.test_market_prices import MarketPriceTestCase, make_price_list
 from commera.tests.test_markets import make_market
@@ -349,3 +352,26 @@ class TestMarketsSharingASaleList(MarketCartTestCase):
 
 	def in_store_twin(self):
 		return pin_localization(resolve("/en-om/")[0])
+
+
+class TestBeforeMigrate(MarketCartTestCase):
+	"""Code deployed before migrate syncs the new fields."""
+
+	def test_a_cart_without_the_market_field_moves_to_a_market(self):
+		cart = frappe.new_doc("Commera Cart")
+		cart.__dict__.pop("market", None)
+
+		cart.move_to_market("gulf")
+
+		self.assertEqual(cart.market, "gulf")
+
+	def test_a_quotation_without_the_market_field_matches_on_its_lists(self):
+		quotation = frappe.new_doc("Quotation", selling_price_list=self.market_sale, currency=self.currency)
+		meta = frappe.get_meta("Quotation")
+		has_field = meta.has_field
+
+		with (
+			self.in_market(),
+			patch.object(type(meta), "has_field", lambda m, name: name != MARKET_FIELD and has_field(name)),
+		):
+			self.assertTrue(is_priced_in(quotation, MarketPrices.current()))

@@ -31,8 +31,11 @@ def apply_market(quotation, prices: MarketPrices):
 
 def is_priced_in(doc, prices: MarketPrices) -> bool:
 	"""Priced in the market of `prices`, as its sale list and currency stand now."""
-	priced = (get_market_handle(doc), doc.selling_price_list, doc.currency)
-	return priced == (prices.handle, prices.sale_price_list, prices.currency)
+	priced = (doc.selling_price_list, doc.currency) == (prices.sale_price_list, prices.currency)
+	# Before migrate creates the field it never saves; matching on it would rebuild on every load.
+	if not frappe.get_meta(doc.doctype).has_field(MARKET_FIELD):
+		return priced
+	return priced and get_market_handle(doc) == prices.handle
 
 
 def get_market_handle(doc) -> str:

@@ -176,7 +176,8 @@ class CommeraCart(Document):
 	def move_to_market(self, market: str):
 		"""Reprice in `market`. After a switch, a code that takes nothing off there is dropped; the
 		priced cart lists it once more, with its reason."""
-		previous, self.market = self.market, market
+		# get(): a cart from before the market field was synced has no attribute.
+		previous, self.market = self.get("market"), market
 		if not previous or previous == market or not self.discount_codes:
 			return
 		states = get_code_states(self.get_quotation_preview())
