@@ -4,6 +4,7 @@ Builder binds keys, not expressions, so every value is display-ready: formatted 
 from urllib.parse import urlencode
 
 import frappe
+from frappe.utils import escape_html
 
 from commera.builder_themes.cards import CARD_IMAGE_WIDTH, get_cards
 from commera.builder_themes.listing import Listing
@@ -28,7 +29,17 @@ def get_page_data(page) -> dict:
 
 def get_data_for(page_type: str, form: dict) -> dict:
 	builders = {HOME: get_home_data, PRODUCT_LISTING: get_listing_data, PRODUCT_DETAIL: get_product_data}
-	return {**get_shop_data(), **builders[page_type](form)}
+	return escape_strings({**get_shop_data(), **builders[page_type](form)})
+
+
+def escape_strings(value):
+	"""HTML-escape every string but `*_html` ones: Builder renders bindings through Jinja without autoescape,
+	and the listing echoes the shopper's search and filters."""
+	if isinstance(value, dict):
+		return {key: item if key.endswith("_html") else escape_strings(item) for key, item in value.items()}
+	if isinstance(value, list):
+		return [escape_strings(item) for item in value]
+	return escape_html(value) if isinstance(value, str) else value
 
 
 def get_shop_data() -> dict:

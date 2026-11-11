@@ -8,6 +8,7 @@ from unittest.mock import patch
 from urllib.parse import parse_qsl
 
 import frappe
+from frappe.utils import set_request
 
 from commera.api.admin.builder_theme import make_theme_live
 from commera.builder_themes.agent_context import get_agent_context
@@ -23,6 +24,7 @@ from commera.builder_themes.pages import (
 from commera.builder_themes.renderer import BuilderThemePageRenderer
 from commera.builder_themes.theme import create_builder_theme
 from commera.localization.urls import url
+from commera.storefront_access import PrivateStorefrontPage
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 
 THEME = "Test Builder Theme"
@@ -117,6 +119,13 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		self.assertTrue(filtered["has_active_filters"])
 		self.assertEqual(filtered["active_filters"][0]["url"], url("/products"))
 
+	def test_page_data_escapes_what_the_shopper_typed(self):
+		attack = "<img src=x onerror=alert(1)>"
+		listing = get_data_for(PRODUCT_LISTING, {"search": attack, "colors": attack})
+		for value in (listing["title"], listing["query"], listing["active_filters"][0]["label"]):
+			self.assertNotIn("<img", value)
+			self.assertIn("&lt;img", value)
+
 	def test_renderer_serves_only_published_pages_of_the_live_builder_theme(self):
 		self.activate(THEME)
 		self.assertFalse(BuilderThemePageRenderer("en/products").can_render())
@@ -158,7 +167,7 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		self.assertTrue(renderer.can_render())
 		html = renderer.render().get_data(as_text=True)
 		first_title = get_data_for(PRODUCT_LISTING, {})["products"][0]["title"]
-		self.assertIn(frappe.utils.escape_html(first_title), html)
+		self.assertIn(first_title, html)
 		self.assertIn("commera-builder.js", html)
 		self.assertNotIn("noindex", html)
 
@@ -197,12 +206,18 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		self.assertTrue(frappe.db.get_value("Builder Page", self.pages[HOME], "published"))
 		self.assertFalse(frappe.db.get_value("Builder Page", self.pages[PRODUCT_DETAIL], "published"))
 
+	def test_a_page_deleted_in_builder_drops_out_of_the_theme(self):
+		frappe.delete_doc("Builder Page", self.pages[PRODUCT_LISTING], force=True)
+		bar = get_theme_bar(self.pages[HOME])
+		self.assertEqual([page["page_type"] for page in bar["pages"]], [HOME, PRODUCT_DETAIL])
+		self.assertEqual(publish_theme(THEME), {"published": [], "skipped": ["Home", "Product"]})
+
 	def test_make_theme_live_activates_it(self):
 		make_theme_live(THEME)
 		self.assertTrue(get_theme_bar(self.pages[HOME])["is_live"])
 
 
-class TestBuilderThemesWithoutBuilder(unittest.TestCase):
+class TestBuilderThemeGuards(unittest.TestCase):
 	def test_new_builder_theme_needs_builder(self):
 		self.addCleanup(frappe.db.rollback)
 		theme = frappe.get_doc(
@@ -217,3 +232,14 @@ class TestBuilderThemesWithoutBuilder(unittest.TestCase):
 			"commera.shop_themes.doctype.shop_theme.shop_theme.is_builder_installed", return_value=False
 		):
 			self.assertRaises(frappe.ValidationError, theme.insert)
+
+	def test_private_store_hides_the_theme_page_routes(self):
+		self.addCleanup(frappe.set_user, "Administrator")
+		self.addCleanup(frappe.clear_document_cache, "Commera Settings", "Commera Settings")
+		self.addCleanup(frappe.db.rollback)
+		frappe.db.set_single_value("Commera Settings", "storefront_published", 0)
+		frappe.set_user("Guest")
+		set_request(method="GET", path="/ct/autumn/products")
+		self.assertTrue(PrivateStorefrontPage("ct/autumn/products").can_render())
+		set_request(method="GET", path="/blog")
+		self.assertFalse(PrivateStorefrontPage("blog").can_render())

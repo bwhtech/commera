@@ -3,6 +3,7 @@ import { ref, useId, watch } from 'vue'
 import { Button, Dialog, ErrorMessage, FormControl } from 'frappe-ui'
 import { useTheme } from '../../data/theme'
 import { errorMessage } from '../../data/errors'
+import { __ } from '../../data/translation'
 
 const open = defineModel('open', { type: Boolean, required: true })
 
@@ -43,12 +44,12 @@ async function create() {
 </script>
 
 <template>
-  <Dialog v-model:open="open" title="New theme" size="sm" :dismissible="!creating">
+  <Dialog v-model:open="open" :title="__('New theme')" size="sm" :dismissible="!creating">
     <template #default>
       <form :id="formId" class="space-y-3" @submit.prevent="create">
-        <FormControl v-model="themeName" label="Theme name" required placeholder="Autumn drop" />
+        <FormControl v-model="themeName" :label="__('Theme name')" required :placeholder="__('Autumn drop')" />
         <p class="text-p-sm text-ink-gray-5">
-          It opens in Frappe Builder, where you can describe the design to the AI assistant.
+          {{ __('It opens in Frappe Builder, where you can describe the design to the AI assistant.') }}
         </p>
         <ErrorMessage v-if="failure" :message="failure" />
       </form>
@@ -61,7 +62,7 @@ async function create() {
         :form="formId"
         variant="solid"
         theme="gray"
-        label="Create theme"
+        :label="__('Create theme')"
         :loading="creating"
       />
     </template>

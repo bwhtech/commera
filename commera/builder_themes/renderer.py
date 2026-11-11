@@ -38,7 +38,8 @@ class BuilderThemePageRenderer:
 		from builder.builder.doctype.builder_page.builder_page import BuilderPageRenderer
 
 		# The product page reads its handle from form_dict, as on a Builder dynamic route.
-		apply_route_groups(self.match, frappe._dict())
+		if self.match:
+			apply_route_groups(self.match, frappe._dict())
 		renderer = BuilderPageRenderer(self.path, self.http_status_code)
 		renderer.doctype = "Builder Page"
 		renderer.docname = self.page

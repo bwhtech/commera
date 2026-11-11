@@ -86,6 +86,8 @@ Rules:
   sample data or query records to get products.
 - Every value is display-ready: prices are formatted strings and every link is a finished url. Bind href to the
   url fields; never build product or filter links yourself.
+- Text values are already HTML-escaped and description_html is HTML: bind them to innerHTML or an attribute,
+  never to textContent from a script.
 - Never change this page's route, head HTML or the site's home page, and never edit global settings: Commera
   serves this page at its storefront route.
 - Design tokens are shared by the whole site. Prefix every token you create with "{prefix}-", and change no

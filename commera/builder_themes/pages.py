@@ -5,6 +5,8 @@ PRODUCT_LISTING = "Product Listing"
 PRODUCT_DETAIL = "Product Detail"
 
 PAGE_TABLE = "Shop Theme Builder Page"
+# Builder also serves each theme page at its own route under this prefix.
+ROUTE_PREFIX = "ct"
 
 # The themed routes a Builder theme takes over; every other route renders from its parent theme.
 PAGE_TYPE_BY_TEMPLATE = {
@@ -21,14 +23,21 @@ STOREFRONT_PATHS = {
 
 
 def get_theme_pages(theme_name: str) -> dict[str, str]:
-	"""Builder page name by page type."""
+	"""Builder page name by page type, leaving out a page deleted in Builder: its route falls back to the parent."""
 	rows = frappe.get_all(
 		PAGE_TABLE,
 		filters={"parent": theme_name, "parenttype": "Shop Theme"},
 		fields=["page_type", "builder_page"],
 		order_by="idx asc",
 	)
-	return {row.page_type: row.builder_page for row in rows}
+	if not is_builder_installed():
+		return {}
+	existing = set(
+		frappe.get_all(
+			"Builder Page", filters={"name": ["in", [row.builder_page for row in rows]]}, pluck="name"
+		)
+	)
+	return {row.page_type: row.builder_page for row in rows if row.builder_page in existing}
 
 
 def get_page_role(page_name: str) -> frappe._dict | None:
@@ -39,6 +48,10 @@ def get_page_role(page_name: str) -> frappe._dict | None:
 		["parent as theme", "page_type"],
 		as_dict=True,
 	)
+
+
+def is_builder_theme_path(path: str) -> bool:
+	return path.strip("/").split("/", 1)[0] == ROUTE_PREFIX
 
 
 def is_builder_installed() -> bool:

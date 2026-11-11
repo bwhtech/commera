@@ -1,14 +1,19 @@
 import frappe
 from frappe import _
 
-from commera.builder_themes.pages import HOME, PRODUCT_DETAIL, PRODUCT_LISTING, is_builder_installed
+from commera.builder_themes.pages import (
+	HOME,
+	PRODUCT_DETAIL,
+	PRODUCT_LISTING,
+	ROUTE_PREFIX,
+	is_builder_installed,
+)
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	BUILDER_THEME_TYPE,
 	get_starter_theme,
 	validate_theme_name,
 )
 
-ROUTE_PREFIX = "ct"
 # Builder serves each page at its own route as well; Commera serves the live theme at the storefront routes.
 PAGE_ROUTES = {
 	HOME: "home",

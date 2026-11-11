@@ -2,6 +2,7 @@ import frappe
 from frappe.website.utils import build_response
 
 from commera.api.permission import has_app_permission
+from commera.builder_themes.pages import is_builder_theme_path
 from commera.localization import StorefrontLanguages, get_request_path, strip_language_prefix
 from commera.localization.routing import is_page_path
 
@@ -61,7 +62,7 @@ class PrivateStorefrontPage:
 
 	def can_render(self):
 		path = get_request_path() or self.path
-		if is_storefront_published() or not is_storefront_path(path):
+		if is_storefront_published() or not (is_storefront_path(path) or is_builder_theme_path(path)):
 			return False
 		return frappe.session.user == "Guest" or not has_app_permission()
 
