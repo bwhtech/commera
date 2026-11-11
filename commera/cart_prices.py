@@ -5,10 +5,8 @@ import frappe
 from frappe import _
 from frappe.utils.data import flt
 
-from commera.base_prices import base_price_filters
 from commera.localization.market_prices import MarketPrices
-
-CART_ORDER_TYPE = "Shopping Cart"
+from commera.localization.markets import StorefrontMarkets
 
 
 def apply_market(quotation, prices: MarketPrices):
@@ -42,28 +40,12 @@ def price_regular_lines(quotation, prices: MarketPrices):
 			item.rate = 0
 
 
-def keep_regular_rates(doc, method=None):
-	"""Before validate. With "Auto insert Item Price", ERPNext adds a sale-list price from the rate of a
-	line it finds none for, so a compare-at line would set its own sale price. It rederives a zero rate."""
-	if not is_cart_document(doc) or not doc.get("selling_price_list"):
-		return
-	lines = [item for item in doc.items if flt(item.price_list_rate) and flt(item.rate)]
-	if not lines:
-		return
-	priced = frappe.get_all(
-		"Item Price",
-		filters=base_price_filters(
-			{"price_list": doc.selling_price_list, "item_code": ("in", [item.item_code for item in lines])}
-		),
-		pluck="item_code",
-	)
-	for item in lines:
-		if item.item_code not in priced:
-			item.rate = 0
-
-
-def is_cart_document(doc) -> bool:
-	return doc.get("order_type") == CART_ORDER_TYPE or bool(doc.flags.commera_cart_order)
+def get_priced_market(doc) -> MarketPrices | None:
+	"""The prices of the market whose sale list and currency `doc` uses, hidden markets included."""
+	for market in StorefrontMarkets.load(include_hidden=True).all:
+		if is_priced_in(doc, prices := MarketPrices.of(market)):
+			return prices
+	return None
 
 
 def validate_available(prices: MarketPrices, item_codes: list[str], message: str | None = None):

@@ -62,6 +62,33 @@ class MarketCartTestCase(MarketPriceTestCase):
 			"Commera Cart", get_session_cart().name, ["market", "discount_codes"], as_dict=True
 		)
 
+	def make_code(self, *item_codes, **fields):
+		discount = {
+			"doctype": "Commera Discount",
+			"title": f"ZZ Market {frappe.generate_hash(length=6)}",
+			"discount_type": "Amount Off Products",
+			"applies_to": "Specific Products",
+			"value_type": "Percentage",
+			"value": 10,
+			"currency": self.store_currency,
+			"combines_with_product": 1,
+			"targets": [
+				{"role": "Applies To", "target_type": "Item", "target": item_code} for item_code in item_codes
+			],
+			**fields,
+		}
+		name = frappe.get_doc(discount).insert(ignore_permissions=True).name
+		return add_code(name, f"zz{frappe.generate_hash(length=8)}")
+
+	def set_single(self, doctype, fieldname, value):
+		previous = frappe.db.get_single_value(doctype, fieldname)
+		self.addCleanup(self.write_single, doctype, fieldname, previous)
+		self.write_single(doctype, fieldname, value)
+
+	def write_single(self, doctype, fieldname, value):
+		frappe.db.set_single_value(doctype, fieldname, value)
+		frappe.clear_document_cache(doctype, doctype)
+
 
 class TestCartPriceRule(MarketCartTestCase):
 	def test_a_regular_only_line_sells_at_its_regular_rate_in_the_primary_market(self):
@@ -170,21 +197,6 @@ class TestMarketSwitch(MarketCartTestCase):
 		self.assertEqual(priced["discounts"], [{"label": kept, "amount": 30}])
 		self.assertEqual(self.stored_cart().discount_codes, kept)
 
-	def make_code(self, item_code):
-		discount = {
-			"doctype": "Commera Discount",
-			"title": f"ZZ Market {frappe.generate_hash(length=6)}",
-			"discount_type": "Amount Off Products",
-			"applies_to": "Specific Products",
-			"value_type": "Percentage",
-			"value": 10,
-			"currency": self.store_currency,
-			"combines_with_product": 1,
-			"targets": [{"role": "Applies To", "target_type": "Item", "target": item_code}],
-		}
-		name = frappe.get_doc(discount).insert(ignore_permissions=True).name
-		return add_code(name, f"zz{frappe.generate_hash(length=8)}")
-
 
 class TestMarketCheckout(MarketCartTestCase):
 	def test_checkout_refuses_a_quotation_priced_in_another_market(self):
@@ -218,7 +230,7 @@ class TestMarketCheckout(MarketCartTestCase):
 
 	def test_a_regular_only_line_keeps_its_rate_and_adds_no_sale_price(self):
 		regular_only = self.get_item_code(self.make_priced_variant("CHECKOUTREGULAR", default_rate=100))
-		self.set_auto_insert_prices(1)
+		self.set_single("Stock Settings", "auto_insert_price_list_rate_if_missing", 1)
 		self.sign_in_shopper()
 		self.add(regular_only)
 
@@ -230,15 +242,6 @@ class TestMarketCheckout(MarketCartTestCase):
 		self.assertEqual(quotation.total, 100)
 		sale_rows = {"item_code": regular_only, "price_list": self.sale_price_list}
 		self.assertFalse(frappe.db.exists("Item Price", sale_rows))
-
-	def set_auto_insert_prices(self, value):
-		previous = frappe.db.get_single_value("Stock Settings", "auto_insert_price_list_rate_if_missing")
-		self.addCleanup(self.write_auto_insert_prices, previous)
-		self.write_auto_insert_prices(value)
-
-	def write_auto_insert_prices(self, value):
-		frappe.db.set_single_value("Stock Settings", "auto_insert_price_list_rate_if_missing", value)
-		frappe.clear_document_cache("Stock Settings", "Stock Settings")
 
 	def test_the_primary_market_checkout_is_not_refused(self):
 		item_code = self.item("CHECKOUTSTORE")

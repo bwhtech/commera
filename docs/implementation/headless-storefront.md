@@ -232,8 +232,10 @@ The cart uses the price rule above, in every market (`commera/cart_prices.py`):
 - A line with a rate in neither list has `available: false` and a price of 0, in the primary market too. It is not in the subtotal or in the discounts. `cart.add_lines` refuses such an item, and checkout refuses a cart that has one. The message gives the product title and size.
 - The server cart keeps the handle of its market (`market`). A request in another market prices the same cart in the new market and currency. A read does not save the change; the next change to the cart saves it.
 - After a switch, each discount code that takes nothing off in the new market is removed. The priced cart lists the code one more time with `removed: true` and the reason.
-- A checkout quotation priced in another market is rebuilt (`cart_needs_refresh`). Payment refuses it until it is rebuilt.
-- With the Stock Settings option "Auto insert Item Price if missing", ERPNext adds a sale-list price from the rate of a line that has none. For cart quotations, orders and invoices, Commera clears the rate of such a line before validation, so ERPNext calculates it again from the compare-at rate and adds no price.
+- A checkout quotation priced in another market is rebuilt (`cart_needs_refresh`). Payment refuses it until it is rebuilt. A cash on delivery confirmation does the same check, also when it is sent without checkout.
+- A paid gateway order is checked in the market the quotation was priced in, because a webhook has no market. If that market no longer sells a line, the order is not placed, and staff must reconcile or refund the payment.
+- A discount that excludes sale items reads the lists of the document's market. An item is on sale when its sale rate is below its compare-at rate.
+- With the Stock Settings option "Auto insert Item Price if missing", ERPNext adds a price from the rate of a line that has none. Commera skips this insert for the lines of cart quotations and orders, and of invoices made from cart orders (`commera/item_price_guard.py`). Commera does not change the rate of the line.
 
 The cart keeps the store price list and currency. Search sorting and price filters on the search index, and taxes, do not use market prices yet.
 

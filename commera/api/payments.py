@@ -24,7 +24,14 @@ from commera.api.shipping import (
 	reprice_shipping_discount,
 )
 from commera.api.signup import get_placeholder_first_name, validate_single_email, validate_user_names
-from commera.cart_prices import apply_market, is_priced_in, price_regular_lines, validate_available
+from commera.cart_prices import (
+	apply_market,
+	describe_items,
+	get_priced_market,
+	is_priced_in,
+	price_regular_lines,
+	validate_available,
+)
 from commera.checkout_hooks import (
 	apply_plugin_fees,
 	filter_payment_methods,
@@ -276,9 +283,27 @@ def validate_cart_market(quotation):
 		)
 	validate_available(
 		prices,
-		[item.item_code for item in quotation.items if not item.is_free_item],
+		get_sold_item_codes(quotation),
 		_("{0} is not available in this market. Remove it from your cart to check out."),
 	)
+
+
+def validate_paid_order_market(quotation):
+	"""A paid order is checked in the market it was priced and charged in: a webhook has no market."""
+	item_codes = get_sold_item_codes(quotation)
+	prices = get_priced_market(quotation)
+	if unsold := prices.get_unavailable(item_codes) if prices else set(item_codes):
+		frappe.throw(
+			_(
+				"Order {0} was priced in a market that does not sell {1}. The order has not been placed;"
+				" reconcile or refund the payment before releasing any goods."
+			).format(quotation.name, describe_items(unsold)),
+			title=_("Not Available"),
+		)
+
+
+def get_sold_item_codes(quotation) -> list[str]:
+	return [item.item_code for item in quotation.items if not item.is_free_item]
 
 
 def drop_refused_codes(quotation):
@@ -483,6 +508,7 @@ def get_order_shopper(quotation) -> str | None:
 
 def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
 	"""Submit the cart and bill it. Called once per payment; the Quotation docstatus enforces that."""
+	validate_paid_order_market(quotation)
 	shopper = get_order_shopper(quotation)
 	with system_user_session():
 		fix_payment_schedule_dates(quotation)
@@ -518,7 +544,6 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 def create_sales_invoice(sales_order, payment_mode: str, paid_amount: float, reference_no: str | None):
 	sales_invoice = make_sales_invoice(sales_order.name, ignore_permissions=True)
 	sales_invoice.flags.ignore_permissions = True
-	sales_invoice.flags.commera_cart_order = True
 	sales_invoice.insert()
 	sales_invoice.submit()
 	create_payment_entry(sales_invoice, payment_mode, paid_amount, reference_no)
@@ -921,6 +946,8 @@ def quotation_purchase_summary(quotation_name: str):
 
 def place_cod_order(quotation_name: str):
 	quotation = frappe.get_doc("Quotation", quotation_name)
+	# A COD confirmation can be posted without opening checkout, after a market switch.
+	validate_cart_market(quotation)
 	validate_reviewed_checkout(quotation)
 	shopper = get_order_shopper(quotation)
 	quotation.flags.strict_plugin_fees = True

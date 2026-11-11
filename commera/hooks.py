@@ -211,7 +211,7 @@ doc_events = {
 	"Quotation": {
 		"before_validate": [
 			"commera.discounts.pricing.remove_code_discounts",
-			"commera.cart_prices.keep_regular_rates",
+			"commera.item_price_guard.guard_item_price_inserts",
 		],
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 	},
@@ -219,7 +219,7 @@ doc_events = {
 		"before_insert": "commera.discounts.pricing.drop_copied_discounts",
 		"before_validate": [
 			"commera.discounts.pricing.remove_code_discounts",
-			"commera.cart_prices.keep_regular_rates",
+			"commera.item_price_guard.guard_item_price_inserts",
 		],
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 		"after_insert": [
@@ -294,7 +294,7 @@ doc_events = {
 	"Sales Invoice": {
 		"before_validate": [
 			"commera.discounts.pricing.remove_code_discounts",
-			"commera.cart_prices.keep_regular_rates",
+			"commera.item_price_guard.guard_item_price_inserts",
 		],
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 		"on_submit": "commera.utils.update_so_status_from_related_doc",
