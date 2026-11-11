@@ -41,10 +41,20 @@ def read_price_seq() -> int:
 
 
 def start_seq() -> str:
-	"""The counter's key. A cache flush or eviction restarts it from the clock, above every older stamp."""
+	"""The counter's key. A flushed or evicted counter restarts above the clock and every stored stamp:
+	a stamp read from a clock that ran ahead, or from an earlier restart, would reject newer writes."""
 	key = frappe.cache.make_key(SEQ_KEY)
-	frappe.cache.set(key, time.time_ns() // 1000, nx=True)
+	if frappe.cache.get(key) is None:
+		frappe.cache.set(key, max(stored_seq(), time.time_ns() // 1000) + 1, nx=True)
 	return key
+
+
+def stored_seq() -> int:
+	"""The highest stamp the SQLite index holds. The only engine that stores stamps."""
+	# Imported here: the engine imports this module.
+	from commera.search.sqlite_product_search import SqliteProductSearch
+
+	return SqliteProductSearch().max_price_seq()
 
 
 def refresh_snapshot():

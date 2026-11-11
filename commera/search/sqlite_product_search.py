@@ -207,6 +207,11 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		)
 		self.write_price_markets(cursor, BUILD_PRICE_SEQ, get_price_markets())
 
+	def max_price_seq(self) -> int:
+		"""The highest price stamp in the live index or a build in progress, or 0 without one."""
+		paths = (self.db_path, self._get_db_path(is_temp=True))
+		return max(stored_max_seq(path) for path in paths)
+
 	def write_price_markets(self, cursor, seq, price_markets):
 		"""Replace the priced markets, unless a writer that read a newer sequence replaced them."""
 		stored = cursor.execute("SELECT MAX(seq) FROM search_price_market").fetchone()[0]
@@ -506,19 +511,16 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		)
 
 	def remove_doc(self, doctype, docname):
+		"""Drop the doc whatever the database holds. The sync jobs reconcile through index_docs instead."""
 		super().remove_doc(doctype, docname)
-		doc_id = f"{doctype}:{docname}"
-		self.sql("DELETE FROM search_size WHERE doc_id = ?", (doc_id,), commit=True)
-		self.sql("DELETE FROM product_detail WHERE doc_id = ?", (doc_id,), commit=True)
-		self.remove_prices(doctype, [doc_id], price_seq.read_price_seq())
+		self.remove_docs(doctype, [docname], price_seq.read_price_seq())
 
-	def remove_docs(self, doctype, names, seq=None):
-		"""Drop many docs from the FTS table and its sibling tables."""
+	def remove_docs(self, doctype, names, seq):
+		"""Drop many docs from the FTS table and its sibling tables. `seq` stamps their price removal."""
 		self.raise_if_not_indexed()
 		names = list(names)
 		if not names:
 			return
-		seq = price_seq.read_price_seq() if seq is None else seq
 		for chunk in create_batch(names, SQLITE_PARAM_CHUNK_SIZE):
 			doc_ids = tuple(f"{doctype}:{name}" for name in chunk)
 			placeholders = ", ".join("?" for _ in doc_ids)
@@ -898,6 +900,23 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 		ranked.sort()
 		return ranked[0][3]
+
+
+def stored_max_seq(path: str) -> int:
+	"""The highest stamp in the index at `path`, or 0 when it is absent or predates stamps."""
+	if not os.path.exists(path):
+		return 0
+	with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=15)) as connection:
+		try:
+			row = connection.execute(
+				"SELECT MAX(seq) FROM (SELECT seq FROM search_price_stamp "
+				"UNION ALL SELECT seq FROM search_price_market)"
+			).fetchone()
+		except sqlite3.OperationalError as error:
+			if "no such" not in str(error):
+				raise
+			return 0
+	return row[0] or 0
 
 
 def market_rows(document: dict) -> list[dict]:

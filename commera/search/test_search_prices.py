@@ -9,7 +9,14 @@ from commera import utils
 from commera.localization import pin_localization, resolve
 from commera.localization.content import SHOP_WIDE
 from commera.localization.markets import CACHE_KEY as MARKETS_CACHE_KEY
-from commera.search import price_seq, record_builder, sqlite_product_search, sync
+from commera.search import (
+	price_seq,
+	price_sync,
+	record_builder,
+	source_sync,
+	sqlite_product_search,
+	sync,
+)
 from commera.search import query as search_query
 from commera.search.engine_cache import clear_search_engine
 from commera.search.facets import get_listing_facet_counts
@@ -112,7 +119,7 @@ class SearchPriceTestCase(MarketPriceTestCase):
 
 	def run_price_sync(self, change):
 		"""Run `change` and commit it. Returns the products whose reindex it enqueued, now reindexed."""
-		callbacks = CallbackManager()
+		callbacks = start_transaction()
 		with (
 			patch.object(frappe.db, "after_commit", callbacks),
 			patch("commera.search.sync.frappe.enqueue") as enqueue,
@@ -331,6 +338,13 @@ class TestSearchPriceSync(SearchPriceTestCase):
 		self.assertFalse(self.engine.index_exists())
 
 
+def start_transaction() -> CallbackManager:
+	"""Fresh after-commit callbacks. Drops the batches setUp's saves left: their callbacks never run."""
+	for flag in (price_sync.PENDING_PRICES_FLAG, source_sync.PENDING_VARIANTS_FLAG):
+		frappe.local.flags.pop(flag, None)
+	return CallbackManager()
+
+
 class PriceEvents:
 	"""Other workers' price events in the one test transaction. Each commit bumps the counter, as its
 	after-commit callback does; every refresh_snapshot() replays every commit."""
@@ -515,7 +529,7 @@ class TestPriceWriteRaces(SearchPriceTestCase):
 
 class TestPriceSequence(SearchPriceTestCase):
 	def test_a_price_event_bumps_the_sequence_before_its_job_is_queued(self):
-		order, callbacks = [], CallbackManager()
+		order, callbacks = [], start_transaction()
 		with (
 			patch.object(frappe.db, "after_commit", callbacks),
 			patch.object(price_seq, "bump_price_seq", lambda: order.append("bump")),

@@ -203,6 +203,7 @@ doc_events = {
 	"Commera Settings": {"on_update": "commera.plugin_events.on_menu_change"},
 	"Price List": {
 		"validate": "commera.doc_events.price_list.validate",
+		"after_rename": "commera.search.price_sync.on_price_list_rename",
 	},
 	"Gateway Payment Request": {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
@@ -257,6 +258,7 @@ doc_events = {
 			"commera.plugin_events.on_item_price_change",
 			"commera.search.price_sync.on_item_price_change",
 		],
+		"after_rename": "commera.search.price_sync.on_item_price_rename",
 	},
 	"Style Attribute Variant": {
 		"on_update": [

@@ -1,3 +1,5 @@
+import sqlite3
+
 import frappe
 from frappe.utils import create_batch
 
@@ -7,6 +9,8 @@ from commera.search.price_seq import bump_price_seq_after_commit
 from commera.search.record_builder import IN_CLAUSE_CHUNK_SIZE
 
 PRODUCT_DOCTYPE = "Style Attribute Variant"
+# SQLITE_BUSY and SQLITE_LOCKED, the primary codes of their extended codes.
+SQLITE_BUSY_CODES = (5, 6)
 
 
 def on_update(doc, method=None):
@@ -94,12 +98,30 @@ def upsert_docs(doctype, names):
 
 
 def remove_doc(doctype, name):
-	write_if_indexed(lambda engine: engine.remove_doc(doctype, name))
+	"""Reconcile, not delete: by now the doc can be back, recreated and reindexed under its name."""
+	write_if_indexed(lambda engine: engine.index_docs(doctype, [name]))
 
 
 def write_if_indexed(write):
 	"""Run an index write once the index is built. Stamped price writes need no lock (price_seq); a
 	failure raises, so RQ records the job as failed."""
-	engine = new_search_engine()
-	if engine.index_exists():
-		write(engine)
+	try:
+		engine = new_search_engine()
+		if engine.index_exists():
+			write(engine)
+	except Exception as error:
+		if not is_sqlite_busy(error):
+			raise
+		# execute_job reruns the whole job, fresh read included, up to 5 times with a growing pause.
+		raise frappe.RetryBackgroundJobError("The search index is busy") from error
+
+
+def is_sqlite_busy(error):
+	"""Whether `error`, or an error it wraps, is SQLITE_BUSY or SQLITE_LOCKED."""
+	while error is not None:
+		if isinstance(error, sqlite3.OperationalError) and (
+			(getattr(error, "sqlite_errorcode", 0) & 0xFF) in SQLITE_BUSY_CODES or "locked" in str(error)
+		):
+			return True
+		error = error.__cause__ or error.__context__
+	return False
