@@ -34,6 +34,21 @@ class TestProductTitlePageLanguage(ProductDetailPriceTestCase):
 				activate_theme(theme)
 				self.assert_page_title(f"/ar/products/{self.route}", ARABIC_TITLE)
 
+	def test_content_title_matching_a_ui_key_is_not_translated_again(self):
+		register(PRODUCT, self.product.name, "display_name", "ar", "Size")
+		self.assertNotEqual(frappe._("Size", lang="ar"), "Size")
+		for theme in THEMES:
+			with self.subTest(theme):
+				activate_theme(theme)
+				html = self.assert_page_title(f"/ar/products/{self.route}", "Size")
+				blocks = [json.loads(block) for block in JSON_LD.findall(html)]
+				[product] = [block for block in blocks if block.get("@type") == "Product"]
+				self.assertEqual(product["name"], "Size")
+				self.assertNotIn(escape(frappe._("Size", lang="ar")), get_breadcrumb(html))
+				self.assertIn("الرئيسية", get_breadcrumb(html))
+				if theme != "Commera Starter":
+					self.assertIn("المنتجات", get_breadcrumb(html))
+
 	def test_the_arabic_page_falls_back_to_the_source_title_without_a_translation(self):
 		for theme in THEMES:
 			with self.subTest(theme):

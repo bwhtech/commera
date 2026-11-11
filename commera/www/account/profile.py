@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 from commera.localization import url
 
@@ -12,11 +13,11 @@ def get_context(context):
 	context.user_details = frappe.get_doc("User", user)
 	context.breadcrumbs = [
 		{
-			"label": "My Account",
+			"label": _("My Account"),
 			"href": url("/account/"),
 		},
 		{
-			"label": "Profile",
+			"label": _("Profile"),
 			"href": "#",
 		},
 	]
