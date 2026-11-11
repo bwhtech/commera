@@ -104,6 +104,8 @@ Guest methods are rate-limited by IP address. Frappe reads the first address in 
 
 The code is used once, by the first browser that can use it.
 
+The `open_checkout` link carries the `_lang` of the `get_checkout_url` call. In a secondary market, it also carries `_country`. Each page after it opens under the market's prefix, such as `/en-ae/storefront-cart` and `/en-ae/cart/checkout`, so the checkout prices the cart in the market of the storefront.
+
 After this, the shopper is on the Commera site. Payment, order confirmation and the account pages are Commera's.
 
 ## Customer accounts

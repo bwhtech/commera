@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { beforeEach, test } from 'node:test';
+import * as checkout from '../checkout.js';
 import { StorefrontError, get, post } from '../request.js';
 import { add_fake_fetch } from './fake-fetch.js';
 
@@ -254,6 +255,28 @@ test('a call from a secondary market carries its country in _country', async () 
 	await post('cart.add_lines', { lines: [] });
 	assert.match(calls[0].url, /\?_lang=ar&_country=AE$/);
 	assert.deepEqual(calls[1].body, { lines: [], _lang: 'ar', _country: 'AE' });
+});
+
+test('checkout writes from a secondary market carry its country in _country', async () => {
+	use_localization({
+		language: { code: 'en' },
+		root_prefix: '/en-ae',
+		market: { handle: 'gulf', is_primary: false, default_language: 'ar' },
+		country: 'AE',
+	});
+	const calls = add_fake_fetch();
+	await checkout.set_addresses({ billing_address: 'ADDR-1' });
+	await checkout.set_shipping_option('standard');
+	await checkout.start_payment({ payment_method: 'cod', expected_total: 300 });
+	for (const call of calls) {
+		assert.equal(call.options.method, 'POST');
+		assert.equal(call.body._country, 'AE');
+		assert.equal(call.body._lang, 'en');
+	}
+	assert.deepEqual(
+		calls.map((call) => call.method),
+		['set_addresses', 'set_shipping_option', 'start_payment'],
+	);
 });
 
 test('_lang is compared with the market default, not the store default', async () => {

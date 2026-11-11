@@ -32,7 +32,8 @@ def sync_server_cart(items: list | str, version: str | None = None) -> dict:
 	cart = get_session_cart(create=bool(quantities))
 	if not cart:
 		return {"version": None}
-	if version and not cart.is_new() and version != cart.version:
+	# A browser that never read the cart cannot empty it: its empty list is no edit.
+	if not cart.is_new() and version != cart.version and (version or not quantities):
 		return {"conflict": True, **get_cart_state(cart)}
 
 	changed = cart.set_quantities(quantities)
