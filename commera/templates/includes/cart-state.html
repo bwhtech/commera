@@ -145,7 +145,8 @@
                     else synced_snapshot = get_snapshot(this.items);
                     return;
                 }
-                if (this.version || server_cart.lines.length) this.apply_server_cart(server_cart);
+                // Sending an empty list would empty a cart this browser never saw, such as a storefront handoff's.
+                if (this.version || server_cart.lines.length || !this.items.length) this.apply_server_cart(server_cart);
                 else await this.sync();
             },
             // One request at a time: a second one would carry the version the first is about to replace.

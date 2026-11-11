@@ -11,7 +11,8 @@
 		"plugin_fields",
 		"discount_codes",
 		"lines",
-		"revision"
+		"revision",
+		"market"
 	],
 	"fields": [
 		{
@@ -65,10 +66,17 @@
 			"hidden": 1,
 			"label": "Revision",
 			"read_only": 1
+		},
+		{
+			"description": "Handle of the market the cart was last priced in. A switch drops codes that take nothing off there.",
+			"fieldname": "market",
+			"fieldtype": "Data",
+			"label": "Market",
+			"read_only": 1
 		}
 	],
 	"links": [],
-	"modified": "2026-11-08 10:00:00.000000",
+	"modified": "2026-11-11 10:00:00.000000",
 	"modified_by": "Administrator",
 	"module": "Commera Ecommerce",
 	"name": "Commera Cart",

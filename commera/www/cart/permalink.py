@@ -80,7 +80,8 @@ def get_cart_lines(requested_quantities: dict[str, int], notices: list[str]) -> 
 			continue
 
 		stock_detail = stock_detail_by_item_code[item_code]
-		in_stock_qty = cint(stock_detail.get("stock_qty"))
+		# An item sold without stock has a stock_qty of 0, so it is never out of stock.
+		in_stock_qty = requested_qty if stock_detail["unlimited"] else cint(stock_detail.get("stock_qty"))
 		if in_stock_qty < 1:
 			notices.append(_("{0} is out of stock.").format(size_row.item_name))
 			continue

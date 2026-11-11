@@ -4,7 +4,7 @@ import frappe
 from erpnext.setup.utils import get_exchange_rate
 from frappe.utils.data import cint, cstr, flt
 
-from commera.api.cart import get_cart_price
+from commera.cart_prices import get_document_prices
 from commera.core import is_cod
 
 
@@ -63,13 +63,21 @@ class CartContext:
 		return flt(amount) * self.get_exchange_rate(currency) if flt(amount) else 0.0
 
 	def is_on_sale(self, item_code: str) -> bool:
+		"""On sale in the document's market: a sale rate below the compare-at rate, as its prices show."""
 		if item_code not in self.sale_by_item_code:
-			settings = frappe.get_cached_doc("Commera Settings")
-			regular_price, price = get_cart_price(
-				item_code, settings.get_default_price_list(), settings.get_sale_price_list()
-			)
-			self.sale_by_item_code[item_code] = flt(price) < flt(regular_price)
+			item_codes = {item_code, *(item.item_code for item in self.items)}
+			self.sale_by_item_code.update(get_sale_states(self.doc, list(item_codes)))
 		return self.sale_by_item_code[item_code]
+
+
+def get_sale_states(doc, item_codes: list[str]) -> dict[str, bool]:
+	# A staff-made document has no market: it reads the store's lists, as it always did.
+	prices = get_document_prices(doc)
+	sale, compare_at = prices.get_base_rates(item_codes)
+	return {
+		item_code: prices.compare_at(sale.get(item_code), compare_at.get(item_code)) is not None
+		for item_code in item_codes
+	}
 
 
 def get_cart_context(doc) -> CartContext:

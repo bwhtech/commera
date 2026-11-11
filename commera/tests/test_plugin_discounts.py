@@ -24,10 +24,23 @@ def refuse_zz_codes(quotation, code):
 	return "This code's limit was reached." if code.upper().startswith("ZZ") else None
 
 
+def sell_at_test_prices(test):
+	"""The cart refuses an item the store lists do not price, so the test list is the sale list."""
+	sale_price_list = frappe.db.get_single_value("Commera Settings", "sale_price_list")
+	test.addCleanup(set_sale_price_list, sale_price_list)
+	set_sale_price_list(test.price_list)
+
+
+def set_sale_price_list(price_list: str):
+	frappe.db.set_single_value("Commera Settings", "sale_price_list", price_list)
+	frappe.clear_document_cache("Commera Settings", "Commera Settings")
+
+
 class TestDiscountEvents(DiscountCodeTestCase):
 	def setUp(self):
 		super().setUp()
 		list_items(self.shirt, self.cap)
+		sell_at_test_prices(self)
 
 	def test_a_placed_order_fires_discount_used(self):
 		code = self.create_code(percentage=10)
@@ -72,13 +85,7 @@ class TestCartAttributes(DiscountCodeTestCase):
 	def setUp(self):
 		super().setUp()
 		list_items(self.shirt, self.cap)
-		sale_price_list = frappe.db.get_single_value("Commera Settings", "sale_price_list")
-		self.addCleanup(self.set_sale_price_list, sale_price_list)
-		self.set_sale_price_list(self.price_list)
-
-	def set_sale_price_list(self, price_list: str):
-		frappe.db.set_single_value("Commera Settings", "sale_price_list", price_list)
-		frappe.clear_document_cache("Commera Settings", "Commera Settings")
+		sell_at_test_prices(self)
 
 	def test_cart_attributes_merge_and_reach_the_order(self):
 		cart_sdk.add_lines([{"item_code": self.cap, "qty": 1}])
@@ -98,6 +105,7 @@ class TestValidateDiscountCodeHook(DiscountCodeTestCase):
 	def setUp(self):
 		super().setUp()
 		list_items(self.shirt, self.cap)
+		sell_at_test_prices(self)
 		patch_app_hooks(self, {"commera_hooks": {"validate_discount_code": [f"{__name__}.refuse_zz_codes"]}})
 
 	def test_a_refused_code_is_skipped_on_the_cart(self):

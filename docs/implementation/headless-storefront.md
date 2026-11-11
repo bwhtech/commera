@@ -104,6 +104,8 @@ Guest methods are rate-limited by IP address. Frappe reads the first address in 
 
 The code is used once, by the first browser that can use it.
 
+The `open_checkout` link carries the `_lang` of the `get_checkout_url` call. In a secondary market, it also carries `_country`. Each page after it opens under the market's prefix, such as `/en-ae/storefront-cart` and `/en-ae/cart/checkout`, so the checkout prices the cart in the market of the storefront.
+
 After this, the shopper is on the Commera site. Payment, order confirmation and the account pages are Commera's.
 
 ## Customer accounts
@@ -223,6 +225,19 @@ Only base Item Price rows set a public price: a row with a customer or a batch i
 The product OG card (`/og-image/<handle>.png`) shows the store price. A secondary market page links the card without a price: `/og-image/<handle>.png?price=none`, which has its own cache file.
 
 The patch `set_market_price_lists` gives each market without a sale price list the Commera Settings lists: the sale price list (or the default price list when there is no sale list) as the sale price list, the default price list as the compare-at list, and their currency. The market then prices every item like the primary market. It logs a market it cannot fill.
+
+### Market cart
+
+The cart uses the price rule above, in every market (`commera/cart_prices.py`):
+
+- The cart quotation uses the sale price list and the currency of the current market, and keeps the market handle in the field **Market** (`commera_market`). The Sales Order gets the field from the quotation. Two markets can share a sale price list and a currency, so Commera reads the market from this field, not from the price list. An empty field (a document that staff made) means the store prices. ERPNext prices each line from the sale price list. A line that only the compare-at price list prices gets the compare-at rate. Commera does not convert currency.
+- A line with a rate in neither list has `available: false` and a price of 0, in the primary market too. It is not in the subtotal or in the discounts. `cart.add_lines` refuses such an item, and checkout refuses a cart that has one. The message gives the product title and size.
+- The server cart keeps the handle of its market (`market`). A request in another market prices the same cart in the new market and currency. A read does not save the change; the next change to the cart saves it.
+- After a switch, each discount code that takes nothing off in the new market is removed. The priced cart lists the code one more time with `removed: true` and the reason.
+- A checkout quotation priced in another market (another handle, or a changed sale price list or currency) is rebuilt (`cart_needs_refresh`). Payment refuses it until it is rebuilt. A cash on delivery confirmation does the same check, also when it is sent without checkout.
+- A paid gateway order is placed at the rates of the quotation that the shopper paid, also when the catalog of its market changed after the payment started. If the market no longer prices a line, or the market is deleted, Commera adds a comment to the Sales Order for staff. The check that the charged amount equals the cart total does not change: a different amount is refused.
+- A discount that excludes sale items reads the lists of the market in the **Market** field. A document with no market reads the store lists. An item is on sale when its sale rate is below its compare-at rate.
+- With the Stock Settings option "Auto insert Item Price if missing", ERPNext adds a price from the rate of a line that has none. Commera skips this insert for the lines of cart quotations and orders, of invoices made from cart orders, and for all pricing that Commera does for the cart and for order placement (`commera/item_price_guard.py`). Commera does not change the rate of the line. Commera installs this guard at the start of each web request and background job (`before_request`, `before_job`).
 
 The cart keeps the store price list and currency. Search sorting and price filters on the search index, and taxes, do not use market prices yet.
 

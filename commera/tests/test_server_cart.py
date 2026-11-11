@@ -114,6 +114,23 @@ class TestServerCart(DiscountCodeTestCase):
 		self.assertNotIn("conflict", response)
 		self.assertEqual([(row.item_code, row.qty) for row in get_session_cart().lines], [(self.cap, 4)])
 
+	def test_a_browser_that_never_read_the_cart_cannot_empty_it(self):
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 2}])
+
+		response = sync_server_cart([])
+
+		self.assertTrue(response["conflict"])
+		self.assertEqual([(row.item_code, row.qty) for row in get_session_cart().lines], [(self.shirt, 2)])
+
+	def test_the_browser_cart_shows_a_line_sold_without_stock(self):
+		cart_sdk.add_lines([{"item_code": self.shirt, "qty": 2}])
+		frappe.db.set_value("Item", self.shirt, "is_stock_item", 0)
+		frappe.db.delete("Bin", {"item_code": self.shirt})
+
+		lines = get_server_cart()["lines"]
+
+		self.assertEqual([(line["variant"]["item_code"], line["qty"]) for line in lines], [(self.shirt, 2)])
+
 	def test_sync_refuses_more_than_the_stock(self):
 		self.assertTrue(sync_server_cart([{"item_code": self.shirt, "qty": 10}])["version"])
 
@@ -628,13 +645,13 @@ class TestServerCart(DiscountCodeTestCase):
 			{(row.item_code, row.qty) for row in _get_cart_quotation().items},
 			{(self.shirt, 1), (self.cap, 2)},
 		)
-		sync_server_cart([])
+		sync_server_cart([], get_server_cart()["version"])
 		self.assertEqual(refresh_checkout_cart()["redirect"], "/cart")
 
 	def test_an_emptied_server_cart_checks_out_nothing(self):
 		sync_server_cart([{"item_code": self.shirt, "qty": 1}])
 		generate_quotation_for_cart({"items": [self.browser_line(self.shirt, 1)]})
-		sync_server_cart([])
+		sync_server_cart([], get_server_cart()["version"])
 
 		with self.assertRaises(frappe.ValidationError):
 			generate_quotation_for_cart({"items": [self.browser_line(self.shirt, 1)]})

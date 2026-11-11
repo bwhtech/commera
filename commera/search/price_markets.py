@@ -11,7 +11,7 @@ from commera.card_prices import get_card_price
 from commera.localization.content import SHOP_WIDE
 from commera.localization.languages import StorefrontLanguages
 from commera.localization.market_prices import MarketPrices
-from commera.localization.markets import Market, StorefrontMarkets, fetch_market_rows
+from commera.localization.markets import PRIMARY_MARKET, Market, StorefrontMarkets, fetch_market_rows
 from commera.localization.resolver import get_localization
 from commera.utils import IN_CLAUSE_CHUNK_SIZE, get_store_currency
 
@@ -42,7 +42,9 @@ def get_price_markets(
 def fresh_price_markets() -> dict[str, MarketPrices]:
 	"""get_price_markets from the database, not the caches: they can predate another worker's save."""
 	settings = frappe.get_doc("Commera Settings")
-	store = MarketPrices(True, settings.sale_price_list, settings.default_price_list, get_store_currency())
+	store = MarketPrices(
+		PRIMARY_MARKET, True, settings.sale_price_list, settings.default_price_list, get_store_currency()
+	)
 	return get_price_markets(fresh_markets(settings), store)
 
 

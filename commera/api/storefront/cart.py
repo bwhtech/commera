@@ -19,7 +19,7 @@ from commera.guest import (
 	set_guest_cart_cookie,
 	validate_cart_token,
 )
-from commera.localization import url
+from commera.localization import get_localization, url
 from commera.sdk import cart as cart_sdk
 from commera.sdk.types import PricedCart
 from commera.utils import get_next_url
@@ -132,9 +132,17 @@ def get_checkout_url() -> dict:
 		handoff,
 		expires_in_sec=CHECKOUT_CODE_SECONDS + CHECKOUT_SIGN_IN_SECONDS,
 	)
-	# The browser opens this path itself, so it names the language the checkout pages use.
-	query = urlencode({"code": code, "_lang": frappe.local.lang})
+	query = urlencode({"code": code, **get_localization_params()})
 	return {"path": f"/api/v2/method/commera.api.storefront.cart.open_checkout?{query}"}
+
+
+def get_localization_params() -> dict:
+	"""The browser opens the checkout path itself, so it names the language, and the country of a
+	secondary market: else the checkout pages open in the primary market."""
+	params = {"_lang": frappe.local.lang}
+	if country := get_localization().country:
+		params["_country"] = country.upper()
+	return params
 
 
 def get_checkout_handoff() -> dict:
@@ -188,8 +196,9 @@ def adopt_checkout_cart(code: str):
 
 
 def get_handoff_page_url(code: str) -> str:
+	"""In the request's market. The page forwards `_lang` and `_country` to its form's POST."""
 	params = {key: value for key, value in frappe.form_dict.items() if key not in ("cmd", "csrf_token")}
-	return f"/storefront-cart?{urlencode({**params, 'code': code})}"
+	return f"{url('/storefront-cart')}?{urlencode({**params, 'code': code})}"
 
 
 def get_checkout_code(key: str) -> dict | None:

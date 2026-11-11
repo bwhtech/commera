@@ -53,6 +53,11 @@ def refuse_cancel(sales_order, method=None):
 	frappe.throw(f"{CANCEL_REFUSAL} ({sales_order.name})")
 
 
+def set_sale_price_list(price_list: str | None):
+	frappe.db.set_single_value("Commera Settings", "sale_price_list", price_list)
+	frappe.clear_document_cache("Commera Settings", "Commera Settings")
+
+
 def record_plugin_event(event):
 	frappe.flags.commera_plugin_event_calls.append((event, frappe.session.user))
 
@@ -107,6 +112,11 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 	def setUp(self):
 		StubStripeClient.reset()
 		self.addCleanup(frappe.set_user, frappe.session.user)
+		# Cash on delivery checks the cart in the shopper's market: the store's lists.
+		self.addCleanup(
+			set_sale_price_list, frappe.db.get_single_value("Commera Settings", "sale_price_list")
+		)
+		set_sale_price_list(PRICE_LIST)
 
 		self.item_code = self.create_item()
 		self.customer = self.create_customer()

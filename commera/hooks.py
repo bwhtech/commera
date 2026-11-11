@@ -17,7 +17,11 @@ website_redirects = [
 
 # localize_request strips the language prefix off request.path before any app's path resolver runs,
 # so the route rules below match the path without it. resolve_website_path sends the canonical redirects.
-before_request = ["commera.localization.routing.localize_request"]
+before_request = [
+	"commera.item_price_guard.install_guard",
+	"commera.localization.routing.localize_request",
+]
+before_job = ["commera.item_price_guard.install_guard"]
 website_path_resolver = "commera.localization.routing.resolve_website_path"
 # Frappe runs auth_hooks after its API key and OAuth checks, so a storefront API call knows its user.
 auth_hooks = ["commera.localization.routing.localize_api_request"]
@@ -317,6 +321,7 @@ jinja = {
 		"commera.guest.is_guest_checkout_enabled",
 		"commera.localization.get_country_choices",
 		"commera.localization.get_localization",
+		"commera.localization.get_market_place",
 		"commera.localization.switch_url",
 		"commera.localization.url",
 		"commera.utils.format_theme_css",

@@ -244,10 +244,19 @@ CUSTOM_FIELDS = {
 			"read_only": 1,
 		},
 		{
+			"fieldname": "commera_market",
+			"fieldtype": "Data",
+			"label": "Market",
+			"insert_after": "custom_cart_attributes",
+			"description": "Handle of the Commera Market the cart was priced in. Empty: the store's prices.",
+			"print_hide": 1,
+			"read_only": 1,
+		},
+		{
 			"fieldname": "custom_tracking_section",
 			"fieldtype": "Section Break",
 			"label": "Tracking",
-			"insert_after": "custom_cart_attributes",
+			"insert_after": "commera_market",
 			"collapsible": 1,
 		},
 		{

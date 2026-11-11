@@ -265,6 +265,8 @@ class PricedCartLine(TypedDict):
 	# The Commera Discount on this line.
 	discount: str | None
 	amount: float
+	# False when the market prices the item in neither list: priced at 0, and checkout refuses it.
+	available: bool
 	# None when no published product sells the item any more.
 	product: CartLineProduct | None
 
@@ -283,8 +285,11 @@ class PricedCart(TypedDict):
 	# Counts every change, lines cleared by a placed order included; set_lines takes it.
 	revision: int
 	attributes: dict[str, str]
+	# The handle of the market the cart is priced in; its currency, never converted.
+	market: str | None
 	currency: str
-	# {"code", "title", "discount_class", "applied", "reason"}; reason says why an unapplied code gives nothing.
+	# {"code", "title", "discount_class", "applied", "reason", "removed"}; reason says why an unapplied
+	# code gives nothing. removed: dropped by a market switch, and gone from the next read.
 	discount_codes: list[dict]
 	# {"title", "amount"} of each automatic discount the cart gets.
 	automatic_discounts: list[dict]

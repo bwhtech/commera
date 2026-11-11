@@ -4,6 +4,7 @@ from frappe.tests import IntegrationTestCase
 from commera.shop_themes.tests import test_commera_starter_catalog
 from commera.tests import test_cart_checkout
 from commera.tests.test_localization import use_storefront_languages
+from commera.tests.test_markets import UAE, make_market, use_markets
 
 
 class IntegrationTestCommeraStarterCheckout(IntegrationTestCase):
@@ -52,3 +53,27 @@ class IntegrationTestCommeraStarterCheckout(IntegrationTestCase):
 		self.assertEqual(status, 200)
 		self.assertIn('x-data="order_confirmation"', html)
 		self.assertIn("noindex", html)
+
+	def test_an_unavailable_line_names_the_country_and_blocks_checkout(self):
+		use_storefront_languages(self, "en", published=("en", "ar"))
+		use_markets(self)
+		make_market("Gulf", [UAE], "ar", ["en"], handle="gulf")
+		frappe.set_user("Guest")
+		self.addCleanup(frappe.set_user, "Administrator")
+
+		for template, path in (
+			("pages/cart/cart.html", "/en-ae/cart"),
+			("pages/cart/checkout.html", "/en-ae/cart/checkout"),
+		):
+			with self.subTest(path):
+				status, html = self.render(template, path)
+
+				self.assertEqual(status, 200)
+				self.assertIn('x-show="line.available === false"', html)
+				self.assertIn("Not available in United Arab Emirates", html)
+				self.assertIn("Remove the items not available in United Arab Emirates to check out.", html)
+				self.assertIn(':disabled="$store.cart.busy || $store.cart.has_unavailable"', html)
+				self.assertIn("removed_codes", html)
+
+		self.assertIn('@click="$store.cart.remove(line)"', html)
+		self.assertIn("!payment_method || $store.cart.has_unavailable", html)
