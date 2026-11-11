@@ -281,15 +281,20 @@ for (const field of ['billing_same', 'delivery_method']) {
 }
 
 test('Starter refreshes methods and clears a stale selection after saving an address', async () => {
-	const form = make_checkout_form(make_page(undefined, {
-		checkout: {
-			set_addresses: async () => ({ currency: 'AED' }),
-			list_shipping_options: async () => ({ options: [], reason: 'standard' }),
-			list_payment_methods: async () => [
-				{ id: 'Market gateway', title: 'Market gateway' },
-			],
-		},
-	}));
+	const form = make_checkout_form(
+		make_page(undefined, {
+			checkout: {
+				set_addresses: async () => ({ currency: 'AED' }),
+				list_shipping_options: async () => ({
+					options: [],
+					reason: 'standard',
+				}),
+				list_payment_methods: async () => [
+					{ id: 'Market gateway', title: 'Market gateway' },
+				],
+			},
+		}),
+	);
 	// A new address in the cart's market, so no market switch is offered.
 	form.choices.shipping = 'new';
 	form.forms.shipping.country = 'India';
