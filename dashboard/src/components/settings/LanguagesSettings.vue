@@ -8,6 +8,8 @@ import LanguageRow from './LanguageRow.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import SettingsSkeleton from './SettingsSkeleton.vue'
 import { languagePrefix, storefrontLanguageSettings as store } from '../../data/storefrontLanguages'
+import { useTranslationOverview } from '../../data/translations'
+import { languageTotals, toDoCount } from '../../data/translationStatus'
 import { __ } from '../../data/translation'
 
 const props = defineProps({
@@ -16,10 +18,17 @@ const props = defineProps({
 
 const { screen, loadError, loading: saving, languages, defaultLanguage, maxLanguages, isAtLimit, mutate } = store
 
-watch(() => props.active, (isActive) => isActive && store.load(), { immediate: true })
+const { overview, loadOverview } = useTranslationOverview()
+const translationWork = computed(() =>
+  Object.values(overview.value?.counts ?? {}).reduce((total, counts) => total + toDoCount(languageTotals(counts)), 0),
+)
+watch(() => props.active, (isActive) => {
+  if (!isActive) return
+  store.load()
+  loadOverview()
+}, { immediate: true })
 
 const router = useRouter()
-// The Translations page ships separately; until it does, nothing here links to it.
 const hasTranslations = router.hasRoute('StorefrontTranslations')
 
 const prefixOf = (code) => languagePrefix(code, defaultLanguage.value)
@@ -107,7 +116,7 @@ function openTranslations() {
 }
 
 function translate(language) {
-  router.push({ name: 'StorefrontTranslationEditor', params: { lang: language.code, resource: 'products' } })
+  router.push({ name: 'StorefrontTranslationEditor', params: { lang: language.code, resource: 'product' } })
 }
 </script>
 
@@ -189,7 +198,7 @@ function translate(language) {
       </ul>
 
       <div v-if="hasTranslations" class="mt-6 divide-y divide-outline-gray-1 pb-6">
-        <SettingsRow :title="__('Translations')">
+        <SettingsRow :title="__('Translations')" :description="__('{0} fields to translate or update', [translationWork])">
           <Button icon-right="lucide-arrow-right" :label="__('Open translations')" @click="openTranslations" />
         </SettingsRow>
       </div>

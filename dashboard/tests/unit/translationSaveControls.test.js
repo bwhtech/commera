@@ -53,7 +53,7 @@ test('inputs and navigation render disabled throughout a deferred save', async (
     assert.doesNotMatch(html, /<button(?! disabled)/)
   }
   const editor = await renderTemplate('pages/storefront/TranslationEditor', {
-    saving: disabled, language: { name: 'Arabic' }, languageMenu: [], dirtyCount: 1,
+    saving: disabled, busy: disabled, language: { name: 'Arabic' }, languageMenu: [], dirtyCount: 1,
     overviewLoaded: true, overview: {}, resource: {}, isMobile: false,
     selectedName: '', selectedItem: null, recordError: null, list: { items: {}, total: {}, toDoCount: {}, nextCursor: {}, loading: {}, loaded: {}, loadError: {} },
   })

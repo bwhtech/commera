@@ -18,6 +18,12 @@ const fileInput = ref(null)
 const isImporting = ref(false)
 const report = ref(null)
 
+watch(() => props.languages, (available) => {
+  if (!available.some(({ code }) => code === language.value)) {
+    language.value = available[0]?.code ?? ''
+  }
+}, { immediate: true })
+
 watch(open, (isOpen) => {
   if (!isOpen) return
   report.value = null
@@ -28,13 +34,14 @@ async function importFile(event) {
   const file = event.target.files?.[0]
   // Cleared so that picking the same file again, after fixing it, fires `change` again.
   event.target.value = ''
-  if (!file || isImporting.value) return
+  if (!file || !language.value || isImporting.value) return
+  const targetLanguage = language.value
   report.value = null
   isImporting.value = true
   try {
     // Private: a merchant's working file, not a storefront asset.
     const uploaded = await upload(file, { private: true })
-    const imported = await trySubmit(importAction, { file_url: uploaded.file_url, language: language.value })
+    const imported = await trySubmit(importAction, { file_url: uploaded.file_url, language: targetLanguage })
     if (imported) {
       report.value = importAction.data
       emit('imported')
@@ -56,6 +63,7 @@ async function importFile(event) {
           v-model="language"
           type="select"
           :label="__('Language')"
+          :disabled="isImporting"
           :options="languages.map(({ code, name }) => ({ label: name, value: code }))"
         />
         <input ref="fileInput" type="file" accept=".csv" class="hidden" @change="importFile" />
@@ -63,6 +71,7 @@ async function importFile(event) {
           :label="__('Choose CSV file')"
           icon-left="lucide-upload"
           :loading="isImporting"
+          :disabled="!language || isImporting"
           @click="fileInput.click()"
         />
 

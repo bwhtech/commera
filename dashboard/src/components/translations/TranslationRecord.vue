@@ -17,7 +17,7 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
   showBack: { type: Boolean, default: false },
 })
-const emit = defineEmits(['change', 'back'])
+const emit = defineEmits(['change', 'back', 'uploading'])
 
 const sections = computed(() => groupSections(props.item.fields, props.resourceName))
 
@@ -73,6 +73,7 @@ function viewOnStore() {
           :record-title="item.title"
           :disabled="disabled"
           :pending="pending[fieldKey(language.code, resourceType, item.name, field.field)]"
+          @uploading="emit('uploading', $event)"
           @change="(value, key, originalField) => emit('change', key, originalField, value)"
         />
       </div>

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { Button, FormControl, toast, useFileUpload } from 'frappe-ui'
+import { Button, FormControl, Progress, toast, useFileUpload } from 'frappe-ui'
 import { Editor, EditorContent, RichTextKit } from 'frappe-ui/editor'
 import RichTextField from '../RichTextField.vue'
 import StatusBadge from '../StatusBadge.vue'
@@ -22,7 +22,7 @@ const props = defineProps({
   // The unsaved value, or undefined when there is none.
   pending: { type: String, default: undefined },
 })
-const emit = defineEmits(['change'])
+const emit = defineEmits(['change', 'uploading'])
 
 const isUnsaved = computed(() => props.pending !== undefined)
 const status = computed(() => (isUnsaved.value ? 'unsaved' : props.field.status))
@@ -32,7 +32,7 @@ const value = computed({
 })
 const inputLabel = computed(() => __('{0} of {1} in {2}', [props.field.label, props.recordTitle, props.language.name]))
 
-const { upload } = useFileUpload()
+const { upload, progress } = useFileUpload()
 const imageInput = ref(null)
 const isUploading = ref(false)
 
@@ -43,17 +43,20 @@ function change(newValue, identity = props.identity, field = props.field) {
 async function swapImage(event) {
   const file = event.target.files?.[0]
   event.target.value = ''
-  if (!file || props.disabled) return
+  if (!file || props.disabled || isUploading.value) return
   isUploading.value = true
+  emit('uploading', true)
   try {
     // Public: the storefront shows it to shoppers.
     await uploadTranslationImage(upload, file, props.identity, props.field, (key, field, result) => {
-      change(result, key, field)
+      // The editor disables controls during upload; its completion must still reach the captured field.
+      emit('change', result, key, field)
     })
   } catch {
     toast.error(__('Could not upload {0}', [file.name]))
   } finally {
     isUploading.value = false
+    emit('uploading', false)
   }
 }
 </script>
@@ -92,7 +95,11 @@ async function swapImage(event) {
         <Button :disabled="disabled" size="sm" :label="__('Change')" :loading="isUploading" @click="imageInput.click()" />
         <Button :disabled="disabled" v-if="value" size="sm" variant="ghost" :label="__('Reset')" @click="change('')" />
       </div>
-      <div v-else :dir="language.direction">
+      <div v-if="isUploading" class="mt-2" role="status">
+        <p class="text-p-sm text-ink-gray-5">{{ __('Uploading image · {0}%', [progress]) }}</p>
+        <Progress :value="progress" size="sm" />
+      </div>
+      <div v-if="field.kind !== 'image'" :dir="language.direction">
         <RichTextField v-if="field.kind === 'html'" v-model="value" :disabled="disabled" min-height="min-h-32" />
         <FormControl
           v-else

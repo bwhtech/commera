@@ -7,7 +7,7 @@ import EmptyState from '../../components/EmptyState.vue'
 import TranslationImportDialog from '../../components/translations/TranslationImportDialog.vue'
 import TranslationCounts from '../../components/translations/TranslationCounts.vue'
 import { errorMessage } from '../../data/errors'
-import { exportTranslationsUrl } from '../../data/translationExchange'
+import { exportTranslationsUrl, translatableLanguages } from '../../data/translationExchange'
 import { useTranslationOverview } from '../../data/translations'
 import { groupResources, languageTotals } from '../../data/translationStatus'
 import { onSettingsClose, openSettings } from '../../ia/settings'
@@ -28,11 +28,12 @@ const totals = computed(() =>
   Object.fromEntries(languages.value.map(({ code }) => [code, languageTotals(overview.value.counts[code])])),
 )
 
+const csvLanguages = computed(() => translatableLanguages())
 const isImportOpen = ref(false)
 const csvMenu = computed(() => [
   {
     group: __('Export'),
-    options: languages.value.map((language) => ({
+    options: csvLanguages.value.map((language) => ({
       label: __('Export {0}', [language.name]),
       icon: 'lucide-download',
       // A download answers with the file, so the page stays where it is.
@@ -54,7 +55,7 @@ function editorRoute(language, resource) {
 <template>
   <AppPageHeader :title="__('Translations')">
     <template #actions>
-      <Dropdown v-if="languages.length" :options="csvMenu" align="end">
+      <Dropdown v-if="csvLanguages.length" :options="csvMenu" align="end">
         <Button :label="__('CSV')" icon-left="lucide-file-spreadsheet" icon-right="lucide-chevron-down" />
       </Dropdown>
       <Button
@@ -147,5 +148,5 @@ function editorRoute(language, resource) {
     </div>
   </PageBody>
 
-  <TranslationImportDialog v-model:open="isImportOpen" :languages="languages" @imported="loadOverview" />
+  <TranslationImportDialog v-model:open="isImportOpen" :languages="csvLanguages" @imported="loadOverview" />
 </template>
