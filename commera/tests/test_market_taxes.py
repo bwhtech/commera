@@ -285,7 +285,7 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 		self.assertEqual(len(quotation.taxes), 2)
 		self.assertEqual(quotation.grand_total, 337)
 
-	def test_unmarked_legacy_rows_are_not_preserved_as_commera_charges(self):
+	def test_unmarked_legacy_charges_survive_tax_replacement_but_not_pickup(self):
 		from commera.api.shipping import clear_pickup_charges
 
 		self.set_market_template(self.make_template(10))
@@ -299,10 +299,43 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 				"tax_amount": 15,
 			},
 		)
-		# Missing provenance is ambiguous before migration; rebuilding replaces it with template rows.
+		self.set_single("Commera Settings", "charge_account_head", self.account)
 		apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched=False)
+		self.assertEqual(len(quotation.taxes), 2)
 		clear_pickup_charges(quotation)
 		self.assertEqual([row.description for row in quotation.taxes], ["VAT 10%"])
+
+	def test_unmarked_plugin_and_cod_fees_use_the_shared_charge_rule(self):
+		from commera.api.shipping import add_cod_charge, clear_pickup_charges
+		from commera.checkout_hooks import apply_plugin_fees
+		from commera.utils import COD_CHARGE_DESCRIPTION
+
+		self.set_market_template(self.make_template(10))
+		fee_account = make_tax_account(self.company)
+		self.set_single("Commera Settings", "charge_account_head", fee_account)
+		quotation = self.quote_in_market()
+		fee = {
+			"description": "Delivery Charges - plugin",
+			"charge_type": "Actual",
+			"account_head": fee_account,
+			"tax_amount": 9,
+			"included_in_print_rate": 0,
+			"commera_plugin_fee": 1,
+		}
+		quotation.append("taxes", {**fee, "commera_plugin_fee": 0})
+		quotation.append("taxes", {**fee, "description": COD_CHARGE_DESCRIPTION, "commera_plugin_fee": 0})
+		with (
+			patch("commera.checkout_hooks.get_plugin_fee_rows", return_value=[fee]),
+			patch("commera.checkout_hooks.get_handlers", return_value=["test_fee"]),
+		):
+			apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched=False)
+			add_cod_charge(quotation, 5, fee_account)
+			self.assertEqual(len(quotation.taxes), 3)
+			apply_plugin_fees(quotation)
+			self.assertEqual(len(quotation.taxes), 3)
+			clear_pickup_charges(quotation)
+		self.assertEqual([row.description for row in quotation.taxes], ["VAT 10%", fee["description"]])
+		self.assertEqual(quotation.grand_total, 339)
 
 
 class TestMarketTaxTemplateValidation(MarketTaxTestCase):

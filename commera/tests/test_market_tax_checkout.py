@@ -152,3 +152,95 @@ class TestMarketTaxCheckout(test_market_taxes.TestMarketOrderRecords):
 			with self.assertRaisesRegex(CheckoutPriceChangedError, "Please review"):
 				confirm_payment(quotation.name, payment_mode=COD_PAYMENT_MODE)
 			self.assertEqual(frappe.db.get_value("Quotation", quotation.name, "docstatus"), 0)
+
+
+class TestLegacyMarketTaxCheckout(test_market_taxes.MarketTaxTestCase):
+	create_pickup_warehouse = test_cart_checkout.TestCartCheckout.create_pickup_warehouse
+	create_shop_address = test_cart_checkout.TestCartCheckout.create_shop_address
+
+	def test_primary_legacy_shipping_survives_reload_without_duplication(self):
+		self.assert_legacy_checkout()
+
+	def test_primary_shipping_before_marker_migration(self):
+		self.assert_without_marker_field()
+
+	def test_primary_colliding_template_before_marker_migration(self):
+		self.assert_without_marker_field(colliding=True)
+
+	def assert_without_marker_field(self, colliding=False):
+		meta = frappe.get_meta("Sales Taxes and Charges")
+		with (
+			patch.object(
+				meta, "fields", [field for field in meta.fields if field.fieldname != "commera_cart_charge"]
+			),
+			patch.object(
+				meta,
+				"_valid_columns",
+				[column for column in meta.get_valid_columns() if column != "commera_cart_charge"],
+			),
+		):
+			self.assert_legacy_checkout(colliding=colliding, absent=True)
+
+	def test_primary_colliding_template_survives_legacy_checkout(self):
+		self.assert_legacy_checkout(colliding=True)
+
+	def assert_legacy_checkout(self, colliding=False, absent=False):
+		from commera.api.shipping import set_delivery_option
+		from commera.cart_taxes import TEMPLATE_DOCTYPE
+
+		rule = frappe.get_doc(
+			{
+				"doctype": "Shipping Rule",
+				"label": f"ZZ Legacy Shipping {frappe.generate_hash(length=8)}",
+				"shipping_rule_type": "Selling",
+				"company": self.company,
+				"account": self.account,
+				"calculate_based_on": "Fixed",
+				"shipping_amount": 40,
+			}
+		).insert(ignore_permissions=True)
+		self.set_single("Commera Settings", "shipping_rule", rule.name)
+		self.set_single("Commera Settings", "store_pickup_enabled", 1)
+		warehouse = self.create_pickup_warehouse()
+		template = None
+		if colliding:
+			template = self.make_template(0)
+			doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
+			doc.taxes[0].update({"charge_type": "Actual", "description": rule.label, "tax_amount": 7})
+			doc.save(ignore_permissions=True)
+		self.sign_in_shopper()
+		self.add(self.item_code)
+		generate_quotation_for_cart({})
+		quotation = _get_cart_quotation()
+		if template:
+			set_tax_template(quotation, template)
+		for row in quotation.taxes:
+			row.set("commera_cart_charge", None)
+		save_cart_quotation(quotation)
+		quotation = frappe.get_doc("Quotation", quotation.name)
+		self.assertTrue(all(not row.get("commera_cart_charge") for row in quotation.taxes))
+		extra = 7 if colliding else 0
+		for _ in range(2):
+			rebuilt = generate_quotation_for_cart({})
+			self.assertEqual(rebuilt.grand_total, 120 + extra)
+			self.assertEqual(len(rebuilt.taxes), 2 if colliding else 1)
+			if absent:
+				reloaded = frappe.get_doc("Quotation", rebuilt.name)
+				self.assertTrue(all(not row.get("commera_cart_charge") for row in reloaded.taxes))
+		with patch(
+			"commera.api.shipping.get_delivery_options",
+			return_value=[{"title": "Legacy express", "amount": 40}],
+		):
+			for _ in range(2):
+				summary = set_delivery_option("Legacy express")["checkout_summary"]
+				self.assertEqual(summary["total"], 120 + extra)
+				self.assertEqual(len(_get_cart_quotation().taxes), 2 if colliding else 1)
+				quotation = _get_cart_quotation()
+				for row in quotation.taxes:
+					row.set("commera_cart_charge", None)
+				save_cart_quotation(quotation)
+		summary = update_quotation_address({"is_store_pickup": True, "store_pickup_warehouse": warehouse})[
+			"checkout_summary"
+		]
+		self.assertEqual(summary["total"], 80 + extra)
+		self.assertEqual(len(_get_cart_quotation().taxes), 1 if colliding else 0)

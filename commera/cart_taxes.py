@@ -97,7 +97,7 @@ def set_tax_template(quotation, template: str | None):
 	# Imported here: commera.api.shipping imports the cart, which imports this module.
 	from commera.api.shipping import is_cart_charge
 
-	charges = [row for row in quotation.get("taxes") or [] if is_cart_charge(row, quotation.shipping_rule)]
+	charges = [row for row in quotation.get("taxes") or [] if is_cart_charge(row, quotation)]
 	quotation.taxes_and_charges = template
 	quotation.set("taxes", get_template_rows(template))
 	for row in charges:

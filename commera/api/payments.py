@@ -705,10 +705,10 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 def set_charges(quotation):
 	shipping_rule = frappe.get_cached_value("Commera Settings", "Commera Settings", "shipping_rule")
 	if shipping_rule:
-		quotation.shipping_rule = shipping_rule
 		from commera.api.shipping import CART_CHARGE_FIELD, remove_shipping_rule_row
 
 		remove_shipping_rule_row(quotation)
+		quotation.shipping_rule = shipping_rule
 		# ERPNext matches by account; isolate its row so a template levy cannot be overwritten.
 		existing_rows = quotation.taxes
 		quotation.taxes = []

@@ -273,13 +273,15 @@ def set_delivery_charge_row(quotation, amount: float, title: str):
 
 
 def remove_delivery_charge_row(quotation):
-	quotation.taxes = [row for row in quotation.taxes if row.get(CART_CHARGE_FIELD) != "delivery"]
+	quotation.taxes = [row for row in quotation.taxes if get_cart_charge_kind(row, quotation) != "delivery"]
 	reindex_taxes(quotation)
 
 
 def remove_shipping_rule_row(quotation):
 	"""Remove only the row Commera added, even if a template uses the same account."""
-	quotation.taxes = [row for row in quotation.taxes if row.get(CART_CHARGE_FIELD) != "shipping_rule"]
+	quotation.taxes = [
+		row for row in quotation.taxes if get_cart_charge_kind(row, quotation) != "shipping_rule"
+	]
 	reindex_taxes(quotation)
 
 
@@ -298,10 +300,49 @@ def is_shipping_rule_row(row, rule) -> bool:
 	)
 
 
-def is_cart_charge(row, shipping_rule: str | None) -> bool:
-	"""A charge Commera adds to the cart: delivery, the COD fee or a plugin fee. Not a tax."""
-	# Before migration, unmarked rows are ambiguous. Never infer ownership from a tax name or account.
-	return bool(row.get(PLUGIN_FEE_FIELD) or row.get(CART_CHARGE_FIELD))
+def is_cart_charge(row, quotation) -> bool:
+	return bool(get_cart_charge_kind(row, quotation))
+
+
+def get_cart_charge_kind(row, quotation) -> str | None:
+	"""Recognize saved legacy charges without claiming the applied template's rows."""
+	if row.get(PLUGIN_FEE_FIELD):
+		return "plugin"
+	if marker := row.get(CART_CHARGE_FIELD):
+		return marker
+	from commera.cart_taxes import get_template_rows
+
+	if any(matches_tax_row(row, tax) for tax in get_template_rows(quotation.taxes_and_charges)):
+		return None
+	if row.charge_type != "Actual":
+		return None
+	description = cstr(row.description).strip()
+	from commera.checkout_hooks import get_plugin_fee_rows
+	from commera.plugin_events import get_handlers
+
+	fees = get_plugin_fee_rows(quotation, get_handlers("commera_hooks", "cart_fees"), strict=False)
+	if any(row.account_head == fee["account_head"] and description == fee["description"] for fee in fees):
+		return "plugin"
+	rule_name = quotation.shipping_rule or get_store_shipping_rule()
+	rule = get_shipping_rule_accounts(rule_name)
+	if rule and row.account_head == rule.account:
+		label = frappe.get_cached_value("Shipping Rule", rule_name, "label")
+		if description == cstr(label).strip():
+			return "shipping_rule"
+	charge_account = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
+	if row.account_head == (get_rule_account(get_store_shipping_rule()) or charge_account):
+		if description.startswith(f"{DELIVERY_CHARGE_DESCRIPTION} - "):
+			return "delivery"
+	if row.account_head == charge_account and description == COD_CHARGE_DESCRIPTION.strip():
+		return "cod"
+	return None
+
+
+def matches_tax_row(row, tax) -> bool:
+	amount = "tax_amount" if row.charge_type == "Actual" else "rate"
+	return all(
+		row.get(key) == tax.get(key) for key in ("account_head", "charge_type", "description")
+	) and flt(row.get(amount)) == flt(tax.get(amount))
 
 
 def get_charge_lines(taxes, shipping_rule: str | None) -> dict:
@@ -376,9 +417,7 @@ def get_charge_summary(quotation) -> dict:
 
 def clear_pickup_charges(quotation):
 	quotation.taxes = [
-		row
-		for row in quotation.taxes
-		if row.get(PLUGIN_FEE_FIELD) or not is_cart_charge(row, quotation.shipping_rule)
+		row for row in quotation.taxes if get_cart_charge_kind(row, quotation) in (None, "plugin")
 	]
 	quotation.shipping_rule = None
 	reindex_taxes(quotation)
@@ -393,6 +432,8 @@ def get_cod_charge(quotation) -> float:
 
 
 def add_cod_charge(quotation, cod_charge: float, account_head: str | None):
+	quotation.taxes = [row for row in quotation.taxes if get_cart_charge_kind(row, quotation) != "cod"]
+	reindex_taxes(quotation)
 	quotation.append(
 		"taxes",
 		{
