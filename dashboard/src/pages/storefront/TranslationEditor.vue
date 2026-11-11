@@ -8,7 +8,7 @@ import PageBody from '../../components/PageBody.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import TranslationItemPicker from '../../components/translations/TranslationItemPicker.vue'
 import TranslationRecord from '../../components/translations/TranslationRecord.vue'
-import { saveTranslations, useTranslationOverview } from '../../data/translations'
+import { getItems, saveTranslations, useTranslationOverview } from '../../data/translations'
 import {
   fieldKey,
   groupResources,
@@ -16,6 +16,7 @@ import {
   parseFieldKey,
   toDoCount,
 } from '../../data/translationStatus'
+import { savePending, useOpenedTranslation } from '../../data/translationEditorState'
 import { useTranslationItems } from '../../data/translationItems'
 import { onSettingsClose, openSettings } from '../../ia/settings'
 import { confirmLeave } from '../../utils/confirmLeave'
@@ -45,26 +46,22 @@ const resource = computed(() =>
 )
 
 const filter = ref('todo')
-const list = useTranslationItems(languageCode, resourceType, filter)
+const list = useTranslationItems(languageCode, resourceType, filter, getItems)
 watch([languageCode, resourceType], () => (filter.value = 'todo'))
 
 // A record opened from search or a link may sit outside the loaded list.
-const openedItem = ref(null)
+const { openedItem, unknownName, open } = useOpenedTranslation(languageCode, resourceType)
 const selectedName = computed(() => route.query.record || (isMobile.value ? '' : list.items.value[0]?.name) || '')
 const selectedItem = computed(
   () =>
     list.items.value.find((item) => item.name === selectedName.value) ??
     (openedItem.value?.name === selectedName.value ? openedItem.value : null),
 )
-// A record name that the server no longer knows, so the pane stops waiting for it.
-const unknownName = ref('')
 watch(
-  [selectedName, () => list.loading.value],
-  async ([name, loading]) => {
+  [languageCode, resourceType, selectedName, () => list.loading.value],
+  async ([_language, _resource, name, loading]) => {
     if (!name || loading || selectedItem.value) return
-    const item = await list.fetchItem(name)
-    if (item) openedItem.value = item
-    else unknownName.value = name
+    await open(name, list.fetchItem)
   },
   { immediate: true },
 )
@@ -103,9 +100,8 @@ async function save() {
   const translations = Object.entries(pending).map(([key, value]) => ({ ...parseFieldKey(key), value }))
   saving.value = true
   try {
-    const saved = await saveTranslations(languageCode.value, translations)
+    const saved = await savePending(pending, () => saveTranslations(languageCode.value, translations))
     if (saved === null) return
-    discard()
     const names = [...new Set(translations.map((translation) => translation.name))]
     const [fresh] = await Promise.all([list.refresh(names), loadOverview()])
     openedItem.value = fresh?.find((item) => item?.name === openedItem.value?.name) ?? openedItem.value
@@ -207,9 +203,12 @@ const languageMenu = computed(() => [
       :selected-name="selectedName"
       :has-more="Boolean(list.nextCursor.value)"
       :loading="list.loading.value"
+      :loaded="list.loaded.value"
+      :load-error="list.loadError.value"
       @select="select"
       @open="openResource"
       @load-more="list.loadMore"
+      @retry="list.load"
     />
 
     <!-- min-w-0: the shell's flex-1 child would otherwise hold the widest field's min-content width. -->

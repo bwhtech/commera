@@ -26,6 +26,7 @@ from commera.localization.resources import (
 	get_translatable_resource,
 	get_translatable_resources,
 )
+from commera.localization.translation_queries import RecordQuery
 
 ITEMS_PER_PAGE = 50
 SEARCH_RESULTS_PER_RESOURCE = 20
@@ -83,7 +84,12 @@ def search(language: str, text: str) -> list[dict]:
 		return []
 	results = []
 	for resource in get_translatable_resources():
-		names = list(islice(iter_matching_names(resource, language, text), SEARCH_RESULTS_PER_RESOURCE))
+		query = RecordQuery.for_resource(resource, language)
+		names = (
+			query.search(text, SEARCH_RESULTS_PER_RESOURCE)
+			if query
+			else list(islice(iter_matching_names(resource, language, text), SEARCH_RESULTS_PER_RESOURCE))
+		)
 		if names:
 			titles = get_titles(resource, names)
 			records = [{"name": name, "title": titles.get(name) or name} for name in names]
@@ -98,12 +104,26 @@ def save(language: str, translations: list[dict] | str) -> int:
 		translations = json.loads(translations)
 	if not isinstance(translations, list) or not 0 < len(translations) <= MAX_SAVE_BATCH:
 		frappe.throw(_("Save between 1 and {0} translations at a time.").format(MAX_SAVE_BATCH))
+	check_target_language(language)
+	writes = []
 	for translation in translations:
-		if not isinstance(translation, dict):
-			frappe.throw(_("Each translation names its resource, record, field and value."))
-		resource = get_translatable_resource(cstr(translation.get("resource")))
-		name, field = cstr(translation.get("name")), cstr(translation.get("field"))
-		resource.write(name, field, language, cstr(translation.get("value")), SHOP_WIDE)
+		if not isinstance(translation, dict) or not all(
+			isinstance(translation.get(key), str) for key in ("resource", "name", "field", "value")
+		):
+			frappe.throw(_("Each translation names its resource, record, field and value as text."))
+		resource = get_translatable_resource(translation["resource"])
+		name, field, value = translation["name"], translation["field"], translation["value"]
+		if not resource.exists(name, field):
+			frappe.throw(_("The translation record or field does not exist."), frappe.DoesNotExistError)
+		resource.check_write_permission(bool(value))
+		writes.append((resource, name, field, value))
+	frappe.db.savepoint("save_dashboard_translations")
+	try:
+		for resource, name, field, value in writes:
+			resource.write(name, field, language, value, SHOP_WIDE)
+	except Exception:
+		frappe.db.rollback(save_point="save_dashboard_translations")
+		raise
 	return len(translations)
 
 
@@ -116,6 +136,8 @@ class ItemList:
 	language: str
 
 	def page(self, to_do: bool, cursor: str | None) -> dict:
+		if query := RecordQuery.for_resource(self.resource, self.language):
+			return self.database_page(query, to_do, cursor)
 		kinds = self.resource.get_field_kinds()
 		page, total, to_do_count, last_key = [], 0, 0, None
 		for name, entries in groupby(self.iter_entries(cursor), key=lambda entry: entry.name):
@@ -135,6 +157,37 @@ class ItemList:
 		result = {"items": self.with_urls(page), "next_cursor": json.dumps(last_key) if more else None}
 		if not cursor:
 			result.update(total=total, to_do=to_do_count)
+		return result
+
+	def database_page(self, query, to_do, cursor):
+		from commera.localization.content import fetch_translations
+		from commera.localization.resources import parse_cursor
+
+		after = parse_cursor(cursor)
+		names = query.names(to_do, after[0] if after else None, ITEMS_PER_PAGE + 1)
+		more = len(names) > ITEMS_PER_PAGE
+		names = names[:ITEMS_PER_PAGE]
+		meta = frappe.get_meta(self.resource.doctype)
+		records = self.resource.read_records(meta, [["name", "in", names]], len(names)) if names else []
+		sources = get_sources(self.resource.doctype, records, list(self.resource.fields))
+		translations = fetch_translations(
+			self.resource.doctype, names, list(self.resource.fields), self.language
+		)
+		kinds = self.resource.get_field_kinds()
+		items = []
+		for record, source in zip(records, sources, strict=True):
+			entries = [
+				self.resource.make_entry(meta, record.name, field, source[field], translations)
+				for field in self.resource.fields
+				if source[field]
+			]
+			items.append(make_item(self.resource, record.name, entries, kinds))
+		result = {
+			"items": self.with_urls(items),
+			"next_cursor": json.dumps([names[-1], ""]) if more else None,
+		}
+		if not cursor:
+			result.update(total=query.count(False), to_do=query.count(True))
 		return result
 
 	def find(self, name: str) -> list[dict]:

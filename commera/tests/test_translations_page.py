@@ -158,6 +158,58 @@ class TestTranslationsPage(IntegrationTestCase):
 
 		self.assertEqual(self.field(note, "title")["status"], MISSING)
 
+	def test_malformed_rows_do_not_delete_or_partially_save(self):
+		note = self.make_note("Batch validation")
+		register("Note", note.name, "title", "ar", "original")
+		valid = {"resource": "note", "name": note.name, "field": "title", "value": "changed"}
+		for key in valid:
+			for value in (None, 1, []):
+				with self.subTest(key=key, value=value):
+					with self.assertRaises(frappe.ValidationError):
+						self.save(valid, {**valid, key: value})
+					self.assertEqual(self.field(note, "title")["value"], "original")
+			missing = {field: value for field, value in valid.items() if field != key}
+			with self.assertRaises(frappe.ValidationError):
+				self.save(valid, missing)
+			self.assertEqual(self.field(note, "title")["value"], "original")
+
+	def test_a_later_write_failure_rolls_back_the_batch(self):
+		from commera.localization.resources import DoctypeResource
+
+		note = self.make_note("Atomic batch")
+		register("Note", note.name, "title", "ar", "original")
+		write = DoctypeResource.write
+		calls = 0
+
+		def fail_second(resource, *args):
+			nonlocal calls
+			calls += 1
+			if calls == 2:
+				raise frappe.ValidationError("second write failed")
+			return write(resource, *args)
+
+		row = {"resource": "note", "name": note.name, "field": "title", "value": "changed"}
+		with patch.object(DoctypeResource, "write", fail_second):
+			with self.assertRaises(frappe.ValidationError):
+				self.save(row, row)
+		self.assertEqual(self.field(note, "title")["value"], "original")
+
+	def test_catalog_pages_and_search_build_only_bounded_records(self):
+		for number in range(120):
+			self.make_note(f"Bounded catalog {number}")
+		with patch.object(translation_items, "ITEMS_PER_PAGE", 2):
+			with patch.object(translation_items, "make_item", wraps=translation_items.make_item) as build:
+				page = translations_api.get_items("ar", "note")
+				self.assertEqual(build.call_count, 2)
+				self.assertGreaterEqual(page["total"], 120)
+				self.assertIsNotNone(page["next_cursor"])
+		resource = translation_items.get_translatable_resource("note")
+		with patch.object(translation_items, "get_translatable_resources", return_value=[resource]):
+			with patch.object(translation_items, "iter_matching_names", side_effect=AssertionError("scan")):
+				self.assertEqual(
+					translations_api.search_translations("ar", frappe.generate_hash(length=20)), []
+				)
+
 	def test_the_default_language_is_not_a_target(self):
 		with self.assertRaises(frappe.ValidationError):
 			translations_api.get_items("en", "note")

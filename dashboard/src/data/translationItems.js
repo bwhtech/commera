@@ -1,16 +1,16 @@
 import { ref, watch } from 'vue'
-import { getItems } from './translations'
-import { createSequence } from '../utils/sequence'
+import { createSequence } from '../utils/sequence.js'
 
 // A record finished by a save keeps its place in the list until the filter, language or resource
 // changes, so the merchant's place does not jump. `filter` is 'todo' or 'all'.
-export function useTranslationItems(language, resource, filter) {
+export function useTranslationItems(language, resource, filter, getItems) {
   const items = ref([])
   const total = ref(0)
   const toDoCount = ref(0)
   const nextCursor = ref(null)
   const loading = ref(false)
   const loadError = ref(null)
+  const loaded = ref(false)
   const loads = createSequence()
 
   function params(extra = {}) {
@@ -24,9 +24,12 @@ export function useTranslationItems(language, resource, filter) {
     items.value = []
     nextCursor.value = null
     loading.value = true
+    loaded.value = false
+    loadError.value = null
     const { data, error } = await getItems(params())
     if (!loads.isLatest(ticket)) return
     loadError.value = error
+    loaded.value = !error && Boolean(data)
     items.value = data?.items ?? []
     total.value = data?.total ?? 0
     toDoCount.value = data?.to_do ?? 0
@@ -38,16 +41,21 @@ export function useTranslationItems(language, resource, filter) {
     if (!nextCursor.value || loading.value) return
     const ticket = loads.current()
     loading.value = true
-    const { data } = await getItems(params({ cursor: nextCursor.value }))
+    const { data, error } = await getItems(params({ cursor: nextCursor.value }))
     if (!loads.isLatest(ticket)) return
-    items.value = [...items.value, ...(data?.items ?? [])]
-    nextCursor.value = data?.next_cursor ?? null
+    loadError.value = error
+    if (data) {
+      items.value = [...items.value, ...data.items]
+      nextCursor.value = data.next_cursor ?? null
+    }
     loading.value = false
   }
 
   // One record as the server has it now, whether or not it is in the loaded list.
   async function fetchItem(name) {
+    const ticket = loads.current()
     const { data } = await getItems(params({ record: name }))
+    if (!loads.isLatest(ticket)) return null
     return data?.items?.[0] ?? null
   }
 
@@ -65,7 +73,7 @@ export function useTranslationItems(language, resource, filter) {
     return fresh
   }
 
-  watch([language, resource, filter], load, { immediate: true })
+  watch([language, resource, filter], load, { immediate: true, flush: 'sync' })
 
-  return { items, total, toDoCount, nextCursor, loading, loadError, load, loadMore, fetchItem, refresh }
+  return { items, total, toDoCount, nextCursor, loading, loaded, loadError, load, loadMore, fetchItem, refresh }
 }

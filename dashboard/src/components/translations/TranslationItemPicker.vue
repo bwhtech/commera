@@ -6,6 +6,7 @@ import TranslationStatusDot from './TranslationStatusDot.vue'
 import { searchTranslations } from '../../data/translations'
 import { describeResource } from '../../data/translationStatus'
 import { createSequence } from '../../utils/sequence'
+import { errorMessage } from '../../data/errors'
 import { __ } from '../../data/translation'
 
 // The left pane: which resource, its records, and a search across every resource.
@@ -19,8 +20,10 @@ const props = defineProps({
   selectedName: { type: String, default: '' },
   hasMore: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
+  loaded: { type: Boolean, default: false },
+  loadError: { type: Object, default: null },
 })
-const emit = defineEmits(['select', 'open', 'load-more'])
+const emit = defineEmits(['select', 'open', 'load-more', 'retry'])
 const filter = defineModel('filter', { type: String, default: 'todo' })
 
 const resourceMenu = computed(() =>
@@ -121,7 +124,11 @@ const shownCount = computed(() => (filter.value === 'todo' ? props.toDoCount : p
         <li v-if="hasMore" class="px-2 pt-2">
           <Button class="w-full" :label="__('Load more')" :loading="loading" @click="emit('load-more')" />
         </li>
-        <li v-if="!loading && !items.length" class="px-2 py-6 text-center">
+        <li v-if="loadError" class="px-2 py-6 text-center" role="alert">
+          <p class="text-p-sm text-ink-red-6">{{ errorMessage(loadError, __('Could not load translations')) }}</p>
+          <Button class="mt-2" size="sm" :label="__('Retry')" @click="emit('retry')" />
+        </li>
+        <li v-else-if="loaded && !loading && !items.length" class="px-2 py-6 text-center">
           <p class="text-p-sm text-ink-gray-5">{{ __('{0} are up to date in {1}', [resource.label, language.name]) }}</p>
           <Button v-if="filter === 'todo' && total" class="mt-2" size="sm" :label="__('Show all')" @click="filter = 'all'" />
         </li>
