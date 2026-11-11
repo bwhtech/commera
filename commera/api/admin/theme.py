@@ -8,8 +8,17 @@ from frappe.utils import get_url_to_form
 
 from commera.api.admin.docfields import build_field_groups, get_child_tables, get_editable_docfields
 from commera.api.admin.settings import coerce_field_value
+from commera.builder_themes.pages import (
+	HOME,
+	get_editor_url,
+	get_home_page_preview,
+	get_theme_pages,
+	is_builder_installed,
+)
+from commera.builder_themes.theme import create_builder_theme as create_theme_in_builder
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	BASE_THEME,
+	BUILDER_THEME_TYPE,
 	get_theme_context,
 	resolve_active_theme,
 )
@@ -43,8 +52,17 @@ def build_themes(active_theme):
 		theme.live = theme.name == active_theme
 		theme.is_base = theme.name == BASE_THEME
 		theme.source = get_theme_source(theme)
+		if theme.theme_type == BUILDER_THEME_TYPE:
+			theme.builder_editor_url = get_builder_editor_url(theme.name)
+			if preview := get_home_page_preview(theme.name):
+				theme.thumbnail, theme.thumbnail_dark = preview, None
 
 	return sorted(themes, key=lambda theme: not theme.live)
+
+
+def get_builder_editor_url(theme_name):
+	home_page = get_theme_pages(theme_name).get(HOME)
+	return get_editor_url(home_page) if home_page and is_builder_installed() else None
 
 
 def get_theme_source(theme):
@@ -81,6 +99,7 @@ def build_editor_data():
 		"active_theme": active_theme,
 		"themes": build_themes(active_theme),
 		"settings": build_theme_settings(active_theme),
+		"builder_installed": is_builder_installed(),
 	}
 
 
@@ -105,6 +124,14 @@ def activate_theme(theme: str):
 	settings.save()
 
 	return build_editor_data()
+
+
+@frappe.whitelist(methods=["POST"])
+def create_builder_theme(theme_name: str):
+	"""A new theme designed in Frappe Builder: three empty pages. Returns the editor URL of its home page."""
+	frappe.has_permission("Shop Theme", ptype="create", throw=True)
+	theme = create_theme_in_builder(theme_name.strip())
+	return {"theme": theme.name, "editor_url": get_builder_editor_url(theme.name)}
 
 
 @frappe.whitelist(methods=["POST"])

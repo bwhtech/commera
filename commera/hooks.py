@@ -57,8 +57,13 @@ on_login = "commera.roles.save_commera_default_app"
 # Runs before every core renderer (frappe/website/path_resolver.py); the private-store gate must stay first.
 page_renderer = [
 	"commera.storefront_access.PrivateStorefrontPage",
+	"commera.builder_themes.renderer.BuilderThemePageRenderer",
 	"commera.shop_themes.theme_resolver.ThemePageRenderer",
 ]
+
+# Frappe Builder hooks (read only when Builder is installed): data and agent instructions for theme pages.
+builder_page_data = ["commera.builder_themes.page_data.get_page_data"]
+builder_agent_context = ["commera.builder_themes.agent_context.get_agent_context"]
 
 # frappe.clear_cache() flushes redis but not frappe.local, where the theme engine memoises - hence these.
 clear_cache = [
@@ -318,6 +323,7 @@ jinja = {
 	"filters": ["commera.utils.can_return"],
 	"methods": [
 		"commera.branding.get_brand_assets",
+		"commera.builder_themes.head.commera_builder_head",
 		"commera.guest.is_guest_checkout_enabled",
 		"commera.localization.get_country_choices",
 		"commera.localization.get_localization",

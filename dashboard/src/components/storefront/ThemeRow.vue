@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Badge, Button, useColorScheme } from 'frappe-ui'
 import Thumb from '../Thumb.vue'
+import ResponsiveButton from '../ResponsiveButton.vue'
 import { __ } from '../../data/translation'
 
 const props = defineProps({
@@ -15,16 +16,20 @@ defineEmits(['activate'])
 
 const { resolvedColorScheme } = useColorScheme()
 
-const isClassic = computed(() => props.theme.theme_type !== 'Sections')
+const isBuilder = computed(() => props.theme.theme_type === 'Builder')
+const isClassic = computed(() => props.theme.theme_type !== 'Sections' && !isBuilder.value)
 const muted = computed(() => isClassic.value && !props.theme.live)
-const meta = computed(() => (isClassic.value ? props.theme.source : __('Built with sections · {0}', [props.theme.source])))
+const meta = computed(() => {
+  if (isBuilder.value) return __('Built with Frappe Builder · {0}', [props.theme.source])
+  return isClassic.value ? props.theme.source : __('Built with sections · {0}', [props.theme.source])
+})
 const editorRoute = computed(() =>
-  isClassic.value ? null : { name: 'StorefrontThemeEditor', params: { theme: props.theme.name } },
+  props.theme.theme_type === 'Sections' ? { name: 'StorefrontThemeEditor', params: { theme: props.theme.name } } : null,
 )
 const thumbnail = computed(() =>
   resolvedColorScheme.value === 'dark' && props.theme.thumbnail_dark ? props.theme.thumbnail_dark : props.theme.thumbnail,
 )
-const imageSize = computed(() => (props.featured ? 'aspect-[16/10] w-full sm:w-60' : 'aspect-[16/10] w-28 sm:w-40'))
+const imageSize = computed(() => (props.featured ? 'aspect-video w-full sm:w-60' : 'aspect-video w-28 sm:w-40'))
 </script>
 
 <template>
@@ -83,6 +88,13 @@ const imageSize = computed(() => (props.featured ? 'aspect-[16/10] w-full sm:w-6
       <span class="sm:hidden">{{ __('Switch') }}</span>
       <span class="hidden sm:inline">{{ __('Switch Theme') }}</span>
     </Button>
+    <ResponsiveButton
+      v-if="isBuilder && theme.builder_editor_url"
+      :label="__('Edit in Builder')"
+      icon="lucide-external-link"
+      icon-position="right"
+      :href="theme.builder_editor_url"
+    />
     <span
       class="lucide-chevron-right size-4 shrink-0 text-ink-gray-5 rtl:-scale-x-100"
       :class="{ invisible: !editorRoute, 'hidden sm:block': featured }"

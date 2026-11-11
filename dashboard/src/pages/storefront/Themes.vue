@@ -1,16 +1,17 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Skeleton, dialog, toast } from 'frappe-ui'
+import { Button, Skeleton, dialog, toast } from 'frappe-ui'
 import AppPageHeader from '../../components/AppPageHeader.vue'
 import PageBody from '../../components/PageBody.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import ThemeRow from '../../components/storefront/ThemeRow.vue'
+import NewBuilderThemeDialog from '../../components/storefront/NewBuilderThemeDialog.vue'
 import { useTheme } from '../../data/theme'
 import { captureMissingThumbnails } from '../../data/storePreview'
 import { errorMessage } from '../../data/errors'
 import { __ } from '../../data/translation'
 
-const { themes, loadError, loading, load, activate } = useTheme()
+const { themes, loadError, loading, builderInstalled, load, activate } = useTheme()
 
 onMounted(async () => {
   await load()
@@ -18,6 +19,7 @@ onMounted(async () => {
 })
 
 const activatingName = ref(null)
+const creatingTheme = ref(false)
 
 const liveTheme = computed(() => themes.value.find((theme) => theme.live) ?? null)
 const libraryThemes = computed(() => themes.value.filter((theme) => !theme.live))
@@ -43,13 +45,17 @@ function confirmActivate(theme) {
 </script>
 
 <template>
-  <AppPageHeader :title="__('Themes')" />
+  <AppPageHeader :title="__('Themes')">
+    <template v-if="builderInstalled" #actions>
+      <Button :label="__('New theme')" icon-left="lucide-plus" variant="solid" theme="gray" @click="creatingTheme = true" />
+    </template>
+  </AppPageHeader>
 
   <PageBody width="wide">
     <div v-if="loading && !themes.length" aria-hidden="true">
       <Skeleton class="h-3.5 w-24 rounded-4" />
       <div class="mt-2 flex items-center gap-4 rounded-5 border border-outline-gray-2 px-4 py-5">
-        <Skeleton class="aspect-[16/10] w-28 shrink-0 rounded-4 sm:w-44" />
+        <Skeleton class="aspect-video w-28 shrink-0 rounded-4 sm:w-44" />
         <div class="min-w-0 flex-1">
           <Skeleton class="h-4 w-32 rounded-4" />
           <Skeleton class="mt-2 h-3.5 w-56 max-w-full rounded-4" />
@@ -96,4 +102,6 @@ function confirmActivate(theme) {
       </section>
     </template>
   </PageBody>
+
+  <NewBuilderThemeDialog v-model:open="creatingTheme" />
 </template>
