@@ -65,7 +65,7 @@ def escape_strings(value, key: str = ""):
 
 
 def is_url_key(key: str) -> bool:
-	return key in ("url", "image", "thumbnail", "logo") or key.endswith("_url")
+	return key in ("url", "thumbnail", "logo") or key.endswith(("_url", "image"))
 
 
 def get_shop_data() -> dict:

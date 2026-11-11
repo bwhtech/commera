@@ -13,6 +13,7 @@ from commera.builder_themes.pages import (
 	get_page_role,
 	get_theme_pages,
 )
+from commera.storefront_access import is_storefront_hidden
 
 SAMPLE_LIST_LENGTH = 2
 SAMPLE_TEXT_LENGTH = 160
@@ -133,6 +134,8 @@ def get_role_text(role, pages: dict) -> str:
 
 
 def get_sample(page_type: str) -> str:
+	if is_storefront_hidden():
+		return "(the store is private: no sample)"
 	try:
 		data = get_data_for(page_type, {})
 	except frappe.PageDoesNotExistError:
