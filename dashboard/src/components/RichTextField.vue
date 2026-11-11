@@ -1,12 +1,8 @@
 <script setup>
-/**
- * Long-form product copy is rich text: a description with a list in it is the
- * norm, not the exception. The field keeps FormControl's shape — label above,
- * hint below — so it sits in a form beside plain inputs without arguing.
- */
 import { Editor, EditorContent, EditorFixedMenu, RichTextKit, commentToolbar } from 'frappe-ui/editor'
 
 defineProps({
+  disabled: { type: Boolean, default: false },
   label: { type: String, default: '' },
   description: { type: String, default: '' },
   placeholder: { type: String, default: '' },
@@ -22,8 +18,8 @@ const model = defineModel({ type: String, default: '' })
     <div
       class="overflow-hidden rounded-4 border border-outline-gray-2 focus-within:border-outline-gray-3"
     >
-      <Editor v-model="model" :extensions="[RichTextKit]" :placeholder="placeholder" editable>
-        <EditorFixedMenu :items="commentToolbar" class="border-b border-outline-gray-1" />
+      <Editor v-model="model" :extensions="[RichTextKit]" :placeholder="placeholder" :editable="!disabled">
+        <EditorFixedMenu v-if="!disabled" :items="commentToolbar" class="border-b border-outline-gray-1" />
         <EditorContent :class="['px-3 py-2', minHeight]" />
       </Editor>
     </div>

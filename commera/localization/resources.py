@@ -31,6 +31,16 @@ PAGE_SIZE = 50
 BATCH_SIZE = 500
 STATUSES = (MISSING, OUTDATED, CURRENT)
 ENTRY_FILTERS = ("name", "field")
+IMAGE, HTML, LONG, TEXT = "image", "html", "long", "text"
+FIELD_KINDS = {
+	"Attach": IMAGE,
+	"Attach Image": IMAGE,
+	"Text Editor": HTML,
+	"Small Text": LONG,
+	"Text": LONG,
+	"Long Text": LONG,
+	"Markdown Editor": LONG,
+}
 
 
 @dataclass(frozen=True)
@@ -112,6 +122,23 @@ class TranslatableResource:
 		check_target_language(language)
 		counts = self.aggregate_statuses(language)
 		return {status: counts[status] for status in STATUSES}
+
+	def count_work(self, language: str) -> dict[str, int]:
+		"""Like `count_statuses`, but an image field without a translation counts as current: the store
+		shows the source image there, so nothing is missing."""
+		counts = self.count_statuses(language)
+		images = [field for field, kind in self.get_field_kinds().items() if kind == IMAGE]
+		missing_images = sum(self.count_field_statuses(language, field)[MISSING] for field in images)
+		counts[MISSING] -= missing_images
+		counts[CURRENT] += missing_images
+		return counts
+
+	def get_field_kinds(self) -> dict[str, str]:
+		"""{field: image, html, long or text} for the fields whose kind is known up front."""
+		return {}
+
+	def count_field_statuses(self, language: str, field: str) -> Counter:
+		return Counter(entry.status for entry, _key in self.scan(language, {"field": field}, None))
 
 	def get_market_entries(self, entries: list[TranslationEntry], language: str) -> dict:
 		"""{(name, field): [its entry per market, by market]} for a batch of shop-wide entries."""
@@ -251,7 +278,8 @@ class DoctypeResource(TranslatableResource):
 			resource=self.type,
 			name=name,
 			field=field,
-			label=meta.get_label(field),
+			# A field without a column has no docfield label to read.
+			label=meta.get_label(field) if meta.has_field(field) else _(frappe.unscrub(field)),
 			source=source,
 			value=value or "",
 			status=get_status(source, value, source_hash),
@@ -269,6 +297,20 @@ class DoctypeResource(TranslatableResource):
 			else:
 				counts.update(self.count_derived_statuses(meta, field, language))
 		return counts
+
+	def get_field_kinds(self):
+		meta = frappe.get_meta(self.doctype)
+		return {
+			field: FIELD_KINDS.get(meta.get_field(field).fieldtype, TEXT)
+			for field in self.fields
+			if meta.has_field(field)
+		}
+
+	def count_field_statuses(self, language, field):
+		meta = frappe.get_meta(self.doctype)
+		if meta.issingle or not meta.has_field(field):
+			return super().count_field_statuses(language, field)
+		return Counter(count_column_statuses(self.doctype, field, language))
 
 	def count_derived_statuses(self, meta, field, language) -> Counter:
 		"""A field without a column has its source in Python, so count it a batch at a time."""

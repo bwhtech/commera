@@ -31,6 +31,7 @@ const ITEM = {
   theme: { label: __('Themes'), icon: 'lucide-palette', to: '/storefront/theme' },
   navigation: { label: __('Navigation'), icon: 'lucide-list-tree', to: '/storefront/navigation' },
   pages: { label: __('Pages'), icon: 'lucide-file-text', to: '/storefront/pages' },
+  translations: { label: __('Translations'), icon: 'lucide-languages', to: '/storefront/translations' },
   reviews: { label: __('Reviews'), icon: 'lucide-star', to: '/reviews' },
 }
 
@@ -43,7 +44,7 @@ const coreSections = [
     items: [ITEM.home, ITEM.search, ITEM.orders, ITEM.customers, ITEM.discounts, ITEM.analytics],
   },
   { id: 'catalog', label: __('Catalog'), items: [ITEM.products, ITEM.collections, ITEM.attributes] },
-  { id: 'storefront', label: __('Storefront'), items: [ITEM.theme, ITEM.navigation, ITEM.pages, ITEM.reviews] },
+  { id: 'storefront', label: __('Storefront'), items: [ITEM.theme, ITEM.navigation, ITEM.pages, ITEM.translations, ITEM.reviews] },
 ]
 
 const pluginItems = pluginNavItems()

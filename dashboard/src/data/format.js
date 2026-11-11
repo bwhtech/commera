@@ -30,6 +30,9 @@ export const shortDate = (iso) => (iso ? dayjs(iso).format(shortDateFormat) : '�
 export const longDate = (iso) => (iso ? dayjs(iso).format(dateFormat) : '—')
 
 const LABELS = {
+  missing: __('Missing'),
+  outdated: __('Outdated'),
+  unsaved: __('Unsaved'),
   paid: __('Paid'),
   pending: __('Payment pending'),
   refunded: __('Refunded'),
@@ -58,6 +61,9 @@ export const label = (key) => LABELS[key] ?? key
 
 // One lookup for every status pill in the app — colour only where it encodes state.
 const THEMES = {
+  missing: 'red',
+  outdated: 'amber',
+  unsaved: 'blue',
   paid: 'green',
   delivered: 'green',
   fulfilled: 'green',

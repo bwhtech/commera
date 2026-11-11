@@ -39,6 +39,14 @@ const routes = [
     meta: { fullscreen: true },
   },
   { path: '/storefront/navigation', name: 'StorefrontNavigation', component: () => import('./pages/storefront/Navigation.vue') },
+  { path: '/storefront/translations', name: 'StorefrontTranslations', component: () => import('./pages/storefront/Translations.vue') },
+  {
+    path: '/storefront/translations/:lang/:resource',
+    name: 'StorefrontTranslationEditor',
+    component: () => import('./pages/storefront/TranslationEditor.vue'),
+    // The editor's two panes scroll on their own, under a header that stays put.
+    meta: { split: true },
+  },
   { path: '/storefront/pages', name: 'StorefrontPages', component: () => import('./pages/storefront/Pages.vue') },
   // A Shop Web Page is named by its title, so this shadows a page literally titled "new" —
   // rare enough to live with, and the editor is still reachable from the list row.
