@@ -2,7 +2,11 @@ import { get_request_params } from './localization.js';
 import { t } from './translate.js';
 
 const API_ROOT = '/api/v2/method/commera.api.storefront';
-const STATUS_MESSAGES = { 403: 'Not permitted.', 404: 'Not found.' };
+// Functions so the string extraction sees each message inside t().
+const STATUS_MESSAGES = {
+	403: () => t('Not permitted.'),
+	404: () => t('Not found.'),
+};
 
 export class StorefrontError extends Error {
 	constructor(message, { status, exc_type, cause } = {}) {
@@ -95,7 +99,7 @@ function get_error_message(body, response) {
 		error.message ||
 			body.messages?.[0]?.message ||
 			error.exception?.trim().split('\n').pop() ||
-			t(STATUS_MESSAGES[response.status] ?? '') ||
+			STATUS_MESSAGES[response.status]?.() ||
 			response.statusText ||
 			t('Request failed'),
 	);

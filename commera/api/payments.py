@@ -71,6 +71,7 @@ from commera.utils import (
 	get_charge_account_head,
 	get_pickup_addresses,
 	get_pickup_warehouses,
+	get_untranslated_address_name,
 )
 
 
@@ -1073,7 +1074,10 @@ def add_customer_address(party_name, values: dict):
 	)
 	# ERPNext resolves a transaction address through Dynamic Link; unlinked addresses are refused.
 	address_doc.append("links", {"link_doctype": "Customer", "link_name": party_name})
-	address_doc.insert(ignore_permissions=True)
+	address_doc.insert(
+		ignore_permissions=True,
+		set_name=get_untranslated_address_name(address_doc),
+	)
 	return address_doc
 
 

@@ -164,5 +164,8 @@ when it is a literal inside `__()`. Templates call the global `__`; a script imp
 - Interpolate with numbered placeholders, one whole sentence per string: `__('{0} orders', [count])`.
 - Translate what the dashboard writes. Server data, option values, keys and routes stay as they are.
 - Layout classes are logical (`ms-*`, `pe-*`, `start-*`, `text-end`), so the shell mirrors under `dir="rtl"`.
+- A new string needs an Arabic row in `commera/translations/ar.csv`. `bench commera check-translations` lists
+  the missing ones, and `test_arabic_translations` fails CI until they are there. A word that Desk also uses with
+  another meaning gets a context: `__('Updated', null, 'Date last updated')`.
 
 The admin's language rides the boot payload, so changing it reloads the shell; nothing translates reactively.

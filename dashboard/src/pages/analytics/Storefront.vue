@@ -35,7 +35,7 @@ const channels = computed(() => report.value?.channels ?? [])
 const FUNNEL_STAGE_LABELS = {
   'Viewed Product': __('Viewed'),
   'Added to Cart': __('Added'),
-  'Reached Checkout': __('Checkout'),
+  'Reached Checkout': __('Checkout', null, 'Storefront checkout'),
   Purchased: __('Bought'),
 }
 

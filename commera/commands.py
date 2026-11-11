@@ -112,6 +112,23 @@ def new_shipping_provider(label: str, app: str | None):
 	)
 
 
+@commera_commands.command("check-translations")
+@click.option("--lang", default="ar", show_default=True, help="Language code of the translation file")
+def check_translations(lang: str):
+	"""List missing or broken translations in the starter theme, SDK, API, packages and dashboard.
+	Exits with 1 when commera/translations/<lang>.csv needs a fix."""
+	from commera.localization.untranslated import check_translations, get_messages
+
+	problems = check_translations(lang)
+	for problem in problems:
+		click.echo(str(problem))
+	total = len(get_messages())
+	if problems:
+		click.secho(f"{len(problems)} of {total} strings need a fix in {lang}.csv", fg="red")
+		raise SystemExit(1)
+	click.secho(f"All {total} strings are translated in {lang}.csv", fg="green")
+
+
 def get_current_app_scaffold(scaffold_class=None, app=None):
 	from frappe.utils import get_bench_path
 

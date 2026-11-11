@@ -118,7 +118,12 @@ class ThemePageRenderer:
 		self.requires_auth = False
 
 	def can_render(self):
-		page = find_theme_page(self.get_request_path(), get_localization().language.code)
+		path = self.get_request_path()
+		page = find_theme_page(path, get_localization().language.code)
+		if not page and path.startswith("account/"):
+			page = find_account_not_found_page(path)
+			if page:
+				self.http_status_code = 404
 		if not page:
 			return False
 
@@ -192,6 +197,17 @@ def find_theme_page(request_path, language_code=None):
 	if not find_theme_file(theme_context["dirs"], template_path):
 		return None
 	return theme_context["dirs"], template_path, requires_auth, match
+
+
+def find_account_not_found_page(path):
+	# Unknown account URLs must not fall through to another app's portal renderer.
+	route, _match = match_route(get_compiled_routes()["routes"], path)
+	if route:
+		return None
+	theme = get_render_theme_context()
+	if find_theme_file(theme["dirs"], NOT_FOUND_TEMPLATE):
+		return theme["dirs"], NOT_FOUND_TEMPLATE, False, None
+	return None
 
 
 def match_route(routes, request_path, legacy_path=None):

@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
-from frappe import _
+from frappe import N_, _
 from frappe.query_builder import Case, Order
 from frappe.query_builder.functions import Count, Max, Sum
 from frappe.utils.data import add_days, cint, cstr, flt, formatdate, getdate
@@ -56,17 +56,17 @@ ORDER_FIELDS = (
 
 # Priority order, read top-down: an order is described by the furthest rung it has reached.
 STAGE_LABELS = {
-	"cancelled": "Cancelled",
-	"returned": "Returned",
-	"delivered": "Delivered",
-	"shipped": "Shipped",
-	"fulfilled": "Fulfilled",
-	"partly_fulfilled": "Partly fulfilled",
-	"packed": "Packed",
-	"delivery_note_drafted": "Preparing for shipment",
-	"to_fulfil": "To fulfil",
+	"cancelled": N_("Cancelled"),
+	"returned": N_("Returned"),
+	"delivered": N_("Delivered"),
+	"shipped": N_("Shipped"),
+	"fulfilled": N_("Fulfilled"),
+	"partly_fulfilled": N_("Partly fulfilled"),
+	"packed": N_("Packed"),
+	"delivery_note_drafted": N_("Preparing for shipment"),
+	"to_fulfil": N_("To fulfil"),
 	# An unsubmitted order is waiting on the owner, which is what "Draft" failed to tell them.
-	"confirmation_pending": "Confirmation pending",
+	"confirmation_pending": N_("Confirmation pending"),
 }
 
 # Sequential timeline, unlike STAGE_LABELS above, which is a priority ordering.
@@ -83,14 +83,14 @@ STEP_POSITIONS = {key: index for index, key in enumerate(STEP_SEQUENCE)}
 # Milestone wording, not badge wording; same keys as STAGE_LABELS.
 # Shop owners don't know what a Delivery Note is, so the wording stays plain even where the key isn't.
 STEP_LABELS = {
-	"confirmation_pending": "Confirmation pending",
-	"to_fulfil": "Order confirmed",
-	"delivery_note_drafted": "Preparing",
-	"packed": "Packed",
-	"shipped": "Shipped",
-	"delivered": "Delivered",
-	"cancelled": "Cancelled",
-	"returned": "Returned",
+	"confirmation_pending": N_("Confirmation pending"),
+	"to_fulfil": N_("Order confirmed"),
+	"delivery_note_drafted": N_("Preparing"),
+	"packed": N_("Packed"),
+	"shipped": N_("Shipped"),
+	"delivered": N_("Delivered"),
+	"cancelled": N_("Cancelled"),
+	"returned": N_("Returned"),
 }
 
 # Rungs that annotate the dispatch node instead of earning a node of their own.
@@ -924,21 +924,21 @@ def get_overview(order_status: str | None = None):
 		"stats": [
 			{
 				"key": "revenue",
-				"label": "Revenue",
+				"label": _("Revenue"),
 				"value": flt(current_window.revenue),
 				"format": "currency",
 				"delta": percent_change(current_window.revenue, previous_window.revenue),
 			},
 			{
 				"key": "orders",
-				"label": "Orders",
+				"label": _("Orders"),
 				"value": cint(current_window.orders),
 				"format": "number",
 				"delta": percent_change(current_window.orders, previous_window.orders),
 			},
 			{
 				"key": "to_fulfil",
-				"label": "Orders to fulfil",
+				"label": _("Orders to fulfil"),
 				"value": to_fulfil,
 				"format": "number",
 				"delta": None,
@@ -948,7 +948,7 @@ def get_overview(order_status: str | None = None):
 			},
 			{
 				"key": "products_live",
-				"label": "Products live",
+				"label": _("Products live"),
 				"value": published_now,
 				"format": "number",
 				"delta": percent_change(published_now, published_now - published_new),

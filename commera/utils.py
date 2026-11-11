@@ -36,6 +36,11 @@ PRICE_SORTS = ("price_low", "price_high", "discount")
 PRICE_FILTERS = ("has_discount", "min_price", "max_price")
 
 
+def get_untranslated_address_name(address):
+	# Frappe translates Address type suffixes during autoname; identifiers must stay stable.
+	return f"{address.address_title}-{address.address_type}-{frappe.generate_hash(length=10)}"
+
+
 def get_address_lines(address_display):
 	"""ERPNext builds address_display as HTML; the dashboard renders plain text, so <br> tags leak."""
 	if not address_display:

@@ -267,7 +267,7 @@
 
 <div class="space-y-10" x-data="checkout_state">
     <div class="flex items-baseline justify-between">
-        <h1 class="text-3xl font-bold my-3 md:mb-11 md">{{ _('Checkout') }}</h1>
+        <h1 class="text-3xl font-bold my-3 md:mb-11 md">{{ _('Checkout', context='Storefront checkout') }}</h1>
         <div class="flex items-center gap-4 my-3">
             <div class="md:hidden">
                 {% include 'templates/components/promo_code_component.html' %}

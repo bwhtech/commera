@@ -810,7 +810,7 @@ function checkout(config) {
 				address.city,
 				address.state,
 				address.pincode,
-				address.country,
+				this.config.country_titles?.[address.country] ?? address.country,
 			]
 				.filter(Boolean)
 				.join(', ');

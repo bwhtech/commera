@@ -161,7 +161,7 @@
 						{% if frappe.session.user == "Guest" %}
 							<button type="button" class="btn btn-secondary w-100" :disabled="!$store.cart.selected_count"
 								@click="$dispatch('open-auth', { mode: 'checkout' })">
-								{{ _("Checkout") }}
+								{{ _("Checkout", context="Storefront checkout") }}
 							</button>
 						{% else %}
 							<button type="button" class="btn btn-secondary w-100" :disabled="checkout_status !== 'idle' || !$store.cart.selected_count"

@@ -78,7 +78,7 @@
 							<div class="mt-auto">
 								<a href="{{ url('/cart/checkout') | e }}" class="btn btn-outline-secondary btn-block m-b20"
 									:class="checkout_status !== 'idle' && 'disabled'" :aria-disabled="checkout_status !== 'idle'"
-									@click.prevent="go_to_checkout($el.href)">{{ _("Checkout") }}</a>
+									@click.prevent="go_to_checkout($el.href)">{{ _("Checkout", context="Storefront checkout") }}</a>
 								<a href="{{ url('/cart') | e }}" class="btn btn-secondary btn-block">{{ _("View Cart") }}</a>
 							</div>
 						</div>

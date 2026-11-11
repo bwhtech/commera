@@ -235,7 +235,7 @@ function moveToCollection() {
           {{ __('Price') }}
         </ListHeaderCellSort>
         <ListHeaderCellSort align="end" :direction="directionFor('updated')" @click="toggleSort('updated')">
-          {{ __('Updated') }}
+          {{ __('Updated', null, 'Date last updated') }}
         </ListHeaderCellSort>
       </ListHeader>
 

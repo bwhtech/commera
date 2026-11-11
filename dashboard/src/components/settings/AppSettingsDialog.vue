@@ -1,5 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { ConfigProvider } from 'reka-ui'
+import { direction } from '../../data/boot'
 import {
   Button,
   Icon,
@@ -54,12 +56,7 @@ const tab = computed({
 
 const isCloudOverlayOpen = ref(false)
 
-// An Esc or outside click meant for one of the Cloud billing panel's menus also reaches this
-// dialog: the panel is a separate Vue app in a shadow root, with its own reka-ui layer stack
-// listening on the same `window`, and its inline runtime closes a menu on an outside click by
-// dispatching a synthetic Escape. The close is ignored here rather than refused with
-// `dismissible: false`, because that calls preventDefault() on the shared event, and the
-// Cloud menu then sees defaultPrevented and stays open.
+// Cloud has its own layer stack; ignoring its close preserves its menu event handling.
 function setOpen(isOpen) {
   if (!isOpen && isCloudOverlayOpen.value) return
   settings.open = isOpen
@@ -87,241 +84,239 @@ watch(
 </script>
 
 <template>
-  <SettingsDialog
-    :open="settings.open"
-    v-model:tab="tab"
-    :unmount-on-hide="false"
-    @update:open="setOpen"
-  >
-    <template #title>{{ __('Commera settings') }}</template>
-
-    <header class="flex h-12 shrink-0 items-center gap-1 border-b border-outline-gray-1 px-2 sm:hidden">
-      <Button
-        variant="ghost"
-        size="lg"
-        icon="lucide-chevron-left"
-        class="rtl:-scale-x-100"
-        :aria-label="settings.pickedTab ? __('Back') : __('Close')"
-        @click="goBack"
-      />
-      <h2 aria-hidden="true" class="text-lg-semibold text-ink-gray-8">{{ __('Settings') }}</h2>
-    </header>
-
-    <SettingsSidebar
-      class="max-sm:max-h-none max-sm:flex-1 max-sm:border-b-0 max-sm:[&_[role=tab]]:h-10"
-      :class="{ 'max-sm:hidden': settings.pickedTab }"
+  <!-- Reka defaults teleported tabs to ltr; provide direction for layout and keyboard navigation. -->
+  <ConfigProvider :dir="direction">
+    <SettingsDialog
+      :open="settings.open"
+      v-model:tab="tab"
+      :unmount-on-hide="false"
+      @update:open="setOpen"
     >
-      <SettingsNavGroup>
-        <SettingsNavItem value="general">
-          <template #prefix><span class="lucide-store size-4" aria-hidden="true" /></template>
-          {{ __('General') }}
-        </SettingsNavItem>
-        <SettingsNavItem value="appearance">
-          <template #prefix><span class="lucide-sun-moon size-4" aria-hidden="true" /></template>
-          {{ __('Appearance') }}
-        </SettingsNavItem>
-        <SettingsNavItem value="emails">
-          <template #prefix><span class="lucide-mail size-4" aria-hidden="true" /></template>
-          {{ __('Emails') }}
-        </SettingsNavItem>
-        <SettingsNavItem value="languages">
-          <template #prefix><span class="lucide-languages size-4" aria-hidden="true" /></template>
-          {{ __('Languages') }}
-        </SettingsNavItem>
-        <SettingsNavItem value="markets">
-          <template #prefix><span class="lucide-globe size-4" aria-hidden="true" /></template>
-          {{ __('Markets') }}
-          <template v-if="marketStore.markets.value" #suffix>
-            <span class="text-sm text-ink-gray-5 tabular-nums">{{ marketStore.enabledCount.value }}</span>
-          </template>
-        </SettingsNavItem>
-      </SettingsNavGroup>
+      <template #title>{{ __('Commera settings') }}</template>
 
-      <SettingsNavGroup :label="__('Checkout')">
-        <SettingsNavItem value="payments">
-          <template #prefix><span class="lucide-credit-card size-4" aria-hidden="true" /></template>
-          {{ __('Payments') }}
-          <template #suffix>
-            <span class="text-sm text-ink-gray-5 tabular-nums">{{ connectedCount }}</span>
-          </template>
-        </SettingsNavItem>
-        <SettingsNavItem value="shipping">
-          <template #prefix><span class="lucide-truck size-4" aria-hidden="true" /></template>
-          {{ __('Shipping') }}
-          <template #suffix>
-            <span class="text-sm text-ink-gray-5 tabular-nums">{{ shippingConnected }}</span>
-          </template>
-        </SettingsNavItem>
-        <SettingsNavItem value="locations">
-          <template #prefix><span class="lucide-map-pin size-4" aria-hidden="true" /></template>
-          {{ __('Pickup locations') }}
-          <!-- Nothing while pickup is off: a count there would suggest shoppers can collect today. -->
-          <template v-if="pickupLocations.pickupEnabled.value" #suffix>
-            <span class="text-sm text-ink-gray-5 tabular-nums">{{ pickupLocations.activeCount.value }}</span>
-          </template>
-        </SettingsNavItem>
-        <SettingsNavItem value="checkout">
-          <template #prefix><span class="lucide-shopping-cart size-4" aria-hidden="true" /></template>
-          {{ __('General') }}
-        </SettingsNavItem>
-      </SettingsNavGroup>
+      <header class="flex h-12 shrink-0 items-center gap-1 border-b border-outline-gray-1 px-2 sm:hidden">
+        <Button
+          variant="ghost"
+          size="lg"
+          icon="lucide-chevron-left"
+          class="rtl:-scale-x-100"
+          :aria-label="settings.pickedTab ? __('Back') : __('Close')"
+          @click="goBack"
+        />
+        <h2 aria-hidden="true" class="text-lg-semibold text-ink-gray-8">{{ __('Settings') }}</h2>
+      </header>
 
-      <SettingsNavGroup :label="__('Connections')">
-        <SettingsNavItem value="apps">
-          <template #prefix><span class="lucide-chart-line size-4" aria-hidden="true" /></template>
-          {{ __('Analytics') }}
-        </SettingsNavItem>
-        <SettingsNavItem value="plugins">
-          <template #prefix><span class="lucide-blocks size-4" aria-hidden="true" /></template>
-          {{ __('Plugins') }}
-        </SettingsNavItem>
-        <SettingsNavItem value="webhooks">
-          <template #prefix><span class="lucide-webhook size-4" aria-hidden="true" /></template>
-          {{ __('Webhooks') }}
-          <template v-if="webhookStore.hasFailingWebhook.value" #suffix>
-            <span class="size-2 rounded-full bg-surface-red-7" role="img" :aria-label="__('A webhook is failing')" />
-          </template>
-        </SettingsNavItem>
-        <SettingsNavItem value="advanced">
-          <template #prefix><span class="lucide-sliders-horizontal size-4" aria-hidden="true" /></template>
-          {{ __('Advanced') }}
-        </SettingsNavItem>
-      </SettingsNavGroup>
+      <SettingsSidebar
+        class="sm:rtl:border-r-0 sm:rtl:border-l max-sm:max-h-none max-sm:flex-1 max-sm:border-b-0 max-sm:[&_[role=tab]]:h-10"
+        :class="{ 'max-sm:hidden': settings.pickedTab }"
+      >
+        <SettingsNavGroup>
+          <SettingsNavItem value="general">
+            <template #prefix><span class="lucide-store size-4" aria-hidden="true" /></template>
+            {{ __('General') }}
+          </SettingsNavItem>
+          <SettingsNavItem value="appearance">
+            <template #prefix><span class="lucide-sun-moon size-4" aria-hidden="true" /></template>
+            {{ __('Appearance') }}
+          </SettingsNavItem>
+          <SettingsNavItem value="emails">
+            <template #prefix><span class="lucide-mail size-4" aria-hidden="true" /></template>
+            {{ __('Emails') }}
+          </SettingsNavItem>
+          <SettingsNavItem value="languages">
+            <template #prefix><span class="lucide-languages size-4" aria-hidden="true" /></template>
+            {{ __('Languages') }}
+          </SettingsNavItem>
+          <SettingsNavItem value="markets">
+            <template #prefix><span class="lucide-globe size-4" aria-hidden="true" /></template>
+            {{ __('Markets') }}
+            <template v-if="marketStore.markets.value" #suffix>
+              <span class="text-sm text-ink-gray-5 tabular-nums">{{ marketStore.enabledCount.value }}</span>
+            </template>
+          </SettingsNavItem>
+        </SettingsNavGroup>
 
-      <SettingsNavGroup v-if="isCloudBillingAvailable" :label="__('Frappe Cloud')">
-        <SettingsNavItem value="billing">
-          <template #prefix><span class="lucide-receipt size-4" aria-hidden="true" /></template>
-          {{ __('Billing') }}
-        </SettingsNavItem>
-        <SettingsNavItem v-if="isCloudDomainsAvailable" value="domains">
-          <template #prefix><span class="lucide-globe size-4" aria-hidden="true" /></template>
-          {{ __('Domains') }}
-        </SettingsNavItem>
-      </SettingsNavGroup>
+        <SettingsNavGroup :label="__('Checkout', null, 'Storefront checkout')">
+          <SettingsNavItem value="payments">
+            <template #prefix><span class="lucide-credit-card size-4" aria-hidden="true" /></template>
+            {{ __('Payments') }}
+            <template #suffix>
+              <span class="text-sm text-ink-gray-5 tabular-nums">{{ connectedCount }}</span>
+            </template>
+          </SettingsNavItem>
+          <SettingsNavItem value="shipping">
+            <template #prefix><span class="lucide-truck size-4" aria-hidden="true" /></template>
+            {{ __('Shipping') }}
+            <template #suffix>
+              <span class="text-sm text-ink-gray-5 tabular-nums">{{ shippingConnected }}</span>
+            </template>
+          </SettingsNavItem>
+          <SettingsNavItem value="locations">
+            <template #prefix><span class="lucide-map-pin size-4" aria-hidden="true" /></template>
+            {{ __('Pickup locations') }}
+            <!-- Nothing while pickup is off: a count there would suggest shoppers can collect today. -->
+            <template v-if="pickupLocations.pickupEnabled.value" #suffix>
+              <span class="text-sm text-ink-gray-5 tabular-nums">{{ pickupLocations.activeCount.value }}</span>
+            </template>
+          </SettingsNavItem>
+          <SettingsNavItem value="checkout">
+            <template #prefix><span class="lucide-shopping-cart size-4" aria-hidden="true" /></template>
+            {{ __('General') }}
+          </SettingsNavItem>
+        </SettingsNavGroup>
 
-      <SettingsNavGroup v-if="pluginTabs.length" :label="__('Installed plugins')">
-        <SettingsNavItem v-for="tab in pluginTabs" :key="tab.value" :value="tab.value">
-          <template #prefix><Icon :name="tab.icon" class="size-4" /></template>
-          {{ tab.label }}
-        </SettingsNavItem>
-      </SettingsNavGroup>
-    </SettingsSidebar>
+        <SettingsNavGroup :label="__('Connections')">
+          <SettingsNavItem value="apps">
+            <template #prefix><span class="lucide-chart-line size-4" aria-hidden="true" /></template>
+            {{ __('Analytics') }}
+          </SettingsNavItem>
+          <SettingsNavItem value="plugins">
+            <template #prefix><span class="lucide-blocks size-4" aria-hidden="true" /></template>
+            {{ __('Plugins') }}
+          </SettingsNavItem>
+          <SettingsNavItem value="webhooks">
+            <template #prefix><span class="lucide-webhook size-4" aria-hidden="true" /></template>
+            {{ __('Webhooks') }}
+            <template v-if="webhookStore.hasFailingWebhook.value" #suffix>
+              <span class="size-2 rounded-full bg-surface-red-7" role="img" :aria-label="__('A webhook is failing')" />
+            </template>
+          </SettingsNavItem>
+          <SettingsNavItem value="advanced">
+            <template #prefix><span class="lucide-sliders-horizontal size-4" aria-hidden="true" /></template>
+            {{ __('Advanced') }}
+          </SettingsNavItem>
+        </SettingsNavGroup>
 
-    <!-- min-w-0 on the column and every panel: frappe-ui gives them `flex-1` with no
-         min-width, so below ~780px the right-hand controls are clipped clean off. -->
-    <SettingsContent class="commera-settings min-w-0" :class="{ 'max-sm:hidden': !settings.pickedTab }">
-      <SettingsPanel value="general" class="min-w-0">
-        <GeneralSettings :active="settings.open && settings.tab === 'general'" />
-      </SettingsPanel>
+        <SettingsNavGroup v-if="isCloudBillingAvailable" :label="__('Frappe Cloud')">
+          <SettingsNavItem value="billing">
+            <template #prefix><span class="lucide-receipt size-4" aria-hidden="true" /></template>
+            {{ __('Billing') }}
+          </SettingsNavItem>
+          <SettingsNavItem v-if="isCloudDomainsAvailable" value="domains">
+            <template #prefix><span class="lucide-globe size-4" aria-hidden="true" /></template>
+            {{ __('Domains') }}
+          </SettingsNavItem>
+        </SettingsNavGroup>
 
-      <SettingsPanel value="emails" class="min-w-0">
-        <EmailSettings :active="settings.open && settings.tab === 'emails'" />
-      </SettingsPanel>
+        <SettingsNavGroup v-if="pluginTabs.length" :label="__('Installed plugins')">
+          <SettingsNavItem v-for="tab in pluginTabs" :key="tab.value" :value="tab.value">
+            <template #prefix><Icon :name="tab.icon" class="size-4" /></template>
+            {{ tab.label }}
+          </SettingsNavItem>
+        </SettingsNavGroup>
+      </SettingsSidebar>
 
-      <SettingsPanel value="languages" class="min-w-0">
-        <LanguagesSettings :active="settings.open && settings.tab === 'languages'" />
-      </SettingsPanel>
+      <!-- min-w-0 on the column and every panel: frappe-ui gives them `flex-1` with no
+           min-width, so below ~780px the right-hand controls are clipped clean off. -->
+      <SettingsContent class="commera-settings min-w-0" :class="{ 'max-sm:hidden': !settings.pickedTab }">
+        <SettingsPanel value="general" class="min-w-0">
+          <GeneralSettings :active="settings.open && settings.tab === 'general'" />
+        </SettingsPanel>
 
-      <SettingsPanel value="markets" class="min-w-0">
-        <MarketsSettings :active="settings.open && settings.tab === 'markets'" />
-      </SettingsPanel>
+        <SettingsPanel value="emails" class="min-w-0">
+          <EmailSettings :active="settings.open && settings.tab === 'emails'" />
+        </SettingsPanel>
 
-      <SettingsPanel value="locations" class="min-w-0">
-        <LocationsSettings :active="settings.open && settings.tab === 'locations'" />
-      </SettingsPanel>
+        <SettingsPanel value="languages" class="min-w-0">
+          <LanguagesSettings :active="settings.open && settings.tab === 'languages'" />
+        </SettingsPanel>
 
-      <SettingsPanel value="checkout" class="min-w-0">
-        <CheckoutSettings :active="settings.open && settings.tab === 'checkout'" />
-      </SettingsPanel>
+        <SettingsPanel value="markets" class="min-w-0">
+          <MarketsSettings :active="settings.open && settings.tab === 'markets'" />
+        </SettingsPanel>
 
-      <SettingsPanel value="appearance" class="min-w-0">
-        <!-- The blank line keeps this tab's header level with the others. -->
-        <SettingsPanelHeader>
-          <div class="flex min-w-0 flex-col gap-1">
-            <h2 class="text-lg font-semibold text-ink-gray-8">{{ __('Appearance') }}</h2>
-            <p class="text-base" aria-hidden="true">&nbsp;</p>
-          </div>
-        </SettingsPanelHeader>
-        <SettingsBody v-scroll-fade>
-          <AppearancePicker />
-        </SettingsBody>
-      </SettingsPanel>
+        <SettingsPanel value="locations" class="min-w-0">
+          <LocationsSettings :active="settings.open && settings.tab === 'locations'" />
+        </SettingsPanel>
 
-      <SettingsPanel value="payments" class="min-w-0">
-        <IntegrationTabPanel
-          :store="paymentIntegrations"
-          :active="settings.tab === 'payments'"
-          :title="__('Payments')"
-          :description="__('Turn on as many providers as you like. Each keeps its own keys.')"
-        >
-          <CashOnDeliverySettings :active="settings.open && settings.tab === 'payments'" />
-        </IntegrationTabPanel>
-      </SettingsPanel>
+        <SettingsPanel value="checkout" class="min-w-0">
+          <CheckoutSettings :active="settings.open && settings.tab === 'checkout'" />
+        </SettingsPanel>
 
-      <SettingsPanel value="shipping" class="min-w-0">
-        <IntegrationTabPanel
-          v-slot="{ takeover, setTakeover }"
-          :store="shippingIntegrations"
-          :active="settings.tab === 'shipping'"
-          :title="__('Shipping')"
-          :description="__('Carriers this store books with. Each quotes its own rates at checkout.')"
-        >
-          <ShippingSections
-            :configuring="takeover"
-            :active="settings.open && settings.tab === 'shipping'"
-            @update:configuring="setTakeover"
+        <SettingsPanel value="appearance" class="min-w-0">
+          <!-- The blank line keeps this tab's header level with the others. -->
+          <SettingsPanelHeader>
+            <div class="flex min-w-0 flex-col gap-1">
+              <h2 class="text-lg font-semibold text-ink-gray-8">{{ __('Appearance') }}</h2>
+              <p class="text-base" aria-hidden="true">&nbsp;</p>
+            </div>
+          </SettingsPanelHeader>
+          <SettingsBody v-scroll-fade>
+            <AppearancePicker />
+          </SettingsBody>
+        </SettingsPanel>
+
+        <SettingsPanel value="payments" class="min-w-0">
+          <IntegrationTabPanel
+            :store="paymentIntegrations"
+            :active="settings.tab === 'payments'"
+            :title="__('Payments')"
+            :description="__('Turn on as many providers as you like. Each keeps its own keys.')"
+          >
+            <CashOnDeliverySettings :active="settings.open && settings.tab === 'payments'" />
+          </IntegrationTabPanel>
+        </SettingsPanel>
+
+        <SettingsPanel value="shipping" class="min-w-0">
+          <IntegrationTabPanel
+            v-slot="{ takeover, setTakeover }"
+            :store="shippingIntegrations"
+            :active="settings.tab === 'shipping'"
+            :title="__('Shipping')"
+            :description="__('Carriers this store books with. Each quotes its own rates at checkout.')"
+          >
+            <ShippingSections
+              :configuring="takeover"
+              :active="settings.open && settings.tab === 'shipping'"
+              @update:configuring="setTakeover"
+            />
+          </IntegrationTabPanel>
+        </SettingsPanel>
+
+        <SettingsPanel value="apps" class="min-w-0">
+          <AppsSettings :active="settings.open && settings.tab === 'apps'" />
+        </SettingsPanel>
+
+        <SettingsPanel value="plugins" class="min-w-0">
+          <PluginsSettings :active="settings.open && settings.tab === 'plugins'" />
+        </SettingsPanel>
+
+        <SettingsPanel v-for="tab in pluginTabs" :key="tab.value" :value="tab.value" class="min-w-0">
+          <PluginSettingsPanel :entry="tab.entry" :active="settings.open && settings.tab === tab.value" />
+        </SettingsPanel>
+
+        <SettingsPanel value="webhooks" class="min-w-0">
+          <WebhooksSettings :active="settings.open && settings.tab === 'webhooks'" />
+        </SettingsPanel>
+
+        <SettingsPanel value="advanced" class="min-w-0">
+          <AdvancedSettings :active="settings.open && settings.tab === 'advanced'" />
+        </SettingsPanel>
+
+        <!-- Unmount Cloud on close so it refreshes billing and domain state on return. -->
+        <SettingsPanel v-if="isCloudBillingAvailable" value="billing" class="min-w-0">
+          <CloudSettingsPanel
+            v-if="settings.open && tab === 'billing'"
+            v-model:overlay-open="isCloudOverlayOpen"
+            panel="billing"
+            :on-close="refreshBilling"
           />
-        </IntegrationTabPanel>
-      </SettingsPanel>
-
-      <SettingsPanel value="apps" class="min-w-0">
-        <AppsSettings :active="settings.open && settings.tab === 'apps'" />
-      </SettingsPanel>
-
-      <SettingsPanel value="plugins" class="min-w-0">
-        <PluginsSettings :active="settings.open && settings.tab === 'plugins'" />
-      </SettingsPanel>
-
-      <SettingsPanel v-for="tab in pluginTabs" :key="tab.value" :value="tab.value" class="min-w-0">
-        <PluginSettingsPanel :entry="tab.entry" :active="settings.open && settings.tab === tab.value" />
-      </SettingsPanel>
-
-      <SettingsPanel value="webhooks" class="min-w-0">
-        <WebhooksSettings :active="settings.open && settings.tab === 'webhooks'" />
-      </SettingsPanel>
-
-      <SettingsPanel value="advanced" class="min-w-0">
-        <AdvancedSettings :active="settings.open && settings.tab === 'advanced'" />
-      </SettingsPanel>
-
-      <!-- Mounted only while shown, unlike the panels kept alive by unmount-on-hide: leaving the
-           tab closes the Cloud panel, and its onClose re-reads what the dashboard shows from it:
-           choosing a plan ends the trial card, and adding a domain moves Home's domain card. -->
-      <SettingsPanel v-if="isCloudBillingAvailable" value="billing" class="min-w-0">
-        <CloudSettingsPanel
-          v-if="settings.open && tab === 'billing'"
-          v-model:overlay-open="isCloudOverlayOpen"
-          panel="billing"
-          :on-close="refreshBilling"
-        />
-      </SettingsPanel>
-      <SettingsPanel v-if="isCloudDomainsAvailable" value="domains" class="min-w-0">
-        <CloudSettingsPanel
-          v-if="settings.open && tab === 'domains'"
-          v-model:overlay-open="isCloudOverlayOpen"
-          panel="domains"
-          :on-close="refreshDomains"
-        />
-      </SettingsPanel>
-    </SettingsContent>
-  </SettingsDialog>
+        </SettingsPanel>
+        <SettingsPanel v-if="isCloudDomainsAvailable" value="domains" class="min-w-0">
+          <CloudSettingsPanel
+            v-if="settings.open && tab === 'domains'"
+            v-model:overlay-open="isCloudOverlayOpen"
+            panel="domains"
+            :on-close="refreshDomains"
+          />
+        </SettingsPanel>
+      </SettingsContent>
+    </SettingsDialog>
+  </ConfigProvider>
 </template>
 
 <style>
-/* frappe-ui's Dialog keeps its card gutter on a phone, which pushes the full-screen settings
-   past the viewport, and its panels keep their desktop insets. Its wrapper is min-h-screen
-   (100vh), which on a real phone is taller than the visible 100dvh while the address bar
-   shows, so the centred dialog gets a gap above and below. Headless Chrome hides this. */
+/* The mobile dialog needs viewport height and no desktop gutters or panel insets. */
 @media (max-width: 639.98px) {
   .dialog-scroll-container > div:has(.commera-settings) {
     min-height: 100dvh;

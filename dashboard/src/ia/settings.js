@@ -75,7 +75,7 @@ export const SETTINGS_TABS = [
   },
   {
     value: 'checkout',
-    label: __('Checkout'),
+    label: __('Checkout', null, 'Storefront checkout'),
     icon: 'lucide-shopping-cart',
     keywords: ['checkout', 'guest', 'guest checkout', 'order link', 'track order', 'without account'],
   },
