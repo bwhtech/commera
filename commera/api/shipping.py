@@ -305,6 +305,17 @@ def is_shipping_rule_row(row, rule) -> bool:
 	)
 
 
+def is_cart_charge(row, shipping_rule: str | None) -> bool:
+	"""A charge Commera adds to the cart: delivery, the COD fee or a plugin fee. Not a tax."""
+	description = cstr(row.description).strip()
+	return bool(
+		row.get(PLUGIN_FEE_FIELD)
+		or description == COD_CHARGE_DESCRIPTION.strip()
+		or description.startswith(DELIVERY_CHARGE_DESCRIPTION)
+		or is_shipping_rule_row(row, get_shipping_rule_accounts(shipping_rule))
+	)
+
+
 def get_charge_lines(taxes, shipping_rule: str | None) -> dict:
 	"""Split a charge table into delivery, the COD fee, plugin fees and the taxes a shopper sees by their own names.
 

@@ -19,7 +19,9 @@
   "sale_price_list",
   "compare_at_price_list",
   "column_break_prc1",
-  "currency"
+  "currency",
+  "taxes_section",
+  "tax_template"
  ],
  "fields": [
   {
@@ -117,10 +119,23 @@
    "label": "Currency",
    "options": "Currency",
    "read_only": 1
+  },
+  {
+   "fieldname": "taxes_section",
+   "fieldtype": "Section Break",
+   "label": "Taxes"
+  },
+  {
+   "description": "Taxes on carts and orders in this market. Empty: ERPNext's tax rules, else the company's default template.",
+   "fieldname": "tax_template",
+   "fieldtype": "Link",
+   "label": "Tax Template",
+   "link_filters": "[[\"Sales Taxes and Charges Template\",\"disabled\",\"=\",0]]",
+   "options": "Sales Taxes and Charges Template"
   }
  ],
  "links": [],
- "modified": "2026-11-10 12:00:00.000000",
+ "modified": "2026-11-11 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Market",
