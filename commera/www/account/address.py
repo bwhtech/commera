@@ -13,7 +13,9 @@ def get_context(context):
 		raise frappe.PermissionError
 	context.billing_addresses = get_addresses()
 	context.shipping_addresses = get_addresses(address_type="Shipping")
-	context.country_list = AddressCountries.current().within(get_country_list())
+	countries = AddressCountries.current()
+	context.country_list = countries.within(get_country_list())
+	context.default_country = countries.market_default_country()
 	context.breadcrumbs = [
 		{
 			"label": _("My Account"),

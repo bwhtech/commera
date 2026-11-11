@@ -44,6 +44,8 @@ from commera.utils import (
 
 no_cache = True
 
+# The default theme's country picker has always started here.
+LEGACY_DEFAULT_COUNTRY = {"name": "Saudi Arabia", "code": "sa"}
 CHECKOUT_PREFILL_PARAMS = {
 	"checkout[email]": "email",
 	"checkout[shipping_address][first_name]": "first_name",
@@ -75,8 +77,11 @@ def get_context(context, allow_guest: bool = False):
 	context.show_cod = int(COD_PAYMENT_MODE in payment_methods)
 	# The list refreshes in the browser after the address step, so label every enabled gateway.
 	context.payment_gateway_labels = {option.name: _(option.name) for option in get_gateway_options()}
+	countries = AddressCountries.current()
 	context.phone_country_list = get_country_list()
-	context.country_list = AddressCountries.current().within(context.phone_country_list)
+	context.country_list = countries.within(context.phone_country_list)
+	context.default_country = countries.market_default_country()
+	context.default_country_row = get_default_country_row(context.country_list, context.default_country)
 	context.checkout_prefill = get_checkout_prefill(context.country_list)
 	context.store_pickup_addresses = (
 		get_store_pickup_addresses() if commera_settings.store_pickup_enabled else []
@@ -93,6 +98,12 @@ def get_context(context, allow_guest: bool = False):
 			"href": "#",
 		},
 	]
+
+
+def get_default_country_row(country_list: list[dict], default_country: str | None) -> dict:
+	"""The row the default theme's country picker starts on: the market's country, else its own."""
+	row = next((row for row in country_list if row["name"] == default_country), None)
+	return row or LEGACY_DEFAULT_COUNTRY
 
 
 def get_checkout_prefill(country_list: list[dict]) -> dict:

@@ -1008,10 +1008,12 @@ document.addEventListener('alpine:init', () => {
 		},
 	}));
 
-	Alpine.data('address_book', (addresses, switches) => ({
+	// `default_country`: a secondary market's country for a new address.
+	Alpine.data('address_book', (addresses, switches, default_country) => ({
 		...form_state(),
 		...market_switch(switches),
 		addresses,
+		default_country: default_country ?? '',
 		form: null,
 
 		init() {
@@ -1021,7 +1023,7 @@ document.addEventListener('alpine:init', () => {
 		edit(address = {}) {
 			this.error = '';
 			this.market_offer = null;
-			this.form = { ...address };
+			this.form = { country: this.default_country, ...address };
 		},
 
 		close() {
@@ -1032,7 +1034,7 @@ document.addEventListener('alpine:init', () => {
 
 		choose_country(event) {
 			this.offer_market(event.target.value, selected_title(event), () => {
-				this.form.country = '';
+				this.form.country = this.default_country;
 			});
 		},
 

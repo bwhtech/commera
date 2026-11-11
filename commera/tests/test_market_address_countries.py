@@ -60,7 +60,10 @@ class TestMarketCountryLists(IntegrationTestCase):
 
 		self.assertEqual((gulf["market"], gulf["title"]), ("gulf", "Gulf"))
 		self.assertEqual([country["name"] for country in gulf["countries"]], ["Saudi Arabia", UAE])
-		self.assertEqual((primary["market"], primary["currency"]), ("primary", get_store_currency()))
+		self.assertEqual(
+			(primary["market"], primary["title"], primary["currency"]),
+			("primary", "Other countries", get_store_currency()),
+		)
 		self.assertTrue({"India", "Belgium"} <= names(primary["countries"]))
 		self.assertFalse(names(primary["countries"]) & GULF)
 
@@ -74,6 +77,16 @@ class TestMarketCountryLists(IntegrationTestCase):
 			f"{{0}} is in the Gulf market. Switch to shop in {get_store_currency()}?",
 		)
 		self.assertTrue(switches["markets"]["gulf"]["url"].startswith("/en-"))
+
+	def test_a_switch_to_the_primary_market_names_the_current_market(self):
+		with in_locale("/en-ae/"):
+			switches = get_market_switches(shop.list_other_market_countries())
+
+		self.assertEqual(switches["countries"]["India"], "primary")
+		self.assertEqual(
+			switches["markets"]["primary"]["prompt"],
+			f"{{0}} is not in the Gulf market. Switch to shop in {get_store_currency()}?",
+		)
 
 	def test_legacy_checkout_keeps_foreign_dialing_codes(self):
 		context = frappe._dict(id="shipping")
@@ -111,7 +124,7 @@ class TestMarketAddressRefusal(MarketCartTestCase):
 	def test_a_country_of_another_market_is_refused(self):
 		with self.assertRaisesRegex(AddressCountryError, "United Arab Emirates is in the Gulf market"):
 			checkout.set_addresses({**ADDRESS, "country": UAE})
-		with self.in_market(), self.assertRaisesRegex(AddressCountryError, "is in the"):
+		with self.in_market(), self.assertRaisesRegex(AddressCountryError, "India is not in the Gulf market"):
 			checkout.set_addresses({**ADDRESS, "country": UAE}, {**ADDRESS, "country": "India"})
 
 	def test_a_saved_address_in_another_market_is_refused(self):

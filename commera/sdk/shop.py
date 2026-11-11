@@ -93,12 +93,13 @@ def list_countries() -> list[Country]:
 
 
 def list_other_market_countries() -> list[MarketCountries]:
-	"""The countries of every other enabled market, by market. Picking one means switching to it."""
+	"""The countries of every other enabled market, by market. Picking one means switching to it.
+	`title` labels the group: the market's name, or "Other countries" for the primary market."""
 	countries = AddressCountries.current()
 	return [
 		{
 			"market": market.handle,
-			"title": _(market.title),
+			"title": countries.group_label(market),
 			"currency": market.currency or get_store_currency(),
 			"countries": get_country_options(rows),
 		}

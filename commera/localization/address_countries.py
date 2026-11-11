@@ -56,25 +56,47 @@ class AddressCountries:
 		code = frappe.get_cached_value("Country", country, "code") if country else None
 		if self.allows(code):
 			return
-		owner = self.markets.for_country(code)
 		frappe.throw(
-			_("{0} is in the {1} market. Switch to that market to use this address.").format(
-				_(country or ""), _(owner.title)
-			),
+			self.refusal(_(country or ""), self.markets.for_country(code)),
 			AddressCountryError,
 			title=_("Country Not Available"),
 		)
 
+	def refusal(self, country: str, owner: Market) -> str:
+		# The primary market goes unnamed: it is titled after the company's country.
+		if owner.is_primary:
+			message = _("{0} is not in the {1} market. Switch markets to use this address.")
+			return message.format(country, _(self.market.title))
+		message = _("{0} is in the {1} market. Switch to that market to use this address.")
+		return message.format(country, _(owner.title))
+
+	def group_label(self, market: Market) -> str:
+		"""The label of a group of `market`'s countries in a picker of this market's countries."""
+		return _("Other countries") if market.is_primary else _(market.title)
+
+	def switch_prompt(self, target: Market, currency: str) -> str:
+		"""What a picker asks when the shopper picks a country of `target`. {0}: that country."""
+		if target.is_primary:
+			prompt = _("{0} is not in the {1} market. Switch to shop in {2}?")
+			return prompt.format("{0}", _(self.market.title), currency)
+		return _("{0} is in the {1} market. Switch to shop in {2}?").format("{0}", _(target.title), currency)
+
 	def default_country(self) -> str | None:
-		"""The Country name a blank address starts with: the URL's country, else the store's."""
-		localization = get_localization()
-		if not self.market.is_primary:
-			code = localization.country if localization.country in self.market.countries else None
-			code = code or self.market.countries[0]
-			return get_country_names((code,)).get(code)
+		"""The Country name a blank address starts with: the market's, else the store's."""
+		if country := self.market_default_country():
+			return country
 		country = get_store_country() or frappe.defaults.get_global_default("country")
 		code = frappe.get_cached_value("Country", country, "code") if country else None
 		return country if self.allows(code) else None
+
+	def market_default_country(self) -> str | None:
+		"""A secondary market's Country name for a blank address: the shopper's country when the
+		market has it, else its first. None in the primary market, where each form keeps its own."""
+		if self.market.is_primary or not self.market.countries:
+			return None
+		country = get_localization().country
+		code = country if country in self.market.countries else self.market.countries[0]
+		return get_country_names((code,)).get(code)
 
 
 def get_draft_scope() -> str:
@@ -86,7 +108,7 @@ def get_draft_scope() -> str:
 def get_market_switches(other_markets: list[dict]) -> dict:
 	"""What a country picker needs to offer a switch, from shop.list_other_market_countries():
 	the market of each Country name, and each market's URL for this page and its prompt."""
-	prompt = _("{0} is in the {1} market. Switch to shop in {2}?")
+	countries = AddressCountries.current()
 	return {
 		"draft_scope": get_draft_scope(),
 		"countries": {
@@ -96,7 +118,7 @@ def get_market_switches(other_markets: list[dict]) -> dict:
 			group["market"]: {
 				"url": switch_url(market=group["market"]),
 				# {0} stays for the browser: the country the shopper picks.
-				"prompt": prompt.format("{0}", group["title"], group["currency"]),
+				"prompt": countries.switch_prompt(countries.markets.find(group["market"]), group["currency"]),
 			}
 			for group in other_markets
 		},

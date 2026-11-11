@@ -543,7 +543,8 @@ class Country(TypedDict):
 
 
 class MarketCountries(TypedDict):
-	"""The countries another market sells to. An address there needs a switch to `market`."""
+	"""The countries another market sells to. An address there needs a switch to `market`.
+	`title` labels the group: the market's name, or "Other countries" for the primary market."""
 
 	market: str
 	title: str

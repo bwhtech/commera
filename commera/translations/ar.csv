@@ -240,3 +240,10 @@ We could not confirm a payment for this order. Your cart is still saved.,لم ن
 Back to checkout,العودة إلى الدفع
 Country and language,الدولة واللغة
 Other countries,دول أخرى
+{0} is in the {1} market. Switch to shop in {2}?,{0} ضمن سوق {1}. هل تريد التبديل للتسوق بعملة {2}؟
+{0} is not in the {1} market. Switch to shop in {2}?,{0} ليست ضمن سوق {1}. هل تريد التبديل للتسوق بعملة {2}؟
+{0} is in the {1} market. Switch to that market to use this address.,{0} ضمن سوق {1}. بدّل إلى ذلك السوق لاستخدام هذا العنوان.
+{0} is not in the {1} market. Switch markets to use this address.,{0} ليست ضمن سوق {1}. بدّل السوق لاستخدام هذا العنوان.
+Country Not Available,الدولة غير متاحة
+Switch,تبديل
+Not now,ليس الآن
