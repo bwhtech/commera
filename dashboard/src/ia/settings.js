@@ -44,6 +44,12 @@ export const SETTINGS_TABS = [
     keywords: ['email', 'template', 'order confirmation', 'cancellation', 'back in stock', 'notification'],
   },
   {
+    value: 'languages',
+    label: __('Languages'),
+    icon: 'lucide-languages',
+    keywords: ['language', 'languages', 'locale', 'default language', 'publish', 'right to left', 'rtl', 'arabic'],
+  },
+  {
     value: 'translations',
     label: __('Translations'),
     icon: 'lucide-languages',

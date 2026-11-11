@@ -1,3 +1,4 @@
+import { reactive } from 'vue'
 import './devBoot.js'
 
 // commera/www/commera.py puts each boot key on `window`. This is the one place
@@ -15,11 +16,19 @@ export const direction = isRtl ? 'rtl' : 'ltr'
 export const isAdmin = bootValue('is_admin', false)
 
 // Every configured storefront language, default first: { code, name, endonym, direction }.
-export const storefrontLanguages = bootValue('storefront_languages', [])
-export const storefrontLanguageOptions = storefrontLanguages.map(({ code }) => ({
-  label: code.toUpperCase(),
-  value: code,
-}))
+// Reactive, unlike the rest of boot: Settings › Languages changes it without a reload.
+export const storefrontLanguages = reactive(bootValue('storefront_languages', []))
+export const storefrontLanguageOptions = reactive(toLanguageOptions(storefrontLanguages))
+
+// Replaced in place, so modules that imported the arrays keep reading the current list.
+export function setStorefrontLanguages(languages) {
+  storefrontLanguages.splice(0, storefrontLanguages.length, ...languages)
+  storefrontLanguageOptions.splice(0, storefrontLanguageOptions.length, ...toLanguageOptions(languages))
+}
+
+function toLanguageOptions(languages) {
+  return languages.map(({ code }) => ({ label: code.toUpperCase(), value: code }))
+}
 
 // Direction comes from Frappe's right-to-left set on the server, never from the code itself.
 export function languageDirection(code) {
