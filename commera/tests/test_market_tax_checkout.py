@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 import frappe
+from frappe.model.meta import Meta
 
 from commera.api.payments import (
 	COD_PAYMENT_MODE,
@@ -177,16 +178,19 @@ class TestLegacyMarketTaxCheckout(test_market_taxes.MarketTaxTestCase):
 		self.assert_without_marker_field(colliding=True, template_copies=2)
 
 	def assert_without_marker_field(self, colliding=False, template_copies=1):
-		meta = frappe.get_meta("Sales Taxes and Charges")
+		# Patch the class: saves read the cached valid fields of whichever meta object is current.
+		def drop_marker(original):
+			def wrapper(meta):
+				names = original(meta)
+				if meta.name != "Sales Taxes and Charges":
+					return names
+				return [name for name in names if name != "commera_cart_charge"]
+
+			return wrapper
+
 		with (
-			patch.object(
-				meta, "fields", [field for field in meta.fields if field.fieldname != "commera_cart_charge"]
-			),
-			patch.object(
-				meta,
-				"_valid_columns",
-				[column for column in meta.get_valid_columns() if column != "commera_cart_charge"],
-			),
+			patch.object(Meta, "get_valid_fields", drop_marker(Meta.get_valid_fields)),
+			patch.object(Meta, "get_valid_columns", drop_marker(Meta.get_valid_columns)),
 		):
 			self.assert_legacy_checkout(colliding=colliding, absent=True, template_copies=template_copies)
 
