@@ -109,6 +109,7 @@ def add_seo(context, detail, content):
 		product,
 		image_url=seo.get_product_og_image(product_variant["route"]),
 		price=price,
+		currency=detail["currency"],
 		availability=availability,
 	)
 	context.json_ld = [
@@ -117,6 +118,7 @@ def add_seo(context, detail, content):
 			product,
 			images=detail["images"],
 			price=price,
+			currency=detail["currency"],
 			availability=availability,
 			review_count=context.reviews["review_count"],
 			average_rating=context.reviews["average_rating"],

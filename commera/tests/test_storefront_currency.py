@@ -4,7 +4,9 @@ from unittest.mock import patch
 import frappe
 
 import commera.sdk
+from commera.api.checkout import apply_shipping_rule
 from commera.localization.cart_currency import CartCurrency, get_cart_delivery_configuration
+from commera.product_detail import get_product_detail
 from commera.tests.test_cart_currency import CartCurrencyTestCase
 from commera.www.cart.checkout import set_cart_context
 
@@ -198,3 +200,66 @@ class TestStorefrontCurrency(CartCurrencyTestCase):
 					call = ""
 				before = frappe.render_template(case["before"] + call, context)
 				self.assertEqual(frappe.render_template(after + call, context).encode(), before.encode())
+
+
+class TestProductPageCurrency(CartCurrencyTestCase):
+	def setUp(self):
+		super().setUp()
+		self.shopper = frappe.session.user
+		# The cart fixture signs in a shopper; product fixtures need catalog write access.
+		# nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
+		frappe.set_user("Administrator")
+		frappe.local.request_ip = "127.0.0.1"
+
+	def open_request(self, path):
+		super().open_request(path)
+		if "/products/" in path:
+			frappe.local.form_dict.route = path.rsplit("/", 1)[-1]
+
+	def test_both_product_pages_use_market_prices_throughout(self):
+		route = self.make_market_variant("PAGECURRENCY", market_sale=1234.5, market_compare_at=1500)
+		for summer in (True, False):
+			with self.subTest(summer=summer):
+				path = f"/en-ae/products/{route}"
+				html = (
+					self.render_summer("pages/products/details.html", path)
+					if summer
+					else self.render_legacy("products/details", path)
+				)
+				self.assertIn(self.market_symbol, html)
+				self.assertIn("1234.50", html)
+				self.assertIn('content="1234.50"', html)
+				self.assertIn('"priceCurrency": "' + self.currency + '"', html)
+				self.assertIn("price: 1234.5," if summer else "price:`1234.5`", html)
+				self.assertIn("default_price: 1500.0," if summer else "default_price:`1500.0`", html)
+
+	def test_compare_at_only_and_free_market_prices(self):
+		full = self.make_market_variant("PAGEFULL", market_compare_at=400)
+		free = self.make_market_variant("PAGEFREE", market_sale=0, market_compare_at=400)
+		for route, expected, compare_at in ((full, 400, None), (free, 0, 400)):
+			self.open_request(f"/en-ae/products/{route}")
+			detail = get_product_detail(route)
+			self.assertEqual(detail["selected_price"], expected)
+			self.assertEqual(detail["default_price"], compare_at)
+			self.assertTrue(detail["in_stock"])
+
+	def test_unpriced_sizes_are_unavailable_and_have_no_store_price(self):
+		route = self.make_market_variant("PAGEUNPRICED")
+		self.open_request(f"/en-ae/products/{route}")
+		detail = get_product_detail(route)
+		self.assertIsNone(detail["selected_price"])
+		self.assertIsNone(detail["default_price"])
+		self.assertFalse(detail["in_stock"])
+		self.assertFalse(detail["available_sizes"][0]["stock_detail"]["in_stock"])
+
+	def test_shipping_api_returns_quotation_currency_amounts(self):
+		# nosemgrep: frappe-semgrep-rules.rules.security.frappe-setuser
+		frappe.set_user(self.shopper)
+		quotation = self.checkout_quotation("/en-ae/cart/checkout")
+		quotation.db_set("conversion_rate", 25)
+		with (
+			patch("commera.api.checkout._get_cart_quotation", return_value=quotation),
+			patch("commera.api.checkout.get_open_gateway_payment_request", return_value="paying"),
+			patch("commera.utils.get_delivery_configuration", return_value=(500, 5000)),
+		):
+			self.assertEqual(apply_shipping_rule(), (20, 200))
