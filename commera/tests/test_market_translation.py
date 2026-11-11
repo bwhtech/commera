@@ -200,22 +200,17 @@ class TestMarketProductTitles(ProductDetailPriceTestCase):
 		cards = {self.serve_card(product.route, path) for path in ("/en-ae", "/")}
 		self.assertEqual(len(cards), 2)
 
-	def test_a_right_to_left_card_keeps_the_source_language_of_its_market(self):
+	def test_a_right_to_left_card_has_the_title_of_its_language_and_market(self):
 		product = self.make_gulf_product()
 		register(PRODUCT, product.name, "display_name", "en", "Gulf Linen Shirt", market="gulf")
 		self.addCleanup(setattr, frappe.local.flags, "redirect_location", None)
 
-		# Satori cannot draw Arabic, so the card text stays in the store's default language.
 		with pin_localization(resolve("/ar-ae")[0]):
-			self.assertEqual(
-				generator.build_variant_card_context(product)["display_name"], "Gulf Linen Shirt"
-			)
+			self.assertEqual(generator.build_variant_card_context(product)["display_name"], "قميص الخليج")
 		with pin_localization(resolve("/ar")[0]):
-			self.assertEqual(
-				generator.build_variant_card_context(product)["display_name"], product.display_name
-			)
-		self.assertEqual(self.serve_card(product.route, "/ar-ae"), self.serve_card(product.route, "/en-ae"))
-		self.assertEqual(self.serve_card(product.route, "/ar"), self.serve_card(product.route, "/"))
+			self.assertEqual(generator.build_variant_card_context(product)["display_name"], "قميص الكتان")
+		cards = {self.serve_card(product.route, path) for path in ("/ar-ae", "/en-ae", "/ar", "/")}
+		self.assertEqual(len(cards), 4)
 
 	def test_the_legacy_product_page_seo_reads_the_market_content(self):
 		product = self.make_gulf_product()

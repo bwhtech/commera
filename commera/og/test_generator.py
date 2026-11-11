@@ -4,6 +4,7 @@
 """Tests for the Satori OG-image render core (og/generator.py) and the /og-image web layer."""
 
 import base64
+import hashlib
 import os
 import time
 import unittest
@@ -248,6 +249,39 @@ class TestServeOgImage(IntegrationTestCase):
 				og_image_render.serve_og_image(variant.route)
 			mocked.assert_not_called()
 
+	def test_renderer_upgrade_ignores_old_cached_cards(self):
+		variant = get_published_variant()
+		if not variant:
+			self.skipTest("No published Style Attribute Variant available.")
+		doc = frappe.get_cached_doc("Style Attribute Variant", variant.name)
+		version = generator.get_variant_card_version(doc)
+		key = hashlib.md5(f"{variant.route}-{version}".encode(), usedforsecurity=False).hexdigest()[:16]
+		old_path = os.path.join(get_files_path(is_private=False), "og-cache", f"{key}.png")
+		og_image_render.write_cache(old_path, b"old blank card")
+		new_path = og_image_render.cache_file_path(variant.route, version)
+		self.addCleanup(lambda: os.path.exists(old_path) and os.remove(old_path))
+		self.addCleanup(lambda: os.path.exists(new_path) and os.remove(new_path))
+		self.assertNotEqual(old_path, new_path)
+		with patch.object(og_image_render, "render_card_for_doc", return_value=b"new card") as render:
+			with self.assertRaises(frappe.Redirect):
+				og_image_render.serve_og_image(variant.route)
+			render.assert_called_once()
+		markup = "<div>same store</div>"
+		version = frappe.as_json([generator.get_localization().language.direction, markup])
+		key = hashlib.md5(f"store-{version}".encode(), usedforsecurity=False).hexdigest()[:16]
+		old_store = os.path.join(get_files_path(is_private=False), "og-cache", f"{key}.png")
+		new_store = og_image_render.cache_file_path("store", version)
+		og_image_render.write_cache(old_store, b"old blank store")
+		self.addCleanup(lambda: os.path.exists(old_store) and os.remove(old_store))
+		self.addCleanup(lambda: os.path.exists(new_store) and os.remove(new_store))
+		with (
+			patch.object(og_image_render, "build_store_card_html", return_value=markup),
+			patch.object(og_image_render, "render_og_png", return_value=b"new store") as render,
+		):
+			with self.assertRaises(frappe.Redirect):
+				og_image_render.serve_store_card()
+			render.assert_called_once()
+
 	def test_cache_key_is_deterministic(self):
 		"""Cache key must be stable per (route, modified): frappe.generate_hash ignores its input in v15."""
 		route = "some-route"
@@ -398,6 +432,25 @@ class TestRenderOgPng(IntegrationTestCase):
 		image = Image.open(BytesIO(png_bytes))
 		self.assertEqual(image.format, "PNG")
 		self.assertEqual(image.size, (generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT))
+
+	def test_a_long_title_keeps_the_product_photo(self):
+		from PIL import Image
+
+		from commera.shop_themes.render import render_themed_template
+
+		photo_colour = (222, 230, 233)
+		buffer = BytesIO()
+		Image.new("RGB", (630, 630), photo_colour).save(buffer, format="PNG")
+		context = {
+			"display_name": "Premium Ceramic Brake Pads for Sports Cars - Black",
+			"photo_data_uri": f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}",
+		}
+		html_str = render_themed_template(generator.BUNDLED_CARD_TEMPLATE, context)
+		png_bytes = generator.render_og_png(html_str, generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT)
+
+		card = Image.open(BytesIO(png_bytes)).convert("RGB")
+		self.assertEqual(card.getpixel((600, 600)), photo_colour)
+		self.assertEqual(card.getpixel((1190, 600)), photo_colour)
 
 	def test_store_card_renders_a_spec_sized_png(self):
 		from PIL import Image
