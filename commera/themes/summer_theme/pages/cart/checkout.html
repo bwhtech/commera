@@ -17,6 +17,7 @@
 	"delivery_charge": delivery_charge,
 	"cart_needs_refresh": cart_needs_refresh or False,
 	"prefill": checkout_prefill,
+	"default_country": default_country,
 	"coupon_code": coupon_code,
 	"discount_codes": discount_code_states,
 } %}
@@ -538,7 +539,7 @@
 			return trimmed.length <= PHONE_NUMBER_MAX_LENGTH && PHONE_NUMBER_DIGITS.test(digits);
 		}
 
-		function get_blank_address() {
+		function get_blank_address(country = "") {
 			return {
 				first_name: "",
 				last_name: "",
@@ -546,7 +547,7 @@
 				phone_number: "",
 				full_address: "",
 				landmark: "",
-				country: "",
+				country: country ?? "",
 				state: "",
 				city: "",
 				po_box: "",
@@ -564,7 +565,7 @@
 				shipping_address_id: "",
 				store_pickup_warehouse: "",
 				billing: get_blank_address(),
-				shipping: get_blank_address(),
+				shipping: get_blank_address(config.default_country),
 				// 'editing', 'saving', then 'saved' once the quotation has the address.
 				address_step: "editing",
 				// 'idle', 'placing', then 'leaving' while the payment or order page loads.
@@ -605,6 +606,7 @@
 					for (const [field, value] of Object.entries(this.config.prefill)) {
 						if (!this.billing[field]) this.billing[field] = value;
 					}
+					if (!this.billing.country) this.billing.country = this.config.default_country ?? "";
 					if (!this.config.is_guest) {
 						this.apply_pending_discount();
 						return;
