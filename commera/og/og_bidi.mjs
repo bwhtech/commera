@@ -1,6 +1,7 @@
 // Satori shapes logical runs with HarfBuzz but ignores paragraph direction.
 // Resolve visual run order and mirror right-to-left layouts before rendering.
 
+import assert from 'node:assert/strict';
 import bidiFactory from 'bidi-js';
 import { isColumn, mirrorStyle } from './og_mirror.mjs';
 
@@ -17,10 +18,25 @@ const placeholders = {
 	R: 'א',
 	AL: 'ا',
 	EN: '0',
+	ES: '+',
+	ET: '#',
+	CS: ',',
+	B: '\u2029',
+	S: '\t',
+	WS: ' ',
 	AN: '٠',
 	ON: '\ufffc',
 	NSM: '\u0300',
 	BN: '\u200b',
+	LRE: '\u202a',
+	RLE: '\u202b',
+	PDF: '\u202c',
+	LRO: '\u202d',
+	RLO: '\u202e',
+	LRI: '\u2066',
+	RLI: '\u2067',
+	FSI: '\u2068',
+	PDI: '\u2069',
 };
 
 export function hasRtlText(text) {
@@ -136,6 +152,11 @@ class Paragraph {
 export function visualRuns(text, rtl) {
 	const units = bidiUnits(text);
 	const input = units.map(({ placeholder }) => placeholder).join('');
+	assert.equal(
+		input.length,
+		units.length,
+		'Each bidi unit must have one placeholder',
+	);
 	const embedding = bidi.getEmbeddingLevels(input, rtl ? 'rtl' : 'ltr');
 	const indices = bidi.getReorderedIndices(input, embedding);
 	const mirrors = bidi.getMirroredCharactersMap(input, embedding.levels);

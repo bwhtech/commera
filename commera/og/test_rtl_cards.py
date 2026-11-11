@@ -156,6 +156,53 @@ class TestRightToLeftCards(IntegrationTestCase):
 			with self.subTest(text=text):
 				self.assertEqual(visual_order(f"<div>{text}</div>", "rtl"), expected)
 
+	def test_keycaps_keep_text_and_spaces_in_both_directions(self):
+		script = """
+import { readFileSync } from 'node:fs';
+const { visualRuns } = await import(process.argv[1]);
+const { text, rtl } = JSON.parse(readFileSync(0, 'utf8'));
+process.stdout.write(JSON.stringify(visualRuns(text, rtl).map(({ text }) => text)));
+"""
+		script_path = frappe.get_app_path("commera", "og", "og_bidi.mjs")
+		for keycap in ("#️⃣", "*️⃣", "1️⃣"):
+			for rtl in (False, True):
+				with self.subTest(keycap=keycap, rtl=rtl):
+					text = f"حذاء Nike {keycap} الرياضي"
+					if not rtl:
+						expected = ["حذاء", f" Nike {keycap} ", "الرياضي"]
+					elif keycap == "1️⃣":
+						expected = ["الرياضي", " ", f"Nike {keycap}", " ", "حذاء"]
+					else:
+						expected = ["الرياضي", " ", keycap, " ", "Nike", " ", "حذاء"]
+					actual = json.loads(run_node(script, {"text": text, "rtl": rtl}, script_path))
+					self.assertEqual(actual, expected)
+
+	def test_random_reordering_preserves_cluster_multiplicities(self):
+		script = """
+import assert from 'node:assert/strict';
+const { visualRuns } = await import(process.argv[1]);
+const segmenter = new Intl.Segmenter('und', { granularity: 'grapheme' });
+const clusters = (text) => [...segmenter.segment(text)].map(({ segment }) => segment).sort();
+const alphabet = ['ح', 'ي', 'א', 'N', 'e', ' ', ' ', '#️⃣', '*️⃣', '1️⃣',
+    '🔥', '👨‍👩‍👧‍👦', '👍🏽', '🇦🇪', '𠀀', '\u0661', '\u06f2', '3', '+', ',', '.', '$', '\t'];
+let seed = 489;
+const random = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed;
+};
+for (let sample = 0; sample < 500; sample++) {
+    const text = Array.from({ length: 1 + random() % 80 },
+        () => alphabet[random() % alphabet.length]).join('');
+    for (const rtl of [false, true]) {
+        const output = visualRuns(text, rtl).map(({ text }) => text).join('');
+        assert.deepEqual(clusters(output), clusters(text), JSON.stringify({ text, rtl, output }));
+    }
+}
+process.stdout.write('ok');
+"""
+		script_path = frappe.get_app_path("commera", "og", "og_bidi.mjs")
+		self.assertEqual(run_node(script, {}, script_path), b"ok")
+
 	def test_custom_centered_element_stays_centered(self):
 		html_str = """<div style="display:flex;width:1200px;height:630px;background:white">
 		<div style="display:flex;position:absolute;left:50%;top:100px;transform:translateX(-50%);
