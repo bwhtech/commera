@@ -30,8 +30,13 @@ export function useSettingsAutosave(save, { params = {}, preserveEdits = false }
   // Merged, not replaced: a panel adopts the fields it owns — a group, a section — one answer at
   // a time, and adopting one must not forget the rest.
   function adopt(record) {
+    const next = { ...values.value }
+    for (const [field, value] of Object.entries(record ?? {})) {
+      const unchanged = normalize(values.value[field]) === normalize(stored.value[field])
+      if (!preserveEdits || (unchanged && !pending[field])) next[field] = value
+    }
     stored.value = { ...stored.value, ...record }
-    values.value = { ...values.value, ...record }
+    values.value = next
   }
 
   // What is being typed, before it is worth writing.

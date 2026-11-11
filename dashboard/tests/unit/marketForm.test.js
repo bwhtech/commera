@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import { ref } from 'vue'
+import { marketUrls } from '../../src/data/marketUrls.js'
 
 const vueUrl = import.meta.resolve('vue')
 const moduleUrl = (source) => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
@@ -10,8 +11,8 @@ const toast = { success() {}, error() {} }
 const autosaveSource = await readFile(new URL('../../src/data/useSettingsAutosave.js', import.meta.url), 'utf8')
 const autosaveUrl = moduleUrl(autosaveSource
   .replace("from 'vue'", `from '${vueUrl}'`)
-  .replace("import { toast } from 'frappe-ui'", `const toast = { success() {} }`)
-  .replace("import { __ } from './translation'", `const __ = (message) => message`))
+  .replace("import { toast } from 'frappe-ui'", 'const toast = { success() {} }')
+  .replace("import { __ } from './translation'", 'const __ = (message) => message'))
 const { useSettingsAutosave } = await import(autosaveUrl)
 
 function delayedForm() {
@@ -123,10 +124,13 @@ test('a language response preserves a newer queued default language', async () =
   assert.equal(form.stored.value.default_language, 'fr')
 })
 
+let formModuleId = 0
+
 async function marketForm(store, actions) {
+  formModuleId += 1
   const source = await readFile(new URL('../../src/data/useMarketForm.js', import.meta.url), 'utf8')
   const imports = {
-    vue: `export { computed, ref } from '${vueUrl}'`,
+    vue: `export { computed, ref, watch } from '${vueUrl}'`,
     'frappe-ui': 'export const toast = globalThis.marketFormTest.toast',
     './api': 'export const useAdminAction = (path) => globalThis.marketFormTest.actions[path]; export const wasAborted = () => false',
     './errors': 'export const errorMessage = (error) => error.message',
@@ -136,12 +140,13 @@ async function marketForm(store, actions) {
   }
   globalThis.marketFormTest = { store, actions, toast, translate }
   let transformed = source.replace("'./useSettingsAutosave'", `'${autosaveUrl}'`)
-  for (const [path, stub] of Object.entries(imports)) transformed = transformed.replace(`'${path}'`, `'${moduleUrl(stub)}'`)
-  return import(moduleUrl(transformed))
+  for (const [path, stub] of Object.entries(imports)) transformed = transformed.replace(`'${path}'`, `'${moduleUrl(`${stub}
+// ${formModuleId}`)}'`)
+  return import(`${moduleUrl(transformed)}#${formModuleId}`)
 }
 
 test('creating New returns a real new handle that opens the saved record', async () => {
-  const records = new Map()
+  const records = ref(new Map()).value
   const store = { choices: ref({}), find: (handle) => records.get(handle), upsert: (record) => records.set(record.handle, record) }
   const actions = {
     'markets.create_market': { submit: async (params) => ({ ...params, handle: 'new' }) },
@@ -161,10 +166,39 @@ test('creating New returns a real new handle that opens the saved record', async
   assert.equal(editor.values.value.market_name, 'New')
   await editor.change('market_name', 'New region', 'Name')
   assert.equal(records.get('new').market_name, 'New region')
-  for (const field of ['sale_price_list', 'compare_at_price_list', 'countries', 'languages']) {
+  for (const field of ['enabled', 'sale_price_list', 'compare_at_price_list', 'countries', 'languages']) {
     actions['markets.update_market'].submit = async () => ({ field, message: 'Invalid value' })
     await editor.change(field, 'invalid', field)
     assert.deepEqual(editor.errors.value, { [field]: 'Invalid value' })
     assert.notEqual(records.get('new')[field], 'invalid')
   }
+})
+
+test('returning from Languages refreshes a mounted editor while retaining pending edits', async () => {
+  const records = ref([{ handle: 'primary', market_name: 'Store', is_primary: true,
+    countries: [], languages: ['en'], default_language: 'en', enabled: 1 }])
+  const store = { choices: ref({ languages: [{ code: 'en' }] }),
+    find: (handle) => records.value.find((record) => record.handle === handle) }
+  const { useMarketForm } = await marketForm(store, {})
+  const editor = useMarketForm('primary')
+  editor.set('market_name', 'Pending name')
+  records.value = [{ ...records.value[0], languages: ['en', 'ar'], countries: ['Oman'] }]
+  store.choices.value = { languages: [{ code: 'en' }, { code: 'ar', published: true }] }
+  await tick()
+  assert.deepEqual(editor.values.value.languages, ['en', 'ar'])
+  assert.deepEqual(editor.values.value.countries, ['Oman'])
+  assert.equal(editor.values.value.market_name, 'Pending name')
+  assert.equal(store.choices.value.languages[1].published, true)
+  assert.ok(marketUrls(editor.values.value, { defaultLanguage: 'en' }).some(({ url }) => url === '/ar/'))
+})
+
+test('a store reload retains an in-flight field and refreshes clean fields', async () => {
+  const { form, requests } = delayedForm()
+  const saving = form.commit('countries', ['UAE', 'Oman'], 'Countries')
+  await tick()
+  form.adopt({ countries: ['UAE'], languages: ['en', 'fr'] })
+  assert.deepEqual(form.values.value.countries, ['UAE', 'Oman'])
+  assert.deepEqual(form.values.value.languages, ['en', 'fr'])
+  requests[0].resolve({ countries: ['UAE', 'Oman'] })
+  await saving
 })

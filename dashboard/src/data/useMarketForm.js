@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { toast } from 'frappe-ui'
 import { useAdminAction, wasAborted } from './api'
 import { errorMessage } from './errors'
@@ -33,7 +33,8 @@ export function useMarketForm(handle) {
     params: { handle },
     preserveEdits: true,
   })
-  adopt(isNew ? blankMarket() : marketStore.find(handle))
+  if (isNew) adopt(blankMarket())
+  else watch(() => marketStore.find(handle), (record) => adopt(record), { immediate: true })
 
   function reportingErrors(action) {
     return {

@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { toast } from 'frappe-ui'
 import { createAdminCaller } from './adminCaller'
 import { wasAborted } from './api'
+import { errorMessage } from './errors'
 import { countryOwners, marketUrls } from './marketUrls'
 import { __ } from './translation'
 
@@ -63,6 +64,10 @@ function setEnabled(market, isOn) {
   const result = queue.then(async () => {
     const saved = await marketActions.call('update_market', { handle: market.handle, enabled: isOn ? 1 : 0 })
     if (!saved) return
+    if (saved.field) {
+      toast.error(errorMessage(saved))
+      return
+    }
     upsert(saved)
     toast.success(
       isOn
