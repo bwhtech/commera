@@ -24,14 +24,14 @@ STOREFRONT_PATHS = {
 
 def get_theme_pages(theme_name: str) -> dict[str, str]:
 	"""Builder page name by page type, leaving out a page deleted in Builder: its route falls back to the parent."""
+	if not is_builder_installed():
+		return {}
 	rows = frappe.get_all(
 		PAGE_TABLE,
 		filters={"parent": theme_name, "parenttype": "Shop Theme"},
 		fields=["page_type", "builder_page"],
 		order_by="idx asc",
 	)
-	if not is_builder_installed():
-		return {}
 	existing = set(
 		frappe.get_all(
 			"Builder Page", filters={"name": ["in", [row.builder_page for row in rows]]}, pluck="name"

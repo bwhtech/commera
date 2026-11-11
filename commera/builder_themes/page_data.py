@@ -12,6 +12,7 @@ from commera.builder_themes.pages import HOME, PRODUCT_DETAIL, PRODUCT_LISTING, 
 from commera.localization.urls import url
 from commera.sdk import catalog, shop
 from commera.sdk.format import image_url, money, product_url
+from commera.storefront_access import is_storefront_hidden
 
 PRODUCT_IMAGE_WIDTH = 1280
 THUMBNAIL_WIDTH = 320
@@ -24,6 +25,9 @@ def get_page_data(page) -> dict:
 	role = get_page_role(page.name)
 	if not role:
 		return {}
+	# whatever route or renderer serves the page, a private store's catalog stays private
+	if is_storefront_hidden():
+		raise frappe.PermissionError
 	return get_data_for(role.page_type, frappe.form_dict)
 
 
@@ -32,14 +36,36 @@ def get_data_for(page_type: str, form: dict) -> dict:
 	return escape_strings({**get_shop_data(), **builders[page_type](form)})
 
 
-def escape_strings(value):
-	"""HTML-escape every string but `*_html` ones: Builder renders bindings through Jinja without autoescape,
-	and the listing echoes the shopper's search and filters."""
+URL_UNSAFE = str.maketrans({'"': "%22", "'": "%27", "<": "%3C", ">": "%3E"})
+
+
+def get_page_seo(page_type: str, form: dict) -> dict:
+	"""Title, description and noindex for the page's head, unescaped: the store's, the listing's or the product's."""
+	store = shop.get_shop()
+	if page_type == PRODUCT_DETAIL:
+		seo = catalog.get_product(form.get("route") or get_sample_handle())["seo"]
+		title = seo["title"] if seo["custom_title"] else f"{seo['title']} · {store['name']}"
+		return {"title": title, "description": seo["description"], "noindex": seo["noindex"]}
+	if page_type == PRODUCT_LISTING:
+		title = f"{Listing(form).get_title()} · {store['name']}"
+		return {"title": title, "description": store["description"], "noindex": False}
+	return {"title": store["name"], "description": store["description"], "noindex": False}
+
+
+def escape_strings(value, key: str = ""):
+	"""Builder renders bindings through Jinja without autoescape, and the listing echoes the shopper's search.
+	URLs stay URLs: the editor canvas binds attributes without decoding entities, so `&amp;` would break them."""
 	if isinstance(value, dict):
-		return {key: item if key.endswith("_html") else escape_strings(item) for key, item in value.items()}
+		return {name: escape_strings(item, name) for name, item in value.items()}
 	if isinstance(value, list):
-		return [escape_strings(item) for item in value]
-	return escape_html(value) if isinstance(value, str) else value
+		return [escape_strings(item, key) for item in value]
+	if not isinstance(value, str) or key.endswith("_html"):
+		return value
+	return value.translate(URL_UNSAFE) if is_url_key(key) else escape_html(value)
+
+
+def is_url_key(key: str) -> bool:
+	return key in ("url", "image", "thumbnail", "logo") or key.endswith("_url")
 
 
 def get_shop_data() -> dict:

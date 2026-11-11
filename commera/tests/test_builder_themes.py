@@ -13,7 +13,7 @@ from frappe.utils import set_request
 from commera.api.admin.builder_theme import make_theme_live
 from commera.builder_themes.agent_context import get_agent_context
 from commera.builder_themes.editor import get_theme_bar, publish_theme
-from commera.builder_themes.page_data import get_data_for
+from commera.builder_themes.page_data import get_data_for, get_page_data
 from commera.builder_themes.pages import (
 	HOME,
 	PRODUCT_DETAIL,
@@ -170,6 +170,9 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		self.assertIn(first_title, html)
 		self.assertIn("commera-builder.js", html)
 		self.assertNotIn("noindex", html)
+		# the storefront's head, not the Builder page record's
+		self.assertRegex(html, r'<link rel="canonical" href="[^"]*/products"')
+		self.assertNotIn("Product Listing · Test Builder Theme", html)
 
 	def test_agent_context_names_the_role_and_the_data(self):
 		home = get_agent_context(self.pages[HOME])
@@ -243,3 +246,8 @@ class TestBuilderThemeGuards(unittest.TestCase):
 		self.assertTrue(PrivateStorefrontPage("ct/autumn/products").can_render())
 		set_request(method="GET", path="/blog")
 		self.assertFalse(PrivateStorefrontPage("blog").can_render())
+		# the data itself too, whichever renderer or route serves the page
+		with patch(
+			"commera.builder_themes.page_data.get_page_role", return_value=frappe._dict(page_type=HOME)
+		):
+			self.assertRaises(frappe.PermissionError, get_page_data, frappe._dict(name="any-page"))

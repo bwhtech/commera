@@ -49,7 +49,7 @@ Two hooks and one editor fix, merged in [frappe/builder#1075](https://github.com
 - Bob builds one page per session. The merchant opens each page and prompts it; the listing and product pages match the home page by instruction.
 - Design tokens are site-wide in Builder. Bob is told to prefix them with the theme slug; nothing enforces it.
 - Builder pages also answer at their own `ct/<theme>/...` routes, and those routes are indexable too.
-- SEO comes from the Builder page, not the product: every page's title is its Builder page title, the canonical URL is the route rule's target, and a product's noindex, meta description, hreflang alternates and JSON-LD are not rendered. Builder nests the hook's data under `commera`, so page data cannot set Builder's top-level `metatags`; fixing it needs a Builder change.
+- The live pages get the store's, listing's or product's title and description, the storefront URL as canonical, and the product's noindex (`renderer.get_storefront_renderer`), but no hreflang alternates or JSON-LD yet.
 - Deleting a theme leaves its Builder folder and pages, so a new theme with the same name is refused until they are deleted in Builder.
 - One language: the `ar` routes render the same blocks.
 - The listing ignores the `subcategory` parameter that menu links carry.
