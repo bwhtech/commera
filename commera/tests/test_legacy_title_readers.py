@@ -83,10 +83,10 @@ class TestLegacyTitleReaders(ProductDetailPriceTestCase):
 				self.assertIn("قميص &amp; كتان", html)
 				self.assertIn(ARABIC_DESCRIPTION, html)
 				# frappe_call asks the server for replies in the page's language.
-				self.assertIn('const page_language = "ar";', html)
+				self.assertIn('_lang: "ar",', html)
 				english = render_page(self, f"/products/{self.route}")
 				self.assertIn(self.product.display_name, english)
-				self.assertIn("const page_language = null;", english)
+				self.assertIn('_lang: "en",', english)
 
 	def card(self):
 		return utils.get_product_list(product_list=[self.product.name], page_length=1)[0]
