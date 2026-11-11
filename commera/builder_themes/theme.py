@@ -76,7 +76,8 @@ def create_page(theme_name: str, folder: str, page_type: str) -> str:
 	page = frappe.get_doc(
 		{
 			"doctype": "Builder Page",
-			"page_title": f"{theme_name} · {page_type}",
+			# page first: Builder's page list drops everything after " · "
+			"page_title": f"{page_type} · {theme_name}",
 			"route": f"{ROUTE_PREFIX}/{frappe.scrub(theme_name)}/{PAGE_ROUTES[page_type]}",
 			"project_folder": folder,
 			"draft_blocks": [ROOT_BLOCK],

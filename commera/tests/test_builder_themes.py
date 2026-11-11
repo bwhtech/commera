@@ -63,6 +63,7 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 			self.assertFalse(page.published)
 		detail = frappe.get_doc("Builder Page", self.pages[PRODUCT_DETAIL])
 		self.assertEqual(detail.route, "ct/test_builder_theme/products/:route")
+		self.assertEqual(detail.page_title, f"{PRODUCT_DETAIL} · {THEME}")
 
 	def test_refuses_a_taken_name(self):
 		with self.assertRaises(frappe.ValidationError):
