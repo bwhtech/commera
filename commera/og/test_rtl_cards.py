@@ -140,6 +140,22 @@ class TestRightToLeftCards(IntegrationTestCase):
 			with self.subTest(text=text):
 				self.assertEqual(visual_order(f"<div>{text}</div>", "rtl"), expected)
 
+	def test_astral_characters_follow_fribidi_visual_order(self):
+		# FriBidi's left-to-right visual order, with RTL words kept logical for HarfBuzz.
+		cases = (
+			("حذاء Nike 🔥 الرياضي", ["الرياضي", "🔥", "Nike", "حذاء"]),
+			("متجر الخليج 🛍️ Nike", ["Nike", "🛍️", "الخليج", "متجر"]),
+			("فروشگاه آنلاین 🛒 Apple", ["Apple", "🛒", "آنلاین", "فروشگاه"]),
+			("حذاء Nike 👨‍👩‍👧‍👦 الرياضي", ["الرياضي", "👨‍👩‍👧‍👦", "Nike", "حذاء"]),
+			("حذاء Nike 𠀀 الرياضي", ["الرياضي", "Nike 𠀀", "حذاء"]),
+			("حذاء Nike 🇦🇪 الرياضي", ["الرياضي", "Nike 🇦🇪", "حذاء"]),
+			("حذاء Nike 👍🏽 الرياضي", ["الرياضي", "👍🏽", "Nike", "حذاء"]),
+			("حذاء Nike 1️⃣ الرياضي", ["الرياضي", "Nike 1️⃣", "حذاء"]),
+		)
+		for text, expected in cases:
+			with self.subTest(text=text):
+				self.assertEqual(visual_order(f"<div>{text}</div>", "rtl"), expected)
+
 	def test_custom_centered_element_stays_centered(self):
 		html_str = """<div style="display:flex;width:1200px;height:630px;background:white">
 		<div style="display:flex;position:absolute;left:50%;top:100px;transform:translateX(-50%);

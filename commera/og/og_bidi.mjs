@@ -11,6 +11,17 @@ const RTL_CHAR = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
 const HEBREW_CHAR = /[\u0590-\u05FF\uFB1D-\uFB4F]/;
 const WORD_GAP = '0.26em';
 const bidi = bidiFactory();
+const graphemes = new Intl.Segmenter('und', { granularity: 'grapheme' });
+const placeholders = {
+	L: 'A',
+	R: 'א',
+	AL: 'ا',
+	EN: '0',
+	AN: '٠',
+	ON: '\ufffc',
+	NSM: '\u0300',
+	BN: '\u200b',
+};
 
 export function hasRtlText(text) {
 	return RTL_CHAR.test(text);
@@ -123,12 +134,14 @@ class Paragraph {
 
 /** UAX #9 levels and L1/L2 reordering precede grouping for HarfBuzz shaping. */
 export function visualRuns(text, rtl) {
-	const embedding = bidi.getEmbeddingLevels(text, rtl ? 'rtl' : 'ltr');
-	const indices = bidi.getReorderedIndices(text, embedding);
-	const mirrors = bidi.getMirroredCharactersMap(text, embedding.levels);
+	const units = bidiUnits(text);
+	const input = units.map(({ placeholder }) => placeholder).join('');
+	const embedding = bidi.getEmbeddingLevels(input, rtl ? 'rtl' : 'ltr');
+	const indices = bidi.getReorderedIndices(input, embedding);
+	const mirrors = bidi.getMirroredCharactersMap(input, embedding.levels);
 	const runs = [];
 	for (const index of indices) {
-		const char = text[index];
+		const char = units[index].text;
 		if (/[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(char)) continue;
 		const level = embedding.levels[index];
 		const last = runs.at(-1);
@@ -155,6 +168,30 @@ export function visualRuns(text, rtl) {
 		}
 	}
 	return runs;
+}
+
+function bidiUnits(text) {
+	const units = [];
+	for (const { segment } of graphemes.segment(text)) {
+		// Keep emoji selectors, modifiers and joiners attached during L2 reordering.
+		if (
+			/[\p{Extended_Pictographic}\p{Regional_Indicator}\u20e3]/u.test(segment)
+		) {
+			units.push({
+				text: segment,
+				placeholder: placeholders[bidi.getBidiCharTypeName(segment)],
+			});
+			continue;
+		}
+		for (const char of segment) {
+			// bidi-js classifies code units internally; its public lookup accepts code points.
+			const placeholder =
+				char.length === 2 ? placeholders[bidi.getBidiCharTypeName(char)] : char;
+			if (!placeholder) throw new Error('Unsupported astral bidi class');
+			units.push({ text: char, placeholder });
+		}
+	}
+	return units;
 }
 
 function row(children, rtl, style) {
