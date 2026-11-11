@@ -22,7 +22,7 @@ def extract_client_t_messages(code: str, markup: bool = False) -> list[tuple[int
 def extract_region(source, line):
 	tokens = [
 		token
-		for token in tokenize(source, jsx=False, dotted=False, lineno=line)
+		for token in region_tokens(source, line)
 		if token.type not in {"linecomment", "multilinecomment"}
 	]
 	messages = []
@@ -48,6 +48,63 @@ def extract_region(source, line):
 			raise ValueError(f"line {token.lineno}: translation argument must be a static literal")
 		messages.append((token.lineno, text, None))
 	return messages
+
+
+def region_tokens(source, line):
+	position = 0
+	while position < len(source):
+		for token in tokenize(source[position:], jsx=False, dotted=False, lineno=line):
+			start = source.index(token.value, position)
+			position = start + len(token.value)
+			line = token.lineno + token.value.count("\n")
+			if token.type == "template_string":
+				end, expressions = template_expressions(source, start)
+				value = source[start:end]
+				yield token._replace(value=value)
+				for expression, offset in expressions:
+					yield from region_tokens(expression, token.lineno + source[start:offset].count("\n"))
+				position = end
+				line = token.lineno + value.count("\n")
+				break
+			yield token
+		else:
+			return
+
+
+def template_expressions(source, start):
+	expressions = []
+	position = start + 1
+	while position < len(source):
+		if source[position] == "\\":
+			position += 2
+		elif source[position] == "`":
+			return position + 1, expressions
+		elif source.startswith("${", position):
+			begin = position + 2
+			position = interpolation_end(source, begin)
+			expressions.append((source[begin:position], begin))
+			position += 1
+		else:
+			position += 1
+	return position, expressions
+
+
+def interpolation_end(source, start, depth=1):
+	position = start
+	for token in tokenize(source[start:], jsx=False, dotted=False):
+		begin = source.index(token.value, position)
+		position = begin + len(token.value)
+		if token.type == "template_string":
+			end, _ = template_expressions(source, begin)
+			# Resume lexing after nested templates, which Babel may truncate at an inner backtick.
+			return interpolation_end(source, end, depth)
+		if token.value == "{":
+			depth += 1
+		elif token.value == "}":
+			depth -= 1
+			if depth == 0:
+				return begin
+	return len(source)
 
 
 def static_argument(tokens, index):

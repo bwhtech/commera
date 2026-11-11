@@ -89,6 +89,23 @@ class TestArabicCatalog(IntegrationTestCase):
 			with self.subTest(code=code):
 				self.assertEqual(extract_client_t_messages(code), [(1, expected, None)])
 
+	def test_template_interpolations_are_extracted(self):
+		for code, expected, line in [
+			('const label = `hello ${ t("x") }`;', "x", 1),
+			('const label = `hello ${ `nested ${t("x")}` }`;', "x", 1),
+			('const label = `hello ${ {key: "}", value: t("x")} }`;', "x", 1),
+			('const label = `hello\n${\nt("x")\n}`;', "x", 3),
+		]:
+			with self.subTest(code=code):
+				path = self.write_source(f"interpolation-{line}-{len(code)}.js", code)
+				found = [(message.text, message.line) for message in extract_messages(path)]
+				self.assertEqual(found, [(expected, line)])
+
+	def test_dynamic_template_interpolations_are_rejected(self):
+		path = self.write_source("interpolation.js", "const label = `hello ${ t(message) }`;")
+		with self.assertRaisesRegex(ValueError, r"interpolation.js: line 1"):
+			extract_messages(path)
+
 	def test_javascript_non_calls_are_ignored(self):
 		for code in [
 			'const text = "t(message)";',
