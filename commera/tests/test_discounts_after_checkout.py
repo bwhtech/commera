@@ -4,7 +4,6 @@ from frappe.utils.data import flt
 from commera.api.payments import COD_PAYMENT_MODE, make_sales_invoice, place_order
 from commera.discounts.codes import get_code_discount
 from commera.tests.test_discount_codes import CAP_RATE, SHIRT_RATE, DiscountCodeTestCase
-from commera.tests.test_plugin_discounts import sell_at_test_prices
 
 try:
 	from erpnext.accounts.doctype.sales_invoice.mapper import make_sales_return
@@ -47,8 +46,6 @@ class TestDiscountsAfterCheckout(DiscountCodeTestCase):
 		return sales_order
 
 	def test_the_order_is_booked_at_the_total_checked_before_payment(self):
-		# A paid order is checked in its market: the store sells from the test list.
-		sell_at_test_prices(self)
 		code = self.create_code(percentage=10)
 		quotation = self.create_quotation({self.shirt: 1}, (code,))
 		self.change_discount(code, value=20)

@@ -4,9 +4,8 @@ import frappe
 from erpnext.setup.utils import get_exchange_rate
 from frappe.utils.data import cint, cstr, flt
 
-from commera.cart_prices import get_priced_market
+from commera.cart_prices import get_document_prices
 from commera.core import is_cod
-from commera.localization.market_prices import MarketPrices
 
 
 @dataclass
@@ -72,8 +71,8 @@ class CartContext:
 
 
 def get_sale_states(doc, item_codes: list[str]) -> dict[str, bool]:
-	# A document in no market's lists (staff-priced) reads the store's, as it always did.
-	prices = get_priced_market(doc) or MarketPrices.of(None)
+	# A staff-made document has no market: it reads the store's lists, as it always did.
+	prices = get_document_prices(doc)
 	sale, compare_at = prices.get_base_rates(item_codes)
 	return {
 		item_code: prices.compare_at(sale.get(item_code), compare_at.get(item_code)) is not None

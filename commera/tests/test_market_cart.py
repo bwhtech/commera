@@ -9,11 +9,15 @@ from commera.api.payments import (
 	save_cart_quotation,
 	validate_cart_market,
 )
+from commera.cart_prices import get_document_prices
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.core import _get_cart_quotation
+from commera.discounts.cart_context import get_cart_context
 from commera.discounts.codes import add_code
+from commera.localization import pin_localization, resolve
 from commera.sdk import cart as cart_sdk
-from commera.tests.test_market_prices import MarketPriceTestCase
+from commera.tests.test_market_prices import MarketPriceTestCase, make_price_list
+from commera.tests.test_markets import make_market
 from commera.www.cart.checkout import cart_needs_refresh
 
 
@@ -252,3 +256,96 @@ class TestMarketCheckout(MarketCartTestCase):
 
 		validate_cart_market(quotation)
 		self.assertEqual((quotation.currency, quotation.total), (self.store_currency, 80))
+
+
+class TestMarketsSharingASaleList(MarketCartTestCase):
+	"""Twin shares Gulf's sale list and currency; Store Twin shares the store's. Each has its own
+	compare-at list, so only the stored market tells them apart."""
+
+	def setUp(self):
+		super().setUp()
+		self.twin_compare_at = make_price_list("Twin Compare", self.currency)
+		self.store_twin_compare_at = make_price_list("Store Twin Compare", self.store_currency)
+		make_market(
+			"Twin",
+			["Saudi Arabia"],
+			"ar",
+			["en"],
+			handle="twin",
+			sale_price_list=self.market_sale,
+			compare_at_price_list=self.twin_compare_at,
+		)
+		make_market(
+			"Store Twin",
+			["Oman"],
+			"ar",
+			["en"],
+			handle="storetwin",
+			sale_price_list=self.sale_price_list,
+			compare_at_price_list=self.store_twin_compare_at,
+		)
+
+	def test_a_switch_to_a_market_on_the_same_sale_list_reprices_the_cart(self):
+		regular_only = self.item("TWINREGULAR", market_compare_at=400)
+		self.make_item_price(regular_only, self.twin_compare_at, 500)
+		self.sign_in_shopper()
+		with self.in_market():
+			self.add(regular_only)
+			quotation = generate_quotation_for_cart({})
+
+		with self.in_twin():
+			self.assertTrue(cart_needs_refresh(quotation))
+			with self.assertRaises(CheckoutPriceChangedError):
+				validate_cart_market(quotation)
+			rebuilt = generate_quotation_for_cart({})
+			validate_cart_market(rebuilt)
+
+		self.assertEqual((quotation.commera_market, quotation.items[0].rate), ("gulf", 400))
+		self.assertEqual((rebuilt.name, rebuilt.commera_market), (quotation.name, "twin"))
+		self.assertEqual((rebuilt.items[0].rate, rebuilt.total), (500, 500))
+
+	def test_a_switch_from_the_primary_market_to_one_on_its_sale_list_reprices_the_cart(self):
+		regular_only = self.get_item_code(self.make_priced_variant("STORETWINREGULAR", default_rate=100))
+		self.make_item_price(regular_only, self.store_twin_compare_at, 150)
+		self.sign_in_shopper()
+		self.add(regular_only)
+		quotation = generate_quotation_for_cart({})
+
+		with self.in_store_twin():
+			self.assertTrue(cart_needs_refresh(quotation))
+			rebuilt = generate_quotation_for_cart({})
+
+		self.assertEqual((quotation.commera_market, quotation.items[0].rate), ("primary", 100))
+		self.assertEqual((rebuilt.commera_market, rebuilt.currency), ("storetwin", self.store_currency))
+		self.assertEqual(rebuilt.items[0].rate, 150)
+
+	def test_sale_status_reads_the_market_the_cart_was_priced_in(self):
+		# On sale in Gulf (300 from 400); Twin has no compare-at rate, so 300 is its full price.
+		item_code = self.item("TWINSALE", market_sale=300, market_compare_at=400)
+		code = self.make_code(item_code, exclude_sale_items=1)
+		self.sign_in_shopper()
+		with self.in_market():
+			self.add(item_code)
+			in_gulf = generate_quotation_for_cart({})
+			self.assertTrue(get_cart_context(in_gulf).is_on_sale(item_code))
+		with self.in_twin():
+			in_twin = generate_quotation_for_cart({})
+			self.assertFalse(get_cart_context(in_twin).is_on_sale(item_code))
+			priced = cart_sdk.add_discount_code(code)
+
+		self.assertEqual(priced["discounts"], [{"label": code, "amount": 30}])
+
+	def test_a_document_with_no_market_reads_the_store_lists(self):
+		item_code = self.item("STAFFSALE")
+		staff_made = frappe.new_doc("Quotation", selling_price_list=self.market_sale, currency=self.currency)
+
+		prices = get_document_prices(staff_made)
+
+		self.assertEqual((prices.handle, prices.sale_price_list), ("primary", self.sale_price_list))
+		self.assertTrue(get_cart_context(staff_made).is_on_sale(item_code))
+
+	def in_twin(self):
+		return pin_localization(resolve("/en-sa/")[0])
+
+	def in_store_twin(self):
+		return pin_localization(resolve("/en-om/")[0])

@@ -7,13 +7,15 @@ import frappe
 from frappe.utils.data import flt
 
 from commera.api.variant_pricing import get_base_price_rows_by_key
-from commera.localization.markets import Market
+from commera.localization.markets import PRIMARY_MARKET, Market
 from commera.localization.resolver import get_localization
 from commera.utils import get_store_currency
 
 
 @dataclass(frozen=True)
 class MarketPrices:
+	# The handle of the market priced in. Lists and currency alone may match another market's.
+	handle: str
 	# The store's lists and currency: the primary market, or a market with no lists of its own.
 	uses_store_prices: bool
 	sale_price_list: str | None
@@ -29,9 +31,12 @@ class MarketPrices:
 		"""Store lists are read here: a cached localization may predate them. A market without a sale
 		list (before the schema sync, or one the backfill could not fill) keeps the store prices."""
 		if market and not market.is_primary and market.sale_price_list:
-			return cls(False, market.sale_price_list, market.compare_at_price_list, market.currency)
+			return cls(
+				market.handle, False, market.sale_price_list, market.compare_at_price_list, market.currency
+			)
 		settings = frappe.get_cached_doc("Commera Settings")
-		return cls(True, settings.sale_price_list, settings.default_price_list, get_store_currency())
+		handle = market.handle if market else PRIMARY_MARKET
+		return cls(handle, True, settings.sale_price_list, settings.default_price_list, get_store_currency())
 
 	@property
 	def cache_key(self) -> str:

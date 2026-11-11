@@ -6,13 +6,17 @@ from frappe import _
 from frappe.utils.data import flt
 
 from commera.localization.market_prices import MarketPrices
-from commera.localization.markets import StorefrontMarkets
+from commera.localization.markets import PRIMARY_MARKET, Market, StorefrontMarkets
+
+MARKET_FIELD = "commera_market"
 
 
 def apply_market(quotation, prices: MarketPrices):
-	"""Point the quotation at the market's sale list and currency before ERPNext prices its lines.
+	"""Point the quotation at the market before ERPNext prices its lines, and record which market.
 	A switch clears the old exchange rates, so ERPNext reads the new ones."""
-	if is_priced_in(quotation, prices):
+	is_priced = is_priced_in(quotation, prices)
+	quotation.set(MARKET_FIELD, prices.handle)
+	if is_priced:
 		return
 	quotation.update(
 		{
@@ -25,8 +29,15 @@ def apply_market(quotation, prices: MarketPrices):
 	)
 
 
-def is_priced_in(quotation, prices: MarketPrices) -> bool:
-	return (quotation.selling_price_list, quotation.currency) == (prices.sale_price_list, prices.currency)
+def is_priced_in(doc, prices: MarketPrices) -> bool:
+	"""Priced in the market of `prices`, as its sale list and currency stand now."""
+	priced = (get_market_handle(doc), doc.selling_price_list, doc.currency)
+	return priced == (prices.handle, prices.sale_price_list, prices.currency)
+
+
+def get_market_handle(doc) -> str:
+	# Empty on staff-made documents and on carts priced before the field: the store's prices.
+	return doc.get(MARKET_FIELD) or PRIMARY_MARKET
 
 
 def price_regular_lines(quotation, prices: MarketPrices):
@@ -40,12 +51,14 @@ def price_regular_lines(quotation, prices: MarketPrices):
 			item.rate = 0
 
 
-def get_priced_market(doc) -> MarketPrices | None:
-	"""The prices of the market whose sale list and currency `doc` uses, hidden markets included."""
-	for market in StorefrontMarkets.load(include_hidden=True).all:
-		if is_priced_in(doc, prices := MarketPrices.of(market)):
-			return prices
-	return None
+def get_document_market(doc) -> Market | None:
+	"""The market `doc` was priced in, hidden markets included. None once it is deleted."""
+	return StorefrontMarkets.load(include_hidden=True).find(get_market_handle(doc))
+
+
+def get_document_prices(doc) -> MarketPrices:
+	"""The prices of `doc`'s market. The store's when it has none, or its market is deleted."""
+	return MarketPrices.of(get_document_market(doc))
 
 
 def validate_available(prices: MarketPrices, item_codes: list[str], message: str | None = None):

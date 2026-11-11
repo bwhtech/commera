@@ -27,7 +27,8 @@ from commera.api.signup import get_placeholder_first_name, validate_single_email
 from commera.cart_prices import (
 	apply_market,
 	describe_items,
-	get_priced_market,
+	get_document_market,
+	get_market_handle,
 	is_priced_in,
 	price_regular_lines,
 	validate_available,
@@ -59,6 +60,7 @@ from commera.guest import (
 	set_guest_cart_cookie,
 	validate_guest_checkout_enabled,
 )
+from commera.item_price_guard import skip_auto_item_price
 from commera.localization import url
 from commera.localization.market_prices import MarketPrices
 from commera.order_access import get_order_link, set_order_access_key
@@ -288,18 +290,18 @@ def validate_cart_market(quotation):
 	)
 
 
-def validate_paid_order_market(quotation):
-	"""A paid order is checked in the market it was priced and charged in: a webhook has no market."""
-	item_codes = get_sold_item_codes(quotation)
-	prices = get_priced_market(quotation)
-	if unsold := prices.get_unavailable(item_codes) if prices else set(item_codes):
-		frappe.throw(
-			_(
-				"Order {0} was priced in a market that does not sell {1}. The order has not been placed;"
-				" reconcile or refund the payment before releasing any goods."
-			).format(quotation.name, describe_items(unsold)),
-			title=_("Not Available"),
+def note_withdrawn_lines(sales_order, quotation):
+	"""A paid order is placed at its paid rates, whatever its market sells now. Staff learn what changed."""
+	market = get_document_market(quotation)
+	if not market:
+		note = _("Placed at paid rates; market {0} no longer exists.").format(get_market_handle(quotation))
+	elif unsold := MarketPrices.of(market).get_unavailable(get_sold_item_codes(quotation)):
+		note = _("Placed at paid rates; {0} no longer prices {1}.").format(
+			market.title, describe_items(unsold)
 		)
+	else:
+		return
+	sales_order.add_comment("Comment", note)
 
 
 def get_sold_item_codes(quotation) -> list[str]:
@@ -484,7 +486,7 @@ def cart_write_lock(quotation):
 def save_cart_quotation(quotation):
 	"""Persist the shopper's own cart, elevated. Saving resolves the receivable account, and ERPNext's
 	account_perm_check calls frappe.has_permission("Account") directly - no ignore_permissions reaches it."""
-	with system_user_session():
+	with system_user_session(), skip_auto_item_price():
 		quotation.flags.ignore_permissions = True
 		return quotation.save()
 
@@ -508,9 +510,8 @@ def get_order_shopper(quotation) -> str | None:
 
 def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
 	"""Submit the cart and bill it. Called once per payment; the Quotation docstatus enforces that."""
-	validate_paid_order_market(quotation)
 	shopper = get_order_shopper(quotation)
-	with system_user_session():
+	with system_user_session(), skip_auto_item_price():
 		fix_payment_schedule_dates(quotation)
 		quotation.flags.ignore_permissions = True
 		quotation.submit()
@@ -525,6 +526,7 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 		sales_order.insert()
 		set_order_access_key(sales_order)
 		sales_order.submit()
+		note_withdrawn_lines(sales_order, quotation)
 
 		# A cart discounted to nothing is settled at placement, so it is billed and paid like a charged one.
 		paid = flt(gateway_amount) > 0 or flt(sales_order.grand_total) <= 0
@@ -959,7 +961,7 @@ def place_cod_order(quotation_name: str):
 		refuse_payment(_("Cash on delivery is not available."), quotation.name)
 	quotation.flags.commera_payment_kind = "cod"
 	reprice_shipping_discount(quotation)
-	with system_user_session():
+	with system_user_session(), skip_auto_item_price():
 		set_cod_charges(quotation)
 		validate_cod_total(quotation)
 		quotation.flags.ignore_permissions = True

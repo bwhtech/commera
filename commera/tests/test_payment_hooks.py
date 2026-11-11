@@ -112,7 +112,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 	def setUp(self):
 		StubStripeClient.reset()
 		self.addCleanup(frappe.set_user, frappe.session.user)
-		# Orders are checked in the market their cart was priced in: the store's lists.
+		# Cash on delivery checks the cart in the shopper's market: the store's lists.
 		self.addCleanup(
 			set_sale_price_list, frappe.db.get_single_value("Commera Settings", "sale_price_list")
 		)

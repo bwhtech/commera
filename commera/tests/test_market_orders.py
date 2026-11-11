@@ -1,6 +1,11 @@
+from unittest.mock import Mock, patch
+
 import frappe
+from erpnext.stock import get_item_details
 from frappe.utils.data import add_days, today
 
+from commera import item_price_guard
+from commera.api.payment_hooks import on_payment_request_update
 from commera.api.payments import (
 	COD_PAYMENT_MODE,
 	CheckoutPriceChangedError,
@@ -8,12 +13,16 @@ from commera.api.payments import (
 	confirm_payment,
 	generate_quotation_for_cart,
 	make_sales_invoice,
-	place_order,
-	validate_paid_order_market,
 )
+from commera.api.shipping import get_charge_amount
+from commera.item_price_guard import install_guard, skip_auto_item_price
+from commera.localization.markets import delete_cached_rows
 from commera.sdk import cart as cart_sdk
 from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.tests.test_market_cart import MarketCartTestCase
+
+GUARD_HOOK = "commera.item_price_guard.install_guard"
+GATEWAY = "ZZ Market Gateway"
 
 
 class TestMarketOrderPlacement(MarketCartTestCase):
@@ -45,21 +54,77 @@ class TestMarketOrderPlacement(MarketCartTestCase):
 
 		self.assertEqual(frappe.db.get_value("Quotation", quotation.name, "docstatus"), 0)
 
-	def test_a_paid_order_is_checked_in_the_market_it_was_priced_in(self):
-		item_code = self.item("PAIDMARKET", market_sale=300)
+
+class TestPaidMarketOrders(MarketCartTestCase):
+	"""A gateway-paid order: the webhook runs outside any market, after the shopper paid."""
+
+	def setUp(self):
+		super().setUp()
+		ensure_fiscal_year()
+		use_company_warehouse(self)
+		mode_of_payment = {"doctype": "Mode of Payment", "mode_of_payment": GATEWAY, "type": "Bank"}
+		frappe.get_doc(mode_of_payment).insert(ignore_permissions=True, ignore_if_duplicate=True)
+		self.item_code = self.item("PAIDMARKET", market_sale=300)
 		self.sign_in_shopper()
-		self.add(item_code)
+		self.add(self.item_code)
 		with self.in_market():
-			quotation = generate_quotation_for_cart({})
+			self.quotation = generate_quotation_for_cart({})
 		frappe.set_user("Administrator")
 
-		# The webhook's request is in the primary market: the quotation's own market decides.
-		validate_paid_order_market(quotation)
-		frappe.db.delete("Item Price", {"item_code": item_code, "price_list": self.market_sale})
+	def test_a_line_withdrawn_after_payment_is_placed_at_its_paid_rate_with_a_note(self):
+		frappe.db.delete("Item Price", {"item_code": self.item_code, "price_list": self.market_sale})
+
+		sales_order = self.pay()
+
+		self.assertEqual((sales_order.commera_market, sales_order.currency), ("gulf", self.currency))
+		self.assertEqual((sales_order.items[0].rate, sales_order.docstatus), (300, 1))
+		self.assertIn("Placed at paid rates; Gulf no longer prices", self.get_note(sales_order))
+
+	def test_an_order_from_a_deleted_market_is_placed_with_a_note(self):
+		frappe.delete_doc("Commera Market", "gulf", ignore_permissions=True)
+		# Deleting re-caches the rows before the row goes; a commit clears them, and tests never commit.
+		delete_cached_rows()
+
+		sales_order = self.pay()
+
+		self.assertEqual((sales_order.items[0].rate, sales_order.docstatus), (300, 1))
+		self.assertIn("market gulf no longer exists", self.get_note(sales_order))
+
+	def test_an_order_its_market_still_sells_gets_no_note(self):
+		self.assertIsNone(self.get_note(self.pay()))
+
+	def test_a_charge_that_does_not_match_the_cart_is_still_refused(self):
+		quotation = frappe.get_doc("Quotation", self.quotation.name)
 		with self.assertRaisesRegex(frappe.ValidationError, "reconcile or refund the payment"):
-			place_order(quotation, payment_mode="Stripe", gateway_amount=300)
+			on_payment_request_update(self.make_payment_request(quotation, amount=250))
 
 		self.assertEqual(frappe.db.get_value("Quotation", quotation.name, "docstatus"), 0)
+
+	def pay(self):
+		quotation = frappe.get_doc("Quotation", self.quotation.name)
+		payment_request = self.make_payment_request(quotation, get_charge_amount(quotation))
+		# Billing needs a gateway Mode of Payment; placement is what this tests.
+		with patch("commera.api.payments.create_sales_invoice") as create_sales_invoice:
+			on_payment_request_update(payment_request)
+		create_sales_invoice.assert_called_once()
+		return frappe.get_doc("Sales Order", payment_request.db_set.call_args.args[0]["ref_docname"])
+
+	def make_payment_request(self, quotation, amount):
+		payment_request = frappe._dict(
+			status="Paid",
+			ref_doctype="Quotation",
+			ref_docname=quotation.name,
+			gateway=GATEWAY,
+			amount=amount,
+			currency_code=quotation.currency,
+			order_ref="pi_zz_market",
+		)
+		payment_request.db_set = Mock()
+		return payment_request
+
+	def get_note(self, sales_order):
+		filters = {"reference_doctype": "Sales Order", "reference_name": sales_order.name}
+		return frappe.db.get_value("Comment", {**filters, "comment_type": "Comment"}, "content")
 
 
 class TestMarketSaleExclusions(MarketCartTestCase):
@@ -86,8 +151,9 @@ class TestCartPriceInserts(MarketCartTestCase):
 
 	def setUp(self):
 		super().setUp()
+		install_guard()
 		self.set_single("Stock Settings", "auto_insert_price_list_rate_if_missing", 1)
-		self.use_company_warehouse()
+		use_company_warehouse(self)
 		self.regular_only = self.get_item_code(self.make_priced_variant("INSERTREGULAR", default_rate=100))
 		self.sign_in_shopper()
 		self.add(self.regular_only)
@@ -116,14 +182,6 @@ class TestCartPriceInserts(MarketCartTestCase):
 		self.assertEqual((sales_order.items[0].rate, sales_invoice.items[0].rate), (100, 100))
 		self.assertFalse(self.has_sale_price())
 
-	def use_company_warehouse(self):
-		# Orders need a warehouse of the cart's company; the base case takes any.
-		company = frappe.db.get_single_value(
-			"Commera Settings", "company"
-		) or frappe.defaults.get_global_default("company")
-		self.warehouse = frappe.db.get_value("Warehouse", {"company": company, "is_group": 0})
-		self.set_single("Commera Settings", "ecommerce_warehouse", self.warehouse)
-
 	def make_sales_order(self, ignore_pricing_rule):
 		sales_order = frappe.get_doc(
 			{
@@ -151,3 +209,65 @@ class TestCartPriceInserts(MarketCartTestCase):
 		return frappe.db.exists(
 			"Item Price", {"item_code": self.regular_only, "price_list": self.sale_price_list}
 		)
+
+
+class TestItemPriceGuardInstall(MarketCartTestCase):
+	"""A fresh process: ERPNext's insert is not wrapped until a hook or Commera's pricing wraps it."""
+
+	def setUp(self):
+		super().setUp()
+		self.set_single("Stock Settings", "auto_insert_price_list_rate_if_missing", 1)
+		wrapped, installed = get_item_details.insert_item_price, item_price_guard._installed
+		self.addCleanup(self.restore_guard, wrapped, installed)
+		self.original = getattr(wrapped, "__wrapped__", wrapped)
+		self.restore_guard(self.original, False)
+		self.item_code = self.get_item_code(self.make_priced_variant("GUARDINSTALL", default_rate=100))
+
+	def test_the_request_and_job_hooks_install_the_guard(self):
+		for hook in ("before_request", "before_job"):
+			with self.subTest(hook=hook):
+				self.restore_guard(self.original, False)
+				self.assertIn(GUARD_HOOK, frappe.get_hooks(hook))
+				frappe.call(GUARD_HOOK)
+				self.assertTrue(get_item_details.insert_item_price.skips_cart_lines)
+
+	def test_cart_pricing_inserts_no_price_and_other_pricing_does(self):
+		ctx = self.get_pricing_context()
+
+		with skip_auto_item_price():
+			get_item_details.insert_item_price(ctx)
+		self.assertFalse(self.has_sale_price())
+		get_item_details.insert_item_price(ctx)
+		self.assertTrue(self.has_sale_price())
+
+	def restore_guard(self, insert_item_price, installed):
+		get_item_details.insert_item_price = insert_item_price
+		item_price_guard._installed = installed
+
+	def get_pricing_context(self):
+		# A line of an ordinary sales document: ERPNext adds its rate to the price list.
+		return frappe._dict(
+			item_code=self.item_code,
+			price_list=self.sale_price_list,
+			currency=self.store_currency,
+			price_list_rate=90,
+			rate=90,
+			stock_uom=frappe.db.get_value("Item", self.item_code, "stock_uom"),
+			conversion_factor=1,
+			order_type="Sales",
+			transaction_date=today(),
+		)
+
+	def has_sale_price(self):
+		return frappe.db.exists(
+			"Item Price", {"item_code": self.item_code, "price_list": self.sale_price_list}
+		)
+
+
+def use_company_warehouse(test):
+	# Orders need a warehouse of the cart's company; the base case takes any.
+	company = frappe.db.get_single_value("Commera Settings", "company") or frappe.defaults.get_global_default(
+		"company"
+	)
+	test.warehouse = frappe.db.get_value("Warehouse", {"company": company, "is_group": 0})
+	test.set_single("Commera Settings", "ecommerce_warehouse", test.warehouse)

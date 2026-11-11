@@ -17,7 +17,11 @@ website_redirects = [
 
 # localize_request strips the language prefix off request.path before any app's path resolver runs,
 # so the route rules below match the path without it. resolve_website_path sends the canonical redirects.
-before_request = ["commera.localization.routing.localize_request"]
+before_request = [
+	"commera.item_price_guard.install_guard",
+	"commera.localization.routing.localize_request",
+]
+before_job = ["commera.item_price_guard.install_guard"]
 website_path_resolver = "commera.localization.routing.resolve_website_path"
 # Frappe runs auth_hooks after its API key and OAuth checks, so a storefront API call knows its user.
 auth_hooks = ["commera.localization.routing.localize_api_request"]
@@ -209,18 +213,12 @@ doc_events = {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},
 	"Quotation": {
-		"before_validate": [
-			"commera.discounts.pricing.remove_code_discounts",
-			"commera.item_price_guard.guard_item_price_inserts",
-		],
+		"before_validate": "commera.discounts.pricing.remove_code_discounts",
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 	},
 	"Sales Order": {
 		"before_insert": "commera.discounts.pricing.drop_copied_discounts",
-		"before_validate": [
-			"commera.discounts.pricing.remove_code_discounts",
-			"commera.item_price_guard.guard_item_price_inserts",
-		],
+		"before_validate": "commera.discounts.pricing.remove_code_discounts",
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 		"after_insert": [
 			"commera.discounts.usage.record_discount_uses",
@@ -292,10 +290,7 @@ doc_events = {
 		],
 	},
 	"Sales Invoice": {
-		"before_validate": [
-			"commera.discounts.pricing.remove_code_discounts",
-			"commera.item_price_guard.guard_item_price_inserts",
-		],
+		"before_validate": "commera.discounts.pricing.remove_code_discounts",
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 		"on_submit": "commera.utils.update_so_status_from_related_doc",
 	},
