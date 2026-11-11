@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const root = new URL('../../../commera/', import.meta.url);
 
-function summer_checkout() {
+function summer_checkout(config = {}) {
 	const html = readFileSync(
 		new URL('themes/summer_theme/pages/cart/checkout.html', root),
 		'utf8',
@@ -16,6 +16,11 @@ function summer_checkout() {
 		.replace(/{{[\s\S]*?}}/g, '"translated"');
 	let checkout;
 	const context = {
+		URL,
+		window: {
+			addEventListener() {},
+			location: { href: 'https://shop.example/en-ae/cart/checkout' },
+		},
 		document: { addEventListener: (_event, callback) => callback() },
 		Alpine: {
 			data: (_name, factory) => {
@@ -37,6 +42,7 @@ function summer_checkout() {
 		is_guest: true,
 		payment_gateways: ['Store gateway'],
 		show_cod: true,
+		...config,
 	});
 }
 
@@ -110,3 +116,16 @@ test('theme API calls keep the default language and the market for every HTTP me
 	assert.equal(explicit._country, 'SA');
 	assert.equal(explicit._lang, 'ar');
 });
+
+for (const country of ['Saudi Arabia', undefined]) {
+	test(`Summer applies validated prefill before the default: ${country}`, async () => {
+		const form = summer_checkout({
+			is_guest: false,
+			default_country: 'United Arab Emirates',
+			prefill: country ? { country, city: 'Riyadh' } : {},
+		});
+		form.apply_pending_discount = () => {};
+		await form.init();
+		assert.equal(form.billing.country, country ?? 'United Arab Emirates');
+	});
+}

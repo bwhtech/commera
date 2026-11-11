@@ -26,7 +26,9 @@ from commera.discounts.selection import get_discount_codes
 from commera.guest import is_guest
 from commera.localization import url
 from commera.localization.address_countries import AddressCountries
+from commera.localization.country_switcher import get_store_country
 from commera.localization.market_prices import MarketPrices
+from commera.localization.resolver import get_localization
 from commera.sdk.catalog import set_product_titles
 from commera.utils import (
 	format_addresses,
@@ -83,6 +85,9 @@ def get_context(context, allow_guest: bool = False):
 	context.default_country = countries.market_default_country()
 	context.default_country_row = get_default_country_row(context.country_list, context.default_country)
 	context.checkout_prefill = get_checkout_prefill(context.country_list)
+	context.billing_country_row = get_default_country_row(
+		context.country_list, context.checkout_prefill.get("country") or context.default_country_row["name"]
+	)
 	context.store_pickup_addresses = (
 		get_store_pickup_addresses() if commera_settings.store_pickup_enabled else []
 	)
@@ -101,9 +106,17 @@ def get_context(context, allow_guest: bool = False):
 
 
 def get_default_country_row(country_list: list[dict], default_country: str | None) -> dict:
-	"""The row the default theme's country picker starts on: the market's country, else its own."""
-	row = next((row for row in country_list if row["name"] == default_country), None)
-	return row or LEGACY_DEFAULT_COUNTRY
+	"""Keep the legacy default only while this market allows it."""
+	for name in (default_country, LEGACY_DEFAULT_COUNTRY["name"]):
+		if row := next((row for row in country_list if row["name"] == name), None):
+			return row
+	shopper_country = get_localization().country
+	if row := next((row for row in country_list if row["code"] == shopper_country), None):
+		return row
+	store_country = get_store_country()
+	if row := next((row for row in country_list if row["name"] == store_country), None):
+		return row
+	return country_list[0] if country_list else {"name": "", "code": ""}
 
 
 def get_checkout_prefill(country_list: list[dict]) -> dict:

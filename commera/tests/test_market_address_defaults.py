@@ -57,11 +57,12 @@ class TestMarketDefaultCountry(IntegrationTestCase):
 		with pin_localization(replace(resolve("/en-ae/")[0], country=None)):
 			self.assertEqual(AddressCountries.current().market_default_country(), "Saudi Arabia")
 
-	def test_the_primary_market_leaves_each_form_its_own_default(self):
+	def test_the_primary_market_default_is_an_allowed_country(self):
 		with in_locale("/"):
 			self.assertIsNone(AddressCountries.current().market_default_country())
 			context = self.legacy_checkout()
-		self.assertEqual(context.default_country_row["name"], "Saudi Arabia")
+		self.assertIn(context.default_country_row, context.country_list)
+		self.assertNotIn(context.default_country_row["name"], ("Saudi Arabia", UAE))
 
 	def test_every_theme_starts_a_gulf_address_in_the_shoppers_country(self):
 		with in_locale("/en-ae/"):
@@ -79,6 +80,15 @@ class TestMarketDefaultCountry(IntegrationTestCase):
 			legacy,
 		)
 		self.assertIn(f'value="{UAE}"', html)
+
+	def test_checkout_link_country_precedes_the_default_only_when_allowed(self):
+		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
+		for code, expected in (("SA", "Saudi Arabia"), ("US", UAE)):
+			with self.subTest(code=code), in_locale("/en-ae/"):
+				frappe.local.form_dict = frappe._dict({"checkout[shipping_address][country]": code})
+				context = self.legacy_checkout()
+				self.assertEqual(context.billing_country_row["name"], expected)
+				self.assertEqual(context.checkout_prefill.get("country", UAE), expected)
 
 	def legacy_checkout(self):
 		context = frappe._dict()
