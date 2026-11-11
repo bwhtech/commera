@@ -78,7 +78,7 @@ async function saveReply() {
 <template>
   <template v-if="review">
     <AppPageHeader
-      :title="review.review_title || __('Review')"
+      :title="review.review_title || __('Review', null, 'Product review')"
       back-to="/reviews"
       :breadcrumbs="[{ label: __('Reviews'), route: '/reviews' }, { label: review.review_title || review.name }]"
     >

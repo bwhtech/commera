@@ -66,12 +66,47 @@ class TestArabicCatalog(IntegrationTestCase):
 		for code in [
 			"t(message)",
 			"t (message)",
+			"t?.(message)",
+			"commera.t?.(message)",
+			"t((message))",
+			't(("Hello") + name)',
 			"t('Hello' + name)",
 			"t(`Hello ${name}`)",
 			"commera.t(prefix + 'Hello')",
 		]:
 			with self.subTest(code=code), self.assertRaisesRegex(ValueError, "line 1"):
 				extract_client_t_messages(code)
+
+	def test_static_javascript_arguments(self):
+		for code, expected in [
+			('t(("Hello"))', "Hello"),
+			('t("Hello /* world */")', "Hello /* world */"),
+			('t?.("Hello")', "Hello"),
+			("commera . t?.((`Hello`))", "Hello"),
+			("t(/* comment */ 'Hello', values)", "Hello"),
+			(r't("Hello\nworld")', "Hello\nworld"),
+		]:
+			with self.subTest(code=code):
+				self.assertEqual(extract_client_t_messages(code), [(1, expected, None)])
+
+	def test_javascript_non_calls_are_ignored(self):
+		for code in [
+			'const text = "t(message)";',
+			"const x = 1; // t(message)",
+			"/* t(message) */",
+			"const text = `t(message)`;",
+			r"const expression = /t(message)/;",
+			"other . t(message)",
+			"other.commera.t(message)",
+			"function t(message) {}",
+		]:
+			with self.subTest(code=code):
+				self.assertEqual(extract_client_t_messages(code), [])
+
+	def test_dynamic_optional_calls_report_file_and_line(self):
+		path = self.write_source("dynamic.js", "\nconst value = t?.(message)")
+		with self.assertRaisesRegex(ValueError, r"dynamic.js: line 2"):
+			extract_messages(path)
 
 	def test_markup_requires_nested_tags_and_complete_format_fields(self):
 		self.assertFalse(markup_matches("<b><i>Hello</i></b>", "<b><i>مرحبا</b></i>"))

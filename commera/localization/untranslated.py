@@ -17,6 +17,7 @@ from frappe.translate import (
 )
 
 import commera
+from commera.localization.javascript import extract_client_t_messages
 
 APP_ROOT = Path(commera.__file__).resolve().parent.parent
 TRANSLATIONS_DIR = APP_ROOT / "commera" / "translations"
@@ -33,12 +34,6 @@ SOURCES = (
 SKIPPED_DIRS = {"node_modules", "test", "tests", "dist", "__pycache__"}
 EXTENSIONS = (".py", ".js", ".vue", ".html")
 
-# Frappe extracts `_()` and `__()` only. The storefront package and Alpine bindings call `t()`.
-CLIENT_T_START = re.compile(r"(?<![\w.$])(?:commera\.)?t\s*\(\s*")
-CLIENT_T_LITERAL = re.compile(
-	r"(?P<quote>['\"`])(?P<message>(?:\\.|(?!(?P=quote)).)*?)(?P=quote)\s*[,)]",
-	re.DOTALL,
-)
 PLACEHOLDER_PATTERN = re.compile(r"%(?:\(\w+\))?[sd]|</?[a-zA-Z][\w-]*")
 
 
@@ -121,36 +116,13 @@ def extract_messages(path: Path) -> list[Message]:
 	else:
 		found = [tuple(row) for row in extract_messages_from_code(code)]
 		try:
-			found += extract_client_t_messages(code)
+			found += extract_client_t_messages(code, markup=path.suffix != ".js")
 		except ValueError as error:
 			raise ValueError(f"{path}: {error}") from error
 	if path.suffix == ".js":
 		found += extract_messages_from_javascript_code(code)
 	shown_path = str(path.relative_to(APP_ROOT) if path.is_relative_to(APP_ROOT) else path)
 	return [Message(text, context, shown_path, line) for line, text, context in found]
-
-
-def extract_client_t_messages(code: str) -> list[tuple[int, str, None]]:
-	code = re.sub(
-		r"(?m)^\s*//[^\n]*|/\*.*?\*/|<!--.*?-->",
-		lambda match: re.sub(r"[^\n]", " ", match.group()),
-		code,
-		flags=re.DOTALL,
-	)
-	messages = []
-	for call in CLIENT_T_START.finditer(code):
-		if re.search(r"function\s+$", code[: call.start()]):
-			continue
-		line = code.count("\n", 0, call.start()) + 1
-		literal = CLIENT_T_LITERAL.match(code, call.end())
-		if not literal or (literal.group("quote") == "`" and "${" in literal.group("message")):
-			raise ValueError(f"line {line}: translation argument must be a static literal")
-		messages.append((line, unescape(literal.group("message")), None))
-	return messages
-
-
-def unescape(text: str) -> str:
-	return re.sub(r"\\(['\"`\\])", r"\1", text)
 
 
 def markup_matches(source: str, translation: str) -> bool:

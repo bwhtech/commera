@@ -99,7 +99,7 @@ def get_context(context, allow_guest: bool = False):
 			"href": url("/cart/"),
 		},
 		{
-			"label": _("Checkout"),
+			"label": _("Checkout", context="Storefront checkout"),
 			"href": "#",
 		},
 	]

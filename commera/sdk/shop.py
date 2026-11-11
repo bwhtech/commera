@@ -74,7 +74,7 @@ def get_menu(handle: str) -> Menu | None:
 	if handle == "footer":
 		return {
 			"handle": handle,
-			"title": _("Footer"),
+			"title": _("Footer", context="Storefront navigation"),
 			"items": [get_footer_menu_item(section) for section in get_footer_sections()],
 		}
 	return None
