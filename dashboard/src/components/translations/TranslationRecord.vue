@@ -4,8 +4,7 @@ import { Badge, Button } from 'frappe-ui'
 import TranslationField from './TranslationField.vue'
 import { fieldKey, groupSections } from '../../data/translationStatus'
 
-// One record's fields in cards. A change carries this record, read from the prop: a field that
-// emits as it unmounts still names the record it belonged to, not the one opened next.
+// Async field changes carry the identity captured before the request started.
 const props = defineProps({
   item: { type: Object, required: true },
   resourceType: { type: String, required: true },
@@ -66,14 +65,15 @@ function viewOnStore() {
       <div class="divide-y divide-outline-gray-1 max-sm:border-t max-sm:border-outline-gray-1">
         <TranslationField
           v-for="field in section.fields"
-          :key="field.field"
+          :key="fieldKey(language.code, resourceType, item.name, field.field)"
+          :identity="fieldKey(language.code, resourceType, item.name, field.field)"
           :field="field"
           :language="language"
           :source-language="sourceLanguage"
           :record-title="item.title"
           :disabled="disabled"
           :pending="pending[fieldKey(language.code, resourceType, item.name, field.field)]"
-          @change="(value) => emit('change', item, field, value)"
+          @change="(value, key, originalField) => emit('change', key, originalField, value)"
         />
       </div>
     </section>

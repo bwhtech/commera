@@ -5,11 +5,13 @@ import { Editor, EditorContent, RichTextKit } from 'frappe-ui/editor'
 import RichTextField from '../RichTextField.vue'
 import StatusBadge from '../StatusBadge.vue'
 import Thumb from '../Thumb.vue'
+import { uploadTranslationImage } from '../../data/translationImage.js'
 import { __ } from '../../data/translation'
 
 // One field of one record: its source and its translation, side by side. The editor holds
 // unsaved values until Save, so this only reports changes.
 const props = defineProps({
+  identity: { type: String, required: true },
   disabled: { type: Boolean, default: false },
   // { field, label, kind, source, value, status }
   field: { type: Object, required: true },
@@ -26,13 +28,17 @@ const isUnsaved = computed(() => props.pending !== undefined)
 const status = computed(() => (isUnsaved.value ? 'unsaved' : props.field.status))
 const value = computed({
   get: () => props.pending ?? props.field.value,
-  set: (newValue) => { if (!props.disabled) emit('change', newValue) },
+  set: (newValue) => change(newValue),
 })
 const inputLabel = computed(() => __('{0} of {1} in {2}', [props.field.label, props.recordTitle, props.language.name]))
 
 const { upload } = useFileUpload()
 const imageInput = ref(null)
 const isUploading = ref(false)
+
+function change(newValue, identity = props.identity, field = props.field) {
+  if (!props.disabled) emit('change', newValue, identity, field)
+}
 
 async function swapImage(event) {
   const file = event.target.files?.[0]
@@ -41,8 +47,9 @@ async function swapImage(event) {
   isUploading.value = true
   try {
     // Public: the storefront shows it to shoppers.
-    const uploaded = await upload(file, { private: false })
-    if (!props.disabled) emit('change', uploaded.file_url)
+    await uploadTranslationImage(upload, file, props.identity, props.field, (key, field, result) => {
+      change(result, key, field)
+    })
   } catch {
     toast.error(__('Could not upload {0}', [file.name]))
   } finally {
@@ -83,7 +90,7 @@ async function swapImage(event) {
         </span>
         <input ref="imageInput" :disabled="disabled" type="file" accept="image/*" class="hidden" @change="swapImage" />
         <Button :disabled="disabled" size="sm" :label="__('Change')" :loading="isUploading" @click="imageInput.click()" />
-        <Button :disabled="disabled" v-if="value" size="sm" variant="ghost" :label="__('Reset')" @click="emit('change', '')" />
+        <Button :disabled="disabled" v-if="value" size="sm" variant="ghost" :label="__('Reset')" @click="change('')" />
       </div>
       <div v-else :dir="language.direction">
         <RichTextField v-if="field.kind === 'html'" v-model="value" :disabled="disabled" min-height="min-h-32" />
@@ -105,7 +112,7 @@ async function swapImage(event) {
         variant="ghost"
         icon-left="lucide-check"
         :label="__('Still correct')"
-        @click="emit('change', field.value)"
+        @click="change(field.value)"
       />
     </div>
   </div>

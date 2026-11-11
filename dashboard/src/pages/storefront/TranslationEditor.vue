@@ -10,7 +10,6 @@ import TranslationItemPicker from '../../components/translations/TranslationItem
 import TranslationRecord from '../../components/translations/TranslationRecord.vue'
 import { getItems, saveTranslations, useTranslationOverview } from '../../data/translations'
 import {
-  fieldKey,
   groupResources,
   languageTotals,
   parseFieldKey,
@@ -88,9 +87,9 @@ const dirtyCount = computed(() => Object.keys(pending).length)
 const context = computed(() => JSON.stringify([languageCode.value, resourceType.value]))
 const { saving, save: saveDraft } = useTranslationSave(pending, context)
 
-function change(item, field, value) {
-  if (saving.value) return
-  const key = fieldKey(languageCode.value, resourceType.value, item.name, field.field)
+function change(key, field, value) {
+  const identity = parseFieldKey(key)
+  if (saving.value || identity.language !== languageCode.value || identity.resource !== resourceType.value) return
   changePending(pending, key, field, value)
 }
 
