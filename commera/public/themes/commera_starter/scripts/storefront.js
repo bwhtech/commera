@@ -517,7 +517,7 @@ function checkout(config) {
 			if (
 				!payment_methods.some((method) => method.id === this.payment_method)
 			) {
-				this.payment_method = payment_methods[0]?.id ?? '';
+				this.payment_method = '';
 			}
 		},
 
