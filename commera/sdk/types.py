@@ -68,6 +68,8 @@ __all__ = [
 
 
 class Charge(TypedDict):
+	"""Included taxes set included=True. Other taxes and plugin fees omit it."""
+
 	description: str
 	amount: float
 	included: NotRequired[bool]
@@ -301,6 +303,7 @@ class PricedCart(TypedDict):
 	subtotal: float
 	order_discount: float
 	total: float
+	# Present together only when the cart has inclusive tax.
 	items_total: NotRequired[float]
 	taxes: NotRequired[list[Charge]]
 	# The store Shipping Rule's free band, judged after every discount; None when it has none.

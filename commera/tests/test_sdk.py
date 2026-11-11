@@ -277,7 +277,8 @@ class TestSdk(IntegrationTestCase):
 		return sales_order
 
 	def assert_shape(self, result: dict, shape):
-		self.assertEqual(set(result), shape.__required_keys__ | shape.__optional_keys__)
+		self.assertTrue(shape.__required_keys__ <= set(result))
+		self.assertTrue(set(result) <= shape.__required_keys__ | shape.__optional_keys__)
 
 	def test_the_public_names_are_frozen(self):
 		for module_name, names in PUBLIC_NAMES.items():
