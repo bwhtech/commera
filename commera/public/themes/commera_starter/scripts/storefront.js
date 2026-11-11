@@ -313,6 +313,14 @@ function order_summary() {
 		},
 
 		get discount_codes() {
+			return this.all_codes.filter((code_state) => !code_state.removed);
+		},
+
+		get removed_codes() {
+			return this.all_codes.filter((code_state) => code_state.removed);
+		},
+
+		get all_codes() {
 			return this.summary?.discount_codes ?? this.cart?.discount_codes ?? [];
 		},
 
@@ -742,6 +750,11 @@ document.addEventListener('alpine:init', () => {
 
 		get count() {
 			return this.cart?.total_quantity ?? 0;
+		},
+
+		// A line the market has no price for: checkout refuses the cart until it is removed.
+		get has_unavailable() {
+			return (this.cart?.lines ?? []).some((line) => line.available === false);
 		},
 
 		async init() {

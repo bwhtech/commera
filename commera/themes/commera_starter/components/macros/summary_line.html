@@ -1,4 +1,7 @@
-{% macro summary_line(image, title, subtitle, qty, amount) -%}
+{% from "components/macros/availability.html" import unavailable_label %}
+
+{# `unavailable`: an expression true for a line the market has no price for; `remove` then removes it. #}
+{% macro summary_line(image, title, subtitle, qty, amount, unavailable=None, remove=None) -%}
 <li class="flex items-center gap-3">
 	<div class="relative w-14 shrink-0">
 		<div class="media overflow-hidden rounded-lg">
@@ -9,9 +12,15 @@
 	<div class="min-w-0 flex-1">
 		<div class="grid gap-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-3">
 			<p class="text-md text-balance [overflow-wrap:anywhere]"><bdi x-text="{{ title }}"></bdi></p>
-			<p class="tabular whitespace-nowrap text-md" x-text="{{ amount }}"></p>
+			<p class="tabular whitespace-nowrap text-md"{% if unavailable %} x-show="!({{ unavailable }})"{% endif %} x-text="{{ amount }}"></p>
 		</div>
 		<p class="mt-1 text-base text-ink-gray-6 [overflow-wrap:anywhere]" x-show="{{ subtitle }}" x-text="{{ subtitle }}"></p>
+		{%- if unavailable %}
+		<div x-show="{{ unavailable }}" class="mt-1 flex flex-wrap items-center gap-x-3">
+			<p class="text-base text-ink-red-7">{{ unavailable_label() }}</p>
+			<button type="button" @click="{{ remove }}" :disabled="$store.cart.busy" class="text-base text-ink-gray-6 link hover:text-ink-gray-9">{{ _("Remove") }}</button>
+		</div>
+		{%- endif %}
 	</div>
 </li>
 {%- endmacro %}

@@ -321,6 +321,7 @@ jinja = {
 		"commera.guest.is_guest_checkout_enabled",
 		"commera.localization.get_country_choices",
 		"commera.localization.get_localization",
+		"commera.localization.get_market_place",
 		"commera.localization.switch_url",
 		"commera.localization.url",
 		"commera.utils.format_theme_css",

@@ -1,5 +1,6 @@
 {% from "components/macros/transitions.html" import overlay, scrim, drawer, sheet, dialog %}
 {% from "components/macros/icons.html" import icon, spinner %}
+{% from "components/macros/availability.html" import checkout_blocked_notice %}
 
 <div x-data="{ just_added: false }" x-effect="$store.cart.open || (just_added = false)" x-cloak x-show="$store.cart.open" {{ overlay() }} @open-cart.window="$store.cart.open = true; just_added = Boolean($event.detail?.added)" @keydown.escape.window="$store.cart.open = false"
     @open-search.window="$store.cart.open = false" @open-auth.window="$store.cart.open = false" @open-menu.window="$store.cart.open = false" class="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="{{ _('Cart') }}">
@@ -19,7 +20,8 @@
 				<span x-text="$store.cart.money($store.cart.cart?.total)"></span>
 			</div>
 			<p class="mt-1 text-base text-ink-gray-6">{{ _("Shipping and taxes calculated at checkout.") }}</p>
-			<button type="button" @click="$store.cart.checkout()" :disabled="$store.cart.busy" :aria-busy="$store.cart.busy === 'checkout'" class="relative mt-4 button-primary w-full">{{ _("Check out") }}{{ spinner("$store.cart.busy === 'checkout'", "size-5 text-on-brand") }}</button>
+			{{ checkout_blocked_notice("mt-3") }}
+			<button type="button" @click="$store.cart.checkout()" :disabled="$store.cart.busy || $store.cart.has_unavailable" :aria-busy="$store.cart.busy === 'checkout'" class="relative mt-4 button-primary w-full">{{ _("Check out") }}{{ spinner("$store.cart.busy === 'checkout'", "size-5 text-on-brand") }}</button>
 		</div>
 	</div>
 </div>

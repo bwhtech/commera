@@ -26,6 +26,10 @@
 		<button type="submit" :disabled="busy || !code.trim()" :aria-busy="busy === 'apply'" class="button-secondary relative shrink-0">{{ _("Apply") }}{{ spinner("busy === 'apply'", "size-5 text-ink-gray-8") }}</button>
 	</form>
 	<p x-show="error" x-text="error" role="alert" class="text-base text-ink-red-7"></p>
+	{# A code a market switch dropped: listed once, with its reason, and gone from the next cart. #}
+	<template x-for="code_state in removed_codes" :key="code_state.code">
+		<p role="status" class="text-base text-ink-gray-7 [overflow-wrap:anywhere]" data-message="{{ _('The code {0} was removed.') | e }}" x-text="$el.dataset.message.replace('{0}', code_state.code) + (code_state.reason ? ' ' + code_state.reason : '')"></p>
+	</template>
 	<ul x-show="discount_codes.length" class="flex flex-col gap-2">
 		<template x-for="code_state in discount_codes" :key="code_state.code">
 			<li>

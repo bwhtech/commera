@@ -1,5 +1,6 @@
 {% from "components/macros/icons.html" import icon, spinner %}
 {% from "components/macros/empty_state.html" import empty_state %}
+{% from "components/macros/availability.html" import unavailable_label %}
 
 {# Loading, unreadable and empty used to look the same: a cart that is not read yet showed as empty. #}
 <div x-show="$store.cart.status === 'loading'" class="flex flex-1 items-center justify-center px-5" aria-busy="true">
@@ -22,12 +23,13 @@
 			<div class="flex min-w-0 flex-1 flex-col">
 				<div class="grid gap-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-3">
 					<a :href="line.product && $store.cart.product_url(line.product)" class="text-md font-medium text-ink-gray-9 [overflow-wrap:anywhere] decoration-1 underline-offset-4 hover:underline" x-text="line.product?.title ?? line.title"></a>
-					<p class="tabular whitespace-nowrap text-md font-medium" x-text="$store.cart.money(line.amount)"></p>
+					<p class="tabular whitespace-nowrap text-md font-medium" x-show="line.available !== false" x-text="$store.cart.money(line.amount)"></p>
 				</div>
 				<p class="mt-1 text-base text-ink-gray-6 [overflow-wrap:anywhere]" x-show="line.product?.variant_title" x-text="line.product?.variant_title"></p>
-				<p class="tabular mt-0.5 text-base text-ink-gray-6" x-show="line.qty > 1" x-text="$store.cart.money(line.rate) + ' ' + $el.dataset.each" data-each="{{ _('each') }}"></p>
+				<p class="mt-1 text-base text-ink-red-7" x-show="line.available === false">{{ unavailable_label() }}</p>
+				<p class="tabular mt-0.5 text-base text-ink-gray-6" x-show="line.qty > 1 && line.available !== false" x-text="$store.cart.money(line.rate) + ' ' + $el.dataset.each" data-each="{{ _('each') }}"></p>
 				<div class="mt-auto flex items-center justify-between pt-3">
-					<div class="flex items-center">
+					<div x-show="line.available !== false" class="flex items-center">
 					<div class="flex h-10 items-center rounded-lg border border-outline-gray-3">
 						<button type="button" @click="$store.cart.set_quantity(line, line.qty - 1)" :disabled="$store.cart.busy" class="grid size-10 place-items-center rounded-lg text-ink-gray-8 disabled:text-ink-gray-4" aria-label="{{ _('Less') }}">{{ icon("minus", "size-4") }}</button>
 						<span class="tabular w-6 text-center text-md" x-text="line.qty"></span>
@@ -35,7 +37,7 @@
 					</div>
 					{{ spinner("$store.cart.busy === 'quantity:' + line.line_id", "size-4 text-ink-gray-6") }}
 					</div>
-					<button type="button" @click="$store.cart.remove(line)" :disabled="$store.cart.busy" :aria-busy="$store.cart.busy === 'remove:' + line.line_id" class="-me-2 inline-flex h-10 items-center rounded-lg px-2 text-base text-ink-gray-6 link hover:text-ink-gray-9">{{ _("Remove") }}{{ spinner("$store.cart.busy === 'remove:' + line.line_id", "size-4 text-ink-gray-6") }}</button>
+					<button type="button" @click="$store.cart.remove(line)" :disabled="$store.cart.busy" :aria-busy="$store.cart.busy === 'remove:' + line.line_id" class="-me-2 ms-auto inline-flex h-10 items-center rounded-lg px-2 text-base text-ink-gray-6 link hover:text-ink-gray-9">{{ _("Remove") }}{{ spinner("$store.cart.busy === 'remove:' + line.line_id", "size-4 text-ink-gray-6") }}</button>
 				</div>
 			</div>
 		</li>

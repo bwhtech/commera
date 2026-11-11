@@ -40,6 +40,14 @@ def get_country_choices() -> list[MarketChoices]:
 	]
 
 
+def get_market_place() -> str:
+	"""Where the shopper buys, in the page language: the country the URL names, else the market."""
+	localization = get_localization()
+	country = localization.country
+	names = get_country_names((country,)) if country else {}
+	return _(names.get(country) or localization.market.title)
+
+
 def get_primary_choices(market: Market, names: dict[str, str]) -> MarketChoices:
 	"""One choice for every country that no other market claims."""
 	localization = get_localization()
