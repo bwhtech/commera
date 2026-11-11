@@ -7,6 +7,7 @@
 {% set currency_symbol = get_currency_symbol() %}
 {% set checkout_config = {
 	"payment_gateways": payment_gateways,
+	"payment_gateway_labels": payment_gateway_labels,
 	"show_cod": show_cod | int,
 	"summary": checkout_summary,
 	"has_billing_addresses": billing_addresses | length > 0,
@@ -454,7 +455,7 @@
 												@click='payment_mode = gateway_name'>
 												<input class="form-check-input radio" type="radio" name="payment_mode"
 													:id="'payment_mode_' + index" :value="gateway_name" x-model="payment_mode">
-												<label class="form-check-label" :for="'payment_mode_' + index" x-text="gateway_name"></label>
+												<label class="form-check-label" :for="'payment_mode_' + index" x-text="config.payment_gateway_labels[gateway_name] || gateway_name"></label>
 											</div>
 										</div>
 										<div class="accordion-collapse collapse"

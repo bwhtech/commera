@@ -1,4 +1,5 @@
 import frappe
+from bwh_payments.api import get_gateway_options
 from frappe import _
 from frappe.query_builder import DocType
 from frappe.rate_limiter import rate_limit
@@ -71,6 +72,8 @@ def get_context(context, allow_guest: bool = False):
 	payment_methods = get_checkout_payment_methods(context.cart_quotation)
 	context.payment_gateways = [method for method in payment_methods if method != COD_PAYMENT_MODE]
 	context.show_cod = int(COD_PAYMENT_MODE in payment_methods)
+	# The list refreshes in the browser after the address step, so label every enabled gateway.
+	context.payment_gateway_labels = {option.name: _(option.name) for option in get_gateway_options()}
 	context.country_list = get_country_list()
 	context.checkout_prefill = get_checkout_prefill(context.country_list)
 	context.store_pickup_addresses = (
