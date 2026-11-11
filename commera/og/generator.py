@@ -2,9 +2,9 @@
 
 import base64
 import os
+import re
 import subprocess
 import time
-from contextlib import contextmanager
 from io import BytesIO
 from urllib.parse import urlsplit
 
@@ -13,7 +13,7 @@ from frappe.utils import flt, get_files_path, get_url
 
 from commera import seo
 from commera.branding import get_brand_assets
-from commera.localization import get_localization, pin_localization, resolve
+from commera.localization import get_localization
 from commera.shop_themes.render import render_themed_template
 
 # resvg-js is pathologically slow on large embedded images (~58s for 1220x1760, <1s downscaled).
@@ -29,19 +29,23 @@ STORE_CARD_TEMPLATE = "commera/templates/og/store_card.html"
 # Tall enough for a crisp logo at the card's 140px display height, small enough to keep resvg fast.
 CARD_LOGO_PX = 420
 
+# (family, folder in public/fonts, the text that needs it). og_bidi.mjs uses the same family names.
+CARD_FONTS = (
+	("OpenSans", "OpenSans", None),
+	("IBM Plex Sans Arabic", "IBMPlexSansArabic", re.compile("[\u0600-\u08ff\ufb50-\ufdff\ufe70-\ufeff]")),
+	("IBM Plex Sans Hebrew", "IBMPlexSansHebrew", re.compile("[\u0590-\u05ff\ufb1d-\ufb4f]")),
+)
+
 
 def render_og_png(html_str, width, height):
-	font_weights = [("OpenSans-Regular.ttf", 400), ("OpenSans-Bold.ttf", 700)]
-	fonts = [
-		{
-			"path": frappe.get_app_path("commera", "public", "fonts", "OpenSans", filename),
-			"name": "OpenSans",
-			"weight": weight,
-			"style": "normal",
-		}
-		for filename, weight in font_weights
-	]
-	payload = {"html": html_str, "width": width, "height": height, "fonts": fonts}
+	direction = get_localization().language.direction
+	payload = {
+		"html": html_str,
+		"width": width,
+		"height": height,
+		"fonts": card_fonts(html_str),
+		"direction": direction,
+	}
 
 	# .mjs, not .js: satori is ESM-only and the app root also holds CJS tooling.
 	script_path = frappe.get_app_path("commera", "og", "og_satori.mjs")
@@ -64,25 +68,23 @@ def render_og_png(html_str, width, height):
 	return result.stdout
 
 
-@contextmanager
-def card_text_localization():
-	"""Satori draws no right-to-left script, so an RTL page's card keeps the source language."""
-	localization = get_localization()
-	if localization.language.direction != "rtl":
-		yield
-		return
-	source = resolve("/", localization.default_language.code, country=localization.country)[0]
-	with pin_localization(source):
-		yield
+def card_fonts(html_str):
+	"""Open Sans, plus the Arabic or Hebrew font when the card has that script."""
+	return [
+		{
+			"path": frappe.get_app_path("commera", "public", "fonts", folder, f"{folder}-{style}.ttf"),
+			"name": family,
+			"weight": weight,
+			"style": "normal",
+		}
+		for family, folder, needed_for in CARD_FONTS
+		if not needed_for or needed_for.search(html_str)
+		for style, weight in (("Regular", 400), ("Bold", 700))
+	]
 
 
 def build_variant_card_context(variant_doc, with_price=True):
 	"""`with_price` False drops the price: a secondary market's card would show the store price."""
-	with card_text_localization():
-		return read_variant_card_context(variant_doc, with_price)
-
-
-def read_variant_card_context(variant_doc, with_price):
 	from commera.product_detail import get_product_detail
 
 	detail = get_product_detail(variant_doc.route)
@@ -120,10 +122,9 @@ def get_card_title(variant_doc) -> str:
 
 def get_variant_card_version(variant_doc) -> str:
 	"""What a product card's cache key must change with: the record, and its translated text."""
-	with card_text_localization():
-		localization = get_localization()
-		market = localization.market.handle if localization.market else ""
-		text = [localization.language.code, market, seo.get_store_name(), get_card_title(variant_doc)]
+	localization = get_localization()
+	market = localization.market.handle if localization.market else ""
+	text = [localization.language.code, market, seo.get_store_name(), get_card_title(variant_doc)]
 	return frappe.as_json([str(variant_doc.modified), *text])
 
 
@@ -157,13 +158,12 @@ def render_card_for_doc(for_doctype, doc, with_price=True):
 
 
 def build_store_card_html():
-	with card_text_localization():
-		context = {
-			"store_name": seo.get_store_name(),
-			"tagline": seo.get_store_description() or seo.default_store_description(),
-			"site_host": urlsplit(get_url()).hostname or "",
-			"logo_data_uri": logo_data_uri(get_brand_assets().logo),
-		}
+	context = {
+		"store_name": seo.get_store_name(),
+		"tagline": seo.get_store_description() or seo.default_store_description(),
+		"site_host": urlsplit(get_url()).hostname or "",
+		"logo_data_uri": logo_data_uri(get_brand_assets().logo),
+	}
 	return render_themed_template(STORE_CARD_TEMPLATE, context)
 
 

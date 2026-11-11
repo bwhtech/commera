@@ -7,6 +7,7 @@ import frappe
 from frappe.utils import get_files_path
 
 from commera.branding import get_brand_assets
+from commera.localization import get_localization
 from commera.og.generator import (
 	DEFAULT_OG_HEIGHT,
 	DEFAULT_OG_WIDTH,
@@ -59,7 +60,7 @@ def serve_og_image(route, with_price=True):
 		raise frappe.DoesNotExistError()
 
 	variant_doc = frappe.get_cached_doc("Style Attribute Variant", variant.name)
-	# /en-ae/og-image/<route>.png renders the Gulf market text; RTL pages keep the source language.
+	# /en-ae/og-image/<route>.png renders the Gulf market text in English.
 	card = route if with_price else f"{route}?price={NO_PRICE}"
 	cache_path = cache_file_path(card, get_variant_card_version(variant_doc))
 	if not os.path.exists(cache_path):
@@ -71,8 +72,10 @@ def serve_og_image(route, with_price=True):
 
 def serve_store_card():
 	html_str = build_store_card_html()
-	# Keyed on the rendered markup, so any change to the name, tagline or logo yields a fresh card.
-	cache_path = cache_file_path(STORE_CARD_ROUTE, html_str)
+	# Keyed on the markup, so a new name, tagline or logo yields a fresh card. A right-to-left card
+	# mirrors the same markup.
+	direction = get_localization().language.direction
+	cache_path = cache_file_path(STORE_CARD_ROUTE, frappe.as_json([direction, html_str]))
 	if not os.path.exists(cache_path):
 		write_cache(cache_path, render_og_png(html_str, DEFAULT_OG_WIDTH, DEFAULT_OG_HEIGHT))
 

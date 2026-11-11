@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { Resvg } from '@resvg/resvg-js';
 import satori from 'satori';
 import { html } from 'satori-html';
+import { prepareTree } from './og_bidi.mjs';
 
 async function readStdin() {
 	const chunks = [];
@@ -24,7 +25,7 @@ async function main() {
 		style: font.style,
 	}));
 
-	const markup = html(payload.html);
+	const markup = prepareTree(html(payload.html), payload.direction);
 	const svg = await satori(markup, {
 		width: payload.width,
 		height: payload.height,
