@@ -26,7 +26,6 @@ from commera.discounts.selection import get_discount_codes
 from commera.guest import is_guest
 from commera.localization import url
 from commera.localization.address_countries import AddressCountries
-from commera.localization.country_switcher import get_store_country
 from commera.localization.market_prices import MarketPrices
 from commera.localization.resolver import get_localization
 from commera.sdk.catalog import set_product_titles
@@ -40,6 +39,7 @@ from commera.utils import (
 	get_free_delivery,
 	get_pickup_addresses,
 	get_pickup_warehouses,
+	get_store_company,
 )
 
 # from commera.api.utils import auth_required
@@ -113,7 +113,8 @@ def get_default_country_row(country_list: list[dict], default_country: str | Non
 	shopper_country = get_localization().country
 	if row := next((row for row in country_list if row["code"] == shopper_country), None):
 		return row
-	store_country = get_store_country()
+	store_company = get_store_company()
+	store_country = store_company and frappe.get_cached_value("Company", store_company, "country")
 	if row := next((row for row in country_list if row["name"] == store_country), None):
 		return row
 	return country_list[0] if country_list else {"name": "", "code": ""}
