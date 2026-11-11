@@ -2224,3 +2224,58 @@ Remove a language you no longer sell in to add another.,أزل لغة لم تع�
 Storefront languages,لغات واجهة المتجر
 {0} of {1},{0} من {1}
 Open translations,فتح الترجمات
+Choose at least one language.,اختر لغة واحدة على الأقل.
+No Languages,لا توجد لغات
+The primary market is your store. Edit its prices in General and its languages in Languages.,السوق الرئيسية هي متجرك. عدّل أسعارها في الإعدادات العامة ولغاتها في اللغات.
+Primary Market,السوق الرئيسية
+Only store administrators can manage markets.,يمكن لمسؤولي المتجر فقط إدارة الأسواق.
+Markets,الأسواق
+{0} (in {1}),{0} (في {1})
+Countries,البلدان
+All countries no other market has.,جميع البلدان غير الموجودة في أي سوق أخرى.
+Add at least one country.,أضف بلدًا واحدًا على الأقل.
+Add a country…,إضافة بلد…
+Add a country,إضافة بلد
+New market,سوق جديدة
+Your store's own market,السوق الخاصة بمتجرك
+Shoppers there move to the primary market. Its URLs stop working.,ينتقل المتسوقون فيها إلى السوق الرئيسية. وتتوقف روابطها عن العمل.
+Delete market,حذف السوق
+Back to markets,العودة إلى الأسواق
+Primary,رئيسية
+Create market,إنشاء سوق
+This market could not be opened,تعذّر فتح هذه السوق
+Not saved. Fix the field below.,لم يتم الحفظ. صحّح الحقل أدناه.
+Edit its prices in General and its languages in Languages.,عدّل أسعارها في الإعدادات العامة ولغاتها في اللغات.
+Sell in this market,البيع في هذه السوق
+Market,السوق
+Handle,المعرّف
+Made from the name when empty.,يُنشأ من الاسم إذا تُرك فارغًا.
+Publish it first,انشرها أولًا
+All other countries,جميع البلدان الأخرى
+All countries,جميع البلدان
+Sell to countries in their own currency and language.,البيع للبلدان بعملتها ولغتها.
+Add market,إضافة سوق
+Your storefront still sells in the markets it had.,تواصل واجهة متجرك البيع في أسواقها السابقة.
+Sell in {0},البيع في {0}
+Store default,الإعداد الافتراضي للمتجر
+Prices and taxes,الأسعار والضرائب
+Sale price list,قائمة أسعار البيع
+Choose a price list,اختر قائمة أسعار
+Compare-at price list,قائمة الأسعار قبل الخصم
+Shown struck through.,يظهر مشطوبًا.
+From the sale price list.,من قائمة أسعار البيع.
+Tax template,قالب الضريبة
+Products without a price in {0} are not sold here.,لا تُباع هنا المنتجات التي ليس لها سعر في {0}.
+Products without a price in the sale price list are not sold here.,لا تُباع هنا المنتجات التي ليس لها سعر في قائمة أسعار البيع.
+URLs,الروابط
+Pick countries and languages to see the URLs.,اختر البلدان واللغات لعرض الروابط.
+New theme,قالب جديد
+Theme name,اسم القالب
+Autumn drop,تشكيلة الخريف
+"It opens in Frappe Builder, where you can describe the design to the AI assistant.",يفتح في Frappe Builder، حيث يمكنك وصف التصميم لمساعد الذكاء الاصطناعي.
+Create theme,إنشاء قالب
+Built with Frappe Builder · {0},أُنشئ باستخدام Frappe Builder · {0}
+Edit in Builder,تحرير في Builder
+{0} is open to shoppers,{0} متاحة للمتسوقين
+{0} is off. Shoppers there see the primary market.,{0} متوقفة. يرى المتسوقون فيها السوق الرئيسية.
+{0} created,تم إنشاء {0}
