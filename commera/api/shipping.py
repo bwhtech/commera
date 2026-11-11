@@ -362,30 +362,34 @@ def matches_tax_row(row, tax) -> bool:
 	) and flt(row.get(amount)) == flt(tax.get(amount))
 
 
-def get_charge_lines(taxes, shipping_rule: str | None) -> dict:
-	"""Split a charge table into delivery, the COD fee, plugin fees and the taxes a shopper sees by their own names.
-
-	The Shipping Rule row is matched on account and cost centre because its description is translated.
-	"""
+def get_charge_lines(taxes, shipping_rule: str | None, quotation=None) -> dict:
+	"""Use cart provenance for checkout and retain the historical order fallback without a quotation."""
 	rule = get_shipping_rule_accounts(shipping_rule)
 	charge_lines = {"shipping": 0.0, "cod_charge": 0.0, "plugin_fees": [], "taxes": []}
 	for row in taxes:
 		description = cstr(row.description).strip()
-		# First: an app names its own fee, so its description can look like any other charge.
-		if row.get(PLUGIN_FEE_FIELD):
-			charge_lines["plugin_fees"].append({"description": description, "amount": flt(row.tax_amount)})
-		elif description == COD_CHARGE_DESCRIPTION.strip():
-			charge_lines["cod_charge"] += flt(row.tax_amount)
-		elif description.startswith(DELIVERY_CHARGE_DESCRIPTION) or is_shipping_rule_row(row, rule):
-			charge_lines["shipping"] += flt(row.tax_amount)
+		kind = get_cart_charge_kind(row, quotation) if quotation else None
+		amount = flt(row.tax_amount)
+		if kind == "plugin" or (quotation is None and row.get(PLUGIN_FEE_FIELD)):
+			charge_lines["plugin_fees"].append({"description": description, "amount": amount})
+		elif kind == "cod" or (quotation is None and description == COD_CHARGE_DESCRIPTION.strip()):
+			charge_lines["cod_charge"] += amount
+		elif kind in ("delivery", "shipping_rule") or (
+			quotation is None
+			and (description.startswith(DELIVERY_CHARGE_DESCRIPTION) or is_shipping_rule_row(row, rule))
+		):
+			charge_lines["shipping"] += amount
 		else:
 			included = bool(row.get("included_in_print_rate"))
 			if included:
 				description = _("{0} (included)").format(description)
+				after_discount = row.get("tax_amount_after_discount_amount")
+				if quotation and flt(quotation.discount_amount) and after_discount is not None:
+					amount = flt(after_discount)
 			charge_lines["taxes"].append(
 				{
 					"description": description,
-					"amount": flt(row.tax_amount),
+					"amount": amount,
 					**({"included": True} if included else {}),
 				}
 			)
@@ -418,7 +422,7 @@ def get_checkout_summary(quotation) -> dict:
 
 
 def get_charge_summary(quotation) -> dict:
-	charge_lines = get_charge_lines(quotation.taxes, quotation.shipping_rule)
+	charge_lines = get_charge_lines(quotation.taxes, quotation.shipping_rule, quotation)
 	charges = charge_lines["shipping"] + charge_lines["cod_charge"]
 	charges += sum(
 		line["amount"]

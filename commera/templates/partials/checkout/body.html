@@ -66,14 +66,10 @@
             },
             calculate_checkout_total() {
 
-                this.checkout_total = this.charge_summary.total - this.charge_summary.shipping - this.charge_summary.cod_charge
-                if (this.delivery_option === 'home_delivery' && !this.is_free_delivery) {
-                    this.checkout_total += this.delivery_charge
-                }
-                if (this.billing_address_filled && this.payment_mode === COD_PAYMENT_MODE && parseFloat('{{cod_charge_applicable_below or 0}}') > parseFloat('{{cart_payable_total or 0}}')) {
-                    this.checkout_total += parseFloat('{{cod_charge or 0}}')
-                }
-
+                const summary = this.payment_mode === COD_PAYMENT_MODE
+                    ? this.charge_summary.cash_on_delivery
+                    : this.charge_summary;
+                this.checkout_total = summary.total;
             },
             async apply_shipping_rule() {
                 let data;

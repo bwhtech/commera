@@ -183,3 +183,34 @@ test('legacy checkout keeps included tax in the payable total before and after a
 	form.calculate_checkout_total();
 	assert.equal(form.checkout_total, 710);
 });
+
+test('Summer uses the rounded server COD total', () => {
+	const form = summer_checkout();
+	form.address_step = 'saved';
+	form.payment_mode = 'COD';
+	form.summary = {
+		total: 710,
+		cash_on_delivery: { total: 715, cod_charge: 5.25 },
+	};
+	assert.equal(form.active_summary.total, 715);
+});
+
+test('legacy checkout uses the rounded server COD total', () => {
+	const html = readFileSync(
+		new URL('templates/partials/checkout/body.html', root),
+		'utf8',
+	);
+	const body = html.match(
+		/calculate_checkout_total\(\) \{([\s\S]*?)\n {12}\},/,
+	)[1];
+	const calculate = new Function('COD_PAYMENT_MODE', body);
+	const state = {
+		payment_mode: 'COD',
+		charge_summary: { total: 710, cash_on_delivery: { total: 715 } },
+	};
+	calculate.call(state, 'COD');
+	assert.equal(state.checkout_total, 715);
+	state.payment_mode = 'gateway';
+	calculate.call(state, 'COD');
+	assert.equal(state.checkout_total, 710);
+});

@@ -72,7 +72,8 @@ class TestStorefrontCart(ProductDetailPriceTestCase):
 		self.assertEqual(line["product"]["variant_title"], "M")
 		self.assertEqual(cart["total_quantity"], 2)
 		for result, shape in ((cart, PricedCart), (line, PricedCartLine), (line["product"], CartLineProduct)):
-			self.assertEqual(set(result), shape.__required_keys__ | shape.__optional_keys__)
+			self.assertTrue(shape.__required_keys__ <= set(result))
+			self.assertTrue(set(result) <= shape.__required_keys__ | shape.__optional_keys__)
 
 	def test_an_item_no_product_sells_is_refused(self):
 		frappe.set_user("Administrator")

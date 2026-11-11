@@ -37,13 +37,45 @@ class TestMarketTaxCheckout(test_market_taxes.TestMarketOrderRecords):
 	def test_exclusive_summaries_before_and_after_address(self):
 		self.assert_public_summaries(inclusive=False)
 
-	def assert_public_summaries(self, inclusive):
+	def test_inclusive_delivery_named_template_stays_tax(self):
+		self.assert_public_summaries(inclusive=True, description="Delivery Charges - template levy")
+
+	def test_inclusive_summary_uses_discounted_vat(self):
+		self.assert_public_summaries(inclusive=True, discount=70)
+
+	def test_inclusive_cod_summary_uses_server_rounding(self):
+		self.assert_public_summaries(inclusive=True, delivery=10.25, cod=5.25)
+
+	def assert_public_summaries(self, inclusive, description=None, discount=0, delivery=0, cod=0):
 		from commera.api.storefront import cart as cart_api
 		from commera.api.storefront import checkout as checkout_api
 		from commera.tests.test_sdk_checkout import BILLING_ADDRESS
 
-		self.set_market_template(self.make_template(15, inclusive=int(inclusive)))
+		template = self.make_template(15, inclusive=int(inclusive))
+		if description:
+			doc = frappe.get_doc("Sales Taxes and Charges Template", template)
+			doc.taxes[0].description = description
+			doc.save(ignore_permissions=True)
+		self.set_market_template(template)
+		if cod:
+			account = frappe.db.get_value(
+				"Account", {"company": self.company, "root_type": "Income", "is_group": 0}, "name"
+			)
+			self.set_single("Commera Settings", "charge_account_head", account)
+			self.set_single("Commera Settings", "cod_enabled", 1)
+			self.set_single("Commera Settings", "cod_charge", cod)
+			self.set_single("Commera Settings", "cod_charge_applicable_below", 100000)
 		self.item_code = self.item("SUMMARY", market_sale=699.95)
+		code = (
+			self.make_code(
+				discount_type="Amount Off Order",
+				value_type="Fixed Amount",
+				value=discount,
+				currency=self.currency,
+			)
+			if discount
+			else None
+		)
 		self.sign_in_shopper()
 		frappe.local.request_ip = "127.0.0.1"
 		with self.in_market():
@@ -53,18 +85,52 @@ class TestMarketTaxCheckout(test_market_taxes.TestMarketOrderRecords):
 			self.assertIsNone(checkout_api.get())
 			if inclusive:
 				self.assertEqual(priced["items_total"], 699.95)
-				self.assertEqual(priced["taxes"][0]["description"], "VAT 15% (included)")
+				self.assertEqual(
+					priced["taxes"][0]["description"], (description or "VAT 15%") + " (included)"
+				)
 			state = checkout_api.set_addresses(
 				{**BILLING_ADDRESS, "country": "United Arab Emirates", "city": "Dubai"}
 			)
+			if discount:
+				priced = cart_api.add_discount_code(code)
+				state = checkout_api.get()
+			if delivery:
+				with patch(
+					"commera.api.shipping.get_delivery_options",
+					return_value=[{"title": "Express", "amount": delivery}],
+				):
+					state = checkout_api.set_shipping_option("Express")
 			summary = state["summary"]
 			quotation = _get_cart_quotation()
-			self.assertEqual(summary["total"], 700 if inclusive else 805)
+			self.assertEqual(
+				summary["total"], 710 if delivery else (630 if discount else (700 if inclusive else 805))
+			)
 			self.assertEqual(summary["subtotal"], 699.95)
 			self.assertEqual(summary["total"], quotation.rounded_total or quotation.grand_total)
 			self.assertEqual(
-				summary["taxes"][0]["description"], "VAT 15% (included)" if inclusive else "VAT 15%"
+				summary["taxes"][0]["description"],
+				(description or "VAT 15%") + (" (included)" if inclusive else ""),
 			)
+			self.assertEqual(summary["shipping"], delivery)
+			if inclusive:
+				self.assertTrue(summary["taxes"][0]["included"])
+				self.assertEqual(summary["taxes"][0]["amount"], 82.17 if discount else 91.30)
+			self.assertAlmostEqual(
+				summary["subtotal"]
+				+ summary["shipping"]
+				- summary["discount_amount"]
+				+ sum(row["amount"] for row in summary["taxes"] if not row.get("included"))
+				+ summary["rounding_adjustment"],
+				summary["total"],
+				places=2,
+			)
+			if discount:
+				self.assertEqual(
+					summary["taxes"][0]["amount"], quotation.taxes[0].tax_amount_after_discount_amount
+				)
+			if cod:
+				self.assertEqual(summary["cash_on_delivery"]["total"], 715)
+				self.assertEqual(summary["cash_on_delivery"]["cod_charge"], cod)
 			self.assertEqual(checkout_api.get()["summary"], summary)
 			self.assertEqual(cart_api.get_cart()["total"], priced["total"])
 
@@ -298,6 +364,8 @@ class TestLegacyMarketTaxCheckout(test_market_taxes.MarketTaxTestCase):
 			for _ in range(2):
 				summary = set_delivery_option("Legacy express")["checkout_summary"]
 				self.assertEqual(summary["total"], 120 + extra)
+				self.assertEqual(summary["shipping"], 40)
+				self.assertEqual(len(summary["taxes"]), template_copies if colliding else 0)
 				self.assertEqual(len(_get_cart_quotation().taxes), template_copies + 1 if colliding else 1)
 				quotation = _get_cart_quotation()
 				for row in quotation.taxes:

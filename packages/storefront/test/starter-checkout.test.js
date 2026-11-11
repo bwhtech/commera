@@ -317,3 +317,14 @@ test('the delivery recap translates the country without changing the stored valu
 	form.state.shipping_address.country = 'Unknown country';
 	assert.equal(form.address_recap, 'Kochi, Unknown country');
 });
+
+test('Starter uses the rounded server COD total', () => {
+	const form = make_checkout_form();
+	form.state = {
+		summary: { total: 710, cash_on_delivery: { total: 715, cod_charge: 5.25 } },
+	};
+	form.payment_methods = [{ id: 'cod', is_cash_on_delivery: true }];
+	form.payment_method = 'cod';
+	form.$store = { cart: { cart: { total: 700 } } };
+	assert.equal(form.total, 715);
+});
