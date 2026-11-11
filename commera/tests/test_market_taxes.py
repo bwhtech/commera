@@ -6,7 +6,7 @@ from frappe.utils.data import flt
 from commera.api.payment_hooks import on_payment_request_update
 from commera.api.payments import generate_quotation_for_cart, save_cart_quotation
 from commera.api.shipping import DELIVERY_CHARGE_DESCRIPTION, get_charge_amount
-from commera.cart_taxes import TEMPLATE_DOCTYPE, apply_market_taxes
+from commera.cart_taxes import TEMPLATE_DOCTYPE, apply_market_taxes, set_tax_template
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.localization import pin_localization, resolve
 from commera.localization.markets import StorefrontMarkets
@@ -304,6 +304,30 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 		self.assertEqual(len(quotation.taxes), 2)
 		clear_pickup_charges(quotation)
 		self.assertEqual([row.description for row in quotation.taxes], ["VAT 10%"])
+
+	def test_identical_unmarked_cod_fee_does_not_claim_a_template_row(self):
+		from commera.api.shipping import add_cod_charge, clear_pickup_charges
+		from commera.utils import COD_CHARGE_DESCRIPTION
+
+		template = self.make_template(0)
+		doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
+		doc.taxes[0].update(
+			{"charge_type": "Actual", "description": COD_CHARGE_DESCRIPTION, "tax_amount": 15}
+		)
+		doc.save(ignore_permissions=True)
+		self.set_market_template(template)
+		self.set_single("Commera Settings", "charge_account_head", self.account)
+		quotation = self.quote_in_market()
+		for _ in range(2):
+			add_cod_charge(quotation, 15, self.account)
+			self.assertEqual(quotation.grand_total, 330)
+			self.assertEqual(len(quotation.taxes), 2)
+			for row in quotation.taxes:
+				row.set("commera_cart_charge", None)
+			set_tax_template(quotation, template)
+		clear_pickup_charges(quotation)
+		self.assertEqual(len(quotation.taxes), 1)
+		self.assertEqual(quotation.grand_total, 315)
 
 	def test_unmarked_plugin_and_cod_fees_use_the_shared_charge_rule(self):
 		from commera.api.shipping import add_cod_charge, clear_pickup_charges

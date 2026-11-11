@@ -310,9 +310,7 @@ def get_cart_charge_kind(row, quotation) -> str | None:
 		return "plugin"
 	if marker := row.get(CART_CHARGE_FIELD):
 		return marker
-	from commera.cart_taxes import get_template_rows
-
-	if any(matches_tax_row(row, tax) for tax in get_template_rows(quotation.taxes_and_charges)):
+	if is_applied_template_row(row, quotation):
 		return None
 	if row.charge_type != "Actual":
 		return None
@@ -336,6 +334,25 @@ def get_cart_charge_kind(row, quotation) -> str | None:
 	if row.account_head == charge_account and description == COD_CHARGE_DESCRIPTION.strip():
 		return "cod"
 	return None
+
+
+def is_applied_template_row(row, quotation) -> bool:
+	"""Consume each template match once, in quotation order, excluding marked charges."""
+	from commera.cart_taxes import get_template_rows
+
+	remaining = get_template_rows(quotation.taxes_and_charges)
+	for candidate in quotation.taxes:
+		if candidate.get(PLUGIN_FEE_FIELD) or candidate.get(CART_CHARGE_FIELD):
+			continue
+		for index, tax in enumerate(remaining):
+			if matches_tax_row(candidate, tax):
+				remaining.pop(index)
+				if candidate is row:
+					return True
+				break
+		if candidate is row:
+			return False
+	return False
 
 
 def matches_tax_row(row, tax) -> bool:

@@ -24,7 +24,11 @@ from commera.tests.test_payment_hooks import patch_app_hooks
 class TestMarketTaxCheckout(test_market_taxes.TestMarketOrderRecords):
 	create_pickup_warehouse = test_cart_checkout.TestCartCheckout.create_pickup_warehouse
 	create_shop_address = test_cart_checkout.TestCartCheckout.create_shop_address
-	address_payload = test_cart_checkout.TestCartCheckout.address_payload
+
+	def address_payload(self):
+		payload = test_cart_checkout.TestCartCheckout.address_payload(self)
+		payload["billing_address"].update({"country": "United Arab Emirates", "city": "Dubai"})
+		return payload
 
 	def enable_gateway(self):
 		account = frappe.db.get_value(
@@ -41,7 +45,9 @@ class TestMarketTaxCheckout(test_market_taxes.TestMarketOrderRecords):
 				},
 			},
 		)
-		self.enterContext(patch("commera.api.payments.get_available_payment_modes", return_value=[GATEWAY]))
+		self.enterContext(
+			patch("commera.api.payments.get_gateway_options", return_value=[frappe._dict(name=GATEWAY)])
+		)
 		self.enterContext(patch("commera.api.payments.resolve_payment_mode", return_value=GATEWAY))
 
 	def checkout(self, total):
@@ -167,7 +173,10 @@ class TestLegacyMarketTaxCheckout(test_market_taxes.MarketTaxTestCase):
 	def test_primary_colliding_template_before_marker_migration(self):
 		self.assert_without_marker_field(colliding=True)
 
-	def assert_without_marker_field(self, colliding=False):
+	def test_primary_identical_template_rows_before_marker_migration(self):
+		self.assert_without_marker_field(colliding=True, template_copies=2)
+
+	def assert_without_marker_field(self, colliding=False, template_copies=1):
 		meta = frappe.get_meta("Sales Taxes and Charges")
 		with (
 			patch.object(
@@ -179,12 +188,12 @@ class TestLegacyMarketTaxCheckout(test_market_taxes.MarketTaxTestCase):
 				[column for column in meta.get_valid_columns() if column != "commera_cart_charge"],
 			),
 		):
-			self.assert_legacy_checkout(colliding=colliding, absent=True)
+			self.assert_legacy_checkout(colliding=colliding, absent=True, template_copies=template_copies)
 
 	def test_primary_colliding_template_survives_legacy_checkout(self):
 		self.assert_legacy_checkout(colliding=True)
 
-	def assert_legacy_checkout(self, colliding=False, absent=False):
+	def assert_legacy_checkout(self, colliding=False, absent=False, template_copies=1):
 		from commera.api.shipping import set_delivery_option
 		from commera.cart_taxes import TEMPLATE_DOCTYPE
 
@@ -206,7 +215,21 @@ class TestLegacyMarketTaxCheckout(test_market_taxes.MarketTaxTestCase):
 		if colliding:
 			template = self.make_template(0)
 			doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
-			doc.taxes[0].update({"charge_type": "Actual", "description": rule.label, "tax_amount": 7})
+			doc.taxes[0].update({"charge_type": "Actual", "description": rule.label, "tax_amount": 40})
+			for _ in range(template_copies - 1):
+				doc.append(
+					"taxes",
+					{
+						key: doc.taxes[0].get(key)
+						for key in (
+							"charge_type",
+							"account_head",
+							"description",
+							"tax_amount",
+							"included_in_print_rate",
+						)
+					},
+				)
 			doc.save(ignore_permissions=True)
 		self.sign_in_shopper()
 		self.add(self.item_code)
@@ -219,11 +242,11 @@ class TestLegacyMarketTaxCheckout(test_market_taxes.MarketTaxTestCase):
 		save_cart_quotation(quotation)
 		quotation = frappe.get_doc("Quotation", quotation.name)
 		self.assertTrue(all(not row.get("commera_cart_charge") for row in quotation.taxes))
-		extra = 7 if colliding else 0
+		extra = 40 * template_copies if colliding else 0
 		for _ in range(2):
 			rebuilt = generate_quotation_for_cart({})
 			self.assertEqual(rebuilt.grand_total, 120 + extra)
-			self.assertEqual(len(rebuilt.taxes), 2 if colliding else 1)
+			self.assertEqual(len(rebuilt.taxes), template_copies + 1 if colliding else 1)
 			if absent:
 				reloaded = frappe.get_doc("Quotation", rebuilt.name)
 				self.assertTrue(all(not row.get("commera_cart_charge") for row in reloaded.taxes))
@@ -234,13 +257,30 @@ class TestLegacyMarketTaxCheckout(test_market_taxes.MarketTaxTestCase):
 			for _ in range(2):
 				summary = set_delivery_option("Legacy express")["checkout_summary"]
 				self.assertEqual(summary["total"], 120 + extra)
-				self.assertEqual(len(_get_cart_quotation().taxes), 2 if colliding else 1)
+				self.assertEqual(len(_get_cart_quotation().taxes), template_copies + 1 if colliding else 1)
 				quotation = _get_cart_quotation()
 				for row in quotation.taxes:
 					row.set("commera_cart_charge", None)
 				save_cart_quotation(quotation)
+		from commera.api.shipping import add_cod_charge
+
+		quotation = _get_cart_quotation()
+		self.set_single("Commera Settings", "charge_account_head", self.account)
+		add_cod_charge(quotation, 15, self.account)
+		for row in quotation.taxes:
+			row.set("commera_cart_charge", None)
+		add_cod_charge(quotation, 15, self.account)
+		self.assertEqual(quotation.grand_total, 135 + extra)
+		for row in quotation.taxes:
+			row.set("commera_cart_charge", None)
+		save_cart_quotation(quotation)
 		summary = update_quotation_address({"is_store_pickup": True, "store_pickup_warehouse": warehouse})[
 			"checkout_summary"
 		]
 		self.assertEqual(summary["total"], 80 + extra)
-		self.assertEqual(len(_get_cart_quotation().taxes), 1 if colliding else 0)
+		from commera.api.payments import update_delivery_charges
+
+		quotation = _get_cart_quotation()
+		update_delivery_charges(quotation)
+		self.assertEqual(quotation.grand_total, 80 + extra)
+		self.assertEqual(len(quotation.taxes), template_copies if colliding else 0)
