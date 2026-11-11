@@ -63,6 +63,7 @@ from commera.guest import (
 )
 from commera.item_price_guard import skip_auto_item_price
 from commera.localization import url
+from commera.localization.address_countries import AddressCountries
 from commera.localization.market_prices import MarketPrices
 from commera.order_access import get_order_link, set_order_access_key
 from commera.plugin_events import fire_event, get_plugin_fieldnames
@@ -79,6 +80,7 @@ class CheckoutPriceChangedError(frappe.ValidationError):
 
 COD_TOTAL_TTL_SECONDS = 24 * 60 * 60
 ADDRESS_TYPES = ("Billing", "Shipping")
+ADDRESS_KINDS = ("billing_address", "shipping_address")
 
 
 # ERPNext moved its transaction mappers to a sibling `mapper` module; both layouts are in the wild.
@@ -181,6 +183,7 @@ def open_checkout(
 	is_reviewed: bool = False,
 ):
 	"""`is_reviewed`: the buyer approved this checkout in a review, so cash on delivery must place it as is."""
+	validate_persisted_address_countries(quotation)
 	validate_delivery_option(quotation, delivery_option)
 	validate_cart_is_not_in_checkout(quotation.name)
 	validate_cart_market(quotation)
@@ -516,6 +519,7 @@ def get_order_shopper(quotation) -> str | None:
 
 def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
 	"""Submit the cart and bill it. Called once per payment; the Quotation docstatus enforces that."""
+	validate_persisted_address_countries(quotation)
 	shopper = get_order_shopper(quotation)
 	with system_user_session(), skip_auto_item_price():
 		fix_payment_schedule_dates(quotation)
@@ -741,6 +745,7 @@ def save_quotation_address(quotation, address: dict):
 	quotation.custom_is_store_pickup = False
 	quotation.custom_store = ""
 	validate_guest_address_is_new(quotation, address)
+	validate_address_countries(quotation, address)
 
 	if address.get("billing_address", {}).get("is_saved"):
 		billing_address_name = address.get("billing_address", {}).get("address_id")
@@ -795,6 +800,41 @@ def validate_guest_address_is_new(quotation, address: dict):
 		"is_saved"
 	):
 		raise frappe.PermissionError
+
+
+def validate_persisted_address_countries(quotation):
+	countries = AddressCountries.of(get_document_market(quotation))
+	fields = ["customer_address"]
+	if not quotation.custom_is_store_pickup:
+		fields.append("shipping_address_name")
+	for field in fields:
+		if address := quotation.get(field):
+			countries.validate(frappe.db.get_value("Address", address, "country"))
+
+
+def validate_address_countries(quotation, address: dict):
+	"""Both addresses must be in the cart's market: the shopper switches markets to use another."""
+	countries = AddressCountries.of(get_document_market(quotation))
+	kinds = ["billing_address"] if address.get("shipping_same_as_billing") else ADDRESS_KINDS
+	for kind in kinds:
+		values = address.get(kind) or {}
+		if not values.get("is_saved"):
+			countries.validate(values.get("country"))
+		elif country := get_party_address_country(quotation.party_name, values.get("address_id")):
+			countries.validate(country)
+
+
+def get_party_address_country(party_name: str, address_name: str | None) -> str | None:
+	# Only the party's own address: the refusal names its country.
+	link = {
+		"parenttype": "Address",
+		"parent": address_name,
+		"link_doctype": "Customer",
+		"link_name": party_name,
+	}
+	if address_name and frappe.db.exists("Dynamic Link", link):
+		return frappe.db.get_value("Address", address_name, "country")
+	return None
 
 
 def replace_placeholder_names(quotation, contact, billing_address: dict):
@@ -955,6 +995,7 @@ def quotation_purchase_summary(quotation_name: str):
 
 def place_cod_order(quotation_name: str):
 	quotation = frappe.get_doc("Quotation", quotation_name)
+	validate_persisted_address_countries(quotation)
 	# A COD confirmation can be posted without opening checkout, after a market switch.
 	validate_cart_market(quotation)
 	validate_reviewed_checkout(quotation)

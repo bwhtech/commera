@@ -25,6 +25,7 @@ from commera.core import _get_cart_quotation
 from commera.discounts.selection import get_discount_codes
 from commera.guest import is_guest
 from commera.localization import url
+from commera.localization.address_countries import AddressCountries
 from commera.localization.market_prices import MarketPrices
 from commera.sdk.catalog import set_product_titles
 from commera.utils import (
@@ -74,7 +75,8 @@ def get_context(context, allow_guest: bool = False):
 	context.show_cod = int(COD_PAYMENT_MODE in payment_methods)
 	# The list refreshes in the browser after the address step, so label every enabled gateway.
 	context.payment_gateway_labels = {option.name: _(option.name) for option in get_gateway_options()}
-	context.country_list = get_country_list()
+	context.phone_country_list = get_country_list()
+	context.country_list = AddressCountries.current().within(context.phone_country_list)
 	context.checkout_prefill = get_checkout_prefill(context.country_list)
 	context.store_pickup_addresses = (
 		get_store_pickup_addresses() if commera_settings.store_pickup_enabled else []

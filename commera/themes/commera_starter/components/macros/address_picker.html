@@ -6,13 +6,33 @@
 </label>
 {%- endmacro %}
 
-{% macro address_picker(kind, countries, saved_addresses) -%}
+{# The market's countries, then each other market's, whose pick offers a switch to it. #}
+{% macro country_options(countries, other_markets) -%}
+{% for country in countries %}<option value="{{ country.name | e }}">{{ country.title | e }}</option>{% endfor %}
+{% for market in other_markets %}
+<optgroup label="{{ market.title | e }}">
+	{% for country in market.countries %}<option value="{{ country.name | e }}">{{ country.title | e }}</option>{% endfor %}
+</optgroup>
+{% endfor %}
+{%- endmacro %}
+
+{% macro market_offer(accept) -%}
+<div x-cloak x-show="market_offer" role="alert" class="flex flex-col gap-3 rounded-xl bg-surface-gray-1 p-4 text-md">
+	<p x-text="market_offer?.prompt"></p>
+	<div class="flex flex-wrap gap-2">
+		<button type="button" @click="{{ accept }}" :disabled="busy" class="button-primary">{{ _("Switch") }}</button>
+		<button type="button" @click="decline_market()" :disabled="busy" class="button-secondary">{{ _("Not now") }}</button>
+	</div>
+</div>
+{%- endmacro %}
+
+{% macro address_picker(kind, countries, saved_addresses, other_markets=[]) -%}
 <div class="flex flex-col gap-3">
 	{% if saved_addresses %}
 	<div role="radiogroup" class="flex flex-col gap-2">
 		{% for address in saved_addresses %}
 		<label class="choice-card items-start">
-			<input type="radio" name="{{ kind }}_address" value="{{ address.name }}" x-model="choices.{{ kind }}" class="mt-1 size-4">
+			<input type="radio" name="{{ kind }}_address" value="{{ address.name }}" x-model="choices.{{ kind }}" @change="offer_address_market()" class="mt-1 size-4">
 			<span class="flex flex-col gap-0.5 text-md">
 				<span class="font-medium">{{ address.address_title or address.address_line1 }}</span>
 				<span class="text-ink-gray-6"><bdi>{{ [address.address_line1, address.address_line2, address.city, address.state, address.pincode, address.country] | select | join(", ") }}</bdi></span>
@@ -20,7 +40,7 @@
 		</label>
 		{% endfor %}
 		<label class="choice-card items-center text-md">
-			<input type="radio" name="{{ kind }}_address" value="new" x-model="choices.{{ kind }}" class="size-4">
+			<input type="radio" name="{{ kind }}_address" value="new" x-model="choices.{{ kind }}" @change="offer_address_market()" class="size-4">
 			{{ _("Use a new address") }}
 		</label>
 	</div>
@@ -37,10 +57,8 @@
 				{{ address_input(kind, "pincode", _("Postcode"), "postal-code") }}
 				<label class="flex flex-col gap-2">
 					<span class="field-label">{{ _("Country") }}</span>
-					{% call select('x-model="forms.' ~ kind ~ '.country" autocomplete="' ~ kind ~ ' country-name" required') %}
-						{% for country in countries %}
-						<option value="{{ country.name }}">{{ country.title }}</option>
-						{% endfor %}
+					{% call select('x-model="forms.' ~ kind ~ '.country" @change="choose_country(`' ~ kind ~ '`, $event)" autocomplete="' ~ kind ~ ' country-name" required') %}
+						{{ country_options(countries, other_markets) }}
 					{% endcall %}
 				</label>
 				<div class="sm:col-span-2">{{ address_input(kind, "phone", _("Phone"), "tel", type="tel") }}</div>

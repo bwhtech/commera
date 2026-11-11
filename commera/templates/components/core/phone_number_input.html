@@ -1,5 +1,5 @@
 <div x-data="{
-    allOptions: {{country_list}},
+    allOptions: {{ phone_country_list|tojson|forceescape }},
     options: [],
     isOpen: true,
     openedWithKeyboard: false,

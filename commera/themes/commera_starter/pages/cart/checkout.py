@@ -2,6 +2,7 @@ import frappe
 from frappe import _
 
 from commera import seo
+from commera.localization.address_countries import AddressCountries, get_market_switches
 from commera.sdk import account, checkout, shop
 from commera.sdk.format import url
 
@@ -11,13 +12,16 @@ no_cache = True
 def get_context(context):
 	is_guest = frappe.session.user == "Guest"
 	context.countries = shop.list_countries()
+	context.other_markets = shop.list_other_market_countries()
 	context.saved_addresses = [] if is_guest else account.list_addresses()
 	context.pickup_locations = checkout.list_pickup_locations()
 	context.checkout_config = {
 		"is_guest": is_guest,
 		"email": None if is_guest else frappe.session.user,
-		"country": shop.get_shop()["country"],
+		"country": AddressCountries.current().default_country(),
 		"saved_addresses": [address["name"] for address in context.saved_addresses],
+		"saved_countries": {address["name"]: address["country"] for address in context.saved_addresses},
+		"market_switches": get_market_switches(context.other_markets),
 		"pickup_titles": {location["id"]: location["title"] for location in context.pickup_locations},
 		"sign_in_url": f"{url('/account/login')}?redirect-to={url('/cart/checkout')}",
 	}
