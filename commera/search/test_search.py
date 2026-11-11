@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.utils import CallbackManager
 
 from commera import utils
 from commera.search import build, record_builder, sync
@@ -322,13 +323,22 @@ class TestStorefrontSearch(SearchCatalogue, IntegrationTestCase):
 	def test_total_count_uses_engine_for_search(self):
 		self.assertEqual(utils.get_total_product_count({"search": SEARCH_TOKEN}), 2)
 
-	# -- live price overlay ----------------------------------------------------------------------
+	# -- indexed prices --------------------------------------------------------------------------
 
-	def test_live_price_overlay_reflects_item_price_edit(self):
-		# An Item Price edit fires no Style Attribute Variant event, so the overlay must show it unrebuilt.
+	def test_an_item_price_save_reprices_the_indexed_card(self):
 		price_name = self.price_names[("ZZ-RED-S", self.sale_price_list)]
-		frappe.db.set_value("Item Price", price_name, "price_list_rate", 50)
 		self.addCleanup(frappe.db.set_value, "Item Price", price_name, "price_list_rate", 80)
+		callbacks = CallbackManager()
+		with (
+			patch.object(frappe.db, "after_commit", callbacks),
+			patch("commera.search.sync.frappe.enqueue") as enqueue,
+		):
+			price = frappe.get_doc("Item Price", price_name)
+			price.update({"price_list_rate": 50}).save(ignore_permissions=True)
+			callbacks.run()
+		for call in enqueue.call_args_list:
+			if call.args == ("commera.search.sync.upsert_docs",):
+				sync.upsert_docs(call.kwargs["doctype"], call.kwargs["names"])
 
 		card = search_query.build_product_cards([self.red])[0]
 		self.assertEqual(card["sale_price"], 50)

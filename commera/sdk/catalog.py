@@ -23,7 +23,8 @@ from commera.sdk.types import (
 	Typeahead,
 )
 from commera.search.facets import get_listing_facet_counts, get_price_range
-from commera.search.record_builder import rates_by_item_code, sizes_for_variants
+from commera.search.price_markets import rates_by_item_code
+from commera.search.record_builder import sizes_for_variants
 from commera.search.typeahead import get_typeahead as get_search_typeahead
 from commera.shop_data import get_storefront_menu, translate_categories
 from commera.swatches import get_swatch_map

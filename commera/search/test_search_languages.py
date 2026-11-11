@@ -452,34 +452,26 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		rebuild.assert_called_once_with(deduplicate=True)
 
 	def test_a_language_change_during_a_build_rebuilds_again(self):
-		def change_languages(*args, **kwargs):
-			if not changed:
-				changed.append(True)
-				set_storefront_languages("en", published=("en", "fr"))
-			return paginate(*args, **kwargs)
-
-		changed, paginate = [], SqliteProductSearch.get_documents_paginated
-		with patch.object(SqliteProductSearch, "get_documents_paginated", autospec=True) as patched:
-			patched.side_effect = change_languages
-			callbacks = self.build_with_after_commit()
+		with (
+			patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild,
+			# No build is queued: a job left in Redis by another test would suppress the rebuild.
+			patch("commera.search.translations.get_job_status", return_value=None),
+		):
+			self.build_changing_languages_midway()
 		# Started builds suppress a deduplicated enqueue, so the build must enqueue its own successor.
-		with patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild:
-			callbacks.run()
 		rebuild.assert_called_once_with()
 
 	def test_a_build_with_unchanged_languages_or_a_queued_build_enqueues_nothing(self):
-		callbacks = self.build_with_after_commit()
 		with patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild:
-			callbacks.run()
+			SqliteProductSearch().drop_index()
+			SqliteProductSearch().build_index()
 		rebuild.assert_not_called()
 
-		callbacks = self.build_with_after_commit()
-		set_storefront_languages("en", published=("en",))
 		with (
 			patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild,
 			patch("commera.search.translations.get_job_status", return_value=JobStatus.QUEUED),
 		):
-			callbacks.run()
+			self.build_changing_languages_midway()
 		rebuild.assert_not_called()
 
 	def test_resuming_a_build_after_a_language_change_starts_again(self):
@@ -538,23 +530,31 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		frappe.db.set_value(PRODUCT, product, "meta_description", text)
 
 	def add_index_rows(self, doctype, names, markets):
-		"""A row per name and market that matches SEARCH_TOKEN, written straight to the index."""
+		"""A row per name and market that matches SEARCH_TOKEN, and its price, written straight to the index."""
 		rows = [
 			(f"{doctype}:{name}", SEARCH_TOKEN, SEARCH_TOKEN, doctype, name, market)
 			for name in names
 			for market in markets
 		]
-		self.engine._with_connection(
-			lambda cursor: cursor.executemany(
+
+		def write(cursor):
+			cursor.executemany(
 				"INSERT INTO search_fts (doc_id, title, content, doctype, name, market) "
 				"VALUES (?, ?, ?, ?, ?, ?)",
 				rows,
 			)
-		)
+			prices = [(doc_id, market, 1) for doc_id, *_rest, market in rows]
+			cursor.executemany(
+				"INSERT INTO search_price (doc_id, market, effective_price) VALUES (?, ?, ?)", prices
+			)
+
+		self.engine._with_connection(write)
 
 	def use_gulf_market(self, language="ar"):
+		"""A Gulf market on the store's lists, so it prices every fixture, in a rebuilt index."""
 		use_markets(self)
-		make_market("Gulf", [UAE], language, handle="gulf")
+		make_market("Gulf", [UAE], language, handle="gulf", compare_at_price_list=self.default_price_list)
+		self.rebuild_index()
 
 	@contextmanager
 	def market_request(self, country):
@@ -611,13 +611,20 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		else:
 			doc.update(changes).save(ignore_permissions=True)
 
-	def build_with_after_commit(self):
-		"""Rebuild the index. Returns the after-commit callbacks the build left, without running them."""
-		callbacks = CallbackManager()
-		with patch.object(frappe.db, "after_commit", callbacks):
+	def build_changing_languages_midway(self):
+		"""Rebuild the index, publishing French after the build read its languages."""
+
+		def change_languages(*args, **kwargs):
+			if not changed:
+				changed.append(True)
+				set_storefront_languages("en", published=("en", "fr"))
+			return paginate(*args, **kwargs)
+
+		changed, paginate = [], SqliteProductSearch.get_documents_paginated
+		with patch.object(SqliteProductSearch, "get_documents_paginated", autospec=True) as patched:
+			patched.side_effect = change_languages
 			SqliteProductSearch().drop_index()
 			SqliteProductSearch().build_index()
-		return callbacks
 
 	def interrupt_build(self):
 		"""Start a fresh build that dies after the products. Its temporary database stays."""

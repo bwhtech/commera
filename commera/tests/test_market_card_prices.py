@@ -8,9 +8,9 @@ from commera import card_prices
 from commera.card_prices import get_card_price
 from commera.sdk import catalog
 from commera.search.facets import get_price_range
-from commera.search.record_builder import aggregate_prices
+from commera.search.price_markets import aggregate_prices
 from commera.tests.test_market_prices import MarketPriceTestCase
-from commera.utils import attach_live_prices, get_product_count_qb, get_product_list_qb
+from commera.utils import get_product_count_qb, get_product_list_qb
 
 # The reviewer's product: M on sale at 300 from 400, L at its compare-at rate of 250 only.
 MIXED_SIZES = {"M": (300, 400), "L": (None, 250)}
@@ -139,15 +139,6 @@ class TestMarketCardPrices(CardPriceTestCase):
 				row = get_product_list_qb(product_list=[name])[0]
 				self.assertEqual((card["price"], card["compare_at_price"]), (300, None))
 				self.assertEqual((row["has_discount"], row["discount_percent"]), (0, 0))
-
-	def test_live_prices_on_index_cards_use_the_card_rule(self):
-		name, _item_codes = self.make_product("LIVE", MIXED_SIZES)
-
-		for market, context in self.in_each_market():
-			with self.subTest(market=market), context():
-				card = get_product_list_qb(product_list=[name])[0]
-				live = attach_live_prices([{"name": name, "sizes": card["sizes"]}])[0]
-				self.assertEqual((live["effective_price"], live["default_price"]), (250, None))
 
 	def test_catalog_items_cross_out_only_a_sale_rate(self):
 		_name, item_codes = self.make_product("ITEMS", {**MIXED_SIZES, "S": (300, 250)})

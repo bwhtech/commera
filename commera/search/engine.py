@@ -62,13 +62,14 @@ FacetCounts = dict[str, dict[str, int]]
 
 
 class SearchEngineBase(ABC):
-	"""What the storefront needs from a search engine. Engines rank and filter; Commera owns prices and cards."""
+	"""What the storefront needs from a search engine. Price sorts, price filters and cards use the
+	request market's card prices, and every read leaves out a product that market cannot price."""
 
 	# -- reads ----------------------------------------------------------------------------------
 
 	@abstractmethod
 	def can_rank(self, term: str) -> bool:
-		"""Whether this engine can serve `term`. When False, the frappe.qb grid serves the request."""
+		"""Whether this engine can serve `term` in the request's market. When False, frappe.qb serves it."""
 
 	@abstractmethod
 	def typeahead(self, query: str, limit: int = 6) -> TypeaheadHits:
@@ -93,7 +94,7 @@ class SearchEngineBase(ABC):
 
 	@abstractmethod
 	def hydrate_cards(self, names: list[str]) -> list[dict]:
-		"""Card dicts with CARD_COLUMNS and `sizes`, in `names` order. Prices may be stale; callers overlay live ones."""
+		"""Card dicts with CARD_COLUMNS and `sizes`, in `names` order, with the request market's prices."""
 
 	@abstractmethod
 	def index_exists(self) -> bool:

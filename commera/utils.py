@@ -235,29 +235,6 @@ def shape_product_cards(cards):
 	return set_product_titles(cards)
 
 
-def attach_live_prices(cards):
-	"""Overlay the live Item Price onto index-hydrated cards."""
-	# Item Price edits fire no Style Attribute Variant event, so the indexed price lags until the rebuild.
-	from commera.localization.market_prices import MarketPrices
-	from commera.search.record_builder import aggregate_prices, rates_by_item_code
-
-	if not cards:
-		return cards
-
-	prices = MarketPrices.current()
-	item_codes = list(
-		{size["item_code"] for card in cards for size in (card.get("sizes") or []) if size.get("item_code")}
-	)
-	default_rate, sale_rate, sale_upto = rates_by_item_code(
-		item_codes, prices.compare_at_price_list, prices.sale_price_list
-	)
-
-	for card in cards:
-		codes = [size["item_code"] for size in (card.get("sizes") or []) if size.get("item_code")]
-		card.update(aggregate_prices(codes, default_rate, sale_rate, sale_upto))
-	return cards
-
-
 def get_total_product_count(filters=None, product_list=None):
 	"""Total products for the grid's pagination controls — from SQLite unless frappe.qb owns the grid."""
 	from commera.search import query as search_query
@@ -292,12 +269,13 @@ def get_product_base_query(filters=None, product_list=None, with_card_prices=Fal
 	from commera.localization.market_prices import MarketPrices
 
 	query = filtered_products_query(filters, product_list)
-	if not (with_card_prices or has_price_filter(filters)):
+	prices = MarketPrices.current()
+	priced_only = searches_a_secondary_market(filters, prices)
+	if not (with_card_prices or has_price_filter(filters) or priced_only):
 		return query
 
 	style_attribute_variant = DocType("Style Attribute Variant")
 	candidates = product_list or filtered_products_query(filters).select(style_attribute_variant.name)
-	prices = MarketPrices.current()
 	card_prices = card_prices_query(prices.sale_price_list, prices.compare_at_price_list, candidates).as_(
 		"card_prices"
 	)
@@ -306,6 +284,8 @@ def get_product_base_query(filters=None, product_list=None, with_card_prices=Fal
 	query = query.left_join(card_prices).on(
 		Field("parent", table=card_prices) == style_attribute_variant.name
 	)
+	if priced_only:
+		query = query.where(card.effective_price.notnull())
 	if filters.get("has_discount"):
 		query = query.where(card.default_price.notnull())
 	if filters.get("min_price"):
@@ -313,6 +293,12 @@ def get_product_base_query(filters=None, product_list=None, with_card_prices=Fal
 	if filters.get("max_price"):
 		query = query.where(card.effective_price <= filters["max_price"])
 	return query
+
+
+def searches_a_secondary_market(filters, prices) -> bool:
+	"""A search in a secondary market leaves out what that market cannot price, like the index does.
+	Browsing keeps those products, shown unavailable."""
+	return bool(filters and filters.get("search")) and not prices.uses_store_prices
 
 
 def filtered_products_query(filters=None, product_list=None):

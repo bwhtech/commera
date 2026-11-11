@@ -45,11 +45,17 @@ def queue_variants_of(doc):
 	# Blind to in_import: no importer re-syncs the variants of the sources it saved.
 	if skip_batch_sync():
 		return
-	variants = frappe.get_all(
-		PRODUCT_DOCTYPE,
-		filters={SOURCE_LINK_FIELDS[doc.doctype]: doc.name, "is_published": 1},
-		pluck="name",
+	queue_variants(
+		frappe.get_all(
+			PRODUCT_DOCTYPE,
+			filters={SOURCE_LINK_FIELDS[doc.doctype]: doc.name, "is_published": 1},
+			pluck="name",
+		)
 	)
+
+
+def queue_variants(variants):
+	"""Reindex `variants` once, after this transaction commits."""
 	if variants:
 		get_transaction_batch(PENDING_VARIANTS_FLAG, set, enqueue_pending_variants).update(variants)
 
