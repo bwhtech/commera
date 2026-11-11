@@ -10,6 +10,7 @@ from commera.commera_ecommerce.doctype.shop_web_page.shop_web_page import (
 	get_translated_page,
 	translate_pages,
 )
+from commera.localization.address_countries import AddressCountries
 from commera.sdk.catalog import get_seo
 from commera.sdk.types import (
 	ContentPage,
@@ -17,6 +18,7 @@ from commera.sdk.types import (
 	Country,
 	FooterSection,
 	Localization,
+	MarketCountries,
 	Menu,
 	MenuItem,
 	Shop,
@@ -35,6 +37,7 @@ __all__ = [
 	"get_shop",
 	"get_sitemap",
 	"list_countries",
+	"list_other_market_countries",
 	"list_pages",
 	"subscribe_to_newsletter",
 ]
@@ -85,7 +88,26 @@ def get_store_country() -> str | None:
 
 
 def list_countries() -> list[Country]:
-	countries = [{"name": country["name"], "title": _(country["name"])} for country in get_country_list()]
+	"""The countries of the request's market: an address may be in these only."""
+	return get_country_options(AddressCountries.current().within(get_country_list()))
+
+
+def list_other_market_countries() -> list[MarketCountries]:
+	"""The countries of every other enabled market, by market. Picking one means switching to it."""
+	countries = AddressCountries.current()
+	return [
+		{
+			"market": market.handle,
+			"title": _(market.title),
+			"currency": market.currency or get_store_currency(),
+			"countries": get_country_options(rows),
+		}
+		for market, rows in countries.group_others(get_country_list())
+	]
+
+
+def get_country_options(rows: list[dict]) -> list[Country]:
+	countries = [{"name": row["name"], "title": _(row["name"])} for row in rows]
 	return sorted(countries, key=lambda country: country["title"])
 
 

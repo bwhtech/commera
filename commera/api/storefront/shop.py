@@ -6,7 +6,15 @@ from frappe import _
 from commera.api.storefront import rate_limited_guest_api
 from commera.localization import url
 from commera.sdk import shop
-from commera.sdk.types import ContentPage, ContentPageLink, Country, Localization, MenuItem, Sitemap
+from commera.sdk.types import (
+	ContentPage,
+	ContentPageLink,
+	Country,
+	Localization,
+	MarketCountries,
+	MenuItem,
+	Sitemap,
+)
 
 
 @rate_limited_guest_api("GET", limit=600, seconds=60)
@@ -47,6 +55,11 @@ def get_sitemap(kind: str | None = None, page: int = 1) -> Sitemap:
 @rate_limited_guest_api("GET", limit=600, seconds=60)
 def list_countries() -> list[Country]:
 	return shop.list_countries()
+
+
+@rate_limited_guest_api("GET", limit=600, seconds=60)
+def list_other_market_countries() -> list[MarketCountries]:
+	return shop.list_other_market_countries()
 
 
 def with_storefront_url(item: MenuItem) -> dict:

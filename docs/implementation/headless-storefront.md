@@ -239,6 +239,16 @@ The cart uses the price rule above, in every market (`commera/cart_prices.py`):
 - A discount that excludes sale items reads the lists of the market in the **Market** field. A document with no market reads the store lists. An item is on sale when its sale rate is below its compare-at rate.
 - With the Stock Settings option "Auto insert Item Price if missing", ERPNext adds a price from the rate of a line that has none. Commera skips this insert for the lines of cart quotations and orders, of invoices made from cart orders, and for all pricing that Commera does for the cart and for order placement (`commera/item_price_guard.py`). Commera does not change the rate of the line. Commera installs this guard at the start of each web request and background job (`before_request`, `before_job`).
 
+### Market address countries
+
+An address is in the countries of the current market (`commera/localization/address_countries.py`). A secondary market has its own countries. The primary market has every country that no enabled market claims, so the countries of a disabled market belong to the primary market.
+
+- `shop.list_countries` gives the countries of the current market.
+- `shop.list_other_market_countries` gives the countries of each other enabled market: `market` (the handle), `title`, `currency` and `countries`. To use a country from this list, switch to its market first: send its `_country`, or open the market URL. The cart then moves to that market and gets the market prices.
+- `checkout.set_addresses` refuses a billing or shipping country, typed or from a saved address, that is not in the market of the cart. The error is `AddressCountryError`, and its message names the market of the country.
+- An account address book can keep addresses in any country.
+- The Starter theme lists the other markets in their own groups, below the market countries. If the shopper picks one of these countries, the theme asks: "United Arab Emirates is in the Gulf market. Switch to shop in AED?". **Switch** opens the same page in that market and keeps the form. **Not now** puts the country back.
+
 The cart keeps the store price list and currency. Search sorting and price filters on the search index, and taxes, do not use market prices yet.
 
 **Limitation (v1).** A regional language, such as `pt-BR`, shows in the primary market only, at its own URL (`/pt-br/`). To serve Portuguese in a market, publish the base language `pt` and add it to the market. A market saved before this rule can keep its regional rows. Commera serves no URL for them. You can still remove those rows or disable the market.

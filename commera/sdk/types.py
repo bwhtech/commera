@@ -26,6 +26,7 @@ __all__ = [
 	"FooterSection",
 	"Language",
 	"Localization",
+	"MarketCountries",
 	"Menu",
 	"MenuItem",
 	"NewCartLine",
@@ -539,6 +540,15 @@ class Localization(TypedDict):
 class Country(TypedDict):
 	name: str
 	title: str
+
+
+class MarketCountries(TypedDict):
+	"""The countries another market sells to. An address there needs a switch to `market`."""
+
+	market: str
+	title: str
+	currency: str
+	countries: list[Country]
 
 
 class ContentPage(TypedDict):

@@ -4,6 +4,10 @@ export async function list_countries() {
 	return get('shop.list_countries');
 }
 
+export async function list_other_market_countries() {
+	return get('shop.list_other_market_countries');
+}
+
 export async function list_pages() {
 	return get('shop.list_pages');
 }

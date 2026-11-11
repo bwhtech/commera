@@ -64,6 +64,13 @@ const endpoint_calls = [
 	],
 	['shop.list_countries', 'GET', () => shop.list_countries(), '', undefined],
 	[
+		'shop.list_other_market_countries',
+		'GET',
+		() => shop.list_other_market_countries(),
+		'',
+		undefined,
+	],
+	[
 		'products.get_product',
 		'GET',
 		() => products.get('blue-runner'),
