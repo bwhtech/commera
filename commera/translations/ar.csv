@@ -2279,3 +2279,49 @@ Edit in Builder,تحرير في Builder
 {0} is open to shoppers,{0} متاحة للمتسوقين
 {0} is off. Shoppers there see the primary market.,{0} متوقفة. يرى المتسوقون فيها السوق الرئيسية.
 {0} created,تم إنشاء {0}
+{0} fields to translate or update,الحقول المطلوب ترجمتها أو تحديثها: {0}
+{0} missing,غير المترجم: {0}
+{0} outdated,القديم: {0}
+{0} of {1} in {2},{0} من {1} باللغة {2}
+Source changed,تغيّر النص الأصلي
+Uses the {0} image,تُستخدم صورة {0}
+Uploading image · {0}%,جارٍ رفع الصورة · {0}%
+Still correct,لا تزال صحيحة
+Choose CSV file,اختيار ملف CSV
+Resource: {0},المورد: {0}
+Search all resources,البحث في جميع الموارد
+Showing {0} of {1},عرض {0} من {1}
+To do,المطلوب إنجازه
+Up to date,محدّث
+Load more,تحميل المزيد
+Could not load translations,تعذّر تحميل الترجمات
+{0} are up to date in {1},عدد العناصر المحدّثة باللغة {1}: {0}
+Show all,عرض الكل
+All items,جميع العناصر
+View on store,عرض في المتجر
+Missing,غير مترجم
+Outdated,قديم
+Unsaved,غير محفوظ
+Theme section,قسم القالب
+Landing page,صفحة الهبوط
+Footer section,قسم التذييل
+Footer link,رابط التذييل
+Media,الوسائط
+1 translation saved,تم حفظ ترجمة واحدة
+{0} translations saved,الترجمات المحفوظة: {0}
+Discard unsaved translations?,تجاهل الترجمات غير المحفوظة؟
+1 change is not saved.,لم يُحفظ تغيير واحد.
+{0} changes are not saved.,التغييرات غير المحفوظة: {0}.
+Translate into,الترجمة إلى
+{0} · {1} to do,{0} · المطلوب إنجازه: {1}
+Back to translations,العودة إلى الترجمات
+Language: {0},اللغة: {0}
+{0} unsaved,غير المحفوظ: {0}
+Nothing to translate here,لا يوجد ما يُترجم هنا
+Export {0},تصدير {0}
+CSV,CSV
+Your storefront speaks {0} only,واجهة متجرك متاحة باللغة {0} فقط
+{0} missing · {1} outdated,غير المترجم: {0} · القديم: {1}
+By resource,حسب المورد
+Resource,المورد
+{0} in {1},{0} باللغة {1}

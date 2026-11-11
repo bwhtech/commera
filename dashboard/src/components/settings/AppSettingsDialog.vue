@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { ConfigProvider } from 'reka-ui'
-import { direction } from '../../data/translation'
+import { direction } from '../../data/boot'
 import {
   Button,
   Icon,
@@ -56,12 +56,7 @@ const tab = computed({
 
 const isCloudOverlayOpen = ref(false)
 
-// An Esc or outside click meant for one of the Cloud billing panel's menus also reaches this
-// dialog: the panel is a separate Vue app in a shadow root, with its own reka-ui layer stack
-// listening on the same `window`, and its inline runtime closes a menu on an outside click by
-// dispatching a synthetic Escape. The close is ignored here rather than refused with
-// `dismissible: false`, because that calls preventDefault() on the shared event, and the
-// Cloud menu then sees defaultPrevented and stays open.
+// Cloud has its own layer stack; ignoring its close preserves its menu event handling.
 function setOpen(isOpen) {
   if (!isOpen && isCloudOverlayOpen.value) return
   settings.open = isOpen
@@ -98,7 +93,7 @@ watch(
       @update:open="setOpen"
     >
       <template #title>{{ __('Commera settings') }}</template>
-  
+
       <header class="flex h-12 shrink-0 items-center gap-1 border-b border-outline-gray-1 px-2 sm:hidden">
         <Button
           variant="ghost"
@@ -110,7 +105,7 @@ watch(
         />
         <h2 aria-hidden="true" class="text-lg-semibold text-ink-gray-8">{{ __('Settings') }}</h2>
       </header>
-  
+
       <SettingsSidebar
         class="sm:rtl:border-r-0 sm:rtl:border-l max-sm:max-h-none max-sm:flex-1 max-sm:border-b-0 max-sm:[&_[role=tab]]:h-10"
         :class="{ 'max-sm:hidden': settings.pickedTab }"
@@ -140,7 +135,7 @@ watch(
             </template>
           </SettingsNavItem>
         </SettingsNavGroup>
-  
+
         <SettingsNavGroup :label="__('Checkout', null, 'Storefront checkout')">
           <SettingsNavItem value="payments">
             <template #prefix><span class="lucide-credit-card size-4" aria-hidden="true" /></template>
@@ -169,7 +164,7 @@ watch(
             {{ __('General') }}
           </SettingsNavItem>
         </SettingsNavGroup>
-  
+
         <SettingsNavGroup :label="__('Connections')">
           <SettingsNavItem value="apps">
             <template #prefix><span class="lucide-chart-line size-4" aria-hidden="true" /></template>
@@ -191,7 +186,7 @@ watch(
             {{ __('Advanced') }}
           </SettingsNavItem>
         </SettingsNavGroup>
-  
+
         <SettingsNavGroup v-if="isCloudBillingAvailable" :label="__('Frappe Cloud')">
           <SettingsNavItem value="billing">
             <template #prefix><span class="lucide-receipt size-4" aria-hidden="true" /></template>
@@ -202,7 +197,7 @@ watch(
             {{ __('Domains') }}
           </SettingsNavItem>
         </SettingsNavGroup>
-  
+
         <SettingsNavGroup v-if="pluginTabs.length" :label="__('Installed plugins')">
           <SettingsNavItem v-for="tab in pluginTabs" :key="tab.value" :value="tab.value">
             <template #prefix><Icon :name="tab.icon" class="size-4" /></template>
@@ -210,34 +205,34 @@ watch(
           </SettingsNavItem>
         </SettingsNavGroup>
       </SettingsSidebar>
-  
+
       <!-- min-w-0 on the column and every panel: frappe-ui gives them `flex-1` with no
            min-width, so below ~780px the right-hand controls are clipped clean off. -->
       <SettingsContent class="commera-settings min-w-0" :class="{ 'max-sm:hidden': !settings.pickedTab }">
         <SettingsPanel value="general" class="min-w-0">
           <GeneralSettings :active="settings.open && settings.tab === 'general'" />
         </SettingsPanel>
-  
+
         <SettingsPanel value="emails" class="min-w-0">
           <EmailSettings :active="settings.open && settings.tab === 'emails'" />
         </SettingsPanel>
-  
+
         <SettingsPanel value="languages" class="min-w-0">
           <LanguagesSettings :active="settings.open && settings.tab === 'languages'" />
         </SettingsPanel>
-  
+
         <SettingsPanel value="markets" class="min-w-0">
           <MarketsSettings :active="settings.open && settings.tab === 'markets'" />
         </SettingsPanel>
-  
+
         <SettingsPanel value="locations" class="min-w-0">
           <LocationsSettings :active="settings.open && settings.tab === 'locations'" />
         </SettingsPanel>
-  
+
         <SettingsPanel value="checkout" class="min-w-0">
           <CheckoutSettings :active="settings.open && settings.tab === 'checkout'" />
         </SettingsPanel>
-  
+
         <SettingsPanel value="appearance" class="min-w-0">
           <!-- The blank line keeps this tab's header level with the others. -->
           <SettingsPanelHeader>
@@ -250,7 +245,7 @@ watch(
             <AppearancePicker />
           </SettingsBody>
         </SettingsPanel>
-  
+
         <SettingsPanel value="payments" class="min-w-0">
           <IntegrationTabPanel
             :store="paymentIntegrations"
@@ -261,7 +256,7 @@ watch(
             <CashOnDeliverySettings :active="settings.open && settings.tab === 'payments'" />
           </IntegrationTabPanel>
         </SettingsPanel>
-  
+
         <SettingsPanel value="shipping" class="min-w-0">
           <IntegrationTabPanel
             v-slot="{ takeover, setTakeover }"
@@ -277,30 +272,28 @@ watch(
             />
           </IntegrationTabPanel>
         </SettingsPanel>
-  
+
         <SettingsPanel value="apps" class="min-w-0">
           <AppsSettings :active="settings.open && settings.tab === 'apps'" />
         </SettingsPanel>
-  
+
         <SettingsPanel value="plugins" class="min-w-0">
           <PluginsSettings :active="settings.open && settings.tab === 'plugins'" />
         </SettingsPanel>
-  
+
         <SettingsPanel v-for="tab in pluginTabs" :key="tab.value" :value="tab.value" class="min-w-0">
           <PluginSettingsPanel :entry="tab.entry" :active="settings.open && settings.tab === tab.value" />
         </SettingsPanel>
-  
+
         <SettingsPanel value="webhooks" class="min-w-0">
           <WebhooksSettings :active="settings.open && settings.tab === 'webhooks'" />
         </SettingsPanel>
-  
+
         <SettingsPanel value="advanced" class="min-w-0">
           <AdvancedSettings :active="settings.open && settings.tab === 'advanced'" />
         </SettingsPanel>
-  
-        <!-- Mounted only while shown, unlike the panels kept alive by unmount-on-hide: leaving the
-             tab closes the Cloud panel, and its onClose re-reads what the dashboard shows from it:
-             choosing a plan ends the trial card, and adding a domain moves Home's domain card. -->
+
+        <!-- Unmount Cloud on close so it refreshes billing and domain state on return. -->
         <SettingsPanel v-if="isCloudBillingAvailable" value="billing" class="min-w-0">
           <CloudSettingsPanel
             v-if="settings.open && tab === 'billing'"
@@ -323,10 +316,7 @@ watch(
 </template>
 
 <style>
-/* frappe-ui's Dialog keeps its card gutter on a phone, which pushes the full-screen settings
-   past the viewport, and its panels keep their desktop insets. Its wrapper is min-h-screen
-   (100vh), which on a real phone is taller than the visible 100dvh while the address bar
-   shows, so the centred dialog gets a gap above and below. Headless Chrome hides this. */
+/* The mobile dialog needs viewport height and no desktop gutters or panel insets. */
 @media (max-width: 639.98px) {
   .dialog-scroll-container > div:has(.commera-settings) {
     min-height: 100dvh;
