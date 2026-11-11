@@ -60,15 +60,6 @@ page_renderer = [
 # Frappe Builder hooks (read only when Builder is installed): data and agent instructions for theme pages.
 builder_page_data = ["commera.builder_themes.page_data.get_page_data"]
 builder_agent_context = ["commera.builder_themes.agent_context.get_agent_context"]
-builder_plugins = [
-	{
-		"name": "theme-bar",
-		"label": "Commera Theme",
-		"description": "Switch, preview and publish the pages of a Commera theme",
-		"icon": "lucide-store",
-		"entry": "builder_themes/theme_bar.js",
-	}
-]
 
 # frappe.clear_cache() flushes redis but not frappe.local, where the theme engine memoises - hence these.
 clear_cache = [

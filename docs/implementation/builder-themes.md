@@ -34,15 +34,14 @@ After a successful add, the window fires `commera:cart-added` with the cart. A c
 
 ## Theme bar (Builder plugin)
 
-`commera/builder_themes/theme_bar.js` is a Builder editor plugin: a "Theme · Page" button in the toolbar on pages of a Commera theme. Its popover switches between the theme's three pages (each with Published, Edited or Draft), picks the product or collection the canvas previews (it sets the page's route variables), publishes the theme, makes it live, and opens the page on the store. The plugin is one plain ES module; Commera lists it in the `builder_plugins` hook and Builder installs it on migrate. Its API is `commera.api.admin.builder_theme`, its logic `commera.builder_themes.editor`. Publish theme skips a page that has nothing built yet, so its route keeps rendering from the parent theme.
+The theme bar is a Builder editor plugin: a "Theme · Page" button in the toolbar on pages of a Commera theme. Its popover switches between the theme's three pages (each with Published, Edited or Draft), picks the product or collection the canvas previews (it sets the page's route variables), publishes the theme, makes it live, and opens the page on the store. It lives in [bwhtech/commera-builder-plugin](https://github.com/bwhtech/commera-builder-plugin) as one plain ES module, and the merchant installs it from the Builder Hub catalog. Its API is `commera.api.admin.builder_theme`, its logic `commera.builder_themes.editor`. Publish theme skips a page that has nothing built yet, so its route keeps rendering from the parent theme.
 
 ## Builder changes
 
-Three hooks and one editor fix, all in the `feat/app-hooks` branch of Builder:
+Two hooks and one editor fix, merged in [frappe/builder#1075](https://github.com/frappe/builder/pull/1075):
 
 - `builder_page_data`: `BuilderPage.get_app_page_data` puts each app's dict under the app's name (`commera`), before the page's own data script runs. Bindings read `commera.product.title`.
 - `builder_agent_context`: `AgentRunner.build_agent_context` adds each hook's text for the open page to Bob's context.
-- `builder_plugins`: the `App` plugin source, which the `Builder Plugin` doctype declared but nothing implemented. `builder/plugins/app.py` packages each listed ES module as `<app>/<name>`, checks it like a Hub release and installs it on install and migrate, releasing again only when the module changes. It shares the release step with Bob's plugins.
 - The editor (`pageStore.setPageData`) fetched page data only for pages with a data script, so the canvas showed hook data as empty. It now always fetches. With no route variable set, the product page previews the newest product; type a handle into the page's `route` variable to preview another.
 
 ## Known gaps
