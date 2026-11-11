@@ -38,8 +38,7 @@ watch(
         <span class="w-8" />
       </div>
 
-      <!-- 18rem is the thumbnail's 16:10 at 30rem wide. -->
-      <div class="relative h-52 overflow-hidden sm:h-72">
+      <div class="relative aspect-video overflow-hidden">
         <div class="absolute inset-0 flex flex-col gap-3 p-4" aria-hidden="true">
           <div class="flex items-center justify-between">
             <Skeleton class="h-3 w-20 rounded-full" />

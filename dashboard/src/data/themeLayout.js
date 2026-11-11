@@ -22,7 +22,7 @@ const themeCaller = createAdminCaller('theme.')
 
 const thumbnailAction = effectScope(true).run(() => useAdminAction('theme_layout.save_thumbnail', { quiet: true }))
 
-const THUMBNAIL_SIZE = { width: 1280, height: 800, scale: 2, outputWidth: 480, quality: 0.85 }
+const THUMBNAIL_SIZE = { width: 1280, height: 720, scale: 2, outputWidth: 480, quality: 0.85 }
 
 async function captureThumbnail(theme, scheme) {
   const params = new URLSearchParams({ theme, page: 'index', lang: sourceLanguage() })

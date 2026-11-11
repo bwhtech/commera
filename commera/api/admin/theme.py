@@ -8,7 +8,13 @@ from frappe.utils import get_url_to_form
 
 from commera.api.admin.docfields import build_field_groups, get_child_tables, get_editable_docfields
 from commera.api.admin.settings import coerce_field_value
-from commera.builder_themes.pages import HOME, get_editor_url, get_theme_pages, is_builder_installed
+from commera.builder_themes.pages import (
+	HOME,
+	get_editor_url,
+	get_home_page_preview,
+	get_theme_pages,
+	is_builder_installed,
+)
 from commera.builder_themes.theme import create_builder_theme as create_theme_in_builder
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	BASE_THEME,
@@ -18,8 +24,6 @@ from commera.shop_themes.doctype.shop_theme.shop_theme import (
 )
 
 THEME_SETTINGS_DOCTYPE = "Shop Theme Settings"
-# Builder gives a page this placeholder until it has taken the page's screenshot.
-BUILDER_PLACEHOLDER_PREVIEW = "/assets/builder/images/fallback.png"
 
 
 def get_theme_settings_doctype(theme):
@@ -50,7 +54,8 @@ def build_themes(active_theme):
 		theme.source = get_theme_source(theme)
 		if theme.theme_type == BUILDER_THEME_TYPE:
 			theme.builder_editor_url = get_builder_editor_url(theme.name)
-			set_home_page_preview(theme)
+			if preview := get_home_page_preview(theme.name):
+				theme.thumbnail, theme.thumbnail_dark = preview, None
 
 	return sorted(themes, key=lambda theme: not theme.live)
 
@@ -58,14 +63,6 @@ def build_themes(active_theme):
 def get_builder_editor_url(theme_name):
 	home_page = get_theme_pages(theme_name).get(HOME)
 	return get_editor_url(home_page) if home_page and is_builder_installed() else None
-
-
-def set_home_page_preview(theme):
-	"""Show Builder's screenshot of the theme's Home page, once Builder has taken one."""
-	home_page = get_theme_pages(theme.name).get(HOME)
-	preview = home_page and frappe.db.get_value("Builder Page", home_page, "preview")
-	if preview and preview != BUILDER_PLACEHOLDER_PREVIEW:
-		theme.thumbnail, theme.thumbnail_dark = preview, None
 
 
 def get_theme_source(theme):

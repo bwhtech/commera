@@ -7,6 +7,8 @@ PRODUCT_DETAIL = "Product Detail"
 PAGE_TABLE = "Shop Theme Builder Page"
 # Builder also serves each theme page at its own route under this prefix.
 ROUTE_PREFIX = "ct"
+# Builder gives a page this placeholder until it has taken the page's screenshot.
+BUILDER_PLACEHOLDER_PREVIEW = "/assets/builder/images/fallback.png"
 
 # The themed routes a Builder theme takes over; every other route renders from its parent theme.
 PAGE_TYPE_BY_TEMPLATE = {
@@ -38,6 +40,13 @@ def get_theme_pages(theme_name: str) -> dict[str, str]:
 		)
 	)
 	return {row.page_type: row.builder_page for row in rows if row.builder_page in existing}
+
+
+def get_home_page_preview(theme_name: str) -> str | None:
+	"""Builder's screenshot of the theme's Home page, or None until Builder has taken one."""
+	home_page = get_theme_pages(theme_name).get(HOME)
+	preview = home_page and frappe.db.get_value("Builder Page", home_page, "preview")
+	return preview if preview and preview != BUILDER_PLACEHOLDER_PREVIEW else None
 
 
 def get_page_role(page_name: str) -> frappe._dict | None:

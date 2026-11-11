@@ -11,11 +11,13 @@ import frappe
 from frappe.utils import set_request
 
 from commera.api.admin.builder_theme import make_theme_live
-from commera.api.admin.theme import BUILDER_PLACEHOLDER_PREVIEW, build_themes
+from commera.api.admin.home import get_store_preview
+from commera.api.admin.theme import build_themes
 from commera.builder_themes.agent_context import get_agent_context
 from commera.builder_themes.editor import get_theme_bar, publish_theme
 from commera.builder_themes.page_data import get_data_for, get_page_data
 from commera.builder_themes.pages import (
+	BUILDER_PLACEHOLDER_PREVIEW,
 	HOME,
 	PRODUCT_DETAIL,
 	PRODUCT_LISTING,
@@ -224,6 +226,7 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		self.assertIsNone(get_thumbnail())
 		frappe.db.set_value("Builder Page", self.pages[HOME], "preview", "/files/home-preview.webp?v=1")
 		self.assertEqual(get_thumbnail(), "/files/home-preview.webp?v=1")
+		self.assertEqual(get_store_preview(THEME)["image"], "/files/home-preview.webp?v=1")
 
 	def test_make_theme_live_activates_it(self):
 		make_theme_live(THEME)

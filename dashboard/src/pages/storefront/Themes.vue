@@ -55,7 +55,7 @@ function confirmActivate(theme) {
     <div v-if="loading && !themes.length" aria-hidden="true">
       <Skeleton class="h-3.5 w-24 rounded-4" />
       <div class="mt-2 flex items-center gap-4 rounded-5 border border-outline-gray-2 px-4 py-5">
-        <Skeleton class="aspect-[16/10] w-28 shrink-0 rounded-4 sm:w-44" />
+        <Skeleton class="aspect-video w-28 shrink-0 rounded-4 sm:w-44" />
         <div class="min-w-0 flex-1">
           <Skeleton class="h-4 w-32 rounded-4" />
           <Skeleton class="mt-2 h-3.5 w-56 max-w-full rounded-4" />

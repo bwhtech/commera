@@ -29,7 +29,7 @@ const editorRoute = computed(() =>
 const thumbnail = computed(() =>
   resolvedColorScheme.value === 'dark' && props.theme.thumbnail_dark ? props.theme.thumbnail_dark : props.theme.thumbnail,
 )
-const imageSize = computed(() => (props.featured ? 'aspect-[16/10] w-full sm:w-60' : 'aspect-[16/10] w-28 sm:w-40'))
+const imageSize = computed(() => (props.featured ? 'aspect-video w-full sm:w-60' : 'aspect-video w-28 sm:w-40'))
 </script>
 
 <template>

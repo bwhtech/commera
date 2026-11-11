@@ -10,8 +10,13 @@ from frappe.utils.data import cint
 from commera.api.admin.integrations import is_profile_enabled
 from commera.api.admin.payments import get_payment_registry
 from commera.api.admin.theme_layout import EDITOR_ROLES
+from commera.builder_themes.pages import get_home_page_preview
 from commera.roles import COMMERA_ADMIN
-from commera.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
+from commera.shop_themes.doctype.shop_theme.shop_theme import (
+	BUILDER_THEME_TYPE,
+	get_theme_context,
+	resolve_active_theme,
+)
 from commera.storefront_access import SETTINGS_DOCTYPE, get_store_name
 
 PUBLISH_ROLE = "System Manager"
@@ -30,6 +35,10 @@ def has_shipping(settings) -> bool:
 
 
 def get_store_preview(theme: str) -> dict:
+	theme_type = get_theme_context(theme)["theme_type"]
+	if theme_type == BUILDER_THEME_TYPE and (image := get_home_page_preview(theme)):
+		return {"image": image, "captured_on": None, "can_capture": False}
+
 	image = frappe.db.get_value("Shop Theme", theme, "thumbnail")
 	captured_on = image and frappe.db.get_value(
 		"File",
@@ -40,8 +49,7 @@ def get_store_preview(theme: str) -> dict:
 		"image": image,
 		"captured_on": captured_on
 		and captured_on.replace(tzinfo=ZoneInfo(get_system_timezone())).isoformat(),
-		"can_capture": get_theme_context(theme)["theme_type"] == "Sections"
-		and bool(set(EDITOR_ROLES) & set(frappe.get_roles())),
+		"can_capture": theme_type == "Sections" and bool(set(EDITOR_ROLES) & set(frappe.get_roles())),
 	}
 
 
