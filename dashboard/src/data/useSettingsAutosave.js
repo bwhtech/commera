@@ -10,32 +10,15 @@ function normalize(value) {
   return String(value ?? '')
 }
 
-/**
- * A settings panel that saves itself: there is no Save button, so every control writes its own
- * field the moment it settles.
- *
- * What is in the boxes is kept next to what the server last said was stored, because a write is
- * the only truth here — a refused one must not leave a box showing what the server refused, and a
- * value the controller rewrote on save wins over what was typed. Only the one field that changed
- * is ever submitted, so a blank secret means "keep the stored one" rather than "wipe it", and one
- * control's save never rewrites a field the owner never touched.
- */
-// `params` rides along on every write, for an endpoint that serves more than one panel: a
-// submit's own params replace the action's, so they cannot be set once on the action.
-export function useSettingsAutosave(save, { params = {} } = {}) {
+// Extra params identify the record while each commit writes only its changed field.
+export function useSettingsAutosave(save, { params = {}, preserveEdits = false } = {}) {
   const values = ref({})
   const stored = ref({})
+  const revisions = {}
+  const pending = {}
 
-  // Every control in the panel commits through the one `save` action, and a `useCall` is one
-  // request at a time: VueUse's fetch aborts the in-flight request at the top of the next
-  // `execute()`, and `data`/`error` are a single ref pair per instance — so two overlapping
-  // commits abort each other and each `await` resolves reading the other's answer (frappe-ui
-  // #991; its own fix, `useIsolatedCall`, is internal and exported from no entry point). They
-  // overlap in one ordinary gesture: a text box commits on blur, and the control that took the
-  // focus commits on its own mouseup ~50ms later. Chaining every commit onto one promise gives
-  // each its own uncontested request, and last-write-wins ordering on the server for free. The
-  // chain is carried forward with its rejection swallowed, so a commit that throws cannot wedge
-  // the queue for the rest of the session — the caller still sees its own rejection.
+  // useCall shares one response and aborts overlapping requests, so each commit waits its turn.
+  // A failed request must not wedge later writes.
   let queue = Promise.resolve()
 
   function enqueue(write) {
@@ -47,33 +30,55 @@ export function useSettingsAutosave(save, { params = {} } = {}) {
   // Merged, not replaced: a panel adopts the fields it owns — a group, a section — one answer at
   // a time, and adopting one must not forget the rest.
   function adopt(record) {
+    const next = { ...values.value }
+    for (const [field, value] of Object.entries(record ?? {})) {
+      const unchanged = normalize(values.value[field]) === normalize(stored.value[field])
+      if (!preserveEdits || (unchanged && !pending[field])) next[field] = value
+    }
     stored.value = { ...stored.value, ...record }
-    values.value = { ...values.value, ...record }
+    values.value = next
   }
 
   // What is being typed, before it is worth writing.
   function set(fieldname, value) {
     values.value[fieldname] = value
+    revisions[fieldname] = (revisions[fieldname] ?? 0) + 1
   }
 
   // `afterSave` is for panels whose stored truth is wider than the save's answer — an analytics
   // secret that only stops reading as missing once the settings are re-read.
   async function commit(fieldname, value, label, afterSave) {
-    if (normalize(value) === normalize(stored.value[fieldname])) return
+    if (!pending[fieldname] && normalize(value) === normalize(stored.value[fieldname])) return
 
-    values.value[fieldname] = value
+    set(fieldname, value)
+    const revision = revisions[fieldname]
+    pending[fieldname] = (pending[fieldname] ?? 0) + 1
 
     return enqueue(async () => {
       let saved
       try {
         saved = await save.submit({ ...params, [fieldname]: value })
       } catch {
-        values.value[fieldname] = stored.value[fieldname]
+        pending[fieldname] -= 1
+        if (!preserveEdits || revisions[fieldname] === revision) {
+          values.value[fieldname] = stored.value[fieldname]
+        }
         return
       }
 
+      pending[fieldname] -= 1
+      if (preserveEdits) {
+        const next = { ...values.value }
+        for (const [field, savedValue] of Object.entries(saved)) {
+          const unchanged = normalize(values.value[field]) === normalize(stored.value[field])
+          const completed = field === fieldname && revisions[field] === revision
+          if (completed || (field !== fieldname && unchanged && !pending[field])) next[field] = savedValue
+        }
+        stored.value = { ...stored.value, ...saved }
+        values.value = next
+      }
       if (afterSave) await afterSave(saved)
-      else adopt(saved)
+      else if (!preserveEdits) adopt(saved)
 
       toast.success(__('{0} saved', [label]))
     })

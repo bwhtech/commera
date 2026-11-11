@@ -50,6 +50,12 @@ export const SETTINGS_TABS = [
     keywords: ['language', 'languages', 'locale', 'default language', 'publish', 'right to left', 'rtl', 'arabic'],
   },
   {
+    value: 'markets',
+    label: __('Markets'),
+    icon: 'lucide-globe',
+    keywords: ['market', 'markets', 'country', 'countries', 'currency', 'price list', 'region', 'international', 'tax'],
+  },
+  {
     value: 'translations',
     label: __('Translations'),
     icon: 'lucide-languages',
