@@ -65,12 +65,27 @@ def get_overview() -> dict:
 	}
 
 
-def get_items(language: str, resource_type: str, *, to_do: bool = False, record=None, cursor=None) -> dict:
+def get_items(
+	language: str, resource_type: str, *, to_do: bool = False, record=None, cursor=None, records=None
+) -> dict:
 	"""One page of a resource's records, each with its fields. The first page also has `total` and
-	`to_do`, the record counts; `record` names one record to return alone."""
+	`to_do`, the record counts; `record` or `records` selects records without the page filter."""
 	resource = get_translatable_resource(resource_type)
 	check_target_language(language)
 	items = ItemList(resource, language)
+	if records is not None:
+		if isinstance(records, str):
+			records = json.loads(records)
+		if (
+			not isinstance(records, list)
+			or len(records) > MAX_SAVE_BATCH
+			or any(not isinstance(name, str) for name in records)
+		):
+			frappe.throw(_("Provide at most {0} record names as text.").format(MAX_SAVE_BATCH))
+		return {
+			"items": [item for name in dict.fromkeys(records) for item in items.find(name)],
+			"next_cursor": None,
+		}
 	if record:
 		return {"items": items.find(cstr(record)), "next_cursor": None}
 	return items.page(to_do=bool(cint(to_do)), cursor=cursor or None)

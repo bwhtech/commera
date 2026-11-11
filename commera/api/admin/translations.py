@@ -21,11 +21,18 @@ def get_overview() -> dict:
 
 @frappe.whitelist()
 def get_items(
-	language: str, resource: str, to_do: int = 0, record: str | None = None, cursor: str | None = None
+	language: str,
+	resource: str,
+	to_do: int = 0,
+	record: str | None = None,
+	cursor: str | None = None,
+	records: list | str | None = None,
 ) -> dict:
-	"""One page of a resource's records with their fields, or the one `record`."""
+	"""One page of a resource's records with their fields, or selected records."""
 	frappe.has_permission(DOCTYPE, ptype="read", throw=True)
-	return translation_items.get_items(language, resource, to_do=to_do, record=record, cursor=cursor)
+	return translation_items.get_items(
+		language, resource, to_do=to_do, record=record, cursor=cursor, records=records
+	)
 
 
 @frappe.whitelist()

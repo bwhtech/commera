@@ -94,6 +94,22 @@ class TestTranslationsPage(IntegrationTestCase):
 		self.assertEqual((content["field"], content["kind"], content["status"]), ("content", "html", MISSING))
 		self.assertIsNone(item["url"])
 
+	def test_saved_records_can_be_refreshed_together_outside_the_to_do_filter(self):
+		notes = [self.make_note(f"Batch refresh {number}") for number in range(2)]
+		for note in notes:
+			register("Note", note.name, "title", "ar", "saved")
+			register("Note", note.name, "content", "ar", "saved content")
+		result = translations_api.get_items(
+			"ar", "note", to_do=1, records=json.dumps([note.name for note in notes])
+		)
+		self.assertEqual({item["name"] for item in result["items"]}, {note.name for note in notes})
+		self.assertTrue(all(item["to_do"] == 0 for item in result["items"]))
+		self.assertTrue(all(item["fields"][0]["value"] == "saved" for item in result["items"]))
+		self.assertIsNone(result["next_cursor"])
+		for records in ({}, [None], ["name"] * 501):
+			with self.assertRaises(frappe.ValidationError):
+				translations_api.get_items("ar", "note", records=json.dumps(records))
+
 	def test_pages_return_each_record_once_and_the_to_do_filter_drops_finished_ones(self):
 		notes = [self.make_note(f"Note {number}", "<p>Wrap it</p>") for number in range(3)]
 		register("Note", notes[1].name, "title", "ar", "ملاحظة")

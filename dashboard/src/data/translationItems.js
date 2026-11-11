@@ -54,15 +54,17 @@ export function useTranslationItems(language, resource, filter, getItems) {
   // One record as the server has it now, whether or not it is in the loaded list.
   async function fetchItem(name) {
     const ticket = loads.current()
-    const { data } = await getItems(params({ record: name }))
+    const { data, error } = await getItems(params({ record: name }))
     if (!loads.isLatest(ticket)) return null
-    return data?.items?.[0] ?? null
+    return { item: data?.items?.[0] ?? null, error }
   }
 
   // Reread records after a save, in place, and keep the to-do count in step with them.
   async function refresh(names) {
     const ticket = loads.current()
-    const fresh = await Promise.all(names.map(fetchItem))
+    const { data, error } = await getItems(params({ records: names }))
+    if (error || !data) return
+    const fresh = data.items
     if (!loads.isLatest(ticket)) return
     for (const item of fresh.filter(Boolean)) {
       const index = items.value.findIndex((listed) => listed.name === item.name)

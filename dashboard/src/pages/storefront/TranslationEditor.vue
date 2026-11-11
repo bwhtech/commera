@@ -16,11 +16,12 @@ import {
   parseFieldKey,
   toDoCount,
 } from '../../data/translationStatus'
-import { savePending, useOpenedTranslation } from '../../data/translationEditorState'
+import { changePending, savePending, useOpenedTranslation } from '../../data/translationEditorState'
 import { useTranslationItems } from '../../data/translationItems'
 import { onSettingsClose, openSettings } from '../../ia/settings'
 import { confirmLeave } from '../../utils/confirmLeave'
 import { useIsMobile } from '../../utils/useIsMobile'
+import { errorMessage } from '../../data/errors'
 import { __ } from '../../data/translation'
 
 const route = useRoute()
@@ -50,7 +51,7 @@ const list = useTranslationItems(languageCode, resourceType, filter, getItems)
 watch([languageCode, resourceType], () => (filter.value = 'todo'))
 
 // A record opened from search or a link may sit outside the loaded list.
-const { openedItem, unknownName, open } = useOpenedTranslation(languageCode, resourceType)
+const { openedItem, unknownName, loadError: recordError, failedName, open } = useOpenedTranslation(languageCode, resourceType)
 const selectedName = computed(() => route.query.record || (isMobile.value ? '' : list.items.value[0]?.name) || '')
 const selectedItem = computed(
   () =>
@@ -83,12 +84,11 @@ function openResource(type, record) {
 const pending = reactive({})
 const dirtyCount = computed(() => Object.keys(pending).length)
 const saving = ref(false)
+const submitted = ref({})
 
 function change(item, field, value) {
   const key = fieldKey(resourceType.value, item.name, field.field)
-  // Typed back to what is saved: nothing to save, unless it confirms an outdated translation.
-  if (value === field.value && field.status !== 'outdated') delete pending[key]
-  else pending[key] = value
+  changePending(pending, key, field, value, submitted.value)
 }
 
 function discard() {
@@ -99,6 +99,7 @@ async function save() {
   if (!dirtyCount.value || saving.value) return
   const translations = Object.entries(pending).map(([key, value]) => ({ ...parseFieldKey(key), value }))
   saving.value = true
+  submitted.value = { ...pending }
   try {
     const saved = await savePending(pending, () => saveTranslations(languageCode.value, translations))
     if (saved === null) return
@@ -107,6 +108,7 @@ async function save() {
     openedItem.value = fresh?.find((item) => item?.name === openedItem.value?.name) ?? openedItem.value
     toast.success(saved === 1 ? __('1 translation saved') : __('{0} translations saved', [saved]))
   } finally {
+    submitted.value = {}
     saving.value = false
   }
 }
@@ -214,7 +216,11 @@ const languageMenu = computed(() => [
     <!-- min-w-0: the shell's flex-1 child would otherwise hold the widest field's min-content width. -->
     <ScrollArea v-if="!isMobile || selectedName" v-scroll-fade class="min-w-0 flex-1">
       <PageBody width="narrow">
-        <LoadingText v-if="!selectedItem && (list.loading.value || (selectedName && selectedName !== unknownName))" />
+        <div v-if="!selectedItem && recordError && failedName === selectedName" role="alert">
+          <p class="text-p-sm text-ink-red-6">{{ errorMessage(recordError, __('Could not load translations')) }}</p>
+          <Button class="mt-2" :label="__('Retry')" @click="open(selectedName, list.fetchItem)" />
+        </div>
+        <LoadingText v-else-if="!selectedItem && (list.loading.value || (selectedName && selectedName !== unknownName))" />
         <TranslationRecord
           v-else-if="selectedItem"
           :item="selectedItem"
