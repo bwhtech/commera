@@ -12,6 +12,7 @@ from commera.utils import (
 	format_addresses,
 	get_address_lines,
 	get_pickup_addresses,
+	get_untranslated_address_name,
 )
 
 SETTINGS_DOCTYPE = "Commera Settings"
@@ -452,7 +453,10 @@ def save_pickup_address(warehouse: str, values: dict | str):
 		# The pin arrives as GeoJSON; cstr would store a parsed one as a Python repr Desk cannot draw.
 		address.set(fieldname, frappe.as_json(value) if isinstance(value, dict) else cstr(value).strip())
 	address.address_title = address.address_title or warehouse_doc.warehouse_name
-	address.save()
+	if address.is_new():
+		address.insert(set_name=get_untranslated_address_name(address))
+	else:
+		address.save()
 	return get_locations()
 
 

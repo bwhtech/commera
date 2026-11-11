@@ -102,6 +102,25 @@ class TestAdminLocations(IntegrationTestCase):
 		entry = find_warehouse(screen, warehouse)
 		self.assertEqual(entry["address"]["address_title"], entry["warehouse_name"])
 
+	def test_arabic_admin_creates_an_untranslated_pickup_address(self):
+		self.assertEqual(frappe.session.user, "Administrator")
+		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
+		frappe.local.lang = "ar"
+		frappe.translate.clear_cache()
+		self.addCleanup(frappe.translate.clear_cache)
+		self.assertEqual(frappe._("Shop"), "تسوّق")
+		warehouse = self.create_warehouse(custom_store_pickup=1)
+
+		screen = save_pickup_address(warehouse, self.address_values())
+
+		entry = find_warehouse(screen, warehouse)
+		address = frappe.get_doc("Address", entry["address"]["name"])
+		self.assertEqual(address.address_type, "Shop")
+		self.assertTrue(address.name.startswith(f"{entry['warehouse_name']}-Shop-"))
+		self.assertNotIn(frappe._("Shop"), address.name)
+		updated = save_pickup_address(warehouse, self.address_values(city="Jeddah"))
+		self.assertEqual(find_warehouse(updated, warehouse)["address"]["name"], address.name)
+
 	def test_saving_again_edits_the_same_address(self):
 		warehouse = self.create_warehouse(custom_store_pickup=1)
 		first = find_warehouse(save_pickup_address(warehouse, self.address_values()), warehouse)["address"]
