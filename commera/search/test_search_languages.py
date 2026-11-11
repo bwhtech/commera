@@ -452,7 +452,11 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		rebuild.assert_called_once_with(deduplicate=True)
 
 	def test_a_language_change_during_a_build_rebuilds_again(self):
-		with patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild:
+		with (
+			patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild,
+			# No build is queued: a job left in Redis by another test would suppress the rebuild.
+			patch("commera.search.translations.get_job_status", return_value=None),
+		):
 			self.build_changing_languages_midway()
 		# Started builds suppress a deduplicated enqueue, so the build must enqueue its own successor.
 		rebuild.assert_called_once_with()

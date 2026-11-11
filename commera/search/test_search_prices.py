@@ -314,6 +314,8 @@ class TestSearchPriceSync(SearchPriceTestCase):
 		with (
 			PriceEvents(disable_gulf).active(),
 			patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild,
+			# No build is queued: a job left in Redis by another test would suppress the rebuild.
+			patch("commera.search.translations.get_job_status", return_value=None),
 		):
 			SqliteProductSearch().drop_index()
 			SqliteProductSearch().build_index()
