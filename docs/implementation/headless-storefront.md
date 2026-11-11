@@ -21,7 +21,7 @@ Charges in cart, checkout and order results have `description` and `amount`. The
 
 A priced cart returns optional `items_total` and `taxes` together when it has inclusive tax. Otherwise, it omits both keys. `items_total` includes inclusive tax before order discounts. The cart's `total` includes inclusive tax. Checkout adds shipping and exclusive tax. Checkout summaries always return `items_total` and `taxes`.
 
-These optional fields use `NotRequired` in Python. The storefront package documents them in `packages/storefront/types.js`.
+These optional fields use `NotRequired` in `commera.sdk.types`.
 
 Plugin hooks run for headless carts too. `validate_discount_code` runs when a code is applied. `validate_cart`, `cart_fees`, `delivery_options` and `payment_methods` run on the Commera checkout, which a headless cart reaches through the hand-off.
 
