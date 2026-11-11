@@ -183,7 +183,7 @@
                     {% call modal(button_classes='hidden',modal_header="Item added to your bag",external_control=True,modal_classes='w-fit') %}
                     <div class="p-6 text-center space-y-4">
                         <div class="flex items-center justify-center">
-                            <img src="{{ images[0]}}" alt="{{ _(product_variant.display_name) }}"
+                            <img src="{{ images[0]}}" alt="{{ product_title | e }}"
                                 class="w-34 h-45 object-cover rounded-lg">
                         </div>
                         <p class="text-accent">
