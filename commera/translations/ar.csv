@@ -5,8 +5,8 @@ Product,منتج
 Inventory,المخزون
 Home,الرئيسية
 Navigation,التنقل
-Footer,تذييل الصفحة
-Storefront,المتجر
+Footer,التذييل
+Storefront,واجهة المتجر
 Catalog,الكتالوج
 Sales,المبيعات
 Overview,نظرة عامة
@@ -32,7 +32,7 @@ Not configured,غير مُهيأ
 Unavailable,غير متاح
 Configure,تهيئة
 Enable this integration,تفعيل هذا التكامل
-Customers only see it at checkout while it is on.,لا يراه العملاء عند الدفع إلا وهو مُفعّل.
+Customers only see it at checkout while it is on.,لا يراه العملاء عند إتمام الطلب إلا وهو مُفعّل.
 Saved — leave blank to keep it,محفوظ — اتركه فارغًا للإبقاء عليه
 Webhook URL,رابط الويب هوك
 Copy,نسخ
@@ -126,7 +126,7 @@ This page has moved or is no longer here.,نُقلت هذه الصفحة أو ل
 Back to home,العودة إلى الرئيسية
 New arrivals,وصل حديثًا
 Addresses,العناوين
-Wishlist,قائمة الأمنيات
+Wishlist,المفضلة
 Account,الحساب
 Default address,العنوان الافتراضي
 Edit,تعديل
@@ -150,8 +150,8 @@ Use as my default address,استخدامه كعنواني الافتراضي
 Save address,حفظ العنوان
 Email,البريد الإلكتروني
 Save,حفظ
-Remove from wishlist,إزالة من قائمة الأمنيات
-Your wishlist is empty.,قائمة أمنياتك فارغة.
+Remove from wishlist,إزالة من المفضلة
+Your wishlist is empty.,قائمة المفضلة فارغة.
 Email address,البريد الإلكتروني
 Placed on {0},تم الطلب في {0}
 Download invoice,تنزيل الفاتورة
@@ -201,7 +201,7 @@ Change email,تغيير البريد الإلكتروني
 New here?,جديد هنا؟
 Already have an account?,لديك حساب بالفعل؟
 Close,إغلاق
-Checkout,الدفع
+Checkout,إتمام الطلب
 Contact,معلومات التواصل
 Signed in as,تم تسجيل الدخول باسم
 Change,تغيير
@@ -237,7 +237,7 @@ View order,عرض الطلب
 Payment not completed,لم يكتمل الدفع
 We are waiting for your payment to be confirmed. Refresh this page in a minute.,ننتظر تأكيد دفعتك. حدّث هذه الصفحة بعد دقيقة.
 We could not confirm a payment for this order. Your cart is still saved.,لم نتمكن من تأكيد الدفع لهذا الطلب. سلتك لا تزال محفوظة.
-Back to checkout,العودة إلى الدفع
+Back to checkout,العودة إلى إتمام الطلب
 Country and language,الدولة واللغة
 Other countries,دول أخرى
 {0} is in the {1} market. Switch to shop in {2}?,{0} ضمن سوق {1}. هل تريد التبديل للتسوق بعملة {2}؟
@@ -245,5 +245,1720 @@ Other countries,دول أخرى
 {0} is in the {1} market. Switch to that market to use this address.,{0} ضمن سوق {1}. بدّل إلى ذلك السوق لاستخدام هذا العنوان.
 {0} is not in the {1} market. Switch markets to use this address.,{0} ليست ضمن سوق {1}. بدّل السوق لاستخدام هذا العنوان.
 Country Not Available,الدولة غير متاحة
-Switch,تبديل
+Switch,تغيير
 Not now,ليس الآن
+No password needed. We'll email you a one‑time code.,لا حاجة إلى كلمة مرور. سنرسل إليك رمزًا لمرة واحدة عبر البريد الإلكتروني.
+Resend code in,إعادة إرسال الرمز خلال
+Skip to content,انتقل إلى المحتوى
+Added to your cart,أُضيف إلى سلتك
+We could not load your cart,تعذّر تحميل سلتك
+Check your connection and try again.,تحقق من اتصالك وحاول مرة أخرى.
+Try again,حاول مرة أخرى
+Your cart is empty,سلتك فارغة
+Browse the shop and add what you like. It will wait for you here.,تصفّح المتجر وأضف ما يعجبك، وسيبقى هنا بانتظارك.
+each,للقطعة
+Less,إنقاص
+More,زيادة
+Remove,إزالة
+Your cart,سلتك
+Shipping and taxes calculated at checkout.,تُحسب رسوم الشحن والضرائب عند إتمام الطلب.
+Menu,القائمة
+View all,عرض الكل
+The code {0} was removed.,أُزيل الرمز {0}.
+Colour,اللون
+Brand,العلامة التجارية
+From,من
+To,إلى
+Reset,إعادة ضبط
+"Search by product name, colour or brand.",ابحث باسم المنتج أو اللون أو العلامة التجارية.
+Search is not available right now. Try again.,البحث غير متاح حاليًا. حاول مرة أخرى.
+No results.,لا توجد نتائج.
+Collections,المجموعات
+Not available in {0},غير متوفر في {0}
+Remove the items not available in {0} to check out.,أزِل المنتجات غير المتوفرة في {0} لإتمام الطلب.
+Sale price,سعر التخفيض
+Regular price,السعر الأصلي
+Untitled product,منتج بلا عنوان
+Page not found,الصفحة غير موجودة
+"This page has moved or is no longer here. Try a search, or start from the home page.",نُقلت هذه الصفحة أو لم تعد موجودة. جرّب البحث، أو ابدأ من الصفحة الرئيسية.
+Your wishlist is empty,قائمة المفضلة فارغة
+Tap the heart on a product to save it here for later.,اضغط على القلب في أي منتج لحفظه هنا لوقت لاحق.
+We are waiting for your payment to be confirmed. This page updates by itself.,ننتظر تأكيد دفعتك. تتحدّث هذه الصفحة تلقائيًا.
+"This is taking longer than usual. Refresh this page in a minute, or check your orders.",يستغرق هذا وقتًا أطول من المعتاد. حدّث هذه الصفحة بعد دقيقة، أو راجع طلباتك.
+No orders yet,لا توجد طلبات بعد
+"When you place an order, it shows here with its delivery status.",عندما تقدّم طلبًا، سيظهر هنا مع حالة توصيله.
+Sign in to check out,سجّل الدخول لإتمام الطلب
+Your cart is saved. Sign in and pick up where you left off.,سلتك محفوظة. سجّل الدخول وتابع من حيث توقفت.
+Loading checkout,جارٍ تحميل صفحة إتمام الطلب
+Name,الاسم
+{0} to {1},من {0} إلى {1}
+{0} products,{0} منتج
+Products you add to this section show here.,تظهر هنا المنتجات التي تضيفها إلى هذا القسم.
+Instagram,إنستغرام
+Facebook,فيسبوك
+X,إكس
+Pinterest,بنترست
+YouTube,يوتيوب
+Slide {0},الشريحة {0}
+Play slideshow,تشغيل العرض
+Pause slideshow,إيقاف العرض مؤقتًا
+No products match these filters,لا توجد منتجات تطابق هذه الفلاتر
+Try removing a filter or searching for something else.,جرّب إزالة أحد الفلاتر أو البحث عن شيء آخر.
+Clear filters,مسح الفلاتر
+Browse all products,تصفّح كل المنتجات
+Added,تمت الإضافة
+Description,الوصف
+No results,لا توجد نتائج
+Thanks. You're subscribed.,شكرًا لك. تم اشتراكك.
+{0} is not an installed plugin.,{0} ليست إضافة مثبّتة.
+Please sign in.,يرجى تسجيل الدخول.
+Send plugin_fields as an object.,أرسل plugin_fields ككائن.
+Address {0} not found,العنوان {0} غير موجود
+Order {0} not found,الطلب {0} غير موجود
+Invalid code,رمز غير صالح
+This email is already registered. Please log in.,هذا البريد الإلكتروني مسجّل بالفعل. يرجى تسجيل الدخول.
+This account is disabled.,هذا الحساب معطّل.
+"A kept line needs a quantity of 0 or more, and a new line 1 or more.",يجب أن تكون كمية السطر الحالي 0 أو أكثر، وكمية السطر الجديد 1 أو أكثر.
+The cart changed. Read it again and retry.,تغيّرت السلة. اقرأها مجددًا ثم أعد المحاولة.
+{0} is not for sale.,{0} غير معروض للبيع.
+Add something to your cart first.,أضف شيئًا إلى سلتك أولًا.
+Sort must be one of {0}.,يجب أن يكون الترتيب إحدى القيم: {0}.
+Collection {0} not found,المجموعة {0} غير موجودة
+Send an address as an object or as the name of a saved address.,أرسل العنوان ككائن أو باسم عنوان محفوظ.
+Cash on Delivery,الدفع عند الاستلام
+Your cart has changed. Please choose your delivery again before placing your order.,تغيّرت سلتك. يرجى اختيار طريقة التوصيل مرة أخرى قبل تقديم طلبك.
+Cart Changed,تغيّرت السلة
+Your checkout has changed. Please review it before placing your order.,تغيّرت تفاصيل إتمام الطلب. يرجى مراجعتها قبل تقديم طلبك.
+Checkout Changed,تغيّرت تفاصيل الطلب
+Enter your address first.,أدخل عنوانك أولًا.
+A product URL needs the product's handle.,يحتاج رابط المنتج إلى المعرّف (handle) الخاص به.
+"Only public JPEG, PNG and WebP files resize, to one of {0} pixels wide.",لا يُعاد تحجيم إلا ملفات JPEG وPNG وWebP العامة، وبعرض أحد هذه القيم بالبكسل: {0}.
+Image {0} not found,الصورة {0} غير موجودة
+A shipment needs its AWB.,تحتاج الشحنة إلى رقم بوليصة الشحن (AWB).
+Only a submitted order can be shipped.,لا يمكن شحن إلا الطلب المعتمد.
+Shipping provider {0} does not exist.,مزوّد الشحن {0} غير موجود.
+Main menu,القائمة الرئيسية
+Sitemap kind must be one of {0}.,يجب أن يكون نوع خريطة الموقع إحدى القيم: {0}.
+Product {0} not found,المنتج {0} غير موجود
+The store sent an unexpected response.,أرسل المتجر استجابة غير متوقعة.
+Could not reach the store.,تعذّر الوصول إلى المتجر.
+Request failed,فشل الطلب
+Select a collection,اختر مجموعة
+New collection,مجموعة جديدة
+"""{0}"" created","تم إنشاء ""{0}"""
+New option,خيار جديد
+Format,الصيغة
+Values,القيم
+"Paperback, Hardcover",غلاف ورقي، غلاف مقوّى
+Pick at least one size for {0},اختر مقاسًا واحدًا على الأقل لـ {0}
+1 option,خيار واحد
+{0} options,{0} خيارات
+1 variant will be created,سيُنشأ متغيّر واحد
+{0} variants will be created,سيُنشأ {0} متغيّرات
+"no sizes, so each one sells as a single item",بلا مقاسات، لذا يُباع كل خيار كمنتج واحد
+"No options — this sells as a single item, the way a book does",بلا خيارات — يُباع كمنتج واحد، كما يُباع الكتاب
+Add a title to continue.,أضف عنوانًا للمتابعة.
+Pick a collection to continue.,اختر مجموعة للمتابعة.
+Set a price above zero to continue.,حدّد سعرًا أكبر من صفر للمتابعة.
+Title,العنوان
+Cotton oversized tee,تيشيرت قطني واسع
+(required),(مطلوب)
+New,جديد
+Option,الخيار
+What this product varies by. Sizes are added below and apply to every option.,ما يختلف به هذا المنتج. تُضاف المقاسات أدناه وتنطبق على كل خيار.
+Pick or type a {0},اختر {0} أو اكتبه
+Type a new {0} to add it — leave empty if this product has none,اكتب {0} جديدًا لإضافته — اتركه فارغًا إن لم يكن لهذا المنتج أي منه
+Sizes,المقاسات
+Pick or type a size,اختر مقاسًا أو اكتبه
+"Leave empty for a product that has no sizes, like a book",اتركه فارغًا لمنتج بلا مقاسات، مثل الكتاب
+Compare at,السعر قبل الخصم
+Photos come next,الصور في الخطوة التالية
+"This product is created without a photo, so it stays hidden from shoppers until you add one — from the product page, right after this.",يُنشأ هذا المنتج بلا صورة، لذا يبقى مخفيًا عن المتسوقين حتى تضيف صورة — من صفحة المنتج، بعد هذه الخطوة مباشرة.
+Apps,التطبيقات
+sidebar,الشريط الجانبي
+Add {0},إضافة {0}
+Could not upload {0},تعذّر رفع {0}
+Attribute,الخاصية
+"A shopper sees these instead of the words. Upload an image for a pattern a flat colour cannot show — denim, floral, marble.",يرى المتسوق هذه بدلًا من الكلمات. ارفع صورة لنقشة لا يُظهرها لون واحد — جينز، زهور، رخام.
+The choices a shopper picks from. Click a name to rename one.,الخيارات التي يختار منها المتسوق. انقر على اسم لإعادة تسميته.
+Rename {0},إعادة تسمية {0}
+Used by 1 product — renaming would leave its SKUs and links saying {0}.,يستخدمه منتج واحد — إعادة التسمية ستُبقي رموز SKU والروابط الخاصة به تقول {0}.
+Used by {0} products — renaming would leave their SKUs and links saying {1}.,يستخدمه {0} منتجات — إعادة التسمية ستُبقي رموز SKU والروابط الخاصة بها تقول {1}.
+{0} colour,لون {0}
+{0} hex,رمز HEX لـ {0}
+Replace,استبدال
+Image,الصورة
+Clear {0} swatch,مسح عيّنة {0}
+Add a value to {0},إضافة قيمة إلى {0}
+Type a new one,اكتب قيمة جديدة
+Add,إضافة
+Rows pick instead of opening while this is on.,النقر على الصفوف يحدّدها بدلًا من فتحها ما دام هذا مُفعّلًا.
+Done,تم
+1 variant will be added,سيُضاف متغيّر واحد
+{0} variants will be added,سيُضاف {0} متغيّرات
+{0} will come off sale,سيُوقف بيع {0}
+No changes yet,لا توجد تغييرات بعد
+Keep at least one variant ticked.,أبقِ متغيّرًا واحدًا على الأقل محددًا.
+"They leave the storefront and can't be sold, but past orders keep them. Tick one again to bring it back with its stock and price.",تختفي من واجهة المتجر ولا يمكن بيعها، لكن الطلبات السابقة تحتفظ بها. حدّد أحدها مجددًا لإعادته بمخزونه وسعره.
+A new size takes its option's price and goes on sale with it. A new option takes the product's price and stays hidden until it has a photo.,يأخذ المقاس الجديد سعر خياره ويُعرض للبيع معه. ويأخذ الخيار الجديد سعر المنتج ويبقى مخفيًا حتى تُضاف له صورة.
+{0} added,أُضيف {0}
+{0} back on sale,{0} معروض للبيع مجددًا
+{0} taken off sale,أُوقف بيع {0}
+Variants updated: {0},تم تحديث المتغيّرات: {0}
+Edit options,تعديل الخيارات
+Type a new {0} to add it,اكتب {0} جديدًا لإضافته
+"Unticked variants are hidden, not deleted",المتغيّرات غير المحددة تُخفى ولا تُحذف
+Prices are filled in for you,تُملأ الأسعار تلقائيًا
+Save options,حفظ الخيارات
+Cancel,إلغاء
+Switch language,تغيير اللغة
+Dashboard language,لغة لوحة التحكم
+The dashboard reloads in the language you pick. Your storefront keeps its own languages.,يُعاد تحميل لوحة التحكم باللغة التي تختارها. ويحتفظ متجرك بلغاته الخاصة.
+Pick a language,اختر لغة
+{0}–{1} of {2},{0}–{1} من {2}
+Rows per page,صفوف في الصفحة
+{0} per page,{0} في الصفحة
+Previous,السابق
+Next,التالي
+OpenStreetMap contributors,المساهمون في OpenStreetMap
+"{0} in size {1}, coming off sale",{0} بمقاس {1}، سيُوقف بيعه
+"{0} in size {1}, new",{0} بمقاس {1}، جديد
+{0} in size {1},{0} بمقاس {1}
+Untick any size you do not carry in a {0}.,ألغِ تحديد أي مقاس لا يتوفر لديك من {0}.
+Coming off sale,سيُوقف بيعه
+Customer,العميل
+Shipping address,عنوان الشحن
+No shipping address on file.,لا يوجد عنوان شحن مسجّل.
+Tags,الوسوم
+None,لا شيء
+Note,ملاحظة
+No note on this order.,لا توجد ملاحظة على هذا الطلب.
+Retry,إعادة المحاولة
+One update did not reach it.,لم يصلها تحديث واحد.
+{0} updates did not reach it.,لم يصلها {0} تحديثات.
+{0} could not process this order,تعذّر على {0} معالجة هذا الطلب
+In progress,قيد التنفيذ
+Not yet,لم يبدأ بعد
+{0} couldn't load,تعذّر تحميل {0}
+This plugin has not been built yet.,لم يتم بناء هذه الإضافة بعد.
+More actions,إجراءات أخرى
+Refunded {0},تم استرداد {0}
+Payment Entry {0} created.,تم إنشاء قيد الدفع {0}.
+Refund this order,استرداد مبلغ هذا الطلب
+"{0} goes back to the customer on {1}, the same way they paid. This cannot be undone from here.",يُعاد {0} إلى العميل عبر {1}، بالطريقة نفسها التي دفع بها. لا يمكن التراجع عن ذلك من هنا.
+{0} has already been refunded on this order.,تم بالفعل استرداد {0} من هذا الطلب.
+The goods are already fully refunded — only shipping and other charges are left.,تم استرداد مبلغ المنتجات بالكامل — لم يتبقَّ إلا الشحن والرسوم الأخرى.
+Keep the payment,الاحتفاظ بالمبلغ
+Refund {0},استرداد {0}
+Last 7 days,آخر 7 أيام
+Last 30 days,آخر 30 يومًا
+Last 12 months,آخر 12 شهرًا
+All time,كل الفترات
+Analytics,التحليلات
+Compare,مقارنة
+{0} vs. previous period,{0} مقارنة بالفترة السابقة
+Nothing matches “{0}”,لا شيء يطابق “{0}”
+"Try a product name, an order number, or a customer.",جرّب اسم منتج، أو رقم طلب، أو عميلًا.
+Customers,العملاء
+Bulk edit prices,تعديل الأسعار بالجملة
+Revenue report,تقرير الإيرادات
+Inventory report,تقرير المخزون
+Storefront report,تقرير واجهة المتجر
+Storefront theme,قالب واجهة المتجر
+New product,منتج جديد
+Import products from CSV,استيراد المنتجات من CSV
+Receive stock,استلام المخزون
+Install demo data,تثبيت البيانات التجريبية
+Open settings,فتح الإعدادات
+Create,إنشاء
+Plugins,الإضافات
+Jump to,انتقال سريع
+Search Commera,ابحث في Commera
+"Search products, orders and customers, or type a command…",ابحث في المنتجات والطلبات والعملاء، أو اكتب أمرًا…
+Navigate,تنقّل
+Open,فتح
+Expand {0},توسيع {0}
+Collapse {0},طيّ {0}
+{0} saved,تم حفظ {0}
+Variant,المتغيّر
+of {0},من {0}
+Photos,الصور
+Shown when a shopper picks this combination. The first one is the cover.,تظهر عندما يختار المتسوق هذه التركيبة. الصورة الأولى هي الغلاف.
+Pricing and stock,السعر والمخزون
+Applies to every size under this option ({0}). Edit one size at a time from the variant's own page.,ينطبق على كل مقاس ضمن هذا الخيار ({0}). عدّل مقاسًا واحدًا في كل مرة من صفحة المتغيّر نفسه.
+On hand,المتوفر فعليًا
+Committed,المحجوز
+Identifiers,المعرّفات
+SKU,SKU
+Open full page,فتح الصفحة كاملة
+Save variant,حفظ المتغيّر
+option,خيار
+Price updated for {0} ({1} sizes),تم تحديث سعر {0} ({1} مقاسات)
+Set price on 1 variant,تحديد السعر لمتغيّر واحد
+Set price on {0} variants,تحديد السعر لـ {0} متغيّرات
+Sets the price for every size under each selected variant.,يحدّد السعر لكل مقاس ضمن كل متغيّر محدد.
+1 variant repriced,أُعيد تسعير متغيّر واحد
+{0} variants repriced,أُعيد تسعير {0} متغيّرات
+{0} of {1} variants repriced. {2} failed,أُعيد تسعير {0} من {1} متغيّرات. فشل {2}
+Needs a photo and a size,يحتاج إلى صورة ومقاس
+Needs a photo,يحتاج إلى صورة
+Needs a size,يحتاج إلى مقاس
+Not ready,غير جاهز
+{0} hidden from the storefront,{0} مخفي من واجهة المتجر
+{0} published,{0} منشور
+{0} has no sizes to receive stock against yet.,لا توجد مقاسات لـ {0} لاستلام المخزون عليها بعد.
+Receive stock on {0},استلام مخزون {0}
+Adds this quantity to each of the {0} sizes under this option. There is no way to set stock to an exact number here.,يضيف هذه الكمية إلى كل مقاس من مقاسات هذا الخيار البالغة {0}. لا يمكن ضبط المخزون على رقم محدد من هنا.
+Quantity received,الكمية المستلمة
+Received {0} on {1} sizes,تم استلام {0} على {1} مقاسات
+Hide from storefront,إخفاء من واجهة المتجر
+Publish to storefront,نشر في واجهة المتجر
+"Add a {0} or size, or take one off sale.",أضف {0} أو مقاسًا، أو أوقف بيع أحدها.
+This product has no options,لا توجد خيارات لهذا المنتج
+It sells as a single item.,يُباع كمنتج واحد.
+Variants,المتغيّرات
+{0} selected,تم تحديد {0}
+Set price,تحديد السعر
+Clear,مسح
+Options for this variant,خيارات هذا المتغيّر
+No variants yet,لا توجد متغيّرات بعد
+"Variants are the buyable combinations, like a colour in a size.",المتغيّرات هي التركيبات القابلة للشراء، مثل لون بمقاس معيّن.
+1 photo added to {0},أُضيفت صورة واحدة إلى {0}
+{0} photos added to {1},أُضيفت {0} صور إلى {1}
+Cover,الغلاف
+Remove photo,إزالة الصورة
+Add photo,إضافة صورة
+Uploading…,جارٍ الرفع…
+No photo yet. This variant falls back to the product's own image on the storefront.,لا توجد صورة بعد. يستخدم هذا المتغيّر صورة المنتج نفسه في واجهة المتجر.
+Applies to,ينطبق على
+Specific products,منتجات محددة
+Specific collections,مجموعات محددة
+Includes their sub-collections.,يشمل المجموعات الفرعية.
+Specific brands,علامات تجارية محددة
+Skip items already on sale,تخطّي المنتجات المخفّضة بالفعل
+Items priced below their regular price get no extra discount.,المنتجات المسعّرة بأقل من سعرها الأصلي لا تحصل على خصم إضافي.
+Excluded products,المنتجات المستثناة
+Exclude products,استثناء منتجات
+Customer buys,يشتري العميل
+Minimum quantity,الحد الأدنى للكمية
+Minimum amount,الحد الأدنى للمبلغ
+Quantity,الكمية
+Amount,المبلغ
+Buys any of,يشتري أيًّا من
+Customer gets,يحصل العميل على
+These items must be in the cart; the discount does not add them.,يجب أن تكون هذه المنتجات في السلة؛ فالخصم لا يضيفها.
+Gets any of,يحصل على أيٍّ من
+At a discounted value,بقيمة مخفّضة
+Percentage off,خصم بنسبة مئوية
+Amount off each,خصم مبلغ على كل قطعة
+Discount (%),الخصم (%)
+Discount amount,مبلغ الخصم
+Maximum uses per order,الحد الأقصى للاستخدام في الطلب الواحد
+0 means as many times as the cart allows.,0 يعني عدد المرات التي تسمح بها السلة.
+Automatic,تلقائي
+{0} codes created,تم إنشاء {0} رموز
+How it applies,طريقة التطبيق
+Generate,توليد
+Shoppers type this at checkout. Matching ignores case.,يكتبه المتسوقون عند إتمام الطلب. المطابقة لا تميّز بين الأحرف الكبيرة والصغيرة.
+Unique codes,رموز فريدة
+{0} of {1} used,استُخدم {0} من {1}
+Download as CSV,تنزيل بصيغة CSV
+"Single-use codes for influencers, emails or receipts, sharing these rules.",رموز للاستخدام مرة واحدة للمؤثرين أو الرسائل أو الإيصالات، تتبع هذه القواعد نفسها.
+"Save the discount first, then generate single-use codes that share these rules.",احفظ الخصم أولًا، ثم ولّد رموزًا للاستخدام مرة واحدة تتبع هذه القواعد.
+Generate codes,توليد رموز
+Diwali sale,تخفيضات ديوالي
+Shoppers see this in the cart and at checkout.,يرى المتسوقون هذا في السلة وعند إتمام الطلب.
+Generate unique codes,توليد رموز فريدة
+How many,العدد
+"Up to 5,000 at a time.","حتى 5,000 في المرة الواحدة."
+Prefix,البادئة
+Each code is the prefix and 8 random letters.,كل رمز هو البادئة متبوعة بـ 8 أحرف عشوائية.
+No minimum,بلا حد أدنى
+Everyone,الجميع
+Any payment method,أي طريقة دفع
+"Choose at least one group. Without one, nobody can use this discount.",اختر مجموعة واحدة على الأقل. بدونها لن يتمكن أحد من استخدام هذا الخصم.
+"Choose at least one customer. Without one, nobody can use this discount.",اختر عميلًا واحدًا على الأقل. بدونه لن يتمكن أحد من استخدام هذا الخصم.
+Minimum purchase,الحد الأدنى للشراء
+Minimum subtotal,الحد الأدنى للمجموع الفرعي
+Minimum number of items,الحد الأدنى لعدد المنتجات
+Who can use it,من يمكنه استخدامه
+"Everyone, guests included",الجميع، بمن فيهم الزوار
+First order only,الطلب الأول فقط
+"Checked by customer and email, so guests count too.",يُتحقق منه بالعميل والبريد الإلكتروني، لذا يُحتسب الزوار أيضًا.
+Customer groups,مجموعات العملاء
+Specific customers,عملاء محددون
+"Signed-in customers only, up to 100.",العملاء المسجّلون فقط، حتى 100.
+Choose customer groups,اختر مجموعات العملاء
+Chosen customers,العملاء المختارون
+Search customers,ابحث في العملاء
+Prepaid only (not cash on delivery),الدفع المسبق فقط (لا الدفع عند الاستلام)
+Cash on delivery only,الدفع عند الاستلام فقط
+Combinations,الجمع بين الخصومات
+Two discounts stack only when each allows the other.,لا يُجمع خصمان إلا إذا سمح كل منهما بالآخر.
+Product discounts,خصومات المنتجات
+Order discounts,خصومات الطلب
+Shipping discounts,خصومات الشحن
+Discount given,الخصم الممنوح
+Budget left,الميزانية المتبقية
+Test a cart,تجربة سلة
+"Priced the way checkout prices it, with this draft.",مسعّرة كما يسعّرها إتمام الطلب، مع هذه المسودة.
+Search items,ابحث في الأصناف
+Item on line {0},الصنف في السطر {0}
+Quantity on line {0},الكمية في السطر {0}
+Remove line {0},إزالة السطر {0}
+Add item,إضافة صنف
+Any customer,أي عميل
+Clear customer,مسح العميل
+Prepaid,دفع مسبق
+Shopper,المتسوق
+Returning shopper,متسوق عائد
+New shopper,متسوق جديد
+Total,الإجمالي
+Create a discount,إنشاء خصم
+No limits,بلا حدود
+Active dates,فترة التفعيل
+Starts on,يبدأ في
+Ends on,ينتهي في
+Set an end date,تحديد تاريخ انتهاء
+Limits,الحدود
+Total uses,إجمالي مرات الاستخدام
+0 means no limit.,0 يعني بلا حد.
+Budget,الميزانية
+Stops once this much discount is given.,يتوقف بعد منح هذا القدر من الخصم.
+Once per customer,مرة واحدة لكل عميل
+"Matched by customer, email or phone.",يُطابَق بالعميل أو البريد الإلكتروني أو الهاتف.
+Reporting and accounting,التقارير والمحاسبة
+Optional. Kept on every order the discount touches.,اختياري. يُحفظ في كل طلب يشمله الخصم.
+Campaign,الحملة
+The marketing campaign orders using this discount are tagged with.,الحملة التسويقية التي تُوسم بها الطلبات التي تستخدم هذا الخصم.
+Discount account,حساب الخصم
+Used when Discount Accounting is on.,يُستخدم عند تفعيل محاسبة الخصومات.
+Delivery options,طرق التوصيل
+Every delivery option,كل طرق التوصيل
+Off the delivery charge (%),خصم على رسوم التوصيل (%)
+100 makes delivery free.,100 تجعل التوصيل مجانيًا.
+Skip rates above,تخطّي الأسعار التي تزيد على
+Keeps expensive options at full price. 0 means no limit.,يُبقي الخيارات المكلفة بسعرها الكامل. 0 يعني بلا حد.
+Percentage,نسبة مئوية
+Fixed amount,مبلغ ثابت
+Value,القيمة
+Value type,نوع القيمة
+Currency,العملة
+Carts in another currency get it converted.,تُحوَّل القيمة للسلال التي بعملة أخرى.
+Maximum discount,الحد الأقصى للخصم
+"“10% off, up to 200”. 0 means no cap.",“خصم 10%، حتى 200”. 0 يعني بلا سقف.
+The amount comes off,يُخصم المبلغ من
+Each eligible item,كل منتج مؤهّل
+"Once per order, spread over eligible items",مرة واحدة لكل طلب، موزّعًا على المنتجات المؤهّلة
+Their amount does not count towards the discount.,لا تُحتسب قيمتها ضمن الخصم.
+"Spend more, save more",اشترِ أكثر، وفّر أكثر
+The best tier the subtotal reaches applies.,يُطبَّق أفضل مستوى يبلغه المجموع الفرعي.
+Subtotal from,المجموع الفرعي من
+Tier {0} subtotal from,المجموع الفرعي للمستوى {0} من
+Tier {0} {1},المستوى {0} {1}
+Remove tier {0},إزالة المستوى {0}
+Add tier,إضافة مستوى
+Your customer,عميلك
+{0} · Thursday,{0} · الخميس
+1 order to fulfil,طلب واحد للتجهيز
+{0} orders to fulfil,{0} طلبات للتجهيز
+Fulfil orders,تجهيز الطلبات
+1 variant low on stock,متغيّر واحد مخزونه منخفض
+{0} variants low on stock,{0} متغيّرات مخزونها منخفض
+At or below five units,خمس وحدات أو أقل
+Restock,إعادة التخزين
+1 product needs attention,منتج واحد يحتاج إلى اهتمام
+{0} products need attention,{0} منتجات تحتاج إلى اهتمام
+Missing a photo or a size before it can publish,ينقصه صورة أو مقاس قبل أن يمكن نشره
+Open catalogue,فتح الكتالوج
+Needs attention,يحتاج إلى اهتمام
+Revenue,الإيرادات
+No revenue yet,لا توجد إيرادات بعد
+The trend appears once orders start coming in.,يظهر الاتجاه بمجرد أن تبدأ الطلبات بالوصول.
+Recent orders,أحدث الطلبات
+Fulfilment,التجهيز
+Placed,تاريخ الطلب
+Your first order will appear here.,سيظهر طلبك الأول هنا.
+Top products,أفضل المنتجات
+{0} in stock,{0} في المخزون
+{0} sold,{0} مُباع
+No sales yet,لا توجد مبيعات بعد
+Bestsellers rank once orders come in.,يُرتَّب الأكثر مبيعًا بمجرد وصول الطلبات.
+View your storefront,عرض واجهة متجرك
+Preview your storefront,معاينة واجهة متجرك
+View store,عرض المتجر
+Preview store,معاينة المتجر
+Private,خاص
+Card,بطاقة
+Dismiss card,إخفاء البطاقة
+Needed to sell,مطلوب للبيع
+{0} of {1} done,أُنجز {0} من {1}
+Show {0} dismissed,عرض {0} مخفية
+You are all caught up,لا يوجد ما يتطلب انتباهك
+New suggestions show up here as your store grows.,تظهر هنا اقتراحات جديدة مع نمو متجرك.
+Skip photos for now,تخطّي الصور الآن
+Import 1 product,استيراد منتج واحد
+Import {0} products,استيراد {0} منتجات
+The import keeps running. Reopen Import to see how it went.,يستمر الاستيراد في العمل. أعد فتح الاستيراد لمعرفة النتيجة.
+Import products,استيراد المنتجات
+Step {0} of {1},الخطوة {0} من {1}
+Import running…,جارٍ الاستيراد…
+Nothing is saved until the last step.,لا يُحفظ شيء حتى الخطوة الأخيرة.
+Do this later,لاحقًا
+"We match each file to a product by its name, so {0} lands on Oversized Tee in Black.",نطابق كل ملف مع منتج حسب اسمه، فيذهب {0} إلى Oversized Tee باللون Black.
+Leave unmatched,تركه دون مطابقة
+Add product photos,إضافة صور المنتجات
+Products sell far better with a photo. You can also skip this and add them later.,تُباع المنتجات أفضل بكثير مع صورة. يمكنك أيضًا تخطّي هذا وإضافتها لاحقًا.
+Drop a folder,أفلت مجلدًا
+One by one,واحدة تلو الأخرى
+Reading your products…,جارٍ قراءة منتجاتك…
+Matching photos to your products…,جارٍ مطابقة الصور مع منتجاتك…
+Uploading photos,جارٍ رفع الصور
+{0} of {1} uploaded,تم رفع {0} من {1}
+Drop your photos here,أفلت صورك هنا
+Browse photos,تصفّح الصور
+of {0} photos matched to a product,من {0} صورة طابقت منتجًا
+could not be matched,تعذّرت مطابقتها
+of {0} products still have no photo,من {0} منتجًا ما زالت بلا صورة
+Files we could not place,ملفات تعذّر وضعها
+Add more photos,إضافة مزيد من الصور
+File names do the matching,أسماء الملفات تحدد المطابقة
+"Name each photo after the product and its colour — oversized-tee-black.jpg — and add -1, -2, -3 for extra shots. The first photo for a colour becomes its main image.",سمِّ كل صورة باسم المنتج ولونه — oversized-tee-black.jpg — وأضف ‎-1 و‎-2 و‎-3 للّقطات الإضافية. تصبح الصورة الأولى للون صورته الرئيسية.
+{0} of {1} have a photo,{0} من {1} لها صورة
+Skip the rest for now,تخطّي الباقي الآن
+1 photo,صورة واحدة
+{0} photos,{0} صور
+Add more,إضافة المزيد
+Upload,رفع
+Slow going for a long catalogue,بطيء مع كتالوج طويل
+"For {0} product colours, dropping a folder of named photos is far quicker.",مع {0} من ألوان المنتجات، يكون إفلات مجلد من الصور المسمّاة أسرع بكثير.
+Sure,مؤكد
+Likely,مرجّح
+Guess,تخمين
+No match,لا تطابق
+Match your columns,طابِق أعمدتك
+"We matched {0} of {1} columns for you. Change anything that looks wrong, then re-check.",طابقنا {0} من {1} أعمدة لك. غيّر أي شيء يبدو خاطئًا، ثم أعد التحقق.
+Use suggestions,استخدام الاقتراحات
+Still needed: {0},ما زال مطلوبًا: {0}
+Column in your file,العمود في ملفك
+Goes into,يُوضع في
+Match,المطابقة
+Skipped,متخطّى
+{0} columns mapped,تمت مطابقة {0} أعمدة
+{0} skipped,تخطّي {0}
+Re-check,إعادة التحقق
+Skipping a column is safe,تخطّي عمود آمن
+"Anything you leave out never reaches your catalogue, and your own file stays untouched.",أي شيء تتركه لن يصل إلى كتالوجك أبدًا، ويبقى ملفك كما هو.
+Check before it goes live,راجِع قبل النشر
+Nothing has been saved yet. Rows with an error are left out entirely; everything else imports.,لم يُحفظ شيء بعد. تُستبعد الصفوف التي فيها خطأ بالكامل؛ ويُستورد كل ما عداها.
+ready to import,جاهزة للاستيراد
+"warnings, still imported",تحذيرات، ستُستورد مع ذلك
+"errors, skipped",أخطاء، ستُتخطّى
+products,منتجات
+All rows,كل الصفوف
+Ready,جاهز
+Warnings,التحذيرات
+Errors,الأخطاء
+{0} · row {1},{0} · الصف {1}
+Error,خطأ
+Warning,تحذير
+Nothing in this bucket,لا شيء في هذه الفئة
+Your file is clean on this count.,ملفك سليم من هذه الناحية.
+Showing {0} of {1} rows,عرض {0} من {1} صفوف
+Errors do not stop the import,الأخطاء لا توقف الاستيراد
+"Every other row goes in — the row with the problem is simply left out, and none of its data is written.",يُستورد كل صف آخر — يُستبعد الصف الذي فيه المشكلة فقط، ولا يُكتب أي من بياناته.
+Turn on payments,تفعيل المدفوعات
+Accept cards and UPI at checkout.,اقبل البطاقات وUPI عند إتمام الطلب.
+Set shipping rates,تحديد أسعار الشحن
+"Flat rate, or by weight and pin code.",سعر ثابت، أو حسب الوزن والرمز البريدي.
+Set up the storefront,إعداد واجهة المتجر
+"Theme, navigation and pages.",القالب والتنقل والصفحات.
+Importing your catalogue,جارٍ استيراد كتالوجك
+This only takes a moment.,لن يستغرق هذا إلا لحظة.
+Creating {0} products…,جارٍ إنشاء {0} منتجات…
+"This is taking longer than usual. It is still running: you can close this window, and the products appear in your catalogue when it finishes.",يستغرق هذا وقتًا أطول من المعتاد. ما زال يعمل: يمكنك إغلاق هذه النافذة، وستظهر المنتجات في كتالوجك عند انتهائه.
+"Products appear in your catalogue as they land, so you can start editing right away.",تظهر المنتجات في كتالوجك فور وصولها، لذا يمكنك البدء بتعديلها مباشرة.
+The import could not run,تعذّر تشغيل الاستيراد
+Back to review,العودة إلى المراجعة
+{0} products are live,{0} منتجات منشورة الآن
+"Your catalogue now has these products, with {0} photos already on them.",أصبح كتالوجك يضم هذه المنتجات، ومعها {0} صور بالفعل.
+Your catalogue now has these products. Add photos from each product page to publish them.,أصبح كتالوجك يضم هذه المنتجات. أضف الصور من صفحة كل منتج لنشرها.
+View my products,عرض منتجاتي
+Back to overview,العودة إلى النظرة العامة
+products created,منتجات تم إنشاؤها
+Fix and re-upload,التصحيح وإعادة الرفع
+rows skipped,صفوف تم تخطّيها
+photos attached,صور تم إرفاقها
+Add from the product page,الإضافة من صفحة المنتج
+rows whose photos did not attach,صفوف لم تُرفق صورها
+Rows that did not import,صفوف لم تُستورد
+Row {0},الصف {0}
+Rows whose photos did not attach,صفوف لم تُرفق صورها
+What usually comes next,ما يأتي عادةً بعد ذلك
+Start,ابدأ
+Spreadsheet,جدول بيانات
+CSV or Excel exported from anywhere.,ملف CSV أو Excel مُصدَّر من أي مكان.
+Most common,الأكثر شيوعًا
+"Pull products, variants and photos over.",انقل المنتجات والمتغيّرات والصور.
+Connect with your store URL and a key.,اتصل برابط متجرك ومفتاح.
+Paste a link and we keep it in sync.,الصق رابطًا وسنُبقيه متزامنًا.
+Instagram catalogue,كتالوج إنستغرام
+Bring across the products you tag in posts.,انقل المنتجات التي تضع عليها إشارة في منشوراتك.
+Type them in,اكتبها يدويًا
+Fine for a handful of products.,مناسب لعدد قليل من المنتجات.
+Where are your products right now?,أين منتجاتك الآن؟
+Pick the one closest to your setup. You can import again later from anywhere else.,اختر الأقرب إلى إعدادك. يمكنك الاستيراد مرة أخرى لاحقًا من أي مصدر آخر.
+Coming soon,قريبًا
+Not sure which one to pick?,لست متأكدًا أيها تختار؟
+"Export a CSV from your old store and choose Spreadsheet. Every platform can produce one, and it carries your prices and stock counts along.","صدّر ملف CSV من متجرك القديم واختر ""جدول بيانات"". كل المنصات تستطيع إنشاء هذا الملف، وهو يحمل أسعارك وكميات مخزونك."
+{0} rows read from {1},تمت قراءة {0} صفوف من {1}
+Could not read {0},تعذّرت قراءة {0}
+Upload your product file,ارفع ملف منتجاتك
+"CSV or Excel. Column names can be anything, we work them out next.",ملف CSV أو Excel. يمكن أن تكون أسماء الأعمدة أي شيء، وسنتعرّف عليها في الخطوة التالية.
+Download our template,تنزيل القالب الخاص بنا
+Drop your spreadsheet here,أفلت جدول البيانات هنا
+or,أو
+Browse files,تصفّح الملفات
+{0} rows,{0} صفوف
+{0} columns,{0} أعمدة
+Remove file,إزالة الملف
+Reading rows and checking your columns…,جارٍ قراءة الصفوف والتحقق من أعمدتك…
+Showing the first 3 of {0} rows.,عرض أول 3 من {0} صفوف.
+Starting from scratch?,تبدأ من الصفر؟
+"Download our template spreadsheet, fill it in, and drop it back here.",نزّل جدول البيانات النموذجي، واملأه، ثم أفلته هنا مجددًا.
+A few rows look odd,بعض الصفوف تبدو غريبة
+That is fine. We show you exactly which ones before anything is saved.,لا بأس. سنُريك أيها بالضبط قبل حفظ أي شيء.
+"Welcome, {0}",مرحبًا، {0}
+Almost there,أوشكنا على الانتهاء
+{0} is ready,{0} جاهز
+Your store is ready,متجرك جاهز
+"Creating your company, books and warehouse",جارٍ إنشاء شركتك ودفاترك المحاسبية ومستودعك
+Setting up,جارٍ الإعداد
+Setup failed,فشل الإعداد
+Could not load your setup,تعذّر تحميل إعدادك
+Store setup failed,فشل إعداد المتجر
+Setup is taking longer than usual,يستغرق الإعداد وقتًا أطول من المعتاد
+"It may still finish. Check again in a minute, or reload the page.",قد ينتهي رغم ذلك. تحقّق مرة أخرى بعد دقيقة، أو أعد تحميل الصفحة.
+Check again,تحقّق مرة أخرى
+Skip,تخطٍّ
+Shop,تسوّق
+Your logo,شعارك
+Logo,الشعار
+Remove logo,إزالة الشعار
+Use {0},استخدام {0}
+Only you can see it for now. Publish it from Home when you are ready.,لا يراه أحد غيرك الآن. انشره من الرئيسية عندما تكون جاهزًا.
+Go to Home,الانتقال إلى الرئيسية
+"Your store could not be set up. Retry it above, then come back here.",تعذّر إعداد متجرك. أعد المحاولة في الأعلى، ثم عد إلى هنا.
+Finishing setup,جارٍ إنهاء الإعداد
+Import from Shopify,الاستيراد من Shopify
+Import a CSV,استيراد ملف CSV
+Add a product,إضافة منتج
+Guest checkout,الدفع كزائر
+Standard accounts,الحسابات القياسية
+You can change the name once setup finishes.,يمكنك تغيير الاسم بعد انتهاء الإعداد.
+Required,مطلوب
+You sell,تبيع
+Search countries,ابحث في الدول
+Time zone,المنطقة الزمنية
+Chart of accounts,دليل الحسابات
+Year starts,تبدأ السنة في
+Country default,الافتراضي للدولة
+Short code,الرمز المختصر
+Your name,اسمك
+Password,كلمة المرور
+Shown on the product page.,يظهر في صفحة المنتج.
+Active,نشط
+Draft,مسودة
+Archived,مؤرشف
+Organisation,التنظيم
+Pricing,التسعير
+This product has variants. Price is set per variant below.,لهذا المنتج متغيّرات. يُحدَّد السعر لكل متغيّر أدناه.
+Cost,التكلفة
+Not shown to customers.,لا يظهر للعملاء.
+On hand per variant.,المتوفر فعليًا لكل متغيّر.
+Open in Inventory,فتح في المخزون
+No stock to track yet,لا يوجد مخزون لتتبعه بعد
+Stock appears once this product has variants.,يظهر المخزون بمجرد أن تكون لهذا المنتج متغيّرات.
+Storefront listing,العرض في واجهة المتجر
+Every option has its own page on the store. These are the live addresses.,لكل خيار صفحته الخاصة في المتجر. هذه هي العناوين المنشورة.
+Not published,غير منشور
+No option has a storefront address yet. One is generated when an option is first saved.,لا يوجد لأي خيار عنوان في واجهة المتجر بعد. يُنشأ العنوان عند حفظ الخيار أول مرة.
+At a glance,لمحة سريعة
+Available,متاح
+sold,مُباع
+orders,طلبات
+revenue,إيرادات
+{0} out of stock,{0} نفد من المخزون
+{0} running low,{0} أوشك على النفاد
+Received {0} across {1} sizes,تم استلام {0} عبر {1} مقاسات
+1 Material Receipt submitted.,تم اعتماد إيصال مواد واحد.
+{0} Material Receipts submitted.,تم اعتماد {0} إيصالات مواد.
+"Quantities are added to what is on hand, as a Material Receipt into the shop's warehouse. Leave the valuation rate blank to keep the item's own.",تُضاف الكميات إلى المتوفر فعليًا، كإيصال مواد إلى مستودع المتجر. اترك معدل التقييم فارغًا للإبقاء على معدل الصنف نفسه.
+{0} on hand,{0} متوفر فعليًا
+Qty,الكمية
+Valuation rate,معدل التقييم
+Receive {0},استلام {0}
+"Every remaining store setting, grouped as it appears in your books.",كل إعدادات المتجر المتبقية، مجمّعة كما تظهر في دفاترك المحاسبية.
+"These are setup values, not everyday settings",هذه قيم إعداد، وليست إعدادات يومية
+Changing one can break your storefront — edit only what you recognise.,تغيير أحدها قد يعطّل واجهة متجرك — لا تعدّل إلا ما تعرفه.
+Managed in Desk,تُدار في Desk
+"These are lists rather than single values, so they are still edited on the Commera Settings form.",هذه قوائم وليست قيمًا مفردة، لذا ما زالت تُعدَّل في نموذج إعدادات Commera.
+Demo data,البيانات التجريبية
+"Fills an empty store with a demo catalogue, menu, footer and banners so you can see how the storefront looks before you add your own products.",يملأ متجرًا فارغًا بكتالوج تجريبي وقائمة وتذييل ولافتات لترى شكل واجهة المتجر قبل أن تضيف منتجاتك.
+Commera settings,إعدادات Commera
+General,عام
+Emails,رسائل البريد الإلكتروني
+Translations,الترجمات
+Pickup locations,مواقع الاستلام
+Connections,الاتصالات
+Webhooks,ويب هوك
+A webhook is failing,أحد الويب هوك يفشل
+Frappe Cloud,Frappe Cloud
+Billing,الفوترة
+Domains,النطاقات
+Installed plugins,الإضافات المثبّتة
+Turn on as many providers as you like. Each keeps its own keys.,فعّل أي عدد تريده من المزوّدين. كل منهم يحتفظ بمفاتيحه الخاصة.
+Carriers this store books with. Each quotes its own rates at checkout.,شركات الشحن التي يحجز معها هذا المتجر. كل منها يعرض أسعاره الخاصة عند إتمام الطلب.
+Light,فاتح
+Dark,داكن
+System,النظام
+This store,هذا المتجر
+Track visits in Commera,تتبّع الزيارات في Commera
+Powers the Storefront report. Nothing leaves this site.,يغذّي تقرير واجهة المتجر. لا يغادر شيء هذا الموقع.
+Send events to GA4,إرسال الأحداث إلى GA4
+Measurement ID,معرّف القياس
+"Starts with G-. In GA4 it is under Admin, Data streams.",يبدأ بـ G-. تجده في GA4 ضمن Admin ثم Data streams.
+Property ID,معرّف الموقع
+"The numeric property, used to read reports back out of GA4.",رقم الموقع، ويُستخدم لقراءة التقارير من GA4.
+Service account JSON,ملف JSON لحساب الخدمة
+Send events to Meta,إرسال الأحداث إلى Meta
+Pixel ID,معرّف البكسل
+Access token,رمز الوصول
+The analytics and marketing services this store reports to.,خدمات التحليلات والتسويق التي يرسل إليها هذا المتجر.
+Hidden from your role,مخفي عن دورك
+These credentials are only visible to a System Manager.,لا تظهر بيانات الاعتماد هذه إلا لمدير النظام.
+"Taking payment at the door, and what it costs to offer it.",تحصيل المبلغ عند الباب، وتكلفة تقديم هذا الخيار.
+This could not be loaded,تعذّر تحميل هذا
+Cash on delivery may still be on — this panel just cannot say.,قد يكون الدفع عند الاستلام مُفعّلًا — هذه اللوحة لا تستطيع التأكد.
+Offer cash on delivery,تقديم الدفع عند الاستلام
+"When off, checkout stops offering it — placed orders are unaffected.",عند إيقافه، لا يُعرض عند إتمام الطلب — ولا تتأثر الطلبات المقدّمة.
+Added to the order when the fee applies.,يُضاف إلى الطلب عند تطبيق الرسوم.
+Charge below order value,الرسوم تحت قيمة الطلب
+"The fee applies under this total, so bigger baskets carry no COD charge. Leave both at zero to never charge for it.",تُطبَّق الرسوم تحت هذا الإجمالي، فلا تتحمل السلال الأكبر رسوم الدفع عند الاستلام. اترك القيمتين صفرًا لعدم فرض أي رسوم.
+Order value,قيمة الطلب
+Charge account,حساب الرسوم
+Where the COD and delivery charges post in your books.,الحساب الذي تُقيَّد فيه رسوم الدفع عند الاستلام ورسوم التوصيل في دفاترك.
+How shoppers check out.,طريقة إتمام المتسوقين لطلباتهم.
+Guest checkout may still be on. This panel just cannot say.,قد يكون الدفع كزائر مُفعّلًا. هذه اللوحة لا تستطيع التأكد.
+Allow guest checkout,السماح بالدفع كزائر
+"Off, and shoppers sign in with an emailed code before they pay. Past guest orders stay viewable.",عند إيقافه، يسجّل المتسوقون الدخول برمز يصلهم بالبريد الإلكتروني قبل الدفع. وتبقى طلبات الزوار السابقة قابلة للعرض.
+Order link shows full details for (days),يعرض رابط الطلب التفاصيل الكاملة لمدة (أيام)
+"The emailed order link shows the address and payment for this long, then only status and tracking. 0 means always.",يعرض رابط الطلب المرسل بالبريد الإلكتروني العنوان والدفع لهذه المدة، ثم الحالة والتتبع فقط. 0 يعني دائمًا.
+Order link days,أيام رابط الطلب
+Could not open Frappe Cloud settings.,تعذّر فتح إعدادات Frappe Cloud.
+Delivery option saved,تم حفظ طريقة التوصيل
+Delivery option added,تمت إضافة طريقة التوصيل
+Add a delivery option,إضافة طريقة توصيل
+"What shoppers pick at checkout, and what it costs them.",ما يختاره المتسوقون عند إتمام الطلب، وكم يكلّفهم.
+Name at checkout,الاسم عند إتمام الطلب
+"Orders are stored against this name, so it cannot be changed.",تُحفظ الطلبات بهذا الاسم، لذا لا يمكن تغييره.
+Standard delivery,التوصيل العادي
+What shoppers read beside the price. It cannot be changed later.,ما يقرؤه المتسوقون بجانب السعر. لا يمكن تغييره لاحقًا.
+Priced by shipping rule,مسعّرة حسب قاعدة الشحن
+Carrier rate,سعر شركة الشحن
++{0} handling,+{0} رسوم مناولة
+{0} fallback,{0} احتياطي
+{0} flat,{0} ثابت
+Own delivery,توصيل ذاتي
+Hidden at checkout,مخفية عند إتمام الطلب
+More actions for {0},إجراءات أخرى لـ {0}
+{0} is on,{0} مُفعّل
+{0} is off,{0} متوقف
+Delete {0}?,حذف {0}؟
+Shoppers stop being offered it at checkout. Orders already placed with it keep the name they were placed under.,لن يُعرض على المتسوقين عند إتمام الطلب. وتحتفظ الطلبات المقدّمة به بالاسم الذي قُدّمت به.
+{0} deleted,تم حذف {0}
+What shoppers pick at checkout.,ما يختاره المتسوقون عند إتمام الطلب.
+{0} of {1} on,{0} من {1} مُفعّلة
+Import from carrier,الاستيراد من شركة الشحن
+Add option,إضافة طريقة
+These could not be loaded,تعذّر تحميل هذه
+Shoppers are still offered whatever is stored — this panel just cannot say what.,ما زال المتسوقون يرون ما هو محفوظ — هذه اللوحة لا تستطيع معرفة ما هو.
+Checkout offers nothing to pick,لا يعرض إتمام الطلب أي خيار
+"There are no delivery options yet. Import the services a connected carrier sells, or add one of your own.",لا توجد طرق توصيل بعد. استورد الخدمات التي تبيعها شركة شحن متصلة، أو أضف طريقة خاصة بك.
+Order confirmation,تأكيد الطلب
+Sent when a customer places an order.,يُرسل عندما يقدّم العميل طلبًا.
+Order cancellation,إلغاء الطلب
+Sent when an order is cancelled.,يُرسل عند إلغاء الطلب.
+Back in stock,متوفر مجددًا
+Sent to customers waiting on a product when it is restocked.,يُرسل إلى العملاء المنتظرين لمنتج عند إعادة تخزينه.
+Templates,القوالب
+The template each store email is sent with.,القالب الذي تُرسل به كل رسالة من رسائل المتجر.
+Your emails still go out. This panel just cannot say which templates they use.,ما زالت رسائلك تُرسل. هذه اللوحة لا تستطيع معرفة القوالب التي تستخدمها.
+Company,الشركة
+"How your storefront names itself, and how customers reach you.",كيف تُعرّف واجهة متجرك نفسها، وكيف يتواصل معك العملاء.
+Shown across your storefront and in the browser tab.,يظهر في واجهة متجرك وفي علامة تبويب المتصفح.
+Contact email,البريد الإلكتروني للتواصل
+"Where customers reach you, and who order mail comes from.",حيث يتواصل معك العملاء، والعنوان الذي تُرسل منه رسائل الطلبات.
+Contact phone,هاتف التواصل
+Working hours,ساعات العمل
+Shown alongside your contact details.,تظهر بجانب بيانات التواصل.
+Orders are booked against this company. Its details are edited on the company record.,تُسجَّل الطلبات باسم هذه الشركة. تُعدَّل بياناتها في سجل الشركة.
+Open company record,فتح سجل الشركة
+Store company,شركة المتجر
+No company is set for this store yet,لم تُحدَّد شركة لهذا المتجر بعد
+Pick one above and orders will book against it.,اختر واحدة في الأعلى وستُسجَّل الطلبات باسمها.
+Registered name,الاسم المسجّل
+Registered address,العنوان المسجّل
+No address on the company record,لا يوجد عنوان في سجل الشركة
+Tax ID,الرقم الضريبي
+"Printed on invoices. Tax rates themselves are set by your books, not here.",يُطبع على الفواتير. أما نسب الضرائب نفسها فتُحدَّد في دفاترك، لا هنا.
+Not set,غير محدد
+Financial year,السنة المالية
+None covers today,لا توجد سنة تشمل اليوم
+1 delivery option imported,تم استيراد طريقة توصيل واحدة
+{0} delivery options imported,تم استيراد {0} طرق توصيل
+Import from {0},الاستيراد من {0}
+These services could not be read from the carrier.,تعذّرت قراءة هذه الخدمات من شركة الشحن.
+No services to import,لا توجد خدمات للاستيراد
+This carrier is not offering any services on the account it is connected with.,لا تقدّم شركة الشحن هذه أي خدمات على الحساب المتصل بها.
+Pick what shoppers should be offered at checkout. Each becomes a delivery option you can rename the price rules on afterwards.,اختر ما يُعرض على المتسوقين عند إتمام الطلب. تصبح كل خدمة طريقة توصيل يمكنك لاحقًا إعادة تسمية قواعد سعرها.
+Fallback price,السعر الاحتياطي
+Charged when the carrier gives no quote. Leave at 0 only if you will set a shipping rule on each option.,يُفرض عندما لا تعطي شركة الشحن سعرًا. اتركه 0 فقط إذا كنت ستضع قاعدة شحن لكل طريقة.
+Import {0},استيراد {0}
+Import,استيراد
+Keys missing,المفاتيح ناقصة
+Not installed,غير مثبّت
+Add keys,إضافة المفاتيح
+Webhook URL copied,تم نسخ رابط الويب هوك
+Could not copy the webhook URL,تعذّر نسخ رابط الويب هوك
+Enabled,مُفعّل
+Offered to customers at checkout.,يُعرض على العملاء عند إتمام الطلب.
+{0} still needed,{0} ما زال مطلوبًا
+Paste this into the provider's dashboard so it can report status back to this store.,الصق هذا في لوحة تحكم المزوّد ليتمكن من إرسال الحالة إلى هذا المتجر.
+Provider documentation,وثائق المزوّد
+1 needs keys,واحد يحتاج إلى مفاتيح
+{0} need keys,{0} تحتاج إلى مفاتيح
+These could not be loaded.,تعذّر تحميل هذه.
+No integrations available,لا توجد تكاملات متاحة
+Install a payments or delivery app to see it here.,ثبّت تطبيقًا للمدفوعات أو التوصيل ليظهر هنا.
+Store pickup is on,الاستلام من المتجر مُفعّل
+Store pickup is off,الاستلام من المتجر متوقف
+Pickup allowed at {0},الاستلام مسموح في {0}
+Pickup stopped at {0},أُوقف الاستلام في {0}
+Pickup address saved,تم حفظ عنوان الاستلام
+Pickup address added,تمت إضافة عنوان الاستلام
+"Your warehouses, and where shoppers can collect their order.",مستودعاتك، والأماكن التي يمكن للمتسوقين استلام طلباتهم منها.
+Checkout still offers whatever is stored — this panel just cannot say what.,ما زال إتمام الطلب يعرض ما هو محفوظ — هذه اللوحة لا تستطيع معرفة ما هو.
+Store pickup,الاستلام من المتجر
+Let shoppers collect their order from a warehouse instead of having it delivered.,اسمح للمتسوقين باستلام طلباتهم من مستودع بدلًا من توصيلها.
+No warehouses yet,لا توجد مستودعات بعد
+"Add a warehouse in your books, and it shows up here.",أضف مستودعًا في دفاترك، وسيظهر هنا.
+Online orders,الطلبات عبر الإنترنت
+No map pin,لا يوجد دبوس على الخريطة
+Needs an address — hidden at checkout,يحتاج إلى عنوان — مخفي عند إتمام الطلب
+Pinned near {0}. Drag the pin if it is off.,الدبوس قرب {0}. اسحبه إن لم يكن في مكانه.
+"Location access is blocked. Allow it in your browser, or click the map.",الوصول إلى الموقع محظور. اسمح به في متصفحك، أو انقر على الخريطة.
+Your location could not be found. Click the map to place the pin.,تعذّر العثور على موقعك. انقر على الخريطة لوضع الدبوس.
+Pickup address,عنوان الاستلام
+What shoppers read when they pick where to collect.,ما يقرؤه المتسوقون عند اختيار مكان الاستلام.
+Address line 1,سطر العنوان 1
+Address line 2,سطر العنوان 2
+Location on the map,الموقع على الخريطة
+Use my current location,استخدام موقعي الحالي
+No pin yet — click the map to place one,لا يوجد دبوس بعد — انقر على الخريطة لوضع واحد
+Looking up the address…,جارٍ البحث عن العنوان…
+Pinned at your current location. Drag the pin if it is off.,الدبوس في موقعك الحالي. اسحبه إن لم يكن في مكانه.
+That address is not on the map. Click the map to place the pin.,هذا العنوان غير موجود على الخريطة. انقر على الخريطة لوضع الدبوس.
+Drag the pin to adjust it.,اسحب الدبوس لضبطه.
+Fill in the address and the pin is placed for you.,املأ العنوان وسيُوضع الدبوس تلقائيًا.
+Remove pin,إزالة الدبوس
+Not the right place?,ليس المكان الصحيح؟
+Added by {0}.,أضافته {0}.
+These settings could not be loaded,تعذّر تحميل هذه الإعدادات
+{0} may still be set up. This tab just cannot say.,قد تكون {0} مُعدّة. هذا التبويب لا يستطيع التأكد.
+Failed,فشل
+1 addition to the dashboard,إضافة واحدة إلى لوحة التحكم
+{0} additions to the dashboard,{0} إضافات إلى لوحة التحكم
+{0} now runs on your storefront,{0} تعمل الآن في واجهة متجرك
+{0} is off your storefront,{0} متوقفة في واجهة متجرك
+"Plugins installed alongside Commera, and what they add to it.",الإضافات المثبّتة مع Commera، وما تضيفه إليه.
+Installed plugins are only listed for a System Manager.,لا تُعرض الإضافات المثبّتة إلا لمدير النظام.
+Plugins could not be loaded,تعذّر تحميل الإضافات
+No plugins installed,لا توجد إضافات مثبّتة
+Plugins built for Commera show up here once they are installed on this site.,تظهر هنا الإضافات المصممة لـ Commera بمجرد تثبيتها على هذا الموقع.
+{0} not loaded,لم تُحمَّل {0}
+{0} failed,فشلت {0}
+Version {0},الإصدار {0}
+Run on the storefront,التشغيل في واجهة المتجر
+"This plugin adds scripts or blocks to your store pages, such as a popup or a banner. They load only while this is on.",تضيف هذه الإضافة نصوصًا برمجية أو كتلًا إلى صفحات متجرك، مثل نافذة منبثقة أو لافتة. لا تُحمَّل إلا ما دام هذا مُفعّلًا.
+What it adds,ما تضيفه
+Nothing on the dashboard. It may still listen to orders.,لا شيء في لوحة التحكم. قد تظل تستمع إلى الطلبات.
+Recent deliveries,آخر الإرسالات
+"Each time an order changes, Commera tells the plugin. A failed send can be retried.",في كل مرة يتغيّر فيها طلب، يُبلغ Commera الإضافة. ويمكن إعادة محاولة الإرسال الفاشل.
+Nothing failed,لم يفشل شيء
+No deliveries yet,لا توجد إرسالات بعد
+Every order update reached this plugin.,وصل كل تحديث للطلبات إلى هذه الإضافة.
+This plugin has not been sent an order update.,لم يُرسل إلى هذه الإضافة أي تحديث للطلبات.
+Pick a collection,اختر مجموعة
+Nothing uploaded,لم يُرفع شيء
+Stored. Leave blank to keep it.,محفوظ. اتركه فارغًا للإبقاء عليه.
+"Stored encrypted, never shown again.",يُحفظ مشفّرًا، ولا يُعرض مرة أخرى.
+Links to {0}.,يرتبط بـ {0}.
+Search {0},ابحث في {0}
+Pick products,اختر المنتجات
+Clear All,مسح الكل
+Any option,أي طريقة
+Off at checkout,متوقفة عند إتمام الطلب
+Each band has to start below where it ends.,يجب أن تبدأ كل شريحة قبل أن تنتهي.
+Only one band can be left open-ended.,لا يمكن ترك إلا شريحة واحدة مفتوحة النهاية.
+{0} and {1} overlap.,{0} و{1} متداخلتان.
+Band saved,تم حفظ الشريحة
+Band removed,تمت إزالة الشريحة
+"For every order, delivery is free",لكل الطلبات، التوصيل مجاني
+"For every order, delivery costs {0}",لكل الطلبات، تكلفة التوصيل {0}
+"For orders {0} and above, delivery is free",للطلبات من {0} فأكثر، التوصيل مجاني
+"For orders {0} and above, delivery costs {1}",للطلبات من {0} فأكثر، تكلفة التوصيل {1}
+"For orders {0} to {1}, delivery is free",للطلبات من {0} إلى {1}، التوصيل مجاني
+"For orders {0} to {1}, delivery costs {2}",للطلبات من {0} إلى {1}، تكلفة التوصيل {2}
+Shipping rule saved,تم حفظ قاعدة الشحن
+Shipping rule added,تمت إضافة قاعدة الشحن
+Add a shipping rule,إضافة قاعدة شحن
+Checkout charges the band the order total falls in.,يحتسب إتمام الطلب الشريحة التي يقع فيها إجمالي الطلب.
+Standard shipping,الشحن العادي
+Only you see it. It cannot be changed later.,لا يراه أحد غيرك. لا يمكن تغييره لاحقًا.
+Used at checkout,مُستخدمة عند إتمام الطلب
+"Checkout charges these bands. To stop, pick another rule for checkout.",يحتسب إتمام الطلب هذه الشرائح. لإيقافها، اختر قاعدة أخرى لإتمام الطلب.
+In use,قيد الاستخدام
+Use at checkout,استخدام عند إتمام الطلب
+"On, and checkout charges these bands instead of the rule it uses now.",عند التفعيل، يحتسب إتمام الطلب هذه الشرائح بدلًا من القاعدة المستخدمة حاليًا.
+Bands,الشرائح
+Remove band,إزالة الشريحة
+From ({0}),من ({0})
+To ({0}),إلى ({0})
+No limit,بلا حد
+Charge ({0}),الرسوم ({0})
+0 for free delivery,0 للتوصيل المجاني
+Search delivery options,ابحث في طرق التوصيل
+No bands yet. Add one for each range of order totals you charge differently.,لا توجد شرائح بعد. أضف شريحة لكل نطاق من إجماليات الطلب تختلف رسومه.
+Add band,إضافة شريحة
+No bands yet,لا توجد شرائح بعد
+Checkout uses this rule,إتمام الطلب يستخدم هذه القاعدة
+Checkout now uses {0},إتمام الطلب يستخدم الآن {0}
+Its bands go with it. Orders already placed keep the shipping they were charged.,تنتقل شرائحها معها. وتحتفظ الطلبات المقدّمة برسوم الشحن التي احتُسبت عليها.
+Shipping rules,قواعد الشحن
+The order-value bands checkout charges. Options with no matching band use their carrier rate or Backup Charge.,شرائح قيمة الطلب التي يحتسبها إتمام الطلب. الطرق التي لا تطابقها أي شريحة تستخدم سعر شركة الشحن أو الرسوم الاحتياطية.
+Add rule,إضافة قاعدة
+Shipping rules could not be loaded,تعذّر تحميل قواعد الشحن
+Checkout still charges whatever is stored — this panel just cannot say what.,ما زال إتمام الطلب يحتسب ما هو محفوظ — هذه اللوحة لا تستطيع معرفة ما هو.
+No shipping rules yet,لا توجد قواعد شحن بعد
+"Add one to charge shipping by order value, per delivery option or for any of them.",أضف قاعدة لاحتساب الشحن حسب قيمة الطلب، لكل طريقة توصيل أو لجميعها.
+"Download a language as a CSV file, translate it, and upload it back.",نزّل لغة كملف CSV، وترجمها، ثم ارفعها مجددًا.
+No language to translate into,لا توجد لغة للترجمة إليها
+Add a storefront language besides your default one first.,أضف لغة لواجهة المتجر غير لغتك الافتراضية أولًا.
+The language the file holds.,اللغة التي يحتويها الملف.
+Export,تصدير
+"Every translatable field, with its default and translated content.",كل حقل قابل للترجمة، بمحتواه الافتراضي والمترجم.
+Export CSV,تصدير CSV
+Rows with empty translated content leave the translation as it is.,الصفوف التي محتواها المترجم فارغ تُبقي الترجمة كما هي.
+Import CSV,استيراد CSV
+Add webhook,إضافة ويب هوك
+Endpoint URL,رابط نقطة النهاية
+Commera posts each event here as JSON.,يرسل Commera كل حدث إلى هنا بصيغة JSON.
+Events,الأحداث
+Logs,السجلات
+1 event has not arrived,لم يصل حدث واحد
+{0} events have not arrived,لم تصل {0} أحداث
+with an error,مع خطأ
+Webhook turned on,تم تفعيل الويب هوك
+Webhook turned off,تم إيقاف الويب هوك
+Choose at least one event.,اختر حدثًا واحدًا على الأقل.
+1 event queued to retry,حدث واحد في قائمة إعادة المحاولة
+{0} events queued to retry,{0} أحداث في قائمة إعادة المحاولة
+no answer,لا استجابة
+Test event sent: {0},تم إرسال حدث تجريبي: {0}
+Test event failed: {0}. It will retry.,فشل الحدث التجريبي: {0}. ستُعاد المحاولة.
+Test event failed: {0},فشل الحدث التجريبي: {0}
+Rotate the signing secret?,تغيير سر التوقيع؟
+"Requests are signed with the new secret straight away. Update the receiving app first, or it will reject every event until you do.",تُوقَّع الطلبات بالسر الجديد فورًا. حدّث التطبيق المستقبِل أولًا، وإلا فسيرفض كل حدث حتى تفعل.
+Rotate secret,تغيير السر
+Secret rotated,تم تغيير السر
+Delete the webhook to {0}?,حذف الويب هوك إلى {0}؟
+Commera stops sending events to this URL. Events that are waiting to retry are dropped.,يتوقف Commera عن إرسال الأحداث إلى هذا الرابط. وتُلغى الأحداث المنتظرة لإعادة المحاولة.
+Delete webhook,حذف الويب هوك
+Webhook deleted,تم حذف الويب هوك
+Send test event,إرسال حدث تجريبي
+Back to webhooks,العودة إلى الويب هوك
+Send test,إرسال تجربة
+This webhook could not be opened,تعذّر فتح هذا الويب هوك
+It may have been deleted.,ربما تم حذفه.
+Copy the signing secret into the receiving app,انسخ سر التوقيع إلى التطبيق المستقبِل
+It checks the X-Commera-Hmac-Sha256 header with this secret before it trusts an event.,يتحقق من الترويسة X-Commera-Hmac-Sha256 بهذا السر قبل أن يثق بأي حدث.
+Commera turned this webhook off,أوقف Commera هذا الويب هوك
+"{0} attempts failed within 24 hours. The endpoint last answered {1}. Events since {2} were not sent. Fix the endpoint, then turn the webhook back on.",فشلت {0} محاولات خلال 24 ساعة. كانت آخر استجابة لنقطة النهاية {1}. لم تُرسل الأحداث منذ {2}. أصلح نقطة النهاية، ثم أعد تفعيل الويب هوك.
+Turn back on,إعادة التفعيل
+The endpoint answered {0}. {1} of {2} attempts failed in the last 24 hours. After {2} failed attempts it will automatically be turned off.,استجابت نقطة النهاية بـ {0}. فشلت {1} من {2} محاولات خلال آخر 24 ساعة. بعد {2} محاولات فاشلة سيُوقف تلقائيًا.
+Retry now,إعادة المحاولة الآن
+Send events,إرسال الأحداث
+"While off, Commera does not record or send events for this webhook. It turns a webhook off itself after {0} failed attempts within 24 hours.",أثناء الإيقاف، لا يسجّل Commera الأحداث ولا يرسلها لهذا الويب هوك. ويوقف Commera الويب هوك بنفسه بعد {0} محاولات فاشلة خلال 24 ساعة.
+Webhook sections,أقسام الويب هوك
+Select all,تحديد الكل
+Last sent {0},آخر إرسال {0}
+Nothing sent yet,لم يُرسل شيء بعد
+1 event,حدث واحد
+{0} events,{0} أحداث
+"Send store events to another app, such as a headless storefront that refreshes its pages when a product changes.",أرسل أحداث المتجر إلى تطبيق آخر، مثل واجهة متجر منفصلة (headless) تحدّث صفحاتها عند تغيّر منتج.
+Webhooks are only listed for a role that can read them.,لا تُعرض الويب هوك إلا لدور يمكنه قراءتها.
+"Each request is signed with the webhook's secret. Failed deliveries retry after 1, 5, 30, 120 and 360 minutes. After 10 failed attempts within 24 hours, Commera turns the webhook off.",يُوقَّع كل طلب بسر الويب هوك. يُعاد إرسال الطلبات الفاشلة بعد 1 و5 و30 و120 و360 دقيقة. وبعد 10 محاولات فاشلة خلال 24 ساعة، يوقف Commera الويب هوك.
+No webhooks yet,لا يوجد ويب هوك بعد
+"Add one to tell a headless storefront or another app when products, stock or orders change.",أضف واحدًا لإبلاغ واجهة متجر منفصلة (headless) أو تطبيق آخر عند تغيّر المنتجات أو المخزون أو الطلبات.
+Body copied,تم نسخ المحتوى
+Log,السجل
+Response code,رمز الاستجابة
+Attempts,المحاولات
+Sent,أُرسل
+Commera tries again {0}.,سيحاول Commera مرة أخرى {0}.
+Commera has stopped retrying this event.,توقف Commera عن إعادة محاولة إرسال هذا الحدث.
+Headers,الترويسات
+Body,المحتوى
+Replay,إعادة الإرسال
+Replay {0}?,إعادة إرسال {0}؟
+"Commera sends this event to {0} again, with the same body and event id. A receiver that skips event ids it has already handled will ignore it.",يرسل Commera هذا الحدث إلى {0} مرة أخرى، بالمحتوى ومعرّف الحدث نفسيهما. والمستقبِل الذي يتخطى معرّفات الأحداث التي عالجها سيتجاهله.
+Replayed to {0},أُعيد الإرسال إلى {0}
+Replay to {0} failed: {1}. It will retry.,فشلت إعادة الإرسال إلى {0}: {1}. ستُعاد المحاولة.
+Replay to {0} failed: {1},فشلت إعادة الإرسال إلى {0}: {1}
+Logs show here when a subscribed event is sent. Send a test event to check the endpoint now.,تظهر السجلات هنا عند إرسال حدث مشترك فيه. أرسل حدثًا تجريبيًا للتحقق من نقطة النهاية الآن.
+Secret copied,تم نسخ السر
+Signing secret,سر التوقيع
+Hide secret,إخفاء السر
+Show secret,إظهار السر
+Copy secret,نسخ السر
+"Publish the options under ""{0}""?","نشر الخيارات ضمن ""{0}""؟"
+"Take the options under ""{0}"" off the storefront?","إزالة الخيارات ضمن ""{0}"" من واجهة المتجر؟"
+1 option will go live on your storefront.,سيُنشر خيار واحد في واجهة متجرك.
+{0} options will go live on your storefront.,سيُنشر {0} خيارات في واجهة متجرك.
+None of these options can go live yet.,لا يمكن نشر أي من هذه الخيارات بعد.
+1 option will come off your storefront. It stays in your catalogue.,سيُزال خيار واحد من واجهة متجرك. ويبقى في كتالوجك.
+{0} options will come off your storefront. They stay in your catalogue.,ستُزال {0} خيارات من واجهة متجرك. وتبقى في كتالوجك.
+None of these options are on your storefront right now.,لا يوجد أي من هذه الخيارات في واجهة متجرك حاليًا.
+"1 option is missing images or sizes, so it cannot go live yet and is left as it is.",ينقص خيارًا واحدًا صور أو مقاسات، لذا لا يمكن نشره بعد ويُترك كما هو.
+"{0} options are missing images or sizes, so they cannot go live yet and are left as they are.",تنقص {0} خيارات صور أو مقاسات، لذا لا يمكن نشرها بعد وتُترك كما هي.
+Nothing to publish,لا شيء للنشر
+Nothing to take off,لا شيء للإزالة
+Publish 1 option,نشر خيار واحد
+Publish {0} options,نشر {0} خيارات
+Take 1 option off,إزالة خيار واحد
+Take {0} options off,إزالة {0} خيارات
+Coming off,ستُزال
+Already off,مُزالة بالفعل
+Already live,منشورة بالفعل
+Going live,ستُنشر
+1 option live on your storefront,خيار واحد منشور في واجهة متجرك
+{0} options live on your storefront,{0} خيارات منشورة في واجهة متجرك
+1 option taken off your storefront,أُزيل خيار واحد من واجهة متجرك
+{0} options taken off your storefront,أُزيلت {0} خيارات من واجهة متجرك
+"An option is one colour of a product, with a page of its own. The menu entry itself is not touched — this only changes what shoppers can buy.",الخيار هو لون واحد من منتج، وله صفحته الخاصة. لا يتغيّر عنصر القائمة نفسه — هذا يغيّر فقط ما يمكن للمتسوقين شراؤه.
+Search these options,ابحث في هذه الخيارات
+Could not list these options.,تعذّر عرض هذه الخيارات.
+No options under this entry match.,لا توجد خيارات ضمن هذا العنصر تطابق البحث.
+Resize {0},تغيير حجم {0}
+Show {0},إظهار {0}
+Moved to {0},نُقل إلى {0}
+Add a footer column,إضافة عمود للتذييل
+Column title,عنوان العمود
+Help,المساعدة
+Column added,تمت إضافة العمود
+Rename column,إعادة تسمية العمود
+Rename,إعادة التسمية
+Column renamed,تمت إعادة تسمية العمود
+"Delete ""{0}""?","حذف ""{0}""؟"
+The 1 link in this column goes with it. Pages are not deleted.,يُحذف الرابط الوحيد في هذا العمود معه. لا تُحذف الصفحات.
+The {0} links in this column go with it. Pages are not deleted.,تُحذف الروابط الـ {0} في هذا العمود معه. لا تُحذف الصفحات.
+Pages are not deleted — only this footer column.,لا تُحذف الصفحات — فقط عمود التذييل هذا.
+Delete column,حذف العمود
+Column deleted,تم حذف العمود
+"Remove ""{0}""?","إزالة ""{0}""؟"
+The page it points at is not deleted — only this footer link.,لا تُحذف الصفحة التي يشير إليها — فقط رابط التذييل هذا.
+Remove link,إزالة الرابط
+Link removed,تمت إزالة الرابط
+Move left,نقل لليسار
+Move right,نقل لليمين
+Hide from footer,إخفاء من التذييل
+Show in footer,إظهار في التذييل
+Danger,إجراءات خطرة
+Move up,نقل لأعلى
+Move down,نقل لأسفل
+Move to previous column,نقل إلى العمود السابق
+Move to next column,نقل إلى العمود التالي
+Could not load your footer,تعذّر تحميل التذييل
+No footer columns yet,لا توجد أعمدة في التذييل بعد
+"Add a column, then fill it with links to your pages.",أضف عمودًا، ثم املأه بروابط لصفحاتك.
+Add a link,إضافة رابط
+Add a link to this column,إضافة رابط إلى هذا العمود
+Column actions,إجراءات العمود
+Link actions,إجراءات الرابط
+Custom URL,رابط مخصص
+Existing page,صفحة موجودة
+Link saved,تم حفظ الرابط
+Link added,تمت إضافة الرابط
+Edit link,تعديل الرابط
+In the {0} column.,في عمود {0}.
+Link source,مصدر الرابط
+Pick a page to fill the label and address in for you.,اختر صفحة لتعبئة التسمية والعنوان تلقائيًا.
+Page,الصفحة
+Search pages,ابحث في الصفحات
+Label,التسمية
+URL,الرابط
+Where this link sends shoppers.,المكان الذي يرسل إليه هذا الرابط المتسوقين.
+Fit,ملاءمة
+Desktop,سطح المكتب
+Mobile,الجوال
+Preview zoom,تكبير المعاينة
+Restore panels,استعادة اللوحات
+Maximise preview,تكبير المعاينة إلى أقصى حد
+The preview could not be updated. Your changes are kept.,تعذّر تحديث المعاينة. تغييراتك محفوظة.
+Storefront preview,معاينة واجهة المتجر
+Updating preview,جارٍ تحديث المعاينة
+Other,أخرى
+Back to sections,العودة إلى الأقسام
+Duplicate,تكرار
+Sections,الأقسام
+Add section to {0},إضافة قسم إلى {0}
+Add block to {0},إضافة كتلة إلى {0}
+Hide {0},إخفاء {0}
+{0} actions,إجراءات {0}
+Pick up to {0}.,اختر حتى {0}.
+Back to {0},العودة إلى {0}
+Show section,إظهار القسم
+Hide section,إخفاء القسم
+Remove block,إزالة الكتلة
+Remove section,إزالة القسم
+In {0},في {0}
+Hidden. It stays in the layout but the store does not show it.,مخفي. يبقى في التخطيط لكن المتجر لا يعرضه.
+This section has no settings of its own. Add a {0} with the + on its row in the list.,لا توجد إعدادات خاصة بهذا القسم. أضف {0} بالزر + في صفه في القائمة.
+This block has no settings. Drag it in the list to move it.,لا توجد إعدادات لهذه الكتلة. اسحبها في القائمة لنقلها.
+This section has no settings. Drag it in the list to move it.,لا توجد إعدادات لهذا القسم. اسحبه في القائمة لنقله.
+Select a section,اختر قسمًا
+Click it in the preview or in the list to change its settings.,انقر عليه في المعاينة أو في القائمة لتغيير إعداداته.
+Nothing — heading only,لا شيء — عنوان فقط
+Item groups,مجموعات الأصناف
+Menu entry saved,تم حفظ عنصر القائمة
+Pick an entry to edit it,اختر عنصرًا لتعديله
+"Drag entries to reorder them, or drop one onto another to nest it.",اسحب العناصر لإعادة ترتيبها، أو أفلت عنصرًا على آخر لتضمينه فيه.
+Menu label,تسمية القائمة
+URL slug,المعرّف في الرابط (slug)
+Used in the storefront address for this section.,يُستخدم في عنوان واجهة المتجر لهذا القسم.
+Optional. Top-level sections need one; entries below them do not.,اختياري. الأقسام في المستوى الأعلى تحتاج إليه؛ والعناصر تحتها لا تحتاج إليه.
+Links to,يرتبط بـ
+Leave as a heading to show a label that is not clickable.,اتركه عنوانًا لعرض تسمية غير قابلة للنقر.
+Products from every group listed here appear together under this entry.,تظهر منتجات كل مجموعة مدرجة هنا معًا ضمن هذا العنصر.
+Search item groups,ابحث في مجموعات الأصناف
+Search brands,ابحث في العلامات التجارية
+Where this entry sends shoppers.,المكان الذي يرسل إليه هذا العنصر المتسوقين.
+Icon,الأيقونة
+Optional icon name or CSS class.,اسم أيقونة أو فئة CSS اختياري.
+Shown under the title on the collection page.,يظهر تحت العنوان في صفحة المجموعة.
+Search engine listing,الظهور في محركات البحث
+Page title,عنوان الصفحة
+Defaults to the menu label and your store name.,الافتراضي هو تسمية القائمة واسم متجرك.
+Shown under the title in search results.,يظهر تحت العنوان في نتائج البحث.
+Hide from search engines,إخفاء من محركات البحث
+Asks crawlers not to list this page.,يطلب من برامج الزحف عدم إدراج هذه الصفحة.
+Add an entry inside,إضافة عنصر بداخله
+Add a menu section,إضافة قسم للقائمة
+Shoes,أحذية
+Menu entry added,تمت إضافة عنصر القائمة
+1 group,مجموعة واحدة
+{0} groups,{0} مجموعات
+Build the menu from item groups,بناء القائمة من مجموعات الأصناف
+"Entries will be added inside ""{0}"".","ستُضاف العناصر داخل ""{0}""."
+Entries will be added as new top-level sections.,ستُضاف العناصر كأقسام جديدة في المستوى الأعلى.
+Item group,مجموعة الأصناف
+"The group and everything under it, as far as the menu depth allows.",المجموعة وكل ما تحتها، بقدر ما يسمح عمق القائمة.
+Added 1 menu entry,تمت إضافة عنصر واحد إلى القائمة
+Added {0} menu entries,تمت إضافة {0} عناصر إلى القائمة
+Nothing new to add,لا جديد لإضافته
+This also removes 1 entry nested inside it. Products are not deleted.,يزيل هذا أيضًا عنصرًا واحدًا متداخلًا بداخله. لا تُحذف المنتجات.
+This also removes {0} entries nested inside it. Products are not deleted.,يزيل هذا أيضًا {0} عناصر متداخلة بداخله. لا تُحذف المنتجات.
+Products are not deleted — only this menu entry.,لا تُحذف المنتجات — فقط عنصر القائمة هذا.
+Menu entry deleted,تم حذف عنصر القائمة
+Delete the whole menu?,حذف القائمة بأكملها؟
+All {0} entries are removed and shoppers lose the navigation until you build it again. Products are not deleted.,تُزال العناصر الـ {0} كلها ويفقد المتسوقون التنقل حتى تبنيه مجددًا. لا تُحذف المنتجات.
+Delete everything,حذف كل شيء
+Menu cleared,تم مسح القائمة
+Add entry inside,إضافة عنصر بداخله
+Hide from menu,إخفاء من القائمة
+Show in menu,إظهار في القائمة
+Products under this entry,المنتجات ضمن هذا العنصر
+Publish to the storefront,نشر في واجهة المتجر
+Take off the storefront,إزالة من واجهة المتجر
+Import from item groups,الاستيراد من مجموعات الأصناف
+Delete whole menu,حذف القائمة بأكملها
+Menu actions,إجراءات القائمة
+Could not load your menu,تعذّر تحميل قائمتك
+No menu yet,لا توجد قائمة بعد
+"Add a section, or build one from your item groups.",أضف قسمًا، أو ابنِ قائمة من مجموعات الأصناف.
+Entry actions,إجراءات العنصر
+Publish a product to see this layout with real content.,انشر منتجًا لترى هذا التخطيط بمحتوى حقيقي.
+Go to products,الانتقال إلى المنتجات
+"Search, or type any term",ابحث، أو اكتب أي كلمة
+Publish a product to see search results here.,انشر منتجًا لترى نتائج البحث هنا.
+Search collections,ابحث في المجموعات
+No collections yet,لا توجد مجموعات بعد
+Every product is still listed under All products.,"كل منتج ما زال مدرجًا ضمن ""كل المنتجات""."
+Go to collections,الانتقال إلى المجموعات
+No pages yet,لا توجد صفحات بعد
+Publish a page to see this layout with real content.,انشر صفحة لترى هذا التخطيط بمحتوى حقيقي.
+Create a page,إنشاء صفحة
+Preview with {0},المعاينة مع {0}
+Preview with,المعاينة مع
+No matches,لا توجد نتائج مطابقة
+Show more,عرض المزيد
+Desktop and mobile,سطح المكتب والجوال
+More preview options,مزيد من خيارات المعاينة
+Device,الجهاز
+Preview language,لغة المعاينة
+Built with sections · {0},مبني بالأقسام · {0}
+Customize {0},تخصيص {0}
+Classic,كلاسيكي
+Switch Theme,تغيير القالب
+Theme settings,إعدادات القالب
+Close theme settings,إغلاق إعدادات القالب
+Activate {0} to change its settings.,فعّل {0} لتغيير إعداداته.
+This theme ships no settings of its own.,لا يأتي هذا القالب بإعدادات خاصة به.
+1 product,منتج واحد
+There are no collections yet — create one first.,لا توجد مجموعات بعد — أنشئ واحدة أولًا.
+File {0} under a collection,وضع {0} ضمن مجموعة
+"A product sits in one collection, so this replaces the one it is in now.",يكون المنتج في مجموعة واحدة، لذا يحل هذا محل المجموعة التي هو فيها الآن.
+Move,نقل
+{0} moved to {1},نُقل {0} إلى {1}
+Replace this store with demo data?,استبدال هذا المتجر ببيانات تجريبية؟
+"It seeds a full demo catalogue, and overwrites your homepage, footer, store currency and payment accounts. Run it on a store you have not set up yet.",يضيف كتالوجًا تجريبيًا كاملًا، ويستبدل صفحتك الرئيسية والتذييل وعملة المتجر وحسابات الدفع. شغّله على متجر لم تُعدّه بعد.
+Demo data queued,البيانات التجريبية في قائمة الانتظار
+It runs in the background and takes a few minutes.,يعمل في الخلفية ويستغرق بضع دقائق.
+Amount off products,خصم على المنتجات
+"A percentage or amount off chosen products, collections or brands.",نسبة مئوية أو مبلغ يُخصم من منتجات أو مجموعات أو علامات تجارية مختارة.
+Amount off order,خصم على الطلب
+"Off the order subtotal, with optional spend tiers and a cap.",يُخصم من المجموع الفرعي للطلب، مع مستويات إنفاق وسقف اختياريين.
+Buy X get Y,اشترِ X واحصل على Y
+"Buy a quantity or amount of some products, get others free or cheaper.",اشترِ كمية أو مبلغًا من منتجات معيّنة، واحصل على أخرى مجانًا أو بسعر أقل.
+Free shipping,شحن مجاني
+"Free or cheaper delivery above a spend, on chosen delivery options.",توصيل مجاني أو أرخص فوق مبلغ إنفاق معيّن، على طرق توصيل مختارة.
+Untitled discount,خصم بلا عنوان
+{0} unique codes,{0} رموز فريدة
+No code yet,لا يوجد رمز بعد
+Brands,العلامات التجارية
+Free delivery,توصيل مجاني
+{0}% off delivery,خصم {0}% على التوصيل
+{0}+ gets {1},{0}+ يحصل على {1}
+"{0} off the order, up to {1}",{0} خصم على الطلب، حتى {1}
+"{0} off products, up to {1}",{0} خصم على المنتجات، حتى {1}
+{0} off the order,{0} خصم على الطلب
+{0} off products,{0} خصم على المنتجات
+"Buy {0}, get {1} free",اشترِ {0}، واحصل على {1} مجانًا
+"Buy {0}, get {1} {2}% off",اشترِ {0}، واحصل على {1} بخصم {2}%
+"Buy {0}, get {1} {2} off each",اشترِ {0}، واحصل على {1} بخصم {2} لكل قطعة
+Minimum subtotal {0},الحد الأدنى للمجموع الفرعي {0}
+Minimum {0} items,{0} منتجات على الأقل
+Chosen customer groups,مجموعات العملاء المختارة
+Prepaid orders only,الطلبات المدفوعة مسبقًا فقط
+product,المنتجات
+order,الطلب
+shipping,الشحن
+Combines with {0} discounts,يُجمع مع خصومات {0}
+Does not combine with other discounts,لا يُجمع مع خصومات أخرى
+{0} uses in total,{0} استخدام إجمالًا
+Stops after {0} of discounts,يتوقف بعد منح {0} من الخصومات
+Not on items already on sale,لا يشمل المنتجات المخفّضة بالفعل
+Something went wrong,حدث خطأ ما
+Refunded,تم الاسترداد
+Partly refunded,مُسترد جزئيًا
+Unfulfilled,لم يُجهَّز
+Fulfilled,تم التجهيز
+Partly fulfilled,مُجهَّز جزئيًا
+Delivered,تم التوصيل
+Cancelled,ملغى
+Published,منشور
+Queued,في قائمة الانتظار
+Sending,جارٍ الإرسال
+Retrying,جارٍ إعادة المحاولة
+Scheduled,مجدول
+Expired,منتهي الصلاحية
+Used up,استُنفد
+Disabled,معطّل
+No price,بلا سعر
+Add your products,أضف منتجاتك
+Your store has nothing to sell until you add a product and publish it.,لا يوجد في متجرك ما يُباع حتى تضيف منتجًا وتنشره.
+payments,المدفوعات
+Take online payments,استقبل المدفوعات عبر الإنترنت
+Set up payments,إعداد المدفوعات
+"Connect payment gateways like Stripe or Razorpay, or configure COD.",اربط بوابات دفع مثل Stripe أو Razorpay، أو هيّئ الدفع عند الاستلام.
+Set up shipping,إعداد الشحن
+Add delivery options or a shipping rule so checkout can quote delivery.,أضف طرق توصيل أو قاعدة شحن ليتمكن إتمام الطلب من احتساب التوصيل.
+Make it look like your brand,اجعله يعكس علامتك التجارية
+"Add your logo, a hero image and the menu customers will browse.",أضف شعارك وصورة رئيسية والقائمة التي سيتصفحها العملاء.
+Customize theme,تخصيص القالب
+Make your domain primary,اجعل نطاقك أساسيًا
+{0} is connected. Make it the primary domain so shoppers land on it.,تم ربط {0}. اجعله النطاق الأساسي ليصل إليه المتسوقون.
+Open domains,فتح النطاقات
+Finishing your domain,جارٍ إكمال إعداد نطاقك
+{0} is added. It goes live once DNS and the certificate are ready.,تمت إضافة {0}. سيعمل بمجرد جاهزية DNS والشهادة.
+View status,عرض الحالة
+Connect a custom domain,ربط نطاق مخصص
+Use your own address instead of {0}.,استخدم عنوانك الخاص بدلًا من {0}.
+Connect domain,ربط النطاق
+Your store is open for business,متجرك مفتوح للعمل
+Here is what will make your store even better.,إليك ما سيجعل متجرك أفضل.
+Your store is taking shape,متجرك يتشكّل
+1 step before you can sell,خطوة واحدة قبل أن تتمكن من البيع
+{0} steps before you can sell,{0} خطوات قبل أن تتمكن من البيع
+"Finish the essentials, then publish when you are ready.",أكمل الأساسيات، ثم انشر عندما تكون جاهزًا.
+Ready to publish,جاهز للنشر
+You can take orders now. Publish to open the doors.,يمكنك استقبال الطلبات الآن. انشر لتفتح الأبواب.
+Source,المصدر
+Where the products live today,أين توجد المنتجات اليوم
+Your spreadsheet,جدول بياناتك
+Match columns,مطابقة الأعمدة
+Your headings to ours,عناوينك مقابل عناويننا
+Images,الصور
+Photos for each product,صور لكل منتج
+Review,المراجعة
+Check before saving,راجِع قبل الحفظ
+Create everything,إنشاء كل شيء
+Don't import,عدم الاستيراد
+Product title,عنوان المنتج
+Compare-at price,السعر قبل الخصم
+Selling price,سعر البيع
+Next try {0},المحاولة التالية {0}
+Waiting to send,في انتظار الإرسال
+Sending to {0} again,جارٍ الإرسال إلى {0} مرة أخرى
+1 delivery queued for {0},إرسال واحد في قائمة الانتظار لـ {0}
+{0} deliveries queued for {1},{0} إرسالات في قائمة الانتظار لـ {1}
+{0} of {1} deliveries queued for {2}. {3} failed,{0} من {1} إرسالات في قائمة الانتظار لـ {2}. فشل {3}
+{0} done,اكتمل {0}
+{0} and above,{0} فأكثر
+{0} from {1} and above,{0} من {1} فأكثر
+{0} up to {1},{0} حتى {1}
+{0} for {1},{0} مقابل {1}
+"carrier rate, {0} if unavailable",سعر شركة الشحن، أو {0} إن لم يتوفر
+carrier rate,سعر شركة الشحن
+Header group,مجموعة الترويسة
+Footer group,مجموعة التذييل
+Home page,الصفحة الرئيسية
+Your trial ends today,تنتهي فترتك التجريبية اليوم
+Your trial ends tomorrow,تنتهي فترتك التجريبية غدًا
+Your trial ends in {0} days,تنتهي فترتك التجريبية خلال {0} أيام
+Choose a plan to keep using your store.,اختر خطة لمواصلة استخدام متجرك.
+Your store will be deleted on {0}. Choose a plan to keep it.,سيُحذف متجرك في {0}. اختر خطة للاحتفاظ به.
+Your trial has ended,انتهت فترتك التجريبية
+Choose a plan,اختر خطة
+Your plan is over your spending limit,خطتك تتجاوز حد الإنفاق
+Raise the limit or choose a smaller plan to end your trial.,ارفع الحد أو اختر خطة أصغر لإنهاء الفترة التجريبية.
+Manage billing,إدارة الفوترة
+Choose a plan to keep your store after the trial.,اختر خطة للاحتفاظ بمتجرك بعد الفترة التجريبية.
+Test event,حدث تجريبي
+Failing,يفشل
+Discounts,الخصومات
+Attributes,الخصائص
+Themes,القوالب
+Reviews,التقييمات
+Fashion,أزياء
+Wear it well.,ارتدِه بأناقة.
+Beauty,تجميل
+"Glow, every day.",إشراقة كل يوم.
+Make it home.,اجعله بيتك.
+Food,طعام
+Small batch.,دفعات صغيرة.
+Electronics,إلكترونيات
+"Sound, simplified.",صوت ببساطة.
+Made with care.,صُنع بعناية.
+Welcome,مرحبًا
+Your store,متجرك
+Your brand,علامتك التجارية
+Pick a look,اختر مظهرًا
+Selling,البيع
+Sidebar action,إجراء في الشريط الجانبي
+Order card,بطاقة الطلب
+Product card,بطاقة المنتج
+Customer card,بطاقة العميل
+Order action,إجراء على الطلب
+Product action,إجراء على المنتج
+Customer action,إجراء على العميل
+Settings tab,تبويب في الإعدادات
+Command,أمر
+Unpublish,إلغاء النشر
+Preview on storefront,المعاينة في واجهة المتجر
+Copy product link,نسخ رابط المنتج
+Link copied,تم نسخ الرابط
+Could not copy the link,تعذّر نسخ الرابط
+See storefront addresses,عرض عناوين واجهة المتجر
+Catalogue,الكتالوج
+See options,عرض الخيارات
+Bulk edit variants,تعديل المتغيّرات بالجملة
+Add to collection,إضافة إلى مجموعة
+Adds this quantity to each of the {0} sizes under this product. There is no way to set stock to an exact number here.,يضيف هذه الكمية إلى كل مقاس من مقاسات هذا المنتج البالغة {0}. لا يمكن ضبط المخزون على رقم محدد من هنا.
+Set the low-stock level,تحديد مستوى المخزون المنخفض
+Every size of this product reads as Low stock on the Stock screen at or below this number. Nobody is notified.,كل مقاس من هذا المنتج يظهر كمخزون منخفض في شاشة المخزون عند هذا الرقم أو أقل. لا يُرسل أي تنبيه.
+Low-stock level,مستوى المخزون المنخفض
+Low stock now reads at {0} or below,يظهر المخزون المنخفض الآن عند {0} أو أقل
+Bulk edit prices across products,تعديل الأسعار بالجملة عبر المنتجات
+Reporting,التقارير
+Open the orders list,فتح قائمة الطلبات
+Manage,الإدارة
+Restore from archive,الاستعادة من الأرشيف
+Archive,أرشفة
+Archive this product?,أرشفة هذا المنتج؟
+It leaves the storefront. Past orders keep their line items.,يُزال من واجهة المتجر. وتحتفظ الطلبات السابقة بسطورها.
+"This removes the product, its options and every size under it, for good. A product that has ever been ordered cannot be deleted — archive it instead, and its past orders keep their line items.",يحذف هذا المنتج وخياراته وكل مقاس تحته نهائيًا. لا يمكن حذف منتج طُلب من قبل — أرشفه بدلًا من ذلك، وستحتفظ طلباته السابقة بسطورها.
+Adjustments,التسويات
+"Every stock movement, in order. Read-only.",كل حركة مخزون، بالترتيب. للقراءة فقط.
+Date,التاريخ
+Reason,السبب
+By,بواسطة
+No movements yet,لا توجد حركات بعد
+Stock receipts and sales will show up here.,ستظهر هنا إيصالات المخزون والمبيعات.
+New attribute,خاصية جديدة
+Attributes are shared across products. Any product can turn one into a variant option.,الخصائص مشتركة بين المنتجات. ويمكن لأي منتج أن يحوّل إحداها إلى خيار للمتغيّرات.
+Comma separated,مفصولة بفواصل
+Edit {0},تعديل {0}
+Used by {0} products,يستخدمها {0} منتجات
+No attributes yet,لا توجد خصائص بعد
+"Attributes are the choices a shopper picks — size, colour, format.",الخصائص هي الخيارات التي يختارها المتسوق — المقاس، اللون، الصيغة.
+A collection groups products the storefront can filter and browse by.,تجمع المجموعة منتجات يمكن لواجهة المتجر التصفية والتصفّح بها.
+Create collection,إنشاء مجموعة
+Create one to start filing products under it.,أنشئ واحدة لتبدأ بوضع المنتجات ضمنها.
+Could not load this customer,تعذّر تحميل هذا العميل
+Customer not found,العميل غير موجود
+No customer matches {0}. They may have been deleted or merged.,لا يوجد عميل يطابق {0}. ربما حُذف أو دُمج.
+Lapsed,منقطع
+Repeat,متكرر
+Lifetime spend,إجمالي الإنفاق
+Avg spend per order,متوسط الإنفاق لكل طلب
+Last order,آخر طلب
+First order,أول طلب
+Orders about every,يطلب تقريبًا كل
+{0} days,{0} أيام
+Units bought,الوحدات المشتراة
+Usually pays by,يدفع عادةً عبر
+Came from,جاء من
+Note saved,تم حفظ الملاحظة
+1 order,طلب واحد
+{0} orders,{0} طلبات
+1 unit,وحدة واحدة
+{0} units,{0} وحدات
+View in ERP,عرض في ERP
+No contact details on file,لا توجد بيانات تواصل مسجّلة
+Customer for {0} · since {1},عميل لمدة {0} · منذ {1}
+Spend by month,الإنفاق حسب الشهر
+This month,هذا الشهر
+Last {0} months,آخر {0} أشهر
+{0} all time,{0} منذ البداية
+Discounts used,الخصومات المستخدمة
+{0} saved all time,وُفّر {0} منذ البداية
+Recently bought,المشتريات الأخيرة
+No address on file.,لا يوجد عنوان مسجّل.
+Anything worth remembering about this customer,أي شيء يستحق التذكّر عن هذا العميل
+Save note,حفظ الملاحظة
+Back to customers,العودة إلى العملاء
+Spend,الإنفاق
+Customer since,عميل منذ
+No customers yet,لا يوجد عملاء بعد
+A customer appears here the moment someone checks out.,يظهر العميل هنا لحظة إتمام أي شخص لطلبه.
+No customers match that search,لا يوجد عملاء يطابقون هذا البحث
+Try a different search term.,جرّب كلمة بحث مختلفة.
+Setup,الإعداد
+Conditions,الشروط
+Limits and dates,الحدود والتواريخ
+New discount,خصم جديد
+Discard unsaved changes?,تجاهل التغييرات غير المحفوظة؟
+The changes to this discount have not been saved.,لم تُحفظ التغييرات على هذا الخصم.
+Discard,تجاهل
+Discount created,تم إنشاء الخصم
+Saved,تم الحفظ
+Discount switched on,تم تفعيل الخصم
+Discount switched off,تم إيقاف الخصم
+Shoppers can no longer use it. Discounts already used on orders can't be deleted; switch it off instead.,لن يتمكن المتسوقون من استخدامه بعد الآن. لا يمكن حذف الخصومات المستخدمة في طلبات؛ أوقفها بدلًا من ذلك.
+Delete discount,حذف الخصم
+Discount deleted,تم حذف الخصم
+Switch off,إيقاف
+Switch on,تفعيل
+Could not load this discount,تعذّر تحميل هذا الخصم
+Create discount,إنشاء خصم
+Search titles and codes,ابحث في العناوين والرموز
+Type,النوع
+Method,الطريقة
+Used,الاستخدام
+No discounts yet,لا توجد خصومات بعد
+"Create a code shoppers type at checkout, or a discount that applies on its own.",أنشئ رمزًا يكتبه المتسوقون عند إتمام الطلب، أو خصمًا يُطبَّق تلقائيًا.
+No discounts match,لا توجد خصومات مطابقة
+Try another tab or search.,جرّب تبويبًا أو بحثًا آخر.
+your store,متجرك
+{0} is live,{0} منشور الآن
+Your store is private again,أصبح متجرك خاصًا مرة أخرى
+Publish anyway,النشر على أي حال
+Publish store,نشر المتجر
+Finish setup first,أكمل الإعداد أولًا
+Copy link,نسخ الرابط
+Make private,جعله خاصًا
+Preview,معاينة
+Visitors see a coming-soon page.,"يرى الزوار صفحة ""قريبًا""."
+Grow your store,نمِّ متجرك
+Get ready to sell,استعد للبيع
+Publish before you can sell?,النشر قبل أن تتمكن من البيع؟
+Publish {0}?,نشر {0}؟
+"You have not set up {0} yet. Visitors can browse, but checkout will not work.",لم تُعدّ {0} بعد. يمكن للزوار التصفح، لكن إتمام الطلب لن يعمل.
+Anyone with the link to {0} can browse and buy. You can make it private again any time.,يمكن لأي شخص لديه رابط {0} التصفح والشراء. ويمكنك جعله خاصًا مرة أخرى في أي وقت.
+Make your store private?,جعل متجرك خاصًا؟
+Visitors will see a coming-soon page and cannot place orders until you publish again.,"سيرى الزوار صفحة ""قريبًا"" ولن يتمكنوا من تقديم طلبات حتى تنشره مجددًا."
+Receive stock on 1 line,استلام مخزون على سطر واحد
+Receive stock on {0} lines,استلام مخزون على {0} سطور
+Adds this quantity to each selected line. There is no way to set stock to an exact number here.,يضيف هذه الكمية إلى كل سطر محدد. لا يمكن ضبط المخزون على رقم محدد من هنا.
+Adjustment recorded for {0} lines,تم تسجيل التسوية لـ {0} سطور
+Low stock only,المخزون المنخفض فقط
+Search SKU or product,ابحث برمز SKU أو المنتج
+Cancel selection,إلغاء التحديد
+Select,تحديد
+1 line selected,تم تحديد سطر واحد
+{0} lines selected,تم تحديد {0} سطور
+Select lines to act on them,حدّد سطورًا لتنفيذ إجراءات عليها
+Adjust quantity,تعديل الكمية
+{0} available,{0} متاح
+No stock yet,لا يوجد مخزون بعد
+"Add a product, then receive stock against it to see it counted here.",أضف منتجًا، ثم استلم مخزونًا له لتراه محسوبًا هنا.
+Nothing matches,لا شيء يطابق
+Clear the filters to see all stock.,امسح الفلاتر لترى كل المخزون.
+No pages are available to you yet,لا توجد صفحات متاحة لك بعد
+Ask your store admin to give you access to an app.,اطلب من مسؤول المتجر منحك صلاحية الوصول إلى تطبيق.
+There is nothing at this address,لا يوجد شيء على هذا العنوان
+{0} is not a screen in Commera.,{0} ليست شاشة في Commera.
+Go to Overview,الانتقال إلى النظرة العامة
+Print invoice,طباعة الفاتورة
+Refund,استرداد المبلغ
+Fulfilment created,تم إنشاء التجهيز
+Could not load this order,تعذّر تحميل هذا الطلب
+Order not found,الطلب غير موجود
+No order matches {0}. It may have been deleted.,لا يوجد طلب يطابق {0}. ربما حُذف.
+Fulfil items,تجهيز المنتجات
+1 line,سطر واحد
+{0} lines,{0} سطور
+No items on this order,لا توجد منتجات في هذا الطلب
+Shipping discount,خصم الشحن
+Cash on delivery charge,رسوم الدفع عند الاستلام
+Tax,الضريبة
+Unpaid,غير مدفوع
+Closed,مغلق
+1 order marked fulfilled,تم تعليم طلب واحد كمُجهَّز
+{0} orders marked fulfilled,تم تعليم {0} طلبات كمُجهَّزة
+{0} of {1} orders marked fulfilled. {2} failed,تم تعليم {0} من {1} طلبات كمُجهَّزة. فشل {2}
+No delivery note yet for {0} — nothing to print.,لا توجد مذكرة تسليم لـ {0} بعد — لا شيء للطباعة.
+Search orders,ابحث في الطلبات
+1 order selected,تم تحديد طلب واحد
+{0} orders selected,تم تحديد {0} طلبات
+Select orders to act on them,حدّد طلبات لتنفيذ إجراءات عليها
+Mark fulfilled,تعليم كمُجهَّز
+Print delivery notes,طباعة مذكرات التسليم
+Your first order will appear here the moment a shopper checks out.,سيظهر طلبك الأول هنا لحظة إتمام متسوق لطلبه.
+Try a different filter or search term.,جرّب فلترًا أو كلمة بحث مختلفة.
+All types,كل الأنواع
+Raise price on 1 item,رفع سعر صنف واحد
+Raise price on {0} items,رفع سعر {0} أصناف
+"Raises the price a shopper actually pays by this percentage, rounded to the nearest paisa.",يرفع السعر الذي يدفعه المتسوق فعليًا بهذه النسبة، مقرّبًا إلى أقرب بيسة.
+Raise by %,الرفع بنسبة %
+1 item repriced,أُعيد تسعير صنف واحد
+{0} items repriced,أُعيد تسعير {0} أصناف
+{0} of {1} items repriced. {2} failed,أُعيد تسعير {0} من {1} أصناف. فشل {2}
+Set compare-at on 1 item,تحديد السعر قبل الخصم لصنف واحد
+Set compare-at on {0} items,تحديد السعر قبل الخصم لـ {0} أصناف
+Sets the struck-through reference price shown above the real price.,يحدّد السعر المرجعي المشطوب الذي يظهر فوق السعر الفعلي.
+1 item given a compare-at price,حُدّد السعر قبل الخصم لصنف واحد
+{0} items given a compare-at price,حُدّد السعر قبل الخصم لـ {0} أصناف
+{0} of {1} items given a compare-at price. {2} failed,حُدّد السعر قبل الخصم لـ {0} من {1} أصناف. فشل {2}
+Edit prices,تعديل الأسعار
+"{0} sellable units · one row per variant, priced individually on its product",{0} وحدات قابلة للبيع · صف لكل متغيّر، مسعّر بشكل منفصل في منتجه
+1 item selected,تم تحديد عنصر واحد
+{0} items selected,تم تحديد {0} عناصر
+Select items to act on them,حدّد أصنافًا لتنفيذ إجراءات عليها
+Set compare-at,تحديد السعر قبل الخصم
+Item,الصنف
+No sellable items yet,لا توجد أصناف قابلة للبيع بعد
+Add a product to start pricing it.,أضف منتجًا لتبدأ تسعيره.
+"Published {0}, skipped {1} (missing a photo or size)",نُشر {0}، وتُخطّي {1} (ينقصه صورة أو مقاس)
+Hidden from the storefront,مخفي من واجهة المتجر
+Restored,تمت الاستعادة
+Could not load this product,تعذّر تحميل هذا المنتج
+Product not found,المنتج غير موجود
+No product matches {0}. It may have been deleted or renamed.,لا يوجد منتج يطابق {0}. ربما حُذف أو أُعيدت تسميته.
+updated {0},حُدّث {0}
+Back to products,العودة إلى المنتجات
+All collections,كل المجموعات
+1 product archived,تمت أرشفة منتج واحد
+{0} products archived,تمت أرشفة {0} منتجات
+{0} of {1} products archived. {2} failed,تمت أرشفة {0} من {1} منتجات. فشل {2}
+1 product selected,تم تحديد منتج واحد
+{0} products selected,تم تحديد {0} منتجات
+Select products to act on them,حدّد منتجات لتنفيذ إجراءات عليها
+Move to collection,نقل إلى مجموعة
+Updated,آخر تحديث,Date last updated
+{0} variants,{0} متغيّرات
+"Add your first product, or import a catalogue to get started.",أضف منتجك الأول، أو استورد كتالوجًا للبدء.
+No products match,لا توجد منتجات مطابقة
+"Change the filters, or import a catalogue to get started.",غيّر الفلاتر، أو استورد كتالوجًا للبدء.
+Could not load this review,تعذّر تحميل هذا التقييم
+Review not found,التقييم غير موجود
+No review matches {0}. It may have been deleted.,لا يوجد تقييم يطابق {0}. ربما حُذف.
+Reply posted,تم نشر الرد
+Verified purchase,عملية شراء موثّقة
+Seller reply,رد البائع
+Last replied {0} by {1},آخر رد {0} بواسطة {1}
+Write a reply the shopper and other buyers will see under this review…,اكتب ردًا سيراه المتسوق والمشترون الآخرون تحت هذا التقييم…
+Update reply,تحديث الرد
+Post reply,نشر الرد
+Back to reviews,العودة إلى التقييمات
+Unpublished,غير منشور
+Search reviews,ابحث في التقييمات
+Submitted,تاريخ الإرسال,Date a review was submitted
+Untitled review,تقييم بلا عنوان
+No reviews waiting on you,لا توجد تقييمات بانتظارك
+No published reviews yet,لا توجد تقييمات منشورة بعد
+New reviews land here for you to approve before they reach the storefront.,تصل التقييمات الجديدة إلى هنا لتوافق عليها قبل أن تظهر في واجهة المتجر.
+Publish a review from the Unpublished tab to see it here.,"انشر تقييمًا من تبويب ""غير منشور"" لتراه هنا."
+No reviews match that search,لا توجد تقييمات تطابق هذا البحث
+Variant saved,تم حفظ المتغيّر
+Could not load this variant,تعذّر تحميل هذا المتغيّر
+Variant not found,المتغيّر غير موجود
+{0} has no option {1}. It may have been deleted.,لا يحتوي {0} على الخيار {1}. ربما حُذف.
+Back to product,العودة إلى المنتج
+Visible on the storefront to shoppers.,ظاهر للمتسوقين في واجهة المتجر.
+Size {0},المقاس {0}
+Barcode,الباركود
+On hand: {0} · Committed: {1},المتوفر فعليًا: {0} · المحجوز: {1}
+Receive qty,الكمية المستلمة
+No sizes yet,لا توجد مقاسات بعد
+Add a size so this variant can be stocked and sold.,أضف مقاسًا ليتمكن هذا المتغيّر من التخزين والبيع.
+Stock value,قيمة المخزون
+Units on hand,الوحدات المتوفرة فعليًا
+Days of cover,أيام التغطية
+Capital in dead stock,رأس المال في المخزون الراكد
+No movement yet,لا توجد حركة بعد
+Stock movement appears once products start selling.,تظهر حركة المخزون بمجرد أن تبدأ المنتجات بالبيع.
+No sales pace yet,لا يوجد معدل مبيعات بعد
+Days of cover needs recent sales to project from.,تحتاج أيام التغطية إلى مبيعات حديثة للتقدير بناءً عليها.
+"How much capital the shelves are holding, and how fast it turns. {0}.",كم من رأس المال تحتفظ به الرفوف، ومدى سرعة دورانه. {0}.
+Stock value over time,قيمة المخزون عبر الزمن
+No stock history yet,لا يوجد سجل للمخزون بعد
+Stock value appears once inventory is received or sold.,تظهر قيمة المخزون بمجرد استلام المخزون أو بيعه.
+Sell-through rate,معدل تصريف المخزون
+Units sold in the last 30 days against what's on the shelf.,الوحدات المباعة في آخر 30 يومًا مقارنة بما على الرف.
+How long today's stock lasts at the last 30 days' pace.,المدة التي يكفيها مخزون اليوم بوتيرة آخر 30 يومًا.
+Dead stock,المخزون الراكد
+Products with no sales in the last 30 days.,منتجات بلا مبيعات في آخر 30 يومًا.
+Open inventory,فتح المخزون
+Last sold,آخر بيع
+Tied-up value,القيمة المجمّدة
+{0} days ago,قبل {0} أيام
+Never sold,لم يُبع قط
+Nothing is sitting still,لا شيء راكد
+Every product has sold in this period.,بِيع كل منتج في هذه الفترة.
+Gross revenue,إجمالي الإيرادات
+Avg. order value,متوسط قيمة الطلب
+No revenue in this period,لا توجد إيرادات في هذه الفترة
+Try a wider date range.,جرّب نطاقًا زمنيًا أوسع.
+"What the store earned, and what came back off the top. {0}.",ما حققه المتجر، وما خُصم منه. {0}.
+Revenue over time,الإيرادات عبر الزمن
+Discounts given,الخصومات الممنوحة
+{0} on 1 order,{0} على طلب واحد
+{0} on {1} orders,{0} على {1} طلبات
+Average order value,متوسط قيمة الطلب
+Top discounts,أبرز الخصومات
+Given,الممنوح
+No discounts in this period,لا توجد خصومات في هذه الفترة
+Orders that use a code or an automatic discount show up here.,تظهر هنا الطلبات التي تستخدم رمزًا أو خصمًا تلقائيًا.
+By month,حسب الشهر
+Month,الشهر
+Refunds,المبالغ المستردة
+Net,الصافي
+Viewed,المشاهدة
+Bought,الشراء
+The storefront doesn't record search terms.,لا تسجّل واجهة المتجر كلمات البحث.
+Sessions,الجلسات
+Conversion,التحويل
+Checkout completion,إكمال إتمام الطلب
+"Who reaches the store, what they look at, where they drop out. {0}.",من يصل إلى المتجر، وما يشاهده، وأين يتوقف. {0}.
+Sessions over time,الجلسات عبر الزمن
+No sessions in this period,لا توجد جلسات في هذه الفترة
+Where they come from,من أين يأتون
+No traffic sources yet,لا توجد مصادر زيارات بعد
+Channels appear once shoppers reach the storefront.,تظهر القنوات بمجرد وصول المتسوقين إلى واجهة المتجر.
+Checkout funnel,مسار إتمام الطلب
+No checkout activity yet,لا يوجد نشاط في إتمام الطلب بعد
+The funnel fills in once shoppers start browsing.,يمتلئ المسار بمجرد أن يبدأ المتسوقون بالتصفح.
+Top pages,أبرز الصفحات
+Landing sessions per page — the storefront doesn't record a separate page-view count.,جلسات الدخول لكل صفحة — لا تسجّل واجهة المتجر عدد مشاهدات منفصلًا للصفحات.
+Views,المشاهدات
+No page views yet,لا توجد مشاهدات للصفحات بعد
+Views appear once shoppers browse the storefront.,تظهر المشاهدات بمجرد أن يتصفح المتسوقون واجهة المتجر.
+Search terms,كلمات البحث
+Term,الكلمة
+Searches,عمليات البحث
+Results,النتائج
+Not tracked yet,غير متتبَّع بعد
+Main navigation,التنقل الرئيسي
+New page,صفحة جديدة
+Give the page a title,أعطِ الصفحة عنوانًا
+The page needs some content,تحتاج الصفحة إلى بعض المحتوى
+Page created,تم إنشاء الصفحة
+Shoppers following a link to this page will get a not-found instead.,"سيحصل المتسوقون الذين يتبعون رابطًا إلى هذه الصفحة على صفحة ""غير موجودة"" بدلًا منها."
+Delete page,حذف الصفحة
+Page deleted,تم حذف الصفحة
+View on storefront,عرض في واجهة المتجر
+Could not load this page,تعذّر تحميل هذه الصفحة
+"Shoppers see this at the top of the page, and it names the page everywhere else.",يراه المتسوقون أعلى الصفحة، وهو اسم الصفحة في كل مكان آخر.
+Lives at {0},موجودة على {0}
+"Left blank, it is built from the title.",إن تُرك فارغًا، يُبنى من العنوان.
+An unpublished page is hidden from shoppers until you switch this on.,الصفحة غير المنشورة مخفية عن المتسوقين حتى تفعّل هذا.
+Content,المحتوى
+Write the page…,اكتب الصفحة…
+How this page appears on Google and when shared.,كيف تظهر هذه الصفحة في Google وعند مشاركتها.
+Meta title,عنوان الميتا
+"Overrides the page title in search results. Left blank, the title above is used.",يحل محل عنوان الصفحة في نتائج البحث. إن تُرك فارغًا، يُستخدم العنوان أعلاه.
+Meta description,وصف الميتا
+Roughly 160 characters shows in search results.,يظهر نحو 160 حرفًا في نتائج البحث.
+Share image,صورة المشاركة
+The image shown when the page is shared. Paste the address of an uploaded file.,الصورة التي تظهر عند مشاركة الصفحة. الصق عنوان ملف مرفوع.
+"The page stays reachable by link, but Google is told not to list it.",تبقى الصفحة متاحة عبر الرابط، لكن يُطلب من Google عدم إدراجها.
+Last saved {0},آخر حفظ {0}
+Add page,إضافة صفحة
+"Standalone pages — About us, shipping, returns — that your footer and menus can link to.",صفحات مستقلة — من نحن، الشحن، الإرجاع — يمكن للتذييل والقوائم الربط بها.
+Could not load your pages,تعذّر تحميل صفحاتك
+"Add one to tell shoppers about your store, your shipping or your returns.",أضف صفحة لتعريف المتسوقين بمتجرك أو بالشحن أو بالإرجاع.
+Path,المسار
+Discard unsaved theme settings?,تجاهل إعدادات القالب غير المحفوظة؟
+The changes you have not saved are lost.,ستُفقد التغييرات التي لم تحفظها.
+Nothing to save,لا شيء للحفظ
+Draft saved,تم حفظ المسودة
+Already published,منشور بالفعل
+Published to your store,تم النشر في متجرك
+Published. Activate {0} to show it in your store.,تم النشر. فعّل {0} لعرضه في متجرك.
+Discard all unpublished changes?,تجاهل كل التغييرات غير المنشورة؟
+The layout goes back to what your store shows now.,يعود التخطيط إلى ما يعرضه متجرك الآن.
+Changes discarded,تم تجاهل التغييرات
+Publish,نشر
+The theme settings you have not saved are lost.,ستُفقد إعدادات القالب التي لم تحفظها.
+Leave without saving?,المغادرة دون حفظ؟
+Your layout changes could not be saved. Leaving now loses them.,تعذّر حفظ تغييرات التخطيط. ستفقدها إن غادرت الآن.
+Unpublished changes,تغييرات غير منشورة
+Not live,غير منشور
+Could not open this theme,تعذّر فتح هذا القالب
+Panel,اللوحة
+Switch to {0}?,التبديل إلى {0}؟
+Shoppers see {0} straight away. {1} moves to the theme library and keeps all its changes.,يرى المتسوقون {0} فورًا. وينتقل {1} إلى مكتبة القوالب محتفظًا بكل تغييراته.
+Shoppers see {0} straight away.,يرى المتسوقون {0} فورًا.
+{0} is now the live theme,{0} هو القالب المنشور الآن
+Could not load themes,تعذّر تحميل القوالب
+No themes installed,لا توجد قوالب مثبّتة
+A theme ships with the app it belongs to. Install one to style the storefront.,يأتي القالب مع التطبيق الذي ينتمي إليه. ثبّت قالبًا لتنسيق واجهة المتجر.
+Live theme,القالب المنشور
+Theme library,مكتبة القوالب
+Shoppers only see the live theme.,لا يرى المتسوقون إلا القالب المنشور.
+Leave,مغادرة,Leave the page
+Not permitted.,غير مسموح.
+Not found.,غير موجود.

@@ -111,7 +111,7 @@ async function togglePublished(row) {
           <ListHeaderCell>{{ __('Review') }}</ListHeaderCell>
           <ListHeaderCell class="max-sm:hidden">{{ __('Product') }}</ListHeaderCell>
           <ListHeaderCell class="max-sm:hidden">{{ __('Shopper') }}</ListHeaderCell>
-          <ListHeaderCell class="max-sm:hidden">{{ __('Submitted') }}</ListHeaderCell>
+          <ListHeaderCell class="max-sm:hidden">{{ __('Submitted', null, 'Date a review was submitted') }}</ListHeaderCell>
           <ListHeaderCell>{{ __('Published') }}</ListHeaderCell>
         </ListHeader>
 

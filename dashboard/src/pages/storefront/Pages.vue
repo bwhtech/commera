@@ -84,7 +84,7 @@ function detailRoute(name) {
             <ListHeaderCell>{{ __('Page') }}</ListHeaderCell>
             <ListHeaderCell>{{ __('Path') }}</ListHeaderCell>
             <ListHeaderCell>{{ __('Status') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Updated') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Updated', null, 'Date last updated') }}</ListHeaderCell>
           </ListHeader>
           <ListSkeleton v-if="loading && !pages.length" :columns="skeletonColumns" />
           <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">

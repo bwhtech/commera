@@ -38,7 +38,7 @@ Write each piece of interface text in `_()`:
 <p>{{ _("{0} items").format(count) | e }}</p>
 ```
 
-`_()` reads the translation files of the installed apps, such as `commera/translations/ar.csv`. Put the translations of your theme strings in the translation files of your app. Write each string as one literal inside `_()`, so that Frappe's string extraction finds it.
+`_()` reads the translation files of the installed apps, such as `commera/translations/ar.csv`. Put the translations of your theme strings in the translation files of your app. Write each string as one literal inside `_()`, so that Frappe's string extraction finds it. Commera ships Arabic for the starter theme, the SDK, the storefront package and the dashboard. `bench commera check-translations --lang ar` lists the strings that have no Arabic yet.
 
 Frappe Jinja does not escape a value for you. Add `| e` to a value that a merchant or a shopper can change.
 
