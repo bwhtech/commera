@@ -37,15 +37,21 @@ def bump_price_seq():
 
 
 def read_price_seq() -> int:
-	return int(frappe.cache.get(start_seq()))
+	key = start_seq()
+	# nosemgrep: frappe-semgrep-rules.rules.frappe-cache-breaks-multitenancy
+	return int(frappe.cache.get(key))
 
 
 def start_seq() -> str:
 	"""The counter's key. A flushed or evicted counter restarts above the clock and every stored stamp:
 	a stamp read from a clock that ran ahead, or from an earlier restart, would reject newer writes."""
+	# make_key scopes the key to the site; set_value has no NX, which the restart needs.
 	key = frappe.cache.make_key(SEQ_KEY)
+	# nosemgrep: frappe-semgrep-rules.rules.frappe-cache-breaks-multitenancy
 	if frappe.cache.get(key) is None:
-		frappe.cache.set(key, max(stored_seq(), time.time_ns() // 1000) + 1, nx=True)
+		first = max(stored_seq(), time.time_ns() // 1000) + 1
+		# nosemgrep: frappe-semgrep-rules.rules.frappe-cache-breaks-multitenancy
+		frappe.cache.set(key, first, nx=True)
 	return key
 
 
