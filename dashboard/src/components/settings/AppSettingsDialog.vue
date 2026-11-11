@@ -22,6 +22,7 @@ import EmailSettings from './EmailSettings.vue'
 import GeneralSettings from './GeneralSettings.vue'
 import PluginsSettings from './PluginsSettings.vue'
 import IntegrationTabPanel from './IntegrationTabPanel.vue'
+import LanguagesSettings from './LanguagesSettings.vue'
 import LocationsSettings from './LocationsSettings.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import ShippingSections from './ShippingSections.vue'
@@ -121,6 +122,10 @@ watch(
           <template #prefix><span class="lucide-mail size-4" aria-hidden="true" /></template>
           {{ __('Emails') }}
         </SettingsNavItem>
+        <SettingsNavItem value="languages">
+          <template #prefix><span class="lucide-languages size-4" aria-hidden="true" /></template>
+          {{ __('Languages') }}
+        </SettingsNavItem>
         <SettingsNavItem value="translations">
           <template #prefix><span class="lucide-languages size-4" aria-hidden="true" /></template>
           {{ __('Translations') }}
@@ -206,6 +211,10 @@ watch(
 
       <SettingsPanel value="emails" class="min-w-0">
         <EmailSettings :active="settings.open && settings.tab === 'emails'" />
+      </SettingsPanel>
+
+      <SettingsPanel value="languages" class="min-w-0">
+        <LanguagesSettings :active="settings.open && settings.tab === 'languages'" />
       </SettingsPanel>
 
       <SettingsPanel value="translations" class="min-w-0">
