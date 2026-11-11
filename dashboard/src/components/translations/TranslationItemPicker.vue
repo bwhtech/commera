@@ -59,7 +59,8 @@ function openResult(resource, name) {
   emit('open', resource, name)
 }
 
-const shownCount = computed(() => (filter.value === 'todo' ? props.toDoCount : props.total))
+// Records matching the filter; the list may hold only the first pages of them.
+const matchingCount = computed(() => (filter.value === 'todo' ? props.toDoCount : props.total))
 </script>
 
 <template>
@@ -98,7 +99,7 @@ const shownCount = computed(() => (filter.value === 'todo' ? props.toDoCount : p
 
     <template v-else>
       <div class="flex items-center gap-2 px-3 pb-2">
-        <p class="text-sm text-ink-gray-5">{{ __('Showing {0} of {1}', [shownCount, total]) }}</p>
+        <p class="text-sm text-ink-gray-5">{{ __('Showing {0} of {1}', [items.length, matchingCount]) }}</p>
         <TabButtons
           v-model="filter"
           :disabled="disabled"
