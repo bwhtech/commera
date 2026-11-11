@@ -164,6 +164,17 @@ class TestStorefrontCurrency(CartCurrencyTestCase):
 		self.assertIn(self.market_symbol, html)
 		self.assertIn("commera.format.amount(", html)
 
+	def test_price_filter_labels_keep_whole_numbers(self):
+		# The range labels have always shown rounded amounts; only their symbol follows the market.
+		sidebar = frappe.get_app_path(
+			"commera", "themes", "summer_theme", "components", "sections", "shop_filter_sidebar.html"
+		)
+		with open(sidebar) as source:  # nosemgrep
+			text = source.read()
+		self.assertIn('x-text="Math.round(minimum)"', text)
+		self.assertIn('x-text="Math.round(maximum)"', text)
+		self.assertIn("get_cart_currency().symbol", text)
+
 	def test_primary_server_money_markup_matches_develop_bytes(self):
 		self.open_request("/cart")
 		self.set_default("currency_precision", "3")
