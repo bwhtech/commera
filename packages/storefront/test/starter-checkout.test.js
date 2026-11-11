@@ -307,3 +307,13 @@ test('Starter refreshes methods and clears a stale selection after saving an add
 	assert.equal(form.payment_methods[0].id, 'Market gateway');
 	assert.equal(form.payment_method, '');
 });
+
+test('the delivery recap translates the country without changing the stored value', () => {
+	const form = make_checkout_form();
+	form.config.country_titles = { India: 'الهند' };
+	form.state = { shipping_address: { city: 'Kochi', country: 'India' } };
+	assert.equal(form.address_recap, 'Kochi, الهند');
+	assert.equal(form.state.shipping_address.country, 'India');
+	form.state.shipping_address.country = 'Unknown country';
+	assert.equal(form.address_recap, 'Kochi, Unknown country');
+});

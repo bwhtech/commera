@@ -108,7 +108,8 @@ def list_other_market_countries() -> list[MarketCountries]:
 
 
 def get_country_options(rows: list[dict]) -> list[Country]:
-	countries = [{"name": row["name"], "title": _(row["name"])} for row in rows]
+	names = [row["name"] for row in rows]
+	countries = [{"name": name, "title": _(name)} for name in names]
 	return sorted(countries, key=lambda country: country["title"])
 
 

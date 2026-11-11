@@ -1,5 +1,5 @@
-"""Finds the UI strings of the starter theme, the SDK, the storefront package and the dashboard
-that Commera's translation file for a language does not translate, or translates with broken markup."""
+"""Find UI strings in the starter theme, SDK, API, storefront package and dashboard
+with missing translations or broken markup in an app translation file."""
 
 import os
 import re
@@ -27,6 +27,7 @@ SOURCES = (
 	"commera/themes/commera_starter",
 	"commera/templates/macros/language_switcher.html",
 	"commera/sdk",
+	"commera/api",
 	"packages/storefront",
 	"packages/plugin-kit",
 	"dashboard/src",

@@ -109,8 +109,8 @@
 				{% endif %}
 				{% for block in section.blocks %}
 				<div class="border-b border-outline-gray-2" data-accordion-key="block-{{ loop.index }}"{{ block.editor_attributes }}>
-					<button type="button" @click="open = open === 'block-{{ loop.index }}' ? '' : 'block-{{ loop.index }}'" :aria-expanded="open === 'block-{{ loop.index }}'" class="flex h-14 w-full items-center justify-between text-md font-medium">{{ block.settings.title }}<span :class="open === 'block-{{ loop.index }}' && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
-					<div x-cloak x-show="open === 'block-{{ loop.index }}'" x-collapse.duration.300ms><p class="max-w-[62ch] pb-5 text-p-md text-ink-gray-7">{{ block.settings.text }}</p></div>
+					<button type="button" @click="open = open === 'block-{{ loop.index }}' ? '' : 'block-{{ loop.index }}'" :aria-expanded="open === 'block-{{ loop.index }}'" class="flex h-14 w-full items-center justify-between text-md font-medium">{{ _("Shipping & returns") if block.settings.title == "Shipping & returns" else block.settings.title | e }}<span :class="open === 'block-{{ loop.index }}' && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
+					<div x-cloak x-show="open === 'block-{{ loop.index }}'" x-collapse.duration.300ms><p class="max-w-[62ch] pb-5 text-p-md text-ink-gray-7">{{ _("Delivery and return options are shown at checkout.") if block.settings.text == "Delivery and return options are shown at checkout." else block.settings.text | e }}</p></div>
 				</div>
 				{% endfor %}
 			</div>

@@ -404,6 +404,28 @@ class TestStorefrontApiAuthentication(RoutingTestCase):
 
 
 class TestCachedNotFound(RoutingTestCase):
+	def test_unknown_account_paths_render_404_in_every_published_language(self):
+		from pathlib import Path
+
+		import commera
+		from commera.shop_themes.doctype.shop_theme.shop_theme import render_theme_context
+
+		theme = {
+			"theme_name": "Commera Starter",
+			"theme_type": "Sections",
+			"names": ["Commera Starter"],
+			"dirs": [str(Path(commera.__file__).parent / "themes" / "commera_starter")],
+			"apps": {"Commera Starter": "commera"},
+			"settings_doctype": None,
+		}
+		with render_theme_context(theme):
+			for prefix, language in (("", "en"), ("/ar", "ar")):
+				for path in ("addresses", "unknown/nested"):
+					with self.subTest(prefix=prefix, path=path):
+						response = self.respond(f"{prefix}/account/{path}")
+						self.assertEqual(response.status_code, 404)
+						self.assertIn(f'lang="{language}"', response.get_data(as_text=True))
+
 	def test_a_cached_404_renders_in_the_language_of_the_url(self):
 		self.set_request("/ar/no-such-page-anywhere", lang="fr")
 		url = frappe.local.request.url

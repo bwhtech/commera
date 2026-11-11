@@ -1965,3 +1965,262 @@ Not found.,غير موجود.
 Review,التقييم,Product review
 Checkout,إتمام الطلب,Storefront checkout
 Footer,التذييل,Storefront navigation
+Not now,ليس الآن
+Delivery and return options are shown at checkout.,تُعرض خيارات التوصيل والإرجاع عند إتمام الطلب.
+Unknown analytics event,حدث تحليلات غير معروف
+sort_by must be revenue or units,يجب أن تكون قيمة sort_by هي revenue أو units
+Item {0} does not exist,الصنف {0} غير موجود
+"{0} - Requested: {1}, In Stock: {2}",{0} - المطلوب: {1}، المتوفر: {2}
+Some items are out of stock:,بعض الأصناف غير متوفرة:
+Out Of Stock,غير متوفر
+Product not found.,المنتج غير موجود.
+Selected size not found.,المقاس المحدد غير موجود.
+"If that order number and email match an order, we have emailed you a link to it.",إذا كان رقم الطلب والبريد الإلكتروني يطابقان طلبًا، فقد أرسلنا إليك رابطًا إليه بالبريد الإلكتروني.
+Your order {0},طلبك {0}
+Open your order {0}: {1},افتح طلبك {0}: {1}
+Refund amount must be between 0 and {0}.,يجب أن يكون مبلغ الاسترداد بين 0 و{0}.
+This order cannot be refunded.,لا يمكن استرداد مبلغ هذا الطلب.
+No Payment Entry found for this Sales Order.,لم يُعثر على قيد دفع لأمر البيع هذا.
+This payment crossed currencies; refund it from the accounts desk instead.,استُخدمت عملات مختلفة في هذه الدفعة؛ استردّها من قسم الحسابات.
+Order already cancelled!,أُلغي الطلب بالفعل!
+Order already shipped!,شُحن الطلب بالفعل!
+Order already delivered!,سُلّم الطلب بالفعل!
+This order is already being prepared for shipment.,يجري تجهيز هذا الطلب للشحن بالفعل.
+Action not allowed,الإجراء غير مسموح
+"This order is paid on delivery, so there is nothing to refund.",هذا الطلب يُدفع عند الاستلام، لذا لا يوجد مبلغ لاسترداده.
+No payment has been captured for this order yet.,لم يُحصّل أي مبلغ لهذا الطلب بعد.
+This order has already been refunded in full.,استُرد مبلغ هذا الطلب بالكامل بالفعل.
+Order {0} now totals {1} but only {2} was collected. The order has not been placed; reconcile or refund the payment before releasing any goods.,أصبح إجمالي الطلب {0} الآن {1}، لكن لم يُحصّل سوى {2}. لم يُؤكد الطلب؛ سوِّ الدفعة أو استردّها قبل تسليم أي بضائع.
+Paid Amount Does Not Match The Order,المبلغ المدفوع لا يطابق الطلب
+A payment is already in progress for this order. Finish or cancel it before changing your cart.,توجد دفعة قيد التنفيذ لهذا الطلب بالفعل. أكملها أو ألغها قبل تغيير سلتك.
+Checkout In Progress,إتمام الطلب قيد التنفيذ
+This order has already been paid. Open it from your account rather than changing the cart.,دُفع مبلغ هذا الطلب بالفعل. افتحه من حسابك بدلًا من تغيير السلة.
+Already Paid,مدفوع بالفعل
+Cash on delivery is not available.,الدفع عند الاستلام غير متاح.
+Please select a valid payment mode.,يرجى اختيار طريقة دفع صالحة.
+This payment method is not available for your order.,طريقة الدفع هذه غير متاحة لطلبك.
+Your cart was priced in another market. Please review it before placing your order.,سُعّرت سلتك في سوق أخرى. يرجى مراجعتها قبل تأكيد طلبك.
+Market Changed,تغيّرت السوق
+{0} is not available in this market. Remove it from your cart to check out.,{0} غير متوفر في هذه السوق. أزله من سلتك لإتمام الطلب.
+Placed at paid rates; market {0} no longer exists.,أُنشئ بالأسعار المدفوعة؛ السوق {0} لم تعد موجودة.
+Placed at paid rates; {0} no longer prices {1}.,أُنشئ بالأسعار المدفوعة؛ لم تعد {0} تسعّر {1}.
+We removed the code and updated your total.,أزلنا الرمز وحدّثنا الإجمالي.
+Discount Removed,أُزيل الخصم
+Your delivery option has changed. Please choose it again before placing your order.,تغيّر خيار التوصيل. يرجى اختياره مجددًا قبل تأكيد طلبك.
+Delivery Option Changed,تغيّر خيار التوصيل
+Your order total has changed to {0}. Please review it before placing your order.,تغيّر إجمالي طلبك إلى {0}. يرجى مراجعته قبل تأكيد طلبك.
+Order Total Changed,تغيّر إجمالي الطلب
+No Mode of Payment found matching gateway {0},لم يُعثر على طريقة دفع تطابق البوابة {0}
+Can't checkout with empty cart,لا يمكن إتمام الطلب بسلة فارغة
+Addresses updated successfully,حُدّثت العناوين بنجاح
+A card payment is already in progress for this order.,توجد دفعة بالبطاقة قيد التنفيذ لهذا الطلب بالفعل.
+No payment record found for this order.,لم يُعثر على سجل دفع لهذا الطلب.
+Cannot save an address without a customer,لا يمكن حفظ عنوان دون عميل
+Address type must be one of {0}.,يجب أن يكون نوع العنوان أحد الأنواع التالية: {0}.
+Store pickup is not available.,الاستلام من المتجر غير متاح.
+Please select a valid pickup location.,يرجى اختيار موقع استلام صالح.
+Items to return must be a list of objects.,يجب إرسال الأصناف المراد إرجاعها كقائمة من الكائنات.
+This order is not delivered yet or its return period has expired.,لم يُسلّم هذا الطلب بعد أو انتهت فترة إرجاعه.
+Some of these items have already been returned.,أُرجعت بعض هذه الأصناف بالفعل.
+No Delivery Note found for this Sales Order.,لم يُعثر على إشعار تسليم لأمر البيع هذا.
+None of the items to return were found in the original Delivery Note.,لم يُعثر على أي من الأصناف المراد إرجاعها في إشعار التسليم الأصلي.
+Sign in to write a review,سجّل الدخول لكتابة تقييم
+Rating must be between 1 and 5,يجب أن يكون التقييم بين 1 و5
+Review is too long,التقييم طويل جدًا
+You have already reviewed this product,لقد قيّمت هذا المنتج بالفعل
+Sign in to edit your review,سجّل الدخول لتعديل تقييمك
+Each cart line needs an item code and a quantity of at least 1.,يحتاج كل بند في السلة إلى رمز صنف وكمية لا تقل عن 1.
+A cart holds at most {0} lines.,تستوعب السلة {0} بندًا كحد أقصى.
+"This order is a store pickup, so it has no delivery option.",هذا الطلب للاستلام من المتجر، لذا ليس له خيار توصيل.
+{0} needs a phone number on the shipping address.,تحتاج {0} إلى رقم هاتف في عنوان الشحن.
+Delivery option {0} is not available for this address.,خيار التوصيل {0} غير متاح لهذا العنوان.
+Your delivery option is no longer available. Please choose another one.,لم يعد خيار التوصيل متاحًا. يرجى اختيار خيار آخر.
+Too many wrong codes. Please ask for a new one.,أُدخلت رموز خاطئة مرات كثيرة. يرجى طلب رمز جديد.
+Invalid OTP,رمز التحقق غير صالح
+Please enter your first name.,يرجى إدخال اسمك الأول.
+{0} cannot be longer than {1} characters.,لا يمكن أن يتجاوز {0} عدد {1} حرفًا.
+Please enter a single valid email address.,يرجى إدخال عنوان بريد إلكتروني واحد صالح.
+Email already in use.,البريد الإلكتروني مستخدم بالفعل.
+Invalid login ID,معرّف تسجيل الدخول غير صالح
+Address ID is required.,معرّف العنوان مطلوب.
+Cannot delete address,لا يمكن حذف العنوان
+"Cannot delete address, it is in use",لا يمكن حذف العنوان لأنه قيد الاستخدام
+Cannot subscribe for notification,لا يمكن الاشتراك في الإشعار
+Set Default Price List and Sale Price List in Commera Settings first.,عيّن قائمة الأسعار الافتراضية وقائمة أسعار البيع في إعدادات كوميرا أولًا.
+"Bulk pricing by {0}: {1} created, {2} updated, {3} skipped, {4} queued",التسعير الجماعي حسب {0}: أُنشئ {1}، وحُدّث {2}، وتُخطي {3}، وأُضيف {4} إلى قائمة الانتظار
+Every tracking script needs a title and a snippet,يحتاج كل نص تتبع إلى عنوان ومقتطف برمجي
+Not an analytics secret: {0},ليست قيمة سرية للتحليلات: {0}
+Collection {0} does not exist.,المجموعة {0} غير موجودة.
+"{0} holds other collections, so products cannot be filed under it.",تحتوي {0} على مجموعات أخرى، لذا لا يمكن إدراج منتجات تحتها.
+Add at least one image,أضف صورة واحدة على الأقل
+Add at least one size,أضف مقاسًا واحدًا على الأقل
+Enter a collection name,أدخل اسم المجموعة
+Collection {0} already exists.,المجموعة {0} موجودة بالفعل.
+Select at least one product.,اختر منتجًا واحدًا على الأقل.
+Add at most {0} products to a collection at a time.,أضف {0} منتجًا كحد أقصى إلى المجموعة في المرة الواحدة.
+Abbreviation {0} is already used by another value on {1}.,الاختصار {0} مستخدم بالفعل لقيمة أخرى في {1}.
+Enter an attribute name,أدخل اسم الخاصية
+Enter a value,أدخل قيمة
+{0} already has a value called {1}.,توجد في {0} قيمة باسم {1} بالفعل.
+{0} is used by {1} products. Renaming it would leave their SKUs and links saying {0}.,تستخدم {1} من المنتجات القيمة {0}. ستؤدي إعادة تسميتها إلى بقاء {0} في رموز منتجاتها وروابطها.
+{0} has no value called {1}.,لا توجد في {0} قيمة باسم {1}.
+Enter a product title,أدخل عنوان المنتج
+"A product title cannot start with ""New Item"" - Frappe reserves that wording for documents it has not saved yet. Try another title.","لا يمكن أن يبدأ عنوان المنتج بعبارة ""New Item""؛ يحتفظ فرابي بهذه العبارة للمستندات التي لم تُحفظ بعد. جرّب عنوانًا آخر."
+A product called {0} already exists. Give this one a different title.,يوجد منتج باسم {0} بالفعل. أعطِ هذا المنتج عنوانًا مختلفًا.
+"The size option must use the attribute named exactly ""Size"" — {0} will not work.","يجب أن يستخدم خيار المقاس الخاصية المسماة ""Size"" حرفيًا — لن تعمل {0}."
+Collection {0} does not exist. Create it first.,المجموعة {0} غير موجودة. أنشئها أولًا.
+Colours and sizes could not be read,تعذّرت قراءة الألوان والمقاسات
+Product {0} has no options to edit,لا توجد خيارات لتعديلها في المنتج {0}
+Nothing to change,لا يوجد ما يمكن تغييره
+Keep at least one variant on sale. A product cannot sell with none.,أبقِ متغيرًا واحدًا على الأقل معروضًا للبيع. لا يمكن بيع منتج دون متغيرات.
+Each variant needs both an option and a size,يحتاج كل متغير إلى خيار ومقاس
+Title is required.,العنوان مطلوب.
+"{0} has been ordered before, so it cannot be deleted.",طُلب {0} سابقًا، لذا لا يمكن حذفه.
+"{0} has been shipped before, so it cannot be deleted.",شُحن {0} سابقًا، لذا لا يمكن حذفه.
+"{0} has been invoiced before, so it cannot be deleted.",أُصدرت فاتورة لـ{0} سابقًا، لذا لا يمكن حذفه.
+"{0} is on a packing slip, so it cannot be deleted.",يوجد {0} في قسيمة تعبئة، لذا لا يمكن حذفه.
+"{0} has been quoted before, so it cannot be deleted.",أُدرج {0} في عرض سعر سابقًا، لذا لا يمكن حذفه.
+"{0} is on a material request, so it cannot be deleted.",يوجد {0} في طلب مواد، لذا لا يمكن حذفه.
+"{0} has stock movement against it, so it cannot be deleted.",توجد حركة مخزون لـ{0}، لذا لا يمكن حذفه.
+"{0} has been viewed by shoppers, so it cannot be deleted.",شاهد المتسوقون {0}، لذا لا يمكن حذفه.
+Archive it instead.,أرشفه بدلًا من ذلك.
+This product has a history,لهذا المنتج سجل سابق
+A restock level cannot be negative.,لا يمكن أن يكون مستوى إعادة التخزين سالبًا.
+This product has no sizes to watch yet.,لا توجد مقاسات لمراقبتها في هذا المنتج بعد.
+Cannot publish yet: {0},لا يمكن النشر بعد: {0}
+Enter a price above zero. A price cannot be removed once it is set.,أدخل سعرًا أكبر من صفر. لا يمكن إزالة السعر بعد تعيينه.
+Customer {0} not found,العميل {0} غير موجود
+Shipping provider {0} is not enabled,مزوّد الشحن {0} غير مفعّل
+{0} cannot list its carrier services,لا يستطيع {0} عرض خدمات شركات الشحن التابعة له
+{0} has no field {1},لا يوجد في {0} حقل {1}
+{0} cannot be renamed — its name is stored on every order already placed with it. Create a new delivery option instead.,لا يمكن إعادة تسمية {0}؛ فقد حُفظ اسمه في كل طلب أُنشئ باستخدامه. أنشئ خيار توصيل جديدًا بدلًا من ذلك.
+A delivery option cannot link to {0}.,لا يمكن ربط خيار توصيل بـ{0}.
+this discount,هذا الخصم
+Unknown target type {0}.,نوع هدف غير معروف: {0}.
+Footer section {0} is not part of this footer.,قسم التذييل {0} ليس جزءًا من هذا التذييل.
+Link not found in {0}.,لم يُعثر على الرابط في {0}.
+The file has no rows,لا يحتوي الملف على صفوف
+These columns are not mapped: {0},هذه الأعمدة غير معيّنة: {0}
+These images are not on the server any more — upload them again: {0},لم تعد هذه الصور على الخادم؛ ارفعها مجددًا: {0}
+These images are private and cannot go on a storefront page: {0},هذه الصور خاصة ولا يمكن عرضها في صفحة المتجر: {0}
+Images must be sent as a list of file names and file URLs,يجب إرسال الصور كقائمة من أسماء الملفات وروابطها
+Each image must be sent as a file name and a file URL,يجب إرسال كل صورة باسم ملف ورابط ملف
+An image was sent without a file URL,أُرسلت صورة دون رابط ملف
+Image assignments must be sent as a group name against its list of photos,يجب إرسال تعيينات الصور كاسم مجموعة مقابل قائمة صورها
+The photos for {0} must be sent as a list of file URLs,يجب إرسال صور {0} كقائمة من روابط الملفات
+A photo assigned to {0} was sent without a file URL,أُرسلت صورة معيّنة لـ{0} دون رابط ملف
+{0} has no {1} to put photos on,لا يوجد لدى {0} أي {1} لإضافة الصور إليه
+"This store has no Item Attribute named ""{0}"" — create it first.","لا توجد في هذا المتجر خاصية صنف باسم ""{0}""؛ أنشئها أولًا."
+"No product was created for {0}, so its {1} photos were not attached",لم يُنشأ منتج لـ{0}، لذا لم تُرفق صور {1} الخاصة به
+{0} is not installed on this site,{0} غير مثبت على هذا الموقع
+Fill in {0} before enabling {1},أكمل {0} قبل تفعيل {1}
+No provider setting links to {0}.,لا يوجد إعداد مزوّد مرتبط بـ{0}.
+received_quantities must map item codes to quantities,يجب أن تربط received_quantities رموز الأصناف بالكميات
+valuation_rates must map item codes to rates,يجب أن تربط valuation_rates رموز الأصناف بمعدلات التقييم
+Enter a quantity for at least one item,أدخل كمية لصنف واحد على الأقل
+Not a sellable size: {0},ليس مقاسًا قابلًا للبيع: {0}
+{0} is not an enabled language.,{0} ليست لغة مفعّلة.
+You do not have access to the store dashboard.,ليس لديك حق الوصول إلى لوحة تحكم المتجر.
+A menu entry cannot link to {0}.,لا يمكن ربط عنصر قائمة بـ{0}.
+Full name is required,الاسم الكامل مطلوب
+Store name is required,اسم المتجر مطلوب
+Unknown country {0},بلد غير معروف: {0}
+Unknown currency {0},عملة غير معروفة: {0}
+Unknown time zone {0},منطقة زمنية غير معروفة: {0}
+Chart of accounts {0} is not available for {1},دليل الحسابات {0} غير متاح لـ{1}
+Fiscal year start month must be between 1 and 12,يجب أن يكون شهر بداية السنة المالية بين 1 و12
+Abbreviation {0} is already used by another company,الاختصار {0} مستخدم بالفعل لشركة أخرى
+Primary color must be a hex color such as #1d4ed8,يجب أن يكون اللون الأساسي رمزًا سداسيًا مثل #1d4ed8
+Returned,مُرجع
+Shipped,مشحون
+Packed,معبّأ
+Preparing for shipment,قيد التجهيز للشحن
+To fulfil,بانتظار التجهيز
+Confirmation pending,بانتظار التأكيد
+Preparing,قيد التجهيز
+Only a confirmed order can be fulfilled.,لا يمكن تجهيز سوى طلب مؤكد.
+This order has already been fulfilled.,جُهّز هذا الطلب بالفعل.
+"The items left on this order are shipped by their supplier, not from your store.",يشحن المورّد الأصناف المتبقية في هذا الطلب، وليس متجرك.
+This order is already {0} and needs nothing shipped.,هذا الطلب في حالة {0} بالفعل ولا يحتاج إلى شحن أي شيء.
+Orders to fulfil,طلبات بانتظار التجهيز
+Oldest waiting since {0},أقدم طلب ينتظر منذ {0}
+Nothing waiting,لا توجد طلبات منتظرة
+Products live,المنتجات المنشورة
+Page title is required.,عنوان الصفحة مطلوب.
+Unknown payment gateway {0},بوابة دفع غير معروفة: {0}
+Plugins can't extend {0} records,لا يمكن للإضافات توسيع سجلات {0}
+Plugin action {0} not found,لم يُعثر على إجراء الإضافة {0}
+{0} isn't available for {1},{0} غير متاح لـ{1}
+{0} isn't available,{0} غير متاح
+{0} is required,{0} مطلوب
+{0} has no settings here,لا توجد إعدادات لـ{0} هنا
+Reply cannot be empty,لا يمكن أن يكون الرد فارغًا
+Reply is too long,الرد طويل جدًا
+Unknown setting {0},إعداد غير معروف: {0}
+Store Name is required,اسم المتجر مطلوب
+Unknown settings tab {0},تبويب إعدادات غير معروف: {0}
+Not an advanced setting: {0},ليس إعدادًا متقدمًا: {0}
+This store has its own orders. Demo data would overwrite its setup.,لهذا المتجر طلباته الخاصة. ستستبدل البيانات التجريبية إعداداته.
+{0} is not linked from {1},{0} غير مرتبط من {1}
+Unknown shipping provider {0},مزوّد شحن غير معروف: {0}
+Set the company in Settings → General before adding shipping rules.,عيّن الشركة في الإعدادات ← عام قبل إضافة قواعد الشحن.
+{0} has no {1} account for shipping charges to post to.,لا يوجد لدى {0} حساب {1} لترحيل رسوم الشحن إليه.
+{0} is not a selling shipping rule of the store's company.,{0} ليست قاعدة شحن مبيعات تابعة لشركة المتجر.
+A band cannot charge less than zero.,لا يمكن أن تكون رسوم الشريحة أقل من صفر.
+Delivery option {0} not found,خيار التوصيل {0} غير موجود
+A shipping rule's name cannot be changed.,لا يمكن تغيير اسم قاعدة الشحن.
+Name the shipping rule.,سمِّ قاعدة الشحن.
+Checkout uses {0}. Pick another rule for checkout before deleting it.,تستخدم صفحة إتمام الطلب {0}. اختر قاعدة أخرى لإتمام الطلب قبل حذفها.
+{0} is already a storefront language.,{0} إحدى لغات واجهة المتجر بالفعل.
+Make another language the default before you remove {0}.,اجعل لغة أخرى هي الافتراضية قبل إزالة {0}.
+Shoppers always see the default language.,يرى المتسوقون اللغة الافتراضية دائمًا.
+Publish {0} before you make it the default language.,انشر {0} قبل جعلها اللغة الافتراضية.
+{0} is not a storefront language.,{0} ليست إحدى لغات واجهة المتجر.
+Only store administrators can manage storefront languages.,يمكن لمسؤولي المتجر فقط إدارة لغات واجهته.
+Made on this site,أُنشئ على هذا الموقع
+Theme {0} is not installed on this site,القالب {0} غير مثبت على هذا الموقع
+Theme {0} has no settings to save,لا توجد إعدادات لحفظها في القالب {0}
+"{0} is a Classic theme, so it has no layouts to edit.",{0} قالب كلاسيكي، لذا لا توجد تخطيطات لتعديلها.
+{0} has no layout for page {1}.,لا يوجد في {0} تخطيط للصفحة {1}.
+This page changed elsewhere. Reload to continue.,تغيّرت هذه الصفحة في مكان آخر. أعد تحميلها للمتابعة.
+Page changed,تغيّرت الصفحة
+A layout is required.,التخطيط مطلوب.
+A thumbnail is either for light or for dark mode.,تكون الصورة المصغرة للوضع الفاتح أو الداكن.
+"A thumbnail must be a WebP, PNG or JPEG image.",يجب أن تكون الصورة المصغرة بصيغة WebP أو PNG أو JPEG.
+A thumbnail must be smaller than 2 MB.,يجب أن يكون حجم الصورة المصغرة أقل من 2 ميغابايت.
+Upload a CSV file.,ارفع ملف CSV.
+The file is larger than {0} MB.,حجم الملف أكبر من {0} ميغابايت.
+Send the address as an object.,أرسل العنوان ككائن.
+Send the lines as a list of objects.,أرسل البنود كقائمة من الكائنات.
+Send a qty for every line.,أرسل كمية لكل بند.
+Send the line ids as a list of strings.,أرسل معرّفات البنود كقائمة من النصوص.
+Send the cart token of the cart to adopt.,أرسل رمز السلة المراد اعتمادها.
+Send the cart token to start a storefront checkout.,أرسل رمز السلة لبدء إتمام طلب في واجهة المتجر.
+Page {0} not found,الصفحة {0} غير موجودة
+Add a language,أضف لغة
+Publish now,انشر الآن
+Add language,إضافة لغة
+Languages,اللغات
+Translate,ترجمة
+Make default,تعيين كافتراضية
+Default,افتراضية
+Right to left,من اليمين إلى اليسار
+Publish {0},نشر {0}
+Make {0} the default language?,هل تريد جعل {0} اللغة الافتراضية؟
+Make {0} the default,تعيين {0} كافتراضية
+{0} is the default language,{0} هي اللغة الافتراضية
+{0} is live at {1},{0} منشورة على {1}
+{0} is hidden from shoppers,{0} مخفية عن المتسوقين
+Remove {0}?,هل تريد إزالة {0}؟
+{0} pages stop working. Its translations are kept.,ستتوقف صفحات {0} عن العمل. ستُحفظ ترجماتها.
+{0} removed,أُزيلت {0}
+{0} added. Shoppers cannot see it yet.,أُضيفت {0}. لا يمكن للمتسوقين رؤيتها بعد.
+Shoppers see published languages only.,يرى المتسوقون اللغات المنشورة فقط.
+Your storefront still shows the languages it had.,لا تزال واجهة متجرك تعرض لغاتها السابقة.
+Default language,اللغة الافتراضية
+The language your catalog is written in.,اللغة التي كُتب بها كتالوجك.
+"This storefront has {0} languages, the most it can have",تحتوي واجهة المتجر على {0} لغة، وهو الحد الأقصى المسموح
+Remove a language you no longer sell in to add another.,أزل لغة لم تعد تبيع بها لإضافة لغة أخرى.
+Storefront languages,لغات واجهة المتجر
+{0} of {1},{0} من {1}
+Open translations,فتح الترجمات

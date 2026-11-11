@@ -32,7 +32,24 @@ class TestArabicCatalog(IntegrationTestCase):
 	def test_the_check_covers_every_source(self):
 		paths = {"/".join(Path(message.path).parts[:2]) for message in get_messages()}
 		self.assertTrue(
-			{"commera/themes", "commera/sdk", "packages/storefront", "dashboard/src"} <= paths, paths
+			{"commera/themes", "commera/sdk", "commera/api", "packages/storefront", "dashboard/src"} <= paths,
+			paths,
+		)
+
+	def test_dashboard_api_labels_are_extracted(self):
+		path = STARTER_THEME.parents[1] / "api" / "admin" / "orders.py"
+		messages = {message.text for message in extract_messages(path)}
+		self.assertTrue(
+			{
+				"Revenue",
+				"Orders",
+				"Orders to fulfil",
+				"Products live",
+				"Nothing waiting",
+				"Oldest waiting since {0}",
+				"Confirmation pending",
+			}
+			<= messages
 		)
 
 	def test_the_check_reads_t_calls_and_translation_contexts(self):
@@ -154,6 +171,54 @@ class TestArabicSurfaces(IntegrationTestCase):
 		self.assertIn("ابحث باسم المنتج أو اللون أو العلامة التجارية.", search)
 		self.assertIn("سلتك فارغة", cart)
 		self.assertNotIn("Your cart is empty", cart)
+
+	def test_product_defaults_translate_but_merchant_text_stays_unchanged(self):
+		import commera.sdk
+
+		environment = get_theme_environment(get_jenv(), [str(STARTER_THEME)])
+		template = environment.get_template("theme://sections/main_product.html")
+		product = frappe._dict(
+			id="arabic-product",
+			title="Merchant product",
+			currency="INR",
+			price=10,
+			options=[],
+			variants=[],
+			images=[],
+			description_html="",
+			selected_variant_id=None,
+		)
+		for title, text, expected_title, expected_text in (
+			(
+				"Shipping & returns",
+				"Delivery and return options are shown at checkout.",
+				"الشحن والإرجاع",
+				"تُعرض خيارات التوصيل والإرجاع عند إتمام الطلب.",
+			),
+			("Merchant title!", "Merchant terms!", "Merchant title!", "Merchant terms!"),
+		):
+			with self.subTest(title=title):
+				section = frappe._dict(
+					id="main",
+					settings={},
+					blocks=[
+						frappe._dict(
+							settings=frappe._dict(title=title, text=text),
+							editor_attributes="",
+						)
+					],
+				)
+				html = template.render(
+					product=product,
+					section=section,
+					theme={},
+					commera=commera.sdk,
+					in_wishlist=False,
+					breadcrumb_links=[],
+				)
+				self.assertIn(expected_title, html)
+				self.assertIn(expected_text, html)
+				self.assertIn("تُحسب رسوم الشحن والضرائب عند إتمام الطلب.", html)
 
 	def test_sdk_errors_are_in_arabic(self):
 		self.assertEqual(frappe._("Add something to your cart first."), "أضف شيئًا إلى سلتك أولًا.")

@@ -115,8 +115,8 @@ def new_shipping_provider(label: str, app: str | None):
 @commera_commands.command("check-translations")
 @click.option("--lang", default="ar", show_default=True, help="Language code of the translation file")
 def check_translations(lang: str):
-	"""List the strings of the starter theme, the SDK, the storefront package and the dashboard that
-	commera/translations/<lang>.csv does not translate. Exits with 1 when there is one."""
+	"""List missing or broken translations in the starter theme, SDK, API, packages and dashboard.
+	Exits with 1 when commera/translations/<lang>.csv needs a fix."""
 	from commera.localization.untranslated import check_translations, get_messages
 
 	problems = check_translations(lang)

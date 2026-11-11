@@ -23,6 +23,17 @@ class TestCheckoutAddress(IntegrationTestCase):
 		self.customer = self.create_customer()
 		self.item_code = self.create_item()
 
+	def test_address_identifiers_keep_their_type_in_english_in_arabic(self):
+		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
+		frappe.local.lang = "ar"
+		payload = self.checkout_payload()
+		for kind, create in (("Billing", add_billing_address), ("Shipping", add_shipping_address)):
+			with self.subTest(kind=kind):
+				address = create(self.customer, payload)
+				self.assertEqual(address.address_type, kind)
+				self.assertTrue(address.name.startswith(f"Shop {kind} Address - {self.customer}-{kind}-"))
+				self.assertEqual(create(self.customer, payload).name, address.name)
+
 	# -- fixtures ---------------------------------------------------------------------------------
 
 	@classmethod

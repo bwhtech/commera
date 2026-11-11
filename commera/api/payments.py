@@ -1073,7 +1073,11 @@ def add_customer_address(party_name, values: dict):
 	)
 	# ERPNext resolves a transaction address through Dynamic Link; unlinked addresses are refused.
 	address_doc.append("links", {"link_doctype": "Customer", "link_name": party_name})
-	address_doc.insert(ignore_permissions=True)
+	# Frappe's Address autoname translates the type suffix; stored identifiers must stay stable.
+	address_doc.insert(
+		ignore_permissions=True,
+		set_name=f"{address_doc.address_title}-{address_type}-{frappe.generate_hash(length=10)}",
+	)
 	return address_doc
 
 
