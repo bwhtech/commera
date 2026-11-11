@@ -24,8 +24,11 @@ defineProps({
            below, instead of the box's padding pushing it in to 19px. Recheck it
            if that button ever stops defaulting to `md`. -->
       <PageHeaderBackButton v-if="backTo" class="-ms-2 shrink-0 sm:hidden" :fallback-route="backTo" />
-      <Breadcrumbs v-if="breadcrumbs" class="min-w-0" :items="breadcrumbs" />
-      <h1 v-else class="min-w-0 truncate text-lg-semibold text-ink-gray-8">{{ title }}</h1>
+      <!-- `title` slot: a heading with controls in it, which neither a string nor breadcrumbs can carry. -->
+      <slot name="title">
+        <Breadcrumbs v-if="breadcrumbs" class="min-w-0" :items="breadcrumbs" />
+        <h1 v-else class="min-w-0 truncate text-lg-semibold text-ink-gray-8">{{ title }}</h1>
+      </slot>
     </div>
     <div class="flex shrink-0 items-center gap-2">
       <slot name="actions" />

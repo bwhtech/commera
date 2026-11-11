@@ -56,12 +56,6 @@ export const SETTINGS_TABS = [
     keywords: ['market', 'markets', 'country', 'countries', 'currency', 'price list', 'region', 'international', 'tax'],
   },
   {
-    value: 'translations',
-    label: __('Translations'),
-    icon: 'lucide-languages',
-    keywords: ['translation', 'translate', 'language', 'locale', 'csv', 'export', 'import', 'arabic'],
-  },
-  {
     value: 'payments',
     label: __('Payments'),
     icon: 'lucide-credit-card',
