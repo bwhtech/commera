@@ -8,7 +8,7 @@
 
 {% block uncontained_body %}
 <section x-data='checkout({{ checkout_config | tojson }})' class="section-x pt-6 md:pt-10">
-	<h1 class="page-title">{{ _("Checkout") }}</h1>
+	<h1 class="page-title">{{ _("Checkout", context="Storefront checkout") }}</h1>
 
 	{% call empty_state(_("Sign in to check out"), _("Your cart is saved. Sign in and pick up where you left off."), "user", show="sign_in_required") %}
 	<a :href="config.sign_in_url" class="button-primary">{{ _("Sign in") }}</a>

@@ -14,7 +14,7 @@
 
 		<div class="summer-auth-head">
 			<h4 class="mb-0" x-show="selected_tab !== 'checkout'">{{ _("Let's get started") }}</h4>
-			<h4 class="mb-0" x-show="selected_tab === 'checkout'" x-cloak>{{ _("Checkout") }}</h4>
+			<h4 class="mb-0" x-show="selected_tab === 'checkout'" x-cloak>{{ _("Checkout", context="Storefront checkout") }}</h4>
 			<button type="button" class="btn-close" @click="close_dialog()"
 				aria-label="{{ _('Close') }}">&times;</button>
 		</div>

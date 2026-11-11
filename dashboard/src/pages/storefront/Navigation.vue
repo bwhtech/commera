@@ -9,7 +9,7 @@ import FooterEditor from '../../components/storefront/FooterEditor.vue'
 
 const MENUS = [
   { label: __('Main navigation'), value: 'main' },
-  { label: __('Footer'), value: 'footer' },
+  { label: __('Footer', null, 'Storefront navigation'), value: 'footer' },
 ]
 
 const menuId = ref('main')

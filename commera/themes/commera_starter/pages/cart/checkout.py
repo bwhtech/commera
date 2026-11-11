@@ -25,5 +25,7 @@ def get_context(context):
 		"pickup_titles": {location["id"]: location["title"] for location in context.pickup_locations},
 		"sign_in_url": f"{url('/account/login')}?redirect-to={url('/cart/checkout')}",
 	}
-	context.seo = seo.build_page_seo({"noindex": 1}, display_name=_("Checkout"))
+	context.seo = seo.build_page_seo(
+		{"noindex": 1}, display_name=_("Checkout", context="Storefront checkout")
+	)
 	return context

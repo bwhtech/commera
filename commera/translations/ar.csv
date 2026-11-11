@@ -5,7 +5,7 @@ Product,منتج
 Inventory,المخزون
 Home,الرئيسية
 Navigation,التنقل
-Footer,التذييل
+Footer,تذييل الصفحة
 Storefront,واجهة المتجر
 Catalog,الكتالوج
 Sales,المبيعات
@@ -201,7 +201,7 @@ Change email,تغيير البريد الإلكتروني
 New here?,جديد هنا؟
 Already have an account?,لديك حساب بالفعل؟
 Close,إغلاق
-Checkout,إتمام الطلب
+Checkout,الدفع
 Contact,معلومات التواصل
 Signed in as,تم تسجيل الدخول باسم
 Change,تغيير
@@ -292,7 +292,7 @@ Your cart is saved. Sign in and pick up where you left off.,سلتك محفوظ�
 Loading checkout,جارٍ تحميل صفحة إتمام الطلب
 Name,الاسم
 {0} to {1},من {0} إلى {1}
-{0} products,{0} منتج
+{0} products,عدد المنتجات: {0}
 Products you add to this section show here.,تظهر هنا المنتجات التي تضيفها إلى هذا القسم.
 Instagram,إنستغرام
 Facebook,فيسبوك
@@ -717,7 +717,7 @@ Uploading photos,جارٍ رفع الصور
 {0} of {1} uploaded,تم رفع {0} من {1}
 Drop your photos here,أفلت صورك هنا
 Browse photos,تصفّح الصور
-of {0} photos matched to a product,من {0} صورة طابقت منتجًا
+of {0} photos matched to a product,من أصل {0} صورة تمت مطابقتها بمنتج
 could not be matched,تعذّرت مطابقتها
 of {0} products still have no photo,من {0} منتجًا ما زالت بلا صورة
 Files we could not place,ملفات تعذّر وضعها
@@ -751,7 +751,7 @@ Skipping a column is safe,تخطّي عمود آمن
 "Anything you leave out never reaches your catalogue, and your own file stays untouched.",أي شيء تتركه لن يصل إلى كتالوجك أبدًا، ويبقى ملفك كما هو.
 Check before it goes live,راجِع قبل النشر
 Nothing has been saved yet. Rows with an error are left out entirely; everything else imports.,لم يُحفظ شيء بعد. تُستبعد الصفوف التي فيها خطأ بالكامل؛ ويُستورد كل ما عداها.
-ready to import,جاهزة للاستيراد
+ready to import,صفوف جاهزة للاستيراد
 "warnings, still imported",تحذيرات، ستُستورد مع ذلك
 "errors, skipped",أخطاء، ستُتخطّى
 products,منتجات
@@ -885,8 +885,8 @@ Not published,غير منشور
 No option has a storefront address yet. One is generated when an option is first saved.,لا يوجد لأي خيار عنوان في واجهة المتجر بعد. يُنشأ العنوان عند حفظ الخيار أول مرة.
 At a glance,لمحة سريعة
 Available,متاح
-sold,مُباع
-orders,طلبات
+sold,الوحدات المباعة
+orders,الطلبات
 revenue,إيرادات
 {0} out of stock,{0} نفد من المخزون
 {0} running low,{0} أوشك على النفاد
@@ -949,8 +949,8 @@ Order value,قيمة الطلب
 Charge account,حساب الرسوم
 Where the COD and delivery charges post in your books.,الحساب الذي تُقيَّد فيه رسوم الدفع عند الاستلام ورسوم التوصيل في دفاترك.
 How shoppers check out.,طريقة إتمام المتسوقين لطلباتهم.
-Guest checkout may still be on. This panel just cannot say.,قد يكون الدفع كزائر مُفعّلًا. هذه اللوحة لا تستطيع التأكد.
-Allow guest checkout,السماح بالدفع كزائر
+Guest checkout may still be on. This panel just cannot say.,قد يكون إتمام الطلب كزائر مُفعّلًا. لا يمكن التأكد من هذه اللوحة.
+Allow guest checkout,السماح بإتمام الطلب كزائر
 "Off, and shoppers sign in with an emailed code before they pay. Past guest orders stay viewable.",عند إيقافه، يسجّل المتسوقون الدخول برمز يصلهم بالبريد الإلكتروني قبل الدفع. وتبقى طلبات الزوار السابقة قابلة للعرض.
 Order link shows full details for (days),يعرض رابط الطلب التفاصيل الكاملة لمدة (أيام)
 "The emailed order link shows the address and payment for this long, then only status and tracking. 0 means always.",يعرض رابط الطلب المرسل بالبريد الإلكتروني العنوان والدفع لهذه المدة، ثم الحالة والتتبع فقط. 0 يعني دائمًا.
@@ -1774,8 +1774,8 @@ Sets the struck-through reference price shown above the real price.,يحدّد �
 {0} of {1} items given a compare-at price. {2} failed,حُدّد السعر قبل الخصم لـ {0} من {1} أصناف. فشل {2}
 Edit prices,تعديل الأسعار
 "{0} sellable units · one row per variant, priced individually on its product",{0} وحدات قابلة للبيع · صف لكل متغيّر، مسعّر بشكل منفصل في منتجه
-1 item selected,تم تحديد عنصر واحد
-{0} items selected,تم تحديد {0} عناصر
+1 item selected,تم تحديد صنف واحد
+{0} items selected,الأصناف المحددة: {0}
 Select items to act on them,حدّد أصنافًا لتنفيذ إجراءات عليها
 Set compare-at,تحديد السعر قبل الخصم
 Item,الصنف
@@ -1881,7 +1881,7 @@ Bought,الشراء
 The storefront doesn't record search terms.,لا تسجّل واجهة المتجر كلمات البحث.
 Sessions,الجلسات
 Conversion,التحويل
-Checkout completion,إكمال إتمام الطلب
+Checkout completion,معدل إتمام الطلب
 "Who reaches the store, what they look at, where they drop out. {0}.",من يصل إلى المتجر، وما يشاهده، وأين يتوقف. {0}.
 Sessions over time,الجلسات عبر الزمن
 No sessions in this period,لا توجد جلسات في هذه الفترة
@@ -1962,3 +1962,6 @@ Shoppers only see the live theme.,لا يرى المتسوقون إلا القا
 Leave,مغادرة,Leave the page
 Not permitted.,غير مسموح.
 Not found.,غير موجود.
+Review,التقييم,Product review
+Checkout,إتمام الطلب,Storefront checkout
+Footer,التذييل,Storefront navigation

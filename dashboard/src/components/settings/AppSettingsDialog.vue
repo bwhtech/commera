@@ -137,7 +137,7 @@ watch(
         </SettingsNavItem>
       </SettingsNavGroup>
 
-      <SettingsNavGroup :label="__('Checkout')">
+      <SettingsNavGroup :label="__('Checkout', null, 'Storefront checkout')">
         <SettingsNavItem value="payments">
           <template #prefix><span class="lucide-credit-card size-4" aria-hidden="true" /></template>
           {{ __('Payments') }}

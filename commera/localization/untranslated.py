@@ -5,7 +5,9 @@ import os
 import re
 from collections import Counter
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from pathlib import Path
+from string import Formatter
 
 from frappe.gettext.extractors.utils import extract_messages_from_code
 from frappe.translate import (
@@ -32,10 +34,12 @@ SKIPPED_DIRS = {"node_modules", "test", "tests", "dist", "__pycache__"}
 EXTENSIONS = (".py", ".js", ".vue", ".html")
 
 # Frappe extracts `_()` and `__()` only. The storefront package and Alpine bindings call `t()`.
-CLIENT_T_PATTERN = re.compile(
-	r"(?<![\w.$])(?:commera\.)?t\(\s*(?P<quote>['\"])(?P<message>(?:\\.|(?!(?P=quote)).)*?)(?P=quote)\s*[,)]"
+CLIENT_T_START = re.compile(r"(?<![\w.$])(?:commera\.)?t\s*\(\s*")
+CLIENT_T_LITERAL = re.compile(
+	r"(?P<quote>['\"`])(?P<message>(?:\\.|(?!(?P=quote)).)*?)(?P=quote)\s*[,)]",
+	re.DOTALL,
 )
-PLACEHOLDER_PATTERN = re.compile(r"\{\w*\}|%(?:\(\w+\))?[sd]|</?[a-zA-Z][\w-]*")
+PLACEHOLDER_PATTERN = re.compile(r"%(?:\(\w+\))?[sd]|</?[a-zA-Z][\w-]*")
 
 
 @dataclass(frozen=True)
@@ -67,7 +71,7 @@ def check_translations(lang: str) -> list[Problem]:
 		translation = translations.get(message.key)
 		if not translation:
 			problems.append(Problem(message, "untranslated"))
-		elif get_markup(message.text) != get_markup(translation):
+		elif not markup_matches(message.text, translation):
 			problems.append(Problem(message, "placeholders or tags differ"))
 	return problems
 
@@ -116,7 +120,10 @@ def extract_messages(path: Path) -> list[Message]:
 		found = extract_messages_from_python_code(code)
 	else:
 		found = [tuple(row) for row in extract_messages_from_code(code)]
-		found += extract_client_t_messages(code)
+		try:
+			found += extract_client_t_messages(code)
+		except ValueError as error:
+			raise ValueError(f"{path}: {error}") from error
 	if path.suffix == ".js":
 		found += extract_messages_from_javascript_code(code)
 	shown_path = str(path.relative_to(APP_ROOT) if path.is_relative_to(APP_ROOT) else path)
@@ -124,16 +131,79 @@ def extract_messages(path: Path) -> list[Message]:
 
 
 def extract_client_t_messages(code: str) -> list[tuple[int, str, None]]:
-	return [
-		(code.count("\n", 0, match.start()) + 1, unescape(match.group("message")), None)
-		for match in CLIENT_T_PATTERN.finditer(code)
-		if re.search("[a-zA-Z]", match.group("message"))
-	]
+	code = re.sub(
+		r"(?m)^\s*//[^\n]*|/\*.*?\*/|<!--.*?-->",
+		lambda match: re.sub(r"[^\n]", " ", match.group()),
+		code,
+		flags=re.DOTALL,
+	)
+	messages = []
+	for call in CLIENT_T_START.finditer(code):
+		if re.search(r"function\s+$", code[: call.start()]):
+			continue
+		line = code.count("\n", 0, call.start()) + 1
+		literal = CLIENT_T_LITERAL.match(code, call.end())
+		if not literal or (literal.group("quote") == "`" and "${" in literal.group("message")):
+			raise ValueError(f"line {line}: translation argument must be a static literal")
+		messages.append((line, unescape(literal.group("message")), None))
+	return messages
 
 
 def unescape(text: str) -> str:
-	return re.sub(r"\\(['\"\\])", r"\1", text)
+	return re.sub(r"\\(['\"`\\])", r"\1", text)
+
+
+def markup_matches(source: str, translation: str) -> bool:
+	try:
+		return get_markup(source) == get_markup(translation)
+	except ValueError:
+		return False
 
 
 def get_markup(text: str) -> Counter:
-	return Counter(PLACEHOLDER_PATTERN.findall(text))
+	parser = TranslationHTMLParser()
+	parser.feed(text)
+	if parser.stack:
+		raise ValueError("unclosed HTML tag")
+	markup = Counter(PLACEHOLDER_PATTERN.findall(text))
+	for _, field, spec, conversion in Formatter().parse(text):
+		if field is not None:
+			markup[(field, spec, conversion)] += 1
+			markup.update(get_markup(spec))
+	return markup
+
+
+class TranslationHTMLParser(HTMLParser):
+	VOID_TAGS = frozenset(
+		{
+			"area",
+			"base",
+			"br",
+			"col",
+			"embed",
+			"hr",
+			"img",
+			"input",
+			"link",
+			"meta",
+			"param",
+			"source",
+			"track",
+			"wbr",
+		}
+	)
+
+	def __init__(self):
+		super().__init__()
+		self.stack = []
+
+	def handle_starttag(self, tag, attrs):
+		if tag not in self.VOID_TAGS:
+			self.stack.append(tag)
+
+	def handle_startendtag(self, tag, attrs):
+		pass
+
+	def handle_endtag(self, tag):
+		if not self.stack or self.stack.pop() != tag:
+			raise ValueError("mis-nested HTML tags")

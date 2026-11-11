@@ -10,8 +10,10 @@ from commera.api.storefront.translations import get_translations
 from commera.localization.untranslated import (
 	Message,
 	check_translations,
+	extract_client_t_messages,
 	extract_messages,
 	get_messages,
+	markup_matches,
 )
 from commera.shop_themes.theme_resolver import get_theme_environment
 from commera.tests.test_localization import use_storefront_languages
@@ -38,10 +40,12 @@ class TestArabicCatalog(IntegrationTestCase):
 			"sample.vue",
 			"<p x-text=\"commera.t('Please Select')\"></p>\n"
 			"{{ __('Updated', null, 'Date last updated') }}\n"
-			"<b>{{ format(count) }} {{ t(`skipped`) }}</b>",
+			"<b>{{ format(count) }} {{ t(`Hello`) }}</b>",
 		)
 		found = {(message.text, message.context, message.line) for message in extract_messages(path)}
-		self.assertEqual(found, {("Please Select", None, 1), ("Updated", "Date last updated", 2)})
+		self.assertEqual(
+			found, {("Please Select", None, 1), ("Updated", "Date last updated", 2), ("Hello", None, 3)}
+		)
 
 	def test_a_missing_or_broken_translation_fails_the_check(self):
 		messages = [
@@ -57,6 +61,23 @@ class TestArabicCatalog(IntegrationTestCase):
 			problems = [(problem.message.text, problem.reason) for problem in check_translations("ar")]
 
 		self.assertEqual(problems, [("Hello {0}", "placeholders or tags differ"), ("New", "untranslated")])
+
+	def test_dynamic_translation_arguments_are_rejected(self):
+		for code in [
+			"t(message)",
+			"t (message)",
+			"t('Hello' + name)",
+			"t(`Hello ${name}`)",
+			"commera.t(prefix + 'Hello')",
+		]:
+			with self.subTest(code=code), self.assertRaisesRegex(ValueError, "line 1"):
+				extract_client_t_messages(code)
+
+	def test_markup_requires_nested_tags_and_complete_format_fields(self):
+		self.assertFalse(markup_matches("<b><i>Hello</i></b>", "<b><i>مرحبا</b></i>"))
+		self.assertFalse(markup_matches("{0:.2f}", "{0}"))
+		self.assertFalse(markup_matches("{value!r:>{width}}", "{value!s:>{width}}"))
+		self.assertTrue(markup_matches("<b>{0:.2f}</b><br>", "<b>{0:.2f}</b><br>"))
 
 	def write_source(self, name, code):
 		path = Path(frappe.get_site_path("private", "files", name))

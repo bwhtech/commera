@@ -108,7 +108,7 @@ async function togglePublished(row) {
         :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['1fr', '9rem', '9rem', '7rem', '5rem'] }"
       >
         <ListHeader>
-          <ListHeaderCell>{{ __('Review') }}</ListHeaderCell>
+          <ListHeaderCell>{{ __('Review', null, 'Product review') }}</ListHeaderCell>
           <ListHeaderCell class="max-sm:hidden">{{ __('Product') }}</ListHeaderCell>
           <ListHeaderCell class="max-sm:hidden">{{ __('Shopper') }}</ListHeaderCell>
           <ListHeaderCell class="max-sm:hidden">{{ __('Submitted', null, 'Date a review was submitted') }}</ListHeaderCell>
