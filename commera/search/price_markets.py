@@ -9,10 +9,11 @@ from frappe.utils import create_batch, flt
 from commera.base_prices import base_price_filters, is_base_price
 from commera.card_prices import get_card_price
 from commera.localization.content import SHOP_WIDE
+from commera.localization.languages import StorefrontLanguages
 from commera.localization.market_prices import MarketPrices
-from commera.localization.markets import Market, StorefrontMarkets
+from commera.localization.markets import Market, StorefrontMarkets, fetch_market_rows
 from commera.localization.resolver import get_localization
-from commera.utils import IN_CLAUSE_CHUNK_SIZE
+from commera.utils import IN_CLAUSE_CHUNK_SIZE, get_store_currency
 
 PRODUCT_DOCTYPE = "Style Attribute Variant"
 # The card price columns each market row holds.
@@ -26,15 +27,29 @@ PRICE_COLUMNS = (
 )
 
 
-def get_price_markets(markets: StorefrontMarkets | None = None) -> dict[str, MarketPrices]:
+def get_price_markets(
+	markets: StorefrontMarkets | None = None, store: MarketPrices | None = None
+) -> dict[str, MarketPrices]:
 	"""{key: prices} of each market the index prices: the store, and each enabled market with lists."""
 	markets = markets or StorefrontMarkets.load()
-	priced = {SHOP_WIDE: MarketPrices.of(markets.primary)}
+	priced = {SHOP_WIDE: store or MarketPrices.of(markets.primary)}
 	for market in markets.secondary:
-		prices = MarketPrices.of(market)
-		if not prices.uses_store_prices:
-			priced[market.handle] = prices
+		if market.sale_price_list:
+			priced[market.handle] = MarketPrices.of(market)
 	return priced
+
+
+def fresh_price_markets() -> dict[str, MarketPrices]:
+	"""get_price_markets from the database, not the caches: they can predate another worker's save."""
+	settings = frappe.get_doc("Commera Settings")
+	store = MarketPrices(True, settings.sale_price_list, settings.default_price_list, get_store_currency())
+	return get_price_markets(fresh_markets(settings), store)
+
+
+def fresh_markets(settings=None) -> StorefrontMarkets:
+	"""StorefrontMarkets from the database, not the caches."""
+	settings = settings or frappe.get_doc("Commera Settings")
+	return StorefrontMarkets(StorefrontLanguages.from_settings(settings), fetch_market_rows())
 
 
 def get_price_market(market: Market | None = None) -> str:
@@ -53,9 +68,9 @@ def price_generation(settings, markets: StorefrontMarkets | None = None) -> list
 	return [settings.sale_price_list, settings.default_price_list, lists]
 
 
-def prices_for_variants(names, sizes_by_variant) -> dict[str, dict[str, dict]]:
+def prices_for_variants(names, sizes_by_variant, price_markets=None) -> dict[str, dict[str, dict]]:
 	"""{variant: {market key: card prices}} of `names`, as card_prices_by_variant prices them."""
-	price_markets = get_price_markets()
+	price_markets = price_markets or get_price_markets()
 	codes_by_variant = {
 		name: [size["item_code"] for size in sizes_by_variant.get(name, []) if size.get("item_code")]
 		for name in names

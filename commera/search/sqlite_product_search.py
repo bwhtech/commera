@@ -16,6 +16,7 @@ from frappe.utils import create_batch, flt
 
 from commera.localization.content import SHOP_WIDE
 from commera.localization.languages import StorefrontLanguages
+from commera.search import price_seq
 from commera.search.arabic import arabic_search_forms, arabic_word_forms, is_arabic_query
 from commera.search.engine import (
 	CARD_COLUMNS,
@@ -36,12 +37,10 @@ from commera.search.record_builder import (
 	build_product_search_records,
 )
 from commera.search.translations import (
-	fresh_markets,
 	get_search_markets,
 	index_generation,
 	rebuild_if_generation_changes,
 )
-from commera.search.write_lock import locked_index_write
 
 PRODUCT_DOCTYPE = "Style Attribute Variant"
 CATEGORY_DOCTYPE = "Ecommerce Category"
@@ -56,9 +55,8 @@ MAX_EDIT_DISTANCE_FALLBACK = 2
 SEARCH_CLASS_PATH = "commera.search.sqlite_product_search.SqliteProductSearch"
 CORE_BUILD_INDEX = "frappe.search.sqlite_search.build_index"
 BUILD_TIMEOUT = 2 * 60 * 60 + 10 * 60
-# The price refresh holds the write lock longer than an incremental write may.
-REFRESH_LOCK_TIMEOUT = 10 * 60
-REFRESH_BLOCKING_TIMEOUT = 60
+# A build's batches price from cached lists; its refresh replaces them, as does any stamped write.
+BUILD_PRICE_SEQ = 0
 
 ARABIC_SCRIPT_LANGUAGES = {"ar", "fa", "ur"}
 # Sorts after every character, so `word < prefix + LAST_CHARACTER` bounds a prefix range.
@@ -145,15 +143,16 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 				and self._table_exists("product_detail")
 				and self._table_exists("search_language")
 				and self._table_exists("search_price")
-				and self._table_exists("search_price_market")
-				and self.fts_has_columns(("market",))
+				and self._table_exists("search_price_stamp")
+				and self.has_columns("search_price_market", ("seq",))
+				and self.has_columns("search_fts", ("market",))
 			)
 			self.index_exists_cache = cached
 		return cached
 
-	def fts_has_columns(self, columns):
+	def has_columns(self, table, columns):
 		try:
-			rows = self.sql("PRAGMA table_info(search_fts)", read_only=True)
+			rows = self.sql(f"PRAGMA table_info({table})", read_only=True)
 		except sqlite3.Error:
 			return False
 		existing = {row["name"] for row in rows}
@@ -198,14 +197,25 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			"sale_end_date TEXT, PRIMARY KEY (market, doc_id))"
 		)
 		cursor.execute("CREATE INDEX IF NOT EXISTS idx_search_price_doc ON search_price(doc_id)")
+		# The price sequence each product's rows were read at (price_seq). Kept when its rows go.
+		cursor.execute(
+			"CREATE TABLE IF NOT EXISTS search_price_stamp (doc_id TEXT PRIMARY KEY, seq INTEGER NOT NULL)"
+		)
 		# The markets this build prices. A search in any other market is served by frappe.qb.
-		cursor.execute("CREATE TABLE IF NOT EXISTS search_price_market (market TEXT PRIMARY KEY)")
-		self.write_price_markets(cursor, get_price_markets())
+		cursor.execute(
+			"CREATE TABLE IF NOT EXISTS search_price_market (market TEXT PRIMARY KEY, seq INTEGER NOT NULL)"
+		)
+		self.write_price_markets(cursor, BUILD_PRICE_SEQ, get_price_markets())
 
-	def write_price_markets(self, cursor, price_markets):
+	def write_price_markets(self, cursor, seq, price_markets):
+		"""Replace the priced markets, unless a writer that read a newer sequence replaced them."""
+		stored = cursor.execute("SELECT MAX(seq) FROM search_price_market").fetchone()[0]
+		if stored is not None and stored > seq:
+			return
 		cursor.execute("DELETE FROM search_price_market")
 		cursor.executemany(
-			"INSERT INTO search_price_market (market) VALUES (?)", [(key,) for key in price_markets]
+			"INSERT INTO search_price_market (market, seq) VALUES (?, ?)",
+			[(key, seq) for key in price_markets],
 		)
 
 	def product_detail_column_defs(self):
@@ -237,33 +247,28 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		rebuild_if_generation_changes(self, generation, SEARCH_CLASS_PATH)
 
 	def refresh_prices(self):
-		"""Rewrite every product's prices and the priced markets from reads made under the write lock.
-		Idempotent: whichever refresh or incremental write runs last reads the newest prices."""
+		"""Rewrite every product's prices and the priced markets from a fresh read. Raises on failure,
+		so the build fails and a retry reconciles. Rows a newer read stamped stay (price_seq)."""
 		self.index_exists_cache = None
-		if self.index_exists():
-			locked_index_write(
-				self.write_fresh_prices,
-				timeout=REFRESH_LOCK_TIMEOUT,
-				blocking_timeout=REFRESH_BLOCKING_TIMEOUT,
-			)
-
-	def write_fresh_prices(self):
-		price_markets = get_price_markets(fresh_markets())
+		if not self.index_exists():
+			return
+		read = price_seq.PriceRead.begin()
 		products = frappe.qb.get_query(PRODUCT_DOCTYPE, filters=self.product_filters(), fields=["name"])
-		prices = all_card_prices(products, price_markets)
-		rows = [
-			(f"{PRODUCT_DOCTYPE}:{name}", market, *(snapshot.get(column) for column in PRICE_COLUMNS))
-			for name, by_market in prices.items()
-			for market, snapshot in by_market.items()
-		]
+		prices = {
+			f"{PRODUCT_DOCTYPE}:{name}": by_market
+			for name, by_market in all_card_prices(products, read.price_markets).items()
+		}
 
 		def replace_prices(cursor):
-			# One SQLite transaction: a reader sees the old prices or the new ones.
-			cursor.execute("DELETE FROM search_price")
-			self.insert_price_rows(cursor, rows)
-			self.write_price_markets(cursor, price_markets)
+			# A product this read did not find loses its rows.
+			for (doc_id,) in cursor.execute(
+				"SELECT doc_id FROM search_price UNION SELECT doc_id FROM search_price_stamp"
+			).fetchall():
+				prices.setdefault(doc_id, {})
+			self.write_stamped_prices(cursor, read.seq, prices)
+			self.write_price_markets(cursor, read.seq, read.price_markets)
 
-		self._with_connection(replace_prices)
+		self.write_transaction(replace_prices)
 
 	def product_filters(self):
 		return self.INDEXABLE_DOCTYPES[PRODUCT_DOCTYPE]["filters"]
@@ -323,9 +328,11 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 	# -- record overlay -------------------------------------------------------------------------
 
-	def build_records_for(self, doctype, names):
+	def build_records_for(self, doctype, names, price_markets=None):
 		builder = self.RECORD_BUILDERS.get(doctype)
-		records = builder(names) if builder else []
+		if not builder:
+			return {}
+		records = builder(names, price_markets) if doctype == PRODUCT_DOCTYPE else builder(names)
 		return {record["name"]: record for record in records}
 
 	def overlay_records(self, docs, records):
@@ -377,13 +384,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	def index_doc(self, doctype, docname):
 		"""Rebuild and write one doc's index rows directly."""
 		# Not core's queue path: it re-reads the doc without the record overlay and wipes product_detail rows.
-		self.raise_if_not_indexed()
-		records = self.build_records_for(doctype, [docname])
-		record = records.get(docname)
-		if not record:
-			self.remove_doc(doctype, docname)
-			return
-		self._index_documents(self.documents_for(doctype, [docname], records))
+		self.index_docs(doctype, [docname])
 
 	def index_docs(self, doctype, names):
 		"""Re-sync many docs at once: one batched record build, one FTS write, one delete pass."""
@@ -392,9 +393,10 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		if not names:
 			return
 
-		records = self.build_records_for(doctype, names)
-		self._index_documents(self.documents_for(doctype, names, records))
-		self.remove_docs(doctype, [name for name in names if name not in records])
+		read = price_seq.PriceRead.begin()
+		records = self.build_records_for(doctype, names, read.price_markets)
+		self._index_documents(self.documents_for(doctype, names, records), seq=read.seq)
+		self.remove_docs(doctype, [name for name in names if name not in records], seq=read.seq)
 
 	def documents_for(self, doctype, names, records):
 		"""Indexable documents for the names that produced a record, overlaid with their record data."""
@@ -412,20 +414,33 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		self.overlay_records(docs, records)
 		return [document for document in (self.prepare_document(doc) for doc in docs) if document]
 
-	def _index_documents(self, documents):
+	def _index_documents(self, documents, seq=BUILD_PRICE_SEQ):
+		"""`seq`: the price sequence the caller read before its prices (price_seq.PriceRead)."""
 		super()._index_documents(documents)
 
 		def index_siblings(cursor):
+			prices = {}
 			for document in documents:
 				doc_id = document.get("id")
 				if not doc_id:
 					continue
 				self.write_search_size(cursor, doc_id, document.get("_sizes") or [])
 				self.write_product_detail(cursor, doc_id, document.get("_detail"))
-				self.write_search_prices(cursor, doc_id, document.get("_market_prices") or {})
+				if document.get("doctype") == PRODUCT_DOCTYPE:
+					prices[doc_id] = document.get("_market_prices") or {}
+			self.write_stamped_prices(cursor, seq, prices)
 			self.write_market_rows(cursor, documents)
 
-		self._with_connection(index_siblings)
+		self.write_transaction(index_siblings)
+
+	def write_transaction(self, write):
+		"""Run write(cursor) in one SQLite transaction that holds the write lock from its first read."""
+
+		def run(cursor):
+			cursor.execute("BEGIN IMMEDIATE")
+			write(cursor)
+
+		self._with_connection(run)
 
 	def write_market_rows(self, cursor, documents):
 		"""A row per market title of each document. Core's write deleted the old ones with its doc_id."""
@@ -445,13 +460,29 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		if rows:
 			cursor.executemany("INSERT INTO search_size (doc_id, size, item_code) VALUES (?, ?, ?)", rows)
 
-	def write_search_prices(self, cursor, doc_id, market_prices):
-		cursor.execute("DELETE FROM search_price WHERE doc_id = ?", (doc_id,))
+	def write_stamped_prices(self, cursor, seq, prices_by_doc):
+		"""Replace the rows of each doc in {doc_id: {market: prices}} and stamp it `seq`. A doc stamped
+		higher keeps its rows: that writer read the database later. Run it in write_transaction()."""
+		newer = {
+			doc_id
+			for (doc_id,) in cursor.execute(
+				"SELECT doc_id FROM search_price_stamp WHERE seq > ?", (seq,)
+			).fetchall()
+		}
+		doc_ids = [doc_id for doc_id in prices_by_doc if doc_id not in newer]
+		for chunk in create_batch(doc_ids, SQLITE_PARAM_CHUNK_SIZE):
+			placeholders = ", ".join("?" for _ in chunk)
+			cursor.execute(f"DELETE FROM search_price WHERE doc_id IN ({placeholders})", chunk)
 		rows = [
 			(doc_id, market, *(prices.get(column) for column in PRICE_COLUMNS))
-			for market, prices in market_prices.items()
+			for doc_id in doc_ids
+			for market, prices in prices_by_doc[doc_id].items()
 		]
 		self.insert_price_rows(cursor, rows)
+		cursor.executemany(
+			"INSERT OR REPLACE INTO search_price_stamp (doc_id, seq) VALUES (?, ?)",
+			[(doc_id, seq) for doc_id in doc_ids],
+		)
 
 	def insert_price_rows(self, cursor, rows):
 		columns = ("doc_id", "market", *PRICE_COLUMNS)
@@ -479,16 +510,27 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		doc_id = f"{doctype}:{docname}"
 		self.sql("DELETE FROM search_size WHERE doc_id = ?", (doc_id,), commit=True)
 		self.sql("DELETE FROM product_detail WHERE doc_id = ?", (doc_id,), commit=True)
-		self.sql("DELETE FROM search_price WHERE doc_id = ?", (doc_id,), commit=True)
+		self.remove_prices(doctype, [doc_id], price_seq.read_price_seq())
 
-	def remove_docs(self, doctype, names):
+	def remove_docs(self, doctype, names, seq=None):
 		"""Drop many docs from the FTS table and its sibling tables."""
 		self.raise_if_not_indexed()
-		for chunk in create_batch(list(names), SQLITE_PARAM_CHUNK_SIZE):
+		names = list(names)
+		if not names:
+			return
+		seq = price_seq.read_price_seq() if seq is None else seq
+		for chunk in create_batch(names, SQLITE_PARAM_CHUNK_SIZE):
 			doc_ids = tuple(f"{doctype}:{name}" for name in chunk)
 			placeholders = ", ".join("?" for _ in doc_ids)
-			for table in ("search_fts", "search_size", "product_detail", "search_price"):
+			for table in ("search_fts", "search_size", "product_detail"):
 				self.sql(f"DELETE FROM {table} WHERE doc_id IN ({placeholders})", doc_ids, commit=True)
+		self.remove_prices(doctype, [f"{doctype}:{name}" for name in names], seq)
+
+	def remove_prices(self, doctype, doc_ids, seq):
+		"""Drop the price rows of `doc_ids` and keep their stamps: an older read cannot add them back."""
+		if doctype == PRODUCT_DOCTYPE:
+			prices = {doc_id: {} for doc_id in doc_ids}
+			self.write_transaction(lambda cursor: self.write_stamped_prices(cursor, seq, prices))
 
 	# -- card hydration -------------------------------------------------------------------------
 

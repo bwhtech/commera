@@ -5,6 +5,7 @@ from frappe.query_builder import DocType
 
 from commera.search.build import enqueue_full_rebuild
 from commera.search.price_markets import get_price_markets
+from commera.search.price_seq import bump_price_seq_after_commit
 from commera.search.source_sync import PRODUCT_DOCTYPE, queue_variants
 from commera.search.sync import skip_batch_sync
 
@@ -22,6 +23,7 @@ def on_item_price_change(doc, method=None):
 		if version and version.price_list in price_lists and is_base_price(version)
 	}
 	if item_codes:
+		bump_price_seq_after_commit()
 		queue_variants(get_published_variants(sorted(item_codes)))
 
 
@@ -52,6 +54,7 @@ def rebuild_if_market_prices_change(before, after):
 	"""Commera Market on_update and on_trash. Every product has a row per market, so rebuild."""
 	if skip_batch_sync() or get_market_price_lists(before) == get_market_price_lists(after):
 		return
+	bump_price_seq_after_commit()
 	enqueue_full_rebuild(deduplicate=True)
 
 

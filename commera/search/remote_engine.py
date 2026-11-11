@@ -14,9 +14,9 @@ from commera.product_detail import size_sort_key
 from commera.search.engine import CARD_COLUMNS, SearchEngineBase, empty_facets, empty_typeahead
 from commera.search.http_client import SearchServerError
 from commera.search.price_markets import get_price_market
+from commera.search.price_seq import PriceRead, refresh_snapshot
 from commera.search.record_builder import build_category_search_records, build_product_search_records
 from commera.search.translations import index_generation, rebuild_if_generation_changes
-from commera.search.write_lock import locked_index_write, refresh_snapshot
 
 PRODUCT_DOCTYPE = "Style Attribute Variant"
 CATEGORY_DOCTYPE = "Ecommerce Category"
@@ -207,7 +207,7 @@ class RemoteSearchEngine(SearchEngineBase):
 
 	def index_docs(self, doctype, names):
 		names = list(names)
-		uid, documents = self.documents_for(doctype, names)
+		uid, documents = self.documents_for(doctype, names, PriceRead.begin().price_markets)
 		if documents:
 			self.upsert(uid, documents)
 		indexed = {document["name"] for document in documents}
@@ -220,11 +220,11 @@ class RemoteSearchEngine(SearchEngineBase):
 	def uid_for(self, doctype):
 		return self.products_uid if doctype == PRODUCT_DOCTYPE else self.categories_uid
 
-	def documents_for(self, doctype, names):
+	def documents_for(self, doctype, names, price_markets=None):
 		"""The target index and its documents for `names`; a name that no longer qualifies yields none."""
 		if doctype == PRODUCT_DOCTYPE:
 			return self.products_uid, [
-				product_document(record) for record in build_product_search_records(names)
+				product_document(record) for record in build_product_search_records(names, price_markets)
 			]
 		return self.categories_uid, [
 			category_document(record) for record in build_category_search_records(names)
@@ -264,14 +264,14 @@ class RemoteSearchEngine(SearchEngineBase):
 
 	def rewrite_products(self, started):
 		"""Rewrite each product from fresh reads: a price save leaves the product's `modified` as is.
-		Each chunk reads under the write lock, so no chunk lands an older price over a newer write."""
+		No server API here writes conditionally, so a chunk can land over a newer job until the next rewrite."""
 		refresh_snapshot()
 		names = {
 			*frappe.get_all(PRODUCT_DOCTYPE, filters={"is_published": 1}, pluck="name"),
 			*frappe.get_all(PRODUCT_DOCTYPE, filters={"modified": (">=", started)}, pluck="name"),
 		}
 		for chunk in create_batch(sorted(names), BATCH_SIZE):
-			locked_index_write(lambda chunk=chunk: self.index_docs(PRODUCT_DOCTYPE, chunk))
+			self.index_docs(PRODUCT_DOCTYPE, chunk)
 
 	def drop_index(self):
 		self.drop_indexes()

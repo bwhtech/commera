@@ -74,7 +74,8 @@ def get_indexable_docs(doctype, filters, names, fields):
 	return rows
 
 
-def build_product_search_records(variant_names=None):
+def build_product_search_records(variant_names=None, price_markets=None):
+	"""`price_markets`: the price lists a writer read fresh. A build's batches use the cached ones."""
 	configured_fields = get_configured_content_fields()
 	variant_content_fields = fields_by_doctype(configured_fields, "Style Attribute Variant")
 	item_content_fields = fields_by_doctype(configured_fields, "Item")
@@ -109,7 +110,7 @@ def build_product_search_records(variant_names=None):
 	names = [variant.name for variant in variants]
 	sizes_by_variant = sizes_for_variants(names)
 	images_by_variant = images_for_variants(names)
-	prices_by_variant = prices_for_variants(names, sizes_by_variant)
+	prices_by_variant = prices_for_variants(names, sizes_by_variant, price_markets)
 	titles_by_variant = get_translated_titles("Style Attribute Variant", variants)
 	market_titles = get_market_titles("Style Attribute Variant", names)
 

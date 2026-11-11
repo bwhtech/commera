@@ -17,6 +17,7 @@ from commera.localization.markets import find_market_by_prefix
 from commera.search.build import enqueue_full_rebuild
 from commera.search.engine_cache import clear_search_engine, get_engine_class
 from commera.search.http_client import SearchServerError
+from commera.search.price_seq import bump_price_seq_after_commit
 from commera.search.record_builder import ALLOWED_CONTENT_DOCTYPES, is_indexable_content_field
 from commera.search.remote_engine import RemoteSearchEngine
 from commera.search.result_card import (
@@ -275,6 +276,8 @@ class CommeraSettings(Document):
 			return
 		old_pairs = [(row.search_doctype, row.field) for row in (before.search_content_fields or [])]
 		new_pairs = [(row.search_doctype, row.field) for row in (self.search_content_fields or [])]
+		if self.store_prices_changed(before):
+			bump_price_seq_after_commit()
 		if self.search_engine_changed(before):
 			# Build the newly chosen index. Until it exists, the frappe.qb grid serves every search.
 			clear_search_engine()
