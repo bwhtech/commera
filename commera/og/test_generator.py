@@ -399,6 +399,25 @@ class TestRenderOgPng(IntegrationTestCase):
 		self.assertEqual(image.format, "PNG")
 		self.assertEqual(image.size, (generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT))
 
+	def test_a_long_title_keeps_the_product_photo(self):
+		from PIL import Image
+
+		from commera.shop_themes.render import render_themed_template
+
+		photo_colour = (222, 230, 233)
+		buffer = BytesIO()
+		Image.new("RGB", (630, 630), photo_colour).save(buffer, format="PNG")
+		context = {
+			"display_name": "Premium Ceramic Brake Pads for Sports Cars - Black",
+			"photo_data_uri": f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}",
+		}
+		html_str = render_themed_template(generator.BUNDLED_CARD_TEMPLATE, context)
+		png_bytes = generator.render_og_png(html_str, generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT)
+
+		card = Image.open(BytesIO(png_bytes)).convert("RGB")
+		self.assertEqual(card.getpixel((600, 600)), photo_colour)
+		self.assertEqual(card.getpixel((1190, 600)), photo_colour)
+
 	def test_store_card_renders_a_spec_sized_png(self):
 		from PIL import Image
 
