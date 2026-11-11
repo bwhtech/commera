@@ -16,7 +16,7 @@ const props = defineProps({
 
 const { screen, loadError, loading: saving, languages, defaultLanguage, maxLanguages, isAtLimit, mutate } = store
 
-watch(() => props.active, (isActive) => isActive && store.loadOnce(), { immediate: true })
+watch(() => props.active, (isActive) => isActive && store.load(), { immediate: true })
 
 const router = useRouter()
 // The Translations page ships separately; until it does, nothing here links to it.

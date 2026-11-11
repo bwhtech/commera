@@ -126,3 +126,46 @@ class TestAdminStorefrontLanguages(IntegrationTestCase):
 				api.get_storefront_languages()
 			with self.assertRaises(frappe.PermissionError):
 				api.add_storefront_language("de")
+
+
+class TestLanguageSettingsRoles(IntegrationTestCase):
+	setUp = TestAdminStorefrontLanguages.setUp
+
+	def make_user(self, role=None):
+		return (
+			frappe.get_doc(
+				{
+					"doctype": "User",
+					"email": f"language-settings-{frappe.generate_hash(length=10)}@example.com",
+					"first_name": "Language settings test",
+					"user_type": "System User" if role else "Website User",
+					"send_welcome_email": 0,
+					"roles": [{"role": role}] if role else [],
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
+
+	def test_commera_admin_can_read_and_perform_every_language_action(self):
+		with self.set_user(self.make_user("Commera Admin")):
+			self.assertNotIn("System Manager", frappe.get_roles())
+			self.assertEqual(api.get_storefront_languages()["default_language"], "en")
+			self.assertEqual(rows(api.add_storefront_language("de"))[-1], ("de", False))
+			self.assertEqual(rows(api.set_storefront_language_published("de", 1))[-1], ("de", True))
+			self.assertEqual(rows(api.move_storefront_language("de", -1))[2], ("de", True))
+			self.assertEqual(api.set_default_storefront_language("de")["default_language"], "de")
+			self.assertNotIn("fr", [code for code, _ in rows(api.remove_storefront_language("fr"))])
+
+	def test_authenticated_website_customer_cannot_read_or_write_languages(self):
+		with self.set_user(self.make_user()):
+			for action, arguments in (
+				(api.get_storefront_languages, ()),
+				(api.add_storefront_language, ("de",)),
+				(api.remove_storefront_language, ("fr",)),
+				(api.set_storefront_language_published, ("fr", 1)),
+				(api.move_storefront_language, ("fr", -1)),
+				(api.set_default_storefront_language, ("ar",)),
+			):
+				with self.subTest(action=action.__name__), self.assertRaises(frappe.PermissionError):
+					action(*arguments)

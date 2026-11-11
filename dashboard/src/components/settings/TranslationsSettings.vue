@@ -4,12 +4,10 @@ import { Button, FormControl, SettingsBody, SettingsRow, toast, useFileUpload } 
 import EmptyState from '../EmptyState.vue'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import { trySubmit, useAdminAction } from '../../data/api'
-import { exportTranslationsUrl, translatableLanguages } from '../../data/translationExchange'
+import { exportTranslationsUrl, useTranslationLanguages } from '../../data/translationExchange'
 import { __ } from '../../data/translation'
 
-const languages = translatableLanguages()
-const languageOptions = languages.map(({ code, name }) => ({ label: name, value: code }))
-const language = ref(languages[0]?.code ?? '')
+const { languages, languageOptions, language } = useTranslationLanguages()
 const exportUrl = computed(() => exportTranslationsUrl(language.value))
 
 const importAction = useAdminAction('translations.import_translations')

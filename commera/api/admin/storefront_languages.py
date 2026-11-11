@@ -13,6 +13,7 @@ from commera.localization.languages import (
 	Language,
 	get_default_language_code,
 )
+from commera.roles import is_commera_admin
 
 SETTINGS_DOCTYPE = "Commera Settings"
 
@@ -20,7 +21,7 @@ SETTINGS_DOCTYPE = "Commera Settings"
 # Not GET-only: the dashboard reads it through createAdminCaller, which POSTs.
 @frappe.whitelist()
 def get_storefront_languages() -> dict:
-	frappe.has_permission(SETTINGS_DOCTYPE, ptype="read", throw=True)
+	require_store_admin()
 	return LanguageSettings(frappe.get_cached_doc(SETTINGS_DOCTYPE)).as_dict()
 
 
@@ -69,7 +70,7 @@ class LanguageSettings:
 
 	@classmethod
 	def for_update(cls) -> "LanguageSettings":
-		frappe.has_permission(SETTINGS_DOCTYPE, ptype="write", throw=True)
+		require_store_admin()
 		settings = cls(frappe.get_doc(SETTINGS_DOCTYPE))
 		settings.ensure_default_row()
 		return settings
@@ -92,7 +93,7 @@ class LanguageSettings:
 		}
 
 	def save(self) -> dict:
-		self.doc.save()
+		self.doc.save(ignore_permissions=True)
 		return LanguageSettings(self.doc).as_dict()
 
 	def add(self, code: str, published: int):
@@ -149,3 +150,8 @@ class LanguageSettings:
 
 def name_of(code: str) -> str:
 	return Language.from_code(code).name
+
+
+def require_store_admin():
+	if not is_commera_admin():
+		frappe.throw(_("Only store administrators can manage storefront languages."), frappe.PermissionError)
