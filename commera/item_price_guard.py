@@ -5,6 +5,9 @@ import functools
 from contextlib import contextmanager
 
 import frappe
+
+# ERPNext offers no hook to skip its auto Item Price insert/update; the wrapper is the only full guard.
+# nosemgrep: frappe-semgrep-rules.rules.frappe-monkey-patching-not-allowed
 from erpnext.stock import get_item_details
 
 CART_ORDER_TYPE = "Shopping Cart"
