@@ -36,9 +36,20 @@ runs:
         restore-keys: |
           ${{ runner.os }}-yarn-
 
-    - name: Install MariaDB Client
+    # No apt: the runner's Ubuntu mirrors can stall or stop resolving. Run the client that ships in the
+    # MariaDB service container instead; only stdin and stdout reach it, which is all bench needs.
+    - name: Use the MariaDB service's client
       shell: bash
-      run: sudo apt update && sudo apt-get install mariadb-client
+      run: |
+        container=$(docker ps --filter "publish=3306" --format '{{.ID}}' | head -n 1)
+        if [ -z "$container" ]; then
+          echo "No container publishes port 3306" >&2
+          exit 1
+        fi
+        for bin in mariadb mariadb-dump; do
+          printf '#!/bin/sh\nexec docker exec -i %s %s "$@"\n' "$container" "$bin" | sudo tee "/usr/local/bin/$bin" > /dev/null
+          sudo chmod +x "/usr/local/bin/$bin"
+        done
 
     - name: Setup
       shell: bash
@@ -56,7 +67,8 @@ runs:
         bench setup requirements --dev
         bench get-app erpnext
         bench get-app bwh_payments https://github.com/bwhtech/bwh_payments
-        bench new-site --db-root-password root --admin-password admin test_site
+        # The client runs inside the MariaDB container, so the site user must log in from any host.
+        bench new-site --db-root-password root --admin-password admin --mariadb-user-host-login-scope='%' test_site
         bench --site test_site install-app erpnext
         bench --site test_site install-app bwh_payments
         bench --site test_site install-app commera
