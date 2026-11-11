@@ -3,7 +3,11 @@ from unittest.mock import Mock, patch
 import frappe
 
 from commera.api.payments import (
+	COD_PAYMENT_MODE,
+	CheckoutPriceChangedError,
+	confirm_payment,
 	generate_quotation_for_cart,
+	get_cod_total_key,
 	initiate_checkout_with_mode,
 	save_cart_quotation,
 	update_quotation_address,
@@ -125,3 +129,26 @@ class TestMarketTaxCheckout(test_market_taxes.TestMarketOrderRecords):
 				(rebuilt.taxes_and_charges, rebuilt.grand_total), (gst_template, 354 + GIFT_WRAP_FEE)
 			)
 			self.checkout(354 + GIFT_WRAP_FEE)
+
+	def test_cod_confirmation_refuses_a_changed_market_tax_template(self):
+		self.assert_cod_tax_refresh(clear=False)
+
+	def test_cod_confirmation_refuses_a_cleared_market_tax_template(self):
+		self.assert_cod_tax_refresh(clear=True)
+
+	def assert_cod_tax_refresh(self, clear):
+		self.set_market_template(self.make_template(10))
+		self.set_single("Commera Settings", "cod_enabled", 1)
+		self.set_single("Commera Settings", "cod_charge", 0)
+		self.quote_in_market()
+		self.shopper = frappe.session.user
+		with self.in_market():
+			update_quotation_address(self.address_payload())
+			initiate_checkout_with_mode(COD_PAYMENT_MODE)
+			quotation = _get_cart_quotation()
+			self.addCleanup(frappe.cache.delete_value, get_cod_total_key(quotation.name))
+			self.make_template(5, is_default=1)
+			self.set_market_template(None if clear else self.make_template(18))
+			with self.assertRaisesRegex(CheckoutPriceChangedError, "Please review"):
+				confirm_payment(quotation.name, payment_mode=COD_PAYMENT_MODE)
+			self.assertEqual(frappe.db.get_value("Quotation", quotation.name, "docstatus"), 0)

@@ -706,7 +706,20 @@ def set_charges(quotation):
 	shipping_rule = frappe.get_cached_value("Commera Settings", "Commera Settings", "shipping_rule")
 	if shipping_rule:
 		quotation.shipping_rule = shipping_rule
-		quotation.run_method("apply_shipping_rule")
+		from commera.api.shipping import CART_CHARGE_FIELD, remove_shipping_rule_row
+
+		remove_shipping_rule_row(quotation)
+		# ERPNext matches by account; isolate its row so a template levy cannot be overwritten.
+		existing_rows = quotation.taxes
+		quotation.taxes = []
+		try:
+			quotation.run_method("apply_shipping_rule")
+			for row in quotation.taxes:
+				row.set(CART_CHARGE_FIELD, "shipping_rule")
+		finally:
+			quotation.taxes = existing_rows + quotation.taxes
+		for index, row in enumerate(quotation.taxes, start=1):
+			row.idx = index
 		quotation.run_method("calculate_taxes_and_totals")
 	apply_plugin_fees(quotation)
 
@@ -1005,8 +1018,7 @@ def place_cod_order(quotation_name: str):
 	validate_reviewed_checkout(quotation)
 	shopper = get_order_shopper(quotation)
 	quotation.flags.strict_plugin_fees = True
-	# Repriced here too: the fee a cart edit left out after a hook failed must not slip into the order.
-	apply_plugin_fees(quotation)
+	update_delivery_charges(quotation)
 	# Again here: a COD confirmation can be posted without ever opening checkout.
 	validate_cart(quotation)
 	if COD_PAYMENT_MODE not in get_checkout_payment_methods(quotation, strict=True):

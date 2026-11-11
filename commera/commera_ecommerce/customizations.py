@@ -493,6 +493,15 @@ CUSTOM_FIELDS = {
 	],
 	"Sales Taxes and Charges": [
 		{
+			"fieldname": "commera_cart_charge",
+			"fieldtype": "Data",
+			"label": "Commera Cart Charge",
+			"insert_after": "dont_recompute_tax",
+			"hidden": 1,
+			"print_hide": 1,
+			"read_only": 1,
+		},
+		{
 			"fieldname": "commera_plugin_fee",
 			"fieldtype": "Check",
 			"label": "Commera Plugin Fee",
@@ -502,7 +511,7 @@ CUSTOM_FIELDS = {
 			"hidden": 1,
 			"print_hide": 1,
 			"read_only": 1,
-		}
+		},
 	],
 	"Warehouse": [
 		{

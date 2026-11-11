@@ -25,8 +25,9 @@ from commera.utils import (
 	validate_document_access,
 )
 
-# The Actual charge row the chosen option posts through, matched on description on re-selection.
+# The Actual charge row the chosen option posts through, marked separately from template taxes.
 DELIVERY_CHARGE_DESCRIPTION = "Delivery Charges"
+CART_CHARGE_FIELD = "commera_cart_charge"
 
 # ponytail: one notional box for the whole cart, since commera has no parcel templates; swap for a
 # Shipment Parcel Template on Commera Settings once packing rules matter more than a rate estimate.
@@ -259,6 +260,7 @@ def set_delivery_charge_row(quotation, amount: float, title: str):
 			{
 				"doctype": "Sales Taxes and Charges",
 				"description": f"{DELIVERY_CHARGE_DESCRIPTION} - {title}",
+				CART_CHARGE_FIELD: "delivery",
 				"charge_type": "Actual",
 				"account_head": get_charge_account(get_store_shipping_rule()),
 				"tax_amount": amount,
@@ -271,22 +273,13 @@ def set_delivery_charge_row(quotation, amount: float, title: str):
 
 
 def remove_delivery_charge_row(quotation):
-	quotation.taxes = [
-		row for row in quotation.taxes if not (row.description or "").startswith(DELIVERY_CHARGE_DESCRIPTION)
-	]
+	quotation.taxes = [row for row in quotation.taxes if row.get(CART_CHARGE_FIELD) != "delivery"]
 	reindex_taxes(quotation)
 
 
 def remove_shipping_rule_row(quotation):
-	"""Drop the tax row ERPNext's Shipping Rule appended, identified the way ERPNext identifies it.
-
-	Matched on charge_type, account_head and cost_center: the description is renamed and translated.
-	"""
-	rule = get_shipping_rule_accounts(quotation.shipping_rule)
-	if not rule:
-		return
-
-	quotation.taxes = [row for row in quotation.taxes if not is_shipping_rule_row(row, rule)]
+	"""Remove only the row Commera added, even if a template uses the same account."""
+	quotation.taxes = [row for row in quotation.taxes if row.get(CART_CHARGE_FIELD) != "shipping_rule"]
 	reindex_taxes(quotation)
 
 
@@ -307,13 +300,8 @@ def is_shipping_rule_row(row, rule) -> bool:
 
 def is_cart_charge(row, shipping_rule: str | None) -> bool:
 	"""A charge Commera adds to the cart: delivery, the COD fee or a plugin fee. Not a tax."""
-	description = cstr(row.description).strip()
-	return bool(
-		row.get(PLUGIN_FEE_FIELD)
-		or description == COD_CHARGE_DESCRIPTION.strip()
-		or description.startswith(DELIVERY_CHARGE_DESCRIPTION)
-		or is_shipping_rule_row(row, get_shipping_rule_accounts(shipping_rule))
-	)
+	# Before migration, unmarked rows are ambiguous. Never infer ownership from a tax name or account.
+	return bool(row.get(PLUGIN_FEE_FIELD) or row.get(CART_CHARGE_FIELD))
 
 
 def get_charge_lines(taxes, shipping_rule: str | None) -> dict:
@@ -410,6 +398,7 @@ def add_cod_charge(quotation, cod_charge: float, account_head: str | None):
 		{
 			"doctype": "Sales Taxes and Charges",
 			"description": COD_CHARGE_DESCRIPTION,
+			CART_CHARGE_FIELD: "cod",
 			"charge_type": "Actual",
 			"account_head": account_head,
 			"tax_amount": cod_charge,

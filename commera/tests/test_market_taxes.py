@@ -4,7 +4,7 @@ import frappe
 from frappe.utils.data import flt
 
 from commera.api.payment_hooks import on_payment_request_update
-from commera.api.payments import generate_quotation_for_cart
+from commera.api.payments import generate_quotation_for_cart, save_cart_quotation
 from commera.api.shipping import DELIVERY_CHARGE_DESCRIPTION, get_charge_amount
 from commera.cart_taxes import TEMPLATE_DOCTYPE, apply_market_taxes
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
@@ -126,7 +126,11 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 		self.set_market_template(new)
 		quotation = frappe.new_doc("Quotation", company=self.company, taxes_and_charges=old)
 		quotation.append("taxes", {"charge_type": "On Net Total", "account_head": self.account, "rate": 10})
-		delivery = {"description": f"{DELIVERY_CHARGE_DESCRIPTION} - Express", "charge_type": "Actual"}
+		delivery = {
+			"description": f"{DELIVERY_CHARGE_DESCRIPTION} - Express",
+			"charge_type": "Actual",
+			"commera_cart_charge": "delivery",
+		}
 		quotation.append("taxes", {**delivery, "account_head": self.account, "tax_amount": 15})
 
 		apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched=True)
@@ -176,10 +180,10 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 		self.set_market_template(self.make_template(10))
 		quotation = self.quote_in_market()
 		charges = [
-			{"description": f"{DELIVERY_CHARGE_DESCRIPTION} - Express"},
-			{"description": COD_CHARGE_DESCRIPTION},
+			{"description": f"{DELIVERY_CHARGE_DESCRIPTION} - Express", "commera_cart_charge": "delivery"},
+			{"description": COD_CHARGE_DESCRIPTION, "commera_cart_charge": "cod"},
 			{"description": "Gift wrap", "commera_plugin_fee": 1},
-			{"description": "Rule shipping"},
+			{"description": "Rule shipping", "commera_cart_charge": "shipping_rule"},
 		]
 		for charge in charges:
 			quotation.append(
@@ -201,6 +205,104 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 					["VAT 10%", *[charge["description"] for charge in charges]],
 				)
 				self.assertEqual([row.idx for row in quotation.taxes], [1, 2, 3, 4, 5])
+
+	def test_template_charge_collisions_do_not_duplicate_or_disappear_on_pickup(self):
+		from commera.api.shipping import clear_pickup_charges, set_delivery_charge_row
+
+		charge_account = make_tax_account(self.company)
+		template = self.make_template(10)
+		doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
+		doc.taxes[0].description = "Delivery Charges - template levy"
+		doc.append(
+			"taxes",
+			{
+				"charge_type": "Actual",
+				"account_head": charge_account,
+				"description": " Cash on Delivery Charges",
+				"tax_amount": 7,
+				"included_in_print_rate": 0,
+			},
+		)
+		doc.save(ignore_permissions=True)
+		self.set_market_template(template)
+		quotation = self.quote_in_market()
+		with patch("commera.api.shipping.get_charge_account", return_value=charge_account):
+			set_delivery_charge_row(quotation, 15, "Express")
+		for _ in range(3):
+			apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched=False)
+			save_cart_quotation(quotation)
+			quotation = frappe.get_doc("Quotation", quotation.name)
+			self.assertEqual(len(quotation.taxes), 3)
+			self.assertEqual(
+				[row.description for row in quotation.taxes[:2]],
+				["Delivery Charges - template levy", " Cash on Delivery Charges"],
+			)
+		clear_pickup_charges(quotation)
+		self.assertEqual(len(quotation.taxes), 2)
+		self.assertEqual(quotation.grand_total, 337)
+
+	def test_shipping_rule_keeps_a_template_levy_on_the_same_account(self):
+		from commera.api.payments import set_charges
+		from commera.api.shipping import clear_pickup_charges
+
+		charge_account = make_tax_account(self.company)
+		template = self.make_template(10)
+		doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
+		doc.append(
+			"taxes",
+			{
+				"charge_type": "Actual",
+				"account_head": charge_account,
+				"description": "Template levy",
+				"tax_amount": 7,
+				"included_in_print_rate": 0,
+			},
+		)
+		doc.save(ignore_permissions=True)
+		self.set_market_template(template)
+		rule = frappe.get_doc(
+			{
+				"doctype": "Shipping Rule",
+				"label": f"ZZ Tax Shipping {frappe.generate_hash(length=8)}",
+				"shipping_rule_type": "Selling",
+				"company": self.company,
+				"account": charge_account,
+				"calculate_based_on": "Fixed",
+				"shipping_amount": 40,
+			}
+		).insert(ignore_permissions=True)
+		self.set_single("Commera Settings", "shipping_rule", rule.name)
+		quotation = self.quote_in_market()
+		for _ in range(3):
+			apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched=False)
+			set_charges(quotation)
+			save_cart_quotation(quotation)
+			quotation = frappe.get_doc("Quotation", quotation.name)
+			self.assertEqual(len(quotation.taxes), 3)
+			self.assertEqual(quotation.taxes[1].tax_amount, 7)
+			self.assertEqual(quotation.taxes[2].get("commera_cart_charge"), "shipping_rule")
+		clear_pickup_charges(quotation)
+		self.assertEqual(len(quotation.taxes), 2)
+		self.assertEqual(quotation.grand_total, 337)
+
+	def test_unmarked_legacy_rows_are_not_preserved_as_commera_charges(self):
+		from commera.api.shipping import clear_pickup_charges
+
+		self.set_market_template(self.make_template(10))
+		quotation = self.quote_in_market()
+		quotation.append(
+			"taxes",
+			{
+				"description": "Delivery Charges - legacy",
+				"charge_type": "Actual",
+				"account_head": self.account,
+				"tax_amount": 15,
+			},
+		)
+		# Missing provenance is ambiguous before migration; rebuilding replaces it with template rows.
+		apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched=False)
+		clear_pickup_charges(quotation)
+		self.assertEqual([row.description for row in quotation.taxes], ["VAT 10%"])
 
 
 class TestMarketTaxTemplateValidation(MarketTaxTestCase):
