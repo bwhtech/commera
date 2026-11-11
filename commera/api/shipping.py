@@ -387,8 +387,12 @@ def get_charge_summary(quotation) -> dict:
 
 
 def clear_pickup_charges(quotation):
+	quotation.taxes = [
+		row
+		for row in quotation.taxes
+		if row.get(PLUGIN_FEE_FIELD) or not is_cart_charge(row, quotation.shipping_rule)
+	]
 	quotation.shipping_rule = None
-	quotation.taxes = [row for row in quotation.taxes if row.get(PLUGIN_FEE_FIELD)]
 	reindex_taxes(quotation)
 	quotation.calculate_taxes_and_totals()
 

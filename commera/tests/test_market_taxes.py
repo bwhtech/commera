@@ -145,6 +145,63 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 
 		self.assertEqual((quotation.taxes_and_charges, quotation.grand_total), (default, 315))
 
+	def test_disabling_the_template_reprices_an_existing_cart(self):
+		template = self.make_template(10)
+		default = self.make_template(5, is_default=1)
+		self.set_market_template(template)
+		quotation = self.quote_in_market()
+		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "disabled", 1)
+
+		with self.in_market():
+			rebuilt = generate_quotation_for_cart({})
+
+		self.assertEqual(rebuilt.name, quotation.name)
+		self.assertEqual((rebuilt.taxes_and_charges, rebuilt.grand_total), (default, 315))
+
+	def test_clearing_the_template_reprices_an_existing_cart(self):
+		self.set_market_template(self.make_template(10))
+		quotation = self.quote_in_market()
+		default = self.make_template(5, is_default=1)
+		self.set_market_template(None)
+
+		with self.in_market():
+			rebuilt = generate_quotation_for_cart({})
+
+		self.assertEqual(rebuilt.name, quotation.name)
+		self.assertEqual((rebuilt.taxes_and_charges, rebuilt.grand_total), (default, 315))
+
+	def test_repeated_tax_rebuilds_preserve_charge_order(self):
+		from commera.api.shipping import COD_CHARGE_DESCRIPTION
+
+		self.set_market_template(self.make_template(10))
+		quotation = self.quote_in_market()
+		charges = [
+			{"description": f"{DELIVERY_CHARGE_DESCRIPTION} - Express"},
+			{"description": COD_CHARGE_DESCRIPTION},
+			{"description": "Gift wrap", "commera_plugin_fee": 1},
+			{"description": "Rule shipping"},
+		]
+		for charge in charges:
+			quotation.append(
+				"taxes",
+				{
+					**charge,
+					"charge_type": "Actual",
+					"account_head": self.account,
+					"tax_amount": 5,
+				},
+			)
+		quotation.shipping_rule = "ZZ Rule"
+		rule = frappe._dict(account=self.account, cost_center=None)
+		with patch("commera.api.shipping.get_shipping_rule_accounts", return_value=rule):
+			for _ in range(3):
+				apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched=False)
+				self.assertEqual(
+					[row.description for row in quotation.taxes],
+					["VAT 10%", *[charge["description"] for charge in charges]],
+				)
+				self.assertEqual([row.idx for row in quotation.taxes], [1, 2, 3, 4, 5])
+
 
 class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 	def test_a_template_of_another_company_is_refused(self):
@@ -196,6 +253,17 @@ class TestMarketOrderRecords(MarketTaxTestCase):
 			with self.subTest(doctype=doc.doctype):
 				self.assertEqual((doc.commera_market, doc.language), ("gulf", "ar"))
 				self.assertEqual((doc.taxes_and_charges, doc.grand_total), (template, 330))
+
+	def test_a_paid_order_keeps_its_taxes_after_market_configuration_changes(self):
+		template = self.make_template(10)
+		self.set_market_template(template)
+		quotation = self.quote_in_market()
+		self.set_market_template(self.make_template(18))
+		frappe.set_user("Administrator")
+
+		order = self.pay(quotation)
+
+		self.assertEqual((order.taxes_and_charges, order.grand_total), (template, 330))
 
 	def test_the_primary_market_records_its_handle_and_language(self):
 		self.sign_in_shopper()

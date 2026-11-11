@@ -92,6 +92,16 @@ CUSTOM_FIELDS = {
 	],
 	"Quotation": [
 		{
+			"fieldname": "commera_market_tax_template",
+			"fieldtype": "Data",
+			"label": "Market Tax Template",
+			"description": "Last template applied by the market, so removing it clears only market taxes.",
+			"insert_after": "taxes_and_charges",
+			"read_only": 1,
+			"hidden": 1,
+			"no_copy": 1,
+		},
+		{
 			"fieldname": "custom_is_store_pickup",
 			"fieldtype": "Check",
 			"label": "Is Store Pickup?",

@@ -11,16 +11,41 @@ TEMPLATE_DOCTYPE = "Sales Taxes and Charges Template"
 
 
 def apply_market_taxes(quotation, market: Market | None, switched: bool):
-	"""Set the market's template, and on a switch replace the old market's taxes. Before ERPNext
-	prices the lines: it adds a template's rows only to a quotation that has none."""
-	if own_template := get_own_template(market, quotation.company):
-		if quotation.taxes_and_charges != own_template:
-			set_tax_template(quotation, own_template)
+	"""Resolve unpaid cart taxes independently of price changes."""
+	if quotation.docstatus or (
+		quotation.name
+		and frappe.db.exists(
+			"Gateway Payment Request",
+			{"ref_doctype": "Quotation", "ref_docname": quotation.name, "status": "Paid"},
+		)
+	):
 		return
-	if not switched or (is_primary(market) and not has_taxes(quotation)):
-		# The primary market keeps ERPNext's own choice, which set_missing_values makes.
+	if own_template := get_own_template(market, quotation.company):
+		set_tax_template(quotation, own_template)
+		quotation.commera_market_tax_template = own_template
+		return
+	managed = quotation.get("commera_market_tax_template")
+	quotation.commera_market_tax_template = None
+	if (
+		not switched
+		and (not managed or quotation.taxes_and_charges != managed)
+		and has_usable_taxes(quotation)
+	):
+		return
+	if is_primary(market) and not has_taxes(quotation):
 		return
 	set_tax_template(quotation, get_default_template(quotation, market))
+
+
+def has_usable_taxes(quotation) -> bool:
+	template = quotation.taxes_and_charges
+	if not template:
+		return bool(quotation.get("taxes"))
+	company, disabled = frappe.get_cached_value(TEMPLATE_DOCTYPE, template, ["company", "disabled"]) or (
+		None,
+		1,
+	)
+	return company == quotation.company and not disabled
 
 
 def get_own_template(market: Market | None, company: str) -> str | None:

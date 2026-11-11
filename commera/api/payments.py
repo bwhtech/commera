@@ -34,6 +34,7 @@ from commera.cart_prices import (
 	price_regular_lines,
 	validate_available,
 )
+from commera.cart_taxes import apply_market_taxes
 from commera.checkout_hooks import (
 	apply_plugin_fees,
 	filter_payment_methods,
@@ -740,6 +741,7 @@ def save_quotation_address(quotation, address: dict):
 		quotation.custom_is_store_pickup = True
 		# A delivery option picked before store pickup would otherwise still be charged at payment time.
 		clear_delivery_option(quotation)
+		apply_market_taxes(quotation, get_document_market(quotation), switched=False)
 		save_cart_quotation(quotation)
 
 		return get_address_saved_response(quotation)
@@ -767,6 +769,7 @@ def save_quotation_address(quotation, address: dict):
 	quotation.shipping_address_name = shipping_address_name
 	clear_delivery_option(quotation)
 	set_gst_details(quotation)
+	apply_market_taxes(quotation, get_document_market(quotation), switched=False)
 	save_contact_details(quotation, address)
 	save_cart_quotation(quotation)
 
@@ -1121,6 +1124,7 @@ def validate_store_pickup(warehouse: str | None):
 
 
 def update_delivery_charges(quotation):
+	apply_market_taxes(quotation, get_document_market(quotation), switched=False)
 	if quotation.custom_is_store_pickup:
 		# A cart saved as a pickup before the owner switched pickup off must not reach payment as one.
 		validate_store_pickup(quotation.custom_store)

@@ -17,10 +17,11 @@ def apply_market(quotation, prices: MarketPrices):
 	"""Point the quotation at the market's prices and taxes before ERPNext prices its lines, and
 	record the market and language. A switch clears the old exchange rates, so ERPNext reads the new ones."""
 	is_priced = is_priced_in(quotation, prices)
+	switched = get_market_handle(quotation) != prices.handle
 	quotation.set(MARKET_FIELD, prices.handle)
 	# ERPNext's print language: the order prints in the language the shopper bought in.
 	quotation.language = get_localization().language.code
-	apply_market_taxes(quotation, get_document_market(quotation), switched=not is_priced)
+	apply_market_taxes(quotation, get_document_market(quotation), switched=switched)
 	if is_priced:
 		return
 	quotation.update(
