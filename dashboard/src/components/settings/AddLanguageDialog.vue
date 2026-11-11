@@ -19,7 +19,9 @@ const publish = ref(false)
 const options = computed(() =>
   (enabledLanguages.data?.options ?? [])
     .filter((option) => !props.added.includes(option.value))
-    .map(({ value, label, description }) => ({ value, label: description ? `${description} · ${label}` : label })),
+    .map(({ value, label, description }) => ({ value, label: description ? `${description} · ${label}` : label }))
+    // Labels start with the English name, so sort by it rather than the endonym order of the API.
+    .sort((a, b) => a.label.localeCompare(b.label)),
 )
 
 watch(open, async (isOpen) => {
