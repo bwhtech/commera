@@ -9,6 +9,8 @@ import frappe
 from frappe.model.document import Document
 from frappe.modules.utils import export_module_json
 
+from commera.builder_themes.pages import is_builder_installed
+
 # frappe.scrub() does not strip path separators, so it is not a sanitiser.
 THEME_NAME_PATTERN = re.compile(r"^[A-Za-z0-9 _-]+$")
 
@@ -60,6 +62,9 @@ class ShopTheme(Document):
 			)
 		if self.use_as_starter:
 			frappe.throw(frappe._("A Builder theme cannot be used as a starter"))
+		# only new ones: an existing theme must still save, e.g. when switching away after an uninstall
+		if self.is_new() and not is_builder_installed():
+			frappe.throw(frappe._("Install Frappe Builder on this site to design themes in it"))
 		self.validate_no_circular_inheritance()
 
 	def validate_unique_slug(self):

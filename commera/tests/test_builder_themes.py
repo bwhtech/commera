@@ -4,6 +4,7 @@
 """Builder themes: a Shop Theme whose home, listing and product pages are Frappe Builder pages."""
 
 import unittest
+from unittest.mock import patch
 from urllib.parse import parse_qsl
 
 import frappe
@@ -124,6 +125,9 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		self.assertTrue(BuilderThemePageRenderer("en/products").can_render())
 		self.assertFalse(BuilderThemePageRenderer("en/cart").can_render())
 
+		with patch("commera.builder_themes.renderer.is_builder_installed", return_value=False):
+			self.assertFalse(BuilderThemePageRenderer("en/products").can_render())
+
 		self.activate(STARTER_THEME)
 		self.assertFalse(BuilderThemePageRenderer("en/products").can_render())
 
@@ -196,3 +200,20 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 	def test_make_theme_live_activates_it(self):
 		make_theme_live(THEME)
 		self.assertTrue(get_theme_bar(self.pages[HOME])["is_live"])
+
+
+class TestBuilderThemesWithoutBuilder(unittest.TestCase):
+	def test_new_builder_theme_needs_builder(self):
+		self.addCleanup(frappe.db.rollback)
+		theme = frappe.get_doc(
+			{
+				"doctype": "Shop Theme",
+				"theme_name": "Test Theme Without Builder",
+				"theme_type": "Builder",
+				"parent_theme": STARTER_THEME,
+			}
+		)
+		with patch(
+			"commera.shop_themes.doctype.shop_theme.shop_theme.is_builder_installed", return_value=False
+		):
+			self.assertRaises(frappe.ValidationError, theme.insert)

@@ -1,14 +1,14 @@
 import frappe
 
-from commera.builder_themes.pages import PAGE_TYPE_BY_TEMPLATE, get_theme_pages
+from commera.builder_themes.pages import PAGE_TYPE_BY_TEMPLATE, get_theme_pages, is_builder_installed
 from commera.localization import get_localization
 from commera.shop_themes.doctype.shop_theme.shop_theme import BUILDER_THEME_TYPE, get_render_theme_context
 from commera.shop_themes.theme_resolver import ThemePageRenderer, apply_route_groups, find_theme_page
 
 
 class BuilderThemePageRenderer:
-	"""Serves the live Builder theme's published page on its storefront route; anything else falls through to
-	the parent theme. Builder is imported only in render(), so a site without Builder never loads it."""
+	"""Serves the live Builder theme's published page on its storefront route, else falls through to the parent
+	theme, as it does for every page when Builder is not installed. Builder is imported only in render()."""
 
 	def __init__(self, path, http_status_code=None):
 		self.path = path
@@ -18,7 +18,7 @@ class BuilderThemePageRenderer:
 
 	def can_render(self):
 		theme_context = get_render_theme_context()
-		if theme_context["theme_type"] != BUILDER_THEME_TYPE:
+		if theme_context["theme_type"] != BUILDER_THEME_TYPE or not is_builder_installed():
 			return False
 
 		request_path = ThemePageRenderer(self.path).get_request_path()
