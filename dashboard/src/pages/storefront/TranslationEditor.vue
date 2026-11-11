@@ -16,7 +16,7 @@ import {
   parseFieldKey,
   toDoCount,
 } from '../../data/translationStatus'
-import { changePending, savePending, useOpenedTranslation } from '../../data/translationEditorState'
+import { changePending, useTranslationSave, useOpenedTranslation } from '../../data/translationEditorState'
 import { useTranslationItems } from '../../data/translationItems'
 import { onSettingsClose, openSettings } from '../../ia/settings'
 import { confirmLeave } from '../../utils/confirmLeave'
@@ -68,10 +68,12 @@ watch(
 )
 
 function select(name) {
+  if (saving.value) return
   router.replace({ query: name ? { record: name } : {} })
 }
 
 function openResource(type, record) {
+  if (saving.value) return
   if (type === resourceType.value && record) return select(record)
   router.push({
     name: 'StorefrontTranslationEditor',
@@ -83,34 +85,33 @@ function openResource(type, record) {
 // Unsaved values by field: a new translation, or an outdated one confirmed as still correct.
 const pending = reactive({})
 const dirtyCount = computed(() => Object.keys(pending).length)
-const saving = ref(false)
-const submitted = ref({})
+const context = computed(() => JSON.stringify([languageCode.value, resourceType.value]))
+const { saving, save: saveDraft } = useTranslationSave(pending, context)
 
 function change(item, field, value) {
-  const key = fieldKey(resourceType.value, item.name, field.field)
-  changePending(pending, key, field, value, submitted.value)
+  if (saving.value) return
+  const key = fieldKey(languageCode.value, resourceType.value, item.name, field.field)
+  changePending(pending, key, field, value)
 }
 
 function discard() {
+  if (saving.value) return
   for (const key of Object.keys(pending)) delete pending[key]
 }
 
 async function save() {
-  if (!dirtyCount.value || saving.value) return
-  const translations = Object.entries(pending).map(([key, value]) => ({ ...parseFieldKey(key), value }))
-  saving.value = true
-  submitted.value = { ...pending }
-  try {
-    const saved = await savePending(pending, () => saveTranslations(languageCode.value, translations))
-    if (saved === null) return
+  const startedIn = context.value
+  const language = languageCode.value
+  const translations = Object.entries(pending)
+    .map(([key, value]) => ({ ...parseFieldKey(key), value }))
+    .filter((translation) => translation.language === language)
+  await saveDraft(() => saveTranslations(language, translations), async (saved) => {
     const names = [...new Set(translations.map((translation) => translation.name))]
     const [fresh] = await Promise.all([list.refresh(names), loadOverview()])
+    if (!fresh || context.value !== startedIn) return false
     openedItem.value = fresh?.find((item) => item?.name === openedItem.value?.name) ?? openedItem.value
     toast.success(saved === 1 ? __('1 translation saved') : __('{0} translations saved', [saved]))
-  } finally {
-    submitted.value = {}
-    saving.value = false
-  }
+  })
 }
 
 async function leaveUnsaved() {
@@ -119,13 +120,15 @@ async function leaveUnsaved() {
     dirtyCount.value === 1 ? __('1 change is not saved.') : __('{0} changes are not saved.', [dirtyCount.value]),
     __('Discard'),
   )
+  if (saving.value) return false
   if (confirmed) discard()
   return confirmed
 }
 
-onBeforeRouteLeave(() => (dirtyCount.value ? leaveUnsaved() : true))
+onBeforeRouteLeave(() => saving.value ? false : (dirtyCount.value ? leaveUnsaved() : true))
 // Another language or resource opens in this same component; picking a record only changes the query.
 onBeforeRouteUpdate((to) => {
+  if (saving.value) return false
   const sameList = to.params.lang === languageCode.value && to.params.resource === resourceType.value
   return sameList || !dirtyCount.value ? true : leaveUnsaved()
 })
@@ -137,6 +140,7 @@ const languageMenu = computed(() => [
   {
     group: __('Translate into'),
     options: (overview.value?.languages ?? []).map((target) => ({
+      disabled: saving.value,
       label: __('{0} · {1} to do', [target.name, toDoCount(languageTotals(overview.value.counts[target.code]))]),
       onClick: () => router.push({ name: 'StorefrontTranslationEditor', params: { lang: target.code, resource: resourceType.value } }),
     })),
@@ -144,7 +148,7 @@ const languageMenu = computed(() => [
   {
     group: __('More'),
     hideLabel: true,
-    options: [{ label: __('Add a language'), icon: 'lucide-plus', onClick: () => openSettings('languages') }],
+    options: [{ label: __('Add a language'), icon: 'lucide-plus', onClick: () => { if (!saving.value) openSettings('languages') } }],
   },
 ])
 </script>
@@ -155,6 +159,7 @@ const languageMenu = computed(() => [
       <div class="flex min-w-0 items-center gap-1">
         <Button
           variant="ghost"
+          :disabled="saving"
           icon="lucide-arrow-left"
           class="-ms-2 shrink-0 rtl:-scale-x-100"
           :label="__('Back to translations')"
@@ -167,8 +172,8 @@ const languageMenu = computed(() => [
           {{ __('Translations') }}
         </RouterLink>
         <span class="text-lg text-ink-gray-4 max-sm:hidden" aria-hidden="true">/</span>
-        <Dropdown v-if="language" :options="languageMenu">
-          <Button variant="ghost" icon-right="lucide-chevron-down" :aria-label="__('Language: {0}', [language.name])">
+        <Dropdown v-if="language" :disabled="saving" :options="languageMenu">
+          <Button :disabled="saving" variant="ghost" icon-right="lucide-chevron-down" :aria-label="__('Language: {0}', [language.name])">
             <span class="truncate text-lg-semibold text-ink-gray-8">{{ language.name }}</span>
           </Button>
         </Dropdown>
@@ -178,7 +183,7 @@ const languageMenu = computed(() => [
     <template #actions>
       <span v-if="dirtyCount" class="text-sm text-ink-gray-5 max-sm:hidden">{{ __('{0} unsaved', [dirtyCount]) }}</span>
       <Button v-if="dirtyCount" :label="__('Discard')" :disabled="saving" @click="discard" />
-      <Button :label="__('Save')" variant="solid" theme="gray" :disabled="!dirtyCount" :loading="saving" @click="save" />
+      <Button :label="__('Save')" variant="solid" theme="gray" :disabled="saving || !dirtyCount" :loading="saving" @click="save" />
     </template>
   </AppPageHeader>
 
@@ -196,6 +201,7 @@ const languageMenu = computed(() => [
       v-if="!isMobile || !selectedName"
       v-model:filter="filter"
       class="w-full shrink-0 border-outline-gray-2 sm:w-72 sm:border-e"
+      :disabled="saving"
       :language="language"
       :resource="resource"
       :resource-groups="resourceGroups"
@@ -223,6 +229,7 @@ const languageMenu = computed(() => [
         <LoadingText v-else-if="!selectedItem && (list.loading.value || (selectedName && selectedName !== unknownName))" />
         <TranslationRecord
           v-else-if="selectedItem"
+          :disabled="saving"
           :item="selectedItem"
           :resource-name="resource.one"
           :language="language"

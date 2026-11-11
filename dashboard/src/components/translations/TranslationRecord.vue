@@ -15,6 +15,7 @@ const props = defineProps({
   sourceLanguage: { type: Object, required: true },
   // Unsaved values by fieldKey().
   pending: { type: Object, required: true },
+  disabled: { type: Boolean, default: false },
   showBack: { type: Boolean, default: false },
 })
 const emit = defineEmits(['change', 'back'])
@@ -31,6 +32,7 @@ function viewOnStore() {
     <div class="flex flex-wrap items-center gap-2">
       <Button
         v-if="showBack"
+        :disabled="disabled"
         variant="ghost"
         icon="lucide-arrow-left"
         class="rtl:-scale-x-100"
@@ -69,7 +71,8 @@ function viewOnStore() {
           :language="language"
           :source-language="sourceLanguage"
           :record-title="item.title"
-          :pending="pending[fieldKey(resourceType, item.name, field.field)]"
+          :disabled="disabled"
+          :pending="pending[fieldKey(language.code, resourceType, item.name, field.field)]"
           @change="(value) => emit('change', item, field, value)"
         />
       </div>

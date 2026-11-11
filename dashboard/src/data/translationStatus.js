@@ -68,12 +68,12 @@ export function languageTotals(languageCounts = {}) {
   return { ...totals, percent: all ? Math.floor((totals.current / all) * 100) : 100 }
 }
 
-// A key per field across records and resources, so unsaved edits survive switching items.
-export function fieldKey(resource, name, field) {
-  return JSON.stringify([resource, name, field])
+// A key per field across languages, records and resources, so unsaved edits survive switching items.
+export function fieldKey(language, resource, name, field) {
+  return JSON.stringify([language, resource, name, field])
 }
 
 export function parseFieldKey(key) {
-  const [resource, name, field] = JSON.parse(key)
-  return { resource, name, field }
+  const [language, resource, name, field] = JSON.parse(key)
+  return { language, resource, name, field }
 }

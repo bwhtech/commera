@@ -61,7 +61,11 @@ test('a language adds up its resources, and nothing to translate is done', () =>
 })
 
 test('a field key round-trips names holding any character', () => {
-  const key = fieldKey('theme_section', 'index/hero "1"', 'heading')
+  const key = fieldKey('ar', 'theme_section', 'index/hero "1"', 'heading')
 
-  assert.deepEqual(parseFieldKey(key), { resource: 'theme_section', name: 'index/hero "1"', field: 'heading' })
+  assert.deepEqual(parseFieldKey(key), { language: 'ar', resource: 'theme_section', name: 'index/hero "1"', field: 'heading' })
+})
+
+test('pending field keys isolate languages', () => {
+  assert.notEqual(fieldKey('ar', 'product', 'same', 'title'), fieldKey('fr', 'product', 'same', 'title'))
 })

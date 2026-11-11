@@ -11,6 +11,7 @@ import { __ } from '../../data/translation'
 
 // The left pane: which resource, its records, and a search across every resource.
 const props = defineProps({
+  disabled: { type: Boolean, default: false },
   language: { type: Object, required: true },
   resource: { type: Object, required: true },
   resourceGroups: { type: Array, required: true },
@@ -32,7 +33,8 @@ const resourceMenu = computed(() =>
     options: group.resources.map((resource) => ({
       label: resource.label,
       icon: resource.icon,
-      onClick: () => emit('open', resource.type),
+      disabled: props.disabled,
+      onClick: () => { if (!props.disabled) emit('open', resource.type) },
     })),
   })),
 )
@@ -52,6 +54,7 @@ watch(searchText, runSearch)
 watch(() => props.language.code, () => (searchText.value = ''))
 
 function openResult(resource, name) {
+  if (props.disabled) return
   searchText.value = ''
   emit('open', resource, name)
 }
@@ -62,12 +65,12 @@ const shownCount = computed(() => (filter.value === 'todo' ? props.toDoCount : p
 <template>
   <div class="flex min-h-0 flex-col">
     <div class="space-y-2 p-3">
-      <Dropdown :options="resourceMenu" class="w-full">
-        <Button class="w-full" :icon-left="resource.icon" icon-right="lucide-chevron-down" :aria-label="__('Resource: {0}', [resource.label])">
+      <Dropdown :disabled="disabled" :options="resourceMenu" class="w-full">
+        <Button :disabled="disabled" class="w-full" :icon-left="resource.icon" icon-right="lucide-chevron-down" :aria-label="__('Resource: {0}', [resource.label])">
           <span class="flex-1 truncate text-start">{{ resource.label }}</span>
         </Button>
       </Dropdown>
-      <TextInput v-model="searchText" type="search" :placeholder="__('Search all resources')" :aria-label="__('Search all resources')">
+      <TextInput :disabled="disabled" v-model="searchText" type="search" :placeholder="__('Search all resources')" :aria-label="__('Search all resources')">
         <template #prefix><span class="lucide-search size-4 text-ink-gray-5" aria-hidden="true" /></template>
       </TextInput>
     </div>
@@ -83,6 +86,7 @@ const shownCount = computed(() => (filter.value === 'todo' ? props.toDoCount : p
         <button
           v-for="record in group.records"
           :key="record.name"
+          :disabled="disabled"
           type="button"
           class="block w-full truncate rounded-4 px-2 py-1.5 text-start text-base text-ink-gray-8 hover:bg-surface-gray-2"
           @click="openResult(group.resource, record.name)"
@@ -97,16 +101,18 @@ const shownCount = computed(() => (filter.value === 'todo' ? props.toDoCount : p
         <p class="text-sm text-ink-gray-5">{{ __('Showing {0} of {1}', [shownCount, total]) }}</p>
         <TabButtons
           v-model="filter"
+          :disabled="disabled"
           class="ms-auto"
           :options="[
-            { label: __('To do'), value: 'todo' },
-            { label: __('All'), value: 'all' },
+            { label: __('To do'), value: 'todo', disabled },
+            { label: __('All'), value: 'all', disabled },
           ]"
         />
       </div>
       <ul class="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-6">
         <li v-for="item in items" :key="item.name">
           <button
+            :disabled="disabled"
             type="button"
             class="flex w-full items-center gap-2 rounded-4 px-2 py-2 text-start hover:bg-surface-gray-2"
             :class="{ 'bg-surface-gray-3': item.name === selectedName }"
@@ -122,15 +128,15 @@ const shownCount = computed(() => (filter.value === 'todo' ? props.toDoCount : p
           </button>
         </li>
         <li v-if="hasMore" class="px-2 pt-2">
-          <Button class="w-full" :label="__('Load more')" :loading="loading" @click="emit('load-more')" />
+          <Button :disabled="disabled" class="w-full" :label="__('Load more')" :loading="loading" @click="emit('load-more')" />
         </li>
         <li v-if="loadError" class="px-2 py-6 text-center" role="alert">
           <p class="text-p-sm text-ink-red-6">{{ errorMessage(loadError, __('Could not load translations')) }}</p>
-          <Button class="mt-2" size="sm" :label="__('Retry')" @click="emit('retry')" />
+          <Button :disabled="disabled" class="mt-2" size="sm" :label="__('Retry')" @click="emit('retry')" />
         </li>
         <li v-else-if="loaded && !loading && !items.length" class="px-2 py-6 text-center">
           <p class="text-p-sm text-ink-gray-5">{{ __('{0} are up to date in {1}', [resource.label, language.name]) }}</p>
-          <Button v-if="filter === 'todo' && total" class="mt-2" size="sm" :label="__('Show all')" @click="filter = 'all'" />
+          <Button :disabled="disabled" v-if="filter === 'todo' && total" class="mt-2" size="sm" :label="__('Show all')" @click="filter = 'all'" />
         </li>
       </ul>
     </template>

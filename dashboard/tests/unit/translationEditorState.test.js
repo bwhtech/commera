@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { effectScope, nextTick, ref } from 'vue'
-import { changePending, savePending, useOpenedTranslation } from '../../src/data/translationEditorState.js'
+import { changePending, useTranslationSave, useOpenedTranslation } from '../../src/data/translationEditorState.js'
 import { useTranslationItems } from '../../src/data/translationItems.js'
 
 function deferred() {
@@ -10,15 +10,64 @@ function deferred() {
   return { promise, resolve }
 }
 
-test('edits during a deferred save remain pending', async () => {
+test('a deferred save locks until refresh adopts saved values', async () => {
   const response = deferred()
-  const pending = { title: 'submitted', content: 'submitted' }
-  const saving = savePending(pending, () => response.promise)
-  pending.title = 'typed while saving'
-  pending.newField = 'new'
-  response.resolve(2)
+  const refreshed = deferred()
+  const pending = { title: 'B' }
+  const state = useTranslationSave(pending, ref('ar/product'))
+  let stored = 'A'
+  const saving = state.save(() => response.promise, async () => {
+    await refreshed.promise
+    stored = 'B'
+  })
+  assert.equal(state.saving.value, true)
+  assert.equal(pending.title ?? stored, 'B')
+  await state.save(() => assert.fail('duplicate save'), () => {})
+  response.resolve(1)
+  await nextTick()
+  assert.equal(state.saving.value, true)
+  assert.equal(pending.title ?? stored, 'B')
+  refreshed.resolve()
   await saving
-  assert.deepEqual(pending, { title: 'typed while saving', newField: 'new' })
+  assert.equal(state.saving.value, false)
+  assert.deepEqual(pending, {})
+  assert.equal(pending.title ?? stored, 'B')
+})
+
+test('failed saves retain every edit and unlock for retry', async () => {
+  for (const fails of [false, true]) {
+    const pending = { title: 'B', content: 'draft' }
+    const state = useTranslationSave(pending, ref('ar/product'))
+    const attempt = state.save(async () => {
+      if (fails) throw new Error('offline')
+      return null
+    }, () => assert.fail('refresh on failed save'))
+    if (fails) await assert.rejects(attempt, /offline/)
+    else await attempt
+    assert.deepEqual(pending, { title: 'B', content: 'draft' })
+    assert.equal(state.saving.value, false)
+  }
+})
+
+test('save completion cannot refresh or clear a different context', async () => {
+  const response = deferred()
+  const context = ref('ar/product')
+  const pending = { arabic: 'B' }
+  const state = useTranslationSave(pending, context)
+  const saving = state.save(() => response.promise, () => assert.fail('stale refresh'))
+  context.value = 'fr/product'
+  delete pending.arabic
+  pending.french = 'French'
+  response.resolve(1)
+  await saving
+  assert.deepEqual(pending, { french: 'French' })
+})
+
+test('drafts remain visible if the saved record cannot refresh', async () => {
+  const pending = { title: 'B' }
+  const state = useTranslationSave(pending, ref('ar/product'))
+  await state.save(async () => 1, async () => false)
+  assert.deepEqual(pending, { title: 'B' })
 })
 
 test('opened records reset across languages and resources and ignore stale responses', async () => {
@@ -77,19 +126,15 @@ test('old list and record responses cannot replace the new language', async () =
 })
 
 
-test('the change handler keeps a reversion to the pre-save value pending', async () => {
-  const response = deferred()
+test('reverting an idle edit clears it, except confirmation of outdated text', () => {
   const pending = {}
   const field = { value: 'A', status: 'current' }
   changePending(pending, 'title', field, 'B')
-  const submitted = { ...pending }
-  const saving = savePending(pending, () => response.promise)
-  changePending(pending, 'title', field, 'A', submitted)
-  response.resolve(1)
-  await saving
-  assert.deepEqual(pending, { title: 'A' })
-  changePending(pending, 'title', { ...field, value: 'B' }, 'B')
+  assert.deepEqual(pending, { title: 'B' })
+  changePending(pending, 'title', field, 'A')
   assert.deepEqual(pending, {})
+  changePending(pending, 'title', { ...field, status: 'outdated' }, 'A')
+  assert.deepEqual(pending, { title: 'A' })
 })
 
 test('refresh uses one request for multiple saved records and updates their statuses and counts', async () => {
@@ -133,16 +178,4 @@ test('a failed detail load exposes an error and can retry without becoming a mis
   assert.equal(state.unknownName.value, 'missing')
   assert.equal(state.loadError.value, null)
   scope.stop()
-})
-
-
-test('a failed save retains a field edited back to its submitted value', async () => {
-  const response = deferred()
-  const pending = { title: 'B' }
-  const submitted = { ...pending }
-  const saving = savePending(pending, () => response.promise)
-  changePending(pending, 'title', { value: 'A', status: 'current' }, 'B', submitted)
-  response.resolve(null)
-  await saving
-  assert.deepEqual(pending, { title: 'B' })
 })

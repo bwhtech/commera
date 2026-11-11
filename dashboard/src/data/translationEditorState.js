@@ -1,25 +1,30 @@
 import { computed, ref, watch } from 'vue'
 
-export function changePending(pending, key, field, value, submitted = {}) {
-  // A successful save will replace the displayed value with the submitted one.
-  const inFlight = Object.hasOwn(submitted, key)
-  const baseline = inFlight ? submitted[key] : field.value
-  if (value === baseline && (inFlight || field.status !== 'outdated')) delete pending[key]
+export function changePending(pending, key, field, value) {
+  if (value === field.value && field.status !== 'outdated') delete pending[key]
   else pending[key] = value
 }
 
-export async function savePending(pending, submit) {
-  const submitted = { ...pending }
-  let saved = null
-  try {
-    saved = await submit(submitted)
-    return saved
-  } finally {
-    for (const [key, value] of Object.entries(submitted)) {
-      if (saved !== null && pending[key] === value) delete pending[key]
-      else if (saved === null && !Object.hasOwn(pending, key)) pending[key] = value
+export function useTranslationSave(pending, context) {
+  const saving = ref(false)
+
+  async function save(submit, refresh) {
+    if (saving.value || !Object.keys(pending).length) return
+    const startedIn = context.value
+    saving.value = true
+    try {
+      const saved = await submit()
+      if (saved === null || context.value !== startedIn) return
+      const refreshed = await refresh(saved)
+      if (refreshed !== false && context.value === startedIn) {
+        for (const key of Object.keys(pending)) delete pending[key]
+      }
+    } finally {
+      saving.value = false
     }
   }
+
+  return { saving, save }
 }
 
 export function useOpenedTranslation(language, resource) {

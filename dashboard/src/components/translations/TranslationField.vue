@@ -10,6 +10,7 @@ import { __ } from '../../data/translation'
 // One field of one record: its source and its translation, side by side. The editor holds
 // unsaved values until Save, so this only reports changes.
 const props = defineProps({
+  disabled: { type: Boolean, default: false },
   // { field, label, kind, source, value, status }
   field: { type: Object, required: true },
   // { code, name, direction }
@@ -25,7 +26,7 @@ const isUnsaved = computed(() => props.pending !== undefined)
 const status = computed(() => (isUnsaved.value ? 'unsaved' : props.field.status))
 const value = computed({
   get: () => props.pending ?? props.field.value,
-  set: (newValue) => emit('change', newValue),
+  set: (newValue) => { if (!props.disabled) emit('change', newValue) },
 })
 const inputLabel = computed(() => __('{0} of {1} in {2}', [props.field.label, props.recordTitle, props.language.name]))
 
@@ -36,12 +37,12 @@ const isUploading = ref(false)
 async function swapImage(event) {
   const file = event.target.files?.[0]
   event.target.value = ''
-  if (!file) return
+  if (!file || props.disabled) return
   isUploading.value = true
   try {
     // Public: the storefront shows it to shoppers.
     const uploaded = await upload(file, { private: false })
-    emit('change', uploaded.file_url)
+    if (!props.disabled) emit('change', uploaded.file_url)
   } catch {
     toast.error(__('Could not upload {0}', [file.name]))
   } finally {
@@ -80,15 +81,16 @@ async function swapImage(event) {
         <span v-else class="min-w-0 flex-1 text-sm text-ink-gray-5">
           {{ __('Uses the {0} image', [sourceLanguage.name]) }}
         </span>
-        <input ref="imageInput" type="file" accept="image/*" class="hidden" @change="swapImage" />
-        <Button size="sm" :label="__('Change')" :loading="isUploading" @click="imageInput.click()" />
-        <Button v-if="value" size="sm" variant="ghost" :label="__('Reset')" @click="emit('change', '')" />
+        <input ref="imageInput" :disabled="disabled" type="file" accept="image/*" class="hidden" @change="swapImage" />
+        <Button :disabled="disabled" size="sm" :label="__('Change')" :loading="isUploading" @click="imageInput.click()" />
+        <Button :disabled="disabled" v-if="value" size="sm" variant="ghost" :label="__('Reset')" @click="emit('change', '')" />
       </div>
       <div v-else :dir="language.direction">
-        <RichTextField v-if="field.kind === 'html'" v-model="value" min-height="min-h-32" />
+        <RichTextField v-if="field.kind === 'html'" v-model="value" :disabled="disabled" min-height="min-h-32" />
         <FormControl
           v-else
           v-model="value"
+          :disabled="disabled"
           :type="field.kind === 'long' ? 'textarea' : 'text'"
           :rows="field.kind === 'long' ? 3 : undefined"
           :aria-label="inputLabel"
@@ -97,6 +99,7 @@ async function swapImage(event) {
       <!-- Saving the same text stamps it with the source as it is now, which clears outdated. -->
       <Button
         v-if="field.status === 'outdated' && !isUnsaved"
+        :disabled="disabled"
         class="mt-1.5"
         size="sm"
         variant="ghost"
