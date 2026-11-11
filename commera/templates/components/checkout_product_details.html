@@ -36,7 +36,7 @@
     <div class="space-y-3 my-4 py-4 border-b border-t border-gray-300">
         <div class="flex justify-between text-gray-500 text-base">
             <span>{{ _('Subtotal') }}</span>
-            <span class="font-medium flex"> {{get_currency_symbol()}} {{ "%.2f"|format(checkout_summary.items_total or 0) }}</span>
+            <span class="font-medium flex"> {{get_currency_symbol()}} <span x-text="charge_summary.items_total.toFixed(2)">{{ "%.2f"|format(checkout_summary.items_total or 0) }}</span></span>
         </div>
 
         {% for discount in checkout_summary.discounts or [] %}
@@ -56,6 +56,12 @@
                 x-transition x-cloak>
                 {{_('Free')}}</span>
         </div>
+        <template x-for="(tax, index) in charge_summary.taxes" :key="index">
+            <div class="flex justify-between text-gray-500 text-base">
+                <span x-text="tax.description"></span>
+                <span>{{get_currency_symbol()}} <span x-text="tax.amount.toFixed(2)"></span></span>
+            </div>
+        </template>
         {% if cod_charge_applicable_below > cart_payable_total and cod_charge %}
         <div class="flex justify-between text-gray-500 text-base"
             x-show="billing_address_filled && payment_mode === 'cod'" x-transition x-cloak>

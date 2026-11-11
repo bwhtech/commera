@@ -216,6 +216,10 @@ class CommeraCart(Document):
 				get_preview_lines(other_lines), user=self.user, flags={"commera_discounts": []}
 			)
 			items_by_row.update(zip([row.name for row in other_lines], plain_quotation.items, strict=True))
+		from commera.api.shipping import get_charge_summary
+
+		summary = get_charge_summary(quotation)
+		inclusive = any(tax.get("included") for tax in summary["taxes"])
 		return {
 			"name": self.name,
 			"version": self.version,
@@ -232,7 +236,8 @@ class CommeraCart(Document):
 			],
 			"subtotal": flt(quotation.total),
 			"order_discount": flt(quotation.custom_code_order_discount),
-			"total": flt(quotation.net_total),
+			"total": summary["total"] if inclusive else flt(quotation.net_total),
+			**({"items_total": summary["items_total"], "taxes": summary["taxes"]} if inclusive else {}),
 			**get_free_delivery(quotation),
 		}
 

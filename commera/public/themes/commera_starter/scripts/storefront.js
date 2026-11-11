@@ -328,10 +328,18 @@ function order_summary() {
 			return this.summary?.discounts ?? this.cart?.discounts ?? [];
 		},
 
+		get cart_taxes() {
+			return this.summary ? [] : this.cart?.taxes ?? [];
+		},
+
 		get subtotal() {
-			return (this.cart?.discounts ?? []).reduce(
-				(subtotal, discount) => subtotal + discount.amount,
-				this.cart?.total ?? 0,
+			return (
+				this.summary?.items_total ??
+				this.cart?.items_total ??
+				(this.cart?.discounts ?? []).reduce(
+					(subtotal, discount) => subtotal + discount.amount,
+					this.cart?.total ?? 0,
+				)
 			);
 		},
 

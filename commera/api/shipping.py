@@ -379,7 +379,16 @@ def get_charge_lines(taxes, shipping_rule: str | None) -> dict:
 		elif description.startswith(DELIVERY_CHARGE_DESCRIPTION) or is_shipping_rule_row(row, rule):
 			charge_lines["shipping"] += flt(row.tax_amount)
 		else:
-			charge_lines["taxes"].append({"description": description, "amount": flt(row.tax_amount)})
+			included = bool(row.get("included_in_print_rate"))
+			if included:
+				description = _("{0} (included)").format(description)
+			charge_lines["taxes"].append(
+				{
+					"description": description,
+					"amount": flt(row.tax_amount),
+					**({"included": True} if included else {}),
+				}
+			)
 	return charge_lines
 
 
@@ -411,7 +420,11 @@ def get_checkout_summary(quotation) -> dict:
 def get_charge_summary(quotation) -> dict:
 	charge_lines = get_charge_lines(quotation.taxes, quotation.shipping_rule)
 	charges = charge_lines["shipping"] + charge_lines["cod_charge"]
-	charges += sum(line["amount"] for line in charge_lines["taxes"] + charge_lines["plugin_fees"])
+	charges += sum(
+		line["amount"]
+		for line in charge_lines["taxes"] + charge_lines["plugin_fees"]
+		if not line.get("included")
+	)
 	discount_amount = flt(quotation.discount_amount)
 	# Derived rather than read: with a Grand Total discount the stored net_total is already partly discounted.
 	subtotal = flt(flt(quotation.grand_total) + discount_amount - charges, quotation.precision("grand_total"))
@@ -483,6 +496,7 @@ def read_order_taxes(order_names: list) -> dict[str, list]:
 			"account_head",
 			"cost_center",
 			"tax_amount",
+			"included_in_print_rate",
 			PLUGIN_FEE_FIELD,
 		],
 		order_by="idx asc",

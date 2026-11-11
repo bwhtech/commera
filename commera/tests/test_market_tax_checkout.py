@@ -31,6 +31,43 @@ class TestMarketTaxCheckout(test_market_taxes.TestMarketOrderRecords):
 		payload["billing_address"].update({"country": "United Arab Emirates", "city": "Dubai"})
 		return payload
 
+	def test_inclusive_summaries_before_and_after_address(self):
+		self.assert_public_summaries(inclusive=True)
+
+	def test_exclusive_summaries_before_and_after_address(self):
+		self.assert_public_summaries(inclusive=False)
+
+	def assert_public_summaries(self, inclusive):
+		from commera.api.storefront import cart as cart_api
+		from commera.api.storefront import checkout as checkout_api
+		from commera.tests.test_sdk_checkout import BILLING_ADDRESS
+
+		self.set_market_template(self.make_template(15, inclusive=int(inclusive)))
+		self.item_code = self.item("SUMMARY", market_sale=699.95)
+		self.sign_in_shopper()
+		frappe.local.request_ip = "127.0.0.1"
+		with self.in_market():
+			priced = cart_api.add_lines([{"item_code": self.item_code, "qty": 1}])
+			self.assertEqual(priced["subtotal"], 699.95)
+			self.assertEqual(priced["total"], 700 if inclusive else 699.95)
+			self.assertIsNone(checkout_api.get())
+			if inclusive:
+				self.assertEqual(priced["items_total"], 699.95)
+				self.assertEqual(priced["taxes"][0]["description"], "VAT 15% (included)")
+			state = checkout_api.set_addresses(
+				{**BILLING_ADDRESS, "country": "United Arab Emirates", "city": "Dubai"}
+			)
+			summary = state["summary"]
+			quotation = _get_cart_quotation()
+			self.assertEqual(summary["total"], 700 if inclusive else 805)
+			self.assertEqual(summary["subtotal"], 699.95)
+			self.assertEqual(summary["total"], quotation.rounded_total or quotation.grand_total)
+			self.assertEqual(
+				summary["taxes"][0]["description"], "VAT 15% (included)" if inclusive else "VAT 15%"
+			)
+			self.assertEqual(checkout_api.get()["summary"], summary)
+			self.assertEqual(cart_api.get_cart()["total"], priced["total"])
+
 	def enable_gateway(self):
 		account = frappe.db.get_value(
 			"Account", {"company": self.company, "root_type": "Income", "is_group": 0}, "name"

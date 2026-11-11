@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 __all__ = [
 	"Address",
@@ -70,6 +70,7 @@ __all__ = [
 class Charge(TypedDict):
 	description: str
 	amount: float
+	included: NotRequired[bool]
 
 
 class Stage(TypedDict):
@@ -279,7 +280,7 @@ class DiscountRow(TypedDict):
 
 
 class PricedCart(TypedDict):
-	"""Before shipping and tax."""
+	"""Before shipping and exclusive tax; inclusive tax stays in the line price."""
 
 	name: str
 	version: str
@@ -300,6 +301,8 @@ class PricedCart(TypedDict):
 	subtotal: float
 	order_discount: float
 	total: float
+	items_total: NotRequired[float]
+	taxes: NotRequired[list[Charge]]
 	# The store Shipping Rule's free band, judged after every discount; None when it has none.
 	free_delivery_above: float | None
 	free_delivery_shortfall: float

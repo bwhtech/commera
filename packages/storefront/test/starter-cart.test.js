@@ -72,3 +72,25 @@ test('a code a market switch removed is a notice, not a chip', () => {
 		['INDIA20'],
 	);
 });
+
+test('inclusive summary keeps the line price before and after the address step', () => {
+	const { context } = load_starter();
+	const component = context.order_summary();
+	component.$store = {
+		cart: {
+			cart: {
+				total: 700,
+				items_total: 699.95,
+				discounts: [],
+				taxes: [
+					{ description: 'VAT 15% (included)', amount: 91.3, included: true },
+				],
+			},
+		},
+	};
+	assert.equal(component.subtotal, 699.95);
+	assert.equal(component.cart_taxes[0].included, true);
+	component.summary = { items_total: 699.95, total: 700 };
+	assert.equal(component.subtotal, 699.95);
+	assert.equal(component.cart_taxes.length, 0);
+});

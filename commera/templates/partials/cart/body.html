@@ -38,7 +38,7 @@
 			return this.delivery_charge > 0 && $store.cart.delivery_status === 'charged';
 		},
 		get cart_total() {
-			return $store.cart.total - $store.cart.saved + (this.show_delivery_charges ? this.delivery_charge : 0);
+			return ($store.cart.priced?.taxes ? $store.cart.priced.total : $store.cart.total - $store.cart.saved) + (this.show_delivery_charges ? this.delivery_charge : 0);
 		},
 	}" x-init="
 		window.addEventListener('pageshow', (event) => { if (event.persisted) checkout_status = 'idle'; });
@@ -208,9 +208,15 @@
 					<p class="text-base font-normal text-gray-400"><span x-text="$store.cart.selected_count"></span> {{
 						_('items') }}</p>
 
-					<p class="text-base font-medium flex">{{get_currency_symbol()}}<span x-text="$store.cart.total.toFixed(2)" class="me-2"></span>
+					<p class="text-base font-medium flex">{{get_currency_symbol()}}<span x-text="($store.cart.priced?.items_total ?? $store.cart.total).toFixed(2)" class="me-2"></span>
 						</p>
 				</div>
+				<template x-for="(tax, index) in $store.cart.priced?.taxes ?? []" :key="index">
+					<div class="mb-3 flex items-center justify-between">
+						<span x-text="tax.description"></span>
+						<span>{{get_currency_symbol()}} <span x-text="tax.amount.toFixed(2)"></span></span>
+					</div>
+				</template>
 				{{ discount_code_chips("$store.cart.discount_codes", "$store.cart.saving_code", "$store.cart.remove_discount_code", classes="mb-3") }}
 				<template x-for="(discount, index) in $store.cart.discounts" :key="index">
 					<div class="mb-3 flex items-center justify-between">
