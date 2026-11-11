@@ -2,9 +2,11 @@
 index's own rows; a secondary market with its own price lists is keyed by its handle."""
 
 import frappe
+from frappe.query_builder import DocType
+from frappe.query_builder.functions import Max, Min
 from frappe.utils import create_batch, flt
 
-from commera.base_prices import base_price_filters
+from commera.base_prices import base_price_filters, is_base_price
 from commera.card_prices import get_card_price
 from commera.localization.content import SHOP_WIDE
 from commera.localization.market_prices import MarketPrices
@@ -12,6 +14,7 @@ from commera.localization.markets import Market, StorefrontMarkets
 from commera.localization.resolver import get_localization
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
+PRODUCT_DOCTYPE = "Style Attribute Variant"
 # The card price columns each market row holds.
 PRICE_COLUMNS = (
 	"effective_price",
@@ -51,17 +54,42 @@ def price_generation(settings, markets: StorefrontMarkets | None = None) -> list
 
 
 def prices_for_variants(names, sizes_by_variant) -> dict[str, dict[str, dict]]:
-	"""{variant: {market key: card prices}}. Every variant has store prices, 0 when unpriced, as
-	before. A secondary market leaves out each variant it cannot price: it does not sell it."""
+	"""{variant: {market key: card prices}} of `names`, as card_prices_by_variant prices them."""
 	price_markets = get_price_markets()
 	codes_by_variant = {
 		name: [size["item_code"] for size in sizes_by_variant.get(name, []) if size.get("item_code")]
 		for name in names
 	}
 	codes = list({code for item_codes in codes_by_variant.values() for code in item_codes})
-	price_lists = {name for prices in price_markets.values() for name in prices.price_lists}
-	rates = rates_by_price_list(codes, sorted(price_lists))
+	rates = rates_by_price_list(codes, price_lists_of(price_markets))
+	return card_prices_by_variant(codes_by_variant, price_markets, rates)
 
+
+def all_card_prices(products, price_markets) -> dict[str, dict[str, dict]]:
+	"""prices_for_variants of every product in `products`, a name subquery. One read of the products,
+	one of their sizes and one grouped read of their rates: no read per product."""
+	codes_by_variant = {name: [] for name in products.run(pluck=True)}
+	size = DocType("Color Size Item")
+	sizes = (
+		frappe.qb.from_(size)
+		.select(size.parent, size.item_code)
+		.where((size.parenttype == PRODUCT_DOCTYPE) & size.parent.isin(products) & (size.item_code != ""))
+		.run(as_dict=True)
+	)
+	for row in sizes:
+		codes_by_variant[row.parent].append(row.item_code)
+	item_codes = (
+		frappe.qb.from_(size)
+		.select(size.item_code)
+		.where((size.parenttype == PRODUCT_DOCTYPE) & size.parent.isin(products))
+	)
+	rates = grouped_rates(price_lists_of(price_markets), item_codes)
+	return card_prices_by_variant(codes_by_variant, price_markets, rates)
+
+
+def card_prices_by_variant(codes_by_variant, price_markets, rates) -> dict[str, dict[str, dict]]:
+	"""Every variant has store prices, 0 when unpriced, as before. A secondary market leaves out
+	each variant it cannot price: it does not sell it."""
 	snapshots = {}
 	for name, item_codes in codes_by_variant.items():
 		by_market = snapshots[name] = {}
@@ -74,6 +102,41 @@ def prices_for_variants(names, sizes_by_variant) -> dict[str, dict[str, dict]]:
 			if snapshot["effective_price"] is not None:
 				by_market[key] = snapshot
 	return snapshots
+
+
+def price_lists_of(price_markets) -> list[str]:
+	return sorted({name for prices in price_markets.values() for name in prices.price_lists})
+
+
+def grouped_rates(price_lists, item_codes) -> dict[str, dict]:
+	"""rates_by_price_list over the item codes of a subquery, aggregated in SQL."""
+	rates = {}
+	if not price_lists:
+		return rates
+	price = DocType("Item Price")
+	rows = (
+		frappe.qb.from_(price)
+		.select(
+			price.price_list,
+			price.item_code,
+			Min(price.price_list_rate).as_("rate"),
+			Max(price.valid_upto).as_("upto"),
+		)
+		.where(
+			price.price_list.isin(price_lists)
+			& is_base_price(price)
+			& price.price_list_rate.notnull()
+			& price.item_code.isin(item_codes)
+		)
+		.groupby(price.price_list, price.item_code)
+		.run(as_dict=True)
+	)
+	for row in rows:
+		price_list = rates.setdefault(row.price_list, empty_rates())
+		price_list["rate"][row.item_code] = row.rate
+		if row.upto:
+			price_list["upto"][row.item_code] = row.upto
+	return rates
 
 
 def rates_by_price_list(item_codes, price_lists) -> dict[str, dict]:

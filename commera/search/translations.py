@@ -13,6 +13,7 @@ from commera.localization.content import BATCH_SIZE, DOCTYPE, SHOP_WIDE, get_loo
 from commera.localization.languages import Language, StorefrontLanguages
 from commera.localization.markets import StorefrontMarkets, fetch_market_rows
 from commera.localization.resolver import Localization, get_localization
+from commera.search import write_lock
 from commera.search.price_markets import price_generation
 
 # The field the index takes its title from, on both indexed doctypes.
@@ -135,20 +136,21 @@ def index_generation(settings=None, markets: StorefrontMarkets | None = None) ->
 def fresh_index_generation() -> str:
 	"""index_generation from the database. The worker's own caches can predate another worker's save."""
 	settings = frappe.get_doc("Commera Settings")
-	markets = StorefrontMarkets(StorefrontLanguages.from_settings(settings), fetch_market_rows())
-	return index_generation(settings, markets)
+	return index_generation(settings, fresh_markets(settings))
+
+
+def fresh_markets(settings=None) -> StorefrontMarkets:
+	"""StorefrontMarkets from the database, not the caches."""
+	settings = settings or frappe.get_doc("Commera Settings")
+	return StorefrontMarkets(StorefrontLanguages.from_settings(settings), fetch_market_rows())
 
 
 def rebuild_if_generation_changes(engine, generation: str, job_id: str):
-	"""After a build commits, rebuild again if the languages or prices changed while it ran."""
+	"""After a build, rebuild again if the languages or prices changed while it ran."""
 	# A settings save during the build saw its job as started, and dedupe dropped that save's rebuild.
-
-	def check():
-		# After the commit, so the build's read snapshot cannot hide a newer save.
-		if fresh_index_generation() == generation:
-			return
-		# Only a queued build reads the new settings. This build's own job still counts as started.
-		if get_job_status(job_id) != JobStatus.QUEUED:
-			engine.enqueue_full_rebuild()
-
-	frappe.db.after_commit.add(check)
+	write_lock.refresh_snapshot()
+	if fresh_index_generation() == generation:
+		return
+	# Only a queued build reads the new settings. This build's own job still counts as started.
+	if get_job_status(job_id) != JobStatus.QUEUED:
+		engine.enqueue_full_rebuild()

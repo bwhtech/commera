@@ -17,7 +17,6 @@ from frappe.utils import create_batch, flt
 from commera.localization.content import SHOP_WIDE
 from commera.localization.languages import StorefrontLanguages
 from commera.search.arabic import arabic_search_forms, arabic_word_forms, is_arabic_query
-from commera.search.build_writes import reconcile_build_writes, track_build_writes
 from commera.search.engine import (
 	CARD_COLUMNS,
 	MIN_QUERY_LENGTH,
@@ -26,17 +25,25 @@ from commera.search.engine import (
 	empty_typeahead,
 	is_query_too_short,
 )
-from commera.search.price_markets import PRICE_COLUMNS, get_price_market, get_price_markets
+from commera.search.price_markets import (
+	PRICE_COLUMNS,
+	all_card_prices,
+	get_price_market,
+	get_price_markets,
+)
 from commera.search.record_builder import (
 	build_category_search_records,
 	build_product_search_records,
 )
 from commera.search.translations import (
+	fresh_markets,
 	get_search_markets,
 	index_generation,
 	rebuild_if_generation_changes,
 )
+from commera.search.write_lock import locked_index_write
 
+PRODUCT_DOCTYPE = "Style Attribute Variant"
 CATEGORY_DOCTYPE = "Ecommerce Category"
 FACET_COLUMN_TO_KEY = {"brand": "brand", "color": "color", "item_group": "category"}
 
@@ -49,6 +56,9 @@ MAX_EDIT_DISTANCE_FALLBACK = 2
 SEARCH_CLASS_PATH = "commera.search.sqlite_product_search.SqliteProductSearch"
 CORE_BUILD_INDEX = "frappe.search.sqlite_search.build_index"
 BUILD_TIMEOUT = 2 * 60 * 60 + 10 * 60
+# The price refresh holds the write lock longer than an incremental write may.
+REFRESH_LOCK_TIMEOUT = 10 * 60
+REFRESH_BLOCKING_TIMEOUT = 60
 
 ARABIC_SCRIPT_LANGUAGES = {"ar", "fa", "ur"}
 # Sorts after every character, so `word < prefix + LAST_CHARACTER` bounds a prefix range.
@@ -190,9 +200,13 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		cursor.execute("CREATE INDEX IF NOT EXISTS idx_search_price_doc ON search_price(doc_id)")
 		# The markets this build prices. A search in any other market is served by frappe.qb.
 		cursor.execute("CREATE TABLE IF NOT EXISTS search_price_market (market TEXT PRIMARY KEY)")
+		self.write_price_markets(cursor, get_price_markets())
+
+	def write_price_markets(self, cursor, price_markets):
 		cursor.execute("DELETE FROM search_price_market")
-		markets = [(key,) for key in get_price_markets()]
-		cursor.executemany("INSERT INTO search_price_market (market) VALUES (?)", markets)
+		cursor.executemany(
+			"INSERT INTO search_price_market (market) VALUES (?)", [(key,) for key in price_markets]
+		)
 
 	def product_detail_column_defs(self):
 		integer_columns = {"is_stock_item", "has_discount"}
@@ -212,15 +226,47 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	# -- builds ---------------------------------------------------------------------------------
 
 	def build_index(self, batch_size=1000, is_continuation=False):
-		track_build_writes()
 		self.build_generation = generation = index_generation()
 		if is_continuation and self.stored_generation() != generation:
 			# The finished batches hold the old languages' titles or the old prices.
 			self.discard_partial_build()
 			is_continuation = False
 		super().build_index(batch_size=batch_size, is_continuation=is_continuation)
-		frappe.db.after_commit.add(reconcile_build_writes)
+		# The batches read their prices before later price writes: the refresh supersedes them.
+		self.refresh_prices()
 		rebuild_if_generation_changes(self, generation, SEARCH_CLASS_PATH)
+
+	def refresh_prices(self):
+		"""Rewrite every product's prices and the priced markets from reads made under the write lock.
+		Idempotent: whichever refresh or incremental write runs last reads the newest prices."""
+		self.index_exists_cache = None
+		if self.index_exists():
+			locked_index_write(
+				self.write_fresh_prices,
+				timeout=REFRESH_LOCK_TIMEOUT,
+				blocking_timeout=REFRESH_BLOCKING_TIMEOUT,
+			)
+
+	def write_fresh_prices(self):
+		price_markets = get_price_markets(fresh_markets())
+		products = frappe.qb.get_query(PRODUCT_DOCTYPE, filters=self.product_filters(), fields=["name"])
+		prices = all_card_prices(products, price_markets)
+		rows = [
+			(f"{PRODUCT_DOCTYPE}:{name}", market, *(snapshot.get(column) for column in PRICE_COLUMNS))
+			for name, by_market in prices.items()
+			for market, snapshot in by_market.items()
+		]
+
+		def replace_prices(cursor):
+			# One SQLite transaction: a reader sees the old prices or the new ones.
+			cursor.execute("DELETE FROM search_price")
+			self.insert_price_rows(cursor, rows)
+			self.write_price_markets(cursor, price_markets)
+
+		self._with_connection(replace_prices)
+
+	def product_filters(self):
+		return self.INDEXABLE_DOCTYPES[PRODUCT_DOCTYPE]["filters"]
 
 	def stored_generation(self):
 		"""The index generation the build being resumed started with, or None."""
@@ -243,7 +289,6 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	def enqueue_full_rebuild(self, deduplicate=False):
 		"""Enqueue a full rebuild on the long queue. Returns the enqueue payload."""
 		# Core builds into a temp DB and renames it over the live one, so the index keeps serving.
-		track_build_writes()
 		return frappe.enqueue(
 			CORE_BUILD_INDEX,
 			queue="long",
@@ -402,11 +447,14 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 
 	def write_search_prices(self, cursor, doc_id, market_prices):
 		cursor.execute("DELETE FROM search_price WHERE doc_id = ?", (doc_id,))
-		columns = ("doc_id", "market", *PRICE_COLUMNS)
 		rows = [
 			(doc_id, market, *(prices.get(column) for column in PRICE_COLUMNS))
 			for market, prices in market_prices.items()
 		]
+		self.insert_price_rows(cursor, rows)
+
+	def insert_price_rows(self, cursor, rows):
+		columns = ("doc_id", "market", *PRICE_COLUMNS)
 		if rows:
 			placeholders = ", ".join("?" for _ in columns)
 			cursor.executemany(

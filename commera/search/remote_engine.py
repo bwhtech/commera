@@ -11,12 +11,12 @@ from frappe.utils import create_batch, flt
 
 from commera.localization.content import SHOP_WIDE
 from commera.product_detail import size_sort_key
-from commera.search.build_writes import reconcile_build_writes, track_build_writes
 from commera.search.engine import CARD_COLUMNS, SearchEngineBase, empty_facets, empty_typeahead
 from commera.search.http_client import SearchServerError
 from commera.search.price_markets import get_price_market
 from commera.search.record_builder import build_category_search_records, build_product_search_records
 from commera.search.translations import index_generation, rebuild_if_generation_changes
+from commera.search.write_lock import locked_index_write, refresh_snapshot
 
 PRODUCT_DOCTYPE = "Style Attribute Variant"
 CATEGORY_DOCTYPE = "Ecommerce Category"
@@ -231,7 +231,6 @@ class RemoteSearchEngine(SearchEngineBase):
 		]
 
 	def enqueue_full_rebuild(self, deduplicate=False):
-		track_build_writes()
 		return frappe.enqueue(
 			self.REBUILD_JOB,
 			queue="long",
@@ -250,7 +249,6 @@ class RemoteSearchEngine(SearchEngineBase):
 
 	def rebuild(self):
 		"""Build both indexes beside the live ones, then swap them in, so search keeps serving meanwhile."""
-		track_build_writes()
 		started = frappe.utils.now()
 		generation = index_generation()
 		for doctype, filters in ((PRODUCT_DOCTYPE, {"is_published": 1}), (CATEGORY_DOCTYPE, {"enabled": 1})):
@@ -259,11 +257,21 @@ class RemoteSearchEngine(SearchEngineBase):
 		self.remember_readiness(True)
 
 		# Writes made during the build went to the old index, which the swap just dropped. Replay them.
-		for doctype in (PRODUCT_DOCTYPE, CATEGORY_DOCTYPE):
-			if changed := frappe.get_all(doctype, filters={"modified": (">=", started)}, pluck="name"):
-				self.index_docs(doctype, changed)
-		frappe.db.after_commit.add(reconcile_build_writes)
+		if changed := frappe.get_all(CATEGORY_DOCTYPE, filters={"modified": (">=", started)}, pluck="name"):
+			self.index_docs(CATEGORY_DOCTYPE, changed)
+		self.rewrite_products(started)
 		rebuild_if_generation_changes(self, generation, self.REBUILD_JOB)
+
+	def rewrite_products(self, started):
+		"""Rewrite each product from fresh reads: a price save leaves the product's `modified` as is.
+		Each chunk reads under the write lock, so no chunk lands an older price over a newer write."""
+		refresh_snapshot()
+		names = {
+			*frappe.get_all(PRODUCT_DOCTYPE, filters={"is_published": 1}, pluck="name"),
+			*frappe.get_all(PRODUCT_DOCTYPE, filters={"modified": (">=", started)}, pluck="name"),
+		}
+		for chunk in create_batch(sorted(names), BATCH_SIZE):
+			locked_index_write(lambda chunk=chunk: self.index_docs(PRODUCT_DOCTYPE, chunk))
 
 	def drop_index(self):
 		self.drop_indexes()

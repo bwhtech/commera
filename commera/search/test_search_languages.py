@@ -452,34 +452,22 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		rebuild.assert_called_once_with(deduplicate=True)
 
 	def test_a_language_change_during_a_build_rebuilds_again(self):
-		def change_languages(*args, **kwargs):
-			if not changed:
-				changed.append(True)
-				set_storefront_languages("en", published=("en", "fr"))
-			return paginate(*args, **kwargs)
-
-		changed, paginate = [], SqliteProductSearch.get_documents_paginated
-		with patch.object(SqliteProductSearch, "get_documents_paginated", autospec=True) as patched:
-			patched.side_effect = change_languages
-			callbacks = self.build_with_after_commit()
-		# Started builds suppress a deduplicated enqueue, so the build must enqueue its own successor.
 		with patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild:
-			callbacks.run()
+			self.build_changing_languages_midway()
+		# Started builds suppress a deduplicated enqueue, so the build must enqueue its own successor.
 		rebuild.assert_called_once_with()
 
 	def test_a_build_with_unchanged_languages_or_a_queued_build_enqueues_nothing(self):
-		callbacks = self.build_with_after_commit()
 		with patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild:
-			callbacks.run()
+			SqliteProductSearch().drop_index()
+			SqliteProductSearch().build_index()
 		rebuild.assert_not_called()
 
-		callbacks = self.build_with_after_commit()
-		set_storefront_languages("en", published=("en",))
 		with (
 			patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild,
 			patch("commera.search.translations.get_job_status", return_value=JobStatus.QUEUED),
 		):
-			callbacks.run()
+			self.build_changing_languages_midway()
 		rebuild.assert_not_called()
 
 	def test_resuming_a_build_after_a_language_change_starts_again(self):
@@ -619,13 +607,20 @@ class TestSearchLanguages(SearchCatalogue, IntegrationTestCase):
 		else:
 			doc.update(changes).save(ignore_permissions=True)
 
-	def build_with_after_commit(self):
-		"""Rebuild the index. Returns the after-commit callbacks the build left, without running them."""
-		callbacks = CallbackManager()
-		with patch.object(frappe.db, "after_commit", callbacks):
+	def build_changing_languages_midway(self):
+		"""Rebuild the index, publishing French after the build read its languages."""
+
+		def change_languages(*args, **kwargs):
+			if not changed:
+				changed.append(True)
+				set_storefront_languages("en", published=("en", "fr"))
+			return paginate(*args, **kwargs)
+
+		changed, paginate = [], SqliteProductSearch.get_documents_paginated
+		with patch.object(SqliteProductSearch, "get_documents_paginated", autospec=True) as patched:
+			patched.side_effect = change_languages
 			SqliteProductSearch().drop_index()
 			SqliteProductSearch().build_index()
-		return callbacks
 
 	def interrupt_build(self):
 		"""Start a fresh build that dies after the products. Its temporary database stays."""

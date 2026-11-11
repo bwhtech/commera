@@ -1,5 +1,5 @@
 import copy
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from unittest.mock import patch
 
 import frappe
@@ -8,10 +8,8 @@ from frappe.utils import CallbackManager
 from commera import utils
 from commera.localization import pin_localization, resolve
 from commera.localization.markets import CACHE_KEY as MARKETS_CACHE_KEY
-from commera.localization.markets import StorefrontMarkets
+from commera.search import price_markets, sqlite_product_search, sync, write_lock
 from commera.search import query as search_query
-from commera.search import sqlite_product_search, sync
-from commera.search.build_writes import BUILD_KEY, BUILD_WRITES_KEY
 from commera.search.engine_cache import clear_search_engine
 from commera.search.facets import get_listing_facet_counts
 from commera.search.sqlite_product_search import SqliteProductSearch
@@ -48,8 +46,6 @@ class SearchPriceTestCase(MarketPriceTestCase):
 		self.swap_engine_attribute("INDEX_NAME", TEST_INDEX_NAME)
 		self.addCleanup(lambda: SqliteProductSearch().drop_index())
 		self.addCleanup(clear_search_engine)
-		# The builds below never run their after-commit reconcile.
-		self.addCleanup(frappe.cache.delete_value, [BUILD_KEY, BUILD_WRITES_KEY])
 		self.products, self.item_codes = {}, {}
 		for label in STORE_RATES:
 			self.products[label], self.item_codes[label] = self.make_product(label)
@@ -87,9 +83,8 @@ class SearchPriceTestCase(MarketPriceTestCase):
 		scoped[PRODUCT]["filters"] = {"is_published": 1, "name": ("in", list(self.products.values()))}
 		scoped["Ecommerce Category"]["filters"] = {"enabled": 1, "name": ("in", ["-"])}
 		self.swap_engine_attribute("INDEXABLE_DOCTYPES", scoped)
-		with patch.object(frappe.db, "after_commit", CallbackManager()):
-			SqliteProductSearch().drop_index()
-			SqliteProductSearch().build_index()
+		SqliteProductSearch().drop_index()
+		SqliteProductSearch().build_index()
 		clear_search_engine()
 		frappe.local.request_cache.clear()
 
@@ -302,24 +297,25 @@ class TestSearchPriceSync(SearchPriceTestCase):
 		rebuild.assert_called_once_with(deduplicate=True)
 
 	def test_a_market_change_during_a_build_rebuilds_again(self):
-		callbacks = CallbackManager()
-		with patch.object(frappe.db, "after_commit", callbacks):
+		def disable_gulf():
+			# Another worker's save: it clears the Redis rows, not this worker's local copy.
+			frappe.db.set_value("Commera Market", "gulf", "enabled", 0)
+			frappe.cache.delete(frappe.cache.make_key(MARKETS_CACHE_KEY))
+
+		# Committed before the build's refresh, after the build read its markets.
+		with (
+			Snapshots(disable_gulf).active(),
+			patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild,
+		):
 			SqliteProductSearch().drop_index()
 			SqliteProductSearch().build_index()
-		# Another worker's save: it clears the Redis rows, not this worker's local copy.
-		frappe.db.set_value("Commera Market", "gulf", "enabled", 0)
-		frappe.cache.delete(frappe.cache.make_key(MARKETS_CACHE_KEY))
-		self.assertTrue(StorefrontMarkets.load().find("gulf"))
-		with patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild:
-			callbacks.run()
 		rebuild.assert_called_once_with()
+		# The refresh read the markets from the database, so it prices the Gulf no more.
+		self.assertFalse(self.engine.prices_market("gulf"))
 
 	def test_an_unchanged_build_does_not_rebuild_again(self):
-		callbacks = CallbackManager()
-		with patch.object(frappe.db, "after_commit", callbacks):
-			SqliteProductSearch().build_index()
 		with patch.object(SqliteProductSearch, "enqueue_full_rebuild") as rebuild:
-			callbacks.run()
+			SqliteProductSearch().build_index()
 		rebuild.assert_not_called()
 
 	def test_an_index_without_market_prices_counts_as_missing(self):
@@ -330,59 +326,158 @@ class TestSearchPriceSync(SearchPriceTestCase):
 		enqueue.assert_called_once()
 
 
-class TestPriceSyncDuringABuild(SearchPriceTestCase):
-	"""A build reads a batch, a price sync writes newer rows, then the build writes its batch."""
+class Snapshots:
+	"""MariaDB REPEATABLE READ in the one test transaction: a worker reads the rows its snapshot
+	holds until refresh_snapshot() replays every commit. Records whether the lock was held then."""
 
-	def build_with_a_price_sync_midway(self, change):
-		"""Rebuild in place, running `change` and its sync before the build's first write."""
-		callbacks, synced = CallbackManager(), []
-		write = SqliteProductSearch._index_documents
+	def __init__(self, *committed):
+		self.committed, self.locked, self.refreshes = list(committed), False, []
 
-		def sync_then_write(engine, documents):
-			if not synced:
-				synced.append(True)
-				synced.extend(self.run_price_sync(change))
-			write(engine, documents)
+	@contextmanager
+	def active(self):
+		lock = frappe.cache.lock
+
+		@contextmanager
+		def recording_lock(*args, **kwargs):
+			with lock(*args, **kwargs):
+				self.locked = True
+				try:
+					yield
+				finally:
+					self.locked = False
 
 		with (
-			patch.object(frappe.db, "after_commit", callbacks),
-			patch.object(SqliteProductSearch, "_index_documents", sync_then_write),
+			patch.object(write_lock, "refresh_snapshot", self.refresh),
+			patch.object(frappe.cache, "lock", recording_lock),
 		):
-			SqliteProductSearch().build_index()
-		self.assertEqual(synced, [True, [self.other]])
-		return callbacks
+			yield self
 
-	def gulf_card_price(self):
+	def commit(self, change):
+		"""Another worker commits `change` now: a worker sees it from its next refresh_snapshot()."""
+		self.committed.append(change)
+
+	def refresh(self):
+		self.refreshes.append(self.locked)
+		for change in self.committed:
+			change()
+
+
+class TestPriceRefreshRaces(SearchPriceTestCase):
+	"""Index writes interleaved with price commits, each worker reading from its own snapshot."""
+
+	def setUp(self):
+		super().setUp()
+		self.price = frappe.db.get_value(
+			"Item Price", {"item_code": self.item_codes["OTHER"]["M"], "price_list": self.market_sale}
+		)
+
+	def set_rate(self, rate):
+		frappe.db.set_value("Item Price", self.price, "price_list_rate", rate)
+
+	def gulf_price(self):
 		clear_search_engine()
 		with self.in_market():
 			return self.cards([self.other]).get(self.other, {}).get("effective_price")
 
-	def test_a_price_saved_during_a_build_survives_it(self):
-		callbacks = self.build_with_a_price_sync_midway(
-			lambda: self.save_item_price(self.item_codes["OTHER"]["M"], self.market_sale, price_list_rate=210)
-		)
-		# The build wrote the price it read first over the synced one.
-		self.assertEqual(self.gulf_card_price(), 260)
-		callbacks.run()
-		self.assertEqual(self.gulf_card_price(), 210)
+	def incremental_write(self):
+		"""The reindex job of another worker's price commit."""
+		sync.upsert_docs(PRODUCT, [self.other])
+
+	def build_with_midway(self, midway):
+		"""Rebuild in place, running `midway` after the first batch read its prices, before it writes."""
+		write, done = SqliteProductSearch._index_documents, []
+
+		def midway_then_write(engine, documents):
+			if not done:
+				done.append(True)
+				midway()
+			write(engine, documents)
+
+		with patch.object(SqliteProductSearch, "_index_documents", midway_then_write):
+			SqliteProductSearch().build_index()
+
+	def test_a_price_committed_after_the_refresh_read_wins(self):
+		# The reviewer's first schedule: a commit lands after the refresh took its snapshot.
+		with Snapshots().active() as snapshots:
+			refresh_read = price_markets.all_card_prices
+
+			def commit_after_the_snapshot(*args):
+				prices = refresh_read(*args)
+				snapshots.commit(lambda: self.set_rate(210))
+				return prices
+
+			with patch.object(sqlite_product_search, "all_card_prices", commit_after_the_snapshot):
+				self.engine.refresh_prices()
+			self.assertEqual(self.gulf_price(), 260)
+			self.incremental_write()
+		self.assertEqual(self.gulf_price(), 210)
+		self.assertEqual(snapshots.refreshes, [True, True])
+
+	def test_a_refresh_after_a_newer_write_reads_past_its_old_snapshot(self):
+		# The build's batch read 260, then another worker committed 210 and reindexed it.
+		def commit_and_reindex():
+			snapshots.commit(lambda: self.set_rate(210))
+			self.incremental_write()
+			# Back in the build's snapshot, which predates the commit.
+			self.set_rate(260)
+
+		with Snapshots().active() as snapshots:
+			self.build_with_midway(commit_and_reindex)
+		# The batch wrote 260 over the reindexed row; the refresh, from a fresh snapshot, wrote 210.
+		self.assertEqual(self.gulf_price(), 210)
 		with self.in_market():
 			self.assertEqual(self.grid("price_low"), [self.discounted, self.other, self.mixed])
-		self.assertFalse(frappe.cache.exists(BUILD_KEY))
-		self.assertEqual(frappe.cache.smembers(BUILD_WRITES_KEY), set())
+
+	def test_overlapping_builds_end_with_the_newest_price(self):
+		# Build A refreshes while build B runs; B's batch read 260 before the commit of 210.
+		def commit_then_refresh_a():
+			snapshots.commit(lambda: self.set_rate(210))
+			self.incremental_write()
+			self.engine.refresh_prices()
+			self.set_rate(260)
+
+		with Snapshots().active() as snapshots:
+			self.build_with_midway(commit_then_refresh_a)
+			self.assertEqual(self.gulf_price(), 210)
+			# A's refresh again, last, in a worker whose snapshot predates the commit.
+			self.set_rate(260)
+			self.engine.refresh_prices()
+		self.assertEqual(self.gulf_price(), 210)
 
 	def test_a_price_deleted_during_a_build_stays_deleted(self):
-		name = frappe.db.get_value(
-			"Item Price", {"item_code": self.item_codes["OTHER"]["M"], "price_list": self.market_sale}
-		)
-		callbacks = self.build_with_a_price_sync_midway(
-			lambda: frappe.delete_doc("Item Price", name, ignore_permissions=True)
-		)
-		with self.in_market():
-			self.assertIn(self.other, self.grid())
-		callbacks.run()
+		with Snapshots().active():
+			self.build_with_midway(
+				lambda: self.run_price_sync(
+					lambda: frappe.delete_doc("Item Price", self.price, ignore_permissions=True)
+				)
+			)
 		with self.in_market():
 			self.assertNotIn(self.other, self.grid())
 			self.assertEqual(self.count(), 2)
+
+	def test_index_writes_read_prices_after_the_lock_and_a_fresh_snapshot(self):
+		events = []
+		reads = {
+			"all_card_prices": sqlite_product_search.all_card_prices,
+			"prices_for_variants": price_markets.prices_for_variants,
+		}
+
+		def recorded(name):
+			def read(*args):
+				events.append(("read", snapshots.locked))
+				return reads[name](*args)
+
+			return read
+
+		with (
+			Snapshots().active() as snapshots,
+			patch.object(sqlite_product_search, "all_card_prices", recorded("all_card_prices")),
+			patch("commera.search.record_builder.prices_for_variants", recorded("prices_for_variants")),
+		):
+			self.engine.refresh_prices()
+			self.incremental_write()
+		self.assertEqual(events, [("read", True), ("read", True)])
+		self.assertEqual(snapshots.refreshes, [True, True])
 
 
 class TestUnpricedSearchFallback(SearchPriceTestCase):

@@ -1,15 +1,10 @@
 import frappe
 from frappe.utils import create_batch
-from redis.exceptions import LockError
 
 from commera.search.build import ensure_index_built
-from commera.search.build_writes import note_build_writes
 from commera.search.engine_cache import new_search_engine
 from commera.search.record_builder import IN_CLAUSE_CHUNK_SIZE
-
-LOCK_KEY = "commera_search_index_write"
-LOCK_TIMEOUT = 30
-LOCK_BLOCKING_TIMEOUT = 10
+from commera.search.write_lock import locked_index_write
 
 
 def on_update(doc, method=None):
@@ -76,7 +71,7 @@ def enqueue_remove(doctype, name):
 
 
 def upsert_doc(doctype, name):
-	serialized_write(lambda engine: engine.index_doc(doctype, name), doctype, [name])
+	serialized_write(lambda engine: engine.index_doc(doctype, name))
 
 
 def upsert_docs(doctype, names):
@@ -84,30 +79,15 @@ def upsert_docs(doctype, names):
 		# No index yet: patching is a no-op, so build it instead of waiting for the nightly job.
 		ensure_index_built()
 		return
-	serialized_write(lambda engine: engine.index_docs(doctype, names), doctype, names)
+	serialized_write(lambda engine: engine.index_docs(doctype, names))
 
 
 def remove_doc(doctype, name):
-	serialized_write(lambda engine: engine.remove_doc(doctype, name), doctype, [name])
+	serialized_write(lambda engine: engine.remove_doc(doctype, name))
 
 
-def serialized_write(write, doctype=None, names=()) -> bool:
-	"""Run an index write under the single-writer cache lock; no-op until the index has been built.
-	False when the lock timed out and the write was skipped."""
+def serialized_write(write):
+	"""Run an index write under the single-writer cache lock; no-op until the index has been built."""
 	engine = new_search_engine()
-	if not engine.index_exists():
-		return True
-	try:
-		with frappe.cache.lock(LOCK_KEY, timeout=LOCK_TIMEOUT, blocking_timeout=LOCK_BLOCKING_TIMEOUT):
-			note_build_writes(doctype, names)
-			write(engine)
-	except LockError:
-		frappe.log_error(
-			title="Search index sync lock timeout",
-			message=(
-				f"Could not acquire '{LOCK_KEY}' within {LOCK_BLOCKING_TIMEOUT}s; skipping this "
-				"index write. The next nightly rebuild will reconcile it."
-			),
-		)
-		return False
-	return True
+	if engine.index_exists():
+		locked_index_write(lambda: write(engine))
