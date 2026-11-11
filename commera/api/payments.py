@@ -237,7 +237,7 @@ def open_checkout(
 
 def get_checkout_payment_methods(quotation, strict: bool = False) -> list[str]:
 	"""Gateways that can charge the cart's currency, and cash on delivery, which has no currency limit."""
-	currency = quotation.currency if quotation else None
+	currency = quotation.currency if quotation else MarketPrices.current().currency
 	payment_methods = [option.name for option in get_gateway_options(currency)]
 	if frappe.get_cached_value("Commera Settings", "Commera Settings", "cod_enabled"):
 		payment_methods.append(COD_PAYMENT_MODE)
