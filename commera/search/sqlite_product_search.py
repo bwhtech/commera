@@ -510,6 +510,15 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			values,
 		)
 
+	def remove_documents_deleted_during_build(self, doctype, started_at):
+		"""Core drops each name it finds in Deleted Document; a product recreated during the build stays."""
+		deleted = frappe.get_all(
+			"Deleted Document",
+			filters={"deleted_doctype": doctype, "creation": (">=", started_at)},
+			pluck="deleted_name",
+		)
+		self.index_docs(doctype, sorted(set(deleted)))
+
 	def remove_doc(self, doctype, docname):
 		"""Drop the doc whatever the database holds. The sync jobs reconcile through index_docs instead."""
 		super().remove_doc(doctype, docname)

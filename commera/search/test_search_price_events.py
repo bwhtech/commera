@@ -242,6 +242,24 @@ class TestDelayedRemoval(PriceJobTestCase):
 		self.assertNotIn(self.other, self.grid())
 
 
+class TestBuildDeletionCleanup(PriceJobTestCase):
+	def test_build_cleanup_keeps_a_product_recreated_during_the_build(self):
+		started_at = frappe.utils.now_datetime()
+		frappe.get_doc(
+			{
+				"doctype": "Deleted Document",
+				"deleted_doctype": PRODUCT,
+				"deleted_name": self.other,
+				"data": "{}",
+			}
+		).db_insert()
+
+		self.engine.remove_documents_deleted_during_build(PRODUCT, started_at)
+
+		self.assertIn(self.other, self.grid())
+		self.assertNotEqual(self.price_rows(self.other), [])
+
+
 def wrapped(error):
 	"""Core wraps a connection's busy error, as _get_connection does."""
 	try:
