@@ -1,7 +1,7 @@
 {% from "templates/macros/modal.html" import modal %}
 {% from 'templates/macros/user_dashboard_product.html' import dashboard_product %}
 
-{% macro return_button(classes='', order_id='N/A', delivery_status='Not Delivered',items=[],return_reasons=[]) %}
+{% macro return_button(classes='', order_id='N/A', delivery_status='Not Delivered',items=[],return_reasons=[],currency=None) %}
 {% set button_classes = 'w-full bg-white hover:bg-gray-50 text-sm text-center p-2 rounded-lg border border-gray-400
 cursor-pointer ' + classes %}
 
@@ -89,6 +89,7 @@ modal_classes='w-full md:max-w-1/2'
                 item['brand'],
                 display_name,
                 item['price'],
+                currency=currency,
                 img_size="w-20 h-27",
                 size=item['size'],
                 info_class=""

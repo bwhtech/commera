@@ -1,12 +1,9 @@
-from unittest.mock import patch
-
 import frappe
 from frappe.website.page_renderers.template_page import TemplatePage
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
 from commera.api.payments import generate_quotation_for_cart
-from commera.localization import cart_currency as cart_currency_module
 from commera.localization.cart_currency import CartCurrency
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context, render_theme_context
 from commera.shop_themes.theme_resolver import ThemePageRenderer
@@ -24,15 +21,18 @@ class CartCurrencyTestCase(MarketCartTestCase):
 		self.saved_request = getattr(frappe.local, "request", None)
 		self.saved_form_dict = frappe.local.form_dict
 		self.addCleanup(self.restore_request)
-		# The amounts print with toFixed and "%.2f"; pin the precision that both pages had.
-		patcher = patch.object(cart_currency_module, "get_money_precision", lambda currency: 2)
-		patcher.start()
-		self.addCleanup(patcher.stop)
+		self.set_default("currency_precision", "2")
+		self.set_default("number_format", "#,###.##")
 		self.item_code = self.item("CARTCURRENCY", market_sale=3499)
 		self.market_symbol = get_currency_symbol(self.currency)
 		self.store_symbol = get_currency_symbol(self.store_currency)
 		self.sign_in_shopper()
 		self.add(self.item_code)
+
+	def set_default(self, key, value):
+		previous = frappe.db.get_default(key)
+		self.addCleanup(frappe.defaults.set_global_default, key, previous)
+		frappe.defaults.set_global_default(key, value)
 
 	def restore_request(self):
 		frappe.local.request = self.saved_request
@@ -79,7 +79,7 @@ class TestCartCurrency(CartCurrencyTestCase):
 
 		self.open_request("/cart")
 		self.assertEqual(CartCurrency.of(quotation).code, self.currency)
-		self.assertEqual(CartCurrency.of(quotation).amount(3499), "3499.00")
+		self.assertEqual(CartCurrency.of(quotation).amount(3499), "3,499.00")
 
 
 class TestSummerCartCurrency(CartCurrencyTestCase):
@@ -88,9 +88,9 @@ class TestSummerCartCurrency(CartCurrencyTestCase):
 
 		html = self.render_summer("pages/cart/checkout.html", "/en-ae/cart/checkout")
 
-		self.assertIn(self.summary_subtotal(self.market_symbol, "3499.00"), html)
+		self.assertIn(self.summary_subtotal(self.market_symbol, "3,499.00"), html)
 		self.assertIn(self.drawer_total(self.market_symbol), html)
-		self.assertIn("toFixed(2)", html)
+		self.assertIn("commera.format.amount(", html)
 		self.assertNotIn(f'<td class="price">{self.store_symbol}', html)
 
 	def test_the_market_cart_page_and_drawer_show_the_market_currency(self):
@@ -126,7 +126,7 @@ class TestSummerCartCurrency(CartCurrencyTestCase):
 		return f'<strong>{symbol}<span x-text="format_amount($store.cart.price_of(cart_item))">'
 
 	def drawer_total(self, symbol):
-		return f'<h5 class="mb-0">{symbol}<span x-text="$store.cart.total.toFixed(2)"></span></h5>'
+		return f'<h5 class="mb-0">{symbol}<span x-text="commera.format.amount($store.cart.total,'
 
 
 class TestLegacyCartCurrency(CartCurrencyTestCase):
@@ -135,14 +135,14 @@ class TestLegacyCartCurrency(CartCurrencyTestCase):
 
 		html = self.render_legacy("cart/checkout", "/en-ae/cart/checkout")
 
-		self.assertIn(f'{self.market_symbol} <span x-text="checkout_total.toFixed(2)"', html)
+		self.assertIn(f'{self.market_symbol} <span x-text="commera.format.amount(checkout_total,', html)
 		self.assertNotIn(f"{self.store_symbol} <span", html)
 
 	def test_the_market_cart_page_shows_the_market_currency(self):
 		html = self.render_legacy("cart/cart", "/en-ae/cart")
 
-		self.assertIn(f'{self.market_symbol}<span x-text="$store.cart.total.toFixed(2)"', html)
-		self.assertNotIn(f'{self.store_symbol}<span x-text="$store.cart.total', html)
+		self.assertIn(f'{self.market_symbol}<span x-text="commera.format.amount($store.cart.total,', html)
+		self.assertNotIn(f'{self.store_symbol}<span x-text="commera.format.amount($store.cart.total', html)
 
 	def test_the_primary_market_pages_keep_the_store_currency(self):
 		self.checkout_quotation("/cart/checkout")
@@ -150,5 +150,5 @@ class TestLegacyCartCurrency(CartCurrencyTestCase):
 		checkout = self.render_legacy("cart/checkout", "/cart/checkout")
 		cart = self.render_legacy("cart/cart", "/cart")
 
-		self.assertIn(f'{self.store_symbol} <span x-text="checkout_total.toFixed(2)"', checkout)
-		self.assertIn(f'{self.store_symbol}<span x-text="$store.cart.total.toFixed(2)"', cart)
+		self.assertIn(f'{self.store_symbol} <span x-text="commera.format.amount(checkout_total,', checkout)
+		self.assertIn(f'{self.store_symbol}<span x-text="commera.format.amount($store.cart.total,', cart)

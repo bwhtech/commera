@@ -51,7 +51,7 @@
             <span class="capitalize">{{ _('non-refundable delivery charge') }}</span>
             <span class="font-medium" x-show="!is_free_delivery"
                 x-transition>
-                {{ cart_currency.symbol }} <span x-text="delivery_charge.toFixed({{ cart_currency.precision }})"></span>
+                {{ cart_currency.symbol }} <span x-text="commera.format.amount(delivery_charge, {{ cart_currency.config | tojson | forceescape }})"></span>
             </span>
             <span class="font-medium" x-show="is_free_delivery"
                 x-transition x-cloak>
@@ -87,7 +87,7 @@
     <div class="flex justify-between text-base font-bold">
         <span class="uppercase">{{ _('Total') }}</span>
         <div>{{ cart_currency.symbol }}
-             <span class="font-medium" x-text="checkout_total.toFixed({{ cart_currency.precision }})"> </span>
+             <span class="font-medium" x-text="commera.format.amount(checkout_total, {{ cart_currency.config | tojson | forceescape }})"> </span>
         </div>
     </div>
 </div>

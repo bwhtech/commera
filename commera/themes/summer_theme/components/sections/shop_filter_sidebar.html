@@ -62,8 +62,8 @@
 						@change="set_filter('max', maximum)">
 				</div>
 				{# Concatenating the currency symbol into x-text would escape it, so Jinja emits it beside the amount. #}
-				<span class="example-val">{{ get_currency_symbol() }}<span x-text="Math.round(minimum)"></span></span>
-				<span class="example-val">{{ get_currency_symbol() }}<span x-text="Math.round(maximum)"></span></span>
+				<span class="example-val">{{ get_cart_currency().symbol }}<span x-text="commera.format.amount(minimum, {{ get_cart_currency().config | tojson | forceescape }})"></span></span>
+				<span class="example-val">{{ get_cart_currency().symbol }}<span x-text="commera.format.amount(maximum, {{ get_cart_currency().config | tojson | forceescape }})"></span></span>
 			</div>
 		</div>
 

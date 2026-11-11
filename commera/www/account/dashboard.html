@@ -61,8 +61,8 @@
                             </p>
 
                             <p class="flex">
-                                {{get_currency_symbol()}}
-                                <span x-text="item.sale_price.toFixed(2)"></span>
+                                {{get_cart_currency().symbol}}
+                                <span x-text="commera.format.amount(item.sale_price, {{ get_cart_currency().config | tojson | forceescape }})"></span>
                             </p>
                         </div>
 

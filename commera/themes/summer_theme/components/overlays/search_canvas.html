@@ -72,9 +72,9 @@
 								<h5 class="title"><a :href="get_product_url(product)" x-text="get_product_name(product)"></a></h5>
 								{# Concatenating the currency symbol into x-text would escape it, so Jinja stamps it beside the amount. #}
 								<h5 class="price">
-									{{ get_currency_symbol() }}<span x-text="format_amount(product.effective_price)"></span>
+									{{ get_cart_currency().symbol }}<span x-text="commera.format.amount(product.effective_price, {{ get_cart_currency().config | tojson | forceescape }})"></span>
 									<template x-if="product.has_discount">
-										<del>{{ get_currency_symbol() }}<span x-text="format_amount(product.default_price)"></span></del>
+										<del>{{ get_cart_currency().symbol }}<span x-text="commera.format.amount(product.default_price, {{ get_cart_currency().config | tojson | forceescape }})"></span></del>
 									</template>
 								</h5>
 							</div>

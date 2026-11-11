@@ -138,6 +138,7 @@ def get_orders_list(order_id_list=None, page=1, page_length=6, owned_only=True):
 			sales_order.creation,
 			sales_order.billing_status,
 			sales_order.rounded_total,
+			sales_order.currency,
 			sales_order.grand_total,
 			sales_order.disable_rounded_total,
 			sales_order.total,

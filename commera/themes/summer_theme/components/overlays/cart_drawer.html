@@ -59,7 +59,7 @@
 															</span>
 														</div>
 													</div>
-													<h6 class="dz-price mb-0">{{ cart_currency.symbol }}<span x-text="($store.cart.price_of(cart_item) * cart_item.qty).toFixed({{ cart_currency.precision }})"></span></h6>
+													<h6 class="dz-price mb-0">{{ cart_currency.symbol }}<span x-text="commera.format.amount(($store.cart.price_of(cart_item) * cart_item.qty), {{ get_cart_currency().config | tojson | forceescape }})"></span></h6>
 												</div>
 											</div>
 											<a href="javascript:void(0);" class="dz-close"
@@ -74,7 +74,7 @@
 							<p class="text-center" x-show="!$store.cart.items.length">{{ _("Your cart is empty.") }}</p>
 							<div class="cart-total" x-show="$store.cart.items.length">
 								<h5 class="mb-0">{{ _("Subtotal") }}:</h5>
-								<h5 class="mb-0">{{ cart_currency.symbol }}<span x-text="$store.cart.total.toFixed({{ cart_currency.precision }})"></span></h5>
+								<h5 class="mb-0">{{ cart_currency.symbol }}<span x-text="commera.format.amount($store.cart.total, {{ get_cart_currency().config | tojson | forceescape }})"></span></h5>
 							</div>
 							<div class="mt-auto">
 								<a href="{{ url('/cart/checkout') | e }}" class="btn btn-outline-secondary btn-block m-b20"
@@ -99,7 +99,7 @@
 													<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route" x-text="wishlist_item.title || wishlist_item.item_name"></a>
 												</h6>
 												<div class="d-flex align-items-center">
-													<h6 class="dz-price mb-0">{{ get_currency_symbol() }}<span x-text="Number(wishlist_item.sale_price || 0).toFixed(2)"></span></h6>
+													<h6 class="dz-price mb-0">{{ get_cart_currency().symbol }}<span x-text="commera.format.amount(Number(wishlist_item.sale_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></span></h6>
 												</div>
 											</div>
 											<a href="javascript:void(0);" class="dz-close"

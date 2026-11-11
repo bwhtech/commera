@@ -1,4 +1,4 @@
-import { Formatter } from './formatter.js';
+import { Formatter, format_number } from './formatter.js';
 
 export { Formatter };
 
@@ -9,6 +9,16 @@ export function money(amount, currency) {
 // For plain text such as a confirm dialog: a symbol drawn with HTML becomes the currency code.
 export function money_text(amount, currency) {
 	return get_formatter().money_text(amount, currency);
+}
+
+// Storefront templates supply the document's rules, including historical order currencies.
+export function amount(value, rules) {
+	return format_number(
+		value,
+		rules.number_format,
+		rules.precision,
+		rules.fraction_precision,
+	);
 }
 
 export function number(value, precision = 0) {

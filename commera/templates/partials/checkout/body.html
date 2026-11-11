@@ -288,7 +288,7 @@
                 {{_('Item')}}
                 {% endif %}
             )
-        </span>{{ cart_currency.symbol }} <span x-text="checkout_total.toFixed({{ cart_currency.precision }})"></span> 
+        </span>{{ cart_currency.symbol }} <span x-text="commera.format.amount(checkout_total, {{ cart_currency.config | tojson | forceescape }})"></span>
         </h2>
         <div>
             {% call modal.modal(button_text='View Items',button_classes='text-sm text-accent font-semibold ms-2',

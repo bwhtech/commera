@@ -93,9 +93,9 @@
     </h4>
     <p class="{{ current_variant.price_size }} flex">
         {% if discount %}
-        <span class="me-2 text-link line-through decoration-[1px] flex ">{{get_currency_symbol()}}{{ "%.2f"|format(original_price or 0)}}</span>
+        <span class="me-2 text-link line-through decoration-[1px] flex ">{{get_cart_currency().symbol}}{{ get_cart_currency().amount(original_price or 0) }}</span>
         {% endif %}
-        <span class="font-semibold flex">{{get_currency_symbol()}}{{"%.2f"|format(formatted_price or 0) }}</span>
+        <span class="font-semibold flex">{{get_cart_currency().symbol}}{{ get_cart_currency().amount(formatted_price or 0) }}</span>
     </p>
 </div>
 

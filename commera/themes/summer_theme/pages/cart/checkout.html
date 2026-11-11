@@ -704,7 +704,7 @@
 				},
 
 				format_amount(amount) {
-					return (Number(amount) || 0).toFixed({{ cart_currency.precision }});
+					return commera.format.amount(amount, {{ cart_currency.config | tojson }});
 				},
 
 				set_payment_methods(methods) {

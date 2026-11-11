@@ -85,3 +85,24 @@ test('money and dates read the resolved rules and the page direction', () => {
 	assert.equal(number(1234567), '1,234,567');
 	assert.equal(date('2026-03-05'), '5 mar');
 });
+
+test('storefront amount uses document precision and Frappe separators', async () => {
+	const { amount } = await import('../format.js');
+	const rules = {
+		number_format: '#,##,###.##',
+		precision: 2,
+		fraction_precision: 2,
+	};
+	assert.equal(amount(123456.78, rules), '1,23,456.78');
+	assert.equal(
+		amount(123456.78, { ...rules, number_format: '#.###,##' }),
+		'123.456,78',
+	);
+	assert.equal(amount(123.456, { ...rules, precision: 3 }), '123.456');
+	assert.equal(amount(123, { ...rules, precision: 3 }), '123.00');
+	assert.equal(
+		amount(123, { ...rules, precision: 3, fraction_precision: 3 }),
+		'123.000',
+	);
+	assert.equal(amount(123.456, rules), '123.46');
+});
