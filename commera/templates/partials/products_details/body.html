@@ -57,7 +57,7 @@
 
                 <a href="{{ url('/products?brands=' ~ (product.brand | urlencode)) | e }}"
                     class="mb-2 text-xl font-bold md:mb-0 md:text-3xl ">
-                    {{ _(product.brand|title) }}
+                    <bdi>{{ _(product.brand|title) }}</bdi>
                 </a>
                 <h2 class="mb-3.5 text-base md:mb-6 md:text-xl ">
                     <bdi>{{ product_title|title|e }}</bdi>
@@ -216,7 +216,7 @@
                                         class="w-18 h-25 object-cover rounded-lg">
                                 </a>
                                 <p class="text-xs font-medium  text-center mt-1 truncate max-w-15">
-                                    {{_(color.attribute_value|title) or ''}}
+                                    <bdi>{{_(color.attribute_value|title) or ''}}</bdi>
                                 </p>
                             </div>
                             {% endfor %}
@@ -257,15 +257,15 @@
                                     <ul>
                                         <li>
 
-                                            <bdi class="text-base font-medium  ">{{_(selected_item.style_code) or ''}}</bdi>, <bdi
-                                                class="text-base font-medium  ">{{_(product_variant.attribute_value|title)}}</bdi>
+                                            <span class="text-base font-medium  "><bdi>{{_(selected_item.style_code) or ''}}</bdi></span>, <span
+                                                class="text-base font-medium  "><bdi>{{_(product_variant.attribute_value|title)}}</bdi></span>
                                         </li>
                                           <li>
-                                            <span class="text-base font-medium  ">{{_(product_variant.attribute_name|title
-                                                or '')}}</span>
+                                            <span class="text-base font-medium  "><bdi>{{_(product_variant.attribute_name|title
+                                                or '')}}</bdi></span>
                                         </li>
                                         <li>
-                                            <bdi class="text-base font-medium  ">{{_(selected_item.material|title) or ''}}</bdi>
+                                            <span class="text-base font-medium  "><bdi>{{_(selected_item.material|title) or ''}}</bdi></span>
                                         </li>
 
                                     </ul>

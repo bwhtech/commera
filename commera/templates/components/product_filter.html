@@ -65,7 +65,7 @@
             <div class="border-b border-gray-300">
                 <button @click="current_tab = (current_tab === key) ? null : key"
                     class="flex w-full items-center justify-between py-4 text-lg font-medium cursor-pointer">
-                    <span x-text="commera.t(format_key(key))"></span>
+                    <span><bdi x-text="commera.t(format_key(key))"></bdi></span>
                     <svg class="w-5 h-5 transition-transform duration-200"
                         :class="{ 'rotate-180': current_tab === key }" xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 20 20" fill="currentColor">
@@ -83,8 +83,7 @@
                                     @change="toggle_filter(key, option, false)"
                                     :checked="is_checked(key, option, false)"
                                     class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                                <label :for="`${key}-${option}-${index}`" class="ms-2 text-sm text-gray-700 capitalize"
-                                    x-text="commera.t(option)"></label>
+                                <label :for="`${key}-${option}-${index}`" class="ms-2 text-sm text-gray-700 capitalize"><bdi x-text="commera.t(option)"></bdi></label>
                             </div>
                         </template>
                     </div>
@@ -100,8 +99,7 @@
                         <div class="mb-3">
                             <div x-data="{ open: false }">
                                 <div x-show="!node.is_leaf" class="flex items-center">
-                                    <span class="flex items-center text-gray-800 font-semibold"
-                                        x-text="commera.t(node.display_name)"></span>
+                                    <span class="flex items-center text-gray-800 font-semibold"><bdi x-text="commera.t(node.display_name)"></bdi></span>
 
                                 </div>
 
@@ -110,8 +108,7 @@
                                         @change="toggle_filter(key, node.item_groups, true)"
                                         :checked="is_checked(key, node.item_groups, true)"
                                         class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                                    <label :for="`${key}-${node_index}`" class="ms-2 text-sm text-gray-700 capitalize"
-                                        x-text="commera.t(node.display_name)"></label>
+                                    <label :for="`${key}-${node_index}`" class="ms-2 text-sm text-gray-700 capitalize"><bdi x-text="commera.t(node.display_name)"></bdi></label>
                                 </div>
 
                                 <div class="pl-3 mt-2 space-y-2">
@@ -122,7 +119,7 @@
                                                 <button @click="childOpen = !childOpen"
                                                     class="flex items-center text-gray-800 font-medium">
                                                  
-                                                    <span x-text="commera.t(child.display_name)"></span>
+                                                    <span><bdi x-text="commera.t(child.display_name)"></bdi></span>
                                                 </button>
                                             </div>
 
@@ -134,8 +131,7 @@
                                                     :checked="is_checked(key, child.item_groups, true)"
                                                     class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                                 <label :for="`${key}-${node_index}-${child_index}`"
-                                                    class="ms-2 text-sm text-gray-700 capitalize"
-                                                    x-text="commera.t(child.display_name)"></label>
+                                                    class="ms-2 text-sm text-gray-700 capitalize"><bdi x-text="commera.t(child.display_name)"></bdi></label>
                                             </div>
 
                                             <div class="pl-3 mt-2 space-y-2">
@@ -150,8 +146,7 @@
                                                             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                                         <label
                                                             :for="`${key}-${node_index}-${child_index}-${grandchild_index}`"
-                                                            class="ms-2 text-sm text-gray-700 capitalize"
-                                                            x-text="commera.t(grandchild.display_name)"></label>
+                                                            class="ms-2 text-sm text-gray-700 capitalize"><bdi x-text="commera.t(grandchild.display_name)"></bdi></label>
                                                     </div>
                                                 </template>
                                             </div>

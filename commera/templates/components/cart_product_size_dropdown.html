@@ -37,7 +37,7 @@
             x-on:keydown.space.prevent="opened_with_keyboard = true"
             :aria-label="selected_option ? selected_option.value : 'Please Select'"
             :aria-expanded="is_open || opened_with_keyboard">
-            <span x-text="selected_option ? selected_option.value : 'Please Select'"></span>
+            <span><bdi x-text="selected_option ? selected_option.value : 'Please Select'"></bdi></span>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20" class="size-5"
                 :class="{ 'transition-transform duration-200 transform rotate-180': is_open }">
                 <path fill="currentColor" fill-rule="evenodd"
@@ -57,7 +57,7 @@
                 <li class="combobox-option px-4 py-2 text-xs md:text-sm text-gray-900 hover:bg-gray-300 cursor-pointer text-nowrap whitespace-nowrap"
                     role="option" x-on:click="set_selected_option(item)" x-on:keydown.enter="set_selected_option(item)"
                     :id="'option-' + index" tabindex="0">
-                    <span :class="selected_option?.value === item.value ? 'font-bold' : ''" x-text="item.label"></span>
+                    <span :class="selected_option?.value === item.value ? 'font-bold' : ''"><bdi x-text="item.label"></bdi></span>
                     <svg x-show="selected_option?.value === item.value" class="inline size-4 ml-2" fill="none"
                         stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />

@@ -75,9 +75,9 @@
 					</div>
 
 					{% if show_product_description %}
-					<p dir="auto" class="para-text">
+					<div dir="auto" class="para-text">
 						{{ product_description }}
-					</p>
+					</div>
 					{% endif %}
 
 					<div class="product-num">
@@ -121,14 +121,14 @@
 							<li>
 								<a href="{{ url('/products/' ~ product_variant.route) | e }}" class="is-active" aria-current="page">
 									<img src="{{ images[0] }}" alt="{{ product_variant.attribute_value }}">
-									<bdi>{{ product_variant.attribute_value }}</bdi>
+									<span><bdi>{{ product_variant.attribute_value }}</bdi></span>
 								</a>
 							</li>
 							{% for variant in other_variants %}
 							<li>
 								<a href="{{ url('/products/' ~ variant.route) | e }}">
 									<img src="{{ variant.image or '/assets/commera/images/1.jpg' }}" alt="{{ variant.attribute_value }}">
-									<bdi>{{ variant.attribute_value }}</bdi>
+									<span><bdi>{{ variant.attribute_value }}</bdi></span>
 								</a>
 							</li>
 							{% endfor %}

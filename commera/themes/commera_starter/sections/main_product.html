@@ -52,7 +52,7 @@
 
 			{% if colour_option %}
 			<div class="mt-8 border-t border-outline-gray-2 pt-6">
-				<p class="text-base font-medium text-ink-gray-9">{{ colour_option.name }}: <bdi class="font-normal text-ink-gray-6">{{ product.color }}</bdi></p>
+				<p class="text-base font-medium text-ink-gray-9"><bdi>{{ colour_option.name }}</bdi>: <span class="font-normal text-ink-gray-6"><bdi>{{ product.color }}</bdi></span></p>
 				<div class="mt-3 flex flex-wrap gap-2">
 					{% for value in colour_option["values"] %}
 					<a href="{{ commera.format.product_url(value.handle) }}" {{ 'aria-current="page"' | safe if value.selected }}{{ ' aria-disabled="true"' | safe if not value.available }} class="chip">
@@ -66,7 +66,7 @@
 
 			{% if size_option %}
 			<div class="mt-6">
-				<p class="text-base font-medium text-ink-gray-9">{{ size_option.name }}: <bdi class="font-normal text-ink-gray-6" x-text="variant?.title ?? ''"></bdi></p>
+				<p class="text-base font-medium text-ink-gray-9"><bdi>{{ size_option.name }}</bdi>: <span class="font-normal text-ink-gray-6"><bdi x-text="variant?.title ?? ''"></bdi></span></p>
 				<div class="mt-3 flex flex-wrap gap-2">
 					{% for size_variant in product.variants %}
 					<button type="button" @click="size = variants[{{ loop.index0 }}].size" {{ "disabled" if not size_variant.available }} :aria-pressed="size === variants[{{ loop.index0 }}].size" class="chip"><bdi>{{ size_variant.title }}</bdi></button>

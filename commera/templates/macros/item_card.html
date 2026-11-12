@@ -81,7 +81,7 @@
     </div>
 
     <h3 class="mt-6 font-medium text-link {{  current_variant.brand_size  }}" title="{{_(brand|title)}}">
-        {{_(brand|title)}}
+        <bdi>{{_(brand|title)}}</bdi>
     </h3>
     <h4 class="{{ current_variant.product_name_size }}" title="{{ _(product_name|title)|e }}">
         <bdi>{% if product_name|length > 25 %}

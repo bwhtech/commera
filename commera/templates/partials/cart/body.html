@@ -98,14 +98,12 @@
 							</a>
 							<div class="mt-4 md:mt-6 flex flex-4 justify-between">
 								<div>
-									<h3 class="mb-2.5 text-sm font-medium text-brand md:text-base"
-										x-text="cart_item.brand">
-									</h3>
+									<h3 class="mb-2.5 text-sm font-medium text-brand md:text-base"><bdi x-text="cart_item.brand"></bdi></h3>
 									<h4 class="mb-2 text-sm font-medium md:text-base">
 									{% if in_source_language %}
-									<bdi x-text="cart_item.variant.item_name"></bdi>
+									<span><bdi x-text="cart_item.variant.item_name"></bdi></span>
 									{% else %}
-									<bdi x-text="cart_item.variant.title || cart_item.variant.item_name"></bdi>
+									<span><bdi x-text="cart_item.variant.title || cart_item.variant.item_name"></bdi></span>
 									{% endif %}
 
 									</h4>

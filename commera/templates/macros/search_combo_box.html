@@ -74,7 +74,7 @@
                         <div>
                             <div x-show="'{{show_title}}'==='True'" x-bind:class="selectedOption == item ? 'font-semibold' : 'font-medium'"
                                 class="flex mb-1 text-base  items-center">
-                                <h6 x-text="item.title"></h6>
+                                <h6><bdi x-text="item.title"></bdi></h6>
                             </div>
                             <span x-bind:class="selectedOption == item ? 'font-medium' : null" x-text="item.display"></span>
                         </div>

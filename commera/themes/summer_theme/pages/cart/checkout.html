@@ -305,7 +305,7 @@
 									</div>
 									<div class="dz-content">
 										<h6 class="title mb-0">
-											<bdi x-text="{% if not in_source_language %}cart_item.variant.title || {% endif %}cart_item.variant.item_name"></bdi>
+											<span><bdi x-text="{% if not in_source_language %}cart_item.variant.title || {% endif %}cart_item.variant.item_name"></bdi></span>
 											<span class="checkout-item-meta">{{ _("Qty") }} <span x-text="cart_item.qty"></span></span>
 										</h6>
 										<span class="price">{{ currency_symbol }}<span x-text="format_amount(cart_item.price * cart_item.qty)"></span></span>

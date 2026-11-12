@@ -34,6 +34,11 @@
 
 /* --- Colour variants: the reference's .color-filter swatches have no rule in style.css --- */
 
+/* The rich-text wrapper is a div, so retain the paragraph's buy-box spacing. */
+.dz-product-detail .dz-content .para-text {
+	margin-bottom: 1rem;
+}
+
 .product-colour-list {
 	display: flex;
 	flex-wrap: wrap;

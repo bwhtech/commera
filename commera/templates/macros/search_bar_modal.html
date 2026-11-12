@@ -104,7 +104,7 @@
                                         class="h-10 w-10 object-cover rounded-md bg-gray-400">
                                     <div></div>
                                     <h3 class="text-base">
-                                        <span x-text="product.title || product.item_name"></span>
+                                        <span><bdi x-text="product.title || product.item_name"></bdi></span>
                                         {% if "color" in card_fields %}
                                         <span x-text="commera.t(product.attribute_value)"></span>
                                         {% endif %}
@@ -113,7 +113,7 @@
                                 {% if "brand" in card_fields or "item_group" in card_fields %}
                                 <div class="flex flex-wrap gap-2 mb-1 text-xs text-gray-500">
                                     {% if "brand" in card_fields %}
-                                    <span x-show="product.brand" x-text="product.brand"></span>
+                                    <span x-show="product.brand"><bdi x-text="product.brand"></bdi></span>
                                     {% endif %}
                                     {% if "item_group" in card_fields %}
                                     <span x-show="product.item_group" x-text="product.item_group"></span>
@@ -132,7 +132,7 @@
                                 {% if "sizes" in card_fields %}
                                 <div class="flex flex-wrap gap-1 mt-1">
                                     <template x-for="(size_option, size_index) in (product.sizes || [])" :key="size_index">
-                                        <span class="text-xs border border-gray-300 rounded px-1.5 py-0.5" x-text="size_option.size"></span>
+                                        <span class="text-xs border border-gray-300 rounded px-1.5 py-0.5"><bdi x-text="size_option.size"></bdi></span>
                                     </template>
                                 </div>
                                 {% endif %}
