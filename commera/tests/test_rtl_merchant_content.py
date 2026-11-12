@@ -2,6 +2,7 @@
 
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import frappe
 import html5lib
@@ -127,7 +128,7 @@ class TestRtlMerchantContent(ProductDetailPriceTestCase):
 					if "x-text" in match.group()
 				]
 				self.assertTrue(markup)
-				html = Environment().from_string("".join(markup)).render()
+				html = template_environment().from_string("".join(markup)).render()
 				tree = html5lib.parse(html, namespaceHTMLElements=False)
 				isolated = []
 				for element in tree.iter():
@@ -144,8 +145,7 @@ class TestRtlMerchantContent(ProductDetailPriceTestCase):
 		source = Path(
 			frappe.get_app_path("commera", "templates/macros/user_dashboard_product.html")
 		).read_text()
-		environment = Environment()
-		environment.globals.update(_=lambda value: value, get_currency_symbol=lambda: "$")
+		environment = template_environment()
 		html = environment.from_string(
 			source + '{{ dashboard_product("", "Brand.", "Shirt & linen.", 30, size="صغير (S)") }}'
 		).render()
@@ -277,3 +277,12 @@ def render_value_lines(template, expressions, **context):
 	environment.globals["_"] = lambda value: value
 	environment.globals.update({key: value for key, value in context.items() if callable(value)})
 	return environment.from_string("\n".join(lines)).render(context)
+
+
+def template_environment():
+	environment = Environment()
+	currency = SimpleNamespace(symbol="$", precision=2, config={"precision": 2}, amount="{:.2f}".format)
+	environment.globals.update(
+		_=lambda value: value, get_currency_symbol=lambda: "$", get_cart_currency=lambda *args: currency
+	)
+	return environment
