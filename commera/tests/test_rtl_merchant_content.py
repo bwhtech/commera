@@ -48,6 +48,12 @@ class TestRtlMerchantContent(ProductDetailPriceTestCase):
 		for size in ENGLISH["sizes"]:
 			self.assertIn(f"><bdi>{size}</bdi></label>", html)
 
+	def test_the_summer_collection_heading_is_isolated_and_escaped(self):
+		html = render_value_lines(
+			"themes/summer_theme/pages/products/list.html", ["<h1>"], category="Shirts & co (Summer)."
+		)
+		self.assertIn("<h1><bdi>Shirts &amp; co (Summer).</bdi></h1>", html)
+
 	def test_the_legacy_page_isolates_english_content(self):
 		route = self.make_product("RTLLEGACY", ENGLISH)
 		activate_theme("Shop Default Theme")
