@@ -139,6 +139,8 @@ class TestMarketTaxCheckout(test_market_taxes.TestMarketOrderRecords):
 			"Account", {"company": self.company, "root_type": "Income", "is_group": 0}, "name"
 		)
 		self.set_single("Commera Settings", "charge_account_head", account)
+		# A card payment is invoiced in the market currency on the store-currency receivable.
+		self.set_single("Accounts Settings", "allow_multi_currency_invoices_against_single_party_account", 1)
 		frappe.flags.commera_hooks_hook_calls = []
 		self.addCleanup(frappe.flags.pop, "commera_hooks_hook_calls", None)
 		patch_app_hooks(
