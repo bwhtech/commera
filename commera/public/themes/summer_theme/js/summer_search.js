@@ -76,9 +76,5 @@ document.addEventListener('alpine:init', () => {
 		get_product_name(product) {
 			return product.title || product.item_name;
 		},
-
-		format_amount(amount) {
-			return Number(amount || 0).toFixed(2);
-		},
 	}));
 });

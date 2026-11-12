@@ -12,34 +12,6 @@ from commera.www.cart.checkout import set_cart_context
 
 
 class TestStorefrontCurrency(CartCurrencyTestCase):
-	def test_fixed_amounts_ignore_number_separators(self):
-		self.open_request("/en-ae/cart")
-		for number_format, expected in (
-			("#,##,###.##", "123456.78"),
-			("#.###,##", "123456.78"),
-		):
-			self.set_default("number_format", number_format)
-			self.assertEqual(CartCurrency.of().amount(123456.78), expected)
-
-	def test_real_precision_three_and_primary_compatibility(self):
-		self.set_default("currency_precision", "3")
-		self.open_request("/en-ae/cart")
-		currency = CartCurrency.of()
-		self.assertEqual(currency.precision, 3)
-		self.assertEqual(currency.amount(123456.789), "123456.789")
-		self.assertEqual(currency.amount(123), "123.000")
-		self.open_request("/cart")
-		self.assertEqual(CartCurrency.of().precision, 2)
-		self.assertEqual(CartCurrency.of().amount(123456.789), "123456.79")
-
-	def test_three_decimal_currency_keeps_trailing_zeroes(self):
-		self.set_default("currency_precision", "3")
-		self.open_request("/en-ae/cart")
-		currency = CartCurrency.of({"currency": "KWD"})
-		self.assertEqual(currency.precision, 3)
-		self.assertEqual(currency.amount(123456.789), "123456.789")
-		self.assertEqual(currency.amount(123), "123.000")
-
 	def test_only_the_hardcoded_sar_icon_is_trusted_html(self):
 		symbol = '<b title="currency">&</b>'
 		previous = frappe.db.get_value("Currency", self.currency, "symbol")
@@ -135,7 +107,7 @@ class TestStorefrontCurrency(CartCurrencyTestCase):
 			'{{ dashboard_product("", "brand", "item", 1234.5, currency=currency) }}',
 			{"currency": self.currency},
 		)
-		self.assertIn(f"{self.market_symbol} 1234.50", html)
+		self.assertIn(f"{self.market_symbol} 1,234.50", html)
 		self.assertNotIn(self.store_symbol, html)
 
 	def test_order_page_totals_use_order_currency_outside_its_market(self):
@@ -151,7 +123,7 @@ class TestStorefrontCurrency(CartCurrencyTestCase):
 				source = frappe.get_jenv().loader.get_source(frappe.get_jenv(), template)[0]
 				line = next(line for line in source.splitlines() if "amount(order.payable_total)" in line)
 				html = frappe.render_template(line, {"order": order})
-				self.assertIn(f"{self.market_symbol}1234.50", html)
+				self.assertIn(f"{self.market_symbol}1,234.50", html)
 				self.assertNotIn(self.store_symbol, html)
 
 	def test_wishlist_and_search_use_market_formatter_in_both_themes(self):
@@ -167,39 +139,15 @@ class TestStorefrontCurrency(CartCurrencyTestCase):
 		self.assertIn("commera.format.amount(", html)
 
 	def test_price_filter_labels_keep_whole_numbers(self):
-		# The range labels have always shown rounded amounts; only their symbol follows the market.
+		# The range labels show rounded amounts in the page's number format; the symbol follows the market.
 		sidebar = frappe.get_app_path(
 			"commera", "themes", "summer_theme", "components", "sections", "shop_filter_sidebar.html"
 		)
 		with open(sidebar) as source:  # nosemgrep
 			text = source.read()
-		self.assertIn('x-text="Math.round(minimum)"', text)
-		self.assertIn('x-text="Math.round(maximum)"', text)
+		self.assertIn('x-text="commera.format.number(Math.round(minimum))"', text)
+		self.assertIn('x-text="commera.format.number(Math.round(maximum))"', text)
 		self.assertIn("get_cart_currency().symbol", text)
-
-	def test_primary_server_money_markup_matches_develop_bytes(self):
-		self.open_request("/cart")
-		self.set_default("currency_precision", "3")
-		self.set_default("number_format", "#,##,###.##")
-		context = {
-			"currency_symbol": self.store_symbol,
-			"cart_currency": CartCurrency.of(),
-			"checkout_summary": frappe._dict(items_total=123456.789),
-			"order": frappe._dict(currency=self.store_currency, payable_total=123456.789),
-		}
-		cases = frappe.get_file_json(frappe.get_app_path("commera", "tests", "primary_currency_develop.json"))
-		for case in cases:
-			with self.subTest(page=case["template"]):
-				source = frappe.get_jenv().loader.get_source(frappe.get_jenv(), case["template"])[0]
-				if case["marker"] == "card_price":
-					start = source.index("{% macro card_price(")
-					after = source[start : source.index("{%- endmacro %}", start) + len("{%- endmacro %}")]
-					call = "{{ card_price(123456.789, 150000.789, 10) }}"
-				else:
-					after = next(line.strip() for line in source.splitlines() if case["marker"] in line)
-					call = ""
-				before = frappe.render_template(case["before"] + call, context)
-				self.assertEqual(frappe.render_template(after + call, context).encode(), before.encode())
 
 
 class TestProductPageCurrency(CartCurrencyTestCase):
@@ -227,7 +175,7 @@ class TestProductPageCurrency(CartCurrencyTestCase):
 					else self.render_legacy("products/details", path)
 				)
 				self.assertIn(self.market_symbol, html)
-				self.assertIn("1234.50", html)
+				self.assertIn("1,234.50", html)
 				self.assertIn('content="1234.50"', html)
 				self.assertIn('"priceCurrency": "' + self.currency + '"', html)
 				self.assertIn("price: 1234.5," if summer else "price:`1234.5`", html)

@@ -1,0 +1,362 @@
+[
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 0,
+		"expected": "0.00"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 123456.78,
+		"expected": "1,23,456.78"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": -123456.785,
+		"expected": "-1,23,456.79"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 12345678.9,
+		"expected": "1,23,45,678.90"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 999.995,
+		"expected": "1,000.00"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 3,
+		"fraction_precision": 2,
+		"amount": 123456.789,
+		"expected": "1,23,456.789"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 3,
+		"fraction_precision": 2,
+		"amount": 123,
+		"expected": "123.00"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 3,
+		"fraction_precision": 2,
+		"amount": 699.95,
+		"expected": "699.95"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "USD",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 123456.78,
+		"expected": "123,456.78"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "USD",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": -1234.5,
+		"expected": "-1,234.50"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "USD",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": -0.001,
+		"expected": "0.00"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "USD",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 1234567.891,
+		"expected": "1,234,567.89"
+	},
+	{
+		"number_format": "#.###,##",
+		"currency": "EUR",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 123456.78,
+		"expected": "123.456,78"
+	},
+	{
+		"number_format": "#.###,##",
+		"currency": "EUR",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": -1234.5,
+		"expected": "-1.234,50"
+	},
+	{
+		"number_format": "#.###,##",
+		"currency": "EUR",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 0.5,
+		"expected": "0,50"
+	},
+	{
+		"number_format": "# ###,##",
+		"currency": "EUR",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 1234567.5,
+		"expected": "1 234 567,50"
+	},
+	{
+		"number_format": "#'###.##",
+		"currency": "USD",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 1234567.5,
+		"expected": "1'234'567.50"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "KWD",
+		"precision": 3,
+		"fraction_precision": 3,
+		"amount": 123456.789,
+		"expected": "123,456.789"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "KWD",
+		"precision": 3,
+		"fraction_precision": 3,
+		"amount": 123,
+		"expected": "123.000"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "KWD",
+		"precision": 3,
+		"fraction_precision": 3,
+		"amount": -0.5,
+		"expected": "-0.500"
+	},
+	{
+		"number_format": "#.###,##",
+		"currency": "BHD",
+		"precision": 3,
+		"fraction_precision": 3,
+		"amount": 1234567.891,
+		"expected": "1.234.567,891"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "JPY",
+		"precision": 0,
+		"fraction_precision": 2,
+		"amount": 1234.5,
+		"expected": "1,234"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "JPY",
+		"precision": 0,
+		"fraction_precision": 2,
+		"amount": 1234567,
+		"expected": "1,234,567"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "SAR",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 1250,
+		"expected": "1,250.00"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "USD",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 1000000000000000.0,
+		"expected": "1,000,000,000,000,000.00"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "USD",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 1e16,
+		"expected": "10,000,000,000,000,000.00"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "USD",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 9007199254740991,
+		"expected": "9,007,199,254,740,991.00"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "USD",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 1e21,
+		"expected": "1,000,000,000,000,000,000,000.00"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "USD",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": -1e21,
+		"expected": "-1,000,000,000,000,000,000,000.00"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "USD",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 1e23,
+		"expected": "99,999,999,999,999,991,611,392.00"
+	},
+	{
+		"number_format": "#,###.##",
+		"currency": "USD",
+		"precision": 2,
+		"fraction_precision": 2,
+		"amount": 1.7976931348623157e308,
+		"expected": "179,769,313,486,231,570,814,527,423,731,704,356,798,070,567,525,844,996,598,917,476,803,157,260,780,028,538,760,589,558,632,766,878,171,540,458,953,514,382,464,234,321,326,889,464,182,768,467,546,703,537,516,986,049,910,576,551,282,076,245,490,090,389,328,944,075,868,508,455,133,942,304,583,236,903,222,948,165,808,559,332,123,348,274,797,826,204,144,723,168,738,177,180,919,299,881,250,404,026,184,124,858,368.00"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 3,
+		"fraction_precision": 2,
+		"amount": 1000000000000000.0,
+		"expected": "1,00,00,00,00,00,00,000.00"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 3,
+		"fraction_precision": 2,
+		"amount": 1e16,
+		"expected": "10,00,00,00,00,00,00,000.00"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 3,
+		"fraction_precision": 2,
+		"amount": 9007199254740991,
+		"expected": "9,00,71,99,25,47,40,991.00"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 3,
+		"fraction_precision": 2,
+		"amount": 1e21,
+		"expected": "1,00,00,00,00,00,00,00,00,00,000.00"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 3,
+		"fraction_precision": 2,
+		"amount": -1e21,
+		"expected": "-1,00,00,00,00,00,00,00,00,00,000.00"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 3,
+		"fraction_precision": 2,
+		"amount": 1e23,
+		"expected": "99,99,99,99,99,99,99,99,16,11,392.00"
+	},
+	{
+		"number_format": "#,##,###.##",
+		"currency": "INR",
+		"precision": 3,
+		"fraction_precision": 2,
+		"amount": 1.7976931348623157e308,
+		"expected": "17,97,69,31,34,86,23,15,70,81,45,27,42,37,31,70,43,56,79,80,70,56,75,25,84,49,96,59,89,17,47,68,03,15,72,60,78,00,28,53,87,60,58,95,58,63,27,66,87,81,71,54,04,58,95,35,14,38,24,64,23,43,21,32,68,89,46,41,82,76,84,67,54,67,03,53,75,16,98,60,49,91,05,76,55,12,82,07,62,45,49,00,90,38,93,28,94,40,75,86,85,08,45,51,33,94,23,04,58,32,36,90,32,22,94,81,65,80,85,59,33,21,23,34,82,74,79,78,26,20,41,44,72,31,68,73,81,77,18,09,19,29,98,81,25,04,04,02,61,84,12,48,58,368.00"
+	},
+	{
+		"number_format": "#.###,##",
+		"currency": "KWD",
+		"precision": 3,
+		"fraction_precision": 3,
+		"amount": 1000000000000000.0,
+		"expected": "1.000.000.000.000.000,000"
+	},
+	{
+		"number_format": "#.###,##",
+		"currency": "KWD",
+		"precision": 3,
+		"fraction_precision": 3,
+		"amount": 1e16,
+		"expected": "10.000.000.000.000.000,000"
+	},
+	{
+		"number_format": "#.###,##",
+		"currency": "KWD",
+		"precision": 3,
+		"fraction_precision": 3,
+		"amount": 9007199254740991,
+		"expected": "9.007.199.254.740.991,000"
+	},
+	{
+		"number_format": "#.###,##",
+		"currency": "KWD",
+		"precision": 3,
+		"fraction_precision": 3,
+		"amount": 1e21,
+		"expected": "1.000.000.000.000.000.000.000,000"
+	},
+	{
+		"number_format": "#.###,##",
+		"currency": "KWD",
+		"precision": 3,
+		"fraction_precision": 3,
+		"amount": -1e21,
+		"expected": "-1.000.000.000.000.000.000.000,000"
+	},
+	{
+		"number_format": "#.###,##",
+		"currency": "KWD",
+		"precision": 3,
+		"fraction_precision": 3,
+		"amount": 1e23,
+		"expected": "99.999.999.999.999.991.611.392,000"
+	},
+	{
+		"number_format": "#.###,##",
+		"currency": "KWD",
+		"precision": 3,
+		"fraction_precision": 3,
+		"amount": 1.7976931348623157e308,
+		"expected": "179.769.313.486.231.570.814.527.423.731.704.356.798.070.567.525.844.996.598.917.476.803.157.260.780.028.538.760.589.558.632.766.878.171.540.458.953.514.382.464.234.321.326.889.464.182.768.467.546.703.537.516.986.049.910.576.551.282.076.245.490.090.389.328.944.075.868.508.455.133.942.304.583.236.903.222.948.165.808.559.332.123.348.274.797.826.204.144.723.168.738.177.180.919.299.881.250.404.026.184.124.858.368,000"
+	}
+]

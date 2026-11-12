@@ -13,8 +13,8 @@
 
 
 {% macro card_price(amount, original_amount=0, discount=0) -%}
-{{- get_cart_currency().symbol }}{{ get_cart_currency().catalog_amount(amount or 0) -}}
-{%- if discount %}<del>{{ get_cart_currency().symbol }}{{ get_cart_currency().catalog_amount(original_amount or 0) }}</del>{% endif -%}
+{{- get_cart_currency().symbol }}{{ get_cart_currency().amount(amount or 0) -}}
+{%- if discount %}<del>{{ get_cart_currency().symbol }}{{ get_cart_currency().amount(original_amount or 0) }}</del>{% endif -%}
 {%- endmacro %}
 
 

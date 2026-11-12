@@ -1,4 +1,4 @@
-import { Formatter } from './formatter.js';
+import { Formatter, format_number } from './formatter.js';
 
 export { Formatter };
 
@@ -11,9 +11,17 @@ export function money_text(amount, currency) {
 	return get_formatter().money_text(amount, currency);
 }
 
-// Storefront templates supply the document's rules, including historical order currencies.
+// The digits of CartCurrency.amount: templates supply its config, which may be a historical
+// order's currency, and print the symbol themselves.
 export function amount(value, rules) {
-	return (Number(value) || 0).toFixed(rules.precision);
+	const number_format =
+		rules.number_format ?? globalThis.commera_storefront_config?.number_format;
+	return format_number(
+		value,
+		number_format,
+		rules.precision,
+		rules.fraction_precision,
+	);
 }
 
 export function number(value, precision = 0) {
