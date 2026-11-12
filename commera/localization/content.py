@@ -143,11 +143,14 @@ def delete_removed_row_translations(doc, method=None):
 			frappe.db.delete(DOCTYPE, {"reference_doctype": table.options, "reference_name": ("in", removed)})
 
 
-def drop_merged_duplicates(doc, method=None, old=None, new=None, merge=False):
-	"""doc_events before_rename: a merge points the old record's translations at the target. Where both
-	translate the same field in a language and market, the target's stays and the old one goes."""
-	if not merge:
-		return
+def rename_translations(doc, method=None, old=None, new=None, merge=False):
+	"""Move translations in the rename transaction. A merge keeps the target's duplicate keys."""
+	if merge:
+		drop_merged_duplicates(doc.doctype, old, new)
+	move_translations(doc.doctype, old, new)
+
+
+def drop_merged_duplicates(doctype: str, old: str, new: str):
 	translation, target = DocType(DOCTYPE), DocType(DOCTYPE).as_("target")
 	duplicates = (
 		frappe.qb.from_(translation)
@@ -160,7 +163,7 @@ def drop_merged_duplicates(doc, method=None, old=None, new=None, merge=False):
 		)
 		.select(translation.name)
 		.where(
-			(translation.reference_doctype == doc.doctype)
+			(translation.reference_doctype == doctype)
 			& (translation.reference_name == old)
 			& (target.reference_name == new)
 		)

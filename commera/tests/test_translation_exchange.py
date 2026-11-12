@@ -471,10 +471,14 @@ class TestTranslationExchange(IntegrationTestCase):
 		self.assertIsNone(self.stored(self.note.name))
 		job = enqueue.call_args.kwargs
 		self.assertEqual((job["queue"], job["job_id"]), ("long", answer["job_id"]))
-		with patch.object(exchange_job, "is_job_enqueued", return_value=True):
+		with patch.object(exchange_job, "get_job_status", return_value=exchange_job.JobStatus.STARTED):
 			self.assertEqual(translations_api.get_import_status(answer["job_id"])["status"], "queued")
 
-		exchange_job.run_import(job["file_name"], job["language"], job["import_id"])
+		with patch.object(frappe.db, "after_commit") as after_commit:
+			exchange_job.run_import(job["file_name"], job["language"], job["import_id"])
+		with patch.object(exchange_job, "get_job_status", return_value=exchange_job.JobStatus.STARTED):
+			self.assertEqual(translations_api.get_import_status(answer["job_id"])["status"], "queued")
+		after_commit.add.call_args.args[0]()
 
 		status = translations_api.get_import_status(answer["job_id"])
 		self.assertEqual((status["status"], status["report"]["updated"]), ("done", 2))
@@ -484,6 +488,17 @@ class TestTranslationExchange(IntegrationTestCase):
 		job_id = exchange_job.queue_import("missing-file", "ar")["job_id"]
 
 		self.assertEqual(translations_api.get_import_status(job_id)["status"], "failed")
+
+	def test_a_retryable_import_error_stays_queued_until_the_worker_finishes(self):
+		job_id = exchange_job.queue_import("missing-file", "ar")["job_id"]
+		with patch.object(frappe, "get_doc", side_effect=frappe.QueryDeadlockError):
+			with self.assertRaises(frappe.QueryDeadlockError):
+				exchange_job.run_import("missing-file", "ar", job_id)
+		for worker_status in (exchange_job.JobStatus.STARTED, exchange_job.JobStatus.SCHEDULED):
+			with patch.object(exchange_job, "get_job_status", return_value=worker_status):
+				self.assertEqual(exchange_job.get_status(job_id)["status"], "queued")
+		with patch.object(exchange_job, "get_job_status", return_value=exchange_job.JobStatus.FAILED):
+			self.assertEqual(exchange_job.get_status(job_id)["status"], "failed")
 
 	def test_another_users_import_status_is_hidden(self):
 		job_id = exchange_job.queue_import("missing-file", "ar")["job_id"]

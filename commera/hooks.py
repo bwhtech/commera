@@ -184,8 +184,8 @@ commera_events = {
 
 doc_events = {
 	"*": {
-		# Before Frappe points the old record's translations at the target: one key may hold one row.
-		"before_rename": "commera.localization.content.drop_merged_duplicates",
+		# Move translations only when the rename runs, after Frappe validates the target.
+		"after_rename": "commera.localization.content.rename_translations",
 	},
 	"Website Settings": {
 		"validate": "commera.localization.redirect_rules.canonicalize_redirect_targets",
