@@ -135,6 +135,24 @@ class TestCategoryTranslation(IntegrationTestCase):
 			frappe.db.exists("Content Translation", {"reference_doctype": CATEGORY, "reference_name": entry})
 		)
 
+	def test_merging_a_category_keeps_the_targets_translations(self):
+		other = self.make_category("Other", parent=self.tab.name, description="Other story")
+		register(CATEGORY, other.name, "display_name", "ar", "أخرى")
+		register(CATEGORY, other.name, "description", "ar", "قصة أخرى")
+
+		frappe.rename_doc(CATEGORY, other.name, self.entry.name, merge=True)
+
+		translations = frappe.get_all(
+			"Content Translation",
+			filters={"reference_doctype": CATEGORY, "reference_name": ("in", [other.name, self.entry.name])},
+			fields=["reference_name", "reference_field", "translated_value"],
+			as_list=True,
+		)
+		self.assertCountEqual(
+			translations,
+			[(self.entry.name, "display_name", "قمصان"), (self.entry.name, "description", "قصة أخرى")],
+		)
+
 	def test_a_source_label_category_link_keeps_filtering_in_every_language(self):
 		for language in ("en", "ar"):
 			with self.subTest(language=language):
