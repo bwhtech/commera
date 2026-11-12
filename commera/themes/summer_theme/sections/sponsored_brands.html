@@ -24,11 +24,11 @@
 							{% if brand.image %}
 							<a href="{{ brand_url | e }}"><img src="{{ brand.image }}" alt="{{ brand.name }}" class="logo"></a>
 							{% else %}
-							<a href="{{ brand_url | e }}" class="logo brand-name">{{ brand.name }}</a>
+							<a href="{{ brand_url | e }}" class="logo brand-name"><bdi>{{ brand.name | e }}</bdi></a>
 							{% endif %}
 						</div>
 						<div class="dz-content">
-							<h6 class="title"><a href="{{ brand_url | e }}">{{ brand.name }}</a></h6>
+							<h6 class="title"><a href="{{ brand_url | e }}"><bdi>{{ brand.name | e }}</bdi></a></h6>
 							{% if brand_picks %}
 							{% set brand_discount = namespace(percent=0) %}
 							{% for pick in brand_picks %}{% set brand_discount.percent = [brand_discount.percent, card_discount(pick) | int] | max %}{% endfor %}

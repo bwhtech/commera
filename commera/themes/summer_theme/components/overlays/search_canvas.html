@@ -29,7 +29,7 @@
 			<ul class="recent-tag">
 				<li class="pe-0"><span>{{ _("Quick Search") }} :</span></li>
 				{% for node in header_data.navigation_menu[:4] %}
-				<li><a href="{{ (node.href or url('/products')) | e }}">{{ node.label | e }}</a></li>
+				<li><a href="{{ (node.href or url('/products')) | e }}"><bdi>{{ node.label | e }}</bdi></a></li>
 				{% endfor %}
 			</ul>
 			{% endif %}
@@ -50,7 +50,7 @@
 			<ul class="recent-tag mb-3" x-cloak x-show="status === 'ready' && categories.length">
 				<li class="pe-0"><span>{{ _("Categories") }} :</span></li>
 				<template x-for="category in categories" :key="category.name">
-					<li><a :href="category.url" x-text="category.label"></a></li>
+					<li><a :href="category.url"><bdi x-text="category.label"></bdi></a></li>
 				</template>
 			</ul>
 
@@ -69,7 +69,7 @@
 								</a>
 							</div>
 							<div class="dz-content">
-								<h5 class="title"><a :href="get_product_url(product)" x-text="get_product_name(product)"></a></h5>
+								<h5 class="title"><a :href="get_product_url(product)"><bdi x-text="get_product_name(product)"></bdi></a></h5>
 								{# Concatenating the currency symbol into x-text would escape it, so Jinja stamps it beside the amount. #}
 								<h5 class="price">
 									{{ get_cart_currency().symbol }}<span x-text="commera.format.amount(product.effective_price, {{ get_cart_currency().config | tojson | forceescape }})"></span>

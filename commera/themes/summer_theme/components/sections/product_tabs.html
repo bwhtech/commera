@@ -73,7 +73,7 @@
 						</ul>
 						{% if show_option_axis %}
 						<ul>
-							<li><strong>{{ product_variant.attribute_name }}:</strong></li>
+							<li><strong><bdi>{{ product_variant.attribute_name | e }}</bdi>:</strong></li>
 							<li><bdi>{{ product_variant.attribute_value }}</bdi></li>
 						</ul>
 						{% endif %}

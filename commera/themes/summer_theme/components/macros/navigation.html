@@ -8,7 +8,7 @@
 
 {% macro menu_branch(node) %}
 <li>
-	<a href="{{ (node.href or 'javascript:void(0);') | e }}"{% if node.children %} class="menu-title"{% endif %}>{{ node.label | e }}</a>
+	<a href="{{ (node.href or 'javascript:void(0);') | e }}"{% if node.children %} class="menu-title"{% endif %}><bdi>{{ node.label | e }}</bdi></a>
 	{% if node.children %}
 	<ul>
 		{% for child in node.children %}{{ menu_branch(child) }}{% endfor %}
@@ -28,7 +28,7 @@
 	@keydown.escape="$refs.menu_trigger.focus(); menu_expanded = false">
 	<a href="{{ (node.href or 'javascript:void(0);') | e }}" x-ref="menu_trigger"
 		:aria-expanded="menu_expanded || is_branch_open({{ branch_key }})">
-		<span>{{ node.label | e }}</span>
+		<span><bdi>{{ node.label | e }}</bdi></span>
 		<i class="fas fa-chevron-down tabindex" @click.prevent.stop="toggle_branch({{ branch_key }})"></i>
 	</a>
 	<div class="mega-menu">
@@ -39,7 +39,7 @@
 </li>
 {% else %}
 <li>
-	<a href="{{ (node.href or 'javascript:void(0);') | e }}"><span>{{ node.label | e }}</span></a>
+	<a href="{{ (node.href or 'javascript:void(0);') | e }}"><span><bdi>{{ node.label | e }}</bdi></span></a>
 </li>
 {% endif %}
 {% endmacro %}

@@ -65,7 +65,7 @@
                 {% if order.custom_ecommerce_payment_mode != "COD" %}
                 {{_('Card')}}
                 {% else %}
-                {{_(order.custom_ecommerce_payment_mode)}}
+                <bdi>{{ _(order.custom_ecommerce_payment_mode) | e }}</bdi>
                 {% endif %}
                 {% endif %}
             </h3>

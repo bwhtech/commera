@@ -167,7 +167,7 @@
 					<template x-for="method in payment_methods" :key="method.id">
 						<label class="choice-card items-center text-md">
 							<input type="radio" name="payment_method" :value="method.id" x-model="payment_method" class="size-4">
-							<span x-text="method.title"></span>
+							<span><bdi x-text="method.title"></bdi></span>
 						</label>
 					</template>
 					<p x-show="!payment_methods.length" class="text-md text-ink-gray-6">{{ _("No payment methods are available. Please contact the store.") }}</p>
@@ -196,19 +196,19 @@
 				</div>
 				<template x-for="(discount, index) in shipping_pending ? [] : summary?.shipping_discounts ?? []" :key="index">
 					<div class="flex justify-between gap-3 text-ink-gray-7">
-						<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Delivery discount") }}<span x-show="discount.label" x-text="' (' + discount.label + ')'"></span></span>
+						<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Delivery discount") }}<span x-show="discount.label"><bdi x-text="' (' + discount.label + ')'"></bdi></span></span>
 						<span dir="ltr" class="shrink-0 whitespace-nowrap" x-text="'−' + money(discount.amount)"></span>
 					</div>
 				</template>
 				<template x-for="(fee, index) in summary?.plugin_fees ?? []" :key="index">
 					<div class="flex justify-between gap-3">
-						<span class="min-w-0 [overflow-wrap:anywhere]" x-text="fee.description"></span>
+						<span class="min-w-0 [overflow-wrap:anywhere]"><bdi x-text="fee.description"></bdi></span>
 						<span class="shrink-0 whitespace-nowrap" x-text="money(fee.amount)"></span>
 					</div>
 				</template>
 				<template x-for="(tax, index) in summary?.taxes ?? []" :key="index">
 					<div class="flex justify-between gap-3">
-						<span class="min-w-0 [overflow-wrap:anywhere]" x-text="tax.description"></span>
+						<span class="min-w-0 [overflow-wrap:anywhere]"><bdi x-text="tax.description"></bdi></span>
 						<span class="shrink-0 whitespace-nowrap" x-text="money(tax.amount)"></span>
 					</div>
 				</template>

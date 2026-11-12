@@ -42,7 +42,7 @@
 
         {% for discount in checkout_summary.discounts or [] %}
             <div class="flex justify-between text-gray-500 text-base">
-                <span>{{ _('Discount') }}{% if discount.label %} ({{ discount.label | e }}){% endif %}</span>
+                <span>{{ _('Discount') }}{% if discount.label %} (<bdi>{{ discount.label | e }}</bdi>){% endif %}</span>
                 <span class="font-medium flex text-green-700"> &minus;{{ cart_currency.symbol }} {{ cart_currency.amount(discount.amount) }}</span>
             </div>
         {% endfor %}
@@ -59,7 +59,7 @@
         </div>
         <template x-for="(tax, index) in charge_summary.taxes" :key="index">
             <div class="flex justify-between text-gray-500 text-base">
-                <span x-text="tax.description"></span>
+                <span><bdi x-text="tax.description"></bdi></span>
                 <span>{{ cart_currency.symbol }} <span x-text="commera.format.amount(tax.amount, {{ cart_currency.config | tojson | forceescape }})"></span></span>
             </div>
         </template>

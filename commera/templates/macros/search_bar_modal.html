@@ -90,8 +90,7 @@
                 </p>
                 <div class="flex flex-wrap gap-2 my-4" x-cloak x-show="categories.length > 0">
                     <template x-for="category in categories" :key="category.name">
-                        <a :href="category.url" class="text-sm border border-gray-300 rounded-full px-3 py-1 hover:bg-gray-100"
-                            x-text="category.label"></a>
+                        <a :href="category.url" class="text-sm border border-gray-300 rounded-full px-3 py-1 hover:bg-gray-100"><bdi x-text="category.label"></bdi></a>
                     </template>
                 </div>
                 <h3 class="text-sm my-4" x-show="products.length > 0">{{_("Search Results")}}</h3>
@@ -106,7 +105,7 @@
                                     <h3 class="text-base">
                                         <span><bdi x-text="product.title || product.item_name"></bdi></span>
                                         {% if "color" in card_fields %}
-                                        <span x-text="commera.t(product.attribute_value)"></span>
+                                        <span><bdi x-text="commera.t(product.attribute_value)"></bdi></span>
                                         {% endif %}
                                     </h3>
                                 </div>
@@ -116,7 +115,7 @@
                                     <span x-show="product.brand"><bdi x-text="product.brand"></bdi></span>
                                     {% endif %}
                                     {% if "item_group" in card_fields %}
-                                    <span x-show="product.item_group" x-text="product.item_group"></span>
+                                    <span x-show="product.item_group"><bdi x-text="product.item_group"></bdi></span>
                                     {% endif %}
                                 </div>
                                 {% endif %}

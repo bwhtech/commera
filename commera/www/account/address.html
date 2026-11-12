@@ -17,7 +17,7 @@
                 <div
                     class="w-full md:w-3/4 flex items-center  p-3 space-x-3 bg-gray-50 border rounded-lg  hover:bg-gray-100 border-gray-200/70 my-3 justify-between">
                     <span class="text-base">
-                        {{address.display}}
+                        <bdi>{{ address.display | e }}</bdi>
                     </span>
                     <span class="flex gap-5">
                         <button class="text-accent" @click="delete_doc($el,'Address', '{{address.name}}')">
@@ -39,7 +39,7 @@
                 <div
                     class="w-full md:w-3/4 flex items-center  p-3 space-x-3 bg-gray-50 border rounded-lg  hover:bg-gray-100 border-gray-200/70 my-3 justify-between">
                     <span class="text-base">
-                        {{_(address.display)}}
+                        <bdi>{{ _(address.display) | e }}</bdi>
                     </span>
                     <span class="flex gap-5">
                         <button class="text-accent" @click="delete_doc($el,'Address', '{{address.name}}')">

@@ -33,7 +33,7 @@
         <div class="p-3">
 
             {% if billing_address %}
-            <p class="text-base flex items-center mt-2">{{_(billing_address.display)}}</p>
+            <p class="text-base flex items-center mt-2"><bdi>{{ _(billing_address.display) | e }}</bdi></p>
             {% endif %}
         </div>
     </div>
@@ -54,10 +54,10 @@
                     <div class="md:mt-5">
                     
                         <div class="text-sm gap-2 flex flex-col">
-                            <p class="text-secondary-accent font-medium text-base" :title="item.brand" x-text="commera.t(item.brand)"></p>
+                            <p class="text-secondary-accent font-medium text-base" :title="item.brand"><bdi x-text="commera.t(item.brand)"></bdi></p>
                             <p>
-                                <span x-text="item.title || item.item_name"></span>
-                                <span x-text="commera.t(item.attribute_value)"></span>
+                                <span><bdi x-text="item.title || item.item_name"></bdi></span>
+                                <span><bdi x-text="commera.t(item.attribute_value)"></bdi></span>
                             </p>
 
                             <p x-show="$store.wishlist.prices_ready && item.available === false" x-cloak>{{ _("Unavailable") }}</p>

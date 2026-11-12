@@ -12,7 +12,7 @@
 {% set detail_config = {"name": order.name, "key": order_key, "is_owner": is_owner, "is_cancelled": order.is_cancelled} %}
 
 {% macro summary_row(label, amount, class="", sign="") %}
-<div class="{{ class }} flex justify-between gap-3"><dt class="min-w-0 [overflow-wrap:anywhere]">{{ label }}</dt><dd class="shrink-0 whitespace-nowrap"><bdi>{{ sign }}{{ commera.format.money(amount, order.currency) }}</bdi></dd></div>
+<div class="{{ class }} flex justify-between gap-3"><dt class="min-w-0 [overflow-wrap:anywhere]"><bdi>{{ label | e }}</bdi></dt><dd class="shrink-0 whitespace-nowrap"><bdi>{{ sign }}{{ commera.format.money(amount, order.currency) }}</bdi></dd></div>
 {%- endmacro %}
 
 {% block body %}

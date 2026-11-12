@@ -12,7 +12,7 @@
 								<div class="dz-media">
 									{% if category.settings.image %}<img src="{{ category.settings.image }}" alt="{{ category.settings.heading }}">{% endif %}
 								</div>
-								<h6 class="product-name"><a href="{{ url(category.settings.url or products_url) | e }}">{{ category.settings.heading }}</a></h6>
+								<h6 class="product-name"><a href="{{ url(category.settings.url or products_url) | e }}"><bdi>{{ category.settings.heading | e }}</bdi></a></h6>
 							</div>
 						</div>
 						{% endfor %}

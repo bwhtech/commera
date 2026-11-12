@@ -133,7 +133,8 @@ class TestRtlMerchantContent(ProductDetailPriceTestCase):
 				for element in tree.iter():
 					expression = element.get("x-text", "")
 					if re.search(
-						r"brand|title|item_name|size|display_name|option|item.label|format_key", expression
+						r"brand|title|item_name|size|display_name|option|item.label|format_key|attribute_value|item_group|category.label",
+						expression,
 					):
 						self.assertEqual(element.tag, "bdi", expression)
 						isolated.append(expression)
@@ -153,6 +154,85 @@ class TestRtlMerchantContent(ProductDetailPriceTestCase):
 			[element.text for element in tree.iter("bdi")], ["Brand.", "Shirt & linen.", "صغير (S)"]
 		)
 		self.assertIn("Shirt &amp; linen.", html)
+
+	def test_summer_metadata_keeps_escaping_and_inline_isolation(self):
+		html = render_value_lines(
+			"themes/summer_theme/components/sections/product_info.html",
+			("{{ selected_item.item_code", "{{ product_variant.item_group", "{{ selected_item.material"),
+			selected_item=frappe._dict(item_code="SKU & 42.", material="قطن (Cotton)."),
+			product_variant=frappe._dict(item_group="Shirts & tops."),
+			url=lambda value: value,
+		)
+		tree = html5lib.parse(html, namespaceHTMLElements=False)
+		self.assertEqual(
+			[element.text for element in tree.iter("bdi")],
+			["SKU & 42.", "Shirts & tops.", "قطن (Cotton)."],
+		)
+		self.assertIn("SKU &amp; 42.", html)
+		self.assertEqual(len(tree.findall(".//a/bdi")), 1)
+
+	def test_selected_filter_chip_keeps_its_label_isolated_and_escaped(self):
+		html = render_value_lines(
+			"themes/commera_starter/components/product_grid.html",
+			("{{ chip.label",),
+			chip=frappe._dict(url="/products", label="Size & مقاس (M)."),
+			icon=lambda *args: "",
+		)
+		tree = html5lib.parse(html, namespaceHTMLElements=False)
+		self.assertEqual(tree.find(".//a/span/bdi").text, "Size & مقاس (M).")
+		self.assertIn("Size &amp; مقاس (M).", html)
+
+	def test_swept_jinja_labels_keep_escaping_and_isolation(self):
+		cases = (
+			("themes/commera_starter/sections/header.html", 'item["title"]'),
+			("themes/commera_starter/components/macros/menu_link.html", 'item["title"]'),
+			("themes/commera_starter/sections/footer.html", "shop_name"),
+			("themes/commera_starter/sections/hero.html", "section.settings.primary_label"),
+			("themes/summer_theme/components/macros/navigation.html", "node.label"),
+			("themes/summer_theme/sections/collection.html", "banner.settings.heading"),
+			("themes/summer_theme/sections/hero_slider.html", "slide.settings.heading"),
+			("themes/summer_theme/sections/recent_additions.html", "product_name"),
+			("themes/summer_theme/sections/sponsored_brands.html", "brand.name"),
+			("themes/summer_theme/pages/account/address.html", "address.address_line1"),
+			("themes/summer_theme/components/sections/product_tabs.html", "product_variant.attribute_name"),
+			("templates/macros/navigation_menu.html", "text"),
+			("themes/summer_theme/pages/account/orders/detail.html", "tax.description"),
+			("themes/summer_theme/pages/account/orders/detail.html", "fee.description"),
+			("themes/commera_starter/pages/account/orders/detail.html", "label"),
+			("templates/includes/footer.html", "link.title"),
+			("www/account/address.html", "address.display"),
+		)
+		for template, expression in cases:
+			with self.subTest(template=template, expression=expression):
+				source = Path(frappe.get_app_path("commera", template)).read_text()
+				pattern = r"<bdi>\s*{{\s*" + re.escape(expression) + r"\s*\|\s*e\s*}}\s*</bdi>"
+				matches = re.findall(pattern, source)
+				self.assertTrue(matches)
+				markup = re.sub(r"{{.*?}}", "{{ value | e }}", matches[0])
+				html = Environment().from_string(markup).render(value="Shirts & قمصان (M).")
+				tree = html5lib.parse(html, namespaceHTMLElements=False)
+				self.assertEqual(tree.find(".//bdi").text, "Shirts & قمصان (M).")
+				self.assertIn("&amp;", html)
+
+	def test_swept_alpine_values_are_isolated_in_parsed_markup(self):
+		roots = ("themes/commera_starter", "themes/summer_theme", "templates", "www")
+		merchant_value = re.compile(
+			r"attribute_value|item_group|category.label|chip.label|get_product_name|"
+			r"item.brand|item.title|item.item_name|item.display|selectedOption.*display|"
+			r"option.label|method.title|tax.description|fee.description|discount.label|"
+			r"discount.code|code_state.code|selected_shipping_option|gateway_name|"
+			r"details\?\.payment_mode|cell \?\?|cell \|\|"
+		)
+		for root in roots:
+			for template in Path(frappe.get_app_path("commera", root)).rglob("*.html"):
+				source = re.sub(r"{%.*?%}", "", template.read_text(), flags=re.S)
+				source = re.sub(r"{{.*?}}", "value", source, flags=re.S)
+				tree = html5lib.parse(source, namespaceHTMLElements=False)
+				for element in tree.iter():
+					expression = element.get("x-text", "")
+					if merchant_value.search(expression) and not expression.startswith("$el.dataset.message"):
+						with self.subTest(template=str(template), expression=expression):
+							self.assertEqual(element.tag, "bdi")
 
 	def assert_description_descendants(self, html, description, expected=1):
 		tree = html5lib.parse(html, namespaceHTMLElements=False)
@@ -195,4 +275,5 @@ def render_value_lines(template, expressions, **context):
 	lines = [line for line in source.splitlines() if any(value in line for value in expressions)]
 	environment = Environment()
 	environment.globals["_"] = lambda value: value
+	environment.globals.update({key: value for key, value in context.items() if callable(value)})
 	return environment.from_string("\n".join(lines)).render(context)

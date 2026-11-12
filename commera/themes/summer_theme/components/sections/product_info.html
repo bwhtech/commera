@@ -139,16 +139,16 @@
 					<div class="dz-info">
 						<ul>
 							<li><strong>{{ _("SKU") }}:</strong></li>
-							<li>{{ selected_item.item_code }}</li>
+							<li><bdi>{{ selected_item.item_code | e }}</bdi></li>
 						</ul>
 						<ul>
 							<li><strong>{{ _("Category") }}:</strong></li>
-							<li><a href="{{ url('/products?item_groups=' ~ (product_variant.item_group | urlencode)) | e }}">{{ product_variant.item_group }}</a></li>
+							<li><a href="{{ url('/products?item_groups=' ~ (product_variant.item_group | urlencode)) | e }}"><bdi>{{ product_variant.item_group | e }}</bdi></a></li>
 						</ul>
 						{% if selected_item.material %}
 						<ul>
 							<li><strong>{{ _("Material") }}:</strong></li>
-							<li>{{ selected_item.material }}</li>
+							<li><bdi>{{ selected_item.material | e }}</bdi></li>
 						</ul>
 						{% endif %}
 					</div>

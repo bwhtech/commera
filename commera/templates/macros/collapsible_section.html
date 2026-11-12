@@ -4,7 +4,7 @@
     })" class="{{ additional_classes }}">
   <div class="flex w-full items-center justify-between py-3 border-b border-gray-800 md:border-0 md:disable"
     @click="open = !open">
-    <h3>{{ title | e }}</h3>
+    <h3><bdi>{{ title | e }}</bdi></h3>
     <button class="md:hidden focus:outline-none">
       <span x-show="open" class="block w-4 h-4">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"

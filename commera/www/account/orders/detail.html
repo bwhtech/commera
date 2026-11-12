@@ -81,7 +81,7 @@
                 {% if order.custom_ecommerce_payment_mode != "COD" %}
                 {{_('Card')}}
                 {% else %}
-                {{_(order.custom_ecommerce_payment_mode)}}
+                <bdi>{{ _(order.custom_ecommerce_payment_mode) | e }}</bdi>
                 {% endif %}
                 {% endif %}
             </h3>
@@ -101,7 +101,7 @@
             {% for discount in order_summary.discounts %}
                 <h3 class="text-base font-normal mt-2 flex items-center justify-between">
                     <span>
-                        {{_('Discount')}}{% if discount.label %} ({{ discount.label | e }}){% endif %}
+                        {{_('Discount')}}{% if discount.label %} (<bdi>{{ discount.label | e }}</bdi>){% endif %}
                     </span>
                     <span class="flex whitespace-nowrap text-green-700">
                         &minus;
@@ -126,7 +126,7 @@
             {% for discount in order_summary.shipping_discounts %}
                 <h3 class="text-base font-normal mt-2 flex items-center justify-between">
                     <span>
-                        {{_('Shipping discount')}}{% if discount.label %} ({{ discount.label | e }}){% endif %}
+                        {{_('Shipping discount')}}{% if discount.label %} (<bdi>{{ discount.label | e }}</bdi>){% endif %}
                     </span>
                     <span class="flex whitespace-nowrap text-green-700">
                         &minus;

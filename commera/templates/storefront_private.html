@@ -33,7 +33,7 @@
 <body>
 	<main>
 		{% if logo %}<img src="{{ logo | e }}" alt="{{ store_name | e }}">{% endif %}
-		<h1>{{ (store_name or _("Coming soon")) | e }}</h1>
+		<h1><bdi>{{ (store_name or _("Coming soon")) | e }}</bdi></h1>
 		<p>{{ _("We're getting the store ready. Check back soon.") }}</p>
 		<p class="staff"><a href="/login?redirect-to=/commera">{{ _("Store staff? Log in") }}</a></p>
 	</main>

@@ -36,7 +36,7 @@
             x-on:keydown.down.prevent="openedWithKeyboard = true" x-on:keydown.enter.prevent="openedWithKeyboard = true"
             x-on:keydown.space.prevent="openedWithKeyboard = true" x-bind:aria-expanded="isOpen || openedWithKeyboard"
             x-bind:aria-label="selectedOption ? selectedOption.value : commera.t('Please Select')">
-            <span class="text-sm font-normal text-left" x-text="selectedOption ? selectedOption.display : commera.t('Please Select')"></span>
+            <span class="text-sm font-normal text-left"><bdi x-text="selectedOption ? selectedOption.display : commera.t('Please Select')"></bdi></span>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"
                 aria-hidden="true">
                 <path fill-rule="evenodd"
@@ -76,7 +76,7 @@
                                 class="flex mb-1 text-base  items-center">
                                 <h6><bdi x-text="item.title"></bdi></h6>
                             </div>
-                            <span x-bind:class="selectedOption == item ? 'font-medium' : null" x-text="item.display"></span>
+                            <span x-bind:class="selectedOption == item ? 'font-medium' : null"><bdi x-text="item.display"></bdi></span>
                         </div>
                         <span class="sr-only" x-text="selectedOption == item ? 'selected' : null"></span>
                         <svg x-cloak x-show="selectedOption == item" xmlns="http://www.w3.org/2000/svg"

@@ -3,7 +3,7 @@
 {% macro combobox(input_id, model, options, label, required=False, placeholder="", autocomplete="off",
 	required_message=_("Please select an option from the list."), empty_message=_("No matches found")) %}
 {%- set settings = {"options": options, "required": required, "required_message": required_message} -%}
-<label class="label-title" id="{{ input_id }}_label" for="{{ input_id }}">{{ label }}</label>
+<label class="label-title" id="{{ input_id }}_label" for="{{ input_id }}">{{ label | e }}</label>
 <div class="summer-combobox position-relative"
 	x-data='summer_combobox({{ settings | tojson }})'
 	x-modelable="value" x-model="{{ model }}"
@@ -30,8 +30,7 @@
 		<template x-for="(option, index) in matches" :key="option.value">
 			<li class="dropdown-item" role="option" :id="'{{ input_id }}_option_' + index"
 				:aria-selected="option.value === value" :class="index === active_index && 'active'"
-				:title="option.label" @mousemove="active_index = index" @click="select(option)"
-				x-text="option.label"></li>
+				:title="option.label" @mousemove="active_index = index" @click="select(option)"><bdi x-text="option.label"></bdi></li>
 		</template>
 		<li class="dropdown-item-text" x-show="!matches.length">{{ empty_message }}</li>
 	</ul>

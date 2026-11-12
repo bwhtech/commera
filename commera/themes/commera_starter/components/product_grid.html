@@ -45,7 +45,7 @@
 	{% if chips %}
 	<div class="mt-3 flex flex-wrap items-center gap-2">
 		{% for chip in chips %}
-		<a href="{{ chip.url | e }}" class="inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-full bg-surface-gray-2 py-1 pe-2 ps-3 text-base text-ink-gray-7 hover:bg-surface-gray-3" aria-label="{{ _('Remove {0}').format(chip.label) }}"><span class="min-w-0 [overflow-wrap:anywhere]">{{ chip.label }}</span>{{ icon("close", "size-3 shrink-0") }}</a>
+		<a href="{{ chip.url | e }}" class="inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-full bg-surface-gray-2 py-1 pe-2 ps-3 text-base text-ink-gray-7 hover:bg-surface-gray-3" aria-label="{{ _('Remove {0}').format(chip.label) }}"><span class="min-w-0 [overflow-wrap:anywhere]"><bdi>{{ chip.label | e }}</bdi></span>{{ icon("close", "size-3 shrink-0") }}</a>
 		{% endfor %}
 		<a href="{{ reset_url | e }}" class="inline-flex h-10 items-center rounded-lg px-2 text-base text-ink-gray-7 link hover:text-ink-gray-9">{{ _("Reset") }}</a>
 	</div>

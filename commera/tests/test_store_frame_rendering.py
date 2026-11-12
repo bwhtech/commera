@@ -59,17 +59,17 @@ class TestStoreFrameRendering(StoreFrameTestCase):
 	def test_the_starter_shows_the_translated_shop_name_everywhere(self):
 		html = self.render_starter_home("ar")
 
-		self.assertRegex(html, rf'tracking-widest">\s*{ARABIC_NAME}\s*</a>')
-		self.assertIn(f'tracking-widest">{ARABIC_NAME}</span>', html)
-		self.assertIn(f'tracking-widest">{ARABIC_NAME}</p>', html)
-		self.assertIn(f"© {frappe.utils.getdate().year} {ARABIC_NAME}</p>", html)
+		self.assertRegex(html, rf'tracking-widest">\s*<bdi>{ARABIC_NAME}</bdi>\s*</a>')
+		self.assertIn(f'tracking-widest"><bdi>{ARABIC_NAME}</bdi></span>', html)
+		self.assertIn(f'tracking-widest"><bdi>{ARABIC_NAME}</bdi></p>', html)
+		self.assertIn(f"© {frappe.utils.getdate().year} {ARABIC_NAME}</bdi></p>", html)
 
 	def test_the_starter_escapes_a_translated_shop_name(self):
 		self.write_unsafe_name()
 		html = self.render_starter_home("ar")
 
 		self.assertNotIn("<script>alert(2)", html)
-		self.assertIn(f'tracking-widest">{ESCAPED_NAME}</p>', html)
+		self.assertIn(f'tracking-widest"><bdi>{ESCAPED_NAME}</bdi></p>', html)
 
 	def test_summer_escapes_translated_category_labels_and_links(self):
 		tree = [unsafe_node(unsafe_node()), unsafe_node()]
@@ -90,9 +90,13 @@ class TestStoreFrameRendering(StoreFrameTestCase):
 		self.assertNotIn("<script>alert(2)", html)
 		self.assertNotIn('" onload="', html)
 		# The desktop dropdown and its group heading, and the mobile menu toggle.
-		self.assertIn(f'text-md text-ink-gray-8 hover:bg-surface-gray-3">{ESCAPED_NAME} <span', html)
-		self.assertIn(f'text-ink-gray-6">{ESCAPED_NAME}</p>', html)
-		self.assertIn(f'text-lg text-ink-gray-8 hover:bg-surface-gray-3">{ESCAPED_NAME} <span', html)
+		self.assertIn(
+			f'text-md text-ink-gray-8 hover:bg-surface-gray-3"><bdi>{ESCAPED_NAME}</bdi> <span', html
+		)
+		self.assertIn(f'text-ink-gray-6"><bdi>{ESCAPED_NAME}</bdi></p>', html)
+		self.assertIn(
+			f'text-lg text-ink-gray-8 hover:bg-surface-gray-3"><bdi>{ESCAPED_NAME}</bdi> <span', html
+		)
 
 	def test_the_starter_falls_back_to_the_app_name_without_a_store_name(self):
 		frappe.db.set_single_value(SETTINGS, "store_name", "")

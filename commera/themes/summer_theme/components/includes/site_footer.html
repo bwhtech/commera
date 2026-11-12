@@ -29,9 +29,9 @@
 							<li><p><a href="{{ url('/track-order') | e }}">{{ _("Track Your Order") }}</a></p></li>
 						</ul>
 						<div class="subscribe_widget">
-							<h6 class="title fw-medium text-capitalize">{{ newsletter_title }}</h6>
+							<h6 class="title fw-medium text-capitalize"><bdi>{{ newsletter_title | e }}</bdi></h6>
 							{% if settings.newsletter_description %}
-							<p>{{ settings.newsletter_description }}</p>
+							<p dir="auto">{{ settings.newsletter_description | e }}</p>
 							{% endif %}
 							{# The app ships no subscribe endpoint, so the form is deliberately inert rather than posting at a URL that would 404. #}
 							<form class="dzSubscribe style-1" x-data @submit.prevent>
@@ -55,10 +55,10 @@
 				{% if section.enabled and section.links %}
 				<div class="col-xl-3 col-md-4 col-sm-4 col-6 wow fadeInUp" data-wow-delay="0.{{ loop.index + 1 }}s">
 					<div class="widget widget_services">
-						<h5 class="footer-title">{{ section.title | e }}</h5>
+						<h5 class="footer-title"><bdi>{{ section.title | e }}</bdi></h5>
 						<ul>
 							{% for link in section.links %}
-							<li><a href="{{ (url(link.url) if link.url else 'javascript:void(0);') | e }}">{{ link.title | e }}</a></li>
+							<li><a href="{{ (url(link.url) if link.url else 'javascript:void(0);') | e }}"><bdi>{{ link.title | e }}</bdi></a></li>
 							{% endfor %}
 						</ul>
 					</div>
@@ -75,7 +75,7 @@
 			{# No `wow` here: summer.js observes with a 10% bottom inset, and this last row can never intersect at a 900px viewport. #}
 			<div class="row fb-inner">
 				<div class="col-lg-6 col-md-12 text-start">
-					<p class="copyright-text">&copy; {{ frappe.utils.getdate().year }} {{ _(copyright_text) | e }}</p>
+					<p class="copyright-text">&copy; {{ frappe.utils.getdate().year }} <bdi>{{ _(copyright_text) | e }}</bdi></p>
 				</div>
 				<div class="col-lg-6 col-md-12 text-end">
 					<div class="d-flex align-items-center justify-content-center justify-content-xl-end">
