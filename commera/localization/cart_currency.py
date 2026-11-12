@@ -50,10 +50,12 @@ class CartCurrency:
 			"precision": self.precision,
 			"fraction_precision": self.fraction_precision,
 			"number_format": self.number_format,
+			"is_sign": self.is_sign,
 		}
 
 	def amount(self, value: float | None) -> str:
-		return format_money_digits(value, self.precision, self.number_format, self.code)
+		formatted = format_money_digits(value, self.precision, self.number_format, self.code)
+		return formatted.replace("-", "\u2212", 1) if self.is_sign else formatted
 
 
 def get_cart_currency(quotation=None) -> CartCurrency:

@@ -40,6 +40,7 @@ class Formatter:
 		formatted = format_money_digits(amount, precision, self.number_format, currency)
 		symbol = get_html_currency_symbol(currency)
 		if is_currency_sign(currency):
+			formatted = formatted.replace("-", "\u2212", 1)
 			return isolate_left_to_right(f"{symbol}{formatted}")
 		sign, digits = split_sign(formatted)
 		if self.language.direction == "rtl":
@@ -53,6 +54,7 @@ class Formatter:
 		formatted = format_money_digits(amount, precision, self.number_format, currency)
 		symbol = get_currency_symbol(currency)
 		if is_currency_sign(currency):
+			formatted = formatted.replace("-", "\u2212", 1)
 			return f"{symbol}{NO_BREAK_SPACE}{formatted}"
 		sign, digits = split_sign(formatted)
 		if self.language.direction == "rtl":

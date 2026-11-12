@@ -20,12 +20,13 @@ export function signed_money(amount, currency, minus = '−') {
 export function amount(value, rules) {
 	const number_format =
 		rules.number_format ?? globalThis.commera_storefront_config?.number_format;
-	return format_number(
+	const formatted = format_number(
 		value,
 		number_format,
 		rules.precision,
 		rules.fraction_precision,
 	);
+	return rules.is_sign ? formatted.replace(/^-/, '−') : formatted;
 }
 
 export function number(value, precision = 0) {

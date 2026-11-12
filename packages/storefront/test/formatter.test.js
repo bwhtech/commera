@@ -150,8 +150,8 @@ test('signed money keeps the old minus for other currencies and signs first for 
 				);
 				assert.equal(
 					formatter.money_text(amount, currency),
-					`${cases.currency_symbols[currency]}\u00a0${formatter.digits(
-						amount,
+					`${cases.currency_symbols[currency]}\u00a0−${formatter.digits(
+						Math.abs(amount),
 						currency,
 					)}`,
 				);

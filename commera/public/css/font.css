@@ -42,3 +42,7 @@
 	src: url("/assets/commera/fonts/currency-signs/currency-signs.woff2") format("woff2");
 	unicode-range: U+20C1, U+20C3;
 }
+
+.currency-sign {
+  font-family: "Commera Currency Signs", sans-serif;
+}

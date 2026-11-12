@@ -58,7 +58,7 @@ test('money_text returns Unicode currency signs without HTML', () => {
 		currency_symbols: { SAR: '\u20c1', AED: '\u20c3', USD: '$' },
 	};
 	assert.equal(money_text(1250, 'SAR'), '\u20c1\u00a01,250.00');
-	assert.equal(money_text(-1250, 'AED'), '\u20c3\u00a0-1,250.00');
+	assert.equal(money_text(-1250, 'AED'), '\u20c3\u00a0−1,250.00');
 	assert.equal(money_text(1250, 'USD'), '$1,250.00');
 });
 
@@ -129,4 +129,11 @@ test('all HTML money paths escape every symbol, SAR included', () => {
 		'&lt;img src=x onerror=alert(1)&gt; &amp; &quot;currency&quot;';
 	assert.equal(money(10, 'USD'), `${expected}10.00`);
 	assert.equal(money(10, 'SAR'), `${expected}10.00`);
+});
+
+test('legacy amount uses the currency-sign minus without changing other currencies', () => {
+	const rules = { precision: 2, number_format: '#,###.##' };
+	assert.equal(amount(-10, { ...rules, is_sign: true }), '−10.00');
+	assert.equal(amount(-0.25, { ...rules, is_sign: true }), '−0.25');
+	assert.equal(amount(-10, rules), '-10.00');
 });

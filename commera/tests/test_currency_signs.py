@@ -22,6 +22,22 @@ OTHER_CURRENCIES = ("INR", "USD", "EUR")
 class TestCurrencySigns(CartCurrencyTestCase):
 	"""The Gulf market of CartCurrencyTestCase sells in AED."""
 
+	def test_bundled_theme_price_css_has_a_currency_font(self):
+		root = Path(frappe.get_app_path("commera"))
+		shared = (root / "public/css/font.css").read_text()
+		self.assertIn('.currency-sign {\n  font-family: "Commera Currency Signs", sans-serif;', shared)
+		for theme in (root / "public/themes").iterdir():
+			styles = list(theme.rglob("*.css"))
+			if not styles:
+				continue
+			with self.subTest(theme=theme.name):
+				css = "\n".join(path.read_text() for path in styles)
+				self.assertIn('"Commera Currency Signs",', css)
+		shop = (root / "public/themes/shop_default_theme/tailwind.output.css").read_text()
+		self.assertIn('--font-sans: "Commera Currency Signs",', shop)
+		compiled = (root / "public/css/tailwind.css").read_text()
+		self.assertIn('.currency-sign {\n  font-family: "Commera Currency Signs", sans-serif;', compiled)
+
 	def test_the_signs_are_plain_unicode_text(self):
 		for currency, sign in SIGNS:
 			with self.subTest(currency=currency):
@@ -53,7 +69,7 @@ class TestCurrencySigns(CartCurrencyTestCase):
 					self.assertEqual(
 						formatter.money(-1234.5, currency, 2),
 						f'<bdi dir="ltr"><span class="currency-sign" role="img" aria-label="{currency}">'
-						f"{sign}</span>\u00a0-1,234.50</bdi>",
+						f"{sign}</span>\u00a0\u22121,234.50</bdi>",
 					)
 
 	def test_other_currencies_keep_their_symbols(self):
@@ -173,7 +189,9 @@ class TestCurrencySigns(CartCurrencyTestCase):
 					if currency in ("SAR", "AED"):
 						pair = tree.find('.//bdi[@dir="ltr"]')
 						self.assertIsNotNone(pair)
-						self.assertEqual("".join(pair.itertext()), f"{sign}\u00a0{amount}")
+						self.assertEqual(
+							"".join(pair.itertext()), f"{sign}\u00a0{amount.replace("-", "\u2212")}"
+						)
 					else:
 						if "rounding" in marker:
 							expected = "₹\n                -0.25" if "templates/" in template else "₹-0.25"
@@ -185,7 +203,7 @@ class TestCurrencySigns(CartCurrencyTestCase):
 		for code, direction in (("en", "ltr"), ("ar", "rtl")):
 			formatter = Formatter(Language(code, code, code, direction), "#,###.##")
 			for currency, sign in SIGNS:
-				for amount, expected in ((10, "10.00"), (-10, "-10.00"), (-0.25, "-0.25")):
+				for amount, expected in ((10, "10.00"), (-10, "\u221210.00"), (-0.25, "\u22120.25")):
 					with self.subTest(language=code, currency=currency, amount=amount):
 						self.assertEqual(formatter.money_text(amount, currency, 2), f"{sign}\u00a0{expected}")
 
@@ -216,4 +234,4 @@ class TestCurrencySigns(CartCurrencyTestCase):
 					if currency == "INR":
 						self.assertEqual(text, f"\u2212{amount:.2f}\u00a0₹")
 					else:
-						self.assertEqual(text, f"{sign}\u00a0-{amount:.2f}")
+						self.assertEqual(text, f"{sign}\u00a0\u2212{amount:.2f}")

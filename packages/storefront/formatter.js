@@ -53,7 +53,7 @@ export class Formatter {
 		const formatted = this.digits(amount, currency, precision);
 		const symbol = this.symbol(currency);
 		if (this.is_sign(currency)) {
-			return `${symbol}${NO_BREAK_SPACE}${formatted}`;
+			return `${symbol}${NO_BREAK_SPACE}${formatted.replace(/^-/, '−')}`;
 		}
 		const [sign, digits] = split_sign(formatted);
 		return this.join(sign, digits, symbol);
@@ -119,7 +119,7 @@ export class Formatter {
 	join_html(formatted, currency) {
 		const symbol = this.html_symbol(currency);
 		if (this.is_sign(currency)) {
-			return `<bdi dir="ltr">${symbol}${formatted}</bdi>`;
+			return `<bdi dir="ltr">${symbol}${formatted.replace(/^-/, '−')}</bdi>`;
 		}
 		const [sign, digits] = split_sign(formatted);
 		return this.join(sign, digits, symbol);

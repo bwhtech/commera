@@ -20,3 +20,7 @@
   direction: ltr;
   justify-content: flex-end;
 }
+
+.currency-sign {
+  font-family: "Commera Currency Signs", sans-serif;
+}

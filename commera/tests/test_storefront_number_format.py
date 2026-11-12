@@ -40,11 +40,17 @@ class TestStorefrontNumberFormat(CartCurrencyTestCase):
 					self.open_request(path)
 					currency = CartCurrency.of()
 					self.assertEqual(currency.amount(123456.78), expected)
-					self.assertEqual(currency.amount(-123456.78), f"-{expected}")
+					minus = "\u2212" if path == "/en-ae/cart" else "-"
+					self.assertEqual(currency.amount(-123456.78), f"{minus}{expected}")
 					self.assertEqual(currency.amount(None), "0.00" if number_format == INDIAN else "0,00")
 					self.assertEqual(
 						currency.config,
-						{"precision": 2, "fraction_precision": 2, "number_format": number_format},
+						{
+							"precision": 2,
+							"fraction_precision": 2,
+							"number_format": number_format,
+							"is_sign": path == "/en-ae/cart",
+						},
 					)
 
 	def test_precision_three_applies_to_store_and_market_currencies(self):

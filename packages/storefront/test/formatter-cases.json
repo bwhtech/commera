@@ -223,7 +223,7 @@
 			"currency": "SAR",
 			"amount": -1234.567,
 			"precision": null,
-			"expected": "<bdi dir=\"ltr\"><span class=\"currency-sign\" role=\"img\" aria-label=\"SAR\">\u20c1</span>\u00a0-1,234.57</bdi>"
+			"expected": "<bdi dir=\"ltr\"><span class=\"currency-sign\" role=\"img\" aria-label=\"SAR\">\u20c1</span>\u00a0−1,234.57</bdi>"
 		},
 		{
 			"language": "en",
@@ -335,7 +335,7 @@
 			"currency": "SAR",
 			"amount": -1234.567,
 			"precision": null,
-			"expected": "<bdi dir=\"ltr\"><span class=\"currency-sign\" role=\"img\" aria-label=\"SAR\">\u20c1</span>\u00a0-1,234.57</bdi>"
+			"expected": "<bdi dir=\"ltr\"><span class=\"currency-sign\" role=\"img\" aria-label=\"SAR\">\u20c1</span>\u00a0−1,234.57</bdi>"
 		},
 		{
 			"language": "ar",
