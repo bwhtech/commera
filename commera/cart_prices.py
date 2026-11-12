@@ -5,17 +5,23 @@ import frappe
 from frappe import _
 from frappe.utils.data import flt
 
+from commera.cart_taxes import apply_market_taxes
 from commera.localization.market_prices import MarketPrices
 from commera.localization.markets import PRIMARY_MARKET, Market, StorefrontMarkets
+from commera.localization.resolver import get_localization
 
 MARKET_FIELD = "commera_market"
 
 
 def apply_market(quotation, prices: MarketPrices):
-	"""Point the quotation at the market before ERPNext prices its lines, and record which market.
-	A switch clears the old exchange rates, so ERPNext reads the new ones."""
+	"""Point the quotation at the market's prices and taxes before ERPNext prices its lines, and
+	record the market and language. A switch clears the old exchange rates, so ERPNext reads the new ones."""
 	is_priced = is_priced_in(quotation, prices)
+	switched = get_market_handle(quotation) != prices.handle
 	quotation.set(MARKET_FIELD, prices.handle)
+	# ERPNext's print language: the order prints in the language the shopper bought in.
+	quotation.language = get_localization().language.code
+	apply_market_taxes(quotation, get_document_market(quotation), switched=switched)
 	if is_priced:
 		return
 	quotation.update(

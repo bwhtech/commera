@@ -26,12 +26,12 @@ def apply_plugin_fees(quotation):
 	"""Set quotation.flags.strict_plugin_fees at checkout: a failing fee hook then blocks it, while on a cart
 	edit the fee is only left out, so a broken app never stops a shopper changing their cart."""
 	# Imported here: commera.api.shipping imports this module.
-	from commera.api.shipping import reindex_taxes
+	from commera.api.shipping import get_cart_charge_kind, reindex_taxes
 
 	handlers = get_handlers("commera_hooks", "cart_fees")
-	if any(row.get(PLUGIN_FEE_FIELD) for row in quotation.taxes):
+	if any(get_cart_charge_kind(row, quotation) == "plugin" for row in quotation.taxes):
 		# Dropped before the hooks run, so a fee priced on the grand total never compounds on its own last value.
-		quotation.taxes = [row for row in quotation.taxes if not row.get(PLUGIN_FEE_FIELD)]
+		quotation.taxes = [row for row in quotation.taxes if get_cart_charge_kind(row, quotation) != "plugin"]
 		reindex_taxes(quotation)
 		quotation.calculate_taxes_and_totals()
 	if not handlers:

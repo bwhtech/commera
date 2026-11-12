@@ -15,6 +15,7 @@ from commera.localization.languages import StorefrontLanguages
 from commera.localization.markets import PRIMARY_MARKET, clear_market_cache, is_market_language
 from commera.search.price_sync import rebuild_if_market_prices_change
 from commera.search.translations import reindex_market_records
+from commera.utils import get_store_company
 
 HANDLE_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
@@ -66,6 +67,7 @@ class CommeraMarket(Document):
 		languages: DF.Table[CommeraMarketLanguage]
 		market_name: DF.Data
 		sale_price_list: DF.Link
+		tax_template: DF.Link | None
 	# end: auto-generated types
 
 	def autoname(self):
@@ -77,6 +79,7 @@ class CommeraMarket(Document):
 		self.validate_countries()
 		self.validate_languages()
 		self.validate_price_lists()
+		self.validate_tax_template()
 
 	def before_save(self):
 		self.reinsert_changed_countries()
@@ -201,6 +204,27 @@ class CommeraMarket(Document):
 					"Compare-at Price List {0} is in {1}, but the Sale Price List is in {2}. Use one currency."
 				).format(frappe.bold(self.compare_at_price_list), compare_at_currency, self.currency),
 				title=_("Currency Mismatch"),
+			)
+
+	def validate_tax_template(self):
+		"""Carts are quoted by the store company, and ERPNext refuses another company's template."""
+		if not self.tax_template:
+			return
+		company, disabled = frappe.db.get_value(
+			"Sales Taxes and Charges Template", self.tax_template, ["company", "disabled"]
+		) or (None, 0)
+		store_company = get_store_company()
+		if company != store_company:
+			frappe.throw(
+				_("Tax template {0} belongs to {1}. Choose a template of the store company {2}.").format(
+					frappe.bold(self.tax_template), frappe.bold(company), frappe.bold(store_company)
+				),
+				title=_("Invalid Tax Template"),
+			)
+		if disabled and self.has_value_changed("tax_template"):
+			frappe.throw(
+				_("Tax template {0} is disabled.").format(frappe.bold(self.tax_template)),
+				title=_("Invalid Tax Template"),
 			)
 
 	def reinsert_changed_countries(self):

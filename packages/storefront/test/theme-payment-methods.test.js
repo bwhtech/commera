@@ -129,3 +129,88 @@ for (const country of ['Saudi Arabia', undefined]) {
 		assert.equal(form.billing.country, country ?? 'United Arab Emirates');
 	});
 }
+
+test('Summer uses the payable inclusive cart total before the address step', () => {
+	const form = summer_checkout();
+	form.$store = {
+		cart: {
+			total: 699.95,
+			saved: 0,
+			discounts: [],
+			is_delivery_charged: false,
+			priced: {
+				items_total: 699.95,
+				total: 700,
+				taxes: [
+					{ description: 'VAT 15% (included)', amount: 91.3, included: true },
+				],
+			},
+		},
+	};
+	const summary = form.get_browser_cart_summary();
+	assert.equal(summary.subtotal, 699.95);
+	assert.equal(summary.total, 700);
+	assert.equal(summary.taxes[0].description, 'VAT 15% (included)');
+	assert.equal(summary.cash_on_delivery.total, 700);
+});
+
+test('legacy checkout keeps included tax in the payable total before and after address', () => {
+	const html = readFileSync(
+		new URL('templates/partials/checkout/body.html', root),
+		'utf8',
+	);
+	const script = html
+		.split('<script>')[1]
+		.split('</script>')[0]
+		.replace(/{{[\s\S]*?}}/g, '0');
+	let form;
+	vm.runInNewContext(script, {
+		document: { addEventListener: (_event, callback) => callback() },
+		Alpine: {
+			data: (_name, factory) => {
+				form = factory();
+			},
+			$persist: (value) => ({ as: () => value }),
+		},
+	});
+	form.charge_summary = { total: 700, shipping: 0, cod_charge: 0 };
+	form.delivery_charge = 0;
+	form.calculate_checkout_total();
+	assert.equal(form.checkout_total, 700);
+	form.billing_address_filled = true;
+	form.charge_summary = { total: 710, shipping: 10, cod_charge: 0 };
+	form.delivery_charge = 10;
+	form.calculate_checkout_total();
+	assert.equal(form.checkout_total, 710);
+});
+
+test('Summer uses the rounded server COD total', () => {
+	const form = summer_checkout();
+	form.address_step = 'saved';
+	form.payment_mode = 'COD';
+	form.summary = {
+		total: 710,
+		cash_on_delivery: { total: 715, cod_charge: 5.25 },
+	};
+	assert.equal(form.active_summary.total, 715);
+});
+
+test('legacy checkout uses the rounded server COD total', () => {
+	const html = readFileSync(
+		new URL('templates/partials/checkout/body.html', root),
+		'utf8',
+	);
+	const body = html.match(
+		/calculate_checkout_total\(\) \{([\s\S]*?)\n {12}\},/,
+	)[1];
+	const calculate = new Function('COD_PAYMENT_MODE', body);
+	const state = {
+		payment_mode: 'COD',
+		charge_summary: { total: 710, cash_on_delivery: { total: 715 } },
+	};
+	calculate.call(state, 'COD');
+	assert.equal(state.checkout_total, 715);
+	state.payment_mode = 'gateway';
+	calculate.call(state, 'COD');
+	assert.equal(state.checkout_total, 710);
+});

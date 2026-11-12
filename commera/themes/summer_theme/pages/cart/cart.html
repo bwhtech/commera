@@ -147,6 +147,12 @@
 										<span x-show="$store.cart.delivery_status === 'failed'">&mdash;</span>
 									</td>
 								</tr>
+								<template x-for="(tax, index) in $store.cart.priced?.taxes ?? []" :key="index">
+									<tr>
+										<td x-text="tax.description"></td>
+										<td class="price">{{ currency_symbol }}<span x-text="format_amount(tax.amount)"></span></td>
+									</tr>
+								</template>
 								<tr class="total" :aria-busy="!$store.cart.is_priced_current">
 									<td><h6 class="mb-0">{{ _("Total") }}</h6></td>
 									<td class="price">
@@ -220,7 +226,7 @@
 				},
 
 				get subtotal() {
-					return this.$store.cart.total;
+					return this.$store.cart.priced?.items_total ?? this.$store.cart.total;
 				},
 
 				get delivery_amount() {
@@ -228,7 +234,7 @@
 				},
 
 				get total() {
-					return this.subtotal - this.$store.cart.saved + this.delivery_amount;
+					return (this.$store.cart.priced?.taxes ? this.$store.cart.priced.total : this.subtotal - this.$store.cart.saved) + this.delivery_amount;
 				},
 
 				get free_delivery_shortfall() {

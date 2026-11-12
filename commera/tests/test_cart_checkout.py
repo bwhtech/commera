@@ -445,7 +445,7 @@ class TestCartCheckout(IntegrationTestCase):
 			(None, None, cart.modified),
 		)
 
-	def test_a_pickup_summary_drops_the_charges_without_saving_that(self):
+	def test_a_pickup_summary_keeps_taxes(self):
 		self.set_store_pickup(1)
 		warehouse = self.create_pickup_warehouse()
 		frappe.set_user(self.shopper)
@@ -454,8 +454,8 @@ class TestCartCheckout(IntegrationTestCase):
 
 		summary = update_quotation_address(self.pickup_payload(warehouse))["checkout_summary"]
 
-		self.assertEqual(summary["taxes"], [])
-		self.assertEqual(summary["total"], 270)
+		self.assertEqual(summary["taxes"], [{"description": TAX_DESCRIPTION, "amount": 48.6}])
+		self.assertEqual(summary["total"], 270 + 48.6 + summary["rounding_adjustment"])
 		self.assertIn(TAX_DESCRIPTION, [row.description for row in _get_cart_quotation().taxes])
 
 	def test_switching_from_pickup_back_to_delivery_keeps_the_tax(self):

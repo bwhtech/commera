@@ -17,6 +17,12 @@ The API is a thin layer over `commera.sdk`. It reads the request, calls the SDK,
 
 The shapes are typed in `commera.sdk.types`: `ProductPage`, `ProductCard`, `Product`, `ProductVariant`, `Collection`, `Shop`, `MenuItem`, `ContentPage`, `Sitemap`, `PricedCart`, `CustomerProfile`, `CustomerAddress`, `ShopperOrder` and `ShopperOrderPage`. Each priced cart line has its `product` (handle, title, size and image). A menu item gives a link `type` and `target`, and the storefront API adds the headless path in `url`, with the language prefix.
 
+Charges in cart, checkout and order results have `description` and `amount`. The optional `included` flag is `true` for included tax. Other taxes and plugin fees omit it. An omitted flag means the charge adds to the price. Do not add included tax again.
+
+A priced cart returns optional `items_total` and `taxes` together when it has inclusive tax. Otherwise, it omits both keys. `items_total` includes inclusive tax before order discounts. The cart's `total` includes inclusive tax. Checkout adds shipping and exclusive tax. Checkout summaries always return `items_total` and `taxes`.
+
+These optional fields use `NotRequired` in `commera.sdk.types`.
+
 Plugin hooks run for headless carts too. `validate_discount_code` runs when a code is applied. `validate_cart`, `cart_fees`, `delivery_options` and `payment_methods` run on the Commera checkout, which a headless cart reaches through the hand-off.
 
 ```python

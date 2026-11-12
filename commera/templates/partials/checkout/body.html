@@ -17,7 +17,8 @@
             address_loading: false,
             payment_gateway_loading:false,
             delivery_option: 'home_delivery',
-            checkout_total: parseFloat('{{cart_quotation.net_total or 0}}') + parseFloat('{{delivery_charge or 0}}') + parseFloat('{{cart_quotation.rounding_adjustment or 0}}'),
+            charge_summary: {{ checkout_summary | tojson }},
+            checkout_total: parseFloat('{{checkout_summary.total or 0}}'),
             is_free_delivery: {{ (checkout_summary.get("free_delivery_above") is not none and not checkout_summary.get("free_delivery_shortfall")) | tojson }},
             delivery_charge: parseFloat('{{delivery_charge or 0}}'),
 
@@ -65,14 +66,10 @@
             },
             calculate_checkout_total() {
 
-                this.checkout_total = parseFloat('{{cart_quotation.net_total or 0}}') + parseFloat('{{cart_quotation.rounding_adjustment or 0}}')
-                if (this.delivery_option === 'home_delivery' && !this.is_free_delivery) {
-                    this.checkout_total += this.delivery_charge
-                }
-                if (this.billing_address_filled && this.payment_mode === COD_PAYMENT_MODE && parseFloat('{{cod_charge_applicable_below or 0}}') > parseFloat('{{cart_payable_total or 0}}')) {
-                    this.checkout_total += parseFloat('{{cod_charge or 0}}')
-                }
-
+                const summary = this.payment_mode === COD_PAYMENT_MODE
+                    ? this.charge_summary.cash_on_delivery
+                    : this.charge_summary;
+                this.checkout_total = summary.total;
             },
             async apply_shipping_rule() {
                 let data;
@@ -158,6 +155,7 @@
                 "/api/v2/method/commera.api.payments.update_quotation_address", { address: payload }
             )
             toast(data.data.message, { type: "success" })
+            state.charge_summary = data.data.checkout_summary;
             state.show_pickup_state = false;
             state.billing_address_filled = true;
         }
@@ -242,6 +240,7 @@
                 "/api/v2/method/commera.api.payments.update_quotation_address", { address: payload }
             )
             toast(response_data.data.message, { type: "success" })
+            state.charge_summary = response_data.data.checkout_summary;
             state.show_billing_state = false;
             state.billing_address_filled = true;
         }

@@ -13,6 +13,8 @@ MARKET_DOCTYPE = "Commera Market"
 PRIMARY_MARKET = "primary"
 CACHE_KEY = "commera_markets"
 PRICE_FIELDS = ("sale_price_list", "compare_at_price_list", "currency")
+# Read only once the schema sync adds their columns.
+OPTIONAL_FIELDS = (*PRICE_FIELDS, "tax_template")
 COUNTRY_CODE = re.compile(r"[A-Za-z]{2}")
 # A base language, with an optional four-letter script: `pt`, `zh-Hans`. Never a region.
 MARKET_LANGUAGE = re.compile(r"[a-z]{2,3}(?:-[a-z]{4})?", re.IGNORECASE)
@@ -32,6 +34,8 @@ class Market:
 	sale_price_list: str | None = None
 	compare_at_price_list: str | None = None
 	currency: str | None = None
+	# None in the primary market and in a market that uses ERPNext's default taxes.
+	tax_template: str | None = None
 
 	@property
 	def is_primary(self) -> bool:
@@ -140,6 +144,7 @@ class StorefrontMarkets:
 			sale_price_list=row.get("sale_price_list"),
 			compare_at_price_list=row.get("compare_at_price_list"),
 			currency=row.get("currency") or get_default_currency(),
+			tax_template=row.get("tax_template"),
 		)
 
 	def find_language(self, code: str | None) -> Language | None:
@@ -195,8 +200,8 @@ def fetch_market_rows() -> list[dict]:
 	if not frappe.db.table_exists(MARKET_DOCTYPE):
 		return []
 	# Before the schema sync adds the price columns, markets keep the store prices.
-	price_fields = [field for field in PRICE_FIELDS if frappe.db.has_column(MARKET_DOCTYPE, field)]
-	fields = ["name", "market_name", "enabled", "default_language", *price_fields]
+	optional = [field for field in OPTIONAL_FIELDS if frappe.db.has_column(MARKET_DOCTYPE, field)]
+	fields = ["name", "market_name", "enabled", "default_language", *optional]
 	rows = frappe.get_all(MARKET_DOCTYPE, fields=fields, order_by="creation")
 	countries = get_child_values("Commera Market Country", "country")
 	languages = get_child_values("Commera Market Language", "language")

@@ -2231,6 +2231,7 @@ Primary Market,السوق الرئيسية
 Only store administrators can manage markets.,يمكن لمسؤولي المتجر فقط إدارة الأسواق.
 Markets,الأسواق
 {0} (in {1}),{0} (في {1})
+{0} (included),{0} (مشمولة)
 Countries,البلدان
 All countries no other market has.,جميع البلدان غير الموجودة في أي سوق أخرى.
 Add at least one country.,أضف بلدًا واحدًا على الأقل.

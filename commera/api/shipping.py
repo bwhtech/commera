@@ -25,8 +25,9 @@ from commera.utils import (
 	validate_document_access,
 )
 
-# The Actual charge row the chosen option posts through, matched on description on re-selection.
+# The Actual charge row the chosen option posts through, marked separately from template taxes.
 DELIVERY_CHARGE_DESCRIPTION = "Delivery Charges"
+CART_CHARGE_FIELD = "commera_cart_charge"
 
 # ponytail: one notional box for the whole cart, since commera has no parcel templates; swap for a
 # Shipment Parcel Template on Commera Settings once packing rules matter more than a rate estimate.
@@ -259,6 +260,7 @@ def set_delivery_charge_row(quotation, amount: float, title: str):
 			{
 				"doctype": "Sales Taxes and Charges",
 				"description": f"{DELIVERY_CHARGE_DESCRIPTION} - {title}",
+				CART_CHARGE_FIELD: "delivery",
 				"charge_type": "Actual",
 				"account_head": get_charge_account(get_store_shipping_rule()),
 				"tax_amount": amount,
@@ -271,22 +273,15 @@ def set_delivery_charge_row(quotation, amount: float, title: str):
 
 
 def remove_delivery_charge_row(quotation):
-	quotation.taxes = [
-		row for row in quotation.taxes if not (row.description or "").startswith(DELIVERY_CHARGE_DESCRIPTION)
-	]
+	quotation.taxes = [row for row in quotation.taxes if get_cart_charge_kind(row, quotation) != "delivery"]
 	reindex_taxes(quotation)
 
 
 def remove_shipping_rule_row(quotation):
-	"""Drop the tax row ERPNext's Shipping Rule appended, identified the way ERPNext identifies it.
-
-	Matched on charge_type, account_head and cost_center: the description is renamed and translated.
-	"""
-	rule = get_shipping_rule_accounts(quotation.shipping_rule)
-	if not rule:
-		return
-
-	quotation.taxes = [row for row in quotation.taxes if not is_shipping_rule_row(row, rule)]
+	"""Remove only the row Commera added, even if a template uses the same account."""
+	quotation.taxes = [
+		row for row in quotation.taxes if get_cart_charge_kind(row, quotation) != "shipping_rule"
+	]
 	reindex_taxes(quotation)
 
 
@@ -305,24 +300,99 @@ def is_shipping_rule_row(row, rule) -> bool:
 	)
 
 
-def get_charge_lines(taxes, shipping_rule: str | None) -> dict:
-	"""Split a charge table into delivery, the COD fee, plugin fees and the taxes a shopper sees by their own names.
+def is_cart_charge(row, quotation) -> bool:
+	return bool(get_cart_charge_kind(row, quotation))
 
-	The Shipping Rule row is matched on account and cost centre because its description is translated.
-	"""
+
+def get_cart_charge_kind(row, quotation) -> str | None:
+	"""Recognize saved legacy charges without claiming the applied template's rows."""
+	if row.get(PLUGIN_FEE_FIELD):
+		return "plugin"
+	if marker := row.get(CART_CHARGE_FIELD):
+		return marker
+	if is_applied_template_row(row, quotation):
+		return None
+	if row.charge_type != "Actual":
+		return None
+	description = cstr(row.description).strip()
+	from commera.checkout_hooks import get_plugin_fee_rows
+	from commera.plugin_events import get_handlers
+
+	fees = get_plugin_fee_rows(quotation, get_handlers("commera_hooks", "cart_fees"), strict=False)
+	if any(row.account_head == fee["account_head"] and description == fee["description"] for fee in fees):
+		return "plugin"
+	rule_name = quotation.shipping_rule or get_store_shipping_rule()
+	rule = get_shipping_rule_accounts(rule_name)
+	if rule and row.account_head == rule.account:
+		label = frappe.get_cached_value("Shipping Rule", rule_name, "label")
+		if description == cstr(label).strip():
+			return "shipping_rule"
+	charge_account = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
+	if row.account_head == (get_rule_account(get_store_shipping_rule()) or charge_account):
+		if description.startswith(f"{DELIVERY_CHARGE_DESCRIPTION} - "):
+			return "delivery"
+	if row.account_head == charge_account and description == COD_CHARGE_DESCRIPTION.strip():
+		return "cod"
+	return None
+
+
+def is_applied_template_row(row, quotation) -> bool:
+	"""Consume each template match once, in quotation order, excluding marked charges."""
+	from commera.cart_taxes import get_template_rows
+
+	remaining = get_template_rows(quotation.taxes_and_charges)
+	for candidate in quotation.taxes:
+		if candidate.get(PLUGIN_FEE_FIELD) or candidate.get(CART_CHARGE_FIELD):
+			continue
+		for index, tax in enumerate(remaining):
+			if matches_tax_row(candidate, tax):
+				remaining.pop(index)
+				if candidate is row:
+					return True
+				break
+		if candidate is row:
+			return False
+	return False
+
+
+def matches_tax_row(row, tax) -> bool:
+	amount = "tax_amount" if row.charge_type == "Actual" else "rate"
+	return all(
+		row.get(key) == tax.get(key) for key in ("account_head", "charge_type", "description")
+	) and flt(row.get(amount)) == flt(tax.get(amount))
+
+
+def get_charge_lines(taxes, shipping_rule: str | None, quotation=None) -> dict:
+	"""Use cart provenance for checkout and retain the historical order fallback without a quotation."""
 	rule = get_shipping_rule_accounts(shipping_rule)
 	charge_lines = {"shipping": 0.0, "cod_charge": 0.0, "plugin_fees": [], "taxes": []}
 	for row in taxes:
 		description = cstr(row.description).strip()
-		# First: an app names its own fee, so its description can look like any other charge.
-		if row.get(PLUGIN_FEE_FIELD):
-			charge_lines["plugin_fees"].append({"description": description, "amount": flt(row.tax_amount)})
-		elif description == COD_CHARGE_DESCRIPTION.strip():
-			charge_lines["cod_charge"] += flt(row.tax_amount)
-		elif description.startswith(DELIVERY_CHARGE_DESCRIPTION) or is_shipping_rule_row(row, rule):
-			charge_lines["shipping"] += flt(row.tax_amount)
+		kind = get_cart_charge_kind(row, quotation) if quotation else None
+		amount = flt(row.tax_amount)
+		if kind == "plugin" or (quotation is None and row.get(PLUGIN_FEE_FIELD)):
+			charge_lines["plugin_fees"].append({"description": description, "amount": amount})
+		elif kind == "cod" or (quotation is None and description == COD_CHARGE_DESCRIPTION.strip()):
+			charge_lines["cod_charge"] += amount
+		elif kind in ("delivery", "shipping_rule") or (
+			quotation is None
+			and (description.startswith(DELIVERY_CHARGE_DESCRIPTION) or is_shipping_rule_row(row, rule))
+		):
+			charge_lines["shipping"] += amount
 		else:
-			charge_lines["taxes"].append({"description": description, "amount": flt(row.tax_amount)})
+			included = bool(row.get("included_in_print_rate"))
+			if included:
+				description = _("{0} (included)").format(description)
+				after_discount = row.get("tax_amount_after_discount_amount")
+				if quotation and flt(quotation.discount_amount) and after_discount is not None:
+					amount = flt(after_discount)
+			charge_lines["taxes"].append(
+				{
+					"description": description,
+					"amount": amount,
+					**({"included": True} if included else {}),
+				}
+			)
 	return charge_lines
 
 
@@ -352,9 +422,13 @@ def get_checkout_summary(quotation) -> dict:
 
 
 def get_charge_summary(quotation) -> dict:
-	charge_lines = get_charge_lines(quotation.taxes, quotation.shipping_rule)
+	charge_lines = get_charge_lines(quotation.taxes, quotation.shipping_rule, quotation)
 	charges = charge_lines["shipping"] + charge_lines["cod_charge"]
-	charges += sum(line["amount"] for line in charge_lines["taxes"] + charge_lines["plugin_fees"])
+	charges += sum(
+		line["amount"]
+		for line in charge_lines["taxes"] + charge_lines["plugin_fees"]
+		if not line.get("included")
+	)
 	discount_amount = flt(quotation.discount_amount)
 	# Derived rather than read: with a Grand Total discount the stored net_total is already partly discounted.
 	subtotal = flt(flt(quotation.grand_total) + discount_amount - charges, quotation.precision("grand_total"))
@@ -376,8 +450,10 @@ def get_charge_summary(quotation) -> dict:
 
 
 def clear_pickup_charges(quotation):
+	quotation.taxes = [
+		row for row in quotation.taxes if get_cart_charge_kind(row, quotation) in (None, "plugin")
+	]
 	quotation.shipping_rule = None
-	quotation.taxes = [row for row in quotation.taxes if row.get(PLUGIN_FEE_FIELD)]
 	reindex_taxes(quotation)
 	quotation.calculate_taxes_and_totals()
 
@@ -390,11 +466,14 @@ def get_cod_charge(quotation) -> float:
 
 
 def add_cod_charge(quotation, cod_charge: float, account_head: str | None):
+	quotation.taxes = [row for row in quotation.taxes if get_cart_charge_kind(row, quotation) != "cod"]
+	reindex_taxes(quotation)
 	quotation.append(
 		"taxes",
 		{
 			"doctype": "Sales Taxes and Charges",
 			"description": COD_CHARGE_DESCRIPTION,
+			CART_CHARGE_FIELD: "cod",
 			"charge_type": "Actual",
 			"account_head": account_head,
 			"tax_amount": cod_charge,
@@ -421,6 +500,7 @@ def read_order_taxes(order_names: list) -> dict[str, list]:
 			"account_head",
 			"cost_center",
 			"tax_amount",
+			"included_in_print_rate",
 			PLUGIN_FEE_FIELD,
 		],
 		order_by="idx asc",

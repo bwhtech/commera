@@ -18,6 +18,12 @@
 			<span class="shrink-0 whitespace-nowrap" x-text="money(fee.amount)"></span>
 		</div>
 	</template>
+	<template x-for="(tax, index) in cart_taxes" :key="index">
+		<div class="flex justify-between gap-3">
+			<span class="min-w-0 [overflow-wrap:anywhere]" x-text="tax.description"></span>
+			<span class="shrink-0 whitespace-nowrap" x-text="money(tax.amount)"></span>
+		</div>
+	</template>
 	{% if caller is defined %}{{ caller() }}{% endif %}
 
 	<form @submit.prevent="apply_code()" class="mt-2 flex flex-wrap gap-2">

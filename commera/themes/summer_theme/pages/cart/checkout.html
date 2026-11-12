@@ -643,18 +643,19 @@
 
 				// Before the address step a guest has no quotation, so the summary comes from the priced cart.
 				get_browser_cart_summary() {
-					const subtotal = this.$store.cart.total;
+					const priced = this.$store.cart.priced;
+					const subtotal = priced?.items_total ?? this.$store.cart.total;
 					const shipping = this.$store.cart.is_delivery_charged ? this.config.delivery_charge : 0;
 					const discounts = this.$store.cart.discounts;
 					const summary = {
 						subtotal: subtotal,
 						shipping: shipping,
 						cod_charge: 0,
-						taxes: [],
+						taxes: priced?.taxes ?? [],
 						discounts: discounts,
 						discount_amount: this.$store.cart.saved,
 						rounding_adjustment: 0,
-						total: subtotal - this.$store.cart.saved + shipping,
+						total: (priced?.taxes ? priced.total : subtotal - this.$store.cart.saved) + shipping,
 					};
 					return { ...summary, cash_on_delivery: summary };
 				},

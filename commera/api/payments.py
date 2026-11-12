@@ -34,6 +34,7 @@ from commera.cart_prices import (
 	price_regular_lines,
 	validate_available,
 )
+from commera.cart_taxes import apply_market_taxes
 from commera.checkout_hooks import (
 	apply_plugin_fees,
 	filter_payment_methods,
@@ -704,8 +705,21 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 def set_charges(quotation):
 	shipping_rule = frappe.get_cached_value("Commera Settings", "Commera Settings", "shipping_rule")
 	if shipping_rule:
+		from commera.api.shipping import CART_CHARGE_FIELD, remove_shipping_rule_row
+
+		remove_shipping_rule_row(quotation)
 		quotation.shipping_rule = shipping_rule
-		quotation.run_method("apply_shipping_rule")
+		# ERPNext matches by account; isolate its row so a template levy cannot be overwritten.
+		existing_rows = quotation.taxes
+		quotation.taxes = []
+		try:
+			quotation.run_method("apply_shipping_rule")
+			for row in quotation.taxes:
+				row.set(CART_CHARGE_FIELD, "shipping_rule")
+		finally:
+			quotation.taxes = existing_rows + quotation.taxes
+		for index, row in enumerate(quotation.taxes, start=1):
+			row.idx = index
 		quotation.run_method("calculate_taxes_and_totals")
 	apply_plugin_fees(quotation)
 
@@ -740,6 +754,7 @@ def save_quotation_address(quotation, address: dict):
 		quotation.custom_is_store_pickup = True
 		# A delivery option picked before store pickup would otherwise still be charged at payment time.
 		clear_delivery_option(quotation)
+		apply_market_taxes(quotation, get_document_market(quotation), switched=False)
 		save_cart_quotation(quotation)
 
 		return get_address_saved_response(quotation)
@@ -767,6 +782,7 @@ def save_quotation_address(quotation, address: dict):
 	quotation.shipping_address_name = shipping_address_name
 	clear_delivery_option(quotation)
 	set_gst_details(quotation)
+	apply_market_taxes(quotation, get_document_market(quotation), switched=False)
 	save_contact_details(quotation, address)
 	save_cart_quotation(quotation)
 
@@ -1002,8 +1018,7 @@ def place_cod_order(quotation_name: str):
 	validate_reviewed_checkout(quotation)
 	shopper = get_order_shopper(quotation)
 	quotation.flags.strict_plugin_fees = True
-	# Repriced here too: the fee a cart edit left out after a hook failed must not slip into the order.
-	apply_plugin_fees(quotation)
+	update_delivery_charges(quotation)
 	# Again here: a COD confirmation can be posted without ever opening checkout.
 	validate_cart(quotation)
 	if COD_PAYMENT_MODE not in get_checkout_payment_methods(quotation, strict=True):
@@ -1121,6 +1136,7 @@ def validate_store_pickup(warehouse: str | None):
 
 
 def update_delivery_charges(quotation):
+	apply_market_taxes(quotation, get_document_market(quotation), switched=False)
 	if quotation.custom_is_store_pickup:
 		# A cart saved as a pickup before the owner switched pickup off must not reach payment as one.
 		validate_store_pickup(quotation.custom_store)

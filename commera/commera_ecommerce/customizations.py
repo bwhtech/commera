@@ -92,6 +92,16 @@ CUSTOM_FIELDS = {
 	],
 	"Quotation": [
 		{
+			"fieldname": "commera_market_tax_template",
+			"fieldtype": "Data",
+			"label": "Market Tax Template",
+			"description": "Last template applied by the market, so removing it clears only market taxes.",
+			"insert_after": "taxes_and_charges",
+			"read_only": 1,
+			"hidden": 1,
+			"no_copy": 1,
+		},
+		{
 			"fieldname": "custom_is_store_pickup",
 			"fieldtype": "Check",
 			"label": "Is Store Pickup?",
@@ -483,6 +493,15 @@ CUSTOM_FIELDS = {
 	],
 	"Sales Taxes and Charges": [
 		{
+			"fieldname": "commera_cart_charge",
+			"fieldtype": "Data",
+			"label": "Commera Cart Charge",
+			"insert_after": "dont_recompute_tax",
+			"hidden": 1,
+			"print_hide": 1,
+			"read_only": 1,
+		},
+		{
 			"fieldname": "commera_plugin_fee",
 			"fieldtype": "Check",
 			"label": "Commera Plugin Fee",
@@ -492,7 +511,7 @@ CUSTOM_FIELDS = {
 			"hidden": 1,
 			"print_hide": 1,
 			"read_only": 1,
-		}
+		},
 	],
 	"Warehouse": [
 		{
