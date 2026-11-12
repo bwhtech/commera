@@ -31,8 +31,11 @@ def set_language(language: str) -> str:
 	if not frappe.db.exists("Language", {"name": language, "enabled": 1}):
 		frappe.throw(_("{0} is not an enabled language.").format(language))
 
-	# set_value skips the User controller, which would re-validate unrelated fields of the admin's record.
-	frappe.db.set_value("User", frappe.session.user, "language", language)
+	# User.on_update copies the language's date and number formats to the admin's defaults and clears
+	# the cached bootinfo, so Desk switches too. Admins may not write User records, only their language.
+	user = frappe.get_doc("User", frappe.session.user)
+	user.language = language
+	user.save(ignore_permissions=True)
 	return language
 
 
