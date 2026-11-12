@@ -9,6 +9,7 @@ from commera.api.shipping import DELIVERY_CHARGE_DESCRIPTION, get_charge_amount
 from commera.cart_taxes import TEMPLATE_DOCTYPE, apply_market_taxes, set_tax_template
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.localization import pin_localization, resolve
+from commera.localization.market_setup import validate_markets_for_store
 from commera.localization.markets import StorefrontMarkets
 from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.tests.test_market_cart import MarketCartTestCase
@@ -16,7 +17,6 @@ from commera.tests.test_market_orders import use_company_warehouse
 from commera.utils import get_store_company
 
 GATEWAY = "ZZ Market Tax Gateway"
-MARKET_MODULE = "commera.commera_ecommerce.doctype.commera_market.commera_market"
 
 
 class MarketTaxTestCase(MarketCartTestCase):
@@ -366,10 +366,10 @@ class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 	def test_a_template_of_another_company_is_refused(self):
 		template = self.make_template(10)
 
-		with (
-			patch(f"{MARKET_MODULE}.get_store_company", return_value="ZZ Other Company"),
-			self.assertRaisesRegex(frappe.ValidationError, "Choose a template of the store company"),
-		):
+		other_company = frappe.db.get_value("Company", {"name": ("!=", self.company)})
+		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "company", other_company)
+
+		with self.assertRaisesRegex(frappe.ValidationError, "Choose a template of the store company"):
 			self.set_market_template(template)
 
 	def test_a_disabled_template_is_refused(self):
@@ -378,6 +378,31 @@ class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 
 		with self.assertRaisesRegex(frappe.ValidationError, "is disabled"):
 			self.set_market_template(template)
+
+	def test_a_template_disabled_after_it_was_chosen_is_refused(self):
+		template = self.make_template(10)
+		self.set_market_template(template)
+		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "disabled", 1)
+
+		with self.assertRaisesRegex(frappe.ValidationError, "is disabled"):
+			frappe.get_doc("Commera Market", "gulf").save()
+
+	def test_a_market_template_cannot_be_disabled(self):
+		template = self.make_template(10)
+		self.set_market_template(template)
+		doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
+		doc.disabled = 1
+
+		with self.assertRaisesRegex(frappe.ValidationError, "must stay enabled in the store company"):
+			doc.save()
+
+	def test_a_new_store_company_must_own_the_market_templates(self):
+		self.set_market_template(self.make_template(10))
+		settings = frappe.get_doc("Commera Settings")
+		settings.company = frappe.db.get_value("Company", {"name": ("!=", self.company)})
+
+		with self.assertRaisesRegex(frappe.ValidationError, "Choose a template of the store company"):
+			validate_markets_for_store(settings)
 
 	def test_a_template_of_the_store_company_is_kept(self):
 		template = self.make_template(10)

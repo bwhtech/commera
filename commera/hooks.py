@@ -214,6 +214,11 @@ doc_events = {
 		"validate": "commera.doc_events.price_list.validate",
 		"after_rename": "commera.search.price_sync.on_price_list_rename",
 	},
+	"Sales Taxes and Charges Template": {
+		"validate": "commera.localization.market_setup.validate_tax_template",
+	},
+	"Shipping Rule": {"validate": "commera.localization.market_setup.validate_shipping_rule"},
+	"Accounts Settings": {"validate": "commera.localization.market_setup.validate_accounts_settings"},
 	"Gateway Payment Request": {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},
