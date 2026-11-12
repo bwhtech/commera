@@ -93,5 +93,7 @@ function renderableGrapheme(grapheme) {
 	if (!ASTRAL.test(grapheme) || EMOJI.test(grapheme)) return grapheme;
 	// Mathematical bold letters such as 𝐒𝐀𝐋𝐄 read as SALE.
 	const compatible = grapheme.normalize('NFKC');
-	return ASTRAL.test(compatible) ? DROPPED : compatible;
+	return (
+		[...compatible].filter((char) => !ASTRAL.test(char)).join('') || DROPPED
+	);
 }

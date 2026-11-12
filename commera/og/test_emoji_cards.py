@@ -96,6 +96,22 @@ process.stdout.write(JSON.stringify(sequences.map(emojiKey)));
 		):
 			self.assertEqual(render_png(with_astral, "/ar"), render_png(without, "/ar"))
 
+	def test_supported_bases_survive_unsupported_astral_marks(self):
+		for plain, marked in (
+			("A", "A\U000e0100"),
+			# U+1D165 is the combining musical stem.
+			("A", "A\U0001d165"),
+			("A\u0301", "A\u0301\U000e0100"),
+			("حذاء", "حذاء\U000e0100"),
+			(
+				"حذاء 🏴\U000e0067\U000e0062\U000e0065\U000e006e\U000e0067\U000e007f",
+				"حذاء\U000e0100 🏴\U000e0067\U000e0062\U000e0065\U000e006e\U000e0067\U000e007f",
+			),
+		):
+			for path in ("/", "/ar"):
+				with self.subTest(plain=plain, marked=marked, path=path):
+					self.assertEqual(render_png(marked, path), render_png(plain, path))
+
 	def test_renderable_text(self):
 		script = """
 import { readFileSync } from 'node:fs';
