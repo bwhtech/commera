@@ -74,8 +74,9 @@
 											<template x-if="cart_item.default_price && parseFloat(cart_item.default_price) !== $store.cart.price_of(cart_item)">
 												<span>{{ currency_symbol }}<span x-text="format_amount(cart_item.default_price)"></span></span>
 											</template>
-											<span x-show="cart_item.available === false">{{ _("Unavailable") }}</span>
-											<span x-show="cart_item.available !== false"><strong>{{ currency_symbol }}<span x-text="format_amount($store.cart.price_of(cart_item))"></span></strong></span>
+											{# The theme strikes through every span in this cell (old prices), so these use other elements. #}
+											<em x-show="cart_item.available === false">{{ _("Unavailable") }}</em>
+											<strong x-show="cart_item.available !== false">{{ currency_symbol }}<span x-text="format_amount($store.cart.price_of(cart_item))"></span></strong>
 										</td>
 										<td class="product-item-quantity">
 											{# Written out by hand with bootstrap-touchspin's own class names, so style.css still shapes it. #}
