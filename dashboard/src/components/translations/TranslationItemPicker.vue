@@ -4,7 +4,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { Button, Dropdown, TabButtons, TextInput } from 'frappe-ui'
 import TranslationStatusDot from './TranslationStatusDot.vue'
 import { searchTranslations } from '../../data/translations'
-import { describeResource } from '../../data/translationStatus'
+import { describeResource, itemProgress, progressStatus } from '../../data/translationStatus'
 import { createSequence } from '../../utils/sequence'
 import { errorMessage } from '../../data/errors'
 import { __ } from '../../data/translation'
@@ -23,6 +23,8 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   loaded: { type: Boolean, default: false },
   loadError: { type: Object, default: null },
+  // Unsaved values by fieldKey(), so a record's dot shows edits before they are saved.
+  pending: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits(['select', 'open', 'load-more', 'retry'])
 const filter = defineModel('filter', { type: String, default: 'todo' })
@@ -61,14 +63,24 @@ function openResult(resource, name) {
 
 // Records matching the filter; the list may hold only the first pages of them.
 const matchingCount = computed(() => (filter.value === 'todo' ? props.toDoCount : props.total))
+
+const rows = computed(() =>
+  props.items.map((item) => {
+    const progress = itemProgress(item, props.pending, props.language.code, props.resource.type)
+    return { item, progress, status: progressStatus(progress) }
+  }),
+)
 </script>
 
 <template>
   <div class="flex min-h-0 flex-col">
     <div class="space-y-2 p-3">
-      <Dropdown :disabled="disabled" :options="resourceMenu" class="w-full">
-        <Button :disabled="disabled" class="w-full" :icon-left="resource.icon" icon-right="lucide-chevron-down" :aria-label="__('Resource: {0}', [resource.label])">
-          <span class="flex-1 truncate text-start">{{ resource.label }}</span>
+      <Dropdown :disabled="disabled" :options="resourceMenu" match-trigger-width>
+        <!-- Button centres its content; the chevron's auto margin takes the free space instead,
+             which holds the icon and label at the start and the chevron at the end. -->
+        <Button :disabled="disabled" class="w-full" :icon-left="resource.icon" :aria-label="__('Resource: {0}', [resource.label])">
+          {{ resource.label }}
+          <template #suffix><span class="lucide-chevron-down ms-auto size-4 shrink-0" aria-hidden="true" /></template>
         </Button>
       </Dropdown>
       <TextInput :disabled="disabled" v-model="searchText" type="search" :placeholder="__('Search all resources')" :aria-label="__('Search all resources')">
@@ -111,7 +123,7 @@ const matchingCount = computed(() => (filter.value === 'todo' ? props.toDoCount 
         />
       </div>
       <ul class="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-6">
-        <li v-for="item in items" :key="item.name">
+        <li v-for="{ item, progress, status } in rows" :key="item.name">
           <button
             :disabled="disabled"
             type="button"
@@ -121,11 +133,15 @@ const matchingCount = computed(() => (filter.value === 'todo' ? props.toDoCount 
             @click="emit('select', item.name)"
           >
             <span class="min-w-0 flex-1 truncate text-base text-ink-gray-8">{{ item.title }}</span>
-            <span v-if="item.to_do" class="flex items-center gap-1.5 text-sm tabular-nums text-ink-gray-5">
-              <TranslationStatusDot :status="item.outdated ? 'outdated' : 'missing'" />
-              {{ item.to_do }}
+            <span v-if="status === 'current'" class="lucide-check size-3.5 text-ink-green-5" :aria-label="__('Up to date')" />
+            <span
+              v-else
+              class="flex items-center gap-1.5 text-sm tabular-nums text-ink-gray-5"
+              :aria-label="status === 'unsaved' ? __('Unsaved changes') : undefined"
+            >
+              <TranslationStatusDot :status="status" />
+              <template v-if="progress.toDo">{{ progress.toDo }}</template>
             </span>
-            <span v-else class="lucide-check size-3.5 text-ink-green-5" :aria-label="__('Up to date')" />
           </button>
         </li>
         <li v-if="hasMore" class="px-2 pt-2">
@@ -134,6 +150,9 @@ const matchingCount = computed(() => (filter.value === 'todo' ? props.toDoCount 
         <li v-if="loadError" class="px-2 py-6 text-center" role="alert">
           <p class="text-p-sm text-ink-red-6">{{ errorMessage(loadError, __('Could not load translations')) }}</p>
           <Button :disabled="disabled" class="mt-2" size="sm" :label="__('Retry')" @click="emit('retry')" />
+        </li>
+        <li v-else-if="loaded && !loading && !items.length && !total" class="px-2 py-6 text-center">
+          <p class="text-p-sm text-ink-gray-5">{{ __('Nothing to translate here') }}</p>
         </li>
         <li v-else-if="loaded && !loading && !items.length" class="px-2 py-6 text-center">
           <p class="text-p-sm text-ink-gray-5">{{ __('{0} are up to date in {1}', [resource.label, language.name]) }}</p>

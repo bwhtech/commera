@@ -1,5 +1,6 @@
 <script setup>
 import TranslationStatusDot from './TranslationStatusDot.vue'
+import { isEmptyResource } from '../../data/translationStatus'
 
 defineProps({
   // { missing, outdated, current }
@@ -8,7 +9,8 @@ defineProps({
 </script>
 
 <template>
-  <span v-if="!counts.missing && !counts.outdated" class="flex items-center gap-1.5 text-sm text-ink-gray-5">
+  <span v-if="isEmptyResource(counts)" class="text-sm text-ink-gray-5">{{ __('Nothing to translate') }}</span>
+  <span v-else-if="!counts.missing && !counts.outdated" class="flex items-center gap-1.5 text-sm text-ink-gray-5">
     <span class="lucide-check size-3.5 text-ink-green-5" aria-hidden="true" />
     {{ __('Done') }}
   </span>

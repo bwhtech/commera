@@ -25,6 +25,7 @@ from commera.shop_themes.section_text import (
 	set_stored_hash,
 	with_translation,
 )
+from commera.shop_themes.section_titles import get_entry_titles
 from commera.shop_themes.sections import (
 	get_inherited_layout,
 	get_pages,
@@ -97,6 +98,18 @@ class ThemeSectionResource(TranslatableResource):
 				value=value,
 				status=get_status("", value, None),
 			)
+
+	def get_record_titles(self, names):
+		theme_context = self.get_theme_context()
+		if not theme_context or not names:
+			return {}
+		theme_dirs, titles = theme_context["dirs"], {}
+		pages = set(get_pages(theme_dirs))
+		for page in dict.fromkeys(name.partition("/")[0] for name in names):
+			if page in pages:
+				layout = get_inherited_layout(theme_context["names"], theme_dirs, page)
+				titles.update(get_entry_titles(theme_dirs, page, layout))
+		return {name: titles[name] for name in names if name in titles}
 
 	def exists(self, name, field):
 		theme_context = self.get_theme_context()

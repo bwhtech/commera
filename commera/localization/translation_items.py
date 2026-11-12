@@ -2,7 +2,6 @@
 records of a resource with their fields, search across resources, and a batch save, all shop-wide."""
 
 import json
-import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from itertools import groupby, islice
@@ -11,14 +10,10 @@ import frappe
 from frappe import _
 from frappe.utils import cint, cstr, strip_html
 
-from commera.localization.content import CURRENT, MISSING, OUTDATED, SHOP_WIDE, get_sources
+from commera.localization.content import CURRENT, OUTDATED, SHOP_WIDE, get_sources
 from commera.localization.languages import StorefrontLanguages
 from commera.localization.resources import (
 	BATCH_SIZE,
-	HTML,
-	IMAGE,
-	LONG,
-	TEXT,
 	DoctypeResource,
 	TranslatableResource,
 	TranslationEntry,
@@ -26,14 +21,12 @@ from commera.localization.resources import (
 	get_translatable_resource,
 	get_translatable_resources,
 )
+from commera.localization.translation_fields import add_details, make_field
 from commera.localization.translation_queries import RecordQuery
 
 ITEMS_PER_PAGE = 50
 SEARCH_RESULTS_PER_RESOURCE = 20
 MAX_SAVE_BATCH = 500
-# Longer text, or text over several lines, gets a text area.
-SHORT_TEXT_LENGTH = 80
-HTML_TAG = re.compile(r"<[a-z][^>]*>", re.IGNORECASE)
 # The storefront path of a record, by its doctype: (route field, path from the route).
 STORE_PATHS = {
 	"Style Attribute Variant": ("route", "/products/{0}"),
@@ -106,7 +99,7 @@ def search(language: str, text: str) -> list[dict]:
 			else list(islice(iter_matching_names(resource, language, text), SEARCH_RESULTS_PER_RESOURCE))
 		)
 		if names:
-			titles = get_titles(resource, names)
+			titles = get_titles(resource, names) or resource.get_record_titles(names)
 			records = [{"name": name, "title": titles.get(name) or name} for name in names]
 			results.append({"resource": resource.type, "label": _(resource.label), "records": records})
 	return results
@@ -169,7 +162,7 @@ class ItemList:
 			page.append(item)
 			last_key = [name, item["fields"][-1]["field"]]
 		more = len(page) == ITEMS_PER_PAGE and (to_do_count if to_do else total) > len(page)
-		result = {"items": self.with_urls(page), "next_cursor": json.dumps(last_key) if more else None}
+		result = {"items": self.finish(page), "next_cursor": json.dumps(last_key) if more else None}
 		if not cursor:
 			result.update(total=total, to_do=to_do_count)
 		return result
@@ -198,7 +191,7 @@ class ItemList:
 			]
 			items.append(make_item(self.resource, record.name, entries, kinds))
 		result = {
-			"items": self.with_urls(items),
+			"items": self.finish(items),
 			"next_cursor": json.dumps([names[-1], ""]) if more else None,
 		}
 		if not cursor:
@@ -210,7 +203,7 @@ class ItemList:
 		if not page.entries:
 			return []
 		item = make_item(self.resource, name, page.entries, self.resource.get_field_kinds())
-		return self.with_urls([item])
+		return self.finish([item])
 
 	def iter_entries(self, cursor: str | None) -> Iterator[TranslationEntry]:
 		while True:
@@ -219,6 +212,10 @@ class ItemList:
 			if not page.next_cursor:
 				return
 			cursor = page.next_cursor
+
+	def finish(self, items: list[dict]) -> list[dict]:
+		add_details(self.resource, self.language, items)
+		return self.with_urls(items)
 
 	def with_urls(self, items: list[dict]) -> list[dict]:
 		paths = get_store_paths(self.resource, [item["name"] for item in items])
@@ -240,26 +237,6 @@ def make_item(resource: TranslatableResource, name: str, entries: list, kinds: d
 		"to_do": len(to_do),
 		"outdated": any(field["status"] == OUTDATED for field in to_do),
 	}
-
-
-def make_field(entry: TranslationEntry, kind: str | None) -> dict:
-	kind = kind or guess_kind(entry.source)
-	# An image without a translation shows the source image, so it is not missing.
-	status = CURRENT if kind == IMAGE and entry.status == MISSING else entry.status
-	return {
-		"field": entry.field,
-		"label": entry.label,
-		"kind": kind,
-		"source": entry.source,
-		"value": entry.value,
-		"status": status,
-	}
-
-
-def guess_kind(source: str) -> str:
-	if HTML_TAG.search(source):
-		return HTML
-	return LONG if len(source) > SHORT_TEXT_LENGTH or "\n" in source else TEXT
 
 
 def get_entry_title(resource: TranslatableResource, name: str, entries: list) -> str:

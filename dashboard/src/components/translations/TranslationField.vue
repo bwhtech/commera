@@ -13,7 +13,7 @@ import { __ } from '../../data/translation'
 const props = defineProps({
   identity: { type: String, required: true },
   disabled: { type: Boolean, default: false },
-  // { field, label, kind, source, value, status }
+  // { field, label, kind, source, value, status, source_empty, previous_source }
   field: { type: Object, required: true },
   // { code, name, direction }
   language: { type: Object, required: true },
@@ -69,7 +69,8 @@ async function swapImage(event) {
     </div>
 
     <div class="min-w-0 bg-surface-gray-1 px-4 py-3" :dir="sourceLanguage.direction">
-      <div v-if="field.kind === 'image'" class="flex items-center gap-2 text-sm text-ink-gray-7">
+      <p v-if="field.source_empty" class="text-p-sm text-ink-gray-5">{{ __('Source is empty') }}</p>
+      <div v-else-if="field.kind === 'image'" class="flex items-center gap-2 text-sm text-ink-gray-7">
         <Thumb :image="field.source" />
         <span class="truncate">{{ field.source }}</span>
       </div>
@@ -78,9 +79,13 @@ async function swapImage(event) {
         <EditorContent class="text-p-base text-ink-gray-7" />
       </Editor>
       <p v-else class="whitespace-pre-wrap break-words text-p-base text-ink-gray-7">{{ field.source }}</p>
-      <!-- The store keeps a hash of the old source, not its text, so there is no "Was:" to show. -->
-      <p v-if="field.status === 'outdated' && !isUnsaved" class="mt-1.5 text-p-sm text-ink-amber-7">
-        {{ __('Source changed') }}
+      <!-- A translation saved before the store kept source text has no "Was:" to show. -->
+      <p v-if="field.status === 'outdated' && !isUnsaved" class="mt-1.5 break-words text-p-sm text-ink-gray-5">
+        <template v-if="field.previous_source">
+          <span class="text-ink-amber-7">{{ __('Source changed.') }}</span>
+          {{ __('Was: “{0}”', [field.previous_source]) }}
+        </template>
+        <span v-else class="text-ink-amber-7">{{ __('Source changed') }}</span>
       </p>
     </div>
 

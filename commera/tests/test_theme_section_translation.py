@@ -1,4 +1,6 @@
 import copy
+import json
+from unittest.mock import patch
 
 import frappe
 from frappe.core.doctype.user_permission.test_user_permission import create_user
@@ -6,12 +8,15 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils.jinja import get_jenv
 
 from commera.api.admin import theme_layout as theme_layout_api
+from commera.api.admin import translations as translations_api
 from commera.api.admin.theme import activate_theme
 from commera.api.admin.theme_layout import discard, get_editor
 from commera.localization import CURRENT, MISSING, OUTDATED, get_translatable_resource
+from commera.localization.resources import HOOK_KEY
 from commera.roles import COMMERA_ADMIN, add_commera_roles
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context, get_theme_context
 from commera.shop_themes.section_text import OVERLAY, SOURCE_HASHES
+from commera.shop_themes.section_titles import SEPARATOR
 from commera.shop_themes.section_translations import ThemeSectionResource
 from commera.shop_themes.sections import get_page_layout, get_text
 from commera.shop_themes.theme_resolver import get_theme_environment
@@ -378,6 +383,40 @@ class TestThemeSectionTranslation(IntegrationTestCase):
 		layout["sections"][0]["settings"]["caption"] = {"en": self.file_caption(), "fr": "Légende"}
 		with self.assertRaisesRegex(frappe.ValidationError, "fr is not a storefront language"):
 			save_draft(SUMMER_THEME, "index", layout)
+
+	def test_the_translations_page_names_each_entry_by_its_page_section_and_block(self):
+		self.resource.write(ENTRY, "heading", "ar", ARABIC_HEADING)
+		# Search reads every resource; only the theme's matter here.
+		hooks = frappe.get_hooks("commera_hooks", {})
+		theme_only = [entry for entry in hooks[HOOK_KEY] if entry["type"] == "theme_section"]
+		hooks = {**hooks, HOOK_KEY: theme_only}
+		self.enterContext(self.patch_hooks({"commera_hooks": hooks}))
+
+		with patch("commera.shop_themes.section_titles._", lambda text: f"[{text}]"):
+			items = translations_api.get_items(
+				"ar", "theme_section", records=json.dumps(["index/hero", ENTRY])
+			)
+			results = translations_api.search_translations("ar", ARABIC_HEADING)
+
+		slide = SEPARATOR.join(["[Home]", "[Hero slider]", "[Slide] 1"])
+		titles = {item["name"]: item["title"] for item in items["items"]}
+		self.assertEqual(titles, {"index/hero": SEPARATOR.join(["[Home]", "[Hero slider]"]), ENTRY: slide})
+		(found,) = [group for group in results if group["resource"] == "theme_section"]
+		self.assertEqual(found["records"], [{"name": ENTRY, "title": slide}])
+
+	def test_the_translations_page_shows_a_translation_whose_source_was_cleared(self):
+		publish(SUMMER_THEME, "index", self.editor_layout({"en": "", "ar": ARABIC_HEADING}))
+
+		(item,) = translations_api.get_items("ar", "theme_section", record=ENTRY)["items"]
+
+		heading = next(field for field in item["fields"] if field["field"] == "heading")
+		self.assertEqual(
+			(heading["source"], heading["value"], heading["status"], heading["source_empty"]),
+			("", ARABIC_HEADING, CURRENT, True),
+		)
+		self.assertNotIn(
+			ENTRY, {entry.name for entry, _key in self.resource.scan("ar", {"field": "heading"}, None)}
+		)
 
 
 class TestSectionTextSourceKey(IntegrationTestCase):

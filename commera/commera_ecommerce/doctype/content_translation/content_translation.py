@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-from commera.localization.content import get_market_key, get_source_hash, read_source
+from commera.localization.content import get_market_key, get_source_hash, get_source_text, read_source
 from commera.localization.resources import get_translatable_fields
 
 KEY_FIELDS = ["reference_doctype", "reference_name", "reference_field", "language", "market"]
@@ -26,6 +26,7 @@ class ContentTranslation(Document):
 		reference_field: DF.Data
 		reference_name: DF.DynamicLink
 		source_hash: DF.Data | None
+		source_text: DF.SmallText | None
 		translated_value: DF.LongText | None
 	# end: auto-generated types
 
@@ -38,9 +39,9 @@ class ContentTranslation(Document):
 				)
 			)
 		if self.flags.refresh_source_hash or self.source_changed():
-			self.source_hash = get_source_hash(
-				read_source(self.reference_doctype, self.reference_name, self.reference_field)
-			)
+			source = read_source(self.reference_doctype, self.reference_name, self.reference_field)
+			self.source_hash = get_source_hash(source)
+			self.source_text = get_source_text(self.reference_doctype, self.reference_field, source)
 
 	def source_changed(self) -> bool:
 		"""A new or edited translation was written against the source as it is now."""
