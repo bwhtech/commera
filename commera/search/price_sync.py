@@ -59,8 +59,9 @@ def rebuild_if_lists_indexed():
 
 
 def is_base_price(item_price) -> bool:
-	"""base_prices.BASE_PRICE_FILTERS on a document."""
-	return not item_price.get("customer") and not item_price.get("batch_no")
+	"""base_prices.is_public_price on a document. Validity is left out: a change of dates can make a
+	row a price, or end one."""
+	return not (item_price.get("customer") or item_price.get("supplier") or item_price.get("batch_no"))
 
 
 def get_published_variants(item_codes: list[str]) -> list[str]:

@@ -3,7 +3,7 @@ sale rate, else its compare-at rate, as on product pages. A line with neither is
 
 import frappe
 from frappe import _
-from frappe.utils.data import flt
+from frappe.utils.data import flt, nowdate
 
 from commera.cart_taxes import apply_market_taxes
 from commera.localization.market_prices import MarketPrices
@@ -50,14 +50,43 @@ def get_market_handle(doc) -> str:
 
 
 def price_regular_lines(quotation, prices: MarketPrices):
-	"""Before ERPNext prices new lines from the sale list: a line only the compare-at list prices takes
-	that rate. ERPNext keeps a price_list_rate that is set, and derives the rate from it."""
-	new_lines = [item for item in quotation.items if not flt(item.price_list_rate)]
-	sale, compare_at = prices.get_base_rates([item.item_code for item in new_lines])
-	for item in new_lines:
-		if item.item_code not in sale and item.item_code in compare_at:
-			item.price_list_rate = compare_at[item.item_code]
+	"""Before ERPNext prices new lines from the sale list: a line the sale list has no price for takes
+	ERPNext's price from the compare-at list. ERPNext keeps a price_list_rate that is set, and derives
+	the rate from it."""
+	if not prices.compare_at_price_list:
+		return
+	for item in quotation.items:
+		if flt(item.price_list_rate) or get_list_rate(quotation, item, prices.sale_price_list) is not None:
+			continue
+		if (rate := get_list_rate(quotation, item, prices.compare_at_price_list)) is not None:
+			item.price_list_rate = rate
 			item.rate = 0
+
+
+def get_list_rate(quotation, item, price_list: str) -> float | None:
+	"""ERPNext's rate for the line on `price_list`, in the line's UOM: the customer's own row before the
+	public one, valid on the quotation's date. None when the list has no such row."""
+	from erpnext.stock.get_item_details import get_conversion_factor, get_price_list_rate_for
+
+	stock_uom, sales_uom = frappe.get_cached_value("Item", item.item_code, ["stock_uom", "sales_uom"])
+	# The UOM erpnext.stock.get_item_details gives a new selling line.
+	uom = item.uom or sales_uom or stock_uom
+	return get_price_list_rate_for(
+		{
+			"price_list": price_list,
+			"customer": quotation.party_name if quotation.quotation_to == "Customer" else None,
+			"uom": uom,
+			"stock_uom": stock_uom,
+			"conversion_factor": item.conversion_factor
+			or get_conversion_factor(item.item_code, uom)["conversion_factor"],
+			"price_list_uom_dependant": frappe.get_cached_value(
+				"Price List", price_list, "price_not_uom_dependent"
+			),
+			"transaction_date": quotation.transaction_date or nowdate(),
+			"qty": item.qty,
+		},
+		item.item_code,
+	)
 
 
 def get_document_market(doc) -> Market | None:

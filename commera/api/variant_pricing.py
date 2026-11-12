@@ -6,7 +6,7 @@ from frappe import _
 from frappe.utils import create_batch
 from frappe.utils.data import cint, cstr, flt
 
-from commera.base_prices import base_price_filters
+from commera.base_prices import get_base_price_rows
 from commera.plugin_events import add_changed_products
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
@@ -33,13 +33,8 @@ def get_base_price_rows_by_key(item_codes, price_lists):
 	price_rows = []
 	for item_code_chunk in create_batch(list(item_codes), IN_CLAUSE_CHUNK_SIZE):
 		price_rows.extend(
-			frappe.get_all(
-				"Item Price",
-				filters=base_price_filters(
-					{"item_code": ["in", item_code_chunk], "price_list": ["in", price_lists], "selling": 1}
-				),
-				fields=["name", "item_code", "price_list", "price_list_rate"],
-				order_by="creation asc",
+			get_base_price_rows(
+				item_code_chunk, price_lists, ["name", "item_code", "price_list", "price_list_rate"]
 			)
 		)
 	return {(cstr(price_row.item_code), price_row.price_list): price_row for price_row in price_rows}

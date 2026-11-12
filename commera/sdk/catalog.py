@@ -290,8 +290,8 @@ def get_product(handle: str) -> Product | None:
 		"images": detail["images"],
 		"collection": get_product_collection(product_variant.item_group),
 		"currency": prices.currency,
-		# A secondary market has no price for a product it does not sell.
-		"price": min(prices_paid, default=0 if prices.uses_store_prices else None),
+		# No price for a product the market does not sell.
+		"price": min(prices_paid, default=None),
 		"available": any(variant["available"] for variant in variants),
 		"options": get_options(product_variant, detail["available_sizes"]),
 		"variants": variants,
@@ -369,7 +369,7 @@ def get_product_cards(cards: list[dict]) -> list[ProductCard]:
 	stock = get_available_stocks(item_codes, get_ecommerce_warehouse())
 	prices = MarketPrices.current()
 	# A size is for sale with both a market price and stock.
-	unpriced = prices.get_unpriced(item_codes)
+	unpriced = prices.get_unavailable(item_codes)
 	sellable = {code for code in item_codes if code not in unpriced and stock.get(code, {}).get("in_stock")}
 	# utils.shape_product_cards titles every grid's cards; only a hand-built card lacks one.
 	set_product_titles([card for card in cards if "title" not in card])

@@ -224,17 +224,21 @@ def shape_product_cards(cards):
 
 	unsized = [card["name"] for card in cards if card.get("sizes") is None]
 	sizes_by_variant = sizes_for_variants(unsized) if unsized else {}
-
 	for card in cards:
 		if card.get("sizes") is None:
 			card["sizes"] = sizes_by_variant.get(card["name"], [])
+	unpriced = prices.get_unavailable([size["item_code"] for card in cards for size in card["sizes"]])
+
+	for card in cards:
 		for column in CARD_COLUMNS:
 			card.setdefault(column, None)
 		card.setdefault("average_rating", None)
 		card.setdefault("review_count", None)
-		# No size priced: 0 in the primary market, as before; no price in a secondary market.
-		if card["effective_price"] is None:
-			card["effective_price"] = prices.price(None, None)
+		# The index keeps a store price of 0 for a product no size of which is priced today: not for sale.
+		if all(size["item_code"] in unpriced for size in card["sizes"]):
+			card.update(
+				effective_price=None, sale_price=None, default_price=None, discount_percent=0, has_discount=0
+			)
 		if card["has_discount"] is None:
 			card["has_discount"] = 1 if card["default_price"] else 0
 		# frappe.qb returns a datetime where the index holds a string, and the card is json.dumps'd into HTML.
@@ -304,7 +308,7 @@ def get_product_base_query(filters=None, product_list=None, with_card_prices=Fal
 
 def searches_a_secondary_market(filters, prices) -> bool:
 	"""A search in a secondary market leaves out what that market cannot price, like the index does.
-	Browsing keeps those products, shown unavailable."""
+	Browsing keeps those products, shown unavailable, and so does a search in the primary market."""
 	return bool(filters and filters.get("search")) and not prices.uses_store_prices
 
 

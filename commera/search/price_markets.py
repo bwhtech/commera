@@ -6,7 +6,7 @@ from frappe.query_builder import DocType
 from frappe.query_builder.functions import Max, Min
 from frappe.utils import create_batch, flt
 
-from commera.base_prices import base_price_filters, is_base_price
+from commera.base_prices import get_base_price_rows, is_base_price
 from commera.card_prices import get_card_price
 from commera.localization.content import SHOP_WIDE
 from commera.localization.languages import StorefrontLanguages
@@ -162,10 +162,8 @@ def rates_by_price_list(item_codes, price_lists) -> dict[str, dict]:
 	if not price_lists:
 		return rates
 	for chunk in create_batch(item_codes, IN_CLAUSE_CHUNK_SIZE):
-		for row in frappe.get_all(
-			"Item Price",
-			filters=base_price_filters({"item_code": ("in", chunk), "price_list": ("in", price_lists)}),
-			fields=["item_code", "price_list", "price_list_rate", "valid_upto"],
+		for row in get_base_price_rows(
+			chunk, price_lists, ["item_code", "price_list", "price_list_rate", "valid_upto"]
 		):
 			if row.price_list_rate is None:
 				continue

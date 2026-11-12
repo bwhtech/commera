@@ -12,9 +12,12 @@
 {%- endmacro %}
 
 
+{# No amount: the market sells no size of the product today, so the cart would refuse it. #}
 {% macro card_price(amount, original_amount=0, discount=0) -%}
+{% if amount is none %}{{ _("Unavailable") }}{% else -%}
 {% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{- get_cart_currency().symbol }}{{ get_cart_currency().amount(amount or 0) -}}{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}
 {%- if discount %}<del>{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}{{ get_cart_currency().amount(original_amount or 0) }}{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</del>{% endif -%}
+{%- endif %}
 {%- endmacro %}
 
 

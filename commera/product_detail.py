@@ -1,7 +1,6 @@
 import frappe
 from frappe.utils import cstr, flt
 
-from commera.base_prices import base_price_filters
 from commera.localization.market_prices import MarketPrices
 from commera.utils import get_available_stock, get_discount_percent
 
@@ -33,18 +32,16 @@ def get_product_detail(route, selected_size=None):
 
 	prices = MarketPrices.current()
 	available_sizes = get_available_sizes(product_variant, warehouse)
-	if not prices.uses_store_prices:
-		price_sizes(available_sizes, prices)
+	price_sizes(available_sizes, prices)
 	selected_item = get_selected_item(available_sizes, selected_size)
 	if not selected_item:
 		selected_item = available_sizes[0] if available_sizes else None
 
+	selected_price = (selected_item or {}).get("price")
 	if prices.uses_store_prices:
-		default_price = flt(get_price(selected_item, prices.compare_at_price_list))
-		sale_price = get_price(selected_item, prices.sale_price_list)
-		selected_price = sale_price if sale_price is not None else default_price
+		default_price = flt((selected_item or {}).get("compare_at_rate"))
+		sale_price = (selected_item or {}).get("sale_rate")
 	else:
-		selected_price = (selected_item or {}).get("price")
 		default_price = (selected_item or {}).get("compare_at_price")
 		sale_price = selected_price
 
@@ -93,23 +90,13 @@ def get_selected_item(available_sizes, selected_size):
 	)
 
 
-def get_price(selected_item, price_list):
-	"""Rate for the item on this price list, or None when it has no row there."""
-	# None and 0.0 must stay distinguishable: "not on this list" falls back, "free" does not.
-	if not selected_item:
-		return None
-	price = frappe.db.get_value(
-		"Item Price",
-		base_price_filters({"item_code": selected_item["item_code"], "price_list": price_list}),
-		"price_list_rate",
-	)
-	return flt(price) if price is not None else None
-
-
 def price_sizes(sizes, prices):
+	"""Price each size in the market. A size with no price today is not for sale."""
 	sale, compare_at = prices.get_base_rates([row["item_code"] for row in sizes])
 	for row in sizes:
 		item_code = row["item_code"]
+		# None and 0.0 stay distinct: "not on this list" falls back, "free" does not.
+		row["sale_rate"], row["compare_at_rate"] = sale.get(item_code), compare_at.get(item_code)
 		row["price"] = prices.price(sale.get(item_code), compare_at.get(item_code))
 		row["compare_at_price"] = prices.compare_at(row["price"], compare_at.get(item_code))
 		if row["price"] is None:
