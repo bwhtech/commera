@@ -4,7 +4,8 @@ from pathlib import Path
 import frappe
 
 from commera.localization.cart_currency import CartCurrency
-from commera.localization.formatter import Formatter
+from commera.localization.formatter import Formatter, get_html_currency_symbol
+from commera.localization.languages import Language
 from commera.tests.test_cart_currency import CartCurrencyTestCase
 
 # packages/storefront/test/format.test.js passes the same cases with commera.format.amount.
@@ -24,6 +25,13 @@ class TestStorefrontNumberFormat(CartCurrencyTestCase):
 					case["currency"], "", case["precision"], case["fraction_precision"], case["number_format"]
 				)
 				self.assertEqual(currency.amount(case["amount"]), case["expected"])
+				starter = Formatter(Language("en", "English", "English", "ltr"), case["number_format"])
+				sign = "-" if case["expected"].startswith("-") else ""
+				digits = case["expected"].removeprefix("-")
+				self.assertEqual(
+					starter.money(case["amount"], case["currency"], case["precision"]),
+					f"{sign}{get_html_currency_symbol(case['currency'])}{digits}",
+				)
 
 	def test_amounts_and_browser_rules_follow_the_store_number_format(self):
 		for path in ("/cart", "/en-ae/cart"):

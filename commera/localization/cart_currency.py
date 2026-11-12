@@ -3,14 +3,14 @@
 from dataclasses import dataclass
 
 import frappe
-from frappe.utils.data import flt, fmt_money
+from frappe.utils.data import flt
 
 from commera.localization.formatter import (
 	Formatter,
+	format_money_digits,
 	get_fraction_precision,
 	get_html_currency_symbol,
 	get_money_precision,
-	strip_fmt_money_symbol,
 )
 from commera.localization.market_prices import MarketPrices
 from commera.utils import get_store_currency
@@ -48,10 +48,7 @@ class CartCurrency:
 		}
 
 	def amount(self, value: float | None) -> str:
-		formatted = fmt_money(
-			flt(value), precision=self.precision, currency=self.code, format=self.number_format
-		)
-		return strip_fmt_money_symbol(formatted, self.code)
+		return format_money_digits(value, self.precision, self.number_format, self.code)
 
 
 def get_cart_currency(quotation=None) -> CartCurrency:

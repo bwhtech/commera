@@ -10,6 +10,7 @@ from frappe import _
 from frappe.locale import get_number_format
 from frappe.model.meta import get_field_precision
 from frappe.utils.data import cstr, flt, fmt_money, getdate
+from frappe.utils.number_format import NumberFormat
 
 from commera.localization.date_formats import DATE_STYLES, DateFormats, get_babel_locale
 from commera.localization.languages import Language
@@ -36,15 +37,15 @@ class Formatter:
 		currency = currency or get_store_currency()
 		if precision is None:
 			precision = get_money_precision(currency)
-		formatted = fmt_money(flt(amount), precision=precision, currency=currency, format=self.number_format)
-		sign, digits = split_sign(strip_fmt_money_symbol(formatted, currency))
+		formatted = format_money_digits(amount, precision, self.number_format, currency)
+		sign, digits = split_sign(formatted)
 		symbol = get_html_currency_symbol(currency)
 		if self.language.direction == "rtl":
 			return f"{sign}{digits}{NO_BREAK_SPACE}{symbol.strip()}"
 		return f"{sign}{symbol}{digits}"
 
 	def number(self, value: float | None, precision: int = 0) -> str:
-		return fmt_money(flt(value), precision=precision, format=self.number_format)
+		return format_money_digits(value, precision, self.number_format)
 
 	def date(self, value: str | datetime.date | None, style: str = "medium") -> str:
 		if not value:
@@ -60,6 +61,29 @@ class Formatter:
 			"money_formats": {currency: get_money_format(currency) for currency in get_selling_currencies()},
 			"date_formats": DateFormats.for_language(self.language.code).as_dict(),
 		}
+
+
+def format_money_digits(value, precision: int, number_format: str, currency: str | None = None) -> str:
+	amount = flt(value)
+	if abs(amount) < 1e16:
+		formatted = fmt_money(amount, precision=precision, currency=currency, format=number_format)
+		return strip_fmt_money_symbol(formatted, currency) if currency else formatted
+
+	# Frappe groups str(float(amount)), which uses scientific notation from 1e16 onward.
+	format_info = NumberFormat.from_string(number_format)
+	if format_info.decimal_separator and precision > 2:
+		precision = get_fraction_precision(currency) if currency else format_info.precision
+	whole, _, decimals = ("%.*f" % (precision, round(abs(amount), precision))).partition(".")
+	groups = [whole[-3:]]
+	whole = whole[:-3]
+	size = 2 if number_format == "#,##,###.##" else 3
+	while whole:
+		groups.insert(0, whole[-size:])
+		whole = whole[:-size]
+	digits = format_info.thousands_separator.join(groups)
+	if precision and format_info.decimal_separator:
+		digits += format_info.decimal_separator + decimals
+	return ("-" if amount < 0 else "") + digits
 
 
 def get_money_format(currency: str) -> dict:
