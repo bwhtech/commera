@@ -3,6 +3,7 @@
 import glob
 import hashlib
 import os
+import uuid
 
 import frappe
 from frappe.utils import get_files_path
@@ -19,15 +20,15 @@ from commera.og.generator import (
 )
 
 # Bump whenever fonts, layout or text rendering change.
-RENDERER_VERSION = 3
+RENDERER_VERSION = 4
 
 CACHE_SUBDIR = "og-cache"
 STORE_CARD_ROUTE = "store"
 # `?price=none` asks for a card without the store price, for pages of a secondary market.
 NO_PRICE = "none"
 
-# Long enough for a cold Chromium start; short enough that a crashed worker's lock frees soon.
-LOCK_TTL = 90
+# Exceeds the 180-second CDP render deadline and cold Chromium startup.
+LOCK_TTL = 300
 # A failed render is not tried again for this long, so crawlers do not restart Chromium on every hit.
 FAILURE_TTL = 600
 RETRY_AFTER = 10
@@ -103,6 +104,9 @@ def serve_og_image(route, with_price=True):
 		render_once(
 			cache_path,
 			lambda: render_card_for_doc("Style Attribute Variant", variant_doc, with_price=with_price),
+			lambda: cache_file_path(
+				card, get_variant_card_version(frappe.get_doc("Style Attribute Variant", variant.name))
+			),
 		)
 
 	redirect_to_cached_card(cache_path)
@@ -113,35 +117,48 @@ def serve_store_card():
 	# Keyed on the markup, so a new name, tagline, logo or language yields a fresh card.
 	cache_path = cache_file_path(STORE_CARD_ROUTE, html_str)
 	if not os.path.exists(cache_path):
-		render_once(cache_path, lambda: render_card_image(html_str))
+		render_once(
+			cache_path,
+			lambda: render_card_image(html_str),
+			lambda: cache_file_path(STORE_CARD_ROUTE, build_store_card_html()),
+		)
 
 	redirect_to_cached_card(cache_path)
 
 
-def render_once(cache_path, render):
+def render_once(cache_path, render, current_path=None):
 	"""Render a card at most once at a time. A request that finds the card being rendered gets a 503."""
 	name = os.path.basename(cache_path)
 	failure_key = f"commera_og_failed:{name}"
-	lock_key = f"commera_og_lock:{name}"
+	lock_key = f"commera_og_lock:{name.split('-', 1)[0]}"
+	token = uuid.uuid4().hex
+	redis_key = frappe.cache.make_key(lock_key)
 	if frappe.cache.get_value(failure_key):
 		raise CardFailed
 
 	# set_value cannot set only-if-absent: the lock needs Redis SET NX.
 	# nosemgrep: frappe-semgrep-rules.rules.frappe-cache-breaks-multitenancy
-	if not frappe.cache.set(frappe.cache.make_key(lock_key), 1, nx=True, ex=LOCK_TTL):
+	if not frappe.cache.set(redis_key, token, nx=True, ex=LOCK_TTL):
 		raise CardBusy
 
 	try:
 		# Another request may have written it between our check and the lock.
 		if not os.path.exists(cache_path):
-			write_cache(cache_path, render())
-			remove_older_cards(cache_path)
+			older = card_versions(cache_path)
+			image = render()
+			# Redis locks contain raw tokens, not pickled cache values.
+			if not owns_lock(redis_key, token) or (current_path and current_path() != cache_path):
+				raise CardBusy
+			write_cache(cache_path, image)
+			remove_older_cards(cache_path, older)
+	except CardBusy:
+		raise
 	except Exception as error:
 		frappe.cache.set_value(failure_key, 1, expires_in_sec=FAILURE_TTL)
 		frappe.log_error("OG card render failed")
 		raise CardFailed from error
 	finally:
-		frappe.cache.delete_value(lock_key)
+		release_lock(redis_key, token)
 
 
 def redirect_to_cached_card(cache_path):
@@ -179,10 +196,30 @@ def write_cache(cache_path, image_bytes):
 	os.replace(temp_path, cache_path)
 
 
-def remove_older_cards(cache_path):
-	"""A card keeps one file: the files of its older versions go."""
+def card_versions(cache_path):
 	card_key = os.path.basename(cache_path).split("-", 1)[0]
-	for path in glob.glob(os.path.join(os.path.dirname(cache_path), f"{card_key}-*.jpg")):
+	return glob.glob(os.path.join(os.path.dirname(cache_path), f"{card_key}-*.jpg"))
+
+
+def owns_lock(key, token):
+	# nosemgrep: frappe-semgrep-rules.rules.frappe-cache-breaks-multitenancy
+	return bool(frappe.cache.eval("return redis.call('get', KEYS[1]) == ARGV[1]", 1, key, token))
+
+
+def release_lock(key, token):
+	# Compare and delete atomically: an expired holder must not unlock its successor.
+	# nosemgrep: frappe-semgrep-rules.rules.frappe-cache-breaks-multitenancy
+	frappe.cache.eval(
+		"if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end",
+		1,
+		key,
+		token,
+	)
+
+
+def remove_older_cards(cache_path, older):
+	"""A card keeps one file: the files of its older versions go."""
+	for path in older:
 		if path != cache_path:
 			try:
 				os.remove(path)

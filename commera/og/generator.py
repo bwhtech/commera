@@ -1,5 +1,5 @@
 """OG cards for the /og-image endpoint and the admin preview: HTML pages that Frappe's Chromium
-screenshots. get_preview_from_html is not whitelisted: only card templates reach it."""
+screenshots through a card-only request allowlist. Only card templates reach the renderer."""
 
 import os
 import posixpath
@@ -9,11 +9,11 @@ from urllib.parse import quote, unquote, urlsplit
 
 import frappe
 from frappe.utils import flt, get_files_path, get_url
-from frappe.utils.preview import get_preview_from_html
 
 from commera import seo
 from commera.branding import get_brand_assets
 from commera.localization import get_localization
+from commera.og.chromium import get_preview_from_html
 from commera.shop_themes.render import render_themed_template
 
 # Social card spec used by Facebook/X/LinkedIn; 1.91:1 ratio.

@@ -58,7 +58,8 @@ The store card, `commera/templates/og/store_card.html`, gets `store_name`, `tagl
 - Jinja does not escape values here. Write `| e` after every value, also in attributes: `{{ display_name | e }}`.
 - Write the layout with logical CSS, such as `margin-inline-start` and `text-align: start`. A right-to-left card then flips by itself. See [Right-to-left layout](localization.md#right-to-left-layout).
 - Images must be public files of the site (`/files/...`), assets (`/assets/...`) or `data:` URIs. The card cannot load an image or a font from another host, and it cannot read private files.
-- Scripts do not run.
+- The renderer serves the first document and public images and fonts from disk. It blocks later navigations, frames, objects, private files and remote requests, regardless of the requesting user.
+- Scripts do not run. Cards and admin previews use JPEG quality 85.
 
 ## Fonts
 

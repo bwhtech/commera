@@ -2,10 +2,12 @@
 # See license.txt
 
 import unittest
+from io import BytesIO
 from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from PIL import Image
 
 
 def get_published_variant():
@@ -62,16 +64,16 @@ class TestOGImageTemplate(IntegrationTestCase):
 			self.skipTest("No published Style Attribute Variant to preview against.")
 
 		doc = self.make_template()
-		fixed_png = b"\x89PNG\r\n\x1a\n-preview"
+		fixed_jpeg = jpeg_bytes("red")
 
 		with patch(
 			"commera.og.generator.render_card_for_doc",
-			return_value=fixed_png,
+			return_value=fixed_jpeg,
 		) as mocked:
 			file_url = doc.generate_preview()
 
 		mocked.assert_called_once()
-		self.assertTrue(file_url)
+		self.assertTrue(file_url.endswith(".jpg"))
 
 		doc.reload()
 		self.assertEqual(doc.preview_image, file_url)
@@ -94,12 +96,12 @@ class TestOGImageTemplate(IntegrationTestCase):
 		doc = self.make_template()
 		with patch(
 			"commera.og.generator.render_card_for_doc",
-			return_value=b"\x89PNG\r\n\x1a\n-one",
+			return_value=jpeg_bytes("red"),
 		):
 			doc.generate_preview()
 		with patch(
 			"commera.og.generator.render_card_for_doc",
-			return_value=b"\x89PNG\r\n\x1a\n-two",
+			return_value=jpeg_bytes("blue"),
 		):
 			doc.reload()
 			second_url = doc.generate_preview()
@@ -117,3 +119,9 @@ class TestOGImageTemplate(IntegrationTestCase):
 			self.addCleanup(frappe.delete_doc, "File", name, force=True)
 		doc.reload()
 		self.assertEqual(doc.preview_image, second_url)
+
+
+def jpeg_bytes(colour):
+	buffer = BytesIO()
+	Image.new("RGB", (10, 10), colour).save(buffer, format="JPEG")
+	return buffer.getvalue()

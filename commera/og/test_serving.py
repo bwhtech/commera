@@ -31,7 +31,7 @@ class OgServingTestCase(IntegrationTestCase):
 
 	def forget_card(self, path):
 		name = os.path.basename(path)
-		frappe.cache.delete_value([f"commera_og_failed:{name}", f"commera_og_lock:{name}"])
+		frappe.cache.delete_value([f"commera_og_failed:{name}", f"commera_og_lock:{name.split('-', 1)[0]}"])
 		if os.path.exists(path):
 			os.remove(path)
 
@@ -165,6 +165,42 @@ class TestRenderLock(OgServingTestCase):
 		os.remove(self.cache_path)
 		og_image_render.render_once(self.cache_path, lambda: calls.append(1) or JPEG)
 		self.assertEqual(len(calls), 2)
+
+	def test_expired_holder_cannot_delete_successor_lock_or_write(self):
+		key = frappe.cache.make_key(f"commera_og_lock:{os.path.basename(self.cache_path).split('-', 1)[0]}")
+
+		def render():
+			# Simulate expiry and a successor acquiring the stable card lock.
+			# The key is site-prefixed; simulate the raw Redis lock, not a pickled cache value.
+			# nosemgrep: frappe-semgrep-rules.rules.frappe-cache-breaks-multitenancy
+			frappe.cache.set(key, "successor", ex=300)
+			return JPEG
+
+		with self.assertRaises(og_image_render.CardBusy):
+			og_image_render.render_once(self.cache_path, render)
+		self.assertTrue(og_image_render.owns_lock(key, "successor"))
+		self.assertFalse(os.path.exists(self.cache_path))
+		og_image_render.release_lock(key, "successor")
+
+	def test_different_fingerprints_share_one_lock(self):
+		newer = self.cache_path.replace("-1.jpg", "-2.jpg")
+		self.addCleanup(self.forget_card, newer)
+
+		def render():
+			with self.assertRaises(og_image_render.CardBusy):
+				og_image_render.render_once(newer, lambda: JPEG)
+			return JPEG
+
+		og_image_render.render_once(self.cache_path, render)
+
+	def test_stale_render_does_not_write_or_remove_current_card(self):
+		newer = self.cache_path.replace("-1.jpg", "-2.jpg")
+		self.addCleanup(self.forget_card, newer)
+		og_image_render.write_cache(newer, JPEG)
+		with self.assertRaises(og_image_render.CardBusy):
+			og_image_render.render_once(self.cache_path, lambda: JPEG, lambda: newer)
+		self.assertTrue(os.path.exists(newer))
+		self.assertFalse(os.path.exists(self.cache_path))
 
 	def test_a_failed_render_is_not_tried_again_for_ten_minutes(self):
 		route = self.published_route()

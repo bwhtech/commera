@@ -10,6 +10,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 from unittest import skipUnless
+from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -88,8 +89,33 @@ class TestChromiumRender(IntegrationTestCase):
 			self.assertEqual(log.paths, [])
 
 			# The log does see a request when the page has no content policy.
-			generator.get_preview_from_html(page, format="jpg", width=1200, height=630)
+			from frappe.utils.preview import get_preview_from_html
+
+			get_preview_from_html(page, format="jpg", width=1200, height=630)
 			self.assertIn("/image.png", log.paths)
+
+	def test_navigation_frames_and_private_files_are_blocked(self):
+		name = f"og-private-{frappe.generate_hash(length=10)}.jpg"
+		path = get_files_path(name, is_private=True)
+		Image.new("RGB", (1200, 630), PHOTO_COLOUR).save(path)
+		self.addCleanup(os.remove, path)
+		with RequestLog() as log:
+			for attack in (
+				f'<meta http-equiv="refresh" content="0;url={log.url}/refresh">',
+				f'<iframe src="{log.url}/frame"></iframe>',
+				f'<img src="/private/files/{name}">',
+				f'<img src="/files/%2e%2e/%2e%2e/private/files/{name}">',
+			):
+				with (
+					self.subTest(attack=attack),
+					patch.object(generator, "with_content_policy", side_effect=lambda html: html),
+				):
+					jpeg = generator.render_card_image(
+						f'<html><head></head><body style="margin:0">{attack}</body></html>'
+					)
+					image = Image.open(BytesIO(jpeg)).convert("RGB")
+					self.assertFalse(is_colour(image.getpixel((600, 315)), PHOTO_COLOUR))
+			self.assertEqual(log.paths, [])
 
 
 class RequestLog:
