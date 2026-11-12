@@ -24,13 +24,15 @@ for (const [number_format, amounts] of Object.entries(cases)) {
 	});
 }
 
-test('money keeps the SAR icon span the server renders', () => {
-	const sar_symbol = '<span class="saudi-currency-symbol pe-0.5"></span>';
+test('money writes the riyal sign as text, labelled and left of the amount', () => {
 	globalThis.commera_storefront_config = {
 		number_format: '#,###.##',
-		currency_symbols: { SAR: sar_symbol },
+		currency_symbols: { SAR: '\u20c1' },
 	};
-	assert.equal(money(1499, 'SAR'), `${sar_symbol}1,499.00`);
+	assert.equal(
+		money(1499, 'SAR'),
+		'<bdi dir="ltr"><span class="currency-sign" role="img" aria-label="SAR">\u20c1</span>\u00a01,499.00</bdi>',
+	);
 });
 
 test('money falls back to the currency code and a no-break space', () => {
@@ -51,19 +53,13 @@ test('money uses the store currency and the default format when not given', () =
 	assert.equal(money(null, 'USD'), '$0.00');
 });
 
-test('money_text spells out a currency whose symbol is HTML', () => {
+test('money_text spells out the riyal and dirham signs as their codes', () => {
 	globalThis.commera_storefront_config = {
-		currency_symbols: {
-			SAR: '<span class="saudi-currency-symbol pe-0.5"></span>',
-			USD: '$',
-		},
+		currency_symbols: { SAR: '\u20c1', AED: '\u20c3', USD: '$' },
 	};
-	assert.equal(money_text(1250, 'SAR'), 'SAR 1,250.00');
+	assert.equal(money_text(1250, 'SAR'), 'SAR\u00a01,250.00');
+	assert.equal(money_text(-1250, 'AED'), '-AED\u00a01,250.00');
 	assert.equal(money_text(1250, 'USD'), '$1,250.00');
-	assert.equal(
-		money(1250, 'SAR'),
-		'<span class="saudi-currency-symbol pe-0.5"></span>1,250.00',
-	);
 });
 
 test('money and dates read the resolved rules and the page direction', () => {
@@ -124,7 +120,7 @@ test('summer cart executes its formatter with the server config', () => {
 	assert.equal(format(0, { format: { amount } }), '0.00');
 });
 
-test('all HTML money paths escape ordinary symbols and trust only the SAR icon', () => {
+test('all HTML money paths escape every symbol, SAR included', () => {
 	const symbol = '<img src=x onerror=alert(1)> & "currency"';
 	globalThis.commera_storefront_config = {
 		currency_symbols: { USD: symbol, SAR: symbol },

@@ -4,24 +4,24 @@
 <div x-data="order_summary" class="tabular flex flex-col gap-3 text-md">
 	<div class="flex justify-between gap-3">
 		<span class="min-w-0 [overflow-wrap:anywhere]" title="{{ _("Subtotal") }}">{{ _("Subtotal") }}</span>
-		<span class="shrink-0 whitespace-nowrap" x-text="money(subtotal)"></span>
+		<span class="shrink-0 whitespace-nowrap" x-html="money(subtotal)"></span>
 	</div>
 	<template x-for="(discount, index) in discounts" :key="index">
 		<div class="flex justify-between gap-3 text-ink-gray-7">
 			<span class="min-w-0 [overflow-wrap:anywhere]" :title='{{ _("Discount") | tojson }} + (discount.label ? " (" + discount.label + ")" : "")'>{{ _("Discount") }}<span x-show="discount.label"><bdi x-text="' (' + discount.label + ')'"></bdi></span></span>
-			<span dir="ltr" class="shrink-0 whitespace-nowrap" x-text="'−' + money(discount.amount)"></span>
+			<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="'−' + money(discount.amount)"></span>
 		</div>
 	</template>
 	<template x-for="(fee, index) in cart?.plugin_fees ?? []" :key="index">
 		<div class="flex justify-between gap-3">
 			<span class="min-w-0 [overflow-wrap:anywhere]" :title="fee.description"><bdi x-text="fee.description"></bdi></span>
-			<span class="shrink-0 whitespace-nowrap" x-text="money(fee.amount)"></span>
+			<span class="shrink-0 whitespace-nowrap" x-html="money(fee.amount)"></span>
 		</div>
 	</template>
 	<template x-for="(tax, index) in cart_taxes" :key="index">
 		<div class="flex justify-between gap-3">
 			<span class="min-w-0 [overflow-wrap:anywhere]"><bdi x-text="tax.description"></bdi></span>
-			<span class="shrink-0 whitespace-nowrap" x-text="money(tax.amount)"></span>
+			<span class="shrink-0 whitespace-nowrap" x-html="money(tax.amount)"></span>
 		</div>
 	</template>
 	{% if caller is defined %}{{ caller() }}{% endif %}
@@ -50,7 +50,7 @@
 
 	<div class="mt-2 flex justify-between gap-3 border-t border-outline-gray-2 pt-4 text-2xl font-medium">
 		<span class="min-w-0 [overflow-wrap:anywhere]" title="{{ _("Order total") }}">{{ _("Order total") }}</span>
-		<span class="shrink-0 whitespace-nowrap" x-text="money({{ total }})"></span>
+		<span class="shrink-0 whitespace-nowrap" x-html="money({{ total }})"></span>
 	</div>
 </div>
 {%- endmacro %}

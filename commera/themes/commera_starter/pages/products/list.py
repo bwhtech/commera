@@ -106,9 +106,12 @@ def get_chips(context):
 		for value in context.selected[key]
 	]
 	if context.selected.min is not None or context.selected.max is not None:
+		price_label = get_price_label(context.selected, context.listing["facets"]["price"]["currency"])
 		chips.append(
 			{
-				"label": get_price_label(context.selected, context.listing["facets"]["price"]["currency"]),
+				# The price label is formatter HTML (sign plus a hidden code); other labels are plain text.
+				"label": frappe.utils.strip_html(price_label),
+				"html": price_label,
 				"url": get_listing_url(context, min=None, max=None),
 			}
 		)

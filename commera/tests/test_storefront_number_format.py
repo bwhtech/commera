@@ -4,9 +4,10 @@ from pathlib import Path
 import frappe
 
 from commera.localization.cart_currency import CartCurrency
-from commera.localization.formatter import Formatter, get_html_currency_symbol
+from commera.localization.formatter import Formatter
 from commera.localization.languages import Language
 from commera.tests.test_cart_currency import CartCurrencyTestCase
+from commera.tests.test_market_prices import starter_money
 
 # packages/storefront/test/format.test.js passes the same cases with commera.format.amount.
 AMOUNT_CASES = Path(__file__).resolve().parents[2] / "packages" / "storefront" / "test" / "amount-cases.json"
@@ -26,11 +27,9 @@ class TestStorefrontNumberFormat(CartCurrencyTestCase):
 				)
 				self.assertEqual(currency.amount(case["amount"]), case["expected"])
 				starter = Formatter(Language("en", "English", "English", "ltr"), case["number_format"])
-				sign = "-" if case["expected"].startswith("-") else ""
-				digits = case["expected"].removeprefix("-")
 				self.assertEqual(
 					starter.money(case["amount"], case["currency"], case["precision"]),
-					f"{sign}{get_html_currency_symbol(case['currency'])}{digits}",
+					starter_money(case["currency"], case["expected"]),
 				)
 
 	def test_amounts_and_browser_rules_follow_the_store_number_format(self):
@@ -67,7 +66,7 @@ class TestStorefrontNumberFormat(CartCurrencyTestCase):
 				self.open_request(path)
 				currency = CartCurrency.of()
 				starter = Formatter.current().money(123456.78, currency.code)
-				self.assertEqual(starter, f"{currency.symbol}{currency.amount(123456.78)}")
+				self.assertEqual(starter, starter_money(currency.code, currency.amount(123456.78)))
 
 	def test_primary_and_market_pages_render_grouped_amounts(self):
 		for path, symbol in (("/cart", self.store_symbol), ("/en-ae/cart", self.market_symbol)):

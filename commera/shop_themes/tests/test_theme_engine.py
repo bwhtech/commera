@@ -437,9 +437,7 @@ class IntegrationTestThemeBaseContext(IntegrationTestCase):
 			"Price List", filters={"enabled": 1, "selling": 1}, pluck="currency", distinct=True
 		)
 		self.assertEqual(set(config["currency_symbols"]), {*selling_currencies, get_store_currency()})
-		self.assertEqual(
-			config["currency_symbols"]["SAR"], '<span class="saudi-currency-symbol pe-0.5"></span>'
-		)
+		self.assertEqual(config["currency_symbols"]["SAR"], "\u20c1")
 		self.assertNotIn("AED", config["currency_symbols"])
 		self.assertNotIn("EUR", config["currency_symbols"])
 		self.assertEqual(config["store_currency"], get_store_currency())

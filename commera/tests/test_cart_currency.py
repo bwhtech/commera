@@ -10,10 +10,10 @@ from commera.api.server_cart import get_server_cart, sync_server_cart
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.guest import GUEST_CART_COOKIE
 from commera.localization.cart_currency import CartCurrency
+from commera.localization.formatter import get_html_currency_symbol
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context, render_theme_context
 from commera.shop_themes.theme_resolver import ThemePageRenderer
 from commera.tests.test_market_cart import MarketCartTestCase
-from commera.utils import get_currency_symbol
 from commera.www.cart.permalink import get_cart_lines
 
 SUMMER = "Summer Theme"
@@ -30,8 +30,9 @@ class CartCurrencyTestCase(MarketCartTestCase):
 		self.set_default("currency_precision", "2")
 		self.set_default("number_format", "#,###.##")
 		self.item_code = self.item("CARTCURRENCY", market_sale=3499)
-		self.market_symbol = get_currency_symbol(self.currency)
-		self.store_symbol = get_currency_symbol(self.store_currency)
+		# What a page places before an amount: AED's sign comes labelled with its code.
+		self.market_symbol = get_html_currency_symbol(self.currency)
+		self.store_symbol = get_html_currency_symbol(self.store_currency)
 		self.sign_in_shopper()
 		self.add(self.item_code)
 

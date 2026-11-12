@@ -9,9 +9,9 @@
 				<span class="media aspect-[3/4] w-10 shrink-0 overflow-hidden rounded-lg"><img x-show="product.image" :src="product.image" alt="" class="size-full object-cover object-top"></span>
 				<span class="min-w-0">
 					<span class="block text-md text-ink-gray-8 [overflow-wrap:anywhere]"><bdi x-text="product.title"></bdi></span>
-					<span class="tabular block text-base font-medium text-ink-gray-9 sm:hidden" x-text="money(product)"></span>
+					<span class="tabular block text-base font-medium text-ink-gray-9 sm:hidden" x-html="money(product)"></span>
 				</span>
-				<span class="tabular hidden whitespace-nowrap text-md font-medium text-ink-gray-9 sm:block" x-text="money(product)"></span>
+				<span class="tabular hidden whitespace-nowrap text-md font-medium text-ink-gray-9 sm:block" x-html="money(product)"></span>
 			</a>
 		</template>
 	</div>

@@ -21,7 +21,7 @@
 }
 
 /* style.css strikes through every span inside .product-item-price so the demo's struck
-   original renders; get_currency_symbol() emits a span inside the live price too. */
+   original renders; the riyal and dirham signs sit in a span inside the live price too. */
 .check-tbl .product-item-price strong span {
 	text-decoration: none;
 }

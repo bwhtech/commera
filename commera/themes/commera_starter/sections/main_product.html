@@ -41,8 +41,8 @@
 			{% endif %}
 			<h1 class="{{ 'mt-1.5' if theme.show_vendor and product.vendor else 'mt-4' }} text-6xl leading-tight tracking-tight [overflow-wrap:anywhere] md:text-7xl"><bdi>{{ product.title }}</bdi></h1>
 			<p class="tabular mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
-				<span class="text-4xl font-semibold text-ink-gray-9"><span x-show="compare_at_price" class="sr-only">{{ _("Sale price") }}</span><span x-show="!compare_at_price" class="sr-only">{{ _("Price") }}</span><span x-text="money(price)">{{ commera.format.money(shown_price, product.currency) if shown_price is not none }}</span></span>
-				<span x-show="compare_at_price" class="text-lg text-ink-gray-6 line-through"><span class="sr-only">{{ _("Regular price") }}</span><span x-text="money(compare_at_price)"></span></span>
+				<span class="text-4xl font-semibold text-ink-gray-9"><span x-show="compare_at_price" class="sr-only">{{ _("Sale price") }}</span><span x-show="!compare_at_price" class="sr-only">{{ _("Price") }}</span><span x-html="money(price)">{{ commera.format.money(shown_price, product.currency) if shown_price is not none }}</span></span>
+				<span x-show="compare_at_price" class="text-lg text-ink-gray-6 line-through"><span class="sr-only">{{ _("Regular price") }}</span><span x-html="money(compare_at_price)"></span></span>
 				<span x-show="compare_at_price" x-text="'−' + discount + '%'" dir="ltr" class="inline-flex h-6 items-center rounded-full bg-surface-red-2 px-2 text-xs font-semibold text-ink-red-7"></span>
 			</p>
 			<p class="mt-1.5 text-base text-ink-gray-6">{{ _("Shipping and taxes calculated at checkout.") }}</p>
@@ -121,7 +121,7 @@
 		{{ image((product.images or [None])[0], "", 160, "size-12 shrink-0 rounded-lg " ~ fit) }}
 		<div class="min-w-0 flex-1">
 			<p class="truncate text-base text-ink-gray-7"><bdi>{{ product.title }}</bdi></p>
-			<p class="tabular text-md font-semibold text-ink-gray-9" x-text="money(price)">{{ commera.format.money(shown_price, product.currency) if shown_price is not none }}</p>
+			<p class="tabular text-md font-semibold text-ink-gray-9" x-html="money(price)">{{ commera.format.money(shown_price, product.currency) if shown_price is not none }}</p>
 		</div>
 		<button type="button" @click="add_to_cart()" :disabled="variant && !variant.available" :aria-busy="busy === 'add_to_cart'" class="button-primary relative shrink-0 aria-busy:text-transparent">
 			<span class="grid [&>span]:col-start-1 [&>span]:row-start-1">

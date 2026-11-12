@@ -76,7 +76,7 @@ test('a right-to-left language puts the symbol after the amount', () => {
 	assert.equal(arabic.money(10, 'XTS'), '10.00\u00a0XTS');
 });
 
-test('money_text spells out an HTML symbol on the correct side', () => {
+test('money_text spells out a currency sign on the correct side', () => {
 	assert.equal(
 		formatter_for('en').money_text(1250, 'SAR'),
 		'SAR\u00a01,250.00',

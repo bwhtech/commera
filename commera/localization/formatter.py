@@ -15,15 +15,15 @@ from frappe.utils.number_format import NumberFormat
 from commera.localization.date_formats import DATE_STYLES, DateFormats, get_babel_locale
 from commera.localization.languages import Language
 from commera.localization.resolver import get_localization
-from commera.utils import get_currency_symbol, get_selling_currencies, get_store_currency
+from commera.utils import CURRENCY_SIGNS, get_currency_symbol, get_selling_currencies, get_store_currency
 
 DEFAULT_NUMBER_FORMAT = "#,###.##"
 NO_BREAK_SPACE = "\u00a0"
 
 
 class Formatter:
-	"""Money has the digits of ERPNext's print formats, so a price reads as on the invoice.
-	The symbol goes before the amount in a left-to-right language and after it in a right-to-left one."""
+	"""Money has the digits of ERPNext's print formats, so a price reads as on the invoice. A symbol goes
+	before the amount in a left-to-right language and after it in a right-to-left one; a sign, always left."""
 
 	def __init__(self, language: Language, number_format: str | None = None):
 		self.language = language
@@ -38,8 +38,10 @@ class Formatter:
 		if precision is None:
 			precision = get_money_precision(currency)
 		formatted = format_money_digits(amount, precision, self.number_format, currency)
-		sign, digits = split_sign(formatted)
 		symbol = get_html_currency_symbol(currency)
+		if is_currency_sign(currency):
+			return isolate_left_to_right(f"{symbol}{formatted}")
+		sign, digits = split_sign(formatted)
 		if self.language.direction == "rtl":
 			return f"{sign}{digits}{NO_BREAK_SPACE}{symbol.strip()}"
 		return f"{sign}{symbol}{digits}"
@@ -128,6 +130,27 @@ def get_language_number_format(code: str) -> str:
 		return frappe.db.get_default("number_format") or DEFAULT_NUMBER_FORMAT
 
 
+def email_money(amount: float | None, currency: str | None = None) -> str:
+	"""fmt_money for order emails. Email clients ignore webfonts, so a riyal or dirham shows its code."""
+	formatted = fmt_money(amount, currency=currency)
+	if currency not in CURRENCY_SIGNS:
+		return formatted
+	return f"{currency}{NO_BREAK_SPACE}{strip_fmt_money_symbol(formatted, currency)}"
+
+
 def get_html_currency_symbol(currency: str) -> str:
-	symbol = get_currency_symbol(currency)
-	return symbol if currency == "SAR" else escape(symbol)
+	"""The escaped symbol to place before an amount. Screen readers may not know the new signs yet,
+	so a sign reads as its currency code."""
+	symbol = escape(get_currency_symbol(currency))
+	if not is_currency_sign(currency):
+		return symbol
+	return f'<span class="currency-sign" role="img" aria-label="{escape(currency)}">{symbol}</span>{NO_BREAK_SPACE}'
+
+
+def is_currency_sign(currency: str) -> bool:
+	return get_currency_symbol(currency) in CURRENCY_SIGNS.values()
+
+
+def isolate_left_to_right(html: str) -> str:
+	# SAMA and the CBUAE put the sign left of the amount, and of a minus sign, on any page.
+	return f'<bdi dir="ltr">{html}</bdi>'

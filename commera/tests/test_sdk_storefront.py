@@ -123,7 +123,10 @@ class TestSdkStorefront(ProductDetailPriceTestCase):
 	def test_money_uses_the_storefront_currency_symbol(self):
 		symbol = frappe.db.get_value("Currency", "INR", "symbol")
 		self.assertEqual(format.money(1234.5, "INR"), f"{symbol}1,234.50")
-		self.assertEqual(format.money(10, "SAR"), '<span class="saudi-currency-symbol pe-0.5"></span>10.00')
+		self.assertEqual(
+			format.money(10, "SAR"),
+			'<bdi dir="ltr"><span class="currency-sign" role="img" aria-label="SAR">\u20c1</span>\u00a010.00</bdi>',
+		)
 
 	def test_product_url_links_the_handle_in_the_current_language(self):
 		use_storefront_languages(self, "en", published=("en", "ar"))

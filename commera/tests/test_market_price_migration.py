@@ -16,11 +16,10 @@ from commera.og import generator
 from commera.patches import set_market_price_lists
 from commera.sdk import cart as cart_sdk
 from commera.sdk import catalog
-from commera.tests.test_market_prices import MarketPriceTestCase, make_price_list
+from commera.tests.test_market_prices import MarketPriceTestCase, make_price_list, starter_money
 from commera.tests.test_markets import make_market
 from commera.themes.commera_starter.pages.products import details as starter_details
 from commera.themes.commera_starter.pages.products import list as starter_list
-from commera.utils import get_currency_symbol
 from commera.www import og_image_render
 
 
@@ -135,9 +134,10 @@ class TestListingCurrency(MarketPriceTestCase):
 			facet = starter_list.catalog.get_market_price_facet()
 			label = starter_list.get_price_label(frappe._dict(min=10, max=20), facet["currency"])
 
-		symbol = get_currency_symbol(self.currency)
 		self.assertEqual(facet["currency"], self.currency)
-		self.assertEqual(label, f"{symbol}10.00 to {symbol}20.00")
+		self.assertEqual(
+			label, f"{starter_money(self.currency, '10.00')} to {starter_money(self.currency, '20.00')}"
+		)
 
 	def test_the_price_inputs_format_in_the_facet_currency(self):
 		path = os.path.join(frappe.get_app_path("commera"), "themes", "commera_starter", "components")
