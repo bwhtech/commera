@@ -23,7 +23,7 @@
 			"label": "Enabled"
 		},
 		{
-			"description": "Jinja template for the OG card. The source document is available as `doc`. Satori supports flexbox + a CSS subset only.",
+			"description": "Jinja template for the OG card, a 1200 × 630 HTML page with full CSS. The source document is available as `doc`. Escape every value with `| e`.",
 			"fieldname": "template_html",
 			"fieldtype": "Code",
 			"label": "Template HTML",
@@ -40,7 +40,7 @@
 	"grid_page_length": 50,
 	"index_web_pages_for_search": 1,
 	"links": [],
-	"modified": "2026-06-17 00:00:00.000000",
+	"modified": "2026-11-12 00:00:00.000000",
 	"modified_by": "Administrator",
 	"module": "Commera Ecommerce",
 	"name": "OG Image Template",

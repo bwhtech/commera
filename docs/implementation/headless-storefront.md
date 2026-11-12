@@ -228,7 +228,7 @@ On a secondary market page, or an API request with that market's `_country`, pro
 
 Only base Item Price rows set a public price: a row with a customer or a batch is not shown, not used in a filter or a facet, and does not make an item available (`commera/base_prices.py`). Item Price validity dates do not apply.
 
-The product OG card (`/og-image/<handle>.png`) shows the store price. A secondary market page links the card without a price: `/og-image/<handle>.png?price=none`, which has its own cache file.
+The product OG card (`/og-image/<handle>.jpg`) shows the store price. A secondary market page links the card without a price: `/og-image/<handle>.jpg?price=none`, which has its own cache file.
 
 The patch `set_market_price_lists` gives each market without a sale price list the Commera Settings lists: the sale price list (or the default price list when there is no sale list) as the sale price list, the default price list as the compare-at list, and their currency. The market then prices every item like the primary market. It logs a market it cannot fill.
 

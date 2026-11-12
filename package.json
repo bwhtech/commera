@@ -25,11 +25,7 @@
 	},
 	"homepage": "https://github.com/BuildWithHussain/commera#readme",
 	"dependencies": {
-		"@resvg/resvg-js": "^2.6.2",
 		"@tailwindcss/cli": "^4.0.14",
-		"bidi-js": "^1.0.3",
-		"satori": "^0.33",
-		"satori-html": "^0.3.2",
 		"tailwindcss": "^4.0.14"
 	},
 	"devDependencies": {

@@ -175,10 +175,10 @@ class TestMarketProductTitles(ProductDetailPriceTestCase):
 		return product
 
 	def serve_card(self, route, path):
-		"""The cached file /<path>/og-image/<route>.png redirects to. Nothing renders or is written."""
+		"""The cached file /<path>/og-image/<route>.jpg redirects to. Nothing renders or is written."""
 		with (
 			pin_localization(resolve(path)[0]),
-			patch.object(og_image_render, "render_card_for_doc", return_value=b"png"),
+			patch.object(og_image_render, "render_card_for_doc", return_value=b"jpg"),
 			patch.object(og_image_render, "write_cache"),
 			self.assertRaises(frappe.Redirect),
 		):
@@ -194,11 +194,25 @@ class TestMarketProductTitles(ProductDetailPriceTestCase):
 			self.assertEqual(
 				generator.build_variant_card_context(product)["display_name"], "Gulf Linen Shirt"
 			)
-			self.assertEqual(seo.get_product_og_image(product.route), f"/en-ae/og-image/{product.route}.png")
+			self.assertEqual(seo.get_product_og_image(product.route), f"/en-ae/og-image/{product.route}.jpg")
 		with pin_localization(resolve("/ar-ae")[0]):
-			self.assertEqual(seo.get_product_og_image(product.route), f"/ar-ae/og-image/{product.route}.png")
+			self.assertEqual(seo.get_product_og_image(product.route), f"/ar-ae/og-image/{product.route}.jpg")
 		cards = {self.serve_card(product.route, path) for path in ("/en-ae", "/")}
 		self.assertEqual(len(cards), 2)
+
+	def test_an_old_png_card_url_redirects_to_the_jpg_card_of_its_market(self):
+		product = self.make_gulf_product()
+		self.addCleanup(setattr, frappe.local.flags, "redirect_location", None)
+		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
+		frappe.local.form_dict = frappe._dict(route=f"{product.route}.png", price="none")
+
+		with pin_localization(resolve("/en-ae")[0]), self.assertRaises(frappe.Redirect) as redirect:
+			og_image_render.get_context(frappe._dict())
+
+		self.assertEqual(redirect.exception.http_status_code, 301)
+		self.assertEqual(
+			frappe.local.flags.redirect_location, f"/en-ae/og-image/{product.route}.jpg?price=none"
+		)
 
 	def test_a_right_to_left_card_has_the_title_of_its_language_and_market(self):
 		product = self.make_gulf_product()
@@ -223,7 +237,7 @@ class TestMarketProductTitles(ProductDetailPriceTestCase):
 
 		self.assertEqual(context.seo["title"], f"قميص الخليج | {seo.get_store_name()}")
 		self.assertEqual(context.seo["description"], "وصف الخليج")
-		self.assertIn(f"/ar-ae/og-image/{product.route}.png", context.seo["image"])
+		self.assertIn(f"/ar-ae/og-image/{product.route}.jpg", context.seo["image"])
 		self.assertEqual(
 			(context.json_ld[0]["name"], context.json_ld[0]["description"]), ("قميص الخليج", "وصف الخليج")
 		)

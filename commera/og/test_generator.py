@@ -1,24 +1,30 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # See license.txt
 
-"""Tests for the Satori OG-image render core (og/generator.py) and the /og-image web layer."""
+"""The OG card pages (og/generator.py), with Chromium stubbed: these tests read the HTML it gets."""
 
-import base64
-import hashlib
 import os
 import time
-import unittest
-from io import BytesIO
 from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import flt, get_files_path
+from markupsafe import escape
 
 from commera import branding, seo
 from commera.og import generator
-from commera.tests import get_test_configurator, get_test_item
-from commera.www import og_image_render
+
+CARD_FONTS = (
+	"/assets/commera/fonts/OpenSans/OpenSans-Regular.ttf",
+	"/assets/commera/fonts/OpenSans/OpenSans-Bold.ttf",
+	"/assets/commera/fonts/IBMPlexSansArabic/IBMPlexSansArabic-Regular.ttf",
+	"/assets/commera/fonts/IBMPlexSansArabic/IBMPlexSansArabic-Bold.ttf",
+	"/assets/commera/fonts/IBMPlexSansHebrew/IBMPlexSansHebrew-Regular.ttf",
+	"/assets/commera/fonts/IBMPlexSansHebrew/IBMPlexSansHebrew-Bold.ttf",
+	"/assets/commera/fonts/NotoColorEmoji/Noto-COLRv1.woff2",
+)
+HOSTILE_TITLE = '"><img src=http://example.com/x>'
 
 
 def get_published_variant():
@@ -26,99 +32,168 @@ def get_published_variant():
 	return rows[0] if rows else None
 
 
+def make_public_file(test, name):
+	path = os.path.join(get_files_path(is_private=False), name)
+	with open(path, "wb") as image_file:
+		image_file.write(b"\xff\xd8\xff")
+	test.addCleanup(lambda: os.path.exists(path) and os.remove(path))
+	return f"/files/{name}"
+
+
+def use_og_template(test, template_html):
+	frappe.db.delete("OG Image Template", {"for_doctype": "Style Attribute Variant"})
+	template = frappe.get_doc(
+		{
+			"doctype": "OG Image Template",
+			"for_doctype": "Style Attribute Variant",
+			"enabled": 1,
+			"template_html": template_html,
+		}
+	).insert(ignore_permissions=True)
+	test.addCleanup(frappe.delete_doc, "OG Image Template", template.name, force=True)
+
+
 class TestResolveTemplate(IntegrationTestCase):
 	def test_returns_bundled_path_when_no_enabled_template(self):
-		# A DocType with no OG Image Template row must fall back to the bundled path.
 		frappe.db.delete("OG Image Template", {"for_doctype": "Style Attribute Variant"})
-		result = generator.resolve_template("Style Attribute Variant")
-		self.assertEqual(result, generator.BUNDLED_CARD_TEMPLATE)
+		self.assertEqual(
+			generator.resolve_template("Style Attribute Variant"), generator.BUNDLED_CARD_TEMPLATE
+		)
 
 	def test_returns_admin_template_html_when_enabled_row_exists(self):
 		marker = f"<div>custom-{frappe.generate_hash(length=8)}</div>"
-		frappe.db.delete("OG Image Template", {"for_doctype": "Style Attribute Variant"})
-		template = frappe.get_doc(
-			{
-				"doctype": "OG Image Template",
-				"for_doctype": "Style Attribute Variant",
-				"enabled": 1,
-				"template_html": marker,
-			}
-		).insert(ignore_permissions=True)
-		self.addCleanup(frappe.delete_doc, "OG Image Template", template.name, force=True)
-
-		result = generator.resolve_template("Style Attribute Variant")
-		self.assertEqual(result, marker)
+		use_og_template(self, marker)
+		self.assertEqual(generator.resolve_template("Style Attribute Variant"), marker)
 
 	def test_disabled_template_is_ignored(self):
-		frappe.db.delete("OG Image Template", {"for_doctype": "Style Attribute Variant"})
-		template = frappe.get_doc(
-			{
-				"doctype": "OG Image Template",
-				"for_doctype": "Style Attribute Variant",
-				"enabled": 0,
-				"template_html": "<div>disabled</div>",
-			}
-		).insert(ignore_permissions=True)
-		self.addCleanup(frappe.delete_doc, "OG Image Template", template.name, force=True)
-
-		result = generator.resolve_template("Style Attribute Variant")
-		self.assertEqual(result, generator.BUNDLED_CARD_TEMPLATE)
+		use_og_template(self, "<div>disabled</div>")
+		frappe.db.set_value("OG Image Template", {"for_doctype": "Style Attribute Variant"}, "enabled", 0)
+		self.assertEqual(
+			generator.resolve_template("Style Attribute Variant"), generator.BUNDLED_CARD_TEMPLATE
+		)
 
 
-class TestProductImageDataUri(IntegrationTestCase):
-	def test_returns_none_for_http_url(self):
-		self.assertIsNone(generator.product_image_data_uri("http://example.com/a.png"))
+class TestCardImageUrl(IntegrationTestCase):
+	def test_a_public_file_or_asset_is_kept(self):
+		url = make_public_file(self, f"og-test-{frappe.generate_hash(length=10)}.jpg")
+		self.assertEqual(generator.card_image_url(url), url)
+		self.assertEqual(generator.card_image_url(branding.BUNDLED_LOGO), branding.BUNDLED_LOGO)
 
-	def test_returns_none_for_https_url(self):
-		self.assertIsNone(generator.product_image_data_uri("https://example.com/a.png"))
+	def test_a_file_name_with_a_space_is_quoted(self):
+		url = make_public_file(self, f"og test {frappe.generate_hash(length=10)}.jpg")
+		self.assertEqual(generator.card_image_url(url), url.replace(" ", "%20"))
+		self.assertEqual(generator.card_image_url(url.replace(" ", "%20")), url.replace(" ", "%20"))
 
-	def test_returns_none_for_missing_files_path(self):
-		missing = f"/files/og-test-missing-{frappe.generate_hash(length=10)}.png"
-		self.assertIsNone(generator.product_image_data_uri(missing))
+	def test_remote_private_missing_and_climbing_images_are_dropped(self):
+		public = make_public_file(self, f"og-test-{frappe.generate_hash(length=10)}.jpg")
+		for url in (
+			"http://example.com/a.png",
+			"https://example.com/a.png",
+			"//example.com/files/a.png",
+			"/private/files/a.png",
+			"/files/og-test-missing.png",
+			"/assets/../site_config.json",
+			"/files/../private/files/a.png",
+			"/files/%2e%2e/private/files/a.png",
+			f"/files/x/..{public.removeprefix('/files')}",
+			"data:image/png;base64,AAAA",
+			"",
+			None,
+		):
+			with self.subTest(url=url):
+				self.assertIsNone(generator.card_image_url(url))
 
-	def test_returns_none_for_non_files_path(self):
-		self.assertIsNone(generator.product_image_data_uri("/assets/something.png"))
 
-	def test_returns_jpeg_data_uri_and_downscales_large_source(self):
-		from PIL import Image
+class TestCardPage(IntegrationTestCase):
+	"""What Chromium is asked to draw."""
 
-		# Write a large opaque PNG to public files; far bigger than CARD_PHOTO_PX.
-		filename = f"og-test-src-{frappe.generate_hash(length=10)}.png"
-		public_path = os.path.join(get_files_path(is_private=False), filename)
-		large = Image.new("RGB", (1600, 1600), (10, 20, 30))
-		large.save(public_path, format="PNG")
-		self.addCleanup(lambda: os.path.exists(public_path) and os.remove(public_path))
+	def render_product_card(self, **context):
+		with patch.object(generator, "get_preview_from_html", return_value=b"jpg") as preview:
+			html_str = generator.render_card_html(generator.BUNDLED_CARD_TEMPLATE, context)
+			self.assertEqual(generator.render_card_image(html_str), b"jpg")
+		return preview.call_args
 
-		source_bytes = os.path.getsize(public_path)
-		data_uri = generator.product_image_data_uri(f"/files/{filename}")
+	def test_the_card_is_a_1200_by_630_jpeg_with_a_content_policy_after_the_doctype(self):
+		call = self.render_product_card(display_name="Brake pads")
 
-		self.assertIsNotNone(data_uri)
-		self.assertTrue(data_uri.startswith("data:image/jpeg;base64,"))
+		self.assertEqual(call.kwargs, {"format": "jpg", "width": 1200, "height": 630})
+		html_str = call.args[0]
+		self.assertTrue(html_str.startswith(f"<!doctype html>{generator.CONTENT_POLICY}"), html_str[:200])
+		self.assertIn("default-src 'none'", generator.CONTENT_POLICY)
 
-		decoded = base64.b64decode(data_uri[len("data:image/jpeg;base64,") :])
-		# Downscale sanity: the inlined JPEG is meaningfully smaller than the source.
-		self.assertLess(len(decoded), source_bytes)
+	def test_every_value_is_escaped(self):
+		html_str = self.render_product_card(
+			store_name=HOSTILE_TITLE, display_name=HOSTILE_TITLE, brand=HOSTILE_TITLE, price=HOSTILE_TITLE
+		).args[0]
 
-		# The longest edge must be clamped to CARD_PHOTO_PX.
-		out_image = Image.open(BytesIO(decoded))
-		self.assertEqual(out_image.format, "JPEG")
-		self.assertLessEqual(max(out_image.size), generator.CARD_PHOTO_PX)
+		self.assertNotIn("<img src=http://example.com", html_str)
+		self.assertEqual(html_str.count("&#34;&gt;&lt;img src=http://example.com/x&gt;"), 4)
 
-	def test_flattens_transparency_to_jpeg(self):
-		from PIL import Image
+	def test_an_image_attribute_cannot_be_broken_out_of(self):
+		html_str = self.render_product_card(photo_url='/files/a.jpg" onerror="x').args[0]
+		self.assertIn('src="/files/a.jpg&#34; onerror=&#34;x"', html_str)
 
-		filename = f"og-test-rgba-{frappe.generate_hash(length=10)}.png"
-		public_path = os.path.join(get_files_path(is_private=False), filename)
-		rgba = Image.new("RGBA", (300, 300), (200, 0, 0, 0))  # fully transparent red
-		rgba.save(public_path, format="PNG")
-		self.addCleanup(lambda: os.path.exists(public_path) and os.remove(public_path))
+	def test_fonts_come_from_commera_assets(self):
+		html_str = self.render_product_card(display_name="Brake pads").args[0]
 
-		data_uri = generator.product_image_data_uri(f"/files/{filename}")
-		self.assertIsNotNone(data_uri)
-		self.assertTrue(data_uri.startswith("data:image/jpeg;base64,"))
-		decoded = base64.b64decode(data_uri[len("data:image/jpeg;base64,") :])
-		out_image = Image.open(BytesIO(decoded))
-		self.assertEqual(out_image.mode, "RGB")  # alpha flattened away
+		for url in CARD_FONTS:
+			with self.subTest(url=url):
+				self.assertIn(f'url("{url}")', html_str)
+				path = frappe.get_app_path("commera", "public", url.removeprefix("/assets/commera/"))
+				self.assertTrue(os.path.isfile(path))
+		self.assertIn('font-family: "OpenSans", "Commera Emoji", sans-serif', html_str)
+		self.assertNotIn("local(", html_str)
+
+	def test_the_product_photo_is_a_site_file(self):
+		variant = get_published_variant()
+		if not variant:
+			self.skipTest("No published Style Attribute Variant available.")
+		photo = make_public_file(self, f"og-test-{frappe.generate_hash(length=10)}.jpg")
+
+		with (
+			patch.object(generator, "get_preview_from_html", return_value=b"jpg") as preview,
+			patch("commera.product_detail.get_product_detail", return_value=detail_with_image(photo)),
+		):
+			doc = frappe.get_doc("Style Attribute Variant", variant.name)
+			generator.render_card_for_doc("Style Attribute Variant", doc)
+
+		self.assertIn(f'<img class="photo" src="{photo}"', preview.call_args.args[0])
+
+	def test_an_og_image_template_fragment_gets_the_card_page(self):
+		variant = get_published_variant()
+		if not variant:
+			self.skipTest("No published Style Attribute Variant available.")
+		use_og_template(self, "<div style='display:flex'>{{ display_name | e }}</div>")
+
+		with patch.object(generator, "get_preview_from_html", return_value=b"jpg") as preview:
+			doc = frappe.get_doc("Style Attribute Variant", variant.name)
+			generator.render_card_for_doc("Style Attribute Variant", doc)
+
+		html_str = preview.call_args.args[0]
+		self.assertIn('<html lang="', html_str)
+		self.assertIn(CARD_FONTS[0], html_str)
+		self.assertIn(f"<div style='display:flex'>{escape(generator.get_card_title(doc))}", html_str)
+
+	def test_a_template_without_a_doctype_still_gets_the_content_policy_first(self):
+		self.assertTrue(
+			generator.with_content_policy("<html><body>x</body></html>").startswith(generator.CONTENT_POLICY)
+		)
+
+
+class TestStoreCardPage(IntegrationTestCase):
+	def test_the_card_carries_the_store_name_and_the_logo_url(self):
+		html_str = generator.build_store_card_html()
+
+		self.assertIn(escape(seo.get_store_name()), html_str)
+		self.assertIn(f'src="{generator.card_image_url(branding.get_brand_assets().logo)}"', html_str)
+
+	def test_a_remote_logo_is_left_out(self):
+		remote = frappe._dict(logo="https://cdn.example.com/logo.png")
+		with patch.object(generator, "get_brand_assets", return_value=remote):
+			html_str = generator.build_store_card_html()
+
+		self.assertNotIn("cdn.example.com", html_str)
+		self.assertNotIn('class="logo"', html_str)
 
 
 class TestContextBuilderFor(IntegrationTestCase):
@@ -146,268 +221,52 @@ class TestPriceParity(IntegrationTestCase):
 		context = generator.build_variant_card_context(variant_doc)
 
 		amount = (detail or {}).get("sale_price") or (detail or {}).get("default_price")
-		if amount:
-			expected = f"{seo.get_site_currency()} {flt(amount):.2f}"
-		else:
-			expected = ""
+		expected = f"{seo.get_site_currency()} {flt(amount):.2f}" if amount else ""
 		self.assertEqual(context["price"], expected)
 
 	def test_context_shape(self):
 		variant_doc = frappe.get_doc("Style Attribute Variant", self.variant.name)
 		context = generator.build_variant_card_context(variant_doc)
-		for key in ("store_name", "display_name", "brand", "price", "photo_data_uri", "doc"):
+		for key in ("store_name", "display_name", "brand", "price", "photo_url", "photo_data_uri", "doc"):
 			self.assertIn(key, context)
 		self.assertIs(context["doc"], variant_doc)
+		self.assertEqual(context["photo_data_uri"], context["photo_url"])
 		self.assertEqual(context["store_name"], seo.get_store_name())
 
 
-class TestServeOgImage(IntegrationTestCase):
-	def setUp(self):
-		frappe.local.flags.redirect_location = None
-
-	def tearDown(self):
-		frappe.local.flags.redirect_location = None
-
-	def test_raises_does_not_exist_for_unknown_route(self):
-		unknown = f"no-such-route-{frappe.generate_hash(length=10)}"
-		with self.assertRaises(frappe.DoesNotExistError):
-			og_image_render.serve_og_image(unknown)
-
-	def test_raises_does_not_exist_for_unpublished_variant(self):
-		# A draft route must 404 rather than leak an unreleased product card to a crawler.
-		route = f"og-test-draft-{frappe.generate_hash(length=10)}"
-		variant = frappe.new_doc("Style Attribute Variant")
-		variant.configurator = get_test_configurator()
-		variant.item_style = get_test_item()
-		variant.attribute_value = f"Val {frappe.generate_hash(length=6)}"
-		variant.display_name = f"Draft {route}"
-		variant.route = route
-		variant.is_published = 0
-		variant.insert(ignore_permissions=True)
-
-		with self.assertRaises(frappe.DoesNotExistError):
-			og_image_render.serve_og_image(route)
-
-	def test_redirects_and_writes_cache_on_success(self):
-		variant = get_published_variant()
-		if not variant:
-			self.skipTest("No published Style Attribute Variant available.")
-
-		# Pin the cache path so the render -> write -> redirect contract runs in isolation from disk state.
-		public_root = get_files_path(is_private=False)
-		cache_dir = os.path.join(public_root, og_image_render.CACHE_SUBDIR)
-		os.makedirs(cache_dir, exist_ok=True)
-		cache_path = os.path.join(cache_dir, f"og-test-{frappe.generate_hash(length=12)}.png")
-		if os.path.exists(cache_path):
-			os.remove(cache_path)
-		self.addCleanup(lambda: os.path.exists(cache_path) and os.remove(cache_path))
-
-		fixed_png = b"\x89PNG\r\n\x1a\n-fake-card-bytes"
-		# Mock ONLY the Node/Satori boundary; everything else is real.
-		with (
-			patch(
-				"commera.www.og_image_render.render_card_for_doc",
-				return_value=fixed_png,
-			) as mocked,
-			patch(
-				"commera.www.og_image_render.cache_file_path",
-				return_value=cache_path,
-			),
-		):
-			with self.assertRaises(frappe.Redirect):
-				og_image_render.serve_og_image(variant.route)
-
-		mocked.assert_called_once()
-		self.assertTrue(os.path.exists(cache_path))
-		with open(cache_path, "rb") as cache_file:
-			self.assertEqual(cache_file.read(), fixed_png)
-
-		expected_url = "/files/" + os.path.relpath(cache_path, public_root).replace(os.sep, "/")
-		self.assertEqual(frappe.local.flags.redirect_location, expected_url)
-
-	def test_cached_card_is_served_without_rerender(self):
-		variant = get_published_variant()
-		if not variant:
-			self.skipTest("No published Style Attribute Variant available.")
-
-		public_root = get_files_path(is_private=False)
-		cache_dir = os.path.join(public_root, og_image_render.CACHE_SUBDIR)
-		os.makedirs(cache_dir, exist_ok=True)
-		cache_path = os.path.join(cache_dir, f"og-test-{frappe.generate_hash(length=12)}.png")
-		og_image_render.write_cache(cache_path, b"cached")
-		self.addCleanup(lambda: os.path.exists(cache_path) and os.remove(cache_path))
-
-		# Pin the same path on both calls so the cache-hit branch is reachable.
-		with (
-			patch("commera.www.og_image_render.render_card_for_doc") as mocked,
-			patch(
-				"commera.www.og_image_render.cache_file_path",
-				return_value=cache_path,
-			),
-		):
-			with self.assertRaises(frappe.Redirect):
-				og_image_render.serve_og_image(variant.route)
-			mocked.assert_not_called()
-
-	def test_renderer_upgrade_ignores_old_cached_cards(self):
-		variant = get_published_variant()
-		if not variant:
-			self.skipTest("No published Style Attribute Variant available.")
-		doc = frappe.get_cached_doc("Style Attribute Variant", variant.name)
-		version = generator.get_variant_card_version(doc)
-		key = hashlib.md5(f"{variant.route}-{version}".encode(), usedforsecurity=False).hexdigest()[:16]
-		old_path = os.path.join(get_files_path(is_private=False), "og-cache", f"{key}.png")
-		og_image_render.write_cache(old_path, b"old blank card")
-		new_path = og_image_render.cache_file_path(variant.route, version)
-		self.addCleanup(lambda: os.path.exists(old_path) and os.remove(old_path))
-		self.addCleanup(lambda: os.path.exists(new_path) and os.remove(new_path))
-		self.assertNotEqual(old_path, new_path)
-		with patch.object(og_image_render, "render_card_for_doc", return_value=b"new card") as render:
-			with self.assertRaises(frappe.Redirect):
-				og_image_render.serve_og_image(variant.route)
-			render.assert_called_once()
-		markup = "<div>same store</div>"
-		version = frappe.as_json([generator.get_localization().language.direction, markup])
-		key = hashlib.md5(f"store-{version}".encode(), usedforsecurity=False).hexdigest()[:16]
-		old_store = os.path.join(get_files_path(is_private=False), "og-cache", f"{key}.png")
-		new_store = og_image_render.cache_file_path("store", version)
-		og_image_render.write_cache(old_store, b"old blank store")
-		self.addCleanup(lambda: os.path.exists(old_store) and os.remove(old_store))
-		self.addCleanup(lambda: os.path.exists(new_store) and os.remove(new_store))
-		with (
-			patch.object(og_image_render, "build_store_card_html", return_value=markup),
-			patch.object(og_image_render, "render_og_png", return_value=b"new store") as render,
-		):
-			with self.assertRaises(frappe.Redirect):
-				og_image_render.serve_store_card()
-			render.assert_called_once()
-
-	def test_cache_key_is_deterministic(self):
-		"""Cache key must be stable per (route, modified): frappe.generate_hash ignores its input in v15."""
-		route = "some-route"
-		modified = "2026-06-17 14:08:55.980572"
-		first = og_image_render.cache_file_path(route, modified)
-		second = og_image_render.cache_file_path(route, modified)
-		self.assertEqual(first, second)
-		# A different modified timestamp must yield a different key (auto-invalidation).
-		self.assertNotEqual(first, og_image_render.cache_file_path(route, "2026-06-18 00:00:00"))
-
-
-class TestStoreCard(IntegrationTestCase):
-	def setUp(self):
-		frappe.local.flags.redirect_location = None
-		public_root = get_files_path(is_private=False)
-		cache_dir = os.path.join(public_root, og_image_render.CACHE_SUBDIR)
-		os.makedirs(cache_dir, exist_ok=True)
-		self.cache_path = os.path.join(cache_dir, f"og-test-{frappe.generate_hash(length=12)}.png")
-		self.addCleanup(lambda: os.path.exists(self.cache_path) and os.remove(self.cache_path))
-		self.expected_url = "/files/" + os.path.relpath(self.cache_path, public_root).replace(os.sep, "/")
-
-	def tearDown(self):
-		frappe.local.flags.redirect_location = None
-
-	def test_card_carries_the_store_name_and_inlined_logo(self):
-		html_str = generator.build_store_card_html()
-
-		self.assertIn(seo.get_store_name(), html_str)
-		self.assertIn("data:image/", html_str)
-
-	def test_bundled_svg_logo_is_inlined_as_svg(self):
-		self.assertTrue(
-			generator.logo_data_uri(branding.BUNDLED_LOGO).startswith("data:image/svg+xml;base64,")
-		)
-
-	def test_raster_logo_keeps_its_transparency(self):
-		from PIL import Image
-
-		buffer = BytesIO()
-		Image.new("RGBA", (40, 20), (0, 0, 0, 0)).save(buffer, format="PNG")
-		logo = frappe.get_doc(
-			{
-				"doctype": "File",
-				"file_name": f"og-logo-{frappe.generate_hash(length=8)}.png",
-				"content": buffer.getvalue(),
-				"is_private": 0,
-			}
-		).insert(ignore_permissions=True)
-
-		data_uri = generator.logo_data_uri(logo.file_url)
-
-		self.assertTrue(data_uri.startswith("data:image/png;base64,"))
-		inlined = Image.open(BytesIO(base64.b64decode(data_uri.split(",", 1)[1])))
-		self.assertEqual(inlined.getpixel((0, 0))[3], 0)
-
-	def test_asset_path_cannot_climb_out_of_assets(self):
-		self.assertIsNone(generator.logo_data_uri("/assets/../site_config.json"))
-
-	def test_remote_logo_is_skipped(self):
-		self.assertIsNone(generator.logo_data_uri("https://cdn.example.com/logo.png"))
-
-	def test_renders_once_then_serves_from_cache(self):
-		fixed_png = b"\x89PNG\r\n\x1a\n-fake-store-card"
-		# Mock ONLY the Node/Satori boundary; the template and the cache are real.
-		with (
-			patch("commera.www.og_image_render.render_og_png", return_value=fixed_png) as mocked,
-			patch("commera.www.og_image_render.cache_file_path", return_value=self.cache_path),
-		):
-			for _attempt in range(2):
-				with self.assertRaises(frappe.Redirect):
-					og_image_render.serve_store_card()
-
-		mocked.assert_called_once()
-		with open(self.cache_path, "rb") as cache_file:
-			self.assertEqual(cache_file.read(), fixed_png)
-		self.assertEqual(frappe.local.flags.redirect_location, self.expected_url)
-
-	def test_failed_render_falls_back_to_the_store_logo(self):
-		frappe.form_dict.route = "store.png"
-		self.addCleanup(frappe.form_dict.pop, "route", None)
-
-		with (
-			patch("commera.www.og_image_render.render_og_png", side_effect=RuntimeError("node missing")),
-			patch("commera.www.og_image_render.cache_file_path", return_value=self.cache_path),
-		):
-			with self.assertRaises(frappe.Redirect):
-				og_image_render.get_context(frappe._dict())
-
-		self.assertEqual(frappe.local.flags.redirect_location, branding.get_brand_assets().logo)
-
-
 class TestClearOldCards(IntegrationTestCase):
-	"""The cache key embeds `modified`, so every edit strands a PNG; clear_old_cards is the only bound."""
+	"""The cache key embeds `modified`, so every edit strands a card; clear_old_cards is the only bound."""
 
 	def setUp(self):
 		self.cache_dir = os.path.join(get_files_path(is_private=False), "og-cache")
 		os.makedirs(self.cache_dir, exist_ok=True)
 
-	def write_card(self, age_days, suffix=".png"):
+	def write_card(self, age_days, suffix=".jpg"):
 		path = os.path.join(self.cache_dir, f"og-test-{frappe.generate_hash(length=12)}{suffix}")
 		with open(path, "wb") as card_file:
-			card_file.write(b"\x89PNG\r\n\x1a\n")
+			card_file.write(b"\xff\xd8\xff")
 		aged = time.time() - (age_days * 86400)
 		os.utime(path, (aged, aged))
 		self.addCleanup(lambda: os.path.exists(path) and os.remove(path))
 		return path
 
-	def test_stale_card_is_pruned_and_fresh_one_survives(self):
-		stale = self.write_card(age_days=45)
+	def test_stale_cards_and_unfinished_writes_are_pruned_and_fresh_ones_survive(self):
+		stale = [self.write_card(45, suffix) for suffix in (".jpg", ".png", ".jpg.tmp-abcd1234")]
 		fresh = self.write_card(age_days=1)
 
 		generator.clear_old_cards(days=30)
 
-		self.assertFalse(os.path.exists(stale))
+		self.assertFalse(any(os.path.exists(path) for path in stale))
 		self.assertTrue(os.path.exists(fresh))
 
 	def test_cutoff_is_the_days_argument_not_the_default(self):
-		# 10 days old: pruned at days=5, kept at the 30-day default.
 		card = self.write_card(age_days=10)
 		generator.clear_old_cards(days=30)
 		self.assertTrue(os.path.exists(card))
 		generator.clear_old_cards(days=5)
 		self.assertFalse(os.path.exists(card))
 
-	def test_non_png_files_are_left_alone(self):
-		# The cache dir sits under public/files; only our own .png cards may be deleted.
+	def test_other_files_are_left_alone(self):
 		bystander = self.write_card(age_days=365, suffix=".txt")
 		generator.clear_old_cards(days=30)
 		self.assertTrue(os.path.exists(bystander))
@@ -417,60 +276,13 @@ class TestClearOldCards(IntegrationTestCase):
 			"commera.og.generator.get_files_path",
 			return_value=os.path.join(self.cache_dir, f"nope-{frappe.generate_hash(length=8)}"),
 		):
-			generator.clear_old_cards(days=30)  # must not raise
+			generator.clear_old_cards(days=30)
 
 
-class TestRenderOgPng(IntegrationTestCase):
-	"""End-to-end through the real Node/Satori subprocess - the only cover for og_satori.mjs, fonts and resvg."""
-
-	def test_renders_a_spec_sized_png(self):
-		from PIL import Image
-
-		html_str = "<div style='display:flex;width:100%;height:100%;background:#fff'>OG</div>"
-		png_bytes = generator.render_og_png(html_str, generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT)
-
-		image = Image.open(BytesIO(png_bytes))
-		self.assertEqual(image.format, "PNG")
-		self.assertEqual(image.size, (generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT))
-
-	def test_a_long_title_keeps_the_product_photo(self):
-		from PIL import Image
-
-		from commera.shop_themes.render import render_themed_template
-
-		photo_colour = (222, 230, 233)
-		buffer = BytesIO()
-		Image.new("RGB", (630, 630), photo_colour).save(buffer, format="PNG")
-		context = {
-			"display_name": "Premium Ceramic Brake Pads for Sports Cars - Black",
-			"photo_data_uri": f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}",
-		}
-		html_str = render_themed_template(generator.BUNDLED_CARD_TEMPLATE, context)
-		png_bytes = generator.render_og_png(html_str, generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT)
-
-		card = Image.open(BytesIO(png_bytes)).convert("RGB")
-		self.assertEqual(card.getpixel((600, 600)), photo_colour)
-		self.assertEqual(card.getpixel((1190, 600)), photo_colour)
-
-	def test_store_card_renders_a_spec_sized_png(self):
-		from PIL import Image
-
-		png_bytes = generator.render_og_png(
-			generator.build_store_card_html(), generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT
-		)
-
-		image = Image.open(BytesIO(png_bytes))
-		self.assertEqual(image.size, (generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT))
-
-	def test_render_card_for_doc_produces_a_png_for_a_real_variant(self):
-		from PIL import Image
-
-		variant = get_published_variant()
-		if not variant:
-			self.skipTest("No published Style Attribute Variant available.")
-
-		variant_doc = frappe.get_doc("Style Attribute Variant", variant.name)
-		png_bytes = generator.render_card_for_doc("Style Attribute Variant", variant_doc)
-
-		image = Image.open(BytesIO(png_bytes))
-		self.assertEqual(image.size, (generator.DEFAULT_OG_WIDTH, generator.DEFAULT_OG_HEIGHT))
+def detail_with_image(image_url):
+	return {
+		"product": frappe._dict(brand=""),
+		"sale_price": None,
+		"default_price": None,
+		"images": [image_url],
+	}

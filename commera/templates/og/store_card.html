@@ -1,14 +1,52 @@
-<div style="display:flex;flex-direction:column;justify-content:space-between;width:1200px;height:630px;padding:72px 80px;background:#fafaf9;color:#1c1917;font-family:'OpenSans';border-bottom:16px solid #1c1917;">
-  <div style="display:flex;flex-direction:column;">
-    {% if logo_data_uri %}
-    <img src="{{ logo_data_uri }}" style="height:140px;max-width:600px;object-fit:contain;object-position:left;" />
-    {% endif %}
-    <div style="font-size:72px;font-weight:700;line-height:1.1;margin-top:40px;">{{ store_name | e }}</div>
-    {% if tagline %}
-    <div style="font-size:34px;font-weight:400;color:#57534e;line-height:1.35;margin-top:20px;max-width:1000px;">{{ tagline | e }}</div>
-    {% endif %}
-  </div>
-  {% if site_host %}
-  <div style="font-size:28px;font-weight:700;color:#78716c;">{{ site_host | e }}</div>
-  {% endif %}
+{% extends "commera/templates/og/base.html" %}
+
+{% block head %}
+<style>
+	.card {
+		display: flex;
+		flex-direction: column;
+		justify-content: space-between;
+		height: 100%;
+		padding: 72px 80px;
+		background: #fafaf9;
+		color: #1c1917;
+		border-bottom: 16px solid #1c1917;
+	}
+	.logo { display: block; height: 140px; max-width: 600px; object-fit: contain; object-position: left; }
+	[dir="rtl"] .logo { object-position: right; }
+	.name {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		overflow: hidden;
+		overflow-wrap: anywhere;
+		margin-top: 40px;
+		font-size: 72px;
+		font-weight: 700;
+		line-height: 1.1;
+	}
+	.tagline {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		overflow: hidden;
+		max-width: 1000px;
+		margin-top: 20px;
+		color: #57534e;
+		font-size: 34px;
+		line-height: 1.35;
+	}
+	.host { color: #78716c; font-size: 28px; font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="card">
+	<div>
+		{% if logo_url %}<img class="logo" src="{{ logo_url | e }}" alt="">{% endif %}
+		<div class="name">{{ store_name | e }}</div>
+		{% if tagline %}<div class="tagline">{{ tagline | e }}</div>{% endif %}
+	</div>
+	{% if site_host %}<div class="host"><bdi>{{ site_host | e }}</bdi></div>{% endif %}
 </div>
+{% endblock %}

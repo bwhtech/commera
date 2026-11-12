@@ -43,7 +43,7 @@ class OGImageTemplate(Document):
 			frappe.throw(f"No {self.for_doctype} records exist to preview this template against.")
 
 		sample_doc = frappe.get_cached_doc(self.for_doctype, sample[0].name)
-		png_bytes = generator.render_card_for_doc(self.for_doctype, sample_doc)
+		jpeg_bytes = generator.render_card_for_doc(self.for_doctype, sample_doc)
 
 		if self.preview_image:
 			prior = frappe.db.get_value(
@@ -60,8 +60,8 @@ class OGImageTemplate(Document):
 				frappe.delete_doc("File", prior, ignore_permissions=True)
 
 		preview_file = save_file(
-			f"og-preview-{frappe.scrub(self.name)}.png",
-			png_bytes,
+			f"og-preview-{frappe.scrub(self.name)}.jpg",
+			jpeg_bytes,
 			self.doctype,
 			self.name,
 			df="preview_image",

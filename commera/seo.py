@@ -14,8 +14,8 @@ from commera.utils import get_store_currency
 
 META_DESCRIPTION_MAX_LENGTH = 160
 
-# Satori card of the store's logo and name, served by www/og_image_render.
-DEFAULT_OG_IMAGE = "/og-image/store.png"
+# Card of the store's logo and name, served by www/og_image_render.
+DEFAULT_OG_IMAGE = "/og-image/store.jpg"
 
 
 def get_default_og_image() -> str:
@@ -25,7 +25,7 @@ def get_default_og_image() -> str:
 
 def get_product_og_image(route: str) -> str:
 	"""A product's card under the request's locale prefix, so each language and market has its own."""
-	return localized_url(f"/og-image/{route}.png")
+	return localized_url(f"/og-image/{route}.jpg")
 
 
 def encode_url_path(url):

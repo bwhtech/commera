@@ -1,0 +1,17 @@
+{#- The fonts of every OG card, from Commera's assets, never system fonts. Add a font here. -#}
+{#- "OpenSans" takes Arabic and Hebrew by unicode-range: old card templates ask for 'OpenSans'. -#}
+{#- Emoji need a family of their own; as an "OpenSans" face, Chromium does not use them. -#}
+{#- The emoji range has the digits, # and *, so 1️⃣ is one emoji: Open Sans, first, keeps plain digits. -#}
+{%- set arabic = "U+0600-06FF, U+0750-077F, U+0870-08FF, U+FB50-FDFF, U+FE70-FEFF" -%}
+{%- set hebrew = "U+0590-05FF, U+FB1D-FB4F" -%}
+{%- set emoji = "U+0023, U+002A, U+0030-0039, U+00A9, U+00AE, U+200D, U+203C, U+2049, U+20E3, U+2122, U+2139, U+2194-2199, U+21A9-21AA, U+231A-23FF, U+24C2, U+25AA-25FE, U+2600-27BF, U+2934-2935, U+2B05-2B55, U+3030, U+303D, U+3297, U+3299, U+FE0F, U+1F000-1FAFF, U+E0020-E007F" -%}
+{#- `block`: the card is one frame, so a fallback font would stay in the image. -#}
+<style>
+	@font-face { font-family: "OpenSans"; src: url("/assets/commera/fonts/OpenSans/OpenSans-Regular.ttf"); font-weight: 400; font-display: block; }
+	@font-face { font-family: "OpenSans"; src: url("/assets/commera/fonts/OpenSans/OpenSans-Bold.ttf"); font-weight: 700; font-display: block; }
+	@font-face { font-family: "OpenSans"; src: url("/assets/commera/fonts/IBMPlexSansArabic/IBMPlexSansArabic-Regular.ttf"); font-weight: 400; font-display: block; unicode-range: {{ arabic }}; }
+	@font-face { font-family: "OpenSans"; src: url("/assets/commera/fonts/IBMPlexSansArabic/IBMPlexSansArabic-Bold.ttf"); font-weight: 700; font-display: block; unicode-range: {{ arabic }}; }
+	@font-face { font-family: "OpenSans"; src: url("/assets/commera/fonts/IBMPlexSansHebrew/IBMPlexSansHebrew-Regular.ttf"); font-weight: 400; font-display: block; unicode-range: {{ hebrew }}; }
+	@font-face { font-family: "OpenSans"; src: url("/assets/commera/fonts/IBMPlexSansHebrew/IBMPlexSansHebrew-Bold.ttf"); font-weight: 700; font-display: block; unicode-range: {{ hebrew }}; }
+	@font-face { font-family: "Commera Emoji"; src: url("/assets/commera/fonts/NotoColorEmoji/Noto-COLRv1.woff2") format("woff2"); font-display: block; unicode-range: {{ emoji }}; }
+</style>

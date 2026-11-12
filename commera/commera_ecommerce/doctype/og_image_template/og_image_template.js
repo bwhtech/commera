@@ -7,7 +7,7 @@ frappe.ui.form.on('OG Image Template', {
 		if (frm.is_new()) return;
 
 		frm.add_custom_button(__('Generate Preview'), async () => {
-			// Generation shells out to Node (Satori) and takes ~1s; freeze for feedback.
+			// Chromium takes a few seconds to render the card; freeze for feedback.
 			frappe.dom.freeze(__('Generating preview…'));
 			try {
 				await frm.call('generate_preview');
