@@ -6,7 +6,10 @@
             prices_ready: false,
             // Keep market prices off persisted entries so refreshes do not echo between tabs.
             display_items: [],
-            refresh_version: 0,
+            price_cache: {},
+            refresh_pending: null,
+            prices_failed: false,
+            market_key: null,
 
             init() {
                 this.refresh_route_set();
@@ -29,31 +32,61 @@
                 });
             },
 
-            async refresh_prices() {
-                this.prices_ready = false;
-                const version = ++this.refresh_version;
-                const display = this.items.map(item => ({ ...item }));
-                this.display_items = display;
-                await Promise.all(display.map(async item => {
-                    item.sale_price = null;
-                    item.default_price = null;
-                    item.available = false;
-                    try {
-                        const url = '/api/v2/method/commera.api.storefront.products.get_product?handle=' + encodeURIComponent(item.route);
-                        const { data: product } = await frappe_call(url, {}, 'GET');
-                        const variant = product.variants.find(variant => variant.price === product.price);
-                        item.sale_price = product.price;
-                        item.default_price = variant?.compare_at_price ?? null;
-                        item.currency = product.currency;
-                        item.available = product.available;
-                    } catch (error) {
-                        // A removed product stays in the wishlist for the shopper to remove.
-                    }
-                }));
-                if (version === this.refresh_version) {
-                    this.display_items = [...display];
-                    this.prices_ready = true;
+            async refresh_prices(retry = false) {
+                const [market] = with_page_localization('/api/v2/method/commera.api.storefront.products.get_wishlist_prices', {}, 'GET');
+                if (this.market_key !== market || retry) {
+                    this.market_key = market;
+                    this.price_cache = {};
                 }
+                this.render_prices();
+                if (this.refresh_pending) return this.refresh_pending;
+                this.refresh_pending = this.load_prices();
+                try {
+                    await this.refresh_pending;
+                } finally {
+                    this.refresh_pending = null;
+                    this.render_prices();
+                }
+            },
+
+            async load_prices() {
+                this.prices_ready = false;
+                while (true) {
+                    const market = this.market_key;
+                    const handles = [...new Set(this.items.map(item => item.route))]
+                        .filter(handle => !(handle in this.price_cache)).slice(0, 100);
+                    if (!handles.length) break;
+                    try {
+                        const url = market + (market.includes('?') ? '&' : '?') + 'handles=' + encodeURIComponent(JSON.stringify(handles));
+                        const response = await fetch(url, { headers: { Accept: 'application/json' } });
+                        if (!response.ok) throw new Error('Wishlist refresh failed');
+                        const { data } = await response.json();
+                        if (!Array.isArray(data)) throw new Error('Invalid wishlist response');
+                        if (market !== this.market_key) continue;
+                        for (const handle of handles) {
+                            this.price_cache[handle] = data.find(product => product.handle === handle) ?? null;
+                        }
+                    } catch (error) {
+                        if (market !== this.market_key) continue;
+                        for (const handle of handles) this.price_cache[handle] = null;
+                    }
+                    this.render_prices();
+                }
+                this.prices_ready = true;
+            },
+
+            render_prices() {
+                this.prices_failed = this.items.some(item => this.price_cache[item.route] === null);
+                this.display_items = this.items.map(item => {
+                    const product = this.price_cache[item.route];
+                    return {
+                        ...item,
+                        sale_price: product?.price ?? null,
+                        default_price: product?.compare_at_price ?? null,
+                        currency: product?.currency,
+                        available: product?.available,
+                    };
+                });
             },
 
             refresh_route_set() {

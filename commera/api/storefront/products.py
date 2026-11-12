@@ -44,6 +44,33 @@ def get_product(handle: str) -> Product:
 	frappe.throw(_("Product {0} not found").format(handle), frappe.DoesNotExistError)
 
 
+@rate_limited_guest_api("GET", limit=600, seconds=60)
+def get_wishlist_prices(handles: list | str) -> list[dict]:
+	if isinstance(handles, str):
+		handles = frappe.parse_json(handles)
+	if not isinstance(handles, list) or len(handles) > 100:
+		frappe.throw(_("Invalid wishlist product list"), frappe.ValidationError)
+	if any(not isinstance(handle, str) or len(handle) > 140 for handle in handles):
+		frappe.throw(_("Invalid wishlist product list"), frappe.ValidationError)
+	if not handles:
+		return []
+	names = frappe.get_all(
+		"Style Attribute Variant",
+		filters={"route": ("in", handles), "is_published": 1},
+		pluck="name",
+	)
+	cards = {card["handle"]: card for card in catalog.get_product_cards_for(names)} if names else {}
+	return [
+		{
+			"handle": handle,
+			**{key: cards[handle][key] for key in ("price", "compare_at_price", "currency", "available")},
+		}
+		if handle in cards
+		else {"handle": handle, "price": None, "compare_at_price": None, "available": False}
+		for handle in dict.fromkeys(handles)
+	]
+
+
 def get_list(value: list | str | None) -> list[str]:
 	if isinstance(value, str):
 		value = value.split(",")

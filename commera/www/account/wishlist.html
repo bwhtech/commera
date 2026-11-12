@@ -3,6 +3,7 @@
 
 {% block user_body %}
 
+<button x-show="$store.wishlist.prices_failed" x-cloak @click="$store.wishlist.refresh_prices(true)">{{ _("Retry prices") }}</button>
 <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-6">
 	<template x-for="item in $store.wishlist.display_items">
 		<div class="flex flex-col w-fit mb-4">

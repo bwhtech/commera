@@ -10,6 +10,7 @@
 
 {% block uncontained_body %}
 {% call account_shell(_("Wishlist")) %}
+	<button x-show="$store.wishlist.prices_failed" x-cloak @click="$store.wishlist.refresh_prices(true)">{{ _("Retry prices") }}</button>
 <div class="account-card">
 	<div class="table-responsive" x-show="$store.wishlist.items.length" x-cloak>
 		<table class="table check-tbl style-1 account-table mb-0">
