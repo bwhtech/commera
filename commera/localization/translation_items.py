@@ -4,6 +4,7 @@ records of a resource with their fields, search across resources, and a batch sa
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass
+from heapq import merge
 from itertools import groupby, islice
 
 import frappe
@@ -148,8 +149,8 @@ class ItemList:
 			return self.database_page(query, to_do, cursor)
 		kinds = self.resource.get_field_kinds()
 		page, total, to_do_count, last_key = [], 0, 0, None
-		for name, entries in groupby(self.iter_entries(cursor), key=lambda entry: entry.name):
-			item = make_item(self.resource, name, list(entries), kinds)
+		for name, entries in self.iter_records(cursor):
+			item = make_item(self.resource, name, entries, kinds)
 			total += 1
 			to_do_count += bool(item["to_do"])
 			if to_do and not item["to_do"]:
@@ -160,7 +161,7 @@ class ItemList:
 				# The first page goes on to count every record; a later page stops here.
 				continue
 			page.append(item)
-			last_key = [name, item["fields"][-1]["field"]]
+			last_key = [name, ""]
 		more = len(page) == ITEMS_PER_PAGE and (to_do_count if to_do else total) > len(page)
 		result = {"items": self.finish(page), "next_cursor": json.dumps(last_key) if more else None}
 		if not cursor:
@@ -204,6 +205,23 @@ class ItemList:
 			return []
 		item = make_item(self.resource, name, page.entries, self.resource.get_field_kinds())
 		return self.finish([item])
+
+	def iter_records(self, cursor):
+		from commera.localization.resources import parse_cursor
+
+		after = parse_cursor(cursor)
+		sourceless = sorted(
+			(
+				entry
+				for entry in self.resource.scan_sourceless(self.language)
+				if entry.value and not entry.market
+			),
+			key=lambda entry: entry.name,
+		)
+		entries = merge(self.iter_entries(None), sourceless, key=lambda entry: entry.name)
+		for name, fields in groupby(entries, key=lambda entry: entry.name):
+			if not after or name > after[0]:
+				yield name, [entry for entry in fields if entry.source]
 
 	def iter_entries(self, cursor: str | None) -> Iterator[TranslationEntry]:
 		while True:

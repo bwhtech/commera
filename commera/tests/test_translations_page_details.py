@@ -57,6 +57,12 @@ class TestTranslationsPageDetails(TranslationsPageCase):
 	def test_reading_and_saving_before_the_source_text_column_is_migrated(self):
 		note = self.make_note("Unmigrated note")
 		has_column = type(frappe.local.db).has_column
+		sql = type(frappe.local.db).sql
+
+		def reject_source_text(db, query, *args, **kwargs):
+			if "source_text" in str(query).lower():
+				raise frappe.db.ProgrammingError(1054, "Unknown column source_text")
+			return sql(db, query, *args, **kwargs)
 
 		def without_source_text(method):
 			def fields(meta, *args, **kwargs):
@@ -78,6 +84,7 @@ class TestTranslationsPageDetails(TranslationsPageCase):
 
 		with (
 			patch.object(type(frappe.local.db), "has_column", column_exists),
+			patch.object(type(frappe.local.db), "sql", reject_source_text),
 			patch.object(Meta, "get_valid_fields", without_source_text(Meta.get_valid_fields)),
 			patch.object(Meta, "get_valid_columns", without_source_text(Meta.get_valid_columns)),
 		):
@@ -108,6 +115,25 @@ class TestTranslationsPageDetails(TranslationsPageCase):
 		self.assertEqual(translations_api.get_items("ar", "note", record=note.name)["items"], [])
 		self.assertNotIn(note.name, self.listed_names(to_do=0))
 		self.assertEqual(self.note_counts(), before)
+
+	def test_a_single_with_only_a_sourceless_translation_is_listed(self):
+		frappe.db.set_single_value("Landing Page Settings", {"gif_1": "/files/sale.gif", "gif_url_1": ""})
+		register("Landing Page Settings", "Landing Page Settings", "gif_1", "ar", "/files/ar.gif")
+		frappe.db.set_single_value("Landing Page Settings", "gif_1", "")
+		frappe.clear_document_cache("Landing Page Settings", "Landing Page Settings")
+
+		page = translations_api.get_items("ar", "landing_page")
+		self.assertEqual((page["total"], page["to_do"]), (1, 0))
+		(item,) = page["items"]
+		self.assertEqual(item["name"], "Landing Page Settings")
+		self.assertEqual(item["to_do"], 0)
+		(field,) = item["fields"]
+		self.assertEqual(
+			(field["field"], field["source_empty"], field["value"]), ("gif_1", True, "/files/ar.gif")
+		)
+		self.assertEqual(translations_api.get_items("ar", "landing_page", to_do=1)["items"], [])
+		counts = translations_api.get_overview()["counts"]["ar"]["landing_page"]
+		self.assertEqual(sum(counts.values()), 0)
 
 	def test_the_source_text_is_plain_and_bounded(self):
 		note = self.make_note("Long note", f"<p>Wrap &amp; send</p><p>{'x' * 600}</p>")

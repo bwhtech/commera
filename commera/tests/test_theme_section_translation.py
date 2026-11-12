@@ -404,6 +404,36 @@ class TestThemeSectionTranslation(IntegrationTestCase):
 		(found,) = [group for group in results if group["resource"] == "theme_section"]
 		self.assertEqual(found["records"], [{"name": ENTRY, "title": slide}])
 
+	def test_a_sourceless_theme_record_is_in_all_pages_but_not_to_do(self):
+		layout = self.editor_layout({"en": "", "ar": ARABIC_HEADING})
+		settings = layout["sections"][0]["blocks"][0]["settings"]
+		for field in ("subheading", "cta_label", "thumbnail_label"):
+			settings[field] = ""
+		publish(SUMMER_THEME, "index", layout)
+		counts = self.resource.count_work("ar")
+
+		with patch("commera.localization.translation_items.ITEMS_PER_PAGE", 1):
+			for to_do in (False, True):
+				names, cursor = [], None
+				while True:
+					page = translations_api.get_items("ar", "theme_section", to_do=to_do, cursor=cursor)
+					if cursor is None:
+						total = page["to_do"] if to_do else page["total"]
+					names.extend(item["name"] for item in page["items"])
+					if not (cursor := page["next_cursor"]):
+						break
+				self.assertEqual(len(names), total)
+				self.assertEqual(len(names), len(set(names)))
+				self.assertEqual(ENTRY in names, not to_do)
+		(item,) = translations_api.get_items("ar", "theme_section", record=ENTRY)["items"]
+		self.assertEqual(item["to_do"], 0)
+		self.assertEqual([field["field"] for field in item["fields"]], ["heading"])
+		settings["heading"] = ""
+		publish(SUMMER_THEME, "index", layout)
+		self.assertEqual(self.resource.count_work("ar"), counts)
+		page = translations_api.get_items("ar", "theme_section")
+		self.assertNotIn(ENTRY, {item["name"] for item in page["items"]})
+
 	def test_a_section_named_like_its_page_is_named_once(self):
 		self.assertEqual(
 			join_labels("Footer", "Footer", "Social links"), SEPARATOR.join(["Footer", "Social links"])
