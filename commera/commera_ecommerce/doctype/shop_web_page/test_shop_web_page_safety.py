@@ -103,7 +103,7 @@ class TestShopWebPageEscaping(ShopWebPageTestCase):
 	def test_the_starter_heading_matches_the_sdk_title(self):
 		register(PAGE, self.page.name, "title", "ar", "سياسة الإرجاع")
 		html = self.render_theme("Commera Starter")
-		self.assertIn("سياسة الإرجاع</h1>", html)
+		self.assertIn("سياسة الإرجاع</bdi></h1>", html)
 
 	def test_the_sdk_keeps_plain_text_unescaped(self):
 		use_storefront_language(self, "ar")
@@ -131,7 +131,7 @@ class TestShopWebPageEscaping(ShopWebPageTestCase):
 	def assert_escaped(self, html):
 		self.assertNotIn("<script>alert(1)", html)
 		self.assertNotIn(ATTRIBUTE_INJECTION, html)
-		self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;</h1>", html)
+		self.assertRegex(html, r"&lt;script&gt;alert\(1\)&lt;/script&gt;(</bdi>)?</h1>")
 		self.assertIn('content="&#34; onmouseover=&#34;alert(1)"', html)
 		self.assertIn("<title>&#34; onmouseover=&#34;alert(1)</title>", html)
 		parser = AttributeCollector()
