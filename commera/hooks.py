@@ -15,14 +15,13 @@ website_redirects = [
 	{"source": "/en-GB/(.*)", "target": r"/en/\1"},
 ]
 
-# localize_request strips the language prefix off request.path before any app's path resolver runs,
-# so the route rules below match the path without it. resolve_website_path sends the canonical redirects.
+# localize_request strips the language prefix and redirects before any path resolver runs. No
+# website_path_resolver here: Frappe keeps only the last app's, so ours would replace Builder's.
 before_request = [
 	"commera.item_price_guard.install_guard",
 	"commera.localization.routing.localize_request",
 ]
 before_job = ["commera.item_price_guard.install_guard"]
-website_path_resolver = "commera.localization.routing.resolve_website_path"
 # Frappe runs auth_hooks after its API key and OAuth checks, so a storefront API call knows its user.
 auth_hooks = ["commera.localization.routing.localize_api_request"]
 
