@@ -139,10 +139,10 @@ class TestSummerCartCurrency(CartCurrencyTestCase):
 		return f'<h5 class="mb-0">{self.pair_start(symbol)}{symbol}<span x-text="commera.format.amount($store.cart.total,'
 
 	def pair_start(self, symbol):
-		return '<bdi dir="ltr">' if 'class="currency-sign"' in symbol else ''
+		return '<bdi dir="ltr">' if 'class="currency-sign"' in symbol else ""
 
 	def pair_end(self, symbol):
-		return '</bdi>' if 'class="currency-sign"' in symbol else ''
+		return "</bdi>" if 'class="currency-sign"' in symbol else ""
 
 
 class TestLegacyCartCurrency(CartCurrencyTestCase):
