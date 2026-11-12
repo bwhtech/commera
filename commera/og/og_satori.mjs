@@ -6,6 +6,11 @@ import { Resvg } from '@resvg/resvg-js';
 import satori from 'satori';
 import { html } from 'satori-html';
 import { prepareTree } from './og_bidi.mjs';
+import {
+	graphemeImages,
+	loadAdditionalAsset,
+	withRenderableText,
+} from './og_glyphs.mjs';
 
 async function readStdin() {
 	const chunks = [];
@@ -25,11 +30,16 @@ async function main() {
 		style: font.style,
 	}));
 
-	const markup = prepareTree(html(payload.html), payload.direction);
+	const markup = prepareTree(
+		withRenderableText(html(payload.html)),
+		payload.direction,
+	);
 	const svg = await satori(markup, {
 		width: payload.width,
 		height: payload.height,
 		fonts,
+		graphemeImages: graphemeImages(markup),
+		loadAdditionalAsset,
 	});
 
 	const png = new Resvg(svg, {

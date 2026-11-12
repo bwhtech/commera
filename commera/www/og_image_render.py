@@ -19,7 +19,7 @@ from commera.og.generator import (
 )
 
 # Bump whenever fonts, layout or text rendering change.
-RENDERER_VERSION = 2
+RENDERER_VERSION = 3
 
 CACHE_SUBDIR = "og-cache"
 STORE_CARD_ROUTE = "store"
