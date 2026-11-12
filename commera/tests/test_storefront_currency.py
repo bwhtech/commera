@@ -101,7 +101,7 @@ class TestStorefrontCurrency(CartCurrencyTestCase):
 			"{{ card_price(123456.78, 130000, 5) }}",
 			{},
 		)
-		self.assertEqual(html, f"{self.market_symbol}1,23,456.78<del>{self.market_symbol}1,30,000.00</del>")
+		self.assertEqual(html, f"{self.priced('1,23,456.78')}<del>{self.priced('1,30,000.00')}</del>")
 
 	def test_order_item_macro_uses_order_currency_outside_its_market(self):
 		self.open_request("/account/orders")
@@ -110,8 +110,13 @@ class TestStorefrontCurrency(CartCurrencyTestCase):
 			'{{ dashboard_product("", "brand", "item", 1234.5, currency=currency) }}',
 			{"currency": self.currency},
 		)
-		self.assertIn(f"{self.market_symbol} 1,234.50", html)
+		self.assertIn(self.priced("1,234.50"), html)
 		self.assertNotIn(self.store_symbol, html)
+
+	def priced(self, amount):
+		# The signs (SAR, AED) come wrapped in an ltr bdi; other symbols are plain.
+		text = f"{self.market_symbol}{amount}"
+		return f'<bdi dir="ltr">{text}</bdi>' if "currency-sign" in text else text
 
 	def test_order_page_totals_use_order_currency_outside_its_market(self):
 		self.open_request("/account/orders")
