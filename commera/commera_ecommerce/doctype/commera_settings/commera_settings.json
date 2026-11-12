@@ -1030,7 +1030,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 00:00:00.000000",
+ "modified": "2026-11-12 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Settings",
@@ -1069,6 +1069,11 @@
   {
    "read": 1,
    "role": "All"
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "role": "Commera Admin"
   }
  ],
  "row_format": "Dynamic",
