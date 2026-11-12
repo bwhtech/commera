@@ -8,6 +8,7 @@ from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_ban
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 from frappe import _
 from frappe.rate_limiter import rate_limit
+from frappe.translate import print_language
 from frappe.utils import getdate, validate_email_address
 from frappe.utils.data import cint, cstr, flt, fmt_money, sha256_hash
 
@@ -112,14 +113,28 @@ def get_open_gateway_payment_request(quotation_name: str) -> str | None:
 
 
 def validate_cart_is_not_in_checkout(quotation_name: str):
+	status = get_checkout_payment_status(quotation_name)
+	if status == "Paid":
+		refuse_paid_cart()
+	if status == "Pending":
+		frappe.throw(
+			_(
+				"A payment is already in progress for this order. Finish or cancel it before changing your cart."
+			),
+			title=_("Checkout In Progress"),
+		)
+
+
+def get_checkout_payment_status(quotation_name: str | None) -> str | None:
+	"""The status of the gateway payment that holds the cart, Paid or Pending. Unpaid sessions are released first."""
 	if not quotation_name:
-		return
+		return None
 
 	if frappe.db.exists(
 		"Gateway Payment Request",
 		{"ref_doctype": "Quotation", "ref_docname": quotation_name, "status": "Paid"},
 	):
-		refuse_paid_cart()
+		return "Paid"
 
 	# A double-clicked Place Order leaves two open sessions, and each one still bills the old cart.
 	pending_requests = frappe.get_all(
@@ -131,14 +146,8 @@ def validate_cart_is_not_in_checkout(quotation_name: str):
 		payment_request = frappe.get_doc("Gateway Payment Request", pending_request)
 		if payment_request.release_if_unpaid():
 			continue
-		if payment_request.status == "Paid":
-			refuse_paid_cart()
-		frappe.throw(
-			_(
-				"A payment is already in progress for this order. Finish or cancel it before changing your cart."
-			),
-			title=_("Checkout In Progress"),
-		)
+		return "Paid" if payment_request.status == "Paid" else "Pending"
+	return None
 
 
 def refuse_paid_cart():
@@ -314,6 +323,19 @@ def note_withdrawn_lines(sales_order, quotation):
 	else:
 		return
 	sales_order.add_comment("Comment", note)
+
+
+def note_moved_address_countries(sales_order, quotation):
+	"""Checkout start checked the addresses. Staff learn when the market has dropped their country since."""
+	countries = AddressCountries.of(get_document_market(quotation))
+	moved = [
+		country
+		for country in get_persisted_address_countries(quotation)
+		if country and not countries.allows(frappe.get_cached_value("Country", country, "code"))
+	]
+	if moved:
+		note = _("Placed as paid; the {0} market no longer ships to {1}. Check where to deliver this order.")
+		sales_order.add_comment("Comment", note.format(_(countries.market.title), ", ".join(moved)))
 
 
 def get_sold_item_codes(quotation) -> list[str]:
@@ -521,8 +543,17 @@ def get_order_shopper(quotation) -> str | None:
 
 
 def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
-	"""Submit the cart and bill it. Called once per payment; the Quotation docstatus enforces that."""
-	validate_persisted_address_countries(quotation)
+	"""Submit the cart and bill it. Called once per payment; the Quotation docstatus enforces that.
+
+	The payment webhook runs in the system language, so the order is placed in the cart's language:
+	its amount in words and its email link follow the shopper.
+	"""
+	with print_language(quotation.language):
+		return place_paid_order(quotation, payment_mode, gateway_amount, gateway_reference)
+
+
+def place_paid_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
+	# No address check: checkout start checked it, and the payment is captured now. A change since gets a note.
 	shopper = get_order_shopper(quotation)
 	with system_user_session(), skip_auto_item_price():
 		fix_payment_schedule_dates(quotation)
@@ -540,6 +571,7 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 		set_order_access_key(sales_order)
 		sales_order.submit()
 		note_withdrawn_lines(sales_order, quotation)
+		note_moved_address_countries(sales_order, quotation)
 
 		# A cart discounted to nothing is settled at placement, so it is billed and paid like a charged one.
 		paid = flt(gateway_amount) > 0 or flt(sales_order.grand_total) <= 0
@@ -831,12 +863,17 @@ def validate_guest_address_is_new(quotation, address: dict):
 
 def validate_persisted_address_countries(quotation):
 	countries = AddressCountries.of(get_document_market(quotation))
+	for country in get_persisted_address_countries(quotation):
+		countries.validate(country)
+
+
+def get_persisted_address_countries(quotation) -> list[str | None]:
+	"""The countries of the billing address and, unless picked up, the shipping address, each once."""
 	fields = ["customer_address"]
 	if not quotation.custom_is_store_pickup:
 		fields.append("shipping_address_name")
-	for field in fields:
-		if address := quotation.get(field):
-			countries.validate(frappe.db.get_value("Address", address, "country"))
+	addresses = dict.fromkeys(address for field in fields if (address := quotation.get(field)))
+	return list(dict.fromkeys(frappe.db.get_value("Address", address, "country") for address in addresses))
 
 
 def validate_address_countries(quotation, address: dict):

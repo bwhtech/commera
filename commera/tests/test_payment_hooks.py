@@ -11,8 +11,9 @@ from bwh_payments.bwh_payments.doctype.gateway_payment_request.test_gateway_paym
 )
 from bwh_payments.services.stripe.stub import StubStripeClient
 from frappe.tests import IntegrationTestCase
+from frappe.translate import print_language
 from frappe.utils import add_to_date, get_year_ending, get_year_start, getdate, now_datetime
-from frappe.utils.data import flt
+from frappe.utils.data import flt, money_in_words
 
 from commera.api.orders import cancel_order
 from commera.api.payment_hooks import on_payment_request_update
@@ -584,6 +585,64 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.create_abandoned_payment_request(self.quotation)
 
 		self.assertEqual(get_open_gateway_payment_request(self.quotation.name), paid_request.name)
+
+	def address_in_checkout(self, quotation):
+		address = frappe.get_doc(
+			{
+				"doctype": "Address",
+				"address_title": self.customer,
+				"address_type": "Shipping",
+				"address_line1": "1 Olaya Street",
+				"city": "Riyadh",
+				"country": "Saudi Arabia",
+				"links": [{"link_doctype": "Customer", "link_name": self.customer}],
+			}
+		).insert(ignore_permissions=True)
+		quotation.db_set({"customer_address": address.name, "shipping_address_name": address.name})
+		return address
+
+	def test_an_address_a_captured_payment_was_taken_for_cannot_change(self):
+		quotation = self.create_cart_quotation()
+		address = self.address_in_checkout(quotation)
+		self.create_pending_payment_request(quotation)
+
+		address.country = "Germany"
+		with self.assertRaisesRegex(
+			frappe.ValidationError, "payment is in progress for an order with this address"
+		):
+			address.save(ignore_permissions=True)
+
+		self.assertEqual(frappe.db.get_value("Address", address.name, "country"), "Saudi Arabia")
+
+	def test_changing_an_address_releases_an_abandoned_checkout(self):
+		quotation = self.create_cart_quotation()
+		address = self.address_in_checkout(quotation)
+		payment_request = self.create_abandoned_payment_request(quotation)
+
+		address.country = "Germany"
+		address.save(ignore_permissions=True)
+
+		self.assertEqual(
+			frappe.db.get_value("Gateway Payment Request", payment_request.name, "status"), "Cancelled"
+		)
+
+	def test_a_paid_order_is_placed_in_the_language_of_its_cart(self):
+		self.quotation.db_set("language", "ar")
+		link_languages = []
+		system_language = frappe.local.lang
+
+		with patch(
+			"commera.jobs.get_order_link", side_effect=lambda doc: link_languages.append(frappe.local.lang)
+		):
+			on_payment_request_update(self.payment_request)
+
+		sales_order = frappe.get_doc("Sales Order", self.submitted_sales_orders()[0])
+		with print_language("ar"):
+			arabic_words = money_in_words(sales_order.rounded_total, sales_order.currency)
+		self.assertNotEqual(arabic_words, money_in_words(sales_order.rounded_total, sales_order.currency))
+		self.assertEqual(sales_order.in_words, arabic_words)
+		self.assertEqual(link_languages, ["ar"])
+		self.assertEqual(frappe.local.lang, system_language)
 
 	# -- pending payment sweep --------------------------------------------------------------------
 

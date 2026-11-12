@@ -18,8 +18,11 @@ from commera.api.shipping import get_charge_amount
 from commera.item_price_guard import install_guard, skip_auto_item_price
 from commera.localization.markets import delete_cached_rows
 from commera.sdk import cart as cart_sdk
+from commera.sdk import checkout as checkout_sdk
 from commera.tests.test_admin_orders import ensure_fiscal_year
+from commera.tests.test_market_address_countries import ADDRESS
 from commera.tests.test_market_cart import MarketCartTestCase
+from commera.tests.test_markets import UAE
 
 GUARD_HOOK = "commera.item_price_guard.install_guard"
 GATEWAY = "ZZ Market Gateway"
@@ -89,6 +92,20 @@ class TestPaidMarketOrders(MarketCartTestCase):
 
 		self.assertEqual((sales_order.items[0].rate, sales_order.docstatus), (300, 1))
 		self.assertIn("market gulf no longer exists", self.get_note(sales_order))
+
+	def test_an_address_country_the_market_dropped_after_payment_is_placed_with_a_note(self):
+		frappe.set_user(self.quotation.contact_email)
+		with self.in_market():
+			state = checkout_sdk.set_addresses({**ADDRESS, "country": UAE})
+		self.assertEqual(state["cart"], self.quotation.name)
+		frappe.set_user("Administrator")
+		# As if the merchant moved the UAE out of the market while the shopper paid.
+		frappe.db.set_value("Address", state["shipping_address"]["name"], "country", "India")
+
+		sales_order = self.pay()
+
+		self.assertEqual(sales_order.docstatus, 1)
+		self.assertIn("the Gulf market no longer ships to India", self.get_note(sales_order))
 
 	def test_an_order_its_market_still_sells_gets_no_note(self):
 		self.assertIsNone(self.get_note(self.pay()))

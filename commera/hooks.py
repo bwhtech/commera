@@ -214,6 +214,7 @@ doc_events = {
 		"validate": "commera.doc_events.price_list.validate",
 		"after_rename": "commera.search.price_sync.on_price_list_rename",
 	},
+	"Address": {"validate": "commera.doc_events.address.validate"},
 	"Gateway Payment Request": {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},
