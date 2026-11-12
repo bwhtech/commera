@@ -139,28 +139,33 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 		self.assertEqual(quotation.taxes_and_charges, new)
 		self.assertEqual(rows, [(1, "VAT 5%", 0), (2, delivery["description"], 15)])
 
-	def test_a_disabled_template_falls_back_to_the_company_default(self):
+	def test_a_disabled_template_is_refused_not_replaced(self):
 		template = self.make_template(10)
-		default = self.make_template(5, is_default=1)
+		self.make_template(5, is_default=1)
 		self.set_market_template(template)
 		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "disabled", 1)
 
-		quotation = self.quote_in_market()
+		with self.assertRaisesRegex(frappe.ValidationError, "cannot be calculated"):
+			self.quote_in_market()
 
-		self.assertEqual((quotation.taxes_and_charges, quotation.grand_total), (default, 315))
-
-	def test_disabling_the_template_reprices_an_existing_cart(self):
+	def test_a_template_of_another_company_is_refused_not_replaced(self):
 		template = self.make_template(10)
-		default = self.make_template(5, is_default=1)
 		self.set_market_template(template)
-		quotation = self.quote_in_market()
+		other_company = frappe.get_all("Company", {"name": ("!=", self.company)}, pluck="name", limit=1)[0]
+		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "company", other_company)
+
+		with self.assertRaisesRegex(frappe.ValidationError, "cannot be calculated"):
+			self.quote_in_market()
+
+	def test_disabling_the_template_refuses_an_existing_cart(self):
+		template = self.make_template(10)
+		self.make_template(5, is_default=1)
+		self.set_market_template(template)
+		self.quote_in_market()
 		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "disabled", 1)
 
-		with self.in_market():
-			rebuilt = generate_quotation_for_cart({})
-
-		self.assertEqual(rebuilt.name, quotation.name)
-		self.assertEqual((rebuilt.taxes_and_charges, rebuilt.grand_total), (default, 315))
+		with self.in_market(), self.assertRaisesRegex(frappe.ValidationError, "cannot be calculated"):
+			generate_quotation_for_cart({})
 
 	def test_clearing_the_template_reprices_an_existing_cart(self):
 		self.set_market_template(self.make_template(10))
@@ -378,6 +383,23 @@ class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 
 		with self.assertRaisesRegex(frappe.ValidationError, "is disabled"):
 			self.set_market_template(template)
+
+	def test_a_template_a_market_uses_cannot_be_disabled(self):
+		template = self.make_template(10)
+		self.set_market_template(template)
+		doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
+		doc.disabled = 1
+
+		with self.assertRaisesRegex(frappe.ValidationError, "use this tax template"):
+			doc.save(ignore_permissions=True)
+
+	def test_a_template_no_market_uses_can_be_disabled(self):
+		doc = frappe.get_doc(TEMPLATE_DOCTYPE, self.make_template(10))
+		doc.disabled = 1
+
+		doc.save(ignore_permissions=True)
+
+		self.assertEqual(frappe.db.get_value(TEMPLATE_DOCTYPE, doc.name, "disabled"), 1)
 
 	def test_a_template_of_the_store_company_is_kept(self):
 		template = self.make_template(10)
