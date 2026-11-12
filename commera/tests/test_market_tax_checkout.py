@@ -63,7 +63,8 @@ class TestMarketTaxCheckout(test_market_taxes.TestMarketOrderRecords):
 			)
 			self.set_single("Commera Settings", "charge_account_head", account)
 			self.set_single("Commera Settings", "cod_enabled", 1)
-			self.set_single("Commera Settings", "cod_charge", cod)
+			# Set in the store currency: the Gulf currency is worth 20 of it.
+			self.set_single("Commera Settings", "cod_charge", cod * 20)
 			self.set_single("Commera Settings", "cod_charge_applicable_below", 100000)
 		self.item_code = self.item("SUMMARY", market_sale=699.95)
 		code = (

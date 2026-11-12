@@ -210,6 +210,7 @@ doc_events = {
 		"on_trash": "commera.localization.content.delete_translations",
 	},
 	"Commera Settings": {"on_update": "commera.plugin_events.on_menu_change"},
+	"Shipping Rule": {"validate": "commera.doc_events.shipping_rule.validate"},
 	"Price List": {
 		"validate": "commera.doc_events.price_list.validate",
 		"after_rename": "commera.search.price_sync.on_price_list_rename",

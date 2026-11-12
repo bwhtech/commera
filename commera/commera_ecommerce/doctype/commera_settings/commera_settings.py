@@ -28,6 +28,7 @@ from commera.search.result_card import (
 	RESULT_CARD_CATALOG,
 )
 from commera.search.translations import search_languages_changed
+from commera.shipping.coverage import validate_charge_account
 from commera.storefront_plugins import clear_storefront_plugin_cache, get_enabled_storefront_apps
 from commera.utils import get_store_currency
 
@@ -155,6 +156,7 @@ class CommeraSettings(Document):
 	def validate(self):
 		self.validate_price_list_currencies()
 		self.validate_a_payment_method_is_available()
+		validate_charge_account(self.charge_account_head, self.shipping_rule)
 		self.validate_search_content_fields()
 		self.validate_search_result_fields()
 		self.validate_search_engine()

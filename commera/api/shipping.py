@@ -1,3 +1,4 @@
+import erpnext
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
@@ -11,6 +12,7 @@ from commera.discounts.pricing import refresh_code_discounts
 from commera.discounts.selection import get_discount_codes
 from commera.discounts.shipping import apply_shipping_discounts, set_shipping_discount
 from commera.shipping.base_class import RateItem
+from commera.shipping.coverage import get_store_shipping_rule, ships_to_address
 from commera.shipping.pricing import get_charge_account as get_rule_account
 from commera.shipping.pricing import get_charge_amount as get_option_charge_amount
 from commera.shipping.pricing import has_delivery_options, quote_services
@@ -54,6 +56,8 @@ def get_cart_shipping_options(quotation) -> dict:
 	if quotation.custom_is_store_pickup:
 		return {"options": [], "store_pickup": True}
 	if not has_delivery_options():
+		if is_delivery_unavailable(quotation):
+			return {"options": [], "unavailable": True}
 		return {"options": [], "connector_missing": True}
 	if not quotation.shipping_address_name:
 		return {"options": [], "address_missing": True}
@@ -64,7 +68,17 @@ def get_cart_shipping_options(quotation) -> dict:
 		frappe.log_error(title="Shipping options could not be quoted")
 		return {"options": [], "unavailable": True}
 
+	if not options and is_delivery_unavailable(quotation):
+		return {"options": [], "unavailable": True}
 	return {"options": options, "selected": quotation.custom_delivery_option}
+
+
+def is_delivery_unavailable(quotation) -> bool:
+	"""No delivery option is chosen, and the store's Shipping Rule does not deliver to the shipping address."""
+	if quotation.custom_is_store_pickup or quotation.custom_delivery_option:
+		return False
+	shipping_rule = get_store_shipping_rule()
+	return bool(shipping_rule) and not ships_to_address(quotation, shipping_rule)
 
 
 def get_delivery_options(quotation) -> list[dict]:
@@ -73,10 +87,6 @@ def get_delivery_options(quotation) -> list[dict]:
 
 def get_quoted_options(quotation) -> list[dict]:
 	return quote_options(quotation)
-
-
-def get_store_shipping_rule() -> str | None:
-	return frappe.get_cached_value("Commera Settings", "Commera Settings", "shipping_rule")
 
 
 def quote_options(quotation) -> list[dict]:
@@ -242,7 +252,16 @@ def clear_delivery_option(quotation):
 	quotation.custom_shipping_service_code = None
 	set_shipping_discount(quotation, None)
 	remove_delivery_charge_row(quotation)
+	drop_undeliverable_shipping_rule(quotation)
 	quotation.calculate_taxes_and_totals()
+
+
+def drop_undeliverable_shipping_rule(quotation):
+	"""A new address can be outside the rule's countries, and ERPNext's Shipping Rule throws on every
+	recalculation then. Checkout refuses payment instead: see is_delivery_unavailable."""
+	if quotation.shipping_rule and not ships_to_address(quotation, quotation.shipping_rule):
+		remove_shipping_rule_row(quotation)
+		quotation.shipping_rule = None
 
 
 def set_delivery_charge_row(quotation, amount: float, title: str):
@@ -470,10 +489,13 @@ def clear_pickup_charges(quotation):
 
 
 def get_cod_charge(quotation) -> float:
+	"""The fee and its threshold are in company currency, as a Shipping Rule's amounts are."""
 	applicable_below, cod_charge = get_cod_configuration()
-	if not applicable_below or not cod_charge or flt(applicable_below) < get_charge_amount(quotation):
+	conversion_rate = flt(quotation.conversion_rate) or 1.0
+	base_amount = flt(get_charge_amount(quotation) * conversion_rate, quotation.precision("base_grand_total"))
+	if not applicable_below or not cod_charge or flt(applicable_below) < base_amount:
 		return 0.0
-	return flt(cod_charge)
+	return flt(flt(cod_charge) / conversion_rate, quotation.precision("tax_amount", "taxes"))
 
 
 def add_cod_charge(quotation, cod_charge: float, account_head: str | None):
@@ -487,6 +509,8 @@ def add_cod_charge(quotation, cod_charge: float, account_head: str | None):
 			CART_CHARGE_FIELD: "cod",
 			"charge_type": "Actual",
 			"account_head": account_head,
+			# As saving fills it, so the cart preview prices the same rows as the placed order.
+			"cost_center": erpnext.get_default_cost_center(quotation.company),
 			"tax_amount": cod_charge,
 			# ERPNext's validate_inclusive_tax refuses an inclusive Actual charge; pinned against a site default of 1.
 			"included_in_print_rate": 0,
