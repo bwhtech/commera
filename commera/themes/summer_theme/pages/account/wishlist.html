@@ -23,7 +23,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				<template x-for="wishlist_item in $store.wishlist.items" :key="wishlist_item.route">
+				<template x-for="wishlist_item in $store.wishlist.display_items" :key="wishlist_item.route">
 					<tr>
 						<td class="product-item-img">
 							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route">
@@ -32,11 +32,12 @@
 						</td>
 						<td class="product-item-name">
 							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route" x-text="wishlist_item.title || wishlist_item.item_name"></a>
+							<span x-show="$store.wishlist.prices_ready && wishlist_item.available === false" x-cloak>{{ _("Unavailable") }}</span>
 						</td>
 						<td class="product-item-price text-nowrap">
 							{# .product-item-price strikes through every span it holds, so the amounts sit in bdi. #}
-							<span x-show="wishlist_item.default_price > wishlist_item.sale_price">{{ get_cart_currency().symbol }}<bdi x-text="commera.format.amount(Number(wishlist_item.default_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></bdi></span>
-							<strong>{{ get_cart_currency().symbol }}<bdi x-text="commera.format.amount(Number(wishlist_item.sale_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></bdi></strong>
+							<span x-show="$store.wishlist.prices_ready && wishlist_item.default_price > wishlist_item.sale_price">{{ get_cart_currency().symbol }}<bdi x-text="commera.format.amount(Number(wishlist_item.default_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></bdi></span>
+							<strong x-show="$store.wishlist.prices_ready && wishlist_item.sale_price != null" x-cloak>{{ get_cart_currency().symbol }}<bdi x-text="commera.format.amount(Number(wishlist_item.sale_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></bdi></strong>
 						</td>
 						<td>
 							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route" class="btn btn-secondary btnhover text-nowrap">{{ _("Add To Cart") }}</a>

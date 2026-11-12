@@ -14,6 +14,7 @@ from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_contex
 from commera.shop_themes.theme_resolver import ThemePageRenderer
 from commera.tests.test_market_cart import MarketCartTestCase
 from commera.utils import get_currency_symbol
+from commera.www.cart.permalink import get_cart_lines
 
 SUMMER = "Summer Theme"
 
@@ -216,3 +217,25 @@ class TestGuestCartMarket(CartCurrencyTestCase):
 		self.assertEqual(get_server_cart()["lines"][0]["price"], 80)
 		sync_server_cart([{"item_code": self.code, "qty": 2}], get_session_cart().version)
 		self.assertEqual(get_session_cart().market, "primary")
+
+	def test_restoration_retains_unpriced_lines_through_quantity_sync(self):
+		self.guest_request()
+		sync_server_cart([{"item_code": self.code, "qty": 1}, {"item_code": self.unpriced, "qty": 1}])
+		self.guest_request("AE")
+		restored = get_server_cart()
+		lines = {line["variant"]["item_code"]: line for line in restored["lines"]}
+		self.assertEqual(set(lines), {self.code, self.unpriced})
+		self.assertIsNone(lines[self.unpriced]["price"])
+		self.assertFalse(lines[self.unpriced]["available"])
+		sync_server_cart([{"item_code": code, "qty": 2} for code in lines], restored["version"])
+		self.assertEqual(
+			{line.item_code: line.qty for line in get_session_cart().lines},
+			{
+				self.code: 2,
+				self.unpriced: 2,
+			},
+		)
+		self.assertEqual(
+			[line["variant"]["item_code"] for line in get_cart_lines({self.code: 1, self.unpriced: 1}, [])],
+			[self.code],
+		)

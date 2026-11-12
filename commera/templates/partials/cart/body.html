@@ -119,7 +119,8 @@
 										</p>
 									</template>
 									&nbsp;
-									<p class="flex">{{ cart_currency.symbol }} <span x-text="commera.format.amount($store.cart.price_of(cart_item), {{ cart_currency.config | tojson | forceescape }})"></span>
+									<p x-show="cart_item.available === false">{{ _("Unavailable") }}</p>
+									<p class="flex" x-show="cart_item.available !== false">{{ cart_currency.symbol }} <span x-text="commera.format.amount($store.cart.price_of(cart_item), {{ cart_currency.config | tojson | forceescape }})"></span>
 											
 										</p>
 								</div>

@@ -93,7 +93,7 @@ def get_browser_selection(items: list | str) -> dict[str, bool]:
 
 def get_cart_state(cart: CommeraCart) -> dict:
 	selected_item_codes = {row.item_code for row in cart.get_selected_lines()}
-	lines = get_cart_lines(get_quantities_by_item_code(cart.lines), [])
+	lines = get_cart_lines(get_quantities_by_item_code(cart.lines), [], keep_unavailable=True)
 	for line in lines:
 		line["selected"] = line["variant"]["item_code"] in selected_item_codes
 	return {

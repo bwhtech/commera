@@ -3,9 +3,14 @@
         Alpine.store('wishlist', {
             items: Alpine.$persist([]).as("wishlist_items"),
             route_set: new Set(),
+            prices_ready: false,
+            // Keep market prices off persisted entries so refreshes do not echo between tabs.
+            display_items: [],
+            refresh_version: 0,
 
             init() {
                 this.refresh_route_set();
+                this.refresh_prices();
                 // Another tab's add or remove lands in localStorage only; take it, or this tab's next change
                 // writes its older list over it.
                 window.addEventListener('storage', (event) => {
@@ -20,7 +25,35 @@
                     }
                     this.items = Array.isArray(items) ? items : [];
                     this.refresh_route_set();
+                    this.refresh_prices();
                 });
+            },
+
+            async refresh_prices() {
+                this.prices_ready = false;
+                const version = ++this.refresh_version;
+                const display = this.items.map(item => ({ ...item }));
+                this.display_items = display;
+                await Promise.all(display.map(async item => {
+                    item.sale_price = null;
+                    item.default_price = null;
+                    item.available = false;
+                    try {
+                        const url = '/api/v2/method/commera.api.storefront.products.get_product?handle=' + encodeURIComponent(item.route);
+                        const { data: product } = await frappe_call(url, {}, 'GET');
+                        const variant = product.variants.find(variant => variant.price === product.price);
+                        item.sale_price = product.price;
+                        item.default_price = variant?.compare_at_price ?? null;
+                        item.currency = product.currency;
+                        item.available = product.available;
+                    } catch (error) {
+                        // A removed product stays in the wishlist for the shopper to remove.
+                    }
+                }));
+                if (version === this.refresh_version) {
+                    this.display_items = [...display];
+                    this.prices_ready = true;
+                }
             },
 
             refresh_route_set() {
@@ -37,12 +70,14 @@
                     return;
                 }
                 this.items.push(item);
+                this.refresh_prices();
                 this.refresh_route_set();
                 toast("Item added to wishlist!", { type: "success" });
             },
 
             remove(item) {
                 this.items = this.items.filter(w_item => w_item.route !== item.route);
+                this.refresh_prices();
                 this.refresh_route_set();
             },
 

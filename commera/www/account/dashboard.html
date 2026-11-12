@@ -47,7 +47,7 @@
             </a>
         </div>
         <div class="p-4">
-            <template x-for="item in $store.wishlist.items">
+            <template x-for="item in $store.wishlist.display_items">
                 <div class="flex pb-3 mb-3 border-b border-gray-300 md:w-2/3">
                     <img :src="item.image || '/assets/commera/images/1.jpg'"
                         class="w-34 h-45 object-cover rounded-lg me-3 md:me-7" alt="">
@@ -60,7 +60,8 @@
                                 <span x-text="commera.t(item.attribute_value)"></span>
                             </p>
 
-                            <p class="flex">
+                            <p x-show="$store.wishlist.prices_ready && item.available === false" x-cloak>{{ _("Unavailable") }}</p>
+                            <p class="flex" x-show="$store.wishlist.prices_ready && item.sale_price != null" x-cloak>
                                 {{get_cart_currency().symbol}}
                                 <span x-text="commera.format.amount(item.sale_price, {{ get_cart_currency().config | tojson | forceescape }})"></span>
                             </p>

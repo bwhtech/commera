@@ -58,7 +58,9 @@ def parse_cart_codes(codes: str | None) -> tuple[dict[str, int], list[str]]:
 	return requested_quantities, notices
 
 
-def get_cart_lines(requested_quantities: dict[str, int], notices: list[str]) -> list[dict]:
+def get_cart_lines(
+	requested_quantities: dict[str, int], notices: list[str], *, keep_unavailable: bool = False
+) -> list[dict]:
 	if not requested_quantities:
 		return []
 
@@ -93,7 +95,7 @@ def get_cart_lines(requested_quantities: dict[str, int], notices: list[str]) -> 
 			)
 
 		default_price, price = get_cart_price(item_code, prices)
-		if price is None:
+		if price is None and not keep_unavailable:
 			notices.append(_("{0} is not available in this market.").format(size_row.item_name))
 			continue
 		variant = variant_by_name[size_row.parent]
@@ -108,6 +110,7 @@ def get_cart_lines(requested_quantities: dict[str, int], notices: list[str]) -> 
 					"title": products.get_title(item_code, size_row.item_name),
 				},
 				"qty": min(requested_qty, in_stock_qty),
+				"available": price is not None,
 				"price": price,
 				"default_price": default_price,
 				"brand": variant.brand or "",
