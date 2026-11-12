@@ -154,6 +154,30 @@ test('Summer uses the payable inclusive cart total before the address step', () 
 	assert.equal(summary.cash_on_delivery.total, 700);
 });
 
+test('Summer shows no delivery price until the guest cart is priced', () => {
+	const form = summer_checkout({ delivery_charge: 21.98 });
+	const cart = {
+		total: 1234.5,
+		saved: 0,
+		discounts: [],
+		is_delivery_charged: false,
+		priced: null,
+	};
+	form.$store = { cart };
+	form.summary = form.get_browser_cart_summary();
+	assert.equal(form.shipping_amount, null);
+	assert.equal(form.summary.total, 1234.5);
+
+	cart.priced = { items_total: 1234.5 };
+	cart.is_delivery_charged = true;
+	form.summary = form.get_browser_cart_summary();
+	assert.equal(form.shipping_amount, 21.98);
+
+	cart.is_delivery_charged = false;
+	form.summary = form.get_browser_cart_summary();
+	assert.equal(form.shipping_amount, 0);
+});
+
 test('legacy checkout keeps included tax in the payable total before and after address', () => {
 	const html = readFileSync(
 		new URL('templates/partials/checkout/body.html', root),

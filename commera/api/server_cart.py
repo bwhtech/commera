@@ -3,6 +3,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cint, cstr
 
+from commera.api.payments import get_charged_preview
 from commera.api.shipping import get_checkout_summary
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	MAX_CART_LINES,
@@ -67,7 +68,7 @@ def remove_discount_code(code: str) -> dict:
 
 def get_open_checkout_summary() -> dict | None:
 	quotation = cart_sdk.get_open_cart_quotation()
-	return get_checkout_summary(quotation) if quotation else None
+	return get_checkout_summary(get_charged_preview(quotation)) if quotation else None
 
 
 def get_browser_quantities(items: list | str) -> dict[str, int]:

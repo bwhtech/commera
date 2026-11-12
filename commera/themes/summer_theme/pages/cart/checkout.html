@@ -363,8 +363,8 @@
 										<span x-show="delivery_option === 'store_pickup'" x-cloak>{{ _("Pickup From Store") }}</span>
 									</td>
 									<td class="price">
-										<span x-show="!shipping_amount">{{ _("Free") }}</span>
-										<span x-show="shipping_amount" x-cloak>{{ currency_symbol }}<span x-text="format_amount(shipping_amount)"></span></span>
+										<span x-show="shipping_amount === 0" x-cloak>{{ _("Free") }}</span>
+										<span x-show="shipping_amount > 0" x-cloak>{{ currency_symbol }}<span x-text="format_amount(shipping_amount)"></span></span>
 									</td>
 								</tr>
 								<template x-for="(discount, index) in active_summary.shipping_discounts || []" :key="index">
@@ -646,7 +646,8 @@
 				get_browser_cart_summary() {
 					const priced = this.$store.cart.priced;
 					const subtotal = priced?.items_total ?? this.$store.cart.total;
-					const shipping = this.$store.cart.is_delivery_charged ? this.config.delivery_charge : 0;
+					// Unknown until the cart is priced, so the delivery line says neither Free nor a charge.
+					const shipping = priced ? (this.$store.cart.is_delivery_charged ? this.config.delivery_charge : 0) : null;
 					const discounts = this.$store.cart.discounts;
 					const summary = {
 						subtotal: subtotal,
@@ -656,7 +657,7 @@
 						discounts: discounts,
 						discount_amount: this.$store.cart.saved,
 						rounding_adjustment: 0,
-						total: (priced?.taxes ? priced.total : subtotal - this.$store.cart.saved) + shipping,
+						total: (priced?.taxes ? priced.total : subtotal - this.$store.cart.saved) + (shipping ?? 0),
 					};
 					return { ...summary, cash_on_delivery: summary };
 				},
@@ -721,6 +722,7 @@
 
 				// Before its discount, so the shipping row and the shipping discount rows under it add up.
 				get shipping_amount() {
+					if (this.active_summary.shipping == null) return null;
 					const discounts = this.active_summary.shipping_discounts || [];
 					return this.active_summary.shipping + discounts.reduce((sum, discount) => sum + discount.amount, 0);
 				},
