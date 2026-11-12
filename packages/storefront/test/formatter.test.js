@@ -76,14 +76,14 @@ test('a right-to-left language puts the symbol after the amount', () => {
 	assert.equal(arabic.money(10, 'XTS'), '10.00\u00a0XTS');
 });
 
-test('money_text spells out a currency sign on the correct side', () => {
+test('money_text puts the Unicode sign left in both directions', () => {
 	assert.equal(
 		formatter_for('en').money_text(1250, 'SAR'),
-		'SAR\u00a01,250.00',
+		'\u20c1\u00a01,250.00',
 	);
 	assert.equal(
 		formatter_for('ar').money_text(1250, 'SAR'),
-		'1,250.00\u00a0SAR',
+		'\u20c1\u00a01,250.00',
 	);
 });
 
@@ -137,4 +137,79 @@ test('decimal.js avoids syntax the ES2015 dashboard build cannot keep for BigInt
 		.join('\n');
 	assert.doesNotMatch(code, /\*\*/);
 	assert.doesNotMatch(code, /\b\d+n\b/);
+});
+
+test('signed money keeps the old minus for other currencies and signs first for SAR/AED', () => {
+	for (const language of ['en', 'ar']) {
+		const formatter = formatter_for(language);
+		for (const currency of ['SAR', 'AED']) {
+			for (const amount of [-10, -0.25]) {
+				assert.equal(
+					formatter.signed_money(amount, currency),
+					formatter.money(amount, currency),
+				);
+				assert.equal(
+					formatter.money_text(amount, currency),
+					`${cases.currency_symbols[currency]}\u00a0${formatter.digits(
+						amount,
+						currency,
+					)}`,
+				);
+			}
+		}
+		assert.equal(
+			formatter.signed_money(-10, 'INR'),
+			`−${formatter.money(10, 'INR')}`,
+		);
+		assert.equal(
+			formatter.signed_money(-0.25, 'INR'),
+			`−${formatter.money(0.25, 'INR')}`,
+		);
+	}
+});
+
+test('Starter discount and rounding bindings render signed amounts', () => {
+	const templates = [
+		'components/order_summary.html',
+		'pages/cart/checkout.html',
+		'pages/account/orders/confirmation.html',
+	];
+	for (const template of templates) {
+		const source = readFileSync(
+			new URL(
+				`../../../commera/themes/commera_starter/${template}`,
+				import.meta.url,
+			),
+			'utf8',
+		);
+		const bindings = [
+			...source.matchAll(/x-html="([^"]*signed_money[^\"]*)"/g),
+		];
+		assert.ok(bindings.length);
+		for (const currency of ['SAR', 'AED', 'INR']) {
+			const formatter = formatter_for('ar');
+			for (const [, expression] of bindings) {
+				const render = new Function(
+					'signed_money',
+					'discount',
+					'summary',
+					'details',
+					`return (${expression});`,
+				);
+				const summary = { rounding_adjustment: -0.25 };
+				const html = render(
+					(amount) => formatter.signed_money(amount, currency),
+					{ amount: 10 },
+					summary,
+					summary,
+				);
+				const amount = expression.includes('discount') ? 10 : 0.25;
+				const expected =
+					currency === 'INR'
+						? `−${formatter.money(amount, currency)}`
+						: formatter.money(-amount, currency);
+				assert.equal(html, expected, `${template}: ${currency}`);
+			}
+		}
+	}
 });

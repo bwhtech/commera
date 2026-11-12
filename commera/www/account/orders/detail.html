@@ -94,8 +94,8 @@
                     {{_('Item(s) subtotal')}}
                 </span>
                 <span class="flex">
-                    {{get_cart_currency(order).symbol}}
-                    {{ get_cart_currency(order).amount(order_summary.items_total) }}
+                    {% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency(order).symbol}}{% if not get_cart_currency(order).is_sign %}
+                    {% endif %}{{ get_cart_currency(order).amount(order_summary.items_total) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}
                 </span>
             </h3>
             {% for discount in order_summary.discounts %}
@@ -104,9 +104,9 @@
                         {{_('Discount')}}{% if discount.label %} (<bdi>{{ discount.label | e }}</bdi>){% endif %}
                     </span>
                     <span class="flex whitespace-nowrap text-green-700">
-                        &minus;
+                        {% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{{get_cart_currency(order).symbol}}{{ get_cart_currency(order).amount(-discount.amount) }}</bdi>{% else %}&minus;
                         {{get_cart_currency(order).symbol}}
-                        {{ get_cart_currency(order).amount(discount.amount) }}
+                        {{ get_cart_currency(order).amount(discount.amount) }}{% endif %}
 
                     </span>
                 </h3>
@@ -118,8 +118,8 @@
                         {{_('Shipping & Handling')}}
                     </span>
                     <span class="flex">
-                        {{get_cart_currency(order).symbol}}
-                        {{ get_cart_currency(order).amount(order.total_taxes_and_charges + shipping_discount) }}
+                        {% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency(order).symbol}}{% if not get_cart_currency(order).is_sign %}
+                        {% endif %}{{ get_cart_currency(order).amount(order.total_taxes_and_charges + shipping_discount) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}
                     </span>
                 </h3>
             {% endif %}
@@ -129,9 +129,9 @@
                         {{_('Shipping discount')}}{% if discount.label %} (<bdi>{{ discount.label | e }}</bdi>){% endif %}
                     </span>
                     <span class="flex whitespace-nowrap text-green-700">
-                        &minus;
+                        {% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{{get_cart_currency(order).symbol}}{{ get_cart_currency(order).amount(-discount.amount) }}</bdi>{% else %}&minus;
                         {{get_cart_currency(order).symbol}}
-                        {{ get_cart_currency(order).amount(discount.amount) }}
+                        {{ get_cart_currency(order).amount(discount.amount) }}{% endif %}
                     </span>
                 </h3>
             {% endfor %}
@@ -141,8 +141,8 @@
                     {{_('rounding adjustment')}}
                 </span>
                 <span class="flex">
-                    {{get_cart_currency(order).symbol}}
-                    {{ get_cart_currency(order).amount(order.rounding_adjustment) }}
+                    {% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency(order).symbol}}{% if not get_cart_currency(order).is_sign %}
+                    {% endif %}{{ get_cart_currency(order).amount(order.rounding_adjustment) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}
 
                 </span>
             </h3>
@@ -152,8 +152,8 @@
                     {{_('grand total')}}
                 </span>
                 <span class="flex">
-                    {{get_cart_currency(order).symbol}}
-                    {{ get_cart_currency(order).amount(order.payable_total) }}
+                    {% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency(order).symbol}}{% if not get_cart_currency(order).is_sign %}
+                    {% endif %}{{ get_cart_currency(order).amount(order.payable_total) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}
                 </span>
             </h3>
         </div>

@@ -7,7 +7,7 @@ from frappe.utils.data import cint, cstr, flt
 
 from commera import seo
 from commera.sdk import catalog
-from commera.sdk.format import money, url
+from commera.sdk.format import money_html, url
 
 PAGE_SIZE = 24
 LIST_FILTERS = ("sizes", "colors", "brands")
@@ -122,10 +122,12 @@ def get_chips(context):
 
 def get_price_label(selected, currency):
 	if selected.max is None:
-		return _("From {0}").format(money(selected.min, currency))
+		return frappe.utils.escape_html(_("From {0}")).format(money_html(selected.min, currency))
 	if selected.min is None:
-		return _("Up to {0}").format(money(selected.max, currency))
-	return _("{0} to {1}").format(money(selected.min, currency), money(selected.max, currency))
+		return frappe.utils.escape_html(_("Up to {0}")).format(money_html(selected.max, currency))
+	return frappe.utils.escape_html(_("{0} to {1}")).format(
+		money_html(selected.min, currency), money_html(selected.max, currency)
+	)
 
 
 def add_seo(context):

@@ -214,7 +214,7 @@
 					<div class="tracking-product-content">
 						<h6 class="title"><bdi>{{ (item.title or item.item_name)|e }}</bdi></h6>
 						{% if item.brand %}<small class="d-block"><strong>{{ _("Brand") }}</strong> : <bdi>{{ item.brand }}</bdi></small>{% endif %}
-						<small class="d-block"><strong>{{ _("Price") }}</strong> : {{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(item.price or 0) }}</small>
+						<small class="d-block"><strong>{{ _("Price") }}</strong> : {% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(item.price or 0) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</small>
 						{% if item.size %}<small class="d-block"><strong>{{ _("Size") }}</strong> : <bdi>{{ item.size }}</bdi></small>{% endif %}
 					</div>
 				</div>
@@ -222,53 +222,53 @@
 
 				<div class="tracking-item-content">
 					<span>{{ _("Item(s) Subtotal") }}</span>
-					<h6>{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order_summary.items_total) }}</h6>
+					<h6>{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order_summary.items_total) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</h6>
 				</div>
 				{% for discount in order_summary.discounts %}
 				<div class="tracking-item-content">
 					<span class="text-success">{{ _("Discount") }}{% if discount.label %} (<bdi>{{ discount.label | e }}</bdi>){% endif %}</span>
-					<h6>&minus; {{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(discount.amount) }}</h6>
+					<h6>{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(-discount.amount) }}</bdi>{% else %}&minus; {{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(discount.amount) }}{% endif %}</h6>
 				</div>
 				{% endfor %}
 				{% if charge_lines.shipping or shipping_discount %}
 				<div class="tracking-item-content">
 					<span>{{ _("Shipping") }}</span>
-					<h6>{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(charge_lines.shipping + shipping_discount) }}</h6>
+					<h6>{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(charge_lines.shipping + shipping_discount) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</h6>
 				</div>
 				{% endif %}
 				{% for discount in order_summary.shipping_discounts %}
 				<div class="tracking-item-content">
 					<span class="text-success">{{ _("Shipping discount") }}{% if discount.label %} (<bdi>{{ discount.label | e }}</bdi>){% endif %}</span>
-					<h6>&minus; {{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(discount.amount) }}</h6>
+					<h6>{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(-discount.amount) }}</bdi>{% else %}&minus; {{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(discount.amount) }}{% endif %}</h6>
 				</div>
 				{% endfor %}
 				{% if charge_lines.cod_charge %}
 				<div class="tracking-item-content">
 					<span>{{ _("Cash on Delivery Fee") }}</span>
-					<h6>{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(charge_lines.cod_charge) }}</h6>
+					<h6>{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(charge_lines.cod_charge) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</h6>
 				</div>
 				{% endif %}
 				{% for tax in charge_lines.taxes %}
 				<div class="tracking-item-content">
 					<span><bdi>{{ tax.description | e }}</bdi></span>
-					<h6>{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(tax.amount) }}</h6>
+					<h6>{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(tax.amount) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</h6>
 				</div>
 				{% endfor %}
 				{% for fee in charge_lines.plugin_fees %}
 				<div class="tracking-item-content">
 					<span><bdi>{{ fee.description | e }}</bdi></span>
-					<h6>{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(fee.amount) }}</h6>
+					<h6>{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(fee.amount) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</h6>
 				</div>
 				{% endfor %}
 				{% if order.rounding_adjustment %}
 				<div class="tracking-item-content">
 					<span>{{ _("Rounding Adjustment") }}</span>
-					<h6>{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order.rounding_adjustment) }}</h6>
+					<h6>{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order.rounding_adjustment) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</h6>
 				</div>
 				{% endif %}
 				<div class="tracking-item-content border-top pt-2">
 					<span>{{ _("Order Total") }}</span>
-					<h6>{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order.payable_total) }}</h6>
+					<h6>{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order.payable_total) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</h6>
 				</div>
 			</div>
 
@@ -277,7 +277,7 @@
 				<ul class="tracking-receiver">
 					<li>{{ _("Order Number") }} : <strong>{{ order.name }}</strong></li>
 					<li>{{ _("Date") }} : <strong>{{ frappe.utils.format_datetime(order.creation, "medium") }}</strong></li>
-					<li>{{ _("Total") }} : <strong>{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order.payable_total) }}</strong></li>
+					<li>{{ _("Total") }} : <strong>{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order.payable_total) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</strong></li>
 					<li>{{ _("Status") }} : <strong>{{ _(order.custom_ecommerce_status or "Draft") }}</strong></li>
 					{% if shows_private_details %}
 					<li>{{ address_label }} : <strong>{% if address_display %}<bdi>{{ address_display | e }}</bdi>{% else %}&mdash;{% endif %}</strong></li>

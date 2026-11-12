@@ -11,6 +11,7 @@ from commera.localization.formatter import (
 	get_fraction_precision,
 	get_html_currency_symbol,
 	get_money_precision,
+	is_currency_sign,
 )
 from commera.localization.market_prices import MarketPrices
 from commera.utils import get_store_currency
@@ -37,6 +38,10 @@ class CartCurrency:
 			get_fraction_precision(code),
 			Formatter.current().number_format,
 		)
+
+	@property
+	def is_sign(self) -> bool:
+		return is_currency_sign(self.code)
 
 	@property
 	def config(self) -> dict:

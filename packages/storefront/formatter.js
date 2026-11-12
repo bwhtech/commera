@@ -49,14 +49,21 @@ export class Formatter {
 		return this.join_html(this.digits(amount, currency, precision), currency);
 	}
 
-	// For plain text such as a confirm dialog, which may not use the page's fonts: a sign
-	// becomes the currency code.
 	money_text(amount, currency, precision) {
-		const [sign, digits] = split_sign(this.digits(amount, currency, precision));
-		const symbol = this.is_sign(currency)
-			? `${this.code(currency)}${NO_BREAK_SPACE}`
-			: this.symbol(currency);
+		const formatted = this.digits(amount, currency, precision);
+		const symbol = this.symbol(currency);
+		if (this.is_sign(currency)) {
+			return `${symbol}${NO_BREAK_SPACE}${formatted}`;
+		}
+		const [sign, digits] = split_sign(formatted);
 		return this.join(sign, digits, symbol);
+	}
+
+	signed_money(amount, currency, minus = '−') {
+		if (this.is_sign(currency)) {
+			return this.money(amount, currency);
+		}
+		return (amount < 0 ? minus : '') + this.money(Math.abs(amount), currency);
 	}
 
 	// Report figures: 4.8L or 482.3K, in the language's words, with the number format's separators.

@@ -197,7 +197,7 @@
 				<template x-for="(discount, index) in shipping_pending ? [] : summary?.shipping_discounts ?? []" :key="index">
 					<div class="flex justify-between gap-3 text-ink-gray-7">
 						<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Delivery discount") }}<span x-show="discount.label"><bdi x-text="' (' + discount.label + ')'"></bdi></span></span>
-						<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="'−' + money(discount.amount)"></span>
+						<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="signed_money(-discount.amount)"></span>
 					</div>
 				</template>
 				<template x-for="(fee, index) in summary?.plugin_fees ?? []" :key="index">
@@ -218,7 +218,7 @@
 				</div>
 				<div x-show="summary?.rounding_adjustment" class="flex justify-between gap-3">
 					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Rounding") }}</span>
-					<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="(summary?.rounding_adjustment < 0 ? '−' : '') + money(Math.abs(summary?.rounding_adjustment ?? 0))"></span>
+					<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="signed_money(summary?.rounding_adjustment ?? 0)"></span>
 				</div>
 				{% endcall %}
 			</div>

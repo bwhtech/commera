@@ -9,7 +9,7 @@
 	<template x-for="(discount, index) in discounts" :key="index">
 		<div class="flex justify-between gap-3 text-ink-gray-7">
 			<span class="min-w-0 [overflow-wrap:anywhere]" :title='{{ _("Discount") | tojson }} + (discount.label ? " (" + discount.label + ")" : "")'>{{ _("Discount") }}<span x-show="discount.label"><bdi x-text="' (' + discount.label + ')'"></bdi></span></span>
-			<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="'−' + money(discount.amount)"></span>
+			<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="signed_money(-discount.amount)"></span>
 		</div>
 	</template>
 	<template x-for="(fee, index) in cart?.plugin_fees ?? []" :key="index">

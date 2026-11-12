@@ -46,6 +46,26 @@ class Formatter:
 			return f"{sign}{digits}{NO_BREAK_SPACE}{symbol.strip()}"
 		return f"{sign}{symbol}{digits}"
 
+	def money_text(self, amount, currency=None, precision=None) -> str:
+		currency = currency or get_store_currency()
+		if precision is None:
+			precision = get_money_precision(currency)
+		formatted = format_money_digits(amount, precision, self.number_format, currency)
+		symbol = get_currency_symbol(currency)
+		if is_currency_sign(currency):
+			return f"{symbol}{NO_BREAK_SPACE}{formatted}"
+		sign, digits = split_sign(formatted)
+		if self.language.direction == "rtl":
+			return f"{sign}{digits}{NO_BREAK_SPACE}{symbol.strip()}"
+		return f"{sign}{symbol}{digits}"
+
+	def signed_money(self, amount, currency=None, minus="\u2212") -> str:
+		"""Keep the literal minus used by themes for currencies without the new signs."""
+		currency = currency or get_store_currency()
+		if is_currency_sign(currency):
+			return self.money(amount, currency)
+		return (minus if amount < 0 else "") + self.money(abs(amount), currency)
+
 	def number(self, value: float | None, precision: int = 0) -> str:
 		return format_money_digits(value, precision, self.number_format)
 

@@ -53,12 +53,12 @@ test('money uses the store currency and the default format when not given', () =
 	assert.equal(money(null, 'USD'), '$0.00');
 });
 
-test('money_text spells out the riyal and dirham signs as their codes', () => {
+test('money_text returns Unicode currency signs without HTML', () => {
 	globalThis.commera_storefront_config = {
 		currency_symbols: { SAR: '\u20c1', AED: '\u20c3', USD: '$' },
 	};
-	assert.equal(money_text(1250, 'SAR'), 'SAR\u00a01,250.00');
-	assert.equal(money_text(-1250, 'AED'), '-AED\u00a01,250.00');
+	assert.equal(money_text(1250, 'SAR'), '\u20c1\u00a01,250.00');
+	assert.equal(money_text(-1250, 'AED'), '\u20c3\u00a0-1,250.00');
 	assert.equal(money_text(1250, 'USD'), '$1,250.00');
 });
 

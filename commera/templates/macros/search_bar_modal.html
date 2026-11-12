@@ -122,10 +122,10 @@
                                 <div class="flex gap-1">
                                     <template x-if="product.default_price && product.discount_percent">
                                         <p class="text-base font-medium line-through text-accent me-2 flex">
-											{{get_cart_currency().symbol}}<span x-text="commera.format.amount(product.default_price, {{ get_cart_currency().config | tojson | forceescape }})"></span>
+											{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency().symbol}}<span x-text="commera.format.amount(product.default_price, {{ get_cart_currency().config | tojson | forceescape }})"></span>{% if get_cart_currency().is_sign %}</bdi>{% endif %}
 										</p>
                                     </template>
-                                    <h3 class="text-base font-medium flex">{{get_cart_currency().symbol}}<span x-text="commera.format.amount((product.sale_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></span>
+                                    <h3 class="text-base font-medium flex">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency().symbol}}<span x-text="commera.format.amount((product.sale_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></span>{% if get_cart_currency().is_sign %}</bdi>{% endif %}
                                         </span> </h3>
                                 </div>
                                 {% if "sizes" in card_fields %}

@@ -96,7 +96,12 @@ class TestStorefrontNumberFormat(CartCurrencyTestCase):
 					"{{ card_price(123456.78, 150000, 10) }}",
 					{},
 				)
-				self.assertEqual(card, f"{symbol}1,23,456.78<del>{symbol}1,50,000.00</del>")
+				price = f"{symbol}1,23,456.78"
+				original = f"{symbol}1,50,000.00"
+				if 'class="currency-sign"' in symbol:
+					price = f'<bdi dir="ltr">{price}</bdi>'
+					original = f'<bdi dir="ltr">{original}</bdi>'
+				self.assertEqual(card, f"{price}<del>{original}</del>")
 
 	def test_historical_orders_render_grouped_amounts_in_their_currency(self):
 		self.open_request("/account/orders")
@@ -113,7 +118,7 @@ class TestStorefrontNumberFormat(CartCurrencyTestCase):
 			'{{ dashboard_product("", "brand", "item", 123456.78, currency=currency) }}',
 			{"currency": self.currency},
 		)
-		self.assertIn(f"{self.market_symbol} 1,23,456.78", legacy)
+		self.assertIn(f"{self.market_symbol}1,23,456.78", legacy)
 
 	def render_line(self, template, marker, context):
 		source = frappe.get_jenv().loader.get_source(frappe.get_jenv(), template)[0]

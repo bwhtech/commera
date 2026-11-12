@@ -6,9 +6,13 @@ export function money(amount, currency) {
 	return get_formatter().money(amount, currency);
 }
 
-// For plain text such as a confirm dialog: a symbol drawn with HTML becomes the currency code.
+// Plain Unicode text for APIs, agent replies and dialogs.
 export function money_text(amount, currency) {
 	return get_formatter().money_text(amount, currency);
+}
+
+export function signed_money(amount, currency, minus = '−') {
+	return get_formatter().signed_money(amount, currency, minus);
 }
 
 // The digits of CartCurrency.amount: templates supply its config, which may be a historical

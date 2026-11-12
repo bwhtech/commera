@@ -34,7 +34,7 @@
 				<template x-for="(discount, index) in (details?.discounts ?? []).filter((discount) => discount.discount_class === 'Order')" :key="index">
 					<div class="flex justify-between gap-3 text-ink-gray-7">
 						<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Discount") }}<span x-show="discount.code || discount.title"><bdi x-text="' (' + (discount.code || discount.title) + ')'"></bdi></span></span>
-						<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="'−' + money(discount.amount)"></span>
+						<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="signed_money(-discount.amount)"></span>
 					</div>
 				</template>
 				<div class="flex justify-between gap-3">
@@ -53,7 +53,7 @@
 				</div>
 				<div x-show="details?.rounding_adjustment" class="flex justify-between gap-3">
 					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Rounding") }}</span>
-					<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="(details?.rounding_adjustment < 0 ? '−' : '') + money(Math.abs(details?.rounding_adjustment ?? 0))"></span>
+					<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="signed_money(details?.rounding_adjustment ?? 0)"></span>
 				</div>
 				<div x-show="details?.payment_mode" class="flex justify-between gap-3 border-t border-outline-gray-2 pt-3">
 					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Payment") }}</span>

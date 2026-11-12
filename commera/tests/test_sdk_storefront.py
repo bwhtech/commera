@@ -125,7 +125,7 @@ class TestSdkStorefront(ProductDetailPriceTestCase):
 		self.assertEqual(format.money(1234.5, "INR"), f"{symbol}1,234.50")
 		self.assertEqual(
 			format.money(10, "SAR"),
-			'<bdi dir="ltr"><span class="currency-sign" role="img" aria-label="SAR">\u20c1</span>\u00a010.00</bdi>',
+			"\u20c1\u00a010.00",
 		)
 
 	def test_product_url_links_the_handle_in_the_current_language(self):

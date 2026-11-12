@@ -10,9 +10,9 @@
 {%- else -%}
 {%- set on_sale = product.compare_at_price and product.compare_at_price > product.price -%}
 <span class="tabular inline-flex flex-wrap items-baseline gap-x-2">
-	<span class="{{ 'font-semibold' if on_sale else 'font-medium' }} text-ink-gray-9">{% if on_sale %}<span class="sr-only">{{ _("Sale price") }}</span>{% endif %}{{ commera.format.money(product.price, product.currency) }}</span>
+	<span class="{{ 'font-semibold' if on_sale else 'font-medium' }} text-ink-gray-9">{% if on_sale %}<span class="sr-only">{{ _("Sale price") }}</span>{% endif %}{{ commera.format.money_html(product.price, product.currency) }}</span>
 	{%- if on_sale %}
-	<span class="text-base text-ink-gray-6 line-through"><span class="sr-only">{{ _("Regular price") }}</span>{{ commera.format.money(product.compare_at_price, product.currency) }}</span>
+	<span class="text-base text-ink-gray-6 line-through"><span class="sr-only">{{ _("Regular price") }}</span>{{ commera.format.money_html(product.compare_at_price, product.currency) }}</span>
 	{%- endif %}
 </span>
 {%- endif -%}

@@ -343,6 +343,10 @@ function order_summary() {
 			);
 		},
 
+		signed_money(amount) {
+			return this.$store.cart.signed_money(amount);
+		},
+
 		money(amount) {
 			return this.$store.cart.money(amount);
 		},
@@ -824,6 +828,10 @@ function checkout(config) {
 				.join(', ');
 		},
 
+		signed_money(amount) {
+			return this.$store.cart.signed_money(amount);
+		},
+
 		money(amount) {
 			return this.$store.cart.money(amount);
 		},
@@ -896,6 +904,10 @@ function order_confirmation() {
 				.catch(() => null);
 		},
 
+		signed_money(amount) {
+			return commera.format.signed_money(amount, this.order?.currency);
+		},
+
 		money(amount) {
 			return commera.format.money(amount, this.order?.currency);
 		},
@@ -963,6 +975,10 @@ document.addEventListener('alpine:init', () => {
 				() => commera.cart.go_to_checkout(),
 				'checkout',
 			);
+		},
+
+		signed_money(amount) {
+			return commera.format.signed_money(amount, this.cart?.currency);
 		},
 
 		money(amount) {
