@@ -20,13 +20,18 @@ def get_entry_titles(theme_dirs, page: str, layout) -> dict[str, str]:
 	sections = (layout or {}).get("sections") or []
 	for section, schema, section_label in iter_labels(sections, partial(get_section_schema, theme_dirs)):
 		section_name = f"{page}/{section.get('id')}"
-		titles[section_name] = SEPARATOR.join([page_label, section_label])
+		titles[section_name] = join_labels(page_label, section_label)
 		blocks = section.get("blocks") or []
 		for block, _schema, block_label in iter_labels(blocks, partial(get_block_schema, schema)):
-			titles[f"{section_name}/{block.get('id')}"] = SEPARATOR.join(
-				[page_label, section_label, block_label]
-			)
+			titles[f"{section_name}/{block.get('id')}"] = join_labels(page_label, section_label, block_label)
 	return titles
+
+
+def join_labels(*labels: str) -> str:
+	"""A label equal to the one before it is left out: the footer section of the footer group reads
+	"Footer, Social links", not "Footer, Footer, Social links"."""
+	kept = [label for index, label in enumerate(labels) if not index or label != labels[index - 1]]
+	return SEPARATOR.join(kept)
 
 
 def get_page_label(page: str) -> str:

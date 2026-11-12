@@ -16,7 +16,7 @@ from commera.localization.resources import HOOK_KEY
 from commera.roles import COMMERA_ADMIN, add_commera_roles
 from commera.shop_themes.doctype.shop_theme.shop_theme import get_render_theme_context, get_theme_context
 from commera.shop_themes.section_text import OVERLAY, SOURCE_HASHES
-from commera.shop_themes.section_titles import SEPARATOR
+from commera.shop_themes.section_titles import SEPARATOR, join_labels
 from commera.shop_themes.section_translations import ThemeSectionResource
 from commera.shop_themes.sections import get_page_layout, get_text
 from commera.shop_themes.theme_resolver import get_theme_environment
@@ -403,6 +403,11 @@ class TestThemeSectionTranslation(IntegrationTestCase):
 		self.assertEqual(titles, {"index/hero": SEPARATOR.join(["[Home]", "[Hero slider]"]), ENTRY: slide})
 		(found,) = [group for group in results if group["resource"] == "theme_section"]
 		self.assertEqual(found["records"], [{"name": ENTRY, "title": slide}])
+
+	def test_a_section_named_like_its_page_is_named_once(self):
+		self.assertEqual(
+			join_labels("Footer", "Footer", "Social links"), SEPARATOR.join(["Footer", "Social links"])
+		)
 
 	def test_the_translations_page_shows_a_translation_whose_source_was_cleared(self):
 		publish(SUMMER_THEME, "index", self.editor_layout({"en": "", "ar": ARABIC_HEADING}))
