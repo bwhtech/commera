@@ -3,7 +3,7 @@
         <thead class="border-b border-gray-300 bg-white text-sm text-accent ">
             <tr>
                 <template x-for="(cell, index) in size_chart[0]" :key="'head-' + index">
-                    <th scope="col" class="p-4" x-text="cell || ''"></th>
+                    <th scope="col" class="p-4"><bdi x-text="cell || ''"></bdi></th>
                 </template>
             </tr>
         </thead>
@@ -11,7 +11,7 @@
             <template x-for="(row, rowIndex) in size_chart.slice(1)" :key="rowIndex">
                 <tr>
                     <template x-for="(cell, cellIndex) in row" :key="cellIndex">
-                        <td class="p-4" x-text="cell ?? ''"></td>
+                        <td class="p-4"><bdi x-text="cell ?? ''"></bdi></td>
                     </template>
                 </tr>
             </template>

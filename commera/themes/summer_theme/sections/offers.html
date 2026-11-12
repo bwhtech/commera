@@ -3,7 +3,7 @@
 	<div class="container">
 		<div class="section-head style-1 wow fadeInUp d-flex justify-content-between m-b30" data-wow-delay="0.2s">
 			<div class="left-content">
-				<h2 class="title">{{ section.settings.title }}</h2>
+				<h2 class="title"><bdi>{{ section.settings.title }}</bdi></h2>
 			</div>
 		</div>
 	</div>
@@ -16,9 +16,9 @@
 						<div class="product-media"{% if banner.settings.image %} style="background-image: url('{{ banner.settings.image }}');"{% endif %}></div>
 						<div class="product-content">
 							<div class="main-content">
-								{% if banner.settings.badge_label %}<span class="offer">{{ banner.settings.badge_label }}</span>{% endif %}
-								<h2 class="product-name">{{ banner.settings.heading }}</h2>
-								{% if banner.settings.cta_label %}<a href="{{ url(banner.settings.url or '#') | e }}" class="btn btn-outline-secondary btn-rounded btn-lg">{{ banner.settings.cta_label }}</a>{% endif %}
+								{% if banner.settings.badge_label %}<span class="offer"><bdi>{{ banner.settings.badge_label | e }}</bdi></span>{% endif %}
+								<h2 class="product-name"><bdi>{{ banner.settings.heading | e }}</bdi></h2>
+								{% if banner.settings.cta_label %}<a href="{{ url(banner.settings.url or '#') | e }}" class="btn btn-outline-secondary btn-rounded btn-lg"><bdi>{{ banner.settings.cta_label | e }}</bdi></a>{% endif %}
 							</div>
 						</div>
 					</div>

@@ -160,7 +160,7 @@ class TestStoreFrameTranslation(StoreFrameTestCase):
 		html = frappe.render_template(FOOTER_TEMPLATE, {"localization": resolve("/ar")[0]})
 
 		self.assertIn("مساعدة", html)
-		self.assertIn(">الشحن</a>", html)
+		self.assertIn("><bdi>الشحن</bdi></a>", html)
 		self.assertIn("&lt;b&gt;الإرجاع&lt;/b&gt;", html)
 		self.assertIn('href="/pages/shipping"', html)
 		self.assertIn("بيت الكتان", html)

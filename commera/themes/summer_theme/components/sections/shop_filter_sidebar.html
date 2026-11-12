@@ -11,9 +11,9 @@
 		{% if node.is_leaf %}
 		<a href="javascript:void(0);"
 			:class='{ "selected": is_selected("subcategory", {{ node.item_groups | tojson }}) }'
-			@click='toggle_filter("subcategory", {{ node.item_groups | tojson }})'>{{ node.display_name | e }}</a>
+			@click='toggle_filter("subcategory", {{ node.item_groups | tojson }})'><bdi>{{ node.display_name | e }}</bdi></a>
 		{% else %}
-		<span class="cat-parent text-start">{{ node.display_name | e }}</span>
+		<span class="cat-parent text-start"><bdi>{{ node.display_name | e }}</bdi></span>
 		{% endif %}
 		{% if node.children %}{{ category_facet_list(node.children) }}{% endif %}
 	</li>
@@ -75,7 +75,7 @@
 				<input type="checkbox" class="btn-check" id="filter-color-{{ loop.index }}"
 					:checked='is_selected("colors", {{ color | tojson }})'
 					@change='toggle_filter("colors", {{ color | tojson }})'>
-				<label class="btn" for="filter-color-{{ loop.index }}">{{ swatch_dot(color, swatches) }}{{ _(color) }}</label>
+				<label class="btn" for="filter-color-{{ loop.index }}">{{ swatch_dot(color, swatches) }}<bdi>{{ _(color) }}</bdi></label>
 				{% endfor %}
 			</div>
 		</div>
@@ -89,7 +89,7 @@
 				<input type="checkbox" class="btn-check" id="filter-size-{{ loop.index }}"
 					:checked='is_selected("sizes", {{ size | tojson }})'
 					@change='toggle_filter("sizes", {{ size | tojson }})'>
-				<label class="btn" for="filter-size-{{ loop.index }}">{{ size }}</label>
+				<label class="btn" for="filter-size-{{ loop.index }}"><bdi>{{ size }}</bdi></label>
 				{% endfor %}
 			</div>
 		</div>
@@ -97,7 +97,7 @@
 
 		{% for facet_name, facet_nodes in filters.items() if facet_name not in attribute_facets and facet_nodes %}
 		<div class="widget widget_categories">
-			<h6 class="widget-title">{{ _(facet_name) }}</h6>
+			<h6 class="widget-title"><bdi>{{ _(facet_name) }}</bdi></h6>
 			{{ category_facet_list(facet_nodes) }}
 		</div>
 		{% endfor %}
@@ -110,7 +110,7 @@
 				<li class="cat-item">
 					<a href="javascript:void(0);"
 						:class='{ "selected": is_selected("brands", {{ brand | tojson }}) }'
-						@click='toggle_filter("brands", {{ brand | tojson }})'>{{ brand }}</a>
+						@click='toggle_filter("brands", {{ brand | tojson }})'><bdi>{{ brand }}</bdi></a>
 				</li>
 				{% endfor %}
 			</ul>

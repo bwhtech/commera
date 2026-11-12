@@ -20,7 +20,7 @@
 					<ul class="breadcrumb">
 						<li class="breadcrumb-item"><a href="{{ url('/') | e }}">{{ _("Home") }}</a></li>
 						{% for breadcrumb in breadcrumbs %}
-							<li class="breadcrumb-item">{{ breadcrumb.label|e }}</li>
+							<li class="breadcrumb-item"><bdi>{{ breadcrumb.label|e }}</bdi></li>
 						{% endfor %}
 					</ul>
 				</nav>
@@ -67,8 +67,8 @@
 											</div>
 										</td>
 										<td class="product-item-name">
-											<a :href="{{ url('/products') | tojson | forceescape }} + '/' + cart_item.item.route"
-												x-text="{% if in_source_language %}cart_item.variant.item_name{% else %}cart_item.variant.title || cart_item.variant.item_name{% endif %}"></a>
+											<a :href="{{ url('/products') | tojson | forceescape }} + '/' + cart_item.item.route"><bdi
+												x-text="{% if in_source_language %}cart_item.variant.item_name{% else %}cart_item.variant.title || cart_item.variant.item_name{% endif %}"></bdi></a>
 										</td>
 										<td class="product-item-price">
 											<template x-if="cart_item.default_price && parseFloat(cart_item.default_price) !== $store.cart.price_of(cart_item)">
@@ -137,7 +137,7 @@
 								</tr>
 								<template x-for="(discount, index) in $store.cart.discounts" :key="index">
 									<tr class="discount">
-										<td>{{ _("Discount") }}<span x-show="discount.label" x-text="` (${discount.label})`"></span></td>
+										<td>{{ _("Discount") }}<span x-show="discount.label"><bdi x-text="` (${discount.label})`"></bdi></span></td>
 										<td class="price">-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span></td>
 									</tr>
 								</template>
@@ -152,7 +152,7 @@
 								</tr>
 								<template x-for="(tax, index) in $store.cart.priced?.taxes ?? []" :key="index">
 									<tr>
-										<td x-text="tax.description"></td>
+										<td><bdi x-text="tax.description"></bdi></td>
 										<td class="price">{{ currency_symbol }}<span x-text="format_amount(tax.amount)"></span></td>
 									</tr>
 								</template>

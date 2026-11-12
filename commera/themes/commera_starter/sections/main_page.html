@@ -1,8 +1,8 @@
 {% if page is defined and page %}
 <article class="section-x pt-6 md:pt-10"><div class="mx-auto max-w-3xl">
 	{% if section.settings.show_title %}
-	<h1 class="page-title">{{ page.title|e }}</h1>
+	<h1 class="page-title"><bdi>{{ page.title|e }}</bdi></h1>
 	{% endif %}
-	<div class="rich-text mt-8 text-p-xl text-ink-gray-7">{{ page.body_html | safe }}</div>
+	<div dir="auto" class="rich-text mt-8 text-p-xl text-ink-gray-7">{{ page.body_html | safe }}</div>
 </div></article>
 {% endif %}

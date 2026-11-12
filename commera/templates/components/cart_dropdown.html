@@ -22,15 +22,15 @@ link='cart',
                 class="object-cover rounded-lg w-11 h-11">
         </div>
         <div>
-            <p class="text-xs text-brand" x-text="cart_item.brand"></p>
+            <p class="text-xs text-brand"><bdi x-text="cart_item.brand"></bdi></p>
             <div class="flex">
                 {% if in_source_language %}
-                <p class="text-xs mt-1 text-gray-500" x-text="cart_item.variant.item_name"></p>
+                <p class="text-xs mt-1 text-gray-500"><bdi x-text="cart_item.variant.item_name"></bdi></p>
                 {% else %}
-                  <p class="text-xs mt-1 text-gray-500" x-text="cart_item.variant.title || cart_item.variant.item_name"></p>
+                  <p class="text-xs mt-1 text-gray-500"><bdi x-text="cart_item.variant.title || cart_item.variant.item_name"></bdi></p>
                   {% endif %}
                 <p class="text-xs mt-1 text-gray-500 mx-1" x-show="cart_item && cart_item.variant"> - </p>
-                <p class="text-xs mt-1 text-gray-500" x-text="cart_item?.variant?.size"></p>
+                <p class="text-xs mt-1 text-gray-500"><bdi x-text="cart_item?.variant?.size"></bdi></p>
             </div>
         </div>
     </div>

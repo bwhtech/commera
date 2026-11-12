@@ -9,17 +9,17 @@
 						{% for slide in section.blocks %}
 						<div class="slick-slide">
 							<div class="content-info">
-								<h1 class="title">{{ slide.settings.heading }}</h1>
+								<h1 class="title"><bdi>{{ slide.settings.heading | e }}</bdi></h1>
 								{% if slide.settings.subheading %}
 								<div class="swiper-meta-items">
 									<div class="meta-content">
-										<span class="price-num d-inline-block">{{ slide.settings.subheading }}</span>
+										<span class="price-num d-inline-block"><bdi>{{ slide.settings.subheading | e }}</bdi></span>
 									</div>
 								</div>
 								{% endif %}
 								{% if slide.settings.cta_label %}
 								<div class="content-btn m-b30">
-									<a href="{{ url(slide.settings.url or '/products') | e }}" class="btn btn-secondary me-xl-3 me-2 btnhover20">{{ slide.settings.cta_label }}</a>
+									<a href="{{ url(slide.settings.url or '/products') | e }}" class="btn btn-secondary me-xl-3 me-2 btnhover20"><bdi>{{ slide.settings.cta_label | e }}</bdi></a>
 								</div>
 								{% endif %}
 							</div>
@@ -52,8 +52,8 @@
 				<path d="M52.6617 37.6496L58.7381 40.0325L75.0609 49.0874L66.6016 63.7422L49.9214 54.6872L45.1557 50.7554L46.1088 57.1892V75.18H28.952V57.1892L30.0243 50.5171L24.9011 54.6872L8.45924 63.7422L0 49.0874L16.3228 39.7942L22.3991 37.6496L16.3228 35.1475L0 26.2117L8.45924 11.557L25.1394 20.4928L30.0243 24.6629L28.952 18.3482V0H46.1088V18.3482L45.1557 24.4246L49.9214 20.4928L66.6016 11.557L75.0609 26.2117L58.7381 35.3858L52.6617 37.6496Z" fill="black" />
 			</svg>
 			<div>
-				<span class="sub-title">{{ section.settings.caption_label }}</span>
-				<h4 class="title">{{ section.settings.caption }}</h4>
+				<span class="sub-title"><bdi>{{ section.settings.caption_label | e }}</bdi></span>
+				<h4 class="title"><bdi>{{ section.settings.caption | e }}</bdi></h4>
 			</div>
 		</div>
 		{% endif %}

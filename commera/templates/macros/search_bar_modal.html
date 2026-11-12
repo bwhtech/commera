@@ -90,8 +90,7 @@
                 </p>
                 <div class="flex flex-wrap gap-2 my-4" x-cloak x-show="categories.length > 0">
                     <template x-for="category in categories" :key="category.name">
-                        <a :href="category.url" class="text-sm border border-gray-300 rounded-full px-3 py-1 hover:bg-gray-100"
-                            x-text="category.label"></a>
+                        <a :href="category.url" class="text-sm border border-gray-300 rounded-full px-3 py-1 hover:bg-gray-100"><bdi x-text="category.label"></bdi></a>
                     </template>
                 </div>
                 <h3 class="text-sm my-4" x-show="products.length > 0">{{_("Search Results")}}</h3>
@@ -104,19 +103,19 @@
                                         class="h-10 w-10 object-cover rounded-md bg-gray-400">
                                     <div></div>
                                     <h3 class="text-base">
-                                        <span x-text="product.title || product.item_name"></span>
+                                        <span><bdi x-text="product.title || product.item_name"></bdi></span>
                                         {% if "color" in card_fields %}
-                                        <span x-text="commera.t(product.attribute_value)"></span>
+                                        <span><bdi x-text="commera.t(product.attribute_value)"></bdi></span>
                                         {% endif %}
                                     </h3>
                                 </div>
                                 {% if "brand" in card_fields or "item_group" in card_fields %}
                                 <div class="flex flex-wrap gap-2 mb-1 text-xs text-gray-500">
                                     {% if "brand" in card_fields %}
-                                    <span x-show="product.brand" x-text="product.brand"></span>
+                                    <span x-show="product.brand"><bdi x-text="product.brand"></bdi></span>
                                     {% endif %}
                                     {% if "item_group" in card_fields %}
-                                    <span x-show="product.item_group" x-text="product.item_group"></span>
+                                    <span x-show="product.item_group"><bdi x-text="product.item_group"></bdi></span>
                                     {% endif %}
                                 </div>
                                 {% endif %}
@@ -132,7 +131,7 @@
                                 {% if "sizes" in card_fields %}
                                 <div class="flex flex-wrap gap-1 mt-1">
                                     <template x-for="(size_option, size_index) in (product.sizes || [])" :key="size_index">
-                                        <span class="text-xs border border-gray-300 rounded px-1.5 py-0.5" x-text="size_option.size"></span>
+                                        <span class="text-xs border border-gray-300 rounded px-1.5 py-0.5"><bdi x-text="size_option.size"></bdi></span>
                                     </template>
                                 </div>
                                 {% endif %}

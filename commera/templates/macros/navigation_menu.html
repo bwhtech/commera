@@ -1,6 +1,6 @@
 {# Frappe's Jinja environment has no autoescape, so every shop-owner authored label and href is piped through `| e`. #}
 
-{% macro nav_label(node, class_names, with_caret=false, caption=none, on_click=none) %}{% set text = caption or node.label %}{% if node.href %}<a href="{{ node.href | e }}"{% if class_names %} class="{{ class_names }}"{% endif %}{% if on_click %} @click="{{ on_click }}"{% endif %}>{{ text | e }}{% if with_caret %}<img src="/assets/commera/icons/arrow-down.svg" alt="" class="h-6 w-6 p-1" :class="{ 'transition-transform duration-200 transform rotate-180': open }">{% endif %}</a>{% else %}<span{% if class_names %} class="{{ class_names }}"{% endif %}>{{ text | e }}{% if with_caret %}<img src="/assets/commera/icons/arrow-down.svg" alt="" class="h-6 w-6 p-1" :class="{ 'transition-transform duration-200 transform rotate-180': open }">{% endif %}</span>{% endif %}{% endmacro %}
+{% macro nav_label(node, class_names, with_caret=false, caption=none, on_click=none) %}{% set text = caption or node.label %}{% if node.href %}<a href="{{ node.href | e }}"{% if class_names %} class="{{ class_names }}"{% endif %}{% if on_click %} @click="{{ on_click }}"{% endif %}><bdi>{{ text | e }}</bdi>{% if with_caret %}<img src="/assets/commera/icons/arrow-down.svg" alt="" class="h-6 w-6 p-1" :class="{ 'transition-transform duration-200 transform rotate-180': open }">{% endif %}</a>{% else %}<span{% if class_names %} class="{{ class_names }}"{% endif %}><bdi>{{ text | e }}</bdi>{% if with_caret %}<img src="/assets/commera/icons/arrow-down.svg" alt="" class="h-6 w-6 p-1" :class="{ 'transition-transform duration-200 transform rotate-180': open }">{% endif %}</span>{% endif %}{% endmacro %}
 
 {% macro mega_menu_column(node, caption=none) %}
 <div>
@@ -62,7 +62,7 @@
 {% if node.children %}
 {% set toggle_expression = "open_item = open_item === '" ~ key ~ "' ? null : '" ~ key ~ "'" %}
 <button type="button" class="{{ class_names }}" @click="{{ toggle_expression }}">
-  <span>{{ node.label | e }}</span>
+  <span><bdi>{{ node.label | e }}</bdi></span>
   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 transition-transform"
        :class="{ 'rotate-180': open_item === '{{ key }}' }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />

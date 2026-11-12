@@ -14,7 +14,7 @@
 			<p class="text-md text-balance [overflow-wrap:anywhere]"><bdi x-text="{{ title }}"></bdi></p>
 			<p class="tabular whitespace-nowrap text-md"{% if unavailable %} x-show="!({{ unavailable }})"{% endif %} x-text="{{ amount }}"></p>
 		</div>
-		<p class="mt-1 text-base text-ink-gray-6 [overflow-wrap:anywhere]" x-show="{{ subtitle }}" x-text="{{ subtitle }}"></p>
+		<p class="mt-1 text-base text-ink-gray-6 [overflow-wrap:anywhere]" x-show="{{ subtitle }}"><bdi x-text="{{ subtitle }}"></bdi></p>
 		{%- if unavailable %}
 		<div x-show="{{ unavailable }}" class="mt-1 flex flex-wrap items-center gap-x-3">
 			<p class="text-base text-ink-red-7">{{ unavailable_label() }}</p>

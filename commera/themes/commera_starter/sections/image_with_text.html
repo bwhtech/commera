@@ -5,14 +5,14 @@
 		{{ image(section.settings.image, "", 1280, "aspect-[4/3] size-full object-cover md:aspect-auto md:min-h-[32rem]") }}
 		<div class="px-6 pb-10 md:px-16 md:py-16 lg:px-20">
 			{% if section.settings.badge %}
-			<p class="eyebrow">{{ section.settings.badge }}</p>
+			<p class="eyebrow"><bdi>{{ section.settings.badge }}</bdi></p>
 			{% endif %}
-			<h2 class="mt-4 max-w-[20ch] text-6xl leading-tight tracking-tight md:text-7xl">{{ section.settings.heading }}</h2>
+			<h2 class="mt-4 max-w-[20ch] text-6xl leading-tight tracking-tight md:text-7xl"><bdi>{{ section.settings.heading }}</bdi></h2>
 			{% if section.settings.text %}
-			<p class="mt-5 max-w-[44ch] text-p-xl text-ink-gray-6">{{ section.settings.text }}</p>
+			<p dir="auto" class="mt-5 max-w-[44ch] text-p-xl text-ink-gray-6">{{ section.settings.text }}</p>
 			{% endif %}
 			{% if section.settings.button_label %}
-			<a href="{{ url(section.settings.button_url or '/products') | e }}" class="group mt-8 button-secondary">{{ section.settings.button_label }}<span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
+			<a href="{{ url(section.settings.button_url or '/products') | e }}" class="group mt-8 button-secondary"><bdi>{{ section.settings.button_label | e }}</bdi><span class="transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100">{{ icon("right", "size-4") }}</span></a>
 			{% endif %}
 		</div>
 	</div>

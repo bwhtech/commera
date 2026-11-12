@@ -118,9 +118,9 @@
 						{% for breadcrumb in breadcrumbs %}
 							<li class="breadcrumb-item">
 								{% if breadcrumb.href and breadcrumb.href != "#" %}
-									<a href="{{ breadcrumb.href | e }}">{{ breadcrumb.label|e }}</a>
+									<a href="{{ breadcrumb.href | e }}"><bdi>{{ breadcrumb.label|e }}</bdi></a>
 								{% else %}
-									{{ breadcrumb.label|e }}
+									<bdi>{{ breadcrumb.label|e }}</bdi>
 								{% endif %}
 							</li>
 						{% endfor %}
@@ -305,7 +305,7 @@
 									</div>
 									<div class="dz-content">
 										<h6 class="title mb-0">
-											<span x-text="{% if not in_source_language %}cart_item.variant.title || {% endif %}cart_item.variant.item_name"></span>
+											<span><bdi x-text="{% if not in_source_language %}cart_item.variant.title || {% endif %}cart_item.variant.item_name"></bdi></span>
 											<span class="checkout-item-meta">{{ _("Qty") }} <span x-text="cart_item.qty"></span></span>
 										</h6>
 										<span class="price">{{ currency_symbol }}<span x-text="format_amount(cart_item.price * cart_item.qty)"></span></span>
@@ -321,9 +321,9 @@
 								</div>
 								<div class="dz-content">
 									<h6 class="title mb-0">
-										{{ item.title|e }}
+										<bdi>{{ item.title|e }}</bdi>
 										<span class="checkout-item-meta">
-											{% if item.size %}{{ item.size }} &middot; {% endif %}{{ _("Qty") }} {{ item.qty | int }}
+											{% if item.size %}<bdi>{{ item.size }}</bdi> &middot; {% endif %}{{ _("Qty") }} {{ item.qty | int }}
 										</span>
 									</h6>
 									<span class="price">{{ currency_symbol }}{{ cart_currency.amount((item.amount or 0) + (item.custom_code_discount or 0) * (item.qty or 0)) }}</span>
@@ -352,14 +352,14 @@
 								</tr>
 								<template x-for="(discount, index) in active_summary.discounts || []" :key="index">
 									<tr class="discount">
-										<td>{{ _("Discount") }}<span x-show="discount.label" x-text="` (${discount.label})`"></span></td>
+										<td>{{ _("Discount") }}<span x-show="discount.label"><bdi x-text="` (${discount.label})`"></bdi></span></td>
 										<td class="price">-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span></td>
 									</tr>
 								</template>
 								<tr class="shipping">
 									<td>
 										<span x-show="delivery_option === 'home_delivery' && !selected_shipping_option">{{ _("Home Delivery") }}</span>
-										<span x-show="delivery_option === 'home_delivery' && selected_shipping_option" x-cloak x-text="selected_shipping_option"></span>
+										<span x-show="delivery_option === 'home_delivery' && selected_shipping_option" x-cloak><bdi x-text="selected_shipping_option"></bdi></span>
 										<span x-show="delivery_option === 'store_pickup'" x-cloak>{{ _("Pickup From Store") }}</span>
 									</td>
 									<td class="price">
@@ -369,19 +369,19 @@
 								</tr>
 								<template x-for="(discount, index) in active_summary.shipping_discounts || []" :key="index">
 									<tr class="discount">
-										<td>{{ _("Shipping discount") }}<span x-show="discount.label" x-text="` (${discount.label})`"></span></td>
+										<td>{{ _("Shipping discount") }}<span x-show="discount.label"><bdi x-text="` (${discount.label})`"></bdi></span></td>
 										<td class="price">-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span></td>
 									</tr>
 								</template>
 								<template x-for="(tax, index) in active_summary.taxes" :key="index">
 									<tr class="tax">
-										<td x-text="tax.description"></td>
+										<td><bdi x-text="tax.description"></bdi></td>
 										<td class="price">{{ currency_symbol }}<span x-text="format_amount(tax.amount)"></span></td>
 									</tr>
 								</template>
 								<template x-for="(fee, index) in active_summary.plugin_fees" :key="index">
 									<tr class="plugin-fee">
-										<td x-text="fee.description"></td>
+										<td><bdi x-text="fee.description"></bdi></td>
 										<td class="price">{{ currency_symbol }}<span x-text="format_amount(fee.amount)"></span></td>
 									</tr>
 								</template>
@@ -422,7 +422,7 @@
 														:id="'shipping_option_' + index" :value="option.title"
 														:checked="shown_shipping_option === option.title">
 													<label class="form-check-label" :for="'shipping_option_' + index">
-														<span x-text="option.label || option.title"></span>
+														<span><bdi x-text="option.label || option.title"></bdi></span>
 														<span x-show="option.is_free"> &mdash; {{ _("Free") }}</span>
 														<span x-show="!option.is_free" x-cloak>
 															&mdash; {{ currency_symbol }}<span x-text="format_amount(option.amount)"></span>
@@ -433,7 +433,7 @@
 											<div class="accordion-collapse collapse"
 												:class="shown_shipping_option === option.title && 'show'">
 												<div class="accordion-body">
-													<p class="m-b0" x-text="option.description"></p>
+													<p dir="auto" class="m-b0" x-text="option.description"></p>
 												</div>
 											</div>
 										</div>
@@ -457,7 +457,7 @@
 												@click='payment_mode = gateway_name'>
 												<input class="form-check-input radio" type="radio" name="payment_mode"
 													:id="'payment_mode_' + index" :value="gateway_name" x-model="payment_mode">
-												<label class="form-check-label" :for="'payment_mode_' + index" x-text="config.payment_gateway_labels[gateway_name] || gateway_name"></label>
+												<label class="form-check-label" :for="'payment_mode_' + index"><bdi x-text="config.payment_gateway_labels[gateway_name] || gateway_name"></bdi></label>
 											</div>
 										</div>
 										<div class="accordion-collapse collapse"

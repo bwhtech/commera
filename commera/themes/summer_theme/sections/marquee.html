@@ -10,7 +10,7 @@
 		<ul class="dz-features text-wrapper"{% if not loop.first %} aria-hidden="true"{% endif %}>
 			{% for pass in range(pass_count) %}{% for label in category_labels %}
 			<li class="item">
-				<h2 class="title">{{ label | e }}</h2>
+				<h2 class="title"><bdi>{{ label | e }}</bdi></h2>
 			</li>
 			<li class="item">
 				<svg xmlns="http://www.w3.org/2000/svg" width="61" height="60" viewBox="0 0 61 60" fill="none" aria-hidden="true" focusable="false">

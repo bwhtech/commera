@@ -215,4 +215,4 @@ class ProductListingPageSizeTestCase(IntegrationTestCase):
 				self.assertEqual(context.total_count, FIXTURE_COUNT)
 				self.assertEqual(context.seo["title"], f"Meta {label}")
 				self.assertIn(label, context.filters)
-				self.assertIn(f"<h1>{label}</h1>", self.get_listing_html(category=category))
+				self.assertIn(f"<h1><bdi>{label}</bdi></h1>", self.get_listing_html(category=category))

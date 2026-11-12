@@ -8,9 +8,9 @@
         <h1 class="text-base md:text-lg  font-medium mb-3"> {{_('Arriving')}} {{_(delivery_date)}}</h1>
         {% endif %}
         <div class="text-sm gap-2 flex flex-col">
-            <p class="text-gray-800 capitalize">{{_(brand)}}</p>
-            <p class="capitalize">{{ _(name)|e }}</p>
-            <p class="font-medium"><span class="capitalize">{{_("size")}}:</span> {{_(size)}}</p>
+            <p class="text-gray-800 capitalize"><bdi>{{_(brand)}}</bdi></p>
+            <p class="capitalize"><bdi>{{ _(name)|e }}</bdi></p>
+            <p class="font-medium"><span class="capitalize">{{_("size")}}:</span> <bdi>{{_(size)}}</bdi></p>
 
             <p class="flex">{{get_cart_currency({"currency": currency}).symbol}} {{ get_cart_currency({"currency": currency}).amount(price) }} </p>
         </div>

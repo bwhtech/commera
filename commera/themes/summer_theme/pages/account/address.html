@@ -186,15 +186,15 @@
 					<div class="account-address-box">
 						<h6 class="mb-3">{{ address_type_labels.get(address.address_type, address.address_type) | e }}</h6>
 						<ul>
-							<li>{{ address.address_title | e }}</li>
-							<li>{{ address.address_line1 | e }}</li>
-							{% if address.address_line2 %}<li>{{ address.address_line2 | e }}</li>{% endif %}
+							<li><bdi>{{ address.address_title | e }}</bdi></li>
+							<li><bdi>{{ address.address_line1 | e }}</bdi></li>
+							{% if address.address_line2 %}<li><bdi>{{ address.address_line2 | e }}</bdi></li>{% endif %}
 							<li>
-								{{ address.city | e }}{% if address.state %}, {{ address.state | e }}{% endif %}{% if address.pincode %} - {{ address.pincode | e }}{% endif %}
+								<bdi>{{ address.city | e }}</bdi>{% if address.state %}, <bdi>{{ address.state | e }}</bdi>{% endif %}{% if address.pincode %} - <bdi>{{ address.pincode | e }}</bdi>{% endif %}
 							</li>
-							<li>{{ address.country | e }}</li>
-							{% if address.phone %}<li>{{ address.phone | e }}</li>{% endif %}
-							{% if address.email_id %}<li>{{ address.email_id | e }}</li>{% endif %}
+							<li><bdi>{{ address.country | e }}</bdi></li>
+							{% if address.phone %}<li><bdi>{{ address.phone | e }}</bdi></li>{% endif %}
+							{% if address.email_id %}<li><bdi>{{ address.email_id | e }}</bdi></li>{% endif %}
 						</ul>
 					</div>
 					<div class="account-address-bottom">

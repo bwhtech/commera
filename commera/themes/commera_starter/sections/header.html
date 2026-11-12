@@ -15,11 +15,11 @@
 			{% for item in menu_items %}
 			{% if item["items"] %}
 			<div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false" class="relative hidden xl:block">
-				<button type="button" @click="open = !open" :aria-expanded="open" :class="open && 'bg-surface-gray-4'" class="inline-flex h-10 items-center gap-1 whitespace-nowrap rounded-lg px-3 text-md text-ink-gray-8 hover:bg-surface-gray-3">{{ item["title"] | e }} <span :class="open && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
+				<button type="button" @click="open = !open" :aria-expanded="open" :class="open && 'bg-surface-gray-4'" class="inline-flex h-10 items-center gap-1 whitespace-nowrap rounded-lg px-3 text-md text-ink-gray-8 hover:bg-surface-gray-3"><bdi>{{ item["title"] | e }}</bdi> <span :class="open && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
 				<div x-cloak x-show="open" {{ popover() }} class="absolute start-0 top-full z-50 mt-2 min-w-56 popover divide-y divide-outline-gray-2 text-start">
 					{% for group in item["items"] if group["items"] %}
 					<div class="p-1.5">
-						<p class="flex h-7 items-center px-2 text-base font-medium text-ink-gray-6">{{ group["title"] | e }}</p>
+						<p class="flex h-7 items-center px-2 text-base font-medium text-ink-gray-6"><bdi>{{ group["title"] | e }}</bdi></p>
 						{% for link in group["items"] %}{{ menu_link(link, "flex h-10 items-center rounded-lg px-2.5 text-md text-ink-gray-8 hover:bg-surface-gray-3") }}{% endfor %}
 					</div>
 					{% endfor %}
@@ -37,7 +37,7 @@
 		</div>
 
 		<a href="{{ url('/') | e }}" class="{{ 'lg:order-first' if logo_at_start else 'justify-self-center text-center' }} inline-flex min-h-11 items-center px-2 text-2xl font-semibold uppercase tracking-widest">
-			{% if theme.logo %}<img src="{{ theme.logo | e }}" alt="{{ shop_name | e }}" class="h-8 w-auto">{% else %}{{ shop_name | e }}{% endif %}
+			{% if theme.logo %}<img src="{{ theme.logo | e }}" alt="{{ shop_name | e }}" class="h-8 w-auto">{% else %}<bdi>{{ shop_name | e }}</bdi>{% endif %}
 		</a>
 
 		<div class="{{ 'ms-auto' if logo_at_start }} flex items-center justify-end gap-1 lg:-me-2.5">

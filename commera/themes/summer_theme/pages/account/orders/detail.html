@@ -91,7 +91,7 @@
 		<div class="col-sm-6">
 			<div class="shiping-tracker-detail">
 				<span>{{ address_label }}</span>
-				<h6 class="title">{% if address_display %}{{ address_display }}{% else %}&mdash;{% endif %}</h6>
+				<h6 class="title">{% if address_display %}<bdi>{{ address_display | e }}</bdi>{% else %}&mdash;{% endif %}</h6>
 			</div>
 		</div>
 		{% endif %}
@@ -162,8 +162,8 @@
 				<input type="checkbox" class="form-check-input m-0 me-3" value="{{ item.item_code }}"
 					x-model="selected_item_codes" :disabled='returns_status !== "ready" || is_item_locked({{ item.item_code | tojson }})'>
 				<div class="tracking-product-content">
-					<h6 class="title">{{ (item.title or item.item_name)|e }}</h6>
-					{% if item.size %}<small class="d-block"><strong>{{ _("Size") }}</strong> : {{ item.size }}</small>{% endif %}
+					<h6 class="title"><bdi>{{ (item.title or item.item_name)|e }}</bdi></h6>
+					{% if item.size %}<small class="d-block"><strong>{{ _("Size") }}</strong> : <bdi>{{ item.size }}</bdi></small>{% endif %}
 					<template x-if='is_item_locked({{ item.item_code | tojson }})'>
 						<small class="d-block text-muted" x-text='item_state_label({{ item.item_code | tojson }})'></small>
 					</template>
@@ -212,10 +212,10 @@
 					</div>
 					{% endif %}
 					<div class="tracking-product-content">
-						<h6 class="title">{{ (item.title or item.item_name)|e }}</h6>
-						{% if item.brand %}<small class="d-block"><strong>{{ _("Brand") }}</strong> : {{ item.brand }}</small>{% endif %}
+						<h6 class="title"><bdi>{{ (item.title or item.item_name)|e }}</bdi></h6>
+						{% if item.brand %}<small class="d-block"><strong>{{ _("Brand") }}</strong> : <bdi>{{ item.brand }}</bdi></small>{% endif %}
 						<small class="d-block"><strong>{{ _("Price") }}</strong> : {{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(item.price or 0) }}</small>
-						{% if item.size %}<small class="d-block"><strong>{{ _("Size") }}</strong> : {{ item.size }}</small>{% endif %}
+						{% if item.size %}<small class="d-block"><strong>{{ _("Size") }}</strong> : <bdi>{{ item.size }}</bdi></small>{% endif %}
 					</div>
 				</div>
 				{% endfor %}
@@ -226,7 +226,7 @@
 				</div>
 				{% for discount in order_summary.discounts %}
 				<div class="tracking-item-content">
-					<span class="text-success">{{ _("Discount") }}{% if discount.label %} ({{ discount.label | e }}){% endif %}</span>
+					<span class="text-success">{{ _("Discount") }}{% if discount.label %} (<bdi>{{ discount.label | e }}</bdi>){% endif %}</span>
 					<h6>&minus; {{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(discount.amount) }}</h6>
 				</div>
 				{% endfor %}
@@ -238,7 +238,7 @@
 				{% endif %}
 				{% for discount in order_summary.shipping_discounts %}
 				<div class="tracking-item-content">
-					<span class="text-success">{{ _("Shipping discount") }}{% if discount.label %} ({{ discount.label | e }}){% endif %}</span>
+					<span class="text-success">{{ _("Shipping discount") }}{% if discount.label %} (<bdi>{{ discount.label | e }}</bdi>){% endif %}</span>
 					<h6>&minus; {{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(discount.amount) }}</h6>
 				</div>
 				{% endfor %}
@@ -250,13 +250,13 @@
 				{% endif %}
 				{% for tax in charge_lines.taxes %}
 				<div class="tracking-item-content">
-					<span>{{ tax.description }}</span>
+					<span><bdi>{{ tax.description | e }}</bdi></span>
 					<h6>{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(tax.amount) }}</h6>
 				</div>
 				{% endfor %}
 				{% for fee in charge_lines.plugin_fees %}
 				<div class="tracking-item-content">
-					<span>{{ fee.description }}</span>
+					<span><bdi>{{ fee.description | e }}</bdi></span>
 					<h6>{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(fee.amount) }}</h6>
 				</div>
 				{% endfor %}
@@ -280,7 +280,7 @@
 					<li>{{ _("Total") }} : <strong>{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order.payable_total) }}</strong></li>
 					<li>{{ _("Status") }} : <strong>{{ _(order.custom_ecommerce_status or "Draft") }}</strong></li>
 					{% if shows_private_details %}
-					<li>{{ address_label }} : <strong>{% if address_display %}{{ address_display }}{% else %}&mdash;{% endif %}</strong></li>
+					<li>{{ address_label }} : <strong>{% if address_display %}<bdi>{{ address_display | e }}</bdi>{% else %}&mdash;{% endif %}</strong></li>
 					{% endif %}
 				</ul>
 				{% if is_owner %}

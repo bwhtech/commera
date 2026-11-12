@@ -1,3 +1,3 @@
 {% macro menu_link(item, class) %}
-{% if item["url"] %}<a href="{{ item['url'] | e }}" class="{{ class }}">{{ item["title"] | e }}</a>{% else %}<span class="{{ class }}">{{ item["title"] | e }}</span>{% endif %}
+{% if item["url"] %}<a href="{{ item['url'] | e }}" class="{{ class }}"><bdi>{{ item["title"] | e }}</bdi></a>{% else %}<span class="{{ class }}"><bdi>{{ item["title"] | e }}</bdi></span>{% endif %}
 {%- endmacro %}

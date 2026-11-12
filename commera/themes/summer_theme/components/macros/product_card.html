@@ -81,12 +81,12 @@
 	<div class="dz-content">
 		{% if style == "style-2" %}
 		{% if discount %}<span class="sale-title">{{ _("up to {0}% off").format(discount | round | int) }}</span>{% endif %}
-		<h5 class="title shop-card-title"><a href="{{ product_url | e }}">{{ product_name }}</a></h5>
+		<h5 class="title shop-card-title"><a href="{{ product_url | e }}"><bdi>{{ product_name }}</bdi></a></h5>
 		{{ card_rating(average_rating, review_count) }}
 		<h6 class="price shop-card-price">{{ card_price(formatted_price, original_price, discount) }}</h6>
 		{% elif style == "style-4" %}
 		<div>
-			<h6 class="title"><a href="{{ product_url | e }}">{{ product_name }}</a></h6>
+			<h6 class="title"><a href="{{ product_url | e }}"><bdi>{{ product_name }}</bdi></a></h6>
 			{{ card_rating(average_rating, review_count) }}
 			{% if discount %}<span class="sale-title">{{ _("Up to {0}% Off").format(discount | round | int) }}</span>{% endif %}
 		</div>
@@ -94,7 +94,7 @@
 			<h6 class="price">{{ card_price(formatted_price, original_price, discount) }}</h6>
 		</div>
 		{% else %}
-		<h5 class="title shop-card-title"><a href="{{ product_url | e }}">{{ product_name }}</a></h5>
+		<h5 class="title shop-card-title"><a href="{{ product_url | e }}"><bdi>{{ product_name }}</bdi></a></h5>
 		{{ card_rating(average_rating, review_count) }}
 		<h5 class="price shop-card-price">{{ card_price(formatted_price, original_price, discount) }}</h5>
 		{% endif %}

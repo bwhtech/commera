@@ -8,17 +8,17 @@
 					<div class="product-media"{% if banner.settings.image %} style="background-image: url('{{ banner.settings.image }}');"{% endif %}></div>
 					{% if loop.first %}
 					<div class="sale-box">
-						{% if banner.settings.badge_label %}<div class="badge style-1 mb-1">{{ banner.settings.badge_label }}</div>{% endif %}
-						<h2 class="sale-name">{{ banner.settings.heading }}</h2>
-						{% if banner.settings.cta_label %}<a href="{{ url(banner.settings.url or '#') | e }}" class="btn btn-outline-secondary btn-lg text-uppercase">{{ banner.settings.cta_label }}</a>{% endif %}
+						{% if banner.settings.badge_label %}<div class="badge style-1 mb-1"><bdi>{{ banner.settings.badge_label | e }}</bdi></div>{% endif %}
+						<h2 class="sale-name"><bdi>{{ banner.settings.heading | e }}</bdi></h2>
+						{% if banner.settings.cta_label %}<a href="{{ url(banner.settings.url or '#') | e }}" class="btn btn-outline-secondary btn-lg text-uppercase"><bdi>{{ banner.settings.cta_label | e }}</bdi></a>{% endif %}
 					</div>
 					{% else %}
 					<div class="product-content">
 						<div class="main-content">
-							{% if banner.settings.badge_label %}<div class="badge style-1 mb-3">{{ banner.settings.badge_label }}</div>{% endif %}
-							<h2 class="product-name">{{ banner.settings.heading }}</h2>
+							{% if banner.settings.badge_label %}<div class="badge style-1 mb-3"><bdi>{{ banner.settings.badge_label | e }}</bdi></div>{% endif %}
+							<h2 class="product-name"><bdi>{{ banner.settings.heading | e }}</bdi></h2>
 						</div>
-						{% if banner.settings.cta_label %}<a href="{{ url(banner.settings.url or '#') | e }}" class="btn btn-secondary btn-lg text-uppercase">{{ banner.settings.cta_label }}</a>{% endif %}
+						{% if banner.settings.cta_label %}<a href="{{ url(banner.settings.url or '#') | e }}" class="btn btn-secondary btn-lg text-uppercase"><bdi>{{ banner.settings.cta_label | e }}</bdi></a>{% endif %}
 					</div>
 					{% endif %}
 				</div>

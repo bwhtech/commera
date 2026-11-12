@@ -35,7 +35,7 @@
             <ul class="list-disc ps-4 text-sm">
               {% for link in section.links %}
                 <li class="mb-2">
-                  <a href="{{ url(link.url or '#') | e }}" class="text-xs text-gray-300 hover:text-white">{{ link.title | e }}</a>
+                  <a href="{{ url(link.url or '#') | e }}" class="text-xs text-gray-300 hover:text-white"><bdi>{{ link.title | e }}</bdi></a>
                 </li>
               {% endfor %}
             </ul>
@@ -98,8 +98,8 @@
   
       <div
         class="order-1 mt-12 mb-4 border-b border-gray-700 pb-6 decoration-1 md:order-{{ footer_sections|length + 2 }} md:mt-0 md:w-1/5 md:border-0 md:pb-0">
-        <h3 class="py-3 text-sm">{{ newsletter_title }}</h3>
-        <p class="me-8 mb-4 pt-4 text-xs text-gray-400">
+        <h3 class="py-3 text-sm"><bdi>{{ newsletter_title | e }}</bdi></h3>
+        <p dir="auto" class="me-8 mb-4 pt-4 text-xs text-gray-400">
           {{ newsletter_desc }}.
         </p>
         <form class="w-full">
@@ -125,7 +125,7 @@
         <img src="{{ vat_image }}" alt="VAT Certificate" class="me-4 mb-4 h-9 w-auto object-contain md:mb-0" />
         {% endif %}
         <div class="flex flex-col items-start">
-          <p>&copy; {{ frappe.utils.getdate().year }} {{ _(copyright_text) | e }}</p>
+          <p>&copy; {{ frappe.utils.getdate().year }} <bdi>{{ _(copyright_text) | e }}</bdi></p>
         </div>
       </div>
       {% include "templates/includes/social_links.html" %}

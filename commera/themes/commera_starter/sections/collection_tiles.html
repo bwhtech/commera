@@ -11,7 +11,7 @@
 			<div class="pointer-events-none absolute inset-0 rounded-2xl bg-linear-to-t from-black/55 via-black/10 via-45% to-transparent"></div>
 			<div class="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5 text-white md:p-6">
 				<div class="min-w-0">
-					<p class="text-3xl font-medium md:text-4xl">{{ title | e }}</p>
+					<p class="text-3xl font-medium md:text-4xl"><bdi>{{ title | e }}</bdi></p>
 					{% if collection %}
 					<p class="tabular mt-0.5 text-base opacity-80">{{ _("{0} products").format(commera.catalog.list_products(collection=collection.handle, page_size=1).total) }}</p>
 					{% endif %}

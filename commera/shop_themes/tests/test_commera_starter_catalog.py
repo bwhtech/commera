@@ -114,7 +114,7 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		status, html = self.render("pages/products/list.html", "/en/products", category=collection["handle"])
 
 		self.assertEqual(status, 200)
-		self.assertIn(f">{collection['title']}</h1>", html)
+		self.assertIn(f"><bdi>{collection['title']}</bdi></h1>", html)
 		self.assertIn(f'name="category" value="{collection["handle"]}"', html)
 
 	def test_a_collection_page_shows_its_description(self):
@@ -171,7 +171,7 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		status, html = self.render("pages/products/details.html", f"/en/products/{handle}", route=handle)
 
 		self.assertEqual(status, 200)
-		self.assertIn(f">{product['title']}</h1>", html.replace("&#39;", "'"))
+		self.assertIn(f"><bdi>{product['title']}</bdi></h1>", html.replace("&#39;", "'"))
 		self.assertIn("product_form(", html)
 		self.assertIn("Add to cart", html)
 		self.assertIn("Shipping &amp; returns", html)
@@ -208,7 +208,7 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		)
 
 		self.assertEqual(status, 200)
-		self.assertIn("ZZ Starter Returns</h1>", html)
+		self.assertIn("ZZ Starter Returns</bdi></h1>", html)
 		self.assertIn("ZZ starter returns body", html)
 
 	def test_the_cart_page_and_the_drawer_share_the_cart_contents(self):

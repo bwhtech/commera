@@ -1,14 +1,14 @@
 {% from "components/macros/icons.html" import icon, spinner %}
 <section class="section-x section-top">
 	<div class="mx-auto max-w-xl text-center">
-		<h2 class="section-title">{{ section.settings.heading }}</h2>
+		<h2 class="section-title"><bdi>{{ section.settings.heading }}</bdi></h2>
 		{% if section.settings.text %}
-		<p class="mt-3 text-p-xl text-ink-gray-6">{{ section.settings.text }}</p>
+		<p dir="auto" class="mt-3 text-p-xl text-ink-gray-6">{{ section.settings.text }}</p>
 		{% endif %}
 		<form x-data="newsletter" @submit.prevent="subscribe()" class="mx-auto mt-8 max-w-md">
 			<div x-show="!subscribed" class="flex gap-2">
 				<input type="email" name="email" x-model="email" required autocomplete="email" placeholder="{{ section.settings.placeholder }}" aria-label="{{ section.settings.placeholder }}" class="field flex-1">
-				<button type="submit" :aria-busy="busy" class="button-primary relative shrink-0 aria-busy:opacity-80">{{ section.settings.button_label }}{{ spinner("busy", "size-5 text-on-brand") }}</button>
+				<button type="submit" :aria-busy="busy" class="button-primary relative shrink-0 aria-busy:opacity-80"><bdi>{{ section.settings.button_label | e }}</bdi>{{ spinner("busy", "size-5 text-on-brand") }}</button>
 			</div>
 			<p x-cloak x-show="error" x-text="error" class="mt-2 text-base text-ink-red-7" role="alert"></p>
 			<p x-cloak x-show="subscribed" x-transition.opacity.duration.300ms class="flex min-h-12 items-center justify-center gap-2 text-md text-ink-gray-8" role="status">{{ icon("check", "size-5") }}{{ _("Thanks. You're subscribed.") }}</p>
