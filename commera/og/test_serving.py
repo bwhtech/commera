@@ -121,6 +121,40 @@ class TestServeOgImage(OgServingTestCase):
 		self.assertFalse(os.path.exists(older))
 		self.assertTrue(os.path.exists(other_card))
 
+	def test_old_request_snapshot_cannot_remove_a_card_published_before_its_lock(self):
+		newer = self.cache_path.replace("-1.jpg", "-2.jpg")
+		self.addCleanup(self.forget_card, newer)
+		old_doc = frappe._dict(name="og-snapshot", modified="old", is_published=1)
+		new_doc = frappe._dict(name="og-snapshot", modified="new", is_published=1)
+		acquire = frappe.cache.set
+
+		def publish_before_lock(*args, **kwargs):
+			og_image_render.write_cache(newer, JPEG)
+			return acquire(*args, **kwargs)
+
+		def read_doc(*args, **kwargs):
+			# Ordinary reads retain the old snapshot; locking reads see the committed update.
+			return new_doc if kwargs.get("for_update") else old_doc
+
+		with (
+			patch.object(frappe.db, "get_value", return_value=old_doc),
+			patch("frappe.get_cached_doc", return_value=old_doc),
+			patch("frappe.get_doc", side_effect=read_doc),
+			patch.object(og_image_render, "get_variant_card_version", side_effect=lambda doc: doc.modified),
+			patch.object(
+				og_image_render,
+				"cache_file_path",
+				side_effect=lambda card, version: newer if version == "new" else self.cache_path,
+			),
+			patch("frappe.cache.set", side_effect=publish_before_lock),
+			patch.object(og_image_render, "render_card_for_doc", return_value=JPEG),
+			self.assertRaises(og_image_render.CardBusy),
+		):
+			og_image_render.serve_og_image("og-snapshot")
+
+		self.assertTrue(os.path.exists(newer))
+		self.assertFalse(os.path.exists(self.cache_path))
+
 	def test_a_renderer_upgrade_ignores_old_cards(self):
 		with patch.object(og_image_render, "RENDERER_VERSION", 2):
 			old = og_image_render.cache_file_path("some-route", "v1")

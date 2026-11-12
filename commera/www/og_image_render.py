@@ -104,8 +104,12 @@ def serve_og_image(route, with_price=True):
 		render_once(
 			cache_path,
 			lambda: render_card_for_doc("Style Attribute Variant", variant_doc, with_price=with_price),
+			# A locking read sees committed changes even in a REPEATABLE READ request snapshot.
 			lambda: cache_file_path(
-				card, get_variant_card_version(frappe.get_doc("Style Attribute Variant", variant.name))
+				card,
+				get_variant_card_version(
+					frappe.get_doc("Style Attribute Variant", variant.name, for_update=True)
+				),
 			),
 		)
 
