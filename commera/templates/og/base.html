@@ -1,0 +1,25 @@
+{#-
+	The page around an OG card. Chromium screenshots it at 1200 × 630.
+	Jinja does not escape here: every value needs `| e`.
+-#}
+<!doctype html>
+<html lang="{{ lang | e }}" dir="{{ dir | e }}">
+<head>
+<meta charset="utf-8">
+{% include "commera/templates/og/fonts.html" %}
+<style>
+	* { box-sizing: border-box; }
+	html, body { width: 1200px; height: 630px; margin: 0; overflow: hidden; }
+	body {
+		font-family: "OpenSans", "Commera Emoji", sans-serif;
+		font-synthesis: none;
+		-webkit-font-smoothing: antialiased;
+	}
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+{#- A card template that is only a fragment, as the old renderer took, is shown as is. -#}
+{% block body %}{{ fragment }}{% endblock %}
+</body>
+</html>

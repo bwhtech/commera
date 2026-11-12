@@ -1,23 +1,20 @@
-"""Shared OG card render core for the live /og-image endpoint and the admin preview button."""
+"""OG cards for the /og-image endpoint and the admin preview: HTML pages that Frappe's Chromium
+screenshots. get_preview_from_html is not whitelisted: only card templates reach it."""
 
-import base64
 import os
+import posixpath
 import re
-import subprocess
 import time
-from io import BytesIO
-from urllib.parse import urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 import frappe
 from frappe.utils import flt, get_files_path, get_url
+from frappe.utils.preview import get_preview_from_html
 
 from commera import seo
 from commera.branding import get_brand_assets
 from commera.localization import get_localization
 from commera.shop_themes.render import render_themed_template
-
-# resvg-js is pathologically slow on large embedded images (~58s for 1220x1760, <1s downscaled).
-CARD_PHOTO_PX = 700
 
 # Social card spec used by Facebook/X/LinkedIn; 1.91:1 ratio.
 DEFAULT_OG_WIDTH = 1200
@@ -25,62 +22,51 @@ DEFAULT_OG_HEIGHT = 630
 
 BUNDLED_CARD_TEMPLATE = "commera/templates/og/product_card.html"
 STORE_CARD_TEMPLATE = "commera/templates/og/store_card.html"
+CARD_PAGE_TEMPLATE = "commera/templates/og/base.html"
 
-# Tall enough for a crisp logo at the card's 140px display height, small enough to keep resvg fast.
-CARD_LOGO_PX = 420
-
-# (family, folder in public/fonts, the text that needs it). og_bidi.mjs uses the same family names.
-CARD_FONTS = (
-	("OpenSans", "OpenSans", None),
-	("IBM Plex Sans Arabic", "IBMPlexSansArabic", re.compile("[\u0600-\u08ff\ufb50-\ufdff\ufe70-\ufeff]")),
-	("IBM Plex Sans Hebrew", "IBMPlexSansHebrew", re.compile("[\u0590-\u05ff\ufb1d-\ufb4f]")),
+# Chromium reads this site's files from disk, so the card may not load anything from another host.
+CONTENT_POLICY = (
+	'<meta http-equiv="Content-Security-Policy" content="'
+	"default-src 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'unsafe-inline'; "
+	"base-uri 'none'; form-action 'none'\">"
 )
+DOCTYPE = re.compile(r"\A\s*<!doctype[^>]*>", re.IGNORECASE)
+HTML_TAG = re.compile(r"<html[\s>]", re.IGNORECASE)
 
 
-def render_og_png(html_str, width, height):
-	direction = get_localization().language.direction
-	payload = {
-		"html": html_str,
-		"width": width,
-		"height": height,
-		"fonts": card_fonts(html_str),
-		"direction": direction,
+def render_card_image(html_str):
+	"""The card as JPEG bytes."""
+	return get_preview_from_html(
+		with_content_policy(html_str), format="jpg", width=DEFAULT_OG_WIDTH, height=DEFAULT_OG_HEIGHT
+	)
+
+
+def render_card_for_doc(for_doctype, doc, with_price=True):
+	context = context_builder_for(for_doctype)(doc, with_price=with_price)
+	return render_card_image(render_card_html(resolve_template(for_doctype), context))
+
+
+def render_card_html(template, context):
+	"""The card page. A template that is only a fragment, as the old renderer took, gets the page around it."""
+	context = {**page_context(), **context}
+	# nosemgrep: frappe-ssti  # template is a bundled card or an admin-authored OG Image Template
+	html_str = render_themed_template(template, context)
+	if HTML_TAG.search(html_str):
+		return html_str
+	return render_themed_template(CARD_PAGE_TEMPLATE, {**context, "fragment": html_str})
+
+
+def build_store_card_html():
+	logo_url = card_image_url(get_brand_assets().logo)
+	context = {
+		"store_name": seo.get_store_name(),
+		"tagline": seo.get_store_description() or seo.default_store_description(),
+		"site_host": urlsplit(get_url()).hostname or "",
+		"logo_url": logo_url,
+		# The old renderer's name; theme templates may still use it.
+		"logo_data_uri": logo_url,
 	}
-
-	# .mjs, not .js: satori is ESM-only and the app root also holds CJS tooling.
-	script_path = frappe.get_app_path("commera", "og", "og_satori.mjs")
-	payload_bytes = frappe.as_json(payload).encode()
-	# node is on PATH on benches; the satori toolchain resolves via the app's node_modules.
-	try:
-		result = subprocess.run(  # nosemgrep: frappe-subprocess-exec
-			["node", script_path],
-			input=payload_bytes,
-			capture_output=True,
-			cwd=frappe.get_app_path("commera"),
-			timeout=30,
-		)
-	except subprocess.TimeoutExpired:
-		frappe.throw(frappe._("OG card render timed out"))
-
-	if result.returncode != 0:
-		frappe.throw(f"satori render failed: {result.stderr.decode(errors='replace')}")
-
-	return result.stdout
-
-
-def card_fonts(html_str):
-	"""Open Sans, plus the Arabic or Hebrew font when the card has that script."""
-	return [
-		{
-			"path": frappe.get_app_path("commera", "public", "fonts", folder, f"{folder}-{style}.ttf"),
-			"name": family,
-			"weight": weight,
-			"style": "normal",
-		}
-		for family, folder, needed_for in CARD_FONTS
-		if not needed_for or needed_for.search(html_str)
-		for style, weight in (("Regular", 400), ("Bold", 700))
-	]
+	return render_card_html(STORE_CARD_TEMPLATE, context)
 
 
 def build_variant_card_context(variant_doc, with_price=True):
@@ -90,7 +76,7 @@ def build_variant_card_context(variant_doc, with_price=True):
 	detail = get_product_detail(variant_doc.route)
 	brand = ""
 	price = ""
-	photo_data_uri = None
+	photo_url = None
 	if detail:
 		brand = detail["product"].brand or ""
 		amount = detail["sale_price"] or detail["default_price"]
@@ -98,14 +84,16 @@ def build_variant_card_context(variant_doc, with_price=True):
 			price = f"{seo.get_site_currency()} {flt(amount):.2f}"
 		images = detail["images"]
 		if images:
-			photo_data_uri = product_image_data_uri(images[0])
+			photo_url = card_image_url(images[0])
 
 	return {
 		"store_name": seo.get_store_name(),
 		"display_name": get_card_title(variant_doc),
 		"brand": brand,
 		"price": price,
-		"photo_data_uri": photo_data_uri,
+		"photo_url": photo_url,
+		# The old renderer's name; OG Image Templates may still use it.
+		"photo_data_uri": photo_url,
 		# DocType templates address the source document as `doc`.
 		"doc": variant_doc,
 	}
@@ -150,23 +138,6 @@ def resolve_template(for_doctype):
 	return template_html or BUNDLED_CARD_TEMPLATE
 
 
-def render_card_for_doc(for_doctype, doc, with_price=True):
-	context = context_builder_for(for_doctype)(doc, with_price=with_price)
-	# nosemgrep: frappe-ssti  # template is admin-authored OG Image Template, not end-user input
-	html_str = render_themed_template(resolve_template(for_doctype), context)
-	return render_og_png(html_str, DEFAULT_OG_WIDTH, DEFAULT_OG_HEIGHT)
-
-
-def build_store_card_html():
-	context = {
-		"store_name": seo.get_store_name(),
-		"tagline": seo.get_store_description() or seo.default_store_description(),
-		"site_host": urlsplit(get_url()).hostname or "",
-		"logo_data_uri": logo_data_uri(get_brand_assets().logo),
-	}
-	return render_themed_template(STORE_CARD_TEMPLATE, context)
-
-
 def variant_primary_image_url(variant_name):
 	return frappe.db.get_value(
 		"Website Slideshow Item",
@@ -176,70 +147,38 @@ def variant_primary_image_url(variant_name):
 	)
 
 
-def local_image_path(image_url):
-	# Satori can't fetch remote URLs offline, so only local files can be inlined as data URIs.
-	if image_url.startswith("/files/"):
-		path = get_files_path(image_url[len("/files/") :], is_private=False)
-	elif image_url.startswith("/private/files/"):
-		path = get_files_path(image_url[len("/private/files/") :], is_private=True)
-	elif image_url.startswith("/assets/"):
-		assets_root = os.path.abspath(os.path.join(frappe.local.sites_path, "assets"))
-		path = os.path.abspath(os.path.join(frappe.local.sites_path, image_url.lstrip("/")))
-		if not path.startswith(assets_root + os.sep):
-			return None
+def card_image_url(image_url):
+	"""The URL of a public site file or asset that exists, else None: never a remote or private image."""
+	parts = urlsplit(image_url or "")
+	url_path = unquote(parts.path)
+	# A `..` or `//` would let Chromium leave /files/ after this check.
+	if parts.scheme or parts.netloc or posixpath.normpath(url_path) != url_path:
+		return None
+
+	if url_path.startswith("/files/"):
+		disk_path = get_files_path(url_path.removeprefix("/files/"), is_private=False)
+	elif url_path.startswith("/assets/"):
+		disk_path = os.path.join(frappe.local.sites_path, url_path.lstrip("/"))
 	else:
 		return None
-
-	return path if os.path.exists(path) else None
-
-
-def logo_data_uri(image_url):
-	path = local_image_path(image_url)
-	if not path:
-		return None
-
-	# nosemgrep: frappe-security-file-traversal  # local_image_path confines the path to files/ or assets/
-	with open(path, "rb") as logo_file:
-		raw = logo_file.read()
-	if path.lower().endswith(".svg"):
-		return f"data:image/svg+xml;base64,{base64.b64encode(raw).decode()}"
-
-	from PIL import Image
-
-	# PNG, not the product photo's JPEG: a logo's transparency must survive onto the card background.
-	image = Image.open(BytesIO(raw)).convert("RGBA")
-	image.thumbnail((CARD_LOGO_PX * 3, CARD_LOGO_PX))
-	buffer = BytesIO()
-	image.save(buffer, format="PNG")
-	return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+	return quote(url_path) if os.path.isfile(disk_path) else None
 
 
-def product_image_data_uri(image_url):
-	path = local_image_path(image_url)
-	if not path:
-		return None
+def page_context():
+	language = get_localization().language
+	return {"lang": language.code, "dir": language.direction}
 
-	from PIL import Image
 
-	image = Image.open(path)
-	image.thumbnail((CARD_PHOTO_PX, CARD_PHOTO_PX))
-	# Always emit JPEG: a downscaled PNG can still be ~800KB, and resvg is slow on large blobs.
-	if image.mode == "RGBA" or (image.mode == "P" and "transparency" in image.info):
-		flattened = Image.new("RGB", image.size, (255, 255, 255))
-		rgba = image.convert("RGBA")
-		flattened.paste(rgba, mask=rgba.split()[-1])
-		image = flattened
-	else:
-		image = image.convert("RGB")
-
-	buffer = BytesIO()
-	image.save(buffer, format="JPEG", quality=85)
-	encoded = base64.b64encode(buffer.getvalue()).decode()
-	return f"data:image/jpeg;base64,{encoded}"
+def with_content_policy(html_str):
+	"""Put the content policy first in the page, after the doctype, whatever the template wrote."""
+	doctype = DOCTYPE.match(html_str)
+	at = doctype.end() if doctype else 0
+	return html_str[:at] + CONTENT_POLICY + html_str[at:]
 
 
 # Keyed on route+modified, so every edit strands the previous card; bound the directory.
 CARD_CACHE_MAX_AGE_DAYS = 30
+CARD_SUFFIXES = (".jpg", ".png")
 
 
 def clear_old_cards(days=CARD_CACHE_MAX_AGE_DAYS):
@@ -249,7 +188,8 @@ def clear_old_cards(days=CARD_CACHE_MAX_AGE_DAYS):
 
 	cutoff = time.time() - (days * 86400)
 	for filename in os.listdir(cache_dir):
-		if not filename.endswith(".png"):
+		# A .tmp- file is a write that did not finish.
+		if not filename.endswith(CARD_SUFFIXES) and ".tmp-" not in filename:
 			continue
 		path = os.path.join(cache_dir, filename)
 		if os.path.getmtime(path) < cutoff:

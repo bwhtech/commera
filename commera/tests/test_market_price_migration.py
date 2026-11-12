@@ -158,13 +158,13 @@ class TestMarketOgCard(MarketPriceTestCase):
 
 		# The locale prefix keeps the card's text in the market; the flag drops its store price.
 		self.assertEqual(market_url, f"{localized}?price=none")
-		self.assertEqual(starter_details.get_og_image_url("shirt"), "/og-image/shirt.png")
+		self.assertEqual(starter_details.get_og_image_url("shirt"), "/og-image/shirt.jpg")
 
 	def test_the_card_without_a_price_shows_none(self):
 		route = self.make_market_variant("OGCARD", market_sale=300)
 		variant = frappe.get_doc("Style Attribute Variant", {"route": route})
 
-		with patch.object(generator, "product_image_data_uri", return_value=None):
+		with patch.object(generator, "card_image_url", return_value=None):
 			priced = generator.build_variant_card_context(variant)
 			unpriced = generator.build_variant_card_context(variant, with_price=False)
 
@@ -183,8 +183,8 @@ class TestMarketOgCard(MarketPriceTestCase):
 			self.addCleanup(lambda path=path: os.path.exists(path) and os.remove(path))
 
 		self.addCleanup(setattr, frappe.local, "form_dict", frappe.local.form_dict)
-		frappe.local.form_dict = frappe._dict(route=f"{route}.png", price="none")
-		with patch.object(og_image_render, "render_card_for_doc", return_value=b"png") as render:
+		frappe.local.form_dict = frappe._dict(route=f"{route}.jpg", price="none")
+		with patch.object(og_image_render, "render_card_for_doc", return_value=b"jpg") as render:
 			with self.assertRaises(frappe.Redirect):
 				og_image_render.get_context(frappe._dict())
 
