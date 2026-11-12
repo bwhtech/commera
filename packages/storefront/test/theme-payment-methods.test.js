@@ -137,6 +137,8 @@ test('Summer uses the payable inclusive cart total before the address step', () 
 			total: 699.95,
 			saved: 0,
 			discounts: [],
+			pricing_status: 'ready',
+			is_priced_current: true,
 			is_delivery_charged: false,
 			priced: {
 				items_total: 699.95,
@@ -160,13 +162,15 @@ test('Summer shows no delivery price until the guest cart is priced', () => {
 		total: 1234.5,
 		saved: 0,
 		discounts: [],
+		pricing_status: 'ready',
+		is_priced_current: true,
 		is_delivery_charged: false,
 		priced: null,
 	};
 	form.$store = { cart };
 	form.summary = form.get_browser_cart_summary();
 	assert.equal(form.shipping_amount, null);
-	assert.equal(form.summary.total, 1234.5);
+	assert.equal(form.summary.total, null);
 
 	cart.priced = { items_total: 1234.5 };
 	cart.is_delivery_charged = true;
@@ -237,4 +241,51 @@ test('legacy checkout uses the rounded server COD total', () => {
 	state.payment_mode = 'gateway';
 	calculate.call(state, 'COD');
 	assert.equal(state.checkout_total, 710);
+});
+
+test('Summer hides stale free delivery and total after a failed re-price', async () => {
+	const form = summer_checkout();
+	const html = readFileSync(
+		new URL('templates/includes/cart-state.html', root),
+		'utf8',
+	);
+	const pricing = html.slice(
+		html.indexOf('async load_priced()'),
+		html.indexOf("// 'pending'"),
+	);
+	const context = {
+		frappe_call: async () => ({
+			data: { version: 'one', items_total: 100, total: 100, taxes: [] },
+		}),
+	};
+	vm.runInNewContext(`let priced_request = 0; cart = { ${pricing} };`, context);
+	const cart = context.cart;
+	Object.assign(cart, {
+		total: 100,
+		saved: 0,
+		discounts: [],
+		is_delivery_charged: false,
+		version: 'one',
+		items: [{ qty: 1 }],
+		is_dirty: false,
+	});
+	form.$store = { cart };
+	await cart.load_priced();
+	form.summary = form.get_browser_cart_summary();
+	assert.equal(form.shipping_amount, 0);
+	assert.equal(form.summary.total, 100);
+	cart.version = 'two';
+	context.frappe_call = async () => {
+		throw new Error('Pricing failed');
+	};
+	await cart.load_priced();
+	assert.equal(cart.pricing_status, 'failed');
+	assert.equal(cart.is_priced_current, false);
+	assert.equal(cart.priced.total, 100);
+	assert.equal(form.shipping_amount, null);
+	assert.equal(form.active_summary.total, null);
+	form.summary = form.get_browser_cart_summary();
+	assert.equal(form.shipping_amount, null);
+	assert.equal(form.summary.total, null);
+	assert.equal(form.summary.cash_on_delivery.total, null);
 });

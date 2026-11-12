@@ -8,13 +8,12 @@ from frappe.utils.data import cstr
 from commera.api.payments import (
 	COD_PAYMENT_MODE,
 	cart_write_lock,
-	get_charged_preview,
 	get_checkout_cart,
 	get_checkout_payment_methods,
 	get_quotation_for_cart,
 	validate_cart_is_not_in_checkout,
 )
-from commera.api.shipping import get_charge_amount, get_checkout_summary
+from commera.api.shipping import get_priced_checkout_summary
 from commera.base_prices import base_price_filters
 from commera.cart_prices import is_priced_in
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
@@ -160,10 +159,8 @@ def set_cart_context(context, commera_settings):
 	default_price_list = MarketPrices.current().compare_at_price_list
 	context.cart_quotation = cart_quotation
 	context.cart_needs_refresh = cart_needs_refresh(cart_quotation)
-	# The page GET never writes the cart, so the charges shown are priced on a copy.
-	charged = get_charged_preview(cart_quotation)
-	context.cart_payable_total = get_charge_amount(charged)
-	context.checkout_summary = get_checkout_summary(charged)
+	context.checkout_summary = get_priced_checkout_summary(cart_quotation)
+	context.cart_payable_total = context.checkout_summary["total"]
 	context.update(get_free_delivery(cart_quotation))
 	context.coupon_code = get_coupon_code(cart_quotation)
 	context.discount_code_states = get_code_states(cart_quotation)

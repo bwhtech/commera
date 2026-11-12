@@ -395,7 +395,7 @@
 								</tr>
 								<tr class="total">
 									<td>{{ _("Total") }}</td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.total)"></span></td>
+									<td class="price"><span x-show="active_summary.total != null" x-cloak>{{ currency_symbol }}<span x-text="format_amount(active_summary.total)"></span></span></td>
 								</tr>
 							</tbody>
 						</table>
@@ -644,7 +644,8 @@
 
 				// Before the address step a guest has no quotation, so the summary comes from the priced cart.
 				get_browser_cart_summary() {
-					const priced = this.$store.cart.priced;
+					const cart = this.$store.cart;
+					const priced = cart.pricing_status === "ready" && cart.is_priced_current ? cart.priced : null;
 					const subtotal = priced?.items_total ?? this.$store.cart.total;
 					// Unknown until the cart is priced, so the delivery line says neither Free nor a charge.
 					const shipping = priced ? (this.$store.cart.is_delivery_charged ? this.config.delivery_charge : 0) : null;
@@ -657,7 +658,7 @@
 						discounts: discounts,
 						discount_amount: this.$store.cart.saved,
 						rounding_adjustment: 0,
-						total: (priced?.taxes ? priced.total : subtotal - this.$store.cart.saved) + (shipping ?? 0),
+						total: priced ? (priced.taxes ? priced.total : subtotal - cart.saved) + shipping : null,
 					};
 					return { ...summary, cash_on_delivery: summary };
 				},
@@ -740,6 +741,9 @@
 				},
 
 				get active_summary() {
+					if (this.config.is_guest && !this.address_saved && this.$store?.cart) {
+						return this.get_browser_cart_summary();
+					}
 					if (!this.address_saved || this.payment_mode !== COD_PAYMENT_MODE) return this.summary;
 					return this.summary.cash_on_delivery;
 				},

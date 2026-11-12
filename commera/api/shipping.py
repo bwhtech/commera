@@ -44,7 +44,7 @@ def get_shipping_options() -> dict:
 	quotation = _get_cart_quotation()
 	options = get_cart_shipping_options(quotation)
 	if quotation and quotation.items:
-		options["checkout_summary"] = get_checkout_summary(quotation)
+		options["checkout_summary"] = get_priced_checkout_summary(quotation)
 	return options
 
 
@@ -400,6 +400,13 @@ def get_charge_amount(quotation) -> float:
 	return flt(quotation.grand_total if quotation.is_rounded_total_disabled() else quotation.rounded_total)
 
 
+def get_priced_checkout_summary(quotation) -> dict:
+	"""Show the delivery charges payment applies without writing the cart."""
+	from commera.api.payments import get_charged_preview
+
+	return get_checkout_summary(get_charged_preview(quotation))
+
+
 def get_checkout_summary(quotation) -> dict:
 	"""The charges payment will apply, priced on an unsaved copy so showing them never rewrites the cart."""
 	preview = frappe.get_doc(quotation.as_dict())
@@ -525,7 +532,7 @@ def get_delivery_summary(quotation) -> dict:
 		"delivery_charge": flt(quotation.custom_delivery_charge),
 		"grand_total": get_charge_amount(quotation),
 		"currency": quotation.currency,
-		"checkout_summary": get_checkout_summary(quotation),
+		"checkout_summary": get_priced_checkout_summary(quotation),
 	}
 
 

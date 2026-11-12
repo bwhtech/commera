@@ -21,6 +21,7 @@ from commera.api.shipping import (
 	get_charge_amount,
 	get_checkout_summary,
 	get_cod_charge,
+	get_priced_checkout_summary,
 	reprice_selected_option,
 	reprice_shipping_discount,
 )
@@ -896,7 +897,7 @@ def get_address_saved_response(quotation) -> dict:
 	return {
 		"message": _("Addresses updated successfully"),
 		"payment_methods": get_checkout_payment_methods(quotation),
-		"checkout_summary": get_checkout_summary(quotation),
+		"checkout_summary": get_priced_checkout_summary(quotation),
 	}
 
 
