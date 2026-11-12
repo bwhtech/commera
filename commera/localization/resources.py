@@ -381,7 +381,7 @@ class DoctypeResource(TranslatableResource):
 		]
 
 	def get_previous_sources(self, language, keys):
-		if not keys:
+		if not keys or not frappe.db.has_column(DOCTYPE, "source_text"):
 			return {}
 		rows = frappe.get_all(
 			DOCTYPE,

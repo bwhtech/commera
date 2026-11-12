@@ -200,7 +200,7 @@ class ItemList:
 
 	def find(self, name: str) -> list[dict]:
 		page = self.resource.list_entries(self.language, filters={"name": name}, limit=BATCH_SIZE)
-		if not page.entries:
+		if not page.entries and not self.resource.get_sourceless_entries(self.language, [name]):
 			return []
 		item = make_item(self.resource, name, page.entries, self.resource.get_field_kinds())
 		return self.finish([item])

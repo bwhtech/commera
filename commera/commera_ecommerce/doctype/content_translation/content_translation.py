@@ -41,7 +41,8 @@ class ContentTranslation(Document):
 		if self.flags.refresh_source_hash or self.source_changed():
 			source = read_source(self.reference_doctype, self.reference_name, self.reference_field)
 			self.source_hash = get_source_hash(source)
-			self.source_text = get_source_text(self.reference_doctype, self.reference_field, source)
+			if frappe.db.has_column("Content Translation", "source_text"):
+				self.source_text = get_source_text(self.reference_doctype, self.reference_field, source)
 
 	def source_changed(self) -> bool:
 		"""A new or edited translation was written against the source as it is now."""

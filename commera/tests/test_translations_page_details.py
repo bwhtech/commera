@@ -1,4 +1,7 @@
+from unittest.mock import patch
+
 import frappe
+from frappe.model.meta import Meta
 
 from commera.api.admin import translations as translations_api
 from commera.localization import CURRENT, MISSING, OUTDATED, register
@@ -50,6 +53,61 @@ class TestTranslationsPageDetails(TranslationsPageCase):
 
 		title = self.field(note, "title")
 		self.assertEqual((title["status"], title["previous_source"]), (OUTDATED, None))
+
+	def test_reading_and_saving_before_the_source_text_column_is_migrated(self):
+		note = self.make_note("Unmigrated note")
+		has_column = type(frappe.local.db).has_column
+
+		def without_source_text(method):
+			def fields(meta, *args, **kwargs):
+				result = method(meta, *args, **kwargs)
+				return (
+					[field for field in result if field != "source_text"]
+					if meta.name == "Content Translation"
+					else result
+				)
+
+			return fields
+
+		def column_exists(db, doctype, column):
+			return (
+				False
+				if (doctype, column) == ("Content Translation", "source_text")
+				else has_column(db, doctype, column)
+			)
+
+		with (
+			patch.object(type(frappe.local.db), "has_column", column_exists),
+			patch.object(Meta, "get_valid_fields", without_source_text(Meta.get_valid_fields)),
+			patch.object(Meta, "get_valid_columns", without_source_text(Meta.get_valid_columns)),
+		):
+			self.save_one(note, "title", "ملاحظة")
+			self.change_title(note)
+			title = self.field(note, "title")
+			self.assertEqual((title["status"], title["previous_source"]), (OUTDATED, None))
+			self.save_one(note, "title", "ملاحظة جديدة")
+			self.assertEqual(self.field(note, "title")["status"], CURRENT)
+
+	def test_a_record_with_only_sourceless_translations_can_be_found_and_cleared(self):
+		before = self.note_counts()
+		note = self.make_note("Only source")
+		self.save_one(note, "title", "ملاحظة")
+		frappe.db.set_value("Note", note.name, {"title": "", "content": ""})
+
+		self.assertEqual(self.note_counts(), before)
+		self.assertIn(note.name, self.listed_names(to_do=0))
+		self.assertNotIn(note.name, self.listed_names(to_do=1))
+		item = self.item(note)
+		self.assertEqual(item["to_do"], 0)
+		(field,) = item["fields"]
+		self.assertEqual((field["field"], field["source_empty"], field["value"]), ("title", True, "ملاحظة"))
+		batch = translations_api.get_items("ar", "note", records=[note.name])
+		self.assertEqual(batch["items"], [item])
+
+		self.save_one(note, "title", "")
+		self.assertEqual(translations_api.get_items("ar", "note", record=note.name)["items"], [])
+		self.assertNotIn(note.name, self.listed_names(to_do=0))
+		self.assertEqual(self.note_counts(), before)
 
 	def test_the_source_text_is_plain_and_bounded(self):
 		note = self.make_note("Long note", f"<p>Wrap &amp; send</p><p>{'x' * 600}</p>")

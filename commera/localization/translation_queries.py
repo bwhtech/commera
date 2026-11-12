@@ -15,7 +15,7 @@ class RecordQuery:
 		self.query = frappe.qb.from_(self.record)
 		self.sources, self.translations = [], []
 		kinds = resource.get_field_kinds()
-		self.present, self.unfinished = [], []
+		self.present, self.unfinished, self.translated = [], [], []
 		for index, field in enumerate(resource.fields):
 			source = self.source(field)
 			translation = DocType(DOCTYPE).as_("translation_" + str(index))
@@ -30,6 +30,7 @@ class RecordQuery:
 			missing = IfNull(translation.translated_value, "") == ""
 			outdated = IfNull(translation.source_hash, "") != Sha2(source, 256)
 			self.present.append(present)
+			self.translated.append(~missing)
 			self.unfinished.append(
 				present & ((~missing & outdated) if kinds.get(field) == IMAGE else (missing | outdated))
 			)
@@ -54,7 +55,7 @@ class RecordQuery:
 		raise ValueError("A database source is required for " + self.resource.doctype + "." + field)
 
 	def matching(self, to_do):
-		return self.query.where(Criterion.any(self.unfinished if to_do else self.present))
+		return self.query.where(Criterion.any(self.unfinished if to_do else self.present + self.translated))
 
 	def names(self, to_do, after, limit):
 		query = self.matching(to_do).select(self.record.name).orderby(self.record.name).limit(limit)
