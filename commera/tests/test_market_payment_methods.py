@@ -169,6 +169,16 @@ class TestMarketPaymentMethods(MarketCartTestCase):
 
 		self.assertFalse(frappe.db.exists("Gateway Payment Request", {"ref_docname": quotation.name}))
 
+	def test_card_payment_in_a_currency_erpnext_cannot_invoice_is_refused_before_any_capture(self):
+		# Stock ERPNext: the shopper's receivable account is in the store currency only.
+		self.set_single("Accounts Settings", "allow_multi_currency_invoices_against_single_party_account", 0)
+		with self.in_market():
+			quotation = generate_quotation_for_cart({})
+			with self.assertRaisesRegex(frappe.ValidationError, "not available for this store yet"):
+				open_checkout(quotation, ANY_CURRENCY_GATEWAY)
+
+		self.assertFalse(frappe.db.exists("Gateway Payment Request", {"ref_docname": quotation.name}))
+
 
 def make_gateway(name, settings_doctype):
 	# The class shares one transaction, so an earlier test may have made it.

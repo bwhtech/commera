@@ -63,6 +63,7 @@ from commera.guest import (
 	set_guest_cart_cookie,
 	validate_guest_checkout_enabled,
 )
+from commera.invoice_currency import get_invoice_currency_error
 from commera.item_price_guard import skip_auto_item_price
 from commera.localization import url
 from commera.localization.address_countries import AddressCountries
@@ -222,6 +223,7 @@ def open_checkout(
 			gateway=gateway,
 			currency=quotation.currency,
 		)
+	validate_invoice_currency(quotation)
 
 	payment_request = frappe.get_doc(
 		{
@@ -239,6 +241,21 @@ def open_checkout(
 	).insert(ignore_permissions=True)
 
 	return {"order_url": payment_request.order_url}
+
+
+def validate_invoice_currency(quotation):
+	"""A paid cart is invoiced in its own currency right after capture, so ERPNext must accept that first."""
+	customer = quotation.party_name if quotation.quotation_to == "Customer" else None
+	reason = get_invoice_currency_error(quotation.company, quotation.currency, customer)
+	if reason:
+		refuse_payment(
+			_(
+				"Card payments in {0} are not available for this store yet. Choose another payment method or contact the store."
+			).format(quotation.currency),
+			quotation.name,
+			currency=quotation.currency,
+			reason=reason,
+		)
 
 
 def get_checkout_payment_methods(quotation, strict: bool = False) -> list[str]:
@@ -566,29 +583,48 @@ def create_sales_invoice(sales_order, payment_mode: str, paid_amount: float, ref
 
 
 def create_payment_entry(sales_invoice, payment_mode: str, paid_amount: float, reference_no: str | None):
+	"""`paid_amount` is what the gateway charged, in the invoice currency."""
 	# Never allocate more than the invoice owes, whatever the gateway reported.
-	allocated = min(flt(paid_amount), flt(sales_invoice.outstanding_amount))
-	if allocated <= 0:
+	party_amount = min(
+		convert_invoice_amount(sales_invoice, paid_amount, sales_invoice.party_account_currency),
+		flt(sales_invoice.outstanding_amount),
+	)
+	if party_amount <= 0:
 		return None
 
-	payment_entry = get_payment_entry("Sales Invoice", sales_invoice.name, party_amount=allocated)
-	payment_entry.mode_of_payment = gateway_mode_of_payment(payment_mode)
+	mode_of_payment = gateway_mode_of_payment(payment_mode)
+	bank = get_default_bank_cash_account(
+		sales_invoice.company, "Cash", mode_of_payment=mode_of_payment, fetch_balance=False
+	)
+	payment_entry = get_payment_entry(
+		"Sales Invoice",
+		sales_invoice.name,
+		party_amount=party_amount,
+		bank_account=bank.get("account"),
+		bank_amount=convert_invoice_amount(sales_invoice, paid_amount, bank.get("account_currency")),
+	)
+	payment_entry.mode_of_payment = mode_of_payment
 	if reference_no:
 		# Load-bearing: bwh_payments matches a refund Payment Entry back to its gateway session on this.
 		payment_entry.reference_no = reference_no
 		payment_entry.reference_date = getdate()
 
-	bank = get_default_bank_cash_account(
-		sales_invoice.company, "Cash", mode_of_payment=payment_entry.mode_of_payment
-	)
-	if bank:
-		payment_entry.paid_to = bank.account
-		payment_entry.paid_to_account_currency = bank.account_currency
-
 	payment_entry.flags.ignore_permissions = True
 	payment_entry.insert()
 	payment_entry.submit()
 	return payment_entry
+
+
+def convert_invoice_amount(sales_invoice, amount: float, currency: str | None) -> float | None:
+	"""An invoice-currency amount in `currency`, at the invoice's own rate. None for a third currency,
+	which ERPNext then converts at its exchange rate."""
+	if currency == sales_invoice.currency:
+		return flt(amount)
+	if currency == sales_invoice.company_currency:
+		return flt(
+			flt(amount) * flt(sales_invoice.conversion_rate), sales_invoice.precision("outstanding_amount")
+		)
+	return None
 
 
 def set_delivery_date(sales_order):

@@ -41,6 +41,7 @@ COMPANY = "Lifestyle Demo"
 ITEM_GROUP = "Interior Accessories"
 DEFAULT_CASH_ACCOUNT = "Cash - LSD"
 CURRENCY = "INR"
+FOREIGN_CURRENCY = "USD"
 # A price list in the company currency keeps the fixture off the Currency Exchange table.
 PRICE_LIST = "ZZ Payhook SAR Selling"
 ITEM_RATE = 150.0
@@ -220,7 +221,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.contact_person = contact.name
 		return email_id
 
-	def create_cart_quotation(self):
+	def create_cart_quotation(self, currency=CURRENCY, conversion_rate=1):
 		quotation = frappe.new_doc("Quotation")
 		quotation.update(
 			{
@@ -231,8 +232,8 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 				"contact_person": self.contact_person,
 				# The storefront stamps the shopper's login here; ownership checks read it back.
 				"contact_email": self.contact_email,
-				"currency": CURRENCY,
-				"conversion_rate": 1,
+				"currency": currency,
+				"conversion_rate": conversion_rate,
 				"selling_price_list": PRICE_LIST,
 				"price_list_currency": CURRENCY,
 				"plc_conversion_rate": 1,
@@ -402,6 +403,40 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		self.assertEqual(len(self.submitted_sales_orders()), 1)
 		self.assertEqual(payment_request.ref_doctype, "Sales Order")
+
+	# -- currencies -----------------------------------------------------------------------------------
+
+	def test_a_payment_in_another_currency_settles_the_invoice(self):
+		"""The gateway charges the cart currency; the invoice owes in its party account's currency."""
+		self.allow_multi_currency_invoices()
+		quotation = self.create_cart_quotation(currency=FOREIGN_CURRENCY, conversion_rate=3)
+		on_payment_request_update(self.create_paid_payment_request(quotation))
+
+		sales_order = self.submitted_sales_orders(quotation.name)[0]
+		sales_invoice = frappe.get_doc("Sales Invoice", self.submitted_sales_invoices(sales_order)[0])
+		self.assertEqual(
+			(sales_invoice.currency, sales_invoice.party_account_currency), (FOREIGN_CURRENCY, CURRENCY)
+		)
+		self.assertEqual((sales_invoice.status, sales_invoice.outstanding_amount), ("Paid", 0))
+
+		payment_entry = frappe.get_doc("Payment Entry", self.submitted_payment_entries(sales_invoice.name)[0])
+		self.assertEqual(payment_entry.paid_amount, flt(quotation.grand_total * 3))
+		self.assertEqual(payment_entry.paid_to, DEFAULT_CASH_ACCOUNT)
+
+	def test_a_payment_collected_in_another_currency_is_refused(self):
+		"""The same number in another currency is another amount."""
+		self.payment_request.db_set("currency_code", FOREIGN_CURRENCY, update_modified=False)
+
+		with self.assertRaisesRegex(frappe.ValidationError, f"collected in {FOREIGN_CURRENCY}"):
+			on_payment_request_update(self.payment_request)
+
+		self.assertEqual(self.submitted_sales_orders(), [])
+
+	def allow_multi_currency_invoices(self):
+		fieldname = "allow_multi_currency_invoices_against_single_party_account"
+		previous = frappe.db.get_single_value("Accounts Settings", fieldname)
+		self.addCleanup(frappe.db.set_single_value, "Accounts Settings", fieldname, previous)
+		frappe.db.set_single_value("Accounts Settings", fieldname, 1)
 
 	# -- refund Payment Entry mirroring ----------------------------------------------------------------
 
