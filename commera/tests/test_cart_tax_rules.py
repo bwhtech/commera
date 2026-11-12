@@ -3,7 +3,9 @@ from frappe.utils.data import add_days, today
 
 from commera.api.payments import generate_quotation_for_cart, update_quotation_address
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
+from commera.commera_ecommerce.doctype.commera_market.commera_market import get_country_code
 from commera.core import _get_cart_quotation, get_party
+from commera.localization import pin_localization, resolve
 from commera.tests.test_market_taxes import MarketTaxTestCase
 from commera.tests.test_markets import UAE
 
@@ -84,6 +86,52 @@ class TestCartTaxRules(MarketTaxTestCase):
 		quotation = self.quote_in_store()
 
 		self.assertEqual((quotation.taxes_and_charges, quotation.grand_total), (self.vat, 92))
+
+	def test_a_generic_rule_does_not_override_the_market_template(self):
+		market_template = self.make_template(10)
+		self.set_market_template(market_template)
+		self.make_tax_rule(self.vat, customer_group="")
+		quotation = self.quote_in_market()
+		self.assertEqual((quotation.taxes_and_charges, quotation.grand_total), (market_template, 330))
+
+	def test_a_country_rule_beats_the_market_template(self):
+		self.set_market_template(self.make_template(10))
+		self.make_tax_rule(self.vat, shipping_country=UAE)
+		quotation = self.quote_in_market()
+		self.assertEqual((quotation.taxes_and_charges, quotation.grand_total), (self.vat, 345))
+
+	def test_specific_rules_keep_erpnext_priority_order(self):
+		self.set_market_template(self.make_template(10))
+		self.make_tax_rule(self.make_template(12), shipping_country=UAE, priority=2)
+		self.make_tax_rule(self.vat, shipping_country=UAE, priority=1)
+		quotation = self.quote_in_market()
+		self.assertEqual((quotation.taxes_and_charges, quotation.grand_total), (self.vat, 345))
+
+	def test_guest_previews_use_country_rules(self):
+		from commera.discounts.preview import get_preview_quotation
+
+		self.make_tax_rule(self.vat, shipping_country=self.store_country)
+		with pin_localization(resolve("/", country=get_country_code(self.store_country))[0]):
+			quotation = get_preview_quotation([{"item_code": self.item_code, "qty": 1}], user="Guest")
+		self.assertEqual((quotation.taxes_and_charges, quotation.grand_total), (self.vat, 92))
+
+	def test_guest_previews_do_not_use_a_named_customer_rule(self):
+		from commera.discounts.preview import get_preview_quotation
+
+		self.sign_in_shopper()
+		self.make_tax_rule(self.vat, customer=get_party().name)
+		quotation = get_preview_quotation([{"item_code": self.item_code, "qty": 1}], user="Guest")
+		self.assertIsNone(quotation.taxes_and_charges)
+		self.assertEqual(quotation.grand_total, 80)
+
+	def test_an_unclaimed_country_does_not_use_the_store_country_rule(self):
+		from commera.cart_taxes import get_market_country, get_tax_rule_template
+
+		self.make_tax_rule(self.vat, shipping_country=self.store_country)
+		with pin_localization(resolve("/", country="EG")[0]) as localization:
+			quotation = frappe.new_doc("Quotation", company=self.company, quotation_to="Customer")
+			self.assertEqual(get_market_country(localization.market), OTHER_COUNTRY)
+			self.assertIsNone(get_tax_rule_template(quotation, localization.market))
 
 	def quote_in_store(self):
 		self.sign_in_shopper()

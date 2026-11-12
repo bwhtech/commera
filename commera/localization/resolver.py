@@ -21,7 +21,7 @@ class Localization:
 	prefix_codes: tuple[str, ...] = ()
 	market: Market | None = None
 	available_markets: tuple[Market, ...] = ()
-	# The lowercase ISO code the URL or `_country` named, when it belongs to `market`.
+	# The lowercase ISO code the URL or `_country` named.
 	country: str | None = None
 
 	def as_dict(self) -> dict:
@@ -60,7 +60,6 @@ def resolve(
 	else:
 		country = normalize_country(country)
 		market = markets.for_country(country)
-		country = None if market.is_primary else country
 		language = find_market_language(markets, market, lang)
 		root_prefix = markets.prefix(market, language, country)
 

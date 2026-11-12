@@ -221,7 +221,7 @@ class CommeraMarket(Document):
 				),
 				title=_("Invalid Tax Template"),
 			)
-		if disabled and self.has_value_changed("tax_template"):
+		if disabled and (self.enabled or self.has_value_changed("tax_template")):
 			frappe.throw(
 				_("Tax template {0} is disabled.").format(frappe.bold(self.tax_template)),
 				title=_("Invalid Tax Template"),

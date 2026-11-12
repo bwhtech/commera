@@ -2,8 +2,8 @@
 market, the company default. Inclusive or exclusive follows each template row's `included_in_print_rate`."""
 
 import frappe
-from erpnext.accounts.doctype.tax_rule.tax_rule import get_tax_template
-from erpnext.accounts.party import get_address_tax_category, set_taxes
+from erpnext.accounts.doctype.tax_rule.tax_rule import get_tax_rule_party_details, get_tax_template
+from erpnext.accounts.party import get_address_tax_category
 from frappe import _
 from frappe.model import child_table_fields, default_fields
 from frappe.utils.data import nowdate
@@ -28,14 +28,16 @@ def apply_market_taxes(quotation, market: Market | None, switched: bool):
 		get_tax_rule_template(quotation, market) or own_template or get_default_template(quotation, market)
 	)
 	is_market_template = bool(own_template) and template == own_template
-	if not switched and not is_market_template and has_address_taxes(quotation):
+	if has_unmanaged_rows(quotation) or (
+		not switched and not is_market_template and has_address_taxes(quotation)
+	):
 		return
 	quotation.commera_market_tax_template = own_template if is_market_template else None
 	# ERPNext's party lookup would name a Tax Rule template this cart left out, without its rows.
 	if "taxes_and_charges" not in quotation.dont_update_if_missing:
 		quotation.dont_update_if_missing.append("taxes_and_charges")
 	if not is_template_applied(quotation, template):
-		set_tax_template(quotation, template)
+		set_tax_template(quotation, template, managed=True)
 
 
 def clear_address_taxes(quotation):
@@ -51,7 +53,10 @@ def has_address_taxes(quotation) -> bool:
 	# Imported here: commera.api.shipping imports the cart, which imports this module.
 	from commera.api.shipping import is_cart_charge
 
-	if not any(not is_cart_charge(row, quotation) for row in quotation.get("taxes") or []):
+	if not any(
+		not row.get("commera_cart_charge") and not is_cart_charge(row, quotation)
+		for row in quotation.get("taxes") or []
+	):
 		return False
 	template = quotation.taxes_and_charges
 	if not template:
@@ -72,7 +77,9 @@ def is_template_applied(quotation, template: str | None) -> bool:
 		return False
 	rows = [row for row in quotation.get("taxes") or [] if not is_cart_charge(row, quotation)]
 	expected = get_template_rows(template)
-	return len(rows) == len(expected) and all(map(matches_tax_row, rows, expected))
+	return len(rows) == len(expected) and all(
+		matches_tax_row(row, tax) for row, tax in zip(rows, expected, strict=True)
+	)
 
 
 def get_own_template(market: Market | None, company: str) -> str | None:
@@ -106,67 +113,101 @@ def get_default_template(quotation, market: Market | None) -> str | None:
 
 
 def get_tax_rule_template(quotation, market: Market | None = None) -> str | None:
-	"""The Tax Rule ERPNext's shopping cart finds for the shopper. Before the cart has an address, the rule
-	is matched against the market's country, so a rule for the store's country does not tax other markets."""
-	if quotation.quotation_to != "Customer" or not quotation.party_name:
-		return None
-	customer = frappe.get_cached_value(
-		"Customer", quotation.party_name, ["customer_group", "tax_category"], as_dict=True
+	"""Use ERPNext matching and ranking, excluding generic rules when the market has a template."""
+	customer_name = quotation.party_name if quotation.quotation_to == "Customer" else None
+	customer = (
+		frappe.get_cached_value("Customer", customer_name, ["customer_group", "tax_category"], as_dict=True)
+		if customer_name
+		else None
 	)
-	if not customer:
-		return None
 	billing, shipping = quotation.customer_address, quotation.shipping_address_name
-	tax_category = get_address_tax_category(customer.tax_category, billing, shipping)
-	# A Quotation has no posting_date; with None, ERPNext skips every dated rule.
-	date = quotation.transaction_date or nowdate()
-	if billing or shipping:
-		return set_taxes(
-			quotation.party_name,
-			"Customer",
-			date,
-			quotation.company,
-			customer_group=customer.customer_group,
-			tax_category=tax_category,
-			billing_address=billing,
-			shipping_address=shipping,
-			use_for_shopping_cart=1,
-		)
-	country = get_market_country(market)
 	args = {
-		"customer": quotation.party_name,
+		"customer": customer_name,
 		"company": quotation.company,
-		"customer_group": customer.customer_group,
-		"tax_category": tax_category,
-		"billing_country": country,
-		"shipping_country": country,
+		"tax_category": get_address_tax_category(
+			customer.tax_category if customer else "", billing, shipping
+		),
 		"tax_type": "Sales",
 		"use_for_shopping_cart": 1,
 	}
-	return get_tax_template(date, args)
+	if customer:
+		args.update(customer_group=customer.customer_group)
+	if billing or shipping:
+		args.update(
+			get_tax_rule_party_details(
+				customer_name, "Customer", {"billing_address": billing, "shipping_address": shipping}
+			)
+		)
+	else:
+		country = get_market_country(market)
+		args.update(billing_country=country, shipping_country=country)
+	date = quotation.transaction_date or nowdate()
+	if not market or not market.tax_template:
+		return get_tax_template(date, args)
+
+	# ERPNext exposes no candidate filter. Check each specific rule with its matcher,
+	# then use its key-count and priority order over those eligible candidates.
+	fields = ("customer", "customer_group", "tax_category", "billing_country", "shipping_country")
+	rules = frappe.get_all(
+		"Tax Rule", filters={"tax_type": "Sales", "use_for_shopping_cart": 1}, fields=["*"]
+	)
+	eligible = []
+	for rule in rules:
+		if any(rule.get(field) for field in fields):
+			template = get_tax_template(date, {**args, "name": rule.name})
+			if template:
+				eligible.append((sum(bool(rule.get(key)) for key in args), rule.priority or 0, template))
+	if eligible:
+		return sorted(eligible, key=lambda row: (-row[0], row[1]))[0][2]
+	return None
 
 
 def get_market_country(market: Market | None) -> str | None:
-	"""The Country a cart without an address ships to: the store's in the primary market, else the
-	shopper's country when the market has it, else the market's first country."""
+	"""Prefer the shopper's known country, including unclaimed countries in the primary market."""
 	from commera.localization.resolver import get_localization
 	from commera.utils import get_store_company
 
-	if is_primary(market):
-		company = get_store_company()
-		return frappe.get_cached_value("Company", company, "country") if company else None
 	code = get_localization().country
-	code = code if code in market.countries else next(iter(market.countries), None)
-	return frappe.db.get_value("Country", {"code": code})
+	if not code and market:
+		code = next(iter(market.countries), None)
+	if code:
+		return frappe.db.get_value("Country", {"code": code})
+	company = get_store_company()
+	return frappe.get_cached_value("Company", company, "country") if company else None
 
 
-def set_tax_template(quotation, template: str | None):
-	"""The template's rows first, so their row references hold, then Commera's own charges."""
-	# Imported here: commera.api.shipping imports the cart, which imports this module.
+def has_unmanaged_rows(quotation) -> bool:
+	"""Commera may replace only its own template rows, never a caller's manual taxes."""
 	from commera.api.shipping import is_cart_charge
 
-	charges = [row for row in quotation.get("taxes") or [] if is_cart_charge(row, quotation)]
+	return any(
+		not is_managed_tax_row(row, quotation) and not is_cart_charge(row, quotation)
+		for row in quotation.get("taxes") or []
+	)
+
+
+def is_managed_tax_row(row, quotation) -> bool:
+	from commera.api.shipping import is_applied_template_row
+
+	if row.get("commera_cart_charge") == "tax_template":
+		return True
+	if any(tax.get("commera_cart_charge") == "tax_template" for tax in quotation.taxes):
+		return False
+	# Old carts have no provenance. Recognize their applied template until the next rebuild.
+	return bool(quotation.taxes_and_charges) and is_applied_template_row(row, quotation)
+
+
+def set_tax_template(quotation, template: str | None, *, managed: bool = False):
+	"""The template's rows first, so their row references hold, then Commera's own charges."""
+	charges = [row for row in quotation.get("taxes") or [] if not is_managed_tax_row(row, quotation)]
 	quotation.taxes_and_charges = template
-	quotation.set("taxes", get_template_rows(template))
+	quotation.set(
+		"taxes",
+		[
+			{**row, "commera_cart_charge": "tax_template" if managed else ""}
+			for row in get_template_rows(template)
+		],
+	)
 	for row in charges:
 		quotation.append("taxes", row)
 	for index, row in enumerate(quotation.taxes, start=1):

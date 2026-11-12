@@ -125,7 +125,15 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 		old, new = self.make_template(10), self.make_template(5)
 		self.set_market_template(new)
 		quotation = frappe.new_doc("Quotation", company=self.company, taxes_and_charges=old)
-		quotation.append("taxes", {"charge_type": "On Net Total", "account_head": self.account, "rate": 10})
+		quotation.append(
+			"taxes",
+			{
+				"charge_type": "On Net Total",
+				"account_head": self.account,
+				"rate": 10,
+				"commera_cart_charge": "tax_template",
+			},
+		)
 		delivery = {
 			"description": f"{DELIVERY_CHARGE_DESCRIPTION} - Express",
 			"charge_type": "Actual",
@@ -139,6 +147,48 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 		self.assertEqual(quotation.taxes_and_charges, new)
 		self.assertEqual(rows, [(1, "VAT 5%", 0), (2, delivery["description"], 15)])
 
+	def test_manual_rows_without_a_template_survive_market_taxes(self):
+		self.set_market_template(self.make_template(10))
+		quotation = frappe.new_doc("Quotation", company=self.company)
+		quotation.append(
+			"taxes",
+			{
+				"charge_type": "Actual",
+				"account_head": self.account,
+				"description": "Manual tax",
+				"tax_amount": 7,
+			},
+		)
+		for switched in (False, True):
+			apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched)
+			self.assertIsNone(quotation.taxes_and_charges)
+			self.assertEqual(
+				[(row.description, row.tax_amount) for row in quotation.taxes], [("Manual tax", 7)]
+			)
+
+	def test_manual_rows_added_to_managed_taxes_survive_a_rebuild(self):
+		self.set_market_template(self.make_template(10))
+		quotation = self.quote_in_market()
+		quotation.append(
+			"taxes",
+			{
+				"charge_type": "Actual",
+				"account_head": self.account,
+				"description": "Manual tax",
+				"tax_amount": 7,
+			},
+		)
+		apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched=True)
+		self.assertEqual(
+			[(row.description, row.tax_amount) for row in quotation.taxes],
+			[("VAT 10%", 30), ("Manual tax", 7)],
+		)
+
+	def test_commera_template_rows_have_provenance(self):
+		self.set_market_template(self.make_template(10))
+		quotation = self.quote_in_market()
+		self.assertEqual(quotation.taxes[0].commera_cart_charge, "tax_template")
+
 	def test_a_disabled_template_is_refused_not_replaced(self):
 		template = self.make_template(10)
 		self.make_template(5, is_default=1)
@@ -151,7 +201,7 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 	def test_a_template_of_another_company_is_refused_not_replaced(self):
 		template = self.make_template(10)
 		self.set_market_template(template)
-		other_company = frappe.get_all("Company", {"name": ("!=", self.company)}, pluck="name", limit=1)[0]
+		other_company = "ZZ Other Company"
 		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "company", other_company)
 
 		with self.assertRaisesRegex(frappe.ValidationError, "cannot be calculated"):
@@ -392,6 +442,20 @@ class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 
 		with self.assertRaisesRegex(frappe.ValidationError, "use this tax template"):
 			doc.save(ignore_permissions=True)
+
+	def test_a_disabled_market_does_not_block_retiring_its_template(self):
+		template = self.make_template(10)
+		self.set_market_template(template)
+		market = frappe.get_doc("Commera Market", "gulf")
+		market.enabled = 0
+		market.save(ignore_permissions=True)
+		doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
+		doc.disabled = 1
+		doc.save(ignore_permissions=True)
+		self.assertEqual(frappe.db.get_value(TEMPLATE_DOCTYPE, template, "disabled"), 1)
+		market.enabled = 1
+		with self.assertRaisesRegex(frappe.ValidationError, "is disabled"):
+			market.save(ignore_permissions=True)
 
 	def test_a_template_no_market_uses_can_be_disabled(self):
 		doc = frappe.get_doc(TEMPLATE_DOCTYPE, self.make_template(10))

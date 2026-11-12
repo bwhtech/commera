@@ -439,7 +439,7 @@ class TestMarketResolution(IntegrationTestCase):
 				localization = resolve("/api/method/x", "fr", country=country)[0]
 				self.assertTrue(localization.market.is_primary)
 				self.assertEqual(localization.language.code, "fr")
-				self.assertIsNone(localization.country)
+				self.assertEqual(localization.country, country.lower() if country else None)
 
 	def test_the_url_prefix_wins_over_country(self):
 		self.assertTrue(resolve("/ar/cart", country="AE")[0].market.is_primary)
