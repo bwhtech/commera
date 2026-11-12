@@ -21,6 +21,7 @@ from commera.api.shipping import (
 	get_charge_amount,
 	get_checkout_summary,
 	get_cod_charge,
+	get_priced_checkout_summary,
 	reprice_selected_option,
 	reprice_shipping_discount,
 )
@@ -724,6 +725,15 @@ def set_charges(quotation):
 	apply_plugin_fees(quotation)
 
 
+def get_charged_preview(quotation):
+	"""An unsaved copy carrying the delivery charge payment will apply, which a saved cart may lack."""
+	preview = frappe.get_doc(quotation.as_dict())
+	# Payment re-quotes a chosen option over the network; its stored row stands until then.
+	if not preview.custom_is_store_pickup and not preview.custom_delivery_option:
+		set_charges(preview)
+	return preview
+
+
 def set_cod_charges(quotation):
 	if cod_charge := get_cod_charge(quotation):
 		add_cod_charge(quotation, cod_charge, get_charge_account_head())
@@ -887,7 +897,7 @@ def get_address_saved_response(quotation) -> dict:
 	return {
 		"message": _("Addresses updated successfully"),
 		"payment_methods": get_checkout_payment_methods(quotation),
-		"checkout_summary": get_checkout_summary(quotation),
+		"checkout_summary": get_priced_checkout_summary(quotation),
 	}
 
 

@@ -3,7 +3,7 @@ from frappe import _
 from frappe.utils.data import cint, cstr, flt
 
 from commera.api.payments import cart_write_lock, save_cart_quotation, validate_cart_is_not_in_checkout
-from commera.api.shipping import get_checkout_summary, reprice_shipping_discount
+from commera.api.shipping import get_priced_checkout_summary, reprice_shipping_discount
 from commera.cart_prices import describe_items, validate_available
 from commera.checkout_hooks import apply_plugin_fees
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import CommeraCart, get_session_cart
@@ -73,14 +73,14 @@ def set_cart_fields(values: dict) -> CheckoutSummary:
 		cart.save(ignore_permissions=True)
 		preview = cart.get_quotation_preview()
 		apply_plugin_fees(preview)
-		return get_checkout_summary(preview)
+		return get_priced_checkout_summary(preview)
 
 	with cart_write_lock(quotation):
 		validate_cart_is_not_in_checkout(quotation.name)
 		quotation.update(values)
 		apply_plugin_fees(quotation)
 		save_cart_quotation(quotation)
-		return get_checkout_summary(quotation)
+		return get_priced_checkout_summary(quotation)
 
 
 def get_open_cart_quotation():

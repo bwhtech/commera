@@ -19,7 +19,7 @@ from commera.api.payments import (
 	save_quotation_address,
 	validate_cart_is_not_in_checkout,
 )
-from commera.api.shipping import get_cart_shipping_options, get_checkout_summary, save_delivery_option
+from commera.api.shipping import get_cart_shipping_options, get_priced_checkout_summary, save_delivery_option
 from commera.core import COD_PAYMENT_MODE, is_cod, is_shoppers_address
 from commera.guest import is_guest, validate_guest_checkout_enabled
 from commera.sdk.cart import get_open_cart_quotation
@@ -278,7 +278,7 @@ def get_checkout_state(quotation) -> CheckoutState:
 		"is_store_pickup": bool(quotation.custom_is_store_pickup),
 		"store": quotation.custom_store or None,
 		"shipping_option": quotation.custom_delivery_option or None,
-		"summary": get_checkout_summary(quotation),
+		"summary": get_priced_checkout_summary(quotation),
 	}
 
 

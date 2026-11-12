@@ -13,7 +13,7 @@ from commera.api.payments import (
 	get_quotation_for_cart,
 	validate_cart_is_not_in_checkout,
 )
-from commera.api.shipping import get_charge_amount, get_checkout_summary
+from commera.api.shipping import get_priced_checkout_summary
 from commera.base_prices import base_price_filters
 from commera.cart_prices import is_priced_in
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
@@ -159,8 +159,8 @@ def set_cart_context(context, commera_settings):
 	default_price_list = MarketPrices.current().compare_at_price_list
 	context.cart_quotation = cart_quotation
 	context.cart_needs_refresh = cart_needs_refresh(cart_quotation)
-	context.cart_payable_total = get_charge_amount(cart_quotation)
-	context.checkout_summary = get_checkout_summary(cart_quotation)
+	context.checkout_summary = get_priced_checkout_summary(cart_quotation)
+	context.cart_payable_total = context.checkout_summary["total"]
 	context.update(get_free_delivery(cart_quotation))
 	context.coupon_code = get_coupon_code(cart_quotation)
 	context.discount_code_states = get_code_states(cart_quotation)
