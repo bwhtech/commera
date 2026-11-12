@@ -129,7 +129,7 @@ class TestSummerCartCurrency(CartCurrencyTestCase):
 		)
 
 	def cart_line_price(self, symbol):
-		return f'<strong>{symbol}<span x-text="format_amount($store.cart.price_of(cart_item))">'
+		return f'<strong x-show="cart_item.available !== false">{symbol}<span x-text="format_amount($store.cart.price_of(cart_item))">'
 
 	def drawer_total(self, symbol):
 		return f'<h5 class="mb-0">{symbol}<span x-text="commera.format.amount($store.cart.total,'
@@ -147,8 +147,11 @@ class TestLegacyCartCurrency(CartCurrencyTestCase):
 	def test_the_market_cart_page_shows_the_market_currency(self):
 		html = self.render_legacy("cart/cart", "/en-ae/cart")
 
-		self.assertIn(f'{self.market_symbol}<span x-text="commera.format.amount($store.cart.total,', html)
-		self.assertNotIn(f'{self.store_symbol}<span x-text="commera.format.amount($store.cart.total', html)
+		self.assertIn(
+			f'{self.market_symbol}<span x-text="commera.format.amount(($store.cart.priced?.items_total ?? $store.cart.total),',
+			html,
+		)
+		self.assertNotIn(f'{self.store_symbol}<span x-text="commera.format.amount(', html)
 
 	def test_the_primary_market_pages_keep_the_store_currency(self):
 		self.checkout_quotation("/cart/checkout")
@@ -157,7 +160,10 @@ class TestLegacyCartCurrency(CartCurrencyTestCase):
 		cart = self.render_legacy("cart/cart", "/cart")
 
 		self.assertIn(f'{self.store_symbol} <span x-text="commera.format.amount(checkout_total,', checkout)
-		self.assertIn(f'{self.store_symbol}<span x-text="commera.format.amount($store.cart.total,', cart)
+		self.assertIn(
+			f'{self.store_symbol}<span x-text="commera.format.amount(($store.cart.priced?.items_total ?? $store.cart.total),',
+			cart,
+		)
 
 
 class TestGuestCartMarket(CartCurrencyTestCase):
