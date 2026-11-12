@@ -75,17 +75,19 @@ class CartCurrencyTestCase(MarketCartTestCase):
 class TestCartCurrency(CartCurrencyTestCase):
 	def test_a_cart_without_a_quotation_is_in_the_market_currency(self):
 		self.open_request("/en-ae/cart")
-		self.assertEqual(CartCurrency.of(), CartCurrency(self.currency, self.market_symbol, 2))
+		self.assertEqual(CartCurrency.of(), CartCurrency(self.currency, self.market_symbol, 2, 2, "#,###.##"))
 
 		self.open_request("/cart")
-		self.assertEqual(CartCurrency.of(), CartCurrency(self.store_currency, self.store_symbol, 2))
+		self.assertEqual(
+			CartCurrency.of(), CartCurrency(self.store_currency, self.store_symbol, 2, 2, "#,###.##")
+		)
 
 	def test_a_cart_with_a_quotation_is_in_the_quotation_currency(self):
 		quotation = self.checkout_quotation("/en-ae/cart/checkout")
 
 		self.open_request("/cart")
 		self.assertEqual(CartCurrency.of(quotation).code, self.currency)
-		self.assertEqual(CartCurrency.of(quotation).amount(3499), "3499.00")
+		self.assertEqual(CartCurrency.of(quotation).amount(3499), "3,499.00")
 
 
 class TestSummerCartCurrency(CartCurrencyTestCase):
@@ -94,7 +96,7 @@ class TestSummerCartCurrency(CartCurrencyTestCase):
 
 		html = self.render_summer("pages/cart/checkout.html", "/en-ae/cart/checkout")
 
-		self.assertIn(self.summary_subtotal(self.market_symbol, "3499.00"), html)
+		self.assertIn(self.summary_subtotal(self.market_symbol, "3,499.00"), html)
 		self.assertIn(self.drawer_total(self.market_symbol), html)
 		self.assertIn("commera.format.amount(", html)
 		self.assertNotIn(f'<td class="price">{self.store_symbol}', html)

@@ -6,6 +6,8 @@ import frappe
 from frappe.utils.data import flt, fmt_money
 
 from commera.localization.formatter import (
+	Formatter,
+	get_fraction_precision,
 	get_html_currency_symbol,
 	get_money_precision,
 	strip_fmt_money_symbol,
@@ -16,31 +18,40 @@ from commera.utils import get_store_currency
 
 @dataclass(frozen=True)
 class CartCurrency:
+	"""Digits as the localization formatter writes them, so every theme agrees with Starter.
+	Templates place the symbol themselves: it goes before the amount."""
+
 	code: str
 	symbol: str
 	precision: int
+	fraction_precision: int
+	number_format: str
 
 	@classmethod
 	def of(cls, quotation=None) -> "CartCurrency":
 		code = (quotation and quotation.get("currency")) or MarketPrices.current().currency
-		# Primary storefront templates have always printed two decimal places.
-		precision = 2 if code == get_store_currency() else get_money_precision(code)
-		return cls(code, get_html_currency_symbol(code), precision)
+		return cls(
+			code,
+			get_html_currency_symbol(code),
+			get_money_precision(code),
+			get_fraction_precision(code),
+			Formatter.current().number_format,
+		)
 
 	@property
 	def config(self) -> dict:
-		return {"precision": self.precision}
+		"""The rules `commera.format.amount` needs to print the same digits in the browser."""
+		return {
+			"precision": self.precision,
+			"fraction_precision": self.fraction_precision,
+			"number_format": self.number_format,
+		}
 
 	def amount(self, value: float | None) -> str:
-		return f"{flt(value):.{self.precision}f}"
-
-	def catalog_amount(self, value: float | None) -> str:
-		# Summer product cards already use fmt_money, including its precision fallback.
-		if self.code == get_store_currency():
-			return fmt_money(flt(value), precision=2)
-		return strip_fmt_money_symbol(
-			fmt_money(flt(value), precision=self.precision, currency=self.code), self.code
+		formatted = fmt_money(
+			flt(value), precision=self.precision, currency=self.code, format=self.number_format
 		)
+		return strip_fmt_money_symbol(formatted, self.code)
 
 
 def get_cart_currency(quotation=None) -> CartCurrency:

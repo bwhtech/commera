@@ -86,17 +86,25 @@ test('money and dates read the resolved rules and the page direction', () => {
 	assert.equal(date('2026-03-05'), '5 mar');
 });
 
-test('storefront amounts keep fixed decimals regardless of number format', () => {
-	for (const number_format of ['#,##,###.##', '#.###,##']) {
-		assert.equal(
-			amount(123456.78, { number_format, precision: 2 }),
-			'123456.78',
-		);
-		assert.equal(amount(123, { number_format, precision: 3 }), '123.000');
+const amount_cases = JSON.parse(
+	readFileSync(new URL('./amount-cases.json', import.meta.url)),
+);
+
+// commera/tests/test_storefront_currency.py passes the same cases with CartCurrency.amount.
+test('amount prints the server digits for each number format and currency', () => {
+	for (const { amount: value, expected, ...rules } of amount_cases) {
+		assert.equal(amount(value, rules), expected, JSON.stringify(rules));
 	}
 });
 
-test('cart executes its formatter and keeps develop primary output', () => {
+test("amount without a number format takes the page's", () => {
+	globalThis.commera_storefront_config = { number_format: '#,##,###.##' };
+	assert.equal(amount(123456.78, { precision: 2 }), '1,23,456.78');
+	globalThis.commera_storefront_config = undefined;
+	assert.equal(amount(123456.78, { precision: 2 }), '123,456.78');
+});
+
+test('summer cart executes its formatter with the server config', () => {
 	const template = readFileSync(
 		new URL(
 			'../../../commera/themes/summer_theme/pages/cart/cart.html',
@@ -109,15 +117,11 @@ test('cart executes its formatter and keeps develop primary output', () => {
 	)[1];
 	const source = method.replace(
 		/\{\{ cart_currency.config \| tojson \}\}/g,
-		'{"precision":2}',
+		'{"precision":2,"fraction_precision":2,"number_format":"#,##,###.##"}',
 	);
 	const format = new Function('amount', 'commera', source);
-	for (const value of [123456.78, 123456.789, 0]) {
-		assert.equal(
-			format(value, { format: { amount } }),
-			Number(value || 0).toFixed(2),
-		);
-	}
+	assert.equal(format(123456.78, { format: { amount } }), '1,23,456.78');
+	assert.equal(format(0, { format: { amount } }), '0.00');
 });
 
 test('all HTML money paths escape ordinary symbols and trust only the SAR icon', () => {
