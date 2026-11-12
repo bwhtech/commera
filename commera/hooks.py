@@ -295,6 +295,7 @@ doc_events = {
 		],
 	},
 	"Sales Invoice": {
+		"before_mapping": "commera.item_price_guard.refuse_cart_quotation_invoice",
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
 		"validate": "commera.discounts.pricing.apply_code_discounts",
 		"on_submit": "commera.utils.update_so_status_from_related_doc",

@@ -213,6 +213,44 @@ class TestCartPriceInserts(MarketCartTestCase):
 		self.assertEqual(delivery_note.items[0].rate, 75)
 		self.assertEqual(frappe.db.get_value("Item Price", sale_price.name, "price_list_rate"), 100)
 
+	def test_cart_quotation_cannot_be_invoiced_directly(self):
+		from erpnext.selling.doctype.quotation.mapper import make_sales_invoice
+
+		ensure_fiscal_year()
+		self.quotation.reload().submit()
+		with self.assertRaisesRegex(frappe.ValidationError, "from its Sales Order"):
+			make_sales_invoice(self.quotation.name)
+		self.assertFalse(self.has_sale_price())
+
+	def test_desk_quotation_can_be_invoiced_and_insert_a_price(self):
+		from erpnext.selling.doctype.quotation.mapper import make_sales_invoice
+
+		ensure_fiscal_year()
+		self.quotation.reload()
+		self.quotation.order_type = "Sales"
+		self.quotation.save().submit()
+		make_sales_invoice(self.quotation.name).insert()
+		self.assertTrue(self.has_sale_price())
+
+	def test_source_lookups_are_shared_by_all_rows_of_an_order(self):
+		sales_order = self.make_sales_order(0)
+		row = sales_order.items[0].as_dict()
+		row.pop("name")
+		sales_order.append("items", row)
+		sales_order.save()
+		frappe.local.commera_source_order_types = {}
+		with patch.object(frappe.db, "sql", wraps=frappe.db.sql) as sql:
+			for _ in range(3):
+				for row in sales_order.items:
+					self.assertTrue(item_price_guard.is_cart_line(frappe._dict(so_detail=row.name)))
+			self.assertEqual(sql.call_count, 1)
+
+	def test_disabled_auto_insert_does_not_resolve_sources(self):
+		self.set_single("Stock Settings", "auto_insert_price_list_rate_if_missing", 0)
+		with patch.object(item_price_guard, "source_order_type") as lookup:
+			get_item_details.insert_item_price(frappe._dict(so_detail="unused"))
+		lookup.assert_not_called()
+
 	def make_sales_order(self, ignore_pricing_rule):
 		sales_order = frappe.get_doc(
 			{
