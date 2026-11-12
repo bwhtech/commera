@@ -423,6 +423,50 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.assertEqual(payment_entry.paid_amount, flt(quotation.grand_total * 3))
 		self.assertEqual(payment_entry.paid_to, DEFAULT_CASH_ACCOUNT)
 
+	def test_full_foreign_payment_books_row_rounding_in_both_directions(self):
+		for disabled in (0, 1):
+			for rate, outstanding, receipt in ((1.01, 11.37, 11.36), (1.03, 11.58, 11.59)):
+				with self.subTest(disabled=disabled, rate=rate):
+					invoice = self.create_fractional_invoice(rate, disabled)
+					self.assertEqual(invoice.outstanding_amount, outstanding)
+					payment = create_payment_entry(invoice, GATEWAY, invoice.grand_total, None)
+					invoice.reload()
+					self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
+					self.assertEqual(payment.received_amount, receipt)
+					self.assertEqual(payment.references[0].allocated_amount, outstanding)
+					self.assertAlmostEqual(
+						sum(row.amount for row in payment.deductions), outstanding - receipt
+					)
+					self.assertEqual((payment.difference_amount, payment.unallocated_amount), (0, 0))
+
+	def test_partial_foreign_payment_keeps_converted_allocation(self):
+		invoice = self.create_fractional_invoice(1.01, 1)
+		payment = create_payment_entry(invoice, GATEWAY, 1, None)
+		invoice.reload()
+		self.assertEqual(payment.references[0].allocated_amount, 3.75)
+		self.assertEqual(payment.received_amount, 3.75)
+		self.assertEqual(invoice.outstanding_amount, 7.62)
+		self.assertEqual(invoice.status, "Partly Paid")
+		self.assertFalse(payment.deductions)
+
+	def create_fractional_invoice(self, rate, disabled):
+		self.allow_multi_currency_invoices()
+		invoice = frappe.get_doc(
+			{
+				"doctype": "Sales Invoice",
+				"company": COMPANY,
+				"customer": self.customer,
+				"currency": FOREIGN_CURRENCY,
+				"conversion_rate": 3.75,
+				"disable_rounded_total": disabled,
+				"ignore_pricing_rule": 1,
+				"items": [{"item_code": self.item_code, "qty": 1, "rate": rate} for _ in range(3)],
+			}
+		)
+		invoice.insert(ignore_permissions=True)
+		invoice.submit()
+		return invoice
+
 	def test_a_payment_collected_in_another_currency_is_refused(self):
 		"""The same number in another currency is another amount."""
 		self.payment_request.db_set("currency_code", FOREIGN_CURRENCY, update_modified=False)
