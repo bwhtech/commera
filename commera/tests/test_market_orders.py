@@ -218,7 +218,7 @@ class TestCartPriceInserts(MarketCartTestCase):
 
 		ensure_fiscal_year()
 		self.quotation.reload().submit()
-		with self.assertRaisesRegex(frappe.ValidationError, "from its Sales Order"):
+		with self.assertRaisesRegex(frappe.ValidationError, "Create a Sales Order first"):
 			make_sales_invoice(self.quotation.name)
 		self.assertFalse(self.has_sale_price())
 
@@ -232,18 +232,27 @@ class TestCartPriceInserts(MarketCartTestCase):
 		make_sales_invoice(self.quotation.name).insert()
 		self.assertTrue(self.has_sale_price())
 
-	def test_source_lookups_are_shared_by_all_rows_of_an_order(self):
+	def test_source_lookup_uses_one_query_per_row(self):
 		sales_order = self.make_sales_order(0)
 		row = sales_order.items[0].as_dict()
 		row.pop("name")
 		sales_order.append("items", row)
 		sales_order.save()
-		frappe.local.commera_source_order_types = {}
 		with patch.object(frappe.db, "sql", wraps=frappe.db.sql) as sql:
 			for _ in range(3):
 				for row in sales_order.items:
 					self.assertTrue(item_price_guard.is_cart_line(frappe._dict(so_detail=row.name)))
-			self.assertEqual(sql.call_count, 1)
+			self.assertEqual(sql.call_count, 3 * len(sales_order.items))
+
+	def test_source_order_type_changes_between_pricing_passes(self):
+		sales_order = self.make_sales_order(0)
+		ctx = frappe._dict(so_detail=sales_order.items[0].name)
+		writer = Mock()
+		price_line = item_price_guard.skip_cart_lines(writer)
+		for order_type, expected_calls in (("Sales", 1), ("Shopping Cart", 1), ("Sales", 2)):
+			frappe.db.set_value("Sales Order", sales_order.name, "order_type", order_type)
+			price_line(ctx)
+			self.assertEqual(writer.call_count, expected_calls)
 
 	def test_disabled_auto_insert_does_not_resolve_sources(self):
 		self.set_single("Stock Settings", "auto_insert_price_list_rate_if_missing", 0)

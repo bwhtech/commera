@@ -63,23 +63,15 @@ def source_order_type(ctx) -> str | None:
 	# their chains) keeps `so_detail`, ERPNext's own join field for delivered and billed qty.
 	if not ctx.get("so_detail"):
 		return None
-	cache = getattr(frappe.local, "commera_source_order_types", None)
-	if cache is None:
-		cache = frappe.local.commera_source_order_types = {}
-	if ctx.so_detail not in cache:
-		# Resolve every row of this order once, including negative results, for this request only.
-		rows = frappe.db.sql(
-			"""select item.name, orders.order_type
-			from `tabSales Order Item` item
-			join `tabSales Order` orders on orders.name = item.parent
-			where item.parent = (
-				select parent from `tabSales Order Item` where name = %s
-			)""",
-			(ctx.so_detail,),
-		)
-		cache[ctx.so_detail] = None
-		cache.update(rows)
-	return cache[ctx.so_detail]
+	# Read current data on every pricing pass; order types can change within one request.
+	rows = frappe.db.sql(
+		"""select orders.order_type
+		from `tabSales Order Item` item
+		join `tabSales Order` orders on orders.name = item.parent
+		where item.name = %s""",
+		(ctx.so_detail,),
+	)
+	return rows[0][0] if rows else None
 
 
 def refuse_cart_quotation_invoice(doc, method, source, table_maps):
@@ -87,6 +79,6 @@ def refuse_cart_quotation_invoice(doc, method, source, table_maps):
 	if source.doctype == "Quotation" and source.order_type == CART_ORDER_TYPE:
 		frappe.throw(
 			frappe._(
-				"Cannot invoice a Shopping Cart Quotation directly. Create the Sales Invoice from its Sales Order."
+				"Cannot invoice a Shopping Cart Quotation directly. Create a Sales Order first, then create the Sales Invoice from that Sales Order."
 			)
 		)
