@@ -6,7 +6,7 @@
 	<div class="container">
 		<div class="section-head style-1 wow fadeInUp d-lg-flex justify-content-between" data-wow-delay="0.2s">
 			<div class="left-content">
-				<h2 class="title">{{ section.settings.title }}</h2>
+				<h2 class="title"><bdi>{{ section.settings.title }}</bdi></h2>
 			</div>
 			{% if section.settings.link_label %}
 			<a href="{{ url(section.settings.link_url or '/products') | e }}" class="text-secondary font-14 d-flex align-items-center gap-1">{{ section.settings.link_label }}

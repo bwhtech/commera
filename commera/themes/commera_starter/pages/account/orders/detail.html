@@ -57,7 +57,7 @@
 		<div data-item="{{ line.item_code }}" x-show="returnable_codes.includes($el.dataset.item)" class="flex flex-col gap-3 md:flex-row md:items-center">
 			<label class="flex min-w-0 flex-1 items-center gap-2 text-md text-ink-gray-8">
 				<input type="checkbox" value="{{ line.item_code }}" x-model="selected" class="size-4 rounded">
-				<span class="min-w-0 [overflow-wrap:anywhere]">{{ line.title }}</span>
+				<span class="min-w-0 [overflow-wrap:anywhere]"><bdi>{{ line.title }}</bdi></span>
 			</label>
 			{% call select('x-model="reasons[$el.closest(\'[data-item]\').dataset.item]" aria-label="' ~ (_('Reason for return') | e) ~ '"', "md:w-56") %}
 				<option value="">{{ _("Reason for return") }}</option>
@@ -82,10 +82,10 @@
 				{{ image(line.image, width=160, class="aspect-[3/4] w-16 shrink-0 rounded-lg object-cover object-top") }}
 				<div class="min-w-0 flex-1">
 					<div class="grid gap-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-3">
-						<p class="text-md text-balance text-ink-gray-9 [overflow-wrap:anywhere]">{{ line.title }}</p>
+						<p class="text-md text-balance text-ink-gray-9 [overflow-wrap:anywhere]"><bdi>{{ line.title }}</bdi></p>
 						<p class="tabular whitespace-nowrap text-md text-ink-gray-9"><bdi>{{ commera.format.money(line.amount, order.currency) }}</bdi></p>
 					</div>
-					{% if line.size %}<p class="mt-1 text-base text-ink-gray-6 [overflow-wrap:anywhere]">{{ _("Size") }} {{ line.size }}</p>{% endif %}
+					{% if line.size %}<p class="mt-1 text-base text-ink-gray-6 [overflow-wrap:anywhere]">{{ _("Size") }} <bdi>{{ line.size }}</bdi></p>{% endif %}
 					<p class="tabular mt-0.5 text-base text-ink-gray-6"><bdi class="whitespace-nowrap">{{ line.qty | int }} × {{ commera.format.money(line.rate, order.currency) }}</bdi></p>
 				</div>
 			</li>

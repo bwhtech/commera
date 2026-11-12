@@ -67,8 +67,8 @@
 											</div>
 										</td>
 										<td class="product-item-name">
-											<a :href="{{ url('/products') | tojson | forceescape }} + '/' + cart_item.item.route"
-												x-text="{% if in_source_language %}cart_item.variant.item_name{% else %}cart_item.variant.title || cart_item.variant.item_name{% endif %}"></a>
+											<a :href="{{ url('/products') | tojson | forceescape }} + '/' + cart_item.item.route"><bdi
+												x-text="{% if in_source_language %}cart_item.variant.item_name{% else %}cart_item.variant.title || cart_item.variant.item_name{% endif %}"></bdi></a>
 										</td>
 										<td class="product-item-price">
 											<template x-if="cart_item.default_price && parseFloat(cart_item.default_price) !== $store.cart.price_of(cart_item)">

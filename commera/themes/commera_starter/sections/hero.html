@@ -3,11 +3,11 @@
 <section x-data="hero({{ slides | length }})" @mouseenter="hovered = true" @mouseleave="hovered = false" @focusin="focused = true" @focusout="focused = $el.contains($event.relatedTarget)" class="section-x grid items-center gap-6 pt-2 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-12 md:pt-4 lg:gap-20">
 	<div class="order-2 animate-rise md:order-1">
 		{% if section.settings.badge %}
-		<span class="inline-flex h-7 items-center rounded-full border border-outline-gray-2 px-3 text-xs font-medium uppercase tracking-wider text-ink-gray-6">{{ section.settings.badge }}</span>
+		<span class="inline-flex h-7 items-center rounded-full border border-outline-gray-2 px-3 text-xs font-medium uppercase tracking-wider text-ink-gray-6"><bdi>{{ section.settings.badge }}</bdi></span>
 		{% endif %}
-		<h1 class="mt-4 max-w-[14ch] md:mt-6 text-9xl leading-none tracking-tight md:text-10xl xl:text-12xl [overflow-wrap:anywhere]">{{ section.settings.heading }}</h1>
+		<h1 class="mt-4 max-w-[14ch] md:mt-6 text-9xl leading-none tracking-tight md:text-10xl xl:text-12xl [overflow-wrap:anywhere]"><bdi>{{ section.settings.heading }}</bdi></h1>
 		{% if section.settings.text %}
-		<p class="mt-4 max-w-[38ch] text-p-xl md:mt-6 text-ink-gray-6 md:text-p-2xl">{{ section.settings.text }}</p>
+		<p dir="auto" class="mt-4 max-w-[38ch] text-p-xl md:mt-6 text-ink-gray-6 md:text-p-2xl">{{ section.settings.text }}</p>
 		{% endif %}
 		<div class="mt-6 flex flex-wrap gap-3 md:mt-9">
 			{% if section.settings.primary_label %}

@@ -32,9 +32,9 @@
 				<div class="tab-pane fade" id="description-tab-pane" role="tabpanel" aria-labelledby="description-tab"
 					:class="active_tab === 'description' ? 'show active' : ''">
 					<div class="detail-bx text-center">
-						<h5 class="title">{{ product_title|e }}</h5>
+						<h5 class="title"><bdi>{{ product_title|e }}</bdi></h5>
 						{% if show_product_description %}
-						<p class="para-text">
+						<p dir="auto" class="para-text">
 							{{ product_description }}
 						</p>
 						{% endif %}
@@ -42,7 +42,7 @@
 							{% if show_option_axis %}
 							<li>
 								<i class="icon feather icon-check"></i>
-								<h5>{{ product_variant.attribute_name }}: {{ product_variant.attribute_value }}</h5>
+								<h5><bdi>{{ product_variant.attribute_name }}</bdi>: <bdi>{{ product_variant.attribute_value }}</bdi></h5>
 							</li>
 							{% endif %}
 							{% if show_sizes %}
@@ -54,7 +54,7 @@
 							{% if selected_item.material %}
 							<li>
 								<i class="icon feather icon-check"></i>
-								<h5>{{ selected_item.material }}</h5>
+								<h5><bdi>{{ selected_item.material }}</bdi></h5>
 							</li>
 							{% endif %}
 						</ul>
@@ -65,28 +65,28 @@
 					<div class="dz-info product-specification">
 						<ul>
 							<li><strong>{{ _("Brand") }}:</strong></li>
-							<li>{{ product.brand }}</li>
+							<li><bdi>{{ product.brand }}</bdi></li>
 						</ul>
 						<ul>
 							<li><strong>{{ _("Category") }}:</strong></li>
-							<li>{{ product_variant.item_group }}</li>
+							<li><bdi>{{ product_variant.item_group }}</bdi></li>
 						</ul>
 						{% if show_option_axis %}
 						<ul>
 							<li><strong>{{ product_variant.attribute_name }}:</strong></li>
-							<li>{{ product_variant.attribute_value }}</li>
+							<li><bdi>{{ product_variant.attribute_value }}</bdi></li>
 						</ul>
 						{% endif %}
 						{% if selected_item.style_code %}
 						<ul>
 							<li><strong>{{ _("Style Code") }}:</strong></li>
-							<li>{{ selected_item.style_code }}</li>
+							<li><bdi>{{ selected_item.style_code }}</bdi></li>
 						</ul>
 						{% endif %}
 						{% if show_sizes %}
 						<ul>
 							<li><strong>{{ _("Sizes") }}:</strong></li>
-							<li>{{ available_sizes | map(attribute="size") | join(", ") }}</li>
+							<li>{% for size in available_sizes %}<bdi>{{ size.size }}</bdi>{{ ", " if not loop.last }}{% endfor %}</li>
 						</ul>
 						{% endif %}
 					</div>

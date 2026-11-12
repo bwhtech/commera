@@ -103,9 +103,9 @@
 									</h3>
 									<h4 class="mb-2 text-sm font-medium md:text-base">
 									{% if in_source_language %}
-									<span x-text="cart_item.variant.item_name"></span>
+									<bdi x-text="cart_item.variant.item_name"></bdi>
 									{% else %}
-									<span x-text="cart_item.variant.title || cart_item.variant.item_name"></span>
+									<bdi x-text="cart_item.variant.title || cart_item.variant.item_name"></bdi>
 									{% endif %}
 
 									</h4>

@@ -18,7 +18,7 @@
 				{% for facet in values %}
 				<label class="flex min-h-10 items-center gap-2.5 rounded-lg px-2.5 py-2 text-md text-ink-gray-8 hover:bg-surface-gray-3">
 					<input type="checkbox" name="{{ key }}" value="{{ facet.value }}" {{ "checked" if facet.value in selected[key] }} class="size-4 shrink-0">
-					<span class="min-w-0 flex-1 [overflow-wrap:anywhere]">{{ facet.value }}</span>
+					<span class="min-w-0 flex-1 [overflow-wrap:anywhere]"><bdi>{{ facet.value }}</bdi></span>
 					<span class="tabular shrink-0 text-base text-ink-gray-6">{{ facet.count }}</span>
 				</label>
 				{% endfor %}

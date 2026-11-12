@@ -84,12 +84,12 @@
         {{_(brand|title)}}
     </h3>
     <h4 class="{{ current_variant.product_name_size }}" title="{{ _(product_name|title)|e }}">
-        {% if product_name|length > 25 %}
+        <bdi>{% if product_name|length > 25 %}
         {{ _(product_name[:25]|title)|e }}...
         {% else %}
         {{ _(product_name|title)|e }}
-        {% endif %}
-        {{_(attribute_value|title)}}
+        {% endif %}</bdi>
+        <bdi>{{_(attribute_value|title)}}</bdi>
     </h4>
     <p class="{{ current_variant.price_size }} flex">
         {% if discount %}

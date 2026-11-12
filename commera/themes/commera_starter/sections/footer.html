@@ -32,8 +32,8 @@
 	{% endfor %}
 	{% elif block.type == "text" %}
 	<div class="col-span-2 py-4 text-ink-gray-6 md:col-span-1 md:py-0"{{ block.editor_attributes }}>
-		{% if block.settings.heading %}<p class="mb-3 text-xs font-medium uppercase tracking-wider text-ink-gray-9">{{ block.settings.heading }}</p>{% endif %}
-		<p class="text-p-sm max-w-[36ch]">{{ block.settings.text }}</p>
+		{% if block.settings.heading %}<p class="mb-3 text-xs font-medium uppercase tracking-wider text-ink-gray-9"><bdi>{{ block.settings.heading }}</bdi></p>{% endif %}
+		<p dir="auto" class="text-p-sm max-w-[36ch]">{{ block.settings.text }}</p>
 	</div>
 	{% elif block.type == "social" and social_links %}
 	<div x-data="{ open: false }" class="col-span-2 border-b border-outline-gray-2 text-ink-gray-6 md:col-span-1 md:border-0"{{ block.editor_attributes }}>

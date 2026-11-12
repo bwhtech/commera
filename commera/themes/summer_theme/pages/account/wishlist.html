@@ -32,7 +32,7 @@
 							</a>
 						</td>
 						<td class="product-item-name">
-							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route" x-text="wishlist_item.title || wishlist_item.item_name"></a>
+							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route"><bdi x-text="wishlist_item.title || wishlist_item.item_name"></bdi></a>
 							<span x-show="$store.wishlist.prices_ready && wishlist_item.available === false" x-cloak>{{ _("Unavailable") }}</span>
 						</td>
 						<td class="product-item-price text-nowrap">

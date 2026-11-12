@@ -64,18 +64,18 @@
 							<span class="badge bg-secondary mb-2">{{ _("Sale {0}% Off").format(discount_percent | round | int) }}</span>
 							{% endif %}
 							<h1 class="h4 title mb-1">
-								{{ product_title|e }}
+								<bdi>{{ product_title|e }}</bdi>
 							</h1>
 							{% if product.brand %}
 							<div class="review-num">
-								<a href="{{ url('/products?brands=' ~ (product.brand | urlencode)) | e }}">{{ product.brand }}</a>
+								<a href="{{ url('/products?brands=' ~ (product.brand | urlencode)) | e }}"><bdi>{{ product.brand }}</bdi></a>
 							</div>
 							{% endif %}
 						</div>
 					</div>
 
 					{% if show_product_description %}
-					<p class="para-text">
+					<p dir="auto" class="para-text">
 						{{ product_description }}
 					</p>
 					{% endif %}
@@ -107,7 +107,7 @@
 									{% if size_selected and selected_size == size.size %}checked{% endif %}
 									{% if not size.stock_detail.in_stock %}disabled{% endif %}
 									@change='select_size({{ size.size | tojson }})'>
-								<label class="btn" for="product-size-{{ loop.index }}">{{ size.size }}</label>
+								<label class="btn" for="product-size-{{ loop.index }}"><bdi>{{ size.size }}</bdi></label>
 								{% endfor %}
 							</div>
 						</div>
@@ -121,14 +121,14 @@
 							<li>
 								<a href="{{ url('/products/' ~ product_variant.route) | e }}" class="is-active" aria-current="page">
 									<img src="{{ images[0] }}" alt="{{ product_variant.attribute_value }}">
-									<span>{{ product_variant.attribute_value }}</span>
+									<bdi>{{ product_variant.attribute_value }}</bdi>
 								</a>
 							</li>
 							{% for variant in other_variants %}
 							<li>
 								<a href="{{ url('/products/' ~ variant.route) | e }}">
 									<img src="{{ variant.image or '/assets/commera/images/1.jpg' }}" alt="{{ variant.attribute_value }}">
-									<span>{{ variant.attribute_value }}</span>
+									<bdi>{{ variant.attribute_value }}</bdi>
 								</a>
 							</li>
 							{% endfor %}

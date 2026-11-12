@@ -60,7 +60,7 @@
                     {{ _(product.brand|title) }}
                 </a>
                 <h2 class="mb-3.5 text-base md:mb-6 md:text-xl ">
-                    {{ product_title|title|e }}
+                    <bdi>{{ product_title|title|e }}</bdi>
                 </h2>
                 {% if reviews.review_count %}
                 <a href="#product-reviews" class="mb-3.5 flex items-center gap-1.5 md:mb-6 w-fit">
@@ -128,7 +128,7 @@
                                     'opacity-50 out-of-stock': '{{size.stock_detail.in_stock}}' !== '1'
                                 }"  @click="update_size('{{ size.size }}');
                                 selected_variant={{size}}">
-                                {{ size.size }}
+                                <bdi>{{ size.size }}</bdi>
                             </button>
                         {% endfor %}
                     </div>
@@ -187,7 +187,7 @@
                                 class="w-34 h-45 object-cover rounded-lg">
                         </div>
                         <p class="text-accent">
-                            {{ product_title|e }}
+                            <bdi>{{ product_title|e }}</bdi>
                         </p>
 
                         <div class="flex justify-center gap-4 mt-6">
@@ -257,20 +257,20 @@
                                     <ul>
                                         <li>
 
-                                            <span class="text-base font-medium  ">{{_(selected_item.style_code) or ''}}</span>, <span
-                                                class="text-base font-medium  ">{{_(product_variant.attribute_value|title)}}</span>
+                                            <bdi class="text-base font-medium  ">{{_(selected_item.style_code) or ''}}</bdi>, <bdi
+                                                class="text-base font-medium  ">{{_(product_variant.attribute_value|title)}}</bdi>
                                         </li>
                                           <li>
                                             <span class="text-base font-medium  ">{{_(product_variant.attribute_name|title
                                                 or '')}}</span>
                                         </li>
                                         <li>
-                                            <span class="text-base font-medium  ">{{_(selected_item.material|title) or ''}}</span>
+                                            <bdi class="text-base font-medium  ">{{_(selected_item.material|title) or ''}}</bdi>
                                         </li>
 
                                     </ul>
                                     {% if show_product_description %}
-                                    {{ product_description }}
+                                    <div dir="auto">{{ product_description }}</div>
                                     {% endif %}
                                 </div>
                             </div>

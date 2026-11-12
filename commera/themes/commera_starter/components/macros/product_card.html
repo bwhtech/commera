@@ -22,9 +22,9 @@
 	</div>
 	<div class="mt-3.5">
 		{% if theme.show_vendor %}
-		<p class="eyebrow mb-1 min-h-lh truncate">{{ product.vendor or "" }}</p>
+		<p class="eyebrow mb-1 min-h-lh truncate"><bdi>{{ product.vendor or "" }}</bdi></p>
 		{% endif %}
-		<h3 class="line-clamp-2 min-h-[2lh] font-sans text-md text-balance font-medium text-ink-gray-9 decoration-1 underline-offset-4 [overflow-wrap:anywhere] group-hover:underline">{{ product.title or _("Untitled product") }}</h3>
+		<h3 class="line-clamp-2 min-h-[2lh] font-sans text-md text-balance font-medium text-ink-gray-9 decoration-1 underline-offset-4 [overflow-wrap:anywhere] group-hover:underline"><bdi>{{ product.title or _("Untitled product") }}</bdi></h3>
 		<p class="mt-1.5 text-md">{{ price(product) }}</p>
 	</div>
 </a>

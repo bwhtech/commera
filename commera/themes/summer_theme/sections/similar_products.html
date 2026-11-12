@@ -14,7 +14,7 @@
 	<div class="dz-content">
 		<div>
 			{% if discount %}<span class="sale-title">{{ _("up to {0}% off").format(discount) }}</span>{% endif %}
-			<h6 class="title"><a href="{{ product_url | e }}">{{ product_name }}</a></h6>
+			<h6 class="title"><a href="{{ product_url | e }}"><bdi>{{ product_name }}</bdi></a></h6>
 		</div>
 		<h6 class="price">{{ card_price(product.price, product.compare_at_price, discount) }}</h6>
 	</div>

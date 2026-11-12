@@ -43,7 +43,7 @@
 											</div>
 											<div class="cart-content">
 												<h6 class="title">
-													<a :href="{{ url('/products') | tojson | forceescape }} + '/' + cart_item.item.route" x-text="{% if in_source_language %}cart_item.variant.item_name{% else %}cart_item.variant.title || cart_item.variant.item_name{% endif %}"></a>
+													<a :href="{{ url('/products') | tojson | forceescape }} + '/' + cart_item.item.route"><bdi x-text="{% if in_source_language %}cart_item.variant.item_name{% else %}cart_item.variant.title || cart_item.variant.item_name{% endif %}"></bdi></a>
 												</h6>
 												<div class="d-flex align-items-center">
 													<div class="btn-quantity light quantity-sm me-3">
@@ -97,7 +97,7 @@
 											</div>
 											<div class="cart-content">
 												<h6 class="title">
-													<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route" x-text="wishlist_item.title || wishlist_item.item_name"></a>
+													<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route"><bdi x-text="wishlist_item.title || wishlist_item.item_name"></bdi></a>
 													<span x-show="$store.wishlist.prices_ready && wishlist_item.available === false" x-cloak>{{ _("Unavailable") }}</span>
 												</h6>
 												<div class="d-flex align-items-center">

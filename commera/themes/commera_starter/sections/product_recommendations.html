@@ -2,7 +2,7 @@
 {% set products = commera.catalog.get_recommendations(product.handle, section.settings.limit | int or 4) if product is defined and product else [] %}
 {% if products %}
 <section class="section-x section-top">
-	<h2 class="section-title">{{ section.settings.title }}</h2>
+	<h2 class="section-title"><bdi>{{ section.settings.title }}</bdi></h2>
 	<div class="mt-8 grid grid-cols-2 gap-x-3 gap-y-10 md:mt-10 md:grid-cols-4 md:gap-x-6 md:gap-y-14">
 		{% for recommended in products %}
 		{{ product_card(recommended) }}

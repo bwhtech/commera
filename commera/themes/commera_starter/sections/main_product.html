@@ -37,9 +37,9 @@
 		<div class="lg:sticky lg:top-[calc(var(--header-height)+1.5rem)] lg:self-start lg:pt-2">
 			{{ breadcrumbs(breadcrumb_links) }}
 			{% if theme.show_vendor and product.vendor %}
-			<p class="eyebrow mt-5">{{ product.vendor }}</p>
+			<p class="eyebrow mt-5"><bdi>{{ product.vendor }}</bdi></p>
 			{% endif %}
-			<h1 class="{{ 'mt-1.5' if theme.show_vendor and product.vendor else 'mt-4' }} text-6xl leading-tight tracking-tight [overflow-wrap:anywhere] md:text-7xl">{{ product.title }}</h1>
+			<h1 class="{{ 'mt-1.5' if theme.show_vendor and product.vendor else 'mt-4' }} text-6xl leading-tight tracking-tight [overflow-wrap:anywhere] md:text-7xl"><bdi>{{ product.title }}</bdi></h1>
 			<p class="tabular mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
 				<span class="text-4xl font-semibold text-ink-gray-9"><span x-show="compare_at_price" class="sr-only">{{ _("Sale price") }}</span><span x-show="!compare_at_price" class="sr-only">{{ _("Price") }}</span><span x-text="money(price)">{{ commera.format.money(shown_price, product.currency) if shown_price is not none }}</span></span>
 				<span x-show="compare_at_price" class="text-lg text-ink-gray-6 line-through"><span class="sr-only">{{ _("Regular price") }}</span><span x-text="money(compare_at_price)"></span></span>
@@ -52,12 +52,12 @@
 
 			{% if colour_option %}
 			<div class="mt-8 border-t border-outline-gray-2 pt-6">
-				<p class="text-base font-medium text-ink-gray-9">{{ colour_option.name }}: <span class="font-normal text-ink-gray-6">{{ product.color }}</span></p>
+				<p class="text-base font-medium text-ink-gray-9">{{ colour_option.name }}: <bdi class="font-normal text-ink-gray-6">{{ product.color }}</bdi></p>
 				<div class="mt-3 flex flex-wrap gap-2">
 					{% for value in colour_option["values"] %}
 					<a href="{{ commera.format.product_url(value.handle) }}" {{ 'aria-current="page"' | safe if value.selected }}{{ ' aria-disabled="true"' | safe if not value.available }} class="chip">
 						{% if value.swatch and value.swatch.image %}{{ image(value.swatch.image, "", 64, "size-5 rounded-full object-cover") }}{% endif %}
-						{{ value.name }}
+						<bdi>{{ value.name }}</bdi>
 					</a>
 					{% endfor %}
 				</div>
@@ -66,10 +66,10 @@
 
 			{% if size_option %}
 			<div class="mt-6">
-				<p class="text-base font-medium text-ink-gray-9">{{ size_option.name }}: <span class="font-normal text-ink-gray-6" x-text="variant?.title ?? ''"></span></p>
+				<p class="text-base font-medium text-ink-gray-9">{{ size_option.name }}: <bdi class="font-normal text-ink-gray-6" x-text="variant?.title ?? ''"></bdi></p>
 				<div class="mt-3 flex flex-wrap gap-2">
 					{% for size_variant in product.variants %}
-					<button type="button" @click="size = variants[{{ loop.index0 }}].size" {{ "disabled" if not size_variant.available }} :aria-pressed="size === variants[{{ loop.index0 }}].size" class="chip">{{ size_variant.title }}</button>
+					<button type="button" @click="size = variants[{{ loop.index0 }}].size" {{ "disabled" if not size_variant.available }} :aria-pressed="size === variants[{{ loop.index0 }}].size" class="chip"><bdi>{{ size_variant.title }}</bdi></button>
 					{% endfor %}
 				</div>
 			</div>
@@ -104,13 +104,13 @@
 				{% if product.description_html %}
 				<div class="border-b border-outline-gray-2">
 					<button type="button" @click="open = open === 'description' ? '' : 'description'" :aria-expanded="open === 'description'" class="flex h-14 w-full items-center justify-between text-md font-medium">{{ _("Description") }}<span :class="open === 'description' && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
-					<div x-show="open === 'description'" x-collapse.duration.300ms><div class="rich-text max-w-[62ch] pb-5 text-p-md text-ink-gray-7">{{ product.description_html | safe }}</div></div>
+					<div x-show="open === 'description'" x-collapse.duration.300ms><div dir="auto" class="rich-text max-w-[62ch] pb-5 text-p-md text-ink-gray-7">{{ product.description_html | safe }}</div></div>
 				</div>
 				{% endif %}
 				{% for block in section.blocks %}
 				<div class="border-b border-outline-gray-2" data-accordion-key="block-{{ loop.index }}"{{ block.editor_attributes }}>
-					<button type="button" @click="open = open === 'block-{{ loop.index }}' ? '' : 'block-{{ loop.index }}'" :aria-expanded="open === 'block-{{ loop.index }}'" class="flex h-14 w-full items-center justify-between text-md font-medium">{{ _("Shipping & returns") if block.settings.title == "Shipping & returns" else block.settings.title | e }}<span :class="open === 'block-{{ loop.index }}' && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
-					<div x-cloak x-show="open === 'block-{{ loop.index }}'" x-collapse.duration.300ms><p class="max-w-[62ch] pb-5 text-p-md text-ink-gray-7">{{ _("Delivery and return options are shown at checkout.") if block.settings.text == "Delivery and return options are shown at checkout." else block.settings.text | e }}</p></div>
+					<button type="button" @click="open = open === 'block-{{ loop.index }}' ? '' : 'block-{{ loop.index }}'" :aria-expanded="open === 'block-{{ loop.index }}'" class="flex h-14 w-full items-center justify-between text-md font-medium"><bdi>{{ _("Shipping & returns") if block.settings.title == "Shipping & returns" else block.settings.title | e }}</bdi><span :class="open === 'block-{{ loop.index }}' && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></button>
+					<div x-cloak x-show="open === 'block-{{ loop.index }}'" x-collapse.duration.300ms><p dir="auto" class="max-w-[62ch] pb-5 text-p-md text-ink-gray-7">{{ _("Delivery and return options are shown at checkout.") if block.settings.text == "Delivery and return options are shown at checkout." else block.settings.text | e }}</p></div>
 				</div>
 				{% endfor %}
 			</div>
@@ -120,7 +120,7 @@
 	<div x-cloak x-show="add_button_passed" {{ bar() }} class="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-outline-gray-2 bg-surface-base/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-lg backdrop-blur lg:hidden">
 		{{ image((product.images or [None])[0], "", 160, "size-12 shrink-0 rounded-lg " ~ fit) }}
 		<div class="min-w-0 flex-1">
-			<p class="truncate text-base text-ink-gray-7">{{ product.title }}</p>
+			<p class="truncate text-base text-ink-gray-7"><bdi>{{ product.title }}</bdi></p>
 			<p class="tabular text-md font-semibold text-ink-gray-9" x-text="money(price)">{{ commera.format.money(shown_price, product.currency) if shown_price is not none }}</p>
 		</div>
 		<button type="button" @click="add_to_cart()" :disabled="variant && !variant.available" :aria-busy="busy === 'add_to_cart'" class="button-primary relative shrink-0 aria-busy:text-transparent">
