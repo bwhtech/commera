@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 import frappe
+from erpnext.selling.doctype.sales_order.mapper import make_delivery_note
 from erpnext.stock import get_item_details
 from frappe.utils.data import add_days, today
 
@@ -181,6 +182,36 @@ class TestCartPriceInserts(MarketCartTestCase):
 
 		self.assertEqual((sales_order.items[0].rate, sales_invoice.items[0].rate), (100, 100))
 		self.assertFalse(self.has_sale_price())
+
+	def test_a_delivery_note_from_a_cart_order_adds_no_sale_price(self):
+		ensure_fiscal_year()
+		sales_order = self.make_sales_order(0)
+		sales_order.submit()
+		delivery_note = make_delivery_note(sales_order.name).insert()
+
+		self.assertEqual(delivery_note.items[0].rate, 100)
+		self.assertFalse(self.has_sale_price())
+
+	def test_a_delivery_note_from_a_discounted_cart_line_keeps_the_sale_price(self):
+		ensure_fiscal_year()
+		self.set_single("Stock Settings", "update_existing_price_list_rate", 1)
+		self.set_single("Stock Settings", "update_price_list_based_on", "Rate")
+		sale_price = frappe.get_doc(
+			{
+				"doctype": "Item Price",
+				"item_code": self.regular_only,
+				"price_list": self.sale_price_list,
+				"price_list_rate": 100,
+			}
+		).insert()
+		sales_order = self.make_sales_order(0)
+		sales_order.items[0].rate = 75
+		sales_order.save()
+		sales_order.submit()
+		delivery_note = make_delivery_note(sales_order.name).insert()
+
+		self.assertEqual(delivery_note.items[0].rate, 75)
+		self.assertEqual(frappe.db.get_value("Item Price", sale_price.name, "price_list_rate"), 100)
 
 	def make_sales_order(self, ignore_pricing_rule):
 		sales_order = frappe.get_doc(

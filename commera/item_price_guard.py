@@ -50,10 +50,16 @@ def skip_cart_lines(insert_item_price):
 
 
 def is_cart_line(ctx) -> bool:
-	"""A line of a cart quotation or order, or of an invoice billed from a cart order."""
+	"""A line of a cart quotation or order, or of any document ERPNext maps from a cart order."""
 	if ctx.get("order_type"):
 		return ctx.order_type == CART_ORDER_TYPE
-	sales_order = ctx.get("sales_order")
-	return bool(sales_order) and (
-		frappe.db.get_value("Sales Order", sales_order, "order_type") == CART_ORDER_TYPE
-	)
+	return source_order_type(ctx) == CART_ORDER_TYPE
+
+
+def source_order_type(ctx) -> str | None:
+	# Every ERPNext mapper from a Sales Order (Delivery Note, Sales Invoice, Pick List, returns, and
+	# their chains) keeps `so_detail`, ERPNext's own join field for delivered and billed qty.
+	if not ctx.get("so_detail"):
+		return None
+	sales_order = frappe.db.get_value("Sales Order Item", ctx.so_detail, "parent")
+	return sales_order and frappe.db.get_value("Sales Order", sales_order, "order_type")
