@@ -1,18 +1,26 @@
-/* `.saudi-currency-symbol` and its font live in main.css, which compiles into a tailwind.css this
-   theme never loads. The standalone icons/saudi_riyal.svg is an SVG font Chrome and Firefox dropped. */
+/* Only the riyal and dirham signs, so a page downloads it only when it shows one. Block, not swap:
+   the fallback would draw the sign as a box. */
 @font-face {
-  font-family: saudi_riyal;
-  font-style: normal;
-  font-weight: 300;
-  font-display: swap;
-  src: url(/assets/commera/fonts/saudi_riyal/saudi_riyal.woff2) format("woff2");
+  font-family: "Commera Currency Signs";
+  font-display: block;
+  src: url(/assets/commera/fonts/currency-signs/currency-signs.woff2) format("woff2");
+  unicode-range: U+20C1, U+20C3;
 }
 
-.saudi-currency-symbol {
-  font-family: saudi_riyal;
-  font-weight: 300;
+/* style.css loads first and sets these on :root too. */
+:root {
+  --font-family-base: "Commera Currency Signs", DM Sans, sans-serif;
+  --font-family-title: "Commera Currency Signs", Lufga, sans-serif;
+  --bs-body-font-family: "Commera Currency Signs", "DM Sans", sans-serif;
 }
 
-.saudi-currency-symbol::before {
-  content: "\E900";
+/* A flex row makes the sign and the amount separate items, which a right-to-left page would swap.
+   SAMA and the CBUAE put the sign left of the amount on any page. */
+[dir="rtl"] :is(.d-flex, .d-inline-flex):has(> .currency-sign) {
+  direction: ltr;
+  justify-content: flex-end;
+}
+
+.currency-sign {
+  font-family: "Commera Currency Signs", sans-serif;
 }

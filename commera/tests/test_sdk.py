@@ -104,6 +104,8 @@ PUBLIC_NAMES = {
 		"date",
 		"image_url",
 		"money",
+		"money_html",
+		"signed_money_html",
 		"number",
 		"product_url",
 		"switch_url",

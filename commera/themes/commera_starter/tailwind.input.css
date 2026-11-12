@@ -11,14 +11,23 @@
 	src: url("/assets/frappe/css/fonts/inter/InterVariable.woff2") format("woff2");
 }
 
+/* Only the riyal and dirham signs, so a page downloads it only when it shows one. Block, not swap:
+   the fallback would draw the sign as a box. */
+@font-face {
+	font-family: "Commera Currency Signs";
+	font-display: block;
+	src: url("/assets/commera/fonts/currency-signs/currency-signs.woff2") format("woff2");
+	unicode-range: U+20C1, U+20C3;
+}
+
 @theme inline {
 	--color-*: initial;
 	--radius-*: initial;
 	--shadow-*: initial;
 	--text-*: initial;
 	--font-*: initial;
-	--font-sans: var(--theme-font, InterVar), "Inter Variable", Inter, sans-serif;
-	--font-heading: var(--theme-heading-font, var(--theme-font, InterVar)), "Inter Variable", Inter, sans-serif;
+	--font-sans: "Commera Currency Signs", var(--theme-font, InterVar), "Inter Variable", Inter, sans-serif;
+	--font-heading: "Commera Currency Signs", var(--theme-heading-font, var(--theme-font, InterVar)), "Inter Variable", Inter, sans-serif;
 	--font-weight-normal: 420;
 	--font-weight-medium: 500;
 	--font-weight-semibold: 600;

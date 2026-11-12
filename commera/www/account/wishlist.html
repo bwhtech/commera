@@ -31,7 +31,7 @@
 			</h4>
 			<div class="mt-2 text-sm md:text-base flex font-semibold">
 				<p x-show="$store.wishlist.prices_ready && item.available === false" x-cloak>{{ _("Unavailable") }}</p>
-				<p class="flex" x-show="$store.wishlist.prices_ready && item.sale_price != null" x-cloak>{{get_cart_currency().symbol}} <span x-text="commera.format.amount(item.sale_price, {{ get_cart_currency().config | tojson | forceescape }})"></span>
+				<p class="flex" x-show="$store.wishlist.prices_ready && item.sale_price != null" x-cloak>{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency().symbol}}{% if not get_cart_currency().is_sign %} {% endif %}<span x-text="commera.format.amount(item.sale_price, {{ get_cart_currency().config | tojson | forceescape }})"></span>{% if get_cart_currency().is_sign %}</bdi>{% endif %}
 				</p>
 			</div>
 		</div>

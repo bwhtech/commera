@@ -21,6 +21,8 @@ const DATE_STYLES = ['short', 'medium', 'long', 'full'];
 const NO_BREAK_SPACE = '\u00a0';
 // Intl wraps a right-to-left sign in these; the symbol placement already orders the parts.
 const BIDI_MARKS = /[\u061c\u200e\u200f]/g;
+// The Saudi riyal and UAE dirham signs, newer (Unicode 17, 18) than most fonts and screen readers.
+const CURRENCY_SIGNS = ['\u20c1', '\u20c3'];
 
 export class Formatter {
 	// The server resolves `money_formats` and `date_formats` (Formatter.as_config in Python).
@@ -44,28 +46,29 @@ export class Formatter {
 	}
 
 	money(amount, currency, precision) {
-		return this.place_symbol(
-			amount,
-			currency,
-			precision,
-			this.html_symbol(currency),
-		);
+		return this.join_html(this.digits(amount, currency, precision), currency);
 	}
 
-	// For plain text such as a confirm dialog: a symbol drawn with HTML becomes the currency code.
 	money_text(amount, currency, precision) {
+		const formatted = this.digits(amount, currency, precision);
 		const symbol = this.symbol(currency);
-		const code = currency || this.store_currency;
-		const text_symbol = symbol.includes('<')
-			? `${code}${NO_BREAK_SPACE}`
-			: symbol;
-		return this.place_symbol(amount, currency, precision, text_symbol);
+		if (this.is_sign(currency)) {
+			return `${symbol}${NO_BREAK_SPACE}${formatted.replace(/^-/, '−')}`;
+		}
+		const [sign, digits] = split_sign(formatted);
+		return this.join(sign, digits, symbol);
+	}
+
+	signed_money(amount, currency, minus = '−') {
+		if (this.is_sign(currency)) {
+			return this.money(amount, currency);
+		}
+		return (amount < 0 ? minus : '') + this.money(Math.abs(amount), currency);
 	}
 
 	// Report figures: 4.8L or 482.3K, in the language's words, with the number format's separators.
 	compact_money(amount, currency) {
-		const [sign, digits] = split_sign(this.compact(amount, this.number_format));
-		return this.join(sign, digits, this.html_symbol(currency));
+		return this.join_html(this.compact(amount, this.number_format), currency);
 	}
 
 	number(value, precision = 0) {
@@ -94,18 +97,15 @@ export class Formatter {
 		}).format(date);
 	}
 
-	place_symbol(amount, currency, precision, symbol) {
+	digits(amount, currency, precision) {
 		const { precision: money_precision, fraction_precision } =
 			this.money_format(currency);
-		const [sign, number] = split_sign(
-			format_number(
-				amount,
-				this.number_format,
-				precision ?? money_precision,
-				fraction_precision,
-			),
+		return format_number(
+			amount,
+			this.number_format,
+			precision ?? money_precision,
+			fraction_precision,
 		);
-		return this.join(sign, number, symbol);
 	}
 
 	join(sign, digits, symbol) {
@@ -115,17 +115,37 @@ export class Formatter {
 		return `${sign}${symbol}${digits}`;
 	}
 
-	html_symbol(currency) {
-		const symbol = this.symbol(currency);
-		if ((currency || this.store_currency) === 'SAR' && symbol === SAR_ICON) {
-			return SAR_ICON;
+	// SAMA and the CBUAE put a sign left of the amount, and of a minus sign, on any page.
+	join_html(formatted, currency) {
+		const symbol = this.html_symbol(currency);
+		if (this.is_sign(currency)) {
+			return `<bdi dir="ltr">${symbol}${formatted.replace(/^-/, '−')}</bdi>`;
 		}
-		return symbol.replace(/[&<>"']/g, (character) => HTML_ENTITIES[character]);
+		const [sign, digits] = split_sign(formatted);
+		return this.join(sign, digits, symbol);
+	}
+
+	// Screen readers may not know the new signs yet, so a sign reads as its currency code.
+	html_symbol(currency) {
+		const symbol = escape_html(this.symbol(currency));
+		if (!this.is_sign(currency)) {
+			return symbol;
+		}
+		const label = escape_html(this.code(currency));
+		return `<span class="currency-sign" role="img" aria-label="${label}">${symbol}</span>${NO_BREAK_SPACE}`;
+	}
+
+	is_sign(currency) {
+		return CURRENCY_SIGNS.includes(this.symbol(currency));
 	}
 
 	symbol(currency) {
-		const code = currency || this.store_currency;
+		const code = this.code(currency);
 		return this.currency_symbols[code] ?? `${code}${NO_BREAK_SPACE}`;
+	}
+
+	code(currency) {
+		return currency || this.store_currency;
 	}
 
 	// A currency the server did not resolve takes the format's precision and fmt_money's 100 units.
@@ -259,7 +279,6 @@ function group_digits(whole, group_size) {
 	return groups;
 }
 
-const SAR_ICON = '<span class="saudi-currency-symbol pe-0.5"></span>';
 const HTML_ENTITIES = {
 	'&': '&amp;',
 	'<': '&lt;',
@@ -267,3 +286,10 @@ const HTML_ENTITIES = {
 	'"': '&quot;',
 	"'": '&#x27;',
 };
+
+function escape_html(text) {
+	return String(text).replace(
+		/[&<>"']/g,
+		(character) => HTML_ENTITIES[character],
+	);
+}

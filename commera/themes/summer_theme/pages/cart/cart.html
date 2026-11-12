@@ -72,11 +72,11 @@
 										</td>
 										<td class="product-item-price">
 											<template x-if="cart_item.default_price && parseFloat(cart_item.default_price) !== $store.cart.price_of(cart_item)">
-												<span>{{ currency_symbol }}<span x-text="format_amount(cart_item.default_price)"></span></span>
+												<span>{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(cart_item.default_price)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</span>
 											</template>
 											{# The theme strikes through every span in this cell (old prices), so these use other elements. #}
 											<em x-show="cart_item.available === false">{{ _("Unavailable") }}</em>
-											<strong x-show="cart_item.available !== false">{{ currency_symbol }}<span x-text="format_amount($store.cart.price_of(cart_item))"></span></strong>
+											<strong x-show="cart_item.available !== false">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol | replace('<span ', '<bdi ') | replace('</span>', '</bdi>') }}<bdi x-text="format_amount($store.cart.price_of(cart_item))"></bdi>{% if cart_currency.is_sign %}</bdi>{% endif %}</strong>
 										</td>
 										<td class="product-item-quantity">
 											{# Written out by hand with bootstrap-touchspin's own class names, so style.css still shapes it. #}
@@ -96,7 +96,7 @@
 											</div>
 										</td>
 										<td class="product-item-totle">
-											<span x-show="cart_item.available !== false">{{ currency_symbol }}<span x-text="format_amount($store.cart.price_of(cart_item) * cart_item.qty)"></span></span>
+											<span x-show="cart_item.available !== false">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount($store.cart.price_of(cart_item) * cart_item.qty)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</span>
 										</td>
 										<td class="product-item-close">
 											<a href="javascript:void(0);" aria-label="{{ _('Remove') }}"
@@ -124,7 +124,7 @@
 						<div class="save-text" x-show="free_delivery_shortfall > 0">
 							<i class="icon feather icon-check-circle"></i>
 							<span class="m-l10">
-								{{ _("Add") }} {{ currency_symbol }}<span x-text="format_amount(free_delivery_shortfall)"></span>
+								{{ _("Add") }} {% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(free_delivery_shortfall)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}
 								{{ _("more to get free delivery") }}
 							</span>
 						</div>
@@ -133,19 +133,19 @@
 							<tbody>
 								<tr>
 									<td>{{ _("Subtotal") }} (<span x-text="$store.cart.selected_count"></span> {{ _("items") }})</td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(subtotal)"></span></td>
+									<td class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(subtotal)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</td>
 								</tr>
 								<template x-for="(discount, index) in $store.cart.discounts" :key="index">
 									<tr class="discount">
 										<td>{{ _("Discount") }}<span x-show="discount.label"><bdi x-text="` (${discount.label})`"></bdi></span></td>
-										<td class="price">-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span></td>
+										<td class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{{ currency_symbol }}<span x-text="format_amount(-discount.amount)"></span></bdi>{% else %}-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span>{% endif %}</td>
 									</tr>
 								</template>
 								<tr>
 									<td>{{ _("Delivery Charge") }}</td>
 									<td class="price">
 										<span x-show="$store.cart.delivery_status === 'free'">{{ _("Free") }}</span>
-										<span x-show="$store.cart.delivery_status === 'charged'">{{ currency_symbol }}<span x-text="format_amount(delivery_amount)"></span></span>
+										<span x-show="$store.cart.delivery_status === 'charged'">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(delivery_amount)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</span>
 										<span x-show="$store.cart.delivery_status === 'pending'">&hellip;</span>
 										<span x-show="$store.cart.delivery_status === 'failed'">&mdash;</span>
 									</td>
@@ -153,13 +153,13 @@
 								<template x-for="(tax, index) in $store.cart.priced?.taxes ?? []" :key="index">
 									<tr>
 										<td><bdi x-text="tax.description"></bdi></td>
-										<td class="price">{{ currency_symbol }}<span x-text="format_amount(tax.amount)"></span></td>
+										<td class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(tax.amount)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</td>
 									</tr>
 								</template>
 								<tr class="total" :aria-busy="!$store.cart.is_priced_current">
 									<td><h6 class="mb-0">{{ _("Total") }}</h6></td>
 									<td class="price">
-										<span x-show="$store.cart.is_priced_current">{{ currency_symbol }}<span x-text="format_amount(total)"></span></span>
+										<span x-show="$store.cart.is_priced_current">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(total)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</span>
 										<span x-show="!$store.cart.is_priced_current && $store.cart.pricing_status !== 'failed'">{{ _("Updating…") }}</span>
 										<a href="javascript:void(0);" x-show="!$store.cart.is_priced_current && $store.cart.pricing_status === 'failed'"
 											@click="$store.cart.load_priced()">{{ _("Retry") }}</a>

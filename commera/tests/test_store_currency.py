@@ -2,7 +2,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from commera import seo
-from commera.utils import get_currency_symbol, get_store_currency
+from commera.utils import CURRENCY_SIGNS, get_currency_symbol, get_store_currency
 
 
 class TestStoreCurrency(IntegrationTestCase):
@@ -60,5 +60,5 @@ class TestStoreCurrency(IntegrationTestCase):
 
 		symbol = frappe.get_cached_value("Currency", self.store_currency, "symbol")
 		self.assertEqual(seo.get_site_currency(), self.store_currency)
-		if self.store_currency != "SAR" and symbol:
+		if self.store_currency not in CURRENCY_SIGNS and symbol:
 			self.assertEqual(get_currency_symbol(), symbol)

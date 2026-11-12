@@ -308,7 +308,7 @@
 											<span><bdi x-text="{% if not in_source_language %}cart_item.variant.title || {% endif %}cart_item.variant.item_name"></bdi></span>
 											<span class="checkout-item-meta">{{ _("Qty") }} <span x-text="cart_item.qty"></span></span>
 										</h6>
-										<span class="price">{{ currency_symbol }}<span x-text="format_amount(cart_item.price * cart_item.qty)"></span></span>
+										<span class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(cart_item.price * cart_item.qty)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</span>
 									</div>
 								</div>
 							</template>
@@ -326,7 +326,7 @@
 											{% if item.size %}<bdi>{{ item.size }}</bdi> &middot; {% endif %}{{ _("Qty") }} {{ item.qty | int }}
 										</span>
 									</h6>
-									<span class="price">{{ currency_symbol }}{{ cart_currency.amount((item.amount or 0) + (item.custom_code_discount or 0) * (item.qty or 0)) }}</span>
+									<span class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}{{ cart_currency.amount((item.amount or 0) + (item.custom_code_discount or 0) * (item.qty or 0)) }}{% if cart_currency.is_sign %}</bdi>{% endif %}</span>
 								</div>
 							</div>
 						{% endfor %}
@@ -348,12 +348,12 @@
 							<tbody>
 								<tr class="subtotal">
 									<td>{{ _("Subtotal") }}</td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.items_total ?? active_summary.subtotal)">{{ cart_currency.amount(checkout_summary.items_total or checkout_summary.subtotal) }}</span></td>
+									<td class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(active_summary.items_total ?? active_summary.subtotal)">{{ cart_currency.amount(checkout_summary.items_total or checkout_summary.subtotal) }}</span>{% if cart_currency.is_sign %}</bdi>{% endif %}</td>
 								</tr>
 								<template x-for="(discount, index) in active_summary.discounts || []" :key="index">
 									<tr class="discount">
 										<td>{{ _("Discount") }}<span x-show="discount.label"><bdi x-text="` (${discount.label})`"></bdi></span></td>
-										<td class="price">-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span></td>
+										<td class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{{ currency_symbol }}<span x-text="format_amount(-discount.amount)"></span></bdi>{% else %}-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span>{% endif %}</td>
 									</tr>
 								</template>
 								<tr class="shipping">
@@ -364,38 +364,38 @@
 									</td>
 									<td class="price">
 										<span x-show="shipping_amount === 0" x-cloak>{{ _("Free") }}</span>
-										<span x-show="shipping_amount > 0" x-cloak>{{ currency_symbol }}<span x-text="format_amount(shipping_amount)"></span></span>
+										<span x-show="shipping_amount > 0" x-cloak>{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(shipping_amount)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</span>
 									</td>
 								</tr>
 								<template x-for="(discount, index) in active_summary.shipping_discounts || []" :key="index">
 									<tr class="discount">
 										<td>{{ _("Shipping discount") }}<span x-show="discount.label"><bdi x-text="` (${discount.label})`"></bdi></span></td>
-										<td class="price">-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span></td>
+										<td class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{{ currency_symbol }}<span x-text="format_amount(-discount.amount)"></span></bdi>{% else %}-{{ currency_symbol }}<span x-text="format_amount(discount.amount)"></span>{% endif %}</td>
 									</tr>
 								</template>
 								<template x-for="(tax, index) in active_summary.taxes" :key="index">
 									<tr class="tax">
 										<td><bdi x-text="tax.description"></bdi></td>
-										<td class="price">{{ currency_symbol }}<span x-text="format_amount(tax.amount)"></span></td>
+										<td class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(tax.amount)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</td>
 									</tr>
 								</template>
 								<template x-for="(fee, index) in active_summary.plugin_fees" :key="index">
 									<tr class="plugin-fee">
 										<td><bdi x-text="fee.description"></bdi></td>
-										<td class="price">{{ currency_symbol }}<span x-text="format_amount(fee.amount)"></span></td>
+										<td class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(fee.amount)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</td>
 									</tr>
 								</template>
 								<tr class="cod-charge" x-show="active_summary.cod_charge" x-cloak>
 									<td>{{ _("Cash on Delivery Fee") }}</td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.cod_charge)"></span></td>
+									<td class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(active_summary.cod_charge)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</td>
 								</tr>
 								<tr class="rounding-adjustment" x-show="active_summary.rounding_adjustment" x-cloak>
 									<td>{{ _("Rounding Adjustment") }}</td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.rounding_adjustment)"></span></td>
+									<td class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(active_summary.rounding_adjustment)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</td>
 								</tr>
 								<tr class="total">
 									<td>{{ _("Total") }}</td>
-									<td class="price"><span x-show="active_summary.total != null" x-cloak>{{ currency_symbol }}<span x-text="format_amount(active_summary.total)"></span></span></td>
+									<td class="price"><span x-show="active_summary.total != null" x-cloak>{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(active_summary.total)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</span></td>
 								</tr>
 							</tbody>
 						</table>
@@ -425,7 +425,7 @@
 														<span><bdi x-text="option.label || option.title"></bdi></span>
 														<span x-show="option.is_free"> &mdash; {{ _("Free") }}</span>
 														<span x-show="!option.is_free" x-cloak>
-															&mdash; {{ currency_symbol }}<span x-text="format_amount(option.amount)"></span>
+															&mdash; {% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(option.amount)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}
 														</span>
 													</label>
 												</div>
@@ -484,7 +484,7 @@
 												<p class="m-b0">{{ _("Pay in cash when your order is delivered.") }}</p>
 												<p class="m-b0 text-danger" x-show="summary.cash_on_delivery.cod_charge" x-cloak>
 													{{ _("A non-refundable cash on delivery fee of") }}
-													{{ currency_symbol }}<span x-text="format_amount(summary.cash_on_delivery.cod_charge)"></span> {{ _("will apply.") }}
+													{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span x-text="format_amount(summary.cash_on_delivery.cod_charge)"></span>{% if cart_currency.is_sign %}</bdi>{% endif %} {{ _("will apply.") }}
 												</p>
 											</div>
 										</div>

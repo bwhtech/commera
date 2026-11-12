@@ -34,6 +34,8 @@ IN_CLAUSE_CHUNK_SIZE = 1000
 # Grid sorts and filters on the card price: these need the price inside the grid query.
 PRICE_SORTS = ("price_low", "price_high", "discount")
 PRICE_FILTERS = ("has_discount", "min_price", "max_price")
+# Unicode 17 and 18 signs, newer than the Currency records. public/fonts/currency-signs draws them.
+CURRENCY_SIGNS = {"SAR": "\u20c1", "AED": "\u20c3"}
 
 
 def get_untranslated_address_name(address):
@@ -488,9 +490,8 @@ def get_store_currency(company: str | None = None) -> str:
 
 def get_currency_symbol(currency: str | None = None):
 	currency = currency or get_store_currency()
-	# Riyal has no glyph in the fonts the themes ship, so SAR alone borrows the icon font.
-	if currency == "SAR":
-		return '<span class="saudi-currency-symbol pe-0.5"></span>'
+	if currency in CURRENCY_SIGNS:
+		return CURRENCY_SIGNS[currency]
 	# A code needs a gap before the amount; a plain space collapses inside the flex price wrappers.
 	return frappe.get_cached_value("Currency", currency, "symbol") or f"{currency}\u00a0"
 

@@ -51,7 +51,7 @@
 	<div x-show="show_delivery_charges && $store.cart.free_delivery_shortfall > 0" x-transition>
 		{% call banner() %}
 		<div class="text-sm text-secondary-accent w-full text-center">
-			{{_('Add items worth')}} {{ cart_currency.symbol }} <span x-text="commera.format.amount(($store.cart.free_delivery_shortfall || 0), {{ cart_currency.config | tojson | forceescape }})"></span>
+			{{_('Add items worth')}} {% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{% if not cart_currency.is_sign %} {% endif %}<span x-text="commera.format.amount(($store.cart.free_delivery_shortfall || 0), {{ cart_currency.config | tojson | forceescape }})"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}
 			{{_('more to get free delivery')}}
 		</div>
 		{% endcall %}
@@ -67,7 +67,7 @@
 		<h1 class="mb-4 text-3xl font-semibold">{{ _('Your bag') }}</h1>
 		<h3 class="text-lg font-medium flex">
 			{{ _('Total') }} (<span x-text="$store.cart.selected_count"></span><span class=""> &nbsp; {{ _('items') }}) </span>
-			<span x-show="$store.cart.is_priced_current">{{ cart_currency.symbol }} <span x-text="commera.format.amount(cart_total, {{ cart_currency.config | tojson | forceescape }})" class="ps-0.5"></span></span>
+			<span x-show="$store.cart.is_priced_current">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{% if not cart_currency.is_sign %} {% endif %}<span x-text="commera.format.amount(cart_total, {{ cart_currency.config | tojson | forceescape }})" class="ps-0.5"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</span>
 			<span x-show="!$store.cart.is_priced_current" class="ps-0.5">{{ _("Updating…") }}</span>
 		</h3>
 	</div>
@@ -112,13 +112,13 @@
 									<div class="text-sm font-medium mt-2 md:mt-9 flex">
 										<template x-if="cart_item.default_price && parseFloat(cart_item.default_price) !== $store.cart.price_of(cart_item)">
 										<p class="text-sm font-medium line-through text-strikethrough me-2 flex">
-											{{ cart_currency.symbol }}
-											<span x-text="commera.format.amount(parseFloat(cart_item.default_price), {{ cart_currency.config | tojson | forceescape }})"></span>
+											{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{% if not cart_currency.is_sign %}
+											{% endif %}<span x-text="commera.format.amount(parseFloat(cart_item.default_price), {{ cart_currency.config | tojson | forceescape }})"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}
 										</p>
 									</template>
 									&nbsp;
 									<p x-show="cart_item.available === false">{{ _("Unavailable") }}</p>
-									<p class="flex" x-show="cart_item.available !== false">{{ cart_currency.symbol }} <span x-text="commera.format.amount($store.cart.price_of(cart_item), {{ cart_currency.config | tojson | forceescape }})"></span>
+									<p class="flex" x-show="cart_item.available !== false">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{% if not cart_currency.is_sign %} {% endif %}<span x-text="commera.format.amount($store.cart.price_of(cart_item), {{ cart_currency.config | tojson | forceescape }})"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}
 											
 										</p>
 								</div>
@@ -208,13 +208,13 @@
 					<p class="text-base font-normal text-gray-400"><span x-text="$store.cart.selected_count"></span> {{
 						_('items') }}</p>
 
-					<p class="text-base font-medium flex">{{ cart_currency.symbol }}<span x-text="commera.format.amount(($store.cart.priced?.items_total ?? $store.cart.total), {{ cart_currency.config | tojson | forceescape }})" class="me-2"></span>
+					<p class="text-base font-medium flex">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}<span x-text="commera.format.amount(($store.cart.priced?.items_total ?? $store.cart.total), {{ cart_currency.config | tojson | forceescape }})" class="me-2"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}
 						</p>
 				</div>
 				<template x-for="(tax, index) in $store.cart.priced?.taxes ?? []" :key="index">
 					<div class="mb-3 flex items-center justify-between">
 						<span><bdi x-text="tax.description"></bdi></span>
-						<span>{{ cart_currency.symbol }} <span x-text="commera.format.amount(tax.amount, {{ cart_currency.config | tojson | forceescape }})"></span></span>
+						<span>{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{% if not cart_currency.is_sign %} {% endif %}<span x-text="commera.format.amount(tax.amount, {{ cart_currency.config | tojson | forceescape }})"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}</span>
 					</div>
 				</template>
 				{{ discount_code_chips("$store.cart.discount_codes", "$store.cart.saving_code", "$store.cart.remove_discount_code", classes="mb-3") }}
@@ -223,13 +223,13 @@
 						<p class="text-base font-normal text-gray-400">
 							{{ _('Discount') }}<span x-show="discount.label"><bdi x-text="` (${discount.label})`"></bdi></span>
 						</p>
-						<p class="text-base font-medium flex text-green-700">&minus;{{ cart_currency.symbol }}<span x-text="commera.format.amount(discount.amount, {{ cart_currency.config | tojson | forceescape }})"></span></p>
+						<p class="text-base font-medium flex text-green-700">{% if cart_currency.is_sign %}<bdi dir="ltr">{{ cart_currency.symbol }}<span x-text="commera.format.amount(-discount.amount, {{ cart_currency.config | tojson | forceescape }})"></span></bdi>{% else %}&minus;{{ cart_currency.symbol }}<span x-text="commera.format.amount(discount.amount, {{ cart_currency.config | tojson | forceescape }})"></span>{% endif %}</p>
 					</div>
 				</template>
 				<div class="mb-3 flex items-center justify-between">
 					<p class="text-base font-normal text-gray-400 capitalize">{{ _("non-refundable delivery charge") }}</p>
 					<div x-show="show_delivery_charges && $store.cart.selected_count >0">
-						<p class="text-base font-medium flex">{{ cart_currency.symbol }}<span x-text="commera.format.amount(delivery_charge, {{ cart_currency.config | tojson | forceescape }})" ></span>
+						<p class="text-base font-medium flex">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}<span x-text="commera.format.amount(delivery_charge, {{ cart_currency.config | tojson | forceescape }})" ></span>{% if cart_currency.is_sign %}</bdi>{% endif %}
 							</p>
 					</div>
 					<div x-show="delivery_charge <= 0 || $store.cart.delivery_status === 'free'">
@@ -242,7 +242,7 @@
 				<div class="mb-3 flex items-center justify-between">
 					<p class="text-base font-normal text-gray-400"> {{
 						_('Total') }}</p>
-					<p class="text-base font-medium flex" x-show="$store.cart.is_priced_current">	{{ cart_currency.symbol }}<span x-text="commera.format.amount(cart_total, {{ cart_currency.config | tojson | forceescape }})"></span>
+					<p class="text-base font-medium flex" x-show="$store.cart.is_priced_current">	{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}<span x-text="commera.format.amount(cart_total, {{ cart_currency.config | tojson | forceescape }})"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}
 					</p>
 					<p class="text-base font-medium flex" x-show="!$store.cart.is_priced_current && $store.cart.pricing_status !== 'failed'">{{ _("Updating…") }}</p>
 					<button type="button" class="text-base font-medium underline cursor-pointer" x-show="!$store.cart.is_priced_current && $store.cart.pricing_status === 'failed'"

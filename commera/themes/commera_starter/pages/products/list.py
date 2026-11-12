@@ -7,7 +7,7 @@ from frappe.utils.data import cint, cstr, flt
 
 from commera import seo
 from commera.sdk import catalog
-from commera.sdk.format import money, url
+from commera.sdk.format import money_html, url
 
 PAGE_SIZE = 24
 LIST_FILTERS = ("sizes", "colors", "brands")
@@ -106,9 +106,12 @@ def get_chips(context):
 		for value in context.selected[key]
 	]
 	if context.selected.min is not None or context.selected.max is not None:
+		price_label = get_price_label(context.selected, context.listing["facets"]["price"]["currency"])
 		chips.append(
 			{
-				"label": get_price_label(context.selected, context.listing["facets"]["price"]["currency"]),
+				# The price label is formatter HTML (sign plus a hidden code); other labels are plain text.
+				"label": frappe.utils.strip_html(price_label),
+				"html": price_label,
 				"url": get_listing_url(context, min=None, max=None),
 			}
 		)
@@ -119,10 +122,12 @@ def get_chips(context):
 
 def get_price_label(selected, currency):
 	if selected.max is None:
-		return _("From {0}").format(money(selected.min, currency))
+		return frappe.utils.escape_html(_("From {0}")).format(money_html(selected.min, currency))
 	if selected.min is None:
-		return _("Up to {0}").format(money(selected.max, currency))
-	return _("{0} to {1}").format(money(selected.min, currency), money(selected.max, currency))
+		return frappe.utils.escape_html(_("Up to {0}")).format(money_html(selected.max, currency))
+	return frappe.utils.escape_html(_("{0} to {1}")).format(
+		money_html(selected.min, currency), money_html(selected.max, currency)
+	)
 
 
 def add_seo(context):

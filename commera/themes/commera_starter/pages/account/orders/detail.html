@@ -12,7 +12,7 @@
 {% set detail_config = {"name": order.name, "key": order_key, "is_owner": is_owner, "is_cancelled": order.is_cancelled} %}
 
 {% macro summary_row(label, amount, class="", sign="") %}
-<div class="{{ class }} flex justify-between gap-3"><dt class="min-w-0 [overflow-wrap:anywhere]"><bdi>{{ label | e }}</bdi></dt><dd class="shrink-0 whitespace-nowrap"><bdi>{{ sign }}{{ commera.format.money(amount, order.currency) }}</bdi></dd></div>
+<div class="{{ class }} flex justify-between gap-3"><dt class="min-w-0 [overflow-wrap:anywhere]"><bdi>{{ label | e }}</bdi></dt><dd class="shrink-0 whitespace-nowrap"><bdi>{{ commera.format.signed_money_html(-amount, order.currency) if sign else commera.format.money_html(amount, order.currency) }}</bdi></dd></div>
 {%- endmacro %}
 
 {% block body %}
@@ -83,10 +83,10 @@
 				<div class="min-w-0 flex-1">
 					<div class="grid gap-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-3">
 						<p class="text-md text-balance text-ink-gray-9 [overflow-wrap:anywhere]"><bdi>{{ line.title }}</bdi></p>
-						<p class="tabular whitespace-nowrap text-md text-ink-gray-9"><bdi>{{ commera.format.money(line.amount, order.currency) }}</bdi></p>
+						<p class="tabular whitespace-nowrap text-md text-ink-gray-9"><bdi>{{ commera.format.money_html(line.amount, order.currency) }}</bdi></p>
 					</div>
 					{% if line.size %}<p class="mt-1 text-base text-ink-gray-6 [overflow-wrap:anywhere]">{{ _("Size") }} <bdi>{{ line.size }}</bdi></p>{% endif %}
-					<p class="tabular mt-0.5 text-base text-ink-gray-6"><bdi class="whitespace-nowrap">{{ line.qty | int }} × {{ commera.format.money(line.rate, order.currency) }}</bdi></p>
+					<p class="tabular mt-0.5 text-base text-ink-gray-6"><bdi class="whitespace-nowrap">{{ line.qty | int }} × {{ commera.format.money_html(line.rate, order.currency) }}</bdi></p>
 				</div>
 			</li>
 			{% endfor %}
@@ -103,7 +103,7 @@
 			{{ summary_row(charge.description, charge.amount) }}
 			{% endfor %}
 			{% if order.rounded_total and order.rounding_adjustment %}{{ summary_row(_("Rounding"), order.rounding_adjustment | abs, sign="−" if order.rounding_adjustment < 0 else "") }}{% endif %}
-			<div class="mt-2 flex justify-between gap-3 border-t border-outline-gray-2 pt-4 text-2xl font-medium text-ink-gray-9"><dt class="min-w-0 [overflow-wrap:anywhere]">{{ _("Order total") }}</dt><dd class="shrink-0 whitespace-nowrap"><bdi>{{ commera.format.money(order.rounded_total or order.grand_total, order.currency) }}</bdi></dd></div>
+			<div class="mt-2 flex justify-between gap-3 border-t border-outline-gray-2 pt-4 text-2xl font-medium text-ink-gray-9"><dt class="min-w-0 [overflow-wrap:anywhere]">{{ _("Order total") }}</dt><dd class="shrink-0 whitespace-nowrap"><bdi>{{ commera.format.money_html(order.rounded_total or order.grand_total, order.currency) }}</bdi></dd></div>
 		</dl>
 	</section>
 

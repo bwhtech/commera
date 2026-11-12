@@ -6,14 +6,14 @@ from frappe.tests import IntegrationTestCase
 from commera.api.storefront import products as products_api
 from commera.localization import formatter as formatter_module
 from commera.localization import pin_localization, resolve
-from commera.localization.formatter import Formatter
+from commera.localization.formatter import Formatter, get_html_currency_symbol
 from commera.localization.languages import Language
 from commera.sdk import cart as cart_sdk
 from commera.sdk import catalog
 from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_markets import UAE, make_market, use_markets
 from commera.tests.test_product_details import ProductDetailPriceTestCase
-from commera.utils import get_currency_symbol, get_product_list_qb
+from commera.utils import CURRENCY_SIGNS, get_product_list_qb
 
 MARKET_CURRENCY = "AED"
 
@@ -26,6 +26,15 @@ def make_price_list(name, currency, selling=1):
 	price_list.buying = 0 if selling else 1
 	price_list.enabled = 1
 	return price_list.insert(ignore_permissions=True).name
+
+
+def starter_money(currency: str, formatted: str) -> str:
+	"""Formatter.money in a left-to-right language; a riyal or dirham sign stays left of a minus sign."""
+	symbol = get_html_currency_symbol(currency)
+	if currency in CURRENCY_SIGNS:
+		return f'<bdi dir="ltr">{symbol}{formatted}</bdi>'
+	sign = "-" if formatted.startswith("-") else ""
+	return f"{sign}{symbol}{formatted.removeprefix('-')}"
 
 
 def get_other_currency():
@@ -221,7 +230,7 @@ class TestMarketProductPrices(MarketPriceTestCase):
 		english = Language("en", "English", "English", "ltr")
 		with patch.object(formatter_module, "get_money_precision", lambda currency: 2):
 			money = Formatter(english, "#,###.##").money(product["price"], product["currency"])
-		self.assertEqual(money, f"{get_currency_symbol(self.currency)}1,250.00")
+		self.assertEqual(money, starter_money(self.currency, "1,250.00"))
 
 
 class TestMarketProductListing(MarketPriceTestCase):

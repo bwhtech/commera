@@ -10,32 +10,30 @@ from commera.product_detail import get_product_detail
 from commera.tests.test_cart_currency import CartCurrencyTestCase
 from commera.www.cart.checkout import set_cart_context
 
+# The market's AED draws a sign, so the hostile symbol goes on a currency that keeps its record's.
+PLAIN_CURRENCY = "USD"
+
 
 class TestStorefrontCurrency(CartCurrencyTestCase):
-	def test_only_the_hardcoded_sar_icon_is_trusted_html(self):
+	def test_every_symbol_is_escaped_text(self):
 		symbol = '<b title="currency">&</b>'
-		previous = frappe.db.get_value("Currency", self.currency, "symbol")
-		self.addCleanup(self.restore_symbol, previous)
-		frappe.db.set_value("Currency", self.currency, "symbol", symbol)
-		frappe.clear_document_cache("Currency", self.currency)
-		self.addCleanup(frappe.clear_document_cache, "Currency", self.currency)
+		self.set_symbol(symbol)
 		self.open_request("/en-ae/cart")
-		self.assertEqual(CartCurrency.of().symbol, escape(symbol))
-		self.assertEqual(
-			CartCurrency.of({"currency": "SAR"}).symbol,
-			'<span class="saudi-currency-symbol pe-0.5"></span>',
-		)
+		self.assertEqual(CartCurrency.of({"currency": PLAIN_CURRENCY}).symbol, escape(symbol))
+		for currency, sign in (("SAR", "\u20c1"), ("AED", "\u20c3")):
+			with self.subTest(currency=currency):
+				self.assertEqual(
+					CartCurrency.of({"currency": currency}).symbol,
+					f'<span class="currency-sign" role="img" aria-label="{currency}">{sign}</span>\u00a0',
+				)
 
-	def test_starter_money_escapes_symbols_and_preserves_sar_icon(self):
+	def test_starter_money_escapes_symbols_and_labels_the_signs(self):
 		self.open_request("/en-ae/products")
 		symbol = '<img src=x onerror=alert(1)> & "currency"'
-		previous = frappe.db.get_value("Currency", self.currency, "symbol")
-		self.addCleanup(self.restore_symbol, previous)
-		frappe.db.set_value("Currency", self.currency, "symbol", symbol)
-		frappe.clear_document_cache("Currency", self.currency)
+		self.set_symbol(symbol)
 		for currency, expected in (
-			(self.currency, escape(symbol)),
-			("SAR", '<span class="saudi-currency-symbol pe-0.5"></span>'),
+			(PLAIN_CURRENCY, escape(symbol)),
+			("SAR", '<span class="currency-sign" role="img" aria-label="SAR">\u20c1</span>\u00a0'),
 		):
 			with self.subTest(currency=currency):
 				html = frappe.render_template(
@@ -49,9 +47,14 @@ class TestStorefrontCurrency(CartCurrencyTestCase):
 				self.assertEqual(html.count(expected), 2)
 				self.assertNotIn("<img", html)
 
+	def set_symbol(self, symbol):
+		self.addCleanup(self.restore_symbol, frappe.db.get_value("Currency", PLAIN_CURRENCY, "symbol"))
+		frappe.db.set_value("Currency", PLAIN_CURRENCY, "symbol", symbol)
+		frappe.clear_document_cache("Currency", PLAIN_CURRENCY)
+
 	def restore_symbol(self, symbol):
-		frappe.db.set_value("Currency", self.currency, "symbol", symbol)
-		frappe.clear_document_cache("Currency", self.currency)
+		frappe.db.set_value("Currency", PLAIN_CURRENCY, "symbol", symbol)
+		frappe.clear_document_cache("Currency", PLAIN_CURRENCY)
 
 	def test_shipping_amount_and_threshold_are_in_cart_currency(self):
 		self.open_request("/en-ae/cart")
@@ -98,7 +101,7 @@ class TestStorefrontCurrency(CartCurrencyTestCase):
 			"{{ card_price(123456.78, 130000, 5) }}",
 			{},
 		)
-		self.assertEqual(html, f"{self.market_symbol}1,23,456.78<del>{self.market_symbol}1,30,000.00</del>")
+		self.assertEqual(html, f"{self.priced('1,23,456.78')}<del>{self.priced('1,30,000.00')}</del>")
 
 	def test_order_item_macro_uses_order_currency_outside_its_market(self):
 		self.open_request("/account/orders")
@@ -107,8 +110,13 @@ class TestStorefrontCurrency(CartCurrencyTestCase):
 			'{{ dashboard_product("", "brand", "item", 1234.5, currency=currency) }}',
 			{"currency": self.currency},
 		)
-		self.assertIn(f"{self.market_symbol} 1,234.50", html)
+		self.assertIn(self.priced("1,234.50"), html)
 		self.assertNotIn(self.store_symbol, html)
+
+	def priced(self, amount):
+		# The signs (SAR, AED) come wrapped in an ltr bdi; other symbols are plain.
+		text = f"{self.market_symbol}{amount}"
+		return f'<bdi dir="ltr">{text}</bdi>' if "currency-sign" in text else text
 
 	def test_order_page_totals_use_order_currency_outside_its_market(self):
 		self.open_request("/account/orders")

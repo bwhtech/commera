@@ -1,8 +1,8 @@
 /* This file contains all the theme variables regarding the website it automatically extends and overwrites the tailwindcss default variables */
 @theme {
     
-    --default-font-family: "OpenSans";
-    --font-sans: "OpenSans", system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --default-font-family: "Commera Currency Signs", "OpenSans";
+    --font-sans: "Commera Currency Signs", "OpenSans", system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     --font-serif: "doto", Georgia, Cambria, "Times New Roman", Times, serif;
     --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 	--bg-rahul : #334432;

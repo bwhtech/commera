@@ -11,6 +11,7 @@ from commera.localization.formatter import (
 	get_fraction_precision,
 	get_html_currency_symbol,
 	get_money_precision,
+	is_currency_sign,
 )
 from commera.localization.market_prices import MarketPrices
 from commera.utils import get_store_currency
@@ -39,16 +40,22 @@ class CartCurrency:
 		)
 
 	@property
+	def is_sign(self) -> bool:
+		return is_currency_sign(self.code)
+
+	@property
 	def config(self) -> dict:
 		"""The rules `commera.format.amount` needs to print the same digits in the browser."""
 		return {
 			"precision": self.precision,
 			"fraction_precision": self.fraction_precision,
 			"number_format": self.number_format,
+			"is_sign": self.is_sign,
 		}
 
 	def amount(self, value: float | None) -> str:
-		return format_money_digits(value, self.precision, self.number_format, self.code)
+		formatted = format_money_digits(value, self.precision, self.number_format, self.code)
+		return formatted.replace("-", "\u2212", 1) if self.is_sign else formatted
 
 
 def get_cart_currency(quotation=None) -> CartCurrency:

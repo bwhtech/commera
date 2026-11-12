@@ -150,8 +150,8 @@
 								<span x-show="option.description" class="text-ink-gray-6"><bdi x-text="option.description"></bdi></span>
 							</span>
 							<span class="flex shrink-0 gap-2 text-md">
-								<span x-show="option.original_amount" x-text="money(option.original_amount)" class="text-ink-gray-6 line-through"></span>
-								<span x-show="option.is_free">{{ _("Free") }}</span><span x-show="!option.is_free" x-text="money(option.amount)"></span>
+								<span x-show="option.original_amount" x-html="money(option.original_amount)" class="text-ink-gray-6 line-through"></span>
+								<span x-show="option.is_free">{{ _("Free") }}</span><span x-show="!option.is_free" x-html="money(option.amount)"></span>
 							</span>
 							{{ spinner("busy === 'shipping:' + option.id", "size-5 self-center text-ink-gray-6") }}
 						</label>
@@ -175,7 +175,7 @@
 				<p x-show="error && step === 'payment'" x-text="error" role="alert" class="text-base text-ink-red-7"></p>
 				{{ checkout_blocked_notice() }}
 				<button type="submit" :disabled="busy || needs_shipping_option || !payment_method || $store.cart.has_unavailable" :aria-busy="busy === 'pay'" class="button-primary relative w-full">
-					{{ _("Pay") }}&nbsp;<span x-text="money(total)"></span>
+					{{ _("Pay") }}&nbsp;<span x-html="money(total)"></span>
 					{{ spinner("busy === 'pay'", "size-5 text-on-brand") }}
 				</button>
 			</form>
@@ -184,7 +184,7 @@
 		<aside class="order-first rounded-2xl bg-surface-gray-1 p-6 lg:sticky lg:top-[calc(var(--header-height)+1.5rem)] lg:order-none">
 			<button type="button" @click="summary_open = !summary_open" :aria-expanded="summary_open" class="flex min-h-12 w-full items-center justify-between gap-3 lg:hidden">
 				<span class="flex min-w-0 items-center gap-1 text-start text-md">{{ _("Order summary") }}<span :class="summary_open && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></span>
-				<span class="tabular text-2xl font-medium" x-text="money(total)"></span>
+				<span class="tabular text-2xl font-medium" x-html="money(total)"></span>
 			</button>
 			<div :class="summary_open || 'max-lg:hidden'" class="max-lg:mt-5">
 				<h2 class="mb-5 text-3xl max-lg:hidden">{{ _("Order summary") }}</h2>
@@ -192,33 +192,33 @@
 				{% call order_summary(total="total") %}
 				<div class="flex justify-between gap-3">
 					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Shipping") }}</span>
-					<span x-show="shipping_pending" class="shrink-0 whitespace-nowrap text-ink-gray-6">{{ _("Choose an option") }}</span><span x-show="!shipping_pending" class="shrink-0 whitespace-nowrap" x-text="money(shipping_amount)"></span>
+					<span x-show="shipping_pending" class="shrink-0 whitespace-nowrap text-ink-gray-6">{{ _("Choose an option") }}</span><span x-show="!shipping_pending" class="shrink-0 whitespace-nowrap" x-html="money(shipping_amount)"></span>
 				</div>
 				<template x-for="(discount, index) in shipping_pending ? [] : summary?.shipping_discounts ?? []" :key="index">
 					<div class="flex justify-between gap-3 text-ink-gray-7">
 						<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Delivery discount") }}<span x-show="discount.label"><bdi x-text="' (' + discount.label + ')'"></bdi></span></span>
-						<span dir="ltr" class="shrink-0 whitespace-nowrap" x-text="'−' + money(discount.amount)"></span>
+						<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="signed_money(-discount.amount)"></span>
 					</div>
 				</template>
 				<template x-for="(fee, index) in summary?.plugin_fees ?? []" :key="index">
 					<div class="flex justify-between gap-3">
 						<span class="min-w-0 [overflow-wrap:anywhere]"><bdi x-text="fee.description"></bdi></span>
-						<span class="shrink-0 whitespace-nowrap" x-text="money(fee.amount)"></span>
+						<span class="shrink-0 whitespace-nowrap" x-html="money(fee.amount)"></span>
 					</div>
 				</template>
 				<template x-for="(tax, index) in summary?.taxes ?? []" :key="index">
 					<div class="flex justify-between gap-3">
 						<span class="min-w-0 [overflow-wrap:anywhere]"><bdi x-text="tax.description"></bdi></span>
-						<span class="shrink-0 whitespace-nowrap" x-text="money(tax.amount)"></span>
+						<span class="shrink-0 whitespace-nowrap" x-html="money(tax.amount)"></span>
 					</div>
 				</template>
 				<div x-show="summary?.cod_charge" class="flex justify-between gap-3">
 					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Cash on delivery fee") }}</span>
-					<span class="shrink-0 whitespace-nowrap" x-text="money(summary?.cod_charge)"></span>
+					<span class="shrink-0 whitespace-nowrap" x-html="money(summary?.cod_charge)"></span>
 				</div>
 				<div x-show="summary?.rounding_adjustment" class="flex justify-between gap-3">
 					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Rounding") }}</span>
-					<span dir="ltr" class="shrink-0 whitespace-nowrap" x-text="(summary?.rounding_adjustment < 0 ? '−' : '') + money(Math.abs(summary?.rounding_adjustment ?? 0))"></span>
+					<span dir="ltr" class="shrink-0 whitespace-nowrap" x-html="signed_money(summary?.rounding_adjustment ?? 0)"></span>
 				</div>
 				{% endcall %}
 			</div>

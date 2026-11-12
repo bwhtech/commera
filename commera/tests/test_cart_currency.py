@@ -10,10 +10,10 @@ from commera.api.server_cart import get_server_cart, sync_server_cart
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.guest import GUEST_CART_COOKIE
 from commera.localization.cart_currency import CartCurrency
+from commera.localization.formatter import get_html_currency_symbol
 from commera.shop_themes.doctype.shop_theme.shop_theme import build_theme_context, render_theme_context
 from commera.shop_themes.theme_resolver import ThemePageRenderer
 from commera.tests.test_market_cart import MarketCartTestCase
-from commera.utils import get_currency_symbol
 from commera.www.cart.permalink import get_cart_lines
 
 SUMMER = "Summer Theme"
@@ -30,8 +30,9 @@ class CartCurrencyTestCase(MarketCartTestCase):
 		self.set_default("currency_precision", "2")
 		self.set_default("number_format", "#,###.##")
 		self.item_code = self.item("CARTCURRENCY", market_sale=3499)
-		self.market_symbol = get_currency_symbol(self.currency)
-		self.store_symbol = get_currency_symbol(self.store_currency)
+		# What a page places before an amount: AED's sign comes labelled with its code.
+		self.market_symbol = get_html_currency_symbol(self.currency)
+		self.store_symbol = get_html_currency_symbol(self.store_currency)
 		self.sign_in_shopper()
 		self.add(self.item_code)
 
@@ -126,15 +127,22 @@ class TestSummerCartCurrency(CartCurrencyTestCase):
 
 	def summary_subtotal(self, symbol, amount):
 		return (
-			f'<td class="price">{symbol}<span x-text="format_amount(active_summary.items_total'
-			f' ?? active_summary.subtotal)">{amount}</span></td>'
+			f'<td class="price">{self.pair_start(symbol)}{symbol}<span x-text="format_amount(active_summary.items_total'
+			f' ?? active_summary.subtotal)">{amount}</span>{self.pair_end(symbol)}</td>'
 		)
 
 	def cart_line_price(self, symbol):
-		return f'<strong x-show="cart_item.available !== false">{symbol}<span x-text="format_amount($store.cart.price_of(cart_item))">'
+		symbol_element = symbol.replace("<span ", "<bdi ").replace("</span>", "</bdi>")
+		return f'<strong x-show="cart_item.available !== false">{self.pair_start(symbol)}{symbol_element}<bdi x-text="format_amount($store.cart.price_of(cart_item))">'
 
 	def drawer_total(self, symbol):
-		return f'<h5 class="mb-0">{symbol}<span x-text="commera.format.amount($store.cart.total,'
+		return f'<h5 class="mb-0">{self.pair_start(symbol)}{symbol}<span x-text="commera.format.amount($store.cart.total,'
+
+	def pair_start(self, symbol):
+		return '<bdi dir="ltr">' if 'class="currency-sign"' in symbol else ""
+
+	def pair_end(self, symbol):
+		return "</bdi>" if 'class="currency-sign"' in symbol else ""
 
 
 class TestLegacyCartCurrency(CartCurrencyTestCase):
@@ -143,7 +151,7 @@ class TestLegacyCartCurrency(CartCurrencyTestCase):
 
 		html = self.render_legacy("cart/checkout", "/en-ae/cart/checkout")
 
-		self.assertIn(f'{self.market_symbol} <span x-text="commera.format.amount(checkout_total,', html)
+		self.assertIn(f'{self.market_symbol}<span x-text="commera.format.amount(checkout_total,', html)
 		self.assertNotIn(f"{self.store_symbol} <span", html)
 
 	def test_the_market_cart_page_shows_the_market_currency(self):

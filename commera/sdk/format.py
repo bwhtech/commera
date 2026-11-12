@@ -11,7 +11,18 @@ from commera.localization import switch_url, url
 from commera.localization.formatter import Formatter
 from commera.shop_themes.doctype.shop_theme.shop_theme import is_within_directory
 
-__all__ = ["IMAGE_WIDTHS", "date", "image_url", "money", "number", "product_url", "switch_url", "url"]
+__all__ = [
+	"IMAGE_WIDTHS",
+	"date",
+	"image_url",
+	"money",
+	"money_html",
+	"number",
+	"product_url",
+	"signed_money_html",
+	"switch_url",
+	"url",
+]
 
 IMAGE_WIDTHS = (160, 320, 480, 640, 960, 1280, 1920)
 RESIZED_IMAGES_URL = "/files/commera-images"
@@ -21,7 +32,17 @@ WEBP_QUALITY = 80
 
 
 def money(amount: float | None, currency: str | None = None) -> str:
+	"""Plain Unicode text for SDK and API responses."""
+	return Formatter.current().money_text(amount, currency)
+
+
+def money_html(amount: float | None, currency: str | None = None) -> str:
+	"""Escaped presentation HTML for templates, including the sign screen-reader label."""
 	return Formatter.current().money(amount, currency)
+
+
+def signed_money_html(amount, currency=None, minus="\u2212") -> str:
+	return Formatter.current().signed_money(amount, currency, minus)
 
 
 def number(value: float | None, precision: int = 0) -> str:

@@ -29,8 +29,8 @@
 		"USD": "$",
 		"EUR": "€",
 		"INR": "₹",
-		"SAR": "<span class=\"saudi-currency-symbol pe-0.5\"></span>",
-		"AED": "د.إ",
+		"SAR": "\u20c1",
+		"AED": "\u20c3",
 		"JPY": "¥",
 		"KWD": "د.ك",
 		"XTS": "XTS ",
@@ -215,7 +215,31 @@
 			"currency": "SAR",
 			"amount": 1250,
 			"precision": null,
-			"expected": "<span class=\"saudi-currency-symbol pe-0.5\"></span>1,250.00"
+			"expected": "<bdi dir=\"ltr\"><span class=\"currency-sign\" role=\"img\" aria-label=\"SAR\">\u20c1</span>\u00a01,250.00</bdi>"
+		},
+		{
+			"language": "en",
+			"rules": "currency_format_on",
+			"currency": "SAR",
+			"amount": -1234.567,
+			"precision": null,
+			"expected": "<bdi dir=\"ltr\"><span class=\"currency-sign\" role=\"img\" aria-label=\"SAR\">\u20c1</span>\u00a0−1,234.57</bdi>"
+		},
+		{
+			"language": "en",
+			"rules": "currency_format_on",
+			"currency": "AED",
+			"amount": 1234.5,
+			"precision": null,
+			"expected": "<bdi dir=\"ltr\"><span class=\"currency-sign\" role=\"img\" aria-label=\"AED\">\u20c3</span>\u00a01,234.50</bdi>"
+		},
+		{
+			"language": "de",
+			"rules": "currency_format_on",
+			"currency": "AED",
+			"amount": 1234.5,
+			"precision": null,
+			"expected": "<bdi dir=\"ltr\"><span class=\"currency-sign\" role=\"img\" aria-label=\"AED\">\u20c3</span>\u00a01.234,50</bdi>"
 		},
 		{
 			"language": "en",
@@ -303,7 +327,7 @@
 			"currency": "SAR",
 			"amount": 1250,
 			"precision": null,
-			"expected": "1,250.00 <span class=\"saudi-currency-symbol pe-0.5\"></span>"
+			"expected": "<bdi dir=\"ltr\"><span class=\"currency-sign\" role=\"img\" aria-label=\"SAR\">\u20c1</span>\u00a01,250.00</bdi>"
 		},
 		{
 			"language": "ar",
@@ -311,7 +335,7 @@
 			"currency": "SAR",
 			"amount": -1234.567,
 			"precision": null,
-			"expected": "-1,234.57 <span class=\"saudi-currency-symbol pe-0.5\"></span>"
+			"expected": "<bdi dir=\"ltr\"><span class=\"currency-sign\" role=\"img\" aria-label=\"SAR\">\u20c1</span>\u00a0−1,234.57</bdi>"
 		},
 		{
 			"language": "ar",
@@ -319,7 +343,7 @@
 			"currency": "AED",
 			"amount": 1234.5,
 			"precision": null,
-			"expected": "1,234.50 د.إ"
+			"expected": "<bdi dir=\"ltr\"><span class=\"currency-sign\" role=\"img\" aria-label=\"AED\">\u20c3</span>\u00a01,234.50</bdi>"
 		},
 		{
 			"language": "ar",

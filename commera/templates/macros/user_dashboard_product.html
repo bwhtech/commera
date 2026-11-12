@@ -12,7 +12,7 @@
             <p class="capitalize"><bdi>{{ _(name)|e }}</bdi></p>
             <p class="font-medium"><span class="capitalize">{{_("size")}}:</span> <bdi>{{_(size)}}</bdi></p>
 
-            <p class="flex">{{get_cart_currency({"currency": currency}).symbol}} {{ get_cart_currency({"currency": currency}).amount(price) }} </p>
+            <p class="flex">{% if get_cart_currency({"currency": currency}).is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency({"currency": currency}).symbol}}{% if not get_cart_currency({"currency": currency}).is_sign %} {% endif %}{{ get_cart_currency({"currency": currency}).amount(price) }}{% if get_cart_currency({"currency": currency}).is_sign %}</bdi>{% endif %} </p>
         </div>
         {% if view_order %}
         <p class="text-base text-accent underline capitalize">

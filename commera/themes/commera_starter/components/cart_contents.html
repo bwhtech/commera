@@ -23,11 +23,11 @@
 			<div class="flex min-w-0 flex-1 flex-col">
 				<div class="grid gap-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-3">
 					<a :href="line.product && $store.cart.product_url(line.product)" class="text-md font-medium text-ink-gray-9 [overflow-wrap:anywhere] decoration-1 underline-offset-4 hover:underline"><bdi x-text="line.product?.title ?? line.title"></bdi></a>
-					<p class="tabular whitespace-nowrap text-md font-medium" x-show="line.available !== false" x-text="$store.cart.money(line.amount)"></p>
+					<p class="tabular whitespace-nowrap text-md font-medium" x-show="line.available !== false" x-html="$store.cart.money(line.amount)"></p>
 				</div>
 				<p class="mt-1 text-base text-ink-gray-6 [overflow-wrap:anywhere]" x-show="line.product?.variant_title"><bdi x-text="line.product?.variant_title"></bdi></p>
 				<p class="mt-1 text-base text-ink-red-7" x-show="line.available === false">{{ unavailable_label() }}</p>
-				<p class="tabular mt-0.5 text-base text-ink-gray-6" x-show="line.qty > 1 && line.available !== false" x-text="$store.cart.money(line.rate) + ' ' + $el.dataset.each" data-each="{{ _('each') }}"></p>
+				<p class="tabular mt-0.5 text-base text-ink-gray-6" x-show="line.qty > 1 && line.available !== false"><span x-html="$store.cart.money(line.rate)"></span> {{ _("each") | e }}</p>
 				<div class="mt-auto flex items-center justify-between pt-3">
 					<div x-show="line.available !== false" class="flex items-center">
 					<div class="flex h-10 items-center rounded-lg border border-outline-gray-3">

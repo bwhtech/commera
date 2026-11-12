@@ -1,6 +1,8 @@
 import os
+from unittest.mock import patch
 
 import frappe
+import html5lib
 from frappe.tests import IntegrationTestCase
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
@@ -220,3 +222,37 @@ class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
 		self.assertIn('x-data="order_summary"', html)
 		self.assertIn('id="discount-code"', html)
 		self.assertIn("noindex", html)
+
+	def test_price_chip_translations_are_escaped_before_adding_money_html(self):
+		from commera.shop_themes.theme_resolver import load_page_controller
+
+		listing = load_page_controller([STARTER_DIR], "pages/products/list.html")
+
+		payload = "<img src=x onerror=alert(1)>"
+		for values, message in (
+			({"min": 10}, "From {0}"),
+			({"max": 20}, "Up to {0}"),
+			({"min": 10, "max": 20}, "{0} to {1}"),
+		):
+			with (
+				self.subTest(message=message),
+				patch.object(
+					listing, "_", side_effect=lambda text: payload + " " + text if text == message else text
+				),
+			):
+				status, html = self.render("pages/products/list.html", "/products", **values)
+				self.assertEqual(status, 200)
+				tree = html5lib.parse(html, namespaceHTMLElements=False)
+				self.assertFalse([node for node in tree.iter("img") if node.get("src") == "x"])
+				self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)
+
+	def test_url_filter_values_stay_text_in_chips_and_aria_labels(self):
+		payload = "<img src=x onerror=alert(1)>"
+		status, html = self.render("pages/products/list.html", "/products", colors=payload)
+		self.assertEqual(status, 200)
+		tree = html5lib.parse(html, namespaceHTMLElements=False)
+		chips = [node for node in tree.iter("a") if node.get("aria-label") == f"Remove {payload}"]
+		self.assertEqual(len(chips), 1)
+		self.assertIn(payload, "".join(chips[0].itertext()))
+		self.assertFalse(list(chips[0].iter("img")))
+		self.assertFalse([node for node in tree.iter() if node.get("src") == "x"])

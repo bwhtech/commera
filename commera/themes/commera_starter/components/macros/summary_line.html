@@ -1,6 +1,7 @@
 {% from "components/macros/availability.html" import unavailable_label %}
 
-{# `unavailable`: an expression true for a line the market has no price for; `remove` then removes it. #}
+{# `amount`: an expression for commera.format.money HTML. `unavailable`: an expression true for a line
+   the market has no price for; `remove` then removes it. #}
 {% macro summary_line(image, title, subtitle, qty, amount, unavailable=None, remove=None) -%}
 <li class="flex items-center gap-3">
 	<div class="relative w-14 shrink-0">
@@ -12,7 +13,7 @@
 	<div class="min-w-0 flex-1">
 		<div class="grid gap-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-3">
 			<p class="text-md text-balance [overflow-wrap:anywhere]"><bdi x-text="{{ title }}"></bdi></p>
-			<p class="tabular whitespace-nowrap text-md"{% if unavailable %} x-show="!({{ unavailable }})"{% endif %} x-text="{{ amount }}"></p>
+			<p class="tabular whitespace-nowrap text-md"{% if unavailable %} x-show="!({{ unavailable }})"{% endif %} x-html="{{ amount }}"></p>
 		</div>
 		<p class="mt-1 text-base text-ink-gray-6 [overflow-wrap:anywhere]" x-show="{{ subtitle }}"><bdi x-text="{{ subtitle }}"></bdi></p>
 		{%- if unavailable %}

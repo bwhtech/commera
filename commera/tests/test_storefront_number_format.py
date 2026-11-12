@@ -4,9 +4,10 @@ from pathlib import Path
 import frappe
 
 from commera.localization.cart_currency import CartCurrency
-from commera.localization.formatter import Formatter, get_html_currency_symbol
+from commera.localization.formatter import Formatter
 from commera.localization.languages import Language
 from commera.tests.test_cart_currency import CartCurrencyTestCase
+from commera.tests.test_market_prices import starter_money
 
 # packages/storefront/test/format.test.js passes the same cases with commera.format.amount.
 AMOUNT_CASES = Path(__file__).resolve().parents[2] / "packages" / "storefront" / "test" / "amount-cases.json"
@@ -26,11 +27,9 @@ class TestStorefrontNumberFormat(CartCurrencyTestCase):
 				)
 				self.assertEqual(currency.amount(case["amount"]), case["expected"])
 				starter = Formatter(Language("en", "English", "English", "ltr"), case["number_format"])
-				sign = "-" if case["expected"].startswith("-") else ""
-				digits = case["expected"].removeprefix("-")
 				self.assertEqual(
 					starter.money(case["amount"], case["currency"], case["precision"]),
-					f"{sign}{get_html_currency_symbol(case['currency'])}{digits}",
+					starter_money(case["currency"], case["expected"]),
 				)
 
 	def test_amounts_and_browser_rules_follow_the_store_number_format(self):
@@ -41,11 +40,17 @@ class TestStorefrontNumberFormat(CartCurrencyTestCase):
 					self.open_request(path)
 					currency = CartCurrency.of()
 					self.assertEqual(currency.amount(123456.78), expected)
-					self.assertEqual(currency.amount(-123456.78), f"-{expected}")
+					minus = "\u2212" if path == "/en-ae/cart" else "-"
+					self.assertEqual(currency.amount(-123456.78), f"{minus}{expected}")
 					self.assertEqual(currency.amount(None), "0.00" if number_format == INDIAN else "0,00")
 					self.assertEqual(
 						currency.config,
-						{"precision": 2, "fraction_precision": 2, "number_format": number_format},
+						{
+							"precision": 2,
+							"fraction_precision": 2,
+							"number_format": number_format,
+							"is_sign": path == "/en-ae/cart",
+						},
 					)
 
 	def test_precision_three_applies_to_store_and_market_currencies(self):
@@ -67,7 +72,7 @@ class TestStorefrontNumberFormat(CartCurrencyTestCase):
 				self.open_request(path)
 				currency = CartCurrency.of()
 				starter = Formatter.current().money(123456.78, currency.code)
-				self.assertEqual(starter, f"{currency.symbol}{currency.amount(123456.78)}")
+				self.assertEqual(starter, starter_money(currency.code, currency.amount(123456.78)))
 
 	def test_primary_and_market_pages_render_grouped_amounts(self):
 		for path, symbol in (("/cart", self.store_symbol), ("/en-ae/cart", self.market_symbol)):
@@ -97,7 +102,12 @@ class TestStorefrontNumberFormat(CartCurrencyTestCase):
 					"{{ card_price(123456.78, 150000, 10) }}",
 					{},
 				)
-				self.assertEqual(card, f"{symbol}1,23,456.78<del>{symbol}1,50,000.00</del>")
+				price = f"{symbol}1,23,456.78"
+				original = f"{symbol}1,50,000.00"
+				if 'class="currency-sign"' in symbol:
+					price = f'<bdi dir="ltr">{price}</bdi>'
+					original = f'<bdi dir="ltr">{original}</bdi>'
+				self.assertEqual(card, f"{price}<del>{original}</del>")
 
 	def test_historical_orders_render_grouped_amounts_in_their_currency(self):
 		self.open_request("/account/orders")
@@ -114,7 +124,7 @@ class TestStorefrontNumberFormat(CartCurrencyTestCase):
 			'{{ dashboard_product("", "brand", "item", 123456.78, currency=currency) }}',
 			{"currency": self.currency},
 		)
-		self.assertIn(f"{self.market_symbol} 1,23,456.78", legacy)
+		self.assertIn(f"{self.market_symbol}1,23,456.78", legacy)
 
 	def render_line(self, template, marker, context):
 		source = frappe.get_jenv().loader.get_source(frappe.get_jenv(), template)[0]
