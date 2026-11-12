@@ -25,7 +25,7 @@ LANDING_RESOURCE = {
 }
 
 
-class TestTranslationsPage(IntegrationTestCase):
+class TranslationsPageCase(IntegrationTestCase):
 	"""Notes stand in for a store's resources. Other notes on the site may count too, so counts are
 	compared before and after a test's own notes."""
 
@@ -60,6 +60,8 @@ class TestTranslationsPage(IntegrationTestCase):
 	def save(self, *translations):
 		return translations_api.save_translations("ar", json.dumps(translations))
 
+
+class TestTranslationsPage(TranslationsPageCase):
 	def test_the_overview_counts_each_status_per_language_and_resource(self):
 		before = self.note_counts()
 		current = self.make_note("Packing note", "<p>Wrap it well</p>")

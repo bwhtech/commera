@@ -1,12 +1,13 @@
 <script setup>
 defineProps({
-  // missing or outdated
+  // missing, outdated or unsaved
   status: { type: String, required: true },
 })
 
 const COLOURS = {
   missing: 'bg-surface-red-7',
   outdated: 'bg-surface-amber-7',
+  unsaved: 'bg-surface-blue-7',
 }
 </script>
 

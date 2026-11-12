@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, h, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { useEventListener } from '@vueuse/core'
 import { Badge, Button, Dropdown, LoadingText, ScrollArea, toast } from 'frappe-ui'
@@ -9,12 +9,7 @@ import EmptyState from '../../components/EmptyState.vue'
 import TranslationItemPicker from '../../components/translations/TranslationItemPicker.vue'
 import TranslationRecord from '../../components/translations/TranslationRecord.vue'
 import { getItems, saveTranslations, useTranslationOverview } from '../../data/translations'
-import {
-  groupResources,
-  languageTotals,
-  parseFieldKey,
-  toDoCount,
-} from '../../data/translationStatus'
+import { groupResources, languageChoices, parseFieldKey } from '../../data/translationStatus'
 import { changePending, useTranslationSave, useOpenedTranslation } from '../../data/translationEditorState'
 import { useTranslationItems } from '../../data/translationItems'
 import { onSettingsClose, openSettings } from '../../ia/settings'
@@ -142,13 +137,15 @@ useEventListener(window, 'beforeunload', (event) => {
   if (busy.value || dirtyCount.value) event.preventDefault()
 })
 
+const hiddenBadge = () => h(Badge, { variant: 'subtle', theme: 'gray', label: __('Hidden') })
 const languageMenu = computed(() => [
   {
     group: __('Translate into'),
-    options: (overview.value?.languages ?? []).map((target) => ({
+    options: languageChoices(overview.value?.languages ?? [], overview.value?.counts ?? {}).map((choice) => ({
       disabled: busy.value,
-      label: __('{0} · {1} to do', [target.name, toDoCount(languageTotals(overview.value.counts[target.code]))]),
-      onClick: () => router.push({ name: 'StorefrontTranslationEditor', params: { lang: target.code, resource: resourceType.value } }),
+      label: choice.label,
+      slots: choice.hidden ? { suffix: hiddenBadge } : undefined,
+      onClick: () => router.push({ name: 'StorefrontTranslationEditor', params: { lang: choice.code, resource: resourceType.value } }),
     })),
   },
   {
@@ -219,6 +216,7 @@ const languageMenu = computed(() => [
       :loading="list.loading.value"
       :loaded="list.loaded.value"
       :load-error="list.loadError.value"
+      :pending="pending"
       @select="select"
       @open="openResource"
       @load-more="list.loadMore"

@@ -2327,6 +2327,40 @@ Your storefront speaks {0} only,واجهة متجرك متاحة باللغة {0
 By resource,حسب المورد
 Resource,المورد
 {0} in {1},{0} باللغة {1}
-
 Invalid wishlist product list,قائمة منتجات المفضلة غير صالحة
 Retry prices,إعادة محاولة تحميل الأسعار
+Nothing to translate,لا يوجد ما يُترجم
+Unsaved changes,تغييرات غير محفوظة
+Source is empty,النص الأصلي فارغ
+Source changed.,تغيّر النص الأصلي.
+Was: “{0}”,كان: «{0}»
+Header,الترويسة
+Announcement bar,شريط الإعلانات
+Collection tiles,بطاقات المجموعات
+Tile,بطاقة
+Featured products,منتجات مميزة
+Menu columns,أعمدة القائمة
+Text column,عمود نصي
+Social links,روابط التواصل الاجتماعي
+Hero,البانر الرئيسي
+Slide,شريحة
+Image with text,صورة مع نص
+Product list,قائمة المنتجات
+Page content,محتوى الصفحة
+Collapsible text,نص قابل للطي
+Search results,نتائج البحث
+Newsletter,النشرة البريدية
+Product recommendations,منتجات مقترحة
+Category strip,شريط الفئات
+Collection collage,مجموعة صور المجموعات
+Collection banners,بانرات المجموعات
+Banner,بانر
+Deals,العروض
+Everyday essentials,أساسيات يومية
+Hero slider,عارض الشرائح الرئيسي
+Menu marquee,شريط القائمة المتحرك
+Offers,عروض
+Product grid,شبكة المنتجات
+Recent additions,أحدث الإضافات
+Similar products,منتجات مشابهة
+Sponsored brands,علامات تجارية مُموّلة

@@ -42,5 +42,5 @@ test('a failed load renders an error and Retry instead of completion', async () 
 
 test('completion appears only after a successful load', async () => {
   assert.doesNotMatch(await renderPicker({}), /are up to date/)
-  assert.match(await renderPicker({ loaded: true }), /are up to date/)
+  assert.match(await renderPicker({ loaded: true, total: 1 }), /are up to date/)
 })

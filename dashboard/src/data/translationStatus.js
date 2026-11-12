@@ -57,6 +57,43 @@ export function toDoCount(counts) {
   return counts.missing + counts.outdated
 }
 
+// A resource with no source text at all has nothing to translate, which is not the same as done.
+export function isEmptyResource(counts) {
+  return !counts.missing && !counts.outdated && !counts.current
+}
+
+// A record as it will be once saved: an unsaved value is done, unless it clears a text field.
+export function itemProgress(item, pending, language, resource) {
+  const progress = { toDo: 0, outdated: false, unsaved: 0 }
+  for (const field of item.fields) {
+    const value = pending[fieldKey(language, resource, item.name, field.field)]
+    if (value !== undefined) {
+      progress.unsaved += 1
+      if (!value && field.kind !== 'image' && !field.source_empty) progress.toDo += 1
+    } else if (field.status !== 'current') {
+      progress.toDo += 1
+      progress.outdated ||= field.status === 'outdated'
+    }
+  }
+  return progress
+}
+
+// The status dot of a record in the list: unsaved edits first, then what is left to do.
+export function progressStatus(progress) {
+  if (progress.unsaved) return 'unsaved'
+  if (progress.toDo) return progress.outdated ? 'outdated' : 'missing'
+  return 'current'
+}
+
+// The editor's language menu: each target language with its to-do count, a hidden one marked.
+export function languageChoices(languages, counts) {
+  return languages.map((language) => ({
+    code: language.code,
+    label: __('{0} · {1} to do', [language.name, toDoCount(languageTotals(counts[language.code]))]),
+    hidden: !language.published,
+  }))
+}
+
 // Every resource of one language added up, for its card and the editor's language menu.
 export function languageTotals(languageCounts = {}) {
   const totals = { missing: 0, outdated: 0, current: 0 }

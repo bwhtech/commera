@@ -14,7 +14,8 @@
   "reference_field",
   "section_break_ctrn",
   "translated_value",
-  "source_hash"
+  "source_hash",
+  "source_text"
  ],
  "fields": [
   {
@@ -76,10 +77,17 @@
    "fieldtype": "Data",
    "label": "Source Hash",
    "read_only": 1
+  },
+  {
+   "description": "The source text this translation was written against, as plain text of at most 500 characters. Shown when the source changes.",
+   "fieldname": "source_text",
+   "fieldtype": "Small Text",
+   "label": "Source Text",
+   "read_only": 1
   }
  ],
  "links": [],
- "modified": "2026-11-10 00:00:00.000000",
+ "modified": "2026-11-12 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Content Translation",

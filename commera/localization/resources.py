@@ -144,6 +144,23 @@ class TranslatableResource:
 		"""{(name, field): [its entry per market, by market]} for a batch of shop-wide entries."""
 		return {}
 
+	def get_record_titles(self, names: list[str]) -> dict[str, str]:
+		"""{name: readable title} for records whose name is a key, such as a theme section path."""
+		return {}
+
+	def get_sourceless_entries(self, language: str, names: list[str]) -> list[TranslationEntry]:
+		"""The shop-wide translations of `names` whose source is now empty."""
+		wanted = set(names)
+		return [
+			entry
+			for entry in self.scan_sourceless(language)
+			if entry.name in wanted and entry.market == SHOP_WIDE and entry.value
+		]
+
+	def get_previous_sources(self, language: str, keys: list[tuple]) -> dict[tuple, str]:
+		"""{(name, field): the source text a shop-wide translation was written against}, where stored."""
+		return {}
+
 	def write(self, name: str, field: str, language: str, value: str, market: str = SHOP_WIDE):
 		"""Save the translation of a field, shop-wide or for `market`, current against its source now.
 		Empty removes it. The caller needs write permission on the storage."""
@@ -347,6 +364,43 @@ class DoctypeResource(TranslatableResource):
 				market_entry = replace(entry, market=row.market, value=value, status=status)
 				markets.setdefault((entry.name, entry.field), []).append(market_entry)
 		return markets
+
+	def get_sourceless_entries(self, language, names):
+		meta = frappe.get_meta(self.doctype)
+		translations = fetch_translations(self.doctype, names, list(self.fields), language)
+		translated = sorted({name for name, _field in translations})
+		if not translated:
+			return []
+		records = self.read_records(meta, [["name", "in", translated]], len(translated))
+		sources = get_sources(self.doctype, records, list(self.fields))
+		return [
+			self.make_entry(meta, record.name, field, "", translations)
+			for record, source in zip(records, sources, strict=True)
+			for field in self.fields
+			if (record.name, field) in translations and not source[field]
+		]
+
+	def get_previous_sources(self, language, keys):
+		if not keys or not frappe.db.has_column(DOCTYPE, "source_text"):
+			return {}
+		rows = frappe.get_all(
+			DOCTYPE,
+			filters={
+				"reference_doctype": self.doctype,
+				"reference_name": ("in", list({name for name, _field in keys})),
+				"reference_field": ("in", list({field for _name, field in keys})),
+				"language": language,
+				"market": SHOP_WIDE,
+				"source_text": ("is", "set"),
+			},
+			fields=["reference_name", "reference_field", "source_text"],
+		)
+		wanted = set(keys)
+		return {
+			(row.reference_name, row.reference_field): row.source_text
+			for row in rows
+			if (row.reference_name, row.reference_field) in wanted
+		}
 
 	def check_write_permission(self, saving):
 		frappe.has_permission(DOCTYPE, "write" if saving else "delete", throw=True)

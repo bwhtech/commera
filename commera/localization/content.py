@@ -1,6 +1,8 @@
 """Translated record content, such as product titles, read from Content Translation rows.
 These rows stay out of Frappe's Translation dictionary, so the per-request and browser dictionaries stay small."""
 
+import html
+import re
 from dataclasses import dataclass
 
 import frappe
@@ -19,6 +21,11 @@ DOCTYPE = "Content Translation"
 MISSING, OUTDATED, CURRENT = "missing", "outdated", "current"
 SHOP_WIDE = ""
 BATCH_SIZE = 500
+# The stored copy of a source, shown when it changes, is cut to this many characters.
+SOURCE_TEXT_LENGTH = 500
+FILE_FIELDTYPES = ("Attach", "Attach Image")
+HTML_TAG = re.compile(r"<[a-z][^>]*>", re.IGNORECASE)
+ANY_TAG = re.compile(r"</?[a-z][^>]*>", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -186,6 +193,22 @@ def read_derived_sources(doctype: str, field: str, names: list) -> dict:
 
 def get_source_hash(source) -> str:
 	return sha256_hash(cstr(source))
+
+
+def get_source_text(doctype: str, field: str, source) -> str | None:
+	"""The source as short plain text, kept with a translation to show what it was written against.
+	None for a file field, whose source is a file path."""
+	meta = frappe.get_meta(doctype)
+	if meta.has_field(field) and meta.get_field(field).fieldtype in FILE_FIELDTYPES:
+		return None
+	text = cstr(source)
+	if HTML_TAG.search(text):
+		# A space for each tag, so paragraphs do not run together.
+		text = html.unescape(ANY_TAG.sub(" ", text))
+	text = " ".join(text.split())
+	if len(text) > SOURCE_TEXT_LENGTH:
+		text = text[: SOURCE_TEXT_LENGTH - 1] + "…"
+	return text or None
 
 
 def fetch_translations(
