@@ -219,6 +219,8 @@ class TestMarketValidation(IntegrationTestCase):
 		market.languages = [row for row in market.languages if row.language != "pt-BR"]
 		market.save()
 		market.append("languages", {"language": "pt-BR"})
+		market.save()
+		market.enabled = 1
 		with self.assertRaisesRegex(frappe.ValidationError, "names a region"):
 			market.save()
 

@@ -1,6 +1,4 @@
-"""A market sells through ERPNext records it does not own: its price lists, its tax template, the
-store Shipping Rule and the company accounts. ERPNext checks them only in a shopper's checkout, so
-Commera checks them when the merchant saves the market, and again when one of these records changes."""
+"""Validate only new market setup violations, so existing bad data can still be repaired."""
 
 from contextlib import contextmanager
 from functools import wraps
@@ -9,6 +7,7 @@ import frappe
 from frappe import _
 from frappe.query_builder import DocType
 
+from commera.core import get_default_customer_group
 from commera.utils import get_store_company, get_store_currency
 
 MARKET_DOCTYPE = "Commera Market"
@@ -62,6 +61,7 @@ class MarketStoreFit:
 			None,
 			0,
 		)
+
 		if company != self.company:
 			frappe.throw(
 				_(
@@ -80,17 +80,20 @@ class MarketStoreFit:
 
 	@validates_field("sale_price_list")
 	def validate_invoice_currency(self):
-		"""ERPNext invoices a shopper against the company receivable account. It accepts an invoice in
-		another currency only with this Accounts Settings option, and the payment is captured by then."""
+		"""Reject only currencies with no configured company or default customer-group route."""
 		company_currency = get_store_currency(self.company)
 		if self.market.currency in (None, company_currency) or frappe.db.get_single_value(
 			"Accounts Settings", MULTI_CURRENCY_FIELD
 		):
 			return
+		currencies = get_receivable_currencies(self.company)
+		if self.market.currency in currencies:
+			return
+
 		frappe.throw(
 			_(
 				"Market {0} sells in {1}, but {2} keeps its accounts in {3}. ERPNext can invoice orders in {1}"
-				" only when {4} is on in Accounts Settings. Turn it on, or use a price list in {3}."
+				" with {4} in Accounts Settings or a receivable account in {1}. Configure either route, or use {3}."
 			).format(
 				*self.bold(self.market.market_name, self.market.currency, self.company, company_currency),
 				frappe.bold(_(frappe.get_meta("Accounts Settings").get_label(MULTI_CURRENCY_FIELD).strip())),
@@ -99,10 +102,12 @@ class MarketStoreFit:
 		)
 
 	@validates_field("countries")
-	def validate_delivery_countries(self):
-		"""ERPNext applies the store Shipping Rule to every cart and refuses an address outside its countries."""
-		countries = [row.country for row in self.market.countries]
-		if missing := get_countries_without_delivery(self.shipping_rule, countries):
+	def validate_delivery_countries(self, countries=None, missing=None):
+		"""Only refuse a missing country when no alternate delivery configuration exists."""
+		if missing is None:
+			countries = countries if countries is not None else [row.country for row in self.market.countries]
+			missing = get_countries_without_delivery(self.shipping_rule, countries)
+		if missing:
 			frappe.throw(
 				_(
 					"The store Shipping Rule {0} does not deliver to {1}, a country of market {2}. Add {1} to"
@@ -116,13 +121,61 @@ class MarketStoreFit:
 
 
 def validate_markets_for_store(settings):
-	"""A new store company or Shipping Rule must still fit every market."""
-	if settings.is_new() or not (
-		settings.has_value_changed("company") or settings.has_value_changed("shipping_rule")
-	):
+	"""Check only invariants changed by these store settings."""
+	if settings.is_new() or frappe.flags.in_patch or frappe.flags.in_migrate:
 		return
-	for name in frappe.get_all(MARKET_DOCTYPE, pluck="name"):
-		MarketStoreFit(frappe.get_doc(MARKET_DOCTYPE, name), settings).validate()
+	before = settings.get_doc_before_save() or frappe.get_doc("Commera Settings")
+	if settings.has_value_changed("company"):
+		validate_store_company(settings, before)
+	if settings.has_value_changed("shipping_rule"):
+		validate_store_delivery(settings, before)
+
+
+def validate_store_company(settings, before):
+	markets = frappe.get_all(
+		MARKET_DOCTYPE, filters={"enabled": 1}, fields=["market_name", "currency", "tax_template"]
+	)
+	templates = {
+		row.name: row.company for row in frappe.get_all(TAX_TEMPLATE_DOCTYPE, fields=["name", "company"])
+	}
+	old_company = before.company or get_store_company()
+	old_currencies = get_receivable_currencies(old_company) | {get_store_currency(old_company)}
+	currencies = get_receivable_currencies(settings.company) | {get_store_currency(settings.company)}
+	multi_currency = frappe.db.get_single_value("Accounts Settings", MULTI_CURRENCY_FIELD)
+	for market in markets:
+		fit = MarketStoreFit(market, settings)
+		# A company change can repair a mismatch without repairing a disabled template too.
+		template_company = templates.get(market.tax_template)
+		if template_company == old_company and template_company != settings.company:
+			fit.validate_tax_template()
+		if not multi_currency and market.currency in old_currencies and market.currency not in currencies:
+			fit.validate_invoice_currency()
+
+
+def validate_store_delivery(settings, before):
+	rows = get_all_market_countries()
+	countries = [country for country, _ in rows]
+	old_missing = set(get_countries_without_delivery(before.shipping_rule, countries))
+	new_missing = set(get_countries_without_delivery(settings.shipping_rule, countries)) - old_missing
+	for country, market in rows:
+		if country in new_missing:
+			MarketStoreFit(frappe._dict(market_name=market), settings).validate_delivery_countries(
+				missing=[country]
+			)
+
+
+def get_receivable_currencies(company):
+	accounts = frappe.get_all(
+		"Party Account",
+		filters={"parenttype": "Customer Group", "parent": get_default_customer_group(), "company": company},
+		pluck="account",
+	)
+	accounts.append(frappe.get_cached_value("Company", company, "default_receivable_account"))
+	return set(
+		frappe.get_all(
+			"Account", filters={"name": ("in", [a for a in accounts if a])}, pluck="account_currency"
+		)
+	)
 
 
 def validate_price_list(doc, method=None):
@@ -132,6 +185,7 @@ def validate_price_list(doc, method=None):
 		return
 	markets = frappe.get_all(
 		MARKET_DOCTYPE,
+		filters={"enabled": 1},
 		or_filters={"sale_price_list": doc.name, "compare_at_price_list": doc.name},
 		fields=["name", "market_name", "sale_price_list"],
 	)
@@ -141,7 +195,7 @@ def validate_price_list(doc, method=None):
 		throw_price_list_in_use(
 			_("Price List {0} sets the prices of market {1}, so its currency cannot change."), doc, markets[0]
 		)
-	if not (doc.enabled and doc.selling):
+	if any(doc.has_value_changed(field) and not doc.get(field) for field in ("enabled", "selling")):
 		throw_price_list_in_use(
 			_(
 				"Price List {0} sets the prices of market {1}, so it must stay enabled and selling."
@@ -150,15 +204,31 @@ def validate_price_list(doc, method=None):
 			doc,
 			markets[0],
 		)
-	validate_price_list_countries(doc, [market for market in markets if market.sale_price_list == doc.name])
+	if doc.has_value_changed("countries"):
+		validate_price_list_countries(
+			doc, [market for market in markets if market.sale_price_list == doc.name]
+		)
 
 
 def validate_price_list_countries(doc, markets: list[dict]):
 	"""ERPNext refuses a sale to an address outside the sale list's countries. No countries: all."""
 	if not (countries := {row.country for row in doc.countries}):
 		return
+	before = doc.get_doc_before_save()
+	old_countries = {row.country for row in before.countries} if before else set()
+	rows = frappe.get_all(
+		"Commera Market Country",
+		filters={"parent": ("in", [m.name for m in markets]), "parenttype": MARKET_DOCTYPE},
+		fields=["parent", "country"],
+	)
 	for market in markets:
-		if missing := [country for country in get_market_countries(market.name) if country not in countries]:
+		if missing := [
+			row.country
+			for row in rows
+			if row.parent == market.name
+			and row.country not in countries
+			and (not old_countries or row.country in old_countries)
+		]:
 			frappe.throw(
 				_(
 					"Price List {0} sets the prices of market {1}, which includes {2}. Keep {2} in its"
@@ -178,9 +248,16 @@ def validate_tax_template(doc, method=None):
 	"""Refuse to disable a market's template, or move it to another company."""
 	if doc.is_new() or not frappe.db.has_column(MARKET_DOCTYPE, "tax_template"):
 		return
-	if not (doc.disabled or doc.company != get_store_company()):
+	if not (
+		(doc.has_value_changed("disabled") and doc.disabled)
+		or (
+			doc.has_value_changed("company")
+			and doc.company != get_store_company()
+			and doc.get_doc_before_save().company == get_store_company()
+		)
+	):
 		return
-	if market := frappe.db.get_value(MARKET_DOCTYPE, {"tax_template": doc.name}, "market_name"):
+	if market := frappe.db.get_value(MARKET_DOCTYPE, {"tax_template": doc.name, "enabled": 1}, "market_name"):
 		frappe.throw(
 			_(
 				"Tax template {0} sets the taxes of market {1}, so it must stay enabled in the store company."
@@ -192,11 +269,21 @@ def validate_tax_template(doc, method=None):
 
 def validate_shipping_rule(doc, method=None):
 	"""Refuse to drop a market country from the store Shipping Rule."""
-	if doc.is_new() or doc.name != frappe.db.get_single_value("Commera Settings", "shipping_rule"):
+	if frappe.flags.in_patch or frappe.flags.in_migrate or has_delivery_services():
+		return
+	if (
+		doc.is_new()
+		or not doc.has_value_changed("countries")
+		or doc.name != frappe.db.get_single_value("Commera Settings", "shipping_rule")
+	):
 		return
 	shipped = {row.country for row in doc.countries}
+	before = doc.get_doc_before_save()
+	old = {row.country for row in before.countries} if before else set()
+	if shipped == old:
+		return
 	for country, market in get_all_market_countries():
-		if shipped and country not in shipped:
+		if shipped and country not in shipped and (not old or country in old):
 			frappe.throw(
 				_(
 					"Shipping Rule {0} is the store delivery rule, and market {1} includes {2}. Keep {2} in"
@@ -206,29 +293,15 @@ def validate_shipping_rule(doc, method=None):
 			)
 
 
-def validate_accounts_settings(doc, method=None):
-	"""Refuse to turn off multi-currency invoices while a market sells in another currency."""
-	if doc.get(MULTI_CURRENCY_FIELD) or not doc.has_value_changed(MULTI_CURRENCY_FIELD):
-		return
-	if not frappe.db.has_column(MARKET_DOCTYPE, "currency"):
-		return
-	currency = get_store_currency()
-	if market := frappe.db.get_value(MARKET_DOCTYPE, {"currency": ("!=", currency)}, "market_name"):
-		frappe.throw(
-			_(
-				"Market {0} sells in another currency than {1}, so ERPNext needs {2} to invoice its orders."
-				" Change the market's price lists to {1} first."
-			).format(
-				frappe.bold(market),
-				frappe.bold(currency),
-				frappe.bold(_(doc.meta.get_label(MULTI_CURRENCY_FIELD).strip())),
-			),
-			title=_("Market Needs Multi-Currency Invoices"),
-		)
+def has_delivery_services():
+	# Carrier coverage depends on a live quote. Configuration cannot prove a country is unreachable.
+	return frappe.db.exists("Shipping Service", {"enabled": 1}) or frappe.db.exists(
+		"Shipping Provider Profile", {"enabled": 1, "offer_all_rates": 1}
+	)
 
 
 def get_countries_without_delivery(shipping_rule: str | None, countries: list[str]) -> list[str]:
-	if not shipping_rule:
+	if not shipping_rule or has_delivery_services():
 		return []
 	shipped = frappe.get_all(
 		"Shipping Rule Country",
@@ -253,5 +326,6 @@ def get_all_market_countries() -> list[tuple[str, str]]:
 		.on(row.parent == market.name)
 		.select(row.country, market.market_name)
 		.where(row.parenttype == MARKET_DOCTYPE)
+		.where(market.enabled == 1)
 		.run()
 	)

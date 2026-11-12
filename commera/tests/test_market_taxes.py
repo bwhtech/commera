@@ -379,13 +379,14 @@ class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "is disabled"):
 			self.set_market_template(template)
 
-	def test_a_template_disabled_after_it_was_chosen_is_refused(self):
+	def test_an_existing_disabled_template_allows_unrelated_changes(self):
 		template = self.make_template(10)
 		self.set_market_template(template)
 		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "disabled", 1)
 
-		with self.assertRaisesRegex(frappe.ValidationError, "is disabled"):
-			frappe.get_doc("Commera Market", "gulf").save()
+		market = frappe.get_doc("Commera Market", "gulf")
+		market.market_name = "Renamed market"
+		market.save()
 
 	def test_a_market_template_cannot_be_disabled(self):
 		template = self.make_template(10)
@@ -403,6 +404,25 @@ class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 
 		with self.assertRaisesRegex(frappe.ValidationError, "Choose a template of the store company"):
 			validate_markets_for_store(settings)
+
+	def test_disabled_markets_do_not_keep_template_enabled(self):
+		template = self.make_template(10)
+		self.set_market_template(template)
+		market = frappe.get_doc("Commera Market", "gulf")
+		market.enabled = 0
+		market.save()
+		doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
+		doc.disabled = 1
+		doc.save()
+
+	def test_company_change_can_repair_a_mismatched_disabled_template(self):
+		template = self.make_template(10)
+		self.set_market_template(template)
+		other = frappe.db.get_value("Company", {"name": ("!=", self.company)})
+		frappe.db.set_value(TEMPLATE_DOCTYPE, template, {"company": other, "disabled": 1})
+		settings = frappe.get_doc("Commera Settings")
+		settings.company = other
+		validate_markets_for_store(settings)
 
 	def test_a_template_of_the_store_company_is_kept(self):
 		template = self.make_template(10)

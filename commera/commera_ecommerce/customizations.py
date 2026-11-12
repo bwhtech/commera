@@ -255,6 +255,7 @@ CUSTOM_FIELDS = {
 		},
 		{
 			"fieldname": "commera_market",
+			"search_index": 1,
 			"fieldtype": "Data",
 			"label": "Market",
 			"insert_after": "custom_cart_attributes",
