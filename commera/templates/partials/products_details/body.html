@@ -79,10 +79,10 @@
                 <div class="mb-5 flex items-center md:mb-6.5">
                     {% if discount_percent %}
                     <span
-                        class="text-base font-normal text-strikethrough line-through decoration-[1px] md:text-xl flex">{{get_currency_symbol()}}{{"%.2f"|format(default_price)}}</span>
+                        class="text-base font-normal text-strikethrough line-through decoration-[1px] md:text-xl flex">{{get_cart_currency().symbol}}{{ get_cart_currency().amount(default_price) }}</span>
                     {% endif %}
                     <span
-                        class="ms-2 text-base font-medium text-gray-900 md:text-xl md:font-medium flex">{{get_currency_symbol()}}{{"%.2f"|format(selected_price)}}</span>
+                        class="ms-2 text-base font-medium text-gray-900 md:text-xl md:font-medium flex">{{get_cart_currency().symbol}}{{ get_cart_currency().amount(selected_price) }}</span>
                     <span class="ms-2 mt-0.5 text-xs"> {{_('incl. VAT')}}</span>
 
                 </div>

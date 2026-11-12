@@ -325,6 +325,7 @@ jinja = {
 		"commera.branding.get_brand_assets",
 		"commera.builder_themes.head.commera_builder_head",
 		"commera.guest.is_guest_checkout_enabled",
+		"commera.localization.cart_currency.get_cart_currency",
 		"commera.localization.get_country_choices",
 		"commera.localization.get_localization",
 		"commera.localization.get_market_place",

@@ -2,7 +2,8 @@ import frappe
 from frappe import _
 from frappe.utils.data import cstr, flt
 
-from commera.product_detail import get_available_sizes, get_price, get_selected_item
+from commera.localization.market_prices import MarketPrices
+from commera.product_detail import get_available_sizes, get_selected_item
 from commera.utils import get_available_stocks
 
 
@@ -14,12 +15,11 @@ def get_cart_item_codes(items) -> list[str]:
 	]
 
 
-def get_cart_price(item_code: str, default_price_list: str, sale_price_list: str) -> tuple[float, float]:
-	"""Struck-through price and the price actually charged, resolved the way the product page does it.
-	get_price returns None for "not on this list", so the sale price falls back - it would otherwise book at zero."""
-	default_price = flt(get_price({"item_code": item_code}, default_price_list))
-	sale_price = get_price({"item_code": item_code}, sale_price_list)
-	return default_price, sale_price if sale_price is not None else default_price
+def get_cart_price(item_code: str, prices: MarketPrices | None = None) -> tuple[float | None, float | None]:
+	prices = prices or MarketPrices.current()
+	sale, compare_at = prices.get_base_rates([item_code])
+	price = prices.price(sale.get(item_code), compare_at.get(item_code))
+	return flt(compare_at.get(item_code)) if price is not None else None, price
 
 
 def get_stock_shortfalls(items) -> list[str]:
@@ -66,18 +66,19 @@ def get_detail_for_cart_items(items: list | str):
 	items = frappe.parse_json(items)
 	commera_settings = frappe.get_cached_doc("Commera Settings")
 	warehouse = commera_settings.ecommerce_warehouse
-	default_price_list = commera_settings.get_default_price_list()
-	sale_price_list = commera_settings.get_sale_price_list()
+	prices = MarketPrices.current()
 
 	item_codes = get_cart_item_codes(items)
 	stock_by_item_code = get_available_stocks(item_codes, warehouse)
 
 	stock_data = {}
 	for item_code in item_codes:
-		default_price, sale_price = get_cart_price(item_code, default_price_list, sale_price_list)
+		default_price, sale_price = get_cart_price(item_code, prices)
 		stock_detail = stock_by_item_code.get(item_code, {})
 		stock_data[item_code] = {
-			"stock": None if stock_detail.get("unlimited") else stock_detail.get("stock_qty", 0),
+			"stock": (None if stock_detail.get("unlimited") else stock_detail.get("stock_qty", 0))
+			if sale_price is not None
+			else 0,
 			"default_price": default_price,
 			"sale_price": sale_price,
 		}
@@ -110,11 +111,9 @@ def update_variant(product_name: str, size: str):
 	if not selected_item or selected_item.get("size") != size:
 		frappe.throw(_("Selected size not found."))
 
-	default_price, sale_price = get_cart_price(
-		selected_item["item_code"],
-		commera_settings.get_default_price_list(),
-		commera_settings.get_sale_price_list(),
-	)
+	default_price, sale_price = get_cart_price(selected_item["item_code"])
+	if sale_price is None:
+		frappe.throw(_("Selected size is not available in this market."))
 
 	return {
 		"variant": selected_item,

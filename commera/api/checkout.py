@@ -9,7 +9,7 @@ from commera.api.payments import (
 )
 from commera.api.shipping import clear_delivery_option
 from commera.core import _get_cart_quotation
-from commera.utils import get_delivery_configuration
+from commera.localization.cart_currency import get_cart_delivery_configuration
 
 
 # Guest checkout: refuses any caller without a guest cart cookie, and is rate limited.
@@ -24,4 +24,4 @@ def apply_shipping_rule():
 			clear_delivery_option(cart_quotation)
 			set_charges(cart_quotation)
 			save_cart_quotation(cart_quotation)
-	return get_delivery_configuration()
+	return get_cart_delivery_configuration(cart_quotation)

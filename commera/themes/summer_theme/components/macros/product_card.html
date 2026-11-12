@@ -13,8 +13,8 @@
 
 
 {% macro card_price(amount, original_amount=0, discount=0) -%}
-{{- get_currency_symbol() }}{{ frappe.utils.fmt_money(amount or 0, precision=2) -}}
-{%- if discount %}<del>{{ get_currency_symbol() }}{{ frappe.utils.fmt_money(original_amount or 0, precision=2) }}</del>{% endif -%}
+{{- get_cart_currency().symbol }}{{ get_cart_currency().catalog_amount(amount or 0) -}}
+{%- if discount %}<del>{{ get_cart_currency().symbol }}{{ get_cart_currency().catalog_amount(original_amount or 0) }}</del>{% endif -%}
 {%- endmacro %}
 
 

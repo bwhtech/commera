@@ -10,6 +10,7 @@
 
 {% block uncontained_body %}
 {% call account_shell(_("Wishlist")) %}
+	<button x-show="$store.wishlist.prices_failed" x-cloak @click="$store.wishlist.refresh_prices(true)">{{ _("Retry prices") }}</button>
 <div class="account-card">
 	<div class="table-responsive" x-show="$store.wishlist.items.length" x-cloak>
 		<table class="table check-tbl style-1 account-table mb-0">
@@ -23,7 +24,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				<template x-for="wishlist_item in $store.wishlist.items" :key="wishlist_item.route">
+				<template x-for="wishlist_item in $store.wishlist.display_items" :key="wishlist_item.route">
 					<tr>
 						<td class="product-item-img">
 							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route">
@@ -32,11 +33,12 @@
 						</td>
 						<td class="product-item-name">
 							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route" x-text="wishlist_item.title || wishlist_item.item_name"></a>
+							<span x-show="$store.wishlist.prices_ready && wishlist_item.available === false" x-cloak>{{ _("Unavailable") }}</span>
 						</td>
 						<td class="product-item-price text-nowrap">
 							{# .product-item-price strikes through every span it holds, so the amounts sit in bdi. #}
-							<span x-show="wishlist_item.default_price > wishlist_item.sale_price">{{ get_currency_symbol() }}<bdi x-text="Number(wishlist_item.default_price || 0).toFixed(2)"></bdi></span>
-							<strong>{{ get_currency_symbol() }}<bdi x-text="Number(wishlist_item.sale_price || 0).toFixed(2)"></bdi></strong>
+							<span x-show="$store.wishlist.prices_ready && wishlist_item.default_price > wishlist_item.sale_price">{{ get_cart_currency().symbol }}<bdi x-text="commera.format.amount(Number(wishlist_item.default_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></bdi></span>
+							<strong x-show="$store.wishlist.prices_ready && wishlist_item.sale_price != null" x-cloak>{{ get_cart_currency().symbol }}<bdi x-text="commera.format.amount(Number(wishlist_item.sale_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></bdi></strong>
 						</td>
 						<td>
 							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route" class="btn btn-secondary btnhover text-nowrap">{{ _("Add To Cart") }}</a>

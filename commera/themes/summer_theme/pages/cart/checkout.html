@@ -4,7 +4,8 @@
 {% from "components/macros/discount_codes.html" import discount_code_chips %}
 
 {% set in_source_language = get_localization().language == get_localization().default_language %}
-{% set currency_symbol = get_currency_symbol() %}
+{% set cart_currency = get_cart_currency(cart_quotation) %}
+{% set currency_symbol = cart_currency.symbol %}
 {% set checkout_config = {
 	"payment_gateways": payment_gateways,
 	"payment_gateway_labels": payment_gateway_labels,
@@ -325,7 +326,7 @@
 											{% if item.size %}{{ item.size }} &middot; {% endif %}{{ _("Qty") }} {{ item.qty | int }}
 										</span>
 									</h6>
-									<span class="price">{{ currency_symbol }}{{ "%.2f" | format((item.amount or 0) + (item.custom_code_discount or 0) * (item.qty or 0)) }}</span>
+									<span class="price">{{ currency_symbol }}{{ cart_currency.amount((item.amount or 0) + (item.custom_code_discount or 0) * (item.qty or 0)) }}</span>
 								</div>
 							</div>
 						{% endfor %}
@@ -347,7 +348,7 @@
 							<tbody>
 								<tr class="subtotal">
 									<td>{{ _("Subtotal") }}</td>
-									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.items_total ?? active_summary.subtotal)">{{ "%.2f" | format(checkout_summary.items_total or checkout_summary.subtotal or 0) }}</span></td>
+									<td class="price">{{ currency_symbol }}<span x-text="format_amount(active_summary.items_total ?? active_summary.subtotal)">{{ cart_currency.amount(checkout_summary.items_total or checkout_summary.subtotal) }}</span></td>
 								</tr>
 								<template x-for="(discount, index) in active_summary.discounts || []" :key="index">
 									<tr class="discount">
@@ -703,7 +704,7 @@
 				},
 
 				format_amount(amount) {
-					return (Number(amount) || 0).toFixed(2);
+					return commera.format.amount(amount, {{ cart_currency.config | tojson }});
 				},
 
 				set_payment_methods(methods) {

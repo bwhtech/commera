@@ -1,3 +1,4 @@
+{% set cart_currency = get_cart_currency(cart_quotation) %}
 
 <script>
     const COD_PAYMENT_MODE = "COD";
@@ -287,7 +288,7 @@
                 {{_('Item')}}
                 {% endif %}
             )
-        </span>{{get_currency_symbol()}} <span x-text="checkout_total.toFixed(2)"></span> 
+        </span>{{ cart_currency.symbol }} <span x-text="commera.format.amount(checkout_total, {{ cart_currency.config | tojson | forceescape }})"></span>
         </h2>
         <div>
             {% call modal.modal(button_text='View Items',button_classes='text-sm text-accent font-semibold ms-2',
@@ -418,10 +419,10 @@
                             {% if cod_charge_applicable_below > cart_payable_total and cod_charge %}
                             <div class="text-red-600 rounded-lg relative mt-4">
                                 <p class="text-sm">
-                                    ({{ _('Additional cash on delivery charge of')}}  {{get_currency_symbol()}}{{"%.2f"|format(cod_charge)}} {{_('will apply')}})
+                                    ({{ _('Additional cash on delivery charge of')}}  {{ cart_currency.symbol }}{{ cart_currency.amount(cod_charge) }} {{_('will apply')}})
                                 </p>
                                 <p class="text-sm">
-                                    ({{ _('Non refundable fee of')}} {{get_currency_symbol()}} {{"%.2f"|format(cod_charge)}} {{_('will apply')}})
+                                    ({{ _('Non refundable fee of')}} {{ cart_currency.symbol }} {{ cart_currency.amount(cod_charge) }} {{_('will apply')}})
                                 </p>
                             </div>
                             {% endif %}

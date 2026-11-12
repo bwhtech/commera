@@ -343,6 +343,7 @@
                     variant: line.variant,
                     qty: line.qty,
                     price: line.price,
+                    available: line.available,
                     default_price: line.default_price,
                     brand: line.brand,
                     stock_qty: stock_of(line.variant),
@@ -430,6 +431,7 @@
                         if (!requested.has(key)) return;
                         item.stock_qty = stock_data[key] !== undefined ? stock_data[key]["stock"] : 0;
                         item.price = stock_data[key] !== undefined ? stock_data[key]["sale_price"] : 0;
+                        item.available = stock_data[key] !== undefined && item.price != null;
                         item.default_price = stock_data[key] !== undefined ? stock_data[key]["default_price"] : 0;
 
                     });

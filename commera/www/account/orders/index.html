@@ -150,6 +150,7 @@
                 item['brand'],
                 display_name,
                 item['price'],
+                currency=order.currency,
                 size=item['size']
                 )}}
             </div>
@@ -164,7 +165,7 @@
                 {{ cancel_order_button(classes='mt-4', order_id=order.name, ecommerce_order_status =order.custom_ecommerce_status) }}
             </div>
             {% if order.name | can_return(return_period) %}
-                {{ return_button("mt-4", order.name, order.delivery_status, items,return_reasons) }}
+                {{ return_button("mt-4", order.name, order.delivery_status, items,return_reasons,currency=order.currency) }}
             {% endif %}
         </div>
     </div>

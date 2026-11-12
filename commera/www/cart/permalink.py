@@ -7,6 +7,7 @@ from frappe.utils.data import cint, cstr
 from commera.api.cart import get_cart_price
 from commera.guest import is_guest, is_guest_checkout_enabled
 from commera.localization import url
+from commera.localization.market_prices import MarketPrices
 from commera.product_detail import size_sort_key
 from commera.sdk.lines import LineProducts
 from commera.utils import get_available_stocks, get_next_url
@@ -57,7 +58,9 @@ def parse_cart_codes(codes: str | None) -> tuple[dict[str, int], list[str]]:
 	return requested_quantities, notices
 
 
-def get_cart_lines(requested_quantities: dict[str, int], notices: list[str]) -> list[dict]:
+def get_cart_lines(
+	requested_quantities: dict[str, int], notices: list[str], *, keep_unavailable: bool = False
+) -> list[dict]:
 	if not requested_quantities:
 		return []
 
@@ -69,8 +72,7 @@ def get_cart_lines(requested_quantities: dict[str, int], notices: list[str]) -> 
 	}
 	variant_by_name = get_variants(variant_names)
 	products = LineProducts(list(size_row_by_item_code))
-	commera_settings = frappe.get_cached_doc("Commera Settings")
-	price_lists = (commera_settings.get_default_price_list(), commera_settings.get_sale_price_list())
+	prices = MarketPrices.current()
 
 	lines = []
 	for item_code, requested_qty in requested_quantities.items():
@@ -92,7 +94,10 @@ def get_cart_lines(requested_quantities: dict[str, int], notices: list[str]) -> 
 				)
 			)
 
-		default_price, price = get_cart_price(item_code, *price_lists)
+		default_price, price = get_cart_price(item_code, prices)
+		if price is None and not keep_unavailable:
+			notices.append(_("{0} is not available in this market.").format(size_row.item_name))
+			continue
 		variant = variant_by_name[size_row.parent]
 		lines.append(
 			{
@@ -105,6 +110,7 @@ def get_cart_lines(requested_quantities: dict[str, int], notices: list[str]) -> 
 					"title": products.get_title(item_code, size_row.item_name),
 				},
 				"qty": min(requested_qty, in_stock_qty),
+				"available": price is not None,
 				"price": price,
 				"default_price": default_price,
 				"brand": variant.brand or "",

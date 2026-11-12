@@ -26,6 +26,7 @@ from commera.discounts.selection import get_discount_codes
 from commera.guest import is_guest
 from commera.localization import url
 from commera.localization.address_countries import AddressCountries
+from commera.localization.cart_currency import get_cart_delivery_configuration
 from commera.localization.market_prices import MarketPrices
 from commera.localization.resolver import get_localization
 from commera.sdk.catalog import set_product_titles
@@ -34,7 +35,6 @@ from commera.utils import (
 	get_addresses,
 	get_cod_configuration,
 	get_country_list,
-	get_delivery_configuration,
 	get_directions_url,
 	get_free_delivery,
 	get_pickup_addresses,
@@ -91,7 +91,9 @@ def get_context(context, allow_guest: bool = False):
 	context.store_pickup_addresses = (
 		get_store_pickup_addresses() if commera_settings.store_pickup_enabled else []
 	)
-	context.delivery_charge, context.delivery_charge_applicable_below = get_delivery_configuration()
+	context.delivery_charge, context.delivery_charge_applicable_below = get_cart_delivery_configuration(
+		context.cart_quotation
+	)
 	context.cod_charge_applicable_below, context.cod_charge = get_cod_configuration()
 	context.breadcrumbs = [
 		{
@@ -163,7 +165,11 @@ def set_cart_context(context, commera_settings):
 	context.coupon_code = get_coupon_code(cart_quotation)
 	context.discount_code_states = get_code_states(cart_quotation)
 	items = get_checkout_items(cart_quotation)
-	if default_price_list:
+	if (
+		default_price_list
+		and not context.cart_needs_refresh
+		and is_priced_in(cart_quotation, MarketPrices.current())
+	):
 		for item in items:
 			item["default_price"] = frappe.db.get_value(
 				"Item Price",

@@ -11,6 +11,11 @@ export function money_text(amount, currency) {
 	return get_formatter().money_text(amount, currency);
 }
 
+// Storefront templates supply the document's rules, including historical order currencies.
+export function amount(value, rules) {
+	return (Number(value) || 0).toFixed(rules.precision);
+}
+
 export function number(value, precision = 0) {
 	return get_formatter().number(value, precision);
 }

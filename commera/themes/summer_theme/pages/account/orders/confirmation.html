@@ -34,7 +34,7 @@
 		{% if order %}
 		<p class="mb-0">
 			{{ _("Order Total") }}:
-			<strong class="text-black">{{ get_currency_symbol() }}{{ "%.2f" | format(order.payable_total) }}</strong>
+			<strong class="text-black">{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order.payable_total) }}</strong>
 		</p>
 		{% endif %}
 		<div class="mt-4 d-sm-flex gap-3 justify-content-center">

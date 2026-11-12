@@ -3,8 +3,9 @@
 
 {% block user_body %}
 
+<button x-show="$store.wishlist.prices_failed" x-cloak @click="$store.wishlist.refresh_prices(true)">{{ _("Retry prices") }}</button>
 <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-6">
-	<template x-for="item in $store.wishlist.items">
+	<template x-for="item in $store.wishlist.display_items">
 		<div class="flex flex-col w-fit mb-4">
 			<div class="relative w-fit">
 				<a :href="{{ url('/products') | tojson | forceescape }} + '/' + item.route">
@@ -30,7 +31,8 @@
 					x-text="commera.t(item.attribute_value)"></span>
 			</h4>
 			<div class="mt-2 text-sm md:text-base flex font-semibold">
-				<p class="flex">{{get_currency_symbol()}} <span x-text="item.sale_price.toFixed(2)"></span>
+				<p x-show="$store.wishlist.prices_ready && item.available === false" x-cloak>{{ _("Unavailable") }}</p>
+				<p class="flex" x-show="$store.wishlist.prices_ready && item.sale_price != null" x-cloak>{{get_cart_currency().symbol}} <span x-text="commera.format.amount(item.sale_price, {{ get_cart_currency().config | tojson | forceescape }})"></span>
 				</p>
 			</div>
 		</div>

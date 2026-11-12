@@ -94,8 +94,8 @@
                     {{_('Item(s) subtotal')}}
                 </span>
                 <span class="flex">
-                    {{get_currency_symbol()}}
-                    {{"%.2f"|format(order_summary.items_total)}}
+                    {{get_cart_currency(order).symbol}}
+                    {{ get_cart_currency(order).amount(order_summary.items_total) }}
                 </span>
             </h3>
             {% for discount in order_summary.discounts %}
@@ -105,8 +105,8 @@
                     </span>
                     <span class="flex whitespace-nowrap text-green-700">
                         &minus;
-                        {{get_currency_symbol()}}
-                        {{"%.2f"|format(discount.amount)}}
+                        {{get_cart_currency(order).symbol}}
+                        {{ get_cart_currency(order).amount(discount.amount) }}
 
                     </span>
                 </h3>
@@ -118,8 +118,8 @@
                         {{_('Shipping & Handling')}}
                     </span>
                     <span class="flex">
-                        {{get_currency_symbol()}}
-                        {{"%.2f"|format(order.total_taxes_and_charges + shipping_discount)}}
+                        {{get_cart_currency(order).symbol}}
+                        {{ get_cart_currency(order).amount(order.total_taxes_and_charges + shipping_discount) }}
                     </span>
                 </h3>
             {% endif %}
@@ -130,8 +130,8 @@
                     </span>
                     <span class="flex whitespace-nowrap text-green-700">
                         &minus;
-                        {{get_currency_symbol()}}
-                        {{"%.2f"|format(discount.amount)}}
+                        {{get_cart_currency(order).symbol}}
+                        {{ get_cart_currency(order).amount(discount.amount) }}
                     </span>
                 </h3>
             {% endfor %}
@@ -141,8 +141,8 @@
                     {{_('rounding adjustment')}}
                 </span>
                 <span class="flex">
-                    {{get_currency_symbol()}}
-                    {{"%.2f"|format(order.rounding_adjustment)}}
+                    {{get_cart_currency(order).symbol}}
+                    {{ get_cart_currency(order).amount(order.rounding_adjustment) }}
 
                 </span>
             </h3>
@@ -152,8 +152,8 @@
                     {{_('grand total')}}
                 </span>
                 <span class="flex">
-                    {{get_currency_symbol()}}
-                    {{"%.2f"|format(order.payable_total)}}
+                    {{get_cart_currency(order).symbol}}
+                    {{ get_cart_currency(order).amount(order.payable_total) }}
                 </span>
             </h3>
         </div>
@@ -168,6 +168,7 @@
                     item['brand'],
                     display_name,
                     item['price'],
+                    currency=order.currency,
                     size=item['size']
                      ) }}
                 </div>
@@ -183,7 +184,7 @@
                {{ cancel_order_button(classes='mt-4', order_id=order.name, ecommerce_order_status =order.custom_ecommerce_status) }}
             </div>
             {% if order.name | can_return(return_period) %}
-            {{return_button("mt-4",order.name,order.delivery_status,items,return_reasons)}}
+            {{return_button("mt-4",order.name,order.delivery_status,items,return_reasons,currency=order.currency)}}
             {% endif %}
             {% endif %}
         </div>

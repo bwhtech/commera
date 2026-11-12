@@ -1,4 +1,4 @@
-{% macro dashboard_product(img,brand,name,price,delivery_date = '',view_order=False,img_size="w-34 h-45",size="",info_class="md:mt-5") %}
+{% macro dashboard_product(img,brand,name,price,delivery_date = '',view_order=False,img_size="w-34 h-45",size="",info_class="md:mt-5",currency=None) %}
 
 <div class="flex">
     <img src="{% if img %} {{img}} {% else %} /assets/commera/images/1.jpg {% endif %}"
@@ -12,7 +12,7 @@
             <p class="capitalize">{{ _(name)|e }}</p>
             <p class="font-medium"><span class="capitalize">{{_("size")}}:</span> {{_(size)}}</p>
 
-            <p class="flex">{{get_currency_symbol()}} {{"%.2f"|format(price)}} </p>
+            <p class="flex">{{get_cart_currency({"currency": currency}).symbol}} {{ get_cart_currency({"currency": currency}).amount(price) }} </p>
         </div>
         {% if view_order %}
         <p class="text-base text-accent underline capitalize">

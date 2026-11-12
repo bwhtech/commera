@@ -1,3 +1,4 @@
+{% set cart_currency = get_cart_currency(cart_quotation) %}
 <div class="space-y-6">
 
     <div class="max-h-80 overflow-y-auto space-y-4 pr-2">
@@ -15,14 +16,14 @@
                 <div class="flex items-center gap-3 md:gap-2">
                     {% if cart_item.default_price %}
                     <span class="text-sm md:text-base font-medium text-accent line-through flex">
-                        {{get_currency_symbol()}}
-                        {{"%.2f"|format(cart_item.default_price)}}
+                        {{ cart_currency.symbol }}
+                        {{ cart_currency.amount(cart_item.default_price) }}
                     </span>
                     {% endif %}
                     <span class="text-sm md:text-base font-medium flex">
                         {% if cart_item.rate %}
-                        {{get_currency_symbol()}}
-                        {{"%.2f"|format(cart_item.price_list_rate)}}
+                        {{ cart_currency.symbol }}
+                        {{ cart_currency.amount(cart_item.price_list_rate) }}
                         {% else %}
                         {{_('Free')}}
                         {% endif %}
@@ -36,13 +37,13 @@
     <div class="space-y-3 my-4 py-4 border-b border-t border-gray-300">
         <div class="flex justify-between text-gray-500 text-base">
             <span>{{ _('Subtotal') }}</span>
-            <span class="font-medium flex"> {{get_currency_symbol()}} <span x-text="charge_summary.items_total.toFixed(2)">{{ "%.2f"|format(checkout_summary.items_total or 0) }}</span></span>
+            <span class="font-medium flex"> {{ cart_currency.symbol }} <span x-text="charge_summary.items_total.toFixed({{ cart_currency.precision }})">{{ cart_currency.amount(checkout_summary.items_total or 0) }}</span></span>
         </div>
 
         {% for discount in checkout_summary.discounts or [] %}
             <div class="flex justify-between text-gray-500 text-base">
                 <span>{{ _('Discount') }}{% if discount.label %} ({{ discount.label | e }}){% endif %}</span>
-                <span class="font-medium flex text-green-700"> &minus;{{get_currency_symbol()}} {{ "%.2f"|format(discount.amount) }}</span>
+                <span class="font-medium flex text-green-700"> &minus;{{ cart_currency.symbol }} {{ cart_currency.amount(discount.amount) }}</span>
             </div>
         {% endfor %}
         <div class="flex justify-between text-gray-500 text-base" x-show=" delivery_option === 'home_delivery'"
@@ -50,7 +51,7 @@
             <span class="capitalize">{{ _('non-refundable delivery charge') }}</span>
             <span class="font-medium" x-show="!is_free_delivery"
                 x-transition>
-                {{get_currency_symbol()}} <span x-text="delivery_charge.toFixed(2)"></span>
+                {{ cart_currency.symbol }} <span x-text="commera.format.amount(delivery_charge, {{ cart_currency.config | tojson | forceescape }})"></span>
             </span>
             <span class="font-medium" x-show="is_free_delivery"
                 x-transition x-cloak>
@@ -59,7 +60,7 @@
         <template x-for="(tax, index) in charge_summary.taxes" :key="index">
             <div class="flex justify-between text-gray-500 text-base">
                 <span x-text="tax.description"></span>
-                <span>{{get_currency_symbol()}} <span x-text="tax.amount.toFixed(2)"></span></span>
+                <span>{{ cart_currency.symbol }} <span x-text="tax.amount.toFixed({{ cart_currency.precision }})"></span></span>
             </div>
         </template>
         {% if cod_charge_applicable_below > cart_payable_total and cod_charge %}
@@ -67,8 +68,8 @@
             x-show="billing_address_filled && payment_mode === 'cod'" x-transition x-cloak>
             <span>{{ _('COD Charges') }}</span>
             <span class="font-medium flex">
-                {{get_currency_symbol()}}
-                {{"%.2f"|format(cod_charge)}}
+                {{ cart_currency.symbol }}
+                {{ cart_currency.amount(cod_charge) }}
             </span>
         </div>
         {% endif %}
@@ -77,16 +78,16 @@
            >
             <span>{{ _('Round Off') }}</span>
             <span class="font-medium flex">
-               {{get_currency_symbol()}}
-                {{"%.2f"|format(cart_quotation.rounding_adjustment)}} 
+               {{ cart_currency.symbol }}
+                {{ cart_currency.amount(cart_quotation.rounding_adjustment) }} 
             </span>
         </div>
         {% endif %}
     </div>
     <div class="flex justify-between text-base font-bold">
         <span class="uppercase">{{ _('Total') }}</span>
-        <div>{{get_currency_symbol()}}
-             <span class="font-medium" x-text="checkout_total.toFixed(2)"> </span>
+        <div>{{ cart_currency.symbol }}
+             <span class="font-medium" x-text="commera.format.amount(checkout_total, {{ cart_currency.config | tojson | forceescape }})"> </span>
         </div>
     </div>
 </div>
