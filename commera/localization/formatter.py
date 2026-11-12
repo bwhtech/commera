@@ -15,15 +15,21 @@ from frappe.utils.number_format import NumberFormat
 from commera.localization.date_formats import DATE_STYLES, DateFormats, get_babel_locale
 from commera.localization.languages import Language
 from commera.localization.resolver import get_localization
-from commera.utils import CURRENCY_SIGNS, get_currency_symbol, get_selling_currencies, get_store_currency
+from commera.utils import (
+	CURRENCY_SIGNS,
+	get_currency_symbol,
+	get_selling_currencies,
+	get_store_currency,
+	is_currency_symbol_hidden,
+)
 
 DEFAULT_NUMBER_FORMAT = "#,###.##"
 NO_BREAK_SPACE = "\u00a0"
 
 
 class Formatter:
-	"""Money has the digits of ERPNext's print formats, so a price reads as on the invoice. A symbol goes
-	before the amount in a left-to-right language and after it in a right-to-left one; a sign, always left."""
+	"""Money has the digits of ERPNext's print formats. A symbol goes after the amount in a right-to-left
+	language or when its Currency's symbol_on_right is set, else before; a sign, always left."""
 
 	def __init__(self, language: Language, number_format: str | None = None):
 		self.language = language
@@ -42,10 +48,7 @@ class Formatter:
 		if is_currency_sign(currency):
 			formatted = formatted.replace("-", "\u2212", 1)
 			return isolate_left_to_right(f"{symbol}{formatted}")
-		sign, digits = split_sign(formatted)
-		if self.language.direction == "rtl":
-			return f"{sign}{digits}{NO_BREAK_SPACE}{symbol.strip()}"
-		return f"{sign}{symbol}{digits}"
+		return self.place_symbol(formatted, symbol, currency)
 
 	def money_text(self, amount, currency=None, precision=None) -> str:
 		currency = currency or get_store_currency()
@@ -56,8 +59,13 @@ class Formatter:
 		if is_currency_sign(currency):
 			formatted = formatted.replace("-", "\u2212", 1)
 			return f"{symbol}{NO_BREAK_SPACE}{formatted}"
+		return self.place_symbol(formatted, symbol, currency)
+
+	def place_symbol(self, formatted: str, symbol: str, currency: str) -> str:
+		if not symbol:
+			return formatted
 		sign, digits = split_sign(formatted)
-		if self.language.direction == "rtl":
+		if self.language.direction == "rtl" or is_symbol_on_right(currency):
 			return f"{sign}{digits}{NO_BREAK_SPACE}{symbol.strip()}"
 		return f"{sign}{symbol}{digits}"
 
@@ -115,6 +123,7 @@ def get_money_format(currency: str) -> dict:
 	return {
 		"precision": get_money_precision(currency),
 		"fraction_precision": get_fraction_precision(currency),
+		"symbol_on_right": is_symbol_on_right(currency),
 	}
 
 
@@ -130,9 +139,14 @@ def get_fraction_precision(currency: str) -> int:
 	return len(cstr(fraction_units)) - 1
 
 
+def is_symbol_on_right(currency: str) -> bool:
+	"""The Currency's "Show Currency Symbol on Right Side", which fmt_money follows too."""
+	return bool(frappe.db.get_value("Currency", currency, "symbol_on_right", cache=True))
+
+
 def strip_fmt_money_symbol(formatted: str, currency: str) -> str:
 	"""fmt_money adds the Currency record's symbol; Commera places its own by text direction."""
-	if frappe.defaults.get_global_default("hide_currency_symbol") in ("1", "Yes"):
+	if is_currency_symbol_hidden():
 		return formatted
 	symbol = _(frappe.db.get_value("Currency", currency, "symbol", cache=True) or currency)
 	# Only the side fmt_money used: a symbol made of digits could match the amount's other end.
@@ -155,7 +169,7 @@ def get_language_number_format(code: str) -> str:
 def email_money(amount: float | None, currency: str | None = None) -> str:
 	"""fmt_money for order emails. Email clients ignore webfonts, so a riyal or dirham shows its code."""
 	formatted = fmt_money(amount, currency=currency)
-	if currency not in CURRENCY_SIGNS:
+	if currency not in CURRENCY_SIGNS or is_currency_symbol_hidden():
 		return formatted
 	return f"{currency}{NO_BREAK_SPACE}{strip_fmt_money_symbol(formatted, currency)}"
 

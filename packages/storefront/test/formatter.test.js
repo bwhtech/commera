@@ -213,3 +213,14 @@ test('Starter discount and rounding bindings render signed amounts', () => {
 		}
 	}
 });
+
+// Global Defaults' "Hide Currency Symbol": the server sends each currency an empty symbol.
+test('money prints no symbol, not even a sign, when the symbols are hidden', () => {
+	const currency_symbols = { USD: '', SAR: '' };
+	for (const language of ['en', 'ar']) {
+		const formatter = formatter_for(language, { currency_symbols });
+		assert.equal(formatter.money(1234.5, 'USD'), '1,234.50');
+		assert.equal(formatter.money(-1234.5, 'SAR'), '-1,234.50');
+		assert.equal(formatter.money_text(1234.5, 'SAR'), '1,234.50');
+	}
+});

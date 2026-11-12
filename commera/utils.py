@@ -489,11 +489,18 @@ def get_store_currency(company: str | None = None) -> str:
 
 
 def get_currency_symbol(currency: str | None = None):
+	"""The symbol the storefront prints. None when Global Defaults hide the symbols, as fmt_money does."""
 	currency = currency or get_store_currency()
+	if is_currency_symbol_hidden():
+		return ""
 	if currency in CURRENCY_SIGNS:
 		return CURRENCY_SIGNS[currency]
 	# A code needs a gap before the amount; a plain space collapses inside the flex price wrappers.
 	return frappe.get_cached_value("Currency", currency, "symbol") or f"{currency}\u00a0"
+
+
+def is_currency_symbol_hidden() -> bool:
+	return frappe.defaults.get_global_default("hide_currency_symbol") in ("1", "Yes")
 
 
 @request_cache

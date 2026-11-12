@@ -288,7 +288,7 @@
                 {{_('Item')}}
                 {% endif %}
             )
-        </span>{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{% if not cart_currency.is_sign %} {% endif %}<span x-text="commera.format.amount(checkout_total, {{ cart_currency.config | tojson | forceescape }})"></span>{% if cart_currency.is_sign %}</bdi>{% endif %}
+        </span>{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{% if not cart_currency.is_sign %} {% endif %}<span x-text="commera.format.amount(checkout_total, {{ cart_currency.config | tojson | forceescape }})"></span>{{ cart_currency.symbol_after }}{% if cart_currency.is_sign %}</bdi>{% endif %}
         </h2>
         <div>
             {% call modal.modal(button_text='View Items',button_classes='text-sm text-accent font-semibold ms-2',
@@ -419,10 +419,10 @@
                             {% if cod_charge_applicable_below > cart_payable_total and cod_charge %}
                             <div class="text-red-600 rounded-lg relative mt-4">
                                 <p class="text-sm">
-                                    ({{ _('Additional cash on delivery charge of')}}  {% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{{ cart_currency.amount(cod_charge) }}{% if cart_currency.is_sign %}</bdi>{% endif %} {{_('will apply')}})
+                                    ({{ _('Additional cash on delivery charge of')}}  {% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{{ cart_currency.amount(cod_charge) }}{{ cart_currency.symbol_after }}{% if cart_currency.is_sign %}</bdi>{% endif %} {{_('will apply')}})
                                 </p>
                                 <p class="text-sm">
-                                    ({{ _('Non refundable fee of')}} {% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{% if not cart_currency.is_sign %} {% endif %}{{ cart_currency.amount(cod_charge) }}{% if cart_currency.is_sign %}</bdi>{% endif %} {{_('will apply')}})
+                                    ({{ _('Non refundable fee of')}} {% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{% if not cart_currency.is_sign %} {% endif %}{{ cart_currency.amount(cod_charge) }}{{ cart_currency.symbol_after }}{% if cart_currency.is_sign %}</bdi>{% endif %} {{_('will apply')}})
                                 </p>
                             </div>
                             {% endif %}
