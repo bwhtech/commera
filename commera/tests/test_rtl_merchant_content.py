@@ -54,6 +54,15 @@ class TestRtlMerchantContent(ProductDetailPriceTestCase):
 		)
 		self.assertIn("<h1><bdi>Shirts &amp; co (Summer).</bdi></h1>", html)
 
+	def test_the_legacy_collection_heading_is_isolated_and_escaped(self):
+		html = render_value_lines(
+			"templates/partials/products_list/body.html",
+			["_(category)"],
+			category="Shirts & co (Summer).",
+			total_count=3,
+		)
+		self.assertIn("<bdi>Shirts &amp; co (Summer).</bdi> (3)", html)
+
 	def test_the_legacy_page_isolates_english_content(self):
 		route = self.make_product("RTLLEGACY", ENGLISH)
 		activate_theme("Shop Default Theme")
