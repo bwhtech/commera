@@ -32,7 +32,7 @@
         {% with sales_invoice = frappe.get_all("Sales Invoice",filters={'sales_order':order.name},limit=1) %}
         {% if sales_invoice and shows_private_details %}
         <a href="/api/method/frappe.utils.print_format.download_pdf?doctype=Sales Invoice&name={{sales_invoice[0].name}}&format={{print_format}}" target="_blank" class="text-base flex items-center mb-2 md:mb-0 "       x-show="!partially_returned">
-            {% if order.custom_ecommerce_status == "Delivered"  %}
+            {% if order.custom_ecommerce_status in ("Partially Shipped", "Delivered") %}
                     {{icon("invoice",classes = 'size-4 me-1')}}
                     {{_('Invoice')}}
                 {% endif %}

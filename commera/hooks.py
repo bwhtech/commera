@@ -253,7 +253,11 @@ doc_events = {
 			"commera.plugin_events.on_sales_order_cancel",
 			"commera.plugin_events.on_sales_order_stock_reservation",
 		],
-		"on_update_after_submit": "commera.plugin_events.on_sales_order_update_after_submit",
+		"on_update_after_submit": [
+			"commera.plugin_events.on_sales_order_update_after_submit",
+			"commera.doc_events.sales_order.on_update_after_submit",
+		],
+		"on_change": "commera.doc_events.sales_order.on_change",
 		"on_trash": "commera.doc_events.sales_order.on_trash",
 	},
 	"Stock Ledger Entry": {

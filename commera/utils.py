@@ -919,7 +919,7 @@ def update_sales_order_ecommerce_status(sales_order_name):
 	order = frappe.db.get_value(
 		"Sales Order",
 		sales_order_name,
-		["docstatus", "custom_ecommerce_status", "order_type"],
+		["docstatus", "custom_ecommerce_status", "order_type", "modified"],
 		as_dict=True,
 		for_update=True,
 	)
@@ -933,12 +933,16 @@ def update_sales_order_ecommerce_status(sales_order_name):
 	else:
 		new_status = get_fulfilment_status(sales_order_name)
 
+	# Writing an unchanged status would bump modified and fail the next save from an open form.
+	if new_status == order.custom_ecommerce_status:
+		return
+
 	frappe.db.set_value("Sales Order", sales_order_name, "custom_ecommerce_status", new_status)
-	if order.order_type == STORE_ORDER_TYPE and new_status != order.custom_ecommerce_status:
-		fire_status_events(sales_order_name, new_status)
+	if order.order_type == STORE_ORDER_TYPE:
+		fire_status_events(sales_order_name, new_status, order.modified)
 
 
-def fire_status_events(sales_order_name, status: str):
+def fire_status_events(sales_order_name, status: str, modified):
 	events = list(FULFILMENT_EVENTS.get(status, ()))
 	if get_handlers("commera_events", "order_updated"):
 		events.append("order_updated")
@@ -952,13 +956,14 @@ def fire_status_events(sales_order_name, status: str):
 			"Sales Order",
 			sales_order_name,
 			order_snapshot=order_snapshot,
-			**get_status_event_args(event, status),
+			**get_status_event_args(event, status, modified),
 		)
 
 
-def get_status_event_args(event: str, status: str) -> dict:
+def get_status_event_args(event: str, status: str, modified) -> dict:
 	if event == "order_updated":
-		return {"data": {"status": status}, "key": f"status-{frappe.scrub(status)}"}
+		# Overlapping recounts of one move read the same modified and fire once. A later move back fires again.
+		return {"data": {"status": status}, "key": f"status-{frappe.scrub(status)}-{cstr(modified)}"}
 	if event != "order_returned":
 		return {}
 	# Keyed on the status, so a partial return and the full return that follows each fire once.
@@ -968,7 +973,7 @@ def get_status_event_args(event: str, status: str) -> dict:
 	}
 
 
-FORWARD_STATUSES = ("Order Received", "Preparing for Shipment", "Shipped", "Delivered")
+FORWARD_STATUSES = ("Order Received", "Preparing for Shipment", "Partially Shipped", "Shipped", "Delivered")
 
 
 def get_fulfilment_status(sales_order_name) -> str:
@@ -979,12 +984,14 @@ def get_fulfilment_status(sales_order_name) -> str:
 	)
 	supplier_lines = [line for line in lines if line.delivered_by_supplier]
 	if not supplier_lines:
-		return get_store_status(sales_order_name)
+		return get_store_status(sales_order_name, lines)
 
 	supplier_status = get_supplier_status(sales_order_name, supplier_lines)
 	if len(supplier_lines) == len(lines):
 		return supplier_status
-	return get_earlier_status(get_store_status(sales_order_name, from_delivery_note=True), supplier_status)
+	return get_earlier_status(
+		get_store_status(sales_order_name, lines, from_delivery_note=True), supplier_status
+	)
 
 
 def get_supplier_status(sales_order_name, supplier_lines) -> str:
@@ -1004,7 +1011,17 @@ def get_earlier_status(store_status: str, supplier_status: str) -> str:
 	return earlier
 
 
-def get_store_status(sales_order_name, from_delivery_note: bool | None = None) -> str:
+def get_lines_the_store_ships(lines) -> list:
+	"""Outstanding lines a Delivery Note can take. ERPNext's mapper leaves out drop-ship lines: the supplier
+	ships those against a Purchase Order."""
+	return [
+		line
+		for line in lines
+		if not cint(line.delivered_by_supplier) and flt(line.delivered_qty) < flt(line.qty)
+	]
+
+
+def get_store_status(sales_order_name, lines, from_delivery_note: bool | None = None) -> str:
 	delivery_lines = get_delivery_note_lines(sales_order_name)
 	submitted_lines = [line for line in delivery_lines if line.docstatus == 1]
 	delivered_qty = sum(flt(line.qty) for line in submitted_lines if not line.is_return)
@@ -1015,7 +1032,18 @@ def get_store_status(sales_order_name, from_delivery_note: bool | None = None) -
 	if returned_qty:
 		return "Partially Returned"
 
-	if carrier_status := get_carrier_status(sales_order_name, from_delivery_note):
+	carrier_status = get_carrier_status(sales_order_name, from_delivery_note)
+	is_short_shipped = delivered_qty and get_lines_the_store_ships(lines)
+	# A parcel still waiting at the store has shipped nothing, and one sent back ends that shipment.
+	# A closed order ships nothing more, so what already left is the whole delivery.
+	if (
+		is_short_shipped
+		and carrier_status in (None, "Shipped", "Delivered")
+		and frappe.db.get_value("Sales Order", sales_order_name, "status") != "Closed"
+	):
+		return "Partially Shipped"
+
+	if carrier_status:
 		return carrier_status
 
 	if delivered_qty:

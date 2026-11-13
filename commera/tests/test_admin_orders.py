@@ -530,11 +530,11 @@ class TestDropShipFulfilment(IntegrationTestCase):
 		self.assertFalse(get_order(sales_order.name)["can_fulfil"])
 
 
-def make_drop_ship_order(with_store_line: bool = False):
+def make_drop_ship_order(with_store_line: bool = False, store_line_qty: int = 1):
 	sales_order = make_test_sales_order(submit=False)
 	if with_store_line:
 		sales_order.append(
-			"items", {"item_code": sales_order.items[0].item_code, "qty": 1, "rate": ITEM_RATE}
+			"items", {"item_code": sales_order.items[0].item_code, "qty": store_line_qty, "rate": ITEM_RATE}
 		)
 	sales_order.items[0].update({"delivered_by_supplier": 1, "supplier": get_drop_ship_supplier()})
 	sales_order.save()
