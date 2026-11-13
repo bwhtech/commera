@@ -23,6 +23,7 @@ from commera.api.payments import (
 	make_sales_invoice,
 	place_cod_order,
 	validate_cart_is_not_in_checkout,
+	validate_invoice_currency,
 )
 from commera.jobs import delete_old_draft_quotations, sync_pending_gateway_payments
 from commera.plugin_events import (
@@ -449,7 +450,64 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.assertEqual(invoice.status, "Partly Paid")
 		self.assertFalse(payment.deductions)
 
-	def create_fractional_invoice(self, rate, disabled):
+	def test_advance_does_not_turn_a_partial_foreign_payment_into_settlement(self):
+		invoice = self.create_fractional_invoice(1.01, 1, advance=1)
+		self.assertEqual((invoice.total_advance, invoice.outstanding_amount), (1, 10.37))
+		payment = create_payment_entry(invoice, GATEWAY, 2.03, None)
+		invoice.reload()
+		self.assertEqual((invoice.status, invoice.outstanding_amount), ("Partly Paid", 2.76))
+		self.assertEqual(payment.received_amount, 7.61)
+		self.assertFalse(payment.deductions)
+
+	def test_foreign_overpayments_remain_customer_advances(self):
+		for extra, receipt, advance in ((0.01, 11.63, 0.05), (1, 15.34, 3.76)):
+			with self.subTest(extra=extra):
+				invoice = self.create_fractional_invoice(1.03, 1)
+				payment = create_payment_entry(invoice, GATEWAY, flt(invoice.grand_total + extra, 2), None)
+				invoice.reload()
+				self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
+				self.assertEqual(payment.received_amount, receipt)
+				self.assertEqual(payment.unallocated_amount, advance)
+				self.assertEqual(payment.references[0].allocated_amount, 11.58)
+				self.assertFalse(payment.deductions)
+				self.assertEqual(payment.difference_amount, 0)
+
+	def test_repeat_full_foreign_payment_on_part_paid_invoice_keeps_the_surplus(self):
+		invoice = self.create_fractional_invoice(1.01, 1)
+		create_payment_entry(invoice, GATEWAY, 1, None)
+		invoice.reload()
+		payment = create_payment_entry(invoice, GATEWAY, invoice.grand_total, None)
+		invoice.reload()
+		self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
+		self.assertEqual(payment.received_amount, 11.36)
+		self.assertEqual(payment.unallocated_amount, 3.74)
+		self.assertFalse(payment.deductions)
+
+	def test_split_foreign_payments_that_add_up_settle_the_invoice(self):
+		invoice = self.create_fractional_invoice(1.01, 1)
+		create_payment_entry(invoice, GATEWAY, 1, None)
+		invoice.reload()
+		payment = create_payment_entry(invoice, GATEWAY, 2.03, None)
+		invoice.reload()
+		self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
+		self.assertEqual((payment.received_amount, payment.references[0].allocated_amount), (7.61, 7.62))
+		self.assertEqual([row.amount for row in payment.deductions], [0.01])
+
+	def test_foreign_checkout_needs_a_rounding_account_before_capture(self):
+		self.allow_multi_currency_invoices()
+		quotation = self.create_cart_quotation(currency=FOREIGN_CURRENCY, conversion_rate=3.75)
+		validate_invoice_currency(quotation)
+		with (
+			patch("commera.api.payments.get_rounding_account", return_value=None),
+			self.assertRaisesRegex(frappe.ValidationError, "not available"),
+		):
+			validate_invoice_currency(quotation)
+
+	def test_company_currency_checkout_needs_no_rounding_account(self):
+		with patch("commera.api.payments.get_rounding_account", return_value=None):
+			validate_invoice_currency(self.quotation)
+
+	def create_fractional_invoice(self, rate, disabled, advance=0):
 		self.allow_multi_currency_invoices()
 		invoice = frappe.get_doc(
 			{
@@ -463,6 +521,38 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 				"items": [{"item_code": self.item_code, "qty": 1, "rate": rate} for _ in range(3)],
 			}
 		)
+		if advance:
+			journal = frappe.get_doc(
+				{
+					"doctype": "Journal Entry",
+					"company": COMPANY,
+					"posting_date": getdate(),
+					"accounts": [
+						{"account": DEFAULT_CASH_ACCOUNT, "debit_in_account_currency": advance},
+						{
+							"account": frappe.get_cached_value(
+								"Company", COMPANY, "default_receivable_account"
+							),
+							"party_type": "Customer",
+							"party": self.customer,
+							"credit_in_account_currency": advance,
+							"is_advance": "Yes",
+						},
+					],
+				}
+			).insert(ignore_permissions=True)
+			journal.submit()
+			invoice.allocate_advances_automatically = 0
+			invoice.append(
+				"advances",
+				{
+					"reference_type": "Journal Entry",
+					"reference_name": journal.name,
+					"reference_row": journal.accounts[1].name,
+					"advance_amount": advance,
+					"allocated_amount": advance,
+				},
+			)
 		invoice.insert(ignore_permissions=True)
 		invoice.submit()
 		return invoice

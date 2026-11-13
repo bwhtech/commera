@@ -247,6 +247,9 @@ def validate_invoice_currency(quotation):
 	"""A paid cart is invoiced in its own currency right after capture, so ERPNext must accept that first."""
 	customer = quotation.party_name if quotation.quotation_to == "Customer" else None
 	reason = get_invoice_currency_error(quotation.company, quotation.currency, customer)
+	company = frappe.get_cached_doc("Company", quotation.company)
+	if not reason and quotation.currency != company.default_currency and not get_rounding_account(company):
+		reason = f"Company {company.name} has no Exchange Gain / Loss Account or Round Off Account"
 	if reason:
 		refuse_payment(
 			_(
@@ -584,20 +587,12 @@ def create_sales_invoice(sales_order, payment_mode: str, paid_amount: float, ref
 
 def create_payment_entry(sales_invoice, payment_mode: str, paid_amount: float, reference_no: str | None):
 	"""`paid_amount` is what the gateway charged, in the invoice currency."""
-	total_field = "grand_total" if sales_invoice.disable_rounded_total else "rounded_total"
-	amount_due = flt(sales_invoice.get(total_field)) - flt(sales_invoice.total_advance)
-	full_settlement = flt(paid_amount, sales_invoice.precision(total_field)) == flt(
-		amount_due, sales_invoice.precision(total_field)
-	)
-	# Row rounding can make the receivable differ from the converted invoice total.
-	party_amount = min(
-		convert_invoice_amount(sales_invoice, paid_amount, sales_invoice.party_account_currency),
-		flt(sales_invoice.outstanding_amount),
-	)
-	if full_settlement:
-		party_amount = flt(sales_invoice.outstanding_amount)
-	if party_amount <= 0:
+	receipt = convert_invoice_amount(sales_invoice, paid_amount, sales_invoice.party_account_currency)
+	if receipt <= 0:
 		return None
+	outstanding = flt(sales_invoice.outstanding_amount)
+	difference = flt(abs(receipt - outstanding), sales_invoice.precision("outstanding_amount"))
+	is_settled = difference <= get_rounding_tolerance(sales_invoice)
 
 	mode_of_payment = gateway_mode_of_payment(payment_mode)
 	bank = get_default_bank_cash_account(
@@ -606,12 +601,11 @@ def create_payment_entry(sales_invoice, payment_mode: str, paid_amount: float, r
 	payment_entry = get_payment_entry(
 		"Sales Invoice",
 		sales_invoice.name,
-		party_amount=party_amount,
+		party_amount=outstanding if is_settled else min(receipt, outstanding),
 		bank_account=bank.get("account"),
 		bank_amount=convert_invoice_amount(sales_invoice, paid_amount, bank.get("account_currency")),
 	)
-	if full_settlement:
-		settle_payment_receipt(payment_entry, sales_invoice, paid_amount)
+	set_payment_receipt(payment_entry, sales_invoice, paid_amount, is_settled)
 	payment_entry.mode_of_payment = mode_of_payment
 	if reference_no:
 		# Load-bearing: bwh_payments matches a refund Payment Entry back to its gateway session on this.
@@ -624,11 +618,24 @@ def create_payment_entry(sales_invoice, payment_mode: str, paid_amount: float, r
 	return payment_entry
 
 
-def settle_payment_receipt(payment_entry, sales_invoice, paid_amount):
+def get_rounding_tolerance(sales_invoice) -> float:
+	"""Up to half a minor unit per converted item row, tax row, total and receipt."""
+	if sales_invoice.party_account_currency == sales_invoice.currency:
+		return 0
+	minor_unit = 10 ** -sales_invoice.precision("outstanding_amount")
+	rounded_amounts = len(sales_invoice.items) + len(sales_invoice.taxes) + 2
+	return flt(rounded_amounts * minor_unit / 2, sales_invoice.precision("outstanding_amount"))
+
+
+def set_payment_receipt(payment_entry, sales_invoice, paid_amount, is_settled):
+	"""Record the whole charge. An overpayment stays unallocated, as a customer advance."""
+	if not is_settled:
+		payment_entry.paid_amount = convert_invoice_amount(
+			sales_invoice, paid_amount, payment_entry.paid_from_account_currency
+		)
 	receipt = convert_invoice_amount(sales_invoice, paid_amount, payment_entry.paid_to_account_currency)
-	if receipt is None:
-		return
-	payment_entry.received_amount = receipt
+	if receipt is not None:
+		payment_entry.received_amount = receipt
 	if payment_entry.paid_from_account_currency == payment_entry.paid_to_account_currency:
 		# ERPNext sets received_amount from paid_amount for accounts in the same currency.
 		payment_entry.paid_amount = receipt
@@ -637,18 +644,25 @@ def settle_payment_receipt(payment_entry, sales_invoice, paid_amount):
 			payment_entry.base_total_allocated_amount - payment_entry.base_received_amount,
 			payment_entry.precision("difference_amount"),
 		)
-		if difference:
-			company = frappe.get_cached_doc("Company", sales_invoice.company)
-			account = company.exchange_gain_loss_account or company.round_off_account
-			if not account:
-				frappe.throw(
-					_("Set an Exchange Gain / Loss Account or Round Off Account for {0}").format(company.name)
-				)
-			payment_entry.append(
-				"deductions",
-				{"account": account, "cost_center": company.cost_center, "amount": difference},
-			)
+		if is_settled and difference:
+			add_rounding_deduction(payment_entry, difference)
 	payment_entry.set_amounts()
+
+
+def add_rounding_deduction(payment_entry, amount):
+	company = frappe.get_cached_doc("Company", payment_entry.company)
+	account = get_rounding_account(company)
+	if not account:
+		frappe.throw(
+			_("Set an Exchange Gain / Loss Account or Round Off Account for {0}").format(company.name)
+		)
+	payment_entry.append(
+		"deductions", {"account": account, "cost_center": company.cost_center, "amount": amount}
+	)
+
+
+def get_rounding_account(company) -> str | None:
+	return company.exchange_gain_loss_account or company.round_off_account
 
 
 def convert_invoice_amount(sales_invoice, amount: float, currency: str | None) -> float | None:
