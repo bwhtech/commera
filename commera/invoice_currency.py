@@ -4,12 +4,7 @@ from erpnext.accounts.services.party_validation import PartyValidator
 
 
 def get_invoice_currency_error(company: str, currency: str, customer: str | None = None) -> str | None:
-	"""Why ERPNext would refuse a Sales Invoice in `currency`, or None if it accepts one.
-
-	A paid cart is invoiced right after the gateway captures it, so checkout asks before it opens a session.
-	These are the party checks Sales Invoice runs on save, on a draft that is never saved. No `customer`
-	stands for a new one, on the company's default receivable account.
-	"""
+	"""Run ERPNext currency checks without saving an invoice or adding shopper messages."""
 	invoice = frappe.new_doc("Sales Invoice")
 	invoice.update(
 		{
