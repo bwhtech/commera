@@ -175,7 +175,7 @@
 				<p x-show="error && step === 'payment'" x-text="error" role="alert" class="text-base text-ink-red-7"></p>
 				{{ checkout_blocked_notice() }}
 				<button type="submit" :disabled="busy || needs_shipping_option || !payment_method || $store.cart.has_unavailable" :aria-busy="busy === 'pay'" class="button-primary relative w-full">
-					{{ _("Pay") }}&nbsp;<span x-html="money(total)"></span>
+					{{ _("Pay") }}<span x-show="!delivery_unavailable">&nbsp;<span x-html="money(total)"></span></span>
 					{{ spinner("busy === 'pay'", "size-5 text-on-brand") }}
 				</button>
 			</form>
