@@ -1,6 +1,5 @@
 import frappe
 from frappe.core.doctype.doctype.doctype import validate_permissions_for_doctype
-from frappe.permissions import setup_custom_perms
 
 from commera.roles import COMMERA_ADMIN, add_admin_permission
 
@@ -16,13 +15,14 @@ def execute():
 	if not frappe.db.exists("Role", COMMERA_ADMIN):
 		return
 	for doctype, rights in TRANSLATION_RIGHTS.items():
-		grant_rights(doctype, rights)
+		# Without Custom DocPerm rows, the doctype JSON grants these rights.
+		if frappe.db.exists("Custom DocPerm", {"parent": doctype}):
+			grant_rights(doctype, rights)
 
 
 def grant_rights(doctype, rights):
 	"""Set only the missing rights on Commera Admin's level 0 row, or add the row. Other roles,
 	rights and restrictions stay as they are."""
-	setup_custom_perms(doctype)
 	key = {"parent": doctype, "role": COMMERA_ADMIN, "permlevel": 0}
 	name = frappe.db.get_value("Custom DocPerm", key)
 	if not name:

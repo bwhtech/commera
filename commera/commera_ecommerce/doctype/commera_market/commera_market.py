@@ -2,44 +2,28 @@
 # For license information, please see license.txt
 
 import re
-from contextlib import contextmanager
-from functools import wraps
 
 import frappe
+from erpnext.stock.doctype.price_list.price_list import validate_price_list_country
 from frappe import _
 from frappe.model.document import Document
 from frappe.query_builder import DocType
 from frappe.website.utils import clear_cache as clear_website_cache
 
 from commera.localization.languages import StorefrontLanguages
+from commera.localization.market_setup import MarketStoreFit, market_field, validates_field
 from commera.localization.markets import PRIMARY_MARKET, clear_market_cache, is_market_language
 from commera.search.price_sync import rebuild_if_market_prices_change
 from commera.search.translations import reindex_market_records
-from commera.utils import get_store_company
 
 HANDLE_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-
-
-@contextmanager
-def market_field(fieldname):
-	try:
-		yield
-	except frappe.ValidationError as error:
-		if not getattr(error, "field", None):
-			error.field = fieldname
-		raise
-
-
-def validates_field(fieldname):
-	def decorate(validate):
-		@wraps(validate)
-		def wrapped(*args, **kwargs):
-			with market_field(fieldname):
-				return validate(*args, **kwargs)
-
-		return wrapped
-
-	return decorate
+# Orders and carts keep the market handle as text, so Frappe's link check does not see them. A link
+# field cannot hold it: they store "primary" for the store's own prices.
+MARKET_REFERENCES = (
+	("Sales Order", "commera_market"),
+	("Quotation", "commera_market"),
+	("Commera Cart", "market"),
+)
 
 
 class CommeraMarket(Document):
@@ -75,11 +59,47 @@ class CommeraMarket(Document):
 		self.name = self.handle
 
 	def validate(self):
-		self.validate_handle()
-		self.validate_countries()
-		self.validate_languages()
-		self.validate_price_lists()
-		self.validate_tax_template()
+		if not self.enabled:
+			self.currency = get_price_list_currency(self.sale_price_list)
+		if frappe.flags.in_patch or frappe.flags.in_migrate:
+			return
+		full = self.is_new() or self.is_enabled_now()
+		if full or self.has_fields_changed("handle"):
+			self.validate_handle()
+		if full or self.has_fields_changed("countries"):
+			self.validate_countries()
+		if full or self.has_fields_changed("languages", "default_language", "countries"):
+			self.validate_languages()
+		# A disabled market sells nothing, so it need not fit the store setup yet.
+		if self.enabled:
+			self.validate_store_fit(full)
+
+	def validate_store_fit(self, full: bool):
+		before = self.get_doc_before_save()
+		if full or self.has_fields_changed("sale_price_list", "compare_at_price_list"):
+			self.validate_price_lists(full=full)
+		if full or self.has_fields_changed("sale_price_list", "countries"):
+			self.validate_price_list_countries()
+		fit = MarketStoreFit(self)
+		if full or self.has_fields_changed("tax_template"):
+			fit.validate_tax_template()
+		if full or (self.has_fields_changed("sale_price_list") and self.currency != before.currency):
+			fit.validate_invoice_currency()
+		if full or self.has_fields_changed("countries"):
+			old = set() if full else {row.country for row in before.countries}
+			fit.validate_delivery_countries([row.country for row in self.countries if row.country not in old])
+
+	def is_enabled_now(self) -> bool:
+		before = self.get_doc_before_save()
+		return bool(self.enabled and before and not before.enabled)
+
+	def has_fields_changed(self, *fields) -> bool:
+		return any(
+			not self.is_child_table_same(field)
+			if self.meta.get_field(field).fieldtype == "Table"
+			else self.has_value_changed(field)
+			for field in fields
+		)
 
 	def before_save(self):
 		self.reinsert_changed_countries()
@@ -89,11 +109,28 @@ class CommeraMarket(Document):
 		rebuild_if_market_prices_change(self.get_doc_before_save(), self)
 
 	def on_trash(self):
+		self.validate_not_in_use()
 		rebuild_if_market_prices_change(self, None)
 		reindex_market_records(self.name)
 		# An export would list them under a market an import refuses.
 		frappe.db.delete("Content Translation", {"market": self.name})
+
+	def after_delete(self):
+		# robots.txt lists the market URLs it reads, so the row must be gone.
 		refresh_market_surfaces()
+
+	def validate_not_in_use(self):
+		"""Without its market, an order or cart is repriced in the store currency, and a new market with
+		the same handle would take it over."""
+		for doctype, fieldname in MARKET_REFERENCES:
+			if name := frappe.db.get_value(doctype, {fieldname: self.name}):
+				frappe.throw(
+					_("Market {0} is used by {1} {2}. Disable the market instead of deleting it.").format(
+						frappe.bold(self.market_name), _(doctype), frappe.bold(name)
+					),
+					title=_("Market In Use"),
+					exc=frappe.LinkExistsError,
+				)
 
 	@validates_field("handle")
 	def validate_handle(self):
@@ -168,7 +205,7 @@ class CommeraMarket(Document):
 
 	def get_saved_languages(self) -> set[str]:
 		before = self.get_doc_before_save()
-		return {row.language for row in before.languages} if before else set()
+		return set() if not before or self.is_enabled_now() else {row.language for row in before.languages}
 
 	def validate_no_region(self, code: str):
 		"""The hreflang of a market URL is `<language>-<COUNTRY>`. pt-BR in Portugal has no valid tag."""
@@ -183,22 +220,21 @@ class CommeraMarket(Document):
 			)
 
 	@validates_field("compare_at_price_list")
-	def validate_price_lists(self):
+	def validate_price_lists(self, full=True):
 		"""The market sells in the sale price list's currency; Commera converts no prices."""
 		for fieldname in ("sale_price_list", "compare_at_price_list"):
 			with market_field(fieldname):
-				if (price_list := self.get(fieldname)) and not frappe.get_cached_value(
-					"Price List", price_list, "selling"
-				):
-					frappe.throw(
-						_("{0} {1} is not a selling price list.").format(
-							_(self.meta.get_label(fieldname)), frappe.bold(price_list)
-						),
-						title=_("Invalid Price List"),
-					)
+				if (full or self.has_value_changed(fieldname)) and (price_list := self.get(fieldname)):
+					validate_selling_price_list(price_list, _(self.meta.get_label(fieldname)))
 		self.currency = get_price_list_currency(self.sale_price_list)
 		compare_at_currency = get_price_list_currency(self.compare_at_price_list)
-		if self.compare_at_price_list and compare_at_currency != self.currency:
+		before = self.get_doc_before_save()
+		was_matching = (
+			not before
+			or not before.compare_at_price_list
+			or get_price_list_currency(before.compare_at_price_list) == before.currency
+		)
+		if self.compare_at_price_list and compare_at_currency != self.currency and (full or was_matching):
 			frappe.throw(
 				_(
 					"Compare-at Price List {0} is in {1}, but the Sale Price List is in {2}. Use one currency."
@@ -206,26 +242,25 @@ class CommeraMarket(Document):
 				title=_("Currency Mismatch"),
 			)
 
-	def validate_tax_template(self):
-		"""Carts are quoted by the store company, and ERPNext refuses another company's template."""
-		if not self.tax_template:
-			return
-		company, disabled = frappe.db.get_value(
-			"Sales Taxes and Charges Template", self.tax_template, ["company", "disabled"]
-		) or (None, 0)
-		store_company = get_store_company()
-		if company != store_company:
-			frappe.throw(
-				_("Tax template {0} belongs to {1}. Choose a template of the store company {2}.").format(
-					frappe.bold(self.tax_template), frappe.bold(company), frappe.bold(store_company)
-				),
-				title=_("Invalid Tax Template"),
+	@validates_field("sale_price_list")
+	def validate_price_list_countries(self):
+		"""ERPNext refuses a sale to an address outside the sale list's countries."""
+		before = self.get_doc_before_save()
+		old = {row.country for row in before.countries} if before and before.enabled else set()
+		old_list_countries = (
+			set(
+				frappe.get_all(
+					"Price List Country", filters={"parent": before.sale_price_list}, pluck="country"
+				)
 			)
-		if disabled and self.has_value_changed("tax_template"):
-			frappe.throw(
-				_("Tax template {0} is disabled.").format(frappe.bold(self.tax_template)),
-				title=_("Invalid Tax Template"),
-			)
+			if before and before.enabled
+			else set()
+		)
+		for row in self.countries:
+			if row.country in old and old_list_countries and row.country not in old_list_countries:
+				continue
+			if row.country not in old or self.has_value_changed("sale_price_list"):
+				validate_price_list_country(self.sale_price_list, row.country)
 
 	def reinsert_changed_countries(self):
 		"""Frappe updates kept rows one by one, so a swap of two countries breaks the unique index midway.
@@ -265,26 +300,16 @@ def throw_country_taken(country: str, market: str | None, exc=frappe.ValidationE
 	)
 
 
-def validate_market_price_list(doc, method=None):
-	"""A market's currency is its price lists' currency, cached with the markets."""
-	if doc.is_new() or not doc.has_value_changed("currency"):
+def validate_selling_price_list(price_list: str, label: str):
+	"""ERPNext refuses a disabled or a buying-only price list in a sale."""
+	enabled, selling = frappe.db.get_value("Price List", price_list, ["enabled", "selling"]) or (0, 0)
+	if not selling:
+		message = _("{0} {1} is not a selling price list.")
+	elif not enabled:
+		message = _("{0} {1} is disabled.")
+	else:
 		return
-	# Before the schema sync no market has a price list.
-	if not frappe.db.has_column("Commera Market", "sale_price_list"):
-		return
-	markets = frappe.get_all(
-		"Commera Market",
-		or_filters={"sale_price_list": doc.name, "compare_at_price_list": doc.name},
-		pluck="market_name",
-		limit=1,
-	)
-	if markets:
-		frappe.throw(
-			_("Price List {0} sets the prices of market {1}, so its currency cannot change.").format(
-				frappe.bold(doc.name), frappe.bold(markets[0])
-			),
-			title=_("Price List In Use"),
-		)
+	frappe.throw(message.format(label, frappe.bold(price_list)), title=_("Invalid Price List"))
 
 
 def get_price_list_currency(price_list: str | None) -> str | None:

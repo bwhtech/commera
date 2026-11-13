@@ -309,7 +309,7 @@ def get_cart_charge_kind(row, quotation) -> str | None:
 	if row.get(PLUGIN_FEE_FIELD):
 		return "plugin"
 	if marker := row.get(CART_CHARGE_FIELD):
-		return marker
+		return None if marker == "tax_template" else marker
 	if is_applied_template_row(row, quotation):
 		return None
 	if row.charge_type != "Actual":
@@ -342,7 +342,11 @@ def is_applied_template_row(row, quotation) -> bool:
 
 	remaining = get_template_rows(quotation.taxes_and_charges)
 	for candidate in quotation.taxes:
-		if candidate.get(PLUGIN_FEE_FIELD) or candidate.get(CART_CHARGE_FIELD):
+		if candidate.get(PLUGIN_FEE_FIELD) or candidate.get(CART_CHARGE_FIELD) not in (
+			None,
+			"",
+			"tax_template",
+		):
 			continue
 		for index, tax in enumerate(remaining):
 			if matches_tax_row(candidate, tax):

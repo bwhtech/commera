@@ -42,6 +42,8 @@ def skip_auto_item_price():
 def skip_cart_lines(insert_item_price):
 	@functools.wraps(insert_item_price)
 	def insert_unless_cart_line(ctx):
+		if not frappe.get_cached_doc("Stock Settings").auto_insert_price_list_rate_if_missing:
+			return
 		if not frappe.flags.get(SKIP_FLAG) and not is_cart_line(ctx):
 			insert_item_price(ctx)
 
@@ -50,10 +52,33 @@ def skip_cart_lines(insert_item_price):
 
 
 def is_cart_line(ctx) -> bool:
-	"""A line of a cart quotation or order, or of an invoice billed from a cart order."""
+	"""A line of a cart quotation or order, or of any document ERPNext maps from a cart order."""
 	if ctx.get("order_type"):
 		return ctx.order_type == CART_ORDER_TYPE
-	sales_order = ctx.get("sales_order")
-	return bool(sales_order) and (
-		frappe.db.get_value("Sales Order", sales_order, "order_type") == CART_ORDER_TYPE
+	return source_order_type(ctx) == CART_ORDER_TYPE
+
+
+def source_order_type(ctx) -> str | None:
+	# Every ERPNext mapper from a Sales Order (Delivery Note, Sales Invoice, Pick List, returns, and
+	# their chains) keeps `so_detail`, ERPNext's own join field for delivered and billed qty.
+	if not ctx.get("so_detail"):
+		return None
+	# Read current data on every pricing pass; order types can change within one request.
+	rows = frappe.db.sql(
+		"""select orders.order_type
+		from `tabSales Order Item` item
+		join `tabSales Order` orders on orders.name = item.parent
+		where item.name = %s""",
+		(ctx.so_detail,),
 	)
+	return rows[0][0] if rows else None
+
+
+def refuse_cart_quotation_invoice(doc, method, source, table_maps):
+	# The direct mapper drops quotation provenance. Invoice the cart's Sales Order instead.
+	if source.doctype == "Quotation" and source.order_type == CART_ORDER_TYPE:
+		frappe.throw(
+			frappe._(
+				"Cannot invoice a Shopping Cart Quotation directly. Create a Sales Order first, then create the Sales Invoice from that Sales Order."
+			)
+		)

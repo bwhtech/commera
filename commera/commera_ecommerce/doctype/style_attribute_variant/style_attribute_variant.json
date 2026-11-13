@@ -197,7 +197,7 @@
 	"index_web_pages_for_search": 1,
 	"is_published_field": "is_published",
 	"links": [],
-	"modified": "2026-09-16 00:00:00.000000",
+	"modified": "2026-11-12 12:00:00.000000",
 	"modified_by": "Administrator",
 	"module": "Commera Ecommerce",
 	"name": "Style Attribute Variant",
@@ -214,6 +214,14 @@
 			"report": 1,
 			"role": "System Manager",
 			"share": 1,
+			"write": 1
+		},
+		{
+			"create": 1,
+			"delete": 1,
+			"export": 1,
+			"read": 1,
+			"role": "Commera Admin",
 			"write": 1
 		}
 	],

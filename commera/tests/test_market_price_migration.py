@@ -5,13 +5,13 @@ import frappe
 from frappe.utils import get_files_path
 
 from commera import seo
-from commera.commera_ecommerce.doctype.commera_market.commera_market import validate_market_price_list
 from commera.localization import formatter as formatter_module
 from commera.localization import markets as markets_module
 from commera.localization import pin_localization, resolve
 from commera.localization.formatter import Formatter
 from commera.localization.languages import Language
 from commera.localization.market_prices import MarketPrices
+from commera.localization.market_setup import validate_price_list as validate_market_price_list
 from commera.og import generator
 from commera.patches import set_market_price_lists
 from commera.sdk import cart as cart_sdk

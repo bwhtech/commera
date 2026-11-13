@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 import frappe
+from erpnext.selling.doctype.sales_order.mapper import make_delivery_note
 from erpnext.stock import get_item_details
 from frappe.utils.data import add_days, today
 
@@ -84,8 +85,8 @@ class TestPaidMarketOrders(MarketCartTestCase):
 		self.assertIn("Placed at paid rates; Gulf no longer prices", self.get_note(sales_order))
 
 	def test_an_order_from_a_deleted_market_is_placed_with_a_note(self):
-		frappe.delete_doc("Commera Market", "gulf", ignore_permissions=True)
-		# Deleting re-caches the rows before the row goes; a commit clears them, and tests never commit.
+		# A market deleted before deletion was refused while orders and carts used it.
+		frappe.db.delete("Commera Market", "gulf")
 		delete_cached_rows()
 
 		sales_order = self.pay()
@@ -225,6 +226,83 @@ class TestCartPriceInserts(MarketCartTestCase):
 
 		self.assertEqual((sales_order.items[0].rate, sales_invoice.items[0].rate), (100, 100))
 		self.assertFalse(self.has_sale_price())
+
+	def test_a_delivery_note_from_a_cart_order_adds_no_sale_price(self):
+		ensure_fiscal_year()
+		sales_order = self.make_sales_order(0)
+		sales_order.submit()
+		delivery_note = make_delivery_note(sales_order.name).insert()
+
+		self.assertEqual(delivery_note.items[0].rate, 100)
+		self.assertFalse(self.has_sale_price())
+
+	def test_a_delivery_note_from_a_discounted_cart_line_keeps_the_sale_price(self):
+		ensure_fiscal_year()
+		self.set_single("Stock Settings", "update_existing_price_list_rate", 1)
+		self.set_single("Stock Settings", "update_price_list_based_on", "Rate")
+		sale_price = frappe.get_doc(
+			{
+				"doctype": "Item Price",
+				"item_code": self.regular_only,
+				"price_list": self.sale_price_list,
+				"price_list_rate": 100,
+			}
+		).insert()
+		sales_order = self.make_sales_order(0)
+		sales_order.items[0].rate = 75
+		sales_order.save()
+		sales_order.submit()
+		delivery_note = make_delivery_note(sales_order.name).insert()
+
+		self.assertEqual(delivery_note.items[0].rate, 75)
+		self.assertEqual(frappe.db.get_value("Item Price", sale_price.name, "price_list_rate"), 100)
+
+	def test_cart_quotation_cannot_be_invoiced_directly(self):
+		from erpnext.selling.doctype.quotation.mapper import make_sales_invoice
+
+		ensure_fiscal_year()
+		self.quotation.reload().submit()
+		with self.assertRaisesRegex(frappe.ValidationError, "Create a Sales Order first"):
+			make_sales_invoice(self.quotation.name)
+		self.assertFalse(self.has_sale_price())
+
+	def test_desk_quotation_can_be_invoiced_and_insert_a_price(self):
+		from erpnext.selling.doctype.quotation.mapper import make_sales_invoice
+
+		ensure_fiscal_year()
+		self.quotation.reload()
+		self.quotation.order_type = "Sales"
+		self.quotation.save().submit()
+		make_sales_invoice(self.quotation.name).insert()
+		self.assertTrue(self.has_sale_price())
+
+	def test_source_lookup_uses_one_query_per_row(self):
+		sales_order = self.make_sales_order(0)
+		row = sales_order.items[0].as_dict()
+		row.pop("name")
+		sales_order.append("items", row)
+		sales_order.save()
+		with patch.object(frappe.db, "sql", wraps=frappe.db.sql) as sql:
+			for _ in range(3):
+				for row in sales_order.items:
+					self.assertTrue(item_price_guard.is_cart_line(frappe._dict(so_detail=row.name)))
+			self.assertEqual(sql.call_count, 3 * len(sales_order.items))
+
+	def test_source_order_type_changes_between_pricing_passes(self):
+		sales_order = self.make_sales_order(0)
+		ctx = frappe._dict(so_detail=sales_order.items[0].name)
+		writer = Mock()
+		price_line = item_price_guard.skip_cart_lines(writer)
+		for order_type, expected_calls in (("Sales", 1), ("Shopping Cart", 1), ("Sales", 2)):
+			frappe.db.set_value("Sales Order", sales_order.name, "order_type", order_type)
+			price_line(ctx)
+			self.assertEqual(writer.call_count, expected_calls)
+
+	def test_disabled_auto_insert_does_not_resolve_sources(self):
+		self.set_single("Stock Settings", "auto_insert_price_list_rate_if_missing", 0)
+		with patch.object(item_price_guard, "source_order_type") as lookup:
+			get_item_details.insert_item_price(frappe._dict(so_detail="unused"))
+		lookup.assert_not_called()
 
 	def make_sales_order(self, ignore_pricing_rule):
 		sales_order = frappe.get_doc(

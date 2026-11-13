@@ -9,14 +9,15 @@ from commera.api.shipping import DELIVERY_CHARGE_DESCRIPTION, get_charge_amount
 from commera.cart_taxes import TEMPLATE_DOCTYPE, apply_market_taxes, set_tax_template
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart
 from commera.localization import pin_localization, resolve
+from commera.localization.market_setup import validate_markets_for_store
 from commera.localization.markets import StorefrontMarkets
 from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.tests.test_market_cart import MarketCartTestCase
 from commera.tests.test_market_orders import use_company_warehouse
+from commera.tests.test_summer_demo import get_test_company
 from commera.utils import get_store_company
 
 GATEWAY = "ZZ Market Tax Gateway"
-MARKET_MODULE = "commera.commera_ecommerce.doctype.commera_market.commera_market"
 
 
 class MarketTaxTestCase(MarketCartTestCase):
@@ -125,7 +126,15 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 		old, new = self.make_template(10), self.make_template(5)
 		self.set_market_template(new)
 		quotation = frappe.new_doc("Quotation", company=self.company, taxes_and_charges=old)
-		quotation.append("taxes", {"charge_type": "On Net Total", "account_head": self.account, "rate": 10})
+		quotation.append(
+			"taxes",
+			{
+				"charge_type": "On Net Total",
+				"account_head": self.account,
+				"rate": 10,
+				"commera_cart_charge": "tax_template",
+			},
+		)
 		delivery = {
 			"description": f"{DELIVERY_CHARGE_DESCRIPTION} - Express",
 			"charge_type": "Actual",
@@ -139,28 +148,75 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 		self.assertEqual(quotation.taxes_and_charges, new)
 		self.assertEqual(rows, [(1, "VAT 5%", 0), (2, delivery["description"], 15)])
 
-	def test_a_disabled_template_falls_back_to_the_company_default(self):
+	def test_manual_rows_without_a_template_survive_market_taxes(self):
+		self.set_market_template(self.make_template(10))
+		quotation = frappe.new_doc("Quotation", company=self.company)
+		quotation.append(
+			"taxes",
+			{
+				"charge_type": "Actual",
+				"account_head": self.account,
+				"description": "Manual tax",
+				"tax_amount": 7,
+			},
+		)
+		for switched in (False, True):
+			apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched)
+			self.assertIsNone(quotation.taxes_and_charges)
+			self.assertEqual(
+				[(row.description, row.tax_amount) for row in quotation.taxes], [("Manual tax", 7)]
+			)
+
+	def test_manual_rows_added_to_managed_taxes_survive_a_rebuild(self):
+		self.set_market_template(self.make_template(10))
+		quotation = self.quote_in_market()
+		quotation.append(
+			"taxes",
+			{
+				"charge_type": "Actual",
+				"account_head": self.account,
+				"description": "Manual tax",
+				"tax_amount": 7,
+			},
+		)
+		apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched=True)
+		self.assertEqual(
+			[(row.description, row.tax_amount) for row in quotation.taxes],
+			[("VAT 10%", 30), ("Manual tax", 7)],
+		)
+
+	def test_commera_template_rows_have_provenance(self):
+		self.set_market_template(self.make_template(10))
+		quotation = self.quote_in_market()
+		self.assertEqual(quotation.taxes[0].commera_cart_charge, "tax_template")
+
+	def test_a_disabled_template_is_refused_not_replaced(self):
 		template = self.make_template(10)
-		default = self.make_template(5, is_default=1)
+		self.make_template(5, is_default=1)
 		self.set_market_template(template)
 		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "disabled", 1)
 
-		quotation = self.quote_in_market()
+		with self.assertRaisesRegex(frappe.ValidationError, "cannot be calculated"):
+			self.quote_in_market()
 
-		self.assertEqual((quotation.taxes_and_charges, quotation.grand_total), (default, 315))
-
-	def test_disabling_the_template_reprices_an_existing_cart(self):
+	def test_a_template_of_another_company_is_refused_not_replaced(self):
 		template = self.make_template(10)
-		default = self.make_template(5, is_default=1)
 		self.set_market_template(template)
-		quotation = self.quote_in_market()
+		other_company = "ZZ Other Company"
+		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "company", other_company)
+
+		with self.assertRaisesRegex(frappe.ValidationError, "cannot be calculated"):
+			self.quote_in_market()
+
+	def test_disabling_the_template_refuses_an_existing_cart(self):
+		template = self.make_template(10)
+		self.make_template(5, is_default=1)
+		self.set_market_template(template)
+		self.quote_in_market()
 		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "disabled", 1)
 
-		with self.in_market():
-			rebuilt = generate_quotation_for_cart({})
-
-		self.assertEqual(rebuilt.name, quotation.name)
-		self.assertEqual((rebuilt.taxes_and_charges, rebuilt.grand_total), (default, 315))
+		with self.in_market(), self.assertRaisesRegex(frappe.ValidationError, "cannot be calculated"):
+			generate_quotation_for_cart({})
 
 	def test_clearing_the_template_reprices_an_existing_cart(self):
 		self.set_market_template(self.make_template(10))
@@ -366,10 +422,9 @@ class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 	def test_a_template_of_another_company_is_refused(self):
 		template = self.make_template(10)
 
-		with (
-			patch(f"{MARKET_MODULE}.get_store_company", return_value="ZZ Other Company"),
-			self.assertRaisesRegex(frappe.ValidationError, "Choose a template of the store company"),
-		):
+		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "company", get_test_company())
+
+		with self.assertRaisesRegex(frappe.ValidationError, "Choose a template of the store company"):
 			self.set_market_template(template)
 
 	def test_a_disabled_template_is_refused(self):
@@ -378,6 +433,51 @@ class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 
 		with self.assertRaisesRegex(frappe.ValidationError, "is disabled"):
 			self.set_market_template(template)
+
+	def test_an_existing_disabled_template_allows_unrelated_changes(self):
+		template = self.make_template(10)
+		self.set_market_template(template)
+		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "disabled", 1)
+
+		market = frappe.get_doc("Commera Market", "gulf")
+		market.market_name = "Renamed market"
+		market.save()
+
+	def test_a_market_template_cannot_be_disabled(self):
+		template = self.make_template(10)
+		self.set_market_template(template)
+		doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
+		doc.disabled = 1
+
+		with self.assertRaisesRegex(frappe.ValidationError, "must stay enabled in the store company"):
+			doc.save()
+
+	def test_a_new_store_company_must_own_the_market_templates(self):
+		self.set_market_template(self.make_template(10))
+		settings = frappe.get_doc("Commera Settings")
+		settings.company = get_test_company()
+
+		with self.assertRaisesRegex(frappe.ValidationError, "Choose a template of the store company"):
+			validate_markets_for_store(settings)
+
+	def test_disabled_markets_do_not_keep_template_enabled(self):
+		template = self.make_template(10)
+		self.set_market_template(template)
+		market = frappe.get_doc("Commera Market", "gulf")
+		market.enabled = 0
+		market.save()
+		doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
+		doc.disabled = 1
+		doc.save()
+
+	def test_company_change_can_repair_a_mismatched_disabled_template(self):
+		template = self.make_template(10)
+		self.set_market_template(template)
+		other = get_test_company()
+		frappe.db.set_value(TEMPLATE_DOCTYPE, template, {"company": other, "disabled": 1})
+		settings = frappe.get_doc("Commera Settings")
+		settings.company = other
+		validate_markets_for_store(settings)
 
 	def test_a_template_of_the_store_company_is_kept(self):
 		template = self.make_template(10)

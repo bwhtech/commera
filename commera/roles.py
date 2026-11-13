@@ -6,11 +6,12 @@ from frappe.permissions import setup_custom_perms
 COMMERA_ADMIN = "Commera Admin"
 COMMERA_USER = "Commera User"
 
+# A Custom DocPerm row replaces all of a doctype's own DocPerm rows, so Commera's own doctypes grant
+# Commera Admin in their doctype JSON instead.
 ADMIN_PERMISSIONS = {
 	"Item": ("read", "write", "create", "delete"),
 	"Item Group": ("read", "write", "create"),
 	"Item Attribute": ("read", "write", "create"),
-	"Style Attribute Variant": ("read", "write", "create", "delete"),
 	"Brand": ("read",),
 	"Customer": ("read", "write"),
 	"Sales Order": ("read", "write", "submit"),
@@ -20,17 +21,8 @@ ADMIN_PERMISSIONS = {
 	"Stock Entry": ("read", "create", "submit"),
 	"Stock Ledger Entry": ("read",),
 	"Warehouse": ("read",),
-	"Commera Discount": ("read", "write", "create", "delete"),
-	"Product Review": ("read", "write"),
-	"Shop Web Page": ("read", "write", "create", "delete"),
-	"Ecommerce Category": ("read",),
-	"Shop Theme Settings": ("read", "write"),
+	# Kept here until its JSON "All" row is reviewed: Semgrep's relaxed-permissions rule flags it on edit.
 	"Commera Settings": ("read",),
-	"Commera Webhook": ("read", "write", "create", "delete"),
-	# Translation writes check these rights. Create: an inherited page's first translation adds its row.
-	# Existing sites get them from patches.grant_commera_admin_translation_rights.
-	"Theme Layout": ("read", "write", "create"),
-	"Content Translation": ("read", "write", "create", "delete"),
 }
 
 

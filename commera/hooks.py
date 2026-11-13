@@ -214,6 +214,10 @@ doc_events = {
 		"validate": "commera.doc_events.price_list.validate",
 		"after_rename": "commera.search.price_sync.on_price_list_rename",
 	},
+	"Sales Taxes and Charges Template": {
+		"validate": "commera.localization.market_setup.validate_tax_template",
+	},
+	"Shipping Rule": {"validate": ["commera.localization.market_setup.validate_shipping_rule"]},
 	"Gateway Payment Request": {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},
@@ -301,6 +305,7 @@ doc_events = {
 		],
 	},
 	"Sales Invoice": {
+		"before_mapping": "commera.item_price_guard.refuse_cart_quotation_invoice",
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
 		"validate": [
 			"commera.discounts.pricing.apply_code_discounts",

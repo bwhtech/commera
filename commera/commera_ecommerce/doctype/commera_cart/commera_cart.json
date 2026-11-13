@@ -70,6 +70,7 @@
 		{
 			"description": "Handle of the market the cart was last priced in. A switch drops codes that take nothing off there.",
 			"fieldname": "market",
+			"search_index": 1,
 			"fieldtype": "Data",
 			"label": "Market",
 			"read_only": 1
