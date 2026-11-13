@@ -6,6 +6,7 @@ from bwh_payments.api import get_gateway_options
 from bwh_payments.bwh_payments.utils import get_available_payment_modes, resolve_payment_mode
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+from erpnext.accounts.general_ledger import get_debit_credit_allowance
 from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import getdate, validate_email_address
@@ -63,6 +64,7 @@ from commera.guest import (
 	set_guest_cart_cookie,
 	validate_guest_checkout_enabled,
 )
+from commera.invoice_currency import get_invoice_currency_error
 from commera.item_price_guard import skip_auto_item_price
 from commera.localization import url
 from commera.localization.address_countries import AddressCountries
@@ -222,6 +224,7 @@ def open_checkout(
 			gateway=gateway,
 			currency=quotation.currency,
 		)
+	validate_invoice_currency(quotation)
 
 	payment_request = frappe.get_doc(
 		{
@@ -239,6 +242,24 @@ def open_checkout(
 	).insert(ignore_permissions=True)
 
 	return {"order_url": payment_request.order_url}
+
+
+def validate_invoice_currency(quotation):
+	"""A paid cart is invoiced in its own currency right after capture, so ERPNext must accept that first."""
+	customer = quotation.party_name if quotation.quotation_to == "Customer" else None
+	reason = get_invoice_currency_error(quotation.company, quotation.currency, customer)
+	company = frappe.get_cached_doc("Company", quotation.company)
+	if not reason and quotation.currency != company.default_currency and not get_rounding_account(company):
+		reason = f"Company {company.name} has no Exchange Gain / Loss Account or Round Off Account"
+	if reason:
+		refuse_payment(
+			_(
+				"Card payments in {0} are not available for this store yet. Choose another payment method or contact the store."
+			).format(quotation.currency),
+			quotation.name,
+			currency=quotation.currency,
+			reason=reason,
+		)
 
 
 def get_checkout_payment_methods(quotation, strict: bool = False) -> list[str]:
@@ -566,29 +587,96 @@ def create_sales_invoice(sales_order, payment_mode: str, paid_amount: float, ref
 
 
 def create_payment_entry(sales_invoice, payment_mode: str, paid_amount: float, reference_no: str | None):
-	# Never allocate more than the invoice owes, whatever the gateway reported.
-	allocated = min(flt(paid_amount), flt(sales_invoice.outstanding_amount))
-	if allocated <= 0:
+	"""`paid_amount` is what the gateway charged, in the invoice currency."""
+	receipt = convert_invoice_amount(sales_invoice, paid_amount, sales_invoice.party_account_currency)
+	if receipt <= 0:
 		return None
+	outstanding = flt(sales_invoice.outstanding_amount)
+	difference = flt(abs(receipt - outstanding), sales_invoice.precision("outstanding_amount"))
+	is_settled = difference <= get_rounding_tolerance(sales_invoice)
 
-	payment_entry = get_payment_entry("Sales Invoice", sales_invoice.name, party_amount=allocated)
-	payment_entry.mode_of_payment = gateway_mode_of_payment(payment_mode)
+	mode_of_payment = gateway_mode_of_payment(payment_mode)
+	bank = get_default_bank_cash_account(
+		sales_invoice.company, "Cash", mode_of_payment=mode_of_payment, fetch_balance=False
+	)
+	payment_entry = get_payment_entry(
+		"Sales Invoice",
+		sales_invoice.name,
+		party_amount=outstanding if is_settled else min(receipt, outstanding),
+		bank_account=bank.get("account"),
+		bank_amount=convert_invoice_amount(sales_invoice, paid_amount, bank.get("account_currency")),
+	)
+	set_payment_receipt(payment_entry, sales_invoice, paid_amount, is_settled)
+	payment_entry.mode_of_payment = mode_of_payment
 	if reference_no:
 		# Load-bearing: bwh_payments matches a refund Payment Entry back to its gateway session on this.
 		payment_entry.reference_no = reference_no
 		payment_entry.reference_date = getdate()
 
-	bank = get_default_bank_cash_account(
-		sales_invoice.company, "Cash", mode_of_payment=payment_entry.mode_of_payment
-	)
-	if bank:
-		payment_entry.paid_to = bank.account
-		payment_entry.paid_to_account_currency = bank.account_currency
-
 	payment_entry.flags.ignore_permissions = True
 	payment_entry.insert()
 	payment_entry.submit()
 	return payment_entry
+
+
+def get_rounding_tolerance(sales_invoice) -> float:
+	"""Up to half a minor unit per converted item row, tax row, total and receipt,
+	capped at the drift ERPNext allows a Sales Invoice's GL entries."""
+	if sales_invoice.party_account_currency == sales_invoice.currency:
+		return 0
+	precision = sales_invoice.precision("outstanding_amount")
+	row_drift = (len(sales_invoice.items) + len(sales_invoice.taxes) + 2) * 10**-precision / 2
+	return min(row_drift, get_debit_credit_allowance(sales_invoice.doctype, precision))
+
+
+def set_payment_receipt(payment_entry, sales_invoice, paid_amount, is_settled):
+	"""Record the whole charge. An overpayment stays unallocated, as a customer advance."""
+	if not is_settled:
+		payment_entry.paid_amount = convert_invoice_amount(
+			sales_invoice, paid_amount, payment_entry.paid_from_account_currency
+		)
+	receipt = convert_invoice_amount(sales_invoice, paid_amount, payment_entry.paid_to_account_currency)
+	if receipt is not None:
+		payment_entry.received_amount = receipt
+	if payment_entry.paid_from_account_currency == payment_entry.paid_to_account_currency:
+		# ERPNext sets received_amount from paid_amount for accounts in the same currency.
+		payment_entry.paid_amount = receipt
+		payment_entry.set_amounts_in_company_currency()
+		difference = flt(
+			payment_entry.base_total_allocated_amount - payment_entry.base_received_amount,
+			payment_entry.precision("difference_amount"),
+		)
+		if is_settled and difference:
+			add_rounding_deduction(payment_entry, difference)
+	payment_entry.set_amounts()
+
+
+def add_rounding_deduction(payment_entry, amount):
+	company = frappe.get_cached_doc("Company", payment_entry.company)
+	account = get_rounding_account(company)
+	if not account:
+		frappe.throw(
+			_("Set an Exchange Gain / Loss Account or Round Off Account for {0}").format(company.name)
+		)
+	payment_entry.append(
+		"deductions", {"account": account, "cost_center": company.cost_center, "amount": amount}
+	)
+
+
+def get_rounding_account(company) -> str | None:
+	return company.exchange_gain_loss_account or company.round_off_account
+
+
+def convert_invoice_amount(sales_invoice, amount: float, currency: str | None) -> float | None:
+	"""An invoice-currency amount in `currency`, at the invoice's own rate. None for a third currency,
+	which ERPNext then converts at its exchange rate."""
+	if currency == sales_invoice.currency:
+		return flt(amount)
+	if currency == sales_invoice.company_currency:
+		return flt(
+			flt(amount) * flt(sales_invoice.conversion_rate), sales_invoice.precision("outstanding_amount")
+		)
+	return None
 
 
 def set_delivery_date(sales_order):

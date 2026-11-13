@@ -31,6 +31,7 @@ def on_payment_request_update(doc, method=None):
 def validate_charged_amount_matches_cart(quotation, payment_request):
 	"""Refuse a cart that no longer costs what the gateway charged - ref_docname is a live editable draft."""
 	currency = payment_request.currency_code
+	validate_charged_currency_matches_cart(quotation, currency)
 	cart_amount = get_charge_amount(quotation)
 	charged_amount = flt(payment_request.amount)
 	# Minor units, because two float totals that render identically are routinely not `==`.
@@ -47,4 +48,18 @@ def validate_charged_amount_matches_cart(quotation, payment_request):
 			fmt_money(charged_amount, currency=currency),
 		),
 		title=_("Paid Amount Does Not Match The Order"),
+	)
+
+
+def validate_charged_currency_matches_cart(quotation, currency: str):
+	"""The same number in another currency is another amount."""
+	if currency == quotation.currency:
+		return
+
+	frappe.throw(
+		_(
+			"Order {0} is priced in {1} but the payment was collected in {2}. The order has not been placed;"
+			" reconcile or refund the payment before releasing any goods."
+		).format(quotation.name, quotation.currency, currency),
+		title=_("Paid Currency Does Not Match The Order"),
 	)

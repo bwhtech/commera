@@ -2364,3 +2364,7 @@ Product grid,شبكة المنتجات
 Recent additions,أحدث الإضافات
 Similar products,منتجات مشابهة
 Sponsored brands,علامات تجارية مُموّلة
+Order {0} is priced in {1} but the payment was collected in {2}. The order has not been placed; reconcile or refund the payment before releasing any goods.,تم تسعير الطلب {0} بعملة {1} ولكن تم تحصيل الدفعة بعملة {2}. لم يتم تقديم الطلب؛ قم بتسوية الدفعة أو استردادها قبل تسليم أي بضائع.
+Paid Currency Does Not Match The Order,عملة الدفع لا تطابق عملة الطلب
+Card payments in {0} are not available for this store yet. Choose another payment method or contact the store.,الدفع بالبطاقة بعملة {0} غير متاح لهذا المتجر بعد. اختر طريقة دفع أخرى أو تواصل مع المتجر.
+Set an Exchange Gain / Loss Account or Round Off Account for {0},حدد حساب أرباح أو خسائر الصرف أو حساب التقريب لشركة {0}

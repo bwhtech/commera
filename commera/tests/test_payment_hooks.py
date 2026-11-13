@@ -23,6 +23,7 @@ from commera.api.payments import (
 	make_sales_invoice,
 	place_cod_order,
 	validate_cart_is_not_in_checkout,
+	validate_invoice_currency,
 )
 from commera.jobs import delete_old_draft_quotations, sync_pending_gateway_payments
 from commera.plugin_events import (
@@ -41,6 +42,7 @@ COMPANY = "Lifestyle Demo"
 ITEM_GROUP = "Interior Accessories"
 DEFAULT_CASH_ACCOUNT = "Cash - LSD"
 CURRENCY = "INR"
+FOREIGN_CURRENCY = "USD"
 # A price list in the company currency keeps the fixture off the Currency Exchange table.
 PRICE_LIST = "ZZ Payhook SAR Selling"
 ITEM_RATE = 150.0
@@ -220,7 +222,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.contact_person = contact.name
 		return email_id
 
-	def create_cart_quotation(self):
+	def create_cart_quotation(self, currency=CURRENCY, conversion_rate=1):
 		quotation = frappe.new_doc("Quotation")
 		quotation.update(
 			{
@@ -231,8 +233,8 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 				"contact_person": self.contact_person,
 				# The storefront stamps the shopper's login here; ownership checks read it back.
 				"contact_email": self.contact_email,
-				"currency": CURRENCY,
-				"conversion_rate": 1,
+				"currency": currency,
+				"conversion_rate": conversion_rate,
 				"selling_price_list": PRICE_LIST,
 				"price_list_currency": CURRENCY,
 				"plc_conversion_rate": 1,
@@ -402,6 +404,185 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		self.assertEqual(len(self.submitted_sales_orders()), 1)
 		self.assertEqual(payment_request.ref_doctype, "Sales Order")
+
+	# -- currencies -----------------------------------------------------------------------------------
+
+	def test_a_payment_in_another_currency_settles_the_invoice(self):
+		"""The gateway charges the cart currency; the invoice owes in its party account's currency."""
+		self.allow_multi_currency_invoices()
+		quotation = self.create_cart_quotation(currency=FOREIGN_CURRENCY, conversion_rate=3)
+		on_payment_request_update(self.create_paid_payment_request(quotation))
+
+		sales_order = self.submitted_sales_orders(quotation.name)[0]
+		sales_invoice = frappe.get_doc("Sales Invoice", self.submitted_sales_invoices(sales_order)[0])
+		self.assertEqual(
+			(sales_invoice.currency, sales_invoice.party_account_currency), (FOREIGN_CURRENCY, CURRENCY)
+		)
+		self.assertEqual((sales_invoice.status, sales_invoice.outstanding_amount), ("Paid", 0))
+
+		payment_entry = frappe.get_doc("Payment Entry", self.submitted_payment_entries(sales_invoice.name)[0])
+		self.assertEqual(payment_entry.paid_amount, flt(quotation.grand_total * 3))
+		self.assertEqual(payment_entry.paid_to, DEFAULT_CASH_ACCOUNT)
+
+	def test_full_foreign_payment_books_row_rounding_in_both_directions(self):
+		for disabled in (0, 1):
+			for rate, outstanding, receipt in ((1.01, 11.37, 11.36), (1.03, 11.58, 11.59)):
+				with self.subTest(disabled=disabled, rate=rate):
+					invoice = self.create_fractional_invoice(rate, disabled)
+					self.assertEqual(invoice.outstanding_amount, outstanding)
+					payment = create_payment_entry(invoice, GATEWAY, invoice.grand_total, None)
+					invoice.reload()
+					self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
+					self.assertEqual(payment.received_amount, receipt)
+					self.assertEqual(payment.references[0].allocated_amount, outstanding)
+					self.assertAlmostEqual(
+						sum(row.amount for row in payment.deductions), outstanding - receipt
+					)
+					self.assertEqual((payment.difference_amount, payment.unallocated_amount), (0, 0))
+
+	def test_partial_foreign_payment_keeps_converted_allocation(self):
+		invoice = self.create_fractional_invoice(1.01, 1)
+		payment = create_payment_entry(invoice, GATEWAY, 1, None)
+		invoice.reload()
+		self.assertEqual(payment.references[0].allocated_amount, 3.75)
+		self.assertEqual(payment.received_amount, 3.75)
+		self.assertEqual(invoice.outstanding_amount, 7.62)
+		self.assertEqual(invoice.status, "Partly Paid")
+		self.assertFalse(payment.deductions)
+
+	def test_rounding_tolerance_stops_at_the_erpnext_allowance(self):
+		"""120 rows may drift SAR 0.6, but ERPNext never lets a Sales Invoice drift past 0.5."""
+		invoice = self.create_fractional_invoice(0.99, 1, rows=120, conversion_rate=3.7512)
+		self.assertEqual(invoice.outstanding_amount, 445.2)
+		payment = create_payment_entry(invoice, GATEWAY, flt(invoice.grand_total - 0.28, 2), None)
+		invoice.reload()
+		self.assertEqual((invoice.status, invoice.outstanding_amount), ("Partly Paid", 0.61))
+		self.assertEqual(payment.received_amount, 444.59)
+		self.assertFalse(payment.deductions)
+
+	def test_advance_does_not_turn_a_partial_foreign_payment_into_settlement(self):
+		invoice = self.create_fractional_invoice(1.01, 1, advance=1)
+		self.assertEqual((invoice.total_advance, invoice.outstanding_amount), (1, 10.37))
+		payment = create_payment_entry(invoice, GATEWAY, 2.03, None)
+		invoice.reload()
+		self.assertEqual((invoice.status, invoice.outstanding_amount), ("Partly Paid", 2.76))
+		self.assertEqual(payment.received_amount, 7.61)
+		self.assertFalse(payment.deductions)
+
+	def test_foreign_overpayments_remain_customer_advances(self):
+		for extra in (0.01, 1):
+			with self.subTest(extra=extra):
+				invoice = self.create_fractional_invoice(1.03, 1)
+				charged = flt(invoice.grand_total + extra, 2)
+				payment = create_payment_entry(invoice, GATEWAY, charged, None)
+				invoice.reload()
+				receipt = flt(charged * 3.75, 2)
+				self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
+				self.assertEqual(payment.received_amount, receipt)
+				self.assertEqual(payment.unallocated_amount, flt(receipt - 11.58, 2))
+				self.assertEqual(payment.references[0].allocated_amount, 11.58)
+				self.assertFalse(payment.deductions)
+				self.assertEqual(payment.difference_amount, 0)
+
+	def test_repeat_full_foreign_payment_on_part_paid_invoice_keeps_the_surplus(self):
+		invoice = self.create_fractional_invoice(1.01, 1)
+		create_payment_entry(invoice, GATEWAY, 1, None)
+		invoice.reload()
+		payment = create_payment_entry(invoice, GATEWAY, invoice.grand_total, None)
+		invoice.reload()
+		self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
+		self.assertEqual(payment.received_amount, 11.36)
+		self.assertEqual(payment.unallocated_amount, 3.74)
+		self.assertFalse(payment.deductions)
+
+	def test_split_foreign_payments_that_add_up_settle_the_invoice(self):
+		invoice = self.create_fractional_invoice(1.01, 1)
+		create_payment_entry(invoice, GATEWAY, 1, None)
+		invoice.reload()
+		payment = create_payment_entry(invoice, GATEWAY, 2.03, None)
+		invoice.reload()
+		self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
+		self.assertEqual((payment.received_amount, payment.references[0].allocated_amount), (7.61, 7.62))
+		self.assertEqual([row.amount for row in payment.deductions], [0.01])
+
+	def test_foreign_checkout_needs_a_rounding_account_before_capture(self):
+		self.allow_multi_currency_invoices()
+		quotation = self.create_cart_quotation(currency=FOREIGN_CURRENCY, conversion_rate=3.75)
+		validate_invoice_currency(quotation)
+		with (
+			patch("commera.api.payments.get_rounding_account", return_value=None),
+			self.assertRaisesRegex(frappe.ValidationError, "not available"),
+		):
+			validate_invoice_currency(quotation)
+
+	def test_company_currency_checkout_needs_no_rounding_account(self):
+		with patch("commera.api.payments.get_rounding_account", return_value=None):
+			validate_invoice_currency(self.quotation)
+
+	def create_fractional_invoice(self, rate, disabled, advance=0, rows=3, conversion_rate=3.75):
+		self.allow_multi_currency_invoices()
+		invoice = frappe.get_doc(
+			{
+				"doctype": "Sales Invoice",
+				"company": COMPANY,
+				"customer": self.customer,
+				"currency": FOREIGN_CURRENCY,
+				"conversion_rate": conversion_rate,
+				"disable_rounded_total": disabled,
+				"ignore_pricing_rule": 1,
+				"items": [{"item_code": self.item_code, "qty": 1, "rate": rate} for _ in range(rows)],
+			}
+		)
+		if advance:
+			journal = frappe.get_doc(
+				{
+					"doctype": "Journal Entry",
+					"company": COMPANY,
+					"posting_date": getdate(),
+					"accounts": [
+						{"account": DEFAULT_CASH_ACCOUNT, "debit_in_account_currency": advance},
+						{
+							"account": frappe.get_cached_value(
+								"Company", COMPANY, "default_receivable_account"
+							),
+							"party_type": "Customer",
+							"party": self.customer,
+							"credit_in_account_currency": advance,
+							"is_advance": "Yes",
+						},
+					],
+				}
+			).insert(ignore_permissions=True)
+			journal.submit()
+			invoice.allocate_advances_automatically = 0
+			invoice.append(
+				"advances",
+				{
+					"reference_type": "Journal Entry",
+					"reference_name": journal.name,
+					"reference_row": journal.accounts[1].name,
+					"advance_amount": advance,
+					"allocated_amount": advance,
+				},
+			)
+		invoice.insert(ignore_permissions=True)
+		invoice.submit()
+		return invoice
+
+	def test_a_payment_collected_in_another_currency_is_refused(self):
+		"""The same number in another currency is another amount."""
+		self.payment_request.db_set("currency_code", FOREIGN_CURRENCY, update_modified=False)
+
+		with self.assertRaisesRegex(frappe.ValidationError, f"collected in {FOREIGN_CURRENCY}"):
+			on_payment_request_update(self.payment_request)
+
+		self.assertEqual(self.submitted_sales_orders(), [])
+
+	def allow_multi_currency_invoices(self):
+		fieldname = "allow_multi_currency_invoices_against_single_party_account"
+		previous = frappe.db.get_single_value("Accounts Settings", fieldname)
+		self.addCleanup(frappe.db.set_single_value, "Accounts Settings", fieldname, previous)
+		frappe.db.set_single_value("Accounts Settings", fieldname, 1)
 
 	# -- refund Payment Entry mirroring ----------------------------------------------------------------
 
