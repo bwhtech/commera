@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from html import escape
 from urllib.parse import urlencode
 
 import frappe
@@ -70,14 +69,7 @@ from commera.localization import url
 from commera.localization.address_countries import AddressCountries
 from commera.localization.market_prices import MarketPrices
 from commera.order_access import get_order_link, set_order_access_key
-from commera.paid_checkout import (
-	accept_checkout,
-	freeze_addresses,
-	load_checkout,
-	note_checkout_changes,
-	paid_target,
-	validate_accepted_countries,
-)
+from commera.paid_checkout import keep_accepted_addresses, keep_accepted_checkout, note_checkout_changes
 from commera.plugin_events import fire_event, get_plugin_fieldnames
 from commera.utils import (
 	get_charge_account_head,
@@ -122,28 +114,14 @@ def get_open_gateway_payment_request(quotation_name: str) -> str | None:
 
 
 def validate_cart_is_not_in_checkout(quotation_name: str):
-	status = get_checkout_payment_status(quotation_name)
-	if status == "Paid":
-		refuse_paid_cart()
-	if status == "Pending":
-		frappe.throw(
-			_(
-				"A payment is already in progress for this order. Finish or cancel it before changing your cart."
-			),
-			title=_("Checkout In Progress"),
-		)
-
-
-def get_checkout_payment_status(quotation_name: str | None) -> str | None:
-	"""The status of the gateway payment that holds the cart, Paid or Pending. Unpaid sessions are released first."""
 	if not quotation_name:
-		return None
+		return
 
 	if frappe.db.exists(
 		"Gateway Payment Request",
 		{"ref_doctype": "Quotation", "ref_docname": quotation_name, "status": "Paid"},
 	):
-		return "Paid"
+		refuse_paid_cart()
 
 	# A double-clicked Place Order leaves two open sessions, and each one still bills the old cart.
 	pending_requests = frappe.get_all(
@@ -155,8 +133,14 @@ def get_checkout_payment_status(quotation_name: str | None) -> str | None:
 		payment_request = frappe.get_doc("Gateway Payment Request", pending_request)
 		if payment_request.release_if_unpaid():
 			continue
-		return "Paid" if payment_request.status == "Paid" else "Pending"
-	return None
+		if payment_request.status == "Paid":
+			refuse_paid_cart()
+		frappe.throw(
+			_(
+				"A payment is already in progress for this order. Finish or cancel it before changing your cart."
+			),
+			title=_("Checkout In Progress"),
+		)
 
 
 def refuse_paid_cart():
@@ -204,8 +188,7 @@ def open_checkout(
 	is_reviewed: bool = False,
 ):
 	"""`is_reviewed`: the buyer approved this checkout in a review, so cash on delivery must place it as is."""
-	accepted = accept_checkout(quotation)
-	validate_accepted_countries(quotation, accepted)
+	validate_persisted_address_countries(quotation)
 	validate_delivery_option(quotation, delivery_option)
 	validate_cart_is_not_in_checkout(quotation.name)
 	validate_cart_market(quotation)
@@ -242,7 +225,6 @@ def open_checkout(
 			currency=quotation.currency,
 		)
 
-	quotation.add_comment("Info", "Accepted checkout: " + escape(frappe.as_json(accepted, indent=None)))
 	payment_request = frappe.get_doc(
 		{
 			"doctype": "Gateway Payment Request",
@@ -548,19 +530,15 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 
 def place_paid_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
 	# No address check: checkout start checked it, and the payment is captured now. A change since gets a note.
-	accepted = load_checkout(quotation)
 	shopper = get_order_shopper(quotation)
 	with system_user_session(), skip_auto_item_price():
-		quotation.shipping_rule = None
-		freeze_addresses(quotation, accepted)
+		changes = keep_accepted_checkout(quotation)
 		fix_payment_schedule_dates(quotation)
 		quotation.flags.ignore_permissions = True
 		quotation.submit()
 
-		sales_order = _make_sales_order(
-			quotation.name, target_doc=paid_target("Sales Order", accepted), ignore_permissions=True
-		)
-		freeze_addresses(sales_order, accepted)
+		sales_order = _make_sales_order(quotation.name, ignore_permissions=True)
+		keep_accepted_addresses(sales_order, quotation)
 		sales_order.custom_ecommerce_payment_mode = payment_mode
 		copy_delivery_option_to_order(quotation.name, sales_order)
 		set_delivery_date(sales_order)
@@ -571,7 +549,7 @@ def place_paid_order(quotation, payment_mode: str, gateway_amount=None, gateway_
 		set_order_access_key(sales_order)
 		sales_order.submit()
 		note_withdrawn_lines(sales_order, quotation)
-		note_checkout_changes(sales_order, quotation, accepted)
+		note_checkout_changes(sales_order, changes)
 
 		# A cart discounted to nothing is settled at placement, so it is billed and paid like a charged one.
 		paid = flt(gateway_amount) > 0 or flt(sales_order.grand_total) <= 0
@@ -589,11 +567,8 @@ def place_paid_order(quotation, payment_mode: str, gateway_amount=None, gateway_
 
 
 def create_sales_invoice(sales_order, payment_mode: str, paid_amount: float, reference_no: str | None):
-	accepted = {field: sales_order.get(field) for field in ("address_display", "shipping_address")}
-	sales_invoice = make_sales_invoice(
-		sales_order.name, target_doc=paid_target("Sales Invoice", accepted), ignore_permissions=True
-	)
-	freeze_addresses(sales_invoice, accepted)
+	sales_invoice = make_sales_invoice(sales_order.name, ignore_permissions=True)
+	keep_accepted_addresses(sales_invoice, sales_order)
 	sales_invoice.flags.ignore_permissions = True
 	sales_invoice.insert()
 	sales_invoice.submit()
@@ -867,17 +842,12 @@ def validate_guest_address_is_new(quotation, address: dict):
 
 def validate_persisted_address_countries(quotation):
 	countries = AddressCountries.of(get_document_market(quotation))
-	for country in get_persisted_address_countries(quotation):
-		countries.validate(country)
-
-
-def get_persisted_address_countries(quotation) -> list[str | None]:
-	"""The countries of the billing address and, unless picked up, the shipping address, each once."""
 	fields = ["customer_address"]
 	if not quotation.custom_is_store_pickup:
 		fields.append("shipping_address_name")
-	addresses = dict.fromkeys(address for field in fields if (address := quotation.get(field)))
-	return list(dict.fromkeys(frappe.db.get_value("Address", address, "country") for address in addresses))
+	for field in fields:
+		if address := quotation.get(field):
+			countries.validate(frappe.db.get_value("Address", address, "country"))
 
 
 def validate_address_countries(quotation, address: dict):

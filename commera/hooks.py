@@ -219,12 +219,18 @@ doc_events = {
 	},
 	"Quotation": {
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
-		"validate": "commera.discounts.pricing.apply_code_discounts",
+		"validate": [
+			"commera.discounts.pricing.apply_code_discounts",
+			"commera.paid_checkout.restore_accepted_addresses",
+		],
 	},
 	"Sales Order": {
 		"before_insert": "commera.discounts.pricing.drop_copied_discounts",
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
-		"validate": "commera.discounts.pricing.apply_code_discounts",
+		"validate": [
+			"commera.discounts.pricing.apply_code_discounts",
+			"commera.paid_checkout.restore_accepted_addresses",
+		],
 		"after_insert": [
 			"commera.discounts.usage.record_discount_uses",
 			"commera.jobs.send_order_success_acknowledgement",
@@ -296,7 +302,10 @@ doc_events = {
 	},
 	"Sales Invoice": {
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
-		"validate": "commera.discounts.pricing.apply_code_discounts",
+		"validate": [
+			"commera.discounts.pricing.apply_code_discounts",
+			"commera.paid_checkout.restore_accepted_addresses",
+		],
 		"on_submit": "commera.utils.update_so_status_from_related_doc",
 	},
 	"Payment Entry": {"on_submit": "commera.plugin_events.on_payment_entry_submit"},
@@ -639,11 +648,4 @@ scheduler_events = {
 		"commera.search.build.rebuild_index_nightly",
 		"commera.og.generator.clear_old_cards",
 	],
-}
-
-# Paid placement keeps the accepted address text when ERPNext fills party details.
-override_doctype_class = {
-	"Quotation": "commera.paid_transactions.PaidQuotation",
-	"Sales Order": "commera.paid_transactions.PaidSalesOrder",
-	"Sales Invoice": "commera.paid_transactions.PaidSalesInvoice",
 }

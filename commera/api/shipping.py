@@ -368,7 +368,7 @@ def get_charge_lines(taxes, shipping_rule: str | None, quotation=None) -> dict:
 	charge_lines = {"shipping": 0.0, "cod_charge": 0.0, "plugin_fees": [], "taxes": []}
 	for row in taxes:
 		description = cstr(row.description).strip()
-		kind = get_cart_charge_kind(row, quotation) if quotation else None
+		kind = get_cart_charge_kind(row, quotation) if quotation else row.get(CART_CHARGE_FIELD)
 		amount = flt(row.tax_amount)
 		if kind == "plugin" or (quotation is None and row.get(PLUGIN_FEE_FIELD)):
 			charge_lines["plugin_fees"].append({"description": description, "amount": amount})
@@ -509,6 +509,7 @@ def read_order_taxes(order_names: list) -> dict[str, list]:
 			"tax_amount",
 			"included_in_print_rate",
 			PLUGIN_FEE_FIELD,
+			CART_CHARGE_FIELD,
 		],
 		order_by="idx asc",
 	):

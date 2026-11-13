@@ -1,172 +1,126 @@
-"""Keep paid checkout addresses and shipping charges independent of live records."""
-
-from html import unescape
+"""Place a paid cart as accepted at checkout start: the cart save there rendered its address text and charges,
+and the cart lock keeps them. Live records that changed since only produce a staff note."""
 
 import frappe
-from frappe.utils import escape_html, strip_html
+from erpnext.accounts.party import render_address
+from frappe import _
+from frappe.utils import escape_html, flt, strip_html
 
+from commera.api.shipping import CART_CHARGE_FIELD, get_cart_charge_kind
 from commera.cart_prices import get_document_market
 from commera.localization.address_countries import AddressCountries
 
-PREFIX = "Accepted checkout: "
-DETAIL_FIELDS = ("address_line1", "address_line2", "city", "state", "pincode", "country", "phone")
-ADDRESS_FIELDS = ("customer_address", "shipping_address_name")
+ADDRESS_TEXT = {"customer_address": "address_display", "shipping_address_name": "shipping_address"}
 
 
-def accept_checkout(quotation):
+def keep_accepted_checkout(quotation) -> list[str]:
+	"""Keep the paid cart's addresses and shipping charge through submission. Returns what changed."""
+	changes = get_address_changes(quotation)
+	for field in ADDRESS_TEXT:
+		# A deleted Address fails link validation; its accepted text stays.
+		if (name := quotation.get(field)) and not frappe.db.exists("Address", name):
+			quotation.set(field, None)
+	if reason := get_shipping_rule_change(quotation):
+		release_shipping_rule(quotation)
+		changes.append(reason)
+	keep_accepted_addresses(quotation, quotation)
+	return changes
+
+
+def keep_accepted_addresses(doc, source):
+	"""ERPNext refills and renders the address links on every validate; keep the values of `source`."""
+	fields = [*ADDRESS_TEXT, *ADDRESS_TEXT.values()]
+	doc.flags.accepted_addresses = {field: source.get(field) for field in fields}
+
+
+def restore_accepted_addresses(doc, method=None):
+	doc.update(doc.flags.get("accepted_addresses") or {})
+
+
+def get_shipping_rule_change(quotation) -> str | None:
+	"""Why ERPNext would refuse or reprice the accepted shipping charge on submit, if it would."""
+	name = quotation.shipping_rule
+	if not name:
+		return None
+	if not frappe.db.exists("Shipping Rule", name):
+		return _("Shipping Rule {0} was deleted").format(name)
+	rule = frappe.get_doc("Shipping Rule", name)
+	address = quotation.get_shipping_address()
+	countries = [row.country for row in rule.countries]
+	if address and countries and address.get("country") not in countries:
+		return _("Shipping Rule {0} no longer covers {1}").format(name, address.get("country"))
+	trial = frappe.copy_doc(quotation, ignore_no_copy=True)
+	rule.apply(trial)
+	if get_charge_amounts(trial) != get_charge_amounts(quotation):
+		return _("Shipping Rule {0} now charges a different amount").format(name)
+	return None
+
+
+def get_charge_amounts(doc) -> list[float]:
+	return [flt(row.tax_amount, row.precision("tax_amount")) for row in doc.taxes]
+
+
+def release_shipping_rule(quotation):
+	"""Keep the accepted shipping row, marked so order charge lines still show it as shipping."""
+	for row in quotation.taxes:
+		if get_cart_charge_kind(row, quotation) == "shipping_rule":
+			row.set(CART_CHARGE_FIELD, "shipping_rule")
+	quotation.shipping_rule = None
+
+
+def get_address_changes(quotation) -> list[str]:
+	try:
+		return list(dict.fromkeys(read_address_changes(quotation)))
+	except Exception:
+		frappe.log_error(
+			"Paid order address check failed", reference_doctype="Quotation", reference_name=quotation.name
+		)
+		return []
+
+
+def read_address_changes(quotation):
 	countries = AddressCountries.of(get_document_market(quotation))
-	addresses = {}
-	for field in ADDRESS_FIELDS:
-		if name := quotation.get(field):
-			address = frappe.get_doc("Address", name)
-			addresses[field] = {
-				"name": name,
-				"country": address.country,
-				"modified": str(address.modified),
-				"details": {key: address.get(key) for key in DETAIL_FIELDS},
-			}
-	return {
-		"addresses": addresses,
-		"address_display": quotation.address_display,
-		"shipping_address": quotation.shipping_address,
-		"market": countries.market.handle,
-		"market_countries": list(countries.market.countries),
-		"shipping_rule": quotation.shipping_rule,
-		"rule_countries": rule_countries(quotation.shipping_rule),
-		"rule_config": rule_config(quotation.shipping_rule),
-		"country_markets": {
-			address["country"]: country_market(countries, address["country"])
-			for address in addresses.values()
-		},
-	}
-
-
-def validate_accepted_countries(quotation, accepted):
-	countries = AddressCountries.of(get_document_market(quotation))
-	for field, address in accepted["addresses"].items():
-		if field == "shipping_address_name" and quotation.custom_is_store_pickup:
+	for field, text_field in ADDRESS_TEXT.items():
+		name = quotation.get(field)
+		if not name or (field == "shipping_address_name" and quotation.custom_is_store_pickup):
 			continue
-		countries.validate(address["country"])
+		address = frappe.db.get_value("Address", name, "country")
+		if not address:
+			yield _("Address {0} was deleted").format(name)
+			continue
+		if normalize(render_address(name, check_permissions=False)) != normalize(quotation.get(text_field)):
+			yield _("Address {0} was edited").format(name)
+		if not is_linked(name, quotation):
+			yield _("Address {0} is no longer linked to {1}").format(name, quotation.party_name)
+		if not countries.allows(frappe.get_cached_value("Country", address, "code")):
+			yield _("the {0} market no longer ships to {1}").format(_(countries.market.title), _(address))
 
 
-def load_checkout(quotation):
-	rows = frappe.get_all(
-		"Comment",
-		filters={"reference_doctype": "Quotation", "reference_name": quotation.name, "comment_type": "Info"},
-		pluck="content",
-		order_by="creation desc",
-	)
-	for content in rows:
-		content = unescape(strip_html(content))
-		if content.startswith(PREFIX):
-			return frappe.parse_json(content[len(PREFIX) :])
-	# Older sessions have only the quotation's rendered address snapshot.
-	return accept_checkout(quotation)
-
-
-def freeze_addresses(doc, accepted):
-	# ERPNext renders linked addresses on every validate and checks current Customer links.
-	# Keep the accepted text as transaction data; original links remain in the checkout comment.
-	doc.flags.accepted_checkout = accepted
-	clear_address_links(doc, accepted)
-
-
-def note_checkout_changes(order, quotation, accepted):
-	changes = []
-	for field, old in accepted["addresses"].items():
-		current = frappe.db.get_value("Address", old["name"], ["modified", *DETAIL_FIELDS], as_dict=True)
-		linked = frappe.db.exists(
+def is_linked(address: str, quotation) -> bool:
+	return bool(
+		frappe.db.exists(
 			"Dynamic Link",
 			{
 				"parenttype": "Address",
-				"parent": old["name"],
-				"link_doctype": "Customer",
+				"parent": address,
+				"link_doctype": quotation.quotation_to,
 				"link_name": quotation.party_name,
 			},
 		)
-		differences = [
-			f"{key}: {value or '(empty)'} → {current.get(key) or '(empty)'}"
-			for key, value in old["details"].items()
-			if current and current.get(key) != value
-		]
-		if not current:
-			differences.append("Address deleted")
-		if not linked:
-			differences.append("Customer link removed")
-		if differences:
-			changes.append(f"{field} {old['name']}: " + ", ".join(differences))
-	countries = AddressCountries.of(get_document_market(quotation))
-	if sorted(accepted["market_countries"]) != sorted(countries.market.countries):
-		changes.append(
-			f"market {accepted['market']} countries: {accepted['market_countries']} → {list(countries.market.countries)}"
+	)
+
+
+def normalize(text: str | None) -> str:
+	return " ".join(strip_html(text or "").split())
+
+
+def note_checkout_changes(order, changes: list[str]):
+	if not changes:
+		return
+	note = _("Placed as paid with the accepted addresses and totals. Check delivery: {0}.")
+	try:
+		order.add_comment("Comment", escape_html(note.format("; ".join(changes))))
+	except Exception:
+		frappe.log_error(
+			"Paid order change note failed", reference_doctype="Sales Order", reference_name=order.name
 		)
-	for country, old_market in accepted["country_markets"].items():
-		new_market = country_market(countries, country)
-		if new_market != old_market:
-			changes.append(f"{country} market: {old_market} → {new_market}")
-	for old in accepted["addresses"].values():
-		if not countries.allows(frappe.get_cached_value("Country", old["country"], "code")):
-			changes.append(f"the {countries.market.title} market no longer ships to {old['country']}")
-	current_countries = rule_countries(accepted["shipping_rule"])
-	if accepted["rule_countries"] != current_countries:
-		changes.append(
-			f"Shipping Rule {accepted['shipping_rule']} countries: {accepted['rule_countries']} → {current_countries}"
-		)
-	current_config = rule_config(accepted["shipping_rule"])
-	if accepted["rule_config"] != current_config:
-		changes.append(
-			f"Shipping Rule {accepted['shipping_rule']} configuration: {accepted['rule_config']} → {current_config}"
-		)
-	if changes:
-		order.add_comment(
-			"Comment",
-			escape_html(
-				"Placed as paid with accepted addresses and totals. Check delivery: " + "; ".join(changes)
-			),
-		)
-
-
-def rule_countries(name):
-	if not name:
-		return []
-	return sorted(frappe.get_all("Shipping Rule Country", filters={"parent": name}, pluck="country"))
-
-
-class PaidAddressMixin:
-	def set_missing_lead_customer_details(self, for_validate=False):
-		if accepted := self.flags.get("accepted_checkout"):
-			clear_address_links(self, accepted)
-			return
-		super().set_missing_lead_customer_details(for_validate=for_validate)
-
-
-def clear_address_links(doc, accepted):
-	for field in ADDRESS_FIELDS:
-		doc.set(field, None)
-	for field in ("address_display", "shipping_address"):
-		doc.set(field, accepted.get(field))
-
-
-def paid_target(doctype, accepted):
-	doc = frappe.new_doc(doctype)
-	freeze_addresses(doc, accepted)
-	return doc
-
-
-def country_market(countries, country):
-	return countries.markets.for_country(frappe.get_cached_value("Country", country, "code")).handle
-
-
-def rule_config(name):
-	if not name or not frappe.db.exists("Shipping Rule", name):
-		return None
-	rule = frappe.get_doc("Shipping Rule", name)
-	return {
-		"disabled": rule.disabled,
-		"calculate_based_on": rule.calculate_based_on,
-		"shipping_amount": rule.shipping_amount,
-		"conditions": [
-			{key: row.get(key) for key in ("from_value", "to_value", "shipping_amount")}
-			for row in rule.conditions
-		],
-	}
