@@ -27,7 +27,7 @@ COPIED_FIELDS = (
 
 
 def execute():
-	"""Move Telr out of commera and into bwh_payments, carrying its settings and its refund ledger."""
+	"""Move the retired Telr doctypes onto the gateway doctypes, carrying settings and the refund ledger."""
 	add_gateway_profile()
 	migrate_settings()
 	migrate_payment_requests()
