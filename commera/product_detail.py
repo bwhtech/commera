@@ -1,6 +1,7 @@
 import frappe
 from frappe.utils import cstr, flt
 
+from commera.base_prices import get_sales_units
 from commera.localization.market_prices import MarketPrices
 from commera.utils import get_available_stock, get_discount_percent
 
@@ -91,10 +92,13 @@ def get_selected_item(available_sizes, selected_size):
 
 
 def price_sizes(sizes, prices):
-	"""Price each size in the market. A size with no price today is not for sale."""
-	sale, compare_at = prices.get_base_rates([row["item_code"] for row in sizes])
+	"""Price each size in the market, per its sales unit. A size with no price today is not for sale."""
+	item_codes = [row["item_code"] for row in sizes]
+	sale, compare_at = prices.get_base_rates(item_codes)
+	units = get_sales_units(item_codes)
 	for row in sizes:
 		item_code = row["item_code"]
+		row["unit"] = units.get(item_code)
 		# None and 0.0 stay distinct: "not on this list" falls back, "free" does not.
 		row["sale_rate"], row["compare_at_rate"] = sale.get(item_code), compare_at.get(item_code)
 		row["price"] = prices.price(sale.get(item_code), compare_at.get(item_code))
