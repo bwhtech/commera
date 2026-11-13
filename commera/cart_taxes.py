@@ -224,6 +224,9 @@ def is_managed_tax_row(row, quotation) -> bool:
 
 def set_tax_template(quotation, template: str | None, *, managed: bool = False):
 	"""The template's rows first, so their row references hold, then Commera's own charges."""
+	# Imported here: commera.api.shipping imports the cart, which imports this module.
+	from commera.api.shipping import keep_shipping_rule_last
+
 	charges = [row for row in quotation.get("taxes") or [] if not is_managed_tax_row(row, quotation)]
 	quotation.taxes_and_charges = template
 	quotation.set(
@@ -235,6 +238,7 @@ def set_tax_template(quotation, template: str | None, *, managed: bool = False):
 	)
 	for row in charges:
 		quotation.append("taxes", row)
+	keep_shipping_rule_last(quotation)
 	for index, row in enumerate(quotation.taxes, start=1):
 		row.idx = index
 

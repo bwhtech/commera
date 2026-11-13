@@ -24,6 +24,7 @@ from commera.api.shipping import (
 	get_checkout_summary,
 	get_cod_charge,
 	get_priced_checkout_summary,
+	is_delivery_unavailable,
 	reprice_selected_option,
 	reprice_shipping_discount,
 )
@@ -73,6 +74,7 @@ from commera.localization.market_prices import MarketPrices
 from commera.order_access import get_order_link, set_order_access_key
 from commera.paid_checkout import keep_accepted_addresses, keep_accepted_checkout, note_checkout_changes
 from commera.plugin_events import fire_event, get_plugin_fieldnames
+from commera.shipping.coverage import ships_to_address
 from commera.utils import (
 	get_charge_account_head,
 	get_pickup_addresses,
@@ -272,6 +274,8 @@ def get_checkout_payment_methods(quotation, strict: bool = False) -> list[str]:
 		payment_methods.append(COD_PAYMENT_MODE)
 	if not quotation:
 		return payment_methods
+	if is_delivery_unavailable(quotation):
+		return []
 	return filter_payment_methods(quotation, payment_methods, strict)
 
 
@@ -805,21 +809,12 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 def set_charges(quotation):
 	shipping_rule = frappe.get_cached_value("Commera Settings", "Commera Settings", "shipping_rule")
 	if shipping_rule:
-		from commera.api.shipping import CART_CHARGE_FIELD, remove_shipping_rule_row
+		from commera.api.shipping import keep_shipping_rule_last, remove_shipping_rule_row
 
 		remove_shipping_rule_row(quotation)
-		quotation.shipping_rule = shipping_rule
-		# ERPNext matches by account; isolate its row so a template levy cannot be overwritten.
-		existing_rows = quotation.taxes
-		quotation.taxes = []
-		try:
-			quotation.run_method("apply_shipping_rule")
-			for row in quotation.taxes:
-				row.set(CART_CHARGE_FIELD, "shipping_rule")
-		finally:
-			quotation.taxes = existing_rows + quotation.taxes
-		for index, row in enumerate(quotation.taxes, start=1):
-			row.idx = index
+		# Left off where it does not deliver, so the cart still saves: payment then refuses the cart.
+		quotation.shipping_rule = shipping_rule if ships_to_address(quotation, shipping_rule) else None
+		keep_shipping_rule_last(quotation)
 		quotation.run_method("calculate_taxes_and_totals")
 	apply_plugin_fees(quotation)
 
@@ -904,7 +899,9 @@ def save_contact_details(quotation, address: dict):
 	if quotation.custom_guest_cart_key and frappe.db.exists("User", quotation.contact_email):
 		return
 
-	contact = frappe.get_doc("Contact", quotation.contact_person)
+	# Locked: Frappe's User.on_update enqueues create_contact, which re-saves this Contact. Right after sign-up,
+	# that job saving between this load and the save below would fail the shopper's address step.
+	contact = frappe.get_doc("Contact", quotation.contact_person, for_update=True)
 	replace_placeholder_names(quotation, contact, address.get("billing_address", {}))
 	existing_phones = {entry.phone for entry in contact.phone_nos}
 
@@ -1257,4 +1254,16 @@ def update_delivery_charges(quotation):
 
 	if not reprice_selected_option(quotation):
 		set_charges(quotation)
+		validate_delivery_available(quotation)
 	save_cart_quotation(quotation)
+
+
+def validate_delivery_available(quotation):
+	if is_delivery_unavailable(quotation):
+		# Not refuse_payment: the shopper can fix this, so it is no error to log.
+		frappe.throw(
+			_("We do not deliver to {0}. Please choose another address.").format(
+				_(quotation.get_shipping_address().get("country"))
+			),
+			title=_("Delivery Not Available"),
+		)

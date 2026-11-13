@@ -138,9 +138,10 @@ def price_service(service: dict, quote: dict | None, cart: dict, band=None):
 	if live_amount is not None:
 		return live_amount, True
 
-	backup_charge = flt(service.get("backup_charge"), 2)
+	# Set in company currency, as the Shipping Rule's bands are.
+	backup_charge = flt(service.get("backup_charge"))
 	if backup_charge > 0:
-		return backup_charge, False
+		return flt(backup_charge / get_conversion_rate(cart), 2), False
 	return UNPRICEABLE
 
 
@@ -187,8 +188,8 @@ def get_live_amount(service: dict, quote: dict | None, cart: dict) -> float | No
 	if amount is None:
 		return None
 
-	marked_up = amount * (1 + flt(service.get("markup_percent")) / 100) + flt(service.get("handling_fee"))
-	return flt(marked_up, 2)
+	handling_fee = flt(service.get("handling_fee")) / get_conversion_rate(cart)
+	return flt(amount * (1 + flt(service.get("markup_percent")) / 100) + handling_fee, 2)
 
 
 def convert_to_cart_currency(amount: float, currency: str | None, cart: dict) -> float | None:

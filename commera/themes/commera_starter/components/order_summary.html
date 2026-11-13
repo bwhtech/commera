@@ -1,6 +1,6 @@
 {% from "components/macros/icons.html" import icon, spinner %}
 
-{% macro order_summary(total="cart?.total") -%}
+{% macro order_summary(total="cart?.total", unavailable="false") -%}
 <div x-data="order_summary" class="tabular flex flex-col gap-3 text-md">
 	<div class="flex justify-between gap-3">
 		<span class="min-w-0 [overflow-wrap:anywhere]" title="{{ _("Subtotal") }}">{{ _("Subtotal") }}</span>
@@ -50,7 +50,8 @@
 
 	<div class="mt-2 flex justify-between gap-3 border-t border-outline-gray-2 pt-4 text-2xl font-medium">
 		<span class="min-w-0 [overflow-wrap:anywhere]" title="{{ _("Order total") }}">{{ _("Order total") }}</span>
-		<span class="shrink-0 whitespace-nowrap" x-html="money({{ total }})"></span>
+		<span class="shrink-0 whitespace-nowrap" x-show="!({{ unavailable }})" x-html="money({{ total }})"></span>
+		<span x-show="{{ unavailable }}" class="shrink-0 whitespace-nowrap text-ink-gray-6">{{ _("Unavailable") }}</span>
 	</div>
 </div>
 {%- endmacro %}

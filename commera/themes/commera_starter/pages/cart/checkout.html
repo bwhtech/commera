@@ -175,7 +175,7 @@
 				<p x-show="error && step === 'payment'" x-text="error" role="alert" class="text-base text-ink-red-7"></p>
 				{{ checkout_blocked_notice() }}
 				<button type="submit" :disabled="busy || needs_shipping_option || !payment_method || $store.cart.has_unavailable" :aria-busy="busy === 'pay'" class="button-primary relative w-full">
-					{{ _("Pay") }}&nbsp;<span x-html="money(total)"></span>
+					{{ _("Pay") }}<span x-show="!delivery_unavailable">&nbsp;<span x-html="money(total)"></span></span>
 					{{ spinner("busy === 'pay'", "size-5 text-on-brand") }}
 				</button>
 			</form>
@@ -184,15 +184,15 @@
 		<aside class="order-first rounded-2xl bg-surface-gray-1 p-6 lg:sticky lg:top-[calc(var(--header-height)+1.5rem)] lg:order-none">
 			<button type="button" @click="summary_open = !summary_open" :aria-expanded="summary_open" class="flex min-h-12 w-full items-center justify-between gap-3 lg:hidden">
 				<span class="flex min-w-0 items-center gap-1 text-start text-md">{{ _("Order summary") }}<span :class="summary_open && 'rotate-180'" class="transition-transform duration-200">{{ icon("down", "size-4") }}</span></span>
-				<span class="tabular text-2xl font-medium" x-html="money(total)"></span>
+				<span x-show="!delivery_unavailable" class="tabular text-2xl font-medium" x-html="money(total)"></span>
 			</button>
 			<div :class="summary_open || 'max-lg:hidden'" class="max-lg:mt-5">
 				<h2 class="mb-5 text-3xl max-lg:hidden">{{ _("Order summary") }}</h2>
 				{% include "components/checkout_lines.html" %}
-				{% call order_summary(total="total") %}
+				{% call order_summary(total="total", unavailable="delivery_unavailable") %}
 				<div class="flex justify-between gap-3">
 					<span class="min-w-0 [overflow-wrap:anywhere]">{{ _("Shipping") }}</span>
-					<span x-show="shipping_pending" class="shrink-0 whitespace-nowrap text-ink-gray-6">{{ _("Choose an option") }}</span><span x-show="!shipping_pending" class="shrink-0 whitespace-nowrap" x-html="money(shipping_amount)"></span>
+					<span x-show="delivery_unavailable" class="shrink-0 whitespace-nowrap text-ink-gray-6">{{ _("Unavailable") }}</span><span x-show="!delivery_unavailable && shipping_pending" class="shrink-0 whitespace-nowrap text-ink-gray-6">{{ _("Choose an option") }}</span><span x-show="!delivery_unavailable && !shipping_pending" class="shrink-0 whitespace-nowrap" x-html="money(shipping_amount)"></span>
 				</div>
 				<template x-for="(discount, index) in shipping_pending ? [] : summary?.shipping_discounts ?? []" :key="index">
 					<div class="flex justify-between gap-3 text-ink-gray-7">
