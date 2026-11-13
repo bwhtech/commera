@@ -1,6 +1,7 @@
 import click
 import frappe
 from bwh_payments_core.contract import PaymentGatewayBase
+from frappe import _
 from frappe.model.base_document import get_controller
 from frappe.utils.caching import site_cache
 
@@ -48,6 +49,11 @@ def resolve_payment_mode(payment_mode: str) -> str | None:
 		if gateway.casefold() == requested:
 			return gateway
 	return None
+
+
+def refuse_bwh_payments(app_name: str):
+	if app_name == "bwh_payments":
+		frappe.throw(_("Payments are part of Commera, so bwh_payments cannot be installed alongside it."))
 
 
 def validate_connectors(app_name: str | None = None):

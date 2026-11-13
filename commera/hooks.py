@@ -98,6 +98,7 @@ after_app_install = [
 	"commera.shipping.providers.validate_providers",
 	"commera.payment_gateways.connectors.validate_connectors",
 ]
+before_app_install = "commera.payment_gateways.connectors.refuse_bwh_payments"
 before_app_uninstall = "commera.shipping.providers.disable_app_profiles"
 
 commera_hooks = {
