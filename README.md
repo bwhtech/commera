@@ -40,7 +40,7 @@ A Vue 3 + [Frappe UI](https://github.com/frappe/frappe-ui) app served at `/comme
 
 ### Payments, Shipping and Analytics
 
-> Payments are provided by the companion app [**bwh_payments**](https://github.com/bwhtech/bwh_payments), which is required alongside ERPNext. Shipping is part of Commera.
+> Payments and shipping are part of Commera. Payment gateways come from the [**bwh_payments_core**](https://github.com/bwhtech/bwh_payments_core) library, which installs with Commera.
 
 Providers are configured from the dashboard rather than the desk. Each keeps its own credentials, and each can be switched on independently.
 
