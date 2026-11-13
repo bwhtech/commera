@@ -8,6 +8,7 @@ from frappe import _
 from frappe.query_builder import DocType
 
 from commera.core import get_default_customer_group
+from commera.shipping.pricing import has_delivery_options
 from commera.utils import get_store_company, get_store_currency
 
 MARKET_DOCTYPE = "Commera Market"
@@ -269,12 +270,13 @@ def validate_tax_template(doc, method=None):
 
 def validate_shipping_rule(doc, method=None):
 	"""Refuse to drop a market country from the store Shipping Rule."""
-	if frappe.flags.in_patch or frappe.flags.in_migrate or has_delivery_services():
-		return
 	if (
-		doc.is_new()
+		frappe.flags.in_patch
+		or frappe.flags.in_migrate
+		or doc.is_new()
 		or not doc.has_value_changed("countries")
 		or doc.name != frappe.db.get_single_value("Commera Settings", "shipping_rule")
+		or has_delivery_options()
 	):
 		return
 	shipped = {row.country for row in doc.countries}
@@ -293,15 +295,9 @@ def validate_shipping_rule(doc, method=None):
 			)
 
 
-def has_delivery_services():
-	# Carrier coverage depends on a live quote. Configuration cannot prove a country is unreachable.
-	return frappe.db.exists("Shipping Service", {"enabled": 1}) or frappe.db.exists(
-		"Shipping Provider Profile", {"enabled": 1, "offer_all_rates": 1}
-	)
-
-
 def get_countries_without_delivery(shipping_rule: str | None, countries: list[str]) -> list[str]:
-	if not shipping_rule or has_delivery_services():
+	# Carrier coverage depends on a live quote. Configuration cannot prove a country is unreachable.
+	if not shipping_rule or has_delivery_options():
 		return []
 	shipped = frappe.get_all(
 		"Shipping Rule Country",

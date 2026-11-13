@@ -61,40 +61,45 @@ class CommeraMarket(Document):
 	def validate(self):
 		if not self.enabled:
 			self.currency = get_price_list_currency(self.sale_price_list)
-			return
 		if frappe.flags.in_patch or frappe.flags.in_migrate:
 			return
-		before = self.get_doc_before_save()
-		full = not before or not before.enabled
-
-		def changed(*fields):
-			if full:
-				return True
-			return any(
-				not self.is_child_table_same(field)
-				if self.meta.get_field(field).fieldtype == "Table"
-				else self.has_value_changed(field)
-				for field in fields
-			)
-
-		if changed("handle"):
+		full = self.is_new() or self.is_enabled_now()
+		if full or self.has_fields_changed("handle"):
 			self.validate_handle()
-		if changed("countries"):
+		if full or self.has_fields_changed("countries"):
 			self.validate_countries()
-		if changed("languages", "default_language", "countries"):
+		if full or self.has_fields_changed("languages", "default_language", "countries"):
 			self.validate_languages()
-		if changed("sale_price_list", "compare_at_price_list"):
+		# A disabled market sells nothing, so it need not fit the store setup yet.
+		if self.enabled:
+			self.validate_store_fit(full)
+
+	def validate_store_fit(self, full: bool):
+		before = self.get_doc_before_save()
+		if full or self.has_fields_changed("sale_price_list", "compare_at_price_list"):
 			self.validate_price_lists(full=full)
-		if changed("sale_price_list", "countries"):
+		if full or self.has_fields_changed("sale_price_list", "countries"):
 			self.validate_price_list_countries()
 		fit = MarketStoreFit(self)
-		if changed("tax_template"):
+		if full or self.has_fields_changed("tax_template"):
 			fit.validate_tax_template()
-		if full or (changed("sale_price_list") and self.currency != before.currency):
+		if full or (self.has_fields_changed("sale_price_list") and self.currency != before.currency):
 			fit.validate_invoice_currency()
-		if changed("countries"):
-			old = {row.country for row in before.countries} if before and not full else set()
+		if full or self.has_fields_changed("countries"):
+			old = set() if full else {row.country for row in before.countries}
 			fit.validate_delivery_countries([row.country for row in self.countries if row.country not in old])
+
+	def is_enabled_now(self) -> bool:
+		before = self.get_doc_before_save()
+		return bool(self.enabled and before and not before.enabled)
+
+	def has_fields_changed(self, *fields) -> bool:
+		return any(
+			not self.is_child_table_same(field)
+			if self.meta.get_field(field).fieldtype == "Table"
+			else self.has_value_changed(field)
+			for field in fields
+		)
 
 	def before_save(self):
 		self.reinsert_changed_countries()
@@ -200,7 +205,7 @@ class CommeraMarket(Document):
 
 	def get_saved_languages(self) -> set[str]:
 		before = self.get_doc_before_save()
-		return {row.language for row in before.languages} if before and before.enabled else set()
+		return set() if not before or self.is_enabled_now() else {row.language for row in before.languages}
 
 	def validate_no_region(self, code: str):
 		"""The hreflang of a market URL is `<language>-<COUNTRY>`. pt-BR in Portugal has no valid tag."""

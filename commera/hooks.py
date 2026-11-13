@@ -217,7 +217,7 @@ doc_events = {
 	"Sales Taxes and Charges Template": {
 		"validate": "commera.localization.market_setup.validate_tax_template",
 	},
-	"Shipping Rule": {"validate": "commera.localization.market_setup.validate_shipping_rule"},
+	"Shipping Rule": {"validate": ["commera.localization.market_setup.validate_shipping_rule"]},
 	"Gateway Payment Request": {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},

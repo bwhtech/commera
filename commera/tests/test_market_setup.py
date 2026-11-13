@@ -127,7 +127,7 @@ class TestMarketDelivery(MarketSetupTestCase):
 	def test_every_market_country_needs_the_store_shipping_rule(self):
 		self.use_store_rule(["Saudi Arabia"])
 
-		with patch("commera.localization.market_setup.has_delivery_services", return_value=False):
+		with patch("commera.localization.market_setup.has_delivery_options", return_value=False):
 			with self.assertRaisesRegex(frappe.ValidationError, "does not deliver to"):
 				MarketStoreFit(self.market).validate_delivery_countries()
 
@@ -140,7 +140,7 @@ class TestMarketDelivery(MarketSetupTestCase):
 		rule = self.use_store_rule(["Saudi Arabia", UAE])
 		rule.set("countries", [{"country": "Saudi Arabia"}])
 
-		with patch("commera.localization.market_setup.has_delivery_services", return_value=False):
+		with patch("commera.localization.market_setup.has_delivery_options", return_value=False):
 			with self.assertRaisesRegex(
 				frappe.ValidationError, "in its countries, or remove it from the market"
 			):
@@ -150,7 +150,7 @@ class TestMarketDelivery(MarketSetupTestCase):
 		settings = frappe.get_doc("Commera Settings")
 		settings.shipping_rule = self.make_saudi_rule()
 
-		with patch("commera.localization.market_setup.has_delivery_services", return_value=False):
+		with patch("commera.localization.market_setup.has_delivery_options", return_value=False):
 			with self.assertRaisesRegex(frappe.ValidationError, "does not deliver to"):
 				validate_markets_for_store(settings)
 
@@ -167,13 +167,13 @@ class TestMarketDelivery(MarketSetupTestCase):
 		rule.set("conditions", [{"from_value": 0, "to_value": 0, "shipping_amount": 10}])
 		rule.db_update()
 		rule.update_children()
-		with patch("commera.localization.market_setup.has_delivery_services", return_value=False):
+		with patch("commera.localization.market_setup.has_delivery_options", return_value=False):
 			stamp_store_rule_bands(rule.name, [None])
 
 	def test_coverage_can_expand_without_repairing_all_missing_countries(self):
 		rule = self.use_store_rule(["Saudi Arabia"])
 		rule.append("countries", {"country": "Kuwait"})
-		with patch("commera.localization.market_setup.has_delivery_services", return_value=False):
+		with patch("commera.localization.market_setup.has_delivery_options", return_value=False):
 			rule.save()
 
 	def test_patch_skips_even_a_reduction_in_coverage(self):
@@ -181,7 +181,7 @@ class TestMarketDelivery(MarketSetupTestCase):
 		rule.set("countries", [{"country": "Saudi Arabia"}])
 		with (
 			patch.dict(frappe.flags, {"in_patch": True}),
-			patch("commera.localization.market_setup.has_delivery_services", return_value=False),
+			patch("commera.localization.market_setup.has_delivery_options", return_value=False),
 		):
 			rule.save()
 
@@ -230,7 +230,7 @@ class TestMarketRepairs(MarketSetupTestCase):
 		with (
 			patch.object(MarketStoreFit, "validate_invoice_currency", side_effect=AssertionError),
 			patch.object(MarketStoreFit, "validate_tax_template", side_effect=AssertionError),
-			patch("commera.localization.market_setup.has_delivery_services", return_value=True),
+			patch("commera.localization.market_setup.has_delivery_options", return_value=True),
 		):
 			validate_markets_for_store(settings)
 
@@ -274,5 +274,33 @@ class TestMarketRepairs(MarketSetupTestCase):
 		MarketStoreFit(self.market).validate_invoice_currency()
 
 	def test_live_delivery_configuration_allows_a_country_outside_store_rule(self):
-		with patch("commera.localization.market_setup.has_delivery_services", return_value=True):
+		with patch("commera.localization.market_setup.has_delivery_options", return_value=True):
 			MarketStoreFit(self.market).validate_delivery_countries()
+
+
+class TestDisabledMarkets(MarketSetupTestCase):
+	def make_disabled(self, handle, countries=("Kuwait",), languages=()):
+		return make_market("Gulf North", list(countries), "ar", languages, enabled=0, handle=handle)
+
+	def test_a_disabled_market_needs_a_valid_handle(self):
+		for handle in ("primary", "Bad Handle!"):
+			with self.subTest(handle=handle), self.assertRaisesRegex(frappe.ValidationError, "Handle"):
+				self.make_disabled(handle)
+
+	def test_a_disabled_market_cannot_take_a_country_of_another_market(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "already in market"):
+			self.make_disabled("gulf-north", countries=[UAE])
+
+	def test_a_disabled_market_needs_published_languages(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "not a published storefront language"):
+			self.make_disabled("gulf-north", languages=["fr"])
+
+	def test_a_disabled_market_need_not_fit_the_store_setup_until_enabled(self):
+		allow_multi_currency_invoices(self, 0)
+		market = make_market(
+			"Gulf North", ["Kuwait"], "ar", enabled=0, handle="gulf-north", sale_price_list=self.sale
+		)
+
+		market.enabled = 1
+		with self.assertRaisesRegex(frappe.ValidationError, "ERPNext can invoice"):
+			market.save()

@@ -14,6 +14,7 @@ from commera.localization.markets import StorefrontMarkets
 from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.tests.test_market_cart import MarketCartTestCase
 from commera.tests.test_market_orders import use_company_warehouse
+from commera.tests.test_summer_demo import get_test_company
 from commera.utils import get_store_company
 
 GATEWAY = "ZZ Market Tax Gateway"
@@ -366,8 +367,7 @@ class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 	def test_a_template_of_another_company_is_refused(self):
 		template = self.make_template(10)
 
-		other_company = frappe.db.get_value("Company", {"name": ("!=", self.company)})
-		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "company", other_company)
+		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "company", get_test_company())
 
 		with self.assertRaisesRegex(frappe.ValidationError, "Choose a template of the store company"):
 			self.set_market_template(template)
@@ -400,7 +400,7 @@ class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 	def test_a_new_store_company_must_own_the_market_templates(self):
 		self.set_market_template(self.make_template(10))
 		settings = frappe.get_doc("Commera Settings")
-		settings.company = frappe.db.get_value("Company", {"name": ("!=", self.company)})
+		settings.company = get_test_company()
 
 		with self.assertRaisesRegex(frappe.ValidationError, "Choose a template of the store company"):
 			validate_markets_for_store(settings)
@@ -418,7 +418,7 @@ class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 	def test_company_change_can_repair_a_mismatched_disabled_template(self):
 		template = self.make_template(10)
 		self.set_market_template(template)
-		other = frappe.db.get_value("Company", {"name": ("!=", self.company)})
+		other = get_test_company()
 		frappe.db.set_value(TEMPLATE_DOCTYPE, template, {"company": other, "disabled": 1})
 		settings = frappe.get_doc("Commera Settings")
 		settings.company = other
