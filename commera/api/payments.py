@@ -6,6 +6,7 @@ from bwh_payments.api import get_gateway_options
 from bwh_payments.bwh_payments.utils import get_available_payment_modes, resolve_payment_mode
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+from erpnext.accounts.general_ledger import get_debit_credit_allowance
 from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import getdate, validate_email_address
@@ -619,11 +620,13 @@ def create_payment_entry(sales_invoice, payment_mode: str, paid_amount: float, r
 
 
 def get_rounding_tolerance(sales_invoice) -> float:
-	"""Up to half a minor unit per converted item row, tax row, total and receipt."""
+	"""Up to half a minor unit per converted item row, tax row, total and receipt,
+	capped at the drift ERPNext allows a Sales Invoice's GL entries."""
 	if sales_invoice.party_account_currency == sales_invoice.currency:
 		return 0
-	minor_unit = 10 ** -sales_invoice.precision("outstanding_amount")
-	return (len(sales_invoice.items) + len(sales_invoice.taxes) + 2) * minor_unit / 2
+	precision = sales_invoice.precision("outstanding_amount")
+	row_drift = (len(sales_invoice.items) + len(sales_invoice.taxes) + 2) * 10**-precision / 2
+	return min(row_drift, get_debit_credit_allowance(sales_invoice.doctype, precision))
 
 
 def set_payment_receipt(payment_entry, sales_invoice, paid_amount, is_settled):

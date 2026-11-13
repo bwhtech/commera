@@ -450,6 +450,16 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.assertEqual(invoice.status, "Partly Paid")
 		self.assertFalse(payment.deductions)
 
+	def test_rounding_tolerance_stops_at_the_erpnext_allowance(self):
+		"""120 rows may drift SAR 0.6, but ERPNext never lets a Sales Invoice drift past 0.5."""
+		invoice = self.create_fractional_invoice(0.99, 1, rows=120, conversion_rate=3.7512)
+		self.assertEqual(invoice.outstanding_amount, 445.2)
+		payment = create_payment_entry(invoice, GATEWAY, flt(invoice.grand_total - 0.28, 2), None)
+		invoice.reload()
+		self.assertEqual((invoice.status, invoice.outstanding_amount), ("Partly Paid", 0.61))
+		self.assertEqual(payment.received_amount, 444.59)
+		self.assertFalse(payment.deductions)
+
 	def test_advance_does_not_turn_a_partial_foreign_payment_into_settlement(self):
 		invoice = self.create_fractional_invoice(1.01, 1, advance=1)
 		self.assertEqual((invoice.total_advance, invoice.outstanding_amount), (1, 10.37))
@@ -509,7 +519,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		with patch("commera.api.payments.get_rounding_account", return_value=None):
 			validate_invoice_currency(self.quotation)
 
-	def create_fractional_invoice(self, rate, disabled, advance=0):
+	def create_fractional_invoice(self, rate, disabled, advance=0, rows=3, conversion_rate=3.75):
 		self.allow_multi_currency_invoices()
 		invoice = frappe.get_doc(
 			{
@@ -517,10 +527,10 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 				"company": COMPANY,
 				"customer": self.customer,
 				"currency": FOREIGN_CURRENCY,
-				"conversion_rate": 3.75,
+				"conversion_rate": conversion_rate,
 				"disable_rounded_total": disabled,
 				"ignore_pricing_rule": 1,
-				"items": [{"item_code": self.item_code, "qty": 1, "rate": rate} for _ in range(3)],
+				"items": [{"item_code": self.item_code, "qty": 1, "rate": rate} for _ in range(rows)],
 			}
 		)
 		if advance:
