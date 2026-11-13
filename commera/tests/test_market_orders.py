@@ -1,3 +1,4 @@
+from html import escape
 from unittest.mock import Mock, patch
 
 import frappe
@@ -17,9 +18,10 @@ from commera.api.payments import (
 from commera.api.shipping import get_charge_amount
 from commera.item_price_guard import install_guard, skip_auto_item_price
 from commera.localization.markets import delete_cached_rows
+from commera.paid_checkout import accept_checkout
 from commera.sdk import cart as cart_sdk
 from commera.sdk import checkout as checkout_sdk
-from commera.tests.test_admin_orders import ensure_fiscal_year
+from commera.tests.test_admin_orders import ensure_fiscal_year, make_shipping_rule
 from commera.tests.test_market_address_countries import ADDRESS
 from commera.tests.test_market_cart import MarketCartTestCase
 from commera.tests.test_markets import UAE
@@ -106,6 +108,68 @@ class TestPaidMarketOrders(MarketCartTestCase):
 
 		self.assertEqual(sales_order.docstatus, 1)
 		self.assertIn("the Gulf market no longer ships to India", self.get_note(sales_order))
+
+	def test_paid_addresses_survive_country_and_customer_link_changes(self):
+
+		frappe.set_user(self.quotation.contact_email)
+		with self.in_market():
+			state = checkout_sdk.set_addresses({**ADDRESS, "country": UAE})
+		frappe.set_user("Administrator")
+		quotation = self.quotation.reload()
+		accepted = accept_checkout(quotation)
+		quotation.add_comment("Info", "Accepted checkout: " + escape(frappe.as_json(accepted, indent=None)))
+		address = frappe.get_doc("Address", state["shipping_address"]["name"])
+		address.country = "India"
+		address.links = []
+		address.save(ignore_permissions=True)
+		frappe.db.delete("Dynamic Link", {"parenttype": "Address", "parent": address.name})
+		sales_order = self.pay()
+		self.assertEqual(sales_order.docstatus, 1)
+		self.assertEqual(sales_order.address_display, accepted["address_display"])
+		self.assertEqual(sales_order.shipping_address, accepted["shipping_address"])
+		self.assertEqual(sales_order.grand_total, quotation.grand_total)
+		self.assertIn("Customer link removed", self.get_note(sales_order))
+
+	def test_paid_shipping_uses_accepted_rows_after_rule_country_removal(self):
+
+		frappe.set_user(self.quotation.contact_email)
+		with self.in_market():
+			checkout_sdk.set_addresses({**ADDRESS, "country": UAE})
+		frappe.set_user("Administrator")
+		quotation = self.quotation.reload()
+		rule = make_shipping_rule(25)
+		rule.append("countries", {"country": UAE})
+		rule.save()
+		quotation.shipping_rule = rule.name
+		quotation.run_method("apply_shipping_rule")
+		quotation.save(ignore_permissions=True)
+		accepted = accept_checkout(quotation)
+		quotation.add_comment("Info", "Accepted checkout: " + escape(frappe.as_json(accepted, indent=None)))
+		rule.set("countries", [{"country": "Germany"}])
+		rule.save()
+
+		sales_order = self.pay()
+		self.assertEqual(sales_order.grand_total, quotation.grand_total)
+		self.assertFalse(sales_order.shipping_rule)
+		self.assertIn("Shipping Rule", self.get_note(sales_order))
+		self.assertIn("Germany", self.get_note(sales_order))
+
+	def test_paid_market_reassignment_keeps_accepted_totals(self):
+
+		frappe.set_user(self.quotation.contact_email)
+		with self.in_market():
+			checkout_sdk.set_addresses({**ADDRESS, "country": UAE})
+		frappe.set_user("Administrator")
+		quotation = self.quotation.reload()
+		accepted = accept_checkout(quotation)
+		quotation.add_comment("Info", "Accepted checkout: " + escape(frappe.as_json(accepted, indent=None)))
+		frappe.db.delete("Commera Market Country", {"parent": "gulf", "country": UAE})
+		delete_cached_rows()
+
+		sales_order = self.pay()
+		self.assertEqual(sales_order.grand_total, quotation.grand_total)
+		self.assertEqual(sales_order.shipping_address, accepted["shipping_address"])
+		self.assertIn("market: gulf", self.get_note(sales_order))
 
 	def test_an_order_its_market_still_sells_gets_no_note(self):
 		self.assertIsNone(self.get_note(self.pay()))

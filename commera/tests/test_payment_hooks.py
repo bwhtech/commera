@@ -601,30 +601,39 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		quotation.db_set({"customer_address": address.name, "shipping_address_name": address.name})
 		return address
 
-	def test_an_address_a_captured_payment_was_taken_for_cannot_change(self):
-		quotation = self.create_cart_quotation()
-		address = self.address_in_checkout(quotation)
-		self.create_pending_payment_request(quotation)
-
-		address.country = "Germany"
-		with self.assertRaisesRegex(
-			frappe.ValidationError, "payment is in progress for an order with this address"
-		):
-			address.save(ignore_permissions=True)
-
-		self.assertEqual(frappe.db.get_value("Address", address.name, "country"), "Saudi Arabia")
-
-	def test_changing_an_address_releases_an_abandoned_checkout(self):
+	def test_an_address_save_does_not_call_the_gateway(self):
 		quotation = self.create_cart_quotation()
 		address = self.address_in_checkout(quotation)
 		payment_request = self.create_abandoned_payment_request(quotation)
+		with patch.object(type(payment_request), "release_if_unpaid") as release:
+			address.country = "Germany"
+			address.links = []
+			address.save(ignore_permissions=True)
+			release.assert_not_called()
+		self.assertEqual(payment_request.reload().status, "Pending")
 
-		address.country = "Germany"
-		address.save(ignore_permissions=True)
+	def test_a_failed_address_save_keeps_the_gateway_session_open(self):
+		quotation = self.create_cart_quotation()
+		address = self.address_in_checkout(quotation)
+		payment_request = self.create_abandoned_payment_request(quotation)
+		address.country = ""
+		with self.assertRaises(frappe.MandatoryError):
+			address.save(ignore_permissions=True)
+		self.assertEqual(StubStripeClient.sessions[payment_request.order_ref].status, "open")
+		self.assertEqual(payment_request.reload().status, "Pending")
 
-		self.assertEqual(
-			frappe.db.get_value("Gateway Payment Request", payment_request.name, "status"), "Cancelled"
-		)
+	def test_a_desk_sales_quotation_does_not_lock_address_edits(self):
+		quotation = self.create_cart_quotation()
+		quotation.db_set("order_type", "Sales")
+		address = self.address_in_checkout(quotation)
+		self.create_pending_payment_request(quotation)
+		address.city = "Berlin"
+		with patch(
+			"commera.api.payments.get_checkout_payment_status",
+			side_effect=AssertionError("Address save queried payments"),
+		):
+			address.save(ignore_permissions=True)
+		self.assertEqual(frappe.db.get_value("Address", address.name, "city"), "Berlin")
 
 	def test_a_paid_order_is_placed_in_the_language_of_its_cart(self):
 		self.quotation.db_set("language", "ar")

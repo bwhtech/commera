@@ -214,7 +214,6 @@ doc_events = {
 		"validate": "commera.doc_events.price_list.validate",
 		"after_rename": "commera.search.price_sync.on_price_list_rename",
 	},
-	"Address": {"validate": "commera.doc_events.address.validate"},
 	"Gateway Payment Request": {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},
@@ -640,4 +639,11 @@ scheduler_events = {
 		"commera.search.build.rebuild_index_nightly",
 		"commera.og.generator.clear_old_cards",
 	],
+}
+
+# Paid placement keeps the accepted address text when ERPNext fills party details.
+override_doctype_class = {
+	"Quotation": "commera.paid_transactions.PaidQuotation",
+	"Sales Order": "commera.paid_transactions.PaidSalesOrder",
+	"Sales Invoice": "commera.paid_transactions.PaidSalesInvoice",
 }
