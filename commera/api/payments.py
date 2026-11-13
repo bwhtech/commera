@@ -623,8 +623,7 @@ def get_rounding_tolerance(sales_invoice) -> float:
 	if sales_invoice.party_account_currency == sales_invoice.currency:
 		return 0
 	minor_unit = 10 ** -sales_invoice.precision("outstanding_amount")
-	rounded_amounts = len(sales_invoice.items) + len(sales_invoice.taxes) + 2
-	return flt(rounded_amounts * minor_unit / 2, sales_invoice.precision("outstanding_amount"))
+	return (len(sales_invoice.items) + len(sales_invoice.taxes) + 2) * minor_unit / 2
 
 
 def set_payment_receipt(payment_entry, sales_invoice, paid_amount, is_settled):
