@@ -6,12 +6,14 @@ import frappe
 from frappe.utils.data import flt
 
 from commera.localization.formatter import (
+	NO_BREAK_SPACE,
 	Formatter,
 	format_money_digits,
 	get_fraction_precision,
 	get_html_currency_symbol,
 	get_money_precision,
 	is_currency_sign,
+	is_symbol_on_right,
 )
 from commera.localization.market_prices import MarketPrices
 from commera.utils import get_store_currency
@@ -19,24 +21,32 @@ from commera.utils import get_store_currency
 
 @dataclass(frozen=True)
 class CartCurrency:
-	"""Digits as the localization formatter writes them, so every theme agrees with Starter.
-	Templates place the symbol themselves: it goes before the amount."""
+	"""Digits as the localization formatter writes them. Templates print `symbol` before the digits and
+	`symbol_after` after them: the Currency's symbol_on_right moves it after, as in fmt_money."""
 
 	code: str
 	symbol: str
 	precision: int
 	fraction_precision: int
 	number_format: str
+	symbol_after: str = ""
 
 	@classmethod
 	def of(cls, quotation=None) -> "CartCurrency":
 		code = (quotation and quotation.get("currency")) or MarketPrices.current().currency
+		symbol = get_html_currency_symbol(code)
+		# A riyal or dirham sign stays left of the amount.
+		if symbol and not is_currency_sign(code) and is_symbol_on_right(code):
+			symbol, symbol_after = "", NO_BREAK_SPACE + symbol.strip()
+		else:
+			symbol_after = ""
 		return cls(
 			code,
-			get_html_currency_symbol(code),
+			symbol,
 			get_money_precision(code),
 			get_fraction_precision(code),
 			Formatter.current().number_format,
+			symbol_after,
 		)
 
 	@property

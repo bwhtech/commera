@@ -19,8 +19,11 @@ from commera.api.shipping import get_charge_amount
 from commera.item_price_guard import install_guard, skip_auto_item_price
 from commera.localization.markets import delete_cached_rows
 from commera.sdk import cart as cart_sdk
+from commera.sdk import checkout as checkout_sdk
 from commera.tests.test_admin_orders import ensure_fiscal_year
+from commera.tests.test_market_address_countries import ADDRESS
 from commera.tests.test_market_cart import MarketCartTestCase
+from commera.tests.test_markets import UAE
 
 GUARD_HOOK = "commera.item_price_guard.install_guard"
 GATEWAY = "ZZ Market Gateway"
@@ -90,6 +93,47 @@ class TestPaidMarketOrders(MarketCartTestCase):
 
 		self.assertEqual((sales_order.items[0].rate, sales_order.docstatus), (300, 1))
 		self.assertIn("market gulf no longer exists", self.get_note(sales_order))
+
+	def test_an_address_country_the_market_dropped_after_payment_is_placed_with_a_note(self):
+		address = self.checkout_in_the_uae()
+		# As if the shopper edited the address in another tab while paying.
+		frappe.db.set_value("Address", address, "country", "India")
+
+		sales_order = self.pay()
+
+		self.assert_accepted(sales_order, address)
+		self.assertIn("the Gulf market no longer ships to India", self.get_note(sales_order))
+
+	def test_a_paid_market_reassignment_keeps_the_accepted_order(self):
+		address = self.checkout_in_the_uae()
+		# The Gulf keeps a country, so it still exists; the UAE falls to the primary market.
+		frappe.db.set_value("Commera Market Country", {"parent": "gulf", "country": UAE}, "country", "Oman")
+		delete_cached_rows()
+
+		sales_order = self.pay()
+
+		self.assert_accepted(sales_order, address)
+		self.assertEqual(self.get_note(sales_order).count("no longer ships to"), 1)
+
+	def checkout_in_the_uae(self) -> str:
+		frappe.set_user(self.quotation.contact_email)
+		with self.in_market():
+			state = checkout_sdk.set_addresses({**ADDRESS, "country": UAE})
+		frappe.set_user("Administrator")
+		self.quotation.reload()
+		return state["shipping_address"]["name"]
+
+	def assert_accepted(self, sales_order, address):
+		self.assertEqual(sales_order.docstatus, 1)
+		self.assertEqual(
+			(sales_order.customer_address, sales_order.shipping_address_name), (address, address)
+		)
+		self.assertEqual(
+			(sales_order.grand_total, sales_order.shipping_address),
+			(self.quotation.grand_total, self.quotation.shipping_address),
+		)
+		comments = {"reference_doctype": "Sales Order", "reference_name": sales_order.name}
+		self.assertEqual(frappe.db.count("Comment", {**comments, "comment_type": "Comment"}), 1)
 
 	def test_an_order_its_market_still_sells_gets_no_note(self):
 		self.assertIsNone(self.get_note(self.pay()))

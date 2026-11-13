@@ -1,4 +1,5 @@
 {# The size radios reload the page: price, stock and the cart variant are all resolved per size by the controller. #}
+{% from "components/macros/product_card.html" import card_price %}
 <div class="col-xl-8 col-md-8" x-data='{
 		product: JSON.parse({{ product_variant.as_json() | tojson }}),
 		selected_variant: {{ (json.dumps(selected_item) if size_selected else "") | tojson }},
@@ -177,14 +178,15 @@
 						{% if discount_percent %}
 						<tr>
 							<td><h6 class="mb-0">{{ _("You save") }}</h6></td>
-							<td class="price">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<span x-text="commera.format.amount((qty * (default_price - price)), {{ get_cart_currency().config | tojson | forceescape }})">{{ get_cart_currency().amount(default_price - selected_price) }}</span>{% if get_cart_currency().is_sign %}</bdi>{% endif %}</td>
+							<td class="price">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<span x-text="commera.format.amount((qty * (default_price - price)), {{ get_cart_currency().config | tojson | forceescape }})">{{ get_cart_currency().amount(default_price - selected_price) }}</span>{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</td>
 						</tr>
 						{% endif %}
 						<tr class="total">
 							<td><h6 class="mb-0">{{ _("Total") }}</h6></td>
 							<td class="price">
-								{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<span x-text="commera.format.amount((qty * price), {{ get_cart_currency().config | tojson | forceescape }})">{{ get_cart_currency().amount(selected_price or 0) }}</span>{% if get_cart_currency().is_sign %}</bdi>{% endif %}
-								{% if discount_percent %}<del>{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<span x-text="commera.format.amount((qty * default_price), {{ get_cart_currency().config | tojson | forceescape }})">{{ get_cart_currency().amount(default_price or 0) }}</span>{% if get_cart_currency().is_sign %}</bdi>{% endif %}</del>{% endif %}
+								{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<span x-text="commera.format.amount((qty * price), {{ get_cart_currency().config | tojson | forceescape }})">{{ get_cart_currency().amount(selected_price or 0) }}</span>{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}
+								{% if discount_percent %}<del>{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<span x-text="commera.format.amount((qty * default_price), {{ get_cart_currency().config | tojson | forceescape }})">{{ get_cart_currency().amount(default_price or 0) }}</span>{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</del>{% endif %}
+								{% if selected_item.unit and selected_price is not none %}<small class="d-block">{{ card_price(selected_price, unit=selected_item.unit) }}</small>{% endif %}
 							</td>
 						</tr>
 					</tbody>

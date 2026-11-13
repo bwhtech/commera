@@ -12,9 +12,13 @@
 {%- endmacro %}
 
 
-{% macro card_price(amount, original_amount=0, discount=0) -%}
-{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{- get_cart_currency().symbol }}{{ get_cart_currency().amount(amount or 0) -}}{% if get_cart_currency().is_sign %}</bdi>{% endif %}
-{%- if discount %}<del>{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}{{ get_cart_currency().amount(original_amount or 0) }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</del>{% endif -%}
+{# No amount: the market sells no size of the product today, so the cart would refuse it. #}
+{% macro card_price(amount, original_amount=0, discount=0, unit=None) -%}
+{% if amount is none %}{{ _("Unavailable") }}{% else -%}
+{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{- get_cart_currency().symbol }}{{ get_cart_currency().amount(amount or 0) -}}{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}
+{%- if unit %} <small class="shop-card-unit">{{ _("per {0}").format(_(unit)) }}</small>{% endif %}
+{%- if discount %}<del>{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}{{ get_cart_currency().amount(original_amount or 0) }}{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</del>{% endif -%}
+{%- endif %}
 {%- endmacro %}
 
 
@@ -45,7 +49,8 @@
     wow_delay="",
     product_obj=None,
     average_rating=0,
-    review_count=0
+    review_count=0,
+    unit=None
 ) %}
 {% set product_url = url("/products/" ~ route) %}
 <div class="shop-card {{ style }} wow fadeInUp" data-wow-delay="{{ wow_delay }}">
@@ -83,7 +88,7 @@
 		{% if discount %}<span class="sale-title">{{ _("up to {0}% off").format(discount | round | int) }}</span>{% endif %}
 		<h5 class="title shop-card-title"><a href="{{ product_url | e }}"><bdi>{{ product_name }}</bdi></a></h5>
 		{{ card_rating(average_rating, review_count) }}
-		<h6 class="price shop-card-price">{{ card_price(formatted_price, original_price, discount) }}</h6>
+		<h6 class="price shop-card-price">{{ card_price(formatted_price, original_price, discount, unit) }}</h6>
 		{% elif style == "style-4" %}
 		<div>
 			<h6 class="title"><a href="{{ product_url | e }}"><bdi>{{ product_name }}</bdi></a></h6>
@@ -91,12 +96,12 @@
 			{% if discount %}<span class="sale-title">{{ _("Up to {0}% Off").format(discount | round | int) }}</span>{% endif %}
 		</div>
 		<div class="d-flex align-items-center">
-			<h6 class="price">{{ card_price(formatted_price, original_price, discount) }}</h6>
+			<h6 class="price">{{ card_price(formatted_price, original_price, discount, unit) }}</h6>
 		</div>
 		{% else %}
 		<h5 class="title shop-card-title"><a href="{{ product_url | e }}"><bdi>{{ product_name }}</bdi></a></h5>
 		{{ card_rating(average_rating, review_count) }}
-		<h5 class="price shop-card-price">{{ card_price(formatted_price, original_price, discount) }}</h5>
+		<h5 class="price shop-card-price">{{ card_price(formatted_price, original_price, discount, unit) }}</h5>
 		{% endif %}
 	</div>
 	{% if not style and discount %}
@@ -130,6 +135,7 @@
     wow_delay=wow_delay,
     product_obj=wishlist_item,
     average_rating=product.rating.average,
-    review_count=product.rating.count
+    review_count=product.rating.count,
+    unit=product.unit
 ) }}
 {% endmacro %}

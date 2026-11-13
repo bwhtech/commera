@@ -11,8 +11,9 @@ from bwh_payments.bwh_payments.doctype.gateway_payment_request.test_gateway_paym
 )
 from bwh_payments.services.stripe.stub import StubStripeClient
 from frappe.tests import IntegrationTestCase
+from frappe.translate import print_language
 from frappe.utils import add_to_date, get_year_ending, get_year_start, getdate, now_datetime
-from frappe.utils.data import flt
+from frappe.utils.data import flt, money_in_words
 
 from commera.api.orders import cancel_order
 from commera.api.payment_hooks import on_payment_request_update
@@ -23,7 +24,9 @@ from commera.api.payments import (
 	make_sales_invoice,
 	place_cod_order,
 	validate_cart_is_not_in_checkout,
+	validate_invoice_currency,
 )
+from commera.api.shipping import get_charge_amount, get_order_charge_lines
 from commera.jobs import delete_old_draft_quotations, sync_pending_gateway_payments
 from commera.plugin_events import (
 	PLUGINS_USER,
@@ -36,14 +39,17 @@ from commera.plugin_events import (
 	sweep_missed_cod_payments,
 )
 from commera.sdk.events import CommeraEvent
+from commera.tests.test_admin_orders import make_shipping_rule
 
 COMPANY = "Lifestyle Demo"
 ITEM_GROUP = "Interior Accessories"
 DEFAULT_CASH_ACCOUNT = "Cash - LSD"
 CURRENCY = "INR"
+FOREIGN_CURRENCY = "USD"
 # A price list in the company currency keeps the fixture off the Currency Exchange table.
 PRICE_LIST = "ZZ Payhook SAR Selling"
 ITEM_RATE = 150.0
+SHIPPING_AMOUNT = 25.0
 
 
 CANCEL_REFUSAL = "Printful is already producing this order."
@@ -220,7 +226,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.contact_person = contact.name
 		return email_id
 
-	def create_cart_quotation(self):
+	def create_cart_quotation(self, currency=CURRENCY, conversion_rate=1):
 		quotation = frappe.new_doc("Quotation")
 		quotation.update(
 			{
@@ -231,8 +237,8 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 				"contact_person": self.contact_person,
 				# The storefront stamps the shopper's login here; ownership checks read it back.
 				"contact_email": self.contact_email,
-				"currency": CURRENCY,
-				"conversion_rate": 1,
+				"currency": currency,
+				"conversion_rate": conversion_rate,
 				"selling_price_list": PRICE_LIST,
 				"price_list_currency": CURRENCY,
 				"plc_conversion_rate": 1,
@@ -402,6 +408,185 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		self.assertEqual(len(self.submitted_sales_orders()), 1)
 		self.assertEqual(payment_request.ref_doctype, "Sales Order")
+
+	# -- currencies -----------------------------------------------------------------------------------
+
+	def test_a_payment_in_another_currency_settles_the_invoice(self):
+		"""The gateway charges the cart currency; the invoice owes in its party account's currency."""
+		self.allow_multi_currency_invoices()
+		quotation = self.create_cart_quotation(currency=FOREIGN_CURRENCY, conversion_rate=3)
+		on_payment_request_update(self.create_paid_payment_request(quotation))
+
+		sales_order = self.submitted_sales_orders(quotation.name)[0]
+		sales_invoice = frappe.get_doc("Sales Invoice", self.submitted_sales_invoices(sales_order)[0])
+		self.assertEqual(
+			(sales_invoice.currency, sales_invoice.party_account_currency), (FOREIGN_CURRENCY, CURRENCY)
+		)
+		self.assertEqual((sales_invoice.status, sales_invoice.outstanding_amount), ("Paid", 0))
+
+		payment_entry = frappe.get_doc("Payment Entry", self.submitted_payment_entries(sales_invoice.name)[0])
+		self.assertEqual(payment_entry.paid_amount, flt(quotation.grand_total * 3))
+		self.assertEqual(payment_entry.paid_to, DEFAULT_CASH_ACCOUNT)
+
+	def test_full_foreign_payment_books_row_rounding_in_both_directions(self):
+		for disabled in (0, 1):
+			for rate, outstanding, receipt in ((1.01, 11.37, 11.36), (1.03, 11.58, 11.59)):
+				with self.subTest(disabled=disabled, rate=rate):
+					invoice = self.create_fractional_invoice(rate, disabled)
+					self.assertEqual(invoice.outstanding_amount, outstanding)
+					payment = create_payment_entry(invoice, GATEWAY, invoice.grand_total, None)
+					invoice.reload()
+					self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
+					self.assertEqual(payment.received_amount, receipt)
+					self.assertEqual(payment.references[0].allocated_amount, outstanding)
+					self.assertAlmostEqual(
+						sum(row.amount for row in payment.deductions), outstanding - receipt
+					)
+					self.assertEqual((payment.difference_amount, payment.unallocated_amount), (0, 0))
+
+	def test_partial_foreign_payment_keeps_converted_allocation(self):
+		invoice = self.create_fractional_invoice(1.01, 1)
+		payment = create_payment_entry(invoice, GATEWAY, 1, None)
+		invoice.reload()
+		self.assertEqual(payment.references[0].allocated_amount, 3.75)
+		self.assertEqual(payment.received_amount, 3.75)
+		self.assertEqual(invoice.outstanding_amount, 7.62)
+		self.assertEqual(invoice.status, "Partly Paid")
+		self.assertFalse(payment.deductions)
+
+	def test_rounding_tolerance_stops_at_the_erpnext_allowance(self):
+		"""120 rows may drift SAR 0.6, but ERPNext never lets a Sales Invoice drift past 0.5."""
+		invoice = self.create_fractional_invoice(0.99, 1, rows=120, conversion_rate=3.7512)
+		self.assertEqual(invoice.outstanding_amount, 445.2)
+		payment = create_payment_entry(invoice, GATEWAY, flt(invoice.grand_total - 0.28, 2), None)
+		invoice.reload()
+		self.assertEqual((invoice.status, invoice.outstanding_amount), ("Partly Paid", 0.61))
+		self.assertEqual(payment.received_amount, 444.59)
+		self.assertFalse(payment.deductions)
+
+	def test_advance_does_not_turn_a_partial_foreign_payment_into_settlement(self):
+		invoice = self.create_fractional_invoice(1.01, 1, advance=1)
+		self.assertEqual((invoice.total_advance, invoice.outstanding_amount), (1, 10.37))
+		payment = create_payment_entry(invoice, GATEWAY, 2.03, None)
+		invoice.reload()
+		self.assertEqual((invoice.status, invoice.outstanding_amount), ("Partly Paid", 2.76))
+		self.assertEqual(payment.received_amount, 7.61)
+		self.assertFalse(payment.deductions)
+
+	def test_foreign_overpayments_remain_customer_advances(self):
+		for extra in (0.01, 1):
+			with self.subTest(extra=extra):
+				invoice = self.create_fractional_invoice(1.03, 1)
+				charged = flt(invoice.grand_total + extra, 2)
+				payment = create_payment_entry(invoice, GATEWAY, charged, None)
+				invoice.reload()
+				receipt = flt(charged * 3.75, 2)
+				self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
+				self.assertEqual(payment.received_amount, receipt)
+				self.assertEqual(payment.unallocated_amount, flt(receipt - 11.58, 2))
+				self.assertEqual(payment.references[0].allocated_amount, 11.58)
+				self.assertFalse(payment.deductions)
+				self.assertEqual(payment.difference_amount, 0)
+
+	def test_repeat_full_foreign_payment_on_part_paid_invoice_keeps_the_surplus(self):
+		invoice = self.create_fractional_invoice(1.01, 1)
+		create_payment_entry(invoice, GATEWAY, 1, None)
+		invoice.reload()
+		payment = create_payment_entry(invoice, GATEWAY, invoice.grand_total, None)
+		invoice.reload()
+		self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
+		self.assertEqual(payment.received_amount, 11.36)
+		self.assertEqual(payment.unallocated_amount, 3.74)
+		self.assertFalse(payment.deductions)
+
+	def test_split_foreign_payments_that_add_up_settle_the_invoice(self):
+		invoice = self.create_fractional_invoice(1.01, 1)
+		create_payment_entry(invoice, GATEWAY, 1, None)
+		invoice.reload()
+		payment = create_payment_entry(invoice, GATEWAY, 2.03, None)
+		invoice.reload()
+		self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
+		self.assertEqual((payment.received_amount, payment.references[0].allocated_amount), (7.61, 7.62))
+		self.assertEqual([row.amount for row in payment.deductions], [0.01])
+
+	def test_foreign_checkout_needs_a_rounding_account_before_capture(self):
+		self.allow_multi_currency_invoices()
+		quotation = self.create_cart_quotation(currency=FOREIGN_CURRENCY, conversion_rate=3.75)
+		validate_invoice_currency(quotation)
+		with (
+			patch("commera.api.payments.get_rounding_account", return_value=None),
+			self.assertRaisesRegex(frappe.ValidationError, "not available"),
+		):
+			validate_invoice_currency(quotation)
+
+	def test_company_currency_checkout_needs_no_rounding_account(self):
+		with patch("commera.api.payments.get_rounding_account", return_value=None):
+			validate_invoice_currency(self.quotation)
+
+	def create_fractional_invoice(self, rate, disabled, advance=0, rows=3, conversion_rate=3.75):
+		self.allow_multi_currency_invoices()
+		invoice = frappe.get_doc(
+			{
+				"doctype": "Sales Invoice",
+				"company": COMPANY,
+				"customer": self.customer,
+				"currency": FOREIGN_CURRENCY,
+				"conversion_rate": conversion_rate,
+				"disable_rounded_total": disabled,
+				"ignore_pricing_rule": 1,
+				"items": [{"item_code": self.item_code, "qty": 1, "rate": rate} for _ in range(rows)],
+			}
+		)
+		if advance:
+			journal = frappe.get_doc(
+				{
+					"doctype": "Journal Entry",
+					"company": COMPANY,
+					"posting_date": getdate(),
+					"accounts": [
+						{"account": DEFAULT_CASH_ACCOUNT, "debit_in_account_currency": advance},
+						{
+							"account": frappe.get_cached_value(
+								"Company", COMPANY, "default_receivable_account"
+							),
+							"party_type": "Customer",
+							"party": self.customer,
+							"credit_in_account_currency": advance,
+							"is_advance": "Yes",
+						},
+					],
+				}
+			).insert(ignore_permissions=True)
+			journal.submit()
+			invoice.allocate_advances_automatically = 0
+			invoice.append(
+				"advances",
+				{
+					"reference_type": "Journal Entry",
+					"reference_name": journal.name,
+					"reference_row": journal.accounts[1].name,
+					"advance_amount": advance,
+					"allocated_amount": advance,
+				},
+			)
+		invoice.insert(ignore_permissions=True)
+		invoice.submit()
+		return invoice
+
+	def test_a_payment_collected_in_another_currency_is_refused(self):
+		"""The same number in another currency is another amount."""
+		self.payment_request.db_set("currency_code", FOREIGN_CURRENCY, update_modified=False)
+
+		with self.assertRaisesRegex(frappe.ValidationError, f"collected in {FOREIGN_CURRENCY}"):
+			on_payment_request_update(self.payment_request)
+
+		self.assertEqual(self.submitted_sales_orders(), [])
+
+	def allow_multi_currency_invoices(self):
+		fieldname = "allow_multi_currency_invoices_against_single_party_account"
+		previous = frappe.db.get_single_value("Accounts Settings", fieldname)
+		self.addCleanup(frappe.db.set_single_value, "Accounts Settings", fieldname, previous)
+		frappe.db.set_single_value("Accounts Settings", fieldname, 1)
 
 	# -- refund Payment Entry mirroring ----------------------------------------------------------------
 
@@ -584,6 +769,211 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.create_abandoned_payment_request(self.quotation)
 
 		self.assertEqual(get_open_gateway_payment_request(self.quotation.name), paid_request.name)
+
+	def address_in_checkout(self, quotation):
+		address = frappe.get_doc(
+			{
+				"doctype": "Address",
+				"address_title": self.customer,
+				"address_type": "Shipping",
+				"address_line1": "1 Olaya Street",
+				"city": "Riyadh",
+				"country": "Saudi Arabia",
+				"links": [{"link_doctype": "Customer", "link_name": self.customer}],
+			}
+		).insert(ignore_permissions=True)
+		quotation.db_set({"customer_address": address.name, "shipping_address_name": address.name})
+		return address
+
+	def test_an_address_save_does_not_call_the_gateway(self):
+		quotation = self.create_cart_quotation()
+		address = self.address_in_checkout(quotation)
+		payment_request = self.create_abandoned_payment_request(quotation)
+		with patch.object(type(payment_request), "release_if_unpaid") as release:
+			address.country = "Germany"
+			address.links = []
+			address.save(ignore_permissions=True)
+			release.assert_not_called()
+		self.assertEqual(payment_request.reload().status, "Pending")
+
+	def test_a_failed_address_save_keeps_the_gateway_session_open(self):
+		quotation = self.create_cart_quotation()
+		address = self.address_in_checkout(quotation)
+		payment_request = self.create_abandoned_payment_request(quotation)
+		address.country = ""
+		with self.assertRaises(frappe.MandatoryError):
+			address.save(ignore_permissions=True)
+		self.assertEqual(StubStripeClient.sessions[payment_request.order_ref].status, "open")
+		self.assertEqual(payment_request.reload().status, "Pending")
+
+	def test_a_desk_sales_quotation_renders_the_current_address(self):
+		quotation = self.create_cart_quotation()
+		quotation.db_set("order_type", "Sales")
+		address = self.address_in_checkout(quotation)
+		self.create_pending_payment_request(quotation)
+		address.city = "Dammam"
+		address.save(ignore_permissions=True)
+
+		quotation.reload().save(ignore_permissions=True)
+
+		self.assertIn("Dammam", quotation.address_display)
+		self.assertEqual(quotation.customer_address, address.name)
+
+	# -- paid checkout ----------------------------------------------------------------------------
+
+	def checkout_with_shipping(self):
+		"""The cart as checkout start saves it: rendered address text and a 25 shipping charge."""
+		address = self.address_in_checkout(self.quotation)
+		rule = make_shipping_rule(SHIPPING_AMOUNT)
+		rule.append("countries", {"country": "Saudi Arabia"})
+		rule.save()
+		quotation = frappe.get_doc("Quotation", self.quotation.name)
+		quotation.shipping_rule = rule.name
+		quotation.flags.ignore_permissions = True
+		quotation.save()
+		self.payment_request.db_set("amount", get_charge_amount(quotation))
+		return quotation, address, rule
+
+	def place_paid_cart(self, quotation):
+		on_payment_request_update(self.payment_request.reload())
+		sales_order = frappe.get_doc("Sales Order", self.submitted_sales_orders()[0])
+		sales_invoice = frappe.get_doc("Sales Invoice", self.submitted_sales_invoices(sales_order.name)[0])
+		self.assertEqual(
+			(sales_order.grand_total, sales_order.address_display, sales_order.shipping_address),
+			(quotation.grand_total, quotation.address_display, quotation.shipping_address),
+		)
+		self.assertEqual(sales_invoice.address_display, quotation.address_display)
+		self.assertEqual(
+			get_order_charge_lines(sales_order.name, sales_order.shipping_rule)["shipping"], SHIPPING_AMOUNT
+		)
+		return sales_order, sales_invoice
+
+	def get_notes(self, sales_order):
+		filters = {"reference_doctype": "Sales Order", "reference_name": sales_order.name}
+		return frappe.get_all("Comment", {**filters, "comment_type": "Comment"}, pluck="content")
+
+	def assert_links(self, address, *documents):
+		for document in documents:
+			self.assertEqual((document.customer_address, document.shipping_address_name), (address, address))
+
+	def test_a_paid_order_keeps_its_address_links_and_shipping_rule(self):
+		quotation, address, rule = self.checkout_with_shipping()
+
+		sales_order, sales_invoice = self.place_paid_cart(quotation)
+
+		self.assert_links(address.name, sales_order, sales_invoice)
+		self.assertEqual((sales_order.shipping_rule, sales_invoice.shipping_rule), (rule.name, rule.name))
+		self.assertEqual(self.get_notes(sales_order), [])
+
+	def test_a_paid_order_survives_an_address_edit_and_unlink_after_capture(self):
+		quotation, address, rule = self.checkout_with_shipping()
+		address.country = "Germany"
+		address.links = []
+		address.save(ignore_permissions=True)
+
+		sales_order, sales_invoice = self.place_paid_cart(quotation)
+
+		# ERPNext refuses an address of another party, so only the accepted text stays.
+		self.assert_links(None, sales_order, sales_invoice)
+		self.assertFalse(sales_order.shipping_rule)
+		[note] = self.get_notes(sales_order)
+		self.assertIn(f"Address {address.name} was edited", note)
+		self.assertIn(
+			f"This order has no address link because Address {address.name} is no longer linked", note
+		)
+		self.assertIn("Set the delivery address on the Delivery Note", note)
+		self.assertIn(f"Shipping Rule {rule.name} was not applied again", note)
+
+	def test_a_paid_order_keeps_the_links_of_an_address_edited_after_capture(self):
+		quotation, address, rule = self.checkout_with_shipping()
+		address.country = "Germany"
+		address.save(ignore_permissions=True)
+
+		sales_order, sales_invoice = self.place_paid_cart(quotation)
+
+		self.assert_links(address.name, sales_order, sales_invoice)
+		self.assertFalse(sales_order.shipping_rule)
+		[note] = self.get_notes(sales_order)
+		self.assertIn(f"Address {address.name} was edited", note)
+		self.assertIn(f"Shipping Rule {rule.name} no longer covers Germany", note)
+
+	def test_a_paid_order_keeps_the_accepted_charge_when_the_rule_drops_the_country(self):
+		quotation, address, rule = self.checkout_with_shipping()
+		rule.set("countries", [{"country": "Germany"}])
+		rule.save()
+
+		sales_order, sales_invoice = self.place_paid_cart(quotation)
+
+		self.assert_links(address.name, sales_order, sales_invoice)
+		self.assertFalse(sales_order.shipping_rule)
+		self.assertEqual(
+			self.get_notes(sales_order),
+			[
+				"Placed as paid with the accepted addresses and totals. Check delivery: "
+				f"Shipping Rule {rule.name} no longer covers Saudi Arabia."
+			],
+		)
+
+	def test_a_paid_order_keeps_the_accepted_charge_when_the_rule_reprices(self):
+		quotation, address, rule = self.checkout_with_shipping()
+		rule.conditions[0].shipping_amount = 40
+		rule.save()
+
+		sales_order, _sales_invoice = self.place_paid_cart(quotation)
+
+		self.assertFalse(sales_order.shipping_rule)
+		self.assertIn("now charges a different amount", self.get_notes(sales_order)[0])
+
+	def test_a_paid_order_is_placed_when_its_address_was_deleted(self):
+		quotation, address, _rule = self.checkout_with_shipping()
+		frappe.db.delete("Dynamic Link", {"parenttype": "Address", "parent": address.name})
+		frappe.db.delete("Address", address.name)
+
+		sales_order, _sales_invoice = self.place_paid_cart(quotation)
+
+		self.assertEqual((sales_order.customer_address, sales_order.shipping_address_name), (None, None))
+		self.assertIn(
+			f"This order has no address link because Address {address.name} was deleted",
+			self.get_notes(sales_order)[0],
+		)
+
+	def test_a_paid_order_is_placed_when_the_shipping_rule_check_fails(self):
+		quotation, address, rule = self.checkout_with_shipping()
+
+		with patch.object(type(rule), "apply", side_effect=RuntimeError("rule")):
+			sales_order, _sales_invoice = self.place_paid_cart(quotation)
+
+		self.assert_links(address.name, sales_order)
+		self.assertFalse(sales_order.shipping_rule)
+		self.assertIn(f"Shipping Rule {rule.name} could not be checked", self.get_notes(sales_order)[0])
+
+	def test_a_failed_change_note_does_not_undo_a_paid_order(self):
+		quotation, address, _rule = self.checkout_with_shipping()
+		address.city = "Dammam"
+		address.save(ignore_permissions=True)
+
+		with patch("commera.paid_checkout.escape_html", side_effect=RuntimeError("note")):
+			sales_order, _sales_invoice = self.place_paid_cart(quotation)
+
+		self.assertEqual(sales_order.docstatus, 1)
+
+	def test_a_paid_order_is_placed_in_the_language_of_its_cart(self):
+		self.quotation.db_set("language", "ar")
+		link_languages = []
+		system_language = frappe.local.lang
+
+		with patch(
+			"commera.jobs.get_order_link", side_effect=lambda doc: link_languages.append(frappe.local.lang)
+		):
+			on_payment_request_update(self.payment_request)
+
+		sales_order = frappe.get_doc("Sales Order", self.submitted_sales_orders()[0])
+		with print_language("ar"):
+			arabic_words = money_in_words(sales_order.rounded_total, sales_order.currency)
+		self.assertNotEqual(arabic_words, money_in_words(sales_order.rounded_total, sales_order.currency))
+		self.assertEqual(sales_order.in_words, arabic_words)
+		self.assertEqual(link_languages, ["ar"])
+		self.assertEqual(frappe.local.lang, system_language)
 
 	# -- pending payment sweep --------------------------------------------------------------------
 

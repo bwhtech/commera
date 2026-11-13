@@ -59,7 +59,8 @@ test('mounted CSV dialog reconciles its target when configured languages change'
   const component = loadComponent('components/translations/TranslationImportDialog', {
     Button: shell, Dialog: shell,
     FormControl: { props: ['modelValue'], render() { return Vue.h('select', { value: this.modelValue }) } },
-    useAdminAction: () => ({}), useFileUpload: () => ({}), trySubmit() {}, toast: {}, __: (text) => text,
+    useAdminAction: () => ({}), useAdminRead: () => ({}), useFileUpload: () => ({}), trySubmit() {}, toast: {},
+    FrappeResponseError: Error, errorMessage: String, __: (text) => text,
   })
   const fixture = mount({ render: () => Vue.h(component, { open: true, languages: languages.value }) })
   try {
@@ -73,4 +74,86 @@ test('mounted CSV dialog reconciles its target when configured languages change'
     const upload = findNode(fixture.root, (node) => node.type === 'button' && node.children.some((child) => child.text === 'Choose CSV file'))
     assert.equal(upload.props.disabled, true)
   } finally { fixture.unmount() }
+})
+
+async function pollImport(t, answers) {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  class FrappeResponseError extends Error {}
+  const toasts = []
+  const statusRequest = {
+    error: null,
+    async fetch() {
+      const answer = answers.shift()
+      this.error = answer instanceof Error ? answer : null
+      return this.error ? null : answer
+    },
+  }
+  const component = loadComponent('components/translations/TranslationImportDialog', {
+    Button: { props: ['loading'], render() { return Vue.h('button', { loading: this.loading }) } },
+    Dialog: { render() { return Vue.h('div', this.$slots.default?.()) } }, FormControl: shell, FrappeResponseError, errorMessage: (error) => error.message,
+    useAdminAction: () => ({ data: { queued: true, job_id: 'job-1' } }), useAdminRead: () => statusRequest,
+    useFileUpload: () => ({ upload: async () => ({ file_url: '/private/files/fr.csv' }) }),
+    trySubmit: async () => true, toast: { error: (message) => toasts.push(message) }, __: (text) => text,
+  })
+  const fixture = mount({ render: () => Vue.h(component, { open: true, languages: [{ code: 'fr', name: 'French' }] }) })
+  t.after(() => fixture.unmount())
+  const input = findNode(fixture.root, (node) => node.type === 'input')
+  input.props.onChange({ target: { files: [{ name: 'fr.csv' }], value: '' } })
+  await flush()
+  const isLoading = () => findNode(fixture.root, (node) => node.type === 'button').props.loading
+  async function tick(milliseconds) {
+    t.mock.timers.tick(milliseconds)
+    await flush()
+  }
+  return { isLoading, tick, toasts, statusRequest, FrappeResponseError }
+}
+
+test('the CSV dialog keeps polling a background import through network errors, slower each time', async (t) => {
+  const offline = new TypeError('Failed to fetch')
+  const answers = [offline, offline, { status: 'queued' }, { status: 'done', report: { updated: 1, unchanged: 0, skipped: 0, errors: [] } }]
+  const poll = await pollImport(t, answers)
+  await poll.tick(2000)
+  assert.equal(poll.isLoading(), true)
+  await poll.tick(4000)
+  assert.equal(answers.length, 2)
+  await poll.tick(7999)
+  assert.equal(answers.length, 2)
+  await poll.tick(1)
+  assert.equal(poll.isLoading(), true)
+  await poll.tick(2000)
+  assert.equal(poll.isLoading(), false)
+  assert.deepEqual(poll.toasts, [])
+})
+
+test('the CSV dialog caps the poll back-off at 30 seconds', async (t) => {
+  const offline = new TypeError('Failed to fetch')
+  const answers = [offline, offline, offline, offline, offline, { status: 'done', report: { updated: 1, unchanged: 0, skipped: 0, errors: [] } }]
+  const poll = await pollImport(t, answers)
+  for (const delay of [2000, 4000, 8000, 16000]) await poll.tick(delay)
+  assert.equal(answers.length, 2)
+  await poll.tick(29999)
+  assert.equal(answers.length, 2)
+  await poll.tick(1)
+  assert.equal(answers.length, 1)
+  await poll.tick(29999)
+  assert.equal(poll.isLoading(), true)
+  await poll.tick(1)
+  assert.equal(poll.isLoading(), false)
+  assert.deepEqual(poll.toasts, [])
+})
+
+test('the CSV dialog stops polling when the import fails', async (t) => {
+  const failed = await pollImport(t, [{ status: 'failed', error: 'The import stopped before it finished.' }])
+  await failed.tick(2000)
+  assert.equal(failed.isLoading(), false)
+  assert.deepEqual(failed.toasts, ['The import stopped before it finished.'])
+})
+
+test('the CSV dialog stops polling when the server refuses the poll', async (t) => {
+  const answers = []
+  const refused = await pollImport(t, answers)
+  answers.push(new refused.FrappeResponseError('No such import.'))
+  await refused.tick(2000)
+  assert.equal(refused.isLoading(), false)
+  assert.deepEqual(refused.toasts, ['No such import.'])
 })

@@ -43,7 +43,7 @@
 				<tr>
 					<td><a href="{{ order_url | e }}" class="fw-medium">{{ order.name }}</a></td>
 					<td>{{ frappe.utils.formatdate(order.creation, "medium") }}</td>
-					<td>{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order.payable_total) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</td>
+					<td>{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order.payable_total) }}{{ get_cart_currency(order).symbol_after }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</td>
 					<td>
 						<span class="badge m-0 {{ status_badges.get(order.custom_ecommerce_status, 'bg-secondary') }}">
 							{{ _(order.custom_ecommerce_status or "Draft") }}

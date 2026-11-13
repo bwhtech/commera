@@ -79,10 +79,10 @@
                 <div class="mb-5 flex items-center md:mb-6.5">
                     {% if discount_percent %}
                     <span
-                        class="text-base font-normal text-strikethrough line-through decoration-[1px] md:text-xl flex">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency().symbol}}{{ get_cart_currency().amount(default_price) }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
+                        class="text-base font-normal text-strikethrough line-through decoration-[1px] md:text-xl flex">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency().symbol}}{{ get_cart_currency().amount(default_price) }}{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
                     {% endif %}
                     <span
-                        class="ms-2 text-base font-medium text-gray-900 md:text-xl md:font-medium flex">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency().symbol}}{{ get_cart_currency().amount(selected_price) }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
+                        class="ms-2 text-base font-medium text-gray-900 md:text-xl md:font-medium flex">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency().symbol}}{{ get_cart_currency().amount(selected_price) }}{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
                     <span class="ms-2 mt-0.5 text-xs"> {{_('incl. VAT')}}</span>
 
                 </div>

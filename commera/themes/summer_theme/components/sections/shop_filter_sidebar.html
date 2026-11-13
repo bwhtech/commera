@@ -62,8 +62,8 @@
 						@change="set_filter('max', maximum)">
 				</div>
 				{# Concatenating the currency symbol into x-text would escape it, so Jinja emits it beside the amount. #}
-				<span class="example-val">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<span x-text="commera.format.number(Math.round(minimum))"></span>{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
-				<span class="example-val">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<span x-text="commera.format.number(Math.round(maximum))"></span>{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
+				<span class="example-val">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<span x-text="commera.format.number(Math.round(minimum))"></span>{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
+				<span class="example-val">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<span x-text="commera.format.number(Math.round(maximum))"></span>{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
 			</div>
 		</div>
 

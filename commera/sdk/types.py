@@ -339,6 +339,8 @@ class CatalogItem(TypedDict):
 	is_listed: bool
 	price: float | None
 	list_price: float | None
+	# The sales UOM `price` buys one of, when it is not the stock UOM.
+	unit: str | None
 	currency: str
 	available_qty: float
 	# Drop-shipped or not stock-tracked: sellable whatever available_qty says.
@@ -365,6 +367,8 @@ class ProductCard(TypedDict):
 	currency: str
 	price: float | None
 	compare_at_price: float | None
+	# The sales UOM a price buys one of, when it is not the stock UOM and every size shares it.
+	unit: str | None
 	available: bool
 	rating: Rating
 	updated_at: str | None
@@ -441,6 +445,8 @@ class ProductVariant(TypedDict):
 	# None where the request market has no price: the variant is unavailable there.
 	price: float | None
 	compare_at_price: float | None
+	# The sales UOM `price` buys one of, when it is not the stock UOM.
+	unit: str | None
 	available: bool
 	# None when the item is sold without stock tracking.
 	quantity_available: float | None
@@ -460,6 +466,8 @@ class Product(TypedDict):
 	currency: str
 	# The lowest variant price; None where the request market prices no variant.
 	price: float | None
+	# The sales UOM a price buys one of, when it is not the stock UOM and every variant shares it.
+	unit: str | None
 	available: bool
 	options: list[ProductOption]
 	variants: list[ProductVariant]

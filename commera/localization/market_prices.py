@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import frappe
 from frappe.utils.data import flt
 
-from commera.api.variant_pricing import get_base_price_rows_by_key
+from commera.base_prices import get_public_rates
 from commera.localization.markets import PRIMARY_MARKET, Market
 from commera.localization.resolver import get_localization
 from commera.utils import get_store_currency
@@ -45,10 +45,10 @@ class MarketPrices:
 
 	def price(self, sale: float | None, compare_at: float | None) -> float | None:
 		"""The sale rate, else the compare-at rate as the full price. None when neither list prices the
-		item: not for sale in a secondary market. The store prices that as 0, as it always did."""
+		item: it is not for sale, in any market."""
 		if sale is not None:
 			return flt(sale)
-		if compare_at is not None or self.uses_store_prices:
+		if compare_at is not None:
 			return flt(compare_at)
 		return None
 
@@ -62,23 +62,17 @@ class MarketPrices:
 	def price_lists(self) -> list[str]:
 		return [name for name in (self.sale_price_list, self.compare_at_price_list) if name]
 
-	def get_unpriced(self, item_codes: list[str]) -> set[str]:
-		"""The items this market cannot sell: those with no price in either of its price lists."""
-		if self.uses_store_prices or not item_codes:
-			return set()
-		return self.get_unavailable(item_codes)
-
 	def get_unavailable(self, item_codes: list[str]) -> set[str]:
 		"""Items neither list prices. A cart cannot sell them in any market, the primary one included."""
 		sale, compare_at = self.get_base_rates(item_codes)
 		return set(item_codes) - set(sale) - set(compare_at)
 
 	def get_base_rates(self, item_codes: list[str]) -> tuple[dict[str, float], dict[str, float]]:
-		"""(sale, compare-at) public rates by item code. Customer rows are negotiated contracts."""
+		"""(sale, compare-at) rates by item code: base_prices.get_public_rates, per sales UOM."""
 		sale, compare_at = {}, {}
-		for (item_code, price_list), row in get_base_price_rows_by_key(item_codes, self.price_lists).items():
-			if price_list == self.sale_price_list:
-				sale[item_code] = flt(row.price_list_rate)
-			if price_list == self.compare_at_price_list:
-				compare_at[item_code] = flt(row.price_list_rate)
+		for row in get_public_rates(item_codes, self.price_lists):
+			if row.price_list == self.sale_price_list:
+				sale[row.item_code] = flt(row.rate)
+			if row.price_list == self.compare_at_price_list:
+				compare_at[row.item_code] = flt(row.rate)
 		return sale, compare_at

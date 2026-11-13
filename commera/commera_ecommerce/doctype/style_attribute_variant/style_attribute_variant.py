@@ -182,7 +182,7 @@ class StyleAttributeVariant(Document):
 					{"item_code": item_code, "price_list": price_list, "price_list_rate": rate}
 				)
 			elif flt(existing_price.price_list_rate) != rate:
-				frappe.db.set_value("Item Price", existing_price.name, "price_list_rate", rate)
+				frappe.db.set_value("Item Price", existing_price.price_name, "price_list_rate", rate)
 				updated_count += 1
 
 		if updated_count:

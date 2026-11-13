@@ -15,14 +15,13 @@ website_redirects = [
 	{"source": "/en-GB/(.*)", "target": r"/en/\1"},
 ]
 
-# localize_request strips the language prefix off request.path before any app's path resolver runs,
-# so the route rules below match the path without it. resolve_website_path sends the canonical redirects.
+# localize_request strips the language prefix and redirects before any path resolver runs. No
+# website_path_resolver here: Frappe keeps only the last app's, so ours would replace Builder's.
 before_request = [
 	"commera.item_price_guard.install_guard",
 	"commera.localization.routing.localize_request",
 ]
 before_job = ["commera.item_price_guard.install_guard"]
-website_path_resolver = "commera.localization.routing.resolve_website_path"
 # Frappe runs auth_hooks after its API key and OAuth checks, so a storefront API call knows its user.
 auth_hooks = ["commera.localization.routing.localize_api_request"]
 
@@ -184,6 +183,10 @@ commera_events = {
 
 
 doc_events = {
+	"*": {
+		# Move translations only when the rename runs, after Frappe validates the target.
+		"after_rename": "commera.localization.content.rename_translations",
+	},
 	"Website Settings": {
 		"validate": "commera.localization.redirect_rules.canonicalize_redirect_targets",
 	},
@@ -223,12 +226,18 @@ doc_events = {
 	},
 	"Quotation": {
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
-		"validate": "commera.discounts.pricing.apply_code_discounts",
+		"validate": [
+			"commera.discounts.pricing.apply_code_discounts",
+			"commera.paid_checkout.restore_accepted_addresses",
+		],
 	},
 	"Sales Order": {
 		"before_insert": "commera.discounts.pricing.drop_copied_discounts",
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
-		"validate": "commera.discounts.pricing.apply_code_discounts",
+		"validate": [
+			"commera.discounts.pricing.apply_code_discounts",
+			"commera.paid_checkout.restore_accepted_addresses",
+		],
 		"after_insert": [
 			"commera.discounts.usage.record_discount_uses",
 			"commera.jobs.send_order_success_acknowledgement",
@@ -301,7 +310,10 @@ doc_events = {
 	"Sales Invoice": {
 		"before_mapping": "commera.item_price_guard.refuse_cart_quotation_invoice",
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
-		"validate": "commera.discounts.pricing.apply_code_discounts",
+		"validate": [
+			"commera.discounts.pricing.apply_code_discounts",
+			"commera.paid_checkout.restore_accepted_addresses",
+		],
 		"on_submit": "commera.utils.update_so_status_from_related_doc",
 	},
 	"Payment Entry": {"on_submit": "commera.plugin_events.on_payment_entry_submit"},

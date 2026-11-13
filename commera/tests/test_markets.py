@@ -514,7 +514,9 @@ class TestMarketRequests(RoutingTestCase):
 		self.assertEqual(get_localization().country, "sa")
 
 	def test_a_market_prefix_is_never_dropped_for_the_default_language(self):
-		self.assertServes("/en-ae", "index", "en")
+		# get_home_page() reads the before_request override only outside tests.
+		with patch.object(frappe, "in_test", False):
+			self.assertServes("/en-ae", "index", "en")
 		self.assertRedirects("/EN-AE/cart?x=1", "/en-ae/cart?x=1")
 		self.assertRedirects("/en-ae/account", "/en-ae/account/dashboard")
 

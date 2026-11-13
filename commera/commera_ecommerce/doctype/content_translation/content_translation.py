@@ -24,7 +24,7 @@ class ContentTranslation(Document):
 		market: DF.Data
 		reference_doctype: DF.Link
 		reference_field: DF.Data
-		reference_name: DF.DynamicLink
+		reference_name: DF.Data
 		source_hash: DF.Data | None
 		source_text: DF.SmallText | None
 		translated_value: DF.LongText | None
@@ -32,6 +32,8 @@ class ContentTranslation(Document):
 
 	def validate(self):
 		self.market = get_market_key(self.market)
+		if not frappe.db.exists(self.reference_doctype, self.reference_name):
+			frappe.throw(_("The translation source does not exist."), frappe.LinkValidationError)
 		if self.reference_field not in get_translatable_fields(self.reference_doctype):
 			frappe.throw(
 				_("{0} of {1} is not a translatable field.").format(

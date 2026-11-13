@@ -41,3 +41,4 @@ commera.patches.move_landing_page_arabic_fields_to_content_translation
 commera.patches.grant_commera_admin_translation_rights
 commera.patches.set_market_price_lists
 commera.patches.drop_commera_custom_docperms
+commera.patches.reindex_public_prices

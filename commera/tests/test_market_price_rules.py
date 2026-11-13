@@ -58,7 +58,7 @@ class TestCustomerPricesStayPrivate(MarketPriceTestCase):
 		with self.in_market():
 			product = catalog.get_product(route)
 			card = self.get_card(route)
-			self.assertEqual(MarketPrices.current().get_unpriced([item_code]), {item_code})
+			self.assertEqual(MarketPrices.current().get_unavailable([item_code]), {item_code})
 			with self.assertRaisesRegex(frappe.ValidationError, "not available in this market"):
 				cart_sdk.validate_items_for_sale([{"item_code": item_code, "qty": 1}])
 

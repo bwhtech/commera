@@ -3,7 +3,6 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from commera.api.payment_hooks import on_payment_request_update
 from commera.api.payments import COD_PAYMENT_MODE, confirm_payment, generate_quotation_for_cart, place_order
 from commera.cart_prices import MARKET_FIELD
 from commera.localization import pin_localization, resolve
@@ -172,22 +171,6 @@ class TestMarketAddressRefusal(MarketCartTestCase):
 		quotation = self.changed_address()
 		with self.assertRaises(AddressCountryError):
 			confirm_payment(quotation.name, payment_mode=COD_PAYMENT_MODE)
-		self.assertEqual(frappe.db.get_value("Quotation", quotation.name, "docstatus"), 0)
-
-	def test_paid_order_placement_uses_the_cart_market_without_a_request_market(self):
-		quotation = self.changed_address("shipping_address")
-		with self.assertRaises(AddressCountryError):
-			on_payment_request_update(
-				frappe._dict(
-					status="Paid",
-					ref_doctype="Quotation",
-					ref_docname=quotation.name,
-					gateway="Card",
-					amount=quotation.grand_total,
-					currency_code=quotation.currency,
-					order_ref="zz-country-paid",
-				)
-			)
 		self.assertEqual(frappe.db.get_value("Quotation", quotation.name, "docstatus"), 0)
 
 	def test_repricing_into_another_market_rechecks_old_addresses(self):

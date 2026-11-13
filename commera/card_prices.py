@@ -8,7 +8,7 @@ from pypika.analytics import Min as WindowMin
 from pypika.queries import QueryBuilder
 from pypika.terms import Field
 
-from commera.base_prices import is_base_price
+from commera.base_prices import public_rates_query
 
 
 def get_card_price(size_rates: list[tuple[float | None, float | None]]) -> dict:
@@ -80,20 +80,23 @@ def size_prices_query(
 ):
 	"""Each size of `products` with its rates, and the lowest size price of its product."""
 	size = DocType("Color Size Item").as_("priced_size")
-	sale = DocType("Item Price").as_("size_sale")
-	compare_at = DocType("Item Price").as_("size_compare_at")
-	sale_rate, compare_at_rate = Min(sale.price_list_rate), Min(compare_at.price_list_rate)
+	listed = DocType("Color Size Item").as_("listed_size")
+	item_codes = (
+		frappe.qb.from_(listed)
+		.select(listed.item_code)
+		.where((listed.parenttype == "Style Attribute Variant") & listed.parent.isin(products))
+	)
+	sale = public_rates_query([sale_price_list], item_codes).as_("size_sale")
+	compare_at = public_rates_query([compare_at_price_list], item_codes).as_("size_compare_at")
+	sale_rate = Min(Field("rate", table=sale))
+	compare_at_rate = Min(Field("rate", table=compare_at))
 	size_price = Coalesce(sale_rate, compare_at_rate)
 	return (
 		frappe.qb.from_(size)
 		.left_join(sale)
-		.on((sale.item_code == size.item_code) & (sale.price_list == sale_price_list) & is_base_price(sale))
+		.on(Field("item_code", table=sale) == size.item_code)
 		.left_join(compare_at)
-		.on(
-			(compare_at.item_code == size.item_code)
-			& (compare_at.price_list == compare_at_price_list)
-			& is_base_price(compare_at)
-		)
+		.on(Field("item_code", table=compare_at) == size.item_code)
 		.where((size.parenttype == "Style Attribute Variant") & size.parent.isin(products))
 		.groupby(size.parent, size.item_code)
 		.select(

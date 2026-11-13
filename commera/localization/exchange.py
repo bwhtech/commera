@@ -18,6 +18,7 @@ from commera.localization.resources import (
 	TranslationEntry,
 	get_translatable_resources,
 )
+from commera.search.sync import batched_upserts
 
 COLUMNS = (
 	"Type",
@@ -147,11 +148,13 @@ class TranslationImport:
 		self.entries = {entry.key: entry for entry in iter_entries(self.language, types)}
 
 	def run(self) -> ImportReport:
-		for number, row in self.rows:
-			try:
-				self.import_row(number, row)
-			except RowError as error:
-				self.report.errors.append({"row": number, "message": str(error)})
+		# Each saved translation would queue its own search job: reindex the records once at the end.
+		with batched_upserts():
+			for number, row in self.rows:
+				try:
+					self.import_row(number, row)
+				except RowError as error:
+					self.report.errors.append({"row": number, "message": str(error)})
 		return self.report
 
 	def import_row(self, number: int, row: dict):

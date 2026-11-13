@@ -3,17 +3,16 @@ index's own rows; a secondary market with its own price lists is keyed by its ha
 
 import frappe
 from frappe.query_builder import DocType
-from frappe.query_builder.functions import Max, Min
-from frappe.utils import create_batch, flt
+from frappe.utils import flt
 
-from commera.base_prices import base_price_filters, is_base_price
+from commera.base_prices import get_public_rates, public_rates_query
 from commera.card_prices import get_card_price
 from commera.localization.content import SHOP_WIDE
 from commera.localization.languages import StorefrontLanguages
 from commera.localization.market_prices import MarketPrices
 from commera.localization.markets import PRIMARY_MARKET, Market, StorefrontMarkets, fetch_market_rows
 from commera.localization.resolver import get_localization
-from commera.utils import IN_CLAUSE_CHUNK_SIZE, get_store_currency
+from commera.utils import get_store_currency
 
 PRODUCT_DOCTYPE = "Style Attribute Variant"
 # The card price columns each market row holds.
@@ -126,57 +125,24 @@ def price_lists_of(price_markets) -> list[str]:
 
 
 def grouped_rates(price_lists, item_codes) -> dict[str, dict]:
-	"""rates_by_price_list over the item codes of a subquery, aggregated in SQL."""
-	rates = {}
+	"""rates_by_price_list over the item codes of a subquery, in one query."""
 	if not price_lists:
-		return rates
-	price = DocType("Item Price")
-	rows = (
-		frappe.qb.from_(price)
-		.select(
-			price.price_list,
-			price.item_code,
-			Min(price.price_list_rate).as_("rate"),
-			Max(price.valid_upto).as_("upto"),
-		)
-		.where(
-			price.price_list.isin(price_lists)
-			& is_base_price(price)
-			& price.price_list_rate.notnull()
-			& price.item_code.isin(item_codes)
-		)
-		.groupby(price.price_list, price.item_code)
-		.run(as_dict=True)
-	)
-	for row in rows:
-		price_list = rates.setdefault(row.price_list, empty_rates())
-		price_list["rate"][row.item_code] = row.rate
-		if row.upto:
-			price_list["upto"][row.item_code] = row.upto
-	return rates
+		return {}
+	return group_rates(public_rates_query(price_lists, item_codes).run(as_dict=True))
 
 
 def rates_by_price_list(item_codes, price_lists) -> dict[str, dict]:
-	"""{price list: {rate: {item_code: min rate}, upto: {item_code: max valid_upto}}}."""
+	"""{price list: {rate: {item_code: rate}, upto: {item_code: valid_upto}}} of base_prices' public rates."""
+	return group_rates(get_public_rates(item_codes, price_lists))
+
+
+def group_rates(rows) -> dict[str, dict]:
 	rates = {}
-	if not price_lists:
-		return rates
-	for chunk in create_batch(item_codes, IN_CLAUSE_CHUNK_SIZE):
-		for row in frappe.get_all(
-			"Item Price",
-			filters=base_price_filters({"item_code": ("in", chunk), "price_list": ("in", price_lists)}),
-			fields=["item_code", "price_list", "price_list_rate", "valid_upto"],
-		):
-			if row.price_list_rate is None:
-				continue
-			price_list = rates.setdefault(row.price_list, empty_rates())
-			price_list["rate"][row.item_code] = min_or(
-				price_list["rate"].get(row.item_code), row.price_list_rate
-			)
-			if row.valid_upto:
-				price_list["upto"][row.item_code] = max_or(
-					price_list["upto"].get(row.item_code), row.valid_upto
-				)
+	for row in rows:
+		price_list = rates.setdefault(row.price_list, empty_rates())
+		price_list["rate"][row.item_code] = row.rate
+		if row.valid_upto:
+			price_list["upto"][row.item_code] = row.valid_upto
 	return rates
 
 
@@ -200,11 +166,3 @@ def aggregate_prices(item_codes, default_rate, sale_rate, sale_upto):
 
 def empty_rates():
 	return {"rate": {}, "upto": {}}
-
-
-def min_or(current, value):
-	return value if current is None else min(current, value)
-
-
-def max_or(current, value):
-	return value if current is None else max(current, value)
