@@ -153,9 +153,8 @@ def get_tax_rule_template(quotation, market: Market | None = None) -> str | None
 
 
 def get_specific_rule_template(date: str, args: dict) -> str | None:
-	"""ERPNext's `get_tax_template` over specific rules only: a customer, customer group, tax category or
-	country condition. ERPNext exposes no candidate filter, so its matching, ranking and disabled check
-	are repeated here in one query."""
+	"""ERPNext's `get_tax_template` over rules with a `SPECIFIC_RULE_FIELDS` condition. ERPNext has no
+	candidate filter, so this repeats its matching, ranking and disabled check in one query."""
 	rule = frappe.qb.DocType("Tax Rule")
 	query = (
 		frappe.qb.from_(rule)
