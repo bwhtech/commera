@@ -304,6 +304,28 @@ def remove_shipping_rule_row(quotation):
 	reindex_taxes(quotation)
 
 
+def keep_shipping_rule_last(quotation):
+	"""ERPNext's Shipping Rule sets the last Actual row on its account. Add the rule's own row if missing and move
+	it last, so a COD fee, app fee or template tax on that account keeps its amount."""
+	if not quotation.shipping_rule:
+		return
+	shipping_rows = [
+		row for row in quotation.taxes if get_cart_charge_kind(row, quotation) == "shipping_rule"
+	]
+	if not shipping_rows:
+		existing_rows = quotation.taxes
+		quotation.taxes = []
+		try:
+			quotation.run_method("apply_shipping_rule")
+			shipping_rows = quotation.taxes
+			for row in shipping_rows:
+				row.set(CART_CHARGE_FIELD, "shipping_rule")
+		finally:
+			quotation.taxes = existing_rows
+	quotation.taxes = [row for row in quotation.taxes if row not in shipping_rows] + shipping_rows
+	reindex_taxes(quotation)
+
+
 def get_shipping_rule_accounts(shipping_rule: str | None):
 	if not shipping_rule:
 		return None
@@ -516,6 +538,7 @@ def add_cod_charge(quotation, cod_charge: float, account_head: str | None):
 			"included_in_print_rate": 0,
 		},
 	)
+	keep_shipping_rule_last(quotation)
 	quotation.calculate_taxes_and_totals()
 
 

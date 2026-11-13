@@ -8,7 +8,6 @@ from frappe.tests import IntegrationTestCase
 from commera.api.payments import COD_PAYMENT_MODE, generate_quotation_for_cart, save_cart_quotation
 from commera.api.shipping import add_cod_charge, get_checkout_summary, get_cod_charge
 from commera.core import _get_cart_quotation, get_party
-from commera.doc_events import shipping_rule as shipping_rule_events
 from commera.sdk import cart as cart_sdk
 from commera.sdk import checkout
 from commera.shipping.pricing import get_live_amount, price_service
@@ -89,28 +88,74 @@ class ShippingRuleTestCase(IntegrationTestCase):
 
 
 class TestCashOnDeliveryAccount(ShippingRuleTestCase):
-	def test_settings_refuse_the_shipping_rules_account_for_charges(self):
+	def test_settings_accept_the_shipping_rules_account_for_charges(self):
 		settings = frappe.get_doc("Commera Settings")
 		settings.charge_account_head = self.rule_account
+		settings.save(ignore_permissions=True)
 
-		with self.assertRaisesRegex(frappe.ValidationError, "also the account of the store's Shipping Rule"):
-			settings.save(ignore_permissions=True)
-
-	def test_the_store_shipping_rule_refuses_the_charge_account(self):
-		self.rule.account = self.charge_account
-
-		with self.assertRaisesRegex(frappe.ValidationError, "also the account of the store's Shipping Rule"):
-			shipping_rule_events.validate(self.rule)
-
-	def test_a_cod_fee_on_the_shipping_rules_account_is_refused_before_it_is_overwritten(self):
-		# A store set up before the settings check: ERPNext would charge the shipping amount as the fee.
+	def test_cod_on_the_shipping_account_survives_save_submit_and_mapping(self):
 		self.set_settings(charge_account_head=self.rule_account)
 		self.fill_cart()
 		state = checkout.set_addresses(BILLING_ADDRESS)
-		session = checkout.start_payment(COD_PAYMENT_MODE, state["summary"]["cash_on_delivery"]["total"])
+		summary = state["summary"]["cash_on_delivery"]
+		self.assertEqual((summary["shipping"], summary["cod_charge"]), (SHIPPING_AMOUNT, COD_FEE))
+		session = checkout.start_payment(COD_PAYMENT_MODE, summary["total"])
+		order = checkout.complete(session["reference_id"])["order"]
+		self.assertEqual(order["grand_total"], summary["total"])
+		rows = frappe.get_doc("Sales Order", order["name"]).taxes
+		self.assertEqual([row.tax_amount for row in rows], [COD_FEE, SHIPPING_AMOUNT])
+		self.assertEqual([row.commera_cart_charge for row in rows], ["cod", "shipping_rule"])
 
-		with self.assertRaisesRegex(frappe.ValidationError, "also the account of the store's Shipping Rule"):
-			checkout.complete(session["reference_id"])
+	def test_missing_shipping_row_is_created_before_cod_recalculation(self):
+		from commera.api.shipping import remove_shipping_rule_row
+
+		self.fill_cart()
+		checkout.set_addresses(BILLING_ADDRESS)
+		quotation = _get_cart_quotation()
+		remove_shipping_rule_row(quotation)
+		add_cod_charge(quotation, COD_FEE, self.rule_account)
+		self.assertEqual([row.tax_amount for row in quotation.taxes], [COD_FEE, SHIPPING_AMOUNT])
+		save_cart_quotation(quotation)
+		self.assertEqual([row.tax_amount for row in quotation.taxes], [COD_FEE, SHIPPING_AMOUNT])
+
+	def test_a_saved_shipping_row_without_its_marker_is_not_added_twice(self):
+		self.fill_cart()
+		checkout.set_addresses(BILLING_ADDRESS)
+		quotation = _get_cart_quotation()
+		for row in quotation.taxes:
+			row.commera_cart_charge = None
+		add_cod_charge(quotation, COD_FEE, self.rule_account)
+		self.assertEqual([row.tax_amount for row in quotation.taxes], [COD_FEE, SHIPPING_AMOUNT])
+
+	def test_plugin_fees_stay_before_shipping_after_a_template_refresh(self):
+		from commera.cart_taxes import set_tax_template
+		from commera.checkout_hooks import apply_plugin_fees
+
+		self.fill_cart()
+		checkout.set_addresses(BILLING_ADDRESS)
+		quotation = _get_cart_quotation()
+		fee = {"description": "App fee", "account_head": self.rule_account, "amount": 7}
+		with (
+			patch("commera.checkout_hooks.get_handlers", return_value=["test.fee"]),
+			patch("frappe.get_attr", return_value=lambda quotation: [fee]),
+		):
+			apply_plugin_fees(quotation)
+		self.assertEqual([row.tax_amount for row in quotation.taxes], [7, SHIPPING_AMOUNT])
+		add_cod_charge(quotation, COD_FEE, self.rule_account)
+		template_row = {
+			"charge_type": "Actual",
+			"account_head": self.rule_account,
+			"description": "Template levy",
+			"tax_amount": 3,
+			"included_in_print_rate": 0,
+		}
+		with patch("commera.cart_taxes.get_template_rows", return_value=[template_row]):
+			set_tax_template(quotation, None)
+		quotation.calculate_taxes_and_totals()
+		self.assertEqual([row.tax_amount for row in quotation.taxes], [3, 7, COD_FEE, SHIPPING_AMOUNT])
+		self.assertEqual(
+			[row.commera_cart_charge for row in quotation.taxes], [None, None, "cod", "shipping_rule"]
+		)
 
 	def test_the_previewed_cod_fee_row_is_the_row_that_is_saved(self):
 		self.fill_cart()
@@ -141,7 +186,7 @@ class TestCashOnDeliveryAccount(ShippingRuleTestCase):
 			pluck="tax_amount",
 			order_by="idx",
 		)
-		self.assertEqual(charges, [SHIPPING_AMOUNT, COD_FEE])
+		self.assertEqual(charges, [COD_FEE, SHIPPING_AMOUNT])
 
 
 class TestShippingRuleCountries(ShippingRuleTestCase):

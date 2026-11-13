@@ -70,7 +70,7 @@ from commera.localization.address_countries import AddressCountries
 from commera.localization.market_prices import MarketPrices
 from commera.order_access import get_order_link, set_order_access_key
 from commera.plugin_events import fire_event, get_plugin_fieldnames
-from commera.shipping.coverage import ships_to_address, validate_charge_account
+from commera.shipping.coverage import ships_to_address
 from commera.utils import (
 	get_charge_account_head,
 	get_pickup_addresses,
@@ -710,22 +710,12 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 def set_charges(quotation):
 	shipping_rule = frappe.get_cached_value("Commera Settings", "Commera Settings", "shipping_rule")
 	if shipping_rule:
-		from commera.api.shipping import CART_CHARGE_FIELD, remove_shipping_rule_row
+		from commera.api.shipping import keep_shipping_rule_last, remove_shipping_rule_row
 
 		remove_shipping_rule_row(quotation)
 		# Left off where it does not deliver, so the cart still saves: payment then refuses the cart.
 		quotation.shipping_rule = shipping_rule if ships_to_address(quotation, shipping_rule) else None
-		# ERPNext matches by account; isolate its row so a template levy cannot be overwritten.
-		existing_rows = quotation.taxes
-		quotation.taxes = []
-		try:
-			quotation.run_method("apply_shipping_rule")
-			for row in quotation.taxes:
-				row.set(CART_CHARGE_FIELD, "shipping_rule")
-		finally:
-			quotation.taxes = existing_rows + quotation.taxes
-		for index, row in enumerate(quotation.taxes, start=1):
-			row.idx = index
+		keep_shipping_rule_last(quotation)
 		quotation.run_method("calculate_taxes_and_totals")
 	apply_plugin_fees(quotation)
 
@@ -741,8 +731,6 @@ def get_charged_preview(quotation):
 
 def set_cod_charges(quotation):
 	if cod_charge := get_cod_charge(quotation):
-		# Saved settings are checked; this catches a store set up before that check.
-		validate_charge_account(get_charge_account_head(), quotation.shipping_rule)
 		add_cod_charge(quotation, cod_charge, get_charge_account_head())
 	# Saved even without a fee: submit keeps the cart's discounts, so this save prices them for cash on delivery.
 	quotation.flags.ignore_permissions = True
