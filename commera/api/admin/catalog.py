@@ -182,12 +182,10 @@ def get_default_rates(item_codes):
 		return {}
 
 	default_price_list, _sale_price_list = get_selling_price_lists()
-	rows = frappe.get_all(
-		"Item Price",
-		filters={"item_code": ["in", item_codes], "price_list": default_price_list},
-		fields=["item_code", "price_list_rate"],
-	)
-	return {cstr(row.item_code): flt(row.price_list_rate) for row in rows}
+	price_rows_by_key = get_base_price_rows_by_key(item_codes, [default_price_list])
+	return {
+		item_code: flt(row.price_list_rate) for (item_code, _price_list), row in price_rows_by_key.items()
+	}
 
 
 def get_selling_rates(item_codes):

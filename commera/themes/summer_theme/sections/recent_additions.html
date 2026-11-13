@@ -15,7 +15,7 @@
 			{% if discount %}<span class="sale-title">{{ _("up to {0}% off").format(discount) }}</span>{% endif %}
 			<h6 class="title"><a href="{{ product_url | e }}"><bdi>{{ product_name | e }}</bdi></a></h6>
 		</div>
-		<h6 class="price">{{ card_price(product.price, product.compare_at_price, discount) }}</h6>
+		<h6 class="price">{{ card_price(product.price, product.compare_at_price, discount, product.unit) }}</h6>
 	</div>
 	{% if show_sale_badge and discount %}
 	<span class="sale-badge">{{ discount }}%<br>{{ _("Sale") }} <img src="{{ shop_theme_asset_url('images/star.png') }}" alt="" loading="lazy"></span>

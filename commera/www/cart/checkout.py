@@ -14,7 +14,6 @@ from commera.api.payments import (
 	validate_cart_is_not_in_checkout,
 )
 from commera.api.shipping import get_priced_checkout_summary
-from commera.base_prices import base_price_filters
 from commera.cart_prices import is_priced_in
 from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	get_code_states,
@@ -170,12 +169,9 @@ def set_cart_context(context, commera_settings):
 		and not context.cart_needs_refresh
 		and is_priced_in(cart_quotation, MarketPrices.current())
 	):
+		_sale, compare_at = MarketPrices.current().get_base_rates([item.item_code for item in items])
 		for item in items:
-			item["default_price"] = frappe.db.get_value(
-				"Item Price",
-				base_price_filters({"item_code": item.item_code, "price_list": default_price_list}),
-				"price_list_rate",
-			)
+			item["default_price"] = compare_at.get(item.item_code)
 	context.items = items
 	context.billing_addresses = get_addresses()
 	context.shipping_addresses = get_addresses(address_type="Shipping")
