@@ -52,3 +52,11 @@ class TestPaymentConnectors(IntegrationTestCase):
 			self.assertRaises(ProviderNotRegisteredError),
 		):
 			connectors.validate_connectors()
+
+	def test_bwh_payments_cannot_be_installed_alongside_commera(self):
+		self.assertIn(
+			"commera.payment_gateways.connectors.refuse_bwh_payments", frappe.get_hooks("before_app_install")
+		)
+		with self.assertRaises(frappe.ValidationError):
+			connectors.refuse_bwh_payments("bwh_payments")
+		connectors.refuse_bwh_payments("hrms")
