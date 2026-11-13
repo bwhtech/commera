@@ -235,7 +235,7 @@ def shape_product_cards(cards):
 		card.setdefault("average_rating", None)
 		card.setdefault("review_count", None)
 		# The index keeps a store price of 0 for a product no size of which is priced today: not for sale.
-		if all(size["item_code"] in unpriced for size in card["sizes"]):
+		if card["sizes"] and all(size["item_code"] in unpriced for size in card["sizes"]):
 			card.update(
 				effective_price=None, sale_price=None, default_price=None, discount_percent=0, has_discount=0
 			)

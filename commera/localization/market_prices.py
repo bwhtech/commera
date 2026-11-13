@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import frappe
 from frappe.utils.data import flt
 
-from commera.api.variant_pricing import get_base_price_rows_by_key
+from commera.base_prices import get_public_rates
 from commera.localization.markets import PRIMARY_MARKET, Market
 from commera.localization.resolver import get_localization
 from commera.utils import get_store_currency
@@ -68,11 +68,11 @@ class MarketPrices:
 		return set(item_codes) - set(sale) - set(compare_at)
 
 	def get_base_rates(self, item_codes: list[str]) -> tuple[dict[str, float], dict[str, float]]:
-		"""(sale, compare-at) rates by item code, from the rows base_prices counts as public prices today."""
+		"""(sale, compare-at) rates by item code: base_prices.get_public_rates, per sales UOM."""
 		sale, compare_at = {}, {}
-		for (item_code, price_list), row in get_base_price_rows_by_key(item_codes, self.price_lists).items():
-			if price_list == self.sale_price_list:
-				sale[item_code] = flt(row.price_list_rate)
-			if price_list == self.compare_at_price_list:
-				compare_at[item_code] = flt(row.price_list_rate)
+		for row in get_public_rates(item_codes, self.price_lists):
+			if row.price_list == self.sale_price_list:
+				sale[row.item_code] = flt(row.rate)
+			if row.price_list == self.compare_at_price_list:
+				compare_at[row.item_code] = flt(row.rate)
 		return sale, compare_at

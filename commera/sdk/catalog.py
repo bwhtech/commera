@@ -5,6 +5,7 @@ from frappe.utils.caching import redis_cache
 from frappe.utils.data import cint, cstr, flt, sha256_hash
 
 from commera.api.admin.catalog import DEFAULT_OPTION_ATTRIBUTE, DEFAULT_SIZE_VALUE
+from commera.base_prices import get_sales_units
 from commera.localization import get_localization, translate
 from commera.localization.market_prices import MarketPrices
 from commera.plugin_events import get_ecommerce_warehouse, get_listed_items
@@ -94,6 +95,7 @@ def read_items(item_codes: list[str]) -> dict[str, CatalogItem]:
 	listed_items = get_listed_items(found_codes)
 	prices = MarketPrices.current()
 	sale_rates, compare_at_rates = prices.get_base_rates(found_codes)
+	units = get_sales_units(found_codes)
 	warehouse = get_ecommerce_warehouse()
 	# get_available_stocks reads a missing warehouse as one literally named "website_warehouse".
 	stocks = get_available_stocks(found_codes, warehouse) if warehouse else {}
@@ -105,6 +107,7 @@ def read_items(item_codes: list[str]) -> dict[str, CatalogItem]:
 			"product": row.variant_of or row.name,
 			"is_listed": row.name in listed_items,
 			**get_item_prices(prices, sale_rates.get(row.name), compare_at_rates.get(row.name)),
+			"unit": units.get(row.name),
 			"currency": prices.currency,
 			"available_qty": flt(stocks.get(row.name, {}).get("stock_qty")),
 			"unlimited": bool(stocks.get(row.name, {}).get("unlimited")),
@@ -292,6 +295,7 @@ def get_product(handle: str) -> Product | None:
 		"currency": prices.currency,
 		# No price for a product the market does not sell.
 		"price": min(prices_paid, default=None),
+		"unit": get_shared_unit(variant["unit"] for variant in variants),
 		"available": any(variant["available"] for variant in variants),
 		"options": get_options(product_variant, detail["available_sizes"]),
 		"variants": variants,
@@ -371,12 +375,15 @@ def get_product_cards(cards: list[dict]) -> list[ProductCard]:
 	# A size is for sale with both a market price and stock.
 	unpriced = prices.get_unavailable(item_codes)
 	sellable = {code for code in item_codes if code not in unpriced and stock.get(code, {}).get("in_stock")}
+	units = get_sales_units(item_codes)
 	# utils.shape_product_cards titles every grid's cards; only a hand-built card lacks one.
 	set_product_titles([card for card in cards if "title" not in card])
-	return [get_product_card(card, sellable, prices) for card in cards]
+	return [get_product_card(card, sellable, prices, units) for card in cards]
 
 
-def get_product_card(card: dict, sellable: set[str], prices: MarketPrices) -> ProductCard:
+def get_product_card(
+	card: dict, sellable: set[str], prices: MarketPrices, units: dict[str, str]
+) -> ProductCard:
 	# shape_product_cards leaves no price on a product the market does not sell.
 	price = flt(card["effective_price"]) if card["effective_price"] is not None else None
 	# default_price is the compare-at rate of the size with the card price: crossed out only above it.
@@ -393,6 +400,7 @@ def get_product_card(card: dict, sellable: set[str], prices: MarketPrices) -> Pr
 		"currency": prices.currency,
 		"price": price,
 		"compare_at_price": prices.compare_at(price, compare_at),
+		"unit": get_shared_unit(units.get(size["item_code"]) for size in card["sizes"]),
 		"available": price is not None and any(size["item_code"] in sellable for size in card["sizes"]),
 		"rating": {"average": flt(card["average_rating"]), "count": cint(card["review_count"])},
 		"updated_at": card["modified"],
@@ -422,16 +430,32 @@ def set_product_titles(rows: list[dict]) -> list[dict]:
 
 
 def get_variants(prices: MarketPrices, sizes: list[dict]) -> list[dict]:
+	item_codes = [size["item_code"] for size in sizes]
 	compare_at_rates, sale_rates, _sale_ends = rates_by_item_code(
-		[size["item_code"] for size in sizes], prices.compare_at_price_list, prices.sale_price_list
+		item_codes, prices.compare_at_price_list, prices.sale_price_list
 	)
+	units = get_sales_units(item_codes)
 	return [
-		get_variant(prices, size, sale_rates.get(size["item_code"]), compare_at_rates.get(size["item_code"]))
+		get_variant(
+			prices,
+			size,
+			sale_rates.get(size["item_code"]),
+			compare_at_rates.get(size["item_code"]),
+			units.get(size["item_code"]),
+		)
 		for size in sizes
 	]
 
 
-def get_variant(prices: MarketPrices, size: dict, sale: float | None, compare_at: float | None) -> dict:
+def get_shared_unit(units) -> str | None:
+	"""The one unit every size is sold in, else None: a mixed label would mislead."""
+	shared = set(units)
+	return shared.pop() if len(shared) == 1 else None
+
+
+def get_variant(
+	prices: MarketPrices, size: dict, sale: float | None, compare_at: float | None, unit: str | None
+) -> dict:
 	price = prices.price(sale, compare_at)
 	stock = size["stock_detail"]
 	return {
@@ -440,6 +464,7 @@ def get_variant(prices: MarketPrices, size: dict, sale: float | None, compare_at
 		"size": size["size"],
 		"price": price,
 		"compare_at_price": prices.compare_at(price, compare_at),
+		"unit": unit,
 		"available": price is not None and bool(stock.get("in_stock")),
 		"quantity_available": None if stock.get("unlimited") else flt(stock.get("stock_qty")),
 	}

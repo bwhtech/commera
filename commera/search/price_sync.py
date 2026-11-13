@@ -65,8 +65,11 @@ def is_base_price(item_price) -> bool:
 
 
 def get_published_variants(item_codes: list[str]) -> list[str]:
+	"""The published products with a size among `item_codes`, or a size whose template is among them."""
 	size = DocType("Color Size Item")
 	variant = DocType(PRODUCT_DOCTYPE)
+	item = DocType("Item")
+	variants_of = frappe.qb.from_(item).select(item.name).where(item.variant_of.isin(item_codes))
 	return (
 		frappe.qb.from_(size)
 		.join(variant)
@@ -75,7 +78,7 @@ def get_published_variants(item_codes: list[str]) -> list[str]:
 		.distinct()
 		.where(
 			(size.parenttype == PRODUCT_DOCTYPE)
-			& size.item_code.isin(item_codes)
+			& (size.item_code.isin(item_codes) | size.item_code.isin(variants_of))
 			& (variant.is_published == 1)
 		)
 		.run(pluck=True)
