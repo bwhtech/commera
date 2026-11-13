@@ -12,6 +12,7 @@ from commera.commera_ecommerce.doctype.commera_market_country.commera_market_cou
 	UNIQUE_COUNTRY,
 )
 from commera.localization import alternates, get_localization, resolve, switch_url, url
+from commera.localization.market_setup import MULTI_CURRENCY_FIELD
 from commera.localization.markets import (
 	StorefrontMarkets,
 	delete_cached_rows,
@@ -59,10 +60,18 @@ def get_store_sale_price_list():
 
 
 def use_markets(test):
-	"""Start the test with no markets and forget them after it. The class rollback runs no hooks."""
+	"""Start the test with no markets and forget them after it. The class rollback runs no hooks.
+	ERPNext invoices a market in another currency only with multi-currency invoices on."""
 	delete_markets()
+	allow_multi_currency_invoices(test)
 	test.addCleanup(frappe.local.request_cache.clear)
 	test.addCleanup(delete_markets)
+
+
+def allow_multi_currency_invoices(test, allow=1):
+	previous = frappe.db.get_single_value("Accounts Settings", MULTI_CURRENCY_FIELD)
+	test.addCleanup(frappe.db.set_single_value, "Accounts Settings", MULTI_CURRENCY_FIELD, previous)
+	frappe.db.set_single_value("Accounts Settings", MULTI_CURRENCY_FIELD, allow)
 
 
 def use_language(test, code):

@@ -10,8 +10,8 @@ import frappe
 from frappe import _
 from frappe.utils import cint
 
-from commera.commera_ecommerce.doctype.commera_market.commera_market import market_field
 from commera.localization.languages import StorefrontLanguages
+from commera.localization.market_setup import market_field
 from commera.localization.markets import (
 	MARKET_DOCTYPE,
 	PRIMARY_MARKET,

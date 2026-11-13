@@ -13,6 +13,7 @@ from commera.localization.languages import (
 	StorefrontLanguages,
 	get_default_language_code,
 )
+from commera.localization.market_setup import validate_markets_for_store
 from commera.localization.markets import find_market_by_prefix
 from commera.search.build import enqueue_full_rebuild
 from commera.search.engine_cache import clear_search_engine, get_engine_class
@@ -158,6 +159,7 @@ class CommeraSettings(Document):
 		self.validate_search_result_fields()
 		self.validate_search_engine()
 		self.validate_storefront_languages()
+		validate_markets_for_store(self)
 		sync_headless_oauth_client(self)
 
 	def validate_price_list_currencies(self):

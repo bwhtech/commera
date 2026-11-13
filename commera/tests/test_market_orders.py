@@ -82,8 +82,8 @@ class TestPaidMarketOrders(MarketCartTestCase):
 		self.assertIn("Placed at paid rates; Gulf no longer prices", self.get_note(sales_order))
 
 	def test_an_order_from_a_deleted_market_is_placed_with_a_note(self):
-		frappe.delete_doc("Commera Market", "gulf", ignore_permissions=True)
-		# Deleting re-caches the rows before the row goes; a commit clears them, and tests never commit.
+		# A market deleted before deletion was refused while orders and carts used it.
+		frappe.db.delete("Commera Market", "gulf")
 		delete_cached_rows()
 
 		sales_order = self.pay()
