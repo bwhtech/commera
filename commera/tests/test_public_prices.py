@@ -6,7 +6,7 @@ from pathlib import Path
 import frappe
 from frappe.utils import add_days, getdate, today
 
-from commera.api.admin.catalog import get_selling_rates, get_size_prices
+from commera.api.admin.catalog import get_default_rates, get_selling_rates, get_size_prices
 from commera.core import get_party
 from commera.discounts.preview import get_preview_quotation
 from commera.localization.cart_currency import CartCurrency
@@ -255,6 +255,19 @@ class TestPriceEditors(PublicPriceTestCase):
 		rows = [expired, (60, today(), None), (50, as_date(next_week), None)]
 		self.assertEqual(self.get_rows(item_code, self.sale_price_list), rows)
 		self.assertEqual(get_selling_rates([item_code]), {item_code: 60})
+
+	def test_the_stock_value_rate_is_the_price_of_today_in_any_row_order(self):
+		expired = {"valid_from": add_days(today(), -30), "valid_upto": add_days(today(), -1)}
+		future = {"valid_from": add_days(today(), 7)}
+		for label, rows in (
+			("ROWORDERA", [(150, expired), (140, {}), (200, future)]),
+			("ROWORDERB", [(200, future), (140, {}), (150, expired)]),
+		):
+			item_code = self.get_item_code(self.make_priced_variant(label, default_rate=None))
+			for rate, fields in rows:
+				self.make_price(item_code, self.default_price_list, rate, **fields)
+
+			self.assertEqual(get_default_rates([item_code]), {item_code: 140}, label)
 
 	def test_editing_the_price_of_today_updates_its_row(self):
 		route = self.make_priced_variant("TODAYEDIT", default_rate=100)
