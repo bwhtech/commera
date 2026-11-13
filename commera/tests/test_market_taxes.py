@@ -126,7 +126,15 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 		old, new = self.make_template(10), self.make_template(5)
 		self.set_market_template(new)
 		quotation = frappe.new_doc("Quotation", company=self.company, taxes_and_charges=old)
-		quotation.append("taxes", {"charge_type": "On Net Total", "account_head": self.account, "rate": 10})
+		quotation.append(
+			"taxes",
+			{
+				"charge_type": "On Net Total",
+				"account_head": self.account,
+				"rate": 10,
+				"commera_cart_charge": "tax_template",
+			},
+		)
 		delivery = {
 			"description": f"{DELIVERY_CHARGE_DESCRIPTION} - Express",
 			"charge_type": "Actual",
@@ -140,28 +148,75 @@ class TestMarketTaxTemplate(MarketTaxTestCase):
 		self.assertEqual(quotation.taxes_and_charges, new)
 		self.assertEqual(rows, [(1, "VAT 5%", 0), (2, delivery["description"], 15)])
 
-	def test_a_disabled_template_falls_back_to_the_company_default(self):
+	def test_manual_rows_without_a_template_survive_market_taxes(self):
+		self.set_market_template(self.make_template(10))
+		quotation = frappe.new_doc("Quotation", company=self.company)
+		quotation.append(
+			"taxes",
+			{
+				"charge_type": "Actual",
+				"account_head": self.account,
+				"description": "Manual tax",
+				"tax_amount": 7,
+			},
+		)
+		for switched in (False, True):
+			apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched)
+			self.assertIsNone(quotation.taxes_and_charges)
+			self.assertEqual(
+				[(row.description, row.tax_amount) for row in quotation.taxes], [("Manual tax", 7)]
+			)
+
+	def test_manual_rows_added_to_managed_taxes_survive_a_rebuild(self):
+		self.set_market_template(self.make_template(10))
+		quotation = self.quote_in_market()
+		quotation.append(
+			"taxes",
+			{
+				"charge_type": "Actual",
+				"account_head": self.account,
+				"description": "Manual tax",
+				"tax_amount": 7,
+			},
+		)
+		apply_market_taxes(quotation, StorefrontMarkets.load().find("gulf"), switched=True)
+		self.assertEqual(
+			[(row.description, row.tax_amount) for row in quotation.taxes],
+			[("VAT 10%", 30), ("Manual tax", 7)],
+		)
+
+	def test_commera_template_rows_have_provenance(self):
+		self.set_market_template(self.make_template(10))
+		quotation = self.quote_in_market()
+		self.assertEqual(quotation.taxes[0].commera_cart_charge, "tax_template")
+
+	def test_a_disabled_template_is_refused_not_replaced(self):
 		template = self.make_template(10)
-		default = self.make_template(5, is_default=1)
+		self.make_template(5, is_default=1)
 		self.set_market_template(template)
 		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "disabled", 1)
 
-		quotation = self.quote_in_market()
+		with self.assertRaisesRegex(frappe.ValidationError, "cannot be calculated"):
+			self.quote_in_market()
 
-		self.assertEqual((quotation.taxes_and_charges, quotation.grand_total), (default, 315))
-
-	def test_disabling_the_template_reprices_an_existing_cart(self):
+	def test_a_template_of_another_company_is_refused_not_replaced(self):
 		template = self.make_template(10)
-		default = self.make_template(5, is_default=1)
 		self.set_market_template(template)
-		quotation = self.quote_in_market()
+		other_company = "ZZ Other Company"
+		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "company", other_company)
+
+		with self.assertRaisesRegex(frappe.ValidationError, "cannot be calculated"):
+			self.quote_in_market()
+
+	def test_disabling_the_template_refuses_an_existing_cart(self):
+		template = self.make_template(10)
+		self.make_template(5, is_default=1)
+		self.set_market_template(template)
+		self.quote_in_market()
 		frappe.db.set_value(TEMPLATE_DOCTYPE, template, "disabled", 1)
 
-		with self.in_market():
-			rebuilt = generate_quotation_for_cart({})
-
-		self.assertEqual(rebuilt.name, quotation.name)
-		self.assertEqual((rebuilt.taxes_and_charges, rebuilt.grand_total), (default, 315))
+		with self.in_market(), self.assertRaisesRegex(frappe.ValidationError, "cannot be calculated"):
+			generate_quotation_for_cart({})
 
 	def test_clearing_the_template_reprices_an_existing_cart(self):
 		self.set_market_template(self.make_template(10))

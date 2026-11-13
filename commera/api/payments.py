@@ -35,7 +35,7 @@ from commera.cart_prices import (
 	price_regular_lines,
 	validate_available,
 )
-from commera.cart_taxes import apply_market_taxes
+from commera.cart_taxes import apply_market_taxes, clear_address_taxes
 from commera.checkout_hooks import (
 	apply_plugin_fees,
 	filter_payment_methods,
@@ -791,6 +791,7 @@ def save_quotation_address(quotation, address: dict):
 
 	quotation.shipping_address_name = shipping_address_name
 	clear_delivery_option(quotation)
+	clear_address_taxes(quotation)
 	set_gst_details(quotation)
 	apply_market_taxes(quotation, get_document_market(quotation), switched=False)
 	save_contact_details(quotation, address)
