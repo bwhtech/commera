@@ -3,3 +3,4 @@ Commera Ecommerce
 Shop Themes
 Discounts
 Shipping
+Payment Gateways

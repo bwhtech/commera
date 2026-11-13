@@ -152,7 +152,7 @@ class TestMarketTaxCheckout(test_market_taxes.TestMarketOrderRecords):
 			},
 		)
 		self.enterContext(
-			patch("commera.api.payments.get_gateway_options", return_value=[frappe._dict(name=GATEWAY)])
+			patch("commera.api.payments.get_payment_modes_for_currency", return_value=[GATEWAY])
 		)
 		self.enterContext(patch("commera.api.payments.resolve_payment_mode", return_value=GATEWAY))
 

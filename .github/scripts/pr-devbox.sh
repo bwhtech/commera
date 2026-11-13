@@ -98,11 +98,11 @@ up() {
 		chown -R frappe:frappe /home/frappe/.ssh && chmod 700 /home/frappe/.ssh && chmod 600 /home/frappe/.ssh/authorized_keys" >&2
 
 	in_box "git -C apps/frappe pull -q && bench setup requirements --python > /dev/null" >&2
-	for app in bwh_payments bwh_shipping; do
+	for app in bwh_shipping; do
 		in_box "test -d apps/$app || bench get-app https://github.com/bwhtech/$app" >&2
 	done
 	in_box "if test -d apps/commera; then git -C apps/commera fetch -q --depth 1 https://github.com/bwhtech/commera $branch && git -C apps/commera checkout -q -f -B pr FETCH_HEAD; else bench get-app https://github.com/bwhtech/commera --branch $branch; fi" >&2
-	in_box "installed=\$(bench --site $site list-apps); for app in erpnext bwh_payments bwh_shipping commera; do echo \"\$installed\" | grep -qw \$app || bench --site $site install-app \$app; done" >&2
+	in_box "installed=\$(bench --site $site list-apps); for app in erpnext bwh_shipping commera; do echo \"\$installed\" | grep -qw \$app || bench --site $site install-app \$app; done" >&2
 	in_box "bench --site $site migrate" >&2
 	in_box "test -f ~/.pr_seeded || { bench --site $site execute commera.install.before_tests && bench --site $site execute commera.install_summer_demo.install_summer_demo --kwargs \"{\\\"currency\\\": \\\"INR\\\"}\" && touch ~/.pr_seeded; }" >&2
 
