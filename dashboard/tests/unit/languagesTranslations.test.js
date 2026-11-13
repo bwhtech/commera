@@ -125,6 +125,23 @@ test('the CSV dialog keeps polling a background import through network errors, s
   assert.deepEqual(poll.toasts, [])
 })
 
+test('the CSV dialog caps the poll back-off at 30 seconds', async (t) => {
+  const offline = new TypeError('Failed to fetch')
+  const answers = [offline, offline, offline, offline, offline, { status: 'done', report: { updated: 1, unchanged: 0, skipped: 0, errors: [] } }]
+  const poll = await pollImport(t, answers)
+  for (const delay of [2000, 4000, 8000, 16000]) await poll.tick(delay)
+  assert.equal(answers.length, 2)
+  await poll.tick(29999)
+  assert.equal(answers.length, 2)
+  await poll.tick(1)
+  assert.equal(answers.length, 1)
+  await poll.tick(29999)
+  assert.equal(poll.isLoading(), true)
+  await poll.tick(1)
+  assert.equal(poll.isLoading(), false)
+  assert.deepEqual(poll.toasts, [])
+})
+
 test('the CSV dialog stops polling when the import fails', async (t) => {
   const failed = await pollImport(t, [{ status: 'failed', error: 'The import stopped before it finished.' }])
   await failed.tick(2000)
