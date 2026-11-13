@@ -807,6 +807,10 @@ function checkout(config) {
 			);
 		},
 
+		get delivery_unavailable() {
+			return !this.state?.is_store_pickup && this.shipping_reason === "unavailable";
+		},
+
 		get shipping_pending() {
 			return this.editing_address || this.needs_shipping_option;
 		},
