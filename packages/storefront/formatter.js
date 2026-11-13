@@ -55,8 +55,7 @@ export class Formatter {
 		if (this.is_sign(currency)) {
 			return `${symbol}${NO_BREAK_SPACE}${formatted.replace(/^-/, '−')}`;
 		}
-		const [sign, digits] = split_sign(formatted);
-		return this.join(sign, digits, symbol);
+		return this.join(formatted, symbol, currency);
 	}
 
 	signed_money(amount, currency, minus = '−') {
@@ -108,8 +107,17 @@ export class Formatter {
 		);
 	}
 
-	join(sign, digits, symbol) {
-		if (this.direction === 'rtl') {
+	// After the amount in a right-to-left language or when the Currency says so. No symbol when
+	// Global Defaults hide them: the server then sends an empty one.
+	join(formatted, symbol, currency) {
+		if (!symbol) {
+			return formatted;
+		}
+		const [sign, digits] = split_sign(formatted);
+		if (
+			this.direction === 'rtl' ||
+			this.money_format(currency).symbol_on_right
+		) {
 			return `${sign}${digits}${NO_BREAK_SPACE}${symbol.trim()}`;
 		}
 		return `${sign}${symbol}${digits}`;
@@ -121,8 +129,7 @@ export class Formatter {
 		if (this.is_sign(currency)) {
 			return `<bdi dir="ltr">${symbol}${formatted.replace(/^-/, '−')}</bdi>`;
 		}
-		const [sign, digits] = split_sign(formatted);
-		return this.join(sign, digits, symbol);
+		return this.join(formatted, symbol, currency);
 	}
 
 	// Screen readers may not know the new signs yet, so a sign reads as its currency code.

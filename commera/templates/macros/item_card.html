@@ -93,9 +93,9 @@
     </h4>
     <p class="{{ current_variant.price_size }} flex">
         {% if discount %}
-        <span class="me-2 text-link line-through decoration-[1px] flex ">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency().symbol}}{{ get_cart_currency().amount(original_price or 0) }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
+        <span class="me-2 text-link line-through decoration-[1px] flex ">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency().symbol}}{{ get_cart_currency().amount(original_price or 0) }}{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
         {% endif %}
-        <span class="font-semibold flex">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency().symbol}}{{ get_cart_currency().amount(formatted_price or 0) }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
+        <span class="font-semibold flex">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{get_cart_currency().symbol}}{{ get_cart_currency().amount(formatted_price or 0) }}{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
     </p>
 </div>
 

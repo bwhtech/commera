@@ -8,7 +8,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, cstr
 
-from commera.localization import exchange, translation_items
+from commera.localization import exchange, exchange_job, translation_items
 from commera.localization.content import DOCTYPE
 
 
@@ -66,7 +66,8 @@ def export_translations(language: str):
 
 @frappe.whitelist(methods=["POST"])
 def import_translations(file_url: str, language: str) -> dict:
-	"""Write an uploaded CSV's translations of `language`. Answers a report with an error per bad row."""
+	"""Write an uploaded CSV's translations of `language`. Answers a report with an error per bad row,
+	or, for a large file, {"queued": True, "job_id": ...} for `get_import_status`."""
 	frappe.has_permission(DOCTYPE, ptype="write", throw=True)
 	frappe.has_permission(DOCTYPE, ptype="create", throw=True)
 	file = frappe.get_doc("File", {"file_url": file_url})
@@ -75,4 +76,10 @@ def import_translations(file_url: str, language: str) -> dict:
 		frappe.throw(_("Upload a CSV file."))
 	if cint(file.file_size) > exchange.MAX_FILE_SIZE:
 		frappe.throw(_("The file is larger than {0} MB.").format(exchange.MAX_FILE_SIZE // (1024 * 1024)))
-	return exchange.import_csv(file.get_content(), language).as_dict()
+	return exchange_job.import_file(file, language)
+
+
+@frappe.whitelist(methods=["GET"])
+def get_import_status(job_id: str) -> dict:
+	frappe.has_permission(DOCTYPE, ptype="write", throw=True)
+	return exchange_job.get_status(job_id)

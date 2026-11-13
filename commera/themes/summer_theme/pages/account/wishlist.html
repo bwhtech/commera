@@ -37,8 +37,8 @@
 						</td>
 						<td class="product-item-price text-nowrap">
 							{# .product-item-price strikes through every span it holds, so the amounts sit in bdi. #}
-							<span x-show="$store.wishlist.prices_ready && wishlist_item.default_price > wishlist_item.sale_price">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<bdi x-text="commera.format.amount(Number(wishlist_item.default_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></bdi>{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
-							<strong x-show="$store.wishlist.prices_ready && wishlist_item.sale_price != null" x-cloak>{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<bdi x-text="commera.format.amount(Number(wishlist_item.sale_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></bdi>{% if get_cart_currency().is_sign %}</bdi>{% endif %}</strong>
+							<span x-show="$store.wishlist.prices_ready && wishlist_item.default_price > wishlist_item.sale_price">{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<bdi x-text="commera.format.amount(Number(wishlist_item.default_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></bdi>{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</span>
+							<strong x-show="$store.wishlist.prices_ready && wishlist_item.sale_price != null" x-cloak>{% if get_cart_currency().is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency().symbol }}<bdi x-text="commera.format.amount(Number(wishlist_item.sale_price || 0), {{ get_cart_currency().config | tojson | forceescape }})"></bdi>{{ get_cart_currency().symbol_after }}{% if get_cart_currency().is_sign %}</bdi>{% endif %}</strong>
 						</td>
 						<td>
 							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route" class="btn btn-secondary btnhover text-nowrap">{{ _("Add To Cart") }}</a>

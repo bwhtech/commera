@@ -1,7 +1,8 @@
 <script setup>
-import { ref, watch } from 'vue'
-import { Button, Dialog, FormControl, toast, useFileUpload } from 'frappe-ui'
-import { trySubmit, useAdminAction } from '../../data/api'
+import { onBeforeUnmount, ref, watch } from 'vue'
+import { Button, Dialog, FormControl, FrappeResponseError, toast, useFileUpload } from 'frappe-ui'
+import { trySubmit, useAdminAction, useAdminRead } from '../../data/api'
+import { errorMessage } from '../../data/errors'
 import { __ } from '../../data/translation'
 
 const props = defineProps({
@@ -13,6 +14,17 @@ const open = defineModel('open', { type: Boolean, default: false })
 
 const language = ref('')
 const importAction = useAdminAction('translations.import_translations')
+// A large file imports in a background job. No socket is open in the dashboard, so this polls it.
+const POLL_DELAY = 2000
+// A poll that does not reach the server is retried, slower each time: the job keeps running meanwhile.
+const MAX_POLL_DELAY = 30000
+const jobId = ref('')
+const statusRequest = useAdminRead('translations.get_import_status', {
+  immediate: false,
+  quiet: true,
+  params: () => ({ job_id: jobId.value }),
+})
+let pollTimer = null
 const { upload } = useFileUpload()
 const fileInput = ref(null)
 const isImporting = ref(false)
@@ -27,6 +39,7 @@ watch(() => props.languages, (available) => {
 watch(open, (isOpen) => {
   if (!isOpen) return
   report.value = null
+  jobId.value = ''
   language.value = props.languages[0]?.code ?? ''
 })
 
@@ -37,21 +50,55 @@ async function importFile(event) {
   if (!file || !language.value || isImporting.value) return
   const targetLanguage = language.value
   report.value = null
+  jobId.value = ''
   isImporting.value = true
   try {
     // Private: a merchant's working file, not a storefront asset.
     const uploaded = await upload(file, { private: true })
     const imported = await trySubmit(importAction, { file_url: uploaded.file_url, language: targetLanguage })
-    if (imported) {
-      report.value = importAction.data
-      emit('imported')
+    if (!imported) {
+      isImporting.value = false
+    } else if (importAction.data?.queued) {
+      jobId.value = importAction.data.job_id
+      schedulePoll()
+    } else {
+      finish(importAction.data)
     }
   } catch {
     toast.error(__('Could not upload {0}', [file.name]))
-  } finally {
     isImporting.value = false
   }
 }
+
+function schedulePoll(delay = POLL_DELAY) {
+  pollTimer = setTimeout(async () => {
+    const status = await statusRequest.fetch()
+    // Unmounted while the poll was in flight.
+    if (!pollTimer) return
+    const refusal = statusRequest.error instanceof FrappeResponseError ? statusRequest.error : null
+    if (status?.status === 'done') {
+      finish(status.report)
+    } else if (status?.status === 'queued') {
+      schedulePoll()
+    } else if (status?.status === 'failed' || refusal) {
+      toast.error(status?.error || errorMessage(refusal))
+      isImporting.value = false
+    } else {
+      schedulePoll(Math.min(delay * 2, MAX_POLL_DELAY))
+    }
+  }, delay)
+}
+
+function finish(importReport) {
+  report.value = importReport
+  isImporting.value = false
+  emit('imported')
+}
+
+onBeforeUnmount(() => {
+  clearTimeout(pollTimer)
+  pollTimer = null
+})
 </script>
 
 <template>
@@ -74,6 +121,10 @@ async function importFile(event) {
           :disabled="!language || isImporting"
           @click="fileInput.click()"
         />
+
+        <p v-if="isImporting && jobId" class="text-p-sm text-ink-gray-6">
+          {{ __('This is a large file. It is imported in the background, so this can take a few minutes.') }}
+        </p>
 
         <section v-if="report" class="rounded-5 border border-outline-gray-1 p-4">
           <p class="text-base text-ink-gray-8">

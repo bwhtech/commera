@@ -58,6 +58,28 @@ class TestDashboardLanguage(IntegrationTestCase):
 		self.assertEqual(frappe.db.get_value("User", "Administrator", "language"), "ar")
 		self.assertEqual(dashboard_language.get_dashboard_language("Administrator"), "ar")
 
+	def test_set_language_applies_the_languages_formats_and_clears_the_boot_cache(self):
+		self.set_admin_language("en")
+		formats = {
+			"date_format": "dd/mm/yyyy",
+			"number_format": "#.###,##",
+			"first_day_of_the_week": "Saturday",
+		}
+		before = frappe.db.get_value("Language", "ar", list(formats), as_dict=True)
+		# set_value adds the modified fields to the dict it gets.
+		frappe.db.set_value("Language", "ar", dict(formats))
+		self.addCleanup(frappe.db.set_value, "Language", "ar", before)
+		for key in formats:
+			self.addCleanup(frappe.defaults.clear_default, key, parent="Administrator")
+		frappe.cache.hset("bootinfo", "Administrator", {"lang": "en"})
+
+		with self.set_user("Administrator"):
+			dashboard_language.set_language("ar")
+
+		for key, value in formats.items():
+			self.assertEqual(frappe.defaults.get_user_default(key, "Administrator"), value)
+		self.assertIsNone(frappe.cache.hget("bootinfo", "Administrator"))
+
 	def test_set_language_refuses_a_disabled_language(self):
 		frappe.db.set_value("Language", "de", "enabled", 0)
 		self.addCleanup(frappe.db.set_value, "Language", "de", "enabled", 1)

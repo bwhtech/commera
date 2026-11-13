@@ -9,7 +9,15 @@ from frappe.tests import IntegrationTestCase
 from commera.api.admin import translations as translations_api
 from commera.api.admin.theme import activate_theme
 from commera.api.admin.theme_layout import get_editor
-from commera.localization import CURRENT, MISSING, OUTDATED, exchange, get_translatable_resource, register
+from commera.localization import (
+	CURRENT,
+	MISSING,
+	OUTDATED,
+	exchange,
+	exchange_job,
+	get_translatable_resource,
+	register,
+)
 from commera.roles import COMMERA_ADMIN, COMMERA_USER, add_commera_roles
 from commera.tests.test_admin_theme_layout import publish
 from commera.tests.test_localization import use_storefront_languages
@@ -433,6 +441,72 @@ class TestTranslationExchange(IntegrationTestCase):
 		self.assertEqual(frappe.response["filename"], "translations-ar.csv")
 		self.assertEqual((report["updated"], report["errors"]), (1, []))
 		self.assertEqual(self.stored(self.note.name), "ملاحظة")
+
+	def test_an_import_reindexes_its_records_in_one_search_job(self):
+		other = self.make_note("Gift note")
+		rows = [self.row("title", "ملاحظة"), self.row("title", "هدية", Identification=other.name)]
+
+		with (
+			patch("commera.search.translations.is_search_title", return_value=True),
+			patch("frappe.enqueue") as enqueue,
+		):
+			exchange.import_csv(to_csv(rows), "ar")
+
+		search_jobs = [call for call in enqueue.call_args_list if call.args[0].startswith("commera.search.")]
+		self.assertEqual(len(search_jobs), 1)
+		self.assertEqual(search_jobs[0].args[0], "commera.search.sync.upsert_docs")
+		self.assertEqual(search_jobs[0].kwargs["queue"], "long")
+		self.assertCountEqual(search_jobs[0].kwargs["names"], [self.note.name, other.name])
+
+	def test_a_large_import_runs_as_a_background_job(self):
+		file = self.upload([self.row("title", "ملاحظة"), self.row("content", "<p>لفها جيدا</p>")])
+
+		with (
+			patch.object(exchange_job, "REQUEST_IMPORT_ROWS", 1),
+			patch.object(exchange_job.frappe, "enqueue") as enqueue,
+		):
+			answer = translations_api.import_translations(file.file_url, "ar")
+
+		self.assertTrue(answer["queued"])
+		self.assertIsNone(self.stored(self.note.name))
+		job = enqueue.call_args.kwargs
+		self.assertEqual((job["queue"], job["job_id"]), ("long", answer["job_id"]))
+		with patch.object(exchange_job, "get_job_status", return_value=exchange_job.JobStatus.STARTED):
+			self.assertEqual(translations_api.get_import_status(answer["job_id"])["status"], "queued")
+
+		with patch.object(frappe.db, "after_commit") as after_commit:
+			exchange_job.run_import(job["file_name"], job["language"], job["import_id"])
+		with patch.object(exchange_job, "get_job_status", return_value=exchange_job.JobStatus.STARTED):
+			self.assertEqual(translations_api.get_import_status(answer["job_id"])["status"], "queued")
+		after_commit.add.call_args.args[0]()
+
+		status = translations_api.get_import_status(answer["job_id"])
+		self.assertEqual((status["status"], status["report"]["updated"]), ("done", 2))
+		self.assertEqual(self.stored(self.note.name), "ملاحظة")
+
+	def test_a_queued_import_whose_job_is_gone_has_failed(self):
+		job_id = exchange_job.queue_import("missing-file", "ar")["job_id"]
+
+		self.assertEqual(translations_api.get_import_status(job_id)["status"], "failed")
+
+	def test_a_retryable_import_error_stays_queued_until_the_worker_finishes(self):
+		job_id = exchange_job.queue_import("missing-file", "ar")["job_id"]
+		with patch.object(frappe, "get_doc", side_effect=frappe.QueryDeadlockError):
+			with self.assertRaises(frappe.QueryDeadlockError):
+				exchange_job.run_import("missing-file", "ar", job_id)
+		for worker_status in (exchange_job.JobStatus.STARTED, exchange_job.JobStatus.SCHEDULED):
+			with patch.object(exchange_job, "get_job_status", return_value=worker_status):
+				self.assertEqual(exchange_job.get_status(job_id)["status"], "queued")
+		with patch.object(exchange_job, "get_job_status", return_value=exchange_job.JobStatus.FAILED):
+			self.assertEqual(exchange_job.get_status(job_id)["status"], "failed")
+
+	def test_another_users_import_status_is_hidden(self):
+		job_id = exchange_job.queue_import("missing-file", "ar")["job_id"]
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(make_user(COMMERA_ADMIN))
+
+		with self.assertRaises(frappe.DoesNotExistError):
+			translations_api.get_import_status(job_id)
 
 	def test_the_admin_api_refuses_a_user_without_access_to_translations(self):
 		self.addCleanup(frappe.set_user, "Administrator")

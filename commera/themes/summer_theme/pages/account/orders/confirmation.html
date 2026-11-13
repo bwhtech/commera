@@ -34,7 +34,7 @@
 		{% if order %}
 		<p class="mb-0">
 			{{ _("Order Total") }}:
-			<strong class="text-black">{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order.payable_total) }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</strong>
+			<strong class="text-black">{% if get_cart_currency(order).is_sign %}<bdi dir="ltr">{% endif %}{{ get_cart_currency(order).symbol }}{{ get_cart_currency(order).amount(order.payable_total) }}{{ get_cart_currency(order).symbol_after }}{% if get_cart_currency(order).is_sign %}</bdi>{% endif %}</strong>
 		</p>
 		{% endif %}
 		<div class="mt-4 d-sm-flex gap-3 justify-content-center">
