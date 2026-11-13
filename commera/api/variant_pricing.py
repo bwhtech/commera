@@ -3,10 +3,10 @@
 
 import frappe
 from frappe import _
-from frappe.utils import create_batch
+from frappe.utils import create_batch, nowdate
 from frappe.utils.data import cint, cstr, flt
 
-from commera.base_prices import get_public_price_rows
+from commera.base_prices import get_todays_price_rows
 from commera.plugin_events import add_changed_products
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
@@ -26,22 +26,11 @@ def get_selling_price_lists():
 
 
 def get_base_price_rows_by_key(item_codes, price_lists):
-	"""The public selling row a price editor reads and updates, keyed (item_code, price_list): see
-	base_prices.get_public_price_rows. A future or expired row is updated, not duplicated."""
-	if not item_codes:
-		return {}
-
-	price_rows = []
-	for item_code_chunk in create_batch(list(item_codes), IN_CLAUSE_CHUNK_SIZE):
-		price_rows.extend(
-			get_public_price_rows(
-				item_code_chunk, price_lists, ["name", "item_code", "price_list", "price_list_rate"]
-			)
-		)
-	rows_by_key = {}
-	for price_row in price_rows:
-		rows_by_key.setdefault((cstr(price_row.item_code), price_row.price_list), price_row)
-	return rows_by_key
+	"""The row a price editor reads and updates, keyed (item_code, price_list): today's, see
+	base_prices.get_todays_price_rows. A key without one gets a new row from today."""
+	return {
+		(cstr(row.item_code), row.price_list): row for row in get_todays_price_rows(item_codes, price_lists)
+	}
 
 
 def get_size_item_codes(item_template, style_attribute_variant_list=None):
@@ -124,7 +113,7 @@ def set_variant_prices(
 					{"item_code": item_code, "price_list": price_list, "price_list_rate": rate}
 				)
 			elif overwrite_existing and flt(existing_price.price_list_rate) != rate:
-				stale_price_names.append(existing_price.name)
+				stale_price_names.append(existing_price.price_name)
 			else:
 				counts["skipped"] += 1
 
@@ -179,6 +168,8 @@ def insert_item_prices(price_rows, commit_in_chunks=False):
 					"price_list": price_row["price_list"],
 					"price_list_rate": price_row["price_list_rate"],
 					"selling": 1,
+					# As erpnext.stock.get_item_details.insert_item_price: expired and future rows stay as they are.
+					"valid_from": nowdate(),
 					# ERPNext keys its duplicate-price check on uom; blank makes every later edit look like a new price.
 					"uom": stock_uom_by_item_code.get(price_row["item_code"]),
 				}

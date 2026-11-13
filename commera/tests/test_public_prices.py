@@ -6,11 +6,13 @@ from pathlib import Path
 import frappe
 from frappe.utils import add_days, getdate, today
 
+from commera.api.admin.catalog import get_selling_rates, get_size_prices
 from commera.core import get_party
 from commera.discounts.preview import get_preview_quotation
 from commera.localization.cart_currency import CartCurrency
 from commera.localization.content import SHOP_WIDE
 from commera.localization.market_prices import MarketPrices
+from commera.product_detail import get_product_detail
 from commera.sdk import cart as cart_sdk
 from commera.sdk import catalog
 from commera.search.price_markets import get_price_markets, prices_for_variants
@@ -161,6 +163,20 @@ class TestERPNextRowChoice(PublicPriceTestCase):
 		self.assertEqual((card["price"], card["unit"]), (120, "ZZ Box"))
 		self.assertEqual(self.storefront(route)["index"], 120)
 		self.assertEqual(catalog.get_items([item_code])[item_code]["unit"], "ZZ Box")
+		self.assertEqual(get_product_detail(route)["selected_item"]["unit"], "ZZ Box")
+
+	def test_a_sales_uom_without_an_item_row_uses_the_global_conversion_factor(self):
+		route = self.make_priced_variant("GLOBALCRATE", default_rate=12)
+		item_code = self.get_item_code(route)
+		crate = get_uom("ZZ Crate")
+		category = frappe.db.get_value("UOM Category", {}) or make_uom_category()
+		factor = {"category": category, "from_uom": crate, "to_uom": "Nos", "value": 6}
+		frappe.get_doc({"doctype": "UOM Conversion Factor", **factor}).insert(ignore_permissions=True)
+		frappe.db.set_value("Item", item_code, "sales_uom", crate)
+		self.sign_in_shopper()
+
+		self.assertEqual(catalog.get_product(route)["price"], 72)
+		self.assertEqual(self.lines(self.add(item_code))[item_code]["rate"], 72)
 
 	def test_a_sale_row_in_packs_refuses_a_quantity_it_does_not_fit(self):
 		route = self.make_priced_variant("PACKED", default_rate=300)
@@ -209,44 +225,78 @@ class TestCartDate(PublicPriceTestCase):
 
 
 class TestPriceEditors(PublicPriceTestCase):
-	def test_saving_a_size_price_updates_a_future_row_instead_of_adding_one(self):
-		route = self.make_priced_variant("FUTUREROW", default_rate=100)
+	def test_editing_an_expired_only_price_adds_a_row_from_today(self):
+		route = self.make_priced_variant("EXPIREDEDIT", default_rate=150)
 		item_code = self.get_item_code(route)
-		self.make_price(item_code, self.sale_price_list, 70, valid_from=add_days(today(), 1))
+		self.expire(item_code, self.default_price_list)
 		variant = frappe.get_doc("Style Attribute Variant", {"route": route})
 
-		variant.save_size_prices([{"item_code": item_code, "sale_rate": 60}])
+		self.assertIsNone(variant.get_size_prices()["sizes"][0]["default_rate"])
+		variant.save_size_prices([{"item_code": item_code, "default_rate": 160}])
 
-		self.assertEqual(self.get_sale_rates(item_code), [60])
+		expired = (150, as_date(add_days(today(), -30)), as_date(add_days(today(), -1)))
+		self.assertEqual(self.get_rows(item_code, self.default_price_list), [expired, (160, today(), None)])
+		self.assertEqual(self.storefront(route)["product"], (160, True))
+		self.assertEqual(variant.get_size_prices()["sizes"][0]["default_rate"], 160)
 
-	def test_saving_a_size_price_updates_an_expired_row_instead_of_adding_one(self):
-		route = self.make_priced_variant("EXPIREDROW", default_rate=100, sale_rate=70)
+	def test_editing_beside_a_future_sale_adds_a_row_from_today_and_keeps_the_sale(self):
+		route = self.make_priced_variant("FUTUREEDIT", default_rate=100, sale_rate=70)
 		item_code = self.get_item_code(route)
 		self.expire(item_code, self.sale_price_list)
+		next_week = add_days(today(), 7)
+		self.make_price(item_code, self.sale_price_list, 50, valid_from=next_week)
 		variant = frappe.get_doc("Style Attribute Variant", {"route": route})
 
-		self.assertEqual(variant.get_size_prices()["sizes"][0]["sale_rate"], 70)
+		self.assertEqual(get_size_prices([item_code])[item_code]["sale_rate"], None)
+		self.assertEqual(get_selling_rates([item_code]), {item_code: 100})
 		variant.save_size_prices([{"item_code": item_code, "sale_rate": 60}])
 
-		self.assertEqual(self.get_sale_rates(item_code), [60])
+		expired = (70, as_date(add_days(today(), -30)), as_date(add_days(today(), -1)))
+		rows = [expired, (60, today(), None), (50, as_date(next_week), None)]
+		self.assertEqual(self.get_rows(item_code, self.sale_price_list), rows)
+		self.assertEqual(get_selling_rates([item_code]), {item_code: 60})
 
-	def get_sale_rates(self, item_code):
-		filters = {"item_code": item_code, "price_list": self.sale_price_list}
-		return frappe.get_all("Item Price", filters=filters, pluck="price_list_rate")
+	def test_editing_the_price_of_today_updates_its_row(self):
+		route = self.make_priced_variant("TODAYEDIT", default_rate=100)
+		item_code = self.get_item_code(route)
+		variant = frappe.get_doc("Style Attribute Variant", {"route": route})
+
+		self.assertEqual(
+			variant.save_size_prices([{"item_code": item_code, "default_rate": 120}]),
+			{"created": 0, "updated": 1},
+		)
+
+		self.assertEqual([row[0] for row in self.get_rows(item_code, self.default_price_list)], [120])
+
+	def get_rows(self, item_code, price_list):
+		rows = frappe.get_all(
+			"Item Price",
+			filters={"item_code": item_code, "price_list": price_list},
+			fields=["price_list_rate", "valid_from", "valid_upto"],
+			order_by="valid_from",
+		)
+		return [(row.price_list_rate, as_date(row.valid_from), as_date(row.valid_upto)) for row in rows]
 
 
 class TestSummerCardWithoutPrice(PublicPriceTestCase):
-	def render_card_price(self, amount):
+	def render_card_price(self, amount, unit=None):
 		source = Path(frappe.get_app_path("commera", SUMMER_CARD)).read_text()
 		money = CartCurrency.of({"currency": self.store_currency})
-		html = frappe.render_template(
-			source + "{{ card_price(amount) }}", {"amount": amount, "get_cart_currency": lambda: money}
-		)
+		context = {"amount": amount, "unit": unit, "get_cart_currency": lambda: money}
+		html = frappe.render_template(source + "{{ card_price(amount, unit=unit) }}", context)
 		return html.rsplit("</div>", 1)[-1].strip()
 
 	def test_a_card_the_market_cannot_price_says_unavailable(self):
 		self.assertEqual(self.render_card_price(None), "Unavailable")
 		self.assertIn("0.00", self.render_card_price(0))
+
+	def test_a_card_names_the_sales_unit_of_its_price(self):
+		self.assertIn("per ZZ Box", self.render_card_price(120, unit="ZZ Box"))
+		self.assertNotIn("shop-card-unit", self.render_card_price(120))
+
+
+def as_date(value):
+	return str(getdate(value)) if value else None
 
 
 def get_supplier():
@@ -254,6 +304,10 @@ def get_supplier():
 		return supplier
 	doc = {"doctype": "Supplier", "supplier_name": f"ZZ Prices {frappe.generate_hash(length=6)}"}
 	return frappe.get_doc(doc).insert(ignore_permissions=True).name
+
+
+def make_uom_category():
+	return frappe.get_doc({"doctype": "UOM Category", "category_name": "ZZ Prices"}).insert().name
 
 
 def get_uom(name):

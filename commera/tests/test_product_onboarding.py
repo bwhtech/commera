@@ -5,6 +5,7 @@
 import frappe
 from erpnext.controllers.item_variant import create_variant
 from frappe.tests import IntegrationTestCase
+from frappe.utils import add_days, today
 
 from commera.api.admin.catalog import (
 	DEFAULT_OPTION_ATTRIBUTE,
@@ -14,6 +15,7 @@ from commera.api.admin.catalog import (
 	create_product,
 	get_attribute_values,
 	get_product,
+	get_size_prices,
 	update_product,
 )
 from commera.api.admin.inventory import LOW_STOCK_THRESHOLD, get_inventory
@@ -281,6 +283,19 @@ class TestSetVariantPrices(ProductOnboardingTestCase):
 
 		self.assertEqual(counts, {"created": 0, "updated": 0, "skipped": 2, "queued": 0})
 		self.assertEqual(self.get_price(self.size_item_codes[0], self.default_price_list), 200)
+
+	def test_an_expired_price_is_not_an_existing_price(self):
+		set_variant_prices(self.item_template, default_rate=200)
+		expired = {"valid_from": add_days(today(), -30), "valid_upto": add_days(today(), -1)}
+		for item_code in self.size_item_codes:
+			name = frappe.db.get_value("Item Price", {"item_code": item_code})
+			frappe.get_doc("Item Price", name).update(expired).save()
+
+		counts = set_variant_prices(self.item_template, default_rate=300)
+
+		self.assertEqual(counts, {"created": 2, "updated": 0, "skipped": 0, "queued": 0})
+		item_code = self.size_item_codes[0]
+		self.assertEqual(get_size_prices([item_code])[item_code]["default_rate"], 300)
 
 	def test_overwrite_existing_rewrites_the_stale_rows(self):
 		set_variant_prices(self.item_template, default_rate=200)
