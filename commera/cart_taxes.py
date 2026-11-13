@@ -4,13 +4,18 @@ market, the company default. Inclusive or exclusive follows each template row's 
 import frappe
 from erpnext.accounts.doctype.tax_rule.tax_rule import get_tax_rule_party_details, get_tax_template
 from erpnext.accounts.party import get_address_tax_category
+from erpnext.setup.doctype.customer_group.customer_group import get_parent_customer_groups
 from frappe import _
 from frappe.model import child_table_fields, default_fields
+from frappe.query_builder import Criterion
+from frappe.query_builder.functions import IfNull
 from frappe.utils.data import nowdate
+from frappe.utils.nestedset import get_root_of
 
 from commera.localization.markets import Market
 
 TEMPLATE_DOCTYPE = "Sales Taxes and Charges Template"
+SPECIFIC_RULE_FIELDS = ("customer", "customer_group", "tax_category", "billing_country", "shipping_country")
 
 
 def apply_market_taxes(quotation, market: Market | None, switched: bool):
@@ -144,22 +149,43 @@ def get_tax_rule_template(quotation, market: Market | None = None) -> str | None
 	date = quotation.transaction_date or nowdate()
 	if not market or not market.tax_template:
 		return get_tax_template(date, args)
+	return get_specific_rule_template(date, args)
 
-	# ERPNext exposes no candidate filter. Check each specific rule with its matcher,
-	# then use its key-count and priority order over those eligible candidates.
-	fields = ("customer", "customer_group", "tax_category", "billing_country", "shipping_country")
-	rules = frappe.get_all(
-		"Tax Rule", filters={"tax_type": "Sales", "use_for_shopping_cart": 1}, fields=["*"]
+
+def get_specific_rule_template(date: str, args: dict) -> str | None:
+	"""ERPNext's `get_tax_template` over specific rules only: a customer, customer group, tax category or
+	country condition. ERPNext exposes no candidate filter, so its matching, ranking and disabled check
+	are repeated here in one query."""
+	rule = frappe.qb.DocType("Tax Rule")
+	query = (
+		frappe.qb.from_(rule)
+		.select(rule.star)
+		.where(rule.from_date.isnull() | (rule.from_date <= date))
+		.where(rule.to_date.isnull() | (rule.to_date >= date))
+		.where(Criterion.any([IfNull(rule[field], "") != "" for field in SPECIFIC_RULE_FIELDS]))
 	)
-	eligible = []
-	for rule in rules:
-		if any(rule.get(field) for field in fields):
-			template = get_tax_template(date, {**args, "name": rule.name})
-			if template:
-				eligible.append((sum(bool(rule.get(key)) for key in args), rule.priority or 0, template))
-	if eligible:
-		return sorted(eligible, key=lambda row: (-row[0], row[1]))[0][2]
-	return None
+	for key, value in args.items():
+		query = query.where(get_rule_condition(rule, key, value))
+	rules = query.run(as_dict=True)
+	if not rules:
+		return None
+	# More matched conditions win, then the higher priority. A disabled template stops the search.
+	best = max(rules, key=lambda row: (sum(bool(row.get(key)) for key in args), row.priority or 0))
+	if frappe.db.get_value(TEMPLATE_DOCTYPE, best.sales_tax_template, "disabled"):
+		return None
+	return best.sales_tax_template
+
+
+def get_rule_condition(rule, key: str, value):
+	"""ERPNext `get_tax_template`'s condition on one argument."""
+	if key == "use_for_shopping_cart":
+		return rule.use_for_shopping_cart == value
+	if key == "tax_category":
+		return IfNull(rule.tax_category, "") == (value or "")
+	if key == "customer_group":
+		parents = get_parent_customer_groups(value or get_root_of("Customer Group"))
+		return IfNull(rule.customer_group, "").isin(["", *(group.name for group in parents)])
+	return IfNull(rule[key], "").isin(["", value or ""])
 
 
 def get_market_country(market: Market | None) -> str | None:

@@ -6,7 +6,7 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_sess
 from commera.commera_ecommerce.doctype.commera_market.commera_market import get_country_code
 from commera.core import _get_cart_quotation, get_party
 from commera.localization import pin_localization, resolve
-from commera.tests.test_market_taxes import MarketTaxTestCase
+from commera.tests.test_market_taxes import TEMPLATE_DOCTYPE, MarketTaxTestCase
 from commera.tests.test_markets import UAE
 
 OTHER_COUNTRY = "Egypt"
@@ -102,10 +102,21 @@ class TestCartTaxRules(MarketTaxTestCase):
 
 	def test_specific_rules_keep_erpnext_priority_order(self):
 		self.set_market_template(self.make_template(10))
-		self.make_tax_rule(self.make_template(12), shipping_country=UAE, priority=2)
+		higher = self.make_template(12)
 		self.make_tax_rule(self.vat, shipping_country=UAE, priority=1)
+		self.make_tax_rule(higher, shipping_country=UAE, priority=2)
 		quotation = self.quote_in_market()
-		self.assertEqual((quotation.taxes_and_charges, quotation.grand_total), (self.vat, 345))
+		self.assertEqual((quotation.taxes_and_charges, quotation.grand_total), (higher, 336))
+
+	def test_the_best_rule_with_a_disabled_template_stops_the_search(self):
+		market_template = self.make_template(10)
+		self.set_market_template(market_template)
+		retired = self.make_template(12)
+		self.make_tax_rule(self.vat, shipping_country=UAE, priority=1)
+		self.make_tax_rule(retired, shipping_country=UAE, priority=2)
+		frappe.db.set_value(TEMPLATE_DOCTYPE, retired, "disabled", 1)
+		quotation = self.quote_in_market()
+		self.assertEqual((quotation.taxes_and_charges, quotation.grand_total), (market_template, 330))
 
 	def test_guest_previews_use_country_rules(self):
 		from commera.discounts.preview import get_preview_quotation
