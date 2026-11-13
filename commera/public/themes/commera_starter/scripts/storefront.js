@@ -808,7 +808,9 @@ function checkout(config) {
 		},
 
 		get delivery_unavailable() {
-			return !this.state?.is_store_pickup && this.shipping_reason === "unavailable";
+			return (
+				!this.state?.is_store_pickup && this.shipping_reason === 'unavailable'
+			);
 		},
 
 		get shipping_pending() {
