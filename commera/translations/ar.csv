@@ -2364,3 +2364,4 @@ Product grid,شبكة المنتجات
 Recent additions,أحدث الإضافات
 Similar products,منتجات مشابهة
 Sponsored brands,علامات تجارية مُموّلة
+"This order has no address link because {0}. Set the delivery address on the Delivery Note; the accepted address is in the order's address text","لا يحتوي هذا الطلب على رابط عنوان لأن {0}. حدّد عنوان التسليم في إشعار التسليم؛ العنوان المقبول موجود في نص عنوان الطلب"

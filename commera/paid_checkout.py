@@ -18,6 +18,7 @@ def keep_accepted_checkout(quotation) -> list[str]:
 	changes = get_address_changes(quotation)
 	# ERPNext refuses a deleted Address and one no longer linked to the customer. The accepted text stays.
 	dropped = [field for field in ADDRESS_TEXT if not is_party_address(quotation.get(field), quotation)]
+	changes += dict.fromkeys(get_dropped_address_note(quotation.get(field), quotation) for field in dropped)
 	for field in dropped:
 		quotation.set(field, None)
 	if reason := get_shipping_rule_change(quotation, "shipping_address_name" in dropped):
@@ -39,6 +40,18 @@ def restore_accepted_addresses(doc, method=None):
 
 def get_shipping_rule_change(quotation, shipping_address_dropped: bool = False) -> str | None:
 	"""Why ERPNext would refuse or reprice the accepted shipping charge on submit, if it would."""
+	try:
+		return read_shipping_rule_change(quotation, shipping_address_dropped)
+	except Exception:
+		frappe.log_error(
+			"Paid order shipping rule check failed",
+			reference_doctype="Quotation",
+			reference_name=quotation.name,
+		)
+		return _("Shipping Rule {0} could not be checked").format(quotation.shipping_rule)
+
+
+def read_shipping_rule_change(quotation, shipping_address_dropped: bool) -> str | None:
 	name = quotation.shipping_rule
 	if not name:
 		return None
@@ -89,14 +102,23 @@ def read_address_changes(quotation):
 			continue
 		address = frappe.db.get_value("Address", name, "country")
 		if not address:
-			yield _("Address {0} was deleted").format(name)
 			continue
 		if normalize(render_address(name, check_permissions=False)) != normalize(quotation.get(text_field)):
 			yield _("Address {0} was edited").format(name)
-		if not is_linked(name, quotation):
-			yield _("Address {0} is no longer linked to {1}").format(name, quotation.party_name)
 		if not countries.allows(frappe.get_cached_value("Country", address, "code")):
 			yield _("the {0} market no longer ships to {1}").format(_(countries.market.title), _(address))
+
+
+def get_dropped_address_note(address: str, quotation) -> str:
+	"""ERPNext's Delivery Note mapper refills a missing address link from the customer's other addresses."""
+	if frappe.db.exists("Address", address):
+		reason = _("Address {0} is no longer linked to {1}").format(address, quotation.party_name)
+	else:
+		reason = _("Address {0} was deleted").format(address)
+	note = _(
+		"This order has no address link because {0}. Set the delivery address on the Delivery Note; the accepted address is in the order's address text"
+	)
+	return note.format(reason)
 
 
 def is_party_address(address: str | None, quotation) -> bool:

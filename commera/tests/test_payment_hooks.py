@@ -697,7 +697,10 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.assertFalse(sales_order.shipping_rule)
 		[note] = self.get_notes(sales_order)
 		self.assertIn(f"Address {address.name} was edited", note)
-		self.assertIn(f"Address {address.name} is no longer linked", note)
+		self.assertIn(
+			f"This order has no address link because Address {address.name} is no longer linked", note
+		)
+		self.assertIn("Set the delivery address on the Delivery Note", note)
 		self.assertIn(f"Shipping Rule {rule.name} was not applied again", note)
 
 	def test_a_paid_order_keeps_the_links_of_an_address_edited_after_capture(self):
@@ -748,7 +751,20 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		sales_order, _sales_invoice = self.place_paid_cart(quotation)
 
 		self.assertEqual((sales_order.customer_address, sales_order.shipping_address_name), (None, None))
-		self.assertIn(f"Address {address.name} was deleted", self.get_notes(sales_order)[0])
+		self.assertIn(
+			f"This order has no address link because Address {address.name} was deleted",
+			self.get_notes(sales_order)[0],
+		)
+
+	def test_a_paid_order_is_placed_when_the_shipping_rule_check_fails(self):
+		quotation, address, rule = self.checkout_with_shipping()
+
+		with patch.object(type(rule), "apply", side_effect=RuntimeError("rule")):
+			sales_order, _sales_invoice = self.place_paid_cart(quotation)
+
+		self.assert_links(address.name, sales_order)
+		self.assertFalse(sales_order.shipping_rule)
+		self.assertIn(f"Shipping Rule {rule.name} could not be checked", self.get_notes(sales_order)[0])
 
 	def test_a_failed_change_note_does_not_undo_a_paid_order(self):
 		quotation, address, _rule = self.checkout_with_shipping()
