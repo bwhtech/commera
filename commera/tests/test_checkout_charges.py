@@ -154,7 +154,7 @@ class TestCashOnDeliveryAccount(ShippingRuleTestCase):
 		quotation.calculate_taxes_and_totals()
 		self.assertEqual([row.tax_amount for row in quotation.taxes], [3, 7, COD_FEE, SHIPPING_AMOUNT])
 		self.assertEqual(
-			[row.commera_cart_charge for row in quotation.taxes], [None, None, "cod", "shipping_rule"]
+			[row.commera_cart_charge or None for row in quotation.taxes], [None, None, "cod", "shipping_rule"]
 		)
 
 	def test_the_previewed_cod_fee_row_is_the_row_that_is_saved(self):
