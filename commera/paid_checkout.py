@@ -16,11 +16,11 @@ ADDRESS_TEXT = {"customer_address": "address_display", "shipping_address_name": 
 def keep_accepted_checkout(quotation) -> list[str]:
 	"""Keep the paid cart's addresses and shipping charge through submission. Returns what changed."""
 	changes = get_address_changes(quotation)
-	for field in ADDRESS_TEXT:
-		# A deleted Address fails link validation; its accepted text stays.
-		if (name := quotation.get(field)) and not frappe.db.exists("Address", name):
-			quotation.set(field, None)
-	if reason := get_shipping_rule_change(quotation):
+	# ERPNext refuses a deleted Address and one no longer linked to the customer. The accepted text stays.
+	dropped = [field for field in ADDRESS_TEXT if not is_party_address(quotation.get(field), quotation)]
+	for field in dropped:
+		quotation.set(field, None)
+	if reason := get_shipping_rule_change(quotation, "shipping_address_name" in dropped):
 		release_shipping_rule(quotation)
 		changes.append(reason)
 	keep_accepted_addresses(quotation, quotation)
@@ -37,13 +37,16 @@ def restore_accepted_addresses(doc, method=None):
 	doc.update(doc.flags.get("accepted_addresses") or {})
 
 
-def get_shipping_rule_change(quotation) -> str | None:
+def get_shipping_rule_change(quotation, shipping_address_dropped: bool = False) -> str | None:
 	"""Why ERPNext would refuse or reprice the accepted shipping charge on submit, if it would."""
 	name = quotation.shipping_rule
 	if not name:
 		return None
 	if not frappe.db.exists("Shipping Rule", name):
 		return _("Shipping Rule {0} was deleted").format(name)
+	if shipping_address_dropped:
+		# ERPNext would apply the rule to the customer's default address instead.
+		return _("Shipping Rule {0} was not applied again without the shipping address").format(name)
 	rule = frappe.get_doc("Shipping Rule", name)
 	address = quotation.get_shipping_address()
 	countries = [row.country for row in rule.countries]
@@ -94,6 +97,10 @@ def read_address_changes(quotation):
 			yield _("Address {0} is no longer linked to {1}").format(name, quotation.party_name)
 		if not countries.allows(frappe.get_cached_value("Country", address, "code")):
 			yield _("the {0} market no longer ships to {1}").format(_(countries.market.title), _(address))
+
+
+def is_party_address(address: str | None, quotation) -> bool:
+	return not address or (bool(frappe.db.exists("Address", address)) and is_linked(address, quotation))
 
 
 def is_linked(address: str, quotation) -> bool:

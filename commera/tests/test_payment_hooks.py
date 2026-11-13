@@ -692,11 +692,25 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		sales_order, sales_invoice = self.place_paid_cart(quotation)
 
-		self.assert_links(address.name, sales_order, sales_invoice)
+		# ERPNext refuses an address of another party, so only the accepted text stays.
+		self.assert_links(None, sales_order, sales_invoice)
 		self.assertFalse(sales_order.shipping_rule)
 		[note] = self.get_notes(sales_order)
 		self.assertIn(f"Address {address.name} was edited", note)
 		self.assertIn(f"Address {address.name} is no longer linked", note)
+		self.assertIn(f"Shipping Rule {rule.name} was not applied again", note)
+
+	def test_a_paid_order_keeps_the_links_of_an_address_edited_after_capture(self):
+		quotation, address, rule = self.checkout_with_shipping()
+		address.country = "Germany"
+		address.save(ignore_permissions=True)
+
+		sales_order, sales_invoice = self.place_paid_cart(quotation)
+
+		self.assert_links(address.name, sales_order, sales_invoice)
+		self.assertFalse(sales_order.shipping_rule)
+		[note] = self.get_notes(sales_order)
+		self.assertIn(f"Address {address.name} was edited", note)
 		self.assertIn(f"Shipping Rule {rule.name} no longer covers Germany", note)
 
 	def test_a_paid_order_keeps_the_accepted_charge_when_the_rule_drops_the_country(self):

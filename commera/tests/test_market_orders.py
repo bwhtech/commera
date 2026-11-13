@@ -105,7 +105,8 @@ class TestPaidMarketOrders(MarketCartTestCase):
 
 	def test_a_paid_market_reassignment_keeps_the_accepted_order(self):
 		address = self.checkout_in_the_uae()
-		frappe.db.delete("Commera Market Country", {"parent": "gulf", "country": UAE})
+		# The Gulf keeps a country, so it still exists; the UAE falls to the primary market.
+		frappe.db.set_value("Commera Market Country", {"parent": "gulf", "country": UAE}, "country", "Oman")
 		delete_cached_rows()
 
 		sales_order = self.pay()
