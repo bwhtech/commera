@@ -2372,3 +2372,4 @@ No such import.,لا توجد عملية استيراد بهذا المعرّف.
 The import stopped.,توقف الاستيراد.
 The import stopped before it finished. Please try again.,توقف الاستيراد قبل أن يكتمل. يُرجى المحاولة مرة أخرى.
 "This is a large file. It is imported in the background, so this can take a few minutes.","هذا ملف كبير. يُستورد في الخلفية، لذا قد يستغرق ذلك بضع دقائق."
+per {0},لكل {0}

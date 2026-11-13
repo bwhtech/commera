@@ -6,7 +6,6 @@ from pathlib import Path
 import frappe
 from frappe.utils import add_days, getdate, today
 
-from commera.api.variant_pricing import set_variant_prices
 from commera.core import get_party
 from commera.discounts.preview import get_preview_quotation
 from commera.localization.cart_currency import CartCurrency
@@ -124,7 +123,9 @@ class TestERPNextRowChoice(PublicPriceTestCase):
 		route = self.make_priced_variant("DATEDROW", default_rate=120)
 		item_code = self.get_item_code(route)
 		self.make_price(item_code, self.sale_price_list, 80, valid_from=add_days(today(), -2))
-		self.make_price(item_code, self.sale_price_list, 110)
+		# Item Price defaults valid_from to today; an import or an old row can leave it empty.
+		undated = self.make_price(item_code, self.sale_price_list, 110)
+		frappe.db.set_value("Item Price", undated, "valid_from", None)
 
 		self.assertEqual(
 			self.storefront(route), {"product": (80, True), "card": (80, 120, True), "index": 80}
@@ -218,15 +219,14 @@ class TestPriceEditors(PublicPriceTestCase):
 
 		self.assertEqual(self.get_sale_rates(item_code), [60])
 
-	def test_bulk_pricing_updates_an_expired_row_instead_of_adding_one(self):
+	def test_saving_a_size_price_updates_an_expired_row_instead_of_adding_one(self):
 		route = self.make_priced_variant("EXPIREDROW", default_rate=100, sale_rate=70)
 		item_code = self.get_item_code(route)
 		self.expire(item_code, self.sale_price_list)
 		variant = frappe.get_doc("Style Attribute Variant", {"route": route})
 
-		set_variant_prices(
-			item_code, sale_rate=60, overwrite_existing=1, style_attribute_variant_list=[variant.name]
-		)
+		self.assertEqual(variant.get_size_prices()["sizes"][0]["sale_rate"], 70)
+		variant.save_size_prices([{"item_code": item_code, "sale_rate": 60}])
 
 		self.assertEqual(self.get_sale_rates(item_code), [60])
 
