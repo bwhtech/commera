@@ -1,7 +1,8 @@
 <script setup>
 import { onBeforeUnmount, ref, watch } from 'vue'
-import { Button, Dialog, FormControl, toast, useFileUpload } from 'frappe-ui'
+import { Button, Dialog, FormControl, FrappeResponseError, toast, useFileUpload } from 'frappe-ui'
 import { trySubmit, useAdminAction, useAdminRead } from '../../data/api'
+import { errorMessage } from '../../data/errors'
 import { __ } from '../../data/translation'
 
 const props = defineProps({
@@ -15,9 +16,12 @@ const language = ref('')
 const importAction = useAdminAction('translations.import_translations')
 // A large file imports in a background job. No socket is open in the dashboard, so this polls it.
 const POLL_DELAY = 2000
+// A poll that does not reach the server is retried, slower each time: the job keeps running meanwhile.
+const MAX_POLL_DELAY = 30000
 const jobId = ref('')
 const statusRequest = useAdminRead('translations.get_import_status', {
   immediate: false,
+  quiet: true,
   params: () => ({ job_id: jobId.value }),
 })
 let pollTimer = null
@@ -66,19 +70,23 @@ async function importFile(event) {
   }
 }
 
-function schedulePoll() {
+function schedulePoll(delay = POLL_DELAY) {
   pollTimer = setTimeout(async () => {
     const status = await statusRequest.fetch()
+    // Unmounted while the poll was in flight.
+    if (!pollTimer) return
+    const refusal = statusRequest.error instanceof FrappeResponseError ? statusRequest.error : null
     if (status?.status === 'done') {
       finish(status.report)
     } else if (status?.status === 'queued') {
       schedulePoll()
-    } else {
-      // A refused poll has already toasted.
-      if (status) toast.error(status.error)
+    } else if (status?.status === 'failed' || refusal) {
+      toast.error(status?.error || errorMessage(refusal))
       isImporting.value = false
+    } else {
+      schedulePoll(Math.min(delay * 2, MAX_POLL_DELAY))
     }
-  }, POLL_DELAY)
+  }, delay)
 }
 
 function finish(importReport) {
@@ -87,7 +95,10 @@ function finish(importReport) {
   emit('imported')
 }
 
-onBeforeUnmount(() => clearTimeout(pollTimer))
+onBeforeUnmount(() => {
+  clearTimeout(pollTimer)
+  pollTimer = null
+})
 </script>
 
 <template>
