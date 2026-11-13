@@ -434,37 +434,6 @@ class TestMarketTaxTemplateValidation(MarketTaxTestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "is disabled"):
 			self.set_market_template(template)
 
-	def test_a_template_a_market_uses_cannot_be_disabled(self):
-		template = self.make_template(10)
-		self.set_market_template(template)
-		doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
-		doc.disabled = 1
-
-		with self.assertRaisesRegex(frappe.ValidationError, "use this tax template"):
-			doc.save(ignore_permissions=True)
-
-	def test_a_disabled_market_does_not_block_retiring_its_template(self):
-		template = self.make_template(10)
-		self.set_market_template(template)
-		market = frappe.get_doc("Commera Market", "gulf")
-		market.enabled = 0
-		market.save(ignore_permissions=True)
-		doc = frappe.get_doc(TEMPLATE_DOCTYPE, template)
-		doc.disabled = 1
-		doc.save(ignore_permissions=True)
-		self.assertEqual(frappe.db.get_value(TEMPLATE_DOCTYPE, template, "disabled"), 1)
-		market.enabled = 1
-		with self.assertRaisesRegex(frappe.ValidationError, "is disabled"):
-			market.save(ignore_permissions=True)
-
-	def test_a_template_no_market_uses_can_be_disabled(self):
-		doc = frappe.get_doc(TEMPLATE_DOCTYPE, self.make_template(10))
-		doc.disabled = 1
-
-		doc.save(ignore_permissions=True)
-
-		self.assertEqual(frappe.db.get_value(TEMPLATE_DOCTYPE, doc.name, "disabled"), 1)
-
 	def test_a_template_of_the_store_company_is_kept(self):
 		template = self.make_template(10)
 

@@ -217,7 +217,6 @@ doc_events = {
 	"Gateway Payment Request": {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},
-	"Sales Taxes and Charges Template": {"validate": "commera.doc_events.tax_template.validate"},
 	"Quotation": {
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
 		"validate": "commera.discounts.pricing.apply_code_discounts",
