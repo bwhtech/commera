@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import contextmanager
 
 import frappe
 from frappe.utils import create_batch
@@ -36,8 +37,26 @@ def skip_batch_sync():
 	return bool(frappe.flags.in_migrate or frappe.flags.in_install or frappe.flags.in_patch)
 
 
+@contextmanager
+def batched_upserts():
+	"""Collect the per-doc upserts of a bulk write, then queue them once: a job per doctype and chunk."""
+	if frappe.flags.commera_pending_upserts is not None:
+		yield
+		return
+	frappe.flags.commera_pending_upserts = pending = {}
+	try:
+		yield
+	finally:
+		frappe.flags.commera_pending_upserts = None
+	for doctype, names in pending.items():
+		enqueue_upsert_many(doctype, names)
+
+
 def enqueue_upsert(doctype, name):
 	if skip_sync():
+		return
+	if (pending := frappe.flags.commera_pending_upserts) is not None:
+		pending.setdefault(doctype, {})[name] = None
 		return
 	bump_if_priced(doctype)
 	frappe.enqueue(

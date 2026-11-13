@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
@@ -133,6 +135,80 @@ class TestCategoryTranslation(IntegrationTestCase):
 
 		self.assertFalse(
 			frappe.db.exists("Content Translation", {"reference_doctype": CATEGORY, "reference_name": entry})
+		)
+
+	def test_queuing_a_merge_keeps_the_sources_translations(self):
+		from frappe.model.rename_doc import update_document_title
+
+		self.enterContext(patch.dict(frappe.conf, maintenance_mode=0, pause_scheduler=0, disable_scheduler=0))
+		settings = getattr(frappe.local, "system_settings", None)
+		self.addCleanup(setattr, frappe.local, "system_settings", settings)
+		frappe.local.system_settings = frappe._dict(enable_scheduler=1)
+		other = self.make_category("Queued source", parent=self.tab.name)
+		register(CATEGORY, other.name, "display_name", "ar", "أخرى")
+		with patch("frappe.model.document.Document.queue_action") as dispatch:
+			update_document_title(
+				doctype=CATEGORY, docname=other.name, name=self.entry.name, merge=True, enqueue=True
+			)
+		self.assertEqual(dispatch.call_args.args, ("rename",))
+		self.assertTrue(frappe.db.exists(CATEGORY, other.name))
+		self.assertEqual(
+			frappe.db.get_value("Content Translation", {"reference_name": other.name}, "translated_value"),
+			"أخرى",
+		)
+
+	def test_rolling_back_a_merge_restores_the_sources_translations(self):
+		other = self.make_category("Rolled back source", parent=self.tab.name)
+		register(CATEGORY, other.name, "display_name", "ar", "أخرى")
+		frappe.db.savepoint("translation_merge")
+		frappe.rename_doc(CATEGORY, other.name, self.entry.name, merge=True)
+		frappe.db.rollback(save_point="translation_merge")
+		self.assertTrue(frappe.db.exists(CATEGORY, other.name))
+		self.assertEqual(
+			frappe.db.get_value("Content Translation", {"reference_name": other.name}, "translated_value"),
+			"أخرى",
+		)
+
+	def test_a_translation_requires_an_existing_source(self):
+		with self.assertRaises(frappe.LinkValidationError):
+			register(CATEGORY, "missing-translation-source", "display_name", "ar", "أخرى")
+
+	def test_a_rejected_self_merge_keeps_its_translations(self):
+		with self.assertRaises(frappe.ValidationError):
+			frappe.rename_doc(CATEGORY, self.entry.name, self.entry.name, merge=True)
+		self.assertEqual(
+			frappe.db.get_value(
+				"Content Translation", {"reference_name": self.entry.name}, "translated_value"
+			),
+			"قمصان",
+		)
+
+	def test_renaming_a_category_moves_its_translations(self):
+		old = self.entry.name
+		new = f"renamed-{frappe.generate_hash(length=10)}"
+		frappe.rename_doc(CATEGORY, old, new)
+		self.assertFalse(frappe.db.exists("Content Translation", {"reference_name": old}))
+		self.assertEqual(
+			frappe.db.get_value("Content Translation", {"reference_name": new}, "translated_value"),
+			"قمصان",
+		)
+
+	def test_merging_a_category_keeps_the_targets_translations(self):
+		other = self.make_category("Other", parent=self.tab.name, description="Other story")
+		register(CATEGORY, other.name, "display_name", "ar", "أخرى")
+		register(CATEGORY, other.name, "description", "ar", "قصة أخرى")
+
+		frappe.rename_doc(CATEGORY, other.name, self.entry.name, merge=True)
+
+		translations = frappe.get_all(
+			"Content Translation",
+			filters={"reference_doctype": CATEGORY, "reference_name": ("in", [other.name, self.entry.name])},
+			fields=["reference_name", "reference_field", "translated_value"],
+			as_list=True,
+		)
+		self.assertCountEqual(
+			translations,
+			[(self.entry.name, "display_name", "قمصان"), (self.entry.name, "description", "قصة أخرى")],
 		)
 
 	def test_a_source_label_category_link_keeps_filtering_in_every_language(self):

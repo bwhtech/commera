@@ -3,8 +3,11 @@
 
 """The dashboard Theme API, and the storefront preview the theme editor frames."""
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.website.serve import get_response_content
 
 from commera.api.admin.pages import save_page
 from commera.api.admin.theme import (
@@ -30,6 +33,17 @@ DEFAULT_THEME = "Shop Default Theme"
 
 
 STARTER_LAYOUT_PAGES = ("index", "product", "products", "search", "page")
+
+
+def render_live_home_page(test_case):
+	"""Render `/` as a guest the way `localize_request` serves it in a real request."""
+	frappe.set_user("Guest")
+	frappe.local.form_dict = frappe._dict()
+	frappe.local.flags.home_page = "index"
+	test_case.addCleanup(frappe.local.flags.pop, "home_page", None)
+	# get_home_page() reads the before_request override only outside tests.
+	with patch.object(frappe, "in_test", False):
+		return get_response_content("/")
 
 
 class TestAdminTheme(IntegrationTestCase):
@@ -237,17 +251,10 @@ class TestThemeEditorPreview(IntegrationTestCase):
 	def test_the_published_preview_and_the_live_home_page_carry_no_markers(self):
 		self.render(layout=frappe.as_json(hero_layout("Draft caption")))
 
-		for html in (self.render(), self.render_live_home_page()):
+		for html in (self.render(), render_live_home_page(self)):
 			self.assertIn("theme-summer", html)
 			self.assertNotIn("data-commera-section", html)
 			self.assertNotIn("theme_editor_preview.js", html)
-
-	def render_live_home_page(self):
-		from frappe.website.serve import get_response_content
-
-		frappe.set_user("Guest")
-		frappe.local.form_dict = frappe._dict()
-		return get_response_content("/")
 
 	def test_blocks_get_escaped_editor_attributes_only_in_editor_mode(self):
 		theme_context = build_theme_context(SUMMER_THEME)
@@ -327,7 +334,7 @@ class TestThemeEditorGroupPreview(IntegrationTestCase):
 		self.assertIn("Draft announcement", html)
 		self.assertNotIn("Published announcement", html)
 		self.assertLess(html.index("Draft announcement"), html.index('data-commera-group="index"'))
-		for published_html in (self.render(), self.render_live_home_page()):
+		for published_html in (self.render(), render_live_home_page(self)):
 			self.assertIn("Published announcement", published_html)
 			self.assertNotIn("Draft announcement", published_html)
 
@@ -360,20 +367,13 @@ class TestThemeEditorGroupPreview(IntegrationTestCase):
 			self.render(header_group_layout=frappe.as_json(announcement_layout("Draft announcement"))),
 		)
 
-		for html in (self.render(), self.render_live_home_page()):
+		for html in (self.render(), render_live_home_page(self)):
 			self.assertIn("Published announcement", html)
 			self.assertNotIn("data-commera-group", html)
 			self.assertNotIn("data-commera-section", html)
 
 	def test_a_group_layout_that_is_not_an_object_with_sections_is_rejected(self):
 		self.assertRaises(frappe.ValidationError, self.render, footer_group_layout='{"sections": "footer"}')
-
-	def render_live_home_page(self):
-		from frappe.website.serve import get_response_content
-
-		frappe.set_user("Guest")
-		frappe.local.form_dict = frappe._dict()
-		return get_response_content("/")
 
 
 class TestThemeEditorLayoutPagePreview(ProductDetailPriceTestCase):

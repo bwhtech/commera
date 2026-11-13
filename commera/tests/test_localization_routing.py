@@ -121,8 +121,10 @@ class TestRootAndPrefixedRoutes(RoutingTestCase):
 
 	def test_the_home_page_is_the_storefront_for_staff_too(self):
 		frappe.set_user("Administrator")
-		self.assertServes("/", "index", "en")
-		self.assertServes("/ar", "index", "ar")
+		# get_home_page() reads the before_request override only outside tests.
+		with patch.object(frappe, "in_test", False):
+			self.assertServes("/", "index", "en")
+			self.assertServes("/ar", "index", "ar")
 
 	def test_a_prefix_is_a_whole_segment_only(self):
 		_endpoint, renderer = self.open("/archive", lang="fr")
@@ -257,20 +259,22 @@ def resolve_like_another_app(path):
 
 
 class TestEveryAppRoutesWithoutThePrefix(RoutingTestCase):
-	"""Frappe calls every website_path_resolver with the same path and keeps the last endpoint."""
+	"""localize_request strips the prefix and redirects before any website_path_resolver runs."""
 
 	def in_each_app_order(self):
-		commera = "commera.localization.routing.resolve_website_path"
-		other = f"{__name__}.resolve_like_another_app"
-		for resolvers in ([commera, other], [other, commera]):
+		for resolvers in ([], [f"{__name__}.resolve_like_another_app"]):
 			with self.subTest(resolvers=resolvers):
 				self.patch_hooks(website_path_resolver=resolvers)
 				yield
 
+	def test_commera_registers_no_path_resolver(self):
+		# Frappe keeps only the last app's resolver: Commera's would replace Builder's.
+		self.assertEqual(frappe.get_hooks("website_path_resolver", app_name="commera"), [])
+
 	def test_a_prefixed_page_is_routed_without_the_prefix(self):
 		for _order in self.in_each_app_order():
 			self.assertServes("/ar/products/blue-shirt", "/products/details.html", "ar")
-			self.assertEqual(PATHS_SEEN_BY_ANOTHER_APP[-1], "products/blue-shirt")
+		self.assertEqual(PATHS_SEEN_BY_ANOTHER_APP[-1], "products/blue-shirt")
 
 	def test_the_canonical_redirect_wins(self):
 		for _order in self.in_each_app_order():

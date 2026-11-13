@@ -10,6 +10,7 @@ from frappe.utils.number_format import NumberFormat
 import commera.sdk
 from commera.localization import Localization
 from commera.localization import formatter as formatter_module
+from commera.localization.cart_currency import CartCurrency
 from commera.localization.date_formats import DateFormats
 from commera.localization.formatter import DEFAULT_NUMBER_FORMAT, Formatter
 from commera.localization.languages import Language
@@ -48,6 +49,9 @@ class TestFormatterCases(IntegrationTestCase):
 			with (
 				self.subTest(**{key: case[key] for key in ("language", "rules", "currency", "amount")}),
 				patch.object(formatter_module, "get_money_precision", lambda c, r=rules: r[c]["precision"]),
+				patch.object(
+					formatter_module, "is_symbol_on_right", lambda c, r=rules: r[c]["symbol_on_right"]
+				),
 			):
 				formatter = self.formatter_for(case["language"])
 				self.assertEqual(
@@ -158,7 +162,8 @@ class TestFormatterSources(IntegrationTestCase):
 		with self.change_money_settings(use_number_format_from_currency=1, currency_precision="0"):
 			self.assertEqual(self.formatter.money(1234567.4, "INR"), f"{self.symbol}1,234,567")
 			self.assertEqual(
-				formatter_module.get_money_format("INR"), {"precision": 0, "fraction_precision": 2}
+				formatter_module.get_money_format("INR"),
+				{"precision": 0, "fraction_precision": 2, "symbol_on_right": False},
 			)
 
 	def test_config_sends_the_resolved_rules(self):
@@ -168,7 +173,10 @@ class TestFormatterSources(IntegrationTestCase):
 		):
 			config = Formatter(Language.from_code("de"), "#.###,##").as_config()
 		self.assertEqual(config["number_format"], "#.###,##")
-		self.assertEqual(config["money_formats"], {"INR": {"precision": 3, "fraction_precision": 2}})
+		self.assertEqual(
+			config["money_formats"],
+			{"INR": {"precision": 3, "fraction_precision": 2, "symbol_on_right": False}},
+		)
 		self.assertEqual(config["date_formats"], DateFormats.for_language("de").as_dict())
 
 	def test_language_number_format_comes_from_frappe(self):
@@ -210,3 +218,56 @@ def print_format_money(amount: float, currency: str) -> str:
 	digits = printed.removeprefix(f"{frappe.db.get_value('Currency', currency, 'symbol')} ")
 	sign, digits = ("-", digits[1:]) if digits.startswith("-") else ("", digits)
 	return f"{sign}{get_currency_symbol(currency)}{digits}"
+
+
+class TestCurrencySymbolSettings(IntegrationTestCase):
+	"""The Currency's symbol_on_right and Global Defaults' hide_currency_symbol, which fmt_money follows."""
+
+	def setUp(self):
+		self.english = Formatter(Language.from_code("en"), "#,###.##")
+		self.addCleanup(self.clear_caches)
+
+	def clear_caches(self):
+		frappe.db.value_cache.clear()
+		frappe.clear_document_cache("Currency", "USD")
+		frappe.clear_document_cache("Currency", "SAR")
+
+	def put_symbol_on_the_right(self, currency):
+		frappe.db.set_value("Currency", currency, "symbol_on_right", 1)
+		self.addCleanup(frappe.db.set_value, "Currency", currency, "symbol_on_right", 0)
+		self.clear_caches()
+
+	def hide_symbols(self):
+		before = frappe.defaults.get_global_default("hide_currency_symbol")
+		frappe.db.set_default("hide_currency_symbol", "Yes")
+		self.addCleanup(frappe.db.set_default, "hide_currency_symbol", before)
+
+	def test_a_symbol_on_the_right_follows_the_amount(self):
+		self.put_symbol_on_the_right("USD")
+
+		self.assertEqual(self.english.money(-1234.5, "USD"), "-1,234.50\u00a0$")
+		self.assertEqual(self.english.money_text(1234.5, "USD"), "1,234.50\u00a0$")
+		self.assertTrue(formatter_module.get_money_format("USD")["symbol_on_right"])
+		currency = CartCurrency.of({"currency": "USD"})
+		self.assertEqual((currency.symbol, currency.symbol_after), ("", "\u00a0$"))
+
+	def test_a_riyal_sign_stays_left_of_the_amount(self):
+		self.put_symbol_on_the_right("SAR")
+
+		self.assertTrue(self.english.money_text(1234.5, "SAR").startswith("\u20c1\u00a0"))
+		currency = CartCurrency.of({"currency": "SAR"})
+		self.assertEqual(currency.symbol_after, "")
+		self.assertIn("\u20c1", currency.symbol)
+
+	def test_hidden_symbols_leave_the_digits_only(self):
+		self.hide_symbols()
+
+		for code in ("en", "ar"):
+			formatter = Formatter(Language.from_code(code), "#,###.##")
+			for currency in ("USD", "SAR"):
+				with self.subTest(language=code, currency=currency):
+					self.assertEqual(formatter.money(1234.5, currency), "1,234.50")
+					self.assertEqual(formatter.money_text(-1234.5, currency), "-1,234.50")
+		currency = CartCurrency.of({"currency": "SAR"})
+		self.assertEqual((currency.symbol, currency.symbol_after, currency.is_sign), ("", "", False))
+		self.assertEqual(formatter_module.email_money(1234.5, "SAR"), "1,234.50")

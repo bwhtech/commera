@@ -143,6 +143,36 @@ def delete_removed_row_translations(doc, method=None):
 			frappe.db.delete(DOCTYPE, {"reference_doctype": table.options, "reference_name": ("in", removed)})
 
 
+def rename_translations(doc, method=None, old=None, new=None, merge=False):
+	"""Move translations in the rename transaction. A merge keeps the target's duplicate keys."""
+	if merge:
+		drop_merged_duplicates(doc.doctype, old, new)
+	move_translations(doc.doctype, old, new)
+
+
+def drop_merged_duplicates(doctype: str, old: str, new: str):
+	translation, target = DocType(DOCTYPE), DocType(DOCTYPE).as_("target")
+	duplicates = (
+		frappe.qb.from_(translation)
+		.join(target)
+		.on(
+			(target.reference_doctype == translation.reference_doctype)
+			& (target.reference_field == translation.reference_field)
+			& (target.language == translation.language)
+			& (target.market == translation.market)
+		)
+		.select(translation.name)
+		.where(
+			(translation.reference_doctype == doctype)
+			& (translation.reference_name == old)
+			& (target.reference_name == new)
+		)
+		.run(pluck=True)
+	)
+	if duplicates:
+		frappe.db.delete(DOCTYPE, {"name": ("in", duplicates)})
+
+
 def move_translations(doctype: str, old_name: str, new_name: str):
 	"""Point a record's translations at its copy, as when a child row moves to another parent."""
 	frappe.db.set_value(

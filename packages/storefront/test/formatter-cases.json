@@ -40,119 +40,211 @@
 		"currency_format_on": {
 			"USD": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"EUR": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"INR": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"SAR": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"AED": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"JPY": {
 				"precision": 0,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"KWD": {
 				"precision": 3,
-				"fraction_precision": 3
+				"fraction_precision": 3,
+				"symbol_on_right": false
 			},
 			"BHD": {
 				"precision": 3,
-				"fraction_precision": 3
+				"fraction_precision": 3,
+				"symbol_on_right": false
 			},
 			"XTS": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			}
 		},
 		"currency_format_off": {
 			"USD": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"EUR": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"INR": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"SAR": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"AED": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"JPY": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"KWD": {
 				"precision": 2,
-				"fraction_precision": 3
+				"fraction_precision": 3,
+				"symbol_on_right": false
 			},
 			"BHD": {
 				"precision": 2,
-				"fraction_precision": 3
+				"fraction_precision": 3,
+				"symbol_on_right": false
 			},
 			"XTS": {
 				"precision": 2,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			}
 		},
 		"currency_precision_4": {
 			"USD": {
 				"precision": 4,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"EUR": {
 				"precision": 4,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"INR": {
 				"precision": 4,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"SAR": {
 				"precision": 4,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"AED": {
 				"precision": 4,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"JPY": {
 				"precision": 4,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
 			},
 			"KWD": {
 				"precision": 4,
-				"fraction_precision": 3
+				"fraction_precision": 3,
+				"symbol_on_right": false
 			},
 			"BHD": {
 				"precision": 4,
-				"fraction_precision": 3
+				"fraction_precision": 3,
+				"symbol_on_right": false
 			},
 			"XTS": {
 				"precision": 4,
-				"fraction_precision": 2
+				"fraction_precision": 2,
+				"symbol_on_right": false
+			}
+		},
+		"symbol_on_right": {
+			"USD": {
+				"precision": 2,
+				"fraction_precision": 2,
+				"symbol_on_right": true
+			},
+			"SAR": {
+				"precision": 2,
+				"fraction_precision": 2,
+				"symbol_on_right": true
+			},
+			"XTS": {
+				"precision": 2,
+				"fraction_precision": 2,
+				"symbol_on_right": true
 			}
 		}
 	},
 	"money": [
+		{
+			"language": "en",
+			"rules": "symbol_on_right",
+			"currency": "USD",
+			"amount": 1234.5,
+			"precision": null,
+			"expected": "1,234.50\u00a0$"
+		},
+		{
+			"language": "en",
+			"rules": "symbol_on_right",
+			"currency": "USD",
+			"amount": -1234.5,
+			"precision": null,
+			"expected": "-1,234.50\u00a0$"
+		},
+		{
+			"language": "de",
+			"rules": "symbol_on_right",
+			"currency": "USD",
+			"amount": 1234.5,
+			"precision": null,
+			"expected": "1.234,50\u00a0$"
+		},
+		{
+			"language": "ar",
+			"rules": "symbol_on_right",
+			"currency": "USD",
+			"amount": 1234.5,
+			"precision": null,
+			"expected": "1,234.50\u00a0$"
+		},
+		{
+			"language": "en",
+			"rules": "symbol_on_right",
+			"currency": "XTS",
+			"amount": 5,
+			"precision": null,
+			"expected": "5.00\u00a0XTS"
+		},
+		{
+			"language": "en",
+			"rules": "symbol_on_right",
+			"currency": "SAR",
+			"amount": -1234.5,
+			"precision": null,
+			"expected": "<bdi dir=\"ltr\"><span class=\"currency-sign\" role=\"img\" aria-label=\"SAR\">\u20c1</span>\u00a0\u22121,234.50</bdi>"
+		},
 		{
 			"language": "en",
 			"rules": "currency_format_on",

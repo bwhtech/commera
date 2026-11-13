@@ -49,10 +49,10 @@
   },
   {
    "fieldname": "reference_name",
-   "fieldtype": "Dynamic Link",
+   "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Reference Name",
-   "options": "reference_doctype",
+   "description": "Renames and merges move translations after duplicate keys are resolved.",
    "reqd": 1
   },
   {
@@ -87,7 +87,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-12 12:00:00.000000",
+ "modified": "2026-11-12 23:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Content Translation",
