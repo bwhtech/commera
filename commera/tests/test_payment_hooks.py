@@ -11,8 +11,9 @@ from bwh_payments.bwh_payments.doctype.gateway_payment_request.test_gateway_paym
 )
 from bwh_payments.services.stripe.stub import StubStripeClient
 from frappe.tests import IntegrationTestCase
+from frappe.translate import print_language
 from frappe.utils import add_to_date, get_year_ending, get_year_start, getdate, now_datetime
-from frappe.utils.data import flt
+from frappe.utils.data import flt, money_in_words
 
 from commera.api.orders import cancel_order
 from commera.api.payment_hooks import on_payment_request_update
@@ -25,6 +26,7 @@ from commera.api.payments import (
 	validate_cart_is_not_in_checkout,
 	validate_invoice_currency,
 )
+from commera.api.shipping import get_charge_amount, get_order_charge_lines
 from commera.jobs import delete_old_draft_quotations, sync_pending_gateway_payments
 from commera.plugin_events import (
 	PLUGINS_USER,
@@ -37,6 +39,7 @@ from commera.plugin_events import (
 	sweep_missed_cod_payments,
 )
 from commera.sdk.events import CommeraEvent
+from commera.tests.test_admin_orders import make_shipping_rule
 
 COMPANY = "Lifestyle Demo"
 ITEM_GROUP = "Interior Accessories"
@@ -46,6 +49,7 @@ FOREIGN_CURRENCY = "USD"
 # A price list in the company currency keeps the fixture off the Currency Exchange table.
 PRICE_LIST = "ZZ Payhook SAR Selling"
 ITEM_RATE = 150.0
+SHIPPING_AMOUNT = 25.0
 
 
 CANCEL_REFUSAL = "Printful is already producing this order."
@@ -765,6 +769,211 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.create_abandoned_payment_request(self.quotation)
 
 		self.assertEqual(get_open_gateway_payment_request(self.quotation.name), paid_request.name)
+
+	def address_in_checkout(self, quotation):
+		address = frappe.get_doc(
+			{
+				"doctype": "Address",
+				"address_title": self.customer,
+				"address_type": "Shipping",
+				"address_line1": "1 Olaya Street",
+				"city": "Riyadh",
+				"country": "Saudi Arabia",
+				"links": [{"link_doctype": "Customer", "link_name": self.customer}],
+			}
+		).insert(ignore_permissions=True)
+		quotation.db_set({"customer_address": address.name, "shipping_address_name": address.name})
+		return address
+
+	def test_an_address_save_does_not_call_the_gateway(self):
+		quotation = self.create_cart_quotation()
+		address = self.address_in_checkout(quotation)
+		payment_request = self.create_abandoned_payment_request(quotation)
+		with patch.object(type(payment_request), "release_if_unpaid") as release:
+			address.country = "Germany"
+			address.links = []
+			address.save(ignore_permissions=True)
+			release.assert_not_called()
+		self.assertEqual(payment_request.reload().status, "Pending")
+
+	def test_a_failed_address_save_keeps_the_gateway_session_open(self):
+		quotation = self.create_cart_quotation()
+		address = self.address_in_checkout(quotation)
+		payment_request = self.create_abandoned_payment_request(quotation)
+		address.country = ""
+		with self.assertRaises(frappe.MandatoryError):
+			address.save(ignore_permissions=True)
+		self.assertEqual(StubStripeClient.sessions[payment_request.order_ref].status, "open")
+		self.assertEqual(payment_request.reload().status, "Pending")
+
+	def test_a_desk_sales_quotation_renders_the_current_address(self):
+		quotation = self.create_cart_quotation()
+		quotation.db_set("order_type", "Sales")
+		address = self.address_in_checkout(quotation)
+		self.create_pending_payment_request(quotation)
+		address.city = "Dammam"
+		address.save(ignore_permissions=True)
+
+		quotation.reload().save(ignore_permissions=True)
+
+		self.assertIn("Dammam", quotation.address_display)
+		self.assertEqual(quotation.customer_address, address.name)
+
+	# -- paid checkout ----------------------------------------------------------------------------
+
+	def checkout_with_shipping(self):
+		"""The cart as checkout start saves it: rendered address text and a 25 shipping charge."""
+		address = self.address_in_checkout(self.quotation)
+		rule = make_shipping_rule(SHIPPING_AMOUNT)
+		rule.append("countries", {"country": "Saudi Arabia"})
+		rule.save()
+		quotation = frappe.get_doc("Quotation", self.quotation.name)
+		quotation.shipping_rule = rule.name
+		quotation.flags.ignore_permissions = True
+		quotation.save()
+		self.payment_request.db_set("amount", get_charge_amount(quotation))
+		return quotation, address, rule
+
+	def place_paid_cart(self, quotation):
+		on_payment_request_update(self.payment_request.reload())
+		sales_order = frappe.get_doc("Sales Order", self.submitted_sales_orders()[0])
+		sales_invoice = frappe.get_doc("Sales Invoice", self.submitted_sales_invoices(sales_order.name)[0])
+		self.assertEqual(
+			(sales_order.grand_total, sales_order.address_display, sales_order.shipping_address),
+			(quotation.grand_total, quotation.address_display, quotation.shipping_address),
+		)
+		self.assertEqual(sales_invoice.address_display, quotation.address_display)
+		self.assertEqual(
+			get_order_charge_lines(sales_order.name, sales_order.shipping_rule)["shipping"], SHIPPING_AMOUNT
+		)
+		return sales_order, sales_invoice
+
+	def get_notes(self, sales_order):
+		filters = {"reference_doctype": "Sales Order", "reference_name": sales_order.name}
+		return frappe.get_all("Comment", {**filters, "comment_type": "Comment"}, pluck="content")
+
+	def assert_links(self, address, *documents):
+		for document in documents:
+			self.assertEqual((document.customer_address, document.shipping_address_name), (address, address))
+
+	def test_a_paid_order_keeps_its_address_links_and_shipping_rule(self):
+		quotation, address, rule = self.checkout_with_shipping()
+
+		sales_order, sales_invoice = self.place_paid_cart(quotation)
+
+		self.assert_links(address.name, sales_order, sales_invoice)
+		self.assertEqual((sales_order.shipping_rule, sales_invoice.shipping_rule), (rule.name, rule.name))
+		self.assertEqual(self.get_notes(sales_order), [])
+
+	def test_a_paid_order_survives_an_address_edit_and_unlink_after_capture(self):
+		quotation, address, rule = self.checkout_with_shipping()
+		address.country = "Germany"
+		address.links = []
+		address.save(ignore_permissions=True)
+
+		sales_order, sales_invoice = self.place_paid_cart(quotation)
+
+		# ERPNext refuses an address of another party, so only the accepted text stays.
+		self.assert_links(None, sales_order, sales_invoice)
+		self.assertFalse(sales_order.shipping_rule)
+		[note] = self.get_notes(sales_order)
+		self.assertIn(f"Address {address.name} was edited", note)
+		self.assertIn(
+			f"This order has no address link because Address {address.name} is no longer linked", note
+		)
+		self.assertIn("Set the delivery address on the Delivery Note", note)
+		self.assertIn(f"Shipping Rule {rule.name} was not applied again", note)
+
+	def test_a_paid_order_keeps_the_links_of_an_address_edited_after_capture(self):
+		quotation, address, rule = self.checkout_with_shipping()
+		address.country = "Germany"
+		address.save(ignore_permissions=True)
+
+		sales_order, sales_invoice = self.place_paid_cart(quotation)
+
+		self.assert_links(address.name, sales_order, sales_invoice)
+		self.assertFalse(sales_order.shipping_rule)
+		[note] = self.get_notes(sales_order)
+		self.assertIn(f"Address {address.name} was edited", note)
+		self.assertIn(f"Shipping Rule {rule.name} no longer covers Germany", note)
+
+	def test_a_paid_order_keeps_the_accepted_charge_when_the_rule_drops_the_country(self):
+		quotation, address, rule = self.checkout_with_shipping()
+		rule.set("countries", [{"country": "Germany"}])
+		rule.save()
+
+		sales_order, sales_invoice = self.place_paid_cart(quotation)
+
+		self.assert_links(address.name, sales_order, sales_invoice)
+		self.assertFalse(sales_order.shipping_rule)
+		self.assertEqual(
+			self.get_notes(sales_order),
+			[
+				"Placed as paid with the accepted addresses and totals. Check delivery: "
+				f"Shipping Rule {rule.name} no longer covers Saudi Arabia."
+			],
+		)
+
+	def test_a_paid_order_keeps_the_accepted_charge_when_the_rule_reprices(self):
+		quotation, address, rule = self.checkout_with_shipping()
+		rule.conditions[0].shipping_amount = 40
+		rule.save()
+
+		sales_order, _sales_invoice = self.place_paid_cart(quotation)
+
+		self.assertFalse(sales_order.shipping_rule)
+		self.assertIn("now charges a different amount", self.get_notes(sales_order)[0])
+
+	def test_a_paid_order_is_placed_when_its_address_was_deleted(self):
+		quotation, address, _rule = self.checkout_with_shipping()
+		frappe.db.delete("Dynamic Link", {"parenttype": "Address", "parent": address.name})
+		frappe.db.delete("Address", address.name)
+
+		sales_order, _sales_invoice = self.place_paid_cart(quotation)
+
+		self.assertEqual((sales_order.customer_address, sales_order.shipping_address_name), (None, None))
+		self.assertIn(
+			f"This order has no address link because Address {address.name} was deleted",
+			self.get_notes(sales_order)[0],
+		)
+
+	def test_a_paid_order_is_placed_when_the_shipping_rule_check_fails(self):
+		quotation, address, rule = self.checkout_with_shipping()
+
+		with patch.object(type(rule), "apply", side_effect=RuntimeError("rule")):
+			sales_order, _sales_invoice = self.place_paid_cart(quotation)
+
+		self.assert_links(address.name, sales_order)
+		self.assertFalse(sales_order.shipping_rule)
+		self.assertIn(f"Shipping Rule {rule.name} could not be checked", self.get_notes(sales_order)[0])
+
+	def test_a_failed_change_note_does_not_undo_a_paid_order(self):
+		quotation, address, _rule = self.checkout_with_shipping()
+		address.city = "Dammam"
+		address.save(ignore_permissions=True)
+
+		with patch("commera.paid_checkout.escape_html", side_effect=RuntimeError("note")):
+			sales_order, _sales_invoice = self.place_paid_cart(quotation)
+
+		self.assertEqual(sales_order.docstatus, 1)
+
+	def test_a_paid_order_is_placed_in_the_language_of_its_cart(self):
+		self.quotation.db_set("language", "ar")
+		link_languages = []
+		system_language = frappe.local.lang
+
+		with patch(
+			"commera.jobs.get_order_link", side_effect=lambda doc: link_languages.append(frappe.local.lang)
+		):
+			on_payment_request_update(self.payment_request)
+
+		sales_order = frappe.get_doc("Sales Order", self.submitted_sales_orders()[0])
+		with print_language("ar"):
+			arabic_words = money_in_words(sales_order.rounded_total, sales_order.currency)
+		self.assertNotEqual(arabic_words, money_in_words(sales_order.rounded_total, sales_order.currency))
+		self.assertEqual(sales_order.in_words, arabic_words)
+		self.assertEqual(link_languages, ["ar"])
+		self.assertEqual(frappe.local.lang, system_language)
 
 	# -- pending payment sweep --------------------------------------------------------------------
 

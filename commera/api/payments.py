@@ -9,6 +9,7 @@ from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_ent
 from erpnext.accounts.general_ledger import get_debit_credit_allowance
 from frappe import _
 from frappe.rate_limiter import rate_limit
+from frappe.translate import print_language
 from frappe.utils import getdate, validate_email_address
 from frappe.utils.data import cint, cstr, flt, fmt_money, sha256_hash
 
@@ -70,6 +71,7 @@ from commera.localization import url
 from commera.localization.address_countries import AddressCountries
 from commera.localization.market_prices import MarketPrices
 from commera.order_access import get_order_link, set_order_access_key
+from commera.paid_checkout import keep_accepted_addresses, keep_accepted_checkout, note_checkout_changes
 from commera.plugin_events import fire_event, get_plugin_fieldnames
 from commera.utils import (
 	get_charge_account_head,
@@ -542,15 +544,22 @@ def get_order_shopper(quotation) -> str | None:
 
 
 def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
-	"""Submit the cart and bill it. Called once per payment; the Quotation docstatus enforces that."""
-	validate_persisted_address_countries(quotation)
+	"""The webhook uses the system language. Keep the cart language for amounts in words and email links."""
+	with print_language(quotation.language):
+		return place_paid_order(quotation, payment_mode, gateway_amount, gateway_reference)
+
+
+def place_paid_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
+	# No address check: checkout start checked it, and the payment is captured now. A change since gets a note.
 	shopper = get_order_shopper(quotation)
 	with system_user_session(), skip_auto_item_price():
+		changes = keep_accepted_checkout(quotation)
 		fix_payment_schedule_dates(quotation)
 		quotation.flags.ignore_permissions = True
 		quotation.submit()
 
 		sales_order = _make_sales_order(quotation.name, ignore_permissions=True)
+		keep_accepted_addresses(sales_order, quotation)
 		sales_order.custom_ecommerce_payment_mode = payment_mode
 		copy_delivery_option_to_order(quotation.name, sales_order)
 		set_delivery_date(sales_order)
@@ -561,6 +570,7 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 		set_order_access_key(sales_order)
 		sales_order.submit()
 		note_withdrawn_lines(sales_order, quotation)
+		note_checkout_changes(sales_order, changes)
 
 		# A cart discounted to nothing is settled at placement, so it is billed and paid like a charged one.
 		paid = flt(gateway_amount) > 0 or flt(sales_order.grand_total) <= 0
@@ -579,6 +589,7 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 
 def create_sales_invoice(sales_order, payment_mode: str, paid_amount: float, reference_no: str | None):
 	sales_invoice = make_sales_invoice(sales_order.name, ignore_permissions=True)
+	keep_accepted_addresses(sales_invoice, sales_order)
 	sales_invoice.flags.ignore_permissions = True
 	sales_invoice.insert()
 	sales_invoice.submit()

@@ -2368,6 +2368,7 @@ Order {0} is priced in {1} but the payment was collected in {2}. The order has n
 Paid Currency Does Not Match The Order,عملة الدفع لا تطابق عملة الطلب
 Card payments in {0} are not available for this store yet. Choose another payment method or contact the store.,الدفع بالبطاقة بعملة {0} غير متاح لهذا المتجر بعد. اختر طريقة دفع أخرى أو تواصل مع المتجر.
 Set an Exchange Gain / Loss Account or Round Off Account for {0},حدد حساب أرباح أو خسائر الصرف أو حساب التقريب لشركة {0}
+"This order has no address link because {0}. Set the delivery address on the Delivery Note; the accepted address is in the order's address text","لا يحتوي هذا الطلب على رابط عنوان لأن {0}. حدّد عنوان التسليم في إشعار التسليم؛ العنوان المقبول موجود في نص عنوان الطلب"
 No such import.,لا توجد عملية استيراد بهذا المعرّف.
 The import stopped.,توقف الاستيراد.
 The import stopped before it finished. Please try again.,توقف الاستيراد قبل أن يكتمل. يُرجى المحاولة مرة أخرى.
