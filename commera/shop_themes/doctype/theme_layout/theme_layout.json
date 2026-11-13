@@ -42,7 +42,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-10-26 12:00:00.000000",
+ "modified": "2026-11-12 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Shop Themes",
  "name": "Theme Layout",
@@ -61,6 +61,13 @@
    "delete": 1,
    "read": 1,
    "role": "Website Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "export": 1,
+   "read": 1,
+   "role": "Commera Admin",
    "write": 1
   }
  ],

@@ -3,6 +3,7 @@ from unittest.mock import patch
 import frappe
 from frappe.apps import get_default_path
 from frappe.core.doctype.user_permission.test_user_permission import create_user
+from frappe.permissions import setup_custom_perms
 from frappe.tests import IntegrationTestCase
 from frappe.utils import set_request
 from frappe.website.serve import get_response
@@ -13,6 +14,7 @@ from commera.roles import (
 	ADMIN_PERMISSIONS,
 	COMMERA_ADMIN,
 	COMMERA_USER,
+	add_admin_permission,
 	add_commera_roles,
 	save_commera_default_app,
 )
@@ -33,6 +35,7 @@ GRANTED_USER = "roles-granted-user@example.com"
 LANDING_PICKER = "roles-landing-picker@example.com"
 LANDING_ADMIN = "roles-landing-admin@example.com"
 TRANSLATION_ROW = {"parent": "Content Translation", "role": COMMERA_ADMIN, "permlevel": 0}
+ITEM_ROW = {"parent": "Item", "role": COMMERA_ADMIN, "permlevel": 0}
 
 
 def get_other_role_rows(doctype):
@@ -43,6 +46,12 @@ def get_other_role_rows(doctype):
 		order_by="role, permlevel",
 	)
 	return [dict(row) for row in rows]
+
+
+def customize_permissions(doctype):
+	"""Custom DocPerm rows with a Commera Admin row, as a merchant's Role Permission Manager edit leaves."""
+	setup_custom_perms(doctype)
+	add_admin_permission(doctype, ("read",))
 
 
 def make_website_user(email: str, *roles: str):
@@ -100,28 +109,27 @@ class TestCommeraRoles(IntegrationTestCase):
 	def test_adding_the_roles_twice_changes_nothing(self):
 		add_commera_roles()
 		roles = frappe.get_all("Role", filters={"name": ["in", [COMMERA_ADMIN, COMMERA_USER]]}, pluck="name")
-		permissions = frappe.get_all("Custom DocPerm", filters={"role": COMMERA_ADMIN}, fields=["parent"])
+		admin_rows = {"role": COMMERA_ADMIN, "parent": ["in", list(ADMIN_PERMISSIONS)]}
+		permissions = frappe.get_all("Custom DocPerm", filters=admin_rows, fields=["parent"])
 
 		add_commera_roles()
 
 		self.assertCountEqual(roles, [COMMERA_ADMIN, COMMERA_USER])
-		self.assertEqual(
-			frappe.get_all("Custom DocPerm", filters={"role": COMMERA_ADMIN}, fields=["parent"]), permissions
-		)
+		self.assertEqual(frappe.get_all("Custom DocPerm", filters=admin_rows, fields=["parent"]), permissions)
 		self.assertCountEqual([row.parent for row in permissions], ADMIN_PERMISSIONS)
 
 	def test_a_migrate_never_grants_back_a_revoked_right(self):
 		self.addCleanup(frappe.db.rollback)
 		add_commera_roles()
-		frappe.db.set_value("Custom DocPerm", TRANSLATION_ROW, "delete", 0)
+		frappe.db.set_value("Custom DocPerm", ITEM_ROW, "delete", 0)
 
 		add_commera_roles()
 
-		self.assertEqual(frappe.db.get_value("Custom DocPerm", TRANSLATION_ROW, ["read", "delete"]), (1, 0))
+		self.assertEqual(frappe.db.get_value("Custom DocPerm", ITEM_ROW, ["read", "delete"]), (1, 0))
 
 	def test_the_translation_rights_patch_sets_only_the_missing_rights(self):
 		self.addCleanup(frappe.db.rollback)
-		add_commera_roles()
+		customize_permissions("Content Translation")
 		frappe.db.set_value("Custom DocPerm", TRANSLATION_ROW, {"delete": 0, "export": 1, "if_owner": 1})
 		other_roles = get_other_role_rows("Content Translation")
 
@@ -135,7 +143,7 @@ class TestCommeraRoles(IntegrationTestCase):
 
 	def test_the_translation_rights_patch_adds_a_missing_row(self):
 		self.addCleanup(frappe.db.rollback)
-		add_commera_roles()
+		customize_permissions("Theme Layout")
 		frappe.db.delete("Custom DocPerm", {"parent": "Theme Layout", "role": COMMERA_ADMIN})
 
 		grant_commera_admin_translation_rights.execute()
@@ -144,16 +152,15 @@ class TestCommeraRoles(IntegrationTestCase):
 		rights = frappe.db.get_value("Custom DocPerm", key, ["read", "write", "create", "delete"])
 		self.assertEqual(rights, (1, 1, 1, 0))
 
-	def test_a_commera_admin_manages_translations_and_theme_text(self):
-		add_commera_roles()
-		create_user(GRANTED_ADMIN, COMMERA_ADMIN)
-		for doctype, rights in (
-			("Content Translation", ("read", "write", "create", "delete")),
-			("Theme Layout", ("read", "write", "create")),
-		):
-			for right in rights:
-				with self.subTest(doctype=doctype, right=right):
-					self.assertTrue(frappe.has_permission(doctype, right, user=GRANTED_ADMIN))
+	def test_the_translation_rights_patch_leaves_json_permissions_alone(self):
+		self.addCleanup(frappe.db.rollback)
+		frappe.db.delete("Custom DocPerm", {"parent": ["in", ["Content Translation", "Theme Layout"]]})
+
+		grant_commera_admin_translation_rights.execute()
+
+		self.assertFalse(
+			frappe.db.exists("Custom DocPerm", {"parent": ["in", ["Content Translation", "Theme Layout"]]})
+		)
 
 	def test_a_commera_admin_can_write_items(self):
 		add_commera_roles()
