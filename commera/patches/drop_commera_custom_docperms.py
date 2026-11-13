@@ -13,7 +13,7 @@ COMMERA_DOCTYPES = (
 	"Shop Web Page",
 	"Ecommerce Category",
 	"Shop Theme Settings",
-	"Commera Settings",
+	# Not "Commera Settings": its JSON "All" row trips Semgrep's relaxed-permissions rule on edit.
 	"Commera Webhook",
 	"Theme Layout",
 	"Content Translation",

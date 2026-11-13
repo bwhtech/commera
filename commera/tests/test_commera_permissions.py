@@ -1,5 +1,5 @@
-"""Commera's own doctypes grant their roles in the doctype JSON. Custom DocPerm is for other apps'
-doctypes only, because its rows replace all of a doctype's own DocPerm rows."""
+"""Commera's own doctypes, except Commera Settings, grant their roles in the doctype JSON. Custom DocPerm
+rows replace all of a doctype's own DocPerm rows."""
 
 import frappe
 from frappe.core.doctype.user_permission.test_user_permission import create_user
@@ -57,6 +57,11 @@ class TestCommeraAdminRights(PermissionsTestCase):
 		with self.set_user(COMMERA_ADMIN_USER):
 			self.assertIsInstance(frappe.get_list("Commera Market", pluck="name"), list)
 
+	def test_a_commera_admin_reads_commera_settings(self):
+		add_commera_roles()
+
+		self.assert_rights("Commera Settings", ("read",))
+
 	def test_a_commera_admin_manages_translations_and_theme_text(self):
 		for doctype, rights in (("Content Translation", RIGHTS), ("Theme Layout", RIGHTS[:3])):
 			frappe.db.delete("Custom DocPerm", {"parent": doctype})
@@ -70,9 +75,9 @@ class TestCommeraAdminRights(PermissionsTestCase):
 
 
 class TestCommeraCustomDocPerm(PermissionsTestCase):
-	def test_admin_permissions_name_only_other_apps_doctypes(self):
+	def test_admin_permissions_name_commera_settings_as_the_only_commera_doctype(self):
 		commera_doctypes = [doctype for doctype in ADMIN_PERMISSIONS if get_app(doctype) == "commera"]
-		self.assertEqual(commera_doctypes, [])
+		self.assertEqual(commera_doctypes, ["Commera Settings"])
 
 	def test_adding_the_roles_leaves_commera_doctypes_without_custom_docperm(self):
 		frappe.db.delete("Custom DocPerm", {"parent": ["in", drop_commera_custom_docperms.COMMERA_DOCTYPES]})
@@ -96,6 +101,16 @@ class TestCommeraCustomDocPerm(PermissionsTestCase):
 				self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": doctype}))
 				roles = {row.role for row in frappe.get_meta(doctype).permissions}
 				self.assertIn(COMMERA_ADMIN, roles)
+
+	def test_the_patch_keeps_commera_settings_rows(self):
+		frappe.db.delete("Custom DocPerm", {"parent": "Commera Settings"})
+		setup_custom_perms("Commera Settings")
+		rows = get_custom_rows("Commera Settings")
+
+		drop_commera_custom_docperms.execute()
+
+		self.assertTrue(rows)
+		self.assertEqual(get_custom_rows("Commera Settings"), rows)
 
 	def test_the_patch_keeps_rows_a_merchant_changed(self):
 		self.copy_permissions_as_commera_did("Content Translation")

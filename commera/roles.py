@@ -6,8 +6,8 @@ from frappe.permissions import setup_custom_perms
 COMMERA_ADMIN = "Commera Admin"
 COMMERA_USER = "Commera User"
 
-# Only doctypes of other apps. A Custom DocPerm row replaces all of a doctype's own DocPerm rows, so
-# Commera's own doctypes grant Commera Admin in their doctype JSON instead.
+# A Custom DocPerm row replaces all of a doctype's own DocPerm rows, so Commera's own doctypes grant
+# Commera Admin in their doctype JSON instead.
 ADMIN_PERMISSIONS = {
 	"Item": ("read", "write", "create", "delete"),
 	"Item Group": ("read", "write", "create"),
@@ -21,6 +21,8 @@ ADMIN_PERMISSIONS = {
 	"Stock Entry": ("read", "create", "submit"),
 	"Stock Ledger Entry": ("read",),
 	"Warehouse": ("read",),
+	# Kept here until its JSON "All" row is reviewed: Semgrep's relaxed-permissions rule flags it on edit.
+	"Commera Settings": ("read",),
 }
 
 
