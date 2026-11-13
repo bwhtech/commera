@@ -460,14 +460,16 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.assertFalse(payment.deductions)
 
 	def test_foreign_overpayments_remain_customer_advances(self):
-		for extra, receipt, advance in ((0.01, 11.63, 0.05), (1, 15.34, 3.76)):
+		for extra in (0.01, 1):
 			with self.subTest(extra=extra):
 				invoice = self.create_fractional_invoice(1.03, 1)
-				payment = create_payment_entry(invoice, GATEWAY, flt(invoice.grand_total + extra, 2), None)
+				charged = flt(invoice.grand_total + extra, 2)
+				payment = create_payment_entry(invoice, GATEWAY, charged, None)
 				invoice.reload()
+				receipt = flt(charged * 3.75, 2)
 				self.assertEqual((invoice.status, invoice.outstanding_amount), ("Paid", 0))
 				self.assertEqual(payment.received_amount, receipt)
-				self.assertEqual(payment.unallocated_amount, advance)
+				self.assertEqual(payment.unallocated_amount, flt(receipt - 11.58, 2))
 				self.assertEqual(payment.references[0].allocated_amount, 11.58)
 				self.assertFalse(payment.deductions)
 				self.assertEqual(payment.difference_amount, 0)
