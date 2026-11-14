@@ -189,6 +189,19 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		self.assertIn("data-commera-add-to-cart", detail)
 		self.assertIn("commera:cart-added", detail)
 
+	def test_agent_context_builds_every_theme_page_with_their_keys(self):
+		home = get_agent_context(self.pages[HOME])
+		self.assertIn("build all three pages in this turn unless they say to build fewer", home)
+		self.assertIn(f"Keys of the {PRODUCT_LISTING} page (page id {self.pages[PRODUCT_LISTING]})", home)
+		self.assertIn(f"Keys of the {PRODUCT_DETAIL} page (page id {self.pages[PRODUCT_DETAIL]})", home)
+		self.assertIn("sort_options", home)
+		self.assertIn("related_products", home)
+		self.assertNotIn(f"Keys of the {HOME} page", home)
+
+		detail = get_agent_context(self.pages[PRODUCT_DETAIL])
+		self.assertIn(f"Keys of the {HOME} page (page id {self.pages[HOME]})", detail)
+		self.assertNotIn(f"Keys of the {PRODUCT_DETAIL} page", detail)
+
 	def test_theme_bar_lists_the_pages_and_preview_choices(self):
 		bar = get_theme_bar(self.pages[PRODUCT_DETAIL])
 		self.assertEqual(bar["theme"], THEME)

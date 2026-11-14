@@ -81,6 +81,19 @@ lives in the browser, so render it from a page JavaScript script, not from bindi
 - Build it once, on the Home page, as one shared script (and the drawer's markup in the header component); on
   the other pages attach_page_script the same script so every page shares it."""
 
+THEME_BUILD = """\
+Building the theme: when the user asks to build, design or redesign the theme or the storefront, not only
+this page, build all three pages in this turn unless they say to build fewer. The pages already exist: never
+create_page for them.
+- Build this page first and make its header and footer components (extract_component).
+- Then build each other theme page from here: read_page it by its page id, then one edit_page with that id
+  as `page` that adds all its sections to its root, the header first and the footer last as
+  `div use(<component id>)`, bound to that page's keys below.
+- Those edits wait for the user's OK on the card at the end of your turn: your reply names the pages you
+  prepared and says they land once confirmed.
+- A page's scripts change only from that page: when another page needs one (the cart drawer's), tell the
+  user to open it and ask there."""
+
 RULES = """\
 Rules:
 - The data is already on the page: bind to these keys. Never write a page data script, create DocTypes, seed
@@ -108,6 +121,7 @@ def get_agent_context(page_id: str) -> str | None:
 			get_role_text(role, pages),
 			DATA_INTRO + COMMON_KEYS + "\n" + PAGE_KEYS[role.page_type],
 			"A trimmed sample of this page's real data:\n" + get_sample(role.page_type),
+			THEME_BUILD + "\n" + get_other_page_keys(role.page_type, pages),
 			BEHAVIOURS,
 			CART_DRAWER,
 			RULES.format(prefix=frappe.scrub(role.theme).replace("_", "-")),
@@ -128,8 +142,16 @@ def get_role_text(role, pages: dict) -> str:
 			" and footer components (extract_component) so the other pages embed them instead of copying them."
 		)
 	return text + (
-		f" Match the theme's Home page ({pages.get(HOME)}): read_page it first, reuse its design tokens and its "
-		"header and footer components, and match it instead of asking design questions."
+		f" Match the theme's Home page ({pages.get(HOME)}) once it is built: read_page it first, reuse its design "
+		"tokens and its header and footer components, and match it instead of asking design questions."
+	)
+
+
+def get_other_page_keys(page_type: str, pages: dict) -> str:
+	return "\n".join(
+		f"Keys of the {other} page (page id {name}), besides shop, menu and footer:\n{PAGE_KEYS[other]}"
+		for other, name in pages.items()
+		if other != page_type
 	)
 
 
