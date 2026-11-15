@@ -1,8 +1,11 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.model.base_document import get_controller
 from frappe.tests import IntegrationTestCase
 
 from commera.payment_gateways import connectors
+from commera.plugins.providers import ProviderNotRegisteredError
 
 GATEWAY_SETTINGS = [
 	"Razorpay Gateway Settings",
@@ -13,6 +16,9 @@ GATEWAY_SETTINGS = [
 
 
 class TestPaymentConnectors(IntegrationTestCase):
+	def test_commera_offers_its_four_gateways(self):
+		self.assertEqual(connectors.get_connector_doctypes(), GATEWAY_SETTINGS)
+
 	def test_each_single_declares_every_field_its_connector_reads(self):
 		for doctype in GATEWAY_SETTINGS:
 			missing = [
@@ -21,6 +27,23 @@ class TestPaymentConnectors(IntegrationTestCase):
 				if not frappe.get_meta(doctype).has_field(field)
 			]
 			self.assertEqual(missing, [], doctype)
+
+	def test_a_registered_doctype_that_is_not_a_gateway_stops_the_migrate(self):
+		get_hooks = frappe.get_hooks
+
+		def get_hooks_with(hook=None, *args, **kwargs):
+			if hook == "commera_hooks":
+				return {
+					**get_hooks(hook, *args, **kwargs),
+					connectors.KIND: [*GATEWAY_SETTINGS, "Commera Settings"],
+				}
+			return get_hooks(hook, *args, **kwargs)
+
+		with (
+			patch.object(frappe, "get_hooks", side_effect=get_hooks_with),
+			self.assertRaises(ProviderNotRegisteredError),
+		):
+			connectors.validate_connectors()
 
 	def test_bwh_payments_cannot_be_installed_alongside_commera(self):
 		self.assertIn(

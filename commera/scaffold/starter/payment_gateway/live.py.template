@@ -1,0 +1,59 @@
+from typing import NoReturn
+
+import frappe
+from frappe import _
+from frappe.integrations.utils import create_request_log, make_get_request, make_post_request
+
+from $package.base import Base${prefix}Client, ${prefix}Payment, ${prefix}Refund
+
+BASE_URL = "https://api.example.com"
+SETTINGS_DOCTYPE = "$doctype"
+
+
+class Live${prefix}Client(Base${prefix}Client):
+	def __init__(self, api_key: str):
+		self.headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+	def create_payment(self, params: dict) -> ${prefix}Payment:
+		return ${prefix}Payment.model_validate(self.post("/payments", params))
+
+	def get_payment(self, payment_id: str) -> ${prefix}Payment:
+		return ${prefix}Payment.model_validate(self.get(f"/payments/{payment_id}"))
+
+	def create_refund(self, params: dict) -> ${prefix}Refund:
+		return ${prefix}Refund.model_validate(self.post("/refunds", params))
+
+	def post(self, endpoint: str, payload: dict) -> dict:
+		url = f"{BASE_URL}{endpoint}"
+		try:
+			response = make_post_request(url, json=payload, headers=self.headers)
+		except Exception as exception:
+			throw_request_error(url, exception)
+		log_request(url)
+		return response
+
+	def get(self, endpoint: str) -> dict:
+		url = f"{BASE_URL}{endpoint}"
+		try:
+			response = make_get_request(url, headers=self.headers)
+		except Exception as exception:
+			throw_request_error(url, exception)
+		log_request(url)
+		return response
+
+
+def throw_request_error(url: str, exception: Exception) -> NoReturn:
+	log_request(url, error=exception)
+	frappe.throw(_("$label rejected the request"))
+
+
+def log_request(url: str, error: Exception | None = None):
+	create_request_log(
+		{"endpoint": url},
+		service_name="$label",
+		is_remote_request=True,
+		reference_doctype=SETTINGS_DOCTYPE,
+		reference_docname=SETTINGS_DOCTYPE,
+		error=error,
+		status="Failed" if error else "Completed",
+	)
