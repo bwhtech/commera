@@ -44,7 +44,7 @@ from commera.search.translations import (
 
 PRODUCT_DOCTYPE = "Style Attribute Variant"
 CATEGORY_DOCTYPE = "Ecommerce Category"
-FACET_COLUMN_TO_KEY = {"brand": "brand", "color": "color", "item_group": "category"}
+FACET_COLUMN_TO_KEY = {"brand": "brand", "color": "color"}
 
 # SQLite caps bound parameters per statement (999 on older builds), so bulk deletes go out in chunks.
 SQLITE_PARAM_CHUNK_SIZE = 500
@@ -144,6 +144,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 				and self._table_exists("search_language")
 				and self._table_exists("search_price")
 				and self._table_exists("search_price_stamp")
+				and self._table_exists("search_collection")
 				and self.has_columns("search_price_market", ("seq",))
 				and self.has_columns("search_fts", ("market",))
 			)
@@ -165,6 +166,12 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	def create_sibling_tables(self, cursor):
 		cursor.execute("CREATE TABLE IF NOT EXISTS search_size (doc_id TEXT, size TEXT, item_code TEXT)")
 		cursor.execute("CREATE INDEX IF NOT EXISTS idx_search_size_doc ON search_size(doc_id)")
+		# A product sits in several collections, so membership is a table, not an FTS column.
+		cursor.execute("CREATE TABLE IF NOT EXISTS search_collection (doc_id TEXT, item_group TEXT)")
+		cursor.execute("CREATE INDEX IF NOT EXISTS idx_search_collection_doc ON search_collection(doc_id)")
+		cursor.execute(
+			"CREATE INDEX IF NOT EXISTS idx_search_collection_group ON search_collection(item_group)"
+		)
 
 		# The published languages whose titles this build indexed.
 		cursor.execute("CREATE TABLE IF NOT EXISTS search_language (code TEXT PRIMARY KEY)")
@@ -353,6 +360,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			doc.item_group = record.get("item_group") or doc.get("item_group") or ""
 			doc.route_slug = record.get("route_slug") or ""
 			doc.sizes = record.get("sizes") or []
+			doc.collections = record.get("collections") or []
 			doc.product_detail = record.get("detail")
 			doc.market_prices = record.get("market_prices") or {}
 
@@ -380,6 +388,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			document["_own_content"] = content
 			document["_market_titles"] = getattr(doc, "market_titles", None) or {}
 			document["_sizes"] = getattr(doc, "sizes", None) or []
+			document["_collections"] = getattr(doc, "collections", None) or []
 			document["_detail"] = getattr(doc, "product_detail", None)
 			document["_market_prices"] = getattr(doc, "market_prices", None) or {}
 		return document
@@ -430,6 +439,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 				if not doc_id:
 					continue
 				self.write_search_size(cursor, doc_id, document.get("_sizes") or [])
+				self.write_search_collection(cursor, doc_id, document.get("_collections") or [])
 				self.write_product_detail(cursor, doc_id, document.get("_detail"))
 				if document.get("doctype") == PRODUCT_DOCTYPE:
 					prices[doc_id] = document.get("_market_prices") or {}
@@ -497,6 +507,12 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 				f"INSERT INTO search_price ({', '.join(columns)}) VALUES ({placeholders})", rows
 			)
 
+	def write_search_collection(self, cursor, doc_id, collections):
+		cursor.execute("DELETE FROM search_collection WHERE doc_id = ?", (doc_id,))
+		rows = [(doc_id, collection) for collection in collections]
+		if rows:
+			cursor.executemany("INSERT INTO search_collection (doc_id, item_group) VALUES (?, ?)", rows)
+
 	def write_product_detail(self, cursor, doc_id, detail):
 		cursor.execute("DELETE FROM product_detail WHERE doc_id = ?", (doc_id,))
 		if not detail:
@@ -533,7 +549,7 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		for chunk in create_batch(names, SQLITE_PARAM_CHUNK_SIZE):
 			doc_ids = tuple(f"{doctype}:{name}" for name in chunk)
 			placeholders = ", ".join("?" for _ in doc_ids)
-			for table in ("search_fts", "search_size", "product_detail"):
+			for table in ("search_fts", "search_size", "search_collection", "product_detail"):
 				self.sql(f"DELETE FROM {table} WHERE doc_id IN ({placeholders})", doc_ids, commit=True)
 		self.remove_prices(doctype, [f"{doctype}:{name}" for name in names], seq)
 
@@ -598,7 +614,6 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 	# -- facets ---------------------------------------------------------------------------------
 
 	NARROW_KEY_TO_COLUMN: ClassVar = {
-		"subcategory": "item_group",
 		"brands": "brand",
 		"colors": "color",
 	}
@@ -621,7 +636,20 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			)
 			counts[key] = {row["value"]: row["count"] for row in rows}
 		counts["size"] = self.size_facet_counts(fts_query, selected)
+		counts["category"] = self.collection_facet_counts(fts_query, selected)
 		return counts
+
+	def collection_facet_counts(self, fts_query, filters=None):
+		"""Products per collection; a product in two collections counts in both."""
+		narrow_sql, narrow_params = self.narrow_clause(filters or {}, "subcategory")
+		rows = self.sql(
+			"SELECT item_group, COUNT(DISTINCT doc_id) AS count FROM search_collection WHERE doc_id IN "
+			f"(SELECT doc_id FROM search_fts WHERE search_fts MATCH ?{narrow_sql}) "
+			"GROUP BY item_group ORDER BY count DESC",
+			(fts_query, *narrow_params),
+			read_only=True,
+		)
+		return {row["item_group"]: row["count"] for row in rows}
 
 	def size_facet_counts(self, fts_query, filters=None):
 		narrow_sql, narrow_params = self.narrow_clause(filters or {}, "sizes")
@@ -650,10 +678,14 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			clauses.append(f" AND {prefix}{column} IN ({placeholders})")
 			params.extend(values)
 		# The ?category= tab scope is not a facet: no facet drops it, so it narrows every count too.
-		if selected.get("category_item_groups"):
-			placeholders = ", ".join("?" for _ in selected["category_item_groups"])
-			clauses.append(f" AND {prefix}item_group IN ({placeholders})")
-			params.extend(selected["category_item_groups"])
+		for key in ("subcategory", "category_item_groups"):
+			if key != drop_key and selected.get(key):
+				placeholders = ", ".join("?" for _ in selected[key])
+				clauses.append(
+					f" AND {prefix}doc_id IN "
+					f"(SELECT doc_id FROM search_collection WHERE item_group IN ({placeholders}))"
+				)
+				params.extend(selected[key])
 		if drop_key != "sizes" and selected.get("sizes"):
 			placeholders = ", ".join("?" for _ in selected["sizes"])
 			clauses.append(

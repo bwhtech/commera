@@ -1,10 +1,10 @@
 <script setup>
-import { computed } from 'vue'
-import { MultiSelect, Select } from 'frappe-ui'
+import { Select } from 'frappe-ui'
+import TagMultiSelect from '../TagMultiSelect.vue'
 import { useCollections } from '../../data/collections'
 import { __ } from '../../data/translation'
 
-const props = defineProps({
+defineProps({
   product: { type: Object, required: true },
   layout: { type: String, default: 'stacked' },
 })
@@ -18,34 +18,29 @@ const statusOptions = [
 const { collectionOptions, load: loadCollections } = useCollections()
 loadCollections()
 
-// Item.item_group is a single collection, not the mock's array of them — the
-// MultiSelect widget stays (it is the approved control), wrapped around one
-// value, so picking a second collection here replaces the first rather than
-// adding to it.
-const productCollections = computed({
-  get: () => (props.product.collection ? [props.product.collection] : []),
-  set: (values) => {
-    props.product.collection = values.at(-1) ?? null
-  },
-})
+// The first collection is the primary one (Item.item_group).
+const primaryIcon = (option, index) => (index === 0 ? 'lucide-star' : null)
 </script>
 
 <template>
-  <section :class="layout === 'stacked' ? '' : 'space-y-4'">
+  <section :class="layout === 'stacked' ? '' : 'border-b border-outline-gray-1 px-4 py-4'">
     <h2 v-if="layout === 'stacked'" class="text-lg-semibold text-ink-gray-8">{{ __('Organisation') }}</h2>
     <h3 v-else class="text-sm text-ink-gray-5">{{ __('Organisation') }}</h3>
 
-    <div :class="layout === 'stacked' ? 'mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2' : 'mt-4 space-y-4'">
+    <div :class="layout === 'stacked' ? 'mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2' : 'mt-3 space-y-4'">
       <!-- Status is read-only here: it is really Item.disabled, and the page's
            "Archive"/"Restore from archive" action (in the ⋯ menu) is the one real
            write path for it — a second editable control here would just race it. -->
       <Select :model-value="product.status" class="w-full" :label="__('Status')" :options="statusOptions" disabled />
-      <MultiSelect
-        v-model="productCollections"
+      <TagMultiSelect
+        v-model="product.collections"
         class="w-full"
         :class="layout === 'stacked' ? 'sm:col-span-2' : ''"
         :label="__('Collections')"
+        :description="__('The starred collection is the primary one.')"
+        :placeholder="__('Add a collection')"
         :options="collectionOptions"
+        :tag-icon="primaryIcon"
       />
     </div>
   </section>

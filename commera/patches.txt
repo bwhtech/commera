@@ -42,3 +42,4 @@ commera.patches.grant_commera_admin_translation_rights
 commera.patches.set_market_price_lists
 commera.patches.drop_commera_custom_docperms
 commera.patches.reindex_public_prices
+commera.patches.add_products_to_their_collection

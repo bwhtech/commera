@@ -314,6 +314,8 @@ def searches_a_secondary_market(filters, prices) -> bool:
 
 def filtered_products_query(filters=None, product_list=None):
 	"""Products matching every filter but the price filters, with their sizes and their Item."""
+	from commera.product_collections import variant_in_collections
+
 	style_attribute_variant = DocType("Style Attribute Variant")
 	color_size_item = DocType("Color Size Item")
 	item = DocType("Item")
@@ -331,10 +333,9 @@ def filtered_products_query(filters=None, product_list=None):
 		query = query.where(style_attribute_variant.is_published == 1)
 
 	if filters:
-		if filters.get("category_item_groups"):
-			query = query.where(style_attribute_variant.item_group.isin(filters["category_item_groups"]))
-		if filters.get("subcategory"):
-			query = query.where(style_attribute_variant.item_group.isin(filters["subcategory"]))
+		for key in ("category_item_groups", "subcategory"):
+			if filters.get(key):
+				query = query.where(variant_in_collections(style_attribute_variant, filters[key]))
 		if filters.get("colors"):
 			query = query.where(style_attribute_variant.attribute_value.isin(filters["colors"]))
 		if filters.get("sizes"):
