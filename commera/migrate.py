@@ -9,7 +9,7 @@ from commera.commera_ecommerce.doctype.commera_settings.navbar.navbar_manager im
 )
 from commera.customizations import create_customizations
 from commera.localization import StorefrontLanguages
-from commera.payment_gateways.connectors import get_available_payment_modes, validate_connectors
+from commera.payment_gateways.connectors import get_available_payment_modes
 from commera.plugin_events import add_plugin_user, validate_plugins
 from commera.plugins.registry import get_registry
 from commera.roles import add_commera_roles
@@ -84,7 +84,6 @@ def after_migrate():
 	validate_plugins()
 	print_plugin_problems()
 	validate_providers()
-	validate_connectors()
 
 
 def print_plugin_problems():

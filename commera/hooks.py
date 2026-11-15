@@ -95,7 +95,6 @@ before_uninstall = "commera.customizations.delete_customizations"
 after_app_install = [
 	"commera.storefront_plugins.sync_storefront_apps",
 	"commera.shipping.providers.validate_providers",
-	"commera.payment_gateways.connectors.validate_connectors",
 ]
 before_app_install = "commera.payment_gateways.connectors.refuse_bwh_payments"
 before_app_uninstall = "commera.shipping.providers.disable_app_profiles"
@@ -155,12 +154,6 @@ commera_hooks = {
 			"adapter": "commera.shop_themes.section_translations.ThemeSectionResource",
 			"label": "Theme",
 		},
-	],
-	"payment_connectors": [
-		"Razorpay Gateway Settings",
-		"Stripe Gateway Settings",
-		"Telr Gateway Settings",
-		"Tabby Gateway Settings",
 	],
 }
 setup_wizard_complete = [
