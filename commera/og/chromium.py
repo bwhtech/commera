@@ -9,14 +9,24 @@ from urllib.parse import unquote, urlsplit
 
 import frappe
 from frappe.utils import get_files_path
-from frappe.utils.chromium import CDPSocketClient, ChromiumManager, Page
 from frappe.utils.pdf import get_host_url
 from frappe.utils.preview import safe_execute
+
+# Frappe 16 has no shared Chromium pool. Without this fallback the import error breaks every page
+# Frappe finds by walking www/, because og_image_render.py is one of them.
+try:
+	from frappe.utils.chromium import CDPSocketClient, ChromiumManager, Page
+except ImportError:
+	from frappe.utils.pdf_generator.cdp_connection import CDPSocketClient
+
+	ChromiumManager = Page = None
 
 RENDER_DEADLINE = 180
 
 
 def get_preview_from_html(html, format="jpg", width=1200, height=630, quality=85):
+	if ChromiumManager is None:
+		raise RuntimeError("Social cards need the Chromium pool of Frappe 17")
 	generator, browser_id = ChromiumManager.acquire()
 	session = page = None
 	try:
