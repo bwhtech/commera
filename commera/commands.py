@@ -85,7 +85,9 @@ def new_theme(context, name: str, theme_type: str, parent: str | None, app: str 
 		frappe.destroy()
 
 	if installed:
-		click.secho(f"Next: set Active Theme to {name} in Shop Theme Settings, then open your store", fg="green")
+		click.secho(
+			f"Next: set Active Theme to {name} in Shop Theme Settings, then open your store", fg="green"
+		)
 	else:
 		click.secho(
 			f"Next: bench --site {site} install-app {scaffold.app} creates the Shop Theme record", fg="green"
