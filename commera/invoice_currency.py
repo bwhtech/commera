@@ -1,6 +1,11 @@
 import frappe
 from erpnext.accounts.party import find_party_account
-from erpnext.accounts.services.party_validation import PartyValidator
+
+# ERPNext 16 keeps these checks on the document; the validator class exists from 17.
+try:
+	from erpnext.accounts.services.party_validation import PartyValidator
+except ImportError:
+	PartyValidator = None
 
 
 def get_invoice_currency_error(company: str, currency: str, customer: str | None = None) -> str | None:
@@ -14,7 +19,7 @@ def get_invoice_currency_error(company: str, currency: str, customer: str | None
 			"debit_to": find_party_account("Customer", customer, company),
 		}
 	)
-	validator = PartyValidator(invoice)
+	validator = PartyValidator(invoice) if PartyValidator else invoice
 	muted = frappe.flags.mute_messages
 	# Muted, so the refusal is ours to word and ERPNext's message does not reach the shopper.
 	frappe.flags.mute_messages = True
