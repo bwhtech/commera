@@ -12,6 +12,7 @@ from commera.api.admin.catalog import (
 	create_product,
 	delete_product,
 	get_collection_product_counts,
+	get_collections,
 	get_product,
 	get_product_chain,
 	get_products,
@@ -242,6 +243,10 @@ class TestProductCollection(DeleteProductTestCase):
 		):
 			with self.assertRaises(frappe.ValidationError):
 				move()
+
+	def test_the_picker_offers_only_collections_a_product_can_be_filed_under(self):
+		self.assertEqual(get_collections(search_text=self.other_collection), [self.other_collection])
+		self.assertNotIn("All Item Groups", get_collections(search_text="All Item Groups"))
 
 	def test_a_desk_edit_of_the_item_group_makes_it_the_primary(self):
 		item = frappe.get_doc("Item", self.item_template)

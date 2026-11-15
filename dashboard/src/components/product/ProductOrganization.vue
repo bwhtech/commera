@@ -1,10 +1,10 @@
 <script setup>
-import { computed } from 'vue'
-import { MultiSelect, Select } from 'frappe-ui'
+import { Select } from 'frappe-ui'
+import TagMultiSelect from '../TagMultiSelect.vue'
 import { useCollections } from '../../data/collections'
 import { __ } from '../../data/translation'
 
-const props = defineProps({
+defineProps({
   product: { type: Object, required: true },
   layout: { type: String, default: 'stacked' },
 })
@@ -18,13 +18,8 @@ const statusOptions = [
 const { collectionOptions, load: loadCollections } = useCollections()
 loadCollections()
 
-// The first pick is the primary collection (Item.item_group). The trigger collapses to
-// "N selected", so the description lists the picks and marks the primary.
-const collectionsHint = computed(() => {
-  const [primary, ...others] = props.product.collections ?? []
-  if (!primary) return __('The first collection picked is the primary one.')
-  return [__('{0} (primary)', [primary]), ...others].join(', ')
-})
+// The first collection is the primary one (Item.item_group).
+const primaryIcon = (option, index) => (index === 0 ? 'lucide-star' : null)
 </script>
 
 <template>
@@ -37,13 +32,15 @@ const collectionsHint = computed(() => {
            "Archive"/"Restore from archive" action (in the ⋯ menu) is the one real
            write path for it — a second editable control here would just race it. -->
       <Select :model-value="product.status" class="w-full" :label="__('Status')" :options="statusOptions" disabled />
-      <MultiSelect
+      <TagMultiSelect
         v-model="product.collections"
         class="w-full"
         :class="layout === 'stacked' ? 'sm:col-span-2' : ''"
         :label="__('Collections')"
-        :description="collectionsHint"
+        :description="__('The starred collection is the primary one.')"
+        :placeholder="__('Add a collection')"
         :options="collectionOptions"
+        :tag-icon="primaryIcon"
       />
     </div>
   </section>
