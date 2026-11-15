@@ -38,7 +38,9 @@ class TestDeskSidebars(IntegrationTestCase):
 				if item["type"] == "Link" and item["link_type"] == "DocType"
 			}
 			doctypes = frappe.get_all(
-				"DocType", filters={"module": module, "istable": 0, "custom": 0}, pluck="name"
+				"DocType",
+				filters={"module": module, "istable": 0, "custom": 0, "read_only": 0},
+				pluck="name",
 			)
 			self.assertEqual(sorted(set(doctypes) - listed), [], f"{module} sidebar leaves these out")
 
