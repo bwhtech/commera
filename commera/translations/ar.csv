@@ -2380,3 +2380,16 @@ Shoppers,المتسوقون
 Bulk Tools,أدوات الإجراءات الجماعية
 Storefront Analytics,تحليلات واجهة المتجر
 eCommerce Analytics,تحليلات التجارة الإلكترونية
+Choose at least one collection.,اختر مجموعة واحدة على الأقل.
+"{0} is only in {1}, and a product needs at least one collection.",{0} موجود في {1} فقط، ويجب أن يكون المنتج في مجموعة واحدة على الأقل.
+Change at most {0} products at a time.,غيّر {0} منتجات كحد أقصى في المرة الواحدة.
+Add…,إضافة…
+The starred collection is the primary one.,المجموعة المميزة بنجمة هي المجموعة الأساسية.
+Add a collection,إضافة مجموعة
+Add {0} to a collection,إضافة {0} إلى مجموعة
+Products keep the collections they are already in.,تبقى المنتجات في المجموعات التي هي فيها بالفعل.
+{0} added to {1},تمت إضافة {0} إلى {1}
+Remove {0} from a collection,إزالة {0} من مجموعة
+A product must stay in at least one collection.,يجب أن يبقى المنتج في مجموعة واحدة على الأقل.
+{0} removed from {1},تمت إزالة {0} من {1}
+Remove from collection,إزالة من المجموعة
