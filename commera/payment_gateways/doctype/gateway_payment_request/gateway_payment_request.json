@@ -1,0 +1,295 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-08-16 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "gateway",
+  "status",
+  "column_break_tvtq",
+  "order_ref",
+  "order_url",
+  "urls_section",
+  "redirect_to",
+  "success_url",
+  "column_break_meyd",
+  "cancel_url",
+  "column_break_zmcj",
+  "failure_url",
+  "details_section",
+  "ref_doctype",
+  "currency_code",
+  "customer_ref",
+  "company",
+  "column_break_qowt",
+  "ref_docname",
+  "amount",
+  "erpnext_payment_request",
+  "gateway_transaction_ref",
+  "last_webhook_event_id",
+  "customer_section",
+  "customer_email",
+  "customer_phone",
+  "column_break_cust",
+  "customer_forenames",
+  "customer_surname",
+  "customer_address",
+  "refund_section",
+  "refund_amount",
+  "refund_id",
+  "refund_payment_entries"
+ ],
+ "fields": [
+  {
+   "fieldname": "gateway",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Gateway",
+   "options": "Payment Gateway Profile",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nPaid\nNot Paid\nCancelled\nExpired\nPartially Refunded\nRefunded",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_tvtq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Gateway session identifier. Unique so a duplicate webhook delivery cannot open a second request.",
+   "fieldname": "order_ref",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Order Reference",
+   "read_only": 1,
+   "search_index": 1,
+   "set_only_once": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "order_url",
+   "fieldtype": "Small Text",
+   "label": "Order URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "urls_section",
+   "fieldtype": "Section Break",
+   "label": "URLs"
+  },
+  {
+   "description": "Path on this site the shopper is sent to after the gateway, once the payment status is synced",
+   "fieldname": "redirect_to",
+   "fieldtype": "Data",
+   "label": "Redirect To",
+   "read_only": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "success_url",
+   "fieldtype": "Data",
+   "label": "Success URL",
+   "options": "URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_meyd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cancel_url",
+   "fieldtype": "Data",
+   "label": "Cancel URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_zmcj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "failure_url",
+   "fieldtype": "Data",
+   "label": "Failure URL",
+   "options": "URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "fieldname": "ref_doctype",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Reference Document Type",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "customer_ref",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "column_break_qowt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ref_docname",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Name",
+   "options": "ref_doctype",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount",
+   "options": "currency_code",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Optional bridge to the ERPNext Payment Request when the flow is driven from Desk.",
+   "fieldname": "erpnext_payment_request",
+   "fieldtype": "Link",
+   "label": "ERPNext Payment Request",
+   "options": "Payment Request"
+  },
+  {
+   "description": "Gateway transaction reference, where the gateway issues one distinct from the session id.",
+   "fieldname": "gateway_transaction_ref",
+   "fieldtype": "Data",
+   "label": "Gateway Transaction Reference",
+   "read_only": 1
+  },
+  {
+   "description": "Gateway event id of the last applied webhook, used to drop replayed deliveries.",
+   "fieldname": "last_webhook_event_id",
+   "fieldtype": "Data",
+   "label": "Last Webhook Event ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer_section",
+   "fieldtype": "Section Break",
+   "label": "Customer Details"
+  },
+  {
+   "fieldname": "customer_email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "customer_phone",
+   "fieldtype": "Data",
+   "label": "Phone"
+  },
+  {
+   "fieldname": "column_break_cust",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer_forenames",
+   "fieldtype": "Data",
+   "label": "Forenames"
+  },
+  {
+   "fieldname": "customer_surname",
+   "fieldtype": "Data",
+   "label": "Surname"
+  },
+  {
+   "fieldname": "customer_address",
+   "fieldtype": "Link",
+   "label": "Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "refund_section",
+   "fieldtype": "Section Break",
+   "label": "Refund"
+  },
+  {
+   "default": "0",
+   "fieldname": "refund_amount",
+   "fieldtype": "Currency",
+   "label": "Refund Amount",
+   "options": "currency_code",
+   "read_only": 1
+  },
+  {
+   "description": "Comma-separated gateway refund ids, appended once per successful refund.",
+   "fieldname": "refund_id",
+   "fieldtype": "Small Text",
+   "label": "Refund IDs",
+   "read_only": 1
+  },
+  {
+   "description": "Comma-separated Payment Entries already refunded through this request.",
+   "fieldname": "refund_payment_entries",
+   "fieldtype": "Small Text",
+   "label": "Refunded Payment Entries",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-16 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Payment Gateways",
+ "name": "Gateway Payment Request",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Accounts User",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

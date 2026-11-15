@@ -23,8 +23,6 @@ from commera.www.cart.checkout import get_context
 ANY_CURRENCY_GATEWAY = "ZZ Any Currency Gateway"
 LIMITED_GATEWAY = "ZZ Limited Currency Gateway"
 MARKET_ONLY_GATEWAY = "ZZ Market Currency Gateway"
-# Gateways whose currencies are fixed in code. One of them takes the store currency but not the market's.
-FIXED_CURRENCY_SETTINGS = ("PayU Gateway Settings", "Tabby Gateway Settings", "PayPal Gateway Settings")
 
 
 class TestMarketPaymentMethods(MarketCartTestCase):
@@ -34,15 +32,20 @@ class TestMarketPaymentMethods(MarketCartTestCase):
 	def setUp(self):
 		super().setUp()
 		self.set_single("Commera Settings", "cod_enabled", 1)
-		make_gateway(ANY_CURRENCY_GATEWAY, "Stripe Gateway Settings")
-		make_gateway(LIMITED_GATEWAY, find_settings(takes=self.store_currency, refuses=self.currency))
-		make_gateway(MARKET_ONLY_GATEWAY, find_settings(takes=self.currency, refuses=self.store_currency))
-		gateways = patch(
-			"bwh_payments.api.get_available_payment_modes",
-			return_value=[ANY_CURRENCY_GATEWAY, LIMITED_GATEWAY, MARKET_ONLY_GATEWAY],
-		)
-		gateways.start()
-		self.addCleanup(gateways.stop)
+		currencies = {
+			ANY_CURRENCY_GATEWAY: None,
+			LIMITED_GATEWAY: (self.store_currency,),
+			MARKET_ONLY_GATEWAY: (self.currency,),
+		}
+		for gateway in currencies:
+			make_gateway(gateway, "Stripe Gateway Settings")
+		for target, kwargs in (
+			("get_available_payment_modes", {"return_value": list(currencies)}),
+			("get_supported_currencies", {"side_effect": currencies.get}),
+		):
+			patcher = patch(f"commera.payment_gateways.connectors.{target}", **kwargs)
+			patcher.start()
+			self.addCleanup(patcher.stop)
 		item_code = self.item("PAYMENTS", market_sale=300)
 		self.item_code = item_code
 		self.sign_in_shopper()
@@ -192,14 +195,6 @@ def make_gateway(name, settings_doctype):
 			"enabled": 1,
 		}
 	).insert(ignore_permissions=True)
-
-
-def find_settings(takes, refuses):
-	for doctype in FIXED_CURRENCY_SETTINGS:
-		supported = frappe.get_single(doctype).supported_currencies()
-		if takes in supported and refuses not in supported:
-			return doctype
-	raise AssertionError(f"No gateway takes {takes} but not {refuses}")
 
 
 def listed_ids():

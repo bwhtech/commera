@@ -2,7 +2,6 @@
 # For license information, please see license.txt
 
 import frappe
-from bwh_payments.bwh_payments.utils import get_available_payment_modes
 from frappe.model.document import Document
 from frappe.utils import get_url_to_form
 from frappe.website.utils import clear_cache as clear_website_cache
@@ -15,6 +14,7 @@ from commera.localization.languages import (
 )
 from commera.localization.market_setup import validate_markets_for_store
 from commera.localization.markets import find_market_by_prefix
+from commera.payment_gateways.connectors import get_available_payment_modes
 from commera.search.build import enqueue_full_rebuild
 from commera.search.engine_cache import clear_search_engine, get_engine_class
 from commera.search.http_client import SearchServerError

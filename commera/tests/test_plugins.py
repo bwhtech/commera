@@ -36,7 +36,7 @@ from commera.tests.test_plugin_events import patch_app_declarations
 from commera.www import commera as dashboard
 
 APP = "erpnext"
-OTHER_APP = "bwh_payments"
+OTHER_APP = "frappe"
 FUNCTIONS = f"{APP}.commera_test_plugins"
 SETTINGS_DOCTYPE = "Google Settings"
 REQUIRED_SETTINGS_DOCTYPE = "SMS Settings"

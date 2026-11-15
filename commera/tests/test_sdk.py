@@ -200,7 +200,7 @@ PUBLIC_NAMES = {
 	],
 	"commera.sdk.wishlist": ["add_to_wishlist", "get_wishlist", "remove_from_wishlist"],
 }
-APP = "bwh_payments"
+APP = "frappe"
 APP_FIELD = f"{APP}_zz_sdk_note"
 FEE_DESCRIPTION = "ZZ SDK wrap"
 FEE_AMOUNT = 25.0

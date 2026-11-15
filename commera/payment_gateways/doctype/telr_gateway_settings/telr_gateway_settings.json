@@ -1,0 +1,141 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-16 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "column_break_mode",
+  "test_mode",
+  "treat_authorised_as_paid",
+  "section_break_store",
+  "store_id",
+  "currency",
+  "column_break_keys",
+  "auth_key",
+  "remote_auth_key",
+  "section_break_urls",
+  "authorised_url",
+  "column_break_urls",
+  "declined_url",
+  "column_break_urls_two",
+  "cancelled_url"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "column_break_mode",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "test_mode",
+   "fieldtype": "Check",
+   "label": "Test Mode"
+  },
+  {
+   "default": "0",
+   "description": "Telr's <b>ecom</b> transaction class authorises and captures in one step, so an Authorised order has already been charged. Only turn this on if your Telr store is configured that way \u2014 with an authorise-only store it would release goods against funds that were never captured.",
+   "fieldname": "treat_authorised_as_paid",
+   "fieldtype": "Check",
+   "label": "Treat Authorised As Paid"
+  },
+  {
+   "fieldname": "section_break_store",
+   "fieldtype": "Section Break",
+   "label": "Store"
+  },
+  {
+   "fieldname": "store_id",
+   "fieldtype": "Data",
+   "label": "Store ID",
+   "reqd": 1
+  },
+  {
+   "description": "Fallback currency when the payment request does not carry one.",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "column_break_keys",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "auth_key",
+   "fieldtype": "Password",
+   "label": "Auth Key",
+   "reqd": 1
+  },
+  {
+   "description": "Required only to issue refunds.",
+   "fieldname": "remote_auth_key",
+   "fieldtype": "Password",
+   "label": "Remote Auth Key"
+  },
+  {
+   "fieldname": "section_break_urls",
+   "fieldtype": "Section Break",
+   "label": "Return URLs"
+  },
+  {
+   "fieldname": "authorised_url",
+   "fieldtype": "Data",
+   "label": "Authorised URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "column_break_urls",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "declined_url",
+   "fieldtype": "Data",
+   "label": "Declined URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "column_break_urls_two",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cancelled_url",
+   "fieldtype": "Data",
+   "label": "Cancelled URL",
+   "options": "URL"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-16 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Payment Gateways",
+ "name": "Telr Gateway Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
