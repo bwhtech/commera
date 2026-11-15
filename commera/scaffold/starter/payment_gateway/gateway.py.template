@@ -1,6 +1,5 @@
 import hashlib
 import hmac
-import json
 
 import frappe
 $imports
@@ -70,7 +69,7 @@ class ${prefix}Gateway(PaymentGatewayBase):
 		if not hmac.compare_digest(expected, headers.get(SIGNATURE_HEADER) or ""):
 			frappe.throw(_("Invalid $label webhook signature"))
 
-		event = json.loads(payload)
+		event = frappe.parse_json(payload.decode())
 		return WebhookEvent(
 			session_id=event["data"]["id"],
 			status=STATUS_MAP.get(event["data"]["status"], "Pending"),
