@@ -1,0 +1,133 @@
+{% macro masthead(brand, kind, when) -%}
+<header class="masthead">
+	<div class="wordmark">
+		{% if brand.logo %}<img src="{{ brand.logo }}" height="28" alt="">{% else %}<span class="mark">{{ brand.name[0] }}</span>{% endif %}
+		{{ brand.name }}
+	</div>
+	<div class="doc-kind">
+		<strong>{{ kind }}</strong>
+		<span class="num">{{ when }}</span>
+	</div>
+</header>
+{%- endmacro %}
+
+{% macro hero(heading, intro, number_label, number, steps=None) -%}
+<section class="hero">
+	<div class="hero-top">
+		<div>
+			<h1>{{ heading }}</h1>
+			{% if intro %}<p>{{ intro }}</p>{% endif %}
+		</div>
+		<div class="doc-number">
+			<span>{{ number_label }}</span>
+			<b>{{ number }}</b>
+		</div>
+	</div>
+	{% if steps %}{{ progress_steps(steps) }}{% endif %}
+</section>
+{%- endmacro %}
+
+{% macro progress_steps(steps) -%}
+<div class="steps" style="grid-template-columns: repeat({{ steps | length }}, 1fr)">
+	{% for step in steps %}
+	<div class="step {{ 'done' if step.done }}"><b>{{ step.title }}</b>{{ step.hint }}</div>
+	{% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro address_block(label, address=None, empty_text=None, extra_lines=[]) -%}
+{% set extras = extra_lines | select | list %}
+{% if address or empty_text %}
+<div class="label">{{ label }}</div>
+<address>
+	{%- if address %}<b>{{ address.name }}</b>{% for line in address.lines %}<br>{{ line }}{% endfor %}
+	{%- else %}{{ empty_text }}{% endif %}
+	{%- for line in extras %}<br>{{ line }}{% endfor %}
+</address>
+{% endif %}
+{%- endmacro %}
+
+{% macro fact(label, title, detail=None) -%}
+<div class="label">{{ label }}</div>
+<address><b>{{ title }}</b>{% if detail %}<br>{{ detail }}{% endif %}</address>
+{%- endmacro %}
+
+{% macro thumb(row) -%}
+{% if row.image %}<img class="thumb" src="{{ row.image }}" alt="">{% else %}<div class="thumb empty">{{ row.item_name[0] }}</div>{% endif %}
+{%- endmacro %}
+
+{% macro product_cell(row, show_hsn=False) -%}
+<div class="product">
+	{{ thumb(row) }}
+	<div>
+		<div class="name">{{ row.item_name }}</div>
+		<div class="meta">
+			{%- if row.variant %}<span class="sku">{{ row.variant }}</span>{% endif -%}
+			<span class="sku">SKU {{ row.item_code }}</span>
+			{%- if show_hsn and row.gst_hsn_code %}<span class="sku">HSN <span class="num">{{ row.gst_hsn_code }}</span></span>{% endif -%}
+		</div>
+	</div>
+</div>
+{%- endmacro %}
+
+{% macro items_table(items, money) -%}
+<table class="items">
+	<thead>
+		<tr>
+			<th>Product</th>
+			<th class="r" style="width: 60px">Qty</th>
+			<th class="r" style="width: 100px">Price</th>
+			<th class="r" style="width: 100px">Amount</th>
+		</tr>
+	</thead>
+	<tbody>
+	{% for row in items %}
+		<tr>
+			<td>{{ product_cell(row) }}</td>
+			<td class="r num">{{ row.qty | int }}</td>
+			<td class="r num">
+				{% if row.price_list_rate > row.rate %}<span class="strike">{{ money(row.price_list_rate) }}</span>{% endif %}
+				{{ money(row.rate) }}
+			</td>
+			<td class="r num">{{ money(row.amount) }}</td>
+		</tr>
+	{% endfor %}
+	</tbody>
+</table>
+{%- endmacro %}
+
+{% macro notes(doc) -%}
+{% if doc.customer_note or doc.gift_message %}
+<div class="note">
+	{% if doc.customer_note %}<div class="label">Your delivery note</div><p>{{ doc.customer_note }}</p>{% endif %}
+	{% if doc.gift_message %}<div class="label">Gift message, printed on the card</div><p>{{ doc.gift_message }}</p>{% endif %}
+</div>
+{% else %}<div></div>{% endif %}
+{%- endmacro %}
+
+{% macro totals(doc, money, total_label="Total") -%}
+<table class="totals">
+	<tr><td>Subtotal</td><td class="num">{{ money(doc.total) }}</td></tr>
+	{% if doc.discount_amount %}
+	<tr class="discount"><td>Discount{% if doc.coupon_code %} ({{ doc.coupon_code }}){% endif %}</td><td class="num">&minus;{{ money(doc.discount_amount) }}</td></tr>
+	{% endif %}
+	{% for charge in doc.charges %}
+	<tr><td>{{ charge.description }}</td><td class="num">{{ money(charge.amount) if charge.amount else "Free" }}</td></tr>
+	{% endfor %}
+	<tr class="grand"><td>{{ total_label }}</td><td class="num">{{ money(doc.grand_total) }}</td></tr>
+	<tr class="tax-note"><td colspan="2" class="num">Includes {{ money(doc.tax_included) }} {{ doc.tax_label }}</td></tr>
+</table>
+{%- endmacro %}
+
+{% macro footer(brand, closing) -%}
+<footer class="footer">
+	<div>
+		{% if closing %}{{ closing }}<br>{% endif %}
+		{{ brand.legal_name }}, {{ brand.address }}. <span class="nowrap">GSTIN {{ brand.tax_id }}</span>
+	</div>
+	<div class="links">
+		{% for link in brand.footer_links %}<a href="{{ link.url }}">{{ link.label }}</a>{% endfor %}
+		<br>{{ brand.support_email }}
+	</div>
+</footer>
+{%- endmacro %}
