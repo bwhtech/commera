@@ -2,6 +2,8 @@
 
 A payment gateway opens a checkout session, reports the payment status, sends refunds and verifies webhooks. Commera includes Razorpay, Stripe, Telr and Tabby. An app can add a gateway without a change to Commera.
 
+This page is the reference. For step-by-step instructions, see [Add a payment gateway](add-a-payment-gateway.md).
+
 ## Where the code lives
 
 Each gateway has two parts: a connector, and a settings Single that stores its credentials.

@@ -39,9 +39,6 @@ class PaymentGatewayScaffold(AppScaffold):
 	def add_payment_gateway(self, label: str) -> list[tuple[str, str]]:
 		values = {**self.get_values(label), "module": self.get_module()}
 		doctype = values["doctype"]
-		if (COMMERA_DOCTYPES / scrub(doctype)).exists():
-			raise click.ClickException(f"Commera already ships {doctype}; pick another name")
-
 		self.add_connector(values)
 		folder = self.app_root / self.app / scrub(values["module"]) / "doctype" / scrub(doctype)
 		self.add_file(folder / "__init__.py", "")
@@ -149,6 +146,8 @@ def validate_label(label: str):
 		raise click.ClickException(
 			"Name the gateway with letters, digits and spaces, such as Tamara, and not a Python keyword"
 		)
+	if (COMMERA_DOCTYPES / scrub(f"{label} Gateway Settings")).exists():
+		raise click.ClickException(f"Commera already ships {label} Gateway Settings; pick another name")
 
 
 def get_library_root(folder: Path) -> Path | None:

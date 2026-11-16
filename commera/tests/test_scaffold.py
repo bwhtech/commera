@@ -915,9 +915,17 @@ class TestPaymentGatewayScaffold(UnitTestCase):
 
 	def test_a_gateway_commera_ships_or_the_host_app_is_refused(self):
 		app_root = make_app(self.apps_path)
-		with self.assertRaisesRegex(click.ClickException, "Commera already ships Stripe Gateway Settings"):
-			get_payment_gateway_scaffold("Stripe", app_root, self.apps_path).add_payment_gateway("Stripe")
+		library = self.add_library()
+		for folder in (app_root, self.bench, library):
+			with (
+				self.subTest(folder=folder.name),
+				self.assertRaisesRegex(click.ClickException, "Commera already ships Stripe Gateway Settings"),
+			):
+				get_payment_gateway_scaffold("Stripe", folder, self.apps_path)
 		self.assertFalse((app_root / APP / "connectors").exists())
+		self.assertFalse((library / "bwh_payments_core" / "connectors" / "stripe").exists())
+		self.assertEqual({path.name for path in self.apps_path.iterdir()}, {APP})
+		self.assertEqual(self.apps_txt.read_text(), "frappe\ncommera\n")
 		with self.assertRaisesRegex(click.ClickException, "host app"):
 			self.get_scaffold(self.bench, app="commera")
 
