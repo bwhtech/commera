@@ -1,0 +1,142 @@
+<!doctype html>
+{% raw %}
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Espresso templates</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+	:root {
+		--ink-9: #0f0f0f;
+		--ink-7: #383838;
+		--ink-5: #7c7c7c;
+		--surface: #ffffff;
+		--surface-1: #f8f8f8;
+		--surface-2: #f3f3f3;
+		--outline-1: #ededed;
+		--outline-2: #e2e2e2;
+		--green: #258c5c;
+	}
+	* { box-sizing: border-box; }
+	body { margin: 0; background: var(--surface-1); color: var(--ink-7); font: 420 14px/1.5 Inter, system-ui, sans-serif; }
+	header.top { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--outline-1); }
+	.top-inner { max-width: 1240px; margin: 0 auto; padding: 14px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+	.top-inner strong { color: var(--ink-9); font-weight: 600; font-size: 15px; }
+	nav { display: flex; gap: 6px; flex-wrap: wrap; }
+	nav a { color: var(--ink-7); text-decoration: none; padding: 4px 10px; border-radius: 8px; background: var(--surface-2); font-size: 13px; }
+	nav a:hover { color: var(--ink-9); background: var(--outline-2); }
+	main { max-width: 1240px; margin: 0 auto; padding: 24px 16px 80px; }
+	.intro { max-width: 760px; margin-bottom: 32px; }
+	.intro h1 { color: var(--ink-9); font-size: 28px; letter-spacing: -0.02em; margin: 0 0 8px; font-weight: 600; }
+	.intro p { margin: 0 0 6px; }
+	.intro a { color: var(--ink-9); font-weight: 500; }
+	section { background: var(--surface); border: 1px solid var(--outline-1); border-radius: 12px; padding: 20px; margin-bottom: 28px; scroll-margin-top: 80px; }
+	.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+	.section-head h2 { margin: 0; font-size: 17px; color: var(--ink-9); font-weight: 600; }
+	.tag { font-size: 12px; color: var(--ink-5); }
+	.section-head a { color: var(--ink-9); font-size: 13px; font-weight: 500; }
+	.note { margin: -8px 0 16px; color: var(--ink-5); font-size: 13px; }
+	.frames { display: flex; gap: 20px; align-items: flex-start; overflow-x: auto; }
+	.frame { flex: none; }
+	.frame .label { font-size: 12px; color: var(--ink-5); margin-bottom: 6px; }
+	iframe { display: block; border: 1px solid var(--outline-2); border-radius: 8px; background: var(--surface); }
+	.desktop iframe { width: 720px; }
+	.mobile iframe { width: 390px; }
+	.pdf iframe { width: 794px; height: 1123px; }
+	@media (max-width: 1180px) { .desktop { display: none; } }
+	@media (max-width: 860px) { .pdf iframe { width: 100%; height: 80vh; } .frames { flex-direction: column; } .pdf { width: 100%; } }
+	@media (max-width: 430px) { .mobile, .mobile iframe { width: 100%; } header.top { position: static; } section { scroll-margin-top: 16px; padding: 14px; } }
+</style>
+</head>
+<body>
+<header class="top">
+	<div class="top-inner">
+		<strong>Espresso templates</strong>
+		<nav id="nav"></nav>
+	</div>
+</header>
+<main>
+	<div class="intro">
+		<h1>Customer emails and PDFs: first batch</h1>
+		<p>Designs for Commera's customer emails and PDFs, built on the Espresso sample. These are the live email HTML files, not screenshots, shown at desktop width (720px) and phone width (390px).</p>
+		<p>Nothing in the app sends these yet. Each section has a link you can share. Leave feedback on <a href="https://github.com/bwhtech/commera/pull/550">pull request #550</a>.</p>
+	</div>
+	<div id="sections"></div>
+</main>
+<script>
+	const base = '/assets/commera/espresso-templates';
+	const templates = [
+		{ id: 'order-confirmation-classic', title: 'Order confirmation', tag: 'Email, Classic layout', file: 'order-confirmation-classic' },
+		{ id: 'order-confirmation-lookbook', title: 'Order confirmation', tag: 'Email, Lookbook layout', file: 'order-confirmation-lookbook' },
+		{ id: 'order-cancelled', title: 'Order cancelled', tag: 'Email', file: 'order-cancelled-classic' },
+		{ id: 'back-in-stock', title: 'Back in stock', tag: 'Email', file: 'back-in-stock' },
+		{ id: 'order-link', title: 'Your order link', tag: 'Email', file: 'order-link' },
+		{ id: 'sign-in-code', title: 'Sign-in code', tag: 'Email', file: 'sign-in-code' },
+		{ id: 'order-confirmation-pdf', title: 'Order confirmation', tag: 'PDF, A4', pdf: 'order-confirmation' },
+		{ id: 'check-empty-sections', title: 'Check: empty sections hidden', tag: 'Email, Classic layout', file: 'order-confirmation-classic-minimal', note: 'No delivery note, no gift message, billing the same as shipping.' },
+		{ id: 'check-empty-sections-pdf', title: 'Check: empty sections hidden', tag: 'PDF, A4', pdf: 'order-confirmation-minimal', note: 'No notes, billing the same as shipping, no customer GSTIN.' },
+		{ id: 'check-merchant-text', title: 'Check: merchant text', tag: 'Email, Classic layout', file: 'order-confirmation-classic-merchant-text', note: 'The merchant changed the heading, intro, button label and closing.' },
+	];
+
+	function fitHeight(iframe) {
+		try {
+			iframe.style.height = iframe.contentDocument.documentElement.scrollHeight + 'px';
+		} catch (error) {
+			iframe.style.height = '1200px';
+		}
+	}
+
+	function addFrame(container, className, label, src) {
+		const frame = document.createElement('div');
+		frame.className = 'frame ' + className;
+		frame.innerHTML = `<div class="label">${label}</div>`;
+		const iframe = document.createElement('iframe');
+		iframe.loading = 'lazy';
+		iframe.src = src;
+		iframe.title = label;
+		if (className !== 'pdf') {
+			iframe.addEventListener('load', () => {
+				fitHeight(iframe);
+				setTimeout(() => fitHeight(iframe), 800);
+			});
+		}
+		frame.appendChild(iframe);
+		container.appendChild(frame);
+	}
+
+	const nav = document.getElementById('nav');
+	const sections = document.getElementById('sections');
+	for (const template of templates) {
+		const isCheck = template.id.startsWith('check-');
+		if (!isCheck) {
+			nav.insertAdjacentHTML('beforeend', `<a href="#${template.id}">${template.title}${template.tag.includes('Lookbook') ? ', Lookbook' : ''}${template.pdf ? ' PDF' : ''}</a>`);
+		}
+		const section = document.createElement('section');
+		section.id = template.id;
+		const openLink = template.pdf ? `${base}/pdfs/${template.pdf}.pdf` : `${base}/emails/${template.file}.html`;
+		section.innerHTML = `
+			<div class="section-head">
+				<div><h2>${template.title}</h2><div class="tag">${template.tag}</div></div>
+				<div><a href="#${template.id}">Link to this</a> &nbsp; <a href="${openLink}" target="_blank" rel="noopener">Open ${template.pdf ? 'PDF' : 'email'} on its own</a></div>
+			</div>
+			${template.note ? `<p class="note">${template.note}</p>` : ''}
+			<div class="frames"></div>`;
+		const frames = section.querySelector('.frames');
+		if (template.pdf) {
+			addFrame(frames, 'pdf', 'A4 page', `${base}/pdfs/${template.pdf}.pdf#view=FitH&toolbar=0`);
+		} else {
+			addFrame(frames, 'desktop', 'Desktop, 720px', `${base}/emails/${template.file}.html`);
+			addFrame(frames, 'mobile', 'Phone, 390px', `${base}/emails/${template.file}.html`);
+		}
+		sections.appendChild(section);
+	}
+	if (location.hash) {
+		setTimeout(() => document.querySelector(location.hash)?.scrollIntoView(), 300);
+	}
+</script>
+</body>
+</html>
+{% endraw %}
