@@ -62,18 +62,14 @@
 	.hero .doc-number span { display: block; font-size: 12px; color: var(--ink-gray-5); margin-bottom: 6px; }
 	.hero .doc-number b { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink-gray-9); }
 
-	.steps { display: grid; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--outline-gray-2); }
-	.step { position: relative; padding-top: 18px; font-size: 12px; line-height: 1.4; color: var(--ink-gray-5); }
-	.step::before { content: ""; position: absolute; top: 4px; left: 0; right: 0; height: 2px; background: var(--outline-gray-2); }
-	.step::after {
-		content: ""; position: absolute; top: 0; left: 0; width: 10px; height: 10px; border-radius: 50%;
-		background: var(--surface-gray-2); border: 2px solid var(--ink-gray-3);
-	}
-	.step.done { color: var(--ink-gray-7); }
-	.step.done::before { background: var(--ink-gray-9); }
-	.step.done::after { background: var(--ink-green-6); border-color: var(--ink-green-6); }
-	.step b { display: block; font-weight: 500; font-size: 13px; margin-bottom: 2px; color: var(--ink-gray-5); }
-	.step.done b { color: var(--ink-gray-9); }
+	.steps { margin-top: 18px; padding-top: 20px; border-top: 1px solid var(--outline-gray-2); }
+	.steps-status { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; line-height: 1.3; }
+	.steps-status b { font-size: 15px; font-weight: 600; color: var(--ink-gray-9); }
+	.steps-status span { font-size: 13px; color: var(--ink-gray-5); white-space: nowrap; }
+	.steps-bar { display: grid; gap: 4px; margin-top: 10px; }
+	.steps-bar i { height: 4px; border-radius: 4px; background: var(--outline-gray-2); }
+	.steps-bar i.done { background: var(--ink-green-6); }
+	.steps-detail { margin-top: 8px; font-size: 12px; line-height: 1.4; color: var(--ink-gray-5); }
 
 	.facts { display: grid; grid-template-columns: 1.2fr 1fr 1fr; margin-top: 20px; border-bottom: 1px solid var(--outline-gray-2); padding-bottom: 16px; }
 	.fact { padding-right: 14px; }
@@ -146,15 +142,17 @@
 			<b>SO-26-00482</b>
 		</div>
 	</div>
-	<div class="steps" style="grid-template-columns: repeat(4, 1fr)">
 	
-	<div class="step done"><b>Confirmed</b>28 Sep</div>
-	
-	<div class="step "><b>Packed</b>Within a day</div>
-	
-	<div class="step "><b>Shipped</b>Tracking by email</div>
-	
-	<div class="step "><b>Delivered</b>2 to 4 Oct</div>
+
+
+<div class="steps">
+	<div class="steps-status">
+		<b>Confirmed</b>
+		<span class="num">Arriving 2 to 4 Oct</span>
+	</div>
+	<div class="steps-bar" style="grid-template-columns: repeat(4, 1fr)">
+		<i class="done"></i><i class=""></i><i class=""></i><i class=""></i>
+	</div>
 	
 </div>
 </section>

@@ -79,7 +79,7 @@ export type Brand = {
 
 export type Copy = { subject: string; heading: string; intro: string; closing: string; button: string };
 
-export type Step = { title: string; hint: string; done: boolean };
+export type Step = { title: string; date?: string; pending_title?: string; detail?: string; done: boolean };
 
 export type Sample = {
 	brand: Brand;

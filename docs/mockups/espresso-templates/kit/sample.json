@@ -101,10 +101,10 @@
 		]
 	},
 	"steps": [
-		{ "title": "Confirmed", "hint": "28 Sep", "done": true },
-		{ "title": "Packed", "hint": "Within a day", "done": false },
-		{ "title": "Shipped", "hint": "Tracking by email", "done": false },
-		{ "title": "Delivered", "hint": "2 to 4 Oct", "done": false }
+		{ "title": "Confirmed", "date": "28 Sep", "done": true },
+		{ "title": "Packed", "done": false },
+		{ "title": "Shipped", "done": false },
+		{ "title": "Delivered", "pending_title": "Arriving", "date": "2 to 4 Oct", "done": false }
 	],
 	"shipment": {
 		"carrier": "Delhivery",

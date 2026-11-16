@@ -28,10 +28,18 @@
 {%- endmacro %}
 
 {% macro progress_steps(steps) -%}
-<div class="steps" style="grid-template-columns: repeat({{ steps | length }}, 1fr)">
-	{% for step in steps %}
-	<div class="step {{ 'done' if step.done }}"><b>{{ step.title }}</b>{{ step.hint }}</div>
-	{% endfor %}
+{% set done_steps = steps | selectattr("done") | list %}
+{% set current = done_steps | last if done_steps else steps[0] %}
+{% set upcoming = steps[steps.index(current) + 1:] | selectattr("date") | first %}
+<div class="steps">
+	<div class="steps-status">
+		<b>{{ current.title }}</b>
+		<span class="num">{% if upcoming %}{{ upcoming.pending_title or upcoming.title }} {{ upcoming.date }}{% else %}{{ current.date }}{% endif %}</span>
+	</div>
+	<div class="steps-bar" style="grid-template-columns: repeat({{ steps | length }}, 1fr)">
+		{% for step in steps %}<i class="{{ 'done' if step.done }}"></i>{% endfor %}
+	</div>
+	{% if current.detail %}<p class="steps-detail">{{ current.detail }}</p>{% endif %}
 </div>
 {%- endmacro %}
 

@@ -16,7 +16,7 @@ export default function OrderConfirmationClassic({ brand, order, steps, copy, im
 			<Card first>
 				<Heading layout="classic">{fill(text.heading, values)}</Heading>
 				<Intro layout="classic">{fill(text.intro, values)}</Intro>
-				<ProgressSteps steps={steps} layout="classic" />
+				<ProgressSteps steps={steps} />
 				<Button href={order.order_url}>{text.button}</Button>
 			</Card>
 

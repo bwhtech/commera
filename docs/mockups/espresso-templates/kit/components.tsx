@@ -133,48 +133,46 @@ export function PlaceholderTile({ name, width, height, fontSize = 16, margin = "
 	);
 }
 
-export function ProgressSteps({ steps, layout }: { steps: Step[]; layout: Layout }) {
-	if (layout === "lookbook") {
-		return (
-			<>
-				{steps.map((step, index) => (
-					<Row key={step.title}>
-						<Column style={{ width: 24, verticalAlign: "top" }}>
-							<div
-								style={{
-									width: 8, height: 8, borderRadius: "50%", border: "2px solid", marginTop: 3,
-									backgroundColor: step.done ? t.inkGreen6 : t.surfaceBase, borderColor: step.done ? t.inkGreen6 : t.inkGray3,
-								}}
-							/>
-							{index < steps.length - 1 && (
-								<div style={{ width: 2, height: 20, backgroundColor: t.outlineGray2, marginLeft: 5, marginTop: 4 }} />
-							)}
-						</Column>
-						<Column style={{ verticalAlign: "top", paddingBottom: 12 }}>
-							<Text style={{ ...text, fontSize: 14, fontWeight: t.medium, lineHeight: "1.3", color: step.done ? t.inkGray9 : t.inkGray5 }}>
-								{step.title} <span style={{ fontWeight: t.regular, color: t.inkGray5, marginLeft: 6 }}>{step.hint}</span>
-							</Text>
-						</Column>
-					</Row>
-				))}
-			</>
-		);
-	}
+function stepStatus(steps: Step[]) {
+	const current = [...steps].reverse().find((step) => step.done) ?? steps[0];
+	const upcoming = steps.slice(steps.indexOf(current) + 1).find((step) => step.date);
+	const when = upcoming ? `${upcoming.pending_title ?? upcoming.title} ${upcoming.date}` : (current.date ?? "");
+	return { title: current.title, when, detail: current.detail };
+}
+
+export function ProgressSteps({ steps, marginTop = 24 }: { steps: Step[]; marginTop?: number }) {
+	const status = stepStatus(steps);
+	const barHeight = 4;
+	const barGap = 4;
 	return (
-		<Row style={{ marginTop: 22 }}>
-			{steps.map((step, index) => (
-				<Column
-					key={step.title}
-					style={{
-						borderTop: "3px solid", borderTopColor: step.done ? t.inkGreen6 : t.outlineGray2, paddingTop: 10,
-						verticalAlign: "top", width: `${100 / steps.length}%`, paddingRight: index < steps.length - 1 ? 8 : 0,
-					}}
-				>
-					<Text style={{ ...text, fontSize: 13, fontWeight: t.medium, lineHeight: "1.3", color: step.done ? t.inkGray9 : t.inkGray5 }}>{step.title}</Text>
-					<Text style={{ ...text, fontSize: 12, color: t.inkGray5, lineHeight: "1.4", marginTop: 2 }}>{step.hint}</Text>
+		<Section style={{ marginTop }}>
+			<Row>
+				<Column style={{ verticalAlign: "bottom" }}>
+					<Text style={{ ...text, fontSize: 15, fontWeight: t.semibold, lineHeight: "1.3", color: t.inkGray9 }}>{status.title}</Text>
 				</Column>
-			))}
-		</Row>
+				<Column align="right" style={{ verticalAlign: "bottom", whiteSpace: "nowrap" }}>
+					<Text style={{ ...text, ...s.num, fontSize: 13, lineHeight: "1.3", color: t.inkGray5 }}>{status.when}</Text>
+				</Column>
+			</Row>
+			<Row style={{ marginTop: 10 }}>
+				{steps.map((step, index) => (
+					<Column
+						key={step.title}
+						style={{ width: `${100 / steps.length}%`, padding: 0, paddingRight: index < steps.length - 1 ? barGap : 0, verticalAlign: "top" }}
+					>
+						<div
+							style={{
+								height: barHeight, lineHeight: `${barHeight}px`, fontSize: 1, borderRadius: barHeight,
+								backgroundColor: step.done ? t.inkGreen6 : t.outlineGray2,
+							}}
+						>
+							&nbsp;
+						</div>
+					</Column>
+				))}
+			</Row>
+			{status.detail && <Text style={{ ...text, fontSize: 13, lineHeight: "1.4", color: t.inkGray5, marginTop: 8 }}>{status.detail}</Text>}
+		</Section>
 	);
 }
 

@@ -23,9 +23,8 @@ export default function OrderConfirmationLookbook({ brand, order, steps, copy, i
 			<Totals order={order} layout="lookbook" />
 
 			<Section style={{ marginTop: 32 }}>
-				<Text style={s.h2}>What happens next</Text>
-				<ProgressSteps steps={steps} layout="lookbook" />
-				<Button href={order.order_url} layout="lookbook">
+				<ProgressSteps steps={steps} marginTop={0} />
+				<Button href={order.order_url} layout="lookbook" marginTop={24}>
 					{text.button}
 				</Button>
 			</Section>
