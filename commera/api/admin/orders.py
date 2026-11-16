@@ -12,7 +12,7 @@ from commera.api.admin.inventory import get_inventory
 from commera.api.admin.plugins import query_deliveries
 from commera.api.shipping import get_order_charge_lines
 from commera.discounts.allocations import get_allocations, get_discount_rows, get_order_discount_rows
-from commera.utils import get_address_lines, get_item_images, get_store_currency
+from commera.utils import get_address_lines, get_item_images, get_lines_the_store_ships, get_store_currency
 
 PAGE_LENGTH = 20
 
@@ -356,6 +356,7 @@ def get_shipped_orders():
 	"""The orders whose parcel has physically moved, as a subquery. Only the latest shipment counts: a
 	rebooked order carries a stale older request that must not settle it."""
 	shipment = frappe.qb.DocType("Shipment")
+	sales_order = frappe.qb.DocType("Sales Order")
 	newest_moved = Max(
 		Case()
 		.when(shipment.custom_shipment_status.isin(SETTLED_SHIPMENT_STATUSES), shipment.creation)
@@ -363,10 +364,11 @@ def get_shipped_orders():
 	)
 	return (
 		frappe.qb.from_(shipment)
+		.join(sales_order)
+		.on(sales_order.name == shipment.custom_sales_order)
 		.select(shipment.custom_sales_order)
 		.where(shipment.docstatus < 2)
-		.where(shipment.custom_sales_order.notnull())
-		.where(shipment.custom_sales_order != "")
+		.where((sales_order.per_delivered <= 0) | (sales_order.per_delivered >= 100))
 		.groupby(shipment.custom_sales_order)
 		.having(newest_moved == Max(shipment.creation))
 	)
@@ -384,8 +386,9 @@ def pick_stage(order, lifecycle) -> str:
 	"""The furthest rung this order has reached, tried from the top of the ladder down."""
 	if cint(order.docstatus) == 2:
 		return "cancelled"
-	if lifecycle.get("stage_from_shipment"):
-		return lifecycle.stage_from_shipment
+	stage_from_shipment = lifecycle.get("stage_from_shipment")
+	if stage_from_shipment == "returned" or (stage_from_shipment and not is_part_shipped(order)):
+		return stage_from_shipment
 	if lifecycle.get("has_return"):
 		return "returned"
 	if order.status == "Completed" or flt(order.per_delivered) >= 100:
@@ -403,6 +406,11 @@ def pick_stage(order, lifecycle) -> str:
 		return "to_fulfil"
 	# On Hold, Closed and friends keep ERPNext's own word rather than a rung they never reached.
 	return cstr(order.status)
+
+
+def is_part_shipped(order) -> bool:
+	# A parcel carries only the units on its Delivery Note; closing the order is what settles the rest.
+	return 0 < flt(order.per_delivered) < 100 and order.status != "Closed"
 
 
 def describe_progress(order, lifecycle=None) -> list:
@@ -837,16 +845,6 @@ def can_fulfil_order(order, state) -> bool:
 		and state["key"] not in SETTLED_STAGES
 		and bool(get_lines_the_store_ships(order.lines))
 	)
-
-
-def get_lines_the_store_ships(lines) -> list:
-	"""Outstanding lines a Delivery Note can take. ERPNext's mapper leaves out drop-ship lines: the supplier
-	ships those against a Purchase Order."""
-	return [
-		line
-		for line in lines
-		if not cint(line.delivered_by_supplier) and flt(line.delivered_qty) < flt(line.qty)
-	]
 
 
 @frappe.whitelist(methods=["POST"])

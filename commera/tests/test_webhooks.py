@@ -14,9 +14,11 @@ from commera.api.admin import webhooks as webhooks_api
 from commera.roles import COMMERA_ADMIN, COMMERA_USER, add_commera_roles
 from commera.sdk import STORE_ORDER_TYPE
 from commera.sdk.events import HANDLER_HOOKS, CommeraEvent
+from commera.shipping.testing import insert_shipment_record
 from commera.tests.test_admin_orders import make_test_sales_order
+from commera.tests.test_order_status import deliver as deliver_order
 from commera.tests.test_product_details import ProductDetailPriceTestCase
-from commera.utils import update_sales_order_ecommerce_status
+from commera.utils import fire_status_events, update_sales_order_ecommerce_status
 from commera.webhooks import (
 	ALLOW_LOCAL_URLS_CONFIG,
 	EVENT_HEADER,
@@ -565,4 +567,34 @@ class TestWebhookOrderEvents(IntegrationTestCase):
 		)
 		self.assertEqual(
 			data["status"], frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status")
+		)
+
+	def test_overlapping_recounts_of_one_status_move_fire_order_updated_once(self):
+		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
+		make_webhook(["order_updated"])
+		modified = frappe.db.get_value("Sales Order", sales_order.name, "modified")
+
+		fire_status_events(sales_order.name, "Delivered", modified)
+		fire_status_events(sales_order.name, "Delivered", modified)
+
+		self.assertEqual(self.get_events(sales_order.name).count("order_updated"), 1)
+
+	def test_going_back_to_an_earlier_status_fires_order_updated_again(self):
+		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
+		make_webhook(["order_updated"])
+		delivery_note = deliver_order(sales_order, first_line_qty=1)
+		update_sales_order_ecommerce_status(sales_order.name)
+		for parcel_status in ("Draft", "In Transit"):
+			insert_shipment_record(sales_order.name, parcel_status, delivery_note.name)
+			update_sales_order_ecommerce_status(sales_order.name)
+
+		events = frappe.get_all(
+			"Commera Event",
+			filters={"reference_name": sales_order.name, "event": "order_updated"},
+			pluck="data",
+			order_by="creation",
+		)
+		self.assertEqual(
+			[frappe.parse_json(data)["status"] for data in events],
+			["Partially Shipped", "Preparing for Shipment", "Partially Shipped"],
 		)

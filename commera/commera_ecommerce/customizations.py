@@ -391,6 +391,7 @@ CUSTOM_FIELDS = {
 			"options": "Waiting for Approval\n"
 			"Order Received\n"
 			"Preparing for Shipment\n"
+			"Partially Shipped\n"
 			"Shipped\n"
 			"Delivered\n"
 			"Partially Returned\n"
