@@ -1,0 +1,2 @@
+/* The editor already loads frappe-ui's styles and fonts. This adds only the utility classes the plugin uses. */
+@tailwind utilities;

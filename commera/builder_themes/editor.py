@@ -33,14 +33,20 @@ def get_page_labels() -> dict[str, str]:
 
 
 def get_page_tab(page_type: str, page_name: str) -> dict:
-	page = frappe.db.get_value("Builder Page", page_name, ["published", "draft_blocks"], as_dict=True)
+	page = frappe.get_doc("Builder Page", page_name)
 	return {
 		"page_type": page_type,
 		"label": get_page_labels()[page_type],
 		"page": page_name,
 		"is_published": bool(page.published),
 		"has_unpublished_changes": bool(page.draft_blocks) and bool(page.published),
+		"is_empty": is_empty(page),
 	}
+
+
+def is_empty(page) -> bool:
+	"""A page with only its body block. Publishing skips it, so its route keeps the parent theme's page."""
+	return page.block_count() <= 1
 
 
 def get_preview(page_type: str) -> dict | None:
@@ -84,7 +90,7 @@ def publish_theme(theme: str) -> dict:
 	for page_type, page_name in get_theme_pages(theme).items():
 		page = frappe.get_doc("Builder Page", page_name)
 		page.check_permission("write")
-		if page.block_count() <= 1:
+		if is_empty(page):
 			skipped.append(labels[page_type])
 			continue
 		page.publish()

@@ -1,0 +1,9 @@
+{
+	"v": 1,
+	"name": "bwhtech/commera",
+	"label": "Commera",
+	"description": "Design Commera store themes in Builder: switch between a theme's pages, pick what the canvas previews, publish the theme and activate it.",
+	"version": "1.0.0",
+	"entry": "main.js",
+	"icon": "icon.svg"
+}
