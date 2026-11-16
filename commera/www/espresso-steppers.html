@@ -1,0 +1,174 @@
+<!doctype html>
+{% raw %}
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stepper options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+	:root {
+		--ink-9: #0f0f0f;
+		--ink-7: #383838;
+		--ink-5: #7c7c7c;
+		--surface: #ffffff;
+		--surface-1: #f8f8f8;
+		--surface-2: #f3f3f3;
+		--outline-1: #ededed;
+		--outline-2: #e2e2e2;
+		--green: #258c5c;
+	}
+	* { box-sizing: border-box; }
+	body { margin: 0; background: var(--surface-1); color: var(--ink-7); font: 420 14px/1.5 Inter, system-ui, sans-serif; }
+	header.top { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--outline-1); }
+	.top-inner { max-width: 1240px; margin: 0 auto; padding: 14px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+	.top-inner strong { color: var(--ink-9); font-weight: 600; font-size: 15px; }
+	nav { display: flex; gap: 6px; flex-wrap: wrap; }
+	nav a { color: var(--ink-7); text-decoration: none; padding: 4px 10px; border-radius: 8px; background: var(--surface-2); font-size: 13px; }
+	nav a:hover { color: var(--ink-9); background: var(--outline-2); }
+	main { max-width: 1240px; margin: 0 auto; padding: 24px 16px 80px; }
+	.intro { max-width: 760px; margin-bottom: 32px; }
+	.intro h1 { color: var(--ink-9); font-size: 28px; letter-spacing: -0.02em; margin: 0 0 8px; font-weight: 600; }
+	.intro p { margin: 0 0 6px; }
+	.intro a { color: var(--ink-9); font-weight: 500; }
+	section { background: var(--surface); border: 1px solid var(--outline-1); border-radius: 12px; padding: 20px; margin-bottom: 28px; scroll-margin-top: 80px; }
+	.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+	.section-head h2 { margin: 0; font-size: 17px; color: var(--ink-9); font-weight: 600; }
+	.tag { font-size: 12px; color: var(--ink-5); }
+	.section-head a { color: var(--ink-9); font-size: 13px; font-weight: 500; }
+	.verdict { margin: 0 0 20px; max-width: 760px; font-size: 13px; }
+	.verdict p { margin: 0 0 4px; }
+	.verdict b { color: var(--ink-9); font-weight: 500; }
+	.state-title { font-size: 13px; font-weight: 500; color: var(--ink-9); margin: 20px 0 8px; }
+	.frames { display: flex; gap: 20px; align-items: flex-start; overflow-x: auto; }
+	.frame { flex: none; }
+	.frame .label { font-size: 12px; color: var(--ink-5); margin-bottom: 6px; }
+	iframe { display: block; border: 1px solid var(--outline-2); border-radius: 8px; background: var(--surface); }
+	.desktop iframe { width: 720px; }
+	.mobile iframe { width: 390px; }
+	.pdf img { display: block; width: 794px; max-width: 100%; border: 1px solid var(--outline-2); border-radius: 8px; }
+	.pdf { max-width: 100%; }
+	@media (max-width: 1180px) { .desktop { display: none; } }
+	@media (max-width: 860px) { .frames { flex-direction: column; } .pdf { width: 100%; } }
+	@media (max-width: 430px) { .mobile, .mobile iframe { width: 100%; } header.top { position: static; } section { scroll-margin-top: 16px; padding: 14px; } }
+</style>
+</head>
+<body>
+<header class="top">
+	<div class="top-inner">
+		<strong>Stepper options</strong>
+		<nav id="nav"><a href="/espresso-templates">Back to all templates</a></nav>
+	</div>
+</header>
+<main>
+	<div class="intro">
+		<h1>Order progress stepper: pick one</h1>
+		<p>The stepper (Confirmed, Packed, Shipped, Delivered) sits in the first card of the order emails and in the PDF hero. Today its sub-lines wrap to two or three lines on a phone. Each option below copies a pattern a large store already uses, and is drawn with tables and inline styles, so the same markup works in email at 720px, at 390px, and in an A4 PDF.</p>
+		<p>Every option is shown in three states: just confirmed, shipped, and delivered. The frames are the live email HTML, not screenshots. <a href="/espresso-templates">Back to all templates</a></p>
+	</div>
+	<div id="sections"></div>
+</main>
+<script>
+	const base = '/assets/commera/espresso-templates/steppers';
+	const states = [
+		{ key: 'confirmed', title: 'Just confirmed, arriving 2 to 4 Oct' },
+		{ key: 'shipped', title: 'Shipped with Delhivery, arriving 3 Oct' },
+		{ key: 'delivered', title: 'Delivered 3 Oct' },
+	];
+	const options = [
+		{
+			id: 'current', title: 'Option 0: Current', model: 'Commera today: segmented bar with a hint under every step',
+			pros: 'Every step carries its own context on desktop.',
+			cons: 'At 390px the hints wrap to two or three lines, and the PDF uses a different dot design from the email.',
+		},
+		{
+			id: 'amazon', title: 'Option 1: Amazon-style bar, labels only', model: 'Amazon order page and shipment emails',
+			pros: 'The delivery date is the largest line, and one-word labels never wrap.',
+			cons: 'Dates of finished steps are not shown; only the current date is.',
+		},
+		{
+			id: 'apple', title: 'Option 2: Apple-style status line and thin bar', model: 'Apple order status page and order emails',
+			pros: 'The smallest and calmest option. There is nothing that can wrap.',
+			cons: 'Pending step names are hidden, so the customer does not see what comes next.',
+		},
+		{
+			id: 'shopify', title: 'Option 3: Shopify-style check markers', model: 'Shopify order status page',
+			pros: 'Reads as a sequence at a glance, and each finished step keeps its date.',
+			cons: 'Four columns at 390px are near the limit; a longer translated label would wrap. The estimate looks like a done date.',
+		},
+		{
+			id: 'flipkart', title: 'Option 4: Flipkart-style vertical timeline', model: 'Flipkart and Myntra order tracking',
+			pros: 'Room for a date on every step at any width, safe for translations, and the same markup for email and PDF.',
+			cons: 'The tallest option. It adds about 150px and pushes the button down; on desktop the rows are wide and sparse.',
+		},
+		{
+			id: 'hims', title: 'Option 5: Hims-style segmented bar, labels only', model: 'Hims delivery email (Email Love, Really Good Emails), AfterShip and Zembula templates',
+			pros: 'The smallest change from today: keep the segments, drop the hints, move the date above.',
+			cons: 'The 3px bar is faint, especially on the gray PDF band. Dates of finished steps are not shown.',
+		},
+		{
+			id: 'nike', title: 'Option 6: Nike-style status box, no stepper', model: 'Nike, Zara and H&M shipping emails, Shopify notification emails',
+			pros: 'Nothing can break. One clear sentence answers "when will it arrive".',
+			cons: 'No sense of how many steps are left. The least visual option.',
+		},
+	];
+
+	function fitHeight(iframe) {
+		try {
+			iframe.style.height = iframe.contentDocument.documentElement.scrollHeight + 'px';
+		} catch (error) {
+			iframe.style.height = '420px';
+		}
+	}
+
+	function addFrame(container, className, label, src) {
+		const frame = document.createElement('div');
+		frame.className = 'frame ' + className;
+		frame.innerHTML = `<div class="label">${label}</div>`;
+		const iframe = document.createElement('iframe');
+		iframe.loading = 'lazy';
+		iframe.src = src;
+		iframe.title = label;
+		iframe.addEventListener('load', () => {
+			fitHeight(iframe);
+			setTimeout(() => fitHeight(iframe), 800);
+		});
+		frame.appendChild(iframe);
+		container.appendChild(frame);
+	}
+
+	const nav = document.getElementById('nav');
+	const sections = document.getElementById('sections');
+	for (const option of options) {
+		nav.insertAdjacentHTML('beforeend', `<a href="#${option.id}">${option.title.split(': ')[1].split('-style')[0]}</a>`);
+		const section = document.createElement('section');
+		section.id = option.id;
+		section.innerHTML = `
+			<div class="section-head">
+				<div><h2>${option.title}</h2><div class="tag">Modelled on ${option.model}</div></div>
+				<div><a href="#${option.id}">Link to this</a></div>
+			</div>
+			<div class="verdict"><p><b>Pros:</b> ${option.pros}</p><p><b>Cons:</b> ${option.cons}</p></div>`;
+		for (const state of states) {
+			section.insertAdjacentHTML('beforeend', `<div class="state-title">${state.title}</div>`);
+			const frames = document.createElement('div');
+			frames.className = 'frames';
+			const src = `${base}/${option.id}-${state.key}.html`;
+			addFrame(frames, 'desktop', 'Desktop, 720px', src);
+			addFrame(frames, 'mobile', 'Phone, 390px', src);
+			section.appendChild(frames);
+		}
+		section.insertAdjacentHTML('beforeend', `
+			<div class="state-title">PDF hero, A4, just confirmed</div>
+			<div class="pdf"><img src="${base}/${option.id}-pdf.png" alt="${option.title} in the PDF hero" loading="lazy"></div>`);
+		sections.appendChild(section);
+	}
+	if (location.hash) {
+		setTimeout(() => document.querySelector(location.hash)?.scrollIntoView(), 300);
+	}
+</script>
+</body>
+</html>
+{% endraw %}
