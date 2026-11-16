@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe.utils import get_url
 
 from commera.api.admin.integrations import describe_integration, save_integration
 from commera.migrate import add_payment_mode
@@ -10,11 +11,40 @@ from commera.payment_gateways.connectors import get_connector_class, get_connect
 PROFILE_DOCTYPE = "Payment Gateway Profile"
 PROFILE_SETTINGS_FIELDNAME = "gateway_settings"
 WEBHOOK_PATH = "/api/method/commera.payment_gateways.api.handle_webhook?gateway={profile}"
+CONFIRMATION_PATH = "/account/orders/confirmation"
+CHECKOUT_PATH = "/cart/checkout"
+RETURN_PATHS = {
+	"success_url": CONFIRMATION_PATH,
+	"authorised_url": CONFIRMATION_PATH,
+	"failure_url": CHECKOUT_PATH,
+	"declined_url": CHECKOUT_PATH,
+	"cancelled_url": CHECKOUT_PATH,
+}
 
 
 def add_gateway_payment_mode(integration):
 	"""ERPNext refuses to post a Payment Entry for a gateway with no matching Mode of Payment."""
 	add_payment_mode(integration["label"], "Bank")
+
+
+def add_gateway_setup(integration):
+	add_gateway_payment_mode(integration)
+	add_return_urls(integration["settings_doctype"])
+
+
+def add_return_urls(settings_doctype: str):
+	settings = frappe.get_single(settings_doctype)
+	empty_fields = [
+		fieldname
+		for fieldname in RETURN_PATHS
+		if settings.meta.has_field(fieldname) and not settings.get(fieldname)
+	]
+	if not empty_fields:
+		return
+
+	for fieldname in empty_fields:
+		settings.set(fieldname, get_url(RETURN_PATHS[fieldname]))
+	settings.save()
 
 
 def get_payment_registry():
@@ -34,7 +64,7 @@ def get_payment_entry(settings_doctype: str) -> dict:
 		"profile_doctype": PROFILE_DOCTYPE,
 		"profile_settings_fieldname": PROFILE_SETTINGS_FIELDNAME,
 		"webhook_path": WEBHOOK_PATH,
-		"on_enable": add_gateway_payment_mode,
+		"on_enable": add_gateway_setup,
 	}
 
 

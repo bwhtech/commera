@@ -6,6 +6,7 @@ import frappe
 from bwh_payments_core.contract import PaymentGatewayBase
 from frappe.model.base_document import get_controller
 from frappe.tests import IntegrationTestCase
+from frappe.utils import get_url
 from frappe.utils.password import get_decrypted_password
 
 from commera.api.admin.integrations import (
@@ -145,6 +146,34 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 		self.assertTrue(frappe.db.get_single_value(SETTINGS_DOCTYPE, "enabled"))
 		self.assertTrue(frappe.db.get_value("Mode of Payment", GATEWAY, "enabled"))
 		self.assertIn(GATEWAY, get_available_payment_modes())
+
+	def test_enabling_fills_the_empty_return_urls_with_the_shop_pages(self):
+		custom_failure_url = "https://shop.example/payment-failed"
+		frappe.db.set_single_value(
+			SETTINGS_DOCTYPE, {"success_url": "", "failure_url": custom_failure_url, "cancelled_url": ""}
+		)
+		frappe.clear_document_cache(SETTINGS_DOCTYPE, SETTINGS_DOCTYPE)
+
+		save_payment_integration(SLUG, 1, FULL_CREDENTIALS)
+
+		settings = frappe.get_single(SETTINGS_DOCTYPE)
+		self.assertEqual(settings.success_url, get_url("/account/orders/confirmation"))
+		self.assertEqual(settings.cancelled_url, get_url("/cart/checkout"))
+		self.assertEqual(settings.failure_url, custom_failure_url)
+		self.assertTrue(settings.success_url.startswith(("http://", "https://")))
+
+	def test_enabling_telr_fills_its_own_return_url_fields(self):
+		telr = "Telr Gateway Settings"
+		self.addCleanup(frappe.clear_document_cache, telr, telr)
+		frappe.db.set_single_value(telr, {"authorised_url": "", "declined_url": "", "cancelled_url": ""})
+		frappe.clear_document_cache(telr, telr)
+
+		save_payment_integration("telr", 1, {"store_id": "12345", "auth_key": "zz-telr-auth-key"})
+
+		settings = frappe.get_single(telr)
+		self.assertEqual(settings.authorised_url, get_url("/account/orders/confirmation"))
+		self.assertEqual(settings.declined_url, get_url("/cart/checkout"))
+		self.assertEqual(settings.cancelled_url, get_url("/cart/checkout"))
 
 	def test_disabling_switches_both_off_without_deleting(self):
 		save_payment_integration(SLUG, 1, FULL_CREDENTIALS)
