@@ -71,6 +71,13 @@ class TestOrderStatus(IntegrationTestCase):
 		update_sales_order_ecommerce_status(sales_order.name)
 		return frappe.db.get_value("Sales Order", sales_order.name, "custom_ecommerce_status")
 
+	def queued_methods(self, action):
+		frappe.db.after_commit.reset()
+		with patch.object(frappe, "enqueue") as enqueue:
+			action()
+			frappe.db.after_commit.run()
+		return [call.args[0] for call in enqueue.call_args_list if call.args]
+
 	def fired_events(self, sales_order):
 		return frappe.get_all(
 			"Commera Event", filters={"reference_name": sales_order.name}, pluck="event", order_by="creation"
@@ -173,9 +180,9 @@ class TestOrderStatus(IntegrationTestCase):
 
 		line = sales_order.items[0]
 		items = [{"docname": line.name, "item_code": line.item_code, "qty": 1, "rate": line.rate}]
-		with patch.object(frappe, "enqueue") as enqueue:
-			update_child_qty_rate("Sales Order", frappe.as_json(items), sales_order.name)
-		queued_methods = [call.args[0] for call in enqueue.call_args_list if call.args]
+		queued_methods = self.queued_methods(
+			lambda: update_child_qty_rate("Sales Order", frappe.as_json(items), sales_order.name)
+		)
 		self.assertIn("commera.utils.update_sales_order_ecommerce_status", queued_methods)
 		self.assertEqual(self.status_of(sales_order), "Delivered")
 
@@ -184,16 +191,16 @@ class TestOrderStatus(IntegrationTestCase):
 		deliver(sales_order, first_line_qty=1)
 		self.assertEqual(self.status_of(sales_order), "Partially Shipped")
 
-		with patch.object(frappe, "enqueue") as enqueue:
-			frappe.get_doc("Sales Order", sales_order.name).update_status("Closed")
-		queued_methods = [call.args[0] for call in enqueue.call_args_list if call.args]
+		queued_methods = self.queued_methods(
+			lambda: frappe.get_doc("Sales Order", sales_order.name).update_status("Closed")
+		)
 		self.assertIn("commera.utils.update_sales_order_ecommerce_status", queued_methods)
 		self.assertEqual(self.status_of(sales_order), "Delivered")
 		self.assertIn("order_delivered", self.fired_events(sales_order))
 
-		with patch.object(frappe, "enqueue") as enqueue:
-			frappe.get_doc("Sales Order", sales_order.name).update_status("Draft")
-		queued_methods = [call.args[0] for call in enqueue.call_args_list if call.args]
+		queued_methods = self.queued_methods(
+			lambda: frappe.get_doc("Sales Order", sales_order.name).update_status("Draft")
+		)
 		self.assertIn("commera.utils.update_sales_order_ecommerce_status", queued_methods)
 		self.assertEqual(self.status_of(sales_order), "Partially Shipped")
 
