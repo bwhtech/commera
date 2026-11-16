@@ -11,7 +11,12 @@ from commera.api.admin.orders import get_order
 from commera.api.payments import make_sales_invoice
 from commera.sdk import STORE_ORDER_TYPE
 from commera.shipping.testing import insert_shipment_record
-from commera.tests.test_admin_orders import ITEM_RATE, make_drop_ship_order, make_test_sales_order
+from commera.tests.test_admin_orders import (
+	ITEM_RATE,
+	make_drop_ship_order,
+	make_test_sales_order,
+	to_fulfil_names,
+)
 from commera.tests.test_order_access import make_website_user
 from commera.themes.summer_theme.pages.account.dashboard import (
 	get_context as get_account_dashboard_context,
@@ -237,6 +242,16 @@ class TestOrderStatus(IntegrationTestCase):
 		self.assertEqual(self.status_of(sales_order), "Partially Shipped")
 		self.assertNotIn("order_fulfilled", self.fired_events(sales_order))
 		self.assertNotIn("order_delivered", self.fired_events(sales_order))
+
+	def test_the_owner_can_ship_the_rest_after_a_parcel_for_part_of_an_order_moves(self):
+		sales_order = make_paid_order()
+		delivery_note = deliver(sales_order, first_line_qty=1)
+		self.book_parcel(sales_order, "Delivered", delivery_note=delivery_note.name)
+
+		order = get_order(sales_order.name)
+		self.assertEqual(order["state"]["key"], "partly_fulfilled")
+		self.assertTrue(order["can_fulfil"])
+		self.assertIn(sales_order.name, to_fulfil_names())
 
 	def test_a_booked_parcel_holds_the_order_until_the_carrier_moves_it(self):
 		sales_order = make_paid_order()

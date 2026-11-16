@@ -205,6 +205,18 @@ class TestFulfilmentLadder(UnitTestCase):
 	def test_a_part_shipped_order_is_partly_fulfilled(self):
 		self.assertEqual(describe_state(make_order(per_delivered=40))["key"], "partly_fulfilled")
 
+	def test_a_parcel_for_part_of_an_order_leaves_it_partly_fulfilled(self):
+		for stage_from_shipment in ("shipped", "delivered"):
+			with self.subTest(stage_from_shipment=stage_from_shipment):
+				lifecycle = frappe._dict(stage_from_shipment=stage_from_shipment)
+				state = describe_state(make_order(per_delivered=40), lifecycle)
+				self.assertEqual(state["key"], "partly_fulfilled")
+
+	def test_a_closed_part_shipped_order_takes_its_parcel_s_stage(self):
+		lifecycle = frappe._dict(stage_from_shipment="delivered")
+		order = make_order(status="Closed", per_delivered=40)
+		self.assertEqual(describe_state(order, lifecycle)["key"], "delivered")
+
 	def test_the_carrier_status_outranks_the_paperwork(self):
 		lifecycle = frappe._dict(stage_from_shipment="delivered", has_packing_slip=True)
 		order = make_order(status="Completed", per_delivered=100)
