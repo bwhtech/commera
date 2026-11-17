@@ -1,16 +1,43 @@
-import { Column, Row, Section, Text } from "@react-email/components";
+import { Column, Row, Section, Text } from '@react-email/components';
 import {
-	AddressBlock, Button, Card, EmailLayout, FactBlock, Footer, Header, Heading, Intro, ItemRow, NoteBlock, ProgressSteps, Totals, s,
-} from "../kit/components";
-import { type Sample, fill, money, orderTotals } from "../kit/data";
+	AddressBlock,
+	Button,
+	Card,
+	EmailLayout,
+	FactBlock,
+	Footer,
+	Header,
+	Heading,
+	Intro,
+	ItemRow,
+	NoteBlock,
+	ProgressSteps,
+	Totals,
+	s,
+} from '../kit/components';
+import { type Sample, fill, money, orderTotals } from '../kit/data';
 
-export default function OrderConfirmationClassic({ brand, order, steps, copy, imageBase }: Sample) {
+export default function OrderConfirmationClassic({
+	brand,
+	order,
+	steps,
+	copy,
+	imageBase,
+}: Sample) {
 	const text = copy.order_confirmation;
 	const { grand } = orderTotals(order);
-	const values = { first_name: order.customer_first_name, order_number: order.name };
+	const values = {
+		first_name: order.customer_first_name,
+		order_number: order.name,
+	};
 
 	return (
-		<EmailLayout layout="classic" preview={`Order ${order.name} confirmed. ${money(grand)}, arriving ${order.delivery_window}.`}>
+		<EmailLayout
+			layout="classic"
+			preview={`Order ${order.name} confirmed. ${money(grand)}, arriving ${
+				order.delivery_window
+			}.`}
+		>
 			<Header brand={brand} layout="classic" meta={`Order ${order.name}`} />
 
 			<Card first>
@@ -31,26 +58,44 @@ export default function OrderConfirmationClassic({ brand, order, steps, copy, im
 			{(order.customer_note || order.gift_message) && (
 				<Card>
 					<NoteBlock label="Your delivery note" body={order.customer_note} />
-					<NoteBlock label="Gift message, printed on the card" body={order.gift_message} first={!order.customer_note} />
+					<NoteBlock
+						label="Gift message, printed on the card"
+						body={order.gift_message}
+						first={!order.customer_note}
+					/>
 				</Card>
 			)}
 
 			<Card>
-				<AddressBlock label="Shipping to" address={order.shipping} extraLines={[order.contact_mobile]} />
+				<AddressBlock
+					label="Shipping to"
+					address={order.shipping}
+					extraLines={[order.contact_mobile]}
+				/>
 				<Section style={{ marginTop: 16 }}>
 					<AddressBlock
 						label="Billing to"
 						address={order.billing}
 						emptyText="Same as shipping address"
-						extraLines={[order.customer_tax_id && `GSTIN ${order.customer_tax_id}`]}
+						extraLines={[
+							order.customer_tax_id && `GSTIN ${order.customer_tax_id}`,
+						]}
 					/>
 				</Section>
 				<Row style={{ marginTop: 16 }}>
 					<Column style={s.half}>
-						<FactBlock label="Payment" title={order.payment_method} detail={order.payment_status} />
+						<FactBlock
+							label="Payment"
+							title={order.payment_method}
+							detail={order.payment_status}
+						/>
 					</Column>
 					<Column style={s.half}>
-						<FactBlock label="Delivery" title={order.delivery_method} detail={`Arrives ${order.delivery_window}`} />
+						<FactBlock
+							label="Delivery"
+							title={order.delivery_method}
+							detail={`Arrives ${order.delivery_window}`}
+						/>
 					</Column>
 				</Row>
 			</Card>

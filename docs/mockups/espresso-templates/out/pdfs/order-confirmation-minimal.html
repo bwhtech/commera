@@ -75,6 +75,7 @@
 	.fact { padding-right: 14px; }
 	.fact + .fact { padding-left: 14px; border-left: 1px solid var(--outline-gray-1); }
 	.fact .label + address + .label { margin-top: 12px; }
+	.facts-wide-middle { grid-template-columns: 1fr 1.25fr 0.85fr; }
 
 	.items { width: 100%; border-collapse: collapse; margin-top: 18px; }
 	.items thead { display: table-header-group; }
@@ -115,6 +116,18 @@
 	.footer .links { text-align: right; white-space: nowrap; }
 	.footer .links a + a { margin-left: 14px; }
 	.nowrap { white-space: nowrap; }
+
+	.tax-table { width: 100%; border-collapse: collapse; }
+	.tax-table th {
+		font-size: 12px; font-weight: 420; color: var(--ink-gray-5); text-align: left;
+		padding: 0 0 8px; border-bottom: 1px solid var(--outline-gray-2);
+	}
+	.tax-table td { padding: 7px 0; border-bottom: 1px solid var(--outline-gray-1); }
+	.tax-table .r { text-align: right; }
+	.tax-table .sum td { border-bottom: 0; font-weight: 500; }
+	.invoice-totals { align-self: start; }
+	.tax-hint { margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--ink-gray-5); }
+	.tax-hint + .tax-hint { margin-top: 4px; }
 	
 </style>
 </head>

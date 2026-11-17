@@ -60,7 +60,7 @@
 </header>
 <main>
 	<div class="intro">
-		<h1>Customer emails and PDFs: first batch</h1>
+		<h1>Customer emails and PDFs</h1>
 		<p>Designs for Commera's customer emails and PDFs, built on the Espresso sample. These are the live email HTML files, not screenshots, shown at desktop width (720px) and phone width (390px).</p>
 		<p>Nothing in the app sends these yet. Each section has a link you can share. Leave feedback on <a href="https://github.com/bwhtech/commera/pull/550">pull request #550</a>.</p>
 	</div>
@@ -75,7 +75,22 @@
 		{ id: 'back-in-stock', title: 'Back in stock', tag: 'Email', file: 'back-in-stock' },
 		{ id: 'order-link', title: 'Your order link', tag: 'Email', file: 'order-link' },
 		{ id: 'sign-in-code', title: 'Sign-in code', tag: 'Email', file: 'sign-in-code' },
+		{ id: 'shipped-classic', title: 'Shipped', tag: 'Email, Classic layout', file: 'shipped-classic' },
+		{ id: 'shipped-lookbook', title: 'Shipped', tag: 'Email, Lookbook layout', file: 'shipped-lookbook' },
+		{ id: 'out-for-delivery', title: 'Out for delivery', tag: 'Email, the Shipped email with other data', file: 'shipped-classic-out-for-delivery' },
+		{ id: 'delivery-delayed', title: 'Delivery delayed', tag: 'Email, the Shipped email with other data', file: 'shipped-classic-delayed' },
+		{ id: 'delivered', title: 'Delivered', tag: 'Email', file: 'delivered' },
+		{ id: 'ready-for-pickup', title: 'Ready for pickup', tag: 'Email', file: 'ready-for-pickup' },
+		{ id: 'refund-issued', title: 'Refund issued', tag: 'Email', file: 'refund-issued' },
+		{ id: 'return-received', title: 'Return received', tag: 'Email', file: 'return-received' },
+		{ id: 'payment-failed', title: 'Payment failed', tag: 'Email', file: 'payment-failed' },
+		{ id: 'owner-new-order', title: 'New order (to the store owner)', tag: 'Email', file: 'owner-new-order' },
 		{ id: 'order-confirmation-pdf', title: 'Order confirmation', tag: 'PDF, A4', pdf: 'order-confirmation' },
+		{ id: 'tax-invoice-pdf', title: 'Tax invoice', tag: 'PDF, A4, India GST (CGST + SGST)', pdf: 'tax-invoice' },
+		{ id: 'credit-note-pdf', title: 'Credit note', tag: 'PDF, A4', pdf: 'credit-note' },
+		{ id: 'packing-slip-pdf', title: 'Packing slip', tag: 'PDF, A4, no prices', pdf: 'packing-slip' },
+		{ id: 'check-tax-invoice-igst', title: 'Check: inter-state invoice', tag: 'PDF, A4', pdf: 'tax-invoice-igst', note: 'IGST instead of CGST + SGST, shipped to another state.' },
+		{ id: 'check-tax-invoice-generic', title: 'Check: invoice without GST', tag: 'PDF, A4', pdf: 'tax-invoice-generic', note: 'A UK seller with VAT: no HSN column, no place of supply, no GSTIN.' },
 		{ id: 'check-empty-sections', title: 'Check: empty sections hidden', tag: 'Email, Classic layout', file: 'order-confirmation-classic-minimal', note: 'No delivery note, no gift message, billing the same as shipping.' },
 		{ id: 'check-empty-sections-pdf', title: 'Check: empty sections hidden', tag: 'PDF, A4', pdf: 'order-confirmation-minimal', note: 'No notes, billing the same as shipping, no customer GSTIN.' },
 		{ id: 'check-merchant-text', title: 'Check: merchant text', tag: 'Email, Classic layout', file: 'order-confirmation-classic-merchant-text', note: 'The merchant changed the heading, intro, button label and closing.' },

@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Renders every email (desktop + mobile) and every PDF into out/. Run from anywhere.
 set -euo pipefail
 cd "$(dirname "$0")"
 export PATH=/home/frappe/.nvm/versions/node/v24.12.0/bin:$PATH

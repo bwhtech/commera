@@ -1,0 +1,33 @@
+{% extends "kit/pdf_layout.html.j2" %}
+{% import "kit/pdf_macros.html.j2" as ui %}
+
+{% block title %}{{ doc.title }} {{ doc.name }}{% endblock %}
+
+{% block body %}
+{{ ui.masthead(brand, doc.title, doc.posting_date) }}
+
+{{ ui.hero(brand.legal_name, None, doc.title ~ " number", doc.name, intro_lines=[brand.address, (brand.tax_id_label or "GSTIN") ~ " " ~ brand.tax_id]) }}
+
+<section class="facts">
+	<div class="fact">
+		{{ ui.address_block("Credited to", doc.billing, extra_lines=[doc.customer_tax_id and "GSTIN " ~ doc.customer_tax_id]) }}
+	</div>
+	<div class="fact">
+		{{ ui.fact("Against invoice", doc.return_against, "Dated " ~ doc.return_against_date) }}
+		{{ ui.fact("Reason", doc.reason) }}
+	</div>
+	<div class="fact">
+		{{ ui.fact("Refund to", doc.refund_method, doc.refund_days and "Arrives in " ~ doc.refund_days) }}
+		{% if doc.return_name %}{{ ui.fact("Return", doc.return_name, "Order " ~ doc.order_name) }}{% endif %}
+	</div>
+</section>
+
+{{ ui.line_items_table(doc.items, money, "Returned", "Credit") }}
+
+<section class="summary">
+	{{ ui.tax_breakdown(doc, money, "Tax reversed") }}
+	{{ ui.invoice_totals(doc, money, "Total credited", (doc.taxes | length == 1) and doc.taxes[0].description or "Tax reversed", highlight_discount=False) }}
+</section>
+
+{{ ui.footer(brand, copy.closing) }}
+{% endblock %}

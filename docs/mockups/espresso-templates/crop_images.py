@@ -4,7 +4,6 @@ from pathlib import Path
 from PIL import Image
 
 raw_dir, out_dir = Path(sys.argv[1]), Path(sys.argv[2])
-# (centre x, centre y, square side) as fractions of the photo width, picked per photo to frame the garment
 framing = {
 	"p1": (0.5, 0.36, 0.78),
 	"p2": (0.51, 0.52, 0.6),

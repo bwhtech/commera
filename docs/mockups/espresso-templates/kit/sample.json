@@ -10,9 +10,18 @@
 		"store_url": "https://verano.studio",
 		"help_url": "https://verano.studio/help",
 		"footer_links": [
-			{ "label": "Track order", "url": "https://verano.studio/account/orders" },
-			{ "label": "Returns", "url": "https://verano.studio/returns" },
-			{ "label": "Help", "url": "https://verano.studio/help" }
+			{
+				"label": "Track order",
+				"url": "https://verano.studio/account/orders"
+			},
+			{
+				"label": "Returns",
+				"url": "https://verano.studio/returns"
+			},
+			{
+				"label": "Help",
+				"url": "https://verano.studio/help"
+			}
 		]
 	},
 	"order": {
@@ -28,8 +37,14 @@
 		"coupon_code": "WELCOME10",
 		"discount_amount": 2229.4,
 		"charges": [
-			{ "description": "Standard shipping", "amount": 0 },
-			{ "description": "Gift wrap", "amount": 149 }
+			{
+				"description": "Standard shipping",
+				"amount": 0
+			},
+			{
+				"description": "Gift wrap",
+				"amount": 149
+			}
 		],
 		"tax_label": "GST (12%)",
 		"tax_rate": 12,
@@ -37,7 +52,11 @@
 		"gift_message": "Happy birthday, Zoya! The pink jacket is yours. The socks are a joke. Love, A.",
 		"shipping": {
 			"name": "Aisha Rahman",
-			"lines": ["Flat 1204, Prestige Lakeside Habitat", "Varthur Main Road, Whitefield", "Bengaluru, Karnataka 560087"]
+			"lines": [
+				"Flat 1204, Prestige Lakeside Habitat",
+				"Varthur Main Road, Whitefield",
+				"Bengaluru, Karnataka 560087"
+			]
 		},
 		"billing": {
 			"name": "Rahman Design Studio LLP",
@@ -101,16 +120,162 @@
 		]
 	},
 	"steps": [
-		{ "title": "Confirmed", "date": "28 Sep", "done": true },
-		{ "title": "Packed", "done": false },
-		{ "title": "Shipped", "done": false },
-		{ "title": "Delivered", "pending_title": "Arriving", "date": "2 to 4 Oct", "done": false }
+		{
+			"title": "Confirmed",
+			"date": "28 Sep",
+			"done": true
+		},
+		{
+			"title": "Packed",
+			"done": false
+		},
+		{
+			"title": "Shipped",
+			"done": false
+		},
+		{
+			"title": "Delivered",
+			"pending_title": "Arriving",
+			"date": "2 to 4 Oct",
+			"done": false
+		}
 	],
+	"progress": {
+		"shipped": [
+			{
+				"title": "Confirmed",
+				"date": "28 Sep",
+				"done": true
+			},
+			{
+				"title": "Packed",
+				"date": "29 Sep",
+				"done": true
+			},
+			{
+				"title": "Shipped",
+				"date": "30 Sep",
+				"done": true
+			},
+			{
+				"title": "Delivered",
+				"pending_title": "Arriving",
+				"date": "3 Oct",
+				"done": false
+			}
+		],
+		"out_for_delivery": [
+			{
+				"title": "Confirmed",
+				"date": "28 Sep",
+				"done": true
+			},
+			{
+				"title": "Packed",
+				"date": "29 Sep",
+				"done": true
+			},
+			{
+				"title": "Out for delivery",
+				"date": "3 Oct",
+				"done": true
+			},
+			{
+				"title": "Delivered",
+				"pending_title": "Arriving",
+				"date": "today",
+				"done": false
+			}
+		],
+		"delayed": [
+			{
+				"title": "Confirmed",
+				"date": "28 Sep",
+				"done": true
+			},
+			{
+				"title": "Packed",
+				"date": "29 Sep",
+				"done": true
+			},
+			{
+				"title": "Shipped",
+				"date": "30 Sep",
+				"done": true
+			},
+			{
+				"title": "Delivered",
+				"pending_title": "Now arriving",
+				"date": "6 Oct",
+				"done": false
+			}
+		],
+		"delivered": [
+			{
+				"title": "Confirmed",
+				"date": "28 Sep",
+				"done": true
+			},
+			{
+				"title": "Packed",
+				"date": "29 Sep",
+				"done": true
+			},
+			{
+				"title": "Shipped",
+				"date": "30 Sep",
+				"done": true
+			},
+			{
+				"title": "Delivered",
+				"date": "2 Oct",
+				"done": true
+			}
+		],
+		"pickup": [
+			{
+				"title": "Confirmed",
+				"date": "28 Sep",
+				"done": true
+			},
+			{
+				"title": "Packed",
+				"date": "29 Sep",
+				"done": true
+			},
+			{
+				"title": "Ready",
+				"date": "30 Sep",
+				"done": true
+			}
+		]
+	},
 	"shipment": {
 		"carrier": "Delhivery",
 		"tracking_number": "1490223188765",
 		"tracking_url": "https://www.delhivery.com/track/package/1490223188765",
-		"shipped_on": "30 Sep 2026"
+		"shipped_on": "30 Sep 2026",
+		"delivered_on": "2 Oct 2026",
+		"return_by": "16 Oct"
+	},
+	"pickup": {
+		"store_name": "Verano Studio, Indiranagar",
+		"address": {
+			"name": "Verano Studio, Indiranagar",
+			"lines": [
+				"812, 100 Feet Road, HAL 2nd Stage",
+				"Indiranagar, Bengaluru 560038"
+			]
+		},
+		"hours": ["Monday to Saturday, 11 am to 8 pm", "Sunday, 12 pm to 6 pm"],
+		"collect_by": "7 Oct",
+		"directions_url": "https://maps.google.com/?q=Verano+Studio+Indiranagar"
+	},
+	"payment_failure": {
+		"attempted_method": "UPI, aisha@okhdfc",
+		"hold_hours": 24,
+		"held_until": "29 Sep, 4:12 pm IST",
+		"payment_url": "https://verano.studio/checkout/pay/SO-26-00482?key=7f3c91"
 	},
 	"cancellation": {
 		"cancelled_on": "28 Sep 2026, 5:40 pm IST",
@@ -123,8 +288,19 @@
 		"refund_amount": 4049.1,
 		"refund_method": "UPI, aisha@okhdfc",
 		"refund_days": "5 to 7 working days",
+		"refunded_on": "10 Oct 2026",
+		"return_url": "https://verano.studio/account/returns/SR-26-00031?key=2b81de",
+		"next_steps": [
+			"Pack the jacket in its original bag, with the tags still on.",
+			"Write {return_number} on the outside of the parcel.",
+			"Our courier collects it from your address on 8 Oct, 10 am to 6 pm."
+		],
 		"items": [
-			{ "item_code": "SS26-FFJ-PNK-M", "qty": 1, "reason": "Too small" }
+			{
+				"item_code": "SS26-FFJ-PNK-M",
+				"qty": 1,
+				"reason": "Too small"
+			}
 		]
 	},
 	"invoice": {
@@ -132,8 +308,14 @@
 		"posting_date": "30 Sep 2026",
 		"place_of_supply": "29-Karnataka",
 		"taxes": [
-			{ "description": "CGST", "rate": 6 },
-			{ "description": "SGST", "rate": 6 }
+			{
+				"description": "CGST",
+				"rate": 6
+			},
+			{
+				"description": "SGST",
+				"rate": 6
+			}
 		]
 	},
 	"back_in_stock": {
@@ -186,6 +368,69 @@
 			"intro": "Enter this code to sign in to {store_name}.",
 			"closing": "Didn't ask for a code? You can ignore this email. Your account is safe.",
 			"button": ""
+		},
+		"shipped": {
+			"subject": "Your order {order_number} has shipped",
+			"heading": "{first_name}, your order is on its way.",
+			"intro": "It left our studio today. Use the tracking number below to follow it to your door.",
+			"closing": "Not home on the day? The courier will try again the next working day.",
+			"button": "Track your parcel"
+		},
+		"out_for_delivery": {
+			"subject": "Your order {order_number} arrives today",
+			"heading": "{first_name}, your order arrives today.",
+			"intro": "It's with the courier and on the way to your door. Keep your phone close in case they call.",
+			"closing": "Not home today? The courier will try again the next working day.",
+			"button": "Track your parcel"
+		},
+		"shipment_delayed": {
+			"subject": "Your order {order_number} is running late",
+			"heading": "{first_name}, your order is running late.",
+			"intro": "It's still on its way, but the courier needs a little more time. Here's the new date.",
+			"closing": "Sorry for the wait. Questions? Reply to this email and we'll help.",
+			"button": "Track your parcel"
+		},
+		"delivered": {
+			"subject": "Your order {order_number} was delivered",
+			"heading": "Delivered. Enjoy it, {first_name}.",
+			"intro": "Your order reached your shipping address. We hope everything fits just right.",
+			"closing": "Didn't get your parcel? Reply to this email and we'll look into it.",
+			"button": "View your order"
+		},
+		"ready_for_pickup": {
+			"subject": "Your order {order_number} is ready to collect",
+			"heading": "{first_name}, your order is ready to collect.",
+			"intro": "It's packed and waiting for you at the store.",
+			"closing": "Can't make it in time? Reply to this email and we'll hold it a little longer.",
+			"button": "Get directions"
+		},
+		"refund_issued": {
+			"subject": "Your refund for order {order_number} is on its way",
+			"heading": "{first_name}, your refund is on its way.",
+			"intro": "We checked your return and sent the money back. Banks can take a few days to show it.",
+			"closing": "Don't see it after that? Reply to this email and we'll check with the bank.",
+			"button": "View your order"
+		},
+		"return_received": {
+			"subject": "We got your return request {return_number}",
+			"heading": "Thanks, {first_name}. We got your return request.",
+			"intro": "Here's how to send the item back. We'll refund you once it reaches us.",
+			"closing": "Changed your mind? Reply to this email before the pickup and we'll cancel the return.",
+			"button": "View your return"
+		},
+		"payment_failed": {
+			"subject": "Your payment for order {order_number} didn't go through",
+			"heading": "{first_name}, your payment didn't go through.",
+			"intro": "Your order isn't lost. We're holding it for {hold_hours} hours so you can try again, with the same method or a different one.",
+			"closing": "If money left your account, your bank will return it within 5 to 7 working days.",
+			"button": "Try payment again"
+		},
+		"owner_new_order": {
+			"subject": "New order {order_number}, {total}",
+			"heading": "New order {order_number}",
+			"intro": "{customer_name} placed an order for {total}.",
+			"closing": "",
+			"button": "Open in dashboard"
 		}
 	}
 }

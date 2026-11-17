@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Headless Chrome can't go below 500px, so mobile shots go through agent-browser at a 390px viewport.
 set -euo pipefail
 cd "$(dirname "$0")"
 export PATH=/home/frappe/.nvm/versions/node/v24.12.0/bin:$PATH

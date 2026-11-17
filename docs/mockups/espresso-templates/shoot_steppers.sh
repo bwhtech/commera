@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# 390px shots of every stepper card, then trim the empty page below the card.
 set -euo pipefail
 cd "$(dirname "$0")"
 export PATH=/home/frappe/.nvm/versions/node/v24.12.0/bin:$PATH

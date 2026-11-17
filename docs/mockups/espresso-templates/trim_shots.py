@@ -1,5 +1,3 @@
-"""Trim the empty page background below the email content, keeping the bottom gutter."""
-
 import sys
 from pathlib import Path
 
