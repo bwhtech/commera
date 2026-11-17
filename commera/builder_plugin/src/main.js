@@ -1,6 +1,6 @@
 import { toolbarItems } from 'builder';
-import './index.css';
 import ThemeBar, { openThemeBar } from './ThemeBar.vue';
+import './index.css';
 
 export default {
 	install(_app, context) {

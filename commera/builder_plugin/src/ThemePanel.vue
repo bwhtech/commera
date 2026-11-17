@@ -1,5 +1,8 @@
 <template>
-	<div class="flex w-80 flex-col gap-4 p-3">
+	<div
+		class="flex w-80 flex-col gap-4 p-3 transition-opacity"
+		:class="{ 'pointer-events-none opacity-60': isStale }"
+		:inert="isStale">
 		<div class="flex items-start justify-between gap-2">
 			<div class="flex min-w-0 flex-col gap-1">
 				<span class="truncate text-base font-medium text-ink-gray-9">{{ bar.theme }}</span>
@@ -50,7 +53,10 @@ import PageTabs from './PageTabs.vue';
 import ProductPicker from './ProductPicker.vue';
 import { errorMessage, makeThemeLive, publishTheme } from './api';
 
-const props = defineProps({ bar: { type: Object, required: true } });
+const props = defineProps({
+	bar: { type: Object, required: true },
+	isStale: { type: Boolean, default: false },
+});
 const emit = defineEmits(['changed']);
 
 const ExternalLinkIcon = lucideIcon('lucide-external-link');
@@ -70,30 +76,38 @@ async function run(action, task, failure) {
 	}
 }
 
-const publish = () =>
-	run(
+const publish = () => {
+	const { theme } = props.bar;
+	const pageName = pageStore.selectedPage;
+	const pageLoadToken = pageStore.pageLoadToken;
+	return run(
 		'publish',
 		async () => {
 			await pageStore.waitTillPageIsSaved();
-			const result = await publishTheme(props.bar.theme);
+			const result = await publishTheme(theme);
 			// the editor's own status pill and Publish button read the page
-			pageStore.activePage = await pageStore.fetchActivePage(
-				pageStore.selectedPage,
-			);
+			const page = await pageStore.fetchActivePage(pageName);
+			// another page may have opened meanwhile, and its canvas autosaves to activePage
+			if (pageLoadToken === pageStore.pageLoadToken && pageStore.selectedPage === pageName) {
+				pageStore.activePage = page;
+			}
 			return publishedMessage(result);
 		},
 		'Could not publish the theme',
 	);
+};
 
-const activate = () =>
-	run(
+const activate = () => {
+	const { theme } = props.bar;
+	return run(
 		'activate',
 		async () => {
-			await makeThemeLive(props.bar.theme);
-			return `${props.bar.theme} is now the live theme`;
+			await makeThemeLive(theme);
+			return `${theme} is now the live theme`;
 		},
 		'Could not activate the theme',
 	);
+};
 
 function publishedMessage({ published, skipped }) {
 	if (!published.length) return 'Nothing to publish yet: every page is empty.';

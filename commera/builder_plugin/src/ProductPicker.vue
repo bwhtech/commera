@@ -38,7 +38,7 @@
 <script setup>
 import { lucideIcon, usePageStore } from 'builder';
 import { LoadingIndicator, TextInput } from 'frappe-ui';
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { searchProducts } from './api';
 
 const props = defineProps({ preview: { type: Object, required: true } });
@@ -64,12 +64,14 @@ let latest = 0;
 watch(query, (value) => {
 	clearTimeout(timer);
 	isSearching.value = true;
+	// counted now, so a reply for the previous query is dropped while this one waits for its delay
+	const request = ++latest;
 	timer = setTimeout(async () => {
-		const request = ++latest;
 		const results = await searchProducts(value.trim()).catch(() => []);
 		if (request !== latest) return;
 		options.value = results;
 		isSearching.value = false;
 	}, SEARCH_DELAY_MS);
 });
+onBeforeUnmount(() => clearTimeout(timer));
 </script>

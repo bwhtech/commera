@@ -13,7 +13,7 @@
 				</span>
 			</Button>
 		</template>
-		<ThemePanel :bar="bar" @changed="load" />
+		<ThemePanel :bar="bar" :is-stale="barPage !== pageId" @changed="load" />
 	</Popover>
 </template>
 
@@ -40,21 +40,31 @@ const ChevronIcon = lucideIcon('lucide-chevron-down');
 
 const pageStore = usePageStore();
 const bar = ref(null);
+// the page `bar` was loaded for; until the new page's bar arrives, the panel is disabled
+const barPage = ref(null);
 const pageId = computed(() => pageStore.activePage?.name);
 const currentPage = computed(() => bar.value?.pages.find((page) => page.page_type === bar.value.page_type));
 
+let latest = 0;
 async function load() {
+	const request = ++latest;
 	const page = pageId.value;
 	const result = page ? await getThemeBar(page).catch(() => null) : null;
-	// a slow reply for a page the editor has left must not show
-	if (page === pageId.value) bar.value = result;
+	// a slow reply must not replace a newer one, or show for a page the editor has left
+	if (request !== latest || page !== pageId.value) return;
+	bar.value = result;
+	barPage.value = page;
 }
 watch(pageId, load, { immediate: true });
 
 watch(isOpen, (open) => {
-	if (open && !bar.value) {
+	if (!open) return;
+	if (!bar.value) {
 		isOpen.value = false;
 		toast.info('Open a page of a Commera theme to see its theme bar.');
+		return;
 	}
+	// the editor's own saves and Publish button change the page statuses
+	load();
 });
 </script>

@@ -34,7 +34,11 @@ function builderPackage() {
 					(file) => file.type === 'chunk' && file.isEntry,
 				);
 				// the editor's styles load after this link, so they win a tie with the plugin's
-				entry.code = `(() => { const link = document.createElement("link"); link.rel = "stylesheet"; link.href = new URL(${JSON.stringify(sheet.fileName)}, import.meta.url).href; document.head.prepend(link); })();\n${entry.code}`;
+				entry.code = `(() => { const link = document.createElement("link"); link.rel = "stylesheet"; link.href = new URL(${JSON.stringify(
+					sheet.fileName,
+				)}, import.meta.url).href; document.head.prepend(link); })();\n${
+					entry.code
+				}`;
 			},
 		},
 	};
