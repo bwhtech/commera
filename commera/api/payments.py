@@ -47,6 +47,7 @@ from commera.commera_ecommerce.doctype.commera_cart.commera_cart import (
 	get_quantities_by_item_code,
 	get_session_cart,
 )
+from commera.compat import _make_sales_order, make_sales_invoice
 from commera.core import (
 	COD_PAYMENT_MODE,
 	_get_cart_quotation,
@@ -93,18 +94,6 @@ class CheckoutPriceChangedError(frappe.ValidationError):
 COD_TOTAL_TTL_SECONDS = 24 * 60 * 60
 ADDRESS_TYPES = ("Billing", "Shipping")
 ADDRESS_KINDS = ("billing_address", "shipping_address")
-
-
-# ERPNext moved its transaction mappers to a sibling `mapper` module; both layouts are in the wild.
-try:
-	from erpnext.selling.doctype.quotation.mapper import _make_sales_order
-except ImportError:
-	from erpnext.selling.doctype.quotation.quotation import _make_sales_order
-
-try:
-	from erpnext.selling.doctype.sales_order.mapper import make_sales_invoice
-except ImportError:
-	from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
 
 
 def get_open_gateway_payment_request(quotation_name: str) -> str | None:

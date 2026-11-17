@@ -11,6 +11,7 @@ from commera.api.admin.catalog import get_unpublishable_options
 from commera.api.admin.inventory import get_inventory
 from commera.api.admin.plugins import query_deliveries
 from commera.api.shipping import get_order_charge_lines
+from commera.compat import make_delivery_note
 from commera.discounts.allocations import get_allocations, get_discount_rows, get_order_discount_rows
 from commera.utils import get_address_lines, get_item_images, get_lines_the_store_ships, get_store_currency
 
@@ -850,12 +851,6 @@ def can_fulfil_order(order, state) -> bool:
 @frappe.whitelist(methods=["POST"])
 def fulfil_order(sales_order: str):
 	"""Ship what is still outstanding on an order."""
-	# ERPNext moved its mappers to a sibling `mapper` module; both layouts are in the wild.
-	try:
-		from erpnext.selling.doctype.sales_order.mapper import make_delivery_note
-	except ImportError:
-		from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note
-
 	frappe.has_permission("Sales Order", doc=sales_order, ptype="submit", throw=True)
 	frappe.has_permission("Delivery Note", ptype="create", throw=True)
 

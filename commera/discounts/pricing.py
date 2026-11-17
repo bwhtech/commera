@@ -4,6 +4,7 @@ import frappe
 from frappe import _
 from frappe.utils.data import flt
 
+from commera.compat import set_payment_schedule
 from commera.discounts.allocations import ALLOCATIONS_FIELD, get_allocation, get_allocations, set_allocations
 from commera.discounts.cart_context import get_cart_context
 from commera.discounts.codes import get_code_discount
@@ -15,11 +16,6 @@ from commera.discounts.selection import (
 	get_discount_codes,
 	get_unmet_reason,
 )
-
-try:
-	from erpnext.accounts.services.payment_schedule import PaymentScheduleService
-except ImportError:
-	PaymentScheduleService = None
 
 MAX_PRICED_COMBINATIONS = 20
 # At most 3^(12/3) = 81 combinations, however many automatic discounts are live.
@@ -358,10 +354,7 @@ def set_amounts_from_grand_total(doc):
 	doc.set_total_in_words()
 	if not doc.meta.has_field("payment_schedule") or doc.get("is_return"):
 		return
-	if PaymentScheduleService:
-		PaymentScheduleService(doc).set_payment_schedule()
-	else:
-		doc.set_payment_schedule()
+	set_payment_schedule(doc)
 
 
 def get_other_order_discount(doc, source) -> float:
