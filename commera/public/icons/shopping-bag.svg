@@ -1,10 +1,1 @@
-<svg width="24" height="25" viewBox="0 0 24 25" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g id="vuesax/linear/bag-2">
-<g id="bag-2">
-<path id="Vector" d="M7.5 8.17001V7.20001C7.5 4.95001 9.31 2.74001 11.56 2.53001C14.24 2.27001 16.5 4.38001 16.5 7.01001V8.39001" stroke="#292D32" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
-<path id="Vector_2" d="M9.00007 22.5H15.0001C19.0201 22.5 19.7401 20.89 19.9501 18.93L20.7001 12.93C20.9701 10.49 20.2701 8.5 16.0001 8.5H8.00007C3.73007 8.5 3.03007 10.49 3.30007 12.93L4.05007 18.93C4.26007 20.89 4.98007 22.5 9.00007 22.5Z" stroke="#292D32" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
-<path id="Vector_3" d="M15.4955 12.5H15.5045" stroke="#292D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path id="Vector_4" d="M8.49451 12.5H8.50349" stroke="#292D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</g>
-</g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="25" fill="none" viewBox="0 0 24 25"><g id="vuesax/linear/bag-2"><g id="bag-2"><path id="Vector" stroke="#292D32" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1.5" d="M7.5 8.17001V7.20001C7.5 4.95001 9.31 2.74001 11.56 2.53001C14.24 2.27001 16.5 4.38001 16.5 7.01001V8.39001"/><path id="Vector_2" stroke="#292D32" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1.5" d="M9.00007 22.5H15.0001C19.0201 22.5 19.7401 20.89 19.9501 18.93L20.7001 12.93C20.9701 10.49 20.2701 8.5 16.0001 8.5H8.00007C3.73007 8.5 3.03007 10.49 3.30007 12.93L4.05007 18.93C4.26007 20.89 4.98007 22.5 9.00007 22.5Z"/><path id="Vector_3" stroke="#292D32" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.4955 12.5H15.5045"/><path id="Vector_4" stroke="#292D32" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.49451 12.5H8.50349"/></g></g></svg>

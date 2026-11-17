@@ -1,5 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Placeholder">
-  <rect width="64" height="64" fill="#e5e7eb" />
-  <path d="M12 44l12-14 9 10 7-8 12 12z" fill="#9ca3af" />
-  <circle cx="22" cy="20" r="5" fill="#9ca3af" />
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" aria-label="Placeholder" role="img" viewBox="0 0 64 64"><rect width="64" height="64" fill="#e5e7eb"/><path fill="#9ca3af" d="M12 44l12-14 9 10 7-8 12 12z"/><circle cx="22" cy="20" r="5" fill="#9ca3af"/></svg>
