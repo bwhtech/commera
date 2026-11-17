@@ -728,3 +728,17 @@ class IntegrationTestCreateThemeSettings(IntegrationTestCase):
 		self.assertTrue(frappe.db.get_value("DocType", "Shop Base Theme Settings", "issingle"))
 		self.assertTrue(frappe.get_meta("Shop Base Theme Settings").get_field("style_tab"))
 		self.assertEqual(frappe.local.message_log, [])
+
+	def test_the_link_is_written_to_the_theme_file_in_developer_mode(self):
+		self.addCleanup(frappe.clear_cache)
+		self.addCleanup(frappe.db.rollback)
+		shop_theme = "commera.shop_themes.doctype.shop_theme.shop_theme"
+		with (
+			patch.dict(frappe.conf, {"developer_mode": 1}),
+			patch(f"{shop_theme}.create_theme_settings_doctype"),
+			patch(f"{shop_theme}.export_module_json") as export,
+		):
+			frappe.get_doc("Shop Theme", "Shop Base Theme").create_theme_settings()
+
+		exported = export.call_args.args[0]
+		self.assertEqual(exported.theme_settings, "Shop Base Theme Settings")
