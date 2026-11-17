@@ -9,7 +9,7 @@ readme = "README.md"
 dynamic = ["version"]
 dependencies = [
     # "frappe~=15.0.0" # Installed and managed by bench.
-    "bwh-payments-core @ git+https://github.com/bwhtech/bwh_payments_core@v0.1.0",
+    "bwh-payments-core>=0.1.1,<0.2",
 ]
 
 [tool.bench.frappe-dependencies]
