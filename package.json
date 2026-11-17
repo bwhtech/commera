@@ -6,7 +6,8 @@
 	"scripts": {
 		"postinstall": "yarn tailwind:build",
 		"dev": "cd dashboard && yarn dev",
-		"build": "yarn tailwind:build && cd dashboard && yarn install && yarn build && node buildPlugins.js",
+		"build": "yarn tailwind:build && yarn build:builder_plugin && cd dashboard && yarn install && yarn build && node buildPlugins.js",
+		"build:builder_plugin": "yarn --cwd commera/builder_plugin install --frozen-lockfile && yarn --cwd commera/builder_plugin build",
 		"tailwind:watch": "npx @tailwindcss/cli -i ./commera/public/css/main.css -o ./commera/public/css/tailwind.css --watch",
 		"tailwind:build": "npx @tailwindcss/cli -i ./commera/public/css/main.css -o ./commera/public/css/tailwind.css",
 		"dupes": "npm run dupes:py && npm run dupes:vue",

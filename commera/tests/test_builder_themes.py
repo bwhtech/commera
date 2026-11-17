@@ -207,6 +207,7 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		self.assertEqual(bar["theme"], THEME)
 		self.assertFalse(bar["is_live"])
 		self.assertEqual([page["label"] for page in bar["pages"]], ["Home", "Listing", "Product"])
+		self.assertTrue(all(page["is_empty"] for page in bar["pages"]))
 		self.assertEqual(bar["preview"]["variable"], "route")
 		self.assertIn(self.handle, [option["value"] for option in bar["preview"]["options"]])
 
@@ -219,6 +220,10 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 			[{"element": "div", "blockId": "root", "children": [{"element": "p", "blockId": "hello"}]}]
 		)
 		page.save()
+
+		self.assertEqual(
+			[page["is_empty"] for page in get_theme_bar(self.pages[HOME])["pages"]], [False, True, True]
+		)
 
 		result = publish_theme(THEME)
 		self.assertEqual(result, {"published": ["Home"], "skipped": ["Listing", "Product"]})
