@@ -1,4 +1,4 @@
-import { Column, Row, Text } from "@react-email/components";
+import { Column, Row, Section, Text } from "@react-email/components";
 import {
 	AddressBlock, Button, Card, EmailLayout, FactBlock, Footer, Header, Heading, Intro, ItemRow, NoteBlock, ProgressSteps, Totals, s,
 } from "../kit/components";
@@ -36,19 +36,15 @@ export default function OrderConfirmationClassic({ brand, order, steps, copy, im
 			)}
 
 			<Card>
-				<Row>
-					<Column style={s.half}>
-						<AddressBlock label="Shipping to" address={order.shipping} extraLines={[order.contact_mobile]} />
-					</Column>
-					<Column style={s.half}>
-						<AddressBlock
-							label="Billing to"
-							address={order.billing}
-							emptyText="Same as shipping address"
-							extraLines={[order.customer_tax_id && `GSTIN ${order.customer_tax_id}`]}
-						/>
-					</Column>
-				</Row>
+				<AddressBlock label="Shipping to" address={order.shipping} extraLines={[order.contact_mobile]} />
+				<Section style={{ marginTop: 16 }}>
+					<AddressBlock
+						label="Billing to"
+						address={order.billing}
+						emptyText="Same as shipping address"
+						extraLines={[order.customer_tax_id && `GSTIN ${order.customer_tax_id}`]}
+					/>
+				</Section>
 				<Row style={{ marginTop: 16 }}>
 					<Column style={s.half}>
 						<FactBlock label="Payment" title={order.payment_method} detail={order.payment_status} />

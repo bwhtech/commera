@@ -1,4 +1,4 @@
-import { Column, Hr, Row, Section, Text } from "@react-email/components";
+import { Hr, Section, Text } from "@react-email/components";
 import {
 	AddressBlock, Button, EmailLayout, Footer, Header, Heading, Intro, ItemGrid, ProgressSteps, Totals, s,
 } from "../kit/components";
@@ -50,20 +50,16 @@ export default function OrderConfirmationLookbook({ brand, order, steps, copy, i
 
 			<Hr style={{ ...s.hr, margin: "32px 0 20px" }} />
 
-			<Row>
-				<Column style={s.half}>
-					<AddressBlock label="Shipping to" address={order.shipping} bold={false} />
-				</Column>
-				<Column style={s.half}>
-					<AddressBlock
-						label="Billing to"
-						address={order.billing}
-						emptyText="Same as shipping address"
-						extraLines={[order.customer_tax_id && `GSTIN ${order.customer_tax_id}`]}
-						bold={false}
-					/>
-				</Column>
-			</Row>
+			<AddressBlock label="Shipping to" address={order.shipping} bold={false} />
+			<Section style={{ marginTop: 16 }}>
+				<AddressBlock
+					label="Billing to"
+					address={order.billing}
+					emptyText="Same as shipping address"
+					extraLines={[order.customer_tax_id && `GSTIN ${order.customer_tax_id}`]}
+					bold={false}
+				/>
+			</Section>
 
 			<Hr style={{ ...s.hr, margin: "20px 0" }} />
 
