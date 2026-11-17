@@ -110,7 +110,7 @@ The connector code lives in the `bwh_payments_core` library: https://github.com/
 
    In the pull request, say which gateway account you tested with, and paste the test output.
 
-9. After the pull request merges, a maintainer publishes a GitHub release, such as `v0.2.0`. The release uploads the library to PyPI. Commera can use the connector only after this version is on PyPI.
+9. After the pull request merges, a maintainer publishes a GitHub release, such as `v0.1.2`. The release uploads the library to PyPI. Commera can use the connector only after this version is on PyPI.
 
 ### Part 2: add the settings page to Commera
 
@@ -134,7 +134,7 @@ The connector code lives in the `bwh_payments_core` library: https://github.com/
    - **After the release is on PyPI**, point Commera at it. In `pyproject.toml`, change the versions in this line, then run `bench setup requirements`:
 
      ```toml
-     "bwh-payments-core>=0.2.0,<0.3",
+     "bwh-payments-core>=0.1.2,<0.2",
      ```
 
    The pull request must have the `pyproject.toml` change before it merges.
