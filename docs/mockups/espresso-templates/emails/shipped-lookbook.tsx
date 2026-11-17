@@ -12,7 +12,7 @@ import {
 	ShipmentPanel,
 	s,
 } from '../kit/components';
-import { type Sample, fill } from '../kit/data';
+import { type Sample, fill, orderValues } from '../kit/data';
 
 export default function ShippedLookbook({
 	brand,
@@ -23,10 +23,7 @@ export default function ShippedLookbook({
 	imageBase,
 }: Sample) {
 	const text = copy.shipped;
-	const values = {
-		first_name: order.customer_first_name,
-		order_number: order.name,
-	};
+	const values = orderValues(order);
 	const arrival = steps.at(-1);
 
 	return (
@@ -36,13 +33,13 @@ export default function ShippedLookbook({
 				arrival?.pending_title ?? 'Arriving'
 			} ${arrival?.date}.`}
 		>
-			<Header brand={brand} layout="lookbook" />
+			<Header brand={brand} />
 
-			<Text style={s.kicker}>
+			<Text style={s.caption}>
 				Order {order.name}, shipped {shipment.shipped_on}
 			</Text>
-			<Heading layout="lookbook">{fill(text.heading, values)}</Heading>
-			<Intro layout="lookbook">{fill(text.intro, values)}</Intro>
+			<Heading>{fill(text.heading, values)}</Heading>
+			<Intro>{fill(text.intro, values)}</Intro>
 
 			<Section style={{ marginTop: 32 }}>
 				<ProgressSteps
@@ -51,9 +48,7 @@ export default function ShippedLookbook({
 					detail={shipment.delay_note}
 				/>
 				<ShipmentPanel shipment={shipment} marginTop={24} />
-				<Button href={shipment.tracking_url} layout="lookbook" marginTop={24}>
-					{text.button}
-				</Button>
+				<Button href={shipment.tracking_url}>{text.button}</Button>
 			</Section>
 
 			<ItemGrid items={order.items} imageBase={imageBase} />
@@ -64,12 +59,7 @@ export default function ShippedLookbook({
 
 			<Hr style={{ ...s.hr, margin: '20px 0' }} />
 
-			<Footer
-				brand={brand}
-				layout="lookbook"
-				closing={fill(text.closing, values)}
-				reason={`You're receiving this because you placed an order at ${brand.name}.`}
-			/>
+			<Footer brand={brand} closing={fill(text.closing, values)} />
 		</EmailLayout>
 	);
 }

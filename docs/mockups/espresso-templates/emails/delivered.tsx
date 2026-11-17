@@ -7,11 +7,11 @@ import {
 	Header,
 	Heading,
 	Intro,
-	ItemRow,
+	ItemList,
 	ProgressSteps,
 	s,
 } from '../kit/components';
-import { type Sample, fill, t } from '../kit/data';
+import { type Sample, fill, orderValues, t } from '../kit/data';
 
 export default function Delivered({
 	brand,
@@ -22,30 +22,27 @@ export default function Delivered({
 	imageBase,
 }: Sample) {
 	const text = copy.delivered;
-	const values = {
-		first_name: order.customer_first_name,
-		order_number: order.name,
-	};
+	const values = orderValues(order);
 
 	return (
 		<EmailLayout
-			layout="classic"
 			preview={`Order ${order.name} was delivered on ${shipment.delivered_on}.`}
 		>
-			<Header brand={brand} layout="classic" meta={`Order ${order.name}`} />
+			<Header brand={brand} meta={`Order ${order.name}`} />
 
 			<Card first>
-				<Heading layout="classic">{fill(text.heading, values)}</Heading>
-				<Intro layout="classic">{fill(text.intro, values)}</Intro>
+				<Heading>{fill(text.heading, values)}</Heading>
+				<Intro>{fill(text.intro, values)}</Intro>
 				<ProgressSteps steps={steps} />
 				<Button href={order.order_url}>{text.button}</Button>
 			</Card>
 
 			<Card>
-				<Text style={s.sectionTitle}>What arrived</Text>
-				{order.items.map((row) => (
-					<ItemRow key={row.item_code} row={row} imageBase={imageBase} />
-				))}
+				<ItemList
+					heading="What arrived"
+					items={order.items}
+					imageBase={imageBase}
+				/>
 			</Card>
 
 			{shipment.return_by && (
@@ -70,11 +67,7 @@ export default function Delivered({
 				</Card>
 			)}
 
-			<Footer
-				brand={brand}
-				closing={fill(text.closing, values)}
-				reason={`You're receiving this because you placed an order at ${brand.name}.`}
-			/>
+			<Footer brand={brand} closing={fill(text.closing, values)} />
 		</EmailLayout>
 	);
 }

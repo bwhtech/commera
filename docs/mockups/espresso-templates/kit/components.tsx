@@ -13,7 +13,13 @@ import {
 	Section,
 	Text,
 } from '@react-email/components';
-import type { CSSProperties, ReactNode } from 'react';
+import {
+	type CSSProperties,
+	Children,
+	type ReactNode,
+	createContext,
+	useContext,
+} from 'react';
 import {
 	type Address,
 	type Brand,
@@ -27,151 +33,108 @@ import {
 	t,
 } from './data';
 
-export type Layout = 'classic' | 'lookbook';
+type Layout = 'classic' | 'lookbook';
+
+const LayoutContext = createContext<Layout>('classic');
 
 const text: CSSProperties = {
 	margin: 0,
 	fontFamily: t.font,
 	letterSpacing: '0.005em',
 };
+const title: CSSProperties = {
+	...text,
+	fontSize: 15,
+	fontWeight: t.semibold,
+	color: t.inkGray9,
+};
+const num: CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 
 export const s = {
 	muted: { ...text, fontSize: 12, color: t.inkGray5, lineHeight: '1.4' },
+	caption: { ...text, fontSize: 13, color: t.inkGray5 },
 	label: { ...text, fontSize: 12, color: t.inkGray5, marginBottom: 6 },
 	para: { ...text, fontSize: 14, lineHeight: '1.55', color: t.inkGray7 },
+	value: { ...text, fontSize: 14, fontWeight: t.medium, color: t.inkGray9 },
 	strong: { color: t.inkGray9, fontWeight: t.medium },
 	address: { ...text, fontSize: 13, lineHeight: '1.55', color: t.inkGray7 },
-	sectionTitle: {
-		...text,
-		fontSize: 15,
-		fontWeight: t.semibold,
-		color: t.inkGray9,
-		marginBottom: 8,
-	},
-	h2: {
-		...text,
-		fontSize: 17,
-		fontWeight: t.semibold,
-		color: t.inkGray9,
-		marginBottom: 14,
-	},
-	kicker: { ...text, fontSize: 13, color: t.inkGray5 },
+	title,
+	sectionTitle: { ...title, marginBottom: 8 },
 	line: { ...text, fontSize: 14, color: t.inkGray7, lineHeight: '1.9' },
 	hr: { borderColor: t.outlineGray2, margin: '14px 0' },
 	half: { width: '50%', verticalAlign: 'top', paddingRight: 12 },
-	num: { fontVariantNumeric: 'tabular-nums' },
-	amount: {
-		...text,
-		fontVariantNumeric: 'tabular-nums',
-		fontSize: 20,
-		fontWeight: t.semibold,
-		letterSpacing: '-0.01em',
-		color: t.inkGray9,
-	},
+	num,
+	amount: { ...title, ...num, fontSize: 20, letterSpacing: '-0.01em' },
 } satisfies Record<string, CSSProperties>;
 
 const layouts = {
 	classic: {
-		body: {
-			backgroundColor: t.surfaceGray1,
-			margin: 0,
-			padding: '32px 12px',
-			fontFamily: t.font,
-		},
-		container: { maxWidth: 600, width: '100%', margin: '0 auto', padding: 0 },
+		background: t.surfaceGray1,
+		padding: '32px 12px',
+		maxWidth: 600,
 		heading: {
-			...text,
+			...title,
 			fontSize: 26,
 			lineHeight: '1.15',
-			fontWeight: t.semibold,
 			letterSpacing: '-0.02em',
-			color: t.inkGray9,
 		},
-		intro: {
-			...text,
-			marginTop: 10,
-			fontSize: 14,
-			lineHeight: '1.55',
-			color: t.inkGray7,
-		},
+		intro: { ...s.para, marginTop: 10 },
 	},
 	lookbook: {
-		body: {
-			backgroundColor: t.surfaceBase,
-			margin: 0,
-			padding: '40px 20px',
-			fontFamily: t.font,
-		},
-		container: { maxWidth: 560, width: '100%', margin: '0 auto', padding: 0 },
+		background: t.surfaceBase,
+		padding: '40px 20px',
+		maxWidth: 560,
 		heading: {
-			...text,
+			...title,
 			marginTop: 10,
 			fontSize: 34,
 			lineHeight: '1.08',
-			fontWeight: t.semibold,
 			letterSpacing: '-0.025em',
-			color: t.inkGray9,
 		},
-		intro: {
-			...text,
-			marginTop: 14,
-			fontSize: 15,
-			lineHeight: '1.55',
-			color: t.inkGray7,
-		},
+		intro: { ...s.para, marginTop: 14, fontSize: 15 },
 	},
-} satisfies Record<Layout, Record<string, CSSProperties>>;
+};
 
 export function EmailLayout({
-	layout,
+	layout = 'classic',
 	preview,
 	children,
-}: { layout: Layout; preview: string; children: ReactNode }) {
+}: { layout?: Layout; preview: string; children: ReactNode }) {
+	const { background, padding, maxWidth } = layouts[layout];
 	return (
-		<Html lang="en">
-			<Head>
-				<link href={t.fontStylesheet} rel="stylesheet" />
-			</Head>
-			<Preview>{preview}</Preview>
-			<Body style={layouts[layout].body}>
-				<Container style={layouts[layout].container}>{children}</Container>
-			</Body>
-		</Html>
+		<LayoutContext.Provider value={layout}>
+			<Html lang="en">
+				<Head>
+					<link href={t.fontStylesheet} rel="stylesheet" />
+				</Head>
+				<Preview>{preview}</Preview>
+				<Body
+					style={{
+						backgroundColor: background,
+						margin: 0,
+						padding,
+						fontFamily: t.font,
+					}}
+				>
+					<Container
+						style={{ maxWidth, width: '100%', margin: '0 auto', padding: 0 }}
+					>
+						{children}
+					</Container>
+				</Body>
+			</Html>
+		</LayoutContext.Provider>
 	);
 }
 
-export function Header({
-	brand,
-	layout,
-	meta,
-}: { brand: Brand; layout: Layout; meta?: string }) {
-	if (layout === 'lookbook') {
-		return (
-			<Text
-				style={{
-					...text,
-					fontSize: 15,
-					fontWeight: t.semibold,
-					color: t.inkGray9,
-					marginBottom: 40,
-				}}
-			>
-				{brand.name}
-			</Text>
-		);
+export function Header({ brand, meta }: { brand: Brand; meta?: string }) {
+	if (useContext(LayoutContext) === 'lookbook') {
+		return <Text style={{ ...title, marginBottom: 40 }}>{brand.name}</Text>;
 	}
 	return (
 		<Row style={{ padding: '8px 4px 20px' }}>
 			<Column>
-				<Text
-					style={{
-						...text,
-						fontSize: 16,
-						fontWeight: t.semibold,
-						color: t.inkGray9,
-						lineHeight: '28px',
-					}}
-				>
+				<Text style={{ ...title, fontSize: 16, lineHeight: '28px' }}>
 					{brand.logo ? (
 						<Img
 							src={brand.logo}
@@ -184,7 +147,23 @@ export function Header({
 							}}
 						/>
 					) : (
-						<span style={markStyle}>{brand.name[0]}</span>
+						<span
+							style={{
+								display: 'inline-block',
+								width: 26,
+								height: 26,
+								lineHeight: '26px',
+								textAlign: 'center',
+								backgroundColor: t.inkGray9,
+								color: t.inkWhite,
+								borderRadius: t.radiusThumb,
+								fontSize: 14,
+								fontWeight: 700,
+								marginRight: 10,
+							}}
+						>
+							{brand.name[0]}
+						</span>
 					)}
 					{brand.name}
 				</Text>
@@ -198,46 +177,29 @@ export function Header({
 	);
 }
 
-const markStyle: CSSProperties = {
-	display: 'inline-block',
-	width: 26,
-	height: 26,
-	lineHeight: '26px',
-	textAlign: 'center',
-	backgroundColor: t.inkGray9,
-	color: t.inkWhite,
-	borderRadius: t.radiusThumb,
-	fontSize: 14,
-	fontWeight: 700,
-	marginRight: 10,
-};
-
-export function Heading({
-	layout,
-	children,
-}: { layout: Layout; children: ReactNode }) {
-	return <Text style={layouts[layout].heading}>{children}</Text>;
+export function Heading({ children }: { children: ReactNode }) {
+	return (
+		<Text style={layouts[useContext(LayoutContext)].heading}>{children}</Text>
+	);
 }
 
-export function Intro({
-	layout,
-	children,
-}: { layout: Layout; children: ReactNode }) {
-	return <Text style={layouts[layout].intro}>{children}</Text>;
+export function Intro({ children }: { children: ReactNode }) {
+	return (
+		<Text style={layouts[useContext(LayoutContext)].intro}>{children}</Text>
+	);
 }
 
 export function Card({
 	children,
 	first,
-	padding,
-}: { children: ReactNode; first?: boolean; padding?: string }) {
+}: { children: ReactNode; first?: boolean }) {
 	return (
 		<Section
 			style={{
 				backgroundColor: t.surfaceBase,
 				borderRadius: t.radiusCard,
 				border: `1px solid ${t.outlineGray1}`,
-				padding: padding ?? (first ? '28px' : '24px 28px'),
+				padding: first ? '28px' : '24px 28px',
 				marginTop: first ? 0 : 12,
 			}}
 		>
@@ -249,14 +211,14 @@ export function Card({
 export function Button({
 	href,
 	children,
-	layout = 'classic',
-	marginTop,
-}: { href: string; children: ReactNode; layout?: Layout; marginTop?: number }) {
+	marginTop = 24,
+}: { href: string; children: ReactNode; marginTop?: number }) {
+	const classic = useContext(LayoutContext) === 'classic';
 	return (
 		<EmailButton
 			href={href}
 			style={{
-				marginTop: marginTop ?? (layout === 'classic' ? 24 : 12),
+				marginTop,
 				backgroundColor: t.inkGray9,
 				color: t.inkWhite,
 				fontFamily: t.font,
@@ -264,7 +226,7 @@ export function Button({
 				fontWeight: t.medium,
 				borderRadius: t.radiusThumb,
 				textDecoration: 'none',
-				padding: layout === 'classic' ? '11px 18px' : '12px 20px',
+				padding: classic ? '11px 18px' : '12px 20px',
 			}}
 		>
 			{children}
@@ -275,18 +237,52 @@ export function Button({
 export function Panel({
 	children,
 	marginTop = 22,
-}: { children: ReactNode; marginTop?: number }) {
+	padding = '16px 20px',
+}: { children: ReactNode; marginTop?: number; padding?: string }) {
 	return (
 		<Section
 			style={{
 				backgroundColor: t.surfaceGray2,
 				borderRadius: t.radiusCard,
-				padding: '16px 20px',
+				padding,
 				marginTop,
 			}}
 		>
 			{children}
 		</Section>
+	);
+}
+
+export function AmountPanel({
+	label,
+	amount,
+	amountStyle,
+	children,
+}: {
+	label: string;
+	amount: string;
+	amountStyle?: CSSProperties;
+	children: ReactNode;
+}) {
+	return (
+		<Panel>
+			<Text style={s.label}>{label}</Text>
+			<Text style={{ ...s.amount, ...amountStyle }}>{amount}</Text>
+			<Text style={{ ...s.address, marginTop: 6 }}>{children}</Text>
+		</Panel>
+	);
+}
+
+export function TwoColumns({
+	children,
+	marginTop,
+}: { children: ReactNode; marginTop?: number }) {
+	return (
+		<Row style={{ marginTop }}>
+			{Children.map(children, (child) => (
+				<Column style={s.half}>{child}</Column>
+			))}
+		</Row>
 	);
 }
 
@@ -296,25 +292,13 @@ export function ShipmentPanel({
 }: { shipment: Sample['shipment']; marginTop?: number }) {
 	return (
 		<Panel marginTop={marginTop}>
-			<Row>
-				<Column style={s.half}>
-					<FactBlock label="Carrier" title={shipment.carrier} />
-				</Column>
-				<Column style={s.half}>
-					<FactBlock label="Tracking number" title={shipment.tracking_number} />
-				</Column>
-			</Row>
+			<TwoColumns>
+				<FactBlock label="Carrier" title={shipment.carrier} />
+				<FactBlock label="Tracking number" title={shipment.tracking_number} />
+			</TwoColumns>
 		</Panel>
 	);
 }
-
-type PlaceholderTileProps = {
-	name: string;
-	width: number | string;
-	height: number;
-	fontSize?: number;
-	margin?: string;
-};
 
 export function PlaceholderTile({
 	name,
@@ -322,7 +306,13 @@ export function PlaceholderTile({
 	height,
 	fontSize = 16,
 	margin = '0',
-}: PlaceholderTileProps) {
+}: {
+	name: string;
+	width: number | string;
+	height: number;
+	fontSize?: number;
+	margin?: string;
+}) {
 	return (
 		<div
 			style={{
@@ -361,37 +351,17 @@ export function ProgressSteps({
 }: { steps: Step[]; marginTop?: number; detail?: string }) {
 	const status = stepStatus(steps);
 	const statusDetail = detail ?? status.detail;
-	const barHeight = 4;
-	const barGap = 4;
 	return (
 		<Section style={{ marginTop }}>
 			<Row>
 				<Column style={{ verticalAlign: 'bottom' }}>
-					<Text
-						style={{
-							...text,
-							fontSize: 15,
-							fontWeight: t.semibold,
-							lineHeight: '1.3',
-							color: t.inkGray9,
-						}}
-					>
-						{status.title}
-					</Text>
+					<Text style={{ ...title, lineHeight: '1.3' }}>{status.title}</Text>
 				</Column>
 				<Column
 					align="right"
 					style={{ verticalAlign: 'bottom', whiteSpace: 'nowrap' }}
 				>
-					<Text
-						style={{
-							...text,
-							...s.num,
-							fontSize: 13,
-							lineHeight: '1.3',
-							color: t.inkGray5,
-						}}
-					>
+					<Text style={{ ...s.caption, ...num, lineHeight: '1.3' }}>
 						{status.when}
 					</Text>
 				</Column>
@@ -403,16 +373,16 @@ export function ProgressSteps({
 						style={{
 							width: `${100 / steps.length}%`,
 							padding: 0,
-							paddingRight: index < steps.length - 1 ? barGap : 0,
+							paddingRight: index < steps.length - 1 ? 4 : 0,
 							verticalAlign: 'top',
 						}}
 					>
 						<div
 							style={{
-								height: barHeight,
-								lineHeight: `${barHeight}px`,
+								height: 4,
+								lineHeight: '4px',
 								fontSize: 1,
-								borderRadius: barHeight,
+								borderRadius: 4,
 								backgroundColor: step.done ? t.inkGreen6 : t.outlineGray2,
 							}}
 						>
@@ -422,15 +392,7 @@ export function ProgressSteps({
 				))}
 			</Row>
 			{statusDetail && (
-				<Text
-					style={{
-						...text,
-						fontSize: 13,
-						lineHeight: '1.4',
-						color: t.inkGray5,
-						marginTop: 8,
-					}}
-				>
+				<Text style={{ ...s.caption, lineHeight: '1.4', marginTop: 8 }}>
 					{statusDetail}
 				</Text>
 			)}
@@ -438,21 +400,45 @@ export function ProgressSteps({
 	);
 }
 
-const onSale = (row: Item) => row.price_list_rate > row.rate;
+export const onSale = (row: Item) => row.price_list_rate > row.rate;
 
-export function ItemRow({ row, imageBase }: { row: Item; imageBase: string }) {
+export function WasPrice({
+	amount,
+	fontSize,
+}: { amount: number; fontSize: number }) {
+	return (
+		<span
+			style={{
+				marginLeft: 8,
+				fontSize,
+				fontWeight: t.regular,
+				color: t.inkGray5,
+				textDecoration: 'line-through',
+			}}
+		>
+			{money(amount)}
+		</span>
+	);
+}
+
+function ItemRow({ row, imageBase }: { row: Item; imageBase: string }) {
 	const thumb = imageUrl(imageBase, row.image, 'thumb');
-	const thumbStyle: CSSProperties = {
-		display: 'block',
-		borderRadius: t.radiusThumb,
-		backgroundColor: t.surfaceGray2,
-		margin: '12px 0',
-	};
 	return (
 		<Row style={{ borderBottom: `1px solid ${t.outlineGray1}` }}>
 			<Column style={{ width: 64, verticalAlign: 'top' }}>
 				{thumb ? (
-					<Img src={thumb} width="52" height="64" alt="" style={thumbStyle} />
+					<Img
+						src={thumb}
+						width="52"
+						height="64"
+						alt=""
+						style={{
+							display: 'block',
+							borderRadius: t.radiusThumb,
+							backgroundColor: t.surfaceGray2,
+							margin: '12px 0',
+						}}
+					/>
 				) : (
 					<PlaceholderTile
 						name={row.item_name}
@@ -463,28 +449,11 @@ export function ItemRow({ row, imageBase }: { row: Item; imageBase: string }) {
 				)}
 			</Column>
 			<Column style={{ verticalAlign: 'top' }}>
-				<Text
-					style={{
-						...text,
-						fontSize: 14,
-						fontWeight: t.medium,
-						color: t.inkGray9,
-						lineHeight: '1.3',
-						marginTop: 14,
-					}}
-				>
+				<Text style={{ ...s.value, lineHeight: '1.3', marginTop: 14 }}>
 					{row.item_name}
 				</Text>
-				<Text
-					style={{
-						...text,
-						fontSize: 13,
-						color: t.inkGray5,
-						lineHeight: '1.4',
-						marginTop: 3,
-					}}
-				>
-					{row.variant}, qty <span style={s.num}>{row.qty}</span>
+				<Text style={{ ...s.caption, lineHeight: '1.4', marginTop: 3 }}>
+					{row.variant}, qty <span style={num}>{row.qty}</span>
 					{onSale(row) && (
 						<span style={{ color: t.inkGreen6, fontWeight: t.medium }}>
 							{' '}
@@ -494,25 +463,15 @@ export function ItemRow({ row, imageBase }: { row: Item; imageBase: string }) {
 				</Text>
 			</Column>
 			<Column align="right" style={{ verticalAlign: 'top', width: 110 }}>
-				<Text
-					style={{
-						...text,
-						...s.num,
-						fontSize: 14,
-						fontWeight: t.medium,
-						color: t.inkGray9,
-						marginTop: 14,
-					}}
-				>
+				<Text style={{ ...s.value, ...num, marginTop: 14 }}>
 					{money(row.qty * row.rate)}
 				</Text>
 				{onSale(row) && (
 					<Text
 						style={{
-							...text,
-							...s.num,
+							...s.caption,
+							...num,
 							fontSize: 12,
-							color: t.inkGray5,
 							textDecoration: 'line-through',
 							marginTop: 3,
 						}}
@@ -525,7 +484,22 @@ export function ItemRow({ row, imageBase }: { row: Item; imageBase: string }) {
 	);
 }
 
-export function ItemCard({ row, imageBase }: { row: Item; imageBase: string }) {
+export function ItemList({
+	heading,
+	items,
+	imageBase,
+}: { heading?: string; items: Item[]; imageBase: string }) {
+	return (
+		<>
+			{heading && <Text style={s.sectionTitle}>{heading}</Text>}
+			{items.map((row) => (
+				<ItemRow key={row.item_code} row={row} imageBase={imageBase} />
+			))}
+		</>
+	);
+}
+
+function ItemCard({ row, imageBase }: { row: Item; imageBase: string }) {
 	const photo = imageUrl(imageBase, row.image, 'card');
 	return (
 		<>
@@ -553,45 +527,17 @@ export function ItemCard({ row, imageBase }: { row: Item; imageBase: string }) {
 					fontSize={24}
 				/>
 			)}
-			<Text
-				style={{
-					...text,
-					marginTop: 12,
-					fontSize: 14,
-					fontWeight: t.medium,
-					lineHeight: '1.3',
-					color: t.inkGray9,
-				}}
-			>
+			<Text style={{ ...s.value, marginTop: 12, lineHeight: '1.3' }}>
 				{row.item_name}
 			</Text>
-			<Text style={{ ...text, marginTop: 3, fontSize: 13, color: t.inkGray5 }}>
+			<Text style={{ ...s.caption, marginTop: 3 }}>
 				{row.variant}
 				{row.qty > 1 ? `, ${row.qty} pieces` : ''}
 			</Text>
-			<Text
-				style={{
-					...text,
-					...s.num,
-					marginTop: 6,
-					fontSize: 14,
-					fontWeight: t.medium,
-					color: t.inkGray9,
-				}}
-			>
+			<Text style={{ ...s.value, ...num, marginTop: 6 }}>
 				{money(row.qty * row.rate)}
 				{onSale(row) && (
-					<span
-						style={{
-							marginLeft: 8,
-							fontSize: 13,
-							fontWeight: t.regular,
-							color: t.inkGray5,
-							textDecoration: 'line-through',
-						}}
-					>
-						{money(row.qty * row.price_list_rate)}
-					</span>
+					<WasPrice amount={row.qty * row.price_list_rate} fontSize={13} />
 				)}
 			</Text>
 		</>
@@ -629,10 +575,10 @@ export function ItemGrid({
 	);
 }
 
-export function Line({
+function Line({
 	label,
 	value,
-	color,
+	color = t.inkGray9,
 }: { label: string; value: string; color?: string }) {
 	return (
 		<Row>
@@ -640,26 +586,46 @@ export function Line({
 				<Text style={s.line}>{label}</Text>
 			</Column>
 			<Column align="right">
-				<Text style={{ ...s.line, ...s.num, color: color ?? t.inkGray9 }}>
-					{value}
-				</Text>
+				<Text style={{ ...s.line, ...num, color }}>{value}</Text>
 			</Column>
 		</Row>
 	);
 }
 
-function ChargeLines({ order, subtotal }: { order: Order; subtotal: number }) {
+function DiscountLine({ code, amount }: { code?: string; amount: number }) {
 	return (
+		<Line
+			label={code ? `Discount (${code})` : 'Discount'}
+			value={`−${money(amount)}`}
+			color={t.inkGreen6}
+		/>
+	);
+}
+
+function TotalRow({ label, amount }: { label: string; amount: number }) {
+	return (
+		<Row>
+			<Column>
+				<Text style={title}>{label}</Text>
+			</Column>
+			<Column align="right">
+				<Text style={s.amount}>{money(amount)}</Text>
+			</Column>
+		</Row>
+	);
+}
+
+export function Totals({
+	order,
+	totalLabel = 'Total',
+}: { order: Order; totalLabel?: string }) {
+	const lookbook = useContext(LayoutContext) === 'lookbook';
+	const { subtotal, grand, tax } = orderTotals(order);
+	const lines = (
 		<>
 			<Line label="Subtotal" value={money(subtotal)} />
 			{order.discount_amount > 0 && (
-				<Line
-					label={
-						order.coupon_code ? `Discount (${order.coupon_code})` : 'Discount'
-					}
-					value={`−${money(order.discount_amount)}`}
-					color={t.inkGreen6}
-				/>
+				<DiscountLine code={order.coupon_code} amount={order.discount_amount} />
 			)}
 			{order.charges.map((charge) => (
 				<Line
@@ -668,94 +634,46 @@ function ChargeLines({ order, subtotal }: { order: Order; subtotal: number }) {
 					value={charge.amount ? money(charge.amount) : 'Free'}
 				/>
 			))}
-		</>
-	);
-}
-
-export function Totals({
-	order,
-	layout,
-	totalLabel = 'Total',
-}: { order: Order; layout: Layout; totalLabel?: string }) {
-	const { subtotal, grand, tax } = orderTotals(order);
-	const taxNote = `Includes ${money(tax)} ${order.tax_label}`;
-	if (layout === 'lookbook') {
-		return (
-			<Section
-				style={{
-					backgroundColor: t.surfaceGray2,
-					borderRadius: t.radiusCard,
-					padding: '20px 24px 18px',
-					marginTop: 8,
-				}}
-			>
-				<ChargeLines order={order} subtotal={subtotal} />
-				<Hr style={{ ...s.hr, margin: '12px 0' }} />
+			<Hr style={lookbook ? { ...s.hr, margin: '12px 0' } : s.hr} />
+			{lookbook ? (
 				<Row>
 					<Column style={{ verticalAlign: 'bottom' }}>
-						<Text style={{ ...text, fontSize: 13, color: t.inkGray5 }}>
-							Paid with {order.payment_method}
-						</Text>
+						<Text style={s.caption}>Paid with {order.payment_method}</Text>
 					</Column>
 					<Column align="right">
 						<Text
-							style={{
-								...text,
-								...s.num,
-								fontSize: 24,
-								fontWeight: t.semibold,
-								letterSpacing: '-0.015em',
-								color: t.inkGray9,
-							}}
+							style={{ ...s.amount, fontSize: 24, letterSpacing: '-0.015em' }}
 						>
 							{money(grand)}
 						</Text>
 					</Column>
 				</Row>
-				<Text
-					style={{ ...s.muted, ...s.num, textAlign: 'right', marginTop: 4 }}
-				>
-					{taxNote}
-				</Text>
-			</Section>
+			) : (
+				<TotalRow label={totalLabel} amount={grand} />
+			)}
+			<Text
+				style={{
+					...s.muted,
+					...num,
+					textAlign: 'right',
+					marginTop: lookbook ? 4 : 2,
+				}}
+			>
+				Includes {money(tax)} {order.tax_label}
+			</Text>
+		</>
+	);
+	if (lookbook) {
+		return (
+			<Panel marginTop={8} padding="20px 24px 18px">
+				{lines}
+			</Panel>
 		);
 	}
 	return (
 		<>
 			<Hr style={s.hr} />
-			<ChargeLines order={order} subtotal={subtotal} />
-			<Hr style={s.hr} />
-			<Row>
-				<Column>
-					<Text
-						style={{
-							...text,
-							fontSize: 15,
-							fontWeight: t.semibold,
-							color: t.inkGray9,
-						}}
-					>
-						{totalLabel}
-					</Text>
-				</Column>
-				<Column align="right">
-					<Text
-						style={{
-							...text,
-							...s.num,
-							fontSize: 20,
-							fontWeight: t.semibold,
-							color: t.inkGray9,
-							letterSpacing: '-0.01em',
-						}}
-					>
-						{money(grand)}
-					</Text>
-				</Column>
-			</Row>
-			<Text style={{ ...s.muted, ...s.num, textAlign: 'right', marginTop: 2 }}>
-				{taxNote}
-			</Text>
+			{lines}
 		</>
 	);
 }
@@ -763,13 +681,11 @@ export function Totals({
 export function ReturnItems({
 	order,
 	returned,
-	refundAmount,
 	totalLabel,
 	imageBase,
 }: {
 	order: Order;
 	returned: Sample['return'];
-	refundAmount: number;
 	totalLabel: string;
 	imageBase: string;
 }) {
@@ -778,53 +694,22 @@ export function ReturnItems({
 		return row ? [{ ...row, qty: line.qty }] : [];
 	});
 	const itemsTotal = rows.reduce((sum, row) => sum + row.qty * row.rate, 0);
-	const discount = Math.round((itemsTotal - refundAmount) * 100) / 100;
+	const discount =
+		Math.round((itemsTotal - returned.refund_amount) * 100) / 100;
 	return (
 		<>
-			{rows.map((row) => (
-				<ItemRow key={row.item_code} row={row} imageBase={imageBase} />
-			))}
+			<ItemList items={rows} imageBase={imageBase} />
 			<Hr style={s.hr} />
 			{discount > 0 && (
 				<>
-					<Line
-						label={
-							order.coupon_code ? `Discount (${order.coupon_code})` : 'Discount'
-						}
-						value={`−${money(discount)}`}
-						color={t.inkGreen6}
-					/>
+					<DiscountLine code={order.coupon_code} amount={discount} />
 					<Hr style={s.hr} />
 				</>
 			)}
-			<Row>
-				<Column>
-					<Text
-						style={{
-							...text,
-							fontSize: 15,
-							fontWeight: t.semibold,
-							color: t.inkGray9,
-						}}
-					>
-						{totalLabel}
-					</Text>
-				</Column>
-				<Column align="right">
-					<Text style={s.amount}>{money(refundAmount)}</Text>
-				</Column>
-			</Row>
+			<TotalRow label={totalLabel} amount={returned.refund_amount} />
 		</>
 	);
 }
-
-type AddressBlockProps = {
-	label: string;
-	address?: Address | null;
-	emptyText?: string;
-	extraLines?: (string | null | undefined)[];
-	bold?: boolean;
-};
 
 export function AddressBlock({
 	label,
@@ -832,27 +717,23 @@ export function AddressBlock({
 	emptyText,
 	extraLines = [],
 	bold = true,
-}: AddressBlockProps) {
-	const extras = extraLines.filter(Boolean) as string[];
+}: {
+	label: string;
+	address?: Address | null;
+	emptyText?: string;
+	extraLines?: (string | null | undefined)[];
+	bold?: boolean;
+}) {
 	if (!address && !emptyText) return null;
+	const lines = [...(address?.lines ?? []), ...extraLines].filter(Boolean);
 	return (
 		<>
 			<Text style={s.label}>{label}</Text>
 			<Text style={s.address}>
-				{address ? (
-					<>
-						{bold ? <b style={s.strong}>{address.name}</b> : address.name}
-						{address.lines.map((line) => (
-							<span key={line}>
-								<br />
-								{line}
-							</span>
-						))}
-					</>
-				) : (
-					emptyText
-				)}
-				{extras.map((line) => (
+				{!address && emptyText}
+				{address && bold && <b style={s.strong}>{address.name}</b>}
+				{address && !bold && address.name}
+				{lines.map((line) => (
 					<span key={line}>
 						<br />
 						{line}
@@ -863,24 +744,34 @@ export function AddressBlock({
 	);
 }
 
+export function BillingAddress({
+	order,
+	bold,
+}: { order: Order; bold?: boolean }) {
+	return (
+		<Section style={{ marginTop: 16 }}>
+			<AddressBlock
+				label="Billing to"
+				address={order.billing}
+				emptyText="Same as shipping address"
+				extraLines={[order.customer_tax_id && `GSTIN ${order.customer_tax_id}`]}
+				bold={bold}
+			/>
+		</Section>
+	);
+}
+
 export function FactBlock({
 	label,
 	title,
 	detail,
 }: { label: string; title: string; detail?: string }) {
 	return (
-		<>
-			<Text style={s.label}>{label}</Text>
-			<Text style={s.address}>
-				<b style={s.strong}>{title}</b>
-				{detail && (
-					<>
-						<br />
-						{detail}
-					</>
-				)}
-			</Text>
-		</>
+		<AddressBlock
+			label={label}
+			address={{ name: title, lines: [] }}
+			extraLines={[detail]}
+		/>
 	);
 }
 
@@ -898,27 +789,20 @@ export function NoteBlock({
 	);
 }
 
-type FooterProps = {
-	brand: Brand;
-	closing?: string;
-	reason: string;
-	links?: { label: string; url: string }[];
-	layout?: Layout;
-};
-
 export function Footer({
 	brand,
 	closing,
-	reason,
+	reason = `You're receiving this because you placed an order at ${brand.name}.`,
 	links = brand.footer_links,
-	layout = 'classic',
-}: FooterProps) {
+}: {
+	brand: Brand;
+	closing?: string;
+	reason?: string;
+	links?: { label: string; url: string }[];
+}) {
+	const classic = useContext(LayoutContext) === 'classic';
 	return (
-		<Section
-			style={{
-				padding: layout === 'classic' ? `${closing ? 8 : 20}px 4px 0` : 0,
-			}}
-		>
+		<Section style={{ padding: classic ? `${closing ? 8 : 20}px 4px 0` : 0 }}>
 			{closing && (
 				<Text style={{ ...s.para, marginBottom: 16 }}>{closing}</Text>
 			)}

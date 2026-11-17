@@ -11,13 +11,13 @@
 </header>
 {%- endmacro %}
 
-{% macro hero(heading, intro, number_label, number, steps=None, intro_lines=[]) -%}
+{% macro hero(heading, lines, number_label, number, steps=None, label=None) -%}
 <section class="hero">
 	<div class="hero-top">
 		<div>
+			{% if label %}<div class="label">{{ label }}</div>{% endif %}
 			<h1>{{ heading }}</h1>
-			{% if intro %}<p>{{ intro }}</p>{% endif %}
-			{%- if intro_lines %}<p>{% for line in intro_lines | select %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>{% endif %}
+			<p>{% for line in lines | select %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
 		</div>
 		<div class="doc-number">
 			<span>{{ number_label }}</span>
@@ -57,8 +57,7 @@
 {%- endmacro %}
 
 {% macro fact(label, title, detail=None) -%}
-<div class="label">{{ label }}</div>
-<address><b>{{ title }}</b>{% if detail %}<br>{{ detail }}{% endif %}</address>
+{{ address_block(label, {"name": title, "lines": []}, extra_lines=[detail]) }}
 {%- endmacro %}
 
 {% macro thumb(row) -%}
@@ -114,16 +113,20 @@
 {% else %}<div></div>{% endif %}
 {%- endmacro %}
 
-{% macro totals(doc, money, total_label="Total") -%}
-<table class="totals">
+{% macro charge_rows(doc, money, highlight_discount=True) -%}
 	<tr><td>Subtotal</td><td class="num">{{ money(doc.total) }}</td></tr>
 	{% if doc.discount_amount %}
-	<tr class="discount"><td>Discount{% if doc.coupon_code %} ({{ doc.coupon_code }}){% endif %}</td><td class="num">&minus;{{ money(doc.discount_amount) }}</td></tr>
+	<tr class="{{ 'discount' if highlight_discount }}"><td>Discount{% if doc.coupon_code %} ({{ doc.coupon_code }}){% endif %}</td><td class="num">&minus;{{ money(doc.discount_amount) }}</td></tr>
 	{% endif %}
 	{% for charge in doc.charges %}
 	<tr><td>{{ charge.description }}</td><td class="num">{{ money(charge.amount) if charge.amount else "Free" }}</td></tr>
 	{% endfor %}
-	<tr class="grand"><td>{{ total_label }}</td><td class="num">{{ money(doc.grand_total) }}</td></tr>
+{%- endmacro %}
+
+{% macro totals(doc, money) -%}
+<table class="totals">
+	{{ charge_rows(doc, money) }}
+	<tr class="grand"><td>Total</td><td class="num">{{ money(doc.grand_total) }}</td></tr>
 	<tr class="tax-note"><td colspan="2" class="num">Includes {{ money(doc.tax_included) }} {{ doc.tax_label }}</td></tr>
 </table>
 {%- endmacro %}
@@ -143,7 +146,7 @@
 
 {% macro line_items_table(items, money, quantity_label="Qty", amount_label="Amount") -%}
 {% set show_hsn = items | selectattr("gst_hsn_code") | list %}
-<table class="items lines">
+<table class="items">
 	<thead>
 		<tr>
 			<th>Description</th>
@@ -186,19 +189,13 @@
 </div>
 {%- endmacro %}
 
-{% macro invoice_totals(doc, money, total_label="Total", tax_label="Tax", highlight_discount=True) -%}
+{% macro invoice_totals(doc, money, total_label="Total", tax_label="Total tax", highlight_discount=True) -%}
 <table class="totals invoice-totals">
-	<tr><td>Subtotal</td><td class="num">{{ money(doc.total) }}</td></tr>
-	{% if doc.discount_amount %}
-	<tr class="{{ 'discount' if highlight_discount }}"><td>Discount{% if doc.coupon_code %} ({{ doc.coupon_code }}){% endif %}</td><td class="num">&minus;{{ money(doc.discount_amount) }}</td></tr>
-	{% endif %}
-	{% for charge in doc.charges %}
-	<tr><td>{{ charge.description }}</td><td class="num">{{ money(charge.amount) if charge.amount else "Free" }}</td></tr>
-	{% endfor %}
+	{{ charge_rows(doc, money, highlight_discount) }}
 	{% if doc.discount_amount or doc.charges %}
-	<tr class="taxable"><td>Taxable value</td><td class="num">{{ money(doc.net_total) }}</td></tr>
+	<tr><td>Taxable value</td><td class="num">{{ money(doc.net_total) }}</td></tr>
 	{% endif %}
-	<tr><td>{{ tax_label }}</td><td class="num">{{ money(doc.total_taxes) }}</td></tr>
+	<tr><td>{{ doc.taxes[0].description if doc.taxes | length == 1 else tax_label }}</td><td class="num">{{ money(doc.total_taxes) }}</td></tr>
 	<tr class="grand"><td>{{ total_label }}</td><td class="num">{{ money(doc.grand_total) }}</td></tr>
 </table>
 {%- endmacro %}

@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import tokens from './tokens.json' with { type: 'json' };
 
 export const t = {
@@ -15,7 +12,6 @@ export const t = {
 	surfaceGray2: tokens.colors['surface-gray-2'].hex,
 	outlineGray1: tokens.colors['outline-gray-1'].hex,
 	outlineGray2: tokens.colors['outline-gray-2'].hex,
-	radiusTag: tokens.radius.tag,
 	radiusThumb: tokens.radius.thumb,
 	radiusCard: tokens.radius.card,
 	font: tokens.font.family,
@@ -29,7 +25,6 @@ export type Item = {
 	item_name: string;
 	variant: string;
 	item_code: string;
-	gst_hsn_code: string;
 	qty: number;
 	rate: number;
 	price_list_rate: number;
@@ -69,16 +64,12 @@ export type Brand = {
 	legal_name: string;
 	address: string;
 	tax_id: string;
-	state: string;
 	logo: string | null;
-	support_email: string;
 	store_url: string;
-	help_url: string;
 	footer_links: { label: string; url: string }[];
 };
 
-export type Copy = {
-	subject: string;
+type Copy = {
 	heading: string;
 	intro: string;
 	closing: string;
@@ -123,7 +114,7 @@ export type Sample = {
 		held_until: string;
 		payment_url: string;
 	};
-	cancellation: { cancelled_on: string; reason: string; refund_days: string };
+	cancellation: { reason: string; refund_days: string };
 	return: {
 		name: string;
 		requested_on: string;
@@ -133,13 +124,7 @@ export type Sample = {
 		refunded_on: string;
 		return_url: string;
 		next_steps: string[];
-		items: { item_code: string; qty: number; reason: string }[];
-	};
-	invoice: {
-		name: string;
-		posting_date: string;
-		place_of_supply: string;
-		taxes: { description: string; rate: number }[];
+		items: { item_code: string; qty: number }[];
 	};
 	back_in_stock: { item_code: string; product_url: string };
 	sign_in: { code: string; expires_in_minutes: number };
@@ -163,22 +148,10 @@ export type Sample = {
 	imageBase: string;
 };
 
-const sampleFile = resolve(import.meta.dirname, 'sample.json');
-
-export function loadSample(): Sample {
-	const data = JSON.parse(readFileSync(sampleFile, 'utf8'));
-	return {
-		...data,
-		imageBase: pathToFileURL(resolve(import.meta.dirname, '../static')).href,
-	};
-}
-
-export type ImageSize = 'square' | 'card' | 'thumb';
-
 export function imageUrl(
 	imageBase: string,
 	image: string | null,
-	size: ImageSize,
+	size: 'square' | 'card' | 'thumb',
 ) {
 	if (!image) return null;
 	return size === 'square'
@@ -208,4 +181,8 @@ export function orderTotals(order: Order) {
 
 export function fill(text: string, values: Record<string, string>) {
 	return text.replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match);
+}
+
+export function orderValues(order: Order) {
+	return { first_name: order.customer_first_name, order_number: order.name };
 }

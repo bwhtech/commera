@@ -6,7 +6,7 @@
 {% block body %}
 {{ ui.masthead(brand, doc.title, doc.posting_date) }}
 
-{{ ui.hero(brand.legal_name, None, doc.title ~ " number", doc.name, intro_lines=[brand.address, (brand.tax_id_label or "GSTIN") ~ " " ~ brand.tax_id]) }}
+{{ ui.hero(brand.legal_name, [brand.address, (brand.tax_id_label or "GSTIN") ~ " " ~ brand.tax_id], doc.title ~ " number", doc.name) }}
 
 <section class="facts">
 	<div class="fact">
@@ -26,7 +26,7 @@
 
 <section class="summary">
 	{{ ui.tax_breakdown(doc, money, "Tax reversed") }}
-	{{ ui.invoice_totals(doc, money, "Total credited", (doc.taxes | length == 1) and doc.taxes[0].description or "Tax reversed", highlight_discount=False) }}
+	{{ ui.invoice_totals(doc, money, "Total credited", "Tax reversed", highlight_discount=False) }}
 </section>
 
 {{ ui.footer(brand, copy.closing) }}

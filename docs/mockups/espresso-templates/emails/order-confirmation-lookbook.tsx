@@ -1,6 +1,7 @@
 import { Hr, Section, Text } from '@react-email/components';
 import {
 	AddressBlock,
+	BillingAddress,
 	Button,
 	EmailLayout,
 	Footer,
@@ -12,7 +13,14 @@ import {
 	Totals,
 	s,
 } from '../kit/components';
-import { type Sample, fill, money, orderTotals, t } from '../kit/data';
+import {
+	type Sample,
+	fill,
+	money,
+	orderTotals,
+	orderValues,
+	t,
+} from '../kit/data';
 
 export default function OrderConfirmationLookbook({
 	brand,
@@ -23,10 +31,7 @@ export default function OrderConfirmationLookbook({
 }: Sample) {
 	const text = copy.order_confirmation;
 	const { grand } = orderTotals(order);
-	const values = {
-		first_name: order.customer_first_name,
-		order_number: order.name,
-	};
+	const values = orderValues(order);
 
 	return (
 		<EmailLayout
@@ -35,22 +40,20 @@ export default function OrderConfirmationLookbook({
 				order.delivery_window
 			}.`}
 		>
-			<Header brand={brand} layout="lookbook" />
+			<Header brand={brand} />
 
-			<Text style={s.kicker}>
+			<Text style={s.caption}>
 				Order {order.name}, {order.transaction_date}, {order.transaction_time}
 			</Text>
-			<Heading layout="lookbook">{fill(text.heading, values)}</Heading>
-			<Intro layout="lookbook">{fill(text.intro, values)}</Intro>
+			<Heading>{fill(text.heading, values)}</Heading>
+			<Intro>{fill(text.intro, values)}</Intro>
 
 			<ItemGrid items={order.items} imageBase={imageBase} />
-			<Totals order={order} layout="lookbook" />
+			<Totals order={order} />
 
 			<Section style={{ marginTop: 32 }}>
 				<ProgressSteps steps={steps} marginTop={0} />
-				<Button href={order.order_url} layout="lookbook" marginTop={24}>
-					{text.button}
-				</Button>
+				<Button href={order.order_url}>{text.button}</Button>
 			</Section>
 
 			{(order.customer_note || order.gift_message) && (
@@ -86,26 +89,11 @@ export default function OrderConfirmationLookbook({
 			<Hr style={{ ...s.hr, margin: '32px 0 20px' }} />
 
 			<AddressBlock label="Shipping to" address={order.shipping} bold={false} />
-			<Section style={{ marginTop: 16 }}>
-				<AddressBlock
-					label="Billing to"
-					address={order.billing}
-					emptyText="Same as shipping address"
-					extraLines={[
-						order.customer_tax_id && `GSTIN ${order.customer_tax_id}`,
-					]}
-					bold={false}
-				/>
-			</Section>
+			<BillingAddress order={order} bold={false} />
 
 			<Hr style={{ ...s.hr, margin: '20px 0' }} />
 
-			<Footer
-				brand={brand}
-				layout="lookbook"
-				closing={fill(text.closing, values)}
-				reason={`You're receiving this because you placed an order at ${brand.name}.`}
-			/>
+			<Footer brand={brand} closing={fill(text.closing, values)} />
 		</EmailLayout>
 	);
 }

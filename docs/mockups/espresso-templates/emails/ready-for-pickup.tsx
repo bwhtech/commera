@@ -1,6 +1,7 @@
 import { Section, Text } from '@react-email/components';
 import {
 	AddressBlock,
+	AmountPanel,
 	Button,
 	Card,
 	EmailLayout,
@@ -8,12 +9,11 @@ import {
 	Header,
 	Heading,
 	Intro,
-	ItemRow,
-	Panel,
+	ItemList,
 	ProgressSteps,
 	s,
 } from '../kit/components';
-import { type Sample, fill } from '../kit/data';
+import { type Sample, fill, orderValues } from '../kit/data';
 
 export default function ReadyForPickup({
 	brand,
@@ -24,30 +24,22 @@ export default function ReadyForPickup({
 	imageBase,
 }: Sample) {
 	const text = copy.ready_for_pickup;
-	const values = {
-		first_name: order.customer_first_name,
-		order_number: order.name,
-	};
+	const values = orderValues(order);
 
 	return (
 		<EmailLayout
-			layout="classic"
 			preview={`Order ${order.name} is ready at ${pickup.store_name}. Collect it by ${pickup.collect_by}.`}
 		>
-			<Header brand={brand} layout="classic" meta={`Order ${order.name}`} />
+			<Header brand={brand} meta={`Order ${order.name}`} />
 
 			<Card first>
-				<Heading layout="classic">{fill(text.heading, values)}</Heading>
-				<Intro layout="classic">{fill(text.intro, values)}</Intro>
+				<Heading>{fill(text.heading, values)}</Heading>
+				<Intro>{fill(text.intro, values)}</Intro>
 				<ProgressSteps steps={steps} />
-				<Panel>
-					<Text style={s.label}>Collect by</Text>
-					<Text style={s.amount}>{pickup.collect_by}</Text>
-					<Text style={{ ...s.address, marginTop: 6 }}>
-						Bring your order number <b style={s.strong}>{order.name}</b> and a
-						photo ID.
-					</Text>
-				</Panel>
+				<AmountPanel label="Collect by" amount={pickup.collect_by}>
+					Bring your order number <b style={s.strong}>{order.name}</b> and a
+					photo ID.
+				</AmountPanel>
 				<Button href={pickup.directions_url}>{text.button}</Button>
 			</Card>
 
@@ -69,17 +61,14 @@ export default function ReadyForPickup({
 			</Card>
 
 			<Card>
-				<Text style={s.sectionTitle}>To collect</Text>
-				{order.items.map((row) => (
-					<ItemRow key={row.item_code} row={row} imageBase={imageBase} />
-				))}
+				<ItemList
+					heading="To collect"
+					items={order.items}
+					imageBase={imageBase}
+				/>
 			</Card>
 
-			<Footer
-				brand={brand}
-				closing={fill(text.closing, values)}
-				reason={`You're receiving this because you placed an order at ${brand.name}.`}
-			/>
+			<Footer brand={brand} closing={fill(text.closing, values)} />
 		</EmailLayout>
 	);
 }

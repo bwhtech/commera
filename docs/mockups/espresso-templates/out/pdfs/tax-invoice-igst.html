@@ -80,12 +80,12 @@
 	.items { width: 100%; border-collapse: collapse; margin-top: 18px; }
 	.items thead { display: table-header-group; }
 	.items tr { break-inside: avoid; }
-	.items th {
+	.items th, .tax-table th {
 		font-size: 12px; font-weight: 420; color: var(--ink-gray-5); text-align: left;
 		padding: 0 0 10px; border-bottom: 1px solid var(--outline-gray-2);
 	}
 	.items td { padding: 8px 0; border-bottom: 1px solid var(--outline-gray-1); vertical-align: middle; }
-	.items .r { text-align: right; }
+	.items .r, .tax-table .r { text-align: right; }
 	.items tr:last-child td { border-bottom: 1px solid var(--outline-gray-2); }
 	.product { display: flex; align-items: center; gap: 14px; }
 	.thumb { width: 36px; height: 44px; border-radius: var(--radius-thumb); object-fit: cover; background: var(--surface-gray-2); flex: none; }
@@ -118,12 +118,8 @@
 	.nowrap { white-space: nowrap; }
 
 	.tax-table { width: 100%; border-collapse: collapse; }
-	.tax-table th {
-		font-size: 12px; font-weight: 420; color: var(--ink-gray-5); text-align: left;
-		padding: 0 0 8px; border-bottom: 1px solid var(--outline-gray-2);
-	}
+	.tax-table th { padding-bottom: 8px; }
 	.tax-table td { padding: 7px 0; border-bottom: 1px solid var(--outline-gray-1); }
-	.tax-table .r { text-align: right; }
 	.tax-table .sum td { border-bottom: 0; font-weight: 500; }
 	.invoice-totals { align-self: start; }
 	.tax-hint { margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--ink-gray-5); }
@@ -147,6 +143,7 @@
 <section class="hero">
 	<div class="hero-top">
 		<div>
+			
 			<h1>Verano Studio Pvt. Ltd.</h1>
 			<p>17 Lavelle Road, Bengaluru 560001<br>GSTIN 29AAHCV3310K1Z2</p>
 		</div>
@@ -176,15 +173,23 @@
 
 	</div>
 	<div class="fact">
-		<div class="label">Order</div>
-<address><b>SO-26-00482</b><br>Placed 28 Sep 2026</address>
-		<div class="label">Payment</div>
-<address><b>UPI, aisha@okhdfc</b><br>Paid in full</address>
+		
+
+<div class="label">Order</div>
+<address><b>SO-26-00482</b><br>Placed 28 Sep 2026
+</address>
+
+		
+
+<div class="label">Payment</div>
+<address><b>UPI, aisha@okhdfc</b><br>Paid in full
+</address>
+
 	</div>
 </section>
 
 
-<table class="items lines">
+<table class="items">
 	<thead>
 		<tr>
 			<th>Description</th>
@@ -295,7 +300,7 @@
 	<tr><td>Gift wrap</td><td class="num">₹133.04</td></tr>
 	
 	
-	<tr class="taxable"><td>Taxable value</td><td class="num">₹18,047.86</td></tr>
+	<tr><td>Taxable value</td><td class="num">₹18,047.86</td></tr>
 	
 	<tr><td>IGST</td><td class="num">₹2,165.74</td></tr>
 	<tr class="grand"><td>Total</td><td class="num">₹20,213.60</td></tr>

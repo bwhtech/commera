@@ -1,4 +1,4 @@
-import { Section, Text } from '@react-email/components';
+import { Text } from '@react-email/components';
 import {
 	Card,
 	EmailLayout,
@@ -6,9 +6,10 @@ import {
 	Header,
 	Heading,
 	Intro,
+	Panel,
 	s,
 } from '../kit/components';
-import { type Sample, fill, t } from '../kit/data';
+import { type Sample, fill } from '../kit/data';
 
 export default function SignInCode({ brand, sign_in, copy }: Sample) {
 	const text = copy.sign_in_code;
@@ -16,39 +17,28 @@ export default function SignInCode({ brand, sign_in, copy }: Sample) {
 
 	return (
 		<EmailLayout
-			layout="classic"
 			preview={`Your ${brand.name} sign-in code is ${sign_in.code}. It expires in ${sign_in.expires_in_minutes} minutes.`}
 		>
-			<Header brand={brand} layout="classic" />
+			<Header brand={brand} />
 
 			<Card first>
-				<Heading layout="classic">{fill(text.heading, values)}</Heading>
-				<Intro layout="classic">{fill(text.intro, values)}</Intro>
-				<Section
-					style={{
-						backgroundColor: t.surfaceGray2,
-						borderRadius: t.radiusCard,
-						padding: '20px 16px',
-						marginTop: 22,
-					}}
-				>
+				<Heading>{fill(text.heading, values)}</Heading>
+				<Intro>{fill(text.intro, values)}</Intro>
+				<Panel padding="20px 16px">
 					<Text
 						style={{
+							...s.title,
 							...s.num,
-							margin: 0,
-							fontFamily: t.font,
 							fontSize: 36,
 							lineHeight: '1.1',
-							fontWeight: t.semibold,
 							letterSpacing: '0.16em',
 							paddingLeft: '0.16em',
-							color: t.inkGray9,
 							textAlign: 'center',
 						}}
 					>
 						{sign_in.code}
 					</Text>
-				</Section>
+				</Panel>
 				<Text style={{ ...s.para, marginTop: 16 }}>
 					The code expires in {sign_in.expires_in_minutes} minutes.
 				</Text>

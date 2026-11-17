@@ -1,6 +1,6 @@
-import { Column, Row, Section, Text } from '@react-email/components';
 import {
 	AddressBlock,
+	BillingAddress,
 	Button,
 	Card,
 	EmailLayout,
@@ -9,13 +9,19 @@ import {
 	Header,
 	Heading,
 	Intro,
-	ItemRow,
+	ItemList,
 	NoteBlock,
 	ProgressSteps,
 	Totals,
-	s,
+	TwoColumns,
 } from '../kit/components';
-import { type Sample, fill, money, orderTotals } from '../kit/data';
+import {
+	type Sample,
+	fill,
+	money,
+	orderTotals,
+	orderValues,
+} from '../kit/data';
 
 export default function OrderConfirmationClassic({
 	brand,
@@ -26,33 +32,30 @@ export default function OrderConfirmationClassic({
 }: Sample) {
 	const text = copy.order_confirmation;
 	const { grand } = orderTotals(order);
-	const values = {
-		first_name: order.customer_first_name,
-		order_number: order.name,
-	};
+	const values = orderValues(order);
 
 	return (
 		<EmailLayout
-			layout="classic"
 			preview={`Order ${order.name} confirmed. ${money(grand)}, arriving ${
 				order.delivery_window
 			}.`}
 		>
-			<Header brand={brand} layout="classic" meta={`Order ${order.name}`} />
+			<Header brand={brand} meta={`Order ${order.name}`} />
 
 			<Card first>
-				<Heading layout="classic">{fill(text.heading, values)}</Heading>
-				<Intro layout="classic">{fill(text.intro, values)}</Intro>
+				<Heading>{fill(text.heading, values)}</Heading>
+				<Intro>{fill(text.intro, values)}</Intro>
 				<ProgressSteps steps={steps} />
 				<Button href={order.order_url}>{text.button}</Button>
 			</Card>
 
 			<Card>
-				<Text style={s.sectionTitle}>Order summary</Text>
-				{order.items.map((row) => (
-					<ItemRow key={row.item_code} row={row} imageBase={imageBase} />
-				))}
-				<Totals order={order} layout="classic" />
+				<ItemList
+					heading="Order summary"
+					items={order.items}
+					imageBase={imageBase}
+				/>
+				<Totals order={order} />
 			</Card>
 
 			{(order.customer_note || order.gift_message) && (
@@ -72,39 +75,22 @@ export default function OrderConfirmationClassic({
 					address={order.shipping}
 					extraLines={[order.contact_mobile]}
 				/>
-				<Section style={{ marginTop: 16 }}>
-					<AddressBlock
-						label="Billing to"
-						address={order.billing}
-						emptyText="Same as shipping address"
-						extraLines={[
-							order.customer_tax_id && `GSTIN ${order.customer_tax_id}`,
-						]}
+				<BillingAddress order={order} />
+				<TwoColumns marginTop={16}>
+					<FactBlock
+						label="Payment"
+						title={order.payment_method}
+						detail={order.payment_status}
 					/>
-				</Section>
-				<Row style={{ marginTop: 16 }}>
-					<Column style={s.half}>
-						<FactBlock
-							label="Payment"
-							title={order.payment_method}
-							detail={order.payment_status}
-						/>
-					</Column>
-					<Column style={s.half}>
-						<FactBlock
-							label="Delivery"
-							title={order.delivery_method}
-							detail={`Arrives ${order.delivery_window}`}
-						/>
-					</Column>
-				</Row>
+					<FactBlock
+						label="Delivery"
+						title={order.delivery_method}
+						detail={`Arrives ${order.delivery_window}`}
+					/>
+				</TwoColumns>
 			</Card>
 
-			<Footer
-				brand={brand}
-				closing={fill(text.closing, values)}
-				reason={`You're receiving this because you placed an order at ${brand.name}.`}
-			/>
+			<Footer brand={brand} closing={fill(text.closing, values)} />
 		</EmailLayout>
 	);
 }

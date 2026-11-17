@@ -1,5 +1,5 @@
-import { Text } from '@react-email/components';
 import {
+	AmountPanel,
 	Button,
 	Card,
 	EmailLayout,
@@ -7,12 +7,17 @@ import {
 	Header,
 	Heading,
 	Intro,
-	ItemRow,
-	Panel,
+	ItemList,
 	Totals,
 	s,
 } from '../kit/components';
-import { type Sample, fill, money, orderTotals } from '../kit/data';
+import {
+	type Sample,
+	fill,
+	money,
+	orderTotals,
+	orderValues,
+} from '../kit/data';
 
 export default function PaymentFailed({
 	brand,
@@ -24,45 +29,36 @@ export default function PaymentFailed({
 	const text = copy.payment_failed;
 	const { grand } = orderTotals(order);
 	const values = {
-		first_name: order.customer_first_name,
-		order_number: order.name,
+		...orderValues(order),
 		hold_hours: String(payment_failure.hold_hours),
 	};
 
 	return (
 		<EmailLayout
-			layout="classic"
 			preview={`Payment for order ${order.name} didn't go through. We're holding it until ${payment_failure.held_until}.`}
 		>
-			<Header brand={brand} layout="classic" meta={`Order ${order.name}`} />
+			<Header brand={brand} meta={`Order ${order.name}`} />
 
 			<Card first>
-				<Heading layout="classic">{fill(text.heading, values)}</Heading>
-				<Intro layout="classic">{fill(text.intro, values)}</Intro>
-				<Panel>
-					<Text style={s.label}>To pay</Text>
-					<Text style={s.amount}>{money(grand)}</Text>
-					<Text style={{ ...s.address, marginTop: 6 }}>
-						Held until <b style={s.strong}>{payment_failure.held_until}</b>.
-						Last tried with {payment_failure.attempted_method}.
-					</Text>
-				</Panel>
+				<Heading>{fill(text.heading, values)}</Heading>
+				<Intro>{fill(text.intro, values)}</Intro>
+				<AmountPanel label="To pay" amount={money(grand)}>
+					Held until <b style={s.strong}>{payment_failure.held_until}</b>. Last
+					tried with {payment_failure.attempted_method}.
+				</AmountPanel>
 				<Button href={payment_failure.payment_url}>{text.button}</Button>
 			</Card>
 
 			<Card>
-				<Text style={s.sectionTitle}>Order summary</Text>
-				{order.items.map((row) => (
-					<ItemRow key={row.item_code} row={row} imageBase={imageBase} />
-				))}
-				<Totals order={order} layout="classic" totalLabel="To pay" />
+				<ItemList
+					heading="Order summary"
+					items={order.items}
+					imageBase={imageBase}
+				/>
+				<Totals order={order} totalLabel="To pay" />
 			</Card>
 
-			<Footer
-				brand={brand}
-				closing={fill(text.closing, values)}
-				reason={`You're receiving this because you placed an order at ${brand.name}.`}
-			/>
+			<Footer brand={brand} closing={fill(text.closing, values)} />
 		</EmailLayout>
 	);
 }

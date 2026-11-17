@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { render } from '@react-email/render';
@@ -18,7 +18,7 @@ import ReturnReceived from './emails/return-received';
 import ShippedClassic from './emails/shipped-classic';
 import ShippedLookbook from './emails/shipped-lookbook';
 import SignInCode from './emails/sign-in-code';
-import { type Sample, loadSample } from './kit/data';
+import { type Sample } from './kit/data';
 
 const CHROMIUM =
 	'/home/frappe/.agent-browser/browsers/chrome-157.0.8103.78/chrome';
@@ -132,6 +132,16 @@ const emails: {
 	{ name: 'order-link', Email: OrderLink, props: (sample) => sample },
 	{ name: 'sign-in-code', Email: SignInCode, props: (sample) => sample },
 ];
+
+const sampleFile = resolve(import.meta.dirname, 'kit/sample.json');
+
+function loadSample(): Sample {
+	const data = JSON.parse(readFileSync(sampleFile, 'utf8'));
+	return {
+		...data,
+		imageBase: pathToFileURL(resolve(import.meta.dirname, 'static')).href,
+	};
+}
 
 const filter = process.argv[2];
 const sample = loadSample();

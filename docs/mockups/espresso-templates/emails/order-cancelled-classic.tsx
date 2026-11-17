@@ -1,5 +1,5 @@
-import { Text } from '@react-email/components';
 import {
+	AmountPanel,
 	Button,
 	Card,
 	EmailLayout,
@@ -7,12 +7,17 @@ import {
 	Header,
 	Heading,
 	Intro,
-	ItemRow,
-	Panel,
+	ItemList,
 	Totals,
 	s,
 } from '../kit/components';
-import { type Sample, fill, money, orderTotals } from '../kit/data';
+import {
+	type Sample,
+	fill,
+	money,
+	orderTotals,
+	orderValues,
+} from '../kit/data';
 
 export default function OrderCancelledClassic({
 	brand,
@@ -23,48 +28,36 @@ export default function OrderCancelledClassic({
 }: Sample) {
 	const text = copy.order_cancelled;
 	const { grand } = orderTotals(order);
-	const values = {
-		first_name: order.customer_first_name,
-		order_number: order.name,
-		reason: cancellation.reason,
-	};
+	const values = { ...orderValues(order), reason: cancellation.reason };
 
 	return (
 		<EmailLayout
-			layout="classic"
 			preview={`Order ${order.name} is cancelled. ${money(
 				grand,
 			)} goes back to ${order.payment_method} in ${cancellation.refund_days}.`}
 		>
-			<Header brand={brand} layout="classic" meta={`Order ${order.name}`} />
+			<Header brand={brand} meta={`Order ${order.name}`} />
 
 			<Card first>
-				<Heading layout="classic">{fill(text.heading, values)}</Heading>
-				<Intro layout="classic">{fill(text.intro, values)}</Intro>
-				<Panel>
-					<Text style={s.label}>Your refund</Text>
-					<Text style={s.amount}>{money(grand)}</Text>
-					<Text style={{ ...s.address, marginTop: 6 }}>
-						Back to <b style={s.strong}>{order.payment_method}</b> within{' '}
-						{cancellation.refund_days}.
-					</Text>
-				</Panel>
+				<Heading>{fill(text.heading, values)}</Heading>
+				<Intro>{fill(text.intro, values)}</Intro>
+				<AmountPanel label="Your refund" amount={money(grand)}>
+					Back to <b style={s.strong}>{order.payment_method}</b> within{' '}
+					{cancellation.refund_days}.
+				</AmountPanel>
 				<Button href={order.order_url}>{text.button}</Button>
 			</Card>
 
 			<Card>
-				<Text style={s.sectionTitle}>Cancelled items</Text>
-				{order.items.map((row) => (
-					<ItemRow key={row.item_code} row={row} imageBase={imageBase} />
-				))}
-				<Totals order={order} layout="classic" />
+				<ItemList
+					heading="Cancelled items"
+					items={order.items}
+					imageBase={imageBase}
+				/>
+				<Totals order={order} />
 			</Card>
 
-			<Footer
-				brand={brand}
-				closing={fill(text.closing, values)}
-				reason={`You're receiving this because you placed an order at ${brand.name}.`}
-			/>
+			<Footer brand={brand} closing={fill(text.closing, values)} />
 		</EmailLayout>
 	);
 }

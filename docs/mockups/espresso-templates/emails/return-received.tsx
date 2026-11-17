@@ -1,5 +1,6 @@
 import { Column, Row, Text } from '@react-email/components';
 import {
+	AmountPanel,
 	Button,
 	Card,
 	EmailLayout,
@@ -7,11 +8,10 @@ import {
 	Header,
 	Heading,
 	Intro,
-	Panel,
 	ReturnItems,
 	s,
 } from '../kit/components';
-import { type Sample, fill, money, t } from '../kit/data';
+import { type Sample, fill, money, orderValues, t } from '../kit/data';
 
 export default function ReturnReceived({
 	brand,
@@ -21,34 +21,27 @@ export default function ReturnReceived({
 	imageBase,
 }: Sample) {
 	const text = copy.return_received;
-	const values = {
-		first_name: order.customer_first_name,
-		order_number: order.name,
-		return_number: returned.name,
-	};
+	const values = { ...orderValues(order), return_number: returned.name };
 
 	return (
 		<EmailLayout
-			layout="classic"
 			preview={`Return ${returned.name} received. Expected refund ${money(
 				returned.refund_amount,
 			)}.`}
 		>
-			<Header brand={brand} layout="classic" meta={`Return ${returned.name}`} />
+			<Header brand={brand} meta={`Return ${returned.name}`} />
 
 			<Card first>
-				<Heading layout="classic">{fill(text.heading, values)}</Heading>
-				<Intro layout="classic">{fill(text.intro, values)}</Intro>
-				<Panel>
-					<Text style={s.label}>Return number</Text>
-					<Text style={{ ...s.amount, fontVariantNumeric: 'normal' }}>
-						{returned.name}
-					</Text>
-					<Text style={{ ...s.address, marginTop: 6 }}>
-						Requested on {returned.requested_on}, for order{' '}
-						<span style={{ whiteSpace: 'nowrap' }}>{order.name}</span>.
-					</Text>
-				</Panel>
+				<Heading>{fill(text.heading, values)}</Heading>
+				<Intro>{fill(text.intro, values)}</Intro>
+				<AmountPanel
+					label="Return number"
+					amount={returned.name}
+					amountStyle={{ fontVariantNumeric: 'normal' }}
+				>
+					Requested on {returned.requested_on}, for order{' '}
+					<span style={{ whiteSpace: 'nowrap' }}>{order.name}</span>.
+				</AmountPanel>
 				{returned.next_steps.length > 0 && (
 					<>
 						<Text style={{ ...s.sectionTitle, marginTop: 24, marginBottom: 4 }}>
@@ -83,7 +76,6 @@ export default function ReturnReceived({
 				<ReturnItems
 					order={order}
 					returned={returned}
-					refundAmount={returned.refund_amount}
 					totalLabel="Expected refund"
 					imageBase={imageBase}
 				/>

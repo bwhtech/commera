@@ -6,7 +6,7 @@
 {% block body %}
 {{ ui.masthead(brand, "Order confirmation", doc.transaction_date ~ ", " ~ doc.transaction_time) }}
 
-{{ ui.hero(copy.heading | replace("{first_name}", doc.customer_first_name), copy.intro, "Order number", doc.name, steps) }}
+{{ ui.hero(copy.heading | replace("{first_name}", doc.customer_first_name), [copy.intro], "Order number", doc.name, steps) }}
 
 <section class="facts">
 	<div class="fact">

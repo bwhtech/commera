@@ -7,6 +7,8 @@ import {
 	Heading,
 	Intro,
 	PlaceholderTile,
+	WasPrice,
+	onSale,
 	s,
 } from '../kit/components';
 import { type Sample, fill, imageUrl, money, t } from '../kit/data';
@@ -27,7 +29,6 @@ export default function BackInStock({
 		first_name: order.customer_first_name,
 		item_name: item.item_name,
 	};
-	const onSale = item.price_list_rate > item.rate;
 
 	return (
 		<EmailLayout
@@ -36,11 +37,11 @@ export default function BackInStock({
 				item.rate,
 			)}.`}
 		>
-			<Header brand={brand} layout="lookbook" />
+			<Header brand={brand} />
 
-			<Text style={s.kicker}>Back in stock</Text>
-			<Heading layout="lookbook">{fill(text.heading, values)}</Heading>
-			<Intro layout="lookbook">{fill(text.intro, values)}</Intro>
+			<Text style={s.caption}>Back in stock</Text>
+			<Heading>{fill(text.heading, values)}</Heading>
+			<Intro>{fill(text.intro, values)}</Intro>
 
 			<Section style={{ marginTop: 28 }}>
 				{photo ? (
@@ -65,17 +66,10 @@ export default function BackInStock({
 						fontSize={32}
 					/>
 				)}
-				<Text
-					style={{
-						...s.sectionTitle,
-						fontSize: 17,
-						marginTop: 16,
-						marginBottom: 0,
-					}}
-				>
+				<Text style={{ ...s.title, fontSize: 17, marginTop: 16 }}>
 					{item.item_name}
 				</Text>
-				<Text style={{ ...s.kicker, fontSize: 14, marginTop: 4 }}>
+				<Text style={{ ...s.caption, fontSize: 14, marginTop: 4 }}>
 					{item.variant}
 				</Text>
 				<Text
@@ -90,25 +84,11 @@ export default function BackInStock({
 					}}
 				>
 					{money(item.rate)}
-					{onSale && (
-						<span
-							style={{
-								marginLeft: 8,
-								fontSize: 14,
-								fontWeight: t.regular,
-								color: t.inkGray5,
-								textDecoration: 'line-through',
-							}}
-						>
-							{money(item.price_list_rate)}
-						</span>
+					{onSale(item) && (
+						<WasPrice amount={item.price_list_rate} fontSize={14} />
 					)}
 				</Text>
-				<Button
-					href={back_in_stock.product_url}
-					layout="lookbook"
-					marginTop={20}
-				>
+				<Button href={back_in_stock.product_url} marginTop={20}>
 					{text.button}
 				</Button>
 			</Section>
@@ -117,7 +97,6 @@ export default function BackInStock({
 
 			<Footer
 				brand={brand}
-				layout="lookbook"
 				closing={fill(text.closing, values)}
 				links={[
 					{

@@ -11,6 +11,7 @@ import {
 	Intro,
 	NoteBlock,
 	Totals,
+	TwoColumns,
 	s,
 } from '../kit/components';
 import {
@@ -26,16 +27,7 @@ function CompactItem({ row }: { row: Item }) {
 	return (
 		<Row style={{ borderBottom: `1px solid ${t.outlineGray1}` }}>
 			<Column style={{ verticalAlign: 'top', padding: '10px 0' }}>
-				<Text
-					style={{
-						...s.para,
-						color: t.inkGray9,
-						fontWeight: t.medium,
-						lineHeight: '1.35',
-					}}
-				>
-					{row.item_name}
-				</Text>
+				<Text style={{ ...s.value, lineHeight: '1.35' }}>{row.item_name}</Text>
 				<Text style={{ ...s.muted, marginTop: 2 }}>
 					{row.variant}
 					<br />
@@ -46,15 +38,7 @@ function CompactItem({ row }: { row: Item }) {
 				align="right"
 				style={{ verticalAlign: 'top', width: 120, padding: '10px 0' }}
 			>
-				<Text
-					style={{
-						...s.para,
-						...s.num,
-						color: t.inkGray9,
-						fontWeight: t.medium,
-						lineHeight: '1.35',
-					}}
-				>
+				<Text style={{ ...s.value, ...s.num, lineHeight: '1.35' }}>
 					{money(row.qty * row.rate)}
 				</Text>
 				<Text style={{ ...s.muted, ...s.num, marginTop: 2 }}>
@@ -73,60 +57,49 @@ export default function OwnerNewOrder({ brand, order, copy }: Sample) {
 		customer_name: order.customer_name,
 		total: money(grand),
 	};
-	const dashboardUrl = `${brand.store_url}/commera/orders/${order.name}`;
+	const pieces = order.items.reduce((sum, row) => sum + row.qty, 0);
 
 	return (
 		<EmailLayout
-			layout="classic"
 			preview={`${order.customer_name}, ${money(grand)}, ${
 				order.payment_status
 			}.`}
 		>
 			<Header
 				brand={brand}
-				layout="classic"
 				meta={`${order.transaction_date}, ${order.transaction_time}`}
 			/>
 
 			<Card first>
-				<Heading layout="classic">{fill(text.heading, values)}</Heading>
-				<Intro layout="classic">{fill(text.intro, values)}</Intro>
-				<Row style={{ marginTop: 20 }}>
-					<Column style={s.half}>
-						<FactBlock
-							label="Customer"
-							title={order.customer_name}
-							detail={order.contact_mobile}
-						/>
-					</Column>
-					<Column style={s.half}>
-						<FactBlock
-							label="Payment"
-							title={order.payment_status}
-							detail={order.payment_method}
-						/>
-					</Column>
-				</Row>
-				<Row style={{ marginTop: 16 }}>
-					<Column style={s.half}>
-						<FactBlock
-							label="Delivery"
-							title={order.delivery_method}
-							detail={`Due ${order.delivery_window}`}
-						/>
-					</Column>
-					<Column style={s.half}>
-						<FactBlock
-							label="Items"
-							title={`${order.items.reduce(
-								(sum, row) => sum + row.qty,
-								0,
-							)} pieces`}
-							detail={`${order.items.length} lines`}
-						/>
-					</Column>
-				</Row>
-				<Button href={dashboardUrl}>{text.button}</Button>
+				<Heading>{fill(text.heading, values)}</Heading>
+				<Intro>{fill(text.intro, values)}</Intro>
+				<TwoColumns marginTop={20}>
+					<FactBlock
+						label="Customer"
+						title={order.customer_name}
+						detail={order.contact_mobile}
+					/>
+					<FactBlock
+						label="Payment"
+						title={order.payment_status}
+						detail={order.payment_method}
+					/>
+				</TwoColumns>
+				<TwoColumns marginTop={16}>
+					<FactBlock
+						label="Delivery"
+						title={order.delivery_method}
+						detail={`Due ${order.delivery_window}`}
+					/>
+					<FactBlock
+						label="Items"
+						title={`${pieces} pieces`}
+						detail={`${order.items.length} lines`}
+					/>
+				</TwoColumns>
+				<Button href={`${brand.store_url}/commera/orders/${order.name}`}>
+					{text.button}
+				</Button>
 			</Card>
 
 			<Card>
@@ -134,7 +107,7 @@ export default function OwnerNewOrder({ brand, order, copy }: Sample) {
 				{order.items.map((row) => (
 					<CompactItem key={row.item_code} row={row} />
 				))}
-				<Totals order={order} layout="classic" />
+				<Totals order={order} />
 			</Card>
 
 			<Card>

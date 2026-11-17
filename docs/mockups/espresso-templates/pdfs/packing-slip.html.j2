@@ -4,9 +4,8 @@
 {% block title %}Packing slip {{ doc.order_name }}{% endblock %}
 
 {% block styles %}
-	.ship-to .label { margin-bottom: 8px; }
-	.ship-to h1 { margin-bottom: 8px; }
-	.ship-to address { font-size: 16px; line-height: 1.45; color: var(--ink-gray-7); }
+	.hero .label { margin-bottom: 8px; }
+	.hero p { font-size: 16px; line-height: 1.45; }
 	.picklist td { padding: 10px 0; }
 	.check-cell { width: 34px; }
 	.check { display: block; width: 16px; height: 16px; border: 1.5px solid var(--ink-gray-3); border-radius: var(--radius-tag); }
@@ -19,22 +18,7 @@
 {% block body %}
 {{ ui.masthead(brand, "Packing slip", doc.packed_on) }}
 
-<section class="hero ship-to">
-	<div class="hero-top">
-		<div>
-			<div class="label">Ship to</div>
-			<h1>{{ doc.shipping.name }}</h1>
-			<address>
-				{%- for line in doc.shipping.lines %}{{ line }}<br>{% endfor -%}
-				{{ doc.contact_mobile }}
-			</address>
-		</div>
-		<div class="doc-number">
-			<span>Order number</span>
-			<b>{{ doc.order_name }}</b>
-		</div>
-	</div>
-</section>
+{{ ui.hero(doc.shipping.name, doc.shipping.lines + [doc.contact_mobile], "Order number", doc.order_name, label="Ship to") }}
 
 {% if doc.is_gift %}
 <p class="gift-flag"><b>This parcel is a gift.</b> Pack no invoice and no prices. Put the gift card on top.</p>

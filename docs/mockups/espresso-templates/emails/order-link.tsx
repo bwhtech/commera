@@ -9,26 +9,28 @@ import {
 	Intro,
 	s,
 } from '../kit/components';
-import { type Sample, fill, money, orderTotals } from '../kit/data';
+import {
+	type Sample,
+	fill,
+	money,
+	orderTotals,
+	orderValues,
+} from '../kit/data';
 
 export default function OrderLink({ brand, order, copy }: Sample) {
 	const text = copy.order_link;
 	const { grand } = orderTotals(order);
-	const values = {
-		first_name: order.customer_first_name,
-		order_number: order.name,
-	};
+	const values = orderValues(order);
 
 	return (
 		<EmailLayout
-			layout="classic"
 			preview={`Your link to order ${order.name}, placed on ${order.transaction_date}.`}
 		>
-			<Header brand={brand} layout="classic" meta={`Order ${order.name}`} />
+			<Header brand={brand} meta={`Order ${order.name}`} />
 
 			<Card first>
-				<Heading layout="classic">{fill(text.heading, values)}</Heading>
-				<Intro layout="classic">{fill(text.intro, values)}</Intro>
+				<Heading>{fill(text.heading, values)}</Heading>
+				<Intro>{fill(text.intro, values)}</Intro>
 				<Row style={{ marginTop: 22 }}>
 					<Column
 						style={{ width: '36%', verticalAlign: 'top', paddingRight: 12 }}

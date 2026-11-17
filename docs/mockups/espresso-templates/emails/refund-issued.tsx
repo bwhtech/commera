@@ -1,5 +1,6 @@
 import { Text } from '@react-email/components';
 import {
+	AmountPanel,
 	Button,
 	Card,
 	EmailLayout,
@@ -7,11 +8,10 @@ import {
 	Header,
 	Heading,
 	Intro,
-	Panel,
 	ReturnItems,
 	s,
 } from '../kit/components';
-import { type Sample, fill, money } from '../kit/data';
+import { type Sample, fill, money, orderValues } from '../kit/data';
 
 export default function RefundIssued({
 	brand,
@@ -21,32 +21,26 @@ export default function RefundIssued({
 	imageBase,
 }: Sample) {
 	const text = copy.refund_issued;
-	const values = {
-		first_name: order.customer_first_name,
-		order_number: order.name,
-		return_number: returned.name,
-	};
+	const values = { ...orderValues(order), return_number: returned.name };
 
 	return (
 		<EmailLayout
-			layout="classic"
 			preview={`${money(returned.refund_amount)} refunded to ${
 				returned.refund_method
 			}. Allow ${returned.refund_days}.`}
 		>
-			<Header brand={brand} layout="classic" meta={`Order ${order.name}`} />
+			<Header brand={brand} meta={`Order ${order.name}`} />
 
 			<Card first>
-				<Heading layout="classic">{fill(text.heading, values)}</Heading>
-				<Intro layout="classic">{fill(text.intro, values)}</Intro>
-				<Panel>
-					<Text style={s.label}>Refunded on {returned.refunded_on}</Text>
-					<Text style={s.amount}>{money(returned.refund_amount)}</Text>
-					<Text style={{ ...s.address, marginTop: 6 }}>
-						Back to <b style={s.strong}>{returned.refund_method}</b>. Allow{' '}
-						{returned.refund_days} for it to show.
-					</Text>
-				</Panel>
+				<Heading>{fill(text.heading, values)}</Heading>
+				<Intro>{fill(text.intro, values)}</Intro>
+				<AmountPanel
+					label={`Refunded on ${returned.refunded_on}`}
+					amount={money(returned.refund_amount)}
+				>
+					Back to <b style={s.strong}>{returned.refund_method}</b>. Allow{' '}
+					{returned.refund_days} for it to show.
+				</AmountPanel>
 				<Button href={order.order_url}>{text.button}</Button>
 			</Card>
 
@@ -58,7 +52,6 @@ export default function RefundIssued({
 				<ReturnItems
 					order={order}
 					returned={returned}
-					refundAmount={returned.refund_amount}
 					totalLabel="Refund total"
 					imageBase={imageBase}
 				/>

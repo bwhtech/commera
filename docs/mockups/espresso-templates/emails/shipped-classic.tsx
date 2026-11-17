@@ -1,4 +1,3 @@
-import { Text } from '@react-email/components';
 import {
 	AddressBlock,
 	Button,
@@ -8,12 +7,11 @@ import {
 	Header,
 	Heading,
 	Intro,
-	ItemRow,
+	ItemList,
 	ProgressSteps,
 	ShipmentPanel,
-	s,
 } from '../kit/components';
-import { type Sample, fill } from '../kit/data';
+import { type Sample, fill, orderValues } from '../kit/data';
 
 export default function ShippedClassic({
 	brand,
@@ -24,34 +22,31 @@ export default function ShippedClassic({
 	imageBase,
 }: Sample) {
 	const text = copy.shipped;
-	const values = {
-		first_name: order.customer_first_name,
-		order_number: order.name,
-	};
+	const values = orderValues(order);
 	const arrival = steps.at(-1);
 
 	return (
 		<EmailLayout
-			layout="classic"
 			preview={`Order ${order.name} shipped with ${shipment.carrier}. ${
 				arrival?.pending_title ?? 'Arriving'
 			} ${arrival?.date}.`}
 		>
-			<Header brand={brand} layout="classic" meta={`Order ${order.name}`} />
+			<Header brand={brand} meta={`Order ${order.name}`} />
 
 			<Card first>
-				<Heading layout="classic">{fill(text.heading, values)}</Heading>
-				<Intro layout="classic">{fill(text.intro, values)}</Intro>
+				<Heading>{fill(text.heading, values)}</Heading>
+				<Intro>{fill(text.intro, values)}</Intro>
 				<ProgressSteps steps={steps} detail={shipment.delay_note} />
 				<ShipmentPanel shipment={shipment} />
 				<Button href={shipment.tracking_url}>{text.button}</Button>
 			</Card>
 
 			<Card>
-				<Text style={s.sectionTitle}>In this parcel</Text>
-				{order.items.map((row) => (
-					<ItemRow key={row.item_code} row={row} imageBase={imageBase} />
-				))}
+				<ItemList
+					heading="In this parcel"
+					items={order.items}
+					imageBase={imageBase}
+				/>
 			</Card>
 
 			<Card>
@@ -62,11 +57,7 @@ export default function ShippedClassic({
 				/>
 			</Card>
 
-			<Footer
-				brand={brand}
-				closing={fill(text.closing, values)}
-				reason={`You're receiving this because you placed an order at ${brand.name}.`}
-			/>
+			<Footer brand={brand} closing={fill(text.closing, values)} />
 		</EmailLayout>
 	);
 }
