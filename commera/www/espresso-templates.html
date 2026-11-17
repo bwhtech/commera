@@ -55,7 +55,7 @@
 <header class="top">
 	<div class="top-inner">
 		<strong>Espresso templates</strong>
-		<nav id="nav"><a href="espresso-steppers">Stepper options</a></nav>
+		<nav id="nav"><a data-page="espresso-steppers">Stepper options</a></nav>
 	</div>
 </header>
 <main>
@@ -148,6 +148,7 @@
 		}
 		sections.appendChild(section);
 	}
+	for (const link of document.querySelectorAll('[data-page]')) link.href = link.dataset.page;
 	if (location.hash) {
 		setTimeout(() => document.querySelector(location.hash)?.scrollIntoView(), 300);
 	}

@@ -59,14 +59,14 @@
 <header class="top">
 	<div class="top-inner">
 		<strong>Stepper options</strong>
-		<nav id="nav"><a href="espresso-templates">Back to all templates</a></nav>
+		<nav id="nav"><a data-page="espresso-templates">Back to all templates</a></nav>
 	</div>
 </header>
 <main>
 	<div class="intro">
 		<h1>Order progress stepper: pick one</h1>
 		<p>The stepper (Confirmed, Packed, Shipped, Delivered) sits in the first card of the order emails and in the PDF hero. Today its sub-lines wrap to two or three lines on a phone. Each option below copies a pattern a large store already uses, and is drawn with tables and inline styles, so the same markup works in email at 720px, at 390px, and in an A4 PDF.</p>
-		<p>Every option is shown in three states: just confirmed, shipped, and delivered. The frames are the live email HTML, not screenshots. <a href="espresso-templates">Back to all templates</a></p>
+		<p>Every option is shown in three states: just confirmed, shipped, and delivered. The frames are the live email HTML, not screenshots. <a data-page="espresso-templates">Back to all templates</a></p>
 	</div>
 	<div id="sections"></div>
 </main>
@@ -165,6 +165,7 @@
 			<div class="pdf"><img src="${base}/${option.id}-pdf.png" alt="${option.title} in the PDF hero" loading="lazy"></div>`);
 		sections.appendChild(section);
 	}
+	for (const link of document.querySelectorAll('[data-page]')) link.href = link.dataset.page;
 	if (location.hash) {
 		setTimeout(() => document.querySelector(location.hash)?.scrollIntoView(), 300);
 	}
