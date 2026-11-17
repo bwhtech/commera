@@ -6,6 +6,7 @@
 from unittest.mock import patch
 
 import frappe
+import frappe.handler
 from frappe.tests import IntegrationTestCase
 from frappe.website.serve import get_response_content
 
@@ -108,6 +109,16 @@ class TestAdminTheme(IntegrationTestCase):
 			if field["fieldname"] == "categories_title"
 		)
 		self.assertEqual(saved["value"], "ZZ Categories")
+
+	def test_save_theme_settings_saves_when_called_over_http(self):
+		method = "commera.api.admin.theme.save_theme_settings"
+		frappe.local.form_dict = frappe._dict(cmd=method, theme=SUMMER_THEME, categories_title="ZZ Over HTTP")
+		with patch("frappe.handler.is_valid_http_method"):
+			frappe.handler.execute_cmd(method)
+
+		self.assertEqual(
+			frappe.db.get_single_value("Summer Theme Settings", "categories_title"), "ZZ Over HTTP"
+		)
 
 	def test_save_theme_settings_writes_the_edited_theme_not_the_live_one(self):
 		live_title = frappe.db.get_single_value("Summer Theme Settings", "categories_title")

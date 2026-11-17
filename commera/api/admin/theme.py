@@ -137,6 +137,7 @@ def create_builder_theme(theme_name: str):
 @frappe.whitelist(methods=["POST"])
 def save_theme_settings(theme: str, **values):
 	"""Write the edited theme's own settings. Returns its refreshed settings."""
+	values.pop("cmd", None)
 	frappe.has_permission(THEME_SETTINGS_DOCTYPE, ptype="read", throw=True)
 
 	if not frappe.db.exists("Shop Theme", theme):
