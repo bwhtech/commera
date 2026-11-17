@@ -154,7 +154,6 @@ class ShopTheme(Document):
 		settings_doctype = f"{self.theme_name} Settings"
 		create_theme_settings_doctype(settings_doctype, self.module)
 		self.db_set("theme_settings", settings_doctype, notify=True)
-		# db_set skips on_update, so the theme's file would ship without the link.
 		if frappe.conf.developer_mode:
 			export_module_json(self, is_standard=bool(self.is_standard), module=self.module)
 
