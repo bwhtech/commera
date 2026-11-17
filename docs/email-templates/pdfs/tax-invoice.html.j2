@@ -1,0 +1,32 @@
+{% extends "kit/pdf_layout.html.j2" %}
+{% import "kit/pdf_macros.html.j2" as ui %}
+
+{% block title %}{{ doc.title }} {{ doc.name }}{% endblock %}
+
+{% block body %}
+{{ ui.masthead(brand, doc.copy_label or doc.title, doc.posting_date) }}
+
+{{ ui.hero(brand.legal_name, [brand.address, (brand.tax_id_label or "GSTIN") ~ " " ~ brand.tax_id], doc.title ~ " number", doc.name) }}
+
+<section class="facts facts-wide-middle">
+	<div class="fact">
+		{{ ui.address_block("Billed to", doc.billing, extra_lines=[doc.customer_tax_id and "GSTIN " ~ doc.customer_tax_id]) }}
+	</div>
+	<div class="fact">
+		{{ ui.address_block("Shipped to", doc.shipping, "Same as billing address") }}
+	</div>
+	<div class="fact">
+		{{ ui.fact("Order", doc.order_name, "Placed " ~ doc.transaction_date) }}
+		{{ ui.fact("Payment", doc.payment_method, doc.payment_status) }}
+	</div>
+</section>
+
+{{ ui.line_items_table(doc.items, money) }}
+
+<section class="summary">
+	{{ ui.tax_breakdown(doc, money) }}
+	{{ ui.invoice_totals(doc, money) }}
+</section>
+
+{{ ui.footer(brand, copy.closing) }}
+{% endblock %}

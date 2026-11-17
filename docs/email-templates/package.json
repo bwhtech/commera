@@ -1,0 +1,11 @@
+{
+	"name": "commera-email-templates",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@react-email/components": "^1.0.12",
+		"@react-email/render": "^2.3.1",
+		"react": "^19.3.1",
+		"react-dom": "^19.3.1"
+	}
+}

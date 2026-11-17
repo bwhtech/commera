@@ -1,0 +1,32 @@
+{% extends "kit/pdf_layout.html.j2" %}
+{% import "kit/pdf_macros.html.j2" as ui %}
+
+{% block title %}Order {{ doc.name }}{% endblock %}
+
+{% block body %}
+{{ ui.masthead(brand, "Order confirmation", doc.transaction_date ~ ", " ~ doc.transaction_time) }}
+
+{{ ui.hero(copy.heading | replace("{first_name}", doc.customer_first_name), [copy.intro], "Order number", doc.name, steps) }}
+
+<section class="facts">
+	<div class="fact">
+		{{ ui.address_block("Shipping to", doc.shipping, extra_lines=[doc.contact_email, doc.contact_mobile]) }}
+	</div>
+	<div class="fact">
+		{{ ui.address_block("Billing to", doc.billing, "Same as shipping address", [doc.customer_tax_id and "GSTIN " ~ doc.customer_tax_id]) }}
+	</div>
+	<div class="fact">
+		{{ ui.fact("Payment", doc.payment_method, doc.payment_status) }}
+		{{ ui.fact("Delivery", doc.delivery_method, "Arrives " ~ doc.delivery_window) }}
+	</div>
+</section>
+
+{{ ui.items_table(doc.items, money) }}
+
+<section class="summary">
+	{{ ui.notes(doc) }}
+	{{ ui.totals(doc, money) }}
+</section>
+
+{{ ui.footer(brand, copy.closing) }}
+{% endblock %}

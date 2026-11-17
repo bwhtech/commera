@@ -1,0 +1,66 @@
+{% extends "kit/pdf_layout.html.j2" %}
+{% import "kit/pdf_macros.html.j2" as ui %}
+
+{% block title %}Packing slip {{ doc.order_name }}{% endblock %}
+
+{% block styles %}
+	.hero .label { margin-bottom: 8px; }
+	.hero p { font-size: 16px; line-height: 1.45; }
+	.picklist td { padding: 10px 0; }
+	.check-cell { width: 34px; }
+	.check { display: block; width: 16px; height: 16px; border: 1.5px solid var(--ink-gray-3); border-radius: var(--radius-tag); }
+	.picklist .qty { font-size: 16px; font-weight: {{ tokens.font.semibold }}; }
+	.slip-notes { margin-top: 16px; }
+	.gift-flag { margin-top: 16px; padding: 12px 14px; border: 1px solid var(--outline-gray-2); border-radius: var(--radius-thumb); font-size: 13px; line-height: 1.5; color: var(--ink-gray-7); }
+	.gift-flag b { color: var(--ink-gray-9); font-weight: {{ tokens.font.semibold }}; }
+{% endblock %}
+
+{% block body %}
+{{ ui.masthead(brand, "Packing slip", doc.packed_on) }}
+
+{{ ui.hero(doc.shipping.name, doc.shipping.lines + [doc.contact_mobile], "Order number", doc.order_name, label="Ship to") }}
+
+{% if doc.is_gift %}
+<p class="gift-flag"><b>This parcel is a gift.</b> Pack no invoice and no prices. Put the gift card on top.</p>
+{% endif %}
+
+<section class="facts">
+	<div class="fact">
+		{{ ui.fact("Delivery", doc.delivery_method, "Arrives " ~ doc.delivery_window) }}
+	</div>
+	<div class="fact">
+		{{ ui.fact("Delivery note", doc.name, doc.parcel) }}
+	</div>
+	<div class="fact">
+		{{ ui.fact("Items", (doc.items | sum(attribute="qty")) ~ " pieces", (doc.items | length) ~ " lines") }}
+	</div>
+</section>
+
+<table class="items picklist">
+	<thead>
+		<tr>
+			<th class="check-cell"></th>
+			<th>Product</th>
+			<th class="r" style="width: 60px">Qty</th>
+		</tr>
+	</thead>
+	<tbody>
+	{% for row in doc.items %}
+		<tr>
+			<td class="check-cell"><i class="check"></i></td>
+			<td>{{ ui.product_cell(row) }}</td>
+			<td class="r num qty">{{ row.qty | int }}</td>
+		</tr>
+	{% endfor %}
+	</tbody>
+</table>
+
+{% if doc.customer_note or doc.gift_message %}
+<section class="note slip-notes">
+		{% if doc.gift_message %}<div class="label">Gift message, print on the card</div><p>{{ doc.gift_message }}</p>{% endif %}
+		{% if doc.customer_note %}<div class="label">Delivery note from the customer</div><p>{{ doc.customer_note }}</p>{% endif %}
+</section>
+{% endif %}
+
+{{ ui.footer(brand, copy.closing) }}
+{% endblock %}
