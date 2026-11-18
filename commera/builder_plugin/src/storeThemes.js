@@ -35,6 +35,10 @@ export function openStoreThemes() {
 	router.push(STORE_THEMES_ROUTE);
 }
 
+export function openTheme(theme) {
+	router.push({ ...STORE_THEMES_ROUTE, params: { item: VIEW, path: [theme] } });
+}
+
 /**
  * Opens a theme page in the editor. `askBob` opens it on the Chat tab, for a page with nothing on it yet.
  * The tab sets up AI itself when the site has none.

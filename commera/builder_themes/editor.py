@@ -8,7 +8,6 @@ from commera.builder_themes.pages import (
 	HOME,
 	PRODUCT_DETAIL,
 	PRODUCT_LISTING,
-	get_home_page_preview,
 	get_page_role,
 	get_theme_pages,
 )
@@ -30,7 +29,7 @@ def get_theme_bar(page_id: str) -> dict | None:
 		"theme": role.theme,
 		"is_live": role.theme == resolve_active_theme(),
 		"page_type": role.page_type,
-		"pages": [get_page_tab(page_type, page) for page_type, page in get_theme_pages(role.theme).items()],
+		"pages": get_page_tabs(role.theme),
 		"preview": get_preview(role.page_type),
 		"storefront_path": get_storefront_path(role.page_type),
 	}
@@ -52,14 +51,24 @@ def get_theme(theme: str) -> dict:
 	if frappe.db.get_value("Shop Theme", theme, "theme_type") != BUILDER_THEME_TYPE:
 		frappe.throw(_("{0} is not a Builder theme").format(theme), frappe.DoesNotExistError)
 	live_theme = resolve_active_theme()
+	pages = get_page_tabs(theme)
 	return {
 		"theme": theme,
 		"is_live": theme == live_theme,
 		"live_theme": live_theme,
-		"preview": get_home_page_preview(theme),
-		"pages": [get_page_tab(page_type, page) for page_type, page in get_theme_pages(theme).items()],
+		"preview": next((page["preview"] for page in pages if page["page_type"] == HOME), None),
+		"pages": pages,
 		"store_url": url("/"),
 	}
+
+
+def get_page_tabs(theme: str) -> list[dict]:
+	"""The theme's pages that the user may read: a tab carries the page's screenshot and its drafts' state."""
+	return [
+		get_page_tab(page_type, page)
+		for page_type, page in get_theme_pages(theme).items()
+		if frappe.has_permission("Builder Page", "read", doc=page)
+	]
 
 
 def get_page_labels() -> dict[str, str]:

@@ -28,7 +28,7 @@
 import { Button, Dialog, ErrorMessage, FormControl } from 'frappe-ui';
 import { ref, useId, watch } from 'vue';
 import { createTheme, errorMessage } from '../api';
-import { openPage } from '../storeThemes';
+import { openPage, openTheme } from '../storeThemes';
 
 const open = defineModel('open', { type: Boolean, required: true });
 
@@ -51,7 +51,10 @@ async function create() {
 	try {
 		const theme = await createTheme(themeName.value.trim());
 		open.value = false;
-		openPage(theme.pages.find((page) => page.page_type === 'Home').page, { askBob: true });
+		// without read access to Builder pages, the theme comes back with none
+		const home = theme.pages.find((page) => page.page_type === 'Home');
+		if (home) openPage(home.page, { askBob: true });
+		else openTheme(theme.theme);
 	} catch (error) {
 		failure.value = errorMessage(error, 'Could not create the theme');
 	} finally {

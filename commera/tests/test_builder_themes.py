@@ -8,6 +8,7 @@ from unittest.mock import patch
 from urllib.parse import parse_qsl
 
 import frappe
+from frappe.permissions import add_permission
 from frappe.utils import set_request
 
 from commera.api.admin import builder_theme as builder_theme_api
@@ -283,14 +284,7 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 
 	def test_store_themes_list_only_themes_the_user_can_read(self):
 		create_builder_theme("Other Builder Theme")
-		user = frappe.get_doc(
-			{
-				"doctype": "User",
-				"email": "store-themes-reader@example.com",
-				"first_name": "Reader",
-				"roles": [{"role": "Website Manager"}],
-			}
-		).insert(ignore_permissions=True)
+		user = self.make_user("Website Manager")
 		# a Builder theme links its parent theme, and user permissions check that link too
 		for theme in (THEME, STARTER_THEME):
 			frappe.get_doc(
@@ -301,6 +295,26 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		themes = builder_theme_api.get_themes()["themes"]
 		self.assertEqual([theme["theme"] for theme in themes], [THEME])
 		self.assertRaises(frappe.PermissionError, builder_theme_api.get_theme, "Other Builder Theme")
+
+	def test_store_themes_show_only_the_pages_the_user_can_read(self):
+		frappe.get_doc({"doctype": "Role", "role_name": "Store Theme Viewer"}).insert(ignore_permissions=True)
+		add_permission("Shop Theme", "Store Theme Viewer")
+		frappe.db.set_value("Builder Page", self.pages[HOME], "preview", "/files/home.webp")
+
+		frappe.set_user(self.make_user("Store Theme Viewer").name)
+		theme = builder_theme_api.get_theme(THEME)
+		self.assertEqual(theme["pages"], [])
+		self.assertIsNone(theme["preview"])
+
+	def make_user(self, role):
+		return frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": f"store-themes-{frappe.scrub(role)}@example.com",
+				"first_name": "Store Themes",
+				"roles": [{"role": role}],
+			}
+		).insert(ignore_permissions=True)
 
 	def test_store_themes_hide_from_users_without_theme_access(self):
 		self.assertEqual(get_theme_access(), {"can_read": True, "can_create": True})
