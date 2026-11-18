@@ -8,13 +8,15 @@ from unittest.mock import patch
 from urllib.parse import parse_qsl
 
 import frappe
+from frappe.permissions import add_permission
 from frappe.utils import set_request
 
-from commera.api.admin.builder_theme import make_theme_live
+from commera.api.admin import builder_theme as builder_theme_api
+from commera.api.admin.builder_theme import create_theme, get_theme_access, make_theme_live
 from commera.api.admin.home import get_store_preview
 from commera.api.admin.theme import build_themes
 from commera.builder_themes.agent_context import get_agent_context
-from commera.builder_themes.editor import get_theme_bar, publish_theme
+from commera.builder_themes.editor import get_theme, get_theme_bar, get_themes, publish_theme
 from commera.builder_themes.page_data import get_data_for, get_page_data
 from commera.builder_themes.pages import (
 	BUILDER_PLACEHOLDER_PREVIEW,
@@ -249,6 +251,75 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 	def test_make_theme_live_activates_it(self):
 		make_theme_live(THEME)
 		self.assertTrue(get_theme_bar(self.pages[HOME])["is_live"])
+
+	def test_store_themes_list_only_builder_themes(self):
+		result = get_themes()
+		self.assertEqual(result["live_theme"], STARTER_THEME)
+		names = [theme["theme"] for theme in result["themes"]]
+		self.assertIn(THEME, names)
+		self.assertNotIn(STARTER_THEME, names)
+
+		make_theme_live(THEME)
+		theme = next(theme for theme in get_themes()["themes"] if theme["theme"] == THEME)
+		self.assertTrue(theme["is_live"])
+		self.assertEqual([page["label"] for page in theme["pages"]], ["Home", "Listing", "Product"])
+
+	def test_store_theme_pages_carry_builder_screenshots(self):
+		frappe.db.set_value("Builder Page", self.pages[HOME], "preview", "/files/home.webp")
+		frappe.db.set_value(
+			"Builder Page", self.pages[PRODUCT_LISTING], "preview", BUILDER_PLACEHOLDER_PREVIEW
+		)
+		theme = get_theme(THEME)
+		self.assertEqual(theme["preview"], "/files/home.webp")
+		self.assertEqual([page["preview"] for page in theme["pages"]], ["/files/home.webp", None, None])
+
+	def test_store_theme_must_be_a_builder_theme(self):
+		self.assertRaises(frappe.DoesNotExistError, get_theme, STARTER_THEME)
+
+	def test_new_theme_from_builder_opens_with_its_pages(self):
+		theme = create_theme("  Another Builder Theme  ")
+		self.assertEqual(theme["theme"], "Another Builder Theme")
+		self.assertFalse(theme["is_live"])
+		self.assertTrue(all(page["is_empty"] for page in theme["pages"]))
+
+	def test_store_themes_list_only_themes_the_user_can_read(self):
+		create_builder_theme("Other Builder Theme")
+		user = self.make_user("Website Manager")
+		# a Builder theme links its parent theme, and user permissions check that link too
+		for theme in (THEME, STARTER_THEME):
+			frappe.get_doc(
+				{"doctype": "User Permission", "user": user.name, "allow": "Shop Theme", "for_value": theme}
+			).insert(ignore_permissions=True)
+
+		frappe.set_user(user.name)
+		themes = builder_theme_api.get_themes()["themes"]
+		self.assertEqual([theme["theme"] for theme in themes], [THEME])
+		self.assertRaises(frappe.PermissionError, builder_theme_api.get_theme, "Other Builder Theme")
+
+	def test_store_themes_show_only_the_pages_the_user_can_read(self):
+		frappe.get_doc({"doctype": "Role", "role_name": "Store Theme Viewer"}).insert(ignore_permissions=True)
+		add_permission("Shop Theme", "Store Theme Viewer")
+		frappe.db.set_value("Builder Page", self.pages[HOME], "preview", "/files/home.webp")
+
+		frappe.set_user(self.make_user("Store Theme Viewer").name)
+		theme = builder_theme_api.get_theme(THEME)
+		self.assertEqual(theme["pages"], [])
+		self.assertIsNone(theme["preview"])
+
+	def make_user(self, role):
+		return frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": f"store-themes-{frappe.scrub(role)}@example.com",
+				"first_name": "Store Themes",
+				"roles": [{"role": role}],
+			}
+		).insert(ignore_permissions=True)
+
+	def test_store_themes_hide_from_users_without_theme_access(self):
+		self.assertEqual(get_theme_access(), {"can_read": True, "can_create": True})
+		frappe.set_user("Guest")
+		self.assertEqual(get_theme_access(), {"can_read": False, "can_create": False})
 
 
 class TestBuilderThemeGuards(unittest.TestCase):

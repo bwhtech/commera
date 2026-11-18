@@ -20,29 +20,11 @@
 
 <script setup>
 import router from 'builder/internal/router';
+import { STATUS_DOTS, STATUS_HINTS, pageStatus as status } from './pageStatus';
 
 const props = defineProps({ bar: { type: Object, required: true } });
 
-// the editor's page status dots: filled is live, hollow is a draft or edits waiting to publish
-const STATUS_DOTS = {
-	Published: 'bg-current text-ink-green-7',
-	Edited: 'border-[1.5px] border-current text-ink-green-7',
-	Draft: 'border-[1.5px] border-current text-ink-gray-4',
-	Empty: 'border-[1.5px] border-dashed border-current text-ink-gray-4',
-};
-const STATUS_HINTS = {
-	Published: 'Published',
-	Edited: 'Published, with changes not published yet',
-	Draft: 'Not published yet',
-	Empty: 'Nothing on this page yet, so the store shows the parent theme here',
-};
-
 const isCurrent = (page) => page.page_type === props.bar.page_type;
-
-function status(page) {
-	if (!page.is_published) return page.is_empty ? 'Empty' : 'Draft';
-	return page.has_unpublished_changes ? 'Edited' : 'Published';
-}
 
 function open(page) {
 	if (!isCurrent(page))

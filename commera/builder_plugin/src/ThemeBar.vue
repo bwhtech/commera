@@ -17,21 +17,10 @@
 	</Popover>
 </template>
 
-<script>
-import { ref } from 'vue';
-
-const isOpen = ref(false);
-
-/** The Open button in the plugin's details page. */
-export const openThemeBar = () => {
-	isOpen.value = true;
-};
-</script>
-
 <script setup>
 import { lucideIcon, usePageStore } from 'builder';
-import { Button, Popover, toast } from 'frappe-ui';
-import { computed, watch } from 'vue';
+import { Button, Popover } from 'frappe-ui';
+import { computed, ref, watch } from 'vue';
 import { getThemeBar } from './api';
 import ThemePanel from './ThemePanel.vue';
 
@@ -39,6 +28,7 @@ const StoreIcon = lucideIcon('lucide-store');
 const ChevronIcon = lucideIcon('lucide-chevron-down');
 
 const pageStore = usePageStore();
+const isOpen = ref(false);
 const bar = ref(null);
 // the page `bar` was loaded for; until the new page's bar arrives, the panel is disabled
 const barPage = ref(null);
@@ -57,14 +47,6 @@ async function load() {
 }
 watch(pageId, load, { immediate: true });
 
-watch(isOpen, (open) => {
-	if (!open) return;
-	if (!bar.value) {
-		isOpen.value = false;
-		toast.info('Open a page of a Commera theme to see its theme bar.');
-		return;
-	}
-	// the editor's own saves and Publish button change the page statuses
-	load();
-});
+// the editor's own saves and Publish button change the page statuses
+watch(isOpen, (open) => open && load());
 </script>
