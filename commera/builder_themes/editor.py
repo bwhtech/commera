@@ -37,9 +37,13 @@ def get_theme_bar(page_id: str) -> dict | None:
 
 
 def get_themes() -> dict:
-	"""Every Builder theme, most recently changed first, and the theme shoppers see, which can be any theme."""
-	names = frappe.get_all(
-		"Shop Theme", filters={"theme_type": BUILDER_THEME_TYPE}, pluck="name", order_by="modified desc"
+	"""The Builder themes the user can read, most recently changed first, and the theme shoppers see."""
+	names = frappe.get_list(
+		"Shop Theme",
+		filters={"theme_type": BUILDER_THEME_TYPE},
+		pluck="name",
+		order_by="modified desc",
+		limit_page_length=0,
 	)
 	return {"live_theme": resolve_active_theme(), "themes": [get_theme(name) for name in names]}
 

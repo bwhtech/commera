@@ -10,6 +10,7 @@ from urllib.parse import parse_qsl
 import frappe
 from frappe.utils import set_request
 
+from commera.api.admin import builder_theme as builder_theme_api
 from commera.api.admin.builder_theme import create_theme, get_theme_access, make_theme_live
 from commera.api.admin.home import get_store_preview
 from commera.api.admin.theme import build_themes
@@ -279,6 +280,27 @@ class TestBuilderThemes(ProductDetailPriceTestCase):
 		self.assertEqual(theme["theme"], "Another Builder Theme")
 		self.assertFalse(theme["is_live"])
 		self.assertTrue(all(page["is_empty"] for page in theme["pages"]))
+
+	def test_store_themes_list_only_themes_the_user_can_read(self):
+		create_builder_theme("Other Builder Theme")
+		user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": "store-themes-reader@example.com",
+				"first_name": "Reader",
+				"roles": [{"role": "Website Manager"}],
+			}
+		).insert(ignore_permissions=True)
+		# a Builder theme links its parent theme, and user permissions check that link too
+		for theme in (THEME, STARTER_THEME):
+			frappe.get_doc(
+				{"doctype": "User Permission", "user": user.name, "allow": "Shop Theme", "for_value": theme}
+			).insert(ignore_permissions=True)
+
+		frappe.set_user(user.name)
+		themes = builder_theme_api.get_themes()["themes"]
+		self.assertEqual([theme["theme"] for theme in themes], [THEME])
+		self.assertRaises(frappe.PermissionError, builder_theme_api.get_theme, "Other Builder Theme")
 
 	def test_store_themes_hide_from_users_without_theme_access(self):
 		self.assertEqual(get_theme_access(), {"can_read": True, "can_create": True})
