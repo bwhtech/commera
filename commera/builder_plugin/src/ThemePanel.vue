@@ -46,12 +46,12 @@
 
 <script setup>
 import { lucideIcon, usePageStore } from 'builder';
-import { Badge, Button, toast } from 'frappe-ui';
-import { ref } from 'vue';
+import { Badge, Button } from 'frappe-ui';
 import CollectionPicker from './CollectionPicker.vue';
 import PageTabs from './PageTabs.vue';
 import ProductPicker from './ProductPicker.vue';
-import { errorMessage, makeThemeLive, publishTheme } from './api';
+import { makeThemeLive, publishTheme } from './api';
+import { publishedMessage, useActions } from './useActions';
 
 const props = defineProps({
 	bar: { type: Object, required: true },
@@ -61,20 +61,7 @@ const emit = defineEmits(['changed']);
 
 const ExternalLinkIcon = lucideIcon('lucide-external-link');
 const pageStore = usePageStore();
-const busy = ref('');
-
-/** Runs one action at a time, and toasts the message it answers with, or its error. */
-async function run(action, task, failure) {
-	busy.value = action;
-	try {
-		toast.success(await task());
-		emit('changed');
-	} catch (error) {
-		toast.error(errorMessage(error, failure));
-	} finally {
-		busy.value = '';
-	}
-}
+const { busy, run } = useActions(() => emit('changed'));
 
 const publish = () => {
 	const { theme } = props.bar;
@@ -108,17 +95,6 @@ const activate = () => {
 		'Could not activate the theme',
 	);
 };
-
-function publishedMessage({ published, skipped }) {
-	if (!published.length) return 'Nothing to publish yet: every page is empty.';
-	const empty = skipped.length
-		? ` ${listOf(skipped)} ${skipped.length > 1 ? 'are' : 'is'} empty, so not published.`
-		: '';
-	return `Published ${listOf(published)}.${empty}`;
-}
-
-const listOf = (labels) =>
-	new Intl.ListFormat('en', { type: 'conjunction' }).format(labels);
 
 function viewOnStore() {
 	const { bar } = props;

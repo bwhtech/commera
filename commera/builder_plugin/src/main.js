@@ -1,6 +1,7 @@
 import { toolbarItems } from 'builder';
-import ThemeBar, { openThemeBar } from './ThemeBar.vue';
+import ThemeBar from './ThemeBar.vue';
 import './index.css';
+import { openStoreThemes, registerStoreThemes } from './storeThemes';
 
 export default {
 	install(_app, context) {
@@ -9,6 +10,6 @@ export default {
 			region: 'center',
 			component: ThemeBar,
 		});
-		context.setOpenHandler(openThemeBar);
+		if (registerStoreThemes()) context.setOpenHandler(openStoreThemes);
 	},
 };

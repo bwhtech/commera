@@ -4,7 +4,14 @@ import tailwindcss from 'tailwindcss';
 import { defineConfig } from 'vite';
 
 // The editor serves these modules through its import map, so the plugin shares its Vue, stores and frappe-ui.
-const SHARED_MODULES = ['builder', 'vue', 'pinia', 'frappe-ui'];
+const SHARED_MODULES = [
+	'builder',
+	'vue',
+	'pinia',
+	'frappe-ui',
+	'frappe-ui/editor',
+	'frappe-ui/list',
+];
 const isShared = (id) =>
 	SHARED_MODULES.includes(id) || id.startsWith('builder/internal/');
 
