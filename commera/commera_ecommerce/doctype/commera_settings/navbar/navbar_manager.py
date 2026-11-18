@@ -119,9 +119,8 @@ def create_node(parent, display_name, link_type=None, link_target=None, display_
 	doc.enabled = 1
 	doc.display_order = next_order(parent) if display_order is None else display_order
 	set_link(doc, link_type, link_target)
-	doc.insert()
-
 	mark_as_group(parent)
+	doc.insert()
 	return doc
 
 
@@ -257,9 +256,8 @@ def move_node(name: str, to_parent: str | None = None, target_index: int | str =
 	from_parent = doc.parent_ecommerce_category or ""
 
 	doc.parent_ecommerce_category = to_parent or None
-	doc.save()
-
 	mark_as_group(to_parent)
+	doc.save()
 
 	apply_order(sibling_names(from_parent))
 
