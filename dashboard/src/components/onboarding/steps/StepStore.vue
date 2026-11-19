@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Combobox, FormControl, Select, TextInput } from 'frappe-ui'
-import { getCountryDefaults, storeSetup } from '../../../data/onboarding'
+import { Button, Combobox, FormControl, Select, TextInput } from 'frappe-ui'
+import { createSalePriceList, getCountryDefaults, storeSetup } from '../../../data/onboarding'
 import { CATEGORIES, draft, flow } from '../../../ia/onboarding'
 import { abbreviate, missingField, toOptions } from '../../../ia/onboardingSteps'
 import { monthName } from '../../../data/format'
@@ -33,17 +33,72 @@ const options = computed(() => props.record.options ?? {})
 const chartOptions = computed(() =>
   toOptions(countryCharts.value ?? options.value.charts_of_accounts ?? STANDARD_CHARTS),
 )
+function chartLabel(chart) {
+  return chart === 'Standard' ? __('Standard accounts') : chart
+}
+
 const accountingSummary = computed(() =>
-  [draft.currency, draft.timeZone, draft.chartOfAccounts === 'Standard' ? __('Standard accounts') : draft.chartOfAccounts]
-    .filter(Boolean)
-    .join(' · '),
+  [draft.currency, draft.timeZone, chartLabel(draft.chartOfAccounts)].filter(Boolean).join(' · '),
 )
+
+const existingStore = computed(() => props.record.existing_store)
+const createdPriceLists = ref([])
+const duplicating = ref(false)
+
+const company = computed(() => existingStore.value?.companies.find((row) => row.name === draft.company))
+const companyOptions = computed(() => toOptions(existingStore.value?.companies.map((row) => row.name)))
+const priceListOptions = computed(() =>
+  toOptions(
+    [...(existingStore.value?.price_lists ?? []), ...createdPriceLists.value]
+      .filter((row) => row.currency === company.value?.default_currency)
+      .map((row) => row.name),
+  ),
+)
+const warehouseOptions = computed(() =>
+  toOptions(existingStore.value?.warehouses.filter((row) => row.company === draft.company).map((row) => row.name)),
+)
+const companySummary = computed(() =>
+  company.value
+    ? [company.value.default_currency, company.value.abbr, chartLabel(company.value.chart_of_accounts)]
+        .filter(Boolean)
+        .join(' · ')
+    : '',
+)
+
+function isOffered(options, value) {
+  return options.some((option) => option.value === value)
+}
+
+watch(
+  company,
+  (picked) => {
+    if (!picked) return
+    draft.currency = picked.default_currency
+    draft.companyAbbr = picked.abbr
+    draft.chartOfAccounts = picked.chart_of_accounts
+    if (!isOffered(priceListOptions.value, draft.priceList)) draft.priceList = ''
+    if (!isOffered(priceListOptions.value, draft.salePriceList)) draft.salePriceList = draft.priceList
+    if (!isOffered(warehouseOptions.value, draft.warehouse)) {
+      draft.warehouse = isOffered(warehouseOptions.value, picked.default_warehouse) ? picked.default_warehouse : ''
+    }
+  },
+  { immediate: true },
+)
+
+async function duplicateSaleList() {
+  duplicating.value = true
+  const name = await createSalePriceList({ storeName: draft.storeName, company: draft.company })
+  duplicating.value = false
+  if (!name) return
+  createdPriceLists.value.push({ name, currency: company.value.default_currency })
+  draft.salePriceList = name
+}
 
 watch(
   () => draft.country,
   async (country, previous) => {
     // A fresh site starts with no country, so the first pick must fill its defaults too.
-    if (!country || country === previous || isLocked.value) return
+    if (!country || country === previous || isLocked.value || existingStore.value) return
     draft.fiscalYearStartMonth = null
     if (!STANDARD_CHARTS.includes(draft.chartOfAccounts)) draft.chartOfAccounts = 'Standard'
     const defaults = await getCountryDefaults(country)
@@ -90,70 +145,126 @@ watch(
       </div>
     </div>
 
-    <Combobox
-      v-model="draft.country"
-      trigger="button"
-      :label="__('Country')"
-      :placeholder="__('Search countries')"
-      :options="toOptions(options.countries)"
-      :disabled="isLocked"
-    />
+    <template v-if="existingStore">
+      <Combobox
+        v-model="draft.company"
+        trigger="button"
+        :label="__('Company')"
+        :placeholder="__('Pick your company')"
+        :options="companyOptions"
+        :description="companySummary"
+        :error="missing === 'company' ? __('Pick the company your store sells for') : ''"
+      />
+      <Combobox
+        v-model="draft.priceList"
+        trigger="button"
+        :label="__('Price list')"
+        :placeholder="__('Pick a selling price list')"
+        :options="priceListOptions"
+        :disabled="!draft.company"
+        :error="missing === 'priceList' ? __('Required') : ''"
+      />
+      <div>
+        <div class="flex items-end gap-2">
+          <Combobox
+            v-model="draft.salePriceList"
+            class="min-w-0 flex-1"
+            trigger="button"
+            :label="__('Sale price list')"
+            :placeholder="__('Pick a sale price list')"
+            :options="priceListOptions"
+            :disabled="!draft.company"
+            :error="missing === 'salePriceList' ? __('Required') : ''"
+          />
+          <Button
+            :label="__('Duplicate')"
+            :loading="duplicating"
+            :disabled="!draft.company || !draft.storeName.trim()"
+            data-onboarding-duplicate-sale-list
+            @click="duplicateSaleList"
+          />
+        </div>
+        <p class="mt-1.5 text-p-sm text-ink-gray-6">
+          {{ __('Pick the price list as the sale list to sell without sale prices, or Duplicate for an empty one.') }}
+        </p>
+      </div>
+      <Combobox
+        v-model="draft.warehouse"
+        trigger="button"
+        :label="__('Warehouse')"
+        :placeholder="__('Pick the warehouse you ship from')"
+        :options="warehouseOptions"
+        :disabled="!draft.company"
+        :error="missing === 'warehouse' ? __('Required') : ''"
+      />
+    </template>
 
-    <div>
-      <button
-        type="button"
-        class="flex items-center gap-1 text-sm text-ink-gray-5 transition-colors hover:text-ink-gray-7"
-        :aria-expanded="showAccounting"
-        data-onboarding-accounting
-        @click="showAccounting = !showAccounting"
-      >
-        {{ accountingSummary }}
-        <span
-          class="lucide-chevron-down size-3.5 transition-transform duration-300 ease-in-out-strong"
-          :class="{ 'rotate-180': showAccounting }"
-          aria-hidden="true"
-        />
-      </button>
-      <!-- A 0fr→1fr grid row is the one height animation CSS can do without measuring; inert keeps the
-           closed fields out of the tab order. -->
-      <div
-        class="grid transition-[grid-template-rows,opacity] duration-300 ease-out-strong"
-        :class="showAccounting ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'"
-        :inert="!showAccounting"
-      >
-        <div class="overflow-hidden">
-          <div class="grid grid-cols-2 gap-3 pt-3">
-            <Combobox
-              v-model="draft.currency"
-              trigger="button"
-              :label="__('Currency')"
-              :options="toOptions(options.currencies)"
-              :disabled="isLocked"
-            />
-            <Combobox
-              v-model="draft.timeZone"
-              trigger="button"
-              :label="__('Time zone')"
-              :options="toOptions(options.time_zones)"
-              :disabled="isLocked"
-            />
-            <Select v-model="draft.chartOfAccounts" :label="__('Chart of accounts')" :options="chartOptions" :disabled="isLocked" />
-            <Select
-              v-model="draft.fiscalYearStartMonth"
-              :label="__('Year starts')"
-              :placeholder="__('Country default')"
-              :options="MONTHS"
-              :disabled="isLocked"
-            />
-            <TextInput
-              v-model="draft.companyAbbr"
-              :label="__('Short code')"
-              :placeholder="abbreviate(draft.storeName)"
-              :disabled="isLocked"
-            />
+    <template v-else>
+      <Combobox
+        v-model="draft.country"
+        trigger="button"
+        :label="__('Country')"
+        :placeholder="__('Search countries')"
+        :options="toOptions(options.countries)"
+        :disabled="isLocked"
+      />
+
+      <div>
+        <button
+          type="button"
+          class="flex items-center gap-1 text-sm text-ink-gray-5 transition-colors hover:text-ink-gray-7"
+          :aria-expanded="showAccounting"
+          data-onboarding-accounting
+          @click="showAccounting = !showAccounting"
+        >
+          {{ accountingSummary }}
+          <span
+            class="lucide-chevron-down size-3.5 transition-transform duration-300 ease-in-out-strong"
+            :class="{ 'rotate-180': showAccounting }"
+            aria-hidden="true"
+          />
+        </button>
+        <!-- A 0fr→1fr grid row is the one height animation CSS can do without measuring; inert keeps the
+             closed fields out of the tab order. -->
+        <div
+          class="grid transition-[grid-template-rows,opacity] duration-300 ease-out-strong"
+          :class="showAccounting ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'"
+          :inert="!showAccounting"
+        >
+          <div class="overflow-hidden">
+            <div class="grid grid-cols-2 gap-3 pt-3">
+              <Combobox
+                v-model="draft.currency"
+                trigger="button"
+                :label="__('Currency')"
+                :options="toOptions(options.currencies)"
+                :disabled="isLocked"
+              />
+              <Combobox
+                v-model="draft.timeZone"
+                trigger="button"
+                :label="__('Time zone')"
+                :options="toOptions(options.time_zones)"
+                :disabled="isLocked"
+              />
+              <Select v-model="draft.chartOfAccounts" :label="__('Chart of accounts')" :options="chartOptions" :disabled="isLocked" />
+              <Select
+                v-model="draft.fiscalYearStartMonth"
+                :label="__('Year starts')"
+                :placeholder="__('Country default')"
+                :options="MONTHS"
+                :disabled="isLocked"
+              />
+              <TextInput
+                v-model="draft.companyAbbr"
+                :label="__('Short code')"
+                :placeholder="abbreviate(draft.storeName)"
+                :disabled="isLocked"
+              />
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>

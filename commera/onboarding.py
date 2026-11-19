@@ -133,7 +133,12 @@ def run_frappe_setup(setup_args: dict):
 		raise RuntimeError(f"Setup did not create company {setup_args['company_name']}")
 
 
-def seed_commera_settings(company: str):
+def seed_commera_settings(
+	company: str,
+	price_list: str | None = None,
+	sale_price_list: str | None = None,
+	warehouse: str | None = None,
+):
 	"""Fill the mandatory Commera Settings fields, which any later save() would otherwise trip on."""
 	# FOR UPDATE: a plain read returns this job's stale snapshot, which save() refuses once the owner
 	# has saved brand or selling meanwhile; a locking read sees the latest commit.
@@ -142,20 +147,73 @@ def seed_commera_settings(company: str):
 	for fieldname, template in DEFAULT_EMAIL_TEMPLATES.items():
 		settings.set(fieldname, settings.get(fieldname) or template)
 
-	settings.default_price_list = settings.default_price_list or DEFAULT_PRICE_LIST
-	settings.ecommerce_warehouse = settings.ecommerce_warehouse or get_company_warehouse(company)
+	settings.default_price_list = price_list or settings.default_price_list or DEFAULT_PRICE_LIST
+	settings.sale_price_list = sale_price_list or settings.sale_price_list
+	settings.ecommerce_warehouse = warehouse or settings.ecommerce_warehouse or get_company_warehouse(company)
 	settings.save(ignore_permissions=True)
 
 
-def adopt_existing_company():
-	"""A site set up before Commera gets what the setup job fills, for its store company or ERPNext's default."""
-	company = frappe.db.get_single_value(SETTINGS_DOCTYPE, "company") or frappe.db.get_single_value(
-		"Global Defaults", "default_company"
+def adopt_existing_company(
+	company: str | None = None,
+	price_list: str | None = None,
+	sale_price_list: str | None = None,
+	warehouse: str | None = None,
+):
+	company = company or frappe.db.get_single_value(SETTINGS_DOCTYPE, "company") or get_only_company()
+	if not company:
+		frappe.throw(_("Pick the company your store sells for"), frappe.MandatoryError)
+
+	validate_store_picks(company, price_list, sale_price_list, warehouse)
+	sale_price_list = sale_price_list or price_list
+	seed_commera_settings(company, price_list, sale_price_list, warehouse)
+
+
+def get_only_company() -> str | None:
+	companies = frappe.get_all("Company", pluck="name", limit=2)
+	return companies[0] if len(companies) == 1 else None
+
+
+def validate_store_picks(
+	company: str, price_list: str | None, sale_price_list: str | None, warehouse: str | None
+):
+	from commera.commera_ecommerce.doctype.commera_settings.commera_settings import (
+		validate_price_list_currency,
 	)
-	if not company and frappe.db.count("Company") == 1:
-		company = frappe.db.get_value("Company", {}, "name")
-	if company:
-		seed_commera_settings(company)
+
+	currency = frappe.db.get_value("Company", company, "default_currency")
+	if not currency:
+		frappe.throw(_("Unknown company {0}").format(company))
+
+	for label, name in ((_("Price list"), price_list), (_("Sale price list"), sale_price_list)):
+		if not name:
+			continue
+		if not frappe.db.exists("Price List", {"name": name, "selling": 1, "enabled": 1}):
+			frappe.throw(_("{0} {1} is not an enabled selling price list").format(label, name))
+		validate_price_list_currency(name, currency, label)
+
+	if warehouse and frappe.db.get_value("Warehouse", warehouse, "company") != company:
+		frappe.throw(_("Warehouse {0} does not belong to {1}").format(warehouse, company))
+
+
+def create_sale_price_list(store_name: str, company: str) -> str:
+	currency = frappe.db.get_value("Company", company, "default_currency")
+	if not currency:
+		frappe.throw(_("Unknown company {0}").format(company))
+	name = f"{store_name} Sale"
+	if frappe.db.exists("Price List", name):
+		frappe.throw(
+			_("Price list {0} already exists. Pick it instead.").format(name), frappe.DuplicateEntryError
+		)
+	frappe.get_doc(
+		{
+			"doctype": "Price List",
+			"price_list_name": name,
+			"currency": currency,
+			"selling": 1,
+			"enabled": 1,
+		}
+	).insert(ignore_permissions=True)
+	return name
 
 
 def set_owner_default_app(user: str):

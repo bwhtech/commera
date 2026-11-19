@@ -4,6 +4,7 @@ import frappe
 from erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts import get_charts_for_country
 from frappe import _
 from frappe.core.doctype.user.user import get_timezones
+from frappe.query_builder.functions import Count
 from frappe.utils.data import cint, cstr
 
 from commera import onboarding
@@ -34,6 +35,65 @@ def get_suggested_abbr(settings) -> str | None:
 	return onboarding.get_company_abbr(settings.store_name) if settings.store_name else None
 
 
+def get_existing_store(settings) -> dict:
+	company = settings.company or onboarding.get_only_company()
+	return {
+		"companies": frappe.get_all(
+			"Company",
+			fields=["name", "abbr", "chart_of_accounts", "default_currency", "country", "default_warehouse"],
+			order_by="name",
+		),
+		"company": company,
+		"price_lists": frappe.get_all(
+			"Price List", filters={"selling": 1, "enabled": 1}, fields=["name", "currency"], order_by="name"
+		),
+		"price_list": settings.default_price_list
+		or frappe.db.get_single_value("Selling Settings", "selling_price_list"),
+		"sale_price_list": settings.sale_price_list,
+		"warehouses": frappe.get_all(
+			"Warehouse",
+			filters={"is_group": 0, "disabled": 0, "warehouse_type": ["!=", "Transit"]},
+			fields=["name", "company"],
+			order_by="name",
+		),
+		"warehouse": settings.ecommerce_warehouse or (company and onboarding.get_company_warehouse(company)),
+		"has_webshop": "webshop" in frappe.get_installed_apps(),
+		"importable_count": get_importable_item_count(),
+	}
+
+
+def get_importable_item_count() -> int:
+	item = frappe.qb.DocType("Item")
+	configurator = frappe.qb.DocType("Style Attribute Configurator")
+	size_item = frappe.qb.DocType("Color Size Item")
+	wrapped_templates = (
+		frappe.qb.from_(configurator)
+		.select(configurator.item_template)
+		.where(configurator.item_template.isnotnull())
+	)
+	wrapped_items = (
+		frappe.qb.from_(size_item).select(size_item.item_code).where(size_item.item_code.isnotnull())
+	)
+	return (
+		frappe.qb.from_(item)
+		.select(Count(item.name))
+		.where(
+			(item.disabled == 0)
+			& (item.is_sales_item == 1)
+			& (item.variant_of.isnull() | (item.variant_of == ""))
+			& item.name.notin(wrapped_templates)
+			& item.name.notin(wrapped_items)
+		)
+		.run()[0][0]
+	)
+
+
+def is_existing_store() -> bool:
+	return frappe.is_setup_complete() and (
+		frappe.db.get_single_value(SETTINGS_DOCTYPE, "store_setup_status") != "done"
+	)
+
+
 @frappe.whitelist(methods=["GET"])
 def get_onboarding():
 	"""Everything the onboarding screens prefill, defaulted from what Frappe Cloud stored at signup."""
@@ -43,6 +103,8 @@ def get_onboarding():
 	settings = frappe.get_single(SETTINGS_DOCTYPE)
 	user = frappe.get_cached_doc("User", frappe.session.user)
 	country = system_settings.country
+	existing_store = get_existing_store(settings) if is_existing_store() else None
+	company = existing_store and existing_store["company"]
 	return {
 		"full_name": user.full_name,
 		"email": user.email,
@@ -52,9 +114,11 @@ def get_onboarding():
 		"country": country,
 		"currency": system_settings.currency,
 		"time_zone": system_settings.time_zone,
-		"chart_of_accounts": onboarding.DEFAULT_CHART_OF_ACCOUNTS,
+		"chart_of_accounts": (company and frappe.get_cached_value("Company", company, "chart_of_accounts"))
+		or onboarding.DEFAULT_CHART_OF_ACCOUNTS,
 		"fiscal_year_start_month": onboarding.get_fiscal_year_start_month(country),
-		"company_abbr": get_suggested_abbr(settings),
+		"company_abbr": (company and frappe.get_cached_value("Company", company, "abbr"))
+		or get_suggested_abbr(settings),
 		"is_frappe_setup_complete": frappe.is_setup_complete(),
 		"setup": onboarding.get_setup_status(),
 		"brand_logo": read_branding_fields()["brand_logo"],
@@ -62,6 +126,7 @@ def get_onboarding():
 		"cod_enabled": bool(settings.cod_enabled),
 		"allow_guest_checkout": bool(settings.allow_guest_checkout),
 		"options": get_options(country),
+		"existing_store": existing_store,
 	}
 
 
@@ -124,6 +189,10 @@ def start_store_setup(
 	chart_of_accounts: str = onboarding.DEFAULT_CHART_OF_ACCOUNTS,
 	fiscal_year_start_month: int | None = None,
 	company_abbr: str | None = None,
+	company: str | None = None,
+	price_list: str | None = None,
+	sale_price_list: str | None = None,
+	warehouse: str | None = None,
 ):
 	"""Save the store basics and queue the Frappe/ERPNext setup, once. A failed setup can be retried."""
 	frappe.only_for(ONBOARDING_ROLE)
@@ -134,6 +203,13 @@ def start_store_setup(
 		return status
 
 	store_name = cstr(store_name).strip()
+	if status["status"] == "done":
+		if not store_name:
+			frappe.throw(_("Store name is required"), frappe.MandatoryError)
+		save_store_basics(store_name, store_category)
+		onboarding.adopt_existing_company(company, price_list, sale_price_list, warehouse)
+		return status
+
 	chart_of_accounts = chart_of_accounts or onboarding.DEFAULT_CHART_OF_ACCOUNTS
 	start_month = cint(fiscal_year_start_month) or onboarding.get_fiscal_year_start_month(country)
 	validate_store_setup(store_name, country, currency, time_zone, chart_of_accounts, start_month)
@@ -141,18 +217,28 @@ def start_store_setup(
 	if company_abbr and frappe.db.exists("Company", {"abbr": company_abbr}):
 		frappe.throw(_("Abbreviation {0} is already used by another company").format(company_abbr))
 
-	# set_single_value: the settings cannot save() until setup has made the company it requires.
-	frappe.db.set_single_value(
-		SETTINGS_DOCTYPE, {"store_name": store_name, "store_category": cstr(store_category).strip()}
-	)
-	if status["status"] == "done":
-		onboarding.adopt_existing_company()
-		return status
-
+	save_store_basics(store_name, store_category)
 	args = onboarding.build_setup_args(
 		store_name, country, currency, time_zone, chart_of_accounts, start_month, company_abbr
 	)
 	return onboarding.queue_store_setup(args)
+
+
+def save_store_basics(store_name: str, store_category: str | None):
+	# set_single_value: the settings cannot save() until setup has made the company it requires.
+	frappe.db.set_single_value(
+		SETTINGS_DOCTYPE, {"store_name": store_name, "store_category": cstr(store_category).strip()}
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def create_sale_price_list(store_name: str, company: str):
+	frappe.only_for(ONBOARDING_ROLE)
+
+	store_name = cstr(store_name).strip()
+	if not store_name:
+		frappe.throw(_("Store name is required"), frappe.MandatoryError)
+	return onboarding.create_sale_price_list(store_name, company)
 
 
 @frappe.whitelist(methods=["GET"])
