@@ -58,7 +58,10 @@ def get_size_item_codes(item_template, style_attribute_variant_list=None):
 			.on(item.name == color_size_item.item_code)
 			.select(item.name)
 			.distinct()
-			.where((style_attribute_variant.item_style == item_template) & (item.variant_of == item_template))
+			.where(
+				(style_attribute_variant.item_style == item_template)
+				& ((item.variant_of == item_template) | (item.name == item_template))
+			)
 		)
 		if variant_name_chunk is not None:
 			query = query.where(style_attribute_variant.name.isin(variant_name_chunk))

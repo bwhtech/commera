@@ -230,15 +230,14 @@ class TestStorefrontAccount(IntegrationTestCase):
 	def make_order(self, owner: str = "Administrator", contact_email=None, guest_cart=False) -> str:
 		sales_order = make_test_sales_order()
 		sales_order.db_set({"owner": owner, "contact_email": contact_email})
-		# The Jinja order list reads only lines whose item has a Size attribute.
 		frappe.get_doc(
 			{
-				"doctype": "Item Variant Attribute",
-				"parent": sales_order.items[0].item_code,
-				"parenttype": "Item",
-				"parentfield": "attributes",
-				"attribute": "Size",
-				"attribute_value": "M",
+				"doctype": "Color Size Item",
+				"parent": frappe.generate_hash(length=10),
+				"parenttype": "Style Attribute Variant",
+				"parentfield": "sizes",
+				"item_code": sales_order.items[0].item_code,
+				"size": "M",
 			}
 		).db_insert()
 		if guest_cart:

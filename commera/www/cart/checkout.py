@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from frappe.query_builder import DocType
+from frappe.query_builder.functions import Coalesce
 from frappe.rate_limiter import rate_limit
 from frappe.utils.data import cstr
 
@@ -235,9 +236,11 @@ def get_checkout_items(cart_quotation):
 		.left_join(item)
 		.on(item.name == style_attribute_variant.item_style)
 		.left_join(item_variant_attribute)
-		.on(item_variant_attribute.parent == quotation_item.item_code)
+		.on(
+			(item_variant_attribute.parent == quotation_item.item_code)
+			& (item_variant_attribute.attribute == "Size")
+		)
 		.where(quotation_item.parent == cart_quotation.name)
-		.where(item_variant_attribute.attribute == "Size")
 		.select(
 			style_attribute_variant.name,
 			style_attribute_variant.item_style,
@@ -251,7 +254,7 @@ def get_checkout_items(cart_quotation):
 			quotation_item.price_list_rate,
 			quotation_item.amount,
 			quotation_item.custom_code_discount,
-			item_variant_attribute.attribute_value.as_("size"),
+			Coalesce(item_variant_attribute.attribute_value, color_size_item.size).as_("size"),
 		)
 		.groupby(quotation_item.name)
 	)
