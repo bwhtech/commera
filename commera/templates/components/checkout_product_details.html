@@ -17,13 +17,13 @@
                     {% if cart_item.default_price %}
                     <span class="text-sm md:text-base font-medium text-accent line-through flex">
                         {% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{% if not cart_currency.is_sign %}
-                        {% endif %}{{ cart_currency.amount(cart_item.default_price) }}{{ cart_currency.symbol_after }}{% if cart_currency.is_sign %}</bdi>{% endif %}
+                        {% endif %}<span>{{ cart_currency.amount(cart_item.default_price) }}</span>{{ cart_currency.symbol_after }}{% if cart_currency.is_sign %}</bdi>{% endif %}
                     </span>
                     {% endif %}
                     <span class="text-sm md:text-base font-medium flex">
                         {% if cart_item.rate %}
                         {% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ cart_currency.symbol }}{% if not cart_currency.is_sign %}
-                        {% endif %}{{ cart_currency.amount(cart_item.price_list_rate) }}{{ cart_currency.symbol_after }}{% if cart_currency.is_sign %}</bdi>{% endif %}
+                        {% endif %}<span>{{ cart_currency.amount(cart_item.price_list_rate) }}</span>{{ cart_currency.symbol_after }}{% if cart_currency.is_sign %}</bdi>{% endif %}
                         {% else %}
                         {{_('Free')}}
                         {% endif %}
