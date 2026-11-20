@@ -1,7 +1,6 @@
 from unittest.mock import Mock, patch
 
 import frappe
-from erpnext.selling.doctype.sales_order.mapper import make_delivery_note
 from erpnext.stock import get_item_details
 from frappe.utils.data import add_days, today
 
@@ -24,6 +23,11 @@ from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.tests.test_market_address_countries import ADDRESS
 from commera.tests.test_market_cart import MarketCartTestCase
 from commera.tests.test_markets import UAE
+
+try:
+	from erpnext.selling.doctype.sales_order.mapper import make_delivery_note
+except ImportError:
+	from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note
 
 GUARD_HOOK = "commera.item_price_guard.install_guard"
 GATEWAY = "ZZ Market Gateway"
@@ -258,7 +262,10 @@ class TestCartPriceInserts(MarketCartTestCase):
 		self.assertEqual(frappe.db.get_value("Item Price", sale_price.name, "price_list_rate"), 100)
 
 	def test_cart_quotation_cannot_be_invoiced_directly(self):
-		from erpnext.selling.doctype.quotation.mapper import make_sales_invoice
+		try:
+			from erpnext.selling.doctype.quotation.mapper import make_sales_invoice
+		except ImportError:
+			from erpnext.selling.doctype.quotation.quotation import make_sales_invoice
 
 		ensure_fiscal_year()
 		self.quotation.reload().submit()
@@ -267,7 +274,10 @@ class TestCartPriceInserts(MarketCartTestCase):
 		self.assertFalse(self.has_sale_price())
 
 	def test_desk_quotation_can_be_invoiced_and_insert_a_price(self):
-		from erpnext.selling.doctype.quotation.mapper import make_sales_invoice
+		try:
+			from erpnext.selling.doctype.quotation.mapper import make_sales_invoice
+		except ImportError:
+			from erpnext.selling.doctype.quotation.quotation import make_sales_invoice
 
 		ensure_fiscal_year()
 		self.quotation.reload()
