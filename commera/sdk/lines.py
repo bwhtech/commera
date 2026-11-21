@@ -5,7 +5,7 @@ from functools import cached_property
 import frappe
 from frappe import _
 
-from commera.api.admin.catalog import DEFAULT_SIZE_VALUE
+from commera.api.admin.catalog import DEFAULT_OPTION_VALUE, DEFAULT_SIZE_VALUE, get_variant_title
 from commera.localization import get_localization
 from commera.sdk.catalog import translate_products, translate_term
 from commera.sdk.types import CartLineProduct
@@ -28,6 +28,18 @@ class LineProducts:
 		if not product or not product.title:
 			return _(item_name, lang=self.localization.language.code) if item_name else item_name
 		return get_product_label(product)
+
+	def get_order_title(self, item_code: str, item_name: str | None) -> str | None:
+		"""As get_title, but an imported ERPNext variant keeps ERPNext's "<title>-<abbreviations>" name, so an
+		order line is titled from its product in every language."""
+		if self.localization.language.code != self.localization.default_language.code:
+			return self.get_title(item_code, item_name)
+		product = self.products.get(item_code)
+		if not product or not product.title:
+			return item_name
+		return get_variant_title(
+			product.title, product.attribute_value or DEFAULT_OPTION_VALUE, product.size or DEFAULT_SIZE_VALUE
+		)
 
 	def get_label(self, item_code: str) -> str:
 		"""The product and size for a message to the shopper, in any language; never the item code."""
@@ -70,7 +82,7 @@ def read_variants(names: list[str]) -> dict[str, frappe._dict]:
 	variants = frappe.get_all(
 		"Style Attribute Variant",
 		filters={"name": ("in", list(set(names)) or [""])},
-		fields=["name", "route", "display_name", "item_style", "is_published"],
+		fields=["name", "route", "display_name", "item_style", "is_published", "attribute_value"],
 	)
 	titles = translate_products(variants)
 	return {
