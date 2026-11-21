@@ -83,7 +83,7 @@ function finish(path) {
           <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-gray-2 text-ink-gray-7">
             <span class="lucide-package-check size-6" aria-hidden="true" />
           </div>
-          <h2 class="mt-4 text-2xl text-ink-gray-9">{{ __('{0} products are ready as drafts', [status?.created ?? 0]) }}</h2>
+          <h2 class="mt-4 text-2xl text-ink-gray-9">{{ status?.created === 1 ? __('1 product is ready as a draft') : __('{0} products are ready as drafts', [status?.created ?? 0]) }}</h2>
           <p class="mx-auto mt-1.5 max-w-[460px] text-p-base text-ink-gray-6">
             {{ __('Publish them to put them on your storefront. Products without a photo stay as drafts until you add one.') }}
           </p>
@@ -104,12 +104,14 @@ function finish(path) {
           <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-green-2 text-ink-green-7">
             <span class="lucide-party-popper size-6" aria-hidden="true" />
           </div>
-          <h2 class="mt-4 text-2xl text-ink-gray-9">{{ __('{0} products are live', [imp.erpnext.published.published]) }}</h2>
+          <h2 class="mt-4 text-2xl text-ink-gray-9">{{ imp.erpnext.published.published === 1 ? __('1 product is live') : __('{0} products are live', [imp.erpnext.published.published]) }}</h2>
           <p class="mx-auto mt-1.5 max-w-[460px] text-p-base text-ink-gray-6">
             {{
-              needsPhoto.length
-                ? __('{0} need a photo before they can go live.', [needsPhoto.length])
-                : __('Every imported product is on your storefront.')
+              needsPhoto.length === 1
+                ? __('1 product needs a photo before it can go live.')
+                : needsPhoto.length
+                  ? __('{0} need a photo before they can go live.', [needsPhoto.length])
+                  : __('Every imported product is on your storefront.')
             }}
           </p>
           <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
