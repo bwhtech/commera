@@ -20,6 +20,17 @@ const previewRequest = useAdminRead('customer_emails.get_email_preview', {
 })
 
 const savingTemplate = ref(false)
+const previewHeight = ref(640)
+
+function fitPreview(event) {
+  const previewDocument = event.target.contentDocument
+  if (!previewDocument) return
+  const measure = () => {
+    previewHeight.value = previewDocument.documentElement.scrollHeight
+  }
+  measure()
+  for (const image of previewDocument.images) image.addEventListener('load', measure)
+}
 const sendingTest = ref(false)
 
 async function setTemplate(emailTemplate) {
@@ -112,9 +123,12 @@ async function sendTest() {
             <Skeleton v-if="!previewRequest.data" class="h-[40rem] w-full rounded-0" />
             <iframe
               v-else
-              class="block h-[40rem] w-full"
-              sandbox=""
+              class="block w-full"
+              sandbox="allow-same-origin"
+              scrolling="no"
+              :style="{ height: `${previewHeight}px` }"
               :srcdoc="previewRequest.data.html"
+              @load="fitPreview"
               :title="__('Preview of {0}', [email.label])"
             />
           </div>
