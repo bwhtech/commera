@@ -11,6 +11,7 @@ from commera.api.admin.catalog import (
 	save_product_options,
 )
 from commera.api.variant_pricing import get_size_item_codes, set_variant_prices
+from commera.sdk.catalog import get_product_cards_for
 from commera.tests.test_admin_orders import COMPANY, CURRENCY, ensure_fiscal_year
 from commera.tests.test_product_onboarding import ProductOnboardingTestCase
 from commera.www.account.orders.index import get_orders_list
@@ -89,6 +90,15 @@ class TestPlainItemProducts(ProductOnboardingTestCase):
 
 		product = listed[self.plain_item]
 		self.assertEqual((product["price_from"], product["price_to"], product["stock"]), (499, 499, 4))
+
+	def test_the_product_card_has_no_colour_for_the_standard_option(self):
+		set_variant_prices(self.plain_item, default_rate=499)
+		self.plain_variant.receive_stock({self.plain_item: 4}, {self.plain_item: 100})
+		self.plain_variant.db_set("is_published", 1)
+
+		(card,) = get_product_cards_for([self.plain_variant.name])
+
+		self.assertIsNone(card["color"])
 
 	def test_price_editing_finds_the_plain_item_itself(self):
 		self.assertEqual(get_size_item_codes(self.plain_item), [self.plain_item])
