@@ -64,7 +64,7 @@ async function setEnabled(email, enabled) {
 
   <template v-else>
     <SettingsPanelHeader
-      :title="__('Customer emails')"
+      :title="__('Emails')"
       :description="__('What your store emails shoppers. Open one to preview it, send yourself a test or pick its template.')"
     />
 

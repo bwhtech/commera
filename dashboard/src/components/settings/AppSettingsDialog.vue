@@ -121,7 +121,7 @@ watch(
           </SettingsNavItem>
           <SettingsNavItem value="emails">
             <template #prefix><span class="lucide-mail size-4" aria-hidden="true" /></template>
-            {{ __('Customer emails') }}
+            {{ __('Emails') }}
           </SettingsNavItem>
           <SettingsNavItem value="languages">
             <template #prefix><span class="lucide-languages size-4" aria-hidden="true" /></template>

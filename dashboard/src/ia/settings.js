@@ -39,7 +39,7 @@ export const SETTINGS_TABS = [
   },
   {
     value: 'emails',
-    label: __('Customer emails'),
+    label: __('Emails'),
     icon: 'lucide-mail',
     keywords: ['email', 'emails', 'notification', 'template', 'order confirmation', 'cancellation', 'back in stock', 'sign-in code', 'test email'],
   },
