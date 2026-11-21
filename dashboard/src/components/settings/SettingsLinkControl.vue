@@ -15,6 +15,7 @@ const props = defineProps({
   label: { type: String, default: '' },
   required: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
+  placeholder: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -49,7 +50,7 @@ const options = computed(() => {
       :disabled="disabled"
       :filterable="false"
       :loading="search.results.loading"
-      :placeholder="__('Search {0}', [__(field.options)])"
+      :placeholder="placeholder || __('Search {0}', [__(field.options)])"
       @update:model-value="emit('update:modelValue', $event)"
     />
   </div>

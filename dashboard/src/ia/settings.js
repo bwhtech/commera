@@ -38,6 +38,12 @@ export const SETTINGS_TABS = [
     keywords: ['theme', 'dark', 'light', 'colour', 'color', 'logo', 'brand'],
   },
   {
+    value: 'emails',
+    label: __('Customer emails'),
+    icon: 'lucide-mail',
+    keywords: ['email', 'emails', 'notification', 'template', 'order confirmation', 'cancellation', 'back in stock', 'sign-in code', 'test email'],
+  },
+  {
     value: 'languages',
     label: __('Languages'),
     icon: 'lucide-languages',

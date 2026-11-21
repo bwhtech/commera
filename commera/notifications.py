@@ -6,6 +6,7 @@ from frappe.contacts.doctype.address.address import get_company_address
 from frappe.email.doctype.email_account.email_account import EmailAccount
 from frappe.translate import print_language
 from frappe.utils import cint, flt, formatdate, get_url, strip_html
+from frappe.utils.jinja import get_email_from_template
 
 from commera.api.payments import COD_PAYMENT_MODE
 from commera.api.shipping import get_charge_amount
@@ -28,6 +29,48 @@ EMAIL_SUBJECTS = {
 	"order_refunded": _lt("Your refund for order {order_number} is on its way"),
 	"order_returned": _lt("We received your return for order {order_number}"),
 	"payment_failed": _lt("Your payment to {store_name} didn't go through"),
+}
+EMAIL_LABELS = {
+	"order_confirmation": {
+		"label": _lt("Order confirmation"),
+		"description": _lt("Sent when a shopper places an order."),
+	},
+	"order_cancelled": {
+		"label": _lt("Order cancelled"),
+		"description": _lt("Sent when an order is cancelled."),
+	},
+	"back_in_stock": {
+		"label": _lt("Back in stock"),
+		"description": _lt("Sent to shoppers waiting on a product when it is restocked."),
+	},
+	"order_link": {
+		"label": _lt("Order link"),
+		"description": _lt("Sent when a guest asks for the link to their order."),
+	},
+	"sign_in_code": {
+		"label": _lt("Sign-in code"),
+		"description": _lt("Sent when a shopper signs in with their email address."),
+	},
+	"order_shipped": {
+		"label": _lt("Order shipped"),
+		"description": _lt("Sent when a parcel leaves your store, with its tracking."),
+	},
+	"order_delivered": {
+		"label": _lt("Order delivered"),
+		"description": _lt("Sent when the carrier confirms delivery."),
+	},
+	"order_refunded": {
+		"label": _lt("Refund issued"),
+		"description": _lt("Sent when you refund all or part of an order."),
+	},
+	"order_returned": {
+		"label": _lt("Return received"),
+		"description": _lt("Sent when returned items reach your store."),
+	},
+	"payment_failed": {
+		"label": _lt("Payment failed"),
+		"description": _lt("Sent when a shopper's card payment does not go through."),
+	},
 }
 CUSTOMER_EMAILS = tuple(EMAIL_SUBJECTS)
 ALWAYS_ON_EMAILS = ("order_link", "sign_in_code")
@@ -95,7 +138,18 @@ def send_customer_email(
 ):
 	if not is_customer_email_enabled(email):
 		return
+	deliver_customer_email(email, recipients, args, reference, language, now, attachments)
 
+
+def deliver_customer_email(
+	email: str,
+	recipients: list[str],
+	args: dict,
+	reference=None,
+	language: str | None = None,
+	now: bool = False,
+	attachments: list[dict] | None = None,
+):
 	with print_language(language):
 		args = {**args, "language": frappe.local.lang}
 		content = get_email_content(email, get_customer_email_setting(email), args)
@@ -125,6 +179,14 @@ def get_email_content(email: str, setting, args: dict) -> dict:
 		"template": get_template_name(email),
 		"args": args,
 	}
+
+
+def render_customer_email(email: str, args: dict) -> dict:
+	content = get_email_content(email, get_customer_email_setting(email), args)
+	if "message" in content:
+		return {"subject": content["subject"], "html": content["message"]}
+	html = get_email_from_template(content["template"], content["args"])[0]
+	return {"subject": content["subject"], "html": html}
 
 
 def send(event):
