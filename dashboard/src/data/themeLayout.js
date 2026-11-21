@@ -103,7 +103,8 @@ const PART_ORDER = ['header_group', null, 'footer_group']
 
 export function acceptsSection(schema, group) {
   const allowed = schema.groups ?? ['pages']
-  return allowed.includes(SECTION_GROUPS.includes(group) ? group : 'pages')
+  if (SECTION_GROUPS.includes(group)) return allowed.includes(group)
+  return allowed.includes('pages') && (!schema.pages?.length || schema.pages.includes(group))
 }
 
 function createPart(group, data) {
