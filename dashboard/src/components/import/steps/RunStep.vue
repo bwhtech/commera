@@ -2,7 +2,7 @@
 import { onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Alert, Badge, Button, Spinner } from 'frappe-ui'
-import { beginPhase, closeImport, endPhase, imp, isCurrentImport } from '../../../data/importFlow'
+import { beginPhase, canRouteAway, closeImport, endPhase, importExits, imp, isCurrentImport } from '../../../data/importFlow'
 import { useAdminAction, trySubmit } from '../../../data/api'
 import { stepIndex } from '../../../data/importSteps'
 import { __ } from '../../../data/translation'
@@ -62,7 +62,7 @@ function backToReview() {
 
 function finish(path) {
   closeImport()
-  router.push(path)
+  if (path) router.push(path)
 }
 
 const NEXT = [
@@ -137,8 +137,14 @@ const NEXT = [
         </div>
 
         <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
-          <Button variant="solid" theme="gray" :label="__('View my products')" @click="finish('/products')" />
-          <Button :label="__('Back to overview')" @click="finish('/')" />
+          <Button
+            v-for="(exit, index) in importExits"
+            :key="exit.label"
+            :variant="index ? 'subtle' : 'solid'"
+            theme="gray"
+            :label="exit.label"
+            @click="finish(exit.path)"
+          />
         </div>
       </div>
 
@@ -193,7 +199,7 @@ const NEXT = [
         </div>
       </div>
 
-      <div class="rounded-5 border border-outline-gray-1 p-4">
+      <div v-if="canRouteAway" class="rounded-5 border border-outline-gray-1 p-4">
         <div class="text-base-semibold text-ink-gray-8">{{ __('What usually comes next') }}</div>
         <div class="mt-3 divide-y divide-outline-gray-1">
           <div v-for="n in NEXT" :key="n.title" class="flex items-center gap-3 py-3 first:pt-0 last:pb-0">

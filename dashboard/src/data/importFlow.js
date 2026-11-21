@@ -2,12 +2,17 @@
 // commera.api.admin.imports endpoints — the spreadsheet is the only source that exists, and photos
 // are matched to a product colour by file name (imports.match_import_images).
 import { computed, reactive } from 'vue'
+import { onboardingOpen } from '../ia/onboarding'
 import { useAdminAction } from './api'
 import { canMove, isBusy, nextPhase } from './importPhase'
-import { stepIndex, stepsFor } from './importSteps'
+import { resultExits, stepIndex, stepsFor } from './importSteps'
 import { __ } from './translation'
 
 export const steps = computed(() => stepsFor(imp.source))
+
+// Onboarding replaces the router view (App.vue), so a route change from a result screen shows nothing.
+export const canRouteAway = computed(() => !onboardingOpen.value)
+export const importExits = computed(() => resultExits(canRouteAway.value))
 
 // TARGET_FIELDS/REQUIRED mirror commera.api.admin.imports.FIELD_SYNONYMS/REQUIRED_FIELDS field
 // for field — a mismatch here means a column that maps cleanly on the server shows the wrong

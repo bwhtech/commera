@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Alert, Badge, Button, Progress, Spinner } from 'frappe-ui'
-import { closeImport, imp } from '../../../data/importFlow'
+import { canRouteAway, closeImport, importExits, imp } from '../../../data/importFlow'
 import { stepIndex } from '../../../data/importSteps'
 import {
   publishAction,
@@ -27,7 +27,7 @@ function backToPick() {
 
 function finish(path) {
   closeImport()
-  router.push(path)
+  if (path) router.push(path)
 }
 </script>
 
@@ -96,7 +96,7 @@ function finish(path) {
               :loading="publishAction.loading"
               @click="publishErpnextImport"
             />
-            <Button :label="__('View my products')" @click="finish('/products')" />
+            <Button :label="importExits[0].label" @click="finish(importExits[0].path)" />
           </div>
         </template>
 
@@ -115,8 +115,14 @@ function finish(path) {
             }}
           </p>
           <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
-            <Button variant="solid" theme="gray" :label="__('View my products')" @click="finish('/products')" />
-            <Button :label="__('Back to overview')" @click="finish('/')" />
+            <Button
+              v-for="(exit, index) in importExits"
+              :key="exit.label"
+              :variant="index ? 'subtle' : 'solid'"
+              theme="gray"
+              :label="exit.label"
+              @click="finish(exit.path)"
+            />
           </div>
         </template>
       </div>
@@ -150,6 +156,7 @@ function finish(path) {
               <div class="truncate text-sm text-ink-gray-5">{{ product.item_code }}</div>
             </div>
             <Button
+              v-if="canRouteAway"
               variant="subtle"
               icon-right="lucide-chevron-right rtl:-scale-x-100"
               :label="__('Add a photo')"
