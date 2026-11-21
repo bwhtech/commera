@@ -1,4 +1,5 @@
 from commera.shipping.shipment import (
+	fire_dispatched_events,
 	get_erpnext_status,
 	sync_erpnext_status,
 	validate_carrier_cancel,
@@ -24,10 +25,13 @@ def on_update(doc, method=None):
 def on_submit(doc, method=None):
 	doc.db_set("status", get_erpnext_status(doc))
 	update_so_status_from_related_doc(doc, method)
+	fire_dispatched_events(doc)
 
 
 def on_update_after_submit(doc, method=None):
 	update_so_status_from_related_doc(doc, method)
+	if doc.has_value_changed("custom_shipment_status"):
+		fire_dispatched_events(doc)
 
 
 def before_cancel(doc, method=None):

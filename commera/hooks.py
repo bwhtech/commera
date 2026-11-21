@@ -180,6 +180,7 @@ commera_events = {
 		"order_cancelled",
 		"order_refunded",
 		"order_fulfilled",
+		"order_shipment_dispatched",
 		"order_delivered",
 		"order_returned",
 		"order_updated",

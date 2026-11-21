@@ -1121,7 +1121,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.assertEqual(frappe.local.message_log, [], "a repeat must not pop an error at the user")
 		self.assertEqual(self.plugin_events(sales_order), ["order_paid", "order_placed"])
 		job = {
-			"app": "commera",
+			"lane": "commera",
 			"reference_doctype": "Sales Order",
 			"reference_name": sales_order,
 			"lane_event": None,

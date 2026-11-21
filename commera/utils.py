@@ -28,6 +28,7 @@ from commera.plugin_events import (
 	get_handlers,
 	get_order_snapshot,
 )
+from commera.shipping.shipment import get_shipment_sales_orders
 
 # Ceiling for any IN (...) list this app sends to MariaDB/Postgres.
 IN_CLAUSE_CHUNK_SIZE = 1000
@@ -854,16 +855,7 @@ def update_so_status_from_related_doc(doc, method):
 		sales_orders.update([d.against_sales_order for d in doc.items if d.against_sales_order])
 
 	elif doc.doctype == "Shipment":
-		if doc.get("custom_sales_order"):
-			sales_orders.add(doc.custom_sales_order)
-		elif delivery_notes := [row.delivery_note for row in doc.shipment_delivery_note]:
-			sales_orders.update(
-				frappe.get_all(
-					"Delivery Note Item",
-					filters={"parent": ["in", delivery_notes], "against_sales_order": ["is", "set"]},
-					pluck="against_sales_order",
-				)
-			)
+		sales_orders.update(get_shipment_sales_orders(doc))
 	for so in sales_orders:
 		enqueue_ecommerce_status_update(so)
 

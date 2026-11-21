@@ -3,9 +3,17 @@ from frappe import _
 from frappe.utils import validate_url
 from frappe.utils.data import cstr, flt, get_datetime, today
 
+from commera.plugin_events import fire_event
+from commera.sdk import STORE_ORDER_TYPE
 from commera.shipping.exceptions import PartialBookingError
 from commera.shipping.providers import get_provider
-from commera.shipping.status import AWAITING_PICKUP_STATUSES, can_advance, is_terminal, validate_status
+from commera.shipping.status import (
+	AWAITING_PICKUP_STATUSES,
+	IN_FLIGHT,
+	can_advance,
+	is_terminal,
+	validate_status,
+)
 from commera.shipping.units import normalise_parcels
 from commera.shipping.utils import get_address_payload
 
@@ -435,3 +443,62 @@ def get_order_shipments(sales_order: str, fields: list | None = None, **filters)
 		fields=fields or ["name"],
 		order_by="creation desc",
 	)
+
+
+def fire_dispatched_events(shipment):
+	if not has_left_store(shipment):
+		return
+	sales_orders = get_shipment_sales_orders(shipment)
+	store_orders = frappe.get_all(
+		"Sales Order", filters={"name": ["in", sales_orders], "order_type": STORE_ORDER_TYPE}, pluck="name"
+	)
+	items_by_order = get_shipped_items(shipment)
+	for sales_order in store_orders:
+		data = {
+			"shipment": shipment.name,
+			"carrier": shipment.carrier,
+			"awb": shipment.awb_number,
+			"tracking_url": shipment.tracking_url,
+		}
+		if items := items_by_order.get(sales_order):
+			data["line_items"] = items
+		fire_event("order_shipment_dispatched", "Sales Order", sales_order, data=data, key=shipment.name)
+
+
+def has_left_store(shipment) -> bool:
+	if shipment.docstatus != 1:
+		return False
+	if shipment.custom_shipment_status in IN_FLIGHT:
+		return True
+	return not shipment.custom_shipping_provider and shipment.custom_shipment_status != "Cancelled"
+
+
+def get_shipment_sales_orders(shipment) -> list[str]:
+	if shipment.get("custom_sales_order"):
+		return [shipment.custom_sales_order]
+	if delivery_notes := get_delivery_notes(shipment):
+		return frappe.get_all(
+			"Delivery Note Item",
+			filters={"parent": ["in", delivery_notes], "against_sales_order": ["is", "set"]},
+			pluck="against_sales_order",
+			distinct=True,
+		)
+	return []
+
+
+def get_shipped_items(shipment) -> dict[str, list[dict]]:
+	delivery_notes = get_delivery_notes(shipment)
+	if not delivery_notes:
+		return {}
+	lines = frappe.get_all(
+		"Delivery Note Item",
+		filters={"parent": ["in", delivery_notes], "against_sales_order": ["is", "set"]},
+		fields=["against_sales_order", "item_code", "item_name", "qty"],
+		order_by="parent asc, idx asc",
+	)
+	items_by_order = {}
+	for line in lines:
+		items_by_order.setdefault(line.against_sales_order, []).append(
+			{"item_code": line.item_code, "item_name": line.item_name, "qty": flt(line.qty)}
+		)
+	return items_by_order
