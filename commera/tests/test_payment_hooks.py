@@ -118,6 +118,8 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 	def setUp(self):
 		StubStripeClient.reset()
 		self.addCleanup(frappe.set_user, frappe.session.user)
+		self.addCleanup(setattr, frappe.flags, "mute_emails", frappe.flags.mute_emails)
+		frappe.flags.mute_emails = True
 		# Cash on delivery checks the cart in the shopper's market: the store's lists.
 		self.addCleanup(
 			set_sale_price_list, frappe.db.get_single_value("Commera Settings", "sale_price_list")
@@ -961,6 +963,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.quotation.db_set("language", "ar")
 		link_languages = []
 		system_language = frappe.local.lang
+		self.run_enqueued_jobs_now()
 
 		with patch(
 			"commera.notifications.get_order_link",

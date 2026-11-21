@@ -105,6 +105,25 @@
 </td></tr></table>
 {%- endmacro %}
 
+{% macro detail_panel(details) -%}
+<table {{ table }} style="background-color:#f3f3f3;border-radius:12px;padding:16px 20px;margin-top:22px"><tr>
+{%- for detail in details %}
+<td style="width:{{ (100 / (details | length)) | round(2) }}%;vertical-align:top{{ ';padding-right:12px' if not loop.last }}">
+<p style="{{ label }}">{{ detail.label | e }}</p>
+<p style="{{ value }};{{ num }};font-weight:420;line-height:24px">{{ detail.value | e }}</p>
+</td>
+{%- endfor %}
+</tr></table>
+{%- endmacro %}
+
+{% macro section_title(text_value) -%}
+<p style="{{ title }};line-height:24px;margin-bottom:8px">{{ text_value | e }}</p>
+{%- endmacro %}
+
+{% macro text_link(url, label_value) -%}
+<p style="{{ para }};margin-top:10px"><a href="{{ url | e }}" target="_blank" style="color:#0f0f0f;font-weight:500;text-decoration:underline">{{ label_value | e }}</a></p>
+{%- endmacro %}
+
 {% macro code_box(code) -%}
 <table {{ table }} style="background-color:#f3f3f3;border-radius:12px;padding:20px 16px;margin-top:22px"><tr><td>
 <p style="{{ title }};{{ num }};font-size:36px;line-height:1.1;letter-spacing:0.16em;padding-left:0.16em;text-align:center">{{ code | e }}</p>
