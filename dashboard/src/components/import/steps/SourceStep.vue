@@ -1,13 +1,24 @@
 <script setup>
+import { computed } from 'vue'
 import { Badge } from 'frappe-ui'
 import { imp } from '../../../data/importFlow'
+import { loadErpnextPreview } from '../../../data/erpnextImport'
 import CoachTip from '../CoachTip.vue'
 import { __ } from '../../../data/translation'
+
+if (!imp.erpnext.importableCount) loadErpnextPreview()
+
+const erpnextSource = {
+  value: 'erpnext',
+  title: 'ERPNext',
+  body: __('Turn the items you already sell in ERPNext into products.'),
+  icon: 'lucide-database',
+}
 
 // Only the spreadsheet path exists today. The rest are named anyway: a merchant
 // coming from Shopify should see that we know about it, and that it is not
 // their route in yet.
-const sources = [
+const otherSources = [
   {
     value: 'csv',
     title: __('Spreadsheet'),
@@ -21,6 +32,10 @@ const sources = [
   { value: 'insta', title: __('Instagram catalogue'), body: __('Bring across the products you tag in posts.'), icon: 'lucide-camera', soon: true },
   { value: 'manual', title: __('Type them in'), body: __('Fine for a handful of products.'), icon: 'lucide-pencil-line', soon: true },
 ]
+
+const sources = computed(() =>
+  imp.erpnext.importableCount ? [otherSources[0], erpnextSource, ...otherSources.slice(1)] : otherSources,
+)
 </script>
 
 <template>
