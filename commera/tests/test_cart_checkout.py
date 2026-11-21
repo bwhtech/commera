@@ -391,6 +391,21 @@ class TestCartCheckout(IntegrationTestCase):
 			[{"description": TAX_DESCRIPTION, "amount": 48.6}],
 		)
 
+	def test_confirming_a_cod_order_again_names_the_same_order(self):
+		ensure_fiscal_year()
+		frappe.set_user(self.shopper)
+		generate_quotation_for_cart({"items": [self.cart_line(self.discounted_item, 1)]})
+		update_quotation_address(self.address_payload())
+		initiate_checkout_with_mode(COD_PAYMENT_MODE)
+		quotation_name = _get_cart_quotation().name
+		placed = confirm_payment(quotation_name, payment_mode=COD_PAYMENT_MODE)
+
+		confirmed_again = confirm_payment(quotation_name, payment_mode=COD_PAYMENT_MODE)
+
+		self.assertEqual(confirmed_again["order_name"], placed["order_name"])
+		self.assertEqual(confirmed_again["order_link"], placed["order_link"])
+		self.assertTrue(placed["order_link"])
+
 	def test_cash_on_delivery_refuses_a_total_that_rose_since_checkout(self):
 		ensure_fiscal_year()
 		discount = frappe.get_doc(
