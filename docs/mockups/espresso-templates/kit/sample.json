@@ -1,0 +1,436 @@
+{
+	"brand": {
+		"name": "Verano Studio",
+		"legal_name": "Verano Studio Pvt. Ltd.",
+		"address": "17 Lavelle Road, Bengaluru 560001",
+		"tax_id": "29AAHCV3310K1Z2",
+		"state": "29-Karnataka",
+		"logo": null,
+		"support_email": "help@verano.studio",
+		"store_url": "https://verano.studio",
+		"help_url": "https://verano.studio/help",
+		"footer_links": [
+			{
+				"label": "Track order",
+				"url": "https://verano.studio/account/orders"
+			},
+			{
+				"label": "Returns",
+				"url": "https://verano.studio/returns"
+			},
+			{
+				"label": "Help",
+				"url": "https://verano.studio/help"
+			}
+		]
+	},
+	"order": {
+		"name": "SO-26-00482",
+		"customer_first_name": "Aisha",
+		"customer_name": "Aisha Rahman",
+		"transaction_date": "28 Sep 2026",
+		"transaction_time": "4:12 pm IST",
+		"payment_method": "UPI, aisha@okhdfc",
+		"payment_status": "Paid in full",
+		"delivery_method": "Standard shipping",
+		"delivery_window": "2 to 4 Oct",
+		"coupon_code": "WELCOME10",
+		"discount_amount": 2229.4,
+		"charges": [
+			{
+				"description": "Standard shipping",
+				"amount": 0
+			},
+			{
+				"description": "Gift wrap",
+				"amount": 149
+			}
+		],
+		"tax_label": "GST (12%)",
+		"tax_rate": 12,
+		"customer_note": "Please hand it to the concierge at the front desk if I'm not home. The lift to floor 12 needs a key card.",
+		"gift_message": "Happy birthday, Zoya! The pink jacket is yours. The socks are a joke. Love, A.",
+		"shipping": {
+			"name": "Aisha Rahman",
+			"lines": [
+				"Flat 1204, Prestige Lakeside Habitat",
+				"Varthur Main Road, Whitefield",
+				"Bengaluru, Karnataka 560087"
+			]
+		},
+		"billing": {
+			"name": "Rahman Design Studio LLP",
+			"lines": ["3rd Floor, 42 Church Street", "Bengaluru, Karnataka 560001"]
+		},
+		"customer_tax_id": "29AAKFR4821M1Z6",
+		"contact_email": "aisha.rahman@example.com",
+		"contact_mobile": "+91 98450 12345",
+		"order_url": "https://verano.studio/account/orders/SO-26-00482?key=7f3c91",
+		"items": [
+			{
+				"item_name": "Faux-fur cropped jacket",
+				"variant": "Candy pink, M",
+				"item_code": "SS26-FFJ-PNK-M",
+				"gst_hsn_code": "62024000",
+				"qty": 1,
+				"rate": 4499,
+				"price_list_rate": 5999,
+				"image": "p1"
+			},
+			{
+				"item_name": "Cable-knit crew sweater",
+				"variant": "Magenta, S",
+				"item_code": "SS26-CKS-MAG-S",
+				"gst_hsn_code": "61102000",
+				"qty": 2,
+				"rate": 2299,
+				"price_list_rate": 2299,
+				"image": "p2"
+			},
+			{
+				"item_name": "Double-breasted tailored blazer",
+				"variant": "Blush, 36",
+				"item_code": "SS26-DBB-BLS-36",
+				"gst_hsn_code": "62043300",
+				"qty": 1,
+				"rate": 6999,
+				"price_list_rate": 6999,
+				"image": "p5"
+			},
+			{
+				"item_name": "Linen-blend unstructured blazer",
+				"variant": "Sage, 40",
+				"item_code": "SS26-LUB-SGE-40",
+				"gst_hsn_code": "62033900",
+				"qty": 1,
+				"rate": 5499,
+				"price_list_rate": 5499,
+				"image": "p7"
+			},
+			{
+				"item_name": "Organic cotton crew socks, 3 pack",
+				"variant": "One size",
+				"item_code": "ACC-OCS-3PK",
+				"gst_hsn_code": "61159500",
+				"qty": 1,
+				"rate": 699,
+				"price_list_rate": 699,
+				"image": null
+			}
+		]
+	},
+	"steps": [
+		{
+			"title": "Confirmed",
+			"date": "28 Sep",
+			"done": true
+		},
+		{
+			"title": "Packed",
+			"done": false
+		},
+		{
+			"title": "Shipped",
+			"done": false
+		},
+		{
+			"title": "Delivered",
+			"pending_title": "Arriving",
+			"date": "2 to 4 Oct",
+			"done": false
+		}
+	],
+	"progress": {
+		"shipped": [
+			{
+				"title": "Confirmed",
+				"date": "28 Sep",
+				"done": true
+			},
+			{
+				"title": "Packed",
+				"date": "29 Sep",
+				"done": true
+			},
+			{
+				"title": "Shipped",
+				"date": "30 Sep",
+				"done": true
+			},
+			{
+				"title": "Delivered",
+				"pending_title": "Arriving",
+				"date": "3 Oct",
+				"done": false
+			}
+		],
+		"out_for_delivery": [
+			{
+				"title": "Confirmed",
+				"date": "28 Sep",
+				"done": true
+			},
+			{
+				"title": "Packed",
+				"date": "29 Sep",
+				"done": true
+			},
+			{
+				"title": "Out for delivery",
+				"date": "3 Oct",
+				"done": true
+			},
+			{
+				"title": "Delivered",
+				"pending_title": "Arriving",
+				"date": "today",
+				"done": false
+			}
+		],
+		"delayed": [
+			{
+				"title": "Confirmed",
+				"date": "28 Sep",
+				"done": true
+			},
+			{
+				"title": "Packed",
+				"date": "29 Sep",
+				"done": true
+			},
+			{
+				"title": "Shipped",
+				"date": "30 Sep",
+				"done": true
+			},
+			{
+				"title": "Delivered",
+				"pending_title": "Now arriving",
+				"date": "6 Oct",
+				"done": false
+			}
+		],
+		"delivered": [
+			{
+				"title": "Confirmed",
+				"date": "28 Sep",
+				"done": true
+			},
+			{
+				"title": "Packed",
+				"date": "29 Sep",
+				"done": true
+			},
+			{
+				"title": "Shipped",
+				"date": "30 Sep",
+				"done": true
+			},
+			{
+				"title": "Delivered",
+				"date": "2 Oct",
+				"done": true
+			}
+		],
+		"pickup": [
+			{
+				"title": "Confirmed",
+				"date": "28 Sep",
+				"done": true
+			},
+			{
+				"title": "Packed",
+				"date": "29 Sep",
+				"done": true
+			},
+			{
+				"title": "Ready",
+				"date": "30 Sep",
+				"done": true
+			}
+		]
+	},
+	"shipment": {
+		"carrier": "Delhivery",
+		"tracking_number": "1490223188765",
+		"tracking_url": "https://www.delhivery.com/track/package/1490223188765",
+		"shipped_on": "30 Sep 2026",
+		"delivered_on": "2 Oct 2026",
+		"return_by": "16 Oct"
+	},
+	"pickup": {
+		"store_name": "Verano Studio, Indiranagar",
+		"address": {
+			"name": "Verano Studio, Indiranagar",
+			"lines": [
+				"812, 100 Feet Road, HAL 2nd Stage",
+				"Indiranagar, Bengaluru 560038"
+			]
+		},
+		"hours": ["Monday to Saturday, 11 am to 8 pm", "Sunday, 12 pm to 6 pm"],
+		"collect_by": "7 Oct",
+		"directions_url": "https://maps.google.com/?q=Verano+Studio+Indiranagar"
+	},
+	"payment_failure": {
+		"attempted_method": "UPI, aisha@okhdfc",
+		"hold_hours": 24,
+		"held_until": "29 Sep, 4:12 pm IST",
+		"payment_url": "https://verano.studio/checkout/pay/SO-26-00482?key=7f3c91"
+	},
+	"cancellation": {
+		"cancelled_on": "28 Sep 2026, 5:40 pm IST",
+		"reason": "you asked us to",
+		"refund_days": "5 to 7 working days"
+	},
+	"return": {
+		"name": "SR-26-00031",
+		"requested_on": "6 Oct 2026",
+		"refund_amount": 4049.1,
+		"refund_method": "UPI, aisha@okhdfc",
+		"refund_days": "5 to 7 working days",
+		"refunded_on": "10 Oct 2026",
+		"return_url": "https://verano.studio/account/returns/SR-26-00031?key=2b81de",
+		"next_steps": [
+			"Pack the jacket in its original bag, with the tags still on.",
+			"Write {return_number} on the outside of the parcel.",
+			"Our courier collects it from your address on 8 Oct, 10 am to 6 pm."
+		],
+		"items": [
+			{
+				"item_code": "SS26-FFJ-PNK-M",
+				"qty": 1,
+				"reason": "Too small"
+			}
+		]
+	},
+	"invoice": {
+		"name": "SINV-26-00482",
+		"posting_date": "30 Sep 2026",
+		"place_of_supply": "29-Karnataka",
+		"taxes": [
+			{
+				"description": "CGST",
+				"rate": 6
+			},
+			{
+				"description": "SGST",
+				"rate": 6
+			}
+		]
+	},
+	"back_in_stock": {
+		"item_code": "SS26-FFJ-PNK-M",
+		"product_url": "https://verano.studio/products/faux-fur-cropped-jacket?variant=SS26-FFJ-PNK-M"
+	},
+	"sign_in": {
+		"code": "482913",
+		"expires_in_minutes": 10
+	},
+	"copy": {
+		"order_confirmation": {
+			"subject": "Your order {order_number} is in",
+			"heading": "Thanks, {first_name}. Your order is in.",
+			"intro": "We've received your order and our team is getting it ready. We'll email you again with tracking details as soon as it ships.",
+			"closing": "Need to change something? Reply to this email within 2 hours and we'll sort it out.",
+			"button": "View your order"
+		},
+		"order_confirmation_pdf": {
+			"subject": "",
+			"heading": "Thanks, {first_name}. Your order is in.",
+			"intro": "We've received your order and our team is getting it ready. We'll email you again with tracking details as soon as it ships.",
+			"closing": "Need to change something? Write to us within 2 hours and we'll sort it out.",
+			"button": ""
+		},
+		"order_cancelled": {
+			"subject": "Your order {order_number} is cancelled",
+			"heading": "Your order {order_number} is cancelled.",
+			"intro": "We cancelled it because {reason}. Nothing will be shipped, and you don't need to do anything.",
+			"closing": "Questions about your refund? Reply to this email and we'll help.",
+			"button": "View your order"
+		},
+		"back_in_stock": {
+			"subject": "It's back: {item_name}",
+			"heading": "Good news, {first_name}. It's back.",
+			"intro": "The piece you asked about is back in your size. We can't hold it for you, so order soon if you still want it.",
+			"closing": "",
+			"button": "Shop now"
+		},
+		"order_link": {
+			"subject": "The link to your order {order_number}",
+			"heading": "Hi {first_name}, here's the link to your order.",
+			"intro": "Use the button below to see where your order is and what's in it.",
+			"closing": "Didn't ask for this link? You can ignore this email.",
+			"button": "View your order"
+		},
+		"sign_in_code": {
+			"subject": "Your {store_name} sign-in code",
+			"heading": "Your sign-in code",
+			"intro": "Enter this code to sign in to {store_name}.",
+			"closing": "Didn't ask for a code? You can ignore this email. Your account is safe.",
+			"button": ""
+		},
+		"shipped": {
+			"subject": "Your order {order_number} has shipped",
+			"heading": "{first_name}, your order is on its way.",
+			"intro": "It left our studio today. Use the tracking number below to follow it to your door.",
+			"closing": "Not home on the day? The courier will try again the next working day.",
+			"button": "Track your parcel"
+		},
+		"out_for_delivery": {
+			"subject": "Your order {order_number} arrives today",
+			"heading": "{first_name}, your order arrives today.",
+			"intro": "It's with the courier and on the way to your door. Keep your phone close in case they call.",
+			"closing": "Not home today? The courier will try again the next working day.",
+			"button": "Track your parcel"
+		},
+		"shipment_delayed": {
+			"subject": "Your order {order_number} is running late",
+			"heading": "{first_name}, your order is running late.",
+			"intro": "It's still on its way, but the courier needs a little more time. Here's the new date.",
+			"closing": "Sorry for the wait. Questions? Reply to this email and we'll help.",
+			"button": "Track your parcel"
+		},
+		"delivered": {
+			"subject": "Your order {order_number} was delivered",
+			"heading": "Delivered. Enjoy it, {first_name}.",
+			"intro": "Your order reached your shipping address. We hope everything fits just right.",
+			"closing": "Didn't get your parcel? Reply to this email and we'll look into it.",
+			"button": "View your order"
+		},
+		"ready_for_pickup": {
+			"subject": "Your order {order_number} is ready to collect",
+			"heading": "{first_name}, your order is ready to collect.",
+			"intro": "It's packed and waiting for you at the store.",
+			"closing": "Can't make it in time? Reply to this email and we'll hold it a little longer.",
+			"button": "Get directions"
+		},
+		"refund_issued": {
+			"subject": "Your refund for order {order_number} is on its way",
+			"heading": "{first_name}, your refund is on its way.",
+			"intro": "We checked your return and sent the money back. Banks can take a few days to show it.",
+			"closing": "Don't see it after that? Reply to this email and we'll check with the bank.",
+			"button": "View your order"
+		},
+		"return_received": {
+			"subject": "We got your return request {return_number}",
+			"heading": "Thanks, {first_name}. We got your return request.",
+			"intro": "Here's how to send the item back. We'll refund you once it reaches us.",
+			"closing": "Changed your mind? Reply to this email before the pickup and we'll cancel the return.",
+			"button": "View your return"
+		},
+		"payment_failed": {
+			"subject": "Your payment for order {order_number} didn't go through",
+			"heading": "{first_name}, your payment didn't go through.",
+			"intro": "Your order isn't lost. We're holding it for {hold_hours} hours so you can try again, with the same method or a different one.",
+			"closing": "If money left your account, your bank will return it within 5 to 7 working days.",
+			"button": "Try payment again"
+		},
+		"owner_new_order": {
+			"subject": "New order {order_number}, {total}",
+			"heading": "New order {order_number}",
+			"intro": "{customer_name} placed an order for {total}.",
+			"closing": "",
+			"button": "Open in dashboard"
+		}
+	}
+}

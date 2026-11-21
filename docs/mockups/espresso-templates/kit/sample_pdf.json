@@ -1,0 +1,91 @@
+{
+	"copy": {
+		"tax_invoice": {
+			"closing": "This invoice was issued electronically and is valid without a signature."
+		},
+		"credit_note": {
+			"closing": "The credit is refunded to your original payment method. Questions? Write to us and we'll help."
+		},
+		"packing_slip": {
+			"closing": "Something missing or wrong in this parcel? Write to us and quote the order number."
+		}
+	},
+	"tax_invoice": {
+		"title": "Tax invoice",
+		"copy_label": "Original for recipient",
+		"in_words": "Twenty thousand two hundred thirteen rupees and sixty paise only"
+	},
+	"tax_invoice_igst": {
+		"place_of_supply": "27-Maharashtra",
+		"taxes": [{ "description": "IGST", "rate": 12 }],
+		"billing": {
+			"name": "Rahman Design Studio LLP",
+			"lines": [
+				"5th Floor, 12 Hill Road, Bandra West",
+				"Mumbai, Maharashtra 400050"
+			]
+		},
+		"shipping": null,
+		"customer_tax_id": "27AAKFR4821M1Z4"
+	},
+	"invoice_generic": {
+		"name": "INV-2026-01187",
+		"title": "Invoice",
+		"posting_date": "30 Sep 2026",
+		"order_name": "SO-26-00517",
+		"transaction_date": "28 Sep 2026",
+		"payment_method": "Visa ending 4242",
+		"payment_status": "Paid in full",
+		"currency_symbol": "£",
+		"billing": {
+			"name": "Olivia Grant",
+			"lines": ["Flat 3, 27 Elgin Crescent", "London W11 2JD"]
+		},
+		"shipping": null,
+		"discount_amount": 0,
+		"charges": [{ "description": "Standard shipping", "amount": 6.5 }],
+		"taxes": [{ "description": "VAT", "rate": 20 }],
+		"items": [
+			{
+				"item_name": "Faux-fur cropped jacket",
+				"variant": "Candy pink, M",
+				"item_code": "SS26-FFJ-PNK-M",
+				"qty": 1,
+				"rate": 180
+			},
+			{
+				"item_name": "Cable-knit crew sweater",
+				"variant": "Magenta, S",
+				"item_code": "SS26-CKS-MAG-S",
+				"qty": 2,
+				"rate": 85
+			},
+			{
+				"item_name": "Organic cotton crew socks, 3 pack",
+				"variant": "One size",
+				"item_code": "ACC-OCS-3PK",
+				"qty": 1,
+				"rate": 24
+			}
+		]
+	},
+	"brand_generic": {
+		"legal_name": "Verano Studio Ltd",
+		"address": "14 Redchurch Street, London E2 7DJ",
+		"tax_id": "GB 284 5571 93",
+		"tax_id_label": "VAT no."
+	},
+	"credit_note": {
+		"name": "CN-26-00031",
+		"title": "Credit note",
+		"posting_date": "9 Oct 2026",
+		"reason": "Too small for the customer",
+		"in_words": "Four thousand forty-nine rupees and ten paise only"
+	},
+	"packing_slip": {
+		"name": "DN-26-00390",
+		"packed_on": "29 Sep 2026",
+		"parcel": "Parcel 1 of 1",
+		"is_gift": true
+	}
+}

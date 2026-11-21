@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invoice INV-2026-01187</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&amp;display=swap" rel="stylesheet">
+<style>
+	:root {
+		--ink-gray-9: oklch(0.168 0 0);
+		--ink-gray-7: oklch(0.341 0 0);
+		--ink-gray-5: oklch(0.586 0 0);
+		--ink-gray-3: oklch(0.83 0 0);
+		--ink-green-6: oklch(0.57 0.119 158.092);
+		--ink-white: oklch(1 0 0);
+		--surface-base: oklch(1 0 0);
+		--surface-gray-1: oklch(0.979 0 0);
+		--surface-gray-2: oklch(0.964 0 0);
+		--outline-gray-1: oklch(0.946 0 0);
+		--outline-gray-2: oklch(0.913 0 0);
+		--radius-tag: 4px;
+		--radius-thumb: 8px;
+		--radius-card: 12px;
+		--accent: var(--ink-gray-9);
+		--accent-soft: var(--ink-white);
+	}
+
+	@page { size: A4; margin: 12mm 14mm; }
+	* { box-sizing: border-box; margin: 0; padding: 0; }
+	html, body { background: var(--surface-base); }
+	body {
+		font-family: Inter, 'Inter Variable', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+		font-weight: 420;
+		font-size: 13px;
+		letter-spacing: 0.005em;
+		line-height: 1.15;
+		color: var(--ink-gray-9);
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+		font-feature-settings: "cv11", "ss01";
+	}
+	.num { font-variant-numeric: tabular-nums; }
+	.label { font-size: 12px; color: var(--ink-gray-5); margin-bottom: 6px; }
+	address { font-style: normal; font-size: 12px; line-height: 1.5; color: var(--ink-gray-7); }
+	address b { color: var(--ink-gray-9); font-weight: 500; }
+
+	.masthead { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; }
+	.wordmark { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+	.wordmark .mark {
+		width: 28px; height: 28px; border-radius: var(--radius-thumb);
+		background: var(--accent); color: var(--accent-soft);
+		display: grid; place-items: center; font-size: 15px; font-weight: 700;
+	}
+	.doc-kind { text-align: right; font-size: 12px; color: var(--ink-gray-5); line-height: 1.5; }
+	.doc-kind strong { display: block; color: var(--ink-gray-9); font-size: 13px; font-weight: 500; }
+
+	.hero { background: var(--surface-gray-2); color: var(--ink-gray-7); border-radius: var(--radius-card); padding: 24px 28px 20px; }
+	.hero-top { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; }
+	.hero h1 { font-size: 27px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.12; color: var(--ink-gray-9); }
+	.hero p { margin-top: 8px; font-size: 13px; line-height: 1.55; max-width: 60ch; }
+	.hero .doc-number { text-align: right; }
+	.hero .doc-number span { display: block; font-size: 12px; color: var(--ink-gray-5); margin-bottom: 6px; }
+	.hero .doc-number b { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink-gray-9); }
+
+	.steps { margin-top: 18px; padding-top: 20px; border-top: 1px solid var(--outline-gray-2); }
+	.steps-status { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; line-height: 1.3; }
+	.steps-status b { font-size: 15px; font-weight: 600; color: var(--ink-gray-9); }
+	.steps-status span { font-size: 13px; color: var(--ink-gray-5); white-space: nowrap; }
+	.steps-bar { display: grid; gap: 4px; margin-top: 10px; }
+	.steps-bar i { height: 4px; border-radius: 4px; background: var(--outline-gray-2); }
+	.steps-bar i.done { background: var(--ink-green-6); }
+	.steps-detail { margin-top: 8px; font-size: 12px; line-height: 1.4; color: var(--ink-gray-5); }
+
+	.facts { display: grid; grid-template-columns: 1.2fr 1fr 1fr; margin-top: 20px; border-bottom: 1px solid var(--outline-gray-2); padding-bottom: 16px; }
+	.fact { padding-right: 14px; }
+	.fact + .fact { padding-left: 14px; border-left: 1px solid var(--outline-gray-1); }
+	.fact .label + address + .label { margin-top: 12px; }
+	.facts-wide-middle { grid-template-columns: 1fr 1.25fr 0.85fr; }
+
+	.items { width: 100%; border-collapse: collapse; margin-top: 18px; }
+	.items thead { display: table-header-group; }
+	.items tr { break-inside: avoid; }
+	.items th, .tax-table th {
+		font-size: 12px; font-weight: 420; color: var(--ink-gray-5); text-align: left;
+		padding: 0 0 10px; border-bottom: 1px solid var(--outline-gray-2);
+	}
+	.items td { padding: 8px 0; border-bottom: 1px solid var(--outline-gray-1); vertical-align: middle; }
+	.items .r, .tax-table .r { text-align: right; }
+	.items tr:last-child td { border-bottom: 1px solid var(--outline-gray-2); }
+	.product { display: flex; align-items: center; gap: 14px; }
+	.thumb { width: 36px; height: 44px; border-radius: var(--radius-thumb); object-fit: cover; background: var(--surface-gray-2); flex: none; }
+	.thumb.empty { display: grid; place-items: center; color: var(--ink-gray-5); font-size: 16px; }
+	.product .name { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+	.product .meta { font-size: 12px; color: var(--ink-gray-5); line-height: 1.4; }
+	.product .meta .sku { margin-left: 12px; padding-left: 12px; border-left: 1px solid var(--outline-gray-2); }
+	.product .meta .sku:first-child { margin-left: 0; padding-left: 0; border-left: 0; }
+	.strike { text-decoration: line-through; color: var(--ink-gray-5); font-size: 12px; display: block; margin-bottom: 3px; }
+
+	.summary { display: grid; grid-template-columns: 1fr 250px; gap: 40px; margin-top: 16px; break-inside: avoid; }
+	.note { background: var(--surface-gray-1); border-radius: var(--radius-thumb); padding: 12px 14px; align-self: start; }
+	.note p { font-size: 12px; line-height: 1.5; color: var(--ink-gray-7); }
+	.note p + .label { margin-top: 12px; }
+	.totals { width: 100%; border-collapse: collapse; }
+	.totals td { padding: 4px 0; font-size: 13px; }
+	.totals td:last-child { text-align: right; }
+	.totals .discount td:last-child { color: var(--ink-green-6); }
+	.totals .grand td { padding-top: 14px; border-top: 1px solid var(--outline-gray-2); font-size: 16px; font-weight: 600; }
+	.totals .grand td:last-child { color: var(--accent); }
+	.totals .tax-note td { font-size: 12px; color: var(--ink-gray-5); padding-top: 4px; }
+
+	.footer {
+		margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--outline-gray-1); break-inside: avoid;
+		display: grid; grid-template-columns: 1fr auto; gap: 24px; font-size: 12px; color: var(--ink-gray-5); line-height: 1.55;
+	}
+	.footer a { color: var(--ink-gray-7); text-decoration: none; }
+	.footer .links { text-align: right; white-space: nowrap; }
+	.footer .links a + a { margin-left: 14px; }
+	.nowrap { white-space: nowrap; }
+
+	.tax-table { width: 100%; border-collapse: collapse; }
+	.tax-table th { padding-bottom: 8px; }
+	.tax-table td { padding: 7px 0; border-bottom: 1px solid var(--outline-gray-1); }
+	.tax-table .sum td { border-bottom: 0; font-weight: 500; }
+	.invoice-totals { align-self: start; }
+	.tax-hint { margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--ink-gray-5); }
+	.tax-hint + .tax-hint { margin-top: 4px; }
+	
+</style>
+</head>
+<body>
+
+<header class="masthead">
+	<div class="wordmark">
+		<span class="mark">V</span>
+		Verano Studio
+	</div>
+	<div class="doc-kind">
+		<strong>Invoice</strong>
+		<span class="num">30 Sep 2026</span>
+	</div>
+</header>
+
+<section class="hero">
+	<div class="hero-top">
+		<div>
+			
+			<h1>Verano Studio Ltd</h1>
+			<p>14 Redchurch Street, London E2 7DJ<br>VAT no. GB 284 5571 93</p>
+		</div>
+		<div class="doc-number">
+			<span>Invoice number</span>
+			<b>INV-2026-01187</b>
+		</div>
+	</div>
+	
+</section>
+
+<section class="facts facts-wide-middle">
+	<div class="fact">
+		
+
+<div class="label">Billed to</div>
+<address><b>Olivia Grant</b><br>Flat 3, 27 Elgin Crescent<br>London W11 2JD
+</address>
+
+	</div>
+	<div class="fact">
+		
+
+<div class="label">Shipped to</div>
+<address>Same as billing address
+</address>
+
+	</div>
+	<div class="fact">
+		
+
+<div class="label">Order</div>
+<address><b>SO-26-00517</b><br>Placed 28 Sep 2026
+</address>
+
+		
+
+<div class="label">Payment</div>
+<address><b>Visa ending 4242</b><br>Paid in full
+</address>
+
+	</div>
+</section>
+
+
+<table class="items">
+	<thead>
+		<tr>
+			<th>Description</th>
+			
+			<th class="r" style="width: 70px">Qty</th>
+			<th class="r" style="width: 100px">Rate</th>
+			<th class="r" style="width: 100px">Amount</th>
+		</tr>
+	</thead>
+	<tbody>
+	
+		<tr>
+			<td><div class="product">
+	
+	<div>
+		<div class="name">Faux-fur cropped jacket</div>
+		<div class="meta"><span class="sku">Candy pink, M</span><span class="sku">SKU SS26-FFJ-PNK-M</span></div>
+	</div>
+</div></td>
+			
+			<td class="r num">1</td>
+			<td class="r num">£180.00</td>
+			<td class="r num">£180.00</td>
+		</tr>
+	
+		<tr>
+			<td><div class="product">
+	
+	<div>
+		<div class="name">Cable-knit crew sweater</div>
+		<div class="meta"><span class="sku">Magenta, S</span><span class="sku">SKU SS26-CKS-MAG-S</span></div>
+	</div>
+</div></td>
+			
+			<td class="r num">2</td>
+			<td class="r num">£85.00</td>
+			<td class="r num">£170.00</td>
+		</tr>
+	
+		<tr>
+			<td><div class="product">
+	
+	<div>
+		<div class="name">Organic cotton crew socks, 3 pack</div>
+		<div class="meta"><span class="sku">One size</span><span class="sku">SKU ACC-OCS-3PK</span></div>
+	</div>
+</div></td>
+			
+			<td class="r num">1</td>
+			<td class="r num">£24.00</td>
+			<td class="r num">£24.00</td>
+		</tr>
+	
+	</tbody>
+</table>
+
+<section class="summary">
+	<div>
+	<div class="label">Tax breakdown</div>
+	<table class="tax-table">
+		<thead><tr><th>Tax</th><th class="r">Taxable value</th><th class="r">Amount</th></tr></thead>
+		<tbody>
+		
+			<tr><td>VAT <span class="num">20%</span></td><td class="r num">£380.50</td><td class="r num">£76.10</td></tr>
+		
+		
+		</tbody>
+	</table>
+	
+	
+</div>
+	<table class="totals invoice-totals">
+	<tr><td>Subtotal</td><td class="num">£374.00</td></tr>
+	
+	
+	<tr><td>Standard shipping</td><td class="num">£6.50</td></tr>
+	
+	
+	<tr><td>Taxable value</td><td class="num">£380.50</td></tr>
+	
+	<tr><td>VAT</td><td class="num">£76.10</td></tr>
+	<tr class="grand"><td>Total</td><td class="num">£456.60</td></tr>
+</table>
+</section>
+
+<footer class="footer">
+	<div>
+		This invoice was issued electronically and is valid without a signature.<br>
+		Verano Studio Ltd, 14 Redchurch Street, London E2 7DJ. <span class="nowrap">VAT no. GB 284 5571 93</span>
+	</div>
+	<div class="links">
+		<a href="https://verano.studio/account/orders">Track order</a><a href="https://verano.studio/returns">Returns</a><a href="https://verano.studio/help">Help</a>
+		<br>help@verano.studio
+	</div>
+</footer>
+
+</body>
+</html>
