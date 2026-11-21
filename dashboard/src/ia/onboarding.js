@@ -68,6 +68,11 @@ export const draft = reactive({
   fiscalYearStartMonth: null,
   // '' leaves the short code to the server, which also steps around one another company holds.
   companyAbbr: '',
+  existingStore: false,
+  company: '',
+  priceList: '',
+  salePriceList: '',
+  warehouse: '',
   brandLogo: '',
   primaryColor: '',
   theme: '',
@@ -76,6 +81,7 @@ export const draft = reactive({
 })
 
 export function adoptRecord(record) {
+  const store = record.existing_store
   Object.assign(draft, {
     fullName: record.full_name || '',
     storeName: record.store_name || '',
@@ -85,6 +91,11 @@ export function adoptRecord(record) {
     timeZone: record.time_zone || '',
     chartOfAccounts: record.chart_of_accounts || 'Standard',
     fiscalYearStartMonth: record.fiscal_year_start_month || null,
+    existingStore: Boolean(store),
+    company: store?.company || '',
+    priceList: store?.price_list || '',
+    salePriceList: store?.sale_price_list || store?.price_list || '',
+    warehouse: store?.warehouse || '',
     brandLogo: record.brand_logo || '',
     primaryColor: record.primary_color || '',
     codEnabled: Boolean(record.cod_enabled),

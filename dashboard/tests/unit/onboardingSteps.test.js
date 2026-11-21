@@ -30,6 +30,15 @@ test('missingField names the first empty required field of a step', () => {
   assert.equal(missingField('brand', { ...filled, storeName: '' }), '')
 })
 
+test('a store ERPNext already set up must pick its company, price lists and warehouse', () => {
+  const picked = { ...filled, existingStore: true, company: 'Acme', priceList: 'Selling', salePriceList: 'Selling', warehouse: 'Stores' }
+  assert.equal(missingField('store', picked), '')
+  for (const field of ['company', 'priceList', 'salePriceList', 'warehouse']) {
+    assert.equal(missingField('store', { ...picked, [field]: '' }), field)
+  }
+  assert.equal(missingField('store', { ...picked, existingStore: false, company: '' }), '')
+})
+
 test('a reload resumes at the saved step, unless the store setup never started', () => {
   assert.equal(resumeStep(STEP_INDEX.theme, 'running'), STEP_INDEX.theme)
   assert.equal(resumeStep(STEP_INDEX.theme, 'idle'), STEP_INDEX.store)

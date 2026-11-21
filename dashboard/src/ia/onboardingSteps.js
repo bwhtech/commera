@@ -33,6 +33,9 @@ export function missingField(stepKey, draft, { needsPassword = false } = {}) {
   if (stepKey === 'you' && needsPassword && !draft.password) return 'password'
   if (stepKey === 'store' && !draft.storeName.trim()) return 'storeName'
   if (stepKey === 'store' && !draft.storeCategory) return 'storeCategory'
+  if (stepKey === 'store' && draft.existingStore) {
+    return ['company', 'priceList', 'salePriceList', 'warehouse'].find((field) => !draft[field]) ?? ''
+  }
   return ''
 }
 

@@ -5,7 +5,7 @@ from frappe.tests import IntegrationTestCase
 
 from commera import onboarding
 from commera.api.admin import onboarding as onboarding_api
-from commera.install import TEST_ABBR, TEST_COMPANY
+from commera.install import SALE_PRICE_LIST, TEST_ABBR, TEST_COMPANY
 from commera.migrate import set_default_app
 from commera.roles import COMMERA_ADMIN
 from commera.www.commera import get_boot
@@ -18,6 +18,38 @@ STORE = {
 	"currency": "INR",
 	"time_zone": "Asia/Kolkata",
 }
+OTHER_COMPANY = "Zz Onboarding Other Company"
+FOREIGN_PRICE_LIST = "Zz Onboarding USD Selling"
+
+
+OTHER_WAREHOUSE = "Zz Onboarding Stores - ZZOOC"
+FIXTURE_SAVEPOINT = "existing_store_fixtures"
+
+
+def make_other_company():
+	frappe.get_doc(
+		{
+			"doctype": "Company",
+			"name": OTHER_COMPANY,
+			"company_name": OTHER_COMPANY,
+			"abbr": "ZZOOC",
+			"default_currency": "USD",
+			"country": "United States",
+			"chart_of_accounts": "Standard",
+		}
+	).db_insert()
+	frappe.get_doc(
+		{
+			"doctype": "Warehouse",
+			"name": OTHER_WAREHOUSE,
+			"warehouse_name": "Zz Onboarding Stores",
+			"company": OTHER_COMPANY,
+			"is_group": 0,
+		}
+	).db_insert()
+	frappe.get_doc(
+		{"doctype": "Price List", "price_list_name": FOREIGN_PRICE_LIST, "selling": 1, "currency": "USD"}
+	).insert(ignore_permissions=True)
 
 
 class OnboardingSetupArgsTestCase(IntegrationTestCase):
@@ -134,7 +166,9 @@ class StartStoreSetupTestCase(IntegrationTestCase):
 			frappe.cache.delete_value(onboarding.SETUP_QUEUEING_CACHE_KEY)
 			self.assertEqual(onboarding.get_setup_status()["status"], "failed")
 
-	def test_rejects_invalid_store_details(self):
+	@patch("frappe.enqueue")
+	@patch("frappe.is_setup_complete", return_value=False)
+	def test_rejects_invalid_store_details(self, _setup_complete, _enqueue):
 		for override in (
 			{"store_name": "  "},
 			{"country": "Atlantis"},
@@ -299,18 +333,6 @@ class InstallOnSiteInUseTestCase(IntegrationTestCase):
 
 		self.assertFalse(frappe.db.get_value("User", "Administrator", "default_app"))
 
-	def test_store_step_adopts_the_default_company(self):
-		frappe.db.set_single_value(SETTINGS, "company", "")
-		with patch("frappe.enqueue") as enqueue:
-			result = onboarding_api.start_store_setup(**STORE)
-
-		self.assertEqual(result["status"], "done")
-		enqueue.assert_not_called()
-		default_company = frappe.db.get_single_value("Global Defaults", "default_company")
-		self.assertTrue(default_company)
-		self.assertEqual(frappe.db.get_single_value(SETTINGS, "company"), default_company)
-		self.assertTrue(frappe.db.get_single_value(SETTINGS, "ecommerce_warehouse"))
-
 	def test_store_step_fills_the_rest_for_a_company_already_chosen(self):
 		warehouse = frappe.db.get_single_value(SETTINGS, "ecommerce_warehouse")
 		self.addCleanup(frappe.db.set_single_value, SETTINGS, "ecommerce_warehouse", warehouse)
@@ -322,3 +344,128 @@ class InstallOnSiteInUseTestCase(IntegrationTestCase):
 			frappe.db.get_single_value(SETTINGS, "ecommerce_warehouse"),
 			onboarding.get_company_warehouse(TEST_COMPANY),
 		)
+
+
+class ExistingStorePicksTestCase(IntegrationTestCase):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.db.savepoint(FIXTURE_SAVEPOINT)
+		make_other_company()
+
+	@classmethod
+	def tearDownClass(cls):
+		frappe.db.rollback(save_point=FIXTURE_SAVEPOINT)
+		super().tearDownClass()
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		fields = (
+			"company",
+			"default_price_list",
+			"sale_price_list",
+			"ecommerce_warehouse",
+			"store_setup_status",
+		)
+		before = frappe.db.get_singles_dict(SETTINGS)
+		self.addCleanup(frappe.db.set_single_value, SETTINGS, {field: before.get(field) for field in fields})
+		frappe.db.set_single_value(SETTINGS, {field: "" for field in fields})
+
+	def picks(self, **overrides):
+		return {
+			**STORE,
+			"company": TEST_COMPANY,
+			"price_list": "Standard Selling",
+			"sale_price_list": SALE_PRICE_LIST,
+			"warehouse": onboarding.get_company_warehouse(TEST_COMPANY),
+			**overrides,
+		}
+
+	def test_two_companies_and_no_pick_is_refused(self):
+		with patch("frappe.enqueue") as enqueue, self.assertRaises(frappe.MandatoryError):
+			onboarding_api.start_store_setup(**STORE)
+
+		enqueue.assert_not_called()
+		self.assertFalse(frappe.db.get_single_value(SETTINGS, "company"))
+
+	def test_picks_persist(self):
+		picks = self.picks()
+		with patch("frappe.enqueue") as enqueue:
+			self.assertEqual(onboarding_api.start_store_setup(**picks)["status"], "done")
+
+		self.assertNotIn(onboarding.run_store_setup, [call.args[0] for call in enqueue.call_args_list])
+		settings = frappe.get_single(SETTINGS)
+		self.assertEqual(
+			(
+				settings.company,
+				settings.default_price_list,
+				settings.sale_price_list,
+				settings.ecommerce_warehouse,
+			),
+			(TEST_COMPANY, picks["price_list"], picks["sale_price_list"], picks["warehouse"]),
+		)
+
+	def test_no_sale_list_sells_at_the_selling_list(self):
+		onboarding_api.start_store_setup(**self.picks(sale_price_list=None))
+
+		self.assertEqual(frappe.db.get_single_value(SETTINGS, "sale_price_list"), "Standard Selling")
+
+	def test_price_list_in_another_currency_is_refused(self):
+		for field in ("price_list", "sale_price_list"):
+			with self.subTest(field=field), self.assertRaises(frappe.ValidationError):
+				onboarding_api.start_store_setup(**self.picks(**{field: FOREIGN_PRICE_LIST}))
+
+	def test_another_companys_warehouse_is_refused(self):
+		with self.assertRaises(frappe.ValidationError):
+			onboarding_api.start_store_setup(**self.picks(warehouse=OTHER_WAREHOUSE))
+
+		self.assertNotEqual(frappe.db.get_single_value(SETTINGS, "ecommerce_warehouse"), OTHER_WAREHOUSE)
+
+	def test_duplicate_creates_an_empty_sale_list(self):
+		name = onboarding_api.create_sale_price_list("Zz Onboarding Store", TEST_COMPANY)
+		self.addCleanup(frappe.delete_doc, "Price List", name, force=True)
+
+		self.assertEqual(name, "Zz Onboarding Store Sale")
+		self.assertEqual(
+			frappe.db.get_value("Price List", name, ["selling", "enabled", "currency"], as_dict=True),
+			{
+				"selling": 1,
+				"enabled": 1,
+				"currency": frappe.db.get_value("Company", TEST_COMPANY, "default_currency"),
+			},
+		)
+		self.assertFalse(frappe.db.exists("Item Price", {"price_list": name}))
+		with self.assertRaises(frappe.DuplicateEntryError):
+			onboarding_api.create_sale_price_list("Zz Onboarding Store", TEST_COMPANY)
+
+	def test_get_onboarding_shows_the_real_company(self):
+		frappe.db.set_single_value(SETTINGS, "company", TEST_COMPANY)
+		data = onboarding_api.get_onboarding()
+
+		self.assertEqual(data["company_abbr"], TEST_ABBR)
+		self.assertEqual(
+			data["chart_of_accounts"], frappe.db.get_value("Company", TEST_COMPANY, "chart_of_accounts")
+		)
+		store = data["existing_store"]
+		self.assertEqual(store["company"], TEST_COMPANY)
+		self.assertIn(TEST_COMPANY, [company.name for company in store["companies"]])
+		self.assertIn("Standard Selling", [price_list.name for price_list in store["price_lists"]])
+		warehouse_types = frappe.get_all(
+			"Warehouse",
+			filters={"name": ["in", [row.name for row in store["warehouses"]]]},
+			pluck="warehouse_type",
+		)
+		self.assertNotIn("Transit", warehouse_types)
+		self.assertIsInstance(store["importable_count"], int)
+
+	def test_a_store_commera_set_up_has_no_existing_store(self):
+		frappe.db.set_single_value(SETTINGS, "store_setup_status", "done")
+
+		self.assertIsNone(onboarding_api.get_onboarding()["existing_store"])
+
+	def test_a_fresh_site_has_no_existing_store(self):
+		with patch("frappe.is_setup_complete", return_value=False):
+			data = onboarding_api.get_onboarding()
+
+		self.assertIsNone(data["existing_store"])
+		self.assertEqual(data["chart_of_accounts"], onboarding.DEFAULT_CHART_OF_ACCOUNTS)

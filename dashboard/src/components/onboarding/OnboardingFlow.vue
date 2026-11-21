@@ -122,6 +122,19 @@ onMounted(async () => {
 onBeforeUnmount(stopSetupPolling)
 
 function storeSetupValues() {
+  if (draft.existingStore) {
+    return {
+      store_name: draft.storeName.trim(),
+      store_category: draft.storeCategory,
+      country: draft.country,
+      currency: draft.currency,
+      time_zone: draft.timeZone,
+      company: draft.company,
+      price_list: draft.priceList,
+      sale_price_list: draft.salePriceList,
+      warehouse: draft.warehouse,
+    }
+  }
   return {
     store_name: draft.storeName.trim(),
     store_category: draft.storeCategory,
