@@ -15,11 +15,10 @@ export function createTranslator(translations) {
 
 export const __ = createTranslator(messages)
 
-// Frappe's own endpoint, the one Desk uses: the version in the URL lets the browser cache it for a year.
 export async function loadTranslations(fetchMessages = fetch) {
   const params = new URLSearchParams({ v: bootValue('translations_version', ''), lang: bootValue('lang', 'en') })
   try {
-    const response = await fetchMessages(`/api/method/frappe.translate.get_boot_translations?${params}`, {
+    const response = await fetchMessages(`/api/method/commera.localization.boot_translations.get_boot_translations?${params}`, {
       credentials: 'same-origin',
     })
     Object.assign(messages, (await response.json()).message || {})

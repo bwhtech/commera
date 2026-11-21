@@ -1,7 +1,6 @@
 from unittest.mock import Mock, patch
 
 import frappe
-from erpnext.selling.doctype.sales_order.mapper import make_delivery_note
 from erpnext.stock import get_item_details
 from frappe.utils.data import add_days, today
 
@@ -16,6 +15,7 @@ from commera.api.payments import (
 	make_sales_invoice,
 )
 from commera.api.shipping import get_charge_amount
+from commera.compat import make_delivery_note
 from commera.item_price_guard import install_guard, skip_auto_item_price
 from commera.localization.markets import delete_cached_rows
 from commera.sdk import cart as cart_sdk
@@ -24,6 +24,11 @@ from commera.tests.test_admin_orders import ensure_fiscal_year
 from commera.tests.test_market_address_countries import ADDRESS
 from commera.tests.test_market_cart import MarketCartTestCase
 from commera.tests.test_markets import UAE
+
+try:
+	from erpnext.selling.doctype.quotation.mapper import make_sales_invoice as make_quotation_invoice
+except ImportError:
+	from erpnext.selling.doctype.quotation.quotation import make_sales_invoice as make_quotation_invoice
 
 GUARD_HOOK = "commera.item_price_guard.install_guard"
 GATEWAY = "ZZ Market Gateway"
@@ -258,22 +263,18 @@ class TestCartPriceInserts(MarketCartTestCase):
 		self.assertEqual(frappe.db.get_value("Item Price", sale_price.name, "price_list_rate"), 100)
 
 	def test_cart_quotation_cannot_be_invoiced_directly(self):
-		from erpnext.selling.doctype.quotation.mapper import make_sales_invoice
-
 		ensure_fiscal_year()
 		self.quotation.reload().submit()
 		with self.assertRaisesRegex(frappe.ValidationError, "Create a Sales Order first"):
-			make_sales_invoice(self.quotation.name)
+			make_quotation_invoice(self.quotation.name)
 		self.assertFalse(self.has_sale_price())
 
 	def test_desk_quotation_can_be_invoiced_and_insert_a_price(self):
-		from erpnext.selling.doctype.quotation.mapper import make_sales_invoice
-
 		ensure_fiscal_year()
 		self.quotation.reload()
 		self.quotation.order_type = "Sales"
 		self.quotation.save().submit()
-		make_sales_invoice(self.quotation.name).insert()
+		make_quotation_invoice(self.quotation.name).insert()
 		self.assertTrue(self.has_sale_price())
 
 	def test_source_lookup_uses_one_query_per_row(self):

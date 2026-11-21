@@ -3,10 +3,10 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.translate import get_boot_translations
 from frappe.utils.jinja import get_jenv
 
 from commera.api.storefront.translations import get_translations
+from commera.localization.boot_translations import get_boot_translations
 from commera.localization.untranslated import (
 	Message,
 	check_translations,

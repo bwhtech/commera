@@ -5,11 +5,11 @@ import frappe
 from frappe import _
 from frappe.translate import (
 	get_all_translations,
-	get_translation_version,
 	get_user_translations,
 	print_language,
 )
 
+from commera.localization.boot_translations import get_translation_version
 from commera.localization.languages import StorefrontLanguages
 from commera.roles import is_commera_admin
 

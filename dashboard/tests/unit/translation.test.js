@@ -55,7 +55,7 @@ test('the shell translator reads the dictionary from the versioned endpoint', as
     return { json: async () => ({ message: { Customers: 'العملاء' } }) }
   })
 
-  assert.deepEqual(requested, ['/api/method/frappe.translate.get_boot_translations?v=abc_1&lang=ar'])
+  assert.deepEqual(requested, ['/api/method/commera.localization.boot_translations.get_boot_translations?v=abc_1&lang=ar'])
   assert.equal(bootTranslator('Customers'), 'العملاء')
 })
 
