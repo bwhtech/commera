@@ -178,7 +178,9 @@ class TestProductStatusFilter(DeleteProductTestCase):
 		return {product["name"] for product in listed["products"]}, listed["total"]
 
 	def test_a_product_with_no_published_option_is_a_draft(self):
-		self.assertEqual(self.list_products(disabled=0, published=0), ({self.draft_product}, 1))
+		self.assertEqual(
+			self.list_products(disabled=0, published=0), ({self.draft_product, self.item_template}, 2)
+		)
 
 	def test_a_product_with_a_published_option_is_active(self):
 		self.assertEqual(self.list_products(disabled=0, published=1), ({self.published_product}, 1))
@@ -186,7 +188,7 @@ class TestProductStatusFilter(DeleteProductTestCase):
 	def test_no_published_filter_lists_every_product(self):
 		self.assertEqual(
 			self.list_products(),
-			({self.published_product, self.draft_product, self.archived_product}, 3),
+			({self.published_product, self.draft_product, self.archived_product, self.item_template}, 4),
 		)
 		self.assertEqual(self.list_products(disabled=1), ({self.archived_product}, 1))
 
