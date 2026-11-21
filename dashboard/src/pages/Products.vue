@@ -18,7 +18,7 @@ import { pickCollectionFor, useCollections } from '../data/collections'
 import { priceRange, shortDate, stockTone } from '../data/format'
 import { ia } from '../ia/store'
 import { productRoute } from '../ia/routes'
-import { openImport } from '../data/importFlow'
+import { importsLanded, openImport } from '../data/importFlow'
 import { openAddProduct } from '../data/addProduct'
 import { useBulkAction } from '../utils/useBulkAction'
 import { __ } from '../data/translation'
@@ -72,6 +72,8 @@ const productsRequest = useAdminRead('catalog.get_products', {
   }),
   refetch: true,
 })
+
+watch(importsLanded, () => productsRequest.reload())
 
 // A filter changes what page one is, so it sends you back to it.
 watch([query, status, collection], () => (page.value = 1))

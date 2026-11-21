@@ -1,9 +1,9 @@
 // The product import flow: shared state for one run of it. Every step reads and writes the real
 // commera.api.admin.imports endpoints — the spreadsheet is the only source that exists, and photos
 // are matched to a product colour by file name (imports.match_import_images).
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useAdminAction } from './api'
-import { canMove, isBusy, nextPhase } from './importPhase'
+import { canMove, createdProducts, isBusy, nextPhase } from './importPhase'
 import { stepIndex, stepsFor } from './importSteps'
 import { __ } from './translation'
 
@@ -76,6 +76,15 @@ function blankImport() {
 }
 
 export const imp = reactive({ open: false, ...blankImport() })
+
+// Bumped when the dialog closes on a run that created products, so lists read before it reload.
+export const importsLanded = ref(0)
+watch(
+  () => imp.open,
+  (open) => {
+    if (!open && createdProducts(imp)) importsLanded.value += 1
+  },
+)
 
 // Bumped on every reset. A request started before a reset — a spreadsheet still uploading when the
 // dialog was closed and reopened, a photo upload loop — holds the old number and must not write its
