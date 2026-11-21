@@ -45,5 +45,5 @@ commera.patches.drop_commera_custom_docperms
 commera.patches.reindex_public_prices
 commera.patches.add_products_to_their_collection
 commera.patches.create_gateway_refunds_from_refund_totals
-commera.patches.seed_customer_emails
+commera.patches.seed_customer_emails #order-event-emails
 commera.patches.delete_default_email_templates

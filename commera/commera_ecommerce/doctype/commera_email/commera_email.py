@@ -14,7 +14,16 @@ class CommeraEmail(Document):
 		from frappe.types import DF
 
 		email: DF.Literal[
-			"order_confirmation", "order_cancelled", "back_in_stock", "order_link", "sign_in_code"
+			"order_confirmation",
+			"order_cancelled",
+			"back_in_stock",
+			"order_link",
+			"sign_in_code",
+			"order_shipped",
+			"order_delivered",
+			"order_refunded",
+			"order_returned",
+			"payment_failed",
 		]
 		email_template: DF.Link | None
 		enabled: DF.Check
