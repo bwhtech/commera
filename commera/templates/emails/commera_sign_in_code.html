@@ -1,0 +1,12 @@
+{%- import "templates/emails/macros.html" as email -%}
+{%- call email.layout(_("Your {0} sign-in code is {1}. It expires in {2} minutes.").format(brand.name, code, expires_in_minutes), language) -%}
+{{ email.header(brand) }}
+{%- call email.card(first=True) %}
+{{ email.heading(_("Your sign-in code")) }}
+{{ email.intro(_("Enter this code to sign in to {0}.").format(brand.name)) }}
+{{ email.code_box(code) }}
+{{ email.paragraph(_("The code expires in {0} minutes.").format(expires_in_minutes)) }}
+{{ email.paragraph(_("Didn't ask for a code? You can ignore this email. Your account is safe."), 4) }}
+{%- endcall %}
+{{ email.footer(brand, _("You're receiving this because someone asked to sign in to {0} with this email address.").format(brand.name)) }}
+{%- endcall -%}

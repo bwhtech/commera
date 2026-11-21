@@ -89,7 +89,20 @@ def send_otp(email, purpose: str | None = None):
 		print(f"OTP for {email}: {otp}")
 		return
 
-	frappe.sendmail(recipients=email, subject="Your OTP", message=f"Your OTP: {otp}", now=True)
+	from commera.notifications import get_brand_context, send_customer_email
+
+	brand = get_brand_context()
+	send_customer_email(
+		"sign_in_code",
+		[email],
+		{
+			"brand": brand,
+			"store_name": brand["name"],
+			"code": otp,
+			"expires_in_minutes": OTP_EXPIRY_SECONDS // 60,
+		},
+		now=True,
+	)
 
 
 def _get_default_territory() -> str:

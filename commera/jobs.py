@@ -1,17 +1,14 @@
 import frappe
-from frappe.integrations.utils import (
-	create_request_log,
-)
 from frappe.utils import add_to_date, get_url, now_datetime
 
 from commera.api.payments import COD_PAYMENT_MODE
-from commera.api.shipping import get_charge_amount
-from commera.discounts.allocations import get_price_discount_rows
-from commera.order_access import get_order_link, set_order_access_key
-
-
-def get_cc_email():
-	return frappe.get_cached_value("Commera Settings", "Commera Settings", "cc_email")
+from commera.localization import StorefrontLanguages
+from commera.notifications import (
+	get_back_in_stock_context,
+	is_customer_email_enabled,
+	send_customer_email,
+	send_order_email,
+)
 
 
 def send_order_success_acknowledgement(doc, method):
@@ -19,72 +16,30 @@ def send_order_success_acknowledgement(doc, method):
 	is_cod_order = doc.custom_ecommerce_payment_mode == COD_PAYMENT_MODE
 	if is_cod_order != (method == "after_insert"):
 		return
+	send_order_email_safely("order_confirmation", doc)
 
+
+def send_order_cancel_acknowledgement(doc, method):
+	send_order_email_safely("order_cancelled", doc)
+
+
+def send_order_email_safely(email: str, sales_order):
+	recipient = sales_order.contact_email or get_portal_user_email(sales_order.customer)
+	if not recipient:
+		return
 	try:
-		doc_args = doc.as_dict()
-		set_order_access_key(doc)
-		doc_args["order_link"] = get_order_link(doc)
-		doc_args["discount_rows"] = get_price_discount_rows(doc)
-		doc_args["payable_total"] = get_charge_amount(doc)
-		order_confirmation_template_name = frappe.get_cached_value(
-			"Commera Settings",
-			"Commera Settings",
-			"order_confirmation_email_template",
-		)
-		email_template = frappe.get_doc("Email Template", order_confirmation_template_name)
-		# The template is Desk-authored on Email Template, so it is as trusted as the code itself.
-		message = frappe.render_template(email_template.response_, doc_args)  # nosemgrep: frappe-ssti
-		subject = frappe.render_template(email_template.subject, doc_args)  # nosemgrep: frappe-ssti
-
-		recipient = doc.contact_email or get_portal_user_email(doc.customer)
-		if not recipient:
-			return
-		frappe.sendmail(
-			recipients=[recipient],
-			subject=subject,
-			message=message,
-			cc=[get_cc_email()],
-			reference_doctype=doc.doctype,
-			reference_name=doc.name,
-		)
-	except Exception as e:
-		create_request_log(
-			data=doc_args,
-			service_name="send_order_success_acknowledgement",
-			output=e,
-			status="Failed",
+		send_order_email(email, sales_order, [recipient])
+	except Exception:
+		frappe.log_error(
+			title=f"Could not send the {email} email",
+			reference_doctype=sales_order.doctype,
+			reference_name=sales_order.name,
 		)
 
 
 def get_portal_user_email(customer: str) -> str | None:
 	portal_users = frappe.get_all("Portal User", {"parent": customer}, pluck="user", limit=1)
 	return portal_users[0] if portal_users else None
-
-
-def send_order_cancel_acknowledgement(doc, method):
-	try:
-		doc_args = doc.as_dict()
-		doc_args["payable_total"] = get_charge_amount(doc)
-		order_confirmation_template_name = frappe.get_cached_value(
-			"Commera Settings",
-			"Commera Settings",
-			"order_cancellation_email_template",
-		)
-		email_template = frappe.get_doc("Email Template", order_confirmation_template_name)
-		# The template is Desk-authored on Email Template, so it is as trusted as the code itself.
-		message = frappe.render_template(email_template.response_, doc_args)  # nosemgrep: frappe-ssti
-		subject = frappe.render_template(email_template.subject, doc_args)  # nosemgrep: frappe-ssti
-
-		emails = frappe.get_all("Portal User", {"parent": doc.customer}, ["user"], limit=1)
-		email = emails[0].get("user", "")
-		frappe.sendmail(recipients=[email], subject=subject, message=message, cc=[get_cc_email()])
-	except Exception as e:
-		create_request_log(
-			data=doc_args,
-			service_name="send_order_cancel_acknowledgement",
-			output=e,
-			status="Failed",
-		)
 
 
 def send_product_back_in_stock_email(doc, method):
@@ -151,6 +106,8 @@ def send_product_in_stock_email_stock_reconciliation(doc, warehouse):
 
 
 def notify_users_if_item_in_stock(item_code):
+	if not is_customer_email_enabled("back_in_stock"):
+		return
 	color_size_item = frappe.get_all(
 		"Color Size Item",
 		{"item_code": item_code, "parenttype": "Style Attribute Variant"},
@@ -166,33 +123,43 @@ def notify_users_if_item_in_stock(item_code):
 	)
 	if not style_attribute_variant.is_published:
 		return
-	item_in_stock_template_name = frappe.get_cached_value(
-		"Commera Settings",
-		"Commera Settings",
-		"item_in_stock_email_template",
-	)
-	email_template = frappe.get_doc("Email Template", item_in_stock_template_name)
-	doc_args = {
-		"item_code": style_attribute_variant.display_name,
-		"company": "Commera",
-		"website_url": get_url(f"{frappe.local.lang}/products/{style_attribute_variant.route}"),
-	}
-	# The template is Desk-authored on Email Template, so it is as trusted as the code itself.
-	message = frappe.render_template(email_template.response_, doc_args)  # nosemgrep: frappe-ssti
-	subject = frappe.render_template(email_template.subject, doc_args)  # nosemgrep: frappe-ssti
-
 	user_subscriptions = frappe.get_all(
 		"OOS Notify Subscription",
 		filters={"item": item_code, "notified": False},
 		pluck="user",
 	)
+	if not user_subscriptions:
+		return
+
+	context = get_back_in_stock_context(item_code, style_attribute_variant)
+	subscribers = {
+		user.name: user
+		for user in frappe.get_all(
+			"User", filters={"name": ("in", user_subscriptions)}, fields=["name", "first_name", "language"]
+		)
+	}
+	languages = StorefrontLanguages.load()
 	for user in user_subscriptions:
 		# Claimed before sending: two stock updates for the same item run this at once, and only the job
 		# that flips the flag sends the email.
 		if not claim_oos_subscription(item_code, user):
 			continue
+		subscriber = subscribers.get(user) or frappe._dict()
+		language = languages.find(subscriber.language) or languages.default
 		try:
-			frappe.sendmail(recipients=[user], subject=subject, message=message, now=True)
+			send_customer_email(
+				"back_in_stock",
+				[user],
+				{
+					**context,
+					"first_name": subscriber.first_name,
+					"product_url": get_url(
+						f"/{language.code.lower()}/products/{style_attribute_variant.route}"
+					),
+				},
+				language=subscriber.language,
+				now=True,
+			)
 		except Exception as e:
 			set_oos_notified(item_code, user, notified=False)
 			frappe.log_error(

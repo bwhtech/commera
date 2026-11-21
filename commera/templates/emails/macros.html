@@ -1,0 +1,240 @@
+{%- set font = "Inter, 'Inter Variable', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" -%}
+{%- set text = "margin:0;font-family:" ~ font ~ ";letter-spacing:0.005em" -%}
+{%- set title = text ~ ";font-size:15px;font-weight:600;color:#0f0f0f" -%}
+{%- set muted = text ~ ";font-size:12px;line-height:1.4;color:#7c7c7c" -%}
+{%- set caption = text ~ ";font-size:13px;line-height:24px;color:#7c7c7c" -%}
+{%- set label = text ~ ";font-size:12px;line-height:24px;color:#7c7c7c;margin-bottom:6px" -%}
+{%- set para = text ~ ";font-size:14px;line-height:1.55;color:#383838" -%}
+{%- set value = text ~ ";font-size:14px;font-weight:500;color:#0f0f0f" -%}
+{%- set strong = "color:#0f0f0f;font-weight:500" -%}
+{%- set address = text ~ ";font-size:13px;line-height:1.55;color:#383838" -%}
+{%- set line = text ~ ";font-size:14px;color:#383838;line-height:1.9" -%}
+{%- set num = "font-variant-numeric:tabular-nums" -%}
+{%- set amount = title ~ ";" ~ num ~ ";font-size:20px;line-height:24px;letter-spacing:-0.01em" -%}
+{%- set hr = "width:100%;border:none;border-top:1px solid #e2e2e2;margin:14px 0" -%}
+{%- set table = 'align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation"' -%}
+
+{% macro layout(preview, language, lookbook=False) -%}
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html dir="{{ 'rtl' if language in ('ar', 'he', 'fa', 'ur') else 'ltr' }}" lang="{{ language | e }}">
+<head>
+<meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="x-apple-disable-message-reformatting"/>
+</head>
+<body style="background-color:{{ '#ffffff' if lookbook else '#f8f8f8' }};margin:0;padding:0">
+<div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0">{{ preview | e }}</div>
+<table {{ table }}><tr><td style="background-color:{{ '#ffffff' if lookbook else '#f8f8f8' }};margin:0;padding:{{ '40px 20px' if lookbook else '32px 12px' }};font-family:{{ font }}">
+<table {{ table }} style="max-width:{{ 560 if lookbook else 600 }}px;width:100%;margin:0 auto;padding:0"><tr><td>
+{{ caller() }}
+</td></tr></table>
+</td></tr></table>
+</body>
+</html>
+{%- endmacro %}
+
+{% macro header(brand, meta=None, lookbook=False) -%}
+{%- if lookbook -%}
+<p style="{{ title }};line-height:24px;margin-bottom:40px">{{ brand.name | e }}</p>
+{%- else -%}
+<table {{ table }} style="padding:8px 4px 20px"><tr>
+<td><p style="{{ title }};font-size:16px;line-height:28px">
+{%- if brand.logo -%}
+<img src="{{ brand.logo | e }}" height="26" alt="{{ brand.name | e }}" style="display:inline-block;vertical-align:middle;margin-right:10px;border:none">
+{%- else -%}
+<span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;background-color:#0f0f0f;color:#ffffff;border-radius:8px;font-size:14px;font-weight:700;margin-right:10px">{{ brand.initial | e }}</span>
+{%- endif -%}
+{{ brand.name | e }}</p></td>
+{%- if meta %}
+<td align="right"><p style="{{ muted }}">{{ meta | e }}</p></td>
+{%- endif %}
+</tr></table>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro card(first=False) -%}
+<table {{ table }} style="background-color:#ffffff;border-radius:12px;border:1px solid #ededed;padding:{{ '28px' if first else '24px 28px' }};margin-top:{{ 0 if first else 12 }}px"><tr><td>
+{{ caller() }}
+</td></tr></table>
+{%- endmacro %}
+
+{% macro eyebrow(text_value) -%}
+<p style="{{ caption }}">{{ text_value | e }}</p>
+{%- endmacro %}
+
+{% macro heading(text_value, lookbook=False) -%}
+{%- if lookbook -%}
+<p style="{{ title }};margin-top:10px;font-size:34px;line-height:1.08;letter-spacing:-0.025em">{{ text_value | e }}</p>
+{%- else -%}
+<p style="{{ title }};font-size:26px;line-height:1.15;letter-spacing:-0.02em">{{ text_value | e }}</p>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro intro(text_value, lookbook=False) -%}
+<p style="{{ para }};margin-top:{{ 14 if lookbook else 10 }}px{{ ';font-size:15px' if lookbook }}">{{ text_value | e }}</p>
+{%- endmacro %}
+
+{% macro paragraph(text_value, margin_top=16) -%}
+<p style="{{ para }};margin-top:{{ margin_top }}px">{{ text_value | e }}</p>
+{%- endmacro %}
+
+{% macro small_print(text_value) -%}
+<p style="{{ muted }};margin-top:20px;line-height:1.5">{{ text_value | e }}</p>
+{%- endmacro %}
+
+{% macro button(url, label_value, margin_top=24, lookbook=False) -%}
+<a href="{{ url | e }}" target="_blank" style="line-height:100%;text-decoration:none;display:inline-block;max-width:100%;margin-top:{{ margin_top }}px;background-color:#0f0f0f;color:#ffffff;font-family:{{ font }};font-size:14px;font-weight:500;border-radius:8px;padding:{{ '12px 20px' if lookbook else '11px 18px' }}"><span style="display:inline-block;line-height:120%">{{ label_value | e }}</span></a>
+{%- endmacro %}
+
+{% macro progress_steps(status, done, total) -%}
+<table {{ table }} style="margin-top:24px"><tr>
+<td style="vertical-align:bottom"><p style="{{ title }};line-height:1.3">{{ status | e }}</p></td>
+</tr></table>
+<table {{ table }} style="margin-top:10px"><tr>
+{%- for step in range(total) %}
+<td style="width:{{ (100 / total) | round(2) }}%;padding:0;padding-right:{{ 4 if not loop.last else 0 }}px;vertical-align:top"><div style="height:4px;line-height:4px;font-size:1px;border-radius:4px;background-color:{{ '#258c5c' if step < done else '#e2e2e2' }}">&nbsp;</div></td>
+{%- endfor %}
+</tr></table>
+{%- endmacro %}
+
+{% macro amount_panel(label_value, amount_value, note, note_strong) -%}
+<table {{ table }} style="background-color:#f3f3f3;border-radius:12px;padding:16px 20px;margin-top:22px"><tr><td>
+<p style="{{ label }}">{{ label_value | e }}</p>
+<p style="{{ amount }}">{{ amount_value | e }}</p>
+<p style="{{ address }};margin-top:6px">{{ (note | e) | replace("{0}", '<b style="' ~ strong ~ '">' ~ (note_strong | e) ~ '</b>') }}</p>
+</td></tr></table>
+{%- endmacro %}
+
+{% macro code_box(code) -%}
+<table {{ table }} style="background-color:#f3f3f3;border-radius:12px;padding:20px 16px;margin-top:22px"><tr><td>
+<p style="{{ title }};{{ num }};font-size:36px;line-height:1.1;letter-spacing:0.16em;padding-left:0.16em;text-align:center">{{ code | e }}</p>
+</td></tr></table>
+{%- endmacro %}
+
+{% macro facts_row(facts) -%}
+<table {{ table }} style="margin-top:22px"><tr>
+{%- for fact in facts %}
+<td style="width:{{ fact.width }};vertical-align:top{{ ';padding-right:12px' if not loop.last }}">
+<p style="{{ label }}">{{ fact.label | e }}</p>
+<p style="{{ address }};{{ strong }};{{ num }}">{{ fact.value | e }}</p>
+</td>
+{%- endfor %}
+</tr></table>
+{%- endmacro %}
+
+{% macro item_list(heading_value, items, currency) -%}
+<p style="{{ title }};line-height:24px;margin-bottom:8px">{{ heading_value | e }}</p>
+{%- for item in items %}
+<table {{ table }} style="border-bottom:1px solid #ededed"><tr>
+<td style="width:64px;vertical-align:top">
+{%- if item.image -%}
+<img src="{{ item.image | e }}" width="52" height="64" alt="" style="display:block;border:none;border-radius:8px;background-color:#f3f3f3;margin:12px 0;object-fit:cover">
+{%- else -%}
+<div style="width:52px;height:64px;margin:12px 0;line-height:64px;text-align:center;border-radius:8px;background-color:#f3f3f3;color:#7c7c7c;font-size:16px;font-family:{{ font }}">{{ item.item_name[:1] | e }}</div>
+{%- endif -%}
+</td>
+<td style="vertical-align:top">
+<p style="{{ value }};line-height:1.3;margin-top:14px">{{ item.item_name | e }}</p>
+<p style="{{ caption }};line-height:1.4;margin-top:3px">{% if item.variant %}{{ item.variant | e }}, {% endif %}{{ _("qty") }} <span style="{{ num }}">{{ item.qty | e }}</span>
+{%- if item.was_amount %}<span style="color:#258c5c;font-weight:500"> {{ _("Sale") }}</span>{% endif %}</p>
+</td>
+<td align="right" style="vertical-align:top;width:110px">
+<p style="{{ value }};{{ num }};line-height:24px;margin-top:14px">{{ email_money(item.amount, currency) | e }}</p>
+{%- if item.was_amount %}
+<p style="{{ caption }};{{ num }};font-size:12px;text-decoration:line-through;margin-top:3px">{{ email_money(item.was_amount, currency) | e }}</p>
+{%- endif %}
+</td>
+</tr></table>
+{%- endfor %}
+{%- endmacro %}
+
+{% macro total_line(label_value, amount_value, color="#0f0f0f") -%}
+<table {{ table }}><tr>
+<td><p style="{{ line }}">{{ label_value | e }}</p></td>
+<td align="right"><p style="{{ line }};{{ num }};color:{{ color }}">{{ amount_value | e }}</p></td>
+</tr></table>
+{%- endmacro %}
+
+{% macro totals(totals_value, currency) -%}
+<hr style="{{ hr }}">
+{{ total_line(_("Subtotal"), email_money(totals_value.subtotal, currency)) }}
+{%- for discount in totals_value.discounts %}
+{{ total_line(_("Discount ({0})").format(discount.label) if discount.label else _("Discount"), "−" ~ email_money(discount.amount, currency), "#258c5c") }}
+{%- endfor %}
+{%- for charge in totals_value.charges %}
+{{ total_line(charge.label, email_money(charge.amount, currency) if charge.amount else _("Free")) }}
+{%- endfor %}
+<hr style="{{ hr }}">
+<table {{ table }}><tr>
+<td><p style="{{ title }};line-height:24px">{{ _("Total") }}</p></td>
+<td align="right"><p style="{{ amount }}">{{ email_money(totals_value.total, currency) | e }}</p></td>
+</tr></table>
+{%- for tax in totals_value.included_taxes %}
+<p style="{{ muted }};{{ num }};text-align:right;margin-top:2px">{{ _("Includes {0} {1}").format(email_money(tax.amount, currency), tax.label) | e }}</p>
+{%- endfor %}
+{%- endmacro %}
+
+{% macro address_block(label_value, address_value, extra_lines=(), empty_text=None) -%}
+{%- if address_value or empty_text -%}
+<p style="{{ label }}">{{ label_value | e }}</p>
+<p style="{{ address }}">
+{%- if address_value -%}
+<b style="{{ strong }}">{{ address_value.name | e }}</b>
+{%- for address_line in address_value.lines + (extra_lines | select | list) %}<br>{{ address_line | e }}{% endfor -%}
+{%- else -%}
+{{ empty_text | e }}
+{%- endif -%}
+</p>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro billing_block(label_value, address_value, extra_lines, empty_text) -%}
+<table {{ table }} style="margin-top:16px"><tr><td>
+{{ address_block(label_value, address_value, extra_lines, empty_text) }}
+</td></tr></table>
+{%- endmacro %}
+
+{% macro fact_columns(facts) -%}
+<table {{ table }} style="margin-top:16px"><tr>
+{%- for fact in facts %}
+<td style="width:50%;vertical-align:top;padding-right:12px">{{ address_block(fact.label, {"name": fact.title, "lines": []}, [fact.detail]) }}</td>
+{%- endfor %}
+</tr></table>
+{%- endmacro %}
+
+{% macro product_feature(product, currency, url, label_value) -%}
+<table {{ table }} style="margin-top:28px"><tr><td>
+{%- if product.image -%}
+<img src="{{ product.image | e }}" alt="{{ product.item_name | e }}" width="560" style="display:block;width:100%;height:auto;border:none;border-radius:12px;background-color:#f3f3f3">
+{%- else -%}
+<div style="width:100%;height:360px;line-height:360px;text-align:center;border-radius:8px;background-color:#f3f3f3;color:#7c7c7c;font-size:32px;font-family:{{ font }}">{{ product.item_name[:1] | e }}</div>
+{%- endif %}
+<p style="{{ title }};line-height:24px;font-size:17px;margin-top:16px">{{ product.item_name | e }}</p>
+{%- if product.variant %}
+<p style="{{ caption }};font-size:14px;margin-top:4px">{{ product.variant | e }}</p>
+{%- endif %}
+{%- if product.price %}
+<p style="{{ num }};margin:0;margin-top:8px;font-family:{{ font }};font-size:17px;line-height:24px;font-weight:500;color:#0f0f0f">{{ email_money(product.price, currency) | e }}
+{%- if product.was_price %}<span style="margin-left:8px;font-size:14px;font-weight:420;color:#7c7c7c;text-decoration:line-through">{{ email_money(product.was_price, currency) | e }}</span>{% endif %}</p>
+{%- endif %}
+{{ button(url, label_value, 20, True) }}
+</td></tr></table>
+<hr style="{{ hr }};margin:32px 0 20px">
+{%- endmacro %}
+
+{% macro footer(brand, reason, closing=None, links=(), lookbook=False) -%}
+<table {{ table }} style="padding:{{ '0' if lookbook else ('8px 4px 0' if closing else '20px 4px 0') }}"><tr><td>
+{%- if closing %}
+<p style="{{ para }};margin-bottom:16px">{{ closing | e }}</p>
+{%- endif %}
+{%- if links %}
+<p style="{{ muted }};margin-bottom:8px">
+{%- for link in links %}<a href="{{ link.url | e }}" target="_blank" style="color:#383838;text-decoration:underline;margin-left:{{ 16 if not loop.first else 0 }}px">{{ link.label | e }}</a>{% endfor -%}
+</p>
+{%- endif %}
+<p style="{{ muted }};line-height:1.5">
+{%- set legal = [brand.legal_name, brand.address] | select | join(", ") -%}
+{%- if legal %}{{ legal | e }}.{% if brand.tax_id %} {{ brand.tax_id | e }}.{% endif %}<br>{% endif -%}
+{{ reason | e }}</p>
+</td></tr></table>
+{%- endmacro %}

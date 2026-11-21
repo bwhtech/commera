@@ -8,7 +8,7 @@ from frappe.desk.page.setup_wizard.setup_wizard import setup_complete, update_gl
 from frappe.utils.background_jobs import is_job_enqueued
 from frappe.utils.data import add_days, add_years, get_abbr, getdate
 
-from commera.migrate import DEFAULT_EMAIL_TEMPLATES, create_payment_modes
+from commera.migrate import create_payment_modes
 
 SETTINGS_DOCTYPE = "Commera Settings"
 DEFAULT_PRICE_LIST = "Standard Selling"
@@ -144,9 +144,6 @@ def seed_commera_settings(
 	# has saved brand or selling meanwhile; a locking read sees the latest commit.
 	settings = frappe.get_doc(SETTINGS_DOCTYPE, SETTINGS_DOCTYPE, for_update=True)
 	settings.company = company
-	for fieldname, template in DEFAULT_EMAIL_TEMPLATES.items():
-		settings.set(fieldname, settings.get(fieldname) or template)
-
 	settings.default_price_list = price_list or settings.default_price_list or DEFAULT_PRICE_LIST
 	settings.sale_price_list = sale_price_list or settings.sale_price_list
 	settings.ecommerce_warehouse = warehouse or settings.ecommerce_warehouse or get_company_warehouse(company)

@@ -1,0 +1,16 @@
+{%- import "templates/emails/macros.html" as email -%}
+{%- call email.layout(_("Your link to order {0}, placed on {1}.").format(order.name, order.transaction_date), language) -%}
+{{ email.header(brand, _("Order {0}").format(order.name)) }}
+{%- call email.card(first=True) %}
+{{ email.heading(_("Hi {0}, here's the link to your order.").format(first_name) if first_name else _("Here's the link to your order.")) }}
+{{ email.intro(_("Use the button below to see where your order is and what's in it.")) }}
+{{ email.facts_row([
+	{"label": _("Order number"), "value": order.name, "width": "36%"},
+	{"label": _("Placed on"), "value": order.transaction_date, "width": "32%"},
+	{"label": _("Total"), "value": email_money(order.totals.total, order.currency), "width": "32%"},
+]) }}
+{{ email.button(order.link, _("View your order")) }}
+{{ email.small_print(_("This link is private. Anyone who has it can see your order, so please don't forward this email.")) }}
+{%- endcall %}
+{{ email.footer(brand, _("You're receiving this because someone asked for the link to this order at {0}.").format(brand.name), _("Didn't ask for this link? You can ignore this email.")) }}
+{%- endcall -%}

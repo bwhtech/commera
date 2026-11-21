@@ -51,12 +51,6 @@ PAYMENT_FIELDS = (
 
 CHECKOUT_FIELDS = ("allow_guest_checkout", "guest_order_link_days")
 
-EMAIL_TEMPLATE_FIELDS = (
-	"order_confirmation_email_template",
-	"order_cancellation_email_template",
-	"item_in_stock_email_template",
-)
-
 FOOTER_FIELDS = (
 	"facebook_url",
 	"twitter_url",
@@ -75,7 +69,6 @@ FOOTER_FIELDS = (
 SETTINGS_TAB_FIELDS = {
 	"payments": PAYMENT_FIELDS,
 	"checkout": CHECKOUT_FIELDS,
-	"emails": EMAIL_TEMPLATE_FIELDS,
 }
 
 # Fields the curated tabs own, so the Advanced tab does not render a second copy.

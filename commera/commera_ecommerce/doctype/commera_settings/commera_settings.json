@@ -142,13 +142,9 @@
   "navbar_editor",
   "communication_tab",
   "order_section",
-  "order_confirmation_email_template",
-  "item_in_stock_email_template",
-  "column_break_tald",
-  "order_cancellation_email_template",
-  "logo_url",
+  "customer_emails",
   "email_section",
-  "cc_email",
+  "logo_url",
   "languages_tab",
   "storefront_languages_section",
   "default_storefront_language",
@@ -375,40 +371,21 @@
   {
    "fieldname": "order_section",
    "fieldtype": "Section Break",
-   "label": "Order"
+   "label": "Customer Emails"
   },
   {
-   "fieldname": "order_confirmation_email_template",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Order Confirmation Email Template",
-   "options": "Email Template",
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_tald",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "order_cancellation_email_template",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Order Cancellation Email Template",
-   "options": "Email Template",
-   "reqd": 1
+   "cannot_add_rows": 1,
+   "cannot_delete_rows": 1,
+   "fieldname": "customer_emails",
+   "fieldtype": "Table",
+   "label": "Customer Emails",
+   "options": "Commera Email"
   },
   {
    "fieldname": "logo_url",
    "fieldtype": "Data",
    "label": "Logo URL",
    "options": "URL"
-  },
-  {
-   "fieldname": "item_in_stock_email_template",
-   "fieldtype": "Link",
-   "label": "Item In Stock Email Template",
-   "options": "Email Template",
-   "reqd": 1
   },
   {
    "fieldname": "item_group_section",
@@ -707,12 +684,6 @@
    "fieldname": "email_section",
    "fieldtype": "Section Break",
    "label": "Email"
-  },
-  {
-   "fieldname": "cc_email",
-   "fieldtype": "Data",
-   "label": "CC Email",
-   "options": "Email"
   },
   {
    "fieldname": "attribute_name_field",
@@ -1030,7 +1001,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 00:00:00.000000",
+ "modified": "2026-11-18 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Commera Ecommerce",
  "name": "Commera Settings",

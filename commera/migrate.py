@@ -9,6 +9,7 @@ from commera.commera_ecommerce.doctype.commera_settings.navbar.navbar_manager im
 )
 from commera.customizations import create_customizations
 from commera.localization import StorefrontLanguages
+from commera.notifications import seed_customer_emails
 from commera.payment_gateways.connectors import get_available_payment_modes, validate_connectors
 from commera.plugin_events import add_plugin_user, validate_plugins
 from commera.plugins.registry import get_registry
@@ -31,17 +32,7 @@ def after_install():
 	create_customizations()
 	create_payment_modes()
 	add_commera_roles()
-	try:
-		create_default_email_templates()
-		assign_default_email_templates()
-	except Exception as e:
-		import traceback
-
-		error_msg = f"Error creating default email templates: {e!s}"
-		frappe.log_error(traceback.format_exc(), "Commera Installation - Email Templates")
-		frappe.errprint(error_msg)
-		frappe.errprint(traceback.format_exc())
-
+	seed_customer_emails()
 	populate_search_settings()
 	ensure_storefront_search_index()
 	seed_default_storefront_language()
@@ -80,7 +71,6 @@ def after_migrate():
 	setup_robots_txt()
 	seed_llms_txt()
 	seed_default_routes()
-	assign_default_email_templates()
 	validate_plugins()
 	print_plugin_problems()
 	validate_providers()
@@ -161,82 +151,6 @@ def get_shop_company() -> str | None:
 	return frappe.db.get_single_value("Commera Settings", "company") or frappe.get_cached_value(
 		"Global Defaults", "Global Defaults", "default_company"
 	)
-
-
-DEFAULT_EMAIL_TEMPLATES = {
-	"order_confirmation_email_template": "Order Confirmation",
-	"order_cancellation_email_template": "Order Cancellation",
-	"item_in_stock_email_template": "Item In Stock",
-}
-
-
-def assign_default_email_templates():
-	# The fields are mandatory, so while any is empty every save of Commera Settings fails, even one
-	# that only changes the company. set_single_value skips that check, which a save() here cannot.
-	for fieldname, template in DEFAULT_EMAIL_TEMPLATES.items():
-		if frappe.db.get_single_value("Commera Settings", fieldname):
-			continue
-		if frappe.db.exists("Email Template", template):
-			frappe.db.set_single_value("Commera Settings", fieldname, template)
-
-
-def create_default_email_templates():
-	"""Create default email templates required by Commera Settings"""
-
-	email_templates = [
-		{
-			"name": "Order Confirmation",
-			"subject": "Order Confirmation - {{ doc.name }}",
-			"response": """Dear {{ doc.customer_name }},
-
-Thank you for your order! Your order has been confirmed.
-
-Order Details:
-Order ID: {{ doc.name }}
-Date: {{ doc.transaction_date }}
-Total: {{ doc.grand_total }}
-
-You can track your order status at: {{ login_url }}
-
-Best regards,
-{{ company }}""",
-			"reference_doctype": "Sales Order",
-		},
-		{
-			"name": "Item In Stock",
-			"subject": "Item Back in Stock - {{ item.item_name }}",
-			"response": """Dear Customer,
-
-Great news! The item "{{ item.item_name }}" is now back in stock.
-
-You can purchase it now at: {{ item_url }}
-
-Best regards,
-{{ company }}""",
-			"reference_doctype": "Item",
-		},
-		{
-			"name": "Order Cancellation",
-			"subject": "Order Cancellation Confirmation - {{ doc.name }}",
-			"response": """Dear {{ doc.customer_name }},
-
-Your order {{ doc.name }} has been cancelled as requested.
-
-If you have any questions, please contact our customer service.
-
-Best regards,
-{{ company }}""",
-			"reference_doctype": "Sales Order",
-		},
-	]
-
-	for template_data in email_templates:
-		if not frappe.db.exists("Email Template", template_data["name"]):
-			template = frappe.get_doc({"doctype": "Email Template", **template_data})
-			template.insert(ignore_permissions=True)
-			frappe.errprint(f"Created Email Template: {template_data['name']}")
-		else:
-			frappe.errprint(f"Email Template '{template_data['name']}' already exists")
 
 
 def seed_llms_txt():

@@ -963,7 +963,8 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		system_language = frappe.local.lang
 
 		with patch(
-			"commera.jobs.get_order_link", side_effect=lambda doc: link_languages.append(frappe.local.lang)
+			"commera.notifications.get_order_link",
+			side_effect=lambda doc: link_languages.append(frappe.local.lang),
 		):
 			on_payment_request_update(self.payment_request)
 
