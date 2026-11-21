@@ -21,8 +21,8 @@ from commera.commera_ecommerce.doctype.bulk_publish_variants.bulk_publish_varian
 from commera.commera_ecommerce.doctype.commera_settings.commera_settings import create_configurator_log
 from commera.product_collections import COLLECTIONS_FIELD, PRODUCT_COLLECTION
 from commera.swatches import COLOUR_ATTRIBUTE, DUPLICATE_COLOUR_ATTRIBUTE
-from commera.utils import IN_CLAUSE_CHUNK_SIZE
-from commera.webshop_migration import apply_webshop_extras
+from commera.utils import get_rows
+from commera.webshop_migration import apply_webshop_extras, get_webshop_published_items
 
 JOB_ID = "commera-erpnext-import"
 JOB_TIMEOUT = 2 * 60 * 60
@@ -104,20 +104,6 @@ def get_skip_reason(row, sellable_templates: set) -> str | None:
 	if row.item_code not in sellable_templates:
 		return _("It has no enabled variants to sell.")
 	return None
-
-
-def get_rows(doctype: str, fieldname: str, values: list, fields: list, filters: dict | None = None) -> dict:
-	"""Rows whose `fieldname` is one of `values`, grouped by that value, in IN (...) sized batches."""
-	grouped = {}
-	for chunk in create_batch(list(dict.fromkeys(values)), IN_CLAUSE_CHUNK_SIZE):
-		for row in frappe.get_all(
-			doctype,
-			filters={**(filters or {}), fieldname: ["in", chunk]},
-			fields=list(dict.fromkeys([fieldname, *fields])),
-			order_by="idx asc" if frappe.get_meta(doctype).istable else "creation asc",
-		):
-			grouped.setdefault(row[fieldname], []).append(row)
-	return grouped
 
 
 def plan_products(item_codes: list) -> list:
@@ -225,6 +211,7 @@ def get_preview(search: str | None, start: int, page_length: int) -> dict:
 	rates = {} if get_missing_settings() else get_selling_rates(all_item_codes)
 	stock = get_ecommerce_stock(all_item_codes)
 
+	webshop_items = get_webshop_published_items()
 	items = []
 	for plan in plans:
 		item_codes = item_codes_by_plan[plan["item_code"]]
@@ -239,7 +226,7 @@ def get_preview(search: str | None, start: int, page_length: int) -> dict:
 				"price": min(prices) if prices else None,
 				"stock": sum(stock.get(item_code, 0) for item_code in item_codes),
 				"attributes": plan["attributes"],
-				"preselected": True,
+				"preselected": webshop_items is None or plan["item_code"] in webshop_items,
 			}
 		)
 	return {"items": items, "skipped": skipped, "total": len(importable)}

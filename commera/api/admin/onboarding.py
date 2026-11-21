@@ -9,6 +9,7 @@ from frappe.utils.data import cint, cstr
 
 from commera import onboarding
 from commera.api.admin.settings import read_branding_fields, write_branding_fields
+from commera.webshop_migration import get_webshop_store_defaults
 
 SETTINGS_DOCTYPE = "Commera Settings"
 ONBOARDING_ROLE = "System Manager"
@@ -36,7 +37,8 @@ def get_suggested_abbr(settings) -> str | None:
 
 
 def get_existing_store(settings) -> dict:
-	company = settings.company or onboarding.get_only_company()
+	webshop_defaults = get_webshop_store_defaults()
+	company = settings.company or webshop_defaults.get("company") or onboarding.get_only_company()
 	return {
 		"companies": frappe.get_all(
 			"Company",
@@ -48,6 +50,7 @@ def get_existing_store(settings) -> dict:
 			"Price List", filters={"selling": 1, "enabled": 1}, fields=["name", "currency"], order_by="name"
 		),
 		"price_list": settings.default_price_list
+		or webshop_defaults.get("price_list")
 		or frappe.db.get_single_value("Selling Settings", "selling_price_list"),
 		"sale_price_list": settings.sale_price_list,
 		"warehouses": frappe.get_all(
@@ -56,7 +59,9 @@ def get_existing_store(settings) -> dict:
 			fields=["name", "company"],
 			order_by="name",
 		),
-		"warehouse": settings.ecommerce_warehouse or (company and onboarding.get_company_warehouse(company)),
+		"warehouse": settings.ecommerce_warehouse
+		or webshop_defaults.get("warehouse")
+		or (company and onboarding.get_company_warehouse(company)),
 		"has_webshop": "webshop" in frappe.get_installed_apps(),
 		"importable_count": get_importable_item_count(),
 	}

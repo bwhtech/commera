@@ -142,7 +142,8 @@ class TestErpnextImport(ProductOnboardingTestCase):
 		)
 		self.assertEqual(self.get_options(other), {"Cotton": {("64 GB", cotton_64), ("128 GB", cotton_128)}})
 
-	def test_preview_lists_kinds_and_skips_manufacturer_templates(self):
+	@patch("commera.erpnext_import.get_webshop_published_items", return_value=None)
+	def test_preview_lists_kinds_and_skips_manufacturer_templates(self, _webshop_items):
 		colour_only, _variants = self.make_template([COLOUR_ATTRIBUTE], [{COLOUR_ATTRIBUTE: "Red"}])
 		manufacturer = frappe.new_doc("Item")
 		manufacturer.item_code = f"IMPORT-MFR-{self.suffix}"

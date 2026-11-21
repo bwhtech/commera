@@ -1189,3 +1189,17 @@ def pick_product_covers(templates: list, options: list) -> dict:
 			(option.photo for option in options if option.template == template and option.photo), None
 		)
 	return covers
+
+
+def get_rows(doctype: str, fieldname: str, values: list, fields: list, filters: dict | None = None) -> dict:
+	"""Rows whose `fieldname` is one of `values`, grouped by that value, in IN (...) sized batches."""
+	grouped = {}
+	for chunk in create_batch(list(dict.fromkeys(values)), IN_CLAUSE_CHUNK_SIZE):
+		for row in frappe.get_all(
+			doctype,
+			filters={**(filters or {}), fieldname: ["in", chunk]},
+			fields=list(dict.fromkeys([fieldname, *fields])),
+			order_by="idx asc" if frappe.get_meta(doctype).istable else "creation asc",
+		):
+			grouped.setdefault(row[fieldname], []).append(row)
+	return grouped
