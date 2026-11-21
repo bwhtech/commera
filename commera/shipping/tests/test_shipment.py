@@ -6,7 +6,13 @@ from frappe.tests import IntegrationTestCase
 from commera.sdk import STORE_ORDER_TYPE
 from commera.shipping.fulfilment import create_shipment
 from commera.shipping.providers import use_providers
-from commera.shipping.shipment import book, cancel_booking, schedule_pickup, sync_status
+from commera.shipping.shipment import (
+	book,
+	cancel_booking,
+	fire_dispatched_events,
+	schedule_pickup,
+	sync_status,
+)
 from commera.shipping.testing import InMemoryShippingProvider
 from commera.shipping.tests.test_carrier_import import create_test_address, create_test_provider_profile
 from commera.tests.test_admin_orders import make_test_sales_order
@@ -208,6 +214,19 @@ class TestShipmentBooking(IntegrationTestCase):
 		create_shipment(self.delivery_note)
 
 		self.assertEqual(self.dispatched_events(), [])
+
+	def test_a_parcel_with_no_delivery_note_is_dispatched_without_line_items(self):
+		shipment = frappe.get_doc(
+			{"doctype": "Shipment", "custom_sales_order": self.sales_order, "custom_shipping_provider": None}
+		)
+		shipment.name = "SHIP-NO-NOTE"
+		shipment.docstatus = 1
+
+		fire_dispatched_events(shipment)
+
+		events = self.dispatched_events()
+		self.assertEqual([event.shipment for event in events], ["SHIP-NO-NOTE"])
+		self.assertNotIn("line_items", events[0])
 
 	def test_a_pickup_is_only_scheduled_before_the_carrier_collects(self):
 		shipment = self.book()

@@ -1,6 +1,5 @@
 import frappe
 from frappe import _
-from frappe.query_builder import DocType
 from frappe.utils import validate_url
 from frappe.utils.data import cstr, flt, get_datetime, today
 
@@ -449,20 +448,21 @@ def get_order_shipments(sales_order: str, fields: list | None = None, **filters)
 def fire_dispatched_events(shipment):
 	if not has_left_store(shipment):
 		return
-	for sales_order, items in get_dispatched_items(shipment).items():
-		fire_event(
-			"order_shipment_dispatched",
-			"Sales Order",
-			sales_order,
-			data={
-				"shipment": shipment.name,
-				"carrier": shipment.carrier,
-				"awb": shipment.awb_number,
-				"tracking_url": shipment.tracking_url,
-				"line_items": items,
-			},
-			key=shipment.name,
-		)
+	sales_orders = get_shipment_sales_orders(shipment)
+	store_orders = frappe.get_all(
+		"Sales Order", filters={"name": ["in", sales_orders], "order_type": STORE_ORDER_TYPE}, pluck="name"
+	)
+	items_by_order = get_shipped_items(shipment)
+	for sales_order in store_orders:
+		data = {
+			"shipment": shipment.name,
+			"carrier": shipment.carrier,
+			"awb": shipment.awb_number,
+			"tracking_url": shipment.tracking_url,
+		}
+		if items := items_by_order.get(sales_order):
+			data["line_items"] = items
+		fire_event("order_shipment_dispatched", "Sales Order", sales_order, data=data, key=shipment.name)
 
 
 def has_left_store(shipment) -> bool:
@@ -473,31 +473,32 @@ def has_left_store(shipment) -> bool:
 	return not shipment.custom_shipping_provider and shipment.custom_shipment_status != "Cancelled"
 
 
-def get_dispatched_items(shipment) -> dict[str, list[dict]]:
-	sales_order = DocType("Sales Order")
+def get_shipment_sales_orders(shipment) -> list[str]:
+	if shipment.get("custom_sales_order"):
+		return [shipment.custom_sales_order]
 	if delivery_notes := get_delivery_notes(shipment):
-		line = DocType("Delivery Note Item")
-		order_field = line.against_sales_order
-		lines = frappe.qb.from_(line).where(line.parent.isin(delivery_notes))
-	elif shipment.custom_sales_order:
-		line = DocType("Sales Order Item")
-		order_field = line.parent
-		lines = frappe.qb.from_(line).where(line.parent == shipment.custom_sales_order)
-	else:
-		return {}
+		return frappe.get_all(
+			"Delivery Note Item",
+			filters={"parent": ["in", delivery_notes], "against_sales_order": ["is", "set"]},
+			pluck="against_sales_order",
+			distinct=True,
+		)
+	return []
 
-	rows = (
-		lines.join(sales_order)
-		.on(sales_order.name == order_field)
-		.select(order_field.as_("sales_order"), line.item_code, line.item_name, line.qty)
-		.where(sales_order.order_type == STORE_ORDER_TYPE)
-		.orderby(line.parent)
-		.orderby(line.idx)
-		.run(as_dict=True)
+
+def get_shipped_items(shipment) -> dict[str, list[dict]]:
+	delivery_notes = get_delivery_notes(shipment)
+	if not delivery_notes:
+		return {}
+	lines = frappe.get_all(
+		"Delivery Note Item",
+		filters={"parent": ["in", delivery_notes], "against_sales_order": ["is", "set"]},
+		fields=["against_sales_order", "item_code", "item_name", "qty"],
+		order_by="parent asc, idx asc",
 	)
 	items_by_order = {}
-	for row in rows:
-		items_by_order.setdefault(cstr(row.sales_order), []).append(
-			{"item_code": row.item_code, "item_name": row.item_name, "qty": flt(row.qty)}
+	for line in lines:
+		items_by_order.setdefault(line.against_sales_order, []).append(
+			{"item_code": line.item_code, "item_name": line.item_name, "qty": flt(line.qty)}
 		)
 	return items_by_order
