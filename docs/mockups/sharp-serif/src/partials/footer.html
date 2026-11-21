@@ -1,0 +1,50 @@
+<footer class="footer">
+	<div class="container">
+		<div class="footer-top">
+			<div class="footer-brand">
+				<a href="index.html" class="wordmark">Émail</a>
+				<p class="footer-blurb">Vintage enamelware from European kitchens, cleaned, checked and photographed in our Lisbon workshop.</p>
+			</div>
+			<div>
+				<h2>Shop</h2>
+				<ul><li><a href="collection.html?category=Cookware">Cookware</a></li><li><a href="collection.html?category=Tableware">Tableware</a></li><li><a href="collection.html?category=Coffee+%26+tea">Coffee &amp; tea</a></li><li><a href="collection.html?category=Kitchen+tools">Kitchen tools</a></li><li><a href="collection.html?category=Sale">Sale</a></li></ul>
+			</div>
+			<div>
+				<h2>Help</h2>
+				<ul><li><button class="footer-link" data-info="Track an order">Track an order</button></li><li><button class="footer-link" data-info="Shipping">Shipping</button></li><li><button class="footer-link" data-info="Returns">Returns</button></li><li><button class="footer-link" data-info="Care guide">Care guide</button></li><li><button class="footer-link" data-info="Contact">Contact</button></li></ul>
+			</div>
+			<div>
+				<h2>Studio</h2>
+				<ul><li><button class="footer-link" data-info="About">About</button></li><li><a href="index.html#journal">Journal</a></li><li><button class="footer-link" data-info="Wholesale">Wholesale</button></li><li><button class="footer-link" data-info="Instagram">Instagram</button></li></ul>
+			</div>
+		</div>
+		<div class="footer-bottom">
+			<p>© 2026 Émail Studio. Prices in USD.</p>
+			<div class="pay" role="group" aria-label="Payment methods"><span>VISA</span><span>MC</span><span>AMEX</span><span>PAYPAL</span></div>
+		</div>
+	</div>
+</footer>
+<div class="drawer" id="menu" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Main menu" inert>
+	<div class="drawer-scrim" data-close></div>
+	<div class="drawer-panel">
+		<div class="drawer-head"><span class="wordmark">Émail</span><button class="icon-btn" aria-label="Close menu" data-close>{icon:x}</button></div>
+		<button class="field drawer-search" data-open-search>{icon:search icon-sm}<span>Search enamelware</span></button>
+		<nav class="drawer-nav">
+			<a href="collection.html">Shop all {icon:chev-right icon-sm}</a>
+			<a href="collection.html?category=Cookware">Cookware {icon:chev-right icon-sm}</a>
+			<a href="collection.html?category=Tableware">Tableware {icon:chev-right icon-sm}</a>
+			<a href="collection.html?category=Coffee+%26+tea">Coffee &amp; tea {icon:chev-right icon-sm}</a>
+			<a href="index.html#journal">Journal {icon:chev-right icon-sm}</a>
+		</nav>
+		<div class="drawer-foot"><p>Vintage pieces. A new chapter.</p><a href="index.html#journal" class="arrow-link">From our Lisbon workshop {icon:arrow icon-sm}</a></div>
+	</div>
+</div>
+<!--@search_overlay-->
+<p class="store-status" role="status" aria-live="polite" data-status></p>
+<dialog class="info-dialog" id="info-dialog" aria-labelledby="info-title">
+	<div class="dialog-head"><h2 class="h2" id="info-title"></h2><button class="icon-btn" data-close-info aria-label="Close">{icon:x}</button></div>
+	<div class="dialog-copy" data-info-copy></div>
+</dialog>
+<script src="catalog.js"></script>
+<script src="store.js"></script>
+<script src="search.js"></script>
