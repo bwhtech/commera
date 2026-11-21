@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { Button, TextInput } from 'frappe-ui'
+import { Button } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import { ia } from '../../ia/store'
 import EmptyState from '../EmptyState.vue'
@@ -63,12 +63,7 @@ const rows = computed(() =>
           <ListCell><span class="truncate text-base text-ink-gray-8">{{ item.title }}</span></ListCell>
           <ListCell><span class="truncate text-base text-ink-gray-5">{{ item.sku }}</span></ListCell>
           <ListCell><span class="text-base text-ink-gray-5 tabular-nums">{{ item.committed }}</span></ListCell>
-          <ListCell>
-            <!-- Read-only (:model-value only, no write): commera only exposes receiving stock
-                 (Style Attribute Variant.receive_stock, additive), not setting on-hand to an
-                 arbitrary number — the Receive stock dialog above is the write. -->
-            <TextInput :model-value="String(item.onHand)" size="sm" class="w-16" disabled />
-          </ListCell>
+          <ListCell><span class="text-base text-ink-gray-8 tabular-nums">{{ item.onHand }}</span></ListCell>
         </ListRow>
       </ListRows>
     </List>

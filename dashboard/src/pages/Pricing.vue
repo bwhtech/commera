@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { Button, Select, dialog, toast } from 'frappe-ui'
+import { Button, dialog, toast } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
@@ -23,14 +23,6 @@ function endSelecting() {
   selecting.value = false
   selection.value = []
 }
-
-// commera has no product-type schema at all (confirmed against the doctypes — the same
-// gap flagged as open question #1 in docs/commera-open-questions.md, where section 1 substituted
-// Collection for Type on its own judgement). That substitution needs the owner's yes/no before it
-// is repeated, so this stays a single always-selected option rather than silently becoming
-// something it isn't.
-const type = ref('all')
-const typeOptions = [{ label: __('All types'), value: 'all' }]
 
 const pricingRequest = useAdminRead('catalog.get_pricing_rows', {
   params: () => ({ page_length: 500 }),
@@ -126,9 +118,8 @@ function bulkSetCompareAt() {
 
   <PageBody>
     <div class="flex flex-wrap items-center gap-3">
-      <Select v-model="type" :options="typeOptions" disabled />
       <p v-if="!pricingRequest.loading" class="text-sm text-ink-gray-5">
-        {{ __('{0} sellable units · one row per variant, priced individually on its product', [rows.length]) }}
+        {{ __('{0} sellable units', [rows.length]) }}
       </p>
       <Button
         class="ms-auto"
