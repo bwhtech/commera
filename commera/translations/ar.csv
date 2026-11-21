@@ -2394,3 +2394,11 @@ Remove {0} from a collection,إزالة {0} من مجموعة
 A product must stay in at least one collection.,يجب أن يبقى المنتج في مجموعة واحدة على الأقل.
 {0} removed from {1},تمت إزالة {0} من {1}
 Remove from collection,إزالة من المجموعة
+Pick your company,اختر شركتك
+Pick the company your store sells for,اختر الشركة التي يبيع متجرك باسمها
+Price list,قائمة الأسعار
+Pick a selling price list,اختر قائمة أسعار بيع
+Pick a sale price list,اختر قائمة أسعار التخفيضات
+"Pick the price list as the sale list to sell without sale prices, or Duplicate for an empty one.",اختر قائمة الأسعار نفسها كقائمة التخفيضات للبيع دون أسعار مخفضة، أو اضغط تكرار لإنشاء قائمة فارغة.
+Warehouse,المستودع
+Pick the warehouse you ship from,اختر المستودع الذي تشحن منه
