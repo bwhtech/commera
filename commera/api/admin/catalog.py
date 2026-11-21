@@ -1402,6 +1402,12 @@ def add_missing_attribute_values(attribute: str, values: list, abbreviations: di
 def save_product_options(item_template: str, add: list | str | None = None, remove: list | str | None = None):
 	frappe.has_permission("Item", doc=item_template, ptype="write", throw=True)
 	frappe.has_permission("Item", ptype="create", throw=True)
+	if not frappe.db.get_value("Item", item_template, "has_variants"):
+		frappe.throw(
+			_("Product {0} is a single item without variants, so it has no options to edit").format(
+				item_template
+			)
+		)
 
 	configurator = frappe.db.get_value(
 		"Style Attribute Configurator",

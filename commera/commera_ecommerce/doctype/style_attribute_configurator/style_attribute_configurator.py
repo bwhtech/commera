@@ -24,6 +24,9 @@ class StyleAttributeConfigurator(Document):
 	# end: auto-generated types
 
 	def after_insert(self):
+		# The importer builds the SAVs itself.
+		if self.flags.skip_variant_generation:
+			return
 		settings = frappe.get_cached_doc("Commera Settings")
 
 		if settings.create_variants_automatically_on_configurator_creation:

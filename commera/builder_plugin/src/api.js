@@ -12,3 +12,9 @@ export const makeThemeLive = (theme) =>
 
 export const errorMessage = (error, fallback) =>
 	error?.messages?.[0] || fallback;
+
+export const getThemeAccess = () => call(`${API}get_theme_access`);
+export const getThemes = () => call(`${API}get_themes`);
+export const getTheme = (theme) => call(`${API}get_theme`, { theme });
+export const createTheme = (themeName) =>
+	call(`${API}create_theme`, { theme_name: themeName });

@@ -13,7 +13,11 @@ COLLECTIONS_FIELD = "custom_collections"
 
 def sync_collections(doc, method=None):
 	"""Item validate: dedupe the rows, check new ones, and keep item_group equal to the first."""
-	if not doc.has_variants or not doc.meta.has_field(COLLECTIONS_FIELD):
+	if not doc.meta.has_field(COLLECTIONS_FIELD):
+		return
+	if not doc.has_variants and not frappe.db.exists(
+		"Style Attribute Configurator", {"item_template": doc.name}
+	):
 		return
 
 	collections = [row.item_group for row in doc.get(COLLECTIONS_FIELD)]

@@ -154,6 +154,8 @@ class ShopTheme(Document):
 		settings_doctype = f"{self.theme_name} Settings"
 		create_theme_settings_doctype(settings_doctype, self.module)
 		self.db_set("theme_settings", settings_doctype, notify=True)
+		if frappe.conf.developer_mode:
+			export_module_json(self, is_standard=bool(self.is_standard), module=self.module)
 
 	def after_rename(self, old_name, new_name, merge=False):
 		validate_theme_name(old_name)

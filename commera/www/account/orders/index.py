@@ -6,6 +6,7 @@ import json
 import frappe
 from frappe import _
 from frappe.query_builder import DocType
+from frappe.query_builder.functions import Coalesce
 from pypika import CustomFunction, Order
 
 from commera.localization import url
@@ -86,7 +87,7 @@ def get_orders_list(order_id_list=None, page=1, page_length=6, owned_only=True):
 		"is_free_item",
 		sales_order_item.is_free_item,
 		"size",
-		color_size_item.size,
+		Coalesce(item_variant_attribute.attribute_value, color_size_item.size),
 	]
 	num_keys = len(json_object_args) // 2
 	arg_names = []
@@ -104,7 +105,10 @@ def get_orders_list(order_id_list=None, page=1, page_length=6, owned_only=True):
 		.left_join(item)
 		.on(item.name == style_attribute_variant.item_style)
 		.left_join(item_variant_attribute)
-		.on(item_variant_attribute.parent == sales_order_item.item_code)
+		.on(
+			(item_variant_attribute.parent == sales_order_item.item_code)
+			& (item_variant_attribute.attribute == "Size")
+		)
 		.left_join(payment_entry_reference)
 		.on(payment_entry_reference.reference_name == sales_order.name)
 		.left_join(warehouse)
@@ -119,7 +123,7 @@ def get_orders_list(order_id_list=None, page=1, page_length=6, owned_only=True):
 		.on(address.name == dynamic_link.parent)
 		.left_join(payment_entry)
 		.on(payment_entry_reference.parent == payment_entry.name)
-		.where(item_variant_attribute.attribute == "Size")
+		.where(color_size_item.item_code.isnotnull())
 	)
 	if owned_only:
 		base_query = base_query.where(get_shopper_order_condition(frappe.session.user))

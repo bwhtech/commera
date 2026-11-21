@@ -43,6 +43,8 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 			"settings_doctype": None,
 		}
 		frappe.db.delete("Theme Layout", {"theme": STARTER})
+		frappe.local.commera_storefront_menu = None
+		self.addCleanup(setattr, frappe.local, "commera_storefront_menu", None)
 
 	def render_home(self, products):
 		with (

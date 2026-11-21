@@ -1,13 +1,20 @@
-"""What the Commera theme bar in the Builder editor shows and does."""
+"""What the Commera theme bar in the Builder editor, and the Store themes view in its dashboard, show and do."""
 
 import frappe
 from frappe import _
 
-from commera.builder_themes.pages import HOME, PRODUCT_DETAIL, PRODUCT_LISTING, get_page_role, get_theme_pages
+from commera.builder_themes.pages import (
+	BUILDER_PLACEHOLDER_PREVIEW,
+	HOME,
+	PRODUCT_DETAIL,
+	PRODUCT_LISTING,
+	get_page_role,
+	get_theme_pages,
+)
 from commera.localization.urls import url
 from commera.sdk import catalog
 from commera.sdk.format import image_url
-from commera.shop_themes.doctype.shop_theme.shop_theme import resolve_active_theme
+from commera.shop_themes.doctype.shop_theme.shop_theme import BUILDER_THEME_TYPE, resolve_active_theme
 
 PREVIEW_PRODUCT_COUNT = 12
 PREVIEW_IMAGE_WIDTH = 160
@@ -22,10 +29,46 @@ def get_theme_bar(page_id: str) -> dict | None:
 		"theme": role.theme,
 		"is_live": role.theme == resolve_active_theme(),
 		"page_type": role.page_type,
-		"pages": [get_page_tab(page_type, page) for page_type, page in get_theme_pages(role.theme).items()],
+		"pages": get_page_tabs(role.theme),
 		"preview": get_preview(role.page_type),
 		"storefront_path": get_storefront_path(role.page_type),
 	}
+
+
+def get_themes() -> dict:
+	"""The Builder themes the user can read, most recently changed first, and the theme shoppers see."""
+	names = frappe.get_list(
+		"Shop Theme",
+		filters={"theme_type": BUILDER_THEME_TYPE},
+		pluck="name",
+		order_by="modified desc",
+		limit_page_length=0,
+	)
+	return {"live_theme": resolve_active_theme(), "themes": [get_theme(name) for name in names]}
+
+
+def get_theme(theme: str) -> dict:
+	if frappe.db.get_value("Shop Theme", theme, "theme_type") != BUILDER_THEME_TYPE:
+		frappe.throw(_("{0} is not a Builder theme").format(theme), frappe.DoesNotExistError)
+	live_theme = resolve_active_theme()
+	pages = get_page_tabs(theme)
+	return {
+		"theme": theme,
+		"is_live": theme == live_theme,
+		"live_theme": live_theme,
+		"preview": next((page["preview"] for page in pages if page["page_type"] == HOME), None),
+		"pages": pages,
+		"store_url": url("/"),
+	}
+
+
+def get_page_tabs(theme: str) -> list[dict]:
+	"""The theme's pages that the user may read: a tab carries the page's screenshot and its drafts' state."""
+	return [
+		get_page_tab(page_type, page)
+		for page_type, page in get_theme_pages(theme).items()
+		if frappe.has_permission("Builder Page", "read", doc=page)
+	]
 
 
 def get_page_labels() -> dict[str, str]:
@@ -41,6 +84,8 @@ def get_page_tab(page_type: str, page_name: str) -> dict:
 		"is_published": bool(page.published),
 		"has_unpublished_changes": bool(page.draft_blocks) and bool(page.published),
 		"is_empty": is_empty(page),
+		# Builder's screenshot of the page, once it has taken one
+		"preview": page.preview if page.preview and page.preview != BUILDER_PLACEHOLDER_PREVIEW else None,
 	}
 
 

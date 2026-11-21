@@ -1,2 +1,4 @@
 /* The editor already loads frappe-ui's styles and fonts. This adds only the utility classes the plugin uses. */
+/* The editor shares frappe-ui/list through its import map, which does not load the list's own stylesheet. */
+@import '../node_modules/frappe-ui/src/molecules/list/style.css';
 @tailwind utilities;

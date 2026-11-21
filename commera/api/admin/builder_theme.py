@@ -1,18 +1,47 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
-"""The Commera theme bar in the Frappe Builder editor."""
+"""The Commera theme bar in the Frappe Builder editor, and the Store themes view in its dashboard."""
 
 import frappe
 
 from commera.api.admin.theme import activate_theme
 from commera.builder_themes import editor
+from commera.builder_themes.theme import create_builder_theme
 
 
 @frappe.whitelist()
 def get_theme_bar(page_id: str):
 	frappe.has_permission("Builder Page", ptype="read", doc=page_id, throw=True)
 	return editor.get_theme_bar(page_id)
+
+
+@frappe.whitelist()
+def get_theme_access():
+	"""Whether the Store themes view shows for this user, and whether it offers New theme."""
+	return {
+		"can_read": bool(frappe.has_permission("Shop Theme", ptype="read")),
+		"can_create": bool(frappe.has_permission("Shop Theme", ptype="create")),
+	}
+
+
+@frappe.whitelist()
+def get_themes():
+	frappe.has_permission("Shop Theme", ptype="read", throw=True)
+	return editor.get_themes()
+
+
+@frappe.whitelist()
+def get_theme(theme: str):
+	frappe.has_permission("Shop Theme", ptype="read", doc=theme, throw=True)
+	return editor.get_theme(theme)
+
+
+@frappe.whitelist(methods=["POST"])
+def create_theme(theme_name: str):
+	"""A new Builder theme with three empty pages. Returns it as the Store themes view shows it."""
+	frappe.has_permission("Shop Theme", ptype="create", throw=True)
+	return editor.get_theme(create_builder_theme(theme_name.strip()).name)
 
 
 @frappe.whitelist()
