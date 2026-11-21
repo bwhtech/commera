@@ -4,7 +4,7 @@ from frappe.utils import create_batch
 from frappe.utils.caching import redis_cache
 from frappe.utils.data import cint, cstr, flt, sha256_hash
 
-from commera.api.admin.catalog import DEFAULT_OPTION_ATTRIBUTE, DEFAULT_SIZE_VALUE
+from commera.api.admin.catalog import DEFAULT_OPTION_ATTRIBUTE, DEFAULT_OPTION_VALUE, DEFAULT_SIZE_VALUE
 from commera.base_prices import get_sales_units
 from commera.localization import get_localization, translate
 from commera.localization.market_prices import MarketPrices
@@ -288,7 +288,7 @@ def get_product(handle: str) -> Product | None:
 		"handle": product_variant.route,
 		"title": title,
 		"vendor": item.brand,
-		"color": translate_term(product_variant.attribute_value),
+		"color": get_option_color(product_variant.attribute_value),
 		"description_html": content["description"],
 		"images": detail["images"],
 		"collection": get_product_collection(product_variant.item_group),
@@ -394,7 +394,7 @@ def get_product_card(
 		"title": card["title"],
 		"vendor": card["brand"],
 		"product_type": card["item_group"],
-		"color": translate_term(card["attribute_value"]),
+		"color": get_option_color(card["attribute_value"]),
 		"image": card["image"],
 		"hover_image": card["hover_image"],
 		"currency": prices.currency,
@@ -468,6 +468,11 @@ def get_variant(
 		"available": price is not None and bool(stock.get("in_stock")),
 		"quantity_available": None if stock.get("unlimited") else flt(stock.get("stock_qty")),
 	}
+
+
+def get_option_color(attribute_value: str) -> str | None:
+	# A product without colours has the placeholder option "Standard": themes must not print it after the title.
+	return None if attribute_value == DEFAULT_OPTION_VALUE else translate_term(attribute_value)
 
 
 def get_options(product_variant, sizes: list[dict]) -> list[ProductOption]:
