@@ -1,0 +1,20 @@
+{%- import "templates/emails/macros.html" as email -%}
+{%- call email.layout(_("Return {0} received for order {1}.").format(returned.name, order.name) if returned.name else _("Your return for order {0} reached us.").format(order.name), language) -%}
+{{ email.header(brand, _("Return {0}").format(returned.name) if returned.name else _("Order {0}").format(order.name)) }}
+{%- call email.card(first=True) %}
+{{ email.heading(_("Thanks, {0}. We got your return.").format(first_name) if first_name else _("Thanks. We got your return.")) }}
+{{ email.intro(_("Your returned items reached us. We'll email you again when your refund is on its way.")) }}
+{%- if returned.name %}
+{{ email.amount_panel(_("Return number"), returned.name, _("Received on {0}, for order {1}.").format(returned.received_on, "{0}"), order.name) }}
+{%- endif %}
+{%- if order.link %}
+{{ email.button(order.link, _("View your order")) }}
+{%- endif %}
+{%- endcall %}
+{%- if returned["items"] %}
+{%- call email.card() %}
+{{ email.item_list(_("Items you returned"), returned["items"], order.currency) }}
+{%- endcall %}
+{%- endif %}
+{{ email.footer(brand, _("You're receiving this because you returned an item to {0}.").format(brand.name), _("Questions about your refund? Reply to this email and we'll help."), order.links) }}
+{%- endcall -%}

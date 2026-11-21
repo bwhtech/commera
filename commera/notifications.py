@@ -3,17 +3,19 @@ import re
 import frappe
 from frappe import _, _lt
 from frappe.contacts.doctype.address.address import get_company_address
+from frappe.email.doctype.email_account.email_account import EmailAccount
 from frappe.translate import print_language
-from frappe.utils import flt, formatdate, get_url, strip_html
+from frappe.utils import cint, flt, formatdate, get_url, strip_html
 
 from commera.api.payments import COD_PAYMENT_MODE
 from commera.api.shipping import get_charge_amount
 from commera.branding import get_configured_brand_assets
 from commera.discounts.allocations import get_price_discount_rows
+from commera.localization import StorefrontLanguages
 from commera.localization.market_prices import MarketPrices
 from commera.order_access import get_order_link, set_order_access_key
 from commera.storefront_access import get_store_name
-from commera.utils import get_item_images
+from commera.utils import get_item_images, get_return_deadline
 
 EMAIL_SUBJECTS = {
 	"order_confirmation": _lt("Order {order_number} confirmed"),
@@ -21,9 +23,25 @@ EMAIL_SUBJECTS = {
 	"back_in_stock": _lt("{item_name} is back in stock"),
 	"order_link": _lt("Your link to order {order_number}"),
 	"sign_in_code": _lt("Your {store_name} sign-in code"),
+	"order_shipped": _lt("Your order {order_number} has shipped"),
+	"order_delivered": _lt("Your order {order_number} was delivered"),
+	"order_refunded": _lt("Your refund for order {order_number} is on its way"),
+	"order_returned": _lt("We received your return for order {order_number}"),
+	"payment_failed": _lt("Your payment to {store_name} didn't go through"),
 }
 CUSTOMER_EMAILS = tuple(EMAIL_SUBJECTS)
 ALWAYS_ON_EMAILS = ("order_link", "sign_in_code")
+EVENT_EMAILS = {
+	"order_placed": "order_confirmation",
+	"order_cancelled": "order_cancelled",
+	"order_shipment_dispatched": "order_shipped",
+	"order_delivered": "order_delivered",
+	"order_refunded": "order_refunded",
+	"order_returned": "order_returned",
+}
+PAYMENT_FAILED_STATUSES = ("Not Paid",)
+INVOICE_PRINT_FORMAT = "Commera Invoice"
+ATTACHED_INVOICES = {"order_confirmation": False, "order_refunded": True}
 EMAIL_WRAPPER = "templates/emails/commera_document.html"
 
 
@@ -73,6 +91,7 @@ def send_customer_email(
 	reference=None,
 	language: str | None = None,
 	now: bool = False,
+	attachments: list[dict] | None = None,
 ):
 	if not is_customer_email_enabled(email):
 		return
@@ -86,6 +105,7 @@ def send_customer_email(
 			wrapper=EMAIL_WRAPPER,
 			add_css=False,
 			add_unsubscribe_link=False,
+			attachments=attachments,
 			reference_doctype=reference.doctype if reference else None,
 			reference_name=reference.name if reference else None,
 			now=now,
@@ -107,15 +127,203 @@ def get_email_content(email: str, setting, args: dict) -> dict:
 	}
 
 
-def send_order_email(email: str, sales_order, recipients: list[str]):
+def send(event):
+	if not frappe.flags.mute_emails and not EmailAccount.find_outgoing():
+		return
+	email = EVENT_EMAILS[event.name]
+	sales_order = frappe.get_doc("Sales Order", event.reference_name)
+	recipient = get_order_recipient(sales_order)
+	if recipient:
+		send_order_email(email, sales_order, [recipient], event.data)
+
+
+def get_order_recipient(sales_order) -> str | None:
+	return sales_order.contact_email or get_portal_user_email(sales_order.customer)
+
+
+def get_portal_user_email(customer: str) -> str | None:
+	portal_users = frappe.get_all("Portal User", {"parent": customer}, pluck="user", limit=1)
+	return portal_users[0] if portal_users else None
+
+
+def send_order_email(email: str, sales_order, recipients: list[str], event_data: dict | None = None):
+	if not is_customer_email_enabled(email):
+		return
 	with print_language(sales_order.language):
+		context = get_order_context(sales_order)
+		if add_context := EMAIL_CONTEXT.get(email):
+			add_context(context, sales_order, event_data or {})
 		send_customer_email(
 			email,
 			recipients,
-			get_order_context(sales_order),
+			context,
 			reference=sales_order,
 			language=sales_order.language,
+			attachments=get_order_attachments(email, sales_order),
 		)
+
+
+def add_shipped_context(context: dict, sales_order, event_data: dict):
+	shipped_lines = event_data.get("line_items")
+	order = context["order"]
+	if shipped_lines:
+		order["parcel_items"] = get_parcel_items(sales_order, order["line_items"], shipped_lines)
+		shipped_qty = sum(flt(line.get("qty")) for line in shipped_lines)
+		order["partial"] = shipped_qty < sum(flt(row.qty) for row in sales_order.items)
+	else:
+		order["parcel_items"] = []
+		order["partial"] = sales_order.get("custom_ecommerce_status") == "Partially Shipped"
+	context["shipment"] = {
+		"carrier": event_data.get("carrier"),
+		"awb": event_data.get("awb"),
+		"tracking_url": event_data.get("tracking_url"),
+	}
+
+
+def get_parcel_items(sales_order, order_items: list[dict], shipped_lines: list[dict]) -> list[dict]:
+	ordered_qty = {}
+	for row in sales_order.items:
+		ordered_qty[row.item_code] = ordered_qty.get(row.item_code, 0) + flt(row.qty)
+	items_by_code = {item["item_code"]: item for item in order_items}
+	parcel_items = []
+	for line in shipped_lines:
+		item = items_by_code.get(line.get("item_code"))
+		if not item or not ordered_qty.get(item["item_code"]):
+			continue
+		share = flt(line.get("qty")) / ordered_qty[item["item_code"]]
+		parcel_items.append(
+			{
+				**item,
+				"qty": f"{flt(line.get('qty')):g}",
+				"amount": item["amount"] * share,
+				"was_amount": item["was_amount"] * share if item["was_amount"] else None,
+			}
+		)
+	return parcel_items
+
+
+def add_delivered_context(context: dict, sales_order, event_data: dict):
+	return_period = cint(frappe.get_cached_doc("Commera Settings").return_period)
+	return_deadline = get_return_deadline(sales_order.name, return_period) if return_period else None
+	context["order"]["return_by"] = formatdate(return_deadline) if return_deadline else None
+
+
+def add_refunded_context(context: dict, sales_order, event_data: dict):
+	payment_entry = frappe.db.get_value(
+		"Payment Entry", event_data.get("payment_entry"), ["posting_date", "mode_of_payment"], as_dict=True
+	)
+	context["refund"] = {
+		"amount": flt(event_data.get("amount")),
+		"refunded_on": formatdate(payment_entry.posting_date) if payment_entry else None,
+		"method": payment_entry.mode_of_payment if payment_entry else None,
+	}
+
+
+def add_returned_context(context: dict, sales_order, event_data: dict):
+	return_lines = frappe.get_all(
+		"Delivery Note Item",
+		filters={
+			"against_sales_order": sales_order.name,
+			"parenttype": "Delivery Note",
+			"docstatus": 1,
+			"qty": ("<", 0),
+		},
+		fields=["parent", "item_code", "item_name", "qty", "creation"],
+		order_by="creation desc",
+	)
+	latest_return = return_lines[0].parent if return_lines else None
+	received_on = return_lines[0].creation if return_lines else None
+	context["returned"] = {
+		"name": latest_return,
+		"received_on": formatdate(received_on) if received_on else None,
+		"items": get_parcel_items(
+			sales_order,
+			context["order"]["line_items"],
+			[{"item_code": line.item_code, "qty": abs(flt(line.qty))} for line in return_lines],
+		),
+	}
+
+
+EMAIL_CONTEXT = {
+	"order_shipped": add_shipped_context,
+	"order_delivered": add_delivered_context,
+	"order_refunded": add_refunded_context,
+	"order_returned": add_returned_context,
+}
+
+
+def send_payment_failed_email(payment_request):
+	if payment_request.status not in PAYMENT_FAILED_STATUSES or payment_request.ref_doctype != "Quotation":
+		return
+	before_save = payment_request.get_doc_before_save()
+	if before_save and before_save.status in PAYMENT_FAILED_STATUSES:
+		return
+	quotation = frappe.get_doc("Quotation", payment_request.ref_docname)
+	recipient = quotation.contact_email or payment_request.customer_email
+	if not recipient or not is_customer_email_enabled("payment_failed"):
+		return
+	with print_language(quotation.language):
+		send_customer_email(
+			"payment_failed",
+			[recipient],
+			get_payment_failed_context(quotation, payment_request),
+			reference=quotation,
+			language=quotation.language,
+		)
+
+
+def get_payment_failed_context(quotation, payment_request) -> dict:
+	items = get_order_items(quotation)
+	total = get_charge_amount(quotation)
+	languages = StorefrontLanguages.load()
+	language = languages.find(quotation.language) or languages.default
+	return {
+		"brand": get_brand_context(quotation.company),
+		"store_name": get_store_name(),
+		"first_name": (quotation.customer_name or "").split(" ")[0],
+		"cart_url": get_url(f"/{language.code.lower()}/cart"),
+		"payment": {"amount": flt(payment_request.amount), "method": payment_request.gateway},
+		"order": {
+			"name": quotation.name,
+			"currency": quotation.currency,
+			"line_items": items,
+			"totals": get_order_totals(quotation, items, total),
+		},
+	}
+
+
+def get_invoice_print_format() -> str:
+	return (
+		frappe.get_cached_value("Commera Settings", "Commera Settings", "print_format")
+		or INVOICE_PRINT_FORMAT
+	)
+
+
+def get_order_attachments(email: str, sales_order) -> list[dict]:
+	is_return = ATTACHED_INVOICES.get(email)
+	if is_return is None or (not is_return and sales_order.custom_ecommerce_payment_mode == COD_PAYMENT_MODE):
+		return []
+	invoices = frappe.get_all(
+		"Sales Invoice",
+		filters=[
+			["Sales Invoice Item", "sales_order", "=", sales_order.name],
+			["docstatus", "=", 1],
+			["is_return", "=", int(is_return)],
+		],
+		pluck="name",
+		order_by="creation desc",
+		limit=1,
+	)
+	return [
+		{
+			"print_format_attachment": 1,
+			"doctype": "Sales Invoice",
+			"name": invoice,
+			"print_format": get_invoice_print_format(),
+			"lang": frappe.local.lang,
+		}
+		for invoice in invoices
+	]
 
 
 def get_brand_context(company: str | None = None) -> dict:
@@ -173,6 +381,7 @@ def get_order_items(sales_order) -> list[dict]:
 		image = images.get(row.item_code) or row.image
 		items.append(
 			{
+				"item_code": row.item_code,
 				"item_name": row.item_name,
 				"variant": variants.get(row.item_code),
 				"qty": f"{flt(row.qty):g}",

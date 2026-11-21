@@ -13,11 +13,12 @@ export function erpnextLink(doctype, name) {
 // NOTE: download_multi_pdf is gated on the User.bulk_actions permission, so a
 // shop owner without it gets Frappe's error page in the new tab, not a toast —
 // there is no way to know before opening it.
-export function printUrl(doctype, names) {
+export function printUrl(doctype, names, format) {
   const single = names.length === 1
   const params = new URLSearchParams(
     single ? { doctype, name: names[0] } : { doctype, name: JSON.stringify(names) },
   )
+  if (format) params.set('format', format)
   const method = single
     ? 'frappe.utils.print_format.download_pdf'
     : 'frappe.utils.print_format.download_multi_pdf'

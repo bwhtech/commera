@@ -174,6 +174,19 @@ setup_wizard_complete = [
 # Commera Webhooks: the handler counts only while an enabled webhook subscribes to the event.
 commera_events = {
 	event: ["commera.webhooks.deliver"]
+	+ (
+		["commera.notifications.send"]
+		if event
+		in (
+			"order_placed",
+			"order_cancelled",
+			"order_shipment_dispatched",
+			"order_delivered",
+			"order_refunded",
+			"order_returned",
+		)
+		else []
+	)
 	for event in (
 		"order_placed",
 		"order_paid",
@@ -249,17 +262,12 @@ doc_events = {
 			"commera.discounts.pricing.apply_code_discounts",
 			"commera.paid_checkout.restore_accepted_addresses",
 		],
-		"after_insert": [
-			"commera.discounts.usage.record_discount_uses",
-			"commera.jobs.send_order_success_acknowledgement",
-		],
+		"after_insert": "commera.discounts.usage.record_discount_uses",
 		"on_submit": [
-			"commera.jobs.send_order_success_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
 			"commera.plugin_events.on_sales_order_stock_reservation",
 		],
 		"on_cancel": [
-			"commera.jobs.send_order_cancel_acknowledgement",
 			"commera.utils.update_so_status_from_related_doc",
 			"commera.plugin_events.on_sales_order_cancel",
 			"commera.plugin_events.on_sales_order_stock_reservation",
@@ -365,6 +373,7 @@ jinja = {
 		"commera.localization.get_market_place",
 		"commera.localization.switch_url",
 		"commera.localization.url",
+		"commera.print_views.get_commera_print_view",
 		"commera.utils.format_theme_css",
 		"commera.utils.get_currency_symbol",
 		"commera.search.result_card.get_search_result_fields",

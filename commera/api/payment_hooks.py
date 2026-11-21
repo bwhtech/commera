@@ -4,10 +4,20 @@ from frappe import _
 from frappe.utils.data import flt, fmt_money
 
 from commera.api.payments import get_charge_amount, place_order
+from commera.notifications import send_payment_failed_email
 
 
 def on_payment_request_update(doc, method=None):
 	"""Turn a paid gateway request into a Sales Order, exactly once per payment."""
+	try:
+		send_payment_failed_email(doc)
+	except Exception:
+		frappe.log_error(
+			title="Could not send the payment_failed email",
+			reference_doctype=doc.doctype,
+			reference_name=doc.name,
+		)
+
 	if doc.status != "Paid" or doc.ref_doctype != "Quotation":
 		return
 

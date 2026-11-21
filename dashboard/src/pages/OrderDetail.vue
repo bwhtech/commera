@@ -80,7 +80,7 @@ const orderActions = [
     label: __('Print invoice'),
     icon: 'lucide-printer',
     condition: () => Boolean(order.value?.invoices?.length),
-    onClick: () => window.open(printUrl('Sales Invoice', order.value.invoices), '_blank', 'noopener'),
+    onClick: () => window.open(printUrl('Sales Invoice', order.value.invoices, order.value.invoice_print_format), '_blank', 'noopener'),
   },
   // Nothing is refundable on a COD, unpaid or already fully refunded order, so
   // the row is not offered at all rather than offered and then apologised for.

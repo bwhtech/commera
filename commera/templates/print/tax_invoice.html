@@ -1,0 +1,30 @@
+{% extends "commera/templates/print/layout.html" %}
+{% import "commera/templates/print/macros.html" as ui %}
+
+{% block body %}
+{{ ui.masthead(brand, doc.title, doc.posting_date) }}
+
+{{ ui.seller_hero(brand, doc.number_label, doc.name) }}
+
+<section class="facts facts-wide-middle">
+	<div class="fact">
+		{{ ui.address_block(_("Billed to"), doc.billing, extra_lines=[doc.customer_tax_id and brand.tax_id_label ~ " " ~ doc.customer_tax_id]) }}
+	</div>
+	<div class="fact">
+		{{ ui.address_block(_("Shipped to"), doc.shipping, _("Same as billing address")) }}
+	</div>
+	<div class="fact">
+		{{ ui.fact(_("Order"), doc.order_name, doc.transaction_date and _("Placed {0}").format(doc.transaction_date)) }}
+		{{ ui.fact(_("Payment"), doc.payment_method and _(doc.payment_method), doc.payment_status) }}
+	</div>
+</section>
+
+{{ ui.line_items_table(doc.lines, money, _("Qty"), _("Amount")) }}
+
+<section class="summary">
+	{{ ui.tax_breakdown(doc, money, _("Tax breakdown")) }}
+	{{ ui.invoice_totals(doc, money, _("Total"), _("Total tax")) }}
+</section>
+
+{{ ui.footer(brand, copy.closing) }}
+{% endblock %}

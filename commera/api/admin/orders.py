@@ -13,6 +13,7 @@ from commera.api.admin.plugins import query_deliveries
 from commera.api.shipping import get_order_charge_lines
 from commera.compat import make_delivery_note
 from commera.discounts.allocations import get_allocations, get_discount_rows, get_order_discount_rows
+from commera.notifications import get_invoice_print_format
 from commera.utils import get_address_lines, get_item_images, get_lines_the_store_ships, get_store_currency
 
 PAGE_LENGTH = 20
@@ -665,6 +666,7 @@ def get_order(sales_order: str):
 		],
 		"deliveries": lifecycle.get("printable_delivery_notes") or [],
 		"invoices": read_order_invoices(order.name),
+		"invoice_print_format": get_invoice_print_format(),
 		"plugin_failures": get_order_plugin_failures(order.name),
 	}
 

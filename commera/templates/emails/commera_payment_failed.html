@@ -1,0 +1,15 @@
+{%- import "templates/emails/macros.html" as email -%}
+{%- call email.layout(_("Your payment of {0} didn't go through. Your cart is saved.").format(email_money(payment.amount, order.currency)), language) -%}
+{{ email.header(brand) }}
+{%- call email.card(first=True) %}
+{{ email.heading(_("{0}, your payment didn't go through.").format(first_name) if first_name else _("Your payment didn't go through.")) }}
+{{ email.intro(_("Your order isn't lost. Your cart is saved, so you can try again with the same method or a different one.")) }}
+{{ email.amount_panel(_("To pay"), email_money(payment.amount, order.currency), _("Last tried with {0}."), payment.method) }}
+{{ email.button(cart_url, _("Try payment again")) }}
+{%- endcall %}
+{%- call email.card() %}
+{{ email.item_list(_("Order summary"), order.line_items, order.currency) }}
+{{ email.totals(order.totals, order.currency) }}
+{%- endcall %}
+{{ email.footer(brand, _("You're receiving this because you started a checkout at {0}.").format(brand.name), _("If money left your account, your bank will return it within 5 to 7 working days.")) }}
+{%- endcall -%}

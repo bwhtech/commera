@@ -1,0 +1,194 @@
+{% macro masthead(brand, kind, when) -%}
+<header class="masthead">
+	<div class="wordmark">
+		{% if brand.logo %}<img src="{{ brand.logo }}" alt="">{% else %}<span class="mark">{{ brand.initial }}</span>{% endif %}
+		{{ brand.name }}
+	</div>
+	<div class="doc-kind">
+		<strong>{{ kind }}</strong>
+		<span class="num">{{ when }}</span>
+	</div>
+</header>
+{%- endmacro %}
+
+{% macro hero(heading, lines, number_label, number, label=None) -%}
+<section class="hero">
+	<div class="hero-top">
+		<div>
+			{% if label %}<div class="caption">{{ label }}</div>{% endif %}
+			<h1>{{ heading }}</h1>
+			<p>{% for line in lines | select %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
+		</div>
+		<div class="doc-number">
+			<span>{{ number_label }}</span>
+			<b>{{ number }}</b>
+		</div>
+	</div>
+</section>
+{%- endmacro %}
+
+{% macro seller_hero(brand, number_label, number) -%}
+{{ hero(brand.legal_name or brand.name, [brand.address, brand.tax_id and brand.tax_id_label ~ " " ~ brand.tax_id], number_label, number) }}
+{%- endmacro %}
+
+{% macro address_block(label, address=None, empty_text=None, extra_lines=[]) -%}
+{% set extras = extra_lines | select | list %}
+{% if address or empty_text %}
+<div class="caption">{{ label }}</div>
+<address>
+	{%- if address %}<b>{{ address.name }}</b>{% for line in address.lines %}<br>{{ line }}{% endfor %}
+	{%- else %}{{ empty_text }}{% endif %}
+	{%- for line in extras %}<br>{{ line }}{% endfor %}
+</address>
+{% endif %}
+{%- endmacro %}
+
+{% macro fact(label, title, detail=None) -%}
+{% if title %}{{ address_block(label, {"name": title, "lines": []}, extra_lines=[detail]) }}{% endif %}
+{%- endmacro %}
+
+{% macro thumb(row) -%}
+{% if row.image %}<img class="thumb" src="{{ row.image }}" alt="">{% else %}<div class="thumb empty">{{ row.item_name[:1] }}</div>{% endif %}
+{%- endmacro %}
+
+{% macro product_cell(row, with_thumb=True) -%}
+<div class="product">
+	{% if with_thumb %}{{ thumb(row) }}{% endif %}
+	<div>
+		<div class="name">{{ row.item_name }}</div>
+		<div class="meta">
+			{%- if row.variant %}<span class="sku">{{ row.variant }}</span>{% endif -%}
+			<span class="sku">{{ _("SKU") }} {{ row.item_code }}</span>
+		</div>
+	</div>
+</div>
+{%- endmacro %}
+
+{% macro items_table(items, money) -%}
+<table class="items">
+	<thead>
+		<tr>
+			<th>{{ _("Product") }}</th>
+			<th class="r" style="width: 60px">{{ _("Qty") }}</th>
+			<th class="r" style="width: 100px">{{ _("Price") }}</th>
+			<th class="r" style="width: 100px">{{ _("Amount") }}</th>
+		</tr>
+	</thead>
+	<tbody>
+	{% for row in items %}
+		<tr>
+			<td>{{ product_cell(row) }}</td>
+			<td class="r num">{{ row.qty }}</td>
+			<td class="r num">
+				{% if row.was_rate %}<span class="strike">{{ money(row.was_rate) }}</span>{% endif %}
+				{{ money(row.rate) }}
+			</td>
+			<td class="r num">{{ money(row.amount) }}</td>
+		</tr>
+	{% endfor %}
+	</tbody>
+</table>
+{%- endmacro %}
+
+{% macro discount_label(discount) -%}
+{{ _("Discount ({0})").format(discount.label) if discount.label else _("Discount") }}
+{%- endmacro %}
+
+{% macro order_totals(totals, money) -%}
+<table class="totals">
+	<tr><td>{{ _("Subtotal") }}</td><td class="num">{{ money(totals.subtotal) }}</td></tr>
+	{% for discount in totals.discounts %}
+	<tr class="discount"><td>{{ discount_label(discount) }}</td><td class="num">&minus;{{ money(discount.amount) }}</td></tr>
+	{% endfor %}
+	{% for charge in totals.charges %}
+	<tr><td>{{ charge.label }}</td><td class="num">{{ money(charge.amount) if charge.amount else _("Free") }}</td></tr>
+	{% endfor %}
+	<tr class="grand"><td>{{ _("Total") }}</td><td class="num">{{ money(totals.total) }}</td></tr>
+	{% for tax in totals.included_taxes %}
+	<tr class="tax-note"><td colspan="2" class="num">{{ _("Includes {0} {1}").format(money(tax.amount), tax.label) }}</td></tr>
+	{% endfor %}
+</table>
+{%- endmacro %}
+
+{% macro footer(brand, closing) -%}
+<footer class="footer">
+	<div>
+		{% if closing %}{{ closing }}<br>{% endif %}
+		{{ [brand.legal_name, brand.address] | select | join(", ") }}.
+		{% if brand.tax_id %}<span class="nowrap">{{ brand.tax_id_label }} {{ brand.tax_id }}</span>{% endif %}
+	</div>
+	<div class="links">
+		<a href="{{ brand.url }}">{{ brand.url | replace("https://", "") | replace("http://", "") }}</a>
+	</div>
+</footer>
+{%- endmacro %}
+
+{% macro line_items_table(items, money, quantity_label, amount_label) -%}
+{% set show_hsn = items | selectattr("gst_hsn_code") | list %}
+<table class="items">
+	<thead>
+		<tr>
+			<th>{{ _("Description") }}</th>
+			{% if show_hsn %}<th style="width: 90px">{{ _("HSN/SAC") }}</th>{% endif %}
+			<th class="r" style="width: 70px">{{ quantity_label }}</th>
+			<th class="r" style="width: 100px">{{ _("Rate") }}</th>
+			<th class="r" style="width: 100px">{{ amount_label }}</th>
+		</tr>
+	</thead>
+	<tbody>
+	{% for row in items %}
+		<tr>
+			<td>{{ product_cell(row, with_thumb=False) }}</td>
+			{% if show_hsn %}<td class="num">{{ row.gst_hsn_code or "" }}</td>{% endif %}
+			<td class="r num">{{ "%g" | format(row.qty) }}</td>
+			<td class="r num">{{ money(row.rate) }}</td>
+			<td class="r num">{{ money(row.amount) }}</td>
+		</tr>
+	{% endfor %}
+	</tbody>
+</table>
+{%- endmacro %}
+
+{% macro tax_breakdown(doc, money, label) -%}
+<div>
+	{% if doc.taxes %}
+	<div class="caption">{{ label }}</div>
+	<table class="tax-table">
+		<thead><tr><th>{{ _("Tax") }}</th><th class="r">{{ _("Taxable value") }}</th><th class="r">{{ _("Amount") }}</th></tr></thead>
+		<tbody>
+		{% for tax in doc.taxes %}
+			<tr><td>{{ tax.label }}{% if tax.rate %} <span class="num">{{ tax.rate }}</span>{% endif %}</td><td class="r num">{{ money(tax.taxable_value) }}</td><td class="r num">{{ money(tax.amount) }}</td></tr>
+		{% endfor %}
+		{% if doc.taxes | length > 1 %}
+			<tr class="sum"><td>{{ _("Total tax") }}</td><td></td><td class="r num">{{ money(doc.total_taxes) }}</td></tr>
+		{% endif %}
+		</tbody>
+	</table>
+	{% endif %}
+	{% if doc.place_of_supply %}<p class="tax-hint">{{ _("Place of supply {0}").format(doc.place_of_supply) }}</p>{% endif %}
+	{% if doc.in_words %}<p class="tax-hint">{{ _("Amount in words: {0}").format(doc.in_words) }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro invoice_totals(doc, money, total_label, tax_label, highlight_discount=True) -%}
+{% set tax_line_label = doc.taxes[0].label if doc.taxes | length == 1 else tax_label %}
+<table class="totals invoice-totals">
+	<tr><td>{{ _("Subtotal") }}</td><td class="num">{{ money(doc.subtotal) }}</td></tr>
+	{% for discount in doc.discounts %}
+	<tr class="{{ 'discount' if highlight_discount }}"><td>{{ discount_label(discount) }}</td><td class="num">&minus;{{ money(discount.amount) }}</td></tr>
+	{% endfor %}
+	{% for charge in doc.charges %}
+	<tr><td>{{ charge.label }}</td><td class="num">{{ money(charge.amount) if charge.amount else _("Free") }}</td></tr>
+	{% endfor %}
+	{% if doc.taxes and not doc.taxes_included %}
+	{% if doc.discounts or doc.charges %}
+	<tr><td>{{ _("Taxable value") }}</td><td class="num">{{ money(doc.taxable_value) }}</td></tr>
+	{% endif %}
+	<tr><td>{{ tax_line_label }}</td><td class="num">{{ money(doc.total_taxes) }}</td></tr>
+	{% endif %}
+	<tr class="grand"><td>{{ total_label }}</td><td class="num">{{ money(doc.grand_total) }}</td></tr>
+	{% if doc.taxes_included %}
+	<tr class="tax-note"><td colspan="2" class="num">{{ _("Includes {0} {1}").format(money(doc.total_taxes), tax_line_label) }}</td></tr>
+	{% endif %}
+</table>
+{%- endmacro %}

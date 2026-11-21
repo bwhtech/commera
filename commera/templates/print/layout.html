@@ -1,0 +1,106 @@
+<style>
+	@font-face { font-family: "Inter"; src: url("/assets/frappe/css/fonts/inter/InterVariable.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
+	.commera-print {
+		{%- for name, value in tokens.colors.items() %}
+		--{{ name }}: {{ value.hex }};
+		{%- endfor %}
+		--radius-tag: {{ tokens.radius.tag }};
+		--radius-thumb: {{ tokens.radius.thumb }};
+		--radius-card: {{ tokens.radius.card }};
+		--accent: var(--ink-gray-9);
+		--accent-soft: var(--ink-white);
+	}
+
+	@page { size: A4; margin: 12mm 14mm; }
+	.print-format-gutter, .print-format { margin: 0 !important; padding: 0 !important; max-width: none !important; width: auto !important; box-shadow: none !important; border: 0 !important; background: var(--surface-base); }
+	.commera-print, .commera-print * { box-sizing: border-box; margin: 0; padding: 0; }
+	.commera-print {
+		background: var(--surface-base);
+		font-family: {{ tokens.font.family | safe }};
+		font-weight: {{ tokens.font.regular }};
+		font-size: 13px;
+		letter-spacing: 0.005em;
+		line-height: 1.15;
+		color: var(--ink-gray-9);
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+		font-feature-settings: "cv11", "ss01";
+	}
+	.commera-print .num { font-variant-numeric: tabular-nums; }
+	.commera-print .caption { font-size: 12px; color: var(--ink-gray-5); margin-bottom: 6px; }
+	.commera-print address { font-style: normal; font-size: 12px; line-height: 1.5; color: var(--ink-gray-7); }
+	.commera-print address b { color: var(--ink-gray-9); font-weight: {{ tokens.font.medium }}; }
+
+	.commera-print .masthead { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; }
+	.commera-print .wordmark { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: {{ tokens.font.semibold }}; letter-spacing: -0.01em; }
+	.commera-print .wordmark img { height: 28px; width: auto; }
+	.commera-print .wordmark .mark {
+		width: 28px; height: 28px; border-radius: var(--radius-thumb);
+		background: var(--accent); color: var(--accent-soft);
+		display: grid; place-items: center; font-size: 15px; font-weight: 700;
+	}
+	.commera-print .doc-kind { text-align: right; font-size: 12px; color: var(--ink-gray-5); line-height: 1.5; }
+	.commera-print .doc-kind strong { display: block; color: var(--ink-gray-9); font-size: 13px; font-weight: {{ tokens.font.medium }}; }
+
+	.commera-print .hero { background: var(--surface-gray-2); color: var(--ink-gray-7); border-radius: var(--radius-card); padding: 24px 28px 20px; }
+	.commera-print .hero-top { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; }
+	.commera-print .hero h1 { font-size: 27px; font-weight: {{ tokens.font.semibold }}; letter-spacing: -0.02em; line-height: 1.12; color: var(--ink-gray-9); }
+	.commera-print .hero p { margin-top: 8px; font-size: 13px; line-height: 1.55; max-width: 60ch; }
+	.commera-print .hero .doc-number { text-align: right; }
+	.commera-print .hero .doc-number span { display: block; font-size: 12px; color: var(--ink-gray-5); margin-bottom: 6px; }
+	.commera-print .hero .doc-number b { font-size: 22px; font-weight: {{ tokens.font.semibold }}; letter-spacing: -0.01em; color: var(--ink-gray-9); }
+
+	.commera-print .facts { display: grid; grid-template-columns: 1.2fr 1fr 1fr; margin-top: 20px; border-bottom: 1px solid var(--outline-gray-2); padding-bottom: 16px; }
+	.commera-print .fact { padding-right: 14px; }
+	.commera-print .fact + .fact { padding-left: 14px; border-left: 1px solid var(--outline-gray-1); }
+	.commera-print .fact .caption + address + .caption { margin-top: 12px; }
+	.commera-print .facts-wide-middle { grid-template-columns: 1fr 1.25fr 0.85fr; }
+
+	.commera-print .items { width: 100%; border-collapse: collapse; margin-top: 18px; }
+	.commera-print .items thead { display: table-header-group; }
+	.commera-print .items tr { break-inside: avoid; }
+	.commera-print .items th, .commera-print .tax-table th {
+		font-size: 12px; font-weight: {{ tokens.font.regular }}; color: var(--ink-gray-5); text-align: left;
+		padding: 0 0 10px; border-bottom: 1px solid var(--outline-gray-2); white-space: nowrap;
+	}
+	.commera-print .items td { padding: 8px 0; border-bottom: 1px solid var(--outline-gray-1); vertical-align: middle; }
+	.commera-print .items .r, .commera-print .tax-table .r { text-align: right; white-space: nowrap; padding-left: 12px; }
+	.commera-print .items tr:last-child td { border-bottom: 1px solid var(--outline-gray-2); }
+	.commera-print .product { display: flex; align-items: center; gap: 14px; }
+	.commera-print .thumb { width: 36px; height: 44px; border-radius: var(--radius-thumb); object-fit: cover; background: var(--surface-gray-2); flex: none; }
+	.commera-print .thumb.empty { display: grid; place-items: center; color: var(--ink-gray-5); font-size: 16px; }
+	.commera-print .product .name { font-size: 13px; font-weight: {{ tokens.font.medium }}; margin-bottom: 4px; }
+	.commera-print .product .meta { font-size: 12px; color: var(--ink-gray-5); line-height: 1.4; }
+	.commera-print .product .meta .sku { margin-left: 12px; padding-left: 12px; border-left: 1px solid var(--outline-gray-2); }
+	.commera-print .product .meta .sku:first-child { margin-left: 0; padding-left: 0; border-left: 0; }
+	.commera-print .strike { text-decoration: line-through; color: var(--ink-gray-5); font-size: 12px; display: block; margin-bottom: 3px; }
+
+	.commera-print .summary { display: grid; grid-template-columns: 1fr 250px; gap: 40px; margin-top: 16px; break-inside: avoid; }
+	.commera-print .totals { width: 100%; border-collapse: collapse; }
+	.commera-print .totals td { padding: 4px 0; font-size: 13px; }
+	.commera-print .totals td:last-child { text-align: right; white-space: nowrap; }
+	.commera-print .totals .discount td:last-child { color: var(--ink-green-6); }
+	.commera-print .totals .grand td { padding-top: 14px; border-top: 1px solid var(--outline-gray-2); font-size: 16px; font-weight: {{ tokens.font.semibold }}; }
+	.commera-print .totals .grand td:last-child { color: var(--accent); }
+	.commera-print .totals .tax-note td { font-size: 12px; color: var(--ink-gray-5); padding-top: 4px; }
+
+	.commera-print .footer {
+		margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--outline-gray-1); break-inside: avoid;
+		display: grid; grid-template-columns: 1fr auto; gap: 24px; font-size: 12px; color: var(--ink-gray-5); line-height: 1.55;
+	}
+	.commera-print .footer a { color: var(--ink-gray-7); text-decoration: none; }
+	.commera-print .footer .links { text-align: right; white-space: nowrap; }
+	.commera-print .nowrap { white-space: nowrap; }
+
+	.commera-print .tax-table { width: 100%; border-collapse: collapse; }
+	.commera-print .tax-table th { padding-bottom: 8px; }
+	.commera-print .tax-table td { padding: 7px 0; border-bottom: 1px solid var(--outline-gray-1); }
+	.commera-print .tax-table .sum td { border-bottom: 0; font-weight: {{ tokens.font.medium }}; }
+	.commera-print .invoice-totals { align-self: start; }
+	.commera-print .tax-hint { margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--ink-gray-5); }
+	.commera-print .tax-hint + .tax-hint { margin-top: 4px; }
+	{% block styles %}{% endblock %}
+</style>
+<div class="commera-print">
+{% block body %}{% endblock %}
+</div>

@@ -1,0 +1,4 @@
+{%- set print_view = get_commera_print_view(doc) -%}
+{%- with doc = print_view.doc, brand = print_view.brand, money = print_view.money, tokens = print_view.tokens, copy = print_view["copy"] -%}
+{% include print_view.template %}
+{%- endwith -%}

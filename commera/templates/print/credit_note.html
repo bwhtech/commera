@@ -1,0 +1,30 @@
+{% extends "commera/templates/print/layout.html" %}
+{% import "commera/templates/print/macros.html" as ui %}
+
+{% block body %}
+{{ ui.masthead(brand, doc.title, doc.posting_date) }}
+
+{{ ui.seller_hero(brand, doc.number_label, doc.name) }}
+
+<section class="facts">
+	<div class="fact">
+		{{ ui.address_block(_("Credited to"), doc.billing, extra_lines=[doc.customer_tax_id and brand.tax_id_label ~ " " ~ doc.customer_tax_id]) }}
+	</div>
+	<div class="fact">
+		{{ ui.fact(_("Against invoice"), doc.return_against, doc.return_against_date and _("Dated {0}").format(doc.return_against_date)) }}
+	</div>
+	<div class="fact">
+		{{ ui.fact(_("Refund to"), doc.refund_method and _(doc.refund_method)) }}
+		{{ ui.fact(_("Order"), doc.order_name) }}
+	</div>
+</section>
+
+{{ ui.line_items_table(doc.lines, money, _("Returned"), _("Credit")) }}
+
+<section class="summary">
+	{{ ui.tax_breakdown(doc, money, _("Tax reversed")) }}
+	{{ ui.invoice_totals(doc, money, _("Total credited"), _("Tax reversed"), highlight_discount=False) }}
+</section>
+
+{{ ui.footer(brand, copy.closing) }}
+{% endblock %}
