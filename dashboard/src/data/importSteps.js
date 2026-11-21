@@ -21,3 +21,11 @@ export const SOURCE_STEPS = {
 export const stepsFor = (source) => SOURCE_STEPS[source] ?? SOURCE_STEPS.csv
 
 export const stepIndex = (source, key) => stepsFor(source).findIndex((step) => step.key === key)
+
+export const resultExits = (canRouteAway) =>
+  canRouteAway
+    ? [
+        { label: __('View my products'), path: '/products' },
+        { label: __('Back to overview'), path: '/' },
+      ]
+    : [{ label: __('Back to setup') }]
