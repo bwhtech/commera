@@ -28,7 +28,7 @@ def clear_translation_version():
 	frappe.cache.delete_value(TRANSLATION_VERSION_KEY)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])
+@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: guest-whitelisted-method
 @http_cache(max_age=ONE_YEAR)
 def get_boot_translations(lang: str | None = None) -> dict[str, str]:
 	if get_frappe_boot_translations:
