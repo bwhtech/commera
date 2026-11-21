@@ -40,8 +40,7 @@ class ProductReview(Document):
 	def autoname(self):
 		# Deterministic and PII-free: a plain {variant}-{owner} name leaks reviewer emails to any
 		# guest reading get_reviews, and risks overflowing the 140-char name limit.
-		digest = hashlib.sha256(f"{self.variant}:{self.owner}".encode()).hexdigest()
-		self.name = digest[:16]
+		self.name = get_review_name(self.variant, self.owner)
 
 	def validate(self):
 		if not 1 <= cint(self.rating) <= 5:
@@ -60,6 +59,10 @@ class ProductReview(Document):
 	def on_trash(self):
 		if cint(self.is_published):
 			recompute_variant_rating(self.variant)
+
+
+def get_review_name(variant: str, owner: str) -> str:
+	return hashlib.sha256(f"{variant}:{owner}".encode()).hexdigest()[:16]
 
 
 def recompute_variant_rating(variant: str) -> None:
