@@ -191,15 +191,6 @@ export function buildProductActions(product, router, handlers = {}) {
       ],
     },
     {
-      id: 'insight',
-      label: __('Reporting'),
-      items: [
-        // orders.get_orders searches order name and customer name only — there is no
-        // product filter to send, so the row promises no more than the trip it makes.
-        { key: 'orders', label: __('Open the orders list'), icon: 'lucide-shopping-bag', onClick: () => router.push('/orders') },
-      ],
-    },
-    {
       id: 'manage',
       label: __('Manage'),
       items: [

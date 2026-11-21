@@ -26,9 +26,7 @@ const rows = computed(() => movementsRequest.data?.rows ?? [])
   <AppPageHeader :title="__('Adjustments')" back-to="/inventory" />
 
   <PageBody>
-    <p class="text-p-sm text-ink-gray-5">{{ __('Every stock movement, in order. Read-only.') }}</p>
-
-    <div class="mt-3 overflow-x-auto">
+    <div class="overflow-x-auto">
       <List class="min-w-[52rem]" :row-height="ia.density" :columns="['7rem', '1fr', '11rem', '6rem', '9rem', '7rem']">
       <ListHeader>
         <ListHeaderCell>{{ __('Date') }}</ListHeaderCell>
