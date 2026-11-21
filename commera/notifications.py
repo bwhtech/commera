@@ -40,6 +40,8 @@ EVENT_EMAILS = {
 	"order_returned": "order_returned",
 }
 PAYMENT_FAILED_STATUSES = ("Not Paid",)
+INVOICE_PRINT_FORMAT = "Commera Invoice"
+ATTACHED_INVOICES = {"order_confirmation": False, "order_refunded": True}
 EMAIL_WRAPPER = "templates/emails/commera_document.html"
 
 
@@ -89,6 +91,7 @@ def send_customer_email(
 	reference=None,
 	language: str | None = None,
 	now: bool = False,
+	attachments: list[dict] | None = None,
 ):
 	if not is_customer_email_enabled(email):
 		return
@@ -102,6 +105,7 @@ def send_customer_email(
 			wrapper=EMAIL_WRAPPER,
 			add_css=False,
 			add_unsubscribe_link=False,
+			attachments=attachments,
 			reference_doctype=reference.doctype if reference else None,
 			reference_name=reference.name if reference else None,
 			now=now,
@@ -155,6 +159,7 @@ def send_order_email(email: str, sales_order, recipients: list[str], event_data:
 			context,
 			reference=sales_order,
 			language=sales_order.language,
+			attachments=get_order_attachments(email, sales_order),
 		)
 
 
@@ -285,6 +290,40 @@ def get_payment_failed_context(quotation, payment_request) -> dict:
 			"totals": get_order_totals(quotation, items, total),
 		},
 	}
+
+
+def get_invoice_print_format() -> str:
+	return (
+		frappe.get_cached_value("Commera Settings", "Commera Settings", "print_format")
+		or INVOICE_PRINT_FORMAT
+	)
+
+
+def get_order_attachments(email: str, sales_order) -> list[dict]:
+	is_return = ATTACHED_INVOICES.get(email)
+	if is_return is None or (not is_return and sales_order.custom_ecommerce_payment_mode == COD_PAYMENT_MODE):
+		return []
+	invoices = frappe.get_all(
+		"Sales Invoice",
+		filters=[
+			["Sales Invoice Item", "sales_order", "=", sales_order.name],
+			["docstatus", "=", 1],
+			["is_return", "=", int(is_return)],
+		],
+		pluck="name",
+		order_by="creation desc",
+		limit=1,
+	)
+	return [
+		{
+			"print_format_attachment": 1,
+			"doctype": "Sales Invoice",
+			"name": invoice,
+			"print_format": get_invoice_print_format(),
+			"lang": frappe.local.lang,
+		}
+		for invoice in invoices
+	]
 
 
 def get_brand_context(company: str | None = None) -> dict:
