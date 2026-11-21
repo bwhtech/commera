@@ -93,6 +93,7 @@ class TestCountryChoices(CountrySwitcherTestCase):
 		self.open("/ar-ae/products")
 		self.addCleanup(setattr, frappe.local, "lang", frappe.local.lang)
 		frappe.local.lang = "ar"
+		frappe.translate.clear_cache()
 
 		gulf = get_country_choices()[1]
 		self.assertEqual(
