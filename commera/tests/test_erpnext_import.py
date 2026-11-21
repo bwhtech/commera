@@ -152,13 +152,15 @@ class TestErpnextImport(ProductOnboardingTestCase):
 		item_name = frappe.db.get_value("Item", red_small, "item_name")
 		self.run_import([template])
 
-		self.assertEqual(LineProducts([red_small]).get_title(red_small, item_name), "Field Hoodie - Red - S")
+		self.assertEqual(
+			LineProducts([red_small]).get_order_title(red_small, item_name), "Field Hoodie - Red - S"
+		)
 
 	def test_an_imported_plain_item_line_reads_its_name(self):
 		plain = self.make_plain_item()
 		self.run_import([plain])
 
-		self.assertEqual(LineProducts([plain]).get_title(plain, plain), plain)
+		self.assertEqual(LineProducts([plain]).get_order_title(plain, plain), plain)
 
 	def test_a_commera_variant_line_keeps_its_item_name(self):
 		item_template = create_product(
@@ -173,7 +175,7 @@ class TestErpnextImport(ProductOnboardingTestCase):
 
 		for item_code in item_codes:
 			item_name = frappe.db.get_value("Item", item_code, "item_name")
-			self.assertEqual(products.get_title(item_code, item_name), item_name)
+			self.assertEqual(products.get_order_title(item_code, item_name), item_name)
 
 	def test_a_colour_and_size_template_with_another_attribute_keeps_it_in_the_size_label(self):
 		template, (small_cotton, small_linen) = self.make_template(

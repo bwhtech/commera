@@ -22,18 +22,24 @@ class LineProducts:
 
 	def get_title(self, item_code: str, item_name: str | None) -> str | None:
 		"""The line title as on the product card, followed by the size, like the Item's own name."""
-		product = self.products.get(item_code)
 		if self.localization.language.code == self.localization.default_language.code:
-			if not product or not product.title:
-				return item_name
-			return get_variant_title(
-				product.title,
-				product.attribute_value or DEFAULT_OPTION_VALUE,
-				product.size or DEFAULT_SIZE_VALUE,
-			)
+			return item_name
+		product = self.products.get(item_code)
 		if not product or not product.title:
 			return _(item_name, lang=self.localization.language.code) if item_name else item_name
 		return get_product_label(product)
+
+	def get_order_title(self, item_code: str, item_name: str | None) -> str | None:
+		"""As get_title, but an imported ERPNext variant keeps ERPNext's "<title>-<abbreviations>" name, so an
+		order line is titled from its product in every language."""
+		if self.localization.language.code != self.localization.default_language.code:
+			return self.get_title(item_code, item_name)
+		product = self.products.get(item_code)
+		if not product or not product.title:
+			return item_name
+		return get_variant_title(
+			product.title, product.attribute_value or DEFAULT_OPTION_VALUE, product.size or DEFAULT_SIZE_VALUE
+		)
 
 	def get_label(self, item_code: str) -> str:
 		"""The product and size for a message to the shopper, in any language; never the item code."""
