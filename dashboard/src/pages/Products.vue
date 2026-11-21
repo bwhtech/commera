@@ -54,11 +54,15 @@ const collectionFilterOptions = computed(() => [
   ...collectionPickerOptions.value,
 ])
 
-// Item only carries a disabled flag — there is no "draft" state in the catalog,
-// so the tab stays for parity with the approved design but always reads empty.
 const disabledFilter = computed(() => {
-  if (status.value === 'active') return 0
+  if (status.value === 'active' || status.value === 'draft') return 0
   if (status.value === 'archived') return 1
+  return undefined
+})
+
+const publishedFilter = computed(() => {
+  if (status.value === 'active') return 1
+  if (status.value === 'draft') return 0
   return undefined
 })
 
@@ -67,6 +71,7 @@ const productsRequest = useAdminRead('catalog.get_products', {
     search: query.value || undefined,
     collection: collection.value !== 'all' ? collection.value : undefined,
     disabled: disabledFilter.value,
+    published: publishedFilter.value,
     start: (page.value - 1) * pageSize.value,
     page_length: pageSize.value,
   }),
@@ -86,12 +91,11 @@ watch([query, status, collection, page, pageSize], () => {
   selection.value = []
 })
 
-const total = computed(() => (status.value === 'draft' ? 0 : productsRequest.data?.total ?? 0))
+const total = computed(() => productsRequest.data?.total ?? 0)
 
 // The endpoint always orders by last-modified — the toggle re-sorts the
 // loaded page itself, which is all a merchant is looking at when they click a header.
 const rows = computed(() => {
-  if (status.value === 'draft') return []
   const products = productsRequest.data?.products ?? []
   const { key, direction } = sort.value
   const dir = direction === 'asc' ? 1 : -1
@@ -264,7 +268,7 @@ function collectionSummary(product) {
               </div>
             </div>
           </ListCell>
-          <ListCell><StatusBadge :status="item.disabled ? 'archived' : 'active'" /></ListCell>
+          <ListCell><StatusBadge :status="item.disabled ? 'archived' : item.published_count ? 'active' : 'draft'" /></ListCell>
           <ListCell>
             <span class="truncate text-base text-ink-gray-7" :title="item.collections?.join(', ')">
               {{ collectionSummary(item) }}
