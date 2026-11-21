@@ -19,6 +19,7 @@ import AppsSettings from './AppsSettings.vue'
 import CloudSettingsPanel from './CloudSettingsPanel.vue'
 import CashOnDeliverySettings from './CashOnDeliverySettings.vue'
 import CheckoutSettings from './CheckoutSettings.vue'
+import CustomerEmailsSettings from './CustomerEmailsSettings.vue'
 import PluginSettingsPanel from './PluginSettingsPanel.vue'
 import GeneralSettings from './GeneralSettings.vue'
 import PluginsSettings from './PluginsSettings.vue'
@@ -118,6 +119,10 @@ watch(
             <template #prefix><span class="lucide-sun-moon size-4" aria-hidden="true" /></template>
             {{ __('Appearance') }}
           </SettingsNavItem>
+          <SettingsNavItem value="emails">
+            <template #prefix><span class="lucide-mail size-4" aria-hidden="true" /></template>
+            {{ __('Customer emails') }}
+          </SettingsNavItem>
           <SettingsNavItem value="languages">
             <template #prefix><span class="lucide-languages size-4" aria-hidden="true" /></template>
             {{ __('Languages') }}
@@ -206,6 +211,10 @@ watch(
       <SettingsContent class="commera-settings min-w-0" :class="{ 'max-sm:hidden': !settings.pickedTab }">
         <SettingsPanel value="general" class="min-w-0">
           <GeneralSettings :active="settings.open && settings.tab === 'general'" />
+        </SettingsPanel>
+
+        <SettingsPanel value="emails" class="min-w-0">
+          <CustomerEmailsSettings :active="settings.open && settings.tab === 'emails'" />
         </SettingsPanel>
 
         <SettingsPanel value="languages" class="min-w-0">

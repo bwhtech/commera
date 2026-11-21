@@ -2402,3 +2402,36 @@ Pick a sale price list,اختر قائمة أسعار التخفيضات
 "Pick the price list as the sale list to sell without sale prices, or Duplicate for an empty one.",اختر قائمة الأسعار نفسها كقائمة التخفيضات للبيع دون أسعار مخفضة، أو اضغط تكرار لإنشاء قائمة فارغة.
 Warehouse,المستودع
 Pick the warehouse you ship from,اختر المستودع الذي تشحن منه
+Your user has no email address to send the test to.,لا يوجد عنوان بريد إلكتروني لمستخدمك لإرسال الاختبار إليه.
+Place a test order on your store first. This email shows an order.,قدّم طلبًا تجريبيًا في متجرك أولًا. هذا البريد يعرض طلبًا.
+There is no {0} email.,لا يوجد بريد {0}.
+Sample product,منتج تجريبي
+Customer emails,رسائل العملاء
+Template saved,تم حفظ القالب
+Back to the built-in design,تمت العودة إلى التصميم المدمج
+Test email sent to {0},تم إرسال بريد تجريبي إلى {0}
+Send test email,إرسال بريد تجريبي
+Template,القالب
+"Leave it on the built-in design, or pick an Email Template you made in Desk.",اتركه على التصميم المدمج، أو اختر قالب بريد أنشأته في Desk.
+Built-in design,التصميم المدمج
+Use built-in design,استخدام التصميم المدمج
+Place a test order first,قدّم طلبًا تجريبيًا أولًا
+"This email shows an order. Place one on your store, then come back to preview it.",هذا البريد يعرض طلبًا. قدّم طلبًا في متجرك، ثم عُد لمعاينته.
+The preview could not be drawn,تعذر عرض المعاينة
+"Check the template it uses, then try again.",تحقق من القالب الذي يستخدمه، ثم حاول مرة أخرى.
+Subject,الموضوع
+Preview of {0},معاينة {0}
+"What your store emails shoppers. Open one to preview it, send yourself a test or pick its template.",ما يرسله متجرك إلى المتسوقين. افتح رسالة لمعاينتها أو إرسال اختبار لنفسك أو اختيار قالبها.
+Your emails still go out. This panel just cannot say which ones.,ما زالت رسائلك تُرسل. هذه اللوحة فقط لا تستطيع تحديدها.
+Always on,مفعّل دائمًا
+Custom template,قالب مخصص
+Always on: shoppers need it to sign in or open their order.,مفعّل دائمًا: يحتاجه المتسوقون لتسجيل الدخول أو فتح طلبهم.
+{0} is always on,{0} مفعّل دائمًا
+Send {0},إرسال {0}
+Order cancelled,تم إلغاء الطلب
+Order link,رابط الطلب
+Sign-in code,رمز تسجيل الدخول
+Sent when a shopper places an order.,يُرسل عندما يقدّم متسوق طلبًا.
+Sent to shoppers waiting on a product when it is restocked.,يُرسل إلى المتسوقين المنتظرين لمنتج عند إعادة توفيره.
+Sent when a guest asks for the link to their order.,يُرسل عندما يطلب زائر رابط طلبه.
+Sent when a shopper signs in with their email address.,يُرسل عندما يسجّل متسوق الدخول ببريده الإلكتروني.
