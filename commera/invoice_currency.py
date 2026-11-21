@@ -1,6 +1,7 @@
 import frappe
 from erpnext.accounts.party import find_party_account
-from erpnext.accounts.services.party_validation import PartyValidator
+
+from commera.compat import PartyValidator
 
 
 def get_invoice_currency_error(company: str, currency: str, customer: str | None = None) -> str | None:
