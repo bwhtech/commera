@@ -158,6 +158,41 @@ class TestDeleteProduct(DeleteProductTestCase):
 		self.assertTrue(frappe.db.exists("Item", item_template))
 
 
+class TestProductStatusFilter(DeleteProductTestCase):
+	def setUp(self):
+		super().setUp()
+		self.published_product = self.add_product()
+		self.draft_product = self.add_product()
+		self.archived_product = self.add_product()
+		for item_template, is_published in (
+			(self.published_product, 1),
+			(self.draft_product, 0),
+			(self.archived_product, 0),
+		):
+			for variant_name in get_product_chain(item_template)["variants"]:
+				frappe.db.set_value("Style Attribute Variant", variant_name, "is_published", is_published)
+		frappe.db.set_value("Item", self.archived_product, "disabled", 1)
+
+	def list_products(self, **filters):
+		listed = get_products(collection=self.item_group, **filters)
+		return {product["name"] for product in listed["products"]}, listed["total"]
+
+	def test_a_product_with_no_published_option_is_a_draft(self):
+		self.assertEqual(
+			self.list_products(disabled=0, published=0), ({self.draft_product, self.item_template}, 2)
+		)
+
+	def test_a_product_with_a_published_option_is_active(self):
+		self.assertEqual(self.list_products(disabled=0, published=1), ({self.published_product}, 1))
+
+	def test_no_published_filter_lists_every_product(self):
+		self.assertEqual(
+			self.list_products(),
+			({self.published_product, self.draft_product, self.archived_product, self.item_template}, 4),
+		)
+		self.assertEqual(self.list_products(disabled=1), ({self.archived_product}, 1))
+
+
 class TestProductCollection(DeleteProductTestCase):
 	"""A product sits in one or more collections. Style Attribute Variant carries its own copy of the
 	primary one, and that copy - not Item.item_group - is what the storefront category pages read."""

@@ -47,9 +47,7 @@ watch(
       title: data.title,
       description: data.description,
       collections: data.collections,
-      // Item only carries a disabled flag — there is no "draft" state in the
-      // catalog (same fact Products.vue's list screen already works around).
-      status: data.disabled ? 'archived' : 'active',
+      status: data.disabled ? 'archived' : data.variants.some((variant) => variant.is_published) ? 'active' : 'draft',
       restock_level: data.restock_level,
       sku: data.name,
       updated: data.updated,
