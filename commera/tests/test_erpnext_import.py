@@ -142,6 +142,21 @@ class TestErpnextImport(ProductOnboardingTestCase):
 		)
 		self.assertEqual(self.get_options(other), {"Cotton": {("64 GB", cotton_64), ("128 GB", cotton_128)}})
 
+	def test_a_colour_and_size_template_with_another_attribute_keeps_it_in_the_size_label(self):
+		template, (small_cotton, small_linen) = self.make_template(
+			[COLOUR_ATTRIBUTE, SIZE_ATTRIBUTE, self.material],
+			[
+				{COLOUR_ATTRIBUTE: "Red", SIZE_ATTRIBUTE: "S", self.material: "Cotton"},
+				{COLOUR_ATTRIBUTE: "Red", SIZE_ATTRIBUTE: "S", self.material: "Linen"},
+			],
+		)
+
+		self.run_import([template])
+
+		self.assertEqual(
+			self.get_options(template), {"Red": {("S / Cotton", small_cotton), ("S / Linen", small_linen)}}
+		)
+
 	def test_preview_lists_kinds_and_skips_manufacturer_templates(self):
 		colour_only, _variants = self.make_template([COLOUR_ATTRIBUTE], [{COLOUR_ATTRIBUTE: "Red"}])
 		manufacturer = frappe.new_doc("Item")

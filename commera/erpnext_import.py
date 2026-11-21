@@ -271,7 +271,8 @@ def import_items(item_codes: list | None, log_name: str, import_id: str = JOB_ID
 	importable, _skipped = get_importable_items()
 	importable_codes = [row.item_code for row in importable]
 	requested = importable_codes if item_codes is None else list(dict.fromkeys(item_codes))
-	importable_codes = [item_code for item_code in importable_codes if item_code in set(requested)]
+	requested_codes = set(requested)
+	importable_codes = [item_code for item_code in importable_codes if item_code in requested_codes]
 	skipped_count = len(requested) - len(importable_codes)
 
 	progress = get_new_progress("running", log_name, total=len(requested))
@@ -337,7 +338,8 @@ def add_product(plan: dict):
 	configurator.flags.skip_variant_generation = True
 	configurator.insert()
 
-	if plan["kind"] == "colour_size":
+	# generate_variants keeps only the Size value, so a third attribute would merge variants into one size.
+	if plan["kind"] == "colour_size" and len(plan["attributes"]) == 2:
 		configurator.generate_variants(skip_disabled=True)
 		return configurator
 
