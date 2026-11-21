@@ -21,3 +21,21 @@ export const SOURCE_STEPS = {
 export const stepsFor = (source) => SOURCE_STEPS[source] ?? SOURCE_STEPS.csv
 
 export const stepIndex = (source, key) => stepsFor(source).findIndex((step) => step.key === key)
+
+const SPREADSHEET_SOURCE = {
+  value: 'csv',
+  title: __('Spreadsheet'),
+  body: __('CSV or Excel exported from anywhere.'),
+  icon: 'lucide-file-spreadsheet',
+  tag: __('Most common'),
+}
+
+const ERPNEXT_SOURCE = {
+  value: 'erpnext',
+  title: 'ERPNext',
+  body: __('Turn the items you already sell in ERPNext into products.'),
+  icon: 'lucide-database',
+}
+
+export const sourceCards = (hasErpnextItems) =>
+  hasErpnextItems ? [SPREADSHEET_SOURCE, ERPNEXT_SOURCE] : [SPREADSHEET_SOURCE]

@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { Badge, Spinner } from 'frappe-ui'
+import { Spinner } from 'frappe-ui'
 import { openAddProduct } from '../../../data/addProduct'
 import { openImport } from '../../../data/importFlow'
 import { onboarding, storeSetup } from '../../../data/onboarding'
@@ -10,7 +10,6 @@ import { __ } from '../../../data/translation'
 const isStoreReady = computed(() => storeSetup.status === 'done')
 
 const OTHER_SOURCES = [
-  { key: 'shopify', label: __('Import from Shopify'), icon: 'lucide-arrow-down-to-line', comingSoon: true },
   { key: 'csv', label: __('Import a CSV'), icon: 'lucide-file-spreadsheet', open: openImport },
   { key: 'manual', label: __('Add a product'), icon: 'lucide-plus', open: openAddProduct },
 ]
@@ -34,14 +33,13 @@ const sources = computed(() =>
       :key="source.key"
       type="button"
       class="flex w-full items-center gap-3 rounded-5 border border-outline-gray-2 px-3 py-3 text-start transition-[background-color,transform] duration-150 ease-out-strong enabled:hover:bg-surface-gray-1 enabled:active:scale-[0.99] disabled:cursor-not-allowed"
-      :disabled="source.comingSoon || !isStoreReady"
+      :disabled="!isStoreReady"
       :data-onboarding-source="source.key"
       @click="source.open()"
     >
       <span :class="source.icon" class="size-4 text-ink-gray-6" aria-hidden="true" />
-      <span class="flex-1 text-base" :class="source.comingSoon ? 'text-ink-gray-5' : 'text-ink-gray-8'">{{ source.label }}</span>
-      <Badge v-if="source.comingSoon" :label="__('Coming soon')" theme="gray" variant="subtle" />
-      <Spinner v-else-if="!isStoreReady" class="size-4 text-ink-gray-5" />
+      <span class="flex-1 text-base text-ink-gray-8">{{ source.label }}</span>
+      <Spinner v-if="!isStoreReady" class="size-4 text-ink-gray-5" />
       <span v-else class="lucide-chevron-right size-4 text-ink-gray-5 rtl:-scale-x-100" aria-hidden="true" />
     </button>
   </div>
