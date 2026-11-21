@@ -1,0 +1,22 @@
+{%- import "templates/emails/macros.html" as email -%}
+{%- call email.layout(_("Order {0} confirmed. {1}.").format(order.name, email_money(order.totals.total, order.currency)), language) -%}
+{{ email.header(brand, _("Order {0}").format(order.name)) }}
+{%- call email.card(first=True) %}
+{{ email.heading(_("Thanks, {0}. Your order is in.").format(first_name) if first_name else _("Thanks. Your order is in.")) }}
+{{ email.intro(_("We've received your order and our team is getting it ready. We'll email you again with tracking details as soon as it ships.")) }}
+{{ email.progress_steps(_("Confirmed"), 1, 4) }}
+{%- if order.link %}
+{{ email.button(order.link, _("View your order")) }}
+{%- endif %}
+{%- endcall %}
+{%- call email.card() %}
+{{ email.item_list(_("Order summary"), order.line_items, order.currency) }}
+{{ email.totals(order.totals, order.currency) }}
+{%- endcall %}
+{%- call email.card() %}
+{{ email.address_block(_("Shipping to"), order.shipping, [order.contact_mobile]) }}
+{{ email.billing_block(_("Billing to"), order.billing, [order.tax_id], _("Same as shipping address")) }}
+{{ email.fact_columns(order.facts) }}
+{%- endcall %}
+{{ email.footer(brand, _("You're receiving this because you placed an order at {0}.").format(brand.name), _("Questions about your order? Reply to this email and we'll help."), order.links) }}
+{%- endcall -%}

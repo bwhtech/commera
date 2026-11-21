@@ -1,0 +1,9 @@
+{%- import "templates/emails/macros.html" as email -%}
+{%- call email.layout(_("{0} is back.").format(product.item_name), language, lookbook=True) -%}
+{{ email.header(brand, lookbook=True) }}
+{{ email.eyebrow(_("Back in stock")) }}
+{{ email.heading(_("Good news, {0}. It's back.").format(first_name) if first_name else _("Good news. It's back."), lookbook=True) }}
+{{ email.intro(_("The piece you asked about is back. We can't hold it for you, so order soon if you still want it."), lookbook=True) }}
+{{ email.product_feature(product, currency, product_url, _("Shop now")) }}
+{{ email.footer(brand, _("You're receiving this because you asked us to email you when this item is back."), lookbook=True) }}
+{%- endcall -%}

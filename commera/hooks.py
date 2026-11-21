@@ -643,19 +643,6 @@ export_python_type_annotations = True
 
 default_log_clearing_doctypes = {"Commera Event": 14, "Commera Webhook Log": 30}
 
-fixtures = [
-	{
-		"dt": "Email Template",
-		"filters": [
-			[
-				"name",
-				"in",
-				("Order Confirmation", "Order Cancellation", "Item In Stock"),
-			]
-		],
-	},
-]
-
 scheduler_events = {
 	# Cron entries still only fire on the scheduler tick (scheduler_tick_interval, 4 minutes by default),
 	# so a retry due after 1 minute really runs up to a tick later.

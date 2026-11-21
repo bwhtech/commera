@@ -322,11 +322,6 @@ def configure_commera_settings():
 	settings.cod_charge = 5.00
 	settings.cod_charge_applicable_below = 100.00
 
-	# Email templates (use existing from fixtures)
-	settings.order_confirmation_email_template = "Order Confirmation"
-	settings.order_cancellation_email_template = "Order Cancellation"
-	settings.item_in_stock_email_template = "Item In Stock"
-
 	# Return reasons
 	if not settings.reason_for_return:
 		reasons = ["Wrong Size", "Wrong Color", "Defective Product", "Not as Described", "Changed Mind"]
@@ -908,16 +903,6 @@ def create_default_footer_sections():
 		return
 
 	settings = frappe.get_doc("Commera Settings", "Commera Settings")
-
-	# Set default email templates if not already set (required fields)
-	if not settings.order_confirmation_email_template:
-		settings.order_confirmation_email_template = "Order Confirmation"
-
-	if not settings.item_in_stock_email_template:
-		settings.item_in_stock_email_template = "Item In Stock"
-
-	if not settings.order_cancellation_email_template:
-		settings.order_cancellation_email_template = "Order Cancellation"
 
 	# Only create if no footer sections exist
 	if settings.footer_sections:

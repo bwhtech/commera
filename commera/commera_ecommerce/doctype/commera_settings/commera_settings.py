@@ -14,6 +14,7 @@ from commera.localization.languages import (
 )
 from commera.localization.market_setup import validate_markets_for_store
 from commera.localization.markets import find_market_by_prefix
+from commera.notifications import validate_customer_emails
 from commera.payment_gateways.connectors import get_available_payment_modes
 from commera.search.build import enqueue_full_rebuild
 from commera.search.engine_cache import clear_search_engine, get_engine_class
@@ -43,6 +44,7 @@ class CommeraSettings(Document):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
+		from commera.commera_ecommerce.doctype.commera_email.commera_email import CommeraEmail
 		from commera.commera_ecommerce.doctype.commera_storefront_app.commera_storefront_app import (
 			CommeraStorefrontApp,
 		)
@@ -70,7 +72,6 @@ class CommeraSettings(Document):
 		brand_logo: DF.AttachImage | None
 		brand_text_color: DF.Color | None
 		button_bg_color: DF.Color | None
-		cc_email: DF.Data | None
 		charge_account_head: DF.Link | None
 		cod_charge: DF.Currency
 		cod_charge_applicable_below: DF.Currency
@@ -80,6 +81,7 @@ class CommeraSettings(Document):
 		contact_phone: DF.Data | None
 		copyright_text: DF.Data | None
 		create_variants_automatically_on_configurator_creation: DF.Check
+		customer_emails: DF.Table[CommeraEmail]
 		default_meta_description: DF.SmallText | None
 		default_price_list: DF.Link | None
 		default_storefront_language: DF.Link | None
@@ -102,7 +104,6 @@ class CommeraSettings(Document):
 		homepage_meta_title: DF.Data | None
 		homepage_og_image: DF.AttachImage | None
 		instagram_url: DF.Data | None
-		item_in_stock_email_template: DF.Link
 		link_color: DF.Color | None
 		link_hover_color: DF.Color | None
 		llms_txt: DF.Code | None
@@ -110,8 +111,6 @@ class CommeraSettings(Document):
 		newsletter_description: DF.Text | None
 		newsletter_title: DF.Data | None
 		onboarding_completed: DF.Check
-		order_cancellation_email_template: DF.Link
-		order_confirmation_email_template: DF.Link
 		payment_methods_image: DF.AttachImage | None
 		primary_color: DF.Color | None
 		primary_hover_color: DF.Color | None
@@ -160,6 +159,7 @@ class CommeraSettings(Document):
 		self.validate_search_engine()
 		self.validate_storefront_languages()
 		validate_markets_for_store(self)
+		validate_customer_emails(self)
 		sync_headless_oauth_client(self)
 
 	def validate_price_list_currencies(self):

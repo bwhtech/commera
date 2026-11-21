@@ -14,7 +14,6 @@ from commera.shop_themes.tests.test_theme_engine import STOREFRONT_CONFIG_PATTER
 from commera.tests.test_cart_currency import CartCurrencyTestCase
 from commera.utils import get_currency_symbol
 
-EMAIL_TEMPLATES = Path(frappe.get_app_path("commera", "fixtures", "email_template.json"))
 SIGNS = (("SAR", "\u20c1"), ("AED", "\u20c3"))
 OTHER_CURRENCIES = ("INR", "USD", "EUR")
 
@@ -90,28 +89,35 @@ class TestCurrencySigns(CartCurrencyTestCase):
 			with self.subTest(currency=currency):
 				self.assertEqual(email_money(1234.5, currency), fmt_money(1234.5, currency=currency))
 
-	def test_the_order_email_templates_format_money_with_the_codes(self):
-		templates = {template["name"]: template for template in json.loads(EMAIL_TEMPLATES.read_text())}
-		for name in ("Order Confirmation", "Order Cancellation"):
-			with self.subTest(template=name):
-				source = templates[name]["response_html"]
-				self.assertNotIn("fmt_money", source)
-				html = frappe.render_template(source, self.email_context())
+	def test_the_order_emails_format_money_with_the_codes(self):
+		for template in ("commera_order_confirmation", "commera_order_cancelled"):
+			with self.subTest(template=template):
+				html = frappe.render_template(f"templates/emails/{template}.html", self.email_context())
 				self.assertIn("SAR\u00a01,234.50", html)
 				self.assertNotIn("\u20c1", html)
 
 	def email_context(self) -> dict:
-		item = frappe._dict(item_name="Shirt", qty=1, amount=1234.5, custom_code_discount=0)
+		item = {"item_name": "Shirt", "variant": None, "qty": "1", "amount": 1234.5, "was_amount": None}
 		return {
-			"currency": "SAR",
-			"customer_name": "Shopper",
-			"company": "Store",
-			"transaction_date": "2026-11-12",
-			"items": [item],
-			"taxes": [],
-			"discount_rows": [],
-			"payable_total": 1234.5,
-			"order_link": "",
+			"brand": {"name": "Store", "initial": "S"},
+			"first_name": "Shopper",
+			"language": "en",
+			"order": {
+				"name": "SO-0001",
+				"currency": "SAR",
+				"line_items": [item],
+				"totals": {
+					"subtotal": 1234.5,
+					"discounts": [],
+					"charges": [],
+					"included_taxes": [],
+					"total": 1234.5,
+				},
+				"paid_amount": 1234.5,
+				"payment_mode": "Card",
+				"facts": [],
+				"links": [],
+			},
 		}
 
 	def test_arabic_cart_prices_share_one_ltr_isolate(self):
