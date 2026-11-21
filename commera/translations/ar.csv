@@ -2402,3 +2402,9 @@ Pick a sale price list,اختر قائمة أسعار التخفيضات
 "Pick the price list as the sale list to sell without sale prices, or Duplicate for an empty one.",اختر قائمة الأسعار نفسها كقائمة التخفيضات للبيع دون أسعار مخفضة، أو اضغط تكرار لإنشاء قائمة فارغة.
 Warehouse,المستودع
 Pick the warehouse you ship from,اختر المستودع الذي تشحن منه
+"The options of product {0} come from its item attributes in ERPNext, so change them there",خيارات المنتج {0} مأخوذة من سمات الصنف في ERPNext، لذا غيّرها هناك
+Pick at least one item to import.,اختر صنفًا واحدًا على الأقل لاستيراده.
+Set {0} in Commera Settings before importing items from ERPNext.,اضبط {0} في إعدادات Commera قبل استيراد الأصناف من ERPNext.
+Store Not Set Up,المتجر غير مُعدّ
+"Its variants are based on manufacturers, which the store cannot show as options.",متغيراته مبنية على الشركات المصنّعة، ولا يستطيع المتجر عرضها كخيارات.
+It has no enabled variants to sell.,ليس له متغيرات مفعّلة للبيع.
