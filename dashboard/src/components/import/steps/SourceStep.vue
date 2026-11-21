@@ -3,39 +3,13 @@ import { computed } from 'vue'
 import { Badge } from 'frappe-ui'
 import { imp } from '../../../data/importFlow'
 import { loadErpnextPreview } from '../../../data/erpnextImport'
+import { sourceCards } from '../../../data/importSteps'
 import CoachTip from '../CoachTip.vue'
 import { __ } from '../../../data/translation'
 
 if (!imp.erpnext.importableCount) loadErpnextPreview()
 
-const erpnextSource = {
-  value: 'erpnext',
-  title: 'ERPNext',
-  body: __('Turn the items you already sell in ERPNext into products.'),
-  icon: 'lucide-database',
-}
-
-// Only the spreadsheet path exists today. The rest are named anyway: a merchant
-// coming from Shopify should see that we know about it, and that it is not
-// their route in yet.
-const otherSources = [
-  {
-    value: 'csv',
-    title: __('Spreadsheet'),
-    body: __('CSV or Excel exported from anywhere.'),
-    icon: 'lucide-file-spreadsheet',
-    tag: __('Most common'),
-  },
-  { value: 'shopify', title: 'Shopify', body: __('Pull products, variants and photos over.'), icon: 'lucide-shopping-bag', soon: true },
-  { value: 'woo', title: 'WooCommerce', body: __('Connect with your store URL and a key.'), icon: 'lucide-plug-zap', soon: true },
-  { value: 'sheets', title: 'Google Sheet', body: __('Paste a link and we keep it in sync.'), icon: 'lucide-table', soon: true },
-  { value: 'insta', title: __('Instagram catalogue'), body: __('Bring across the products you tag in posts.'), icon: 'lucide-camera', soon: true },
-  { value: 'manual', title: __('Type them in'), body: __('Fine for a handful of products.'), icon: 'lucide-pencil-line', soon: true },
-]
-
-const sources = computed(() =>
-  imp.erpnext.importableCount ? [otherSources[0], erpnextSource, ...otherSources.slice(1)] : otherSources,
-)
+const sources = computed(() => sourceCards(imp.erpnext.importableCount > 0))
 </script>
 
 <template>
@@ -52,12 +26,8 @@ const sources = computed(() =>
         v-for="s in sources"
         :key="s.value"
         type="button"
-        class="rounded-5 border p-5 text-start transition"
-        :class="[
-          imp.source === s.value ? 'border-outline-gray-4 bg-surface-gray-1' : 'border-outline-gray-1',
-          s.soon ? 'cursor-not-allowed opacity-60' : 'hover:bg-surface-gray-1',
-        ]"
-        :disabled="s.soon"
+        class="rounded-5 border p-5 text-start transition hover:bg-surface-gray-1"
+        :class="imp.source === s.value ? 'border-outline-gray-4 bg-surface-gray-1' : 'border-outline-gray-1'"
         @click="imp.source = s.value"
       >
         <div class="flex items-start gap-3">
@@ -66,7 +36,6 @@ const sources = computed(() =>
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span class="text-base-semibold text-ink-gray-8">{{ s.title }}</span>
               <Badge v-if="s.tag" class="shrink-0" :label="s.tag" theme="blue" variant="subtle" />
-              <Badge v-if="s.soon" class="shrink-0" :label="__('Coming soon')" theme="gray" variant="subtle" />
             </div>
             <p class="mt-1 text-p-sm text-ink-gray-5">{{ s.body }}</p>
           </div>
