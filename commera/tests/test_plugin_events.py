@@ -60,6 +60,7 @@ except ImportError:
 	from erpnext.stock.doctype.delivery_note.delivery_note import make_sales_return as make_delivery_return
 
 RECORD_PLUGIN_EVENT = f"{payment_hooks.__name__}.record_plugin_event"
+RAISE_PLUGIN_EVENT = f"{payment_hooks.__name__}.raise_from_plugin_event"
 STORE_WAREHOUSE = "Stores - LSD"
 OTHER_WAREHOUSE = "Finished Goods - LSD"
 
@@ -154,6 +155,31 @@ class TestPluginEvents(payment_hooks.TestPaymentHookIdempotency):
 		self.assertEqual(
 			[(event.name, event.reference_name) for event, user in calls],
 			[("order_fulfilled", sales_order), ("order_delivered", sales_order)],
+		)
+
+	def test_a_webhook_waiting_on_a_retry_never_holds_back_the_email_for_its_order(self):
+		handlers = [RAISE_PLUGIN_EVENT, RECORD_PLUGIN_EVENT]
+		patch_app_hooks(self, {"commera_events": {"order_placed": handlers, "order_paid": handlers}})
+		self.enterContext(patch("commera.plugin_events.OWN_LANE_HANDLERS", (RECORD_PLUGIN_EVENT,)))
+		calls = self.record_plugin_events()
+		self.run_enqueued_jobs_now()
+		sales_order = make_test_sales_order(submit=False).name
+
+		fire_event("order_placed", "Sales Order", sales_order)
+		fire_event("order_paid", "Sales Order", sales_order)
+
+		self.assertEqual([event.name for event, user in calls], ["order_placed", "order_paid"])
+		self.assertEqual(
+			[
+				frappe.db.get_value(
+					"Commera Event Delivery",
+					{"parent": f"{sales_order}-{event}", "handler": RAISE_PLUGIN_EVENT},
+					["status", "attempts"],
+				)
+				for event in ("order_placed", "order_paid")
+			],
+			[("Queued", 1), ("Queued", 0)],
+			"the app's own lane still waits behind its head",
 		)
 
 	def test_an_order_placed_outside_the_store_is_never_announced(self):
@@ -894,6 +920,25 @@ class TestPluginEventDeliveryClaims(IntegrationTestCase):
 		company_lane = ("commera", "Company", COMPANY, self.event)
 		self.assertEqual(lanes.count(order_lane), 1, "one job for both order events, none once it waits")
 		self.assertEqual(lanes.count(company_lane), 2)
+
+	def test_the_sweep_queues_the_email_lane_while_the_app_lane_waits_on_a_retry(self):
+		sales_order = make_test_sales_order(submit=False).name
+		self.enterContext(patch("commera.plugin_events.OWN_LANE_HANDLERS", (RECORD_PLUGIN_EVENT,)))
+		patch_app_hooks(self, {"commera_events": {"order_placed": [RAISE_PLUGIN_EVENT, RECORD_PLUGIN_EVENT]}})
+		fire_event("order_placed", "Sales Order", sales_order)
+		frappe.db.set_value(
+			"Commera Event Delivery",
+			{"parent": f"{sales_order}-order_placed", "handler": RAISE_PLUGIN_EVENT},
+			{"attempts": 1, "next_retry_at": add_to_date(now_datetime(), minutes=5)},
+		)
+
+		with patch("commera.plugin_events.enqueue_app_deliveries") as enqueue_lane:
+			run_due_deliveries()
+
+		self.assertEqual(
+			[call.args for call in enqueue_lane.call_args_list if call.args[2] == sales_order],
+			[(RECORD_PLUGIN_EVENT, "Sales Order", sales_order, None)],
+		)
 
 	def test_a_new_event_is_queued_even_while_its_lane_job_is_running(self):
 		for job_status, deduplicate in ((JobStatus.QUEUED, True), (JobStatus.STARTED, False)):

@@ -78,6 +78,7 @@ Fix the receiver, then turn the webhook on. This clears the failure count and **
 | `order_placed` | A shopper completes checkout | The order snapshot |
 | `order_paid` | Payment is captured, including cash on delivery | The order snapshot |
 | `order_fulfilled` | Every item has shipped | The order snapshot |
+| `order_shipment_dispatched` | A parcel left the store, with its tracking | The order snapshot, `shipment`, `carrier`, `awb`, `tracking_url`, `line_items` |
 | `order_delivered` | The carrier confirms delivery | The order snapshot |
 | `order_cancelled` | The order is cancelled | The order snapshot |
 | `order_refunded` | All or part of the order is refunded | The order snapshot, `payment_entry`, `amount` |

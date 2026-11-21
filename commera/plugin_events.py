@@ -38,6 +38,9 @@ EXTENDED_DOCTYPES = ("Sales Order", "Quotation", "Sales Invoice", "Item", "Custo
 CHANGED_PRODUCTS_FLAG = "commera_changed_products"
 CHANGED_ITEMS_FLAG = "commera_changed_items"
 CHANGED_STOREFRONT_FLAG = "commera_changed_storefront"
+NOTIFICATIONS_HANDLER = "commera.notifications.send"
+# Each gets a lane of its own, so a webhook waiting on retries never holds back a customer email.
+OWN_LANE_HANDLERS = (NOTIFICATIONS_HANDLER,)
 
 
 def fire_event(
@@ -80,8 +83,8 @@ def fire_event(
 		return
 
 	lane_event = get_lane_event(reference_doctype, event)
-	for app in dict.fromkeys(get_handler_app(handler) for handler in handlers):
-		enqueue_app_deliveries(app, reference_doctype, reference_name, lane_event)
+	for lane in dict.fromkeys(get_lane(handler) for handler in handlers):
+		enqueue_app_deliveries(lane, reference_doctype, reference_name, lane_event)
 
 
 def get_event_key(event: str, reference_doctype: str, reference_name: str | int, key: str | None) -> str:
@@ -160,6 +163,16 @@ def get_handler_app(handler: str) -> str:
 	return handler.split(".", 1)[0]
 
 
+def get_lane(handler: str) -> str:
+	return handler if handler in OWN_LANE_HANDLERS else get_handler_app(handler)
+
+
+def get_lane_criterion(delivery, lane: str):
+	if lane in OWN_LANE_HANDLERS:
+		return delivery.handler == lane
+	return (delivery.app == lane) & delivery.handler.notin(OWN_LANE_HANDLERS)
+
+
 def get_handlers(hook: str, key: str) -> list[str]:
 	return [
 		handler
@@ -174,17 +187,17 @@ def is_supported_app(app: str) -> bool:
 
 
 def enqueue_app_deliveries(
-	app: str, reference_doctype: str, reference_name: str | int, lane_event: str | None = None
+	lane: str, reference_doctype: str, reference_name: str | int, lane_event: str | None = None
 ):
 	reference_name = cstr(reference_name)
-	job_id = f"commera-plugin-events::{app}::{reference_doctype}::{reference_name}"
+	job_id = f"commera-plugin-events::{lane}::{reference_doctype}::{reference_name}"
 	if lane_event:
 		job_id = f"{job_id}::{lane_event}"
 	# A started job may already be past this event's delivery, so deduplicating against it would drop it.
 	lane_job_started = get_job_status(job_id) == JobStatus.STARTED
 	frappe.enqueue(
 		run_app_deliveries,
-		app=app,
+		lane=lane,
 		reference_doctype=reference_doctype,
 		reference_name=reference_name,
 		lane_event=lane_event,
@@ -194,13 +207,14 @@ def enqueue_app_deliveries(
 	)
 
 
-def run_app_deliveries(app: str, reference_doctype: str, reference_name: str, lane_event: str | None = None):
+def run_app_deliveries(lane: str, reference_doctype: str, reference_name: str, lane_event: str | None = None):
+	app = get_handler_app(lane)
 	if app not in frappe.get_installed_apps():
 		fail_uninstalled_app_deliveries(app)
 		return
 
 	with as_plugin_user(app):
-		run_lane(app, reference_doctype, reference_name, lane_event)
+		run_lane(lane, reference_doctype, reference_name, lane_event)
 
 
 def fail_uninstalled_app_deliveries(app: str):
@@ -216,8 +230,8 @@ def fail_uninstalled_app_deliveries(app: str):
 	frappe.db.commit()
 
 
-def run_lane(app: str, reference_doctype: str, reference_name: str, lane_event: str | None = None):
-	while delivery := get_next_delivery(app, reference_doctype, reference_name, lane_event):
+def run_lane(lane: str, reference_doctype: str, reference_name: str, lane_event: str | None = None):
+	while delivery := get_next_delivery(lane, reference_doctype, reference_name, lane_event):
 		if delivery.status == "Running" or (
 			delivery.next_retry_at and delivery.next_retry_at > now_datetime()
 		):
@@ -244,7 +258,7 @@ def claim_delivery(delivery_name: str) -> bool:
 	return claimed
 
 
-def get_next_delivery(app: str, reference_doctype: str, reference_name: str, lane_event: str | None = None):
+def get_next_delivery(lane: str, reference_doctype: str, reference_name: str, lane_event: str | None = None):
 	delivery = DocType("Commera Event Delivery")
 	commera_event = DocType("Commera Event")
 	query = (
@@ -265,7 +279,7 @@ def get_next_delivery(app: str, reference_doctype: str, reference_name: str, lan
 			commera_event.creation,
 		)
 		.where(
-			(delivery.app == app)
+			get_lane_criterion(delivery, lane)
 			& delivery.status.isin(("Queued", "Running"))
 			& (commera_event.reference_doctype == reference_doctype)
 			& (commera_event.reference_name == cstr(reference_name))
@@ -367,7 +381,9 @@ def fail_retrying_webhook_logs(delivery):
 def run_due_deliveries():
 	release_stale_claims()
 	for lane in get_due_lanes():
-		enqueue_app_deliveries(lane.app, lane.reference_doctype, lane.reference_name, lane.lane_event or None)
+		enqueue_app_deliveries(
+			lane.lane, lane.reference_doctype, lane.reference_name, lane.lane_event or None
+		)
 
 
 def release_stale_claims():
@@ -388,18 +404,19 @@ def get_due_lanes() -> list:
 	delivery = DocType("Commera Event Delivery")
 	commera_event = DocType("Commera Event")
 	lane_event = Case().when(commera_event.reference_doctype == "Sales Order", "").else_(commera_event.event)
+	lane = Case().when(delivery.handler.isin(OWN_LANE_HANDLERS), delivery.handler).else_(delivery.app)
 	return (
 		frappe.qb.from_(delivery)
 		.join(commera_event)
 		.on(commera_event.name == delivery.parent)
 		.select(
-			delivery.app,
+			lane.as_("lane"),
 			commera_event.reference_doctype,
 			commera_event.reference_name,
 			lane_event.as_("lane_event"),
 		)
 		.where(delivery.status == "Queued")
-		.groupby(delivery.app, commera_event.reference_doctype, commera_event.reference_name, lane_event)
+		.groupby(lane, commera_event.reference_doctype, commera_event.reference_name, lane_event)
 		.having(Max(Coalesce(delivery.next_retry_at, commera_event.creation)) <= now_datetime())
 		.orderby(Min(commera_event.creation))
 		.limit(LANES_PER_SWEEP)
@@ -422,7 +439,7 @@ def retry_delivery(delivery: str):
 def queue_delivery_now(delivery: str, from_statuses: tuple = ("Queued", "Failed")) -> bool:
 	"""Run a waiting or failed delivery on its lane's next job. A Running delivery is left to its job, and a
 	Done one is never sent again. Returns whether the delivery was queued."""
-	parent, app = frappe.db.get_value("Commera Event Delivery", delivery, ["parent", "app"])
+	parent, handler = frappe.db.get_value("Commera Event Delivery", delivery, ["parent", "handler"])
 	if not set_delivery_state(
 		delivery, from_statuses, {"status": "Queued", "next_retry_at": now_datetime(), "finished_at": None}
 	):
@@ -430,7 +447,9 @@ def queue_delivery_now(delivery: str, from_statuses: tuple = ("Queued", "Failed"
 	event, reference_doctype, reference_name = frappe.db.get_value(
 		"Commera Event", parent, ["event", "reference_doctype", "reference_name"]
 	)
-	enqueue_app_deliveries(app, reference_doctype, reference_name, get_lane_event(reference_doctype, event))
+	enqueue_app_deliveries(
+		get_lane(handler), reference_doctype, reference_name, get_lane_event(reference_doctype, event)
+	)
 	return True
 
 

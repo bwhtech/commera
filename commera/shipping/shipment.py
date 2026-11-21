@@ -1,11 +1,20 @@
 import frappe
 from frappe import _
+from frappe.query_builder import DocType
 from frappe.utils import validate_url
 from frappe.utils.data import cstr, flt, get_datetime, today
 
+from commera.plugin_events import fire_event
+from commera.sdk import STORE_ORDER_TYPE
 from commera.shipping.exceptions import PartialBookingError
 from commera.shipping.providers import get_provider
-from commera.shipping.status import AWAITING_PICKUP_STATUSES, can_advance, is_terminal, validate_status
+from commera.shipping.status import (
+	AWAITING_PICKUP_STATUSES,
+	IN_FLIGHT,
+	can_advance,
+	is_terminal,
+	validate_status,
+)
 from commera.shipping.units import normalise_parcels
 from commera.shipping.utils import get_address_payload
 
@@ -435,3 +444,60 @@ def get_order_shipments(sales_order: str, fields: list | None = None, **filters)
 		fields=fields or ["name"],
 		order_by="creation desc",
 	)
+
+
+def fire_dispatched_events(shipment):
+	if not has_left_store(shipment):
+		return
+	for sales_order, items in get_dispatched_items(shipment).items():
+		fire_event(
+			"order_shipment_dispatched",
+			"Sales Order",
+			sales_order,
+			data={
+				"shipment": shipment.name,
+				"carrier": shipment.carrier,
+				"awb": shipment.awb_number,
+				"tracking_url": shipment.tracking_url,
+				"line_items": items,
+			},
+			key=shipment.name,
+		)
+
+
+def has_left_store(shipment) -> bool:
+	if shipment.docstatus != 1:
+		return False
+	if shipment.custom_shipment_status in IN_FLIGHT:
+		return True
+	return not shipment.custom_shipping_provider and shipment.custom_shipment_status != "Cancelled"
+
+
+def get_dispatched_items(shipment) -> dict[str, list[dict]]:
+	sales_order = DocType("Sales Order")
+	if delivery_notes := get_delivery_notes(shipment):
+		line = DocType("Delivery Note Item")
+		order_field = line.against_sales_order
+		lines = frappe.qb.from_(line).where(line.parent.isin(delivery_notes))
+	elif shipment.custom_sales_order:
+		line = DocType("Sales Order Item")
+		order_field = line.parent
+		lines = frappe.qb.from_(line).where(line.parent == shipment.custom_sales_order)
+	else:
+		return {}
+
+	rows = (
+		lines.join(sales_order)
+		.on(sales_order.name == order_field)
+		.select(order_field.as_("sales_order"), line.item_code, line.item_name, line.qty)
+		.where(sales_order.order_type == STORE_ORDER_TYPE)
+		.orderby(line.parent)
+		.orderby(line.idx)
+		.run(as_dict=True)
+	)
+	items_by_order = {}
+	for row in rows:
+		items_by_order.setdefault(cstr(row.sales_order), []).append(
+			{"item_code": row.item_code, "item_name": row.item_name, "qty": flt(row.qty)}
+		)
+	return items_by_order

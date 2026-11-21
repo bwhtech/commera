@@ -22,6 +22,11 @@ class TestShipmentBooking(IntegrationTestCase):
 		self.carrier = InMemoryShippingProvider()
 		self.enterContext(use_providers({self.profile: self.carrier}))
 
+		sales_order = self.make_store_order()
+		self.sales_order = sales_order.name
+		self.delivery_note = deliver(sales_order).name
+
+	def make_store_order(self):
 		sales_order = make_test_sales_order(order_type=STORE_ORDER_TYPE)
 		sales_order.db_set(
 			{
@@ -31,8 +36,7 @@ class TestShipmentBooking(IntegrationTestCase):
 				"custom_shipping_service_code": SERVICE_CODE,
 			}
 		)
-		self.sales_order = sales_order.name
-		self.delivery_note = deliver(sales_order).name
+		return sales_order
 
 	def book(self):
 		shipment = create_shipment(self.delivery_note)
@@ -142,6 +146,68 @@ class TestShipmentBooking(IntegrationTestCase):
 
 		self.assertRaisesRegex(frappe.ValidationError, "cannot be booked", book, shipment.name)
 		self.assertEqual(self.carrier.shipments, {})
+
+	def dispatched_events(self) -> list[dict]:
+		return [
+			frappe.parse_json(data)
+			for data in frappe.get_all(
+				"Commera Event",
+				filters={"reference_name": self.sales_order, "event": "order_shipment_dispatched"},
+				pluck="data",
+				order_by="creation asc",
+			)
+		]
+
+	def ship_without_carrier(self, delivery_note: str) -> str:
+		shipment = frappe.get_doc("Shipment", create_shipment(delivery_note))
+		shipment.custom_shipping_provider = None
+		shipment.submit()
+		return shipment.name
+
+	def test_a_carrier_shipment_is_dispatched_when_it_reaches_in_transit_not_at_booking(self):
+		shipment = self.book()
+		self.assertEqual(self.dispatched_events(), [])
+
+		self.sync_to(shipment, "In Transit")
+		self.sync_to(shipment, "Out For Delivery")
+
+		events = self.dispatched_events()
+		self.assertEqual(len(events), 1)
+		item_code = frappe.db.get_value("Sales Order Item", {"parent": self.sales_order}, "item_code")
+		self.assertEqual(
+			(events[0].shipment, events[0].awb, events[0].carrier, events[0].line_items),
+			(
+				shipment.name,
+				"AWB-MEM-1",
+				shipment.carrier,
+				[{"item_code": item_code, "item_name": "ZZ Fulfilment Ladder Item", "qty": 2.0}],
+			),
+		)
+
+	def test_a_carrier_shipment_that_jumps_straight_to_delivered_is_dispatched(self):
+		shipment = self.book()
+
+		self.sync_to(shipment, "Delivered")
+
+		self.assertEqual([event.shipment for event in self.dispatched_events()], [shipment.name])
+
+	def test_each_parcel_of_an_order_is_dispatched_once(self):
+		sales_order = self.make_store_order()
+		self.sales_order = sales_order.name
+		first_parcel = self.ship_without_carrier(deliver(sales_order, first_line_qty=1).name)
+		second_parcel = self.ship_without_carrier(deliver(sales_order).name)
+
+		frappe.get_doc("Shipment", first_parcel).save()
+
+		self.assertEqual(
+			[(event.shipment, event.line_items[0]["qty"]) for event in self.dispatched_events()],
+			[(first_parcel, 1.0), (second_parcel, 1.0)],
+		)
+
+	def test_a_draft_shipment_is_not_dispatched(self):
+		create_shipment(self.delivery_note)
+
+		self.assertEqual(self.dispatched_events(), [])
 
 	def test_a_pickup_is_only_scheduled_before_the_carrier_collects(self):
 		shipment = self.book()
