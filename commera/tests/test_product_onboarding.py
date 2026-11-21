@@ -577,8 +577,6 @@ class TestCreateSingleItemProduct(ProductOnboardingTestCase):
 		self.assertTrue(frappe.db.exists("Item Attribute", DEFAULT_OPTION_ATTRIBUTE))
 
 	def test_the_leaf_item_carries_a_real_size_attribute_row(self):
-		"""www/cart/checkout.py filters cart lines on attribute == "Size". A leaf Item without that
-		row does not error — it silently vanishes from the shopper's own checkout page."""
 		book = self.add_book(option_attribute=self.format_attribute, option_sizes=[{"option": "Paperback"}])
 
 		leaf_item_codes = frappe.get_all("Item", filters={"variant_of": book["name"]}, pluck="name")

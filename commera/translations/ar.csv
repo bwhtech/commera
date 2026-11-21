@@ -2072,6 +2072,7 @@ A product called {0} already exists. Give this one a different title.,يوجد �
 Collection {0} does not exist. Create it first.,المجموعة {0} غير موجودة. أنشئها أولًا.
 Colours and sizes could not be read,تعذّرت قراءة الألوان والمقاسات
 Product {0} has no options to edit,لا توجد خيارات لتعديلها في المنتج {0}
+"Product {0} is a single item without variants, so it has no options to edit",المنتج {0} صنف واحد بدون متغيرات، لذلك لا توجد خيارات لتعديلها
 Nothing to change,لا يوجد ما يمكن تغييره
 Keep at least one variant on sale. A product cannot sell with none.,أبقِ متغيرًا واحدًا على الأقل معروضًا للبيع. لا يمكن بيع منتج دون متغيرات.
 Each variant needs both an option and a size,يحتاج كل متغير إلى خيار ومقاس

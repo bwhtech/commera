@@ -326,7 +326,7 @@
 											{% if item.size %}<bdi>{{ item.size }}</bdi> &middot; {% endif %}{{ _("Qty") }} {{ item.qty | int }}
 										</span>
 									</h6>
-									<span class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}{{ cart_currency.amount((item.amount or 0) + (item.custom_code_discount or 0) * (item.qty or 0)) }}{{ cart_currency.symbol_after }}{% if cart_currency.is_sign %}</bdi>{% endif %}</span>
+									<span class="price">{% if cart_currency.is_sign %}<bdi dir="ltr">{% endif %}{{ currency_symbol }}<span>{{ cart_currency.amount((item.amount or 0) + (item.custom_code_discount or 0) * (item.qty or 0)) }}</span>{{ cart_currency.symbol_after }}{% if cart_currency.is_sign %}</bdi>{% endif %}</span>
 								</div>
 							</div>
 						{% endfor %}
