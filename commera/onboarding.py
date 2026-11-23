@@ -162,12 +162,7 @@ def seed_commera_settings(
 
 
 def adopt_existing_company(store_name: str, company: str | None = None, price_list: str | None = None):
-	saved = frappe.db.get_value(
-		SETTINGS_DOCTYPE,
-		None,
-		["default_price_list", "sale_price_list", "ecommerce_warehouse"],
-		as_dict=True,
-	)
+	saved = frappe.db.get_singles_dict(SETTINGS_DOCTYPE, cast=True)
 	company = company or get_default_company()
 	if not company:
 		frappe.throw(_("Pick the company your store sells for"), frappe.MandatoryError)
