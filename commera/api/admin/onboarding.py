@@ -33,27 +33,16 @@ def get_suggested_abbr(settings) -> str | None:
 
 
 def get_existing_store(settings) -> dict:
-	company = settings.company or onboarding.get_only_company()
 	return {
 		"companies": frappe.get_all(
-			"Company",
-			fields=["name", "abbr", "chart_of_accounts", "default_currency", "country", "default_warehouse"],
-			order_by="name",
+			"Company", fields=["name", "abbr", "chart_of_accounts", "default_currency"], order_by="name"
 		),
-		"company": company,
-		"price_lists": frappe.get_all(
-			"Price List", filters={"selling": 1, "enabled": 1}, fields=["name", "currency"], order_by="name"
+		"company": onboarding.get_default_company(),
+		"price_lists": onboarding.get_selling_price_lists(
+			settings.store_name, sale_price_list=settings.sale_price_list
 		),
 		"price_list": settings.default_price_list
 		or frappe.db.get_single_value("Selling Settings", "selling_price_list"),
-		"sale_price_list": settings.sale_price_list,
-		"warehouses": frappe.get_all(
-			"Warehouse",
-			filters={"is_group": 0, "disabled": 0, "warehouse_type": ["!=", "Transit"]},
-			fields=["name", "company"],
-			order_by="name",
-		),
-		"warehouse": settings.ecommerce_warehouse or (company and onboarding.get_company_warehouse(company)),
 		"has_webshop": "webshop" in frappe.get_installed_apps(),
 		"importable_count": get_importable_item_count(),
 	}
@@ -187,8 +176,6 @@ def start_store_setup(
 	company_abbr: str | None = None,
 	company: str | None = None,
 	price_list: str | None = None,
-	sale_price_list: str | None = None,
-	warehouse: str | None = None,
 ):
 	"""Save the store basics and queue the Frappe/ERPNext setup, once. A failed setup can be retried."""
 	frappe.only_for(ONBOARDING_ROLE)
@@ -203,7 +190,7 @@ def start_store_setup(
 		if not store_name:
 			frappe.throw(_("Store name is required"), frappe.MandatoryError)
 		save_store_basics(store_name, store_category)
-		onboarding.adopt_existing_company(company, price_list, sale_price_list, warehouse)
+		onboarding.adopt_existing_company(store_name, company, price_list)
 		return status
 
 	chart_of_accounts = chart_of_accounts or onboarding.DEFAULT_CHART_OF_ACCOUNTS
@@ -225,16 +212,6 @@ def save_store_basics(store_name: str, store_category: str | None):
 	frappe.db.set_single_value(
 		SETTINGS_DOCTYPE, {"store_name": store_name, "store_category": cstr(store_category).strip()}
 	)
-
-
-@frappe.whitelist(methods=["POST"])
-def create_sale_price_list(store_name: str, company: str):
-	frappe.only_for(ONBOARDING_ROLE)
-
-	store_name = cstr(store_name).strip()
-	if not store_name:
-		frappe.throw(_("Store name is required"), frappe.MandatoryError)
-	return onboarding.create_sale_price_list(store_name, company)
 
 
 @frappe.whitelist(methods=["GET"])
