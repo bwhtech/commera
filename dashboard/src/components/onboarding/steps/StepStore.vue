@@ -132,7 +132,7 @@ watch(
         v-model="draft.priceList"
         trigger="button"
         :label="__('Price list')"
-        :placeholder="__('Pick the prices your store sells at')"
+        :placeholder="__('Pick a price list')"
         :options="toOptions(picks.priceLists)"
         :error="missing === 'priceList' ? __('Required') : ''"
       />
