@@ -21,7 +21,6 @@ import {
   stopSetupPolling,
   storeSetup,
 } from '../../data/onboarding'
-import { useTheme } from '../../data/theme'
 import { addProduct } from '../../data/addProduct'
 import { imp as productImport } from '../../data/importFlow'
 import { __ } from '../../data/translation'
@@ -43,7 +42,6 @@ import OnboardingPreview from './OnboardingPreview.vue'
 import StepYou from './steps/StepYou.vue'
 import StepStore from './steps/StepStore.vue'
 import StepBrand from './steps/StepBrand.vue'
-import StepTheme from './steps/StepTheme.vue'
 import StepSelling from './steps/StepSelling.vue'
 import StepProducts from './steps/StepProducts.vue'
 import StepDone from './steps/StepDone.vue'
@@ -52,7 +50,6 @@ const STEP_COMPONENTS = {
   you: StepYou,
   store: StepStore,
   brand: StepBrand,
-  theme: StepTheme,
   selling: StepSelling,
   products: StepProducts,
   done: StepDone,
@@ -60,7 +57,7 @@ const STEP_COMPONENTS = {
 
 // One class per step, listed so Tailwind can see them. A transform, not a width, so the fill
 // never touches layout; the first step shows a sliver rather than an empty track.
-const PROGRESS = ['scale-x-[0.04]', 'scale-x-[0.17]', 'scale-x-[0.33]', 'scale-x-50', 'scale-x-[0.67]', 'scale-x-[0.83]', 'scale-x-100']
+const PROGRESS = ['scale-x-[0.04]', 'scale-x-[0.2]', 'scale-x-[0.4]', 'scale-x-[0.6]', 'scale-x-[0.8]', 'scale-x-100']
 
 // Forward enters from the right and leaves to the left; Back plays the same path in reverse.
 const SLIDES = {
@@ -69,9 +66,6 @@ const SLIDES = {
 }
 
 const router = useRouter()
-const { themes, load: loadThemes, activate: activateTheme } = useTheme()
-const activeTheme = computed(() => themes.value.find((theme) => theme.live)?.name ?? '')
-
 const saving = ref(false)
 const finishing = ref(false)
 const retrying = ref(false)
@@ -84,7 +78,7 @@ const entered = useEntrance(() => Boolean(record.value))
 const step = computed(() => currentStep.value)
 const slide = computed(() => (flow.direction > 0 ? SLIDES.forward : SLIDES.back))
 const needsPassword = computed(() => Boolean(record.value?.needs_password))
-const look = computed(() => lookFor(draft.theme, themes.value.map((theme) => theme.name)))
+const look = lookFor('Commera Starter')
 const isReady = computed(() => canFinish(storeSetup.status))
 
 const stepProps = computed(() => {
@@ -112,10 +106,7 @@ async function load() {
   goToStep(resumeStep(readSavedStep(), storeSetup.status))
 }
 
-onMounted(async () => {
-  await Promise.all([load(), loadThemes()])
-  draft.theme = draft.theme || activeTheme.value || ''
-})
+onMounted(load)
 
 // The poll is module state and outlives this component: finishing (or a reload into the shell)
 // must not leave it asking every few seconds behind Home.
@@ -147,17 +138,11 @@ function storeSetupValues() {
   }
 }
 
-async function activatePickedTheme() {
-  if (!draft.theme || draft.theme === activeTheme.value) return true
-  return activateTheme(draft.theme)
-}
-
 // What Continue writes before moving on. A step missing here has nothing of its own to save.
 const SAVES = {
   you: () => saveProfile(draft),
   store: () => startStoreSetup(storeSetupValues()),
   brand: () => saveBrand(draft),
-  theme: activatePickedTheme,
   selling: () => saveSelling(draft),
 }
 

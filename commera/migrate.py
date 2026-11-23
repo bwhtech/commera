@@ -25,6 +25,8 @@ from commera.www.llms import DEFAULT_LLMS_TXT
 # Sentinel marking the robots.txt value as ours; absent from a non-blank value, an admin owns it.
 ROBOTS_MARKER = "# managed by commera"
 
+STARTER_THEME = "Commera Starter"
+
 
 def after_install():
 	# install_app syncs before commera is in installed_apps, so our importable_doctypes hook is skipped.
@@ -39,7 +41,7 @@ def after_install():
 	setup_robots_txt()
 	seed_llms_txt()
 	seed_default_routes()
-	activate_summer_theme()
+	set_live_theme(STARTER_THEME)
 	seed_menu_when_empty()
 	add_plugin_user()
 	set_default_app()
@@ -53,9 +55,9 @@ def set_default_app():
 	frappe.db.set_single_value("System Settings", "default_app", "commera")
 
 
-def activate_summer_theme():
+def set_live_theme(theme: str):
 	settings = frappe.get_doc("Shop Theme Settings")
-	settings.active_theme = "Summer Theme"
+	settings.active_theme = theme
 	settings.dynamic_pages_enabled = 1
 	settings.save(ignore_permissions=True)
 

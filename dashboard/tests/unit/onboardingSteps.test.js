@@ -40,11 +40,22 @@ test('a store ERPNext already set up must pick its company, price lists and ware
 })
 
 test('a reload resumes at the saved step, unless the store setup never started', () => {
-  assert.equal(resumeStep(STEP_INDEX.theme, 'running'), STEP_INDEX.theme)
-  assert.equal(resumeStep(STEP_INDEX.theme, 'idle'), STEP_INDEX.store)
-  assert.equal(resumeStep(STEP_INDEX.store, 'idle'), STEP_INDEX.store)
-  assert.equal(resumeStep(99, 'done'), STEP_INDEX.done)
+  assert.equal(resumeStep('selling', 'running'), STEP_INDEX.selling)
+  assert.equal(resumeStep('selling', 'idle'), STEP_INDEX.store)
+  assert.equal(resumeStep('store', 'idle'), STEP_INDEX.store)
+  assert.equal(resumeStep('done', 'done'), STEP_INDEX.done)
+  assert.equal(resumeStep(null, 'idle'), 0)
+  assert.equal(resumeStep('gone', 'done'), 0)
   assert.equal(clampStep(Number.NaN), 0)
+})
+
+test('a step saved as an index before the look step went resumes at the same step', () => {
+  assert.equal(resumeStep('2', 'running'), STEP_INDEX.brand)
+  assert.equal(resumeStep('3', 'running'), STEP_INDEX.selling)
+  assert.equal(resumeStep('4', 'running'), STEP_INDEX.selling)
+  assert.equal(resumeStep('5', 'done'), STEP_INDEX.products)
+  assert.equal(resumeStep('6', 'done'), STEP_INDEX.done)
+  assert.equal(resumeStep('99', 'done'), 0)
 })
 
 test('onboarding can finish only once the store setup is done', () => {

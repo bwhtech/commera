@@ -1,17 +1,11 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { Button, Spinner, toast, useFileUpload } from 'frappe-ui'
 import { __ } from '../../../data/translation'
-import { BRAND_COLOURS, draft } from '../../../ia/onboarding'
-import SwatchDot from '../../SwatchDot.vue'
+import { draft } from '../../../ia/onboarding'
 
 const { upload, isUploading } = useFileUpload()
 const fileInput = ref(null)
-
-// A colour picked earlier in Settings stays on offer, so revisiting never silently drops it.
-const colours = computed(() =>
-  draft.primaryColor && !BRAND_COLOURS.includes(draft.primaryColor) ? [draft.primaryColor, ...BRAND_COLOURS] : BRAND_COLOURS,
-)
 
 async function uploadLogo(event) {
   const [file] = [...(event.target.files ?? [])]
@@ -44,26 +38,5 @@ async function uploadLogo(event) {
       </template>
     </button>
     <Button v-if="draft.brandLogo" variant="ghost" size="sm" :label="__('Remove logo')" class="-mt-4" @click="draft.brandLogo = ''" />
-
-    <div>
-      <p class="mb-2 text-xs text-ink-gray-6">{{ __('Colour') }}</p>
-      <div class="flex flex-wrap items-center gap-2.5">
-        <!-- The padding is the gap inside the selection ring: ring-offset paints a fixed white,
-             which shows as a halo on a dark dashboard. -->
-        <button
-          v-for="colour in colours"
-          :key="colour"
-          type="button"
-          class="rounded-full p-0.5 transition-[transform,box-shadow] duration-150 ease-out-strong active:scale-90"
-          :class="{ 'ring-2 ring-outline-gray-5': draft.primaryColor === colour }"
-          :aria-label="__('Use {0}', [colour])"
-          :aria-pressed="draft.primaryColor === colour"
-          data-onboarding-colour
-          @click="draft.primaryColor = draft.primaryColor === colour ? '' : colour"
-        >
-          <SwatchDot :color="colour" size="lg" />
-        </button>
-      </div>
-    </div>
   </div>
 </template>
