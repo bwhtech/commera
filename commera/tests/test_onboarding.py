@@ -1,7 +1,10 @@
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request
 
 from commera import onboarding
 from commera.api.admin import onboarding as onboarding_api
@@ -241,6 +244,44 @@ class OnboardingAccessTestCase(IntegrationTestCase):
 		frappe.set_user(self.owner)
 		onboarding_api.complete_onboarding()
 		self.assertFalse(get_boot().onboarding_pending)
+
+	def open_desk(self, user, path):
+		self.addCleanup(setattr, frappe.local, "request", getattr(frappe.local, "request", None))
+		frappe.local.request = Request(EnvironBuilder(path=path).get_environ())
+		frappe.flags.redirect_location = None
+		frappe.set_user(user)
+		with patch.object(onboarding.frappe, "is_setup_complete", return_value=False):
+			try:
+				onboarding.redirect_from_desk_before_setup(frappe._dict())
+			except frappe.Redirect:
+				return frappe.flags.redirect_location
+
+	def test_owner_is_sent_to_onboarding_from_desk_and_the_wizard(self):
+		for path in ("/desk", "/desk/setup-wizard", "/desk/user"):
+			with self.subTest(path=path):
+				self.assertEqual(self.open_desk(self.owner, path), "/commera")
+
+	def test_other_desk_users_see_setup_pending_message(self):
+		location = self.open_desk(self.store_admin, "/desk")
+
+		self.assertTrue(location.startswith("/message?"))
+		self.assertIn(
+			"Ask the store owner to finish setup.", parse_qs(urlsplit(location).query)["message"][0]
+		)
+
+	def test_desk_opens_once_onboarding_is_done(self):
+		frappe.db.set_single_value(SETTINGS, "onboarding_completed", 1)
+
+		self.assertIsNone(self.open_desk(self.owner, "/desk/setup-wizard"))
+		self.assertIsNone(self.open_desk(self.store_admin, "/desk"))
+
+	def test_desk_opens_on_a_site_already_set_up(self):
+		frappe.local.request = Request(EnvironBuilder(path="/desk").get_environ())
+		self.addCleanup(setattr, frappe.local, "request", None)
+		frappe.set_user(self.owner)
+
+		self.assertTrue(frappe.is_setup_complete())
+		self.assertIsNone(onboarding.redirect_from_desk_before_setup(frappe._dict()))
 
 	def test_get_onboarding_prefills_from_system_settings(self):
 		frappe.set_user(self.owner)
