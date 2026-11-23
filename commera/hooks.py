@@ -400,7 +400,7 @@ jinja = {
 update_website_context = [
 	"commera.website_context.update_website_context",
 	"commera.roles.redirect_commera_users_from_desk",
-	"commera.onboarding.redirect_owner_from_desk",
+	"commera.onboarding.redirect_from_desk_before_setup",
 ]
 
 # GDPR erasure: the event log stores the signed-in email as plain Data, so core is told which column to redact.
