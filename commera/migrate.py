@@ -25,7 +25,7 @@ from commera.www.llms import DEFAULT_LLMS_TXT
 # Sentinel marking the robots.txt value as ours; absent from a non-blank value, an admin owns it.
 ROBOTS_MARKER = "# managed by commera"
 
-STARTER_THEME = "Commera Starter"
+DEFAULT_THEME = "Commera Standard"
 
 
 def after_install():
@@ -41,7 +41,7 @@ def after_install():
 	setup_robots_txt()
 	seed_llms_txt()
 	seed_default_routes()
-	set_live_theme(STARTER_THEME)
+	set_live_theme(DEFAULT_THEME)
 	seed_menu_when_empty()
 	add_plugin_user()
 	set_default_app()

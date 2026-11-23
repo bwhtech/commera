@@ -24,7 +24,7 @@ TRANSLATIONS_DIR = APP_ROOT / "commera" / "translations"
 
 # Paths are relative to the app root. The starter theme also renders the shared language switcher.
 SOURCES = (
-	"commera/themes/commera_starter",
+	"commera/themes/commera_standard",
 	"commera/templates/macros/language_switcher.html",
 	"commera/sdk",
 	"commera/api",

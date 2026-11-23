@@ -20,8 +20,8 @@ from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_market_address_countries import GULF, in_locale
 from commera.tests.test_market_cart import MarketCartTestCase
 from commera.tests.test_markets import UAE, make_market, use_markets
-from commera.themes.commera_starter.pages.account import address as starter_address
-from commera.themes.commera_starter.pages.cart import checkout as starter_checkout
+from commera.themes.commera_standard.pages.account import address as starter_address
+from commera.themes.commera_standard.pages.cart import checkout as starter_checkout
 from commera.www.cart import checkout as legacy_checkout
 
 CALL_SCRIPT = "commera/templates/includes/frappe-call-script.html"

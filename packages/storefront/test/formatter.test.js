@@ -177,7 +177,7 @@ test('Starter discount and rounding bindings render signed amounts', () => {
 	for (const template of templates) {
 		const source = readFileSync(
 			new URL(
-				`../../../commera/themes/commera_starter/${template}`,
+				`../../../commera/themes/commera_standard/${template}`,
 				import.meta.url,
 			),
 			'utf8',

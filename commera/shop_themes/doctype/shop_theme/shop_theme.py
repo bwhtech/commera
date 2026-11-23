@@ -172,7 +172,7 @@ class ShopTheme(Document):
 			):
 				old_path = get_contained_path(base_dir, old_slug)
 				new_path = get_contained_path(base_dir, new_slug)
-				if os.path.isdir(old_path):
+				if os.path.isdir(old_path) and not os.path.exists(new_path):
 					os.rename(old_path, new_path)
 
 			if self.module and frappe.conf.developer_mode:

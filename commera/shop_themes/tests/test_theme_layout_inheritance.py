@@ -21,7 +21,7 @@ from commera.shop_themes.sections import get_page_layout, get_theme_json
 from commera.tests.test_admin_theme_layout import publish, save_draft
 from commera.tests.test_localization import use_storefront_languages
 
-PARENT = "Commera Starter"
+PARENT = "Commera Standard"
 CHILD = "ZZ Inherit Child"
 GRANDCHILD = "ZZ Inherit Grandchild"
 PAGE = "index"

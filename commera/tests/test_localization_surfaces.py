@@ -15,7 +15,7 @@ from commera.tests.test_localization import use_storefront_languages
 
 APP_ROOT = frappe.get_app_path("commera")
 BASE_TEMPLATES = (
-	"themes/commera_starter/components/base.html",
+	"themes/commera_standard/components/base.html",
 	"themes/shop_base_theme/components/base.html",
 	"themes/shop_default_theme/components/base.html",
 	"templates/layout.html",

@@ -34,7 +34,7 @@ class TestRtlMerchantContent(ProductDetailPriceTestCase):
 		self.assert_starter_page("", self.make_product("RTLAR", ARABIC), ARABIC)
 
 	def test_the_starter_cart_isolates_line_titles_and_sizes(self):
-		activate_theme("Commera Starter")
+		activate_theme("Commera Standard")
 		html = render_page(self, "/ar/cart")
 		self.assertIn('<bdi x-text="line.product?.title ?? line.title"></bdi>', html)
 		self.assertIn('<bdi x-text="line.product?.variant_title"></bdi>', html)
@@ -188,7 +188,7 @@ class TestRtlMerchantContent(ProductDetailPriceTestCase):
 
 	def test_selected_filter_chip_keeps_its_label_isolated_and_escaped(self):
 		html = render_value_lines(
-			"themes/commera_starter/components/product_grid.html",
+			"themes/commera_standard/components/product_grid.html",
 			("{{ chip.label",),
 			chip=frappe._dict(url="/products", label="Size & مقاس (M)."),
 			icon=lambda *args: "",
@@ -199,10 +199,10 @@ class TestRtlMerchantContent(ProductDetailPriceTestCase):
 
 	def test_swept_jinja_labels_keep_escaping_and_isolation(self):
 		cases = (
-			("themes/commera_starter/sections/header.html", 'item["title"]'),
-			("themes/commera_starter/components/macros/menu_link.html", 'item["title"]'),
-			("themes/commera_starter/sections/footer.html", "shop_name"),
-			("themes/commera_starter/sections/hero.html", "section.settings.primary_label"),
+			("themes/commera_standard/sections/header.html", 'item["title"]'),
+			("themes/commera_standard/components/macros/menu_link.html", 'item["title"]'),
+			("themes/commera_standard/sections/footer.html", "shop_name"),
+			("themes/commera_standard/sections/hero.html", "section.settings.primary_label"),
 			("themes/summer_theme/components/macros/navigation.html", "node.label"),
 			("themes/summer_theme/sections/collection.html", "banner.settings.heading"),
 			("themes/summer_theme/sections/hero_slider.html", "slide.settings.heading"),
@@ -213,7 +213,7 @@ class TestRtlMerchantContent(ProductDetailPriceTestCase):
 			("templates/macros/navigation_menu.html", "text"),
 			("themes/summer_theme/pages/account/orders/detail.html", "tax.description"),
 			("themes/summer_theme/pages/account/orders/detail.html", "fee.description"),
-			("themes/commera_starter/pages/account/orders/detail.html", "label"),
+			("themes/commera_standard/pages/account/orders/detail.html", "label"),
 			("templates/includes/footer.html", "link.title"),
 			("www/account/address.html", "address.display"),
 		)
@@ -230,7 +230,7 @@ class TestRtlMerchantContent(ProductDetailPriceTestCase):
 				self.assertIn("&amp;", html)
 
 	def test_swept_alpine_values_are_isolated_in_parsed_markup(self):
-		roots = ("themes/commera_starter", "themes/summer_theme", "templates", "www")
+		roots = ("themes/commera_standard", "themes/summer_theme", "templates", "www")
 		merchant_value = re.compile(
 			r"attribute_value|item_group|category.label|chip.label|get_product_name|"
 			r"item.brand|item.title|item.item_name|item.display|selectedOption.*display|"
@@ -261,7 +261,7 @@ class TestRtlMerchantContent(ProductDetailPriceTestCase):
 		self.assertEqual(len(paragraphs), expected)
 
 	def assert_starter_page(self, prefix, route, content):
-		activate_theme("Commera Starter")
+		activate_theme("Commera Standard")
 		html = render_page(self, f"{prefix}/products/{route}")
 		title = content["title"]
 		self.assert_description_descendants(html, content["description"])

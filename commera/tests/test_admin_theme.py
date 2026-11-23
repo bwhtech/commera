@@ -28,7 +28,7 @@ from commera.tests.test_product_details import ProductDetailPriceTestCase
 from commera.www import theme_editor_preview
 
 SUMMER_THEME = "Summer Theme"
-STARTER_THEME = "Commera Starter"
+STARTER_THEME = "Commera Standard"
 BASE_THEME = "Shop Base Theme"
 DEFAULT_THEME = "Shop Default Theme"
 
@@ -125,9 +125,9 @@ class TestAdminTheme(IntegrationTestCase):
 
 		data = save_theme_settings(STARTER_THEME, instagram_url="https://instagram.com/zz")
 
-		self.assertEqual(data["doctype"], "Commera Starter Settings")
+		self.assertEqual(data["doctype"], "Commera Standard Settings")
 		self.assertEqual(
-			frappe.db.get_single_value("Commera Starter Settings", "instagram_url"),
+			frappe.db.get_single_value("Commera Standard Settings", "instagram_url"),
 			"https://instagram.com/zz",
 		)
 		self.assertEqual(frappe.db.get_single_value("Summer Theme Settings", "categories_title"), live_title)

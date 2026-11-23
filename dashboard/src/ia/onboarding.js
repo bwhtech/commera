@@ -132,7 +132,7 @@ export const LOOKS = {
 // The themes Commera ships, by name; a theme installed later borrows a look by its place in the list.
 const LOOK_BY_THEME = {
   'Summer Theme': 'clean',
-  'Commera Starter': 'editorial',
+  'Commera Standard': 'editorial',
   'Shop Default Theme': 'market',
   'Shop Base Theme': 'noir',
 }

@@ -218,7 +218,7 @@ class TestCurrencySigns(CartCurrencyTestCase):
 
 		self.open_request("/ar-ae/account/orders")
 		source = Path(
-			frappe.get_app_path("commera", "themes/commera_starter/pages/account/orders/detail.html")
+			frappe.get_app_path("commera", "themes/commera_standard/pages/account/orders/detail.html")
 		).read_text()
 		macro = source[
 			source.index("{% macro summary_row") : source.index("{%- endmacro %}") + len("{%- endmacro %}")

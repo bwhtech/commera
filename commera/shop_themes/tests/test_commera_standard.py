@@ -12,8 +12,8 @@ from commera.shop_themes.sections import get_theme_json, validate_layout
 from commera.shop_themes.theme_resolver import ThemePageRenderer, build_base_context
 from commera.tests.test_localization import use_storefront_languages
 
-STARTER = "Commera Starter"
-STARTER_DIR = os.path.join(frappe.get_app_path("commera"), "themes", "commera_starter")
+STARTER = "Commera Standard"
+STARTER_DIR = os.path.join(frappe.get_app_path("commera"), "themes", "commera_standard")
 PRODUCT_CARD = {
 	"id": "ZZ-STARTER-CARD",
 	"handle": "zz-starter-card",
@@ -32,7 +32,7 @@ PRODUCT_CARD = {
 }
 
 
-class IntegrationTestCommeraStarter(IntegrationTestCase):
+class IntegrationTestCommeraStandard(IntegrationTestCase):
 	def setUp(self):
 		self.theme_context = {
 			"theme_name": STARTER,
@@ -205,7 +205,7 @@ class IntegrationTestCommeraStarter(IntegrationTestCase):
 
 		for expected in (
 			"Clothes made to be lived in.",
-			"/assets/commera/themes/commera_starter/images/banner-banner-media2.webp",
+			"/assets/commera/themes/commera_standard/images/banner-banner-media2.webp",
 			"New arrivals",
 			"ZZ Starter Linen Shirt",
 			commera.sdk.format.money(1999, "INR"),
