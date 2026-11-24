@@ -3,7 +3,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import create_batch, nowdate
+from frappe.utils import create_batch, fmt_money, nowdate
 from frappe.utils.data import cint, cstr, flt
 
 from commera.base_prices import get_todays_price_rows
@@ -104,7 +104,13 @@ def set_variant_prices(
 	if not item_codes:
 		return counts
 
-	existing_price_by_key = get_base_price_rows_by_key(item_codes, list(rate_by_price_list))
+	existing_price_by_key = get_base_price_rows_by_key(item_codes, [default_price_list, sale_price_list])
+	new_rate_by_key = {
+		(item_code, price_list): rate
+		for price_list, rate in rate_by_price_list.items()
+		for item_code in item_codes
+	}
+	check_compare_at_not_below_price(existing_price_by_key, new_rate_by_key, overwrite_existing)
 
 	price_rows_to_insert = []
 	for price_list, rate in rate_by_price_list.items():
@@ -140,6 +146,30 @@ def set_variant_prices(
 
 	add_pricing_comment(item_template, counts)
 	return counts
+
+
+def check_compare_at_not_below_price(existing_price_by_key, new_rate_by_key, overwrite_existing=True):
+	"""Refuse a compare-at rate below the price: the storefront drops it, so the sale the owner meant
+	never shows. Equal is allowed, as that is how a sale ends - a price cannot be removed. Only a
+	compare-at rate this save writes is checked, against the price the size has after the save."""
+	default_price_list, sale_price_list = get_selling_price_lists()
+	rate_by_key = {key: flt(row.price_list_rate) for key, row in existing_price_by_key.items()}
+	written_rate_by_key = {
+		key: flt(rate)
+		for key, rate in new_rate_by_key.items()
+		if overwrite_existing or key not in rate_by_key
+	}
+	rate_by_key.update(written_rate_by_key)
+
+	for (item_code, price_list), compare_at in written_rate_by_key.items():
+		price = rate_by_key.get((item_code, sale_price_list))
+		if price_list == default_price_list and price and compare_at < price:
+			frappe.throw(
+				_("Compare at ({0}) cannot be lower than Price ({1}) for {2}.").format(
+					fmt_money(compare_at), fmt_money(price), item_code
+				),
+				title=_("Invalid compare-at price"),
+			)
 
 
 def set_item_price_rate(price_names, rate):

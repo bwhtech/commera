@@ -196,6 +196,8 @@ def parse_and_validate(file_url: str, column_mapping: dict | None = None):
 					),
 				}
 
+		if not issue and compare_at_price and sale_price and compare_at_price < sale_price:
+			issue = {"level": "error", "text": "Compare at price cannot be lower than the selling price"}
 		if not issue and not compare_at_price and not sale_price:
 			issue = {"level": "warning", "text": "No price set — product is created without a price"}
 

@@ -11,6 +11,7 @@ import { Alert, Button, Dialog, ErrorMessage, FormControl, Select, dialog, toast
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { addProduct, closeAddProduct } from '../data/addProduct'
 import { buildOptionSizes } from '../data/optionSizes'
+import { isCompareAtBelowPrice } from '../data/product'
 import { productRoute } from '../ia/routes'
 import { __ } from '../data/translation'
 import AttributeMultiSelect from './AttributeMultiSelect.vue'
@@ -134,6 +135,10 @@ const mixedOption = computed(() =>
 )
 const gridError = computed(() => (mixedOption.value ? __('Pick at least one size for {0}', [mixedOption.value]) : ''))
 
+const compareAtError = computed(() =>
+  isCompareAtBelowPrice(price.value, compareAt.value) ? __('Compare at cannot be lower than Price.') : '',
+)
+
 // A price is required, not optional. create_product only writes Item Prices for a rate
 // above zero, so a product created without one carries no Item Price row at all and reads
 // as 0 on every screen until someone prices it by hand — it can never be sold in between.
@@ -142,6 +147,7 @@ const canSubmit = computed(
     Boolean(title.value.trim()) &&
     Boolean(collection.value) &&
     Number(price.value) > 0 &&
+    !compareAtError.value &&
     !mixedOption.value,
 )
 
@@ -166,6 +172,7 @@ const submitHint = computed(() => {
   if (!title.value.trim()) return __('Add a title to continue.')
   if (!collection.value) return __('Pick a collection to continue.')
   if (!(Number(price.value) > 0)) return __('Set a price above zero to continue.')
+  if (compareAtError.value) return compareAtError.value
   return ''
 })
 
@@ -267,7 +274,13 @@ async function submit() {
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormControl v-model.number="price" type="number" :label="`${__('Price')} *`" placeholder="0" />
-          <FormControl v-model.number="compareAt" type="number" :label="__('Compare at')" placeholder="0" />
+          <FormControl
+            v-model.number="compareAt"
+            type="number"
+            :label="__('Compare at')"
+            placeholder="0"
+            :error="compareAtError"
+          />
         </div>
 
         <Alert

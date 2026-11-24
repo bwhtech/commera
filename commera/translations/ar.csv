@@ -2522,3 +2522,6 @@ Each {0} has its own photos. The first one is the cover.,لكل {0} صوره ا�
 Add photos of {0},أضف صور {0}
 Shown when a shopper picks {0}. Drop images here or click to choose.,تظهر عندما يختار المتسوق {0}. اسحب الصور إلى هنا أو انقر للاختيار.
 Applies to every size under this option ({0}).,ينطبق على كل المقاسات ضمن هذا الخيار ({0}).
+Compare at cannot be lower than Price.,لا يمكن أن يكون السعر قبل الخصم أقل من السعر.
+Compare at ({0}) cannot be lower than Price ({1}) for {2}.,لا يمكن أن يكون السعر قبل الخصم ({0}) أقل من السعر ({1}) للمنتج {2}.
+Invalid compare-at price,السعر قبل الخصم غير صالح

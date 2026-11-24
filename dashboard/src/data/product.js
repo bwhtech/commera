@@ -17,6 +17,13 @@ export function compareAtPrice(rated) {
   return compareAt != null && compareAt > shownPrice(rated) ? compareAt : null
 }
 
+// The server refuses this (variant_pricing.check_compare_at_not_below_price): the storefront drops
+// a compare-at below the price, so the sale never shows. Equal is fine - that is how a sale ends.
+export function isCompareAtBelowPrice(price, compareAt) {
+  if (compareAt == null || compareAt === '' || !(Number(price) > 0)) return false
+  return Number(compareAt) < Number(price)
+}
+
 // The rate half of a set_variant_price / save_product_prices payload, aimed at the price list
 // actually in force. Safe to send one of the two on its own: set_variant_prices() builds
 // rate_by_price_list from the rates it was given, so the other list keeps what it had.

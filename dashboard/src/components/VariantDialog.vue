@@ -8,7 +8,7 @@ import { computed, ref, watch } from 'vue'
 import { Badge, Button, Dialog, FormControl, toast } from 'frappe-ui'
 import VariantMedia from './VariantMedia.vue'
 import { useAdminAction, trySubmit } from '../data/api'
-import { pricePayload, shownPrice } from '../data/product'
+import { isCompareAtBelowPrice, pricePayload, shownPrice } from '../data/product'
 import { __ } from '../data/translation'
 
 const props = defineProps({
@@ -54,8 +54,12 @@ const skuList = computed(() => props.variant?.sizes?.map((size) => size.item_cod
 
 const priceAction = useAdminAction('catalog.set_variant_price')
 
+const compareAtError = computed(() =>
+  isCompareAtBelowPrice(price.value, compareAt.value) ? __('Compare at cannot be lower than Price.') : '',
+)
+
 async function save() {
-  if (priceAction.loading) return
+  if (priceAction.loading || compareAtError.value) return
   const hasCompareAt = compareAt.value != null && compareAt.value !== ''
   // With no compare-at there is only one price to write, and it has to land on the list already
   // in force: a product created without one is priced on the sale list alone, so writing the
@@ -96,7 +100,7 @@ async function save() {
         </p>
         <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormControl v-model.number="price" type="number" :label="__('Price')" />
-          <FormControl v-model.number="compareAt" type="number" :label="__('Compare at')" />
+          <FormControl v-model.number="compareAt" type="number" :label="__('Compare at')" :error="compareAtError" />
           <!-- Read-only: commera only exposes receiving stock (additive), not setting
                on-hand to an arbitrary number. -->
           <FormControl :model-value="String(onHand)" type="number" :label="__('On hand')" disabled />
@@ -119,7 +123,14 @@ async function save() {
     <template v-if="variant" #actions>
       <div class="flex w-full justify-end gap-2">
         <Button :label="__('Cancel')" :disabled="priceAction.loading" @click="open = false" />
-        <Button :label="__('Save variant')" variant="solid" theme="gray" :loading="priceAction.loading" @click="save" />
+        <Button
+          :label="__('Save variant')"
+          variant="solid"
+          theme="gray"
+          :disabled="Boolean(compareAtError)"
+          :loading="priceAction.loading"
+          @click="save"
+        />
       </div>
     </template>
   </Dialog>
