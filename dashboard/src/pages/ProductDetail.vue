@@ -54,6 +54,7 @@ watch(
       updated: data.updated,
       variants: data.variants,
       option_attribute: data.option_attribute,
+      can_edit_options: data.can_edit_options,
       recent_sales: data.recent_sales,
     }
   },

@@ -10,7 +10,7 @@ import EditOptionsDialog from './EditOptionsDialog.vue'
 import SwatchDot from './SwatchDot.vue'
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { stockTone } from '../data/format'
-import { pricePayload, shownPrice } from '../data/product'
+import { pricePayload, productOptions, shownPrice } from '../data/product'
 import { __ } from '../data/translation'
 import { ia } from '../ia/store'
 import { useBulkAction } from '../utils/useBulkAction'
@@ -35,8 +35,7 @@ function openVariant(variant) {
 
 const showEditOptions = ref(false)
 
-const optionNoun = computed(() => (props.product.option_attribute ?? __('option')).toLowerCase())
-const optionValues = computed(() => [...new Set(props.product.variants.map((v) => v.option))])
+const options = computed(() => productOptions(props.product))
 
 const optionValuesRequest = useAdminRead('catalog.get_attribute_values', {
   params: () => ({ attribute: props.product.option_attribute }),
@@ -183,21 +182,18 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
   <section class="space-y-5">
     <!-- The axis, first: the matrix below is nothing but its values. -->
     <div id="product-options" class="rounded-5 border border-outline-gray-1">
-      <div class="flex items-start justify-between gap-3 px-4 py-3">
-        <div>
-          <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Options') }}</h2>
-          <p class="mt-1 text-p-sm text-ink-gray-5">
-            {{ __('Add a {0} or size, or take one off sale.', [optionNoun]) }}
-          </p>
-        </div>
-        <Button :label="__('Edit')" icon-left="lucide-pencil" @click="showEditOptions = true" />
-      </div>
+      <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">{{ __('Options') }}</h2>
 
-      <div v-if="optionValues.length" class="border-t border-outline-gray-1 px-4 py-3">
-        <div class="flex items-start gap-3">
-          <span class="w-24 shrink-0 pt-0.5 text-base text-ink-gray-6">{{ product.option_attribute }}</span>
-          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-            <Badge v-for="value in optionValues" :key="value" variant="subtle">
+      <template v-if="options.options.length || options.sizes.length">
+        <button
+          v-if="options.options.length"
+          type="button"
+          class="flex w-full items-center gap-3 border-t border-outline-gray-1 px-4 py-3 text-start hover:bg-surface-gray-1"
+          @click="showEditOptions = true"
+        >
+          <span class="w-24 shrink-0 text-base text-ink-gray-6">{{ product.option_attribute }}</span>
+          <span class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+            <Badge v-for="value in options.options" :key="value" variant="subtle">
               <span class="flex items-center gap-1.5">
                 <SwatchDot
                   v-if="swatches[value]?.color || swatches[value]?.image"
@@ -208,14 +204,37 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
                 {{ value }}
               </span>
             </Badge>
-          </div>
-        </div>
-      </div>
+          </span>
+          <span class="lucide-chevron-right size-4 shrink-0 text-ink-gray-5 rtl:rotate-180" aria-hidden="true" />
+        </button>
 
-      <div v-else class="border-t border-outline-gray-1 px-4 py-6 text-center">
-        <p class="text-base text-ink-gray-7">{{ __('This product has no options') }}</p>
-        <p class="mt-1 text-p-sm text-ink-gray-5">{{ __('It sells as a single item.') }}</p>
-      </div>
+        <button
+          v-if="options.sizes.length"
+          type="button"
+          class="flex w-full items-center gap-3 border-t border-outline-gray-1 px-4 py-3 text-start hover:bg-surface-gray-1"
+          @click="showEditOptions = true"
+        >
+          <span class="w-24 shrink-0 text-base text-ink-gray-6">{{ __('Size') }}</span>
+          <span class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+            <Badge v-for="size in options.sizes" :key="size" :label="size" variant="subtle" />
+          </span>
+          <span class="lucide-chevron-right size-4 shrink-0 text-ink-gray-5 rtl:rotate-180" aria-hidden="true" />
+        </button>
+      </template>
+
+      <button
+        v-else-if="product.can_edit_options"
+        type="button"
+        class="flex w-full items-center gap-2 border-t border-outline-gray-1 px-4 py-3 text-start hover:bg-surface-gray-1"
+        @click="showEditOptions = true"
+      >
+        <span class="lucide-plus size-4 text-ink-gray-7" aria-hidden="true" />
+        <span class="text-base text-ink-gray-8">{{ __('Add options like size or color') }}</span>
+      </button>
+
+      <p v-else class="border-t border-outline-gray-1 px-4 py-3 text-p-sm text-ink-gray-5">
+        {{ __('It sells as a single item.') }}
+      </p>
     </div>
 
     <!-- The matrix: one row per option, each with its own sizes underneath. The
