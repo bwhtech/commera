@@ -160,7 +160,7 @@ function printDeliveryNotes() {
   }
   if (!deliveryNotes.length) return
 
-  window.open(printUrl('Delivery Note', deliveryNotes), '_blank', 'noopener')
+  window.open(printUrl('Delivery Note', deliveryNotes, 'Commera Packing Slip'), '_blank', 'noopener')
 }
 </script>
 

@@ -1,0 +1,50 @@
+{% extends "commera/templates/print/layout.html" %}
+{% import "commera/templates/print/macros.html" as ui %}
+
+{% block styles %}
+	.commera-print .hero .caption { margin-bottom: 8px; }
+	.commera-print .hero p { font-size: 16px; line-height: 1.45; }
+	.commera-print .picklist td { padding: 10px 0; }
+	.commera-print .check-cell { width: 34px; }
+	.commera-print .check { display: block; width: 16px; height: 16px; border: 1.5px solid var(--ink-gray-3); border-radius: var(--radius-tag); }
+	.commera-print .picklist .qty { font-size: 16px; font-weight: {{ tokens.font.semibold }}; }
+{% endblock %}
+
+{% block body %}
+{{ ui.masthead(brand, _("Packing slip"), doc.packed_on) }}
+
+{{ ui.hero(doc.shipping.name, doc.shipping.lines + [doc.contact_mobile], _("Order number"), doc.order_name, label=_("Ship to")) }}
+
+<section class="facts">
+	<div class="fact">
+		{{ ui.fact(_("Delivery"), doc.delivery_method) }}
+	</div>
+	<div class="fact">
+		{{ ui.fact(_("Delivery note"), doc.name) }}
+	</div>
+	<div class="fact">
+		{{ ui.fact(_("Items"), _("{0} pieces").format(doc.total_qty), _("{0} lines").format(doc.lines | length)) }}
+	</div>
+</section>
+
+<table class="items picklist">
+	<thead>
+		<tr>
+			<th class="check-cell"></th>
+			<th>{{ _("Product") }}</th>
+			<th class="r" style="width: 60px">{{ _("Qty") }}</th>
+		</tr>
+	</thead>
+	<tbody>
+	{% for row in doc.lines %}
+		<tr>
+			<td class="check-cell"><i class="check"></i></td>
+			<td>{{ ui.product_cell(row) }}</td>
+			<td class="r num qty">{{ row.qty }}</td>
+		</tr>
+	{% endfor %}
+	</tbody>
+</table>
+
+{{ ui.footer(brand, copy.closing) }}
+{% endblock %}

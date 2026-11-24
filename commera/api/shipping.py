@@ -413,16 +413,13 @@ def get_charge_lines(taxes, shipping_rule: str | None, quotation=None) -> dict:
 	charge_lines = {"shipping": 0.0, "cod_charge": 0.0, "plugin_fees": [], "taxes": []}
 	for row in taxes:
 		description = cstr(row.description).strip()
-		kind = get_cart_charge_kind(row, quotation) if quotation else row.get(CART_CHARGE_FIELD)
+		kind = get_charge_line_kind(row, rule, quotation)
 		amount = flt(row.tax_amount)
-		if kind == "plugin" or (quotation is None and row.get(PLUGIN_FEE_FIELD)):
+		if kind == "plugin":
 			charge_lines["plugin_fees"].append({"description": description, "amount": amount})
-		elif kind == "cod" or (quotation is None and description == COD_CHARGE_DESCRIPTION.strip()):
+		elif kind == "cod":
 			charge_lines["cod_charge"] += amount
-		elif kind in ("delivery", "shipping_rule") or (
-			quotation is None
-			and (description.startswith(DELIVERY_CHARGE_DESCRIPTION) or is_shipping_rule_row(row, rule))
-		):
+		elif kind == "shipping":
 			charge_lines["shipping"] += amount
 		else:
 			included = bool(row.get("included_in_print_rate"))
@@ -439,6 +436,21 @@ def get_charge_lines(taxes, shipping_rule: str | None, quotation=None) -> dict:
 				}
 			)
 	return charge_lines
+
+
+def get_charge_line_kind(row, rule, quotation=None) -> str:
+	description = cstr(row.description).strip()
+	kind = get_cart_charge_kind(row, quotation) if quotation else row.get(CART_CHARGE_FIELD)
+	if kind == "plugin" or (quotation is None and row.get(PLUGIN_FEE_FIELD)):
+		return "plugin"
+	if kind == "cod" or (quotation is None and description == COD_CHARGE_DESCRIPTION.strip()):
+		return "cod"
+	if kind in ("delivery", "shipping_rule") or (
+		quotation is None
+		and (description.startswith(DELIVERY_CHARGE_DESCRIPTION) or is_shipping_rule_row(row, rule))
+	):
+		return "shipping"
+	return "tax"
 
 
 def get_charge_amount(quotation) -> float:

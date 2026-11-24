@@ -13,6 +13,7 @@ from commera.notifications import seed_customer_emails
 from commera.payment_gateways.connectors import get_available_payment_modes, validate_connectors
 from commera.plugin_events import add_plugin_user, validate_plugins
 from commera.plugins.registry import get_registry
+from commera.print_views import set_default_invoice_print_format
 from commera.roles import add_commera_roles
 from commera.search.build import ensure_index_built
 from commera.search.record_builder import DEFAULT_CONTENT_FIELDS
@@ -35,6 +36,7 @@ def after_install():
 	create_payment_modes()
 	add_commera_roles()
 	seed_customer_emails()
+	set_default_invoice_print_format()
 	populate_search_settings()
 	ensure_storefront_search_index()
 	seed_default_storefront_language()
