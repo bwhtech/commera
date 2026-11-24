@@ -6,15 +6,15 @@
  "engine": "InnoDB",
  "field_order": [
   "enabled",
-  "column_break_mode",
-  "test_mode",
-  "treat_authorised_as_paid",
   "section_break_store",
   "store_id",
-  "currency",
   "column_break_keys",
   "auth_key",
   "remote_auth_key",
+  "section_break_settings",
+  "test_mode",
+  "treat_authorised_as_paid",
+  "currency",
   "section_break_urls",
   "authorised_url",
   "column_break_urls",
@@ -30,23 +30,6 @@
    "label": "Enabled"
   },
   {
-   "fieldname": "column_break_mode",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "1",
-   "fieldname": "test_mode",
-   "fieldtype": "Check",
-   "label": "Test Mode"
-  },
-  {
-   "default": "0",
-   "description": "Telr's <b>ecom</b> transaction class authorises and captures in one step, so an Authorised order has already been charged. Only turn this on if your Telr store is configured that way \u2014 with an authorise-only store it would release goods against funds that were never captured.",
-   "fieldname": "treat_authorised_as_paid",
-   "fieldtype": "Check",
-   "label": "Treat Authorised As Paid"
-  },
-  {
    "fieldname": "section_break_store",
    "fieldtype": "Section Break",
    "label": "Store"
@@ -56,13 +39,6 @@
    "fieldtype": "Data",
    "label": "Store ID",
    "reqd": 1
-  },
-  {
-   "description": "Fallback currency when the payment request does not carry one.",
-   "fieldname": "currency",
-   "fieldtype": "Link",
-   "label": "Currency",
-   "options": "Currency"
   },
   {
    "fieldname": "column_break_keys",
@@ -79,6 +55,30 @@
    "fieldname": "remote_auth_key",
    "fieldtype": "Password",
    "label": "Remote Auth Key"
+  },
+  {
+   "fieldname": "section_break_settings",
+   "fieldtype": "Section Break",
+   "label": "Settings"
+  },
+  {
+   "default": "1",
+   "fieldname": "test_mode",
+   "fieldtype": "Check",
+   "label": "Test Mode"
+  },
+  {
+   "default": "0",
+   "description": "Only if your Telr store authorises and captures in one step.",
+   "fieldname": "treat_authorised_as_paid",
+   "fieldtype": "Check",
+   "label": "Treat Authorised As Paid"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
   },
   {
    "fieldname": "section_break_urls",
@@ -116,7 +116,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-16 00:00:00.000000",
+ "modified": "2026-11-24 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Payment Gateways",
  "name": "Telr Gateway Settings",

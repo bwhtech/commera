@@ -923,8 +923,6 @@ Frappe Cloud,Frappe Cloud
 Billing,الفوترة
 Domains,النطاقات
 Installed plugins,الإضافات المثبّتة
-Turn on as many providers as you like. Each keeps its own keys.,فعّل أي عدد تريده من المزوّدين. كل منهم يحتفظ بمفاتيحه الخاصة.
-Carriers this store books with. Each quotes its own rates at checkout.,شركات الشحن التي يحجز معها هذا المتجر. كل منها يعرض أسعاره الخاصة عند إتمام الطلب.
 Light,فاتح
 Dark,داكن
 System,النظام
@@ -943,17 +941,11 @@ Access token,رمز الوصول
 The analytics and marketing services this store reports to.,خدمات التحليلات والتسويق التي يرسل إليها هذا المتجر.
 Hidden from your role,مخفي عن دورك
 These credentials are only visible to a System Manager.,لا تظهر بيانات الاعتماد هذه إلا لمدير النظام.
-"Taking payment at the door, and what it costs to offer it.",تحصيل المبلغ عند الباب، وتكلفة تقديم هذا الخيار.
 This could not be loaded,تعذّر تحميل هذا
-Cash on delivery may still be on — this panel just cannot say.,قد يكون الدفع عند الاستلام مُفعّلًا — هذه اللوحة لا تستطيع التأكد.
 Offer cash on delivery,تقديم الدفع عند الاستلام
-"When off, checkout stops offering it — placed orders are unaffected.",عند إيقافه، لا يُعرض عند إتمام الطلب — ولا تتأثر الطلبات المقدّمة.
-Added to the order when the fee applies.,يُضاف إلى الطلب عند تطبيق الرسوم.
 Charge below order value,الرسوم تحت قيمة الطلب
-"The fee applies under this total, so bigger baskets carry no COD charge. Leave both at zero to never charge for it.",تُطبَّق الرسوم تحت هذا الإجمالي، فلا تتحمل السلال الأكبر رسوم الدفع عند الاستلام. اترك القيمتين صفرًا لعدم فرض أي رسوم.
 Order value,قيمة الطلب
 Charge account,حساب الرسوم
-Where the COD and delivery charges post in your books.,الحساب الذي تُقيَّد فيه رسوم الدفع عند الاستلام ورسوم التوصيل في دفاترك.
 How shoppers check out.,طريقة إتمام المتسوقين لطلباتهم.
 Guest checkout may still be on. This panel just cannot say.,قد يكون إتمام الطلب كزائر مُفعّلًا. لا يمكن التأكد من هذه اللوحة.
 Allow guest checkout,السماح بإتمام الطلب كزائر
@@ -1038,9 +1030,6 @@ Add keys,إضافة المفاتيح
 Webhook URL copied,تم نسخ رابط الويب هوك
 Could not copy the webhook URL,تعذّر نسخ رابط الويب هوك
 Enabled,مُفعّل
-Offered to customers at checkout.,يُعرض على العملاء عند إتمام الطلب.
-{0} still needed,{0} ما زال مطلوبًا
-Paste this into the provider's dashboard so it can report status back to this store.,الصق هذا في لوحة تحكم المزوّد ليتمكن من إرسال الحالة إلى هذا المتجر.
 Provider documentation,وثائق المزوّد
 1 needs keys,واحد يحتاج إلى مفاتيح
 {0} need keys,{0} تحتاج إلى مفاتيح
@@ -1108,7 +1097,6 @@ This plugin has not been sent an order update.,لم يُرسل إلى هذه ا�
 Pick a collection,اختر مجموعة
 Nothing uploaded,لم يُرفع شيء
 Stored. Leave blank to keep it.,محفوظ. اتركه فارغًا للإبقاء عليه.
-"Stored encrypted, never shown again.",يُحفظ مشفّرًا، ولا يُعرض مرة أخرى.
 Links to {0}.,يرتبط بـ {0}.
 Search {0},ابحث في {0}
 Pick products,اختر المنتجات
@@ -2523,3 +2511,23 @@ Enter 0 to remove the crossed-out price.,أدخل 0 لإزالة السعر ال
 Enter a discounted price above zero.,أدخل سعرًا بعد الخصم أكبر من صفر.
 Price ({0}) must be higher than the discounted price ({1}) for {2}.,يجب أن يكون السعر ({0}) أعلى من السعر بعد الخصم ({1}) للمنتج {2}.
 Invalid price,سعر غير صالح
+Turn on,تفعيل
+Add this in {0}'s webhook settings.,أضف هذا في إعدادات الويب هوك لدى {0}.
+Cash on delivery may still be on.,قد يكون الدفع عند الاستلام مُفعّلًا.
+Orders up to this total pay the COD charge. Leave at 0 to never charge it.,الطلبات حتى هذا الإجمالي تدفع رسوم الدفع عند الاستلام. اتركه 0 لعدم فرضها أبدًا.
+Delivery charges post here too.,تُقيَّد رسوم التوصيل هنا أيضًا.
+The signing secret of your Stripe webhook endpoint (starts with whsec_).,سر التوقيع لنقطة الويب هوك في Stripe (يبدأ بـ whsec_).
+Only if your Razorpay account captures payments automatically.,فقط إذا كان حسابك في Razorpay يحصّل المدفوعات تلقائيًا.
+From your Razorpay webhook settings. Not the Key Secret.,من إعدادات الويب هوك في Razorpay. ليس المفتاح السري.
+Only if your Telr store authorises and captures in one step.,فقط إذا كان متجرك في Telr يفوّض ويحصّل في خطوة واحدة.
+Any token you choose. Register the same one with Tabby.,أي رمز تختاره. سجّل الرمز نفسه لدى Tabby.
+One IP per line. Leave blank to accept any.,عنوان IP واحد في كل سطر. اتركه فارغًا لقبول أي عنوان.
+Sandbox and production keys are different.,مفاتيح بيئة الاختبار تختلف عن مفاتيح الإنتاج.
+Leave blank to compare every account on the key.,اتركه فارغًا للمقارنة بين كل الحسابات على هذا المفتاح.
+"After this, checkout uses the option's backup price.",بعد ذلك، يستخدم إتمام الطلب السعر الاحتياطي للخيار.
+From your AfterShip webhook settings.,من إعدادات الويب هوك في AfterShip.
+Create an API user under Settings > API in Shiprocket. A normal login does not work.,أنشئ مستخدم API من الإعدادات > API في Shiprocket. تسجيل الدخول العادي لا يعمل.
+Exactly as registered in Shiprocket.,تمامًا كما هو مسجّل في Shiprocket.
+Leave blank to use the default channel.,اتركه فارغًا لاستخدام القناة الافتراضية.
+5000 unless your Shiprocket contract says otherwise.,5000 ما لم ينص عقدك مع Shiprocket على غير ذلك.
+Set the same token as the x-api-key in Shiprocket's webhook settings.,استخدم الرمز نفسه المعيّن كـ x-api-key في إعدادات الويب هوك لدى Shiprocket.

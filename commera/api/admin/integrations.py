@@ -44,8 +44,9 @@ def get_editable_docfields(settings_doctype):
 	return docfields
 
 
-def build_field_groups(settings_doctype, settings):
+def build_field_groups(settings_doctype, settings, defaults=None):
 	"""The settings Single rendered as groups of fields, one group per Section Break."""
+	defaults = defaults or {}
 	groups = []
 	group_by_label = {}
 
@@ -56,15 +57,21 @@ def build_field_groups(settings_doctype, settings):
 			group_by_label[group_label] = group
 			groups.append(group)
 
-		group["fields"].append(build_field(docfield, settings))
+		group["fields"].append(build_field(docfield, settings, defaults.get(docfield.fieldname)))
 
 	return groups
 
 
-def build_field(docfield, settings):
+def build_field(docfield, settings, default=None):
 	"""One docfield as the dashboard sees it. A secret reports whether it is stored, never what it is."""
 	stored_value = settings.get(docfield.fieldname)
 	is_secret = docfield.fieldtype == "Password"
+	if is_secret:
+		shown_value = None
+	elif stored_value in (None, "") and default:
+		shown_value = default
+	else:
+		shown_value = stored_value
 
 	return {
 		"fieldname": docfield.fieldname,
@@ -73,7 +80,7 @@ def build_field(docfield, settings):
 		"options": docfield.options,
 		"description": docfield.description,
 		"required": bool(docfield.reqd),
-		"value": None if is_secret else stored_value,
+		"value": shown_value,
 		"is_secret": is_secret,
 		"is_set": stored_value not in (None, ""),
 	}
@@ -102,6 +109,11 @@ def is_profile_enabled(integration) -> bool:
 		return False
 
 	return bool(frappe.db.get_value(profile_doctype, integration["label"], ENABLED_FIELDNAME))
+
+
+def get_field_defaults(integration) -> dict:
+	get_defaults = integration.get("field_defaults")
+	return get_defaults(integration["settings_doctype"]) if get_defaults else {}
 
 
 def describe_integration(integration):
@@ -134,7 +146,7 @@ def describe_integration(integration):
 			"configured": not missing,
 			"missing": missing,
 			"webhook_url": get_webhook_url(integration),
-			"groups": build_field_groups(settings_doctype, settings),
+			"groups": build_field_groups(settings_doctype, settings, get_field_defaults(integration)),
 		}
 	)
 	return description
@@ -212,6 +224,7 @@ def save_integration(integration, enabled, values):
 
 	if settings.meta.has_field(ENABLED_FIELDNAME):
 		settings.set(ENABLED_FIELDNAME, enabled)
+	settings.flags.ignore_mandatory = not enabled
 	settings.save()
 
 	save_profile(integration, enabled)

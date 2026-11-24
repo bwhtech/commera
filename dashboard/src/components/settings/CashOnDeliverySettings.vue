@@ -30,10 +30,7 @@ function commitNumber(fieldname, event, label) {
 </script>
 
 <template>
-  <SettingsPanelHeader
-    :title="__('Cash on delivery')"
-    :description="__('Taking payment at the door, and what it costs to offer it.')"
-  />
+  <SettingsPanelHeader :title="__('Cash on delivery')" />
 
   <SettingsBody v-scroll-fade>
     <!-- A refused read must not read as "cash on delivery is off". -->
@@ -42,7 +39,7 @@ function commitNumber(fieldname, event, label) {
       compact
       icon="lucide-triangle-alert"
       :title="__('This could not be loaded')"
-      :description="__('Cash on delivery may still be on — this panel just cannot say.')"
+      :description="__('Cash on delivery may still be on.')"
     >
       <Button :label="__('Try again')" variant="subtle" theme="gray" @click="settings.reload()" />
     </EmptyState>
@@ -50,10 +47,7 @@ function commitNumber(fieldname, event, label) {
     <SettingsSkeleton v-else-if="settings.loading && !settings.data" :rows="4" />
 
     <div v-else class="divide-y divide-outline-gray-1">
-      <SettingsRow
-        :title="__('Offer cash on delivery')"
-        :description="__('When off, checkout stops offering it — placed orders are unaffected.')"
-      >
+      <SettingsRow :title="__('Offer cash on delivery')">
         <Switch
           size="sm"
           :model-value="enabled"
@@ -64,7 +58,7 @@ function commitNumber(fieldname, event, label) {
 
       <!-- What it costs to offer COD is only worth asking while it is offered. -->
       <template v-if="enabled">
-        <SettingsRow :title="__('COD charge')" :description="__('Added to the order when the fee applies.')">
+        <SettingsRow :title="__('COD charge')">
           <TextInput
             :model-value="values.cod_charge"
             class="w-full sm:w-40"
@@ -76,7 +70,7 @@ function commitNumber(fieldname, event, label) {
 
         <SettingsRow
           :title="__('Charge below order value')"
-          :description="__('The fee applies under this total, so bigger baskets carry no COD charge. Leave both at zero to never charge for it.')"
+          :description="__('Orders up to this total pay the COD charge. Leave at 0 to never charge it.')"
         >
           <TextInput
             :model-value="values.cod_charge_applicable_below"
@@ -92,7 +86,7 @@ function commitNumber(fieldname, event, label) {
            hiding it with the rest would make that unreachable whenever COD is off. -->
       <SettingsRow
         :title="__('Charge account')"
-        :description="__('Where the COD and delivery charges post in your books.')"
+        :description="__('Delivery charges post here too.')"
       >
         <SettingsLinkControl
           :field="ACCOUNT_FIELD"

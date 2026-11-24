@@ -251,7 +251,6 @@ watch(
             :store="paymentIntegrations"
             :active="settings.tab === 'payments'"
             :title="__('Payments')"
-            :description="__('Turn on as many providers as you like. Each keeps its own keys.')"
           >
             <CashOnDeliverySettings :active="settings.open && settings.tab === 'payments'" />
           </IntegrationTabPanel>
@@ -263,7 +262,6 @@ watch(
             :store="shippingIntegrations"
             :active="settings.tab === 'shipping'"
             :title="__('Shipping')"
-            :description="__('Carriers this store books with. Each quotes its own rates at checkout.')"
           >
             <ShippingSections
               :configuring="takeover"
