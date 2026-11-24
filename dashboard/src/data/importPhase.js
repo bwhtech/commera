@@ -21,3 +21,8 @@ export const canMove = (phase) => !isBusy(phase) && phase !== 'done'
 export function nextPhase(current, phase) {
   return canMove(current) ? phase : null
 }
+
+export const createdProducts = (state) =>
+  state.source === 'erpnext'
+    ? (state.erpnext.status?.created ?? 0) > 0
+    : state.phase === 'done' && state.created.length > 0
