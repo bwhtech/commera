@@ -1095,8 +1095,9 @@ def sales_order_purchase_summary(sales_order):
 
 
 def quotation_purchase_summary(quotation_name: str):
+	# COD orders stay draft, so a repeat confirm must find docstatus 0 too.
 	sales_order = frappe.db.get_value(
-		"Sales Order Item", {"prevdoc_docname": quotation_name, "docstatus": 1}, "parent"
+		"Sales Order Item", {"prevdoc_docname": quotation_name, "docstatus": ("<", 2)}, "parent"
 	)
 	if sales_order:
 		return sales_order_purchase_summary(frappe.get_doc("Sales Order", sales_order))
