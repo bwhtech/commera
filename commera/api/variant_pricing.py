@@ -149,9 +149,8 @@ def set_variant_prices(
 
 
 def check_compare_at_not_below_price(existing_price_by_key, new_rate_by_key, overwrite_existing=True):
-	"""Refuse a compare-at rate below the price: the storefront drops it, so the sale the owner meant
-	never shows. Equal is allowed, as that is how a sale ends - a price cannot be removed. Only a
-	compare-at rate this save writes is checked, against the price the size has after the save."""
+	"""The storefront drops a compare-at rate below the price. Equal is allowed: a price cannot be
+	removed, so that is how a sale ends. Only rates this save writes are checked."""
 	default_price_list, sale_price_list = get_selling_price_lists()
 	rate_by_key = {key: flt(row.price_list_rate) for key, row in existing_price_by_key.items()}
 	written_rate_by_key = {
