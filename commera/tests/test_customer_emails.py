@@ -8,17 +8,18 @@ import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, now_datetime
 
-from commera import jobs
 from commera.api.order_link import email_order_link
 from commera.core import send_otp
 from commera.notifications import (
 	get_back_in_stock_context,
 	get_customer_email_setting,
 	seed_customer_emails,
+	send,
 	send_customer_email,
 	validate_customer_emails,
 )
 from commera.patches import delete_default_email_templates
+from commera.sdk.events import CommeraEvent
 from commera.storefront_access import get_store_name
 from commera.tests.test_admin_customers import make_customer, make_item, make_webshop_order
 
@@ -68,6 +69,18 @@ class TestCustomerEmails(IntegrationTestCase):
 			)
 		return queued
 
+	def send_event(self, event: str, sales_order, data: dict | None = None):
+		send(
+			CommeraEvent(
+				id=f"{sales_order.name}-{event}",
+				name=event,
+				reference_doctype="Sales Order",
+				reference_name=sales_order.name,
+				data=data or {},
+				created_at=now_datetime(),
+			)
+		)
+
 	def set_email_row(self, email: str, **values):
 		row = get_customer_email_setting(email)
 		frappe.db.set_value("Commera Email", row.name, values)
@@ -76,7 +89,7 @@ class TestCustomerEmails(IntegrationTestCase):
 	def test_the_confirmation_is_one_email_to_the_shopper_with_no_cc(self):
 		sales_order = self.make_order()
 
-		jobs.send_order_success_acknowledgement(sales_order, "after_insert")
+		self.send_event("order_placed", sales_order)
 
 		[email] = self.get_queued_emails(sales_order.name)
 		self.assertEqual(email["recipients"], [SHOPPER])
@@ -96,7 +109,7 @@ class TestCustomerEmails(IntegrationTestCase):
 		).insert(ignore_permissions=True)
 		sales_order = self.make_order(language="ar")
 
-		jobs.send_order_success_acknowledgement(sales_order, "after_insert")
+		self.send_event("order_placed", sales_order)
 
 		[email] = self.get_queued_emails(sales_order.name)
 		self.assertEqual(email["subject"], f"تم تأكيد الطلب {sales_order.name}")
@@ -106,7 +119,7 @@ class TestCustomerEmails(IntegrationTestCase):
 		self.set_email_row("order_confirmation", enabled=0)
 		sales_order = self.make_order()
 
-		jobs.send_order_success_acknowledgement(sales_order, "after_insert")
+		self.send_event("order_placed", sales_order)
 
 		self.assertEqual(self.get_queued_emails(sales_order.name), [])
 
@@ -123,9 +136,9 @@ class TestCustomerEmails(IntegrationTestCase):
 		self.set_email_row("order_confirmation", email_template=template.name)
 		sales_order = self.make_order()
 
-		jobs.send_order_success_acknowledgement(sales_order, "after_insert")
+		self.send_event("order_placed", sales_order)
 		self.set_email_row("order_confirmation", email_template=None)
-		jobs.send_order_success_acknowledgement(sales_order, "after_insert")
+		self.send_event("order_placed", sales_order)
 
 		custom, built_in = self.get_queued_emails(sales_order.name)
 		self.assertEqual(custom["subject"], f"Custom {sales_order.name}")
@@ -146,7 +159,7 @@ class TestCustomerEmails(IntegrationTestCase):
 	def test_cancellation_without_a_portal_user_goes_to_the_contact_email(self):
 		sales_order = self.make_order()
 
-		jobs.send_order_cancel_acknowledgement(sales_order, "on_cancel")
+		self.send_event("order_cancelled", sales_order)
 
 		[email] = self.get_queued_emails(sales_order.name)
 		self.assertEqual(email["recipients"], [SHOPPER])
@@ -156,7 +169,7 @@ class TestCustomerEmails(IntegrationTestCase):
 	def test_cancellation_with_no_email_at_all_sends_nothing(self):
 		sales_order = self.make_order(contact_email=None)
 
-		jobs.send_order_cancel_acknowledgement(sales_order, "on_cancel")
+		self.send_event("order_cancelled", sales_order)
 
 		self.assertEqual(self.get_queued_emails(sales_order.name), [])
 

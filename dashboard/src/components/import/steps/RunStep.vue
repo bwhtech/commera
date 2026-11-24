@@ -2,8 +2,9 @@
 import { onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Alert, Badge, Button, Spinner } from 'frappe-ui'
-import { STEPS, beginPhase, closeImport, endPhase, imp, isCurrentImport } from '../../../data/importFlow'
+import { beginPhase, closeImport, endPhase, imp, isCurrentImport } from '../../../data/importFlow'
 import { useAdminAction, trySubmit } from '../../../data/api'
+import { stepIndex } from '../../../data/importSteps'
 import { __ } from '../../../data/translation'
 import { openSettings } from '../../../ia/settings'
 import ProductThumb from '../ProductThumb.vue'
@@ -53,7 +54,7 @@ run()
 
 const router = useRouter()
 
-const reviewStep = STEPS.findIndex((step) => step.key === 'review')
+const reviewStep = stepIndex('csv', 'review')
 
 function backToReview() {
   imp.step = reviewStep

@@ -2402,3 +2402,60 @@ Pick a sale price list,اختر قائمة أسعار التخفيضات
 "Pick the price list as the sale list to sell without sale prices, or Duplicate for an empty one.",اختر قائمة الأسعار نفسها كقائمة التخفيضات للبيع دون أسعار مخفضة، أو اضغط تكرار لإنشاء قائمة فارغة.
 Warehouse,المستودع
 Pick the warehouse you ship from,اختر المستودع الذي تشحن منه
+"The options of product {0} come from its item attributes in ERPNext, so change them there",خيارات المنتج {0} مأخوذة من سمات الصنف في ERPNext، لذا غيّرها هناك
+Pick at least one item to import.,اختر صنفًا واحدًا على الأقل لاستيراده.
+Set {0} in Commera Settings before importing items from ERPNext.,اضبط {0} في إعدادات Commera قبل استيراد الأصناف من ERPNext.
+Store Not Set Up,المتجر غير مُعدّ
+"Its variants are based on manufacturers, which the store cannot show as options.",متغيراته مبنية على الشركات المصنّعة، ولا يستطيع المتجر عرضها كخيارات.
+It has no enabled variants to sell.,ليس له متغيرات مفعّلة للبيع.
+Import 1 item,استيراد عنصر واحد
+Import {0} items,استيراد {0} عناصر
+Items ({0}),العناصر ({0})
+Skipped ({0}),المتخطاة ({0})
+Pick the items to bring in,اختر العناصر التي تريد نقلها
+"Each one becomes a draft product. Prices and stock keep coming from ERPNext, and nothing in ERPNext changes.",يصبح كل عنصر منتجًا في المسودة. تبقى الأسعار والمخزون تأتي من ERPNext، ولا يتغير شيء في ERPNext.
+{0} of {1} selected,تم تحديد {0} من {1}
+Clear selection,مسح التحديد
+No items to import,لا توجد عناصر للاستيراد
+Every sales item in ERPNext is already a product.,كل عنصر مبيعات في ERPNext أصبح منتجًا بالفعل.
+No items match,لا توجد عناصر مطابقة
+Try another name or item code.,جرّب اسمًا آخر أو رمز عنصر آخر.
+Why it is skipped,سبب التخطي
+Nothing skipped,لم يتم تخطي أي شيء
+Every item ERPNext sells can come across.,يمكن نقل كل عنصر يبيعه ERPNext.
+Safe to run again,آمن للتشغيل مرة أخرى
+"Items that are already products are left alone, so a second run only brings in what is new.",تُترك العناصر التي أصبحت منتجات كما هي، لذا لا يجلب التشغيل الثاني إلا ما هو جديد.
+Importing your ERPNext items,جارٍ استيراد عناصر ERPNext
+You can close this window. The import keeps running.,يمكنك إغلاق هذه النافذة. يستمر الاستيراد في العمل.
+{0} of {1} items done,تم {0} من {1} عنصر
+Starting the import…,جارٍ بدء الاستيراد…
+This is taking longer than usual. It may still be running.,يستغرق هذا وقتًا أطول من المعتاد. قد يكون لا يزال قيد التشغيل.
+Every item lands as a draft product. Nothing goes live until you publish.,يصل كل عنصر كمنتج في المسودة. لا يظهر شيء في المتجر حتى تنشره.
+The import could not finish,تعذّر إكمال الاستيراد
+"It stopped before the end. The products it already made are kept, so running it again picks up the rest.",توقف قبل النهاية. تُحفظ المنتجات التي أنشأها، لذا يكمل التشغيل مرة أخرى الباقي.
+Back to items,العودة إلى العناصر
+{0} products are ready as drafts,{0} منتجات جاهزة كمسودات
+Publish them to put them on your storefront. Products without a photo stay as drafts until you add one.,انشرها لتظهر في متجرك. تبقى المنتجات التي بلا صورة مسودات حتى تضيف صورة.
+Publish all,نشر الكل
+{0} need a photo before they can go live.,{0} تحتاج إلى صورة قبل نشرها.
+Every imported product is on your storefront.,كل منتج مستورد معروض في متجرك.
+"already products, left alone",منتجات موجودة، تُركت كما هي
+See below,انظر أدناه
+items that did not import,عناصر لم يتم استيرادها
+1 needs a photo,منتج واحد يحتاج إلى صورة
+{0} need a photo,{0} تحتاج إلى صورة
+Add a photo,إضافة صورة
+Items that did not import,العناصر التي لم يتم استيرادها
+Turn the items you already sell in ERPNext into products.,حوّل العناصر التي تبيعها في ERPNext إلى منتجات.
+Import from ERPNext,استيراد من ERPNext
+No options,بدون خيارات
+Colour and size,اللون والمقاس
+Size only,المقاس فقط
+Colour only,اللون فقط
+Other options,خيارات أخرى
+Pick items,اختيار العناصر
+The ERPNext items to bring in,عناصر ERPNext المراد نقلها
+Create and publish,الإنشاء والنشر
+1 product needs a photo before it can go live.,منتج واحد يحتاج إلى صورة قبل نشره.
+1 product is ready as a draft,منتج واحد جاهز كمسودة
+1 product is live,منتج واحد منشور الآن

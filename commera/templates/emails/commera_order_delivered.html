@@ -1,0 +1,23 @@
+{%- import "templates/emails/macros.html" as email -%}
+{%- call email.layout(_("Order {0} was delivered.").format(order.name), language) -%}
+{{ email.header(brand, _("Order {0}").format(order.name)) }}
+{%- call email.card(first=True) %}
+{{ email.heading(_("Delivered. Enjoy it, {0}.").format(first_name) if first_name else _("Delivered. Enjoy it.")) }}
+{{ email.intro(_("Your order reached your shipping address. We hope everything fits just right.")) }}
+{{ email.progress_steps(_("Delivered"), 4, 4) }}
+{%- if order.link %}
+{{ email.button(order.link, _("View your order")) }}
+{%- endif %}
+{%- endcall %}
+{%- call email.card() %}
+{{ email.item_list(_("What arrived"), order.line_items, order.currency) }}
+{%- endcall %}
+{%- if order.return_by and order.link %}
+{%- call email.card() %}
+{{ email.section_title(_("How did it go?")) }}
+{{ email.paragraph(_("If something doesn't fit or isn't what you hoped, you can return it until {0}.").format(order.return_by), 0) }}
+{{ email.text_link(order.link, _("Start a return")) }}
+{%- endcall %}
+{%- endif %}
+{{ email.footer(brand, _("You're receiving this because you placed an order at {0}.").format(brand.name), _("Didn't get your parcel? Reply to this email and we'll look into it."), order.links) }}
+{%- endcall -%}

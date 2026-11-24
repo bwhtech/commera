@@ -1417,6 +1417,15 @@ def save_product_options(item_template: str, add: list | str | None = None, remo
 	)
 	if not configurator:
 		frappe.throw(_("Product {0} has no options to edit").format(item_template))
+	template_attributes = frappe.get_all(
+		"Item Variant Attribute", filters={"parent": item_template, "parenttype": "Item"}, pluck="attribute"
+	)
+	if not {configurator.item_attribute, SIZE_ATTRIBUTE} <= set(template_attributes):
+		frappe.throw(
+			_(
+				"The options of product {0} come from its item attributes in ERPNext, so change them there"
+			).format(item_template)
+		)
 
 	add_rows = parse_option_size_pairs(add)
 	remove_keys = {(option.casefold(), size.casefold()) for option, size in parse_option_size_pairs(remove)}

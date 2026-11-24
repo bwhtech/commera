@@ -1,45 +1,8 @@
 import frappe
 from frappe.utils import add_to_date, get_url, now_datetime
 
-from commera.api.payments import COD_PAYMENT_MODE
 from commera.localization import StorefrontLanguages
-from commera.notifications import (
-	get_back_in_stock_context,
-	is_customer_email_enabled,
-	send_customer_email,
-	send_order_email,
-)
-
-
-def send_order_success_acknowledgement(doc, method):
-	# COD orders stay draft until staff act, so they are confirmed on insert and never again on submit.
-	is_cod_order = doc.custom_ecommerce_payment_mode == COD_PAYMENT_MODE
-	if is_cod_order != (method == "after_insert"):
-		return
-	send_order_email_safely("order_confirmation", doc)
-
-
-def send_order_cancel_acknowledgement(doc, method):
-	send_order_email_safely("order_cancelled", doc)
-
-
-def send_order_email_safely(email: str, sales_order):
-	recipient = sales_order.contact_email or get_portal_user_email(sales_order.customer)
-	if not recipient:
-		return
-	try:
-		send_order_email(email, sales_order, [recipient])
-	except Exception:
-		frappe.log_error(
-			title=f"Could not send the {email} email",
-			reference_doctype=sales_order.doctype,
-			reference_name=sales_order.name,
-		)
-
-
-def get_portal_user_email(customer: str) -> str | None:
-	portal_users = frappe.get_all("Portal User", {"parent": customer}, pluck="user", limit=1)
-	return portal_users[0] if portal_users else None
+from commera.notifications import get_back_in_stock_context, is_customer_email_enabled, send_customer_email
 
 
 def send_product_back_in_stock_email(doc, method):

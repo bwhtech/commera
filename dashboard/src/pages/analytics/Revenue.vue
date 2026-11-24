@@ -111,7 +111,7 @@ const noRevenueState = {
             }}
           </span>
         </div>
-        <EmptyState v-if="!hasValues(months, 'discounts')" compact v-bind="noRevenueState" />
+        <EmptyState v-if="!hasValues(months, 'discounts')" compact icon="lucide-ticket-percent" :title="__('No discounts in this period')" />
         <div v-else class="h-56">
           <BarChart :data="months" x="label" :y="['discounts']" />
         </div>
