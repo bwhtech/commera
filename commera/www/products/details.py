@@ -7,7 +7,7 @@ from commera.api.admin.catalog import DEFAULT_OPTION_ATTRIBUTE, DEFAULT_SIZE_VAL
 from commera.api.reviews import PAGE_LENGTH as REVIEWS_PAGE_LENGTH
 from commera.api.reviews import get_reviews
 from commera.localization import url
-from commera.product_detail import get_product_detail
+from commera.product_detail import DEFAULT_PRODUCT_IMAGE, get_product_detail
 from commera.utils import get_available_stock, get_product_list
 
 
@@ -25,7 +25,7 @@ def get_context(context):
 
 	context.product_variant = product_variant
 	context.product = product
-	context.images = detail["images"]
+	context.images = detail["images"] or [DEFAULT_PRODUCT_IMAGE]
 	context.product_in_stock = detail["in_stock"]
 
 	add_selected_item_fields(selected_item)

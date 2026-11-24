@@ -128,7 +128,7 @@
 							{% for variant in other_variants %}
 							<li>
 								<a href="{{ url('/products/' ~ variant.route) | e }}">
-									<img src="{{ variant.image or '/assets/commera/images/1.jpg' }}" alt="{{ variant.attribute_value }}">
+									<img src="{{ variant.image or '/assets/commera/images/no-image.svg' }}" alt="{{ variant.attribute_value }}">
 									<span><bdi>{{ variant.attribute_value }}</bdi></span>
 								</a>
 							</li>

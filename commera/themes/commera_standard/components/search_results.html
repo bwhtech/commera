@@ -1,3 +1,4 @@
+{% from "components/macros/icons.html" import icon %}
 {% set inset = result_inset or "px-2" %}
 <p x-cloak x-show="status === 'failed'" class="{{ inset }} py-3 text-start text-base text-ink-gray-6" role="alert">{{ _("Search is not available right now. Try again.") }}</p>
 <p x-cloak x-show="has_no_results()" class="{{ inset }} py-3 text-start text-base text-ink-gray-6">{{ _("No results.") }}</p>
@@ -6,7 +7,7 @@
 		<p class="eyebrow {{ inset }} pb-1">{{ _("Products") }}</p>
 		<template x-for="product in results?.products ?? []" :key="product.id">
 			<a :href="product_url(product)" class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-3 rounded-lg {{ inset }} py-2 hover:bg-surface-gray-3 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto]">
-				<span class="media aspect-[3/4] w-10 shrink-0 overflow-hidden rounded-lg"><img x-show="product.image" :src="product.image" alt="" class="size-full object-cover object-top"></span>
+				<span class="media grid aspect-[3/4] w-10 shrink-0 place-items-center overflow-hidden rounded-lg text-ink-gray-4"><img x-show="product.image" :src="product.image" alt="" class="size-full object-cover object-top"><span x-show="!product.image">{{ icon("image", "size-4") }}</span></span>
 				<span class="min-w-0">
 					<span class="block text-md text-ink-gray-8 [overflow-wrap:anywhere]"><bdi x-text="product.title"></bdi></span>
 					<span class="tabular block text-base font-medium text-ink-gray-9 sm:hidden" x-html="money(product)"></span>

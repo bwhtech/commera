@@ -456,7 +456,7 @@ def publish_imported_products(log: str) -> dict:
 	item_names = get_rows("Item", "name", unpublished_products, ["item_name"])
 	return {
 		"published": len(published_products),
-		"needs_photo": [
+		"needs_size": [
 			{"item_code": item_code, "item_name": item_names[item_code][0].item_name}
 			for item_code in unpublished_products
 		],

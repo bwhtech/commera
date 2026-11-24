@@ -261,7 +261,7 @@ class TestErpnextImport(ProductOnboardingTestCase):
 		self.assertTrue(frappe.db.exists("Style Attribute Configurator", {"item_template": good}))
 		self.assertFalse(frappe.db.exists("Style Attribute Configurator", {"item_template": bad}))
 
-	def test_publish_all_publishes_those_with_a_photo(self):
+	def test_publish_all_publishes_products_with_and_without_a_photo(self):
 		with_photo = self.make_plain_item()
 		frappe.db.set_value("Item", with_photo, "image", self.make_file())
 		without_photo = self.make_plain_item()
@@ -269,10 +269,10 @@ class TestErpnextImport(ProductOnboardingTestCase):
 
 		result = publish_imported_products(log)
 
-		self.assertEqual(result["published"], 1)
-		self.assertEqual([row["item_code"] for row in result["needs_photo"]], [without_photo])
+		self.assertEqual(result["published"], 2)
+		self.assertEqual(result["needs_size"], [])
 		self.assertEqual(
-			frappe.db.get_value("Style Attribute Variant", {"item_style": with_photo}, "is_published"), 1
+			frappe.db.get_value("Style Attribute Variant", {"item_style": without_photo}, "is_published"), 1
 		)
 
 	def test_an_imported_plain_item_reaches_checkout(self):

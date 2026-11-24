@@ -5,7 +5,7 @@ from commera.base_prices import get_sales_units
 from commera.localization.market_prices import MarketPrices
 from commera.utils import get_available_stock, get_discount_percent
 
-DEFAULT_PRODUCT_IMAGE = "/assets/commera/images/1.jpg"
+DEFAULT_PRODUCT_IMAGE = "/assets/commera/images/no-image.svg"
 
 SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
 
@@ -46,11 +46,7 @@ def get_product_detail(route, selected_size=None):
 		default_price = (selected_item or {}).get("compare_at_price")
 		sale_price = selected_price
 
-	images = (
-		[image.image for image in product_variant.images]
-		if product_variant.images
-		else [DEFAULT_PRODUCT_IMAGE]
-	)
+	images = [image.image for image in product_variant.images]
 
 	return {
 		"product_variant": product_variant,

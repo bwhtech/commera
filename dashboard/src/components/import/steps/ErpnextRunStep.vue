@@ -17,7 +17,7 @@ startErpnextImport()
 
 const status = computed(() => imp.erpnext.status)
 const failures = computed(() => status.value?.failed ?? [])
-const needsPhoto = computed(() => imp.erpnext.published?.needs_photo ?? [])
+const needsSize = computed(() => imp.erpnext.published?.needs_size ?? [])
 
 const router = useRouter()
 
@@ -85,7 +85,7 @@ function finish(path) {
           </div>
           <h2 class="mt-4 text-2xl text-ink-gray-9">{{ status?.created === 1 ? __('1 product is ready as a draft') : __('{0} products are ready as drafts', [status?.created ?? 0]) }}</h2>
           <p class="mx-auto mt-1.5 max-w-[460px] text-p-base text-ink-gray-6">
-            {{ __('Publish them to put them on your storefront. Products without a photo stay as drafts until you add one.') }}
+            {{ __('Publish them to put them on your storefront.') }}
           </p>
           <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
             <Button
@@ -107,10 +107,10 @@ function finish(path) {
           <h2 class="mt-4 text-2xl text-ink-gray-9">{{ imp.erpnext.published.published === 1 ? __('1 product is live') : __('{0} products are live', [imp.erpnext.published.published]) }}</h2>
           <p class="mx-auto mt-1.5 max-w-[460px] text-p-base text-ink-gray-6">
             {{
-              needsPhoto.length === 1
-                ? __('1 product needs a photo before it can go live.')
-                : needsPhoto.length
-                  ? __('{0} need a photo before they can go live.', [needsPhoto.length])
+              needsSize.length === 1
+                ? __('1 product needs a size before it can go live.')
+                : needsSize.length
+                  ? __('{0} need a size before they can go live.', [needsSize.length])
                   : __('Every imported product is on your storefront.')
             }}
           </p>
@@ -139,12 +139,12 @@ function finish(path) {
         </div>
       </div>
 
-      <div v-if="needsPhoto.length" class="rounded-5 border border-outline-gray-1">
+      <div v-if="needsSize.length" class="rounded-5 border border-outline-gray-1">
         <div class="border-b border-outline-gray-1 px-4 py-3 text-base-semibold text-ink-gray-8">
-          {{ needsPhoto.length === 1 ? __('1 needs a photo') : __('{0} need a photo', [needsPhoto.length]) }}
+          {{ needsSize.length === 1 ? __('1 needs a size') : __('{0} need a size', [needsSize.length]) }}
         </div>
         <div v-scroll-fade class="max-h-56 divide-y divide-outline-gray-1 overflow-y-auto">
-          <div v-for="product in needsPhoto" :key="product.item_code" class="flex items-center gap-3 px-4 py-2.5">
+          <div v-for="product in needsSize" :key="product.item_code" class="flex items-center gap-3 px-4 py-2.5">
             <div class="min-w-0 flex-1">
               <div class="truncate text-base text-ink-gray-8">{{ product.item_name }}</div>
               <div class="truncate text-sm text-ink-gray-5">{{ product.item_code }}</div>
@@ -152,7 +152,7 @@ function finish(path) {
             <Button
               variant="subtle"
               icon-right="lucide-chevron-right rtl:-scale-x-100"
-              :label="__('Add a photo')"
+              :label="__('Add a size')"
               @click="finish(productRoute(product.item_code))"
             />
           </div>

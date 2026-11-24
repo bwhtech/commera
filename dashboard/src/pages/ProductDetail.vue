@@ -70,7 +70,7 @@ async function togglePublish() {
   const result = publishAction.data
   productRequest.reload()
   if (result.skipped.length) {
-    toast.warning(__('Published {0}, skipped {1} (missing a photo or size)', [result.updated.length, result.skipped.join(', ')]))
+    toast.warning(__('Published {0}, skipped {1} (missing a size)', [result.updated.length, result.skipped.join(', ')]))
   } else {
     toast.success(publish ? __('Published') : __('Hidden from the storefront'))
   }

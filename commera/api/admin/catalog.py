@@ -587,9 +587,7 @@ def get_product(item_template: str):
 				"storefront_url": get_url(f"/products/{row.route}") if row.route else None,
 				"sizes": sizes_by_variant.get(row.name, []),
 				"images": images_by_variant.get(row.name, []),
-				"blockers": get_publish_blockers(
-					images_by_variant.get(row.name, []), sizes_by_variant.get(row.name, [])
-				),
+				"blockers": get_publish_blockers(sizes_by_variant.get(row.name, [])),
 			}
 			for row in variants
 		],
@@ -751,13 +749,8 @@ def get_item_templates_by_item_code(item_codes):
 	return {row[0]: row[1] for row in rows}
 
 
-def get_publish_blockers(images, sizes):
-	blockers = []
-	if not images:
-		blockers.append(_("Add at least one image"))
-	if not sizes:
-		blockers.append(_("Add at least one size"))
-	return blockers
+def get_publish_blockers(sizes):
+	return [] if sizes else [_("Add at least one size")]
 
 
 @frappe.whitelist()
@@ -1903,16 +1896,12 @@ def set_restock_level(item_template: str | int, level: int | str):
 
 @frappe.whitelist(methods=["POST"])
 def set_variant_published(style_attribute_variant: str, publish: int | str):
-	"""Publish or unpublish one option.
-
-	The variant controller refuses to publish without images and sizes.
-	"""
 	variant = frappe.get_doc("Style Attribute Variant", style_attribute_variant)
 	variant.check_permission("write")
 
 	publish = cint(publish)
 	if publish:
-		blockers = get_publish_blockers(variant.images, variant.sizes)
+		blockers = get_publish_blockers(variant.sizes)
 		if blockers:
 			frappe.throw(_("Cannot publish yet: {0}").format(", ".join(blockers)))
 
@@ -1932,7 +1921,7 @@ def add_product_images(style_attribute_variant: str, file_urls: list | str):
 	return {
 		"name": variant.name,
 		"images": [row.image for row in variant.images],
-		"blockers": get_publish_blockers(variant.images, variant.sizes),
+		"blockers": get_publish_blockers(variant.sizes),
 	}
 
 
@@ -1945,7 +1934,7 @@ def remove_product_image(style_attribute_variant: str, file_url: str):
 	return {
 		"name": variant.name,
 		"images": [row.image for row in variant.images],
-		"blockers": get_publish_blockers(variant.images, variant.sizes),
+		"blockers": get_publish_blockers(variant.sizes),
 	}
 
 
@@ -2035,19 +2024,10 @@ def set_product_published(item_template: str, publish: int | str):
 
 
 def get_ready_variant_names(variant_names):
-	"""The variants that carry both an image and a size, so they are allowed to go live."""
 	if not variant_names:
 		return set()
 
-	with_images = {
-		row.parent
-		for row in frappe.get_all(
-			"Website Slideshow Item",
-			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
-			fields=["parent"],
-		)
-	}
-	with_sizes = {
+	return {
 		row.parent
 		for row in frappe.get_all(
 			"Color Size Item",
@@ -2055,7 +2035,6 @@ def get_ready_variant_names(variant_names):
 			fields=["parent"],
 		)
 	}
-	return with_images & with_sizes
 
 
 def get_unpublishable_options(limit: int = 5):
@@ -2075,14 +2054,6 @@ def get_unpublishable_options(limit: int = 5):
 		row.parent
 		for row in frappe.get_all(
 			"Color Size Item",
-			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
-			fields=["parent"],
-		)
-	}
-	imaged_variants = {
-		row.parent
-		for row in frappe.get_all(
-			"Website Slideshow Item",
 			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
 			fields=["parent"],
 		)
@@ -2107,10 +2078,7 @@ def get_unpublishable_options(limit: int = 5):
 
 	blocked = []
 	for row in variants:
-		# The blocker rule reads presence, not content, so membership sets stand in for the lists.
-		blockers = get_publish_blockers(
-			[1] if row.name in imaged_variants else [], [1] if row.name in sized_variants else []
-		)
+		blockers = get_publish_blockers(row.name in sized_variants)
 		if not blockers:
 			continue
 

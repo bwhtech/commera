@@ -39,7 +39,7 @@
 									<li>
 										<div class="cart-widget">
 											<div class="dz-media me-3">
-												<img :src="cart_item.item.images.length > 0 ? cart_item.item.images[0].image : '/assets/commera/images/1.jpg'" :alt="cart_item.variant.item_name">
+												<img :src="cart_item.item.images.length > 0 ? cart_item.item.images[0].image : '/assets/commera/images/no-image.svg'" :alt="cart_item.variant.item_name">
 											</div>
 											<div class="cart-content">
 												<h6 class="title">
@@ -93,7 +93,7 @@
 									<li>
 										<div class="cart-widget">
 											<div class="dz-media me-3">
-												<img :src="wishlist_item.image || '/assets/commera/images/1.jpg'" :alt="wishlist_item.item_name">
+												<img :src="wishlist_item.image || '/assets/commera/images/no-image.svg'" :alt="wishlist_item.item_name">
 											</div>
 											<div class="cart-content">
 												<h6 class="title">

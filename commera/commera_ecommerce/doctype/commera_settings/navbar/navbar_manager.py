@@ -478,7 +478,7 @@ def get_cascade_page(item_groups, start, page_length, search=None):
 			"is_published": cint(row.is_published),
 			"blocked_reason": ""
 			if cint(row.is_published) or cstr(row.name) in publishable
-			else frappe._("Missing images or sizes"),
+			else frappe._("Missing sizes"),
 		}
 		for row in rows
 	]

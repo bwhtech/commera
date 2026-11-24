@@ -128,7 +128,7 @@ const NEXT = [
           {{
             imp.imagesAttached
               ? __('Your catalogue now has these products, with {0} photos already on them.', [imp.imagesAttached])
-              : __('Your catalogue now has these products. Add photos from each product page to publish them.')
+              : __('Your catalogue now has these products. Publish them from each product page when they are ready.')
           }}
         </p>
 
