@@ -26,6 +26,12 @@ class TestMarketTaxCheckout(test_market_taxes.TestMarketOrderRecords):
 	create_pickup_warehouse = test_cart_checkout.TestCartCheckout.create_pickup_warehouse
 	create_shop_address = test_cart_checkout.TestCartCheckout.create_shop_address
 
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		# Frappe skips the class setup, rollback included, when TestMarketOrderRecords ran first.
+		cls.addClassCleanup(frappe.db.rollback)
+
 	def address_payload(self):
 		payload = test_cart_checkout.TestCartCheckout.address_payload(self)
 		payload["billing_address"].update({"country": "United Arab Emirates", "city": "Dubai"})
