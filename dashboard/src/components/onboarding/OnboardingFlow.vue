@@ -36,7 +36,7 @@ import {
   lookFor,
   readSavedStep,
 } from '../../ia/onboarding'
-import { canFinish, missingField, resumeStep } from '../../ia/onboardingSteps'
+import { canFinish, missingField, resumeStep, storePicks } from '../../ia/onboardingSteps'
 import { useEntrance } from '../../utils/reveal'
 import OnboardingPreview from './OnboardingPreview.vue'
 import StepYou from './steps/StepYou.vue'
@@ -121,9 +121,7 @@ function storeSetupValues() {
       currency: draft.currency,
       time_zone: draft.timeZone,
       company: draft.company,
-      price_list: draft.priceList,
-      sale_price_list: draft.salePriceList,
-      warehouse: draft.warehouse,
+      price_list: draft.priceList || undefined,
     }
   }
   return {
@@ -147,7 +145,8 @@ const SAVES = {
 }
 
 async function next() {
-  if (missingField(step.value.key, draft, { needsPassword: needsPassword.value })) {
+  const picks = storePicks(record.value?.existing_store, draft.company)
+  if (missingField(step.value.key, draft, { needsPassword: needsPassword.value, picks })) {
     flow.showErrors = true
     return
   }

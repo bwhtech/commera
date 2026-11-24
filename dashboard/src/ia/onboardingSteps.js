@@ -32,17 +32,30 @@ export function resumeStep(saved, setupStatus) {
   return index
 }
 
+const NO_PICKS = { companies: [], priceLists: [] }
+
 // What still blocks Continue on a step, or '' when nothing does. An owner Frappe Cloud signed in
 // without a password must set one here, or they cannot sign back in once this session ends.
-export function missingField(stepKey, draft, { needsPassword = false } = {}) {
+export function missingField(stepKey, draft, { needsPassword = false, picks = NO_PICKS } = {}) {
   if (stepKey === 'you' && !draft.fullName.trim()) return 'fullName'
   if (stepKey === 'you' && needsPassword && !draft.password) return 'password'
   if (stepKey === 'store' && !draft.storeName.trim()) return 'storeName'
   if (stepKey === 'store' && !draft.storeCategory) return 'storeCategory'
-  if (stepKey === 'store' && draft.existingStore) {
-    return ['company', 'priceList', 'salePriceList', 'warehouse'].find((field) => !draft[field]) ?? ''
-  }
+  if (stepKey === 'store' && picks.companies.length && !draft.company) return 'company'
+  if (stepKey === 'store' && picks.priceLists.length && !picks.priceLists.includes(draft.priceList)) return 'priceList'
   return ''
+}
+
+export function storePicks(existingStore, company) {
+  if (!existingStore) return NO_PICKS
+  const currency = existingStore.companies.find((row) => row.name === company)?.default_currency
+  const priceLists = currency
+    ? existingStore.price_lists.filter((row) => row.currency === currency).map((row) => row.name)
+    : []
+  return {
+    companies: existingStore.company ? [] : existingStore.companies.map((row) => row.name),
+    priceLists: priceLists.length > 1 ? priceLists : [],
+  }
 }
 
 // The setup must have finished before the dashboard opens: every screen behind it reads the company.

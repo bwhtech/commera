@@ -1,9 +1,9 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Button, Combobox, FormControl, Select, TextInput } from 'frappe-ui'
-import { createSalePriceList, getCountryDefaults, storeSetup } from '../../../data/onboarding'
+import { Combobox, FormControl, Select, TextInput } from 'frappe-ui'
+import { getCountryDefaults, storeSetup } from '../../../data/onboarding'
 import { CATEGORIES, draft, flow } from '../../../ia/onboarding'
-import { abbreviate, missingField, toOptions } from '../../../ia/onboardingSteps'
+import { abbreviate, missingField, storePicks, toOptions } from '../../../ia/onboardingSteps'
 import { monthName } from '../../../data/format'
 import { __ } from '../../../data/translation'
 
@@ -21,7 +21,6 @@ const STANDARD_CHARTS = ['Standard', 'Standard with Numbers']
 const countryCharts = ref(null)
 
 const showAccounting = ref(false)
-const missing = computed(() => (flow.showErrors ? missingField('store', draft) : ''))
 
 // Once setup has made the company, its country, currency and books are fixed.
 const isLocked = computed(() => storeSetup.status === 'running' || storeSetup.status === 'done')
@@ -42,21 +41,10 @@ const accountingSummary = computed(() =>
 )
 
 const existingStore = computed(() => props.record.existing_store)
-const createdPriceLists = ref([])
-const duplicating = ref(false)
+const picks = computed(() => storePicks(existingStore.value, draft.company))
+const missing = computed(() => (flow.showErrors ? missingField('store', draft, { picks: picks.value }) : ''))
 
 const company = computed(() => existingStore.value?.companies.find((row) => row.name === draft.company))
-const companyOptions = computed(() => toOptions(existingStore.value?.companies.map((row) => row.name)))
-const priceListOptions = computed(() =>
-  toOptions(
-    [...(existingStore.value?.price_lists ?? []), ...createdPriceLists.value]
-      .filter((row) => row.currency === company.value?.default_currency)
-      .map((row) => row.name),
-  ),
-)
-const warehouseOptions = computed(() =>
-  toOptions(existingStore.value?.warehouses.filter((row) => row.company === draft.company).map((row) => row.name)),
-)
 const companySummary = computed(() =>
   company.value
     ? [company.value.default_currency, company.value.abbr, chartLabel(company.value.chart_of_accounts)]
@@ -65,10 +53,6 @@ const companySummary = computed(() =>
     : '',
 )
 
-function isOffered(options, value) {
-  return options.some((option) => option.value === value)
-}
-
 watch(
   company,
   (picked) => {
@@ -76,23 +60,10 @@ watch(
     draft.currency = picked.default_currency
     draft.companyAbbr = picked.abbr
     draft.chartOfAccounts = picked.chart_of_accounts
-    if (!isOffered(priceListOptions.value, draft.priceList)) draft.priceList = ''
-    if (!isOffered(priceListOptions.value, draft.salePriceList)) draft.salePriceList = draft.priceList
-    if (!isOffered(warehouseOptions.value, draft.warehouse)) {
-      draft.warehouse = isOffered(warehouseOptions.value, picked.default_warehouse) ? picked.default_warehouse : ''
-    }
+    if (!picks.value.priceLists.includes(draft.priceList)) draft.priceList = ''
   },
   { immediate: true },
 )
-
-async function duplicateSaleList() {
-  duplicating.value = true
-  const name = await createSalePriceList({ storeName: draft.storeName, company: draft.company })
-  duplicating.value = false
-  if (!name) return
-  createdPriceLists.value.push({ name, currency: company.value.default_currency })
-  draft.salePriceList = name
-}
 
 watch(
   () => draft.country,
@@ -147,55 +118,23 @@ watch(
 
     <template v-if="existingStore">
       <Combobox
+        v-if="picks.companies.length"
         v-model="draft.company"
         trigger="button"
         :label="__('Company')"
         :placeholder="__('Pick your company')"
-        :options="companyOptions"
+        :options="toOptions(picks.companies)"
         :description="companySummary"
         :error="missing === 'company' ? __('Pick the company your store sells for') : ''"
       />
       <Combobox
+        v-if="picks.priceLists.length"
         v-model="draft.priceList"
         trigger="button"
         :label="__('Price list')"
-        :placeholder="__('Pick a selling price list')"
-        :options="priceListOptions"
-        :disabled="!draft.company"
+        :placeholder="__('Pick a price list')"
+        :options="toOptions(picks.priceLists)"
         :error="missing === 'priceList' ? __('Required') : ''"
-      />
-      <div>
-        <div class="flex items-end gap-2">
-          <Combobox
-            v-model="draft.salePriceList"
-            class="min-w-0 flex-1"
-            trigger="button"
-            :label="__('Sale price list')"
-            :placeholder="__('Pick a sale price list')"
-            :options="priceListOptions"
-            :disabled="!draft.company"
-            :error="missing === 'salePriceList' ? __('Required') : ''"
-          />
-          <Button
-            :label="__('Duplicate')"
-            :loading="duplicating"
-            :disabled="!draft.company || !draft.storeName.trim()"
-            data-onboarding-duplicate-sale-list
-            @click="duplicateSaleList"
-          />
-        </div>
-        <p class="mt-1.5 text-p-sm text-ink-gray-6">
-          {{ __('Pick the price list as the sale list to sell without sale prices, or Duplicate for an empty one.') }}
-        </p>
-      </div>
-      <Combobox
-        v-model="draft.warehouse"
-        trigger="button"
-        :label="__('Warehouse')"
-        :placeholder="__('Pick the warehouse you ship from')"
-        :options="warehouseOptions"
-        :disabled="!draft.company"
-        :error="missing === 'warehouse' ? __('Required') : ''"
       />
     </template>
 

@@ -8,6 +8,7 @@ import {
   missingField,
   resumeStep,
   setupPollDelay,
+  storePicks,
   toOptions,
 } from '../../src/ia/onboardingSteps.js'
 
@@ -30,13 +31,36 @@ test('missingField names the first empty required field of a step', () => {
   assert.equal(missingField('brand', { ...filled, storeName: '' }), '')
 })
 
-test('a store ERPNext already set up must pick its company, price lists and warehouse', () => {
-  const picked = { ...filled, existingStore: true, company: 'Acme', priceList: 'Selling', salePriceList: 'Selling', warehouse: 'Stores' }
-  assert.equal(missingField('store', picked), '')
-  for (const field of ['company', 'priceList', 'salePriceList', 'warehouse']) {
-    assert.equal(missingField('store', { ...picked, [field]: '' }), field)
-  }
-  assert.equal(missingField('store', { ...picked, existingStore: false, company: '' }), '')
+const existingStore = {
+  company: '',
+  companies: [
+    { name: 'Acme India', default_currency: 'INR' },
+    { name: 'Acme US', default_currency: 'USD' },
+  ],
+  price_lists: [
+    { name: 'Retail', currency: 'INR' },
+    { name: 'Wholesale', currency: 'INR' },
+    { name: 'US Retail', currency: 'USD' },
+  ],
+}
+
+test('a store ERPNext already set up picks only where there is a real choice', () => {
+  assert.deepEqual(storePicks(null, ''), { companies: [], priceLists: [] })
+  assert.deepEqual(storePicks(existingStore, ''), { companies: ['Acme India', 'Acme US'], priceLists: [] })
+  assert.deepEqual(storePicks(existingStore, 'Acme India').priceLists, ['Retail', 'Wholesale'])
+  assert.deepEqual(storePicks(existingStore, 'Acme US').priceLists, [])
+  assert.deepEqual(storePicks({ ...existingStore, company: 'Acme US' }, 'Acme US'), { companies: [], priceLists: [] })
+})
+
+test('the store step asks for a company or price list only when it shows that picker', () => {
+  const draft = { ...filled, existingStore: true, company: '', priceList: '' }
+  assert.equal(missingField('store', draft), '')
+  assert.equal(missingField('store', draft, { picks: storePicks(existingStore, '') }), 'company')
+  const india = { ...draft, company: 'Acme India' }
+  assert.equal(missingField('store', india, { picks: storePicks(existingStore, 'Acme India') }), 'priceList')
+  const picks = storePicks(existingStore, 'Acme India')
+  assert.equal(missingField('store', { ...india, priceList: 'US Retail' }, { picks }), 'priceList')
+  assert.equal(missingField('store', { ...india, priceList: 'Wholesale' }, { picks }), '')
 })
 
 test('a reload resumes at the saved step, unless the store setup never started', () => {

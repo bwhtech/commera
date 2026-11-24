@@ -21,6 +21,7 @@ SETUP_QUEUEING_SECONDS = 30
 SETUP_JOB_ID = "commera_store_setup"
 SETUP_JOB_TIMEOUT = 1500
 MAX_ABBR_LENGTH = 5
+STORE_WAREHOUSE_NAME = "commera_store"
 
 # Start months from ERPNext's wizard map (erpnext/public/js/setup_wizard.js), which has no Python copy.
 FISCAL_YEAR_START_MONTHS = {
@@ -160,19 +161,38 @@ def seed_commera_settings(
 	settings.save(ignore_permissions=True)
 
 
-def adopt_existing_company(
-	company: str | None = None,
-	price_list: str | None = None,
-	sale_price_list: str | None = None,
-	warehouse: str | None = None,
-):
-	company = company or frappe.db.get_single_value(SETTINGS_DOCTYPE, "company") or get_only_company()
+def adopt_existing_company(store_name: str, company: str | None = None, price_list: str | None = None):
+	saved = frappe.db.get_singles_dict(SETTINGS_DOCTYPE, cast=True)
+	company = company or get_default_company()
 	if not company:
 		frappe.throw(_("Pick the company your store sells for"), frappe.MandatoryError)
+	currency = frappe.db.get_value("Company", company, "default_currency")
+	if not currency:
+		frappe.throw(_("Unknown company {0}").format(company))
 
-	validate_store_picks(company, price_list, sale_price_list, warehouse)
-	sale_price_list = sale_price_list or price_list
+	price_lists = get_selling_price_lists(store_name, currency, saved.sale_price_list)
+	if price_list and price_list not in [row.name for row in price_lists]:
+		frappe.throw(_("{0} is not an enabled selling price list in {1}").format(price_list, currency))
+	price_list = get_store_price_list(
+		store_name, currency, price_lists, price_list or saved.default_price_list
+	)
+	sale_price_list = saved.sale_price_list
+	if not sale_price_list or not frappe.db.exists(
+		"Price List", {"name": sale_price_list, "selling": 1, "enabled": 1, "currency": currency}
+	):
+		sale_price_list = get_or_create_selling_price_list(f"{store_name} Sale", currency)
+	warehouse = saved.ecommerce_warehouse
+	if not warehouse or frappe.db.get_value("Warehouse", warehouse, "company") != company:
+		warehouse = get_company_warehouse(company) or create_store_warehouse(company)
 	seed_commera_settings(company, price_list, sale_price_list, warehouse)
+
+
+def get_default_company() -> str | None:
+	return (
+		frappe.db.get_single_value(SETTINGS_DOCTYPE, "company")
+		or frappe.db.get_single_value("Global Defaults", "default_company")
+		or get_only_company()
+	)
 
 
 def get_only_company() -> str | None:
@@ -180,36 +200,38 @@ def get_only_company() -> str | None:
 	return companies[0] if len(companies) == 1 else None
 
 
-def validate_store_picks(
-	company: str, price_list: str | None, sale_price_list: str | None, warehouse: str | None
-):
-	from commera.commera_ecommerce.doctype.commera_settings.commera_settings import (
-		validate_price_list_currency,
-	)
-
-	currency = frappe.db.get_value("Company", company, "default_currency")
-	if not currency:
-		frappe.throw(_("Unknown company {0}").format(company))
-
-	for label, name in ((_("Price list"), price_list), (_("Sale price list"), sale_price_list)):
-		if not name:
-			continue
-		if not frappe.db.exists("Price List", {"name": name, "selling": 1, "enabled": 1}):
-			frappe.throw(_("{0} {1} is not an enabled selling price list").format(label, name))
-		validate_price_list_currency(name, currency, label)
-
-	if warehouse and frappe.db.get_value("Warehouse", warehouse, "company") != company:
-		frappe.throw(_("Warehouse {0} does not belong to {1}").format(warehouse, company))
+def get_selling_price_lists(
+	store_name: str | None, currency: str | None = None, sale_price_list: str | None = None
+) -> list[dict]:
+	filters = {"selling": 1, "enabled": 1}
+	if currency:
+		filters["currency"] = currency
+	sale_lists = [name for name in (sale_price_list, store_name and f"{store_name} Sale") if name]
+	if sale_lists:
+		filters["name"] = ["not in", sale_lists]
+	return frappe.get_all("Price List", filters=filters, fields=["name", "currency"], order_by="name")
 
 
-def create_sale_price_list(store_name: str, company: str) -> str:
-	currency = frappe.db.get_value("Company", company, "default_currency")
-	if not currency:
-		frappe.throw(_("Unknown company {0}").format(company))
-	name = f"{store_name} Sale"
-	if frappe.db.exists("Price List", name):
+def get_store_price_list(store_name: str, currency: str, price_lists: list[dict], picked: str | None) -> str:
+	names = [row.name for row in price_lists]
+	if picked in names:
+		return picked
+	if len(names) == 1:
+		return names[0]
+	if names:
+		frappe.throw(_("Pick the price list your store sells at"), frappe.MandatoryError)
+	return get_or_create_selling_price_list(f"{store_name} Selling", currency)
+
+
+def get_or_create_selling_price_list(name: str, currency: str) -> str:
+	existing = frappe.db.get_value("Price List", name, ["selling", "enabled", "currency"], as_dict=True)
+	if existing and (existing.selling, existing.enabled, existing.currency) == (1, 1, currency):
+		return name
+	if existing:
 		frappe.throw(
-			_("Price list {0} already exists. Pick it instead.").format(name), frappe.DuplicateEntryError
+			_("Price list {0} already exists and is not an enabled selling list in {1}").format(
+				name, currency
+			)
 		)
 	frappe.get_doc(
 		{
@@ -223,6 +245,14 @@ def create_sale_price_list(store_name: str, company: str) -> str:
 	return name
 
 
+def create_store_warehouse(company: str) -> str:
+	return (
+		frappe.get_doc({"doctype": "Warehouse", "warehouse_name": STORE_WAREHOUSE_NAME, "company": company})
+		.insert(ignore_permissions=True)
+		.name
+	)
+
+
 def set_owner_default_app(user: str):
 	"""Where the site's default app is not Commera, only the owner who ran onboarding lands on it."""
 	if frappe.db.get_single_value("System Settings", "default_app") == "commera":
@@ -233,9 +263,15 @@ def set_owner_default_app(user: str):
 
 def get_company_warehouse(company: str) -> str | None:
 	"""ERPNext's default warehouse for the company ("Stores"), not the first one in the tree (in transit)."""
-	return frappe.get_cached_value("Company", company, "default_warehouse") or frappe.db.get_value(
-		"Warehouse", {"company": company, "is_group": 0, "warehouse_type": ["!=", "Transit"]}, "name"
+	if default_warehouse := frappe.get_cached_value("Company", company, "default_warehouse"):
+		return default_warehouse
+	warehouses = frappe.get_all(
+		"Warehouse",
+		filters={"company": company, "is_group": 0, "warehouse_type": ["!=", "Transit"]},
+		pluck="name",
+		limit=1,
 	)
+	return warehouses[0] if warehouses else None
 
 
 def get_setup_status() -> dict:
