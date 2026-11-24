@@ -9,7 +9,6 @@ import { Badge, Button, Dialog, FormControl, toast } from 'frappe-ui'
 import VariantMedia from './VariantMedia.vue'
 import { useAdminAction, trySubmit } from '../data/api'
 import { pricePayload, shownPrice } from '../data/product'
-import { productRoute } from '../ia/routes'
 import { __ } from '../data/translation'
 
 const props = defineProps({
@@ -93,7 +92,7 @@ async function save() {
       <section>
         <h3 class="text-base-semibold text-ink-gray-8">{{ __('Pricing and stock') }}</h3>
         <p class="mt-1 text-p-sm text-ink-gray-5">
-          {{ __("Applies to every size under this option ({0}). Edit one size at a time from the variant's own page.", [variant.sizes.length]) }}
+          {{ __('Applies to every size under this option ({0}).', [variant.sizes.length]) }}
         </p>
         <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormControl v-model.number="price" type="number" :label="__('Price')" />
@@ -118,16 +117,9 @@ async function save() {
     <!-- Slot omitted entirely while there is no variant, so the dialog does not
          render an empty action band over an empty body. -->
     <template v-if="variant" #actions>
-      <div class="flex w-full items-center justify-between gap-2">
-        <Button
-          :label="__('Open full page')"
-          icon-left="lucide-external-link"
-          :route="productRoute(product.id, variant.name)"
-        />
-        <div class="flex gap-2">
-          <Button :label="__('Cancel')" :disabled="priceAction.loading" @click="open = false" />
-          <Button :label="__('Save variant')" variant="solid" theme="gray" :loading="priceAction.loading" @click="save" />
-        </div>
+      <div class="flex w-full justify-end gap-2">
+        <Button :label="__('Cancel')" :disabled="priceAction.loading" @click="open = false" />
+        <Button :label="__('Save variant')" variant="solid" theme="gray" :loading="priceAction.loading" @click="save" />
       </div>
     </template>
   </Dialog>

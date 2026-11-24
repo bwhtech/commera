@@ -9,6 +9,7 @@ import PageBody from '../components/PageBody.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import VariantEditor from '../components/VariantEditor.vue'
 import ProductBasics from '../components/product/ProductBasics.vue'
+import ProductPhotos from '../components/product/ProductPhotos.vue'
 import ProductStock from '../components/product/ProductStock.vue'
 import ProductOrganization from '../components/product/ProductOrganization.vue'
 import ProductStorefront from '../components/product/ProductStorefront.vue'
@@ -187,6 +188,7 @@ const loadFailure = computed(() =>
 
           <div class="mt-6 space-y-11">
             <ProductBasics :product="product" />
+            <ProductPhotos v-if="product.variants.length" :product="product" @saved="productRequest.reload()" />
             <VariantEditor :product="product" @saved="productRequest.reload()" />
             <ProductStock :product="product" @received="productRequest.reload()" />
             <ProductStorefront :product="product" />

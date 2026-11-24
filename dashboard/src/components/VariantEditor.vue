@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dropdown, Tooltip, dialog, toast } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import Thumb from './Thumb.vue'
@@ -32,6 +33,18 @@ function openVariant(variant) {
   editingName.value = variant.name
   showVariant.value = true
 }
+
+const route = useRoute()
+const router = useRouter()
+watch(
+  () => props.product.variants.find((variant) => variant.name === route.query.variant),
+  (linked) => {
+    if (!linked) return
+    openVariant(linked)
+    router.replace({ query: { ...route.query, variant: undefined } })
+  },
+  { immediate: true },
+)
 
 const showEditOptions = ref(false)
 
@@ -170,7 +183,6 @@ function rowActions(variant) {
       onClick: () => togglePublish(variant),
     },
     { label: __('Receive stock'), icon: 'lucide-package-plus', onClick: () => receiveStock(variant) },
-    { label: __('Open full page'), icon: 'lucide-external-link', onClick: () => openVariant(variant) },
   ]
 }
 
@@ -268,10 +280,9 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
               <ListCell>
                 <!-- One price for the whole row: sets every size under this variant
                      in one pass (catalog.set_variant_price), the same bulk operation
-                     create_product uses. Per-size prices are edited on the variant's
-                     own page, where there is room to show them individually. What is
-                     shown and written is the rate a shopper is charged — see
-                     shownPrice in data/product.js — not the compare-at above it. -->
+                     create_product uses. What is shown and written is the rate a
+                     shopper is charged — see shownPrice in data/product.js — not the
+                     compare-at above it. -->
                 <EditableValue
                   :model-value="shownPrice(item.sizes[0])"
                   :label="__('Price')"
@@ -281,7 +292,7 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
               </ListCell>
               <ListCell>
                 <!-- Read-only: commera only exposes receiving stock (additive), not
-                     setting on-hand to an arbitrary number — see VariantDetail. -->
+                     setting on-hand to an arbitrary number. -->
                 <EditableValue
                   :model-value="item.sizes.reduce((sum, s) => sum + (s.stock ?? 0), 0)"
                   :label="__('On hand')"
