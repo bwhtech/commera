@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 import frappe
 from frappe import _
 from frappe.apps import DESK_APP_PATTERN
@@ -19,8 +21,6 @@ SETUP_QUEUEING_SECONDS = 30
 SETUP_JOB_ID = "commera_store_setup"
 SETUP_JOB_TIMEOUT = 1500
 MAX_ABBR_LENGTH = 5
-# Left reachable on purpose: the escape hatch if Commera's own setup keeps failing.
-DESK_SETUP_WIZARD_PATH = "/desk/setup-wizard"
 
 # Start months from ERPNext's wizard map (erpnext/public/js/setup_wizard.js), which has no Python copy.
 FISCAL_YEAR_START_MONTHS = {
@@ -52,13 +52,23 @@ def is_onboarding_pending(user: str | None = None) -> bool:
 	return "System Manager" in frappe.get_roles(user)
 
 
-def redirect_owner_from_desk(context):
-	"""Send the owner of a site that has not run setup to /commera, before the desk wizard opens."""
+def redirect_from_desk_before_setup(context):
 	request = getattr(frappe.local, "request", None)
-	if not request or not DESK_APP_PATTERN.match(request.path) or request.path == DESK_SETUP_WIZARD_PATH:
+	if not request or not DESK_APP_PATTERN.match(request.path) or frappe.is_setup_complete():
 		return
-	if not frappe.is_setup_complete() and is_onboarding_pending():
-		frappe.redirect("/commera")
+	if frappe.db.get_single_value(SETTINGS_DOCTYPE, "onboarding_completed"):
+		return
+	frappe.redirect("/commera" if "System Manager" in frappe.get_roles() else get_setup_pending_message_url())
+
+
+def get_setup_pending_message_url() -> str:
+	query = urlencode(
+		{
+			"title": _("Store setup in progress"),
+			"message": _("This store is still being set up. Ask the store owner to finish setup."),
+		}
+	)
+	return f"/message?{query}"
 
 
 def get_fiscal_year_start_month(country: str | None) -> int:

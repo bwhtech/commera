@@ -3,12 +3,12 @@
 
 import frappe
 from frappe import _
-from frappe.translate import get_translation_version
 
 from commera.api.admin.language import get_dashboard_language
 from commera.api.admin.orders import get_reporting_currency_symbol
 from commera.api.permission import has_app_permission
 from commera.localization import StorefrontLanguages
+from commera.localization.boot_translations import get_translation_version
 from commera.localization.formatter import Formatter
 from commera.localization.languages import Language, is_rtl_language
 from commera.onboarding import is_onboarding_pending

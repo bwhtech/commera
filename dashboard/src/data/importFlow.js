@@ -4,16 +4,10 @@
 import { computed, reactive } from 'vue'
 import { useAdminAction } from './api'
 import { canMove, isBusy, nextPhase } from './importPhase'
+import { stepIndex, stepsFor } from './importSteps'
 import { __ } from './translation'
 
-export const STEPS = [
-  { key: 'source', label: __('Source'), icon: 'lucide-plug', hint: __('Where the products live today') },
-  { key: 'upload', label: __('Upload'), icon: 'lucide-file-up', hint: __('Your spreadsheet') },
-  { key: 'map', label: __('Match columns'), icon: 'lucide-arrow-left-right', hint: __('Your headings to ours') },
-  { key: 'images', label: __('Images'), icon: 'lucide-image', hint: __('Photos for each product') },
-  { key: 'review', label: __('Review'), icon: 'lucide-list-checks', hint: __('Check before saving') },
-  { key: 'run', label: __('Import'), icon: 'lucide-rocket', hint: __('Create everything') },
-]
+export const steps = computed(() => stepsFor(imp.source))
 
 // TARGET_FIELDS/REQUIRED mirror commera.api.admin.imports.FIELD_SYNONYMS/REQUIRED_FIELDS field
 // for field — a mismatch here means a column that maps cleanly on the server shows the wrong
@@ -59,6 +53,25 @@ function blankImport() {
     runRowErrors: [],
     runImageErrors: [],
     imagesAttached: 0,
+    erpnext: {
+      importableCount: 0,
+      items: [],
+      skipped: [],
+      total: 0,
+      search: '',
+      page: 1,
+      pageSize: 50,
+      tab: 'items',
+      allItemCodes: [],
+      selected: [],
+      selectionReady: false,
+      jobId: null,
+      log: null,
+      status: null,
+      poll: 'off',
+      error: '',
+      published: null,
+    },
   }
 }
 
@@ -105,10 +118,15 @@ export function clearImportFile() {
   Object.assign(imp, { step, source, imagesMode, imageFiles })
 }
 
-export function openImport() {
+export function openImport(source) {
   // A run still in flight is shown again rather than reset: its write is landing either way, and
   // the merchant should see what it did.
-  if (imp.phase !== 'running' && (imp.phase === 'done' || imp.file)) resetImport()
+  const awaitingPublish = imp.source === 'erpnext' && imp.phase === 'done' && !imp.erpnext.published
+  if (imp.phase !== 'running' && !awaitingPublish && (imp.phase === 'done' || imp.file)) resetImport()
+  if (typeof source === 'string' && imp.step === 0 && imp.phase === 'idle') {
+    imp.source = source
+    imp.step = Math.max(0, stepIndex(source, 'pick'))
+  }
   imp.open = true
 }
 

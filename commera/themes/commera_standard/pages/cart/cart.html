@@ -6,6 +6,8 @@
 {% block uncontained_body %}
 <section x-data class="section-x pb-[var(--section-gap)] pt-6 md:pt-10">
 	<h1 class="page-title">{{ _("Your cart") }} <span class="tabular text-ink-gray-6" x-cloak x-show="$store.cart.count" x-text="'(' + $store.cart.count + ')'"></span></h1>
+	{% set cart_banner = plugin_slot("cart_banner") %}
+	{% if cart_banner %}<div class="mt-6">{{ cart_banner }}</div>{% endif %}
 	<div :class="$store.cart.count && 'lg:grid-cols-[minmax(0,1fr)_24rem]'" class="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 lg:items-start lg:gap-12">
 		<div class="-mx-5 flex min-w-0 flex-col">
 			{% include "components/cart_contents.html" %}

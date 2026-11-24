@@ -4,13 +4,13 @@
  "doctype": "Shop Theme",
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-11-03 12:00:00.000000",
+ "modified": "2026-11-23 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Shop Themes",
- "name": "Commera Starter",
+ "name": "Commera Standard",
  "owner": "Administrator",
- "theme_name": "Commera Starter",
- "theme_settings": "Commera Starter Settings",
+ "theme_name": "Commera Standard",
+ "theme_settings": "Commera Standard Settings",
  "theme_type": "Sections",
  "use_as_starter": 1
 }

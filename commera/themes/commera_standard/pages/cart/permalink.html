@@ -1,0 +1,29 @@
+{% extends "components/base.html" %}
+{% from "components/macros/icons.html" import spinner %}
+
+{% block uncontained_body %}
+{% set config = {"lines": cart_lines, "is_merge": is_merge, "next_url": next_url, "leave": not notices} %}
+<section x-data='cart_link({{ config | tojson }})' class="section-x flex flex-col items-center pt-16 pb-[var(--section-gap)] text-center md:pt-24">
+	{% if lines and not notices %}
+	<div x-show="status !== 'failed'" role="status" class="flex flex-col items-center">
+		{{ spinner("true", "size-8 text-ink-gray-6") }}
+		<h1 class="page-title mt-6">{{ _("Adding the products to your cart") }}</h1>
+	</div>
+	{% else %}
+	<h1 class="page-title">{{ _("Some products in this link were changed") if lines else _("This cart link has nothing to add") }}</h1>
+	{% if notices %}
+	<ul class="mt-4 grid max-w-[48ch] gap-2 text-p-lg text-ink-gray-6">
+		{% for notice in notices %}
+		<li>{{ notice | e }}</li>
+		{% endfor %}
+	</ul>
+	{% endif %}
+	<a x-show="status !== 'failed'" href="{{ next_url | e }}" :aria-disabled="status === 'adding'" :class="status === 'adding' && 'pointer-events-none'" class="relative mt-8 button-primary">{{ _("Continue") if lines else _("Go to your cart") }}{{ spinner("status === 'adding'", "size-5 text-on-brand") }}</a>
+	{% endif %}
+	<div x-cloak x-show="status === 'failed'" role="alert" class="flex flex-col items-center">
+		<h1 class="page-title">{{ _("We could not add these products") }}</h1>
+		<p x-text="error" class="mt-4 max-w-[48ch] text-p-lg text-ink-gray-6"></p>
+		<a href="{{ url('/cart') | e }}" class="mt-8 button-primary">{{ _("Go to your cart") }}</a>
+	</div>
+</section>
+{% endblock %}

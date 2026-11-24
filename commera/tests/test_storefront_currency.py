@@ -37,7 +37,7 @@ class TestStorefrontCurrency(CartCurrencyTestCase):
 		):
 			with self.subTest(currency=currency):
 				html = frappe.render_template(
-					'{% from "themes/commera_starter/components/macros/price.html" import price with context %}'
+					'{% from "themes/commera_standard/components/macros/price.html" import price with context %}'
 					"{{ price(product) }}",
 					{
 						"product": frappe._dict(price=10, compare_at_price=20, currency=currency),

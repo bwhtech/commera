@@ -9,7 +9,6 @@ import PageBody from '../components/PageBody.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import VariantEditor from '../components/VariantEditor.vue'
 import ProductBasics from '../components/product/ProductBasics.vue'
-import ProductPricing from '../components/product/ProductPricing.vue'
 import ProductStock from '../components/product/ProductStock.vue'
 import ProductOrganization from '../components/product/ProductOrganization.vue'
 import ProductStorefront from '../components/product/ProductStorefront.vue'
@@ -55,7 +54,6 @@ watch(
       updated: data.updated,
       variants: data.variants,
       option_attribute: data.option_attribute,
-      hasVariants: data.variants.length > 0,
       recent_sales: data.recent_sales,
     }
   },
@@ -189,7 +187,6 @@ const loadFailure = computed(() =>
 
           <div class="mt-6 space-y-11">
             <ProductBasics :product="product" />
-            <ProductPricing :product="product" />
             <VariantEditor :product="product" @saved="productRequest.reload()" />
             <ProductStock :product="product" @received="productRequest.reload()" />
             <ProductStorefront :product="product" />

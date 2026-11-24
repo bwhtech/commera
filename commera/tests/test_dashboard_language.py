@@ -2,9 +2,9 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.translate import get_translation_version
 
 from commera.api.admin import language as dashboard_language
+from commera.localization.boot_translations import get_translation_version
 from commera.www import commera as dashboard
 
 

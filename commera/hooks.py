@@ -341,6 +341,10 @@ doc_events = {
 		"on_submit": "commera.utils.update_so_status_from_related_doc",
 	},
 	"Payment Entry": {"on_submit": "commera.doc_events.payment_entry.on_submit"},
+	"Translation": {
+		"on_update": "commera.doc_events.translation.on_update",
+		"on_trash": "commera.doc_events.translation.on_trash",
+	},
 	"Delivery Note": {
 		"before_validate": "commera.discounts.pricing.remove_code_discounts",
 		"validate": "commera.discounts.pricing.apply_code_discounts",
@@ -397,7 +401,7 @@ jinja = {
 update_website_context = [
 	"commera.website_context.update_website_context",
 	"commera.roles.redirect_commera_users_from_desk",
-	"commera.onboarding.redirect_owner_from_desk",
+	"commera.onboarding.redirect_from_desk_before_setup",
 ]
 
 # GDPR erasure: the event log stores the signed-in email as plain Data, so core is told which column to redact.

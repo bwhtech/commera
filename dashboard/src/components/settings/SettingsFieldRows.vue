@@ -52,7 +52,6 @@ function isOn(field) {
 function hint(field) {
   if (field.is_secret && field.is_set) return __('Stored. Leave blank to keep it.')
   if (field.is_secret) return __('Stored encrypted, never shown again.')
-  if (field.fieldtype === 'Link' && !field.description) return __('Links to {0}.', [__(field.options)])
   return plainText(__(field.description))
 }
 

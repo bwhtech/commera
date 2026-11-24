@@ -8,7 +8,7 @@ from frappe.tests import IntegrationTestCase
 from commera.patches import set_shop_theme_type
 from commera.shop_themes.doctype.shop_theme.shop_theme import clear_theme_cache
 
-STARTER = "Commera Starter"
+STARTER = "Commera Standard"
 
 
 class TestSetShopThemeType(IntegrationTestCase):
@@ -40,7 +40,7 @@ class TestSetShopThemeType(IntegrationTestCase):
 		set_shop_theme_type.execute()
 		import_file_by_path(
 			frappe.get_app_path(
-				"commera", "shop_themes", "shop_theme", "commera_starter", "commera_starter.json"
+				"commera", "shop_themes", "shop_theme", "commera_standard", "commera_standard.json"
 			)
 		)
 

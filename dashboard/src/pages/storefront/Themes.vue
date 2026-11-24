@@ -22,7 +22,7 @@ const activatingName = ref(null)
 const creatingTheme = ref(false)
 
 const liveTheme = computed(() => themes.value.find((theme) => theme.live) ?? null)
-const libraryThemes = computed(() => themes.value.filter((theme) => !theme.live))
+const libraryThemes = computed(() => themes.value.filter((theme) => !theme.live && !theme.is_base))
 
 function confirmActivate(theme) {
   const previous = liveTheme.value?.theme_name
@@ -87,7 +87,6 @@ function confirmActivate(theme) {
 
       <section v-if="libraryThemes.length" class="mt-8">
         <h2 class="text-sm font-medium uppercase tracking-wide text-ink-gray-5">{{ __('Theme library') }}</h2>
-        <p class="text-p-sm text-ink-gray-5">{{ __('Shoppers only see the live theme.') }}</p>
         <div class="mt-2 divide-y divide-outline-gray-1 overflow-hidden rounded-5 border border-outline-gray-2">
           <ThemeRow
             v-for="theme in libraryThemes"

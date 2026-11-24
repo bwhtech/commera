@@ -1,12 +1,12 @@
-# Commera Starter
+# Commera Standard
 
 ## Theme settings
 
 Theme settings are the values a merchant can change without code: colours, fonts, corner radius, logo, social links.
 They live in one Settings doctype per theme.
 
-1. Open the Shop Theme record for Commera Starter in Desk and click **Scaffold Theme Settings**.
-   This creates the Single doctype `Commera Starter Settings`.
+1. Open the Shop Theme record for Commera Standard in Desk and click **Scaffold Theme Settings**.
+   This creates the Single doctype `Commera Standard Settings`.
 2. Add fields to that doctype. The merchant edits them on the Theme screen in `/commera`.
 
 A theme without its own Settings doctype uses its parent's.

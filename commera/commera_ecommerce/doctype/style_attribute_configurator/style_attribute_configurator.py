@@ -33,12 +33,19 @@ class StyleAttributeConfigurator(Document):
 			self.generate_variants()
 
 	@frappe.whitelist()
-	def generate_variants(self):
+	def generate_variants(self, skip_disabled: bool = False):
 		all_attributes = frappe.db.get_all(
 			"Item Variant Attribute",
 			filters={"parenttype": "Item", "variant_of": self.item_template},
 			fields=["attribute", "attribute_value", "parent"],
 		)
+		if skip_disabled:
+			disabled = set(
+				frappe.get_all(
+					"Item", filters={"variant_of": self.item_template, "disabled": 1}, pluck="name"
+				)
+			)
+			all_attributes = [row for row in all_attributes if row.parent not in disabled]
 
 		grouped_by_parent_items = {}
 		attribute_name_field = frappe.get_cached_value(

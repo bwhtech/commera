@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import vm from 'node:vm';
 
 const STARTER_SCRIPT = new URL(
-	'../../../commera/public/themes/commera_starter/scripts/storefront.js',
+	'../../../commera/public/themes/commera_standard/scripts/storefront.js',
 	import.meta.url,
 );
 

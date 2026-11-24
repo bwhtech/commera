@@ -15,7 +15,7 @@ SWITCHER = (
 	'{% from "templates/macros/language_switcher.html" import country_switcher %}'
 	"{{ country_switcher(link_class=link_class, current_class=current_class, heading_class=heading_class) }}"
 )
-STARTER_THEME = Path(__file__).resolve().parents[1] / "themes" / "commera_starter"
+STARTER_THEME = Path(__file__).resolve().parents[1] / "themes" / "commera_standard"
 STORE_COUNTRY = "India"
 
 

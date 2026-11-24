@@ -3,23 +3,34 @@ import { computed } from 'vue'
 import { Badge, Spinner } from 'frappe-ui'
 import { openAddProduct } from '../../../data/addProduct'
 import { openImport } from '../../../data/importFlow'
-import { storeSetup } from '../../../data/onboarding'
+import { onboarding, storeSetup } from '../../../data/onboarding'
 import { __ } from '../../../data/translation'
 
 // Both dialogs write Items against the company, which exists only once the store setup is done.
 const isStoreReady = computed(() => storeSetup.status === 'done')
 
-const SOURCES = [
+const OTHER_SOURCES = [
   { key: 'shopify', label: __('Import from Shopify'), icon: 'lucide-arrow-down-to-line', comingSoon: true },
   { key: 'csv', label: __('Import a CSV'), icon: 'lucide-file-spreadsheet', open: openImport },
   { key: 'manual', label: __('Add a product'), icon: 'lucide-plus', open: openAddProduct },
 ]
+
+const ERPNEXT_SOURCE = {
+  key: 'erpnext',
+  label: __('Import from ERPNext'),
+  icon: 'lucide-database',
+  open: () => openImport('erpnext'),
+}
+
+const sources = computed(() =>
+  onboarding.value?.existing_store?.importable_count > 0 ? [ERPNEXT_SOURCE, ...OTHER_SOURCES] : OTHER_SOURCES,
+)
 </script>
 
 <template>
   <div class="space-y-2">
     <button
-      v-for="source in SOURCES"
+      v-for="source in sources"
       :key="source.key"
       type="button"
       class="flex w-full items-center gap-3 rounded-5 border border-outline-gray-2 px-3 py-3 text-start transition-[background-color,transform] duration-150 ease-out-strong enabled:hover:bg-surface-gray-1 enabled:active:scale-[0.99] disabled:cursor-not-allowed"

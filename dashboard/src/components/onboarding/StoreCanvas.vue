@@ -84,9 +84,6 @@ const perks = computed(() =>
 // Ring width, not colour, is what changes: box-shadow interpolates between widths, so moving the
 // focus from one area to the next cross-fades instead of jumping.
 const ring = (area) => (props.focus === area && !props.mobile ? 'ring-1 ring-inset ring-outline-gray-4' : 'ring-0')
-
-// The owner's brand colour is data, not styling, so it is the one value bound inline.
-const accent = computed(() => (draft.primaryColor ? { backgroundColor: draft.primaryColor } : null))
 </script>
 
 <template>
@@ -151,7 +148,7 @@ const accent = computed(() => (draft.primaryColor ? { backgroundColor: draft.pri
         v-if="category"
         key="hero"
         class="relative flex flex-1 overflow-hidden transition-[background-color,border-radius,box-shadow] duration-500 ease-out-strong"
-        :class="[size.hero, look.hero, look.radius, ring('theme')]"
+        :class="[size.hero, look.hero, look.radius]"
       >
         <span :class="[category.icon, size.heroIcon]" class="absolute opacity-5" aria-hidden="true" />
         <h2 class="relative max-w-md font-medium leading-none tracking-tight" :class="[size.heroLine, look.heading]">
@@ -163,12 +160,9 @@ const accent = computed(() => (draft.primaryColor ? { backgroundColor: draft.pri
         >
           <span
             v-if="hasButton"
-            class="relative shrink-0 transition-[background-color,border-radius] duration-500 ease-out-strong"
-            :class="[size.button, look.button, accent ? 'text-ink-base dark:text-ink-gray-9' : 'bg-surface-gray-10 text-ink-base']"
-            :style="accent"
+            class="relative shrink-0 bg-surface-gray-10 text-ink-base transition-[border-radius] duration-500 ease-out-strong"
+            :class="[size.button, look.button]"
           >
-            <!-- Brand colours run dark, so their label stays light: ink-base is white in light mode, and
-                 under a dark look's data-theme the dark: variant swaps in the light end of the scale. -->
             {{ __('Shop') }}
           </span>
         </Transition>

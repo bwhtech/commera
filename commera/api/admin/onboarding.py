@@ -1,5 +1,3 @@
-import re
-
 import frappe
 from erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts import get_charts_for_country
 from frappe import _
@@ -12,7 +10,6 @@ from commera.api.admin.settings import read_branding_fields, write_branding_fiel
 
 SETTINGS_DOCTYPE = "Commera Settings"
 ONBOARDING_ROLE = "System Manager"
-HEX_COLOR = re.compile(r"^#(?:[0-9a-fA-F]{3}){1,2}$")
 
 
 def get_charts_of_accounts(country: str | None) -> list[str]:
@@ -122,7 +119,6 @@ def get_onboarding():
 		"is_frappe_setup_complete": frappe.is_setup_complete(),
 		"setup": onboarding.get_setup_status(),
 		"brand_logo": read_branding_fields()["brand_logo"],
-		"primary_color": settings.primary_color,
 		"cod_enabled": bool(settings.cod_enabled),
 		"allow_guest_checkout": bool(settings.allow_guest_checkout),
 		"options": get_options(country),
@@ -248,18 +244,11 @@ def get_setup_status():
 
 
 @frappe.whitelist(methods=["POST"])
-def save_brand(brand_logo: str | None = None, primary_color: str | None = None):
+def save_brand(brand_logo: str | None = None):
 	frappe.only_for(ONBOARDING_ROLE)
 
 	branding = write_branding_fields({"brand_logo": brand_logo} if brand_logo is not None else {})
-	if primary_color and not HEX_COLOR.match(primary_color):
-		frappe.throw(_("Primary color must be a hex color such as #1d4ed8"))
-	if primary_color is not None:
-		frappe.db.set_single_value(SETTINGS_DOCTYPE, "primary_color", primary_color)
-	return {
-		"brand_logo": branding["brand_logo"],
-		"primary_color": frappe.db.get_single_value(SETTINGS_DOCTYPE, "primary_color"),
-	}
+	return {"brand_logo": branding["brand_logo"]}
 
 
 @frappe.whitelist(methods=["POST"])

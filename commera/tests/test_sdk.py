@@ -436,7 +436,7 @@ class TestSdk(IntegrationTestCase):
 		order_names = [self.make_store_order().name for _ in range(3)]
 		orders.get_orders(order_names[:1])
 
-		with self.assertQueryCount(14):
+		with self.assertQueryCount(16):
 			page = orders.get_orders([*order_names, "ZZ-NO-SUCH-ORDER"])
 
 		self.assertEqual(sorted(page), sorted(order_names))

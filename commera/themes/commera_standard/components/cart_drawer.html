@@ -12,6 +12,8 @@
 		</div>
 
 		<p x-cloak x-show="just_added" x-transition:enter="transition duration-300 ease-out" x-transition:enter-start="opacity-0 -translate-y-1" class="flex items-center gap-2 border-b border-outline-gray-2 bg-surface-green-1 px-5 py-3 text-base font-medium text-ink-green-7" aria-hidden="true">{{ icon("check", "size-4") }}{{ _("Added to your cart") }}</p>
+		{% set cart_banner = plugin_slot("cart_banner") %}
+		{% if cart_banner %}<div class="border-b border-outline-gray-2 px-5 py-3">{{ cart_banner }}</div>{% endif %}
 		{% include "components/cart_contents.html" %}
 		<div x-show="$store.cart.count" class="border-t border-outline-gray-2 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
 			<p x-show="$store.cart.error" x-text="$store.cart.error" class="mb-3 text-base text-ink-red-7"></p>

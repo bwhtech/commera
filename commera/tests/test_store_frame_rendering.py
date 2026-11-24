@@ -19,7 +19,7 @@ SUMMER_MENUS = {
 	"marquee": "theme://sections/marquee.html",
 	"collage": "theme://sections/collection_collage.html",
 }
-STARTER = "Commera Starter"
+STARTER = "Commera Standard"
 UNSAFE_NAME = '" onload="alert(1)<script>alert(2)</script>'
 ESCAPED_NAME = "&#34; onload=&#34;alert(1)&lt;script&gt;alert(2)&lt;/script&gt;"
 UNSAFE_URL = '/shop" onload="alert(3)'

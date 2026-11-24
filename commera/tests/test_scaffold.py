@@ -45,11 +45,11 @@ from commera.shop_themes.theme_resolver import ThemePageRenderer
 from commera.tests.test_localization import use_storefront_languages
 
 APP = "commera_test_plugin"
-STARTER = "Commera Starter"
-STARTER_SETTINGS = "Commera Starter Settings"
+STARTER = "Commera Standard"
+STARTER_SETTINGS = "Commera Standard Settings"
 STARTER_DIRS = {
-	"themes": Path(frappe.get_app_path("commera"), "themes", "commera_starter"),
-	"public/themes": Path(frappe.get_app_path("commera"), "public", "themes", "commera_starter"),
+	"themes": Path(frappe.get_app_path("commera"), "themes", "commera_standard"),
+	"public/themes": Path(frappe.get_app_path("commera"), "public", "themes", "commera_standard"),
 }
 JINJA_COMMENT = re.compile(r"{#.*?#}", re.DOTALL)
 LINK_HREF = re.compile(r'<a\b[^>]*\bhref="([^"]*)"')
@@ -427,8 +427,8 @@ class IntegrationTestThemeScaffold(IntegrationTestCase):
 			for path in copy_dir.rglob("*"):
 				if path.is_file() and path.suffix in (".css", ".html", ".js", ".json", ".md", ".py"):
 					text = path.read_text()
-					self.assertNotIn("commera_starter", text, path)
-					self.assertNotIn("Commera Starter", text, path)
+					self.assertNotIn("commera_standard", text, path)
+					self.assertNotIn("Commera Standard", text, path)
 		self.assertTrue((self.theme_dir / "README.md").read_text().startswith("# Scaffold Check\n"))
 		self.assert_localized(self.theme_dir)
 

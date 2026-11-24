@@ -88,7 +88,7 @@ def get_order_result(
 			{
 				"line_id": line.name,
 				"item_code": line.item_code,
-				"title": products.get_title(line.item_code, line.item_name),
+				"title": products.get_order_title(line.item_code, line.item_name),
 				"size": line.size,
 				"qty": flt(line.qty),
 				"delivered_qty": flt(line.delivered_qty),

@@ -13,8 +13,8 @@ from commera.shop_themes.sections import get_theme_json, validate_layout
 from commera.shop_themes.theme_resolver import ThemePageRenderer
 from commera.tests.test_localization import use_storefront_languages
 
-STARTER = "Commera Starter"
-STARTER_DIR = os.path.join(frappe.get_app_path("commera"), "themes", "commera_starter")
+STARTER = "Commera Standard"
+STARTER_DIR = os.path.join(frappe.get_app_path("commera"), "themes", "commera_standard")
 CATALOG_LAYOUTS = {
 	"products": "main_collection",
 	"search": "main_search",
@@ -23,7 +23,7 @@ CATALOG_LAYOUTS = {
 }
 
 
-class IntegrationTestCommeraStarterCatalog(IntegrationTestCase):
+class IntegrationTestCommeraStandardCatalog(IntegrationTestCase):
 	def setUp(self):
 		self.theme_context = {
 			"theme_name": STARTER,
