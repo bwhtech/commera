@@ -108,8 +108,6 @@ def get_onboarding():
 		"is_frappe_setup_complete": frappe.is_setup_complete(),
 		"setup": onboarding.get_setup_status(),
 		"brand_logo": read_branding_fields()["brand_logo"],
-		"cod_enabled": bool(settings.cod_enabled),
-		"allow_guest_checkout": bool(settings.allow_guest_checkout),
 		"options": get_options(country),
 		"existing_store": existing_store,
 	}
@@ -226,16 +224,6 @@ def save_brand(brand_logo: str | None = None):
 
 	branding = write_branding_fields({"brand_logo": brand_logo} if brand_logo is not None else {})
 	return {"brand_logo": branding["brand_logo"]}
-
-
-@frappe.whitelist(methods=["POST"])
-def save_selling(cod_enabled: int, allow_guest_checkout: int):
-	frappe.only_for(ONBOARDING_ROLE)
-
-	values = {"cod_enabled": cint(cod_enabled), "allow_guest_checkout": cint(allow_guest_checkout)}
-	# set_single_value adds `modified` to the dict it is given, so it gets a copy.
-	frappe.db.set_single_value(SETTINGS_DOCTYPE, dict(values))
-	return {key: bool(value) for key, value in values.items()}
 
 
 @frappe.whitelist(methods=["POST"])

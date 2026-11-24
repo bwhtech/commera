@@ -28,7 +28,7 @@ test('missingField names the first empty required field of a step', () => {
   assert.equal(missingField('you', { ...filled, password: 'secret' }, { needsPassword: true }), '')
   assert.equal(missingField('store', { ...filled, storeName: '' }), 'storeName')
   assert.equal(missingField('store', { ...filled, storeCategory: '' }), 'storeCategory')
-  assert.equal(missingField('brand', { ...filled, storeName: '' }), '')
+  assert.equal(missingField('done', { ...filled, storeName: '' }), '')
 })
 
 const existingStore = {
@@ -64,20 +64,28 @@ test('the store step asks for a company or price list only when it shows that pi
 })
 
 test('a reload resumes at the saved step, unless the store setup never started', () => {
-  assert.equal(resumeStep('selling', 'running'), STEP_INDEX.selling)
-  assert.equal(resumeStep('selling', 'idle'), STEP_INDEX.store)
   assert.equal(resumeStep('store', 'idle'), STEP_INDEX.store)
-  assert.equal(resumeStep('done', 'done'), STEP_INDEX.done)
+  assert.equal(resumeStep('done', 'running'), STEP_INDEX.done)
+  assert.equal(resumeStep('done', 'idle'), STEP_INDEX.store)
   assert.equal(resumeStep(null, 'idle'), 0)
   assert.equal(resumeStep('gone', 'done'), 0)
   assert.equal(clampStep(Number.NaN), 0)
 })
 
-test('a step saved as an index before the look step went resumes at the same step', () => {
-  assert.equal(resumeStep('2', 'running'), STEP_INDEX.brand)
-  assert.equal(resumeStep('3', 'running'), STEP_INDEX.selling)
-  assert.equal(resumeStep('4', 'running'), STEP_INDEX.selling)
-  assert.equal(resumeStep('5', 'done'), STEP_INDEX.products)
+test('a retired step resumes at the store, or at done once the setup finished', () => {
+  for (const key of ['brand', 'theme', 'selling', 'products']) {
+    for (const status of ['idle', 'running', 'failed']) assert.equal(resumeStep(key, status), STEP_INDEX.store)
+    assert.equal(resumeStep(key, 'done'), STEP_INDEX.done)
+  }
+})
+
+test('a step saved as an index by an older build resumes at a step that still exists', () => {
+  assert.equal(resumeStep('0', 'idle'), STEP_INDEX.you)
+  assert.equal(resumeStep('1', 'idle'), STEP_INDEX.store)
+  for (const index of ['2', '3', '4', '5']) {
+    assert.equal(resumeStep(index, 'running'), STEP_INDEX.store)
+    assert.equal(resumeStep(index, 'done'), STEP_INDEX.done)
+  }
   assert.equal(resumeStep('6', 'done'), STEP_INDEX.done)
   assert.equal(resumeStep('99', 'done'), 0)
 })

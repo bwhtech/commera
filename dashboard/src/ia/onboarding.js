@@ -72,8 +72,6 @@ export const draft = reactive({
   company: '',
   priceList: '',
   brandLogo: '',
-  codEnabled: true,
-  allowGuestCheckout: true,
 })
 
 export function adoptRecord(record) {
@@ -91,8 +89,6 @@ export function adoptRecord(record) {
     company: store?.company || '',
     priceList: store?.price_list || '',
     brandLogo: record.brand_logo || '',
-    codEnabled: Boolean(record.cod_enabled),
-    allowGuestCheckout: Boolean(record.allow_guest_checkout),
   })
 }
 

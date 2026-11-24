@@ -58,7 +58,7 @@ const size = computed(() => (props.mobile ? SIZES.mobile : SIZES.desktop))
 const category = computed(() => CATEGORIES.find((option) => option.value === draft.storeCategory))
 const storeName = computed(() => draft.storeName.trim())
 const isTyping = computed(() => props.stage === STEP_INDEX.store)
-const hasButton = computed(() => props.stage >= STEP_INDEX.brand)
+const hasButton = computed(() => props.stage >= STEP_INDEX.store)
 
 const isSample = computed(() => !storeProducts.value.length)
 const products = computed(() => {
@@ -72,14 +72,7 @@ const products = computed(() => {
   }
   return (SAMPLE_PRODUCTS[draft.storeCategory] ?? []).map((icon) => ({ key: icon, icon }))
 })
-const showProducts = computed(() => (props.stage >= STEP_INDEX.products || !isSample.value) && products.value.length)
-
-const perks = computed(() =>
-  [
-    { icon: 'lucide-banknote', on: draft.codEnabled },
-    { icon: 'lucide-user-round', on: draft.allowGuestCheckout },
-  ].filter((perk) => perk.on),
-)
+const showProducts = computed(() => (props.stage >= STEP_INDEX.done || !isSample.value) && products.value.length)
 
 // Ring width, not colour, is what changes: box-shadow interpolates between widths, so moving the
 // focus from one area to the next cross-fades instead of jumping.
@@ -114,20 +107,6 @@ const ring = (area) => (props.focus === area && !props.mobile ? 'ring-1 ring-ins
       <span v-else class="h-2.5 rounded-full" :class="[look.tile, mobile ? 'w-14' : 'w-24']" />
 
       <div class="ms-auto flex items-center" :class="size.icons">
-        <Transition
-          enter-active-class="transition-[opacity,transform] duration-500 ease-out-strong"
-          enter-from-class="translate-x-1 opacity-0 motion-reduce:translate-x-0"
-          leave-active-class="transition-opacity duration-150"
-          leave-to-class="opacity-0"
-        >
-          <div
-            v-if="focus === 'selling' && !mobile && perks.length"
-            class="flex items-center gap-2.5 rounded-full px-3 py-1 text-ink-gray-5"
-            :class="look.tile"
-          >
-            <span v-for="perk in perks" :key="perk.icon" :class="perk.icon" class="size-3.5" aria-hidden="true" />
-          </div>
-        </Transition>
         <Transition enter-active-class="transition-opacity duration-500 ease-out-strong" enter-from-class="opacity-0">
           <div v-if="stage >= STEP_INDEX.store" class="flex items-center" :class="size.icons">
             <span class="lucide-search" :class="size.icon" aria-hidden="true" />

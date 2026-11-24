@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Combobox, FormControl, Select, TextInput } from 'frappe-ui'
+import { Button, Combobox, FormControl, Select, Spinner, TextInput, toast, useFileUpload } from 'frappe-ui'
 import { getCountryDefaults, storeSetup } from '../../../data/onboarding'
 import { CATEGORIES, draft, flow } from '../../../ia/onboarding'
 import { abbreviate, missingField, storePicks, toOptions } from '../../../ia/onboardingSteps'
@@ -21,6 +21,8 @@ const STANDARD_CHARTS = ['Standard', 'Standard with Numbers']
 const countryCharts = ref(null)
 
 const showAccounting = ref(false)
+const { upload, isUploading } = useFileUpload()
+const logoInput = ref(null)
 
 // Once setup has made the company, its country, currency and books are fixed.
 const isLocked = computed(() => storeSetup.status === 'running' || storeSetup.status === 'done')
@@ -64,6 +66,18 @@ watch(
   },
   { immediate: true },
 )
+
+async function uploadLogo(event) {
+  const [file] = [...(event.target.files ?? [])]
+  event.target.value = ''
+  if (!file) return
+  try {
+    const uploaded = await upload(file, { private: false })
+    draft.brandLogo = uploaded.file_url
+  } catch {
+    toast.error(__('Could not upload {0}', [file.name]))
+  }
+}
 
 watch(
   () => draft.country,
@@ -114,6 +128,28 @@ watch(
           <span class="truncate">{{ option.label }}</span>
         </button>
       </div>
+    </div>
+
+    <div>
+      <div class="mb-2 flex items-center justify-between text-xs">
+        <p class="text-ink-gray-6">{{ __('Logo') }}</p>
+        <p class="text-ink-gray-4">{{ __('Optional') }}</p>
+      </div>
+      <input ref="logoInput" type="file" accept="image/*" class="hidden" data-onboarding-logo-input @change="uploadLogo" />
+      <button
+        type="button"
+        class="flex h-20 w-full items-center justify-center gap-2 rounded-4 border border-dashed border-outline-gray-3 text-ink-gray-5 transition-[background-color,transform] duration-150 ease-out-strong hover:bg-surface-gray-1 active:scale-[0.99]"
+        :disabled="isUploading"
+        @click="logoInput?.click()"
+      >
+        <Spinner v-if="isUploading" class="size-5" />
+        <img v-else-if="draft.brandLogo" :src="draft.brandLogo" :alt="__('Your logo')" class="max-h-12 max-w-[60%] object-contain" />
+        <template v-else>
+          <span class="lucide-image-plus size-5" aria-hidden="true" />
+          <span class="text-sm">{{ __('Upload') }}</span>
+        </template>
+      </button>
+      <Button v-if="draft.brandLogo" variant="ghost" size="sm" :label="__('Remove logo')" class="mt-1" @click="draft.brandLogo = ''" />
     </div>
 
     <template v-if="existingStore">

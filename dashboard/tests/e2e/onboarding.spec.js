@@ -74,8 +74,7 @@ describe('onboarding', () => {
       storeName: settings.store_name || '',
       storeCategory: settings.store_category || '',
       brandLogo: record.brand_logo || '',
-      codEnabled: record.cod_enabled,
-      allowGuestCheckout: record.allow_guest_checkout,
+      isNewStore: record.setup?.status !== 'done',
       theme: activeTheme,
       country: record.country,
     })
@@ -84,10 +83,6 @@ describe('onboarding', () => {
 
   onCleanup(session, async ({ page }) => {
     await adminPost(page, 'onboarding.save_brand', { brand_logo: original.brandLogo })
-    await adminPost(page, 'onboarding.save_selling', {
-      cod_enabled: original.codEnabled ? 1 : 0,
-      allow_guest_checkout: original.allowGuestCheckout ? 1 : 0,
-    })
     await writeSettings(page, {
       store_name: original.storeName,
       store_category: original.storeCategory,
@@ -122,40 +117,18 @@ describe('onboarding', () => {
       await wait(500)
       assert.equal(await page.$eval('[data-onboarding-accounting]', (button) => button.getAttribute('aria-expanded')), 'true')
       assert.ok((await text(page)).includes('Chart of accounts'), 'the accounting line opens onto the chart of accounts')
-      await pressContinue(page, 'brand')
+      assert.ok(await page.$('[data-onboarding-step="store"] [data-onboarding-logo-input]'), 'the logo upload sits on the store step')
 
       // Back reverses one step and keeps what was typed.
       await clickByText(page, '[data-onboarding] button', 'Back', { pause: 300 })
-      await stepShown(page, 'store')
+      await stepShown(page, 'you')
+      await pressContinue(page, 'store')
       assert.equal(await page.$eval('[data-onboarding-step="store"] input', (input) => input.value), STORE_NAME)
-      await pressContinue(page, 'brand')
+      await pressContinue(page, 'done')
 
-      await pressContinue(page, 'selling')
-
-      const guestSwitch = (await page.$$('[data-onboarding-step="selling"] [role="switch"]'))[1]
-      await guestSwitch.click()
-      await wait(300)
-      const guestCheckout = (await guestSwitch.evaluate((element) => element.getAttribute('aria-checked'))) === 'true'
-      await pressContinue(page, 'products')
-
-      const shopify = await page.$('[data-onboarding-source="shopify"]')
-      assert.ok(await shopify.evaluate((button) => button.disabled), 'Shopify import cannot be started yet')
-      assert.ok((await shopify.evaluate((button) => button.innerText)).includes('Coming soon'))
-      // The products step needs the store: its CSV import waits for the setup to finish.
       await page.waitForSelector('[data-onboarding-setup="done"], [data-onboarding-setup="failed"]', { timeout: SETUP_TIMEOUT })
       const failure = await page.$('[data-onboarding-setup="failed"]')
       assert.equal(failure, null, 'the store setup finished: ' + (failure ? await text(page) : ''))
-
-      await page.waitForSelector('[data-onboarding-source="csv"]:not([disabled])', { timeout: 20000 })
-      await page.click('[data-onboarding-source="csv"]')
-      // The import dialog is bare and not dismissible (Esc would drop a half-mapped file), so it is
-      // found by its title and closed with its own Close button.
-      const importOpen = () => document.body.innerText.includes('Import products')
-      await page.waitForFunction(importOpen, { timeout: 10000 })
-      await page.click('button[aria-label="Close"]')
-      await page.waitForFunction((title) => !document.body.innerText.includes(title), { timeout: 10000 }, 'Import products')
-      await clickByText(page, '[data-onboarding] button', 'Skip', { pause: 300 })
-      await stepShown(page, 'done')
       assert.ok((await text(page)).includes(`${STORE_NAME} is ready`))
 
       await clickByText(page, '[data-onboarding] button', 'Go to Home', { pause: 300 })
@@ -171,8 +144,10 @@ describe('onboarding', () => {
       assert.equal(settings.store_name, STORE_NAME)
       assert.equal(settings.store_category, 'Fashion')
       assert.equal(Boolean(settings.onboarding_completed), true)
-      const record = await adminGet(page, 'onboarding.get_onboarding')
-      assert.equal(record.allow_guest_checkout, guestCheckout)
+      if (original.isNewStore) {
+        assert.equal(Boolean(settings.cod_enabled), true, 'a new store takes cash on delivery')
+        assert.equal(Boolean(settings.allow_guest_checkout), true, 'a new store lets guests check out')
+      }
       assert.equal((await adminGet(page, 'theme.get_editor_data')).active_theme, original.theme, 'onboarding leaves the theme alone')
 
       await goto(page, '/')

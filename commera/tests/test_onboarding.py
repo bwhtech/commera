@@ -242,7 +242,6 @@ class OnboardingAccessTestCase(IntegrationTestCase):
 			lambda: onboarding_api.save_profile("Zz Name"),
 			lambda: onboarding_api.start_store_setup(**STORE),
 			lambda: onboarding_api.save_brand(brand_logo=""),
-			lambda: onboarding_api.save_selling(1, 1),
 		)
 		for call in calls:
 			with self.subTest(call=call), self.assertRaises(frappe.PermissionError):
@@ -328,11 +327,8 @@ class OnboardingAccessTestCase(IntegrationTestCase):
 		)
 		self.assertTrue(onboarding.has_password(self.owner))
 
-	def test_save_selling_and_brand(self):
+	def test_save_brand(self):
 		frappe.set_user(self.owner)
-		self.assertEqual(
-			onboarding_api.save_selling(0, 1), {"cod_enabled": False, "allow_guest_checkout": True}
-		)
 		self.assertEqual(
 			onboarding_api.save_brand(brand_logo="/files/brand.png"), {"brand_logo": "/files/brand.png"}
 		)

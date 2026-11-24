@@ -109,12 +109,6 @@ export async function saveBrand({ brandLogo }) {
   return Boolean(await write('save_brand', { brand_logo: brandLogo }))
 }
 
-export async function saveSelling({ codEnabled, allowGuestCheckout }) {
-  return Boolean(
-    await write('save_selling', { cod_enabled: codEnabled ? 1 : 0, allow_guest_checkout: allowGuestCheckout ? 1 : 0 }),
-  )
-}
-
 export async function completeOnboarding() {
   return Boolean(await write('complete_onboarding'))
 }
