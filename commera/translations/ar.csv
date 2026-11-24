@@ -2459,3 +2459,14 @@ Create and publish,الإنشاء والنشر
 1 product needs a photo before it can go live.,منتج واحد يحتاج إلى صورة قبل نشره.
 1 product is ready as a draft,منتج واحد جاهز كمسودة
 1 product is live,منتج واحد منشور الآن
+Adding the products to your cart,جارٍ إضافة المنتجات إلى سلتك
+Some products in this link were changed,تغيّرت بعض المنتجات في هذا الرابط
+This cart link has nothing to add,لا يحتوي رابط السلة هذا على شيء لإضافته
+Go to your cart,انتقل إلى سلتك
+We could not add these products,لم نتمكن من إضافة هذه المنتجات
+{0} was skipped: the quantity must be a whole number above zero.,تم تخطي {0}: يجب أن تكون الكمية عددًا صحيحًا أكبر من صفر.
+{0} more products were skipped: a cart link holds at most {1} products.,تم تخطي {0} منتجات أخرى: يتسع رابط السلة لـ{1} منتجًا على الأكثر.
+{0} is not available.,{0} غير متوفر.
+{0} is out of stock.,{0} غير متوفر في المخزون.
+"Only {0} of {1} are in stock, so the quantity was lowered.",يتوفر {0} فقط من {1} في المخزون، لذا خُفّضت الكمية.
+{0} is not available in this market.,{0} غير متوفر في هذه السوق.
