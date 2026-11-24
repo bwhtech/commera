@@ -25,9 +25,8 @@ import { __ } from '../data/translation'
 
 const STATUS_TABS = [
   { label: __('All'), value: 'all' },
-  { label: __('Active'), value: 'active' },
-  { label: __('Draft'), value: 'draft' },
-  { label: __('Archived'), value: 'archived' },
+  { label: __('Published'), value: 'published' },
+  { label: __('Unpublished'), value: 'unpublished' },
 ]
 
 const status = ref('all')
@@ -54,15 +53,11 @@ const collectionFilterOptions = computed(() => [
   ...collectionPickerOptions.value,
 ])
 
-const disabledFilter = computed(() => {
-  if (status.value === 'active' || status.value === 'draft') return 0
-  if (status.value === 'archived') return 1
-  return undefined
-})
+const disabledFilter = computed(() => (status.value === 'all' ? undefined : 0))
 
 const publishedFilter = computed(() => {
-  if (status.value === 'active') return 1
-  if (status.value === 'draft') return 0
+  if (status.value === 'published') return 1
+  if (status.value === 'unpublished') return 0
   return undefined
 })
 
@@ -268,7 +263,7 @@ function collectionSummary(product) {
               </div>
             </div>
           </ListCell>
-          <ListCell><StatusBadge :status="item.disabled ? 'archived' : item.published_count ? 'active' : 'draft'" /></ListCell>
+          <ListCell><StatusBadge :status="item.disabled ? 'archived' : item.published_count ? 'published' : 'unpublished'" /></ListCell>
           <ListCell>
             <span class="truncate text-base text-ink-gray-7" :title="item.collections?.join(', ')">
               {{ collectionSummary(item) }}

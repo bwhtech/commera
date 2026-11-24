@@ -46,7 +46,7 @@ watch(
       title: data.title,
       description: data.description,
       collections: data.collections,
-      status: data.disabled ? 'archived' : data.variants.some((variant) => variant.is_published) ? 'active' : 'draft',
+      status: data.disabled ? 'archived' : data.variants.some((variant) => variant.is_published) ? 'published' : 'unpublished',
       restock_level: data.restock_level,
       sku: data.name,
       updated: data.updated,

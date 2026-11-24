@@ -162,11 +162,11 @@ class TestProductStatusFilter(DeleteProductTestCase):
 	def setUp(self):
 		super().setUp()
 		self.published_product = self.add_product()
-		self.draft_product = self.add_product()
+		self.unpublished_product = self.add_product()
 		self.archived_product = self.add_product()
 		for item_template, is_published in (
 			(self.published_product, 1),
-			(self.draft_product, 0),
+			(self.unpublished_product, 0),
 			(self.archived_product, 0),
 		):
 			for variant_name in get_product_chain(item_template)["variants"]:
@@ -177,18 +177,21 @@ class TestProductStatusFilter(DeleteProductTestCase):
 		listed = get_products(collection=self.item_group, **filters)
 		return {product["name"] for product in listed["products"]}, listed["total"]
 
-	def test_a_product_with_no_published_option_is_a_draft(self):
+	def test_a_product_with_no_published_option_is_unpublished(self):
 		self.assertEqual(
-			self.list_products(disabled=0, published=0), ({self.draft_product, self.item_template}, 2)
+			self.list_products(disabled=0, published=0), ({self.unpublished_product, self.item_template}, 2)
 		)
 
-	def test_a_product_with_a_published_option_is_active(self):
+	def test_a_product_with_a_published_option_is_published(self):
 		self.assertEqual(self.list_products(disabled=0, published=1), ({self.published_product}, 1))
 
 	def test_no_published_filter_lists_every_product(self):
 		self.assertEqual(
 			self.list_products(),
-			({self.published_product, self.draft_product, self.archived_product, self.item_template}, 4),
+			(
+				{self.published_product, self.unpublished_product, self.archived_product, self.item_template},
+				4,
+			),
 		)
 		self.assertEqual(self.list_products(disabled=1), ({self.archived_product}, 1))
 
