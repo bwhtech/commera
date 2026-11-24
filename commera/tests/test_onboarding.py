@@ -227,7 +227,7 @@ class OnboardingAccessTestCase(IntegrationTestCase):
 			onboarding_api.complete_onboarding,
 			lambda: onboarding_api.save_profile("Zz Name"),
 			lambda: onboarding_api.start_store_setup(**STORE),
-			lambda: onboarding_api.save_brand(primary_color="#000000"),
+			lambda: onboarding_api.save_brand(brand_logo=""),
 			lambda: onboarding_api.save_selling(1, 1),
 		)
 		for call in calls:
@@ -319,9 +319,9 @@ class OnboardingAccessTestCase(IntegrationTestCase):
 		self.assertEqual(
 			onboarding_api.save_selling(0, 1), {"cod_enabled": False, "allow_guest_checkout": True}
 		)
-		self.assertEqual(onboarding_api.save_brand(primary_color="#1d4ed8")["primary_color"], "#1d4ed8")
-		with self.assertRaises(frappe.ValidationError):
-			onboarding_api.save_brand(primary_color="red; background: url(x)")
+		self.assertEqual(
+			onboarding_api.save_brand(brand_logo="/files/brand.png"), {"brand_logo": "/files/brand.png"}
+		)
 
 
 class InstallOnSiteInUseTestCase(IntegrationTestCase):

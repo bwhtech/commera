@@ -52,15 +52,6 @@ async function pressContinue(page, nextKey) {
   await wait(400)
 }
 
-// The first switch, swatch or theme that is not already the stored choice, so the step really writes.
-async function clickUnpressed(page, selector) {
-  const handle = await page.$(`${selector}[aria-pressed="false"]`)
-  if (!handle) throw new Error(`nothing unpicked matches ${selector}`)
-  await handle.click()
-  await wait(400)
-  return handle
-}
-
 async function pickFromCombobox(page, placeholder, value) {
   await clickByText(page, '[data-onboarding-step="store"] button', placeholder)
   await page.keyboard.type(value, { delay: 20 })
@@ -83,7 +74,6 @@ describe('onboarding', () => {
       storeName: settings.store_name || '',
       storeCategory: settings.store_category || '',
       brandLogo: record.brand_logo || '',
-      primaryColor: record.primary_color || '',
       codEnabled: record.cod_enabled,
       allowGuestCheckout: record.allow_guest_checkout,
       theme: activeTheme,
@@ -93,12 +83,11 @@ describe('onboarding', () => {
   })
 
   onCleanup(session, async ({ page }) => {
-    await adminPost(page, 'onboarding.save_brand', { brand_logo: original.brandLogo, primary_color: original.primaryColor })
+    await adminPost(page, 'onboarding.save_brand', { brand_logo: original.brandLogo })
     await adminPost(page, 'onboarding.save_selling', {
       cod_enabled: original.codEnabled ? 1 : 0,
       allow_guest_checkout: original.allowGuestCheckout ? 1 : 0,
     })
-    if (original.theme) await adminPost(page, 'theme.activate_theme', { theme: original.theme })
     await writeSettings(page, {
       store_name: original.storeName,
       store_category: original.storeCategory,
@@ -141,17 +130,6 @@ describe('onboarding', () => {
       assert.equal(await page.$eval('[data-onboarding-step="store"] input', (input) => input.value), STORE_NAME)
       await pressContinue(page, 'brand')
 
-      // An owner does not wait for the store setup: brand, theme and selling save while it still runs,
-      // which is what a setup job holding a stale copy of Commera Settings would trip over.
-      await clickUnpressed(page, '[data-onboarding-colour]')
-      const pickedColour = await page.$eval('[data-onboarding-colour][aria-pressed="true"]', (button) =>
-        button.getAttribute('aria-label').replace('Use ', ''),
-      )
-      await pressContinue(page, 'theme')
-
-      await page.waitForSelector('[data-onboarding-theme]', { timeout: 20000 })
-      const themeButton = await clickUnpressed(page, '[data-onboarding-theme]').catch(() => page.$('[data-onboarding-theme]'))
-      const pickedTheme = await themeButton.evaluate((button) => button.dataset.onboardingTheme)
       await pressContinue(page, 'selling')
 
       const guestSwitch = (await page.$$('[data-onboarding-step="selling"] [role="switch"]'))[1]
@@ -194,9 +172,8 @@ describe('onboarding', () => {
       assert.equal(settings.store_category, 'Fashion')
       assert.equal(Boolean(settings.onboarding_completed), true)
       const record = await adminGet(page, 'onboarding.get_onboarding')
-      assert.equal(record.primary_color, pickedColour)
       assert.equal(record.allow_guest_checkout, guestCheckout)
-      assert.equal((await adminGet(page, 'theme.get_editor_data')).active_theme, pickedTheme)
+      assert.equal((await adminGet(page, 'theme.get_editor_data')).active_theme, original.theme, 'onboarding leaves the theme alone')
 
       await goto(page, '/')
       assert.equal(await page.$('[data-onboarding]'), null, 'a reload opens the dashboard, not onboarding')

@@ -5,6 +5,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from commera.api.admin.pages import PAGE_DOCTYPE, get_page_url
+from commera.api.admin.theme import activate_theme
 from commera.commera_ecommerce.doctype.commera_settings.footer.footer_preview import (
 	STATIC_STOREFRONT_ROUTES,
 	add_footer_link,
@@ -27,6 +28,11 @@ class TestFooterEditor(IntegrationTestCase):
 	# itself or the next hits a duplicate Footer Section Config (autoname is field:section_title).
 	SECTION_TITLES = ("Help", "About", "Contact", "Support")
 	WEB_PAGE_ROUTES = ("footer-editor-test-page", "footer-editor-draft-page")
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		activate_theme("Summer Theme")
 
 	def setUp(self):
 		self.remove_test_documents()

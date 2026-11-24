@@ -21,7 +21,7 @@ from commera.install_fashion_demo_data import (
 	install_fashion_demo_data,
 )
 from commera.install_summer_theme_data import HERO_SLIDES, PRODUCTS_URL, install_summer_theme_data
-from commera.migrate import activate_summer_theme
+from commera.migrate import set_live_theme
 
 DEMO_SIZES = DEFAULT_SIZES
 SALE_PRICE_LIST = "Sale Price List"
@@ -136,7 +136,7 @@ def install_summer_demo():
 	configure_commera_settings()
 	apply_store_copy(profile)
 
-	activate_summer_theme()
+	set_live_theme("Summer Theme")
 	install_fashion_demo_data()
 	apply_catalogue_prices(profile)
 	install_summer_theme_data()

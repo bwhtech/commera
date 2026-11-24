@@ -109,8 +109,8 @@ export async function createSalePriceList({ storeName, company }) {
   return write('create_sale_price_list', { store_name: storeName.trim(), company })
 }
 
-export async function saveBrand({ brandLogo, primaryColor }) {
-  return Boolean(await write('save_brand', { brand_logo: brandLogo, primary_color: primaryColor }))
+export async function saveBrand({ brandLogo }) {
+  return Boolean(await write('save_brand', { brand_logo: brandLogo }))
 }
 
 export async function saveSelling({ codEnabled, allowGuestCheckout }) {

@@ -6,7 +6,6 @@ export const STEPS = [
   { key: 'you', title: __('Welcome') },
   { key: 'store', title: __('Your store') },
   { key: 'brand', title: __('Your brand'), focus: 'brand', optional: true },
-  { key: 'theme', title: __('Pick a look'), focus: 'theme' },
   { key: 'selling', title: __('Selling'), focus: 'selling' },
   { key: 'products', title: __('Products'), focus: 'products', optional: true },
   { key: 'done', title: '' },
@@ -18,10 +17,17 @@ export function clampStep(index) {
   return Math.min(STEPS.length - 1, Math.max(0, Number.isInteger(index) ? index : 0))
 }
 
+const LEGACY_STEP_KEYS = ['you', 'store', 'brand', 'theme', 'selling', 'products', 'done']
+
+function savedStepIndex(saved) {
+  const key = /^\d+$/.test(String(saved ?? '')) ? LEGACY_STEP_KEYS[Number(saved)] : saved
+  return STEP_INDEX[key === 'theme' ? 'selling' : key] ?? 0
+}
+
 // The step a reload resumes at. Every step after the store needs the store setup to have been
 // started; a setup that never started (or a cache that forgot it) sends the owner back to start it.
-export function resumeStep(savedIndex, setupStatus) {
-  const index = clampStep(savedIndex)
+export function resumeStep(saved, setupStatus) {
+  const index = savedStepIndex(saved)
   if (index > STEP_INDEX.store && setupStatus === 'idle') return STEP_INDEX.store
   return index
 }

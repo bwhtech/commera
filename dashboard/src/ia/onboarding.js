@@ -12,16 +12,16 @@ export const onboardingOpen = ref(isAdmin && bootValue('onboarding_pending', fal
 
 export function readSavedStep() {
   try {
-    return clampStep(Number(localStorage.getItem(STEP_KEY)))
+    return localStorage.getItem(STEP_KEY)
   } catch {
     // Private mode: starting over at the first step is harmless, every field is prefilled.
-    return 0
+    return null
   }
 }
 
 function writeSavedStep(index) {
   try {
-    if (index) localStorage.setItem(STEP_KEY, String(index))
+    if (index) localStorage.setItem(STEP_KEY, STEPS[index].key)
     else localStorage.removeItem(STEP_KEY)
   } catch {
     /* private mode */
@@ -74,8 +74,6 @@ export const draft = reactive({
   salePriceList: '',
   warehouse: '',
   brandLogo: '',
-  primaryColor: '',
-  theme: '',
   codEnabled: true,
   allowGuestCheckout: true,
 })
@@ -97,7 +95,6 @@ export function adoptRecord(record) {
     salePriceList: store?.sale_price_list || store?.price_list || '',
     warehouse: store?.warehouse || '',
     brandLogo: record.brand_logo || '',
-    primaryColor: record.primary_color || '',
     codEnabled: Boolean(record.cod_enabled),
     allowGuestCheckout: Boolean(record.allow_guest_checkout),
   })
@@ -121,9 +118,6 @@ export const SAMPLE_PRODUCTS = {
   Electronics: ['lucide-headphones', 'lucide-battery-charging', 'lucide-speaker', 'lucide-usb'],
   Other: ['lucide-star', 'lucide-gift', 'lucide-package', 'lucide-award'],
 }
-
-// The owner's choice of brand colour, so these are data, not app styling. Neutral on purpose.
-export const BRAND_COLOURS = ['#141414', '#2b4fc4', '#2f6b4f', '#6e2a3a', '#5b45c9', '#6b6b66']
 
 // The preview is a sketch of a storefront, not a render of one: each look is a set of tokens, so
 // it holds in dark mode and needs no colour of its own. `dark` scopes frappe-ui's dark tokens to
