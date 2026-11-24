@@ -538,6 +538,40 @@ class ExistingStorePicksTestCase(IntegrationTestCase):
 
 		self.assertIsNone(onboarding_api.get_onboarding()["existing_store"])
 
+	def test_a_time_zone_names_its_country(self):
+		self.assertEqual(onboarding.get_country_for_time_zone("Asia/Kolkata"), "India")
+		self.assertEqual(onboarding.get_country_for_time_zone("Asia/Calcutta"), "India")
+		self.assertEqual(onboarding.get_country_for_time_zone("Europe/London"), "United Kingdom")
+		self.assertEqual(onboarding.get_country_for_time_zone("America/Denver"), "United States")
+		self.assertIsNone(onboarding.get_country_for_time_zone("UTC"))
+		self.assertIsNone(onboarding.get_country_for_time_zone("Mars/Olympus"))
+		self.assertIsNone(onboarding.get_country_for_time_zone(None))
+
+	def test_a_new_store_starts_in_the_browser_country(self):
+		idle = {"status": "idle", "error": None}
+		with (
+			patch("frappe.is_setup_complete", return_value=False),
+			patch("commera.onboarding.get_setup_status", return_value=idle),
+		):
+			data = onboarding_api.get_onboarding(time_zone="Europe/London")
+			unknown = onboarding_api.get_onboarding(time_zone="Mars/Olympus")
+
+		self.assertEqual(
+			(data["country"], data["currency"], data["time_zone"]), ("United Kingdom", "GBP", "Europe/London")
+		)
+		self.assertEqual(
+			data["fiscal_year_start_month"], onboarding.get_fiscal_year_start_month("United Kingdom")
+		)
+		system_settings = frappe.get_single("System Settings")
+		self.assertEqual(
+			(unknown["country"], unknown["currency"], unknown["time_zone"]),
+			(system_settings.country, system_settings.currency, system_settings.time_zone),
+		)
+
+	def test_a_store_already_set_up_keeps_its_country(self):
+		data = onboarding_api.get_onboarding(time_zone="Europe/London")
+		self.assertEqual(data["country"], frappe.db.get_single_value("System Settings", "country"))
+
 	def test_a_fresh_site_has_no_existing_store(self):
 		with patch("frappe.is_setup_complete", return_value=False):
 			data = onboarding_api.get_onboarding()

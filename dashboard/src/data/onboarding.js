@@ -8,7 +8,10 @@ import { setupPollDelay } from '../ia/onboardingSteps'
 const { attempt } = createAdminCaller('onboarding.')
 
 // The reads are GET-only on the server, and createAdminCaller only POSTs.
-const onboardingRequest = useAdminRead('onboarding.get_onboarding', { immediate: false })
+const onboardingRequest = useAdminRead('onboarding.get_onboarding', {
+  immediate: false,
+  params: { time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+})
 // Quiet: a poll that misses one beat would otherwise toast every two seconds.
 const statusRequest = useAdminRead('onboarding.get_setup_status', { immediate: false, quiet: true })
 // useCall's fetch() takes no arguments, so the country rides a params function.

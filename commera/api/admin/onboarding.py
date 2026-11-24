@@ -53,35 +53,48 @@ def is_existing_store() -> bool:
 
 
 @frappe.whitelist(methods=["GET"])
-def get_onboarding():
+def get_onboarding(time_zone: str | None = None):
 	"""Everything the onboarding screens prefill, defaulted from what Frappe Cloud stored at signup."""
 	frappe.only_for(ONBOARDING_ROLE)
 
 	system_settings = frappe.get_single("System Settings")
 	settings = frappe.get_single(SETTINGS_DOCTYPE)
 	user = frappe.get_cached_doc("User", frappe.session.user)
-	country = system_settings.country
 	existing_store = get_existing_store(settings) if is_existing_store() else None
 	company = existing_store and existing_store["company"]
+	setup = onboarding.get_setup_status()
+	country, currency, time_zone = get_store_locale(
+		system_settings, time_zone if not existing_store and setup["status"] == "idle" else None
+	)
 	return {
 		"full_name": user.full_name,
 		"email": user.email,
 		"needs_password": onboarding.needs_password_setup(),
 		"store_name": settings.store_name,
 		"country": country,
-		"currency": system_settings.currency,
-		"time_zone": system_settings.time_zone,
+		"currency": currency,
+		"time_zone": time_zone,
 		"chart_of_accounts": (company and frappe.get_cached_value("Company", company, "chart_of_accounts"))
 		or onboarding.DEFAULT_CHART_OF_ACCOUNTS,
 		"fiscal_year_start_month": onboarding.get_fiscal_year_start_month(country),
 		"company_abbr": (company and frappe.get_cached_value("Company", company, "abbr"))
 		or get_suggested_abbr(settings),
 		"is_frappe_setup_complete": frappe.is_setup_complete(),
-		"setup": onboarding.get_setup_status(),
+		"setup": setup,
 		"brand_logo": read_branding_fields()["brand_logo"],
 		"options": get_options(country),
 		"existing_store": existing_store,
 	}
+
+
+def get_store_locale(system_settings, browser_time_zone: str | None) -> tuple:
+	country = onboarding.get_country_for_time_zone(browser_time_zone)
+	if not country:
+		return system_settings.country, system_settings.currency, system_settings.time_zone
+	from frappe.geo.country_info import get_country_info
+
+	currency = get_country_info(country).get("currency") or system_settings.currency
+	return country, currency, onboarding.get_canonical_time_zone(browser_time_zone)
 
 
 @frappe.whitelist(methods=["GET"])

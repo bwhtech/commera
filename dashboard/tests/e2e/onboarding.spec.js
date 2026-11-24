@@ -108,10 +108,10 @@ describe('onboarding', () => {
       const storeName = await page.$('[data-onboarding-step="store"] input[autocomplete="organization"]')
       await storeName.click({ clickCount: 3 })
       await storeName.type(STORE_NAME, { delay: 10 })
-      if (!original.country) await pickFromCombobox(page, 'Search countries', 'India')
 
       await page.click('[data-onboarding-accounting]')
       await wait(500)
+      if (!original.country) await pickFromCombobox(page, 'Search countries', 'India')
       assert.equal(await page.$eval('[data-onboarding-accounting]', (button) => button.getAttribute('aria-expanded')), 'true')
       assert.ok((await text(page)).includes('Chart of accounts'), 'the accounting line opens onto the chart of accounts')
       assert.ok(await page.$('[data-onboarding-step="store"] [data-onboarding-logo-input]'), 'the logo upload sits on the store step')

@@ -1,6 +1,7 @@
 from urllib.parse import urlencode
 
 import frappe
+from babel.core import get_global
 from frappe import _
 from frappe.apps import DESK_APP_PATTERN
 from frappe.core.doctype.installed_applications.installed_applications import (
@@ -74,6 +75,17 @@ def get_setup_pending_message_url() -> str:
 
 def get_fiscal_year_start_month(country: str | None) -> int:
 	return FISCAL_YEAR_START_MONTHS.get(country, 1)
+
+
+def get_canonical_time_zone(time_zone: str | None) -> str | None:
+	return get_global("zone_aliases").get(time_zone, time_zone)
+
+
+def get_country_for_time_zone(time_zone: str | None) -> str | None:
+	territory = get_global("zone_territories").get(get_canonical_time_zone(time_zone))
+	if not territory or territory == "001":
+		return None
+	return frappe.db.get_value("Country", {"code": territory.lower()})
 
 
 def get_fiscal_year_dates(start_month: int, today=None) -> tuple[str, str]:

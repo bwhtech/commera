@@ -40,12 +40,15 @@ function chartLabel(chart) {
 }
 
 const accountingSummary = computed(() =>
-  [draft.currency, draft.timeZone, chartLabel(draft.chartOfAccounts)].filter(Boolean).join(' · '),
+  [draft.country || __('Choose a country'), draft.currency, draft.timeZone, chartLabel(draft.chartOfAccounts)]
+    .filter(Boolean)
+    .join(' · '),
 )
 
 const existingStore = computed(() => props.record.existing_store)
 const picks = computed(() => storePicks(existingStore.value, draft.company))
 const missing = computed(() => (flow.showErrors ? missingField('store', draft, { picks: picks.value }) : ''))
+const isAccountingOpen = computed(() => showAccounting.value || missing.value === 'country')
 
 const company = computed(() => existingStore.value?.companies.find((row) => row.name === draft.company))
 const companySummary = computed(() =>
@@ -153,27 +156,19 @@ watch(
     </template>
 
     <template v-else>
-      <Combobox
-        v-model="draft.country"
-        trigger="button"
-        :label="__('Country')"
-        :placeholder="__('Search countries')"
-        :options="toOptions(options.countries)"
-        :disabled="isLocked"
-      />
-
       <div>
         <button
           type="button"
-          class="flex items-center gap-1 text-sm text-ink-gray-5 transition-colors hover:text-ink-gray-7"
-          :aria-expanded="showAccounting"
+          class="flex items-center gap-1 text-sm transition-colors"
+          :class="missing === 'country' ? 'text-ink-red-6' : 'text-ink-gray-5 hover:text-ink-gray-7'"
+          :aria-expanded="isAccountingOpen"
           data-onboarding-accounting
           @click="showAccounting = !showAccounting"
         >
           {{ accountingSummary }}
           <span
             class="lucide-chevron-down size-3.5 transition-transform duration-300 ease-in-out-strong"
-            :class="{ 'rotate-180': showAccounting }"
+            :class="{ 'rotate-180': isAccountingOpen }"
             aria-hidden="true"
           />
         </button>
@@ -181,11 +176,20 @@ watch(
              closed fields out of the tab order. -->
         <div
           class="grid transition-[grid-template-rows,opacity] duration-300 ease-out-strong"
-          :class="showAccounting ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'"
-          :inert="!showAccounting"
+          :class="isAccountingOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'"
+          :inert="!isAccountingOpen"
         >
           <div class="overflow-hidden">
             <div class="grid grid-cols-2 gap-3 pt-3">
+              <Combobox
+                v-model="draft.country"
+                trigger="button"
+                class="col-span-2"
+                :label="__('Country')"
+                :placeholder="__('Search countries')"
+                :options="toOptions(options.countries)"
+                :disabled="isLocked"
+              />
               <Combobox
                 v-model="draft.currency"
                 trigger="button"
