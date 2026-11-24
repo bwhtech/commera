@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { Button, Switch, TextInput, dialog, toast } from 'frappe-ui'
+import { Button, Switch, dialog, toast } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
@@ -164,12 +164,7 @@ function adjust() {
               {{ availableStock(item) }}
             </span>
           </ListCell>
-          <ListCell>
-            <!-- Read-only: this is the real on-hand number, and commera has no "set to X" write
-                 for it — the only write here is the additive receive above (same convention as
-                 ProductStock.vue's on-hand column). -->
-            <TextInput :model-value="String(item.stock)" size="sm" class="w-16" disabled />
-          </ListCell>
+          <ListCell><span class="text-base text-ink-gray-8 tabular-nums">{{ item.stock }}</span></ListCell>
         </ListRow>
       </ListRows>
     </List>
