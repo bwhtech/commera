@@ -67,7 +67,7 @@ async function remove(fileUrl) {
     <input ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="onFilePicked" />
     <button
       v-if="!variant.images.length"
-      class="flex min-h-20 w-full items-center justify-center gap-3 rounded-4 border border-dashed border-outline-gray-2 px-4 py-3 text-start hover:bg-surface-gray-1"
+      class="flex min-h-20 w-full flex-col items-center justify-center gap-2 rounded-4 border border-dashed border-outline-gray-2 px-4 py-4 text-center hover:bg-surface-gray-1"
       :disabled="isUploading"
       @click="fileInput.click()"
       @dragover.prevent
@@ -100,7 +100,7 @@ async function remove(fileUrl) {
         <!-- Touch has no hover, so the only way to delete a photo has to be
              visible from the start on a phone; hover-reveal is a desktop luxury. -->
         <Button
-          class="absolute end-1 top-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+          class="absolute end-1 top-1 !size-6 !rounded-full !bg-black-overlay-500 !text-white opacity-100 backdrop-blur-sm transition-opacity hover:!bg-black-overlay-700 sm:opacity-0 sm:group-hover:opacity-100"
           icon="lucide-x"
           :label="__('Remove photo')"
           @click="remove(image)"
