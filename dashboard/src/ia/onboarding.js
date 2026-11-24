@@ -59,7 +59,6 @@ export const draft = reactive({
   fullName: '',
   password: '',
   storeName: '',
-  storeCategory: '',
   country: '',
   currency: '',
   timeZone: '',
@@ -79,7 +78,6 @@ export function adoptRecord(record) {
   Object.assign(draft, {
     fullName: record.full_name || '',
     storeName: record.store_name || '',
-    storeCategory: record.store_category || '',
     country: record.country || '',
     currency: record.currency || '',
     timeZone: record.time_zone || '',
@@ -92,16 +90,6 @@ export function adoptRecord(record) {
   })
 }
 
-export const CATEGORIES = [
-  { value: 'Fashion', label: __('Fashion'), icon: 'lucide-shirt', hero: __('Wear it well.') },
-  { value: 'Beauty', label: __('Beauty'), icon: 'lucide-sparkles', hero: __('Glow, every day.') },
-  { value: 'Home', label: __('Home'), icon: 'lucide-sofa', hero: __('Make it home.') },
-  { value: 'Food', label: __('Food'), icon: 'lucide-coffee', hero: __('Small batch.') },
-  { value: 'Electronics', label: __('Electronics'), icon: 'lucide-headphones', hero: __('Sound, simplified.') },
-  { value: 'Other', label: __('Other'), icon: 'lucide-package', hero: __('Made with care.') },
-]
-
-// Stand-ins the preview shows faded until the owner has products of their own.
 export const SAMPLE_PRODUCTS = {
   Fashion: ['lucide-shirt', 'lucide-shopping-bag', 'lucide-footprints', 'lucide-glasses'],
   Beauty: ['lucide-droplet', 'lucide-sparkles', 'lucide-heart', 'lucide-leaf'],

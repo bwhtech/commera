@@ -12,7 +12,7 @@ import {
   toOptions,
 } from '../../src/ia/onboardingSteps.js'
 
-const filled = { fullName: 'Aisha Khan', password: '', storeName: 'Indigo Loom', storeCategory: 'Fashion' }
+const filled = { fullName: 'Aisha Khan', password: '', storeName: 'Indigo Loom' }
 
 test('abbreviate matches frappe.utils.get_abbr with a five-letter cap', () => {
   assert.equal(abbreviate('Indigo Loom'), 'IL')
@@ -27,7 +27,7 @@ test('missingField names the first empty required field of a step', () => {
   assert.equal(missingField('you', filled, { needsPassword: true }), 'password')
   assert.equal(missingField('you', { ...filled, password: 'secret' }, { needsPassword: true }), '')
   assert.equal(missingField('store', { ...filled, storeName: '' }), 'storeName')
-  assert.equal(missingField('store', { ...filled, storeCategory: '' }), 'storeCategory')
+  assert.equal(missingField('store', filled), '')
   assert.equal(missingField('done', { ...filled, storeName: '' }), '')
 })
 

@@ -36,7 +36,6 @@ export function missingField(stepKey, draft, { needsPassword = false, picks = NO
   if (stepKey === 'you' && !draft.fullName.trim()) return 'fullName'
   if (stepKey === 'you' && needsPassword && !draft.password) return 'password'
   if (stepKey === 'store' && !draft.storeName.trim()) return 'storeName'
-  if (stepKey === 'store' && !draft.storeCategory) return 'storeCategory'
   if (stepKey === 'store' && picks.companies.length && !draft.company) return 'company'
   if (stepKey === 'store' && picks.priceLists.length && !picks.priceLists.includes(draft.priceList)) return 'priceList'
   return ''

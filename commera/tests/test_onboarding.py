@@ -16,7 +16,6 @@ from commera.www.commera import get_boot
 SETTINGS = "Commera Settings"
 STORE = {
 	"store_name": "Zz Onboarding Store",
-	"store_category": "Home",
 	"country": "India",
 	"currency": "INR",
 	"time_zone": "Asia/Kolkata",
@@ -137,7 +136,6 @@ class StartStoreSetupTestCase(IntegrationTestCase):
 		enqueue.assert_not_called()
 		self.assertEqual(frappe.db.count("Company"), companies)
 		self.assertEqual(frappe.db.get_single_value(SETTINGS, "store_name"), STORE["store_name"])
-		self.assertEqual(frappe.db.get_single_value(SETTINGS, "store_category"), STORE["store_category"])
 
 	def test_fresh_site_queues_the_job_once(self):
 		with (
@@ -525,7 +523,6 @@ class ExistingStorePicksTestCase(IntegrationTestCase):
 		self.assertEqual(store["company"], TEST_COMPANY)
 		self.assertIn(TEST_COMPANY, [company.name for company in store["companies"]])
 		self.assertIn("Standard Selling", [price_list.name for price_list in store["price_lists"]])
-		self.assertIsInstance(store["importable_count"], int)
 
 	def test_the_store_sale_list_is_never_offered_as_its_price_list(self):
 		frappe.db.set_single_value(

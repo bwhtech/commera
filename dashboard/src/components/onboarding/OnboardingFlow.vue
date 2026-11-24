@@ -106,7 +106,6 @@ function storeSetupValues() {
   if (draft.existingStore) {
     return {
       store_name: draft.storeName.trim(),
-      store_category: draft.storeCategory,
       country: draft.country,
       currency: draft.currency,
       time_zone: draft.timeZone,
@@ -116,7 +115,6 @@ function storeSetupValues() {
   }
   return {
     store_name: draft.storeName.trim(),
-    store_category: draft.storeCategory,
     country: draft.country,
     currency: draft.currency,
     time_zone: draft.timeZone,

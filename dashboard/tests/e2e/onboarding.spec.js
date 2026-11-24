@@ -72,7 +72,6 @@ describe('onboarding', () => {
     Object.assign(original, {
       onboardingCompleted: settings.onboarding_completed ? 1 : 0,
       storeName: settings.store_name || '',
-      storeCategory: settings.store_category || '',
       brandLogo: record.brand_logo || '',
       isNewStore: record.setup?.status !== 'done',
       theme: activeTheme,
@@ -85,7 +84,6 @@ describe('onboarding', () => {
     await adminPost(page, 'onboarding.save_brand', { brand_logo: original.brandLogo })
     await writeSettings(page, {
       store_name: original.storeName,
-      store_category: original.storeCategory,
       onboarding_completed: original.onboardingCompleted,
     })
   })
@@ -107,10 +105,9 @@ describe('onboarding', () => {
       if (!(await fullName.evaluate((input) => input.value.trim()))) await fullName.type('E2E Owner', { delay: 10 })
       await pressContinue(page, 'store')
 
-      const storeName = await page.$('[data-onboarding-step="store"] input')
+      const storeName = await page.$('[data-onboarding-step="store"] input[autocomplete="organization"]')
       await storeName.click({ clickCount: 3 })
       await storeName.type(STORE_NAME, { delay: 10 })
-      await clickByText(page, '[data-onboarding-step="store"] button', 'Fashion')
       if (!original.country) await pickFromCombobox(page, 'Search countries', 'India')
 
       await page.click('[data-onboarding-accounting]')
@@ -123,7 +120,7 @@ describe('onboarding', () => {
       await clickByText(page, '[data-onboarding] button', 'Back', { pause: 300 })
       await stepShown(page, 'you')
       await pressContinue(page, 'store')
-      assert.equal(await page.$eval('[data-onboarding-step="store"] input', (input) => input.value), STORE_NAME)
+      assert.equal(await page.$eval('[data-onboarding-step="store"] input[autocomplete="organization"]', (input) => input.value), STORE_NAME)
       await pressContinue(page, 'done')
 
       await page.waitForSelector('[data-onboarding-setup="done"], [data-onboarding-setup="failed"]', { timeout: SETUP_TIMEOUT })
@@ -142,7 +139,6 @@ describe('onboarding', () => {
 
       const settings = await readSettings(page)
       assert.equal(settings.store_name, STORE_NAME)
-      assert.equal(settings.store_category, 'Fashion')
       assert.equal(Boolean(settings.onboarding_completed), true)
       if (original.isNewStore) {
         assert.equal(Boolean(settings.cod_enabled), true, 'a new store takes cash on delivery')

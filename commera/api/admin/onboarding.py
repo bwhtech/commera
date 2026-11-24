@@ -2,7 +2,6 @@ import frappe
 from erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts import get_charts_for_country
 from frappe import _
 from frappe.core.doctype.user.user import get_timezones
-from frappe.query_builder.functions import Count
 from frappe.utils.data import cint, cstr
 
 from commera import onboarding
@@ -44,34 +43,7 @@ def get_existing_store(settings) -> dict:
 		"price_list": settings.default_price_list
 		or frappe.db.get_single_value("Selling Settings", "selling_price_list"),
 		"has_webshop": "webshop" in frappe.get_installed_apps(),
-		"importable_count": get_importable_item_count(),
 	}
-
-
-def get_importable_item_count() -> int:
-	item = frappe.qb.DocType("Item")
-	configurator = frappe.qb.DocType("Style Attribute Configurator")
-	size_item = frappe.qb.DocType("Color Size Item")
-	wrapped_templates = (
-		frappe.qb.from_(configurator)
-		.select(configurator.item_template)
-		.where(configurator.item_template.isnotnull())
-	)
-	wrapped_items = (
-		frappe.qb.from_(size_item).select(size_item.item_code).where(size_item.item_code.isnotnull())
-	)
-	return (
-		frappe.qb.from_(item)
-		.select(Count(item.name))
-		.where(
-			(item.disabled == 0)
-			& (item.is_sales_item == 1)
-			& (item.variant_of.isnull() | (item.variant_of == ""))
-			& item.name.notin(wrapped_templates)
-			& item.name.notin(wrapped_items)
-		)
-		.run()[0][0]
-	)
 
 
 def is_existing_store() -> bool:
@@ -96,7 +68,6 @@ def get_onboarding():
 		"email": user.email,
 		"needs_password": onboarding.needs_password_setup(),
 		"store_name": settings.store_name,
-		"store_category": settings.store_category,
 		"country": country,
 		"currency": system_settings.currency,
 		"time_zone": system_settings.time_zone,
@@ -165,7 +136,6 @@ def validate_store_setup(store_name, country, currency, time_zone, chart_of_acco
 @frappe.whitelist(methods=["POST"])
 def start_store_setup(
 	store_name: str,
-	store_category: str,
 	country: str,
 	currency: str,
 	time_zone: str,
@@ -187,7 +157,7 @@ def start_store_setup(
 	if status["status"] == "done":
 		if not store_name:
 			frappe.throw(_("Store name is required"), frappe.MandatoryError)
-		save_store_basics(store_name, store_category)
+		save_store_basics(store_name)
 		onboarding.adopt_existing_company(store_name, company, price_list)
 		return status
 
@@ -198,18 +168,16 @@ def start_store_setup(
 	if company_abbr and frappe.db.exists("Company", {"abbr": company_abbr}):
 		frappe.throw(_("Abbreviation {0} is already used by another company").format(company_abbr))
 
-	save_store_basics(store_name, store_category)
+	save_store_basics(store_name)
 	args = onboarding.build_setup_args(
 		store_name, country, currency, time_zone, chart_of_accounts, start_month, company_abbr
 	)
 	return onboarding.queue_store_setup(args)
 
 
-def save_store_basics(store_name: str, store_category: str | None):
+def save_store_basics(store_name: str):
 	# set_single_value: the settings cannot save() until setup has made the company it requires.
-	frappe.db.set_single_value(
-		SETTINGS_DOCTYPE, {"store_name": store_name, "store_category": cstr(store_category).strip()}
-	)
+	frappe.db.set_single_value(SETTINGS_DOCTYPE, "store_name", store_name)
 
 
 @frappe.whitelist(methods=["GET"])

@@ -4,10 +4,9 @@
  * the real piece — name, hero, button, products.
  */
 import { computed } from 'vue'
-import { storeProducts } from '../../data/onboarding'
-import { priceRange } from '../../data/format'
-import { CATEGORIES, SAMPLE_PRODUCTS, draft } from '../../ia/onboarding'
+import { draft } from '../../ia/onboarding'
 import { STEP_INDEX } from '../../ia/onboardingSteps'
+import commeraLogo from '../../assets/commera.svg'
 
 const props = defineProps({
   focus: { type: String, default: '' },
@@ -30,8 +29,6 @@ const SIZES = {
     heroLine: 'text-5xl',
     button: 'px-5 py-2 text-sm',
     grid: '-mx-3 grid-cols-4 gap-4 p-3',
-    caption: 'text-xs',
-    tileIcon: 'size-7',
   },
   mobile: {
     frame: 'gap-3 px-3 pb-4 pt-1',
@@ -46,33 +43,13 @@ const SIZES = {
     heroLine: 'text-2xl',
     button: 'px-3.5 py-1 text-2xs',
     grid: 'grid-cols-2 gap-2',
-    caption: 'text-2xs',
-    tileIcon: 'size-5',
   },
 }
 
-// Listed rather than computed per index: Tailwind only generates class names it can read.
-const STAGGER = ['delay-0', 'delay-75', 'delay-150', 'delay-200']
-
 const size = computed(() => (props.mobile ? SIZES.mobile : SIZES.desktop))
-const category = computed(() => CATEGORIES.find((option) => option.value === draft.storeCategory))
 const storeName = computed(() => draft.storeName.trim())
 const isTyping = computed(() => props.stage === STEP_INDEX.store)
 const hasButton = computed(() => props.stage >= STEP_INDEX.store)
-
-const isSample = computed(() => !storeProducts.value.length)
-const products = computed(() => {
-  if (!isSample.value) {
-    return storeProducts.value.map((product) => ({
-      key: product.name,
-      title: product.title,
-      image: product.image,
-      price: product.price_from == null ? '' : priceRange(product.price_from, product.price_to),
-    }))
-  }
-  return (SAMPLE_PRODUCTS[draft.storeCategory] ?? []).map((icon) => ({ key: icon, icon }))
-})
-const showProducts = computed(() => (props.stage >= STEP_INDEX.done || !isSample.value) && products.value.length)
 
 // Ring width, not colour, is what changes: box-shadow interpolates between widths, so moving the
 // focus from one area to the next cross-fades instead of jumping.
@@ -89,12 +66,13 @@ const ring = (area) => (props.focus === area && !props.mobile ? 'ring-1 ring-ins
       :class="[size.header, ring('brand')]"
     >
       <Transition
+        mode="out-in"
         enter-active-class="transition-[opacity,transform] duration-500 ease-out-strong"
         enter-from-class="scale-90 opacity-0 motion-reduce:scale-100"
         leave-active-class="transition-opacity duration-150"
         leave-to-class="opacity-0"
       >
-        <img v-if="draft.brandLogo" :src="draft.brandLogo" alt="" class="w-auto object-contain" :class="size.logo" />
+        <img :key="draft.brandLogo" :src="draft.brandLogo || commeraLogo" alt="" class="w-auto object-contain" :class="size.logo" />
       </Transition>
       <span v-if="storeName" class="truncate" :class="[size.name, look.heading]">
         {{ storeName
@@ -124,14 +102,14 @@ const ring = (area) => (props.focus === area && !props.mobile ? 'ring-1 ring-ins
       leave-to-class="opacity-0"
     >
       <section
-        v-if="category"
+        v-if="storeName"
         key="hero"
         class="relative flex flex-1 overflow-hidden transition-[background-color,border-radius,box-shadow] duration-500 ease-out-strong"
         :class="[size.hero, look.hero, look.radius]"
       >
-        <span :class="[category.icon, size.heroIcon]" class="absolute opacity-5" aria-hidden="true" />
+        <span :class="size.heroIcon" class="lucide-shopping-bag absolute opacity-5" aria-hidden="true" />
         <h2 class="relative max-w-md font-medium leading-none tracking-tight" :class="[size.heroLine, look.heading]">
-          {{ category.hero }}
+          {{ __('Made with care.') }}
         </h2>
         <Transition
           enter-active-class="transition-[opacity,transform] duration-500 ease-out-strong"
@@ -154,50 +132,13 @@ const ring = (area) => (props.focus === area && !props.mobile ? 'ring-1 ring-ins
       />
     </Transition>
 
-    <section
-      class="grid shrink-0 rounded-4 transition-shadow duration-300 ease-out-strong"
-      :class="[size.grid, ring('products')]"
-    >
-      <template v-if="showProducts">
-        <TransitionGroup
-          appear
-          enter-active-class="transition-[opacity,transform] duration-500 ease-out-strong"
-          enter-from-class="translate-y-3 scale-[0.97] opacity-0 motion-reduce:translate-y-0 motion-reduce:scale-100"
-        >
-          <div
-            v-for="(product, position) in products.slice(0, 4)"
-            :key="product.key"
-            :class="[STAGGER[position], { 'opacity-50': isSample }]"
-          >
-            <div
-              class="flex aspect-[4/5] items-center justify-center overflow-hidden text-ink-gray-5"
-              :class="[look.tile, look.radius]"
-            >
-              <img v-if="product.image" :src="product.image" alt="" class="size-full object-cover" />
-              <span v-else :class="[product.icon || 'lucide-package', size.tileIcon]" class="opacity-60" aria-hidden="true" />
-            </div>
-            <div class="mt-1.5 flex items-baseline justify-between gap-2" :class="size.caption">
-              <span v-if="product.title" class="truncate">{{ product.title }}</span>
-              <span v-else class="h-1.5 w-3/5 rounded-full" :class="look.tile" />
-              <span v-if="product.price" class="shrink-0 tabular-nums text-ink-gray-5">{{ product.price }}</span>
-            </div>
-          </div>
-        </TransitionGroup>
-        <div
-          v-for="rest in Math.max(0, 4 - products.length)"
-          :key="`rest-${rest}`"
-          class="aspect-[4/5] border-2 border-dashed border-outline-gray-2"
-          :class="look.radius"
-        />
-      </template>
-      <template v-else>
-        <div
-          v-for="ghost in 4"
-          :key="`ghost-${ghost}`"
-          class="aspect-[4/5] border-2 border-dashed border-outline-gray-2"
-          :class="look.radius"
-        />
-      </template>
+    <section class="grid shrink-0" :class="size.grid">
+      <div
+        v-for="ghost in 4"
+        :key="`ghost-${ghost}`"
+        class="aspect-[4/5] border-2 border-dashed border-outline-gray-2"
+        :class="look.radius"
+      />
     </section>
   </div>
 </template>

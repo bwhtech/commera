@@ -2,10 +2,11 @@
 import { computed, ref, watch } from 'vue'
 import { Button, Combobox, FormControl, Select, Spinner, TextInput, toast, useFileUpload } from 'frappe-ui'
 import { getCountryDefaults, storeSetup } from '../../../data/onboarding'
-import { CATEGORIES, draft, flow } from '../../../ia/onboarding'
+import { draft, flow } from '../../../ia/onboarding'
 import { abbreviate, missingField, storePicks, toOptions } from '../../../ia/onboardingSteps'
 import { monthName } from '../../../data/format'
 import { __ } from '../../../data/translation'
+import commeraLogo from '../../../assets/commera.svg'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -26,8 +27,8 @@ const logoInput = ref(null)
 
 // Once setup has made the company, its country, currency and books are fixed.
 const isLocked = computed(() => storeSetup.status === 'running' || storeSetup.status === 'done')
-// start_store_setup leaves a running job alone and writes nothing, so a name or category changed
-// while it runs would be dropped without a word. Once it is done they save again.
+// start_store_setup leaves a running job alone and writes nothing, so a name changed while it
+// runs would be dropped without a word. Once it is done it saves again.
 const isRunning = computed(() => storeSetup.status === 'running')
 
 const options = computed(() => props.record.options ?? {})
@@ -98,38 +99,6 @@ watch(
 
 <template>
   <div class="space-y-5">
-    <FormControl
-      v-model="draft.storeName"
-      :label="__('Store name')"
-      autocomplete="organization"
-      :disabled="isRunning"
-      :description="isRunning ? __('You can change the name once setup finishes.') : ''"
-      :error="missing === 'storeName' ? __('Required') : ''"
-    />
-
-    <div>
-      <p class="mb-2 text-xs" :class="missing === 'storeCategory' ? 'text-ink-red-6' : 'text-ink-gray-6'">{{ __('You sell') }}</p>
-      <div class="grid grid-cols-3 gap-2">
-        <button
-          v-for="option in CATEGORIES"
-          :key="option.value"
-          type="button"
-          class="flex flex-col items-center gap-2 rounded-4 border px-2 py-3 text-sm transition-[background-color,border-color,color,transform] duration-150 ease-out-strong enabled:active:scale-[0.97] disabled:cursor-not-allowed"
-          :class="
-            draft.storeCategory === option.value
-              ? 'border-outline-gray-5 bg-surface-gray-2 text-ink-gray-9'
-              : 'border-outline-gray-2 text-ink-gray-6 hover:bg-surface-gray-1'
-          "
-          :aria-pressed="draft.storeCategory === option.value"
-          :disabled="isRunning"
-          @click="draft.storeCategory = option.value"
-        >
-          <span :class="option.icon" class="size-5" aria-hidden="true" />
-          <span class="truncate">{{ option.label }}</span>
-        </button>
-      </div>
-    </div>
-
     <div>
       <div class="mb-2 flex items-center justify-between text-xs">
         <p class="text-ink-gray-6">{{ __('Logo') }}</p>
@@ -145,12 +114,21 @@ watch(
         <Spinner v-if="isUploading" class="size-5" />
         <img v-else-if="draft.brandLogo" :src="draft.brandLogo" :alt="__('Your logo')" class="max-h-12 max-w-[60%] object-contain" />
         <template v-else>
-          <span class="lucide-image-plus size-5" aria-hidden="true" />
+          <img :src="commeraLogo" alt="" class="size-10 rounded-3" />
           <span class="text-sm">{{ __('Upload') }}</span>
         </template>
       </button>
       <Button v-if="draft.brandLogo" variant="ghost" size="sm" :label="__('Remove logo')" class="mt-1" @click="draft.brandLogo = ''" />
     </div>
+
+    <FormControl
+      v-model="draft.storeName"
+      :label="__('Store name')"
+      autocomplete="organization"
+      :disabled="isRunning"
+      :description="isRunning ? __('You can change the name once setup finishes.') : ''"
+      :error="missing === 'storeName' ? __('Required') : ''"
+    />
 
     <template v-if="existingStore">
       <Combobox

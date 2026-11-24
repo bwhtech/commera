@@ -11,11 +11,6 @@ const { attempt } = createAdminCaller('onboarding.')
 const onboardingRequest = useAdminRead('onboarding.get_onboarding', { immediate: false })
 // Quiet: a poll that misses one beat would otherwise toast every two seconds.
 const statusRequest = useAdminRead('onboarding.get_setup_status', { immediate: false, quiet: true })
-const productsRequest = useAdminRead('catalog.get_products', {
-  immediate: false,
-  quiet: true,
-  params: { page_length: 4 },
-})
 // useCall's fetch() takes no arguments, so the country rides a params function.
 const defaultsCountry = ref('')
 const countryDefaultsRequest = useAdminRead('onboarding.get_country_defaults', {
@@ -111,14 +106,6 @@ export async function saveBrand({ brandLogo }) {
 
 export async function completeOnboarding() {
   return Boolean(await write('complete_onboarding'))
-}
-
-// The first few products the owner made during onboarding, for the store preview.
-export const storeProducts = ref([])
-
-export async function loadStoreProducts() {
-  const data = await productsRequest.fetch()
-  if (data) storeProducts.value = (data.products ?? []).filter((product) => !product.disabled)
 }
 
 // `{ currency, timeZone, fiscalYearStartMonth, chartsOfAccounts }` for a country, or null on a refusal.
