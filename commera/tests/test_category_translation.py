@@ -8,8 +8,8 @@ from commera.sdk import catalog, shop
 from commera.shop_data import find_menu_root, get_category_facets, get_storefront_menu
 from commera.tests.test_content_translation import use_storefront_language
 from commera.tests.test_localization import set_storefront_languages
-from commera.themes.commera_starter.pages.products import details
-from commera.themes.commera_starter.pages.products.list import add_seo
+from commera.themes.commera_standard.pages.products import details
+from commera.themes.commera_standard.pages.products.list import add_seo
 from commera.www.products.list import apply_category_scope
 
 CATEGORY = "Ecommerce Category"

@@ -157,7 +157,7 @@ Flip an icon that points in a direction, such as an arrow, with the `rtl:` varia
 <span class="rtl:-scale-x-100">{{ icon("right", "size-4") }}</span>
 ```
 
-`icon` is a macro of the Commera Starter theme, not a Jinja global. Your theme must have `components/macros/icons.html`, or inherit it from a parent theme.
+`icon` is a macro of the Commera Standard theme, not a Jinja global. Your theme must have `components/macros/icons.html`, or inherit it from a parent theme.
 
 Do not flip icons that have no direction, such as a cart or a search icon. A theme page also gets `is_rtl`, which is true on a right-to-left page.
 

@@ -23,7 +23,7 @@ from commera.tests.test_content_translation import use_storefront_language
 UNSAFE_BODY = "<p>مرحبا</p><img src=x onerror=alert(1)><script>steal()</script>"
 TAG_INJECTION = "</title><script>alert(1)</script>"
 ATTRIBUTE_INJECTION = '" onmouseover="alert(1)'
-THEMES = ("Shop Default Theme", "Summer Theme", "Commera Starter")
+THEMES = ("Shop Default Theme", "Summer Theme", "Commera Standard")
 
 
 class TestShopWebPageBodySanitizing(ShopWebPageTestCase):
@@ -102,7 +102,7 @@ class TestShopWebPageEscaping(ShopWebPageTestCase):
 
 	def test_the_starter_heading_matches_the_sdk_title(self):
 		register(PAGE, self.page.name, "title", "ar", "سياسة الإرجاع")
-		html = self.render_theme("Commera Starter")
+		html = self.render_theme("Commera Standard")
 		self.assertIn("سياسة الإرجاع</bdi></h1>", html)
 
 	def test_the_sdk_keeps_plain_text_unescaped(self):

@@ -13,7 +13,7 @@ from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 
 PRODUCT = "Style Attribute Variant"
-THEMES = ("Shop Default Theme", "Summer Theme", "Commera Starter")
+THEMES = ("Shop Default Theme", "Summer Theme", "Commera Standard")
 ARABIC_TITLE = "قميص & كتان"
 NAV = re.compile(r"<nav\b[^>]*>.*?</nav>", re.DOTALL)
 TITLE = re.compile(r"<title>(.*?)</title>", re.DOTALL)
@@ -46,7 +46,7 @@ class TestProductTitlePageLanguage(ProductDetailPriceTestCase):
 				self.assertEqual(product["name"], "Size")
 				self.assertNotIn(escape(frappe._("Size", lang="ar")), get_breadcrumb(html))
 				self.assertIn("الرئيسية", get_breadcrumb(html))
-				if theme != "Commera Starter":
+				if theme != "Commera Standard":
 					self.assertIn("المنتجات", get_breadcrumb(html))
 
 	def test_the_arabic_page_falls_back_to_the_source_title_without_a_translation(self):

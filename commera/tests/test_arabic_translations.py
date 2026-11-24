@@ -18,7 +18,7 @@ from commera.localization.untranslated import (
 from commera.shop_themes.theme_resolver import get_theme_environment
 from commera.tests.test_localization import use_storefront_languages
 
-STARTER_THEME = Path(__file__).resolve().parents[1] / "themes" / "commera_starter"
+STARTER_THEME = Path(__file__).resolve().parents[1] / "themes" / "commera_standard"
 FIX_HINT = (
 	"Add each string to commera/translations/ar.csv. Run `bench commera check-translations` to list them."
 )

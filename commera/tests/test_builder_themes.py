@@ -33,7 +33,7 @@ from commera.storefront_access import PrivateStorefrontPage
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 
 THEME = "Test Builder Theme"
-STARTER_THEME = "Commera Starter"
+STARTER_THEME = "Commera Standard"
 
 
 @unittest.skipUnless(is_builder_installed(), "Frappe Builder is not installed on this site")

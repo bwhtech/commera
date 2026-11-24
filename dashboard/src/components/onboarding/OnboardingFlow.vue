@@ -78,7 +78,7 @@ const entered = useEntrance(() => Boolean(record.value))
 const step = computed(() => currentStep.value)
 const slide = computed(() => (flow.direction > 0 ? SLIDES.forward : SLIDES.back))
 const needsPassword = computed(() => Boolean(record.value?.needs_password))
-const look = lookFor('Commera Starter')
+const look = lookFor('Commera Standard')
 const isReady = computed(() => canFinish(storeSetup.status))
 
 const stepProps = computed(() => {

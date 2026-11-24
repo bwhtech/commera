@@ -1,16 +1,16 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from commera.shop_themes.tests import test_commera_starter_catalog
+from commera.shop_themes.tests import test_commera_standard_catalog
 from commera.tests import test_cart_checkout
 from commera.tests.test_localization import use_storefront_languages
 from commera.tests.test_markets import UAE, make_market, use_markets
 
 
-class IntegrationTestCommeraStarterCheckout(IntegrationTestCase):
-	setUp = test_commera_starter_catalog.IntegrationTestCommeraStarterCatalog.setUp
-	restore_locals = test_commera_starter_catalog.IntegrationTestCommeraStarterCatalog.restore_locals
-	render = test_commera_starter_catalog.IntegrationTestCommeraStarterCatalog.render
+class IntegrationTestCommeraStandardCheckout(IntegrationTestCase):
+	setUp = test_commera_standard_catalog.IntegrationTestCommeraStandardCatalog.setUp
+	restore_locals = test_commera_standard_catalog.IntegrationTestCommeraStandardCatalog.restore_locals
+	render = test_commera_standard_catalog.IntegrationTestCommeraStandardCatalog.render
 	create_shopper = test_cart_checkout.TestCartCheckout.create_shopper
 
 	def test_the_checkout_offers_the_address_form_and_the_order_summary(self):

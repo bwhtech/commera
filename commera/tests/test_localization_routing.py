@@ -415,11 +415,11 @@ class TestCachedNotFound(RoutingTestCase):
 		from commera.shop_themes.doctype.shop_theme.shop_theme import render_theme_context
 
 		theme = {
-			"theme_name": "Commera Starter",
+			"theme_name": "Commera Standard",
 			"theme_type": "Sections",
-			"names": ["Commera Starter"],
-			"dirs": [str(Path(commera.__file__).parent / "themes" / "commera_starter")],
-			"apps": {"Commera Starter": "commera"},
+			"names": ["Commera Standard"],
+			"dirs": [str(Path(commera.__file__).parent / "themes" / "commera_standard")],
+			"apps": {"Commera Standard": "commera"},
 			"settings_doctype": None,
 		}
 		with render_theme_context(theme):
