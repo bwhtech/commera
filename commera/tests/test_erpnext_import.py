@@ -10,6 +10,7 @@ from commera.api.admin.catalog import (
 	DEFAULT_SIZE_VALUE,
 	SIZE_ATTRIBUTE,
 	add_missing_attribute_values,
+	create_product,
 	ensure_attribute_exists,
 	get_products,
 	save_product_options,
@@ -21,6 +22,7 @@ from commera.api.admin.erpnext_import import (
 	start_erpnext_import,
 )
 from commera.commera_ecommerce.doctype.commera_settings.commera_settings import create_configurator_log
+from commera.sdk.lines import LineProducts
 from commera.swatches import COLOUR_ATTRIBUTE
 from commera.tests.test_admin_orders import COMPANY, CURRENCY
 from commera.tests.test_product_onboarding import ProductOnboardingTestCase
@@ -141,6 +143,39 @@ class TestErpnextImport(ProductOnboardingTestCase):
 			{"Red": {(DEFAULT_SIZE_VALUE, red)}, "Blue": {(DEFAULT_SIZE_VALUE, blue)}},
 		)
 		self.assertEqual(self.get_options(other), {"Cotton": {("64 GB", cotton_64), ("128 GB", cotton_128)}})
+
+	def test_an_imported_variant_line_is_titled_like_the_product(self):
+		template, (red_small,) = self.make_template(
+			[COLOUR_ATTRIBUTE, SIZE_ATTRIBUTE], [{COLOUR_ATTRIBUTE: "Red", SIZE_ATTRIBUTE: "S"}]
+		)
+		frappe.db.set_value("Item", template, "item_name", "Field Hoodie")
+		item_name = frappe.db.get_value("Item", red_small, "item_name")
+		self.run_import([template])
+
+		self.assertEqual(
+			LineProducts([red_small]).get_order_title(red_small, item_name), "Field Hoodie - Red - S"
+		)
+
+	def test_an_imported_plain_item_line_reads_its_name(self):
+		plain = self.make_plain_item()
+		self.run_import([plain])
+
+		self.assertEqual(LineProducts([plain]).get_order_title(plain, plain), plain)
+
+	def test_a_commera_variant_line_keeps_its_item_name(self):
+		item_template = create_product(
+			title=f"Line Title {self.suffix}",
+			collection=self.item_group,
+			option_attribute=COLOUR_ATTRIBUTE,
+			size_attribute=SIZE_ATTRIBUTE,
+			option_sizes=[{"option": "Red", "sizes": ["S"]}, {"option": "Blue", "sizes": ["M"]}],
+		)["name"]
+		item_codes = frappe.get_all("Item", filters={"variant_of": item_template}, pluck="name")
+		products = LineProducts(item_codes)
+
+		for item_code in item_codes:
+			item_name = frappe.db.get_value("Item", item_code, "item_name")
+			self.assertEqual(products.get_order_title(item_code, item_name), item_name)
 
 	def test_a_colour_and_size_template_with_another_attribute_keeps_it_in_the_size_label(self):
 		template, (small_cotton, small_linen) = self.make_template(
