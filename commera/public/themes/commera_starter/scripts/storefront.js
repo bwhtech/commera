@@ -844,6 +844,34 @@ function checkout(config) {
 	};
 }
 
+function cart_link({ lines, is_merge, next_url, leave }) {
+	return {
+		status: lines.length ? 'adding' : 'done',
+		error: '',
+
+		async init() {
+			if (!lines.length) return;
+			if (!history.state?.cart_link_applied) {
+				try {
+					if (is_merge) {
+						await commera.cart.add_lines(lines);
+					} else {
+						const cart = await commera.cart.get();
+						await commera.cart.set_lines(lines, cart?.revision ?? null);
+					}
+				} catch (error) {
+					this.error = error.message;
+					this.status = 'failed';
+					return;
+				}
+				history.replaceState({ ...history.state, cart_link_applied: true }, '');
+			}
+			this.status = 'done';
+			if (leave) globalThis.location.replace(next_url);
+		},
+	};
+}
+
 function order_confirmation() {
 	return {
 		// 'checking', then 'paid', 'pending' (asked again every few seconds, a few times) or 'failed'.
@@ -1001,6 +1029,7 @@ document.addEventListener('alpine:init', () => {
 	Alpine.data('order_summary', order_summary);
 	Alpine.data('checkout', checkout);
 	Alpine.data('order_confirmation', order_confirmation);
+	Alpine.data('cart_link', cart_link);
 
 	Alpine.data('search_modal', () => ({
 		...typeahead(),
