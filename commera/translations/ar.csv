@@ -1773,7 +1773,7 @@ Sets the struck-through reference price shown above the real price.,يحدّد �
 {0} items given a compare-at price,حُدّد السعر قبل الخصم لـ {0} أصناف
 {0} of {1} items given a compare-at price. {2} failed,حُدّد السعر قبل الخصم لـ {0} من {1} أصناف. فشل {2}
 Edit prices,تعديل الأسعار
-"{0} sellable units · one row per variant, priced individually on its product",{0} وحدات قابلة للبيع · صف لكل متغيّر، مسعّر بشكل منفصل في منتجه
+{0} sellable units,{0} وحدات قابلة للبيع
 1 item selected,تم تحديد صنف واحد
 {0} items selected,الأصناف المحددة: {0}
 Select items to act on them,حدّد أصنافًا لتنفيذ إجراءات عليها
