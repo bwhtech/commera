@@ -12,6 +12,7 @@ from commera.api.admin.imports import (
 	OPTION_ATTRIBUTE,
 	SIZE_ATTRIBUTE,
 	get_image_group_key,
+	parse_and_validate,
 	run_import,
 )
 
@@ -46,11 +47,11 @@ class RunImportTestCase(IntegrationTestCase):
 		item_group.insert()
 		return item_group.name
 
-	def make_import_file(self):
+	def make_import_file(self, compare_at_price=120, sale_price=99):
 		rows = [
 			"Product Title,Collection,Color,Size,Compare at price,Selling price,Stock",
-			f"{self.title},{self.collection},{self.color},S,120,99,0",
-			f"{self.title},{self.collection},{self.color},M,120,99,0",
+			f"{self.title},{self.collection},{self.color},S,{compare_at_price},{sale_price},0",
+			f"{self.title},{self.collection},{self.color},M,{compare_at_price},{sale_price},0",
 		]
 		file_doc = frappe.new_doc("File")
 		file_doc.file_name = f"import-{self.suffix}.csv"
@@ -186,3 +187,21 @@ class TestRunImportImageAssignmentShape(RunImportTestCase):
 
 		self.assertIn("private", str(refusal.exception))
 		self.assertEqual(self.get_created_titles(), [])
+
+
+class TestParseAndValidatePrices(RunImportTestCase):
+	def get_issues(self, compare_at_price, sale_price):
+		rows = parse_and_validate(self.make_import_file(compare_at_price, sale_price))["rows"]
+		return [row["issue"] for row in rows]
+
+	def test_a_compare_at_price_below_the_selling_price_is_an_error(self):
+		issues = self.get_issues(compare_at_price=1000, sale_price=1200)
+
+		self.assertEqual({issue["level"] for issue in issues}, {"error"})
+		self.assertIn("Compare at price cannot be lower", issues[0]["text"])
+
+	def test_a_compare_at_price_above_the_selling_price_passes(self):
+		self.assertEqual(self.get_issues(compare_at_price=1200, sale_price=1000), [None, None])
+
+	def test_a_compare_at_price_equal_to_the_selling_price_passes(self):
+		self.assertEqual(self.get_issues(compare_at_price=1000, sale_price=1000), [None, None])
