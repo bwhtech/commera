@@ -17,7 +17,6 @@ import PluginActionDialog from '../components/PluginActionDialog.vue'
 import PluginSlot from '../components/PluginSlot.vue'
 import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { errorMessage } from '../data/errors'
-import { longDate } from '../data/format'
 import { useProductStats } from '../data/product'
 import { useRecordPlugins } from '../data/recordPlugins'
 import { __ } from '../data/translation'
@@ -46,12 +45,9 @@ watch(
       title: data.title,
       description: data.description,
       collections: data.collections,
-      // Item only carries a disabled flag — there is no "draft" state in the
-      // catalog (same fact Products.vue's list screen already works around).
-      status: data.disabled ? 'archived' : 'active',
+      status: data.disabled ? 'archived' : data.variants.some((variant) => variant.is_published) ? 'published' : 'unpublished',
       restock_level: data.restock_level,
       sku: data.name,
-      updated: data.updated,
       variants: data.variants,
       option_attribute: data.option_attribute,
       recent_sales: data.recent_sales,
@@ -181,7 +177,7 @@ const loadFailure = computed(() =>
           <div class="flex flex-wrap items-center gap-2">
             <StatusBadge :status="product.status" />
             <span class="text-sm text-ink-gray-5">
-              {{ product.sku }} · {{ __('updated {0}', [longDate(product.updated)]) }}
+              {{ product.sku }}
             </span>
           </div>
 

@@ -55,6 +55,7 @@ def get_products(
 	search: str | None = None,
 	collection: str | None = None,
 	disabled: int | None = None,
+	published: int | None = None,
 	start: int = 0,
 	page_length: int = PAGE_LENGTH,
 ):
@@ -78,7 +79,19 @@ def get_products(
 
 	templates_by_configurator = {row.name: row.item_template for row in configurators}
 
-	item_filters = {"name": ["in", product_names(templates_by_configurator.values(), collection)]}
+	listed_templates = product_names(templates_by_configurator.values(), collection)
+	if published is not None:
+		published_configurators = frappe.get_all(
+			"Style Attribute Variant", filters={"is_published": 1}, pluck="configurator", distinct=True
+		)
+		published_templates = {templates_by_configurator.get(name) for name in published_configurators}
+		listed_templates = [
+			template
+			for template in listed_templates
+			if (template in published_templates) == bool(cint(published))
+		]
+
+	item_filters = {"name": ["in", listed_templates]}
 	if search:
 		item_filters["item_name"] = ["like", f"%{search}%"]
 	if disabled is not None:
