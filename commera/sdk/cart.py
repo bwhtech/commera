@@ -99,7 +99,7 @@ def set_cart_attributes(values: dict) -> PricedCart:
 
 
 def get_priced_cart() -> PricedCart | None:
-	cart = get_session_cart()
+	cart = get_session_cart(for_update=False)
 	return price_cart(cart) if cart else None
 
 

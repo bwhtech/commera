@@ -304,6 +304,41 @@ def remove_shipping_rule_row(quotation):
 	reindex_taxes(quotation)
 
 
+def apply_cached_shipping_rule(quotation):
+	"""Apply quotation.shipping_rule using cached Shipping Rule and Address docs (0 DB queries on cache hit)."""
+	if not quotation.shipping_rule:
+		return
+	rule = frappe.get_cached_doc("Shipping Rule", quotation.shipping_rule)
+	addr_name = quotation.get("shipping_address_name")
+	cached_addr = (
+		frappe._dict(country=frappe.get_cached_value("Address", addr_name, "country")) if addr_name else None
+	)
+	orig_getter = quotation.__dict__.get("get_shipping_address")
+	quotation.get_shipping_address = lambda: cached_addr
+	try:
+		rule.apply(quotation)
+	finally:
+		if orig_getter is None:
+			quotation.__dict__.pop("get_shipping_address", None)
+		else:
+			quotation.get_shipping_address = orig_getter
+
+
+def calculate_taxes_with_cached_shipping(quotation, *, apply_rule: bool = True):
+	"""Calculate taxes & totals without ERPNext reloading Shipping Rule and Address uncached from DB."""
+	shipping_rule = quotation.shipping_rule
+	if not shipping_rule:
+		quotation.calculate_taxes_and_totals()
+		return
+	if apply_rule:
+		apply_cached_shipping_rule(quotation)
+	quotation.shipping_rule = None
+	try:
+		quotation.calculate_taxes_and_totals()
+	finally:
+		quotation.shipping_rule = shipping_rule
+
+
 def keep_shipping_rule_last(quotation):
 	"""ERPNext's Shipping Rule sets the last Actual row on its account. Add the rule's own row if missing and move
 	it last, so a COD fee, app fee or template tax on that account keeps its amount."""
@@ -316,7 +351,7 @@ def keep_shipping_rule_last(quotation):
 		existing_rows = quotation.taxes
 		quotation.taxes = []
 		try:
-			quotation.run_method("apply_shipping_rule")
+			apply_cached_shipping_rule(quotation)
 			shipping_rows = quotation.taxes
 			for row in shipping_rows:
 				row.set(CART_CHARGE_FIELD, "shipping_rule")
@@ -461,25 +496,38 @@ def get_priced_checkout_summary(quotation) -> dict:
 	"""Show the delivery charges payment applies without writing the cart."""
 	from commera.api.payments import get_charged_preview
 
-	return get_checkout_summary(get_charged_preview(quotation))
+	return get_checkout_summary(get_charged_preview(quotation), _is_copy=True)
 
 
-def get_checkout_summary(quotation) -> dict:
+def has_payment_conditioned_discounts(quotation) -> bool:
+	from commera.discounts.selection import get_candidates
+
+	return any(
+		(s.discount.payment_condition or "Any") != "Any" for s in get_candidates(quotation)
+	)
+
+
+def get_checkout_summary(quotation, *, _is_copy: bool = False) -> dict:
 	"""The charges payment will apply, priced on an unsaved copy so showing them never rewrites the cart."""
-	preview = frappe.get_doc(quotation.as_dict())
+	preview = quotation if _is_copy else frappe.get_doc(quotation.as_dict())
 	if preview.custom_is_store_pickup:
 		clear_pickup_charges(preview)
 	summary = get_charge_summary(preview)
 
 	# A prepaid-only discount drops off, and a cash-on-delivery one comes on, before the fee is judged.
-	preview.flags.commera_payment_kind = "cod"
-	reprice_shipping_discount(preview)
-	refresh_code_discounts(preview)
+	payment_conditioned = has_payment_conditioned_discounts(preview)
+	if payment_conditioned:
+		preview.flags.commera_payment_kind = "cod"
+		reprice_shipping_discount(preview)
+		refresh_code_discounts(preview)
 	cod_charge = get_cod_charge(preview)
 	if cod_charge:
 		account_head = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
 		add_cod_charge(preview, cod_charge, account_head)
-	summary["cash_on_delivery"] = get_charge_summary(preview)
+	if payment_conditioned or cod_charge:
+		summary["cash_on_delivery"] = get_charge_summary(preview)
+	else:
+		summary["cash_on_delivery"] = dict(summary)
 	if get_discount_codes(preview):
 		summary["cash_on_delivery"]["discount_codes"] = get_code_states(preview)
 	return summary
@@ -551,7 +599,7 @@ def add_cod_charge(quotation, cod_charge: float, account_head: str | None):
 		},
 	)
 	keep_shipping_rule_last(quotation)
-	quotation.calculate_taxes_and_totals()
+	calculate_taxes_with_cached_shipping(quotation, apply_rule=False)
 
 
 def get_order_charge_lines(sales_order: str, shipping_rule: str | None) -> dict:

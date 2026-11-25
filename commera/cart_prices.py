@@ -60,19 +60,64 @@ def get_market_handle(doc) -> str:
 	return doc.get(MARKET_FIELD) or PRIMARY_MARKET
 
 
-def price_regular_lines(quotation, prices: MarketPrices):
+def price_regular_lines(quotation, prices: MarketPrices, *, set_all_prices: bool = False):
 	"""Before ERPNext prices new lines from the sale list: a line the sale list has no row for takes its
 	price from the compare-at list. ERPNext keeps a price_list_rate that is set, and derives the rate."""
-	for item in quotation.items:
-		if flt(item.price_list_rate):
-			continue
-		price_list, rate = get_line_price(quotation, item, prices)
-		if price_list and price_list != prices.sale_price_list:
+	unpriced_items = [item for item in quotation.items if not flt(item.price_list_rate)]
+	if not unpriced_items or not prices.price_lists:
+		return
+	batched = fetch_batched_line_prices(quotation, unpriced_items, prices)
+	for item in unpriced_items:
+		price_list, rate = get_line_price(quotation, item, prices, batched=batched)
+		if price_list and (set_all_prices or price_list != prices.sale_price_list):
 			item.price_list_rate = rate
 			item.rate = 0
 
 
-def get_line_price(quotation, item, prices: MarketPrices) -> tuple[str | None, float | None]:
+def fetch_batched_line_prices(quotation, items: list, prices: MarketPrices) -> dict[tuple[str, str], list]:
+	"""Fetch all candidate Item Price rows for `items` (and their templates) across `prices.price_lists` in one query."""
+	all_codes = set()
+	for item in items:
+		all_codes.add(item.item_code)
+		if template := frappe.get_cached_value("Item", item.item_code, "variant_of"):
+			all_codes.add(template)
+	if not all_codes:
+		return {}
+
+	customer = quotation.party_name if quotation.quotation_to == "Customer" else None
+	tx_date = quotation.transaction_date or nowdate()
+	price = frappe.qb.DocType("Item Price")
+	rows = (
+		frappe.qb.from_(price)
+		.select(
+			price.name,
+			price.item_code,
+			price.price_list,
+			price.price_list_rate,
+			price.uom,
+			price.packing_unit,
+			price.customer,
+			price.valid_from,
+		)
+		.where(
+			price.item_code.isin(list(all_codes))
+			& price.price_list.isin(prices.price_lists)
+			& IfNull(price.customer, "").isin(["", customer or ""])
+			& (IfNull(price.supplier, "") == "")
+			& (IfNull(price.batch_no, "") == "")
+			& is_valid_on(price, tx_date)
+		)
+		.run(as_dict=True)
+	)
+	grouped: dict[tuple[str, str], list] = {}
+	for row in rows:
+		grouped.setdefault((row.item_code, row.price_list), []).append(row)
+	return grouped
+
+
+def get_line_price(
+	quotation, item, prices: MarketPrices, *, batched: dict[tuple[str, str], list] | None = None
+) -> tuple[str | None, float | None]:
 	"""The first market list with a row for the line, and ERPNext's rate on it: the item's, else its
 	template's, as get_price_list_rate. A list whose rows fit no quantity of the line refuses it."""
 	from erpnext.stock.get_item_details import get_price_list_rate_for
@@ -80,9 +125,69 @@ def get_line_price(quotation, item, prices: MarketPrices) -> tuple[str | None, f
 	template = frappe.get_cached_value("Item", item.item_code, "variant_of")
 	item_codes = [code for code in (item.item_code, template) if code]
 	for price_list in prices.price_lists:
-		context = get_price_context(quotation, item, price_list)
-		if not (packing_units := get_packing_units(context, item_codes)):
-			continue
+		if batched is not None:
+			stock_uom, sales_uom = frappe.get_cached_value("Item", item.item_code, ["stock_uom", "sales_uom"])
+			uom = item.uom or sales_uom or stock_uom
+			allowed_uoms = {"", uom, stock_uom}
+			matching = [
+				row
+				for code in item_codes
+				for row in batched.get((code, price_list), ())
+				if (row.uom or "") in allowed_uoms
+			]
+			if not matching:
+				continue
+			# Fast path when all matching rows are plain public prices in the line's UOM with no packing_unit.
+			uom_not_dep = frappe.get_cached_value("Price List", price_list, "price_not_uom_dependent")
+			needs_erpnext = any(
+				row.customer
+				or (row.packing_unit and flt(row.packing_unit) > 0)
+				or (not uom_not_dep and (row.uom or "") not in ("", uom) and uom != stock_uom)
+				for row in matching
+			)
+			if not needs_erpnext:
+				best = min(
+					matching,
+					key=lambda r: (
+						0 if r.item_code == item.item_code else 1,
+						0 if (r.uom or "") in ("", uom) else 1,
+						1 if r.valid_from is None else 0,
+						-(r.valid_from.toordinal() if r.valid_from else 0),
+					),
+				)
+				# Tie-break on uom desc, name desc matches ERPNext apply_item_price_order
+				if len(matching) > 1:
+					matching.sort(
+						key=lambda r: (
+							0 if r.item_code == item.item_code else 1,
+							0 if (r.uom or "") in ("", uom) else 1,
+							1 if r.valid_from is None else 0,
+						)
+					)
+					top_key = (
+						0 if matching[0].item_code == item.item_code else 1,
+						0 if (matching[0].uom or "") in ("", uom) else 1,
+						1 if matching[0].valid_from is None else 0,
+					)
+					tied = [
+						r
+						for r in matching
+						if (
+							0 if r.item_code == item.item_code else 1,
+							0 if (r.uom or "") in ("", uom) else 1,
+							1 if r.valid_from is None else 0,
+						)
+						== top_key
+					]
+					best = max(tied, key=lambda r: (str(r.valid_from or ""), r.uom or "", r.name))
+				return price_list, flt(best.price_list_rate)
+			packing_units = [flt(row.packing_unit) for row in matching]
+			context = get_price_context(quotation, item, price_list)
+		else:
+			context = get_price_context(quotation, item, price_list)
+			if not (packing_units := get_packing_units(context, item_codes)):
+				continue
+
 		rates = (get_price_list_rate_for(context, code) for code in item_codes)
 		if (rate := next((rate for rate in rates if rate is not None), None)) is None:
 			frappe.throw(

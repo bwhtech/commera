@@ -216,7 +216,7 @@ def get_customer(customer: str):
 		"discount_saved": sum(flt(use.amount) for use in discount_uses),
 		"recent_orders": [
 			{key: value for key, value in order.items() if key != "base_total"}
-			for order in read_customer_orders(customer)
+			for order in read_customer_orders(customer, lifetime_orders=lifetime_orders)
 		],
 	}
 
@@ -238,7 +238,13 @@ def read_customer_lifetime_orders(customer: str) -> list:
 		.select(
 			sales_order.name,
 			sales_order.transaction_date,
+			sales_order.creation,
+			sales_order.status,
+			sales_order.grand_total,
 			sales_order.base_grand_total,
+			sales_order.currency,
+			sales_order.docstatus,
+			sales_order.per_delivered,
 			sales_order.custom_ecommerce_payment_mode,
 		)
 		.where(is_webshop_order(sales_order))
@@ -356,39 +362,48 @@ def read_customer_discount_uses(customer: str) -> list:
 	).run(as_dict=True)
 
 
-def read_customer_orders(customer: str) -> list:
+def read_customer_orders(customer: str, *, lifetime_orders: list | None = None) -> list:
 	"""This one customer's own order history, in the same shape orders.get_orders uses for its rows.
 	Counts drafts, for the reason read_customer_order_stats gives."""
-	orders = frappe.get_all(
-		"Sales Order",
-		filters=[
-			["customer", "=", customer],
-			["docstatus", "<", 2],
-			["order_type", "=", "Shopping Cart"],
-		],
-		fields=[
-			"name",
-			"transaction_date",
-			"status",
-			"grand_total",
-			"base_grand_total",
-			"currency",
-			"docstatus",
-			"per_delivered",
-			"custom_ecommerce_payment_mode",
-		],
-		order_by="creation desc",
-		page_length=CUSTOMER_ORDER_LIMIT,
-	)
+	if lifetime_orders is not None:
+		orders = sorted(lifetime_orders, key=lambda row: row.creation, reverse=True)[:CUSTOMER_ORDER_LIMIT]
+	else:
+		orders = frappe.get_all(
+			"Sales Order",
+			filters=[
+				["customer", "=", customer],
+				["docstatus", "<", 2],
+				["order_type", "=", "Shopping Cart"],
+			],
+			fields=[
+				"name",
+				"transaction_date",
+				"status",
+				"grand_total",
+				"base_grand_total",
+				"currency",
+				"docstatus",
+				"per_delivered",
+				"custom_ecommerce_payment_mode",
+			],
+			order_by="creation desc",
+			page_length=CUSTOMER_ORDER_LIMIT,
+		)
 	if not orders:
 		return []
 
 	order_names = [row.name for row in orders]
-	item_counts: dict = {}
-	for row in frappe.get_all(
-		"Sales Order Item", filters={"parent": ["in", order_names]}, fields=["parent", "qty"]
-	):
-		item_counts[row.parent] = item_counts.get(row.parent, 0) + flt(row.qty)
+	sales_order_item = frappe.qb.DocType("Sales Order Item")
+	item_counts = {
+		row.parent: flt(row.total_qty)
+		for row in (
+			frappe.qb.from_(sales_order_item)
+			.select(sales_order_item.parent, Sum(sales_order_item.qty).as_("total_qty"))
+			.where(sales_order_item.parent.isin(order_names))
+			.groupby(sales_order_item.parent)
+			.run(as_dict=True)
+		)
+	}
 
 	lifecycles = read_order_lifecycles(order_names)
 	paid_orders = read_paid_orders(order_names)

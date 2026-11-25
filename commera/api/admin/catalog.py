@@ -6,6 +6,8 @@ from erpnext.controllers.item_variant import create_variant
 from frappe import _
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Count, Sum
+from pypika.analytics import Count as WindowCount
+from pypika.terms import ExistsCriterion
 from frappe.utils import add_days, create_batch, get_url, nowdate
 from frappe.utils.data import cint, cstr, flt
 
@@ -70,55 +72,84 @@ def get_products(
 	start = cint(start)
 	page_length = cint(page_length) or PAGE_LENGTH
 
-	configurators = frappe.get_all(
-		"Style Attribute Configurator",
-		fields=["name", "item_template", "item_attribute"],
-	)
-	if not configurators:
-		return {"products": [], "total": 0, "currency": currency}
+	sac = frappe.qb.DocType("Style Attribute Configurator")
+	item = frappe.qb.DocType("Item")
+	sav = frappe.qb.DocType("Style Attribute Variant")
+	pc = frappe.qb.DocType(PRODUCT_COLLECTION)
 
-	templates_by_configurator = {row.name: row.item_template for row in configurators}
-
-	listed_templates = product_names(templates_by_configurator.values(), collection)
-	if published is not None:
-		published_configurators = frappe.get_all(
-			"Style Attribute Variant", filters={"is_published": 1}, pluck="configurator", distinct=True
+	base = (
+		frappe.qb.from_(item)
+		.where(
+			ExistsCriterion(
+				frappe.qb.from_(sac).select(1).where(sac.item_template == item.name)
+			)
 		)
-		published_templates = {templates_by_configurator.get(name) for name in published_configurators}
-		listed_templates = [
-			template
-			for template in listed_templates
-			if (template in published_templates) == bool(cint(published))
-		]
-
-	item_filters = {"name": ["in", listed_templates]}
-	if search:
-		item_filters["item_name"] = ["like", f"%{search}%"]
-	if disabled is not None:
-		item_filters["disabled"] = cint(disabled)
-
-	total = frappe.db.count("Item", item_filters)
-	templates = frappe.get_all(
-		"Item",
-		filters=item_filters,
-		fields=["name", "item_name", "image", "item_group", "disabled", "modified"],
-		order_by="modified desc",
-		start=start,
-		page_length=page_length,
 	)
+	if collection:
+		base = base.where(
+			ExistsCriterion(
+				frappe.qb.from_(pc)
+				.select(1)
+				.where(
+					(pc.parent == item.name)
+					& (pc.parenttype == "Item")
+					& (pc.parentfield == COLLECTIONS_FIELD)
+					& (pc.item_group == collection)
+				)
+			)
+		)
+	if published is not None:
+		pub_exists = ExistsCriterion(
+			frappe.qb.from_(sav)
+			.join(sac)
+			.on(sac.name == sav.configurator)
+			.select(1)
+			.where((sac.item_template == item.name) & (sav.is_published == 1))
+		)
+		base = base.where(pub_exists if cint(published) else pub_exists.negate())
+	if search:
+		base = base.where(item.item_name.like(f"%{search}%"))
+	if disabled is not None:
+		base = base.where(item.disabled == cint(disabled))
+
+	templates = (
+		base.select(
+			item.name,
+			item.item_name,
+			item.image,
+			item.item_group,
+			item.disabled,
+			item.modified,
+			WindowCount("*").over().as_("_total_count"),
+		)
+		.orderby(item.modified, order=Order.desc)
+		.limit(page_length)
+		.offset(start)
+	).run(as_dict=True)
+
 	if not templates:
+		total = 0 if start == 0 else cint(base.select(Count("*")).run()[0][0])
 		return {"products": [], "total": total, "currency": currency}
 
+	total = cint(templates[0].get("_total_count"))
 	template_names = {row.name for row in templates}
 	collections_by_template = get_product_collections(template_names)
-	page_configurators = [
-		name for name, template in templates_by_configurator.items() if template in template_names
-	]
+	page_configurators_rows = frappe.get_all(
+		"Style Attribute Configurator",
+		filters={"item_template": ["in", list(template_names)]},
+		fields=["name", "item_template"],
+	)
+	templates_by_configurator = {row.name: row.item_template for row in page_configurators_rows}
+	page_configurators = list(templates_by_configurator)
 
-	variants = frappe.get_all(
-		"Style Attribute Variant",
-		filters={"configurator": ["in", page_configurators]},
-		fields=["name", "configurator", "attribute_value", "display_name", "is_published", "route"],
+	variants = (
+		frappe.get_all(
+			"Style Attribute Variant",
+			filters={"configurator": ["in", page_configurators]},
+			fields=["name", "configurator", "attribute_value", "display_name", "is_published", "route"],
+		)
+		if page_configurators
+		else []
 	)
 	variant_names = [row.name for row in variants]
 

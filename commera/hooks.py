@@ -72,6 +72,10 @@ clear_cache = [
 	"commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings.clear_settings_cache",
 	"commera.plugins.registry.clear_registry_cache",
 	"commera.storefront_plugins.clear_storefront_plugin_cache",
+	"commera.base_prices.clear_base_prices_cache",
+	"commera.utils.clear_stock_caches",
+	"commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category.clear_menu_tree_cache",
+	"commera.discounts.selection.clear_automatic_discounts_cache",
 ]
 
 # Without this, records of a custom doctype never import on migrate (frappe/model/sync.py).
@@ -219,8 +223,14 @@ doc_events = {
 	},
 	"Item Group": {
 		"before_validate": "commera.utils.set_item_group_displayname",
-		"on_update": "commera.plugin_events.on_item_group_change",
-		"on_trash": "commera.plugin_events.on_item_group_change",
+		"on_update": [
+			"commera.plugin_events.on_item_group_change",
+			"commera.discounts.preview.clear_item_tax_cache",
+		],
+		"on_trash": [
+			"commera.plugin_events.on_item_group_change",
+			"commera.discounts.preview.clear_item_tax_cache",
+		],
 	},
 	"Shop Web Page": {
 		"on_update": "commera.plugin_events.on_shop_web_page_change",
@@ -236,10 +246,37 @@ doc_events = {
 		],
 		"on_trash": "commera.localization.content.delete_translations",
 	},
-	"Commera Settings": {"on_update": "commera.plugin_events.on_menu_change"},
+	"Commera Settings": {
+		"on_update": [
+			"commera.plugin_events.on_menu_change",
+			"commera.utils.clear_selling_currencies_cache",
+		]
+	},
 	"Price List": {
 		"validate": "commera.doc_events.price_list.validate",
+		"on_update": "commera.utils.clear_selling_currencies_cache",
+		"on_trash": "commera.utils.clear_selling_currencies_cache",
 		"after_rename": "commera.search.price_sync.on_price_list_rename",
+	},
+	"Tax Rule": {
+		"on_update": "commera.cart_taxes.clear_tax_rules_cache",
+		"on_trash": "commera.cart_taxes.clear_tax_rules_cache",
+	},
+	"Pricing Rule": {
+		"on_update": "commera.discounts.preview.clear_pricing_rules_cache",
+		"on_trash": "commera.discounts.preview.clear_pricing_rules_cache",
+	},
+	"Item Tax Template": {
+		"on_update": "commera.discounts.preview.clear_item_tax_cache",
+		"on_trash": "commera.discounts.preview.clear_item_tax_cache",
+	},
+	"Customer": {
+		"on_update": "commera.core.clear_user_party_cache",
+		"on_trash": "commera.core.clear_user_party_cache",
+	},
+	"Contact": {
+		"on_update": "commera.core.clear_user_party_cache",
+		"on_trash": "commera.core.clear_user_party_cache",
 	},
 	"Sales Taxes and Charges Template": {
 		"validate": "commera.localization.market_setup.validate_tax_template",
@@ -287,8 +324,16 @@ doc_events = {
 	},
 	"Item": {
 		"validate": "commera.product_collections.sync_collections",
-		"on_update": "commera.plugin_events.on_item_update",
-		"on_change": "commera.search.source_sync.on_source_change",
+		"on_update": [
+			"commera.plugin_events.on_item_update",
+			"commera.base_prices.clear_sales_uom_cache",
+			"commera.discounts.preview.clear_item_tax_cache",
+		],
+		"on_change": [
+			"commera.search.source_sync.on_source_change",
+			"commera.base_prices.clear_sales_uom_cache",
+			"commera.discounts.preview.clear_item_tax_cache",
+		],
 		"after_rename": "commera.search.source_sync.on_source_rename",
 	},
 	"Style Attribute Configurator": {
@@ -299,12 +344,26 @@ doc_events = {
 		"on_update": [
 			"commera.plugin_events.on_item_price_change",
 			"commera.search.price_sync.on_item_price_change",
+			"commera.base_prices.clear_template_price_cache",
 		],
 		"on_trash": [
 			"commera.plugin_events.on_item_price_change",
 			"commera.search.price_sync.on_item_price_change",
+			"commera.base_prices.clear_template_price_cache",
 		],
-		"after_rename": "commera.search.price_sync.on_item_price_rename",
+		"after_rename": [
+			"commera.search.price_sync.on_item_price_rename",
+			"commera.base_prices.clear_template_price_cache",
+		],
+	},
+	"POS Invoice": {
+		"on_submit": "commera.utils.clear_pos_invoice_cache",
+		"on_cancel": "commera.utils.clear_pos_invoice_cache",
+		"on_update_after_submit": "commera.utils.clear_pos_invoice_cache",
+	},
+	"Commera Discount": {
+		"on_update": "commera.discounts.selection.clear_automatic_discounts_cache",
+		"on_trash": "commera.discounts.selection.clear_automatic_discounts_cache",
 	},
 	"Style Attribute Variant": {
 		"on_update": [
@@ -323,12 +382,20 @@ doc_events = {
 		"on_trash": "commera.search.translations.on_translation_change",
 	},
 	"Ecommerce Category": {
-		"on_update": ["commera.search.sync.on_update", "commera.plugin_events.on_menu_change"],
-		"after_rename": "commera.search.sync.after_rename",
+		"on_update": [
+			"commera.search.sync.on_update",
+			"commera.plugin_events.on_menu_change",
+			"commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category.clear_menu_tree_cache",
+		],
+		"after_rename": [
+			"commera.search.sync.after_rename",
+			"commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category.clear_menu_tree_cache",
+		],
 		"on_trash": [
 			"commera.search.sync.on_trash",
 			"commera.plugin_events.on_menu_change",
 			"commera.localization.content.delete_translations",
+			"commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category.clear_menu_tree_cache",
 		],
 	},
 	"Sales Invoice": {

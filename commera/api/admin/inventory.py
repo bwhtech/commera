@@ -3,6 +3,8 @@
 
 import frappe
 from frappe import _
+from frappe.query_builder import Case, Order
+from frappe.query_builder.functions import Coalesce, Count, Lower, NullIf
 from frappe.utils import create_batch
 from frappe.utils.data import cint, cstr, flt
 
@@ -14,96 +16,113 @@ LOW_STOCK_THRESHOLD = 5
 
 @frappe.whitelist()
 def get_inventory(
-	availability: str | None = None, search: str | None = None, start: int = 0, page_length: int = PAGE_LENGTH
+	availability: str | None = None,
+	search: str | None = None,
+	start: int = 0,
+	page_length: int = PAGE_LENGTH,
+	include_images: bool = True,
+	sort: bool = True,
 ):
 	"""Every sellable size and what is left of it."""
 	frappe.has_permission("Item", ptype="read", throw=True)
 
-	# Imported here rather than at module level: catalog.py has no import back to inventory.py
-	# today, but keeping the cycle-risk local matches the same guard catalog.get_products uses.
-	from commera.api.admin.catalog import get_size_stock
+	warehouse = get_ecommerce_warehouse()
+	csi = frappe.qb.DocType("Color Size Item")
+	sav = frappe.qb.DocType("Style Attribute Variant")
+	tpl = frappe.qb.DocType("Item").as_("tpl_item")
+	var_item = frappe.qb.DocType("Item").as_("var_item")
+	bin_dt = frappe.qb.DocType("Bin")
+	needs_var_item = sort or availability == "low"
 
-	variants = frappe.get_all(
-		"Style Attribute Variant",
-		fields=["name", "attribute_value", "display_name", "item_style", "is_published"],
+	product_expr = Coalesce(NullIf(tpl.item_name, ""), sav.item_style)
+	low_level_expr = (
+		Case()
+		.when(Coalesce(var_item.safety_stock, 0) > 0, var_item.safety_stock)
+		.else_(LOW_STOCK_THRESHOLD)
+		if needs_var_item
+		else frappe.qb.terms.ValueWrapper(LOW_STOCK_THRESHOLD)
 	)
-	if not variants:
-		return {"rows": [], "total": 0, "low_stock_threshold": LOW_STOCK_THRESHOLD}
+	stock_expr = Coalesce(bin_dt.actual_qty, 0) if warehouse else frappe.qb.terms.ValueWrapper(0)
+	committed_expr = Coalesce(bin_dt.reserved_qty, 0) if warehouse else frappe.qb.terms.ValueWrapper(0)
 
-	variant_by_name = {row.name: row for row in variants}
-	sizes = frappe.get_all(
-		"Color Size Item",
-		filters={"parent": ["in", list(variant_by_name)], "parenttype": "Style Attribute Variant"},
-		fields=["parent", "size", "item_code"],
-	)
-	item_codes = [row.item_code for row in sizes if row.item_code]
-	if not item_codes:
-		return {"rows": [], "total": 0, "low_stock_threshold": LOW_STOCK_THRESHOLD}
-
-	titles = {
-		row.name: row.item_name
-		for row in frappe.get_all(
-			"Item",
-			filters={"name": ["in", list({row.item_style for row in variants if row.item_style})]},
-			fields=["name", "item_name"],
+	def build_base():
+		q = (
+			frappe.qb.from_(csi)
+			.join(sav)
+			.on(sav.name == csi.parent)
+			.left_join(tpl)
+			.on(tpl.name == sav.item_style)
+			.where((csi.parenttype == "Style Attribute Variant") & (Coalesce(csi.item_code, "") != ""))
 		)
-	}
-	# get_size_stock (catalog.py) already reads Bin actual_qty + reserved_qty in one batched
-	# query - reused rather than re-querying Bin a second way for the same numbers.
-	stock_by_item_code = get_size_stock(item_codes)
-	low_level_by_item_code = get_low_stock_levels(item_codes)
+		if needs_var_item:
+			q = q.left_join(var_item).on(var_item.name == csi.item_code)
+		if warehouse:
+			q = q.left_join(bin_dt).on((bin_dt.item_code == csi.item_code) & (bin_dt.warehouse == warehouse))
+		if availability == "out":
+			q = q.where(stock_expr <= 0)
+		elif availability == "low":
+			q = q.where((stock_expr > 0) & (stock_expr <= low_level_expr))
+		if search:
+			needle = f"%{cstr(search).casefold()}%"
+			q = q.where(Lower(product_expr).like(needle) | Lower(csi.item_code).like(needle))
+		return q
 
-	# A dashboard-created variant never sets an Item.image, so the row falls back to its first option photo.
-	first_image_by_variant = get_first_option_photos(list(variant_by_name))
+	start = cint(start)
+	page_length = cint(page_length) or PAGE_LENGTH
+
+	page_query = build_base().select(
+		csi.item_code,
+		product_expr.as_("product"),
+		sav.item_style.as_("product_name"),
+		Coalesce(NullIf(sav.attribute_value, ""), sav.display_name).as_("option"),
+		sav.name.as_("variant"),
+		csi.size,
+		stock_expr.as_("stock"),
+		committed_expr.as_("committed"),
+		sav.is_published,
+		low_level_expr.as_("low_stock_level"),
+	)
+	if sort:
+		page_query = page_query.orderby(stock_expr, order=Order.asc).orderby(product_expr, order=Order.asc)
+	page_rows = page_query.limit(page_length).offset(start).run(as_dict=True)
+
+	if start == 0 and len(page_rows) < page_length:
+		total = len(page_rows)
+	else:
+		total = cint(build_base().select(Count("*")).run()[0][0])
+
+	if not page_rows:
+		return {"rows": [], "total": total, "low_stock_threshold": LOW_STOCK_THRESHOLD}
+
+	# Only fetch first option photos for variants on this page (skipped for analytics reports).
+	first_image_by_variant = (
+		get_first_option_photos([row.variant for row in page_rows]) if include_images else {}
+	)
 
 	rows = []
-	for size in sizes:
-		if not size.item_code:
-			continue
-
-		variant = variant_by_name.get(size.parent)
-		if not variant:
-			continue
-
-		stock = stock_by_item_code.get(cstr(size.item_code), {})
-		quantity = stock.get("stock", 0)
-		low_level = low_level_by_item_code.get(cstr(size.item_code), LOW_STOCK_THRESHOLD)
+	for row in page_rows:
+		quantity = flt(row.stock)
+		low_level = cint(row.low_stock_level) or LOW_STOCK_THRESHOLD
 		rows.append(
 			{
-				"item_code": size.item_code,
-				"product": titles.get(variant.item_style) or variant.item_style,
-				"product_name": variant.item_style,
-				"option": variant.attribute_value or variant.display_name,
-				"variant": variant.name,
-				"size": size.size,
-				"image": first_image_by_variant.get(variant.name),
+				"item_code": row.item_code,
+				"product": row.product or row.product_name,
+				"product_name": row.product_name,
+				"option": row.option,
+				"variant": row.variant,
+				"size": row.size,
+				"image": first_image_by_variant.get(row.variant),
 				"stock": quantity,
-				"committed": stock.get("committed", 0),
-				"is_published": bool(variant.is_published),
+				"committed": flt(row.committed),
+				"is_published": bool(row.is_published),
 				"low_stock_level": low_level,
 				"availability": describe_availability(quantity, low_level),
 			}
 		)
 
-	if availability in ("out", "low"):
-		rows = [
-			row for row in rows if row["availability"] == ("Out of stock" if availability == "out" else "Low")
-		]
-	if search:
-		needle = cstr(search).casefold()
-		rows = [
-			row
-			for row in rows
-			if needle in cstr(row["product"]).casefold() or needle in cstr(row["item_code"]).casefold()
-		]
-
-	rows.sort(key=lambda row: (row["stock"], cstr(row["product"])))
-
-	start = cint(start)
-	page_length = cint(page_length) or PAGE_LENGTH
 	return {
-		"rows": rows[start : start + page_length],
-		"total": len(rows),
+		"rows": rows,
+		"total": total,
 		"low_stock_threshold": LOW_STOCK_THRESHOLD,
 	}
 

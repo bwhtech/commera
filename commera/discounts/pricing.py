@@ -89,11 +89,41 @@ def apply_code_discounts(doc, method=None):
 	if not is_repriced(doc):
 		apply_recorded_discounts(doc)
 		return
-	selections = select_discounts(get_cart_context(doc))
-	allocations = apply_line_discounts(doc, [s for s in selections if s.discount.discount_class == PRODUCT])
-	doc.calculate_taxes_and_totals()
-	allocations += apply_order_discount(doc, [s for s in selections if s.discount.discount_class == ORDER])
-	doc.calculate_taxes_and_totals()
+	cart = get_cart_context(doc)
+	selections = select_discounts(cart)
+	doc.flags._commera_selected_discounts = selections
+	product_selections = [s for s in selections if s.discount.discount_class == PRODUCT]
+	order_selections = [s for s in selections if s.discount.discount_class == ORDER]
+	allocations = apply_line_discounts(doc, product_selections) if product_selections else []
+	if allocations:
+		if doc.taxes or not order_selections:
+			doc.calculate_taxes_and_totals()
+			doc.flags._commera_totals_calculated = True
+		else:
+			# No taxes: update line amounts & totals in-place before evaluating order discounts, then calculate once.
+			conv = flt(doc.conversion_rate) or 1.0
+			for item in doc.items:
+				item.amount = flt(item.rate) * flt(item.qty)
+				item.net_rate = item.rate
+				item.net_amount = item.amount
+				item.base_rate = flt(item.rate) * conv
+				item.base_amount = flt(item.amount) * conv
+				item.base_net_rate = item.base_rate
+				item.base_net_amount = item.base_amount
+			doc.total = sum(flt(item.amount) for item in doc.items)
+			doc.net_total = doc.total
+			doc.base_total = sum(flt(item.base_amount) for item in doc.items)
+			doc.base_net_total = doc.base_total
+			doc.grand_total = doc.total
+			doc.base_grand_total = doc.base_total
+	order_allocations = apply_order_discount(doc, order_selections) if order_selections else []
+	if order_allocations:
+		allocations += order_allocations
+		doc.calculate_taxes_and_totals()
+		doc.flags._commera_totals_calculated = True
+	elif allocations and not doc.flags.get("_commera_totals_calculated"):
+		doc.calculate_taxes_and_totals()
+		doc.flags._commera_totals_calculated = True
 	allocations += get_shipping_allocations(doc)
 	set_allocations(doc, allocations)
 	if allocations:

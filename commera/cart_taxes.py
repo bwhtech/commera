@@ -16,6 +16,23 @@ from commera.localization.markets import Market
 
 TEMPLATE_DOCTYPE = "Sales Taxes and Charges Template"
 SPECIFIC_RULE_FIELDS = ("customer", "customer_group", "tax_category", "billing_country", "shipping_country")
+TAX_RULES_CACHE_KEY = "commera:has_tax_rules"
+
+
+def has_active_tax_rules() -> bool:
+	"""Whether any Tax Rule exists on this site. Cached in Redis so empty-rule stores skip 3-5 queries per cart."""
+	cached = frappe.cache.get_value(TAX_RULES_CACHE_KEY)
+	if cached is not None:
+		return bool(cached)
+	exists = bool(frappe.db.get_value("Tax Rule", {"tax_type": "Sales"}, "name"))
+	frappe.cache.set_value(TAX_RULES_CACHE_KEY, int(exists))
+	return exists
+
+
+def clear_tax_rules_cache(doc=None, method=None, *args, **kwargs):
+	frappe.cache.delete_value(TAX_RULES_CACHE_KEY)
+	if hasattr(frappe.db, "after_commit"):
+		frappe.db.after_commit.add(lambda: frappe.cache.delete_value(TAX_RULES_CACHE_KEY))
 
 
 def apply_market_taxes(quotation, market: Market | None, switched: bool):
@@ -119,6 +136,8 @@ def get_default_template(quotation, market: Market | None) -> str | None:
 
 def get_tax_rule_template(quotation, market: Market | None = None) -> str | None:
 	"""Use ERPNext matching and ranking, excluding generic rules when the market has a template."""
+	if not has_active_tax_rules():
+		return None
 	customer_name = quotation.party_name if quotation.quotation_to == "Customer" else None
 	customer = (
 		frappe.get_cached_value("Customer", customer_name, ["customer_group", "tax_category"], as_dict=True)

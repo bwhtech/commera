@@ -27,7 +27,15 @@ def has_published_product() -> bool:
 
 
 def has_online_payments() -> bool:
-	return any(is_profile_enabled(integration) for integration in get_payment_registry())
+	by_doctype: dict[str, list[str]] = {}
+	for integration in get_payment_registry():
+		by_doctype.setdefault(integration["profile_doctype"], []).append(integration["label"])
+	for profile_doctype, labels in by_doctype.items():
+		if frappe.db.table_exists(profile_doctype) and frappe.db.exists(
+			profile_doctype, {"name": ["in", labels], "enabled": 1}
+		):
+			return True
+	return False
 
 
 def has_shipping(settings) -> bool:

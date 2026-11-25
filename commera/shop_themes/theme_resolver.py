@@ -54,12 +54,30 @@ NOT_FOUND_TEMPLATE = "pages/404.html"
 LOGIN_TEMPLATE = "pages/account/login.html"
 
 
+_theme_file_cache: dict[tuple[tuple[str, ...], str], str | None] = {}
+_template_source_cache: dict[str, tuple[float, str]] = {}
+
+
+def _is_dev_reload() -> bool:
+	return bool(frappe.conf.get("developer_mode") or frappe._dev_server or frappe.flags.in_test)
+
+
 def find_theme_file(theme_dirs, relative_path):
+	dev_reload = _is_dev_reload()
+	cache_key = (tuple(theme_dirs), relative_path)
+	if not dev_reload and cache_key in _theme_file_cache:
+		return _theme_file_cache[cache_key]
+	found = None
 	for theme_dir in theme_dirs:
 		candidate = os.path.join(theme_dir, relative_path)
 		if is_within_directory(theme_dir, candidate) and os.path.isfile(candidate):
-			return candidate
-	return None
+			found = candidate
+			break
+	if not dev_reload:
+		if len(_theme_file_cache) > 2048:
+			_theme_file_cache.clear()
+		_theme_file_cache[cache_key] = found
+	return found
 
 
 page_controller_modules = {}
@@ -256,10 +274,22 @@ class ThemeFallbackLoader(BaseLoader):
 
 
 def read_template_source(full_path):
+	dev_reload = _is_dev_reload()
+	cached = _template_source_cache.get(full_path)
+	if not dev_reload and cached is not None:
+		return cached[1], full_path, lambda: True
 	modified_time = os.path.getmtime(full_path)
-	# nosemgrep: frappe-semgrep-rules.rules.security.frappe-security-file-traversal
-	with open(full_path) as source_file:
-		source = source_file.read()
+	if cached is not None and cached[0] == modified_time:
+		source = cached[1]
+	else:
+		# nosemgrep: frappe-semgrep-rules.rules.security.frappe-security-file-traversal
+		with open(full_path) as source_file:
+			source = source_file.read()
+		if len(_template_source_cache) > 512:
+			_template_source_cache.clear()
+		_template_source_cache[full_path] = (modified_time, source)
+	if not dev_reload:
+		return source, full_path, lambda: True
 	return (
 		source,
 		full_path,

@@ -1,6 +1,8 @@
 """Item Price rows as storefront prices. A public row has no customer, supplier or batch: a contract,
 a buying price or one batch's price is not what an anonymous shopper pays. Every storefront read uses these."""
 
+from contextlib import contextmanager
+
 import frappe
 from frappe.query_builder import Case, DocType, Order
 from frappe.query_builder.functions import Coalesce, IfNull, NullIf, Round
@@ -10,26 +12,238 @@ from pypika.terms import ValueWrapper
 
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
+TEMPLATE_PRICES_CACHE_KEY = "commera:has_template_item_prices"
+NON_STOCK_SALES_UOM_CACHE_KEY = "commera:has_non_stock_sales_uom"
+MISMATCHED_PRICE_UOM_CACHE_KEY = "commera:has_mismatched_price_uom"
+DUPLICATE_PRICES_CACHE_PREFIX = "commera:has_duplicate_active_prices:"
+
+
+def has_template_item_prices() -> bool:
+	"""Whether any selling Item Price row targets a template Item (has_variants=1).
+	Cached in Redis and invalidated on Item Price writes so the common variant-priced shop skips the UNION."""
+	cached = frappe.cache.get_value(TEMPLATE_PRICES_CACHE_KEY)
+	if cached is not None:
+		return bool(cached)
+	item = DocType("Item")
+	price = DocType("Item Price")
+	exists = bool(
+		frappe.qb.from_(price)
+		.join(item)
+		.on(item.name == price.item_code)
+		.select(price.name)
+		.where((price.selling == 1) & (item.has_variants == 1))
+		.limit(1)
+		.run()
+	)
+	frappe.cache.set_value(TEMPLATE_PRICES_CACHE_KEY, int(exists))
+	return exists
+
+
+def has_non_stock_sales_uom() -> bool:
+	"""Whether any Item defines a sales_uom distinct from its stock_uom.
+	When False, sales_uom == stock_uom everywhere and UOM conversion joins/subqueries are unnecessary."""
+	cached = frappe.cache.get_value(NON_STOCK_SALES_UOM_CACHE_KEY)
+	if cached is not None:
+		return bool(cached)
+	item = DocType("Item")
+	exists = bool(
+		frappe.qb.from_(item)
+		.select(item.name)
+		.where((IfNull(item.sales_uom, "") != "") & (item.sales_uom != item.stock_uom))
+		.limit(1)
+		.run()
+	)
+	frappe.cache.set_value(NON_STOCK_SALES_UOM_CACHE_KEY, int(exists))
+	return exists
+
+
+def has_mismatched_price_uom() -> bool:
+	"""Whether any selling public Item Price specifies a UOM different from its Item's stock_uom."""
+	cached = frappe.cache.get_value(MISMATCHED_PRICE_UOM_CACHE_KEY)
+	if cached is not None:
+		return bool(cached)
+	item = DocType("Item")
+	price = DocType("Item Price")
+	exists = bool(
+		frappe.qb.from_(price)
+		.join(item)
+		.on(item.name == price.item_code)
+		.select(price.name)
+		.where(
+			(price.selling == 1)
+			& is_public_price(price)
+			& (IfNull(price.uom, "") != "")
+			& (price.uom != item.stock_uom)
+		)
+		.limit(1)
+		.run()
+	)
+	frappe.cache.set_value(MISMATCHED_PRICE_UOM_CACHE_KEY, int(exists))
+	return exists
+
+
+def has_duplicate_active_item_prices() -> bool:
+	"""Whether any (item_code, price_list) has more than one active public selling Item Price today."""
+	today = nowdate()
+	cache_key = f"{DUPLICATE_PRICES_CACHE_PREFIX}{today}"
+	cached = frappe.cache.get_value(cache_key)
+	if cached is not None:
+		return bool(cached)
+	from frappe.query_builder.functions import Count
+
+	price = DocType("Item Price")
+	exists = bool(
+		frappe.qb.from_(price)
+		.select(price.item_code)
+		.where((price.selling == 1) & is_public_price(price) & is_valid_on(price, today))
+		.groupby(price.item_code, price.price_list)
+		.having(Count("*") > 1)
+		.limit(1)
+		.run()
+	)
+	frappe.cache.set_value(cache_key, int(exists), expires_in_sec=24 * 60 * 60)
+	return exists
+
+
+def can_use_direct_item_price() -> bool:
+	"""True when public selling prices are 1:1 per (item_code, price_list) on variant items in stock UOM.
+	Allows direct Item Price reads without Item joins or ROW_NUMBER() windowing."""
+	return (
+		not has_template_item_prices()
+		and not has_non_stock_sales_uom()
+		and not has_mismatched_price_uom()
+		and not has_duplicate_active_item_prices()
+	)
+
+
+def _delete_item_price_flags():
+	frappe.cache.delete_value(TEMPLATE_PRICES_CACHE_KEY)
+	frappe.cache.delete_value(MISMATCHED_PRICE_UOM_CACHE_KEY)
+	frappe.cache.delete_keys(f"{DUPLICATE_PRICES_CACHE_PREFIX}*")
+
+
+def clear_template_price_cache(doc=None, method=None, *args, **kwargs):
+	_delete_item_price_flags()
+	clear_request_rates_cache()
+	if hasattr(frappe.db, "after_commit"):
+		frappe.db.after_commit.add(_delete_item_price_flags)
+
+
+def clear_sales_uom_cache(doc=None, method=None, *args, **kwargs):
+	frappe.cache.delete_value(NON_STOCK_SALES_UOM_CACHE_KEY)
+	frappe.cache.delete_value(MISMATCHED_PRICE_UOM_CACHE_KEY)
+	clear_request_rates_cache()
+	if hasattr(frappe.db, "after_commit"):
+		frappe.db.after_commit.add(
+			lambda: (
+				frappe.cache.delete_value(NON_STOCK_SALES_UOM_CACHE_KEY),
+				frappe.cache.delete_value(MISMATCHED_PRICE_UOM_CACHE_KEY),
+			)
+		)
+
+
+def clear_request_rates_cache():
+	if cache := getattr(frappe.local, "commera_public_rates_cache", None):
+		cache.clear()
+
+
+def clear_base_prices_cache():
+	_delete_item_price_flags()
+	frappe.cache.delete_value(NON_STOCK_SALES_UOM_CACHE_KEY)
+	clear_request_rates_cache()
+
+
+@contextmanager
+def memoize_public_rates():
+	"""Memoize get_public_rates within a single read-only storefront call (e.g. list_products)."""
+	existing = getattr(frappe.local, "commera_public_rates_cache", None)
+	if existing is not None:
+		yield
+		return
+	frappe.local.commera_public_rates_cache = {}
+	try:
+		yield
+	finally:
+		frappe.local.commera_public_rates_cache = None
+
 
 def get_public_rates(item_codes: list[str], price_lists: list[str]) -> list[dict]:
 	"""public_rates_query's rows for `item_codes`: item_code, price_list, rate and valid_upto."""
-	price_lists = [name for name in price_lists if name]
+	price_lists = list(dict.fromkeys(name for name in price_lists if name))
 	if not item_codes or not price_lists:
 		return []
+	unique_codes = list(dict.fromkeys(item_codes))
+	cache = getattr(frappe.local, "commera_public_rates_cache", None)
+	cache_key = (tuple(sorted(unique_codes)), tuple(price_lists), nowdate()) if cache is not None else None
+	if cache is not None and cache_key in cache:
+		return cache[cache_key]
+
 	rows = []
-	for chunk in create_batch(list(item_codes), IN_CLAUSE_CHUNK_SIZE):
-		rows.extend(public_rates_query(price_lists, chunk).run(as_dict=True))
+	if can_use_direct_item_price() and len(unique_codes) > IN_CLAUSE_CHUNK_SIZE:
+		# Large catalog-wide reads (e.g. inventory report): one indexed price_list scan beats multi-chunk IN (...).
+		wanted = set(unique_codes)
+		price = DocType("Item Price").as_("public_price")
+		all_rows = (
+			frappe.qb.from_(price)
+			.select(
+				price.item_code,
+				price.price_list,
+				price.price_list_rate.as_("rate"),
+				price.valid_upto,
+				price.name.as_("price_name"),
+				price.price_list_rate,
+				ValueWrapper(0).as_("template_rank"),
+			)
+			.where(
+				price.price_list.isin(price_lists)
+				& (price.selling == 1)
+				& is_public_price(price)
+				& is_valid_on(price, nowdate())
+			)
+			.run(as_dict=True)
+		)
+		rows = [row for row in all_rows if row.item_code in wanted]
+	else:
+		for chunk in create_batch(unique_codes, IN_CLAUSE_CHUNK_SIZE):
+			rows.extend(public_rates_query(price_lists, chunk).run(as_dict=True))
+	if cache is not None:
+		cache[cache_key] = rows
 	return rows
 
 
 def public_rates_query(price_lists: list[str], item_codes):
 	"""One row per item and list: the rate ERPNext's get_price_list_rate gives a new line today, in the
 	item's sales UOM, from the item's rows, else its template's. price_name is the row; the cart applies packing units."""
-	# A union, not an OR join: each half reads Item Price by its item_code index.
-	candidates = (
-		get_candidate_rows(price_lists, item_codes, "name")
-		* get_candidate_rows(price_lists, item_codes, "variant_of")
-	).as_("price_candidates")
+	if can_use_direct_item_price():
+		price = DocType("Item Price").as_("public_price")
+		return (
+			frappe.qb.from_(price)
+			.select(
+				price.item_code,
+				price.price_list,
+				price.price_list_rate.as_("rate"),
+				price.valid_upto,
+				price.name.as_("price_name"),
+				price.price_list_rate,
+				ValueWrapper(0).as_("template_rank"),
+			)
+			.where(
+				price.item_code.isin(item_codes)
+				& price.price_list.isin(price_lists)
+				& (price.selling == 1)
+				& is_public_price(price)
+				& is_valid_on(price, nowdate())
+			)
+		)
+
+	if has_template_item_prices():
+		# A union, not an OR join: each half reads Item Price by its item_code index.
+		candidates = (
+			get_candidate_rows(price_lists, item_codes, "name")
+			* get_candidate_rows(price_lists, item_codes, "variant_of")
+		).as_("price_candidates")
+	else:
+		candidates = get_candidate_rows(price_lists, item_codes, "name").as_("price_candidates")
 	ranked = (
 		frappe.qb.from_(candidates)
 		.select(
@@ -63,19 +277,35 @@ def get_candidate_rows(price_lists: list[str], item_codes, priced_by: str):
 	"""The public rows valid today that price an item through its `priced_by` field: name or variant_of."""
 	item = DocType("Item").as_("priced_item")
 	price = DocType("Item Price").as_("public_price")
-	sales_uom = get_sales_uom(item)
+	use_uom_conversion = has_non_stock_sales_uom()
+	sales_uom = get_sales_uom(item) if use_uom_conversion else item.stock_uom
+	uom_filter = (
+		IfNull(price.uom, "").isin(["", sales_uom, item.stock_uom])
+		if use_uom_conversion
+		else IfNull(price.uom, "").isin(["", item.stock_uom])
+	)
+	uom_rank = (
+		Case().when(IfNull(price.uom, "").isin(["", sales_uom]), 0).else_(1)
+		if use_uom_conversion
+		else ValueWrapper(0)
+	)
+
+	where_cond = (
+		item.name.isin(item_codes)
+		& price.price_list.isin(price_lists)
+		& (price.selling == 1)
+		& is_public_price(price)
+		& is_valid_on(price, nowdate())
+		& uom_filter
+	)
+	if priced_by == "variant_of":
+		where_cond = where_cond & (IfNull(item.variant_of, "") != "")
+
 	query = (
 		frappe.qb.from_(item)
 		.join(price)
 		.on(price.item_code == item[priced_by])
-		.where(
-			item.name.isin(item_codes)
-			& price.price_list.isin(price_lists)
-			& (price.selling == 1)
-			& is_public_price(price)
-			& is_valid_on(price, nowdate())
-			& IfNull(price.uom, "").isin(["", sales_uom, item.stock_uom])
-		)
+		.where(where_cond)
 		.select(
 			item.name.as_("item_code"),
 			price.price_list,
@@ -85,9 +315,11 @@ def get_candidate_rows(price_lists: list[str], item_codes, priced_by: str):
 			price.name.as_("price_name"),
 			price.price_list_rate,
 			ValueWrapper(int(priced_by != "name")).as_("template_rank"),
-			Case().when(IfNull(price.uom, "").isin(["", sales_uom]), 0).else_(1).as_("uom_rank"),
+			uom_rank.as_("uom_rank"),
 		)
 	)
+	if not use_uom_conversion:
+		return query.select(price.price_list_rate.as_("rate"))
 	return add_sales_unit_rate(query, item, price)
 
 
@@ -102,7 +334,10 @@ def add_sales_unit_rate(query, item, price):
 	rate = (
 		Case()
 		.when(
-			(IfNull(price.uom, "") == sales_uom) | (price_list.price_not_uom_dependent == 1),
+			(IfNull(item.sales_uom, "") == "")
+			| (item.sales_uom == item.stock_uom)
+			| (IfNull(price.uom, "") == sales_uom)
+			| (price_list.price_not_uom_dependent == 1),
 			price.price_list_rate,
 		)
 		.else_(
@@ -167,7 +402,7 @@ def get_sales_uom(item):
 
 def get_sales_units(item_codes: list[str]) -> dict[str, str]:
 	"""The sales UOM of each item sold in a UOM other than its stock UOM: what one unit of its price buys."""
-	if not item_codes:
+	if not item_codes or not has_non_stock_sales_uom():
 		return {}
 	rows = frappe.get_all(
 		"Item", filters={"name": ["in", list(item_codes)]}, fields=["name", "sales_uom", "stock_uom"]

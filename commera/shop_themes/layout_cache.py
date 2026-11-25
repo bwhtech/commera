@@ -14,14 +14,22 @@ Sha2 = CustomFunction("SHA2", ["value", "length"])
 
 def get_published_layouts(theme_names, page) -> dict:
 	"""{theme: its parsed published layout, or None}, from the cache when this content is in it."""
+	req_cache = getattr(frappe.local, "commera_published_layouts_cache", None)
+	if req_cache is None:
+		req_cache = frappe.local.commera_published_layouts_cache = {}
+	req_key = (tuple(theme_names), page)
+	if req_key in req_cache:
+		return req_cache[req_key]
 	key = get_cache_key(theme_names, page, read_versions(theme_names, page))
 	if (layouts := frappe.cache.get_value(key)) is not None:
+		req_cache[req_key] = layouts
 		return layouts
 	rows = read_rows(theme_names, page)
 	layouts = parse_layouts(theme_names, rows)
 	frappe.cache.set_value(
 		get_cache_key(theme_names, page, get_versions(rows)), layouts, expires_in_sec=EXPIRES_IN_SEC
 	)
+	req_cache[req_key] = layouts
 	return layouts
 
 

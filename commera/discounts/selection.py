@@ -13,6 +13,26 @@ from commera.discounts.doctype.commera_discount.commera_discount import (
 from commera.discounts.usage import has_used_before, is_first_order
 
 MAX_DISCOUNT_CODES = 5
+AUTOMATIC_DISCOUNTS_CACHE_KEY = "commera:automatic_discounts"
+
+
+def clear_automatic_discounts_cache(doc=None, method=None, *args, **kwargs):
+	frappe.cache.delete_value(AUTOMATIC_DISCOUNTS_CACHE_KEY)
+	if hasattr(frappe.db, "after_commit"):
+		frappe.db.after_commit.add(lambda: frappe.cache.delete_value(AUTOMATIC_DISCOUNTS_CACHE_KEY))
+
+
+def get_automatic_discount_names() -> list[str]:
+	cached = frappe.cache.get_value(AUTOMATIC_DISCOUNTS_CACHE_KEY)
+	if cached is None:
+		cached = frappe.get_all(
+			"Commera Discount",
+			filters={"enabled": 1, "method": "Automatic"},
+			pluck="name",
+			order_by="creation",
+		)
+		frappe.cache.set_value(AUTOMATIC_DISCOUNTS_CACHE_KEY, cached)
+	return cached
 
 
 @dataclass
@@ -91,9 +111,7 @@ def get_candidates(doc) -> list[Selection]:
 		discount_name = get_code_discount(code)
 		if discount_name and not is_single_use_spent(code) and not get_discount_code_refusal(doc, code):
 			candidates.append(Selection(get_discount(discount_name), code))
-	automatic = frappe.get_all(
-		"Commera Discount", filters={"enabled": 1, "method": "Automatic"}, pluck="name", order_by="creation"
-	)
+	automatic = get_automatic_discount_names()
 	return candidates + [Selection(get_discount(name)) for name in automatic]
 
 

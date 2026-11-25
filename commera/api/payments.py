@@ -407,16 +407,22 @@ REVIEWED_TOTAL_FIELD = "custom_reviewed_total"
 VERSIONED_ADDRESS_FIELDS = ("address_line1", "address_line2", "city", "state", "pincode", "country", "phone")
 
 
-def get_checkout_version(quotation) -> str:
+def get_checkout_version(quotation, addresses: dict | None = None) -> str:
 	"""A digest of what the buyer approves: lines, contact, addresses, pickup or delivery, and total."""
-	address_names = [name for name in (quotation.customer_address, quotation.shipping_address_name) if name]
-	addresses = {}
-	if address_names:
+	if addresses is None:
+		address_names = [name for name in (quotation.customer_address, quotation.shipping_address_name) if name]
+		addresses = {}
+		if address_names:
+			addresses = {
+				address.name: address
+				for address in frappe.get_all(
+					"Address", filters={"name": ("in", address_names)}, fields=["name", *VERSIONED_ADDRESS_FIELDS]
+				)
+			}
+	else:
 		addresses = {
-			address.name: address
-			for address in frappe.get_all(
-				"Address", filters={"name": ("in", address_names)}, fields=["name", *VERSIONED_ADDRESS_FIELDS]
-			)
+			name: frappe._dict({k: addr.get(k) for k in ("name", *VERSIONED_ADDRESS_FIELDS)})
+			for name, addr in addresses.items()
 		}
 	content = {
 		"lines": [(row.item_code, flt(row.qty), flt(row.rate)) for row in quotation.items],
@@ -801,13 +807,17 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 def set_charges(quotation):
 	shipping_rule = frappe.get_cached_value("Commera Settings", "Commera Settings", "shipping_rule")
 	if shipping_rule:
-		from commera.api.shipping import keep_shipping_rule_last, remove_shipping_rule_row
+		from commera.api.shipping import (
+			calculate_taxes_with_cached_shipping,
+			keep_shipping_rule_last,
+			remove_shipping_rule_row,
+		)
 
 		remove_shipping_rule_row(quotation)
 		# Left off where it does not deliver, so the cart still saves: payment then refuses the cart.
 		quotation.shipping_rule = shipping_rule if ships_to_address(quotation, shipping_rule) else None
 		keep_shipping_rule_last(quotation)
-		quotation.run_method("calculate_taxes_and_totals")
+		calculate_taxes_with_cached_shipping(quotation, apply_rule=False)
 	apply_plugin_fees(quotation)
 
 
@@ -816,8 +826,43 @@ def get_charged_preview(quotation):
 	preview = frappe.get_doc(quotation.as_dict())
 	# Payment re-quotes a chosen option over the network; its stored row stands until then.
 	if not preview.custom_is_store_pickup and not preview.custom_delivery_option:
-		set_charges(preview)
+		if not _charges_already_current(preview):
+			set_charges(preview)
 	return preview
+
+
+def _charges_already_current(quotation) -> bool:
+	"""True when the quotation already has the current store shipping rule row (with unchanged amount)
+	and no plugin fee handlers, so get_charged_preview can skip recalculating taxes_and_totals."""
+	from commera.plugin_events import get_handlers
+
+	if get_handlers("commera_hooks", "cart_fees"):
+		return False
+	shipping_rule = frappe.get_cached_value("Commera Settings", "Commera Settings", "shipping_rule")
+	if not shipping_rule:
+		return not quotation.shipping_rule
+	expected_rule = shipping_rule if ships_to_address(quotation, shipping_rule) else None
+	if (quotation.shipping_rule or None) != expected_rule:
+		return False
+	if not expected_rule:
+		return True
+	from commera.api.shipping import get_cart_charge_kind
+
+	shipping_rows = [row for row in quotation.taxes if get_cart_charge_kind(row, quotation) == "shipping_rule"]
+	if len(shipping_rows) != 1 or quotation.taxes[-1] is not shipping_rows[0]:
+		return False
+	rule = frappe.get_cached_doc("Shipping Rule", expected_rule)
+	if rule.calculate_based_on == "Net Total":
+		expected_amount = rule.get_shipping_amount_from_rules(rule.get_net_total(quotation))
+	elif rule.calculate_based_on == "Net Weight":
+		expected_amount = rule.get_shipping_amount_from_rules(quotation.total_net_weight)
+	elif rule.calculate_based_on == "Fixed":
+		expected_amount = rule.shipping_amount
+	else:
+		return False
+	if quotation.currency != quotation.company_currency:
+		expected_amount = flt(expected_amount / (flt(quotation.conversion_rate) or 1.0), 2)
+	return flt(shipping_rows[0].tax_amount, 2) == flt(expected_amount, 2)
 
 
 def set_cod_charges(quotation):

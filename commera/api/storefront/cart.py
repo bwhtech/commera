@@ -119,7 +119,7 @@ def adopt_cart() -> PricedCart | None:
 def get_checkout_url() -> dict:
 	"""A single-use path that opens this cart in the Commera checkout, valid for five minutes."""
 	handoff = get_checkout_handoff()
-	if not get_session_cart():
+	if not get_session_cart(for_update=False):
 		frappe.throw(_("Add something to your cart first."), frappe.DoesNotExistError)
 
 	code = frappe.generate_hash(length=32)

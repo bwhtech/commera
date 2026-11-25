@@ -269,7 +269,7 @@ def get_checkout_state(quotation) -> CheckoutState:
 		}
 	return {
 		"cart": quotation.name,
-		"version": get_checkout_version(quotation),
+		"version": get_checkout_version(quotation, addresses=addresses),
 		"currency": quotation.currency,
 		"items": get_checkout_lines(quotation.items),
 		"email": quotation.contact_email,

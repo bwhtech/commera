@@ -5,7 +5,7 @@ from frappe.utils.caching import redis_cache
 from frappe.utils.data import cint, cstr, flt, sha256_hash
 
 from commera.api.admin.catalog import DEFAULT_OPTION_ATTRIBUTE, DEFAULT_OPTION_VALUE, DEFAULT_SIZE_VALUE
-from commera.base_prices import get_sales_units
+from commera.base_prices import get_sales_units, memoize_public_rates
 from commera.localization import get_localization, translate
 from commera.localization.market_prices import MarketPrices
 from commera.plugin_events import get_ecommerce_warehouse, get_listed_items
@@ -156,14 +156,24 @@ def list_products(
 		**({"max_price": flt(max_price)} if max_price is not None else {}),
 	}
 
-	cards = get_product_list(filters=filters, page=page, page_length=page_size, sort_by=sort)
-	return {
-		"products": get_product_cards(cards),
-		"total": get_total_product_count(filters=filters),
-		"page": page,
-		"page_size": page_size,
-		"facets": {**get_facets(filters), "price": get_market_price_facet()},
-	}
+	with memoize_public_rates():
+		out_total = {}
+		cards = get_product_list(
+			filters=filters, page=page, page_length=page_size, sort_by=sort, out_total=out_total
+		)
+		if "total" in out_total:
+			total = out_total["total"]
+		elif page == 1 and len(cards) < page_size:
+			total = len(cards)
+		else:
+			total = get_total_product_count(filters=filters)
+		return {
+			"products": get_product_cards(cards),
+			"total": total,
+			"page": page,
+			"page_size": page_size,
+			"facets": {**get_facets(filters), "price": get_market_price_facet()},
+		}
 
 
 def search(query: str, page: int = 1, page_size: int = 24, sort: str = "default", **filters) -> SearchResults:
@@ -190,13 +200,14 @@ def search(query: str, page: int = 1, page_size: int = 24, sort: str = "default"
 
 
 def get_typeahead(query: str, limit: int = 6) -> Typeahead:
-	typeahead = get_search_typeahead(query, limit)
-	return {
-		"query": typeahead["query"],
-		"corrected_query": typeahead["corrected_query"],
-		"products": get_product_cards(typeahead["products"]),
-		"categories": [{"title": link["label"], "url": link["url"]} for link in typeahead["categories"]],
-	}
+	with memoize_public_rates():
+		typeahead = get_search_typeahead(query, limit)
+		return {
+			"query": typeahead["query"],
+			"corrected_query": typeahead["corrected_query"],
+			"products": get_product_cards(typeahead["products"]),
+			"categories": [{"title": link["label"], "url": link["url"]} for link in typeahead["categories"]],
+		}
 
 
 def get_recommendations(handle: str, limit: int = 8) -> list[ProductCard]:
@@ -208,25 +219,27 @@ def get_recommendations(handle: str, limit: int = 8) -> list[ProductCard]:
 	)
 	if not product_variant:
 		return []
-	return get_product_cards(
-		get_recommended_products(product_variant, limit=min(max(cint(limit), 1), MAX_PAGE_SIZE))
-	)
+	with memoize_public_rates():
+		return get_product_cards(
+			get_recommended_products(product_variant, limit=min(max(cint(limit), 1), MAX_PAGE_SIZE))
+		)
 
 
 def get_product_cards_for(item_codes: list[str] | None = None, limit: int = 8) -> list[ProductCard]:
 	item_codes = [cstr(code) for code in item_codes or [] if code]
-	if not item_codes:
-		return get_product_cards(get_product_list(page_length=min(max(cint(limit), 1), MAX_PAGE_SIZE)))
-	published_codes = frappe.get_all(
-		"Style Attribute Variant", filters={"name": ("in", item_codes), "is_published": 1}, pluck="name"
-	)
-	if not published_codes:
-		return []
-	cards_by_name = {
-		card["name"]: card
-		for card in get_product_list(product_list=published_codes, page_length=len(published_codes))
-	}
-	return get_product_cards([cards_by_name[code] for code in item_codes if code in cards_by_name])
+	with memoize_public_rates():
+		if not item_codes:
+			return get_product_cards(get_product_list(page_length=min(max(cint(limit), 1), MAX_PAGE_SIZE)))
+		published_codes = frappe.get_all(
+			"Style Attribute Variant", filters={"name": ("in", item_codes), "is_published": 1}, pluck="name"
+		)
+		if not published_codes:
+			return []
+		cards_by_name = {
+			card["name"]: card
+			for card in get_product_list(product_list=published_codes, page_length=len(published_codes))
+		}
+		return get_product_cards([cards_by_name[code] for code in item_codes if code in cards_by_name])
 
 
 def list_brands() -> list[dict]:
@@ -430,6 +443,11 @@ def set_product_titles(rows: list[dict]) -> list[dict]:
 
 
 def get_variants(prices: MarketPrices, sizes: list[dict]) -> list[dict]:
+	if sizes and all("sale_rate" in size and "compare_at_rate" in size and "unit" in size for size in sizes):
+		return [
+			get_variant(prices, size, size["sale_rate"], size["compare_at_rate"], size["unit"])
+			for size in sizes
+		]
 	item_codes = [size["item_code"] for size in sizes]
 	compare_at_rates, sale_rates, _sale_ends = rates_by_item_code(
 		item_codes, prices.compare_at_price_list, prices.sale_price_list
@@ -478,27 +496,50 @@ def get_option_color(attribute_value: str) -> str | None:
 def get_options(product_variant, sizes: list[dict]) -> list[ProductOption]:
 	"""The colour axis links sibling products; the size axis picks a variant. Fallback axes stay hidden."""
 	options = []
-	attribute = frappe.db.get_value(
-		"Style Attribute Configurator", product_variant.configurator, "item_attribute"
+	attribute = (
+		frappe.get_cached_value("Style Attribute Configurator", product_variant.configurator, "item_attribute")
+		if product_variant.configurator
+		else None
 	)
 	if attribute and attribute != DEFAULT_OPTION_ATTRIBUTE:
-		options.append({"name": translate_term(attribute), "values": get_sibling_values(product_variant)})
+		options.append(
+			{"name": translate_term(attribute), "values": get_sibling_values(product_variant, sizes)}
+		)
 	if len(sizes) > 1 or (sizes and sizes[0]["size"] != DEFAULT_SIZE_VALUE):
 		values = [{"name": translate_term(size["size"]), "value": size["size"]} for size in sizes]
 		options.append({"name": _("Size", lang=get_localization().language.code), "values": values})
 	return options
 
 
-def get_sibling_values(product_variant) -> list[dict]:
+def get_sibling_values(product_variant, current_sizes: list[dict] | None = None) -> list[dict]:
 	siblings = frappe.get_all(
 		"Style Attribute Variant",
 		filters={"configurator": product_variant.configurator, "is_published": 1},
 		fields=["name", "route", "attribute_value"],
 		order_by="idx asc, attribute_value asc",
 	)
-	sizes_by_variant = sizes_for_variants([sibling.name for sibling in siblings])
-	item_codes = [size["item_code"] for sizes in sizes_by_variant.values() for size in sizes]
-	stock = get_available_stocks(item_codes, get_ecommerce_warehouse())
+	current_stock = (
+		{size["item_code"]: size["stock_detail"] for size in current_sizes if "stock_detail" in size}
+		if current_sizes
+		else {}
+	)
+	other_names = [s.name for s in siblings if s.name != product_variant.name]
+	sizes_by_variant = sizes_for_variants(other_names) if other_names else {}
+	if current_sizes is not None:
+		sizes_by_variant[product_variant.name] = current_sizes
+	else:
+		sizes_by_variant.update(sizes_for_variants([product_variant.name]))
+	other_codes = [
+		size["item_code"]
+		for name, sizes in sizes_by_variant.items()
+		if name != product_variant.name
+		for size in sizes
+		if size["item_code"] not in current_stock
+	]
+	stock = {
+		**current_stock,
+		**(get_available_stocks(other_codes, get_ecommerce_warehouse()) if other_codes else {}),
+	}
 	swatches = get_swatch_map()
 	return [
 		{

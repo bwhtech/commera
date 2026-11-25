@@ -164,7 +164,7 @@ def list_orders(page: int = 1, page_size: int = 10) -> ShopperOrderPage:
 		.offset((page - 1) * page_size)
 		.run(pluck=True)
 	)
-	orders = read_order_results(names, ())
+	orders = read_order_results(names, (), include_tags=False)
 	return {
 		"orders": [without_staff_fields(orders[cstr(name)]) for name in names],
 		"total": total,
@@ -176,7 +176,7 @@ def list_orders(page: int = 1, page_size: int = 10) -> ShopperOrderPage:
 def get_order(name: str, key: str | None = None) -> ShopperOrderDetail:
 	validate_document_access("Sales Order", name, key)
 	access = get_order_access(name, key) or FULL_ACCESS
-	order = without_staff_fields(read_order_results([name], ())[cstr(name)])
+	order = without_staff_fields(read_order_results([name], (), include_tags=False)[cstr(name)])
 	if access == LIMITED_ACCESS:
 		order.update(dict.fromkeys(LIMITED_LINK_HIDDEN_FIELDS))
 	return {**order, "access": access}
