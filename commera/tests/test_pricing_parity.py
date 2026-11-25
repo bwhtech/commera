@@ -19,6 +19,8 @@ from commera.localization import pin_localization, resolve
 from commera.localization.market_prices import MarketPrices
 from commera.localization.markets import delete_cached_rows
 from commera.tests import get_test_configurator
+from commera.tests.test_localization import use_storefront_languages
+from commera.tests.test_markets import use_markets
 
 
 class TestPricingPathParity(IntegrationTestCase):
@@ -26,6 +28,8 @@ class TestPricingPathParity(IntegrationTestCase):
 
 	def setUp(self):
 		super().setUp()
+		self.addCleanup(frappe.clear_document_cache, "Commera Settings", "Commera Settings")
+		self.addCleanup(frappe.local.request_cache.clear)
 		self.suffix = frappe.generate_hash(length=8).upper()
 		self.company = frappe.get_cached_value(
 			"Commera Settings", "Commera Settings", "company"
@@ -294,19 +298,9 @@ class TestPricingPathParity(IntegrationTestCase):
 
 	def test_secondary_currency_market_preview_and_pricing_parity(self):
 		"""R2-2: secondary-currency market (AED) matches across fast preview and ERPNext set_missing_values."""
+		use_storefront_languages(self, "en", published=("en",))
+		use_markets(self)
 		mkt_currency = "USD" if self.currency == "AED" else "AED"
-		prev_multi = frappe.db.get_single_value(
-			"Accounts Settings", "allow_multi_currency_invoices_against_single_party_account"
-		)
-		frappe.db.set_single_value(
-			"Accounts Settings", "allow_multi_currency_invoices_against_single_party_account", 1
-		)
-		self.addCleanup(
-			frappe.db.set_single_value,
-			"Accounts Settings",
-			"allow_multi_currency_invoices_against_single_party_account",
-			prev_multi or 0,
-		)
 		mkt_sale = self._make_price_list(f"MktSale-{mkt_currency}", mkt_currency)
 		mkt_compare = self._make_price_list(f"MktCmp-{mkt_currency}", mkt_currency)
 		if not frappe.db.exists(

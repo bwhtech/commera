@@ -340,6 +340,8 @@ class TestStorefrontCacheIntegration(IntegrationTestCase):
 				delattr(frappe.local, attr)
 		frappe.set_user("Administrator")
 		super().tearDown()
+		# Clear cached Single docs after rollback so uncommitted test edits never leak into later tests.
+		frappe.clear_document_cache("Commera Settings", "Commera Settings")
 
 	def test_http_v1_and_v2_miss_hit_l1_hit_l2_match_uncached(self):
 		"""B6 + B4: MISS == HIT-L1 == HIT-L2 == uncached across v1 and v2 envelopes, no Cache-Control: public."""
@@ -494,6 +496,9 @@ class TestStorefrontCacheIntegration(IntegrationTestCase):
 		suffix = frappe.generate_hash(length=6).upper()
 		settings = frappe.get_doc("Commera Settings")
 		settings.cod_enabled = 1
+		default_pl = settings.sale_price_list or settings.default_price_list or "Standard Selling"
+		if not settings.sale_price_list:
+			settings.sale_price_list = default_pl
 		settings.save(ignore_permissions=True)
 		frappe.clear_document_cache("Commera Settings", "Commera Settings")
 
@@ -508,7 +513,6 @@ class TestStorefrontCacheIntegration(IntegrationTestCase):
 				"is_stock_item": 0,
 			}
 		).insert(ignore_permissions=True)
-		default_pl = settings.default_price_list or settings.sale_price_list
 		frappe.get_doc(
 			{
 				"doctype": "Item Price",
