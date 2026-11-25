@@ -2,11 +2,13 @@ import os
 from unittest.mock import patch
 
 import frappe
+from bwh_payments_core.connectors.razorpay.gateway import RazorpayGateway
+from bwh_payments_core.connectors.razorpay.stub import StubRazorpayClient
 from frappe.utils.password import update_password
 
 from commera import install_summer_demo
-from commera.api.payments import get_gateway_payment_request
-from commera.core import get_otp_key
+from commera.api.payments import get_gateway_payment_request, open_checkout
+from commera.core import _get_cart_quotation, get_otp_key
 from commera.install import before_tests
 from commera.roles import COMMERA_ADMIN
 
@@ -43,6 +45,21 @@ def mark_payment_paid(reference_id: str) -> str:
 	payment_request.save(ignore_permissions=True)
 	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- bench execute does not commit
 	return frappe.db.get_value("Gateway Payment Request", payment_request.name, "ref_docname")
+
+
+def open_online_checkout(
+	email: str, payment_mode: str, delivery_option: str | None = None, expected_total: float | None = None
+) -> dict:
+	validate_allow_tests()
+	frappe.set_user(email)
+	quotation = _get_cart_quotation()
+	with patch.object(RazorpayGateway, "get_client", lambda self: StubRazorpayClient()):
+		checkout = open_checkout(quotation, payment_mode, delivery_option, expected_total)
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- bench execute does not commit
+	reference_id = frappe.db.get_value(
+		"Gateway Payment Request", {"ref_docname": quotation.name}, "name", order_by="creation desc"
+	)
+	return {"order_url": checkout["order_url"], "reference_id": reference_id}
 
 
 def validate_allow_tests():
