@@ -14,7 +14,10 @@ function watchPage(page: Page, problems: string[]) {
 	});
 }
 
-const KNOWN_PROBLEMS = ['favicon', 'summer_theme/images/shap.svg'];
+const KNOWN_PROBLEMS = [
+	'favicon',
+	'summer_theme/images/shap.svg', // https://github.com/bwhtech/commera/issues/605
+];
 
 export function realProblems(problems: string[]) {
 	return [...new Set(problems)].filter(
