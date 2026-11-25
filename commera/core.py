@@ -235,7 +235,7 @@ def get_party(user=None, create: bool = True):
 	if user == "Guest":
 		raise frappe.PermissionError
 
-	from commera.storefront_cache import get_epoch_cached
+	from commera.storefront_cache import bump_party, get_epoch_cached
 
 	cached = get_epoch_cached(
 		"user_party",
@@ -245,16 +245,38 @@ def get_party(user=None, create: bool = True):
 		ttl=300,
 	)
 	if cached:
-		party_doctype, party_name = cached
+		party_doctype, party_name, needs_portal_link = cached
 		try:
-			return frappe.get_cached_doc(party_doctype, party_name)
+			party_doc = frappe.get_cached_doc(party_doctype, party_name)
+			if needs_portal_link:
+				_ensure_portal_user(party_doc, user)
+			return party_doc
 		except frappe.DoesNotExistError:
-			pass
+			# Stale cached ref: re-resolve uncached before creating a new party.
+			bump_party()
+			fresh = _resolve_existing_party_ref(user)
+			if fresh:
+				party_doctype, party_name, needs_portal_link = fresh
+				party_doc = frappe.get_cached_doc(party_doctype, party_name)
+				if needs_portal_link:
+					_ensure_portal_user(party_doc, user)
+				return party_doc
 
 	return _create_party_for_user(user) if create else None
 
 
-def _resolve_existing_party_ref(user: str) -> list[str]:
+def _ensure_portal_user(party_doc, user: str) -> None:
+	if frappe.db.exists("Portal User", {"parent": party_doc.name, "user": user}):
+		return
+	party_doc.append("portal_users", {"user": user})
+	party_doc.flags.ignore_mandatory = True
+	# Customer.on_update rewrites the primary Contact, which the shopper cannot write.
+	with system_user_session():
+		party_doc.save()
+
+
+def _resolve_existing_party_ref(user: str) -> list:
+	"""Pure read-only lookup returning `[doctype, name, needs_portal_link]` or `[]`."""
 	contact_name = get_contact_name(user)
 	if contact_name:
 		contact = frappe.get_cached_doc("Contact", contact_name)
@@ -262,19 +284,13 @@ def _resolve_existing_party_ref(user: str) -> list[str]:
 			(l for l in contact.links if l.link_doctype in {"Customer", "Supplier"}),
 			None,
 		)
-		if link:
-			party_doc = frappe.get_cached_doc(link.link_doctype, link.link_name)
-			if not frappe.db.exists("Portal User", {"parent": party_doc.name, "user": user}):
-				party_doc.append("portal_users", {"user": user})
-				party_doc.flags.ignore_mandatory = True
-				# Customer.on_update rewrites the primary Contact, which the shopper cannot write.
-				with system_user_session():
-					party_doc.save()
-			return [party_doc.doctype, party_doc.name]
+		if link and frappe.db.exists(link.link_doctype, link.link_name):
+			needs_portal_link = not frappe.db.exists("Portal User", {"parent": link.link_name, "user": user})
+			return [link.link_doctype, link.link_name, needs_portal_link]
 
 	if portal_party := frappe.db.get_value("Portal User", {"user": user}, "parent"):
 		if frappe.db.exists("Customer", portal_party):
-			return ["Customer", portal_party]
+			return ["Customer", portal_party, False]
 
 	return []
 

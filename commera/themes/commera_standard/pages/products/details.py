@@ -9,6 +9,7 @@ from commera.sdk import catalog, wishlist
 from commera.sdk.format import product_url, url
 
 cacheable_ssr = True
+ssr_query_params = frozenset({"size"})
 
 
 def get_context(context):

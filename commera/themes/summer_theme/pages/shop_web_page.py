@@ -1,6 +1,7 @@
 from commera.www.shop_web_page import index as shop_web_page
 
 cacheable_ssr = True
+ssr_query_params = frozenset()
 
 
 def get_context(context):

@@ -116,17 +116,40 @@ def build_controller_module_name(theme_dirs, controller_path, relative_path):
 	return f"commera.shop_themes.theme_pages.{theme_slug}.{page_slug}"
 
 
-def run_page_controller(theme_dirs, template_relative_path, context) -> bool:
-	"""Run the page controller and return True only when it opts in with `cacheable_ssr = True`."""
+def _controller_ssr_policy(module) -> tuple[bool, frozenset[str]]:
+	cacheable = bool(getattr(module, "cacheable_ssr", False)) and not bool(getattr(module, "no_cache", False))
+	if not cacheable:
+		return False, frozenset()
+	raw_params = getattr(module, "ssr_query_params", None)
+	return True, frozenset(raw_params) if raw_params is not None else frozenset()
+
+
+def get_page_ssr_query_params(route_path: str, language_code: str | None = None) -> frozenset[str] | None:
+	"""Return controller-declared SSR query params for `route_path`, or None if uncacheable."""
+	page = find_theme_page((route_path or "").strip("/"), language_code)
+	if not page:
+		return None
+	theme_dirs, template_path, requires_auth, _match = page
+	if requires_auth:
+		return None
+	module = load_page_controller(theme_dirs, template_path)
+	if not module:
+		return None
+	cacheable, allowed_params = _controller_ssr_policy(module)
+	return allowed_params if cacheable else None
+
+
+def run_page_controller(theme_dirs, template_relative_path, context) -> tuple[bool, frozenset[str]]:
+	"""Run the page controller and return `(cacheable_ssr, ssr_query_params)` (opt-in)."""
 	module = load_page_controller(theme_dirs, template_relative_path)
 	if not module:
-		return False
-	cacheable = bool(getattr(module, "cacheable_ssr", False)) and not bool(getattr(module, "no_cache", False))
+		return False, frozenset()
+	cacheable, allowed_params = _controller_ssr_policy(module)
 	if hasattr(module, "get_context"):
 		data = module.get_context(context)
 		if data:
 			context.update(data)
-	return cacheable
+	return cacheable, allowed_params
 
 
 class ThemePageRenderer:
@@ -165,7 +188,9 @@ class ThemePageRenderer:
 
 		context = build_base_context(self.match)
 		try:
-			controller_cacheable = run_page_controller(self.theme_dirs, self.template_path, context)
+			controller_cacheable, ssr_query_params = run_page_controller(
+				self.theme_dirs, self.template_path, context
+			)
 		except (frappe.PageDoesNotExistError, frappe.DoesNotExistError):
 			if not find_theme_file(self.theme_dirs, NOT_FOUND_TEMPLATE):
 				raise
@@ -177,8 +202,8 @@ class ThemePageRenderer:
 			from commera.storefront_cache import is_cacheable_ssr_request, store_cached_ssr_response
 
 			route_path = self.get_request_path()
-			if is_cacheable_ssr_request(route_path):
-				store_cached_ssr_response(route_path, html)
+			if is_cacheable_ssr_request(route_path, allowed_query_params=ssr_query_params):
+				store_cached_ssr_response(route_path, html, allowed_query_params=ssr_query_params)
 				headers = {"X-Commera-Cache": "MISS"}
 		return build_response(self.path, html, status, headers)
 

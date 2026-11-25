@@ -69,9 +69,24 @@ def localize_request():
 	set_request_path(request, localized.route_path)
 
 	# Serve verified public guest SSR hits before PathResolver compiles dynamic route rules.
-	from commera.storefront_cache import CachedStorefrontResponse, get_cached_ssr_response
+	from commera.storefront_cache import (
+		CachedStorefrontResponse,
+		get_cached_ssr_response,
+		has_only_base_or_tracking_params,
+	)
 
-	if cached_response := get_cached_ssr_response(localized.route_path, localized=localized):
+	allowed_ssr_params: frozenset[str] | None = frozenset()
+	if not has_only_base_or_tracking_params(request.args):
+		from commera.shop_themes.theme_resolver import get_page_ssr_query_params
+
+		allowed_ssr_params = get_page_ssr_query_params(
+			localized.route_path, localized.localization.language.code
+		)
+	if allowed_ssr_params is not None and (
+		cached_response := get_cached_ssr_response(
+			localized.route_path, localized=localized, allowed_query_params=allowed_ssr_params
+		)
+	):
 		raise CachedStorefrontResponse(cached_response)
 
 

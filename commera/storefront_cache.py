@@ -40,10 +40,17 @@ NON_CACHEABLE_SSR_PREFIXES = (
 	"commera",
 )
 PREVIEW_QUERY_PARAMS = frozenset({"preview_theme", "preview", "editor", "edit", "theme_preview"})
-# Only query parameters that change page output enter the SSR key; tracking params (utm_*, fbclid) share hits.
+# Tracking parameters that never affect rendered HTML and safely share cached SSR entries.
+IGNORED_TRACKING_PARAMS = frozenset(
+	{"fbclid", "gclid", "dclid", "msclkid", "ttclid", "yclid", "mc_cid", "mc_eid", "_ga", "_gl"}
+)
+# Localization routing params handled before page controllers run (already keyed via locale).
+BASE_SSR_QUERY_PARAMS = frozenset({"_lang", "country"})
+# Default SSR query params when no controller-specific list is provided.
 ALLOWED_SSR_QUERY_PARAMS = frozenset(
 	{
 		"category",
+		"subcategory",
 		"search",
 		"sort_by",
 		"page",
@@ -515,13 +522,28 @@ def cached_checkout_response(
 # Guest SSR Page Cache (opt-in per page controller via `cacheable_ssr = True`)
 
 
-def is_cacheable_ssr_request(route_path: str) -> bool:
-	"""True only for anonymous, public, read-only GET requests to published storefront pages."""
-	if not is_cache_enabled() or _is_domain_dirty(ALL_DOMAINS):
-		return False
-	if not frappe.flags.get("enable_storefront_cache_in_test") and (
-		frappe.conf.get("developer_mode") or frappe._dev_server
-	):
+def _is_tracking_param(param: str) -> bool:
+	lower = param.lower()
+	return lower.startswith("utm_") or lower in IGNORED_TRACKING_PARAMS
+
+
+def _resolve_allowed_ssr_params(allowed_query_params: frozenset[str] | None) -> frozenset[str]:
+	if allowed_query_params is None:
+		return ALLOWED_SSR_QUERY_PARAMS
+	return BASE_SSR_QUERY_PARAMS | allowed_query_params
+
+
+def has_only_base_or_tracking_params(args) -> bool:
+	"""True when every query param is a locale routing param or known tracking param."""
+	if not args:
+		return True
+	return all(p in BASE_SSR_QUERY_PARAMS or _is_tracking_param(p) for p in args)
+
+
+def is_cacheable_ssr_request(route_path: str, *, allowed_query_params: frozenset[str] | None = None) -> bool:
+	"""True only for anonymous, public, read-only GET requests to published storefront pages.
+	Fails safe on unknown query params that are neither allowed nor known tracking params."""
+	if not is_cacheable_enabled_for_ssr():
 		return False
 	req = getattr(frappe.local, "request", None)
 	if not req or req.method != "GET":
@@ -536,9 +558,12 @@ def is_cacheable_ssr_request(route_path: str) -> bool:
 	first_seg = clean.split("/", 1)[0]
 	if first_seg in NON_CACHEABLE_SSR_PREFIXES:
 		return False
+	allowed = _resolve_allowed_ssr_params(allowed_query_params)
 	if req.args:
 		for param in req.args:
 			if param in PREVIEW_QUERY_PARAMS:
+				return False
+			if param not in allowed and not _is_tracking_param(param):
 				return False
 	from commera.storefront_access import is_storefront_published
 
@@ -547,7 +572,19 @@ def is_cacheable_ssr_request(route_path: str) -> bool:
 	return True
 
 
-def _ssr_cache_key(route_path: str, localized=None) -> str:
+def is_cacheable_enabled_for_ssr() -> bool:
+	if not is_cache_enabled() or _is_domain_dirty(ALL_DOMAINS):
+		return False
+	if not frappe.flags.get("enable_storefront_cache_in_test") and (
+		frappe.conf.get("developer_mode") or frappe._dev_server
+	):
+		return False
+	return True
+
+
+def _ssr_cache_key(
+	route_path: str, localized=None, *, allowed_query_params: frozenset[str] | None = None
+) -> str:
 	req = frappe.local.request
 	if localized is not None:
 		loc = localized.localization
@@ -556,9 +593,8 @@ def _ssr_cache_key(route_path: str, localized=None) -> str:
 		country = (loc.country or "").lower()
 	else:
 		lang, market_handle, country = _locale_context()
-	query_items = (
-		sorted((k, v) for k, v in req.args.lists() if k in ALLOWED_SSR_QUERY_PARAMS) if req.args else []
-	)
+	allowed = _resolve_allowed_ssr_params(allowed_query_params)
+	query_items = sorted((k, v) for k, v in req.args.lists() if k in allowed) if req.args else []
 	return _hash_key(
 		"ssr",
 		(
@@ -573,10 +609,12 @@ def _ssr_cache_key(route_path: str, localized=None) -> str:
 	)
 
 
-def get_cached_ssr_response(route_path: str, localized=None) -> Response | None:
-	if not is_cacheable_ssr_request(route_path):
+def get_cached_ssr_response(
+	route_path: str, localized=None, *, allowed_query_params: frozenset[str] | None = None
+) -> Response | None:
+	if not is_cacheable_ssr_request(route_path, allowed_query_params=allowed_query_params):
 		return None
-	key = _ssr_cache_key(route_path, localized=localized)
+	key = _ssr_cache_key(route_path, localized=localized, allowed_query_params=allowed_query_params)
 	html_bytes = _l1_get(_l1_ssr, key)
 	status = "HIT-L1"
 	if html_bytes is None:
@@ -598,14 +636,20 @@ def get_cached_ssr_response(route_path: str, localized=None) -> Response | None:
 	)
 
 
-def store_cached_ssr_response(route_path: str, html: str, *, ttl: int = 60) -> None:
-	if not is_cacheable_ssr_request(route_path):
+def store_cached_ssr_response(
+	route_path: str,
+	html: str,
+	*,
+	ttl: int = 60,
+	allowed_query_params: frozenset[str] | None = None,
+) -> None:
+	if not is_cacheable_ssr_request(route_path, allowed_query_params=allowed_query_params):
 		return
 	if not html:
 		return
 	html_bytes = html.encode("utf-8") if isinstance(html, str) else bytes(html)
 	if len(html_bytes) > MAX_SSR_CACHE_BYTES:
 		return
-	key = _ssr_cache_key(route_path)
+	key = _ssr_cache_key(route_path, allowed_query_params=allowed_query_params)
 	_l1_set(_l1_ssr, key, html_bytes, min(ttl, 30), L1_SSR_MAX_ENTRIES)
 	frappe.cache.set_value(key, html_bytes, expires_in_sec=ttl)

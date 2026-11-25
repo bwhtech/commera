@@ -264,6 +264,36 @@ class TestStorefrontCache(UnitTestCase):
 					frappe.local.request = _mock_get_request("/products", query_string=param)
 					self.assertFalse(sfc.is_cacheable_ssr_request("products"))
 
+				# R2-1: unknown query params fail safe (neither read nor written).
+				frappe.local.request = _mock_get_request("/products")
+				sfc.store_cached_ssr_response("products", "<html>base</html>")
+				self.assertIsNotNone(sfc.get_cached_ssr_response("products"))
+				frappe.local.request = _mock_get_request("/products", query_string="coupon=VIP")
+				self.assertFalse(sfc.is_cacheable_ssr_request("products"))
+				self.assertIsNone(sfc.get_cached_ssr_response("products"))
+				sfc.store_cached_ssr_response("products", "<html>vip</html>")
+				self.assertIsNone(sfc.get_cached_ssr_response("products"))
+
+				# Known tracking params still share the cached entry.
+				frappe.local.request = _mock_get_request("/products", query_string="utm_source=ig&fbclid=abc")
+				self.assertTrue(sfc.is_cacheable_ssr_request("products"))
+				self.assertIsNotNone(sfc.get_cached_ssr_response("products"))
+
+				# Controller-declared allowed_query_params allows its own params and rejects others.
+				frappe.local.request = _mock_get_request("/custom", query_string="tab=2")
+				custom_allowed = frozenset({"tab"})
+				self.assertTrue(sfc.is_cacheable_ssr_request("custom", allowed_query_params=custom_allowed))
+				sfc.store_cached_ssr_response(
+					"custom", "<html>tab2</html>", allowed_query_params=custom_allowed
+				)
+				self.assertIsNotNone(
+					sfc.get_cached_ssr_response("custom", allowed_query_params=custom_allowed)
+				)
+				frappe.local.request = _mock_get_request("/custom", query_string="tab=2&extra=1")
+				self.assertIsNone(sfc.get_cached_ssr_response("custom", allowed_query_params=custom_allowed))
+				frappe.local.request = _mock_get_request("/products", query_string="page=2")
+				self.assertFalse(sfc.is_cacheable_ssr_request("products", allowed_query_params=frozenset()))
+
 				# Excluded prefixes -> ineligible
 				frappe.local.request = _mock_get_request("/cart")
 				for prefix in ("cart", "checkout", "account/orders", "login", "track-order"):
@@ -284,9 +314,10 @@ class TestStorefrontCache(UnitTestCase):
 
 		# Opt-in controller check: default False, cacheable_ssr=True -> True, no_cache=True overrides.
 		for attrs, expected in (
-			({}, False),
-			({"cacheable_ssr": True}, True),
-			({"cacheable_ssr": True, "no_cache": True}, False),
+			({}, (False, frozenset())),
+			({"cacheable_ssr": True}, (True, frozenset())),
+			({"cacheable_ssr": True, "ssr_query_params": ("tab",)}, (True, frozenset({"tab"}))),
+			({"cacheable_ssr": True, "no_cache": True}, (False, frozenset())),
 		):
 			fake_mod = type("Mod", (), attrs)()
 			with patch("commera.shop_themes.theme_resolver.load_page_controller", return_value=fake_mod):
@@ -587,3 +618,34 @@ class TestStorefrontCacheIntegration(IntegrationTestCase):
 			delattr(frappe.local, "_commera_sf_epochs")
 		self.assertGreater(sfc.get_epochs()["catalog"], before_cat)
 		self.assertTrue(variant.name)
+
+	def test_get_party_resolves_uncached_on_stale_cached_reference(self):
+		"""R2-3: stale cached Customer ref must fall back to uncached resolution, never create a duplicate."""
+		from commera.core import create_party, get_party
+
+		suffix = frappe.generate_hash(length=6).lower()
+		email = f"zz-party-{suffix}@example.com"
+		if not frappe.db.exists("User", email):
+			frappe.get_doc(
+				{
+					"doctype": "User",
+					"email": email,
+					"first_name": "Party",
+					"enabled": 1,
+					"send_welcome_email": 0,
+				}
+			).insert(ignore_permissions=True)
+		customer, _contact = create_party(email, f"Party {suffix}", portal_user=email)
+		frappe.db.after_commit.run()
+
+		# Simulate a stale cache entry pointing to a deleted Customer name.
+		with (
+			patch(
+				"commera.storefront_cache.get_epoch_cached",
+				return_value=["Customer", "NON-EXISTENT-CUST", False],
+			),
+			patch("commera.core._create_party_for_user") as mock_create,
+		):
+			resolved = get_party(user=email, create=True)
+		self.assertEqual(resolved.name, customer.name)
+		mock_create.assert_not_called()
