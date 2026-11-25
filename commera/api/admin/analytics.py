@@ -443,7 +443,9 @@ def read_inventory_report_rows() -> list[tuple]:
 		.where((csi.parenttype == "Style Attribute Variant") & (Coalesce(csi.item_code, "") != ""))
 	)
 	if warehouse:
-		query = query.left_join(bin_dt).on((bin_dt.item_code == csi.item_code) & (bin_dt.warehouse == warehouse))
+		query = query.left_join(bin_dt).on(
+			(bin_dt.item_code == csi.item_code) & (bin_dt.warehouse == warehouse)
+		)
 	return query.select(csi.item_code, product_expr, sav.item_style, option_expr, stock_expr).run()
 
 
@@ -618,11 +620,7 @@ def read_funnel_pair(from_date, to_date, previous_from, previous_to):
 	cur_start, cur_end = get_window(from_date, to_date)
 	prev_start, _prev_end = get_window(previous_from, previous_to)
 	analytics_event = frappe.qb.DocType("Storefront Analytics Event")
-	period = (
-		frappe.qb.terms.Case()
-		.when(analytics_event.creation >= cur_start, "current")
-		.else_("previous")
-	)
+	period = frappe.qb.terms.Case().when(analytics_event.creation >= cur_start, "current").else_("previous")
 
 	total_rows = (
 		frappe.qb.from_(analytics_event)

@@ -410,13 +410,17 @@ VERSIONED_ADDRESS_FIELDS = ("address_line1", "address_line2", "city", "state", "
 def get_checkout_version(quotation, addresses: dict | None = None) -> str:
 	"""A digest of what the buyer approves: lines, contact, addresses, pickup or delivery, and total."""
 	if addresses is None:
-		address_names = [name for name in (quotation.customer_address, quotation.shipping_address_name) if name]
+		address_names = [
+			name for name in (quotation.customer_address, quotation.shipping_address_name) if name
+		]
 		addresses = {}
 		if address_names:
 			addresses = {
 				address.name: address
 				for address in frappe.get_all(
-					"Address", filters={"name": ("in", address_names)}, fields=["name", *VERSIONED_ADDRESS_FIELDS]
+					"Address",
+					filters={"name": ("in", address_names)},
+					fields=["name", *VERSIONED_ADDRESS_FIELDS],
 				)
 			}
 	else:
@@ -707,7 +711,11 @@ def fix_payment_schedule_dates(doc):
 
 
 @frappe.whitelist(methods=["POST"])
-def generate_quotation_for_cart(cart: dict, *, defer_save: bool = False, existing_quotation=None):
+def generate_quotation_for_cart(cart: dict):
+	return _generate_quotation_for_cart(cart)
+
+
+def _generate_quotation_for_cart(cart: dict, *, defer_save: bool = False, existing_quotation=None):
 	cart = get_checkout_cart(cart)
 	quotation = existing_quotation if existing_quotation is not None else _get_cart_quotation()
 	if not quotation.is_new():
@@ -887,7 +895,9 @@ def _charges_already_current(quotation) -> bool:
 		return True
 	from commera.api.shipping import get_cart_charge_kind
 
-	shipping_rows = [row for row in quotation.taxes if get_cart_charge_kind(row, quotation) == "shipping_rule"]
+	shipping_rows = [
+		row for row in quotation.taxes if get_cart_charge_kind(row, quotation) == "shipping_rule"
+	]
 	if len(shipping_rows) != 1 or quotation.taxes[-1] is not shipping_rows[0]:
 		return False
 	rule = frappe.get_cached_doc("Shipping Rule", expected_rule)

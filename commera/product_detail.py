@@ -74,7 +74,9 @@ def get_available_sizes(product_variant, warehouse):
 		{
 			"item_code": size.item_code,
 			"size": size.size,
-			"stock_detail": stocks.get(cstr(size.item_code), {"stock_qty": 0.0, "in_stock": 0, "unlimited": 0}),
+			"stock_detail": stocks.get(
+				cstr(size.item_code), {"stock_qty": 0.0, "in_stock": 0, "unlimited": 0}
+			),
 		}
 		for size in product_variant.sizes
 	]

@@ -6,10 +6,10 @@ from erpnext.controllers.item_variant import create_variant
 from frappe import _
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Count, Sum
-from pypika.analytics import Count as WindowCount
-from pypika.terms import ExistsCriterion
 from frappe.utils import add_days, create_batch, get_url, nowdate
 from frappe.utils.data import cint, cstr, flt
+from pypika.analytics import Count as WindowCount
+from pypika.terms import ExistsCriterion
 
 from commera.api.variant_pricing import (
 	get_base_price_rows_by_key,
@@ -77,13 +77,8 @@ def get_products(
 	sav = frappe.qb.DocType("Style Attribute Variant")
 	pc = frappe.qb.DocType(PRODUCT_COLLECTION)
 
-	base = (
-		frappe.qb.from_(item)
-		.where(
-			ExistsCriterion(
-				frappe.qb.from_(sac).select(1).where(sac.item_template == item.name)
-			)
-		)
+	base = frappe.qb.from_(item).where(
+		ExistsCriterion(frappe.qb.from_(sac).select(1).where(sac.item_template == item.name))
 	)
 	if collection:
 		base = base.where(

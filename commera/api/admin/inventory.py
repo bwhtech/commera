@@ -36,9 +36,7 @@ def get_inventory(
 
 	product_expr = Coalesce(NullIf(tpl.item_name, ""), sav.item_style)
 	low_level_expr = (
-		Case()
-		.when(Coalesce(var_item.safety_stock, 0) > 0, var_item.safety_stock)
-		.else_(LOW_STOCK_THRESHOLD)
+		Case().when(Coalesce(var_item.safety_stock, 0) > 0, var_item.safety_stock).else_(LOW_STOCK_THRESHOLD)
 		if needs_var_item
 		else frappe.qb.terms.ValueWrapper(LOW_STOCK_THRESHOLD)
 	)

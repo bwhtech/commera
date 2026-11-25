@@ -1,10 +1,5 @@
 """Epoch-versioned L1 (worker RAM) + L2 (Redis) cache for guest storefront APIs and SSR pages.
-
-Every cached entry includes the current integer epochs of the data domains it depends on
-(`catalog`, `prices`, `stock`, `discounts`, `reviews`, `shop`, `theme`). Any DocType mutation
-bumps its domain's epoch in Redis with a single atomic HINCRBY, making invalidation O(1) and
-immediately visible across all Gunicorn workers.
-"""
+Any DocType mutation bumps its domain epoch via atomic HINCRBY for instant cross-worker invalidation."""
 
 from __future__ import annotations
 
@@ -286,12 +281,8 @@ def cached_guest_api(
 	guest_only: bool = True,
 	include_locale: bool = True,
 ):
-	"""Epoch-versioned L1+L2 cache for public guest storefront API endpoints.
-
-	When invoked over HTTP GET at `endpoint`, returns a pre-serialized werkzeug Response directly,
-	skipping frappe.as_json / build_response overhead. When invoked from Python (SSR/tests), returns
-	the Python object directly.
-	"""
+	"""Epoch-versioned L1+L2 cache for guest storefront GET APIs; returns a pre-serialized Response over HTTP
+	and the Python object for direct Python callers (SSR/tests)."""
 	if not is_cache_enabled():
 		return compute_fn()
 	if guest_only and frappe.session.user != "Guest":
@@ -308,7 +299,7 @@ def cached_guest_api(
 			return _make_json_response(raw, cache_status="HIT-L1", cache_control=cache_control)
 
 		raw_l2 = frappe.cache.get_value(bkey)
-		if isinstance(raw_l2, (bytes, bytearray)):
+		if isinstance(raw_l2, bytes | bytearray):
 			raw_bytes = bytes(raw_l2)
 			_l1_set(_l1_bytes, bkey, raw_bytes, min(ttl, 30), L1_MAX_ENTRIES)
 			return _make_json_response(raw_bytes, cache_status="HIT-L2", cache_control=cache_control)
@@ -338,11 +329,7 @@ def cached_cart_response(
 	endpoint: str = "commera.api.storefront.cart.get_cart",
 	ttl: int = 45,
 ):
-	"""Revision-stamped cache for read-only cart.get_cart.
-
-	Invalidates immediately on any cart mutation (`revision`/`modified`), price/discount/catalog/shop
-	epoch bump, or market/language switch.
-	"""
+	"""Revision-stamped cache for read-only cart.get_cart; invalidates on cart revision/modified or epoch bump."""
 	if not is_cache_enabled():
 		return compute_fn()
 
@@ -358,7 +345,7 @@ def cached_cart_response(
 		if raw is not None:
 			return _make_json_response(raw, cache_status="HIT-L1", cache_control="private, no-store")
 		raw_l2 = frappe.cache.get_value(bkey)
-		if isinstance(raw_l2, (bytes, bytearray)):
+		if isinstance(raw_l2, bytes | bytearray):
 			raw_bytes = bytes(raw_l2)
 			_l1_set(_l1_bytes, bkey, raw_bytes, min(ttl, 20), L1_MAX_ENTRIES)
 			return _make_json_response(raw_bytes, cache_status="HIT-L2", cache_control="private, no-store")
@@ -379,11 +366,7 @@ def cached_checkout_response(
 	endpoint: str = "commera.api.storefront.checkout.get",
 	ttl: int = 45,
 ):
-	"""Modified-stamped cache for read-only checkout.get.
-
-	Invalidates immediately on any Quotation write (`modified`), catalog/price/shop/Shipping Rule
-	epoch bump, or market/language switch.
-	"""
+	"""Modified-stamped cache for read-only checkout.get; invalidates on Quotation modified or epoch bump."""
 	if not is_cache_enabled():
 		return compute_fn()
 
@@ -399,7 +382,7 @@ def cached_checkout_response(
 		if raw is not None:
 			return _make_json_response(raw, cache_status="HIT-L1", cache_control="private, no-store")
 		raw_l2 = frappe.cache.get_value(bkey)
-		if isinstance(raw_l2, (bytes, bytearray)):
+		if isinstance(raw_l2, bytes | bytearray):
 			raw_bytes = bytes(raw_l2)
 			_l1_set(_l1_bytes, bkey, raw_bytes, min(ttl, 20), L1_MAX_ENTRIES)
 			return _make_json_response(raw_bytes, cache_status="HIT-L2", cache_control="private, no-store")
@@ -412,9 +395,7 @@ def cached_checkout_response(
 	return get_or_compute("checkout", key_parts, domains, compute_fn, ttl=ttl, include_locale=True)
 
 
-# ---------------------------------------------------------------------------
 # Guest SSR Page Cache (used by localize_request before_request + ThemePageRenderer)
-# ---------------------------------------------------------------------------
 
 
 def is_cacheable_ssr_request(route_path: str) -> bool:
@@ -479,7 +460,7 @@ def get_cached_ssr_response(route_path: str, localized=None) -> Response | None:
 	status = "HIT-L1"
 	if html_bytes is None:
 		raw = frappe.cache.get_value(key)
-		if isinstance(raw, (bytes, bytearray)):
+		if isinstance(raw, bytes | bytearray):
 			html_bytes = bytes(raw)
 			_l1_set(_l1_ssr, key, html_bytes, 30, L1_SSR_MAX_ENTRIES)
 			status = "HIT-L2"

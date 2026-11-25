@@ -103,17 +103,13 @@ def get_product_list(
 	from commera.search.engine_cache import get_search_engine
 
 	if product_list is not None or search_query.use_qb_fallback(filters):
-		return get_product_list_qb(
-			filters, product_list, page, page_length, sort_by, out_total=out_total
-		)
+		return get_product_list_qb(filters, product_list, page, page_length, sort_by, out_total=out_total)
 
 	ranked_names = search_query.read_or_fall_back(
 		lambda: get_search_engine().search_products(filters, page, page_length, sort_by), lambda: None
 	)
 	if ranked_names is None:
-		return get_product_list_qb(
-			filters, product_list, page, page_length, sort_by, out_total=out_total
-		)
+		return get_product_list_qb(filters, product_list, page, page_length, sort_by, out_total=out_total)
 	if not ranked_names:
 		return []
 
@@ -307,9 +303,9 @@ def get_product_base_query(
 		return query
 
 	style_attribute_variant = DocType("Style Attribute Variant")
-	candidates = product_list or filtered_products_query(
-		filters, join_sizes=False, join_item=False
-	).select(style_attribute_variant.name)
+	candidates = product_list or filtered_products_query(filters, join_sizes=False, join_item=False).select(
+		style_attribute_variant.name
+	)
 	card_prices = card_prices_query(prices.sale_price_list, prices.compare_at_price_list, candidates).as_(
 		"card_prices"
 	)

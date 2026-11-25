@@ -5,8 +5,8 @@ from frappe.utils.data import cstr, flt
 from commera.api.payments import (
 	REVIEWED_CHECKOUT_FIELD,
 	CheckoutPriceChangedError,
+	_generate_quotation_for_cart,
 	cart_write_lock,
-	generate_quotation_for_cart,
 	get_checkout_cart,
 	get_checkout_payment_methods,
 	get_checkout_version,
@@ -128,7 +128,7 @@ def save_checkout_address(address: dict, email: str | None) -> CheckoutState:
 			billing_address=address.get("billing_address"),
 		)
 	else:
-		quotation = generate_quotation_for_cart({}, defer_save=True)
+		quotation = _generate_quotation_for_cart({}, defer_save=True)
 	if quotation.is_new():
 		save_quotation_address(quotation, address)
 		return get_checkout_state(quotation)
@@ -142,7 +142,7 @@ def save_checkout_address(address: dict, email: str | None) -> CheckoutState:
 				existing_quotation=quotation,
 			)
 		else:
-			quotation = generate_quotation_for_cart({}, defer_save=True, existing_quotation=quotation)
+			quotation = _generate_quotation_for_cart({}, defer_save=True, existing_quotation=quotation)
 		save_quotation_address(quotation, address)
 		return get_checkout_state(quotation)
 
@@ -212,7 +212,13 @@ def list_payment_methods() -> list[PaymentMethod]:
 			quotation = frappe.db.get_value(
 				"Quotation",
 				cart_name,
-				["name", "currency", "custom_is_store_pickup", "custom_delivery_option", "shipping_address_name"],
+				[
+					"name",
+					"currency",
+					"custom_is_store_pickup",
+					"custom_delivery_option",
+					"shipping_address_name",
+				],
 				as_dict=True,
 			)
 	else:

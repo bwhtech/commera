@@ -73,19 +73,27 @@ def populate_fast_preview_fields(quotation, prices: MarketPrices):
 	if quotation.currency == company_currency:
 		quotation.conversion_rate = 1.0
 	else:
-		quotation.conversion_rate = flt(
-			get_exchange_rate(quotation.currency, company_currency, quotation.transaction_date, "for_selling")
-		) or 1.0
+		quotation.conversion_rate = (
+			flt(
+				get_exchange_rate(
+					quotation.currency, company_currency, quotation.transaction_date, "for_selling"
+				)
+			)
+			or 1.0
+		)
 	if quotation.price_list_currency == company_currency:
 		quotation.plc_conversion_rate = 1.0
 	elif quotation.price_list_currency == quotation.currency:
 		quotation.plc_conversion_rate = quotation.conversion_rate
 	else:
-		quotation.plc_conversion_rate = flt(
-			get_exchange_rate(
-				quotation.price_list_currency, company_currency, quotation.transaction_date, "for_selling"
+		quotation.plc_conversion_rate = (
+			flt(
+				get_exchange_rate(
+					quotation.price_list_currency, company_currency, quotation.transaction_date, "for_selling"
+				)
 			)
-		) or 1.0
+			or 1.0
+		)
 
 	if quotation.party_name:
 		cust = frappe.get_cached_value(

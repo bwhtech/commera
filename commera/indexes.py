@@ -53,7 +53,11 @@ PERFORMANCE_INDEXES: tuple[tuple[str, list[str], str], ...] = (
 	("Storefront Analytics Event", ["event", "session_id", "creation"], "idx_sae_event_sess_creation"),
 	("Storefront Analytics Event", ["order_id"], "idx_sae_order_id"),
 	# Stock movements & inventory report
-	("Stock Ledger Entry", ["warehouse", "is_cancelled", "posting_date", "posting_time"], "idx_sle_wh_cancel_dt"),
+	(
+		"Stock Ledger Entry",
+		["warehouse", "is_cancelled", "posting_date", "posting_time"],
+		"idx_sle_wh_cancel_dt",
+	),
 )
 
 

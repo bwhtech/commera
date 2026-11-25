@@ -504,9 +504,7 @@ def get_priced_checkout_summary(quotation) -> dict:
 def has_payment_conditioned_discounts(quotation) -> bool:
 	from commera.discounts.selection import get_candidates
 
-	return any(
-		(s.discount.payment_condition or "Any") != "Any" for s in get_candidates(quotation)
-	)
+	return any((s.discount.payment_condition or "Any") != "Any" for s in get_candidates(quotation))
 
 
 def get_checkout_summary(quotation, *, _is_copy: bool = False) -> dict:

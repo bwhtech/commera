@@ -497,7 +497,9 @@ def get_options(product_variant, sizes: list[dict]) -> list[ProductOption]:
 	"""The colour axis links sibling products; the size axis picks a variant. Fallback axes stay hidden."""
 	options = []
 	attribute = (
-		frappe.get_cached_value("Style Attribute Configurator", product_variant.configurator, "item_attribute")
+		frappe.get_cached_value(
+			"Style Attribute Configurator", product_variant.configurator, "item_attribute"
+		)
 		if product_variant.configurator
 		else None
 	)

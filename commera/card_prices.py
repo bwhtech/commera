@@ -129,9 +129,7 @@ def size_prices_query(
 	rate_val = Field("rate", table=rates)
 
 	sale_rate = (
-		Min(Case().when(rate_pl == sale_price_list, rate_val))
-		if sale_price_list
-		else ValueWrapper(None)
+		Min(Case().when(rate_pl == sale_price_list, rate_val)) if sale_price_list else ValueWrapper(None)
 	)
 	compare_at_rate = (
 		Min(Case().when(rate_pl == compare_at_price_list, rate_val))

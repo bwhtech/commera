@@ -1369,16 +1369,24 @@ document.addEventListener('alpine:init', () => {
 
 // Prefetch internal storefront product/collection pages on hover or touchstart for instant navigation.
 (() => {
-	const conn = navigator.connection;
-	if (conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || ''))) return;
+	if (typeof document === 'undefined' || typeof location === 'undefined') {
+		return;
+	}
+	const conn = typeof navigator !== 'undefined' ? navigator.connection : null;
+	if (conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || ''))) {
+		return;
+	}
 
 	const prefetched = new Set();
 	const MAX_PREFETCHES = 32;
-	const SKIP_RE = /^\/(?:api|app|assets|desk|files|private|cart|account|login|signup|logout)\b/i;
+	const SKIP_RE =
+		/^\/(?:api|app|assets|desk|files|private|cart|account|login|signup|logout)\b/i;
 	let timer = null;
 
 	function prefetch(href) {
-		if (!href || prefetched.size >= MAX_PREFETCHES || prefetched.has(href)) return;
+		if (!href || prefetched.size >= MAX_PREFETCHES || prefetched.has(href)) {
+			return;
+		}
 		prefetched.add(href);
 		const link = document.createElement('link');
 		link.rel = 'prefetch';
@@ -1389,7 +1397,11 @@ document.addEventListener('alpine:init', () => {
 
 	function resolve_anchor(target) {
 		const anchor = target?.closest?.('a[href]');
-		if (!anchor || anchor.hasAttribute('download') || (anchor.target && anchor.target !== '_self')) {
+		if (
+			!anchor ||
+			anchor.hasAttribute('download') ||
+			(anchor.target && anchor.target !== '_self')
+		) {
 			return null;
 		}
 		let url;
@@ -1399,7 +1411,9 @@ document.addEventListener('alpine:init', () => {
 			return null;
 		}
 		if (url.origin !== location.origin) return null;
-		if (url.pathname === location.pathname && url.search === location.search) return null;
+		if (url.pathname === location.pathname && url.search === location.search) {
+			return null;
+		}
 		if (SKIP_RE.test(url.pathname)) return null;
 		return url.href;
 	}

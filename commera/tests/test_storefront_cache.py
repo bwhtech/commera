@@ -97,13 +97,21 @@ class TestStorefrontCache(UnitTestCase):
 			cart_calls += 1
 			return {"rev_calls": cart_calls}
 
-		self.assertEqual(sfc.cached_cart_response("CART-1", 1, "2026-01-01 00:00:00", compute_cart), {"rev_calls": 1})
-		self.assertEqual(sfc.cached_cart_response("CART-1", 1, "2026-01-01 00:00:00", compute_cart), {"rev_calls": 1})
+		self.assertEqual(
+			sfc.cached_cart_response("CART-1", 1, "2026-01-01 00:00:00", compute_cart), {"rev_calls": 1}
+		)
+		self.assertEqual(
+			sfc.cached_cart_response("CART-1", 1, "2026-01-01 00:00:00", compute_cart), {"rev_calls": 1}
+		)
 		# Cart revision incremented -> immediate cache miss
-		self.assertEqual(sfc.cached_cart_response("CART-1", 2, "2026-01-01 00:00:01", compute_cart), {"rev_calls": 2})
+		self.assertEqual(
+			sfc.cached_cart_response("CART-1", 2, "2026-01-01 00:00:01", compute_cart), {"rev_calls": 2}
+		)
 		# Price epoch bumped -> immediate cache miss even at same revision
 		sfc.bump_prices()
-		self.assertEqual(sfc.cached_cart_response("CART-1", 2, "2026-01-01 00:00:01", compute_cart), {"rev_calls": 3})
+		self.assertEqual(
+			sfc.cached_cart_response("CART-1", 2, "2026-01-01 00:00:01", compute_cart), {"rev_calls": 3}
+		)
 
 		chk_calls = 0
 
@@ -112,8 +120,16 @@ class TestStorefrontCache(UnitTestCase):
 			chk_calls += 1
 			return {"chk_calls": chk_calls}
 
-		self.assertEqual(sfc.cached_checkout_response("QTN-1", "2026-01-01 00:00:00", compute_chk), {"chk_calls": 1})
-		self.assertEqual(sfc.cached_checkout_response("QTN-1", "2026-01-01 00:00:00", compute_chk), {"chk_calls": 1})
-		self.assertEqual(sfc.cached_checkout_response("QTN-1", "2026-01-01 00:00:05", compute_chk), {"chk_calls": 2})
+		self.assertEqual(
+			sfc.cached_checkout_response("QTN-1", "2026-01-01 00:00:00", compute_chk), {"chk_calls": 1}
+		)
+		self.assertEqual(
+			sfc.cached_checkout_response("QTN-1", "2026-01-01 00:00:00", compute_chk), {"chk_calls": 1}
+		)
+		self.assertEqual(
+			sfc.cached_checkout_response("QTN-1", "2026-01-01 00:00:05", compute_chk), {"chk_calls": 2}
+		)
 		sfc.bump_shop()
-		self.assertEqual(sfc.cached_checkout_response("QTN-1", "2026-01-01 00:00:05", compute_chk), {"chk_calls": 3})
+		self.assertEqual(
+			sfc.cached_checkout_response("QTN-1", "2026-01-01 00:00:05", compute_chk), {"chk_calls": 3}
+		)
