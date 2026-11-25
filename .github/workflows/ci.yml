@@ -8,6 +8,8 @@ on:
       - main
   pull_request:
   merge_group:
+  schedule:
+    - cron: "0 3 * * 1"
 
 concurrency:
   group: develop-commera-${{ github.event.number || github.ref }}
@@ -83,4 +85,85 @@ jobs:
         working-directory: /home/runner/frappe-bench
         run: |
           cat bench_start.log || true
+          cat logs/*.log || true
+
+  e2e:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule'
+    timeout-minutes: 30
+    name: E2E
+
+    services:
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 13000:6379
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 11000:6379
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=2s --health-retries=3
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v7
+
+      - name: Setup bench
+        uses: ./.github/actions/setup-bench
+
+      - name: Seed the store
+        working-directory: /home/runner/frappe-bench
+        run: |
+          bench --site test_site set-config allow_tests true
+          bench --site test_site execute commera.tests.e2e_support.seed | tee seed.log
+          grep -q E2E_SEED_OK seed.log
+
+      - name: Start web server, worker and socketio
+        working-directory: /home/runner/frappe-bench
+        run: |
+          echo "127.0.0.1 test_site" | sudo tee -a /etc/hosts
+          nohup bench serve --port 8000 > web.log 2>&1 &
+          nohup bench worker > worker.log 2>&1 &
+          nohup node apps/frappe/socketio.js > socketio.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            curl -sf http://test_site:8000/api/method/frappe.ping && exit 0
+            sleep 2
+          done
+          echo "web server never answered" >&2
+          exit 1
+
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install chromium
+
+      - name: Run e2e
+        working-directory: e2e
+        run: npx playwright test
+        env:
+          COMMERA_BASE: http://test_site:8000
+          COMMERA_BENCH: /home/runner/frappe-bench
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 14
+
+      - name: Show bench output
+        if: failure()
+        working-directory: /home/runner/frappe-bench
+        run: |
+          cat web.log worker.log socketio.log || true
           cat logs/*.log || true
