@@ -1,4 +1,4 @@
-import { type Page, expect } from '@playwright/test';
+import { type Locator, type Page, expect } from '@playwright/test';
 import { getSignupCode } from './bench';
 
 export const SHOP = '/en';
@@ -47,7 +47,21 @@ export async function addToCart(page: Page, productRoute: string) {
 	await expectToast(page, 'Item added to your bag');
 }
 
-export async function enterCode(page: Page, email: string) {
+export async function sendCode(page: Page, button: Locator) {
+	const sent = page.waitForResponse(
+		(response) => /commera\.api\.signup\.send_\w+_otp/.test(response.url()),
+		{ timeout: 15_000 },
+	);
+	await button.click();
+	const response = await sent.catch(() => null);
+	if (!response) return 'no send request';
+	const body = (await response.text().catch(() => '')).slice(0, 300);
+	return `${response.url()} ${response
+		.request()
+		.postData()} -> ${response.status()} ${body}`;
+}
+
+export async function enterCode(page: Page, email: string, sent: string) {
 	let code: number | null = null;
 	await expect
 		.poll(
@@ -55,7 +69,10 @@ export async function enterCode(page: Page, email: string) {
 				code = getSignupCode(email);
 				return code;
 			},
-			{ timeout: 30_000, message: `no code in Redis for ${email}` },
+			{
+				timeout: 30_000,
+				message: `no code in Redis for ${email}; send: ${sent}`,
+			},
 		)
 		.toBeTruthy();
 	const digits = String(code);
@@ -78,9 +95,12 @@ export async function signUp(page: Page, email: string) {
 	await form.locator('input[type="email"]').fill(email);
 	await form.locator('input[type="text"]').nth(0).fill('E2E');
 	await form.locator('input[type="text"]').nth(1).fill('Shopper');
-	await form.getByRole('button', { name: 'Sign Up' }).click();
+	const sent = await sendCode(
+		page,
+		form.getByRole('button', { name: 'Sign Up' }),
+	);
 	await expect(page.locator('.summer-auth-otp input').first()).toBeVisible();
-	await enterCode(page, email);
+	await enterCode(page, email, sent);
 	await expect(page.locator('.summer-auth-panel')).toBeHidden();
 }
 
@@ -90,9 +110,12 @@ export async function signIn(page: Page, email: string) {
 		.locator('.summer-auth form')
 		.filter({ has: page.getByRole('button', { name: 'Sign In' }) });
 	await form.locator('input[type="email"]').fill(email);
-	await form.getByRole('button', { name: 'Sign In' }).click();
+	const sent = await sendCode(
+		page,
+		form.getByRole('button', { name: 'Sign In' }),
+	);
 	await expect(page.locator('.summer-auth-otp input').first()).toBeVisible();
-	await enterCode(page, email);
+	await enterCode(page, email, sent);
 	await expect(page.locator('.summer-auth-panel')).toBeHidden();
 }
 

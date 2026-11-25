@@ -26,6 +26,7 @@ import {
 	placeOrder,
 	readConfirmation,
 	saveAddress,
+	sendCode,
 	signIn,
 	signUp,
 	viewOrder,
@@ -200,9 +201,12 @@ test.describe('shopper buys', () => {
 		await page.getByRole('button', { name: 'Checkout' }).click();
 		const dialog = page.locator('.summer-auth-panel');
 		await dialog.locator('input[type="email"]:visible').fill(email);
-		await dialog.getByRole('button', { name: 'Send Code' }).click();
+		const sent = await sendCode(
+			page,
+			dialog.getByRole('button', { name: 'Send Code' }),
+		);
 		await expect(page.locator('.summer-auth-otp input').first()).toBeVisible();
-		await enterCode(page, email);
+		await enterCode(page, email, sent);
 		users.push(email);
 		await page.waitForURL(/\/cart\/checkout/);
 
