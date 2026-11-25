@@ -157,11 +157,10 @@ def list_products(
 	}
 
 	with memoize_public_rates():
-		from commera.utils import get_product_list as _default_get_product_list
-		from commera.utils import get_product_list_with_total
+		from commera import utils as commera_utils
 
-		if get_product_list is _default_get_product_list:
-			cards, total = get_product_list_with_total(
+		if get_product_list == commera_utils.get_product_list:
+			cards, total = commera_utils.get_product_list_with_total(
 				filters=filters, page=page, page_length=page_size, sort_by=sort
 			)
 		else:
