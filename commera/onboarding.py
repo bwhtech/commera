@@ -10,6 +10,7 @@ from frappe.desk.page.setup_wizard.setup_wizard import setup_complete, update_gl
 from frappe.utils.background_jobs import is_job_enqueued
 from frappe.utils.data import add_days, add_years, get_abbr, getdate
 
+from commera.core import latest_committed_reads
 from commera.migrate import create_payment_modes
 
 SETTINGS_DOCTYPE = "Commera Settings"
@@ -278,8 +279,15 @@ def get_setup_status() -> dict:
 	"""The job's own record on Commera Settings; a site set up some other way also counts as done."""
 	status, error = frappe.db.get_single_value(SETTINGS_DOCTYPE, "store_setup_status"), None
 	if status == "running" and not is_job_enqueued(SETUP_JOB_ID) and not is_setup_being_queued():
-		# The worker died or the job was dropped: report it so the owner can retry.
-		status, error = "failed", _("Store setup stopped before it finished. Please try again.")
+		# The job commits its result just before it leaves the queue, possibly after this request's read
+		# view opened: only a locking read sees that commit.
+		with latest_committed_reads():
+			status = frappe.db.get_single_value(SETTINGS_DOCTYPE, "store_setup_status", for_update=True)
+			if status == "failed":
+				error = frappe.db.get_single_value(SETTINGS_DOCTYPE, "store_setup_error", for_update=True)
+		if status == "running":
+			# The worker died or the job was dropped: report it so the owner can retry.
+			status, error = "failed", _("Store setup stopped before it finished. Please try again.")
 	elif status != "running" and frappe.is_setup_complete():
 		status = "done"
 	elif status == "failed":
