@@ -1,0 +1,14 @@
+{
+	"name": "commera-e2e",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"test": "playwright test",
+		"smoke": "playwright test --project smoke",
+		"report": "playwright show-report"
+	},
+	"devDependencies": {
+		"@playwright/test": "1.65.1",
+		"@types/node": "^24.0.0"
+	}
+}
