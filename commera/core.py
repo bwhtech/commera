@@ -210,27 +210,30 @@ USER_PARTY_CACHE_PREFIX = "commera:user_party:"
 PORTAL_CUSTOMER_CACHE_PREFIX = "commera:portal_customer:"
 
 
-def clear_user_party_cache(doc=None, method=None, *args, **kwargs):
+def _delete_user_party_cache():
 	frappe.cache.delete_keys(f"{USER_PARTY_CACHE_PREFIX}*")
 	frappe.cache.delete_keys(f"{PORTAL_CUSTOMER_CACHE_PREFIX}*")
+
+
+def clear_user_party_cache(doc=None, method=None, *args, **kwargs):
+	_delete_user_party_cache()
 	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(
-			lambda: (
-				frappe.cache.delete_keys(f"{USER_PARTY_CACHE_PREFIX}*"),
-				frappe.cache.delete_keys(f"{PORTAL_CUSTOMER_CACHE_PREFIX}*"),
-			)
-		)
+		frappe.db.after_commit.add(_delete_user_party_cache)
+	if hasattr(frappe.db, "after_rollback"):
+		frappe.db.after_rollback.add(_delete_user_party_cache)
 
 
 def get_cached_portal_customer(user: str | None) -> str | None:
 	if not user:
 		return None
 	key = f"{PORTAL_CUSTOMER_CACHE_PREFIX}{user}"
-	cached = frappe.cache.get_value(key)
-	if cached is not None:
-		return cached or None
+	if not frappe.flags.in_test:
+		cached = frappe.cache.get_value(key)
+		if cached is not None:
+			return cached or None
 	customer = frappe.db.get_value("Portal User", {"user": user}, "parent")
-	frappe.cache.set_value(key, customer or "", expires_in_sec=300)
+	if not frappe.flags.in_test:
+		frappe.cache.set_value(key, customer or "", expires_in_sec=300)
 	return customer
 
 
@@ -243,7 +246,7 @@ def get_party(user=None, create: bool = True):
 		raise frappe.PermissionError
 
 	cache_key = f"{USER_PARTY_CACHE_PREFIX}{user}"
-	if cached := frappe.cache.get_value(cache_key):
+	if not frappe.flags.in_test and (cached := frappe.cache.get_value(cache_key)):
 		party_doctype, party_name = cached
 		try:
 			return frappe.get_cached_doc(party_doctype, party_name)
@@ -265,13 +268,15 @@ def get_party(user=None, create: bool = True):
 				# Customer.on_update rewrites the primary Contact, which the shopper cannot write.
 				with system_user_session():
 					party_doc.save()
-			frappe.cache.set_value(cache_key, [party_doc.doctype, party_doc.name], expires_in_sec=300)
+			if not frappe.flags.in_test:
+				frappe.cache.set_value(cache_key, [party_doc.doctype, party_doc.name], expires_in_sec=300)
 			return party_doc
 
 	if portal_party := frappe.db.get_value("Portal User", {"user": user}, "parent"):
 		if frappe.db.exists("Customer", portal_party):
 			party_doc = frappe.get_cached_doc("Customer", portal_party)
-			frappe.cache.set_value(cache_key, ["Customer", party_doc.name], expires_in_sec=300)
+			if not frappe.flags.in_test:
+				frappe.cache.set_value(cache_key, ["Customer", party_doc.name], expires_in_sec=300)
 			return party_doc
 
 	return _create_party_for_user(user) if create else None

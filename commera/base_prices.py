@@ -21,9 +21,10 @@ DUPLICATE_PRICES_CACHE_PREFIX = "commera:has_duplicate_active_prices:"
 def has_template_item_prices() -> bool:
 	"""Whether any selling Item Price row targets a template Item (has_variants=1).
 	Cached in Redis and invalidated on Item Price writes so the common variant-priced shop skips the UNION."""
-	cached = frappe.cache.get_value(TEMPLATE_PRICES_CACHE_KEY)
-	if cached is not None:
-		return bool(cached)
+	if not frappe.flags.in_test:
+		cached = frappe.cache.get_value(TEMPLATE_PRICES_CACHE_KEY)
+		if cached is not None:
+			return bool(cached)
 	item = DocType("Item")
 	price = DocType("Item Price")
 	exists = bool(
@@ -35,16 +36,18 @@ def has_template_item_prices() -> bool:
 		.limit(1)
 		.run()
 	)
-	frappe.cache.set_value(TEMPLATE_PRICES_CACHE_KEY, int(exists))
+	if not frappe.flags.in_test:
+		frappe.cache.set_value(TEMPLATE_PRICES_CACHE_KEY, int(exists))
 	return exists
 
 
 def has_non_stock_sales_uom() -> bool:
 	"""Whether any Item defines a sales_uom distinct from its stock_uom.
 	When False, sales_uom == stock_uom everywhere and UOM conversion joins/subqueries are unnecessary."""
-	cached = frappe.cache.get_value(NON_STOCK_SALES_UOM_CACHE_KEY)
-	if cached is not None:
-		return bool(cached)
+	if not frappe.flags.in_test:
+		cached = frappe.cache.get_value(NON_STOCK_SALES_UOM_CACHE_KEY)
+		if cached is not None:
+			return bool(cached)
 	item = DocType("Item")
 	exists = bool(
 		frappe.qb.from_(item)
@@ -53,15 +56,17 @@ def has_non_stock_sales_uom() -> bool:
 		.limit(1)
 		.run()
 	)
-	frappe.cache.set_value(NON_STOCK_SALES_UOM_CACHE_KEY, int(exists))
+	if not frappe.flags.in_test:
+		frappe.cache.set_value(NON_STOCK_SALES_UOM_CACHE_KEY, int(exists))
 	return exists
 
 
 def has_mismatched_price_uom() -> bool:
 	"""Whether any selling public Item Price specifies a UOM different from its Item's stock_uom."""
-	cached = frappe.cache.get_value(MISMATCHED_PRICE_UOM_CACHE_KEY)
-	if cached is not None:
-		return bool(cached)
+	if not frappe.flags.in_test:
+		cached = frappe.cache.get_value(MISMATCHED_PRICE_UOM_CACHE_KEY)
+		if cached is not None:
+			return bool(cached)
 	item = DocType("Item")
 	price = DocType("Item Price")
 	exists = bool(
@@ -78,7 +83,8 @@ def has_mismatched_price_uom() -> bool:
 		.limit(1)
 		.run()
 	)
-	frappe.cache.set_value(MISMATCHED_PRICE_UOM_CACHE_KEY, int(exists))
+	if not frappe.flags.in_test:
+		frappe.cache.set_value(MISMATCHED_PRICE_UOM_CACHE_KEY, int(exists))
 	return exists
 
 
@@ -86,9 +92,10 @@ def has_duplicate_active_item_prices() -> bool:
 	"""Whether any (item_code, price_list) has more than one active public selling Item Price today."""
 	today = nowdate()
 	cache_key = f"{DUPLICATE_PRICES_CACHE_PREFIX}{today}"
-	cached = frappe.cache.get_value(cache_key)
-	if cached is not None:
-		return bool(cached)
+	if not frappe.flags.in_test:
+		cached = frappe.cache.get_value(cache_key)
+		if cached is not None:
+			return bool(cached)
 	from frappe.query_builder.functions import Count
 
 	price = DocType("Item Price")
@@ -101,7 +108,8 @@ def has_duplicate_active_item_prices() -> bool:
 		.limit(1)
 		.run()
 	)
-	frappe.cache.set_value(cache_key, int(exists), expires_in_sec=24 * 60 * 60)
+	if not frappe.flags.in_test:
+		frappe.cache.set_value(cache_key, int(exists), expires_in_sec=24 * 60 * 60)
 	return exists
 
 
@@ -122,24 +130,27 @@ def _delete_item_price_flags():
 	frappe.cache.delete_keys(f"{DUPLICATE_PRICES_CACHE_PREFIX}*")
 
 
+def _delete_sales_uom_flags():
+	frappe.cache.delete_value(NON_STOCK_SALES_UOM_CACHE_KEY)
+	frappe.cache.delete_value(MISMATCHED_PRICE_UOM_CACHE_KEY)
+
+
 def clear_template_price_cache(doc=None, method=None, *args, **kwargs):
 	_delete_item_price_flags()
 	clear_request_rates_cache()
 	if hasattr(frappe.db, "after_commit"):
 		frappe.db.after_commit.add(_delete_item_price_flags)
+	if hasattr(frappe.db, "after_rollback"):
+		frappe.db.after_rollback.add(_delete_item_price_flags)
 
 
 def clear_sales_uom_cache(doc=None, method=None, *args, **kwargs):
-	frappe.cache.delete_value(NON_STOCK_SALES_UOM_CACHE_KEY)
-	frappe.cache.delete_value(MISMATCHED_PRICE_UOM_CACHE_KEY)
+	_delete_sales_uom_flags()
 	clear_request_rates_cache()
 	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(
-			lambda: (
-				frappe.cache.delete_value(NON_STOCK_SALES_UOM_CACHE_KEY),
-				frappe.cache.delete_value(MISMATCHED_PRICE_UOM_CACHE_KEY),
-			)
-		)
+		frappe.db.after_commit.add(_delete_sales_uom_flags)
+	if hasattr(frappe.db, "after_rollback"):
+		frappe.db.after_rollback.add(_delete_sales_uom_flags)
 
 
 def clear_request_rates_cache():
@@ -147,7 +158,7 @@ def clear_request_rates_cache():
 		cache.clear()
 
 
-def clear_base_prices_cache():
+def clear_base_prices_cache(*_args, **_kwargs):
 	_delete_item_price_flags()
 	frappe.cache.delete_value(NON_STOCK_SALES_UOM_CACHE_KEY)
 	clear_request_rates_cache()

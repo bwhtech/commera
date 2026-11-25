@@ -19,20 +19,28 @@ SPECIFIC_RULE_FIELDS = ("customer", "customer_group", "tax_category", "billing_c
 TAX_RULES_CACHE_KEY = "commera:has_tax_rules"
 
 
+def _delete_tax_rules_cache():
+	frappe.cache.delete_value(TAX_RULES_CACHE_KEY)
+
+
 def has_active_tax_rules() -> bool:
 	"""Whether any Tax Rule exists on this site. Cached in Redis so empty-rule stores skip 3-5 queries per cart."""
-	cached = frappe.cache.get_value(TAX_RULES_CACHE_KEY)
-	if cached is not None:
-		return bool(cached)
+	if not frappe.flags.in_test:
+		cached = frappe.cache.get_value(TAX_RULES_CACHE_KEY)
+		if cached is not None:
+			return bool(cached)
 	exists = bool(frappe.db.get_value("Tax Rule", {"tax_type": "Sales"}, "name"))
-	frappe.cache.set_value(TAX_RULES_CACHE_KEY, int(exists))
+	if not frappe.flags.in_test:
+		frappe.cache.set_value(TAX_RULES_CACHE_KEY, int(exists))
 	return exists
 
 
 def clear_tax_rules_cache(doc=None, method=None, *args, **kwargs):
-	frappe.cache.delete_value(TAX_RULES_CACHE_KEY)
+	_delete_tax_rules_cache()
 	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(lambda: frappe.cache.delete_value(TAX_RULES_CACHE_KEY))
+		frappe.db.after_commit.add(_delete_tax_rules_cache)
+	if hasattr(frappe.db, "after_rollback"):
+		frappe.db.after_rollback.add(_delete_tax_rules_cache)
 
 
 def apply_market_taxes(quotation, market: Market | None, switched: bool):

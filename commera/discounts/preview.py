@@ -15,36 +15,52 @@ ITEM_TAX_PARENTS_CACHE_KEY = "commera:item_tax_parents"
 
 def has_active_pricing_rules() -> bool:
 	"""Whether any enabled selling ERPNext Pricing Rule exists. Cached in Redis."""
-	cached = frappe.cache.get_value(ACTIVE_PRICING_RULES_CACHE_KEY)
-	if cached is not None:
-		return bool(cached)
+	if not frappe.flags.in_test:
+		cached = frappe.cache.get_value(ACTIVE_PRICING_RULES_CACHE_KEY)
+		if cached is not None:
+			return bool(cached)
 	exists = bool(frappe.db.get_value("Pricing Rule", {"disable": 0, "selling": 1}, "name"))
-	frappe.cache.set_value(ACTIVE_PRICING_RULES_CACHE_KEY, int(exists))
+	if not frappe.flags.in_test:
+		frappe.cache.set_value(ACTIVE_PRICING_RULES_CACHE_KEY, int(exists))
 	return exists
 
 
 def get_item_tax_parents() -> tuple[set[str], set[str]]:
 	"""Sets of (Item names, Item Group names) that carry an Item Tax child row. Cached in Redis."""
-	cached = frappe.cache.get_value(ITEM_TAX_PARENTS_CACHE_KEY)
-	if cached is not None:
-		return set(cached[0]), set(cached[1])
+	if not frappe.flags.in_test:
+		cached = frappe.cache.get_value(ITEM_TAX_PARENTS_CACHE_KEY)
+		if cached is not None:
+			return set(cached[0]), set(cached[1])
 	rows = frappe.get_all("Item Tax", fields=["parent", "parenttype"])
 	items = sorted({row.parent for row in rows if row.parenttype == "Item"})
 	groups = sorted({row.parent for row in rows if row.parenttype == "Item Group"})
-	frappe.cache.set_value(ITEM_TAX_PARENTS_CACHE_KEY, [items, groups])
+	if not frappe.flags.in_test:
+		frappe.cache.set_value(ITEM_TAX_PARENTS_CACHE_KEY, [items, groups])
 	return set(items), set(groups)
 
 
-def clear_pricing_rules_cache(doc=None, method=None, *args, **kwargs):
+def _delete_pricing_rules_cache():
 	frappe.cache.delete_value(ACTIVE_PRICING_RULES_CACHE_KEY)
+
+
+def _delete_item_tax_cache():
+	frappe.cache.delete_value(ITEM_TAX_PARENTS_CACHE_KEY)
+
+
+def clear_pricing_rules_cache(doc=None, method=None, *args, **kwargs):
+	_delete_pricing_rules_cache()
 	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(lambda: frappe.cache.delete_value(ACTIVE_PRICING_RULES_CACHE_KEY))
+		frappe.db.after_commit.add(_delete_pricing_rules_cache)
+	if hasattr(frappe.db, "after_rollback"):
+		frappe.db.after_rollback.add(_delete_pricing_rules_cache)
 
 
 def clear_item_tax_cache(doc=None, method=None, *args, **kwargs):
-	frappe.cache.delete_value(ITEM_TAX_PARENTS_CACHE_KEY)
+	_delete_item_tax_cache()
 	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(lambda: frappe.cache.delete_value(ITEM_TAX_PARENTS_CACHE_KEY))
+		frappe.db.after_commit.add(_delete_item_tax_cache)
+	if hasattr(frappe.db, "after_rollback"):
+		frappe.db.after_rollback.add(_delete_item_tax_cache)
 
 
 def can_fast_price_preview(item_codes: list[str]) -> bool:

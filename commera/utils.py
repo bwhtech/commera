@@ -550,21 +550,29 @@ def get_currency_symbols() -> dict[str, str]:
 SELLING_CURRENCIES_CACHE_KEY = "commera:selling_currencies"
 
 
-def clear_selling_currencies_cache(doc=None, method=None, *args, **kwargs):
+def _delete_selling_currencies_cache():
 	frappe.cache.delete_value(SELLING_CURRENCIES_CACHE_KEY)
+
+
+def clear_selling_currencies_cache(doc=None, method=None, *args, **kwargs):
+	_delete_selling_currencies_cache()
 	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(lambda: frappe.cache.delete_value(SELLING_CURRENCIES_CACHE_KEY))
+		frappe.db.after_commit.add(_delete_selling_currencies_cache)
+	if hasattr(frappe.db, "after_rollback"):
+		frappe.db.after_rollback.add(_delete_selling_currencies_cache)
 
 
 def get_selling_currencies() -> set[str]:
-	cached = frappe.cache.get_value(SELLING_CURRENCIES_CACHE_KEY)
-	if cached is not None:
-		return set(cached)
+	if not frappe.flags.in_test:
+		cached = frappe.cache.get_value(SELLING_CURRENCIES_CACHE_KEY)
+		if cached is not None:
+			return set(cached)
 	currencies = frappe.get_all(
 		"Price List", filters={"enabled": 1, "selling": 1}, pluck="currency", distinct=True
 	)
 	result = {*currencies, get_store_currency()}
-	frappe.cache.set_value(SELLING_CURRENCIES_CACHE_KEY, sorted(result))
+	if not frappe.flags.in_test:
+		frappe.cache.set_value(SELLING_CURRENCIES_CACHE_KEY, sorted(result))
 	return result
 
 
@@ -846,23 +854,31 @@ def get_available_stocks(item_codes, warehouse):
 POS_INVOICE_CACHE_KEY = "commera:has_open_pos_invoices"
 
 
+def _delete_pos_invoice_cache():
+	frappe.cache.delete_value(POS_INVOICE_CACHE_KEY)
+
+
 def has_open_pos_invoices() -> bool:
-	cached = frappe.cache.get_value(POS_INVOICE_CACHE_KEY)
-	if cached is not None:
-		return bool(cached)
+	if not frappe.flags.in_test:
+		cached = frappe.cache.get_value(POS_INVOICE_CACHE_KEY)
+		if cached is not None:
+			return bool(cached)
 	exists = bool(frappe.db.exists("POS Invoice", {"status": ["in", ["Paid", "Return"]], "docstatus": 1}))
-	frappe.cache.set_value(POS_INVOICE_CACHE_KEY, int(exists))
+	if not frappe.flags.in_test:
+		frappe.cache.set_value(POS_INVOICE_CACHE_KEY, int(exists))
 	return exists
 
 
 def clear_pos_invoice_cache(doc=None, method=None, *args, **kwargs):
-	frappe.cache.delete_value(POS_INVOICE_CACHE_KEY)
+	_delete_pos_invoice_cache()
 	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(lambda: frappe.cache.delete_value(POS_INVOICE_CACHE_KEY))
+		frappe.db.after_commit.add(_delete_pos_invoice_cache)
+	if hasattr(frappe.db, "after_rollback"):
+		frappe.db.after_rollback.add(_delete_pos_invoice_cache)
 
 
-def clear_stock_caches():
-	frappe.cache.delete_value(POS_INVOICE_CACHE_KEY)
+def clear_stock_caches(*_args, **_kwargs):
+	_delete_pos_invoice_cache()
 
 
 def get_unlimited_item_codes(item_codes) -> set[str]:

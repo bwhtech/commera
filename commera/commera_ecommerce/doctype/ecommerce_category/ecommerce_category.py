@@ -212,12 +212,18 @@ def add_item_group_links(item_groups_by_entry):
 MENU_TREE_CACHE_KEY = "commera:enabled_menu_tree_data"
 
 
-def clear_menu_tree_cache(doc=None, method=None, *args, **kwargs):
+def _delete_menu_tree_cache():
 	frappe.cache.delete_value(MENU_TREE_CACHE_KEY)
+
+
+def clear_menu_tree_cache(doc=None, method=None, *args, **kwargs):
+	_delete_menu_tree_cache()
 	if hasattr(frappe.local, "commera_storefront_menu"):
 		delattr(frappe.local, "commera_storefront_menu")
 	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(lambda: frappe.cache.delete_value(MENU_TREE_CACHE_KEY))
+		frappe.db.after_commit.add(_delete_menu_tree_cache)
+	if hasattr(frappe.db, "after_rollback"):
+		frappe.db.after_rollback.add(_delete_menu_tree_cache)
 
 
 def fetch_menu_tree_data(enabled_only=False):
@@ -256,7 +262,7 @@ def fetch_menu_tree_data(enabled_only=False):
 def get_menu_tree(enabled_only=False):
 	"""The whole menu as nested nodes. Enabled storefront menu data is cached in Redis and
 	invalidated on Ecommerce Category changes; hrefs are computed per request for active language."""
-	if enabled_only:
+	if enabled_only and not frappe.flags.in_test:
 		cached = frappe.cache.get_value(MENU_TREE_CACHE_KEY)
 		if cached is None:
 			cached = fetch_menu_tree_data(enabled_only=True)
@@ -264,7 +270,7 @@ def get_menu_tree(enabled_only=False):
 		raw_entries, item_groups_by_entry = cached
 		entries = [frappe._dict(e) for e in raw_entries]
 	else:
-		raw_entries, item_groups_by_entry = fetch_menu_tree_data(enabled_only=False)
+		raw_entries, item_groups_by_entry = fetch_menu_tree_data(enabled_only=enabled_only)
 		entries = [frappe._dict(e) for e in raw_entries]
 
 	if not entries:

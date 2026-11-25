@@ -16,23 +16,32 @@ MAX_DISCOUNT_CODES = 5
 AUTOMATIC_DISCOUNTS_CACHE_KEY = "commera:automatic_discounts"
 
 
-def clear_automatic_discounts_cache(doc=None, method=None, *args, **kwargs):
+def _delete_automatic_discounts_cache():
 	frappe.cache.delete_value(AUTOMATIC_DISCOUNTS_CACHE_KEY)
+
+
+def clear_automatic_discounts_cache(doc=None, method=None, *args, **kwargs):
+	_delete_automatic_discounts_cache()
 	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(lambda: frappe.cache.delete_value(AUTOMATIC_DISCOUNTS_CACHE_KEY))
+		frappe.db.after_commit.add(_delete_automatic_discounts_cache)
+	if hasattr(frappe.db, "after_rollback"):
+		frappe.db.after_rollback.add(_delete_automatic_discounts_cache)
 
 
 def get_automatic_discount_names() -> list[str]:
-	cached = frappe.cache.get_value(AUTOMATIC_DISCOUNTS_CACHE_KEY)
-	if cached is None:
-		cached = frappe.get_all(
-			"Commera Discount",
-			filters={"enabled": 1, "method": "Automatic"},
-			pluck="name",
-			order_by="creation",
-		)
-		frappe.cache.set_value(AUTOMATIC_DISCOUNTS_CACHE_KEY, cached)
-	return cached
+	if not frappe.flags.in_test:
+		cached = frappe.cache.get_value(AUTOMATIC_DISCOUNTS_CACHE_KEY)
+		if cached is not None:
+			return cached
+	names = frappe.get_all(
+		"Commera Discount",
+		filters={"enabled": 1, "method": "Automatic"},
+		pluck="name",
+		order_by="creation",
+	)
+	if not frappe.flags.in_test:
+		frappe.cache.set_value(AUTOMATIC_DISCOUNTS_CACHE_KEY, names)
+	return names
 
 
 @dataclass

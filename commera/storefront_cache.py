@@ -134,40 +134,40 @@ def clear_all_storefront_caches(*_args, **_kwargs) -> None:
 	bump_epochs(*ALL_DOMAINS)
 
 
-# Doc-event invalidators (accept doc, method=None)
-def bump_catalog(doc=None, method=None):
+# Doc-event invalidators (accept any positional/keyword args, e.g. 5-arg after_rename).
+def bump_catalog(*_args, **_kwargs):
 	bump_epochs("catalog")
 
 
-def bump_prices(doc=None, method=None):
+def bump_prices(*_args, **_kwargs):
 	bump_epochs("prices")
 
 
-def bump_stock(doc=None, method=None):
+def bump_stock(*_args, **_kwargs):
 	bump_epochs("stock")
 
 
-def bump_discounts(doc=None, method=None):
+def bump_discounts(*_args, **_kwargs):
 	bump_epochs("discounts")
 
 
-def bump_reviews(doc=None, method=None):
+def bump_reviews(*_args, **_kwargs):
 	bump_epochs("reviews")
 
 
-def bump_shop(doc=None, method=None):
+def bump_shop(*_args, **_kwargs):
 	bump_epochs("shop")
 
 
-def bump_theme(doc=None, method=None):
+def bump_theme(*_args, **_kwargs):
 	bump_epochs("theme")
 
 
-def bump_catalog_and_shop(doc=None, method=None):
+def bump_catalog_and_shop(*_args, **_kwargs):
 	bump_epochs("catalog", "shop")
 
 
-def bump_prices_and_shop(doc=None, method=None):
+def bump_prices_and_shop(*_args, **_kwargs):
 	bump_epochs("prices", "shop")
 
 
