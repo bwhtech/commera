@@ -246,11 +246,6 @@ class StyleAttributeVariant(Document):
 	def unpublish_if_incomplete_data(self):
 		if not self.is_published:
 			return
-		if not self.images or not self.sizes:
+		if not self.sizes:
 			self.is_published = False
-			if not self.images and not self.sizes:
-				frappe.msgprint(frappe._("Cannot publish without Images and Sizes"))
-			elif not self.images:
-				frappe.msgprint(frappe._("Cannot publish without Images"))
-			else:
-				frappe.msgprint(frappe._("Cannot publish without Sizes"))
+			frappe.msgprint(frappe._("Cannot publish without Sizes"))

@@ -16,7 +16,9 @@ from commera.api.admin.catalog import (
 	get_attribute_values,
 	get_product,
 	get_size_prices,
+	set_product_published,
 	set_variant_price,
+	set_variant_published,
 	update_product,
 )
 from commera.api.admin.inventory import LOW_STOCK_THRESHOLD, get_inventory
@@ -187,15 +189,25 @@ class TestVariantImages(ProductOnboardingTestCase):
 		self.variant.reload()
 		self.assertEqual(self.variant.images, [])
 
-	def test_clearing_images_unpublishes_the_variant(self):
-		# The publish gate is the reason the Ecommerce tab shows a blocked reason at all.
+	def test_a_variant_with_sizes_publishes_without_images(self):
+		set_variant_published(self.variant.name, 1)
+
+		self.assertEqual(frappe.db.get_value("Style Attribute Variant", self.variant.name, "is_published"), 1)
+
+	def test_clearing_images_keeps_the_variant_published(self):
 		self.variant.add_images([self.make_file()])
 		self.variant.reload()
 		self.variant.is_published = 1
 		self.variant.save()
-		self.assertEqual(self.variant.is_published, 1)
 
 		self.variant.clear_images()
+
+		self.assertEqual(frappe.db.get_value("Style Attribute Variant", self.variant.name, "is_published"), 1)
+
+	def test_a_variant_without_sizes_still_cannot_publish(self):
+		self.variant.sizes = []
+		self.variant.is_published = 1
+		self.variant.save()
 
 		self.assertEqual(frappe.db.get_value("Style Attribute Variant", self.variant.name, "is_published"), 0)
 
@@ -632,13 +644,21 @@ class TestCreateSingleItemProduct(ProductOnboardingTestCase):
 		self.assertFalse(frappe.db.get_value("Item", leaf_item_code, "has_variants"))
 		self.assertTrue(frappe.db.get_value("Item", book["name"], "has_variants"))
 
-	def test_a_sizeless_product_has_nothing_blocking_publication_but_its_image(self):
+	def test_a_sizeless_product_has_nothing_blocking_publication(self):
 		"""An empty sizes table unpublishes the variant on its own (unpublish_if_incomplete_data),
 		so the hidden size has to satisfy the publish blockers too."""
 		book = self.add_book(option_attribute=self.format_attribute, option_sizes=[{"option": "Paperback"}])
 
 		blockers = get_product(book["name"])["variants"][0]["blockers"]
-		self.assertEqual(blockers, ["Add at least one image"])
+		self.assertEqual(blockers, [])
+
+	def test_a_product_without_a_photo_goes_live(self):
+		book = self.add_book(option_attribute=self.format_attribute, option_sizes=[{"option": "Paperback"}])
+
+		result = set_product_published(book["name"], 1)
+
+		self.assertEqual(result["skipped"], [])
+		self.assertTrue(all(variant["is_published"] for variant in get_product(book["name"])["variants"]))
 
 	def test_a_half_filled_size_grid_is_still_the_owner_forgetting_a_row(self):
 		with self.assertRaises(frappe.ValidationError):

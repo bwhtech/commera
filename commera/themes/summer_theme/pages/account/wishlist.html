@@ -28,7 +28,7 @@
 					<tr>
 						<td class="product-item-img">
 							<a :href="{{ url('/products') | tojson | forceescape }} + '/' + wishlist_item.route">
-								<img :src="wishlist_item.image || '/assets/commera/images/1.jpg'" :alt="wishlist_item.item_name">
+								<img :src="wishlist_item.image || '/assets/commera/images/no-image.svg'" :alt="wishlist_item.item_name">
 							</a>
 						</td>
 						<td class="product-item-name">

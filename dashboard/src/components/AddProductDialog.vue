@@ -292,7 +292,7 @@ async function submit() {
 
         <Alert
           :title="__('Photos come next')"
-          :description="__('This product is created without a photo, so it stays hidden from shoppers until you add one — from the product page, right after this.')"
+          :description="__('This product is saved as a draft. Add photos from the product page right after this, then publish it when it is ready.')"
         />
       </div>
     </template>

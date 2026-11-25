@@ -127,19 +127,12 @@ async function bulkSetPrice() {
 const publishAction = useAdminAction('catalog.set_variant_published')
 const receiveAction = useAdminAction('inventory.receive_stock')
 
-// The server refuses to publish an option with no photo or no size, and says so. Reading the
-// same blockers off the row means the matrix can say it before the merchant clicks.
 function publishBlockers(variant) {
   return variant.blockers ?? []
 }
 
 function blockerLabel(variant) {
-  const needsPhoto = !variant.images.length
-  const needsSize = !variant.sizes.length
-  if (needsPhoto && needsSize) return __('Needs a photo and a size')
-  if (needsPhoto) return __('Needs a photo')
-  if (needsSize) return __('Needs a size')
-  return __('Not ready')
+  return variant.sizes.length ? __('Not ready') : __('Needs a size')
 }
 
 async function togglePublish(variant) {
@@ -147,7 +140,6 @@ async function togglePublish(variant) {
     style_attribute_variant: variant.name,
     publish: variant.is_published ? 0 : 1,
   })
-  // A refusal names the missing photo or size and has already been toasted.
   if (!toggled) return
   toast.success(
     variant.is_published

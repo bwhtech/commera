@@ -484,8 +484,7 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 		cls.gown = cls.make_variant("ZZ Pub Gown", "ZZ Pub Gowns", is_published=0)
 		cls.shoe = cls.make_variant("ZZ Pub Shoe", "ZZ Pub Footwear", is_published=0)
 		cls.bag = cls.make_variant("ZZ Pub Bag", "ZZ Pub Luggage", is_published=1)
-		# No images: unpublish_if_incomplete_data would revert a publish, so the cascade must skip it.
-		cls.incomplete = cls.make_variant("ZZ Pub Draft", "ZZ Pub Dresses", is_published=0, images=False)
+		cls.incomplete = cls.make_variant("ZZ Pub Draft", "ZZ Pub Dresses", is_published=0, sizes=False)
 
 		# publish expands every linked group over its Item Group descendants, so the child gown is reached.
 		cls.cascaded = [cls.dress, cls.gown, cls.shoe]
@@ -520,7 +519,7 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 		).insert(ignore_permissions=True)
 
 	@classmethod
-	def make_variant(cls, display_name, item_group, is_published, images=True):
+	def make_variant(cls, display_name, item_group, is_published, sizes=True):
 		item_code = f"{display_name.replace(' ', '-')}-S"
 		cls.make_item(item_code, display_name)
 		variant = {
@@ -532,10 +531,10 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 			"display_name": display_name,
 			"item_group": item_group,
 			"is_published": is_published,
-			"sizes": [{"size": "S", "item_code": item_code}],
+			"images": [{"image": "/files/zz-pub.png"}],
 		}
-		if images:
-			variant["images"] = [{"image": "/files/zz-pub.png"}]
+		if sizes:
+			variant["sizes"] = [{"size": "S", "item_code": item_code}]
 		return frappe.get_doc(variant).insert(ignore_permissions=True).name
 
 	@classmethod
@@ -613,7 +612,7 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 		self.assertEqual(self.published_variants(), before)
 		self.assertEqual(result["count"], 3)
 
-	def test_publish_skips_products_missing_images_or_sizes(self):
+	def test_publish_skips_products_missing_sizes(self):
 		self.set_published_now(self.women, 1)
 
 		self.assertFalse(frappe.db.get_value("Style Attribute Variant", self.incomplete, "is_published"))

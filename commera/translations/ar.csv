@@ -372,7 +372,7 @@ Sizes,المقاسات
 Pick or type a size,اختر مقاسًا أو اكتبه
 "Leave empty for a product that has no sizes, like a book",اتركه فارغًا لمنتج بلا مقاسات، مثل الكتاب
 Photos come next,الصور في الخطوة التالية
-"This product is created without a photo, so it stays hidden from shoppers until you add one — from the product page, right after this.",يُنشأ هذا المنتج بلا صورة، لذا يبقى مخفيًا عن المتسوقين حتى تضيف صورة — من صفحة المنتج، بعد هذه الخطوة مباشرة.
+"This product is saved as a draft. Add photos from the product page right after this, then publish it when it is ready.",يُحفظ هذا المنتج كمسودة. أضف الصور من صفحة المنتج بعد هذه الخطوة مباشرة، ثم انشره عندما يكون جاهزًا.
 Apps,التطبيقات
 sidebar,الشريط الجانبي
 Add {0},إضافة {0}
@@ -675,7 +675,7 @@ At or below five units,خمس وحدات أو أقل
 Restock,إعادة التخزين
 1 product needs attention,منتج واحد يحتاج إلى اهتمام
 {0} products need attention,{0} منتجات تحتاج إلى اهتمام
-Missing a photo or a size before it can publish,ينقصه صورة أو مقاس قبل أن يمكن نشره
+Missing a size before it can publish,ينقصه مقاس قبل أن يمكن نشره
 Open catalogue,فتح الكتالوج
 Needs attention,يحتاج إلى اهتمام
 Revenue,الإيرادات
@@ -788,7 +788,7 @@ The import could not run,تعذّر تشغيل الاستيراد
 Back to review,العودة إلى المراجعة
 {0} products are live,{0} منتجات منشورة الآن
 "Your catalogue now has these products, with {0} photos already on them.",أصبح كتالوجك يضم هذه المنتجات، ومعها {0} صور بالفعل.
-Your catalogue now has these products. Add photos from each product page to publish them.,أصبح كتالوجك يضم هذه المنتجات. أضف الصور من صفحة كل منتج لنشرها.
+Your catalogue now has these products. Publish them from each product page when they are ready.,أصبح كتالوجك يضم هذه المنتجات. انشرها من صفحة كل منتج عندما تكون جاهزة.
 View my products,عرض منتجاتي
 Back to overview,العودة إلى النظرة العامة
 products created,منتجات تم إنشاؤها
@@ -1234,8 +1234,8 @@ None of these options can go live yet.,لا يمكن نشر أي من هذه ا�
 1 option will come off your storefront. It stays in your catalogue.,سيُزال خيار واحد من واجهة متجرك. ويبقى في كتالوجك.
 {0} options will come off your storefront. They stay in your catalogue.,ستُزال {0} خيارات من واجهة متجرك. وتبقى في كتالوجك.
 None of these options are on your storefront right now.,لا يوجد أي من هذه الخيارات في واجهة متجرك حاليًا.
-"1 option is missing images or sizes, so it cannot go live yet and is left as it is.",ينقص خيارًا واحدًا صور أو مقاسات، لذا لا يمكن نشره بعد ويُترك كما هو.
-"{0} options are missing images or sizes, so they cannot go live yet and are left as they are.",تنقص {0} خيارات صور أو مقاسات، لذا لا يمكن نشرها بعد وتُترك كما هي.
+"1 option is missing sizes, so it cannot go live yet and is left as it is.",ينقص خيارًا واحدًا مقاسات، لذا لا يمكن نشره بعد ويُترك كما هو.
+"{0} options are missing sizes, so they cannot go live yet and are left as they are.",تنقص {0} خيارات مقاسات، لذا لا يمكن نشرها بعد وتُترك كما هي.
 Nothing to publish,لا شيء للنشر
 Nothing to take off,لا شيء للإزالة
 Publish 1 option,نشر خيار واحد
@@ -1766,7 +1766,7 @@ Select items to act on them,حدّد أصنافًا لتنفيذ إجراءات 
 Item,الصنف
 No sellable items yet,لا توجد أصناف قابلة للبيع بعد
 Add a product to start pricing it.,أضف منتجًا لتبدأ تسعيره.
-"Published {0}, skipped {1} (missing a photo or size)",نُشر {0}، وتُخطّي {1} (ينقصه صورة أو مقاس)
+"Published {0}, skipped {1} (missing a size)",نُشر {0}، وتُخطّي {1} (ينقصه مقاس)
 Hidden from the storefront,مخفي من واجهة المتجر
 Restored,تمت الاستعادة
 Could not load this product,تعذّر تحميل هذا المنتج
@@ -2355,11 +2355,11 @@ Order {0} is priced in {1} but the payment was collected in {2}. The order has n
 Paid Currency Does Not Match The Order,عملة الدفع لا تطابق عملة الطلب
 Card payments in {0} are not available for this store yet. Choose another payment method or contact the store.,الدفع بالبطاقة بعملة {0} غير متاح لهذا المتجر بعد. اختر طريقة دفع أخرى أو تواصل مع المتجر.
 Set an Exchange Gain / Loss Account or Round Off Account for {0},حدد حساب أرباح أو خسائر الصرف أو حساب التقريب لشركة {0}
-"This order has no address link because {0}. Set the delivery address on the Delivery Note; the accepted address is in the order's address text","لا يحتوي هذا الطلب على رابط عنوان لأن {0}. حدّد عنوان التسليم في إشعار التسليم؛ العنوان المقبول موجود في نص عنوان الطلب"
+This order has no address link because {0}. Set the delivery address on the Delivery Note; the accepted address is in the order's address text,لا يحتوي هذا الطلب على رابط عنوان لأن {0}. حدّد عنوان التسليم في إشعار التسليم؛ العنوان المقبول موجود في نص عنوان الطلب
 No such import.,لا توجد عملية استيراد بهذا المعرّف.
 The import stopped.,توقف الاستيراد.
 The import stopped before it finished. Please try again.,توقف الاستيراد قبل أن يكتمل. يُرجى المحاولة مرة أخرى.
-"This is a large file. It is imported in the background, so this can take a few minutes.","هذا ملف كبير. يُستورد في الخلفية، لذا قد يستغرق ذلك بضع دقائق."
+"This is a large file. It is imported in the background, so this can take a few minutes.",هذا ملف كبير. يُستورد في الخلفية، لذا قد يستغرق ذلك بضع دقائق.
 per {0},لكل {0}
 Shoppers,المتسوقون
 Bulk Tools,أدوات الإجراءات الجماعية
@@ -2461,16 +2461,16 @@ The import could not finish,تعذّر إكمال الاستيراد
 "It stopped before the end. The products it already made are kept, so running it again picks up the rest.",توقف قبل النهاية. تُحفظ المنتجات التي أنشأها، لذا يكمل التشغيل مرة أخرى الباقي.
 Back to items,العودة إلى العناصر
 {0} products are ready as drafts,{0} منتجات جاهزة كمسودات
-Publish them to put them on your storefront. Products without a photo stay as drafts until you add one.,انشرها لتظهر في متجرك. تبقى المنتجات التي بلا صورة مسودات حتى تضيف صورة.
+Publish them to put them on your storefront.,انشرها لتظهر في متجرك.
 Publish all,نشر الكل
-{0} need a photo before they can go live.,{0} تحتاج إلى صورة قبل نشرها.
+{0} need a size before they can go live.,{0} تحتاج إلى مقاس قبل نشرها.
 Every imported product is on your storefront.,كل منتج مستورد معروض في متجرك.
 "already products, left alone",منتجات موجودة، تُركت كما هي
 See below,انظر أدناه
 items that did not import,عناصر لم يتم استيرادها
-1 needs a photo,منتج واحد يحتاج إلى صورة
-{0} need a photo,{0} تحتاج إلى صورة
-Add a photo,إضافة صورة
+1 needs a size,منتج واحد يحتاج إلى مقاس
+{0} need a size,{0} تحتاج إلى مقاس
+Add a size,إضافة مقاس
 Items that did not import,العناصر التي لم يتم استيرادها
 Turn the items you already sell in ERPNext into products.,حوّل العناصر التي تبيعها في ERPNext إلى منتجات.
 Import from ERPNext,استيراد من ERPNext
@@ -2482,7 +2482,7 @@ Other options,خيارات أخرى
 Pick items,اختيار العناصر
 The ERPNext items to bring in,عناصر ERPNext المراد نقلها
 Create and publish,الإنشاء والنشر
-1 product needs a photo before it can go live.,منتج واحد يحتاج إلى صورة قبل نشره.
+1 product needs a size before it can go live.,منتج واحد يحتاج إلى مقاس قبل نشره.
 1 product is ready as a draft,منتج واحد جاهز كمسودة
 1 product is live,منتج واحد منشور الآن
 Adding the products to your cart,جارٍ إضافة المنتجات إلى سلتك
@@ -2531,3 +2531,5 @@ Exactly as registered in Shiprocket.,تمامًا كما هو مسجّل في Sh
 Leave blank to use the default channel.,اتركه فارغًا لاستخدام القناة الافتراضية.
 5000 unless your Shiprocket contract says otherwise.,5000 ما لم ينص عقدك مع Shiprocket على غير ذلك.
 Set the same token as the x-api-key in Shiprocket's webhook settings.,استخدم الرمز نفسه المعيّن كـ x-api-key في إعدادات الويب هوك لدى Shiprocket.
+Missing sizes,ينقصه مقاسات
+Cannot publish without Sizes,لا يمكن النشر بدون مقاسات

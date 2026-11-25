@@ -1,12 +1,14 @@
 {% from "components/macros/availability.html" import unavailable_label %}
+{% from "components/macros/icons.html" import icon %}
 
 {# `amount`: an expression for commera.format.money HTML. `unavailable`: an expression true for a line
    the market has no price for; `remove` then removes it. #}
 {% macro summary_line(image, title, subtitle, qty, amount, unavailable=None, remove=None) -%}
 <li class="flex items-center gap-3">
 	<div class="relative w-14 shrink-0">
-		<div class="media overflow-hidden rounded-lg">
-			<img x-show="{{ image }}" :src="{{ image }}" alt="" class="aspect-[3/4] w-full object-cover object-top">
+		<div class="media grid aspect-[3/4] place-items-center overflow-hidden rounded-lg text-ink-gray-4">
+			<img x-show="{{ image }}" :src="{{ image }}" alt="" class="size-full object-cover object-top">
+			<span x-show="!({{ image }})">{{ icon("image", "size-5") }}</span>
 		</div>
 		<span class="absolute -end-2 -top-2 grid size-5 place-items-center rounded-full bg-brand text-xs font-medium text-on-brand" x-text="{{ qty }}"></span>
 	</div>

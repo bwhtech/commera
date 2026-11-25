@@ -65,8 +65,8 @@ const summary = computed(() => {
 const blockedNote = computed(() => {
   if (!publishing.value || !incomplete.value) return ''
   return incomplete.value === 1
-    ? __('1 option is missing images or sizes, so it cannot go live yet and is left as it is.')
-    : __('{0} options are missing images or sizes, so they cannot go live yet and are left as they are.', [incomplete.value])
+    ? __('1 option is missing sizes, so it cannot go live yet and is left as it is.')
+    : __('{0} options are missing sizes, so they cannot go live yet and are left as they are.', [incomplete.value])
 })
 
 const confirmLabel = computed(() => {

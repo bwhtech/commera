@@ -300,7 +300,7 @@
 							<template x-for="cart_item in $store.cart.items" :key="cart_item.variant.item_code">
 								<div class="cart-item style-1">
 									<div class="dz-media">
-										<img :src="cart_item.item.images.length ? cart_item.item.images[0].image : '/assets/commera/images/1.jpg'"
+										<img :src="cart_item.item.images.length ? cart_item.item.images[0].image : '/assets/commera/images/no-image.svg'"
 											:alt="cart_item.variant.item_name">
 									</div>
 									<div class="dz-content">
@@ -316,7 +316,7 @@
 						{% for item in items %}
 							<div class="cart-item style-1 {% if loop.last %}mb-0{% endif %}">
 								<div class="dz-media">
-									<img src="{{ item.image or '/assets/commera/images/1.jpg' }}"
+									<img src="{{ item.image or '/assets/commera/images/no-image.svg' }}"
 										alt="{{ item.display_name or item.item_name }}">
 								</div>
 								<div class="dz-content">

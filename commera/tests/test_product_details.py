@@ -5,7 +5,7 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from commera.product_detail import get_product_detail
+from commera.product_detail import DEFAULT_PRODUCT_IMAGE, get_product_detail
 from commera.tests import get_test_configurator
 from commera.utils import get_discount_percent
 from commera.www.products import details
@@ -68,7 +68,7 @@ class ProductDetailPriceTestCase(IntegrationTestCase):
 		item_price.insert()
 		return item_price.name
 
-	def make_variant(self, item_code, route):
+	def make_variant(self, item_code, route, image="/assets/details-test.jpg"):
 		variant = frappe.new_doc("Style Attribute Variant")
 		variant.configurator = self.configurator
 		variant.item_style = item_code
@@ -76,8 +76,8 @@ class ProductDetailPriceTestCase(IntegrationTestCase):
 		variant.attribute_value = f"Val {frappe.generate_hash(length=6)}"
 		variant.display_name = f"Display {route}"
 		variant.route = route
-		# images + sizes are required or validate() force-unpublishes the variant
-		variant.append("images", {"image": "/assets/details-test.jpg"})
+		if image:
+			variant.append("images", {"image": image})
 		variant.append("sizes", {"size": "M", "item_code": item_code})
 		variant.is_published = 1
 		variant.insert(ignore_permissions=True)
@@ -99,6 +99,19 @@ class ProductDetailPriceTestCase(IntegrationTestCase):
 		context = frappe._dict()
 		details.get_context(context)
 		return context
+
+
+class TestProductDetailImages(ProductDetailPriceTestCase):
+	def test_a_product_without_a_photo_is_published_with_no_images(self):
+		item_code = self.make_item("NOPHOTO")
+		route = f"details-test-nophoto-{self.suffix.lower()}"
+		self.make_variant(item_code, route, image=None)
+
+		self.assertEqual(get_product_detail(route)["images"], [])
+		context = self.render(route)
+		self.assertEqual(context.images, [DEFAULT_PRODUCT_IMAGE])
+		product = next(entry for entry in context.json_ld if entry.get("@type") == "Product")
+		self.assertNotIn(DEFAULT_PRODUCT_IMAGE, str(product.get("image")))
 
 
 class TestProductDetailPrice(ProductDetailPriceTestCase):

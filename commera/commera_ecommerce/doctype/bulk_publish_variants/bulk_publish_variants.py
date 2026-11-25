@@ -26,7 +26,6 @@ def get_variants_to_publish(publish, names=None, item_groups=None, require_compl
 	"""Variants whose `is_published` this call would flip. Completeness is demanded only on the way in -
 	an already-live variant must always be unpublishable."""
 	variant = frappe.qb.DocType(PRODUCT_DOCTYPE)
-	slideshow_item = frappe.qb.DocType("Website Slideshow Item")
 	color_size_item = frappe.qb.DocType("Color Size Item")
 
 	found = []
@@ -34,17 +33,8 @@ def get_variants_to_publish(publish, names=None, item_groups=None, require_compl
 		for item_group_chunk in chunked(item_groups):
 			query = frappe.qb.from_(variant)
 			if publish and require_complete:
-				query = (
-					query.inner_join(slideshow_item)
-					.on(
-						(slideshow_item.parent == variant.name)
-						& (slideshow_item.parenttype == PRODUCT_DOCTYPE)
-					)
-					.inner_join(color_size_item)
-					.on(
-						(color_size_item.parent == variant.name)
-						& (color_size_item.parenttype == PRODUCT_DOCTYPE)
-					)
+				query = query.inner_join(color_size_item).on(
+					(color_size_item.parent == variant.name) & (color_size_item.parenttype == PRODUCT_DOCTYPE)
 				)
 			query = query.select(variant.name).distinct().where(variant.is_published == (0 if publish else 1))
 			if name_chunk is not None:

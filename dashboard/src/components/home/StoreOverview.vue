@@ -81,7 +81,7 @@ const attention = computed(() => {
         needsAttentionCount === 1
           ? __('1 product needs attention')
           : __('{0} products need attention', [needsAttentionCount]),
-      note: __('Missing a photo or a size before it can publish'),
+      note: __('Missing a size before it can publish'),
       action: __('Open catalogue'),
       to: '/products',
     },
