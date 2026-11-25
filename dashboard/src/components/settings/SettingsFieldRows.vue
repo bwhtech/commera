@@ -51,7 +51,6 @@ function isOn(field) {
 // A secret already stored is the one thing this screen cannot show, so it says so instead.
 function hint(field) {
   if (field.is_secret && field.is_set) return __('Stored. Leave blank to keep it.')
-  if (field.is_secret) return __('Stored encrypted, never shown again.')
   return plainText(__(field.description))
 }
 

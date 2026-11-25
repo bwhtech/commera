@@ -42,7 +42,6 @@
   },
   {
    "default": "1",
-   "description": "Uses the sandbox host, where labels and AWBs are real objects but no carrier is ever paid.",
    "fieldname": "test_mode",
    "fieldtype": "Check",
    "label": "Test Mode"
@@ -53,7 +52,7 @@
    "label": "API Credentials"
   },
   {
-   "description": "AfterShip API key, sent as the <b>as-api-key</b> header. Sandbox and production keys are different.",
+   "description": "Sandbox and production keys are different.",
    "fieldname": "api_key",
    "fieldtype": "Password",
    "label": "API Key",
@@ -64,7 +63,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Default shipper account to rate and buy against. Leave blank to rate-shop every account on the key.",
+   "description": "Leave blank to compare every account on the key.",
    "fieldname": "shipper_account_id",
    "fieldtype": "Data",
    "label": "Shipper Account ID"
@@ -92,7 +91,6 @@
   },
   {
    "default": "https://api.aftership.com/tracking",
-   "description": "Tracking is a separate AfterShip product with its own host, and has no sandbox of its own.",
    "fieldname": "tracking_host",
    "fieldtype": "Data",
    "label": "Tracking Host"
@@ -109,7 +107,6 @@
    "label": "Pickup"
   },
   {
-   "description": "Ship-from address used when quoting rates at checkout.",
    "fieldname": "pickup_address",
    "fieldtype": "Link",
    "label": "Pickup Address",
@@ -120,7 +117,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Fallback currency when a quote does not name one.",
    "fieldname": "currency",
    "fieldtype": "Link",
    "label": "Currency",
@@ -143,7 +139,7 @@
   },
   {
    "default": "10",
-   "description": "How long a checkout rate call may take before options fall back to their backup price.",
+   "description": "After this, checkout uses the option's backup price.",
    "fieldname": "rates_timeout_seconds",
    "fieldtype": "Int",
    "label": "Rates Timeout (seconds)"
@@ -154,7 +150,7 @@
    "label": "Webhook"
   },
   {
-   "description": "AfterShip signs each webhook with this secret (base64 HMAC-SHA256 in the <b>aftership-hmac-sha256</b> header). Without it a delivery cannot be verified.",
+   "description": "From your AfterShip webhook settings.",
    "fieldname": "webhook_secret",
    "fieldtype": "Password",
    "label": "Webhook Secret"
@@ -164,7 +160,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-20 00:00:00.000000",
+ "modified": "2026-11-24 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Shipping",
  "name": "AfterShip Shipping Settings",

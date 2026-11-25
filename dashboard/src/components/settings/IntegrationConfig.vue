@@ -1,12 +1,13 @@
 <script setup>
-import { reactive, ref } from 'vue'
-import { Badge, Button, SettingsBody, SettingsRow, Switch, toast } from 'frappe-ui'
+import { reactive } from 'vue'
+import { Button, SettingsBody, toast } from 'frappe-ui'
 import SettingsConfigHeader from './SettingsConfigHeader.vue'
 import SettingsFieldRows from './SettingsFieldRows.vue'
 import { __ } from '../../data/translation'
 
 const props = defineProps({
   card: { type: Object, required: true },
+  turningOn: { type: Boolean, default: false },
   saving: { type: Boolean, default: false },
 })
 
@@ -22,8 +23,6 @@ const values = reactive(
   ),
 )
 
-const enabled = ref(props.card.enabled)
-
 // The clipboard is refused outright over plain http and in some embedded browsers,
 // so the URL is put in front of the merchant to copy by hand.
 async function copyWebhookUrl() {
@@ -37,32 +36,20 @@ async function copyWebhookUrl() {
 </script>
 
 <template>
-  <SettingsConfigHeader :title="card.label" :description="card.blurb" @back="emit('back')">
+  <SettingsConfigHeader :title="card.label" @back="emit('back')">
     <template #actions>
       <Button
-        :label="__('Save')"
+        :label="turningOn ? __('Turn on') : __('Save')"
         variant="solid"
         theme="gray"
         :loading="saving"
-        @click="emit('save', { enabled, values })"
+        @click="emit('save', values)"
       />
     </template>
   </SettingsConfigHeader>
 
   <SettingsBody v-scroll-fade>
     <div class="divide-y divide-outline-gray-1">
-      <SettingsRow :title="__('Enabled')" :description="__('Offered to customers at checkout.')">
-        <div class="flex items-center gap-2">
-          <Badge
-            v-if="card.missing?.length"
-            :label="__('{0} still needed', [card.missing.length])"
-            theme="amber"
-            variant="subtle"
-          />
-          <Switch v-model="enabled" size="sm" />
-        </div>
-      </SettingsRow>
-
       <!-- A Link here is a pickup Address or a currency: pickable, because a name typed from
            memory that does not match reads to the carrier as no origin at all. -->
       <SettingsFieldRows
@@ -84,9 +71,7 @@ async function copyWebhookUrl() {
         </code>
         <Button :label="__('Copy')" icon-left="lucide-copy" @click="copyWebhookUrl" />
       </div>
-      <p class="mt-2 text-sm text-ink-gray-5">
-        {{ __("Paste this into the provider's dashboard so it can report status back to this store.") }}
-      </p>
+      <p class="mt-2 text-sm text-ink-gray-5">{{ __("Add this in {0}'s webhook settings.", [card.label]) }}</p>
     </div>
 
     <div v-if="card.docs_url" class="mt-4">

@@ -6,14 +6,14 @@
  "engine": "InnoDB",
  "field_order": [
   "enabled",
-  "column_break_mode",
-  "mode",
   "section_break_keys",
   "public_key",
   "column_break_igiv",
   "private_key",
   "section_break_webhook",
   "webhook_secret",
+  "section_break_settings",
+  "mode",
   "section_break_rprx",
   "success_url",
   "column_break_zncd",
@@ -25,18 +25,6 @@
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled"
-  },
-  {
-   "fieldname": "column_break_mode",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "Test",
-   "fieldname": "mode",
-   "fieldtype": "Select",
-   "label": "Mode",
-   "options": "Test\nLive",
-   "reqd": 1
   },
   {
    "fieldname": "section_break_keys",
@@ -65,10 +53,22 @@
    "label": "Webhook"
   },
   {
-   "description": "Required. Without it a webhook cannot be verified and anyone could mark an order paid.",
+   "description": "The signing secret of your Stripe webhook endpoint (starts with whsec_).",
    "fieldname": "webhook_secret",
    "fieldtype": "Password",
-   "label": "Webhook Secret",
+   "label": "Webhook Secret"
+  },
+  {
+   "fieldname": "section_break_settings",
+   "fieldtype": "Section Break",
+   "label": "Settings"
+  },
+  {
+   "default": "Test",
+   "fieldname": "mode",
+   "fieldtype": "Select",
+   "label": "Mode",
+   "options": "Test\nLive",
    "reqd": 1
   },
   {
@@ -97,7 +97,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-16 00:00:00.000000",
+ "modified": "2026-11-24 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Payment Gateways",
  "name": "Stripe Gateway Settings",

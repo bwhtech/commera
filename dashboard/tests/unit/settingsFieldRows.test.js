@@ -29,3 +29,15 @@ test('a link field without a description shows no made-up hint', async () => {
   assert.match(html, /Default Price List/)
   assert.doesNotMatch(html, /Links to/)
 })
+
+test('a secret shows a hint only once it is saved', async () => {
+  const { default: SettingsFieldRows } = await import(moduleUrl(code))
+  const secret = { fieldname: 'key_secret', label: 'Key Secret', fieldtype: 'Password', is_secret: true }
+  const render = (isSet) =>
+    renderToString(
+      createSSRApp(SettingsFieldRows, { groups: [{ label: 'API Keys', fields: [{ ...secret, is_set: isSet }] }], values: {} }),
+    )
+
+  assert.doesNotMatch(await render(false), /Stored/)
+  assert.match(await render(true), /Stored\. Leave blank to keep it\./)
+})

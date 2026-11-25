@@ -1,9 +1,4 @@
 <script setup>
-/**
- * One provider, one row: the mark, what state it is in, and the two things you came to
- * do — turn it on, or give it keys. Every piece of state is the server's answer, never a
- * local flag, so a card cannot claim a connection the site does not have.
- */
 import { computed } from 'vue'
 import { Badge, Button, Switch } from 'frappe-ui'
 import IntegrationLogo from '../integrations/IntegrationLogo.vue'
@@ -36,16 +31,12 @@ const isLive = computed(() => props.card.enabled && !needsKeys.value)
              nothing to configure and the row says so rather than offering keys. -->
         <Badge v-if="!card.available" :label="__('Not installed')" theme="gray" variant="subtle" />
       </div>
-      <!-- Wraps rather than truncates: a carrier blurb is a sentence, and clipping it at the
-           column edge cut it mid-word — which reads as a rendering fault rather than as text
-           there is more of. The row grows instead; nothing below it is positioned absolutely. -->
-      <p v-if="card.blurb" class="mt-1 text-sm text-ink-gray-5">{{ card.blurb }}</p>
     </div>
 
     <div class="ms-auto flex shrink-0 items-center gap-3">
       <Button
-        :label="card.configured ? __('Configure') : __('Add keys')"
-        :disabled="!card.available"
+        v-if="card.available && (card.enabled || card.configured)"
+        :label="__('Configure')"
         @click="$emit('configure', card.slug)"
       />
       <Switch

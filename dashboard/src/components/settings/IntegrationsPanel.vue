@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Badge, Button, SettingsBody, Skeleton, toast } from 'frappe-ui'
 import SettingsPanelHeader from './SettingsPanelHeader.vue'
 import EmptyState from '../EmptyState.vue'
@@ -10,7 +10,6 @@ import { __ } from '../../data/translation'
 const props = defineProps({
   store: { type: Object, required: true },
   title: { type: String, required: true },
-  description: { type: String, required: true },
   // Opening the dialog should fetch; switching away and back should not.
   active: { type: Boolean, default: false },
 })
@@ -20,12 +19,18 @@ const configuring = defineModel('configuring', { type: String, default: null })
 const current = computed(
   () => props.store.cards.value.find((card) => card.slug === configuring.value) ?? null,
 )
+const turningOn = ref(false)
+watch(configuring, (slug) => !slug && (turningOn.value = false))
 
 watch(() => props.active, (isActive) => isActive && props.store.loadOnce(), { immediate: true })
 
 async function toggle(card, enabled) {
-  // Enabling with a required field still blank is refused by the server, which names the
-  // field. Nothing is done here to pre-empt it: one rule, on the server, for both screens.
+  if (enabled && card.missing?.length) {
+    turningOn.value = true
+    configuring.value = card.slug
+    return
+  }
+
   const saved = await props.store.save(card.slug, enabled, {})
   if (!saved) return
 
@@ -33,18 +38,20 @@ async function toggle(card, enabled) {
   else toast.success(__('{0} is off', [saved.label]))
 }
 
-async function saveCurrent({ enabled, values }) {
+async function saveCurrent(values) {
+  const enabled = turningOn.value || current.value.enabled
   const saved = await props.store.save(current.value.slug, enabled, values)
   if (!saved) return
 
   configuring.value = null
-  toast.success(__('{0} saved', [saved.label]))
+  if (turningOn.value) toast.success(__('{0} is on', [saved.label]))
+  else toast.success(__('{0} saved', [saved.label]))
 }
 </script>
 
 <template>
   <template v-if="!current">
-    <SettingsPanelHeader :title="title" :description="description">
+    <SettingsPanelHeader :title="title">
       <template #actions>
         <Badge
           v-if="store.incomplete.value.length"
@@ -73,14 +80,8 @@ async function saveCurrent({ enabled, values }) {
       >
         <div v-for="row in 3" :key="row" class="flex items-center gap-3 py-3">
           <Skeleton class="h-9 w-24 shrink-0 rounded-5" />
-          <div class="min-w-0 flex-1">
-            <Skeleton class="h-4 w-32 rounded-4" />
-            <Skeleton class="mt-2 h-3.5 w-48 rounded-4" />
-          </div>
-          <div class="ms-auto flex shrink-0 items-center gap-3">
-            <Skeleton class="h-7 w-20 rounded-4" />
-            <Skeleton class="h-4 w-8 rounded-full" />
-          </div>
+          <Skeleton class="h-4 w-32 rounded-4" />
+          <Skeleton class="ms-auto h-4 w-8 shrink-0 rounded-full" />
         </div>
       </div>
       <!-- Nothing installed answers with an empty registry, not a refusal — without this
@@ -108,6 +109,7 @@ async function saveCurrent({ enabled, values }) {
   <IntegrationConfig
     v-else
     :card="current"
+    :turning-on="turningOn"
     :saving="store.loading.value"
     @back="configuring = null"
     @save="saveCurrent"

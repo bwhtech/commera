@@ -20,5 +20,5 @@ class StripeGatewaySettings(Document, StripeGateway):
 		private_key: DF.Password
 		public_key: DF.Data
 		success_url: DF.Data | None
-		webhook_secret: DF.Password
+		webhook_secret: DF.Password | None
 	# end: auto-generated types

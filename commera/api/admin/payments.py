@@ -32,18 +32,22 @@ def add_gateway_setup(integration):
 	add_return_urls(integration["settings_doctype"])
 
 
+def get_return_urls(settings_doctype: str) -> dict:
+	meta = frappe.get_meta(settings_doctype)
+	return {fieldname: get_url(path) for fieldname, path in RETURN_PATHS.items() if meta.has_field(fieldname)}
+
+
 def add_return_urls(settings_doctype: str):
 	settings = frappe.get_single(settings_doctype)
-	empty_fields = [
-		fieldname
-		for fieldname in RETURN_PATHS
-		if settings.meta.has_field(fieldname) and not settings.get(fieldname)
-	]
-	if not empty_fields:
+	empty_urls = {
+		fieldname: url
+		for fieldname, url in get_return_urls(settings_doctype).items()
+		if not settings.get(fieldname)
+	}
+	if not empty_urls:
 		return
 
-	for fieldname in empty_fields:
-		settings.set(fieldname, get_url(RETURN_PATHS[fieldname]))
+	settings.update(empty_urls)
 	settings.save()
 
 
@@ -65,6 +69,7 @@ def get_payment_entry(settings_doctype: str) -> dict:
 		"profile_settings_fieldname": PROFILE_SETTINGS_FIELDNAME,
 		"webhook_path": WEBHOOK_PATH,
 		"on_enable": add_gateway_setup,
+		"field_defaults": get_return_urls,
 	}
 
 

@@ -6,7 +6,6 @@ import { onSettingsClose } from '../../ia/settings'
 defineProps({
   store: { type: Object, required: true },
   title: { type: String, required: true },
-  description: { type: String, required: true },
   // Opening the dialog should fetch; switching away and back should not.
   active: { type: Boolean, default: false },
 })
@@ -36,7 +35,6 @@ onSettingsClose(() => {
         :store="store"
         :active="active"
         :title="title"
-        :description="description"
       />
     </div>
 

@@ -30,6 +30,13 @@ FULL_CREDENTIALS = {
 	"webhook_secret": WEBHOOK_SECRET,
 }
 
+GATEWAY_KEYS = {
+	"razorpay": ({"key_id": "rzp_test_zz"}, "key_secret"),
+	"stripe": ({"public_key": "pk_test_zz"}, "private_key"),
+	"telr": ({"store_id": "12345"}, "auth_key"),
+	"tabby": ({"merchant_code": "ZZ_TEST"}, "key_secret"),
+}
+
 
 BUILT_IN_CARDS = [
 	(
@@ -75,6 +82,15 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 	def get_card(self, slug=SLUG):
 		return next(card for card in get_payment_integrations() if card["slug"] == slug)
 
+	def get_editor_values(self, slug, changes):
+		card = self.get_card(slug)
+		values = {
+			field["fieldname"]: "" if field["is_secret"] else (field["value"] or "")
+			for group in card["groups"]
+			for field in group["fields"]
+		}
+		return values | changes
+
 	def get_field(self, card, fieldname):
 		for group in card["groups"]:
 			for field in group["fields"]:
@@ -106,9 +122,8 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 		save_payment_integration(SLUG, 0, {"key_secret": ""})
 		self.assertEqual(get_stored_password("key_secret"), KEY_SECRET)
 
-		# An explicit null is the only "clear this" the engine honours; a required field then fails mandatory.
-		with self.assertRaises(frappe.MandatoryError):
-			save_payment_integration(SLUG, 0, {"key_secret": None})
+		card = save_payment_integration(SLUG, 0, {"key_secret": None})
+		self.assertIn("key_secret", card["missing"])
 
 	def test_enabling_with_a_required_field_blank_throws(self):
 		credentials = FULL_CREDENTIALS | {"key_id": None}
@@ -124,6 +139,65 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 
 		self.assertTrue(card["enabled"])
 		self.assertEqual(card["missing"], [])
+
+	def test_reconfiguring_saved_keys_keeps_working(self):
+		for slug, (identifier, secret_fieldname) in GATEWAY_KEYS.items():
+			with self.subTest(slug):
+				settings_doctype = self.get_card(slug)["settings_doctype"]
+				self.addCleanup(frappe.clear_document_cache, settings_doctype, settings_doctype)
+
+				save_payment_integration(
+					slug, 1, self.get_editor_values(slug, identifier | {secret_fieldname: "first"})
+				)
+				for secret in ("second", ""):
+					card = save_payment_integration(
+						slug, 1, self.get_editor_values(slug, {secret_fieldname: secret})
+					)
+					self.assertTrue(card["enabled"])
+					self.assertEqual(card["missing"], [])
+
+				stored = get_decrypted_password(settings_doctype, settings_doctype, secret_fieldname)
+				self.assertEqual(stored, "second")
+				self.assertNotIn("second", frappe.as_json(self.get_card(slug)))
+
+	def test_stripe_and_tabby_turn_on_without_a_webhook_secret(self):
+		for slug in ("stripe", "tabby"):
+			with self.subTest(slug):
+				identifier, secret_fieldname = GATEWAY_KEYS[slug]
+				settings_doctype = self.get_card(slug)["settings_doctype"]
+				self.addCleanup(frappe.clear_document_cache, settings_doctype, settings_doctype)
+
+				values = identifier | {secret_fieldname: "zz-secret", "webhook_secret": None}
+				card = save_payment_integration(slug, 1, values)
+
+				self.assertTrue(card["enabled"])
+				self.assertNotIn("webhook_secret", card["missing"])
+
+	def test_keys_typed_so_far_are_kept_while_the_gateway_is_off(self):
+		frappe.db.set_single_value(SETTINGS_DOCTYPE, {"key_id": "", "key_secret": ""})
+		frappe.clear_document_cache(SETTINGS_DOCTYPE, SETTINGS_DOCTYPE)
+
+		card = save_payment_integration(SLUG, 0, {"key_id": "rzp_test_partial"})
+
+		self.assertFalse(card["enabled"])
+		self.assertEqual(card["missing"], ["key_secret"])
+		self.assertEqual(self.get_field(card, "key_id")["value"], "rzp_test_partial")
+
+	def test_the_editor_offers_the_shop_pages_for_blank_return_urls(self):
+		custom_failure_url = "https://shop.example/payment-failed"
+		frappe.db.set_single_value(
+			SETTINGS_DOCTYPE, {"success_url": "", "failure_url": custom_failure_url, "cancelled_url": ""}
+		)
+		frappe.clear_document_cache(SETTINGS_DOCTYPE, SETTINGS_DOCTYPE)
+
+		card = self.get_card()
+
+		self.assertEqual(
+			self.get_field(card, "success_url")["value"], get_url("/account/orders/confirmation")
+		)
+		self.assertEqual(self.get_field(card, "cancelled_url")["value"], get_url("/cart/checkout"))
+		self.assertEqual(self.get_field(card, "failure_url")["value"], custom_failure_url)
+		self.assertFalse(frappe.db.get_single_value(SETTINGS_DOCTYPE, "success_url"))
 
 	def test_unknown_fieldname_throws(self):
 		with self.assertRaises(frappe.ValidationError) as raised:

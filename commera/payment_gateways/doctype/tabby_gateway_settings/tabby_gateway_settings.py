@@ -22,5 +22,5 @@ class TabbyGatewaySettings(Document, TabbyGateway):
 		merchant_code: DF.Data
 		success_url: DF.Data | None
 		webhook_ips: DF.SmallText | None
-		webhook_secret: DF.Password
+		webhook_secret: DF.Password | None
 	# end: auto-generated types
