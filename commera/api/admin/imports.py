@@ -164,7 +164,7 @@ def parse_and_validate(file_url: str, column_mapping: dict | None = None):
 		if not issue and not collection:
 			issue = {"level": "error", "text": "Collection is missing"}
 		elif not issue and not frappe.db.exists("Item Group", collection):
-			issue = {"level": "error", "text": f'Collection "{collection}" does not exist — create it first'}
+			issue = {"level": "error", "text": f'Collection "{collection}" does not exist. Create it first'}
 		if not issue and not color:
 			issue = {"level": "error", "text": "Color is missing"}
 		if not issue and not size:
@@ -198,8 +198,8 @@ def parse_and_validate(file_url: str, column_mapping: dict | None = None):
 				issue = {
 					"level": "error",
 					"text": (
-						f'Price does not match row {first["row"]} for "{title}" — '
-						"one price applies to the whole product"
+						f'Price does not match row {first["row"]} for "{title}". '
+						"One price applies to the whole product"
 					),
 				}
 
@@ -343,7 +343,7 @@ def validate_image_urls(file_urls, names_by_url: dict | None = None):
 	missing = [names_by_url.get(url, url) for url in unique_urls if url not in existing_urls]
 	if missing:
 		frappe.throw(
-			_("These images are not on the server any more — upload them again: {0}").format(
+			_("These images are not on the server any more. Upload them again: {0}").format(
 				", ".join(missing)
 			)
 		)
@@ -522,11 +522,11 @@ def run_import(
 
 	if not frappe.db.exists("Item Attribute", OPTION_ATTRIBUTE):
 		frappe.throw(
-			_('This store has no Item Attribute named "{0}" — create it first.').format(OPTION_ATTRIBUTE)
+			_('This store has no Item Attribute named "{0}". Create it first.').format(OPTION_ATTRIBUTE)
 		)
 	if not frappe.db.exists("Item Attribute", SIZE_ATTRIBUTE):
 		frappe.throw(
-			_('This store has no Item Attribute named "{0}" — create it first.').format(SIZE_ATTRIBUTE)
+			_('This store has no Item Attribute named "{0}". Create it first.').format(SIZE_ATTRIBUTE)
 		)
 
 	result = parse_and_validate(file_url, column_mapping)

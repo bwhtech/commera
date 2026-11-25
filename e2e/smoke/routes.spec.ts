@@ -6,7 +6,7 @@ const ROUTES = [
 	['/products', 'Add product'],
 	['/collections', 'Create collection'],
 	['/attributes', 'New attribute'],
-	['/inventory', 'Receive stock'],
+	['/inventory', 'Add stock'],
 	['/inventory/adjustments', 'Reason'],
 	['/pricing', 'Edit prices'],
 	['/discounts', 'Create discount'],

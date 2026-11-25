@@ -126,16 +126,16 @@ export function buildProductActions(product, router, handlers = {}) {
         // no reason-coded adjustment and no "set on-hand to X".
         itemCodes.length && {
           key: 'adjust',
-          label: __('Receive stock'),
+          label: __('Add stock'),
           icon: 'lucide-package-plus',
           onClick: () =>
             dialog.prompt({
-              title: __('Receive stock on {0}', [product.title]),
+              title: __('Add stock to {0}', [product.title]),
               message: __(
                 'Adds this quantity to each of the {0} sizes under this product. There is no way to set stock to an exact number here.',
                 [itemCodes.length],
               ),
-              fields: [{ name: 'value', label: __('Quantity received'), type: 'number', required: true }],
+              fields: [{ name: 'value', label: __('Quantity to add'), type: 'number', required: true }],
               onConfirm: async ({ values }) => {
                 const quantity = Math.max(0, Number(values.value) || 0)
                 if (!quantity) return
@@ -145,7 +145,7 @@ export function buildProductActions(product, router, handlers = {}) {
                 })
                 if (!received) return
 
-                toast.success(__('Received {0} on {1} sizes', [quantity, itemCodes.length]))
+                toast.success(__('Added {0} to {1} sizes', [quantity, itemCodes.length]))
                 handlers.onReload?.()
               },
             }),
@@ -223,7 +223,7 @@ export function buildProductActions(product, router, handlers = {}) {
             dialog.confirm({
               title: __('Delete {0}?', [product.title]),
               message: __(
-                'This removes the product, its options and every size under it, for good. A product that has ever been ordered cannot be deleted — archive it instead, and its past orders keep their line items.',
+                'This removes the product, its options and every size under it, for good. A product that has ever been ordered cannot be deleted. Archive it instead, and its past orders keep their line items.',
               ),
               theme: 'red',
               confirmLabel: __('Delete'),

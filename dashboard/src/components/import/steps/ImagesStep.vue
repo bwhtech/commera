@@ -34,7 +34,7 @@ const groupsWithPhoto = computed(() => groups.value.filter((group) => assignedPh
 
 const groupOptions = computed(() => [
   { label: __('Leave unmatched'), value: '' },
-  ...groups.value.map((group) => ({ label: `${group.title} — ${group.color}`, value: group.key })),
+  ...groups.value.map((group) => ({ label: `${group.title} · ${group.color}`, value: group.key })),
 ])
 
 // A merchant's manual pick beats the file-name match, so re-running the match after another
@@ -248,7 +248,7 @@ onMounted(() => {
 
       <CoachTip
         :title="__('File names do the matching')"
-        :text="__('Name each photo after the product and its colour — oversized-tee-black.jpg — and add -1, -2, -3 for extra shots. The first photo for a colour becomes its main image.')"
+        :text="__('Name each photo after the product and its colour, like oversized-tee-black.jpg, and add -1, -2, -3 for extra shots. The first photo for a colour becomes its main image.')"
       />
     </template>
 

@@ -10,7 +10,7 @@ const { selected, mutate } = useNavMenu()
 const emit = defineEmits(['remove'])
 
 const LINK_TYPES = [
-  { label: __('Nothing — heading only'), value: '' },
+  { label: __('Heading only, no link'), value: '' },
   { label: __('Item groups'), value: 'Item Group' },
   { label: __('Brand'), value: 'Brand' },
   { label: __('Custom URL'), value: 'URL' },

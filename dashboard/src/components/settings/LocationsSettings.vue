@@ -80,7 +80,7 @@ async function saveAddress(values) {
         compact
         icon="lucide-triangle-alert"
         :title="__('These could not be loaded')"
-        :description="__('Checkout still offers whatever is stored — this panel just cannot say what.')"
+        :description="__('Checkout still offers whatever is stored. This panel just cannot say what.')"
       >
         <Button :label="__('Try again')" variant="subtle" theme="gray" @click="pickupLocations.load()" />
       </EmptyState>
@@ -141,7 +141,7 @@ async function saveAddress(values) {
                 <Badge
                   v-else
                   class="mt-1.5"
-                  :label="__('Needs an address — hidden at checkout')"
+                  :label="__('Needs an address, so hidden at checkout')"
                   theme="amber"
                   variant="subtle"
                 />

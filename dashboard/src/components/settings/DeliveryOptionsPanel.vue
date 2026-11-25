@@ -155,7 +155,7 @@ function confirmDelete(option) {
         compact
         icon="lucide-triangle-alert"
         :title="__('These could not be loaded')"
-        :description="__('Shoppers are still offered whatever is stored — this panel just cannot say what.')"
+        :description="__('Shoppers are still offered whatever is stored. This panel just cannot say what.')"
       >
         <Button :label="__('Try again')" variant="subtle" theme="gray" @click="store.load()" />
       </EmptyState>

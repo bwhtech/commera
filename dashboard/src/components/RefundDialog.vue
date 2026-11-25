@@ -60,7 +60,7 @@ async function refund() {
         </p>
 
         <p v-if="status.only_charges" class="text-p-sm text-ink-gray-5">
-          {{ __('The goods are already fully refunded — only shipping and other charges are left.') }}
+          {{ __('The goods are already fully refunded. Only shipping and other charges are left.') }}
         </p>
       </div>
     </template>

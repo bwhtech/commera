@@ -1259,7 +1259,7 @@ def create_product(
 	# spelling fails deep inside variant generation with "Value missing for: Size".
 	if cstr(size_attribute) != "Size":
 		frappe.throw(
-			_('The size option must use the attribute named exactly "Size" — {0} will not work.').format(
+			_('The size option must use the attribute named exactly "Size". {0} will not work.').format(
 				size_attribute
 			)
 		)

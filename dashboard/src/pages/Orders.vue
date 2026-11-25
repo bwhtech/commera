@@ -156,7 +156,7 @@ function printDeliveryNotes() {
   // Named, not silently dropped — otherwise a mixed selection prints short and
   // the merchant packs one parcel fewer than they selected.
   if (nothingToPrint.length) {
-    toast.warning(__('No delivery note yet for {0} — nothing to print.', [nothingToPrint.join(', ')]))
+    toast.warning(__('No delivery note yet for {0}, so there is nothing to print.', [nothingToPrint.join(', ')]))
   }
   if (!deliveryNotes.length) return
 

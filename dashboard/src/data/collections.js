@@ -54,7 +54,7 @@ export async function pickCollectionFor(itemTemplates, { label, mode = 'add', on
   await collectionsRequest.fetch()
   if (collectionsRequest.error) return
   if (!collectionOptions.value.length) {
-    toast.info(__('There are no collections yet — create one first.'))
+    toast.info(__('There are no collections yet. Create one first.'))
     return
   }
 

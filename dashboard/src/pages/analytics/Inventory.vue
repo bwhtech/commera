@@ -92,7 +92,7 @@ const noCoverState = {
         compact
         icon="lucide-chart-line"
         :title="__('No stock history yet')"
-        :description="__('Stock value appears once inventory is received or sold.')"
+        :description="__('Stock value appears once stock is added or sold.')"
       />
       <div v-else class="h-72">
         <LineChart :data="stockValueByMonth" x="label" :y="['value']" palette="categorical" />

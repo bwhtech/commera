@@ -139,7 +139,7 @@ async function removeEntry(node) {
         ? __('This also removes 1 entry nested inside it. Products are not deleted.')
         : preview.count
           ? __('This also removes {0} entries nested inside it. Products are not deleted.', [preview.count])
-          : __('Products are not deleted — only this menu entry.'),
+          : __('Products are not deleted, only this menu entry.'),
     onConfirm: async () => {
       if (await mutate('delete_node', { name: node.name })) toast.success(__('Menu entry deleted'))
     },
