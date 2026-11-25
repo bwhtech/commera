@@ -1,8 +1,9 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Alert, Button, Dialog, ErrorMessage, toast } from 'frappe-ui'
-import { useAdminAction, trySubmit } from '../data/api'
-import { buildOptionSizes, pairKey } from '../data/optionSizes'
+import { Alert, Button, Dialog, ErrorMessage, Select, toast } from 'frappe-ui'
+import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
+import { optionChanges, pairKey } from '../data/optionSizes'
+import { PLACEHOLDER_ATTRIBUTE, productOptions } from '../data/product'
 import { __ } from '../data/translation'
 import AttributeMultiSelect from './AttributeMultiSelect.vue'
 import OptionSizeGrid from './OptionSizeGrid.vue'
@@ -19,20 +20,40 @@ const optionsOpen = ref(false)
 const sizesOpen = ref(false)
 const pickerOpen = computed(() => optionsOpen.value || sizesOpen.value)
 
-const optionLabel = computed(() => props.product.option_attribute || 'Option')
+const firstOption = computed(() => props.product.option_attribute === PLACEHOLDER_ATTRIBUTE)
+const chosenAttribute = ref('')
+const attributesRequest = useAdminRead('catalog.get_attributes', { immediate: false })
+const attributeOptions = computed(() =>
+  (attributesRequest.data ?? [])
+    .filter((attribute) => ![PLACEHOLDER_ATTRIBUTE, 'Size'].includes(attribute.name))
+    .map((attribute) => ({ label: attribute.name, value: attribute.name })),
+)
+const optionLabel = computed(() =>
+  firstOption.value ? chosenAttribute.value || __('Option') : props.product.option_attribute || __('Option'),
+)
 
 const liveList = computed(() =>
   props.product.variants.flatMap((variant) => variant.sizes.map((size) => ({ option: variant.option, size: size.size }))),
 )
 const livePairs = computed(() => new Set(liveList.value.map((pair) => pairKey(pair.option, pair.size))))
 
-watch(open, (isOpen) => {
+watch(open, async (isOpen) => {
   if (!isOpen) return
-  options.value = [...new Set(props.product.variants.map((variant) => variant.option))]
-  sizes.value = [...new Set(props.product.variants.flatMap((variant) => variant.sizes.map((size) => size.size)))]
+  const shown = productOptions(props.product)
+  options.value = shown.options
+  sizes.value = shown.sizes
   excludedPairs.value = options.value.flatMap((option) =>
     sizes.value.map((size) => pairKey(option, size)).filter((key) => !livePairs.value.has(key)),
   )
+  if (!firstOption.value) return
+  await attributesRequest.reload()
+  const names = attributeOptions.value.map((option) => option.value)
+  chosenAttribute.value = names.includes('Color') ? 'Color' : (names[0] ?? '')
+})
+
+watch(chosenAttribute, () => {
+  options.value = []
+  excludedPairs.value = []
 })
 
 function setOptionSwatches(values) {
@@ -41,14 +62,18 @@ function setOptionSwatches(values) {
   )
 }
 
-const optionSizes = computed(() => buildOptionSizes(options.value, sizes.value, excludedPairs.value))
-const tickedList = computed(() => optionSizes.value.flatMap((row) => row.sizes.map((size) => ({ option: row.option, size }))))
-const tickedPairs = computed(() => new Set(tickedList.value.map((pair) => pairKey(pair.option, pair.size))))
-
-const addedPairs = computed(() => tickedList.value.filter((pair) => !livePairs.value.has(pairKey(pair.option, pair.size))))
-const removedPairs = computed(() => liveList.value.filter((pair) => !tickedPairs.value.has(pairKey(pair.option, pair.size))))
-const addedCount = computed(() => addedPairs.value.length)
-const removedCount = computed(() => removedPairs.value.length)
+const changes = computed(() =>
+  optionChanges({
+    live: liveList.value,
+    options: options.value,
+    sizes: sizes.value,
+    excluded: excludedPairs.value,
+    keepsHiddenOption: firstOption.value,
+  }),
+)
+const addedCount = computed(() => changes.value.added.length)
+const removedCount = computed(() => changes.value.removed.length)
+const switchesOption = computed(() => firstOption.value && Boolean(options.value.length))
 
 const summary = computed(() => {
   const parts = []
@@ -58,7 +83,7 @@ const summary = computed(() => {
   return parts.join(' · ') || __('No changes yet')
 })
 
-const emptyError = computed(() => (tickedPairs.value.size ? '' : __('Keep at least one variant ticked.')))
+const emptyError = computed(() => (changes.value.ticked.length ? '' : __('Keep at least one variant ticked.')))
 const canSave = computed(() => (addedCount.value || removedCount.value) && !emptyError.value)
 
 const removedHint = __(
@@ -68,6 +93,26 @@ const addedHint = __(
   "A new size takes its option's price and goes on sale with it. A new option takes the product's price and stays hidden until it has a photo.",
 )
 
+const stockByPair = computed(
+  () =>
+    new Map(
+      props.product.variants.flatMap((variant) =>
+        variant.sizes.map((size) => [pairKey(variant.option, size.size), size.stock ?? 0]),
+      ),
+    ),
+)
+const offSaleStock = computed(() =>
+  changes.value.removed.reduce((total, pair) => total + (stockByPair.value.get(pairKey(pair.option, pair.size)) ?? 0), 0),
+)
+const firstOptionHint = computed(() =>
+  offSaleStock.value
+    ? __(
+        'The {0} in stock and past orders stay on the current item, which goes off sale. The new variants start with no stock: use Receive stock to add it.',
+        [offSaleStock.value],
+      )
+    : __('Past orders stay on the current item, which goes off sale. The new variants start with no stock.'),
+)
+
 const saveAction = useAdminAction('catalog.save_product_options')
 
 async function save() {
@@ -75,8 +120,9 @@ async function save() {
 
   const saved = await trySubmit(saveAction, {
     item_template: props.product.id,
-    add: addedPairs.value,
-    remove: removedPairs.value,
+    add: changes.value.added,
+    remove: changes.value.removed,
+    option_attribute: switchesOption.value ? chosenAttribute.value : undefined,
   })
   if (!saved) return
 
@@ -96,7 +142,16 @@ async function save() {
   <Dialog v-model:open="open" size="xl" :title="__('Edit options')" :dismissible="!pickerOpen">
     <template #default>
       <div class="space-y-5">
+        <Select
+          v-if="firstOption"
+          v-model="chosenAttribute"
+          :label="__('Option')"
+          :options="attributeOptions"
+          :description="__('What this product varies by. Sizes are added below and apply to every option.')"
+        />
+
         <AttributeMultiSelect
+          v-if="!firstOption || chosenAttribute"
           v-model="options"
           v-model:open="optionsOpen"
           :attribute="optionLabel"
@@ -128,7 +183,12 @@ async function save() {
         <ErrorMessage :message="emptyError" />
 
         <Alert
-          v-if="removedCount"
+          v-if="firstOption && removedCount && addedCount"
+          :title="__('The current item goes off sale')"
+          :description="firstOptionHint"
+        />
+        <Alert
+          v-else-if="removedCount"
           :title="__('Unticked variants are hidden, not deleted')"
           :description="removedHint"
         />

@@ -487,7 +487,7 @@ def get_product(item_template: str):
 	template = frappe.db.get_value(
 		"Item",
 		item_template,
-		["name", "item_name", "image", "item_group", "description", "disabled", "modified"],
+		["name", "item_name", "image", "item_group", "description", "disabled", "modified", "has_variants"],
 		as_dict=True,
 	)
 	if not template:
@@ -555,6 +555,17 @@ def get_product(item_template: str):
 	for row in images:
 		images_by_variant.setdefault(row.parent, []).append(row.image)
 
+	option_attribute = configurators[0].item_attribute if configurators else None
+	variants = [
+		row
+		for row in variants
+		if not (
+			option_attribute != DEFAULT_OPTION_ATTRIBUTE
+			and row.attribute_value == DEFAULT_OPTION_VALUE
+			and not sizes_by_variant.get(row.name)
+		)
+	]
+
 	return {
 		"name": template.name,
 		"title": template.item_name,
@@ -565,7 +576,8 @@ def get_product(item_template: str):
 		"disabled": bool(template.disabled),
 		"updated": template.modified,
 		"restock_level": restock_level,
-		"option_attribute": configurators[0].item_attribute if configurators else None,
+		"option_attribute": option_attribute,
+		"can_edit_options": bool(template.has_variants and configurators),
 		"variants": [
 			{
 				"name": row.name,
@@ -1412,7 +1424,12 @@ def add_missing_attribute_values(attribute: str, values: list, abbreviations: di
 
 
 @frappe.whitelist(methods=["POST"])
-def save_product_options(item_template: str, add: list | str | None = None, remove: list | str | None = None):
+def save_product_options(
+	item_template: str,
+	add: list | str | None = None,
+	remove: list | str | None = None,
+	option_attribute: str | None = None,
+):
 	frappe.has_permission("Item", doc=item_template, ptype="write", throw=True)
 	frappe.has_permission("Item", ptype="create", throw=True)
 	if not frappe.db.get_value("Item", item_template, "has_variants"):
@@ -1430,6 +1447,12 @@ def save_product_options(item_template: str, add: list | str | None = None, remo
 	)
 	if not configurator:
 		frappe.throw(_("Product {0} has no options to edit").format(item_template))
+
+	option_attribute = cstr(option_attribute).strip()
+	switched_codes = []
+	if option_attribute and option_attribute != configurator.item_attribute:
+		switched_codes = switch_option_attribute(item_template, configurator, option_attribute)
+
 	template_attributes = frappe.get_all(
 		"Item Variant Attribute", filters={"parent": item_template, "parenttype": "Item"}, pluck="attribute"
 	)
@@ -1462,6 +1485,8 @@ def save_product_options(item_template: str, add: list | str | None = None, remo
 
 	existing_items = get_variant_items_by_pair(item_template, option_attribute)
 	live_keys = get_listed_pairs(configurator.name, option_attribute)
+	if switched_codes:
+		remove_keys = set(live_keys)
 	remaining_keys = (live_keys - remove_keys) | set(add_pairs)
 	if not remaining_keys:
 		frappe.throw(_("Keep at least one variant on sale. A product cannot sell with none."))
@@ -1497,10 +1522,47 @@ def save_product_options(item_template: str, add: list | str | None = None, remo
 	variants_with_new_sizes = sync_variant_sizes(
 		configurator.name, add_pairs, remove_keys, item_code_by_key, set(created_codes)
 	)
-	price_new_sizes(item_template, variants_with_new_sizes, [item.name for item in existing_items.values()])
+	price_new_sizes(
+		item_template,
+		variants_with_new_sizes,
+		[item.name for item in existing_items.values()] + switched_codes,
+	)
 	add_changed_products([item_template], "options")
 
-	return {"created": len(created_codes), "disabled": len(disabled_codes), "restored": len(restored_codes)}
+	return {
+		"created": len(created_codes),
+		"disabled": len(disabled_codes) + len(switched_codes),
+		"restored": len(restored_codes),
+	}
+
+
+def switch_option_attribute(item_template: str, configurator: dict, option_attribute: str) -> list:
+	if configurator.item_attribute != DEFAULT_OPTION_ATTRIBUTE:
+		frappe.throw(
+			_("Product {0} already varies by {1}, so its options are edited, not replaced").format(
+				item_template, configurator.item_attribute
+			)
+		)
+	if option_attribute in (SIZE_ATTRIBUTE, DEFAULT_OPTION_ATTRIBUTE) or not frappe.db.exists(
+		"Item Attribute", option_attribute
+	):
+		frappe.throw(_("{0} cannot be an option of a product").format(option_attribute))
+
+	template = frappe.get_doc("Item", item_template)
+	if option_attribute not in {row.attribute for row in template.attributes}:
+		template.append("attributes", {"attribute": option_attribute})
+		template.flags.dont_update_variants = True
+		template.save()
+
+	frappe.db.set_value("Style Attribute Configurator", configurator.name, "item_attribute", option_attribute)
+	configurator.item_attribute = option_attribute
+
+	switched_codes = frappe.get_all(
+		"Item", filters={"variant_of": item_template, "disabled": 0}, pluck="name"
+	)
+	if switched_codes:
+		frappe.db.set_value("Item", {"name": ["in", switched_codes]}, "disabled", 1)
+	return switched_codes
 
 
 def get_variant_title(title: str, option: str, size: str) -> str:

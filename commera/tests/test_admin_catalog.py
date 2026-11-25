@@ -6,8 +6,12 @@ import os
 from unittest.mock import patch
 
 import frappe
+from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry
 
 from commera.api.admin.catalog import (
+	DEFAULT_OPTION_ATTRIBUTE,
+	DEFAULT_OPTION_VALUE,
+	DEFAULT_SIZE_VALUE,
 	add_products_to_collection,
 	create_product,
 	delete_product,
@@ -420,3 +424,103 @@ class TestSaveProductOptions(DeleteProductTestCase):
 				remove=[{"option": "Crimson", "size": "S"}, {"option": "Crimson", "size": "M"}],
 			)
 		self.assertEqual(set(self.get_sizes()["Crimson"]), {"S", "M"})
+
+
+class TestFirstOption(DeleteProductTestCase):
+	def setUp(self):
+		super().setUp()
+		self.book = create_product(
+			title=f"First Option Book {frappe.generate_hash(length=6).upper()}",
+			collection=self.item_group,
+			price=500,
+			sale_price=400,
+		)["name"]
+		self.single_item = frappe.get_all("Item", filters={"variant_of": self.book}, pluck="name")[0]
+
+	def placeholder(self):
+		return [{"option": DEFAULT_OPTION_VALUE, "size": DEFAULT_SIZE_VALUE}]
+
+	def get_sizes(self):
+		return {
+			variant["option"]: {size["size"]: size for size in variant["sizes"]}
+			for variant in get_product(self.book)["variants"]
+		}
+
+	def listed_item_codes(self):
+		return {size["item_code"] for sizes in self.get_sizes().values() for size in sizes.values()}
+
+	def enabled_item_codes(self):
+		return set(frappe.get_all("Item", filters={"variant_of": self.book, "disabled": 0}, pluck="name"))
+
+	def add_colours(self):
+		return save_product_options(
+			self.book,
+			add=[{"option": "Crimson", "size": "S"}, {"option": "Teal", "size": "S"}],
+			remove=self.placeholder(),
+			option_attribute=self.colour_attribute,
+		)
+
+	def test_a_product_without_history_takes_its_first_colour_at_its_price(self):
+		result = self.add_colours()
+
+		product = get_product(self.book)
+		self.assertEqual(product["option_attribute"], self.colour_attribute)
+		self.assertEqual((result["created"], result["disabled"]), (2, 1))
+		sizes = self.get_sizes()
+		self.assertEqual(set(sizes), {"Crimson", "Teal"})
+		for option in ("Crimson", "Teal"):
+			self.assertEqual(
+				(sizes[option]["S"]["default_rate"], sizes[option]["S"]["sale_rate"]), (500, 400)
+			)
+		self.assertEqual(frappe.db.get_value("Item", self.single_item, "disabled"), 1)
+		self.assertEqual(self.enabled_item_codes(), self.listed_item_codes())
+
+	def test_stock_and_orders_stay_on_the_single_item_that_goes_off_sale(self):
+		make_stock_entry(item_code=self.single_item, qty=5, to_warehouse=self.warehouse, rate=100)
+		self.order_item(self.single_item)
+
+		self.add_colours()
+
+		self.assertEqual(frappe.db.get_value("Item", self.single_item, "disabled"), 1)
+		self.assertEqual(
+			frappe.db.get_value(
+				"Bin", {"item_code": self.single_item, "warehouse": self.warehouse}, "actual_qty"
+			),
+			5,
+		)
+		self.assertTrue(frappe.db.exists("Sales Order Item", {"item_code": self.single_item}))
+		self.assertEqual({size["stock"] for size in self.get_sizes()["Crimson"].values()}, {0})
+		self.assertEqual(self.get_sizes()["Teal"]["S"]["sale_rate"], 400)
+		self.assertEqual(self.enabled_item_codes(), self.listed_item_codes())
+
+	def test_sizes_alone_keep_the_hidden_option(self):
+		save_product_options(
+			self.book,
+			add=[
+				{"option": DEFAULT_OPTION_VALUE, "size": "S"},
+				{"option": DEFAULT_OPTION_VALUE, "size": "M"},
+			],
+			remove=self.placeholder(),
+		)
+
+		self.assertEqual(get_product(self.book)["option_attribute"], DEFAULT_OPTION_ATTRIBUTE)
+		standard = self.get_sizes()[DEFAULT_OPTION_VALUE]
+		self.assertEqual(list(standard), ["S", "M"])
+		self.assertEqual((standard["M"]["default_rate"], standard["M"]["sale_rate"]), (500, 400))
+		self.assertEqual(frappe.db.get_value("Item", self.single_item, "disabled"), 1)
+		self.assertEqual(self.enabled_item_codes(), self.listed_item_codes())
+
+	def test_a_product_that_already_varies_cannot_switch_its_option(self):
+		self.add_colours()
+		other_attribute = self.make_named_attribute("Pattern", ["Plain"])
+
+		with self.assertRaises(frappe.ValidationError):
+			save_product_options(
+				self.book, add=[{"option": "Plain", "size": "S"}], option_attribute=other_attribute
+			)
+		self.assertEqual(get_product(self.book)["option_attribute"], self.colour_attribute)
+
+	def test_size_is_not_an_option_axis(self):
+		with self.assertRaises(frappe.ValidationError):
+			save_product_options(self.book, add=[{"option": "S", "size": "S"}], option_attribute="Size")
+		self.assertEqual(get_product(self.book)["option_attribute"], DEFAULT_OPTION_ATTRIBUTE)

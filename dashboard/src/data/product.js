@@ -24,6 +24,19 @@ export function pricePayload(rated, rate) {
   return rated?.sale_rate != null ? { sale_rate: rate } : { default_rate: rate }
 }
 
+export const PLACEHOLDER_ATTRIBUTE = 'Title'
+export const PLACEHOLDER_OPTION = 'Standard'
+export const PLACEHOLDER_SIZE = 'One Size'
+
+export function productOptions(product) {
+  const options = [...new Set(product.variants.map((variant) => variant.option))]
+  const sizes = [...new Set(product.variants.flatMap((variant) => variant.sizes.map((size) => size.size)))]
+  return {
+    options: options.filter((option) => option !== PLACEHOLDER_OPTION),
+    sizes: sizes.filter((size) => size !== PLACEHOLDER_SIZE),
+  }
+}
+
 // Everything the product screen needs to summarise a product at a glance,
 // derived from catalog.get_product's real shape: a product's sellable units
 // are its variants' *sizes* (Color Size Item rows), not the variants

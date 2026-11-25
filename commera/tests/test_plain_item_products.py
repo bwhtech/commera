@@ -7,6 +7,7 @@ from commera.api.admin.catalog import (
 	DEFAULT_OPTION_VALUE,
 	DEFAULT_SIZE_VALUE,
 	ensure_attribute_exists,
+	get_product,
 	get_products,
 	save_product_options,
 )
@@ -154,6 +155,9 @@ class TestPlainItemProducts(ProductOnboardingTestCase):
 		_total, orders = get_orders_list([sales_order], owned_only=False)
 
 		self.assertEqual([line["size"] for line in frappe.parse_json(orders[0]["items"])], ["S"])
+
+	def test_a_plain_item_offers_no_options_to_edit(self):
+		self.assertFalse(get_product(self.plain_item)["can_edit_options"])
 
 	def test_editing_options_of_a_plain_item_is_refused(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "without variants"):

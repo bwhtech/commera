@@ -406,6 +406,12 @@ A new size takes its option's price and goes on sale with it. A new option takes
 {0} taken off sale,أُوقف بيع {0}
 Variants updated: {0},تم تحديث المتغيّرات: {0}
 Edit options,تعديل الخيارات
+Add options like size or color,أضف خيارات مثل المقاس أو اللون
+The current item goes off sale,يتوقف بيع العنصر الحالي
+"The {0} in stock and past orders stay on the current item, which goes off sale. The new variants start with no stock: use Receive stock to add it.",تبقى الكمية المتوفرة ({0}) والطلبات السابقة على العنصر الحالي، ويتوقف بيعه. تبدأ المتغيّرات الجديدة بلا مخزون: استخدم استلام المخزون لإضافته.
+"Past orders stay on the current item, which goes off sale. The new variants start with no stock.",تبقى الطلبات السابقة على العنصر الحالي، ويتوقف بيعه. تبدأ المتغيّرات الجديدة بلا مخزون.
+"Product {0} already varies by {1}, so its options are edited, not replaced",المنتج {0} يتنوّع حسب {1} بالفعل، لذا تُعدَّل خياراته ولا تُستبدل
+{0} cannot be an option of a product,لا يمكن أن يكون {0} خيارًا لمنتج
 Type a new {0} to add it,اكتب {0} جديدًا لإضافته
 "Unticked variants are hidden, not deleted",المتغيّرات غير المحددة تُخفى ولا تُحذف
 Prices are filled in for you,تُملأ الأسعار تلقائيًا
