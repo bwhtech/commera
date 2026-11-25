@@ -11,7 +11,7 @@ import EditOptionsDialog from './EditOptionsDialog.vue'
 import SwatchDot from './SwatchDot.vue'
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { stockTone } from '../data/format'
-import { pricePayload, productOptions, shownPrice } from '../data/product'
+import { hasPrice, isPriceValid, priceFields, priceRates, productOptions } from '../data/product'
 import { __ } from '../data/translation'
 import { ia } from '../ia/store'
 import { useBulkAction } from '../utils/useBulkAction'
@@ -67,11 +67,21 @@ const swatches = computed(() =>
 
 const priceAction = useAdminAction('catalog.set_variant_price')
 
+function repricingError(variant, discountedPrice) {
+  if (!hasPrice(discountedPrice)) return __('Enter a discounted price above zero.')
+  const fields = { ...priceFields(variant.sizes[0]), discountedPrice }
+  return isPriceValid(fields) ? '' : __('Price must be higher than the discounted price.')
+}
+
+function repriced(variant, discountedPrice) {
+  return priceRates({ ...priceFields(variant.sizes[0]), discountedPrice })
+}
+
 async function setPrice(variant, rate) {
-  const saved = await trySubmit(priceAction, {
-    style_attribute_variant: variant.name,
-    ...pricePayload(variant.sizes[0], rate),
-  })
+  const error = repricingError(variant, rate)
+  if (error) return toast.error(error)
+  const rates = repriced(variant, rate)
+  const saved = await trySubmit(priceAction, { style_attribute_variant: variant.name, ...rates })
   if (!saved) return
   toast.success(__('Price updated for {0} ({1} sizes)', [variant.option, variant.sizes.length]))
   emit('saved')
@@ -88,14 +98,17 @@ async function bulkSetPrice() {
   dialog.prompt({
     title: selected.length === 1 ? __('Set price on 1 variant') : __('Set price on {0} variants', [selected.length]),
     message: __('Sets the price for every size under each selected variant.'),
-    fields: [{ name: 'value', label: __('Price'), type: 'number', required: true }],
+    fields: [{ name: 'value', label: __('Discounted price'), type: 'number', required: true }],
     onConfirm: async ({ values }) => {
       const rate = Math.max(0, Number(values.value) || 0)
       await runBulk(
         'Set price',
         selected,
-        (variant) =>
-          bulkPriceAction.submit({ style_attribute_variant: variant.name, ...pricePayload(variant.sizes[0], rate) }),
+        (variant) => {
+          const error = repricingError(variant, rate)
+          if (error) return Promise.reject(new Error(error))
+          return bulkPriceAction.submit({ style_attribute_variant: variant.name, ...repriced(variant, rate) })
+        },
         {
           sentences: {
             all: (count) => (count === 1 ? __('1 variant repriced') : __('{0} variants repriced', [count])),
@@ -299,12 +312,10 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
               <ListCell>
                 <!-- One price for the whole row: sets every size under this variant
                      in one pass (catalog.set_variant_price), the same bulk operation
-                     create_product uses. What is shown and written is the rate a
-                     shopper is charged — see shownPrice in data/product.js — not the
-                     compare-at above it. -->
+                     create_product uses. -->
                 <EditableValue
-                  :model-value="shownPrice(item.sizes[0])"
-                  :label="__('Price')"
+                  :model-value="priceFields(item.sizes[0]).discountedPrice ?? 0"
+                  :label="__('Discounted price')"
                   format="money"
                   @update:model-value="(rate) => setPrice(item, rate)"
                 />

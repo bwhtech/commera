@@ -16,12 +16,14 @@ from commera.api.admin.catalog import (
 	get_attribute_values,
 	get_product,
 	get_size_prices,
+	set_variant_price,
 	update_product,
 )
 from commera.api.admin.inventory import LOW_STOCK_THRESHOLD, get_inventory
 from commera.api.admin.orders import get_overview
 from commera.api.utils import get_stock_for_items
 from commera.api.variant_pricing import set_variant_prices
+from commera.card_prices import get_card_price
 
 # "L" is deliberately unused by the variant under test, leaving a second leaf SKU available.
 ATTRIBUTE_VALUES = ["S", "M", "L"]
@@ -265,6 +267,37 @@ class TestSizePrices(ProductOnboardingTestCase):
 				{"size": "M", "item_code": medium, "default_rate": 120, "sale_rate": None},
 			],
 		)
+
+
+class TestCompareAtNotBelowPrice(ProductOnboardingTestCase):
+	def test_save_size_prices_refuses_a_compare_at_below_the_price(self):
+		small = self.size_item_codes[0]
+
+		with self.assertRaises(frappe.ValidationError):
+			self.variant.save_size_prices([{"item_code": small, "default_rate": 1000, "sale_rate": 1200}])
+
+		self.assertFalse(self.get_price(small, self.default_price_list))
+
+	def test_save_size_prices_checks_a_new_compare_at_against_the_stored_price(self):
+		small = self.size_item_codes[0]
+		self.variant.save_size_prices([{"item_code": small, "default_rate": 1200, "sale_rate": 1000}])
+
+		with self.assertRaises(frappe.ValidationError):
+			self.variant.save_size_prices([{"item_code": small, "default_rate": 900}])
+
+		self.assertEqual(self.get_price(small, self.default_price_list), 1200)
+
+	def test_an_empty_price_saves_the_discounted_price_on_both_lists(self):
+		set_variant_price(self.variant.name, default_rate=1299, sale_rate=999)
+
+		set_variant_price(self.variant.name, default_rate=999, sale_rate=999)
+
+		rates = (
+			self.get_price(self.size_item_codes[0], self.sale_price_list),
+			self.get_price(self.size_item_codes[0], self.default_price_list),
+		)
+		card = get_card_price([rates])
+		self.assertEqual((card["effective_price"], card["default_price"]), (999, None))
 
 
 class TestSetVariantPrices(ProductOnboardingTestCase):

@@ -22,8 +22,8 @@ TEMPLATE_HEADERS = [
 	"Collection",
 	"Color",
 	"Size",
-	"Compare at price",
-	"Selling price",
+	"Price",
+	"Discounted price",
 	"Stock",
 ]
 
@@ -34,12 +34,12 @@ FIELD_SYNONYMS = {
 	"collection": ["collection", "category", "item group"],
 	"color": ["color", "colour"],
 	"size": ["size"],
-	"compare_at_price": ["compare at price", "mrp", "compare at", "list price"],
-	"sale_price": ["selling price", "price", "sale price"],
+	"compare_at_price": ["price", "compare at price", "mrp", "compare at", "list price", "regular price"],
+	"sale_price": ["discounted price", "selling price", "sale price"],
 	"stock": ["stock", "quantity", "qty", "stock quantity", "qty on hand"],
 }
 FIELD_LABELS = dict(zip(FIELD_SYNONYMS, TEMPLATE_HEADERS, strict=True))
-REQUIRED_FIELDS = ["title", "collection", "color", "size"]
+REQUIRED_FIELDS = ["title", "collection", "color", "size", "sale_price"]
 
 # Every product this importer creates uses this store's own Color/Size attributes — the same two
 # create_product's own Trap 2 guard requires (generate_variants() depends on the exact name "Size").
@@ -111,6 +111,13 @@ def parse_and_validate(file_url: str, column_mapping: dict | None = None):
 		else suggested_mapping
 	)
 
+	# A sheet with one price column is what the shopper pays, never a crossed-out price on its own.
+	if "sale_price" not in mapping.values():
+		mapping = {
+			header: "sale_price" if field == "compare_at_price" else field
+			for header, field in mapping.items()
+		}
+
 	missing_required = [FIELD_LABELS[field] for field in REQUIRED_FIELDS if field not in mapping.values()]
 	if missing_required:
 		frappe.throw(_("These columns are not mapped: {0}").format(", ".join(missing_required)))
@@ -147,8 +154,8 @@ def parse_and_validate(file_url: str, column_mapping: dict | None = None):
 		size = cstr(cell(row, "size")).strip()
 
 		holder = {}
-		compare_at_price = as_amount(cell(row, "compare_at_price"), "Compare at price", holder)
-		sale_price = as_amount(cell(row, "sale_price"), "Selling price", holder)
+		compare_at_price = as_amount(cell(row, "compare_at_price"), "Price", holder)
+		sale_price = as_amount(cell(row, "sale_price"), "Discounted price", holder)
 		stock = as_amount(cell(row, "stock"), "Stock", holder)
 		issue = holder.get("issue")
 
@@ -196,8 +203,10 @@ def parse_and_validate(file_url: str, column_mapping: dict | None = None):
 					),
 				}
 
-		if not issue and not compare_at_price and not sale_price:
-			issue = {"level": "warning", "text": "No price set — product is created without a price"}
+		if not issue and not sale_price:
+			issue = {"level": "error", "text": "Discounted price is missing"}
+		if not issue and compare_at_price and compare_at_price <= sale_price:
+			issue = {"level": "error", "text": "Price must be higher than the discounted price"}
 
 		parsed_rows.append(
 			{
@@ -540,8 +549,8 @@ def run_import(
 				option_attribute=OPTION_ATTRIBUTE,
 				size_attribute=SIZE_ATTRIBUTE,
 				option_sizes=group_to_option_sizes(group["rows"]),
-				price=group["compare_at_price"] or None,
-				sale_price=group["sale_price"] or None,
+				price=group["compare_at_price"] or group["sale_price"],
+				sale_price=group["sale_price"],
 			)
 			receive_group_stock(created_product["name"], group["rows"])
 		except Exception as error:

@@ -8,6 +8,7 @@ from frappe.utils.data import cstr, flt
 from frappe.website.utils import cleanup_page_name
 
 from commera.api.variant_pricing import (
+	check_compare_at_not_below_price,
 	get_base_price_rows_by_key,
 	get_selling_price_lists,
 	insert_item_prices,
@@ -172,6 +173,7 @@ class StyleAttributeVariant(Document):
 		existing_price_by_key = get_base_price_rows_by_key(
 			list({key[0] for key in rate_by_key}), [default_price_list, sale_price_list]
 		)
+		check_compare_at_not_below_price(existing_price_by_key, rate_by_key)
 
 		updated_count = 0
 		price_rows_to_insert = []

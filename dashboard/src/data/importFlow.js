@@ -18,8 +18,8 @@ export const TARGET_FIELDS = [
   { label: __('Collection'), value: 'collection' },
   { label: __('Colour'), value: 'color' },
   { label: __('Size'), value: 'size' },
-  { label: __('Compare-at price'), value: 'compare_at_price' },
-  { label: __('Selling price'), value: 'sale_price' },
+  { label: __('Price'), value: 'compare_at_price' },
+  { label: __('Discounted price'), value: 'sale_price' },
   { label: __('Stock'), value: 'stock' },
 ]
 

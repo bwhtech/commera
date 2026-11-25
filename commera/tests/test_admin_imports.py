@@ -12,6 +12,7 @@ from commera.api.admin.imports import (
 	OPTION_ATTRIBUTE,
 	SIZE_ATTRIBUTE,
 	get_image_group_key,
+	parse_and_validate,
 	run_import,
 )
 
@@ -46,8 +47,8 @@ class RunImportTestCase(IntegrationTestCase):
 		item_group.insert()
 		return item_group.name
 
-	def make_import_file(self):
-		rows = [
+	def make_import_file(self, rows=None):
+		rows = rows or [
 			"Product Title,Collection,Color,Size,Compare at price,Selling price,Stock",
 			f"{self.title},{self.collection},{self.color},S,120,99,0",
 			f"{self.title},{self.collection},{self.color},M,120,99,0",
@@ -186,3 +187,43 @@ class TestRunImportImageAssignmentShape(RunImportTestCase):
 
 		self.assertIn("private", str(refusal.exception))
 		self.assertEqual(self.get_created_titles(), [])
+
+
+class TestImportPrices(RunImportTestCase):
+	def test_a_row_without_a_discounted_price_is_refused(self):
+		file_url = self.make_import_file(
+			[
+				"Product Title,Collection,Color,Size,Price,Discounted price,Stock",
+				f"{self.title},{self.collection},{self.color},S,120,,0",
+			]
+		)
+
+		issue = parse_and_validate(file_url)["rows"][0]["issue"]
+
+		self.assertEqual(issue, {"level": "error", "text": "Discounted price is missing"})
+
+	def test_a_single_price_column_is_what_the_shopper_pays(self):
+		file_url = self.make_import_file(
+			[
+				"Product Title,Collection,Color,Size,MRP,Stock",
+				f"{self.title},{self.collection},{self.color},S,120,0",
+			]
+		)
+
+		result = parse_and_validate(file_url)
+
+		self.assertEqual(result["mapping"]["MRP"], "sale_price")
+		row = result["rows"][0]
+		self.assertEqual((row["sale_price"], row["compare_at_price"], row["issue"]), (120, 0, None))
+
+	def test_a_price_below_the_discounted_price_is_refused(self):
+		file_url = self.make_import_file(
+			[
+				"Product Title,Collection,Color,Size,Price,Discounted price,Stock",
+				f"{self.title},{self.collection},{self.color},S,1000,1200,0",
+			]
+		)
+
+		issue = parse_and_validate(file_url)["rows"][0]["issue"]
+
+		self.assertEqual(issue, {"level": "error", "text": "Price must be higher than the discounted price"})
