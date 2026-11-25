@@ -221,7 +221,7 @@ async function useCurrentLocation() {
         <LocationMap
           ref="map"
           v-model="values.custom_store_location"
-          :empty-hint="__('No pin yet — click the map to place one')"
+          :empty-hint="__('No pin yet. Click the map to place one')"
           @place-by-hand="placedByHand"
         />
 

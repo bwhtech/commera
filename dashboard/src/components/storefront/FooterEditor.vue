@@ -87,7 +87,7 @@ function removeSection(section) {
       ? count === 1
         ? __('The 1 link in this column goes with it. Pages are not deleted.')
         : __('The {0} links in this column go with it. Pages are not deleted.', [count])
-      : __('Pages are not deleted — only this footer column.'),
+      : __('Pages are not deleted, only this footer column.'),
     confirmLabel: __('Delete column'),
     onConfirm: async () => {
       if (await mutate('delete_section', { name: section.name })) toast.success(__('Column deleted'))
@@ -98,7 +98,7 @@ function removeSection(section) {
 function removeLink(section, link) {
   dialog.danger({
     title: __('Remove "{0}"?', [link.link_label]),
-    message: __('The page it points at is not deleted — only this footer link.'),
+    message: __('The page it points at is not deleted, only this footer link.'),
     confirmLabel: __('Remove link'),
     onConfirm: async () => {
       const removed = await mutate('delete_link', {

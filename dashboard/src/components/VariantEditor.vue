@@ -154,17 +154,17 @@ async function togglePublish(variant) {
 function receiveStock(variant) {
   const itemCodes = variant.sizes.map((size) => size.item_code).filter(Boolean)
   if (!itemCodes.length) {
-    toast.info(__('{0} has no sizes to receive stock against yet.', [variant.option]))
+    toast.info(__('{0} has no sizes to add stock to yet.', [variant.option]))
     return
   }
 
   dialog.prompt({
-    title: __('Receive stock on {0}', [variant.option]),
+    title: __('Add stock to {0}', [variant.option]),
     message: __(
       'Adds this quantity to each of the {0} sizes under this option. There is no way to set stock to an exact number here.',
       [itemCodes.length],
     ),
-    fields: [{ name: 'value', label: __('Quantity received'), type: 'number', required: true }],
+    fields: [{ name: 'value', label: __('Quantity to add'), type: 'number', required: true }],
     onConfirm: async ({ values }) => {
       const quantity = Math.max(0, Math.trunc(Number(values.value) || 0))
       if (!quantity) return
@@ -173,7 +173,7 @@ function receiveStock(variant) {
         received_quantities: Object.fromEntries(itemCodes.map((code) => [code, quantity])),
       })
       if (!received) return
-      toast.success(__('Received {0} on {1} sizes', [quantity, itemCodes.length]))
+      toast.success(__('Added {0} to {1} sizes', [quantity, itemCodes.length]))
       emit('saved')
     },
   })
@@ -186,7 +186,7 @@ function rowActions(variant) {
       icon: variant.is_published ? 'lucide-eye-off' : 'lucide-globe',
       onClick: () => togglePublish(variant),
     },
-    { label: __('Receive stock'), icon: 'lucide-package-plus', onClick: () => receiveStock(variant) },
+    { label: __('Add stock'), icon: 'lucide-package-plus', onClick: () => receiveStock(variant) },
   ]
 }
 

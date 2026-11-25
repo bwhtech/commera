@@ -165,7 +165,7 @@ async function confirmPublish() {
           <p class="text-p-base text-ink-gray-5">
             {{
               __(
-                'An option is one colour of a product, with a page of its own. The menu entry itself is not touched — this only changes what shoppers can buy.',
+                'An option is one colour of a product, with a page of its own. The menu entry itself is not touched. This only changes what shoppers can buy.',
               )
             }}
           </p>

@@ -54,7 +54,7 @@ function detailRoute(name) {
 
   <PageBody width="wide">
     <p class="text-p-sm text-ink-gray-5">
-      {{ __('Standalone pages — About us, shipping, returns — that your footer and menus can link to.') }}
+      {{ __('Standalone pages, like About us, shipping and returns, that your footer and menus can link to.') }}
     </p>
 
     <EmptyState

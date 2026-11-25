@@ -356,7 +356,7 @@ Pick at least one size for {0},اختر مقاسًا واحدًا على الأ�
 1 variant will be created,سيُنشأ متغيّر واحد
 {0} variants will be created,سيُنشأ {0} متغيّرات
 "no sizes, so each one sells as a single item",بلا مقاسات، لذا يُباع كل خيار كمنتج واحد
-"No options — this sells as a single item, the way a book does",بلا خيارات — يُباع كمنتج واحد، كما يُباع الكتاب
+"No options: this sells as a single item, the way a book does",بلا خيارات: يُباع كمنتج واحد، كما يُباع الكتاب
 Add a title to continue.,أضف عنوانًا للمتابعة.
 Pick a collection to continue.,اختر مجموعة للمتابعة.
 Set a price above zero to continue.,حدّد سعرًا أكبر من صفر للمتابعة.
@@ -367,7 +367,7 @@ New,جديد
 Option,الخيار
 What this product varies by. Sizes are added below and apply to every option.,ما يختلف به هذا المنتج. تُضاف المقاسات أدناه وتنطبق على كل خيار.
 Pick or type a {0},اختر {0} أو اكتبه
-Type a new {0} to add it — leave empty if this product has none,اكتب {0} جديدًا لإضافته — اتركه فارغًا إن لم يكن لهذا المنتج أي منه
+"Type a new {0} to add it, or leave empty if this product has none",اكتب {0} جديدًا لإضافته، أو اتركه فارغًا إن لم يكن لهذا المنتج أي منه
 Sizes,المقاسات
 Pick or type a size,اختر مقاسًا أو اكتبه
 "Leave empty for a product that has no sizes, like a book",اتركه فارغًا لمنتج بلا مقاسات، مثل الكتاب
@@ -378,11 +378,11 @@ sidebar,الشريط الجانبي
 Add {0},إضافة {0}
 Could not upload {0},تعذّر رفع {0}
 Attribute,الخاصية
-"A shopper sees these instead of the words. Upload an image for a pattern a flat colour cannot show — denim, floral, marble.",يرى المتسوق هذه بدلًا من الكلمات. ارفع صورة لنقشة لا يُظهرها لون واحد — جينز، زهور، رخام.
+"A shopper sees these instead of the words. Upload an image for a pattern a flat colour cannot show, such as denim, floral or marble.",يرى المتسوق هذه بدلًا من الكلمات. ارفع صورة لنقشة لا يُظهرها لون واحد، مثل الجينز أو الزهور أو الرخام.
 The choices a shopper picks from. Click a name to rename one.,الخيارات التي يختار منها المتسوق. انقر على اسم لإعادة تسميته.
 Rename {0},إعادة تسمية {0}
-Used by 1 product — renaming would leave its SKUs and links saying {0}.,يستخدمه منتج واحد — إعادة التسمية ستُبقي رموز SKU والروابط الخاصة به تقول {0}.
-Used by {0} products — renaming would leave their SKUs and links saying {1}.,يستخدمه {0} منتجات — إعادة التسمية ستُبقي رموز SKU والروابط الخاصة بها تقول {1}.
+Used by 1 product. Renaming would leave its SKUs and links saying {0}.,يستخدمه منتج واحد. إعادة التسمية ستُبقي رموز SKU والروابط الخاصة به تقول {0}.
+Used by {0} products. Renaming would leave their SKUs and links saying {1}.,يستخدمه {0} منتجات. إعادة التسمية ستُبقي رموز SKU والروابط الخاصة بها تقول {1}.
 {0} colour,لون {0}
 {0} hex,رمز HEX لـ {0}
 Replace,استبدال
@@ -407,7 +407,7 @@ Variants updated: {0},تم تحديث المتغيّرات: {0}
 Edit options,تعديل الخيارات
 Add options like size or color,أضف خيارات مثل المقاس أو اللون
 The current item goes off sale,يتوقف بيع العنصر الحالي
-"The {0} in stock and past orders stay on the current item, which goes off sale. The new variants start with no stock: use Receive stock to add it.",تبقى الكمية المتوفرة ({0}) والطلبات السابقة على العنصر الحالي، ويتوقف بيعه. تبدأ المتغيّرات الجديدة بلا مخزون: استخدم استلام المخزون لإضافته.
+"The {0} in stock and past orders stay on the current item, which goes off sale. The new variants start with no stock: use Add stock to add it.",تبقى الكمية المتوفرة ({0}) والطلبات السابقة على العنصر الحالي، ويتوقف بيعه. تبدأ المتغيّرات الجديدة بلا مخزون: استخدم إضافة مخزون لإضافته.
 "Past orders stay on the current item, which goes off sale. The new variants start with no stock.",تبقى الطلبات السابقة على العنصر الحالي، ويتوقف بيعه. تبدأ المتغيّرات الجديدة بلا مخزون.
 "Product {0} already varies by {1}, so its options are edited, not replaced",المنتج {0} يتنوّع حسب {1} بالفعل، لذا تُعدَّل خياراته ولا تُستبدل
 {0} cannot be an option of a product,لا يمكن أن يكون {0} خيارًا لمنتج
@@ -453,7 +453,7 @@ Payment Entry {0} created.,تم إنشاء قيد الدفع {0}.
 Refund this order,استرداد مبلغ هذا الطلب
 "{0} goes back to the customer on {1}, the same way they paid. This cannot be undone from here.",يُعاد {0} إلى العميل عبر {1}، بالطريقة نفسها التي دفع بها. لا يمكن التراجع عن ذلك من هنا.
 {0} has already been refunded on this order.,تم بالفعل استرداد {0} من هذا الطلب.
-The goods are already fully refunded — only shipping and other charges are left.,تم استرداد مبلغ المنتجات بالكامل — لم يتبقَّ إلا الشحن والرسوم الأخرى.
+The goods are already fully refunded. Only shipping and other charges are left.,تم استرداد مبلغ المنتجات بالكامل. لم يتبقَّ إلا الشحن والرسوم الأخرى.
 Keep the payment,الاحتفاظ بالمبلغ
 Refund {0},استرداد {0}
 Last 7 days,آخر 7 أيام
@@ -473,7 +473,7 @@ Storefront report,تقرير واجهة المتجر
 Storefront theme,قالب واجهة المتجر
 New product,منتج جديد
 Import products from CSV,استيراد المنتجات من CSV
-Receive stock,استلام المخزون
+Add stock,إضافة مخزون
 Install demo data,تثبيت البيانات التجريبية
 Open settings,فتح الإعدادات
 Create,إنشاء
@@ -512,11 +512,11 @@ Needs a size,يحتاج إلى مقاس
 Not ready,غير جاهز
 {0} hidden from the storefront,{0} مخفي من واجهة المتجر
 {0} published,{0} منشور
-{0} has no sizes to receive stock against yet.,لا توجد مقاسات لـ {0} لاستلام المخزون عليها بعد.
-Receive stock on {0},استلام مخزون {0}
+{0} has no sizes to add stock to yet.,لا توجد مقاسات لـ {0} لإضافة المخزون إليها بعد.
+Add stock to {0},إضافة مخزون إلى {0}
 Adds this quantity to each of the {0} sizes under this option. There is no way to set stock to an exact number here.,يضيف هذه الكمية إلى كل مقاس من مقاسات هذا الخيار البالغة {0}. لا يمكن ضبط المخزون على رقم محدد من هنا.
-Quantity received,الكمية المستلمة
-Received {0} on {1} sizes,تم استلام {0} على {1} مقاسات
+Quantity to add,الكمية المراد إضافتها
+Added {0} to {1} sizes,تمت إضافة {0} إلى {1} مقاسات
 Hide from storefront,إخفاء من واجهة المتجر
 Publish to storefront,نشر في واجهة المتجر
 "Add a {0} or size, or take one off sale.",أضف {0} أو مقاسًا، أو أوقف بيع أحدها.
@@ -729,7 +729,7 @@ of {0} products still have no photo,من {0} منتجًا ما زالت بلا �
 Files we could not place,ملفات تعذّر وضعها
 Add more photos,إضافة مزيد من الصور
 File names do the matching,أسماء الملفات تحدد المطابقة
-"Name each photo after the product and its colour — oversized-tee-black.jpg — and add -1, -2, -3 for extra shots. The first photo for a colour becomes its main image.",سمِّ كل صورة باسم المنتج ولونه — oversized-tee-black.jpg — وأضف ‎-1 و‎-2 و‎-3 للّقطات الإضافية. تصبح الصورة الأولى للون صورته الرئيسية.
+"Name each photo after the product and its colour, like oversized-tee-black.jpg, and add -1, -2, -3 for extra shots. The first photo for a colour becomes its main image.",سمِّ كل صورة باسم المنتج ولونه، مثل oversized-tee-black.jpg، وأضف ‎-1 و‎-2 و‎-3 للّقطات الإضافية. تصبح الصورة الأولى للون صورته الرئيسية.
 {0} of {1} have a photo,{0} من {1} لها صورة
 Skip the rest for now,تخطّي الباقي الآن
 1 photo,صورة واحدة
@@ -772,7 +772,7 @@ Nothing in this bucket,لا شيء في هذه الفئة
 Your file is clean on this count.,ملفك سليم من هذه الناحية.
 Showing {0} of {1} rows,عرض {0} من {1} صفوف
 Errors do not stop the import,الأخطاء لا توقف الاستيراد
-"Every other row goes in — the row with the problem is simply left out, and none of its data is written.",يُستورد كل صف آخر — يُستبعد الصف الذي فيه المشكلة فقط، ولا يُكتب أي من بياناته.
+"Every other row goes in. The row with the problem is simply left out, and none of its data is written.",يُستورد كل صف آخر. يُستبعد الصف الذي فيه المشكلة فقط، ولا يُكتب أي من بياناته.
 Turn on payments,تفعيل المدفوعات
 Accept cards and UPI at checkout.,اقبل البطاقات وUPI عند إتمام الطلب.
 Set shipping rates,تحديد أسعار الشحن
@@ -896,17 +896,16 @@ orders,الطلبات
 revenue,إيرادات
 {0} out of stock,{0} نفد من المخزون
 {0} running low,{0} أوشك على النفاد
-Received {0} across {1} sizes,تم استلام {0} عبر {1} مقاسات
+Added {0} across {1} sizes,تمت إضافة {0} عبر {1} مقاسات
 1 Material Receipt submitted.,تم اعتماد إيصال مواد واحد.
 {0} Material Receipts submitted.,تم اعتماد {0} إيصالات مواد.
 "Quantities are added to what is on hand, as a Material Receipt into the shop's warehouse. Leave the valuation rate blank to keep the item's own.",تُضاف الكميات إلى المتوفر فعليًا، كإيصال مواد إلى مستودع المتجر. اترك معدل التقييم فارغًا للإبقاء على معدل الصنف نفسه.
 {0} on hand,{0} متوفر فعليًا
 Qty,الكمية
 Valuation rate,معدل التقييم
-Receive {0},استلام {0}
 "Every remaining store setting, grouped as it appears in your books.",كل إعدادات المتجر المتبقية، مجمّعة كما تظهر في دفاترك المحاسبية.
 "These are setup values, not everyday settings",هذه قيم إعداد، وليست إعدادات يومية
-Changing one can break your storefront — edit only what you recognise.,تغيير أحدها قد يعطّل واجهة متجرك — لا تعدّل إلا ما تعرفه.
+"Changing one can break your storefront, so edit only what you recognise.",تغيير أحدها قد يعطّل واجهة متجرك، لذا لا تعدّل إلا ما تعرفه.
 Managed in Desk,تُدار في Desk
 "These are lists rather than single values, so they are still edited on the Commera Settings form.",هذه قوائم وليست قيمًا مفردة، لذا ما زالت تُعدَّل في نموذج إعدادات Commera.
 Demo data,البيانات التجريبية
@@ -980,7 +979,7 @@ What shoppers pick at checkout.,ما يختاره المتسوقون عند إت
 Import from carrier,الاستيراد من شركة الشحن
 Add option,إضافة طريقة
 These could not be loaded,تعذّر تحميل هذه
-Shoppers are still offered whatever is stored — this panel just cannot say what.,ما زال المتسوقون يرون ما هو محفوظ — هذه اللوحة لا تستطيع معرفة ما هو.
+Shoppers are still offered whatever is stored. This panel just cannot say what.,ما زال المتسوقون يرون ما هو محفوظ. هذه اللوحة لا تستطيع معرفة ما هو.
 Checkout offers nothing to pick,لا يعرض إتمام الطلب أي خيار
 "There are no delivery options yet. Import the services a connected carrier sells, or add one of your own.",لا توجد طرق توصيل بعد. استورد الخدمات التي تبيعها شركة شحن متصلة، أو أضف طريقة خاصة بك.
 Order confirmation,تأكيد الطلب
@@ -1043,14 +1042,14 @@ Pickup stopped at {0},أُوقف الاستلام في {0}
 Pickup address saved,تم حفظ عنوان الاستلام
 Pickup address added,تمت إضافة عنوان الاستلام
 "Your warehouses, and where shoppers can collect their order.",مستودعاتك، والأماكن التي يمكن للمتسوقين استلام طلباتهم منها.
-Checkout still offers whatever is stored — this panel just cannot say what.,ما زال إتمام الطلب يعرض ما هو محفوظ — هذه اللوحة لا تستطيع معرفة ما هو.
+Checkout still offers whatever is stored. This panel just cannot say what.,ما زال إتمام الطلب يعرض ما هو محفوظ. هذه اللوحة لا تستطيع معرفة ما هو.
 Store pickup,الاستلام من المتجر
 Let shoppers collect their order from a warehouse instead of having it delivered.,اسمح للمتسوقين باستلام طلباتهم من مستودع بدلًا من توصيلها.
 No warehouses yet,لا توجد مستودعات بعد
 "Add a warehouse in your books, and it shows up here.",أضف مستودعًا في دفاترك، وسيظهر هنا.
 Online orders,الطلبات عبر الإنترنت
 No map pin,لا يوجد دبوس على الخريطة
-Needs an address — hidden at checkout,يحتاج إلى عنوان — مخفي عند إتمام الطلب
+"Needs an address, so hidden at checkout",يحتاج إلى عنوان، لذا يُخفى عند إتمام الطلب
 Pinned near {0}. Drag the pin if it is off.,الدبوس قرب {0}. اسحبه إن لم يكن في مكانه.
 "Location access is blocked. Allow it in your browser, or click the map.",الوصول إلى الموقع محظور. اسمح به في متصفحك، أو انقر على الخريطة.
 Your location could not be found. Click the map to place the pin.,تعذّر العثور على موقعك. انقر على الخريطة لوضع الدبوس.
@@ -1060,7 +1059,7 @@ Address line 1,سطر العنوان 1
 Address line 2,سطر العنوان 2
 Location on the map,الموقع على الخريطة
 Use my current location,استخدام موقعي الحالي
-No pin yet — click the map to place one,لا يوجد دبوس بعد — انقر على الخريطة لوضع واحد
+No pin yet. Click the map to place one,لا يوجد دبوس بعد. انقر على الخريطة لوضع واحد
 Looking up the address…,جارٍ البحث عن العنوان…
 Pinned at your current location. Drag the pin if it is off.,الدبوس في موقعك الحالي. اسحبه إن لم يكن في مكانه.
 That address is not on the map. Click the map to place the pin.,هذا العنوان غير موجود على الخريطة. انقر على الخريطة لوضع الدبوس.
@@ -1143,7 +1142,7 @@ Shipping rules,قواعد الشحن
 The order-value bands checkout charges. Options with no matching band use their carrier rate or Backup Charge.,شرائح قيمة الطلب التي يحتسبها إتمام الطلب. الطرق التي لا تطابقها أي شريحة تستخدم سعر شركة الشحن أو الرسوم الاحتياطية.
 Add rule,إضافة قاعدة
 Shipping rules could not be loaded,تعذّر تحميل قواعد الشحن
-Checkout still charges whatever is stored — this panel just cannot say what.,ما زال إتمام الطلب يحتسب ما هو محفوظ — هذه اللوحة لا تستطيع معرفة ما هو.
+Checkout still charges whatever is stored. This panel just cannot say what.,ما زال إتمام الطلب يحتسب ما هو محفوظ. هذه اللوحة لا تستطيع معرفة ما هو.
 No shipping rules yet,لا توجد قواعد شحن بعد
 "Add one to charge shipping by order value, per delivery option or for any of them.",أضف قاعدة لاحتساب الشحن حسب قيمة الطلب، لكل طريقة توصيل أو لجميعها.
 "Download a language as a CSV file, translate it, and upload it back.",نزّل لغة كملف CSV، وترجمها، ثم ارفعها مجددًا.
@@ -1250,7 +1249,7 @@ Going live,ستُنشر
 {0} options live on your storefront,{0} خيارات منشورة في واجهة متجرك
 1 option taken off your storefront,أُزيل خيار واحد من واجهة متجرك
 {0} options taken off your storefront,أُزيلت {0} خيارات من واجهة متجرك
-"An option is one colour of a product, with a page of its own. The menu entry itself is not touched — this only changes what shoppers can buy.",الخيار هو لون واحد من منتج، وله صفحته الخاصة. لا يتغيّر عنصر القائمة نفسه — هذا يغيّر فقط ما يمكن للمتسوقين شراؤه.
+"An option is one colour of a product, with a page of its own. The menu entry itself is not touched. This only changes what shoppers can buy.",الخيار هو لون واحد من منتج، وله صفحته الخاصة. لا يتغيّر عنصر القائمة نفسه. هذا يغيّر فقط ما يمكن للمتسوقين شراؤه.
 Search these options,ابحث في هذه الخيارات
 Could not list these options.,تعذّر عرض هذه الخيارات.
 No options under this entry match.,لا توجد خيارات ضمن هذا العنصر تطابق البحث.
@@ -1267,11 +1266,11 @@ Column renamed,تمت إعادة تسمية العمود
 "Delete ""{0}""?","حذف ""{0}""؟"
 The 1 link in this column goes with it. Pages are not deleted.,يُحذف الرابط الوحيد في هذا العمود معه. لا تُحذف الصفحات.
 The {0} links in this column go with it. Pages are not deleted.,تُحذف الروابط الـ {0} في هذا العمود معه. لا تُحذف الصفحات.
-Pages are not deleted — only this footer column.,لا تُحذف الصفحات — فقط عمود التذييل هذا.
+"Pages are not deleted, only this footer column.",لا تُحذف الصفحات، فقط عمود التذييل هذا.
 Delete column,حذف العمود
 Column deleted,تم حذف العمود
 "Remove ""{0}""?","إزالة ""{0}""؟"
-The page it points at is not deleted — only this footer link.,لا تُحذف الصفحة التي يشير إليها — فقط رابط التذييل هذا.
+"The page it points at is not deleted, only this footer link.",لا تُحذف الصفحة التي يشير إليها، فقط رابط التذييل هذا.
 Remove link,إزالة الرابط
 Link removed,تمت إزالة الرابط
 Move left,نقل لليسار
@@ -1333,7 +1332,7 @@ This block has no settings. Drag it in the list to move it.,لا توجد إعد
 This section has no settings. Drag it in the list to move it.,لا توجد إعدادات لهذا القسم. اسحبه في القائمة لنقله.
 Select a section,اختر قسمًا
 Click it in the preview or in the list to change its settings.,انقر عليه في المعاينة أو في القائمة لتغيير إعداداته.
-Nothing — heading only,لا شيء — عنوان فقط
+"Heading only, no link",عنوان فقط، بلا رابط
 Item groups,مجموعات الأصناف
 Menu entry saved,تم حفظ عنصر القائمة
 Pick an entry to edit it,اختر عنصرًا لتعديله
@@ -1373,7 +1372,7 @@ Added {0} menu entries,تمت إضافة {0} عناصر إلى القائمة
 Nothing new to add,لا جديد لإضافته
 This also removes 1 entry nested inside it. Products are not deleted.,يزيل هذا أيضًا عنصرًا واحدًا متداخلًا بداخله. لا تُحذف المنتجات.
 This also removes {0} entries nested inside it. Products are not deleted.,يزيل هذا أيضًا {0} عناصر متداخلة بداخله. لا تُحذف المنتجات.
-Products are not deleted — only this menu entry.,لا تُحذف المنتجات — فقط عنصر القائمة هذا.
+"Products are not deleted, only this menu entry.",لا تُحذف المنتجات، فقط عنصر القائمة هذا.
 Menu entry deleted,تم حذف عنصر القائمة
 Delete the whole menu?,حذف القائمة بأكملها؟
 All {0} entries are removed and shoppers lose the navigation until you build it again. Products are not deleted.,تُزال العناصر الـ {0} كلها ويفقد المتسوقون التنقل حتى تبنيه مجددًا. لا تُحذف المنتجات.
@@ -1420,7 +1419,7 @@ Close theme settings,إغلاق إعدادات القالب
 Activate {0} to change its settings.,فعّل {0} لتغيير إعداداته.
 This theme ships no settings of its own.,لا يأتي هذا القالب بإعدادات خاصة به.
 1 product,منتج واحد
-There are no collections yet — create one first.,لا توجد مجموعات بعد — أنشئ واحدة أولًا.
+There are no collections yet. Create one first.,لا توجد مجموعات بعد. أنشئ واحدة أولًا.
 File {0} under a collection,وضع {0} ضمن مجموعة
 "A product sits in one collection, so this replaces the one it is in now.",يكون المنتج في مجموعة واحدة، لذا يحل هذا محل المجموعة التي هو فيها الآن.
 Move,نقل
@@ -1600,7 +1599,7 @@ Restore from archive,الاستعادة من الأرشيف
 Archive,أرشفة
 Archive this product?,أرشفة هذا المنتج؟
 It leaves the storefront. Past orders keep their line items.,يُزال من واجهة المتجر. وتحتفظ الطلبات السابقة بسطورها.
-"This removes the product, its options and every size under it, for good. A product that has ever been ordered cannot be deleted — archive it instead, and its past orders keep their line items.",يحذف هذا المنتج وخياراته وكل مقاس تحته نهائيًا. لا يمكن حذف منتج طُلب من قبل — أرشفه بدلًا من ذلك، وستحتفظ طلباته السابقة بسطورها.
+"This removes the product, its options and every size under it, for good. A product that has ever been ordered cannot be deleted. Archive it instead, and its past orders keep their line items.",يحذف هذا المنتج وخياراته وكل مقاس تحته نهائيًا. لا يمكن حذف منتج طُلب من قبل. أرشفه بدلًا من ذلك، وستحتفظ طلباته السابقة بسطورها.
 Adjustments,التسويات
 "Every stock movement, in order. Read-only.",كل حركة مخزون، بالترتيب. للقراءة فقط.
 Date,التاريخ
@@ -1614,7 +1613,7 @@ Comma separated,مفصولة بفواصل
 Edit {0},تعديل {0}
 Used by {0} products,يستخدمها {0} منتجات
 No attributes yet,لا توجد خصائص بعد
-"Attributes are the choices a shopper picks — size, colour, format.",الخصائص هي الخيارات التي يختارها المتسوق — المقاس، اللون، الصيغة.
+"Attributes are the choices a shopper picks, like size, colour or format.",الخصائص هي الخيارات التي يختارها المتسوق، مثل المقاس أو اللون أو الصيغة.
 A collection groups products the storefront can filter and browse by.,تجمع المجموعة منتجات يمكن لواجهة المتجر التصفية والتصفّح بها.
 Create collection,إنشاء مجموعة
 Create one to start filing products under it.,أنشئ واحدة لتبدأ بوضع المنتجات ضمنها.
@@ -1701,8 +1700,8 @@ Publish {0}?,نشر {0}؟
 Anyone with the link to {0} can browse and buy. You can make it private again any time.,يمكن لأي شخص لديه رابط {0} التصفح والشراء. ويمكنك جعله خاصًا مرة أخرى في أي وقت.
 Make your store private?,جعل متجرك خاصًا؟
 Visitors will see a coming-soon page and cannot place orders until you publish again.,"سيرى الزوار صفحة ""قريبًا"" ولن يتمكنوا من تقديم طلبات حتى تنشره مجددًا."
-Receive stock on 1 line,استلام مخزون على سطر واحد
-Receive stock on {0} lines,استلام مخزون على {0} سطور
+Add stock to 1 line,إضافة مخزون إلى سطر واحد
+Add stock to {0} lines,إضافة مخزون إلى {0} سطور
 Adds this quantity to each selected line. There is no way to set stock to an exact number here.,يضيف هذه الكمية إلى كل سطر محدد. لا يمكن ضبط المخزون على رقم محدد من هنا.
 Adjustment recorded for {0} lines,تم تسجيل التسوية لـ {0} سطور
 Low stock only,المخزون المنخفض فقط
@@ -1715,7 +1714,7 @@ Select lines to act on them,حدّد سطورًا لتنفيذ إجراءات ع
 Adjust quantity,تعديل الكمية
 {0} available,{0} متاح
 No stock yet,لا يوجد مخزون بعد
-"Add a product, then receive stock against it to see it counted here.",أضف منتجًا، ثم استلم مخزونًا له لتراه محسوبًا هنا.
+"Add a product, then add stock to it to see it counted here.",أضف منتجًا، ثم أضف له مخزونًا لتراه محسوبًا هنا.
 Nothing matches,لا شيء يطابق
 Clear the filters to see all stock.,امسح الفلاتر لترى كل المخزون.
 No pages are available to you yet,لا توجد صفحات متاحة لك بعد
@@ -1741,7 +1740,7 @@ Closed,مغلق
 1 order marked fulfilled,تم تعليم طلب واحد كمُجهَّز
 {0} orders marked fulfilled,تم تعليم {0} طلبات كمُجهَّزة
 {0} of {1} orders marked fulfilled. {2} failed,تم تعليم {0} من {1} طلبات كمُجهَّزة. فشل {2}
-No delivery note yet for {0} — nothing to print.,لا توجد مذكرة تسليم لـ {0} بعد — لا شيء للطباعة.
+"No delivery note yet for {0}, so there is nothing to print.",لا توجد مذكرة تسليم لـ {0} بعد، لذا لا شيء للطباعة.
 Search orders,ابحث في الطلبات
 1 order selected,تم تحديد طلب واحد
 {0} orders selected,تم تحديد {0} طلبات
@@ -1815,7 +1814,7 @@ Visible on the storefront to shoppers.,ظاهر للمتسوقين في واجه
 Size {0},المقاس {0}
 Barcode,الباركود
 On hand: {0} · Committed: {1},المتوفر فعليًا: {0} · المحجوز: {1}
-Receive qty,الكمية المستلمة
+Add qty,الكمية المضافة
 No sizes yet,لا توجد مقاسات بعد
 Add a size so this variant can be stocked and sold.,أضف مقاسًا ليتمكن هذا المتغيّر من التخزين والبيع.
 Stock value,قيمة المخزون
@@ -1829,7 +1828,7 @@ Days of cover needs recent sales to project from.,تحتاج أيام التغط
 "How much capital the shelves are holding, and how fast it turns. {0}.",كم من رأس المال تحتفظ به الرفوف، ومدى سرعة دورانه. {0}.
 Stock value over time,قيمة المخزون عبر الزمن
 No stock history yet,لا يوجد سجل للمخزون بعد
-Stock value appears once inventory is received or sold.,تظهر قيمة المخزون بمجرد استلام المخزون أو بيعه.
+Stock value appears once stock is added or sold.,تظهر قيمة المخزون بمجرد إضافة المخزون أو بيعه.
 Sell-through rate,معدل تصريف المخزون
 Units sold in the last 30 days against what's on the shelf.,الوحدات المباعة في آخر 30 يومًا مقارنة بما على الرف.
 How long today's stock lasts at the last 30 days' pace.,المدة التي يكفيها مخزون اليوم بوتيرة آخر 30 يومًا.
@@ -1876,7 +1875,7 @@ Checkout funnel,مسار إتمام الطلب
 No checkout activity yet,لا يوجد نشاط في إتمام الطلب بعد
 The funnel fills in once shoppers start browsing.,يمتلئ المسار بمجرد أن يبدأ المتسوقون بالتصفح.
 Top pages,أبرز الصفحات
-Landing sessions per page — the storefront doesn't record a separate page-view count.,جلسات الدخول لكل صفحة — لا تسجّل واجهة المتجر عدد مشاهدات منفصلًا للصفحات.
+Landing sessions per page. The storefront doesn't record a separate page-view count.,جلسات الدخول لكل صفحة. لا تسجّل واجهة المتجر عدد مشاهدات منفصلًا للصفحات.
 Views,المشاهدات
 No page views yet,لا توجد مشاهدات للصفحات بعد
 Views appear once shoppers browse the storefront.,تظهر المشاهدات بمجرد أن يتصفح المتسوقون واجهة المتجر.
@@ -1911,7 +1910,7 @@ The image shown when the page is shared. Paste the address of an uploaded file.,
 "The page stays reachable by link, but Google is told not to list it.",تبقى الصفحة متاحة عبر الرابط، لكن يُطلب من Google عدم إدراجها.
 Last saved {0},آخر حفظ {0}
 Add page,إضافة صفحة
-"Standalone pages — About us, shipping, returns — that your footer and menus can link to.",صفحات مستقلة — من نحن، الشحن، الإرجاع — يمكن للتذييل والقوائم الربط بها.
+"Standalone pages, like About us, shipping and returns, that your footer and menus can link to.",صفحات مستقلة، مثل من نحن والشحن والإرجاع، يمكن للتذييل والقوائم الربط بها.
 Could not load your pages,تعذّر تحميل صفحاتك
 "Add one to tell shoppers about your store, your shipping or your returns.",أضف صفحة لتعريف المتسوقين بمتجرك أو بالشحن أو بالإرجاع.
 Path,المسار
@@ -2052,7 +2051,7 @@ Enter a value,أدخل قيمة
 Enter a product title,أدخل عنوان المنتج
 "A product title cannot start with ""New Item"" - Frappe reserves that wording for documents it has not saved yet. Try another title.","لا يمكن أن يبدأ عنوان المنتج بعبارة ""New Item""؛ يحتفظ فرابي بهذه العبارة للمستندات التي لم تُحفظ بعد. جرّب عنوانًا آخر."
 A product called {0} already exists. Give this one a different title.,يوجد منتج باسم {0} بالفعل. أعطِ هذا المنتج عنوانًا مختلفًا.
-"The size option must use the attribute named exactly ""Size"" — {0} will not work.","يجب أن يستخدم خيار المقاس الخاصية المسماة ""Size"" حرفيًا — لن تعمل {0}."
+"The size option must use the attribute named exactly ""Size"". {0} will not work.","يجب أن يستخدم خيار المقاس الخاصية المسماة ""Size"" حرفيًا. لن تعمل {0}."
 Collection {0} does not exist. Create it first.,المجموعة {0} غير موجودة. أنشئها أولًا.
 Colours and sizes could not be read,تعذّرت قراءة الألوان والمقاسات
 Product {0} has no options to edit,لا توجد خيارات لتعديلها في المنتج {0}
@@ -2079,7 +2078,7 @@ Customer {0} not found,العميل {0} غير موجود
 Shipping provider {0} is not enabled,مزوّد الشحن {0} غير مفعّل
 {0} cannot list its carrier services,لا يستطيع {0} عرض خدمات شركات الشحن التابعة له
 {0} has no field {1},لا يوجد في {0} حقل {1}
-{0} cannot be renamed — its name is stored on every order already placed with it. Create a new delivery option instead.,لا يمكن إعادة تسمية {0}؛ فقد حُفظ اسمه في كل طلب أُنشئ باستخدامه. أنشئ خيار توصيل جديدًا بدلًا من ذلك.
+{0} cannot be renamed because its name is stored on every order already placed with it. Create a new delivery option instead.,لا يمكن إعادة تسمية {0}؛ فقد حُفظ اسمه في كل طلب أُنشئ باستخدامه. أنشئ خيار توصيل جديدًا بدلًا من ذلك.
 A delivery option cannot link to {0}.,لا يمكن ربط خيار توصيل بـ{0}.
 this discount,هذا الخصم
 Unknown target type {0}.,نوع هدف غير معروف: {0}.
@@ -2087,7 +2086,7 @@ Footer section {0} is not part of this footer.,قسم التذييل {0} ليس 
 Link not found in {0}.,لم يُعثر على الرابط في {0}.
 The file has no rows,لا يحتوي الملف على صفوف
 These columns are not mapped: {0},هذه الأعمدة غير معيّنة: {0}
-These images are not on the server any more — upload them again: {0},لم تعد هذه الصور على الخادم؛ ارفعها مجددًا: {0}
+These images are not on the server any more. Upload them again: {0},لم تعد هذه الصور على الخادم؛ ارفعها مجددًا: {0}
 These images are private and cannot go on a storefront page: {0},هذه الصور خاصة ولا يمكن عرضها في صفحة المتجر: {0}
 Images must be sent as a list of file names and file URLs,يجب إرسال الصور كقائمة من أسماء الملفات وروابطها
 Each image must be sent as a file name and a file URL,يجب إرسال كل صورة باسم ملف ورابط ملف
@@ -2096,7 +2095,7 @@ Image assignments must be sent as a group name against its list of photos,يجب
 The photos for {0} must be sent as a list of file URLs,يجب إرسال صور {0} كقائمة من روابط الملفات
 A photo assigned to {0} was sent without a file URL,أُرسلت صورة معيّنة لـ{0} دون رابط ملف
 {0} has no {1} to put photos on,لا يوجد لدى {0} أي {1} لإضافة الصور إليه
-"This store has no Item Attribute named ""{0}"" — create it first.","لا توجد في هذا المتجر خاصية صنف باسم ""{0}""؛ أنشئها أولًا."
+"This store has no Item Attribute named ""{0}"". Create it first.","لا توجد في هذا المتجر خاصية صنف باسم ""{0}""؛ أنشئها أولًا."
 "No product was created for {0}, so its {1} photos were not attached",لم يُنشأ منتج لـ{0}، لذا لم تُرفق صور {1} الخاصة به
 {0} is not installed on this site,{0} غير مثبت على هذا الموقع
 Fill in {0} before enabling {1},أكمل {0} قبل تفعيل {1}

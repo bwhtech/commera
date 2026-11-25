@@ -114,7 +114,7 @@ function editAttribute(attribute) {
       v-else
       icon="lucide-tags"
       :title="__('No attributes yet')"
-      :description="__('Attributes are the choices a shopper picks — size, colour, format.')"
+      :description="__('Attributes are the choices a shopper picks, like size, colour or format.')"
     >
       <Button :label="__('New attribute')" icon-left="lucide-plus" variant="solid" theme="gray" @click="addAttribute" />
     </EmptyState>

@@ -56,7 +56,7 @@ async function commitField(fieldname, value, label) {
         class="mt-4"
         theme="amber"
         :title="__('These are setup values, not everyday settings')"
-        :description="__('Changing one can break your storefront — edit only what you recognise.')"
+        :description="__('Changing one can break your storefront, so edit only what you recognise.')"
       />
 
       <div class="mt-2 divide-y divide-outline-gray-1">

@@ -115,7 +115,7 @@ const GO_TO = [
 const CREATE = [
   { id: 'new-product', label: __('New product'), icon: 'lucide-plus', keywords: ['add', 'create'], run: openAddProduct },
   { id: 'import', label: __('Import products from CSV'), icon: 'lucide-upload', keywords: ['csv', 'bulk', 'shopify', 'migrate'], run: openImport },
-  { id: 'receive', label: __('Receive stock'), icon: 'lucide-package-plus', keywords: ['inward', 'grn'], run: () => router.push('/inventory') },
+  { id: 'receive', label: __('Add stock'), icon: 'lucide-package-plus', keywords: ['inward', 'grn', 'receive'], run: () => router.push('/inventory') },
   { id: 'demo-data', label: __('Install demo data'), icon: 'lucide-database', keywords: ['demo', 'sample', 'seed', 'example'], run: confirmInstallDemoData },
 ]
 

@@ -107,7 +107,7 @@ const offSaleStock = computed(() =>
 const firstOptionHint = computed(() =>
   offSaleStock.value
     ? __(
-        'The {0} in stock and past orders stay on the current item, which goes off sale. The new variants start with no stock: use Receive stock to add it.',
+        'The {0} in stock and past orders stay on the current item, which goes off sale. The new variants start with no stock: use Add stock to add it.',
         [offSaleStock.value],
       )
     : __('Past orders stay on the current item, which goes off sale. The new variants start with no stock.'),

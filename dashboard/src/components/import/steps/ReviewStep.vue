@@ -128,7 +128,7 @@ const filtered = computed(() => {
     <CoachTip
       icon="lucide-shield-check"
       :title="__('Errors do not stop the import')"
-      :text="__('Every other row goes in — the row with the problem is simply left out, and none of its data is written.')"
+      :text="__('Every other row goes in. The row with the problem is simply left out, and none of its data is written.')"
     />
   </div>
 </template>

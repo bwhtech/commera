@@ -58,9 +58,9 @@ function adjust() {
   if (!item_codes.length) return
 
   dialog.prompt({
-    title: item_codes.length === 1 ? __('Receive stock on 1 line') : __('Receive stock on {0} lines', [item_codes.length]),
+    title: item_codes.length === 1 ? __('Add stock to 1 line') : __('Add stock to {0} lines', [item_codes.length]),
     message: __('Adds this quantity to each selected line. There is no way to set stock to an exact number here.'),
-    fields: [{ name: 'value', label: __('Quantity received'), type: 'number', required: true }],
+    fields: [{ name: 'value', label: __('Quantity to add'), type: 'number', required: true }],
     onConfirm: async ({ values }) => {
       const qty = Math.max(0, Number(values.value) || 0)
       if (!qty) return
@@ -84,7 +84,7 @@ function adjust() {
       <!-- A real destination, so it stays reachable on a phone rather than dropping out. -->
       <ResponsiveButton :label="__('Adjustments')" icon="lucide-history" route="/inventory/adjustments" />
       <Button
-        :label="__('Receive stock')"
+        :label="__('Add stock')"
         icon-left="lucide-plus"
         variant="solid"
         theme="gray"
@@ -174,7 +174,7 @@ function adjust() {
       v-if="!inventoryRequest.loading && !rows.length"
       icon="lucide-boxes"
       :title="__('No stock yet')"
-      :description="__('Add a product, then receive stock against it to see it counted here.')"
+      :description="__('Add a product, then add stock to it to see it counted here.')"
       :filtered="isFiltered"
       :filtered-title="__('Nothing matches')"
       :filtered-description="__('Clear the filters to see all stock.')"

@@ -103,7 +103,7 @@ function confirmDelete(rule) {
         compact
         icon="lucide-triangle-alert"
         :title="__('Shipping rules could not be loaded')"
-        :description="__('Checkout still charges whatever is stored — this panel just cannot say what.')"
+        :description="__('Checkout still charges whatever is stored. This panel just cannot say what.')"
       >
         <Button :label="__('Try again')" variant="subtle" theme="gray" @click="store.load()" />
       </EmptyState>

@@ -52,7 +52,7 @@ async function receive() {
 
   open.value = false
   const count = result.stock_entries?.length ?? 0
-  toast.success(__('Received {0} across {1} sizes', [totalQty.value, lines.value.length]), {
+  toast.success(__('Added {0} across {1} sizes', [totalQty.value, lines.value.length]), {
     description: count === 1 ? __('1 Material Receipt submitted.') : __('{0} Material Receipts submitted.', [count]),
   })
   emit('received')
@@ -60,7 +60,7 @@ async function receive() {
 </script>
 
 <template>
-  <Dialog v-model:open="open" :title="__('Receive stock')" size="xl">
+  <Dialog v-model:open="open" :title="__('Add stock')" size="xl">
     <template #default>
       <p class="text-p-sm text-ink-gray-5">
         {{ __("Quantities are added to what is on hand, as a Material Receipt into the shop's warehouse. Leave the valuation rate blank to keep the item's own.") }}
@@ -106,7 +106,7 @@ async function receive() {
           class="w-full sm:w-auto"
           variant="solid"
           theme="gray"
-          :label="totalQty ? __('Receive {0}', [totalQty]) : __('Receive stock')"
+          :label="totalQty ? __('Add {0}', [totalQty]) : __('Add stock')"
           :loading="receiveAction.loading"
           :disabled="!lines.length || receiveAction.loading"
           @click="receive"

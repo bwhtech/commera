@@ -181,7 +181,7 @@ const stats = computed(() => {
     <section class="mt-6 rounded-5 border border-outline-gray-1">
       <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">{{ __('Top pages') }}</h2>
       <p class="px-4 text-sm text-ink-gray-5">
-        {{ __("Landing sessions per page — the storefront doesn't record a separate page-view count.") }}
+        {{ __("Landing sessions per page. The storefront doesn't record a separate page-view count.") }}
       </p>
       <div class="px-2 pb-2">
         <List :columns="['minmax(0,1fr)', '8rem', '8rem']" :row-height="Math.max(ia.density, 44)">

@@ -130,7 +130,7 @@ async function addValue() {
     <div v-if="attribute" class="space-y-4">
       <p class="text-p-sm text-ink-gray-5">
         <template v-if="isColour">
-          {{ __('A shopper sees these instead of the words. Upload an image for a pattern a flat colour cannot show — denim, floral, marble.') }}
+          {{ __('A shopper sees these instead of the words. Upload an image for a pattern a flat colour cannot show, such as denim, floral or marble.') }}
         </template>
         <template v-else>
           {{ __('The choices a shopper picks from. Click a name to rename one.') }}
@@ -163,8 +163,8 @@ async function addValue() {
             :title="
               row.used_by
                 ? row.used_by === 1
-                  ? __('Used by 1 product — renaming would leave its SKUs and links saying {0}.', [row.value])
-                  : __('Used by {0} products — renaming would leave their SKUs and links saying {1}.', [row.used_by, row.value])
+                  ? __('Used by 1 product. Renaming would leave its SKUs and links saying {0}.', [row.value])
+                  : __('Used by {0} products. Renaming would leave their SKUs and links saying {1}.', [row.used_by, row.value])
                 : __('Rename {0}', [row.value])
             "
             @click="startRename(row)"

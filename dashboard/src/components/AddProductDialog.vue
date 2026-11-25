@@ -163,7 +163,7 @@ const summary = computed(() => {
     return `${options} · ${variants}`
   }
   if (optionCount) return `${options} · ${__('no sizes, so each one sells as a single item')}`
-  return __('No options — this sells as a single item, the way a book does')
+  return __('No options: this sells as a single item, the way a book does')
 })
 
 const createAction = useAdminAction('catalog.create_product')
@@ -249,7 +249,7 @@ async function submit() {
           :attribute="optionAttribute"
           :label="optionAttribute"
           :placeholder="__('Pick or type a {0}', [optionAttribute.toLowerCase()])"
-          :description="__('Type a new {0} to add it — leave empty if this product has none', [optionAttribute.toLowerCase()])"
+          :description="__('Type a new {0} to add it, or leave empty if this product has none', [optionAttribute.toLowerCase()])"
           @values="setOptionSwatches"
         />
 

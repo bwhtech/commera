@@ -139,7 +139,7 @@ def save_delivery_option(name: str | None = None, values: dict | str | None = No
 		if "title" in values and cstr(values["title"]) != option.title:
 			frappe.throw(
 				frappe._(
-					"{0} cannot be renamed — its name is stored on every order already placed with it. "
+					"{0} cannot be renamed because its name is stored on every order already placed with it. "
 					"Create a new delivery option instead."
 				).format(frappe.bold(option.title))
 			)

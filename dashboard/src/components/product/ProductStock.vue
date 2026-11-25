@@ -37,7 +37,7 @@ const rows = computed(() =>
         <!-- Receiving is the only stock write commera has, so it is the one offered
              here; the on-hand column stays read-only. -->
         <Button
-          :label="__('Receive stock')"
+          :label="__('Add stock')"
           icon-left="lucide-package-plus"
           :disabled="!rows.length"
           @click="receiveOpen = true"
