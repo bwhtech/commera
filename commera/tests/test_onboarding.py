@@ -11,6 +11,7 @@ from commera.api.admin import onboarding as onboarding_api
 from commera.install import SALE_PRICE_LIST, TEST_ABBR, TEST_COMPANY
 from commera.migrate import set_default_app
 from commera.roles import COMMERA_ADMIN
+from commera.tests.test_discount_codes import run_in_another_request
 from commera.www.commera import get_boot
 
 SETTINGS = "Commera Settings"
@@ -212,6 +213,38 @@ class StartStoreSetupTestCase(IntegrationTestCase):
 		self.assertIn("no company", status["error"])
 		self.assertEqual(publish.call_args.args[0], onboarding.SETUP_REALTIME_EVENT)
 		self.assertEqual(publish.call_args.args[1]["status"], "failed")
+
+
+class SetupStatusAcrossRequestsTestCase(IntegrationTestCase):
+	def setUp(self):
+		saved = frappe.db.get_value(SETTINGS, SETTINGS, ["store_setup_status", "store_setup_error"])
+		self.addCleanup(self.restore_status, *saved)
+		frappe.cache.delete_value(onboarding.SETUP_QUEUEING_CACHE_KEY)
+		onboarding.set_setup_status("running")
+		frappe.db.commit()
+
+	def restore_status(self, status, error):
+		frappe.db.rollback()
+		onboarding.set_setup_status(status, error)
+		frappe.db.commit()
+
+	def get_status_after_the_job_commits(self, status, error=None):
+		self.assertEqual(frappe.db.get_single_value(SETTINGS, "store_setup_status", cache=False), "running")
+		run_in_another_request(lambda: onboarding.set_setup_status(status, error))
+		with (
+			patch("commera.onboarding.is_job_enqueued", return_value=False),
+			patch("frappe.is_setup_complete", return_value=False),
+		):
+			return onboarding.get_setup_status()
+
+	def test_a_job_that_finished_after_the_poll_began_is_done(self):
+		self.assertEqual(self.get_status_after_the_job_commits("done"), {"status": "done", "error": None})
+
+	def test_a_job_that_failed_after_the_poll_began_keeps_its_reason(self):
+		self.assertEqual(
+			self.get_status_after_the_job_commits("failed", "Store setup failed: boom"),
+			{"status": "failed", "error": "Store setup failed: boom"},
+		)
 
 
 class OnboardingAccessTestCase(IntegrationTestCase):
