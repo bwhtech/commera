@@ -371,7 +371,6 @@ Type a new {0} to add it — leave empty if this product has none,اكتب {0} �
 Sizes,المقاسات
 Pick or type a size,اختر مقاسًا أو اكتبه
 "Leave empty for a product that has no sizes, like a book",اتركه فارغًا لمنتج بلا مقاسات، مثل الكتاب
-Compare at,السعر قبل الخصم
 Photos come next,الصور في الخطوة التالية
 "This product is created without a photo, so it stays hidden from shoppers until you add one — from the product page, right after this.",يُنشأ هذا المنتج بلا صورة، لذا يبقى مخفيًا عن المتسوقين حتى تضيف صورة — من صفحة المنتج، بعد هذه الخطوة مباشرة.
 Apps,التطبيقات
@@ -1533,8 +1532,6 @@ Check before saving,راجِع قبل الحفظ
 Create everything,إنشاء كل شيء
 Don't import,عدم الاستيراد
 Product title,عنوان المنتج
-Compare-at price,السعر قبل الخصم
-Selling price,سعر البيع
 Next try {0},المحاولة التالية {0}
 Waiting to send,في انتظار الإرسال
 Sending to {0} again,جارٍ الإرسال إلى {0} مرة أخرى
@@ -1768,23 +1765,16 @@ Try a different filter or search term.,جرّب فلترًا أو كلمة بح�
 All types,كل الأنواع
 Raise price on 1 item,رفع سعر صنف واحد
 Raise price on {0} items,رفع سعر {0} أصناف
-"Raises the price a shopper actually pays by this percentage, rounded to the nearest paisa.",يرفع السعر الذي يدفعه المتسوق فعليًا بهذه النسبة، مقرّبًا إلى أقرب بيسة.
+"Raises Price and Discounted price by this percentage, rounded to the nearest paisa.",يرفع السعر والسعر بعد الخصم بهذه النسبة، مقرّبًا إلى أقرب بيسة.
 Raise by %,الرفع بنسبة %
 1 item repriced,أُعيد تسعير صنف واحد
 {0} items repriced,أُعيد تسعير {0} أصناف
 {0} of {1} items repriced. {2} failed,أُعيد تسعير {0} من {1} أصناف. فشل {2}
-Set compare-at on 1 item,تحديد السعر قبل الخصم لصنف واحد
-Set compare-at on {0} items,تحديد السعر قبل الخصم لـ {0} أصناف
-Sets the struck-through reference price shown above the real price.,يحدّد السعر المرجعي المشطوب الذي يظهر فوق السعر الفعلي.
-1 item given a compare-at price,حُدّد السعر قبل الخصم لصنف واحد
-{0} items given a compare-at price,حُدّد السعر قبل الخصم لـ {0} أصناف
-{0} of {1} items given a compare-at price. {2} failed,حُدّد السعر قبل الخصم لـ {0} من {1} أصناف. فشل {2}
 Edit prices,تعديل الأسعار
 {0} sellable units,{0} وحدات قابلة للبيع
 1 item selected,تم تحديد صنف واحد
 {0} items selected,الأصناف المحددة: {0}
 Select items to act on them,حدّد أصنافًا لتنفيذ إجراءات عليها
-Set compare-at,تحديد السعر قبل الخصم
 Item,الصنف
 No sellable items yet,لا توجد أصناف قابلة للبيع بعد
 Add a product to start pricing it.,أضف منتجًا لتبدأ تسعيره.
@@ -2522,6 +2512,14 @@ Each {0} has its own photos. The first one is the cover.,لكل {0} صوره ا�
 Add photos of {0},أضف صور {0}
 Shown when a shopper picks {0}. Drop images here or click to choose.,تظهر عندما يختار المتسوق {0}. اسحب الصور إلى هنا أو انقر للاختيار.
 Applies to every size under this option ({0}).,ينطبق على كل المقاسات ضمن هذا الخيار ({0}).
-Compare at cannot be lower than Price.,لا يمكن أن يكون السعر قبل الخصم أقل من السعر.
-Compare at ({0}) cannot be lower than Price ({1}) for {2}.,لا يمكن أن يكون السعر قبل الخصم ({0}) أقل من السعر ({1}) للمنتج {2}.
-Invalid compare-at price,السعر قبل الخصم غير صالح
+Set discounted price on 1 item,تحديد السعر بعد الخصم لصنف واحد
+Set discounted price on {0} items,تحديد السعر بعد الخصم لـ {0} أصناف
+Shoppers pay this and see Price crossed out when it is higher.,يدفع المتسوقون هذا السعر ويرون السعر الأصلي مشطوبًا عندما يكون أعلى.
+Set discounted price,تحديد السعر بعد الخصم
+Discounted price,السعر بعد الخصم
+Optional,اختياري
+Price must be higher than the discounted price.,يجب أن يكون السعر أعلى من السعر بعد الخصم.
+Enter 0 to remove the crossed-out price.,أدخل 0 لإزالة السعر المشطوب.
+Enter a discounted price above zero.,أدخل سعرًا بعد الخصم أكبر من صفر.
+Price ({0}) must be higher than the discounted price ({1}) for {2}.,يجب أن يكون السعر ({0}) أعلى من السعر بعد الخصم ({1}) للمنتج {2}.
+Invalid price,سعر غير صالح

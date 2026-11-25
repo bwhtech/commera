@@ -1739,8 +1739,6 @@ def price_new_sizes(item_template: str, variant_names: list, existing_item_codes
 
 
 def get_copyable_compare_at(size_price: dict) -> float | None:
-	"""A compare-at below the price was saved before check_compare_at_not_below_price existed. The
-	storefront ignores it, so a new size goes without it rather than failing the whole options edit."""
 	compare_at, price = size_price.get("default_rate"), size_price.get("sale_rate")
 	if compare_at and price and compare_at < price:
 		return None

@@ -358,7 +358,6 @@ class TestSaveProductOptions(DeleteProductTestCase):
 		self.assertEqual((crimson["L"]["default_rate"], crimson["L"]["sale_rate"]), (500, 400))
 
 	def test_a_new_size_skips_a_compare_at_saved_below_the_price(self):
-		# Data saved before the compare-at check: compare-at 300 under a price of 400.
 		frappe.db.set_value(
 			"Item Price",
 			{"price_list": self.default_price_list, "item_code": ["in", self.get_item_codes()]},

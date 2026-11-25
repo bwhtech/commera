@@ -16,6 +16,7 @@ const props = defineProps({
   // No popover, no pencil — for a value commera has nothing to write to yet
   // (see callers for why), shown as the same tabular-nums text either way.
   readonly: { type: Boolean, default: false },
+  emptyLabel: { type: String, default: undefined },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -46,7 +47,8 @@ function cancel(close) {
         :class="open ? 'bg-surface-gray-3 text-ink-gray-8' : 'text-ink-gray-7 hover:bg-surface-gray-2'"
         @click.stop.prevent
       >
-        <span class="text-base">{{ format === 'money' ? money(modelValue) : modelValue }}</span>
+        <span v-if="emptyLabel && !modelValue" class="text-base text-ink-gray-4">{{ emptyLabel }}</span>
+        <span v-else class="text-base">{{ format === 'money' ? money(modelValue) : modelValue }}</span>
         <span
           class="lucide-pencil size-3 text-ink-gray-4 transition-opacity"
           :class="open ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"

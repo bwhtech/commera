@@ -11,7 +11,7 @@ import { Alert, Button, Dialog, ErrorMessage, FormControl, Select, dialog, toast
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { addProduct, closeAddProduct } from '../data/addProduct'
 import { buildOptionSizes } from '../data/optionSizes'
-import { isCompareAtBelowPrice } from '../data/product'
+import { hasPrice, isPriceValid, priceRates } from '../data/product'
 import { productRoute } from '../ia/routes'
 import { __ } from '../data/translation'
 import AttributeMultiSelect from './AttributeMultiSelect.vue'
@@ -25,7 +25,7 @@ const optionAttribute = ref('Color')
 const colors = ref([])
 const sizes = ref([])
 const excludedPairs = ref([])
-const compareAt = ref(null)
+const discountedPrice = ref(null)
 const price = ref(null)
 const colorsOpen = ref(false)
 const optionSwatches = ref({})
@@ -48,7 +48,7 @@ function resetForm() {
   colors.value = []
   sizes.value = []
   excludedPairs.value = []
-  compareAt.value = null
+  discountedPrice.value = null
   price.value = null
 }
 
@@ -135,19 +135,21 @@ const mixedOption = computed(() =>
 )
 const gridError = computed(() => (mixedOption.value ? __('Pick at least one size for {0}', [mixedOption.value]) : ''))
 
-const compareAtError = computed(() =>
-  isCompareAtBelowPrice(price.value, compareAt.value) ? __('Compare at cannot be lower than Price.') : '',
+const priceError = computed(() =>
+  isPriceValid({ price: price.value, discountedPrice: discountedPrice.value })
+    ? ''
+    : __('Price must be higher than the discounted price.'),
 )
 
-// A price is required, not optional. create_product only writes Item Prices for a rate
+// The discounted price is required. create_product only writes Item Prices for a rate
 // above zero, so a product created without one carries no Item Price row at all and reads
 // as 0 on every screen until someone prices it by hand — it can never be sold in between.
 const canSubmit = computed(
   () =>
     Boolean(title.value.trim()) &&
     Boolean(collection.value) &&
-    Number(price.value) > 0 &&
-    !compareAtError.value &&
+    hasPrice(discountedPrice.value) &&
+    !priceError.value &&
     !mixedOption.value,
 )
 
@@ -172,7 +174,6 @@ const submitHint = computed(() => {
   if (!title.value.trim()) return __('Add a title to continue.')
   if (!collection.value) return __('Pick a collection to continue.')
   if (!(Number(price.value) > 0)) return __('Set a price above zero to continue.')
-  if (compareAtError.value) return compareAtError.value
   return ''
 })
 
@@ -182,14 +183,15 @@ async function submit() {
   // holds by the time the server answers.
   const productTitle = title.value.trim()
 
+  const rates = priceRates({ price: price.value, discountedPrice: discountedPrice.value })
   const added = await trySubmit(createAction, {
     title: productTitle,
     collection: collection.value,
     option_attribute: colors.value.length ? optionAttribute.value : undefined,
     size_attribute: 'Size',
     option_sizes: optionSizes.value,
-    price: compareAt.value || undefined,
-    sale_price: price.value || undefined,
+    price: rates.default_rate,
+    sale_price: rates.sale_rate,
   })
   // A failure (missing collection, colliding abbreviation, wrong size attribute…) already
   // toasted inside useAdminAction — the form stays open so the owner can fix it and resubmit.
@@ -273,13 +275,18 @@ async function submit() {
         <ErrorMessage :message="gridError" />
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormControl v-model.number="price" type="number" :label="`${__('Price')} *`" placeholder="0" />
           <FormControl
-            v-model.number="compareAt"
+            v-model.number="price"
             type="number"
-            :label="__('Compare at')"
+            :label="__('Price')"
+            :placeholder="__('Optional')"
+            :error="priceError"
+          />
+          <FormControl
+            v-model.number="discountedPrice"
+            type="number"
+            :label="`${__('Discounted price')} *`"
             placeholder="0"
-            :error="compareAtError"
           />
         </div>
 

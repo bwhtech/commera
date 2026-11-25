@@ -47,11 +47,11 @@ class RunImportTestCase(IntegrationTestCase):
 		item_group.insert()
 		return item_group.name
 
-	def make_import_file(self, compare_at_price=120, sale_price=99):
-		rows = [
+	def make_import_file(self, rows=None):
+		rows = rows or [
 			"Product Title,Collection,Color,Size,Compare at price,Selling price,Stock",
-			f"{self.title},{self.collection},{self.color},S,{compare_at_price},{sale_price},0",
-			f"{self.title},{self.collection},{self.color},M,{compare_at_price},{sale_price},0",
+			f"{self.title},{self.collection},{self.color},S,120,99,0",
+			f"{self.title},{self.collection},{self.color},M,120,99,0",
 		]
 		file_doc = frappe.new_doc("File")
 		file_doc.file_name = f"import-{self.suffix}.csv"
@@ -189,19 +189,41 @@ class TestRunImportImageAssignmentShape(RunImportTestCase):
 		self.assertEqual(self.get_created_titles(), [])
 
 
-class TestParseAndValidatePrices(RunImportTestCase):
-	def get_issues(self, compare_at_price, sale_price):
-		rows = parse_and_validate(self.make_import_file(compare_at_price, sale_price))["rows"]
-		return [row["issue"] for row in rows]
+class TestImportPrices(RunImportTestCase):
+	def test_a_row_without_a_discounted_price_is_refused(self):
+		file_url = self.make_import_file(
+			[
+				"Product Title,Collection,Color,Size,Price,Discounted price,Stock",
+				f"{self.title},{self.collection},{self.color},S,120,,0",
+			]
+		)
 
-	def test_a_compare_at_price_below_the_selling_price_is_an_error(self):
-		issues = self.get_issues(compare_at_price=1000, sale_price=1200)
+		issue = parse_and_validate(file_url)["rows"][0]["issue"]
 
-		self.assertEqual({issue["level"] for issue in issues}, {"error"})
-		self.assertIn("Compare at price cannot be lower", issues[0]["text"])
+		self.assertEqual(issue, {"level": "error", "text": "Discounted price is missing"})
 
-	def test_a_compare_at_price_above_the_selling_price_passes(self):
-		self.assertEqual(self.get_issues(compare_at_price=1200, sale_price=1000), [None, None])
+	def test_a_single_price_column_is_what_the_shopper_pays(self):
+		file_url = self.make_import_file(
+			[
+				"Product Title,Collection,Color,Size,MRP,Stock",
+				f"{self.title},{self.collection},{self.color},S,120,0",
+			]
+		)
 
-	def test_a_compare_at_price_equal_to_the_selling_price_passes(self):
-		self.assertEqual(self.get_issues(compare_at_price=1000, sale_price=1000), [None, None])
+		result = parse_and_validate(file_url)
+
+		self.assertEqual(result["mapping"]["MRP"], "sale_price")
+		row = result["rows"][0]
+		self.assertEqual((row["sale_price"], row["compare_at_price"], row["issue"]), (120, 0, None))
+
+	def test_a_price_below_the_discounted_price_is_refused(self):
+		file_url = self.make_import_file(
+			[
+				"Product Title,Collection,Color,Size,Price,Discounted price,Stock",
+				f"{self.title},{self.collection},{self.color},S,1000,1200,0",
+			]
+		)
+
+		issue = parse_and_validate(file_url)["rows"][0]["issue"]
+
+		self.assertEqual(issue, {"level": "error", "text": "Price must be higher than the discounted price"})

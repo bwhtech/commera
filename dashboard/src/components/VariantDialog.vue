@@ -8,7 +8,7 @@ import { computed, ref, watch } from 'vue'
 import { Badge, Button, Dialog, FormControl, toast } from 'frappe-ui'
 import VariantMedia from './VariantMedia.vue'
 import { useAdminAction, trySubmit } from '../data/api'
-import { isCompareAtBelowPrice, pricePayload, shownPrice } from '../data/product'
+import { hasPrice, isPriceValid, priceFields, priceRates } from '../data/product'
 import { __ } from '../data/translation'
 
 const props = defineProps({
@@ -19,23 +19,17 @@ const props = defineProps({
 const open = defineModel('open', { type: Boolean, default: false })
 const emit = defineEmits(['saved'])
 
-// Bulk price editing across every size under this option — the same call
-// the product page's matrix row uses (catalog.set_variant_price). Price is
-// what a shopper is charged (shownPrice in data/product.js); Compare-at is
-// the default price list, shown raw rather than through compareAtPrice so
-// that a reference equal to the price still round-trips through the box
-// instead of being erased by a save that only meant to change the price.
-const price = ref(0)
-const compareAt = ref(null)
+const price = ref(null)
+const discountedPrice = ref(0)
 // Reset on open or on a different variant only: a photo upload reloads the
 // product mid-edit, and that must not wipe a price typed but not yet saved.
 watch(
   [open, () => props.variant?.name],
   () => {
     if (!open.value || !props.variant) return
-    const first = props.variant.sizes?.[0]
-    compareAt.value = first?.default_rate ?? null
-    price.value = shownPrice(first)
+    const fields = priceFields(props.variant.sizes?.[0])
+    price.value = fields.price
+    discountedPrice.value = fields.discountedPrice ?? 0
   },
   { immediate: true },
 )
@@ -53,22 +47,20 @@ const committed = computed(() => props.variant?.sizes?.reduce((sum, size) => sum
 const skuList = computed(() => props.variant?.sizes?.map((size) => size.item_code).join(', ') ?? '')
 
 const priceAction = useAdminAction('catalog.set_variant_price')
-
-const compareAtError = computed(() =>
-  isCompareAtBelowPrice(price.value, compareAt.value) ? __('Compare at cannot be lower than Price.') : '',
+const priceError = computed(() =>
+  isPriceValid({ price: price.value, discountedPrice: discountedPrice.value })
+    ? ''
+    : __('Price must be higher than the discounted price.'),
+)
+const discountedPriceError = computed(() =>
+  hasPrice(discountedPrice.value) ? '' : __('Enter a discounted price above zero.'),
 )
 
 async function save() {
-  if (priceAction.loading || compareAtError.value) return
-  const hasCompareAt = compareAt.value != null && compareAt.value !== ''
-  // With no compare-at there is only one price to write, and it has to land on the list already
-  // in force: a product created without one is priced on the sale list alone, so writing the
-  // default list there would leave the shopper paying the old rate.
+  if (priceAction.loading || priceError.value || discountedPriceError.value) return
   const saved = await trySubmit(priceAction, {
     style_attribute_variant: props.variant.name,
-    ...(hasCompareAt
-      ? { default_rate: compareAt.value, sale_rate: price.value }
-      : pricePayload(props.variant.sizes?.[0], price.value)),
+    ...priceRates({ price: price.value, discountedPrice: discountedPrice.value }),
   })
   if (!saved) return
   open.value = false
@@ -99,8 +91,19 @@ async function save() {
           {{ __('Applies to every size under this option ({0}).', [variant.sizes.length]) }}
         </p>
         <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormControl v-model.number="price" type="number" :label="__('Price')" />
-          <FormControl v-model.number="compareAt" type="number" :label="__('Compare at')" :error="compareAtError" />
+          <FormControl
+            v-model.number="price"
+            type="number"
+            :label="__('Price')"
+            :placeholder="__('Optional')"
+            :error="priceError"
+          />
+          <FormControl
+            v-model.number="discountedPrice"
+            type="number"
+            :label="`${__('Discounted price')} *`"
+            :error="discountedPriceError"
+          />
           <!-- Read-only: commera only exposes receiving stock (additive), not setting
                on-hand to an arbitrary number. -->
           <FormControl :model-value="String(onHand)" type="number" :label="__('On hand')" disabled />
@@ -127,7 +130,7 @@ async function save() {
           :label="__('Save variant')"
           variant="solid"
           theme="gray"
-          :disabled="Boolean(compareAtError)"
+          :disabled="Boolean(priceError || discountedPriceError)"
           :loading="priceAction.loading"
           @click="save"
         />

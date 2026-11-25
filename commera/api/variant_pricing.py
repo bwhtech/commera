@@ -149,8 +149,6 @@ def set_variant_prices(
 
 
 def check_compare_at_not_below_price(existing_price_by_key, new_rate_by_key, overwrite_existing=True):
-	"""The storefront drops a compare-at rate below the price. Equal is allowed: a price cannot be
-	removed, so that is how a sale ends. Only rates this save writes are checked."""
 	default_price_list, sale_price_list = get_selling_price_lists()
 	rate_by_key = {key: flt(row.price_list_rate) for key, row in existing_price_by_key.items()}
 	written_rate_by_key = {
@@ -162,12 +160,13 @@ def check_compare_at_not_below_price(existing_price_by_key, new_rate_by_key, ove
 
 	for (item_code, price_list), compare_at in written_rate_by_key.items():
 		price = rate_by_key.get((item_code, sale_price_list))
+		# Equal passes: an empty Price is saved as the discounted price on both lists.
 		if price_list == default_price_list and price and compare_at < price:
 			frappe.throw(
-				_("Compare at ({0}) cannot be lower than Price ({1}) for {2}.").format(
+				_("Price ({0}) must be higher than the discounted price ({1}) for {2}.").format(
 					fmt_money(compare_at), fmt_money(price), item_code
 				),
-				title=_("Invalid compare-at price"),
+				title=_("Invalid price"),
 			)
 
 

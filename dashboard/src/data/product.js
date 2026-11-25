@@ -17,18 +17,23 @@ export function compareAtPrice(rated) {
   return compareAt != null && compareAt > shownPrice(rated) ? compareAt : null
 }
 
-// The server refuses this (variant_pricing.check_compare_at_not_below_price): the storefront drops
-// a compare-at below the price, so the sale never shows. Equal is fine - that is how a sale ends.
-export function isCompareAtBelowPrice(price, compareAt) {
-  if (compareAt == null || compareAt === '' || !(Number(price) > 0)) return false
-  return Number(compareAt) < Number(price)
+export function priceFields(rated) {
+  return { price: compareAtPrice(rated), discountedPrice: rated?.sale_rate ?? rated?.default_rate ?? null }
 }
 
-// The rate half of a set_variant_price / save_product_prices payload, aimed at the price list
-// actually in force. Safe to send one of the two on its own: set_variant_prices() builds
-// rate_by_price_list from the rates it was given, so the other list keeps what it had.
-export function pricePayload(rated, rate) {
-  return rated?.sale_rate != null ? { sale_rate: rate } : { default_rate: rate }
+export function hasPrice(rate) {
+  return rate != null && rate !== '' && Number(rate) > 0
+}
+
+export function isPriceValid({ price, discountedPrice }) {
+  return !hasPrice(price) || Number(price) > Number(discountedPrice)
+}
+
+// An empty Price writes the discounted price to both lists: Item Prices cannot be deleted through
+// the API, and equal rates show nothing crossed out.
+export function priceRates({ price, discountedPrice }) {
+  const charged = Number(discountedPrice)
+  return { default_rate: hasPrice(price) ? Number(price) : charged, sale_rate: charged }
 }
 
 export const PLACEHOLDER_ATTRIBUTE = 'Title'
