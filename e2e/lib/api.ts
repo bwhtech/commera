@@ -3,8 +3,8 @@ import { BASE } from './env';
 
 type Args = Record<string, unknown>;
 
-async function getCsrfToken(request: APIRequestContext, tokenPage: string) {
-	const response = await request.get(BASE + tokenPage);
+async function getCsrfToken(request: APIRequestContext, tokenUrl: string) {
+	const response = await request.get(tokenUrl);
 	const match = (await response.text()).match(
 		/csrf_token["'\]]*\s*[:=]\s*["']([^"']+)["']/,
 	);
@@ -17,10 +17,11 @@ export class Api {
 	constructor(
 		private request: APIRequestContext,
 		private tokenPage = '/commera',
+		private base = BASE,
 	) {}
 
-	static for(context: BrowserContext, tokenPage?: string) {
-		return new Api(context.request, tokenPage);
+	static for(context: BrowserContext, tokenPage?: string, base?: string) {
+		return new Api(context.request, tokenPage, base);
 	}
 
 	async get<T = unknown>(method: string, args: Args = {}): Promise<T> {
@@ -30,21 +31,30 @@ export class Api {
 				typeof value === 'string' ? value : JSON.stringify(value),
 			]),
 		);
-		const response = await this.request.get(`${BASE}/api/method/${method}`, {
-			params,
-		});
+		const response = await this.request.get(
+			`${this.base}/api/method/${method}`,
+			{
+				params,
+			},
+		);
 		return this.read<T>(method, response);
 	}
 
 	async post<T = unknown>(method: string, args: Args = {}): Promise<T> {
-		this.csrfToken ??= await getCsrfToken(this.request, this.tokenPage);
+		this.csrfToken ??= await getCsrfToken(
+			this.request,
+			this.base + this.tokenPage,
+		);
 		const headers: Record<string, string> = this.csrfToken
 			? { 'X-Frappe-CSRF-Token': this.csrfToken }
 			: {};
-		const response = await this.request.post(`${BASE}/api/method/${method}`, {
-			data: args,
-			headers,
-		});
+		const response = await this.request.post(
+			`${this.base}/api/method/${method}`,
+			{
+				data: args,
+				headers,
+			},
+		);
 		return this.read<T>(method, response);
 	}
 

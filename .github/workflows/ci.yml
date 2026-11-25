@@ -117,6 +117,15 @@ jobs:
       - name: Setup bench
         uses: ./.github/actions/setup-bench
 
+      - name: Create a site that never ran setup, in the background
+        working-directory: /home/runner/frappe-bench
+        run: |
+          nohup bash -c "bench new-site --db-root-password root --admin-password admin --mariadb-user-host-login-scope='%' fresh_site \
+            && bench --site fresh_site install-app erpnext \
+            && bench --site fresh_site install-app commera \
+            && bench --site fresh_site migrate \
+            && echo FRESH_SITE_OK" > fresh_site.log 2>&1 &
+
       - name: Seed the store
         working-directory: /home/runner/frappe-bench
         run: |
@@ -127,9 +136,10 @@ jobs:
       - name: Start web server, worker and socketio
         working-directory: /home/runner/frappe-bench
         run: |
-          echo "127.0.0.1 test_site" | sudo tee -a /etc/hosts
+          echo "127.0.0.1 test_site fresh_site" | sudo tee -a /etc/hosts
           nohup bench serve --port 8000 > web.log 2>&1 &
-          nohup bench worker > worker.log 2>&1 &
+          nohup env -u CI bench worker --queue short,default > worker.log 2>&1 &
+          nohup env -u CI bench worker --queue long > worker-long.log 2>&1 &
           nohup node apps/frappe/socketio.js > socketio.log 2>&1 &
           for attempt in $(seq 1 60); do
             curl -sf http://test_site:8000/api/method/frappe.ping && exit 0
@@ -144,11 +154,23 @@ jobs:
           npm ci
           npx playwright install chromium
 
+      - name: Wait for the fresh site
+        working-directory: /home/runner/frappe-bench
+        run: |
+          for attempt in $(seq 1 120); do
+            grep -q FRESH_SITE_OK fresh_site.log && exit 0
+            pgrep -f "fresh_site" > /dev/null || break
+            sleep 5
+          done
+          cat fresh_site.log
+          exit 1
+
       - name: Run e2e
         working-directory: e2e
         run: npx playwright test
         env:
           COMMERA_BASE: http://test_site:8000
+          COMMERA_FRESH_BASE: http://fresh_site:8000
           COMMERA_BENCH: /home/runner/frappe-bench
 
       - name: Upload report
@@ -165,5 +187,5 @@ jobs:
         if: failure()
         working-directory: /home/runner/frappe-bench
         run: |
-          cat web.log worker.log socketio.log || true
+          cat web.log worker.log worker-long.log socketio.log fresh_site.log || true
           cat logs/*.log || true

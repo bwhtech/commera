@@ -1,6 +1,7 @@
 import path from 'node:path';
 
 export const BASE = process.env.COMMERA_BASE || 'http://e2e.localhost:8000';
+export const FRESH_BASE = process.env.COMMERA_FRESH_BASE;
 export const SITE = process.env.COMMERA_SITE || new URL(BASE).hostname;
 export const BENCH =
 	process.env.COMMERA_BENCH ||
