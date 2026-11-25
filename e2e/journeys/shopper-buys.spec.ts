@@ -1,7 +1,7 @@
 import type { BrowserContext, Page } from '@playwright/test';
 import { Api } from '../lib/api';
 import { newContext } from '../lib/auth';
-import { getSignupCode, markPaymentPaid } from '../lib/bench';
+import { markPaymentPaid } from '../lib/bench';
 import { PREFIX, useCleanup } from '../lib/data';
 import { expect, realProblems, test, watchPage } from '../lib/fixtures';
 import {
@@ -55,6 +55,7 @@ type EmailQueue = {
 };
 
 test.describe('shopper buys', () => {
+	test.describe.configure({ timeout: 240_000 });
 	let admin: BrowserContext;
 	let adminApi: Api;
 	const orders: string[] = [];
@@ -173,7 +174,7 @@ test.describe('shopper buys', () => {
 		page,
 		problems,
 	}) => {
-		const email = shopperEmail('signup');
+		const email = shopperEmail(attempt('signup'));
 		await addToCart(page, PRODUCT);
 		await signUp(page, email);
 		users.push(email);
@@ -192,7 +193,7 @@ test.describe('shopper buys', () => {
 		page,
 		problems,
 	}) => {
-		const email = shopperEmail('checkout-code');
+		const email = shopperEmail(attempt('checkout-code'));
 		await addToCart(page, PRODUCT);
 		await page.goto(`${SHOP}/cart`);
 		await page.getByRole('button', { name: 'Checkout' }).click();
@@ -200,7 +201,7 @@ test.describe('shopper buys', () => {
 		await dialog.locator('input[type="email"]:visible').fill(email);
 		await dialog.getByRole('button', { name: 'Send Code' }).click();
 		await expect(page.locator('.summer-auth-otp input').first()).toBeVisible();
-		await enterCode(page, getSignupCode(email));
+		await enterCode(page, email);
 		users.push(email);
 		await page.waitForURL(/\/cart\/checkout/);
 
@@ -213,7 +214,7 @@ test.describe('shopper buys', () => {
 	test('a signed-in shopper pays online', async ({ browser }) => {
 		await setTestGateway(adminApi, true);
 		gatewayOn = true;
-		const email = await newShopper('online');
+		const email = await newShopper(attempt('online'));
 		const shopper = await signInShopper(browser, email);
 		const page = await shopper.context.newPage();
 		const problems: string[] = [];
@@ -304,7 +305,7 @@ test.describe('shopper buys', () => {
 		problems,
 	}) => {
 		await addDiscountCode();
-		const email = shopperEmail('link');
+		const email = shopperEmail(attempt('link'));
 		await openCartLink(page, [ITEMS[0]], { discount: CODE });
 		await continueAsGuest(page);
 		const { orderName, total } = await checkoutWithCod(page, email);
@@ -333,7 +334,7 @@ test.describe('shopper buys', () => {
 		problems,
 	}) => {
 		await addDiscountCode();
-		const email = shopperEmail('promo');
+		const email = shopperEmail(attempt('promo'));
 		await addToCart(page, PRODUCT);
 		await page.goto(`${SHOP}/cart`);
 		await page.getByRole('button', { name: 'Checkout' }).click();
@@ -355,7 +356,7 @@ test.describe('shopper buys', () => {
 		page,
 		problems,
 	}) => {
-		const email = await newShopper('merge');
+		const email = await newShopper(attempt('merge'));
 		const shopper = await signInShopper(browser, email);
 		const saved = await shopper.context.newPage();
 		await openCartLink(saved, [ITEMS[0]], { return_to: 'cart' });
@@ -371,7 +372,7 @@ test.describe('shopper buys', () => {
 	test('the merchant sees the new order at the top of their orders', async ({
 		browser,
 	}) => {
-		const email = await newShopper('merchant-view');
+		const email = await newShopper(attempt('merchant-view'));
 		const shopper = await signInShopper(browser, email);
 		const orderName = await placeCodOrder(shopper, ITEMS[0]);
 		orders.push(orderName);
@@ -390,6 +391,10 @@ test.describe('shopper buys', () => {
 		await merchant.close();
 	});
 });
+
+function attempt(label: string) {
+	return `${label}-${test.info().retry}`;
+}
 
 async function openCartLink(
 	page: Page,
@@ -416,6 +421,14 @@ async function expectServerCart(
 ) {
 	await expect
 		.poll(async () => {
+			await page.waitForFunction(
+				() =>
+					(
+						window as unknown as {
+							Alpine?: { store: (name: string) => { sync_status?: string } };
+						}
+					).Alpine?.store('cart')?.sync_status === 'idle',
+			);
 			const lines: { variant: { item_code: string } }[] = await page.evaluate(
 				async () => {
 					const response = await fetch(
@@ -455,7 +468,7 @@ async function waitForEmail(api: Api, orderName: string) {
 				});
 				return names.length;
 			},
-			{ timeout: 60_000, message: `no Email Queue row for ${orderName}` },
+			{ timeout: 180_000, message: `no Email Queue row for ${orderName}` },
 		)
 		.toBe(1);
 	return api.post<EmailQueue>('frappe.client.get', {

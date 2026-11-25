@@ -47,8 +47,17 @@ export async function addToCart(page: Page, productRoute: string) {
 	await expectToast(page, 'Item added to your bag');
 }
 
-export async function enterCode(page: Page, code: number | string | null) {
-	expect(code, 'no code in Redis').toBeTruthy();
+export async function enterCode(page: Page, email: string) {
+	let code: number | null = null;
+	await expect
+		.poll(
+			() => {
+				code = getSignupCode(email);
+				return code;
+			},
+			{ timeout: 30_000, message: `no code in Redis for ${email}` },
+		)
+		.toBeTruthy();
 	const digits = String(code);
 	const inputs = page.locator('.summer-auth-otp input');
 	await expect(inputs).toHaveCount(6);
@@ -71,7 +80,7 @@ export async function signUp(page: Page, email: string) {
 	await form.locator('input[type="text"]').nth(1).fill('Shopper');
 	await form.getByRole('button', { name: 'Sign Up' }).click();
 	await expect(page.locator('.summer-auth-otp input').first()).toBeVisible();
-	await enterCode(page, getSignupCode(email));
+	await enterCode(page, email);
 	await expect(page.locator('.summer-auth-panel')).toBeHidden();
 }
 
@@ -83,13 +92,15 @@ export async function signIn(page: Page, email: string) {
 	await form.locator('input[type="email"]').fill(email);
 	await form.getByRole('button', { name: 'Sign In' }).click();
 	await expect(page.locator('.summer-auth-otp input').first()).toBeVisible();
-	await enterCode(page, getSignupCode(email));
+	await enterCode(page, email);
 	await expect(page.locator('.summer-auth-panel')).toBeHidden();
 }
 
 export async function openCheckout(page: Page) {
 	await page.goto(`${SHOP}/cart`);
-	await page.getByRole('button', { name: 'Place Order' }).click();
+	const placeOrder = page.getByRole('button', { name: 'Place Order' });
+	await expect(placeOrder).toBeEnabled();
+	await placeOrder.click();
 	await page.waitForURL(/\/cart\/checkout/);
 }
 
