@@ -276,7 +276,6 @@ def get_company_warehouse(company: str) -> str | None:
 
 
 def get_setup_status() -> dict:
-	"""The job's own record on Commera Settings; a site set up some other way also counts as done."""
 	status, error = frappe.db.get_single_value(SETTINGS_DOCTYPE, "store_setup_status"), None
 	if status == "running" and not is_job_enqueued(SETUP_JOB_ID) and not is_setup_being_queued():
 		with latest_committed_reads():
@@ -284,7 +283,6 @@ def get_setup_status() -> dict:
 			if status == "failed":
 				error = frappe.db.get_single_value(SETTINGS_DOCTYPE, "store_setup_error", for_update=True)
 		if status == "running":
-			# The worker died or the job was dropped: report it so the owner can retry.
 			status, error = "failed", _("Store setup stopped before it finished. Please try again.")
 	elif status != "running" and frappe.is_setup_complete():
 		status = "done"

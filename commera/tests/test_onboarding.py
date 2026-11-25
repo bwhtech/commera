@@ -229,7 +229,6 @@ class SetupStatusAcrossRequestsTestCase(IntegrationTestCase):
 		frappe.db.commit()
 
 	def get_status_after_the_job_commits(self, status, error=None):
-		# The poll's read view opens here, before the job commits and leaves the queue.
 		self.assertEqual(frappe.db.get_single_value(SETTINGS, "store_setup_status", cache=False), "running")
 		run_in_another_request(lambda: onboarding.set_setup_status(status, error))
 		with (
