@@ -11,6 +11,7 @@ from commera.sdk.format import money_html, url
 
 PAGE_SIZE = 24
 LIST_FILTERS = ("sizes", "colors", "brands")
+cacheable_ssr = True
 
 
 def get_context(context):

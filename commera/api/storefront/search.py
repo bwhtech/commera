@@ -1,4 +1,4 @@
-import frappe
+from frappe.utils.data import cint
 
 from commera.api.storefront import rate_limited_guest_api
 from commera.sdk import catalog
@@ -10,7 +10,7 @@ from commera.storefront_cache import CATALOG_READ_DOMAINS, cached_guest_api
 def get_typeahead(query: str, limit: int = 6) -> Typeahead:
 	return cached_guest_api(
 		"search.get_typeahead",
-		(query or "", int(limit)),
+		(query or "", cint(limit)),
 		CATALOG_READ_DOMAINS,
 		lambda: catalog.get_typeahead(query, limit=limit),
 		endpoint="commera.api.storefront.search.get_typeahead",
@@ -22,7 +22,7 @@ def get_typeahead(query: str, limit: int = 6) -> Typeahead:
 def get_recommendations(handle: str, limit: int = 8) -> list[ProductCard]:
 	return cached_guest_api(
 		"search.get_recommendations",
-		(handle or "", int(limit)),
+		(handle or "", cint(limit)),
 		CATALOG_READ_DOMAINS,
 		lambda: catalog.get_recommendations(handle, limit=limit),
 		endpoint="commera.api.storefront.search.get_recommendations",

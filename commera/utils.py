@@ -95,37 +95,66 @@ def get_nested_links(link_doctype, link_name):
 	return _get_nested_links(link_doctype, link_name, ignore_permissions=True)
 
 
-def get_product_list(
-	filters=None, product_list=None, page=1, page_length=30, sort_by="default", *, out_total=None
-):
+def get_product_list(filters=None, product_list=None, page=1, page_length=30, sort_by="default"):
 	"""Storefront product grid: FTS-ranked when a rankable term is searched, frappe.qb otherwise."""
+	cards, _total = get_product_list_with_total(
+		filters=filters,
+		product_list=product_list,
+		page=page,
+		page_length=page_length,
+		sort_by=sort_by,
+		include_total=False,
+	)
+	return cards
+
+
+def get_product_list_with_total(
+	filters=None,
+	product_list=None,
+	page=1,
+	page_length=30,
+	sort_by="default",
+	*,
+	include_total: bool = True,
+) -> tuple[list[dict], int | None]:
+	"""Return `(cards, total_or_none)` where total is computed via window count on the qb grid."""
 	from commera.search import query as search_query
 	from commera.search.engine_cache import get_search_engine
 
 	if product_list is not None or search_query.use_qb_fallback(filters):
-		return get_product_list_qb(filters, product_list, page, page_length, sort_by, out_total=out_total)
+		return get_product_list_qb_with_total(
+			filters, product_list, page, page_length, sort_by, include_total=include_total
+		)
 
 	ranked_names = search_query.read_or_fall_back(
 		lambda: get_search_engine().search_products(filters, page, page_length, sort_by), lambda: None
 	)
 	if ranked_names is None:
-		return get_product_list_qb(filters, product_list, page, page_length, sort_by, out_total=out_total)
+		return get_product_list_qb_with_total(
+			filters, product_list, page, page_length, sort_by, include_total=include_total
+		)
 	if not ranked_names:
-		return []
+		return [], None
 
 	# Hydrate through the qb select for one card shape, then restore rank: frappe.qb orders by name.
 	cards_by_name = {
 		card["name"]: card
 		for card in get_product_list_qb(product_list=ranked_names, page_length=len(ranked_names))
 	}
-	return [cards_by_name[name] for name in ranked_names if name in cards_by_name]
+	return [cards_by_name[name] for name in ranked_names if name in cards_by_name], None
 
 
-def get_product_list_qb(
-	filters=None, product_list=None, page=1, page_length=30, sort_by="default", *, out_total=None
-):
+def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30, sort_by="default"):
 	"""Retained frappe.qb product grid — browse, pinned lists, and the Arabic/short-term search fallback."""
+	cards, _total = get_product_list_qb_with_total(
+		filters, product_list, page, page_length, sort_by, include_total=False
+	)
+	return cards
 
+
+def get_product_list_qb_with_total(
+	filters=None, product_list=None, page=1, page_length=30, sort_by="default", *, include_total: bool = True
+) -> tuple[list[dict], int | None]:
 	from commera.card_prices import card_discount_percent
 	from commera.search.record_builder import images_for_variants
 
@@ -165,7 +194,7 @@ def get_product_list_qb(
 			card.sale_price,
 			discount_expr.as_("discount_percent"),
 		)
-	if out_total is not None:
+	if include_total:
 		query = query.select(WindowCount("*").over().as_("_commera_total_count"))
 	if sort_by == "price_low":
 		query = query.orderby(card.effective_price, order=Order.asc)
@@ -180,8 +209,9 @@ def get_product_list_qb(
 	else:
 		query = query.orderby(style_attribute_variant.name, order=Order.asc)
 	cards = query.run(as_dict=True)
-	if out_total is not None and cards:
-		out_total["total"] = cint(cards[0].get("_commera_total_count"))
+	total = None
+	if include_total and cards:
+		total = cint(cards[0].get("_commera_total_count"))
 		for row in cards:
 			row.pop("_commera_total_count", None)
 	if cards:
@@ -190,7 +220,8 @@ def get_product_list_qb(
 			imgs = images_by_variant.get(row["name"], {})
 			row["image"] = imgs.get("image")
 			row["hover_image"] = imgs.get("hover_image")
-	return shape_product_cards(cards if priced_in_sql else set_card_prices(cards), _from_qb=True)
+	shaped = _shape_product_cards(cards if priced_in_sql else set_card_prices(cards), prices_live=True)
+	return shaped, total
 
 
 def set_card_prices(cards):
@@ -217,9 +248,13 @@ def set_card_prices(cards):
 	return cards
 
 
-def shape_product_cards(cards, *, _from_qb: bool = False):
+def shape_product_cards(cards):
 	"""Give every product card the one storefront card shape, whichever grid built it.
 	`title` is the product's title in the request language."""
+	return _shape_product_cards(cards, prices_live=False)
+
+
+def _shape_product_cards(cards, *, prices_live: bool = False):
 	from commera.localization.market_prices import MarketPrices
 	from commera.sdk.catalog import set_product_titles
 	from commera.search.engine import CARD_COLUMNS
@@ -239,7 +274,7 @@ def shape_product_cards(cards, *, _from_qb: bool = False):
 	# SQLite index cards keep 0 for unpriced products, so check live prices; qb cards already ran card_prices_query.
 	unpriced = (
 		set()
-		if _from_qb
+		if prices_live
 		else MarketPrices.current().get_unavailable(
 			[size["item_code"] for card in cards for size in card["sizes"]]
 		)
@@ -251,7 +286,7 @@ def shape_product_cards(cards, *, _from_qb: bool = False):
 		card.setdefault("average_rating", None)
 		card.setdefault("review_count", None)
 		# The index keeps a store price of 0 for a product no size of which is priced today: not for sale.
-		if not _from_qb and card["sizes"] and all(size["item_code"] in unpriced for size in card["sizes"]):
+		if not prices_live and card["sizes"] and all(size["item_code"] in unpriced for size in card["sizes"]):
 			card.update(
 				effective_price=None, sale_price=None, default_price=None, discount_percent=0, has_discount=0
 			)
@@ -547,33 +582,22 @@ def get_currency_symbols() -> dict[str, str]:
 	return {currency: get_currency_symbol(currency) for currency in get_selling_currencies()}
 
 
-SELLING_CURRENCIES_CACHE_KEY = "commera:selling_currencies"
+def clear_selling_currencies_cache(*_args, **_kwargs):
+	from commera.storefront_cache import bump_prices_and_shop
 
-
-def _delete_selling_currencies_cache():
-	frappe.cache.delete_value(SELLING_CURRENCIES_CACHE_KEY)
-
-
-def clear_selling_currencies_cache(doc=None, method=None, *args, **kwargs):
-	_delete_selling_currencies_cache()
-	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(_delete_selling_currencies_cache)
-	if hasattr(frappe.db, "after_rollback"):
-		frappe.db.after_rollback.add(_delete_selling_currencies_cache)
+	bump_prices_and_shop()
 
 
 def get_selling_currencies() -> set[str]:
-	if not frappe.flags.in_test:
-		cached = frappe.cache.get_value(SELLING_CURRENCIES_CACHE_KEY)
-		if cached is not None:
-			return set(cached)
-	currencies = frappe.get_all(
-		"Price List", filters={"enabled": 1, "selling": 1}, pluck="currency", distinct=True
-	)
-	result = {*currencies, get_store_currency()}
-	if not frappe.flags.in_test:
-		frappe.cache.set_value(SELLING_CURRENCIES_CACHE_KEY, sorted(result))
-	return result
+	from commera.storefront_cache import get_epoch_cached
+
+	def _load() -> list[str]:
+		currencies = frappe.get_all(
+			"Price List", filters={"enabled": 1, "selling": 1}, pluck="currency", distinct=True
+		)
+		return sorted({*currencies, get_store_currency()})
+
+	return set(get_epoch_cached("selling_currencies", (), ("prices", "shop"), _load, ttl=300))
 
 
 def get_addresses(party=None, address_type="Billing"):
@@ -851,34 +875,32 @@ def get_available_stocks(item_codes, warehouse):
 	return stock_by_item_code
 
 
-POS_INVOICE_CACHE_KEY = "commera:has_open_pos_invoices"
-
-
-def _delete_pos_invoice_cache():
-	frappe.cache.delete_value(POS_INVOICE_CACHE_KEY)
-
-
 def has_open_pos_invoices() -> bool:
-	if not frappe.flags.in_test:
-		cached = frappe.cache.get_value(POS_INVOICE_CACHE_KEY)
-		if cached is not None:
-			return bool(cached)
-	exists = bool(frappe.db.exists("POS Invoice", {"status": ["in", ["Paid", "Return"]], "docstatus": 1}))
-	if not frappe.flags.in_test:
-		frappe.cache.set_value(POS_INVOICE_CACHE_KEY, int(exists))
-	return exists
+	from commera.storefront_cache import get_epoch_cached
+
+	return bool(
+		get_epoch_cached(
+			"open_pos_invoices",
+			(),
+			("stock",),
+			lambda: int(
+				bool(frappe.db.exists("POS Invoice", {"status": ["in", ["Paid", "Return"]], "docstatus": 1}))
+			),
+			ttl=300,
+		)
+	)
 
 
-def clear_pos_invoice_cache(doc=None, method=None, *args, **kwargs):
-	_delete_pos_invoice_cache()
-	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(_delete_pos_invoice_cache)
-	if hasattr(frappe.db, "after_rollback"):
-		frappe.db.after_rollback.add(_delete_pos_invoice_cache)
+def clear_pos_invoice_cache(*_args, **_kwargs):
+	from commera.storefront_cache import bump_stock
+
+	bump_stock()
 
 
 def clear_stock_caches(*_args, **_kwargs):
-	_delete_pos_invoice_cache()
+	from commera.storefront_cache import bump_stock
+
+	bump_stock()
 
 
 def get_unlimited_item_codes(item_codes) -> set[str]:

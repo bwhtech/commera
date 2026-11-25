@@ -16,33 +16,14 @@ from commera.sdk.types import (
 
 @rate_limited_guest_api("GET", limit=1200, seconds=60 * 60)
 def get() -> CheckoutState | None:
-	from commera.guest import get_guest_cart_key, is_guest, validate_guest_checkout_enabled
+	from commera.core import get_open_cart_quotation_meta
 	from commera.plugin_events import get_handlers
 	from commera.storefront_cache import cached_checkout_response, is_cache_enabled
 
 	if not is_cache_enabled() or get_handlers("commera_hooks", "cart_fees"):
 		return checkout.get()
 
-	if is_guest():
-		validate_guest_checkout_enabled()
-		cart_key = get_guest_cart_key()
-		if not cart_key:
-			return None
-		meta = frappe.db.get_value(
-			"Quotation",
-			{"custom_guest_cart_key": cart_key, "order_type": "Shopping Cart", "docstatus": 0},
-			["name", "modified"],
-			order_by="modified desc",
-			as_dict=True,
-		)
-	else:
-		meta = frappe.db.get_value(
-			"Quotation",
-			{"contact_email": frappe.session.user, "order_type": "Shopping Cart", "docstatus": 0},
-			["name", "modified"],
-			order_by="modified desc",
-			as_dict=True,
-		)
+	meta = get_open_cart_quotation_meta(["name", "modified"])
 	if not meta:
 		return None
 

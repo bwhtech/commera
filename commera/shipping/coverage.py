@@ -6,9 +6,9 @@ import frappe
 def ships_to_address(quotation, shipping_rule: str) -> bool:
 	# As ERPNext's ShippingRule.apply: a document without a shipping address is not checked.
 	address_name = quotation.get("shipping_address_name")
-	if not address_name:
+	if not address_name and (meta := getattr(quotation, "meta", None)):
 		for fieldname in ("shipping_address",):
-			field = quotation.meta.get_field(fieldname)
+			field = meta.get_field(fieldname)
 			if field and field.fieldtype == "Link" and quotation.get(fieldname):
 				address_name = quotation.get(fieldname)
 				break

@@ -1,8 +1,9 @@
 """Epoch-versioned L1 (worker RAM) + L2 (Redis) cache for guest storefront APIs and SSR pages.
-Any DocType mutation bumps its domain epoch via atomic HINCRBY for instant cross-worker invalidation."""
+Mutations defer epoch bumps via after_commit so concurrent readers never cache uncommitted rows."""
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import time
@@ -12,18 +13,18 @@ from typing import Any
 
 import frappe
 from frappe.utils.response import json_handler
-from redis import Redis
 from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Response
 
 EPOCHS_HASH_KEY = "commera:sf_epochs"
-ALL_DOMAINS = ("catalog", "prices", "stock", "discounts", "reviews", "shop", "theme")
+ALL_DOMAINS = ("catalog", "prices", "stock", "discounts", "reviews", "shop", "theme", "party")
 CATALOG_READ_DOMAINS = ("catalog", "prices", "stock", "discounts", "shop")
 PDP_DOMAINS = ("catalog", "prices", "stock", "discounts", "reviews", "shop")
 SHOP_DOMAINS = ("shop", "theme")
 
 L1_MAX_ENTRIES = 1024
 L1_SSR_MAX_ENTRIES = 256
+MAX_SSR_CACHE_BYTES = 512 * 1024
 
 # Paths that must never be served from the shared guest SSR page cache.
 NON_CACHEABLE_SSR_PREFIXES = (
@@ -39,6 +40,25 @@ NON_CACHEABLE_SSR_PREFIXES = (
 	"commera",
 )
 PREVIEW_QUERY_PARAMS = frozenset({"preview_theme", "preview", "editor", "edit", "theme_preview"})
+# Only query parameters that change page output enter the SSR key; tracking params (utm_*, fbclid) share hits.
+ALLOWED_SSR_QUERY_PARAMS = frozenset(
+	{
+		"category",
+		"search",
+		"sort_by",
+		"page",
+		"page_size",
+		"brands",
+		"colors",
+		"sizes",
+		"min",
+		"max",
+		"has_discount",
+		"size",
+		"_lang",
+		"country",
+	}
+)
 
 # Per-worker L1 LRU caches: key -> (expires_at, value)
 _l1_api: OrderedDict[str, tuple[float, Any]] = OrderedDict()
@@ -60,7 +80,7 @@ class CachedStorefrontResponse(HTTPException):
 
 
 def is_cache_enabled() -> bool:
-	"""Enabled everywhere except unit tests (unless opted in via enable_storefront_cache_in_test)."""
+	"""Enabled everywhere except unit tests unless opted in via enable_storefront_cache_in_test."""
 	if frappe.flags.in_test and not frappe.flags.get("enable_storefront_cache_in_test"):
 		return False
 	return True
@@ -70,22 +90,53 @@ def _site() -> str:
 	return getattr(frappe.local, "site", "") or ""
 
 
+def _dirty_domains() -> set[str]:
+	return getattr(frappe.local, "_commera_sf_dirty_domains", None) or set()
+
+
+def _is_domain_dirty(domains: tuple[str, ...]) -> bool:
+	dirty = _dirty_domains()
+	return bool(dirty and any(domain in dirty for domain in domains))
+
+
+def _clear_local_memos(domains: tuple[str, ...]) -> None:
+	if hasattr(frappe.local, "_commera_sf_epochs"):
+		delattr(frappe.local, "_commera_sf_epochs")
+	if "shop" in domains or "theme" in domains or "catalog" in domains:
+		for attr in (
+			"_commera_sf_languages",
+			"_commera_sf_markets",
+			"_commera_sf_markets_hidden",
+			"commera_published_layouts_cache",
+			"commera_storefront_menu",
+		):
+			if hasattr(frappe.local, attr):
+				delattr(frappe.local, attr)
+
+
+def _decode_redis_token(value: bytes | str) -> str:
+	return value.decode("utf-8") if isinstance(value, bytes) else str(value)
+
+
 def get_epochs() -> dict[str, int]:
-	"""Fetch all storefront cache domain epochs once per request (1 raw Redis HGETALL)."""
+	"""Fetch all storefront cache domain epochs once per request (one Redis HGETALL)."""
 	cached = getattr(frappe.local, "_commera_sf_epochs", None)
 	if cached is not None:
 		return cached
+	raw = {}
 	try:
-		raw = Redis.hgetall(frappe.cache, frappe.cache.make_key(EPOCHS_HASH_KEY)) or {}
+		key = frappe.cache.make_key(EPOCHS_HASH_KEY)
+		raw = frappe.cache.execute_command("HGETALL", key) or {}
+		if isinstance(raw, list):
+			raw = dict(zip(raw[0::2], raw[1::2], strict=False))
 	except Exception:
+		frappe.logger("commera.storefront_cache").exception("Failed to read storefront cache epochs")
 		raw = {}
+	decoded = {_decode_redis_token(k): _decode_redis_token(v) for k, v in raw.items()}
 	epochs = {}
 	for domain in ALL_DOMAINS:
-		val = raw.get(domain.encode()) if raw else None
-		if val is None and raw:
-			val = raw.get(domain)
 		try:
-			epochs[domain] = int(val or 0)
+			epochs[domain] = int(decoded.get(domain, 0))
 		except (TypeError, ValueError):
 			epochs[domain] = 0
 	frappe.local._commera_sf_epochs = epochs
@@ -97,33 +148,66 @@ def epoch_stamp(domains: tuple[str, ...]) -> str:
 	return ":".join(str(epochs.get(d, 0)) for d in domains)
 
 
-def bump_epochs(*domains: str) -> None:
-	"""Atomically increment one or more domain epochs in Redis and clear local request memo."""
-	target = domains or ALL_DOMAINS
+def _flush_redis_epochs(domains: tuple[str, ...]) -> None:
+	if not domains:
+		return
 	key = frappe.cache.make_key(EPOCHS_HASH_KEY)
 	try:
 		pipe = frappe.cache.pipeline()
-		for domain in target:
+		for domain in domains:
 			pipe.hincrby(key, domain, 1)
 		pipe.execute()
 	except Exception:
-		for domain in target:
-			try:
-				Redis.hincrby(frappe.cache, key, domain, 1)
-			except Exception:
-				pass
-	if hasattr(frappe.local, "_commera_sf_epochs"):
-		delattr(frappe.local, "_commera_sf_epochs")
-	# Also clear per-request localization and layout memos when shop/theme changes
-	if "shop" in target or "theme" in target:
-		for attr in (
-			"_commera_sf_languages",
-			"_commera_sf_markets",
-			"_commera_sf_markets_hidden",
-			"commera_published_layouts_cache",
-		):
-			if hasattr(frappe.local, attr):
-				delattr(frappe.local, attr)
+		frappe.logger("commera.storefront_cache").exception(
+			"Failed to bump storefront cache epochs: %s", ",".join(domains)
+		)
+	_clear_local_memos(domains)
+
+
+def _flush_pending_commit_bumps() -> None:
+	pending = getattr(frappe.local, "_commera_sf_pending_bumps", None)
+	if pending:
+		domains = tuple(sorted(pending))
+		pending.clear()
+		_flush_redis_epochs(domains)
+	if hasattr(frappe.local, "_commera_sf_dirty_domains"):
+		frappe.local._commera_sf_dirty_domains.clear()
+	frappe.local._commera_sf_hooks_registered = False
+
+
+def _clear_pending_rollback_bumps() -> None:
+	if pending := getattr(frappe.local, "_commera_sf_pending_bumps", None):
+		pending.clear()
+	if dirty := getattr(frappe.local, "_commera_sf_dirty_domains", None):
+		dirty.clear()
+	frappe.local._commera_sf_hooks_registered = False
+	_clear_local_memos(ALL_DOMAINS)
+
+
+def bump_epochs(*domains: str, immediate: bool = False) -> None:
+	"""Invalidate cache domains: immediately for clear_cache, or on after_commit for DB writes.
+	Inside an active transaction, dirty domains bypass shared L1/L2 until commit or rollback."""
+	target = domains or ALL_DOMAINS
+	_clear_local_memos(target)
+
+	if immediate or not getattr(frappe.local, "db", None):
+		_flush_redis_epochs(target)
+		return
+
+	dirty = getattr(frappe.local, "_commera_sf_dirty_domains", None)
+	if dirty is None:
+		dirty = frappe.local._commera_sf_dirty_domains = set()
+	dirty.update(target)
+
+	pending = getattr(frappe.local, "_commera_sf_pending_bumps", None)
+	if pending is None:
+		pending = frappe.local._commera_sf_pending_bumps = set()
+	pending.update(target)
+
+	if not getattr(frappe.local, "_commera_sf_hooks_registered", False):
+		frappe.local._commera_sf_hooks_registered = True
+		frappe.db.after_commit.add(_flush_pending_commit_bumps)
+		frappe.db.after_rollback.add(_clear_pending_rollback_bumps)
 
 
 def clear_all_storefront_caches(*_args, **_kwargs) -> None:
@@ -131,10 +215,15 @@ def clear_all_storefront_caches(*_args, **_kwargs) -> None:
 	_l1_api.clear()
 	_l1_bytes.clear()
 	_l1_ssr.clear()
-	bump_epochs(*ALL_DOMAINS)
+	if dirty := getattr(frappe.local, "_commera_sf_dirty_domains", None):
+		dirty.clear()
+	if pending := getattr(frappe.local, "_commera_sf_pending_bumps", None):
+		pending.clear()
+	frappe.local._commera_sf_hooks_registered = False
+	bump_epochs(*ALL_DOMAINS, immediate=True)
 
 
-# Doc-event invalidators (accept any positional/keyword args, e.g. 5-arg after_rename).
+# Doc-event invalidators (accept any args, including 5-arg after_rename).
 def bump_catalog(*_args, **_kwargs):
 	bump_epochs("catalog")
 
@@ -163,12 +252,20 @@ def bump_theme(*_args, **_kwargs):
 	bump_epochs("theme")
 
 
+def bump_party(*_args, **_kwargs):
+	bump_epochs("party")
+
+
 def bump_catalog_and_shop(*_args, **_kwargs):
 	bump_epochs("catalog", "shop")
 
 
 def bump_prices_and_shop(*_args, **_kwargs):
 	bump_epochs("prices", "shop")
+
+
+def bump_catalog_and_prices(*_args, **_kwargs):
+	bump_epochs("catalog", "prices")
 
 
 def _l1_get(store: OrderedDict, key: str):
@@ -234,6 +331,26 @@ def _make_json_response(raw_bytes: bytes, *, cache_status: str, cache_control: s
 	return Response(raw_bytes, status=200, mimetype="application/json", headers=headers)
 
 
+def get_epoch_cached(
+	namespace: str,
+	key_parts: Any,
+	domains: tuple[str, ...],
+	compute_fn: Callable[[], Any],
+	*,
+	ttl: int = 300,
+) -> Any:
+	"""Epoch-keyed L2 Redis cache with TTL backstop for DB-derived flags and small lookup metadata."""
+	if not is_cache_enabled() or _is_domain_dirty(domains):
+		return compute_fn()
+	key = _hash_key(f"flag:{namespace}", (_site(), epoch_stamp(domains), key_parts))
+	cached = frappe.cache.get_value(key)
+	if cached is not None:
+		return cached
+	value = compute_fn()
+	frappe.cache.set_value(key, value, expires_in_sec=ttl)
+	return value
+
+
 def get_or_compute(
 	namespace: str,
 	key_parts: Any,
@@ -243,8 +360,8 @@ def get_or_compute(
 	ttl: int = 60,
 	include_locale: bool = True,
 ) -> Any:
-	"""Epoch-versioned L1 + L2 cache returning Python objects (safe for SDK/internal callers)."""
-	if not is_cache_enabled():
+	"""Epoch-versioned L1 + L2 cache returning isolated Python objects (safe for mutable callers)."""
+	if not is_cache_enabled() or _is_domain_dirty(domains):
 		return compute_fn()
 
 	locale = _locale_context() if include_locale else ()
@@ -255,16 +372,16 @@ def get_or_compute(
 
 	hit = _l1_get(_l1_api, key)
 	if hit is not None:
-		return hit
+		return copy.deepcopy(hit)
 
 	l2 = frappe.cache.get_value(key)
 	if l2 is not None:
-		_l1_set(_l1_api, key, l2, min(ttl, 30), L1_MAX_ENTRIES)
+		_l1_set(_l1_api, key, copy.deepcopy(l2), min(ttl, 30), L1_MAX_ENTRIES)
 		return l2
 
 	value = compute_fn()
 	if value is not None:
-		_l1_set(_l1_api, key, value, min(ttl, 30), L1_MAX_ENTRIES)
+		_l1_set(_l1_api, key, copy.deepcopy(value), min(ttl, 30), L1_MAX_ENTRIES)
 		frappe.cache.set_value(key, value, expires_in_sec=ttl)
 	return value
 
@@ -277,13 +394,13 @@ def cached_guest_api(
 	*,
 	endpoint: str | None = None,
 	ttl: int = 60,
-	cache_control: str | None = "public, max-age=15, stale-while-revalidate=60",
+	cache_control: str | None = None,
 	guest_only: bool = True,
 	include_locale: bool = True,
 ):
-	"""Epoch-versioned L1+L2 cache for guest storefront GET APIs; returns a pre-serialized Response over HTTP
-	and the Python object for direct Python callers (SSR/tests)."""
-	if not is_cache_enabled():
+	"""Epoch-versioned L1+L2 cache for guest storefront GET APIs; returns pre-serialized Response over HTTP
+	and the Python object for direct Python callers."""
+	if not is_cache_enabled() or _is_domain_dirty(domains):
 		return compute_fn()
 	if guest_only and frappe.session.user != "Guest":
 		return compute_fn()
@@ -330,11 +447,11 @@ def cached_cart_response(
 	ttl: int = 45,
 ):
 	"""Revision-stamped cache for read-only cart.get_cart; invalidates on cart revision/modified or epoch bump."""
-	if not is_cache_enabled():
+	domains = ("catalog", "prices", "discounts", "shop")
+	if not is_cache_enabled() or _is_domain_dirty(domains):
 		return compute_fn()
 
 	locale = _locale_context()
-	domains = ("catalog", "prices", "discounts", "shop")
 	stamp = epoch_stamp(domains)
 	key_parts = (cart_name, int(revision or 0), str(modified or ""))
 	api_version = _detect_http_api_version(endpoint)
@@ -367,11 +484,11 @@ def cached_checkout_response(
 	ttl: int = 45,
 ):
 	"""Modified-stamped cache for read-only checkout.get; invalidates on Quotation modified or epoch bump."""
-	if not is_cache_enabled():
+	domains = ("catalog", "prices", "discounts", "shop")
+	if not is_cache_enabled() or _is_domain_dirty(domains):
 		return compute_fn()
 
 	locale = _locale_context()
-	domains = ("catalog", "prices", "discounts", "shop")
 	stamp = epoch_stamp(domains)
 	key_parts = (quotation_name, str(modified or ""))
 	api_version = _detect_http_api_version(endpoint)
@@ -395,14 +512,16 @@ def cached_checkout_response(
 	return get_or_compute("checkout", key_parts, domains, compute_fn, ttl=ttl, include_locale=True)
 
 
-# Guest SSR Page Cache (used by localize_request before_request + ThemePageRenderer)
+# Guest SSR Page Cache (opt-in per page controller via `cacheable_ssr = True`)
 
 
 def is_cacheable_ssr_request(route_path: str) -> bool:
-	"""True only for anonymous, public, read-only GET requests to storefront content pages."""
-	if not is_cache_enabled():
+	"""True only for anonymous, public, read-only GET requests to published storefront pages."""
+	if not is_cache_enabled() or _is_domain_dirty(ALL_DOMAINS):
 		return False
-	if frappe.conf.get("developer_mode") or frappe._dev_server:
+	if not frappe.flags.get("enable_storefront_cache_in_test") and (
+		frappe.conf.get("developer_mode") or frappe._dev_server
+	):
 		return False
 	req = getattr(frappe.local, "request", None)
 	if not req or req.method != "GET":
@@ -437,7 +556,9 @@ def _ssr_cache_key(route_path: str, localized=None) -> str:
 		country = (loc.country or "").lower()
 	else:
 		lang, market_handle, country = _locale_context()
-	query_items = sorted(req.args.lists()) if req.args else []
+	query_items = (
+		sorted((k, v) for k, v in req.args.lists() if k in ALLOWED_SSR_QUERY_PARAMS) if req.args else []
+	)
 	return _hash_key(
 		"ssr",
 		(
@@ -472,7 +593,6 @@ def get_cached_ssr_response(route_path: str, localized=None) -> Response | None:
 		mimetype="text/html",
 		headers={
 			"Content-Type": "text/html; charset=utf-8",
-			"Cache-Control": "public, max-age=30, stale-while-revalidate=300",
 			"X-Commera-Cache": status,
 		},
 	)
@@ -483,7 +603,9 @@ def store_cached_ssr_response(route_path: str, html: str, *, ttl: int = 60) -> N
 		return
 	if not html:
 		return
-	key = _ssr_cache_key(route_path)
 	html_bytes = html.encode("utf-8") if isinstance(html, str) else bytes(html)
+	if len(html_bytes) > MAX_SSR_CACHE_BYTES:
+		return
+	key = _ssr_cache_key(route_path)
 	_l1_set(_l1_ssr, key, html_bytes, min(ttl, 30), L1_SSR_MAX_ENTRIES)
 	frappe.cache.set_value(key, html_bytes, expires_in_sec=ttl)

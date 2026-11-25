@@ -833,28 +833,6 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 			self._cached_scoring_pipeline = pipeline
 		return pipeline
 
-	def _calculate_advanced_score(self, row, query, query_words):
-		"""Cache inspect.signature checks once per engine instance instead of per candidate row."""
-		compiled = getattr(self, "_compiled_scoring_pipeline", None)
-		if compiled is None:
-			import inspect
-
-			compiled = []
-			for scoring_method in self.get_scoring_pipeline():
-				params = list(inspect.signature(scoring_method).parameters.keys())
-				if params and params[0] == "self":
-					params = params[1:]
-				compiled.append((scoring_method, len(params) >= 3 or "query_words" in params))
-			self._compiled_scoring_pipeline = compiled
-
-		final_score = 1.0
-		for scoring_method, wants_words in compiled:
-			if wants_words:
-				final_score *= scoring_method(row, query, query_words)
-			else:
-				final_score *= scoring_method(row, query)
-		return final_score
-
 	def facet_counts(self, filters):
 		fts_query = self.fts_query_for((filters.get("search") or "").strip())
 		if not fts_query:

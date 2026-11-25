@@ -121,6 +121,9 @@ def seed_storefront_languages(default: str, codes: tuple[str, ...]):
 			}
 		).db_insert()
 	frappe.clear_document_cache("Commera Settings", "Commera Settings")
+	from commera.storefront_cache import bump_prices_and_shop
+
+	bump_prices_and_shop()
 
 
 def is_rtl_language(code: str) -> bool:

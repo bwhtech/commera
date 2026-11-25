@@ -8,74 +8,56 @@ from commera.core import get_cached_portal_customer, system_user_session
 from commera.discounts.pricing import apply_code_discounts
 from commera.item_price_guard import skip_auto_item_price
 from commera.localization.market_prices import MarketPrices
-
-ACTIVE_PRICING_RULES_CACHE_KEY = "commera:has_active_pricing_rules"
-ITEM_TAX_PARENTS_CACHE_KEY = "commera:item_tax_parents"
+from commera.storefront_cache import bump_catalog_and_prices, bump_prices, get_epoch_cached
 
 
 def has_active_pricing_rules() -> bool:
-	"""Whether any enabled selling ERPNext Pricing Rule exists. Cached in Redis."""
-	if not frappe.flags.in_test:
-		cached = frappe.cache.get_value(ACTIVE_PRICING_RULES_CACHE_KEY)
-		if cached is not None:
-			return bool(cached)
-	exists = bool(frappe.db.get_value("Pricing Rule", {"disable": 0, "selling": 1}, "name"))
-	if not frappe.flags.in_test:
-		frappe.cache.set_value(ACTIVE_PRICING_RULES_CACHE_KEY, int(exists))
-	return exists
+	"""Whether any enabled selling ERPNext Pricing Rule exists (epoch-keyed with TTL)."""
+	return bool(
+		get_epoch_cached(
+			"active_pricing_rules",
+			(),
+			("prices",),
+			lambda: int(bool(frappe.db.get_value("Pricing Rule", {"disable": 0, "selling": 1}, "name"))),
+			ttl=300,
+		)
+	)
 
 
-def get_item_tax_parents() -> tuple[set[str], set[str]]:
-	"""Sets of (Item names, Item Group names) that carry an Item Tax child row. Cached in Redis."""
-	if not frappe.flags.in_test:
-		cached = frappe.cache.get_value(ITEM_TAX_PARENTS_CACHE_KEY)
-		if cached is not None:
-			return set(cached[0]), set(cached[1])
-	rows = frappe.get_all("Item Tax", fields=["parent", "parenttype"])
-	items = sorted({row.parent for row in rows if row.parenttype == "Item"})
-	groups = sorted({row.parent for row in rows if row.parenttype == "Item Group"})
-	if not frappe.flags.in_test:
-		frappe.cache.set_value(ITEM_TAX_PARENTS_CACHE_KEY, [items, groups])
-	return set(items), set(groups)
+def has_any_item_taxes() -> bool:
+	"""Whether any Item Tax child row exists on this site (epoch-keyed with TTL)."""
+	return bool(
+		get_epoch_cached(
+			"has_item_taxes",
+			(),
+			("catalog", "prices"),
+			lambda: int(bool(frappe.db.exists("Item Tax", {}))),
+			ttl=300,
+		)
+	)
 
 
-def _delete_pricing_rules_cache():
-	frappe.cache.delete_value(ACTIVE_PRICING_RULES_CACHE_KEY)
+def clear_pricing_rules_cache(*_args, **_kwargs):
+	bump_prices()
 
 
-def _delete_item_tax_cache():
-	frappe.cache.delete_value(ITEM_TAX_PARENTS_CACHE_KEY)
-
-
-def clear_pricing_rules_cache(doc=None, method=None, *args, **kwargs):
-	_delete_pricing_rules_cache()
-	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(_delete_pricing_rules_cache)
-	if hasattr(frappe.db, "after_rollback"):
-		frappe.db.after_rollback.add(_delete_pricing_rules_cache)
-
-
-def clear_item_tax_cache(doc=None, method=None, *args, **kwargs):
-	_delete_item_tax_cache()
-	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(_delete_item_tax_cache)
-	if hasattr(frappe.db, "after_rollback"):
-		frappe.db.after_rollback.add(_delete_item_tax_cache)
+def clear_item_tax_cache(*_args, **_kwargs):
+	bump_catalog_and_prices()
 
 
 def can_fast_price_preview(item_codes: list[str]) -> bool:
 	if has_active_pricing_rules():
 		return False
-	tax_items, tax_groups = get_item_tax_parents()
-	if not tax_items and not tax_groups:
+	if not has_any_item_taxes():
 		return True
-	for code in item_codes:
-		if code in tax_items:
-			return False
-		if tax_groups:
-			group = frappe.get_cached_value("Item", code, "item_group")
-			if group in tax_groups:
-				return False
+	unique_codes = list(dict.fromkeys(item_codes))
+	if not unique_codes:
+		return True
+	if frappe.db.exists("Item Tax", {"parenttype": "Item", "parent": ("in", unique_codes)}):
+		return False
+	groups = list({g for code in unique_codes if (g := frappe.get_cached_value("Item", code, "item_group"))})
+	if groups and frappe.db.exists("Item Tax", {"parenttype": "Item Group", "parent": ("in", groups)}):
+		return False
 	return True
 
 

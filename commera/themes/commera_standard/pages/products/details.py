@@ -8,6 +8,8 @@ from commera.localization import get_localization
 from commera.sdk import catalog, wishlist
 from commera.sdk.format import product_url, url
 
+cacheable_ssr = True
+
 
 def get_context(context):
 	product = catalog.get_product(frappe.form_dict.get("route"))

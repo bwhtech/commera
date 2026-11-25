@@ -116,16 +116,17 @@ def build_controller_module_name(theme_dirs, controller_path, relative_path):
 	return f"commera.shop_themes.theme_pages.{theme_slug}.{page_slug}"
 
 
-def run_page_controller(theme_dirs, template_relative_path, context):
+def run_page_controller(theme_dirs, template_relative_path, context) -> bool:
+	"""Run the page controller and return True only when it opts in with `cacheable_ssr = True`."""
 	module = load_page_controller(theme_dirs, template_relative_path)
 	if not module:
 		return False
-	no_cache = bool(getattr(module, "no_cache", False))
+	cacheable = bool(getattr(module, "cacheable_ssr", False)) and not bool(getattr(module, "no_cache", False))
 	if hasattr(module, "get_context"):
 		data = module.get_context(context)
 		if data:
 			context.update(data)
-	return no_cache
+	return cacheable
 
 
 class ThemePageRenderer:
@@ -164,7 +165,7 @@ class ThemePageRenderer:
 
 		context = build_base_context(self.match)
 		try:
-			controller_no_cache = run_page_controller(self.theme_dirs, self.template_path, context)
+			controller_cacheable = run_page_controller(self.theme_dirs, self.template_path, context)
 		except (frappe.PageDoesNotExistError, frappe.DoesNotExistError):
 			if not find_theme_file(self.theme_dirs, NOT_FOUND_TEMPLATE):
 				raise
@@ -172,16 +173,13 @@ class ThemePageRenderer:
 		html = self.render_with_theme_loader(context)
 		status = self.http_status_code or 200
 		headers = None
-		if status == 200 and not self.requires_auth and not controller_no_cache:
+		if status == 200 and not self.requires_auth and controller_cacheable:
 			from commera.storefront_cache import is_cacheable_ssr_request, store_cached_ssr_response
 
 			route_path = self.get_request_path()
 			if is_cacheable_ssr_request(route_path):
 				store_cached_ssr_response(route_path, html)
-				headers = {
-					"Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-					"X-Commera-Cache": "MISS",
-				}
+				headers = {"X-Commera-Cache": "MISS"}
 		return build_response(self.path, html, status, headers)
 
 	def redirect_guest_to_login(self):

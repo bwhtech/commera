@@ -1367,9 +1367,14 @@ document.addEventListener('alpine:init', () => {
 	}));
 });
 
-// Prefetch internal storefront product/collection pages on hover or touchstart for instant navigation.
+// Prefetch public guest storefront pages on hover or touchstart for instant navigation.
 (() => {
 	if (typeof document === 'undefined' || typeof location === 'undefined') {
+		return;
+	}
+	// Skip prefetch for signed-in shoppers so hovers never trigger uncached per-user SSR renders.
+	const userMatch = (document.cookie || '').match(/(?:^|;\s*)user_id=([^;]+)/);
+	if (userMatch && decodeURIComponent(userMatch[1]) !== 'Guest') {
 		return;
 	}
 	const conn = typeof navigator !== 'undefined' ? navigator.connection : null;
@@ -1379,8 +1384,9 @@ document.addEventListener('alpine:init', () => {
 
 	const prefetched = new Set();
 	const MAX_PREFETCHES = 32;
+	const LOCALE_PREFIX_RE = /^\/[a-z]{2}(?:-[a-z]{2,4})?(?=\/|$)/i;
 	const SKIP_RE =
-		/^\/(?:api|app|assets|desk|files|private|cart|account|login|signup|logout)\b/i;
+		/^\/(?:api|app|assets|desk|files|private|cart|checkout|account|login|signup|logout|track-order|storefront-cart|storefront-login|og-image|commera)\b/i;
 	let timer = null;
 
 	function prefetch(href) {
@@ -1414,7 +1420,8 @@ document.addEventListener('alpine:init', () => {
 		if (url.pathname === location.pathname && url.search === location.search) {
 			return null;
 		}
-		if (SKIP_RE.test(url.pathname)) return null;
+		const normalizedPath = url.pathname.replace(LOCALE_PREFIX_RE, '') || '/';
+		if (SKIP_RE.test(url.pathname) || SKIP_RE.test(normalizedPath)) return null;
 		return url.href;
 	}
 

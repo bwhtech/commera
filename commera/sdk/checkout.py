@@ -120,6 +120,24 @@ def list_pickup_locations() -> list[PickupLocation]:
 
 
 def save_checkout_address(address: dict, email: str | None) -> CheckoutState:
+	from commera.core import get_open_cart_quotation_meta
+
+	if meta := get_open_cart_quotation_meta(["name"]):
+		quotation = frappe.get_doc("Quotation", meta.name)
+		with cart_write_lock(quotation):
+			if is_guest():
+				quotation = save_guest_cart(
+					{},
+					email,
+					defer_save=True,
+					billing_address=address.get("billing_address"),
+					existing_quotation=quotation,
+				)
+			else:
+				quotation = _generate_quotation_for_cart({}, defer_save=True, existing_quotation=quotation)
+			save_quotation_address(quotation, address)
+			return get_checkout_state(quotation)
+
 	if is_guest():
 		quotation = save_guest_cart(
 			{},
@@ -129,22 +147,8 @@ def save_checkout_address(address: dict, email: str | None) -> CheckoutState:
 		)
 	else:
 		quotation = _generate_quotation_for_cart({}, defer_save=True)
-	if quotation.is_new():
-		save_quotation_address(quotation, address)
-		return get_checkout_state(quotation)
-	with cart_write_lock(quotation):
-		if is_guest():
-			quotation = save_guest_cart(
-				{},
-				email,
-				defer_save=True,
-				billing_address=address.get("billing_address"),
-				existing_quotation=quotation,
-			)
-		else:
-			quotation = _generate_quotation_for_cart({}, defer_save=True, existing_quotation=quotation)
-		save_quotation_address(quotation, address)
-		return get_checkout_state(quotation)
+	save_quotation_address(quotation, address)
+	return get_checkout_state(quotation)
 
 
 def get_checkout_email(email: str | None) -> str | None:
@@ -202,25 +206,20 @@ def set_shipping_option(option_id: str | None) -> CheckoutState:
 
 
 def list_payment_methods() -> list[PaymentMethod]:
-	from commera.guest import get_guest_cart_name
+	from commera.core import get_open_cart_quotation_meta
 	from commera.plugin_events import get_handlers
 
 	quotation = None
 	if not get_handlers("commera_hooks", "payment_methods") and is_guest():
-		validate_guest_checkout_enabled()
-		if cart_name := get_guest_cart_name():
-			quotation = frappe.db.get_value(
-				"Quotation",
-				cart_name,
-				[
-					"name",
-					"currency",
-					"custom_is_store_pickup",
-					"custom_delivery_option",
-					"shipping_address_name",
-				],
-				as_dict=True,
-			)
+		quotation = get_open_cart_quotation_meta(
+			[
+				"name",
+				"currency",
+				"custom_is_store_pickup",
+				"custom_delivery_option",
+				"shipping_address_name",
+			]
+		)
 	else:
 		quotation = get_open_checkout()
 	return [

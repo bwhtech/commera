@@ -102,6 +102,7 @@ def fetch_batched_line_prices(quotation, items: list, prices: MarketPrices) -> d
 		.where(
 			price.item_code.isin(list(all_codes))
 			& price.price_list.isin(prices.price_lists)
+			& (price.selling == 1)
 			& IfNull(price.customer, "").isin(["", customer or ""])
 			& (IfNull(price.supplier, "") == "")
 			& (IfNull(price.batch_no, "") == "")
@@ -146,40 +147,18 @@ def get_line_price(
 				for row in matching
 			)
 			if not needs_erpnext:
-				best = min(
+				# Matches ERPNext apply_item_price_order: item before template, line UOM before stock, dated before undated, then valid_from/uom/name desc.
+				best = max(
 					matching,
 					key=lambda r: (
-						0 if r.item_code == item.item_code else 1,
-						0 if (r.uom or "") in ("", uom) else 1,
-						1 if r.valid_from is None else 0,
-						-(r.valid_from.toordinal() if r.valid_from else 0),
+						1 if r.item_code == item.item_code else 0,
+						1 if (r.uom or "") in ("", uom) else 0,
+						1 if r.valid_from is not None else 0,
+						str(r.valid_from or ""),
+						r.uom or "",
+						r.name,
 					),
 				)
-				# Tie-break on uom desc, name desc matches ERPNext apply_item_price_order
-				if len(matching) > 1:
-					matching.sort(
-						key=lambda r: (
-							0 if r.item_code == item.item_code else 1,
-							0 if (r.uom or "") in ("", uom) else 1,
-							1 if r.valid_from is None else 0,
-						)
-					)
-					top_key = (
-						0 if matching[0].item_code == item.item_code else 1,
-						0 if (matching[0].uom or "") in ("", uom) else 1,
-						1 if matching[0].valid_from is None else 0,
-					)
-					tied = [
-						r
-						for r in matching
-						if (
-							0 if r.item_code == item.item_code else 1,
-							0 if (r.uom or "") in ("", uom) else 1,
-							1 if r.valid_from is None else 0,
-						)
-						== top_key
-					]
-					best = max(tied, key=lambda r: (str(r.valid_from or ""), r.uom or "", r.name))
 				return price_list, flt(best.price_list_rate)
 			packing_units = [flt(row.packing_unit) for row in matching]
 			context = get_price_context(quotation, item, price_list)

@@ -16,7 +16,6 @@ def get_collections() -> list[Collection]:
 		catalog.list_collections,
 		endpoint="commera.api.storefront.collections.get_collections",
 		ttl=180,
-		cache_control="public, max-age=30, stale-while-revalidate=120",
 	)
 
 
@@ -34,5 +33,4 @@ def get_collection(handle: str) -> Collection:
 		_build,
 		endpoint="commera.api.storefront.collections.get_collection",
 		ttl=180,
-		cache_control="public, max-age=30, stale-while-revalidate=120",
 	)

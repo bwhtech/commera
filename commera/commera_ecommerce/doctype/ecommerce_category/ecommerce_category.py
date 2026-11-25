@@ -209,21 +209,12 @@ def add_item_group_links(item_groups_by_entry):
 			link.db_insert()
 
 
-MENU_TREE_CACHE_KEY = "commera:enabled_menu_tree_data"
+def clear_menu_tree_cache(*_args, **_kwargs):
+	from commera.storefront_cache import bump_catalog_and_shop
 
-
-def _delete_menu_tree_cache():
-	frappe.cache.delete_value(MENU_TREE_CACHE_KEY)
-
-
-def clear_menu_tree_cache(doc=None, method=None, *args, **kwargs):
-	_delete_menu_tree_cache()
 	if hasattr(frappe.local, "commera_storefront_menu"):
 		delattr(frappe.local, "commera_storefront_menu")
-	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(_delete_menu_tree_cache)
-	if hasattr(frappe.db, "after_rollback"):
-		frappe.db.after_rollback.add(_delete_menu_tree_cache)
+	bump_catalog_and_shop()
 
 
 def fetch_menu_tree_data(enabled_only=False):
@@ -260,18 +251,21 @@ def fetch_menu_tree_data(enabled_only=False):
 
 
 def get_menu_tree(enabled_only=False):
-	"""The whole menu as nested nodes. Enabled storefront menu data is cached in Redis and
-	invalidated on Ecommerce Category changes; hrefs are computed per request for active language."""
-	if enabled_only and not frappe.flags.in_test:
-		cached = frappe.cache.get_value(MENU_TREE_CACHE_KEY)
-		if cached is None:
-			cached = fetch_menu_tree_data(enabled_only=True)
-			frappe.cache.set_value(MENU_TREE_CACHE_KEY, cached)
-		raw_entries, item_groups_by_entry = cached
-		entries = [frappe._dict(e) for e in raw_entries]
+	"""The whole menu as nested nodes. Enabled storefront menu data is epoch-cached with TTL;
+	hrefs are computed per request for active language."""
+	if enabled_only:
+		from commera.storefront_cache import get_epoch_cached
+
+		raw_entries, item_groups_by_entry = get_epoch_cached(
+			"menu_tree",
+			(),
+			("catalog", "shop"),
+			lambda: fetch_menu_tree_data(enabled_only=True),
+			ttl=300,
+		)
 	else:
-		raw_entries, item_groups_by_entry = fetch_menu_tree_data(enabled_only=enabled_only)
-		entries = [frappe._dict(e) for e in raw_entries]
+		raw_entries, item_groups_by_entry = fetch_menu_tree_data(enabled_only=False)
+	entries = [frappe._dict(e) for e in raw_entries]
 
 	if not entries:
 		return []

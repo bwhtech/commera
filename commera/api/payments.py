@@ -850,68 +850,22 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc, *, defer_save: boo
 def set_charges(quotation):
 	shipping_rule = frappe.get_cached_value("Commera Settings", "Commera Settings", "shipping_rule")
 	if shipping_rule:
-		from commera.api.shipping import (
-			calculate_taxes_with_cached_shipping,
-			keep_shipping_rule_last,
-			remove_shipping_rule_row,
-		)
+		from commera.api.shipping import keep_shipping_rule_last, remove_shipping_rule_row
 
 		remove_shipping_rule_row(quotation)
 		# Left off where it does not deliver, so the cart still saves: payment then refuses the cart.
 		quotation.shipping_rule = shipping_rule if ships_to_address(quotation, shipping_rule) else None
 		keep_shipping_rule_last(quotation)
-		calculate_taxes_with_cached_shipping(quotation, apply_rule=False)
+		quotation.calculate_taxes_and_totals()
 	apply_plugin_fees(quotation)
 
 
 def get_charged_preview(quotation):
 	"""An unsaved copy carrying the delivery charge payment will apply, which a saved cart may lack."""
-	# Fast path: when charges are already current (or pickup / delivery option stands), avoid cloning the Document.
-	if (
-		quotation.custom_is_store_pickup
-		or quotation.custom_delivery_option
-		or _charges_already_current(quotation)
-	):
-		return quotation
 	preview = frappe.get_doc(quotation.as_dict())
-	set_charges(preview)
+	if not preview.custom_is_store_pickup and not preview.custom_delivery_option:
+		set_charges(preview)
 	return preview
-
-
-def _charges_already_current(quotation) -> bool:
-	"""True when the quotation already has the current store shipping rule row (with unchanged amount)
-	and no plugin fee handlers, so get_charged_preview can skip recalculating taxes_and_totals."""
-	from commera.plugin_events import get_handlers
-
-	if get_handlers("commera_hooks", "cart_fees"):
-		return False
-	shipping_rule = frappe.get_cached_value("Commera Settings", "Commera Settings", "shipping_rule")
-	if not shipping_rule:
-		return not quotation.shipping_rule
-	expected_rule = shipping_rule if ships_to_address(quotation, shipping_rule) else None
-	if (quotation.shipping_rule or None) != expected_rule:
-		return False
-	if not expected_rule:
-		return True
-	from commera.api.shipping import get_cart_charge_kind
-
-	shipping_rows = [
-		row for row in quotation.taxes if get_cart_charge_kind(row, quotation) == "shipping_rule"
-	]
-	if len(shipping_rows) != 1 or quotation.taxes[-1] is not shipping_rows[0]:
-		return False
-	rule = frappe.get_cached_doc("Shipping Rule", expected_rule)
-	if rule.calculate_based_on == "Net Total":
-		expected_amount = rule.get_shipping_amount_from_rules(rule.get_net_total(quotation))
-	elif rule.calculate_based_on == "Net Weight":
-		expected_amount = rule.get_shipping_amount_from_rules(quotation.total_net_weight)
-	elif rule.calculate_based_on == "Fixed":
-		expected_amount = rule.shipping_amount
-	else:
-		return False
-	if quotation.currency != quotation.company_currency:
-		expected_amount = flt(expected_amount / (flt(quotation.conversion_rate) or 1.0), 2)
-	return flt(shipping_rows[0].tax_amount, 2) == flt(expected_amount, 2)
 
 
 def set_cod_charges(quotation):
@@ -929,20 +883,21 @@ def update_quotation_address(address: dict, cart: dict | None = None):
 	address = frappe.parse_json(address)
 	if is_guest():
 		email = address.get("billing_address", {}).get("email")
+		if cart_name := get_guest_cart_name():
+			quotation = frappe.get_doc("Quotation", cart_name)
+			with cart_write_lock(quotation):
+				quotation = save_guest_cart(
+					cart,
+					email,
+					defer_save=True,
+					billing_address=address.get("billing_address"),
+					existing_quotation=quotation,
+				)
+				return save_quotation_address(quotation, address)
 		quotation = save_guest_cart(
 			cart, email, defer_save=True, billing_address=address.get("billing_address")
 		)
-		if quotation.is_new():
-			return save_quotation_address(quotation, address)
-		with cart_write_lock(quotation):
-			quotation = save_guest_cart(
-				cart,
-				email,
-				defer_save=True,
-				billing_address=address.get("billing_address"),
-				existing_quotation=quotation,
-			)
-			return save_quotation_address(quotation, address)
+		return save_quotation_address(quotation, address)
 	else:
 		quotation = _get_cart_quotation()
 	with cart_write_lock(quotation):
@@ -989,12 +944,11 @@ def save_quotation_address(quotation, address: dict):
 	clear_address_taxes(quotation)
 	set_gst_details(quotation)
 	apply_market_taxes(quotation, get_document_market(quotation), switched=False)
-	if not _charges_already_current(quotation):
-		with system_user_session(), skip_auto_item_price():
-			quotation.flags.ignore_permissions = True
-			quotation.run_method("set_missing_values")
-			quotation.calculate_taxes_and_totals()
-		set_charges(quotation)
+	with system_user_session(), skip_auto_item_price():
+		quotation.flags.ignore_permissions = True
+		quotation.run_method("set_missing_values")
+		quotation.calculate_taxes_and_totals()
+	set_charges(quotation)
 	save_contact_details(quotation, address)
 	save_cart_quotation(quotation)
 
@@ -1356,45 +1310,20 @@ def validate_store_pickup(warehouse: str | None):
 		frappe.throw(_("Please select a valid pickup location."))
 
 
-def _charges_snapshot(quotation):
-	return (
-		quotation.taxes_and_charges or None,
-		quotation.shipping_rule or None,
-		quotation.custom_delivery_option or None,
-		flt(quotation.custom_delivery_charge, 2),
-		flt(quotation.custom_shipping_discount, 2),
-		flt(quotation.grand_total, 2),
-		tuple(
-			(
-				row.charge_type,
-				row.account_head,
-				flt(row.rate, 4),
-				flt(row.tax_amount, 2),
-				row.description,
-			)
-			for row in (quotation.taxes or [])
-		),
-	)
-
-
 def update_delivery_charges(quotation):
-	before = _charges_snapshot(quotation)
 	apply_market_taxes(quotation, get_document_market(quotation), switched=False)
 	if quotation.custom_is_store_pickup:
 		# A cart saved as a pickup before the owner switched pickup off must not reach payment as one.
 		validate_store_pickup(quotation.custom_store)
 		clear_pickup_charges(quotation)
 		apply_plugin_fees(quotation)
-		if _charges_snapshot(quotation) != before:
-			save_cart_quotation(quotation)
+		save_cart_quotation(quotation)
 		return
 
 	if not reprice_selected_option(quotation):
-		if not _charges_already_current(quotation):
-			set_charges(quotation)
+		set_charges(quotation)
 		validate_delivery_available(quotation)
-	if _charges_snapshot(quotation) != before:
-		save_cart_quotation(quotation)
+	save_cart_quotation(quotation)
 
 
 def validate_delivery_available(quotation):

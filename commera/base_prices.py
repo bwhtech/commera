@@ -10,107 +10,100 @@ from frappe.utils import create_batch, nowdate
 from pypika.analytics import RowNumber
 from pypika.terms import ValueWrapper
 
+from commera.storefront_cache import bump_catalog_and_prices, get_epoch_cached
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
-TEMPLATE_PRICES_CACHE_KEY = "commera:has_template_item_prices"
-NON_STOCK_SALES_UOM_CACHE_KEY = "commera:has_non_stock_sales_uom"
-MISMATCHED_PRICE_UOM_CACHE_KEY = "commera:has_mismatched_price_uom"
-DUPLICATE_PRICES_CACHE_PREFIX = "commera:has_duplicate_active_prices:"
+PRICE_FLAG_DOMAINS = ("prices", "catalog")
 
 
 def has_template_item_prices() -> bool:
 	"""Whether any selling Item Price row targets a template Item (has_variants=1).
-	Cached in Redis and invalidated on Item Price writes so the common variant-priced shop skips the UNION."""
-	if not frappe.flags.in_test:
-		cached = frappe.cache.get_value(TEMPLATE_PRICES_CACHE_KEY)
-		if cached is not None:
-			return bool(cached)
-	item = DocType("Item")
-	price = DocType("Item Price")
-	exists = bool(
-		frappe.qb.from_(price)
-		.join(item)
-		.on(item.name == price.item_code)
-		.select(price.name)
-		.where((price.selling == 1) & (item.has_variants == 1))
-		.limit(1)
-		.run()
-	)
-	if not frappe.flags.in_test:
-		frappe.cache.set_value(TEMPLATE_PRICES_CACHE_KEY, int(exists))
-	return exists
+	Epoch-keyed with TTL backstop so variant-priced shops skip the UNION."""
+
+	def _check() -> int:
+		item = DocType("Item")
+		price = DocType("Item Price")
+		return int(
+			bool(
+				frappe.qb.from_(price)
+				.join(item)
+				.on(item.name == price.item_code)
+				.select(price.name)
+				.where((price.selling == 1) & (item.has_variants == 1))
+				.limit(1)
+				.run()
+			)
+		)
+
+	return bool(get_epoch_cached("has_template_prices", (), PRICE_FLAG_DOMAINS, _check, ttl=300))
 
 
 def has_non_stock_sales_uom() -> bool:
 	"""Whether any Item defines a sales_uom distinct from its stock_uom.
-	When False, sales_uom == stock_uom everywhere and UOM conversion joins/subqueries are unnecessary."""
-	if not frappe.flags.in_test:
-		cached = frappe.cache.get_value(NON_STOCK_SALES_UOM_CACHE_KEY)
-		if cached is not None:
-			return bool(cached)
-	item = DocType("Item")
-	exists = bool(
-		frappe.qb.from_(item)
-		.select(item.name)
-		.where((IfNull(item.sales_uom, "") != "") & (item.sales_uom != item.stock_uom))
-		.limit(1)
-		.run()
-	)
-	if not frappe.flags.in_test:
-		frappe.cache.set_value(NON_STOCK_SALES_UOM_CACHE_KEY, int(exists))
-	return exists
+	When False, sales_uom == stock_uom everywhere and UOM conversion joins are unnecessary."""
+
+	def _check() -> int:
+		item = DocType("Item")
+		return int(
+			bool(
+				frappe.qb.from_(item)
+				.select(item.name)
+				.where((IfNull(item.sales_uom, "") != "") & (item.sales_uom != item.stock_uom))
+				.limit(1)
+				.run()
+			)
+		)
+
+	return bool(get_epoch_cached("has_non_stock_uom", (), PRICE_FLAG_DOMAINS, _check, ttl=300))
 
 
 def has_mismatched_price_uom() -> bool:
 	"""Whether any selling public Item Price specifies a UOM different from its Item's stock_uom."""
-	if not frappe.flags.in_test:
-		cached = frappe.cache.get_value(MISMATCHED_PRICE_UOM_CACHE_KEY)
-		if cached is not None:
-			return bool(cached)
-	item = DocType("Item")
-	price = DocType("Item Price")
-	exists = bool(
-		frappe.qb.from_(price)
-		.join(item)
-		.on(item.name == price.item_code)
-		.select(price.name)
-		.where(
-			(price.selling == 1)
-			& is_public_price(price)
-			& (IfNull(price.uom, "") != "")
-			& (price.uom != item.stock_uom)
+
+	def _check() -> int:
+		item = DocType("Item")
+		price = DocType("Item Price")
+		return int(
+			bool(
+				frappe.qb.from_(price)
+				.join(item)
+				.on(item.name == price.item_code)
+				.select(price.name)
+				.where(
+					(price.selling == 1)
+					& is_public_price(price)
+					& (IfNull(price.uom, "") != "")
+					& (price.uom != item.stock_uom)
+				)
+				.limit(1)
+				.run()
+			)
 		)
-		.limit(1)
-		.run()
-	)
-	if not frappe.flags.in_test:
-		frappe.cache.set_value(MISMATCHED_PRICE_UOM_CACHE_KEY, int(exists))
-	return exists
+
+	return bool(get_epoch_cached("has_mismatched_price_uom", (), PRICE_FLAG_DOMAINS, _check, ttl=300))
 
 
 def has_duplicate_active_item_prices() -> bool:
 	"""Whether any (item_code, price_list) has more than one active public selling Item Price today."""
 	today = nowdate()
-	cache_key = f"{DUPLICATE_PRICES_CACHE_PREFIX}{today}"
-	if not frappe.flags.in_test:
-		cached = frappe.cache.get_value(cache_key)
-		if cached is not None:
-			return bool(cached)
-	from frappe.query_builder.functions import Count
 
-	price = DocType("Item Price")
-	exists = bool(
-		frappe.qb.from_(price)
-		.select(price.item_code)
-		.where((price.selling == 1) & is_public_price(price) & is_valid_on(price, today))
-		.groupby(price.item_code, price.price_list)
-		.having(Count("*") > 1)
-		.limit(1)
-		.run()
-	)
-	if not frappe.flags.in_test:
-		frappe.cache.set_value(cache_key, int(exists), expires_in_sec=24 * 60 * 60)
-	return exists
+	def _check() -> int:
+		from frappe.query_builder.functions import Count
+
+		price = DocType("Item Price")
+		return int(
+			bool(
+				frappe.qb.from_(price)
+				.select(price.item_code)
+				.where((price.selling == 1) & is_public_price(price) & is_valid_on(price, today))
+				.groupby(price.item_code, price.price_list)
+				.having(Count("*") > 1)
+				.limit(1)
+				.run()
+			)
+		)
+
+	return bool(get_epoch_cached("has_dup_prices", today, PRICE_FLAG_DOMAINS, _check, ttl=300))
 
 
 def can_use_direct_item_price() -> bool:
@@ -124,33 +117,14 @@ def can_use_direct_item_price() -> bool:
 	)
 
 
-def _delete_item_price_flags():
-	frappe.cache.delete_value(TEMPLATE_PRICES_CACHE_KEY)
-	frappe.cache.delete_value(MISMATCHED_PRICE_UOM_CACHE_KEY)
-	frappe.cache.delete_keys(f"{DUPLICATE_PRICES_CACHE_PREFIX}*")
-
-
-def _delete_sales_uom_flags():
-	frappe.cache.delete_value(NON_STOCK_SALES_UOM_CACHE_KEY)
-	frappe.cache.delete_value(MISMATCHED_PRICE_UOM_CACHE_KEY)
-
-
-def clear_template_price_cache(doc=None, method=None, *args, **kwargs):
-	_delete_item_price_flags()
+def clear_template_price_cache(*_args, **_kwargs):
 	clear_request_rates_cache()
-	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(_delete_item_price_flags)
-	if hasattr(frappe.db, "after_rollback"):
-		frappe.db.after_rollback.add(_delete_item_price_flags)
+	bump_catalog_and_prices()
 
 
-def clear_sales_uom_cache(doc=None, method=None, *args, **kwargs):
-	_delete_sales_uom_flags()
+def clear_sales_uom_cache(*_args, **_kwargs):
 	clear_request_rates_cache()
-	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(_delete_sales_uom_flags)
-	if hasattr(frappe.db, "after_rollback"):
-		frappe.db.after_rollback.add(_delete_sales_uom_flags)
+	bump_catalog_and_prices()
 
 
 def clear_request_rates_cache():
@@ -159,8 +133,6 @@ def clear_request_rates_cache():
 
 
 def clear_base_prices_cache(*_args, **_kwargs):
-	_delete_item_price_flags()
-	frappe.cache.delete_value(NON_STOCK_SALES_UOM_CACHE_KEY)
 	clear_request_rates_cache()
 
 
@@ -190,33 +162,8 @@ def get_public_rates(item_codes: list[str], price_lists: list[str]) -> list[dict
 		return cache[cache_key]
 
 	rows = []
-	if can_use_direct_item_price() and len(unique_codes) > IN_CLAUSE_CHUNK_SIZE:
-		# Large catalog-wide reads (e.g. inventory report): one indexed price_list scan beats multi-chunk IN (...).
-		wanted = set(unique_codes)
-		price = DocType("Item Price").as_("public_price")
-		all_rows = (
-			frappe.qb.from_(price)
-			.select(
-				price.item_code,
-				price.price_list,
-				price.price_list_rate.as_("rate"),
-				price.valid_upto,
-				price.name.as_("price_name"),
-				price.price_list_rate,
-				ValueWrapper(0).as_("template_rank"),
-			)
-			.where(
-				price.price_list.isin(price_lists)
-				& (price.selling == 1)
-				& is_public_price(price)
-				& is_valid_on(price, nowdate())
-			)
-			.run(as_dict=True)
-		)
-		rows = [row for row in all_rows if row.item_code in wanted]
-	else:
-		for chunk in create_batch(unique_codes, IN_CLAUSE_CHUNK_SIZE):
-			rows.extend(public_rates_query(price_lists, chunk).run(as_dict=True))
+	for chunk in create_batch(unique_codes, IN_CLAUSE_CHUNK_SIZE):
+		rows.extend(public_rates_query(price_lists, chunk).run(as_dict=True))
 	if cache is not None:
 		cache[cache_key] = rows
 	return rows

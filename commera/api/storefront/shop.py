@@ -38,7 +38,6 @@ def get_shop() -> dict:
 		_build,
 		endpoint="commera.api.storefront.shop.get_shop",
 		ttl=300,
-		cache_control="public, max-age=60, stale-while-revalidate=300",
 	)
 
 
@@ -52,7 +51,6 @@ def get_localization() -> Localization:
 		shop.get_localization,
 		endpoint="commera.api.storefront.shop.get_localization",
 		ttl=300,
-		cache_control="public, max-age=60, stale-while-revalidate=300",
 	)
 
 
@@ -70,7 +68,6 @@ def get_page(handle: str) -> ContentPage:
 		_build,
 		endpoint="commera.api.storefront.shop.get_page",
 		ttl=300,
-		cache_control="public, max-age=60, stale-while-revalidate=300",
 	)
 
 
@@ -83,7 +80,6 @@ def list_pages() -> list[ContentPageLink]:
 		shop.list_pages,
 		endpoint="commera.api.storefront.shop.list_pages",
 		ttl=300,
-		cache_control="public, max-age=60, stale-while-revalidate=300",
 	)
 
 
@@ -96,7 +92,6 @@ def get_sitemap(kind: str | None = None, page: int = 1) -> Sitemap:
 		lambda: shop.get_sitemap(kind=kind or None, page=page),
 		endpoint="commera.api.storefront.shop.get_sitemap",
 		ttl=300,
-		cache_control="public, max-age=60, stale-while-revalidate=300",
 	)
 
 
@@ -109,7 +104,6 @@ def list_countries() -> list[Country]:
 		shop.list_countries,
 		endpoint="commera.api.storefront.shop.list_countries",
 		ttl=300,
-		cache_control="public, max-age=300, stale-while-revalidate=600",
 	)
 
 
@@ -122,7 +116,6 @@ def list_other_market_countries() -> list[MarketCountries]:
 		shop.list_other_market_countries,
 		endpoint="commera.api.storefront.shop.list_other_market_countries",
 		ttl=300,
-		cache_control="public, max-age=300, stale-while-revalidate=600",
 	)
 
 

@@ -99,7 +99,7 @@ def size_prices_query(
 		size_price = Coalesce(sale_rate, compare_at_rate)
 		return (
 			frappe.qb.from_(size)
-			.join(price)
+			.left_join(price)
 			.on(
 				(price.item_code == size.item_code)
 				& price.price_list.isin(price_lists)

@@ -32,27 +32,13 @@ CHECKOUT_SIGN_IN_SECONDS = 10 * 60
 # Each call acts on the cart of the X-Commera-Cart-Token header the storefront server sends.
 @rate_limited_guest_api("GET", limit=1200, seconds=60 * 60)
 def get_cart() -> PricedCart | None:
-	from commera.guest import get_guest_cart_key
+	from commera.commera_ecommerce.doctype.commera_cart.commera_cart import get_session_cart_meta
 	from commera.storefront_cache import cached_cart_response, is_cache_enabled
 
 	if not is_cache_enabled():
 		return cart_sdk.get_priced_cart()
 
-	if is_guest():
-		cart_key = get_guest_cart_key()
-		if not cart_key:
-			return None
-		filters = {"cart_key": cart_key}
-	else:
-		filters = {"user": frappe.session.user}
-
-	meta = frappe.db.get_value(
-		"Commera Cart",
-		filters,
-		["name", "revision", "modified", "market", "discount_codes"],
-		order_by="modified desc",
-		as_dict=True,
-	)
+	meta = get_session_cart_meta(["name", "revision", "modified", "market", "discount_codes"])
 	if not meta:
 		return None
 

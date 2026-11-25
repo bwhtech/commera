@@ -73,14 +73,6 @@ clear_cache = [
 	"commera.plugins.registry.clear_registry_cache",
 	"commera.storefront_plugins.clear_storefront_plugin_cache",
 	"commera.base_prices.clear_base_prices_cache",
-	"commera.cart_taxes.clear_tax_rules_cache",
-	"commera.core.clear_user_party_cache",
-	"commera.discounts.preview.clear_pricing_rules_cache",
-	"commera.discounts.preview.clear_item_tax_cache",
-	"commera.utils.clear_stock_caches",
-	"commera.utils.clear_selling_currencies_cache",
-	"commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category.clear_menu_tree_cache",
-	"commera.discounts.selection.clear_automatic_discounts_cache",
 	"commera.storefront_cache.clear_all_storefront_caches",
 ]
 
@@ -237,6 +229,10 @@ doc_events = {
 		],
 		"on_trash": [
 			"commera.plugin_events.on_item_group_change",
+			"commera.discounts.preview.clear_item_tax_cache",
+			"commera.storefront_cache.bump_catalog_and_shop",
+		],
+		"after_rename": [
 			"commera.discounts.preview.clear_item_tax_cache",
 			"commera.storefront_cache.bump_catalog_and_shop",
 		],

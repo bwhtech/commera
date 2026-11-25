@@ -305,41 +305,6 @@ def remove_shipping_rule_row(quotation):
 	reindex_taxes(quotation)
 
 
-def apply_cached_shipping_rule(quotation):
-	"""Apply quotation.shipping_rule using cached Shipping Rule and Address docs (0 DB queries on cache hit)."""
-	if not quotation.shipping_rule:
-		return
-	rule = frappe.get_cached_doc("Shipping Rule", quotation.shipping_rule)
-	addr_name = quotation.get("shipping_address_name")
-	cached_addr = (
-		frappe._dict(country=frappe.get_cached_value("Address", addr_name, "country")) if addr_name else None
-	)
-	orig_getter = quotation.__dict__.get("get_shipping_address")
-	quotation.get_shipping_address = lambda: cached_addr
-	try:
-		rule.apply(quotation)
-	finally:
-		if orig_getter is None:
-			quotation.__dict__.pop("get_shipping_address", None)
-		else:
-			quotation.get_shipping_address = orig_getter
-
-
-def calculate_taxes_with_cached_shipping(quotation, *, apply_rule: bool = True):
-	"""Calculate taxes & totals without ERPNext reloading Shipping Rule and Address uncached from DB."""
-	shipping_rule = quotation.shipping_rule
-	if not shipping_rule:
-		quotation.calculate_taxes_and_totals()
-		return
-	if apply_rule:
-		apply_cached_shipping_rule(quotation)
-	quotation.shipping_rule = None
-	try:
-		quotation.calculate_taxes_and_totals()
-	finally:
-		quotation.shipping_rule = shipping_rule
-
-
 def keep_shipping_rule_last(quotation):
 	"""ERPNext's Shipping Rule sets the last Actual row on its account. Add the rule's own row if missing and move
 	it last, so a COD fee, app fee or template tax on that account keeps its amount."""
@@ -352,7 +317,7 @@ def keep_shipping_rule_last(quotation):
 		existing_rows = quotation.taxes
 		quotation.taxes = []
 		try:
-			apply_cached_shipping_rule(quotation)
+			quotation.run_method("apply_shipping_rule")
 			shipping_rows = quotation.taxes
 			for row in shipping_rows:
 				row.set(CART_CHARGE_FIELD, "shipping_rule")
@@ -497,8 +462,7 @@ def get_priced_checkout_summary(quotation) -> dict:
 	"""Show the delivery charges payment applies without writing the cart."""
 	from commera.api.payments import get_charged_preview
 
-	preview = get_charged_preview(quotation)
-	return get_checkout_summary(preview, _is_copy=(preview is not quotation))
+	return _get_checkout_summary(get_charged_preview(quotation), is_copy=True)
 
 
 def has_payment_conditioned_discounts(quotation) -> bool:
@@ -507,10 +471,13 @@ def has_payment_conditioned_discounts(quotation) -> bool:
 	return any((s.discount.payment_condition or "Any") != "Any" for s in get_candidates(quotation))
 
 
-def get_checkout_summary(quotation, *, _is_copy: bool = False) -> dict:
+def get_checkout_summary(quotation) -> dict:
 	"""The charges payment will apply, priced on an unsaved copy so showing them never rewrites the cart."""
+	return _get_checkout_summary(quotation, is_copy=False)
+
+
+def _get_checkout_summary(quotation, *, is_copy: bool = False) -> dict:
 	preview = quotation
-	is_copy = _is_copy
 
 	def ensure_copy():
 		nonlocal preview, is_copy
@@ -610,7 +577,7 @@ def add_cod_charge(quotation, cod_charge: float, account_head: str | None):
 		},
 	)
 	keep_shipping_rule_last(quotation)
-	calculate_taxes_with_cached_shipping(quotation, apply_rule=False)
+	quotation.calculate_taxes_and_totals()
 
 
 def get_order_charge_lines(sales_order: str, shipping_rule: str | None) -> dict:

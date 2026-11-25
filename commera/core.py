@@ -206,35 +206,25 @@ def get_customer_contact(email: str) -> tuple[str, str] | None:
 	return (links[0].link_name, links[0].parent) if links else None
 
 
-USER_PARTY_CACHE_PREFIX = "commera:user_party:"
-PORTAL_CUSTOMER_CACHE_PREFIX = "commera:portal_customer:"
+def clear_user_party_cache(*_args, **_kwargs):
+	from commera.storefront_cache import bump_party
 
-
-def _delete_user_party_cache():
-	frappe.cache.delete_keys(f"{USER_PARTY_CACHE_PREFIX}*")
-	frappe.cache.delete_keys(f"{PORTAL_CUSTOMER_CACHE_PREFIX}*")
-
-
-def clear_user_party_cache(doc=None, method=None, *args, **kwargs):
-	_delete_user_party_cache()
-	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(_delete_user_party_cache)
-	if hasattr(frappe.db, "after_rollback"):
-		frappe.db.after_rollback.add(_delete_user_party_cache)
+	bump_party()
 
 
 def get_cached_portal_customer(user: str | None) -> str | None:
 	if not user:
 		return None
-	key = f"{PORTAL_CUSTOMER_CACHE_PREFIX}{user}"
-	if not frappe.flags.in_test:
-		cached = frappe.cache.get_value(key)
-		if cached is not None:
-			return cached or None
-	customer = frappe.db.get_value("Portal User", {"user": user}, "parent")
-	if not frappe.flags.in_test:
-		frappe.cache.set_value(key, customer or "", expires_in_sec=300)
-	return customer
+	from commera.storefront_cache import get_epoch_cached
+
+	customer = get_epoch_cached(
+		"portal_customer",
+		user,
+		("party",),
+		lambda: frappe.db.get_value("Portal User", {"user": user}, "parent") or "",
+		ttl=300,
+	)
+	return customer or None
 
 
 def get_party(user=None, create: bool = True):
@@ -245,14 +235,26 @@ def get_party(user=None, create: bool = True):
 	if user == "Guest":
 		raise frappe.PermissionError
 
-	cache_key = f"{USER_PARTY_CACHE_PREFIX}{user}"
-	if not frappe.flags.in_test and (cached := frappe.cache.get_value(cache_key)):
+	from commera.storefront_cache import get_epoch_cached
+
+	cached = get_epoch_cached(
+		"user_party",
+		user,
+		("party",),
+		lambda: _resolve_existing_party_ref(user),
+		ttl=300,
+	)
+	if cached:
 		party_doctype, party_name = cached
 		try:
 			return frappe.get_cached_doc(party_doctype, party_name)
 		except frappe.DoesNotExistError:
-			frappe.cache.delete_value(cache_key)
+			pass
 
+	return _create_party_for_user(user) if create else None
+
+
+def _resolve_existing_party_ref(user: str) -> list[str]:
 	contact_name = get_contact_name(user)
 	if contact_name:
 		contact = frappe.get_cached_doc("Contact", contact_name)
@@ -268,18 +270,46 @@ def get_party(user=None, create: bool = True):
 				# Customer.on_update rewrites the primary Contact, which the shopper cannot write.
 				with system_user_session():
 					party_doc.save()
-			if not frappe.flags.in_test:
-				frappe.cache.set_value(cache_key, [party_doc.doctype, party_doc.name], expires_in_sec=300)
-			return party_doc
+			return [party_doc.doctype, party_doc.name]
 
 	if portal_party := frappe.db.get_value("Portal User", {"user": user}, "parent"):
 		if frappe.db.exists("Customer", portal_party):
-			party_doc = frappe.get_cached_doc("Customer", portal_party)
-			if not frappe.flags.in_test:
-				frappe.cache.set_value(cache_key, ["Customer", party_doc.name], expires_in_sec=300)
-			return party_doc
+			return ["Customer", portal_party]
 
-	return _create_party_for_user(user) if create else None
+	return []
+
+
+def get_open_cart_quotation_meta(fields: list[str] | None = None, party=None) -> frappe._dict | None:
+	"""Canonical open shopping-cart Quotation lookup shared by checkout reads and writes."""
+	fields = fields or ["name"]
+	if is_guest():
+		validate_guest_checkout_enabled()
+		cart_name = get_guest_cart_name()
+		if not cart_name:
+			return None
+		if fields == ["name"]:
+			return frappe._dict(name=cart_name)
+		return frappe.db.get_value("Quotation", cart_name, fields, as_dict=True)
+
+	if party is None:
+		party = get_party(create=False)
+	if not party:
+		return None
+
+	return frappe.db.get_value(
+		"Quotation",
+		{
+			"party_name": party.name,
+			"contact_email": frappe.session.user,
+			"order_type": "Shopping Cart",
+			"docstatus": 0,
+			# A guest who typed this shopper's email booked that cart to them, but it is not theirs to see.
+			"custom_guest_cart_key": ("is", "not set"),
+		},
+		fields,
+		order_by="modified desc",
+		as_dict=True,
+	)
 
 
 def _get_cart_quotation(party=None):
@@ -289,24 +319,8 @@ def _get_cart_quotation(party=None):
 	if not party:
 		party = get_party()
 
-	quotation = frappe.get_all(
-		"Quotation",
-		fields=["name"],
-		filters={
-			"party_name": party.name,
-			"contact_email": frappe.session.user,
-			"order_type": "Shopping Cart",
-			"docstatus": 0,
-			# A guest who typed this shopper's email booked that cart to them, but it is not theirs to see.
-			"custom_guest_cart_key": ("is", "not set"),
-		},
-		order_by="modified desc",
-		limit_page_length=1,
-		pluck="name",
-	)
-
-	if quotation:
-		return frappe.get_cached_doc("Quotation", quotation[0])
+	if meta := get_open_cart_quotation_meta(["name"], party=party):
+		return frappe.get_cached_doc("Quotation", meta.name)
 	return new_cart_quotation(party, frappe.session.user)
 
 

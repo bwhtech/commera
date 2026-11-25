@@ -201,6 +201,9 @@ def clear_market_cache():
 
 def delete_cached_rows():
 	frappe.cache.delete_value(CACHE_KEY)
+	for attr in ("_commera_sf_markets", "_commera_sf_markets_hidden"):
+		if hasattr(frappe.local, attr):
+			delattr(frappe.local, attr)
 
 
 def fetch_market_rows() -> list[dict]:

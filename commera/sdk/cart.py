@@ -84,11 +84,13 @@ def set_cart_fields(values: dict) -> CheckoutSummary:
 
 
 def get_open_cart_quotation():
+	from commera.core import get_open_cart_quotation_meta
+
 	if is_guest():
 		cart_name = get_guest_cart_name()
 		return frappe.get_doc("Quotation", cart_name) if cart_name else None
-	quotation = _get_cart_quotation()
-	return None if quotation.is_new() else quotation
+	meta = get_open_cart_quotation_meta(["name"])
+	return frappe.get_doc("Quotation", meta.name) if meta else None
 
 
 def set_cart_attributes(values: dict) -> PricedCart:

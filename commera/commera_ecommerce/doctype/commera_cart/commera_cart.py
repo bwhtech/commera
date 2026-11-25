@@ -390,13 +390,23 @@ def parse_attributes(attributes) -> dict:
 	return {cstr(key): cstr(value) for key, value in attributes.items()}
 
 
-def get_session_cart(create: bool = False, for_update: bool = True) -> CommeraCart | None:
+def get_session_cart_meta(fields: list[str] | None = None) -> frappe._dict | None:
+	"""Canonical lookup for the current guest or signed-in shopper's Commera Cart."""
 	filters = {"user": frappe.session.user} if not is_guest() else {"cart_key": get_guest_cart_key()}
 	if is_guest() and not filters["cart_key"]:
-		filters = None
-	name = frappe.db.get_value("Commera Cart", filters, "name", order_by="modified desc") if filters else None
-	if name:
-		return frappe.get_doc("Commera Cart", name, for_update=for_update)
+		return None
+	return frappe.db.get_value(
+		"Commera Cart",
+		filters,
+		fields or ["name"],
+		order_by="modified desc",
+		as_dict=True,
+	)
+
+
+def get_session_cart(create: bool = False, for_update: bool = True) -> CommeraCart | None:
+	if meta := get_session_cart_meta(["name"]):
+		return frappe.get_doc("Commera Cart", meta.name, for_update=for_update)
 	if not create:
 		return None
 

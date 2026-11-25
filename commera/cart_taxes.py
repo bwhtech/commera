@@ -16,31 +16,27 @@ from commera.localization.markets import Market
 
 TEMPLATE_DOCTYPE = "Sales Taxes and Charges Template"
 SPECIFIC_RULE_FIELDS = ("customer", "customer_group", "tax_category", "billing_country", "shipping_country")
-TAX_RULES_CACHE_KEY = "commera:has_tax_rules"
-
-
-def _delete_tax_rules_cache():
-	frappe.cache.delete_value(TAX_RULES_CACHE_KEY)
 
 
 def has_active_tax_rules() -> bool:
-	"""Whether any Tax Rule exists on this site. Cached in Redis so empty-rule stores skip 3-5 queries per cart."""
-	if not frappe.flags.in_test:
-		cached = frappe.cache.get_value(TAX_RULES_CACHE_KEY)
-		if cached is not None:
-			return bool(cached)
-	exists = bool(frappe.db.get_value("Tax Rule", {"tax_type": "Sales"}, "name"))
-	if not frappe.flags.in_test:
-		frappe.cache.set_value(TAX_RULES_CACHE_KEY, int(exists))
-	return exists
+	"""Whether any Sales Tax Rule exists on this site (epoch-keyed with TTL)."""
+	from commera.storefront_cache import get_epoch_cached
+
+	return bool(
+		get_epoch_cached(
+			"active_tax_rules",
+			(),
+			("prices", "shop"),
+			lambda: int(bool(frappe.db.get_value("Tax Rule", {"tax_type": "Sales"}, "name"))),
+			ttl=300,
+		)
+	)
 
 
-def clear_tax_rules_cache(doc=None, method=None, *args, **kwargs):
-	_delete_tax_rules_cache()
-	if hasattr(frappe.db, "after_commit"):
-		frappe.db.after_commit.add(_delete_tax_rules_cache)
-	if hasattr(frappe.db, "after_rollback"):
-		frappe.db.after_rollback.add(_delete_tax_rules_cache)
+def clear_tax_rules_cache(*_args, **_kwargs):
+	from commera.storefront_cache import bump_prices_and_shop
+
+	bump_prices_and_shop()
 
 
 def apply_market_taxes(quotation, market: Market | None, switched: bool):
