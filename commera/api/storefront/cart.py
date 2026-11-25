@@ -32,7 +32,42 @@ CHECKOUT_SIGN_IN_SECONDS = 10 * 60
 # Each call acts on the cart of the X-Commera-Cart-Token header the storefront server sends.
 @rate_limited_guest_api("GET", limit=1200, seconds=60 * 60)
 def get_cart() -> PricedCart | None:
-	return cart_sdk.get_priced_cart()
+	from commera.guest import get_guest_cart_key
+	from commera.storefront_cache import cached_cart_response, is_cache_enabled
+
+	if not is_cache_enabled():
+		return cart_sdk.get_priced_cart()
+
+	if is_guest():
+		cart_key = get_guest_cart_key()
+		if not cart_key:
+			return None
+		filters = {"cart_key": cart_key}
+	else:
+		filters = {"user": frappe.session.user}
+
+	meta = frappe.db.get_value(
+		"Commera Cart",
+		filters,
+		["name", "revision", "modified", "market", "discount_codes"],
+		order_by="modified desc",
+		as_dict=True,
+	)
+	if not meta:
+		return None
+
+	# When switching markets with discount codes, dropped_codes is returned once; bypass cache on that switch.
+	current_market = get_localization().market.handle
+	if meta.market and meta.market != current_market and meta.discount_codes:
+		return cart_sdk.get_priced_cart()
+
+	return cached_cart_response(
+		meta.name,
+		cint(meta.revision),
+		str(meta.modified),
+		lambda: cart_sdk.price_cart(frappe.get_doc("Commera Cart", meta.name, for_update=False)),
+		endpoint="commera.api.storefront.cart.get_cart",
+	)
 
 
 @rate_limited_guest_api("POST", limit=600, seconds=60 * 60)

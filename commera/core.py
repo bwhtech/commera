@@ -129,7 +129,14 @@ def _create_party_for_user(user: str):
 	return customer
 
 
-def create_party(email: str, customer_name: str, portal_user: str | None = None):
+def create_party(
+	email: str,
+	customer_name: str,
+	portal_user: str | None = None,
+	*,
+	first_name: str | None = None,
+	last_name: str | None = None,
+):
 	customer = frappe.new_doc("Customer")
 	customer_group = get_default_customer_group()
 	customer.update(
@@ -146,7 +153,13 @@ def create_party(email: str, customer_name: str, portal_user: str | None = None)
 		add_portal_user_after_linking_contacts(customer, portal_user)
 
 	contact = frappe.new_doc("Contact")
-	contact.update({"first_name": customer_name, "email_ids": [{"email_id": email, "is_primary": 1}]})
+	contact_fields = {
+		"first_name": first_name if first_name is not None else customer_name,
+		"email_ids": [{"email_id": email, "is_primary": 1}],
+	}
+	if last_name:
+		contact_fields["last_name"] = last_name
+	contact.update(contact_fields)
 	contact.append("links", {"link_doctype": "Customer", "link_name": customer.name})
 	contact.flags.ignore_mandatory = True
 	contact.insert(ignore_permissions=True)

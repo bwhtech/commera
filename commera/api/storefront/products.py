@@ -5,6 +5,7 @@ from frappe.utils.data import cint, cstr, flt
 from commera.api.storefront import rate_limited_guest_api
 from commera.sdk import catalog
 from commera.sdk.types import Product, ProductPage
+from commera.storefront_cache import CATALOG_READ_DOMAINS, PDP_DOMAINS, cached_guest_api
 
 
 @rate_limited_guest_api("GET", limit=600, seconds=60)
@@ -22,26 +23,66 @@ def get_products(
 	page_size: int = 24,
 ) -> ProductPage:
 	"""List values may be comma separated."""
-	return catalog.list_products(
-		collection=collection or None,
-		query=query,
-		brands=get_list(brands),
-		colors=get_list(colors),
-		sizes=get_list(sizes),
-		min_price=None if min_price in (None, "") else flt(min_price),
-		max_price=None if max_price in (None, "") else flt(max_price),
-		on_sale=bool(cint(on_sale)),
-		sort=sort,
-		page=page,
-		page_size=page_size,
+	norm_collection = collection or None
+	norm_brands = get_list(brands)
+	norm_colors = get_list(colors)
+	norm_sizes = get_list(sizes)
+	norm_min = None if min_price in (None, "") else flt(min_price)
+	norm_max = None if max_price in (None, "") else flt(max_price)
+	norm_on_sale = bool(cint(on_sale))
+	norm_page = cint(page) or 1
+	norm_page_size = cint(page_size) or 24
+	key_parts = (
+		norm_collection,
+		query or "",
+		tuple(norm_brands),
+		tuple(norm_colors),
+		tuple(norm_sizes),
+		norm_min,
+		norm_max,
+		norm_on_sale,
+		sort,
+		norm_page,
+		norm_page_size,
+	)
+
+	return cached_guest_api(
+		"products.get_products",
+		key_parts,
+		CATALOG_READ_DOMAINS,
+		lambda: catalog.list_products(
+			collection=norm_collection,
+			query=query,
+			brands=norm_brands,
+			colors=norm_colors,
+			sizes=norm_sizes,
+			min_price=norm_min,
+			max_price=norm_max,
+			on_sale=norm_on_sale,
+			sort=sort,
+			page=norm_page,
+			page_size=norm_page_size,
+		),
+		endpoint="commera.api.storefront.products.get_products",
+		ttl=60,
 	)
 
 
 @rate_limited_guest_api("GET", limit=600, seconds=60)
 def get_product(handle: str) -> Product:
-	if product := catalog.get_product(handle):
-		return product
-	frappe.throw(_("Product {0} not found").format(handle), frappe.DoesNotExistError)
+	def _build():
+		if product := catalog.get_product(handle):
+			return product
+		frappe.throw(_("Product {0} not found").format(handle), frappe.DoesNotExistError)
+
+	return cached_guest_api(
+		"products.get_product",
+		handle,
+		PDP_DOMAINS,
+		_build,
+		endpoint="commera.api.storefront.products.get_product",
+		ttl=60,
+	)
 
 
 @rate_limited_guest_api("GET", limit=600, seconds=60)
@@ -54,21 +95,33 @@ def get_wishlist_prices(handles: list | str) -> list[dict]:
 		frappe.throw(_("Invalid wishlist product list"), frappe.ValidationError)
 	if not handles:
 		return []
-	names = frappe.get_all(
-		"Style Attribute Variant",
-		filters={"route": ("in", handles), "is_published": 1},
-		pluck="name",
+	deduped = list(dict.fromkeys(handles))
+
+	def _build():
+		names = frappe.get_all(
+			"Style Attribute Variant",
+			filters={"route": ("in", deduped), "is_published": 1},
+			pluck="name",
+		)
+		cards = {card["handle"]: card for card in catalog.get_product_cards_for(names)} if names else {}
+		return [
+			{
+				"handle": handle,
+				**{key: cards[handle][key] for key in ("price", "compare_at_price", "currency", "available")},
+			}
+			if handle in cards
+			else {"handle": handle, "price": None, "compare_at_price": None, "available": False}
+			for handle in deduped
+		]
+
+	return cached_guest_api(
+		"products.get_wishlist_prices",
+		tuple(deduped),
+		CATALOG_READ_DOMAINS,
+		_build,
+		endpoint="commera.api.storefront.products.get_wishlist_prices",
+		ttl=60,
 	)
-	cards = {card["handle"]: card for card in catalog.get_product_cards_for(names)} if names else {}
-	return [
-		{
-			"handle": handle,
-			**{key: cards[handle][key] for key in ("price", "compare_at_price", "currency", "available")},
-		}
-		if handle in cards
-		else {"handle": handle, "price": None, "compare_at_price": None, "available": False}
-		for handle in dict.fromkeys(handles)
-	]
 
 
 def get_list(value: list | str | None) -> list[str]:

@@ -16,7 +16,42 @@ from commera.sdk.types import (
 
 @rate_limited_guest_api("GET", limit=1200, seconds=60 * 60)
 def get() -> CheckoutState | None:
-	return checkout.get()
+	from commera.guest import get_guest_cart_key, is_guest, validate_guest_checkout_enabled
+	from commera.plugin_events import get_handlers
+	from commera.storefront_cache import cached_checkout_response, is_cache_enabled
+
+	if not is_cache_enabled() or get_handlers("commera_hooks", "cart_fees"):
+		return checkout.get()
+
+	if is_guest():
+		validate_guest_checkout_enabled()
+		cart_key = get_guest_cart_key()
+		if not cart_key:
+			return None
+		meta = frappe.db.get_value(
+			"Quotation",
+			{"custom_guest_cart_key": cart_key, "order_type": "Shopping Cart", "docstatus": 0},
+			["name", "modified"],
+			order_by="modified desc",
+			as_dict=True,
+		)
+	else:
+		meta = frappe.db.get_value(
+			"Quotation",
+			{"contact_email": frappe.session.user, "order_type": "Shopping Cart", "docstatus": 0},
+			["name", "modified"],
+			order_by="modified desc",
+			as_dict=True,
+		)
+	if not meta:
+		return None
+
+	return cached_checkout_response(
+		meta.name,
+		str(meta.modified),
+		lambda: checkout.get_checkout_state(frappe.get_doc("Quotation", meta.name)),
+		endpoint="commera.api.storefront.checkout.get",
+	)
 
 
 @rate_limited_guest_api("POST", limit=100, seconds=60 * 60)
@@ -42,7 +77,17 @@ def get_address(address: dict | str) -> dict | str:
 
 @rate_limited_guest_api("GET", limit=300, seconds=60 * 60)
 def list_pickup_locations() -> list[PickupLocation]:
-	return checkout.list_pickup_locations()
+	from commera.storefront_cache import cached_guest_api
+
+	return cached_guest_api(
+		"checkout.list_pickup_locations",
+		(),
+		("shop", "stock"),
+		checkout.list_pickup_locations,
+		endpoint="commera.api.storefront.checkout.list_pickup_locations",
+		ttl=180,
+		include_locale=False,
+	)
 
 
 @rate_limited_guest_api("POST", limit=100, seconds=60 * 60)
@@ -62,6 +107,18 @@ def set_shipping_option(option_id: str | None = None) -> CheckoutState:
 
 @rate_limited_guest_api("GET", limit=1200, seconds=60 * 60)
 def list_payment_methods() -> list[PaymentMethod]:
+	from commera.guest import get_guest_cart_key, is_guest
+	from commera.storefront_cache import cached_guest_api
+
+	if is_guest() and not get_guest_cart_key():
+		return cached_guest_api(
+			"checkout.list_payment_methods",
+			(),
+			("shop",),
+			checkout.list_payment_methods,
+			endpoint="commera.api.storefront.checkout.list_payment_methods",
+			ttl=180,
+		)
 	return checkout.list_payment_methods()
 
 

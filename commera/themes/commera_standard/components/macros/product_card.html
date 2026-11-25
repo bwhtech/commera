@@ -4,11 +4,11 @@
 {% set card_ratio = {"Square": "aspect-square", "Landscape": "aspect-[4/3]"}.get(theme.card_image_ratio, "aspect-[3/4]") %}
 {% set card_fit = "object-contain p-[8%]" if theme.card_image_fit == "Fit" else "object-cover object-top" %}
 
-{% macro product_card(product) %}
+{% macro product_card(product, loading="lazy", fetchpriority="") %}
 {% set discount = discount_percent(product) | int %}
 <a href="{{ commera.format.product_url(product.handle) }}" class="group relative block">
 	<div class="relative overflow-hidden rounded-xl">
-		{{ image(product.image, product.title, 640, card_ratio ~ " w-full rounded-xl " ~ card_fit ~ " group-hover:scale-[1.03]") }}
+		{{ image(product.image, product.title, 640, card_ratio ~ " w-full rounded-xl " ~ card_fit ~ " group-hover:scale-[1.03]", loading=loading, fetchpriority=fetchpriority) }}
 		{% if product.hover_image %}
 		<img src="{{ commera.format.image_url(product.hover_image, 640) }}" alt="" loading="lazy" decoding="async" class="absolute inset-0 size-full rounded-xl bg-surface-gray-2 opacity-0 transition-[opacity,scale] duration-600 ease-out {{ card_fit }} group-hover:scale-[1.03] group-hover:opacity-100">
 		{% endif %}

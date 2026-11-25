@@ -1366,3 +1366,73 @@ document.addEventListener('alpine:init', () => {
 		},
 	}));
 });
+
+// Prefetch internal storefront product/collection pages on hover or touchstart for instant navigation.
+(() => {
+	const conn = navigator.connection;
+	if (conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || ''))) return;
+
+	const prefetched = new Set();
+	const MAX_PREFETCHES = 32;
+	const SKIP_RE = /^\/(?:api|app|assets|desk|files|private|cart|account|login|signup|logout)\b/i;
+	let timer = null;
+
+	function prefetch(href) {
+		if (!href || prefetched.size >= MAX_PREFETCHES || prefetched.has(href)) return;
+		prefetched.add(href);
+		const link = document.createElement('link');
+		link.rel = 'prefetch';
+		link.as = 'document';
+		link.href = href;
+		document.head.appendChild(link);
+	}
+
+	function resolve_anchor(target) {
+		const anchor = target?.closest?.('a[href]');
+		if (!anchor || anchor.hasAttribute('download') || (anchor.target && anchor.target !== '_self')) {
+			return null;
+		}
+		let url;
+		try {
+			url = new URL(anchor.href, location.href);
+		} catch {
+			return null;
+		}
+		if (url.origin !== location.origin) return null;
+		if (url.pathname === location.pathname && url.search === location.search) return null;
+		if (SKIP_RE.test(url.pathname)) return null;
+		return url.href;
+	}
+
+	document.addEventListener(
+		'pointerenter',
+		(event) => {
+			if (event.pointerType === 'touch') return;
+			const href = resolve_anchor(event.target);
+			if (!href || prefetched.has(href)) return;
+			clearTimeout(timer);
+			timer = setTimeout(() => prefetch(href), 65);
+		},
+		true,
+	);
+
+	document.addEventListener(
+		'pointerleave',
+		() => {
+			if (timer) {
+				clearTimeout(timer);
+				timer = null;
+			}
+		},
+		true,
+	);
+
+	document.addEventListener(
+		'touchstart',
+		(event) => {
+			const href = resolve_anchor(event.target);
+			if (href) prefetch(href);
+		},
+		{ passive: true, capture: true },
+	);
+})();

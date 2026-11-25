@@ -202,7 +202,7 @@ def open_checkout(
 		frappe.cache.set_value(
 			get_cod_total_key(quotation.name), payable_total, expires_in_sec=COD_TOTAL_TTL_SECONDS
 		)
-		save_cod_review(quotation.name, payable_total if is_reviewed else None)
+		save_cod_review(quotation.name, payable_total if is_reviewed else None, quotation=quotation)
 		return {"order_url": get_confirmation_url(quotation.name, payment_mode=COD_PAYMENT_MODE)}
 
 	gateway = resolve_payment_mode(payment_mode)
@@ -436,11 +436,11 @@ def get_checkout_version(quotation, addresses: dict | None = None) -> str:
 	return sha256_hash(frappe.as_json(content))
 
 
-def save_cod_review(quotation_name: str, reviewed_total: float | None):
+def save_cod_review(quotation_name: str, reviewed_total: float | None, *, quotation=None):
 	"""Every cash on delivery start writes it, so an ordinary start (None) clears an earlier agent's review."""
 	reviewed_version = None
 	if reviewed_total is not None:
-		reviewed_version = get_checkout_version(frappe.get_doc("Quotation", quotation_name))
+		reviewed_version = get_checkout_version(quotation or frappe.get_doc("Quotation", quotation_name))
 	frappe.db.set_value(
 		"Quotation",
 		quotation_name,
@@ -707,11 +707,12 @@ def fix_payment_schedule_dates(doc):
 
 
 @frappe.whitelist(methods=["POST"])
-def generate_quotation_for_cart(cart: dict):
+def generate_quotation_for_cart(cart: dict, *, defer_save: bool = False, existing_quotation=None):
 	cart = get_checkout_cart(cart)
-	quotation = _get_cart_quotation()
-	validate_cart_is_not_in_checkout(quotation.name)
-	return get_quotation_for_cart(cart, quotation)
+	quotation = existing_quotation if existing_quotation is not None else _get_cart_quotation()
+	if not quotation.is_new():
+		validate_cart_is_not_in_checkout(quotation.name)
+	return get_quotation_for_cart(cart, quotation, defer_save=defer_save)
 
 
 def get_checkout_cart(cart: dict) -> dict:
@@ -728,23 +729,34 @@ def get_checkout_cart(cart: dict) -> dict:
 	return cart
 
 
-def save_guest_cart(cart: dict, email: str | None):
+def save_guest_cart(
+	cart: dict,
+	email: str | None,
+	*,
+	defer_save: bool = False,
+	billing_address: dict | None = None,
+	existing_quotation=None,
+):
 	"""Book the browser cart to the customer of the email typed at checkout, creating the cart on first use."""
 	validate_guest_checkout_enabled()
 	email = cstr(email).strip().lower()
 	validate_single_email(email)
 	cart = get_checkout_cart(cart)
 	cart_key = set_guest_cart_cookie()
-	customer_name, contact_name = get_guest_party(email)
+	customer_name, contact_name = get_guest_party(email, billing_address=billing_address)
 
-	if cart_name := get_guest_cart_name(cart_key):
+	if existing_quotation is not None:
+		quotation = existing_quotation
+		validate_cart_is_not_in_checkout(quotation.name)
+		set_guest_cart_party(quotation, customer_name, contact_name, email)
+	elif cart_name := get_guest_cart_name(cart_key):
 		quotation = frappe.get_doc("Quotation", cart_name)
 		validate_cart_is_not_in_checkout(cart_name)
 		set_guest_cart_party(quotation, customer_name, contact_name, email)
 	else:
 		quotation = new_cart_quotation(frappe.get_cached_doc("Customer", customer_name), email, contact_name)
 		quotation.custom_guest_cart_key = cart_key
-	return get_quotation_for_cart(cart, quotation)
+	return get_quotation_for_cart(cart, quotation, defer_save=defer_save)
 
 
 def set_guest_cart_party(quotation, customer_name: str, contact_name: str, email: str):
@@ -767,17 +779,29 @@ def set_guest_cart_party(quotation, customer_name: str, contact_name: str, email
 	)
 
 
-def get_guest_party(email: str) -> tuple[str, str]:
+def get_guest_party(email: str, *, billing_address: dict | None = None) -> tuple[str, str]:
 	"""The customer and contact a guest's email already belongs to, else new ones with no User behind them."""
 	if customer_contact := get_customer_contact(email):
 		return customer_contact
 
+	first_name = cstr((billing_address or {}).get("first_name")).strip()
+	last_name = cstr((billing_address or {}).get("last_name")).strip()
+	if first_name:
+		validate_user_names(first_name, last_name)
+		customer_name = " ".join(name for name in (first_name, last_name) if name)
+	else:
+		first_name = get_placeholder_first_name(email)
+		last_name = ""
+		customer_name = first_name
+
 	with system_user_session():
-		customer, contact = create_party(email, get_placeholder_first_name(email))
+		customer, contact = create_party(
+			email, customer_name, first_name=first_name, last_name=last_name or None
+		)
 	return customer.name, contact.name
 
 
-def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
+def get_quotation_for_cart(cart: dict, unsaved_quotation_doc, *, defer_save: bool = False):
 	prices = MarketPrices.current()
 	ecommerce_warehouse = frappe.get_cached_value(
 		"Commera Settings", "Commera Settings", "ecommerce_warehouse"
@@ -797,9 +821,20 @@ def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 	if server_cart := get_session_cart():
 		server_cart.update_quotation(unsaved_quotation_doc)
 	price_regular_lines(unsaved_quotation_doc, prices)
-	save_cart_quotation(unsaved_quotation_doc)
+	if defer_save:
+		return unsaved_quotation_doc
+
+	from commera.plugin_events import get_handlers
+
+	if get_handlers("commera_hooks", "cart_fees"):
+		save_cart_quotation(unsaved_quotation_doc)
+	else:
+		with system_user_session(), skip_auto_item_price():
+			unsaved_quotation_doc.flags.ignore_permissions = True
+			unsaved_quotation_doc.run_method("set_missing_values")
+			unsaved_quotation_doc.calculate_taxes_and_totals()
 	# The stored option was priced for the old cart, and payment would re-quote it for the new one.
-	clear_delivery_option(unsaved_quotation_doc)
+	clear_delivery_option(unsaved_quotation_doc, recalculate=False)
 	set_charges(unsaved_quotation_doc)
 	return save_cart_quotation(unsaved_quotation_doc)
 
@@ -823,11 +858,15 @@ def set_charges(quotation):
 
 def get_charged_preview(quotation):
 	"""An unsaved copy carrying the delivery charge payment will apply, which a saved cart may lack."""
+	# Fast path: when charges are already current (or pickup / delivery option stands), avoid cloning the Document.
+	if (
+		quotation.custom_is_store_pickup
+		or quotation.custom_delivery_option
+		or _charges_already_current(quotation)
+	):
+		return quotation
 	preview = frappe.get_doc(quotation.as_dict())
-	# Payment re-quotes a chosen option over the network; its stored row stands until then.
-	if not preview.custom_is_store_pickup and not preview.custom_delivery_option:
-		if not _charges_already_current(preview):
-			set_charges(preview)
+	set_charges(preview)
 	return preview
 
 
@@ -879,7 +918,21 @@ def set_cod_charges(quotation):
 def update_quotation_address(address: dict, cart: dict | None = None):
 	address = frappe.parse_json(address)
 	if is_guest():
-		quotation = save_guest_cart(cart, address.get("billing_address", {}).get("email"))
+		email = address.get("billing_address", {}).get("email")
+		quotation = save_guest_cart(
+			cart, email, defer_save=True, billing_address=address.get("billing_address")
+		)
+		if quotation.is_new():
+			return save_quotation_address(quotation, address)
+		with cart_write_lock(quotation):
+			quotation = save_guest_cart(
+				cart,
+				email,
+				defer_save=True,
+				billing_address=address.get("billing_address"),
+				existing_quotation=quotation,
+			)
+			return save_quotation_address(quotation, address)
 	else:
 		quotation = _get_cart_quotation()
 	with cart_write_lock(quotation):
@@ -887,14 +940,15 @@ def update_quotation_address(address: dict, cart: dict | None = None):
 
 
 def save_quotation_address(quotation, address: dict):
-	validate_cart_is_not_in_checkout(quotation.name)
+	if not quotation.is_new():
+		validate_cart_is_not_in_checkout(quotation.name)
 	update_quotation_payment_terms_due_date(quotation)
 	if address.get("is_store_pickup", False):
 		validate_store_pickup(address.get("store_pickup_warehouse"))
 		quotation.custom_store = address.get("store_pickup_warehouse")
 		quotation.custom_is_store_pickup = True
 		# A delivery option picked before store pickup would otherwise still be charged at payment time.
-		clear_delivery_option(quotation)
+		clear_delivery_option(quotation, recalculate=False)
 		apply_market_taxes(quotation, get_document_market(quotation), switched=False)
 		save_cart_quotation(quotation)
 
@@ -921,10 +975,16 @@ def save_quotation_address(quotation, address: dict):
 		shipping_address_name = shipping_address_doc.name
 
 	quotation.shipping_address_name = shipping_address_name
-	clear_delivery_option(quotation)
+	clear_delivery_option(quotation, recalculate=False)
 	clear_address_taxes(quotation)
 	set_gst_details(quotation)
 	apply_market_taxes(quotation, get_document_market(quotation), switched=False)
+	if not _charges_already_current(quotation):
+		with system_user_session(), skip_auto_item_price():
+			quotation.flags.ignore_permissions = True
+			quotation.run_method("set_missing_values")
+			quotation.calculate_taxes_and_totals()
+		set_charges(quotation)
 	save_contact_details(quotation, address)
 	save_cart_quotation(quotation)
 
@@ -939,18 +999,24 @@ def save_contact_details(quotation, address: dict):
 	# Locked: Frappe's User.on_update enqueues create_contact, which re-saves this Contact. Right after sign-up,
 	# that job saving between this load and the save below would fail the shopper's address step.
 	contact = frappe.get_doc("Contact", quotation.contact_person, for_update=True)
+	orig_first, orig_last = contact.first_name, contact.last_name
 	replace_placeholder_names(quotation, contact, address.get("billing_address", {}))
+	dirty = (contact.first_name != orig_first) or (contact.last_name != orig_last)
 	existing_phones = {entry.phone for entry in contact.phone_nos}
 
 	billing_phone = address.get("billing_address", {}).get("phone_number")
 	if billing_phone and billing_phone not in existing_phones:
 		contact.append("phone_nos", {"phone": billing_phone})
+		existing_phones.add(billing_phone)
+		dirty = True
 
 	shipping_phone = address.get("shipping_address", {}).get("phone_number")
 	if shipping_phone and shipping_phone not in existing_phones:
 		contact.append("phone_nos", {"phone": shipping_phone})
+		dirty = True
 
-	contact.save(ignore_permissions=True)
+	if dirty:
+		contact.save(ignore_permissions=True)
 
 
 def validate_guest_address_is_new(quotation, address: dict):
@@ -1280,20 +1346,45 @@ def validate_store_pickup(warehouse: str | None):
 		frappe.throw(_("Please select a valid pickup location."))
 
 
+def _charges_snapshot(quotation):
+	return (
+		quotation.taxes_and_charges or None,
+		quotation.shipping_rule or None,
+		quotation.custom_delivery_option or None,
+		flt(quotation.custom_delivery_charge, 2),
+		flt(quotation.custom_shipping_discount, 2),
+		flt(quotation.grand_total, 2),
+		tuple(
+			(
+				row.charge_type,
+				row.account_head,
+				flt(row.rate, 4),
+				flt(row.tax_amount, 2),
+				row.description,
+			)
+			for row in (quotation.taxes or [])
+		),
+	)
+
+
 def update_delivery_charges(quotation):
+	before = _charges_snapshot(quotation)
 	apply_market_taxes(quotation, get_document_market(quotation), switched=False)
 	if quotation.custom_is_store_pickup:
 		# A cart saved as a pickup before the owner switched pickup off must not reach payment as one.
 		validate_store_pickup(quotation.custom_store)
 		clear_pickup_charges(quotation)
 		apply_plugin_fees(quotation)
-		save_cart_quotation(quotation)
+		if _charges_snapshot(quotation) != before:
+			save_cart_quotation(quotation)
 		return
 
 	if not reprice_selected_option(quotation):
-		set_charges(quotation)
+		if not _charges_already_current(quotation):
+			set_charges(quotation)
 		validate_delivery_available(quotation)
-	save_cart_quotation(quotation)
+	if _charges_snapshot(quotation) != before:
+		save_cart_quotation(quotation)
 
 
 def validate_delivery_available(quotation):

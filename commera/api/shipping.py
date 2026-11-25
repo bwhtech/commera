@@ -245,7 +245,7 @@ def reprice_shipping_discount(quotation):
 	apply_delivery_option(quotation, apply_shipping_discounts(quotation, [option])[0])
 
 
-def clear_delivery_option(quotation):
+def clear_delivery_option(quotation, *, recalculate: bool = True):
 	quotation.custom_delivery_option = None
 	quotation.custom_delivery_charge = 0
 	quotation.custom_shipping_provider = None
@@ -253,7 +253,8 @@ def clear_delivery_option(quotation):
 	set_shipping_discount(quotation, None)
 	remove_delivery_charge_row(quotation)
 	drop_undeliverable_shipping_rule(quotation)
-	quotation.calculate_taxes_and_totals()
+	if recalculate:
+		quotation.calculate_taxes_and_totals()
 
 
 def drop_undeliverable_shipping_rule(quotation):
@@ -496,7 +497,8 @@ def get_priced_checkout_summary(quotation) -> dict:
 	"""Show the delivery charges payment applies without writing the cart."""
 	from commera.api.payments import get_charged_preview
 
-	return get_checkout_summary(get_charged_preview(quotation), _is_copy=True)
+	preview = get_charged_preview(quotation)
+	return get_checkout_summary(preview, _is_copy=(preview is not quotation))
 
 
 def has_payment_conditioned_discounts(quotation) -> bool:
@@ -509,19 +511,30 @@ def has_payment_conditioned_discounts(quotation) -> bool:
 
 def get_checkout_summary(quotation, *, _is_copy: bool = False) -> dict:
 	"""The charges payment will apply, priced on an unsaved copy so showing them never rewrites the cart."""
-	preview = quotation if _is_copy else frappe.get_doc(quotation.as_dict())
+	preview = quotation
+	is_copy = _is_copy
+
+	def ensure_copy():
+		nonlocal preview, is_copy
+		if not is_copy:
+			preview = frappe.get_doc(preview.as_dict())
+			is_copy = True
+
 	if preview.custom_is_store_pickup:
+		ensure_copy()
 		clear_pickup_charges(preview)
 	summary = get_charge_summary(preview)
 
 	# A prepaid-only discount drops off, and a cash-on-delivery one comes on, before the fee is judged.
 	payment_conditioned = has_payment_conditioned_discounts(preview)
 	if payment_conditioned:
+		ensure_copy()
 		preview.flags.commera_payment_kind = "cod"
 		reprice_shipping_discount(preview)
 		refresh_code_discounts(preview)
 	cod_charge = get_cod_charge(preview)
 	if cod_charge:
+		ensure_copy()
 		account_head = frappe.get_cached_value("Commera Settings", "Commera Settings", "charge_account_head")
 		add_cod_charge(preview, cod_charge, account_head)
 	if payment_conditioned or cod_charge:

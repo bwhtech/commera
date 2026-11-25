@@ -118,12 +118,14 @@ def build_controller_module_name(theme_dirs, controller_path, relative_path):
 
 def run_page_controller(theme_dirs, template_relative_path, context):
 	module = load_page_controller(theme_dirs, template_relative_path)
-	if not module or not hasattr(module, "get_context"):
-		return
-
-	data = module.get_context(context)
-	if data:
-		context.update(data)
+	if not module:
+		return False
+	no_cache = bool(getattr(module, "no_cache", False))
+	if hasattr(module, "get_context"):
+		data = module.get_context(context)
+		if data:
+			context.update(data)
+	return no_cache
 
 
 class ThemePageRenderer:
@@ -162,13 +164,25 @@ class ThemePageRenderer:
 
 		context = build_base_context(self.match)
 		try:
-			run_page_controller(self.theme_dirs, self.template_path, context)
+			controller_no_cache = run_page_controller(self.theme_dirs, self.template_path, context)
 		except (frappe.PageDoesNotExistError, frappe.DoesNotExistError):
 			if not find_theme_file(self.theme_dirs, NOT_FOUND_TEMPLATE):
 				raise
 			return self.render_not_found()
 		html = self.render_with_theme_loader(context)
-		return build_response(self.path, html, self.http_status_code or 200)
+		status = self.http_status_code or 200
+		headers = None
+		if status == 200 and not self.requires_auth and not controller_no_cache:
+			from commera.storefront_cache import is_cacheable_ssr_request, store_cached_ssr_response
+
+			route_path = self.get_request_path()
+			if is_cacheable_ssr_request(route_path):
+				store_cached_ssr_response(route_path, html)
+				headers = {
+					"Cache-Control": "public, max-age=30, stale-while-revalidate=300",
+					"X-Commera-Cache": "MISS",
+				}
+		return build_response(self.path, html, status, headers)
 
 	def redirect_guest_to_login(self):
 		"""Send a guest to the theme's own login page, which returns them here after signing in."""

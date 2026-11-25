@@ -179,72 +179,88 @@ def get_own_review(variant: str) -> dict | None:
 def get_reviews(variant: str, start: int = 0, page_length: int = PAGE_LENGTH):
 	"""Published reviews for the storefront, plus the summary, histogram and the session's own
 	review/write state. One query per concern; reviewer names are batched, never fetched per row."""
-	if not frappe.db.exists("Style Attribute Variant", variant):
-		frappe.throw(_("Product not found"))
+	start_int = cint(start)
+	limit_int = min(cint(page_length) or PAGE_LENGTH, MAX_PAGE_LENGTH)
 
-	filters = {"variant": variant, "is_published": 1}
-	total = frappe.db.count("Product Review", filters)
+	def _build():
+		if not frappe.db.exists("Style Attribute Variant", variant):
+			frappe.throw(_("Product not found"))
 
-	review_rows = frappe.get_all(
-		"Product Review",
-		filters=filters,
-		fields=[
-			"name",
-			"owner",
-			"rating",
-			"review_title",
-			"comment",
-			"verified_purchase",
-			"seller_reply",
-			"replied_on",
-			"replied_by",
-			"creation",
-		],
-		order_by="creation desc",
-		start=cint(start),
-		page_length=min(cint(page_length) or PAGE_LENGTH, MAX_PAGE_LENGTH),
-		ignore_permissions=True,
-	)
+		histogram = get_rating_histogram(variant)
+		total = sum(histogram.values())
+		average_rating = (
+			flt(sum(rating * count for rating, count in histogram.items()) / total) if total else 0.0
+		)
 
-	reviewer_emails = {row.owner for row in review_rows}
-	full_name_by_email = (
-		{
-			row.name: row.full_name
-			for row in frappe.get_all(
-				"User", filters={"name": ["in", list(reviewer_emails)]}, fields=["name", "full_name"]
+		review_rows = (
+			frappe.db.sql(
+				"""
+				SELECT
+					r.name,
+					r.owner,
+					r.rating,
+					r.review_title,
+					r.comment,
+					r.verified_purchase,
+					r.seller_reply,
+					r.replied_on,
+					r.replied_by,
+					r.creation,
+					u.full_name AS reviewer_name
+				FROM `tabProduct Review` r
+				LEFT JOIN `tabUser` u ON u.name = r.owner
+				WHERE r.variant = %s AND r.is_published = 1
+				ORDER BY r.creation DESC
+				LIMIT %s OFFSET %s
+				""",
+				(variant, limit_int, start_int),
+				as_dict=True,
 			)
+			if total
+			else []
+		)
+
+		reviews = [
+			{
+				"name": row.name,
+				"reviewer": row.reviewer_name or row.owner,
+				"rating": cint(row.rating),
+				"review_title": row.review_title,
+				"comment": row.comment,
+				"verified_purchase": bool(cint(row.verified_purchase)),
+				"seller_reply": row.seller_reply,
+				"replied_on": row.replied_on,
+				"replied_by": row.replied_by,
+				"creation": row.creation,
+			}
+			for row in review_rows
+		]
+
+		signed_in = frappe.session.user != "Guest"
+		own_review = get_own_review(variant) if signed_in else None
+
+		return {
+			"reviews": reviews,
+			"total": total,
+			"average_rating": average_rating,
+			"review_count": total,
+			"histogram": histogram,
+			"my_review": own_review,
+			"has_reviewed": bool(own_review),
+			"can_review": signed_in and not own_review,
 		}
-		if reviewer_emails
-		else {}
-	)
 
-	reviews = [
-		{
-			"name": row.name,
-			"reviewer": full_name_by_email.get(row.owner, row.owner),
-			"rating": cint(row.rating),
-			"review_title": row.review_title,
-			"comment": row.comment,
-			"verified_purchase": bool(cint(row.verified_purchase)),
-			"seller_reply": row.seller_reply,
-			"replied_on": row.replied_on,
-			"replied_by": row.replied_by,
-			"creation": row.creation,
-		}
-		for row in review_rows
-	]
+	if frappe.session.user == "Guest":
+		from commera.storefront_cache import cached_guest_api
 
-	summary = get_rating_summary(variant)
-	signed_in = frappe.session.user != "Guest"
-	own_review = get_own_review(variant) if signed_in else None
+		return cached_guest_api(
+			"reviews.get_reviews",
+			(variant, start_int, limit_int),
+			("reviews", "catalog"),
+			_build,
+			endpoint="commera.api.reviews.get_reviews",
+			ttl=180,
+			include_locale=False,
+		)
 
-	return {
-		"reviews": reviews,
-		"total": total,
-		"average_rating": summary["average_rating"],
-		"review_count": summary["review_count"],
-		"histogram": get_rating_histogram(variant),
-		"my_review": own_review,
-		"has_reviewed": bool(own_review),
-		"can_review": signed_in and not own_review,
-	}
+	return _build()

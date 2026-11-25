@@ -81,7 +81,14 @@ class StorefrontMarkets:
 
 	@classmethod
 	def load(cls, include_hidden: bool = False) -> "StorefrontMarkets":
-		return cls(StorefrontLanguages.load(), get_market_rows(), include_hidden)
+		attr = "_commera_sf_markets_hidden" if include_hidden else "_commera_sf_markets"
+		cached = getattr(frappe.local, attr, None)
+		if cached is not None and not frappe.flags.in_test:
+			return cached
+		loaded = cls(StorefrontLanguages.load(), get_market_rows(), include_hidden)
+		if not frappe.flags.in_test:
+			setattr(frappe.local, attr, loaded)
+		return loaded
 
 	@property
 	def all(self) -> list[Market]:

@@ -68,6 +68,12 @@ def localize_request():
 	skip_frappe_redirects(localized.route_path)
 	set_request_path(request, localized.route_path)
 
+	# Serve verified public guest SSR hits before PathResolver compiles dynamic route rules.
+	from commera.storefront_cache import CachedStorefrontResponse, get_cached_ssr_response
+
+	if cached_response := get_cached_ssr_response(localized.route_path, localized=localized):
+		raise CachedStorefrontResponse(cached_response)
+
 
 def localize_api_request():
 	"""auth_hooks hook: a storefront API reply takes its language from `_lang` alone, as its page did.
