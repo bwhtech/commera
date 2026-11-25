@@ -167,3 +167,27 @@ jobs:
         run: |
           cat web.log worker.log socketio.log || true
           cat logs/*.log || true
+
+      - name: Show sign-in code state
+        if: failure()
+        working-directory: /home/runner/frappe-bench
+        run: |
+          set +e
+          cat sites/common_site_config.json sites/test_site/site_config.json
+          bench --site test_site execute frappe.get_conf --kwargs '{"site": "test_site"}' \
+            | grep -oE '"(redis_cache|redis_queue|mute_emails|developer_mode)": [^,}]*'
+          curl -s -c admin.txt -X POST http://test_site:8000/api/method/login \
+            -H 'Content-Type: application/json' -d '{"usr": "Administrator", "pwd": "admin"}' > /dev/null
+          curl -s -b admin.txt http://test_site:8000/desk | grep -oE '"developer_mode": ?[0-9a-z]+' | head -1
+          grep -nE 'otp|signup' web.log | tail -20
+          probe=probe-$(date +%s)@example.com
+          curl -s -X POST http://test_site:8000/api/method/commera.api.signup.send_signup_otp \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\": \"$probe\", \"first_name\": \"Probe\", \"last_name\": \"Code\"}"
+          echo
+          for port in 13000 11000; do
+            container=$(docker ps --filter "publish=$port" --format '{{.ID}}' | head -n 1)
+            echo "redis on $port:"
+            docker exec "$container" redis-cli --scan --pattern '*otp*' | head -20
+          done
+          bench --site test_site execute commera.tests.e2e_support.get_signup_code --kwargs "{\"email\": \"$probe\"}"
