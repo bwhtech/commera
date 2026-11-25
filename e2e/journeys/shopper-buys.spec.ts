@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { BrowserContext, Page } from '@playwright/test';
 import { Api } from '../lib/api';
 import { newContext } from '../lib/auth';
@@ -306,7 +307,7 @@ test.describe('shopper buys', () => {
 	}) => {
 		await addDiscountCode();
 		const email = shopperEmail(attempt('link'));
-		await openCartLink(page, [ITEMS[0]], { discount: CODE });
+		await openCartLink(page, { api: adminApi }, [ITEMS[0]], { discount: CODE });
 		await continueAsGuest(page);
 		const { orderName, total } = await checkoutWithCod(page, email);
 
@@ -321,9 +322,14 @@ test.describe('shopper buys', () => {
 		problems,
 	}) => {
 		await addDiscountCode();
-		await openCartLink(page, [ITEMS[0]], { return_to: 'cart' });
-		await openCartLink(page, [ITEMS[1]], { mode: 'add', discount: CODE });
-		await expectServerCart(page, ITEMS);
+		await openCartLink(page, { api: adminApi }, [ITEMS[0]], {
+			return_to: 'cart',
+		});
+		await openCartLink(page, { api: adminApi }, [ITEMS[1]], {
+			mode: 'add',
+			discount: CODE,
+		});
+		await expectServerCart(page, { api: adminApi }, ITEMS);
 		await continueAsGuest(page);
 		await expect(page.locator('tr.discount').first()).toBeVisible();
 		expect(realProblems(problems)).toEqual([]);
@@ -359,13 +365,17 @@ test.describe('shopper buys', () => {
 		const email = await newShopper(attempt('merge'));
 		const shopper = await signInShopper(browser, email);
 		const saved = await shopper.context.newPage();
-		await openCartLink(saved, [ITEMS[0]], { return_to: 'cart' });
+		await openCartLink(saved, { api: adminApi, email }, [ITEMS[0]], {
+			return_to: 'cart',
+		});
 		await shopper.context.close();
 
-		await openCartLink(page, [ITEMS[1]], { return_to: 'cart' });
+		await openCartLink(page, { api: adminApi }, [ITEMS[1]], {
+			return_to: 'cart',
+		});
 		await signIn(page, email);
 		await page.goto(`${SHOP}/cart`);
-		await expectServerCart(page, ITEMS);
+		await expectServerCart(page, { api: adminApi, email }, ITEMS);
 		expect(realProblems(problems)).toEqual([]);
 	});
 
@@ -396,8 +406,11 @@ function attempt(label: string) {
 	return `${label}-${test.info().retry}`;
 }
 
+type CartOwner = { api: Api; email?: string };
+
 async function openCartLink(
 	page: Page,
+	owner: CartOwner,
 	itemCodes: string[],
 	query: Record<string, string> = {},
 ) {
@@ -409,35 +422,52 @@ async function openCartLink(
 	await page.waitForURL((url) => !/\/cart\/[^/]+:\d/.test(url.pathname));
 	await expectServerCart(
 		page,
+		owner,
 		itemCodes,
 		query.mode === 'add' ? 'contains' : 'equals',
 	);
 }
 
+async function getCartItemCodes(page: Page, { api, email }: CartOwner) {
+	let filters: Record<string, string> | null = email ? { user: email } : null;
+	if (!filters) {
+		const cookie = (await page.context().cookies()).find(
+			(entry) => entry.name === 'commera_guest_cart',
+		);
+		if (!cookie) return [];
+		filters = {
+			cart_key: createHash('sha256').update(cookie.value).digest('hex'),
+		};
+	}
+	const carts = await api.post<{ name: string }[]>('frappe.client.get_list', {
+		doctype: 'Commera Cart',
+		filters,
+		order_by: 'modified desc',
+		limit_page_length: 1,
+	});
+	if (!carts.length) return [];
+	const lines = await api.post<{ item_code: string }[]>(
+		'frappe.client.get_list',
+		{
+			doctype: 'Commera Cart Line',
+			parent: 'Commera Cart',
+			filters: { parent: carts[0].name },
+			fields: ['item_code'],
+			limit_page_length: 0,
+		},
+	);
+	return lines.map((line) => line.item_code).sort();
+}
+
 async function expectServerCart(
 	page: Page,
+	owner: CartOwner,
 	itemCodes: string[],
 	match: 'equals' | 'contains' = 'equals',
 ) {
 	await expect
 		.poll(async () => {
-			await page.waitForFunction(
-				() =>
-					(
-						window as unknown as {
-							Alpine?: { store: (name: string) => { sync_status?: string } };
-						}
-					).Alpine?.store('cart')?.sync_status === 'idle',
-			);
-			const lines: { variant: { item_code: string } }[] = await page.evaluate(
-				async () => {
-					const response = await fetch(
-						'/api/method/commera.api.server_cart.get_server_cart',
-					);
-					return (await response.json()).message?.lines || [];
-				},
-			);
-			const codes = lines.map((line) => line.variant.item_code).sort();
+			const codes = await getCartItemCodes(page, owner);
 			return match === 'equals'
 				? codes
 				: itemCodes.filter((code) => codes.includes(code)).sort();

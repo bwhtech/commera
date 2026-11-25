@@ -4,6 +4,7 @@ from unittest.mock import patch
 import frappe
 from bwh_payments_core.connectors.razorpay.gateway import RazorpayGateway
 from bwh_payments_core.connectors.razorpay.stub import StubRazorpayClient
+from frappe.installer import update_site_config
 from frappe.utils.password import update_password
 
 from commera import install_summer_demo
@@ -24,6 +25,7 @@ def seed():
 		install_summer_demo.install_summer_demo()
 
 	save_outgoing_email_account()
+	update_site_config("mute_emails", 1)
 	save_store_switches()
 	save_merchant_user()
 	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- bench execute does not commit
