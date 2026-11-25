@@ -2512,3 +2512,7 @@ We could not add these products,لم نتمكن من إضافة هذه المن�
 {0} is out of stock.,{0} غير متوفر في المخزون.
 "Only {0} of {1} are in stock, so the quantity was lowered.",يتوفر {0} فقط من {1} في المخزون، لذا خُفّضت الكمية.
 {0} is not available in this market.,{0} غير متوفر في هذه السوق.
+Each {0} has its own photos. The first one is the cover.,لكل {0} صوره الخاصة. الصورة الأولى هي الغلاف.
+Add photos of {0},أضف صور {0}
+Shown when a shopper picks {0}. Drop images here or click to choose.,تظهر عندما يختار المتسوق {0}. اسحب الصور إلى هنا أو انقر للاختيار.
+Applies to every size under this option ({0}).,ينطبق على كل المقاسات ضمن هذا الخيار ({0}).

@@ -12,7 +12,6 @@ const routes = [
   // `split`: the page owns its own scroll — a form pane and a summary pane
   // side by side, the way Helpdesk's ticket screen does it.
   { path: '/products/:id', name: 'ProductDetail', component: () => import('./pages/ProductDetail.vue'), meta: { split: true } },
-  { path: '/products/:id/variants/:variantId', name: 'VariantDetail', component: () => import('./pages/VariantDetail.vue') },
   { path: '/collections', name: 'Collections', component: () => import('./pages/Collections.vue') },
   { path: '/attributes', name: 'Attributes', component: () => import('./pages/Attributes.vue') },
   { path: '/inventory', name: 'Inventory', component: () => import('./pages/Inventory.vue') },

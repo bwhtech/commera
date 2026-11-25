@@ -2,7 +2,7 @@
 // starts a query string, so either lands on "nothing at this address".
 export function productRoute(productName, variantName) {
   const path = `/products/${encodeURIComponent(productName)}`
-  return variantName ? `${path}/variants/${encodeURIComponent(variantName)}` : path
+  return variantName ? `${path}?variant=${encodeURIComponent(variantName)}` : path
 }
 
 export function customerRoute(customerName) {

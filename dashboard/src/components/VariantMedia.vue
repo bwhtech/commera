@@ -65,7 +65,31 @@ async function remove(fileUrl) {
 <template>
   <div>
     <input ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="onFilePicked" />
-    <div class="flex flex-wrap gap-2" @dragover.prevent @drop.prevent="onDrop">
+    <button
+      v-if="!variant.images.length"
+      class="flex min-h-20 w-full flex-col items-center justify-center gap-2 rounded-4 border border-dashed border-outline-gray-2 px-4 py-4 text-center hover:bg-surface-gray-1"
+      :disabled="isUploading"
+      @click="fileInput.click()"
+      @dragover.prevent
+      @drop.prevent="onDrop"
+    >
+      <span class="grid size-8 shrink-0 place-content-center rounded-full bg-surface-gray-2">
+        <span
+          :class="isUploading ? 'lucide-loader-2 animate-spin' : 'lucide-image-plus'"
+          class="size-4 text-ink-gray-6"
+          aria-hidden="true"
+        />
+      </span>
+      <span>
+        <span class="block text-base-medium text-ink-gray-8">
+          {{ isUploading ? __('Uploading…') : __('Add photos of {0}', [variant.option]) }}
+        </span>
+        <span class="block text-p-sm text-ink-gray-5">
+          {{ __('Shown when a shopper picks {0}. Drop images here or click to choose.', [variant.option]) }}
+        </span>
+      </span>
+    </button>
+    <div v-else class="flex flex-wrap gap-2" @dragover.prevent @drop.prevent="onDrop">
       <div
         v-for="(image, index) in variant.images"
         :key="`${index}-${image}`"
@@ -76,7 +100,7 @@ async function remove(fileUrl) {
         <!-- Touch has no hover, so the only way to delete a photo has to be
              visible from the start on a phone; hover-reveal is a desktop luxury. -->
         <Button
-          class="absolute end-1 top-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+          class="absolute end-1 top-1 !size-6 !rounded-full !bg-black-overlay-500 !text-white opacity-100 backdrop-blur-sm transition-opacity hover:!bg-black-overlay-700 sm:opacity-0 sm:group-hover:opacity-100"
           icon="lucide-x"
           :label="__('Remove photo')"
           @click="remove(image)"
@@ -95,9 +119,5 @@ async function remove(fileUrl) {
         </span>
       </button>
     </div>
-
-    <p v-if="!variant.images.length" class="mt-2 text-p-sm text-ink-gray-5">
-      {{ __("No photo yet. This variant falls back to the product's own image on the storefront.") }}
-    </p>
   </div>
 </template>
