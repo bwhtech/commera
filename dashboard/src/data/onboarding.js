@@ -8,14 +8,12 @@ import { setupPollDelay } from '../ia/onboardingSteps'
 const { attempt } = createAdminCaller('onboarding.')
 
 // The reads are GET-only on the server, and createAdminCaller only POSTs.
-const onboardingRequest = useAdminRead('onboarding.get_onboarding', { immediate: false })
+const onboardingRequest = useAdminRead('onboarding.get_onboarding', {
+  immediate: false,
+  params: { time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+})
 // Quiet: a poll that misses one beat would otherwise toast every two seconds.
 const statusRequest = useAdminRead('onboarding.get_setup_status', { immediate: false, quiet: true })
-const productsRequest = useAdminRead('catalog.get_products', {
-  immediate: false,
-  quiet: true,
-  params: { page_length: 4 },
-})
 // useCall's fetch() takes no arguments, so the country rides a params function.
 const defaultsCountry = ref('')
 const countryDefaultsRequest = useAdminRead('onboarding.get_country_defaults', {
@@ -109,22 +107,8 @@ export async function saveBrand({ brandLogo }) {
   return Boolean(await write('save_brand', { brand_logo: brandLogo }))
 }
 
-export async function saveSelling({ codEnabled, allowGuestCheckout }) {
-  return Boolean(
-    await write('save_selling', { cod_enabled: codEnabled ? 1 : 0, allow_guest_checkout: allowGuestCheckout ? 1 : 0 }),
-  )
-}
-
 export async function completeOnboarding() {
   return Boolean(await write('complete_onboarding'))
-}
-
-// The first few products the owner made during onboarding, for the store preview.
-export const storeProducts = ref([])
-
-export async function loadStoreProducts() {
-  const data = await productsRequest.fetch()
-  if (data) storeProducts.value = (data.products ?? []).filter((product) => !product.disabled)
 }
 
 // `{ currency, timeZone, fiscalYearStartMonth, chartsOfAccounts }` for a country, or null on a refusal.

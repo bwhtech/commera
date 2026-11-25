@@ -1,11 +1,12 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Combobox, FormControl, Select, TextInput } from 'frappe-ui'
+import { Button, Combobox, FormControl, Select, Spinner, TextInput, toast, useFileUpload } from 'frappe-ui'
 import { getCountryDefaults, storeSetup } from '../../../data/onboarding'
-import { CATEGORIES, draft, flow } from '../../../ia/onboarding'
+import { draft, flow } from '../../../ia/onboarding'
 import { abbreviate, missingField, storePicks, toOptions } from '../../../ia/onboardingSteps'
 import { monthName } from '../../../data/format'
 import { __ } from '../../../data/translation'
+import commeraLogo from '../../../assets/commera.svg'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -21,11 +22,13 @@ const STANDARD_CHARTS = ['Standard', 'Standard with Numbers']
 const countryCharts = ref(null)
 
 const showAccounting = ref(false)
+const { upload, isUploading } = useFileUpload()
+const logoInput = ref(null)
 
 // Once setup has made the company, its country, currency and books are fixed.
 const isLocked = computed(() => storeSetup.status === 'running' || storeSetup.status === 'done')
-// start_store_setup leaves a running job alone and writes nothing, so a name or category changed
-// while it runs would be dropped without a word. Once it is done they save again.
+// start_store_setup leaves a running job alone and writes nothing, so a name changed while it
+// runs would be dropped without a word. Once it is done it saves again.
 const isRunning = computed(() => storeSetup.status === 'running')
 
 const options = computed(() => props.record.options ?? {})
@@ -37,12 +40,15 @@ function chartLabel(chart) {
 }
 
 const accountingSummary = computed(() =>
-  [draft.currency, draft.timeZone, chartLabel(draft.chartOfAccounts)].filter(Boolean).join(' · '),
+  [draft.country || __('Choose a country'), draft.currency, draft.timeZone, chartLabel(draft.chartOfAccounts)]
+    .filter(Boolean)
+    .join(' · '),
 )
 
 const existingStore = computed(() => props.record.existing_store)
 const picks = computed(() => storePicks(existingStore.value, draft.company))
 const missing = computed(() => (flow.showErrors ? missingField('store', draft, { picks: picks.value }) : ''))
+const isAccountingOpen = computed(() => showAccounting.value || missing.value === 'country')
 
 const company = computed(() => existingStore.value?.companies.find((row) => row.name === draft.company))
 const companySummary = computed(() =>
@@ -65,6 +71,18 @@ watch(
   { immediate: true },
 )
 
+async function uploadLogo(event) {
+  const [file] = [...(event.target.files ?? [])]
+  event.target.value = ''
+  if (!file) return
+  try {
+    const uploaded = await upload(file, { private: false })
+    draft.brandLogo = uploaded.file_url
+  } catch {
+    toast.error(__('Could not upload {0}', [file.name]))
+  }
+}
+
 watch(
   () => draft.country,
   async (country, previous) => {
@@ -84,6 +102,28 @@ watch(
 
 <template>
   <div class="space-y-5">
+    <div>
+      <div class="mb-2 flex items-center justify-between text-xs">
+        <p class="text-ink-gray-6">{{ __('Logo') }}</p>
+        <p class="text-ink-gray-4">{{ __('Optional') }}</p>
+      </div>
+      <input ref="logoInput" type="file" accept="image/*" class="hidden" data-onboarding-logo-input @change="uploadLogo" />
+      <button
+        type="button"
+        class="flex h-20 w-full items-center justify-center gap-2 rounded-4 border border-dashed border-outline-gray-3 text-ink-gray-5 transition-[background-color,transform] duration-150 ease-out-strong hover:bg-surface-gray-1 active:scale-[0.99]"
+        :disabled="isUploading"
+        @click="logoInput?.click()"
+      >
+        <Spinner v-if="isUploading" class="size-5" />
+        <img v-else-if="draft.brandLogo" :src="draft.brandLogo" :alt="__('Your logo')" class="max-h-12 max-w-[60%] object-contain" />
+        <template v-else>
+          <img :src="commeraLogo" alt="" class="size-10 rounded-3" />
+          <span class="text-sm">{{ __('Upload') }}</span>
+        </template>
+      </button>
+      <Button v-if="draft.brandLogo" variant="ghost" size="sm" :label="__('Remove logo')" class="mt-1" @click="draft.brandLogo = ''" />
+    </div>
+
     <FormControl
       v-model="draft.storeName"
       :label="__('Store name')"
@@ -92,29 +132,6 @@ watch(
       :description="isRunning ? __('You can change the name once setup finishes.') : ''"
       :error="missing === 'storeName' ? __('Required') : ''"
     />
-
-    <div>
-      <p class="mb-2 text-xs" :class="missing === 'storeCategory' ? 'text-ink-red-6' : 'text-ink-gray-6'">{{ __('You sell') }}</p>
-      <div class="grid grid-cols-3 gap-2">
-        <button
-          v-for="option in CATEGORIES"
-          :key="option.value"
-          type="button"
-          class="flex flex-col items-center gap-2 rounded-4 border px-2 py-3 text-sm transition-[background-color,border-color,color,transform] duration-150 ease-out-strong enabled:active:scale-[0.97] disabled:cursor-not-allowed"
-          :class="
-            draft.storeCategory === option.value
-              ? 'border-outline-gray-5 bg-surface-gray-2 text-ink-gray-9'
-              : 'border-outline-gray-2 text-ink-gray-6 hover:bg-surface-gray-1'
-          "
-          :aria-pressed="draft.storeCategory === option.value"
-          :disabled="isRunning"
-          @click="draft.storeCategory = option.value"
-        >
-          <span :class="option.icon" class="size-5" aria-hidden="true" />
-          <span class="truncate">{{ option.label }}</span>
-        </button>
-      </div>
-    </div>
 
     <template v-if="existingStore">
       <Combobox
@@ -139,27 +156,19 @@ watch(
     </template>
 
     <template v-else>
-      <Combobox
-        v-model="draft.country"
-        trigger="button"
-        :label="__('Country')"
-        :placeholder="__('Search countries')"
-        :options="toOptions(options.countries)"
-        :disabled="isLocked"
-      />
-
       <div>
         <button
           type="button"
-          class="flex items-center gap-1 text-sm text-ink-gray-5 transition-colors hover:text-ink-gray-7"
-          :aria-expanded="showAccounting"
+          class="flex items-center gap-1 text-sm transition-colors"
+          :class="missing === 'country' ? 'text-ink-red-6' : 'text-ink-gray-5 hover:text-ink-gray-7'"
+          :aria-expanded="isAccountingOpen"
           data-onboarding-accounting
           @click="showAccounting = !showAccounting"
         >
           {{ accountingSummary }}
           <span
             class="lucide-chevron-down size-3.5 transition-transform duration-300 ease-in-out-strong"
-            :class="{ 'rotate-180': showAccounting }"
+            :class="{ 'rotate-180': isAccountingOpen }"
             aria-hidden="true"
           />
         </button>
@@ -167,11 +176,20 @@ watch(
              closed fields out of the tab order. -->
         <div
           class="grid transition-[grid-template-rows,opacity] duration-300 ease-out-strong"
-          :class="showAccounting ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'"
-          :inert="!showAccounting"
+          :class="isAccountingOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'"
+          :inert="!isAccountingOpen"
         >
           <div class="overflow-hidden">
             <div class="grid grid-cols-2 gap-3 pt-3">
+              <Combobox
+                v-model="draft.country"
+                trigger="button"
+                class="col-span-2"
+                :label="__('Country')"
+                :placeholder="__('Search countries')"
+                :options="toOptions(options.countries)"
+                :disabled="isLocked"
+              />
               <Combobox
                 v-model="draft.currency"
                 trigger="button"

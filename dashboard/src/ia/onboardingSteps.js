@@ -4,10 +4,7 @@ import { __ } from '../data/translation.js'
 // `focus` names the area of the store preview a step outlines; `optional` offers Skip.
 export const STEPS = [
   { key: 'you', title: __('Welcome') },
-  { key: 'store', title: __('Your store') },
-  { key: 'brand', title: __('Your brand'), focus: 'brand', optional: true },
-  { key: 'selling', title: __('Selling'), focus: 'selling' },
-  { key: 'products', title: __('Products'), focus: 'products', optional: true },
+  { key: 'store', title: __('Your store'), focus: 'brand' },
   { key: 'done', title: '' },
 ]
 
@@ -18,16 +15,15 @@ export function clampStep(index) {
 }
 
 const LEGACY_STEP_KEYS = ['you', 'store', 'brand', 'theme', 'selling', 'products', 'done']
-
-function savedStepIndex(saved) {
-  const key = /^\d+$/.test(String(saved ?? '')) ? LEGACY_STEP_KEYS[Number(saved)] : saved
-  return STEP_INDEX[key === 'theme' ? 'selling' : key] ?? 0
-}
+const RETIRED_STEP_KEYS = ['brand', 'theme', 'selling', 'products']
 
 // The step a reload resumes at. Every step after the store needs the store setup to have been
 // started; a setup that never started (or a cache that forgot it) sends the owner back to start it.
 export function resumeStep(saved, setupStatus) {
-  const index = savedStepIndex(saved)
+  const key = /^\d+$/.test(String(saved ?? '')) ? LEGACY_STEP_KEYS[Number(saved)] : saved
+  const index = RETIRED_STEP_KEYS.includes(key)
+    ? STEP_INDEX[setupStatus === 'done' ? 'done' : 'store']
+    : (STEP_INDEX[key] ?? 0)
   if (index > STEP_INDEX.store && setupStatus === 'idle') return STEP_INDEX.store
   return index
 }
@@ -40,7 +36,7 @@ export function missingField(stepKey, draft, { needsPassword = false, picks = NO
   if (stepKey === 'you' && !draft.fullName.trim()) return 'fullName'
   if (stepKey === 'you' && needsPassword && !draft.password) return 'password'
   if (stepKey === 'store' && !draft.storeName.trim()) return 'storeName'
-  if (stepKey === 'store' && !draft.storeCategory) return 'storeCategory'
+  if (stepKey === 'store' && !draft.existingStore && !draft.country) return 'country'
   if (stepKey === 'store' && picks.companies.length && !draft.company) return 'company'
   if (stepKey === 'store' && picks.priceLists.length && !picks.priceLists.includes(draft.priceList)) return 'priceList'
   return ''

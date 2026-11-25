@@ -17,7 +17,6 @@ from commera.www.commera import get_boot
 SETTINGS = "Commera Settings"
 STORE = {
 	"store_name": "Zz Onboarding Store",
-	"store_category": "Home",
 	"country": "India",
 	"currency": "INR",
 	"time_zone": "Asia/Kolkata",
@@ -138,7 +137,6 @@ class StartStoreSetupTestCase(IntegrationTestCase):
 		enqueue.assert_not_called()
 		self.assertEqual(frappe.db.count("Company"), companies)
 		self.assertEqual(frappe.db.get_single_value(SETTINGS, "store_name"), STORE["store_name"])
-		self.assertEqual(frappe.db.get_single_value(SETTINGS, "store_category"), STORE["store_category"])
 
 	def test_fresh_site_queues_the_job_once(self):
 		with (
@@ -275,7 +273,6 @@ class OnboardingAccessTestCase(IntegrationTestCase):
 			lambda: onboarding_api.save_profile("Zz Name"),
 			lambda: onboarding_api.start_store_setup(**STORE),
 			lambda: onboarding_api.save_brand(brand_logo=""),
-			lambda: onboarding_api.save_selling(1, 1),
 		)
 		for call in calls:
 			with self.subTest(call=call), self.assertRaises(frappe.PermissionError):
@@ -361,11 +358,8 @@ class OnboardingAccessTestCase(IntegrationTestCase):
 		)
 		self.assertTrue(onboarding.has_password(self.owner))
 
-	def test_save_selling_and_brand(self):
+	def test_save_brand(self):
 		frappe.set_user(self.owner)
-		self.assertEqual(
-			onboarding_api.save_selling(0, 1), {"cod_enabled": False, "allow_guest_checkout": True}
-		)
 		self.assertEqual(
 			onboarding_api.save_brand(brand_logo="/files/brand.png"), {"brand_logo": "/files/brand.png"}
 		)
@@ -562,7 +556,6 @@ class ExistingStorePicksTestCase(IntegrationTestCase):
 		self.assertEqual(store["company"], TEST_COMPANY)
 		self.assertIn(TEST_COMPANY, [company.name for company in store["companies"]])
 		self.assertIn("Standard Selling", [price_list.name for price_list in store["price_lists"]])
-		self.assertIsInstance(store["importable_count"], int)
 
 	def test_the_store_sale_list_is_never_offered_as_its_price_list(self):
 		frappe.db.set_single_value(
@@ -577,6 +570,40 @@ class ExistingStorePicksTestCase(IntegrationTestCase):
 		frappe.db.set_single_value(SETTINGS, "store_setup_status", "done")
 
 		self.assertIsNone(onboarding_api.get_onboarding()["existing_store"])
+
+	def test_a_time_zone_names_its_country(self):
+		self.assertEqual(onboarding.get_country_for_time_zone("Asia/Kolkata"), "India")
+		self.assertEqual(onboarding.get_country_for_time_zone("Asia/Calcutta"), "India")
+		self.assertEqual(onboarding.get_country_for_time_zone("Europe/London"), "United Kingdom")
+		self.assertEqual(onboarding.get_country_for_time_zone("America/Denver"), "United States")
+		self.assertIsNone(onboarding.get_country_for_time_zone("UTC"))
+		self.assertIsNone(onboarding.get_country_for_time_zone("Mars/Olympus"))
+		self.assertIsNone(onboarding.get_country_for_time_zone(None))
+
+	def test_a_new_store_starts_in_the_browser_country(self):
+		idle = {"status": "idle", "error": None}
+		with (
+			patch("frappe.is_setup_complete", return_value=False),
+			patch("commera.onboarding.get_setup_status", return_value=idle),
+		):
+			data = onboarding_api.get_onboarding(time_zone="Europe/London")
+			unknown = onboarding_api.get_onboarding(time_zone="Mars/Olympus")
+
+		self.assertEqual(
+			(data["country"], data["currency"], data["time_zone"]), ("United Kingdom", "GBP", "Europe/London")
+		)
+		self.assertEqual(
+			data["fiscal_year_start_month"], onboarding.get_fiscal_year_start_month("United Kingdom")
+		)
+		system_settings = frappe.get_single("System Settings")
+		self.assertEqual(
+			(unknown["country"], unknown["currency"], unknown["time_zone"]),
+			(system_settings.country, system_settings.currency, system_settings.time_zone),
+		)
+
+	def test_a_store_already_set_up_keeps_its_country(self):
+		data = onboarding_api.get_onboarding(time_zone="Europe/London")
+		self.assertEqual(data["country"], frappe.db.get_single_value("System Settings", "country"))
 
 	def test_a_fresh_site_has_no_existing_store(self):
 		with patch("frappe.is_setup_complete", return_value=False):

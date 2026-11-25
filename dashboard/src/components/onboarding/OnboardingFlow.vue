@@ -3,26 +3,22 @@
  * First-run onboarding, covering the whole app until it is finished: one step at a time on the
  * right, the store building itself on the left. App.vue renders this instead of the shell.
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Alert, Button, Spinner } from 'frappe-ui'
 import { bootValue } from '../../data/boot'
 import {
   completeOnboarding,
   loadOnboarding,
-  loadStoreProducts,
   onboarding,
   onboardingLoadError,
   resumeSetupPolling,
   saveBrand,
   saveProfile,
-  saveSelling,
   startStoreSetup,
   stopSetupPolling,
   storeSetup,
 } from '../../data/onboarding'
-import { addProduct } from '../../data/addProduct'
-import { imp as productImport } from '../../data/importFlow'
 import { __ } from '../../data/translation'
 import { homeArrival } from '../../ia/homeTasks'
 import {
@@ -41,23 +37,17 @@ import { useEntrance } from '../../utils/reveal'
 import OnboardingPreview from './OnboardingPreview.vue'
 import StepYou from './steps/StepYou.vue'
 import StepStore from './steps/StepStore.vue'
-import StepBrand from './steps/StepBrand.vue'
-import StepSelling from './steps/StepSelling.vue'
-import StepProducts from './steps/StepProducts.vue'
 import StepDone from './steps/StepDone.vue'
 
 const STEP_COMPONENTS = {
   you: StepYou,
   store: StepStore,
-  brand: StepBrand,
-  selling: StepSelling,
-  products: StepProducts,
   done: StepDone,
 }
 
 // One class per step, listed so Tailwind can see them. A transform, not a width, so the fill
 // never touches layout; the first step shows a sliver rather than an empty track.
-const PROGRESS = ['scale-x-[0.04]', 'scale-x-[0.2]', 'scale-x-[0.4]', 'scale-x-[0.6]', 'scale-x-[0.8]', 'scale-x-100']
+const PROGRESS = ['scale-x-[0.04]', 'scale-x-50', 'scale-x-100']
 
 // Forward enters from the right and leaves to the left; Back plays the same path in reverse.
 const SLIDES = {
@@ -116,7 +106,6 @@ function storeSetupValues() {
   if (draft.existingStore) {
     return {
       store_name: draft.storeName.trim(),
-      store_category: draft.storeCategory,
       country: draft.country,
       currency: draft.currency,
       time_zone: draft.timeZone,
@@ -126,7 +115,6 @@ function storeSetupValues() {
   }
   return {
     store_name: draft.storeName.trim(),
-    store_category: draft.storeCategory,
     country: draft.country,
     currency: draft.currency,
     time_zone: draft.timeZone,
@@ -139,9 +127,7 @@ function storeSetupValues() {
 // What Continue writes before moving on. A step missing here has nothing of its own to save.
 const SAVES = {
   you: () => saveProfile(draft),
-  store: () => startStoreSetup(storeSetupValues()),
-  brand: () => saveBrand(draft),
-  selling: () => saveSelling(draft),
+  store: async () => (await startStoreSetup(storeSetupValues())) && saveBrand(draft),
 }
 
 async function next() {
@@ -186,14 +172,6 @@ async function finish() {
   await router.replace('/')
   closeOnboarding()
 }
-
-// Products made from the onboarding's dialogs appear in the preview once each dialog closes.
-watch(
-  () => [addProduct.open, productImport.open, storeSetup.status, step.value.key],
-  ([addOpen, importOpen, status, key]) => {
-    if (!addOpen && !importOpen && status === 'done' && key === 'products') loadStoreProducts()
-  },
-)
 </script>
 
 <template>

@@ -137,10 +137,6 @@ describe('state flows', () => {
         () => [...document.querySelectorAll('[data-onboarding-step=store] input')].find((input) => input.autocomplete === 'organization')?.disabled,
       )
       assert.equal(nameDisabled, true, 'the store name could be edited while setup runs')
-      const categoriesDisabled = await page.evaluate(() =>
-        [...document.querySelectorAll('[data-onboarding-step=store] button[aria-pressed]')].every((button) => button.disabled),
-      )
-      assert.equal(categoriesDisabled, true, 'the category could be changed while setup runs')
       assert.ok((await text(page)).includes('once setup finishes'), 'the lock is not explained')
     } finally {
       await stop()
