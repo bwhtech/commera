@@ -576,7 +576,7 @@ test.describe('theme editor', () => {
 		await saveThemeSetting(page, async () => {});
 	});
 
-	test('Saving a theme setting shows the new value in the preview', async ({
+	test('Saving a theme setting shows the new value in the preview https://github.com/bwhtech/commera/issues/607', async ({
 		page,
 	}) => {
 		test.fail();
