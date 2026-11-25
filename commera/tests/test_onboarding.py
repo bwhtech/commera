@@ -216,8 +216,6 @@ class StartStoreSetupTestCase(IntegrationTestCase):
 
 
 class SetupStatusAcrossRequestsTestCase(IntegrationTestCase):
-	"""Commits on purpose: the job's result lands from another connection, as it does from the worker."""
-
 	def setUp(self):
 		saved = frappe.db.get_value(SETTINGS, SETTINGS, ["store_setup_status", "store_setup_error"])
 		self.addCleanup(self.restore_status, *saved)

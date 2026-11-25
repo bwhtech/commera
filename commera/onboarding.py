@@ -279,8 +279,6 @@ def get_setup_status() -> dict:
 	"""The job's own record on Commera Settings; a site set up some other way also counts as done."""
 	status, error = frappe.db.get_single_value(SETTINGS_DOCTYPE, "store_setup_status"), None
 	if status == "running" and not is_job_enqueued(SETUP_JOB_ID) and not is_setup_being_queued():
-		# The job commits its result just before it leaves the queue, possibly after this request's read
-		# view opened: only a locking read sees that commit.
 		with latest_committed_reads():
 			status = frappe.db.get_single_value(SETTINGS_DOCTYPE, "store_setup_status", for_update=True)
 			if status == "failed":
