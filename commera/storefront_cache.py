@@ -533,11 +533,11 @@ def _resolve_allowed_ssr_params(allowed_query_params: frozenset[str] | None) -> 
 	return BASE_SSR_QUERY_PARAMS | allowed_query_params
 
 
-def has_only_base_or_tracking_params(args) -> bool:
+def has_only_base_or_tracking_params(query_params) -> bool:
 	"""True when every query param is a locale routing param or known tracking param."""
-	if not args:
+	if not query_params:
 		return True
-	return all(p in BASE_SSR_QUERY_PARAMS or _is_tracking_param(p) for p in args)
+	return all(p in BASE_SSR_QUERY_PARAMS or _is_tracking_param(p) for p in query_params)
 
 
 def is_cacheable_ssr_request(route_path: str, *, allowed_query_params: frozenset[str] | None = None) -> bool:
