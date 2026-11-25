@@ -113,6 +113,10 @@ class TestPriceEventsReadTheCommittedLists(PriceJobTestCase):
 
 
 class TestLostPriceSequence(PriceJobTestCase):
+	def setUp(self):
+		self.addCleanup(self.lose_the_counter)
+		super().setUp()
+
 	def ahead_of_the_clock(self):
 		return time.time_ns() // 1000 + 10**12
 
