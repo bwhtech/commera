@@ -29,6 +29,7 @@ STARTER_TEXT_SUFFIXES = (".css", ".html", ".js", ".json", ".md", ".py", ".txt")
 THEME_CONTEXT_CACHE_KEY = "shop_theme_context"
 STYLE_TAB = "style_tab"
 PREVIEW_THEME_PARAM = "preview_theme"
+SHIPPED_PREVIEW_FILES = {"light": "preview.webp", "dark": "preview-dark.webp"}
 
 
 class ShopTheme(Document):
@@ -280,6 +281,17 @@ def get_theme_dir(theme_name):
 def get_theme_public_dir(theme_name):
 	base_dir = os.path.join(frappe.get_app_path(get_theme_app(theme_name)), "public", "themes")
 	return get_contained_path(base_dir, frappe.scrub(theme_name))
+
+
+def get_shipped_preview(theme_name, app=None):
+	app = app or DEFAULT_THEME_APP
+	slug = frappe.scrub(theme_name)
+	public_dir = get_contained_path(os.path.join(frappe.get_app_path(app), "public", "themes"), slug)
+	return {
+		scheme: f"/assets/{app}/themes/{slug}/{filename}"
+		for scheme, filename in SHIPPED_PREVIEW_FILES.items()
+		if os.path.isfile(os.path.join(public_dir, filename))
+	}
 
 
 def get_theme_export_dir(module, slug):

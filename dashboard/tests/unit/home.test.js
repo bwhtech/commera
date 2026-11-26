@@ -1,12 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
-  PREVIEW_MAX_AGE_MS,
   buildHomeTasks,
   describeDomains,
   describeStoreStatus,
   listBlockers,
-  needsPreviewCapture,
   storeSlug,
 } from '../../src/data/home.js'
 
@@ -68,19 +66,6 @@ test('a custom domain is connected only once it is primary and has a certificate
     status: 'connected',
     name: 'shop.com',
   })
-})
-
-test('the preview is captured when missing or a day old, and only by someone who can', () => {
-  const now = new Date('2026-11-04T12:00:00Z').getTime()
-  const at = (ms) => new Date(now - ms).toISOString().replace('Z', '+00:00')
-
-  assert.equal(needsPreviewCapture(null, now), false)
-  assert.equal(needsPreviewCapture({ can_capture: false, image: null }, now), false)
-  assert.equal(needsPreviewCapture({ can_capture: true, image: null, captured_on: null }, now), true)
-  assert.equal(needsPreviewCapture({ can_capture: true, image: '/files/a.webp', captured_on: at(60_000) }, now), false)
-  assert.equal(needsPreviewCapture({ can_capture: true, image: '/files/a.webp', captured_on: at(PREVIEW_MAX_AGE_MS + 60_000) }, now), true)
-  const kolkataFreshCapture = '2026-11-04T17:00:00+05:30'
-  assert.equal(needsPreviewCapture({ can_capture: true, image: '/files/a.webp', captured_on: kolkataFreshCapture }, now), false)
 })
 
 test('the publish warning names the blocking tasks as a sentence list', () => {

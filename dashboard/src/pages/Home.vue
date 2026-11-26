@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Button, Dialog, Skeleton, toast } from 'frappe-ui'
+import { Button, Dialog, Skeleton, toast, useColorScheme } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
 import StorefrontPreview from '../components/home/StorefrontPreview.vue'
@@ -9,28 +9,25 @@ import TaskHeading from '../components/home/TaskHeading.vue'
 import TaskList from '../components/home/TaskList.vue'
 import { trySubmit, useAdminAction, useAdminRead } from '../data/api'
 import { customDomain, loadDomains } from '../data/cloudDomains'
-import { buildHomeTasks, describeStoreStatus, listBlockers, needsPreviewCapture, storeSlug } from '../data/home'
-import { captureStorePreview } from '../data/storePreview'
+import { buildHomeTasks, describeStoreStatus, listBlockers, storeSlug } from '../data/home'
 import { isStorefrontPublished } from '../data/storefront'
 import { __ } from '../data/translation'
 import { dismissTask, dismissedTasks, homeArrival, restoreTasks } from '../ia/homeTasks'
 import { lookFor } from '../ia/onboarding'
-import { whenIdle } from '../utils/whenIdle'
 
 const homeRequest = useAdminRead('home.get_home')
 const publishAction = useAdminAction('home.set_storefront_published')
 
 const home = computed(() => homeRequest.data)
 
-watch(home, (record, previousRecord, onCleanup) => {
+watch(home, (record) => {
   if (record) isStorefrontPublished.value = record.published
-  if (!needsPreviewCapture(record?.preview)) return
-  onCleanup(
-    whenIdle(async () => {
-      if (await captureStorePreview(record.theme)) homeRequest.reload()
-    }),
-  )
 })
+
+const { resolvedColorScheme } = useColorScheme()
+const previewImage = computed(() =>
+  resolvedColorScheme.value === 'dark' ? home.value?.preview?.image_dark : home.value?.preview?.image,
+)
 
 onMounted(loadDomains)
 
@@ -109,7 +106,7 @@ async function copyLink() {
     <section class="flex flex-col gap-10 pt-4 sm:flex-row sm:items-center sm:gap-12">
       <Transition v-bind="entrance(0)">
         <div class="shrink-0">
-          <StorefrontPreview :live="isLive" :url="storeUrl" :host="host" :image="home?.preview?.image" />
+          <StorefrontPreview :live="isLive" :url="storeUrl" :host="host" :image="previewImage" />
         </div>
       </Transition>
 

@@ -89,14 +89,6 @@ export function describeDomains(domains) {
   return { status: 'none', name: null }
 }
 
-export const PREVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000
-
-export function needsPreviewCapture(preview, now = Date.now()) {
-  if (!preview?.can_capture) return false
-  if (!preview.image || !preview.captured_on) return true
-  return now - new Date(preview.captured_on).getTime() > PREVIEW_MAX_AGE_MS
-}
-
 const LIST = new Intl.ListFormat([language, 'en'], { type: 'conjunction' })
 
 export function listBlockers(tasks) {
