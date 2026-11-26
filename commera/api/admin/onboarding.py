@@ -71,6 +71,7 @@ def get_onboarding(time_zone: str | None = None):
 		"email": user.email,
 		"needs_password": onboarding.needs_password_setup(),
 		"store_name": settings.store_name,
+		"store_category": settings.store_category,
 		"country": country,
 		"currency": currency,
 		"time_zone": time_zone,
@@ -157,6 +158,7 @@ def start_store_setup(
 	company_abbr: str | None = None,
 	company: str | None = None,
 	price_list: str | None = None,
+	store_category: str | None = None,
 ):
 	"""Save the store basics and queue the Frappe/ERPNext setup, once. A failed setup can be retried."""
 	frappe.only_for(ONBOARDING_ROLE)
@@ -170,7 +172,7 @@ def start_store_setup(
 	if status["status"] == "done":
 		if not store_name:
 			frappe.throw(_("Store name is required"), frappe.MandatoryError)
-		save_store_basics(store_name)
+		save_store_basics(store_name, store_category)
 		onboarding.adopt_existing_company(store_name, company, price_list)
 		return status
 
@@ -181,22 +183,27 @@ def start_store_setup(
 	if company_abbr and frappe.db.exists("Company", {"abbr": company_abbr}):
 		frappe.throw(_("Abbreviation {0} is already used by another company").format(company_abbr))
 
-	save_store_basics(store_name)
+	save_store_basics(store_name, store_category)
 	args = onboarding.build_setup_args(
 		store_name, country, currency, time_zone, chart_of_accounts, start_month, company_abbr
 	)
 	return onboarding.queue_store_setup(args)
 
 
-def save_store_basics(store_name: str):
+def save_store_basics(store_name: str, store_category: str | None):
 	# set_single_value: the settings cannot save() until setup has made the company it requires.
-	frappe.db.set_single_value(SETTINGS_DOCTYPE, "store_name", store_name)
+	frappe.db.set_single_value(
+		SETTINGS_DOCTYPE, {"store_name": store_name, "store_category": cstr(store_category).strip()}
+	)
 
 
 @frappe.whitelist(methods=["GET"])
 def get_setup_status():
 	frappe.only_for(ONBOARDING_ROLE)
-	return onboarding.get_setup_status()
+	status = onboarding.get_setup_status()
+	if status["status"] == "running":
+		status["stage"] = onboarding.get_setup_stage()
+	return status
 
 
 @frappe.whitelist(methods=["POST"])

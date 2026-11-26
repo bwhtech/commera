@@ -19,6 +19,7 @@ DEFAULT_PRICE_LIST = "Standard Selling"
 DEFAULT_CHART_OF_ACCOUNTS = "Standard"
 SETUP_REALTIME_EVENT = "commera_store_setup"
 SETUP_QUEUEING_CACHE_KEY = "commera_store_setup_queueing"
+SETUP_STAGE_CACHE_KEY = "commera_store_setup_stage"
 SETUP_QUEUEING_SECONDS = 30
 SETUP_JOB_ID = "commera_store_setup"
 SETUP_JOB_TIMEOUT = 1500
@@ -307,6 +308,18 @@ def is_setup_being_queued() -> bool:
 	return bool(frappe.cache.get_value(SETUP_QUEUEING_CACHE_KEY))
 
 
+def get_setup_stage() -> str | None:
+	return frappe.cache.get_value(SETUP_STAGE_CACHE_KEY)
+
+
+def set_setup_stage(stage: str | None):
+	frappe.cache.set_value(SETUP_STAGE_CACHE_KEY, stage, expires_in_sec=SETUP_JOB_TIMEOUT)
+	if stage:
+		frappe.publish_realtime(
+			SETUP_REALTIME_EVENT, {"status": "running", "stage": stage}, user=frappe.session.user
+		)
+
+
 def set_setup_status(status: str, error: str | None = None):
 	frappe.db.set_single_value(SETTINGS_DOCTYPE, {"store_setup_status": status, "store_setup_error": error})
 
@@ -314,6 +327,7 @@ def set_setup_status(status: str, error: str | None = None):
 def queue_store_setup(setup_args: dict) -> dict:
 	"""Mark setup running and enqueue its job; deduplicate keeps a second click from queueing another."""
 	set_setup_status("running")
+	set_setup_stage(None)
 	# The job reaches the queue only after this request commits: until then, running without a job is not
 	# a dead job.
 	frappe.cache.set_value(SETUP_QUEUEING_CACHE_KEY, 1, expires_in_sec=SETUP_QUEUEING_SECONDS)
@@ -333,8 +347,11 @@ def run_store_setup(setup_args: dict):
 	"""Background job, run as the owner who queued it: setup, then the Commera Settings a store sells with."""
 	status, error = "done", None
 	try:
+		set_setup_stage("company")
 		run_frappe_setup(setup_args)
+		set_setup_stage("storefront")
 		seed_commera_settings(setup_args["company_name"])
+		set_setup_stage("payments")
 		# The COD Mode of Payment was made before the company had a cash account to link.
 		create_payment_modes()
 	except Exception as exception:

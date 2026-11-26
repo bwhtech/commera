@@ -5,7 +5,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Alert, Button, Spinner } from 'frappe-ui'
+import { Alert, Button, Spinner, toast } from 'frappe-ui'
 import { bootValue } from '../../data/boot'
 import {
   completeOnboarding,
@@ -32,7 +32,7 @@ import {
   lookFor,
   readSavedStep,
 } from '../../ia/onboarding'
-import { canFinish, missingField, resumeStep, storePicks } from '../../ia/onboardingSteps'
+import { STEP_INDEX, canFinish, missingField, resumeStep, storePicks } from '../../ia/onboardingSteps'
 import { useEntrance } from '../../utils/reveal'
 import OnboardingPreview from './OnboardingPreview.vue'
 import StepYou from './steps/StepYou.vue'
@@ -55,9 +55,19 @@ const SLIDES = {
   back: { enter: '-translate-x-4 opacity-0 motion-reduce:translate-x-0', leave: 'translate-x-4 opacity-0 motion-reduce:translate-x-0' },
 }
 
+const MISSING_MESSAGES = {
+  fullName: __('Add your full name to continue'),
+  password: __('Add a password to continue'),
+  storeName: __('Add your store name to continue'),
+  country: __('Pick your country to continue'),
+  company: __('Pick your company to continue'),
+  priceList: __('Pick a price list to continue'),
+}
+
 const router = useRouter()
 const saving = ref(false)
 const finishing = ref(false)
+const build = ref(0)
 const retrying = ref(false)
 // The record's load, which "Try again" repeats: 'idle' | 'loading' | 'error' | 'ready'.
 const loadStatus = ref('idle')
@@ -74,14 +84,14 @@ const isReady = computed(() => canFinish(storeSetup.status))
 const stepProps = computed(() => {
   if (step.value.key === 'you') return { needsPassword: needsPassword.value }
   if (step.value.key === 'store') return { record: record.value }
-  if (step.value.key === 'done') return { finishing: finishing.value, setupStatus: storeSetup.status }
+  if (step.value.key === 'done') {
+    return { finishing: finishing.value, setupStatus: storeSetup.status, setupStage: storeSetup.stage, look }
+  }
   return {}
 })
 
 const title = computed(() => {
   if (step.value.key === 'you') return draft.fullName ? __('Welcome, {0}', [draft.fullName.trim().split(' ')[0]]) : step.value.title
-  if (step.value.key === 'done' && storeSetup.status === 'failed') return __('Almost there')
-  if (step.value.key === 'done') return draft.storeName.trim() ? __('{0} is ready', [draft.storeName.trim()]) : __('Your store is ready')
   return step.value.title
 })
 
@@ -106,6 +116,7 @@ function storeSetupValues() {
   if (draft.existingStore) {
     return {
       store_name: draft.storeName.trim(),
+      store_category: draft.storeCategory,
       country: draft.country,
       currency: draft.currency,
       time_zone: draft.timeZone,
@@ -115,6 +126,7 @@ function storeSetupValues() {
   }
   return {
     store_name: draft.storeName.trim(),
+    store_category: draft.storeCategory,
     country: draft.country,
     currency: draft.currency,
     time_zone: draft.timeZone,
@@ -130,18 +142,31 @@ const SAVES = {
   store: async () => (await startStoreSetup(storeSetupValues())) && saveBrand(draft),
 }
 
+const missing = computed(() =>
+  missingField(step.value.key, draft, {
+    needsPassword: needsPassword.value,
+    picks: storePicks(record.value?.existing_store, draft.company),
+  }),
+)
+
 async function next() {
-  const picks = storePicks(record.value?.existing_store, draft.company)
-  if (missingField(step.value.key, draft, { needsPassword: needsPassword.value, picks })) {
+  if (missing.value) {
     flow.showErrors = true
+    toast.error(MISSING_MESSAGES[missing.value])
     return
   }
   // Enter in a field submits the form even while the Continue button shows its spinner.
   if (saving.value) return
+  if (step.value.key === 'store') return startBuild()
   saving.value = true
   const saved = await (SAVES[step.value.key]?.() ?? true)
   saving.value = false
   if (saved) goToStep(flow.index + 1)
+}
+
+async function startBuild() {
+  goToStep(STEP_INDEX.done)
+  if (!(await SAVES.store())) goToStep(STEP_INDEX.store)
 }
 
 async function retrySetup() {
@@ -177,7 +202,7 @@ async function finish() {
 <template>
   <div class="fixed inset-0 z-10 flex bg-surface-base" data-onboarding>
     <aside class="hidden min-w-0 flex-1 items-center justify-center bg-surface-gray-2 p-10 lg:flex">
-      <OnboardingPreview :focus="step.focus" :stage="flow.index" :look="look" />
+      <OnboardingPreview :focus="step.focus" :stage="flow.index" :look="look" :build="step.key === 'done' ? build : null" />
     </aside>
 
     <main class="flex h-full w-full flex-col lg:w-[480px] lg:shrink-0 xl:w-[520px]">
@@ -201,24 +226,7 @@ async function finish() {
             leave-to-class="opacity-0"
           >
             <span
-              v-if="storeSetup.status === 'running'"
-              key="running"
-              class="flex items-center gap-1.5 text-sm text-ink-gray-5"
-              data-onboarding-setup="running"
-              :title="__('Creating your company, books and warehouse')"
-            >
-              <Spinner class="size-3.5" /> {{ __('Setting up') }}
-            </span>
-            <span
-              v-else-if="storeSetup.status === 'done'"
-              key="done"
-              class="flex items-center gap-1.5 text-sm text-ink-green-6"
-              data-onboarding-setup="done"
-            >
-              <span class="lucide-circle-check size-3.5" aria-hidden="true" /> {{ __('Ready') }}
-            </span>
-            <span
-              v-else-if="storeSetup.status === 'failed'"
+              v-if="storeSetup.status === 'failed'"
               key="failed"
               class="flex items-center gap-1.5 text-sm text-ink-red-6"
               data-onboarding-setup="failed"
@@ -240,7 +248,7 @@ async function finish() {
       <div v-else class="mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col overflow-y-auto px-4 pb-10 pt-[10vh] sm:px-1">
         <div
           class="mb-8 h-[3px] shrink-0 overflow-hidden rounded-full bg-surface-gray-2 transition-[opacity,transform] delay-200 duration-500 ease-out-strong"
-          :class="entered && step.key !== 'done' ? 'translate-y-0 opacity-100' : 'translate-y-2.5 opacity-0 motion-reduce:translate-y-0'"
+          :class="entered ? 'translate-y-0 opacity-100' : 'translate-y-2.5 opacity-0 motion-reduce:translate-y-0'"
         >
           <div
             class="h-full origin-left rounded-full rtl:origin-right bg-surface-gray-10 transition-transform duration-500 ease-in-out-strong"
@@ -276,19 +284,21 @@ async function finish() {
             leave-active-class="pointer-events-none absolute inset-0 transition-[opacity,transform] duration-150 ease-out-strong"
             :leave-to-class="slide.leave"
           >
-            <form :key="step.key" class="flex flex-1 flex-col" :data-onboarding-step="step.key" @submit.prevent="next">
-              <div
-                v-if="step.key === 'done'"
-                class="mb-4 flex size-10 items-center justify-center rounded-full bg-surface-green-2 text-ink-green-6"
-              >
-                <span class="lucide-party-popper size-5" aria-hidden="true" />
-              </div>
-              <h1 class="mb-7 text-3xl-semibold text-ink-gray-9">{{ title }}</h1>
+            <form :key="step.key" novalidate class="flex flex-1 flex-col" :data-onboarding-step="step.key" @submit.prevent="next">
+              <h1 v-if="step.key !== 'done'" class="mb-7 text-3xl-semibold text-ink-gray-9">{{ title }}</h1>
 
-              <component :is="STEP_COMPONENTS[step.key]" v-bind="stepProps" @finish="finish" />
+              <component :is="STEP_COMPONENTS[step.key]" v-bind="stepProps" @finish="finish" @build="build = $event" />
 
               <div v-if="step.key !== 'done'" class="mt-auto space-y-1 pt-8">
-                <Button type="submit" variant="solid" size="md" :label="__('Continue')" class="w-full" :loading="saving" />
+                <Button
+                  type="submit"
+                  variant="solid"
+                  size="md"
+                  :label="__('Continue')"
+                  class="w-full aria-disabled:!bg-surface-gray-2 aria-disabled:!text-ink-gray-4"
+                  :aria-disabled="missing ? 'true' : undefined"
+                  :loading="saving"
+                />
                 <Button v-if="step.optional" variant="ghost" size="md" :label="__('Skip')" class="w-full" :disabled="saving" @click="goToStep(flow.index + 1)" />
               </div>
             </form>

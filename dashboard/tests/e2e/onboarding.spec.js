@@ -72,6 +72,7 @@ describe('onboarding', () => {
     Object.assign(original, {
       onboardingCompleted: settings.onboarding_completed ? 1 : 0,
       storeName: settings.store_name || '',
+      storeCategory: settings.store_category || '',
       brandLogo: record.brand_logo || '',
       isNewStore: record.setup?.status !== 'done',
       theme: activeTheme,
@@ -84,6 +85,7 @@ describe('onboarding', () => {
     await adminPost(page, 'onboarding.save_brand', { brand_logo: original.brandLogo })
     await writeSettings(page, {
       store_name: original.storeName,
+      store_category: original.storeCategory,
       onboarding_completed: original.onboardingCompleted,
     })
   })
@@ -108,6 +110,7 @@ describe('onboarding', () => {
       const storeName = await page.$('[data-onboarding-step="store"] input[autocomplete="organization"]')
       await storeName.click({ clickCount: 3 })
       await storeName.type(STORE_NAME, { delay: 10 })
+      await clickByText(page, '[data-onboarding-step="store"] button', 'Fashion')
 
       await page.click('[data-onboarding-accounting]')
       await wait(500)
@@ -123,22 +126,24 @@ describe('onboarding', () => {
       assert.equal(await page.$eval('[data-onboarding-step="store"] input[autocomplete="organization"]', (input) => input.value), STORE_NAME)
       await pressContinue(page, 'done')
 
-      await page.waitForSelector('[data-onboarding-setup="done"], [data-onboarding-setup="failed"]', { timeout: SETUP_TIMEOUT })
+      await page.waitForFunction(
+        () => !document.querySelector('[data-onboarding]') || document.querySelector('[data-onboarding-setup="failed"]'),
+        { timeout: SETUP_TIMEOUT },
+      )
       const failure = await page.$('[data-onboarding-setup="failed"]')
       assert.equal(failure, null, 'the store setup finished: ' + (failure ? await text(page) : ''))
-      assert.ok((await text(page)).includes(`${STORE_NAME} is ready`))
 
-      await clickByText(page, '[data-onboarding] button', 'Go to Home', { pause: 300 })
       // A store whose currency changed reloads into Home instead of switching in place.
       await page.waitForFunction(
         () => !document.querySelector('[data-onboarding]') && document.body.innerText.includes('Orders'),
         { timeout: 30000 },
       )
       await wait(1500)
-      assert.ok(!(await text(page)).includes(`${STORE_NAME} is ready`), 'Home replaced onboarding')
+      assert.ok(!(await text(page)).includes('Welcome to Commera'), 'Home replaced onboarding')
 
       const settings = await readSettings(page)
       assert.equal(settings.store_name, STORE_NAME)
+      assert.equal(settings.store_category, 'Fashion')
       assert.equal(Boolean(settings.onboarding_completed), true)
       if (original.isNewStore) {
         assert.equal(Boolean(settings.cod_enabled), true, 'a new store takes cash on delivery')

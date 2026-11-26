@@ -4,7 +4,7 @@
  * the real piece — name, hero, button, products.
  */
 import { computed } from 'vue'
-import { draft } from '../../ia/onboarding'
+import { SAMPLE_PRODUCTS, draft } from '../../ia/onboarding'
 import { STEP_INDEX } from '../../ia/onboardingSteps'
 import commeraLogo from '../../assets/commera.svg'
 
@@ -13,7 +13,10 @@ const props = defineProps({
   stage: { type: Number, default: 0 },
   mobile: { type: Boolean, default: false },
   look: { type: Object, required: true },
+  build: { type: Number, default: null },
 })
+
+const STAGGER = ['delay-0', 'delay-100', 'delay-200', 'delay-300']
 
 const SIZES = {
   desktop: {
@@ -29,6 +32,7 @@ const SIZES = {
     heroLine: 'text-5xl',
     button: 'px-5 py-2 text-sm',
     grid: '-mx-3 grid-cols-4 gap-4 p-3',
+    product: 'size-8',
   },
   mobile: {
     frame: 'gap-3 px-3 pb-4 pt-1',
@@ -43,6 +47,7 @@ const SIZES = {
     heroLine: 'text-2xl',
     button: 'px-3.5 py-1 text-2xs',
     grid: 'grid-cols-2 gap-2',
+    product: 'size-5',
   },
 }
 
@@ -50,6 +55,14 @@ const size = computed(() => (props.mobile ? SIZES.mobile : SIZES.desktop))
 const storeName = computed(() => draft.storeName.trim())
 const isTyping = computed(() => props.stage === STEP_INDEX.store)
 const hasButton = computed(() => props.stage >= STEP_INDEX.store)
+const isBuilding = computed(() => props.build !== null)
+const isBuilt = (level, otherwise) => (isBuilding.value ? props.build >= level : otherwise)
+const showsLogo = computed(() => isBuilt(1, true))
+const showsName = computed(() => Boolean(storeName.value) && isBuilt(2, true))
+const showsIcons = computed(() => isBuilt(2, props.stage >= STEP_INDEX.store))
+const showsHero = computed(() => Boolean(storeName.value) && isBuilt(3, true))
+const showsProducts = computed(() => isBuilt(4, false))
+const productIcons = computed(() => SAMPLE_PRODUCTS[draft.storeCategory] ?? SAMPLE_PRODUCTS.Other)
 
 // Ring width, not colour, is what changes: box-shadow interpolates between widths, so moving the
 // focus from one area to the next cross-fades instead of jumping.
@@ -67,14 +80,21 @@ const ring = (area) => (props.focus === area && !props.mobile ? 'ring-1 ring-ins
     >
       <Transition
         mode="out-in"
-        enter-active-class="transition-[opacity,transform] duration-500 ease-out-strong"
-        enter-from-class="scale-90 opacity-0 motion-reduce:scale-100"
+        :enter-active-class="isBuilding ? 'transition-[opacity,transform] duration-500 ease-spring' : 'transition-[opacity,transform] duration-500 ease-out-strong'"
+        :enter-from-class="isBuilding ? 'scale-0 opacity-0 motion-reduce:scale-100' : 'scale-90 opacity-0 motion-reduce:scale-100'"
         leave-active-class="transition-opacity duration-150"
         leave-to-class="opacity-0"
       >
-        <img :key="draft.brandLogo" :src="draft.brandLogo || commeraLogo" alt="" class="w-auto object-contain" :class="size.logo" />
+        <img
+          v-if="showsLogo"
+          :key="draft.brandLogo"
+          :src="draft.brandLogo || commeraLogo"
+          alt=""
+          class="w-auto object-contain"
+          :class="size.logo"
+        />
       </Transition>
-      <span v-if="storeName" class="truncate" :class="[size.name, look.heading]">
+      <span v-if="showsName" class="truncate" :class="[size.name, look.heading]">
         {{ storeName
         }}<span
           v-if="isTyping"
@@ -86,7 +106,7 @@ const ring = (area) => (props.focus === area && !props.mobile ? 'ring-1 ring-ins
 
       <div class="ms-auto flex items-center" :class="size.icons">
         <Transition enter-active-class="transition-opacity duration-500 ease-out-strong" enter-from-class="opacity-0">
-          <div v-if="stage >= STEP_INDEX.store" class="flex items-center" :class="size.icons">
+          <div v-if="showsIcons" class="flex items-center" :class="size.icons">
             <span class="lucide-search" :class="size.icon" aria-hidden="true" />
             <span class="lucide-shopping-bag" :class="size.icon" aria-hidden="true" />
           </div>
@@ -102,7 +122,7 @@ const ring = (area) => (props.focus === area && !props.mobile ? 'ring-1 ring-ins
       leave-to-class="opacity-0"
     >
       <section
-        v-if="storeName"
+        v-if="showsHero"
         key="hero"
         class="relative flex flex-1 overflow-hidden transition-[background-color,border-radius,box-shadow] duration-500 ease-out-strong"
         :class="[size.hero, look.hero, look.radius]"
@@ -133,12 +153,23 @@ const ring = (area) => (props.focus === area && !props.mobile ? 'ring-1 ring-ins
     </Transition>
 
     <section class="grid shrink-0" :class="size.grid">
-      <div
-        v-for="ghost in 4"
-        :key="`ghost-${ghost}`"
-        class="aspect-[4/5] border-2 border-dashed border-outline-gray-2"
-        :class="look.radius"
-      />
+      <Transition
+        v-for="(delay, index) in STAGGER"
+        :key="index"
+        mode="out-in"
+        enter-active-class="transition-[opacity,transform] duration-500 ease-out-strong"
+        enter-from-class="translate-y-2 opacity-0 motion-reduce:translate-y-0"
+      >
+        <div
+          v-if="showsProducts"
+          key="product"
+          class="flex aspect-[4/5] items-center justify-center text-ink-gray-5"
+          :class="[look.tile, look.radius, delay]"
+        >
+          <span :class="[productIcons[index], size.product]" aria-hidden="true" />
+        </div>
+        <div v-else key="ghost" class="aspect-[4/5] border-2 border-dashed border-outline-gray-2" :class="look.radius" />
+      </Transition>
     </section>
   </div>
 </template>

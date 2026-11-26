@@ -29,7 +29,7 @@ export const onboardingLoadError = ref(null)
 // read this, and only adoptSetup() writes it. `status` is the server's (idle, running, done,
 // failed); `poll` is ours: whether this tab is still asking (`polling`), gave up asking
 // (`stalled`), or has nothing to ask about (`off`).
-export const storeSetup = reactive({ status: 'idle', error: '', poll: 'off' })
+export const storeSetup = reactive({ status: 'idle', error: '', stage: '', poll: 'off' })
 
 // No socket is open in the dashboard, so the job's realtime event cannot reach it; polling is
 // the one channel, on the schedule setupPollDelay() sets. Once it says stop, the tab says so
@@ -41,6 +41,7 @@ function adoptSetup(answer) {
   if (!answer) return
   storeSetup.status = answer.status
   storeSetup.error = answer.error || ''
+  storeSetup.stage = answer.stage || ''
   if (answer.status === 'running') schedulePoll()
   else stopSetupPolling()
 }
