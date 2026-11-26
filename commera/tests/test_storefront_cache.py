@@ -132,7 +132,7 @@ class TestStorefrontCache(UnitTestCase):
 		)
 
 	def test_l1_returns_isolated_copies_against_caller_mutation(self):
-		"""M6(c): mutating a dict returned from L1 must not poison subsequent hits."""
+		"""M6(c) + R4: mutating dicts returned from L1 or L2 must not poison subsequent hits."""
 		first = sfc.get_or_compute(
 			"test.mut", ("k",), ("catalog",), lambda: {"items": ["a"]}, include_locale=False
 		)
@@ -141,6 +141,53 @@ class TestStorefrontCache(UnitTestCase):
 			"test.mut", ("k",), ("catalog",), lambda: {"items": ["fresh"]}, include_locale=False
 		)
 		self.assertEqual(second, {"items": ["a"]})
+
+		# L2 hit also returns an isolated deep copy even if the backend returns a shared object.
+		sfc._l1_api.clear()
+		shared_l2 = {"items": ["from_l2"]}
+		with patch.object(frappe.cache, "get_value", return_value=shared_l2):
+			from_l2 = sfc.get_or_compute(
+				"test.mut", ("k2",), ("catalog",), lambda: {"items": ["fresh"]}, include_locale=False
+			)
+		from_l2["items"].append("mutated_l2")
+		self.assertEqual(shared_l2, {"items": ["from_l2"]})
+		self.assertEqual(
+			sfc.get_or_compute(
+				"test.mut", ("k2",), ("catalog",), lambda: {"items": ["fresh"]}, include_locale=False
+			),
+			{"items": ["from_l2"]},
+		)
+
+	def test_get_or_compute_should_cache_skips_l1_and_l2_when_false(self):
+		calls = 0
+
+		def compute():
+			nonlocal calls
+			calls += 1
+			return {"products": []}
+
+		with patch.object(frappe.cache, "set_value", wraps=frappe.cache.set_value) as set_spy:
+			first = sfc.get_or_compute(
+				"test.empty",
+				("k",),
+				("catalog",),
+				compute,
+				include_locale=False,
+				should_cache=lambda val: bool(val["products"]),
+			)
+			second = sfc.get_or_compute(
+				"test.empty",
+				("k",),
+				("catalog",),
+				compute,
+				include_locale=False,
+				should_cache=lambda val: bool(val["products"]),
+			)
+		self.assertEqual(first, {"products": []})
+		self.assertEqual(second, {"products": []})
+		self.assertEqual(calls, 2)
+		self.assertEqual(len(sfc._l1_api), 0)
+		set_spy.assert_not_called()
 
 	def test_guest_only_gate_skips_cache_for_signed_in_users(self):
 		calls = 0
@@ -231,7 +278,7 @@ class TestStorefrontCache(UnitTestCase):
 				sfc.store_cached_ssr_response("products", "<html>vip</html>")
 				self.assertIsNone(sfc.get_cached_ssr_response("products"))
 
-				# R3-2: free-text search, price range, and unbounded/invalid page or page_size bypass SSR cache.
+				# R3-2 + R4-1: search, price range, invalid sort/flag, and unbounded pagination bypass cache.
 				for bad_qs in (
 					"search=x",
 					"min=100",
@@ -240,6 +287,8 @@ class TestStorefrontCache(UnitTestCase):
 					"page=21",
 					"page=abc",
 					"page_size=13",
+					"sort_by=random",
+					"has_discount=yes",
 				):
 					frappe.local.request = _mock_get_request("/products", query_string=bad_qs)
 					self.assertFalse(sfc.is_cacheable_ssr_request("products"), bad_qs)
@@ -322,9 +371,41 @@ class TestStorefrontCacheIntegration(IntegrationTestCase):
 		# Clear cached Single docs after rollback so uncommitted test edits never leak into later tests.
 		frappe.clear_document_cache("Commera Settings", "Commera Settings")
 
+	def _insert_published_variant(self, prefix: str = "ZZ-SFC"):
+		suffix = frappe.generate_hash(length=6).upper()
+		item_code = f"{prefix}-{suffix}"
+		frappe.get_doc(
+			{
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": item_code,
+				"item_group": "All Item Groups",
+				"stock_uom": "Nos",
+				"is_stock_item": 0,
+			}
+		).insert(ignore_permissions=True)
+		variant = frappe.get_doc(
+			{
+				"doctype": "Style Attribute Variant",
+				"configurator": get_test_configurator(),
+				"item_style": item_code,
+				"item_group": "All Item Groups",
+				"attribute_value": f"V-{suffix}",
+				"display_name": f"D-{suffix}",
+				"route": f"{prefix.lower()}-{suffix.lower()}",
+				"is_published": 1,
+				"sizes": [{"size": "M", "item_code": item_code}],
+			}
+		).insert(ignore_permissions=True)
+		frappe.db.after_commit.run()
+		return variant
+
 	def test_http_v1_and_v2_miss_hit_l1_hit_l2_match_uncached(self):
 		"""B6 + B4: MISS == HIT-L1 == HIT-L2 == uncached across v1 and v2 envelopes, no Cache-Control: public."""
 		from commera.api.storefront import collections, products, search, shop
+
+		self._insert_published_variant("ZZ-HTTP")
+		sfc.clear_all_storefront_caches()
 
 		endpoints = [
 			("commera.api.storefront.shop.get_shop", lambda: shop.get_shop()),
@@ -397,6 +478,122 @@ class TestStorefrontCacheIntegration(IntegrationTestCase):
 			self.assertNotIsInstance(res, Response, dotted)
 		self.assertEqual(len(sfc._l1_bytes), 0)
 		self.assertEqual(len(sfc._l1_api), 0)
+
+	def test_random_category_and_empty_listing_leave_l1_and_l2_empty(self):
+		"""R4-1: random category/filter values and empty listings leave both L1 and L2 empty across API and SSR."""
+		import os
+
+		from commera.api.storefront import collections, products
+		from commera.shop_themes.doctype.shop_theme.shop_theme import render_theme_context
+		from commera.shop_themes.theme_resolver import ThemePageRenderer, load_page_controller
+		from commera.themes.commera_standard.pages.products import list as standard_list
+
+		self._insert_published_variant("ZZ-R4")
+		sfc.clear_all_storefront_caches()
+
+		frappe.set_user("Guest")
+		frappe.local.request_ip = "127.0.0.1"
+		orig_csrf = frappe.session.data.get("csrf_token")
+		frappe.session.data["csrf_token"] = None
+		try:
+			# 1. Guest API: unknown collection raises; unknown brand yields empty products & skips cache.
+			with patch.object(frappe.cache, "set_value", wraps=frappe.cache.set_value) as set_spy:
+				frappe.local.request = _mock_get_request(
+					"/api/method/commera.api.storefront.products.get_products"
+				)
+				empty_http = products.get_products(brands="nonexistent-brand-r4")
+				self.assertNotIsInstance(empty_http, Response)
+				self.assertEqual(empty_http["products"], [])
+
+				delattr(frappe.local, "request")
+				empty_py = products.get_products(brands="nonexistent-brand-r4")
+				self.assertEqual(empty_py["products"], [])
+
+				frappe.local.request = _mock_get_request(
+					"/api/method/commera.api.storefront.products.get_products"
+				)
+				with self.assertRaises(frappe.DoesNotExistError):
+					products.get_products(collection="nonexistent-category-r4")
+
+				frappe.local.request = _mock_get_request(
+					"/api/method/commera.api.storefront.collections.get_collection"
+				)
+				with self.assertRaises(frappe.DoesNotExistError):
+					collections.get_collection("nonexistent-category-r4")
+
+			self.assertEqual(len(sfc._l1_bytes), 0)
+			self.assertEqual(len(sfc._l1_api), 0)
+			for call in set_spy.call_args_list:
+				key = str(call.args[0]) if call.args else ""
+				if key.startswith("commera:sfc:flag:"):
+					continue
+				self.assertFalse(key.startswith("commera:sfc:"), f"Unexpected L2 write: {key}")
+
+			# 2. SSR: random ?category= and empty ?brands= leave L1 and L2 empty; non-empty /products caches.
+			starter_dir = os.path.join(frappe.get_app_path("commera"), "themes", "commera_standard")
+			theme_ctx = {
+				"theme_name": "Commera Standard",
+				"theme_type": "Sections",
+				"names": ["Commera Standard"],
+				"dirs": [starter_dir],
+				"apps": {"Commera Standard": "commera"},
+				"settings_doctype": None,
+			}
+			with (
+				patch("commera.storefront_access.is_storefront_published", return_value=True),
+				render_theme_context(theme_ctx),
+			):
+				for qs, form in (
+					("category=nonexistent-category-r4", {"category": "nonexistent-category-r4"}),
+					("brands=nonexistent-brand-r4", {"brands": "nonexistent-brand-r4"}),
+				):
+					sfc.clear_all_storefront_caches()
+					frappe.local.request = _mock_get_request("/products", query_string=qs)
+					frappe.local.form_dict = frappe._dict(form)
+					renderer = ThemePageRenderer("products")
+					renderer.theme_dirs = [starter_dir]
+					renderer.template_path = "pages/products/list.html"
+					resp = renderer.render()
+					self.assertEqual(resp.status_code, 200, qs)
+					self.assertIsNone(resp.headers.get("X-Commera-Cache"), qs)
+					self.assertEqual(len(sfc._l1_ssr), 0, qs)
+					self.assertIsNone(
+						sfc.get_cached_ssr_response(
+							"products", allowed_query_params=standard_list.ssr_query_params
+						),
+						qs,
+					)
+
+				# Legacy theme controllers also set skip_ssr_cache for random category and empty results.
+				for theme_slug in ("shop_default_theme", "summer_theme"):
+					theme_dir = os.path.join(frappe.get_app_path("commera"), "themes", theme_slug)
+					mod = load_page_controller([theme_dir], "pages/products/list.html")
+					for form in (
+						{"category": "nonexistent-category-r4"},
+						{"brands": "nonexistent-brand-r4"},
+					):
+						frappe.local.form_dict = frappe._dict(form)
+						ctx = frappe._dict()
+						mod.get_context(ctx)
+						self.assertTrue(ctx.get("skip_ssr_cache"), (theme_slug, form))
+
+				# Non-empty /products still stores and serves from SSR cache.
+				sfc.clear_all_storefront_caches()
+				frappe.local.request = _mock_get_request("/products")
+				frappe.local.form_dict = frappe._dict()
+				renderer = ThemePageRenderer("products")
+				renderer.theme_dirs = [starter_dir]
+				renderer.template_path = "pages/products/list.html"
+				ok_resp = renderer.render()
+				self.assertEqual(ok_resp.headers.get("X-Commera-Cache"), "MISS")
+				cached = sfc.get_cached_ssr_response(
+					"products", allowed_query_params=standard_list.ssr_query_params
+				)
+				self.assertIsNotNone(cached)
+				self.assertEqual(cached.headers.get("X-Commera-Cache"), "HIT-L1")
+		finally:
+			frappe.session.data["csrf_token"] = orig_csrf
+			frappe.set_user("Administrator")
 
 	def test_real_doc_saves_and_db_set_value_invalidate_domains(self):
 		"""B5 + B6: real DocType saves and navbar_manager.set_visibility invalidate cached reads."""

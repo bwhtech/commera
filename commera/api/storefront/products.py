@@ -84,6 +84,7 @@ def get_products(
 		_compute,
 		endpoint="commera.api.storefront.products.get_products",
 		ttl=60,
+		should_cache=lambda page: bool(page["products"]),
 	)
 
 

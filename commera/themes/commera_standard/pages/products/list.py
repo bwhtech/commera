@@ -56,6 +56,8 @@ def get_context(context):
 			collection=context.collection["handle"] if context.collection else None, **arguments
 		)
 
+	if not context.listing["products"] or (form.get("category") and not context.collection):
+		context.skip_ssr_cache = True
 	context.last_page = ceil(context.listing["total"] / PAGE_SIZE)
 	context.page_url = lambda page: get_listing_url(context, page=page)
 	context.chips = get_chips(context)

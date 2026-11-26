@@ -365,6 +365,7 @@ def get_or_compute(
 	*,
 	ttl: int = 60,
 	include_locale: bool = True,
+	should_cache: Callable[[Any], bool] | None = None,
 ) -> Any:
 	"""Epoch-versioned L1 + L2 cache returning isolated Python objects (safe for mutable callers)."""
 	if not is_cache_enabled() or _is_domain_dirty(domains):
@@ -383,10 +384,10 @@ def get_or_compute(
 	l2 = frappe.cache.get_value(key)
 	if l2 is not None:
 		_l1_set(_l1_api, key, copy.deepcopy(l2), min(ttl, 30), L1_MAX_ENTRIES)
-		return l2
+		return copy.deepcopy(l2)
 
 	value = compute_fn()
-	if value is not None:
+	if value is not None and (should_cache is None or should_cache(value)):
 		_l1_set(_l1_api, key, copy.deepcopy(value), min(ttl, 30), L1_MAX_ENTRIES)
 		frappe.cache.set_value(key, value, expires_in_sec=ttl)
 	return value
@@ -436,21 +437,6 @@ def cached_guest_api(
 		frappe.cache.set_value(bkey, raw_bytes, expires_in_sec=ttl)
 		return _make_json_response(raw_bytes, cache_status="MISS", cache_control=cache_control)
 
-	if should_cache is not None:
-		key = _hash_key(namespace, (_site(), locale, stamp, key_parts))
-		hit = _l1_get(_l1_api, key)
-		if hit is not None:
-			return copy.deepcopy(hit)
-		l2 = frappe.cache.get_value(key)
-		if l2 is not None:
-			_l1_set(_l1_api, key, copy.deepcopy(l2), min(ttl, 30), L1_MAX_ENTRIES)
-			return l2
-		value = compute_fn()
-		if value is not None and should_cache(value):
-			_l1_set(_l1_api, key, copy.deepcopy(value), min(ttl, 30), L1_MAX_ENTRIES)
-			frappe.cache.set_value(key, value, expires_in_sec=ttl)
-		return value
-
 	return get_or_compute(
 		namespace,
 		key_parts,
@@ -458,10 +444,17 @@ def cached_guest_api(
 		compute_fn,
 		ttl=ttl,
 		include_locale=include_locale,
+		should_cache=should_cache,
 	)
 
 
 # Guest SSR Page Cache (opt-in per page controller via `cacheable_ssr = True`)
+
+
+ALLOWED_CACHED_SORT_KEYS = frozenset(
+	{"default", "price_low", "price_high", "name", "new_arrival", "discount"}
+)
+ALLOWED_CACHED_FLAGS = frozenset({"0", "1"})
 
 
 def _is_tracking_param(param: str) -> bool:
@@ -474,6 +467,10 @@ def _is_valid_ssr_param_values(param: str, values: list[str]) -> bool:
 		return len(values) == 1 and values[0].isdigit() and 1 <= int(values[0]) <= MAX_CACHED_PAGE
 	if param == "page_size":
 		return len(values) == 1 and values[0].isdigit() and int(values[0]) in ALLOWED_CACHED_PAGE_SIZES
+	if param == "sort_by":
+		return len(values) == 1 and values[0] in ALLOWED_CACHED_SORT_KEYS
+	if param == "has_discount":
+		return len(values) == 1 and values[0] in ALLOWED_CACHED_FLAGS
 	return True
 
 

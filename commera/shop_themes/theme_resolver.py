@@ -198,7 +198,12 @@ class ThemePageRenderer:
 		html = self.render_with_theme_loader(context)
 		status = self.http_status_code or 200
 		headers = None
-		if status == 200 and not self.requires_auth and controller_cacheable:
+		if (
+			status == 200
+			and not self.requires_auth
+			and controller_cacheable
+			and not context.get("skip_ssr_cache")
+		):
 			from commera.storefront_cache import is_cacheable_ssr_request, store_cached_ssr_response
 
 			route_path = self.get_request_path()
