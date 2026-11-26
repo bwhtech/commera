@@ -2534,3 +2534,14 @@ Leave blank to use the default channel.,اتركه فارغًا لاستخدام
 Set the same token as the x-api-key in Shiprocket's webhook settings.,استخدم الرمز نفسه المعيّن كـ x-api-key في إعدادات الويب هوك لدى Shiprocket.
 Missing sizes,ينقصه مقاسات
 Cannot publish without Sizes,لا يمكن النشر بدون مقاسات
+Generate Demo Products,إنشاء منتجات تجريبية
+Remove demo products,إزالة المنتجات التجريبية
+1 demo product added,أُضيف منتج تجريبي واحد
+{0} demo products added,أُضيف {0} من المنتجات التجريبية
+Remove them from Products when you add your own.,أزِلها من صفحة المنتجات عندما تضيف منتجاتك.
+Remove demo products?,إزالة المنتجات التجريبية؟
+This deletes only the demo products. Your own products stay as they are.,يحذف هذا المنتجات التجريبية فقط. تبقى منتجاتك كما هي.
+{0} demo products removed. {1} kept because they have orders or views,أُزيل {0} من المنتجات التجريبية. وبقي {1} لأن عليها طلبات أو مشاهدات
+Demo products removed,أُزيلت المنتجات التجريبية
+Demo products are in your catalogue. Remove them when you add your own.,توجد منتجات تجريبية في كتالوجك. أزِلها عندما تضيف منتجاتك.
+Demo products are already in your catalogue.,المنتجات التجريبية موجودة بالفعل في كتالوجك.

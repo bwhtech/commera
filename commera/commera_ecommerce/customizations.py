@@ -87,6 +87,15 @@ CUSTOM_FIELDS = {
 			# ERPNext copies a template's fields onto its size Items; the rows belong to the template only.
 			"no_copy": 1,
 		},
+		{
+			"fieldname": "custom_is_sample_product",
+			"fieldtype": "Check",
+			"label": "Sample Product",
+			"insert_after": "custom_collections",
+			"hidden": 1,
+			"read_only": 1,
+			"no_copy": 1,
+		},
 	],
 	"Item Group": [
 		{

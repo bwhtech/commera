@@ -15,11 +15,18 @@ import BulkBar from '../components/BulkBar.vue'
 import SearchInput from '../components/SearchInput.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 import { pickCollectionFor, useCollections } from '../data/collections'
-import { priceRange, shortDate, stockTone } from '../data/format'
+import { priceRange, stockTone } from '../data/format'
 import { ia } from '../ia/store'
 import { productRoute } from '../ia/routes'
 import { importsLanded, openImport } from '../data/importFlow'
 import { openAddProduct } from '../data/addProduct'
+import {
+  confirmRemoveSampleProducts,
+  loadSampleProducts,
+  loadSampleProductsAction,
+  removeSampleProductsAction,
+  sampleProductsChanged,
+} from '../data/sampleProducts'
 import { useBulkAction } from '../utils/useBulkAction'
 import { __ } from '../data/translation'
 
@@ -40,7 +47,7 @@ function endSelecting() {
   selection.value = []
 }
 
-const sort = ref({ key: 'updated', direction: 'desc' })
+const sort = ref({ key: null, direction: 'desc' })
 const page = ref(1)
 const pageSize = ref(20)
 
@@ -75,6 +82,14 @@ const productsRequest = useAdminRead('catalog.get_products', {
 
 watch(importsLanded, () => productsRequest.reload())
 
+const sampleProductsRequest = useAdminRead('sample_products.get_sample_products')
+const sampleCount = computed(() => sampleProductsRequest.data?.count ?? 0)
+
+watch(sampleProductsChanged, () => {
+  productsRequest.reload()
+  sampleProductsRequest.reload()
+})
+
 // A filter changes what page one is, so it sends you back to it.
 watch([query, status, collection], () => (page.value = 1))
 
@@ -95,10 +110,10 @@ const total = computed(() => productsRequest.data?.total ?? 0)
 const rows = computed(() => {
   const products = productsRequest.data?.products ?? []
   const { key, direction } = sort.value
+  if (!key) return products
   const dir = direction === 'asc' ? 1 : -1
   const valueFor = (row) => {
     if (key === 'price') return row.price_from ?? 0
-    if (key === 'updated') return row.updated
     if (key === 'title') return row.title
     return row.stock
   }
@@ -222,13 +237,28 @@ function collectionSummary(product) {
       />
     </BulkBar>
 
+    <div
+      v-if="sampleCount"
+      class="mt-3 flex flex-wrap items-center gap-3 rounded-5 border border-outline-gray-1 bg-surface-gray-1 px-3 py-2.5"
+    >
+      <span class="lucide-flask-conical size-4 shrink-0 text-ink-gray-6" aria-hidden="true" />
+      <p class="min-w-0 flex-1 basis-64 text-base text-ink-gray-7">
+        {{ __('Demo products are in your catalogue. Remove them when you add your own.') }}
+      </p>
+      <Button
+        :label="__('Remove demo products')"
+        :loading="removeSampleProductsAction.loading"
+        @click="confirmRemoveSampleProducts"
+      />
+    </div>
+
     <div class="mt-3 overflow-x-auto">
       <List
       v-model:selection="selection"
       class="min-w-[54rem]"
       :selectable="selecting"
       :row-height="ia.density"
-      :columns="['1fr', '7rem', '8rem', '8rem', '7rem', '6rem']"
+      :columns="['1fr', '7rem', '8rem', '8rem', '7rem']"
     >
       <ListHeader>
         <ListHeaderCellSort :direction="directionFor('title')" @click="toggleSort('title')">
@@ -242,15 +272,12 @@ function collectionSummary(product) {
         <ListHeaderCellSort align="end" :direction="directionFor('price')" @click="toggleSort('price')">
           {{ __('Price') }}
         </ListHeaderCellSort>
-        <ListHeaderCellSort align="end" :direction="directionFor('updated')" @click="toggleSort('updated')">
-          {{ __('Updated', null, 'Date last updated') }}
-        </ListHeaderCellSort>
       </ListHeader>
 
       <!-- `loading` flips on every param change and the request keeps the previous
            `data`, so guarding on it alone would blank a loaded table on each sort
            toggle, keystroke and page change. The skeleton means first load only. -->
-      <ListSkeleton v-if="productsRequest.loading && !rows.length" :columns="6" />
+      <ListSkeleton v-if="productsRequest.loading && !rows.length" :columns="5" />
 
       <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
         <ListRow :route="productRoute(item.name)" :value="item.name">
@@ -281,9 +308,6 @@ function collectionSummary(product) {
               {{ priceRange(item.price_from, item.price_to) }}
             </span>
           </ListCell>
-          <ListCell>
-            <span class="w-full text-end text-base text-ink-gray-5">{{ shortDate(item.updated) }}</span>
-          </ListCell>
         </ListRow>
       </ListRows>
     </List>
@@ -305,7 +329,16 @@ function collectionSummary(product) {
       :filtered-title="__('No products match')"
       :filtered-description="__('Change the filters, or import a catalogue to get started.')"
     >
-      <Button :label="__('Import CSV')" icon-left="lucide-upload" variant="solid" theme="gray" class="mt-2" @click="openImport" />
+      <div class="mt-2 flex flex-wrap justify-center gap-2">
+        <Button :label="__('Import CSV')" icon-left="lucide-upload" variant="solid" theme="gray" @click="openImport" />
+        <Button
+          v-if="!isFiltered"
+          :label="__('Generate Demo Products')"
+          icon-left="lucide-package-plus"
+          :loading="loadSampleProductsAction.loading"
+          @click="loadSampleProducts"
+        />
+      </div>
     </EmptyState>
   </PageBody>
 </template>
