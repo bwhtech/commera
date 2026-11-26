@@ -117,9 +117,5 @@ onBeforeUnmount(() => clearTimeout(beatTimer))
       :label="__('Go to Home')"
       @click="$emit('finish')"
     />
-    <p v-else class="flex items-start gap-2 text-p-base text-ink-gray-6">
-      <span class="lucide-lock mt-0.5 size-4 shrink-0" aria-hidden="true" />
-      {{ __('Only you can see it for now. Publish it from Home when you are ready.') }}
-    </p>
   </div>
 </template>

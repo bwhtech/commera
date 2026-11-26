@@ -220,15 +220,7 @@ async function finish() {
             leave-to-class="opacity-0"
           >
             <span
-              v-if="storeSetup.status === 'done'"
-              key="done"
-              class="flex items-center gap-1.5 text-sm text-ink-green-6"
-              data-onboarding-setup="done"
-            >
-              <span class="lucide-circle-check size-3.5" aria-hidden="true" /> {{ __('Ready') }}
-            </span>
-            <span
-              v-else-if="storeSetup.status === 'failed'"
+              v-if="storeSetup.status === 'failed'"
               key="failed"
               class="flex items-center gap-1.5 text-sm text-ink-red-6"
               data-onboarding-setup="failed"
