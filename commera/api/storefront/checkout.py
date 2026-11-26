@@ -16,7 +16,23 @@ from commera.sdk.types import (
 
 @rate_limited_guest_api("GET", limit=1200, seconds=60 * 60)
 def get() -> CheckoutState | None:
-	return checkout.get()
+	from commera.core import get_open_cart_quotation_meta
+	from commera.plugin_events import get_handlers
+	from commera.storefront_cache import cached_checkout_response, is_cache_enabled
+
+	if not is_cache_enabled() or get_handlers("commera_hooks", "cart_fees"):
+		return checkout.get()
+
+	meta = get_open_cart_quotation_meta(["name", "modified"])
+	if not meta:
+		return None
+
+	return cached_checkout_response(
+		meta.name,
+		str(meta.modified),
+		lambda: checkout.get_checkout_state(frappe.get_doc("Quotation", meta.name)),
+		endpoint="commera.api.storefront.checkout.get",
+	)
 
 
 @rate_limited_guest_api("POST", limit=100, seconds=60 * 60)

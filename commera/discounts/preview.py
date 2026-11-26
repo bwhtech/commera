@@ -4,7 +4,7 @@ from erpnext.setup.utils import get_exchange_rate
 from frappe.utils.data import flt
 
 from commera.cart_prices import apply_market, price_regular_lines
-from commera.core import system_user_session
+from commera.core import get_cached_portal_customer, system_user_session
 from commera.discounts.pricing import apply_code_discounts
 from commera.item_price_guard import skip_auto_item_price
 from commera.localization.market_prices import MarketPrices
@@ -168,7 +168,7 @@ def get_preview_quotation(
 			"company": settings.get("company") or frappe.defaults.get_global_default("company"),
 			"order_type": "Shopping Cart",
 			"custom_discount_codes": codes,
-			"party_name": frappe.db.get_value("Portal User", {"user": user}, "parent") if user else None,
+			"party_name": get_cached_portal_customer(user) if user else None,
 			"contact_email": user,
 		}
 	)

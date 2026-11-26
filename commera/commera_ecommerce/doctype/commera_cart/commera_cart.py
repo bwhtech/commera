@@ -303,21 +303,31 @@ def change_quantity_from_the_end(cart, rows: list, delta: int):
 
 
 def get_code_states(quotation) -> list[dict]:
+	codes = get_discount_codes(quotation)
+	if not codes:
+		return []
 	applied = {(row["discount"], row.get("code")) for row in get_allocations(quotation)}
-	cart = get_cart_context(quotation)
-	selections = select_discounts(cart)
+	cart = None
+	selections = quotation.flags.get("_commera_selected_discounts")
 	states = []
-	for code in get_discount_codes(quotation):
+	for code in codes:
 		discount_name = get_code_discount(code)
 		discount = get_discount(discount_name) if discount_name else None
 		is_applied = (discount_name, code) in applied
+		reason = None
+		if not is_applied:
+			if cart is None:
+				cart = get_cart_context(quotation)
+			if selections is None:
+				selections = select_discounts(cart)
+			reason = get_code_reason(cart, code, selections)
 		states.append(
 			{
 				"code": code,
 				"title": discount.title if discount else code,
 				"discount_class": discount.discount_class if discount else None,
 				"applied": is_applied,
-				"reason": None if is_applied else get_code_reason(cart, code, selections),
+				"reason": reason,
 				"removed": False,
 			}
 		)
@@ -380,13 +390,23 @@ def parse_attributes(attributes) -> dict:
 	return {cstr(key): cstr(value) for key, value in attributes.items()}
 
 
-def get_session_cart(create: bool = False) -> CommeraCart | None:
+def get_session_cart_meta(fields: list[str] | None = None) -> frappe._dict | None:
+	"""Canonical lookup for the current guest or signed-in shopper's Commera Cart."""
 	filters = {"user": frappe.session.user} if not is_guest() else {"cart_key": get_guest_cart_key()}
 	if is_guest() and not filters["cart_key"]:
-		filters = None
-	name = frappe.db.get_value("Commera Cart", filters, "name", order_by="modified desc") if filters else None
-	if name:
-		return frappe.get_doc("Commera Cart", name, for_update=True)
+		return None
+	return frappe.db.get_value(
+		"Commera Cart",
+		filters,
+		fields or ["name"],
+		order_by="modified desc",
+		as_dict=True,
+	)
+
+
+def get_session_cart(create: bool = False, for_update: bool = True) -> CommeraCart | None:
+	if meta := get_session_cart_meta(["name"]):
+		return frappe.get_doc("Commera Cart", meta.name, for_update=for_update)
 	if not create:
 		return None
 

@@ -218,6 +218,49 @@ class TestStorefrontCache(UnitTestCase):
 		)
 		frappe.set_user("Administrator")
 
+	def test_cart_and_checkout_caches_invalidate_on_revision_or_modified(self):
+		cart_calls = 0
+
+		def compute_cart():
+			nonlocal cart_calls
+			cart_calls += 1
+			return {"rev_calls": cart_calls}
+
+		self.assertEqual(
+			sfc.cached_cart_response("CART-1", 1, "2026-01-01 00:00:00", compute_cart), {"rev_calls": 1}
+		)
+		self.assertEqual(
+			sfc.cached_cart_response("CART-1", 1, "2026-01-01 00:00:00", compute_cart), {"rev_calls": 1}
+		)
+		self.assertEqual(
+			sfc.cached_cart_response("CART-1", 2, "2026-01-01 00:00:01", compute_cart), {"rev_calls": 2}
+		)
+		sfc.bump_epochs("prices", immediate=True)
+		self.assertEqual(
+			sfc.cached_cart_response("CART-1", 2, "2026-01-01 00:00:01", compute_cart), {"rev_calls": 3}
+		)
+
+		chk_calls = 0
+
+		def compute_chk():
+			nonlocal chk_calls
+			chk_calls += 1
+			return {"chk_calls": chk_calls}
+
+		self.assertEqual(
+			sfc.cached_checkout_response("QTN-1", "2026-01-01 00:00:00", compute_chk), {"chk_calls": 1}
+		)
+		self.assertEqual(
+			sfc.cached_checkout_response("QTN-1", "2026-01-01 00:00:00", compute_chk), {"chk_calls": 1}
+		)
+		self.assertEqual(
+			sfc.cached_checkout_response("QTN-1", "2026-01-01 00:00:05", compute_chk), {"chk_calls": 2}
+		)
+		sfc.bump_epochs("shop", immediate=True)
+		self.assertEqual(
+			sfc.cached_checkout_response("QTN-1", "2026-01-01 00:00:05", compute_chk), {"chk_calls": 3}
+		)
+
 	def test_ssr_query_param_whitelist_and_size_bound(self):
 		"""M6(b): utm_*/fbclid share one SSR key; whitelisted params vary key; oversized HTML skips cache."""
 		frappe.set_user("Guest")
@@ -641,6 +684,139 @@ class TestStorefrontCacheIntegration(IntegrationTestCase):
 		frappe.db.after_commit.run()
 		self.assertNotIn(disc.name, get_automatic_discount_names())
 
+	def test_signed_in_checkout_get_never_returns_guest_checkout(self):
+		"""B2: a guest checkout booked with a shopper's email must never be returned to that signed-in shopper."""
+		from commera.api.storefront import checkout as checkout_api
+		from commera.core import create_party
+
+		suffix = frappe.generate_hash(length=6).lower()
+		email = f"zz-iso-{suffix}@example.com"
+		if not frappe.db.exists("User", email):
+			frappe.get_doc(
+				{
+					"doctype": "User",
+					"email": email,
+					"first_name": "Iso",
+					"enabled": 1,
+					"send_welcome_email": 0,
+				}
+			).insert(ignore_permissions=True)
+		customer, contact = create_party(email, "Iso Shopper", portal_user=email)
+		company = frappe.get_cached_value("Commera Settings", "Commera Settings", "company") or (
+			frappe.defaults.get_global_default("company")
+		)
+		item_code = f"ZZ-ISO-ITEM-{suffix.upper()}"
+		frappe.get_doc(
+			{
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": item_code,
+				"item_group": "All Item Groups",
+				"stock_uom": "Nos",
+				"is_stock_item": 0,
+			}
+		).insert(ignore_permissions=True)
+		guest_q = frappe.get_doc(
+			{
+				"doctype": "Quotation",
+				"quotation_to": "Customer",
+				"party_name": customer.name,
+				"contact_person": contact.name,
+				"contact_email": email,
+				"company": company,
+				"order_type": "Shopping Cart",
+				"custom_guest_cart_key": f"guest-key-{suffix}",
+				"items": [{"item_code": item_code, "qty": 1, "rate": 50}],
+			}
+		).insert(ignore_permissions=True)
+		frappe.db.after_commit.run()
+
+		frappe.set_user(email)
+		# Even with cache enabled, signed-in shopper must NEVER receive guest_q.
+		self.assertIsNone(checkout_api.get())
+		self.assertEqual(guest_q.docstatus, 0)
+
+	def test_open_checkout_reevaluates_disabled_automatic_discount(self):
+		"""B3: disabling an automatic discount after address step must update total and fail expected_total."""
+		from commera.api.payments import (
+			COD_PAYMENT_MODE,
+			CheckoutPriceChangedError,
+			open_checkout,
+			save_cart_quotation,
+		)
+		from commera.core import create_party
+
+		suffix = frappe.generate_hash(length=6).upper()
+		settings = frappe.get_doc("Commera Settings")
+		settings.cod_enabled = 1
+		default_pl = settings.sale_price_list or settings.default_price_list or "Standard Selling"
+		if not settings.sale_price_list:
+			settings.sale_price_list = default_pl
+		settings.save(ignore_permissions=True)
+		frappe.clear_document_cache("Commera Settings", "Commera Settings")
+
+		item_code = f"ZZ-B3-{suffix}"
+		frappe.get_doc(
+			{
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": item_code,
+				"item_group": "All Item Groups",
+				"stock_uom": "Nos",
+				"is_stock_item": 0,
+			}
+		).insert(ignore_permissions=True)
+		frappe.get_doc(
+			{
+				"doctype": "Item Price",
+				"item_code": item_code,
+				"price_list": default_pl,
+				"price_list_rate": 200,
+			}
+		).insert(ignore_permissions=True)
+
+		disc = frappe.get_doc(
+			{
+				"doctype": "Commera Discount",
+				"title": f"ZZ B3 Auto {suffix}",
+				"enabled": 1,
+				"method": "Automatic",
+				"discount_type": "Amount Off Order",
+				"value_type": "Percentage",
+				"value": 10,
+			}
+		).insert(ignore_permissions=True)
+
+		email = f"zz-b3-{suffix.lower()}@example.com"
+		customer, contact = create_party(email, "B3 Buyer")
+		company = settings.company or frappe.defaults.get_global_default("company")
+		quotation = frappe.get_doc(
+			{
+				"doctype": "Quotation",
+				"quotation_to": "Customer",
+				"party_name": customer.name,
+				"contact_person": contact.name,
+				"contact_email": email,
+				"company": company,
+				"order_type": "Shopping Cart",
+				"selling_price_list": settings.sale_price_list or default_pl,
+				"items": [{"item_code": item_code, "qty": 1, "price_list_rate": 200, "rate": 200}],
+			}
+		)
+		save_cart_quotation(quotation)
+		discounted_total = quotation.grand_total
+		self.assertEqual(discounted_total, 180)
+
+		# Disable the automatic discount before payment start.
+		disc.enabled = 0
+		disc.save(ignore_permissions=True)
+		frappe.db.after_commit.run()
+
+		quotation.reload()
+		with self.assertRaises(CheckoutPriceChangedError):
+			open_checkout(quotation, COD_PAYMENT_MODE, expected_total=discounted_total)
+		self.assertEqual(quotation.grand_total, 200)
+
 	def test_analytics_capture_row_loads_through_get_doc(self):
 		"""Minor: raw SQL INSERT in analytics.capture must produce a valid Storefront Analytics Event doc."""
 		from commera.api.analytics import capture
@@ -699,3 +875,34 @@ class TestStorefrontCacheIntegration(IntegrationTestCase):
 			delattr(frappe.local, "_commera_sf_epochs")
 		self.assertGreater(sfc.get_epochs()["catalog"], before_cat)
 		self.assertTrue(variant.name)
+
+	def test_get_party_resolves_uncached_on_stale_cached_reference(self):
+		"""R2-3: stale cached Customer ref must fall back to uncached resolution, never create a duplicate."""
+		from commera.core import create_party, get_party
+
+		suffix = frappe.generate_hash(length=6).lower()
+		email = f"zz-party-{suffix}@example.com"
+		if not frappe.db.exists("User", email):
+			frappe.get_doc(
+				{
+					"doctype": "User",
+					"email": email,
+					"first_name": "Party",
+					"enabled": 1,
+					"send_welcome_email": 0,
+				}
+			).insert(ignore_permissions=True)
+		customer, _contact = create_party(email, f"Party {suffix}", portal_user=email)
+		frappe.db.after_commit.run()
+
+		# Simulate a stale cache entry pointing to a deleted Customer name.
+		with (
+			patch(
+				"commera.storefront_cache.get_epoch_cached",
+				return_value=["Customer", "NON-EXISTENT-CUST", False],
+			),
+			patch("commera.core._create_party_for_user") as mock_create,
+		):
+			resolved = get_party(user=email, create=True)
+		self.assertEqual(resolved.name, customer.name)
+		mock_create.assert_not_called()

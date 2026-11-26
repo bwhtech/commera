@@ -5,8 +5,8 @@ from frappe.utils.data import cstr, flt
 from commera.api.payments import (
 	REVIEWED_CHECKOUT_FIELD,
 	CheckoutPriceChangedError,
+	_generate_quotation_for_cart,
 	cart_write_lock,
-	generate_quotation_for_cart,
 	get_checkout_cart,
 	get_checkout_payment_methods,
 	get_checkout_version,
@@ -120,10 +120,35 @@ def list_pickup_locations() -> list[PickupLocation]:
 
 
 def save_checkout_address(address: dict, email: str | None) -> CheckoutState:
-	quotation = save_guest_cart({}, email) if is_guest() else generate_quotation_for_cart({})
-	with cart_write_lock(quotation):
-		save_quotation_address(quotation, address)
-		return get_checkout_state(quotation)
+	from commera.core import get_open_cart_quotation_meta
+
+	if meta := get_open_cart_quotation_meta(["name"]):
+		quotation = frappe.get_doc("Quotation", meta.name)
+		with cart_write_lock(quotation):
+			if is_guest():
+				quotation = save_guest_cart(
+					{},
+					email,
+					defer_save=True,
+					billing_address=address.get("billing_address"),
+					existing_quotation=quotation,
+				)
+			else:
+				quotation = _generate_quotation_for_cart({}, defer_save=True, existing_quotation=quotation)
+			save_quotation_address(quotation, address)
+			return get_checkout_state(quotation)
+
+	if is_guest():
+		quotation = save_guest_cart(
+			{},
+			email,
+			defer_save=True,
+			billing_address=address.get("billing_address"),
+		)
+	else:
+		quotation = _generate_quotation_for_cart({}, defer_save=True)
+	save_quotation_address(quotation, address)
+	return get_checkout_state(quotation)
 
 
 def get_checkout_email(email: str | None) -> str | None:
@@ -181,13 +206,29 @@ def set_shipping_option(option_id: str | None) -> CheckoutState:
 
 
 def list_payment_methods() -> list[PaymentMethod]:
+	from commera.core import get_open_cart_quotation_meta
+	from commera.plugin_events import get_handlers
+
+	quotation = None
+	if not get_handlers("commera_hooks", "payment_methods") and is_guest():
+		quotation = get_open_cart_quotation_meta(
+			[
+				"name",
+				"currency",
+				"custom_is_store_pickup",
+				"custom_delivery_option",
+				"shipping_address_name",
+			]
+		)
+	else:
+		quotation = get_open_checkout()
 	return [
 		{
 			"id": payment_method,
 			"title": _("Cash on Delivery") if is_cod(payment_method) else _(payment_method),
 			"is_cash_on_delivery": is_cod(payment_method),
 		}
-		for payment_method in get_checkout_payment_methods(get_open_checkout())
+		for payment_method in get_checkout_payment_methods(quotation)
 	]
 
 
@@ -269,7 +310,7 @@ def get_checkout_state(quotation) -> CheckoutState:
 		}
 	return {
 		"cart": quotation.name,
-		"version": get_checkout_version(quotation),
+		"version": get_checkout_version(quotation, addresses=addresses),
 		"currency": quotation.currency,
 		"items": get_checkout_lines(quotation.items),
 		"email": quotation.contact_email,
