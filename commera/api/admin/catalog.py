@@ -16,6 +16,7 @@ from commera.api.variant_pricing import (
 	get_selling_price_lists,
 	set_variant_prices,
 )
+from commera.data.store_options import SUPERSEDED_VALUES
 from commera.plugin_events import add_changed_products
 from commera.product_collections import (
 	COLLECTIONS_FIELD,
@@ -953,7 +954,24 @@ def get_attribute_values(attribute: str):
 	swatches = get_swatch_map(attribute)
 	usage = get_value_usage_counts([attribute])
 
-	return [decorate_value_with_swatch(value, swatches, usage.get((attribute, value), 0)) for value in values]
+	return [
+		decorate_value_with_swatch(value, swatches, usage.get((attribute, value), 0))
+		for value in get_picker_values(attribute, values, usage)
+	]
+
+
+def get_picker_values(attribute: str, values: list, usage_by_value: dict) -> list:
+	superseded = SUPERSEDED_VALUES.get(attribute)
+	if not superseded:
+		return values
+	value_keys = {cstr(value).casefold() for value in values}
+	return [
+		value
+		for value in values
+		if value not in superseded
+		or superseded[value].casefold() not in value_keys
+		or usage_by_value.get((attribute, value))
+	]
 
 
 def decorate_value_with_swatch(value: str, swatches: dict, used_by: int = 0) -> dict:
@@ -972,7 +990,12 @@ def get_attributes():
 	Three queries however many attributes exist; never per attribute."""
 	frappe.has_permission("Item Attribute", ptype="read", throw=True)
 
-	attribute_names = frappe.get_all("Item Attribute", pluck="name", order_by="name asc")
+	attribute_names = frappe.get_all(
+		"Item Attribute",
+		filters={"name": ["!=", DEFAULT_OPTION_ATTRIBUTE]},
+		pluck="name",
+		order_by="name asc",
+	)
 	if not attribute_names:
 		return []
 
@@ -999,7 +1022,7 @@ def get_attributes():
 					swatches_by_attribute.get(name, {}),
 					usage_by_value.get((name, value), 0),
 				)
-				for value in values_by_attribute.get(name, [])
+				for value in get_picker_values(name, values_by_attribute.get(name, []), usage_by_value)
 			],
 			"used_by": usage_by_attribute.get(name, 0),
 			"is_colour": name == COLOUR_ATTRIBUTE,
@@ -1783,8 +1806,8 @@ def ensure_attribute_exists(attribute_name: str, seed_value: str, abbreviation: 
 	return attribute_name
 
 
-def make_unique_abbreviation(value: str, taken: set):
-	base = "".join(part[0] for part in cstr(value).split() if part).upper() or "X"
+def make_unique_abbreviation(value: str, taken: set, base: str | None = None):
+	base = base or "".join(part[0] for part in cstr(value).split() if part).upper() or "X"
 	if base.casefold() not in taken:
 		return base
 
