@@ -1524,6 +1524,10 @@ def save_product_options(
 		frappe.db.set_value("Item", {"name": ["in", disabled_codes]}, "disabled", 1)
 	if restored_codes:
 		frappe.db.set_value("Item", {"name": ["in", restored_codes]}, "disabled", 0)
+	if disabled_codes or restored_codes:
+		from commera.storefront_cache import bump_catalog
+
+		bump_catalog()
 
 	item_code_by_key = {key: item.name for key, item in existing_items.items()}
 	template_title = frappe.db.get_value("Item", item_template, "item_name")
@@ -1581,6 +1585,9 @@ def switch_option_attribute(item_template: str, configurator: dict, option_attri
 	)
 	if switched_codes:
 		frappe.db.set_value("Item", {"name": ["in", switched_codes]}, "disabled", 1)
+	from commera.storefront_cache import bump_catalog
+
+	bump_catalog()
 	return switched_codes
 
 
@@ -1916,6 +1923,9 @@ def set_restock_level(item_template: str | int, level: int | str):
 		frappe.throw(_("This product has no sizes to watch yet."))
 
 	frappe.db.set_value("Item", {"name": ["in", item_codes]}, "safety_stock", level)
+	from commera.storefront_cache import bump_catalog
+
+	bump_catalog()
 
 	return {"item_codes": item_codes, "level": level}
 

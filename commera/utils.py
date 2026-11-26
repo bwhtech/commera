@@ -582,11 +582,22 @@ def get_currency_symbols() -> dict[str, str]:
 	return {currency: get_currency_symbol(currency) for currency in get_selling_currencies()}
 
 
+def clear_selling_currencies_cache(*_args, **_kwargs):
+	from commera.storefront_cache import bump_prices_and_shop
+
+	bump_prices_and_shop()
+
+
 def get_selling_currencies() -> set[str]:
-	currencies = frappe.get_all(
-		"Price List", filters={"enabled": 1, "selling": 1}, pluck="currency", distinct=True
-	)
-	return {*currencies, get_store_currency()}
+	from commera.storefront_cache import get_epoch_cached
+
+	def _load() -> list[str]:
+		currencies = frappe.get_all(
+			"Price List", filters={"enabled": 1, "selling": 1}, pluck="currency", distinct=True
+		)
+		return sorted({*currencies, get_store_currency()})
+
+	return set(get_epoch_cached("selling_currencies", (), ("prices", "shop"), _load, ttl=300))
 
 
 def get_addresses(party=None, address_type="Billing"):
@@ -865,7 +876,31 @@ def get_available_stocks(item_codes, warehouse):
 
 
 def has_open_pos_invoices() -> bool:
-	return bool(frappe.db.exists("POS Invoice", {"status": ["in", ["Paid", "Return"]], "docstatus": 1}))
+	from commera.storefront_cache import get_epoch_cached
+
+	return bool(
+		get_epoch_cached(
+			"open_pos_invoices",
+			(),
+			("stock",),
+			lambda: int(
+				bool(frappe.db.exists("POS Invoice", {"status": ["in", ["Paid", "Return"]], "docstatus": 1}))
+			),
+			ttl=300,
+		)
+	)
+
+
+def clear_pos_invoice_cache(*_args, **_kwargs):
+	from commera.storefront_cache import bump_stock
+
+	bump_stock()
+
+
+def clear_stock_caches(*_args, **_kwargs):
+	from commera.storefront_cache import bump_stock
+
+	bump_stock()
 
 
 def get_unlimited_item_codes(item_codes) -> set[str]:

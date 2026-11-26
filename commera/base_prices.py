@@ -10,72 +10,100 @@ from frappe.utils import create_batch, nowdate
 from pypika.analytics import RowNumber
 from pypika.terms import ValueWrapper
 
+from commera.storefront_cache import bump_catalog_and_prices, get_epoch_cached
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
+
+PRICE_FLAG_DOMAINS = ("prices", "catalog")
 
 
 def has_template_item_prices() -> bool:
-	"""Whether any selling Item Price row targets a template Item (has_variants=1)."""
-	item = DocType("Item")
-	price = DocType("Item Price")
-	return bool(
-		frappe.qb.from_(price)
-		.join(item)
-		.on(item.name == price.item_code)
-		.select(price.name)
-		.where((price.selling == 1) & (item.has_variants == 1))
-		.limit(1)
-		.run()
-	)
+	"""Whether any selling Item Price row targets a template Item (has_variants=1).
+	Epoch-keyed with TTL backstop so variant-priced shops skip the UNION."""
+
+	def _check() -> int:
+		item = DocType("Item")
+		price = DocType("Item Price")
+		return int(
+			bool(
+				frappe.qb.from_(price)
+				.join(item)
+				.on(item.name == price.item_code)
+				.select(price.name)
+				.where((price.selling == 1) & (item.has_variants == 1))
+				.limit(1)
+				.run()
+			)
+		)
+
+	return bool(get_epoch_cached("has_template_prices", (), PRICE_FLAG_DOMAINS, _check, ttl=300))
 
 
 def has_non_stock_sales_uom() -> bool:
 	"""Whether any Item defines a sales_uom distinct from its stock_uom.
 	When False, sales_uom == stock_uom everywhere and UOM conversion joins are unnecessary."""
-	item = DocType("Item")
-	return bool(
-		frappe.qb.from_(item)
-		.select(item.name)
-		.where((IfNull(item.sales_uom, "") != "") & (item.sales_uom != item.stock_uom))
-		.limit(1)
-		.run()
-	)
+
+	def _check() -> int:
+		item = DocType("Item")
+		return int(
+			bool(
+				frappe.qb.from_(item)
+				.select(item.name)
+				.where((IfNull(item.sales_uom, "") != "") & (item.sales_uom != item.stock_uom))
+				.limit(1)
+				.run()
+			)
+		)
+
+	return bool(get_epoch_cached("has_non_stock_uom", (), PRICE_FLAG_DOMAINS, _check, ttl=300))
 
 
 def has_mismatched_price_uom() -> bool:
 	"""Whether any selling public Item Price specifies a UOM different from its Item's stock_uom."""
-	item = DocType("Item")
-	price = DocType("Item Price")
-	return bool(
-		frappe.qb.from_(price)
-		.join(item)
-		.on(item.name == price.item_code)
-		.select(price.name)
-		.where(
-			(price.selling == 1)
-			& is_public_price(price)
-			& (IfNull(price.uom, "") != "")
-			& (price.uom != item.stock_uom)
+
+	def _check() -> int:
+		item = DocType("Item")
+		price = DocType("Item Price")
+		return int(
+			bool(
+				frappe.qb.from_(price)
+				.join(item)
+				.on(item.name == price.item_code)
+				.select(price.name)
+				.where(
+					(price.selling == 1)
+					& is_public_price(price)
+					& (IfNull(price.uom, "") != "")
+					& (price.uom != item.stock_uom)
+				)
+				.limit(1)
+				.run()
+			)
 		)
-		.limit(1)
-		.run()
-	)
+
+	return bool(get_epoch_cached("has_mismatched_price_uom", (), PRICE_FLAG_DOMAINS, _check, ttl=300))
 
 
 def has_duplicate_active_item_prices() -> bool:
 	"""Whether any (item_code, price_list) has more than one active public selling Item Price today."""
-	from frappe.query_builder.functions import Count
-
 	today = nowdate()
-	price = DocType("Item Price")
-	return bool(
-		frappe.qb.from_(price)
-		.select(price.item_code)
-		.where((price.selling == 1) & is_public_price(price) & is_valid_on(price, today))
-		.groupby(price.item_code, price.price_list)
-		.having(Count("*") > 1)
-		.limit(1)
-		.run()
-	)
+
+	def _check() -> int:
+		from frappe.query_builder.functions import Count
+
+		price = DocType("Item Price")
+		return int(
+			bool(
+				frappe.qb.from_(price)
+				.select(price.item_code)
+				.where((price.selling == 1) & is_public_price(price) & is_valid_on(price, today))
+				.groupby(price.item_code, price.price_list)
+				.having(Count("*") > 1)
+				.limit(1)
+				.run()
+			)
+		)
+
+	return bool(get_epoch_cached("has_dup_prices", today, PRICE_FLAG_DOMAINS, _check, ttl=300))
 
 
 def can_use_direct_item_price() -> bool:
@@ -87,6 +115,16 @@ def can_use_direct_item_price() -> bool:
 		and not has_mismatched_price_uom()
 		and not has_duplicate_active_item_prices()
 	)
+
+
+def clear_template_price_cache(*_args, **_kwargs):
+	clear_request_rates_cache()
+	bump_catalog_and_prices()
+
+
+def clear_sales_uom_cache(*_args, **_kwargs):
+	clear_request_rates_cache()
+	bump_catalog_and_prices()
 
 
 def clear_request_rates_cache():

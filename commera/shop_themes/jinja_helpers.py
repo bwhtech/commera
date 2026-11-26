@@ -13,6 +13,13 @@ from commera.shop_themes.doctype.shop_theme.shop_theme import (
 
 UNSAFE_CSS_VALUE = re.compile(r"[;{}<>\\]|/\*")
 
+_asset_url_cache: dict[tuple[tuple[str, ...], str], str] = {}
+_style_fieldnames_cache: dict[str, tuple[str, ...]] = {}
+
+
+def _is_dev_reload() -> bool:
+	return bool(frappe.conf.get("developer_mode") or frappe._dev_server or frappe.flags.in_test)
+
 
 def shop_theme_asset_url(path):
 	"""Resolve a public asset against the theme inheritance chain, child first.
@@ -23,14 +30,25 @@ def shop_theme_asset_url(path):
 		return ""
 
 	relative_path = path.lstrip("/")
+	dev_reload = _is_dev_reload()
+	cache_key = (tuple(theme_context["names"]), relative_path)
+	if not dev_reload and cache_key in _asset_url_cache:
+		return _asset_url_cache[cache_key]
+
 	asset_url = find_theme_asset_url(theme_context, relative_path)
 	if asset_url:
-		return f"{asset_url}?v={get_asset_version(asset_url)}"
+		resolved = f"{asset_url}?v={get_asset_version(asset_url)}"
+	else:
+		# Nothing in the chain ships it: fall back to the ACTIVE theme's URL so the 404 names this theme.
+		active_name = theme_context["names"][0]
+		active_app = theme_context["apps"][active_name]
+		resolved = f"/assets/{active_app}/themes/{frappe.scrub(active_name)}/{relative_path}"
 
-	# Nothing in the chain ships it: fall back to the ACTIVE theme's URL so the 404 names this theme.
-	active_name = theme_context["names"][0]
-	active_app = theme_context["apps"][active_name]
-	return f"/assets/{active_app}/themes/{frappe.scrub(active_name)}/{relative_path}"
+	if not dev_reload:
+		if len(_asset_url_cache) > 512:
+			_asset_url_cache.clear()
+		_asset_url_cache[cache_key] = resolved
+	return resolved
 
 
 def get_asset_version(asset_url):
@@ -89,6 +107,9 @@ def format_shop_theme_css():
 
 
 def get_style_fieldnames(settings_doctype):
+	dev_reload = _is_dev_reload()
+	if not dev_reload and settings_doctype in _style_fieldnames_cache:
+		return _style_fieldnames_cache[settings_doctype]
 	fieldnames = []
 	in_style_tab = False
 	for docfield in frappe.get_meta(settings_doctype).fields:
@@ -96,4 +117,7 @@ def get_style_fieldnames(settings_doctype):
 			in_style_tab = docfield.fieldname == STYLE_TAB
 		elif in_style_tab and docfield.fieldtype not in no_value_fields:
 			fieldnames.append(docfield.fieldname)
-	return fieldnames
+	result = tuple(fieldnames)
+	if not dev_reload:
+		_style_fieldnames_cache[settings_doctype] = result
+	return result

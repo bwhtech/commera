@@ -54,12 +54,30 @@ NOT_FOUND_TEMPLATE = "pages/404.html"
 LOGIN_TEMPLATE = "pages/account/login.html"
 
 
+_theme_file_cache: dict[tuple[tuple[str, ...], str], str | None] = {}
+_template_source_cache: dict[str, tuple[float, str]] = {}
+
+
+def _is_dev_reload() -> bool:
+	return bool(frappe.conf.get("developer_mode") or frappe._dev_server or frappe.flags.in_test)
+
+
 def find_theme_file(theme_dirs, relative_path):
+	dev_reload = _is_dev_reload()
+	cache_key = (tuple(theme_dirs), relative_path)
+	if not dev_reload and cache_key in _theme_file_cache:
+		return _theme_file_cache[cache_key]
+	found = None
 	for theme_dir in theme_dirs:
 		candidate = os.path.join(theme_dir, relative_path)
 		if is_within_directory(theme_dir, candidate) and os.path.isfile(candidate):
-			return candidate
-	return None
+			found = candidate
+			break
+	if not dev_reload:
+		if len(_theme_file_cache) > 2048:
+			_theme_file_cache.clear()
+		_theme_file_cache[cache_key] = found
+	return found
 
 
 page_controller_modules = {}
@@ -98,14 +116,40 @@ def build_controller_module_name(theme_dirs, controller_path, relative_path):
 	return f"commera.shop_themes.theme_pages.{theme_slug}.{page_slug}"
 
 
-def run_page_controller(theme_dirs, template_relative_path, context):
-	module = load_page_controller(theme_dirs, template_relative_path)
-	if not module or not hasattr(module, "get_context"):
-		return
+def _controller_ssr_policy(module) -> tuple[bool, frozenset[str]]:
+	cacheable = bool(getattr(module, "cacheable_ssr", False)) and not bool(getattr(module, "no_cache", False))
+	if not cacheable:
+		return False, frozenset()
+	raw_params = getattr(module, "ssr_query_params", None)
+	return True, frozenset(raw_params) if raw_params is not None else frozenset()
 
-	data = module.get_context(context)
-	if data:
-		context.update(data)
+
+def get_page_ssr_query_params(route_path: str, language_code: str | None = None) -> frozenset[str] | None:
+	"""Return controller-declared SSR query params for `route_path`, or None if uncacheable."""
+	page = find_theme_page((route_path or "").strip("/"), language_code)
+	if not page:
+		return None
+	theme_dirs, template_path, requires_auth, _match = page
+	if requires_auth:
+		return None
+	module = load_page_controller(theme_dirs, template_path)
+	if not module:
+		return None
+	cacheable, allowed_params = _controller_ssr_policy(module)
+	return allowed_params if cacheable else None
+
+
+def run_page_controller(theme_dirs, template_relative_path, context) -> tuple[bool, frozenset[str]]:
+	"""Run the page controller and return `(cacheable_ssr, ssr_query_params)` (opt-in)."""
+	module = load_page_controller(theme_dirs, template_relative_path)
+	if not module:
+		return False, frozenset()
+	cacheable, allowed_params = _controller_ssr_policy(module)
+	if hasattr(module, "get_context"):
+		data = module.get_context(context)
+		if data:
+			context.update(data)
+	return cacheable, allowed_params
 
 
 class ThemePageRenderer:
@@ -144,13 +188,24 @@ class ThemePageRenderer:
 
 		context = build_base_context(self.match)
 		try:
-			run_page_controller(self.theme_dirs, self.template_path, context)
+			controller_cacheable, ssr_query_params = run_page_controller(
+				self.theme_dirs, self.template_path, context
+			)
 		except (frappe.PageDoesNotExistError, frappe.DoesNotExistError):
 			if not find_theme_file(self.theme_dirs, NOT_FOUND_TEMPLATE):
 				raise
 			return self.render_not_found()
 		html = self.render_with_theme_loader(context)
-		return build_response(self.path, html, self.http_status_code or 200)
+		status = self.http_status_code or 200
+		headers = None
+		if status == 200 and not self.requires_auth and controller_cacheable:
+			from commera.storefront_cache import is_cacheable_ssr_request, store_cached_ssr_response
+
+			route_path = self.get_request_path()
+			if is_cacheable_ssr_request(route_path, allowed_query_params=ssr_query_params):
+				store_cached_ssr_response(route_path, html, allowed_query_params=ssr_query_params)
+				headers = {"X-Commera-Cache": "MISS"}
+		return build_response(self.path, html, status, headers)
 
 	def redirect_guest_to_login(self):
 		"""Send a guest to the theme's own login page, which returns them here after signing in."""
@@ -256,10 +311,22 @@ class ThemeFallbackLoader(BaseLoader):
 
 
 def read_template_source(full_path):
+	dev_reload = _is_dev_reload()
+	cached = _template_source_cache.get(full_path)
+	if not dev_reload and cached is not None:
+		return cached[1], full_path, lambda: True
 	modified_time = os.path.getmtime(full_path)
-	# nosemgrep: frappe-semgrep-rules.rules.security.frappe-security-file-traversal
-	with open(full_path) as source_file:
-		source = source_file.read()
+	if cached is not None and cached[0] == modified_time:
+		source = cached[1]
+	else:
+		# nosemgrep: frappe-semgrep-rules.rules.security.frappe-security-file-traversal
+		with open(full_path) as source_file:
+			source = source_file.read()
+		if len(_template_source_cache) > 512:
+			_template_source_cache.clear()
+		_template_source_cache[full_path] = (modified_time, source)
+	if not dev_reload:
+		return source, full_path, lambda: True
 	return (
 		source,
 		full_path,

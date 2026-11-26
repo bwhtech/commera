@@ -42,7 +42,17 @@ def get_address(address: dict | str) -> dict | str:
 
 @rate_limited_guest_api("GET", limit=300, seconds=60 * 60)
 def list_pickup_locations() -> list[PickupLocation]:
-	return checkout.list_pickup_locations()
+	from commera.storefront_cache import cached_guest_api
+
+	return cached_guest_api(
+		"checkout.list_pickup_locations",
+		(),
+		("shop", "stock"),
+		checkout.list_pickup_locations,
+		endpoint="commera.api.storefront.checkout.list_pickup_locations",
+		ttl=180,
+		include_locale=False,
+	)
 
 
 @rate_limited_guest_api("POST", limit=100, seconds=60 * 60)
@@ -62,6 +72,18 @@ def set_shipping_option(option_id: str | None = None) -> CheckoutState:
 
 @rate_limited_guest_api("GET", limit=1200, seconds=60 * 60)
 def list_payment_methods() -> list[PaymentMethod]:
+	from commera.guest import get_guest_cart_key, is_guest
+	from commera.storefront_cache import cached_guest_api
+
+	if is_guest() and not get_guest_cart_key():
+		return cached_guest_api(
+			"checkout.list_payment_methods",
+			(),
+			("shop",),
+			checkout.list_payment_methods,
+			endpoint="commera.api.storefront.checkout.list_payment_methods",
+			ttl=180,
+		)
 	return checkout.list_payment_methods()
 
 

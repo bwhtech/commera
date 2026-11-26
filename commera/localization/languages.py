@@ -57,7 +57,13 @@ class StorefrontLanguages:
 
 	@classmethod
 	def load(cls) -> "StorefrontLanguages":
-		return cls.from_settings(frappe.get_cached_doc("Commera Settings"))
+		cached = getattr(frappe.local, "_commera_sf_languages", None)
+		if cached is not None and not frappe.flags.in_test:
+			return cached
+		loaded = cls.from_settings(frappe.get_cached_doc("Commera Settings"))
+		if not frappe.flags.in_test:
+			frappe.local._commera_sf_languages = loaded
+		return loaded
 
 	@classmethod
 	def from_settings(cls, settings) -> "StorefrontLanguages":
@@ -115,6 +121,9 @@ def seed_storefront_languages(default: str, codes: tuple[str, ...]):
 			}
 		).db_insert()
 	frappe.clear_document_cache("Commera Settings", "Commera Settings")
+	from commera.storefront_cache import bump_prices_and_shop
+
+	bump_prices_and_shop()
 
 
 def is_rtl_language(code: str) -> bool:

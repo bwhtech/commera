@@ -16,7 +16,7 @@
 			<div class="group/gallery relative">
 				<div x-ref="gallery" @scroll.debounce.60ms="sync_image_with_scroll()" class="flex snap-x snap-mandatory overflow-x-auto rounded-2xl [scrollbar-width:none] md:grid md:overflow-hidden md:[&>*]:col-start-1 md:[&>*]:row-start-1 [&::-webkit-scrollbar]:hidden">
 					{% for path in product.images or [None] %}
-					<div :class="image === {{ loop.index0 }} ? 'md:opacity-100' : 'md:pointer-events-none md:opacity-0'" :aria-hidden="image !== {{ loop.index0 }}" class="w-full shrink-0 snap-center md:transition-opacity md:duration-300 md:ease-out{{ ' md:opacity-0' if not loop.first }}">{{ image(path, product.title, 1200, "aspect-[3/4] max-md:max-h-[calc(100dvh-var(--header-height)-3rem)] w-full rounded-2xl md:aspect-[3/4] " ~ fit, loading="eager" if loop.first else "lazy") }}</div>
+					<div :class="image === {{ loop.index0 }} ? 'md:opacity-100' : 'md:pointer-events-none md:opacity-0'" :aria-hidden="image !== {{ loop.index0 }}" class="w-full shrink-0 snap-center md:transition-opacity md:duration-300 md:ease-out{{ ' md:opacity-0' if not loop.first }}">{{ image(path, product.title, 1200, "aspect-[3/4] max-md:max-h-[calc(100dvh-var(--header-height)-3rem)] w-full rounded-2xl md:aspect-[3/4] " ~ fit, loading="eager" if loop.first else "lazy", fetchpriority="high" if loop.first else "") }}</div>
 					{% endfor %}
 				</div>
 				{% if product.images | length > 1 %}
