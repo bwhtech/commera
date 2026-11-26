@@ -72,6 +72,10 @@ watch(
   { immediate: true },
 )
 
+function submitStep(event) {
+  event.currentTarget.form?.requestSubmit()
+}
+
 async function uploadLogo(event) {
   const [file] = [...(event.target.files ?? [])]
   event.target.value = ''
@@ -132,6 +136,7 @@ watch(
           :disabled="isUploading"
           data-onboarding-logo-drop
           @click="logoInput?.click()"
+          @keydown.enter.prevent="submitStep"
           @dragover.prevent="isDraggingLogo = true"
           @dragleave="isDraggingLogo = false"
           @drop.prevent="dropLogo"
@@ -182,6 +187,7 @@ watch(
           :aria-pressed="draft.storeCategory === option.value"
           :disabled="isRunning"
           @click="draft.storeCategory = draft.storeCategory === option.value ? '' : option.value"
+          @keydown.enter.prevent="submitStep"
         >
           <span :class="option.icon" class="size-5" aria-hidden="true" />
           <span class="truncate">{{ option.label }}</span>
@@ -222,6 +228,7 @@ watch(
           :aria-expanded="isAccountingOpen"
           data-onboarding-accounting
           @click="showAccounting = !showAccounting"
+          @keydown.enter.prevent="submitStep"
         >
           {{ accountingSummary }}
           <span
