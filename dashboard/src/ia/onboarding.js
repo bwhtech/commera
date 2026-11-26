@@ -59,6 +59,7 @@ export const draft = reactive({
   fullName: '',
   password: '',
   storeName: '',
+  storeCategory: '',
   country: '',
   currency: '',
   timeZone: '',
@@ -78,6 +79,7 @@ export function adoptRecord(record) {
   Object.assign(draft, {
     fullName: record.full_name || '',
     storeName: record.store_name || '',
+    storeCategory: record.store_category || '',
     country: record.country || '',
     currency: record.currency || '',
     timeZone: record.time_zone || '',
@@ -89,6 +91,15 @@ export function adoptRecord(record) {
     brandLogo: record.brand_logo || '',
   })
 }
+
+export const CATEGORIES = [
+  { value: 'Fashion', label: __('Fashion'), icon: 'lucide-shirt' },
+  { value: 'Beauty', label: __('Beauty'), icon: 'lucide-sparkles' },
+  { value: 'Home', label: __('Home'), icon: 'lucide-sofa' },
+  { value: 'Food', label: __('Food'), icon: 'lucide-coffee' },
+  { value: 'Electronics', label: __('Electronics'), icon: 'lucide-headphones' },
+  { value: 'Other', label: __('Other'), icon: 'lucide-package' },
+]
 
 export const SAMPLE_PRODUCTS = {
   Fashion: ['lucide-shirt', 'lucide-shopping-bag', 'lucide-footprints', 'lucide-glasses'],

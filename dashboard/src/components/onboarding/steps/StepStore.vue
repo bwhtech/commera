@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { Button, Combobox, FormControl, Select, Spinner, TextInput, toast, useFileUpload } from 'frappe-ui'
 import { getCountryDefaults, storeSetup } from '../../../data/onboarding'
-import { draft, flow } from '../../../ia/onboarding'
+import { CATEGORIES, draft, flow } from '../../../ia/onboarding'
 import { abbreviate, missingField, storePicks, toOptions } from '../../../ia/onboardingSteps'
 import { monthName } from '../../../data/format'
 import { __ } from '../../../data/translation'
@@ -24,6 +24,7 @@ const countryCharts = ref(null)
 const showAccounting = ref(false)
 const { upload, isUploading } = useFileUpload()
 const logoInput = ref(null)
+const isDraggingLogo = ref(false)
 
 // Once setup has made the company, its country, currency and books are fixed.
 const isLocked = computed(() => storeSetup.status === 'running' || storeSetup.status === 'done')
@@ -74,7 +75,22 @@ watch(
 async function uploadLogo(event) {
   const [file] = [...(event.target.files ?? [])]
   event.target.value = ''
+  await uploadLogoFile(file)
+}
+
+async function dropLogo(event) {
+  isDraggingLogo.value = false
+  if (isUploading.value) return
+  const [file] = [...(event.dataTransfer?.files ?? [])]
+  await uploadLogoFile(file)
+}
+
+async function uploadLogoFile(file) {
   if (!file) return
+  if (!file.type.startsWith('image/')) {
+    toast.error(__('Could not upload {0}', [file.name]))
+    return
+  }
   try {
     const uploaded = await upload(file, { private: false })
     draft.brandLogo = uploaded.file_url
@@ -110,9 +126,14 @@ watch(
       <input ref="logoInput" type="file" accept="image/*" class="hidden" data-onboarding-logo-input @change="uploadLogo" />
       <button
         type="button"
-        class="flex h-20 w-full items-center justify-center gap-2 rounded-4 border border-dashed border-outline-gray-3 text-ink-gray-5 transition-[background-color,transform] duration-150 ease-out-strong hover:bg-surface-gray-1 active:scale-[0.99]"
+        class="flex h-20 w-full items-center justify-center gap-2 rounded-4 border border-dashed text-ink-gray-5 transition-[background-color,border-color,transform] duration-150 ease-out-strong hover:bg-surface-gray-1 active:scale-[0.99]"
+        :class="isDraggingLogo ? 'border-outline-gray-4 bg-surface-gray-2' : 'border-outline-gray-3'"
         :disabled="isUploading"
+        data-onboarding-logo-drop
         @click="logoInput?.click()"
+        @dragover.prevent="isDraggingLogo = true"
+        @dragleave="isDraggingLogo = false"
+        @drop.prevent="dropLogo"
       >
         <Spinner v-if="isUploading" class="size-5" />
         <img v-else-if="draft.brandLogo" :src="draft.brandLogo" :alt="__('Your logo')" class="max-h-12 max-w-[60%] object-contain" />
@@ -132,6 +153,32 @@ watch(
       :description="isRunning ? __('You can change the name once setup finishes.') : ''"
       :error="missing === 'storeName' ? __('Required') : ''"
     />
+
+    <div>
+      <div class="mb-2 flex items-center justify-between text-xs">
+        <p class="text-ink-gray-6">{{ __('You sell') }}</p>
+        <p class="text-ink-gray-4">{{ __('Optional') }}</p>
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        <button
+          v-for="option in CATEGORIES"
+          :key="option.value"
+          type="button"
+          class="flex flex-col items-center gap-2 rounded-4 border px-2 py-3 text-sm transition-[background-color,border-color,color,transform] duration-150 ease-out-strong enabled:active:scale-[0.97] disabled:cursor-not-allowed"
+          :class="
+            draft.storeCategory === option.value
+              ? 'border-outline-gray-5 bg-surface-gray-2 text-ink-gray-9'
+              : 'border-outline-gray-2 text-ink-gray-6 hover:bg-surface-gray-1'
+          "
+          :aria-pressed="draft.storeCategory === option.value"
+          :disabled="isRunning"
+          @click="draft.storeCategory = draft.storeCategory === option.value ? '' : option.value"
+        >
+          <span :class="option.icon" class="size-5" aria-hidden="true" />
+          <span class="truncate">{{ option.label }}</span>
+        </button>
+      </div>
+    </div>
 
     <template v-if="existingStore">
       <Combobox

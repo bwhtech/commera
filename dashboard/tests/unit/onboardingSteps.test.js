@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  SETUP_STAGES,
   STEP_INDEX,
   abbreviate,
   canFinish,
   clampStep,
+  completedSetupStages,
   missingField,
   resumeStep,
   setupPollDelay,
@@ -27,6 +29,7 @@ test('missingField names the first empty required field of a step', () => {
   assert.equal(missingField('you', filled, { needsPassword: true }), 'password')
   assert.equal(missingField('you', { ...filled, password: 'secret' }, { needsPassword: true }), '')
   assert.equal(missingField('store', { ...filled, storeName: '' }), 'storeName')
+  assert.equal(missingField('store', { ...filled, storeCategory: '' }), '')
   assert.equal(missingField('store', filled), '')
   assert.equal(missingField('store', { ...filled, country: 'India' }), '')
   assert.equal(missingField('store', { ...filled, country: '' }), 'country')
@@ -91,6 +94,14 @@ test('a step saved as an index by an older build resumes at a step that still ex
   }
   assert.equal(resumeStep('6', 'done'), STEP_INDEX.done)
   assert.equal(resumeStep('99', 'done'), 0)
+})
+
+test('the setup progress counts the stages the job has finished, and all of them once done', () => {
+  assert.equal(completedSetupStages('running', ''), 0)
+  assert.equal(completedSetupStages('running', 'company'), 0)
+  assert.equal(completedSetupStages('running', 'storefront'), 1)
+  assert.equal(completedSetupStages('failed', 'payments'), 2)
+  assert.equal(completedSetupStages('done', ''), SETUP_STAGES.length)
 })
 
 test('onboarding can finish only once the store setup is done', () => {

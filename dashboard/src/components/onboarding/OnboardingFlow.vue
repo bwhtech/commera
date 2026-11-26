@@ -74,14 +74,12 @@ const isReady = computed(() => canFinish(storeSetup.status))
 const stepProps = computed(() => {
   if (step.value.key === 'you') return { needsPassword: needsPassword.value }
   if (step.value.key === 'store') return { record: record.value }
-  if (step.value.key === 'done') return { finishing: finishing.value, setupStatus: storeSetup.status }
+  if (step.value.key === 'done') return { finishing: finishing.value, setupStatus: storeSetup.status, setupStage: storeSetup.stage }
   return {}
 })
 
 const title = computed(() => {
   if (step.value.key === 'you') return draft.fullName ? __('Welcome, {0}', [draft.fullName.trim().split(' ')[0]]) : step.value.title
-  if (step.value.key === 'done' && storeSetup.status === 'failed') return __('Almost there')
-  if (step.value.key === 'done') return draft.storeName.trim() ? __('{0} is ready', [draft.storeName.trim()]) : __('Your store is ready')
   return step.value.title
 })
 
@@ -106,6 +104,7 @@ function storeSetupValues() {
   if (draft.existingStore) {
     return {
       store_name: draft.storeName.trim(),
+      store_category: draft.storeCategory,
       country: draft.country,
       currency: draft.currency,
       time_zone: draft.timeZone,
@@ -115,6 +114,7 @@ function storeSetupValues() {
   }
   return {
     store_name: draft.storeName.trim(),
+    store_category: draft.storeCategory,
     country: draft.country,
     currency: draft.currency,
     time_zone: draft.timeZone,
@@ -277,13 +277,7 @@ async function finish() {
             :leave-to-class="slide.leave"
           >
             <form :key="step.key" class="flex flex-1 flex-col" :data-onboarding-step="step.key" @submit.prevent="next">
-              <div
-                v-if="step.key === 'done'"
-                class="mb-4 flex size-10 items-center justify-center rounded-full bg-surface-green-2 text-ink-green-6"
-              >
-                <span class="lucide-party-popper size-5" aria-hidden="true" />
-              </div>
-              <h1 class="mb-7 text-3xl-semibold text-ink-gray-9">{{ title }}</h1>
+              <h1 v-if="step.key !== 'done'" class="mb-7 text-3xl-semibold text-ink-gray-9">{{ title }}</h1>
 
               <component :is="STEP_COMPONENTS[step.key]" v-bind="stepProps" @finish="finish" />
 

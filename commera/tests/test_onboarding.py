@@ -17,6 +17,7 @@ from commera.www.commera import get_boot
 SETTINGS = "Commera Settings"
 STORE = {
 	"store_name": "Zz Onboarding Store",
+	"store_category": "Home",
 	"country": "India",
 	"currency": "INR",
 	"time_zone": "Asia/Kolkata",
@@ -137,6 +138,13 @@ class StartStoreSetupTestCase(IntegrationTestCase):
 		enqueue.assert_not_called()
 		self.assertEqual(frappe.db.count("Company"), companies)
 		self.assertEqual(frappe.db.get_single_value(SETTINGS, "store_name"), STORE["store_name"])
+		self.assertEqual(frappe.db.get_single_value(SETTINGS, "store_category"), STORE["store_category"])
+
+	def test_the_category_is_optional_and_an_empty_one_is_saved_empty(self):
+		onboarding_api.start_store_setup(**STORE)
+		without_category = {key: value for key, value in STORE.items() if key != "store_category"}
+		self.assertEqual(onboarding_api.start_store_setup(**without_category)["status"], "done")
+		self.assertEqual(frappe.db.get_single_value(SETTINGS, "store_category"), "")
 
 	def test_fresh_site_queues_the_job_once(self):
 		with (
@@ -211,6 +219,26 @@ class StartStoreSetupTestCase(IntegrationTestCase):
 		self.assertIn("no company", status["error"])
 		self.assertEqual(publish.call_args.args[0], onboarding.SETUP_REALTIME_EVENT)
 		self.assertEqual(publish.call_args.args[1]["status"], "failed")
+
+	def test_the_job_reports_each_stage_while_it_runs(self):
+		onboarding.set_setup_status("running")
+		polled = []
+
+		def poll(*args):
+			polled.append(onboarding_api.get_setup_status()["stage"])
+
+		with (
+			patch("commera.onboarding.is_job_enqueued", return_value=True),
+			patch("commera.onboarding.run_frappe_setup", side_effect=poll),
+			patch("commera.onboarding.seed_commera_settings", side_effect=poll),
+			patch("commera.onboarding.create_payment_modes", side_effect=poll),
+			patch("frappe.publish_realtime") as publish,
+		):
+			onboarding.run_store_setup({"company_name": "Zz Staged"})
+
+		self.assertEqual(polled, ["company", "storefront", "payments"])
+		published = [call.args[1].get("stage") for call in publish.call_args_list]
+		self.assertEqual(published, ["company", "storefront", "payments", None])
 
 
 class SetupStatusAcrossRequestsTestCase(IntegrationTestCase):
