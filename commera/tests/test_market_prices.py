@@ -132,10 +132,11 @@ class MarketPriceTestCase(ProductDetailPriceTestCase):
 	def list_only(self, names):
 		"""The grid's own frappe.qb query over this test's products: other products share the site."""
 
-		def get_product_list(filters=None, **kwargs):
-			return get_product_list_qb(filters, product_list=list(names), page_length=len(names))
+		def get_product_list_with_total(filters=None, **kwargs):
+			cards = get_product_list_qb(filters, product_list=list(names), page_length=len(names))
+			return cards, len(cards)
 
-		return get_product_list
+		return get_product_list_with_total
 
 
 class TestMarketProductPrices(MarketPriceTestCase):
@@ -242,7 +243,7 @@ class TestMarketProductListing(MarketPriceTestCase):
 			for route in (priced, unpriced)
 		}
 
-		with self.in_market(), patch.object(catalog, "get_product_list", self.list_only(names)):
+		with self.in_market(), patch("commera.utils.get_product_list_with_total", self.list_only(names)):
 			page = catalog.list_products()
 
 		cards = {card["handle"]: card for card in page["products"]}
@@ -310,7 +311,7 @@ class TestMarketStorefrontApi(MarketPriceTestCase):
 		name = frappe.db.get_value("Style Attribute Variant", {"route": route})
 
 		self.send(_country="AE")
-		with patch.object(catalog, "get_product_list", self.list_only([name])):
+		with patch("commera.utils.get_product_list_with_total", self.list_only([name])):
 			page = products_api.get_products()
 
 		self.assertEqual(

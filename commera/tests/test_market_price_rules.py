@@ -41,7 +41,7 @@ class TestCustomerPricesStayPrivate(MarketPriceTestCase):
 		self.make_customer_price(item_code, self.market_sale, 17)
 		name = frappe.db.get_value("Style Attribute Variant", {"route": route})
 
-		with self.in_market(), patch.object(catalog, "get_product_list", self.list_only([name])):
+		with self.in_market(), patch("commera.utils.get_product_list_with_total", self.list_only([name])):
 			product = catalog.get_product(route)
 			card = catalog.list_products()["products"][0]
 			item = catalog.get_items([item_code])[item_code]
