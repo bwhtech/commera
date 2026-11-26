@@ -5,7 +5,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase, UnitTestCase
 from werkzeug.test import EnvironBuilder
-from werkzeug.wrappers import Request
+from werkzeug.wrappers import Request, Response
 
 from commera import hooks as commera_hooks
 from commera import storefront_cache as sfc
@@ -231,6 +231,28 @@ class TestStorefrontCache(UnitTestCase):
 				sfc.store_cached_ssr_response("products", "<html>vip</html>")
 				self.assertIsNone(sfc.get_cached_ssr_response("products"))
 
+				# R3-2: free-text search, price range, and unbounded/invalid page or page_size bypass SSR cache.
+				for bad_qs in (
+					"search=x",
+					"min=100",
+					"max=500",
+					"page=0",
+					"page=21",
+					"page=abc",
+					"page_size=13",
+				):
+					frappe.local.request = _mock_get_request("/products", query_string=bad_qs)
+					self.assertFalse(sfc.is_cacheable_ssr_request("products"), bad_qs)
+					self.assertIsNone(sfc.get_cached_ssr_response("products"), bad_qs)
+					sfc.store_cached_ssr_response("products", "<html>uncacheable</html>")
+					self.assertIsNone(sfc.get_cached_ssr_response("products"), bad_qs)
+
+				# Valid bounded page and page_size ARE cached.
+				frappe.local.request = _mock_get_request("/products", query_string="page=2&page_size=24")
+				self.assertTrue(sfc.is_cacheable_ssr_request("products"))
+				sfc.store_cached_ssr_response("products", "<html>page2</html>")
+				self.assertIsNotNone(sfc.get_cached_ssr_response("products"))
+
 				# Known tracking params still share the cached entry.
 				frappe.local.request = _mock_get_request("/products", query_string="utm_source=ig&fbclid=abc")
 				self.assertTrue(sfc.is_cacheable_ssr_request("products"))
@@ -308,9 +330,9 @@ class TestStorefrontCacheIntegration(IntegrationTestCase):
 			("commera.api.storefront.shop.get_shop", lambda: shop.get_shop()),
 			("commera.api.storefront.shop.get_localization", lambda: shop.get_localization()),
 			("commera.api.storefront.shop.list_countries", lambda: shop.list_countries()),
+			("commera.api.storefront.shop.list_pages", lambda: shop.list_pages()),
 			("commera.api.storefront.collections.get_collections", lambda: collections.get_collections()),
 			("commera.api.storefront.products.get_products", lambda: products.get_products()),
-			("commera.api.storefront.search.get_typeahead", lambda: search.get_typeahead("zz", limit=6)),
 		]
 
 		frappe.set_user("Guest")
@@ -341,6 +363,40 @@ class TestStorefrontCacheIntegration(IntegrationTestCase):
 				resp_l2 = call()
 				self.assertEqual(resp_l2.headers.get("X-Commera-Cache"), "HIT-L2", (dotted, api_ver))
 				self.assertEqual(json.loads(resp_l2.get_data(as_text=True))[key], uncached)
+
+		# R3-2: free-text search, price ranges, unbounded pagination, typeahead, and empty recs skip cache.
+		sfc.clear_all_storefront_caches()
+		uncached_calls = [
+			(
+				"commera.api.storefront.products.get_products",
+				lambda: products.get_products(query="random-x"),
+			),
+			(
+				"commera.api.storefront.products.get_products",
+				lambda: products.get_products(min_price=100),
+			),
+			(
+				"commera.api.storefront.products.get_products",
+				lambda: products.get_products(max_price=500),
+			),
+			("commera.api.storefront.products.get_products", lambda: products.get_products(page=21)),
+			("commera.api.storefront.products.get_products", lambda: products.get_products(page_size=13)),
+			("commera.api.storefront.search.get_typeahead", lambda: search.get_typeahead("random-x")),
+			(
+				"commera.api.storefront.search.get_recommendations",
+				lambda: search.get_recommendations("nonexistent-handle-r3"),
+			),
+			(
+				"commera.api.storefront.products.get_wishlist_prices",
+				lambda: products.get_wishlist_prices(["nonexistent-handle-r3"]),
+			),
+		]
+		for dotted, call in uncached_calls:
+			frappe.local.request = _mock_get_request(f"/api/method/{dotted}")
+			res = call()
+			self.assertNotIsInstance(res, Response, dotted)
+		self.assertEqual(len(sfc._l1_bytes), 0)
+		self.assertEqual(len(sfc._l1_api), 0)
 
 	def test_real_doc_saves_and_db_set_value_invalidate_domains(self):
 		"""B5 + B6: real DocType saves and navbar_manager.set_visibility invalidate cached reads."""

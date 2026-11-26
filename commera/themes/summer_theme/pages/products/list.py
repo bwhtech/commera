@@ -6,15 +6,12 @@ ssr_query_params = frozenset(
 	{
 		"category",
 		"subcategory",
-		"search",
 		"sort_by",
 		"page",
 		"page_size",
 		"brands",
 		"colors",
 		"sizes",
-		"min",
-		"max",
 		"has_discount",
 	}
 )

@@ -46,20 +46,19 @@ IGNORED_TRACKING_PARAMS = frozenset(
 )
 # Localization routing params handled before page controllers run (already keyed via locale).
 BASE_SSR_QUERY_PARAMS = frozenset({"_lang", "country"})
-# Default SSR query params when no controller-specific list is provided.
+# Default SSR query params when no controller-specific list is provided (no free-text/range params).
+MAX_CACHED_PAGE = 20
+ALLOWED_CACHED_PAGE_SIZES = frozenset({12, 24, 48})
 ALLOWED_SSR_QUERY_PARAMS = frozenset(
 	{
 		"category",
 		"subcategory",
-		"search",
 		"sort_by",
 		"page",
 		"page_size",
 		"brands",
 		"colors",
 		"sizes",
-		"min",
-		"max",
 		"has_discount",
 		"size",
 		"_lang",
@@ -404,6 +403,7 @@ def cached_guest_api(
 	cache_control: str | None = None,
 	guest_only: bool = True,
 	include_locale: bool = True,
+	should_cache: Callable[[Any], bool] | None = None,
 ):
 	"""Epoch-versioned L1+L2 cache for guest storefront GET APIs; returns pre-serialized Response over HTTP
 	and the Python object for direct Python callers."""
@@ -429,10 +429,27 @@ def cached_guest_api(
 			return _make_json_response(raw_bytes, cache_status="HIT-L2", cache_control=cache_control)
 
 		value = compute_fn()
+		if should_cache is not None and not should_cache(value):
+			return value
 		raw_bytes = _encode_api_bytes(value, api_version)
 		_l1_set(_l1_bytes, bkey, raw_bytes, min(ttl, 30), L1_MAX_ENTRIES)
 		frappe.cache.set_value(bkey, raw_bytes, expires_in_sec=ttl)
 		return _make_json_response(raw_bytes, cache_status="MISS", cache_control=cache_control)
+
+	if should_cache is not None:
+		key = _hash_key(namespace, (_site(), locale, stamp, key_parts))
+		hit = _l1_get(_l1_api, key)
+		if hit is not None:
+			return copy.deepcopy(hit)
+		l2 = frappe.cache.get_value(key)
+		if l2 is not None:
+			_l1_set(_l1_api, key, copy.deepcopy(l2), min(ttl, 30), L1_MAX_ENTRIES)
+			return l2
+		value = compute_fn()
+		if value is not None and should_cache(value):
+			_l1_set(_l1_api, key, copy.deepcopy(value), min(ttl, 30), L1_MAX_ENTRIES)
+			frappe.cache.set_value(key, value, expires_in_sec=ttl)
+		return value
 
 	return get_or_compute(
 		namespace,
@@ -452,6 +469,14 @@ def _is_tracking_param(param: str) -> bool:
 	return lower.startswith("utm_") or lower in IGNORED_TRACKING_PARAMS
 
 
+def _is_valid_ssr_param_values(param: str, values: list[str]) -> bool:
+	if param == "page":
+		return len(values) == 1 and values[0].isdigit() and 1 <= int(values[0]) <= MAX_CACHED_PAGE
+	if param == "page_size":
+		return len(values) == 1 and values[0].isdigit() and int(values[0]) in ALLOWED_CACHED_PAGE_SIZES
+	return True
+
+
 def _resolve_allowed_ssr_params(allowed_query_params: frozenset[str] | None) -> frozenset[str]:
 	if allowed_query_params is None:
 		return ALLOWED_SSR_QUERY_PARAMS
@@ -467,7 +492,7 @@ def has_only_base_or_tracking_params(query_params) -> bool:
 
 def is_cacheable_ssr_request(route_path: str, *, allowed_query_params: frozenset[str] | None = None) -> bool:
 	"""True only for anonymous, public, read-only GET requests to published storefront pages.
-	Fails safe on unknown query params that are neither allowed nor known tracking params."""
+	Fails safe on unknown query params or unbounded pagination values."""
 	if not is_cacheable_enabled_for_ssr():
 		return False
 	req = getattr(frappe.local, "request", None)
@@ -485,10 +510,13 @@ def is_cacheable_ssr_request(route_path: str, *, allowed_query_params: frozenset
 		return False
 	allowed = _resolve_allowed_ssr_params(allowed_query_params)
 	if req.args:
-		for param in req.args:
+		for param, values in req.args.lists():
 			if param in PREVIEW_QUERY_PARAMS:
 				return False
-			if param not in allowed and not _is_tracking_param(param):
+			if param in allowed:
+				if not _is_valid_ssr_param_values(param, values):
+					return False
+			elif not _is_tracking_param(param):
 				return False
 	from commera.storefront_access import is_storefront_published
 

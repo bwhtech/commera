@@ -15,14 +15,11 @@ cacheable_ssr = True
 ssr_query_params = frozenset(
 	{
 		"category",
-		"search",
 		"sort_by",
 		"page",
 		"brands",
 		"colors",
 		"sizes",
-		"min",
-		"max",
 		"has_discount",
 	}
 )

@@ -250,7 +250,7 @@ def get_reviews(variant: str, start: int = 0, page_length: int = PAGE_LENGTH):
 			"can_review": signed_in and not own_review,
 		}
 
-	if frappe.session.user == "Guest":
+	if frappe.session.user == "Guest" and 0 <= start_int <= 200 and limit_int == PAGE_LENGTH:
 		from commera.storefront_cache import cached_guest_api
 
 		return cached_guest_api(

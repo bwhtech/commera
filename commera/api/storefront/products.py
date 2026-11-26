@@ -5,7 +5,13 @@ from frappe.utils.data import cint, cstr, flt
 from commera.api.storefront import rate_limited_guest_api
 from commera.sdk import catalog
 from commera.sdk.types import Product, ProductPage
-from commera.storefront_cache import CATALOG_READ_DOMAINS, PDP_DOMAINS, cached_guest_api
+from commera.storefront_cache import (
+	ALLOWED_CACHED_PAGE_SIZES,
+	CATALOG_READ_DOMAINS,
+	MAX_CACHED_PAGE,
+	PDP_DOMAINS,
+	cached_guest_api,
+)
 
 
 @rate_limited_guest_api("GET", limit=600, seconds=60)
@@ -24,6 +30,7 @@ def get_products(
 ) -> ProductPage:
 	"""List values may be comma separated."""
 	norm_collection = collection or None
+	norm_query = cstr(query).strip()
 	norm_brands = get_list(brands)
 	norm_colors = get_list(colors)
 	norm_sizes = get_list(sizes)
@@ -32,25 +39,9 @@ def get_products(
 	norm_on_sale = bool(cint(on_sale))
 	norm_page = cint(page) or 1
 	norm_page_size = cint(page_size) or 24
-	key_parts = (
-		norm_collection,
-		query or "",
-		tuple(norm_brands),
-		tuple(norm_colors),
-		tuple(norm_sizes),
-		norm_min,
-		norm_max,
-		norm_on_sale,
-		sort,
-		norm_page,
-		norm_page_size,
-	)
 
-	return cached_guest_api(
-		"products.get_products",
-		key_parts,
-		CATALOG_READ_DOMAINS,
-		lambda: catalog.list_products(
+	def _compute():
+		return catalog.list_products(
 			collection=norm_collection,
 			query=query,
 			brands=norm_brands,
@@ -62,7 +53,35 @@ def get_products(
 			sort=sort,
 			page=norm_page,
 			page_size=norm_page_size,
-		),
+		)
+
+	# Free-text search, continuous price bounds, or unbounded pagination bypass Redis cache.
+	if (
+		norm_query
+		or norm_min is not None
+		or norm_max is not None
+		or norm_page < 1
+		or norm_page > MAX_CACHED_PAGE
+		or norm_page_size not in ALLOWED_CACHED_PAGE_SIZES
+	):
+		return _compute()
+
+	key_parts = (
+		norm_collection,
+		tuple(norm_brands),
+		tuple(norm_colors),
+		tuple(norm_sizes),
+		norm_on_sale,
+		sort,
+		norm_page,
+		norm_page_size,
+	)
+
+	return cached_guest_api(
+		"products.get_products",
+		key_parts,
+		CATALOG_READ_DOMAINS,
+		_compute,
 		endpoint="commera.api.storefront.products.get_products",
 		ttl=60,
 	)
@@ -96,32 +115,21 @@ def get_wishlist_prices(handles: list | str) -> list[dict]:
 	if not handles:
 		return []
 	deduped = list(dict.fromkeys(handles))
-
-	def _build():
-		names = frappe.get_all(
-			"Style Attribute Variant",
-			filters={"route": ("in", deduped), "is_published": 1},
-			pluck="name",
-		)
-		cards = {card["handle"]: card for card in catalog.get_product_cards_for(names)} if names else {}
-		return [
-			{
-				"handle": handle,
-				**{key: cards[handle][key] for key in ("price", "compare_at_price", "currency", "available")},
-			}
-			if handle in cards
-			else {"handle": handle, "price": None, "compare_at_price": None, "available": False}
-			for handle in deduped
-		]
-
-	return cached_guest_api(
-		"products.get_wishlist_prices",
-		tuple(deduped),
-		CATALOG_READ_DOMAINS,
-		_build,
-		endpoint="commera.api.storefront.products.get_wishlist_prices",
-		ttl=60,
+	names = frappe.get_all(
+		"Style Attribute Variant",
+		filters={"route": ("in", deduped), "is_published": 1},
+		pluck="name",
 	)
+	cards = {card["handle"]: card for card in catalog.get_product_cards_for(names)} if names else {}
+	return [
+		{
+			"handle": handle,
+			**{key: cards[handle][key] for key in ("price", "compare_at_price", "currency", "available")},
+		}
+		if handle in cards
+		else {"handle": handle, "price": None, "compare_at_price": None, "available": False}
+		for handle in deduped
+	]
 
 
 def get_list(value: list | str | None) -> list[str]:
