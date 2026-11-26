@@ -183,13 +183,17 @@ def get_orders(
 		return {"orders": [], "total": total}
 
 	order_names = [row.name for row in orders]
-	item_counts = {}
-	for row in frappe.get_all(
-		"Sales Order Item",
-		filters={"parent": ["in", order_names]},
-		fields=["parent", "qty"],
-	):
-		item_counts[row.parent] = item_counts.get(row.parent, 0) + flt(row.qty)
+	sales_order_item = frappe.qb.DocType("Sales Order Item")
+	item_counts = {
+		row.parent: flt(row.total_qty)
+		for row in (
+			frappe.qb.from_(sales_order_item)
+			.select(sales_order_item.parent, Sum(sales_order_item.qty).as_("total_qty"))
+			.where(sales_order_item.parent.isin(order_names))
+			.groupby(sales_order_item.parent)
+			.run(as_dict=True)
+		)
+	}
 
 	lifecycles = read_order_lifecycles(order_names)
 	paid_orders = read_paid_orders(order_names)
@@ -678,7 +682,7 @@ def read_order(sales_order: str | int) -> frappe._dict:
 	return order
 
 
-def read_orders(order_names: list, extra_fields: list | tuple = ()) -> dict:
+def read_orders(order_names: list, extra_fields: list | tuple = (), *, include_tags: bool = True) -> dict:
 	"""Orders keyed by `cstr(name)` with their `lines`, `lifecycle` and `tags`, in the same number of
 	queries however many there are. No permission check: every caller makes its own."""
 	if not order_names:
@@ -697,12 +701,13 @@ def read_orders(order_names: list, extra_fields: list | tuple = ()) -> dict:
 	lines_by_order = read_order_lines(found_names)
 	lifecycles = read_order_lifecycles(found_names)
 	tags_by_order = {}
-	for row in frappe.get_all(
-		"Tag Link",
-		filters={"document_type": "Sales Order", "document_name": ["in", found_names]},
-		fields=["document_name", "tag"],
-	):
-		tags_by_order.setdefault(cstr(row.document_name), []).append(row.tag)
+	if include_tags:
+		for row in frappe.get_all(
+			"Tag Link",
+			filters={"document_type": "Sales Order", "document_name": ["in", found_names]},
+			fields=["document_name", "tag"],
+		):
+			tags_by_order.setdefault(cstr(row.document_name), []).append(row.tag)
 
 	for name, order in orders.items():
 		order.lines = lines_by_order.get(name, [])
@@ -735,6 +740,7 @@ def read_order_lines(order_names: list[str]) -> dict[str, list]:
 
 	# The size lives on the variant's child row, not on the order line.
 	sizes_by_item_code = {}
+	variant_by_item_code = {}
 	item_codes = list({row.item_code for row in lines if row.item_code})
 	if item_codes:
 		for row in frappe.get_all(
@@ -743,12 +749,15 @@ def read_order_lines(order_names: list[str]) -> dict[str, list]:
 			fields=["item_code", "size", "parent"],
 		):
 			sizes_by_item_code.setdefault(cstr(row.item_code), row.size)
+			variant_by_item_code.setdefault(cstr(row.item_code), row.parent)
 
-	image_by_item_code = get_item_images(item_codes)
+	missing_image_codes = list({row.item_code for row in lines if row.item_code and not row.image})
+	image_by_item_code = get_item_images(missing_image_codes) if missing_image_codes else {}
 
 	lines_by_order = {}
 	for row in lines:
 		row.size = sizes_by_item_code.get(cstr(row.item_code))
+		row._variant_parent = variant_by_item_code.get(cstr(row.item_code))
 		row.image = row.image or image_by_item_code.get(row.item_code)
 		lines_by_order.setdefault(cstr(row.parent), []).append(row)
 	return lines_by_order

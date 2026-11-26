@@ -38,14 +38,20 @@ def get_orders(sales_orders: list[str | int], extra_fields: list[str] | tuple = 
 	return orders
 
 
-def read_order_results(sales_orders: list, extra_fields) -> dict[str, Order]:
-	orders = read_orders(sales_orders, extra_fields)
+def read_order_results(sales_orders: list, extra_fields, *, include_tags: bool = True) -> dict[str, Order]:
+	orders = read_orders(sales_orders, extra_fields, include_tags=include_tags)
 	if not orders:
 		return {}
 	paid_orders = read_paid_orders([order.name for order in orders.values()])
 	taxes_by_order = read_order_taxes(list(orders))
 	addresses = read_shipping_addresses(list(orders))
-	products = LineProducts([line.item_code for order in orders.values() for line in order.lines])
+	all_lines = [line for order in orders.values() for line in order.lines]
+	size_rows = [
+		frappe._dict(item_code=line.item_code, size=line.size, parent=line._variant_parent)
+		for line in all_lines
+		if line.item_code and line.get("_variant_parent")
+	]
+	products = LineProducts([line.item_code for line in all_lines], size_rows=size_rows)
 	return {
 		name: get_order_result(
 			order, paid_orders, taxes_by_order.get(name, []), addresses.get(name), extra_fields, products

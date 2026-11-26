@@ -3,7 +3,7 @@ from frappe.utils import cstr, flt
 
 from commera.base_prices import get_sales_units
 from commera.localization.market_prices import MarketPrices
-from commera.utils import get_available_stock, get_discount_percent
+from commera.utils import get_available_stocks, get_discount_percent
 
 DEFAULT_PRODUCT_IMAGE = "/assets/commera/images/no-image.svg"
 
@@ -25,9 +25,9 @@ def get_product_detail(route, selected_size=None):
 	name = frappe.db.get_value("Style Attribute Variant", {"route": route, "is_published": 1}, "name")
 	if not name:
 		return None
-	product_variant = frappe.get_doc("Style Attribute Variant", name)
+	product_variant = frappe.get_cached_doc("Style Attribute Variant", name)
 
-	product = frappe.get_doc("Item", product_variant.item_style)
+	product = frappe.get_cached_doc("Item", product_variant.item_style)
 	commera_settings = frappe.get_cached_doc("Commera Settings")
 	warehouse = commera_settings.ecommerce_warehouse
 
@@ -66,16 +66,20 @@ def get_product_detail(route, selected_size=None):
 
 
 def get_available_sizes(product_variant, warehouse):
+	if not product_variant.sizes:
+		return []
+	item_codes = [size.item_code for size in product_variant.sizes]
+	stocks = get_available_stocks(item_codes, warehouse)
 	sizes = [
 		{
 			"item_code": size.item_code,
 			"size": size.size,
-			"stock_detail": get_available_stock(size.item_code, warehouse),
+			"stock_detail": stocks.get(
+				cstr(size.item_code), {"stock_qty": 0.0, "in_stock": 0, "unlimited": 0}
+			),
 		}
 		for size in product_variant.sizes
 	]
-	if not sizes:
-		return []
 
 	return sorted(sizes, key=lambda row: size_sort_key(row["size"]))
 

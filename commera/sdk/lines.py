@@ -16,8 +16,9 @@ class LineProducts:
 	"""The products that sell a set of items, read once with one translate() call for all lines.
 	Item codes and sizes stay in source form; only titles are translated."""
 
-	def __init__(self, item_codes: list[str]):
+	def __init__(self, item_codes: list[str], *, size_rows: list | None = None):
 		self.item_codes = list({code for code in item_codes if code})
+		self._size_rows = size_rows
 		self.localization = get_localization()
 
 	def get_title(self, item_code: str, item_name: str | None) -> str | None:
@@ -50,6 +51,8 @@ class LineProducts:
 
 	def get_cart_products(self) -> dict[str, CartLineProduct]:
 		"""The published product, size and image that sell each item."""
+		if not self.item_codes:
+			return {}
 		published = {code: product for code, product in self.products.items() if product.is_published}
 		images = images_for_variants(list({product.name for product in published.values()}))
 		return {
@@ -65,10 +68,16 @@ class LineProducts:
 	@cached_property
 	def products(self) -> dict[str, frappe._dict]:
 		"""{item_code: product}, unpublished products included so old orders keep their titles."""
-		sizes = frappe.get_all(
-			"Color Size Item",
-			filters={"item_code": ("in", self.item_codes or [""]), "parenttype": "Style Attribute Variant"},
-			fields=["item_code", "size", "parent"],
+		if not self.item_codes:
+			return {}
+		sizes = (
+			self._size_rows
+			if self._size_rows is not None
+			else frappe.get_all(
+				"Color Size Item",
+				filters={"item_code": ("in", self.item_codes), "parenttype": "Style Attribute Variant"},
+				fields=["item_code", "size", "parent"],
+			)
 		)
 		variants = read_variants([row.parent for row in sizes])
 		return {
