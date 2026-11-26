@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Button } from 'frappe-ui'
 import { draft } from '../../../ia/onboarding'
 import { SETUP_STAGES, STEP_INDEX, setupBuildLevel } from '../../../ia/onboardingSteps'
@@ -62,11 +62,13 @@ function beat() {
 
 watch([reachedBuild, isFailed], () => scheduleBeat(BUILD_DWELL_MS), { immediate: true })
 watch(shownBuild, (level) => emit('build', level), { immediate: true })
-watch(isWelcome, async (welcome) => {
-  if (!welcome || prefersReducedMotion()) return
-  await nextTick()
-  burstConfetti(confettiCanvas.value)
-})
+watch(
+  confettiCanvas,
+  (canvas) => {
+    if (canvas && !prefersReducedMotion()) burstConfetti(canvas)
+  },
+  { flush: 'post' },
+)
 onBeforeUnmount(() => clearTimeout(beatTimer))
 </script>
 
@@ -87,7 +89,7 @@ onBeforeUnmount(() => clearTimeout(beatTimer))
       leave-to-class="opacity-0"
     >
       <div v-if="isWelcome" key="welcome" class="relative">
-        <div class="pointer-events-none absolute -inset-x-4 -top-16 h-48" aria-hidden="true">
+        <div class="pointer-events-none absolute -inset-x-8 -top-40 h-80" aria-hidden="true">
           <canvas ref="confettiCanvas" class="size-full" />
         </div>
         <h1 class="relative text-3xl-semibold text-ink-gray-9">{{ __('Welcome to Commera') }}</h1>

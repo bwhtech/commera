@@ -1,4 +1,4 @@
-const CONFETTI_COLORS = ['--ink-amber-4', '--ink-blue-4', '--ink-green-4', '--ink-pink-4', '--ink-violet-4']
+const CONFETTI_COLORS = ['--ink-amber-5', '--ink-blue-5', '--ink-green-5', '--ink-pink-5', '--ink-violet-5']
 
 export function burstConfetti(canvas, { pieces = 90, durationMs = 1200 } = {}) {
   const context = canvas?.getContext('2d')

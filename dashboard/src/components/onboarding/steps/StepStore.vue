@@ -124,30 +124,39 @@ watch(
         <p class="text-ink-gray-4">{{ __('Optional') }}</p>
       </div>
       <input ref="logoInput" type="file" accept="image/*" class="hidden" data-onboarding-logo-input @change="uploadLogo" />
-      <button
-        type="button"
-        class="flex h-20 w-full items-center justify-center gap-2 rounded-4 border border-dashed text-ink-gray-5 transition-[background-color,border-color,transform] duration-150 ease-out-strong hover:bg-surface-gray-1 active:scale-[0.99]"
-        :class="isDraggingLogo ? 'border-outline-gray-4 bg-surface-gray-2' : 'border-outline-gray-3'"
-        :disabled="isUploading"
-        data-onboarding-logo-drop
-        @click="logoInput?.click()"
-        @dragover.prevent="isDraggingLogo = true"
-        @dragleave="isDraggingLogo = false"
-        @drop.prevent="dropLogo"
-      >
-        <Spinner v-if="isUploading" class="size-5" />
-        <img v-else-if="draft.brandLogo" :src="draft.brandLogo" :alt="__('Your logo')" class="max-h-12 max-w-[60%] object-contain" />
-        <template v-else>
-          <img :src="commeraLogo" alt="" class="size-10 rounded-3" />
-          <span class="text-sm">{{ __('Upload') }}</span>
-        </template>
-      </button>
-      <Button v-if="draft.brandLogo" variant="ghost" size="sm" :label="__('Remove logo')" class="mt-1" @click="draft.brandLogo = ''" />
+      <div class="group relative">
+        <button
+          type="button"
+          class="flex h-20 w-full items-center justify-center gap-2 rounded-4 border border-dashed text-ink-gray-5 transition-[background-color,border-color,transform] duration-150 ease-out-strong hover:bg-surface-gray-1 active:scale-[0.99]"
+          :class="isDraggingLogo ? 'border-outline-gray-4 bg-surface-gray-2' : 'border-outline-gray-3'"
+          :disabled="isUploading"
+          data-onboarding-logo-drop
+          @click="logoInput?.click()"
+          @dragover.prevent="isDraggingLogo = true"
+          @dragleave="isDraggingLogo = false"
+          @drop.prevent="dropLogo"
+        >
+          <Spinner v-if="isUploading" class="size-5" />
+          <img v-else-if="draft.brandLogo" :src="draft.brandLogo" :alt="__('Your logo')" class="max-h-12 max-w-[60%] object-contain" />
+          <template v-else>
+            <img :src="commeraLogo" alt="" class="size-10 rounded-3" />
+            <span class="text-sm">{{ __('Upload') }}</span>
+          </template>
+        </button>
+        <Button
+          v-if="draft.brandLogo && !isUploading"
+          class="absolute end-1 top-1 !size-6 !rounded-full !bg-black-overlay-500 !text-white opacity-100 backdrop-blur-sm transition-opacity hover:!bg-black-overlay-700 sm:opacity-0 sm:group-hover:opacity-100"
+          icon="lucide-x"
+          :label="__('Remove logo')"
+          @click="draft.brandLogo = ''"
+        />
+      </div>
     </div>
 
     <FormControl
       v-model="draft.storeName"
       :label="__('Store name')"
+      required
       autocomplete="organization"
       :disabled="isRunning"
       :description="isRunning ? __('You can change the name once setup finishes.') : ''"
@@ -186,6 +195,7 @@ watch(
         v-model="draft.company"
         trigger="button"
         :label="__('Company')"
+        required
         :placeholder="__('Pick your company')"
         :options="toOptions(picks.companies)"
         :description="companySummary"
@@ -196,6 +206,7 @@ watch(
         v-model="draft.priceList"
         trigger="button"
         :label="__('Price list')"
+        required
         :placeholder="__('Pick a price list')"
         :options="toOptions(picks.priceLists)"
         :error="missing === 'priceList' ? __('Required') : ''"
@@ -233,6 +244,7 @@ watch(
                 trigger="button"
                 class="col-span-2"
                 :label="__('Country')"
+                required
                 :placeholder="__('Search countries')"
                 :options="toOptions(options.countries)"
                 :disabled="isLocked"

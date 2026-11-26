@@ -835,8 +835,6 @@ Starting from scratch?,تبدأ من الصفر؟
 A few rows look odd,بعض الصفوف تبدو غريبة
 That is fine. We show you exactly which ones before anything is saved.,لا بأس. سنُريك أيها بالضبط قبل حفظ أي شيء.
 "Welcome, {0}",مرحبًا، {0}
-"Creating your company, books and warehouse",جارٍ إنشاء شركتك ودفاترك المحاسبية ومستودعك
-Setting up,جارٍ الإعداد
 Setup failed,فشل الإعداد
 Could not load your setup,تعذّر تحميل إعدادك
 Store setup failed,فشل إعداد المتجر
@@ -857,6 +855,12 @@ Hanging your sign…,نعلّق لافتتك…
 Chiselling the storefront…,ننحت واجهة المتجر…
 Polishing the shelves…,نلمّع الرفوف…
 Welcome to Commera,مرحبًا بك في Commera
+Add your full name to continue,أضف اسمك الكامل للمتابعة
+Add a password to continue,أضف كلمة مرور للمتابعة
+Add your store name to continue,أضف اسم متجرك للمتابعة
+Pick your country to continue,اختر بلدك للمتابعة
+Pick your company to continue,اختر شركتك للمتابعة
+Pick a price list to continue,اختر قائمة أسعار للمتابعة
 "Your store could not be set up. Retry it above, then come back here.",تعذّر إعداد متجرك. أعد المحاولة في الأعلى، ثم عد إلى هنا.
 Import from Shopify,الاستيراد من Shopify
 Import a CSV,استيراد ملف CSV

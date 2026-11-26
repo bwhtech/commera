@@ -16,6 +16,7 @@ const missing = computed(() => (flow.showErrors ? missingField('you', draft, pro
     <FormControl
       v-model="draft.fullName"
       :label="__('Your name')"
+      required
       autocomplete="name"
       :error="missing === 'fullName' ? __('Required') : ''"
     />
@@ -24,6 +25,7 @@ const missing = computed(() => (flow.showErrors ? missingField('you', draft, pro
       v-model="draft.password"
       type="password"
       :label="__('Password')"
+      required
       autocomplete="new-password"
       :error="missing === 'password' ? __('Required') : ''"
     />

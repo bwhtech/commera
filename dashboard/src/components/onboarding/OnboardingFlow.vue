@@ -5,7 +5,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Alert, Button, Spinner } from 'frappe-ui'
+import { Alert, Button, Spinner, toast } from 'frappe-ui'
 import { bootValue } from '../../data/boot'
 import {
   completeOnboarding,
@@ -53,6 +53,15 @@ const PROGRESS = ['scale-x-[0.04]', 'scale-x-50', 'scale-x-100']
 const SLIDES = {
   forward: { enter: 'translate-x-4 opacity-0 motion-reduce:translate-x-0', leave: '-translate-x-4 opacity-0 motion-reduce:translate-x-0' },
   back: { enter: '-translate-x-4 opacity-0 motion-reduce:translate-x-0', leave: 'translate-x-4 opacity-0 motion-reduce:translate-x-0' },
+}
+
+const MISSING_MESSAGES = {
+  fullName: __('Add your full name to continue'),
+  password: __('Add a password to continue'),
+  storeName: __('Add your store name to continue'),
+  country: __('Pick your country to continue'),
+  company: __('Pick your company to continue'),
+  priceList: __('Pick a price list to continue'),
 }
 
 const router = useRouter()
@@ -133,10 +142,17 @@ const SAVES = {
   store: async () => (await startStoreSetup(storeSetupValues())) && saveBrand(draft),
 }
 
+const missing = computed(() =>
+  missingField(step.value.key, draft, {
+    needsPassword: needsPassword.value,
+    picks: storePicks(record.value?.existing_store, draft.company),
+  }),
+)
+
 async function next() {
-  const picks = storePicks(record.value?.existing_store, draft.company)
-  if (missingField(step.value.key, draft, { needsPassword: needsPassword.value, picks })) {
+  if (missing.value) {
     flow.showErrors = true
+    toast.error(MISSING_MESSAGES[missing.value])
     return
   }
   // Enter in a field submits the form even while the Continue button shows its spinner.
@@ -204,16 +220,7 @@ async function finish() {
             leave-to-class="opacity-0"
           >
             <span
-              v-if="storeSetup.status === 'running'"
-              key="running"
-              class="flex items-center gap-1.5 text-sm text-ink-gray-5"
-              data-onboarding-setup="running"
-              :title="__('Creating your company, books and warehouse')"
-            >
-              <Spinner class="size-3.5" /> {{ __('Setting up') }}
-            </span>
-            <span
-              v-else-if="storeSetup.status === 'done'"
+              v-if="storeSetup.status === 'done'"
               key="done"
               class="flex items-center gap-1.5 text-sm text-ink-green-6"
               data-onboarding-setup="done"
@@ -279,13 +286,21 @@ async function finish() {
             leave-active-class="pointer-events-none absolute inset-0 transition-[opacity,transform] duration-150 ease-out-strong"
             :leave-to-class="slide.leave"
           >
-            <form :key="step.key" class="flex flex-1 flex-col" :data-onboarding-step="step.key" @submit.prevent="next">
+            <form :key="step.key" novalidate class="flex flex-1 flex-col" :data-onboarding-step="step.key" @submit.prevent="next">
               <h1 v-if="step.key !== 'done'" class="mb-7 text-3xl-semibold text-ink-gray-9">{{ title }}</h1>
 
               <component :is="STEP_COMPONENTS[step.key]" v-bind="stepProps" @finish="finish" @build="build = $event" />
 
               <div v-if="step.key !== 'done'" class="mt-auto space-y-1 pt-8">
-                <Button type="submit" variant="solid" size="md" :label="__('Continue')" class="w-full" :loading="saving" />
+                <Button
+                  type="submit"
+                  variant="solid"
+                  size="md"
+                  :label="__('Continue')"
+                  class="w-full aria-disabled:!bg-surface-gray-2 aria-disabled:!text-ink-gray-4"
+                  :aria-disabled="missing ? 'true' : undefined"
+                  :loading="saving"
+                />
                 <Button v-if="step.optional" variant="ghost" size="md" :label="__('Skip')" class="w-full" :disabled="saving" @click="goToStep(flow.index + 1)" />
               </div>
             </form>
