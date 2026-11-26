@@ -72,6 +72,7 @@ clear_cache = [
 	"commera.shop_themes.doctype.shop_theme_settings.shop_theme_settings.clear_settings_cache",
 	"commera.plugins.registry.clear_registry_cache",
 	"commera.storefront_plugins.clear_storefront_plugin_cache",
+	"commera.base_prices.clear_base_prices_cache",
 ]
 
 # Without this, records of a custom doctype never import on migrate (frappe/model/sync.py).

@@ -8,6 +8,7 @@ from commera.commera_ecommerce.doctype.commera_settings.navbar.navbar_manager im
 	seed_menu_when_empty,
 )
 from commera.customizations import create_customizations
+from commera.indexes import ensure_performance_indexes
 from commera.localization import StorefrontLanguages
 from commera.notifications import seed_customer_emails
 from commera.payment_gateways.connectors import get_available_payment_modes, validate_connectors
@@ -33,6 +34,7 @@ def after_install():
 	# install_app syncs before commera is in installed_apps, so our importable_doctypes hook is skipped.
 	sync_for("commera")
 	create_customizations()
+	ensure_performance_indexes()
 	create_payment_modes()
 	add_commera_roles()
 	seed_customer_emails()
@@ -66,6 +68,7 @@ def set_live_theme(theme: str):
 
 def after_migrate():
 	create_customizations()
+	ensure_performance_indexes()
 	sync_storefront_apps()
 	create_payment_modes()
 	add_commera_roles()

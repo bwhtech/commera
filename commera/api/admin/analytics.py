@@ -385,39 +385,144 @@ def get_item_sales(from_date, to_date, item_codes):
 	return {row[0]: {"units": cint(row[1]), "revenue": flt(row[2]), "last_sold": row[3]} for row in rows}
 
 
+def get_item_sales_window_and_lifetime(window_start, to_date, item_codes):
+	"""30-day units and lifetime last_sold per item_code in one SQL pass without a giant IN (...) list."""
+	if not item_codes:
+		return {}, {}
+	from commera.api.admin.orders import is_webshop_order
+
+	wanted = set(item_codes)
+	sales_order = frappe.qb.DocType("Sales Order")
+	sales_order_item = frappe.qb.DocType("Sales Order Item")
+	query = (
+		frappe.qb.from_(sales_order)
+		.join(sales_order_item)
+		.on(sales_order_item.parent == sales_order.name)
+		.select(
+			sales_order_item.item_code,
+			Sum(
+				frappe.qb.terms.Case()
+				.when(sales_order.transaction_date >= window_start, sales_order_item.qty)
+				.else_(0)
+			),
+			Max(sales_order.transaction_date),
+		)
+		.where(is_webshop_order(sales_order))
+		.where(sales_order.transaction_date <= to_date)
+		.groupby(sales_order_item.item_code)
+	)
+	if len(wanted) <= 50:
+		query = query.where(sales_order_item.item_code.isin(list(wanted)))
+	rows = query.run()
+	sales_30d, sales_lifetime = {}, {}
+	for item_code, units_30d, last_sold in rows:
+		if item_code not in wanted:
+			continue
+		if cint(units_30d):
+			sales_30d[item_code] = {"units": cint(units_30d)}
+		sales_lifetime[item_code] = {"last_sold": last_sold}
+	return sales_30d, sales_lifetime
+
+
+def read_inventory_report_rows() -> list[tuple]:
+	"""Slim tuple query for get_inventory_report: avoids building thousands of full UI dicts or sorting."""
+	warehouse = frappe.get_cached_value("Commera Settings", "Commera Settings", "ecommerce_warehouse")
+	csi = frappe.qb.DocType("Color Size Item")
+	sav = frappe.qb.DocType("Style Attribute Variant")
+	tpl = frappe.qb.DocType("Item").as_("tpl_item")
+	bin_dt = frappe.qb.DocType("Bin")
+	product_expr = Coalesce(NullIf(tpl.item_name, ""), sav.item_style)
+	option_expr = Coalesce(NullIf(sav.attribute_value, ""), sav.display_name)
+	stock_expr = Coalesce(bin_dt.actual_qty, 0) if warehouse else frappe.qb.terms.ValueWrapper(0)
+	query = (
+		frappe.qb.from_(csi)
+		.join(sav)
+		.on(sav.name == csi.parent)
+		.left_join(tpl)
+		.on(tpl.name == sav.item_style)
+		.where((csi.parenttype == "Style Attribute Variant") & (Coalesce(csi.item_code, "") != ""))
+	)
+	if warehouse:
+		query = query.left_join(bin_dt).on(
+			(bin_dt.item_code == csi.item_code) & (bin_dt.warehouse == warehouse)
+		)
+	return query.select(csi.item_code, product_expr, sav.item_style, option_expr, stock_expr).run()
+
+
+def read_default_rates_map(item_codes: list[str]) -> dict[str, float]:
+	"""Default selling price list rates for inventory valuation, using a fast tuple query when prices are direct."""
+	if not item_codes:
+		return {}
+	from commera.api.variant_pricing import get_selling_price_lists
+	from commera.base_prices import can_use_direct_item_price, is_public_price, is_valid_on
+
+	if can_use_direct_item_price():
+		default_price_list, _sale_price_list = get_selling_price_lists()
+		if not default_price_list:
+			return {}
+		price = frappe.qb.DocType("Item Price")
+		rows = (
+			frappe.qb.from_(price)
+			.select(price.item_code, price.price_list_rate)
+			.where(
+				(price.price_list == default_price_list)
+				& (price.selling == 1)
+				& is_public_price(price)
+				& is_valid_on(price, frappe.utils.nowdate())
+			)
+			.run()
+		)
+		return {code: float(rate or 0) for code, rate in rows}
+	return get_default_rates(item_codes)
+
+
 @frappe.whitelist()
 def get_inventory_report(months: int = REPORT_MONTHS_DEFAULT):
 	"""Stock value and sell-through for the shop's own ecommerce warehouse. "Value" prices on-hand stock at
 	today's selling price - "what my shelves are worth to sell", not ERPNext's landed-cost valuation."""
 	frappe.only_for("System Manager")
-	from commera.api.admin.inventory import get_inventory
 
 	start, today, months = month_window(months)
 
-	rows = get_inventory(page_length=100000)["rows"]
-	item_codes = [row["item_code"] for row in rows]
-	rates = get_default_rates(item_codes)
-	stock_value_now = sum(flt(row["stock"]) * rates.get(row["item_code"], 0) for row in rows)
-	units_on_hand_now = sum(flt(row["stock"]) for row in rows)
+	raw_rows = read_inventory_report_rows()
+	item_codes = [row[0] for row in raw_rows]
+	rates = read_default_rates_map(item_codes)
+
+	stock_value_now = 0.0
+	units_on_hand_now = 0.0
+	for item_code, _product, _product_name, _option, stock in raw_rows:
+		qty = float(stock or 0)
+		units_on_hand_now += qty
+		if qty:
+			stock_value_now += qty * rates.get(item_code, 0.0)
 	avg_price = stock_value_now / units_on_hand_now if units_on_hand_now else 0.0
 
 	window_start_30d = add_days(today, -29)
-	sales_30d = get_item_sales(window_start_30d, today, item_codes)
-	sales_lifetime = get_item_sales(None, today, item_codes)
+	sales_30d, sales_lifetime = get_item_sales_window_and_lifetime(window_start_30d, today, item_codes)
 	units_sold_30d = sum(row["units"] for row in sales_30d.values())
 
-	templates_by_item_code = get_item_templates_by_item_code(item_codes)
-
 	stock_by_template, units_30d_by_template, titles_by_template = {}, {}, {}
-	for row in rows:
-		template = templates_by_item_code.get(row["item_code"])
-		if not template:
-			continue
-		stock_by_template[template] = stock_by_template.get(template, 0) + flt(row["stock"])
-		units_30d_by_template[template] = units_30d_by_template.get(template, 0) + sales_30d.get(
-			row["item_code"], {}
-		).get("units", 0)
-		titles_by_template.setdefault(template, row["product"])
+	dead_stock = []
+	for item_code, product, template, option, stock in raw_rows:
+		qty = float(stock or 0)
+		sold_30 = sales_30d.get(item_code, {}).get("units", 0)
+		if template:
+			stock_by_template[template] = stock_by_template.get(template, 0.0) + qty
+			units_30d_by_template[template] = units_30d_by_template.get(template, 0) + sold_30
+			if template not in titles_by_template:
+				titles_by_template[template] = product or template
+		if qty > 0 and not sold_30:
+			last_sold = sales_lifetime.get(item_code, {}).get("last_sold")
+			dead_stock.append(
+				{
+					"product": product or template,
+					"variant": option,
+					"sku": item_code,
+					"stock": qty,
+					"last_sold_days": date_diff(today, last_sold) if last_sold else None,
+					"value": qty * rates.get(item_code, 0.0),
+				}
+			)
 
 	velocity = []
 	for template, stock in stock_by_template.items():
@@ -436,24 +541,6 @@ def get_inventory_report(months: int = REPORT_MONTHS_DEFAULT):
 
 	# Dead stock: on the shelf with nothing sold in the last 30 days - the section's own subtitle
 	# says exactly that, so that is the window this list is scoped to.
-	dead_stock = []
-	for row in rows:
-		if flt(row["stock"]) <= 0:
-			continue
-		item_code = row["item_code"]
-		if sales_30d.get(item_code, {}).get("units", 0):
-			continue
-		last_sold = sales_lifetime.get(item_code, {}).get("last_sold")
-		dead_stock.append(
-			{
-				"product": row["product"],
-				"variant": row["option"],
-				"sku": item_code,
-				"stock": row["stock"],
-				"last_sold_days": date_diff(today, last_sold) if last_sold else None,
-				"value": flt(row["stock"]) * rates.get(item_code, 0),
-			}
-		)
 	dead_stock.sort(key=lambda row: row["value"], reverse=True)
 	dead_stock = dead_stock[:DEAD_STOCK_LIMIT]
 	dead_stock_value = sum(row["value"] for row in dead_stock)
@@ -526,6 +613,99 @@ def get_channel_split(from_date, to_date):
 	return [{"source": row[0], "sessions": cint(row[1])} for row in rows]
 
 
+def read_funnel_pair(from_date, to_date, previous_from, previous_to):
+	"""Current and previous window funnel stage counts in two queries instead of eight."""
+	from commera.api.analytics_dashboard import FUNNEL_STAGES
+
+	cur_start, cur_end = get_window(from_date, to_date)
+	prev_start, _prev_end = get_window(previous_from, previous_to)
+	analytics_event = frappe.qb.DocType("Storefront Analytics Event")
+	period = frappe.qb.terms.Case().when(analytics_event.creation >= cur_start, "current").else_("previous")
+
+	total_rows = (
+		frappe.qb.from_(analytics_event)
+		.select(period.as_("period"), Count(analytics_event.session_id).distinct())
+		.where((analytics_event.creation >= prev_start) & (analytics_event.creation < cur_end))
+		.groupby(period)
+		.run()
+	)
+	stage_rows = (
+		frappe.qb.from_(analytics_event)
+		.select(period.as_("period"), analytics_event.event, Count(analytics_event.session_id).distinct())
+		.where((analytics_event.creation >= prev_start) & (analytics_event.creation < cur_end))
+		.groupby(period, analytics_event.event)
+		.run()
+	)
+	totals = {row[0]: cint(row[1]) for row in total_rows}
+	stages_map = {(row[0], row[1]): cint(row[2]) for row in stage_rows}
+
+	def build_stages(p_key):
+		stages = [{"key": "sessions", "label": "Sessions", "count": totals.get(p_key, 0)}]
+		for key, label, event in FUNNEL_STAGES:
+			stages.append({"key": key, "label": label, "count": stages_map.get((p_key, event), 0)})
+		return stages
+
+	return build_stages("current"), build_stages("previous")
+
+
+def read_storefront_metrics_single_pass(start, today, from_date, to_date, previous_from, previous_to):
+	"""Compute current/previous funnel stages, monthly sessions, and channel split in ONE covering-index scan."""
+	from commera.api.analytics_dashboard import FUNNEL_STAGES
+
+	cur_start, cur_end = get_window(from_date, to_date)
+	prev_start, _prev_end = get_window(previous_from, previous_to)
+	analytics_event = frappe.qb.DocType("Storefront Analytics Event")
+	date_format = "%Y-%m" if frappe.db.db_type != "postgres" else "YYYY-MM"
+	is_cur_expr = frappe.qb.terms.Case().when(analytics_event.creation >= cur_start, 1).else_(0)
+	month_expr = DateFormat(analytics_event.creation, date_format)
+	src_expr = Coalesce(NullIf(analytics_event.utm_source, ""), "Direct")
+
+	rows = (
+		frappe.qb.from_(analytics_event)
+		.select(is_cur_expr, month_expr, analytics_event.event, src_expr, analytics_event.session_id)
+		.where((analytics_event.creation >= prev_start) & (analytics_event.creation < cur_end))
+		.run()
+	)
+
+	cur_sessions_set = set()
+	prev_sessions_set = set()
+	cur_event_sessions: dict[str, set] = {}
+	prev_event_sessions: dict[str, set] = {}
+	month_sessions: dict[str, set] = {}
+	channel_sessions: dict[str, set] = {}
+
+	for is_cur, month_str, event, source, session_id in rows:
+		if session_id is None:
+			continue
+		if is_cur:
+			cur_sessions_set.add(session_id)
+			cur_event_sessions.setdefault(event, set()).add(session_id)
+			month_sessions.setdefault(month_str, set()).add(session_id)
+			channel_sessions.setdefault(source, set()).add(session_id)
+		else:
+			prev_sessions_set.add(session_id)
+			prev_event_sessions.setdefault(event, set()).add(session_id)
+
+	def build_stages(total_set, event_map):
+		stages = [{"key": "sessions", "label": "Sessions", "count": len(total_set)}]
+		for key, label, event in FUNNEL_STAGES:
+			stages.append({"key": key, "label": label, "count": len(event_map.get(event, ()))})
+		return stages
+
+	funnel = build_stages(cur_sessions_set, cur_event_sessions)
+	previous_funnel = build_stages(prev_sessions_set, prev_event_sessions)
+	sessions_by_month = [
+		{"month": key, "label": formatdate(f"{key}-01", "MMM"), "sessions": len(month_sessions.get(key, ()))}
+		for key in sorted(build_month_buckets(start, today))
+	]
+	channels = sorted(
+		[{"channel": src, "sessions": len(sids)} for src, sids in channel_sessions.items()],
+		key=lambda row: row["sessions"],
+		reverse=True,
+	)
+	return funnel, previous_funnel, sessions_by_month, channels
+
+
 @frappe.whitelist()
 def get_storefront_report(months: int = REPORT_MONTHS_DEFAULT):
 	"""Sessions/funnel/traffic for the trailing N months - a thin wrapper over analytics_dashboard.py's
@@ -534,45 +714,41 @@ def get_storefront_report(months: int = REPORT_MONTHS_DEFAULT):
 
 	start, today, months = month_window(months)
 	from_date, to_date = str(start), str(today)
-
-	current = get_period_kpis(from_date, to_date)
-	# get_previous_window returns date objects, not strings - get_funnel below is a whitelisted,
-	# type-hinted function, and frappe enforces its `str` params even on a direct in-process call.
 	previous_from, previous_to = (str(value) for value in get_previous_window(from_date, to_date))
-	previous = get_period_kpis(previous_from, previous_to)
 
-	funnel = get_funnel(from_date, to_date)["stages"]
-	previous_funnel = get_funnel(previous_from, previous_to)["stages"]
+	funnel, previous_funnel, sessions_by_month, channels = read_storefront_metrics_single_pass(
+		start, today, from_date, to_date, previous_from, previous_to
+	)
 
 	def stage_count(stages, key):
 		return next((row["count"] for row in stages if row["key"] == key), 0)
 
-	add_to_cart_rate = get_rate(stage_count(funnel, "added_to_cart"), stage_count(funnel, "sessions"))
+	cur_sessions = stage_count(funnel, "sessions")
+	prev_sessions = stage_count(previous_funnel, "sessions")
+	cur_conversion = get_rate(stage_count(funnel, "purchased"), cur_sessions)
+	prev_conversion = get_rate(stage_count(previous_funnel, "purchased"), prev_sessions)
+
+	add_to_cart_rate = get_rate(stage_count(funnel, "added_to_cart"), cur_sessions)
 	checkout_completion_rate = get_rate(
 		stage_count(funnel, "purchased"), stage_count(funnel, "reached_checkout")
 	)
-	previous_add_to_cart_rate = get_rate(
-		stage_count(previous_funnel, "added_to_cart"), stage_count(previous_funnel, "sessions")
-	)
+	previous_add_to_cart_rate = get_rate(stage_count(previous_funnel, "added_to_cart"), prev_sessions)
 	previous_checkout_completion_rate = get_rate(
 		stage_count(previous_funnel, "purchased"), stage_count(previous_funnel, "reached_checkout")
 	)
 
 	return {
 		"stats": {
-			"sessions": {"value": current["sessions"], "previous": previous["sessions"]},
-			"conversion_rate": {"value": current["conversion_rate"], "previous": previous["conversion_rate"]},
+			"sessions": {"value": cur_sessions, "previous": prev_sessions},
+			"conversion_rate": {"value": cur_conversion, "previous": prev_conversion},
 			"add_to_cart_rate": {"value": add_to_cart_rate, "previous": previous_add_to_cart_rate},
 			"checkout_completion_rate": {
 				"value": checkout_completion_rate,
 				"previous": previous_checkout_completion_rate,
 			},
 		},
-		"sessions_by_month": get_sessions_by_month(start, today),
-		"channels": [
-			{"channel": row["source"], "sessions": row["sessions"]}
-			for row in get_channel_split(from_date, to_date)
-		],
+		"sessions_by_month": sessions_by_month,
+		"channels": channels,
 		"funnel": [{"stage": row["label"], "count": row["count"]} for row in funnel],
 		"top_pages": [
 			{"page": row["path"], "views": row["sessions"], "conversion": row["conversion_rate"]}

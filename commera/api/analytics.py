@@ -29,29 +29,47 @@ def capture():
 	if item_code and not frappe.db.exists("Item", item_code):
 		item_code = None
 
-	# ponytail: one INSERT per beacon, revisit with a batched buffer if the events table
-	# outgrows the write budget (roughly: sustained page views above a few hundred/sec)
-	frappe.get_doc(
-		{
-			"doctype": "Storefront Analytics Event",
-			"event": payload.get("event"),
-			"session_id": events.clip(payload.get("session_id"), 64),
-			"visitor_user": events.get_visitor_user(),
-			"device": events.get_device(events.get_user_agent()),
-			"item_code": item_code or None,
-			"qty": cint(payload.get("qty")),
-			"value": flt(payload.get("value")),
-			"currency": events.clip(payload.get("currency"), 8),
-			"path": events.clip(payload.get("path"), 255),
-			"referrer": events.clip(payload.get("referrer"), 255),
-			"utm_source": events.clip(payload.get("utm_source"), 140),
-			"utm_medium": events.clip(payload.get("utm_medium"), 140),
-			"utm_campaign": events.clip(payload.get("utm_campaign"), 140),
-			"utm_term": events.clip(payload.get("utm_term"), 140),
-			"utm_content": events.clip(payload.get("utm_content"), 140),
-			"items_json": events.get_items_snapshot(payload.get("items")),
-		}
-	).insert(ignore_permissions=True)
+	# Direct parameterized INSERT avoids full ORM Document/meta overhead on high-frequency guest beacons.
+	now = frappe.utils.now()
+	owner = frappe.session.user or "Guest"
+	frappe.db.sql(
+		"""
+		INSERT INTO `tabStorefront Analytics Event` (
+			name, creation, modified, modified_by, owner, docstatus, idx,
+			event, session_id, visitor_user, device, item_code, qty, value,
+			currency, path, referrer, utm_source, utm_medium, utm_campaign,
+			utm_term, utm_content, items_json
+		) VALUES (
+			%s, %s, %s, %s, %s, 0, 0,
+			%s, %s, %s, %s, %s, %s, %s,
+			%s, %s, %s, %s, %s, %s,
+			%s, %s, %s
+		)
+		""",
+		(
+			frappe.generate_hash(length=10),
+			now,
+			now,
+			owner,
+			owner,
+			payload.get("event"),
+			events.clip(payload.get("session_id"), 64),
+			events.get_visitor_user(),
+			events.get_device(events.get_user_agent()),
+			item_code or None,
+			cint(payload.get("qty")),
+			flt(payload.get("value")),
+			events.clip(payload.get("currency"), 8),
+			events.clip(payload.get("path"), 255),
+			events.clip(payload.get("referrer"), 255),
+			events.clip(payload.get("utm_source"), 140),
+			events.clip(payload.get("utm_medium"), 140),
+			events.clip(payload.get("utm_campaign"), 140),
+			events.clip(payload.get("utm_term"), 140),
+			events.clip(payload.get("utm_content"), 140),
+			events.get_items_snapshot(payload.get("items")),
+		),
+	)
 
 
 @frappe.whitelist()

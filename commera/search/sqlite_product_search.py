@@ -825,6 +825,14 @@ class SqliteProductSearch(SQLiteSearch, SearchEngineBase):
 		"""Names in core's rerank order. Typeahead ranks each doctype apart, so none crowds out another."""
 		return [hit["name"] for hit in self._process_search_results(hits, query)]
 
+	def get_scoring_pipeline(self):
+		"""Cache scoring pipeline discovery on the engine instance instead of calling dir()/getattr() per hit."""
+		pipeline = getattr(self, "_cached_scoring_pipeline", None)
+		if pipeline is None:
+			pipeline = super().get_scoring_pipeline()
+			self._cached_scoring_pipeline = pipeline
+		return pipeline
+
 	def facet_counts(self, filters):
 		fts_query = self.fts_query_for((filters.get("search") or "").strip())
 		if not fts_query:

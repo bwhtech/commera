@@ -14,7 +14,8 @@ from frappe.utils.background_jobs import get_job_status
 from frappe.utils.caching import request_cache
 from frappe.utils.data import strip_html
 from pypika import Order, Table
-from pypika.terms import Field
+from pypika.analytics import Count as WindowCount
+from pypika.terms import ExistsCriterion, Field, ValueWrapper
 from rq.job import JobStatus
 
 from commera.core import get_address_docs, get_party
@@ -96,52 +97,78 @@ def get_nested_links(link_doctype, link_name):
 
 def get_product_list(filters=None, product_list=None, page=1, page_length=30, sort_by="default"):
 	"""Storefront product grid: FTS-ranked when a rankable term is searched, frappe.qb otherwise."""
+	cards, _total = get_product_list_with_total(
+		filters=filters,
+		product_list=product_list,
+		page=page,
+		page_length=page_length,
+		sort_by=sort_by,
+		include_total=False,
+	)
+	return cards
+
+
+def get_product_list_with_total(
+	filters=None,
+	product_list=None,
+	page=1,
+	page_length=30,
+	sort_by="default",
+	*,
+	include_total: bool = True,
+) -> tuple[list[dict], int | None]:
+	"""Return `(cards, total_or_none)` where total is computed via window count on the qb grid."""
 	from commera.search import query as search_query
 	from commera.search.engine_cache import get_search_engine
 
 	if product_list is not None or search_query.use_qb_fallback(filters):
-		return get_product_list_qb(filters, product_list, page, page_length, sort_by)
+		return get_product_list_qb_with_total(
+			filters, product_list, page, page_length, sort_by, include_total=include_total
+		)
 
 	ranked_names = search_query.read_or_fall_back(
 		lambda: get_search_engine().search_products(filters, page, page_length, sort_by), lambda: None
 	)
 	if ranked_names is None:
-		return get_product_list_qb(filters, product_list, page, page_length, sort_by)
+		return get_product_list_qb_with_total(
+			filters, product_list, page, page_length, sort_by, include_total=include_total
+		)
 	if not ranked_names:
-		return []
+		return [], None
 
 	# Hydrate through the qb select for one card shape, then restore rank: frappe.qb orders by name.
 	cards_by_name = {
 		card["name"]: card
 		for card in get_product_list_qb(product_list=ranked_names, page_length=len(ranked_names))
 	}
-	return [cards_by_name[name] for name in ranked_names if name in cards_by_name]
+	return [cards_by_name[name] for name in ranked_names if name in cards_by_name], None
 
 
 def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30, sort_by="default"):
 	"""Retained frappe.qb product grid — browse, pinned lists, and the Arabic/short-term search fallback."""
+	cards, _total = get_product_list_qb_with_total(
+		filters, product_list, page, page_length, sort_by, include_total=False
+	)
+	return cards
 
+
+def get_product_list_qb_with_total(
+	filters=None, product_list=None, page=1, page_length=30, sort_by="default", *, include_total: bool = True
+) -> tuple[list[dict], int | None]:
 	from commera.card_prices import card_discount_percent
+	from commera.search.record_builder import images_for_variants
 
 	# Without a price sort or filter, pick the page first and price only its products.
 	priced_in_sql = sort_by in PRICE_SORTS or has_price_filter(filters)
-	query = get_product_base_query(filters, product_list, with_card_prices=priced_in_sql)
+	query = get_product_base_query(
+		filters, product_list, with_card_prices=priced_in_sql, join_sizes=False, join_item=True
+	)
 	style_attribute_variant = DocType("Style Attribute Variant")
-	website_slideshow_item = DocType("Website Slideshow Item")
-	hover_slideshow_item = DocType("Website Slideshow Item").as_("hover_slideshow_item")
-	color_size_item = DocType("Color Size Item")
 	card = Table("card_prices")
 	item = DocType("Item")
 
 	query = (
-		query.left_join(website_slideshow_item)
-		.on(
-			(website_slideshow_item.parent == style_attribute_variant.name)
-			& (website_slideshow_item.idx == 1)
-		)
-		.left_join(hover_slideshow_item)
-		.on((hover_slideshow_item.parent == style_attribute_variant.name) & (hover_slideshow_item.idx == 2))
-		.select(
+		query.select(
 			style_attribute_variant.name,
 			style_attribute_variant.route,
 			style_attribute_variant.item_style,
@@ -155,11 +182,7 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 			item.brand,
 			item.item_name,
 			item.is_stock_item,
-			color_size_item.item_code.as_("variant_item_code"),
-			website_slideshow_item.image.as_("image"),
-			hover_slideshow_item.image.as_("hover_image"),
 		)
-		.groupby(style_attribute_variant.name)
 		.limit(page_length)
 		.offset((page - 1) * page_length)
 	)
@@ -171,20 +194,34 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 			card.sale_price,
 			discount_expr.as_("discount_percent"),
 		)
+	if include_total:
+		query = query.select(WindowCount("*").over().as_("_commera_total_count"))
 	if sort_by == "price_low":
 		query = query.orderby(card.effective_price, order=Order.asc)
 	elif sort_by == "price_high":
 		query = query.orderby(card.effective_price, order=Order.desc)
 	elif sort_by == "name":
-		query = query.orderby("display_name", order=Order.asc)
+		query = query.orderby(style_attribute_variant.display_name, order=Order.asc)
 	elif sort_by == "new_arrival":
 		query = query.orderby(style_attribute_variant.modified, order=Order.desc)
 	elif sort_by == "discount":
 		query = query.orderby(discount_expr, order=Order.desc)
 	else:
-		query = query.orderby("name", order=Order.asc)
+		query = query.orderby(style_attribute_variant.name, order=Order.asc)
 	cards = query.run(as_dict=True)
-	return shape_product_cards(cards if priced_in_sql else set_card_prices(cards))
+	total = None
+	if include_total and cards:
+		total = cint(cards[0].get("_commera_total_count"))
+		for row in cards:
+			row.pop("_commera_total_count", None)
+	if cards:
+		images_by_variant = images_for_variants([row["name"] for row in cards])
+		for row in cards:
+			imgs = images_by_variant.get(row["name"], {})
+			row["image"] = imgs.get("image")
+			row["hover_image"] = imgs.get("hover_image")
+	shaped = _shape_product_cards(cards if priced_in_sql else set_card_prices(cards), prices_live=True)
+	return shaped, total
 
 
 def set_card_prices(cards):
@@ -214,6 +251,10 @@ def set_card_prices(cards):
 def shape_product_cards(cards):
 	"""Give every product card the one storefront card shape, whichever grid built it.
 	`title` is the product's title in the request language."""
+	return _shape_product_cards(cards, prices_live=False)
+
+
+def _shape_product_cards(cards, *, prices_live: bool = False):
 	from commera.localization.market_prices import MarketPrices
 	from commera.sdk.catalog import set_product_titles
 	from commera.search.engine import CARD_COLUMNS
@@ -221,14 +262,23 @@ def shape_product_cards(cards):
 
 	if not cards:
 		return cards
-	prices = MarketPrices.current()
 
 	unsized = [card["name"] for card in cards if card.get("sizes") is None]
 	sizes_by_variant = sizes_for_variants(unsized) if unsized else {}
 	for card in cards:
 		if card.get("sizes") is None:
 			card["sizes"] = sizes_by_variant.get(card["name"], [])
-	unpriced = prices.get_unavailable([size["item_code"] for card in cards for size in card["sizes"]])
+		if card.get("variant_item_code") is None:
+			card["variant_item_code"] = card["sizes"][0]["item_code"] if card["sizes"] else None
+
+	# SQLite index cards keep 0 for unpriced products, so check live prices; qb cards already ran card_prices_query.
+	unpriced = (
+		set()
+		if prices_live
+		else MarketPrices.current().get_unavailable(
+			[size["item_code"] for card in cards for size in card["sizes"]]
+		)
+	)
 
 	for card in cards:
 		for column in CARD_COLUMNS:
@@ -236,7 +286,7 @@ def shape_product_cards(cards):
 		card.setdefault("average_rating", None)
 		card.setdefault("review_count", None)
 		# The index keeps a store price of 0 for a product no size of which is priced today: not for sale.
-		if card["sizes"] and all(size["item_code"] in unpriced for size in card["sizes"]):
+		if not prices_live and card["sizes"] and all(size["item_code"] in unpriced for size in card["sizes"]):
 			card.update(
 				effective_price=None, sale_price=None, default_price=None, discount_percent=0, has_discount=0
 			)
@@ -263,9 +313,8 @@ def get_total_product_count(filters=None, product_list=None):
 def get_product_count_qb(filters=None, product_list=None):
 	"""Retained frappe.qb total count — used under the frappe.qb fallback and for pinned product lists."""
 
-	query = get_product_base_query(filters, product_list)
-	style_attribute_variant = DocType("Style Attribute Variant")
-	query = query.select(Count(style_attribute_variant.name).distinct().as_("total_count"))
+	query = get_product_base_query(filters, product_list, join_sizes=False, join_item=False)
+	query = query.select(Count("*").as_("total_count"))
 	result = query.run(as_dict=True)
 	return result[0]["total_count"] if result else 0
 
@@ -274,20 +323,24 @@ def has_price_filter(filters) -> bool:
 	return bool(filters) and any(filters.get(key) for key in PRICE_FILTERS)
 
 
-def get_product_base_query(filters=None, product_list=None, with_card_prices=False):
+def get_product_base_query(
+	filters=None, product_list=None, with_card_prices=False, *, join_sizes=True, join_item=True
+):
 	"""Products matching `filters`, joined to `card_prices` when asked or when a price filter needs it.
 	The card prices aggregate only the products the other filters let through."""
 	from commera.card_prices import card_prices_query
 	from commera.localization.market_prices import MarketPrices
 
-	query = filtered_products_query(filters, product_list)
+	query = filtered_products_query(filters, product_list, join_sizes=join_sizes, join_item=join_item)
 	prices = MarketPrices.current()
 	priced_only = searches_a_secondary_market(filters, prices)
 	if not (with_card_prices or has_price_filter(filters) or priced_only):
 		return query
 
 	style_attribute_variant = DocType("Style Attribute Variant")
-	candidates = product_list or filtered_products_query(filters).select(style_attribute_variant.name)
+	candidates = product_list or filtered_products_query(filters, join_sizes=False, join_item=False).select(
+		style_attribute_variant.name
+	)
 	card_prices = card_prices_query(prices.sale_price_list, prices.compare_at_price_list, candidates).as_(
 		"card_prices"
 	)
@@ -313,21 +366,24 @@ def searches_a_secondary_market(filters, prices) -> bool:
 	return bool(filters and filters.get("search")) and not prices.uses_store_prices
 
 
-def filtered_products_query(filters=None, product_list=None):
-	"""Products matching every filter but the price filters, with their sizes and their Item."""
+def filtered_products_query(filters=None, product_list=None, *, join_sizes=True, join_item=True):
+	"""Products matching every filter but the price filters. When `join_sizes=False`, sizes are checked via
+	EXISTS so Style Attribute Variant stays one row per product (no GROUP BY / temp table)."""
 	from commera.product_collections import variant_in_collections
 
 	style_attribute_variant = DocType("Style Attribute Variant")
 	color_size_item = DocType("Color Size Item")
 	item = DocType("Item")
+	needs_item = join_item or bool(filters and (filters.get("brands") or filters.get("search")))
 
-	query = (
-		frappe.qb.from_(style_attribute_variant)
-		.left_join(color_size_item)
-		.on(color_size_item.parent == style_attribute_variant.name)
-		.left_join(item)
-		.on(item.name == style_attribute_variant.item_style)
-	)
+	query = frappe.qb.from_(style_attribute_variant)
+	if join_sizes:
+		query = query.left_join(color_size_item).on(
+			(color_size_item.parent == style_attribute_variant.name)
+			& (color_size_item.parenttype == "Style Attribute Variant")
+		)
+	if needs_item:
+		query = query.left_join(item).on(item.name == style_attribute_variant.item_style)
 	if product_list:
 		query = query.where(style_attribute_variant.name.isin(product_list))
 	else:
@@ -340,7 +396,19 @@ def filtered_products_query(filters=None, product_list=None):
 		if filters.get("colors"):
 			query = query.where(style_attribute_variant.attribute_value.isin(filters["colors"]))
 		if filters.get("sizes"):
-			query = query.where(color_size_item.size.isin(filters["sizes"]))
+			if join_sizes:
+				query = query.where(color_size_item.size.isin(filters["sizes"]))
+			else:
+				size_exists = (
+					frappe.qb.from_(color_size_item)
+					.select(ValueWrapper(1))
+					.where(
+						(color_size_item.parent == style_attribute_variant.name)
+						& (color_size_item.parenttype == "Style Attribute Variant")
+						& color_size_item.size.isin(filters["sizes"])
+					)
+				)
+				query = query.where(ExistsCriterion(size_exists))
 		if filters.get("brands"):
 			query = query.where(item.brand.isin(filters["brands"]))
 		if filters.get("search"):
@@ -751,35 +819,43 @@ def get_available_stock(item_code, warehouse):
 
 
 def get_available_stocks(item_codes, warehouse):
-	"""Sellable qty per item code — two grouped queries for the whole list, not two per item."""
+	"""Sellable qty per item code — one joined Item+Bin query (plus POS check only when open POS invoices exist)."""
 	if not warehouse:
 		warehouse = "website_warehouse"
 	if not item_codes:
 		return {}
 
-	item_codes = [cstr(item_code) for item_code in item_codes]
+	item_codes = list(dict.fromkeys(cstr(item_code) for item_code in item_codes))
+	item_doctype = frappe.qb.DocType("Item")
 	bin_doctype = frappe.qb.DocType("Bin")
-	bin_by_item_code = {}
+	row_by_item_code = {}
 	for item_code_chunk in create_batch(item_codes, IN_CLAUSE_CHUNK_SIZE):
-		bin_rows = (
-			frappe.qb.from_(bin_doctype)
-			.select(bin_doctype.item_code, bin_doctype.actual_qty, bin_doctype.reserved_qty)
-			.where((bin_doctype.item_code.isin(item_code_chunk)) & (bin_doctype.warehouse == warehouse))
+		rows = (
+			frappe.qb.from_(item_doctype)
+			.left_join(bin_doctype)
+			.on((bin_doctype.item_code == item_doctype.name) & (bin_doctype.warehouse == warehouse))
+			.select(
+				item_doctype.name.as_("item_code"),
+				item_doctype.is_stock_item,
+				item_doctype.delivered_by_supplier,
+				bin_doctype.actual_qty,
+				bin_doctype.reserved_qty,
+			)
+			.where(item_doctype.name.isin(item_code_chunk))
 		).run(as_dict=True)
-		bin_by_item_code.update({cstr(row.item_code): row for row in bin_rows})
+		row_by_item_code.update({cstr(row.item_code): row for row in rows})
 
 	pos_reserved_by_item_code = get_pos_reserved_qtys(item_codes, warehouse)
-	unlimited_item_codes = get_unlimited_item_codes(item_codes)
 
 	stock_by_item_code = {}
 	for item_code in item_codes:
-		bin_data = bin_by_item_code.get(item_code) or {}
+		row = row_by_item_code.get(item_code)
 		actual_qty = (
-			flt(bin_data.get("actual_qty"))
-			- flt(bin_data.get("reserved_qty"))
+			flt(row.actual_qty if row else 0)
+			- flt(row.reserved_qty if row else 0)
 			- flt(pos_reserved_by_item_code.get(item_code))
 		)
-		unlimited = item_code in unlimited_item_codes
+		unlimited = bool(row and (cint(row.delivered_by_supplier) or not cint(row.is_stock_item)))
 		stock_by_item_code[item_code] = {
 			"stock_qty": actual_qty,
 			"in_stock": int(unlimited or actual_qty > 0),
@@ -788,10 +864,16 @@ def get_available_stocks(item_codes, warehouse):
 	return stock_by_item_code
 
 
+def has_open_pos_invoices() -> bool:
+	return bool(frappe.db.exists("POS Invoice", {"status": ["in", ["Paid", "Return"]], "docstatus": 1}))
+
+
 def get_unlimited_item_codes(item_codes) -> set[str]:
 	"""Items sold without stock: drop-shipped by the supplier, or not stock-tracked by ERPNext at all."""
+	if not item_codes:
+		return set()
 	unlimited_item_codes = set()
-	for item_code_chunk in create_batch(item_codes, IN_CLAUSE_CHUNK_SIZE):
+	for item_code_chunk in create_batch(list(dict.fromkeys(item_codes)), IN_CLAUSE_CHUNK_SIZE):
 		unlimited_item_codes.update(
 			frappe.get_all(
 				"Item",
@@ -816,7 +898,7 @@ def get_pos_reserved_qty(item_code, warehouse):
 
 
 def get_pos_reserved_qtys(item_codes, warehouse):
-	if not item_codes:
+	if not item_codes or not has_open_pos_invoices():
 		return {}
 
 	p_inv = frappe.qb.DocType("POS Invoice")
@@ -1089,15 +1171,28 @@ def get_delivery_note_lines(sales_order_name, docstatus=None) -> list[dict]:
 
 def get_first_option_photos(option_names: list) -> dict:
 	"""The first gallery photo of each Style Attribute Variant, in gallery order."""
+	unique_options = list(dict.fromkeys(option_names))
+	if not unique_options:
+		return {}
 	first_photo_by_option = {}
-	for chunk in create_batch(list(option_names), IN_CLAUSE_CHUNK_SIZE):
+	for chunk in create_batch(unique_options, IN_CLAUSE_CHUNK_SIZE):
+		for row in frappe.get_all(
+			"Website Slideshow Item",
+			filters={"parent": ["in", chunk], "parenttype": "Style Attribute Variant", "idx": 1},
+			fields=["parent", "image"],
+		):
+			if row.image:
+				first_photo_by_option[row.parent] = row.image
+	missing = [name for name in unique_options if name not in first_photo_by_option]
+	for chunk in create_batch(missing, IN_CLAUSE_CHUNK_SIZE):
 		for row in frappe.get_all(
 			"Website Slideshow Item",
 			filters={"parent": ["in", chunk], "parenttype": "Style Attribute Variant"},
 			fields=["parent", "image"],
 			order_by="idx asc",
 		):
-			first_photo_by_option.setdefault(row.parent, row.image)
+			if row.image:
+				first_photo_by_option.setdefault(row.parent, row.image)
 	return first_photo_by_option
 
 

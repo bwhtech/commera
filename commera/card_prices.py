@@ -4,11 +4,12 @@ A size sells at its sale rate, else its compare-at rate; the card shows its lowe
 import frappe
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Coalesce, Max, Min
+from frappe.utils import nowdate
 from pypika.analytics import Min as WindowMin
 from pypika.queries import QueryBuilder
-from pypika.terms import Field
+from pypika.terms import Field, ValueWrapper
 
-from commera.base_prices import public_rates_query
+from commera.base_prices import can_use_direct_item_price, is_public_price, is_valid_on, public_rates_query
 
 
 def get_card_price(size_rates: list[tuple[float | None, float | None]]) -> dict:
@@ -78,25 +79,68 @@ def card_prices_query(
 def size_prices_query(
 	sale_price_list: str | None, compare_at_price_list: str | None, products: list | QueryBuilder
 ):
-	"""Each size of `products` with its rates, and the lowest size price of its product."""
+	"""Each size of `products` with its rates, and the lowest size price of its product.
+	Reads both price lists in a single pass instead of joining two derived tables."""
 	size = DocType("Color Size Item").as_("priced_size")
+	price_lists = list(dict.fromkeys(pl for pl in (sale_price_list, compare_at_price_list) if pl))
+
+	if can_use_direct_item_price() and price_lists:
+		price = DocType("Item Price").as_("public_price")
+		sale_rate = (
+			Min(Case().when(price.price_list == sale_price_list, price.price_list_rate))
+			if sale_price_list
+			else ValueWrapper(None)
+		)
+		compare_at_rate = (
+			Min(Case().when(price.price_list == compare_at_price_list, price.price_list_rate))
+			if compare_at_price_list
+			else ValueWrapper(None)
+		)
+		size_price = Coalesce(sale_rate, compare_at_rate)
+		return (
+			frappe.qb.from_(size)
+			.left_join(price)
+			.on(
+				(price.item_code == size.item_code)
+				& price.price_list.isin(price_lists)
+				& (price.selling == 1)
+				& is_public_price(price)
+				& is_valid_on(price, nowdate())
+			)
+			.where((size.parenttype == "Style Attribute Variant") & size.parent.isin(products))
+			.groupby(size.parent, size.item_code)
+			.select(
+				size.parent,
+				sale_rate.as_("sale"),
+				compare_at_rate.as_("compare_at"),
+				size_price.as_("size_price"),
+				WindowMin(size_price).over(size.parent).as_("lowest_price"),
+			)
+		)
+
 	listed = DocType("Color Size Item").as_("listed_size")
 	item_codes = (
 		frappe.qb.from_(listed)
 		.select(listed.item_code)
 		.where((listed.parenttype == "Style Attribute Variant") & listed.parent.isin(products))
 	)
-	sale = public_rates_query([sale_price_list], item_codes).as_("size_sale")
-	compare_at = public_rates_query([compare_at_price_list], item_codes).as_("size_compare_at")
-	sale_rate = Min(Field("rate", table=sale))
-	compare_at_rate = Min(Field("rate", table=compare_at))
+	rates = public_rates_query(price_lists or [""], item_codes).as_("size_rates")
+	rate_pl = Field("price_list", table=rates)
+	rate_val = Field("rate", table=rates)
+
+	sale_rate = (
+		Min(Case().when(rate_pl == sale_price_list, rate_val)) if sale_price_list else ValueWrapper(None)
+	)
+	compare_at_rate = (
+		Min(Case().when(rate_pl == compare_at_price_list, rate_val))
+		if compare_at_price_list
+		else ValueWrapper(None)
+	)
 	size_price = Coalesce(sale_rate, compare_at_rate)
 	return (
 		frappe.qb.from_(size)
-		.left_join(sale)
-		.on(Field("item_code", table=sale) == size.item_code)
-		.left_join(compare_at)
-		.on(Field("item_code", table=compare_at) == size.item_code)
+		.left_join(rates)
+		.on(Field("item_code", table=rates) == size.item_code)
 		.where((size.parenttype == "Style Attribute Variant") & size.parent.isin(products))
 		.groupby(size.parent, size.item_code)
 		.select(
