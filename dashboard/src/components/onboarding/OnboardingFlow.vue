@@ -32,7 +32,7 @@ import {
   lookFor,
   readSavedStep,
 } from '../../ia/onboarding'
-import { canFinish, missingField, resumeStep, storePicks } from '../../ia/onboardingSteps'
+import { STEP_INDEX, canFinish, missingField, resumeStep, storePicks } from '../../ia/onboardingSteps'
 import { useEntrance } from '../../utils/reveal'
 import OnboardingPreview from './OnboardingPreview.vue'
 import StepYou from './steps/StepYou.vue'
@@ -157,10 +157,16 @@ async function next() {
   }
   // Enter in a field submits the form even while the Continue button shows its spinner.
   if (saving.value) return
+  if (step.value.key === 'store') return startBuild()
   saving.value = true
   const saved = await (SAVES[step.value.key]?.() ?? true)
   saving.value = false
   if (saved) goToStep(flow.index + 1)
+}
+
+async function startBuild() {
+  goToStep(STEP_INDEX.done)
+  if (!(await SAVES.store())) goToStep(STEP_INDEX.store)
 }
 
 async function retrySetup() {
@@ -242,7 +248,7 @@ async function finish() {
       <div v-else class="mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col overflow-y-auto px-4 pb-10 pt-[10vh] sm:px-1">
         <div
           class="mb-8 h-[3px] shrink-0 overflow-hidden rounded-full bg-surface-gray-2 transition-[opacity,transform] delay-200 duration-500 ease-out-strong"
-          :class="entered && step.key !== 'done' ? 'translate-y-0 opacity-100' : 'translate-y-2.5 opacity-0 motion-reduce:translate-y-0'"
+          :class="entered ? 'translate-y-0 opacity-100' : 'translate-y-2.5 opacity-0 motion-reduce:translate-y-0'"
         >
           <div
             class="h-full origin-left rounded-full rtl:origin-right bg-surface-gray-10 transition-transform duration-500 ease-in-out-strong"

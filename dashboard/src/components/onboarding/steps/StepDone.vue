@@ -25,6 +25,7 @@ const CAPTIONS = [
   __('Polishing the shelves…'),
 ]
 const FINAL_BUILD = SETUP_STAGES.length + 1
+const LOCAL_BUILD = 2
 const BUILD_DWELL_MS = 900
 const WELCOME_DWELL_MS = 1800
 
@@ -35,7 +36,7 @@ const confettiCanvas = ref(null)
 let beatTimer = null
 let lastBeatAt = Date.now()
 
-const reachedBuild = computed(() => setupBuildLevel(props.setupStatus, props.setupStage))
+const reachedBuild = computed(() => Math.max(LOCAL_BUILD, setupBuildLevel(props.setupStatus, props.setupStage)))
 const isFailed = computed(() => props.setupStatus === 'failed')
 const caption = computed(() => CAPTIONS[Math.min(shownBuild.value, CAPTIONS.length - 1)])
 const storeName = computed(() => draft.storeName.trim())
@@ -98,8 +99,8 @@ onBeforeUnmount(() => clearTimeout(beatTimer))
       <p
         v-else
         :key="caption"
-        class="text-lg-medium"
-        :class="isFailed ? 'text-ink-red-6' : 'text-ink-gray-8'"
+        class="text-3xl-semibold"
+        :class="isFailed ? 'text-ink-red-6' : 'text-ink-gray-9'"
         aria-live="polite"
       >
         {{ caption }}
