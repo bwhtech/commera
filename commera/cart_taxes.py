@@ -18,6 +18,27 @@ TEMPLATE_DOCTYPE = "Sales Taxes and Charges Template"
 SPECIFIC_RULE_FIELDS = ("customer", "customer_group", "tax_category", "billing_country", "shipping_country")
 
 
+def has_active_tax_rules() -> bool:
+	"""Whether any Sales Tax Rule exists on this site (epoch-keyed with TTL)."""
+	from commera.storefront_cache import get_epoch_cached
+
+	return bool(
+		get_epoch_cached(
+			"active_tax_rules",
+			(),
+			("prices", "shop"),
+			lambda: int(bool(frappe.db.get_value("Tax Rule", {"tax_type": "Sales"}, "name"))),
+			ttl=300,
+		)
+	)
+
+
+def clear_tax_rules_cache(*_args, **_kwargs):
+	from commera.storefront_cache import bump_prices_and_shop
+
+	bump_prices_and_shop()
+
+
 def apply_market_taxes(quotation, market: Market | None, switched: bool):
 	"""Resolve unpaid cart taxes for the cart's market and its current address."""
 	if quotation.docstatus or (
@@ -119,6 +140,8 @@ def get_default_template(quotation, market: Market | None) -> str | None:
 
 def get_tax_rule_template(quotation, market: Market | None = None) -> str | None:
 	"""Use ERPNext matching and ranking, excluding generic rules when the market has a template."""
+	if not has_active_tax_rules():
+		return None
 	customer_name = quotation.party_name if quotation.quotation_to == "Customer" else None
 	customer = (
 		frappe.get_cached_value("Customer", customer_name, ["customer_group", "tax_category"], as_dict=True)

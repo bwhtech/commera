@@ -209,8 +209,15 @@ def add_item_group_links(item_groups_by_entry):
 			link.db_insert()
 
 
-def get_menu_tree(enabled_only=False):
-	"""The whole menu as nested nodes, in one query."""
+def clear_menu_tree_cache(*_args, **_kwargs):
+	from commera.storefront_cache import bump_catalog_and_shop
+
+	if hasattr(frappe.local, "commera_storefront_menu"):
+		delattr(frappe.local, "commera_storefront_menu")
+	bump_catalog_and_shop()
+
+
+def fetch_menu_tree_data(enabled_only=False):
 	filters = {"enabled": 1} if enabled_only else {}
 	entries = frappe.get_all(
 		"Ecommerce Category",
@@ -238,9 +245,31 @@ def get_menu_tree(enabled_only=False):
 		order_by="lft asc",
 	)
 	if not entries:
+		return [], {}
+	item_groups_by_entry = get_item_groups_by_entry([entry.name for entry in entries])
+	return [dict(entry) for entry in entries], item_groups_by_entry
+
+
+def get_menu_tree(enabled_only=False):
+	"""The whole menu as nested nodes. Enabled storefront menu data is epoch-cached with TTL;
+	hrefs are computed per request for active language."""
+	if enabled_only:
+		from commera.storefront_cache import get_epoch_cached
+
+		raw_entries, item_groups_by_entry = get_epoch_cached(
+			"menu_tree",
+			(),
+			("catalog", "shop"),
+			lambda: fetch_menu_tree_data(enabled_only=True),
+			ttl=300,
+		)
+	else:
+		raw_entries, item_groups_by_entry = fetch_menu_tree_data(enabled_only=False)
+	entries = [frappe._dict(e) for e in raw_entries]
+
+	if not entries:
 		return []
 
-	item_groups_by_entry = get_item_groups_by_entry([entry.name for entry in entries])
 	nodes = {}
 	roots = []
 	for entry in entries:

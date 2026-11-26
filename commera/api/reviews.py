@@ -182,67 +182,85 @@ def get_reviews(variant: str, start: int = 0, page_length: int = PAGE_LENGTH):
 	start_int = cint(start)
 	limit_int = min(cint(page_length) or PAGE_LENGTH, MAX_PAGE_LENGTH)
 
-	if not frappe.db.exists("Style Attribute Variant", variant):
-		frappe.throw(_("Product not found"))
+	def _build():
+		if not frappe.db.exists("Style Attribute Variant", variant):
+			frappe.throw(_("Product not found"))
 
-	histogram = get_rating_histogram(variant)
-	total = sum(histogram.values())
-	average_rating = flt(sum(rating * count for rating, count in histogram.items()) / total) if total else 0.0
-
-	review_rows = (
-		frappe.db.sql(
-			"""
-			SELECT
-				r.name,
-				r.owner,
-				r.rating,
-				r.review_title,
-				r.comment,
-				r.verified_purchase,
-				r.seller_reply,
-				r.replied_on,
-				r.replied_by,
-				r.creation,
-				u.full_name AS reviewer_name
-			FROM `tabProduct Review` r
-			LEFT JOIN `tabUser` u ON u.name = r.owner
-			WHERE r.variant = %s AND r.is_published = 1
-			ORDER BY r.creation DESC
-			LIMIT %s OFFSET %s
-			""",
-			(variant, limit_int, start_int),
-			as_dict=True,
+		histogram = get_rating_histogram(variant)
+		total = sum(histogram.values())
+		average_rating = (
+			flt(sum(rating * count for rating, count in histogram.items()) / total) if total else 0.0
 		)
-		if total
-		else []
-	)
 
-	reviews = [
-		{
-			"name": row.name,
-			"reviewer": row.reviewer_name or row.owner,
-			"rating": cint(row.rating),
-			"review_title": row.review_title,
-			"comment": row.comment,
-			"verified_purchase": bool(cint(row.verified_purchase)),
-			"seller_reply": row.seller_reply,
-			"replied_on": row.replied_on,
-			"replied_by": row.replied_by,
-			"creation": row.creation,
+		review_rows = (
+			frappe.db.sql(
+				"""
+				SELECT
+					r.name,
+					r.owner,
+					r.rating,
+					r.review_title,
+					r.comment,
+					r.verified_purchase,
+					r.seller_reply,
+					r.replied_on,
+					r.replied_by,
+					r.creation,
+					u.full_name AS reviewer_name
+				FROM `tabProduct Review` r
+				LEFT JOIN `tabUser` u ON u.name = r.owner
+				WHERE r.variant = %s AND r.is_published = 1
+				ORDER BY r.creation DESC
+				LIMIT %s OFFSET %s
+				""",
+				(variant, limit_int, start_int),
+				as_dict=True,
+			)
+			if total
+			else []
+		)
+
+		reviews = [
+			{
+				"name": row.name,
+				"reviewer": row.reviewer_name or row.owner,
+				"rating": cint(row.rating),
+				"review_title": row.review_title,
+				"comment": row.comment,
+				"verified_purchase": bool(cint(row.verified_purchase)),
+				"seller_reply": row.seller_reply,
+				"replied_on": row.replied_on,
+				"replied_by": row.replied_by,
+				"creation": row.creation,
+			}
+			for row in review_rows
+		]
+
+		signed_in = frappe.session.user != "Guest"
+		own_review = get_own_review(variant) if signed_in else None
+
+		return {
+			"reviews": reviews,
+			"total": total,
+			"average_rating": average_rating,
+			"review_count": total,
+			"histogram": histogram,
+			"my_review": own_review,
+			"has_reviewed": bool(own_review),
+			"can_review": signed_in and not own_review,
 		}
-		for row in review_rows
-	]
 
-	signed_in = frappe.session.user != "Guest"
-	own_review = get_own_review(variant) if signed_in else None
+	if frappe.session.user == "Guest" and 0 <= start_int <= 200 and limit_int == PAGE_LENGTH:
+		from commera.storefront_cache import cached_guest_api
 
-	return {
-		"reviews": reviews,
-		"total": total,
-		"average_rating": average_rating,
-		"review_count": total,
-		"histogram": histogram,
-		"my_review": own_review,
-		"has_reviewed": bool(own_review),
-		"can_review": signed_in and not own_review,
-	}
+		return cached_guest_api(
+			"reviews.get_reviews",
+			(variant, start_int, limit_int),
+			("reviews", "catalog"),
+			_build,
+			endpoint="commera.api.reviews.get_reviews",
+			ttl=180,
+			include_locale=False,
+		)
+
+	return _build()

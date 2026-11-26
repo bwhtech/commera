@@ -55,7 +55,7 @@
 
 <div class="mt-8 grid grid-cols-2 gap-x-3 gap-y-10 md:gap-x-6 md:gap-y-14 {{ 'md:grid-cols-3 xl:grid-cols-4' if section.settings.columns == '4' else 'md:grid-cols-3' }}">
 	{% for product in listing.products %}
-	{{ product_card(product) }}
+	{{ product_card(product, loading="eager" if loop.index <= 4 else "lazy", fetchpriority="high" if loop.index <= 2 else "") }}
 	{% endfor %}
 </div>
 

@@ -53,32 +53,60 @@ class LineProducts:
 		"""The published product, size and image that sell each item."""
 		if not self.item_codes:
 			return {}
-		published = {code: product for code, product in self.products.items() if product.is_published}
-		images = images_for_variants(list({product.name for product in published.values()}))
-		return {
-			code: {
-				"handle": product.route,
-				"title": product.title,
-				"variant_title": translate_term(product.size),
-				"image": images.get(product.name, {}).get("image"),
+		from commera.storefront_cache import get_or_compute
+
+		def _build():
+			published = {code: product for code, product in self.products.items() if product.is_published}
+			images = images_for_variants(list({product.name for product in published.values()}))
+			return {
+				code: {
+					"handle": product.route,
+					"title": product.title,
+					"variant_title": translate_term(product.size),
+					"image": images.get(product.name, {}).get("image"),
+				}
+				for code, product in published.items()
 			}
-			for code, product in published.items()
-		}
+
+		return get_or_compute(
+			"line_products.cart",
+			tuple(sorted(self.item_codes)),
+			("catalog", "shop"),
+			_build,
+			ttl=120,
+		)
 
 	@cached_property
 	def products(self) -> dict[str, frappe._dict]:
 		"""{item_code: product}, unpublished products included so old orders keep their titles."""
 		if not self.item_codes:
 			return {}
-		sizes = (
-			self._size_rows
-			if self._size_rows is not None
-			else frappe.get_all(
-				"Color Size Item",
-				filters={"item_code": ("in", self.item_codes), "parenttype": "Style Attribute Variant"},
-				fields=["item_code", "size", "parent"],
+		if self._size_rows is None:
+			from commera.storefront_cache import get_or_compute
+
+			def _load_plain():
+				sizes = frappe.get_all(
+					"Color Size Item",
+					filters={"item_code": ("in", self.item_codes), "parenttype": "Style Attribute Variant"},
+					fields=["item_code", "size", "parent"],
+				)
+				variants = read_variants([row.parent for row in sizes])
+				return {
+					row.item_code: dict(variants[row.parent], size=row.size)
+					for row in sizes
+					if row.parent in variants
+				}
+
+			cached = get_or_compute(
+				"line_products.items",
+				tuple(sorted(self.item_codes)),
+				("catalog", "shop"),
+				_load_plain,
+				ttl=120,
 			)
-		)
+			return {code: frappe._dict(val) for code, val in cached.items()}
+
+		sizes = self._size_rows
 		variants = read_variants([row.parent for row in sizes])
 		return {
 			row.item_code: frappe._dict(variants[row.parent], size=row.size)

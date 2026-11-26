@@ -93,6 +93,7 @@ def recount_variant_rating(variant: str) -> None:
 		"UPDATE `tabStyle Attribute Variant` SET average_rating = %s, review_count = %s WHERE name = %s",
 		(flt(average), cint(count), variant),
 	)
+	frappe.clear_document_cache("Style Attribute Variant", variant)
 
 
 def queue_variant_rating(variant: str) -> None:

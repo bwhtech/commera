@@ -188,6 +188,9 @@ class StyleAttributeVariant(Document):
 				updated_count += 1
 
 		if updated_count:
+			from commera.base_prices import clear_template_price_cache
+
+			clear_template_price_cache()
 			add_changed_products([self.item_style], "price")
 		return {"created": insert_item_prices(price_rows_to_insert), "updated": updated_count}
 

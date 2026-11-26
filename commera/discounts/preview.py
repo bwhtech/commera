@@ -8,16 +8,41 @@ from commera.core import system_user_session
 from commera.discounts.pricing import apply_code_discounts
 from commera.item_price_guard import skip_auto_item_price
 from commera.localization.market_prices import MarketPrices
+from commera.storefront_cache import bump_catalog_and_prices, bump_prices, get_epoch_cached
 
 
 def has_active_pricing_rules() -> bool:
-	"""Whether any enabled selling ERPNext Pricing Rule exists."""
-	return bool(frappe.db.get_value("Pricing Rule", {"disable": 0, "selling": 1}, "name"))
+	"""Whether any enabled selling ERPNext Pricing Rule exists (epoch-keyed with TTL)."""
+	return bool(
+		get_epoch_cached(
+			"active_pricing_rules",
+			(),
+			("prices",),
+			lambda: int(bool(frappe.db.get_value("Pricing Rule", {"disable": 0, "selling": 1}, "name"))),
+			ttl=300,
+		)
+	)
 
 
 def has_any_item_taxes() -> bool:
-	"""Whether any Item Tax child row exists on this site."""
-	return bool(frappe.db.exists("Item Tax", {}))
+	"""Whether any Item Tax child row exists on this site (epoch-keyed with TTL)."""
+	return bool(
+		get_epoch_cached(
+			"has_item_taxes",
+			(),
+			("catalog", "prices"),
+			lambda: int(bool(frappe.db.exists("Item Tax", {}))),
+			ttl=300,
+		)
+	)
+
+
+def clear_pricing_rules_cache(*_args, **_kwargs):
+	bump_prices()
+
+
+def clear_item_tax_cache(*_args, **_kwargs):
+	bump_catalog_and_prices()
 
 
 def can_fast_price_preview(item_codes: list[str]) -> bool:

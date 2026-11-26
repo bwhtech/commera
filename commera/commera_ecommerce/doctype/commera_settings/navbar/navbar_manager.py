@@ -109,6 +109,11 @@ def get_menu_editor_data():
 def mark_as_group(name):
 	if name and not frappe.db.get_value("Ecommerce Category", name, "is_group"):
 		frappe.db.set_value("Ecommerce Category", name, "is_group", 1)
+		from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import (
+			clear_menu_tree_cache,
+		)
+
+		clear_menu_tree_cache()
 
 
 def create_node(parent, display_name, link_type=None, link_target=None, display_order=None):
@@ -387,6 +392,11 @@ def set_visibility(name: str, visible: int | str):
 	frappe.has_permission("Ecommerce Category", "write", throw=True)
 
 	frappe.db.set_value("Ecommerce Category", name, "enabled", cint(visible))
+	from commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category import (
+		clear_menu_tree_cache,
+	)
+
+	clear_menu_tree_cache()
 
 	enqueue_upsert("Ecommerce Category", name)
 

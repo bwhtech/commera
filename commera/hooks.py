@@ -73,6 +73,7 @@ clear_cache = [
 	"commera.plugins.registry.clear_registry_cache",
 	"commera.storefront_plugins.clear_storefront_plugin_cache",
 	"commera.base_prices.clear_base_prices_cache",
+	"commera.storefront_cache.clear_all_storefront_caches",
 ]
 
 # Without this, records of a custom doctype never import on migrate (frappe/model/sync.py).
@@ -214,38 +215,98 @@ doc_events = {
 	},
 	"Website Settings": {
 		"validate": "commera.localization.redirect_rules.canonicalize_redirect_targets",
+		"on_update": "commera.storefront_cache.bump_shop",
 	},
 	"User": {
 		"before_insert": "commera.utils.prevent_welcome_email",
 	},
 	"Item Group": {
 		"before_validate": "commera.utils.set_item_group_displayname",
-		"on_update": "commera.plugin_events.on_item_group_change",
-		"on_trash": "commera.plugin_events.on_item_group_change",
+		"on_update": [
+			"commera.plugin_events.on_item_group_change",
+			"commera.discounts.preview.clear_item_tax_cache",
+			"commera.storefront_cache.bump_catalog_and_shop",
+		],
+		"on_trash": [
+			"commera.plugin_events.on_item_group_change",
+			"commera.discounts.preview.clear_item_tax_cache",
+			"commera.storefront_cache.bump_catalog_and_shop",
+		],
+		"after_rename": [
+			"commera.discounts.preview.clear_item_tax_cache",
+			"commera.storefront_cache.bump_catalog_and_shop",
+		],
 	},
 	"Shop Web Page": {
-		"on_update": "commera.plugin_events.on_shop_web_page_change",
+		"on_update": [
+			"commera.plugin_events.on_shop_web_page_change",
+			"commera.storefront_cache.bump_shop",
+		],
 		"on_trash": [
 			"commera.plugin_events.on_shop_web_page_change",
 			"commera.localization.content.delete_translations",
+			"commera.storefront_cache.bump_shop",
 		],
 	},
 	"Footer Section Config": {
 		"on_update": [
 			"commera.plugin_events.on_menu_change",
 			"commera.localization.content.delete_removed_row_translations",
+			"commera.storefront_cache.bump_shop",
 		],
-		"on_trash": "commera.localization.content.delete_translations",
+		"on_trash": [
+			"commera.localization.content.delete_translations",
+			"commera.storefront_cache.bump_shop",
+		],
 	},
-	"Commera Settings": {"on_update": "commera.plugin_events.on_menu_change"},
+	"Commera Settings": {
+		"on_update": [
+			"commera.plugin_events.on_menu_change",
+			"commera.utils.clear_selling_currencies_cache",
+			"commera.storefront_cache.bump_prices_and_shop",
+		]
+	},
 	"Price List": {
 		"validate": "commera.doc_events.price_list.validate",
-		"after_rename": "commera.search.price_sync.on_price_list_rename",
+		"on_update": [
+			"commera.utils.clear_selling_currencies_cache",
+			"commera.storefront_cache.bump_prices",
+		],
+		"on_trash": [
+			"commera.utils.clear_selling_currencies_cache",
+			"commera.storefront_cache.bump_prices",
+		],
+		"after_rename": [
+			"commera.search.price_sync.on_price_list_rename",
+			"commera.storefront_cache.bump_prices",
+		],
+	},
+	"Tax Rule": {
+		"on_update": "commera.cart_taxes.clear_tax_rules_cache",
+		"on_trash": "commera.cart_taxes.clear_tax_rules_cache",
+	},
+	"Pricing Rule": {
+		"on_update": [
+			"commera.discounts.preview.clear_pricing_rules_cache",
+			"commera.storefront_cache.bump_prices",
+		],
+		"on_trash": [
+			"commera.discounts.preview.clear_pricing_rules_cache",
+			"commera.storefront_cache.bump_prices",
+		],
+	},
+	"Item Tax Template": {
+		"on_update": "commera.discounts.preview.clear_item_tax_cache",
+		"on_trash": "commera.discounts.preview.clear_item_tax_cache",
 	},
 	"Sales Taxes and Charges Template": {
 		"validate": "commera.localization.market_setup.validate_tax_template",
 	},
-	"Shipping Rule": {"validate": ["commera.localization.market_setup.validate_shipping_rule"]},
+	"Shipping Rule": {
+		"validate": ["commera.localization.market_setup.validate_shipping_rule"],
+		"on_update": "commera.storefront_cache.bump_shop",
+		"on_trash": "commera.storefront_cache.bump_shop",
+	},
 	"Gateway Payment Request": {
 		"on_update": "commera.api.payment_hooks.on_payment_request_update",
 	},
@@ -267,11 +328,13 @@ doc_events = {
 		"on_submit": [
 			"commera.utils.update_so_status_from_related_doc",
 			"commera.plugin_events.on_sales_order_stock_reservation",
+			"commera.storefront_cache.bump_stock",
 		],
 		"on_cancel": [
 			"commera.utils.update_so_status_from_related_doc",
 			"commera.plugin_events.on_sales_order_cancel",
 			"commera.plugin_events.on_sales_order_stock_reservation",
+			"commera.storefront_cache.bump_stock",
 		],
 		"on_update_after_submit": [
 			"commera.plugin_events.on_sales_order_update_after_submit",
@@ -284,53 +347,167 @@ doc_events = {
 		"after_insert": [
 			"commera.jobs.send_product_back_in_stock_email",
 			"commera.plugin_events.on_stock_ledger_entry_insert",
-		]
+			"commera.storefront_cache.bump_stock",
+		],
+		"on_submit": "commera.storefront_cache.bump_stock",
+		"on_cancel": "commera.storefront_cache.bump_stock",
+	},
+	"Bin": {
+		"on_update": "commera.storefront_cache.bump_stock",
+	},
+	"Warehouse": {
+		"on_update": "commera.storefront_cache.bump_stock",
+		"on_trash": "commera.storefront_cache.bump_stock",
 	},
 	"Item": {
 		"validate": "commera.product_collections.sync_collections",
-		"on_update": "commera.plugin_events.on_item_update",
-		"on_change": "commera.search.source_sync.on_source_change",
-		"after_rename": "commera.search.source_sync.on_source_rename",
+		"on_update": [
+			"commera.plugin_events.on_item_update",
+			"commera.base_prices.clear_sales_uom_cache",
+			"commera.discounts.preview.clear_item_tax_cache",
+			"commera.storefront_cache.bump_catalog",
+		],
+		"on_change": [
+			"commera.search.source_sync.on_source_change",
+			"commera.base_prices.clear_sales_uom_cache",
+			"commera.discounts.preview.clear_item_tax_cache",
+			"commera.storefront_cache.bump_catalog",
+		],
+		"after_rename": [
+			"commera.search.source_sync.on_source_rename",
+			"commera.storefront_cache.bump_catalog",
+		],
 	},
 	"Style Attribute Configurator": {
-		"on_change": "commera.search.source_sync.on_source_change",
-		"after_rename": "commera.search.source_sync.on_source_rename",
+		"on_change": [
+			"commera.search.source_sync.on_source_change",
+			"commera.storefront_cache.bump_catalog",
+		],
+		"after_rename": [
+			"commera.search.source_sync.on_source_rename",
+			"commera.storefront_cache.bump_catalog",
+		],
 	},
 	"Item Price": {
 		"on_update": [
 			"commera.plugin_events.on_item_price_change",
 			"commera.search.price_sync.on_item_price_change",
+			"commera.base_prices.clear_template_price_cache",
+			"commera.storefront_cache.bump_prices",
 		],
 		"on_trash": [
 			"commera.plugin_events.on_item_price_change",
 			"commera.search.price_sync.on_item_price_change",
+			"commera.base_prices.clear_template_price_cache",
+			"commera.storefront_cache.bump_prices",
 		],
-		"after_rename": "commera.search.price_sync.on_item_price_rename",
+		"after_rename": [
+			"commera.search.price_sync.on_item_price_rename",
+			"commera.base_prices.clear_template_price_cache",
+			"commera.storefront_cache.bump_prices",
+		],
+	},
+	"POS Invoice": {
+		"on_submit": "commera.utils.clear_pos_invoice_cache",
+		"on_cancel": "commera.utils.clear_pos_invoice_cache",
+		"on_update_after_submit": "commera.utils.clear_pos_invoice_cache",
+	},
+	"Commera Discount": {
+		"on_update": [
+			"commera.discounts.selection.clear_automatic_discounts_cache",
+			"commera.storefront_cache.bump_discounts",
+		],
+		"on_trash": [
+			"commera.discounts.selection.clear_automatic_discounts_cache",
+			"commera.storefront_cache.bump_discounts",
+		],
 	},
 	"Style Attribute Variant": {
 		"on_update": [
 			"commera.search.sync.on_update",
 			"commera.plugin_events.on_style_attribute_variant_update",
+			"commera.storefront_cache.bump_catalog",
 		],
-		"after_rename": "commera.search.sync.after_rename",
+		"after_rename": [
+			"commera.search.sync.after_rename",
+			"commera.storefront_cache.bump_catalog",
+		],
 		"on_trash": [
 			"commera.search.sync.on_trash",
 			"commera.plugin_events.on_style_attribute_variant_trash",
 			"commera.localization.content.delete_translations",
+			"commera.storefront_cache.bump_catalog",
 		],
 	},
 	"Content Translation": {
-		"on_update": "commera.search.translations.on_translation_change",
-		"on_trash": "commera.search.translations.on_translation_change",
+		"on_update": [
+			"commera.search.translations.on_translation_change",
+			"commera.storefront_cache.bump_catalog_and_shop",
+		],
+		"on_trash": [
+			"commera.search.translations.on_translation_change",
+			"commera.storefront_cache.bump_catalog_and_shop",
+		],
 	},
 	"Ecommerce Category": {
-		"on_update": ["commera.search.sync.on_update", "commera.plugin_events.on_menu_change"],
-		"after_rename": "commera.search.sync.after_rename",
+		"on_update": [
+			"commera.search.sync.on_update",
+			"commera.plugin_events.on_menu_change",
+			"commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category.clear_menu_tree_cache",
+			"commera.storefront_cache.bump_catalog_and_shop",
+		],
+		"after_rename": [
+			"commera.search.sync.after_rename",
+			"commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category.clear_menu_tree_cache",
+			"commera.storefront_cache.bump_catalog_and_shop",
+		],
 		"on_trash": [
 			"commera.search.sync.on_trash",
 			"commera.plugin_events.on_menu_change",
 			"commera.localization.content.delete_translations",
+			"commera.commera_ecommerce.doctype.ecommerce_category.ecommerce_category.clear_menu_tree_cache",
+			"commera.storefront_cache.bump_catalog_and_shop",
 		],
+	},
+	"Product Review": {
+		"on_update": "commera.storefront_cache.bump_reviews",
+		"on_trash": "commera.storefront_cache.bump_reviews",
+	},
+	"Commera Market": {
+		"on_update": "commera.storefront_cache.bump_prices_and_shop",
+		"on_trash": "commera.storefront_cache.bump_prices_and_shop",
+	},
+	"Currency Exchange": {
+		"on_update": "commera.storefront_cache.bump_prices",
+		"on_trash": "commera.storefront_cache.bump_prices",
+	},
+	"Shop Theme": {
+		"on_update": "commera.storefront_cache.bump_theme",
+		"on_trash": "commera.storefront_cache.bump_theme",
+	},
+	"Shop Theme Settings": {
+		"on_update": "commera.storefront_cache.bump_theme",
+	},
+	"Theme Layout": {
+		"on_update": "commera.storefront_cache.bump_theme",
+		"on_trash": "commera.storefront_cache.bump_theme",
+	},
+	"Commera Standard Settings": {
+		"on_update": "commera.storefront_cache.bump_theme",
+	},
+	"Summer Theme Settings": {
+		"on_update": "commera.storefront_cache.bump_theme",
+	},
+	"Shop Default Theme Settings": {
+		"on_update": "commera.storefront_cache.bump_theme",
+	},
+	"Payment Gateway Profile": {
+		"on_update": "commera.storefront_cache.bump_shop",
+		"on_trash": "commera.storefront_cache.bump_shop",
+	},
+	"Brand": {
+		"on_update": "commera.storefront_cache.bump_catalog",
+		"on_trash": "commera.storefront_cache.bump_catalog",
 	},
 	"Sales Invoice": {
 		"before_mapping": "commera.item_price_guard.refuse_cart_quotation_invoice",

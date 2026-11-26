@@ -15,6 +15,29 @@ from commera.discounts.usage import has_used_before, is_first_order
 MAX_DISCOUNT_CODES = 5
 
 
+def clear_automatic_discounts_cache(*_args, **_kwargs):
+	from commera.storefront_cache import bump_discounts
+
+	bump_discounts()
+
+
+def get_automatic_discount_names() -> list[str]:
+	from commera.storefront_cache import get_epoch_cached
+
+	return get_epoch_cached(
+		"automatic_discounts",
+		(),
+		("discounts",),
+		lambda: frappe.get_all(
+			"Commera Discount",
+			filters={"enabled": 1, "method": "Automatic"},
+			pluck="name",
+			order_by="creation",
+		),
+		ttl=300,
+	)
+
+
 @dataclass
 class Selection:
 	discount: CommeraDiscount
@@ -91,9 +114,7 @@ def get_candidates(doc) -> list[Selection]:
 		discount_name = get_code_discount(code)
 		if discount_name and not is_single_use_spent(code) and not get_discount_code_refusal(doc, code):
 			candidates.append(Selection(get_discount(discount_name), code))
-	automatic = frappe.get_all(
-		"Commera Discount", filters={"enabled": 1, "method": "Automatic"}, pluck="name", order_by="creation"
-	)
+	automatic = get_automatic_discount_names()
 	return candidates + [Selection(get_discount(name)) for name in automatic]
 
 

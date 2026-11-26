@@ -3,6 +3,9 @@ import frappe
 from commera import seo
 from commera.sdk import shop
 
+cacheable_ssr = True
+ssr_query_params = frozenset()
+
 
 def get_context(context):
 	page = shop.get_page(frappe.form_dict.get("route"))
