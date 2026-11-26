@@ -1,9 +1,12 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { Button, Progress, Spinner } from 'frappe-ui'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { Button } from 'frappe-ui'
 import { draft } from '../../../ia/onboarding'
-import { SETUP_STAGES, completedSetupStages } from '../../../ia/onboardingSteps'
+import { SETUP_STAGES, STEP_INDEX, setupBuildLevel } from '../../../ia/onboardingSteps'
 import { __ } from '../../../data/translation'
+import { burstConfetti } from '../../../utils/confetti'
+import { prefersReducedMotion } from '../../../utils/reveal'
+import StoreCanvas from '../StoreCanvas.vue'
 
 const props = defineProps({
   finishing: { type: Boolean, default: false },
@@ -11,32 +14,31 @@ const props = defineProps({
   // alert above, so it must not read as a skeleton that will resolve on its own.
   setupStatus: { type: String, default: 'idle' },
   setupStage: { type: String, default: '' },
+  look: { type: Object, required: true },
 })
-const emit = defineEmits(['finish'])
+const emit = defineEmits(['finish', 'build'])
 
-const STAGE_LABELS = {
-  company: __('Creating your store'),
-  storefront: __('Chiselling the storefront'),
-  payments: __('Getting everything ready'),
-}
-const STAGE_DWELL_MS = 900
-const WELCOME_DWELL_MS = 1400
+const CAPTIONS = [
+  __('Laying the foundations…'),
+  __('Hanging your sign…'),
+  __('Chiselling the storefront…'),
+  __('Polishing the shelves…'),
+]
+const FINAL_BUILD = SETUP_STAGES.length + 1
+const BUILD_DWELL_MS = 900
+const WELCOME_DWELL_MS = 1800
 
-const shownStages = ref(0)
-const phase = ref('stages')
+const shownBuild = ref(0)
+const isWelcome = ref(false)
 const finishRequested = ref(false)
+const confettiCanvas = ref(null)
 let beatTimer = null
 let lastBeatAt = Date.now()
 
-const reachedStages = computed(() => completedSetupStages(props.setupStatus, props.setupStage))
+const reachedBuild = computed(() => setupBuildLevel(props.setupStatus, props.setupStage))
 const isFailed = computed(() => props.setupStatus === 'failed')
+const caption = computed(() => CAPTIONS[Math.min(shownBuild.value, CAPTIONS.length - 1)])
 const storeName = computed(() => draft.storeName.trim())
-const heading = computed(() => {
-  if (isFailed.value) return __('Almost there')
-  if (phase.value === 'welcome') return __('Welcome to {0}', [storeName.value])
-  if (phase.value === 'ready') return __('Are you ready?')
-  return STAGE_LABELS[SETUP_STAGES[shownStages.value]]
-})
 
 function scheduleBeat(delay) {
   if (beatTimer) return
@@ -47,30 +49,36 @@ function beat() {
   beatTimer = null
   if (isFailed.value) return
   lastBeatAt = Date.now()
-  if (phase.value === 'welcome') {
+  if (isWelcome.value) {
     finishRequested.value = true
     emit('finish')
     return
   }
-  if (phase.value === 'ready') phase.value = 'welcome'
-  else if (shownStages.value < reachedStages.value) shownStages.value += 1
+  if (shownBuild.value === FINAL_BUILD) isWelcome.value = true
+  else if (shownBuild.value < reachedBuild.value) shownBuild.value += 1
   else return
-  if (shownStages.value === SETUP_STAGES.length && phase.value === 'stages') phase.value = 'ready'
-  scheduleBeat(phase.value === 'welcome' ? WELCOME_DWELL_MS : STAGE_DWELL_MS)
+  scheduleBeat(isWelcome.value ? WELCOME_DWELL_MS : BUILD_DWELL_MS)
 }
 
-watch([reachedStages, isFailed], () => scheduleBeat(STAGE_DWELL_MS), { immediate: true })
+watch([reachedBuild, isFailed], () => scheduleBeat(BUILD_DWELL_MS), { immediate: true })
+watch(shownBuild, (level) => emit('build', level), { immediate: true })
+watch(isWelcome, async (welcome) => {
+  if (!welcome || prefersReducedMotion()) return
+  await nextTick()
+  burstConfetti(confettiCanvas.value)
+})
 onBeforeUnmount(() => clearTimeout(beatTimer))
-
-function stageState(index) {
-  if (index < shownStages.value) return 'done'
-  if (index > shownStages.value) return 'pending'
-  return isFailed.value ? 'failed' : 'active'
-}
 </script>
 
 <template>
-  <div class="space-y-6" :data-onboarding-progress="phase">
+  <div class="space-y-6" :data-onboarding-build="isWelcome ? 'welcome' : shownBuild">
+    <div
+      class="h-72 overflow-hidden rounded-5 border border-outline-gray-2 lg:hidden"
+      :data-theme="look.dark ? 'dark' : undefined"
+    >
+      <StoreCanvas :stage="STEP_INDEX.done" :look="look" :build="shownBuild" mobile />
+    </div>
+
     <Transition
       mode="out-in"
       enter-active-class="transition-[opacity,transform] duration-300 ease-out-strong"
@@ -78,26 +86,23 @@ function stageState(index) {
       leave-active-class="transition-opacity duration-150"
       leave-to-class="opacity-0"
     >
-      <h1 :key="heading" class="text-3xl-semibold text-ink-gray-9" aria-live="polite">{{ heading }}</h1>
-    </Transition>
-
-    <Progress :value="Math.round((shownStages / SETUP_STAGES.length) * 100)" size="md" />
-
-    <ul class="space-y-3">
-      <li
-        v-for="(stage, index) in SETUP_STAGES"
-        :key="stage"
-        class="flex items-center gap-2.5 text-base transition-colors duration-300"
-        :class="stageState(index) === 'pending' ? 'text-ink-gray-4' : 'text-ink-gray-8'"
-        :data-onboarding-stage="stageState(index)"
+      <div v-if="isWelcome" key="welcome" class="relative">
+        <div class="pointer-events-none absolute -inset-x-4 -top-16 h-48" aria-hidden="true">
+          <canvas ref="confettiCanvas" class="size-full" />
+        </div>
+        <h1 class="relative text-3xl-semibold text-ink-gray-9">{{ __('Welcome to Commera') }}</h1>
+        <p v-if="storeName" class="relative mt-2 text-p-base text-ink-gray-6">{{ storeName }}</p>
+      </div>
+      <p
+        v-else
+        :key="caption"
+        class="text-lg-medium"
+        :class="isFailed ? 'text-ink-red-6' : 'text-ink-gray-8'"
+        aria-live="polite"
       >
-        <span v-if="stageState(index) === 'done'" class="lucide-circle-check size-4 shrink-0 text-ink-green-6" aria-hidden="true" />
-        <span v-else-if="stageState(index) === 'failed'" class="lucide-circle-alert size-4 shrink-0 text-ink-red-6" aria-hidden="true" />
-        <Spinner v-else-if="stageState(index) === 'active'" class="size-4 shrink-0" />
-        <span v-else class="lucide-circle size-4 shrink-0" aria-hidden="true" />
-        {{ STAGE_LABELS[stage] }}
-      </li>
-    </ul>
+        {{ caption }}
+      </p>
+    </Transition>
 
     <p v-if="isFailed" class="text-p-base text-ink-red-6">
       {{ __('Your store could not be set up. Retry it above, then come back here.') }}

@@ -139,7 +139,7 @@ describe('onboarding', () => {
         { timeout: 30000 },
       )
       await wait(1500)
-      assert.ok(!(await text(page)).includes(`Welcome to ${STORE_NAME}`), 'Home replaced onboarding')
+      assert.ok(!(await text(page)).includes('Welcome to Commera'), 'Home replaced onboarding')
 
       const settings = await readSettings(page)
       assert.equal(settings.store_name, STORE_NAME)

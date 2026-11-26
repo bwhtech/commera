@@ -58,6 +58,7 @@ const SLIDES = {
 const router = useRouter()
 const saving = ref(false)
 const finishing = ref(false)
+const build = ref(0)
 const retrying = ref(false)
 // The record's load, which "Try again" repeats: 'idle' | 'loading' | 'error' | 'ready'.
 const loadStatus = ref('idle')
@@ -74,7 +75,9 @@ const isReady = computed(() => canFinish(storeSetup.status))
 const stepProps = computed(() => {
   if (step.value.key === 'you') return { needsPassword: needsPassword.value }
   if (step.value.key === 'store') return { record: record.value }
-  if (step.value.key === 'done') return { finishing: finishing.value, setupStatus: storeSetup.status, setupStage: storeSetup.stage }
+  if (step.value.key === 'done') {
+    return { finishing: finishing.value, setupStatus: storeSetup.status, setupStage: storeSetup.stage, look }
+  }
   return {}
 })
 
@@ -177,7 +180,7 @@ async function finish() {
 <template>
   <div class="fixed inset-0 z-10 flex bg-surface-base" data-onboarding>
     <aside class="hidden min-w-0 flex-1 items-center justify-center bg-surface-gray-2 p-10 lg:flex">
-      <OnboardingPreview :focus="step.focus" :stage="flow.index" :look="look" />
+      <OnboardingPreview :focus="step.focus" :stage="flow.index" :look="look" :build="step.key === 'done' ? build : null" />
     </aside>
 
     <main class="flex h-full w-full flex-col lg:w-[480px] lg:shrink-0 xl:w-[520px]">
@@ -279,7 +282,7 @@ async function finish() {
             <form :key="step.key" class="flex flex-1 flex-col" :data-onboarding-step="step.key" @submit.prevent="next">
               <h1 v-if="step.key !== 'done'" class="mb-7 text-3xl-semibold text-ink-gray-9">{{ title }}</h1>
 
-              <component :is="STEP_COMPONENTS[step.key]" v-bind="stepProps" @finish="finish" />
+              <component :is="STEP_COMPONENTS[step.key]" v-bind="stepProps" @finish="finish" @build="build = $event" />
 
               <div v-if="step.key !== 'done'" class="mt-auto space-y-1 pt-8">
                 <Button type="submit" variant="solid" size="md" :label="__('Continue')" class="w-full" :loading="saving" />

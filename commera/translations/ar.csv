@@ -835,9 +835,6 @@ Starting from scratch?,تبدأ من الصفر؟
 A few rows look odd,بعض الصفوف تبدو غريبة
 That is fine. We show you exactly which ones before anything is saved.,لا بأس. سنُريك أيها بالضبط قبل حفظ أي شيء.
 "Welcome, {0}",مرحبًا، {0}
-Almost there,أوشكنا على الانتهاء
-{0} is ready,{0} جاهز
-Your store is ready,متجرك جاهز
 "Creating your company, books and warehouse",جارٍ إنشاء شركتك ودفاترك المحاسبية ومستودعك
 Setting up,جارٍ الإعداد
 Setup failed,فشل الإعداد
@@ -855,13 +852,12 @@ Optional,اختياري
 Use {0},استخدام {0}
 Only you can see it for now. Publish it from Home when you are ready.,لا يراه أحد غيرك الآن. انشره من الرئيسية عندما تكون جاهزًا.
 Go to Home,الانتقال إلى الرئيسية
+Laying the foundations…,نضع الأساسات…
+Hanging your sign…,نعلّق لافتتك…
+Chiselling the storefront…,ننحت واجهة المتجر…
+Polishing the shelves…,نلمّع الرفوف…
+Welcome to Commera,مرحبًا بك في Commera
 "Your store could not be set up. Retry it above, then come back here.",تعذّر إعداد متجرك. أعد المحاولة في الأعلى، ثم عد إلى هنا.
-Finishing setup,جارٍ إنهاء الإعداد
-Creating your store,جارٍ إنشاء متجرك
-Chiselling the storefront,نصقل واجهة المتجر
-Getting everything ready,نجهّز كل شيء
-Are you ready?,هل أنت مستعد؟
-Welcome to {0},مرحبًا بك في {0}
 Import from Shopify,الاستيراد من Shopify
 Import a CSV,استيراد ملف CSV
 Add a product,إضافة منتج

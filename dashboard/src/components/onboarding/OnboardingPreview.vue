@@ -7,6 +7,7 @@ defineProps({
   focus: { type: String, default: '' },
   stage: { type: Number, default: 0 },
   look: { type: Object, required: true },
+  build: { type: Number, default: null },
 })
 
 const storeHost = window.location.host
@@ -31,7 +32,7 @@ const entered = useEntrance()
         <span class="w-10" />
       </div>
       <div class="min-h-0 flex-1" :data-theme="look.dark ? 'dark' : undefined">
-        <StoreCanvas :focus="focus" :stage="stage" :look="look" />
+        <StoreCanvas :focus="focus" :stage="stage" :look="look" :build="build" />
       </div>
     </div>
 
@@ -54,7 +55,7 @@ const entered = useEntrance()
           </span>
         </div>
         <div class="min-h-0 flex-1">
-          <StoreCanvas :focus="focus" :stage="stage" :look="look" mobile />
+          <StoreCanvas :focus="focus" :stage="stage" :look="look" :build="build" mobile />
         </div>
         <span class="mx-auto mb-1.5 h-1 w-20 shrink-0 rounded-full bg-surface-gray-10 opacity-40" />
       </div>

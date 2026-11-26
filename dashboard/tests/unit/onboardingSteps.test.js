@@ -6,9 +6,9 @@ import {
   abbreviate,
   canFinish,
   clampStep,
-  completedSetupStages,
   missingField,
   resumeStep,
+  setupBuildLevel,
   setupPollDelay,
   storePicks,
   toOptions,
@@ -96,12 +96,12 @@ test('a step saved as an index by an older build resumes at a step that still ex
   assert.equal(resumeStep('99', 'done'), 0)
 })
 
-test('the setup progress counts the stages the job has finished, and all of them once done', () => {
-  assert.equal(completedSetupStages('running', ''), 0)
-  assert.equal(completedSetupStages('running', 'company'), 0)
-  assert.equal(completedSetupStages('running', 'storefront'), 1)
-  assert.equal(completedSetupStages('failed', 'payments'), 2)
-  assert.equal(completedSetupStages('done', ''), SETUP_STAGES.length)
+test('the store preview builds one piece per stage the job reaches, and the products once done', () => {
+  assert.equal(setupBuildLevel('running', ''), 0)
+  assert.equal(setupBuildLevel('running', 'company'), 1)
+  assert.equal(setupBuildLevel('running', 'storefront'), 2)
+  assert.equal(setupBuildLevel('failed', 'payments'), 3)
+  assert.equal(setupBuildLevel('done', ''), SETUP_STAGES.length + 1)
 })
 
 test('onboarding can finish only once the store setup is done', () => {

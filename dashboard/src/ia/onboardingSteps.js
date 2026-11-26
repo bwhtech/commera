@@ -56,9 +56,9 @@ export function storePicks(existingStore, company) {
 
 export const SETUP_STAGES = ['company', 'storefront', 'payments']
 
-export function completedSetupStages(setupStatus, stage) {
-  if (setupStatus === 'done') return SETUP_STAGES.length
-  return Math.max(0, SETUP_STAGES.indexOf(stage))
+export function setupBuildLevel(setupStatus, stage) {
+  if (setupStatus === 'done') return SETUP_STAGES.length + 1
+  return SETUP_STAGES.indexOf(stage) + 1
 }
 
 // The setup must have finished before the dashboard opens: every screen behind it reads the company.
