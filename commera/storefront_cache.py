@@ -448,6 +448,81 @@ def cached_guest_api(
 	)
 
 
+def cached_cart_response(
+	cart_name: str,
+	revision: int,
+	modified: str,
+	compute_fn: Callable[[], dict],
+	*,
+	endpoint: str = "commera.api.storefront.cart.get_cart",
+	ttl: int = 45,
+):
+	"""Revision-stamped cache for read-only cart.get_cart; invalidates on cart revision/modified or epoch bump."""
+	domains = ("catalog", "prices", "discounts", "shop")
+	if not is_cache_enabled() or _is_domain_dirty(domains):
+		return compute_fn()
+
+	locale = _locale_context()
+	stamp = epoch_stamp(domains)
+	key_parts = (cart_name, int(revision or 0), str(modified or ""))
+	api_version = _detect_http_api_version(endpoint)
+
+	if api_version is not None:
+		bkey = _hash_key(f"cart:{api_version}", (_site(), locale, stamp, key_parts))
+		raw = _l1_get(_l1_bytes, bkey)
+		if raw is not None:
+			return _make_json_response(raw, cache_status="HIT-L1", cache_control="private, no-store")
+		raw_l2 = frappe.cache.get_value(bkey)
+		if isinstance(raw_l2, bytes | bytearray):
+			raw_bytes = bytes(raw_l2)
+			_l1_set(_l1_bytes, bkey, raw_bytes, min(ttl, 20), L1_MAX_ENTRIES)
+			return _make_json_response(raw_bytes, cache_status="HIT-L2", cache_control="private, no-store")
+		value = compute_fn()
+		raw_bytes = _encode_api_bytes(value, api_version)
+		_l1_set(_l1_bytes, bkey, raw_bytes, min(ttl, 20), L1_MAX_ENTRIES)
+		frappe.cache.set_value(bkey, raw_bytes, expires_in_sec=ttl)
+		return _make_json_response(raw_bytes, cache_status="MISS", cache_control="private, no-store")
+
+	return get_or_compute("cart", key_parts, domains, compute_fn, ttl=ttl, include_locale=True)
+
+
+def cached_checkout_response(
+	quotation_name: str,
+	modified: str,
+	compute_fn: Callable[[], dict],
+	*,
+	endpoint: str = "commera.api.storefront.checkout.get",
+	ttl: int = 45,
+):
+	"""Modified-stamped cache for read-only checkout.get; invalidates on Quotation modified or epoch bump."""
+	domains = ("catalog", "prices", "discounts", "shop")
+	if not is_cache_enabled() or _is_domain_dirty(domains):
+		return compute_fn()
+
+	locale = _locale_context()
+	stamp = epoch_stamp(domains)
+	key_parts = (quotation_name, str(modified or ""))
+	api_version = _detect_http_api_version(endpoint)
+
+	if api_version is not None:
+		bkey = _hash_key(f"chk:{api_version}", (_site(), locale, stamp, key_parts))
+		raw = _l1_get(_l1_bytes, bkey)
+		if raw is not None:
+			return _make_json_response(raw, cache_status="HIT-L1", cache_control="private, no-store")
+		raw_l2 = frappe.cache.get_value(bkey)
+		if isinstance(raw_l2, bytes | bytearray):
+			raw_bytes = bytes(raw_l2)
+			_l1_set(_l1_bytes, bkey, raw_bytes, min(ttl, 20), L1_MAX_ENTRIES)
+			return _make_json_response(raw_bytes, cache_status="HIT-L2", cache_control="private, no-store")
+		value = compute_fn()
+		raw_bytes = _encode_api_bytes(value, api_version)
+		_l1_set(_l1_bytes, bkey, raw_bytes, min(ttl, 20), L1_MAX_ENTRIES)
+		frappe.cache.set_value(bkey, raw_bytes, expires_in_sec=ttl)
+		return _make_json_response(raw_bytes, cache_status="MISS", cache_control="private, no-store")
+
+	return get_or_compute("checkout", key_parts, domains, compute_fn, ttl=ttl, include_locale=True)
+
+
 # Guest SSR Page Cache (opt-in per page controller via `cacheable_ssr = True`)
 
 

@@ -299,6 +299,14 @@ doc_events = {
 		"on_update": "commera.discounts.preview.clear_item_tax_cache",
 		"on_trash": "commera.discounts.preview.clear_item_tax_cache",
 	},
+	"Customer": {
+		"on_update": "commera.core.clear_user_party_cache",
+		"on_trash": "commera.core.clear_user_party_cache",
+	},
+	"Contact": {
+		"on_update": "commera.core.clear_user_party_cache",
+		"on_trash": "commera.core.clear_user_party_cache",
+	},
 	"Sales Taxes and Charges Template": {
 		"validate": "commera.localization.market_setup.validate_tax_template",
 	},
