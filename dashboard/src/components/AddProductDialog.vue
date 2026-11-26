@@ -163,7 +163,7 @@ const summary = computed(() => {
     return `${options} · ${variants}`
   }
   if (optionCount) return `${options} · ${__('no sizes, so each one sells as a single item')}`
-  return __('No options: this sells as a single item, the way a book does')
+  return __('No options: this sells as a single item')
 })
 
 const createAction = useAdminAction('catalog.create_product')

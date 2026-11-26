@@ -260,7 +260,7 @@ function collectionSummary(product) {
               <div class="min-w-0">
                 <p class="truncate text-base text-ink-gray-8">{{ item.title }}</p>
                 <p class="truncate text-sm text-ink-gray-5">
-                  {{ item.name }}<span v-if="item.variant_count"> · {{ __('{0} variants', [item.variant_count]) }}</span>
+                  {{ item.name }}<span v-if="item.variant_count"> · {{ item.variant_count === 1 ? __('1 variant') : __('{0} variants', [item.variant_count]) }}</span>
                 </p>
               </div>
             </div>

@@ -71,7 +71,7 @@ async function saveAddress(values) {
   <template v-else>
     <SettingsPanelHeader
       :title="__('Pickup locations')"
-      :description="__('Your warehouses, and where shoppers can collect their order.')"
+      :description="__('Where shoppers can collect their order.')"
     />
 
     <SettingsBody v-scroll-fade>
@@ -90,7 +90,7 @@ async function saveAddress(values) {
       <template v-else>
         <SettingsRow
           :title="__('Store pickup')"
-          :description="__('Let shoppers collect their order from a warehouse instead of having it delivered.')"
+          :description="__('Let shoppers collect their order from one of your locations instead of having it delivered.')"
         >
           <Switch
             size="sm"
@@ -106,8 +106,8 @@ async function saveAddress(values) {
           v-if="pickupEnabled && !warehouses.length"
           compact
           icon="lucide-warehouse"
-          :title="__('No warehouses yet')"
-          :description="__('Add a warehouse in your books, and it shows up here.')"
+          :title="__('No locations yet')"
+          :description="__('Add a location in your books, and it shows up here.')"
         />
 
         <div v-else-if="pickupEnabled" class="divide-y divide-outline-gray-1 border-t border-outline-gray-1">

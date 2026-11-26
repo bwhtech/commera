@@ -3,9 +3,7 @@
  * Take stock in against any mix of a product's sizes in one pass.
  *
  * Quantities are ADDED, never set: commera's only stock write is
- * `Style Attribute Variant.receive_stock`, a submitted Material Receipt into the
- * ecommerce warehouse. A valuation rate is optional per line — left blank, the
- * item's own valuation stands.
+ * `Style Attribute Variant.receive_stock`.
  */
 import { computed, reactive, watch } from 'vue'
 import { Button, Dialog, TextInput, toast } from 'frappe-ui'
@@ -29,32 +27,26 @@ const drafts = reactive({})
 watch(open, (isOpen) => {
   if (!isOpen) return
   for (const key of Object.keys(drafts)) delete drafts[key]
-  for (const row of props.rows) drafts[row.id] = { qty: '', rate: '' }
+  for (const row of props.rows) drafts[row.id] = { qty: '' }
 })
 
 const lines = computed(() =>
   props.rows
     .filter((row) => Number(drafts[row.id]?.qty) > 0)
-    .map((row) => ({ itemCode: row.id, qty: Number(drafts[row.id].qty), rate: drafts[row.id].rate })),
+    .map((row) => ({ itemCode: row.id, qty: Number(drafts[row.id].qty) })),
 )
 
 const totalQty = computed(() => lines.value.reduce((sum, line) => sum + line.qty, 0))
 
 async function receive() {
   const received_quantities = Object.fromEntries(lines.value.map((line) => [line.itemCode, line.qty]))
-  const valuation_rates = Object.fromEntries(
-    lines.value.filter((line) => line.rate !== '' && line.rate != null).map((line) => [line.itemCode, Number(line.rate)]),
-  )
 
-  const received = await trySubmit(receiveAction, { received_quantities, valuation_rates })
+  const received = await trySubmit(receiveAction, { received_quantities })
   if (!received) return
-  const result = receiveAction.data
 
   open.value = false
-  const count = result.stock_entries?.length ?? 0
-  toast.success(__('Added {0} across {1} sizes', [totalQty.value, lines.value.length]), {
-    description: count === 1 ? __('1 Material Receipt submitted.') : __('{0} Material Receipts submitted.', [count]),
-  })
+  const count = lines.value.length
+  toast.success(count === 1 ? __('Stock added') : __('Stock added to {0} sizes', [count]))
   emit('received')
 }
 </script>
@@ -62,11 +54,7 @@ async function receive() {
 <template>
   <Dialog v-model:open="open" :title="__('Add stock')" size="xl">
     <template #default>
-      <p class="text-p-sm text-ink-gray-5">
-        {{ __("Quantities are added to what is on hand, as a Material Receipt into the shop's warehouse. Leave the valuation rate blank to keep the item's own.") }}
-      </p>
-
-      <div class="mt-4 space-y-3">
+      <div class="space-y-3">
         <div
           v-for="row in rows"
           :key="row.id"
@@ -82,13 +70,6 @@ async function receive() {
             size="sm"
             class="w-full sm:w-28"
             :placeholder="__('Qty')"
-          />
-          <TextInput
-            v-model="drafts[row.id].rate"
-            type="number"
-            size="sm"
-            class="w-full sm:w-36"
-            :placeholder="__('Valuation rate')"
           />
         </div>
       </div>

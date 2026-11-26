@@ -356,7 +356,7 @@ Pick at least one size for {0},اختر مقاسًا واحدًا على الأ�
 1 variant will be created,سيُنشأ متغيّر واحد
 {0} variants will be created,سيُنشأ {0} متغيّرات
 "no sizes, so each one sells as a single item",بلا مقاسات، لذا يُباع كل خيار كمنتج واحد
-"No options: this sells as a single item, the way a book does",بلا خيارات: يُباع كمنتج واحد، كما يُباع الكتاب
+No options: this sells as a single item,لا توجد خيارات: يُباع هذا كمنتج واحد
 Add a title to continue.,أضف عنوانًا للمتابعة.
 Pick a collection to continue.,اختر مجموعة للمتابعة.
 Set a price above zero to continue.,حدّد سعرًا أكبر من صفر للمتابعة.
@@ -498,7 +498,6 @@ Identifiers,المعرّفات
 SKU,SKU
 Open full page,فتح الصفحة كاملة
 Save variant,حفظ المتغيّر
-option,خيار
 Price updated for {0} ({1} sizes),تم تحديث سعر {0} ({1} مقاسات)
 Set price on 1 variant,تحديد السعر لمتغيّر واحد
 Set price on {0} variants,تحديد السعر لـ {0} متغيّرات
@@ -898,13 +897,10 @@ orders,الطلبات
 revenue,إيرادات
 {0} out of stock,{0} نفد من المخزون
 {0} running low,{0} أوشك على النفاد
-Added {0} across {1} sizes,تمت إضافة {0} عبر {1} مقاسات
-1 Material Receipt submitted.,تم اعتماد إيصال مواد واحد.
-{0} Material Receipts submitted.,تم اعتماد {0} إيصالات مواد.
-"Quantities are added to what is on hand, as a Material Receipt into the shop's warehouse. Leave the valuation rate blank to keep the item's own.",تُضاف الكميات إلى المتوفر فعليًا، كإيصال مواد إلى مستودع المتجر. اترك معدل التقييم فارغًا للإبقاء على معدل الصنف نفسه.
+Stock added,تمت إضافة المخزون
+Stock added to {0} sizes,تمت إضافة المخزون إلى {0} مقاسات
 {0} on hand,{0} متوفر فعليًا
 Qty,الكمية
-Valuation rate,معدل التقييم
 "Every remaining store setting, grouped as it appears in your books.",كل إعدادات المتجر المتبقية، مجمّعة كما تظهر في دفاترك المحاسبية.
 "These are setup values, not everyday settings",هذه قيم إعداد، وليست إعدادات يومية
 "Changing one can break your storefront, so edit only what you recognise.",تغيير أحدها قد يعطّل واجهة متجرك، لذا لا تعدّل إلا ما تعرفه.
@@ -994,6 +990,7 @@ Templates,القوالب
 The template each store email is sent with.,القالب الذي تُرسل به كل رسالة من رسائل المتجر.
 Your emails still go out. This panel just cannot say which templates they use.,ما زالت رسائلك تُرسل. هذه اللوحة لا تستطيع معرفة القوالب التي تستخدمها.
 Company,الشركة
+Business,النشاط التجاري
 "How your storefront names itself, and how customers reach you.",كيف تُعرّف واجهة متجرك نفسها، وكيف يتواصل معك العملاء.
 Shown across your storefront and in the browser tab.,يظهر في واجهة متجرك وفي علامة تبويب المتصفح.
 Contact email,البريد الإلكتروني للتواصل
@@ -1001,14 +998,14 @@ Contact email,البريد الإلكتروني للتواصل
 Contact phone,هاتف التواصل
 Working hours,ساعات العمل
 Shown alongside your contact details.,تظهر بجانب بيانات التواصل.
-Orders are booked against this company. Its details are edited on the company record.,تُسجَّل الطلبات باسم هذه الشركة. تُعدَّل بياناتها في سجل الشركة.
-Open company record,فتح سجل الشركة
-Store company,شركة المتجر
-No company is set for this store yet,لم تُحدَّد شركة لهذا المتجر بعد
-Pick one above and orders will book against it.,اختر واحدة في الأعلى وستُسجَّل الطلبات باسمها.
+The business your store sells as. Its details are edited on its own page.,النشاط التجاري الذي يبيع متجرك باسمه. تُعدَّل بياناته في صفحته الخاصة.
+Edit business details,تعديل بيانات النشاط التجاري
+Sells as,يبيع باسم
+No business is set for this store yet,لم يُحدَّد نشاط تجاري لهذا المتجر بعد
+Pick one above and orders will be made out to it.,اختر واحدًا أعلاه وستصدر الطلبات باسمه.
 Registered name,الاسم المسجّل
 Registered address,العنوان المسجّل
-No address on the company record,لا يوجد عنوان في سجل الشركة
+No address set yet,لم يُحدَّد عنوان بعد
 Tax ID,الرقم الضريبي
 "Printed on invoices. Tax rates themselves are set by your books, not here.",يُطبع على الفواتير. أما نسب الضرائب نفسها فتُحدَّد في دفاترك، لا هنا.
 Not set,غير محدد
@@ -1043,12 +1040,12 @@ Pickup allowed at {0},الاستلام مسموح في {0}
 Pickup stopped at {0},أُوقف الاستلام في {0}
 Pickup address saved,تم حفظ عنوان الاستلام
 Pickup address added,تمت إضافة عنوان الاستلام
-"Your warehouses, and where shoppers can collect their order.",مستودعاتك، والأماكن التي يمكن للمتسوقين استلام طلباتهم منها.
+Where shoppers can collect their order.,الأماكن التي يمكن للمتسوقين استلام طلباتهم منها.
 Checkout still offers whatever is stored. This panel just cannot say what.,ما زال إتمام الطلب يعرض ما هو محفوظ. هذه اللوحة لا تستطيع معرفة ما هو.
 Store pickup,الاستلام من المتجر
-Let shoppers collect their order from a warehouse instead of having it delivered.,اسمح للمتسوقين باستلام طلباتهم من مستودع بدلًا من توصيلها.
-No warehouses yet,لا توجد مستودعات بعد
-"Add a warehouse in your books, and it shows up here.",أضف مستودعًا في دفاترك، وسيظهر هنا.
+Let shoppers collect their order from one of your locations instead of having it delivered.,اسمح للمتسوقين باستلام طلباتهم من أحد مواقعك بدلًا من توصيلها.
+No locations yet,لا توجد مواقع بعد
+"Add a location in your books, and it shows up here.",أضف موقعًا في دفاترك، وسيظهر هنا.
 Online orders,الطلبات عبر الإنترنت
 No map pin,لا يوجد دبوس على الخريطة
 "Needs an address, so hidden at checkout",يحتاج إلى عنوان، لذا يُخفى عند إتمام الطلب
@@ -1335,7 +1332,6 @@ This section has no settings. Drag it in the list to move it.,لا توجد إع
 Select a section,اختر قسمًا
 Click it in the preview or in the list to change its settings.,انقر عليه في المعاينة أو في القائمة لتغيير إعداداته.
 "Heading only, no link",عنوان فقط، بلا رابط
-Item groups,مجموعات الأصناف
 Menu entry saved,تم حفظ عنصر القائمة
 Pick an entry to edit it,اختر عنصرًا لتعديله
 "Drag entries to reorder them, or drop one onto another to nest it.",اسحب العناصر لإعادة ترتيبها، أو أفلت عنصرًا على آخر لتضمينه فيه.
@@ -1346,7 +1342,6 @@ Optional. Top-level sections need one; entries below them do not.,اختياري
 Links to,يرتبط بـ
 Leave as a heading to show a label that is not clickable.,اتركه عنوانًا لعرض تسمية غير قابلة للنقر.
 Products from every group listed here appear together under this entry.,تظهر منتجات كل مجموعة مدرجة هنا معًا ضمن هذا العنصر.
-Search item groups,ابحث في مجموعات الأصناف
 Search brands,ابحث في العلامات التجارية
 Where this entry sends shoppers.,المكان الذي يرسل إليه هذا العنصر المتسوقين.
 Icon,الأيقونة
@@ -1364,10 +1359,9 @@ Shoes,أحذية
 Menu entry added,تمت إضافة عنصر القائمة
 1 group,مجموعة واحدة
 {0} groups,{0} مجموعات
-Build the menu from item groups,بناء القائمة من مجموعات الأصناف
+Build the menu from collections,بناء القائمة من المجموعات
 "Entries will be added inside ""{0}"".","ستُضاف العناصر داخل ""{0}""."
 Entries will be added as new top-level sections.,ستُضاف العناصر كأقسام جديدة في المستوى الأعلى.
-Item group,مجموعة الأصناف
 "The group and everything under it, as far as the menu depth allows.",المجموعة وكل ما تحتها، بقدر ما يسمح عمق القائمة.
 Added 1 menu entry,تمت إضافة عنصر واحد إلى القائمة
 Added {0} menu entries,تمت إضافة {0} عناصر إلى القائمة
@@ -1386,12 +1380,12 @@ Show in menu,إظهار في القائمة
 Products under this entry,المنتجات ضمن هذا العنصر
 Publish to the storefront,نشر في واجهة المتجر
 Take off the storefront,إزالة من واجهة المتجر
-Import from item groups,الاستيراد من مجموعات الأصناف
+Import from collections,الاستيراد من المجموعات
 Delete whole menu,حذف القائمة بأكملها
 Menu actions,إجراءات القائمة
 Could not load your menu,تعذّر تحميل قائمتك
 No menu yet,لا توجد قائمة بعد
-"Add a section, or build one from your item groups.",أضف قسمًا، أو ابنِ قائمة من مجموعات الأصناف.
+"Add a section, or build one from your collections.",أضف قسمًا، أو ابنِ قائمة من مجموعاتك.
 Entry actions,إجراءات العنصر
 Publish a product to see this layout with real content.,انشر منتجًا لترى هذا التخطيط بمحتوى حقيقي.
 Go to products,الانتقال إلى المنتجات
@@ -1742,13 +1736,13 @@ Closed,مغلق
 1 order marked fulfilled,تم تعليم طلب واحد كمُجهَّز
 {0} orders marked fulfilled,تم تعليم {0} طلبات كمُجهَّزة
 {0} of {1} orders marked fulfilled. {2} failed,تم تعليم {0} من {1} طلبات كمُجهَّزة. فشل {2}
-"No delivery note yet for {0}, so there is nothing to print.",لا توجد مذكرة تسليم لـ {0} بعد، لذا لا شيء للطباعة.
+"No packing slip yet for {0}, so there is nothing to print.",لا توجد قائمة تعبئة لـ {0} بعد، لذا لا شيء للطباعة.
 Search orders,ابحث في الطلبات
 1 order selected,تم تحديد طلب واحد
 {0} orders selected,تم تحديد {0} طلبات
 Select orders to act on them,حدّد طلبات لتنفيذ إجراءات عليها
 Mark fulfilled,تعليم كمُجهَّز
-Print delivery notes,طباعة مذكرات التسليم
+Print packing slips,طباعة قوائم التعبئة
 Your first order will appear here the moment a shopper checks out.,سيظهر طلبك الأول هنا لحظة إتمام متسوق لطلبه.
 Try a different filter or search term.,جرّب فلترًا أو كلمة بحث مختلفة.
 All types,كل الأنواع
@@ -1784,6 +1778,7 @@ Select products to act on them,حدّد منتجات لتنفيذ إجراءات
 Move to collection,نقل إلى مجموعة
 Updated,آخر تحديث,Date last updated
 {0} variants,{0} متغيّرات
+1 variant,متغيّر واحد
 "Add your first product, or import a catalogue to get started.",أضف منتجك الأول، أو استورد كتالوجًا للبدء.
 No products match,لا توجد منتجات مطابقة
 "Change the filters, or import a catalogue to get started.",غيّر الفلاتر، أو استورد كتالوجًا للبدء.
@@ -2247,14 +2242,14 @@ Your storefront still sells in the markets it had.,تواصل واجهة متج�
 Sell in {0},البيع في {0}
 Store default,الإعداد الافتراضي للمتجر
 Prices and taxes,الأسعار والضرائب
-Sale price list,قائمة أسعار البيع
-Choose a price list,اختر قائمة أسعار
-Compare-at price list,قائمة الأسعار قبل الخصم
+Selling prices,أسعار البيع
+Choose selling prices,اختر أسعار البيع
+Compare-at prices,الأسعار قبل الخصم
 Shown struck through.,يظهر مشطوبًا.
-From the sale price list.,من قائمة أسعار البيع.
-Tax template,قالب الضريبة
+From the selling prices.,من أسعار البيع.
+Taxes,الضرائب
 Products without a price in {0} are not sold here.,لا تُباع هنا المنتجات التي ليس لها سعر في {0}.
-Products without a price in the sale price list are not sold here.,لا تُباع هنا المنتجات التي ليس لها سعر في قائمة أسعار البيع.
+Products without a selling price are not sold here.,لا تُباع هنا المنتجات التي ليس لها سعر بيع.
 URLs,الروابط
 Pick countries and languages to see the URLs.,اختر البلدان واللغات لعرض الروابط.
 New theme,قالب جديد
@@ -2497,7 +2492,6 @@ We could not add these products,لم نتمكن من إضافة هذه المن�
 {0} is out of stock.,{0} غير متوفر في المخزون.
 "Only {0} of {1} are in stock, so the quantity was lowered.",يتوفر {0} فقط من {1} في المخزون، لذا خُفّضت الكمية.
 {0} is not available in this market.,{0} غير متوفر في هذه السوق.
-Each {0} has its own photos. The first one is the cover.,لكل {0} صوره الخاصة. الصورة الأولى هي الغلاف.
 Add photos of {0},أضف صور {0}
 Shown when a shopper picks {0}. Drop images here or click to choose.,تظهر عندما يختار المتسوق {0}. اسحب الصور إلى هنا أو انقر للاختيار.
 Applies to every size under this option ({0}).,ينطبق على كل المقاسات ضمن هذا الخيار ({0}).

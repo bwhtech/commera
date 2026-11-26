@@ -1,21 +1,14 @@
 <script setup>
-import { computed } from 'vue'
 import VariantMedia from '../VariantMedia.vue'
-import { __ } from '../../data/translation'
 
-const props = defineProps({ product: { type: Object, required: true } })
+defineProps({ product: { type: Object, required: true } })
 const emit = defineEmits(['saved'])
-
-const optionNoun = computed(() => (props.product.option_attribute ?? __('option')).toLowerCase())
 </script>
 
 <template>
   <section id="product-photos" class="rounded-5 border border-outline-gray-1">
     <div class="px-4 py-3">
       <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Photos') }}</h2>
-      <p class="mt-1 text-p-sm text-ink-gray-5">
-        {{ __('Each {0} has its own photos. The first one is the cover.', [optionNoun]) }}
-      </p>
     </div>
 
     <div
