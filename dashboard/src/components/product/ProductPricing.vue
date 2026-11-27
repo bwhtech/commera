@@ -1,10 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { Button, FormControl } from 'frappe-ui'
+import { Button } from 'frappe-ui'
+import PriceFields from '../PriceFields.vue'
 import ProductSection from './ProductSection.vue'
 import ReceiveStockDialog from './ReceiveStockDialog.vue'
-import { symbolFor } from '../../data/format'
-import { hasPrice } from '../../data/product'
 
 // Price and stock for a product sold as one item, edited here instead of through a variant
 // dialog naming the placeholder variant. The prices are part of the page's draft and save with
@@ -17,10 +16,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['received'])
 
-const currencySymbol = symbolFor()
-// Revealed once, it stays: clearing the field while typing must not make it vanish.
-const originalPriceRevealed = ref(hasPrice(props.draft.originalPrice))
-const showOriginalPrice = computed(() => originalPriceRevealed.value || hasPrice(props.draft.originalPrice))
 const receiveOpen = ref(false)
 
 const size = computed(() => props.product.variants[0].sizes[0])
@@ -28,43 +23,13 @@ const stockRows = computed(() => [{ id: size.value.item_code, title: props.produ
 </script>
 
 <template>
-  <ProductSection :title="__('Price and stock')">
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <FormControl
-        v-model="draft.price"
-        type="number"
-        inputmode="decimal"
-        :label="__('Price')"
-        :error="priceError"
-        required
-      >
-        <template #prefix>
-          <span class="text-base text-ink-gray-5">{{ currencySymbol }}</span>
-        </template>
-      </FormControl>
-
-      <FormControl
-        v-if="showOriginalPrice"
-        v-model="draft.originalPrice"
-        type="number"
-        inputmode="decimal"
-        :label="__('Original price')"
-        :description="__('Shown crossed out next to the price. Must be higher than the price.')"
-        :error="originalPriceError"
-      >
-        <template #prefix>
-          <span class="text-base text-ink-gray-5">{{ currencySymbol }}</span>
-        </template>
-      </FormControl>
-      <div v-else class="flex items-end">
-        <Button
-          variant="ghost"
-          icon-left="lucide-plus"
-          :label="__('Add original price')"
-          @click="originalPriceRevealed = true"
-        />
-      </div>
-    </div>
+  <ProductSection id="product-pricing" :title="__('Price and stock')">
+    <PriceFields
+      v-model:price="draft.price"
+      v-model:original-price="draft.originalPrice"
+      :price-error="priceError"
+      :original-price-error="originalPriceError"
+    />
 
     <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-outline-gray-1 pt-4">
       <div>

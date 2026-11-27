@@ -26,7 +26,7 @@ function sizeLabel(variant, size) {
 const lowSizes = computed(() =>
   props.product.variants
     .flatMap((variant) => variant.sizes.map((size) => ({ variant, size })))
-    .filter(({ size }) => (size.stock ?? 0) <= 5)
+    .filter(({ size }) => (size.stock ?? 0) <= (props.product.restock_level ?? 5))
     .sort((a, b) => (a.size.stock ?? 0) - (b.size.stock ?? 0))
     .map(({ variant, size }) => ({
       id: size.item_code,

@@ -29,11 +29,11 @@ function remove(value) {
         type="button"
         :disabled="props.disabled"
         :data-state="open ? 'open' : 'closed'"
-        class="relative flex min-h-7 w-full items-center gap-2 rounded-4 border py-1 pl-1 pr-2 text-left text-base transition-[background-color,border-color,box-shadow] duration-150 data-[state=open]:focus-ring"
+        class="relative flex min-h-7 w-full items-center gap-2 rounded-4 border py-1 ps-1 pe-2 text-start text-base transition-[background-color,border-color,box-shadow] duration-150 data-[state=open]:focus-ring"
         :class="
           props.disabled
             ? 'cursor-not-allowed border-transparent bg-surface-gray-1 text-ink-gray-4'
-            : 'border-[--surface-gray-2] bg-surface-gray-2 text-ink-gray-7 hover:border-outline-elevation-2 hover:bg-surface-gray-3'
+            : 'border-transparent bg-surface-gray-2 text-ink-gray-7 hover:border-outline-elevation-2 hover:bg-surface-gray-3'
         "
       >
         <span class="flex min-w-0 flex-1 flex-wrap items-center gap-1">
@@ -53,7 +53,7 @@ function remove(value) {
                 role="button"
                 tabindex="-1"
                 :aria-label="__('Remove {0}', [option.label])"
-                class="-mr-0.5 inline-flex cursor-pointer items-center justify-center rounded-1 p-0.5 opacity-70 hover:opacity-100"
+                class="-me-0.5 inline-flex cursor-pointer items-center justify-center rounded-1 p-0.5 opacity-70 hover:opacity-100"
                 @click.stop="remove(option.value)"
                 @pointerdown.stop
               >

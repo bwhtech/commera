@@ -24,6 +24,7 @@ import { changedFields, rebaseDraft, storedDraft } from '../data/productDraft'
 import { useRecordPlugins } from '../data/recordPlugins'
 import { __ } from '../data/translation'
 import { confirmLeave } from '../utils/confirmLeave'
+import { useIsMobile } from '../utils/useIsMobile'
 import { asDropdownOptions, buildProductActions } from '../ia/productActions'
 
 const route = useRoute()
@@ -163,14 +164,27 @@ useEventListener(window, 'beforeunload', (event) => {
   if (isDirty.value) event.preventDefault()
 })
 
-// The server skips an option with no size rather than refusing, so a product is publishable once
-// one option has none of its blockers.
+// The server skips a color that is not ready rather than refusing, so a product is publishable once
+// one color has none of its blockers (catalog.get_publish_blockers).
 const publishBlocker = computed(() => {
   if (!product.value || isLive.value || product.value.status === 'archived') return ''
   const variants = product.value.variants
   if (variants.some((variant) => !variant.blockers?.length)) return ''
   return variants[0]?.blockers?.[0] ?? __('Add a size before you publish.')
 })
+
+// publishBlocker reads the first color, so the price link follows that same color.
+const isMissingPrice = computed(() => {
+  const sizes = publishBlocker.value ? product.value.variants[0].sizes : []
+  return sizes.length > 0 && sizes.some((size) => !hasPrice(priceInputs(size).price))
+})
+
+// A product sold as one item has its Price on the page; otherwise each color's price is in Variants.
+function goToPrice() {
+  const section = document.getElementById(singleItem.value ? 'product-pricing' : 'product-variants')
+  section?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  section?.querySelector('input')?.focus({ preventScroll: true })
+}
 
 async function togglePublish() {
   const publish = !isLive.value
@@ -219,12 +233,20 @@ const statusLabels = { draft: __('Draft'), live: __('Live'), archived: __('Archi
 // format.js themes `published` green; Live is that state under its seller-facing name.
 const statusKeys = { draft: 'draft', live: 'published', archived: 'archived' }
 
-const breadcrumbs = computed(() => [{ label: __('Products'), route: '/products' }, { label: product.value.title }])
+// A phone has the back button for the way to Products, so the title gets the whole row beside the actions.
+const isMobile = useIsMobile()
+const breadcrumbs = computed(() => [
+  ...(isMobile.value ? [] : [{ label: __('Products'), route: '/products' }]),
+  { label: product.value.title },
+])
 
 // Below lg the rail is hidden, so the two numbers a seller looks for first ride along at the top.
-const glance = computed(() =>
-  __('{0} · {1} in stock', [priceRange(stats.value.priceLow, stats.value.priceHigh), stats.value.onHand]),
-)
+// A draft with no stock reads calm, as on the products list.
+const glance = computed(() => {
+  const price = priceRange(stats.value.priceLow, stats.value.priceHigh)
+  if (stats.value.onHand <= 0 && !isLive.value) return __('{0} · No stock yet', [price])
+  return __('{0} · {1} in stock', [price, stats.value.onHand])
+})
 
 watch(
   () => route.params.id,
@@ -309,8 +331,9 @@ const loadFailure = computed(() =>
       <ScrollArea v-scroll-fade class="min-w-0 flex-1">
         <PageBody width="narrow">
           <div v-if="publishBlocker || !hasRail" class="mb-4 space-y-1">
-            <p v-if="publishBlocker" class="text-p-sm text-ink-gray-6">
-              {{ __('To publish: {0}', [publishBlocker]) }}
+            <p v-if="publishBlocker" class="flex flex-wrap items-center gap-x-2 text-p-sm text-ink-gray-6">
+              {{ publishBlocker }}
+              <Button v-if="isMissingPrice" variant="ghost" size="sm" :label="__('Add price')" @click="goToPrice" />
             </p>
             <p v-if="isDirty && hasErrors" class="text-p-sm text-ink-red-6 md:hidden">
               {{ __('Fix the highlighted fields to save') }}
