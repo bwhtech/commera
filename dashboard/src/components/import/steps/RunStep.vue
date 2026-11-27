@@ -17,6 +17,7 @@ import { useAdminAction, trySubmit } from '../../../data/api'
 import { doneTitle, photoCount, productCount } from '../../../data/importCounts'
 import { __ } from '../../../data/translation'
 import { productRoute } from '../../../ia/routes'
+import ImportResult from '../ImportResult.vue'
 import NotPublishedList from '../NotPublishedList.vue'
 
 const runImportAction = useAdminAction('imports.run_import')
@@ -83,7 +84,7 @@ const doneBody = computed(() => {
   <div class="space-y-6">
     <template v-if="imp.phase === 'running'">
       <div>
-        <h2 class="text-xl-semibold text-ink-gray-9">{{ __('Importing your products') }}</h2>
+        <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Importing your products') }}</h2>
         <p class="mt-1.5 text-p-base text-ink-gray-6">{{ __('This only takes a moment.') }}</p>
       </div>
 
@@ -116,27 +117,16 @@ const doneBody = computed(() => {
     </template>
 
     <template v-else>
-      <div class="rounded-6 border border-outline-gray-1 px-6 py-8 text-center">
-        <div
-          class="mx-auto flex size-12 items-center justify-center rounded-full"
-          :class="published != null ? 'bg-surface-green-2 text-ink-green-7' : 'bg-surface-gray-2 text-ink-gray-7'"
-        >
-          <span :class="[published != null ? 'lucide-circle-check' : 'lucide-package-check', 'size-6']" aria-hidden="true" />
-        </div>
-        <h2 class="mt-4 text-xl-semibold text-ink-gray-9">{{ doneTitle(imp.created.length, published) }}</h2>
-        <p class="mx-auto mt-1.5 max-w-md text-p-base text-ink-gray-6">{{ doneBody }}</p>
-        <p v-if="imp.imagesAttached" class="mx-auto mt-1 max-w-md text-p-sm text-ink-gray-5">
-          {{ __('{0} added to them.', [photoCount(imp.imagesAttached)]) }}
-        </p>
-
-        <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
-          <template v-if="published == null && imp.created.length">
-            <Button :label="__('View products')" @click="finish('/products')" />
-            <Button variant="solid" theme="gray" :label="__('Publish all')" :loading="publishImportAction.loading" @click="publishImported" />
-          </template>
-          <Button v-else variant="solid" theme="gray" :label="__('View products')" @click="finish('/products')" />
-        </div>
-      </div>
+      <ImportResult :published="published" :title="doneTitle(imp.created.length, published)" :body="doneBody">
+        <template v-if="imp.imagesAttached" #details>
+          <p class="mx-auto mt-1 max-w-md text-p-sm text-ink-gray-5">{{ __('{0} added.', [photoCount(imp.imagesAttached)]) }}</p>
+        </template>
+        <template v-if="published == null && imp.created.length">
+          <Button :label="__('View products')" @click="finish('/products')" />
+          <Button variant="solid" theme="gray" :label="__('Publish all')" :loading="publishImportAction.loading" @click="publishImported" />
+        </template>
+        <Button v-else variant="solid" theme="gray" :label="__('View products')" @click="finish('/products')" />
+      </ImportResult>
 
       <NotPublishedList
         v-if="notPublished.length"

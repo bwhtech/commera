@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { Badge, TabButtons } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import { imp } from '../../../data/importFlow'
-import { reviewSummary, visibleFilter } from '../../../data/importCounts'
+import { reviewSummary, showsOriginalPrice, visibleFilter } from '../../../data/importCounts'
 import { money } from '../../../data/format'
 import { __ } from '../../../data/translation'
 import { useIsMobile } from '../../../utils/useIsMobile'
@@ -17,11 +17,11 @@ const filters = {
   warnings: (row) => row.issue?.level === 'warning',
   errors: (row) => row.issue?.level === 'error',
 }
-// Only the buckets that hold a row: a Warnings tab that is always empty is noise.
+// Only the buckets that hold a row: a tab that is always empty is noise.
 const filterOptions = computed(() =>
   [
     { label: __('All rows'), value: 'all' },
-    { label: __('Ready'), value: 'ready' },
+    imp.counts.ready && { label: __('Ready'), value: 'ready' },
     imp.counts.warnings && { label: __('Warnings'), value: 'warnings' },
     imp.counts.errors && { label: __('Errors'), value: 'errors' },
   ].filter(Boolean),
@@ -38,7 +38,7 @@ const summary = computed(() => reviewSummary(imp.counts))
 const optionsOf = (row) => [row.color, row.size].filter(Boolean).join(' · ')
 const coverOf = (row) => imp.imageAssignments[row.image_key]?.[0] ?? null
 const priceOf = (row) => (row.sale_price ? money(row.sale_price) : '—')
-const originalPriceOf = (row) => (row.compare_at_price > row.sale_price ? money(row.compare_at_price) : '')
+const originalPriceOf = (row) => (showsOriginalPrice(row) ? money(row.compare_at_price) : '')
 const statusTheme = (row) => (!row.issue ? 'green' : row.issue.level === 'error' ? 'red' : 'amber')
 const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'error' ? __('Skipped') : __('Warning'))
 </script>
@@ -46,7 +46,7 @@ const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'er
 <template>
   <div class="space-y-5">
     <div>
-      <h2 class="text-xl-semibold text-ink-gray-9">{{ __('Check before importing') }}</h2>
+      <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Check before importing') }}</h2>
       <p class="mt-1.5 text-p-base text-ink-gray-6">
         {{ __('Nothing is saved yet. Every product is added as a draft, so nothing is on your store until you publish it. Rows with an error are skipped.') }}
       </p>
@@ -95,7 +95,7 @@ const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'er
           <ListRows :items="filtered" row-key="row" v-slot="{ item }">
             <ListRow :value="String(item.row)">
               <ListCell>
-                <div class="flex min-w-0 items-center gap-2.5">
+                <div class="flex min-w-0 items-center gap-2.5 py-2.5">
                   <Thumb :image="coverOf(item)" size="size-8" />
                   <div class="min-w-0">
                     <div class="truncate text-base text-ink-gray-8">{{ item.title || '—' }}</div>

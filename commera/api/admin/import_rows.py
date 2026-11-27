@@ -268,7 +268,7 @@ class RowChecker:
 			parsed[field] = read_amount(raw)
 			if parsed[field] is None:
 				parsed[field] = 0
-				issue = issue or error(_('{0} "{1}" is not a number').format(label, raw))
+				issue = issue or error(_('{0} "{1}" is not a number.').format(label, raw))
 		return issue
 
 	def check_required(self, row, parsed):
@@ -351,12 +351,12 @@ class RowChecker:
 			return None
 		if parsed["color"]:
 			return error(
-				_('Price does not match row {0}. Every size of {1} in "{2}" has the same price').format(
+				_('Price does not match row {0}. Every size of {1} in "{2}" has the same price.').format(
 					first["row"], parsed["color"], parsed["title"]
 				)
 			)
 		return error(
-			_('Price does not match row {0}. Every size of "{1}" has the same price').format(
+			_('Price does not match row {0}. Every size of "{1}" has the same price.').format(
 				first["row"], parsed["title"]
 			)
 		)

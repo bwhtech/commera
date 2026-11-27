@@ -277,9 +277,9 @@ class TestImportPrices(RunImportTestCase):
 		above_zero = {"level": "error", "text": "Enter a price above zero."}
 		self.assertEqual(self.get_price_issue("0"), above_zero)
 		self.assertEqual(self.get_price_issue("-5"), above_zero)
-		self.assertEqual(self.get_price_issue("abc")["text"], 'Price "abc" is not a number')
-		self.assertEqual(self.get_price_issue("inf")["text"], 'Price "inf" is not a number')
-		self.assertEqual(self.get_price_issue("nan")["text"], 'Price "nan" is not a number')
+		self.assertEqual(self.get_price_issue("abc")["text"], 'Price "abc" is not a number.')
+		self.assertEqual(self.get_price_issue("inf")["text"], 'Price "inf" is not a number.')
+		self.assertEqual(self.get_price_issue("nan")["text"], 'Price "nan" is not a number.')
 		self.assertIsNone(self.get_price_issue("12.50"))
 
 	def test_the_write_path_refuses_a_price_at_or_below_zero(self):
@@ -322,7 +322,7 @@ class TestImportPrices(RunImportTestCase):
 		self.assertEqual(issue["level"], "error")
 		self.assertEqual(
 			issue["text"],
-			f'Price does not match row 2. Every size of {self.color} in "{self.title}" has the same price',
+			f'Price does not match row 2. Every size of {self.color} in "{self.title}" has the same price.',
 		)
 
 	def test_a_plain_price_next_to_a_discounted_price_is_the_original_price(self):

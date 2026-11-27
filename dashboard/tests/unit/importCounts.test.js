@@ -1,12 +1,32 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { doneTitle, importLabel, photoGroupsNeedPhoto, reviewSummary, visibleFilter } from '../../src/data/importCounts.js'
+import {
+  doneTitle,
+  importLabel,
+  photoGroupsHavePhoto,
+  photoGroupsNeedPhoto,
+  reviewSummary,
+  showsOriginalPrice,
+  visibleFilter,
+} from '../../src/data/importCounts.js'
 
 test('the import button counts products, and variants separately', () => {
   assert.equal(importLabel({ products: 1, variants: 6 }), 'Import 1 product (6 variants)')
   assert.equal(importLabel({ products: 2, variants: 1 }), 'Import 2 products (1 variant)')
   assert.equal(importLabel({ products: 3, variants: 0 }), 'Import 3 products')
   assert.equal(importLabel({ products: 1, variants: 0 }), 'Import 1 product')
+})
+
+test('a review with every row skipped never offers to import 0 products', () => {
+  assert.equal(importLabel({ products: 0, variants: 0 }), 'Nothing to import')
+  assert.deepEqual(reviewSummary({ products: 0, variants: 0, warnings: 0, errors: 2 }), ['2 rows skipped'])
+})
+
+test('the original price is struck through only beside a valid lower price', () => {
+  assert.equal(showsOriginalPrice({ sale_price: 500, compare_at_price: 650 }), true)
+  assert.equal(showsOriginalPrice({ sale_price: 500, compare_at_price: 0 }), false)
+  assert.equal(showsOriginalPrice({ sale_price: -5, compare_at_price: 0 }), false)
+  assert.equal(showsOriginalPrice({ sale_price: 0, compare_at_price: 100 }), false)
 })
 
 test('the review summary names problems only when there are some', () => {
@@ -21,6 +41,10 @@ test('a finished import says drafts until they are published', () => {
   assert.equal(doneTitle(4, 4), '4 products are live')
 })
 
+test('a Publish all that published nothing says so instead of "0 products are live"', () => {
+  assert.equal(doneTitle(2, 0), 'No products were published')
+})
+
 test('a review filter whose tab is gone falls back to all rows', () => {
   const options = [{ value: 'all' }, { value: 'ready' }]
   assert.equal(visibleFilter('errors', options), 'all')
@@ -30,4 +54,10 @@ test('a review filter whose tab is gone falls back to all rows', () => {
 test('photo groups are counted as colors, or as products when nothing has a color', () => {
   assert.equal(photoGroupsNeedPhoto(2, 3, true), '2 of 3 colors still need a photo.')
   assert.equal(photoGroupsNeedPhoto(1, 4, false), '1 of 4 products still need a photo.')
+})
+
+test('one photo group is counted in the singular', () => {
+  assert.equal(photoGroupsNeedPhoto(1, 1, false), '1 product still needs a photo.')
+  assert.equal(photoGroupsNeedPhoto(1, 1, true), '1 color still needs a photo.')
+  assert.equal(photoGroupsHavePhoto(1, 1, false), '1 of 1 product has a photo')
 })

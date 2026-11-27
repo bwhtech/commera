@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Alert, Badge, Button, Progress, Spinner } from 'frappe-ui'
+import { Alert, Button, Progress, Spinner } from 'frappe-ui'
 import { closeImport, goToStep, imp } from '../../../data/importFlow'
 import {
   publishAction,
@@ -11,8 +11,10 @@ import {
 } from '../../../data/erpnextImport'
 import { runPercent } from '../../../data/erpnextImportState'
 import { productRoute } from '../../../ia/routes'
-import { productCount } from '../../../data/importCounts'
+import { doneTitle, productCount } from '../../../data/importCounts'
+import ImportResult from '../ImportResult.vue'
 import NotPublishedList from '../NotPublishedList.vue'
+import { __ } from '../../../data/translation'
 
 startErpnextImport()
 
@@ -21,6 +23,17 @@ const failures = computed(() => status.value?.failed ?? [])
 const notPublished = computed(() => imp.erpnext.published?.not_published ?? [])
 const created = computed(() => status.value?.created ?? 0)
 const skipped = computed(() => status.value?.skipped ?? 0)
+const published = computed(() => imp.erpnext.published?.published ?? null)
+
+const doneBody = computed(() => {
+  if (published.value != null) {
+    return notPublished.value.length
+      ? __('{0} could not go live yet. Each one below says what it still needs.', [productCount(notPublished.value.length)])
+      : __('Customers can find them on your store now.')
+  }
+  if (!created.value) return __('Fix the items below in ERPNext, then import them again.')
+  return __('Drafts are not on your store yet. Publish them now, or later from each product page.')
+})
 
 const router = useRouter()
 
@@ -38,7 +51,7 @@ function finish(path) {
   <div class="space-y-6">
     <template v-if="imp.phase === 'running'">
       <div>
-        <h2 class="text-xl-semibold text-ink-gray-9">{{ __('Importing your ERPNext items') }}</h2>
+        <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Importing your ERPNext items') }}</h2>
         <p class="mt-1 text-p-base text-ink-gray-6">{{ __('You can close this window. The import keeps running.') }}</p>
       </div>
 
@@ -81,68 +94,22 @@ function finish(path) {
     </template>
 
     <template v-else>
-      <div class="rounded-6 border border-outline-gray-1 px-6 py-8 text-center">
-        <template v-if="!imp.erpnext.published">
-          <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-gray-2 text-ink-gray-7">
-            <span class="lucide-package-check size-6" aria-hidden="true" />
-          </div>
-          <h2 class="mt-4 text-xl-semibold text-ink-gray-9">{{ created === 1 ? __('1 product added as a draft') : __('{0} products added as drafts', [created]) }}</h2>
-          <p class="mx-auto mt-1.5 max-w-md text-p-base text-ink-gray-6">
-            {{ __('Drafts are not on your store yet. Publish them now, or later from each product page.') }}
-          </p>
-          <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
-            <Button
-              variant="solid"
-              theme="gray"
-              :label="__('Publish all')"
-              :loading="publishAction.loading"
-              @click="publishErpnextImport"
-            />
-            <Button :label="__('View products')" @click="finish('/products')" />
-          </div>
-        </template>
-
-        <template v-else>
-          <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-green-2 text-ink-green-7">
-            <span class="lucide-circle-check size-6" aria-hidden="true" />
-          </div>
-          <h2 class="mt-4 text-xl-semibold text-ink-gray-9">{{ imp.erpnext.published.published === 1 ? __('1 product is live') : __('{0} products are live', [imp.erpnext.published.published]) }}</h2>
-          <p class="mx-auto mt-1.5 max-w-md text-p-base text-ink-gray-6">
+      <ImportResult :published="published" :title="doneTitle(created, published)" :body="doneBody">
+        <template v-if="skipped" #details>
+          <p class="mx-auto mt-1 max-w-md text-p-sm text-ink-gray-5">
             {{
-              notPublished.length
-                ? __('{0} could not go live yet. Each one below says what it still needs.', [productCount(notPublished.length)])
-                : __('Customers can find them on your store now.')
+              skipped === 1
+                ? __('1 item is already a product, so it was left alone.')
+                : __('{0} items are already products, so they were left alone.', [skipped])
             }}
           </p>
-          <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
-            <Button variant="solid" theme="gray" :label="__('View products')" @click="finish('/products')" />
-            <Button :label="__('Back to overview')" @click="finish('/')" />
-          </div>
         </template>
-      </div>
-
-      <!-- One line per count on a phone: three stacked cards would push the lists below off screen. -->
-      <div class="grid grid-cols-3 gap-2 sm:gap-4">
-        <div class="rounded-5 border border-outline-gray-1 p-3 sm:p-4">
-          <div class="text-2xl text-ink-gray-9 tabular-nums">{{ created }}</div>
-          <div class="mt-0.5 text-sm text-ink-gray-5">{{ created === 1 ? __('product created') : __('products created') }}</div>
-        </div>
-        <div class="rounded-5 border border-outline-gray-1 p-3 sm:p-4">
-          <div class="text-2xl text-ink-gray-9 tabular-nums">{{ skipped }}</div>
-          <div class="mt-0.5 text-sm text-ink-gray-5">
-            {{ skipped === 1 ? __('already a product, left alone') : __('already products, left alone') }}
-          </div>
-        </div>
-        <div class="rounded-5 border border-outline-gray-1 p-3 sm:p-4">
-          <div class="flex items-baseline gap-2">
-            <span class="text-2xl tabular-nums" :class="failures.length ? 'text-ink-red-6' : 'text-ink-gray-9'">{{ failures.length }}</span>
-            <Badge v-if="failures.length" class="hidden sm:inline-flex" :label="__('See below')" theme="red" variant="subtle" />
-          </div>
-          <div class="mt-0.5 text-sm text-ink-gray-5">
-            {{ failures.length === 1 ? __('item that did not import') : __('items that did not import') }}
-          </div>
-        </div>
-      </div>
+        <template v-if="published == null && created">
+          <Button :label="__('View products')" @click="finish('/products')" />
+          <Button variant="solid" theme="gray" :label="__('Publish all')" :loading="publishAction.loading" @click="publishErpnextImport" />
+        </template>
+        <Button v-else variant="solid" theme="gray" :label="__('View products')" @click="finish('/products')" />
+      </ImportResult>
 
       <NotPublishedList
         v-if="notPublished.length"
