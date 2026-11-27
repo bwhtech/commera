@@ -10,6 +10,8 @@ const props = defineProps({
   stats: { type: Object, required: true },
   // Stock warnings are for what shoppers can reach; a draft that never went live has nothing to warn about.
   isLive: { type: Boolean, required: true },
+  // A product sold as one item edits its price and stock in the form, so they are not repeated here.
+  isSingleItem: { type: Boolean, default: false },
 })
 
 const ATTENTION_LIMIT = 4
@@ -42,14 +44,14 @@ const lowSizes = computed(() =>
      it here would only raise the question of which copy is real. -->
 <template>
   <div class="divide-y divide-outline-gray-1">
-    <section class="px-4 py-4">
+    <section v-if="!isSingleItem || stats.committed" class="px-4 py-4">
       <h3 class="text-sm text-ink-gray-5">{{ __('At a glance') }}</h3>
       <dl class="mt-3 space-y-2">
-        <div class="flex items-baseline justify-between gap-3">
+        <div v-if="!isSingleItem" class="flex items-baseline justify-between gap-3">
           <dt class="text-base text-ink-gray-6">{{ __('Price') }}</dt>
           <dd class="text-base text-ink-gray-8 tabular-nums">{{ priceLabel }}</dd>
         </div>
-        <div class="flex items-baseline justify-between gap-3">
+        <div v-if="!isSingleItem" class="flex items-baseline justify-between gap-3">
           <dt class="text-base text-ink-gray-6">{{ __('In stock') }}</dt>
           <dd class="text-base text-ink-gray-7 tabular-nums">{{ stats.onHand }}</dd>
         </div>

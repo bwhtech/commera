@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { useEventListener, useMediaQuery } from '@vueuse/core'
-import { Breadcrumbs, Button, Dropdown, ScrollArea, Skeleton, toast } from 'frappe-ui'
+import { Alert, Breadcrumbs, Button, Dropdown, ScrollArea, Skeleton, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PageBody from '../components/PageBody.vue'
@@ -179,12 +179,16 @@ const isMissingPrice = computed(() => {
   return sizes.length > 0 && sizes.some((size) => !hasPrice(priceInputs(size).price))
 })
 
-// A product sold as one item has its Price on the page; otherwise each color's price is in Variants.
+// A product sold as one item has its Price on the page; otherwise each color's price is in Variants,
+// where the first input is a row checkbox, so focus goes to the first price trigger instead.
 function goToPrice() {
   const section = document.getElementById(singleItem.value ? 'product-pricing' : 'product-variants')
   section?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  section?.querySelector('input')?.focus({ preventScroll: true })
+  const target = singleItem.value ? 'input' : '[data-price-cell] button'
+  section?.querySelector(target)?.focus({ preventScroll: true })
 }
+
+const addPriceAction = computed(() => (isMissingPrice.value ? { label: __('Add price'), onClick: goToPrice } : undefined))
 
 async function togglePublish() {
   const publish = !isLive.value
@@ -240,8 +244,10 @@ const breadcrumbs = computed(() => [
   { label: product.value.title },
 ])
 
-// Below lg the rail is hidden, so the two numbers a seller looks for first ride along at the top.
+// Below lg the rail is hidden, so the two numbers a seller looks for first ride along at the top,
+// except on a product sold as one item, whose Price and stock card already shows them.
 // A draft with no stock reads calm, as on the products list.
+const showsGlance = computed(() => !hasRail.value && !singleItem.value)
 const glance = computed(() => {
   const price = priceRange(stats.value.priceLow, stats.value.priceHigh)
   if (stats.value.onHand <= 0 && !isLive.value) return __('{0} · No stock yet', [price])
@@ -330,15 +336,12 @@ const loadFailure = computed(() =>
     <div class="flex min-h-0 flex-1 overflow-hidden">
       <ScrollArea v-scroll-fade class="min-w-0 flex-1">
         <PageBody width="narrow">
-          <div v-if="publishBlocker || !hasRail" class="mb-4 space-y-1">
-            <p v-if="publishBlocker" class="flex flex-wrap items-center gap-x-2 text-p-sm text-ink-gray-6">
-              {{ publishBlocker }}
-              <Button v-if="isMissingPrice" variant="ghost" size="sm" :label="__('Add price')" @click="goToPrice" />
-            </p>
+          <div v-if="publishBlocker || showsGlance || (!hasRail && isDirty && hasErrors)" class="mb-4 space-y-1">
+            <Alert v-if="publishBlocker" theme="amber" :title="publishBlocker" :primary-action="addPriceAction" />
             <p v-if="isDirty && hasErrors" class="text-p-sm text-ink-red-6 md:hidden">
               {{ __('Fix the highlighted fields to save') }}
             </p>
-            <p v-if="!hasRail" class="text-p-sm text-ink-gray-5 tabular-nums">{{ glance }}</p>
+            <p v-if="showsGlance" class="text-p-sm text-ink-gray-5 tabular-nums">{{ glance }}</p>
           </div>
 
           <div class="space-y-6">
@@ -369,7 +372,7 @@ const loadFailure = computed(() =>
       <aside class="hidden w-72 shrink-0 flex-col border-s border-outline-gray-1 lg:flex">
         <ScrollArea v-scroll-fade class="min-h-0 flex-1">
           <ProductOrganization :draft="draft" layout="rail" />
-          <ProductSummaryPanel :product="product" :stats="stats" :is-live="isLive" />
+          <ProductSummaryPanel :product="product" :stats="stats" :is-live="isLive" :is-single-item="Boolean(singleItem)" />
           <PluginSlot v-if="hasRail" :entries="cards" :record="record" frame="rail" @reload="reloadPlugins" />
         </ScrollArea>
       </aside>

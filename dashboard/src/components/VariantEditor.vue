@@ -321,8 +321,10 @@ const sizeColumns = {
         <List v-if="sizesOnlyVariant" class="list-row-px-2" :columns="sizeColumns">
           <ListHeader>
             <ListHeaderCell>{{ __('Size') }}</ListHeaderCell>
-            <ListHeaderCell class="max-sm:hidden">{{ __('Price') }}</ListHeaderCell>
-            <ListHeaderCell class="max-sm:hidden">{{ __('In stock') }}</ListHeaderCell>
+            <!-- ps-1.5 matches the px-1.5 of the price trigger and the stock number, so each header
+                 starts where its values start. -->
+            <ListHeaderCell class="ps-1.5 max-sm:hidden">{{ __('Price') }}</ListHeaderCell>
+            <ListHeaderCell class="ps-1.5 max-sm:hidden">{{ __('In stock') }}</ListHeaderCell>
             <ListHeaderCell />
           </ListHeader>
 
@@ -342,7 +344,7 @@ const sizeColumns = {
                   </span>
                 </button>
               </ListCell>
-              <ListCell class="max-sm:hidden">
+              <ListCell class="max-sm:hidden" data-price-cell>
                 <EditableValue
                   :model-value="priceInputs(size).price ?? 0"
                   :label="__('Price')"
@@ -372,8 +374,8 @@ const sizeColumns = {
         <List v-else v-model:selection="selection" class="list-row-px-2" selectable :columns="columns">
           <ListHeader>
             <ListHeaderCell>{{ optionName || __('Option') }}</ListHeaderCell>
-            <ListHeaderCell class="max-sm:hidden">{{ __('Price') }}</ListHeaderCell>
-            <ListHeaderCell class="max-sm:hidden">{{ __('In stock') }}</ListHeaderCell>
+            <ListHeaderCell class="ps-1.5 max-sm:hidden">{{ __('Price') }}</ListHeaderCell>
+            <ListHeaderCell class="ps-1.5 max-sm:hidden">{{ __('In stock') }}</ListHeaderCell>
             <ListHeaderCell>{{ __('Status') }}</ListHeaderCell>
             <ListHeaderCell />
           </ListHeader>
@@ -410,7 +412,7 @@ const sizeColumns = {
                   </button>
                 </div>
               </ListCell>
-              <ListCell class="max-sm:hidden">
+              <ListCell class="max-sm:hidden" data-price-cell>
                 <!-- One price for the whole color: set_variant_price writes every size under it. -->
                 <EditableValue
                   :model-value="priceInputs(item.sizes[0]).price ?? 0"

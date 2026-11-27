@@ -5,8 +5,7 @@ defineProps({
 })
 </script>
 
-<!-- The one frame every product-page section wears, matching the Options and Variants cards.
-     Basics leaves the title out: its fields are labelled and need no heading above them. -->
+<!-- The one frame every product-page section wears, matching the Options and Variants cards. -->
 <template>
   <section class="rounded-5 border border-outline-gray-1">
     <div v-if="title" class="flex flex-wrap items-start justify-between gap-2 px-4 py-3">

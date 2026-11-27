@@ -10,7 +10,7 @@ defineProps({
 </script>
 
 <template>
-  <ProductSection>
+  <ProductSection :title="__('Details')">
     <div class="space-y-4">
       <FormControl v-model="draft.title" :label="__('Title')" :error="titleError" required />
       <RichTextField

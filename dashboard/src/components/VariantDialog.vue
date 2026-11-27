@@ -34,13 +34,14 @@ watch(
 )
 
 const sizesOnly = computed(() => Boolean(props.variant && isSizesOnly(props.variant)))
-// A sizes-only product has one hidden color, so the dialog is about the product itself.
+// A sizes-only product has one hidden color, so the dialog is about all its sizes. Like "Black /
+// Color of <product>", the title names what is edited and the line under it names the product.
 const title = computed(() => {
   if (!props.variant) return ''
-  return sizesOnly.value ? props.product.title : colorLabel(props.variant)
+  return sizesOnly.value ? __('All sizes') : colorLabel(props.variant)
 })
 const description = computed(() => {
-  if (sizesOnly.value) return __('All sizes of {0}', [props.product.title])
+  if (sizesOnly.value) return __('Sizes of {0}', [props.product.title])
   return __('{0} of {1}', [props.product.option_attribute, props.product.title])
 })
 const priceHint = computed(() => (props.variant ? priceScopeHint(props.variant) : ''))
