@@ -201,7 +201,8 @@ const missingReason = computed(() => {
   if (!hasPrice(price.value)) return __('Enter a price above zero to continue.')
   if (priceError.value) return __('Fix the original price to continue.')
   if (!collection.value) return __('Pick a collection to continue.')
-  if (gridError.value) return gridError.value
+  // The full sentence already sits under the grid; the footer only says what blocks the button.
+  if (gridError.value) return __('Fix the ticked sizes to continue.')
   return ''
 })
 
@@ -269,6 +270,7 @@ async function submit() {
       <Select
         v-model="collection"
         :label="__('Collection')"
+        :description="__('Collections group products in your store, like T-shirts or Candles.')"
         :placeholder="__('Select a collection')"
         :options="collectionOptions"
         :empty-text="__('No collections yet')"
