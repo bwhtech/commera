@@ -534,7 +534,8 @@ def get_product(item_template: str):
 		frappe.get_all(
 			"Style Attribute Variant",
 			filters={"configurator": ["in", [row.name for row in configurators]]},
-			fields=["name", "attribute_value", "display_name", "is_published", "route"],
+			fields=["name", "attribute_value", "display_name", "is_published", "route", "creation"],
+			order_by="creation asc, name asc",
 		)
 		if configurators
 		else []
@@ -542,11 +543,14 @@ def get_product(item_template: str):
 	variant_names = [row.name for row in variants]
 
 	sizes = (
-		frappe.get_all(
-			"Color Size Item",
-			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
-			fields=["parent", "size", "item_code"],
-			order_by="idx asc",
+		sort_by_size_order(
+			frappe.get_all(
+				"Color Size Item",
+				filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
+				fields=["parent", "size", "item_code"],
+				order_by="idx asc",
+			),
+			lambda row: row.size,
 		)
 		if variant_names
 		else []
@@ -556,6 +560,7 @@ def get_product(item_template: str):
 			"Website Slideshow Item",
 			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
 			fields=["parent", "image"],
+			order_by="idx asc",
 		)
 		if variant_names
 		else []
@@ -597,6 +602,7 @@ def get_product(item_template: str):
 			and not sizes_by_variant.get(row.name)
 		)
 	]
+	variants = sort_by_first_item(variants, sizes_by_variant)
 
 	return {
 		"name": template.name,
@@ -625,6 +631,30 @@ def get_product(item_template: str):
 		],
 		"recent_sales": get_recent_product_sales(item_codes),
 	}
+
+
+def sort_by_first_item(variants: list, sizes_by_variant: dict) -> list:
+	"""Colours in the order the seller added them. create_product makes the size items in the order they
+	were typed but the colour rows in whatever order generate_variants groups them, so a colour's first item
+	is the truer clock; a colour with no items falls back to its own creation."""
+	item_codes = [
+		size["item_code"] for sizes in sizes_by_variant.values() for size in sizes if size["item_code"]
+	]
+	created = dict(
+		frappe.get_all(
+			"Item", filters={"name": ["in", item_codes]}, fields=["name", "creation"], as_list=True
+		)
+	)
+
+	def first_created(variant):
+		times = [
+			created[size["item_code"]]
+			for size in sizes_by_variant.get(variant.name, [])
+			if size["item_code"] in created
+		]
+		return (min(times) if times else variant.creation, variant.name)
+
+	return sorted(variants, key=first_created) if item_codes else variants
 
 
 def get_recent_product_sales(item_codes, window_days: int = 30):
@@ -1797,18 +1827,6 @@ def sync_variant_sizes(
 	for row in current_rows:
 		current_by_variant.setdefault(row.parent, []).append((row.size, row.item_code))
 
-	size_rank = {
-		cstr(value).casefold(): rank
-		for rank, value in enumerate(
-			frappe.get_all(
-				"Item Attribute Value",
-				filters={"parent": SIZE_ATTRIBUTE},
-				order_by="idx asc",
-				pluck="attribute_value",
-			)
-		)
-	}
-
 	variants_with_new_sizes = []
 	for variant in variants:
 		option = cstr(variant.attribute_value).casefold()
@@ -1822,7 +1840,7 @@ def sync_variant_sizes(
 			for key, (_option, size) in add_pairs.items()
 			if key[0] == option and key[1] not in listed
 		]
-		wanted.sort(key=lambda row: size_rank.get(cstr(row[0]).casefold(), len(size_rank)))
+		wanted = sort_by_size_order(wanted, lambda row: row[0])
 
 		if any(code in created_codes for _size, code in wanted):
 			variants_with_new_sizes.append(variant.name)
@@ -1836,6 +1854,23 @@ def sync_variant_sizes(
 		variant_doc.save()
 
 	return variants_with_new_sizes
+
+
+def sort_by_size_order(rows: list, get_size) -> list:
+	"""Sizes in the Size attribute's own order (S, M, L), not the order their items were made in. A
+	size the attribute does not list keeps its place after the listed ones."""
+	size_rank = {
+		cstr(value).casefold(): rank
+		for rank, value in enumerate(
+			frappe.get_all(
+				"Item Attribute Value",
+				filters={"parent": SIZE_ATTRIBUTE},
+				order_by="idx asc",
+				pluck="attribute_value",
+			)
+		)
+	}
+	return sorted(rows, key=lambda row: size_rank.get(cstr(get_size(row)).casefold(), len(size_rank)))
 
 
 def price_new_sizes(item_template: str, variant_names: list, existing_item_codes: list) -> None:
@@ -2075,6 +2110,25 @@ def remove_product_image(style_attribute_variant: str, file_url: str):
 		"images": [row.image for row in variant.images],
 		"blockers": get_publish_blockers(variant.sizes),
 	}
+
+
+@frappe.whitelist(methods=["POST"])
+def move_product_image(style_attribute_variant: str, file_url: str, position: int | str = 0):
+	"""Put one photo at a position, 0 being the cover. Undoing a removal puts the photo back where it was."""
+	variant = frappe.get_doc("Style Attribute Variant", style_attribute_variant)
+	variant.check_permission("write")
+	moved = next((row for row in variant.images if row.image == file_url), None)
+	if not moved:
+		frappe.throw(_("Image not found on this variant: {0}").format(file_url))
+
+	rows = [row for row in variant.images if row is not moved]
+	rows.insert(max(0, min(cint(position), len(rows))), moved)
+	for index, row in enumerate(rows, start=1):
+		row.idx = index
+	variant.images = rows
+	variant.save()
+
+	return {"name": variant.name, "images": [row.image for row in variant.images]}
 
 
 @frappe.whitelist(methods=["POST"])
