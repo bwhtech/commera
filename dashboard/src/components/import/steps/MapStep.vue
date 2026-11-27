@@ -5,10 +5,11 @@ import { trySubmit, useAdminAction, useAdminRead } from '../../../data/api'
 import {
   checkMapping,
   imp,
+  isMappingChecked,
   setColumnField,
   setDefaultCollection,
 } from '../../../data/importFlow'
-import { TARGET_FIELDS, fieldLabel, isSameMapping, missingFields } from '../../../data/importMapping'
+import { TARGET_FIELDS, fieldLabel, isSameMapping, stillNeeded } from '../../../data/importMapping'
 import { __ } from '../../../data/translation'
 
 const mapped = computed(() => Object.values(imp.mapping).filter(Boolean).length)
@@ -16,7 +17,9 @@ const mapped = computed(() => Object.values(imp.mapping).filter(Boolean).length)
 const hasCollectionColumn = computed(() => Object.values(imp.mapping).includes('collection'))
 // The collection is listed apart from the columns, so the alert names only the columns still unmatched.
 const missingColumns = computed(() =>
-  missingFields(imp.mapping, imp.defaultCollection).filter((field) => field !== 'collection'),
+  stillNeeded(imp.mapping, imp.defaultCollection, isMappingChecked.value ? imp.missing : []).filter(
+    (field) => field !== 'collection',
+  ),
 )
 
 const collectionsRequest = useAdminRead('catalog.get_collections')

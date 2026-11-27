@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { doneTitle, importLabel, reviewSummary } from '../../src/data/importCounts.js'
+import { doneTitle, importLabel, photoGroupsNeedPhoto, reviewSummary, visibleFilter } from '../../src/data/importCounts.js'
 
 test('the import button counts products, and variants separately', () => {
   assert.equal(importLabel({ products: 1, variants: 6 }), 'Import 1 product (6 variants)')
@@ -19,4 +19,15 @@ test('a finished import says drafts until they are published', () => {
   assert.equal(doneTitle(4, null), '4 products added as drafts')
   assert.equal(doneTitle(0, null), 'No products were added')
   assert.equal(doneTitle(4, 4), '4 products are live')
+})
+
+test('a review filter whose tab is gone falls back to all rows', () => {
+  const options = [{ value: 'all' }, { value: 'ready' }]
+  assert.equal(visibleFilter('errors', options), 'all')
+  assert.equal(visibleFilter('ready', options), 'ready')
+})
+
+test('photo groups are counted as colors, or as products when nothing has a color', () => {
+  assert.equal(photoGroupsNeedPhoto(2, 3, true), '2 of 3 colors still need a photo.')
+  assert.equal(photoGroupsNeedPhoto(1, 4, false), '1 of 4 products still need a photo.')
 })

@@ -1,10 +1,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { Button, Dialog, Spinner, toast } from 'frappe-ui'
+import { DialogDescription, DialogTitle } from 'reka-ui'
 import { canChangeStep, closeImport, imp, isMappingChecked, steps } from '../../data/importFlow'
 import { loadErpnextPreview } from '../../data/erpnextImport'
 import { importLabel } from '../../data/importCounts'
-import { fieldLabel, missingFields } from '../../data/importMapping'
+import { fieldLabel, stillNeeded } from '../../data/importMapping'
 import ImportStepNav from './ImportStepNav.vue'
 import SourceStep from './steps/SourceStep.vue'
 import UploadStep from './steps/UploadStep.vue'
@@ -53,10 +54,11 @@ const assignedPhotos = computed(() =>
 function mapStepBlocker() {
   if (imp.phase === 'checking') return __('Checking your columns…')
   if (imp.checkError) return __('Your columns could not be checked. Try again.')
-  const missing = missingFields(imp.mapping, imp.defaultCollection)
+  const missing = stillNeeded(imp.mapping, imp.defaultCollection, isMappingChecked.value ? imp.missing : [])
   if (missing.includes('collection') && missing.length === 1) return __('Pick a collection for your products.')
   if (missing.length) return __('Match a column to {0} to continue.', [missing.map(fieldLabel).join(', ')])
   if (!isMappingChecked.value) return __('Checking your columns…')
+  if (!imp.counts.total) return __('Your file has no product rows. Add some and upload it again.')
   return ''
 }
 
@@ -117,11 +119,16 @@ function close() {
     <div class="flex max-h-[calc(100dvh-8rem)] flex-col">
       <div class="space-y-3 border-b border-outline-gray-1 px-6 pb-4 pt-3">
         <div class="flex items-center gap-3">
-          <span class="text-base-semibold text-ink-gray-8">{{ __('Import products') }}</span>
+          <!-- bare drops frappe-ui's own header, so the title and description are wired to the
+               dialog through the same reka primitives it would have used. -->
+          <DialogTitle as="h2" class="text-base-semibold text-ink-gray-8">{{ __('Import products') }}</DialogTitle>
           <span v-if="imp.phase === 'running'" class="text-sm text-ink-gray-5">{{ __('Import running…') }}</span>
           <Button class="ms-auto" variant="ghost" icon="lucide-x" :label="__('Close')" @click="close" />
         </div>
         <ImportStepNav v-if="isReady" />
+        <DialogDescription class="sr-only">
+          {{ isReady ? __('Step {0} of {1}: {2}', [imp.step + 1, steps.length, steps[imp.step]?.label]) : __('Loading…') }}
+        </DialogDescription>
       </div>
 
       <div ref="body" v-scroll-fade class="min-h-0 flex-1 overflow-y-auto px-6 py-6">

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { Badge, Button, Progress, Select, Spinner, TabButtons, toast, useFileUpload } from 'frappe-ui'
 import { beginPhase, canChangeStep, endPhase, imp, importParams, isCurrentImport } from '../../../data/importFlow'
-import { photoCount } from '../../../data/importCounts'
+import { photoCount, photoGroupsHavePhoto, photoGroupsNeedPhoto } from '../../../data/importCounts'
 import { useAdminAction, trySubmit } from '../../../data/api'
 import CoachTip from '../CoachTip.vue'
 import { __ } from '../../../data/translation'
@@ -33,6 +33,7 @@ function assignedPhotos(key) {
 const assignedFileUrls = computed(() => new Set(Object.values(imp.imageAssignments).flat()))
 const unplacedFiles = computed(() => imp.imageFiles.filter((file) => !assignedFileUrls.value.has(file.file_url)))
 const groupsWithPhoto = computed(() => groups.value.filter((group) => assignedPhotos(group.key).length).length)
+const hasColors = computed(() => groups.value.some((group) => group.color))
 
 const groupOptions = computed(() => [
   { label: __('Leave unmatched'), value: '' },
@@ -204,7 +205,7 @@ onMounted(() => {
         <p class="text-p-base text-ink-gray-7">
           {{ __('{0} of {1} photos matched.', [assignedFileUrls.size, imp.imageFiles.length]) }}
           <span v-if="groups.length - groupsWithPhoto" class="text-ink-gray-5">
-            {{ __('{0} of {1} still need a photo.', [groups.length - groupsWithPhoto, groups.length]) }}
+            {{ photoGroupsNeedPhoto(groups.length - groupsWithPhoto, groups.length, hasColors) }}
           </span>
         </p>
 
@@ -250,7 +251,7 @@ onMounted(() => {
     <!-- B: one product colour at a time -->
     <template v-else>
       <div class="flex flex-wrap items-center gap-3 rounded-4 border border-outline-gray-1 bg-surface-gray-1 px-3 py-2.5">
-        <span class="text-base text-ink-gray-7">{{ __('{0} of {1} have a photo', [groupsWithPhoto, groups.length]) }}</span>
+        <span class="text-base text-ink-gray-7">{{ photoGroupsHavePhoto(groupsWithPhoto, groups.length, hasColors) }}</span>
         <Progress
           v-if="groups.length"
           :value="Math.round((groupsWithPhoto / groups.length) * 100)"
@@ -307,7 +308,7 @@ onMounted(() => {
         v-if="groups.length >= 10"
         icon="lucide-clock"
         :title="__('Many products to go')"
-        :text="__('For {0} products and colors, adding several named photos at once is far quicker.', [groups.length])"
+        :text="hasColors ? __('For {0} colors, adding several named photos at once is far quicker.', [groups.length]) : __('For {0} products, adding several named photos at once is far quicker.', [groups.length])"
       />
     </template>
   </div>

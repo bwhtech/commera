@@ -26,7 +26,8 @@ function goTo(index) {
         />
       </Tooltip>
     </div>
-    <span class="shrink-0 text-sm tabular-nums text-ink-gray-5">
+    <!-- Read out through the dialog's description (ImportDialog), which also names the step. -->
+    <span class="shrink-0 text-sm tabular-nums text-ink-gray-5" aria-hidden="true">
       {{ __('Step {0} of {1}', [imp.step + 1, steps.length]) }}
     </span>
   </div>

@@ -11,12 +11,16 @@ import {
 } from '../../../data/erpnextImport'
 import { runPercent } from '../../../data/erpnextImportState'
 import { productRoute } from '../../../ia/routes'
+import { productCount } from '../../../data/importCounts'
+import NotPublishedList from '../NotPublishedList.vue'
 
 startErpnextImport()
 
 const status = computed(() => imp.erpnext.status)
 const failures = computed(() => status.value?.failed ?? [])
-const needsSize = computed(() => imp.erpnext.published?.needs_size ?? [])
+const notPublished = computed(() => imp.erpnext.published?.not_published ?? [])
+const created = computed(() => status.value?.created ?? 0)
+const skipped = computed(() => status.value?.skipped ?? 0)
 
 const router = useRouter()
 
@@ -82,7 +86,7 @@ function finish(path) {
           <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-gray-2 text-ink-gray-7">
             <span class="lucide-package-check size-6" aria-hidden="true" />
           </div>
-          <h2 class="mt-4 text-xl-semibold text-ink-gray-9">{{ status?.created === 1 ? __('1 product added as a draft') : __('{0} products added as drafts', [status?.created ?? 0]) }}</h2>
+          <h2 class="mt-4 text-xl-semibold text-ink-gray-9">{{ created === 1 ? __('1 product added as a draft') : __('{0} products added as drafts', [created]) }}</h2>
           <p class="mx-auto mt-1.5 max-w-md text-p-base text-ink-gray-6">
             {{ __('Drafts are not on your store yet. Publish them now, or later from each product page.') }}
           </p>
@@ -105,11 +109,9 @@ function finish(path) {
           <h2 class="mt-4 text-xl-semibold text-ink-gray-9">{{ imp.erpnext.published.published === 1 ? __('1 product is live') : __('{0} products are live', [imp.erpnext.published.published]) }}</h2>
           <p class="mx-auto mt-1.5 max-w-md text-p-base text-ink-gray-6">
             {{
-              needsSize.length === 1
-                ? __('1 product needs a size before it can go live.')
-                : needsSize.length
-                  ? __('{0} need a size before they can go live.', [needsSize.length])
-                  : __('Customers can find them on your store now.')
+              notPublished.length
+                ? __('{0} could not go live yet. Each one below says what it still needs.', [productCount(notPublished.length)])
+                : __('Customers can find them on your store now.')
             }}
           </p>
           <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
@@ -119,43 +121,34 @@ function finish(path) {
         </template>
       </div>
 
-      <div class="grid gap-4 sm:grid-cols-3">
-        <div class="rounded-5 border border-outline-gray-1 p-4">
-          <div class="text-2xl text-ink-gray-9 tabular-nums">{{ status?.created ?? 0 }}</div>
-          <div class="mt-0.5 text-sm text-ink-gray-5">{{ __('products created') }}</div>
+      <!-- One line per count on a phone: three stacked cards would push the lists below off screen. -->
+      <div class="grid grid-cols-3 gap-2 sm:gap-4">
+        <div class="rounded-5 border border-outline-gray-1 p-3 sm:p-4">
+          <div class="text-2xl text-ink-gray-9 tabular-nums">{{ created }}</div>
+          <div class="mt-0.5 text-sm text-ink-gray-5">{{ created === 1 ? __('product created') : __('products created') }}</div>
         </div>
-        <div class="rounded-5 border border-outline-gray-1 p-4">
-          <div class="text-2xl text-ink-gray-9 tabular-nums">{{ status?.skipped ?? 0 }}</div>
-          <div class="mt-0.5 text-sm text-ink-gray-5">{{ __('already products, left alone') }}</div>
-        </div>
-        <div class="rounded-5 border border-outline-gray-1 p-4">
-          <div class="flex items-baseline gap-2">
-            <span class="text-2xl text-ink-red-6 tabular-nums">{{ failures.length }}</span>
-            <Badge v-if="failures.length" :label="__('See below')" theme="red" variant="subtle" />
+        <div class="rounded-5 border border-outline-gray-1 p-3 sm:p-4">
+          <div class="text-2xl text-ink-gray-9 tabular-nums">{{ skipped }}</div>
+          <div class="mt-0.5 text-sm text-ink-gray-5">
+            {{ skipped === 1 ? __('already a product, left alone') : __('already products, left alone') }}
           </div>
-          <div class="mt-0.5 text-sm text-ink-gray-5">{{ __('items that did not import') }}</div>
+        </div>
+        <div class="rounded-5 border border-outline-gray-1 p-3 sm:p-4">
+          <div class="flex items-baseline gap-2">
+            <span class="text-2xl tabular-nums" :class="failures.length ? 'text-ink-red-6' : 'text-ink-gray-9'">{{ failures.length }}</span>
+            <Badge v-if="failures.length" class="hidden sm:inline-flex" :label="__('See below')" theme="red" variant="subtle" />
+          </div>
+          <div class="mt-0.5 text-sm text-ink-gray-5">
+            {{ failures.length === 1 ? __('item that did not import') : __('items that did not import') }}
+          </div>
         </div>
       </div>
 
-      <div v-if="needsSize.length" class="rounded-5 border border-outline-gray-1">
-        <div class="border-b border-outline-gray-1 px-4 py-3 text-base-semibold text-ink-gray-8">
-          {{ needsSize.length === 1 ? __('1 needs a size') : __('{0} need a size', [needsSize.length]) }}
-        </div>
-        <div v-scroll-fade class="max-h-56 divide-y divide-outline-gray-1 overflow-y-auto">
-          <div v-for="product in needsSize" :key="product.item_code" class="flex items-center gap-3 px-4 py-2.5">
-            <div class="min-w-0 flex-1">
-              <div class="truncate text-base text-ink-gray-8">{{ product.item_name }}</div>
-              <div class="truncate text-sm text-ink-gray-5">{{ product.item_code }}</div>
-            </div>
-            <Button
-              variant="subtle"
-              icon-right="lucide-chevron-right rtl:-scale-x-100"
-              :label="__('Add a size')"
-              @click="finish(productRoute(product.item_code))"
-            />
-          </div>
-        </div>
-      </div>
+      <NotPublishedList
+        v-if="notPublished.length"
+        :products="notPublished"
+        @open="(itemTemplate) => finish(productRoute(itemTemplate))"
+      />
 
       <div v-if="failures.length" class="rounded-5 border border-outline-gray-1">
         <div class="border-b border-outline-gray-1 px-4 py-3 text-base-semibold text-ink-gray-8">

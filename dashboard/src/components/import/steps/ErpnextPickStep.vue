@@ -1,18 +1,21 @@
 <script setup>
 import { computed, watch } from 'vue'
-import { Badge, Button, TabButtons } from 'frappe-ui'
+import { Badge, Button, Checkbox, Skeleton, TabButtons } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import { imp } from '../../../data/importFlow'
 import { loadErpnextPreview, loadErpnextSelection, previewRequest } from '../../../data/erpnextImport'
 import { KIND_LABELS, selectedAfter, selectionOnPage } from '../../../data/erpnextImportState'
 import { money } from '../../../data/format'
 import { __ } from '../../../data/translation'
+import { useIsMobile } from '../../../utils/useIsMobile'
 import EmptyState from '../../EmptyState.vue'
 import ListPagination from '../../ListPagination.vue'
 import ListSkeleton from '../../ListSkeleton.vue'
 import SearchInput from '../../SearchInput.vue'
 import Thumb from '../../Thumb.vue'
 import CoachTip from '../CoachTip.vue'
+
+const isMobile = useIsMobile()
 
 loadErpnextSelection()
 loadErpnextPreview()
@@ -32,6 +35,13 @@ const pageSelection = computed({
 })
 
 const allSelected = computed(() => imp.erpnext.selected.length === imp.erpnext.importableCount)
+
+function toggleItem(itemCode, isSelected) {
+  const others = imp.erpnext.selected.filter((code) => code !== itemCode)
+  imp.erpnext.selected = isSelected ? [...others, itemCode] : others
+}
+
+const kindLabel = (item) => KIND_LABELS[item.kind] ?? item.kind
 
 function toggleAll() {
   imp.erpnext.selected = allSelected.value ? [] : [...imp.erpnext.allItemCodes]
@@ -76,10 +86,43 @@ const tabs = computed(() => [
         />
       </div>
 
-      <div class="overflow-x-auto px-2">
+      <!-- Below sm each item is a stacked row: the four columns cannot share 390px, and a sideways
+           scroll hid the price and stock a seller needs before picking. -->
+      <div v-if="isMobile" class="divide-y divide-outline-gray-1">
+        <template v-if="previewRequest.loading && !imp.erpnext.items.length">
+          <div v-for="row in 4" :key="row" class="px-4 py-4" aria-hidden="true">
+            <Skeleton class="h-3.5 w-40 rounded-4" />
+          </div>
+        </template>
+        <template v-else>
+          <label v-for="item in imp.erpnext.items" :key="item.item_code" class="flex items-start gap-3 px-4 py-3">
+            <Checkbox
+              class="mt-2.5"
+              :model-value="imp.erpnext.selected.includes(item.item_code)"
+              :aria-label="__('Import {0}', [item.item_name])"
+              @update:model-value="(isSelected) => toggleItem(item.item_code, isSelected)"
+            />
+            <Thumb :image="item.image" />
+            <div class="min-w-0 flex-1">
+              <div class="truncate text-base text-ink-gray-8">{{ item.item_name }}</div>
+              <!-- Each part carries its own leading dot, so a wrapped line never ends on a separator. -->
+              <div class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-sm text-ink-gray-5">
+                <span>{{ kindLabel(item) }}</span>
+                <span class="whitespace-nowrap">
+                  <span aria-hidden="true">· </span>
+                  <span v-if="item.price" class="tabular-nums text-ink-gray-7">{{ money(item.price) }}</span>
+                  <span v-else class="text-ink-amber-7">{{ __('No price yet') }}</span>
+                </span>
+                <span class="whitespace-nowrap tabular-nums"><span aria-hidden="true">· </span>{{ __('{0} in stock', [item.stock || 0]) }}</span>
+              </div>
+            </div>
+          </label>
+        </template>
+      </div>
+
+      <div v-else class="px-2">
         <List
           v-model:selection="pageSelection"
-          class="min-w-[44rem]"
           selectable
           :columns="['minmax(0,1fr)', '9rem', '7rem', '5rem']"
           :row-height="52"
@@ -105,10 +148,11 @@ const tabs = computed(() => [
                 </div>
               </ListCell>
               <ListCell>
-                <Badge :label="KIND_LABELS[item.kind] ?? item.kind" theme="gray" variant="subtle" />
+                <Badge :label="kindLabel(item)" theme="gray" variant="subtle" />
               </ListCell>
               <ListCell>
-                <span class="text-sm text-ink-gray-7 tabular-nums">{{ item.price ? money(item.price) : '—' }}</span>
+                <span v-if="item.price" class="text-sm text-ink-gray-7 tabular-nums">{{ money(item.price) }}</span>
+                <span v-else class="text-sm text-ink-amber-7">{{ __('No price yet') }}</span>
               </ListCell>
               <ListCell>
                 <span class="text-sm tabular-nums" :class="item.stock ? 'text-ink-gray-7' : 'text-ink-gray-4'">
@@ -141,8 +185,14 @@ const tabs = computed(() => [
     </div>
 
     <div v-else class="overflow-hidden rounded-5 border border-outline-gray-1">
-      <div class="overflow-x-auto px-2">
-        <List class="min-w-[36rem]" :columns="['minmax(0,1fr)', 'minmax(0,16rem)']" :row-height="52">
+      <div v-if="isMobile" class="divide-y divide-outline-gray-1">
+        <div v-for="item in imp.erpnext.skipped" :key="item.item_code" class="px-4 py-3">
+          <div class="truncate text-base text-ink-gray-8">{{ item.item_name }}</div>
+          <p class="mt-0.5 text-p-sm text-ink-gray-6">{{ item.reason }}</p>
+        </div>
+      </div>
+      <div v-else class="px-2">
+        <List :columns="['minmax(0,1fr)', 'minmax(0,16rem)']" :row-height="52">
           <ListHeader>
             <ListHeaderCell>{{ __('Item') }}</ListHeaderCell>
             <ListHeaderCell>{{ __('Why it is skipped') }}</ListHeaderCell>

@@ -23,6 +23,18 @@ export function missingFields(mapping, defaultCollection) {
   return required.filter((field) => !mapped.has(field))
 }
 
+// What the Map step still needs: the fields the mapping on screen lacks, plus any the last check of
+// that same mapping reported, so a check the server answered "missing" can never unlock Continue.
+export function stillNeeded(mapping, defaultCollection, checkedMissing = []) {
+  return [...new Set([...missingFields(mapping, defaultCollection), ...checkedMissing])]
+}
+
+// "Use our suggestions" sends no mapping, so the server guesses again; the collection picked for every
+// row still goes along, or a file without a collection column comes back with no rows checked.
+export function suggestionParams(fileUrl, defaultCollection) {
+  return defaultCollection ? { file_url: fileUrl, default_collection: defaultCollection } : { file_url: fileUrl }
+}
+
 // One column per field: picking a field another column already has moves it here, since the server
 // would only ever read the first of the two.
 export function remapColumn(mapping, header, field) {

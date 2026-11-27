@@ -5,7 +5,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { errorMessage } from './errors'
 import { trySubmit, useAdminAction, useAdminRead } from './api'
 import { canMove, createdProducts, isBusy, nextPhase } from './importPhase'
-import { isSameMapping, remapColumn } from './importMapping'
+import { isSameMapping, remapColumn, suggestionParams } from './importMapping'
 import { stepIndex, stepsFor } from './importSteps'
 
 export const steps = computed(() => stepsFor(imp.source, imp.hasSourceChoice === true))
@@ -173,6 +173,8 @@ export function applyValidation(data, defaultCollection = imp.defaultCollection)
   imp.samples = data.samples
   imp.rows = data.rows
   imp.counts = data.counts
+  // New rows mean new buckets: a filter picked on the old ones may now hide every row.
+  imp.reviewFilter = 'all'
   // Photo groups are product + color, read through the mapping, so a new mapping means the old
   // match may name groups that no longer exist. Images re-matches whenever this is empty.
   imp.imageMatch = null
@@ -193,7 +195,7 @@ export async function checkMapping({ useSuggestions = false } = {}) {
   if (ticket === null) return
   const sentMapping = { ...imp.mapping }
   const sentCollection = imp.defaultCollection
-  const params = useSuggestions ? { file_url: imp.fileUrl } : importParams(sentMapping)
+  const params = useSuggestions ? suggestionParams(imp.fileUrl, sentCollection) : importParams(sentMapping)
   const checked = await trySubmit(validateImportAction, params)
   if (!endPhase(ticket)) return
   if (!checked) {

@@ -16,6 +16,8 @@ import {
 import { useAdminAction, trySubmit } from '../../../data/api'
 import { doneTitle, photoCount, productCount } from '../../../data/importCounts'
 import { __ } from '../../../data/translation'
+import { productRoute } from '../../../ia/routes'
+import NotPublishedList from '../NotPublishedList.vue'
 
 const runImportAction = useAdminAction('imports.run_import')
 
@@ -69,7 +71,7 @@ const notPublished = computed(() => imp.published?.not_published ?? [])
 const doneBody = computed(() => {
   if (published.value != null) {
     return notPublished.value.length
-      ? __('{0} could not go live yet. Open them from your products to finish them.', [productCount(notPublished.value.length)])
+      ? __('{0} could not go live yet. Each one below says what it still needs.', [productCount(notPublished.value.length)])
       : __('Customers can find them on your store now.')
   }
   if (!imp.created.length) return __('Fix the rows below in your file, then import it again.')
@@ -135,6 +137,12 @@ const doneBody = computed(() => {
           <Button v-else variant="solid" theme="gray" :label="__('View products')" @click="finish('/products')" />
         </div>
       </div>
+
+      <NotPublishedList
+        v-if="notPublished.length"
+        :products="notPublished"
+        @open="(itemTemplate) => finish(productRoute(itemTemplate))"
+      />
 
       <div v-if="imp.runRowErrors.length" class="rounded-5 border border-outline-gray-1">
         <div class="border-b border-outline-gray-1 px-4 py-3 text-base-semibold text-ink-gray-8">

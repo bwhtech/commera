@@ -31,3 +31,17 @@ export function doneTitle(created, published) {
 }
 
 export const photoCount = (count) => (count === 1 ? __('1 photo') : __('{0} photos', [count]))
+
+// The Review filter actually applied: one whose tab is gone (its bucket emptied) falls back to all rows.
+export const visibleFilter = (filter, options) => (options.some((option) => option.value === filter) ? filter : 'all')
+
+// Photos are grouped per color of a product, or per product when it has no colors.
+export function photoGroupsHavePhoto(withPhoto, total, hasColors) {
+  return hasColors ? __('{0} of {1} colors have a photo', [withPhoto, total]) : __('{0} of {1} products have a photo', [withPhoto, total])
+}
+
+export function photoGroupsNeedPhoto(missing, total, hasColors) {
+  return hasColors
+    ? __('{0} of {1} colors still need a photo.', [missing, total])
+    : __('{0} of {1} products still need a photo.', [missing, total])
+}

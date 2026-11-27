@@ -1,9 +1,9 @@
 <script setup>
 import { computed } from 'vue'
-import { Badge, TabButtons, Tooltip } from 'frappe-ui'
+import { Badge, TabButtons } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import { imp } from '../../../data/importFlow'
-import { reviewSummary } from '../../../data/importCounts'
+import { reviewSummary, visibleFilter } from '../../../data/importCounts'
 import { money } from '../../../data/format'
 import { __ } from '../../../data/translation'
 import { useIsMobile } from '../../../utils/useIsMobile'
@@ -17,8 +17,6 @@ const filters = {
   warnings: (row) => row.issue?.level === 'warning',
   errors: (row) => row.issue?.level === 'error',
 }
-const filtered = computed(() => imp.rows.filter(filters[imp.reviewFilter] ?? filters.all))
-
 // Only the buckets that hold a row: a Warnings tab that is always empty is noise.
 const filterOptions = computed(() =>
   [
@@ -29,11 +27,18 @@ const filterOptions = computed(() =>
   ].filter(Boolean),
 )
 
+const activeFilter = computed({
+  get: () => visibleFilter(imp.reviewFilter, filterOptions.value),
+  set: (filter) => (imp.reviewFilter = filter),
+})
+const filtered = computed(() => imp.rows.filter(filters[activeFilter.value]))
+
 const summary = computed(() => reviewSummary(imp.counts))
 
 const optionsOf = (row) => [row.color, row.size].filter(Boolean).join(' · ')
 const coverOf = (row) => imp.imageAssignments[row.image_key]?.[0] ?? null
 const priceOf = (row) => (row.sale_price ? money(row.sale_price) : '—')
+const originalPriceOf = (row) => (row.compare_at_price > row.sale_price ? money(row.compare_at_price) : '')
 const statusTheme = (row) => (!row.issue ? 'green' : row.issue.level === 'error' ? 'red' : 'amber')
 const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'error' ? __('Skipped') : __('Warning'))
 </script>
@@ -54,7 +59,7 @@ const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'er
       </template>
     </p>
 
-    <TabButtons v-if="filterOptions.length > 2" v-model="imp.reviewFilter" :options="filterOptions" />
+    <TabButtons v-if="filterOptions.length > 2" v-model="activeFilter" :options="filterOptions" />
 
     <div class="overflow-hidden rounded-5 border border-outline-gray-1">
       <!-- Below sm each row is a stacked card: the five columns cannot share 390px, and the
@@ -68,7 +73,9 @@ const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'er
               <Badge class="shrink-0" :label="statusLabel(item)" :theme="statusTheme(item)" variant="subtle" />
             </div>
             <div class="mt-0.5 text-sm text-ink-gray-5">
-              {{ [optionsOf(item), priceOf(item), __('Row {0}', [item.row])].filter(Boolean).join(' · ') }}
+              {{ [optionsOf(item), priceOf(item)].filter(Boolean).join(' · ') }}
+              <s v-if="originalPriceOf(item)" class="ms-1 text-ink-gray-4">{{ originalPriceOf(item) }}</s>
+              · {{ __('Row {0}', [item.row]) }}
             </div>
             <p v-if="item.issue" class="mt-1 text-p-sm text-ink-gray-7">{{ item.issue.text }}</p>
           </div>
@@ -76,7 +83,8 @@ const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'er
       </div>
 
       <div v-else class="px-2">
-        <List :columns="['minmax(0,1fr)', '9rem', '7rem', '5rem', 'minmax(0,14rem)']" :row-height="52">
+        <!-- Rows grow with their problem text, which wraps under the badge instead of hiding in a tooltip. -->
+        <List :columns="['minmax(0,1fr)', '9rem', '8rem', '4rem', 'minmax(0,16rem)']">
           <ListHeader>
             <ListHeaderCell>{{ __('Product') }}</ListHeaderCell>
             <ListHeaderCell>{{ __('Collection') }}</ListHeaderCell>
@@ -98,18 +106,18 @@ const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'er
                 </div>
               </ListCell>
               <ListCell><span class="truncate text-sm text-ink-gray-7">{{ item.collection || '—' }}</span></ListCell>
-              <ListCell><span class="text-sm tabular-nums text-ink-gray-7">{{ priceOf(item) }}</span></ListCell>
+              <ListCell>
+                <span class="text-sm tabular-nums text-ink-gray-7">{{ priceOf(item) }}</span>
+                <s v-if="originalPriceOf(item)" class="ms-1.5 text-sm tabular-nums text-ink-gray-4">{{ originalPriceOf(item) }}</s>
+              </ListCell>
               <ListCell>
                 <span class="text-sm tabular-nums" :class="item.stock ? 'text-ink-gray-7' : 'text-ink-gray-4'">{{ item.stock || 0 }}</span>
               </ListCell>
               <ListCell>
-                <Badge v-if="!item.issue" :label="statusLabel(item)" :theme="statusTheme(item)" variant="subtle" />
-                <Tooltip v-else :text="item.issue.text">
-                  <div class="flex min-w-0 items-center gap-1.5">
-                    <Badge class="shrink-0" :label="statusLabel(item)" :theme="statusTheme(item)" variant="subtle" />
-                    <span class="truncate text-sm text-ink-gray-6">{{ item.issue.text }}</span>
-                  </div>
-                </Tooltip>
+                <div class="min-w-0 py-2">
+                  <Badge :label="statusLabel(item)" :theme="statusTheme(item)" variant="subtle" />
+                  <p v-if="item.issue" class="mt-1 text-p-sm text-ink-gray-6">{{ item.issue.text }}</p>
+                </div>
               </ListCell>
             </ListRow>
           </ListRows>
