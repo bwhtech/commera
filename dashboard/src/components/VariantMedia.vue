@@ -11,6 +11,8 @@ import { __ } from '../data/translation'
 
 const props = defineProps({
   variant: { type: Object, required: true },
+  // One row among several colors: no big drop zone, only the strip with its add tile.
+  compact: { type: Boolean, default: false },
 })
 const emit = defineEmits(['saved'])
 
@@ -20,6 +22,8 @@ const removeAction = useAdminAction('catalog.remove_product_image')
 const moveAction = useAdminAction('catalog.move_product_image')
 
 const isPlaceholder = computed(() => props.variant.option === PLACEHOLDER_OPTION)
+
+const addLabel = computed(() => (isPlaceholder.value ? __('Add photo') : __('Add photos of {0}', [props.variant.option])))
 
 const fileInput = ref(null)
 const lastRemoved = ref(null)
@@ -103,7 +107,7 @@ function photoActions(image, index) {
   <div>
     <input ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="onFilePicked" />
     <button
-      v-if="!variant.images.length"
+      v-if="!variant.images.length && !compact"
       class="flex min-h-20 w-full flex-col items-center justify-center gap-2 rounded-4 border border-dashed border-outline-gray-2 px-4 py-4 text-center hover:bg-surface-gray-1"
       :disabled="isUploading"
       @click="fileInput.click()"
@@ -155,7 +159,7 @@ function photoActions(image, index) {
 
       <button
         class="grid size-20 place-content-center rounded-4 border border-dashed border-outline-gray-2 text-ink-gray-5 hover:bg-surface-gray-1"
-        :aria-label="__('Add photo')"
+        :aria-label="addLabel"
         :disabled="isUploading"
         @click="fileInput.click()"
       >
