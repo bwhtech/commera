@@ -179,7 +179,9 @@ async function togglePublish() {
   const result = publishAction.data
   productRequest.reload()
   if (result.skipped.length) {
-    toast.warning(__('Live, except {0}: add a size to publish it.', [result.skipped.join(', ')]))
+    const options = result.skipped.map((skipped) => skipped.option).join(', ')
+    const reasons = [...new Set(result.skipped.flatMap((skipped) => skipped.blockers))].join('. ')
+    toast.warning(__('Live, except {0}. {1}.', [options, reasons]))
   } else {
     toast.success(publish ? __('Live on your store') : __('Back to draft. Shoppers cannot see it.'))
   }

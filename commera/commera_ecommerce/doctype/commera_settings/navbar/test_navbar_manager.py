@@ -535,7 +535,23 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 		}
 		if sizes:
 			variant["sizes"] = [{"size": "S", "item_code": item_code}]
+			cls.make_price(item_code)
 		return frappe.get_doc(variant).insert(ignore_permissions=True).name
+
+	@classmethod
+	def make_price(cls, item_code):
+		"""A color goes live only when it has a price (catalog.get_publish_blockers)."""
+		price_list = frappe.get_cached_doc("Commera Settings").default_price_list
+		if frappe.db.exists("Item Price", {"item_code": item_code, "price_list": price_list}):
+			return
+		frappe.get_doc(
+			{
+				"doctype": "Item Price",
+				"item_code": item_code,
+				"price_list": price_list,
+				"price_list_rate": 100,
+			}
+		).insert(ignore_permissions=True)
 
 	@classmethod
 	def build_menu(cls):

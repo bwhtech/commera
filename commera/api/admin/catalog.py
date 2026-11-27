@@ -16,6 +16,7 @@ from commera.api.variant_pricing import (
 	get_selling_price_lists,
 	set_variant_prices,
 )
+from commera.base_prices import get_public_rates
 from commera.data.store_options import SUPERSEDED_VALUES
 from commera.plugin_events import add_changed_products
 from commera.product_collections import (
@@ -603,6 +604,7 @@ def get_product(item_template: str):
 		)
 	]
 	variants = sort_by_first_item(variants, sizes_by_variant)
+	blockers = get_publish_blockers([row.name for row in variants])
 
 	return {
 		"name": template.name,
@@ -625,7 +627,7 @@ def get_product(item_template: str):
 				"storefront_url": get_url(f"/products/{row.route}") if row.route else None,
 				"sizes": sizes_by_variant.get(row.name, []),
 				"images": images_by_variant.get(row.name, []),
-				"blockers": get_publish_blockers(sizes_by_variant.get(row.name, [])),
+				"blockers": blockers[row.name],
 			}
 			for row in variants
 		],
@@ -811,8 +813,42 @@ def get_item_templates_by_item_code(item_codes):
 	return {row[0]: row[1] for row in rows}
 
 
-def get_publish_blockers(sizes):
-	return [] if sizes else [_("Add at least one size")]
+def get_publish_blockers(variant_names: list) -> dict[str, list[str]]:
+	"""What keeps each color off the store, by Style Attribute Variant name: no sizes, or a size a shopper
+	cannot pay for. Every publish path asks here, so the rules live in one place."""
+	if not variant_names:
+		return {}
+
+	item_codes_by_variant = {name: [] for name in variant_names}
+	for chunk in create_batch(list(item_codes_by_variant), IN_CLAUSE_CHUNK_SIZE):
+		for row in frappe.get_all(
+			"Color Size Item",
+			filters={"parent": ["in", chunk], "parenttype": "Style Attribute Variant"},
+			fields=["parent", "item_code"],
+		):
+			item_codes_by_variant[row.parent].append(cstr(row.item_code))
+
+	rates = get_buyable_rates([code for codes in item_codes_by_variant.values() for code in codes])
+	blockers = {}
+	for name, item_codes in item_codes_by_variant.items():
+		if not item_codes:
+			blockers[name] = [_("Add at least one size")]
+		elif any(rates.get(item_code, 0) <= 0 for item_code in item_codes):
+			blockers[name] = [_("Add a price before publishing")]
+		else:
+			blockers[name] = []
+	return blockers
+
+
+def get_buyable_rates(item_codes: list) -> dict[str, float]:
+	"""The rate a shopper pays today per item, as the storefront reads it (template rows included): the
+	sale list where it has a row, else the default list. An item with neither is missing."""
+	settings = frappe.get_cached_doc("Commera Settings")
+	sale_rates, default_rates = {}, {}
+	for row in get_public_rates(item_codes, [settings.default_price_list, settings.sale_price_list]):
+		rates = sale_rates if row.price_list == settings.sale_price_list else default_rates
+		rates[cstr(row.item_code)] = flt(row.rate)
+	return {**default_rates, **sale_rates}
 
 
 @frappe.whitelist()
@@ -2086,7 +2122,7 @@ def set_variant_published(style_attribute_variant: str, publish: int | str):
 
 	publish = cint(publish)
 	if publish:
-		blockers = get_publish_blockers(variant.sizes)
+		blockers = get_publish_blockers([variant.name])[variant.name]
 		if blockers:
 			frappe.throw(_("Cannot publish yet: {0}").format(", ".join(blockers)))
 
@@ -2106,7 +2142,7 @@ def add_product_images(style_attribute_variant: str, file_urls: list | str):
 	return {
 		"name": variant.name,
 		"images": [row.image for row in variant.images],
-		"blockers": get_publish_blockers(variant.sizes),
+		"blockers": get_publish_blockers([variant.name])[variant.name],
 	}
 
 
@@ -2119,7 +2155,7 @@ def remove_product_image(style_attribute_variant: str, file_url: str):
 	return {
 		"name": variant.name,
 		"images": [row.image for row in variant.images],
-		"blockers": get_publish_blockers(variant.sizes),
+		"blockers": get_publish_blockers([variant.name])[variant.name],
 	}
 
 
@@ -2206,15 +2242,14 @@ def set_product_published(item_template: str, publish: int | str):
 	)
 	variant_names = [row.name for row in variants]
 
-	# Two queries for the whole set; loading each variant to count images and sizes is a read per row.
-	ready = get_ready_variant_names(variant_names) if publish else set(variant_names)
+	blockers = get_publish_blockers(variant_names) if publish else {}
 
 	updated = []
 	skipped = []
 	for row in variants:
 		label = row.attribute_value or row.display_name
-		if row.name not in ready:
-			skipped.append(label)
+		if blockers.get(row.name):
+			skipped.append({"option": label, "blockers": blockers[row.name]})
 			continue
 
 		# ponytail: one save per option so validation and route generation still run,
@@ -2225,20 +2260,6 @@ def set_product_published(item_template: str, publish: int | str):
 		updated.append(label)
 
 	return {"updated": updated, "skipped": skipped}
-
-
-def get_ready_variant_names(variant_names):
-	if not variant_names:
-		return set()
-
-	return {
-		row.parent
-		for row in frappe.get_all(
-			"Color Size Item",
-			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
-			fields=["parent"],
-		)
-	}
 
 
 def get_unpublishable_options(limit: int = 5):
@@ -2253,15 +2274,7 @@ def get_unpublishable_options(limit: int = 5):
 	if not variants:
 		return []
 
-	variant_names = [row.name for row in variants]
-	sized_variants = {
-		row.parent
-		for row in frappe.get_all(
-			"Color Size Item",
-			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
-			fields=["parent"],
-		)
-	}
+	blockers_by_variant = get_publish_blockers([row.name for row in variants])
 
 	templates_by_configurator = {
 		row.name: row.item_template
@@ -2282,7 +2295,7 @@ def get_unpublishable_options(limit: int = 5):
 
 	blocked = []
 	for row in variants:
-		blockers = get_publish_blockers(row.name in sized_variants)
+		blockers = blockers_by_variant[row.name]
 		if not blockers:
 			continue
 
