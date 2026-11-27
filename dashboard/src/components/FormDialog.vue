@@ -1,12 +1,16 @@
 <script setup>
 /**
- * A create or edit dialog whose footer never leaves the screen: a title row, a body that scrolls,
- * and Cancel + one primary task verb. A disabled primary names its reason on the same footer.
+ * A create or edit dialog whose footer never leaves the screen: a title row (with an optional
+ * description under it), a body that scrolls, and Cancel + one primary task verb. A disabled
+ * primary names its reason on the same footer.
  */
 import { Button, Dialog } from 'frappe-ui'
+import { DialogDescription, DialogTitle } from 'reka-ui'
 
 const props = defineProps({
   title: { type: String, required: true },
+  // One quiet line under the title, outside the scrolling body, such as "Color of Cotton tee".
+  description: { type: String, default: '' },
   size: { type: String, default: 'xl' },
   primaryLabel: { type: String, required: true },
   primaryDisabled: { type: Boolean, default: false },
@@ -27,9 +31,16 @@ const emit = defineEmits(['submit'])
          6rem and the body scrolls in the rest. dvh, not vh: on a phone vh is the height with the
          address bar hidden, which would push the footer off. -->
     <div class="flex max-h-[calc(100dvh-6rem)] flex-col">
-      <div class="flex items-center gap-3 px-4 pb-4 pt-5 sm:px-6">
-        <h2 class="min-w-0 flex-1 text-2xl-semibold text-ink-gray-8">{{ props.title }}</h2>
+      <div class="flex items-start gap-3 px-4 pb-4 pt-5 sm:px-6">
+        <div class="min-w-0 flex-1">
+          <!-- reka's primitives carry the ids the dialog's aria-labelledby / aria-describedby point at. -->
+          <DialogTitle class="text-2xl-semibold text-ink-gray-8">{{ props.title }}</DialogTitle>
+          <DialogDescription v-if="props.description" class="mt-1 text-p-sm text-ink-gray-5">
+            {{ props.description }}
+          </DialogDescription>
+        </div>
         <Button
+          class="-mt-0.5"
           variant="ghost"
           icon="lucide-x"
           :aria-label="__('Close')"
@@ -45,14 +56,16 @@ const emit = defineEmits(['submit'])
       <div
         class="flex flex-col gap-3 border-t border-outline-gray-1 px-4 py-4 sm:flex-row sm:items-center sm:px-6"
       >
-        <p
-          v-if="props.reason || props.note"
+        <!-- With no header description, the footer line describes the dialog. It stays in the DOM
+             (hidden when empty) so aria-describedby never points at a missing element. -->
+        <component
+          :is="props.description ? 'p' : DialogDescription"
           class="min-w-0 flex-1 text-p-sm"
-          :class="props.reason ? 'text-ink-gray-7' : 'text-ink-gray-5'"
+          :class="[props.reason ? 'text-ink-gray-7' : 'text-ink-gray-5', { hidden: !props.reason && !props.note }]"
           aria-live="polite"
         >
           {{ props.reason || props.note }}
-        </p>
+        </component>
         <div class="flex items-center justify-end gap-2 sm:ms-auto">
           <Button :label="__('Cancel')" :disabled="props.loading" @click="open = false" />
           <Button
