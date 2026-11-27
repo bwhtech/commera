@@ -1,5 +1,5 @@
 <script setup>
-import { computed, defineAsyncComponent, provide, shallowReactive } from 'vue'
+import { computed, defineAsyncComponent, provide, ref, shallowReactive } from 'vue'
 import { START_LOCATION, routeLocationKey } from 'vue-router'
 import { FrappeUIProvider } from 'frappe-ui'
 import { isAdmin } from './data/boot'
@@ -19,6 +19,10 @@ import LanguageDialog from './components/LanguageDialog.vue'
 const isMobileViewport = useIsMobile()
 const MobileLayout = defineAsyncComponent(() => import('./components/MobileLayout.vue'))
 const Layout = computed(() => (isMobileViewport.value ? MobileLayout : AppShell))
+// The page renders once, outside both shells, and is teleported into whichever one is up: swapping
+// shells at the breakpoint would otherwise remount the page and drop whatever it held unsaved.
+const pageOutlet = ref(null)
+const isShellPage = computed(() => !onboardingOpen.value && !visibleRoute.value.meta.fullscreen)
 const OnboardingFlow = defineAsyncComponent(() => import('./components/onboarding/OnboardingFlow.vue'))
 
 // The add-product dialog reads collections and attributes as it mounts, which only exist once the
@@ -41,8 +45,14 @@ provide(routeLocationKey, shallowReactive(shellRoute))
     <OnboardingFlow v-if="onboardingOpen" />
     <router-view v-else-if="visibleRoute.meta.fullscreen" :route="visibleRoute" />
     <component :is="Layout" v-else>
-      <router-view :route="visibleRoute" />
+      <div ref="pageOutlet" class="contents" />
     </component>
+    <!-- Between shells (the phone one loads lazily) the page waits here, hidden but still mounted. -->
+    <div v-if="isShellPage" hidden>
+      <Teleport :to="pageOutlet" :disabled="!pageOutlet">
+        <router-view :route="visibleRoute" />
+      </Teleport>
+    </div>
 
     <!-- One instance for the whole app, outside the layout so both shells reach
          them; opened from the workspace menu and the sidebar footer. Settings and search
