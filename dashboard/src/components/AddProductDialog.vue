@@ -10,7 +10,6 @@ import { Button, ErrorMessage, FormControl, Select, dialog, toast } from 'frappe
 import { useRouter } from 'vue-router'
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { addProduct, closeAddProduct } from '../data/addProduct'
-import { symbolFor } from '../data/format'
 import { newProductOptionSizes } from '../data/optionSizes'
 import { hasPrice, originalPriceError, priceInputRates } from '../data/product'
 import { productRoute } from '../ia/routes'
@@ -18,15 +17,14 @@ import { __ } from '../data/translation'
 import AttributeMultiSelect from './AttributeMultiSelect.vue'
 import FormDialog from './FormDialog.vue'
 import OptionSizeGrid from './OptionSizeGrid.vue'
+import PriceFields from './PriceFields.vue'
 
 const router = useRouter()
-const currencySymbol = symbolFor()
 
 const title = ref('')
 const titleError = ref('')
 const price = ref(null)
 const originalPrice = ref(null)
-const showOriginalPrice = ref(false)
 const collection = ref('')
 const showOptions = ref(false)
 const showOtherOptions = ref(false)
@@ -68,7 +66,6 @@ async function resetForm() {
   titleError.value = ''
   price.value = null
   originalPrice.value = null
-  showOriginalPrice.value = false
   clearOptions()
   collection.value = ''
   collectionsRequest.reload()
@@ -154,7 +151,9 @@ const variantCount = computed(() =>
 // grid, and still the owner forgetting a row — create_product refuses that pairing for the same reason.
 const sizelessOptions = computed(() => (sizes.value.length ? optionSizes.value.filter((row) => !row.sizes.length) : []))
 const gridError = computed(() =>
-  sizelessOptions.value.length ? __('Pick at least one size for {0}', [sizelessOptions.value[0].option]) : '',
+  sizelessOptions.value.length
+    ? __('{0} has no sizes ticked. Tick one, or remove {0} from {1}.', [sizelessOptions.value[0].option, optionAttribute.value])
+    : '',
 )
 
 const priceError = computed(() => originalPriceError({ price: price.value, originalPrice: originalPrice.value }))
@@ -183,6 +182,14 @@ const summary = computed(() => {
   return ''
 })
 
+// Names the option the owner picked (Material, not "color") and only the axes in use.
+const optionsHint = computed(() => {
+  const option = optionAttribute.value.toLowerCase()
+  if (colors.value.length && !sizes.value.length) return __('Each {0} is a variant you sell and stock.', [option])
+  if (sizes.value.length && !colors.value.length) return __('Each size is a variant you sell and stock.')
+  return __('Each {0} and size pair is a variant you sell and stock.', [option])
+})
+
 const createAction = useAdminAction('catalog.create_product')
 
 // The price is required. create_product only writes Item Prices for a rate above zero, so a product
@@ -190,8 +197,9 @@ const createAction = useAdminAction('catalog.create_product')
 // The first thing still missing is named next to the button, so a disabled button is never silent.
 const missingReason = computed(() => {
   if (!title.value.trim()) return __('Add a title to continue.')
+  if (titleError.value) return __('Change the title to continue.')
   if (!hasPrice(price.value)) return __('Enter a price above zero to continue.')
-  if (priceError.value) return priceError.value
+  if (priceError.value) return __('Fix the original price to continue.')
   if (!collection.value) return __('Pick a collection to continue.')
   if (gridError.value) return gridError.value
   return ''
@@ -252,46 +260,11 @@ async function submit() {
         required
       />
 
-      <div>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormControl
-            v-model.number="price"
-            type="number"
-            inputmode="decimal"
-            :label="__('Price')"
-            placeholder="0"
-            required
-          >
-            <template #prefix>
-              <span class="text-base text-ink-gray-5">{{ currencySymbol }}</span>
-            </template>
-          </FormControl>
-          <FormControl
-            v-if="showOriginalPrice"
-            v-model.number="originalPrice"
-            type="number"
-            inputmode="decimal"
-            :label="__('Original price')"
-            :description="__('Shown crossed out next to the price. Must be higher than the price.')"
-            :error="priceError"
-            placeholder="0"
-          >
-            <template #prefix>
-              <span class="text-base text-ink-gray-5">{{ currencySymbol }}</span>
-            </template>
-          </FormControl>
-        </div>
-        <!-- -ms-2 lines the ghost button's text up with the field labels above: the button's own
-             px-2 padding would otherwise indent it. Recheck if frappe-ui changes Button padding. -->
-        <Button
-          v-if="!showOriginalPrice"
-          class="mt-1.5 -ms-2"
-          variant="ghost"
-          icon-left="lucide-plus"
-          :label="__('Add original price')"
-          @click="showOriginalPrice = true"
-        />
-      </div>
+      <PriceFields
+        v-model:price="price"
+        v-model:original-price="originalPrice"
+        :original-price-error="priceError"
+      />
 
       <Select
         v-model="collection"
@@ -328,7 +301,7 @@ async function submit() {
           <div class="min-w-0 flex-1">
             <h3 class="text-base-semibold text-ink-gray-8">{{ __('Options') }}</h3>
             <p class="mt-0.5 text-p-sm text-ink-gray-5">
-              {{ __('Each color and size pair is a variant you sell and stock.') }}
+              {{ optionsHint }}
             </p>
           </div>
           <Button variant="ghost" :label="__('Remove')" @click="clearOptions" />
@@ -359,7 +332,7 @@ async function submit() {
             variant="ghost"
             size="sm"
             icon-left="lucide-arrow-left-right"
-            :label="__('Use another option, like Material')"
+            :label="__('Use a different option')"
             @click="showOtherOptions = true"
           />
         </div>
